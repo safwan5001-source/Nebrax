@@ -6,8 +6,8 @@ import { ReceiptDialog, type Receipt } from './receipt-dialog';
 
 const { printDocument, documentView } = vi.hoisted(() => ({
   printDocument: vi.fn(),
-  documentView: vi.fn(({ templateId, themeId, showLogo }: { templateId: string; themeId?: string; showLogo?: boolean }) => (
-    <div data-show-logo={String(showLogo)} data-template-id={templateId} data-theme-id={themeId ?? ''} />
+  documentView: vi.fn(({ templateId, themeId, showLogo, rootId }: { templateId: string; themeId?: string; showLogo?: boolean; rootId?: string }) => (
+    <div id={rootId} data-show-logo={String(showLogo)} data-template-id={templateId} data-theme-id={themeId ?? ''} />
   )),
 }));
 
@@ -114,5 +114,41 @@ describe('ReceiptDialog', () => {
     expect(next.className).toMatch(/min-h-11/);
     fireEvent.click(next);
     expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it('PR-4: وضع المعاينة يستبدل إطار «تم البيع» بعنوان محايد وزر «إغلاق» بدل «بيع جديد»، مع إتاحة نسخ رقم الفاتورة', () => {
+    const onClose = vi.fn();
+    const onCopy = vi.fn();
+    render(<ReceiptDialog receipt={receipt('tax-invoice-thermal80')} variant="preview" onCopy={onCopy} onClose={onClose} />);
+
+    const dialog = screen.getByRole('dialog', { name: 'receipt_preview_title' });
+    expect(dialog).toBeTruthy();
+    const preview = screen.getByTestId('pos-receipt-preview');
+    expect(preview.textContent).toContain('receipt_preview_title');
+    expect(preview.textContent).not.toContain('receipt_done');
+    expect(preview.querySelector('.text-positive')).toBeNull();
+
+    expect(screen.queryByRole('button', { name: 'new_sale' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'close' }));
+    expect(onClose).toHaveBeenCalledOnce();
+
+    fireEvent.click(screen.getByRole('button', { name: 'receipt_copy_number' }));
+    expect(onCopy).toHaveBeenCalledOnce();
+  });
+
+  it('PR-4: البيع الناجح لا يتأثر بفشل الطباعة — تُعرض حالة فشل صريحة والزرّ يبقى متاحاً لإعادة المحاولة', () => {
+    printDocument.mockImplementationOnce(() => { throw new Error('print unavailable'); });
+    render(<ReceiptDialog receipt={receipt('tax-invoice-thermal80')} onClose={() => undefined} />);
+
+    expect(screen.queryByTestId('pos-receipt-print-error')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'print' }));
+    expect(screen.getByTestId('pos-receipt-print-error').textContent).toContain('print_failed');
+    // البيع نفسه يبقى ناجحاً — رقم الفاتورة والإجمالي ما زالا معروضين كما هما، لا إعادة تحقق.
+    expect(screen.getByTestId('pos-receipt-success').textContent).toContain('POS-2026-0001');
+
+    // إعادة المحاولة ممكنة ومستقلة عن أي عملية بيع جديدة.
+    fireEvent.click(screen.getByRole('button', { name: 'print' }));
+    expect(screen.queryByTestId('pos-receipt-print-error')).toBeNull();
+    expect(printDocument).toHaveBeenCalledTimes(2);
   });
 });
