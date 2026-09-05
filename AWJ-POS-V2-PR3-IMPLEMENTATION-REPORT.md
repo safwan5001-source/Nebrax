@@ -336,6 +336,161 @@ None required for PR-3's approved scope. PR-4 through PR-8 (Invoice Center, paym
 redesign, return/refund workspace, session reconciliation, hardware/production hardening,
 mobile category-strip redesign) remain entirely untouched and are not started.
 
+## Review Follow-up — Cart Proportion & Selected-Line Controls
+
+Safwan/ChatGPT reviewed the first implementation (head `4c3bec9bcadcd887f31eb9ffd6189157f2d54a2d`)
+and requested a narrow correction, not new scope: restore the originally-approved interaction
+contract — a ~1/3-workspace cart, and a single central selected-line control bar instead of an
+inline per-row editor. This section documents that correction.
+
+### Why the first implementation was corrected
+
+1. **Width was a fixed px target, not a proportion.** The first pass widened the cart column to
+   fixed `minmax(400px,480px)`/`minmax(320px,400px)` values. That is a fixed maximum, not "≈1/3 of
+   the workspace" — at very wide screens the cart would fall well short of a third; the review
+   asked for a true proportion.
+2. **The inline Fixed/% toggle lived inside every cart row.** That duplicated an editor per line
+   and worked against AWJ's dense, compact row style — the approved UX is a single central control
+   bar for the *selected* line, not a form embedded in every row.
+
+### Exact width fix
+
+`POS_SALE_GRID_CLASS` (`lg:`/`xl:` tiers only — `md:`/tablet and mobile untouched) changed from
+fixed-px `minmax()` targets to an `fr`-based ratio, so the cart and product columns split the
+**usable workspace (cart + products, excluding the fixed-width categories rail)** at a true 1:2
+ratio — approximately one third to the cart, two thirds to products, at any screen width, instead
+of capping out at a fixed pixel number:
+
+```diff
+- lg:grid-cols-[minmax(320px,400px)_minmax(0,1fr)_104px] xl:grid-cols-[minmax(400px,480px)_minmax(0,1fr)_148px]
++ lg:grid-cols-[minmax(280px,1fr)_minmax(0,2fr)_104px] xl:grid-cols-[minmax(320px,1fr)_minmax(0,2fr)_148px]
+```
+
+**Measured in real Chromium** (`getBoundingClientRect()` on the cart `<aside>` — the earlier
+`w-full` stretch-fix remains in place and is still required for this to work):
+
+| Viewport | Cart width | Product width | Cart % of workspace (cart+products) |
+|---|---|---|---|
+| 900px (md, unchanged) | 340px | remainder | n/a — proportion applies only to lg/xl |
+| 1100px (lg) | 332px | 664px | 33.3% |
+| 1280px (xl boundary) | 377.3px | 754.7px | 33.3% |
+| 1440px (xl) | 430.7px | 861.3px | 33.3% |
+| 1920px (xl) | **590.66px** | **1181.34px** | **33.33%** (measured exactly: 590.65625 / 1772 = 0.3333) |
+
+The ratio holds constant across every tested width because it comes from the CSS grid `fr` unit
+distribution, not a capped pixel value — this is what "a workspace proportion, not a fixed target"
+means in the grid architecture, achieved with a one-line change to an existing constant.
+
+### Central bottom-control-bar architecture
+
+Removed entirely: the inline Fixed/%% toggle + two numeric inputs + per-row quantity stepper +
+per-row unit-price input + per-row delete icon that the first pass had rendered inside every cart
+line (~110 lines of duplicated-per-row JSX).
+
+Added: one compact control bar rendered once, directly below the cart-lines list, operating
+exclusively on `cart.find(l => l.key === selectedLineKey)` — **no new selection state**, the
+existing `selectedLineKey`/`setSelectedLineKey` (PR-1, `usePosCartLineSelection`) remains the only
+source of truth. Layout (RTL, so visually right-to-left: **حذف | الخصم ▼ | (السعر إن مفعّل) |
+الكمية**; LTR mirrors to **Quantity | Price | Discount ▼ | Remove**):
+
+- **الكمية / Quantity** — the exact same `PosCartQtyControls` component (stepper + `PosNumericEditor`)
+  used per-row before, now bound to the selected line only. No second quantity mutation path.
+- **السعر / Price** — the exact same `PosNumericEditor` used for `setUnitPrice`/`normalizeUnitPrice`
+  before, now bound to the selected line. Still gated by `posCfg.allow_unit_price_override` (hidden
+  entirely when the tenant setting is off — verified in the default-off state: the control does not
+  render at all, matching "visibility is not authorization" and unchanged server enforcement).
+- **الخصم ▼ / Discount ▼** — see next section.
+- **حذف / Remove** — the exact same `PosCartRemoveButton`, now bound to the selected line; still
+  routes through the pre-existing reason-required confirmation dialog (`sensitiveAction` /
+  `PosAuditReasonDialog`) unchanged.
+
+**Deterministic safe state with no selection**: verified in real browser with an empty cart — every
+control renders visibly disabled (`disabled` prop, newly added to `PosCartQtyControls` and
+`PosCartRemoveButton`, both additive/optional/default-`false`) rather than silently acting on an
+arbitrary line. New unit tests cover this exact behavior (see Tests).
+
+Cart rows are now read-only and compact: product name + UOM select (unchanged, untouched), a
+compact `×qty` and line total in the row's trailing column, unit price and a discount summary
+(`−7.50` etc., only when a discount is applied) on a second line. No editor lives in the row.
+
+### Discount ▼ — exact approved UX
+
+The Discount button (`اردية / Discount` + a `ChevronDown` icon) opens the existing, reused
+`Dropdown`/`DropdownItem` component (`@/components/ui/dropdown` — an existing, previously-unused-
+in-POS popover with built-in exclusive-open, outside-click-close, and Escape-close behavior) showing
+**exactly two rows**, each a radio + its own directly-editable numeric field, exactly as specified:
+
+```
+○ مبلغ      [ 7.50 ]
+● نسبة %    [ 10   ]
+```
+
+Selecting the radio switches which field is the active input (disabled the other); typing in the
+percentage field computes the equivalent amount via the existing `discountMinorFromPercent()` helper
+(unchanged from the first pass) and commits it through the **same existing** `setDiscount()` path —
+identical permission gate (`posCfg.allow_discount`), identical audit event, identical
+gross-value clamp. Switching back to "مبلغ" shows the already-committed amount. Verified live: on a
+3×25.00 line (75.00 gross), selecting "نسبة %" and typing `10` produced `7.50` in the "مبلغ" field
+and in the cart totals simultaneously.
+
+### Financial semantics — unchanged safety boundary
+
+Confirmed still true after this correction: the authoritative, persisted cart representation
+remains the fixed discount amount (`PosCartLine.discount`); no `discount_type` field, no schema
+change, no new backend endpoint. Percentage is purely an input method that computes the amount
+once, at entry time. If quantity or unit price change afterward, the amount does not
+auto-recompute from a remembered percentage — this was true before this correction and remains
+true; not expanded, not silently promised.
+
+### Tests (this follow-up)
+
+- `pos-responsive.test.ts`: replaced the fixed-px assertion with an `fr`-ratio assertion
+  (`minmax(280px,1fr)_minmax(0,2fr)_104px` / `minmax(320px,1fr)_minmax(0,2fr)_148px`); the
+  `w-full` stretch-fix guard test is unchanged (still required, still passing).
+- `pos-cart-line-controls.test.tsx`: 2 new tests — `PosCartRemoveButton` and `PosCartQtyControls`
+  render fully disabled and perform no action when `disabled` is passed (the "no selection" safe
+  state).
+- `pos-discount.test.ts`: unchanged, still 6/6 passing (the percent↔amount pure functions were not
+  touched by this correction).
+
+Commands and results:
+
+| Scope | Result |
+|---|---|
+| Targeted (`pos-discount` + `pos-responsive` + `pos-cart-line-controls`) | 3 files, 24 tests passed |
+| Broader POS frontend (`src/components/pos` + the two lib suites) | 28 files, 143 tests passed |
+| Full frontend suite | 229 files, 1459 tests passed (+2 vs. the pre-follow-up 1457, exactly the 2 new disabled-state tests; 0 regressions) |
+| `npm run build` | exit code 0 |
+| Backend regression (still untouched) | 57/57 passed, SQLite |
+
+### Browser QA (this follow-up)
+
+Real Chromium, freshly registered tenant, real API (register → enable applications → warehouse →
+category → 2 products → POS device → open session), `allow_unit_price_override` toggled on for one
+pass specifically to verify the Price control renders.
+
+| Scenario | Result |
+|---|---|
+| Desktop RTL, 1920px, empty cart — bottom bar visibly disabled | PASS |
+| Desktop RTL, 1920px, two lines added, first auto-selected — cart ≈1/3, product ≈2/3 (measured 33.33% exactly) | PASS |
+| Quantity via bottom bar (+1, +1) | PASS |
+| Discount ▼ opens showing "مبلغ [ ]" and "نسبة % [ ]" together | PASS |
+| Typing `10` in نسبة % on a 75.00 gross line → 7.50 computed, shown in "مبلغ" field and totals | PASS |
+| Price control appears only when `allow_unit_price_override` is enabled; hidden by default | PASS |
+| Delete via bottom bar → existing reason-required confirm dialog opens for the selected line | PASS |
+| Scanner/focus recovery: add product → select line → Discount ▼ → percentage → Escape → click product tile ×2 → quantity correctly reaches 2 | PASS (verified via DOM read-back of the cart row, not just visually) |
+| Desktop LTR + dark mode (locale cookie + `colorScheme: 'dark'`), selected line + Discount ▼ open showing "Amount [ ]" / "Percentage % [ ]" | PASS |
+| Mobile (390×844) RTL: product grid, cart tab, selected line + bottom bar all render correctly, no new regression | PASS |
+
+Screenshots captured locally only (not committed), consistent with this repo's established
+convention.
+
+### Remaining known limitation (unchanged from first pass)
+
+Percentage discount does not live-recompute if quantity/price change after it was entered — still
+explicitly out of scope (see "Financial semantics" above). Pre-existing mobile category-strip
+clipping (documented in the PR-2C QA mission) remains untouched and out of scope.
+
 ## Git Metadata
 
 - Repository: `safwan5001-source/Nebrax`
@@ -343,8 +498,9 @@ mobile category-strip redesign) remain entirely untouched and are not started.
 - Base SHA: `256896e8cd36820ce3eaf41ed3ef10df249f8391` (confirmed: `main` HEAD at session start,
   matches the PR-2C merge SHA given in the mission brief)
 - PR number/link: [#658](https://github.com/safwan5001-source/Nebrax/pull/658) (Draft)
-- Head SHA: `d95f8e620142d16b8465ddbdf5a3085c2245ac99`
+- Previously reviewed Head SHA: `4c3bec9bcadcd887f31eb9ffd6189157f2d54a2d`
+- Head SHA (after this correction): recorded after commit (see final chat reply)
 
 ## Next Step
 
-> ChatGPT/Safwan review of PR-3. No merge or deployment has been performed.
+> ChatGPT/Safwan review of the updated PR #658. No merge or deployment has been performed.

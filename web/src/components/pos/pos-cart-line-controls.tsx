@@ -52,18 +52,21 @@ export function PosCartLineFrame({
 export function PosCartRemoveButton({
   label,
   onRemove,
+  disabled = false,
 }: {
   label: string;
   onRemove: () => void;
+  disabled?: boolean;
 }) {
   return (
     <button
       type="button"
+      disabled={disabled}
       onClick={(event) => {
         event.stopPropagation();
         onRemove();
       }}
-      className="grid min-h-12 min-w-12 shrink-0 touch-manipulation place-items-center rounded-md text-muted hover:bg-negative/10 hover:text-negative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+      className="grid min-h-12 min-w-12 shrink-0 touch-manipulation place-items-center rounded-md text-muted hover:bg-negative/10 hover:text-negative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-muted"
       aria-label={label}
     >
       <Trash2 className="h-4 w-4" strokeWidth={1.7} />
@@ -71,7 +74,11 @@ export function PosCartRemoveButton({
   );
 }
 
-/** أزرار كمية لمس كبيرة تستدعي مسار setQty القائم. */
+/**
+ * أزرار كمية لمس كبيرة تستدعي مسار setQty القائم. `disabled` (PR-3: شريط
+ * التحكم السفلي) يعطّل الأزرار حين لا يوجد سطر محدَّد — حالة آمنة حاسمة، لا
+ * تعديل صامت لسطر عشوائي.
+ */
 export function PosCartQtyControls({
   qty,
   decreaseLabel,
@@ -83,6 +90,7 @@ export function PosCartQtyControls({
   onDecrease,
   onIncrease,
   onQtyChange,
+  disabled = false,
 }: {
   qty: number;
   decreaseLabel: string;
@@ -94,6 +102,7 @@ export function PosCartQtyControls({
   onDecrease: () => void;
   onIncrease: () => void;
   onQtyChange: (value: string) => void;
+  disabled?: boolean;
 }) {
   return (
     <div
@@ -101,8 +110,9 @@ export function PosCartQtyControls({
     >
       <button
         type="button"
+        disabled={disabled}
         onClick={onDecrease}
-        className="grid min-h-12 min-w-12 touch-manipulation place-items-center text-text hover:bg-primary-soft hover:text-primary active:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+        className="grid min-h-12 min-w-12 touch-manipulation place-items-center text-text hover:bg-primary-soft hover:text-primary active:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-text"
         aria-label={decreaseLabel}
       >
         <Minus className="h-4 w-4" strokeWidth={1.7} />
@@ -110,6 +120,7 @@ export function PosCartQtyControls({
       <PosNumericEditor
         allowDecimal={false}
         className="h-12 min-w-12 text-sm font-semibold"
+        disabled={disabled}
         inputAriaLabel={quantityLabel}
         labels={labels}
         onChange={onQtyChange}
@@ -119,8 +130,9 @@ export function PosCartQtyControls({
       />
       <button
         type="button"
+        disabled={disabled}
         onClick={onIncrease}
-        className="grid min-h-12 min-w-12 touch-manipulation place-items-center text-text hover:bg-primary-soft hover:text-primary active:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+        className="grid min-h-12 min-w-12 touch-manipulation place-items-center text-text hover:bg-primary-soft hover:text-primary active:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-text"
         aria-label={increaseLabel}
       >
         <Plus className="h-4 w-4" strokeWidth={1.7} />

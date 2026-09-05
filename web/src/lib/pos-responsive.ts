@@ -11,12 +11,15 @@
  */
 
 /**
- * PR-3: توسيع عمود السلة على lg/xl فقط — التابلت (md) يبقى كما هو حرفياً.
- * المساحة تُستعاد من الفراغ الأفقي غير المستغل بين المنتجات والسلة، لا من
- * تضييق شبكة المنتجات (تبقى `minmax(0,1fr)` مرنة). لا تغيير على الجوال.
+ * PR-3 (تصحيح المراجعة): السلة تشغل تقريباً **ثلث** مساحة العمل المستخدمة
+ * (السلة + المنتجات، بلا شريط الأقسام الذي يبقى عرضاً ثابتاً كـ"chrome" لا
+ * كجزء من النسبة) — نسبة لا رقماً ثابتاً. `minmax(_,1fr)_minmax(0,2fr)` يحقق
+ * 1:2 تماماً لأن وحدتي fr تتقاسمان الفراغ المتبقي بعد شريط الأقسام الثابت؛
+ * الحدّ الأدنى (`min` في `minmax`) يحمي السلة من الانضغاط دون ذلك حداً. لا
+ * تغيير على `md` (التابلت) ولا على الجوال — التوسيع النسبي على lg/xl فقط.
  */
 export const POS_SALE_GRID_CLASS =
-  'grid min-h-0 flex-1 grid-cols-1 overflow-hidden md:grid-cols-[minmax(280px,340px)_minmax(0,1fr)] lg:grid-cols-[minmax(320px,400px)_minmax(0,1fr)_104px] xl:grid-cols-[minmax(400px,480px)_minmax(0,1fr)_148px]';
+  'grid min-h-0 flex-1 grid-cols-1 overflow-hidden md:grid-cols-[minmax(280px,340px)_minmax(0,1fr)] lg:grid-cols-[minmax(280px,1fr)_minmax(0,2fr)_104px] xl:grid-cols-[minmax(320px,1fr)_minmax(0,2fr)_148px]';
 
 export const POS_MOBILE_NAV_CLASS =
   'grid min-h-16 shrink-0 grid-cols-4 border-t border-border bg-surface pb-[env(safe-area-inset-bottom)] md:hidden';
