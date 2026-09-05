@@ -122,8 +122,9 @@ class PosController extends ApiController
 
         // تُحمّل لقطة الإيصال الحراري المثبّتة مع فاتورة البيع الجديد، كي تعرض
         // واجهة POS المعاينة والطباعة من قرار المحرك وقت الترحيل لا من تعيين حي
-        // قد يتغير بعد إتمام البيع.
-        $response = (new InvoiceResource($invoice->load(['lines', 'thermalTemplateRevision'])))
+        // قد يتغير بعد إتمام البيع. R5: `partner` محمَّل أيضاً كي تبني واجهة POS
+        // الإيصال الفوري من هذا الردّ وحده — لا من سلة العميل المحلية.
+        $response = (new InvoiceResource($invoice->load(['lines', 'thermalTemplateRevision', 'partner'])))
             ->response()
             ->setStatusCode($replayed ? 200 : 201);
         $payload = $response->getData(true);

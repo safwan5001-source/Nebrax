@@ -753,4 +753,114 @@ class PosCheckoutTest extends TestCase
             ->assertStatus(422);
         $this->assertSame(0, Invoice::where('pos_session_id', $sessionId)->count());
     }
+
+    /**
+     * R5: ردّ checkout هو مصدر الحقيقة الوحيد للإيصال الفوري — يجب أن يحمل
+     * كل ما يلزم (رقم/تاريخ/عميل/سطور/إجماليات/ZATCA) مطابقاً تماماً لما تعيده
+     * `GET /invoices/{id}` لاحقاً عند إعادة الطباعة، فلا يبني الكاشير إيصالاً
+     * من حالة سلة محلية قد تختلف عن الفاتورة المرحّلة فعلياً.
+     *
+     * @test
+     */
+    public function checkout_response_matches_the_persisted_invoice_returned_by_a_subsequent_fetch(): void
+    {
+        $auth = $this->registerTenant();
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $sessionId = $this->openSession($auth);
+        $cash = $this->methodBySettlement($this->methods($auth), 'cash');
+        $customer = $this->withToken($auth['token'])->postJson('/api/partners', [
+            'name' => 'عميل الإيصال', 'type' => 'customer',
+            'vat_number' => '300000000000003', 'city' => 'الدمام',
+        ])->assertCreated()['data'];
+        $product = $this->product($auth['token'], 'صنف الإيصال', null);
+
+        $checkout = $this->checkout($auth['token'], $customer['id'], $sessionId, [$this->tender($cash, 11500)], [$this->productItem($product)])
+            ->assertCreated();
+        $created = $checkout['data'];
+
+        // R5: اسم/رقم ضريبي/مدينة العميل يصلان ضمن ردّ checkout نفسه — لا حاجة
+        // لطلب عميل منفصل، ولا لثقة باسم منتقي الشاشة بعد نجاح البيع.
+        $this->assertSame('عميل الإيصال', $created['partner']['name']);
+        $this->assertSame('300000000000003', $created['partner']['vat_number']);
+        $this->assertSame('الدمام', $created['partner']['city']);
+
+        // R5: رمز ZATCA حاضر ضمن ردّ checkout نفسه — لا حاجة لطلب شبكة ثانٍ.
+        $this->assertNotNull($created['zatca']['qr']);
+
+        // الإعادة (reprint) تجلب الفاتورة نفسها من مصدرها الدائم؛ يجب أن تطابق
+        // ما وصل الكاشير فوراً بعد البيع حرفاً بحرف في كل حقل يعرضه الإيصال.
+        $fetched = $this->withToken($auth['token'])->getJson("/api/invoices/{$created['id']}")->assertOk()['data'];
+        $this->assertSame($created['number'], $fetched['number']);
+        $this->assertSame($created['invoice_date'], $fetched['invoice_date']);
+        $this->assertSame($created['subtotal'], $fetched['subtotal']);
+        $this->assertSame($created['tax_amount'], $fetched['tax_amount']);
+        $this->assertSame($created['total'], $fetched['total']);
+        $this->assertSame($created['zatca']['qr'], $fetched['zatca']['qr']);
+        $this->assertSame(
+            array_map(fn (array $l) => [$l['quantity'], $l['unit_price'], $l['tax_rate'], $l['line_tax'], $l['line_total']], $created['lines']),
+            array_map(fn (array $l) => [$l['quantity'], $l['unit_price'], $l['tax_rate'], $l['line_tax'], $l['line_total']], $fetched['lines']),
+        );
+    }
+
+    /**
+     * R5 — انحدار R1: طلب مباشر يحمل ضريبة سطر متلاعَباً بها لا يزال يُصحَّح
+     * خادمياً، وقيمة الإيصال المُعادة (وليست قيمة العميل) تعكس التصحيح.
+     *
+     * @test
+     */
+    public function checkout_response_reflects_the_authoritative_tax_not_a_tampered_client_value(): void
+    {
+        $auth = $this->registerTenant();
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $sessionId = $this->openSession($auth);
+        $cash = $this->methodBySettlement($this->methods($auth), 'cash');
+        $customer = $this->withToken($auth['token'])->postJson('/api/partners', ['name' => 'عميل', 'type' => 'customer'])['data']['id'];
+        // سعر المنتج الافتراضي بضريبة 15% (Product::$attributes['tax_rate']).
+        $product = $this->product($auth['token'], 'صنف ضريبة موثوقة للإيصال', null);
+        $tampered = ['product_id' => $product['id'], 'quantity' => 1, 'unit_price' => 10000, 'tax_rate' => 0];
+
+        $created = $this->checkout($auth['token'], $customer, $sessionId, [$this->tender($cash, 11500)], [$tampered])
+            ->assertCreated()['data'];
+
+        $this->assertSame(15, $created['lines'][0]['tax_rate']);
+        $this->assertSame('15.00', $created['lines'][0]['line_tax']);
+        $this->assertSame('115.00', $created['total']);
+    }
+
+    /**
+     * R5 — انحدار R4: إعادة نفس مفتاح idempotency تعيد نفس الفاتورة المرحّلة
+     * بنفس بيانات الإيصال (عميل/ZATCA/سطور)، لا تنشئ ولا تُغيّر شيئاً.
+     *
+     * @test
+     */
+    public function replayed_checkout_response_still_carries_the_same_persisted_receipt_data(): void
+    {
+        $auth = $this->registerTenant();
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $sessionId = $this->openSession($auth);
+        $cash = $this->methodBySettlement($this->methods($auth), 'cash');
+        $customer = $this->withToken($auth['token'])->postJson('/api/partners', [
+            'name' => 'عميل إعادة الإيصال', 'type' => 'customer',
+        ])->assertCreated()['data']['id'];
+        $key = (string) \Illuminate\Support\Str::uuid();
+        $body = [
+            'idempotency_key' => $key,
+            'partner_id' => $customer,
+            'pos_session_id' => $sessionId,
+            'items' => [['quantity' => 1, 'unit_price' => 10000, 'tax_rate' => 15]],
+            'tenders' => [['payment_method_id' => $cash['id'], 'amount' => 11500]],
+        ];
+
+        $first = $this->withToken($auth['token'])->postJson('/api/pos/checkout', $body)->assertCreated()['data'];
+        $second = $this->withToken($auth['token'])->postJson('/api/pos/checkout', $body)
+            ->assertOk()
+            ->assertJsonPath('idempotent_replay', true)['data'];
+
+        $this->assertSame($first['id'], $second['id']);
+        $this->assertSame($first['number'], $second['number']);
+        $this->assertSame($first['partner']['name'], $second['partner']['name']);
+        $this->assertSame($first['zatca']['qr'], $second['zatca']['qr']);
+        $this->assertSame($first['total'], $second['total']);
+        $this->assertSame(1, Invoice::where('pos_session_id', $sessionId)->count());
+    }
 }

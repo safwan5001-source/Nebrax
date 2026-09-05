@@ -64,6 +64,7 @@ import {
   isPosCheckoutNetworkFailure,
   type PosCheckoutPhase,
 } from '@/lib/pos-checkout-attempt';
+import { buildPosReceiptInvoice, posReceiptCustomer, type PosCheckoutInvoiceLine } from '@/lib/pos-receipt';
 import {
   buildPosCartSnapshotScope,
   buildPosCartStorageKey,
@@ -153,11 +154,30 @@ interface Product {
 }
 interface PosDevice { id: string; name: string; code: string | null; warehouse_id: string; is_active: boolean; warehouse?: { id: string; code: string; name: string } | null; cash_drawer?: { configured: boolean } }
 interface PosSession { id: string; number: string; status: string; pos_device_id?: string | null; warehouse_id?: string | null; shift_id?: string | null; pos_device?: { id: string; name: string; code: string | null } | null; warehouse?: { id: string; code: string; name: string } | null }
+/**
+ * R5: يطابق حرفياً ما يعيده `InvoiceResource` بعد `POS/checkout` — الفاتورة
+ * المرحّلة الفعلية، لا افتراضاً محلياً. الإيصال الفوري يُبنى من هذا الشكل
+ * وحده (عبر `buildPosReceiptInvoice`)؛ لا يُعاد اشتقاق أي رقم مالي من سلة
+ * العميل بعد نجاح الإتمام.
+ */
 interface PosCheckoutResponse {
   data: {
     id: string;
     number: string;
+    invoice_date: string;
+    payment_type: string;
+    payment_status?: string | null;
+    status?: string | null;
+    subtotal: string;
+    discount?: string;
+    shipping?: string;
+    adjustment?: string;
+    tax_amount: string;
     total: string;
+    notes: string | null;
+    partner?: { id: string; name: string; vat_number: string | null; city: string | null } | null;
+    zatca?: { qr: string | null } | null;
+    lines: PosCheckoutInvoiceLine[];
     thermal_template_revision?: LiveTemplateRevision | null;
   };
   cash_drawer_action?: CashDrawerAction;
@@ -1198,7 +1218,10 @@ export default function PosPage() {
               toast({ title: t('sale_done'), description: t('cash_drawer_automatic_warning'), variant: 'warning' });
             }
           },
-          fetchQr: (created) => api<{ qr: string | null }>(`/invoices/${created.data.id}/zatca`),
+          // R5: رمز ZATCA يصل بالفعل ضمن ردّ checkout نفسه (`data.zatca.qr`) —
+          // الفاتورة تُرحَّل وتُولَّد بيانات ZATCA لها ذرّياً قبل عودة الاستجابة،
+          // فلا حاجة لطلب شبكة ثانٍ قد يفشل لسببٍ لا علاقة له بصحة الفاتورة.
+          fetchQr: (created) => Promise.resolve({ qr: created.data.zatca?.qr ?? null }),
           onPaymentError: (error) => {
             // فشل الدفع يسجله PosService من مسار checkout نفسه بمصدر server؛
             // الواجهة تعرض النتيجة فقط ولا تنشئ دليلاً نهائياً قابلاً للتزوير.
@@ -1220,34 +1243,19 @@ export default function PosPage() {
 
         if (result.status !== 'success' || !result.checkout) return;
 
-        // بناء الإيصال من لقطة السلة السابقة بعد cleanup. فشل نموذج الإيصال نفسه
-        // لا يعيد شاشة الدفع ولا يحول بيعاً مؤكداً إلى فشل.
+        // R5: الإيصال الفوري يُبنى من الفاتورة المرحّلة التي أعادها الخادم —
+        // نفس ما يعيده `GET /invoices/{id}` لاحقاً لإعادة الطباعة — لا من سلة
+        // العميل المحلية. القيم المالية (الكمية/السعر/الضريبة/الإجماليات)
+        // كلها من `created`؛ السلة المحلية لا تُستَشار إلا لعنصر عرضٍ بحت
+        // (اسم الوحدة البديلة المختارة في واجهة الكاشير) لا يغيّر رقماً مالياً.
+        // فشل نموذج الإيصال نفسه لا يعيد شاشة الدفع ولا يحول بيعاً مؤكداً إلى فشل.
         try {
           const created = result.checkout.data;
-          const toRiyal = (m: number) => (m / 100).toFixed(2);
-          const totals = cart.reduce(
-            (a, l) => { const c = lineCalc(l); return { sub: a.sub + c.net, tax: a.tax + c.tax, tot: a.tot + c.total }; },
-            { sub: 0, tax: 0, tot: 0 },
-          );
-          // نوع الدفع للعرض: مسدّد فوراً بأي وسيلة مهيأة، وإلا آجل.
-          const paidNow = tenders.reduce((sum, tender) => sum + tender.amount, 0);
-          const receiptInvoice: SourceInvoice = {
-            number: created.number,
-            invoice_date: new Date().toISOString().slice(0, 10),
-            payment_type: paidNow > 0 ? 'cash' : 'credit',
-            subtotal: toRiyal(totals.sub),
-            tax_amount: toRiyal(totals.tax),
-            total: toRiyal(totals.tot),
-            notes: null,
-            lines: cart.map((l) => { const c = lineCalc(l); return {
-              id: l.key, description: l.unit ? `${l.description} (${l.unit})` : l.description, quantity: l.qty,
-              unit_price: effectiveLinePrice(l), tax_rate: l.tax, line_tax: toRiyal(c.tax), line_total: toRiyal(c.total),
-            }; }),
-          };
+          const receiptInvoice = buildPosReceiptInvoice(created, cart.map((l) => l.unit));
           const model = buildInvoiceDocumentModel({
             invoice: receiptInvoice,
             company,
-            customer: { name: customer.name, vat_number: null, city: null },
+            customer: posReceiptCustomer(created, customer.name),
             qr: result.qr?.qr ?? null,
             footerText: posCfg.receipt_footer,
           });
