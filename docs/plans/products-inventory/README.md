@@ -1,6 +1,6 @@
 # أَوْج / AWJ — Products & Inventory Implementation Program
 
-**Status:** PLANNING — no implementation authorized  
+**Status:** PLANNING COMPLETE — pending final branch/base reconciliation and owner review; no implementation authorized  
 **Audit source:** `docs/audits/AWJ_PRODUCTS_INVENTORY_AUDIT_2026-09-05.md`  
 **Data policy:** `docs/audits/AWJ_PRE_PRODUCTION_DATA_POLICY.md`  
 **Implementation agent:** **Claude Code**
@@ -21,9 +21,7 @@
 - ChatGPT مسؤول عن التخطيط، ضبط Scope، مراجعة Implementation Reports، وتحديد الخطوة التالية.
 - لا يُستخدم Work/Codex لإعادة فحص عمل Claude Code تلقائيًا؛ فقط عند وجود سبب تقني حقيقي.
 
-## المراحل
-
-### Phase 1 — Hardening gates
+## Phase 1 — Hardening gates
 
 1. `PR-SEC-INV-1` — Same-tenant Stocktake/Stock Permit branch/warehouse authorization.
 2. `PR-INV-1` — Central sensitive cost authorization/redaction.
@@ -34,18 +32,40 @@
 7. `PR-UOM-1` — In-use UOM mutation safety + Product.unit invariant + live-reference integrity + barcode namespace.
 8. `PR-PROD-LIFE-1` — Product reference registry + inventory-identity guard.
 
-### Phase 2 — Completion
+Detailed contracts: `phase-1-hardening/`  
+Claude Code handoffs: `prompts/PHASE1_IMPLEMENTATION_PROMPTS.md`
 
-Multiple UOM/Barcode completion → durable imports → warehouse Inventory Workspace → Serial/Lot/Expiry → Reservations/Availability → Stock Requests/Approval/Fulfillment → Low Stock/Replenishment → Movement source drilldown.
+## Phase 2 — Completion
 
-### Phase 3 — Later
+Detailed plans are in `phase-2-completion/`:
+- Multiple UOM & Barcode Completion
+- Durable Imports
+- Warehouse Inventory Workspace
+- Serial / Lot / Expiry
+- Reservations & Availability
+- Stock Requests / Approval / Fulfillment
+- Low Stock / Replenishment
+- Movement Source Drilldown
+- dependency/release gates
 
-Media migration package, quantity-tier pricing, intelligent replenishment, bundles. Manufacturing/BOM remains deferred.
+Phase-2 files are program contracts, not executable implementation authorization. Each feature receives current-main PR decomposition and a final Claude Code prompt only after prerequisite hardening reports are reviewed.
+
+## Phase 3 — Later
+
+`phase-3-later/LATER-ROADMAP.md` records Media portability, quantity-tier pricing, intelligent replenishment, Bundles and deferred Manufacturing/BOM boundaries.
+
+## Governance artifacts
+
+- `DEPENDENCY_MAP.md` — hardening and cross-phase dependencies.
+- `ACCEPTANCE_MATRIX.md` — per-PR proof obligations.
+- `DECISION_REGISTER.md` — owner-level decisions that executors cannot invent.
+- `PROGRAM-REVIEW-CHECKLIST.md` — pre-merge/pre-implementation completeness review.
+- `IMPLEMENTATION-REPORT-TEMPLATE.md` — mandatory Claude Code report structure.
 
 ## تنفيذ Claude Code
 
-كل ملف PR في `phase-1-hardening/` هو العقد الهندسي. ملفه المقابل في `prompts/` هو handoff تنفيذي، ولا يجوز أن يغيّر العقد. يجب على Claude Code في نهاية كل مهمة إنتاج Implementation Report بصيغة MD يتضمن: ما تم، الملفات المتغيرة، الاختبارات ونتائجها، Build/CI، المخاطر والمتبقي، Branch/PR/Base SHA/Head SHA إن توفرت، والخطوة التالية.
+كل Phase-1 PR contract هو العقد الهندسي، والـhandoff لا يجوز أن يغيّره. يجب على Claude Code في نهاية كل مهمة إنتاج Implementation Report MD كامل. ChatGPT يراجع التقرير أولًا قبل قرار PR التالي أو الدمج. لا Merge ولا Deploy تلقائيًا.
 
 ## بوابة الانتقال
 
-لا يبدأ Phase 2 لمجرد اكتمال بعض PRs. يجب أن تكون hardening gates المرتبطة بالميزة التالية مغلقة ومختبرة أولاً، وفق `DEPENDENCY_MAP.md` و`ACCEPTANCE_MATRIX.md`.
+لا يبدأ التنفيذ لمجرد اكتمال التخطيط. قبل أول PR برمجي يجب: (1) reconcile فرع الوثائق مع `main` الحالي، (2) تشغيل `PROGRAM-REVIEW-CHECKLIST.md` على الحزمة، (3) مراجعة/اعتماد صفوان، (4) دمج الوثائق فقط بموافقته، ثم (5) توليد handoff لـPR-SEC-INV-1 من Base SHA الحالي.
