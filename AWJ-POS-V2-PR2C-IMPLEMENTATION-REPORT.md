@@ -3,9 +3,9 @@
 ## Repository state
 
 - Branch: `claude/pos-v2-pr2c-category-presentation`
-- PR number/link: recorded after creation (see final chat reply)
+- PR number/link: [#657](https://github.com/safwan5001-source/Nebrax/pull/657) (Draft)
 - Base SHA: `65314b3772af37ae58483cac63de3dfd7d17cb15` (`origin/main` at session start — confirmed to include merged PR #654)
-- Head SHA: recorded after commit (see final chat reply)
+- Head SHA: `53b47b3f99b9da89e562670f00770adadcc67eb6`
 
 ## Classification Before Implementation
 
