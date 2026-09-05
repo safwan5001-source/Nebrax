@@ -103,6 +103,10 @@ Required invariant:
 
 Must cover Product create/update/import, alternate-barcode writes and future barcode workbook import, including atomic/concurrency-safe enforcement. Because current data is disposable pre-production data, implementation may adopt the cleanest canonical namespace/constraint model rather than preserve experimental duplicates.
 
+**Implementation-contract conclusion:** application-level `exists()` checks are not a sufficient race boundary for a namespace spanning two tables. The hardening PR must establish one authoritative tenant barcode namespace with database-enforceable uniqueness or an equivalently atomic serialization mechanism. The audit deliberately does not prescribe the physical schema before implementation review.
+
+**Needs Decision — production soft-delete reuse:** whether a barcode formerly attached to a soft-deleted/deactivated Product may ever be reused. The safer default is no reuse when historical documents can still identify that product; current test data does not constrain this decision.
+
 ---
 
 ## 7. Pricing
@@ -168,24 +172,34 @@ Opening inventory is currently base-unit oriented; multi-UOM opening is P2.
 
 ## 11. Product lifecycle reference integrity — P1
 
-`ProductLifecycleService::referenceCounts()` is manually maintained and omits at least these confirmed direct generic Product references:
+`ProductLifecycleService::referenceCounts()` is manually maintained. Direct model review confirms the existing registry already covers the established generic Product-bearing business/inventory lines for Invoice, Purchase, Return, Credit Note, Quote, Recurring Invoice, Procurement, Stock Movement, Stock Permit, Stocktake, ProductWarehouseStock and PriceListItem.
+
+Two confirmed direct generic Product references are missing from that registry:
 
 - `InventoryOpeningLine.product_id`
 - `DeliveryNoteLine.product_id`
 
-DB restrictive references remain a final safety line, but the business service can incorrectly report a product as deletable.
+`DebitNote` is not a hidden omission: the current Debit Note model is header/ledger-oriented and does not define a generic Product line model. `PurchaseOrder` likewise does not introduce a separate `PurchaseOrderLine`; procurement line items are represented by the already-counted `ProcurementLine` domain. Fuel-specific product references remain excluded because they point to `FuelProduct`, not generic `Product`.
 
-`ProductActivity.product_id`, alternate barcodes and product media require classification rather than blind addition to deletion blockers: they are product-owned/audit children, and creation activity exists even for a newly-created otherwise-unused product. The target registry must distinguish business/historical blockers, inventory-identity blockers, owned children and unrelated domains.
+### Reference classification
+
+**Business/historical blockers:** InvoiceLine, PurchaseLine, ReturnLine, CreditNoteLine, QuoteLine, RecurringInvoiceLine, ProcurementLine, DeliveryNoteLine and InventoryOpeningLine. These should make destructive Product deletion unavailable; deactivation preserves history.
+
+**Inventory-semantic blockers:** StockMovement, StockPermitLine, StocktakeLine, ProductWarehouseStock and InventoryOpeningLine. These are relevant not only to deletion but to changes that reinterpret `type` / `track_inventory`.
+
+**Commercial live reference:** PriceListItem blocks destructive deletion under the current lifecycle policy, but it does not by itself prove an inventory identity footprint.
+
+**Owned children:** ProductBarcode and ProductMedia belong to Product master data and are explicitly deleted by ProductLifecycleService when true deletion is otherwise allowed; they are not independent historical blockers.
+
+**Audit/history child:** ProductActivity is intentionally retained as Product history and is created even for a newly created otherwise-unused Product. It must not be naively counted as a deletion blocker or no Product could ever pass the lifecycle deletion path. Its historical retention/reference behavior should remain part of lifecycle implementation tests, but it is not an additional business-use blocker.
 
 ### P1 — Inventory identity mutation guard incomplete
 
-`assertInventoryIdentityCanChange()` does not include `InventoryOpeningLine`. A Draft Inventory Opening can therefore reference a product before stock movements exist while `type` / `track_inventory` can still change.
+`assertInventoryIdentityCanChange()` currently checks only StockMovement, StockPermitLine, StocktakeLine and ProductWarehouseStock. It omits `InventoryOpeningLine`. A Draft Inventory Opening can therefore reference a product before stock movements exist while `type` / `track_inventory` can still change.
 
-Required direction: centralized Product Reference Registry/census, explicit policy classes for deletion/deactivation and inventory-identity mutation, plus regression/architecture tests for new Product-bearing domains.
+Required direction: centralized Product Reference Registry/classification rather than duplicated ad-hoc arrays, explicit policy for deletion/deactivation versus inventory-identity mutation, and regression/architecture tests requiring each future generic Product-bearing model to declare its lifecycle classification.
 
-Confirmed false positives excluded: fuel contract/card/fleet product models reference `FuelProduct`, not generic `Product`.
-
-**Audit status:** generic Product-reference census remains open until tree/migration/model review is exhausted; incomplete GitHub code-search results are not accepted as proof of completeness.
+**Census conclusion:** the targeted direct-model census is now reconciled for the known Products & Inventory/business-document model surface. The P1 remains because the registry is structurally manual and the two omissions are confirmed, not because Debit Note or Purchase Order hide additional Product-line models.
 
 ---
 
@@ -479,7 +493,7 @@ No implementation is authorized by this record.
 17. Bundles
 18. Manufacturing deferred
 
-Security PR is first because it is a narrow authorization boundary with no accounting redesign. The remaining ordering may be adjusted at formal closure if final census evidence changes dependencies.
+Security PR is first because it is a narrow authorization boundary with no accounting redesign. The remaining ordering may be adjusted at formal closure if final evidence changes dependencies.
 
 ---
 
@@ -527,13 +541,19 @@ Multiple-UOM/barcode UX/workbook; durable imports; warehouse-aware inventory wor
 
 Before formal closure:
 
-1. complete generic Product-reference census beyond confirmed `InventoryOpeningLine` / `DeliveryNoteLine` omissions
-2. reconcile any remaining same-tenant branch/warehouse record-access edge cases discovered in the final census
-3. finalize barcode namespace/concurrency production invariant at implementation-contract level (without premature schema overdesign)
-4. reconcile remaining Daftra benchmark areas with evidence
-5. finalize P1/P2/P3 mapping and PR order without starting implementation
+1. reconcile any remaining same-tenant branch/warehouse record-access edge cases discovered outside Stocktake/Stock Permit
+2. reconcile remaining Daftra benchmark areas with evidence
+3. perform final P1/P2/P3 and PR-order reconciliation without starting implementation
+4. make the explicit formal close/no-close decision
 
-Cost route/write/export policy census and the reviewed Inventory Settings boundary are now reconciled. Stocktake/Stock Permit same-tenant record authorization is confirmed as a P1 rather than left as Pending Verification.
+Completed closure items:
+
+- targeted generic Product-reference census and lifecycle classification reconciled; confirmed omissions are InventoryOpeningLine and DeliveryNoteLine
+- Debit Note / Purchase Order candidate false positives resolved against current model surface
+- cost route/write/export policy census reconciled
+- reviewed Inventory Settings boundary reconciled
+- barcode namespace/concurrency invariant fixed at implementation-contract level; physical schema intentionally deferred to implementation review
+- Stocktake/Stock Permit same-tenant record authorization confirmed as P1
 
 This record is the living working source of truth. Confirmed findings must be updated here rather than held only in chat.
 
