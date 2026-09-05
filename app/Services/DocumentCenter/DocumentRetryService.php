@@ -62,11 +62,15 @@ final class DocumentRetryService
             if ($file->purged_at !== null || ! $this->stored($file)) {
                 return $this->rejected($locked, $actor, self::CODE_FILE_UNAVAILABLE, 'ملف المستند غير متاح لإعادة المحاولة.');
             }
+            // حد إعادة المحاولة اليدوية مستقلّ تماماً عن ميزانية محاولات المزوّد داخل الدورة
+            // الواحدة (max_attempts). كل دورة (أصلية أو retry مقبول) تحصل على ميزانيتها
+            // الخاصة من جديد — انظر إعادة ضبط attempt_count أدناه عند القبول. المُشتقّ هنا
+            // هو عدد دورات retry المقبولة سابقاً لنفس الـ run، من سجل الحوكمة الدائم.
+            $manualRetryCycles = $this->manualRetryCycleCount($locked);
+            if ($manualRetryCycles >= $this->manualRetryCycleLimit()) {
+                return $this->rejected($locked, $actor, self::CODE_LIMIT_REACHED, 'تم بلوغ الحد الآمن لعدد مرات إعادة المحاولة اليدوية لهذه المعالجة.');
+            }
             if ($locked->stage === DocumentProcessingService::STAGE_SAFETY_SCAN) {
-                $processing = $this->settings->processingPolicy();
-                if ($locked->attempt_count >= $processing['max_attempts']) {
-                    return $this->rejected($locked, $actor, self::CODE_LIMIT_REACHED, 'تم بلوغ الحد الآمن لمحاولات الفحص.');
-                }
                 $synchronous = $this->settings->documentProcessingMode() === DocumentExtractionPolicy::MODE_SYNC;
                 if ((! $synchronous && config('queue.default') === 'sync')
                     || $this->settings->documentProcessingIsAuthoritativelyDisabled()
@@ -88,14 +92,14 @@ final class DocumentRetryService
                 if (! $this->scanAdmission->authorize($file) || $batch->status === DocumentWorkflowStatus::QUARANTINED || ! $policy->allowsFile($file->size_bytes, $file->page_count)) {
                     return $this->rejected($locked, $actor, self::CODE_NOT_ALLOWED, 'حالة الملف أو المستند لا تسمح بإعادة الاستخراج.');
                 }
-                if ($locked->attempt_count >= $configuration->maxAttempts) {
-                    return $this->rejected($locked, $actor, self::CODE_LIMIT_REACHED, 'تم بلوغ الحد الآمن لمحاولات الاستخراج.');
-                }
             }
 
             $jobUuid = (string) Str::uuid();
             $locked->fill([
                 'status' => DocumentProcessingStatus::QUEUED,
+                // دورة معالجة جديدة تبدأ بميزانية محاولات مزوّد خاصة بها من الصفر —
+                // كل البوّابات أعلاه اجتازت بالفعل قبل هذا السطر (لا إعادة ضبط لطلب مرفوض).
+                'attempt_count' => 0,
                 'job_uuid' => $jobUuid,
                 'queued_at' => now('UTC'),
                 'started_at' => null,
@@ -106,7 +110,7 @@ final class DocumentRetryService
             ])->save();
             $fresh = $locked->fresh();
             $this->event($fresh, $actor, DocumentGovernanceEvent::ACTION_RETRY_QUEUED, null, [
-                'retry_sequence' => $fresh->attempt_count + 1,
+                'retry_sequence' => $manualRetryCycles + 1,
             ]);
 
             return ['accepted' => true, 'code' => null, 'message' => 'تمت جدولة إعادة المحاولة.', 'run' => $fresh];
@@ -204,6 +208,20 @@ final class DocumentRetryService
             'actor_id' => $actor?->id,
             'metadata' => $metadata,
         ]);
+    }
+
+    /** عدد دورات retry اليدوية المقبولة سابقاً لهذا الـ run، من سجل الحوكمة الدائم فقط. */
+    private function manualRetryCycleCount(DocumentProcessingRun $run): int
+    {
+        return DocumentGovernanceEvent::query()
+            ->where('document_processing_run_id', $run->id)
+            ->where('action', DocumentGovernanceEvent::ACTION_RETRY_QUEUED)
+            ->count();
+    }
+
+    private function manualRetryCycleLimit(): int
+    {
+        return max(1, (int) config('document_center.processing.manual_retry_max_cycles', 3));
     }
 
     private function stored(DocumentFile $file): bool

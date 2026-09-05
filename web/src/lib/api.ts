@@ -30,6 +30,22 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * تستخرج رسالة الرفض الآمنة من جسم استجابة خطأ — بعض النقاط (كإعادة محاولة
+ * مركز المستندات) تعيدها متداخلة تحت `data.message` بدل الجذر مباشرة. تُفضَّل
+ * الرسالة الجذرية إن وُجدت (التوافق مع بقية النقاط)، ثم المتداخلة، ثم fallback.
+ */
+function extractErrorMessage(body: unknown, fallback: string): string {
+  if (body && typeof body === 'object') {
+    const root = body as { message?: unknown; data?: { message?: unknown } };
+    if (typeof root.message === 'string' && root.message !== '') return root.message;
+    if (root.data && typeof root.data === 'object' && typeof root.data.message === 'string' && root.data.message !== '') {
+      return root.data.message;
+    }
+  }
+  return fallback;
+}
+
 /** يتعرف على أخطاء HTTP الفعلية وعلى محاكي المعاينة من دون كشف جسم الاستجابة. */
 export function hasApiStatus(exception: unknown, status: number): boolean {
   return exception instanceof ApiError
@@ -93,7 +109,7 @@ export async function api<T = unknown>(path: string, options: Options = {}): Pro
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new ApiError(res.status, (body as { message?: string }).message ?? 'حدث خطأ', body);
+    throw new ApiError(res.status, extractErrorMessage(body, 'حدث خطأ'), body);
   }
 
   if (res.status === 204) return null as T;
@@ -173,7 +189,7 @@ export async function downloadFile(path: string, fallbackName: string): Promise<
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new ApiError(res.status, (body as { message?: string }).message ?? 'حدث خطأ', body);
+    throw new ApiError(res.status, extractErrorMessage(body, 'حدث خطأ'), body);
   }
 
   const blob = await res.blob();
