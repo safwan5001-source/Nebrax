@@ -49,6 +49,7 @@ class ProductCategoryController extends ApiController
             'description' => $data['description'] ?? null,
             'parent_id'   => $data['parent_id'] ?? null,
             'is_active'   => $data['is_active'] ?? true,
+            'color'       => $data['color'] ?? null,
         ]);
 
         if ($request->hasFile('image')) {
@@ -73,6 +74,7 @@ class ProductCategoryController extends ApiController
             'description' => $data['description'] ?? null,
             'parent_id'   => $parentId,
             'is_active'   => $data['is_active'] ?? $category->is_active,
+            'color'       => $data['color'] ?? null,
         ]);
 
         if ($request->boolean('remove_image') && ! $request->hasFile('image')) {

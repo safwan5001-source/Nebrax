@@ -42,6 +42,11 @@ const strings: Record<string, string> = {
   show_product_images_hint: 'Image hint.',
   show_cost_profit_in_pos: 'Show cost and profitability in POS',
   show_cost_profit_in_pos_hint: 'Cost/profit hint.',
+  category_presentation_mode: 'Category presentation',
+  category_presentation_mode_hint: 'Category presentation hint.',
+  category_presentation_default: 'Default',
+  category_presentation_image: 'Image',
+  category_presentation_color: 'Color',
   apply_customer_price_list: 'Apply price list',
   apply_customer_price_list_hint: 'Price list hint.',
   allow_unit_price_override: 'Allow override',
@@ -153,6 +158,7 @@ const settings = {
   exchange_surplus_policy: 'customer_credit_only',
   held_sale_close_policy: 'discard_on_session_close',
   show_product_images: true,
+  category_presentation_mode: 'image',
   show_cost_profit_in_pos: false,
   sound_enabled: true,
   cash_drawer_driver: 'local_bridge',
@@ -360,6 +366,19 @@ describe('صفحة تهيئة POS بعد توحيد UX', () => {
     await waitFor(() => expect(api.mock.calls.some(([url, options]) => url === '/sales-config/pos' && options?.method === 'PUT')).toBe(true));
     const saved = api.mock.calls.find(([url, options]) => url === '/sales-config/pos' && options?.method === 'PUT')![1].body.data;
     expect(saved).toMatchObject({ show_cost_profit_in_pos: true, allow_discount: true });
+  });
+
+  it('يعرض «صورة» محمَّلاً افتراضياً (التوافق الرجعي) ويحفظ التغيير إلى «لون» (PR-2C)', async () => {
+    await renderLoaded({ category_presentation_mode: 'image' });
+    const select = screen.getByLabelText('Category presentation') as HTMLSelectElement;
+    expect(select.value).toBe('image');
+
+    fireEvent.change(select, { target: { value: 'color' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save settings' }));
+
+    await waitFor(() => expect(api.mock.calls.some(([url, options]) => url === '/sales-config/pos' && options?.method === 'PUT')).toBe(true));
+    const saved = api.mock.calls.find(([url, options]) => url === '/sales-config/pos' && options?.method === 'PUT')![1].body.data;
+    expect(saved).toMatchObject({ category_presentation_mode: 'color' });
   });
 
   it('يعطل ضوابط الإيصال الثانوية دون فقد قيمتها عند إيقاف الطباعة', async () => {

@@ -36,6 +36,13 @@ class ProductResource extends JsonResource
                     'download_url' => "/api/product-categories?image_id={$this->productCategory->id}",
                 ] : null,
             ),
+            // PR-2C: لون تعريفي للتصنيف — عرضٌ بحت يستهلكه POS فقط حين يختار
+            // المستأجر صراحةً وضع «لون» (`category_presentation_mode`). القيمة
+            // مصدرها `ProductCategory::COLOR_REGEX` وحده، فلا حاجة لتصفيةٍ هنا.
+            'category_color'   => $this->when(
+                $this->relationLoaded('productCategory'),
+                fn () => $this->productCategory?->color,
+            ),
             'unit_template_id' => $this->unit_template_id,
             // الوحدات المتاحة للسطر: الأساس بمعامل ١ ثم البدائل — تقرؤها شاشات
             // الفاتورة والمشتريات مباشرةً بلا استدعاء ثانٍ.

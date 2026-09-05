@@ -15,6 +15,7 @@ class ProductCategoryResource extends JsonResource
             'description' => $this->description,
             'parent_id'   => $this->parent_id,
             'is_active'   => (bool) $this->is_active,
+            'color'       => $this->color,
             'image'       => $this->image_path ? [
                 'download_url' => "/api/product-categories?image_id={$this->id}",
                 'original_name' => $this->image_original_name,
