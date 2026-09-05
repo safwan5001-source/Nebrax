@@ -147,7 +147,7 @@ class DocumentCenterFoundationTest extends TestCase
     {
         $this->assertSame([
             'draft', 'receiving', 'received', 'queued', 'processing', 'needs_review',
-            'ready_for_draft', 'creating_draft', 'draft_created', 'archived', 'failed',
+            'reviewed', 'ready_for_draft', 'creating_draft', 'draft_created', 'archived', 'failed',
             'quarantined', 'duplicate', 'cancelled',
         ], array_column(DocumentWorkflowStatus::cases(), 'value'));
         $this->assertNotContains('approved', array_column(DocumentWorkflowStatus::cases(), 'value'));

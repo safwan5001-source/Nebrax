@@ -10,6 +10,13 @@ enum DocumentWorkflowStatus: string
     case QUEUED = 'queued';
     case PROCESSING = 'processing';
     case NEEDS_REVIEW = 'needs_review';
+    /**
+     * اكتملت المراجعة البشرية بنجاح — لا تعني وجود مسودة أو إمكان إنشائها ولا
+     * أي أثر محاسبي/مخزني/بيانات أساسية. لأنواع مستندات لها سياسة جاهزية لكن
+     * بلا باني مسودة (كسند التسليم اليوم). `READY_FOR_DRAFT` يبقى محجوزاً حصرياً
+     * للأنواع التي يملك المركز باني مسودة فعلياً لها.
+     */
+    case REVIEWED = 'reviewed';
     case READY_FOR_DRAFT = 'ready_for_draft';
     case CREATING_DRAFT = 'creating_draft';
     case DRAFT_CREATED = 'draft_created';

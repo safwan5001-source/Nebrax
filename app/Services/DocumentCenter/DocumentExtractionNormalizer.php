@@ -63,8 +63,8 @@ final class DocumentExtractionNormalizer
                 'tax_amount_minor' => self::minor($fields['tax_amount_minor'] ?? null, $fields['tax_amount'] ?? null),
                 'total_amount_minor' => self::minor($fields['total_amount_minor'] ?? null, $fields['total_amount'] ?? null),
             ],
-            'field_evidence' => self::fieldEvidence($fields, $confidence),
-            'lines' => self::lines($decoded['lines'] ?? [], $confidence),
+            'field_evidence' => self::fieldEvidence($fields),
+            'lines' => self::lines($decoded['lines'] ?? []),
             'warnings' => self::strings($decoded['warnings'] ?? [], 20, 300),
             'source' => [
                 'provider_key' => $providerKey,
@@ -126,7 +126,7 @@ final class DocumentExtractionNormalizer
     }
 
     /** @return list<array<string, mixed>> */
-    private static function lines(mixed $value, ?int $defaultConfidence): array
+    private static function lines(mixed $value): array
     {
         if (! is_array($value)) {
             return [];
@@ -154,7 +154,9 @@ final class DocumentExtractionNormalizer
                 'tax_rate' => self::nullableString($line['tax_rate'] ?? null, 64),
                 'page_number' => self::pageNumber($line['page_number'] ?? null),
                 'bounding_box' => self::boundingBox($line['bounding_box'] ?? null),
-                'confidence_basis_points' => self::confidenceBasisPoints($line['confidence'] ?? null) ?? $defaultConfidence,
+                // لا يُشتق من ثقة المستند: غياب ثقة السطر الصريحة يعني «غير معروفة»
+                // (null)، لا نسخاً لثقة مستوى المستند على كل سطر بلا تمييز.
+                'confidence_basis_points' => self::confidenceBasisPoints($line['confidence'] ?? null),
                 'source' => self::nullableString($line['source'] ?? null, 128),
             ];
         }
@@ -165,7 +167,7 @@ final class DocumentExtractionNormalizer
     /** @param array<string, mixed> $fields
      *  @return array<string, array<string, mixed>>
      */
-    private static function fieldEvidence(array $fields, ?int $defaultConfidence): array
+    private static function fieldEvidence(array $fields): array
     {
         $evidence = [];
         foreach (self::FIELD_KEYS as $key) {
@@ -173,7 +175,10 @@ final class DocumentExtractionNormalizer
             $evidence[$key] = [
                 'page_number' => self::pageNumber($metadata['page_number'] ?? null),
                 'bounding_box' => self::boundingBox($metadata['bounding_box'] ?? null),
-                'confidence_basis_points' => self::confidenceBasisPoints($metadata['confidence'] ?? null) ?? $defaultConfidence,
+                // لا يُشتق من ثقة المستند: حقل بلا `<field>_evidence.confidence`
+                // صريحة (كحقول فارغة أصلاً في مستند كسند التسليم) يعني ثقةً غير
+                // معروفة، لا ثقة المستند المنسوخة زوراً على كل حقل.
+                'confidence_basis_points' => self::confidenceBasisPoints($metadata['confidence'] ?? null),
                 'source' => self::nullableString($metadata['source'] ?? null, 128),
             ];
         }

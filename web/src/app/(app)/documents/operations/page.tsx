@@ -26,7 +26,7 @@ type Data = {
 
 const statusKeys: Record<string, string> = {
   received: 'statusReceived', waiting_for_processing: 'statusWaiting', safety_check_pending: 'statusSafetyPending', quarantined: 'statusQuarantined',
-  extraction_unavailable: 'statusExtractionUnavailable', processing: 'statusProcessing', needs_review: 'statusNeedsReview', ready_for_draft: 'statusReady',
+  extraction_unavailable: 'statusExtractionUnavailable', processing: 'statusProcessing', needs_review: 'statusNeedsReview', reviewed: 'statusReviewed', ready_for_draft: 'statusReady',
   draft_created: 'statusDraftCreated', failed_retry_available: 'statusFailedRetry', failed_action_required: 'statusFailedAction', archived_or_purged: 'statusArchived',
 };
 const tones: Record<string, 'neutral' | 'muted' | 'positive' | 'warning' | 'negative'> = {

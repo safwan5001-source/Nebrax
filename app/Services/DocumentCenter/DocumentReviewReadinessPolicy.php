@@ -6,13 +6,31 @@ use App\Models\DocumentBatch;
 use App\Models\DocumentExtractionResult;
 use App\Models\DocumentIssue;
 use App\Models\DocumentMatchResult;
+use App\Support\DocumentWorkflowStatus;
 use Illuminate\Validation\ValidationException;
 
 final class DocumentReviewReadinessPolicy
 {
+    /** @var list<string> */
+    private const SUPPORTED_TYPES = ['purchase_invoice', 'expense', 'delivery_note'];
+
+    /**
+     * حالة الانتقال الصحيحة بعد اكتمال المراجعة، حسب نوع المستند. الأنواع التي
+     * يملك المركز باني مسودة فعلياً لها (`purchase_invoice`, `expense`) تبقى
+     * تنتقل إلى `READY_FOR_DRAFT` تماماً كما كانت. أي نوع آخر مدعوم بسياسة
+     * جاهزية لكن بلا باني مسودة (`delivery_note` اليوم) ينتقل إلى `REVIEWED` —
+     * مراجعة بشرية مكتملة فقط، دون أي إيحاء بوجود مسودة أو إمكان إنشائها.
+     */
+    public function completionTargetStatus(string $documentType): DocumentWorkflowStatus
+    {
+        return in_array($documentType, ['purchase_invoice', 'expense'], true)
+            ? DocumentWorkflowStatus::READY_FOR_DRAFT
+            : DocumentWorkflowStatus::REVIEWED;
+    }
+
     public function assertReady(DocumentBatch $batch, DocumentExtractionResult $result): void
     {
-        if (! in_array($batch->document_type, ['purchase_invoice', 'expense'], true)) {
+        if (! in_array($batch->document_type, self::SUPPORTED_TYPES, true)) {
             throw ValidationException::withMessages(['document_type' => 'Readiness policy is not available for this document type.']);
         }
 
@@ -22,6 +40,13 @@ final class DocumentReviewReadinessPolicy
 
         $reviewed = app(ReviewedDocumentProjector::class)->project($result);
         $fields = is_array($reviewed['fields'] ?? null) ? $reviewed['fields'] : [];
+
+        if ($batch->document_type === 'delivery_note') {
+            $this->assertDeliveryNoteEvidence($fields, $reviewed['lines'] ?? []);
+
+            return;
+        }
+
         foreach (['currency', 'document_date', 'document_number', 'subtotal_minor', 'tax_amount_minor', 'total_amount_minor'] as $field) {
             if (($fields[$field] ?? null) === null || $fields[$field] === '') {
                 throw ValidationException::withMessages(['fields' => 'Required transaction evidence is incomplete.']);
@@ -60,6 +85,37 @@ final class DocumentReviewReadinessPolicy
 
         if (app(DocumentFinancialValidator::class)->validate($reviewed, 'purchase_invoice') !== []) {
             throw ValidationException::withMessages(['financial' => 'Reviewed financial validation still has issues.']);
+        }
+    }
+
+    /**
+     * حدٌّ أدنى محافظ مبني على العقد القائم: تاريخ ومرجع طرف واحد على الأقل
+     * وسطر واحد على الأقل بكمية لكل سطر. `document_number` اختياري عمداً —
+     * سند التسليم الحقيقي (ADR-009) يولّد رقمه الخاص لاحقاً ولا يعتمد على رقم
+     * الاستخراج. لا فحص مالي ولا مطابقة منتج/وحدة: لا مسودة تستهلكهما لهذا النوع.
+     *
+     * @param array<string,mixed> $fields
+     */
+    private function assertDeliveryNoteEvidence(array $fields, mixed $lines): void
+    {
+        if (($fields['document_date'] ?? null) === null || $fields['document_date'] === '') {
+            throw ValidationException::withMessages(['fields' => 'Required delivery note evidence is incomplete.']);
+        }
+
+        $issuer = $fields['issuer_name'] ?? null;
+        $recipient = $fields['recipient_name'] ?? null;
+        if (($issuer === null || $issuer === '') && ($recipient === null || $recipient === '')) {
+            throw ValidationException::withMessages(['fields' => 'A delivery note requires an identified issuer or recipient.']);
+        }
+
+        if (! is_array($lines) || $lines === []) {
+            throw ValidationException::withMessages(['lines' => 'A delivery note requires at least one reviewed line.']);
+        }
+        foreach ($lines as $line) {
+            $quantity = is_array($line) ? ($line['quantity'] ?? null) : null;
+            if ($quantity === null || $quantity === '') {
+                throw ValidationException::withMessages(['lines' => 'Every delivery note line requires a reviewed quantity.']);
+            }
         }
     }
 

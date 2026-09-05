@@ -174,6 +174,19 @@ class DocumentExtractionProcessingModeTest extends TestCase
         $this->assertSame(1, DocumentExtractionResult::count());
         $this->assertDatabaseMissing('journal_entries', ['tenant_id' => $auth['tenant_id']]);
         $this->assertDatabaseMissing('stock_movements', ['tenant_id' => $auth['tenant_id']]);
+
+        // المركز الوارد: الملف يبقى PENDING/غير CLEAN بالتصميم، والمعاينة/التنزيل
+        // يبقيان محجوبين — لكن حالة المعالجة المعروضة يجب أن تعكس النجاح الفعلي
+        // (needs_review) لا رسالة "بانتظار الفحص" الخاطئة، وتفصح الاستجابة صراحة
+        // عن أن الاستثناء هو سبب عدم الفحص الأمني.
+        $review = $this->withToken($auth['token'])->getJson("/api/document-batches/{$batch['id']}/review")->assertOk()->json('data');
+        $this->assertSame('pending', $review['processing_summary']['scan_status']);
+        $this->assertFalse($review['processing_summary']['download_available']);
+        $this->assertTrue($review['processing_summary']['scan_exception_admitted']);
+        $this->assertSame('needs_review', $review['processing_summary']['workflow_status']);
+        $this->assertSame('needs_review', $review['processing_summary']['processing_key']);
+        $this->assertNotSame('safety_check_pending', $review['processing_summary']['processing_key']);
+        $this->assertFalse($review['files'][0]['download_available']);
     }
 
     /** @test */

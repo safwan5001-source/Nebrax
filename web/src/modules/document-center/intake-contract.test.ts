@@ -46,8 +46,11 @@ describe('intake-contract', () => {
     expect(workflowStatusGroup('needs_review')).toBe('review');
     expect(workflowStatusGroup('ready_for_draft')).toBe('ready');
     expect(workflowStatusGroup('draft_created')).toBe('completed');
+    expect(workflowStatusGroup('reviewed')).toBe('completed');
     expect(workflowStatusGroup('failed')).toBe('terminal');
     expect(statusesForGroup('inbox')).toContain('processing');
+    expect(statusesForGroup('completed')).toContain('reviewed');
+    expect(statusesForGroup('ready')).not.toContain('reviewed');
   });
 
   it('يعرض أحجام الملفات بصيغة مقروءة', () => {
