@@ -124,9 +124,19 @@ export function ReceiptDialog({
   const totalMinor = receipt.model.totals?.total ?? 0;
 
   return (
-    <PosDialog open={!!receipt} onClose={onClose} title={variant === 'preview' ? t('receipt_preview_title') : t('receipt')} className="max-w-sm sm:max-w-md">
-      <div className="space-y-4">
-        <div className="flex items-start justify-between gap-3" data-testid={variant === 'preview' ? 'pos-receipt-preview' : 'pos-receipt-success'}>
+    <PosDialog
+      open={!!receipt}
+      onClose={onClose}
+      title={variant === 'preview' ? t('receipt_preview_title') : t('receipt')}
+      // PR-4.1: كانت `max-w-sm sm:max-w-md` تُنتج نافذة صغيرة يظهر الإيصال
+      // داخلها مصغَّراً جداً في شاشات سطح المكتب الكبيرة رغم مساحة فارغة
+      // حولها. الاتساع الجديد على sm+/lg+ يمنح مساحة معاينة حقيقية، والارتفاع
+      // (~88% من نافذة العرض) يستثمر ارتفاعها أيضاً؛ الجوال دون `sm:` كما كان
+      // تماماً (لا يتأثر بهذا التغيير).
+      className="max-w-sm sm:max-w-xl sm:h-[min(88dvh,52rem)] lg:max-w-2xl"
+    >
+      <div className="flex h-full min-h-0 flex-col gap-3 sm:gap-4">
+        <div className="flex shrink-0 items-start justify-between gap-3" data-testid={variant === 'preview' ? 'pos-receipt-preview' : 'pos-receipt-success'}>
           <div className="min-w-0">
             <div className="flex items-center gap-2 text-sm font-semibold text-text">
               {variant === 'success' && <CheckCircle2 className="h-5 w-5 shrink-0 text-positive" strokeWidth={1.7} aria-hidden />}
@@ -141,26 +151,41 @@ export function ReceiptDialog({
         </div>
 
         {printError && (
-          <div className="flex items-center gap-2 rounded-md border border-negative/30 bg-negative/10 px-3 py-2 text-sm text-negative" role="alert" data-testid="pos-receipt-print-error">
+          <div className="flex shrink-0 items-center gap-2 rounded-md border border-negative/30 bg-negative/10 px-3 py-2 text-sm text-negative" role="alert" data-testid="pos-receipt-print-error">
             <TriangleAlert className="h-4 w-4 shrink-0" strokeWidth={1.7} aria-hidden />
             {t('print_failed')}
           </div>
         )}
 
-        <div className="max-h-[min(55vh,28rem)] overflow-auto rounded-md border border-border bg-background p-3">
-          <DocumentScaler>
-            <DocumentView
-              model={receipt.model}
-              templateId={format.templateId}
-              themeId={'themeId' in format ? format.themeId : undefined}
-              showLogo={'showLogo' in format ? format.showLogo : undefined}
-              layout={'layout' in format ? format.layout : undefined}
-              rootId="print-root"
-            />
-          </DocumentScaler>
+        {/* منطقة معاينة مخصّصة تتمرّر بمفردها (لا صفحة المتصفّح كاملة) وتنمو
+            لتملأ ارتفاع الحوار المتاح. `min-h-full` (لا `h-full`) على المُحاذي
+            الداخلي يُبقي المستندات الطويلة قابلة للتمرير الكامل من أعلاها —
+            محاذاة بالهامش التلقائي لا `justify-center` على flex، فلا ينكسر
+            الوصول لأعلى محتوًى أطول من المساحة المتاحة. */}
+        <div className="min-h-0 flex-1 overflow-auto rounded-md border border-border bg-background p-3 sm:p-6">
+          <div className="flex min-h-full items-center justify-center">
+            {/* التكبير داخل `DocumentScaler` لا حوله: يقيس الأخير عرض/ارتفاع
+                محتواه الفعليَّين (`scrollWidth`/`offsetHeight`) بعد أي تكبير على
+                عناصره — فإحاطته بتكبير خارجي جعل حساب توسيطه (`offsetX`) يعتمد
+                قياساً غير متّسق مع حجم المحتوى المكبَّر فعلياً، فيُقصّ جزء من
+                الإيصال أفقياً. وضع التكبير هنا (طفلاً لا أباً) يبقي كل القياس
+                داخلياً ومتّسقاً. */}
+            <DocumentScaler>
+              <div className="receipt-preview-zoom">
+                <DocumentView
+                  model={receipt.model}
+                  templateId={format.templateId}
+                  themeId={'themeId' in format ? format.themeId : undefined}
+                  showLogo={'showLogo' in format ? format.showLogo : undefined}
+                  layout={'layout' in format ? format.layout : undefined}
+                  rootId="print-root"
+                />
+              </div>
+            </DocumentScaler>
+          </div>
         </div>
 
-        <div className="flex flex-col gap-2 no-print sm:flex-row sm:justify-end">
+        <div className="flex shrink-0 flex-col gap-2 no-print sm:flex-row sm:justify-end">
           <Button variant="outline" className="min-h-11 touch-manipulation sm:min-w-28" onClick={onClose}>
             {variant === 'preview' ? t('close') : t('new_sale')}
           </Button>
