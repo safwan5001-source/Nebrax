@@ -25,7 +25,14 @@ final class DocumentProcessingStatusProjector
         if ($batch->status === DocumentWorkflowStatus::RECEIVING) {
             return $this->state('received', 'neutral', false, 'تم استلام المستند.');
         }
-        if ($file?->scan_status === DocumentScanStatus::PENDING) {
+        // فحص الأمان PENDING هو العنوان فقط بينما المستند لا يزال قيد الاستقبال أو
+        // الطابور أو المعالجة. بعد ذلك — مراجعة/جاهزية/مسودة/فشل — يفوز تقدّم
+        // الحزمة الفعلي: ملفٌ استُقبل عبر استثناء فحص يبقى PENDING إلى الأبد
+        // بالتصميم، فلا يجوز أن يُخفي نجاح الاستخراج والمراجعة خلف رسالة "لا يزال
+        // ينتظر الفحص" الخاطئة. حالة الملف الأمنية (PENDING/CLEAN) تبقى منفصلة
+        // تماماً وتُبلَّغ بمسارها الخاص (انظر DocumentReviewController).
+        if ($file?->scan_status === DocumentScanStatus::PENDING
+            && in_array($batch->status, [DocumentWorkflowStatus::RECEIVED, DocumentWorkflowStatus::QUEUED, DocumentWorkflowStatus::PROCESSING], true)) {
             return $this->state('safety_check_pending', 'warning', false, 'فحص السلامة بانتظار المعالجة.');
         }
         if ($batch->status === DocumentWorkflowStatus::RECEIVED && ! $extractionEnabled) {
@@ -36,6 +43,9 @@ final class DocumentProcessingStatusProjector
         }
         if ($batch->status === DocumentWorkflowStatus::NEEDS_REVIEW) {
             return $this->state('needs_review', 'warning', false, 'المستند جاهز للمراجعة البشرية.');
+        }
+        if ($batch->status === DocumentWorkflowStatus::REVIEWED) {
+            return $this->state('reviewed', 'success', false, 'تمت مراجعة المستند بنجاح.');
         }
         if ($batch->status === DocumentWorkflowStatus::READY_FOR_DRAFT) {
             return $this->state('ready_for_draft', 'success', false, 'المستند جاهز لإنشاء مسودة.');

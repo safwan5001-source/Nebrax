@@ -21,6 +21,7 @@ type Props = {
 const STATUS_OPTIONS = [
   '',
   'needs_review',
+  'reviewed',
   'ready_for_draft',
   'draft_created',
   'processing',
