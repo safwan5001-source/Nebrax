@@ -1,89 +1,52 @@
 # ChatGPT Review
 
-STATUS: CHANGES_REQUESTED
-DECISION: MODIFIED
+STATUS: APPROVED_FOR_OWNER
+DECISION: ACCEPTED
 TASK_ID: ORCH-V2-DESIGN-001
 
 ## نطاق المراجعة
 
-مراجعة تقرير Claude Code للتصميم `ORCH-V2-DESIGN-001` على الفرع `agent/orch-v2-design-001`، مع قبول الاكتشافات المدعومة من بيئة Claude وطلب تصحيح نقطة معمارية واحدة قبل اعتماد V2.
+المراجعة النهائية لتصحيح Claude Code على `ORCH-V2-DESIGN-001` بعد دورة `CHANGES_REQUESTED`.
 
 ## القرار
 
-`CHANGES_REQUESTED` / `MODIFIED`.
+`ACCEPTED` / `APPROVED_FOR_OWNER`.
 
-التقرير مفيد ويقدم تبسيطاً حقيقياً لمسار الاستيقاظ داخل جلسة Claude الحية، لكن لا نعتمد الاستنتاج القائل إن GitHub Actions لا يستطيع تشغيل Claude Code Routine عبر HTTP. توجد حالياً وثائق Anthropic رسمية لـClaude Code Routines API (Experimental) تتضمن endpoint لتشغيل Routine on demand وتعرض GitHub Actions كحالة استخدام. لذلك يجب أن يميز التصميم بين آليتين بدل استبدال إحداهما بالأخرى.
+تم تصحيح النقطة المعمارية المطلوبة بصورة كافية، وأصبح التصميم يميز بوضوح بين آليتين مستقلتين:
 
-## ما تم قبوله من تقرير Claude
+1. `subscribe_pr_activity` كمسار منخفض التعقيد لإيقاظ جلسة Claude الحية المرتبطة بـPR، مع حدود lifecycle/ownership وعدم اعتباره durable trigger.
+2. Claude Code Routines API / GitHub trigger كمسار رسمي Experimental لبدء جلسة جديدة مستقلة، مع متطلبات وصلاحيات ومخاطر مختلفة.
 
-1. `subscribe_pr_activity` مفيد كقناة wake-up منخفضة التعقيد لجلسة Claude الحية المرتبطة بـPR، ويستحق Prototype مستقل.
-2. لا نحتاج dispatcher جديداً لمجرد إيقاظ جلسة Claude الحية إذا أثبت Slice 0 أن subscription تعمل كما هو متوقع.
-3. اعتماد single-writer واضح:
-   - `TASK.md`: Planner/Reviewer/Owner.
-   - `CLAUDE_REPORT.md`: Claude.
-   - `REVIEW.md`: Reviewer.
-4. اعتماد حقول الحالة الأساسية الآن: `TASK_ID`, `STATUS`, `EXPECTED_ACTOR`, `LAST_PROCESSED_SHA`, `ROUND`، مع `MAX_ROUNDS` ثابت في البروتوكول.
-5. fail-closed عند SHA mismatch، stale/replay، fork/untrusted source، conflict، تجاوز MAX_ROUNDS، أو owner gate.
-6. `APPROVED_FOR_OWNER` و`ESCALATED_TO_OWNER` يوقفان أي automation ولا يعنيان Merge/Deploy.
-7. OpenAI API reviewer، إن أُنشئ مستقبلاً، كيان منفصل عن محادثة ChatGPT التفاعلية الحالية ولا يجوز وصفه بأنه نفس المراجع التفاعلي.
-8. لا نؤتمت reviewer الآن لمسارات AWJ الحساسة؛ الهدف الحالي تقليل النقل/الإيقاظ اليدوي دون إنشاء حلقة autonomous بين وكيلين.
-9. ملاحظة غياب `permissions:` الصريحة في workflows الحالية تستحق مهمة أمنية مستقلة، ولا تُصلح ضمن هذه المهمة.
+## ما تم اعتماده
 
-## التغيير المطلوب
+- single-writer لكل ملف orchestration.
+- حقول الحالة: `TASK_ID`, `STATUS`, `EXPECTED_ACTOR`, `LAST_PROCESSED_SHA`, `ROUND`، و`MAX_ROUNDS` ثابت في البروتوكول.
+- fail-closed عند SHA mismatch، stale/replay، fork/untrusted source، conflict، max rounds، أو owner gate.
+- `APPROVED_FOR_OWNER` و`ESCALATED_TO_OWNER` حالتا توقف ولا تعنيان Merge/Deploy.
+- عدم استبدال ChatGPT التفاعلي بـOpenAI API reviewer في V2 الحالية.
+- عدم أتمتة المراجعة لمسارات AWJ الحساسة في هذه المرحلة.
+- Prototype متدرج يبدأ بـSlice 0 عبر `subscribe_pr_activity` فقط.
+- Routines API يبقى durable/on-demand fallback محتمل، ولا يُنفذ قبل إثبات الحاجة.
 
-صحح التقرير/التصميم بحيث يميز صراحة بين:
+## ملاحظات أمان مهمة محفوظة للتصميم اللاحق
 
-### A. Live-session wake-up
+- `/fire` لا يوفر idempotency key؛ أي استخدام مستقبلي يحتاج حماية AWJ من التكرار عبر state/SHA/round.
+- Routine تبدأ جلسة جديدة مستقلة ولا تعتمد على استمرارية سياق الجلسة الحية.
+- تشغيل Routine غير تفاعلي، لذلك لا يجوز اعتباره بديلاً عن بوابات المراجعة البشرية في المسارات الحساسة.
+- فجوة `permissions:` في GitHub workflows الحالية تبقى مهمة أمنية مستقلة ولا تدخل في هذا الـscope.
 
-`subscribe_pr_activity`:
-- مناسب عندما توجد جلسة Claude Code حية/مستمرة ومشتركة في PR.
-- يمكن أن يلغي الحاجة إلى GitHub Action لإيقاظ تلك الجلسة في هذا السيناريو.
-- يجب توثيق lifecycle/expiry/ownership/PR-Steward limitations التي تستطيع إثباتها من البيئة، وعدم اعتباره durable trigger قبل إثبات ذلك.
+## الخطوة التالية المعتمدة للتخطيط
 
-### B. Durable/on-demand Claude Routine dispatch
+إنشاء مهمة جديدة مستقلة لـSlice 0 لاختبار live-session wake-up:
 
-Claude Code Routines API (Experimental):
-- اعتبره مساراً رسمياً منفصلاً يمكن استدعاؤه عبر HTTP لبدء Routine on demand، بما في ذلك من GitHub Actions، وفق توثيق Anthropic الرسمي الحالي.
-- لا يلزم تنفيذه الآن.
-- سجّل أنه Experimental وأنه يحتاج per-routine bearer token ومتطلبات حساب/Claude Code web المناسبة، وبالتالي يحمل dependency/cost/reliability/security considerations مختلفة عن `subscribe_pr_activity`.
-- لا تفترض أنه نفس الجلسة الحية أو أنه يشارك حالتها الداخلية دون دليل.
+- PR تجريبي غير حساس.
+- Claude يشترك عبر `subscribe_pr_activity`.
+- حدث تعليق/مراجعة تجريبي.
+- إثبات هل تستيقظ الجلسة تلقائياً أم لا.
+- لا application code، لا secrets، لا Actions جديدة، لا Routines، لا Deploy/Production.
 
-النتيجة المطلوبة ليست اختيار أحدهما وإلغاء الآخر، بل توصية متدرجة:
-
-1. Prototype `subscribe_pr_activity` أولاً لأنه أبسط ولا يحتاج بنية تحتية جديدة.
-2. احتفظ بـRoutines API كـdurable fallback/dispatch path إذا احتجنا بدء جلسة جديدة أو wake-up مستقل عن بقاء جلسة حية.
-3. لا نبني GitHub Action/Routine integration قبل نجاح Prototype وتقييم الحاجة الفعلية.
-
-## OpenAI reviewer — القرار المعماري
-
-في V2 الحالية **لا نستبدل ChatGPT التفاعلي بوكيل OpenAI API مستقل**.
-
-يمكن دراسة API reviewer لاحقاً كمسار منفصل، لكن أي وكيل API يجب أن يحمل هوية مستقلة وصلاحيات محدودة، ولا يجوز له منح Merge/Deploy/Production approval. المهام التي تمس accounting/security/Tenant isolation/Branch isolation/DB/API contracts أو أي قرار مادي تبقى عند human/interactive review gate قبل `APPROVED_FOR_OWNER`.
-
-## Prototype المقترح بعد التصحيح
-
-Slice 0 فقط:
-- PR تجريبي/غير حساس.
-- جلسة Claude تشترك عبر `subscribe_pr_activity`.
-- تعليق/Review event تجريبي.
-- إثبات أن الجلسة استيقظت تلقائياً.
-- لا secrets، لا Actions جديدة، لا كود AWJ، لا Deploy.
-
-إذا نجح، نقرر بعدها هل Slice 1 documentation/state fields كافية، أو نحتاج اختبار Routines API منفصل.
-
-## المطلوب من Claude الآن
-
-هذه دورة تصميم فقط. لا تنفذ Prototype ولا Actions ولا Routines ولا secrets.
-
-حدّث `CLAUDE_REPORT.md` لنفس `TASK_ID: ORCH-V2-DESIGN-001` مع:
-- `STATUS: READY_FOR_REVIEW` عند اكتمال التصحيح.
-- تصحيح الاستنتاج المتعلق بـRoutines API.
-- مقارنة واضحة بين live-session subscription وdurable routine dispatch.
-- architecture recommendation النهائية بعد هذا التعديل.
-- أي Challenge جديد إذا كان لديك دليل رسمي أحدث يتعارض مع ذلك.
-
-ثم توقف للمراجعة.
+لا يتم توسيع `ORCH-V2-DESIGN-001` لتنفيذ الـPrototype؛ يجب أن يكون له `TASK_ID` مستقل للحفاظ على audit trail واضح.
 
 ## بوابة السلامة
 
-لا Merge، لا Deploy، لا Production Release، لا تغيير secrets/permissions/workflows، ولا تعديل في التطبيق أو accounting/security/API/DB/Tenant/Branch behavior ضمن هذه الدورة.
+هذا الاعتماد تقني للتصميم فقط. لا يمنح موافقة Merge أو Deploy أو Production Release، ولا يجيز أي تغيير محاسبي/أمني/API/DB/Tenant/Branch behavior.
