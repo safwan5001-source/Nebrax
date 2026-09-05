@@ -18,6 +18,7 @@ use App\Http\Resources\DocumentReviewResource;
 use App\Models\DocumentBatch;
 use App\Models\DocumentExtractionResult;
 use App\Models\DocumentFile;
+use App\Models\DocumentFileScanExceptionAdmission;
 use App\Models\DocumentIssue;
 use App\Models\DocumentMatchCandidate;
 use App\Models\DocumentMatchResult;
@@ -33,6 +34,7 @@ use App\Services\DocumentCenter\ExpenseDraftBuildOptions;
 use App\Services\DocumentCenter\PurchaseDocumentDraftBuilder;
 use App\Services\DocumentCenter\PurchaseDraftBuildOptions;
 use App\Services\DocumentCenter\ReviewedDocumentProjector;
+use App\Support\DocumentReviewFieldPresentation;
 use App\Support\DocumentScanStatus;
 use App\Support\DocumentSourceChannel;
 use App\Support\DocumentWorkflowStatusGroup;
@@ -146,8 +148,8 @@ class DocumentReviewController extends Controller
 
         return new DocumentReviewResource([
             'batch' => $batch,
-            'fields' => $this->fields($original, $reviewed),
-            'lines' => $this->lines($original, $reviewed, $matchPayload),
+            'fields' => $this->fields($original, $reviewed, $batch->document_type),
+            'lines' => $this->lines($original, $reviewed, $matchPayload, $batch->document_type),
             'warnings' => $this->warnings($original),
             'files' => $this->files($batch->files),
             'matches' => $matchPayload,
@@ -338,12 +340,16 @@ class DocumentReviewController extends Controller
     }
 
     /** @param array<string, mixed> $original @param array<string, mixed> $reviewed @return array<int, array<string, mixed>> */
-    private function fields(array $original, array $reviewed): array
+    private function fields(array $original, array $reviewed, string $documentType): array
     {
         $originalFields = is_array($original['fields'] ?? null) ? $original['fields'] : [];
         $reviewedFields = is_array($reviewed['fields'] ?? null) ? $reviewed['fields'] : [];
         $evidence = is_array($original['field_evidence'] ?? null) ? $original['field_evidence'] : [];
         $keys = array_values(array_unique(array_merge(array_keys($originalFields), array_keys($reviewedFields))));
+        $visible = DocumentReviewFieldPresentation::visibleHeaderFields($documentType);
+        if ($visible !== null) {
+            $keys = array_values(array_intersect($keys, $visible));
+        }
 
         return collect($keys)
             ->filter(fn ($key) => is_string($key) && $key !== '')
@@ -378,7 +384,7 @@ class DocumentReviewController extends Controller
     }
 
     /** @param array<int, array<string, mixed>> $matchPayload @return array<int, array<string, mixed>> */
-    private function lines(array $original, array $reviewed, array $matchPayload): array
+    private function lines(array $original, array $reviewed, array $matchPayload, string $documentType): array
     {
         $originalLines = is_array($original['lines'] ?? null) ? $original['lines'] : [];
         $reviewedLines = is_array($reviewed['lines'] ?? null) ? $reviewed['lines'] : [];
@@ -386,13 +392,18 @@ class DocumentReviewController extends Controller
         $editable = ['quantity', 'unit_price_minor', 'discount_minor', 'tax_amount_minor', 'total_minor'];
         $count = max(count($originalLines), count($reviewedLines));
         $lines = [];
+        $lineKeys = ['description', 'sku', 'barcode', 'unit', 'quantity', 'unit_price_minor', 'discount_minor', 'tax_amount_minor', 'total_minor'];
+        $visibleLineKeys = DocumentReviewFieldPresentation::visibleLineFields($documentType);
+        if ($visibleLineKeys !== null) {
+            $lineKeys = array_values(array_intersect($lineKeys, $visibleLineKeys));
+        }
 
         for ($index = 0; $index < min($count, 200); $index++) {
             $originalLine = is_array($originalLines[$index] ?? null) ? $originalLines[$index] : [];
             $reviewedLine = is_array($reviewedLines[$index] ?? null) ? $reviewedLines[$index] : [];
             $fields = [];
 
-            foreach (['description', 'sku', 'barcode', 'unit', 'quantity', 'unit_price_minor', 'discount_minor', 'tax_amount_minor', 'total_minor'] as $key) {
+            foreach ($lineKeys as $key) {
                 $originalValue = $this->safeValue($originalLine[$key] ?? null);
                 $currentValue = $this->safeValue($reviewedLine[$key] ?? null);
                 if ($originalValue === null && $currentValue === null) {
@@ -454,12 +465,29 @@ class DocumentReviewController extends Controller
             'download_available' => $file !== null
                 && $file->scan_status === DocumentScanStatus::CLEAN
                 && $file->purged_at === null,
+            // إشارة أمنية صادقة ومنفصلة عن تقدّم المعالجة: الملف لم يُفحص فعلياً
+            // وبقي PENDING لأن استثناء فحص معتمد سمح للمعالجة بتجاوزه. لا تُعلَّم
+            // الملف CLEAN ولا تُفتح المعاينة أو التنزيل بسبب هذا العلم مطلقاً —
+            // القيمتان أعلاه (`scan_status`, `download_available`) تبقيان الحكم
+            // الوحيد لذلك. الواجهة تترجم الرسالة بالمفتاح، لا تعرض نصاً من الخادم.
+            'scan_exception_admitted' => $this->scanExceptionAdmitted($file),
             'workflow_status' => $batch->status->value,
             'processing_key' => $status['key'],
             'processing_message' => $status['message'],
             'retry_available' => $status['retry_available'],
             'diagnostics_url' => '/documents/'.$batch->id.'/diagnostics',
         ];
+    }
+
+    private function scanExceptionAdmitted(?DocumentFile $file): bool
+    {
+        if ($file === null || $file->scan_status !== DocumentScanStatus::PENDING) {
+            return false;
+        }
+
+        return DocumentFileScanExceptionAdmission::withoutGlobalScopes()
+            ->where('document_file_id', $file->id)
+            ->exists();
     }
 
     /** @return array<int, array<string, mixed>> */

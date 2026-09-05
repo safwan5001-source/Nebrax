@@ -44,7 +44,7 @@ type Props = {
 };
 
 function reviewTone(status: string): 'positive' | 'muted' | 'warning' | 'negative' {
-  if (status === 'confirmed' || status === 'resolved' || status === 'ready_for_draft' || status === 'draft_created') return 'positive';
+  if (status === 'confirmed' || status === 'resolved' || status === 'ready_for_draft' || status === 'draft_created' || status === 'reviewed') return 'positive';
   if (status === 'rejected') return 'muted';
   if (status === 'blocking') return 'negative';
   return 'warning';
@@ -185,6 +185,7 @@ export function ReviewWorkspace({ batchId }: Props) {
           file={activeFile}
           scanStatus={review.processing_summary?.scan_status}
           processingMessage={review.processing_summary?.processing_message}
+          scanExceptionAdmitted={review.processing_summary?.scan_exception_admitted}
         />
       </CardContent>
     </Card>
@@ -207,7 +208,9 @@ export function ReviewWorkspace({ batchId }: Props) {
                   ? t('readyForDraft')
                   : review.batch.status === 'draft_created'
                     ? t('draftCreated')
-                    : t('needsReview')}
+                    : review.batch.status === 'reviewed'
+                      ? t('reviewed')
+                      : t('needsReview')}
               </Badge>
               {canManage && (
                 <Button size="sm" variant="outline" onClick={() => setAssignOpen(true)}>

@@ -87,6 +87,7 @@ export type ReviewHistory = {
 export type ProcessingSummary = {
   scan_status: string;
   download_available: boolean;
+  scan_exception_admitted: boolean;
   workflow_status: string;
   processing_key: string;
   processing_message: string;

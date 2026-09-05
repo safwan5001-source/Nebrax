@@ -210,13 +210,15 @@ final class DocumentReviewService
     {
         return DB::transaction(function () use ($batch, $result, $expectedVersion, $reason, $actorId): DocumentBatch {
             $locked = DocumentBatch::query()->whereKey($batch->id)->lockForUpdate()->firstOrFail();
-            if ($locked->status === DocumentWorkflowStatus::READY_FOR_DRAFT) return $locked;
+            $readiness = app(DocumentReviewReadinessPolicy::class);
+            $target = $readiness->completionTargetStatus($locked->document_type);
+            if ($locked->status === $target) return $locked;
             $locked = $this->lockedReviewBatch($locked, $expectedVersion);
             $result = $this->lockedResult($result, $locked);
             $reason = $this->reason($reason);
-            app(DocumentReviewReadinessPolicy::class)->assertReady($locked, $result);
+            $readiness->assertReady($locked, $result);
             $before = ['status' => $locked->status->value];
-            $completed = app(DocumentWorkflowService::class)->transition($locked, DocumentWorkflowStatus::READY_FOR_DRAFT, 'review_completed', 'user', $actorId, null, ['review_version' => $expectedVersion]);
+            $completed = app(DocumentWorkflowService::class)->transition($locked, $target, 'review_completed', 'user', $actorId, null, ['review_version' => $expectedVersion]);
             $this->audit($completed, $result, 'review_completed', 'batch', $completed->id, $before, ['status' => $completed->status->value], $actorId, $reason, $completed->version);
             return $completed;
         }, 3);

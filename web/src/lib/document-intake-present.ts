@@ -8,6 +8,7 @@ export function statusTranslationKey(status: string): string {
     queued: 'statusQueued',
     processing: 'statusProcessing',
     needs_review: 'statusNeedsReview',
+    reviewed: 'statusReviewed',
     ready_for_draft: 'statusReadyForDraft',
     creating_draft: 'statusCreatingDraft',
     draft_created: 'statusDraftCreated',
@@ -39,7 +40,7 @@ export function sourceTypeTranslationKey(sourceType: string): string {
 }
 
 export function statusBadgeTone(status: string): 'positive' | 'warning' | 'negative' | 'muted' {
-  if (status === 'ready_for_draft' || status === 'draft_created') return 'positive';
+  if (status === 'ready_for_draft' || status === 'draft_created' || status === 'reviewed') return 'positive';
   if (status === 'needs_review' || status === 'processing' || status === 'queued' || status === 'received' || status === 'receiving') return 'warning';
   if (status === 'failed' || status === 'quarantined') return 'negative';
   if (status === 'cancelled' || status === 'duplicate' || status === 'archived') return 'muted';

@@ -18,7 +18,7 @@ final class DocumentWorkflowStatusGroup
             'inbox' => self::INBOX,
             'review' => ['needs_review'],
             'ready' => ['ready_for_draft', 'creating_draft'],
-            'completed' => ['draft_created', 'archived'],
+            'completed' => ['reviewed', 'draft_created', 'archived'],
             'terminal' => self::TERMINAL,
             default => [],
         };

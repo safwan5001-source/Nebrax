@@ -13,9 +13,10 @@ type Props = {
   file: ReviewFile | null;
   scanStatus?: string;
   processingMessage?: string;
+  scanExceptionAdmitted?: boolean;
 };
 
-export function DocumentPreviewPanel({ file, scanStatus, processingMessage }: Props) {
+export function DocumentPreviewPanel({ file, scanStatus, processingMessage, scanExceptionAdmitted }: Props) {
   const t = useTranslations('documentCenterReview');
   const [state, setState] = useState<PreviewState>('idle');
   const [url, setUrl] = useState<string | null>(null);
@@ -74,7 +75,11 @@ export function DocumentPreviewPanel({ file, scanStatus, processingMessage }: Pr
             <p className="font-medium text-text">{file.original_name}</p>
             <p className="mt-1 text-sm text-muted">{t('previewUnavailable')}</p>
             {scanStatus && <p className="mt-1 font-mono text-xs text-muted">{scanStatus}</p>}
-            {processingMessage && <p className="mt-1 text-xs text-muted">{processingMessage}</p>}
+            {scanExceptionAdmitted ? (
+              <p className="mt-1 text-xs text-muted">{t('scanExceptionNotice')}</p>
+            ) : (
+              processingMessage && <p className="mt-1 text-xs text-muted">{processingMessage}</p>
+            )}
           </div>
         </div>
       </div>

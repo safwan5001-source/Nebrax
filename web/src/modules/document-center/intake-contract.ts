@@ -93,7 +93,7 @@ export function workflowStatusGroup(status: string): WorkflowStatusGroup {
   if (INBOX_STATUSES.has(status)) return 'inbox';
   if (status === 'needs_review') return 'review';
   if (status === 'ready_for_draft' || status === 'creating_draft') return 'ready';
-  if (status === 'draft_created' || status === 'archived') return 'completed';
+  if (status === 'reviewed' || status === 'draft_created' || status === 'archived') return 'completed';
   if (TERMINAL_STATUSES.has(status)) return 'terminal';
   return 'inbox';
 }
@@ -108,7 +108,7 @@ export function statusesForGroup(group: WorkflowStatusGroup): string[] {
     case 'ready':
       return ['ready_for_draft', 'creating_draft'];
     case 'completed':
-      return ['draft_created', 'archived'];
+      return ['reviewed', 'draft_created', 'archived'];
     case 'terminal':
       return [...TERMINAL_STATUSES];
     default:

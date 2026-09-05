@@ -95,6 +95,7 @@ function demoProcessingSummary(status: string) {
   return {
     scan_status: 'clean',
     download_available: true,
+    scan_exception_admitted: false,
     workflow_status: status,
     processing_key: status === 'needs_review' ? 'needs_review' : status,
     processing_message: status === 'needs_review' ? 'المستند جاهز للمراجعة البشرية.' : 'جاهز للمسودة.',

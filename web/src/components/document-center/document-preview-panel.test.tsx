@@ -41,4 +41,30 @@ describe('DocumentPreviewPanel', () => {
     render(<DocumentPreviewPanel file={null} />);
     expect(screen.getByText('noPreview')).toBeTruthy();
   });
+
+  it('shows the approved scan-exception disclosure instead of the generic processing message when the file was exception-admitted', () => {
+    render(
+      <DocumentPreviewPanel
+        file={{ id: 'f1', original_name: 'delivery-note.pdf', mime_type: 'application/pdf', page_count: 1, download_available: false }}
+        scanStatus="pending"
+        processingMessage="needs_review"
+        scanExceptionAdmitted
+      />,
+    );
+    expect(screen.getByText('scanExceptionNotice')).toBeTruthy();
+    expect(screen.queryByText('needs_review')).toBeNull();
+  });
+
+  it('keeps showing the raw processing message when the file was not exception-admitted', () => {
+    render(
+      <DocumentPreviewPanel
+        file={{ id: 'f1', original_name: 'invoice.pdf', mime_type: 'application/pdf', page_count: 1, download_available: false }}
+        scanStatus="pending"
+        processingMessage="scan pending"
+        scanExceptionAdmitted={false}
+      />,
+    );
+    expect(screen.getByText('scan pending')).toBeTruthy();
+    expect(screen.queryByText('scanExceptionNotice')).toBeNull();
+  });
 });
