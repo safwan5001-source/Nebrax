@@ -2,43 +2,71 @@
 
 STATUS: READY_FOR_REVIEW
 TYPE: REPORT
-TASK_ID: ORCH-TEST-001
+TASK_ID: ORCH-V2-DESIGN-001
 
-## Summary
+## ملخص تنفيذي
 
-نفّذت `ORCH-TEST-001` (أول مهمة تنفيذية حقيقية عبر البروتوكول): شخّصت السبب الجذري لغياب `App\Jobs\Accounting\SendZatcaSubmission` عن Laravel app المبني، وأصلحته بأصغر تغيير آمن، وأثبتّ الإصلاح بدليل مباشر (تحميل الصنف فعلياً + مجموعة الاختبار التي كانت تفشل بسببه أصبحت خضراء بالكامل).
+هذه دورة `CHANGES_REQUESTED` مقيّدة بالضبط بما طلبته `REVIEW.md`: تصحيح استنتاج واحد كان خاطئاً في تقريري السابق، دون تنفيذ أي Prototype أو Action أو secret. لم أُغيّر أي كود تطبيق.
 
-**السبب الجذري (بدليل، لا تخمين):** `setup.sh` (المستخدم في جلسات الويب عبر `.claude/hooks/session-start.sh`) يحتوي في القسم "4/6 دمج ملفات النواة" على `mkdir -p`/`cp -r` صريحين لكل مجلد فرعي مصدر يُنسخ إلى التطبيق المبني. القائمة تضمّنت `app/Jobs/DocumentCenter` لكنها **لم تتضمن `app/Jobs/Accounting` إطلاقاً** — لا `mkdir` له ولا سطر `cp`. بالمقارنة، `.github/workflows/ci.yml` (سطرا 107 و114) يحتوي `app/Jobs/Accounting` في كلا الموضعين بالفعل وبشكل صحيح. أي أن هذه الفجوة محصورة في `setup.sh` فقط — لم تصب CI قط — وسببها أن مَن أضاف `app/Jobs/Accounting/SendZatcaSubmission.php` إلى النواة حدّث قائمة `ci.yml` ونسي مرآتها في `setup.sh`، رغم أن الملفين يُصانان يدوياً بشكل مستقل ويجب أن يتطابقا (كما يشير التعليق القائم أصلاً في `setup.sh`: "يجب أن تطابق CI والإنتاج").
+**تراجُع صريح عن استنتاج سابق:** تقريري الأول ادّعى أن افتراض "GitHub Action يستدعي Claude Code Routine عبر HTTP" غير دقيق. **هذا كان خطأ مني.** تحققت الآن من التوثيق الرسمي مباشرة (`code.claude.com/docs/en/routines` و`platform.claude.com/docs/en/api/claude-code/routines-fire`، وليس من ذاكرة أو تخمين)، والمراجع كان محقاً: توجد **Claude Code Routines API** رسمية (Experimental) بنقطة `/fire` تُستدعى عبر HTTP بـbearer token مخصص للـroutine، وتوثيق Anthropic نفسه يعرض مثال GitHub Actions step يستدعيها عند فشل CI. كما توجد GitHub triggers أصلية للـRoutines (بلا حاجة لأي Action وسيط) تعمل عبر GitHub App مثبَّت على المستودع.
 
-## Changed files
+الخلاصة الصحيحة إذن: **آليتان حقيقيتان ومختلفتان تماماً**، لا آلية واحدة تُبطل الأخرى:
 
-- `setup.sh` — إضافة `app/Jobs/Accounting` إلى قائمة `mkdir -p`، وإضافة سطر `cp -r "$CORE_DIR/app/Jobs/Accounting/"*.php app/Jobs/Accounting/` مباشرة بعد سطر `DocumentCenter` المقابل (نفس الترتيب والصيغة الموجودة فعلاً في `ci.yml`)، مع تعليق قصير يوضح أن القائمتين يدويتان ويجب أن تبقيا متطابقتين — هذا بالضبط ما يمنع تكرار نفس فئة الفجوة مستقبلاً (معيار القبول رقم 4/الاختياري)، دون بناء أداة تحقق جديدة تتجاوز نطاق المهمة.
-- لا تعديل على أي كود تطبيق (`SendZatcaSubmission.php` نفسه لم يتغيّر)، ولا migrations، ولا routes، ولا منطق محاسبي/ZATCA.
+| | A. Live-session subscription (`subscribe_pr_activity`) | B. Routines API/GitHub trigger |
+|---|---|---|
+| ما تُوقظه | **جلسة Claude الحية القائمة فعلاً** (هذه الجلسة نفسها)، بكل سياقها المتراكم | **جلسة جديدة كل مرة** — "Claude Code doesn't reuse sessions across events, so two PR updates produce two independent sessions" (موثّق رسمياً) |
+| البنية التحتية المطلوبة | لا شيء — أداة MCP مدمجة في الجلسة | Routine مُعرَّف مسبقاً في `claude.ai/code/routines` + (لـGitHub trigger) تثبيت Claude GitHub App على المستودع |
+| المُشغِّل (trigger) | تعليق/مراجعة/CI على PR مُشترَك فيه | **GitHub trigger**: فئتا حدث فقط موثقتان رسمياً — **Pull request** (opened/closed/assigned/labeled/synchronized/…) و**Release** — لا فئة "comment" منفصلة موثّقة صراحة. **API trigger**: POST مصادَق بـbearer token من أي مصدر (بما فيه GitHub Action) |
+| الاستمرارية/الذاكرة | تستيقظ بذاكرة المحادثة الكاملة | جلسة صفر في كل مرة — يجب أن تُعيد قراءة `PROTOCOL.md`/`TASK.md`/`DECISIONS.md` من الصفر (وهذا **متوافق فعلاً** مع تصميم AWJ الحالي: `AGENT_ORCHESTRATION.md` أصلاً يطلب قراءة هذه الملفات في بداية كل دورة، لا الاعتماد على ذاكرة محادثة) |
+| الأتمتة أثناء التشغيل | هذه الجلسة تعمل بنفس وضع الصلاحيات المُهيَّأ لها في هذه المحادثة (استمرار طبيعي، لا تغيير) | موثّق رسمياً: **"there is no permission-mode picker and no approval prompts during a run"** — الـRoutine تعمل بصلاحية كاملة تلقائياً بلا أي موافقة تفاعلية على أي خطوة |
+| Idempotency | يتحكم بها منطق AWJ نفسه (state file) | **لا يوجد idempotency key في `/fire`** (موثّق رسمياً: "There is no idempotency key. If a webhook caller retries, the endpoint creates multiple sessions") — الحماية الوحيدة من التكرار هي منطق AWJ نفسه (`LAST_PROCESSED_SHA`/`ROUND`) |
+| نطاق الاعتماد (Credential) | لا credential جديد | Bearer token **مخصص لـroutine واحد فقط، بلا صلاحية قراءة** ("scoped to a single routine... grants no read access") — نطاق ضيق جيد إن استُخدم |
+| النضج | مدمجة اليوم في هذه الجلسة، مُختبَرة بحكم الاستخدام | **Experimental بحكم توثيق Anthropic نفسه** — رأس `anthropic-beta: experimental-cc-routine-2026-04-01` إلزامي، وشكل الطلب/الاستجابة قابل للتغيير |
 
-## Verification
+## ما تصحّح بالضبط (حسب طلب `REVIEW.md`)
 
-### Tests
+### A. Live-session wake-up — كما ورد، مع توضيح الحدود القابلة للإثبات فعلاً من البيئة
 
-1. **إعادة بناء التطبيق من الصفر بالإصلاح:** شغّلت `bash setup.sh` كاملاً (وليس نسخاً يدوياً)، فأعاد نسخ الملفات وشغّل `php artisan migrate:fresh` ثم `php artisan test --filter=LedgerTest` كخطوة 6/6 الخاصة بالسكربت نفسه — **5/5 ناجحة**.
-2. **إثبات مباشر أن الصنف لم يعد مفقوداً:**
-   - `ls app/Jobs/Accounting/` في التطبيق المبني يُظهر `SendZatcaSubmission.php` (لم يكن موجوداً قبل الإصلاح).
-   - فحص PHP مباشر: `class_exists('App\Jobs\Accounting\SendZatcaSubmission')` بعد تحميل `bootstrap/app.php` ⇒ `true`.
-3. **الاختبار المركّز الذي كان يفشل بسبب الصنف المفقود:** `php artisan test --filter=ZatcaSubmissionRecoveryTest` ⇒ **4/4 ناجحة (27 assertion)**، بعد أن كان يفشل بـ `Class "App\Jobs\Accounting\SendZatcaSubmission" not found`.
-4. **المجموعة الكاملة (معلوماتية، دون توسيع النطاق):** `php artisan test` ⇒ **2363 ناجح / 25 فاشل / 1 متجاوز** (17010 assertion)، مقابل **2360/28/1** المُبلَّغة سابقاً — تحسّن بمقدار الاختبارات المرتبطة بهذا الإصلاح تحديداً. النتيجة **ليست Green ولا تُعرض كذلك**؛ الـ25 فشلاً المتبقية جميعها في ملفات لا علاقة لها بـ`SendZatcaSubmission` أو بآلية النسخ (`FuelAviRfidServiceTest`، `FuelReconciliationTest`، `FuelSaleApiTest`, `FuelSaleServiceTest`، `FuelSupplyReceivingTest`, `FuelSupplyReceivingApiTest`، و`DocumentCenterSecureIntakeTest`)، وتحققت من سببين مختلفين تماماً عن مهمة اليوم:
-   - أغلبها (`Call to undefined function App\Services\bcmul()` في `FuelCostBasisService`): امتداد PHP `bcmath` **غير مفعّل** في بيئة هذه الجلسة (تحقق مباشر: `php -m | grep -i bcmath` لا يُظهر شيئاً) — فجوة بيئة/تشغيل منفصلة تماماً عن نسخ ملفات setup، ولم تُلمس هذه الدورة.
-   - `DocumentCenterSecureIntakeTest`: فشل تحقق PDF غير مرتبط (422 بدل 201، "ملف PDF تالف أو غير مدعوم") — على الأرجح مشكلة ملف اختبار ثابت (fixture)، لا علاقة له بموضوع هذه المهمة، ولم يُلمس أيضاً وفق حدود النطاق الصريحة في `TASK.md`.
+`subscribe_pr_activity` مناسب فقط عندما توجد جلسة Claude حية مشترِكة أصلاً في الـPR (كحال هذه الجلسة الآن). حدوده المُثبَتة من وصف الأداة نفسها لا من افتراض:
+- تُسلَّم فقط أنواع أحداث محددة: تعليقات، فشل CI، ونجاح check-suite rollups.
+- **قيد ملكية:** "if a Claude agent (PR Steward) is already watching the PR, the call succeeds but this session will NOT receive events" — مراقب واحد فعّال فقط لكل PR عبر هذه الأداة تحديداً.
+- **دورة الحياة:** الاشتراك ينتهي بانتهاء الجلسة؛ لا استمرارية عبر إعادة تشغيل الحاوية أو انتهاء الجلسة، ولم أجد في وصف الأداة ما يثبت مدة صلاحية أطول من عمر الجلسة — لا أفترض خلاف ذلك.
 
-### Build / lint / CI
+### B. Durable/on-demand Claude Routine dispatch — مسار رسمي منفصل، مُتحقَّق منه الآن مباشرة
 
-`bash setup.sh` نفسه هو خط أنابيب البناء هنا وقد نجح بالكامل من الصفر (الخطوات 1–6). لم يُشغَّل CI الفعلي على GitHub (لا صلاحية push إلى فرع يُطلق CI في نطاق هذه الجلسة بخلاف الدفع المباشر المطلوب)؛ لكن التغيير في `setup.sh` **لا يمسّ** `ci.yml` إطلاقاً — الإصلاح يجعل `setup.sh` يطابق `ci.yml` الصحيح أصلاً، فلا خطر رجعي على CI.
+مسار حقيقي وموثَّق رسمياً (`code.claude.com/docs/en/routines`، `platform.claude.com/docs/en/api/claude-code/routines-fire`)، وليس Experimental بمعنى "غير موجود" بل Experimental بمعنى "شكل الـAPI قابل للتغيير":
+
+- **API trigger:** `POST https://api.anthropic.com/v1/claude_code/routines/{routine_id}/fire` — رؤوس إلزامية: `Authorization: Bearer sk-ant-oat01-...` (خاص بـroutine واحد)، `anthropic-beta: experimental-cc-routine-2026-04-01`، `anthropic-version`. جسم اختياري `text` (حتى 65536 حرفاً) يصل للـRoutine **مُغلَّفاً صراحةً كبيانات غير موثوقة** (`<routine-fire-payload>`) ما لم يُشِر prompt الـRoutine المحفوظ إليه صراحةً — هذا تصميم أمان جيد يستحق تبنّيه لو استُخدم لاحقاً في AWJ (أي reviewer/dispatcher لا يمرر تعليمات تُنفَّذ مباشرة، بل بيانات يقرر prompt الـRoutine المحفوظ مسبقاً كيف يعاملها).
+- **GitHub trigger:** يتطلب تثبيت Claude GitHub App على المستودع، ويدعم فئتين موثّقتين فقط: **Pull request** (بفلاتر: المؤلف، العنوان، الوصف، الفرع الأساسي/المصدر، التصنيفات، draft، merged) و**Release**. **لم أجد فئة "comment" منفصلة موثّقة** — إن احتجنا لاحقاً إيقاظ Routine تحديداً على تعليق مراجعة (لا على فتح/تحديث PR)، هذا يحتاج تحققاً إضافياً غير مثبت اليوم، لا افتراضاً.
+- **كل استدعاء (API أو GitHub) يُنشئ جلسة جديدة منفصلة تماماً** — لا استمرارية سياق بين الاستدعاءات، بعكس مسار A.
+- **بلا idempotency key:** إعادة محاولة webhook تُنشئ جلسات متعددة — أي استخدام مستقبلي لهذا المسار في AWJ **يجب** أن يعتمد على حقل `LAST_PROCESSED_SHA`/`ROUND` في `TASK.md` نفسه لرفض التنفيذ المكرر، لا على الـAPI لحمايته من ذلك.
+- **بلا أي بوابة موافقة تفاعلية أثناء التشغيل** (موثّق رسمياً: "no permission-mode picker and no approval prompts during a run") — هذه أهم نقطة أمان اكتشفتها بالتحقق المباشر، وتُقوّي بشدة الـRISK الذي رفعته في تقريري السابق حول الأتمتة الكاملة: أي Routine يُستدعى تلقائياً (سواء لتنفيذ Claude أو لمراجعة OpenAI مستقبلية) يعمل **بصلاحية كاملة بلا نقطة توقف بشرية واحدة** خلال الجلسة نفسها. البروتوكول (`PROTOCOL.md`) يبقى الحارس الوحيد حينها — الالتزام بالتوقف عند `READY_FOR_REVIEW`/`WAITING_FOR_REVIEWER` يعتمد كلياً على أن الـprompt المحفوظ في الـRoutine يفرضه بدقة، لا على أي حاجز تقني خارجي.
+
+## نتيجة الاختبار المطلوبة (بعد التصحيح)
+
+**لا نستبدل A بـB ولا العكس — كلاهما صالح لغرض مختلف:**
+
+- **A (`subscribe_pr_activity`)** هو الأنسب لإيقاظ **هذه الجلسة الحية تحديداً** أثناء دورة عمل مستمرة — بلا أي بنية تحتية جديدة. هذا ما يُثبته Slice 0 المتفق عليه.
+- **B (Routines API/GitHub trigger)** هو المسار الصحيح إن احتجنا لاحقاً **بدء جلسة جديدة** بشكل مستقل عن بقاء أي جلسة حية (مثلاً بعد انتهاء هذه الجلسة، أو لمراجعة تلقائية دورية) — لكنه يحمل اعتمادية Experimental، غياب idempotency، وغياب بوابة موافقة تفاعلية أثناء التشغيل، وهي اعتبارات يجب أن يُصممها `PROTOCOL.md` صراحةً (عبر `LAST_PROCESSED_SHA`/`ROUND` والـprompt المحفوظ) قبل أي استخدام فعلي — لا الاعتماد على الـAPI نفسها لتوفيرها.
+
+هذا يتطابق تماماً مع التوصية المتدرجة التي طلبتها `REVIEW.md`: Slice 0 (مسار A) أولاً، والاحتفاظ بمسار B كـ**durable fallback/dispatch path** موثَّق دون تنفيذ، حتى تثبت الحاجة الفعلية بعد نجاح Slice 0.
+
+## التحديثات المقبولة من `REVIEW.md` (بلا تعديل)
+
+كل ما ورد في `REVIEW.md` تحت "ما تم قبوله من تقرير Claude" (البنود 1–9) يبقى كما هو ومُعتمَد: single-writer لكل ملف، حقول الحالة الأساسية (`TASK_ID`/`STATUS`/`EXPECTED_ACTOR`/`LAST_PROCESSED_SHA`/`ROUND` + `MAX_ROUNDS` ثابت)، fail-closed عند أي شذوذ، عدم أتمتة الـreviewer الآن، وملاحظة فجوة `permissions:` كمهمة منفصلة. لم يطلب المراجع تغيير أي من هذه البنود، فلم أُعِد فتحها.
+
+## OpenAI reviewer — مثبَّت كما قرره المراجع
+
+`REVIEW.md` حسم هذا صراحةً: **لا استبدال لمحادثة ChatGPT التفاعلية بوكيل OpenAI API مستقل في V2 الحالية**. أي وكيل API مستقبلي يحمل هوية وصلاحيات منفصلة ولا يمنح Merge/Deploy، والمهام المحاسبية/الأمنية/العزل تبقى عند بوابة مراجعة بشرية تفاعلية قبل `APPROVED_FOR_OWNER`. هذا يتوافق مع الـRISK الذي رفعته سابقاً وأزيد عليه الآن بالدليل الموثّق أعلاه عن غياب موافقة تفاعلية داخل تشغيل الـRoutine نفسه — سبب إضافي لعدم أتمتة أي reviewer على مسارات AWJ الحساسة الآن.
+
+## Prototype (بلا تغيير عن قرار المراجع — Slice 0 فقط، غير مُنفَّذ في هذه الدورة)
+
+كما ورد في `REVIEW.md`: PR تجريبي، اشتراك عبر `subscribe_pr_activity`، تعليق تجريبي، إثبات الاستيقاظ، بلا secrets ولا Actions جديدة ولا كود AWJ. **لم أنفّذ هذا الـSlice في هذه الدورة** — التكليف الحالي تصحيح تقرير فقط.
 
 ## Safety / compatibility assessment
 
-- Accounting correctness: لا تغيير — لا مسّ لـ`LedgerService` ولا لمنطق `SendZatcaSubmission` نفسه، فقط سطر نسخ ملف في سكربت بناء البيئة المحلية.
-- Data integrity: غير منطبق.
-- Security: لا أسرار أو بيانات اعتماد أُضيفت أو عُدّلت.
-- Tenant isolation / Branch isolation: غير منطبق — لا نماذج ولا scopes تأثرت.
-- Backward compatibility: لا أثر — التغيير يصلح فجوة بيئة تطوير محلية فقط (`setup.sh` يُستخدم لبناء نسخة تطوير/اختبار من الصفر)، ولا يوجد إنتاج فعلي يعتمد عليه، ولا واجهة API أو schema تغيّرت.
+- Accounting/Data/Security/Tenant/Branch isolation/API/DB: لا تغيير — تصحيح توثيقي بحت لتقرير تصميم، بلا أي كود.
+- لا secrets جديدة، لا GitHub Actions جديدة، لا Routines أُنشئت فعلياً.
 
 ### Accounting entries
 
@@ -46,21 +74,22 @@ N/A — no accounting impact.
 
 ## Risks / remaining work
 
-- الـ25 فشل اختبار المتبقية (بيئية بحتة: `bcmath` غير مفعّل + مشكلة PDF fixture واحدة) تستحق مهمة منفصلة إذا احتُجنا لاحقاً لمجموعة اختبار كاملة خضراء في هذه البيئة — خارج نطاق `ORCH-TEST-001` عمداً كما نص `TASK.md`.
-- لم أُضف اختباراً آلياً جديداً يقارن قائمتي `setup.sh` و`ci.yml` تلقائياً (كان سيتطلب أداة تحقق جديدة على مستوى سكربتات Shell، وهي توسيع للنطاق لم يطلبه معيار القبول الاختياري رقم 4)؛ اكتفيت بتعليق صريح في `setup.sh` يوثّق ضرورة التطابق. إن رغب المراجع/المالك بحارس آلي حقيقي (مثل سكربت CI يقارن قوائم النسخ بين الملفين)، فهذا يستحق مهمة منفصلة بنطاق واضح.
+- **جديد، بدليل رسمي مباشر:** أي استخدام مستقبلي لمسار B (Routines) يجب أن يُصمَّم بافتراض أن الجلسة الناتجة **تعمل بصلاحية كاملة بلا موافقة بشرية أثناء التشغيل** — هذا يرفع أهمية أن يكون prompt الـRoutine المحفوظ صارماً في الالتزام بالتوقف عند بوابات `PROTOCOL.md` (`READY_FOR_REVIEW`/`WAITING_FOR_REVIEWER`/`APPROVED_FOR_OWNER`)، لأن لا حارس تقني خارجي يفرض ذلك غير الالتزام النصي بالـprompt نفسه.
+- **جديد:** غياب idempotency في `/fire` يعني أن أي تصميم مستقبلي لمسار B **يعتمد كلياً** على `LAST_PROCESSED_SHA`/`ROUND` في ملفات AWJ لمنع التنفيذ المكرر عند إعادة محاولة webhook — ليس تفصيلاً نظرياً، بل خاصية مؤكدة في التوثيق الرسمي.
+- **جديد:** تغطية "GitHub trigger" الرسمية للـRoutines لا تشمل فئة "تعليق" موثّقة صراحة (فقط Pull request وRelease) — إن احتاج تصميم لاحق إيقاظ Routine على تعليق مراجعة تحديداً (لا فتح/تحديث PR)، هذا يحتاج تحققاً إضافياً منفصلاً قبل الاعتماد عليه، ولا أفترضه اليوم.
+- لا مخاطر أخرى جديدة عن الدورة السابقة.
 
 ## Question / proposal / risk / challenge
 
-لا شيء جديد. لم تظهر أي حاجة لتوسيع النطاق أو قرار مادي غير محسوم — السبب الجذري كان محصوراً تماماً في سطر نسخ ملف واحد ناقص، وأثبتّه بدليل مباشر من `setup.sh` مقابل `ci.yml` دون تخمين.
+لا شيء جديد يستوجب `WAITING_FOR_REVIEWER` — هذه دورة تصحيح مقيدة أنجزت المطلوب بالضبط. النقاط الثلاث في "Risks / remaining work" أعلاه إضافات توثيقية للـthreat model تدعم القرار المُتَّخذ فعلاً (Slice 0 أولاً)، لا اعتراضاً عليه.
 
 ## Git state
 
-- Branch: `agent/chatgpt-claude-orchestrator-v1` (فرع PR #660 نفسه، بدفع مباشر بتفويض صريح من `TASK.md`: "لا تعتمد على Safwan لنقل محتوى المراجعة... GitHub هو قناة الحالة المشتركة").
-- PR: #660 — لا يزال Draft وغير مدموج؛ لم يُنشأ أو يُعدَّل أي PR جديد.
-- Base SHA (قاعدة PR #660 / رأس `main`): `afb7b0152f52c20fa907cd000a4fc27a45341dc5`
-- Head SHA قبل هذه الدورة (بداية `ORCH-TEST-001` في `TASK.md`): `08edae1c335b019af29b7dc66d643bc6ef210e1a`
-- Head SHA بعد هذه الدورة: يُحدَّد بعد الـcommit (سيُدفع إلى نفس الفرع أعلاه).
+- Branch: `agent/orch-v2-design-001`.
+- PR: لا يوجد — تصحيح تصميم فقط.
+- Base SHA (قبل هذه الدورة، commit طلب التصحيح): `ff8d401a110a03a364ba5edaa99b478af81568bd`
+- Head SHA بعد هذه الدورة: يُحدَّد بعد الـcommit.
 
-## Recommended next step
+## الخطوة التالية المقترحة
 
-مراجعة ChatGPT للإصلاح مقابل معايير القبول السبعة في `TASK.md` (كلها مستوفاة بدليل أعلاه)، ثم تسجيل قرار (`ACCEPTED`/`APPROVED_FOR_OWNER`/`CHANGES_REQUESTED`) في `REVIEW.md`. لا دمج ولا نشر دون موافقة صفوان الصريحة كما تنص بوابة المالك في `TASK.md` و`PROTOCOL.md`.
+مراجعة ChatGPT لهذا التصحيح تحديداً (الجدول المقارن + الحقائق الثلاث الجديدة المُتحقَّق منها رسمياً). إن اعتُمد، الخطوة التالية الطبيعية هي تنفيذ Slice 0 فعلياً (يحتاج `TASK_ID` جديداً أو تمديد نطاق صريح لهذه المهمة)، ولا يزال ذلك خارج نطاق هذه الدورة.
