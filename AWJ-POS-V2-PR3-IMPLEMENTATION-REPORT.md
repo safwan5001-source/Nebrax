@@ -499,7 +499,7 @@ clipping (documented in the PR-2C QA mission) remains untouched and out of scope
   matches the PR-2C merge SHA given in the mission brief)
 - PR number/link: [#658](https://github.com/safwan5001-source/Nebrax/pull/658) (Draft)
 - Previously reviewed Head SHA: `4c3bec9bcadcd887f31eb9ffd6189157f2d54a2d`
-- Head SHA (after this correction): recorded after commit (see final chat reply)
+- Head SHA (after this correction): `894ae14bf1bb295f1f6be74d838c46f2b2632cc4`
 
 ## Next Step
 
