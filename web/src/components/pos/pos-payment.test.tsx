@@ -205,4 +205,232 @@ describe('PosPayment', () => {
     );
     expect(screen.getByRole('alert').className).toMatch(/text-negative/);
   });
+
+  it('PR-5: بنكي زائد عن المتبقي يُعطّل التأكيد ويعرض رسالة تحقّق دون إرسال', () => {
+    const onConfirm = vi.fn();
+    const methods = [
+      ...paymentMethods,
+      { id: 'bank', name: 'Bank', name_en: 'Bank', settlement_type: 'bank' as const, is_active: true, is_default: false },
+    ];
+    render(
+      <PosPayment
+        allowDeferredPayment={false}
+        customerName="Walk-in"
+        defaultPaymentMethodId="cash"
+        error={null}
+        items={[]}
+        onBack={vi.fn()}
+        onConfirm={onConfirm}
+        paying={false}
+        paymentMethods={methods}
+        paymentMethodsLoadError={null}
+        paymentMethodsLoading={false}
+        totalMinor={10000}
+      />,
+    );
+
+    const bankAmount = screen.getByRole('textbox', { name: 'Bank' });
+    fireEvent.change(bankAmount, { target: { value: '120.00' } });
+
+    expect(screen.getByTestId('pos-payment-method-invalid').textContent).toContain('payment_bank_amount_exceeds_remaining');
+    const confirm = screen.getByTestId('pos-confirm-payment') as HTMLButtonElement;
+    expect(confirm.disabled).toBe(true);
+    fireEvent.click(confirm);
+    expect(onConfirm).not.toHaveBeenCalled();
+  });
+
+  it('PR-5: تقسيم نقد + بنكي يطابق الإجمالي بلا متبقٍ ولا فكة، ويُرسَل غير النقدي أولاً', () => {
+    const onConfirm = vi.fn();
+    const methods = [
+      ...paymentMethods,
+      { id: 'bank', name: 'Bank', name_en: 'Bank', settlement_type: 'bank' as const, is_active: true, is_default: false },
+    ];
+    render(
+      <PosPayment
+        allowDeferredPayment={false}
+        customerName="Walk-in"
+        defaultPaymentMethodId="cash"
+        error={null}
+        items={[]}
+        onBack={vi.fn()}
+        onConfirm={onConfirm}
+        paying={false}
+        paymentMethods={methods}
+        paymentMethodsLoadError={null}
+        paymentMethodsLoading={false}
+        totalMinor={10000}
+      />,
+    );
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Cash' }), { target: { value: '40.00' } });
+    fireEvent.change(screen.getByRole('textbox', { name: 'Bank' }), { target: { value: '60.00' } });
+
+    expect(screen.getByTestId('pos-payment-paid').querySelector('.num')?.textContent).toContain('100.00');
+    expect(screen.getByTestId('pos-payment-remaining').querySelector('.num')?.textContent).toContain('0.00');
+    expect(screen.getByTestId('pos-payment-change').querySelector('.num')?.textContent).toContain('0.00');
+
+    fireEvent.click(screen.getByTestId('pos-confirm-payment'));
+    expect(onConfirm).toHaveBeenCalledWith([
+      { payment_method_id: 'bank', amount: 6000 },
+      { payment_method_id: 'cash', amount: 4000 },
+    ]);
+  });
+
+  it('PR-5: نقد يغطي الإجمالي كاملاً — الفكة تُحسب من صافي النقد فقط لا من مجموع كل ما كُتب', () => {
+    const onConfirm = vi.fn();
+    const methods = [
+      ...paymentMethods,
+      { id: 'bank', name: 'Bank', name_en: 'Bank', settlement_type: 'bank' as const, is_active: true, is_default: false },
+    ];
+    render(
+      <PosPayment
+        allowDeferredPayment={false}
+        customerName="Walk-in"
+        defaultPaymentMethodId="cash"
+        error={null}
+        items={[]}
+        onBack={vi.fn()}
+        onConfirm={onConfirm}
+        paying={false}
+        paymentMethods={methods}
+        paymentMethodsLoadError={null}
+        paymentMethodsLoading={false}
+        totalMinor={10000}
+      />,
+    );
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Bank' }), { target: { value: '50.00' } });
+    fireEvent.change(screen.getByRole('textbox', { name: 'Cash' }), { target: { value: '120.00' } });
+
+    // غير النقدي يُطبَّق أولاً (50 من أصل 100 متبقية)، فيبقى 50 يُطبَّق عليها
+    // النقد، والفائض (120-50=70) فكةٌ لا سداد.
+    expect(screen.getByTestId('pos-payment-change').querySelector('.num')?.textContent).toContain('70.00');
+    expect(screen.getByTestId('pos-payment-remaining').querySelector('.num')?.textContent).toContain('0.00');
+
+    fireEvent.click(screen.getByTestId('pos-confirm-payment'));
+    expect(onConfirm).toHaveBeenCalledWith([
+      { payment_method_id: 'bank', amount: 5000 },
+      { payment_method_id: 'cash', amount: 12000 },
+    ]);
+  });
+
+  it('PR-5: الدفع الآجل المسموح مع متبقٍ يعرض ملاحظة الذمة المتبقية', () => {
+    render(
+      <PosPayment
+        allowDeferredPayment
+        customerName="Walk-in"
+        defaultPaymentMethodId="cash"
+        error={null}
+        items={[]}
+        onBack={vi.fn()}
+        onConfirm={vi.fn()}
+        paying={false}
+        paymentMethods={paymentMethods}
+        paymentMethodsLoadError={null}
+        paymentMethodsLoading={false}
+        totalMinor={10000}
+      />,
+    );
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Cash' }), { target: { value: '40.00' } });
+    expect(screen.getByTestId('pos-deferred-remaining-note')).toBeTruthy();
+    expect((screen.getByTestId('pos-confirm-payment') as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it('PR-5: الدفع الآجل الممنوع مع متبقٍ يُبقي التأكيد معطّلاً', () => {
+    render(
+      <PosPayment
+        allowDeferredPayment={false}
+        customerName="Walk-in"
+        defaultPaymentMethodId="cash"
+        error={null}
+        items={[]}
+        onBack={vi.fn()}
+        onConfirm={vi.fn()}
+        paying={false}
+        paymentMethods={paymentMethods}
+        paymentMethodsLoadError={null}
+        paymentMethodsLoading={false}
+        totalMinor={10000}
+      />,
+    );
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Cash' }), { target: { value: '40.00' } });
+    expect((screen.getByTestId('pos-confirm-payment') as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it('PR-5: «المبلغ بالضبط» يملأ ما تبقّى فعلاً بعد وسيلة أخرى مُدخَلة، لا الإجمالي كاملاً', () => {
+    const methods = [
+      ...paymentMethods,
+      { id: 'bank', name: 'Bank', name_en: 'Bank', settlement_type: 'bank' as const, is_active: true, is_default: false },
+    ];
+    render(
+      <PosPayment
+        allowDeferredPayment={false}
+        customerName="Walk-in"
+        defaultPaymentMethodId="cash"
+        error={null}
+        items={[]}
+        onBack={vi.fn()}
+        onConfirm={vi.fn()}
+        paying={false}
+        paymentMethods={methods}
+        paymentMethodsLoadError={null}
+        paymentMethodsLoading={false}
+        totalMinor={10000}
+      />,
+    );
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Bank' }), { target: { value: '40.00' } });
+    fireEvent.click(screen.getByText('Cash'));
+    fireEvent.click(screen.getByRole('button', { name: 'exact_amount' }));
+    expect((screen.getByRole('textbox', { name: 'Cash' }) as HTMLInputElement).value).toBe('60.00');
+  });
+
+  it('PR-5: لوحة الأرقام على الشاشة تُستخدم لمبلغ الدفع عند تفعيل الإعداد فقط', () => {
+    const labels = {
+      apply: 'apply', backspace: 'backspace', cancel: 'cancel', clear: 'clear',
+      decimal: 'decimal', digit: (d: string) => `digit_${d}`, value: 'value',
+    };
+    const { rerender } = render(
+      <PosPayment
+        allowDeferredPayment={false}
+        customerName="Walk-in"
+        defaultPaymentMethodId="cash"
+        error={null}
+        items={[]}
+        onBack={vi.fn()}
+        onConfirm={vi.fn()}
+        paying={false}
+        paymentMethods={paymentMethods}
+        paymentMethodsLoadError={null}
+        paymentMethodsLoading={false}
+        totalMinor={10000}
+        showOnscreenNumericKeypad={false}
+        numericEditorLabels={labels}
+      />,
+    );
+    expect(screen.getByRole('textbox', { name: 'Cash' })).toBeTruthy();
+
+    rerender(
+      <PosPayment
+        allowDeferredPayment={false}
+        customerName="Walk-in"
+        defaultPaymentMethodId="cash"
+        error={null}
+        items={[]}
+        onBack={vi.fn()}
+        onConfirm={vi.fn()}
+        paying={false}
+        paymentMethods={paymentMethods}
+        paymentMethodsLoadError={null}
+        paymentMethodsLoading={false}
+        totalMinor={10000}
+        showOnscreenNumericKeypad
+        numericEditorLabels={labels}
+      />,
+    );
+    expect(screen.queryByRole('textbox', { name: 'Cash' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Cash' })).toBeTruthy();
+  });
 });
