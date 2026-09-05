@@ -10,6 +10,22 @@ This directory is the durable coordination channel between:
 
 This protocol does **not** authorize autonomous merge, deploy, production release, destructive operations, or unapproved financial/security/database/API behavior changes.
 
+## Pilot status
+
+This protocol is running its first pilot cycle (`TASK_ID: ORCH-PILOT-001`) on PR #660's isolated branch. During the pilot, `TASK.md`/`CLAUDE_REPORT.md`/`REVIEW.md`/`DECISIONS.md` stay on that branch and are **not** merged to `main` merely to make the pilot convenient. A merge to `main` requires the pilot to succeed and Safwan's explicit approval — that approval covers this documentation/entrypoint set specifically, not a general merge authorization. Mutable task/review state may be redesigned later if keeping it on `main` proves noisy; that redesign is out of scope for the pilot itself.
+
+## Coordination channel
+
+Intended path for this pilot: `Claude Code → GitHub coordination state → ChatGPT review → GitHub coordination state → Claude Code`.
+
+For this pilot, ChatGPT has direct GitHub repository access and reads/writes the coordination files and inspects PR state itself. Safwan is **not** a required relay for routine reviewer messages between ChatGPT and Claude Code — that would collapse the reviewer/owner separation this protocol depends on. Safwan remains the owner gate only for decisions explicitly reserved to the owner (merge, deploy, production release, destructive operations, sensitive scope expansion).
+
+If direct repository access is unavailable to the reviewer in a future session or environment, the workflow must declare itself `BLOCKED` and say so explicitly, or fall back to a documented manual relay recorded in `DECISIONS.md` — it must never silently assume the independent channel exists when it does not.
+
+## Language
+
+Human-facing explanations, reports, findings, questions, and review rationale default to Arabic, consistent with `CLAUDE.md`. Stable machine/state identifiers — `READY_FOR_CLAUDE`, `IN_PROGRESS`, `WAITING_FOR_REVIEWER`, `READY_FOR_REVIEW`, `CHANGES_REQUESTED`, `APPROVED_FOR_OWNER`, `BLOCKED`, `CANCELLED`, `QUESTION`, `PROPOSAL`, `RISK`, `CHALLENGE`, and reviewer decision tokens — and code/file/symbol identifiers stay in English exactly as written. A full translation of every protocol file is not required for V1; this section governs new human-facing content going forward.
+
 ## Source-of-truth order
 
 When instructions conflict, use this order:
@@ -87,6 +103,8 @@ Repository evidence shows a material task assumption or architectural direction 
 
 Claude must never treat its own `PROPOSAL` or `CHALLENGE` as approved. Wait for a reviewer/owner decision when the affected work is material.
 
+**Small/local autonomy governs only *when* Claude may proceed without stopping — never *whether* the resulting diff needs review.** It means Claude does not need to pause and escalate before every implementation detail inside approved scope; it does **not** authorize autonomous acceptance of the resulting code. Every implementation cycle that changes code must still return to `READY_FOR_REVIEW`, and the resulting diff/evidence must be reviewed before `APPROVED_FOR_OWNER` is recorded.
+
 ## Reviewer decisions
 
 ChatGPT records one of:
@@ -143,6 +161,8 @@ Every completed implementation cycle must update `CLAUDE_REPORT.md` with:
 11. Recommended next step.
 
 Never claim a test/build/CI result that was not actually observed.
+
+For any task that creates, changes, reverses, posts, settles, allocates, or otherwise affects accounting entries, item 7 must include the resulting accounting-entry table (accounts, debit, credit) required by `CLAUDE.md`'s pre-PR protocol. A generic "Accounting correctness: OK" statement is not sufficient on its own for accounting-impacting work. Write `N/A — no accounting impact` only when genuinely applicable.
 
 ## Loop termination
 
