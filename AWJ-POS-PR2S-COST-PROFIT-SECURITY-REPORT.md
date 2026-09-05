@@ -390,7 +390,7 @@ rendering as a proxy for API exposure.
 
 ## 26. Draft PR Number/Link
 
-Recorded after creation (see below).
+Draft PR #655 — https://github.com/safwan5001-source/Nebrax/pull/655
 
 ## 27. Branch
 
@@ -402,7 +402,7 @@ Recorded after creation (see below).
 
 ## 29. Head SHA
 
-Recorded after commit (see below).
+`3b51cb7`
 
 ## 30. Integration Note for PR #654
 
