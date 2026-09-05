@@ -42,7 +42,8 @@ The highest priority is to close correctness/security/integrity gaps before addi
 12. Moving Average Cost remains global per product under the current architecture.
 13. Live operational references must remain valid or fail closed when UOM/catalog structures change.
 14. Current pre-production test/demo data is disposable and must not force a weaker production design.
-15. No Merge/Deploy/Production Release without explicit approval.
+15. Same-tenant branch/warehouse access restrictions are authorization boundaries, not UI filters.
+16. No Merge/Deploy/Production Release without explicit approval.
 
 ---
 
@@ -159,6 +160,8 @@ Workflow: Inspect → Preview → Draft → explicit Posting. Preview/Draft crea
 
 Posting is transaction-protected, locks/rechecks the draft against concurrent double-post, locks product rows before moving-average calculations, requires warehouse per line, supports warehouses from different branches, creates one opening journal entry, and uses stored line values consistently with inventory receipt values. Posted openings cannot be deleted. Restrictive FKs and Product+Warehouse uniqueness protect line integrity.
 
+Inventory Opening is intentionally CompanyWide inside a tenant because one opening may span warehouses from multiple branches; warehouse/branch dimension lives on each line/movement/journal line. Do not add a fake header branch merely to mimic branch-scoped documents.
+
 Opening inventory is currently base-unit oriented; multi-UOM opening is P2.
 
 ---
@@ -214,6 +217,18 @@ Implemented: receipt/issue/transfer, draft→posted, source/target warehouses, s
 
 **PASS — Tenant/warehouse creation path:** source and target warehouses are tenant-owned and must both be allowed to the user; all Product IDs are tenant-owned.
 
+**PASS — posting atomicity/double-post:** posting runs transactionally, locks the permit, rechecks Draft, validates source availability for issue/transfer and posts inventory/accounting together.
+
+### P1 — Same-tenant Branch/Warehouse record authorization
+
+The route layer grants generic `products.view` / `products.manage` plus `inventory.core`. It does not add record-level branch/warehouse middleware. `StockPermitController::index()` applies active/allowed-branch scoping and `store()` validates source/target warehouses, but `show()`, `post()` and `destroy()` load the permit directly by tenant-scoped ID without reasserting the current user's allowed branch/warehouse access.
+
+Tenant isolation remains intact; this finding is specifically **within the same tenant** for users restricted to selected branches/warehouses.
+
+Required invariant:
+
+> A user who cannot access a permit's operational branch/source/target warehouse must not read, post or delete that permit merely by knowing its UUID.
+
 ### P1 — Stock Permit UOM / Base Quantity
 
 `StockPermitLine.quantity` is treated directly as stock quantity and lacks historical `unit_name`/`unit_factor` snapshot. Commercial UOM input must convert to immutable base quantity at posting.
@@ -246,13 +261,25 @@ These two Purchase Return fixes should ship together.
 
 ## 16. Stocktake
 
+**PASS — Tenant isolation:** Stocktake records are protected by the tenant global scope.
+
 **PASS — creation isolation:** warehouse is tenant-owned and allowed for the active branch/user context; supplied Product IDs are tenant-owned.
 
 Stocktake remains base-unit oriented; multi-UOM counting UX is P2.
 
+### P1 — Same-tenant Branch/Warehouse record authorization
+
+As with Stock Permits, route middleware provides generic product permission/application entitlement but not record-level branch/warehouse authorization. The list is active/allowed-branch scoped and creation validates warehouse access, while `show()`, `count()`, `post()` and `destroy()` load the Stocktake directly by tenant-scoped ID without reasserting that the current user can access its branch/warehouse.
+
+Required invariant:
+
+> Same-tenant users restricted away from the stocktake's branch/warehouse cannot read, count, post or delete it by UUID.
+
 ### P1 — Stocktake Snapshot / Concurrent Movement Reconciliation
 
-Opening stocktake snapshots warehouse quantity; intervening movements may occur before posting. Posting stale counted-minus-snapshot requires reconciliation/version validation.
+Opening stocktake snapshots `system_quantity`. `quantityDifference()` is `counted_quantity - system_quantity`, and posting applies that stale difference without proving the warehouse/product balance has remained unchanged since the snapshot. A concurrent sale/receipt/transfer can therefore make the posted adjustment mathematically wrong even though the Stocktake document itself is protected against double-post.
+
+Implementation must choose an explicit correctness policy: movement freeze/cutoff for the counted scope, or version/reconciliation validation before posting (or another equivalently safe design). Silent stale-snapshot posting is not acceptable.
 
 ---
 
@@ -287,6 +314,10 @@ Warehouse Product×Warehouse dimension, Low Stock Center and movement source dri
 ## 19. Central Sensitive Cost Authorization — confirmed P1
 
 Sensitive data includes at minimum purchase price, average cost, profit margin, stock value, movement unit cost and movement total cost. Sale price is not cost.
+
+### Confirmed route-level evidence
+
+The Product route surface grants list/show/export/activity with `products.view`; create/update/import with `products.manage`. Inventory list/export/movements use `products.view` plus `inventory.core`. None of those route guards requires `products.view_cost` for the confirmed sensitive surfaces. This establishes the gap at endpoint level, not only in resources/controllers.
 
 ### Confirmed read/exposure surfaces
 
@@ -376,24 +407,28 @@ Preserve Product Quick View cost authorization, negative-stock enforcement, hist
 ## 23. Current confirmed P1 list
 
 1. **Central Sensitive Cost Authorization & Data Redaction — read + write + import/export + inference**
-2. **Minimum Sale Price after Invoice/Header Discount**
-3. **Purchase Return UOM / Historical Base Quantity**
-4. **Purchase Return Inventory Valuation / GL Reconciliation**
-5. **Stock Permit UOM / Base Quantity**
-6. **Stocktake Snapshot / Concurrent Movement Reconciliation**
-7. **In-use UOM Template Base/Factor Mutation Safety + Product.unit invariant**
-8. **Tenant-wide Primary + Alternate Barcode Namespace Integrity**
-9. **Product Lifecycle Reference Census Integrity**
-10. **Product Inventory-Identity Mutation Guard Completeness**
+2. **Same-tenant Branch/Warehouse Record Authorization — Stocktake + Stock Permit detail/mutation paths**
+3. **Minimum Sale Price after Invoice/Header Discount**
+4. **Purchase Return UOM / Historical Base Quantity**
+5. **Purchase Return Inventory Valuation / GL Reconciliation**
+6. **Stock Permit UOM / Base Quantity**
+7. **Stocktake Snapshot / Concurrent Movement Reconciliation**
+8. **In-use UOM Template Base/Factor Mutation Safety + Product.unit invariant**
+9. **Tenant-wide Primary + Alternate Barcode Namespace Integrity**
+10. **Product Lifecycle Reference Census Integrity**
+11. **Product Inventory-Identity Mutation Guard Completeness**
 
 ### Confirmed PASS items
 
+- Tenant global isolation for reviewed Stocktake / Stock Permit / Inventory Opening records
 - Purchase Return negative-stock enforcement
 - Stock Permit/Transfer operational negative-stock enforcement
 - Stock Permit creation tenant/source/target warehouse/Product isolation
+- Stock Permit posting transaction/double-post protection
 - Stocktake creation tenant/warehouse/Product isolation
 - Inventory Opening staged preview/draft has no stock/GL effect
 - Inventory Opening atomic posting/double-post protection/accounting-value design
+- Inventory Opening CompanyWide multi-branch model is intentional and tenant-isolated
 - UOM unknown-unit resolution fails closed
 - historical UOM snapshots on reviewed posted-document paths
 - Delivery Note no duplicate stock/GL effect under current design
@@ -425,23 +460,26 @@ Media migration package; quantity-tier pricing; intelligent replenishment; bundl
 
 No implementation is authorized by this record.
 
-1. **PR-PRICE-1 — Minimum Sale Price after all economically applicable discounts**
-2. **PR-INV-1 — Centralize Product & Inventory Cost Authorization**
-3. **PR-INV-2 — Purchase Returns Hardening**
-4. **PR-INV-3 — Stock Permit UOM / Base Quantity**
-5. **PR-INV-4 — Stocktake Concurrent Reconciliation**
-6. **PR-UOM-1 — In-use UOM Mutation Safety + Live Reference Integrity + Tenant Barcode Namespace**
-7. **PR-PROD-LIFE-1 — Product Lifecycle Reference Registry + Inventory Identity Guard**
-8. Multiple UOM & Barcode Completion Epic
-9. **PR-IMP-1 — Durable Import Jobs Foundation + Large Catalog/Opening Workflows**
-10. Inventory Workspace server-side/warehouse completion
-11. Serial/Lot/Expiry
-12. Reservations/Availability
-13. Stock Requests/Approval
-14. Low Stock/Replenishment
-15. Movement source drilldown
-16. Bundles
-17. Manufacturing deferred
+1. **PR-SEC-INV-1 — Same-tenant Stocktake/Stock Permit Branch-Warehouse Authorization**
+2. **PR-PRICE-1 — Minimum Sale Price after all economically applicable discounts**
+3. **PR-INV-1 — Centralize Product & Inventory Cost Authorization**
+4. **PR-INV-2 — Purchase Returns Hardening**
+5. **PR-INV-3 — Stock Permit UOM / Base Quantity**
+6. **PR-INV-4 — Stocktake Concurrent Reconciliation**
+7. **PR-UOM-1 — In-use UOM Mutation Safety + Live Reference Integrity + Tenant Barcode Namespace**
+8. **PR-PROD-LIFE-1 — Product Lifecycle Reference Registry + Inventory Identity Guard**
+9. Multiple UOM & Barcode Completion Epic
+10. **PR-IMP-1 — Durable Import Jobs Foundation + Large Catalog/Opening Workflows**
+11. Inventory Workspace server-side/warehouse completion
+12. Serial/Lot/Expiry
+13. Reservations/Availability
+14. Stock Requests/Approval
+15. Low Stock/Replenishment
+16. Movement source drilldown
+17. Bundles
+18. Manufacturing deferred
+
+Security PR is first because it is a narrow authorization boundary with no accounting redesign. The remaining ordering may be adjusted at formal closure if final census evidence changes dependencies.
 
 ---
 
@@ -451,6 +489,7 @@ As applicable: tenant isolation; branch/warehouse correctness; base-UOM invarian
 
 Additional standing DoD:
 
+- same-tenant restricted users must be denied UUID access to Stocktake/Stock Permit records outside allowed branch/warehouse scope on read and every mutation/post path
 - every new Product reference reviews lifecycle/deletion and inventory-identity protection
 - every stock-affecting commercial UOM path proves conversion to immutable base quantity
 - every sensitive-cost surface proves authorized and unauthorized behavior, including exports/history/filter/sort inference and writes/imports
@@ -472,11 +511,11 @@ Key preserved conclusion: AWJ intentionally keeps Product Catalog Import as Mast
 
 ### Strong/already present
 
-Product catalog; categories/brands; warehouses; per-warehouse balances; stock movements; perpetual inventory; moving average; sales COGS; purchase valuation foundation; price lists/per-UOM prices; POS authoritative pricing; stock permits/transfers; opening inventory; stocktake foundation; safe Product Import staging; export infrastructure; alternate-barcode backend/POS; historical UOM snapshots.
+Product catalog; categories/brands; warehouses; per-warehouse balances; stock movements; perpetual inventory; moving average; sales COGS; purchase valuation foundation; price lists/per-UOM prices; POS authoritative pricing; stock permits/transfers; opening inventory; stocktake foundation; safe Product Import staging; export infrastructure; alternate-barcode backend/POS; historical UOM snapshots; tenant global isolation.
 
 ### Hardening before expansion
 
-Minimum-price final economics; centralized cost authorization; purchase-return UOM/valuation; stock-permit UOM; stocktake concurrency; in-use UOM mutation; barcode namespace; complete Product lifecycle reference/identity protection.
+Same-tenant branch/warehouse record authorization; minimum-price final economics; centralized cost authorization; purchase-return UOM/valuation; stock-permit UOM; stocktake concurrency; in-use UOM mutation; barcode namespace; complete Product lifecycle reference/identity protection.
 
 ### Completion after hardening
 
@@ -489,13 +528,12 @@ Multiple-UOM/barcode UX/workbook; durable imports; warehouse-aware inventory wor
 Before formal closure:
 
 1. complete generic Product-reference census beyond confirmed `InventoryOpeningLine` / `DeliveryNoteLine` omissions
-2. finish any remaining cost-write/export endpoint/route policy census
-3. verify remaining tenant/branch/warehouse scoping edge cases, especially post/update paths
-4. finalize barcode namespace/concurrency production invariant
-5. reconcile remaining Daftra benchmark areas with evidence
-6. finalize P1/P2/P3 mapping and PR order without starting implementation
+2. reconcile any remaining same-tenant branch/warehouse record-access edge cases discovered in the final census
+3. finalize barcode namespace/concurrency production invariant at implementation-contract level (without premature schema overdesign)
+4. reconcile remaining Daftra benchmark areas with evidence
+5. finalize P1/P2/P3 mapping and PR order without starting implementation
 
-Inventory Settings route/settings boundary is reconciled for the current reviewed surface; future default-warehouse policy remains backlog rather than a closure blocker.
+Cost route/write/export policy census and the reviewed Inventory Settings boundary are now reconciled. Stocktake/Stock Permit same-tenant record authorization is confirmed as a P1 rather than left as Pending Verification.
 
 This record is the living working source of truth. Confirmed findings must be updated here rather than held only in chat.
 
