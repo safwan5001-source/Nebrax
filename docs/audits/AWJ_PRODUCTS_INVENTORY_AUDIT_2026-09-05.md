@@ -1,0 +1,580 @@
+# أَوْج / AWJ ERP — Products & Inventory Audit Working Record
+
+**Date:** 2026-09-05  
+**Last reconciled:** 2026-09-06  
+**Repository:** `safwan5001-source/Nebrax`  
+**Audit basis:** actual `main` source code + AWJ UI screenshots supplied during the audit + prior approved project discussions/decisions + Daftra as a competitive benchmark where explicitly reviewed.  
+**Status:** **AUDIT CLOSED — READY FOR IMPLEMENTATION PLANNING.** Implementation has **not** started. No merge/deploy/production release is authorized by this document.
+
+## Governing pre-production data rule
+
+The project-wide policy in `docs/audits/AWJ_PRE_PRODUCTION_DATA_POLICY.md` governs this audit: all current tenants and business data are test/demo data and are not preservation constraints. Do not weaken the intended production design or add compatibility complexity solely to preserve them. Clean schema/default/constraint changes and deliberate test-data reset are acceptable before first real production data. This does **not** relax Tenant Isolation, accounting correctness, inventory integrity, security, intended API/domain contracts, idempotency, or explicit merge/deploy approval requirements.
+
+---
+
+## 1. Executive conclusion
+
+AWJ already has a substantial Products & Inventory core. It should **not** be rebuilt as a new Inventory Core/V2 from scratch.
+
+The correct program is:
+
+> **Products & Inventory Completion & Hardening**
+
+The existing foundation includes product catalog, categories/brands, inventory tracking fields, warehouses, warehouse balances, permanent stock movements, moving-average costing, perpetual inventory, sales COGS, purchase receipts, returns foundation, stocktake, stock permits/transfers, opening inventory, POS integration, UOM templates, alternate barcodes, price lists, import/export, and inventory reporting.
+
+The highest priority is to close correctness/security/integrity gaps before adding large-import, serial/lot/expiry, reservations, advanced replenishment, or broader UX.
+
+---
+
+## 2. Audit principles and invariants
+
+1. Actual `main` code is the source of truth for current implementation state.
+2. Daftra is a benchmark, not a checklist.
+3. Master Data, Stock State, and Financial Transactions remain separate.
+4. Product catalog import must not directly create inventory balances or accounting entries.
+5. Every stock movement quantity is a base inventory quantity.
+6. Historical document UOM factors are immutable snapshots.
+7. Referenced products are deactivated, not destructively deleted.
+8. Inventory GL and inventory subledger must reconcile.
+9. Sensitive cost data is protected at backend, not merely hidden in UI.
+10. Tenant isolation and branch/warehouse correctness are mandatory.
+11. Quantity truth is warehouse/subledger state; Product Master edits are not stock adjustments.
+12. Moving Average Cost remains global per product under the current architecture.
+13. Live operational references must remain valid or fail closed when UOM/catalog structures change.
+14. Current pre-production test/demo data is disposable and must not force a weaker production design.
+15. Same-tenant branch/warehouse access restrictions are authorization boundaries, not UI filters.
+16. No Merge/Deploy/Production Release without explicit approval.
+
+---
+
+## 3. Product master and lifecycle
+
+Product Master supports tenant/branch identity, SKU/barcode, bilingual names, product type/base unit, category/brand, unit template, supplier, accounting mappings, sale/purchase/minimum prices, inventory tracking, reorder, quantity, average cost and active state.
+
+Product create/update validates tenant-owned references and accounting account types. Selecting a unit template through Product flows forces `Product.unit` to the template base unit.
+
+`ProductLifecycleService` correctly separates catalog edits from inventory/accounting, but its manually maintained Product-reference census and inventory-identity mutation guard are incomplete; see Section 11.
+
+**PASS:** `UpdateProductRequest` explicitly prohibits `initial_quantity`; stock changes must use stock transactions rather than Product Master edits.
+
+---
+
+## 4. Categories, brands and media
+
+Categories/brands are tenant-scoped managed master data with deletion protection. Product media uses persistent private storage and supports POS exposure. Bulk media portability remains P3: workbook + media manifest/package rather than binary images embedded in XLSX.
+
+---
+
+## 5. Units of measure (UOM)
+
+`UnitTemplate` defines a base unit plus alternative units with canonical integer factors directly to base. The central conversion model converts quantity, not money. Unknown units fail closed rather than silently becoming factor 1.
+
+Historical invoice/purchase/delivery-note lines snapshot `unit_name` and `unit_factor`.
+
+### P1 — In-use Unit Template mutation safety
+
+`UnitTemplateController::update()` can change `base_unit` and recreate alternative-unit rows without protecting existing stock/live references. Changing base/factor semantics can reinterpret future conversions while current stock has no template-version identity.
+
+A direct template base-unit edit can also diverge `UnitTemplate.base_unit` from linked `Product.unit`; POS treats `Product.unit` as factor 1.
+
+Required invariant:
+
+> `Product.unit === UnitTemplate.base_unit` for linked products.
+
+### P2 — Live UOM reference integrity
+
+Alternative-unit rename/delete can leave string-based references stale in alternate barcodes, price-list items and held POS carts. These must fail closed or be explicitly migrated; never silently reinterpret quantity under another factor.
+
+---
+
+## 6. Multiple barcode
+
+Alternate barcode backend/API is real. POS excludes stale alternate barcodes whose `unit_name` is no longer valid; no stale-barcode → silent factor-1 corruption was found in the reviewed POS path.
+
+### P1 — Tenant-wide Primary + Alternate Barcode Namespace Integrity
+
+Alternate-barcode creation checks both primary and alternate barcode namespaces. However, Product primary barcode validation and Product Import live-conflict checks query only `Product.barcode`; they do not consistently include `ProductBarcode.code`.
+
+The original Product schema enforces tenant-wide SKU uniqueness but does not define tenant-wide DB uniqueness for the primary `products.barcode`. `ProductBarcode` is explicitly company-wide because scanner resolution has no branch context. Controller/request checks therefore cannot be the final concurrency boundary.
+
+Required invariant:
+
+> `Primary Barcode ∪ Alternate Barcodes` is unique within the tenant.
+
+Must cover Product create/update/import, alternate-barcode writes and future barcode workbook import, including atomic/concurrency-safe enforcement. Because current data is disposable pre-production data, implementation may adopt the cleanest canonical namespace/constraint model rather than preserve experimental duplicates.
+
+**Implementation-contract conclusion:** application-level `exists()` checks are not a sufficient race boundary for a namespace spanning two tables. The hardening PR must establish one authoritative tenant barcode namespace with database-enforceable uniqueness or an equivalently atomic serialization mechanism. The audit deliberately does not prescribe the physical schema before implementation review.
+
+**Needs Decision — production soft-delete reuse:** whether a barcode formerly attached to a soft-deleted/deactivated Product may ever be reused. The safer default is no reuse when historical documents can still identify that product; current test data does not constrain this decision.
+
+---
+
+## 7. Pricing
+
+Existing: base sale price, explicit price lists, per-product/per-unit list items, customer default list, POS server-authoritative pricing, minimum sale price and authorized override foundation.
+
+Alternative UOM price is intentionally not derived from conversion factor × base price:
+
+> Quantity conversion ≠ Price derivation.
+
+### P1 — Minimum Sale Price after invoice/header discount
+
+Confirmed: line minimum-price validation occurs before invoice/header discount; header discount can later reduce final effective line economics below `minimum_sale_price`.
+
+Required invariant:
+
+> Effective final sale price after all economically applicable discounts must not fall below `minimum_sale_price` unless the authorized override path is used.
+
+---
+
+## 8. Product import/export contract
+
+`ProductImportFields` is the source of truth for the flat Product Import contract. Correctly excluded from Product Master import: quantity on hand, average cost, initial quantity and stock movements.
+
+Current round-trip is lossless for its declared flat contract, not for the complete Product Master. Future lossless workbook direction remains Products + Barcodes + Unit Prices, with media separate. Stock balances never belong in Product Master round-trip.
+
+### Confirmed security detail
+
+`purchase_price` is a writable Product Import field and is updateable. Product Import therefore belongs to the sensitive cost-write authorization surface; see Section 19.
+
+---
+
+## 9. Product import engine and scale
+
+Current workflow: Inspect → Preview → Apply; Apply revalidates and writes transactionally. Current synchronous limit is 2,000 rows; do not simply raise it to 50,000.
+
+Future direction: durable upload/job, whole-file validation, frozen mapping/options, deterministic chunks, progress/errors, resumable/idempotent apply and live conflict revalidation.
+
+---
+
+## 10. Inventory Opening
+
+Inventory Opening remains a separate accounting domain from Product Catalog Import.
+
+Confirmed limits:
+
+- `MAX_ROWS = 2000`
+- `MAX_COLUMNS = 200`
+- `PREVIEW_ROW_LIMIT = 200`
+- `SAMPLE_ROW_LIMIT = 5`
+
+Workflow: Inspect → Preview → Draft → explicit Posting. Preview/Draft creation has no stock/GL effect.
+
+### Inventory Opening posting — PASS
+
+Posting is transaction-protected, locks/rechecks the draft against concurrent double-post, locks product rows before moving-average calculations, requires warehouse per line, supports warehouses from different branches, creates one opening journal entry, and uses stored line values consistently with inventory receipt values. Posted openings cannot be deleted. Restrictive FKs and Product+Warehouse uniqueness protect line integrity.
+
+Inventory Opening is intentionally CompanyWide inside a tenant because one opening may span warehouses from multiple branches; warehouse/branch dimension lives on each line/movement/journal line. Do not add a fake header branch merely to mimic branch-scoped documents.
+
+Opening inventory is currently base-unit oriented; multi-UOM opening is P2.
+
+---
+
+## 11. Product lifecycle reference integrity — P1
+
+`ProductLifecycleService::referenceCounts()` is manually maintained. Direct model review confirms the existing registry already covers the established generic Product-bearing business/inventory lines for Invoice, Purchase, Return, Credit Note, Quote, Recurring Invoice, Procurement, Stock Movement, Stock Permit, Stocktake, ProductWarehouseStock and PriceListItem.
+
+Two confirmed direct generic Product references are missing from that registry:
+
+- `InventoryOpeningLine.product_id`
+- `DeliveryNoteLine.product_id`
+
+`DebitNote` is not a hidden omission: the current Debit Note model is header/ledger-oriented and does not define a generic Product line model. `PurchaseOrder` likewise does not introduce a separate `PurchaseOrderLine`; procurement line items are represented by the already-counted `ProcurementLine` domain. Fuel-specific product references remain excluded because they point to `FuelProduct`, not generic `Product`.
+
+### Reference classification
+
+**Business/historical blockers:** InvoiceLine, PurchaseLine, ReturnLine, CreditNoteLine, QuoteLine, RecurringInvoiceLine, ProcurementLine, DeliveryNoteLine and InventoryOpeningLine. These should make destructive Product deletion unavailable; deactivation preserves history.
+
+**Inventory-semantic blockers:** StockMovement, StockPermitLine, StocktakeLine, ProductWarehouseStock and InventoryOpeningLine. These are relevant not only to deletion but to changes that reinterpret `type` / `track_inventory`.
+
+**Commercial live reference:** PriceListItem blocks destructive deletion under the current lifecycle policy, but it does not by itself prove an inventory identity footprint.
+
+**Owned children:** ProductBarcode and ProductMedia belong to Product master data and are explicitly deleted by ProductLifecycleService when true deletion is otherwise allowed; they are not independent historical blockers.
+
+**Audit/history child:** ProductActivity is intentionally retained as Product history and is created even for a newly created otherwise-unused Product. It must not be naively counted as a deletion blocker or no Product could ever pass the lifecycle deletion path. Its historical retention/reference behavior should remain part of lifecycle implementation tests, but it is not an additional business-use blocker.
+
+### P1 — Inventory identity mutation guard incomplete
+
+`assertInventoryIdentityCanChange()` currently checks only StockMovement, StockPermitLine, StocktakeLine and ProductWarehouseStock. It omits `InventoryOpeningLine`. A Draft Inventory Opening can therefore reference a product before stock movements exist while `type` / `track_inventory` can still change.
+
+Required direction: centralized Product Reference Registry/classification rather than duplicated ad-hoc arrays, explicit policy for deletion/deactivation versus inventory-identity mutation, and regression/architecture tests requiring each future generic Product-bearing model to declare its lifecycle classification.
+
+**Census conclusion:** the targeted direct-model census is reconciled for the known Products & Inventory/business-document model surface. The P1 remains because the registry is structurally manual and the two omissions are confirmed, not because Debit Note or Purchase Order hide additional Product-line models.
+
+---
+
+## 12. Warehouse and inventory core
+
+AWJ already has a real warehouse core. Quantity is per warehouse plus aggregate global; Moving Average Cost is global per product. Do not introduce per-warehouse average cost without deliberate costing redesign.
+
+`InventoryService` implements perpetual inventory, moving-average costing, permanent movements, warehouse quantity updates, sales COGS, purchase receipts and opening inventory.
+
+**Standing decision:** do not build Inventory Core/V2.
+
+---
+
+## 13. Negative stock policy
+
+Tenant setting `inventory.allow_negative_stock` exists. Sales/Invoice COGS converts to base quantity and checks availability.
+
+**PASS:** Stock Permit/Transfer source availability enforcement is warehouse-aware in reviewed paths.
+
+**PASS:** Purchase Return negative-stock enforcement. This does not close its separate UOM/base-quantity and valuation P1s.
+
+Existing demo-tenant values are not a compatibility requirement; choose and enforce the intended production default before real customer data exists.
+
+---
+
+## 14. Stock permits and transfers
+
+Implemented: receipt/issue/transfer, draft→posted, source/target warehouses, stock+accounting transaction and source metadata.
+
+**PASS — Tenant/warehouse creation path:** source and target warehouses are tenant-owned and must both be allowed to the user; all Product IDs are tenant-owned.
+
+**PASS — posting atomicity/double-post:** posting runs transactionally, locks the permit, rechecks Draft, validates source availability for issue/transfer and posts inventory/accounting together.
+
+### P1 — Same-tenant Branch/Warehouse record authorization
+
+The route layer grants generic `products.view` / `products.manage` plus `inventory.core`. It does not add record-level branch/warehouse middleware. `StockPermitController::index()` applies active/allowed-branch scoping and `store()` validates source/target warehouses, but `show()`, `post()` and `destroy()` load the permit directly by tenant-scoped ID without reasserting the current user's allowed branch/warehouse access.
+
+Tenant isolation remains intact. This is a same-tenant authorization gap for users restricted to selected branches/warehouses. The multi-branch architecture intentionally uses explicit filtering for these accounting/inventory documents; therefore the fix is explicit record authorization, not blindly converting them to `BranchScoped` (which could break cross-branch transfer/accounting semantics).
+
+Required invariant:
+
+> A user who cannot access a permit's operational branch/source/target warehouse must not read, post or delete that permit merely by knowing its UUID.
+
+### P1 — Stock Permit UOM / Base Quantity
+
+`StockPermitLine.quantity` is treated directly as stock quantity and lacks historical `unit_name`/`unit_factor` snapshot. Commercial UOM input must convert to immutable base quantity at posting.
+
+### P2 — Stock Requests
+
+Target: Stock Request → Approval → Fulfillment → partial/multiple Stock Permits. Request itself has no stock/GL effect.
+
+---
+
+## 15. Returns
+
+Sales-return inventory handling is comparatively strong and can use historical invoice UOM factor.
+
+### P1 — Purchase Return UOM / Historical Base Quantity
+
+Purchase return lines do not preserve equivalent historical base-quantity semantics. Returning one carton originally factor 24 can risk issuing one base piece.
+
+### P1 — Purchase Return Inventory Valuation / GL Reconciliation
+
+Supplier credit/commercial return value and inventory carrying value can diverge.
+
+Required invariant:
+
+> Δ Inventory GL 1140 = Δ Inventory Subledger.
+
+These two Purchase Return fixes should ship together.
+
+---
+
+## 16. Stocktake
+
+**PASS — Tenant isolation:** Stocktake records are protected by the tenant global scope.
+
+**PASS — creation isolation:** warehouse is tenant-owned and allowed for the active branch/user context; supplied Product IDs are tenant-owned.
+
+Stocktake remains base-unit oriented; multi-UOM counting UX is P2.
+
+### P1 — Same-tenant Branch/Warehouse record authorization
+
+As with Stock Permits, route middleware provides generic product permission/application entitlement but not record-level branch/warehouse authorization. The list is active/allowed-branch scoped and creation validates warehouse access, while `show()`, `count()`, `post()` and `destroy()` load the Stocktake directly by tenant-scoped ID without reasserting that the current user can access its branch/warehouse.
+
+Required invariant:
+
+> Same-tenant users restricted away from the stocktake's branch/warehouse cannot read, count, post or delete it by UUID.
+
+### P1 — Stocktake Snapshot / Concurrent Movement Reconciliation
+
+Opening stocktake snapshots `system_quantity`. `quantityDifference()` is `counted_quantity - system_quantity`, and posting applies that stale difference without proving the warehouse/product balance has remained unchanged since the snapshot. A concurrent sale/receipt/transfer can therefore make the posted adjustment mathematically wrong even though the Stocktake document itself is protected against double-post.
+
+Implementation must choose an explicit correctness policy: movement freeze/cutoff for the counted scope, or version/reconciliation validation before posting (or another equivalently safe design). Silent stale-snapshot posting is not acceptable.
+
+---
+
+## 17. Delivery Notes and POS held sales
+
+### Delivery Notes — PASS for stock/GL ownership and branch isolation
+
+Delivery Note is operational/non-financial under current design; confirm does not issue inventory or create GL. Lines snapshot `unit_name`/`unit_factor`; confirm revalidates current factor and fails closed if semantics changed.
+
+Unlike Stocktake/StockPermit, `DeliveryNote` uses `BranchScoped`, so its index and direct `findOrFail()` detail/mutation paths inherit the active-branch Global Scope. No analogous direct-ID branch gap was found in this reviewed path.
+
+Direct `DeliveryNoteLine.product_id` remains part of the Product lifecycle P1 census gap.
+
+### POS Held Sales — P2 live-reference integrity
+
+Held sales have no Invoice/Payment/Stock Movement/Journal Entry effect. Resume uses cashier/warehouse/session access controls and `lockForUpdate()`. Held lines do not snapshot `unit_factor`, so UOM mutation can invalidate live drafts and must fail closed rather than reinterpret them.
+
+---
+
+## 18. Inventory reporting / workspace
+
+Current `/inventory` is primarily a global Inventory Balance/Valuation Report, not a full Warehouse Inventory Workspace. The screen still loads results for client-side search/filter/sort/pagination; P2 server-side DataTable is required for 20k–50k scale.
+
+### Inventory export scalability — PASS
+
+Inventory export is server-side, chunked/streamed with deterministic ordering and a 50,000-row cap. Do not conflate export scalability with the screen's client-side scalability gap.
+
+### P2
+
+Warehouse Product×Warehouse dimension, Low Stock Center and movement source drilldown.
+
+---
+
+## 19. Central Sensitive Cost Authorization — confirmed P1
+
+Sensitive data includes at minimum purchase price, average cost, profit margin, stock value, movement unit cost and movement total cost. Sale price is not cost.
+
+### Confirmed route-level evidence
+
+The Product route surface grants list/show/export/activity with `products.view`; create/update/import with `products.manage`. Inventory list/export/movements use `products.view` plus `inventory.core`. None of those route guards requires `products.view_cost` for the confirmed sensitive surfaces. This establishes the gap at endpoint level, not only in resources/controllers.
+
+### Confirmed read/exposure surfaces
+
+- generic Product list/show resource
+- Product Activity historical diff
+- Product export
+- Inventory list/valuation
+- Inventory export
+- Stock Movement unit/total cost
+- cost/value filters and sorting
+
+Generic `ProductResource` exposes cost/profit unless a POS-specific transient hide flag is set. Product Activity returns raw dirty diff. Inventory APIs expose valuation/movement costs without a central `products.view_cost` gate in the reviewed path. Cost/value filters and sorts can become inference side channels.
+
+### Confirmed write surfaces
+
+`StoreProductRequest` accepts `purchase_price`; `UpdateProductRequest` inherits the same rule. ProductController store/update passes validated data into Product domain/lifecycle without a separate cost-permission gate.
+
+`ProductImportFields` marks `purchase_price` writable and updateable, and Product Import Apply can create/update it. `ImportProductsRequest::authorize()` itself is unconditional; route-level `products.manage` is not sufficient to distinguish ordinary master edits from sensitive cost edits.
+
+Therefore the approved write policy is now a **confirmed implementation gap**, not merely a future rule:
+
+> non-cost edits = `products.manage`  
+> cost edits/import = `products.manage` + `products.view_cost`
+
+Import inspect/preview may require separate UX policy, but any apply that writes sensitive cost fields must enforce the cost permission server-side.
+
+### Product export — confirmed cost disclosure
+
+`ProductExportService` catalog includes `purchase_price` and `avg_cost`; round-trip includes writable `purchase_price`. `ExportProductsRequest::authorize()` is unconditional. Therefore Product export must be part of the centralized cost authorization/redaction remediation. An operational export may remain available to non-cost users only with sensitive columns omitted or via a separate safe template/policy.
+
+### Required centralized policy
+
+- backend redaction of sensitive fields
+- redact Product Activity historical diff
+- reject/disable cost/value filters and sorts for unauthorized users
+- safe export policy/columns
+- require cost permission for cost writes/import apply
+- authorized/unauthorized regression tests
+- avoid scattered independent sensitive-field lists
+
+### Default role grants — verified
+
+`products.view_cost` is explicit. Owner/Admin (`*`) have it; Accountant/Staff do not by default; custom roles receive it only when explicitly granted.
+
+POS itself is comparatively strong: cost/profit exposure requires both cost permission and the relevant POS visibility setting.
+
+---
+
+## 20. Product & Inventory settings
+
+Reviewed settings include negative-stock policy, show stock quantities, restock sales returns, and Serial/batch/expiry coming-soon surface.
+
+**PASS — current route/settings boundary:** Inventory Settings are tenant-level; read is protected by `products.view`, update by `company.manage`. Unsupported detailed tracking cannot currently be enabled through the backend. Existing demo-tenant settings are not preservation constraints under the governing pre-production policy.
+
+Future default-warehouse/warehouse-required policy remains P2 unless a current correctness dependency proves otherwise.
+
+---
+
+## 21. Future tracking, reservations, replenishment and variants
+
+### P2 — Serial/Lot/Expiry
+
+Target: Quantity-only/Lot/Serial; expiry Off/Optional/Required; Product + Warehouse + Tracking Identity balance; tracking sum equals warehouse quantity; base quantities; global moving average; FEFO selection not valuation.
+
+### P2 — Reservations
+
+> On Hand = physical/subledger truth  
+> Reserved = active durable commitments  
+> Available = On Hand - Active Reservations
+
+### P2/P3 — Replenishment
+
+Warehouse reorder point/target, preferred supplier, lead time, Low Stock Center and transfer-before-purchase suggestion. No automatic PO initially.
+
+Needs Decision: Product Variants/Attributes and Weighted Barcode.
+
+---
+
+## 22. POS and cross-domain dependencies
+
+POS barcode/UOM resolution remains server-authoritative and base-quantity safe in reviewed paths. Checkout revalidates tenant-owned products and session/device warehouse constraints. Alternative-unit pricing requires explicit price rather than factor-derived money.
+
+Preserve Product Quick View cost authorization, negative-stock enforcement, historical UOM snapshots and final minimum-sale-price policy.
+
+---
+
+## 23. Final confirmed P1 list
+
+1. **Same-tenant Branch/Warehouse Record Authorization — Stocktake + Stock Permit detail/mutation paths**
+2. **Central Sensitive Cost Authorization & Data Redaction — read + write + import/export + inference**
+3. **Minimum Sale Price after Invoice/Header Discount**
+4. **Purchase Return UOM / Historical Base Quantity**
+5. **Purchase Return Inventory Valuation / GL Reconciliation**
+6. **Stock Permit UOM / Base Quantity**
+7. **Stocktake Snapshot / Concurrent Movement Reconciliation**
+8. **In-use UOM Template Base/Factor Mutation Safety + Product.unit invariant**
+9. **Tenant-wide Primary + Alternate Barcode Namespace Integrity**
+10. **Product Lifecycle Reference Census Integrity**
+11. **Product Inventory-Identity Mutation Guard Completeness**
+
+### Confirmed PASS items
+
+- Tenant global isolation for reviewed Stocktake / Stock Permit / Inventory Opening records
+- Delivery Note direct-ID branch isolation through `BranchScoped`
+- Purchase Return negative-stock enforcement
+- Stock Permit/Transfer operational negative-stock enforcement
+- Stock Permit creation tenant/source/target warehouse/Product isolation
+- Stock Permit posting transaction/double-post protection
+- Stocktake creation tenant/warehouse/Product isolation
+- Inventory Opening staged preview/draft has no stock/GL effect
+- Inventory Opening atomic posting/double-post protection/accounting-value design
+- Inventory Opening CompanyWide multi-branch model is intentional and tenant-isolated
+- UOM unknown-unit resolution fails closed
+- historical UOM snapshots on reviewed posted-document paths
+- Delivery Note no duplicate stock/GL effect under current design
+- Delivery Note UOM snapshot + confirm revalidation
+- POS tenant/warehouse validation in reviewed checkout path
+- POS local cost visibility gate
+- POS explicit alternative-unit pricing
+- POS held-sale lock/access controls
+- Inventory export scalability/chunking for current 50k target
+- Product Update prohibits `initial_quantity`
+- Product Catalog Import excludes quantity/avg-cost/opening-stock/stock-movement writes
+- Inventory Settings tenant-level route authorization and unsupported detailed-tracking fail-closed behavior
+
+---
+
+## 24. Final P2/P3 backlog
+
+### P2
+
+Alternate-barcode Product UI; Default Sales/Purchase UOM; Default Product UOM Prices; UOM rename/delete live-reference integrity for Barcode/Price List/Held Cart; lossless multiple-barcode import/export; Large Catalog/Opening Import Jobs; multi-UOM stocktake/opening; server-side Inventory DataTable; warehouse Inventory Workspace; Low Stock/warehouse reorder; movement source drilldown; Stock Requests/Approval/partial fulfillment; Reservations/Available Quantity; Serial/Lot/Expiry; warehouse-required/default-warehouse policy; default supplier UX/portability; POS commercial UOM switching.
+
+### P3/later
+
+Media migration package; quantity-tier pricing; intelligent replenishment; bundles; manufacturing/BOM deferred; accounting mapping portability only if a real migration need exists.
+
+---
+
+## 25. Final implementation sequence
+
+No implementation is authorized by this record; this is the approved planning order from the audit.
+
+1. **PR-SEC-INV-1 — Same-tenant Stocktake/Stock Permit Branch-Warehouse Authorization**
+2. **PR-INV-1 — Centralize Product & Inventory Cost Authorization**
+3. **PR-PRICE-1 — Minimum Sale Price after all economically applicable discounts**
+4. **PR-INV-2 — Purchase Returns Hardening (UOM/base quantity + valuation/GL together)**
+5. **PR-INV-3 — Stock Permit UOM / Base Quantity**
+6. **PR-INV-4 — Stocktake Concurrent Reconciliation**
+7. **PR-UOM-1 — In-use UOM Mutation Safety + Live Reference Integrity + Tenant Barcode Namespace**
+8. **PR-PROD-LIFE-1 — Product Lifecycle Reference Registry + Inventory Identity Guard**
+9. Multiple UOM & Barcode Completion Epic
+10. **PR-IMP-1 — Durable Import Jobs Foundation + Large Catalog/Opening Workflows**
+11. Inventory Workspace server-side/warehouse completion
+12. Serial/Lot/Expiry
+13. Reservations/Availability
+14. Stock Requests/Approval
+15. Low Stock/Replenishment
+16. Movement source drilldown
+17. Bundles
+18. Manufacturing deferred
+
+The narrow authorization boundary is first. Central cost authorization follows because it is a broad security surface across reads/writes/import/export. Accounting/UOM correctness follows before expansion features.
+
+---
+
+## 26. Definition of Done
+
+As applicable: tenant isolation; branch/warehouse correctness; base-UOM invariants; accounting/subledger reconciliation; authorized/unauthorized tests; historical snapshots; transaction/rollback behavior; backward compatibility for intended product contracts (not preservation of disposable pre-production data); source metadata; backend/UI authorization consistency; documented tests/build/CI.
+
+Additional standing DoD:
+
+- same-tenant restricted users must be denied UUID access to Stocktake/Stock Permit records outside allowed branch/warehouse scope on read and every mutation/post path
+- every new Product reference reviews lifecycle/deletion and inventory-identity protection
+- every stock-affecting commercial UOM path proves conversion to immutable base quantity
+- every sensitive-cost surface proves authorized and unauthorized behavior, including exports/history/filter/sort inference and writes/imports
+- every financial stock transaction proves Inventory GL ↔ inventory subledger reconciliation where applicable
+- draft/review/import-preview paths prove no unintended stock/GL writes
+- in-use UOM mutation tests cover base unit, factor, rename/delete, Product synchronization, barcodes, price lists and live drafts
+
+---
+
+## 27. Daftra benchmark — final reconciliation
+
+Daftra remains a competitive benchmark, never a source of truth or automatic requirements list.
+
+**MATCH / already present in AWJ:** product catalog/master data; categories/brands; warehouses; inventory balances/movements; opening inventory workflow; stocktake foundation; stock permits/transfers; price lists; import/export foundation; POS integration; negative-stock policy foundation; alternate barcode/UOM backend foundations.
+
+**HARDEN rather than copy:** cost visibility/authorization, minimum-sale-price enforcement, purchase-return inventory correctness, stocktake concurrency, stock-permit UOM semantics, in-use UOM mutation and barcode namespace integrity. AWJ should solve these with stronger backend/accounting invariants rather than merely reproduce competitor UX.
+
+**ADOPT / IMPROVE after hardening:** richer multiple-UOM/barcode Product UX, warehouse-aware Inventory Workspace, low-stock/reorder workflow, stock requests/approvals, durable large imports, movement drilldown, Serial/Lot/Expiry and reservations/available quantity.
+
+**INTENTIONALLY DIFFERENT:** Product Catalog Import remains Master Data only. Opening quantity/value/accounting belongs to Inventory Opening. Moving-average cost remains global per Product under the current architecture; warehouse quantity remains per warehouse. Alternative-UOM selling price is explicit and is not mechanically derived from quantity factor.
+
+**NEEDS DECISION:** weighted barcode semantics; Product Variants/Attributes scope; production barcode reuse after soft deletion; later advanced replenishment/automatic purchasing policy.
+
+No remaining Daftra observation is treated as an audit blocker merely because AWJ does not currently copy it.
+
+---
+
+## 28. Overall assessment
+
+### Strong/already present
+
+Product catalog; categories/brands; warehouses; per-warehouse balances; stock movements; perpetual inventory; moving average; sales COGS; purchase valuation foundation; price lists/per-UOM prices; POS authoritative pricing; stock permits/transfers; opening inventory; stocktake foundation; safe Product Import staging; export infrastructure; alternate-barcode backend/POS; historical UOM snapshots; tenant global isolation.
+
+### Hardening before expansion
+
+Same-tenant branch/warehouse record authorization; centralized cost authorization; minimum-price final economics; purchase-return UOM/valuation; stock-permit UOM; stocktake concurrency; in-use UOM mutation; barcode namespace; complete Product lifecycle reference/identity protection.
+
+### Completion after hardening
+
+Multiple-UOM/barcode UX/workbook; durable imports; warehouse-aware inventory workspace; low stock/replenishment; reservations; serial/lot/expiry; stock requests/approvals; POS commercial UOM completion.
+
+---
+
+## 29. Formal audit closure
+
+**Decision: AUDIT CLOSED — READY FOR IMPLEMENTATION PLANNING.**
+
+Closure basis:
+
+- targeted generic Product-reference census/classification reconciled; confirmed omissions are `InventoryOpeningLine` and `DeliveryNoteLine`
+- Debit Note / Purchase Order candidate false positives resolved against the current model surface
+- cost read/write/import/export/route policy census reconciled
+- Inventory Settings boundary reconciled
+- barcode namespace/concurrency invariant defined at implementation-contract level without premature physical-schema overdesign
+- Stocktake/Stock Permit same-tenant record authorization confirmed and bounded
+- Delivery Note checked as an adjacent operational direct-ID path and found protected by `BranchScoped`; the multi-branch architecture confirms `BelongsToBranch` is intentionally explicit for accounting-style documents rather than a universal Global Scope
+- Stocktake stale-snapshot correctness issue confirmed
+- Daftra benchmark reconciled into MATCH / HARDEN / ADOPT-IMPROVE / INTENTIONALLY DIFFERENT / NEEDS DECISION
+- final P1/P2/P3 and implementation order reconciled
+
+Closure means the discovery/audit phase is complete enough to start scoped remediation PRs. It does **not** mean the P1 findings are fixed, and it does not authorize Merge, Deploy or Production Release.
+
+Reopen this audit only if implementation uncovers evidence that materially changes an invariant, introduces a new Product/Inventory domain reference, or invalidates one of the confirmed findings. Normal implementation details should be handled in their scoped PR rather than reopening broad discovery.
+
+---
+
+## 30. Standing conclusion
+
+> **Do not rebuild AWJ inventory core.**  
+> **Complete and harden the existing Products & Inventory architecture.**  
+> **Audit closed; proceed through scoped remediation PRs in the final sequence above.**
