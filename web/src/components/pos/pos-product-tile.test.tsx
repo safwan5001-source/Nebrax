@@ -141,14 +141,18 @@ describe('PosProductTile', () => {
     expect(onAdd).toHaveBeenCalledOnce();
   });
 
-  it('يعرض «مخزون منخفض» حين تصل الكمية إلى حد إعادة الطلب دون نفاده', () => {
+  it('يعرض «مخزون منخفض» حين تصل الكمية إلى حد إعادة الطلب دون نفاده، في سطر مستقل كامل غير مقصوص', () => {
     renderTile({
       product: { ...product, quantity_on_hand: 3, reorder_level: 5 },
       lowStockLabel: 'Low stock',
     });
-    const stock = screen.getByTestId('pos-product-stock').textContent ?? '';
-    expect(stock).toContain('Available: 3');
-    expect(stock).toContain('Low stock');
+    // سطران مستقلان لا نصّ واحد مدموج — يمنع بتر «Low stock» عند عرض البطاقة
+    // العادي (الثغرة البصرية المكتشفة والمصلَحة هنا).
+    expect(screen.getByText('Available: 3')).toBeTruthy();
+    const lowStockLine = screen.getByTestId('pos-product-low-stock');
+    expect(lowStockLine.textContent).toBe('Low stock');
+    expect(lowStockLine.className).toContain('text-warning');
+    expect(lowStockLine.className).not.toContain('text-negative');
   });
 
   it('لا يعرض تنبيه مخزون منخفض فوق حد إعادة الطلب', () => {

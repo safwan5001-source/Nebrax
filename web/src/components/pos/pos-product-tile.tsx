@@ -94,16 +94,24 @@ export function PosProductTile({
               </span>
             ) : null}
             {product.track_inventory && (
-              <span
-                className={cn(
-                  'num block truncate whitespace-nowrap',
-                  outOfStock ? 'font-semibold text-negative' : lowStock ? 'font-semibold text-warning' : undefined,
+              <div data-testid="pos-product-stock">
+                <span
+                  className={cn(
+                    'num block truncate whitespace-nowrap',
+                    outOfStock ? 'font-semibold text-negative' : lowStock ? 'font-semibold text-warning' : undefined,
+                  )}
+                >
+                  {outOfStock && outOfStockLabel ? outOfStockLabel : `${availableLabel}: ${product.quantity_on_hand}`}
+                </span>
+                {/* سطر مستقل، لا لاحقة على سطر الكمية: الدمج في سطر واحد مقصوص
+                    كان يبتر «مخزون منخفض»/«Low stock» عند العرض العادي للبطاقة —
+                    حالة يجب أن تبقى مقروءة كاملةً دوماً. */}
+                {!outOfStock && lowStock && lowStockLabel && (
+                  <span className="block truncate whitespace-nowrap font-semibold text-warning" data-testid="pos-product-low-stock">
+                    {lowStockLabel}
+                  </span>
                 )}
-                data-testid="pos-product-stock"
-              >
-                {outOfStock && outOfStockLabel ? outOfStockLabel : `${availableLabel}: ${product.quantity_on_hand}`}
-                {!outOfStock && lowStock && lowStockLabel ? ` · ${lowStockLabel}` : ''}
-              </span>
+              </div>
             )}
           </div>
         </div>
