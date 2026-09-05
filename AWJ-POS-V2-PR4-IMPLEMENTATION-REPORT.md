@@ -381,9 +381,9 @@ against a hidden cart.
 - Branch: `claude/pos-v2-pr4-invoice-center-printing`
 - Base SHA: `c60eaa1f08f06dc5626688eda43b056baf75cc41` (confirmed: exact match to the mission's
   required base, `main` HEAD at session start — PR-3 merge, #658)
-- PR number/link: recorded after creation (see final chat reply)
-- Draft status: Draft (will be confirmed after creation)
-- Head SHA: recorded after commit (see final chat reply)
+- PR number/link: [#659](https://github.com/safwan5001-source/Nebrax/pull/659) (Draft)
+- Draft status: Draft, open, not merged (confirmed via `pull_request_read`)
+- Head SHA: `2cbe9b0c344416e257a53afd455d0b05bee66751`
 
 ## 25. Next Recommended Step
 
