@@ -10,6 +10,13 @@ class ProductResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
+        // PR-2S: يُعلَّم فقط من كتالوج POS (`PosController::products()`) حين تمنع
+        // صلاحية `products.view_cost` أو إعداد `show_cost_profit_in_pos` الكشف لهذا
+        // المستخدم. أي استهلاك آخر لهذا المورد (شاشات ERP، الويبهوك، محطات الوقود)
+        // لا يضع العلامة إطلاقاً فيبقى ظاهراً كسابق عهده تماماً — بلا كسر توافق.
+        $hidesCostProfit = array_key_exists('pos_hides_cost_profit', $this->resource->getAttributes())
+            && (bool) $this->resource->getAttribute('pos_hides_cost_profit');
+
         return [
             'id'               => $this->id,
             'sku'              => $this->sku,
@@ -75,17 +82,17 @@ class ProductResource extends JsonResource
             'min_sale_price'   => $this->min_sale_price !== null ? Money::toRiyal($this->min_sale_price) : null,
             'discount'         => $this->discount,
             'discount_type'    => $this->discount_type,
-            'profit_margin'    => $this->profit_margin,
+            'profit_margin'    => $this->when(! $hidesCostProfit, $this->profit_margin),
             'tags'             => $this->tags,
             'internal_notes'   => $this->internal_notes,
             'type'             => $this->type,
             'unit'             => $this->unit,
             'sale_price'       => Money::toRiyal($this->sale_price),
-            'purchase_price'   => Money::toRiyal($this->purchase_price),
+            'purchase_price'   => $this->when(! $hidesCostProfit, fn () => Money::toRiyal($this->purchase_price)),
             'tax_rate'         => $this->tax_rate,
             'track_inventory'  => $this->track_inventory,
             'quantity_on_hand' => $this->quantity_on_hand,
-            'avg_cost'         => Money::toRiyal($this->avg_cost),
+            'avg_cost'         => $this->when(! $hidesCostProfit, fn () => Money::toRiyal($this->avg_cost)),
             'is_active'        => $this->is_active,
         ];
     }

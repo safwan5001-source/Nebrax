@@ -97,6 +97,10 @@ final class PosSettings
         // صور الكتالوج تفضيل عرض خاص بنقطة البيع فقط؛ يبقى مفعّلاً افتراضياً
         // حتى تتوافق المنشآت القائمة مع عرض صور المنتجات عند توافرها.
         'show_product_images' => true,
+        // PR-2S: سياسة عرض إضافية فوق صلاحية `products.view_cost` — لا تمنح
+        // الصلاحية وحدها كشفاً تلقائياً في POS. الافتراض الحامي معطّل: لا يظهر
+        // شيء جديد لمستأجر قائم لم يفعّله المالك صراحةً. الأكثر تقييداً يفوز.
+        'show_cost_profit_in_pos' => false,
         // لا تتصل السحابة بالطابعة أو USB أبداً. الافتراض يظل unavailable حتى
         // يقترن جهاز POS بجسر محلي موثوق وتفعّله المؤسسة صراحةً.
         'cash_drawer_enabled' => false,
@@ -267,6 +271,16 @@ final class PosSettings
         }
 
         return array_values(array_unique(array_filter($ids, fn (mixed $id) => is_string($id) && $id !== '')));
+    }
+
+    /**
+     * PR-2S: هل مسموح بعرض التكلفة/الربحية داخل POS؟ هذا وحده لا يمنح أي شيء —
+     * `EnsurePermission`/`Rbac::allows` هو حدّ الأمان الحقيقي على `products.view_cost`؛
+     * هذا الإعداد يزيد القيد فوقه فقط (صلاحية=نعم وإعداد=معطّل ⇐ لا كشف).
+     */
+    public static function showsCostProfitInPos(?Tenant $tenant = null): bool
+    {
+        return self::group($tenant)['show_cost_profit_in_pos'] === true;
     }
 
     /** هل العد الأعمى مفعّل؟ قيمة غير معروفة لا تكشف بيانات إضافية. */
