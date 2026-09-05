@@ -23,12 +23,29 @@ describe('قشرة نقطة البيع المتجاوبة', () => {
   it('يثبّت توزيع md ثم iPad landscape مضغوطاً ويعيد الثلاثي الكامل على xl', () => {
     expect(POS_SALE_GRID_CLASS).toContain('grid-cols-1');
     expect(POS_SALE_GRID_CLASS).toContain('md:grid-cols-[minmax(280px,340px)_minmax(0,1fr)]');
-    expect(POS_SALE_GRID_CLASS).toContain('lg:grid-cols-[minmax(300px,340px)_minmax(0,1fr)_104px]');
-    expect(POS_SALE_GRID_CLASS).toContain('xl:grid-cols-[minmax(360px,420px)_minmax(0,1fr)_148px]');
+    expect(POS_SALE_GRID_CLASS).toContain('lg:grid-cols-[minmax(280px,1fr)_minmax(0,2fr)_104px]');
+    expect(POS_SALE_GRID_CLASS).toContain('xl:grid-cols-[minmax(320px,1fr)_minmax(0,2fr)_148px]');
     expect(posShowsSplitCart(767)).toBe(false);
     expect(posShowsSplitCart(768)).toBe(true);
     expect(posShowsSplitCart(834)).toBe(true);
     expect(posShowsSplitCart(1023)).toBe(true);
+  });
+
+  it('PR-3 (تصحيح المراجعة): السلة تشغل نسبة ثابتة ≈ الثلث (1fr مقابل 2fr) لا رقماً ثابتاً بالبكسل، على lg/xl فقط', () => {
+    expect(POS_SALE_GRID_CLASS).toContain('md:grid-cols-[minmax(280px,340px)_minmax(0,1fr)]');
+    expect(POS_SALE_GRID_CLASS).not.toContain('minmax(320px,400px)');
+    expect(POS_SALE_GRID_CLASS).not.toContain('minmax(400px,480px)');
+    expect(POS_SALE_GRID_CLASS).toContain('minmax(280px,1fr)_minmax(0,2fr)_104px');
+    expect(POS_SALE_GRID_CLASS).toContain('minmax(320px,1fr)_minmax(0,2fr)_148px');
+  });
+
+  it('PR-3: عمود السلة يمتد فعلياً على كامل عرض مساره في الشبكة (لا انكماش على عرض المحتوى)', () => {
+    // اكتُشف أثناء فحص المتصفح الحقيقي: توسيع مسار الشبكة وحده لا يكفي —
+    // الأب Flex لا يمدّد عرض `<aside>` تلقائياً بلا `w-full`، فيبقى العمود
+    // منكمشاً على عرض محتواه (~300px) مهما اتسع مسار الشبكة. هذا الاختبار
+    // يحرس وجود `w-full` على عنصر السلة حتى لا يتكرر الانكماش الصامت.
+    const page = source('src/app/(pos)/pos/page.tsx');
+    expect(page).toMatch(/<aside className="flex w-full min-h-0 flex-col overflow-hidden border-border bg-surface md:border-e">/);
   });
 
   it('يحمي بطاقات الصور من التضييق الزائد على iPad landscape', () => {

@@ -52,6 +52,15 @@ describe('PosCartRemoveButton', () => {
     expect(button.className).not.toMatch(/opacity-0/);
     expect(button.className).not.toMatch(/group-hover/);
   });
+
+  it('PR-3: حالة آمنة حتمية بلا سطر محدَّد — الزر معطَّل ولا ينفّذ الحذف', () => {
+    const onRemove = vi.fn();
+    render(<PosCartRemoveButton label="Remove" onRemove={onRemove} disabled />);
+    const button = screen.getByRole('button', { name: 'Remove' }) as HTMLButtonElement;
+    expect(button.disabled).toBe(true);
+    fireEvent.click(button);
+    expect(onRemove).not.toHaveBeenCalled();
+  });
 });
 
 describe('PosCartQtyControls', () => {
@@ -83,6 +92,31 @@ describe('PosCartQtyControls', () => {
     expect(onDecrease).toHaveBeenCalledOnce();
     expect(screen.getByRole('button', { name: 'Increase' }).className).toMatch(/min-h-12/);
     expect(screen.getByRole('button', { name: 'Decrease' }).className).toMatch(/focus-visible:ring-2/);
+  });
+
+  it('PR-3: حالة آمنة حتمية بلا سطر محدَّد — كل الأزرار والمحرِّر معطَّلة', () => {
+    const onDecrease = vi.fn();
+    const onIncrease = vi.fn();
+    render(
+      <PosCartQtyControls
+        qty={1}
+        decreaseLabel="Decrease"
+        increaseLabel="Increase"
+        quantityLabel="Quantity"
+        keypadTitle="Edit quantity"
+        showKeypad={false}
+        labels={labels}
+        onDecrease={onDecrease}
+        onIncrease={onIncrease}
+        onQtyChange={vi.fn()}
+        disabled
+      />,
+    );
+    expect((screen.getByRole('button', { name: 'Increase' }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole('button', { name: 'Decrease' }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByLabelText('Quantity') as HTMLInputElement).disabled).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Increase' }));
+    expect(onIncrease).not.toHaveBeenCalled();
   });
 });
 

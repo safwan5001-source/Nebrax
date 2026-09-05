@@ -6,7 +6,7 @@ import { useLocale, useTranslations } from 'next-intl';
 import {
   Search, Barcode, Star, Package, Plus, X,
   User, UserPlus, StickyNote, LayoutGrid, ShoppingCart,
-  Users, MoreHorizontal, PauseCircle, Archive, Trash,
+  Users, MoreHorizontal, PauseCircle, Archive, Trash, ChevronDown,
 } from 'lucide-react';
 import { useToast } from '@/components/ui/toast';
 import { PosDialog } from '@/components/pos/pos-dialog';
@@ -29,6 +29,8 @@ import {
   posProductsPaneClass,
 } from '@/lib/pos-responsive';
 import { formatRiyal, riyalToMinor, extractInclusiveTax } from '@/lib/money';
+import { discountMinorFromPercent, discountPercentFromMinor, type PosDiscountMode } from '@/lib/pos-discount';
+import { cn } from '@/lib/utils';
 import { getSystemTaxInclusive } from '@/lib/tax';
 import { useBranches } from '@/lib/branch';
 import type { Warehouse } from '@/lib/warehouse';
@@ -47,6 +49,7 @@ import { PosReturnDialog } from '@/components/pos/pos-return-dialog';
 import { PosNumericEditor } from '@/components/pos/pos-numeric-editor';
 import { PosProductTile } from '@/components/pos/pos-product-tile';
 import { PosCartEmptyState, PosCartLineFrame, PosCartQtyControls, PosCartRemoveButton } from '@/components/pos/pos-cart-line-controls';
+import { Dropdown } from '@/components/ui/dropdown';
 import { CustomerPickerDialog, type PosCustomer } from '@/components/pos/customer-picker';
 import { PosAuditReasonDialog } from '@/components/pos/pos-audit-reason-dialog';
 import { buildInvoiceDocumentModel, type SourceInvoice, type SourceCompany } from '@/modules/documents/builder/from-invoice';
@@ -270,6 +273,14 @@ export default function PosPage() {
   /** Quick View: معرّف المنتج المعروض فقط — قراءة بحتة، لا تمسّ السلة أو العميل أو الجلسة. */
   const [quickViewProductId, setQuickViewProductId] = useState<string | null>(null);
   const [priceErrors, setPriceErrors] = useState<Record<string, string>>({});
+  /**
+   * PR-3 (تصحيح المراجعة): وضع إدخال الخصم — حالة واجهة محلية بحتة لا تُحفظ
+   * مع السلة، وتخصّ السطر **المحدَّد** فقط (شريط التحكم السفلي)، لا خريطة لكل
+   * الأسطر — فلا حاجة لأكثر من قيمة نشطة واحدة في أي لحظة. المبلغ المعتمد
+   * يبقى `line.discount` دوماً (انظر `pos-discount.ts`).
+   */
+  const [discountMode, setDiscountMode] = useState<PosDiscountMode>('fixed');
+  const [percentDraft, setPercentDraft] = useState('');
   const [step, setStep] = useState<'sale' | 'payment'>('sale');
   const [mobileTab, setMobileTab] = useState<'products' | 'cart'>('products');
   const [receipt, setReceipt] = useState<Receipt | null>(null);
@@ -645,6 +656,13 @@ export default function PosPage() {
     cart.map((line) => ({ key: line.key })),
     false,
   );
+  // PR-3 (تصحيح المراجعة): وضع إدخال الخصم يخصّ السطر المحدَّد فقط — يُصفَّر
+  // عند أي تغيّر في التحديد (تبديل سطر، حذف، إفراغ) كي لا يرث سطرٌ جديد وضعاً
+  // تركه سطرٌ سابق.
+  useEffect(() => {
+    setDiscountMode('fixed');
+    setPercentDraft('');
+  }, [selectedLineKey]);
   const productElementsRef = useRef<Map<number, HTMLButtonElement>>(new Map());
 
   function pricedUnit(product: Product, unitName: string | null): PosUnit | undefined {
@@ -1579,7 +1597,9 @@ export default function PosPage() {
   }
 
   const cartPanel = (
-    <aside className="flex min-h-0 flex-col overflow-hidden border-border bg-surface md:border-e">
+    // PR-3: `w-full` ضروري — الأب Flex ولا يمدّد عرض الابن تلقائياً؛ بدونه
+    // يبقى العمود متقلّصاً على عرض محتواه فلا يظهر التوسيع الفعلي لعمود الشبكة.
+    <aside className="flex w-full min-h-0 flex-col overflow-hidden border-border bg-surface md:border-e">
       <div className="border-b border-border p-3">
         <div className="hidden items-center gap-1 overflow-x-auto pb-2 md:flex" role="tablist" aria-label={t('open_carts')}>
           {carts.map((cartState) => {
@@ -1637,7 +1657,10 @@ export default function PosPage() {
         {cart.length === 0 && <PosCartEmptyState message={t('empty_cart')} />}
         {cart.map((line) => {
           const units = line.productId ? products.find((product) => product.id === line.productId)?.pos_units ?? [] : [];
-          const lineSelected = policy.allowKeyboardPowerMode && keyboardActive && activeZone === 'cart' && selectedLineKey === line.key;
+          // PR-3: التحديد البصري يظهر في كل أوضاع التفاعل (لمس/ماوس/كيبورد) — لم
+          // يعد مقصوراً على وضع الكيبورد المتقدّم؛ منطق التحديد نفسه لم يتغيّر.
+          const lineSelected = selectedLineKey === line.key;
+          const lineDisc = lineCalc(line).disc;
           return (
             <PosCartLineFrame
               key={line.key}
@@ -1649,8 +1672,13 @@ export default function PosPage() {
               }}
               register={(element) => registerCartLine(line.key, element)}
             >
-              <div className="flex min-w-0 flex-1 flex-col gap-2">
-                <div className="flex items-start gap-2">
+              {/*
+                PR-3 (تصحيح المراجعة): السطر عرضٌ مضغوط للقراءة فقط — لا محرِّر
+                مكرَّر هنا. الكمية والسعر والخصم تُعدَّل حصراً عبر شريط التحكّم
+                السفلي للسطر المحدَّد (انظر أسفل قائمة الأسطر).
+              */}
+              <div className="flex min-w-0 flex-1 flex-col gap-1">
+                <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-semibold text-text">{line.description}</div>
                     {line.productId !== null && units.length > 1 ? (
@@ -1659,65 +1687,157 @@ export default function PosPage() {
                       </select>
                     ) : line.unit ? <div className="mt-1 text-xs text-muted">{line.unit}</div> : null}
                   </div>
-                  <PosCartRemoveButton label={t('remove')} onRemove={() => remove(line.key)} />
-                </div>
-                {(posCfg.allow_unit_price_override || posCfg.allow_discount) && (
-                  <div className="flex flex-wrap gap-2" onClick={(event) => event.stopPropagation()}>
-                    {posCfg.allow_unit_price_override && (
-                      <label className="flex items-center gap-1 text-xs text-muted">
-                        {t('unit_price')}
-                        <PosNumericEditor
-                          allowDecimal
-                          className="h-11 w-20 px-2 text-xs"
-                          inputAriaLabel={t('unit_price')}
-                          labels={numericEditorLabels}
-                          onApply={(value) => normalizeUnitPrice(line.key, value)}
-                          onBlur={() => normalizeUnitPrice(line.key)}
-                          onChange={(value) => setUnitPrice(line.key, value)}
-                          showKeypad={posCfg.show_onscreen_numeric_keypad}
-                          title={t('numeric_keypad_edit_unit_price')}
-                          value={line.price}
-                        />
-                      </label>
-                    )}
-                    {posCfg.allow_discount && (
-                      <label className="flex items-center gap-1 text-xs text-muted">
-                        {t('discount')}
-                        <PosNumericEditor
-                          allowDecimal
-                          className="h-11 w-16 px-2 text-xs"
-                          inputAriaLabel={t('discount')}
-                          labels={numericEditorLabels}
-                          onChange={(value) => setDiscount(line.key, value)}
-                          showKeypad={posCfg.show_onscreen_numeric_keypad}
-                          title={t('numeric_keypad_edit_discount')}
-                          value={line.discount}
-                        />
-                      </label>
-                    )}
+                  <div className="shrink-0 text-end">
+                    <div className="num text-xs text-muted">×{line.qty}</div>
+                    <div className="num text-sm font-bold text-text">{formatRiyal(lineCalc(line).total / 100)}</div>
                   </div>
-                )}
-                {priceErrors[line.key] && <p className="text-xs text-negative">{priceErrors[line.key]}</p>}
-                <PosCartQtyControls
-                  qty={line.qty}
-                  decreaseLabel={t('return_decrease')}
-                  increaseLabel={t('return_increase')}
-                  quantityLabel={t('quantity')}
-                  keypadTitle={t('numeric_keypad_edit_quantity')}
-                  showKeypad={posCfg.show_onscreen_numeric_keypad}
-                  labels={numericEditorLabels}
-                  onDecrease={() => setQty(line.key, -1)}
-                  onIncrease={() => setQty(line.key, 1)}
-                  onQtyChange={(value) => setQtyFromInput(line.key, value)}
-                />
-                <div className="flex items-baseline justify-end">
-                  <span className="num text-sm font-bold text-text">{formatRiyal(lineCalc(line).total / 100)}</span>
                 </div>
+                <div className="flex items-center justify-between text-xs text-muted">
+                  <span className="num">{formatRiyal(Number(effectiveLinePrice(line)))}</span>
+                  {lineDisc > 0 && <span className="num text-positive">−{formatRiyal(lineDisc / 100)}</span>}
+                </div>
+                {priceErrors[line.key] && <p className="text-xs text-negative">{priceErrors[line.key]}</p>}
               </div>
             </PosCartLineFrame>
           );
         })}
       </div>
+
+      {(() => {
+        const selectedLine = cart.find((l) => l.key === selectedLineKey) ?? null;
+        const noSelection = !selectedLine;
+        const lineGross = selectedLine ? lineCalc(selectedLine).gross : 0;
+        return (
+          <div
+            className="flex items-stretch gap-1.5 border-t border-border p-3"
+            role="group"
+            aria-label={t('selected_line_controls')}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex min-w-0 flex-1 flex-col gap-1">
+              <span className="truncate text-[11px] font-semibold text-muted">{t('quantity')}</span>
+              <PosCartQtyControls
+                qty={selectedLine?.qty ?? 1}
+                decreaseLabel={t('return_decrease')}
+                increaseLabel={t('return_increase')}
+                quantityLabel={t('quantity')}
+                keypadTitle={t('numeric_keypad_edit_quantity')}
+                showKeypad={posCfg.show_onscreen_numeric_keypad}
+                labels={numericEditorLabels}
+                disabled={noSelection}
+                onDecrease={() => selectedLine && setQty(selectedLine.key, -1)}
+                onIncrease={() => selectedLine && setQty(selectedLine.key, 1)}
+                onQtyChange={(value) => selectedLine && setQtyFromInput(selectedLine.key, value)}
+              />
+            </div>
+
+            {posCfg.allow_unit_price_override && (
+              <div className="flex min-w-0 flex-1 flex-col gap-1">
+                <span className="truncate text-[11px] font-semibold text-muted">{t('unit_price')}</span>
+                <PosNumericEditor
+                  allowDecimal
+                  className="h-12 w-full text-sm font-semibold"
+                  disabled={noSelection}
+                  inputAriaLabel={t('unit_price')}
+                  labels={numericEditorLabels}
+                  onApply={(value) => selectedLine && normalizeUnitPrice(selectedLine.key, value)}
+                  onBlur={() => selectedLine && normalizeUnitPrice(selectedLine.key)}
+                  onChange={(value) => selectedLine && setUnitPrice(selectedLine.key, value)}
+                  showKeypad={posCfg.show_onscreen_numeric_keypad}
+                  title={t('numeric_keypad_edit_unit_price')}
+                  value={selectedLine?.price ?? ''}
+                />
+              </div>
+            )}
+
+            {posCfg.allow_discount && (
+              <div className="flex min-w-0 flex-1 flex-col gap-1">
+                <span className="truncate text-[11px] font-semibold text-muted">{t('discount')}</span>
+                {!selectedLine ? (
+                  <button type="button" disabled className="flex min-h-12 items-center justify-center gap-1 rounded-md border border-border bg-background text-sm font-semibold text-muted opacity-40" aria-label={t('discount')}>
+                    {t('discount')} <ChevronDown className="h-3.5 w-3.5" strokeWidth={1.7} aria-hidden />
+                  </button>
+                ) : (
+                  <Dropdown
+                    align="end"
+                    menuLabel={t('discount')}
+                    triggerLabel={t('discount')}
+                    triggerClassName="flex min-h-12 w-full items-center justify-center gap-1 rounded-md border border-border bg-background text-sm font-semibold text-text hover:border-primary"
+                    menuClassName="w-64 space-y-2 p-3"
+                    trigger={<>{t('discount')} <ChevronDown className="h-3.5 w-3.5" strokeWidth={1.7} aria-hidden /></>}
+                  >
+                    <div className="space-y-2">
+                      <label className="flex items-center justify-between gap-2 text-xs text-muted">
+                        <span className="flex items-center gap-1.5">
+                          <input
+                            type="radio"
+                            name="pos-discount-mode"
+                            className="h-4 w-4 accent-primary"
+                            checked={discountMode === 'fixed'}
+                            onChange={() => setDiscountMode('fixed')}
+                          />
+                          {t('discount_mode_fixed')}
+                        </span>
+                        <PosNumericEditor
+                          allowDecimal
+                          className="h-11 w-24 text-xs font-semibold"
+                          disabled={discountMode !== 'fixed'}
+                          inputAriaLabel={t('discount_mode_fixed')}
+                          labels={numericEditorLabels}
+                          onChange={(value) => setDiscount(selectedLine.key, value)}
+                          showKeypad={posCfg.show_onscreen_numeric_keypad}
+                          title={t('numeric_keypad_edit_discount')}
+                          value={selectedLine.discount}
+                        />
+                      </label>
+                      <label className="flex items-center justify-between gap-2 text-xs text-muted">
+                        <span className="flex items-center gap-1.5">
+                          <input
+                            type="radio"
+                            name="pos-discount-mode"
+                            className="h-4 w-4 accent-primary"
+                            checked={discountMode === 'percent'}
+                            onChange={() => {
+                              setDiscountMode('percent');
+                              const pct = discountPercentFromMinor(lineGross, riyalToMinor(selectedLine.discount));
+                              setPercentDraft(pct > 0 ? String(Math.round(pct * 100) / 100) : '');
+                            }}
+                          />
+                          {t('discount_mode_percent')}
+                        </span>
+                        <PosNumericEditor
+                          allowDecimal
+                          className="h-11 w-24 text-xs font-semibold"
+                          disabled={discountMode !== 'percent'}
+                          inputAriaLabel={t('discount_mode_percent')}
+                          labels={numericEditorLabels}
+                          onChange={(value) => {
+                            setPercentDraft(value);
+                            const amountMinor = discountMinorFromPercent(lineGross, Number(value));
+                            setDiscount(selectedLine.key, (amountMinor / 100).toFixed(2));
+                          }}
+                          showKeypad={posCfg.show_onscreen_numeric_keypad}
+                          title={t('numeric_keypad_edit_discount')}
+                          value={percentDraft}
+                        />
+                      </label>
+                    </div>
+                  </Dropdown>
+                )}
+              </div>
+            )}
+
+            <div className="flex flex-col gap-1">
+              <span className="truncate text-[11px] font-semibold text-muted">{t('remove')}</span>
+              <PosCartRemoveButton
+                label={t('remove')}
+                disabled={noSelection}
+                onRemove={() => selectedLine && remove(selectedLine.key)}
+              />
+            </div>
+          </div>
+        );
+      })()}
 
       <div className="space-y-2 border-t border-border p-3">
         <div className="grid grid-cols-2 gap-2">
