@@ -40,6 +40,10 @@ interface PosConfig {
   exchange_surplus_policy: 'customer_credit_only' | 'allow_cash_refund';
   held_sale_close_policy: 'discard_on_session_close' | 'keep_for_next_session';
   show_product_images: boolean;
+  /** PR-2S: هذا وحده لا يمنح شيئاً — صلاحية `products.view_cost` هي حدّ الأمان
+   *  الحقيقي؛ الإعداد يقيّد فوقها فقط، فمعطَّلاً تبقى التكلفة/الربحية غائبة عن
+   *  استجابة POS حتى لمستخدم يملك الصلاحية. */
+  show_cost_profit_in_pos: boolean;
   blind_cash_count_enabled: boolean;
   audit_operation_policies: Record<string, AuditOperationPolicy>;
 }
@@ -135,6 +139,7 @@ const DEFAULTS: PosConfig = {
   exchange_surplus_policy: 'customer_credit_only',
   held_sale_close_policy: 'discard_on_session_close',
   show_product_images: true,
+  show_cost_profit_in_pos: false,
   blind_cash_count_enabled: false,
   audit_operation_policies: {
     item_remove: 'allowed', price_override: 'allowed', discount_change: 'allowed', cart_cancel: 'allowed', cash_recount: 'approval_required',
@@ -497,6 +502,16 @@ export default function PosSettingsPage() {
                     <p className="text-xs leading-relaxed text-muted">{t('show_product_images_hint')}</p>
                   </div>
                   <Switch checked={config.show_product_images} onCheckedChange={(checked) => patch('show_product_images', checked)} aria-labelledby="show_product_images_label" />
+                </div>
+              </div>
+
+              <div className="border-b border-border py-3">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0 space-y-1">
+                    <p id="show_cost_profit_in_pos_label" className="text-sm font-medium text-text">{t('show_cost_profit_in_pos')}</p>
+                    <p className="text-xs leading-relaxed text-muted">{t('show_cost_profit_in_pos_hint')}</p>
+                  </div>
+                  <Switch checked={config.show_cost_profit_in_pos} onCheckedChange={(checked) => patch('show_cost_profit_in_pos', checked)} aria-labelledby="show_cost_profit_in_pos_label" />
                 </div>
               </div>
 
