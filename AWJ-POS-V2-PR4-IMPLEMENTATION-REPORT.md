@@ -532,7 +532,7 @@ oversized ✓ · Print/Copy/Close clear ✓ · print-failure state untouched and
 - PR number/link: [#659](https://github.com/safwan5001-source/Nebrax/pull/659) (Draft)
 - Draft status: Draft, open, not merged (confirmed via `pull_request_read`)
 - Previously reviewed Head SHA: `7e0fd37d7486a80438247f4fc4074d1bad3d9bdb`
-- Head SHA (after this follow-up): recorded after commit (see final chat reply)
+- Head SHA (after this follow-up): `2bf4706edbff7f94aa582419a05f6983763d872d`
 
 ## 25. Next Recommended Step
 
