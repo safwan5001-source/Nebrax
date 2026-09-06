@@ -3191,6 +3191,8 @@
     "invoice_details_loading": "جارٍ تحميل الفاتورة…",
     "invoice_details_error": "تعذّر تحميل الفاتورة.",
     "invoice_details_back": "رجوع للقائمة",
+    "invoice_details_start_return": "بدء مرتجع",
+    "invoice_details_start_exchange": "بدء استبدال",
     "invoice_details_customer": "العميل",
     "invoice_details_status": "حالة المستند",
     "invoice_details_items": "الأصناف",

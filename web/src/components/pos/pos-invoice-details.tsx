@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
-import { ChevronLeft, ChevronRight, ReceiptText, RotateCw } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ReceiptText, Repeat2, RotateCcw, RotateCw } from 'lucide-react';
 import { formatDate } from '@/lib/formatting';
 import { Button } from '@/components/ui/button';
 import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
@@ -66,16 +66,28 @@ const DOCUMENT_STATUS_KEYS: Record<string, string> = {
 /**
  * تفاصيل الفاتورة داخل POS — عرض مستندي/تجاري بحت، مستقل عن معاينة الإيصال
  * (تلك تمثّل مخرَج الطابعة الحرارية الفعلي). لا يبدأ عرض هذه الشاشة أي مرتجع
- * أو استبدال أو تعديلاً على الفاتورة.
+ * أو استبدال أو تعديلاً على الفاتورة — ذلك فعلٌ صريح فقط عبر زرّي «بدء مرتجع»/
+ * «بدء استبدال» أدناه (PR-6)، وهما لا يتصرّفان في هذا المكوّن نفسه؛ يبلّغان
+ * الحاوية الأم فقط لتفتح حوار الإرجاع/الاستبدال القائم مع تمرير هذه الفاتورة.
  */
 export function PosInvoiceDetails({
   invoiceId,
   onBack,
   onPreviewReceipt,
+  onStartReturn,
+  onStartExchange,
+  canStartExchange = true,
 }: {
   invoiceId: string;
   onBack: () => void;
   onPreviewReceipt: (invoice: InvoiceDetail) => void;
+  /** PR-6: بدء مرتجع/استبدال صريح لهذه الفاتورة تحديداً. اختياري: غيابهما يُخفي
+   * الزرّين بلا كسر — الصفحات/الاختبارات القائمة التي لا تمرّرهما تستمر كما كانت. */
+  onStartReturn?: (invoiceId: string) => void;
+  onStartExchange?: (invoiceId: string) => void;
+  /** PR-6: بوابة توفّر سلة نشطة للاستبدال (نفس شرط تعطيل زرّ الاستبدال في الشريط
+   * العلوي) — الاستبدال يحتاج بديلاً في السلة، لا مجرّد إرجاع. */
+  canStartExchange?: boolean;
 }) {
   const t = useTranslations('pos');
   const locale = useLocale();
@@ -113,10 +125,24 @@ export function PosInvoiceDetails({
         </button>
         <h1 className="num truncate text-sm font-bold text-text">{invoice?.number ?? t('invoice_details_title')}</h1>
         {invoice && invoice.status === 'posted' && (
-          <Button type="button" size="sm" className="ms-auto" onClick={() => onPreviewReceipt(invoice)}>
-            <ReceiptText className="h-4 w-4" strokeWidth={1.7} />
-            {t('receipt_preview_action')}
-          </Button>
+          <div className="ms-auto flex flex-wrap items-center gap-2">
+            {onStartReturn && (
+              <Button type="button" size="sm" variant="outline" onClick={() => onStartReturn(invoice.id)}>
+                <RotateCcw className="h-4 w-4" strokeWidth={1.7} />
+                {t('invoice_details_start_return')}
+              </Button>
+            )}
+            {onStartExchange && (
+              <Button type="button" size="sm" variant="outline" disabled={!canStartExchange} onClick={() => onStartExchange(invoice.id)}>
+                <Repeat2 className="h-4 w-4" strokeWidth={1.7} />
+                {t('invoice_details_start_exchange')}
+              </Button>
+            )}
+            <Button type="button" size="sm" onClick={() => onPreviewReceipt(invoice)}>
+              <ReceiptText className="h-4 w-4" strokeWidth={1.7} />
+              {t('receipt_preview_action')}
+            </Button>
+          </div>
         )}
       </div>
 

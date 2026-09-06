@@ -3191,6 +3191,8 @@
     "invoice_details_loading": "Loading invoice…",
     "invoice_details_error": "Unable to load the invoice.",
     "invoice_details_back": "Back to list",
+    "invoice_details_start_return": "Start return",
+    "invoice_details_start_exchange": "Start exchange",
     "invoice_details_customer": "Customer",
     "invoice_details_status": "Document status",
     "invoice_details_items": "Items",

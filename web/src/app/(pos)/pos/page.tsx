@@ -322,6 +322,11 @@ export default function PosPage() {
   const [closeOpen, setCloseOpen] = useState(false);
   const [returnOpen, setReturnOpen] = useState(false);
   const [exchangeOpen, setExchangeOpen] = useState(false);
+  // PR-6: بدء صريح من تفاصيل الفاتورة يمرّر هويتها، فيفتح الحوار القائم مباشرة
+  // على تلك الفاتورة بدل قائمة الاختيار الافتراضية. يُصفَّر عند الإغلاق حتى لا
+  // يُفتَح الحوار التالي (من الشريط العلوي مثلاً) على فاتورة سابقة خطأً.
+  const [returnPreselectId, setReturnPreselectId] = useState<string | null>(null);
+  const [exchangePreselectId, setExchangePreselectId] = useState<string | null>(null);
   const [countedBal, setCountedBal] = useState('');
   const [sessionBusy, setSessionBusy] = useState(false);
   const [drawerBusy, setDrawerBusy] = useState(false);
@@ -1399,6 +1404,10 @@ export default function PosPage() {
     { key: 'favorites', label: t('tab_favorites'), icon: Star },
   ];
 
+  // PR-6: شرط واحد لإتاحة الاستبدال — يحتاج سلة بديلة نشطة، يُستخدم لتعطيل
+  // زرّ الشريط العلوي وزرّ «بدء استبدال» في تفاصيل الفاتورة معاً بلا ازدواج.
+  const canExchangeNow = cart.length > 0 && step !== 'payment' && !paying && !sessionInvalid;
+
   // ── لوحات فرعية ──────────────────────────────────────────────
   const productsPanel = (
     <section className={POS_PRODUCTS_PANEL_CLASS}>
@@ -1994,11 +2003,11 @@ export default function PosPage() {
         onOpenCashDrawer={() => void openCashDrawer()}
         cashDrawerDisabled={!session || sessionInvalid || !sessionDrawerConfigured || !posCfg.cash_drawer_enabled || posCfg.cash_drawer_driver === 'unavailable' || drawerBusy}
         cashDrawerBusy={drawerBusy}
-        onReturn={() => setReturnOpen(true)}
+        onReturn={() => { setReturnPreselectId(null); setReturnOpen(true); }}
         onReturnToSystem={requestReturnToSystem}
-        onExchange={() => setExchangeOpen(true)}
+        onExchange={() => { setExchangePreselectId(null); setExchangeOpen(true); }}
         onLogout={requestLogout}
-        exchangeDisabled={cart.length === 0 || step === 'payment' || paying || sessionInvalid}
+        exchangeDisabled={!canExchangeNow}
       />
 
       {(sessionRevalidating || !online) && session && (
@@ -2048,6 +2057,9 @@ export default function PosPage() {
             invoiceId={selectedInvoiceId}
             onBack={() => setSelectedInvoiceId(null)}
             onPreviewReceipt={openReceiptPreview}
+            onStartReturn={(id) => { setReturnPreselectId(id); setReturnOpen(true); }}
+            onStartExchange={(id) => { setExchangePreselectId(id); setExchangeOpen(true); }}
+            canStartExchange={canExchangeNow}
           />
         ) : (
           <PosInvoiceCenter
@@ -2106,8 +2118,9 @@ export default function PosPage() {
       <PosReturnDialog
         open={returnOpen}
         sessionId={session?.id ?? null}
-        onClose={() => setReturnOpen(false)}
-        onReturned={(number) => { setReturnOpen(false); success(t('return_done', { number })); }}
+        preselectedInvoiceId={returnPreselectId}
+        onClose={() => { setReturnOpen(false); setReturnPreselectId(null); }}
+        onReturned={(number) => { setReturnOpen(false); setReturnPreselectId(null); success(t('return_done', { number })); }}
       />
       <PosExchangeDialog
         open={exchangeOpen}
@@ -2115,8 +2128,9 @@ export default function PosPage() {
         replacementItems={cart}
         replacementTotalMinor={totalMinor}
         taxInclusive={taxInclusive}
-        onClose={() => setExchangeOpen(false)}
-        onExchanged={(number) => { setExchangeOpen(false); closeCart(activeCart.id); setStep('sale'); setMobileTab('products'); success(t('exchange_done', { number })); }}
+        preselectedInvoiceId={exchangePreselectId}
+        onClose={() => { setExchangeOpen(false); setExchangePreselectId(null); }}
+        onExchanged={(number) => { setExchangeOpen(false); setExchangePreselectId(null); closeCart(activeCart.id); setStep('sale'); setMobileTab('products'); success(t('exchange_done', { number })); }}
       />
 
       <CustomerPickerDialog
