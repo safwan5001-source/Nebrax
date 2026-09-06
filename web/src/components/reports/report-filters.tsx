@@ -43,6 +43,7 @@ export function ReportFilters({
   showBranches = true,
   comparison,
   compactMobile = false,
+  compactDesktop = false,
 }: {
   value: ReportFilterState;
   onChange: (next: ReportFilterState) => void;
@@ -61,6 +62,14 @@ export function ReportFilters({
    * الحالي الذي يطبّق فوراً بلا زرّ تطبيق منفصل.
    */
   compactMobile?: boolean;
+  /**
+   * وضع اختياري للوحة التحكم وحدها (تابلت/ديسكتوب): يزيل بطاقة الإطار المحيطة
+   * (حدّ + خلفية + حشوة) ويُخفي التسميات المرئية فوق الحقول (تبقى مُتاحة
+   * لقارئ الشاشة عبر `aria-label`)، فيندمج الشريط بصرياً مع `AwjGlobalSearch`
+   * في صفّ toolbar واحد كثيف بدل بطاقتين منفصلتين. لا يمسّ شاشات التقارير
+   * الأخرى — تبقى ببطاقتها وتسمياتها كما هي تماماً.
+   */
+  compactDesktop?: boolean;
 }) {
   const t = useTranslations('reports');
   const tb = useTranslations('branches');
@@ -379,27 +388,39 @@ export function ReportFilters({
         </div>
       </Dialog>}
 
-    <div className="no-print hidden flex-wrap items-end gap-3 rounded border border-border bg-surface p-3 sm:flex">
+    <div
+      className={cn(
+        'no-print hidden flex-wrap sm:flex',
+        compactDesktop ? 'items-center gap-2' : 'items-end gap-3 rounded border border-border bg-surface p-3'
+      )}
+    >
       {showDateRange && <>
-        <div className="space-y-1.5">
-          <Label htmlFor="rf-from">{t('from')}</Label>
-          <Input id="rf-from" type="date" dir="ltr" className="w-40 text-start [unicode-bidi:isolate]" value={value.from}
+        <div className={compactDesktop ? undefined : 'space-y-1.5'}>
+          <Label htmlFor="rf-from" className={cn(compactDesktop && 'sr-only')}>{t('from')}</Label>
+          <Input id="rf-from" type="date" dir="ltr"
+            className={cn('text-start [unicode-bidi:isolate]', compactDesktop ? 'h-10 w-36' : 'w-40')}
+            value={value.from}
             onChange={(e) => onChange({ ...value, from: e.target.value })} />
         </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="rf-to">{t('to')}</Label>
-          <Input id="rf-to" type="date" dir="ltr" className="w-40 text-start [unicode-bidi:isolate]" value={value.to}
+        <div className={compactDesktop ? undefined : 'space-y-1.5'}>
+          <Label htmlFor="rf-to" className={cn(compactDesktop && 'sr-only')}>{t('to')}</Label>
+          <Input id="rf-to" type="date" dir="ltr"
+            className={cn('text-start [unicode-bidi:isolate]', compactDesktop ? 'h-10 w-36' : 'w-40')}
+            value={value.to}
             onChange={(e) => onChange({ ...value, to: e.target.value })} />
         </div>
       </>}
 
-      {comparison && <div className="space-y-1.5">
-        <Label htmlFor="rf-comparison">{t('comparison')}</Label>
+      {comparison && <div className={compactDesktop ? undefined : 'space-y-1.5'}>
+        <Label htmlFor="rf-comparison" className={cn(compactDesktop && 'sr-only')}>{t('comparison')}</Label>
         <select
           id="rf-comparison"
           value={comparison.value}
           onChange={(event) => comparison.onChange(event.target.value as ComparisonMode)}
-          className="h-9 w-48 rounded border border-border bg-surface px-2 text-sm text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+          className={cn(
+            'rounded border border-border bg-surface px-2 text-sm text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
+            compactDesktop ? 'h-10 w-44' : 'h-9 w-48'
+          )}
         >
           <option value="none">{t('comparison_none')}</option>
           <option value="previous-period" disabled={comparison.previousPeriodDisabled}>{t('comparison_previous_period')}</option>
@@ -408,8 +429,8 @@ export function ReportFilters({
       </div>}
 
       {/* منتقي فروع متعدّد الاختيار */}
-      {showBranches && <div className="space-y-1.5">
-        <Label htmlFor="rf-branches">{tb('title')}</Label>
+      {showBranches && <div className={compactDesktop ? undefined : 'space-y-1.5'}>
+        <Label htmlFor="rf-branches" className={cn(compactDesktop && 'sr-only')}>{tb('title')}</Label>
         <div ref={rootRef} className="relative">
           <button
             id="rf-branches"
@@ -417,7 +438,10 @@ export function ReportFilters({
             onClick={() => setOpen((o) => !o)}
             aria-haspopup="listbox"
             aria-expanded={open}
-            className="flex h-9 w-56 items-center justify-between gap-2 rounded border border-border bg-surface px-3 text-sm text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+            className={cn(
+              'flex items-center justify-between gap-2 rounded border border-border bg-surface px-3 text-sm text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
+              compactDesktop ? 'h-10 w-52' : 'h-9 w-56'
+            )}
           >
             <span className="flex min-w-0 items-center gap-2">
               <MapPin className="h-4 w-4 shrink-0 text-muted" strokeWidth={1.7} />
