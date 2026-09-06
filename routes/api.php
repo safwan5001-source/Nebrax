@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AccountController;
+use App\Http\Controllers\Api\AccountRoutingController;
 use App\Http\Controllers\Api\AccountSettingsController;
 use App\Http\Controllers\Api\AppointmentController;
 use App\Http\Controllers\Api\AssetController;
@@ -468,6 +469,11 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::post('cost-centers', [CostCenterController::class, 'store'])->middleware($perm('cost_centers.manage'));
         Route::put('cost-centers/{id}', [CostCenterController::class, 'update'])->middleware($perm('cost_centers.manage'));
         Route::delete('cost-centers/{id}', [CostCenterController::class, 'destroy'])->middleware($perm('cost_centers.manage'));
+
+        // ACC-2: توجيه الحسابات — بنية تحتية فقط، بلا مستهلك ترحيل بعد.
+        Route::get('accounting-settings/account-routing', [AccountRoutingController::class, 'index'])->middleware($perm('accounting_settings.view'));
+        Route::put('accounting-settings/account-routing/{roleKey}', [AccountRoutingController::class, 'update'])->middleware($perm('accounting_settings.manage'));
+        Route::delete('accounting-settings/account-routing/{roleKey}', [AccountRoutingController::class, 'reset'])->middleware($perm('accounting_settings.manage'));
 
         // قوائم الأسعار: إعداد شركة مشترك يختاره البائع يدوياً في المسودة؛
         // سعر السطر النهائي يبقى لقطة مستقلة ولا يتغير بتعديل القائمة لاحقاً.
