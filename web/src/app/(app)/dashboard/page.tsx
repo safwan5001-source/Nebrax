@@ -24,6 +24,7 @@ import { SalesChart } from '@/components/dashboard/sales-chart';
 import { ActivityFeed } from '@/components/dashboard/activity-feed';
 import { Registers } from '@/components/dashboard/registers';
 import { ReportFilters, EMPTY_FILTERS, filtersToQuery, type ReportFilterState } from '@/components/reports/report-filters';
+import { AwjGlobalSearch } from '@/components/dashboard/awj-global-search';
 import { api } from '@/lib/api';
 import { barPercent, dailySeries, expenseTone, netIncome, toNumber } from '@/lib/dashboard';
 import { SAUDI_RIYAL_SYMBOL, formatNumberShort, formatRiyal, formatRiyalShort } from '@/lib/money';
@@ -137,10 +138,16 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      {/* ١ — العنوان وشريط الفلاتر */}
+      {/* ١ — العنوان + شريط الأدوات (بحث AWJ + فلاتر اللوحة)
+          نفس نقطة الانكسار sm (640px) التي يستعملها `ReportFilters` داخلياً:
+          أسفلها بحث بعرض كامل ثم زرّ الفلاتر المضغوط تحته، وفوقها toolbar
+          واحد — بحث بعرض ثابت وفلاتر Inline — فلا ينكسر التبويب بين الاثنين. */}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <h1 className="text-2xl font-bold text-text">{t('title')}</h1>
-        <ReportFilters value={filters} onChange={setFilters} />
+        <div className="flex w-full flex-col gap-2.5 sm:w-auto sm:flex-row sm:items-center sm:gap-3">
+          <AwjGlobalSearch className="sm:w-72 lg:w-80" />
+          <ReportFilters compactMobile value={filters} onChange={setFilters} />
+        </div>
       </div>
 
       {/* ٢ — صفّ المؤشّرات: ٣ بطاقات على الديسكتوب، شبكة ٢×٢ على الجوال */}
