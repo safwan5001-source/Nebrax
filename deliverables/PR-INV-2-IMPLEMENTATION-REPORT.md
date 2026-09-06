@@ -5,7 +5,7 @@
 **Branch:** `claude/phase-1-pr-inv-2`
 **PR:** https://github.com/safwan5001-source/Nebrax/pull/671
 **Base SHA:** `3e4556c` (main, after PR-SEC-INV-1 / #666, PR-INV-1 / #668, and PR-PRICE-1 / #669 merged)
-**Head SHA:** `b760f8c`
+**Head SHA:** `5aa7c97`
 
 This report supersedes the version delivered before independent review. §16 records the post-review accounting decision (dedicated variance account instead of reusing 5180) and everything above it reflects the final, updated code.
 
