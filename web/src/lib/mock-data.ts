@@ -1347,6 +1347,91 @@ type MockZatcaCredential = {
   updated_at: string | null;
 };
 
+type MockNotification = {
+  id: string;
+  category: 'alert' | 'update';
+  type: string;
+  severity: 'info' | 'warning' | 'critical';
+  title: string;
+  message: string;
+  source_type: string | null;
+  source_id: string | null;
+  action: string | null;
+  data: Record<string, unknown> | null;
+  read_at: string | null;
+  created_at: string;
+};
+
+// إشعارات تجريبية ثابتة لوضع المعاينة فقط — لا تُنشئ عبر NotificationService الحقيقي،
+// ولا يوجد بعد أي مُنتِج (مخزون/مالية) في PR-NOTIF-2 يولّدها في الإنتاج.
+const mockNotifications: MockNotification[] = [
+  {
+    id: 'demo-notif-1',
+    category: 'alert',
+    type: 'demo.low_stock',
+    severity: 'warning',
+    title: 'مخزون منخفض: زيت محرك 5W-30',
+    message: 'الكمية المتوفرة اقتربت من حد إعادة الطلب المحدَّد للصنف.',
+    source_type: null,
+    source_id: null,
+    action: null,
+    data: null,
+    read_at: null,
+    created_at: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
+  },
+  {
+    id: 'demo-notif-2',
+    category: 'alert',
+    type: 'demo.out_of_stock',
+    severity: 'critical',
+    title: 'نفاد المخزون: فلتر هواء قياسي',
+    message: 'وصلت الكمية إلى صفر — راجع أمر الشراء التالي لهذا الصنف.',
+    source_type: null,
+    source_id: null,
+    action: null,
+    data: null,
+    read_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+    created_at: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
+  },
+  {
+    id: 'demo-notif-3',
+    category: 'update',
+    type: 'demo.platform_update',
+    severity: 'info',
+    title: 'تحديث المنصة: تقارير المخزون',
+    message: 'أُضيفت تقارير فروق الجرد المرحّلة إلى قسم التقارير.',
+    source_type: null,
+    source_id: null,
+    action: null,
+    data: null,
+    read_at: null,
+    created_at: new Date(Date.now() - 26 * 60 * 60 * 1000).toISOString(),
+  },
+];
+
+function mockNotificationsResponse(path: string): { data: MockNotification[]; meta: { current_page: number; last_page: number; per_page: number; total: number } } {
+  const query = new URLSearchParams(path.split('?')[1] ?? '');
+  const category = query.get('category');
+  const read = query.get('read');
+  const perPage = Number(query.get('per_page') ?? '20') || 20;
+  const page = Number(query.get('page') ?? '1') || 1;
+
+  const filtered = mockNotifications.filter((item) => {
+    if (category && item.category !== category) return false;
+    if (read === 'read' && !item.read_at) return false;
+    if (read === 'unread' && item.read_at) return false;
+    return true;
+  });
+  const sorted = [...filtered].sort((a, b) => b.created_at.localeCompare(a.created_at));
+  const start = (page - 1) * perPage;
+  const data = sorted.slice(start, start + perPage);
+
+  return {
+    data,
+    meta: { current_page: page, last_page: Math.max(1, Math.ceil(sorted.length / perPage)), per_page: perPage, total: sorted.length },
+  };
+}
+
 let mockZatcaSubmissionMode: MockZatcaSubmissionMode = 'manual';
 let mockZatcaEnvironment: MockZatcaEnvironment = 'developer';
 const mockZatcaCredentials: MockZatcaCredential[] = [{
@@ -3635,6 +3720,26 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
     return resolve({ data: { timeline: mockPosAuditEvents } });
   }
   if (clean === '/product-categories') return resolve({ data: [] });
+
+  const notificationMethod: string = m;
+  if (clean === '/notifications' && notificationMethod === 'GET') return resolve(mockNotificationsResponse(path));
+  if (clean === '/notifications/unread-count' && notificationMethod === 'GET') {
+    return resolve({ data: { count: mockNotifications.filter((item) => !item.read_at).length } });
+  }
+  const notificationReadMatch = clean.match(/^\/notifications\/([^/]+)\/read$/);
+  if (notificationReadMatch && notificationMethod === 'POST') {
+    const target = mockNotifications.find((item) => item.id === notificationReadMatch[1]);
+    if (target && !target.read_at) target.read_at = new Date().toISOString();
+    return resolve({ data: target ?? null });
+  }
+  if (clean === '/notifications/mark-all-read' && notificationMethod === 'POST') {
+    const now = new Date().toISOString();
+    let updated = 0;
+    for (const item of mockNotifications) {
+      if (!item.read_at) { item.read_at = now; updated += 1; }
+    }
+    return resolve({ data: { updated } });
+  }
 
   // افتراضي: لا بيانات بعد (حالة فارغة).
   return resolve({ data: [] });

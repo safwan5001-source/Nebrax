@@ -17,6 +17,8 @@ interface InventorySettings {
   detailed_tracking_enabled: boolean;
   show_stock_quantities: boolean;
   restock_sales_returns: boolean;
+  low_stock_notifications_enabled: boolean;
+  out_of_stock_notifications_enabled: boolean;
 }
 
 /**
@@ -57,6 +59,8 @@ export default function InventorySettingsPage() {
           allow_negative_stock: form.allow_negative_stock,
           show_stock_quantities: form.show_stock_quantities,
           restock_sales_returns: form.restock_sales_returns,
+          low_stock_notifications_enabled: form.low_stock_notifications_enabled,
+          out_of_stock_notifications_enabled: form.out_of_stock_notifications_enabled,
         },
       });
       success(tc('updated'));
@@ -182,6 +186,37 @@ export default function InventorySettingsPage() {
               {t('restock_off_note')}
             </p>
           )}
+        </CardContent>
+      </Card>
+
+      {/* ═══ إشعارات المخزون (PR-NOTIF-3) ═══ */}
+      {/* تعيد استخدام `products.reorder_level` القائم حصراً — لا عتبة جديدة هنا. */}
+      <Card className="max-w-3xl">
+        <CardHeader><CardTitle>{t('stock_notifications')}</CardTitle></CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-start justify-between gap-4">
+            <div className="space-y-1">
+              <span className="text-sm font-medium text-text">{t('low_stock_notifications')}</span>
+              <p className="text-xs leading-relaxed text-muted">{t('low_stock_notifications_hint')}</p>
+            </div>
+            <Switch
+              checked={form.low_stock_notifications_enabled}
+              onCheckedChange={(v) => set('low_stock_notifications_enabled', v)}
+              aria-label={t('low_stock_notifications')}
+            />
+          </div>
+
+          <div className="flex items-start justify-between gap-4">
+            <div className="space-y-1">
+              <span className="text-sm font-medium text-text">{t('out_of_stock_notifications')}</span>
+              <p className="text-xs leading-relaxed text-muted">{t('out_of_stock_notifications_hint')}</p>
+            </div>
+            <Switch
+              checked={form.out_of_stock_notifications_enabled}
+              onCheckedChange={(v) => set('out_of_stock_notifications_enabled', v)}
+              aria-label={t('out_of_stock_notifications')}
+            />
+          </div>
         </CardContent>
       </Card>
 

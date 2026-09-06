@@ -145,6 +145,19 @@ class Settings
              * لا يمسّ مرتجع المشتريات: الردّ إلى المورّد إخراجٌ في كل حال.
              */
             'restock_sales_returns'     => true,
+            /**
+             * ── `low_stock_notifications_enabled` / `out_of_stock_notifications_enabled`
+             *
+             * تفعيل تنبيهات المخزون في مركز الإشعارات (PR-NOTIF-3). تعيد استخدام
+             * `products.reorder_level` القائم حصراً — لا حقل عتبة جديد ولا تفسير
+             * فرعي له. انظر `App\Services\Accounting\InventoryAlertService`.
+             *
+             * **الافتراض `false` لكليهما** — نفس سياسة `finance.financial_alerts_enabled`:
+             * ميزة كشف/إشعار تلقائية جديدة لا تُفعَّل صامتة لمستأجر قائم أو جديد؛
+             * تُفعَّل بقرار واعٍ من هنا أو من شاشة إعدادات المخزون.
+             */
+            'low_stock_notifications_enabled'     => false,
+            'out_of_stock_notifications_enabled'  => false,
         ],
         'purchases' => [
             'default_tax_rate'      => 15,

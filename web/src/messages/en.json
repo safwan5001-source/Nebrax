@@ -6156,7 +6156,12 @@
     "returns": "Sales returns",
     "restock_sales_returns": "Return goods to stock",
     "restock_sales_returns_hint": "A business policy, not an accounting rule: retail puts sound goods back on the shelf, while restaurants and food shops never restock a return. Either way, the amount refunded to the customer is unchanged.",
-    "restock_off_note": "When off: returned goods do not enter stock and the moving average is untouched; their cost is posted to “5180 Inventory Adjustments” instead of “1140 Inventory”. You can override this per return on its creation screen."
+    "restock_off_note": "When off: returned goods do not enter stock and the moving average is untouched; their cost is posted to “5180 Inventory Adjustments” instead of “1140 Inventory”. You can override this per return on its creation screen.",
+    "stock_notifications": "Stock notifications",
+    "low_stock_notifications": "Low stock alerts",
+    "low_stock_notifications_hint": "Notify product managers when a tracked item reaches its configured reorder level or below.",
+    "out_of_stock_notifications": "Out of stock alerts",
+    "out_of_stock_notifications_hint": "Notify product managers when a tracked item's available quantity reaches zero or below."
   },
   "purchaseSettings": {
     "title": "Purchase settings",
@@ -6449,6 +6454,48 @@
     "from": "From",
     "to": "To",
     "cancel": "Cancel"
+  },
+  "notifications": {
+    "bellLabel": "Notifications",
+    "bellLabelUnread": "Notifications ({count} unread)",
+    "panelLabel": "Notifications panel",
+    "tabs": {
+      "all": "All",
+      "alerts": "Alerts",
+      "updates": "Updates"
+    },
+    "severity": {
+      "info": "Info",
+      "warning": "Warning",
+      "critical": "Critical"
+    },
+    "empty": "No notifications in this tab.",
+    "loadFailed": "Failed to load notifications.",
+    "viewSource": "View source",
+    "noSource": "No direct source",
+    "markAllRead": "Mark all as read",
+    "markingAll": "Marking…",
+    "markAllSuccess": "All notifications marked as read.",
+    "markRead": "Mark as read",
+    "viewAll": "View all notifications",
+    "retry": "Try again",
+    "pageTitle": "Notifications",
+    "pageSubtitle": "Your notification history — reading a notification does not close or acknowledge its source.",
+    "titleColumn": "Notification",
+    "category": "Category",
+    "severityColumn": "Severity",
+    "date": "Date",
+    "statusColumn": "Status",
+    "read": "Read",
+    "unread": "Unread",
+    "source": "Source",
+    "actions": "Actions",
+    "readFilter": {
+      "label": "Filter by read state",
+      "all": "All",
+      "unread": "Unread",
+      "read": "Read"
+    }
   },
   "numberingSettings": {
     "title": "Document numbering",
