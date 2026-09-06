@@ -1,130 +1,121 @@
 # Active Agent Task
 
-TASK_ID: ORCH-V2-DESIGN-001
+TASK_ID: ORCH-V2-SLICE0-001
 STATUS: READY_FOR_CLAUDE
 OWNER: Safwan
 PLANNER_REVIEWER: ChatGPT
 IMPLEMENTER: Claude Code
+EXPECTED_ACTOR: CLAUDE
+ROUND: 0
+MAX_ROUNDS: 2
+LAST_PROCESSED_SHA: 6c9a92db6363558523f77294052be3a90e572812
 
 ## العنوان
 
-مراجعة وتصميم Orchestration V2 — Automatic Dispatch / Wake-up بين GitHub وClaude Code وOpenAI Reviewer.
+Orchestration V2 Slice 0 — إثبات live-session wake-up عبر `subscribe_pr_activity`.
 
 ## الهدف
 
-راجع من داخل واقع مستودع AWJ تصميم V2 المقترح لإزالة حاجة Safwan لإيقاظ الطرف التالي يدويًا بعد كل انتقال حالة، مع الحفاظ الكامل على بوابات المالك والسلامة وعدم إنشاء حلقة agents غير محدودة.
+إثبات أو نفي أن جلسة Claude Code الحية تستطيع الاشتراك في PR تجريبي ثم الاستيقاظ تلقائياً عند حدث PR مدعوم، بدون أن يطلب Safwan منها يدوياً "شيك" بعد إنشاء الحدث.
 
-هذه **مهمة تصميم ومراجعة فقط**. لا تنفذ GitHub Actions، ولا تضف secrets، ولا تنشئ dispatcher، ولا تغيّر كود التطبيق في هذه الدورة.
+هذه تجربة orchestration غير حساسة فقط. لا تغيّر كود AWJ ولا أي workflow أو secret أو Routine.
 
 ## نقطة البداية المؤكدة
 
-V1 أصبح مدموجًا في `main` بعد نجاح `ORCH-TEST-001`. النموذج الحالي يعمل كالتالي:
+تم اعتماد ودمج تصميم `ORCH-V2-DESIGN-001` في `main` عند SHA:
 
-`TASK.md → Claude Code → CLAUDE_REPORT.md → ChatGPT review → REVIEW.md → owner gate`
+`6c9a92db6363558523f77294052be3a90e572812`
 
-GitHub هو shared state، لكن Safwan ما زال يحتاج إلى إيقاظ الطرف التالي يدويًا. المطلوب في V2 هو إزالة هذا الدور اليدوي قدر الإمكان، لا إزالة سلطة Safwan.
-
-## نتائج البحث الخارجي التي يجب التحقق منها وعدم افتراضها بلا مراجعة
-
-1. توجد آلية رسمية حديثة من Anthropic باسم Claude Code Routines API، موصوفة كـExperimental، ويُفترض أنها تسمح بتشغيل Routine محفوظة في Claude Code Web عبر HTTP ويمكن استدعاؤها من GitHub Actions.
-2. OpenAI Responses API يدعم background execution، والمحادثات/الاستمرارية وwebhooks عند اكتمال response، لكن هذا لا يثبت أن GitHub يستطيع إيقاظ جلسة ChatGPT التفاعلية الحالية نفسها.
-3. GitHub Actions يوفر `concurrency` ويمكن استخدام dispatch events صريحة لتجنب loops الناتجة عن commits.
-4. يجب عدم استخدام صلاحيات واسعة أو نمط غير آمن مثل تنفيذ كود PR غير موثوق ضمن سياق ذي صلاحيات مرتفعة. Secrets يجب أن تكون GitHub Actions Secrets وبأقل صلاحيات لازمة.
-
-اعتبر هذه نقاط بحث من Planner وليست حقائق معمارية نهائية. إذا كانت آليات Anthropic/OpenAI الفعلية أو قيود المستودع تختلف، ارفع `CHALLENGE` أو `RISK` مع الدليل.
-
-## المعمارية المقترحة للمراجعة
-
-State machine مبدئي:
-
-`READY_FOR_CLAUDE`
-→ dispatcher/GitHub Action invokes Claude Code Routine
-→ Claude writes/pushes `CLAUDE_REPORT.md: READY_FOR_REVIEW`
-→ dispatcher invokes an OpenAI API Reviewer Agent
-→ reviewer writes `REVIEW.md` as either `CHANGES_REQUESTED`, `APPROVED_FOR_OWNER`, or safe blocking state
-→ `CHANGES_REQUESTED` may dispatch Claude for another bounded round
-→ `APPROVED_FOR_OWNER` stops all automation and waits for Safwan.
-
-لا تفترض أن OpenAI API Reviewer هو نفس جلسة ChatGPT التفاعلية التي يتحدث معها Safwan. صمّم الفصل بوضوح.
-
-## عناصر الحالة المقترحة
-
-راجع الحاجة إلى حقول مثل:
-
-- `STATUS`
-- `TASK_ID`
-- `TURN`
-- `REVISION`
-- `EXPECTED_ACTOR`
-- `LAST_PROCESSED_SHA`
-- `MAX_ROUNDS`
-- optional correlation/run identifiers
-
-المطلوب منع duplicate execution، stale turns، concurrent writers، replay، infinite ping-pong، ومراجعة commit غير الذي نفذه Claude.
+القرار المعتمد:
+- نختبر `subscribe_pr_activity` أولاً لأنه أبسط مسار لإيقاظ جلسة Claude الحية.
+- لا نعتبره durable trigger؛ الاشتراك مرتبط بعمر/ملكية الجلسة وPR Steward.
+- Routines API يبقى fallback منفصلاً ولا يدخل في Slice 0.
 
 ## داخل النطاق
 
-- قراءة ملفات `docs/agent-workspace/*` و`.claude/AGENT_ORCHESTRATION.md` الحالية.
-- فحص workflows/configuration الموجودة فقط بالقدر اللازم لفهم قيود GitHub Actions الحالية وعدم التعارض معها.
-- تقييم التصميم المقترح مقابل واقع المستودع.
-- تحديد أفضل trigger/dispatch topology لـClaude ولـOpenAI reviewer.
-- تحديد state transitions وidempotency/concurrency/round limits/failure states.
-- تحديد security/permissions/secrets model.
-- تحديد owner gates التي يجب أن تبقى غير قابلة للتجاوز آليًا.
-- تحديد ما إذا كان Prototype V2 ينبغي أن يكون داخل هذا المستودع أو isolated branch/workflow وبأي حدود.
-- اقتراح implementation slices صغيرة قابلة للمراجعة لاحقًا.
+1. اقرأ `docs/agent-workspace/PROTOCOL.md`, `TASK.md`, `REVIEW.md`, `DECISIONS.md`, و`.claude/AGENT_ORCHESTRATION.md` بالقدر اللازم.
+2. استخدم الفرع `agent/orch-v2-slice0-001` فقط لهذه التجربة.
+3. أنشئ/استخدم PR تجريبي لهذا الفرع مقابل `main` إذا لم يكن موجوداً.
+4. اشترك في نشاط ذلك الـPR باستخدام `subscribe_pr_activity` من **الجلسة الحية الحالية**.
+5. بعد نجاح الاشتراك، سجّل في `CLAUDE_REPORT.md` حالة انتظار واضحة تتضمن رقم PR وأن الاشتراك أصبح active، ثم توقف وانتظر الحدث التجريبي من Reviewer/Owner.
+6. عند وصول الحدث تلقائياً، سجّل الدليل: نوع الحدث، هل استيقظت الجلسة دون رسالة يدوية من Safwan، والقيود التي ظهرت فعلياً.
+7. لا تعتبر الاختبار ناجحاً إلا إذا استيقظت الجلسة بسبب حدث PR نفسه دون wake-up يدوي من Safwan بعد الاشتراك.
+
+## بروتوكول الاختبار
+
+### Phase A — Setup / Subscribe
+
+Claude:
+- يتحقق أن `TASK_ID` صحيح.
+- يفتح PR تجريبي إن لزم، أو يستخدم PR الخاص بهذا الفرع.
+- يستدعي `subscribe_pr_activity` لذلك PR.
+- يحدّث `CLAUDE_REPORT.md` إلى:
+  - `TASK_ID: ORCH-V2-SLICE0-001`
+  - `STATUS: WAITING_FOR_REVIEWER`
+  - `TYPE: REPORT`
+  - PR number
+  - subscription result
+  - عبارة صريحة أنه الآن ينتظر event ولا يحتاج Safwan لإرسال رسالة أخرى إذا كانت الآلية تعمل.
+- يدفع التقرير إلى نفس الفرع ثم يتوقف.
+
+### Phase B — Wake event
+
+Reviewer/Owner يرسل **تعليق PR تجريبي واحد فقط** بعد التأكد من Phase A.
+
+النص المقترح للحدث:
+`ORCH-V2-SLICE0-001 WAKE TEST — acknowledge this event in CLAUDE_REPORT.md; do not change application code.`
+
+Claude عند الاستيقاظ التلقائي:
+- لا ينفذ أي كود تطبيق.
+- يحدّث `CLAUDE_REPORT.md` إلى `STATUS: READY_FOR_REVIEW`.
+- يسجل timestamp/event type/PR number والنتيجة PASS أو FAIL.
+- PASS فقط إذا لم يحتج Safwan لإيقاظ الجلسة يدوياً بعد تعليق الـPR.
+- ثم يتوقف للمراجعة.
+
+## معايير النجاح
+
+PASS إذا تحقق جميع الآتي:
+- subscription نجح في جلسة Claude الحية.
+- حدث PR المدعوم وصل للجلسة.
+- الجلسة استيقظت وعالجت الحدث دون رسالة يدوية جديدة من Safwan.
+- `CLAUDE_REPORT.md` سجل الدليل والنتيجة.
+- لا تغييرات خارج ملفات agent-workspace اللازمة للتجربة.
+
+FAIL/BLOCKED إذا:
+- subscription غير متاح أو رفض بسبب PR Steward/ownership.
+- الجلسة انتهت قبل الحدث.
+- الحدث لم يصل أو احتاج wake-up يدوي.
+- ظهرت قيود تجعل الآلية غير موثوقة للغرض المقصود.
+
+عند FAIL/BLOCKED لا تحاول Routines API تلقائياً؛ سجل النتيجة وتوقف للمراجعة.
 
 ## خارج النطاق
 
-- أي implementation لـV2 الآن.
-- إنشاء أو تعديل GitHub Actions workflows.
-- إنشاء Claude Routine أو استدعائها فعليًا.
-- استخدام/إنشاء OpenAI أو Anthropic credentials/secrets.
-- تعديل التطبيق Laravel/Next.js.
-- DB/schema/migrations/API/accounting/ZATCA/security/Tenant/Branch behavior changes.
-- Merge أو Deploy أو Production Release.
-- إعادة تصميم V1 بلا حاجة مثبتة.
+- Laravel/Next.js/application code.
+- Accounting/ZATCA/data/security/API/DB/Tenant/Branch behavior.
+- GitHub Actions أو تعديل workflows.
+- Secrets/credentials.
+- Claude Code Routines API أو إنشاء Routine.
+- OpenAI API reviewer.
+- Merge/Deploy/Production Release.
+- أي refactor أو إصلاح CI جانبي.
 
-## أسئلة إلزامية يجب أن يجيب عنها التقرير
+## متطلبات التقرير النهائي
 
-1. هل يمكن لـGitHub Actions تشغيل Claude Code رسميًا بالطريقة المقترحة حاليًا؟ ما المتطلب/القيد؟
-2. ما أفضل طريقة لتشغيل Reviewer آلي من OpenAI دون الادعاء بأنه نفس ChatGPT interactive session؟
-3. من هو الـsingle writer لكل ملف/حالة؟ وكيف نمنع race conditions؟
-4. كيف نضمن أن reviewer يراجع SHA الصحيح الذي أنتجه implementer؟
-5. كيف نمنع loop لا نهائي أو تكرار نفس turn؟
-6. ماذا يحدث إذا فشل Claude invocation، OpenAI invocation، push، أو GitHub Action؟
-7. ما أقل `permissions` مطلوبة للـworkflow؟ وأين تحفظ الأسرار؟
-8. كيف نتعامل مع fork/untrusted PRs أو أي event غير موثوق؟
-9. ما الحالات التي يجب أن توقف automation فورًا وتعيدها إلى Safwan؟
-10. هل الأفضل event-driven single dispatcher أم workflows منفصلة؟ ولماذا؟
-11. هل يوجد سبب يجعل V2 غير مناسب الآن بسبب Experimental API أو تكلفة/اعتمادية؟ اقترح fallback إن لزم.
-12. ما أصغر Prototype آمن يثبت wake-up end-to-end دون لمس كود AWJ أو production؟
-
-## متطلبات التقرير
-
-حدّث `docs/agent-workspace/CLAUDE_REPORT.md` مع:
-
-- `TASK_ID: ORCH-V2-DESIGN-001`
-- `STATUS: READY_FOR_REVIEW` إذا اكتمل التصميم، أو `WAITING_FOR_REVIEWER` إذا يوجد قرار/خطر يحتاج حسمًا قبل الإكمال.
-- `TYPE: REPORT | PROPOSAL | CHALLENGE | RISK | QUESTION` حسب النتيجة.
-- ملخص تنفيذي عربي.
-- الأدلة من ملفات المستودع وأي توثيق رسمي استطعت التحقق منه.
-- architecture/state machine المقترح.
-- threat/failure model مختصر لكن صريح.
-- permissions/secrets model.
-- Prototype plan مقسّم إلى slices صغيرة.
-- ما الذي تقترح قبوله/رفضه/تعديله من تصميم ChatGPT ولماذا.
-- Branch/commit state إن توفرت.
+`docs/agent-workspace/CLAUDE_REPORT.md` يجب أن يتضمن:
+- TASK_ID/status/type.
+- Branch/PR/Base SHA/Head SHA إن توفرت.
+- نتيجة subscribe_pr_activity.
+- event المستخدم للاختبار.
+- هل حدث wake تلقائي بدون تدخل Safwan: YES/NO.
+- PASS/FAIL/BLOCKED مع السبب.
+- الملفات المتغيرة.
+- الاختبارات: N/A للتطبيق، مع توضيح أن الاختبار orchestration-only.
+- المخاطر/القيود.
 - الخطوة التالية المقترحة.
 
-## قواعد القرار
+## بوابات السلامة
 
-Claude Code ليس منفذًا أعمى. إذا وجدت تصميمًا أبسط أو أكثر أمانًا أو أن إحدى فرضيات Planner غير صحيحة، تحداها بالدليل.
+لا Merge، لا Deploy، لا Production، لا secrets، لا workflows، لا Routines، ولا تغييرات تطبيق/محاسبة/API/DB/Tenant/Branch.
 
-لا توسّع المهمة إلى implementation. أي اقتراح implementation يبقى proposal فقط حتى مراجعة ChatGPT وموافقة Safwan على بدء التنفيذ.
-
-## بوابات المالك
-
-ممنوع في هذه المهمة: Merge، Deploy، Production Release، destructive operations، secrets creation/change، أو أي تغيير في accounting/security/API/DB/Tenant/Branch behavior.
-
-أي V2 مستقبلية يجب أن تتوقف حتمًا عند `APPROVED_FOR_OWNER` وأي قرار مادي/حساس، ولا يجوز لها تحويل موافقة reviewer إلى موافقة merge/deploy.
+أي شيء خارج الاختبار المحدد أعلاه = توقف وارفع `WAITING_FOR_REVIEWER` أو `BLOCKED`.

@@ -2,51 +2,51 @@
 
 STATUS: APPROVED_FOR_OWNER
 DECISION: ACCEPTED
-TASK_ID: ORCH-V2-DESIGN-001
+TASK_ID: ORCH-V2-SLICE0-001
 
 ## نطاق المراجعة
 
-المراجعة النهائية لتصحيح Claude Code على `ORCH-V2-DESIGN-001` بعد دورة `CHANGES_REQUESTED`.
+المراجعة النهائية لتجربة Orchestration V2 Slice 0 الخاصة بإثبات live-session wake-up عبر `subscribe_pr_activity` على PR #665.
 
 ## القرار
 
 `ACCEPTED` / `APPROVED_FOR_OWNER`.
 
-تم تصحيح النقطة المعمارية المطلوبة بصورة كافية، وأصبح التصميم يميز بوضوح بين آليتين مستقلتين:
+نتيجة Slice 0 معتمدة: **PASS**.
 
-1. `subscribe_pr_activity` كمسار منخفض التعقيد لإيقاظ جلسة Claude الحية المرتبطة بـPR، مع حدود lifecycle/ownership وعدم اعتباره durable trigger.
-2. Claude Code Routines API / GitHub trigger كمسار رسمي Experimental لبدء جلسة جديدة مستقلة، مع متطلبات وصلاحيات ومخاطر مختلفة.
+## الدليل المقبول
 
-## ما تم اعتماده
+- Claude اشترك في PR #665 من الجلسة الحية عبر `subscribe_pr_activity` ونجح الاشتراك.
+- بعد Phase A توقف Claude عند `WAITING_FOR_REVIEWER` دون polling أو check-in ذاتي.
+- Reviewer أرسل تعليق Phase B واحداً على PR #665.
+- الحدث وصل إلى الجلسة كـ `issue_comment.created` من GitHub، `trust="relay"`.
+- تعليق GitHub سُجل عند `2026-09-06T00:07:56Z` ووصل إلى جلسة Claude عند `2026-09-06T00:07:57Z`، أي بعد نحو ثانية.
+- Claude استيقظ وعالج الحدث دون رسالة يدوية جديدة من Safwan.
+- لم يتغير أي application code، ولم تُستخدم secrets أو workflows أو Routines أو Deploy/Production.
 
-- single-writer لكل ملف orchestration.
-- حقول الحالة: `TASK_ID`, `STATUS`, `EXPECTED_ACTOR`, `LAST_PROCESSED_SHA`, `ROUND`، و`MAX_ROUNDS` ثابت في البروتوكول.
-- fail-closed عند SHA mismatch، stale/replay، fork/untrusted source، conflict، max rounds، أو owner gate.
-- `APPROVED_FOR_OWNER` و`ESCALATED_TO_OWNER` حالتا توقف ولا تعنيان Merge/Deploy.
-- عدم استبدال ChatGPT التفاعلي بـOpenAI API reviewer في V2 الحالية.
-- عدم أتمتة المراجعة لمسارات AWJ الحساسة في هذه المرحلة.
-- Prototype متدرج يبدأ بـSlice 0 عبر `subscribe_pr_activity` فقط.
-- Routines API يبقى durable/on-demand fallback محتمل، ولا يُنفذ قبل إثبات الحاجة.
+## ملاحظة تصميمية مكتسبة من التجربة
 
-## ملاحظات أمان مهمة محفوظة للتصميم اللاحق
+ظهر بعد الاشتراك حدث `subscription.created` نظامي قبل حدث Phase B الحقيقي. لذلك أي منطق orchestration مستقبلي يجب ألا يعتبر كل wake event انتقال حالة صالحاً؛ يجب التحقق من `kind`, `source`, `trust`, task/PR identity والحالة المتوقعة قبل التنفيذ.
 
-- `/fire` لا يوفر idempotency key؛ أي استخدام مستقبلي يحتاج حماية AWJ من التكرار عبر state/SHA/round.
-- Routine تبدأ جلسة جديدة مستقلة ولا تعتمد على استمرارية سياق الجلسة الحية.
-- تشغيل Routine غير تفاعلي، لذلك لا يجوز اعتباره بديلاً عن بوابات المراجعة البشرية في المسارات الحساسة.
-- فجوة `permissions:` في GitHub workflows الحالية تبقى مهمة أمنية مستقلة ولا تدخل في هذا الـscope.
+## القيود التي لم يثبتها Slice 0
 
-## الخطوة التالية المعتمدة للتخطيط
+- مدة بقاء الاشتراك واستمراريته بعد انتهاء/إعادة إنشاء جلسة Claude.
+- سلوك تعارض PR Steward/وجود مراقب آخر.
+- recovery عند فشل/ضياع event.
+- durable wake-up عندما لا توجد جلسة Claude حية؛ يبقى Routines API مساراً منفصلاً محتملاً وليس جزءاً من هذا الاختبار.
 
-إنشاء مهمة جديدة مستقلة لـSlice 0 لاختبار live-session wake-up:
+## اعتماد الاستخدام
 
-- PR تجريبي غير حساس.
-- Claude يشترك عبر `subscribe_pr_activity`.
-- حدث تعليق/مراجعة تجريبي.
-- إثبات هل تستيقظ الجلسة تلقائياً أم لا.
-- لا application code، لا secrets، لا Actions جديدة، لا Routines، لا Deploy/Production.
+يمكن اعتماد `subscribe_pr_activity` كآلية **live-session wake-up** مثبتة تجريبياً، بشرط عدم وصفها كـdurable dispatcher وعدم استخدامها لتجاوز owner/reviewer gates.
 
-لا يتم توسيع `ORCH-V2-DESIGN-001` لتنفيذ الـPrototype؛ يجب أن يكون له `TASK_ID` مستقل للحفاظ على audit trail واضح.
+لا يزال `APPROVED_FOR_OWNER` حالة توقف. هذا الاعتماد لا يمنح Merge/Deploy/Production approval.
+
+## الخطوة التالية
+
+بعد موافقة Safwan على دمج PR #665، يُسجّل نجاح Slice 0 في `DECISIONS.md`/البروتوكول عند الحاجة.
+
+المسار التالي يجب أن يكون مهمة مستقلة لتحديد/إثبات انتقال **Claude → ChatGPT reviewer** دون الادعاء بإمكانية إيقاظ جلسة ChatGPT التفاعلية الحالية ما لم توجد آلية رسمية مثبتة لذلك.
 
 ## بوابة السلامة
 
-هذا الاعتماد تقني للتصميم فقط. لا يمنح موافقة Merge أو Deploy أو Production Release، ولا يجيز أي تغيير محاسبي/أمني/API/DB/Tenant/Branch behavior.
+لا Merge، لا Deploy، لا Production Release، ولا تغييرات في accounting/security/API/DB/Tenant/Branch behavior دون موافقة Safwan الصريحة.
