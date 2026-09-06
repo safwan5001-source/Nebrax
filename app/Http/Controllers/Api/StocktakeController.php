@@ -86,6 +86,23 @@ class StocktakeController extends ApiController
         return (new StocktakeResource($posted->load(['lines.product', 'warehouse'])))->response();
     }
 
+    /**
+     * مطابقة صريحة (PR-INV-4): يُحدِّث لقطة الفتح للأصناف التي تحرّك رصيدها
+     * منذ الفتح ويمسح عدّها القائم — خطوةٌ إلزامية قبل ترحيلٍ رفضه التعارض.
+     */
+    public function reconcile(string $id): JsonResponse
+    {
+        $stocktake = Stocktake::findOrFail($id);
+        $this->assertRecordAccessible($stocktake->branch_id, [$stocktake->warehouse_id]);
+
+        $result = $this->domain(fn () => $this->stocktakes->reconcile($stocktake));
+
+        return response()->json([
+            'data' => (new StocktakeResource($result['stocktake']->load(['lines.product', 'warehouse'])))->toArray(request()),
+            'reconciled_product_ids' => $result['reconciled_product_ids'],
+        ]);
+    }
+
     public function destroy(string $id): JsonResponse
     {
         $stocktake = Stocktake::findOrFail($id);
