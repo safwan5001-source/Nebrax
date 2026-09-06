@@ -240,12 +240,25 @@ browser context — proof this is real server state, not a client-side illusion.
 
 ## Base SHA
 
-`b6ff1c5bb592fdbc09785717ad4c9a3d1b6ffbdd` (`main`, confirmed to contain the PR-5 merge
-commit `eed979d`, via `git fetch && git log` before branching).
+Two distinct values, kept separate deliberately so neither is mistaken for the other:
+
+- **PR-6 branch point** (the `main` commit this branch was actually created from, confirmed
+  at the time to contain the PR-5 merge `eed979d` via `git fetch && git log`):
+  `b6ff1c5bb592fdbc09785717ad4c9a3d1b6ffbdd`.
+- **Current GitHub PR base tip** (`main` has since advanced by one unrelated merge — `cfb9576`
+  / PR-SEC-INV-1, "same-tenant Stocktake/StockPermit record authorization," #666 — which
+  touches inventory/stocktaking security, not POS): `cfb95768744de17fb120397a258e3ae93ab30691`.
+  This is what GitHub currently reports as this PR's `base.sha`.
+
+This drift is expected (other work continued merging into `main` while this PR sat open) and
+is not a conflict: PR-6's diff against either commit contains only the same 7 files listed
+above under "Files changed" — confirmed via `git log b6ff1c5..origin/main`, which shows only
+the single unrelated `#666` commit, none of it touching any POS file this PR changes.
 
 ## Head SHA
 
-`8ff0ab77ccf65029db635adfa25a830156a8094e`
+`1acb1c6f64bc7fd6c4709508beb3e451f53fc02b` — verified live against PR #667's `head.sha` via
+`pull_request_read` immediately before finalizing this report.
 
 ## Recommended next step
 
