@@ -9,6 +9,7 @@ use App\Models\Partner;
 use App\Models\PosSession;
 use App\Models\PosSessionEvent;
 use App\Models\Purchase;
+use App\Models\PurchaseLine;
 use App\Models\ReturnDocument;
 use App\Models\ReturnLine;
 use App\Models\User;
@@ -541,6 +542,35 @@ class ReturnService
 
     /**
      * ═══════════════════════════════════════════════════════════════
+     *  PR-INV-2 — كمية سطر مرتجع الشراء بوحدة المخزون
+     * ═══════════════════════════════════════════════════════════════
+     *  نظير `returnLineBaseQuantity()` أعلاه تماماً، لكن لسطر الشراء المصدر
+     *  (`PurchaseLine`) بدل سطر الفاتورة. `PurchaseLine` لا يملك حقلَي الكمية
+     *  النسبية (`quantity_numerator`/`denominator`) أصلاً — لا سطور شراء
+     *  كسرية اليوم — فلا فرع خاص بها هنا.
+     *
+     *  `ReturnLine.quantity` بوحدة **الشراء** كما كتبها المستخدم (كرتونٌ واحد
+     *  مثلاً)، لا بوحدة المخزون؛ والمخزون استُلم عند الشراء بوحدته عبر
+     *  `PurchaseLine::baseQuantity()` (٢٤ قطعة للكرتون). فإخراج الكمية من
+     *  المخزون يجب أن يستعمل **نفس عامل التحويل التاريخي لسطر الشراء نفسه** —
+     *  لا حالة قالب الوحدات الحالية للمنتج، ولا مدخل الواجهة (العقد لا يقبل
+     *  وحدة أو معاملاً من مرتجع الشراء العام أصلاً).
+     */
+    private function purchaseReturnLineBaseQuantity(ReturnLine $line, ?PurchaseLine $source): int
+    {
+        if ($source === null) {
+            // لا سطر شراء مرتبط (مرتجع حرّ بلا `source_line_id`) — الكمية
+            // المدخلة هي كمية المخزون كما كانت دوماً، فلا يتغيّر سلوكها.
+            return (int) $line->quantity;
+        }
+
+        $factor = max(1, (int) ($source->unit_factor ?? 1));
+
+        return (int) $line->quantity * $factor;
+    }
+
+    /**
+     * ═══════════════════════════════════════════════════════════════
      *  دليل append-only إضافي — مرتجع بيع POS خارج جلسته الأصلية
      * ═══════════════════════════════════════════════════════════════
      *  المسار المقفل بالجلسة (`PosReturnService`) يسجّل دليله عبر
@@ -593,29 +623,71 @@ class ReturnService
 
     /**
      * مرتجع مشتريات: عكس المخزون وضريبة المدخلات والذمم الدائنة، وإخراج البضاعة.
+     *
+     * ═══════════════════════════════════════════════════════════════
+     *  PR-INV-2 — الكمية بوحدة الأساس التاريخية + القيمة الدفترية لا التجارية
+     * ═══════════════════════════════════════════════════════════════
+     *  كان الإخراج يستعمل `line->quantity` مباشرة (بوحدة الشراء كما كتبها
+     *  المستخدم — «كرتون» مثلاً) و`line->unit_price` كتكلفةٍ للحركة، فردّ
+     *  كرتونٍ بمعامل ٢٤ كان يُخرج قطعة واحدة من المخزون، والقيمة الخارجة من
+     *  1140 كانت سعر الاعتماد التجاري لا القيمة الدفترية الفعلية للمنتج.
+     *
+     *  الإصلاح المزدوج (يجب أن يُشحنا معاً — نفس الخروج المالي):
+     *   • الكمية: `purchaseReturnLineBaseQuantity()` تحوّل بعامل `unit_factor`
+     *     التاريخي **لسطر الشراء المصدر نفسه** — لا حالة المنتج الحالية ولا
+     *     قالب وحدات قد يتغيّر لاحقاً (نظير `returnLineBaseQuantity()` في
+     *     مرتجع المبيعات، R2).
+     *   • القيمة: 1140 وحركة المخزون تُقيَّمان بـ`avg_cost` الحالي للمنتج —
+     *     القيمة الدفترية الفعلية المُزالة من الرفّ والدفتر المساعد — لا بسعر
+     *     الشراء/الاعتماد المُدخَل على السطر. الفرق بينهما (إن وُجد) قيمةٌ
+     *     تجارية بحتة تخصّ ذمّة المورّد، فيُرحَّل إلى 5180 (فروق الجرد والتلف
+     *     — نفس حساب فروق القيمة المستعمل في الجرد والأذون المخزنية ومرتجع
+     *     المبيعات التالف، لا حساب جديد): دائنٌ حين الاعتماد التجاري أعلى من
+     *     الدفترية (مكسب)، ومدينٌ حين أقلّ (خسارة) — يبقى القيد متوازناً
+     *     دائماً بلا تغيير في `subtotal`/`tax_amount`/`total` التجارية
+     *     الظاهرة للمستند (تبقى كما أُدخلت، تخصّ ذمّة المورّد لا المخزون).
      */
     protected function postPurchaseReturn(ReturnDocument $return): ReturnDocument
     {
         $return->loadMissing('lines.product');
 
-        $inventoryTotal = 0;
-        $expenseTotal   = 0;
-        $taxTotal       = 0;
+        // مرجع سطر الشراء المصدر — عامل التحويل الثابت وقت الشراء، لا حالة
+        // قالب الوحدات الحالية. استعلامٌ واحد لكل أسطر المستند لا واحد لكل سطر.
+        $sourceLineIds = $return->lines->pluck('source_line_id')->filter()->unique()->values();
+        $sourcePurchaseLines = $sourceLineIds->isEmpty()
+            ? collect()
+            : PurchaseLine::whereIn('id', $sourceLineIds)->get()->keyBy('id');
+
+        // القيمة التجارية (سعر الشراء/الاعتماد المُدخَل) تبني ذمّة المورّد
+        // والمستند الظاهر؛ القيمة الدفترية هي ما يُزال فعلياً من 1140 والدفتر
+        // المساعد. الفرق بينهما — لا أحدهما وحده — هو ما يذهب إلى 5180.
+        $inventoryCommercialTotal = 0;
+        $inventoryCarryingTotal   = 0;
+        $expenseTotal             = 0;
+        $taxTotal                 = 0;
 
         foreach ($return->lines as $line) {
             $taxTotal += $line->line_tax;
             $product = $line->product;
+            $commercial = (int) $line->line_subtotal - (int) $line->line_discount;
+
             if ($product && $product->track_inventory) {
-                $inventoryTotal += (int) $line->line_subtotal - (int) $line->line_discount;
+                $inventoryCommercialTotal += $commercial;
+                $baseQuantity = $this->purchaseReturnLineBaseQuantity($line, $sourcePurchaseLines->get($line->source_line_id));
+                $inventoryCarryingTotal += $baseQuantity * (int) $product->avg_cost;
             } else {
-                $expenseTotal += (int) $line->line_subtotal - (int) $line->line_discount;
+                $expenseTotal += $commercial;
             }
         }
 
-        $subtotal = $inventoryTotal + $expenseTotal;
+        $subtotal = $inventoryCommercialTotal + $expenseTotal;
         $total    = $subtotal + $taxTotal;
+        // موجبٌ = اعتماد المورّد التجاري أعلى من القيمة الدفترية (مكسب)،
+        // سالبٌ = أقلّ (خسارة). صفرٌ في كل الحالات القائمة قبل هذا الإصلاح.
+        $variance = $inventoryCommercialTotal - $inventoryCarryingTotal;
 
-        // قيد عكس الشراء: مدين 2110/1110 / دائن 1140 + دائن 5150 + دائن 1150
+        // قيد عكس الشراء: مدين 2110/1110 / دائن 1140 (بالقيمة الدفترية) +
+        // دائن 5150 + دائن 1150 + فرق القيمة (إن وُجد) إلى 5180.
         $debitLine = [
             'account_id' => $this->accountId($return->payment_type === 'cash' ? self::ACC_CASH : self::ACC_PAYABLE),
             'debit'      => $total,
@@ -626,14 +698,19 @@ class ReturnService
         }
         $lines = [$debitLine];
 
-        if ($inventoryTotal > 0) {
-            $lines[] = ['account_id' => $this->accountId(self::ACC_INVENTORY), 'credit' => $inventoryTotal];
+        if ($inventoryCarryingTotal > 0) {
+            $lines[] = ['account_id' => $this->accountId(self::ACC_INVENTORY), 'credit' => $inventoryCarryingTotal];
         }
         if ($expenseTotal > 0) {
             $lines[] = ['account_id' => $this->accountId(self::ACC_EXPENSE), 'credit' => $expenseTotal];
         }
         if ($taxTotal > 0) {
             $lines[] = ['account_id' => $this->accountId(self::ACC_INPUT_VAT), 'credit' => $taxTotal];
+        }
+        if ($variance > 0) {
+            $lines[] = ['account_id' => $this->accountId(self::ACC_DAMAGE), 'credit' => $variance];
+        } elseif ($variance < 0) {
+            $lines[] = ['account_id' => $this->accountId(self::ACC_DAMAGE), 'debit' => -$variance];
         }
 
         $entry = $this->ledger->post($lines, [
@@ -644,13 +721,15 @@ class ReturnService
             'created_by'  => $return->created_by,
         ]);
 
-        // إخراج البضاعة المتابَعة من المخزون (بسعر الشراء — القيد أعلاه)
+        // إخراج البضاعة المتابَعة من المخزون بالكمية الأساسية والقيمة الدفترية
+        // (avg_cost الحالي) — لا بوحدة الشراء ولا بسعر الاعتماد التجاري.
         foreach ($return->lines as $line) {
             $product = $line->product;
             if ($product && $product->track_inventory && $line->quantity > 0) {
+                $baseQuantity = $this->purchaseReturnLineBaseQuantity($line, $sourcePurchaseLines->get($line->source_line_id));
                 // إرجاع للمورّد إخراجٌ من المخزون كالبيع، لكن الرصيد المقارن
                 // هو رصيد المخزن المثبت على المرتجع لا إجمالي كل المستودعات.
-                $this->inventory->applyIssue($product, $line->quantity, $line->unit_price, [
+                $this->inventory->applyIssue($product, $baseQuantity, (int) $product->avg_cost, [
                     'source_type'   => ReturnDocument::class,
                     'source_id'     => $return->id,
                     'warehouse_id'  => $return->warehouse_id,
