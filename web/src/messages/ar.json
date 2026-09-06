@@ -6434,6 +6434,48 @@
     "to": "إلى",
     "cancel": "إلغاء"
   },
+  "notifications": {
+    "bellLabel": "الإشعارات",
+    "bellLabelUnread": "الإشعارات ({count} غير مقروء)",
+    "panelLabel": "لوحة الإشعارات",
+    "tabs": {
+      "all": "الكل",
+      "alerts": "تنبيهات",
+      "updates": "تحديثات"
+    },
+    "severity": {
+      "info": "معلومة",
+      "warning": "تنبيه",
+      "critical": "حرج"
+    },
+    "empty": "لا توجد إشعارات ضمن هذا التبويب.",
+    "loadFailed": "تعذّر تحميل الإشعارات.",
+    "viewSource": "عرض المصدر",
+    "noSource": "بلا مصدر مباشر",
+    "markAllRead": "تحديد الكل كمقروء",
+    "markingAll": "جارٍ التحديد…",
+    "markAllSuccess": "تم تحديد كل الإشعارات كمقروءة.",
+    "markRead": "تحديد كمقروء",
+    "viewAll": "عرض كل الإشعارات",
+    "retry": "إعادة المحاولة",
+    "pageTitle": "الإشعارات",
+    "pageSubtitle": "سجلّ إشعاراتك — قراءة الإشعار لا تُغلق حالة مصدره ولا تُقرّه.",
+    "titleColumn": "الإشعار",
+    "category": "التصنيف",
+    "severityColumn": "الخطورة",
+    "date": "التاريخ",
+    "statusColumn": "الحالة",
+    "read": "مقروء",
+    "unread": "غير مقروء",
+    "source": "المصدر",
+    "actions": "إجراءات",
+    "readFilter": {
+      "label": "تصفية حسب حالة القراءة",
+      "all": "الكل",
+      "unread": "غير مقروء",
+      "read": "مقروء"
+    }
+  },
   "numberingSettings": {
     "title": "إعدادات الترقيم المتسلسل",
     "picker_title": "نوع المستند",

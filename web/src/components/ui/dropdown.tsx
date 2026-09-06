@@ -25,6 +25,7 @@ export function Dropdown({
   menuClassName,
   popupRole = 'menu',
   mobilePopover = false,
+  onOpenChange,
 }: {
   trigger: React.ReactNode;
   children: DropdownChildren;
@@ -36,13 +37,21 @@ export function Dropdown({
   popupRole?: 'menu' | 'dialog';
   /** قائمة الجوال تُثبت تحت زرها وتُقاس داخل النافذة بدل أن تتحول إلى ورقة سفلية. */
   mobilePopover?: boolean;
+  /** إشعار اختياري بكل تبديل فتح/إغلاق — لتحميل محتوى القائمة كسولاً عند فتحها. */
+  onOpenChange?: (open: boolean) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [mobilePopoverPosition, setMobilePopoverPosition] = useState<{ top: number; left: number } | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
-  const close = useCallback(() => setOpen(false), []);
+  const onOpenChangeRef = useRef(onOpenChange);
+  onOpenChangeRef.current = onOpenChange;
+  const setOpenState = useCallback((next: boolean) => {
+    setOpen(next);
+    onOpenChangeRef.current?.(next);
+  }, []);
+  const close = useCallback(() => setOpenState(false), [setOpenState]);
 
   // تسجيل مُغلِق هذه القائمة في السجلّ العام (لتحقيق الفتح الحصري).
   useEffect(() => {
@@ -56,11 +65,11 @@ export function Dropdown({
   useEffect(() => {
     if (!open) return;
     const onPointer = (e: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpenState(false);
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
-      setOpen(false);
+      setOpenState(false);
       triggerRef.current?.focus();
     };
     document.addEventListener('mousedown', onPointer);
@@ -69,7 +78,7 @@ export function Dropdown({
       document.removeEventListener('mousedown', onPointer);
       document.removeEventListener('keydown', onKey);
     };
-  }, [open]);
+  }, [open, setOpenState]);
 
   useEffect(() => {
     if (!open || !mobilePopover) return;
@@ -99,7 +108,7 @@ export function Dropdown({
 
   function toggle() {
     if (open) {
-      setOpen(false);
+      setOpenState(false);
       return;
     }
     setMobilePopoverPosition(null);
@@ -107,7 +116,7 @@ export function Dropdown({
     closers.forEach((c) => {
       if (c !== close) c();
     });
-    setOpen(true);
+    setOpenState(true);
   }
 
   return (

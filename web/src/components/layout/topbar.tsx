@@ -8,6 +8,7 @@ import { Button } from '../ui/button';
 import { Dropdown, DropdownItem } from '../ui/dropdown';
 import { ThemeToggle } from './theme-toggle';
 import { LangToggle } from './lang-toggle';
+import { NotificationBell } from './notification-bell';
 import { CompanyLogoMark } from '@/components/layout/company-logo-mark';
 import { useCompany } from '@/lib/company';
 import { currentUser, logout } from '@/lib/auth';
@@ -73,6 +74,7 @@ export function Topbar({
           <DropdownItem icon={UserPlus} href="/partners/new">{t('new_customer')}</DropdownItem>
         </Dropdown>
 
+        <NotificationBell />
         <LangToggle />
         <ThemeToggle />
 

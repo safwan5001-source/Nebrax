@@ -6434,6 +6434,48 @@
     "to": "To",
     "cancel": "Cancel"
   },
+  "notifications": {
+    "bellLabel": "Notifications",
+    "bellLabelUnread": "Notifications ({count} unread)",
+    "panelLabel": "Notifications panel",
+    "tabs": {
+      "all": "All",
+      "alerts": "Alerts",
+      "updates": "Updates"
+    },
+    "severity": {
+      "info": "Info",
+      "warning": "Warning",
+      "critical": "Critical"
+    },
+    "empty": "No notifications in this tab.",
+    "loadFailed": "Failed to load notifications.",
+    "viewSource": "View source",
+    "noSource": "No direct source",
+    "markAllRead": "Mark all as read",
+    "markingAll": "Marking…",
+    "markAllSuccess": "All notifications marked as read.",
+    "markRead": "Mark as read",
+    "viewAll": "View all notifications",
+    "retry": "Try again",
+    "pageTitle": "Notifications",
+    "pageSubtitle": "Your notification history — reading a notification does not close or acknowledge its source.",
+    "titleColumn": "Notification",
+    "category": "Category",
+    "severityColumn": "Severity",
+    "date": "Date",
+    "statusColumn": "Status",
+    "read": "Read",
+    "unread": "Unread",
+    "source": "Source",
+    "actions": "Actions",
+    "readFilter": {
+      "label": "Filter by read state",
+      "all": "All",
+      "unread": "Unread",
+      "read": "Read"
+    }
+  },
   "numberingSettings": {
     "title": "Document numbering",
     "picker_title": "Document type",
