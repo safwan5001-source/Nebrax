@@ -408,6 +408,12 @@ class InventoryService
     /**
      * يعدّل رصيد المنتج في مخزن بمقدار موجب/سالب. لا يمسّ القيمة —
      * التقييم عالمي على المنتج (products.avg_cost).
+     *
+     * **المسار الوحيد** الذي يكتب `product_warehouse_stock` — فيزيد
+     * `revision` هنا حصراً بالضبط ١ عند كل حركةٍ فعلية. هذا العدّاد الرتيب
+     * هو مرجع الجرد (`StocktakeService`) لكشف الحركة المتزامنة منذ لحظة
+     * الفتح (PR-INV-4)، لا مقارنة الكمية النهائية وحدها التي تعمى عن حركة
+     * ذهاب-وعودة (ABA) صافيها صفر.
      */
     protected function adjustWarehouseStock(?string $warehouseId, string $productId, int $delta): void
     {
@@ -417,9 +423,10 @@ class InventoryService
 
         $row = ProductWarehouseStock::firstOrCreate(
             ['product_id' => $productId, 'warehouse_id' => $warehouseId],
-            ['quantity' => 0]
+            ['quantity' => 0, 'revision' => 0]
         );
         $row->increment('quantity', $delta);
+        $row->increment('revision');
     }
 
     protected function accountId(string $code): string

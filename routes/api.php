@@ -905,6 +905,7 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::post('stocktakes', [StocktakeController::class, 'store'])->middleware([$perm('products.manage'), $app('inventory.core')]);
         Route::post('stocktakes/{id}/count', [StocktakeController::class, 'count'])->middleware([$perm('products.manage'), $app('inventory.core')]);
         Route::post('stocktakes/{id}/post', [StocktakeController::class, 'post'])->middleware([$perm('products.manage'), $app('inventory.core')]);
+        Route::post('stocktakes/{id}/reconcile', [StocktakeController::class, 'reconcile'])->middleware([$perm('products.manage'), $app('inventory.core')]);
         Route::delete('stocktakes/{id}', [StocktakeController::class, 'destroy'])->middleware([$perm('products.manage'), $app('inventory.core')]);
 
         // سجلّ تغييرات المستندات (قراءة فقط — لا أثر محاسبي)

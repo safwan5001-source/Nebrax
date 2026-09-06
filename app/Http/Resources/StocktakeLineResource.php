@@ -15,6 +15,9 @@ class StocktakeLineResource extends JsonResource
             'product_id'       => $this->product_id,
             'product_name'     => $this->whenLoaded('product', fn () => $this->product?->name),
             'system_quantity'  => $this->system_quantity,
+            // هوية حالة المخزون لحظة الفتح (PR-INV-4) — مرجع اكتشاف الحركة
+            // المتزامنة، لا للاستهلاك المباشر في الواجهة.
+            'system_revision'  => $this->system_revision,
             // null = لم يُعدّ بعد، وهو غير الصفر الذي يعني «عُدَّ فلم يوجد».
             'counted_quantity' => $this->counted_quantity,
             'difference'       => $this->quantityDifference(),
