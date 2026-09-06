@@ -257,8 +257,11 @@ the single unrelated `#666` commit, none of it touching any POS file this PR cha
 
 ## Head SHA
 
-`1acb1c6f64bc7fd6c4709508beb3e451f53fc02b` — verified live against PR #667's `head.sha` via
-`pull_request_read` immediately before finalizing this report.
+`60af16e3db49c5f4255dc22db62fd03cb5d17b69` — verified live against PR #667's `head.sha` via
+`pull_request_read` immediately before this line was written. (A documentation-only commit
+necessarily cannot record its own resulting hash in advance; the exact final SHA after this
+edit is reported and re-verified in the delivering chat reply, not chased further inside this
+file to avoid an unbounded edit/verify loop.)
 
 ## Recommended next step
 
