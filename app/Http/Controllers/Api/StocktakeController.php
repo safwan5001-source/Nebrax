@@ -27,9 +27,10 @@ class StocktakeController extends ApiController
             $query->where('status', $status);
         }
 
-        return StocktakeResource::collection(
-            $this->scopeToActiveBranch($query, $request)->get()
-        )->response();
+        $query = $this->scopeToActiveBranch($query, $request);
+        $query = $this->scopeToAccessibleWarehouses($query, ['warehouse_id']);
+
+        return StocktakeResource::collection($query->get())->response();
     }
 
     public function store(StoreStocktakeRequest $request): JsonResponse
@@ -50,6 +51,7 @@ class StocktakeController extends ApiController
     public function show(string $id): JsonResponse
     {
         $stocktake = Stocktake::with(['lines.product', 'warehouse'])->findOrFail($id);
+        $this->assertRecordAccessible($stocktake->branch_id, [$stocktake->warehouse_id]);
 
         return (new StocktakeResource($stocktake))->response();
     }
@@ -64,7 +66,9 @@ class StocktakeController extends ApiController
         ]);
 
         $stocktake = Stocktake::findOrFail($id);
-        $counts    = collect($request->input('counts'))
+        $this->assertRecordAccessible($stocktake->branch_id, [$stocktake->warehouse_id]);
+
+        $counts = collect($request->input('counts'))
             ->mapWithKeys(fn ($c) => [$c['product_id'] => $c['counted_quantity'] ?? null])->all();
 
         $updated = $this->domain(fn () => $this->stocktakes->count($stocktake, $counts));
@@ -75,7 +79,9 @@ class StocktakeController extends ApiController
     public function post(string $id): JsonResponse
     {
         $stocktake = Stocktake::findOrFail($id);
-        $posted    = $this->domain(fn () => $this->stocktakes->post($stocktake));
+        $this->assertRecordAccessible($stocktake->branch_id, [$stocktake->warehouse_id]);
+
+        $posted = $this->domain(fn () => $this->stocktakes->post($stocktake));
 
         return (new StocktakeResource($posted->load(['lines.product', 'warehouse'])))->response();
     }
@@ -83,6 +89,7 @@ class StocktakeController extends ApiController
     public function destroy(string $id): JsonResponse
     {
         $stocktake = Stocktake::findOrFail($id);
+        $this->assertRecordAccessible($stocktake->branch_id, [$stocktake->warehouse_id]);
 
         if (! $stocktake->isDraft()) {
             abort(422, 'لا يمكن حذف جرد مرحَّل — صحّحه بجرد جديد أو إذن مخزني.');

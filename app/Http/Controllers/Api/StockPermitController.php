@@ -35,9 +35,10 @@ class StockPermitController extends ApiController
             $query->where('status', $status);
         }
 
-        return StockPermitResource::collection(
-            $this->scopeToActiveBranch($query, $request)->get()
-        )->response();
+        $query = $this->scopeToActiveBranch($query, $request);
+        $query = $this->scopeToAccessibleWarehouses($query, ['warehouse_id', 'target_warehouse_id']);
+
+        return StockPermitResource::collection($query->get())->response();
     }
 
     public function store(StoreStockPermitRequest $request): JsonResponse
@@ -59,6 +60,7 @@ class StockPermitController extends ApiController
     public function show(string $id): JsonResponse
     {
         $permit = StockPermit::with(['lines.product', 'warehouse', 'targetWarehouse'])->findOrFail($id);
+        $this->assertRecordAccessible($permit->branch_id, [$permit->warehouse_id, $permit->target_warehouse_id]);
 
         return (new StockPermitResource($permit))->response();
     }
@@ -66,6 +68,8 @@ class StockPermitController extends ApiController
     public function post(string $id): JsonResponse
     {
         $permit = StockPermit::findOrFail($id);
+        $this->assertRecordAccessible($permit->branch_id, [$permit->warehouse_id, $permit->target_warehouse_id]);
+
         $posted = $this->domain(fn () => $this->permits->post($permit));
 
         return (new StockPermitResource($posted->load(['lines.product', 'warehouse', 'targetWarehouse'])))->response();
@@ -74,6 +78,7 @@ class StockPermitController extends ApiController
     public function destroy(string $id): JsonResponse
     {
         $permit = StockPermit::findOrFail($id);
+        $this->assertRecordAccessible($permit->branch_id, [$permit->warehouse_id, $permit->target_warehouse_id]);
 
         if (! $permit->isDraft()) {
             abort(422, 'لا يمكن حذف إذن مرحّل — صحّحه بإذن عكسي.');
