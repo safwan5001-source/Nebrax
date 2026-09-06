@@ -5,7 +5,7 @@
 **Branch:** `claude/phase-1-pr-inv-4`
 **PR:** https://github.com/safwan5001-source/Nebrax/pull/674
 **Base SHA:** `f23e1e5` (main, after PR-SEC-INV-1 / #666, PR-INV-1 / #668, PR-PRICE-1 / #669, PR-INV-2 / #671, and PR-INV-3 / #673 merged)
-**Head SHA:** `ed0a80f`
+**Head SHA:** `550e046`
 
 This report supersedes the version delivered before independent review. §16 records the post-review fix (monotonic revision identity instead of quantity comparison) and everything above it reflects the final, updated code.
 
