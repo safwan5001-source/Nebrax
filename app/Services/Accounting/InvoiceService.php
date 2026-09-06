@@ -443,6 +443,15 @@ class InvoiceService
         $inclusive = (bool) ($data['tax_inclusive'] ?? $invoice->tax_inclusive ?? false);
         $subtotal = $taxTotal = 0;
 
+        // ═══════════════════════════════════════════════════════════════
+        //  PR-PRICE-1 — تمريرتان لا واحدة: خصم الفاتورة (الرأس) لا تُعرف
+        //  قيمته إلا بعد جمع صافي كل السطور، وحكم الحد الأدنى يجب أن يرى ذلك
+        //  الخصم قبل أن يُقبل السطر — لا أن يُفلت منه لأنه طُبِّق لاحقاً على
+        //  المجموع فقط. فالتمريرة الأولى تحسب اقتصاديات كل سطر بلا كتابة ولا
+        //  حكمٍ على الحد الأدنى؛ ثم يُحسب خصم الرأس وتوزيعه؛ ثم تُكتب السطور
+        //  بحكمٍ يرى الاقتصاد **النهائي** بعد خصم السطر وحصته من خصم الرأس معاً.
+        // ═══════════════════════════════════════════════════════════════
+        $lines = [];
         foreach ($items as $item) {
             $unitPrice = (int) ($item['unit_price'] ?? 0);
             $rate      = (int) ($item['tax_rate'] ?? (int) Settings::get('sales', 'default_tax_rate'));
@@ -524,52 +533,25 @@ class InvoiceService
                 $lineTotal = $lineNet + $lineTax;
             }
 
-            [$minimumPrice, $overrideReason, $overrideUserId] = $this->minimumPriceDecision(
-                product: $product,
-                lineNet: $lineNet,
-                quantity: $qty,
-                unitFactor: $unitFactor,
-                precision: $precision,
-                reason: $item['minimum_price_override_reason'] ?? null,
-                actorId: $data['minimum_price_override_actor_id'] ?? null,
-                tenantId: $invoice->tenant_id,
-            );
-
-            $line = InvoiceLine::create([
-                'invoice_id'               => $invoice->id,
-                'product_id'               => $item['product_id'] ?? null,
-                'product_name_snapshot'    => $product?->name ?? $description,
-                'product_sku_snapshot'     => $product?->sku,
-                'product_barcode_snapshot' => $product?->barcode,
-                'description'              => $description,
-                'quantity'                 => $qty,
-                'unit_name'                => $unitName,
-                'unit_factor'              => $unitFactor,
-                'unit_price'               => $unitPrice,
-                'unit_price_before_tax'    => $unitPriceBeforeTax,
-                'min_sale_price_snapshot'  => $minimumPrice,
-                'min_sale_price_override_reason' => $overrideReason,
-                'min_sale_price_overridden_by' => $overrideUserId,
-                'tax_rate'                 => $rate,
-                'quantity_numerator' => $precision['quantity_numerator'] ?? null,
-                'quantity_denominator' => $precision['quantity_denominator'] ?? null,
-                'pricing_numerator' => $precision['pricing_numerator'] ?? null,
-                'pricing_denominator' => $precision['pricing_denominator'] ?? null,
-                'rounded_gross_minor' => $precision['rounded_gross_minor'] ?? null,
-                'rounding_remainder_numerator' => $precision['rounding_remainder_numerator'] ?? null,
-                'rounding_remainder_denominator' => $precision['rounding_remainder_denominator'] ?? null,
-                'rounding_policy' => $precision['rounding_policy'] ?? null,
-                'line_subtotal' => $storedSubtotal,
-                'line_discount' => $storedDiscount,
-                'line_tax'      => $lineTax,
-                'line_total'    => $lineTotal,
-            ]);
-            $this->storeLineCostCenterAllocations(
-                $invoice,
-                $line,
-                $item['cost_center_allocations'] ?? [],
-                $lineNet
-            );
+            // لا حكم على الحد الأدنى هنا بعد — يحتاج حصة هذا السطر من خصم
+            // الرأس، وذلك لا يُعرف إلا بعد جمع صافي كل السطور أدناه.
+            $lines[] = [
+                'item' => $item,
+                'product' => $product,
+                'qty' => $qty,
+                'unitName' => $unitName,
+                'unitFactor' => $unitFactor,
+                'unitPrice' => $unitPrice,
+                'unitPriceBeforeTax' => $unitPriceBeforeTax,
+                'precision' => $precision,
+                'rate' => $rate,
+                'description' => $description,
+                'storedSubtotal' => $storedSubtotal,
+                'storedDiscount' => $storedDiscount,
+                'lineTax' => $lineTax,
+                'lineTotal' => $lineTotal,
+                'lineNet' => $lineNet,
+            ];
 
             $subtotal += $lineNet;                             // إجمالي الفاتورة = مجموع صافي السطور
             $taxTotal += $lineTax;
@@ -584,7 +566,69 @@ class InvoiceService
         $money = fn (string $key, $current) => (int) (array_key_exists($key, $data) ? $data[$key] : $current);
 
         // خصم على مستوى الفاتورة (net method): يخفّض الإيراد والضريبة تناسبياً.
+        // يُحسب **قبل** حكم الحد الأدنى لا بعده — هذا هو إصلاح PR-PRICE-1:
+        // كان الحكم يصدر على صافي السطر وحده فيفلت من رقابته خصمٌ يُطبَّق
+        // لاحقاً على المجموع فيهبط بالسعر الفعلي دون مسار الاستثناء المخوَّل.
         [$discount, $goodsVat] = $this->applyDiscount($subtotal, $taxTotal, $money('discount', $invoice->discount));
+        $headerShares = $this->allocateHeaderDiscountToLines(array_column($lines, 'lineNet'), $discount, $subtotal);
+
+        // ═══ التمريرة الثانية: حكمٌ على الاقتصاد النهائي، ثم الكتابة ═══
+        foreach ($lines as $index => $ctx) {
+            $item = $ctx['item'];
+            $product = $ctx['product'];
+            $precision = $ctx['precision'];
+
+            // الاقتصاد الفعلي النهائي = صافي السطر ناقص حصته من خصم الرأس —
+            // هذا ما يُقاس بالحد الأدنى، لا صافي السطر وحده قبل خصم الرأس.
+            $effectiveLineNet = $ctx['lineNet'] - $headerShares[$index];
+
+            [$minimumPrice, $overrideReason, $overrideUserId] = $this->minimumPriceDecision(
+                product: $product,
+                lineNet: $effectiveLineNet,
+                quantity: $ctx['qty'],
+                unitFactor: $ctx['unitFactor'],
+                precision: $precision,
+                reason: $item['minimum_price_override_reason'] ?? null,
+                actorId: $data['minimum_price_override_actor_id'] ?? null,
+                tenantId: $invoice->tenant_id,
+            );
+
+            $line = InvoiceLine::create([
+                'invoice_id'               => $invoice->id,
+                'product_id'               => $item['product_id'] ?? null,
+                'product_name_snapshot'    => $product?->name ?? $ctx['description'],
+                'product_sku_snapshot'     => $product?->sku,
+                'product_barcode_snapshot' => $product?->barcode,
+                'description'              => $ctx['description'],
+                'quantity'                 => $ctx['qty'],
+                'unit_name'                => $ctx['unitName'],
+                'unit_factor'              => $ctx['unitFactor'],
+                'unit_price'               => $ctx['unitPrice'],
+                'unit_price_before_tax'    => $ctx['unitPriceBeforeTax'],
+                'min_sale_price_snapshot'  => $minimumPrice,
+                'min_sale_price_override_reason' => $overrideReason,
+                'min_sale_price_overridden_by' => $overrideUserId,
+                'tax_rate'                 => $ctx['rate'],
+                'quantity_numerator' => $precision['quantity_numerator'] ?? null,
+                'quantity_denominator' => $precision['quantity_denominator'] ?? null,
+                'pricing_numerator' => $precision['pricing_numerator'] ?? null,
+                'pricing_denominator' => $precision['pricing_denominator'] ?? null,
+                'rounded_gross_minor' => $precision['rounded_gross_minor'] ?? null,
+                'rounding_remainder_numerator' => $precision['rounding_remainder_numerator'] ?? null,
+                'rounding_remainder_denominator' => $precision['rounding_remainder_denominator'] ?? null,
+                'rounding_policy' => $precision['rounding_policy'] ?? null,
+                'line_subtotal' => $ctx['storedSubtotal'],
+                'line_discount' => $ctx['storedDiscount'],
+                'line_tax'      => $ctx['lineTax'],
+                'line_total'    => $ctx['lineTotal'],
+            ]);
+            $this->storeLineCostCenterAllocations(
+                $invoice,
+                $line,
+                $item['cost_center_allocations'] ?? [],
+                $ctx['lineNet']
+            );
+        }
 
         // الشحن: إيراد خاضع للضريبة يُضاف فوق السلع.
         $shipping    = max(0, $money('shipping', $invoice->shipping));
@@ -613,8 +657,10 @@ class InvoiceService
      * الفاتورة ونقطة البيع معاً، وتعيد لقطة الحد أو الاستثناء فقط؛ لا تعدّل
      * سعراً ولا ضريبة ولا قيداً.
      *
-     * `lineNet` صافي السطر بعد خصمه وقبل ضريبته، و`unitFactor` يحول الحد من
-     * وحدة أساس المنتج إلى الوحدة المختارة في السطر.
+     * `lineNet` هو **الاقتصاد الفعلي النهائي**: صافي السطر بعد خصم السطر
+     * وحصته من خصم الرأس معاً، قبل الضريبة (PR-PRICE-1 — لا صافي السطر وحده
+     * قبل خصم الرأس، وإلا أفلت خصمٌ لاحق من رقابة هذا الحارس). `unitFactor`
+     * يحول الحد من وحدة أساس المنتج إلى الوحدة المختارة في السطر.
      *
      * @return array{0: ?int, 1: ?string, 2: ?string}
      */
@@ -1078,6 +1124,50 @@ class InvoiceService
         $taxNet = $subtotal > 0 ? intdiv($taxGross * $net, $subtotal) : 0;
 
         return [$discount, $taxNet, $net + $taxNet];
+    }
+
+    /**
+     * توزيع خصم الرأس على السطور بطريقة «أكبر البقايا» (largest remainder) —
+     * حتمية ودقيقة: كل حصة تبتعد عن نصيبها النسبي الحقيقي بأقل من هللة واحدة،
+     * ومجموع الحصص يساوي الخصم تماماً. لماذا لا "الباقي كله لآخر سطر" كما في
+     * توزيع مراكز التكلفة (`storeLineCostCenterAllocations`)؟ ذاك يوزّع سطراً
+     * واحداً على 2-3 مراكز فلا يضرّ تجميع تقريبٍ صغير في الأخير، أما هنا فقد
+     * تتعدّد السطور فيُحمَّل سطرٌ صغير القيمة كامل تراكم التقريب فيتجاوز
+     * حصته صافيه هو، فيُخفق حارس الحد الأدنى صافي سطرٍ لم يهبط فعلياً.
+     *
+     * @param  array<int, int>  $lineNets  صافي كل سطر بترتيبه — لا تُقبل قيمة سالبة، والمجموع = $subtotal
+     * @return array<int, int>  حصة كل سطر من الخصم، بنفس مفاتيح $lineNets
+     */
+    private function allocateHeaderDiscountToLines(array $lineNets, int $headerDiscount, int $subtotal): array
+    {
+        $shares = array_fill_keys(array_keys($lineNets), 0);
+        if ($headerDiscount <= 0 || $subtotal <= 0) {
+            return $shares;
+        }
+
+        $remainders = [];
+        $allocated = 0;
+        foreach ($lineNets as $index => $net) {
+            $product = $headerDiscount * $net;
+            $shares[$index] = intdiv($product, $subtotal);
+            $remainders[$index] = $product % $subtotal;
+            $allocated += $shares[$index];
+        }
+
+        $leftover = $headerDiscount - $allocated;
+        if ($leftover > 0) {
+            // أكبر باقٍ يفوز؛ التعادل يُحسم بترتيب السطر (فرز مستقر منذ PHP 8).
+            arsort($remainders);
+            foreach (array_keys($remainders) as $index) {
+                if ($leftover <= 0) {
+                    break;
+                }
+                $shares[$index]++;
+                $leftover--;
+            }
+        }
+
+        return $shares;
     }
 
     /**
