@@ -35,6 +35,7 @@ export function PosExchangeDialog({
   replacementItems,
   replacementTotalMinor,
   taxInclusive,
+  preselectedInvoiceId,
   onClose,
   onExchanged,
 }: {
@@ -43,6 +44,9 @@ export function PosExchangeDialog({
   replacementItems: PosExchangeReplacementLine[];
   replacementTotalMinor: number;
   taxInclusive: boolean;
+  /** PR-6: فتح مباشر لفاتورة محدَّدة من تفاصيل الفاتورة (بدء صريح، لا تلقائي) —
+   * نفس مطابقة `PosReturnDialog` مقابل قائمة الفواتير القابلة للاستبدال. */
+  preselectedInvoiceId?: string | null;
   onClose: () => void;
   onExchanged: (replacementNumber: string) => void;
 }) {
@@ -82,11 +86,17 @@ export function PosExchangeDialog({
     setLoadingInvoices(true); setError(null); setInvoices([]); setSelected(null); setDetail(null); setQuantities({}); setQuote(null); setSurplusMethod('credit'); setTenders({ cash: '', card: '', transfer: '', credit: '' });
     exchangeAttemptRef.current.reset();
     api<{ data: ReturnableInvoice[] }>(`/pos/returnable-invoices?pos_session_id=${encodeURIComponent(sessionId)}`)
-      .then((result) => { if (!cancelled) setInvoices(result.data); })
+      .then((result) => {
+        if (cancelled) return;
+        setInvoices(result.data);
+        const preselected = preselectedInvoiceId ? result.data.find((invoice) => invoice.id === preselectedInvoiceId) : null;
+        if (preselected) void chooseInvoice(preselected);
+      })
       .catch((err) => { if (!cancelled) setError(err instanceof ApiError ? err.message : tc('loadFailed')); })
       .finally(() => { if (!cancelled) setLoadingInvoices(false); });
     return () => { cancelled = true; };
-  }, [open, sessionId, tc]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, sessionId, tc, preselectedInvoiceId]);
 
   useEffect(() => {
     if (!sessionId || !selected || !hasReturnItems) { setQuote(null); return; }

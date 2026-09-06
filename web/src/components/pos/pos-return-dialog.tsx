@@ -43,11 +43,16 @@ interface Quote { total: string; cash_allowed: boolean; cash_block_reason: strin
 export function PosReturnDialog({
   open,
   sessionId,
+  preselectedInvoiceId,
   onClose,
   onReturned,
 }: {
   open: boolean;
   sessionId: string | null;
+  /** PR-6: فتح مباشر لفاتورة محدَّدة من تفاصيل الفاتورة (بدء صريح، لا تلقائي) —
+   * يُطابَق مقابل قائمة الفواتير القابلة للإرجاع نفسها؛ إن لم توجد (مثلاً خارج
+   * الجلسة الحالية) يبقى السلوك الافتراضي: قائمة الاختيار كما كانت. */
+  preselectedInvoiceId?: string | null;
   onClose: () => void;
   onReturned: (number: string) => void;
 }) {
@@ -85,11 +90,17 @@ export function PosReturnDialog({
     setSelected(null); setDetail(null); setQuantities({}); setQuote(null); setMethod('cash');
     returnAttemptRef.current.reset();
     api<{ data: ReturnableInvoice[] }>(`/pos/returnable-invoices?pos_session_id=${encodeURIComponent(sessionId)}`)
-      .then((result) => { if (!cancelled) setInvoices(result.data); })
+      .then((result) => {
+        if (cancelled) return;
+        setInvoices(result.data);
+        const preselected = preselectedInvoiceId ? result.data.find((invoice) => invoice.id === preselectedInvoiceId) : null;
+        if (preselected) void chooseInvoice(preselected);
+      })
       .catch((err) => { if (!cancelled) setError(err instanceof ApiError ? err.message : tc('loadFailed')); })
       .finally(() => { if (!cancelled) setLoadingInvoices(false); });
     return () => { cancelled = true; };
-  }, [open, sessionId, tc]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, sessionId, tc, preselectedInvoiceId]);
 
   useEffect(() => {
     if (!sessionId || !selected || !hasItems) { setQuote(null); return; }
