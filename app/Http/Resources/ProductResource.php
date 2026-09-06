@@ -3,6 +3,7 @@
 namespace App\Http\Resources;
 
 use App\Support\Money;
+use App\Support\SensitiveCostPolicy;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -10,12 +11,14 @@ class ProductResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
-        // PR-2S: يُعلَّم فقط من كتالوج POS (`PosController::products()`) حين تمنع
-        // صلاحية `products.view_cost` أو إعداد `show_cost_profit_in_pos` الكشف لهذا
-        // المستخدم. أي استهلاك آخر لهذا المورد (شاشات ERP، الويبهوك، محطات الوقود)
-        // لا يضع العلامة إطلاقاً فيبقى ظاهراً كسابق عهده تماماً — بلا كسر توافق.
+        // PR-2S: كتالوج POS (`PosController::products()`) يحسب علامة أدقّ (صلاحية
+        // **وإعداد** `show_cost_profit_in_pos` معاً) ويضعها صراحة على المورد؛ حين
+        // توجد نأخذها كما هي. أي استهلاك آخر (شاشات ERP، الويبهوك، محطات الوقود)
+        // لا يضعها، فنسقط PR-INV-1 على السياسة المركزية نفسها التي يقيس عليها POS —
+        // لا كشفاً افتراضياً كما كان قبل هذا التاريخ.
         $hidesCostProfit = array_key_exists('pos_hides_cost_profit', $this->resource->getAttributes())
-            && (bool) $this->resource->getAttribute('pos_hides_cost_profit');
+            ? (bool) $this->resource->getAttribute('pos_hides_cost_profit')
+            : ! SensitiveCostPolicy::authorized($request->user());
 
         return [
             'id'               => $this->id,

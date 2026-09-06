@@ -27,6 +27,7 @@ use App\Services\ProductImportService;
 use App\Services\ProductLifecycleService;
 use App\Services\ProductService;
 use App\Support\ProductListFilters;
+use App\Support\SensitiveCostPolicy;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -99,7 +100,11 @@ class ProductController extends ApiController
     public function importPreview(ImportProductsRequest $request): JsonResponse
     {
         return response()->json([
-            'data' => $this->domain(fn () => $this->imports->preview($request->file('file'), $request->importOptions())),
+            'data' => $this->domain(fn () => $this->imports->preview(
+                $request->file('file'),
+                $request->importOptions(),
+                SensitiveCostPolicy::authorized($request->user()),
+            )),
         ]);
     }
 
@@ -111,6 +116,9 @@ class ProductController extends ApiController
                 $request->file('file'),
                 $request->importOptions(),
                 $request->user()?->id,
+                // PR-INV-1: لا تثق بصلاحية جلسة المعاينة — يُعاد فحصها هنا حيّةً،
+                // فرخصةٌ سُحبت بين المعاينة والتطبيق تُرفض عند التطبيق حتماً.
+                SensitiveCostPolicy::authorized($request->user()),
             )),
         ]);
     }
@@ -128,6 +136,16 @@ class ProductController extends ApiController
         $scope = (string) ($filters['scope'] ?? ProductExportService::SCOPE_FILTERED);
         $format = (string) ($filters['format'] ?? ProductExportService::FORMAT_XLSX);
         $template = (string) ($filters['template'] ?? ProductExportService::TEMPLATE_CATALOG);
+
+        $authorizedCost = SensitiveCostPolicy::authorized($request->user());
+        // PR-INV-1: تصفية أو فرز بحقل تكلفة قناة استدلال (binary search عبر
+        // مدى) — تُرفض قبل بناء الاستعلام لا تُخفى بعده فقط في الأعمدة.
+        if (SensitiveCostPolicy::queryBlocked(
+            $filters, $filters['sort'] ?? null, $authorizedCost,
+            SensitiveCostPolicy::PRODUCT_FILTER_KEYS, SensitiveCostPolicy::PRODUCT_SORT_KEYS
+        )) {
+            abort(403, 'تصفية أو فرز المنتجات بحقل تكلفة يحتاج صلاحية عرض التكلفة.');
+        }
 
         $query = ProductListFilters::query();
 
@@ -148,7 +166,7 @@ class ProductController extends ApiController
         $filename = 'nebrax-products-'.$scope.($template === ProductExportService::TEMPLATE_ROUND_TRIP ? '-round-trip' : '')
             .'-'.now()->format('Ymd-His');
 
-        return $this->domain(fn () => $this->exports->download($query, $template, $format, $filename));
+        return $this->domain(fn () => $this->exports->download($query, $template, $format, $filename, $authorizedCost));
     }
 
     public function index(Request $request): JsonResponse
@@ -157,6 +175,15 @@ class ProductController extends ApiController
             'per_page' => ['sometimes', 'nullable', 'integer', 'min:10', 'max:100'],
             'page' => ['sometimes', 'nullable', 'integer', 'min:1'],
         ]));
+
+        // PR-INV-1: نفس حارس التصدير — تصفية/فرز بحقل تكلفة قناة استدلال حتى
+        // لو حُجب العمود في الاستجابة نفسها.
+        if (SensitiveCostPolicy::queryBlocked(
+            $filters, $filters['sort'] ?? null, SensitiveCostPolicy::authorized($request->user()),
+            SensitiveCostPolicy::PRODUCT_FILTER_KEYS, SensitiveCostPolicy::PRODUCT_SORT_KEYS
+        )) {
+            abort(403, 'تصفية أو فرز المنتجات بحقل تكلفة يحتاج صلاحية عرض التكلفة.');
+        }
 
         // التحميل المسبق للتصنيف والعلامة وقالب الوحدات يمنع N+1، بينما
         // الفلترة/الفرز/التقسيم تبقى في SQL كي لا يُنزّل المتصفح الكتالوج كله.
@@ -182,6 +209,11 @@ class ProductController extends ApiController
     public function store(StoreProductRequest $request): JsonResponse
     {
         $data = $request->validated();
+        // PR-INV-1: إنشاءٌ لا سجلّ سابق له يُقاس بافتراضات العمود (صفر/فارغ)،
+        // فقيمة سعر شراء أو هامش ربح فعلية بلا صلاحية تُرفض هنا قبل أي كتابة.
+        if (SensitiveCostPolicy::productWriteBlocked($data, SensitiveCostPolicy::authorized($request->user()))) {
+            abort(403, 'تحديد سعر الشراء أو هامش الربح يحتاج صلاحية عرض التكلفة.');
+        }
         $template = $this->assertProductRefs($data);
         if ($template !== null) {
             $data['unit'] = $template->base_unit;
@@ -202,6 +234,11 @@ class ProductController extends ApiController
     {
         $product = Product::findOrFail($id);
         $data = $request->validated();
+        // PR-INV-1: مقارنةً بالسجلّ القائم — إعادة إرسال القيمة نفسها ليست
+        // محاولة كتابة، فلا يُكسر نموذجٌ يعيد الحقل كما هو لمستخدمٍ غير مصرَّح.
+        if (SensitiveCostPolicy::productWriteBlocked($data, SensitiveCostPolicy::authorized($request->user()), $product)) {
+            abort(403, 'تعديل سعر الشراء أو هامش الربح يحتاج صلاحية عرض التكلفة.');
+        }
         $template = $this->assertProductRefs($data);
         if ($template !== null) {
             $data['unit'] = $template->base_unit;

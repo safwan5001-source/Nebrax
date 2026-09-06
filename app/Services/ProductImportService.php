@@ -7,6 +7,7 @@ use App\Models\Product;
 use App\Models\ProductCategory;
 use App\Models\UnitTemplate;
 use App\Support\ProductImportFields;
+use App\Support\SensitiveCostPolicy;
 use App\Support\Settings;
 use App\Support\SpreadsheetReader;
 use App\Support\SpreadsheetWriter;
@@ -180,9 +181,12 @@ class ProductImportService
      * @param  array<string, mixed>  $options
      * @return array<string, mixed>
      */
-    public function preview(UploadedFile $file, array $options): array
+    public function preview(UploadedFile $file, array $options, bool $costAuthorized = true): array
     {
         $parsed = $this->parse($file, $this->options($options));
+        // PR-INV-1: فشلٌ مبكر متّسق — لا يترك المستخدم يظن أن المعاينة تفويضٌ
+        // للتطبيق حين تُرفض مطابقة سعر الشراء لاحقاً هناك حتماً.
+        $this->assertCostMappingAuthorized($parsed['mapping'], $costAuthorized);
 
         $rows = array_slice($parsed['rows'], 0, self::PREVIEW_ROW_LIMIT);
 
@@ -214,10 +218,13 @@ class ProductImportService
      * @param  array<string, mixed>  $options
      * @return array<string, mixed>
      */
-    public function apply(UploadedFile $file, array $options, ?string $userId = null): array
+    public function apply(UploadedFile $file, array $options, ?string $userId = null, bool $costAuthorized = true): array
     {
         $resolved = $this->options($options);
         $parsed = $this->parse($file, $resolved);
+        // PR-INV-1: لا تُوثَق صلاحية جلسة معاينة قديمة — تُعاد قراءتها هنا حيّةً
+        // على المطابقة الفعلية المطبَّقة قبل أي كتابة.
+        $this->assertCostMappingAuthorized($parsed['mapping'], $costAuthorized);
 
         if ($parsed['error_rows'] > 0) {
             throw new RuntimeException('لا يمكن تطبيق الاستيراد قبل معالجة الأخطاء الظاهرة في المعاينة.');
@@ -286,6 +293,26 @@ class ProductImportService
                 'results' => $results,
             ];
         });
+    }
+
+    /**
+     * PR-INV-1: يرفض مطابقة عمودٍ لسعر الشراء بلا صلاحية `products.view_cost` —
+     * قبل أي تحقق آخر أو كتابة. مصدر الحقيقة `SensitiveCostPolicy` وحده.
+     *
+     * `RuntimeException` لا `abort(403)` عمداً: `ApiController::domain()` يغلّف
+     * `preview`/`apply` كاملاً ويحوّل كل رفضٍ في هذه الخدمة — بما فيها مطابقة
+     * حقل مطلوب ناقصة — إلى 422 موحّد؛ `HttpException`ترث `RuntimeException`
+     * فتُلتقط بالمصادفة هناك بجسم صحيح لكن رمزاً غير متّسق مع بقية أخطاء
+     * الاستيراد. الاتّساق مع اصطلاح الاستيراد القائم أهمّ من تطابق حرفي مع 403
+     * المستعمل في أسطح لا تمرّ عبر `domain()` (الفلترة/الفرز/الكتابة المباشرة).
+     *
+     * @param  array<int, string>  $mapping
+     */
+    private function assertCostMappingAuthorized(array $mapping, bool $costAuthorized): void
+    {
+        if (SensitiveCostPolicy::importMappingBlocked($mapping, $costAuthorized)) {
+            throw new RuntimeException('ربط عمود بسعر الشراء يحتاج صلاحية عرض التكلفة.');
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════

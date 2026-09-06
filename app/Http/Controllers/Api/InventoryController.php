@@ -8,7 +8,9 @@ use App\Models\StockMovement;
 use App\Services\InventoryBalanceExportService;
 use App\Support\InventoryBalanceFilters;
 use App\Support\Money;
+use App\Support\SensitiveCostPolicy;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -20,8 +22,9 @@ class InventoryController extends ApiController
 {
     public function __construct(protected InventoryBalanceExportService $exports) {}
 
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
+        $authorizedCost = SensitiveCostPolicy::authorized($request->user());
         $products = Product::where('track_inventory', true)->orderBy('name')->get();
 
         $items = $products->map(fn (Product $p) => [
@@ -30,15 +33,16 @@ class InventoryController extends ApiController
             'name'             => $p->name,
             'unit'             => $p->unit,
             'quantity_on_hand' => $p->quantity_on_hand,
-            'avg_cost'         => Money::toRiyal($p->avg_cost),
-            'stock_value'      => Money::toRiyal($p->quantity_on_hand * $p->avg_cost),
+            'avg_cost'         => $authorizedCost ? Money::toRiyal($p->avg_cost) : null,
+            'stock_value'      => $authorizedCost ? Money::toRiyal($p->quantity_on_hand * $p->avg_cost) : null,
         ])->values();
 
         $totalMinor = $products->sum(fn (Product $p) => $p->quantity_on_hand * $p->avg_cost);
 
         return response()->json([
             'data'        => $items,
-            'total_value' => Money::toRiyal($totalMinor),
+            // PR-INV-1: الإجمالي مشتقّ من قيمة المخزون — نفس الحقل الحسّاس تجميعاً.
+            'total_value' => $authorizedCost ? Money::toRiyal($totalMinor) : null,
         ]);
     }
 
@@ -59,6 +63,16 @@ class InventoryController extends ApiController
         $includeZero = ! $request->has('include_zero') || $request->boolean('include_zero');
         $locale = str_starts_with((string) $request->query('locale'), 'en') ? 'en' : 'ar';
 
+        $authorizedCost = SensitiveCostPolicy::authorized($request->user());
+        // PR-INV-1: مدى تكلفة/قيمة في الفلترة أو الفرز قناة استدلال حتى لو
+        // أُفرغت أعمدة النتيجة نفسها.
+        if (SensitiveCostPolicy::queryBlocked(
+            $filters, $filters['sort'] ?? null, $authorizedCost,
+            SensitiveCostPolicy::INVENTORY_FILTER_KEYS, SensitiveCostPolicy::INVENTORY_SORT_KEYS
+        )) {
+            abort(403, 'تصفية أو فرز المخزون بحقل تكلفة يحتاج صلاحية عرض التكلفة.');
+        }
+
         $query = InventoryBalanceFilters::query();
         if ($scope === InventoryBalanceExportService::SCOPE_FILTERED) {
             InventoryBalanceFilters::apply($query, $filters);
@@ -67,13 +81,14 @@ class InventoryController extends ApiController
 
         $filename = 'nebrax-inventory-balances-'.now()->toDateString();
 
-        return $this->domain(fn () => $this->exports->download($query, $format, $filename, $locale, $includeZero));
+        return $this->domain(fn () => $this->exports->download($query, $format, $filename, $locale, $includeZero, $authorizedCost));
     }
 
-    public function movements(string $productId): JsonResponse
+    public function movements(Request $request, string $productId): JsonResponse
     {
         // findOrFail يضمن وجود الصنف ضمن نطاق المستأجر (BaseModel + TenantScope).
         Product::findOrFail($productId);
+        $authorizedCost = SensitiveCostPolicy::authorized($request->user());
 
         $rows = StockMovement::where('product_id', $productId)
             ->orderByDesc('movement_date')
@@ -83,8 +98,8 @@ class InventoryController extends ApiController
                 'id'               => $m->id,
                 'type'             => $m->type,
                 'quantity'         => $m->quantity,
-                'unit_cost'        => Money::toRiyal($m->unit_cost),
-                'total_cost'       => Money::toRiyal($m->total_cost),
+                'unit_cost'        => $authorizedCost ? Money::toRiyal($m->unit_cost) : null,
+                'total_cost'       => $authorizedCost ? Money::toRiyal($m->total_cost) : null,
                 'balance_quantity' => $m->balance_quantity,
                 'movement_date'    => optional($m->movement_date)->toDateString(),
                 'notes'            => $m->notes,
