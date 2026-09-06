@@ -245,7 +245,7 @@ commit `eed979d`, via `git fetch && git log` before branching).
 
 ## Head SHA
 
-Recorded after commit (see final chat reply).
+`1364853c188ff1cf276405bd64767b4e4b9e4515`
 
 ## Recommended next step
 
