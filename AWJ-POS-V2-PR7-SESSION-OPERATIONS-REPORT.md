@@ -248,13 +248,20 @@ interaction at all; not touched by, and unrelated to, this PR.)
 ## Branch / PR / SHAs
 
 - **Branch:** `claude/pos-v2-pr7-session-operations`
-- **Base SHA:** `fc88081ec71eb72303d454182cfd0d97726ba5b3` (current `main` tip
-  at branch creation — no drift since; this branch was created directly from
-  it).
-- **Head SHA:** `4d9aea2` (local full hash to be confirmed live against the
-  opened PR's `head.sha` in the chat reply, per the same one-commit-behind
-  self-reference limitation documented in the PR-6 report — this file
-  cannot record the hash of the commit that contains it).
+- **PR:** [#670](https://github.com/safwan5001-source/Nebrax/pull/670) (draft)
+- **PR-7 branch point** (where this branch was created from): `fc88081ec71eb72303d454182cfd0d97726ba5b3`.
+- **Current GitHub PR base tip** (`main` advanced by one unrelated merge —
+  `f7ae6ed` / PR-INV-1 #668, central sensitive-cost authorization for
+  Product/Inventory — while this branch was in progress): `f7ae6ed28036551c080e4ba53065daedff40a8f1`.
+  Confirmed via `git log fc88081..origin/main` to be exactly that one commit,
+  and confirmed it does not touch `web/src/app/(pos)/pos/page.tsx` — no
+  conflict, no rebase needed.
+- **Head SHA:** `c17993ee461d20c9b14eff0ee2a7c0974b8aac09` — verified live
+  against PR #670's `head.sha` via `pull_request_read` immediately before
+  this line was written. (As with the PR-6 report: a documentation-only
+  commit cannot record its own resulting hash in advance; this is the exact
+  final SHA after the report commit, confirmed live, not chased further to
+  avoid an unbounded edit/verify loop.)
 
 ## Next step
 
