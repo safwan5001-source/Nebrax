@@ -181,7 +181,7 @@ describe('NotificationBell — mark read actions', () => {
 describe('NotificationBell — source action safety', () => {
   it('does not render a source link when the notification carries an unregistered action', async () => {
     fetchNotifications.mockResolvedValue({
-      data: [notification({ action: 'view_product', source_type: 'product', source_id: 'p1' })],
+      data: [notification({ action: 'not_a_real_action', source_type: 'product', source_id: 'p1' })],
     });
     renderIntl(<NotificationBell />);
 
@@ -189,6 +189,17 @@ describe('NotificationBell — source action safety', () => {
     await screen.findByText(notification().title);
 
     expect(screen.queryByText('عرض المصدر')).toBeNull();
+  });
+
+  it('renders a source link for a registered action (view_product)', async () => {
+    fetchNotifications.mockResolvedValue({
+      data: [notification({ action: 'view_product', source_type: 'product', source_id: 'p1' })],
+    });
+    renderIntl(<NotificationBell />);
+
+    await openPanel();
+    const link = (await screen.findByText('عرض المصدر')) as HTMLAnchorElement;
+    expect(link.closest('a')?.getAttribute('href')).toBe('/products/p1');
   });
 });
 

@@ -8,6 +8,14 @@ Schedule::command('finance:scan-controls')
     ->withoutOverlapping()
     ->onOneServer();
 
+// فحص مخزون احتياطي — يلتقط ما كان منخفضاً/نافداً أصلاً قبل تفعيل الإعداد؛
+// المسار الأساسي فوري عند كل حركة مخزون فعلية (InventoryService). لا يكتب إلا
+// حالة تنبيه وإشعارات للمستأجرين الذين فعّلوا الإعداد.
+Schedule::command('inventory:scan-alerts')
+    ->hourly()
+    ->withoutOverlapping()
+    ->onOneServer();
+
 // الملخص الرقابي اليومي (Daily LP Digest) — قراءة/تجميع فقط, idempotent لكل (مستأجر، تاريخ).
 // يوماً بعد يوم بتوقيت خادم واحد كي لا يتزاحم توليدان متزامنان لنفس اليوم.
 Schedule::command('pos:generate-lp-digest')

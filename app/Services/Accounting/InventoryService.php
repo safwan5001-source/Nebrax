@@ -119,6 +119,7 @@ class InventoryService
 
         $product->update(['quantity_on_hand' => $newQty, 'avg_cost' => $newAvg]);
         $this->adjustWarehouseStock($warehouseId, $product->id, $quantity);
+        app(InventoryAlertService::class)->queueEvaluation($product->id);
 
         return $movement;
     }
@@ -165,6 +166,7 @@ class InventoryService
 
         $product->update(['quantity_on_hand' => $newQty]);
         $this->adjustWarehouseStock($warehouseId, $product->id, -$quantity);
+        app(InventoryAlertService::class)->queueEvaluation($product->id);
 
         return $movement;
     }
@@ -243,6 +245,7 @@ class InventoryService
 
             $product->update(['quantity_on_hand' => $newQty]);
             $this->adjustWarehouseStock($warehouseId, $product->id, -$quantity);
+            app(InventoryAlertService::class)->queueEvaluation($product->id);
             $totalCogs += $cost;
             $cogsAcct = $product->cogs_account_id ?: $defaultCogs;
             foreach ($this->splitAllocatedAmount($cost, $line->costCenterAllocations, $invoice->cost_center_id) as $allocation) {

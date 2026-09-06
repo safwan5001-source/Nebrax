@@ -61,11 +61,14 @@ export async function markAllNotificationsRead(): Promise<number> {
 
 /**
  * إجراء إشعار مصرَّح به من الخادم (`App\Support\NotificationActions::ALLOWED`) → مسار
- * تنقّل آمن. **فارغة عمداً** في PR-NOTIF-2: لا مُنتِج بعد. كل مُنتِج جديد يضيف مدخله هنا
- * بنفس المفتاح الذي يسجّله في الخادم — لا يُخترع مسار من طرف الواجهة وحدها. فتح المصدر
- * نفسه يعيد تفويضه من جديد؛ هذه الخريطة لا تمنح وصولاً بذاتها.
+ * تنقّل آمن. كل مُنتِج جديد يضيف مدخله هنا بنفس المفتاح الذي يسجّله في الخادم — لا
+ * يُخترع مسار من طرف الواجهة وحدها. فتح المصدر نفسه يعيد تفويضه من جديد (صلاحية
+ * `products.view` على `/products/[id]`)؛ هذه الخريطة لا تمنح وصولاً بذاتها.
  */
-const ACTION_PATHS: Record<string, (sourceId: string) => string> = {};
+const ACTION_PATHS: Record<string, (sourceId: string) => string> = {
+  // PR-NOTIF-3: تنبيهات المخزون (نفاد/انخفاض).
+  view_product: (id) => `/products/${id}`,
+};
 
 export function notificationHref(notification: AppNotification): string | null {
   if (!notification.action || !notification.source_id) return null;

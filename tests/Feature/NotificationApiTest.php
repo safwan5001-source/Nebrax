@@ -180,8 +180,24 @@ class NotificationApiTest extends TestCase
 
         $this->expectException(RuntimeException::class);
         $this->deliver($tenant['tenant_id'], $ownerId, [
-            'action' => 'view_product',
+            'action' => 'not_a_real_action',
             'source_type' => 'product',
+            'source_id' => (string) Str::uuid(),
+        ]);
+    }
+
+    /** @test */
+    public function a_registered_action_still_requires_its_exact_matching_source_type(): void
+    {
+        // 'view_product' هو المدخل الوحيد المسجَّل فعلياً (PR-NOTIF-3)؛ يثبت هذا
+        // أن التسجيل لا يكفي وحده — النوع المصاحب يجب أن يطابق العقد أيضاً.
+        $tenant = $this->registerTenant('acme6b', 'owner6b@acme.test');
+        $ownerId = User::where('tenant_id', $tenant['tenant_id'])->first()->id;
+
+        $this->expectException(RuntimeException::class);
+        $this->deliver($tenant['tenant_id'], $ownerId, [
+            'action' => 'view_product',
+            'source_type' => 'invoice',
             'source_id' => (string) Str::uuid(),
         ]);
     }

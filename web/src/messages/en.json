@@ -6140,7 +6140,12 @@
     "returns": "Sales returns",
     "restock_sales_returns": "Return goods to stock",
     "restock_sales_returns_hint": "A business policy, not an accounting rule: retail puts sound goods back on the shelf, while restaurants and food shops never restock a return. Either way, the amount refunded to the customer is unchanged.",
-    "restock_off_note": "When off: returned goods do not enter stock and the moving average is untouched; their cost is posted to “5180 Inventory Adjustments” instead of “1140 Inventory”. You can override this per return on its creation screen."
+    "restock_off_note": "When off: returned goods do not enter stock and the moving average is untouched; their cost is posted to “5180 Inventory Adjustments” instead of “1140 Inventory”. You can override this per return on its creation screen.",
+    "stock_notifications": "Stock notifications",
+    "low_stock_notifications": "Low stock alerts",
+    "low_stock_notifications_hint": "Notify product managers when a tracked item reaches its configured reorder level or below.",
+    "out_of_stock_notifications": "Out of stock alerts",
+    "out_of_stock_notifications_hint": "Notify product managers when a tracked item's available quantity reaches zero or below."
   },
   "purchaseSettings": {
     "title": "Purchase settings",
