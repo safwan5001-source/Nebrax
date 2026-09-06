@@ -51,6 +51,16 @@ use RuntimeException;
  *  للمخزن (Option A) لم يُختَر: يوقف كل حركة تشغيلية أخرى في المخزن طوال
  *  نافذة الجرد كاملةً، بينما اليقظة تحصر التعطّل في الأصناف التي تحرّكت
  *  فعلاً — ولا حاجة لإطارٍ عامٍّ جديد للقفل تفرضه هذه السياسة.
+ *
+ *  **تصحيحٌ بعد المراجعة المستقلة — الهوية مرجعها `revision` لا الكمية:**
+ *  مقارنة `ProductWarehouseStock.quantity` النهائية وحدها عمياء عن حركة
+ *  ذهاب-وعودة (ABA): ١٠٠ → صرف ١٠ → ٩٠ → استلام ١٠ → ١٠٠. الكمية تعود كما
+ *  كانت فتمرّ المقارنة رغم وقوع حركتين حقيقيتين. المرجع الرسمي الآن
+ *  `ProductWarehouseStock.revision` — عدّاد رتيب يزيده `InventoryService::
+ *  adjustWarehouseStock()` بالضبط ١ عند كل حركةٍ فعلية على الصفّ (المسار
+ *  الوحيد الذي يكتب هذا الجدول)، وتحفظه `StocktakeLine.system_revision`
+ *  عند الفتح. لا طابع زمني: التوقيت لا يضمن ترتيباً رتيباً بدقّة قاعدة
+ *  بيانات محدودة، والعدّاد لا يحتاج توقيتاً أصلاً.
  */
 class StocktakeService
 {
@@ -88,11 +98,12 @@ class StocktakeService
                 'created_by'     => $data['created_by'] ?? null,
             ]);
 
-            foreach ($this->snapshot($data['warehouse_id'], $productIds) as $productId => $quantity) {
+            foreach ($this->snapshot($data['warehouse_id'], $productIds) as $productId => $snap) {
                 StocktakeLine::create([
                     'stocktake_id'     => $stocktake->id,
                     'product_id'       => $productId,
-                    'system_quantity'  => $quantity,
+                    'system_quantity'  => $snap['quantity'],
+                    'system_revision'  => $snap['revision'],
                     'counted_quantity' => null,   // لم يُعدّ بعد — وهو غير الصفر
                 ]);
             }
@@ -208,31 +219,34 @@ class StocktakeService
 
     /**
      * ═══════════════════════════════════════════════════════════════
-     *  الحارس: لا ترحيل على رصيدٍ لم يعد قائماً — Product×Warehouse فقط
+     *  الحارس: لا ترحيل على حالةٍ لم تعد قائمة — Product×Warehouse فقط
      * ═══════════════════════════════════════════════════════════════
      *  يقفل صفّ `ProductWarehouseStock` لكل صنفٍ **معدود** في هذا الجرد
      *  (غير المعدود لا يُطبَّق له فرقٌ أصلاً فلا داعي لقفله أو فحصه — حركةٌ
-     *  على صنفٍ آخر في نفس المخزن لا تُعطِّل عدّاً لا يخصّه) ويقارنه برصيد
-     *  لحظة الفتح المحفوظ على السطر. أي اختلاف واحد يرفض الترحيل **كلّه**:
-     *  لا ترحيلٌ جزئيٌّ لأصنافٍ سليمة بينما أخرى متعارضة في نفس المستند.
+     *  على صنفٍ آخر في نفس المخزن لا تُعطِّل عدّاً لا يخصّه) ويقارن **الـ
+     *  revision الحالي** بلقطة الفتح — لا الكمية وحدها: حركة ذهاب-وعودة
+     *  (ABA) تُعيد الكمية إلى قيمتها الأصلية فتُفلت من مقارنة كميةٍ نهائية،
+     *  لكن الـrevision يزيد مع كل حركة فعلية فيكشفها دائماً. أي اختلاف واحد
+     *  يرفض الترحيل **كلّه**: لا ترحيلٌ جزئيٌّ لأصنافٍ سليمة بينما أخرى
+     *  متعارضة في نفس المستند.
      */
     protected function assertSnapshotStillValid(Stocktake $stocktake, Collection $countedLines): void
     {
         $conflicts = [];
 
         foreach ($countedLines as $line) {
-            $current = (int) (ProductWarehouseStock::where('warehouse_id', $stocktake->warehouse_id)
+            $row = ProductWarehouseStock::where('warehouse_id', $stocktake->warehouse_id)
                 ->where('product_id', $line->product_id)
                 ->lockForUpdate()
-                ->value('quantity') ?? 0);
+                ->first();
 
-            if ($current !== (int) $line->system_quantity) {
-                $conflicts[] = sprintf(
-                    '«%s» (وقت الفتح %d، الآن %d)',
-                    $line->product->name,
-                    $line->system_quantity,
-                    $current
-                );
+            $currentQuantity = (int) ($row->quantity ?? 0);
+            $currentRevision = (int) ($row->revision ?? 0);
+
+            if ($currentRevision !== (int) $line->system_revision) {
+                $conflicts[] = $currentQuantity === (int) $line->system_quantity
+                    ? sprintf('«%s» (تحرّك رصيده ثم عاد إلى %d — لقطة الفتح لم تعد صالحة)', $line->product->name, $currentQuantity)
+                    : sprintf('«%s» (وقت الفتح %d، الآن %d)', $line->product->name, $line->system_quantity, $currentQuantity);
             }
         }
 
@@ -246,9 +260,10 @@ class StocktakeService
     }
 
     /**
-     * مطابقة صريحة: تُحدِّث لقطة الفتح إلى الرصيد الحالي لكل صنفٍ تحرّك
-     * فعلاً، وتمسح عدّه القائم (إن وُجد) — العدّ السابق قِيسَ على رصيدٍ لم
-     * يعد قائماً فلا يصحّ تطبيقه، ولا تُخمَّن حصّة الحركة الفعلية من حصّة
+     * مطابقة صريحة: تُحدِّث لقطة الفتح (الكمية **والـrevision** معاً) إلى
+     * الحالة الحالية لكل صنفٍ تحرّك فعلاً (بمقارنة الـrevision لا الكمية
+     * وحدها)، وتمسح عدّه القائم (إن وُجد) — العدّ السابق قِيسَ على حالةٍ لم
+     * تعد قائمة فلا يصحّ تطبيقه، ولا تُخمَّن حصّة الحركة الفعلية من حصّة
      * عجزٍ حقيقي. الأصناف التي لم تتحرّك تبقى بلا أي تغيير.
      *
      * @return array{stocktake: Stocktake, reconciled_product_ids: array<int, string>}
@@ -269,13 +284,20 @@ class StocktakeService
             $reconciled = [];
 
             foreach ($stocktake->lines->sortBy('product_id') as $line) {
-                $current = (int) (ProductWarehouseStock::where('warehouse_id', $stocktake->warehouse_id)
+                $row = ProductWarehouseStock::where('warehouse_id', $stocktake->warehouse_id)
                     ->where('product_id', $line->product_id)
                     ->lockForUpdate()
-                    ->value('quantity') ?? 0);
+                    ->first();
 
-                if ($current !== (int) $line->system_quantity) {
-                    $line->update(['system_quantity' => $current, 'counted_quantity' => null]);
+                $currentQuantity = (int) ($row->quantity ?? 0);
+                $currentRevision = (int) ($row->revision ?? 0);
+
+                if ($currentRevision !== (int) $line->system_revision) {
+                    $line->update([
+                        'system_quantity'  => $currentQuantity,
+                        'system_revision'  => $currentRevision,
+                        'counted_quantity' => null,
+                    ]);
                     $reconciled[] = $line->product_id;
                 }
             }
@@ -311,20 +333,27 @@ class StocktakeService
     }
 
     /**
-     * أرصدة المخزن لحظة الفتح. المنتجات المتابَعة وحدها — والخدمات لا تُجرَد.
+     * أرصدة المخزن **وrevision كل صفّ** لحظة الفتح. المنتجات المتابَعة
+     * وحدها — والخدمات لا تُجرَد.
      *
-     * @return array<string,int>
+     * @return array<string, array{quantity: int, revision: int}>
      */
     protected function snapshot(string $warehouseId, array $productIds): array
     {
         $rows = ProductWarehouseStock::where('warehouse_id', $warehouseId)
             ->when($productIds !== [], fn ($q) => $q->whereIn('product_id', $productIds))
-            ->pluck('quantity', 'product_id')->all();
+            ->get(['product_id', 'quantity', 'revision'])
+            ->mapWithKeys(fn (ProductWarehouseStock $row) => [
+                $row->product_id => ['quantity' => (int) $row->quantity, 'revision' => (int) $row->revision],
+            ])->all();
 
         // أصنافٌ طُلبت صراحةً ولا صفّ لها في هذا المخزن تُدرَج بصفر — فيمكن
         // تسجيل وجودها فعلياً (زيادة) بدل أن تسقط من الورقة صامتةً.
+        // revision صفرٍ هنا أيضاً: أول حركة فعلية على هذا الصفّ تُنشئه
+        // بـrevision ١ (`InventoryService::adjustWarehouseStock`)، فتُكتشف
+        // كتعارضٍ عادي بنفس آلية أي صفٍّ آخر.
         foreach ($productIds as $id) {
-            $rows[$id] ??= 0;
+            $rows[$id] ??= ['quantity' => 0, 'revision' => 0];
         }
 
         $tracked = Product::whereIn('id', array_keys($rows))

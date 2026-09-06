@@ -35,6 +35,10 @@ use Tests\TestCase;
  *  أو قيد؛ أي تعارض يرفض الترحيل كلّه، ويُلزم `reconcile()` صريحاً يحدّث
  *  اللقطة ويمسح العدّ المتأثر فقط.
  *
+ *  **تصحيحٌ بعد المراجعة المستقلة:** المقارنة الآن على `revision` — عدّاد
+ *  رتيب يزيد مع كل حركة فعلية — لا الكمية النهائية وحدها، فتُكتشف حركة
+ *  ذهاب-وعودة (ABA: ١٠٠→٩٠→١٠٠) رغم عودة الكمية إلى أصلها تماماً.
+ *
  *  تشغيل: php artisan test --filter=StocktakeConcurrencyReconciliationTest
  */
 class StocktakeConcurrencyReconciliationTest extends TestCase
@@ -379,5 +383,203 @@ class StocktakeConcurrencyReconciliationTest extends TestCase
 
         $this->assertSame($afterSubledger - $beforeSubledger, $after1140 - $before1140, 'Δ1140 = Δالدفتر المساعد تماماً.');
         $this->assertSame(50000, (int) $posted->difference_value);
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  PR-INV-4 review fix — revision identity, not quantity alone
+    // ═══════════════════════════════════════════════════════════
+
+    /**
+     * **السيناريو الإلزامي بعد المراجعة:** ١٠٠ → صرف ← ٩٠ → استلام ← ١٠٠.
+     * الكمية النهائية تساوي كمية اللقطة تماماً، لكن حركتين حقيقيتين وقعتا
+     * على نفس الصنف/المخزن — فيجب أن يُرفض الترحيل رغم تطابق الكمية.
+     */
+    /** @test */
+    public function an_aba_movement_that_returns_to_the_original_quantity_still_blocks_posting(): void
+    {
+        $stocktake = $this->stocktakes->open(['warehouse_id' => $this->main->id], [$this->cement->id]);
+        $this->stocktakes->count($stocktake, [$this->cement->id => 95]);
+
+        $row = ProductWarehouseStock::where('product_id', $this->cement->id)->where('warehouse_id', $this->main->id)->first();
+        $revisionAtOpen = $row->revision;
+
+        $this->permits->post($this->permits->create(
+            ['type' => 'issue', 'warehouse_id' => $this->main->id, 'reason' => 'صرف مؤقت'],
+            [['product_id' => $this->cement->id, 'quantity' => 10]]
+        )); // ١٠٠ → ٩٠
+
+        $this->permits->post($this->permits->create(
+            ['type' => 'receipt', 'warehouse_id' => $this->main->id],
+            [['product_id' => $this->cement->id, 'quantity' => 10, 'unit_cost' => 10000]]
+        )); // ٩٠ → ١٠٠ — نفس الكمية الأصلية بالضبط
+
+        $this->assertSame(100, $this->cement->fresh()->quantity_on_hand, 'الكمية عادت لأصلها تماماً (ABA).');
+        $row->refresh();
+        $this->assertGreaterThan($revisionAtOpen, $row->revision, 'الـrevision تحرّك رغم عودة الكمية.');
+
+        try {
+            $this->stocktakes->post($stocktake->fresh());
+            $this->fail('كان يجب رفض الترحيل — حركتان حقيقيتان وقعتا رغم تطابق الكمية النهائية.');
+        } catch (RuntimeException $e) {
+            $this->assertStringContainsString('تحرّك رصيده ثم عاد', $e->getMessage());
+        }
+
+        $this->assertSame('draft', $stocktake->fresh()->status);
+        $this->assertNull($stocktake->fresh()->journal_entry_id);
+    }
+
+    /** المطابقة تلتقط حالة ABA كذلك — لا الكمية وحدها. */
+    /** @test */
+    public function reconcile_updates_both_quantity_and_revision_after_an_aba_movement(): void
+    {
+        $stocktake = $this->stocktakes->open(['warehouse_id' => $this->main->id], [$this->cement->id]);
+        $this->stocktakes->count($stocktake, [$this->cement->id => 95]);
+        $originalRevision = $stocktake->lines->first()->system_revision;
+
+        $this->permits->post($this->permits->create(
+            ['type' => 'issue', 'warehouse_id' => $this->main->id, 'reason' => 'صرف'],
+            [['product_id' => $this->cement->id, 'quantity' => 10]]
+        ));
+        $this->permits->post($this->permits->create(
+            ['type' => 'receipt', 'warehouse_id' => $this->main->id],
+            [['product_id' => $this->cement->id, 'quantity' => 10, 'unit_cost' => 10000]]
+        ));
+
+        $result = $this->stocktakes->reconcile($stocktake->fresh());
+        $line = $result['stocktake']->lines->first();
+
+        $this->assertSame([$this->cement->id], $result['reconciled_product_ids']);
+        $this->assertSame(100, $line->system_quantity, 'الكمية الحالية بعد ABA.');
+        $this->assertGreaterThan($originalRevision, $line->system_revision, 'الـrevision الجديد مسجَّل، لا القديم.');
+        $this->assertNull($line->counted_quantity);
+
+        // إعادة عدٍّ ثم ترحيل ينجح مرّة واحدة على الأساس الجديد.
+        $this->stocktakes->count($result['stocktake'], [$this->cement->id => 100]);
+        $posted = $this->stocktakes->post($result['stocktake']->fresh());
+        $this->assertSame(0, (int) $posted->difference_value, 'لا فرق — العدّ الجديد يطابق الكمية بعد ABA بالضبط.');
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  every inventory movement path required by the contract bumps revision
+    // ═══════════════════════════════════════════════════════════
+
+    private function revisionOf(Product $product, Warehouse $warehouse): int
+    {
+        return (int) ProductWarehouseStock::where('product_id', $product->id)
+            ->where('warehouse_id', $warehouse->id)->value('revision');
+    }
+
+    /** @test */
+    public function a_sale_increments_the_warehouse_revision(): void
+    {
+        $before = $this->revisionOf($this->cement, $this->main);
+        $this->sell($this->cement, 5);
+        $this->assertGreaterThan($before, $this->revisionOf($this->cement, $this->main));
+    }
+
+    /** @test */
+    public function a_purchase_receipt_increments_the_warehouse_revision(): void
+    {
+        $before = $this->revisionOf($this->cement, $this->main);
+        $this->receivePurchase($this->cement, 5, 10000);
+        $this->assertGreaterThan($before, $this->revisionOf($this->cement, $this->main));
+    }
+
+    /** @test */
+    public function a_stock_permit_issue_increments_the_warehouse_revision(): void
+    {
+        $before = $this->revisionOf($this->cement, $this->main);
+        $this->permits->post($this->permits->create(
+            ['type' => 'issue', 'warehouse_id' => $this->main->id, 'reason' => 'تلف'],
+            [['product_id' => $this->cement->id, 'quantity' => 5]]
+        ));
+        $this->assertGreaterThan($before, $this->revisionOf($this->cement, $this->main));
+    }
+
+    /** @test */
+    public function a_stock_permit_receipt_increments_the_warehouse_revision(): void
+    {
+        $before = $this->revisionOf($this->cement, $this->main);
+        $this->permits->post($this->permits->create(
+            ['type' => 'receipt', 'warehouse_id' => $this->main->id],
+            [['product_id' => $this->cement->id, 'quantity' => 5, 'unit_cost' => 10000]]
+        ));
+        $this->assertGreaterThan($before, $this->revisionOf($this->cement, $this->main));
+    }
+
+    /** التحويل يزيد الـrevision على **طرفَي** الحركة معاً — المصدر والوجهة. */
+    /** @test */
+    public function a_stock_permit_transfer_increments_the_revision_on_both_source_and_destination(): void
+    {
+        $beforeSource = $this->revisionOf($this->cement, $this->main);
+        $beforeDestination = $this->revisionOf($this->cement, $this->second);
+
+        $this->permits->post($this->permits->create(
+            ['type' => 'transfer', 'warehouse_id' => $this->main->id, 'target_warehouse_id' => $this->second->id],
+            [['product_id' => $this->cement->id, 'quantity' => 5]]
+        ));
+
+        $this->assertGreaterThan($beforeSource, $this->revisionOf($this->cement, $this->main));
+        $this->assertGreaterThan($beforeDestination, $this->revisionOf($this->cement, $this->second));
+    }
+
+    /** ترحيل الجرد لتصحيح فرقٍ حقيقي هو نفسه حركةٌ تزيد الـrevision. */
+    /** @test */
+    public function posting_a_stocktake_difference_increments_the_revision_too(): void
+    {
+        $stocktake = $this->stocktakes->open(['warehouse_id' => $this->main->id], [$this->cement->id]);
+        $before = $this->revisionOf($this->cement, $this->main);
+
+        $this->stocktakes->count($stocktake, [$this->cement->id => 95]);
+        $this->stocktakes->post($stocktake->fresh());
+
+        $this->assertGreaterThan($before, $this->revisionOf($this->cement, $this->main));
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  rollback leaves no revision residue
+    // ═══════════════════════════════════════════════════════════
+
+    /** @test */
+    public function a_rejected_stock_permit_transfer_leaves_no_revision_residue_on_either_side(): void
+    {
+        $beforeSource = $this->revisionOf($this->cement, $this->main);
+        $beforeDestination = $this->revisionOf($this->cement, $this->second);
+
+        try {
+            $this->permits->post($this->permits->create(
+                ['type' => 'transfer', 'warehouse_id' => $this->main->id, 'target_warehouse_id' => $this->second->id],
+                [['product_id' => $this->cement->id, 'quantity' => 1000]] // أكثر بكثير من المتاح
+            ));
+            $this->fail('كان يجب رفض التحويل لعدم كفاية الرصيد.');
+        } catch (RuntimeException) {
+            // متوقَّع.
+        }
+
+        $this->assertSame($beforeSource, $this->revisionOf($this->cement, $this->main), 'لا زيادة revision من محاولة مرفوضة.');
+        $this->assertSame($beforeDestination, $this->revisionOf($this->cement, $this->second));
+    }
+
+    /** رفضٌ من `assertSnapshotStillValid` نفسه لا يترك أثراً على أي صفٍّ — حتى الأصناف السليمة في نفس المستند. */
+    /** @test */
+    public function a_stale_stocktake_post_leaves_no_revision_residue_even_for_the_unaffected_line(): void
+    {
+        $stocktake = $this->stocktakes->open(['warehouse_id' => $this->main->id], [$this->cement->id, $this->steel->id]);
+        $this->stocktakes->count($stocktake, [$this->cement->id => 95, $this->steel->id => 50]);
+
+        $this->sell($this->cement, 10); // الإسمنت وحده يتحرّك — الحديد سليم
+
+        $cementRevisionBeforeAttempt = $this->revisionOf($this->cement, $this->main);
+        $steelRevisionBeforeAttempt = $this->revisionOf($this->steel, $this->main);
+
+        try {
+            $this->stocktakes->post($stocktake->fresh());
+            $this->fail('كان يجب رفض الترحيل.');
+        } catch (RuntimeException) {
+            // متوقَّع.
+        }
+
+        $this->assertSame($cementRevisionBeforeAttempt, $this->revisionOf($this->cement, $this->main));
+        $this->assertSame($steelRevisionBeforeAttempt, $this->revisionOf($this->steel, $this->main), 'الصنف السليم لم يُمسّ رغم رفض المستند كلّه.');
     }
 }
