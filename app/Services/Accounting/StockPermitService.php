@@ -45,13 +45,14 @@ class StockPermitService
 
     public function __construct(
         protected LedgerService $ledger,
-        protected InventoryService $inventory
+        protected InventoryService $inventory,
+        protected UnitConversion $units
     ) {}
 
     /**
      * @param  array  $data   ['type'=>string, 'warehouse_id'=>uuid, 'target_warehouse_id'=>?uuid,
      *                         'permit_date'=>?, 'reason'=>?, 'notes'=>?, 'number'=>?]
-     * @param  array  $items  [['product_id'=>uuid, 'quantity'=>int, 'unit_cost'=>?int], ...]
+     * @param  array  $items  [['product_id'=>uuid, 'quantity'=>int, 'unit'=>?string, 'unit_cost'=>?int], ...]
      */
     public function create(array $data, array $items): StockPermit
     {
@@ -91,14 +92,27 @@ class StockPermitService
                     throw new RuntimeException("المنتج «{$product->name}» غير متابَع مخزنياً.");
                 }
 
-                // الإضافة وحدها تقبل تكلفة مُدخَلة؛ الصرف والتحويل يأخذان
-                // متوسط التكلفة عند الترحيل، فلا يُسعّر المستخدم ما يُخرِجه.
+                // الوحدة تُحلّ إلى (اسم، معامل) وتُنسَخ على السطر فوراً — نفس
+                // مصدر الحلّ المستخدم في المشتريات والفواتير (`UnitConversion`)
+                // حتى لا تنحرف نسختان: وحدةٌ يقبلها إذنٌ مخزني ويرفضها شراءٌ
+                // للمنتج نفسه أسوأ عطلٍ ممكن في المخزون. المجهولة تُرفض هنا
+                // (fail-closed) ولا تُفترَض معاملاً — وغياب الوحدة صراحةً هو
+                // مسار وحدة الأساس بمعامل ١ الموثَّق، لا سقوطاً على المجهول.
+                [$unitName, $unitFactor] = $this->units->resolve($product, $item['unit'] ?? null);
+                $baseQuantity = $quantity * $unitFactor;
+
+                // الإضافة وحدها تقبل تكلفة مُدخَلة، وهي بالوحدة المُدخَلة أعلاه
+                // (تجارية أو أساس) لا وحدة المخزون بالضرورة — الصرف والتحويل
+                // يأخذان متوسط التكلفة عند الترحيل، فلا يُسعّر المستخدم ما يُخرِجه.
                 $unitCost = $type === 'receipt' ? max(0, (int) ($item['unit_cost'] ?? 0)) : 0;
 
                 StockPermitLine::create([
                     'stock_permit_id' => $permit->id,
                     'product_id'      => $product->id,
                     'quantity'        => $quantity,
+                    'unit_name'       => $unitName,
+                    'unit_factor'     => $unitFactor,
+                    'base_quantity'   => $baseQuantity,
                     'unit_cost'       => $unitCost,
                     'line_cost'       => $quantity * $unitCost,
                 ]);
@@ -144,37 +158,52 @@ class StockPermitService
         });
     }
 
-    /** إضافة: الكمية تدخل بالتكلفة المُدخَلة، فيتحرّك المتوسط معها. */
+    /**
+     * إضافة: الكمية تدخل بالتكلفة المُدخَلة، فيتحرّك المتوسط معها.
+     *
+     * `line->quantity`/`unit_cost` بالوحدة المُدخَلة (تجارية أو أساس)؛
+     * `InventoryService` لا يعرف إلا وحدة المخزون، فتُمرَّر `base_quantity`
+     * المحفوظة على السطر وتكلفة الوحدة بعد التطبيع — القيمة الكلية للسطر
+     * (`line_cost`، بالوحدة المُدخَلة) تُمرَّر كـ`totalCost` صريحاً فتتطابق
+     * 1140 مع الدفتر المساعد بالهللة تماماً، لا بما يُعيد الضرب اشتقاقه.
+     */
     protected function applyReceipt(StockPermit $permit): int
     {
         $total = 0;
 
         foreach ($permit->lines as $line) {
-            $this->inventory->applyReceipt($line->product, $line->quantity, $line->unit_cost, [
+            $baseQuantity = $line->base_quantity;
+            $unitCostBase = intdiv($line->line_cost, max(1, $baseQuantity));
+
+            $this->inventory->applyReceipt($line->product, $baseQuantity, $unitCostBase, [
                 'warehouse_id' => $permit->warehouse_id,
                 'date'         => $permit->permit_date->toDateString(),
                 'source_type'  => StockPermit::class,
                 'source_id'    => $permit->id,
                 'notes'        => "إذن إضافة {$permit->number}",
-            ]);
+            ], $line->line_cost);
             $total += $line->line_cost;
         }
 
         return $total;
     }
 
-    /** صرف: بمتوسط التكلفة وقت الترحيل — تُثبَّت في السطر ليبقى أثرٌ رجعي. */
+    /**
+     * صرف: بمتوسط التكلفة وقت الترحيل — تُثبَّت في السطر ليبقى أثرٌ رجعي.
+     * التوفّر والإخراج بالكمية الأساس المحفوظة على السطر، لا الكمية المُدخَلة.
+     */
     protected function applyIssue(StockPermit $permit): int
     {
         $total = 0;
 
         foreach ($permit->lines as $line) {
-            $product  = $line->product;
-            $unitCost = (int) $product->avg_cost;
+            $product      = $line->product;
+            $unitCost     = (int) $product->avg_cost;
+            $baseQuantity = $line->base_quantity;
 
-            $this->assertAvailable($product, $line->quantity, $permit->warehouse_id);
+            $this->assertAvailable($product, $baseQuantity, $permit->warehouse_id);
 
-            $this->inventory->applyIssue($product, $line->quantity, $unitCost, [
+            $this->inventory->applyIssue($product, $baseQuantity, $unitCost, [
                 'warehouse_id' => $permit->warehouse_id,
                 'date'         => $permit->permit_date->toDateString(),
                 'source_type'  => StockPermit::class,
@@ -182,26 +211,31 @@ class StockPermitService
                 'notes'        => "إذن صرف {$permit->number}",
             ]);
 
-            $line->update(['unit_cost' => $unitCost, 'line_cost' => $line->quantity * $unitCost]);
-            $total += $line->quantity * $unitCost;
+            $lineCost = $baseQuantity * $unitCost;
+            $line->update(['unit_cost' => $unitCost, 'line_cost' => $lineCost]);
+            $total += $lineCost;
         }
 
         return $total;
     }
 
     /**
-     * تحويل: إخراج من المصدر وإدخال إلى الوجهة **بنفس متوسط التكلفة**، فلا
-     * يتغيّر المتوسط ولا إجمالي قيمة المخزون — تتحرّك الكمية بين المخزنين فقط.
+     * تحويل: إخراج من المصدر وإدخال إلى الوجهة **بنفس الكمية الأساس ونفس
+     * متوسط التكلفة**، فلا يتغيّر المتوسط ولا إجمالي قيمة المخزون — تتحرّك
+     * الكمية بين المخزنين فقط. التحويل الواحد يحوّل **مرّة واحدة**: الكمية
+     * الأساس محسوبة ومحفوظة عند الإنشاء، ويُعاد استعمال نفس القيمة على
+     * طرفَي الحركة، فلا احتمال لتباين طفيف بين الإخراج والإدخال.
      */
     protected function applyTransfer(StockPermit $permit): int
     {
         $total = 0;
 
         foreach ($permit->lines as $line) {
-            $product  = $line->product;
-            $unitCost = (int) $product->avg_cost;
+            $product      = $line->product;
+            $unitCost     = (int) $product->avg_cost;
+            $baseQuantity = $line->base_quantity;
 
-            $this->assertAvailable($product, $line->quantity, $permit->warehouse_id);
+            $this->assertAvailable($product, $baseQuantity, $permit->warehouse_id);
 
             $meta = [
                 'date'        => $permit->permit_date->toDateString(),
@@ -210,13 +244,14 @@ class StockPermitService
                 'notes'       => "إذن تحويل {$permit->number}",
             ];
 
-            $this->inventory->applyIssue($product, $line->quantity, $unitCost,
+            $this->inventory->applyIssue($product, $baseQuantity, $unitCost,
                 $meta + ['warehouse_id' => $permit->warehouse_id]);
-            $this->inventory->applyReceipt($product->fresh(), $line->quantity, $unitCost,
+            $this->inventory->applyReceipt($product->fresh(), $baseQuantity, $unitCost,
                 $meta + ['warehouse_id' => $permit->target_warehouse_id]);
 
-            $line->update(['unit_cost' => $unitCost, 'line_cost' => $line->quantity * $unitCost]);
-            $total += $line->quantity * $unitCost;
+            $lineCost = $baseQuantity * $unitCost;
+            $line->update(['unit_cost' => $unitCost, 'line_cost' => $lineCost]);
+            $total += $lineCost;
         }
 
         return $total;
