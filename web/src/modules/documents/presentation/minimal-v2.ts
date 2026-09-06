@@ -7,8 +7,8 @@
 import type { DocItemsColumnId } from '../types';
 
 export const MINIMAL_V2 = {
-  logoMaxPx: 34,
-  logoMaxWidthClass: 'max-h-[34px] max-w-[5.25rem] w-auto shrink-0 object-contain object-start',
+  logoMaxPx: 42,
+  logoMaxWidthClass: 'max-h-[42px] max-w-[6.25rem] w-auto shrink-0 object-contain object-start',
   qrSizePx: 60,
   totalsMaxClass: 'w-full max-w-[288px]',
 } as const;

@@ -37,7 +37,7 @@ describe('توكنز Minimal V2', () => {
   });
 
   it('يسقّف الشعار وQR دون نسخ عائلات V2 الأخرى', () => {
-    expect(MINIMAL_V2.logoMaxPx).toBe(34);
+    expect(MINIMAL_V2.logoMaxPx).toBe(42);
     expect(MINIMAL_V2.qrSizePx).toBe(60);
     expect(MINIMAL_V2.logoMaxPx).toBeGreaterThan(CLASSIC_V2.logoMaxPx);
     expect(MINIMAL_V2.logoMaxPx).toBeLessThan(VISUAL_V2.logoMaxPx);

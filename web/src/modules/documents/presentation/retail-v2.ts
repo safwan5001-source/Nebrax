@@ -7,8 +7,8 @@
 import type { DocItemsColumnId } from '../types';
 
 export const RETAIL_V2 = {
-  logoMaxPx: 30,
-  logoMaxWidthClass: 'max-h-[30px] max-w-[4.75rem] w-auto shrink-0 object-contain object-start',
+  logoMaxPx: 38,
+  logoMaxWidthClass: 'max-h-[38px] max-w-[5.75rem] w-auto shrink-0 object-contain object-start',
   qrSizePx: 66,
   totalsMaxClass: 'w-full max-w-[276px]',
 } as const;

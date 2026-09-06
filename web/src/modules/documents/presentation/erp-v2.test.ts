@@ -7,6 +7,7 @@ import {
   erpItemsColumnWidthClass,
   erpItemsValueCellClass,
 } from './erp-v2';
+import { VISUAL_V2 } from './visual-v2';
 
 describe('توكنز ERP V2', () => {
   it('يبقي الجدول كثيفاً والوصف الأوسع والمجموع 100%', () => {
@@ -25,9 +26,9 @@ describe('توكنز ERP V2', () => {
   });
 
   it('يسقّف الشعار وQR دون نسخ مقاسات Modern', () => {
-    expect(ERP_V2.logoMaxPx).toBe(28);
+    expect(ERP_V2.logoMaxPx).toBe(36);
     expect(ERP_V2.qrSizePx).toBe(64);
-    expect(ERP_V2.logoMaxPx).toBeLessThan(36);
-    expect(ERP_V2.qrSizePx).toBeLessThan(76);
+    expect(ERP_V2.logoMaxPx).toBeLessThan(VISUAL_V2.logoMaxPx);
+    expect(ERP_V2.qrSizePx).toBeLessThan(VISUAL_V2.qrSizePx);
   });
 });

@@ -33,7 +33,7 @@ describe('توكنز Classic V2', () => {
   });
 
   it('يسقّف الشعار وQR بين Modern وERP دون نسخهما', () => {
-    expect(CLASSIC_V2.logoMaxPx).toBe(32);
+    expect(CLASSIC_V2.logoMaxPx).toBe(40);
     expect(CLASSIC_V2.qrSizePx).toBe(70);
     expect(CLASSIC_V2.logoMaxPx).toBeGreaterThan(ERP_V2.logoMaxPx);
     expect(CLASSIC_V2.logoMaxPx).toBeLessThan(VISUAL_V2.logoMaxPx);

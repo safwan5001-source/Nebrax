@@ -7,8 +7,8 @@
 import type { DocItemsColumnId } from '../types';
 
 export const QUOTATION_PROPOSAL = {
-  logoMaxPx: 38,
-  logoMaxWidthClass: 'max-h-[38px] max-w-[6.5rem] w-auto shrink-0 object-contain object-start',
+  logoMaxPx: 46,
+  logoMaxWidthClass: 'max-h-[46px] max-w-[7rem] w-auto shrink-0 object-contain object-start',
   totalsMaxClass: 'w-full max-w-[292px]',
 } as const;
 
