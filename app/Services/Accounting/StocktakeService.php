@@ -7,6 +7,7 @@ use App\Models\Product;
 use App\Models\ProductWarehouseStock;
 use App\Models\Stocktake;
 use App\Models\StocktakeLine;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -30,6 +31,26 @@ use RuntimeException;
  *
  *  الفرق يُقيَّم بمتوسط التكلفة **لحظة الترحيل**، والكمية والقيد يتحرّكان في
  *  معاملة واحدة فلا ينفصل 1140 عن دفتر المخزون.
+ *
+ *  ═══════════════════════════════════════════════════════════════
+ *  PR-INV-4 — لقطة الفتح مقابل الحركة المتزامنة
+ *  ═══════════════════════════════════════════════════════════════
+ *  اللقطة تُلتقَط عند `open()`، والعدّ قد يقع بعدها بساعات، والترحيل بعد
+ *  العدّ بأخرى. أي حركة مخزنية حقيقية (بيع، استلام شراء، إذن صرف/إضافة/
+ *  تحويل، أو جردٌ آخر) على نفس الصنف في نفس المخزن خلال هذه النافذة تجعل
+ *  تطبيق الفرق المحسوب وقت الفتح (`counted - system_quantity`) خاطئاً
+ *  رياضياً على الرصيد الحالي — رغم أن الجرد نفسه محميٌّ من الترحيل المزدوج.
+ *
+ *  **السياسة اليقظة (Option B — الافتراض الأقلّ تعطيلاً تشغيلياً):** `post()`
+ *  يقفل صفّ `ProductWarehouseStock` لكل صنفٍ معدود (بترتيب `product_id`
+ *  الثابت — يمنع تعارض القفل الدائري) ويقارنه بلقطة الفتح **قبل** أي حركة
+ *  أو قيد. أي تعارض يُسقط الترحيل كلّه بلا أثر جزئي، ويُلزم استدعاء صريحاً
+ *  لـ`reconcile()` يُحدِّث اللقطة إلى الرصيد الحالي **ويمسح عدّ الصنف
+ *  المتأثر** — فلا يُخمَّن أيّ جزءٍ من الفرق يخصّ الحركة الفعلية وأيّه يخصّ
+ *  عجزاً حقيقياً؛ يُعاد عدّ الصنف من جديد على أساسٍ صحيح. تجميدٌ عامٌّ
+ *  للمخزن (Option A) لم يُختَر: يوقف كل حركة تشغيلية أخرى في المخزن طوال
+ *  نافذة الجرد كاملةً، بينما اليقظة تحصر التعطّل في الأصناف التي تحرّكت
+ *  فعلاً — ولا حاجة لإطارٍ عامٍّ جديد للقفل تفرضه هذه السياسة.
  */
 class StocktakeService
 {
@@ -116,6 +137,9 @@ class StocktakeService
     /**
      * ترحيل الفرق: يصحّح الكميات ويولّد قيداً واحداً للفروق كلّها.
      * السطور غير المعدودة تُتجاهَل تماماً — لا حركة ولا قيد.
+     *
+     * **يرفض الترحيل بالكامل** إن تحرّك رصيد أيّ صنفٍ معدود في هذا المخزن
+     * منذ لحظة الفتح — قبل أي حركة أو قيد، فلا أثر جزئي عند الرفض.
      */
     public function post(Stocktake $stocktake): Stocktake
     {
@@ -130,11 +154,21 @@ class StocktakeService
             }
 
             $stocktake->loadMissing('lines.product');
+
+            // ترتيبٌ ثابتٌ بمعرّف المنتج قبل القفل: جردان متزامنان يتقاطعان
+            // في صنفَين يُقفلان بنفس الترتيب دائماً فلا ينتظر كلٌّ الآخر دائرياً.
+            $countedLines = $stocktake->lines
+                ->filter(fn (StocktakeLine $l) => $l->counted_quantity !== null)
+                ->sortBy('product_id')
+                ->values();
+
+            $this->assertSnapshotStillValid($stocktake, $countedLines);
+
             $net = 0;
 
-            foreach ($stocktake->lines as $line) {
+            foreach ($countedLines as $line) {
                 $diff = $line->quantityDifference();
-                if ($diff === null || $diff === 0) {
+                if ($diff === 0) {
                     continue;
                 }
 
@@ -169,6 +203,84 @@ class StocktakeService
             ]);
 
             return $stocktake->fresh('lines');
+        });
+    }
+
+    /**
+     * ═══════════════════════════════════════════════════════════════
+     *  الحارس: لا ترحيل على رصيدٍ لم يعد قائماً — Product×Warehouse فقط
+     * ═══════════════════════════════════════════════════════════════
+     *  يقفل صفّ `ProductWarehouseStock` لكل صنفٍ **معدود** في هذا الجرد
+     *  (غير المعدود لا يُطبَّق له فرقٌ أصلاً فلا داعي لقفله أو فحصه — حركةٌ
+     *  على صنفٍ آخر في نفس المخزن لا تُعطِّل عدّاً لا يخصّه) ويقارنه برصيد
+     *  لحظة الفتح المحفوظ على السطر. أي اختلاف واحد يرفض الترحيل **كلّه**:
+     *  لا ترحيلٌ جزئيٌّ لأصنافٍ سليمة بينما أخرى متعارضة في نفس المستند.
+     */
+    protected function assertSnapshotStillValid(Stocktake $stocktake, Collection $countedLines): void
+    {
+        $conflicts = [];
+
+        foreach ($countedLines as $line) {
+            $current = (int) (ProductWarehouseStock::where('warehouse_id', $stocktake->warehouse_id)
+                ->where('product_id', $line->product_id)
+                ->lockForUpdate()
+                ->value('quantity') ?? 0);
+
+            if ($current !== (int) $line->system_quantity) {
+                $conflicts[] = sprintf(
+                    '«%s» (وقت الفتح %d، الآن %d)',
+                    $line->product->name,
+                    $line->system_quantity,
+                    $current
+                );
+            }
+        }
+
+        if ($conflicts !== []) {
+            throw new RuntimeException(
+                'تحرّك رصيد أصنافٍ في هذا الجرد بحركةٍ مخزنية أخرى منذ فتحه: '
+                .implode('، ', $conflicts)
+                .'. أعد مطابقة الجرد أولاً قبل الترحيل.'
+            );
+        }
+    }
+
+    /**
+     * مطابقة صريحة: تُحدِّث لقطة الفتح إلى الرصيد الحالي لكل صنفٍ تحرّك
+     * فعلاً، وتمسح عدّه القائم (إن وُجد) — العدّ السابق قِيسَ على رصيدٍ لم
+     * يعد قائماً فلا يصحّ تطبيقه، ولا تُخمَّن حصّة الحركة الفعلية من حصّة
+     * عجزٍ حقيقي. الأصناف التي لم تتحرّك تبقى بلا أي تغيير.
+     *
+     * @return array{stocktake: Stocktake, reconciled_product_ids: array<int, string>}
+     */
+    public function reconcile(Stocktake $stocktake): array
+    {
+        if (! $stocktake->isDraft()) {
+            throw new RuntimeException('لا يُطابَق جردٌ مرحَّل.');
+        }
+
+        return DB::transaction(function () use ($stocktake) {
+            $stocktake = Stocktake::lockForUpdate()->findOrFail($stocktake->id);
+            if (! $stocktake->isDraft()) {
+                throw new RuntimeException('لا يُطابَق جردٌ مرحَّل.');
+            }
+
+            $stocktake->loadMissing('lines');
+            $reconciled = [];
+
+            foreach ($stocktake->lines->sortBy('product_id') as $line) {
+                $current = (int) (ProductWarehouseStock::where('warehouse_id', $stocktake->warehouse_id)
+                    ->where('product_id', $line->product_id)
+                    ->lockForUpdate()
+                    ->value('quantity') ?? 0);
+
+                if ($current !== (int) $line->system_quantity) {
+                    $line->update(['system_quantity' => $current, 'counted_quantity' => null]);
+                    $reconciled[] = $line->product_id;
+                }
+            }
+
+            return ['stocktake' => $stocktake->fresh('lines'), 'reconciled_product_ids' => $reconciled];
         });
     }
 
