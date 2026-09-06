@@ -505,4 +505,160 @@ class SensitiveCostAuthorizationTest extends TestCase
         $other = $this->registerTenant('cost-tenant-b', 'owner@cost-tenant-b.test');
         $this->withToken($other['token'])->getJson("/api/products/{$product['id']}")->assertNotFound();
     }
+
+    // ═══════════════════════════════════════════════════════════
+    //  /api/reports/inventory — نفس السياسة المركزية، لا سياسة موازية
+    // ═══════════════════════════════════════════════════════════
+    //  `reports.view` وحدها كانت تكفي للوصول إلى avg_cost/stock_value/unit_cost/
+    //  total_cost/in_cost/out_cost/difference_value في هذا التقرير التحليلي —
+    //  نفس الفجوة المؤكدة في المنتج والمخزون، مُصلَحة بالسياسة نفسها لا بموازية.
+    // ═══════════════════════════════════════════════════════════
+
+    /**
+     * @return array{owner_token:string, tenant_id:string, warehouse:string, product:string, permit:string, stocktake:string}
+     */
+    private function inventoryReportSetup(string $slug): array
+    {
+        $auth = $this->registerTenant($slug, "owner@{$slug}.test");
+        $token = $auth['token'];
+        $product = $this->createProduct($token, ['sku' => "{$slug}-PUMP"]);
+        $warehouse = $this->withToken($token)->postJson('/api/warehouses', [
+            'name' => 'مخزن التقارير',
+        ])->assertCreated()['data']['id'];
+
+        // إذن إضافة مرحّل: يولّد حركة مخزون (movements) ويصير هو نفسه عملية
+        // مرحّلة (operations)، ويثبت avg_cost على المنتج (value).
+        $permit = $this->withToken($token)->postJson('/api/stock-permits', [
+            'type' => 'receipt', 'warehouse_id' => $warehouse,
+            'items' => [['product_id' => $product['id'], 'quantity' => 10, 'unit_cost' => 10000]],
+        ])->assertCreated()['data']['id'];
+        $this->withToken($token)->postJson("/api/stock-permits/{$permit}/post")->assertOk();
+
+        // جرد مرحَّل بفرقٍ فعلي: يثبت difference_value (stocktakes).
+        $stocktake = $this->withToken($token)->postJson('/api/stocktakes', [
+            'warehouse_id' => $warehouse,
+        ])->assertCreated()['data']['id'];
+        $this->withToken($token)->postJson("/api/stocktakes/{$stocktake}/count", [
+            'counts' => [['product_id' => $product['id'], 'counted_quantity' => 8]],
+        ])->assertOk();
+        $this->withToken($token)->postJson("/api/stocktakes/{$stocktake}/post")->assertOk();
+
+        return [
+            'owner_token' => $token, 'tenant_id' => $auth['tenant_id'], 'warehouse' => $warehouse,
+            'product' => $product['id'], 'permit' => $permit, 'stocktake' => $stocktake,
+        ];
+    }
+
+    /** @test */
+    public function the_value_view_hides_avg_cost_and_stock_value_for_unauthorized_users(): void
+    {
+        $s = $this->inventoryReportSetup('rpt-value');
+        $staff = $this->tokenForRole($s['tenant_id'], 'staff', 'staff@rpt-value.test');
+
+        $res = $this->withToken($staff)->getJson('/api/reports/inventory?view=value')->assertOk();
+        $row = collect($res->json('data'))->firstWhere('sku', 'rpt-value-PUMP');
+        $this->assertNotNull($row);
+        $this->assertNull($row['avg_cost']);
+        $this->assertNull($row['stock_value']);
+        $this->assertSame(8, $row['quantity'], 'الكمية ليست تكلفة — تبقى ظاهرة (10 مستلمة، عجز 2 بالجرد).');
+        $this->assertNull($res->json('totals.stock_value'));
+
+        $ownerRes = $this->withToken($s['owner_token'])->getJson('/api/reports/inventory?view=value')->assertOk();
+        $ownerRow = collect($ownerRes->json('data'))->firstWhere('sku', 'rpt-value-PUMP');
+        $this->assertSame('100.00', $ownerRow['avg_cost']);
+        $this->assertNotNull($ownerRes->json('totals.stock_value'));
+    }
+
+    /** @test */
+    public function the_warehouses_view_is_unaffected_because_it_never_carried_cost(): void
+    {
+        $s = $this->inventoryReportSetup('rpt-warehouses');
+        $staff = $this->tokenForRole($s['tenant_id'], 'staff', 'staff@rpt-warehouses.test');
+
+        $res = $this->withToken($staff)->getJson('/api/reports/inventory?view=warehouses')->assertOk();
+        $row = collect($res->json('data'))->first();
+        $this->assertArrayNotHasKey('stock_value', $row, 'هذا العرض كميّ بالتصميم أصلاً — لا تغيير هنا.');
+        $this->assertSame(8, $row['quantity']);
+    }
+
+    /** @test */
+    public function the_movements_view_hides_unit_and_total_cost_for_unauthorized_users(): void
+    {
+        $s = $this->inventoryReportSetup('rpt-movements');
+        $staff = $this->tokenForRole($s['tenant_id'], 'staff', 'staff@rpt-movements.test');
+
+        // الحركات مرتَّبة بالأحدث أولاً: تعديل الجرد (صرف عجز) يسبق الاستلام
+        // زمنياً في الاستجابة؛ نلتقط حركة الاستلام (in) صراحةً لا "الأولى".
+        $res = $this->withToken($staff)->getJson('/api/reports/inventory?view=movements')->assertOk();
+        $row = collect($res->json('data'))->firstWhere('type', 'in');
+        $this->assertNotNull($row);
+        $this->assertNull($row['unit_cost']);
+        $this->assertNull($row['total_cost']);
+        $this->assertSame(10, $row['quantity'], 'الكمية تبقى ظاهرة.');
+        $this->assertNull($res->json('totals.in_cost'));
+        $this->assertNull($res->json('totals.out_cost'));
+        $this->assertNull($res->json('totals.total_cost'));
+
+        $ownerRes = $this->withToken($s['owner_token'])->getJson('/api/reports/inventory?view=movements')->assertOk();
+        $ownerRow = collect($ownerRes->json('data'))->firstWhere('type', 'in');
+        $this->assertSame('100.00', $ownerRow['unit_cost']);
+        $this->assertNotNull($ownerRes->json('totals.total_cost'));
+    }
+
+    /** @test */
+    public function the_operations_view_hides_total_cost_for_unauthorized_users(): void
+    {
+        $s = $this->inventoryReportSetup('rpt-operations');
+        $staff = $this->tokenForRole($s['tenant_id'], 'staff', 'staff@rpt-operations.test');
+
+        $res = $this->withToken($staff)->getJson('/api/reports/inventory?view=operations')->assertOk();
+        $row = collect($res->json('data'))->first();
+        $this->assertNull($row['total_cost']);
+        $this->assertSame(10, $row['quantity']);
+        $this->assertNull($res->json('totals.total_cost'));
+
+        $ownerRes = $this->withToken($s['owner_token'])->getJson('/api/reports/inventory?view=operations')->assertOk();
+        $this->assertNotNull(collect($ownerRes->json('data'))->first()['total_cost']);
+    }
+
+    /** @test */
+    public function the_stocktakes_view_hides_difference_value_for_unauthorized_users(): void
+    {
+        $s = $this->inventoryReportSetup('rpt-stocktakes');
+        $staff = $this->tokenForRole($s['tenant_id'], 'staff', 'staff@rpt-stocktakes.test');
+
+        $res = $this->withToken($staff)->getJson('/api/reports/inventory?view=stocktakes')->assertOk();
+        $row = collect($res->json('data'))->first();
+        $this->assertNull($row['difference_value']);
+        $this->assertSame(-2, $row['quantity_difference'], 'فرق الكمية ليس تكلفة — يبقى ظاهراً.');
+        $this->assertNull($res->json('totals.difference_value'));
+
+        $ownerRes = $this->withToken($s['owner_token'])->getJson('/api/reports/inventory?view=stocktakes')->assertOk();
+        $this->assertNotNull(collect($ownerRes->json('data'))->first()['difference_value']);
+    }
+
+    /** @test */
+    public function an_authorized_role_may_still_use_the_report_without_products_view_cost_being_required_for_access(): void
+    {
+        // `reports.view` وحدها تكفي لفتح التقرير — الصلاحية الإضافية تُقصّ
+        // الحقول الحسّاسة فقط، ولا تحجب التقرير نفسه عمّن لا يملكها.
+        $s = $this->inventoryReportSetup('rpt-access');
+        $staff = $this->tokenForRole($s['tenant_id'], 'staff', 'staff@rpt-access.test');
+
+        $this->withToken($staff)->getJson('/api/reports/inventory?view=value')->assertOk();
+        $this->withToken($staff)->getJson('/api/reports/inventory?view=movements')->assertOk();
+        $this->withToken($staff)->getJson('/api/reports/inventory?view=operations')->assertOk();
+        $this->withToken($staff)->getJson('/api/reports/inventory?view=stocktakes')->assertOk();
+        $this->withToken($staff)->getJson('/api/reports/inventory?view=warehouses')->assertOk();
+    }
+
+    /** @test */
+    public function the_inventory_report_still_enforces_tenant_isolation(): void
+    {
+        $a = $this->inventoryReportSetup('rpt-tenant-a');
+        $b = $this->registerTenant('rpt-tenant-b', 'owner@rpt-tenant-b.test');
+
+        $res = $this->withToken($b['token'])->getJson('/api/reports/inventory?view=value')->assertOk();
+        $this->assertSame([], $res->json('data'), 'لا يجب أن يرى مستأجرٌ آخر أصناف مستأجرٍ غيره في التقرير.');
+    }
 }

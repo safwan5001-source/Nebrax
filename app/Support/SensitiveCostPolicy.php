@@ -32,6 +32,16 @@ class SensitiveCostPolicy
     /** حقول حركة المخزون الحسّاسة. */
     public const MOVEMENT_FIELDS = ['unit_cost', 'total_cost'];
 
+    /**
+     * حقول تقارير المخزون التحليلية الحسّاسة (`/api/reports/inventory`) —
+     * صفّاً وإجمالياً معاً. تشمل `in_cost`/`out_cost` (إجماليات عرض الحركات)
+     * و`difference_value` (قيمة فرق الجرد: كمية × متوسط تكلفة — تكشف التكلفة
+     * حسابياً بقسمتها على فرق الكمية تماماً كهامش الربح على سعر البيع).
+     */
+    public const INVENTORY_REPORT_FIELDS = [
+        'avg_cost', 'stock_value', 'unit_cost', 'total_cost', 'in_cost', 'out_cost', 'difference_value',
+    ];
+
     /** مفاتيح فرز قائمة المنتجات المشتقّة من التكلفة. */
     public const PRODUCT_SORT_KEYS = ['purchase_price'];
 
