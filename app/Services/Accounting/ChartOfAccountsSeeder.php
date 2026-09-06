@@ -59,6 +59,11 @@ class ChartOfAccountsSeeder
                 // مصروف مقابل (contra): حركته دائنة فيخفّض إجمالي المصروفات.
                 // يستقبل الإشعارات المدينة — خصومات المورّد بلا حركة مخزون.
                 ['5115', 'مردودات ومسموحات المشتريات', 'Purchase Returns & Allowances', 'expense', false, []],
+                // فرق تقييمٍ بحت بين اعتماد المورّد التجاري لمرتجع مشترياتٍ
+                // مخزني والقيمة الدفترية (avg_cost) الفعلية المُزالة من 1140 —
+                // ليس فرق جردٍ أو تلفٍ فيزيائي فلا يُستخدم له 5180. حركته
+                // مدينة أو دائنة بحسب اتجاه الفرق (انظر ReturnService::postPurchaseReturn).
+                ['5116', 'فروق تقييم مردودات المشتريات', 'Purchase Return Valuation Variance', 'expense', false, []],
             ]],
             ['52', 'مصروفات إدارية وعمومية', 'Administrative & General Expenses', 'expense', true, [
                 ['5120', 'الرواتب والأجور', 'Salaries', 'expense', false, []],

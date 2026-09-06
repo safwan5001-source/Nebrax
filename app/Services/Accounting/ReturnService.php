@@ -36,8 +36,10 @@ use RuntimeException;
  *    مدين 5180 فروق الجرد والتلف / دائن 5110 — بلا حركة مخزون.
  *
  *  مرتجع مشتريات (purchase) — عكس الشراء:
- *    مدين 2110/1110 (الإجمالي) │ دائن 1140 المخزون + دائن 5150 + دائن 1150 ضريبة المدخلات
- *    وللبضاعة المتابَعة: إخراج من المخزون.
+ *    مدين 2110/1110 (الإجمالي التجاري الكامل) │ دائن 1140 المخزون (القيمة
+ *    الدفترية avg_cost فقط) + دائن 5150 + دائن 1150 ضريبة المدخلات + فرق
+ *    التقييم (إن وُجد) على 5116 فروق تقييم مردودات المشتريات — لا 5180.
+ *    وللبضاعة المتابَعة: إخراج من المخزون بالكمية الأساسية التاريخية.
  *
  *  ── المستند المصدر
  *
@@ -62,7 +64,11 @@ class ReturnService
     private const ACC_SALES       = '4110';
     private const ACC_COGS        = '5110';
     private const ACC_EXPENSE     = '5150';
-    private const ACC_DAMAGE      = '5180'; // فروق الجرد والتلف
+    private const ACC_DAMAGE      = '5180'; // فروق الجرد والتلف — تلفٌ/فقدٌ فيزيائي فقط، لا فرق تقييم
+    // PURCHASE_RETURN_VALUATION_VARIANCE (المعنى المحاسبي المستقبلي لميزة Account
+    // Mapping القادمة): فرقٌ تقييمي بحت — اعتماد المورّد التجاري مقابل القيمة
+    // الدفترية الفعلية المُزالة من 1140 — لا فرق جردٍ أو تلفٍ فلا يُستخدم 5180 له.
+    private const ACC_PURCHASE_RETURN_VALUATION_VARIANCE = '5116';
 
     public function __construct(
         protected LedgerService $ledger,
@@ -639,13 +645,16 @@ class ReturnService
      *     مرتجع المبيعات، R2).
      *   • القيمة: 1140 وحركة المخزون تُقيَّمان بـ`avg_cost` الحالي للمنتج —
      *     القيمة الدفترية الفعلية المُزالة من الرفّ والدفتر المساعد — لا بسعر
-     *     الشراء/الاعتماد المُدخَل على السطر. الفرق بينهما (إن وُجد) قيمةٌ
-     *     تجارية بحتة تخصّ ذمّة المورّد، فيُرحَّل إلى 5180 (فروق الجرد والتلف
-     *     — نفس حساب فروق القيمة المستعمل في الجرد والأذون المخزنية ومرتجع
-     *     المبيعات التالف، لا حساب جديد): دائنٌ حين الاعتماد التجاري أعلى من
-     *     الدفترية (مكسب)، ومدينٌ حين أقلّ (خسارة) — يبقى القيد متوازناً
-     *     دائماً بلا تغيير في `subtotal`/`tax_amount`/`total` التجارية
-     *     الظاهرة للمستند (تبقى كما أُدخلت، تخصّ ذمّة المورّد لا المخزون).
+     *     الشراء/الاعتماد المُدخَل على السطر. الفرق بينهما (إن وُجد) **ليس فرق
+     *     جردٍ أو تلفٍ فيزيائي** فلا يُرحَّل إلى 5180: هو فرق تقييمٍ محاسبي
+     *     بحت بين اعتماد المورّد التجاري والقيمة الدفترية، فمحلّه حساب مستقل
+     *     مخصَّص **5116 فروق تقييم مردودات المشتريات** (`ACC_PURCHASE_RETURN_VALUATION_VARIANCE`،
+     *     المعنى المستقبلي لميزة Account Mapping: `PURCHASE_RETURN_VALUATION_VARIANCE`):
+     *     دائنٌ حين الاعتماد التجاري أعلى من الدفترية (مكسب)، ومدينٌ حين أقلّ
+     *     (خسارة) — يبقى القيد متوازناً دائماً بلا تغيير في
+     *     `subtotal`/`tax_amount`/`total` التجارية الظاهرة للمستند (تبقى كما
+     *     أُدخلت، تخصّ ذمّة المورّد لا المخزون). 5180 يبقى محصوراً بفروق
+     *     الجرد والتلف والأذون المخزنية ومرتجع المبيعات التالف كما كان تماماً.
      */
     protected function postPurchaseReturn(ReturnDocument $return): ReturnDocument
     {
@@ -660,7 +669,8 @@ class ReturnService
 
         // القيمة التجارية (سعر الشراء/الاعتماد المُدخَل) تبني ذمّة المورّد
         // والمستند الظاهر؛ القيمة الدفترية هي ما يُزال فعلياً من 1140 والدفتر
-        // المساعد. الفرق بينهما — لا أحدهما وحده — هو ما يذهب إلى 5180.
+        // المساعد. الفرق بينهما — لا أحدهما وحده — هو ما يذهب إلى 5116
+        // فروق تقييم مردودات المشتريات (لا 5180: هذا فرق تقييمٍ لا تلفٌ فيزيائي).
         $inventoryCommercialTotal = 0;
         $inventoryCarryingTotal   = 0;
         $expenseTotal             = 0;
@@ -687,7 +697,7 @@ class ReturnService
         $variance = $inventoryCommercialTotal - $inventoryCarryingTotal;
 
         // قيد عكس الشراء: مدين 2110/1110 / دائن 1140 (بالقيمة الدفترية) +
-        // دائن 5150 + دائن 1150 + فرق القيمة (إن وُجد) إلى 5180.
+        // دائن 5150 + دائن 1150 + فرق القيمة (إن وُجد) إلى 5116.
         $debitLine = [
             'account_id' => $this->accountId($return->payment_type === 'cash' ? self::ACC_CASH : self::ACC_PAYABLE),
             'debit'      => $total,
@@ -708,9 +718,9 @@ class ReturnService
             $lines[] = ['account_id' => $this->accountId(self::ACC_INPUT_VAT), 'credit' => $taxTotal];
         }
         if ($variance > 0) {
-            $lines[] = ['account_id' => $this->accountId(self::ACC_DAMAGE), 'credit' => $variance];
+            $lines[] = ['account_id' => $this->accountId(self::ACC_PURCHASE_RETURN_VALUATION_VARIANCE), 'credit' => $variance];
         } elseif ($variance < 0) {
-            $lines[] = ['account_id' => $this->accountId(self::ACC_DAMAGE), 'debit' => -$variance];
+            $lines[] = ['account_id' => $this->accountId(self::ACC_PURCHASE_RETURN_VALUATION_VARIANCE), 'debit' => -$variance];
         }
 
         $entry = $this->ledger->post($lines, [

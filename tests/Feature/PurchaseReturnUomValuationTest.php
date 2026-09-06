@@ -126,7 +126,8 @@ class PurchaseReturnUomValuationTest extends TestCase
 
         $this->assertSame(7, $product->fresh()->quantity_on_hand);
         $this->assertSame(-12000, $this->bal('1140') - $before1140); // 3 × 4000
-        $this->assertSame(0, $this->bal('5180'), 'لا فرق قيمة عندما يتساوى الاعتماد التجاري بالدفترية.');
+        $this->assertSame(0, $this->bal('5116'), 'لا فرق قيمة عندما يتساوى الاعتماد التجاري بالدفترية.');
+        $this->assertSame(0, $this->bal('5180'), '5180 فروق الجرد والتلف لا يُستخدم لفرق التقييم إطلاقاً.');
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -326,7 +327,8 @@ class PurchaseReturnUomValuationTest extends TestCase
         $this->returns->post($return);
 
         $this->assertSame(-10000, $this->bal('1140') - $before1140); // 2 × 5000 (الدفترية = التجارية هنا)
-        $this->assertSame(0, $this->bal('5180'));
+        $this->assertSame(0, $this->bal('5116'));
+        $this->assertSame(0, $this->bal('5180'), '5180 فروق الجرد والتلف لا يُستخدم لفرق التقييم إطلاقاً.');
     }
 
     /** @test */
@@ -345,12 +347,14 @@ class PurchaseReturnUomValuationTest extends TestCase
         $posted = $this->returns->post($return);
 
         $this->assertSame(-10000, $this->bal('1140') - $before1140);  // ٢ × ٥٠٠٠ الدفترية — لا ١٢٠٠٠ التجارية
-        // 5180 حساب مدين الطبيعة؛ دائنٌ بـ٢٠٠٠ (مكسب) يُنقِص رصيده -٢٠٠٠.
-        $this->assertSame(-2000, $this->bal('5180'));
+        // 5116 حساب مدين الطبيعة؛ دائنٌ بـ٢٠٠٠ (مكسب) يُنقِص رصيده -٢٠٠٠.
+        $this->assertSame(-2000, $this->bal('5116'));
+        $this->assertSame(0, $this->bal('5180'), '5180 فروق الجرد والتلف لا يُستخدم لفرق التقييم إطلاقاً.');
 
         $entry = $posted->journalEntry()->with('lines.account')->first();
         $this->assertEquals($entry->lines->sum('debit'), $entry->lines->sum('credit'), 'القيد يبقى متوازناً رغم الفرق.');
-        $this->assertEquals(2000, (int) $this->line($entry, '5180')->credit);
+        $this->assertEquals(2000, (int) $this->line($entry, '5116')->credit);
+        $this->assertNull($this->line($entry, '5180'), 'لا سطر على 5180 في هذا القيد إطلاقاً.');
         $this->assertEquals(12000, (int) $this->line($entry, '2110')->debit, 'ذمّة المورّد تبقى بالقيمة التجارية الكاملة.');
     }
 
@@ -370,12 +374,14 @@ class PurchaseReturnUomValuationTest extends TestCase
         $posted = $this->returns->post($return);
 
         $this->assertSame(-10000, $this->bal('1140') - $before1140); // ٢ × ٥٠٠٠ الدفترية — لا ٨٠٠٠ التجارية
-        // الفرق الكلي = ٢×(٥٠٠٠-٤٠٠٠) = ٢٠٠٠؛ 5180 مدين الطبيعة فيزيد رصيده +٢٠٠٠.
-        $this->assertSame(2000, $this->bal('5180'));
+        // الفرق الكلي = ٢×(٥٠٠٠-٤٠٠٠) = ٢٠٠٠؛ 5116 مدين الطبيعة فيزيد رصيده +٢٠٠٠.
+        $this->assertSame(2000, $this->bal('5116'));
+        $this->assertSame(0, $this->bal('5180'), '5180 فروق الجرد والتلف لا يُستخدم لفرق التقييم إطلاقاً.');
 
         $entry = $posted->journalEntry()->with('lines.account')->first();
         $this->assertEquals($entry->lines->sum('debit'), $entry->lines->sum('credit'));
-        $this->assertEquals(2000, (int) $this->line($entry, '5180')->debit);
+        $this->assertEquals(2000, (int) $this->line($entry, '5116')->debit);
+        $this->assertNull($this->line($entry, '5180'), 'لا سطر على 5180 في هذا القيد إطلاقاً.');
         $this->assertEquals(8000, (int) $this->line($entry, '2110')->debit, 'ذمّة المورّد تبقى بالقيمة التجارية الأصلية.');
     }
 
@@ -405,7 +411,8 @@ class PurchaseReturnUomValuationTest extends TestCase
         $this->assertEquals(13800, (int) $this->line($entry, '2110')->debit);
         $this->assertEquals(1800, (int) $this->line($entry, '1150')->credit, 'الضريبة تُعكس كاملة — لا تتأثر بفرق القيمة الدفترية.');
         $this->assertEquals(10000, (int) $this->line($entry, '1140')->credit, 'الدفترية وحدها (٢×٥٠٠٠)، بمعزل عن الضريبة.');
-        $this->assertEquals(2000, (int) $this->line($entry, '5180')->credit, 'فرق القيمة (١٢٠٠٠-١٠٠٠٠) بمعزل عن الضريبة تماماً.');
+        $this->assertEquals(2000, (int) $this->line($entry, '5116')->credit, 'فرق القيمة (١٢٠٠٠-١٠٠٠٠) بمعزل عن الضريبة تماماً.');
+        $this->assertNull($this->line($entry, '5180'), 'لا سطر على 5180 في هذا القيد إطلاقاً — فرق التقييم ليس على حساب الجرد والتلف.');
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -478,6 +485,86 @@ class PurchaseReturnUomValuationTest extends TestCase
             8,
             (int) ProductWarehouseStock::where('product_id', $product->id)->where('warehouse_id', $warehouse->id)->value('quantity'),
             'رصيد المخزن المحدَّد لم يتحرّك.'
+        );
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  5116 — new tenant seeder + safe provisioning for existing tenants
+    // ═══════════════════════════════════════════════════════════
+
+    /** @test */
+    public function a_new_tenant_is_seeded_with_the_purchase_return_valuation_variance_account(): void
+    {
+        // $this->tenant أُنشئ في setUp() عبر نفس ChartOfAccountsSeeder المستعمل
+        // لكل مستأجر جديد فعلياً — لا مسار اختباري موازٍ.
+        $account = Account::where('code', '5116')->first();
+
+        $this->assertNotNull($account, 'حساب 5116 يجب أن يُزرع لكل مستأجر جديد.');
+        $this->assertSame('فروق تقييم مردودات المشتريات', $account->name);
+        $this->assertSame('Purchase Return Valuation Variance', $account->name_en);
+        $this->assertSame('expense', $account->type);
+        $this->assertSame('debit', $account->normal_balance);
+        $this->assertFalse((bool) $account->is_group);
+        $this->assertTrue((bool) $account->is_system);
+
+        $parent = Account::find($account->parent_id);
+        $this->assertSame('51', $parent->code, 'يقع تحت مجموعة تكلفة المبيعات، جنباً إلى جنب مع 5115.');
+    }
+
+    /** @test */
+    public function an_existing_tenant_predating_this_pr_receives_the_account_safely_without_duplicates_or_historical_changes(): void
+    {
+        // محاكاة مستأجرٍ قائم قبل هذا الـPR: يُحذف 5116 الذي زرعه seed()،
+        // تاركاً بقية دليل الحسابات كما كان فعلياً على مستأجرٍ قديم.
+        Account::where('tenant_id', $this->tenant->id)->where('code', '5116')->delete();
+        $this->assertNull(Account::where('code', '5116')->first());
+
+        // مرتجعٌ تاريخي مرحَّل **قبل** توفّر 5116 على هذا المستأجر — يثبت أن
+        // ترقية الحساب لا تُعيد تصنيف أو تعدّل أي قيدٍ أو رصيدٍ قائم.
+        $product = Product::create(['name' => 'بضاعة قديمة', 'track_inventory' => true, 'quantity_on_hand' => 0, 'avg_cost' => 0]);
+        $purchase = $this->purchase($product, 5, 4000);
+        $historicalReturn = $this->returns->create(
+            [
+                'type' => 'purchase', 'partner_id' => $this->supplier->id, 'payment_type' => 'credit',
+                'original_id' => $purchase->id, 'original_type' => Purchase::class,
+            ],
+            [['product_id' => $product->id, 'source_line_id' => $this->purchaseLine($purchase)->id, 'quantity' => 2, 'unit_price' => 4000, 'tax_rate' => 0]]
+        );
+        $this->returns->post($historicalReturn);
+        $historicalEntryId = $historicalReturn->fresh()->journal_entry_id;
+        $historicalLineCountBefore = JournalLine::where('journal_entry_id', $historicalEntryId)->count();
+        $accountsCountBefore = Account::where('tenant_id', $this->tenant->id)->count();
+
+        $migration = require base_path('database/migrations/2026_09_06_010000_add_purchase_return_valuation_variance_account.php');
+        $migration->up();
+
+        $accounts = Account::where('tenant_id', $this->tenant->id)->where('code', '5116')->get();
+        $this->assertCount(1, $accounts, 'حساب واحد فقط يُزرع.');
+        $account = $accounts->first();
+        $this->assertSame('فروق تقييم مردودات المشتريات', $account->name);
+        $this->assertSame('expense', $account->type);
+        $this->assertSame('debit', $account->normal_balance);
+        $parent = Account::find($account->parent_id);
+        $this->assertSame('51', $parent->code);
+
+        // القيد التاريخي (المرحَّل قبل توفّر 5116) لم يتغيّر بحرف.
+        $this->assertSame(
+            $historicalLineCountBefore,
+            JournalLine::where('journal_entry_id', $historicalEntryId)->count(),
+            'لا إعادة تصنيف لأي سطر قيدٍ تاريخي.'
+        );
+
+        // إعادة التنفيذ لا تُنشئ نسخة مكرّرة (idempotent).
+        $migration->up();
+        $this->assertSame(
+            1,
+            Account::where('tenant_id', $this->tenant->id)->where('code', '5116')->count(),
+            'إعادة تنفيذ الترقية لا تُكرّر الحساب.'
+        );
+        $this->assertSame(
+            $accountsCountBefore + 1,
+            Account::where('tenant_id', $this->tenant->id)->count(),
+            'حسابٌ واحد إضافي فقط — بقية دليل الحسابات لم تتغيّر.'
         );
     }
 }
