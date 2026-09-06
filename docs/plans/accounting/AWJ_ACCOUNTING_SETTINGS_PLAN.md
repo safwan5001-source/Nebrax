@@ -164,54 +164,26 @@ Transfers post concrete source/destination CashBankAccount accounts. No transfer
 A domain-specific resolver that enforces permissions/policy must not be bypassed by generic Accounting Role resolution.
 
 ## 10. Legacy `5170` Semantic Audit — CONFIRMED 2026-09-06
-
 ### 10.1 Actual consumers
-At the audited code baseline, `5170` is used as `ACC_ADJUSTMENT` by the sales `InvoiceService` and purchase `PurchaseService`. The similarly named Stock Permit `ACC_ADJUSTMENT` is a different legacy account, `5180`, and belongs to the inventory semantics already decomposed above.
+At the audited code baseline, `5170` is used as `ACC_ADJUSTMENT` by sales `InvoiceService` and purchase `PurchaseService`. The similarly named Stock Permit `ACC_ADJUSTMENT` is `5180` and belongs to the inventory semantics already decomposed above.
 
 ### 10.2 Sales behavior
-The invoice header `adjustment` is explicitly non-taxable and is included directly in document total. At posting:
-- positive adjustment -> credit `5170` (gain/increase in invoice total);
-- negative adjustment -> debit `5170` (loss/decrease in invoice total).
-
-The code describes it as rounding/settlement difference rather than product revenue, shipping revenue, VAT, discount, or cash settlement.
+Invoice header `adjustment` is non-taxable and included directly in total. Positive -> credit `5170`; negative -> debit `5170`.
 
 ### 10.3 Purchase behavior
-The purchase header `adjustment` is included directly in total after inventory/expense base and input VAT calculation. At posting:
-- positive adjustment -> debit `5170` (additional purchase-side cost/difference);
-- negative adjustment -> credit `5170` (rounding/adjustment reduction).
+Purchase header `adjustment` is included after base and input VAT. Positive -> debit `5170`; negative -> credit `5170`.
 
-The same service deliberately treats purchase discount and inbound shipping as part of inventory/expense cost, proving that `5170` is not their routing account.
-
-### 10.4 One semantic role, not sales/purchase duplicates
-Both consumers use the same user-facing/document-level concept: a signed header adjustment used to reconcile the final document total. The debit/credit direction differs naturally with sales vs purchase economics, but that does not create different accounting identities.
-
-**Decision:** V1 uses one shared semantic role:
-
-`document_adjustment` — فروق وتسويات/تقريب رأس المستند — legacy fallback `5170`.
-
-Do not create `sales_adjustment` and `purchase_adjustment` as separate mappings in V1. Doing so would duplicate one current accounting policy merely because two document modules consume it.
+### 10.4 One semantic role
+Both are one signed document-header reconciliation concept. V1 uses shared `document_adjustment`, legacy fallback `5170`; no separate sales/purchase adjustment roles.
 
 ### 10.5 Scope guard
-`document_adjustment` must not become a generic dumping account for unrelated future adjustments. A future flow may consume it only when its accounting contract is genuinely the same signed document-header reconciliation concept. Inventory variance/damage remains under the separate `5180`-derived roles.
+`document_adjustment` is not a generic dumping account. Future consumers require the same accounting contract.
 
-### 10.6 Tax and cost-center behavior are preserved
-Current sales adjustment is explicitly non-taxable. Purchase adjustment is added after VAT calculation. Neither current `5170` posting line carries a cost-center dimension. Account Routing must change only account resolution; it must not silently change tax treatment or cost-center tagging.
+### 10.6 Tax and cost-center behavior
+Routing changes only account resolution; current tax and cost-center treatment stays unchanged.
 
 ## 11. Current Role Catalog
-**Confirmed:**
-- `accounts_receivable`
-- `accounts_payable`
-- `sales_revenue`
-- `sales_shipping_revenue`
-- `document_adjustment`
-- `inventory_asset`
-- `cogs`
-- `purchase_expense`
-- `tax_output`
-- `tax_input`
-- `inventory_count_variance`
-- `inventory_manual_adjustment`
-- `inventory_damage_loss`
+**Confirmed:** `accounts_receivable`, `accounts_payable`, `sales_revenue`, `sales_shipping_revenue`, `document_adjustment`, `inventory_asset`, `cogs`, `purchase_expense`, `tax_output`, `tax_input`, `inventory_count_variance`, `inventory_manual_adjustment`, `inventory_damage_loss`.
 
 **Confirmed meaning / placement under review:** `opening_balances`.
 
@@ -234,15 +206,145 @@ Confirmed absent and distinct from date locks. Separate accounting design/audit 
 ## 16. Routing Branch Semantics
 **UNRESOLVED for V1.** Routing, locks, and fiscal periods each require an independent branch-policy decision.
 
-## 17. Audit and Permissions
-Initial direction: `accounting_settings.view` / `accounting_settings.manage`, subject to repository convention check. Audit mapping changes, period-lock changes, fiscal close/reopen, and future high-impact accounting policy changes.
+## 17. ACC-1 / ACC-2 Readiness Contract — CONFIRMED 2026-09-06
+
+### 17.1 RBAC convention and final permission names
+Repository convention is explicit `domain.view` / `domain.manage` permissions in `Rbac::PERMISSIONS`, enforced server-side by `EnsurePermission` route middleware. The Accounting Settings workspace therefore adopts:
+- `accounting_settings.view`
+- `accounting_settings.manage`
+
+`accounting_settings.view` controls access to the workspace and read-only accounting-setting endpoints. `accounting_settings.manage` controls future mapping/policy mutations.
+
+**Default role policy:** owner/admin retain access through `*`. Do **not** automatically add these new permissions to accountant or staff system-role matrices. Accounting routing is company-wide financial policy, not ordinary bookkeeping. A tenant may explicitly grant the permissions to a custom role.
+
+This avoids temporarily reusing `accounts.manage` and later changing security semantics.
+
+### 17.2 Navigation contract
+The sidebar already has a first-class `accounting` group containing Accounts, Journal Entries, Assets and Cost Centers. ACC-1 adds one built leaf:
+- `/accounting-settings`
+- key: `accountingSettings`
+- permission: `accounting_settings.view`
+
+Do not place this workspace under generic `/settings` or `/finance-settings`; cash/bank/payment settings remain Finance concerns. The existing Finance Settings hub is only the interaction/layout precedent.
+
+### 17.3 Workspace UI contract
+ACC-1 may reuse the compact Finance Settings hub pattern (title/subtitle + dense linked cards), but it must not copy its current placeholder behavior. Accounting Settings V1 shows only real destinations/capabilities.
+
+Initial hub destinations:
+- Account Routing — may be marked planned/locked until ACC-2 supplies a real endpoint/page.
+- Cost Centers — real link to existing `/cost-centers`.
+- Fiscal Periods — planned, no fake controls.
+- Accounting Period Locks — planned, no fake controls.
+- General Accounting Settings — only when a real backend-enforced policy exists.
+
+A placeholder may communicate roadmap state but must never look interactive or persist fake values.
+
+### 17.4 Naming contract
+Do not reuse `AccountSettingsController`: it already means the user account/profile center. New backend surfaces use unambiguous Accounting naming, e.g. `AccountingSettingsController` and later `AccountingRoleMappingController`/service names as appropriate.
+
+### 17.5 Tenant isolation model for ACC-2
+Account-role mappings are **CompanyWide tenant data**, not branch-scoped data in V1. Model must extend `BaseModel` (therefore `BelongsToTenant`) and implement `CompanyWide`, matching other company-wide tenant models. No `branch_id` column is added to V1 mappings.
+
+Database invariants:
+- UUID primary key.
+- `tenant_id` foreign key with cascade-on-delete, following repository convention.
+- `role_key` string.
+- `account_id` foreign key to accounts.
+- unique `(tenant_id, role_key)`.
+- index `(tenant_id, account_id)` if useful for reverse/reference checks.
+
+Application validation is mandatory even with FKs: selected account must belong to the active tenant, exist, be active, and be a posting/detail account (`is_group = false`). Explicit invalid mapping blocks; it never falls back.
+
+### 17.6 Mapping deletion/reset semantics
+Deleting/resetting a mapping means **return to unmapped state**, which for existing tenants invokes the documented legacy fallback bridge for future postings. It never alters historical journals.
+
+The UI/API must describe this as “use system default/legacy default” rather than implying that accounting is disabled.
+
+### 17.7 Static catalog vs relational mappings
+ACC-2 adds a static role catalog in code and relational tenant mappings only. No `accounting_roles` table and no tenant-editable role keys. API accepts only catalog keys.
+
+Catalog metadata should include at least key, Arabic/English label/description, legacy code, domain/group, and whether the role is V1 configurable. Metadata is descriptive; the mapping row is the tenant decision.
+
+### 17.8 Resolver contract
+The resolver receives a semantic role key and resolves in this order:
+1. validate role exists in static catalog;
+2. find explicit tenant mapping;
+3. if explicit mapping exists, validate referenced account for the active tenant and posting eligibility; invalid -> fail closed;
+4. if no mapping exists, resolve the catalog legacy code for backward compatibility;
+5. return concrete Account/account ID to the caller before `LedgerService`.
+
+ACC-2 itself has **no posting consumers**. Therefore shipping ACC-2 must not change any journal generated by current services.
+
+### 17.9 Audit contract for mapping changes
+AWJ has domain-specific audit/event models but no generic accounting-settings audit framework. ACC-2 should not invent a cross-domain audit platform.
+
+Create a narrowly scoped immutable accounting-setting audit/event record for mapping mutations, recording at minimum:
+- tenant_id;
+- actor user ID when available;
+- event/action (`mapping_created`, `mapping_changed`, `mapping_reset`);
+- role key;
+- previous account ID/code snapshot when applicable;
+- new account ID/code snapshot when applicable;
+- timestamp.
+
+Audit rows are company-wide tenant data and must be tenant-isolated. Do not make audit deletion part of normal settings CRUD.
+
+### 17.10 API boundary
+ACC-1 requires no mutable accounting-policy API merely to render the hub.
+
+ACC-2 should expose a small dedicated API, conceptually:
+- `GET /accounting-settings/account-routing` -> catalog + current mappings + effective legacy/mapped state; guarded by `accounting_settings.view`.
+- `PUT /accounting-settings/account-routing/{roleKey}` -> set/replace explicit mapping; guarded by `accounting_settings.manage`.
+- `DELETE /accounting-settings/account-routing/{roleKey}` -> reset to unmapped/legacy-default state; guarded by `accounting_settings.manage`.
+
+Exact controller method naming may follow repository style, but do not use generic tenant JSON `Settings` for these relational mappings.
+
+### 17.11 Required ACC-1 tests
+At minimum:
+- RBAC catalog contains both permissions.
+- owner/admin can see/access Accounting Settings through wildcard semantics.
+- accountant/staff do not receive the new policy permissions by default.
+- unauthorized API access is 403 once an Accounting Settings API exists.
+- sidebar visibility mirrors `accounting_settings.view`.
+- workspace has no fake editable controls.
+- web build/typecheck relevant to navigation/page changes.
+
+### 17.12 Required ACC-2 tests
+At minimum:
+- tenant A cannot read/update/delete tenant B mappings.
+- cross-tenant account ID cannot be mapped even if a raw UUID is supplied.
+- group account rejected.
+- inactive account rejected.
+- unknown role key rejected.
+- one mapping per `(tenant, role_key)`.
+- unmapped role resolves legacy account exactly as before.
+- valid explicit mapping resolves selected account.
+- explicit mapping becoming invalid/disabled causes resolution failure, not fallback.
+- reset removes explicit decision and restores legacy-compatible future resolution.
+- mapping change does not mutate historical `journal_lines`.
+- audit event captures actor, role and before/after account snapshots.
+- resolver does not bypass CashBankAccount domain resolver.
+- **zero posting consumers in ACC-2:** representative pre/post accounting service behavior remains unchanged until ACC-3.
+- SQLite and PostgreSQL migration/test coverage for the new relational constraints.
+
+### 17.13 ACC-1 / ACC-2 scope boundary
+ACC-1 is workspace/RBAC/navigation only. ACC-2 is catalog/mapping/resolver/audit/API foundation only.
+
+Neither PR may:
+- modify `LedgerService`;
+- replace any hardcoded posting account in business services;
+- implement fiscal periods/locks;
+- alter purchase-return cash behavior;
+- add branch-specific mappings;
+- migrate historical journals;
+- seed explicit mapping rows for existing tenants in a way that changes current behavior.
 
 ## 18. Updated PR Sequence
 ### ACC-1 — Accounting Settings Foundation + Workspace + RBAC
-Hub/sidebar/real permissions; no accounting behavior change.
+Implement the confirmed §17.1–17.4 and §17.11 contracts. No accounting behavior/schema change is required except normal RBAC code/catalog/navigation/i18n/page changes.
 
 ### ACC-2 — Semantic Roles + Mapping Foundation
-Static catalog; relational tenant mappings; resolver; validation; tenant protection; mapping audit; no posting consumer yet; invalid explicit mapping fails closed. Initial confirmed role catalog includes `document_adjustment` as one shared role.
+Implement §17.5–17.10 and §17.12–17.13: static catalog, company-wide relational tenant mappings, resolver, validation, dedicated audit, API. No posting consumer yet; invalid explicit mapping fails closed.
 
 ### ACC-3 — Sales + Payment Counterparty Routing
 Confirmed sales/shared roles including `document_adjustment`; preserve product sales override; historical journals unchanged; unmapped tenants legacy-equivalent. `PaymentService` may consume `accounts_receivable` / `accounts_payable` while Cash/Bank resolution remains in `CashBankAccountService`.
@@ -251,80 +353,50 @@ Confirmed sales/shared roles including `document_adjustment`; preserve product s
 Before ACC-4: remove dependency on direct legacy `1110` for new cash purchase returns; design dedicated Supplier Refund domain rather than overloading current Payment direction; preserve history; define cutover; use selected CashBankAccount and deposit authorization; define linking/allocation; require accounting, tenant-isolation, authorization, concurrency and historical-integrity tests.
 
 ### ACC-4 — Purchases + Purchase Returns Routing
-Starts only after GATE-ACC-RET-1. Use confirmed purchase/shared roles including the same `document_adjustment`; no dedicated purchase-return role without approval; never repurpose `5180`.
+Starts only after GATE-ACC-RET-1. Use confirmed purchase/shared roles including `document_adjustment`; no dedicated purchase-return role without approval; never repurpose `5180`.
 
 ### ACC-5 — Inventory / COGS Routing
-Use confirmed inventory roles; preserve product COGS override; three `5180`-backed roles may share legacy fallback; no free-text inference; preserve branch dimensions. `opening_balances` inclusion waits for placement decision.
+Use confirmed inventory roles; preserve product COGS override; preserve branch dimensions and stock/GL invariants.
 
-### ACC-6 — Accounting Period Lock
-Branch decision first; central server guard; Web/API/POS/import coverage; explicit reversal and concurrency tests.
+### ACC-6 — Accounting Period Lock Design + Implementation
+Only after branch/enforcement/reversal decisions.
 
 ### Fiscal Periods / Closing
-Dedicated design/audit first, then split implementation into small PRs.
+Separate audit/design first, then implementation PRs. Not ready for implementation.
 
-## 19. Mandatory Routing Test Invariants
-1. No mapping -> legacy-equivalent posting.
-2. Valid mapping -> new posting uses mapped account.
-3. Cross-tenant mapping -> rejected.
-4. Explicit disabled/invalid mapping -> posting blocked.
-5. Mapping change -> historical account IDs unchanged.
-6. Existing product sales override still wins.
-7. Existing product COGS override still wins.
-8. Ledger invariants unchanged.
-9. Tenant isolation.
-10. Payment counterparty routing never bypasses CashBankAccount selection/permissions.
-11. Cash/Bank transfer still uses concrete source/destination accounts.
-12. Sales positive/negative `document_adjustment` preserves existing credit/debit direction and remains non-taxable.
-13. Purchase positive/negative `document_adjustment` preserves existing debit/credit direction and current VAT treatment.
-14. Routing `document_adjustment` does not add cost-center tagging that does not exist today.
-15. Stocktake shortage/surplus preserve direction.
-16. Stock-permit receipt/issue preserve direction.
-17. Non-saleable sales return uses damage/loss role, not count variance.
-18. Inventory opening preserves branch-specific lines and balance.
-19. Same-branch inventory transfer still has no journal; cross-branch transfer uses inventory asset both sides with correct branches.
-20. Supplier Refund gate proves no new Purchase Return silently posts to legacy cash `1110` and historical returns remain unchanged.
-21. Branch isolation once branch-specific routing is approved.
+## 19. Decisions Log
+- DEC-ACC-001: Semantic roles, not codes, are the stable identity.
+- DEC-ACC-002: Role catalog is static code; mappings are relational tenant data.
+- DEC-ACC-003: Explicit invalid mapping blocks posting; no silent fallback.
+- DEC-ACC-004: Legacy fallback is transitional and prospective only.
+- DEC-ACC-005: LedgerService remains semantic-role agnostic.
+- DEC-ACC-006: Fiscal close requires separate design before code.
+- DEC-ACC-007: Routing/locks/fiscal branch policies are independent decisions.
+- DEC-ACC-008: Product sales/COGS overrides remain higher precedence in V1.
+- DEC-ACC-009: Purchase returns do not get a dedicated role merely by analogy.
+- DEC-ACC-010: `5180` is not purchase returns.
+- DEC-ACC-011: `5180` is decomposed by business cause into count variance, manual adjustment and damage/loss roles.
+- DEC-ACC-012: Do not split stock variance gain/loss merely by sign in V1.
+- DEC-ACC-013: Free-text Stock Permit reason cannot drive accounting routing.
+- DEC-ACC-014: Cross-branch inventory transfer currently needs no clearing role.
+- DEC-ACC-015: `opening_balances` is semantically confirmed; settings placement remains under review.
+- DEC-ACC-016: Cash/Bank accounts are resolved by CashBankAccount domain, not generic Accounting Roles.
+- DEC-ACC-017: Payment Methods are not Account Routing roles.
+- DEC-ACC-018: Domain-specific financial resolvers with policy/permission checks take precedence over generic role resolver.
+- DEC-ACC-019: Cash/Bank transfers require no semantic transfer-clearing role today.
+- DEC-ACC-020: Purchase Return and Supplier Refund are distinct target operations; current direct `1110` cash return path is a financial-design gate.
+- DEC-ACC-021: Do not overload existing `Payment.direction` for Supplier Refund; design a dedicated refund domain before ACC-4.
+- DEC-ACC-022: Legacy `5170` is one shared `document_adjustment` role for the current sales/purchase header-adjustment concept.
+- DEC-ACC-023: Do not create separate sales/purchase adjustment roles in V1 without a future proven accounting distinction.
+- DEC-ACC-024: Account Routing must preserve current adjustment tax/cost-center behavior; it changes account resolution only.
+- DEC-ACC-025: Accounting Settings uses dedicated `accounting_settings.view/manage` permissions; owner/admin via wildcard, accountant/staff not granted by default.
+- DEC-ACC-026: `/accounting-settings` is a permission-gated leaf under the Accounting sidebar group; Finance Settings is a UI precedent, not its parent.
+- DEC-ACC-027: V1 role mappings are CompanyWide tenant data with unique `(tenant_id, role_key)` and no branch dimension.
+- DEC-ACC-028: Mapping reset means unmapped/system-default state, never “disable accounting”.
+- DEC-ACC-029: ACC-2 introduces a dedicated narrow mapping audit trail rather than a generic cross-domain audit framework.
+- DEC-ACC-030: ACC-2 has zero posting consumers; first behavior-changing account-routing adoption begins in ACC-3.
 
-Financial/security tests must never be weakened.
+## 20. Immediate Next Step
+**ACC-1 is now architecture-ready.** Prepare a focused implementation task for ACC-1 only: RBAC permissions, `/accounting-settings` hub, Accounting sidebar leaf, i18n, visibility/access tests and web build. No schema, resolver, posting, fiscal or financial behavior changes.
 
-## 20. Decisions Log
-- **DEC-ACC-001 ACCEPTED:** semantic roles, not account codes.
-- **DEC-ACC-002 ACCEPTED:** static catalog + relational mappings.
-- **DEC-ACC-003 ACCEPTED:** legacy fallback only when mapping absent; invalid explicit mapping blocks.
-- **DEC-ACC-004 ACCEPTED:** routing changes prospective; history frozen.
-- **DEC-ACC-005 ACCEPTED:** preserve existing product sales/COGS overrides.
-- **DEC-ACC-006 ACCEPTED:** `5180` is not Purchase Returns.
-- **DEC-ACC-007 ACCEPTED:** no dedicated Purchase Returns role by imitation.
-- **DEC-ACC-008 ACCEPTED:** fiscal close and transaction lock are separate.
-- **DEC-ACC-009 ACCEPTED:** branch semantics are explicit per domain.
-- **DEC-ACC-010 ACCEPTED:** General Settings exposes only real backend behavior.
-- **DEC-ACC-011 ACCEPTED:** decompose overloaded `5180` into count variance, manual adjustment, and damage/non-saleable loss.
-- **DEC-ACC-012 ACCEPTED:** do not split inventory variance gain/loss by sign in V1.
-- **DEC-ACC-013 ACCEPTED:** Stock Permit free text cannot select accounting roles.
-- **DEC-ACC-014 ACCEPTED:** no inventory transfer-clearing role proven necessary.
-- **DEC-ACC-015 ACCEPTED:** opening balances are not inventory variance; final domain placement remains open.
-- **DEC-ACC-016 ACCEPTED:** CashBankAccount is source of truth for cash/bank ledger accounts.
-- **DEC-ACC-017 ACCEPTED:** Payment methods are not Account Routing roles.
-- **DEC-ACC-018 ACCEPTED:** domain-specific financial resolver wins when it enforces additional permissions/policies.
-- **DEC-ACC-019 ACCEPTED:** no Cash/Bank transfer-clearing role required by current architecture.
-- **DEC-ACC-020 ACCEPTED:** Purchase Return and Supplier Refund are distinct target operations; do not overload current Payment direction.
-- **DEC-ACC-021 ACCEPTED:** Supplier Refund is a financial behavior gate before Purchase Return routing.
-- **DEC-ACC-022 ACCEPTED:** legacy `5170` resolves to one shared `document_adjustment` semantic role in V1, not separate sales/purchase roles.
-- **DEC-ACC-023 ACCEPTED:** `document_adjustment` is limited to the signed document-header reconciliation concept; it is not a generic miscellaneous-adjustment account.
-- **DEC-ACC-024 ACCEPTED:** routing `5170` must preserve current tax and cost-center behavior; account resolution alone must not alter those dimensions.
-
-## 21. Open Decisions / Do Not Implement Yet
-- exact Supplier Refund model/API/UI/allocation and cutover under GATE-ACC-RET-1;
-- final domain placement of `opening_balances`;
-- structured Stock Permit reason/category accounting model;
-- separate variance gain/loss mappings;
-- branch-specific routing policy;
-- period-lock branch policy;
-- fiscal-period branch policy;
-- fiscal close mechanics;
-- generic product/category routing beyond current overrides;
-- independent Purchase Returns contra account;
-- multi-currency.
-
-## 22. Immediate Next Step
-The core V1 semantic role catalog is now sufficiently resolved for foundation planning. Before implementation, perform a narrow **ACC-1 / ACC-2 readiness pass** against the current repository conventions: permissions/RBAC naming, settings-hub navigation pattern, migration/model tenant-isolation conventions, audit-log precedent, and tests required for a no-behavior-change mapping foundation. Then prepare the implementation task without merging or deploying anything.
+After ACC-1 is reviewed/merged only with explicit approval, prepare ACC-2 as a separate implementation task using §17 contracts.
