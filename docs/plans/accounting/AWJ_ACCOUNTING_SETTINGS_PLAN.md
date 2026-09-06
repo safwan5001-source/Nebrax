@@ -6,576 +6,220 @@
 **Scope:** Architecture and phased implementation plan only.  
 **Safety:** No merge, deploy, schema change, or accounting behavior change is authorized by this document.
 
----
-
 ## 1. Purpose
-
-This document is the authoritative living plan for building **إعدادات الحسابات / Accounting Settings** in AWJ ERP.
-
-It converts the repository audit, direct code inspection, and Daftra functional-reference review into explicit AWJ decisions. It is not a copy of Daftra and it is not an implementation report.
-
-Priorities, in order:
-
-1. Accounting correctness and historical ledger integrity.
-2. Tenant isolation and explicit branch semantics.
-3. Backward compatibility.
-4. Server-side enforcement for financial controls.
-5. Small independently reviewable PRs.
-6. AWJ-native dense accounting UX.
-
-`LedgerService::post()` remains the exclusive posting primitive. Posted journal history must never be silently rewritten by settings changes.
-
----
+This is the authoritative living plan for **إعدادات الحسابات / Accounting Settings** in AWJ ERP. Priorities: accounting correctness, historical integrity, tenant isolation, explicit branch semantics, backward compatibility, server-side controls, and small reviewable PRs. `LedgerService::post()` remains the exclusive posting primitive.
 
 ## 2. Evidence Base
+The read-only AWJ audit established centralized posting/reversal, hardcoded `ACC_*` resolution, absence of semantic routing/fiscal periods/period locks, real but asymmetric cost-center support, scalar tenant Settings infrastructure, and concrete historical `journal_lines.account_id` snapshots. Daftra is a functional benchmark only; AWJ does not copy behavior that conflicts with its perpetual-inventory or ledger design.
 
-### 2.1 AWJ repository audit
+## 3. Target Workspace — V1
+1. General Accounting Settings
+2. Account Routing
+3. Fiscal Periods
+4. Accounting Period Locks
+5. Cost Centers
 
-The read-only architecture audit established that:
+Deferred: journal/asset custom fields, physical asset locations/stores, multi-currency/exchange rates, generic cross-domain audit framework. Warehouses remain under Products & Inventory. General Settings exposes only policies genuinely enforced by backend behavior.
 
-- Posting is centralized through `LedgerService::post()` and correction through `LedgerService::reverse()`.
-- Current posting services resolve accounts primarily through local hardcoded `ACC_*` account-code constants.
-- There is no semantic account-routing subsystem today.
-- There is no fiscal-year/fiscal-period domain today.
-- There is no accounting-period-lock domain today.
-- Cost centers are implemented, including invoice line allocations, but purchase/inventory allocation capabilities are asymmetric.
-- `App\Support\Settings` is suitable for scalar tenant policy flags, not relational accounting configuration.
-- Posted journal lines already store concrete `account_id` values, providing the correct historical-freeze behavior.
+## 4. Account Routing Architecture Contract
+- Semantic role is the accounting identity; chart codes are legacy defaults.
+- Static role catalog in code; no tenant `accounting_roles` table.
+- Tenant selections are relational mappings: `Tenant + Role Key -> Account ID`.
+- No mapping -> legacy resolution for backward compatibility.
+- Valid explicit mapping -> mapped account for new postings.
+- Explicit invalid/cross-tenant/missing/disabled mapping -> **BLOCK POSTING**, no silent fallback.
+- Historical posted journals never re-resolve; stored `journal_lines.account_id` remains authoritative.
+- Legacy fallback is a migration bridge, not permanent target architecture.
+- No global "disable accounting" switch.
+- `LedgerService` receives resolved account IDs and remains unaware of business-role semantics.
 
-### 2.2 Daftra reference review
-
-Daftra is used only as a functional benchmark. Useful reference concepts include:
-
-- separation of fiscal-period close from transaction-date locks;
-- configurable account routing;
-- per-line account/cost-center capabilities;
-- prospective routing changes that do not rewrite historical postings;
-- fiscal periods and closed intervals as distinct concepts.
-
-AWJ must not copy Daftra behavior where it conflicts with AWJ's ledger architecture, perpetual-inventory design, security model, or accounting invariants.
-
----
-
-## 3. Target Accounting Settings Workspace — V1
-
-The initial workspace is limited to:
-
-1. **الإعدادات العامة — General Accounting Settings**
-2. **توجيه الحسابات — Account Routing**
-3. **الفترات المالية — Fiscal Periods**
-4. **قفل الفترات — Accounting Period Locks**
-5. **مراكز التكلفة — Cost Centers**
-
-Deferred from V1:
-
-- Journal custom fields.
-- Asset custom fields.
-- Physical asset locations/stores.
-- Multi-currency/exchange-rate implementation.
-- Generic cross-domain audit framework.
-- Inventory warehouses inside Accounting Settings; warehouses remain under Products & Inventory.
-
-The General page must expose only policies the backend genuinely enforces. No decorative or non-functional toggles.
-
----
-
-## 4. Account Routing Architecture Contract — V1
-
-### 4.1 Semantic role is the accounting identity
-
-Application code must move toward semantic roles such as `sales_revenue` and `inventory_asset`, not account codes such as `4110` or `1140` as permanent application identities.
-
-### 4.2 Static catalog + relational mapping
-
-Accounting roles are a static code catalog, conceptually similar to `ApplicationCatalog`.
-
-There is **no `accounting_roles` tenant table** in V1.
-
-Tenant choices belong in a relational mapping table conceptually shaped as:
-
-`Tenant + Role Key -> Account ID`
-
-Branch semantics are not assumed by this line and must be decided separately before branch overrides are implemented.
-
-### 4.3 Transitional resolution rules
-
-For an existing tenant during migration:
-
-1. **No explicit mapping exists** -> use the existing legacy resolution/default to preserve backward compatibility.
-2. **A valid explicit mapping exists** -> use the mapped account for new postings.
-3. **An explicit mapping exists but is invalid, cross-tenant, missing, or disabled** -> **BLOCK POSTING** with a clear accounting-configuration error. Do not silently fall back.
-4. **Historical posted journal** -> never re-resolve; stored `journal_lines.account_id` remains authoritative.
-
-Legacy fallback is a migration bridge, not the desired permanent architecture. New tenants should eventually receive explicit default mappings as part of provisioning/setup.
-
-### 4.4 Historical integrity
-
-Changing account routing is prospective only.
-
-`routing change -> future postings`
-
-It must never imply:
-
-`routing change -> rewrite historical journal lines`
-
-Correction of historical accounting must use explicit accounting correction/reversal flows, not silent settings-driven mutation.
-
-### 4.5 Required/optional roles
-
-AWJ must not introduce a global "no accounting" switch copied from another ERP.
-
-If a role can legitimately be optional, that must be defined per role/flow. Accounting-impacting posted documents remain subject to AWJ ledger invariants.
-
-### 4.6 Ledger boundary
-
-`LedgerService` should receive already-resolved account IDs. It should not become aware of sales/purchase/inventory role semantics.
-
-Conceptually:
-
-`Business posting rule -> Account Routing resolution -> Account ID -> LedgerService::post()`
-
----
-
-## 5. Confirmed Sales Routing Contract
-
-Direct inspection of `InvoiceService` and `InventoryService` confirms the following current meanings.
-
-### 5.1 Confirmed semantic roles
-
-| Role key | UI meaning | Current legacy account | Status |
+## 5. Sales Routing Contract
+| Role | Meaning | Legacy | Status |
 |---|---|---:|---|
-| `accounts_receivable` | حساب العملاء / الذمم المدينة | `1130` | CONFIRMED |
+| `accounts_receivable` | الذمم المدينة | `1130` | CONFIRMED |
 | `sales_revenue` | إيرادات المبيعات | `4110` | CONFIRMED |
 | `sales_shipping_revenue` | إيرادات الشحن | `4130` | CONFIRMED |
-| `sales_adjustment` | فروق وتسويات المبيعات | `5170` | UNDER_REVIEW — shared-code semantics need full audit |
-| `tax_output` | ضريبة القيمة المضافة — المخرجات | `2120` | CONFIRMED |
-| `cogs` | تكلفة البضاعة المباعة | `5110` | CONFIRMED; classified under Inventory Accounting |
-| `inventory_asset` | المخزون | `1140` | CONFIRMED; classified under Inventory Accounting |
+| `sales_adjustment` | فروق وتسويات المبيعات | `5170` | UNDER_REVIEW |
+| `tax_output` | ضريبة المخرجات | `2120` | CONFIRMED |
+| `cogs` | تكلفة البضاعة المباعة | `5110` | CONFIRMED / Inventory |
+| `inventory_asset` | المخزون | `1140` | CONFIRMED / Inventory |
 
-### 5.2 Existing product override must be preserved
+Preserve existing precedence:
+- `Product sales_account_id -> tenant sales_revenue mapping -> legacy 4110`
+- `Product cogs_account_id -> tenant cogs mapping -> legacy 5110`
 
-AWJ already supports `products.sales_account_id`.
+Cash/bank is not yet a confirmed Sales role. `tax_output` is a shared Tax role.
 
-Therefore the transitional sales-revenue precedence is:
+## 6. Purchase Routing Contract
+Current purchase posting: tracked goods debit `1140`; non-inventory lines debit `5150`; input VAT debits `1150`; payable credits `2110` even for cash purchases; payment is separate via `PaymentService`. Purchase discount/inbound shipping modify inventory/expense cost rather than posting independently. Adjustment uses `5170`.
 
-`Product sales_account_id override -> explicit tenant sales_revenue mapping -> legacy 4110`
-
-A configured-but-invalid mapping is not equivalent to an absent mapping and must block posting.
-
-### 5.3 COGS override must be preserved
-
-AWJ already supports `products.cogs_account_id`.
-
-Transitional precedence:
-
-`Product cogs_account_id override -> explicit tenant cogs mapping -> legacy 5110`
-
-### 5.4 Cash/bank is not yet a confirmed Sales role
-
-Do not introduce `sales_cash` merely because invoice posting currently references `1110` in some paths. Payment and cash/bank resolution already have separate behavior through `PaymentService` / cash-bank accounts.
-
-Cash/bank routing requires a dedicated flow audit before role design.
-
-### 5.5 VAT classification
-
-`tax_output` is a shared tax role, not a sales-specific identity such as `sales_vat`.
-
----
-
-## 6. Confirmed Purchase Routing Contract
-
-Direct inspection of `PurchaseService` confirms:
-
-- tracked inventory purchases debit inventory (`1140`);
-- non-inventory purchase lines debit general purchase/expense (`5150`);
-- input VAT debits `1150`;
-- payable credits `2110` for the purchase document, including cash purchases;
-- immediate/partial payment is a separate `PaymentService` disbursement;
-- purchase discount and inbound shipping currently modify inventory/expense cost rather than posting to independent discount/shipping accounts;
-- adjustment currently uses `5170`.
-
-### 6.1 Confirmed/under-review roles
-
-| Role key | UI meaning | Current legacy account | Status |
+| Role | Meaning | Legacy | Status |
 |---|---|---:|---|
-| `accounts_payable` | حساب الموردين / الذمم الدائنة | `2110` | CONFIRMED |
-| `inventory_asset` | حساب المخزون | `1140` | CONFIRMED |
+| `accounts_payable` | الذمم الدائنة | `2110` | CONFIRMED |
+| `inventory_asset` | المخزون | `1140` | CONFIRMED |
 | `purchase_expense` | مصروف البنود غير المخزنية | `5150` | CONFIRMED |
-| `tax_input` | ضريبة القيمة المضافة — المدخلات | `1150` | CONFIRMED |
-| `purchase_adjustment` | فروق وتسويات المشتريات | `5170` | UNDER_REVIEW — determine whether role should be shared or flow-specific |
+| `tax_input` | ضريبة المدخلات | `1150` | CONFIRMED |
+| `purchase_adjustment` | فروق وتسويات المشتريات | `5170` | UNDER_REVIEW |
 
-Do not create `purchase_shipping` or `purchase_discount` roles in V1 unless later code/accounting requirements prove they need independent posting identities.
+Do not invent independent purchase shipping/discount roles without a proven accounting need.
 
----
+## 7. Purchase Returns
+Current purchase return reverses original categories: debit payable (`2110`) for credit return or cash (`1110`) for cash return; credit inventory (`1140`), expense (`5150`), input VAT (`1150`) as applicable.
 
-## 7. Purchase Returns — Confirmed Findings
+**`5180` is NOT Purchase Returns.** Current evidence identifies it with inventory variance/damage/adjustment semantics.
 
-### 7.1 Current behavior
+No dedicated `purchase_returns` role is approved merely by imitation of another ERP. AWJ's perpetual-inventory return currently reverses inventory/expense/input VAT directly.
 
-`ReturnService::postPurchaseReturn()` currently reverses the original purchase categories directly:
+**ACCOUNTING_REVIEW_REQUIRED:** purchase posting separates supplier liability from settlement, while a cash purchase return debits cash directly. Before routing this path, determine whether `payment_type=cash` guarantees actual supplier refund at posting time or whether refund/settlement must remain separate. No behavior change is authorized yet.
 
-- debit payable (`2110`) for credit return, or cash (`1110`) for cash return;
-- credit inventory (`1140`) for tracked goods;
-- credit expense (`5150`) for non-inventory lines;
-- credit input VAT (`1150`);
-- tracked goods are issued from inventory.
+## 8. Inventory Routing Contract — CONFIRMED 2026-09-06
+Direct inspection of `InventoryService`, `InventoryOpeningService`, `StocktakeService`, `StockPermitService`, and sales-return inventory behavior establishes:
 
-### 7.2 `5180` is NOT the Purchase Returns account
+### 8.1 Inventory asset
+`1140` is the inventory control account across purchases, purchase returns, sale COGS, sales returns, stocktakes, stock permits, transfers, and openings. It is one shared semantic role: `inventory_asset`.
 
-This is a critical confirmed correction.
+### 8.2 COGS
+`cogs` is a shared Inventory Accounting role. Preserve `Product cogs_account_id -> tenant cogs mapping -> legacy 5110`.
 
-In the inspected current code, `5180` is defined/used as an inventory damage/variance-type account, including sales-return goods that do not return to saleable inventory and other inventory variance contexts.
+### 8.3 Opening balances are not variance
+`InventoryOpeningService` treats opening inventory as the point of origin for perpetual inventory and refuses products with prior stock movements. It posts `Dr inventory_asset (1140) / Cr opening_balances (3130)`.
 
-Therefore:
+`opening_balances` (`3130`) is a confirmed semantic meaning, but final UI/domain placement is UNDER_REVIEW because opening balances are broader than inventory and may belong to company opening/fiscal setup.
 
-> **Do not use or document `5180` as the semantic Purchase Returns account.**
+### 8.4 `5180` is overloaded
+`StocktakeService` uses `5180` for both physical count shortage and surplus. `StockPermitService` uses it for manual receipt/found goods/correction increase and manual issue including damage, internal consumption, and samples. Non-saleable sales returns also use `5180` as a damage/loss path.
 
-Any prior implementation proposal that reused `5180` for Purchase Returns must be re-evaluated against the current code and accounting design before merge.
+Therefore current `5180` conflates at least three semantic families:
+1. `inventory_count_variance` — physical stocktake differences.
+2. `inventory_manual_adjustment` — generic manual stock receipt/issue counterpart.
+3. `inventory_damage_loss` — explicitly damaged/non-saleable goods.
 
-### 7.3 No `purchase_returns` role in V1 by default
+These roles may initially share legacy fallback `5180` while becoming independently mappable.
 
-AWJ currently uses perpetual-inventory reversal semantics. A tracked-goods purchase return credits the same inventory asset that the purchase debited.
+### 8.5 Do not split gain/loss merely by journal sign
+Stocktake surplus and shortage are opposite signs of the same business cause: physical count variance. V1 models the cause first. Separate gain/loss mappings are DEFERRED until a real accounting/reporting requirement proves them necessary.
 
-A dedicated contra-purchase `purchase_returns` role must not be introduced merely because another ERP exposes one. It requires an explicit accounting use case/design decision (for example a different inventory accounting model or reporting requirement).
+### 8.6 Stock Permit free text cannot select accounting semantics
+Current Stock Permit `reason` is not a structured accounting classification. Do not infer damage/internal consumption/samples accounts from free text. Generic receipt/issue remains `inventory_manual_adjustment` until a validated structured reason/category is designed.
 
-### 7.4 Accounting Review Flag — cash purchase return
+### 8.7 Non-saleable sales returns
+Returned goods that do not re-enter saleable inventory are a legitimate consumer of `inventory_damage_loss`, not `inventory_count_variance`.
 
-Current purchase posting always credits Accounts Payable and treats payment as a separate settlement document. However, a purchase return with `payment_type=cash` currently debits cash directly.
+### 8.8 Transfers
+Same-branch warehouse transfer creates no GL entry. Cross-branch transfer posts `Dr inventory_asset` at destination / `Cr inventory_asset` at source using the same account with different branch dimensions. No transfer-clearing role is proven necessary today.
 
-This may conflate:
+### 8.9 Branch dimensions
+Inventory openings can contain warehouses from multiple branches and emit paired inventory/opening lines per branch. Cross-branch transfers also depend on branch-tagged journal lines. This does not approve branch-specific mappings, but ACC-5 must preserve existing branch dimensions exactly.
 
-`Purchase Return`
+### 8.10 Inventory role set
+| Role | Meaning | Legacy | Status |
+|---|---|---:|---|
+| `inventory_asset` | حساب مراقبة المخزون | `1140` | CONFIRMED |
+| `cogs` | تكلفة البضاعة المباعة | `5110` | CONFIRMED |
+| `opening_balances` | مقابل الأرصدة الافتتاحية | `3130` | CONFIRMED meaning / placement UNDER_REVIEW |
+| `inventory_count_variance` | فروق الجرد الفعلي | `5180` | CONFIRMED concept |
+| `inventory_manual_adjustment` | مقابل الإضافة/الصرف اليدوي | `5180` | CONFIRMED concept |
+| `inventory_damage_loss` | تلف/مرتجع غير قابل للبيع | `5180` | CONFIRMED concept |
 
-with
+## 9. Current Role Catalog
+**Confirmed:** `accounts_receivable`, `accounts_payable`, `sales_revenue`, `sales_shipping_revenue`, `inventory_asset`, `cogs`, `purchase_expense`, `tax_output`, `tax_input`, `inventory_count_variance`, `inventory_manual_adjustment`, `inventory_damage_loss`.
 
-`Supplier Refund / Settlement`.
+**Confirmed meaning / placement under review:** `opening_balances`.
 
-**Status: ACCOUNTING_REVIEW_REQUIRED.**
+**Under review:** `sales_adjustment`, `purchase_adjustment`, cash/bank roles and relationship to `CashBankAccount`.
 
-Do not alter behavior yet. Before purchase-return routing is implemented, determine whether a cash purchase return semantically guarantees that cash was actually received at posting time, or whether supplier refund/settlement must remain a separate operation consistent with purchase settlement architecture.
+**Deferred/not approved:** independent `purchase_returns`; separate variance gain/loss without proven need; inventory transfer clearing; generic product/category precedence beyond existing overrides; branch-specific role mappings; fiscal-close roles until fiscal design.
 
----
-
-## 8. Role Catalog — Current Working Set
-
-The catalog must grow only from proven posting needs.
-
-### Confirmed
-
-- `accounts_receivable`
-- `accounts_payable`
-- `sales_revenue`
-- `sales_shipping_revenue`
-- `inventory_asset`
-- `cogs`
-- `purchase_expense`
-- `tax_output`
-- `tax_input`
-
-### Under review
-
-- `sales_adjustment`
-- `purchase_adjustment`
-- inventory variance/loss/damage role split
-- cash/bank roles and their relationship to `CashBankAccount`
-- opening-balance roles
-
-### Deferred / not approved
-
-- `purchase_returns` as an independent contra-purchase role
-- generic product/category routing precedence beyond existing product overrides
-- branch-specific role mappings
-- fiscal-close roles such as `retained_earnings` until fiscal-close design is completed
-
-A role represents accounting meaning, not a module. `inventory_asset`, for example, may be consumed by purchases, purchase returns, COGS flows, sales returns, openings, stocktakes, and stock movements without becoming multiple module-specific roles.
-
----
-
-## 9. Inventory Routing — NEXT / UNDER REVIEW
-
-The next code-audit slice must inspect at minimum:
-
-- `InventoryService`
-- `InventoryOpeningService`
-- `StocktakeService`
-- `StockPermitService`
-- relevant sales-return inventory behavior
-
-It must determine whether the current use of account `5180` conflates distinct semantic meanings that should be separately configurable:
-
-- inventory variance gain;
-- inventory variance loss;
-- damage/write-off;
-- non-saleable returned goods;
-- other inventory adjustments.
-
-It must also confirm the semantic role of opening-balance account `3130` and whether that role belongs to inventory routing or a broader opening-balances/fiscal domain.
-
-No inventory-routing implementation begins until this section is resolved and updated.
-
----
-
-## 10. General Accounting Settings
-
-V1 must be intentionally smaller than Daftra where AWJ lacks corresponding backend behavior.
-
-Do not expose:
-
-- exchange-rate controls before real multi-currency exists;
-- tax-on-journal-line controls when AWJ's VAT model is separate VAT posting lines;
-- per-line account toggles before the corresponding posting flow supports them end-to-end;
-- any switch whose server-side behavior is absent.
-
-Cost-center policies may be surfaced only to the extent supported by the current CostCenter/journal/allocation implementation.
-
----
+## 10. General Settings
+No exchange-rate controls before multi-currency exists; no tax-on-journal-line controls when VAT is posted as separate lines; no per-line account toggles before end-to-end support; no non-functional switches.
 
 ## 11. Cost Centers
-
-Reuse existing implementation. Do not rebuild Cost Centers as part of Accounting Settings.
-
-Current state:
-
-- CostCenter entity exists.
-- `journal_lines.cost_center_id` exists.
-- purchases have header-level cost center.
-- invoice line percentage/amount/basis-point allocations exist.
-- purchase line allocation is not equivalent to the invoice implementation today.
-- inventory line allocation is absent.
-
-The Accounting Settings workspace may link to existing Cost Center management. Purchase-line allocation, if approved, is a separate functional PR rather than a prerequisite for the settings hub.
-
----
+Reuse existing implementation. Settings may link to `/cost-centers`. Purchase-line allocation remains a separate optional functional PR.
 
 ## 12. Accounting Period Locks
-
-Confirmed absent in current AWJ.
-
-Required architectural principles:
-
-- server-side enforcement;
-- UI is never the security/accounting boundary;
-- effective accounting date is checked for every relevant financial mutation path;
-- API/POS/import paths cannot bypass the lock;
-- reversal/correction semantics must be explicit;
-- original historical date being locked must not necessarily prevent a correcting reversal posted to a valid unlocked date.
-
-### Branch semantics
-
-**UNRESOLVED.**
-
-Do not assume tenant-wide or branch-specific locks merely for implementation convenience. Decide from AWJ accounting requirements and branch architecture before schema design.
-
----
+Confirmed absent. Enforcement must be server-side and cover API/POS/import paths. Reversal semantics must be explicit. **Branch semantics UNRESOLVED.**
 
 ## 13. Fiscal Periods and Closing
+Confirmed absent and distinct from date locks. A separate accounting design/audit is required before implementation, including year/sub-period model, P&L close, retained earnings, opening next period/year, generated journals, reopen/re-close, lock interaction, branch semantics, audit, concurrency and idempotency. **Branch semantics UNRESOLVED.**
 
-Confirmed absent in current AWJ.
-
-Fiscal Period Close and Accounting Period Lock are distinct domains.
-
-Do not implement fiscal closing from a simplified formula in the architecture audit. A separate accounting design/audit is required before implementation, covering at minimum:
-
-- fiscal year vs fiscal sub-periods;
-- P&L closing mechanism;
-- whether an income-summary intermediary is used;
-- retained earnings;
-- opening balances for the next period/year;
-- generated closing journal structure;
-- reopen by reversal/correction;
-- re-close after changes;
-- interaction with period locks;
-- branch semantics;
-- audit trail and concurrency/idempotency.
-
-### Branch semantics
-
-**UNRESOLVED.**
-
-Fiscal periods must not be declared `CompanyWide` solely because that is simpler to implement.
-
----
-
-## 14. Account Routing Branch Semantics
-
-**UNRESOLVED for V1.**
-
-Tenant-default routing is the initial conceptual baseline, but whether branch overrides are required must be decided independently from fiscal-period and lock branch semantics.
-
-Do not assume all three domains share the same branch policy.
-
----
+## 14. Routing Branch Semantics
+**UNRESOLVED for V1.** Routing, locks, and fiscal periods each require an independent branch-policy decision.
 
 ## 15. Audit and Permissions
-
-Accounting-settings changes that can affect future financial postings require explicit permissions and an audit trail.
-
-Initial permission direction:
-
-- `accounting_settings.view`
-- `accounting_settings.manage`
-
-Exact naming must be checked against repository RBAC conventions during implementation.
-
-Audit-worthy operations include at minimum:
-
-- account-routing mapping create/change/remove;
-- period-lock create/remove;
-- fiscal close/reopen;
-- future high-impact accounting policy changes.
-
-A generic cross-domain audit framework is not a prerequisite. Follow existing domain event/audit patterns unless a separate generic-audit initiative is approved.
-
----
+Initial direction: `accounting_settings.view` / `accounting_settings.manage`, subject to repository convention check. Audit mapping changes, period-lock changes, fiscal close/reopen, and future high-impact accounting policy changes.
 
 ## 16. Updated PR Sequence
-
-No PR below is authorized for merge/deploy merely by appearing in this plan.
-
 ### ACC-1 — Accounting Settings Foundation + Workspace + RBAC
+Hub/sidebar/real permissions; no accounting behavior change.
 
-- `/accounting-settings` hub.
-- accounting sidebar leaf.
-- real permissions from the start; no temporary permission model.
-- cards only for real/planned capabilities.
-- Cost Centers can link to the existing page.
-- no accounting behavior change.
+### ACC-2 — Semantic Roles + Mapping Foundation
+Static catalog; relational tenant mappings; resolver; validation; tenant protection; mapping audit; no posting consumer yet; invalid explicit mapping fails closed.
 
-### ACC-2 — Semantic Accounting Roles + Mapping Foundation
-
-- static role catalog;
-- relational tenant mapping table;
-- resolver;
-- validation and cross-tenant protection;
-- audit trail for mapping changes;
-- no posting flow consumes the resolver yet;
-- define invalid-mapping fail-closed behavior.
-
-### ACC-3 — Sales Routing Vertical Slice
-
-- consume confirmed sales roles only;
-- preserve `products.sales_account_id` precedence;
-- preserve historical journals;
-- no-mapping tenants must produce legacy-equivalent journals.
+### ACC-3 — Sales Routing
+Confirmed roles only; preserve product sales override; historical journals unchanged; unmapped tenants legacy-equivalent.
 
 ### ACC-4 — Purchases + Purchase Returns Routing
-
-- consume confirmed purchase/shared roles;
-- resolve the cash-purchase-return accounting review flag before implementation;
-- do not introduce a dedicated `purchase_returns` role without explicit approval;
-- do not repurpose `5180`.
+Confirmed purchase/shared roles; resolve cash-return review first; no dedicated purchase-return role without approval; never repurpose `5180`.
 
 ### ACC-5 — Inventory / COGS Routing
+Use `inventory_asset`, `cogs`, `inventory_count_variance`, `inventory_manual_adjustment`, `inventory_damage_loss`; preserve product COGS override; three 5180-backed roles may share legacy fallback; no free-text inference; preserve branch dimensions. `opening_balances` inclusion waits for placement decision.
 
-- implement only after §9 is completed;
-- determine variance/damage role split first;
-- preserve `products.cogs_account_id` precedence.
-
-### ACC-6 — Accounting Period Lock — Design + Implementation
-
-- complete branch-semantics decision first;
-- central server-side guard;
-- comprehensive Web/API/POS/import coverage;
-- explicit reversal behavior;
-- concurrency tests.
+### ACC-6 — Accounting Period Lock
+Branch decision first; central server guard; Web/API/POS/import coverage; explicit reversal and concurrency tests.
 
 ### Fiscal Periods / Closing
+Dedicated design/audit first, then split implementation into small PRs.
 
-Not yet assigned a single implementation PR. First produce a dedicated accounting design/audit, then split implementation into small PRs (CRUD/domain foundation, close, reopen, integration) as justified by that design.
-
-### Optional later work
-
-- purchase-line cost-center allocation;
-- custom journal fields;
-- asset settings;
-- multi-currency;
-- branch-specific account-routing overrides if approved.
-
----
-
-## 17. Mandatory Test Invariants for Routing
-
-When routing implementation starts, tests must explicitly cover:
-
+## 17. Mandatory Routing Test Invariants
 1. No mapping -> legacy-equivalent posting.
-2. Valid explicit mapping -> new posting uses mapped account.
-3. Explicit mapping to cross-tenant account -> rejected.
-4. Explicit mapping to disabled/invalid account -> posting blocked; no silent fallback.
-5. Mapping changed after posting -> historical journal account IDs unchanged.
-6. Existing product sales-account override still wins where currently supported.
-7. Existing product COGS override still wins where currently supported.
-8. Ledger remains balanced and `LedgerService` invariants remain unchanged.
+2. Valid mapping -> new posting uses mapped account.
+3. Cross-tenant mapping -> rejected.
+4. Explicit disabled/invalid mapping -> posting blocked.
+5. Mapping change -> historical account IDs unchanged.
+6. Existing product sales override still wins.
+7. Existing product COGS override still wins.
+8. Ledger invariants unchanged.
 9. Tenant isolation.
-10. Branch isolation/semantics once branch routing is approved.
+10. Stocktake shortage/surplus preserve debit/credit direction.
+11. Stock-permit receipt/issue preserve direction.
+12. Non-saleable sales return uses damage/loss role, not count variance.
+13. Inventory opening preserves branch-specific lines and balance.
+14. Same-branch transfer still has no journal; cross-branch transfer uses inventory asset both sides with correct branches.
+15. Branch isolation once branch-specific routing is approved.
 
-Financial/security tests must never be weakened to make a routing PR pass.
-
----
+Financial/security tests must never be weakened.
 
 ## 18. Decisions Log
-
-### DEC-ACC-001 — Semantic roles, not account codes
-**Status:** ACCEPTED  
-Account codes such as `4110`, `1140`, `5180` are legacy implementation defaults, not permanent application identities.
-
-### DEC-ACC-002 — Static role catalog + relational mappings
-**Status:** ACCEPTED  
-Role definitions live in code; tenant selections live in relational rows.
-
-### DEC-ACC-003 — Legacy fallback only when mapping is absent
-**Status:** ACCEPTED  
-An absent mapping may use the current legacy default during migration. An explicit but invalid/disabled mapping blocks posting.
-
-### DEC-ACC-004 — Routing changes are prospective
-**Status:** ACCEPTED  
-Historical posted `journal_lines.account_id` values are never re-resolved because a setting changes.
-
-### DEC-ACC-005 — Preserve existing product overrides
-**Status:** ACCEPTED  
-Existing `products.sales_account_id` and `products.cogs_account_id` remain higher-precedence explicit overrides until separately redesigned.
-
-### DEC-ACC-006 — `5180` is not Purchase Returns
-**Status:** ACCEPTED  
-Current repository evidence identifies `5180` with inventory damage/variance semantics, not a purchase-return contra account.
-
-### DEC-ACC-007 — No dedicated Purchase Returns role by imitation
-**Status:** ACCEPTED  
-A `purchase_returns` role requires a proven AWJ accounting need; perpetual-inventory purchase returns currently reverse inventory/expense/input VAT directly.
-
-### DEC-ACC-008 — Fiscal close and transaction lock are separate
-**Status:** ACCEPTED  
-They require separate domain models and enforcement semantics.
-
-### DEC-ACC-009 — Branch semantics are explicit decisions
-**Status:** ACCEPTED  
-Routing, locks, and fiscal periods must each decide branch behavior independently; none is assumed CompanyWide merely for convenience.
-
-### DEC-ACC-010 — General Settings exposes only real backend behavior
-**Status:** ACCEPTED  
-No non-functional toggles, speculative exchange-rate controls, or incompatible journal-tax options.
-
----
+- **DEC-ACC-001 ACCEPTED:** semantic roles, not account codes.
+- **DEC-ACC-002 ACCEPTED:** static catalog + relational mappings.
+- **DEC-ACC-003 ACCEPTED:** legacy fallback only when mapping absent; invalid explicit mapping blocks.
+- **DEC-ACC-004 ACCEPTED:** routing changes prospective; history frozen.
+- **DEC-ACC-005 ACCEPTED:** preserve existing product sales/COGS overrides.
+- **DEC-ACC-006 ACCEPTED:** `5180` is not Purchase Returns.
+- **DEC-ACC-007 ACCEPTED:** no dedicated Purchase Returns role by imitation.
+- **DEC-ACC-008 ACCEPTED:** fiscal close and transaction lock are separate.
+- **DEC-ACC-009 ACCEPTED:** branch semantics are explicit per domain.
+- **DEC-ACC-010 ACCEPTED:** General Settings exposes only real backend behavior.
+- **DEC-ACC-011 ACCEPTED:** semantically decompose overloaded `5180` into count variance, manual adjustment, and damage/non-saleable loss.
+- **DEC-ACC-012 ACCEPTED:** do not split inventory variance gain/loss by sign in V1.
+- **DEC-ACC-013 ACCEPTED:** Stock Permit free text cannot select accounting roles.
+- **DEC-ACC-014 ACCEPTED:** no inventory transfer-clearing role proven necessary today.
+- **DEC-ACC-015 ACCEPTED:** opening balances are not inventory variance; final domain placement remains open.
 
 ## 19. Open Decisions / Do Not Implement Yet
-
-Do not implement until explicitly resolved:
-
-- inventory variance vs damage vs write-off role separation;
-- semantic meaning and routing of `5170` across flows;
+- semantic meaning/routing of `5170` across flows;
 - cash/bank routing model;
-- cash purchase-return vs supplier-refund settlement behavior;
-- branch-specific account-routing policy;
+- cash purchase-return vs supplier-refund settlement;
+- final domain placement of `opening_balances`;
+- structured Stock Permit reason/category accounting model;
+- separate variance gain/loss mappings;
+- branch-specific routing policy;
 - period-lock branch policy;
 - fiscal-period branch policy;
 - fiscal close mechanics;
-- generic product/category routing beyond current product overrides;
+- generic product/category routing beyond current overrides;
 - independent Purchase Returns contra account;
 - multi-currency.
 
----
-
 ## 20. Immediate Next Step
-
-Continue the read-only **Inventory Routing Contract** audit and update this living plan with confirmed findings before authorizing ACC-1/ACC-2 implementation work.
-
-Files to inspect next include `InventoryService`, `InventoryOpeningService`, `StocktakeService`, `StockPermitService`, and sales-return inventory accounting paths.
+Inventory Routing Contract is resolved sufficiently for planning. Next read-only slice: **Cash / Bank / Payment Routing**, including `PaymentService`, `CashBankAccountService`, invoice settlement, purchase settlement/refund behavior, and the unresolved cash purchase-return asymmetry. Update this living plan before authorizing routing implementation.
