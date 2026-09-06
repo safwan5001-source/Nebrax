@@ -15,6 +15,21 @@ import { filterPosCenterInvoices, type PosCenterInvoice } from '@/lib/pos-invoic
 const PAYMENT_STATUS_TONE: Record<string, string> = {
   paid: 'text-positive',
   unpaid: 'text-negative',
+  partial: 'text-warning',
+};
+
+// PR-8: نفس مفاتيح الترجمة المستعملة فعلاً في `pos-invoice-details.tsx` — كانت
+// هذه القائمة تعرض رمز الحالة الخام من الخادم (`paid`/`unpaid`) بلا ترجمة،
+// بينما تفاصيل الفاتورة تترجمه بشكل صحيح؛ توحيدٌ لا تصميمٌ جديد.
+const PAYMENT_STATUS_KEYS: Record<string, string> = {
+  paid: 'invoice_payment_status_paid',
+  unpaid: 'invoice_payment_status_unpaid',
+  partial: 'invoice_payment_status_partial',
+};
+const DOCUMENT_STATUS_KEYS: Record<string, string> = {
+  posted: 'invoice_status_posted',
+  draft: 'invoice_status_draft',
+  cancelled: 'invoice_status_cancelled',
 };
 
 /**
@@ -62,7 +77,8 @@ export function PosInvoiceCenter({ onOpenInvoice, onBack }: { onOpenInvoice: (id
   }
 
   function statusLabel(invoice: PosCenterInvoice) {
-    return invoice.payment_status ?? invoice.status;
+    if (invoice.payment_status) return t(PAYMENT_STATUS_KEYS[invoice.payment_status] ?? invoice.payment_status);
+    return t(DOCUMENT_STATUS_KEYS[invoice.status] ?? invoice.status);
   }
 
   function statusTone(invoice: PosCenterInvoice) {
