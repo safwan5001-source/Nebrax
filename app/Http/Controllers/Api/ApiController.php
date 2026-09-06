@@ -132,6 +132,64 @@ abstract class ApiController extends Controller
     }
 
     /**
+     * ═══════════════════════════════════════════════════════════════
+     *  التحقق من صلاحية سجلٍّ صريح النطاق بمعرّفه (BelongsToBranch)
+     * ═══════════════════════════════════════════════════════════════
+     *  مستندات كالجرد والأذون المخزنية موسومة بالفرع لكن بلا Scope عالمي
+     *  (شمولها المتعمَّد للتحويل بين الفروع)؛ فمعرفة UUID وحده — تخميناً أو
+     *  تسريباً — لا يجب أن يمنح وصولاً لمن لا يملك الفرع أو المستودع. يُستدعى
+     *  هذا الحارس فور `findOrFail` وقبل أي كشف بيانات أو أثر تغييري (عدّ/ترحيل/حذف).
+     *
+     *  الرفض 404 لا 422: نفس اصطلاح TenantScope وبقية المستندات الصريحة
+     *  (`InvoiceController::show` عبر `scopeToActiveBranch()->findOrFail()`) —
+     *  «موجود لكن ممنوع» لا يُميَّز عن «غير موجود» في جسم الاستجابة.
+     *
+     * @param  array<int, string|null>  $warehouseIds  كل مخزن عملياتي يمسّه المستند (مصدر ووجهة التحويل معاً)
+     */
+    protected function assertRecordAccessible(?string $branchId, array $warehouseIds): void
+    {
+        $user = request()->user();
+        if (! $user) {
+            return;
+        }
+
+        if ($branchId !== null && ! $user->canAccessBranch($branchId)) {
+            abort(404);
+        }
+
+        foreach ($warehouseIds as $warehouseId) {
+            if ($warehouseId !== null && ! $user->canAccessWarehouse($warehouseId)) {
+                abort(404);
+            }
+        }
+    }
+
+    /**
+     * تصفية قائمة مستندات صريحة النطاق بمستودعاتها المتاحة للمستخدم — يكمّل
+     * `scopeToActiveBranch()` (يصفّي بالفرع فقط) كي لا تُعرَض في القائمة
+     * مستنداتٌ يرفضها `assertRecordAccessible()` عند فتحها مباشرة. مستخدمٌ
+     * مقيَّد يجب أن يرى فقط ما **كل** عمود مستودع فيه إمّا فارغ أو ضمن نطاقه —
+     * فالتحويل يُخفى إن كان أحد طرفيه خارج النطاق، تماماً كما يُرفض مباشرة.
+     *
+     * @param  array<int, string>  $warehouseColumns
+     */
+    protected function scopeToAccessibleWarehouses(Builder $query, array $warehouseColumns): Builder
+    {
+        $allowed = request()->user()?->allowedWarehouseIds();
+        if ($allowed === null) {
+            return $query;
+        }
+
+        foreach ($warehouseColumns as $column) {
+            $query->where(function (Builder $q) use ($column, $allowed) {
+                $q->whereNull($column)->orWhereIn($column, $allowed);
+            });
+        }
+
+        return $query;
+    }
+
+    /**
      * تحقق ملكية مرجع داخل المستأجر: المعرّف (إن وُجد) يجب أن يعود لنموذج
      * يراه الـ TenantScope الحالي — يصدّ حقن معرّفات مستأجرين آخرين أو معرّفات وهمية.
      *
