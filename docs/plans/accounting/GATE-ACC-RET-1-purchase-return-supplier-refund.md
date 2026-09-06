@@ -1,134 +1,160 @@
 # GATE-ACC-RET-1 — Purchase Return & Supplier Refund Financial Contract
 
-**Status:** DESIGN GATE — MUST PASS BEFORE ACC-4  
+**Status:** ARCHITECTURE CONTRACT RESOLVED — IMPLEMENTATION STILL REQUIRES EXPLICIT APPROVAL  
 **Parent plan:** `docs/plans/accounting/AWJ_ACCOUNTING_SETTINGS_PLAN.md`  
+**Audited baseline:** `58513fe77d1dd34ba4eaa797f2b12ab55996e3fd`  
 **Risk:** High financial/accounting + settlement integrity.  
-**Implementation:** NOT AUTHORIZED by this design document alone.
+**Merge / Deploy:** PROHIBITED without explicit Safwan approval.
 
-## Problem
-Current Purchase posting establishes Accounts Payable and delegates settlement to PaymentService. Current Purchase Return, however, accepts `payment_type=cash|credit`; cash return directly debits legacy 1110 without selecting a CashBankAccount or applying its deposit policy. Current PaymentService cannot safely model supplier refund by flipping `direction`: `received` means customer receipt/AR and `paid` means supplier payment/AP, with allocation/payment-status side effects.
+## Confirmed repository evidence
+- `ReturnDocument` is branch-scoped, numbered, draft -> posted, stores partner/original/journal references and legacy `payment_type`; no Supplier Refund relation exists.
+- `Payment` is branch-scoped, numbered, draft -> posted; `direction` is business semantic: `received` = customer receipt/AR and `paid` = supplier payment/AP.
+- `PaymentAllocation` is for Payment allocations to Invoice/Purchase; do not repurpose it for supplier-return credits.
+- `PaymentService::post()` uses row locks and revalidation for concurrency-safe settlement. Reuse this pattern conceptually.
+- `LedgerService::reverse()` locks original journal, reverses original concrete accounts/dimensions, marks original reversed and prevents double reversal.
+- `GeneratesDocumentNumbers` is the numbering source of truth and derives branch/company scope from the model.
 
 ## Target principle
 `Purchase != Supplier Payment` and `Purchase Return != Supplier Refund`.
 
-A purchase return reverses the supplier commercial liability/cost. Actual money received back from supplier is a separate settlement event.
-
-## Target Purchase Return accounting
-For future new returns after an explicit cutover:
-- Dr `accounts_payable` for the supplier credit created by the return.
-- Cr `inventory_asset` for returned tracked inventory cost.
-- Cr `purchase_expense` for returned non-inventory expense basis.
+## Purchase Return target
+For new Purchase Returns after cutover:
+- Dr `accounts_payable`.
+- Cr `inventory_asset` for tracked goods.
+- Cr `purchase_expense` for non-inventory basis.
 - Cr `tax_input` for reversed input VAT.
 
-No direct cash/bank movement belongs inside the Purchase Return posting itself.
+No direct Cash/Bank movement occurs inside Purchase Return posting.
 
-## Target Supplier Refund accounting
-When supplier actually sends/refunds money:
+## Supplier Refund target
+When supplier actually returns money:
 - Dr selected `CashBankAccount.account_id`.
 - Cr `accounts_payable`.
-- Partner/supplier dimension required.
-- CashBankAccount deposit permission/policy required.
-- Ledger posting through LedgerService.
+- Supplier Partner dimension required.
+- CashBankAccount deposit/policy validation required.
+- Posting through LedgerService.
 
-## Dedicated domain
-Preferred architecture: a dedicated `SupplierRefund` document/service rather than mutating `Payment.direction` semantics.
+## Dedicated SupplierRefund domain — DECIDED
+Do not add a third Payment direction and do not abuse `received`. Create a dedicated branch-scoped financial document/service.
 
-Required conceptual fields:
-- tenant/company scope;
-- supplier/partner;
-- document number/reference/date;
-- amount in halalas/current single-currency contract;
-- CashBankAccount/payment method or equivalent settlement selection;
-- status/draft-posted-reversed semantics following AWJ financial document conventions;
-- optional allocation/link to one or more purchase returns / supplier credit balance if repository architecture supports this cleanly;
-- journal entry reference;
-- idempotency/concurrency controls appropriate to money movement;
-- created_by / posted_by where conventions exist.
+### Lifecycle
+V1: `draft -> posted -> reversed`. Posted/reversed documents immutable; correction by reversal.
 
-Exact schema must be validated against execution-baseline conventions before implementation.
+### Numbering
+Use `GeneratesDocumentNumbers`. Register a dedicated prefix through existing numbering catalog/convention; suggested semantic prefix `SRF`, but implementation must first verify no collision on current main.
 
-## Allocation contract to design before code
-Do not overload Purchase `paid_amount` with supplier-refund inflow.
+### Required data concepts
+UUID, tenant_id, branch_id, number, supplier partner_id, refund_date, integer minor-unit amount, payment method snapshot/reference per CashBank conventions, selected CashBankAccount/concrete destination reference as required by service contract, reference, notes, status, journal_entry_id, created_by, lifecycle timestamps where repository convention supports them, normal timestamps. No fake FX fields.
 
-Choose and document one explicit settlement model before implementation:
-A. supplier account balance is authoritative and refund optionally references Purchase Return(s), or
-B. dedicated refund allocations against Purchase Return credit documents.
+## Settlement allocation model — DECIDED: dedicated Return allocations
+Use a dedicated `SupplierRefundAllocation`, not PaymentAllocation.
 
-Whichever is chosen must prevent over-refund and duplicate settlement under concurrency and remain auditable.
+Target allocation fields: tenant_id, supplier_refund_id, purchase_return_id (ReturnDocument constrained to purchase type), amount minor units, timestamps.
 
-## Historical/backward compatibility
-- Existing posted purchase returns, including historical direct-cash entries to 1110, remain frozen.
-- Do not rewrite/reclassify historical journal lines automatically.
-- Do not delete `payment_type` from old records in a destructive migration.
-- Future UI/API after cutover must stop creating new direct-cash Purchase Return postings.
-- Old API clients require an explicit compatibility/cutover policy: reject deprecated `cash` for new returns with actionable error, or version the endpoint. Do not silently reinterpret old `cash` payload as AP-only without a documented API contract.
+### Allocation invariants
+- target is posted Purchase Return (`type=purchase`);
+- same supplier partner;
+- amount > 0;
+- V1 sum allocations = SupplierRefund amount;
+- cannot exceed refundable balance of any return;
+- posting locks SupplierRefund and target returns in deterministic order before final balance check;
+- concurrency cannot double-refund.
 
-## CashBankAccount contract
-Supplier Refund must resolve selected cash/bank through the existing CashBankAccount domain. Do not create a generic semantic `cash_account` role. Enforce active account, linked Account validity, deposit permission, branch scope/policy and currency constraints already provided by that subsystem.
+V1 does not allow free-standing unallocated supplier cash receipts. A future on-account supplier receipt needs its own explicit contract.
 
-## Reversal
-Reversing Supplier Refund must reverse the original concrete journal, not resolve current Account Routing again. Reversal must also restore settlement/allocation state atomically.
+## Refundable amount source of truth
+Do not reuse Purchase `paid_amount` and do not mutate Payment allocations.
+
+`refundable = return.total - SUM(allocations belonging to posted, non-reversed SupplierRefunds)`.
+
+Calculate from allocations in V1 rather than introducing a mutable balance cache. Any future snapshot is a cache, not source of truth.
+
+## CashBankAccount boundary
+Supplier Refund uses existing CashBankAccount domain for active account, linked Account, deposit permission, branch policy, method/account compatibility and currency constraints. No generic cash/bank Accounting Role.
 
 ## Account Routing interaction
 After ACC-2:
-- Purchase Return consumes `accounts_payable`, `inventory_asset`, `purchase_expense`, `tax_input`.
-- Supplier Refund consumes `accounts_payable` on counterparty side.
-- Cash/bank side remains CashBankAccount-resolved.
+- Purchase Return: AP + inventory_asset/purchase_expense/tax_input.
+- Supplier Refund: AP counterparty role.
+- cash/bank side: CashBankAccount resolver.
+Explicit invalid AP mapping fails closed.
 
-## UI contract
-Purchase Return UI:
-- no misleading “cash vs credit” switch for the commercial return after cutover;
-- clearly creates supplier credit / reduces payable;
-- show resulting supplier credit/balance state.
+## Posting transaction / concurrency
+1. DB transaction.
+2. lock SupplierRefund; recheck draft.
+3. lock target ReturnDocuments in deterministic ID order.
+4. revalidate posted/type/partner/refundable balances.
+5. resolve CashBank destination + AP.
+6. LedgerService post.
+7. mark posted/store journal/lifecycle metadata.
+8. atomic commit.
 
-Supplier Refund UI:
-- separate action/document: “استرداد من المورد / Supplier Refund”;
-- select supplier, amount, Cash/Bank destination and payment method if required;
-- optionally allocate to eligible purchase-return credits;
-- show remaining refundable/credit amount;
-- confirmation before posting;
-- no fake direct cash shortcut.
+No partial allocation/GL effect survives failure.
+
+## Idempotency
+V1 uses row-lock + lifecycle recheck to prevent concurrent double-post of the same document, matching current Payment/Ledger financial patterns. Do not invent a generic idempotency framework here. A future retry-prone public API can add a dedicated request-idempotency contract using AWJ's existing public/POS patterns.
+
+## Reversal
+- lock SupplierRefund and verify posted/not already reversed;
+- call LedgerService::reverse() on stored original journal;
+- mark SupplierRefund reversed;
+- its allocations stop counting against refundable balance atomically;
+- keep allocation rows for history;
+- never re-resolve current account mappings for reversal.
+
+## Historical compatibility / cutover — DECIDED
+- Historical posted returns, including old direct-cash 1110 entries, remain untouched.
+- Keep ReturnDocument.payment_type/data readable; no destructive migration.
+- New Purchase Returns after cutover always create AP commercial reversal.
+- New API request with `payment_type=cash` is rejected with explicit deprecation/validation error; never silently reinterpret it.
+- `payment_type=credit` may be temporarily accepted for old clients but becomes redundant/deprecated.
+- New UI removes cash/credit selection and explains supplier credit; actual money receipt is separate Supplier Refund.
+- No automatic SupplierRefund backfill for historical cash returns.
 
 ## Authorization
-Define dedicated permissions consistent with repository RBAC before implementation, likely separate view/manage/post/reverse semantics if financial-document conventions already distinguish them. Do not reuse Accounting Settings manage permission for operational supplier refunds.
+Supplier Refund is operational finance, not Accounting Settings. Never use `accounting_settings.manage`. At implementation baseline, inspect actual financial-document RBAC convention. If no stronger dedicated post/reverse convention exists, use narrowly scoped `supplier_refunds.view` / `supplier_refunds.manage`; if current main has stronger conventions, follow them.
 
-## Mandatory tests for implementation gate
-1. Purchase Return posts AP reversal and no cash movement.
-2. tracked/non-tracked/input VAT reversal amounts unchanged.
-3. Supplier Refund Dr selected CashBank / Cr AP.
-4. wrong-tenant CashBank rejected.
-5. inactive CashBank/account rejected.
-6. deposit-not-allowed rejected.
-7. supplier/partner dimensions correct.
-8. no over-refund/duplicate allocation under concurrency.
-9. idempotent retry does not double-post money.
-10. reversal uses original concrete accounts.
-11. mapping change after posting does not affect historical refund/reversal.
-12. historical old cash Purchase Returns remain unchanged/readable.
-13. deprecated/new API contract prevents silent semantic reinterpretation.
-14. tenant isolation throughout.
-15. SQLite/PostgreSQL financial tests.
-16. authorization tests.
+## UI contract
+Purchase Return: no new cash/credit switch; communicate supplier credit/AP and remaining refundable amount.
 
-## Gate exit criteria
-Before ACC-4 implementation task is considered READY, an implementation design must explicitly settle:
-- SupplierRefund schema/document lifecycle;
-- allocation model A or B (or another explicitly justified model);
-- numbering/reference convention;
-- RBAC;
-- API compatibility/cutover for old `payment_type=cash`;
-- over-refund and concurrency strategy;
-- reversal behavior;
-- UI flow;
-- migration/backward compatibility.
+Supplier Refund: separate dense AWJ workflow with supplier, eligible posted Purchase Returns, allocations, Cash/Bank destination, payment method where required, date/reference/notes, remaining refundable balance, post confirmation and immutable posted/reversed history.
+
+## Migration strategy
+Additive only: create supplier_refunds and supplier_refund_allocations plus required indexes/FKs/lifecycle fields. Retain ReturnDocument.payment_type. Never rewrite old returns or journals.
+
+## Mandatory tests
+1. new Purchase Return AP reversal, no cash movement.
+2. tracked/non-tracked/VAT amounts unchanged.
+3. old cash returns unchanged/readable.
+4. new `payment_type=cash` rejected.
+5. Supplier Refund Dr CashBank / Cr AP.
+6. mapped AP works; invalid explicit AP mapping fails closed.
+7. wrong-tenant/inactive CashBank rejected.
+8. deposit-not-allowed rejected.
+9. method/account compatibility enforced.
+10. allocation only to posted purchase returns.
+11. supplier mismatch rejected.
+12. allocation sum equals refund amount.
+13. over-refund rejected.
+14. concurrent refunds cannot exceed one return balance.
+15. concurrent double-post creates one journal.
+16. failed post leaves no partial GL/settlement state.
+17. reversal uses original concrete accounts.
+18. reversal restores refundable balance while retaining allocation history.
+19. mapping change after posting does not affect reversal.
+20. branch + tenant isolation.
+21. numbering uses GeneratesDocumentNumbers and is concurrency-safe.
+22. authorization tests.
+23. SQLite + PostgreSQL financial suites.
+24. UI/API no longer presents direct-cash Purchase Return as valid new workflow.
+
+## Gate resolution
+Resolved: dedicated domain, lifecycle, allocation model, numbering mechanism, CashBank boundary, concurrency model, reversal, API cutover, migration/history and UI separation.
+
+Implementation-baseline checks still required immediately before coding: current-main RBAC naming, prefix collision, migration conventions and any code changes since audited baseline. These are not unresolved accounting architecture.
 
 ## Prohibited shortcuts
-- no `Payment(direction=received)` supplier refund hack;
-- no generic cash semantic role;
-- no continued direct hardcoded 1110 for new Purchase Returns;
-- no historical rewrite;
-- no hidden settlement side effect in Purchase Return;
-- no implementation/merge/deploy without explicit Safwan approval.
+No Payment(received) hack; no third Payment direction without separate redesign; no generic cash role; no new hardcoded 1110 return; no history rewrite; no allocation deletion on reversal; no silent legacy cash reinterpretation; no implementation/merge/deploy without explicit Safwan approval.
 
-## Next planning action
-Before execution, perform a narrow repository audit of financial document numbering, reversal/status/idempotency patterns and supplier balance/return relationships, then update this gate with exact implementation contracts.
+## Next step
+Prepare a separate prerequisite implementation task **ACC-RET-1 — Purchase Return Cutover + Supplier Refund Foundation**. ACC-4 remains ordered after that prerequisite; do not hide the feature inside ACC-4.
