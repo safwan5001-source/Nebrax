@@ -109,3 +109,20 @@ Neither merge nor deploy was performed. The PR (`#669`) is open for review; no a
 ## 15. Next step
 
 Review of this report and the PR diff (#669). Per `docs/plans/products-inventory/prompts/PHASE1_IMPLEMENTATION_PROMPTS.md`, `PR-INV-2` (Purchase Return UOM/base quantity + valuation/GL reconciliation) is next in the Phase 1 sequence. Do not start it before this review, per program governance.
+
+## 16. Post-review verification — `$money` keep-when-absent behavior (no code change)
+
+**Question raised:** the restructured `applyItemsAndTotals()` relocates the `$money` closure (`array_key_exists($key, $data) ? $data[$key] : $current` — absent key keeps the invoice's current `discount`/`shipping`/`adjustment` value on `update()`, present key replaces it) to before the line loop. Was this "keep on absent" behavior already in place on `main` before this PR, or is it a new behavioral change introduced by PR-PRICE-1?
+
+**Verification method:** `git diff f7ae6ed..HEAD -- app/Services/Accounting/InvoiceService.php`, isolating every line touching `$money`.
+
+**Finding — pure relocation, zero behavioral change:**
+
+- The closure definition line — `$money = fn (string $key, $current) => (int) (array_key_exists($key, $data) ? $data[$key] : $current);` — is **byte-for-byte identical** between the pre-PR position (after the line loop) and the post-PR position (before the line loop, but still after Pass 1 has accumulated `$subtotal`/`$taxTotal`). Confirmed via `git diff --word-diff` on the relevant hunks: the red (removed) and green (added) text of this line and its explanatory comment are character-identical, only their line position changed.
+- The `discount` computation — `[$discount, $goodsVat] = $this->applyDiscount($subtotal, $taxTotal, $money('discount', $invoice->discount));` — is likewise byte-for-byte identical, moved for the same reason (the header discount and its per-line allocation must be known before Pass 2's minimum-price check, which is the entire point of this PR).
+- The `shipping` and `adjustment` computations — `$shipping = max(0, $money('shipping', $invoice->shipping));` and `$adjustment = $money('adjustment', $invoice->adjustment);` — were **not moved at all**. They remain at their original position, after all `InvoiceLine` rows are created, exactly as on `main` at `f7ae6ed`. `$money` is a PHP closure capturing `$data` by value at definition time; moving its *definition* earlier in the same method body has no effect on what it captures or how it behaves when called later for `shipping`/`adjustment` — `$data` is the same array either way.
+- `git show f7ae6ed:app/Services/Accounting/InvoiceService.php` confirms this exact closure and all three call sites (`discount`, `shipping`, `adjustment`) already existed verbatim on `main` before this PR, predating even `PR-PRICE-1`.
+
+**Conclusion:** the "absent key keeps the invoice's current value on `update()`" behavior for `discount`, `shipping`, and `adjustment` is pre-existing production behavior on `main`, unrelated to and unchanged by PR-PRICE-1. Relocating the closure and the `discount` line earlier in the method was necessary for the fix itself (the header discount must be computed before Pass 2 can allocate it per line and evaluate the floor) and introduces no new behavior. Per the review instruction: since this is confirmed as relocation only, **no code change was made** — this section is the requested evidence. The PR's actual fix (splitting the method into two passes so the minimum-price check sees the line's economics after header-discount allocation) is unaffected and remains scoped exactly to the contract.
+
+No source file changed in this update — only this report, to record the verification. Head SHA below reflects this documentation-only commit.
