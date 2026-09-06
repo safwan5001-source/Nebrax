@@ -10,6 +10,7 @@ use App\Models\Tenant;
 use App\Support\CompanyProfile;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\Accounting\AccountRoleMappingSeeder;
 use App\Services\Accounting\CashBankAccountService;
 use App\Services\Accounting\ChartOfAccountsSeeder;
 use App\Services\TenantReferenceNumberService;
@@ -51,6 +52,10 @@ class AuthController extends ApiController
 
             app(TenantContext::class)->set($tenant->id);
             app(ChartOfAccountsSeeder::class)->seed($tenant->id);
+            // ACC-2: Clean Seeded Cutover — كل مستأجر جديد يُعيَّن صراحةً لكل
+            // دور محاسبي دلالي من لحظة التسجيل، فلا تبلغ حالة "بلا تعيين" أي
+            // مستأجر منذ اليوم الأول (لا Transitional Legacy Fallback).
+            app(AccountRoleMappingSeeder::class)->seedDefaults($tenant->id);
             app(CashBankAccountService::class)->bootstrapDefaults();
 
             // الأدوار النظامية الأربعة — نسخةً طبق الأصل من المصفوفة الثابتة،
