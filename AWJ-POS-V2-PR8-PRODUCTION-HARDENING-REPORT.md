@@ -333,13 +333,16 @@ repeatedly polled.
 ## Git metadata
 
 - **Branch:** `claude/pos-v2-pr8-production-hardening`
-- **Base SHA:** `3e4556c...` (current `main` tip at branch creation — see PR page /
-  chat reply for the live-verified full hash and any drift, following the same
-  branch-point-vs-current-tip distinction established in the PR-6/PR-7 reports).
-- **Head SHA:** reported live in the chat reply after pushing (a documentation commit
-  cannot record its own resulting hash in advance — the same limitation documented in
-  the PR-6 and PR-7 reports).
-- **PR:** opened as Draft against `main`.
+- **PR:** [#672](https://github.com/safwan5001-source/Nebrax/pull/672) (Draft, open, unmerged)
+- **Base SHA:** `3e4556c8ea74467b19bf8de64b125c215b4c621e` — `main` tip at branch
+  creation; verified live via `pull_request_read` to be identical to the PR's current
+  `base.sha` (no drift since creation).
+- **Head SHA:** `b960de14f017a9e35b744177d656fbba604170b1` — verified live against
+  PR #672's `head.sha` via `pull_request_read` immediately before this line was written.
+  (As with the PR-6/PR-7 reports: a documentation-only commit cannot record its own
+  resulting hash in advance; this value predates that commit and is confirmed accurate
+  as of the moment written — any further edit to this file would need one more
+  verification pass, which the chat reply performs instead of an unbounded loop here.)
 
 ## Risks / remaining work
 
