@@ -236,7 +236,7 @@ browser context — proof this is real server state, not a client-side illusion.
 
 ## PR number/link
 
-Recorded after push (see final chat reply). Draft.
+[#667](https://github.com/safwan5001-source/Nebrax/pull/667) — Draft, open, not merged.
 
 ## Base SHA
 
@@ -245,7 +245,7 @@ commit `eed979d`, via `git fetch && git log` before branching).
 
 ## Head SHA
 
-`1364853c188ff1cf276405bd64767b4e4b9e4515`
+`8ff0ab77ccf65029db635adfa25a830156a8094e`
 
 ## Recommended next step
 
