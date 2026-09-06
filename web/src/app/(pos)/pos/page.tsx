@@ -28,7 +28,7 @@ import {
   posProductGridPadClass,
   posProductsPaneClass,
 } from '@/lib/pos-responsive';
-import { formatRiyal, riyalToMinor, extractInclusiveTax } from '@/lib/money';
+import { formatRiyal, riyalToMinor, isValidRiyal, extractInclusiveTax } from '@/lib/money';
 import { discountMinorFromPercent, discountPercentFromMinor, type PosDiscountMode } from '@/lib/pos-discount';
 import { cn } from '@/lib/utils';
 import { getSystemTaxInclusive } from '@/lib/tax';
@@ -181,7 +181,29 @@ interface Product {
   profit_margin?: number | null;
 }
 interface PosDevice { id: string; name: string; code: string | null; warehouse_id: string; is_active: boolean; warehouse?: { id: string; code: string; name: string } | null; cash_drawer?: { configured: boolean } }
-interface PosSession { id: string; number: string; status: string; pos_device_id?: string | null; warehouse_id?: string | null; shift_id?: string | null; pos_device?: { id: string; name: string; code: string | null } | null; warehouse?: { id: string; code: string; name: string } | null }
+interface PosSession {
+  id: string; number: string; status: string;
+  pos_device_id?: string | null; warehouse_id?: string | null; shift_id?: string | null;
+  pos_device?: { id: string; name: string; code: string | null } | null;
+  warehouse?: { id: string; code: string; name: string } | null;
+  // PR-7: حقول عرضية فقط (لوحة «إدارة الجلسة» داخل مساحة عمل POS) — موجودة
+  // فعلاً في استجابة `PosSessionResource` الخادمية، لم تكن مُعلَنة هنا سابقاً.
+  opening_balance?: string;
+  opened_at?: string | null;
+  pos_shift?: { id: string; name: string; code: string | null } | null;
+}
+// PR-7: عقد معاينة الإغلاق الخادمية — يطابق حرفياً `/pos/sessions/page.tsx`
+// (نفس الحقول والأسماء) حتى لا يفترق سلوك الشاشتين على نفس نقطة النهاية.
+interface ClosingPreviewMethod {
+  payment_method_id: string | null;
+  payment_method_name: string;
+  settlement_type: string;
+  expected_amount: string | null;
+}
+interface ClosingPreview {
+  cash_drawer: { reconciliation_key: string; name: string; settlement_type: 'cash'; expected_amount: string | null };
+  payment_methods: ClosingPreviewMethod[];
+}
 /**
  * R5: يطابق حرفياً ما يعيده `InvoiceResource` بعد `POS/checkout` — الفاتورة
  * المرحّلة الفعلية، لا افتراضاً محلياً. الإيصال الفوري يُبنى من هذا الشكل
@@ -331,6 +353,12 @@ export default function PosPage() {
   const [sessionBusy, setSessionBusy] = useState(false);
   const [drawerBusy, setDrawerBusy] = useState(false);
   const [sessionError, setSessionError] = useState<string | null>(null);
+  // PR-7: معاينة الإغلاق الخادمية (نقد + كل طريقة دفع غير نقدية) — نفس عقد
+  // `/pos/sessions/page.tsx` حرفياً، حتى يُطابق حوار الإغلاق هنا ذاك المرجعي.
+  const [closePreview, setClosePreview] = useState<ClosingPreview | null>(null);
+  const [closePreviewLoading, setClosePreviewLoading] = useState(false);
+  const [paymentCounts, setPaymentCounts] = useState<Record<string, string>>({});
+  const [handoverNote, setHandoverNote] = useState('');
   const ts = useTranslations('posSessions');
   const online = usePosNetworkStatus();
   const restoreNoticeKeyRef = useRef<string | null>(null);
@@ -1097,30 +1125,70 @@ export default function PosPage() {
   );
   const count = cart.reduce((s, l) => s + l.qty, 0);
 
-  async function finishCloseSession() {
+  // PR-7: تحضير معاينة الإغلاق الخادمية (نقد + طرق الدفع) قبل فتح الحوار —
+  // نفس نمط `/pos/sessions/page.tsx` حرفياً، بدل حوار «مبلغ معدود» بلا سياق.
+  async function prepareClose() {
+    if (!session) return;
+    setCountedBal('');
+    setSessionError(null);
+    setClosePreview(null);
+    setPaymentCounts({});
+    setHandoverNote('');
+    setCloseOpen(true);
+    setClosePreviewLoading(true);
+    try {
+      const result = await api<{ data: ClosingPreview }>(`/pos-sessions/${session.id}/closing-preview`);
+      const preview = result.data;
+      if (!preview?.cash_drawer || !Array.isArray(preview.payment_methods)) {
+        throw new Error('Invalid POS closing preview response.');
+      }
+      setClosePreview(preview);
+      setPaymentCounts(
+        Object.fromEntries(
+          preview.payment_methods.filter((method) => method.payment_method_id).map((method) => [method.payment_method_id as string, '']),
+        ),
+      );
+    } catch (err) {
+      setSessionError(err instanceof ApiError ? err.message : tc('saveFailed'));
+    } finally {
+      setClosePreviewLoading(false);
+    }
+  }
+
+  function closeSessionDialog() {
+    if (!session) return;
+    if (decidePosUnsavedExit(carts.some(cartHasUnsavedData)) === 'guard') {
+      setUnsavedExitAction('close_session');
+      return;
+    }
+    void prepareClose();
+  }
+
+  async function submitClose(e: React.FormEvent) {
+    e.preventDefault();
     if (!session) return;
     setSessionBusy(true);
     setSessionError(null);
     try {
+      const counts = (closePreview?.payment_methods ?? [])
+        .filter((method): method is ClosingPreviewMethod & { payment_method_id: string } => Boolean(method.payment_method_id))
+        .map((method) => ({
+          payment_method_id: method.payment_method_id,
+          counted_amount: riyalToMinor(paymentCounts[method.payment_method_id] ?? ''),
+        }));
       await api(`/pos-sessions/${session.id}/close`, {
         method: 'POST',
-        body: { closing_balance: riyalToMinor(countedBal) },
+        body: {
+          closing_balance: riyalToMinor(countedBal),
+          payment_counts: counts,
+          handover_note: handoverNote.trim() || null,
+        },
       });
       router.push('/dashboard'); // الوردية أُغلقت — نغادر نقطة البيع
     } catch (err) {
       setSessionError(err instanceof ApiError ? err.message : tc('saveFailed'));
       setSessionBusy(false);
     }
-  }
-
-  function closeSession(e: React.FormEvent) {
-    e.preventDefault();
-    if (!session) return;
-    if (decidePosUnsavedExit(carts.some(cartHasUnsavedData)) === 'guard') {
-      setUnsavedExitAction('close_session');
-      return;
-    }
-    void finishCloseSession();
   }
 
   function requestLogout() {
@@ -1151,7 +1219,7 @@ export default function PosPage() {
   async function confirmUnsavedExit() {
     const action = unsavedExitAction;
     setUnsavedExitAction(null);
-    if (action === 'close_session') await finishCloseSession();
+    if (action === 'close_session') await prepareClose();
     if (action === 'logout') await finishLogout();
     if (action === 'return_to_system') finishReturnToSystem();
   }
@@ -1997,7 +2065,7 @@ export default function PosPage() {
         warehouseDisabled={Boolean(session?.warehouse_id) || step === 'payment' || paying || sessionInvalid}
         onWarehouseChange={setWarehouseId}
         heldCount={heldCount}
-        onManageSession={() => (session ? (setCountedBal(''), setSessionError(null), setCloseOpen(true)) : router.push('/dashboard'))}
+        onManageSession={() => (session ? closeSessionDialog() : router.push('/dashboard'))}
         onOpenHeld={() => setRetrieveOpen(true)}
         onOpenRecentInvoices={() => { setSelectedInvoiceId(null); setWorkspaceMode('invoices'); }}
         onOpenCashDrawer={() => void openCashDrawer()}
@@ -2256,15 +2324,109 @@ export default function PosPage() {
 
       {/* إغلاق الوردية: عدّ النقد → المتوقّع/الفرق يُحسبان في الخادم ثم نغادر. */}
       <PosDialog open={closeOpen} onClose={() => setCloseOpen(false)} title={ts('close_title')}>
-        <form onSubmit={closeSession} className="space-y-3">
+        <form onSubmit={submitClose} className="space-y-4">
+          {session && (
+            <div className="grid grid-cols-2 gap-x-3 gap-y-1 rounded-md border border-border bg-surface-subtle px-3 py-2 text-xs text-muted">
+              <span>{ts('number')}: <span className="num font-medium text-text">{session.number}</span></span>
+              <span>{t('cashier')}: <span className="font-medium text-text">{cashier}</span></span>
+              {session.pos_device && <span>{ts('device')}: <span className="font-medium text-text">{session.pos_device.name}</span></span>}
+              {session.pos_shift && <span>{ts('work_shift')}: <span className="font-medium text-text">{session.pos_shift.name}</span></span>}
+              {session.warehouse && <span>{ts('warehouse')}: <span className="font-medium text-text">{session.warehouse.name}</span></span>}
+              {session.opening_balance !== undefined && (
+                <span>{ts('opening_balance')}: <span className="num font-medium text-text">{formatRiyal(session.opening_balance)}</span></span>
+              )}
+              {session.opened_at && <span>{ts('opened_at')}: <span className="num font-medium text-text">{session.opened_at}</span></span>}
+              <a
+                href={`/pos/sessions/${session.id}`}
+                target="_blank"
+                rel="noreferrer"
+                className="col-span-2 mt-1 text-primary underline underline-offset-2"
+              >
+                {ts('view_details')}
+              </a>
+            </div>
+          )}
+          <p className="rounded bg-primary-soft px-3 py-2 text-xs text-text">{ts('close_reconciliation_hint')}</p>
+          {closePreviewLoading && <p className="text-sm text-muted">{tc('loading')}</p>}
+          {closePreview && (
+            <div className="overflow-hidden rounded-md border border-border">
+              <div className="grid grid-cols-[minmax(0,1fr)_140px] gap-3 border-b border-border bg-surface-subtle px-3 py-2 text-xs font-medium text-muted">
+                <span>{ts('reconciliation_source')}</span>
+                <span className="text-end">{ts('counted')}</span>
+              </div>
+              <div className="grid grid-cols-[minmax(0,1fr)_140px] items-center gap-3 border-b border-border px-3 py-2.5">
+                <div className="min-w-0 text-sm">
+                  <p className="font-medium text-text">{ts('cash_drawer')}</p>
+                  {closePreview.cash_drawer.expected_amount !== null && (
+                    <p className="num text-xs text-muted">{ts('expected')}: {formatRiyal(closePreview.cash_drawer.expected_amount)}</p>
+                  )}
+                </div>
+                <Input
+                  id="cb"
+                  aria-label={ts('counted')}
+                  className="num text-end"
+                  inputMode="decimal"
+                  value={countedBal}
+                  onChange={(e) => setCountedBal(e.target.value)}
+                  required
+                  autoFocus
+                />
+              </div>
+              {closePreview.payment_methods.map(
+                (method) =>
+                  method.payment_method_id && (
+                    <div key={method.payment_method_id} className="grid grid-cols-[minmax(0,1fr)_140px] items-center gap-3 border-b border-border px-3 py-2.5 last:border-b-0">
+                      <div className="min-w-0 text-sm">
+                        <p className="truncate font-medium text-text">{method.payment_method_name}</p>
+                        {method.expected_amount !== null && (
+                          <p className="num text-xs text-muted">{ts('expected')}: {formatRiyal(method.expected_amount)}</p>
+                        )}
+                      </div>
+                      <Input
+                        aria-label={`${ts('counted')} — ${method.payment_method_name}`}
+                        className="num text-end"
+                        inputMode="decimal"
+                        value={paymentCounts[method.payment_method_id] ?? ''}
+                        onChange={(e) =>
+                          setPaymentCounts((current) => ({ ...current, [method.payment_method_id as string]: e.target.value }))
+                        }
+                        required
+                      />
+                    </div>
+                  ),
+              )}
+            </div>
+          )}
           <div className="space-y-1.5">
-            <Label htmlFor="cb">{ts('counted')}</Label>
-            <Input id="cb" className="num text-end" inputMode="decimal" value={countedBal} onChange={(e) => setCountedBal(e.target.value)} required autoFocus />
+            <Label htmlFor="handover-note">{ts('handover_note')}</Label>
+            <textarea
+              id="handover-note"
+              value={handoverNote}
+              onChange={(e) => setHandoverNote(e.target.value)}
+              placeholder={ts('handover_note_placeholder')}
+              required
+              className="min-h-20 w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-text outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+            />
           </div>
-          {sessionError && <p className="rounded bg-negative/10 px-3 py-2 text-xs text-negative">{sessionError}</p>}
+          {sessionError && <p role="alert" className="rounded bg-negative/10 px-3 py-2 text-xs text-negative">{sessionError}</p>}
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="outline" className="min-h-11" onClick={() => setCloseOpen(false)}>{ts('cancel')}</Button>
-            <Button type="submit" className="min-h-11" disabled={sessionBusy}>{ts('close')}</Button>
+            <Button
+              type="submit"
+              className="min-h-11"
+              disabled={
+                sessionBusy ||
+                closePreviewLoading ||
+                !closePreview ||
+                !isValidRiyal(countedBal) ||
+                handoverNote.trim().length < 3 ||
+                closePreview.payment_methods.some(
+                  (method) => Boolean(method.payment_method_id) && !isValidRiyal(paymentCounts[method.payment_method_id as string] ?? ''),
+                )
+              }
+            >
+              {ts('close_and_submit_handover')}
+            </Button>
           </div>
         </form>
       </PosDialog>
