@@ -69,6 +69,7 @@ use App\Http\Controllers\Api\JournalEntryController;
 use App\Http\Controllers\Api\LeaveRequestController;
 use App\Http\Controllers\Api\LeaveTypeController;
 use App\Http\Controllers\Api\ManualJournalController;
+use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\PartnerController;
 use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\PaymentMethodController;
@@ -242,6 +243,15 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::get('subscription', [SubscriptionController::class, 'show']); // متاح حتى مع اشتراك منتهٍ
         // مرئية الشريط الجانبي لكل الأدوار — بلا RBAC، لتصحيح التنقّل الأساسي.
         Route::get('applications/nav-state', [TenantApplicationController::class, 'navState']);
+
+        // صندوق إشعارات المستخدم الحالي — متاح دائماً (حتى مع اشتراك منتهٍ)
+        // لأن جرس الإشعارات في القشرة يجب أن يعمل بصرف النظر عن حالة الاشتراك؛
+        // بلا صلاحية RBAC لأنه بيانات مملوكة للمستخدم لا مورد عمل مشترك.
+        // انظر docs/plans/alerts-notifications/AWJ_ALERTS_NOTIFICATIONS_MASTER_PLAN.md §5.1.
+        Route::get('notifications', [NotificationController::class, 'index']);
+        Route::get('notifications/unread-count', [NotificationController::class, 'unreadCount']);
+        Route::post('notifications/mark-all-read', [NotificationController::class, 'markAllRead']);
+        Route::post('notifications/{id}/read', [NotificationController::class, 'markRead']);
 
         $perm = fn (string $p) => EnsurePermission::class . ':' . $p;
         $app = fn (string $k) => EnsureApplicationActive::class . ':' . $k;
