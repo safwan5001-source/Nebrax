@@ -800,6 +800,21 @@
     "save": "Save",
     "cancel": "Cancel"
   },
+  "accountingSettings": {
+    "title": "Accounting Settings",
+    "hubSubtitle": "Company-level accounting settings hub.",
+    "groupSetup": "Accounting settings",
+    "c_accountRouting_t": "Account Routing",
+    "c_accountRouting_d": "Automatically linking accounting operations to your chart of accounts will be available here soon.",
+    "c_costCenters_t": "Cost Centers",
+    "c_costCenters_d": "Create and manage cost centers to allocate revenue and expenses.",
+    "c_fiscalPeriods_t": "Fiscal Periods",
+    "c_fiscalPeriods_d": "Defining and closing the fiscal year will be available here soon.",
+    "c_periodLocks_t": "Accounting Period Locks",
+    "c_periodLocks_d": "Preventing posting and edits in locked accounting periods will be available here soon.",
+    "forbidden": "You don't have access to Accounting Settings.",
+    "forbiddenHint": "Accounting Settings is available to organisation owners and admins. Contact your account administrator for access."
+  },
   "costCenters": {
     "title": "Cost centers",
     "add": "New cost center",
@@ -2329,6 +2344,7 @@
     "assets": "Assets",
     "costCenters": "Cost Centers",
     "cheques": "Cheque Cycle",
+    "accountingSettings": "Accounting Settings",
     "employees": "Employees",
     "attendance": "Attendance",
     "payroll": "Payroll",

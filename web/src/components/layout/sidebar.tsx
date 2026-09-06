@@ -205,6 +205,7 @@ const GROUPS: NavGroup[] = [
       { href: '/assets', icon: Building2, key: 'assets', built: true },
       { href: '/cost-centers', icon: Network, key: 'costCenters', built: true },
       { href: '/cheques', icon: ScrollText, key: 'cheques' },
+      { href: '/accounting-settings', icon: SlidersHorizontal, key: 'accountingSettings', built: true, permission: 'accounting_settings.view' },
     ],
   },
   {
