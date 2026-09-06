@@ -1,7 +1,7 @@
 # FISCAL-1 — Fiscal Year Close Architecture Contract
 
 **Status:** ARCHITECTURE READY FOR IMPLEMENTATION TASK PREPARATION — coding still requires explicit approval  
-**Risk:** Critical financial statements + historical integrity  
+**Risk:** Critical financial statements + Saudi compliance integrity  
 **Audited baseline:** `6a49a956f19e91911662467d9cdf197ce0a295af`
 
 ## Confirmed facts
@@ -13,76 +13,101 @@ A close journal that zeros P&L on year end would make a naive historical Income 
 ## V1 structure — DECIDED
 Use one CompanyWide `FiscalYear` entity, not monthly FiscalPeriod rows. Explicit inclusive start/end dates allow calendar or non-calendar fiscal years. Years cannot overlap. No branch_id.
 
-Lifecycle: `OPEN -> CLOSING -> CLOSED -> REOPENING -> OPEN`. Transitional states are controlled by transaction/concurrency logic. Re-close after reopen is allowed.
+Lifecycle: `OPEN -> CLOSING -> CLOSED -> REOPENING -> OPEN`. Re-close after reopen is allowed.
 
 ## Closing method — DECIDED
 Directly close every non-zero revenue/expense account into semantic role `retained_earnings`; no Income Summary account in V1. Profit credits Retained Earnings; loss debits it. Add `retained_earnings` to Account Routing with legacy default 3120 before implementation. Invalid explicit mapping fails closed.
 
 ## No annual carry-forward journal — DECIDED
-Do not generate opening entries for assets/liabilities/equity. Permanent accounts already remain cumulative in the ledger. 3130 remains only for true opening/import/cutover balances.
+Do not generate opening entries for assets/liabilities/equity. Permanent accounts remain cumulative. 3130 remains only for true opening/import/cutover balances.
 
-## Close classification
-Fiscal-close JournalEntry must be durably identifiable through source/model relationship, not description text or account code. It remains a real JournalEntry visible in Trial Balance/general ledger/audit.
+## Close classification and reports
+Fiscal-close JournalEntry must be durably identifiable through source/model relationship, never description text/account code. It remains visible in Trial Balance/general ledger/audit.
 
-## Report semantics — DECIDED
-### Income Statement
-Historical P&L excludes only Fiscal Close journals from presentation/calculation, so a closed year's original revenue, expenses and profit remain visible. Ordinary corrections/reversals remain included.
-
-### Balance Sheet
-Cumulative assets/liabilities/equity include all real journals including close entries. Synthetic `net_income` includes only unclosed P&L after the latest CLOSED fiscal-year end up to the requested date, excluding close journals. With no previous close, current cumulative behavior remains. Exactly at a closed year end, synthetic net_income = 0 because result is already in Retained Earnings.
-
-### Trial Balance / General Ledger
-Include close journals normally.
-
-### Branch/cost-center reports
-Close is company-wide. Do not invent branch Retained Earnings allocation. Historical branch/cost-center P&L is based on operational P&L and excludes fiscal-close lines where applicable.
+Historical Income Statement excludes Fiscal Close journals so original P&L remains visible. Balance Sheet includes real close equity but synthetic net_income only covers unclosed P&L after the latest closed fiscal boundary. At a closed year end synthetic net_income=0. Branch/cost-center P&L uses operational lines and does not invent branch Retained Earnings allocation.
 
 ## Dimensions / VAT
-Generated close lines carry no Partner or Cost Center in V1. Fiscal close closes only Account.type revenue/expense. VAT asset/liability accounts are not closed by fiscal close; statutory tax periods remain separate.
+Close lines carry no Partner or Cost Center V1. Fiscal close closes only Account.type revenue/expense. VAT asset/liability accounts and statutory VAT-return periods remain separate.
 
-## Close preconditions
-FiscalYear OPEN; no overlap; valid retained-earnings account; no active close generation; serialized against ordinary posting; calculate from ledger truth; balanced integer minor-unit lines.
+# Saudi Compliance Guardrails
+Saudi compliance is a first-class constraint, separate from generic fiscal-close accounting.
 
-## ACC-6 interaction
-Close must prevent concurrent posts without exposing a generic Ledger bypass. Under tenant accounting-control serialization: establish controlled closing state, calculate P&L, create close journal dated year end through an internal close-operation contract, mark CLOSED and activate/ensure accounting lock. Exact implementation must avoid circular 'locked date cannot receive close journal' logic without weakening ordinary guard behavior.
+## ZATCA/Fatoora invariants
+- Fiscal close must never edit, delete, renumber or regenerate an already issued electronic invoice, credit note or debit note as a side effect.
+- Corrections to issued electronic invoices remain through the legally appropriate electronic credit/debit-note workflow; fiscal reopen is not an invoice-edit mechanism.
+- Fatoora invoice/note payloads, identifiers, hashes/security metadata, submission/clearance/reporting status and stored originals remain immutable according to their own lifecycle.
+- Fiscal close/reopen must not silently change the tax period attribution of issued documents.
+- VAT filing period (monthly/quarterly as applicable) is independent of AWJ FiscalYear and must not be inferred from fiscal-year boundaries.
+- VAT-return amendment/correction remains a separate tax workflow; reopening an accounting year does not itself amend a return already submitted to ZATCA.
+- Accounting/tax records and generated fiscal-close evidence must remain retainable/exportable for statutory record-retention requirements. No close/reopen hard deletion.
+- Cloud/storage architecture must preserve compliant access to required Saudi tax records; deployment/data-residency compliance is handled by infrastructure policy, not by FiscalYear logic.
 
-## Reopen — DECIDED
-Permissioned, reason required. Under serialization, temporarily permit the controlled reopen operation, reverse the exact stored close journal using LedgerService original accounts, date that reversal at original fiscal-year end, mark prior generation reversed and year OPEN, and retain all journals/audit. This privileged historical operation is not available through ordinary reversal endpoints.
+## Fiscal Close Readiness — severity model
+Readiness returns `BLOCKER`, `WARNING`, and `INFO`. Only BLOCKER prevents close. Warnings require visibility/acknowledgement but must not invent Saudi legal prohibitions that do not exist.
 
-## Re-close
-After reopen, corrections may post while year is open. Re-close recalculates from ledger truth and creates one new close generation. Row locks + tenant accounting serialization prevent duplicates.
+### BLOCKER
+1. Trial Balance is not balanced for the fiscal year / ledger integrity check fails.
+2. Retained Earnings semantic mapping is missing/invalid/inactive/group/wrong tenant.
+3. Another close/reopen is in progress or an active close generation already exists.
+4. Fiscal year overlaps another year or dates are invalid.
+5. Accounting-control/period-lock state cannot safely serialize close against concurrent postings.
+6. Any issued accounting document is in an internally inconsistent state where its posted journal is missing/broken.
+7. Any Fatoora document that AWJ itself marks as requiring a mandatory completion step before accounting finalization is in a failed/inconsistent state **only where current ZATCA integration contract proves that state must block**. Do not broadly block close merely because a historical ZATCA transmission has a recoverable operational warning.
+
+### WARNING — acknowledgement required
+1. Draft/unposted financial documents dated inside the year remain. They are not in the ledger and therefore are excluded from the close calculation; show counts/amounts where reliable.
+2. Unposted manual journals dated inside the year.
+3. Open AR/AP balances — normal balance-sheet items, not blockers.
+4. Inventory quantity/value anomalies or pending stocktake issues detected by existing controls.
+5. Unreconciled cash/bank items if AWJ has reliable reconciliation state by implementation time.
+6. VAT/tax periods overlapping the fiscal year that are not marked filed/final in AWJ, if such authoritative status exists. Never claim ZATCA filing status from absence of local metadata.
+7. Credit/debit notes or return workflows still draft/pending for events in the year.
+8. Depreciation/payroll or other periodic processes appear incomplete based on authoritative AWJ module state.
+9. Fatoora operational submission/clearance/reporting warnings that do not legally invalidate the underlying accounting close.
+
+### INFO
+1. Fiscal-year revenue, expense and calculated profit/loss.
+2. Retained Earnings destination account.
+3. Closing date and resulting Accounting Period Lock range.
+4. Counts of posted invoices/purchases/payments/returns/notes/journals.
+5. Open AR/AP totals.
+6. VAT output/input balances and known local tax-period status, clearly labeled as accounting/local status rather than ZATCA portal truth unless integration proves otherwise.
+7. Existing previous close/reopen generations and actors.
+
+## Saudi correction boundary
+A fiscal reopen allows accounting corrections in an opened accounting period but does not grant permission to mutate a tax invoice already issued. If correction affects an issued invoice, the domain workflow must use the proper credit/debit note or other ZATCA-compliant correction mechanism and then post the resulting accounting effect.
+
+## Close preconditions / ACC-6 interaction
+FiscalYear OPEN; valid mapping; no active generation; ledger truth; balanced minor-unit lines. Close must serialize against ordinary posting without generic Ledger bypass. Controlled internal close/reopen operations may coordinate with AccountingDateGuard, but no user/admin bypass flag is exposed.
+
+## Reopen / re-close
+Reopen is permissioned and reasoned. Reverse the exact stored close journal, retain history, reopen accounting control, allow compliant corrections, then re-close as a new generation. Reopen never rewrites issued Saudi tax documents or submitted VAT returns.
 
 ## RBAC/audit
-Prefer `fiscal_years.view`, `fiscal_years.manage`, `fiscal_years.close`, `fiscal_years.reopen`. Close/reopen are stronger permissions. Record actors/timestamps/reasons and close/reversal journal IDs/generation. No hard delete once accounting history exists.
+Prefer `fiscal_years.view`, `fiscal_years.manage`, `fiscal_years.close`, `fiscal_years.reopen`. Record actors/timestamps/reasons and close/reversal journal IDs/generation. No hard delete once history exists.
 
 ## UI
-Accounting Settings -> Fiscal Years: dense year list, create year, pre-close summary (revenue/expense/profit-loss/retained-earnings destination/warnings), strong close confirmation, closed journal metadata, reopen with reason. No fake monthly-close controls V1.
+Accounting Settings -> Fiscal Years includes a pre-close Readiness panel grouped into BLOCKERS / WARNINGS / INFO. Close button disabled only by blockers. Warnings require explicit acknowledgement. Saudi tax/Fatoora items must be labeled accurately and never imply that AWJ has confirmed ZATCA portal state unless it actually has authoritative integration data.
 
 ## Mandatory tests
-- zero activity;
-- profit and loss closes;
-- P&L accounts zero in Trial Balance after close;
-- historical Income Statement remains unchanged after close;
-- Balance Sheet at closed year end: net_income zero, result in Retained Earnings, balanced;
-- next-year activity adds only post-close net income;
-- no prior close preserves current behavior;
-- no balance-sheet carry-forward; 3130 untouched; VAT balances untouched;
-- invalid retained-earnings mapping blocks close;
-- mapping changes do not alter close/reversal;
-- reopen restores exact historical P&L balances;
-- correction + re-close creates one new active generation;
-- concurrent close and concurrent ordinary post are safe;
-- tenant isolation;
-- branch/cost-center historical P&L unaffected by close lines;
-- authorization/audit;
-- ACC-6 interaction;
+- zero activity; profit/loss; historical P&L preserved; Balance Sheet no double-count; next-year unclosed income only;
+- 3130/VAT balances untouched; no balance-sheet carry-forward;
+- invalid retained earnings blocked; tenant isolation; concurrency; reopen/re-close;
+- drafts produce warning not blocker;
+- open AR/AP warning/info not blocker;
+- ledger imbalance/integrity failure blocker;
+- close/reopen does not mutate issued invoice/note identifiers, payload/security metadata or numbering;
+- VAT return state is not silently changed by fiscal close/reopen;
+- correction after reopen still requires invoice-domain credit/debit-note rules;
+- readiness does not claim remote ZATCA status without authoritative data;
+- Accounting Period Lock interaction;
 - SQLite + PostgreSQL financial/report suites.
 
-## One bounded implementation choice
-For a zero-activity year, either mark CLOSED with no journal or persist a close-generation record with null journal. Never create a zero-line JournalEntry. Freeze this choice in the implementation task before coding.
+## Bounded implementation choice
+Zero-activity year: prefer marking CLOSED without a zero-line JournalEntry, while persisting close lifecycle/audit state. Freeze exact schema in implementation task.
 
 ## Prohibited shortcuts
-No Income Summary V1; no 3130 annual-close use; no balance-sheet carry-forward journals; no text-based close detection; no hiding close journals from Trial Balance/general ledger; no zeroing historical P&L presentation; no double-counting retained earnings + historical net income; no branch close V1; no edit/delete close journals; no generic Ledger bypass; no implementation/merge/deploy without explicit Safwan approval.
+No Income Summary V1; no 3130 annual-close use; no balance-sheet carry-forward journals; no text-based close detection; no historical P&L zeroing; no net-income double count; no branch close V1; no edit/delete close journals; no generic Ledger bypass; no mutation of issued Fatoora documents; no pretending accounting reopen equals VAT-return amendment; no implementation/merge/deploy without explicit Safwan approval.
 
 ## Readiness
-Architecture is resolved enough to prepare a dedicated implementation task. Before coding verify current-main ReportService, Account Routing `retained_earnings`, ACC-6 status, RBAC/audit conventions and freeze zero-activity persistence. No whole-project re-audit is required.
+Architecture and Saudi guardrails are resolved enough to prepare a dedicated implementation task. Before coding verify current-main ReportService, Account Routing `retained_earnings`, ACC-6 status, current ZATCA integration state, RBAC/audit conventions and exact zero-activity persistence. No whole-project re-audit is required.
