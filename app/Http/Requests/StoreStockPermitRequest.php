@@ -23,7 +23,11 @@ class StoreStockPermitRequest extends FormRequest
             'items'               => ['required', 'array', 'min:1'],
             'items.*.product_id'  => ['required', 'uuid'],
             'items.*.quantity'    => ['required', 'integer', 'min:1', 'max:1000000'],
-            // تكلفة الإضافة وحدها تُدخَل؛ الصرف والتحويل يأخذان المتوسط.
+            // غياب الوحدة = وحدة الأساس بمعامل ١ صراحةً (توافق المستندات القديمة)؛
+            // وحدةٌ غير معروفة على قالب المنتج تُرفض ولا تُفترَض معاملاً.
+            'items.*.unit'        => ['nullable', 'string', 'max:255'],
+            // تكلفة الإضافة وحدها تُدخَل، وهي بالوحدة المُدخَلة أعلاه (لا وحدة
+            // الأساس بالضرورة) — الصرف والتحويل يأخذان المتوسط دائماً.
             'items.*.unit_cost'   => ['nullable', 'integer', 'min:0', 'max:100000000000'], // هللات
         ];
     }
