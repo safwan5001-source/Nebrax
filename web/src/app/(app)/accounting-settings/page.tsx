@@ -20,7 +20,8 @@ interface AccountingSettingItem {
 }
 
 const ITEMS: AccountingSettingItem[] = [
-  { key: 'c_accountRouting', href: null, icon: Route },
+  // ACC-2: بنية تحتية فقط (بلا مستهلك ترحيل) — الرابط حقيقي الآن.
+  { key: 'c_accountRouting', href: '/accounting-settings/account-routing', icon: Route },
   { key: 'c_costCenters', href: '/cost-centers', icon: Network },
   { key: 'c_fiscalPeriods', href: null, icon: CalendarClock },
   { key: 'c_periodLocks', href: null, icon: Lock },
