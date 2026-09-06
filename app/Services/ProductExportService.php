@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Product;
 use App\Support\Money;
 use App\Support\ProductImportFields;
+use App\Support\SensitiveCostPolicy;
 use App\Support\SpreadsheetWriter;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Response;
@@ -99,8 +100,12 @@ class ProductExportService
 
     /**
      * يبني استجابة تنزيل من استعلام مُعدّ مسبقاً (مصفّى ومُرتَّب في المتحكّم).
+     *
+     * `$costAuthorized=false` يُبقي عمودَي `purchase_price`/`avg_cost` في
+     * الترويسة (فلا ينكسر عقد round-trip) لكن يفرغ قيمتهما — PR-INV-1: تصدير
+     * آمن لمن لا يملك `products.view_cost` بدل حجب التصدير كله عنه.
      */
-    public function download(Builder $query, string $template, string $format, string $filename): StreamedResponse|Response
+    public function download(Builder $query, string $template, string $format, string $filename, bool $costAuthorized = true): StreamedResponse|Response
     {
         $total = (clone $query)->toBase()->getCountForPagination();
         if ($total > self::MAX_ROWS) {
@@ -113,22 +118,22 @@ class ProductExportService
         $headers = $this->headers($template);
 
         return $format === self::FORMAT_XLSX
-            ? $this->xlsxResponse($query, $template, $headers, $filename)
-            : $this->csvResponse($query, $template, $headers, $filename);
+            ? $this->xlsxResponse($query, $template, $headers, $filename, $costAuthorized)
+            : $this->csvResponse($query, $template, $headers, $filename, $costAuthorized);
     }
 
     /** @param array<int, string> $headers */
-    private function csvResponse(Builder $query, string $template, array $headers, string $filename): StreamedResponse
+    private function csvResponse(Builder $query, string $template, array $headers, string $filename, bool $costAuthorized): StreamedResponse
     {
-        return response()->streamDownload(function () use ($query, $template, $headers): void {
-            SpreadsheetWriter::streamCsv($headers, $this->rows($query, $template));
+        return response()->streamDownload(function () use ($query, $template, $headers, $costAuthorized): void {
+            SpreadsheetWriter::streamCsv($headers, $this->rows($query, $template, $costAuthorized));
         }, "{$filename}.csv", [
             'Content-Type' => 'text/csv; charset=UTF-8',
         ]);
     }
 
     /** @param array<int, string> $headers */
-    private function xlsxResponse(Builder $query, string $template, array $headers, string $filename): Response
+    private function xlsxResponse(Builder $query, string $template, array $headers, string $filename, bool $costAuthorized): Response
     {
         $path = tempnam(sys_get_temp_dir(), 'nebrax-products-');
         if ($path === false) {
@@ -136,7 +141,7 @@ class ProductExportService
         }
 
         try {
-            SpreadsheetWriter::xlsx($path, $headers, $this->rows($query, $template), $this->columnTypes($headers), 'Products');
+            SpreadsheetWriter::xlsx($path, $headers, $this->rows($query, $template, $costAuthorized), $this->columnTypes($headers), 'Products');
             $contents = file_get_contents($path);
             if ($contents === false) {
                 throw new RuntimeException('تعذر قراءة ملف التصدير بعد بنائه.');
@@ -161,7 +166,7 @@ class ProductExportService
      *
      * @return \Generator<int, array<int, string|null>>
      */
-    private function rows(Builder $query, string $template): \Generator
+    private function rows(Builder $query, string $template, bool $costAuthorized): \Generator
     {
         $headers = $this->headers($template);
         $page = 1;
@@ -173,7 +178,7 @@ class ProductExportService
                 ->get();
 
             foreach ($batch as $product) {
-                yield $this->row($product, $headers);
+                yield $this->row($product, $headers, $costAuthorized);
             }
 
             $page++;
@@ -184,7 +189,7 @@ class ProductExportService
      * @param  array<int, string>  $headers
      * @return array<int, string|null>
      */
-    private function row(Product $product, array $headers): array
+    private function row(Product $product, array $headers, bool $costAuthorized): array
     {
         $values = [
             'nebrax_id' => (string) $product->id,
@@ -213,6 +218,8 @@ class ProductExportService
             'quantity_on_hand' => $product->track_inventory ? (string) $product->quantity_on_hand : null,
             'avg_cost' => $product->track_inventory ? Money::toRiyal($product->avg_cost) : null,
         ];
+
+        $values = SensitiveCostPolicy::redactRow($values, $costAuthorized, SensitiveCostPolicy::PRODUCT_FIELDS);
 
         return array_map(static fn (string $header): ?string => $values[$header] ?? null, $headers);
     }

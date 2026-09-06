@@ -23,7 +23,7 @@ use App\Models\ReturnDocument;
 use App\Models\ReturnLine;
 use App\Support\Money;
 use App\Support\PosSettings;
-use App\Support\Rbac;
+use App\Support\SensitiveCostPolicy;
 use App\Services\Accounting\PosService;
 use App\Services\Accounting\PosExchangeService;
 use App\Services\Accounting\PosCustomerPriceListResolver;
@@ -72,8 +72,10 @@ class PosController extends ApiController
         $catalogUnits = $this->customerPriceLists->catalogUnitsFor($priceList, $products);
 
         // PR-2S: كشف تكلفة/ربحية المنتج في POS يحتاج الصلاحية **والإعداد** معاً؛
-        // الإعداد وحده لا يمنح شيئاً، والأكثر تقييداً يفوز دائماً.
-        $revealCostProfit = Rbac::allows($request->user()?->role ?? '', 'products.view_cost')
+        // الإعداد وحده لا يمنح شيئاً، والأكثر تقييداً يفوز دائماً. PR-INV-1:
+        // الصلاحية تُقرَأ من السياسة المركزية نفسها التي تحكم كل سطح آخر — لا
+        // فحصاً محلياً منفصلاً قد ينحرف عنها لاحقاً.
+        $revealCostProfit = SensitiveCostPolicy::authorized($request->user())
             && PosSettings::showsCostProfitInPos();
 
         $products->each(function (Product $product) use ($catalogUnits, $revealCostProfit): void {

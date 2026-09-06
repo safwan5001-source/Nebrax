@@ -79,7 +79,11 @@ class InventoryBalanceExportService
      * يمسّ الشاشة. يُطبَّق هنا لا في المتحكّم كي يشمل عدّ الصفوف نفسه فلا
      * يتجاوز ملفٌ مصفّى السقفَ بأصفارٍ لن تُكتب.
      */
-    public function download(Builder $query, string $format, string $filename, string $locale, bool $includeZero): StreamedResponse|Response
+    /**
+     * `$costAuthorized=false` يفرغ `avg_cost`/`stock_value` دون حذف عمودَيهما —
+     * PR-INV-1: تصدير آمن لمن لا يملك `products.view_cost` بدل حجب التقرير كله.
+     */
+    public function download(Builder $query, string $format, string $filename, string $locale, bool $includeZero, bool $costAuthorized = true): StreamedResponse|Response
     {
         if (! $includeZero) {
             $query->where('quantity_on_hand', '!=', 0);
@@ -96,22 +100,22 @@ class InventoryBalanceExportService
         $headers = $this->headers($locale);
 
         return $format === self::FORMAT_XLSX
-            ? $this->xlsxResponse($query, $headers, $filename)
-            : $this->csvResponse($query, $headers, $filename);
+            ? $this->xlsxResponse($query, $headers, $filename, $costAuthorized)
+            : $this->csvResponse($query, $headers, $filename, $costAuthorized);
     }
 
     /** @param array<int, string> $headers */
-    private function csvResponse(Builder $query, array $headers, string $filename): StreamedResponse
+    private function csvResponse(Builder $query, array $headers, string $filename, bool $costAuthorized): StreamedResponse
     {
-        return response()->streamDownload(function () use ($query, $headers): void {
-            SpreadsheetWriter::streamCsv($headers, $this->rows($query));
+        return response()->streamDownload(function () use ($query, $headers, $costAuthorized): void {
+            SpreadsheetWriter::streamCsv($headers, $this->rows($query, $costAuthorized));
         }, "{$filename}.csv", [
             'Content-Type' => 'text/csv; charset=UTF-8',
         ]);
     }
 
     /** @param array<int, string> $headers */
-    private function xlsxResponse(Builder $query, array $headers, string $filename): Response
+    private function xlsxResponse(Builder $query, array $headers, string $filename, bool $costAuthorized): Response
     {
         $path = tempnam(sys_get_temp_dir(), 'nebrax-inventory-');
         if ($path === false) {
@@ -119,7 +123,7 @@ class InventoryBalanceExportService
         }
 
         try {
-            SpreadsheetWriter::xlsx($path, $headers, $this->rows($query), $this->columnTypes(), 'Inventory');
+            SpreadsheetWriter::xlsx($path, $headers, $this->rows($query, $costAuthorized), $this->columnTypes(), 'Inventory');
             $contents = file_get_contents($path);
             if ($contents === false) {
                 throw new RuntimeException('تعذر قراءة ملف التصدير بعد بنائه.');
@@ -142,7 +146,7 @@ class InventoryBalanceExportService
      *
      * @return \Generator<int, array<int, string|null>>
      */
-    private function rows(Builder $query): \Generator
+    private function rows(Builder $query, bool $costAuthorized): \Generator
     {
         $page = 1;
 
@@ -150,7 +154,7 @@ class InventoryBalanceExportService
             $batch = (clone $query)->forPage($page, self::CHUNK)->get();
 
             foreach ($batch as $product) {
-                yield $this->row($product);
+                yield $this->row($product, $costAuthorized);
             }
 
             $page++;
@@ -164,7 +168,7 @@ class InventoryBalanceExportService
      *
      * @return array<int, string|null>
      */
-    private function row(Product $product): array
+    private function row(Product $product, bool $costAuthorized): array
     {
         return [
             $product->sku,
@@ -172,8 +176,8 @@ class InventoryBalanceExportService
             $product->name,
             $product->unit,
             (string) $product->quantity_on_hand,
-            Money::toRiyal($product->avg_cost),
-            Money::toRiyal($product->quantity_on_hand * $product->avg_cost),
+            $costAuthorized ? Money::toRiyal($product->avg_cost) : null,
+            $costAuthorized ? Money::toRiyal($product->quantity_on_hand * $product->avg_cost) : null,
         ];
     }
 }
