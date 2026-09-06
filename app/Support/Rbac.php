@@ -138,6 +138,10 @@ class Rbac
             'fuel.credit.view', 'fuel.credit.manage',
             // بوابة الخدمة الذاتية — انظر تعليق دور `self_service` أعلاه.
             'self_service.access',
+            // ACC-1: مركز إعدادات المحاسبة (توجيه الحسابات لاحقاً، الفترات
+            // المحاسبية، إغلاق الفترات). owner/admin يملكانها عبر `*` فقط؛
+            // لا تُضاف لـ accountant/staff تلقائياً — سياسة إدارية للمالك/المدير.
+            'accounting_settings.view', 'accounting_settings.manage',
     ];
 
     /**
