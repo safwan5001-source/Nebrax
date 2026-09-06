@@ -1,476 +1,416 @@
 # AWJ Alerts & Notifications — Master Plan
 
 **Date:** 2026-09-06  
-**Status:** Architecture plan — pre-implementation  
-**Scope:** Alerts, notifications, notification settings, inventory alerts, financial controls, ZATCA, POS, receivables, AWJ system updates, and What's New.  
+**Status:** PR-NOTIF-0 architecture audit completed — implementation not started  
+**Source branch:** `docs/alerts-notifications-master-plan`  
 
-> This document is the planning source of truth for the AWJ Alerts & Notifications program. It must be updated with confirmed repository findings during PR-NOTIF-0 before implementation begins.
+> Source of truth for the AWJ Alerts & Notifications program. No application code, migration, merge, deploy, or production release is authorized by this document.
 
-## 1. Goal
+## 1. Goal and Domain Boundaries
 
-Build one coherent alerts and notifications experience for AWJ while keeping the underlying domain concepts separate:
+AWJ will provide one user-facing notification center while preserving four separate concepts:
 
-- **Alert:** a persistent business/control condition that needs attention or resolution.
-- **Notification:** a user-directed message with a read/unread lifecycle.
-- **System Announcement:** a platform-originated message from AWJ to selected tenants/users.
-- **What's New:** a durable, user-facing release/update history.
+- **Alert:** persistent business/control condition requiring attention or resolution.
+- **Notification:** per-user delivery record with read/unread lifecycle.
+- **System Announcement:** AWJ-platform message targeted to tenants/users.
+- **What's New:** durable tenant-facing release/update history.
 
 Core rule:
 
 `Read Notification != Resolved Alert`
 
-No alert or notification may automatically modify an accounting entry, balance, financial document, inventory transaction, ZATCA document, or POS transaction merely because the alert exists or is acknowledged/read.
+A notification never modifies an accounting entry, balance, financial document, inventory transaction, ZATCA document, or POS transaction merely because it was delivered/read/acknowledged.
 
 ## 2. Governing Principles
 
-1. Tenant Isolation, RBAC, security, accounting correctness, and backward compatibility come first.
-2. Reuse existing alert infrastructure where appropriate; do not create a parallel alert engine without first auditing what exists.
-3. Notifications must never become a side channel around permissions or sensitive-data authorization.
-4. Only actionable/relevant events should generate notifications; avoid notification noise.
-5. Deduplication and lifecycle semantics are required before enabling recurring producers.
-6. Phase 1 delivery is **In-App only**. Email, push, and real-time delivery are deferred until explicitly justified and approved.
-7. AWJ UI remains dense, RTL-first, responsive, token-based, and consistent with the existing design system.
+1. Tenant Isolation, RBAC, security, accounting correctness, and backward compatibility first.
+2. Do not replace the existing Financial Control Alert engine.
+3. Notification payloads, badge counts, metadata, and source links must not leak unauthorized data.
+4. Notify on meaningful state transitions, not every scan/event.
+5. Phase 1 delivery is **In-App only**; Email/Push/real-time are deferred.
+6. UI remains dense, RTL-first, responsive, token-based, Lucide-based, and consistent with AWJ design conventions.
 
-## 3. Existing Financial Control Alerts
+# 3. Confirmed Current Architecture — PR-NOTIF-0
 
-AWJ already has Financial Control Alerts from earlier work (including PR #306 and the unified list work in PR #482). Fuel-related work has also reused this alert foundation.
+The following findings were confirmed against current `main` on 2026-09-06.
 
-PR-NOTIF-0 must confirm the current implementation on `main`, including model/schema, services, APIs, scheduler, settings, RBAC, tenant/branch scope, severity, acknowledgement, deduplication, resolution, and non-financial reuse.
+## 3.1 EXISTING — REUSE: Financial Control Alert engine
 
-The current financial control engine remains the source of truth for its checks. The Notification Center must not re-run financial checks.
+AWJ already has a real domain alert register:
 
-Expected existing examples to verify rather than assume include:
+- `App\Models\FinancialControlAlert`
+- table `financial_control_alerts`
+- `App\Services\Accounting\FinancialControlService`
+- `App\Http\Controllers\Api\FinancialControlAlertController`
+- `/financial-alerts` workspace and finance alert settings UI
+- scheduled `finance:scan-controls`
 
-- Trial Balance / Balance Sheet control discrepancies.
-- Unbalanced journal entries.
-- Posted documents without linked journal entries.
+The engine is explicitly read-only with respect to accounting: it scans accounting/report state and only writes alert records.
 
-No new financial rule is approved by this plan.
+Confirmed financial checks include:
 
-## 4. Inventory Alerts
+- unbalanced posted/reversed journal entries;
+- Trial Balance imbalance;
+- Balance Sheet imbalance;
+- posted Invoice/Purchase/Payment/Expense/ManualJournal without a valid linked posted/reversed journal entry.
 
-Inventory is the first recommended business integration after the notification foundation.
+### Existing alert lifecycle
 
-### 4.1 Low Stock
+`FinancialControlService` uses deterministic `fingerprint` values.
 
-Generate/activate a Low Stock alert when available inventory reaches or falls below the approved reorder/minimum threshold.
+- first detection -> `active`;
+- acknowledgement -> `acknowledged`;
+- issue no longer found -> `resolved` + `resolved_at`;
+- resolved issue detected again -> reopened as `active`, with detection/acknowledgement state reset.
 
-The threshold must **not** be hard-coded globally. PR-NOTIF-0 must determine the current Product/Inventory/Warehouse contract and whether the correct threshold is product-level, warehouse-level, or another existing model.
+This is a proven lifecycle/deduplication pattern and should inform other domain alerts without forcing all domains into the same model.
 
-### 4.2 Out of Stock
+### Existing financial settings
 
-Generate/activate an Out of Stock alert when available quantity reaches zero or below according to the inventory availability semantics already used by AWJ.
+Finance settings already accept:
 
-### 4.3 Lifecycle and Spam Prevention
+- `financial_alerts_enabled`;
+- `alert_check_window_days` (1..90).
 
-Target behavior:
+The financial scan reads these through AWJ's centralized `Settings` abstraction.
 
-- `Normal -> Low Stock`: one alert/notification transition.
-- `Low Stock -> Out of Stock`: a new meaningful transition.
-- `Low Stock/Out of Stock -> Normal`: recovery/resolution according to the approved lifecycle.
-- A later `Normal -> Low Stock` may create a new alert cycle.
+### Existing scheduling
 
-The system must not generate a new notification every scan while the same condition remains active.
+`finance:scan-controls` is scheduled hourly and iterates tenants. The command/service respects tenant settings unless a forced/manual scan is requested.
 
-### 4.4 Warehouse Scope
+## 3.2 EXISTING — REUSE CAREFULLY: Fuel operational alerts
 
-Multi-warehouse behavior must be confirmed before implementation. Alert identity may need to include tenant + warehouse + product + rule, but this is not final until PR-NOTIF-0 confirms the current inventory architecture.
+Fuel operations already reuse `FinancialControlAlert` for non-financial operational conditions. This proves the table/model can technically hold operational alerts, but the name and financial scan lifecycle create domain coupling.
 
-## 5. ZATCA Alerts
+**Decision:** do not rename `financial_control_alerts` or `FinancialControlAlert` now. Do not make them the universal notification store. Preserve backward compatibility and introduce a generic notification delivery layer separately.
 
-Future notification producers should be limited to actionable states such as:
+Future domain alert producers may reuse the existing alert register only when their lifecycle/schema genuinely fits; otherwise use a domain-specific alert model behind a common notification contract.
 
-- submission failure;
-- rejection;
-- clearance failure;
-- reporting failure;
-- resend/intervention required.
+## 3.3 NEW REQUIRED: User Notification delivery layer
 
-Successful routine submissions should not create notification noise.
+Code search on current `main` found no application Notification model/engine and no Laravel `Notification` usage under `app`. The frontend also has no `/notifications` implementation.
 
-This program must not alter ZATCA behavior unless a later explicitly approved PR scopes that change.
+Therefore PR-NOTIF-1 requires a new per-user notification delivery contract/storage.
 
-## 6. POS Alerts
+**Architecture decision:** use a dedicated AWJ notification model/table rather than turning `FinancialControlAlert` into per-user delivery storage. Laravel's notification abstraction may be used internally only if it cleanly supports AWJ's explicit tenant/user/authorization contracts; the database contract remains AWJ-owned and explicit.
 
-Future POS alerts should focus on operational conditions requiring attention, for example:
+Reasoning:
 
-- session/shift requiring review;
-- cash variance requiring review;
-- pending approval;
-- important operational exception.
+- domain Alert lifecycle differs from user Read/Unread lifecycle;
+- one Alert can notify multiple users;
+- system announcements are not financial alerts;
+- explicit `tenant_id` is required for isolation and efficient unread counts;
+- AWJ needs category/severity/source/deduplication metadata with predictable API behavior.
 
-Barcode/payment sounds and other immediate POS feedback are not Notification Center events.
+## 3.4 NEW REQUIRED: Top-bar Bell and Notification Center
 
-## 7. Receivables Alerts
+Current `web/src/components/layout/topbar.tsx` contains quick-create, language, theme, branch/user account controls, but **no notification Bell**.
 
-Future phases may support:
+PR-NOTIF-2 will add the Bell without redesigning the Topbar.
 
-- due soon;
-- due today;
-- overdue.
+Target UX:
 
-Reminder cadence and deduplication must prevent repetitive daily spam. No receivables behavior is changed by this planning document.
+- Bell + unread badge (`1..99+`);
+- tabs: **الكل | تنبيهات | تحديثات**;
+- mark read / mark all read;
+- open authorized source;
+- full `/notifications` workspace.
 
-## 8. AWJ System Updates and Announcements
+Badge represents unread count, never severity.
 
-AWJ should be able to inform tenants about:
+## 3.5 EXISTING — REUSE: Inventory reorder threshold
 
-- new features;
-- improvements;
-- important updates;
-- scheduled maintenance;
-- important operational announcements.
+The product schema already contains:
 
-### 8.1 Audience Targeting
+`products.reorder_level` — documented as the low-stock alert threshold.
 
-System announcements should eventually support targeting appropriate to the confirmed platform architecture, potentially including:
+`Product` exposes/casts it, product create/update contracts use it, and product UI already references it.
 
-- all tenants;
-- specific tenant(s);
-- enabled Application/Capability;
-- subscription plan, if a suitable plan contract exists;
-- user language;
-- other rollout/entitlement criteria supported by the current system.
+The existing product list already defines stock states:
 
-Example principle: a POS-specific feature update should not be sent to a tenant that does not use POS when the entitlement/application architecture can reliably express that distinction.
+- `out`: tracked product with `quantity_on_hand <= 0`;
+- `low`: tracked product with `quantity_on_hand > 0`, `reorder_level > 0`, and `quantity_on_hand <= reorder_level`.
 
-## 9. Notification Center UX
+**Decision:** PR-NOTIF-3 must reuse this exact product-level threshold initially. Do not add another `minimum_stock`/`reorder_point` field.
 
-Target top-bar behavior:
+## 3.6 EXISTING + EXTEND: Inventory quantity and warehouse semantics
 
-- Lucide Bell icon.
-- unread badge (`1` through `99+`).
-- badge represents unread count, not severity.
+AWJ has both product aggregate stock and warehouse stock infrastructure. `User` already supports assigned warehouses through `user_warehouse`, with:
 
-Target panel tabs:
+- `allowedWarehouseIds()`;
+- `canAccessWarehouse()`;
+- empty assignment preserving backward-compatible unrestricted behavior.
 
-- **الكل**
-- **تنبيهات**
-- **تحديثات**
+The current Low/Out product-list semantics are product-level using `products.quantity_on_hand` and `products.reorder_level`.
 
-Core actions:
+**Decision for first inventory alert release:** preserve those existing product-level semantics. Do **not** silently reinterpret `reorder_level` as a per-warehouse threshold.
 
-- mark as read;
-- mark all as read;
-- open the real source entity/workspace;
-- open the full `/notifications` workspace.
+Warehouse-specific Low Stock thresholds are a separate future product decision because there is no confirmed per-warehouse reorder threshold contract in the audited model. If added later, it must be explicit and backward compatible.
 
-The full workspace should support appropriate search/filter/history capabilities while preserving AWJ's dense accounting-tool UX.
+## 3.7 EXISTING — REUSE: Tenant settings architecture
 
-Source navigation examples:
+AWJ has centralized `App\Support\Settings` backed by `tenants.settings[$group]` JSON. The inventory group already contains inventory policies; finance already has alert settings.
 
-- inventory alert -> product/inventory context;
-- invoice alert -> invoice;
-- financial control -> `/financial-alerts`;
-- POS alert -> relevant session/workspace;
-- AWJ update -> `/whats-new` or update details.
+**Decision:** tenant-level notification policy should extend the existing Settings architecture rather than introduce a second generic tenant-settings table in PR-NOTIF-1.
 
-## 10. What's New
+Recommended future group:
 
-Target route:
+`notifications`
 
-`/whats-new`
+with category/policy keys added incrementally. Existing finance settings remain where they are for backward compatibility; the notification layer consumes them rather than moving them immediately.
 
-This is separate from transient read/unread notifications and provides a durable release history.
+## 3.8 EXISTING — REUSE: User preferences and access scopes
 
-Suggested content groups:
+`users.preferences` already exists as JSON. Users also have explicit branch and warehouse assignments plus RBAC.
 
-- New;
-- Improvements;
-- Fixes;
-- release date;
-- affected modules;
-- Learn More when useful.
+**Decision:** user notification preferences can extend `users.preferences` unless a later scale/query requirement proves a dedicated preference table necessary.
 
-Never expose sensitive internal implementation or exploitable security details in tenant-facing release notes.
+Recipient resolution must always intersect:
 
-## 11. Alerts & Notifications Settings
+`Tenant policy ∩ User preference ∩ RBAC ∩ Entitlement ∩ Branch/Warehouse visibility`
 
-Settings are a first-class part of the architecture, not a late cosmetic feature.
+A preference can only reduce delivery; it cannot grant access.
 
-Conceptual navigation:
+## 3.9 EXISTING — REUSE: Application entitlement targeting
+
+`TenantApplicationEntitlement` provides explicit `tenant_id`, `capability_key`, access mode, validity dates, revocation, metadata, and idempotency semantics.
+
+**Decision:** AWJ System Announcements may use the existing entitlement/capability architecture for module-specific targeting. Do not create a duplicate application-targeting mechanism.
+
+## 3.10 NEW REQUIRED: System Announcements and What's New
+
+No generic tenant-facing system announcement/release-note delivery engine was confirmed in the audited notification paths.
+
+These remain separate concepts:
+
+- System Announcement = publishable/targetable platform content;
+- Notification = per-user delivery/read state;
+- What's New = durable release history.
+
+PR-NOTIF-6 will define their persistence/admin publishing contract. It must not expose internal security or implementation details.
+
+# 4. Architecture Decision Record
+
+## ADR-01 — Keep FinancialControlAlert domain-specific
+
+**Decision:** KEEP + WRAP/INTEGRATE. No rename/refactor now.
+
+`FinancialControlAlert` remains the source of truth for existing financial controls and compatible existing fuel behavior. Notification Center consumes alert transitions; it does not own financial scanning.
+
+## ADR-02 — Dedicated AWJ notification storage
+
+**Decision:** NEW REQUIRED.
+
+PR-NOTIF-1 should introduce explicit per-user notification storage with at least the concepts:
+
+- `id`;
+- `tenant_id`;
+- `recipient_user_id`;
+- `category`;
+- `type`;
+- `severity`;
+- safe/localizable title/message contract;
+- `source_type` / `source_id` or equivalent safe action descriptor;
+- `deduplication_key` / idempotency identity;
+- `read_at`;
+- timestamps;
+- constrained metadata.
+
+Exact migration/index names are implementation details for PR-NOTIF-1 and require tests before merge.
+
+## ADR-03 — Domain Event -> Alert -> Notification is not mandatory for every event
+
+Two supported paths:
+
+`Persistent condition -> Domain Alert -> Notification transition`
+
+for Low Stock, financial controls, etc.
+
+and:
+
+`Discrete event/announcement -> Notification`
+
+for events that do not need an independently resolvable Alert.
+
+## ADR-04 — Alert vs Notification lifecycle
+
+Alert lifecycle:
+
+`active -> acknowledged -> resolved -> reopened(active)` where the domain supports it.
+
+Notification lifecycle:
+
+`unread -> read`
+
+Reading/marking a Notification never acknowledges or resolves its source Alert.
+
+## ADR-05 — Deduplication
+
+Persistent alerts use stable domain fingerprints/state transitions. Per-user notifications use an explicit idempotency/deduplication key derived from source + transition/occurrence + recipient.
+
+Repeated scans while a condition remains unchanged must not create repeated notifications.
+
+## ADR-06 — Recipient resolution
+
+Recipients are resolved server-side. Never trust a client-supplied recipient list for domain-generated notifications.
+
+Resolution must honor tenant, permission, capability, branch, warehouse, and relevant user preference constraints.
+
+## ADR-07 — Inventory semantics
+
+Initial Low Stock:
+
+`track_inventory = true AND quantity_on_hand > 0 AND reorder_level > 0 AND quantity_on_hand <= reorder_level`
+
+Initial Out of Stock:
+
+`track_inventory = true AND quantity_on_hand <= 0`
+
+These match current AWJ product-list semantics.
+
+No new threshold field in PR-NOTIF-3.
+
+## ADR-08 — Settings hierarchy
+
+1. Domain/system mandatory safety rules.
+2. Tenant policy through existing Settings architecture.
+3. User preference through existing user preferences where appropriate.
+4. Effective RBAC/entitlement/branch/warehouse access always wins over preference.
+
+## ADR-09 — System Announcement targeting
+
+Use existing tenant/capability entitlement contracts where possible. Announcement persistence remains separate from per-user notification delivery.
+
+## ADR-10 — Polling first
+
+PR-NOTIF-2 should use conservative polling/refetch behavior compatible with the existing web app. WebSockets/push are not a Phase 1 dependency.
+
+# 5. Planned Notification Categories
+
+## Inventory
+
+- Low Stock — warning by default.
+- Out of Stock — critical by default where actionable.
+- recovery resolves the Alert but does not unread/delete historical Notifications.
+
+## Financial Controls
+
+Existing FinancialControlAlert transitions integrated later; no financial rule changes.
+
+## ZATCA
+
+Actionable failures/rejections/resend-required only. Successful routine submissions do not create noise.
+
+## POS
+
+Operational exceptions requiring intervention only. Barcode/payment audio feedback is not Notification Center content.
+
+## Receivables
+
+Due soon / due today / overdue with cadence/deduplication policy.
+
+## AWJ System Updates
+
+- New Feature;
+- Improvement;
+- Important Update;
+- Scheduled Maintenance;
+- Important Operational Announcement.
+
+# 6. Settings Plan
+
+Target navigation:
 
 `Settings -> Alerts & Notifications`
 
-### 11.1 Tenant / Organization Policy
+Tenant policy will eventually control category enablement, recipients/roles, reminder cadence, and mandatory critical policies.
 
-Managed by authorized tenant administrators. It may define:
+User preferences can reduce optional delivery inside tenant policy and authorization boundaries.
 
-- enabled alert categories/types;
-- organization-level alert policies;
-- recipients/roles;
-- reminder cadence;
-- mandatory/critical notification policies.
+Inventory settings must reuse `reorder_level`; notification enablement/recipient policy is separate from the product threshold itself.
 
-### 11.2 User Preferences
+Phase 1 channel: **In-App only**.
 
-Users may customize permitted notifications only within:
+Deferred: Email, Web/Mobile Push, real-time, WhatsApp/SMS.
 
-- tenant policy;
-- RBAC;
-- entitlements;
-- branch/warehouse/data visibility.
+# 7. Security Contract
 
-A user preference must never grant access to data or an event that the user could not otherwise access.
+Every implementation PR must prove:
 
-### 11.3 Inventory Settings
+- tenant-isolated list/count/read/mark-read;
+- recipient ownership checks;
+- no cross-tenant IDOR;
+- source authorization on open;
+- no sensitive information in title/message/metadata for unauthorized users;
+- branch/warehouse visibility where the source is scoped;
+- entitlement checks for module-specific notifications;
+- inventory cost never leaks through notification payloads.
 
-Plan for:
+# 8. Roadmap
 
-- Low Stock enabled/disabled;
-- Out of Stock enabled/disabled;
-- reorder/minimum threshold semantics;
-- recipients;
-- deduplication/recovery policy.
+### PR-NOTIF-0 — Architecture Audit
 
-Threshold placement must be based on the confirmed inventory model, not assumed here.
-
-### 11.4 Financial and Operational Settings
-
-Future settings may cover:
-
-- existing Financial Control Alerts;
-- receivables;
-- ZATCA;
-- POS.
-
-Some critical alerts may be tenant-mandated and therefore not individually suppressible.
-
-### 11.5 AWJ Update Settings
-
-May cover:
-
-- new features;
-- improvements;
-- important updates;
-- scheduled maintenance.
-
-Critical operational platform announcements may be mandatory even if normal product-news notifications are optional.
-
-### 11.6 Delivery Channels
-
-**Phase 1:** In-App only.
-
-Deferred pending explicit approval and demonstrated need:
-
-- Email;
-- Web/Mobile Push;
-- real-time delivery.
-
-WhatsApp/SMS are outside the current scope.
-
-## 12. Security and Authorization Requirements
-
-Non-negotiable requirements:
-
-- Tenant Isolation.
-- User/recipient isolation.
-- RBAC.
-- Entitlements/Application access.
-- Branch/Warehouse scope where applicable.
-- No IDOR.
-- No sensitive-data leakage through notification title, message, metadata, badge counts, or source links.
-- Inventory cost authorization remains enforced; notifications cannot expose cost to unauthorized users.
-- Cross-tenant list/count/read/mark-read/source access must be impossible.
-- Source authorization must still be checked when a notification is opened.
-
-## 13. Severity
-
-Initial conceptual levels:
-
-- `info`
-- `warning`
-- `critical`
-
-A marketing/product update must not be marked critical merely to increase visibility.
-
-Severity must not rely on color alone in the UI.
-
-## 14. Preliminary Data Contracts — Not Final
-
-A user notification may eventually require concepts similar to:
-
-- id;
-- tenant_id;
-- recipient_user_id;
-- category;
-- type;
-- severity;
-- localized title/message or translation keys;
-- source_type/source_id;
-- safe action descriptor;
-- read_at;
-- created_at;
-- metadata;
-- deduplication/idempotency identity.
-
-This is **not an approved schema**. PR-NOTIF-0 must determine whether Laravel Notifications, a custom model, or an extension/wrapper around existing AWJ infrastructure best fits current architecture and backward compatibility.
-
-System Announcements and release notes should remain conceptually separate from per-user notification delivery unless the audit proves another existing design is preferable.
-
-## 15. Implementation Roadmap
-
-### PR-NOTIF-0 — Existing Alerts Architecture Audit
-
-Read-only architecture audit. No application behavior changes.
-
-Deliverable: update this document with confirmed architecture and decisions.
+**Status: COMPLETE in documentation.** No application code changed.
 
 ### PR-NOTIF-1 — Notification Foundation
 
-Expected scope after PR-NOTIF-0 approval:
+Next implementation gate:
 
-- notification storage/model;
-- Tenant Isolation;
-- recipient/RBAC contract;
-- read/unread;
-- unread count;
-- source/action contract;
-- deduplication/idempotency;
-- API;
-- tests.
+- dedicated notification model/table;
+- explicit Tenant Isolation;
+- recipient ownership/RBAC contract;
+- read/unread + unread count;
+- safe source/action contract;
+- deduplication/idempotency contract;
+- list/count/read/mark-read API;
+- focused security/Tenant Isolation tests;
+- no Bell UI yet;
+- no inventory producer yet;
+- no financial/ZATCA/POS behavior change.
 
 ### PR-NOTIF-2 — Notification Center UI
 
-- Bell and badge;
-- panel/sheet;
-- `/notifications`;
-- filters/actions;
-- responsive/mobile;
-- RTL/LTR;
-- light/dark.
+Bell, badge, panel/sheet, `/notifications`, filters/actions, responsive, RTL/LTR, light/dark.
 
 ### PR-NOTIF-3 — Inventory Alerts + Settings
 
-- Low Stock;
-- Out of Stock;
-- threshold semantics;
-- warehouse scope;
-- recovery/resolution;
-- deduplication;
-- recipients;
-- inventory notification settings;
-- tests.
+Low Stock/Out of Stock using existing `reorder_level` and existing product-level stock semantics; lifecycle, deduplication, recipients, settings, tests.
 
 ### PR-NOTIF-4 — Financial + ZATCA Integration
 
-- reuse Financial Control Alerts;
-- connect relevant financial alerts to notification delivery;
-- integrate important ZATCA events;
-- preserve accounting and ZATCA behavior.
+Connect existing FinancialControlAlert transitions and selected actionable ZATCA events without changing accounting/ZATCA behavior.
 
 ### PR-NOTIF-5 — Receivables + POS
 
-- due soon/today/overdue policies;
-- reminder cadence;
-- important POS operational alerts.
+Due/overdue policies and selected POS operational alerts.
 
 ### PR-NOTIF-6 — AWJ System Updates
 
-- System Announcements;
-- audience targeting;
-- publish/expire;
-- notification delivery;
-- `/whats-new`;
-- release notes;
-- system-update settings.
+System Announcements, entitlement-aware audience targeting, publish/expire, `/whats-new`, release notes, update settings.
 
 ### PR-NOTIF-7 — Advanced Preferences & Channels
 
-- advanced user preferences;
-- Email if explicitly approved;
-- Push/real-time only if justified and approved.
+Advanced preferences; Email/Push/real-time only after explicit approval and demonstrated need.
 
-## 16. Priority Order
+# 9. Definition of Done
 
-- **P0:** Foundation + Security + Tenant Isolation + settings contract.
-- **P1:** Notification Center + Low/Out-of-Stock.
-- **P2:** Financial Alerts + ZATCA.
-- **P3:** Receivables + POS.
-- **P4:** AWJ System Updates + What's New.
-- **P5:** Email/Push/real-time.
+Across relevant PRs:
 
-## 17. PR-NOTIF-0 Audit Checklist
-
-PR-NOTIF-0 must inspect only what is needed to answer these questions on current `main`:
-
-1. `FinancialControlAlert` model/schema/service/controller.
-2. Existing alert settings.
-3. Scheduler/commands responsible for scans.
-4. `/financial-alerts` API and UI.
-5. Severity/status/acknowledgement lifecycle.
-6. Tenant Isolation.
-7. Branch scoping.
-8. RBAC/permissions.
-9. Fuel reuse of FinancialControlAlert.
-10. Any other alert/notification engines already present.
-11. Laravel built-in Notification usage, if any.
-12. Existing notification-related tables/migrations.
-13. Top Bar/header implementation and any Bell/notification placeholder.
-14. Product/Inventory/Warehouse models relevant to stock thresholds.
-15. Existing minimum stock/reorder point fields/settings.
-16. Exact available/on-hand/reserved quantity semantics.
-17. Multi-warehouse behavior.
-18. Existing inventory scheduler/events/listeners suitable for alert production.
-19. Tenant/user settings architecture suitable for notification settings.
-20. Applications/entitlements architecture suitable for AWJ announcement targeting.
-21. Translation/i18n conventions.
-22. Existing API pagination/filter conventions suitable for `/notifications`.
-
-Do not inspect unrelated project areas unless required to resolve one of the questions above.
-
-## 18. Required Architecture Decisions After PR-NOTIF-0
-
-Update this document with a **Confirmed Current Architecture** section and classify findings as:
-
-- `EXISTING — REUSE`
-- `EXTEND`
-- `NEW REQUIRED`
-- `DEFERRED`
-- `NOT APPLICABLE`
-
-Then record explicit decisions for:
-
-1. Whether `FinancialControlAlert` remains a domain alert engine or should be generalized/wrapped.
-2. Laravel Notifications vs custom notification storage.
-3. Exact relationship between Domain Event, Alert, and Notification.
-4. Alert lifecycle.
-5. Notification lifecycle.
-6. Deduplication/idempotency strategy.
-7. Recipient resolution strategy.
-8. Tenant/branch/warehouse scope strategy.
-9. Settings hierarchy.
-10. System Announcement architecture.
-11. What's New architecture.
-12. Inventory Low/Out-of-Stock semantics.
-13. Polling vs real-time for the first release.
-
-Do not choose a solution merely because it is conventional Laravel architecture; prefer the solution that fits current AWJ contracts and backward compatibility.
-
-## 19. Definition of Done
-
-The program is not complete merely because a Bell appears.
-
-Required quality gates across the relevant implementation PRs:
-
-- Tenant Isolation tests.
-- RBAC tests.
-- No sensitive-data leakage.
-- Deduplication/idempotency.
-- Correct read/unread behavior.
-- Correct alert lifecycle.
-- Confirmed inventory warehouse/threshold semantics.
-- Accounting behavior unchanged unless explicitly scoped and approved.
-- ZATCA behavior unchanged unless explicitly scoped and approved.
-- RTL/LTR.
-- Mobile/responsive behavior.
-- Light/Dark.
-- SQLite/PostgreSQL as required by project CI.
-- Backend/frontend tests appropriate to each change.
-- Build/CI green.
+- Tenant Isolation tests;
+- RBAC and source authorization tests;
+- no sensitive-data leakage;
+- deduplication/idempotency;
+- correct Alert lifecycle;
+- correct Notification read/unread lifecycle;
+- inventory semantics preserved;
+- accounting behavior unchanged unless explicitly scoped;
+- ZATCA behavior unchanged unless explicitly scoped;
+- RTL/LTR + mobile + light/dark;
+- SQLite/PostgreSQL CI as applicable;
+- backend/frontend tests and build green.
 
 No merge, deploy, or production release without Safwan's explicit approval.
 
-## 20. Immediate Next Step
+# 10. Immediate Next Step
 
-Execute **PR-NOTIF-0 only** as a read-only architecture audit. Update this same document with repository-confirmed findings and architecture decisions before writing any notification migration or application implementation.
+Proceed only to **PR-NOTIF-1 — Notification Foundation** after review/approval of this audit. Keep scope infrastructure-only: no Bell UI, no inventory producer, no financial rule changes, no ZATCA/POS changes.
