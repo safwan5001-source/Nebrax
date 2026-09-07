@@ -97,6 +97,10 @@ class ProductResource extends JsonResource
             'internal_notes'   => $this->internal_notes,
             'type'             => $this->type,
             'unit'             => $this->unit,
+            // PR-UOM2-1: اقتراحٌ للواجهة/نقطة البيع. `null` = وحدة الأساس، وهو
+            // ما تفعله المستندات أصلاً — فلا مسار مستندات يقرأ هذين الحقلين.
+            'default_sales_unit'    => $this->default_sales_unit,
+            'default_purchase_unit' => $this->default_purchase_unit,
             'sale_price'       => Money::toRiyal($this->sale_price),
             'purchase_price'   => $this->when(! $hidesCostProfit, fn () => Money::toRiyal($this->purchase_price)),
             'tax_rate'         => $this->tax_rate,
