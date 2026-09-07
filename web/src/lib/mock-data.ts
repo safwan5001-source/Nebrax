@@ -2495,6 +2495,22 @@ const mockFuelShifts = [
   { id: 'fsh-2', fuel_station_id: 'fs-2', opened_at: '2026-08-24T05:00:00Z', status: 'closed' },
 ];
 
+/**
+ * تطابق بحث نصّي بسيط لبيانات المعاينة المحلية — يطابق سلوك `LIKE '%term%'`
+ * على الخادم الحقيقي (بلا حساسية لحالة الأحرف) لعمود واحد أو أكثر.
+ *
+ * **لماذا هنا:** كل نقاط `mockApi` كانت تتجاهل سلسلة الاستعلام تماماً
+ * (`clean = path.split('?')[0]`) فتُعيد القائمة الكاملة دائماً — بحث AWJ
+ * العام (PR #678) افترض بحقّ أن `search=` يُصفّي على الخادم الحقيقي (وهو
+ * صحيح فعلاً في `InvoiceController`/`PurchaseController`/`ProductController`/
+ * `JournalEntryController`)، لكن طبقة المعاينة المحلية وحدها لم تطبّق هذا
+ * العقد قط — عطل موجود قبل PR #678 لا فيه، يظهر فقط في وضع المعاينة.
+ */
+function matchesSearchTerm(term: string, ...fields: Array<string | null | undefined>): boolean {
+  const needle = term.toLowerCase();
+  return fields.some((field) => typeof field === 'string' && field.toLowerCase().includes(needle));
+}
+
 export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknown): Promise<T> {
   const operationsResponse = handleDocumentOperationsDemo(path, method.toUpperCase(), body);
   if (operationsResponse.handled) {
@@ -3125,7 +3141,13 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
     });
   }
   if (clean === '/applications') return resolve({ data: mockApplications });
-  if (clean === '/journal-entries') return resolve({ data: mockJournalEntriesList });
+  if (clean === '/journal-entries') {
+    const search = (new URLSearchParams(path.split('?')[1] ?? '').get('search') ?? '').trim();
+    const list = search
+      ? mockJournalEntriesList.filter((entry) => matchesSearchTerm(search, entry.number, entry.description))
+      : mockJournalEntriesList;
+    return resolve({ data: list });
+  }
   if (clean === '/manual-journals') return resolve({ data: mockManualJournals });
   if (clean === '/fuel-stations/workspace') return resolve({ data: { stations: mockFuelStations } });
   if (clean === '/fuel-stations/dashboard') return resolve({ data: mockFuelDashboard });
@@ -3174,7 +3196,13 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
       })),
     });
   }
-  if (clean === '/products') return resolve({ data: allMockProducts() });
+  if (clean === '/products') {
+    const search = (new URLSearchParams(path.split('?')[1] ?? '').get('search') ?? '').trim();
+    const list = search
+      ? allMockProducts().filter((product) => matchesSearchTerm(search, product.name, product.sku, product.barcode))
+      : allMockProducts();
+    return resolve({ data: list });
+  }
   const productMediaCollection = clean.match(/^\/products\/([^/]+)\/media$/);
   if (productMediaCollection) return resolve({ data: listDemoProductMedia(productMediaCollection[1]) });
   const productBarcodes = clean.match(/^\/products\/([^/]+)\/barcodes$/);
@@ -3347,7 +3375,17 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
       : mockPartners;
     return resolve({ data: list });
   }
-  if (clean === '/invoices') return resolve({ data: mockInvoices });
+  if (clean === '/invoices') {
+    const search = (new URLSearchParams(path.split('?')[1] ?? '').get('search') ?? '').trim();
+    const list = search
+      ? mockInvoices.filter((inv) => matchesSearchTerm(
+          search,
+          inv.number,
+          mockPartners.find((p) => p.id === inv.partner_id)?.name,
+        ))
+      : mockInvoices;
+    return resolve({ data: list });
+  }
   if (clean === '/quotes') return resolve({ data: mockQuotes });
   if (clean === '/credit-notes') {
     const nt = new URLSearchParams(path.split('?')[1] ?? '').get('type');
@@ -3381,7 +3419,18 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
     (globalThis as typeof globalThis & { __nebraxPurchaseAttachments?: typeof store }).__nebraxPurchaseAttachments = store;
     return resolve({ data: store[purchaseAttachmentCollection[1]] ?? [] });
   }
-  if (clean === '/purchases') return resolve({ data: mockPurchases });
+  if (clean === '/purchases') {
+    const search = (new URLSearchParams(path.split('?')[1] ?? '').get('search') ?? '').trim();
+    const list = search
+      ? mockPurchases.filter((purchase) => matchesSearchTerm(
+          search,
+          purchase.number,
+          purchase.supplier_invoice_no,
+          mockPartners.find((p) => p.id === purchase.partner_id)?.name,
+        ))
+      : mockPurchases;
+    return resolve({ data: list });
+  }
   if (clean === '/returns') {
     const rtype = new URLSearchParams(path.split('?')[1] ?? '').get('type');
     const list = rtype === 'sales' || rtype === 'purchase' ? mockReturns.filter((r) => r.type === rtype) : mockReturns;
