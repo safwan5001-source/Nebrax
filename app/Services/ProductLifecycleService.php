@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\BarcodeRegistryEntry;
 use App\Models\CreditNoteLine;
 use App\Services\DocumentCenter\DocumentStorageService;
 use App\Models\InvoiceLine;
@@ -111,6 +112,11 @@ class ProductLifecycleService
             // لا تبقى باركودات أو صور لمنتج حُذف فعلياً بلا مراجع. نحفظ
             // قائمة الملفات قبل حذف الصفوف، ثم ننظف التخزين بعد نجاح المعاملة.
             $media = $product->media()->get(['disk', 'path'])->all();
+            // فضاء الباركود الموحّد أولاً: حذف العلاقة أدناه استعلامٌ مجمّع
+            // لا يُطلق حدث Eloquent لكل صفّ، فتحرير التسجيل هنا صراحةً هو
+            // الوحيد. مسارٌ لا يُكمِل أصلاً إلا بلا مراجع تاريخية — تحريره
+            // آمنٌ دائماً هنا.
+            BarcodeRegistryEntry::releaseAllForProduct($product->id);
             $product->alternateBarcodes()->delete();
             $product->media()->delete();
             $product->delete();
@@ -141,6 +147,24 @@ class ProductLifecycleService
             ->all();
     }
 
+    /**
+     * أثرٌ مخزني حقيقي على منتج — مرجع مركزي واحد يستهلكه أي مسارٍ يحتاج
+     * إثبات وجود «footprint» قبل قرار لا يجوز التراجع عنه (تغيير نوع
+     * المنتج/تتبّعه هنا، ومنع تعديل وحدة قياسٍ يستعملها القالب في
+     * `UnitTemplateController` — بدل تكرار نفس المصفوفة في كل موضع).
+     *
+     * الحقول الأربعة مطابقة تماماً لتصنيف "Inventory-semantic" في تدقيق
+     * PR-PROD-LIFE-1 (باستثناء `InventoryOpeningLine` — فجوة موثَّقة هناك
+     * صراحةً، خارج نطاق هذا المسار كي لا يُبنى سجلّ مراجع مواز غير متّسق).
+     */
+    public function hasInventoryFootprint(Product $product): bool
+    {
+        return StockMovement::where('product_id', $product->id)->exists()
+            || StockPermitLine::where('product_id', $product->id)->exists()
+            || StocktakeLine::where('product_id', $product->id)->exists()
+            || ProductWarehouseStock::where('product_id', $product->id)->exists();
+    }
+
     /** @param array<string, mixed> $data */
     private function assertInventoryIdentityCanChange(Product $product, array $data): void
     {
@@ -151,13 +175,7 @@ class ProductLifecycleService
             return;
         }
 
-        $inventoryReferences = [
-            'stock_movements'    => StockMovement::where('product_id', $product->id)->exists(),
-            'stock_permit_lines' => StockPermitLine::where('product_id', $product->id)->exists(),
-            'stocktake_lines'    => StocktakeLine::where('product_id', $product->id)->exists(),
-            'warehouse_stocks'   => ProductWarehouseStock::where('product_id', $product->id)->exists(),
-        ];
-        if (in_array(true, $inventoryReferences, true)) {
+        if ($this->hasInventoryFootprint($product)) {
             throw new RuntimeException('لا يمكن تغيير نوع المنتج أو تتبع مخزونه بعد وجود حركة أو رصيد مخزني. أنشئ منتجاً جديداً بدلاً من إعادة تفسير السجل التاريخي.');
         }
     }

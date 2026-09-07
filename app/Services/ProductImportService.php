@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\BarcodeRegistryEntry;
 use App\Models\Brand;
 use App\Models\Product;
 use App\Models\ProductCategory;
@@ -11,7 +12,6 @@ use App\Support\SensitiveCostPolicy;
 use App\Support\Settings;
 use App\Support\SpreadsheetReader;
 use App\Support\SpreadsheetWriter;
-use App\Tenancy\BranchScope;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -1378,17 +1378,19 @@ class ProductImportService
         }
     }
 
-    /** الباركود يُمسح ضوئياً في كل الفروع، فتفرّده على مستوى المؤسسة لا الفرع. */
+    /**
+     * الباركود يُمسح ضوئياً في كل الفروع، فتفرّده على مستوى المؤسسة لا الفرع.
+     * الفحص عبر فضاء الباركود الموحّد (PR-UOM-1) — نفس المصدر الذي يستعمله
+     * إنشاء/تعديل المنتج والباركود البديل، فلا يفوت الاستيراد باركوداً بديلاً
+     * مستخدَماً بالفعل لمنتجٍ آخر (كان يفحص `Product.barcode` وحده سابقاً).
+     */
     private function hasLiveBarcodeConflict(string $barcode, ?string $exceptProductId = null): bool
     {
         if ($barcode === '') {
             return false;
         }
 
-        return Product::withoutGlobalScope(BranchScope::class)
-            ->where('barcode', $barcode)
-            ->when($exceptProductId, fn ($query) => $query->where('id', '!=', $exceptProductId))
-            ->exists();
+        return BarcodeRegistryEntry::isTaken($barcode, $exceptProductId);
     }
 
     private function assertNoLiveBarcodeConflict(string $barcode, ?string $exceptProductId = null): void
