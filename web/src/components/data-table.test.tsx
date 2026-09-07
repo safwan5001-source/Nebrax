@@ -381,3 +381,78 @@ describe('DataTable row selection', () => {
     expect(container.textContent).not.toMatch(/[؀-ۿ]/);
   });
 });
+
+describe('DataTable optional row activation', () => {
+  it('does not change default rows when no row click handler is supplied', () => {
+    renderIntl(<DataTable columns={columns} data={rows} showToolbar={false} />);
+    expect(screen.getByRole('table').querySelector('[data-state="active"]')).toBeNull();
+  });
+
+  it('opens from a non-interactive cell and ignores existing row controls', async () => {
+    const onRowClick = vi.fn();
+    const withAction: ColumnDef<Row, unknown>[] = [
+      ...columns,
+      { id: 'open', header: 'Open', cell: () => <button type="button">Open</button> },
+    ];
+    renderIntl(
+      <DataTable
+        columns={withAction}
+        data={rows}
+        showToolbar={false}
+        onRowClick={(row) => onRowClick(row.id)}
+        isRowActive={(row) => row.id === '1'}
+      />,
+    );
+
+    const table = screen.getByRole('table');
+    expect(table.querySelector('[data-state="active"]')).toBeTruthy();
+
+    await userEvent.click(within(table).getByText('مؤسسة الطموح'));
+    expect(onRowClick).toHaveBeenCalledWith('1');
+
+    onRowClick.mockClear();
+    await userEvent.click(within(table).getByRole('button', { name: 'Open' }));
+    expect(onRowClick).not.toHaveBeenCalled();
+  });
+});
+
+describe('DataTable optional column menu and breakpoint hiding', () => {
+  it('still offers the column menu by default when the toolbar is hidden', () => {
+    renderIntl(
+      <DataTable
+        columns={columns}
+        data={rows}
+        showToolbar={false}
+        columnVisibility={{ value: {}, onChange: vi.fn(), protectedColumnIds: ['number'] }}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: nebraxText('ar', 'columns') })).toBeTruthy();
+  });
+
+  it('hides the standalone column menu when showColumnMenu is false', () => {
+    renderIntl(
+      <DataTable
+        columns={columns}
+        data={rows}
+        showToolbar={false}
+        showColumnMenu={false}
+        columnVisibility={{ value: {}, onChange: vi.fn(), protectedColumnIds: ['number'] }}
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: nebraxText('ar', 'columns') })).toBeNull();
+  });
+
+  it('keeps hideBelow columns in the table with a visual breakpoint class', () => {
+    const withHidden: ColumnDef<Row, unknown>[] = [
+      { accessorKey: 'number', header: 'الرقم' },
+      { accessorKey: 'date', header: 'التاريخ', meta: { hideBelow: 'xl' } },
+    ];
+    renderIntl(<DataTable columns={withHidden} data={rows} showToolbar={false} />);
+
+    const header = screen.getByRole('columnheader', { name: 'التاريخ' });
+    expect(header.className).toContain('hidden');
+    expect(header.className).toContain('xl:table-cell');
+  });
+});
