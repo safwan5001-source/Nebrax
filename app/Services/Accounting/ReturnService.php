@@ -62,13 +62,12 @@ class ReturnService
 {
     private const ACC_CASH        = '1110';
     private const ACC_RECEIVABLE  = '1130';
+    // ACC-4: `inventory_asset` مُوجَّه دلالياً في مرتجع المشتريات (أدناه)،
+    // ويبقى هذا الكود ثابتاً في مرتجع المبيعات فقط (خارج نطاق ACC-4).
     private const ACC_INVENTORY   = '1140';
-    private const ACC_INPUT_VAT   = '1150';
-    private const ACC_PAYABLE     = '2110';
     private const ACC_OUTPUT_VAT  = '2120';
     private const ACC_SALES       = '4110';
     private const ACC_COGS        = '5110';
-    private const ACC_EXPENSE     = '5150';
     private const ACC_DAMAGE      = '5180'; // فروق الجرد والتلف — تلفٌ/فقدٌ فيزيائي فقط، لا فرق تقييم
     // PURCHASE_RETURN_VALUATION_VARIANCE (المعنى المحاسبي المستقبلي لميزة Account
     // Mapping القادمة): فرقٌ تقييمي بحت — اعتماد المورّد التجاري مقابل القيمة
@@ -712,11 +711,17 @@ class ReturnService
         // سالبٌ = أقلّ (خسارة). صفرٌ في كل الحالات القائمة قبل هذا الإصلاح.
         $variance = $inventoryCommercialTotal - $inventoryCarryingTotal;
 
-        // ACC-RET-1 — قيد عكس الشراء **تجاريّ دائماً**: مدين الموردين
-        // (`accounts_payable`) / دائن 1140 (بالقيمة الدفترية) + دائن 5150 +
-        // دائن 1150 + فرق القيمة (إن وُجد) إلى 5116. لا حركة نقد/بنك داخل
-        // المرتجع إطلاقاً — عودة المال مستندٌ مستقل (`SupplierRefund`).
-        // وطرف المورّد ملازمٌ للسطر: ذمّةٌ بلا طرفٍ لا تُسوّى لاحقاً.
+        // ACC-RET-1/ACC-4 — قيد عكس الشراء **تجاريّ دائماً**: مدين الموردين
+        // (`accounts_payable`) / دائن `inventory_asset` (بالقيمة الدفترية) +
+        // دائن `purchase_expense` + دائن `tax_input` + فرق القيمة (إن وُجد)
+        // إلى 5116 (ليس دوراً معتمَداً بعد). لا حركة نقد/بنك داخل المرتجع
+        // إطلاقاً — عودة المال مستندٌ مستقل (`SupplierRefund`). وطرف المورّد
+        // ملازمٌ للسطر: ذمّةٌ بلا طرفٍ لا تُسوّى لاحقاً.
+        //
+        // **التناظر مع الاستلام إلزامي**: الأدوار الثلاثة هنا هي نفسها التي
+        // يستهلكها `PurchaseService::post()` — تعيينٌ مخصَّص لـ`inventory_asset`
+        // مثلاً ينعكس على الشراء ومرتجعه معاً، فلا يفترقان أبداً على تعيين
+        // المستأجر نفسه.
         $lines = [[
             'account_id'   => $this->accountRoles->resolve('accounts_payable')->id,
             'debit'        => $total,
@@ -725,13 +730,13 @@ class ReturnService
         ]];
 
         if ($inventoryCarryingTotal > 0) {
-            $lines[] = ['account_id' => $this->accountId(self::ACC_INVENTORY), 'credit' => $inventoryCarryingTotal];
+            $lines[] = ['account_id' => $this->accountRoles->resolve('inventory_asset')->id, 'credit' => $inventoryCarryingTotal];
         }
         if ($expenseTotal > 0) {
-            $lines[] = ['account_id' => $this->accountId(self::ACC_EXPENSE), 'credit' => $expenseTotal];
+            $lines[] = ['account_id' => $this->accountRoles->resolve('purchase_expense')->id, 'credit' => $expenseTotal];
         }
         if ($taxTotal > 0) {
-            $lines[] = ['account_id' => $this->accountId(self::ACC_INPUT_VAT), 'credit' => $taxTotal];
+            $lines[] = ['account_id' => $this->accountRoles->resolve('tax_input')->id, 'credit' => $taxTotal];
         }
         if ($variance > 0) {
             $lines[] = ['account_id' => $this->accountId(self::ACC_PURCHASE_RETURN_VALUATION_VARIANCE), 'credit' => $variance];
