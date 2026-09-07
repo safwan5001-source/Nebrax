@@ -26,6 +26,22 @@ class ProductBarcode extends BaseModel implements CompanyWide
         ];
     }
 
+    /**
+     * جزء من فضاء الباركود الموحّد (PR-UOM-1). `created` لا `creating`:
+     * يحتاج `id` (المولَّد بالفعل عند هذه اللحظة) بيقين. لا معالج حذفٍ هنا
+     * عمداً — الحذف الفردي (`ProductController::destroyBarcode`) وحذف كل
+     * باركودات منتجٍ دفعةً واحدة (`ProductLifecycleService::delete`) كلاهما
+     * يحرّر التسجيل صراحةً في موضعه، لأن حذف العلاقة الجماعي
+     * (`$product->alternateBarcodes()->delete()`) استعلام مجمّع لا يُطلق
+     * حدث Eloquent لكل صفّ — الاعتماد عليه هنا كان سيترك تسجيلات يتيمة.
+     */
+    protected static function booted(): void
+    {
+        static::created(function (ProductBarcode $barcode) {
+            BarcodeRegistryEntry::claim($barcode->code, $barcode->product_id, 'alternate');
+        });
+    }
+
     public function product(): BelongsTo
     {
         return $this->referenceBelongsTo(Product::class);

@@ -16,6 +16,7 @@ use App\Support\SpreadsheetWriter;
 use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 /**
@@ -29,8 +30,8 @@ use Tests\TestCase;
  */
 class InventoryOpeningImportTest extends TestCase
 {
-    use RefreshDatabase;
     use InteractsWithApi;
+    use RefreshDatabase;
 
     /** @param array<int, string> $headers @param array<int, array<int, string>> $rows */
     private function csv(array $headers, array $rows, string $name = 'openings.csv'): UploadedFile
@@ -281,14 +282,14 @@ class InventoryOpeningImportTest extends TestCase
     {
         $scene = $this->scene();
         $before = [
-            'openings'   => InventoryOpening::count(),
-            'lines'      => InventoryOpeningLine::count(),
-            'movements'  => StockMovement::count(),
-            'entries'    => JournalEntry::count(),
-            'stock'      => ProductWarehouseStock::count(),
-            'products'   => Product::count(),
+            'openings' => InventoryOpening::count(),
+            'lines' => InventoryOpeningLine::count(),
+            'movements' => StockMovement::count(),
+            'entries' => JournalEntry::count(),
+            'stock' => ProductWarehouseStock::count(),
+            'products' => Product::count(),
             'warehouses' => Warehouse::count(),
-            'quantity'   => Product::where('sku', 'SKU-1001')->value('quantity_on_hand'),
+            'quantity' => Product::where('sku', 'SKU-1001')->value('quantity_on_hand'),
         ];
 
         $this->preview($scene['token'], $this->csv(
@@ -417,15 +418,25 @@ class InventoryOpeningImportTest extends TestCase
         $this->assertSame('0.00', $preview['counters']['total_value']);
     }
 
-    /** @test */
+    /**
+     * PR-UOM-1 يمنع الآن تكرار الباركود عند الإنشاء عبر Eloquent (فضاء
+     * الباركود الموحّد). هذا الاختبار يحاكي عمداً بياناتٍ قديمة متكرّرة
+     * فعلياً في القاعدة (سبقت هذا الفضاء) عبر تحديثٍ مباشر بمُنشئ الاستعلام
+     * — يتخطّى أحداث Eloquent فلا يمسّ السجل الموحّد — لا عبر إنشاءٍ عادي
+     * صار مرفوضاً بحقّ؛ فيبقى مطابِق الباركود المبهم في استيراد الأرصدة
+     * الافتتاحية مختبَراً لدفاعه ضد حالةٍ قد توجد فعلاً في بيانات قائمة.
+     *
+     * @test
+     */
     public function an_ambiguous_barcode_stops_the_row_instead_of_guessing(): void
     {
         $scene = $this->scene();
         app(TenantContext::class)->set($scene['tenant_id']);
-        Product::create([
-            'name' => 'توأم الباركود', 'sku' => 'SKU-1002', 'barcode' => '6280000000001', 'type' => 'good',
+        $twin = Product::create([
+            'name' => 'توأم الباركود', 'sku' => 'SKU-1002', 'type' => 'good',
             'sale_price' => 1000, 'purchase_price' => 500, 'track_inventory' => true,
         ]);
+        DB::table('products')->where('id', $twin->id)->update(['barcode' => '6280000000001']);
 
         $preview = $this->preview($scene['token'], $this->csv(
             ['barcode', 'warehouse', 'opening_quantity', 'opening_unit_cost'],

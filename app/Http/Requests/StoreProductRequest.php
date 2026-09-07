@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Models\BarcodeRegistryEntry;
 use App\Models\Product;
 use App\Support\BranchSettings;
 use App\Tenancy\BranchContext;
@@ -54,7 +55,10 @@ class StoreProductRequest extends FormRequest
                 },
             ],
             // الباركود يُمسح عبر نقاط البيع والمستودعات، فلا يجوز أن يشير إلى بندين
-            // مختلفين في المؤسسة ولو كانت المنتجات معزولة بين الفروع.
+            // مختلفين في المؤسسة ولو كانت المنتجات معزولة بين الفروع. الفحص
+            // عبر فضاء الباركود الموحّد (PR-UOM-1) — يشمل الأساسي والبديل معاً،
+            // ولا يستثني منتجاً معطّلاً أو محذوفاً ناعماً: هويته التاريخية
+            // تبقى محمية، فلا يُعاد استخدام باركوده لمنتجٍ آخر.
             'barcode'         => [
                 'nullable',
                 'string',
@@ -64,13 +68,7 @@ class StoreProductRequest extends FormRequest
                         return;
                     }
 
-                    $duplicate = Product::withoutGlobalScope(BranchScope::class)
-                        ->where('barcode', $value)
-                        ->whereNull('deleted_at')
-                        ->when($productId, fn ($query) => $query->where('id', '!=', $productId))
-                        ->exists();
-
-                    if ($duplicate) {
+                    if (BarcodeRegistryEntry::isTaken($value, $productId)) {
                         $fail('الباركود مستخدم بالفعل لمنتج آخر في المؤسسة.');
                     }
                 },

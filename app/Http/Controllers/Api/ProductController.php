@@ -12,6 +12,7 @@ use App\Http\Resources\ProductActivityResource;
 use App\Http\Resources\ProductBarcodeResource;
 use App\Http\Resources\ProductMediaResource;
 use App\Http\Resources\ProductResource;
+use App\Models\BarcodeRegistryEntry;
 use App\Models\Product;
 use App\Models\ProductBarcode;
 use App\Models\ProductMedia;
@@ -266,11 +267,9 @@ class ProductController extends ApiController
             abort(422, 'الباركود لا يمكن أن يكون فارغاً.');
         }
 
-        // الباركود الأساسي التاريخي والباركودات البديلة يعيشان في موضعين؛
-        // نتحقق من كليهما كي يبقى كود المسح فريداً داخل المؤسسة.
-        $primaryTaken = Product::withTrashed()->where('barcode', $code)->exists();
-        $alternateTaken = ProductBarcode::where('code', $code)->exists();
-        if ($primaryTaken || $alternateTaken) {
+        // فحصٌ مسبق برسالة واضحة — الضمان الفعلي تحت التزامن هو القيد
+        // الفريد في `barcode_registry`، تفرضه `ProductBarcode::created` أدناه.
+        if (BarcodeRegistryEntry::isTaken($code)) {
             abort(422, 'الباركود مستخدم بالفعل في منتج آخر أو كوحدة أخرى.');
         }
 
@@ -284,13 +283,13 @@ class ProductController extends ApiController
             abort(422, 'وحدة الباركود يجب أن تكون وحدة الأساس أو وحدة بديلة معرّفة في قالب المنتج.');
         }
 
-        $barcode = $product->alternateBarcodes()->create([
+        $barcode = $this->domain(fn () => $product->alternateBarcodes()->create([
             'code' => $code,
             'unit_name' => $unitName,
             'default_quantity' => (int) ($data['default_quantity'] ?? 1),
             'label' => isset($data['label']) ? trim((string) $data['label']) ?: null : null,
             'created_by' => $request->user()?->id,
-        ]);
+        ]));
 
         return (new ProductBarcodeResource($barcode))->response()->setStatusCode(201);
     }
@@ -298,7 +297,10 @@ class ProductController extends ApiController
     public function destroyBarcode(string $id, string $barcodeId): JsonResponse
     {
         $product = Product::findOrFail($id);
-        $product->alternateBarcodes()->whereKey($barcodeId)->firstOrFail()->delete();
+        $barcode = $product->alternateBarcodes()->whereKey($barcodeId)->firstOrFail();
+        $code = $barcode->code;
+        $barcode->delete();
+        BarcodeRegistryEntry::release($code);
 
         return response()->json(['message' => 'تم حذف الباركود البديل.']);
     }
