@@ -31,6 +31,7 @@ use App\Support\ProductListFilters;
 use App\Support\SensitiveCostPolicy;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -283,13 +284,18 @@ class ProductController extends ApiController
             abort(422, 'وحدة الباركود يجب أن تكون وحدة الأساس أو وحدة بديلة معرّفة في قالب المنتج.');
         }
 
-        $barcode = $this->domain(fn () => $product->alternateBarcodes()->create([
+        // معاملة صريحة: `ProductBarcode::created` يحجز في `barcode_registry` من
+        // داخل نفس استدعاء `create()` — بلا معاملة تجمعهما، فشل الحجز (سباق
+        // نادر يتجاوز الفحص المسبق أعلاه) كان سيترك سطر الباركود البديل قائماً
+        // بلا سجلٍّ يحميه. `domain()` تبقى الطبقة الخارجية لترجمة `RuntimeException`
+        // (من الفحص المسبق هنا أو من فشل الحجز داخل المعاملة) إلى 422 واحد.
+        $barcode = $this->domain(fn () => DB::transaction(fn () => $product->alternateBarcodes()->create([
             'code' => $code,
             'unit_name' => $unitName,
             'default_quantity' => (int) ($data['default_quantity'] ?? 1),
             'label' => isset($data['label']) ? trim((string) $data['label']) ?: null : null,
             'created_by' => $request->user()?->id,
-        ]));
+        ])));
 
         return (new ProductBarcodeResource($barcode))->response()->setStatusCode(201);
     }
@@ -299,8 +305,15 @@ class ProductController extends ApiController
         $product = Product::findOrFail($id);
         $barcode = $product->alternateBarcodes()->whereKey($barcodeId)->firstOrFail();
         $code = $barcode->code;
-        $barcode->delete();
-        BarcodeRegistryEntry::release($code);
+
+        // فضاء الباركود ذرّي بتصميمه (PR-UOM-1): حذف سطر الباركود البديل
+        // وتحرير سجلّه في `barcode_registry` يجب أن ينجحا أو يفشلا معاً — وإلا
+        // بقي الكود محجوزاً أبداً في السجل بلا أي صفٍّ يبرّر حجزه، فيصير غير
+        // قابلٍ لإعادة الاستخدام رغم عدم وجود ما يمنعه فعلياً.
+        DB::transaction(function () use ($barcode, $code): void {
+            $barcode->delete();
+            BarcodeRegistryEntry::release($code);
+        });
 
         return response()->json(['message' => 'تم حذف الباركود البديل.']);
     }

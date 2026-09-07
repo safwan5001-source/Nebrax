@@ -288,6 +288,63 @@ class BarcodeNamespaceTest extends TestCase
         $this->assertFalse(BarcodeRegistryEntry::isTaken('ALT-FREE'));
     }
 
+    /**
+     * حذف الباركود البديل وتحرير سجلّه معاملةٌ واحدة (PR-UOM-1 مراجعة): فشلٌ في
+     * أيّ شطرٍ يتراجع عن الآخر أيضاً — لا يبقى سطر `product_barcodes` محذوفاً
+     * وسجلّه في `barcode_registry` قائماً (أو العكس)، فلا يتباعد المصدر عن السجل.
+     */
+    /** @test */
+    public function a_failure_releasing_the_registry_rolls_back_the_alternate_barcode_delete_too(): void
+    {
+        $auth = $this->registerTenant();
+        $product = $this->product($auth['token']);
+        $barcode = $this->withToken($auth['token'])
+            ->postJson("/api/products/{$product['id']}/barcodes", ['code' => 'ATOMIC-DEL', 'unit_name' => 'piece'])
+            ->assertCreated()['data'];
+
+        // محاكاة فشلٍ حقيقي في نصف العملية الثاني (تحرير السجل) عبر استثناءٍ
+        // يُطلَق فور تنفيذ عبارة الحذف على `barcode_registry` — لا موك لخدمةٍ
+        // وسيطة (لا توجد واحدة هنا)، بل استثناءٌ حقيقي داخل نفس المعاملة يثبت
+        // أن `DB::transaction` المضافة هي ما يحمي الذرّية فعلاً.
+        DB::listen(function ($query): void {
+            $sql = strtolower($query->sql);
+            if (str_contains($sql, 'delete') && str_contains($sql, 'barcode_registry')) {
+                throw new \RuntimeException('محاكاة فشل تحرير السجل — للاختبار فقط.');
+            }
+        });
+
+        $this->withToken($auth['token'])
+            ->deleteJson("/api/products/{$product['id']}/barcodes/{$barcode['id']}");
+
+        $this->assertNotNull(ProductBarcode::find($barcode['id']), 'الحذف تراجع بالكامل — الصفّ ما زال قائماً.');
+        $this->assertTrue(BarcodeRegistryEntry::isTaken('ATOMIC-DEL'), 'السجل لم يُحرَّر لأن المعاملة كلّها تراجعت.');
+    }
+
+    /**
+     * وبالاتجاه المعاكس: فشلٌ في حجز السجل عند إنشاء باركودٍ بديل يتراجع عن
+     * صفّ `product_barcodes` نفسه أيضاً — لا صفّ بديل يتيم بلا سجلٍّ يحميه.
+     */
+    /** @test */
+    public function a_failure_claiming_the_registry_rolls_back_the_alternate_barcode_creation_too(): void
+    {
+        $auth = $this->registerTenant();
+        $product = $this->product($auth['token']);
+        $countBefore = ProductBarcode::count();
+
+        DB::listen(function ($query): void {
+            $sql = strtolower($query->sql);
+            if (str_contains($sql, 'insert') && str_contains($sql, 'barcode_registry')) {
+                throw new \RuntimeException('محاكاة فشل حجز السجل — للاختبار فقط.');
+            }
+        });
+
+        $this->withToken($auth['token'])
+            ->postJson("/api/products/{$product['id']}/barcodes", ['code' => 'ATOMIC-CREATE', 'unit_name' => 'piece']);
+
+        $this->assertSame($countBefore, ProductBarcode::count(), 'لا صفّ باركود بديل تيتيم رغم فشل الحجز.');
+        $this->assertFalse(BarcodeRegistryEntry::isTaken('ATOMIC-CREATE'));
+    }
+
     // ═══════════════════════════════════════════════════════════
     //  import conflict uses the same namespace
     // ═══════════════════════════════════════════════════════════
