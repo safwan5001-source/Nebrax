@@ -209,8 +209,8 @@ untouched.
 
 - **Base SHA:** `70c80b7d37aab13c3c5c181757ae0db8f3494428`
 - **Branch:** `claude/acc-5-inventory-cogs-routing`
-- **Head SHA:** _(filled in on push)_
-- **PR:** _(filled in on open)_ — opened, **not merged**, not deployed. No data was reset or deleted.
+- **Implementation commit:** `4f5f65c`
+- **PR:** [#687](https://github.com/safwan5001-source/Nebrax/pull/687) — opened, **not merged**, not deployed. No data was reset or deleted.
 
 ## Next step
 
