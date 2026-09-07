@@ -18,8 +18,11 @@ use RuntimeException;
  *  InventoryService — المخزون الدائم (Perpetual) بتكلفة متوسط متحرك
  * ═══════════════════════════════════════════════════════════════
  *  - receiveStock(): استلام بضاعة، يحدّث الكمية والمتوسط ويولّد قيداً
- *      (مدين 1140 المخزون / دائن الحساب المقابل، افتراضياً 2110 الموردون).
- *      ACC-3 لا يمسّ هذا المسار (شراء/رصيد افتتاحي، لا بيع) — يبقى بالأكواد.
+ *      (مدين دور `inventory_asset` / دائن الحساب المقابل، افتراضياً 2110).
+ *      ACC-5: **جانب الأصل وحده** يُوجَّه دلالياً — الحساب المقابل يبقى بالكود
+ *      (3130 للرصيد الافتتاحي) لأن `opening_balances` محجوز خارج نطاق ACC-5.
+ *      وبغير ذلك ينكسر الثابت `المخزون = Σ(كمية × متوسط)`: رصيدٌ افتتاحي على
+ *      1140 وحركاتٌ لاحقة على حساب المستأجر المخصَّص = دفترٌ مساعد لا يطابق أصلين.
  *  - recordSaleCogs(): عند بيع منتج track_inventory، يخفّض المخزون ويولّد
  *      قيد تكلفة البضاعة المباعة (مدين دور `cogs` / دائن دور `inventory_asset`،
  *      افتراضياً 5110/1140 — ACC-3، عبر AccountRoleResolver).
@@ -28,7 +31,9 @@ use RuntimeException;
  */
 class InventoryService
 {
-    private const ACC_INVENTORY = '1140'; // المخزون (يبقى مستخدَماً في receiveStock — خارج نطاق ACC-3)
+    // الحسابان المقابلان يبقيان بالأكواد: `opening_balances` (3130) محجوزٌ
+    // صراحةً خارج نطاق ACC-5 حتى يُقرّ موضعه في الإعدادات، و2110 افتراضٌ
+    // للاستلام العام تملكه أدوار المشتريات (ACC-4) لا أدوار المخزون.
     private const ACC_OPENING    = '3130'; // الأرصدة الافتتاحية (حقوق ملكية)
     private const ACC_PAYABLE    = '2110'; // الموردون (الحساب المقابل الافتراضي للاستلام)
 
@@ -47,11 +52,11 @@ class InventoryService
         return DB::transaction(function () use ($product, $quantity, $unitCost, $meta) {
             $movement = $this->applyReceipt($product, $quantity, $unitCost, $meta);
 
-            // قيد: مدين المخزون / دائن الحساب المقابل
+            // قيد: مدين المخزون (دور `inventory_asset`) / دائن الحساب المقابل
             $offset = $meta['offset_account'] ?? self::ACC_PAYABLE;
             $this->ledger->post([
                 [
-                    'account_id' => $this->accountId(self::ACC_INVENTORY),
+                    'account_id' => $this->accountRoles->resolve('inventory_asset')->id,
                     'debit'      => $movement->total_cost,
                 ],
                 [
