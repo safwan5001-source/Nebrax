@@ -2,10 +2,10 @@
 
 namespace App\Models;
 
+use App\Support\GeneratesDocumentNumbers;
 use App\Tenancy\BranchScoped;
 use App\Tenancy\BranchShareable;
 use App\Tenancy\BranchSharing;
-use App\Support\GeneratesDocumentNumbers;
 use Closure;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -36,29 +36,29 @@ class Product extends BaseModel implements BranchShareable
     ];
 
     protected $casts = [
-        'reorder_level'    => 'integer',
-        'min_sale_price'   => 'integer',
-        'discount'         => 'integer',
-        'profit_margin'    => 'integer',
-        'sale_price'       => 'integer',
-        'purchase_price'   => 'integer',
-        'tax_rate'         => 'integer',
-        'track_inventory'  => 'boolean',
+        'reorder_level' => 'integer',
+        'min_sale_price' => 'integer',
+        'discount' => 'integer',
+        'profit_margin' => 'integer',
+        'sale_price' => 'integer',
+        'purchase_price' => 'integer',
+        'tax_rate' => 'integer',
+        'track_inventory' => 'boolean',
         'quantity_on_hand' => 'integer',
-        'avg_cost'         => 'integer',
-        'is_active'        => 'boolean',
+        'avg_cost' => 'integer',
+        'is_active' => 'boolean',
     ];
 
     protected $attributes = [
-        'type'            => 'good',
-        'unit'            => 'piece',
-        'sale_price'      => 0,
-        'purchase_price'  => 0,
-        'tax_rate'        => 15,
-        'track_inventory'  => false,
+        'type' => 'good',
+        'unit' => 'piece',
+        'sale_price' => 0,
+        'purchase_price' => 0,
+        'tax_rate' => 15,
+        'track_inventory' => false,
         'quantity_on_hand' => 0,
-        'avg_cost'         => 0,
-        'is_active'        => true,
+        'avg_cost' => 0,
+        'is_active' => true,
     ];
 
     /** كود الصنف الداخلي هو SKU، وسلسلته مستمرة ولا تُعاد سنوياً. */
@@ -71,6 +71,32 @@ class Product extends BaseModel implements BranchShareable
     protected static function isBranchNumbered(): bool
     {
         return false;
+    }
+
+    /**
+     * الباركود الأساسي جزءٌ من فضاء الباركود الموحّد (PR-UOM-1). `saved` لا
+     * `saving`: يحتاج `id` نهائياً (مضمونٌ بعد الإدراج) و`isDirty()`/
+     * `getOriginal()` ما زالا يعكسان القيمة السابقة قبل `syncOriginal()` —
+     * فيغطي الإنشاء والتعديل بمعالجٍ واحد يعمل حتى مع الاستيراد الذي يكتب
+     * `Product::create()` مباشرة بلا مرور بخدمةٍ وسيطة.
+     */
+    protected static function booted(): void
+    {
+        static::saved(function (Product $product) {
+            if (! $product->isDirty('barcode')) {
+                return;
+            }
+
+            $old = $product->getOriginal('barcode');
+            $new = $product->barcode;
+
+            if ($old !== null && $old !== '') {
+                BarcodeRegistryEntry::release($old);
+            }
+            if ($new !== null && $new !== '') {
+                BarcodeRegistryEntry::claim($new, $product->id, 'primary');
+            }
+        });
     }
 
     public function isService(): bool
