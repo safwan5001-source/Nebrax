@@ -142,6 +142,11 @@ class Rbac
             // المحاسبية، إغلاق الفترات). owner/admin يملكانها عبر `*` فقط؛
             // لا تُضاف لـ accountant/staff تلقائياً — سياسة إدارية للمالك/المدير.
             'accounting_settings.view', 'accounting_settings.manage',
+            // ACC-RET-1: استرداد المورّد سلطة **مالية تشغيلية** مستقلة عن
+            // `returns.manage` (مرتجعٌ تجاري بلا نقد) وعن إعدادات المحاسبة —
+            // فمن يحرّر مرتجعاً لا يحرّك بذلك نقداً. owner/admin عبر `*`؛
+            // ولا تُضاف لـ accountant/staff تلقائياً (نفس نمط الصلاحيات الحديثة).
+            'supplier_refunds.view', 'supplier_refunds.manage',
     ];
 
     /**

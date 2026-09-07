@@ -35,11 +35,16 @@ use RuntimeException;
  *    فإن كانت البضاعة **لا تعود للبيع** (سياسة المستأجر أو تصريح المستند):
  *    مدين 5180 فروق الجرد والتلف / دائن 5110 — بلا حركة مخزون.
  *
- *  مرتجع مشتريات (purchase) — عكس الشراء:
- *    مدين 2110/1110 (الإجمالي التجاري الكامل) │ دائن 1140 المخزون (القيمة
- *    الدفترية avg_cost فقط) + دائن 5150 + دائن 1150 ضريبة المدخلات + فرق
- *    التقييم (إن وُجد) على 5116 فروق تقييم مردودات المشتريات — لا 5180.
+ *  مرتجع مشتريات (purchase) — عكس الشراء **تجارياً على ذمّة المورّد**:
+ *    مدين `accounts_payable` (الإجمالي التجاري الكامل، بطرف المورّد) │ دائن
+ *    1140 المخزون (القيمة الدفترية avg_cost فقط) + دائن 5150 + دائن 1150
+ *    ضريبة المدخلات + فرق التقييم (إن وُجد) على 5116 — لا 5180.
  *    وللبضاعة المتابَعة: إخراج من المخزون بالكمية الأساسية التاريخية.
+ *
+ *    **ACC-RET-1:** لا حركة نقد/بنك داخل مرتجع المشتريات إطلاقاً. عودة المال
+ *    فعلاً مستندٌ مستقل: `SupplierRefund` (مدين الخزينة/البنك، دائن الموردين)،
+ *    مخصَّصٌ على مرتجعات مرحّلة. المرتجعات التاريخية المرحّلة على 1110 تبقى
+ *    كما هي ولا يُعاد تفسيرها.
  *
  *  ── المستند المصدر
  *
@@ -74,6 +79,7 @@ class ReturnService
         protected LedgerService $ledger,
         protected InventoryService $inventory,
         protected PosAuditService $posAudit,
+        protected AccountRoleResolver $accountRoles,
     ) {}
 
     /**
@@ -91,6 +97,16 @@ class ReturnService
         }
         if (empty($items)) {
             throw new RuntimeException('المرتجع يجب أن يحتوي على سطر واحد على الأقل.');
+        }
+
+        // ACC-RET-1 — مرتجع المشتريات لم يعد يحرّك نقداً: القيمة `cash` تُرفض
+        // صراحةً ولا تُعاد تفسيراً صامتاً إلى `credit`. الحارس في الخدمة لا في
+        // الطلب وحده، فلا يتسلّل المسار الملغى من أي مستدعٍ آخر.
+        if ($type === 'purchase' && ($data['payment_type'] ?? null) === 'cash') {
+            throw new RuntimeException(
+                'مرتجع المشتريات لم يعد يقبل السداد النقدي المباشر: المرتجع يعكس ذمّة المورّد فقط، '
+                . 'وعودة المال تُسجَّل بمستند «استرداد مورّد» مستقل.'
+            );
         }
 
         // المصدر يُحلّ ويُتحقَّق منه **قبل** أي كتابة: مستندٌ يعلن مرجعاً لا
@@ -696,17 +712,17 @@ class ReturnService
         // سالبٌ = أقلّ (خسارة). صفرٌ في كل الحالات القائمة قبل هذا الإصلاح.
         $variance = $inventoryCommercialTotal - $inventoryCarryingTotal;
 
-        // قيد عكس الشراء: مدين 2110/1110 / دائن 1140 (بالقيمة الدفترية) +
-        // دائن 5150 + دائن 1150 + فرق القيمة (إن وُجد) إلى 5116.
-        $debitLine = [
-            'account_id' => $this->accountId($return->payment_type === 'cash' ? self::ACC_CASH : self::ACC_PAYABLE),
-            'debit'      => $total,
-        ];
-        if ($return->payment_type === 'credit') {
-            $debitLine['partner_type'] = Partner::class;
-            $debitLine['partner_id']   = $return->partner_id;
-        }
-        $lines = [$debitLine];
+        // ACC-RET-1 — قيد عكس الشراء **تجاريّ دائماً**: مدين الموردين
+        // (`accounts_payable`) / دائن 1140 (بالقيمة الدفترية) + دائن 5150 +
+        // دائن 1150 + فرق القيمة (إن وُجد) إلى 5116. لا حركة نقد/بنك داخل
+        // المرتجع إطلاقاً — عودة المال مستندٌ مستقل (`SupplierRefund`).
+        // وطرف المورّد ملازمٌ للسطر: ذمّةٌ بلا طرفٍ لا تُسوّى لاحقاً.
+        $lines = [[
+            'account_id'   => $this->accountRoles->resolve('accounts_payable')->id,
+            'debit'        => $total,
+            'partner_type' => Partner::class,
+            'partner_id'   => $return->partner_id,
+        ]];
 
         if ($inventoryCarryingTotal > 0) {
             $lines[] = ['account_id' => $this->accountId(self::ACC_INVENTORY), 'credit' => $inventoryCarryingTotal];

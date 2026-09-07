@@ -33,6 +33,7 @@ import {
   FileText,
   Fingerprint,
   Fuel,
+  HandCoins,
   Handshake,
   Hash,
   Inbox,
@@ -193,6 +194,8 @@ const GROUPS: NavGroup[] = [
       { href: '/debit-notes', icon: FileMinus, key: 'debitNotes', built: true },
       { href: '/suppliers', icon: Handshake, key: 'suppliers', built: true },
       { href: '/supplier-payments', icon: CreditCard, key: 'supplierPayments', built: true },
+      // ACC-RET-1: استرداد المورّد سلطة مالية مستقلة عن `returns.manage`.
+      { href: '/supplier-refunds', icon: HandCoins, key: 'supplierRefunds', built: true, permission: 'supplier_refunds.view' },
       { href: '/purchase-settings', icon: SlidersHorizontal, key: 'purchaseSettings', built: true },
     ],
   },
