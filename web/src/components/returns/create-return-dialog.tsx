@@ -275,7 +275,10 @@ export function CreateReturnDialog({
       const created = await api<{ data: { id: string } }>('/returns', {
         method: 'POST',
         body: {
-          type, partner_id: partnerId, warehouse_id: warehouseId || null, payment_type: paymentType,
+          type, partner_id: partnerId, warehouse_id: warehouseId || null,
+          // ACC-RET-1: الحقل خاصٌّ بمرتجع المبيعات وحده — مرتجع المشتريات
+          // لا يقبله أصلاً (ذمّة مورّد لا سداد نقدي).
+          payment_type: type === 'sales' ? paymentType : null,
           original_id: sourceId || null,
           // الفراغ يُرسَل `null` لا `false`: «اتبع السياسة» حالةٌ ثالثة لا
           // مرادفَ لـ«لا يعود».
@@ -371,14 +374,24 @@ export function CreateReturnDialog({
               </Select>
             </div>
           )}
-          <div className="space-y-1.5">
-            <Label htmlFor="pt">{t('payment_type')}</Label>
-            <Select id="pt" value={paymentType} onChange={(e) => setPaymentType(e.target.value)}>
-              <option value="credit">{t('credit')}</option>
-              <option value="cash">{t('cash')}</option>
-            </Select>
-          </div>
+          {/* ACC-RET-1: مرتجع المشتريات يعكس ذمّة المورّد فقط ولا يحرّك نقداً،
+              فلا خيار نقدي/آجل فيه. عودة المال مستندٌ مستقل: «استرداد مورّد». */}
+          {type === 'sales' && (
+            <div className="space-y-1.5">
+              <Label htmlFor="pt">{t('payment_type')}</Label>
+              <Select id="pt" value={paymentType} onChange={(e) => setPaymentType(e.target.value)}>
+                <option value="credit">{t('credit')}</option>
+                <option value="cash">{t('cash')}</option>
+              </Select>
+            </div>
+          )}
         </div>
+
+        {type === 'purchase' && (
+          <p className="rounded border border-border bg-surface px-3 py-2 text-xs leading-relaxed text-muted">
+            {t('purchase_supplier_credit_note')}
+          </p>
+        )}
 
         <div className="space-y-2">
           <div className="flex items-center justify-between">

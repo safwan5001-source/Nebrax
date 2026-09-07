@@ -18,7 +18,11 @@ class StoreReturnRequest extends FormRequest
             'partner_id'          => ['required', 'uuid'],
             // المخزن فعلي؛ وفي المرتجع المرتبط يمكن للخدمة توريث مخزن المصدر عند غيابه.
             'warehouse_id'        => ['nullable', 'uuid'],
-            'payment_type'        => ['required', 'in:cash,credit'],
+            // ACC-RET-1: مرتجع المشتريات لم يعد يقبل `cash` (يُرفض في
+            // `withValidator` برسالة صريحة)، وصار الحقل اختيارياً له لأن
+            // قيمته الوحيدة الباقية `credit` — أي ذمّة المورّد. مرتجع
+            // المبيعات لم يتغيّر: الحقل إلزامي بقيمتيه كما كان.
+            'payment_type'        => ['nullable', 'required_if:type,sales', 'in:cash,credit'],
             'return_date'         => ['nullable', 'date'],
             // المستند المصدر (اختياري ما لم يُلزِم به الإعداد). النوع يُستنتَج
             // من `type` في الخدمة، فلا يُرسله العميل ولا يُصدَّق إن أرسله.
@@ -51,5 +55,22 @@ class StoreReturnRequest extends FormRequest
             'items.*.product_id.required' =>
                 'كل بند في المرتجع يحتاج منتجاً — به وحده تعود البضاعة إلى المخزون. للبنود الخدمية أنشئ منتجاً غير متابَع مخزونياً.',
         ];
+    }
+
+    /**
+     * ACC-RET-1 — رفضٌ صريح لا إعادة تفسير صامتة: مرتجع المشتريات يعكس ذمّة
+     * المورّد فقط، وعودة المال مستندٌ مستقل («استرداد مورّد»).
+     */
+    public function withValidator($validator): void
+    {
+        $validator->after(function ($validator) {
+            if ($this->input('type') === 'purchase' && $this->input('payment_type') === 'cash') {
+                $validator->errors()->add(
+                    'payment_type',
+                    'مرتجع المشتريات لم يعد يقبل السداد النقدي المباشر: المرتجع يعكس ذمّة المورّد فقط، '
+                    . 'وعودة المال تُسجَّل بمستند «استرداد مورّد» مستقل.'
+                );
+            }
+        });
     }
 }

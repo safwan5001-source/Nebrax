@@ -31,6 +31,7 @@ use App\Models\Quote;
 use App\Models\ReturnDocument;
 use App\Models\StockPermit;
 use App\Models\Stocktake;
+use App\Models\SupplierRefund;
 use App\Models\Warehouse;
 
 /**
@@ -130,6 +131,11 @@ class DocumentNumberingCatalog
             'model'  => CashBankTransfer::class,
             'yearly' => true,
             'series' => [['key' => 'default', 'prefix' => 'CBT']],
+        ],
+        'supplier_refund' => [
+            'model'  => SupplierRefund::class,
+            'yearly' => true,
+            'series' => [['key' => 'default', 'prefix' => 'SRF']],
         ],
         'credit_note' => [
             'model'  => CreditNote::class,

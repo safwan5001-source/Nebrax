@@ -109,6 +109,7 @@ use App\Http\Controllers\Api\StockPermitController;
 use App\Http\Controllers\Api\InventoryOpeningController;
 use App\Http\Controllers\Api\StocktakeController;
 use App\Http\Controllers\Api\SubscriptionController;
+use App\Http\Controllers\Api\SupplierRefundController;
 use App\Http\Controllers\Api\TenantApplicationController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\UnitTemplateController;
@@ -947,6 +948,17 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::get('returns/{id}', [ReturnController::class, 'show'])->middleware([$perm('returns.view'), EnsureApplicationOperationActive::class . ':return']);
         Route::post('returns', [ReturnController::class, 'store'])->middleware([$perm('returns.manage'), EnsureApplicationOperationActive::class . ':return']);
         Route::post('returns/{id}/post', [ReturnController::class, 'post'])->middleware([$perm('returns.manage'), EnsureApplicationOperationActive::class . ':return']);
+
+        // ACC-RET-1 — استرداد المورّد: مستندٌ مالي مستقل عن المرتجع. صلاحيته
+        // مستقلة عن `returns.manage` عمداً: تحرير مرتجعٍ تجاري لا يمنح تحريك نقد.
+        Route::get('supplier-refunds', [SupplierRefundController::class, 'index'])->middleware($perm('supplier_refunds.view'));
+        Route::get('supplier-refunds/eligible-returns/{partnerId}', [SupplierRefundController::class, 'eligibleReturns'])->middleware($perm('supplier_refunds.view'));
+        Route::get('supplier-refunds/{id}', [SupplierRefundController::class, 'show'])->middleware($perm('supplier_refunds.view'));
+        Route::post('supplier-refunds', [SupplierRefundController::class, 'store'])->middleware($perm('supplier_refunds.manage'));
+        Route::put('supplier-refunds/{id}', [SupplierRefundController::class, 'update'])->middleware($perm('supplier_refunds.manage'));
+        Route::delete('supplier-refunds/{id}', [SupplierRefundController::class, 'destroy'])->middleware($perm('supplier_refunds.manage'));
+        Route::post('supplier-refunds/{id}/post', [SupplierRefundController::class, 'post'])->middleware($perm('supplier_refunds.manage'));
+        Route::post('supplier-refunds/{id}/reverse', [SupplierRefundController::class, 'reverse'])->middleware($perm('supplier_refunds.manage'));
 
         // الموظفون (HR) — القائمة (`GET employees`) تبقى بلا حجب: مرجع مشترك
         // يستهلكه اختيار البائع في الفاتورة وربط حساب المستخدم بموظف، بلا
