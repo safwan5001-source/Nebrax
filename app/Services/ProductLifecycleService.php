@@ -3,21 +3,14 @@
 namespace App\Services;
 
 use App\Models\BarcodeRegistryEntry;
-use App\Models\CreditNoteLine;
-use App\Services\DocumentCenter\DocumentStorageService;
-use App\Models\InvoiceLine;
-use App\Models\ProcurementLine;
+use App\Models\InventoryStockAlert;
 use App\Models\Product;
 use App\Models\ProductActivity;
-use App\Models\ProductWarehouseStock;
-use App\Models\PriceListItem;
-use App\Models\PurchaseLine;
-use App\Models\QuoteLine;
-use App\Models\RecurringInvoiceLine;
-use App\Models\ReturnLine;
-use App\Models\StockMovement;
-use App\Models\StockPermitLine;
-use App\Models\StocktakeLine;
+use App\Services\DocumentCenter\DocumentStorageService;
+use App\Support\ProductReferenceRegistry;
+use App\Tenancy\BranchScope;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use RuntimeException;
@@ -38,24 +31,38 @@ class ProductLifecycleService
      * سجلات تمنع حذف المنتج؛ الحذف الناعم لبند مستخدم يجعل إعادة استعمال SKU أو
      * الباركود تضلل المستخدم وتترك مرجعاً تاريخياً باسم كتالوجي جديد.
      *
+     * التعداد يأتي كاملاً من `ProductReferenceRegistry` لا من قائمة مكتوبة هنا:
+     * القائمة اليدوية السابقة أغفلت `DeliveryNoteLine` و`InventoryOpeningLine`،
+     * وستُغفل التالي حتماً. المفاتيح المُعادة هي نفسها حرفياً حفاظاً على التوافق.
+     *
      * @return array<string, int>
      */
     public function referenceCounts(Product $product): array
     {
-        return [
-            'invoice_lines'          => InvoiceLine::where('product_id', $product->id)->count(),
-            'purchase_lines'         => PurchaseLine::where('product_id', $product->id)->count(),
-            'return_lines'           => ReturnLine::where('product_id', $product->id)->count(),
-            'credit_note_lines'      => CreditNoteLine::where('product_id', $product->id)->count(),
-            'quote_lines'            => QuoteLine::where('product_id', $product->id)->count(),
-            'recurring_invoice_lines' => RecurringInvoiceLine::where('product_id', $product->id)->count(),
-            'procurement_lines'      => ProcurementLine::where('product_id', $product->id)->count(),
-            'stock_movements'        => StockMovement::where('product_id', $product->id)->count(),
-            'stock_permit_lines'     => StockPermitLine::where('product_id', $product->id)->count(),
-            'stocktake_lines'        => StocktakeLine::where('product_id', $product->id)->count(),
-            'warehouse_stocks'       => ProductWarehouseStock::where('product_id', $product->id)->count(),
-            'price_list_items'       => PriceListItem::where('product_id', $product->id)->count(),
-        ];
+        $counts = [];
+        foreach (ProductReferenceRegistry::deletionBlockers() as $model => $key) {
+            $counts[$key] = $this->referenceQuery($model, $product)->count();
+        }
+
+        return $counts;
+    }
+
+    /**
+     * استعلام مرجعٍ واحد — **بلا عزل فرع، وبعزل مستأجرٍ صارم**.
+     *
+     * `BranchScope::reference()` هو الاصطلاح القائم في المشروع لاستعلام «حلّ
+     * مرجع»: يُسقط عزل الفرع وحده ويُبقي `TenantScope` كما هو. وهو ضرورة لا
+     * تجميل هنا — مرجعٌ حقيقي في فرعٍ آخر يجب أن يمنع الحذف؛ لو أخفاه الفرع
+     * النشط لصار الحذف مسموحاً بحسب ما يصادف المستخدم أن يتصفّحه، وهو بالضبط
+     * ما يحذّر منه العقد. النماذج المصنَّفة اليوم كلها `CompanyWide` أو موسومة
+     * بلا Scope، فالأثر الفعلي لا شيء — لكن تحوّل أي منها إلى `BranchScoped`
+     * لاحقاً كان سيفتح الثغرة صامتاً، وهنا يبقى مغلقاً بالبناء.
+     *
+     * @param  class-string<Model>  $model
+     */
+    private function referenceQuery(string $model, Product $product): Builder
+    {
+        return BranchScope::reference($model)->where('product_id', $product->id);
     }
 
     public function create(Product $product, ?string $userId): void
@@ -98,13 +105,10 @@ class ProductLifecycleService
     {
         $media = [];
         DB::transaction(function () use ($product, $userId, &$media): void {
+            // القفل يُسلسِل عمليات دورة الحياة على المنتج نفسه (حذفٌ مع حذف،
+            // وحذفٌ مع تعديل) — فلا تمرّ عمليتان متزامنتان على نفس البطاقة.
             $product = Product::lockForUpdate()->findOrFail($product->id);
-            $counts = $this->referenceCounts($product);
-            $used = array_filter($counts, static fn (int $count): bool => $count > 0);
-            if ($used !== []) {
-                $total = array_sum($used);
-                throw new RuntimeException("لا يمكن حذف المنتج لأنه مرتبط بـ {$total} سجلّاً. عطّله بدلاً من ذلك حفاظاً على حركاته ومستنداته.");
-            }
+            $this->assertNoBlockingReferences($product);
 
             $this->record($product, 'deleted', [
                 'is_active' => [$product->is_active, false],
@@ -119,7 +123,21 @@ class ProductLifecycleService
             BarcodeRegistryEntry::releaseAllForProduct($product->id);
             $product->alternateBarcodes()->delete();
             $product->media()->delete();
+            // تابعٌ مملوك مصنَّف في السجلّ ولا علاقة Eloquent له على المنتج؛
+            // بقاؤه كان سيترك حالة تنبيهٍ معلَّقة لبطاقةٍ لم تعد قائمة. (عملياً
+            // لا يُرصد تنبيه بلا رصيد أو حركة، وكلاهما مانعٌ للحذف — فهذا
+            // شبكة أمانٍ لا مسارٌ متوقَّع.)
+            $this->referenceQuery(InventoryStockAlert::class, $product)->delete();
             $product->delete();
+
+            // إعادة الفحص بعد الحذف وقبل الـcommit: تحت READ COMMITTED (افتراض
+            // PostgreSQL) يرى الاستعلام الجديد ما التزمت به معاملةٌ أخرى بعد
+            // فحصنا الأول، فتُلتقط مرجعيةٌ وُلدت أثناء المعاملة ويُلغى الحذف
+            // كاملاً. هذا **تضييق** للنافذة لا إغلاقٌ مطلق لها: كاتبٌ التزم بعد
+            // هذه اللحظة وقبل الـcommit يبقى خارج المدى، وإغلاقه التام يقتضي أن
+            // يقفل كل مُنشئ مرجعٍ صفَّ المنتج — إعادة تصميمٍ للمستندات يمنعها
+            // العقد صراحةً. لا يُدَّعى هنا أن تعداد التطبيق ضمانة تزامن.
+            $this->assertNoBlockingReferences($product);
         });
 
         foreach ($media as $item) {
@@ -151,18 +169,38 @@ class ProductLifecycleService
      * أثرٌ مخزني حقيقي على منتج — مرجع مركزي واحد يستهلكه أي مسارٍ يحتاج
      * إثبات وجود «footprint» قبل قرار لا يجوز التراجع عنه (تغيير نوع
      * المنتج/تتبّعه هنا، ومنع تعديل وحدة قياسٍ يستعملها القالب في
-     * `UnitTemplateController` — بدل تكرار نفس المصفوفة في كل موضع).
+     * `UnitTemplateController`).
      *
-     * الحقول الأربعة مطابقة تماماً لتصنيف "Inventory-semantic" في تدقيق
-     * PR-PROD-LIFE-1 (باستثناء `InventoryOpeningLine` — فجوة موثَّقة هناك
-     * صراحةً، خارج نطاق هذا المسار كي لا يُبنى سجلّ مراجع مواز غير متّسق).
+     * التعداد من `ProductReferenceRegistry::inventorySemantic()` حصراً، فيشمل
+     * الآن `InventoryOpeningLine` — الفجوة التي وثّقها عقد PR-PROD-LIFE-1:
+     * مستند رصيدٍ افتتاحي بحالة مسودة يعلن كميةً وتكلفةً لهذا المنتج، فتغيير
+     * `type`/`track_inventory` بعده يعيد تفسير ما سيُرحَّل لا ما رُحِّل فقط.
      */
     public function hasInventoryFootprint(Product $product): bool
     {
-        return StockMovement::where('product_id', $product->id)->exists()
-            || StockPermitLine::where('product_id', $product->id)->exists()
-            || StocktakeLine::where('product_id', $product->id)->exists()
-            || ProductWarehouseStock::where('product_id', $product->id)->exists();
+        foreach (ProductReferenceRegistry::inventorySemantic() as $model => $key) {
+            if ($this->referenceQuery($model, $product)->exists()) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * يمنع الحذف المدمِّر عند وجود أي مرجع مصنَّف مانعاً. رسالةٌ واحدة لكلا
+     * موضعَي الفحص (قبل الحذف وبعده) فلا يختلف النصّ باختلاف لحظة الاكتشاف.
+     */
+    private function assertNoBlockingReferences(Product $product): void
+    {
+        $used = array_filter($this->referenceCounts($product), static fn (int $count): bool => $count > 0);
+        if ($used === []) {
+            return;
+        }
+
+        $total = array_sum($used);
+
+        throw new RuntimeException("لا يمكن حذف المنتج لأنه مرتبط بـ {$total} سجلّاً. عطّله بدلاً من ذلك حفاظاً على حركاته ومستنداته.");
     }
 
     /** @param array<string, mixed> $data */
