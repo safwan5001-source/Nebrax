@@ -2468,7 +2468,8 @@
     "devKeys": "API Keys",
     "devDocs": "Documentation",
     "devWebhooks": "Webhooks",
-    "devSecurity": "Security"
+    "devSecurity": "Security",
+    "supplierRefunds": "Supplier refunds"
   },
   "partnerProfile": {
     "back": "Back",
@@ -5578,7 +5579,8 @@
     "cancel": "Cancel",
     "create": "Create",
     "blocked_returned": "Fully returned",
-    "blocked_window": "Outside the return window"
+    "blocked_window": "Outside the return window",
+    "purchase_supplier_credit_note": "A purchase return only reverses the supplier liability and moves no cash. Money coming back is recorded as a separate Supplier Refund document after the return is posted."
   },
   "returns": {
     "title": "Returns",
@@ -8827,5 +8829,48 @@
       "groupRequests": "Requests",
       "groupWebhooks": "Webhooks"
     }
+  },
+  "supplierRefunds": {
+    "title": "Supplier Refunds",
+    "subtitle": "Money actually returned by the supplier against posted purchase returns.",
+    "new": "New refund",
+    "empty": "No supplier refunds",
+    "supplier": "Supplier",
+    "select_supplier": "Select a supplier…",
+    "select_supplier_first": "Select a supplier first to list their eligible returns.",
+    "no_eligible_returns": "This supplier has no posted purchase returns with a refundable balance.",
+    "destination": "Destination (cash/bank)",
+    "refund_date": "Refund date",
+    "reference": "Reference",
+    "notes": "Notes",
+    "allocations": "Allocation across returns",
+    "col_number": "Number",
+    "col_amount": "Amount",
+    "col_status": "Status",
+    "col_return": "Return",
+    "col_total": "Return total",
+    "col_refundable": "Refundable",
+    "col_allocated": "Allocated",
+    "fill": "Full",
+    "total_amount": "Refund total",
+    "post_now": "Post immediately",
+    "post_action": "Post",
+    "reverse_action": "Reverse refund",
+    "posted_done": "Refund posted.",
+    "reversed_done": "Refund reversed.",
+    "action_failed": "The action could not be completed.",
+    "save_failed": "The refund could not be saved.",
+    "load_failed": "The refund could not be loaded.",
+    "details": "Refund details",
+    "back": "Back to refunds",
+    "status_all": "All statuses",
+    "status_draft": "Draft",
+    "status_posted": "Posted",
+    "status_reversed": "Reversed",
+    "method_cash": "Cash box",
+    "method_bank": "Bank",
+    "validation_allocation_required": "Select a supplier and allocate an amount to at least one return.",
+    "dialog_hint": "A refund is fully allocated to posted purchase returns: the allocation total is the refund amount. Entry: debit cash/bank, credit accounts payable.",
+    "reversed_hint": "This refund is reversed: its original entry was reversed on its original accounts, and the refundable balance returned to its returns. Allocation rows are kept as history."
   }
 }

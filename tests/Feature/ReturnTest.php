@@ -167,20 +167,23 @@ class ReturnTest extends TestCase
         $this->assertSame(8, $product->fresh()->quantity_on_hand);
     }
 
-    /** @test */
-    public function cash_purchase_return_debits_cash_not_payables(): void
+    /**
+     * ACC-RET-1 — المسار النقدي المباشر أُلغي: مرتجع المشتريات يعكس ذمّة
+     * المورّد فقط، وعودة المال مستندٌ مستقل (`SupplierRefund`). القيمة
+     * `cash` تُرفض صراحةً ولا تُعاد تفسيراً صامتاً إلى `credit`.
+     *
+     * @test
+     */
+    public function a_new_cash_purchase_return_is_rejected_and_never_silently_reinterpreted(): void
     {
         $product = Product::create(['name' => 'بضاعة', 'track_inventory' => true, 'quantity_on_hand' => 10, 'avg_cost' => 4000]);
 
-        $return = $this->returns->create(
+        $this->expectException(\RuntimeException::class);
+
+        $this->returns->create(
             ['type' => 'purchase', 'partner_id' => $this->supplier->id, 'payment_type' => 'cash'],
             [['product_id' => $product->id, 'quantity' => 2, 'unit_price' => 4000, 'tax_rate' => 15]]
         );
-        $posted = $this->returns->post($return);
-
-        $entry = $posted->journalEntry()->with('lines.account')->first();
-        $this->assertEquals(9200, $this->line($entry, '1110')->debit); // استرداد نقدي
-        $this->assertNull($this->line($entry, '2110'));
     }
 
     /** @test */
