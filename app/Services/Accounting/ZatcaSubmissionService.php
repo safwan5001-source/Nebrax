@@ -100,7 +100,7 @@ class ZatcaSubmissionService
             throw new RuntimeException('حالة نتيجة ZATCA غير صالحة.');
         }
 
-        return DB::transaction(function () use (
+        $result = DB::transaction(function () use (
             $attempt,
             $status,
             $httpStatus,
@@ -127,6 +127,14 @@ class ZatcaSubmissionService
 
             return $locked->refresh();
         });
+
+        // PR-NOTIF-4: ملاحظة فقط بعد الحفظ الفعلي — لا تأثير على النتيجة أعلاه.
+        // النجاح لا يُنبّه؛ الرفض/الفشل يُؤجَّل عبر afterCommit داخل الجسر نفسه.
+        if (in_array($status, ['rejected', 'failed'], true)) {
+            app(ZatcaNotificationBridge::class)->queueEvaluation($result->id);
+        }
+
+        return $result;
     }
 
     /** @return array{attempt: ZatcaSubmissionAttempt, created: false} */
