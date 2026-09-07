@@ -2,7 +2,6 @@
 
 namespace App\Services\Accounting;
 
-use App\Models\Account;
 use App\Models\Partner;
 use App\Models\Product;
 use App\Models\Purchase;
@@ -21,15 +20,21 @@ use RuntimeException;
  *  - post():   يرحّل الفاتورة، يولّد قيداً متوازناً عبر LedgerService،
  *              ويُدخِل البضاعة للمخزون بالتكلفة (متوسط متحرك) دون ازدواج القيد.
  *
- *  فاتورة مشتريات:
- *    مدين  1140 المخزون        (تكلفة البضاعة المتابَعة)
- *    مدين  5150 مصروفات عامة    (تكلفة البنود غير المتابَعة، إن وُجدت)
- *    مدين  1150 ضريبة المدخلات
- *    دائن  2110 الموردون        (الإجمالي، مربوط بالمورد)
+ *  فاتورة مشتريات (ACC-4 — الحسابات مُوجَّهة دلالياً عبر `AccountRoleResolver`):
+ *    مدين  `inventory_asset`   (افتراضياً 1140 — تكلفة البضاعة المتابَعة)
+ *    مدين  `purchase_expense`  (افتراضياً 5150 — تكلفة البنود غير المتابَعة، إن وُجدت)
+ *    مدين  `tax_input`         (افتراضياً 1150 — ضريبة المدخلات)
+ *    مدين/دائن `document_adjustment` (افتراضياً 5170 — فرق تسوية، إن وُجد)
+ *    دائن  `accounts_payable`  (افتراضياً 2110 — الإجمالي، مربوط بالمورد)
  *
  *  والسداد الفوري — نقديةً كانت أو دفعةً جزئية عند الإصدار — **سندُ صرف
- *  مستقلّ** يولّده `PaymentService` (مدين 2110 / دائن 1110 أو 1120)، لا
- *  اختصارٌ داخل قيد الفاتورة. انظر هجرة 000050.
+ *  مستقلّ** يولّده `PaymentService` (مدين `accounts_payable` / دائن نقد أو بنك
+ *  عبر `CashBankAccountService`)، لا اختصارٌ داخل قيد الفاتورة. انظر هجرة 000050.
+ *
+ *  **تعيين مفقود** يحلّ للحساب القديم بالكود (توافق رجعي)؛ **تعيين صريح غير
+ *  صالح** (معطّل/محذوف/تجميعي) يفشل الترحيل بالكامل قبل أي قيد — لا سقوط صامت.
+ *  مرتجع المشتريات (`ReturnService::postPurchaseReturn`) يستهلك **نفس** الأدوار
+ *  الثلاثة الأولى، فيبقى الاستلام وعكسه متناظرين على تعيين المستأجر نفسه.
  *
  *  لا كتابة مباشرة في journal_lines — القيد عبر المحرك حصراً.
  */
@@ -37,11 +42,6 @@ class PurchaseService
 {
     use ComputesLineTax;
 
-    private const ACC_INVENTORY  = '1140'; // المخزون
-    private const ACC_INPUT_VAT  = '1150'; // ضريبة المدخلات
-    private const ACC_EXPENSE    = '5150'; // مصروفات عامة (بنود غير مخزنية)
-    private const ACC_PAYABLE    = '2110'; // الموردون
-    private const ACC_ADJUSTMENT = '5170'; // فروق التقريب والتسويات
     // حسابا النقد (1110/1120) لا يُذكران هنا: السداد سندُ صرف يبنيه
     // `PaymentService`، فيبقى اختيار الصندوق أو البنك في موضع واحد.
 
@@ -50,7 +50,8 @@ class PurchaseService
         protected InventoryService $inventory,
         protected UnitConversion $units,
         protected PaymentService $payments,
-        protected PrintTemplateService $printTemplates
+        protected PrintTemplateService $printTemplates,
+        protected AccountRoleResolver $accountRoles,
     ) {}
 
     /**
@@ -405,39 +406,44 @@ class PurchaseService
             $lines = [];
 
             // **وسم التكلفة لا الأصل ولا الضريبة.** مركز التكلفة بُعدٌ في قائمة
-            // الدخل: المخزون (1140) أصلٌ يصير تكلفةً حين يُباع فيُوسَم قيد تكلفة
-            // البضاعة المباعة لا قيد الشراء؛ وضريبة المدخلات (1150) ذمّةٌ على
-            // الدولة لا مصروف مركز. فيُوسَم المصروف وحده.
+            // الدخل: المخزون أصلٌ يصير تكلفةً حين يُباع فيُوسَم قيد تكلفة
+            // البضاعة المباعة لا قيد الشراء؛ وضريبة المدخلات ذمّةٌ على الدولة
+            // لا مصروف مركز. فيُوسَم المصروف وحده.
+            //
+            // ACC-4: كل حساب هنا مُوجَّهٌ عبر `AccountRoleResolver` — تعيينٌ
+            // مفقود يحلّ للحساب القديم بالكود، وتعيينٌ صريح غير صالح يفشل
+            // الترحيل بالكامل (`RuntimeException` قبل أي قيد).
             if ($inventoryTotal > 0) {
-                $lines[] = ['account_id' => $this->accountId(self::ACC_INVENTORY), 'debit' => $inventoryTotal];
+                $lines[] = ['account_id' => $this->accountRoles->resolve('inventory_asset')->id, 'debit' => $inventoryTotal];
             }
             if ($expenseTotal > 0) {
                 $lines[] = [
-                    'account_id'     => $this->accountId(self::ACC_EXPENSE),
+                    'account_id'     => $this->accountRoles->resolve('purchase_expense')->id,
                     'debit'          => $expenseTotal,
                     'cost_center_id' => $purchase->cost_center_id,
                 ];
             }
             if ($taxTotal > 0) {
-                $lines[] = ['account_id' => $this->accountId(self::ACC_INPUT_VAT), 'debit' => $taxTotal];
+                $lines[] = ['account_id' => $this->accountRoles->resolve('tax_input')->id, 'debit' => $taxTotal];
             }
 
             // فرق التسوية يوازن القيد: موجب = تكلفة إضافية (مدين)، سالب = خصم
-            // تقريب (دائن) — على 5170 كالفواتير تماماً.
+            // تقريب (دائن) — نفس دور `document_adjustment` المشترك مع الفواتير.
             if ($adjustment !== 0) {
+                $adjustmentAccountId = $this->accountRoles->resolve('document_adjustment')->id;
                 $lines[] = $adjustment > 0
-                    ? ['account_id' => $this->accountId(self::ACC_ADJUSTMENT), 'debit' => $adjustment]
-                    : ['account_id' => $this->accountId(self::ACC_ADJUSTMENT), 'credit' => -$adjustment];
+                    ? ['account_id' => $adjustmentAccountId, 'debit' => $adjustment]
+                    : ['account_id' => $adjustmentAccountId, 'credit' => -$adjustment];
             }
 
             // ═══════════════════════════════════════════════════════════════
-            //  الجانب الدائن: **2110 الموردون دائماً**
+            //  الجانب الدائن: **الموردون دائماً**
             // ═══════════════════════════════════════════════════════════════
             //  حتى النقدية. اختصارُ الصندوق كان يترك المستند `unpaid` بينما لا
             //  دَين له في الدفتر، فيَعدّه تقرير أعمار الديون الدائنة التزاماً
             //  قائماً. السداد يليه سنداً مستقلاً — انظر `settle` أدناه.
             $lines[] = [
-                'account_id'   => $this->accountId(self::ACC_PAYABLE),
+                'account_id'   => $this->accountRoles->resolve('accounts_payable')->id,
                 'credit'       => $total,
                 'partner_type' => Partner::class,
                 'partner_id'   => $purchase->partner_id,
@@ -555,17 +561,6 @@ class PurchaseService
         ], [['purchase_id' => $purchase->id, 'amount' => $paid]]);
 
         $this->payments->post($payment);
-    }
-
-    protected function accountId(string $code): string
-    {
-        $account = Account::where('code', $code)->first();
-
-        if (! $account) {
-            throw new RuntimeException("الحساب بالكود {$code} غير موجود في دليل الحسابات.");
-        }
-
-        return $account->id;
     }
 
     /**
