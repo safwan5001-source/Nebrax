@@ -32,13 +32,16 @@ use RuntimeException;
  */
 class InvoiceService
 {
-    // أكواد الحسابات المرجعية في دليل الحسابات
+    // ACC-3: accounts_receivable/sales_revenue/sales_shipping_revenue/
+    // document_adjustment/tax_output تُحلّ عبر AccountRoleResolver أدناه، لا
+    // بأكواد ثابتة هنا بعد اليوم.
+    //
+    // البيع النقدي وحده يبقى على 1110 صراحةً — عمداً خارج ACC-3: `debitCode`
+    // لا يمرّ عبر CashBankAccountService (على خلاف السند اليدوي في settle()
+    // أدناه)، فتوسيعه بدور `cash`/`bank` دلالي كان سيبتدع دوراً محاسبياً
+    // عاماً للنقد ممنوعاً صراحةً بعقد ACC-2/ACC-3 (الحساب النقدي المحدد يبقى
+    // ملك نطاق CashBankAccount وحده). هذا الفارق موثَّق في تقرير التنفيذ.
     private const ACC_CASH        = '1110'; // الصندوق (بيع نقدي)
-    private const ACC_RECEIVABLE  = '1130'; // العملاء (بيع آجل)
-    private const ACC_SALES       = '4110'; // إيرادات المبيعات
-    private const ACC_SHIPPING    = '4130'; // إيرادات الشحن
-    private const ACC_ADJUSTMENT  = '5170'; // فروق التقريب والتسويات
-    private const ACC_VAT_OUTPUT  = '2120'; // ضريبة المخرجات
     private const VAT_RATE        = 15;     // نسبة ضريبة القيمة المضافة للشحن
 
     /**
@@ -56,6 +59,7 @@ class InvoiceService
         protected PrintTemplateService $printTemplates,
         protected ClassificationService $classifications,
         protected InvoiceLinePrecision $linePrecision,
+        protected AccountRoleResolver $accountRoles,
     ) {}
 
     /**
@@ -801,11 +805,18 @@ class InvoiceService
     /**
      * ترحيل الفاتورة: توليد القيد المحاسبي المتوازن عبر LedgerService.
      *
-     * فاتورة مبيعات نقدية 1150 (1000 + 15%):
+     * فاتورة مبيعات نقدية 1150 (1000 + 15%) — بالتعيينات الافتراضية (بلا تخصيص صريح):
      *   مدين  1110 الصندوق        115000
      *   دائن  4110 إيرادات المبيعات 100000
      *   دائن  2120 ضريبة المخرجات   15000
-     * (للبيع الآجل يُستبدل 1110 بـ 1130 العملاء)
+     * (للبيع الآجل يُستبدل 1110 بحساب دور accounts_receivable المُحلَّل، افتراضياً 1130)
+     *
+     * ACC-3: accounts_receivable/sales_revenue/sales_shipping_revenue/
+     * document_adjustment/tax_output تُحلّ عبر `AccountRoleResolver` — تعيين
+     * صريح للمستأجر إن وُجد، وإلا نفس الحسابات الافتراضية أعلاه بالضبط
+     * (Clean Seeded Cutover: كل مستأجر معيَّن صراحةً لها من التسجيل). تعيينٌ
+     * صريح غير صالح/معطّل يوقف الترحيل (RuntimeException ⇒ 422) بلا أي سقوط
+     * صامت لكودٍ قديم.
      */
     /** @param (callable(Invoice): ?\App\Models\JournalEntry)|null $cogsResolver */
     public function post(Invoice $invoice, ?callable $cogsResolver = null): Invoice
@@ -849,12 +860,12 @@ class InvoiceService
             // حراسة الحد الائتماني: فاتورة آجلة لا يجوز أن تدفع رصيد العميل فوق حدّه.
             $this->assertWithinCreditLimit($invoice, $total);
 
-            $debitCode = $invoice->payment_type === 'cash'
-                ? self::ACC_CASH
-                : self::ACC_RECEIVABLE;
+            $debitAccountId = $invoice->payment_type === 'cash'
+                ? $this->accountId(self::ACC_CASH)
+                : $this->accountRoles->resolve('accounts_receivable')->id;
 
             $lines = [[
-                'account_id'   => $this->accountId($debitCode),
+                'account_id'   => $debitAccountId,
                 'debit'        => $total,
                 'partner_type' => Partner::class,
                 'partner_id'   => $invoice->partner_id,
@@ -862,7 +873,9 @@ class InvoiceService
 
             // كل بند يحسب حصته من خصم الفاتورة أولاً، ثم يوزعها بين مراكزه المخزنة.
             // آخر بند يحمل بقايا التقريب، فلا يظهر هلل «مفقود» في تقرير الربحية أو القيد.
-            $defaultSales = $this->accountId(self::ACC_SALES);
+            // تجاوز المنتج الصريح (product.sales_account_id) يبقى أعلى أولوية من
+            // تعيين المستأجر — ACC-3 لا يمسّ هذا التفضيل، يستبدل مصدر الافتراضي فقط.
+            $defaultSales = $this->accountRoles->resolve('sales_revenue')->id;
             $revByAccountAndCenter = [];
             $lineRevenueAllocated = 0;
             foreach ($invoice->lines->values() as $position => $line) {
@@ -896,7 +909,7 @@ class InvoiceService
 
             if ($shipping > 0) {
                 $lines[] = [
-                    'account_id'     => $this->accountId(self::ACC_SHIPPING),
+                    'account_id'     => $this->accountRoles->resolve('sales_shipping_revenue')->id,
                     'credit'         => $shipping,
                     'cost_center_id' => $invoice->cost_center_id,
                 ];
@@ -904,15 +917,16 @@ class InvoiceService
 
             if ($taxAmount > 0) {
                 $lines[] = [
-                    'account_id' => $this->accountId(self::ACC_VAT_OUTPUT),
+                    'account_id' => $this->accountRoles->resolve('tax_output')->id,
                     'credit'     => $taxAmount,
                 ];
             }
 
-            // فرق التسوية يوازن القيد: موجب = ربح (دائن)، سالب = خسارة (مدين) على 5170.
+            // فرق التسوية يوازن القيد: موجب = ربح (دائن)، سالب = خسارة (مدين).
+            // document_adjustment مشترك مع PurchaseService (نفس الدور، لا يُلمس هنا).
             if ($adjustment !== 0) {
                 $lines[] = [
-                    'account_id' => $this->accountId(self::ACC_ADJUSTMENT),
+                    'account_id' => $this->accountRoles->resolve('document_adjustment')->id,
                     'debit'      => $adjustment < 0 ? -$adjustment : 0,
                     'credit'     => $adjustment > 0 ? $adjustment : 0,
                 ];
@@ -1064,7 +1078,7 @@ class InvoiceService
             return; // بلا حد محدَّد
         }
 
-        $receivableId = $this->accountId(self::ACC_RECEIVABLE);
+        $receivableId = $this->accountRoles->resolve('accounts_receivable')->id;
         $lines = JournalLine::query()
             ->join('journal_entries as e', 'e.id', '=', 'journal_lines.journal_entry_id')
             ->whereIn('e.status', ['posted', 'reversed']) // المعكوس يبقى في الدفاتر
