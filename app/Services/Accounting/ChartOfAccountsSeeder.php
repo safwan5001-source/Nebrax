@@ -8,9 +8,16 @@ use Illuminate\Support\Facades\DB;
 /**
  * يُنشئ دليل حسابات سعودي قياسي لمستأجر جديد.
  * يُستدعى عند إنشاء الشركة.
+ *
+ * ACC-2/ACC-3: دليلٌ مُهيَّأ حديثاً غير مكتمل من دون تعيين صريح لكل دور
+ * محاسبي دلالي إلى حساباته الافتراضية (Clean Seeded Cutover — لا مستأجر
+ * يبقى بلا تعيين). `seed()` يزرع الاثنين معاً ذرّياً؛ المستدعي الوحيد
+ * (`AuthController::register`) لا يستدعي `AccountRoleMappingSeeder` بنفسه.
  */
 class ChartOfAccountsSeeder
 {
+    public function __construct(private AccountRoleMappingSeeder $roleMappings) {}
+
     /**
      * البنية: [code, name_ar, name_en, type, is_group, children[]]
      */
@@ -88,6 +95,7 @@ class ChartOfAccountsSeeder
             foreach ($this->tree as $node) {
                 $this->createNode($tenantId, $node, null);
             }
+            $this->roleMappings->seedDefaults($tenantId);
         });
     }
 

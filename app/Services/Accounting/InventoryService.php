@@ -19,20 +19,22 @@ use RuntimeException;
  * ═══════════════════════════════════════════════════════════════
  *  - receiveStock(): استلام بضاعة، يحدّث الكمية والمتوسط ويولّد قيداً
  *      (مدين 1140 المخزون / دائن الحساب المقابل، افتراضياً 2110 الموردون).
+ *      ACC-3 لا يمسّ هذا المسار (شراء/رصيد افتتاحي، لا بيع) — يبقى بالأكواد.
  *  - recordSaleCogs(): عند بيع منتج track_inventory، يخفّض المخزون ويولّد
- *      قيد تكلفة البضاعة المباعة (مدين 5110 / دائن 1140).
+ *      قيد تكلفة البضاعة المباعة (مدين دور `cogs` / دائن دور `inventory_asset`،
+ *      افتراضياً 5110/1140 — ACC-3، عبر AccountRoleResolver).
  *
  *  التكاليف بالـ minor units (هللات) كأعداد صحيحة. القيود عبر LedgerService حصراً.
  */
 class InventoryService
 {
-    private const ACC_INVENTORY = '1140'; // المخزون
-    private const ACC_COGS       = '5110'; // تكلفة البضاعة المباعة
+    private const ACC_INVENTORY = '1140'; // المخزون (يبقى مستخدَماً في receiveStock — خارج نطاق ACC-3)
     private const ACC_OPENING    = '3130'; // الأرصدة الافتتاحية (حقوق ملكية)
     private const ACC_PAYABLE    = '2110'; // الموردون (الحساب المقابل الافتراضي للاستلام)
 
     public function __construct(
-        protected LedgerService $ledger
+        protected LedgerService $ledger,
+        protected AccountRoleResolver $accountRoles,
     ) {}
 
     /**
@@ -199,7 +201,9 @@ class InventoryService
 
         $totalCogs = 0;
         $cogsByAccountAndCenter = []; // account_id|cost_center_id => amount
-        $defaultCogs = $this->accountId(self::ACC_COGS);
+        // ACC-3: تجاوز المنتج الصريح (product.cogs_account_id) يبقى أعلى
+        // أولوية من تعيين المستأجر — يُستبدل مصدر الافتراضي فقط أدناه.
+        $defaultCogs = $this->accountRoles->resolve('cogs')->id;
 
         // مخزن الإخراج المثبت على الفاتورة يعلو على بديل الفرع؛ المستند القديم
         // بلا مخزن يستمر عبر مخزن فرعه ثم الافتراضي لتبقى البيانات التاريخية قابلة للترحيل.
@@ -276,7 +280,7 @@ class InventoryService
                 'cost_center_id' => $row['cost_center_id'],
             ];
         }
-        $lines[] = ['account_id' => $this->accountId(self::ACC_INVENTORY), 'credit' => $totalCogs];
+        $lines[] = ['account_id' => $this->accountRoles->resolve('inventory_asset')->id, 'credit' => $totalCogs];
 
         return $this->ledger->post($lines, [
             'entry_date'  => $invoice->invoice_date->toDateString(),

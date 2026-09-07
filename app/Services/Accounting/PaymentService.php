@@ -2,7 +2,6 @@
 
 namespace App\Services\Accounting;
 
-use App\Models\Account;
 use App\Models\Invoice;
 use App\Models\Partner;
 use App\Models\Payment;
@@ -22,8 +21,11 @@ use RuntimeException;
  *  - post():   يرحّل السند، يولّد قيداً متوازناً عبر LedgerService،
  *              ويحدّث سداد كل فاتورة مخصَّصة (unpaid → partial → paid).
  *
- *  قبض من عميل (received):  مدين 1110/1120 │ دائن 1130 العملاء
- *  صرف لمورد  (paid):       مدين 2110       │ دائن 1110/1120
+ *  قبض من عميل (received):  مدين نقد/بنك (CashBankAccount) │ دائن دور accounts_receivable (افتراضياً 1130)
+ *  صرف لمورد  (paid):       مدين دور accounts_payable (افتراضياً 2110) │ دائن نقد/بنك (CashBankAccount)
+ *
+ *  ACC-3: طرف العميل/المورد يُحلّ عبر `AccountRoleResolver`؛ الطرف النقدي/
+ *  البنكي يبقى بالكامل ملك `CashBankAccountService::resolveForPayment()`.
  *
  *  التخصيص (allocation) للقبض فقط: مجموع التخصيصات = مبلغ السند،
  *  وكل تخصيص ≤ متبقي فاتورته، والفاتورة مرحّلة وتخص طرف السند.
@@ -31,13 +33,15 @@ use RuntimeException;
  */
 class PaymentService
 {
-    private const ACC_RECEIVABLE  = '1130'; // العملاء
-    private const ACC_PAYABLE     = '2110'; // الموردون
+    // ACC-3: accounts_receivable/accounts_payable تُحلّان عبر AccountRoleResolver
+    // أدناه بدل هذين الكودين — الجانب النقدي/البنكي يبقى بالكامل ملك
+    // CashBankAccountService (`resolveForPayment()`)، ولا يُستبدل بدور دلالي عام.
 
     public function __construct(
         protected LedgerService $ledger,
         protected PrintTemplateService $printTemplates,
         protected CashBankAccountService $cashBankAccounts,
+        protected AccountRoleResolver $accountRoles,
     ) {}
 
     /**
@@ -297,14 +301,14 @@ class PaymentService
                     'account_id' => $cashAccountId,
                     'debit'      => $payment->amount,
                 ], [
-                    'account_id'   => $this->accountId(self::ACC_RECEIVABLE),
+                    'account_id'   => $this->accountRoles->resolve('accounts_receivable')->id,
                     'credit'       => $payment->amount,
                     'partner_type' => Partner::class,
                     'partner_id'   => $payment->partner_id,
                 ]];
             } else {
                 $lines = [[
-                    'account_id'   => $this->accountId(self::ACC_PAYABLE),
+                    'account_id'   => $this->accountRoles->resolve('accounts_payable')->id,
                     'debit'        => $payment->amount,
                     'partner_type' => Partner::class,
                     'partner_id'   => $payment->partner_id,
@@ -391,20 +395,6 @@ class PaymentService
         }
 
         return $paid >= $total ? 'paid' : 'partial';
-    }
-
-    /**
-     * معرّف الحساب من كوده ضمن المستأجر الحالي.
-     */
-    protected function accountId(string $code): string
-    {
-        $account = Account::where('code', $code)->first();
-
-        if (! $account) {
-            throw new RuntimeException("الحساب بالكود {$code} غير موجود في دليل الحسابات.");
-        }
-
-        return $account->id;
     }
 
     /**
