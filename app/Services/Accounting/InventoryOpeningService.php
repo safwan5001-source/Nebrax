@@ -47,12 +47,15 @@ use RuntimeException;
  */
 class InventoryOpeningService
 {
-    public const INVENTORY_ACCOUNT_CODE = '1140';
+    // ACC-5: جانب الأصل صار يُحلّ بدور `inventory_asset`، فحُذف ثابت 1140
+    // بدل إبقائه معلناً يكذب على قارئه. ويبقى `OPENING_ACCOUNT_CODE`
+    // مستعمَلاً فعلياً — `opening_balances` خارج نطاق ACC-5 القابل للضبط.
     public const OPENING_ACCOUNT_CODE = '3130';
 
     public function __construct(
         protected LedgerService $ledger,
-        protected InventoryService $inventory
+        protected InventoryService $inventory,
+        protected AccountRoleResolver $accountRoles,
     ) {}
 
     /**
@@ -314,7 +317,15 @@ class InventoryOpeningService
             return null;
         }
 
-        $inventory = $this->accountId(self::INVENTORY_ACCOUNT_CODE);
+        // ACC-5 — **جانب الأصل وحده يُوجَّه دلالياً.** حساب المخزون هنا هو
+        // نفسه الذي تحرّكه كل حركة لاحقة (شراء/بيع/جرد/إذن/مرتجع)، فلو بقي
+        // ثابتاً بينما هي مُعيَّنة لانكسر الثابت `المخزون = Σ(كمية × متوسط)`
+        // وانقسم دفترٌ مساعدٌ واحد على حسابَي أصول في الأستاذ.
+        //
+        // أمّا الطرف المقابل (3130 الأرصدة الافتتاحية) فيبقى بالكود صراحةً:
+        // `opening_balances` محجوزٌ خارج نطاق ACC-5 حتى يُقرّ موضعه في
+        // الإعدادات — ولا يُعاد توظيفه هنا حساباً للفروقات.
+        $inventory = $this->accountRoles->resolve('inventory_asset')->id;
         $opening_ = $this->accountId(self::OPENING_ACCOUNT_CODE);
 
         $lines = [];
