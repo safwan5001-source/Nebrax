@@ -2,7 +2,6 @@
 
 namespace App\Services\Accounting;
 
-use App\Models\Account;
 use App\Models\Product;
 use App\Models\ProductWarehouseStock;
 use App\Models\Stocktake;
@@ -64,12 +63,17 @@ use RuntimeException;
  */
 class StocktakeService
 {
+    // ACC-5: قيد الجرد نفسه صار يُحلّ بالأدوار الدلالية (`inventory_asset` و
+    // `inventory_count_variance`). يبقى الثابتان معلنَين لأن مطابقة محطات
+    // الوقود (`FuelReconciliationService`) تقرؤهما احتياطاً خلف تجاوز الحساب
+    // على مستوى المحطة — عقدٌ لقطاعٍ خارج نطاق ACC-5 لا يُكسر هنا.
     public const INVENTORY_ACCOUNT_CODE = '1140';
     public const VARIANCE_ACCOUNT_CODE = '5180';
 
     public function __construct(
         protected LedgerService $ledger,
-        protected InventoryService $inventory
+        protected InventoryService $inventory,
+        protected AccountRoleResolver $accountRoles,
     ) {}
 
     /**
@@ -313,8 +317,12 @@ class StocktakeService
             return null;
         }
 
-        $inventory  = $this->accountId(self::INVENTORY_ACCOUNT_CODE);
-        $adjustment = $this->accountId(self::VARIANCE_ACCOUNT_CODE);
+        // ACC-5: الحسابان يُوجَّهان دلالياً. **الدور واحد للاتجاهين**: الزيادة
+        // والعجز سببٌ تجاريّ واحد (فرق جرد فعلي)، والإشارة وحدها تفرّقهما —
+        // فلا دورَ «مكسب» وآخر «خسارة». وهو دورٌ مستقلّ عن التسوية اليدوية
+        // وعن التلف رغم اشتراك الثلاثة اليوم في الحساب الافتراضي 5180.
+        $inventory  = $this->accountRoles->resolve('inventory_asset')->id;
+        $adjustment = $this->accountRoles->resolve('inventory_count_variance')->id;
         $amount     = abs($net);
 
         $lines = $net > 0
@@ -360,16 +368,6 @@ class StocktakeService
             ->where('track_inventory', true)->pluck('id')->all();
 
         return array_intersect_key($rows, array_flip($tracked));
-    }
-
-    protected function accountId(string $code): string
-    {
-        $account = Account::where('code', $code)->first();
-        if (! $account) {
-            throw new RuntimeException("الحساب بالكود {$code} غير موجود في دليل الحسابات.");
-        }
-
-        return $account->id;
     }
 
     /** توليد رقم تسلسلي: STK-2026-00001 — تسلسل مستقلّ لكل فرع. */

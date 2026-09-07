@@ -2,7 +2,6 @@
 
 namespace App\Services\Accounting;
 
-use App\Models\Account;
 use App\Models\Product;
 use App\Models\ProductWarehouseStock;
 use App\Models\StockPermit;
@@ -16,37 +15,40 @@ use RuntimeException;
  * ═══════════════════════════════════════════════════════════════
  *  StockPermitService — الأذون المخزنية (إضافة · صرف · تحويل)
  * ═══════════════════════════════════════════════════════════════
- *  أول وحدة تحرّك حساب المراقبة **1140** بلا فاتورة شراء ولا بيع.
+ *  أول وحدة تحرّك حساب المراقبة **`inventory_asset`** بلا فاتورة شراء ولا بيع.
+ *
+ *  ACC-5: الحسابات تُحلّ بالأدوار الدلالية عبر `AccountRoleResolver`
+ *  (`inventory_asset` افتراضاً 1140، و`inventory_manual_adjustment` افتراضاً
+ *  5180). الدور المقابل هنا **يدويٌّ دائماً** ولا يُشتقّ من نصّ سبب الإذن:
+ *  التلف والاستهلاك والعيّنات أسبابٌ حرّة لا تصنيفٌ محاسبي.
  *
  *  إذن إضافة (بضاعة وُجدت/تبرّع/تصحيح زيادة):
- *    مدين  1140 المخزون                 (بالتكلفة المُدخَلة)
- *    دائن  5180 فروق الجرد والتلف
+ *    مدين  `inventory_asset`             (بالتكلفة المُدخَلة)
+ *    دائن  `inventory_manual_adjustment`
  *
  *  إذن صرف (تلف · استهلاك داخلي · عيّنات):
- *    مدين  5180 فروق الجرد والتلف
- *    دائن  1140 المخزون                 (بمتوسط التكلفة، لا بسعرٍ يختاره المستخدم)
+ *    مدين  `inventory_manual_adjustment`
+ *    دائن  `inventory_asset`             (بمتوسط التكلفة، لا بسعرٍ يختاره المستخدم)
  *
  *  إذن تحويل بين مخزنين:
  *    داخل الفرع الواحد   → **لا قيد إطلاقاً** (لم يتغيّر شيء في الدفتر العام)
- *    بين فرعين مختلفين   → مدين 1140 (فرع الوجهة) / دائن 1140 (فرع المصدر)
+ *    بين فرعين مختلفين   → مدين `inventory_asset` (فرع الوجهة) / دائن نفسه (فرع المصدر)
  *      حسابٌ واحد على الطرفين بوسمَي فرع مختلفين: صافيه صفرٌ على مستوى
  *      الشركة، فلا يتضخّم المخزون؛ ويصحّح ميزان كل فرع على حدة — ولولاه
- *      لبقيت قيمة البضاعة مسجَّلة على الفرع الذي غادرته.
+ *      لبقيت قيمة البضاعة مسجَّلة على الفرع الذي غادرته. ولا حساب تصفية وسيط.
  *
- *  **الثابت المحروس:** بعد كل ترحيل يبقى رصيد 1140 = Σ(كمية × متوسط تكلفة).
+ *  **الثابت المحروس:** بعد كل ترحيل يبقى رصيد حساب المخزون = Σ(كمية × متوسط تكلفة).
  *  الحركة والقيد يقعان في معاملة واحدة، فلا ينفصل الدفتران أبداً.
  */
 class StockPermitService
 {
-    private const ACC_INVENTORY  = '1140';
-    private const ACC_ADJUSTMENT = '5180';
-
     private const PREFIX = ['receipt' => 'SR', 'issue' => 'SI', 'transfer' => 'ST'];
 
     public function __construct(
         protected LedgerService $ledger,
         protected InventoryService $inventory,
-        protected UnitConversion $units
+        protected UnitConversion $units,
+        protected AccountRoleResolver $accountRoles,
     ) {}
 
     /**
@@ -275,7 +277,10 @@ class StockPermitService
                 return null; // تحويل داخلي — لا أثر على الدفتر العام
             }
 
-            $inventory = $this->accountId(self::ACC_INVENTORY);
+            // ACC-5: **نفس دور `inventory_asset` على الطرفين** — التحويل نقلُ
+            // أصلٍ بين فرعين لا تسويةٌ ولا وسيط تصفية، فبُعدا الفرع وحدهما
+            // يفرّقان السطرين ويبقيان كما هما تماماً.
+            $inventory = $this->accountRoles->resolve('inventory_asset')->id;
 
             return $this->ledger->post([
                 ['account_id' => $inventory, 'debit'  => $total, 'branch_id' => $to],
@@ -283,8 +288,12 @@ class StockPermitService
             ], $this->entryMeta($permit, "تحويل مخزني {$permit->number}"));
         }
 
-        $inventory  = $this->accountId(self::ACC_INVENTORY);
-        $adjustment = $this->accountId(self::ACC_ADJUSTMENT);
+        // ACC-5: الإذن اليدوي مقابله دور `inventory_manual_adjustment` — دورٌ
+        // مستقلّ عن فروق الجرد وعن التلف رغم اشتراك الثلاثة في 5180 افتراضاً.
+        // ولا يُشتقّ الدور من نصّ سبب الإذن الحرّ: الإضافة والصرف اليدويان
+        // سببٌ تجاريّ واحد، والإشارة وحدها تفرّقهما.
+        $inventory  = $this->accountRoles->resolve('inventory_asset')->id;
+        $adjustment = $this->accountRoles->resolve('inventory_manual_adjustment')->id;
 
         $lines = $permit->type === 'receipt'
             ? [['account_id' => $inventory, 'debit' => $total], ['account_id' => $adjustment, 'credit' => $total]]
@@ -369,16 +378,6 @@ class StockPermitService
         return $warehouseId
             ? BranchScope::reference(Warehouse::class)->whereKey($warehouseId)->value('branch_id')
             : null;
-    }
-
-    protected function accountId(string $code): string
-    {
-        $account = Account::where('code', $code)->first();
-        if (! $account) {
-            throw new RuntimeException("الحساب بالكود {$code} غير موجود في دليل الحسابات.");
-        }
-
-        return $account->id;
     }
 
     /** تسلسل مستقلّ لكل نوع ولكل فرع: SR · SI · ST. */

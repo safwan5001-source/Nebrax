@@ -31,14 +31,15 @@ use RuntimeException;
  *
  *  مرتجع مبيعات (sales) — عكس البيع:
  *    مدين 4110 المبيعات + مدين 2120 ضريبة المخرجات │ دائن 1130/1110 (الإجمالي)
- *    وللبضاعة المتابَعة: قيد عكس التكلفة (مدين 1140 / دائن 5110) + إرجاع للمخزون.
+ *    وللبضاعة المتابَعة: قيد عكس التكلفة (مدين دور `inventory_asset` / دائن
+ *    دور `cogs` — ACC-5) + إرجاع للمخزون.
  *    فإن كانت البضاعة **لا تعود للبيع** (سياسة المستأجر أو تصريح المستند):
- *    مدين 5180 فروق الجرد والتلف / دائن 5110 — بلا حركة مخزون.
+ *    مدين دور `inventory_damage_loss` / دائن دور `cogs` — بلا حركة مخزون.
  *
  *  مرتجع مشتريات (purchase) — عكس الشراء **تجارياً على ذمّة المورّد**:
  *    مدين `accounts_payable` (الإجمالي التجاري الكامل، بطرف المورّد) │ دائن
- *    1140 المخزون (القيمة الدفترية avg_cost فقط) + دائن 5150 + دائن 1150
- *    ضريبة المدخلات + فرق التقييم (إن وُجد) على 5116 — لا 5180.
+ *    `inventory_asset` (القيمة الدفترية avg_cost فقط) + دائن `purchase_expense`
+ *    + دائن `tax_input` + فرق التقييم (إن وُجد) على 5116 — لا 5180.
  *    وللبضاعة المتابَعة: إخراج من المخزون بالكمية الأساسية التاريخية.
  *
  *    **ACC-RET-1:** لا حركة نقد/بنك داخل مرتجع المشتريات إطلاقاً. عودة المال
@@ -60,18 +61,16 @@ use RuntimeException;
  */
 class ReturnService
 {
+    // ACC-5: حسابات المخزون والتكلفة والتلف صارت أدواراً دلالية. الباقي هنا
+    // أكوادٌ ثابتة عمداً: طرفا مرتجع المبيعات التجاريان (1110/1130/2120/4110)
+    // خارج نطاق ACC-5، و5116 ليس دوراً معتمَداً في أي شريحة حتى اليوم.
     private const ACC_CASH        = '1110';
     private const ACC_RECEIVABLE  = '1130';
-    // ACC-4: `inventory_asset` مُوجَّه دلالياً في مرتجع المشتريات (أدناه)،
-    // ويبقى هذا الكود ثابتاً في مرتجع المبيعات فقط (خارج نطاق ACC-4).
-    private const ACC_INVENTORY   = '1140';
     private const ACC_OUTPUT_VAT  = '2120';
     private const ACC_SALES       = '4110';
-    private const ACC_COGS        = '5110';
-    private const ACC_DAMAGE      = '5180'; // فروق الجرد والتلف — تلفٌ/فقدٌ فيزيائي فقط، لا فرق تقييم
     // PURCHASE_RETURN_VALUATION_VARIANCE (المعنى المحاسبي المستقبلي لميزة Account
     // Mapping القادمة): فرقٌ تقييمي بحت — اعتماد المورّد التجاري مقابل القيمة
-    // الدفترية الفعلية المُزالة من 1140 — لا فرق جردٍ أو تلفٍ فلا يُستخدم 5180 له.
+    // الدفترية الفعلية المُزالة من حساب المخزون — لا فرق جردٍ أو تلفٍ فلا يُستخدم 5180 له.
     private const ACC_PURCHASE_RETURN_VALUATION_VARIANCE = '5116';
 
     public function __construct(
@@ -494,12 +493,18 @@ class ReturnService
             // ولماذا 5180 لا 5110: البضاعة لم تُبَع. إبقاؤها في تكلفة البضاعة
             // المباعة يُفسد هامش الربح الإجمالي ويجعل مطابقة 5110 بالمبيعات
             // مستحيلة — نفس منطق الأذون المخزنية (هجرة 000042).
-            $debitAccount = $restock ? self::ACC_INVENTORY : self::ACC_DAMAGE;
-            $label        = $restock ? 'عكس تكلفة مرتجع' : 'إتلاف مردود';
+            // ACC-5: الحسابان يُحلّان بالأدوار الدلالية. الطرف المدين يفترق
+            // **بالسبب التجاري** لا بالإشارة: بضاعةٌ عادت للرفّ = `inventory_asset`،
+            // وبضاعةٌ غير صالحة = `inventory_damage_loss` — دورٌ مستقلّ عن فروق
+            // الجرد وعن التسوية اليدوية رغم اشتراك الثلاثة في 5180 افتراضاً.
+            $debitAccountId = $restock
+                ? $this->accountRoles->resolve('inventory_asset')->id
+                : $this->accountRoles->resolve('inventory_damage_loss')->id;
+            $label = $restock ? 'عكس تكلفة مرتجع' : 'إتلاف مردود';
 
             $cogsEntry = $this->ledger->post([
-                ['account_id' => $this->accountId($debitAccount), 'debit' => $costTotal],
-                ['account_id' => $this->accountId(self::ACC_COGS), 'credit' => $costTotal],
+                ['account_id' => $debitAccountId, 'debit' => $costTotal],
+                ['account_id' => $this->accountRoles->resolve('cogs')->id, 'credit' => $costTotal],
             ], [
                 'entry_date'  => $return->return_date->toDateString(),
                 'description' => "{$label} {$return->number}",
