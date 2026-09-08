@@ -23,6 +23,14 @@ use Illuminate\Support\Facades\DB;
  */
 class FinancialControlService
 {
+    /** القواعد التي يملك هذا المحرك دورة حياتها؛ لا يجوز له إغلاق تنبيهات نطاقات أخرى. */
+    private const OWNED_RULES = [
+        'journal_unbalanced',
+        'trial_balance_unbalanced',
+        'balance_sheet_unbalanced',
+        'posted_source_without_journal',
+    ];
+
     public function __construct(private readonly ReportService $reports)
     {
     }
@@ -50,14 +58,10 @@ class FinancialControlService
             }
 
             $stale = FinancialControlAlert::query()
+                ->whereIn('rule', self::OWNED_RULES)
                 ->whereIn('status', ['active', 'acknowledged'])
                 ->when($fingerprints === [], fn ($query) => $query, fn ($query) => $query->whereNotIn('fingerprint', $fingerprints))
                 ->get();
-
-            // إن لم يكتشف الفحص الكامل فرقاً، تُغلق كل التنبيهات المفتوحة للمستأجر.
-            if ($fingerprints === []) {
-                $stale = FinancialControlAlert::query()->whereIn('status', ['active', 'acknowledged'])->get();
-            }
 
             foreach ($stale as $alert) {
                 $alert->update(['status' => 'resolved', 'resolved_at' => now()]);
@@ -66,7 +70,10 @@ class FinancialControlService
             return [
                 'enabled' => $enabled,
                 'detected' => count($issues),
-                'active' => FinancialControlAlert::whereIn('status', ['active', 'acknowledged'])->count(),
+                'active' => FinancialControlAlert::query()
+                    ->whereIn('rule', self::OWNED_RULES)
+                    ->whereIn('status', ['active', 'acknowledged'])
+                    ->count(),
                 'resolved' => $stale->count(),
                 'alerts' => $alerts,
             ];
