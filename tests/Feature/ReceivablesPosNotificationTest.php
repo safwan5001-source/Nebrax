@@ -57,10 +57,17 @@ class ReceivablesPosNotificationTest extends TestCase
         app(TenantContext::class)->set($auth['tenant_id']);
         $session = PosSession::create([
             'number' => 'POS-NOTIF-1',
+            'status' => 'open',
+            'opening_balance' => 10000,
+            'opened_at' => now()->subHour(),
+        ]);
+        // Mirror an already-authoritative close state. The projection under test is
+        // read-only; using update() keeps the fixture inside the model's legal
+        // open -> closed transition instead of inserting an invalid closed row.
+        $session->update([
             'status' => 'closed',
             'handover_status' => 'pending',
             'difference_status' => 'pending',
-            'opening_balance' => 10000,
             'closing_balance' => 9000,
             'expected_balance' => 10000,
             'difference' => -1000,
