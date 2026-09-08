@@ -4424,6 +4424,7 @@
     "default_units_hint": "اقتراحٌ للعرض فقط؛ لا يغيّر وحدة أي فاتورة أو مشترى أو نقطة بيع تلقائياً.",
     "units": "الوحدات",
     "unit_base_badge": "أساس",
+    "default_sales_unit_marker": "افتراضي",
     "product_media": "صور المنتج",
     "product_media_hint": "ارفع حتى 8 صور JPG أو PNG أو WebP، بحد أقصى 5 م.ب للصورة. الصور خاصة ولا تظهر إلا للمستخدمين المخوّلين.",
     "upload_media": "رفع الصور",

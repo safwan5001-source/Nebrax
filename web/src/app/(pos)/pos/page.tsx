@@ -154,6 +154,12 @@ interface Product {
   sale_price: string;
   pos_units: PosUnit[];
   pos_barcodes: PosBarcode[];
+  /**
+   * PR-UOM2-3: عرضٌ بحتٌ — يُستعمَل فقط لوسم خيار الوحدة الافتراضية في قائمة
+   * اختيار الوحدة بالسطر (`(افتراضي)`). لا يُقرأ في `addProduct`/`pricedUnit`
+   * ولا يغيّر الوحدة/الكمية/السعر تلقائياً؛ القرار D-A يبقى نافذاً حرفياً.
+   */
+  default_sales_unit?: string | null;
   pos_image?: { download_url: string } | null;
   category_id: string | null;
   category: string | null;
@@ -1787,7 +1793,8 @@ export default function PosPage() {
       <div ref={registerCartContainer} tabIndex={-1} className="min-h-0 flex-1 overflow-y-auto px-3 outline-none">
         {cart.length === 0 && <PosCartEmptyState message={t('empty_cart')} />}
         {cart.map((line) => {
-          const units = line.productId ? products.find((product) => product.id === line.productId)?.pos_units ?? [] : [];
+          const lineProduct = line.productId ? products.find((product) => product.id === line.productId) : undefined;
+          const units = lineProduct?.pos_units ?? [];
           // PR-3: التحديد البصري يظهر في كل أوضاع التفاعل (لمس/ماوس/كيبورد) — لم
           // يعد مقصوراً على وضع الكيبورد المتقدّم؛ منطق التحديد نفسه لم يتغيّر.
           const lineSelected = selectedLineKey === line.key;
@@ -1814,7 +1821,12 @@ export default function PosPage() {
                     <div className="truncate text-sm font-semibold text-text">{line.description}</div>
                     {line.productId !== null && units.length > 1 ? (
                       <select aria-label={tprod('unit')} value={line.unit ?? ''} onChange={(event) => setUnit(line.key, event.target.value)} onClick={(event) => event.stopPropagation()} className="mt-1 min-h-11 max-w-28 rounded border border-border bg-background px-1.5 text-xs text-text outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
-                        {units.map((unit) => <option key={unit.name} value={unit.name}>{unit.name}</option>)}
+                        {units.map((unit) => (
+                          <option key={unit.name} value={unit.name}>
+                            {unit.name}
+                            {lineProduct?.default_sales_unit && unit.name === lineProduct.default_sales_unit ? ` (${tprod('default_sales_unit_marker')})` : ''}
+                          </option>
+                        ))}
                       </select>
                     ) : line.unit ? <div className="mt-1 text-xs text-muted">{line.unit}</div> : null}
                   </div>
