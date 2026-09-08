@@ -71,11 +71,44 @@ Innovation is encouraged when it measurably improves comprehension, speed, confi
 
 ## 5. Reference policy
 
-External enterprise products and design systems may be studied for enterprise UX and pattern discipline, including Microsoft Dynamics 365 Finance & Operations, SAP Fiori, Oracle Redwood, and other high-quality ERP/business applications. AWJ must not become a visual clone of any one product.
+External enterprise products and design systems may be studied for enterprise UX and pattern discipline, including Microsoft Dynamics 365 Finance & Operations, SAP Fiori, Oracle Redwood, Odoo, and other high-quality ERP/business applications. AWJ must not become a visual clone of any one product.
 
 References are inputs to expert judgment, not templates to copy.
 
 The intended outcome is recognizably **AWJ**.
+
+### 5.1 Freshness & Modernity Gate — mandatory
+
+AWJ V2 must not adopt a UI/UX rule, component pattern, navigation model, responsive technique, or visual convention merely because it comes from a famous or mature ERP product.
+
+Enterprise UI/UX continues to evolve. Research and design decisions must therefore distinguish between:
+
+- **Durable enterprise principles** that remain excellent despite their age.
+- **Currently supported modern patterns** that reflect the best available interaction and implementation practice.
+- **Legacy conventions** retained by mature products for historical or backward-compatibility reasons rather than because they remain the best design choice.
+- **Newer alternatives** that solve the same problem more clearly, efficiently, accessibly, responsively, or elegantly.
+- **Visual trends** that appear modern but reduce ERP productivity, accounting confidence, accessibility, information density, or long-term maintainability.
+
+For material reference-derived decisions, research should prefer current official documentation and current supported product experiences where available. When an older pattern remains useful, the useful principle may be retained while its visual or interaction implementation is modernized for AWJ.
+
+Before promoting an external pattern into an AWJ V2 specification, evaluate at least:
+
+1. **Current support status** — is the referenced experience or platform still supported and recommended?
+2. **Documentation freshness** — is there newer official guidance or a successor pattern?
+3. **Modern alternatives** — do current enterprise products/design systems solve the same problem better?
+4. **Cross-device fitness** — does the approach work for modern desktop, laptop, tablet, and mobile environments rather than assuming a legacy desktop-only context?
+5. **Accessibility** — does it align with current accessibility expectations, keyboard/touch usage, zoom, text scaling, and assistive technology?
+6. **Localization and RTL fitness** — can it support Arabic-first AWJ without mechanical mirroring or fragile layouts?
+7. **Workflow efficiency** — is it actually faster and clearer for frequent ERP/accounting work?
+8. **Implementation quality** — can it be expressed cleanly through AWJ's shared patterns, components, tokens, and responsive architecture?
+9. **Longevity** — is it a durable improvement or merely a short-lived visual fashion?
+10. **AWJ fit** — does it strengthen AWJ's own identity and product goals rather than importing another product's historical constraints?
+
+**Newer is not automatically better. Older is not automatically obsolete.** The selection criterion is the best current solution for AWJ's real business workflow.
+
+A visually fashionable approach must be rejected when it weakens clarity, density, speed, accounting precision, accessibility, or trust. Conversely, a mature enterprise principle should not be rejected solely because it originated years ago if current evidence still supports it.
+
+Research documentation should record, where material, whether a reference is **current**, **durable but older**, **legacy/deprecated**, or **superseded**, and should note the preferred AWJ interpretation.
 
 ## 6. Full responsive and viewport coverage — mandatory
 
@@ -133,8 +166,11 @@ Before approval, it should be reviewed for:
 9. Absence of generic/template/AI-generated visual patterns.
 10. Feasibility and maintainability through shared tokens and components.
 11. Visual craft at a level appropriate for a premium global ERP product.
+12. **Freshness and modernity:** material reference-derived choices have been checked against current supported guidance and better modern alternatives; no legacy convention or superficial trend has been adopted by default.
 
 A design that looks correct only at its mockup size fails this review gate.
+
+A design that faithfully copies an established ERP convention but ignores a clearly better current solution also fails this review gate unless there is a documented AWJ-specific reason to retain the older approach.
 
 ## 8. Relationship to the Blueprint
 
@@ -144,8 +180,8 @@ This document supplements:
 
 The Blueprint defines the current V2 direction and pattern architecture. This document defines the **mandatory quality bar** for evaluating those patterns and their implementation.
 
-If a future design is technically consistent with the Blueprint but feels generic, templated, mechanically generated, fails at realistic viewport sizes, or falls below this quality standard, it is **not sufficient for AWJ V2 approval**.
+If a future design is technically consistent with the Blueprint but feels generic, templated, mechanically generated, fails at realistic viewport sizes, relies on obsolete interaction conventions without justification, or falls below this quality standard, it is **not sufficient for AWJ V2 approval**.
 
 ---
 
-**Core rule:** AWJ V2 must feel deliberately designed and meticulously implemented as a mature, premium, global ERP product across the full range of real working screens — never as a generic AI-generated interface or a desktop-only design with responsive patches.
+**Core rule:** AWJ V2 must feel deliberately designed and meticulously implemented as a mature, premium, current-generation global ERP product across the full range of real working screens — never as a generic AI-generated interface, a desktop-only design with responsive patches, or a collection of inherited legacy conventions accepted without review.
