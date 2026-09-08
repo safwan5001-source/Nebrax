@@ -10,6 +10,7 @@ use App\Models\Partner;
 use App\Models\PriceList;
 use App\Tenancy\BranchScope;
 use App\Services\Accounting\PartnerService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -18,13 +19,19 @@ class PartnerController extends ApiController
     public function __construct(protected PartnerService $partners) {}
 
     /**
-     * قائمة الأطراف مع فلترة اختيارية بالدور:
+     * قائمة الأطراف مع فلترة اختيارية بالدور والبحث:
      *   ?type=customer  → العملاء (customer + both)
      *   ?type=supplier  → الموردون (supplier + both)
+     *   ?search=...     → الاسم/الكود/الضريبة/السجل/الهاتف/البريد
      * الطرف كيان واحد؛ الفلترة عرضية فقط لفصل شاشتَي العملاء والمشتريات.
      */
     public function index(Request $request): JsonResponse
     {
+        $filters = $request->validate([
+            'search' => ['nullable', 'string', 'max:100'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+        ]);
+
         $query = Partner::with(['customerClassification', 'supplierClassification', 'defaultPriceList'])->latest();
 
         match ($request->query('type')) {
@@ -32,6 +39,25 @@ class PartnerController extends ApiController
             'supplier' => $query->whereIn('type', ['supplier', 'both']),
             default    => null,
         };
+
+        if ($search = trim((string) ($filters['search'] ?? ''))) {
+            $escaped = addcslashes($search, '%_\\');
+            $query->where(function (Builder $builder) use ($escaped) {
+                $builder
+                    ->where('name', 'like', "%{$escaped}%")
+                    ->orWhere('name_en', 'like', "%{$escaped}%")
+                    ->orWhere('code', 'like', "%{$escaped}%")
+                    ->orWhere('vat_number', 'like', "%{$escaped}%")
+                    ->orWhere('cr_number', 'like', "%{$escaped}%")
+                    ->orWhere('phone', 'like', "%{$escaped}%")
+                    ->orWhere('mobile', 'like', "%{$escaped}%")
+                    ->orWhere('email', 'like', "%{$escaped}%");
+            });
+        }
+
+        if (isset($filters['per_page'])) {
+            $query->limit((int) $filters['per_page']);
+        }
 
         return PartnerResource::collection($query->get())->response();
     }
