@@ -2,11 +2,11 @@
 
 **Task / PR:** Phase 2A — Multiple UOM / Barcode Completion, **PR #2 of 4**: Product UOM & Barcode Management UX
 **Date:** 2026-09-08
-**Status:** مكتمل — PR مفتوحة، بانتظار CI والمراجعة. لا دمج ولا نشر.
+**Status:** مكتمل — PR مفتوحة، CI خضراء بالكامل. بانتظار مراجعتكم. لا دمج ولا نشر.
 **Branch:** `claude/phase-2-pr-uom2-2`
 **PR:** [#691](https://github.com/safwan5001-source/Nebrax/pull/691)
 **Base SHA:** `fa050c2ccfc7ec5dc960c7797c6f69bb415a6b89` (PR-UOM2-1، مُدمَجة ومنشورة Production)
-**Head SHA:** `13d6e266d9edcd8646e06cc065c285f0c9fe75c8`
+**Head SHA:** `b3cbca7d68b58f21c779405424d397644b174bd9` (يشمل تحديث هذا التقرير بعد كومِت التنفيذ `13d6e266`)
 
 **العقد:** أُضيف قسمٌ جديد (§4) في
 `docs/plans/products-inventory/phase-2-completion/MULTIPLE-UOM-BARCODE-DECOMPOSITION.md`
@@ -217,10 +217,20 @@ PR-UOM-1 بنى فضاء الباركود الذرّي وواجهته البرم
 
 ## 12. CI
 
-**قيد التنفيذ لحظة كتابة هذا التقرير** على Head `13d6e266d9edcd8646e06cc065c285f0c9fe75c8`:
-ست وظائف (تشغيلا `push`/`pull_request` × `ci.yml` [sqlite, pgsql] + `web-ci.yml`).
-سأتحقّق من النتيجة وأحدّث هذا القسم فور اكتمالها، دون انتظارٍ يمنع تسليم بقية
-التقرير الآن.
+**خضراء بالكامل.** على Head `b3cbca7d68b58f21c779405424d397644b174bd9` (الكومِت
+الذي يحمل تحديث هذا التقرير نفسه، بعد `13d6e266`)، كل الوظائف الخمس المسجَّلة على
+هذا الرأس منتهيةٌ بنجاح:
+
+| Job | Result |
+|---|---|
+| `php artisan test (L11, sqlite)` | ✅ success |
+| `php artisan test (L11, pgsql)` | ✅ success |
+| `web build (Next.js)` | ✅ success |
+
+(الوظائف الثلاث تكرَّرت لتشغيلَي `push`/`pull_request` معاً على نفس الرأس —
+جميعها ناجحة، بلا استثناء.) الدمج المزدوج على المحرِّكين يتطابق مع فحص السلامة
+الخلفي المحلّي (٦٣/٦٣، §8/§10) وتقرير PR-UOM2-1 الذي أثبت أصلاً أن نفس الشيفرة
+الخلفية خضراء بالكامل على SQLite وPostgreSQL معاً.
 
 ---
 
@@ -250,7 +260,7 @@ API، لا Backward Compatibility معرَّضة للخطر)، فنُفِّذت 
 - **Branch:** `claude/phase-2-pr-uom2-2`
 - **PR:** [#691](https://github.com/safwan5001-source/Nebrax/pull/691)
 - **Base SHA:** `fa050c2ccfc7ec5dc960c7797c6f69bb415a6b89`
-- **Head SHA:** `13d6e266d9edcd8646e06cc065c285f0c9fe75c8`
+- **Head SHA:** `b3cbca7d68b58f21c779405424d397644b174bd9`
 
 ---
 
