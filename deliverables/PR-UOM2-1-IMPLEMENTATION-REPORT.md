@@ -2,13 +2,17 @@
 
 **Task / PR:** Phase 2A — Multiple UOM / Barcode Completion, **PR #1 of 4**: default sales/purchase UOM on Product
 **Date:** 2026-09-07
-**Status:** مكتمل — PR مفتوحة، **CI خضراء على SQLite وPostgreSQL**، بانتظار المراجعة. لا دمج ولا نشر.
+**Status:** مكتمل — PR مفتوحة، **مدمَجة مع أحدث main، `mergeable_state: clean`، CI خضراء على SQLite وPostgreSQL**، بانتظار المراجعة. لا دمج ولا نشر.
 **Branch:** `claude/phase-2-pr-uom2-1`
 **PR:** [#688](https://github.com/safwan5001-source/Nebrax/pull/688)
-**Base SHA:** `528a2f78619158d0ffdbd3c730f27311a9ca5e26`
-**Head SHA:** `67d1d50e8f4beb0b35cbdade3d88d49c2c43b950`
+**Base SHA (نقطة التفرّع الأصلية):** `528a2f78619158d0ffdbd3c730f27311a9ca5e26` (مدمَجة الآن ضمن الفرع)
+**Head SHA:** `603172ec7c5c83373346679df0f8c0c9950c0b22`
 
 **العقد:** `docs/plans/products-inventory/phase-2-completion/MULTIPLE-UOM-BARCODE-DECOMPOSITION.md` (أُنشئ في هذه المهمّة — انظر §2).
+
+> **تحديث بعد فتح الـPR:** دُمج `origin/main` في الفرع بعد أن تقدَّم بدمج PR#687
+> (ACC-5) غير المرتبط. التفاصيل الكاملة والأدلة في §«تحديث الدمج مع main» أدناه؛
+> Head SHA والأرقام في بقية هذا التقرير محدَّثة لتعكس ذلك.
 
 ---
 
@@ -102,7 +106,9 @@
 | `tests/Feature/ProductDefaultUnitsTest.php` (جديد، ١٤ اختباراً) | التغطية الكاملة أدناه |
 | `docs/plans/products-inventory/phase-2-completion/MULTIPLE-UOM-BARCODE-DECOMPOSITION.md` (جديد) | عقد التفكيك (§2) |
 
-**٨ ملفات — ٥٧٠ سطراً مضافاً، سطران محذوفان.**
+**٨ ملفات كودٍ ووثيقة تفكيك — ٥٧٠ سطراً مضافاً، سطران محذوفان.** (الرقم الذي
+يعرضه GitHub على الـPR — ٩ ملفات، ٨٧٨+/٢- — يضيف هذا التقرير نفسه، ٣٠٨ أسطر،
+كملفٍّ تاسع في التزامٍ لاحق؛ لا فرقٍ في الكود.)
 
 ---
 
@@ -187,6 +193,50 @@
 
 ---
 
+## تحديث الدمج مع main
+
+### الملاحظة
+
+بعد فتح PR #688، دُمج PR#687 (ACC-5: توجيه قيود المخزون/تكلفة البضاعة عبر أدوار
+حسابات دلالية) في `main` — عملٌ مستقلّ تماماً لا صلة له بهذه المهمّة. أظهر GitHub
+لحظياً `mergeable: false` على PR#688، ثم `mergeable_state: clean` بعد إعادة
+الحساب — وهو سلوكٌ معروف: GitHub يحسب القابلية للدمج بشكلٍ غير متزامن فور تقدّم
+الفرع الأساس، فتظهر حالة عابرة قبل اكتمال الحساب.
+
+### الفحص
+
+قبل أي تعديل، تحقّقتُ بثلاث طرق مستقلّة أن لا تعارض حقيقي:
+
+1. **`git merge --no-commit --no-ff origin/main`** محلياً — نجح تلقائياً بلا أي
+   تعارض، ثم أُلغي (`git merge --abort`) دون التزام.
+2. **تقاطع الملفات:** `git diff --stat` بين قاعدة هذا الفرع (`528a2f7`) و`main`
+   الجديدة (`f649fa6`) على الملفات الستّة التي تلمسها هذه المهمّة — **صفر تقاطع**.
+   PR#687 لمس فقط: `InventoryOpeningService.php`، `InventoryService.php`،
+   `ReturnService.php`، `StockPermitService.php`، `StocktakeService.php`،
+   واختباره الخاص — لا شيء من ملفات PR-UOM2-1.
+3. **حالة GitHub الفعلية عبر الـAPI:** `mergeable_state: "clean"` — مؤكَّدة، لا مفترَضة.
+
+### الإجراء
+
+**لا شيء كان يلزم إصلاحه فعلياً** — لكن دُمج `origin/main` في الفرع صراحةً (بدل
+الاكتفاء بتقرير الحالة) ليطابق Head المعروض فعلياً على GitHub التقدّم الحقيقي
+لـ`main`، ولضمان أن CI يُشغَّل على نفس السيناريو الذي سيراه الدمج الفعلي.
+الدمج جاء تلقائياً (fast automatic merge) بلا أي تعديل يدوي على أي ملف — لا
+Refactoring ولا توسيع Scope، تماماً كما طُلب.
+
+### إعادة الاختبار (الكود لم يتغيّر، لكن أُعيد كاملاً للتحقّق)
+
+أُعيدت مجموعة الانحدار المستهدفة (١٤ ملفاً هذه المرّة، مضافاً إليها اختبار ACC-5
+الجديد) والمجموعة الكاملة على **كلا المحرِّكين** بعد الدمج — النتائج في §١٢ أدناه
+محدَّثة لتعكس Head الجديد. النتيجة: **نفس الإخفاقات الـ٢٥ حرفياً** (`diff` فارغ
+بين ما قبل الدمج وما بعده)، مع ٢٢ اختباراً ناجحاً إضافياً هي اختبارات ACC-5 نفسها.
+
+### Pint
+
+أُعيدت مقارنة الأساس (`git stash` قبل/بعد) بعد الدمج على الملفات الخمسة
+المعدَّلة — قائمة الفاحصين **مطابقة تماماً** لما كانت عليه قبل الدمج، بلا أي
+مخالفة جديدة.
+
 ## 12. Tests and exact results
 
 **١٤ اختباراً جديداً** في `ProductDefaultUnitsTest`:
@@ -203,22 +253,24 @@
 حارس القالب، تفشل اختبارات المرجع الحيّ الثلاثة فوراً. أُعيد الشرط وتأكّد تطابق
 الملف مع نسخة المستودع حرفياً.
 
-### SQLite results
+### SQLite results (بعد دمج main)
 
 | المجموعة | النتيجة |
 |---|---|
 | `ProductDefaultUnitsTest` | **14 passed** (79 تأكيداً) |
-| المستهدفة + انحدار UOM/Barcode/Lifecycle (١٣ ملفاً) | **178 passed** (1108 تأكيداً) |
-| **المجموعة الكاملة** | **2669 passed, 25 failed, 1 skipped** (18675 تأكيداً)، ٢٦٣ ثانية |
+| المستهدفة + انحدار UOM/Barcode/Lifecycle + ACC-5 (١٤ ملفاً) | **200 passed** (1182 تأكيداً) |
+| **المجموعة الكاملة** | **2691 passed, 25 failed, 1 skipped** (18749 تأكيداً)، ٢٥٢ ثانية |
 
-### PostgreSQL results
+### PostgreSQL results (بعد دمج main)
 
 | المجموعة | النتيجة |
 |---|---|
-| المستهدفة + الانحدار (١٣ ملفاً) | **178 passed** (1108 تأكيداً) |
-| **المجموعة الكاملة** | **2670 passed, 25 failed** (18677 تأكيداً)، ٦٠٨ ثانية |
+| المستهدفة + الانحدار (١٤ ملفاً) | **200 passed** (1182 تأكيداً) |
+| **المجموعة الكاملة** | **2691 passed, 25 failed, 1 skipped** (18749 تأكيداً)، ٢٧٠ ثانية |
 
-مجموعتا الأسماء الفاشلة **متطابقتان على المحرِّكين** (`diff` فارغ).
+مجموعتا الأسماء الفاشلة **متطابقتان على المحرِّكين**، **ومتطابقتان أيضاً مع ما
+قبل الدمج** (`diff` فارغ في الحالتين). الفارق `+22` ناجحاً بين هذا التشغيل وما قبل
+الدمج هو بالضبط اختبارات `InventoryCogsAccountRoutingTest` (ACC-5)، غير المرتبطة.
 
 ### خط الأساس — مُتحقَّق منه لا مفترَض
 
@@ -249,18 +301,19 @@ PR-PROD-LIFE-1 — وهي هناك كانت **CI خضراء بالكامل**، �
 
 ## 14. CI status
 
-على Head `67d1d50`:
+**على Head `603172ec7c5c83373346679df0f8c0c9950c0b22` (بعد دمج main) — أربعة فحوص، كلها ناجحة:**
 
 | Check run | النتيجة |
 |---|---|
-| `php artisan test (L11, sqlite)` — run [34154415416](https://github.com/safwan5001-source/Nebrax/actions/runs/34154415416) | ✅ success |
-| `php artisan test (L11, pgsql)` — run [34154415416](https://github.com/safwan5001-source/Nebrax/actions/runs/34154415416) | ✅ success |
-| `php artisan test (L11, sqlite)` — run [34154450955](https://github.com/safwan5001-source/Nebrax/actions/runs/34154450955) | ✅ success |
-| `php artisan test (L11, pgsql)` — run [34154450955](https://github.com/safwan5001-source/Nebrax/actions/runs/34154450955) | ⏳ لم يكتمل بعد لحظة الكتابة (توأمه على نفس الشيفرة نجح) |
+| `php artisan test (L11, sqlite)` — run [34156420514](https://github.com/safwan5001-source/Nebrax/actions/runs/34156420514) | ✅ success |
+| `php artisan test (L11, pgsql)` — run [34156420514](https://github.com/safwan5001-source/Nebrax/actions/runs/34156420514) | ✅ success |
+| `php artisan test (L11, sqlite)` — run [34156423111](https://github.com/safwan5001-source/Nebrax/actions/runs/34156423111) | ✅ success |
+| `php artisan test (L11, pgsql)` — run [34156423111](https://github.com/safwan5001-source/Nebrax/actions/runs/34156423111) | ✅ success |
 
-(تشغيلان لأن `push` و`pull_request` يُطلقان `ci.yml` معاً.)
+(تشغيلان لأن `push` و`pull_request` يُطلقان `ci.yml` معاً.) `mergeable_state`
+الحالي لهذا الـPR: **`clean`** — مؤكَّدٌ عبر الـAPI مباشرةً.
 
-**دورة كاملة خضراء على المحرِّكين** في التشغيل الأول — وهذا يؤكّد مجدداً أن
+**دورة كاملة خضراء على المحرِّكين بعد دمج main** — وهذا يؤكّد مجدداً أن
 الإخفاقات الـ٢٥ المحلية بيئةٌ لا كود: نفس الشيفرة في بيئة فيها `ext-bcmath`
 تعطي صفر إخفاق.
 
