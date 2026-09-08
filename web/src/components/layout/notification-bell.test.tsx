@@ -225,6 +225,19 @@ describe('NotificationBell — source action safety', () => {
   });
 });
 
+describe('NotificationBell — system update action (PR-NOTIF-6)', () => {
+  it('renders a source link for a registered system update action', async () => {
+    fetchNotifications.mockResolvedValue({
+      data: [notification({ action: 'view_system_update', source_type: 'system_update', source_id: 'su-1' })],
+    });
+    renderIntl(<NotificationBell />);
+
+    await openPanel();
+    const link = (await screen.findByText('عرض المصدر')) as HTMLAnchorElement;
+    expect(link.closest('a')?.getAttribute('href')).toBe('/whats-new');
+  });
+});
+
 describe('NotificationBell — locale-sensitive rendering', () => {
   for (const locale of TEST_LOCALES) {
     it(`renders tab labels from the real ${locale} messages`, async () => {
