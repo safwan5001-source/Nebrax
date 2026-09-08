@@ -51,7 +51,7 @@ describe('توكنز Retail V2', () => {
   });
 
   it('يسقّف الشعار وQR بين ERP وClassic دون نسخ العائلات الأخرى', () => {
-    expect(RETAIL_V2.logoMaxPx).toBe(30);
+    expect(RETAIL_V2.logoMaxPx).toBe(38);
     expect(RETAIL_V2.qrSizePx).toBe(66);
     expect(RETAIL_V2.logoMaxPx).toBeGreaterThan(ERP_V2.logoMaxPx);
     expect(RETAIL_V2.logoMaxPx).toBeLessThan(CLASSIC_V2.logoMaxPx);

@@ -120,8 +120,8 @@ describe('Modern V2 visual composition', () => {
     const { container } = renderComposition(MODERN_V2_STYLE, model);
     const img = container.querySelector('header img');
     expect(img).toBeTruthy();
-    expect(img?.getAttribute('class')).toContain('max-h-9');
-    expect(img?.getAttribute('style')).toContain('36px');
+    expect(img?.getAttribute('class')).toContain('max-h-11');
+    expect(img?.getAttribute('style')).toContain('44px');
   });
 
   it('يعرض شارة المسودة والملغى فقط', () => {

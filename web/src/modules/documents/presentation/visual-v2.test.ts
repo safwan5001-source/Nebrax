@@ -124,7 +124,7 @@ describe('modernStatusLabel', () => {
 
 describe('VISUAL_V2', () => {
   it('يبقي الشعار وQR ضمن حدود لا تهيمن على الصفحة', () => {
-    expect(VISUAL_V2.logoMaxPx).toBe(36);
+    expect(VISUAL_V2.logoMaxPx).toBe(44);
     expect(VISUAL_V2.qrSizePx).toBe(76);
     expect(VISUAL_V2.qrSizePx).toBeLessThan(110);
     expect(VISUAL_V2.qrSizePx).toBeGreaterThanOrEqual(72);
@@ -139,8 +139,8 @@ describe('VISUAL_V2', () => {
 
 describe('cappedLogoHeight', () => {
   it('يقص الارتفاع فوق 36 بكسل ويستخدم السقف عند الغياب', () => {
-    expect(cappedLogoHeight(56)).toBe(36);
-    expect(cappedLogoHeight(null)).toBe(36);
+    expect(cappedLogoHeight(56)).toBe(44);
+    expect(cappedLogoHeight(null)).toBe(44);
     expect(cappedLogoHeight(32)).toBe(32);
   });
 });
