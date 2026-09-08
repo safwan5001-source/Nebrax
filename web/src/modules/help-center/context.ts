@@ -3,6 +3,7 @@ import { getHelpArticle, type HelpArticle, type HelpArticleSlug } from './conten
 type HelpRoutePattern = {
   kind: 'exact' | 'prefix';
   pathname: `/${string}`;
+  excludedPathnames?: readonly `/${string}`[];
 };
 
 export type HelpContextKey =
@@ -15,7 +16,14 @@ export type HelpContextKey =
   | 'stocktaking'
   | 'journals'
   | 'periodLocks'
-  | 'posStart';
+  | 'posStart'
+  | 'partners'
+  | 'salesQuotes'
+  | 'deliveryNotes'
+  | 'inventoryOpenings'
+  | 'stockPermits'
+  | 'expenses'
+  | 'fiscalYears';
 
 export interface ContextualHelpRoute {
   context: HelpContextKey;
@@ -24,7 +32,7 @@ export interface ContextualHelpRoute {
 }
 
 /**
- * مصدر الحقيقة الوحيد لربط شاشات أَوْج بمقالات V1.
+ * مصدر الحقيقة الوحيد لربط شاشات أَوْج بمقالات مركز المساعدة.
  * لا تحتوي المكونات على شروط مسارات، ولا تنشئ هذه الخريطة محتوى مساعدة جديداً.
  */
 export const CONTEXTUAL_HELP_ROUTES = [
@@ -49,6 +57,32 @@ export const CONTEXTUAL_HELP_ROUTES = [
     routes: [{ kind: 'prefix', pathname: '/accounting-settings/period-locks' }],
   },
   { context: 'posStart', articleSlug: 'pos-session-and-sale', routes: [{ kind: 'exact', pathname: '/pos/start' }] },
+  {
+    context: 'partners',
+    articleSlug: 'create-partner',
+    routes: [
+      { kind: 'exact', pathname: '/partners' },
+      { kind: 'exact', pathname: '/partners/new' },
+    ],
+  },
+  { context: 'salesQuotes', articleSlug: 'create-sales-quote', routes: [{ kind: 'prefix', pathname: '/quotes' }] },
+  { context: 'deliveryNotes', articleSlug: 'delivery-notes', routes: [{ kind: 'prefix', pathname: '/delivery-notes' }] },
+  {
+    context: 'inventoryOpenings',
+    articleSlug: 'import-inventory-opening',
+    routes: [{ kind: 'prefix', pathname: '/inventory-openings' }],
+  },
+  { context: 'stockPermits', articleSlug: 'stock-permits', routes: [{ kind: 'prefix', pathname: '/stock-permits' }] },
+  {
+    context: 'expenses',
+    articleSlug: 'record-expense',
+    routes: [{ kind: 'prefix', pathname: '/expenses', excludedPathnames: ['/expenses/categories'] }],
+  },
+  {
+    context: 'fiscalYears',
+    articleSlug: 'fiscal-year-close',
+    routes: [{ kind: 'prefix', pathname: '/accounting-settings/fiscal-years' }],
+  },
 ] as const satisfies readonly ContextualHelpRoute[];
 
 export interface ResolvedContextualHelp {
@@ -63,6 +97,9 @@ function normalizePathname(pathname: string): string {
 }
 
 function matchesRoute(pathname: string, route: HelpRoutePattern): boolean {
+  if (route.excludedPathnames?.some((excluded) => pathname === excluded || pathname.startsWith(`${excluded}/`))) {
+    return false;
+  }
   if (route.kind === 'exact') return pathname === route.pathname;
   return pathname === route.pathname || pathname.startsWith(`${route.pathname}/`);
 }

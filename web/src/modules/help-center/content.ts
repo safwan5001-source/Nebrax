@@ -10,7 +10,14 @@ export type HelpArticleSlug =
   | 'run-stocktake'
   | 'manual-journal-entry'
   | 'period-locks'
-  | 'pos-session-and-sale';
+  | 'pos-session-and-sale'
+  | 'create-partner'
+  | 'create-sales-quote'
+  | 'delivery-notes'
+  | 'import-inventory-opening'
+  | 'stock-permits'
+  | 'record-expense'
+  | 'fiscal-year-close';
 
 export type HelpCategoryKey =
   | 'gettingStarted'
@@ -18,6 +25,7 @@ export type HelpCategoryKey =
   | 'purchases'
   | 'inventory'
   | 'accounting'
+  | 'finance'
   | 'pos';
 
 type LocalizedText = Record<HelpLocale, string>;
@@ -37,6 +45,7 @@ export interface HelpArticle {
   keywords: LocalizedText;
   minutes: number;
   action?: { href: string; label: LocalizedText };
+  related?: readonly HelpArticleSlug[];
   sections: HelpSection[];
 }
 
@@ -65,6 +74,11 @@ export const HELP_CATEGORIES: { key: HelpCategoryKey; title: LocalizedText; desc
     key: 'accounting',
     title: { ar: 'المحاسبة والرقابة', en: 'Accounting and controls' },
     description: { ar: 'القيود والفترات والضوابط المحاسبية.', en: 'Journals, periods, and accounting controls.' },
+  },
+  {
+    key: 'finance',
+    title: { ar: 'المالية والمصروفات', en: 'Finance and expenses' },
+    description: { ar: 'المصروفات وحركات النقد والبنوك.', en: 'Expenses, cash, and bank operations.' },
   },
   {
     key: 'pos',
@@ -282,6 +296,190 @@ export const HELP_ARTICLES: HelpArticle[] = [
           { ar: 'عند نهاية العمل، راجع ملخص الجلسة والفرق ثم نفذ الإغلاق والتسليم.', en: 'At the end of work, review the session summary and variance, then close and hand over.' },
         ],
         note: { ar: 'إذا انقطع الاتصال أثناء الدفع، تحقق من أحدث الفواتير قبل إعادة العملية لتجنب التكرار.', en: 'If the connection drops during payment, check the latest invoices before retrying to avoid duplication.' },
+      },
+    ],
+  },
+  {
+    slug: 'create-partner',
+    category: 'sales',
+    title: { ar: 'إضافة عميل أو مورد', en: 'Add a customer or supplier' },
+    summary: { ar: 'أنشئ بطاقة طرف وحدد نوعها وبيانات الحساب قبل استخدامها في المستندات.', en: 'Create a partner record and set its type and account details before using it in documents.' },
+    keywords: { ar: 'عميل مورد طرف رصيد افتتاحي حد ائتماني قائمة أسعار', en: 'customer supplier partner opening balance credit limit price list' },
+    minutes: 4,
+    related: ['create-sales-invoice', 'create-sales-quote'],
+    sections: [
+      {
+        title: { ar: 'البيانات المطلوبة', en: 'Required details' },
+        steps: [
+          { ar: 'افتح العملاء والموردين، ثم اختر إضافة طرف.', en: 'Open Customers and suppliers, then choose Add partner.' },
+          { ar: 'أدخل الاسم وحدد النوع: عميل أو مورد أو كلاهما، ثم حدد صفة الطرف فرد أو منشأة.', en: 'Enter the name, select Customer, Supplier, or Both, then choose Individual or Commercial.' },
+          { ar: 'أكمل بيانات التواصل والرقم الضريبي أو السجل والعنوان الوطني عند توفرها.', en: 'Complete contact details, VAT or CR number, and national address when available.' },
+          { ar: 'أدخل حد الائتمان ومدته، واختر قائمة الأسعار الافتراضية إذا كان الطرف عميلاً، ثم احفظ.', en: 'Enter the credit limit and period, choose a default price list for a customer, then save.' },
+        ],
+        note: { ar: 'الرصيد الافتتاحي متاح عند الإنشاء فقط ويولّد قيداً مرحّلاً؛ راجع المبلغ والتاريخ قبل الحفظ.', en: 'The opening balance is available only during creation and posts a journal entry; verify its amount and date before saving.' },
+      },
+      {
+        title: { ar: 'مشكلة شائعة', en: 'Common problem' },
+        paragraphs: [
+          { ar: 'إذا كانت قائمة الأسعار فارغة، فتأكد من امتلاك صلاحية عرض الفواتير ومن نجاح تحميل القوائم. تظهر القوائم غير النشطة معطلة ولا يمكن اختيارها، ويظهر الحقل للعملاء وللأطراف من نوع كلاهما فقط.', en: 'If the price-list selector is empty, confirm you have invoice-view permission and that the lists loaded successfully. Inactive lists appear disabled and cannot be selected, and the field is shown only for customers and partners of type Both.' },
+        ],
+      },
+    ],
+  },
+  {
+    slug: 'create-sales-quote',
+    category: 'sales',
+    title: { ar: 'إنشاء عرض سعر وتحويله إلى فاتورة', en: 'Create a quote and convert it to an invoice' },
+    summary: { ar: 'أعد عرضاً للعميل، أصدر نسخة الطباعة، أو حوّله إلى فاتورة مبيعات.', en: 'Prepare a customer quote, issue its print version, or convert it to a sales invoice.' },
+    keywords: { ar: 'عرض سعر عميل صلاحية ضريبة إصدار مراجعة تحويل فاتورة', en: 'quote quotation customer validity tax issue revision convert invoice' },
+    minutes: 4,
+    related: ['create-sales-invoice', 'create-partner'],
+    sections: [
+      {
+        title: { ar: 'إعداد العرض', en: 'Prepare the quote' },
+        steps: [
+          { ar: 'اختر العميل وتاريخ العرض، وحدد صالح حتى عند الحاجة.', en: 'Choose the customer and quote date, and set Valid until when needed.' },
+          { ar: 'حدد وضع الضريبة، ثم أضف منتجاً ووصفاً وكمية وسعراً وضريبة لكل بند.', en: 'Set the tax mode, then add a product, description, quantity, price, and tax for each line.' },
+          { ar: 'راجع الإجمالي والملاحظات واحفظ عرض السعر.', en: 'Review the total and notes, then save the quote.' },
+          { ar: 'من صفحة العرض، اختر إصدار للطباعة لتثبيت النسخة، أو تحويل إلى فاتورة لإنشاء فاتورة مبيعات مرتبطة بطريقة دفع آجل.', en: 'From the quote page, choose Issue for print to lock that version, or Convert to invoice to create a linked sales invoice with credit payment terms.' },
+        ],
+        note: { ar: 'العرض الصادر للطباعة يصبح مقفلاً. استخدم إنشاء نسخة مراجعة إذا احتجت إلى تعديل نسخة صادرة.', en: 'A quote issued for print is locked. Use Create working revision when an issued version needs changes.' },
+      },
+      {
+        title: { ar: 'مشكلة شائعة', en: 'Common problem' },
+        paragraphs: [
+          { ar: 'يتطلب الحفظ بنداً واحداً على الأقل بكمية وسعر صالحين. وبعد التحويل استخدم عرض الفاتورة الناتجة بدلاً من تكرار التحويل.', en: 'Saving requires at least one line with a valid quantity and price. After conversion, open the resulting invoice instead of repeating the conversion.' },
+        ],
+      },
+    ],
+  },
+  {
+    slug: 'delivery-notes',
+    category: 'sales',
+    title: { ar: 'سندات التسليم ومسودة الفاتورة', en: 'Delivery notes and invoice drafts' },
+    summary: { ar: 'سجل التسليم تشغيلياً، أكده بالصلاحية المناسبة، ثم أنشئ مسودة فاتورة من السندات المؤهلة.', en: 'Record delivery operationally, confirm it with the right permission, then create an invoice draft from eligible notes.' },
+    keywords: { ar: 'سند تسليم تأكيد إلغاء مسودة فاتورة مخزن عميل', en: 'delivery note confirm cancel invoice draft warehouse customer' },
+    minutes: 5,
+    related: ['create-sales-invoice', 'stock-permits'],
+    sections: [
+      {
+        title: { ar: 'من المسودة إلى التأكيد', en: 'From draft to confirmation' },
+        steps: [
+          { ar: 'بصلاحية إدارة سندات التسليم، اختر العميل والمخزن وتاريخ التسليم.', en: 'With delivery-note management permission, choose the customer, warehouse, and delivery date.' },
+          { ar: 'أضف المنتجات والوحدات والكميات الصحيحة، ثم احفظ المسودة.', en: 'Add the correct products, units, and quantities, then save the draft.' },
+          { ar: 'راجع المسودة ثم استخدم تأكيد التسليم إذا كانت لديك صلاحية التأكيد.', en: 'Review the draft, then use Confirm delivery if you have confirmation permission.' },
+          { ar: 'لإنشاء مسودة فاتورة، حدد سنداً مؤكداً غير مرتبط بفاتورة، أو مجموعة سندات متوافقة، ثم راجع التسعير.', en: 'To create an invoice draft, select a confirmed unlinked note, or compatible notes, then review pricing.' },
+        ],
+        note: { ar: 'حفظ السند أو تأكيده لا ينشئ فاتورة أو حركة مخزون أو قيداً. إنشاء مسودة الفاتورة قرار منفصل ولا يرحّلها.', en: 'Saving or confirming a note does not create an invoice, stock movement, or journal. Creating an invoice draft is separate and does not post it.' },
+      },
+      {
+        title: { ar: 'الصلاحيات والحالات', en: 'Permissions and states' },
+        paragraphs: [
+          { ar: 'العرض والإدارة والتأكيد والإلغاء وإنشاء الفاتورة صلاحيات منفصلة. السند المؤكد للقراءة فقط، والإلغاء يتطلب سبباً، والسند المرتبط بمسودة فاتورة لا يمكن إلغاؤه من هذه الشاشة.', en: 'Viewing, managing, confirming, cancelling, and invoicing are separate permissions. A confirmed note is read-only, cancellation requires a reason, and a note linked to an invoice draft cannot be cancelled here.' },
+        ],
+      },
+    ],
+  },
+  {
+    slug: 'import-inventory-opening',
+    category: 'inventory',
+    title: { ar: 'استيراد الأرصدة الافتتاحية للمخزون', en: 'Import inventory opening balances' },
+    summary: { ar: 'ارفع ملف الأرصدة، طابق الأعمدة، عالج الأخطاء، ثم أنشئ مسودة للترحيل المقصود.', en: 'Upload opening balances, map columns, resolve errors, then create a draft for deliberate posting.' },
+    keywords: { ar: 'رصيد افتتاحي مخزون استيراد CSV XLSX مطابقة أعمدة ترحيل', en: 'inventory opening balance import CSV XLSX mapping preview post' },
+    minutes: 5,
+    related: ['create-product', 'stock-permits', 'run-stocktake'],
+    sections: [
+      {
+        title: { ar: 'الاستيراد والمراجعة', en: 'Import and review' },
+        steps: [
+          { ar: 'من الأرصدة الافتتاحية اختر استيراد، ونزّل القالب عند الحاجة، ثم اختر ملف CSV أو XLSX.', en: 'From Inventory opening balances choose Import, download the template if needed, then select a CSV or XLSX file.' },
+          { ar: 'حدد تاريخ الافتتاحية، وأدخل الملاحظات، ولا تفعل السماح بتكلفة صفرية إلا إذا كان ذلك مقصوداً.', en: 'Set the opening date and notes, and enable zero unit cost only when it is genuinely intended.' },
+          { ar: 'طابق أعمدة الملف مع حقول أَوْج. يجب تعريف المنتج بالرمز أو الباركود أو معرف أَوْج، وتعريف المخزن.', en: 'Map file columns to AWJ fields. Identify the product by SKU, barcode, or AWJ ID, and identify the warehouse.' },
+          { ar: 'شغّل الفحص وعالج كل الأخطاء المانعة والصفوف المكررة أو المنتجات والمخازن غير المعروفة.', en: 'Run the check and resolve every blocking error, duplicate row, or unknown product or warehouse.' },
+          { ar: 'أنشئ المسودة، افتحها وراجع السطور والقيمة الإجمالية، ثم رحّلها فقط بعد التأكد.', en: 'Create the draft, open it and review lines and total value, then post only after verification.' },
+        ],
+        note: { ar: 'إنشاء المسودة لا يحرك المخزون ولا ينشئ قيداً. الترحيل يفعل ذلك ويجعل المستند غير قابل للتعديل أو الحذف.', en: 'Creating the draft does not move stock or create a journal. Posting does both and makes the document immutable and non-deletable.' },
+      },
+      {
+        title: { ar: 'متى يُستخدم؟', en: 'When to use it' },
+        paragraphs: [
+          { ar: 'استخدم الأرصدة الافتتاحية كنقطة بداية للصنف قبل وجود أي حركة عليه، وليس كبديل عن سند مخزني أو جرد لاحق.', en: 'Use opening balances as the item starting point before it has any movement, not as a substitute for a later stock permit or stocktake.' },
+        ],
+      },
+    ],
+  },
+  {
+    slug: 'stock-permits',
+    category: 'inventory',
+    title: { ar: 'إنشاء وترحيل إذن مخزني', en: 'Create and post a stock permit' },
+    summary: { ar: 'اختر نوع الإذن والمخزن والبنود، ثم راجع أثر الترحيل قبل تنفيذه.', en: 'Choose the permit type, warehouse, and lines, then review the posting effect before proceeding.' },
+    keywords: { ar: 'إذن مخزني إضافة صرف تحويل متوسط تكلفة ترحيل', en: 'stock permit receipt issue transfer average cost post' },
+    minutes: 4,
+    related: ['run-stocktake', 'import-inventory-opening'],
+    sections: [
+      {
+        title: { ar: 'إعداد الإذن', en: 'Prepare the permit' },
+        steps: [
+          { ar: 'اختر نوع الإذن: صرف أو إضافة أو تحويل.', en: 'Choose Issue, Receipt, or Transfer.' },
+          { ar: 'حدد المخزن، وللتحويل حدد مخزن المصدر ومخزن الوجهة المختلف عنه.', en: 'Select the warehouse; for a transfer, select distinct source and destination warehouses.' },
+          { ar: 'حدد التاريخ والسبب، ثم أضف الأصناف المتتبعة مخزونياً والكميات.', en: 'Set the date and reason, then add inventory-tracked products and quantities.' },
+          { ar: 'في الإضافة أدخل تكلفة الوحدة. في الصرف والتحويل يعرض أَوْج متوسط التكلفة ولا يسمح بتعديله.', en: 'For a receipt, enter unit cost. For an issue or transfer, AWJ displays average cost and does not allow editing it.' },
+          { ar: 'احفظ المسودة وراجع التكلفة الإجمالية، ثم استخدم ترحيل عندما تصبح البيانات نهائية.', en: 'Save the draft and review total cost, then use Post when the data is final.' },
+        ],
+        note: { ar: 'المسودة لا تحرك الكمية ولا تنشئ قيداً. الترحيل يحرك الكمية وينشئ القيد المطابق، بينما التحويل داخل الفرع يحرك الكمية بين المخازن دون قيد.', en: 'A draft moves no quantity and creates no journal. Posting moves quantity and creates the matching journal, while an in-branch transfer moves stock between warehouses without a journal.' },
+      },
+    ],
+  },
+  {
+    slug: 'record-expense',
+    category: 'finance',
+    title: { ar: 'تسجيل مصروف وترحيله', en: 'Record and post an expense' },
+    summary: { ar: 'احفظ المصروف كمسودة مع تصنيفه ومستنداته، ثم راجعه قبل الترحيل.', en: 'Save an expense as a draft with its classification and documents, then review it before posting.' },
+    keywords: { ar: 'مصروف حساب ضريبة مورد تصنيف مركز تكلفة مرفق ترحيل', en: 'expense account tax supplier category cost center attachment post' },
+    minutes: 5,
+    related: ['manual-journal-entry', 'create-partner'],
+    sections: [
+      {
+        title: { ar: 'إدخال المسودة', en: 'Enter the draft' },
+        steps: [
+          { ar: 'أدخل المبلغ قبل الضريبة والتاريخ، ثم اختر حساب مصروف تفصيلياً.', en: 'Enter the pre-tax amount and date, then choose a non-group expense account.' },
+          { ar: 'اختر التصنيف والمورد أو أدخل اسمه، وحدد مركز التكلفة عند الحاجة.', en: 'Choose a category and supplier or enter the vendor name, and select a cost center when needed.' },
+          { ar: 'حدد طريقة الدفع: نقداً أو تحويل بنكي أو آجل، ثم راجع نسبة الضريبة والإجمالي.', en: 'Select Cash, Bank transfer, or Credit, then review the tax rate and total.' },
+          { ar: 'أضف الوصف والمرفقات المطلوبة واحفظ كمسودة.', en: 'Add the description and required attachments, then save as a draft.' },
+          { ar: 'من صفحة التفاصيل راجع البيانات والمرفقات، ثم اختر ترحيل المصروف لإنشاء القيد.', en: 'On the detail page, review data and attachments, then choose Post expense to create the journal.' },
+        ],
+        note: { ar: 'يمكن تعديل أي مسودة. ويمكن حذفها ما لم تكن مرتبطة بمستند مصدر. المصروف المرحّل لا يقبل التعديل المباشر.', en: 'Any draft can be edited. It can be deleted unless it is linked to a source document. A posted expense cannot be edited directly.' },
+      },
+      {
+        title: { ar: 'مشكلة شائعة', en: 'Common problem' },
+        paragraphs: [
+          { ar: 'إذا تعذر الحفظ، تحقق من أن المبلغ موجب وأن حساب المصروف محدد. حد المرفقات في الواجهة عشرة ملفات وبحد أقصى 10 MB لكل ملف.', en: 'If saving fails, confirm the amount is positive and an expense account is selected. The UI accepts up to ten attachments, each no larger than 10 MB.' },
+        ],
+      },
+    ],
+  },
+  {
+    slug: 'fiscal-year-close',
+    category: 'accounting',
+    title: { ar: 'إقفال سنة مالية وإعادة فتحها', en: 'Close and reopen a fiscal year' },
+    summary: { ar: 'راجع جاهزية السنة وموانع الإقفال، ونفذ الإقفال أو إعادة الفتح بالصلاحية المستقلة.', en: 'Review year readiness and blockers, then close or reopen it with the separate permission.' },
+    keywords: { ar: 'سنة مالية إقفال إعادة فتح جاهزية موانع تحذيرات أرباح مرحلة صلاحيات', en: 'fiscal year close reopen readiness blockers warnings retained earnings permissions' },
+    minutes: 5,
+    related: ['period-locks', 'manual-journal-entry'],
+    sections: [
+      {
+        title: { ar: 'الصلاحيات والجاهزية', en: 'Permissions and readiness' },
+        paragraphs: [
+          { ar: 'تستخدم الشاشة صلاحيات مستقلة للعرض والإدارة والإقفال وإعادة الفتح. إنشاء سنة يتطلب اسمها وتاريخ البداية والنهاية.', en: 'The screen uses separate permissions for viewing, managing, closing, and reopening. Creating a year requires its name, start date, and end date.' },
+        ],
+        steps: [
+          { ar: 'افتح إجراء الإقفال للسنة المفتوحة لعرض فحص الجاهزية.', en: 'Open the close action for an open year to load its readiness check.' },
+          { ar: 'عالج كل مانع ظاهر. لا يمكن المتابعة عندما تكون نتيجة يمكن الإقفال غير متحققة، ويشمل ذلك قفل فترة نشط يغطي تاريخ الإقفال.', en: 'Resolve every displayed blocker. You cannot proceed while Can close is false, including when an active period lock covers the closing date.' },
+          { ar: 'راجع التحذيرات والمعلومات، وأقر بالتحذيرات إذا سمح الفحص بالإقفال معها.', en: 'Review warnings and information, and acknowledge warnings when the check permits closing with them.' },
+          { ar: 'نفذ الإقفال بعد المراجعة، واستخدم السجل لمراجعة الأجيال والأحداث.', en: 'Close only after review, and use History to inspect generations and events.' },
+          { ar: 'لإعادة فتح سنة مغلقة، استخدم صلاحية إعادة الفتح وأدخل سبباً إلزامياً.', en: 'To reopen a closed year, use the reopen permission and enter a required reason.' },
+        ],
+        note: { ar: 'الإقفال يصفر حسابات النتيجة مقابل الأرباح المرحلة. إعادة الفتح تنشئ عكس قيد الإقفال مع بقاء الجيل والسجل محفوظين؛ لا توجد آلية لتجاوز قفل الفترة من هذه الشاشة.', en: 'Closing zeroes income-statement accounts against retained earnings. Reopening creates a reversal of the closing journal while preserving generation history; this screen has no period-lock override.' },
       },
     ],
   },
