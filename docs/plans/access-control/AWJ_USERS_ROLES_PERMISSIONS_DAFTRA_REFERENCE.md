@@ -2,7 +2,7 @@
 
 **Status:** Living reference — research + code inspection in progress  
 **Date started:** 2026-09-08  
-**Last research update:** 2026-09-08 — full RBAC catalogue vs RoleDialog semantics inspection  
+**Last research update:** 2026-09-08 — cash/bank ACL money-path inspection  
 **Scope:** Users, Employees, Roles, Permissions, Branch Scope, Resource Access, Record Scope, Workflow/Record State, Reports, permission-aware UX.  
 **Reference product:** Daftra official documentation.  
 
@@ -88,150 +88,110 @@ Important entities widely use `SoftDeletes`, but no general tenant Recycle Bin/l
 
 Daftra's deleted-sales/deleted-purchases management therefore remains a capability gap. Restore/permanent-delete must be explicit sensitive authorities and financial recovery must respect journal integrity, fiscal locks, ZATCA/compliance lifecycle and immutable audit.
 
-## 15. RBAC catalogue — CURRENT SHAPE
-`Rbac::PERMISSIONS` is the canonical assignable catalogue. It now mixes three generations of permission design:
+## 15. RBAC catalogue and RoleDialog
+`Rbac::PERMISSIONS` mixes legacy broad `view/manage`, intermediate explicit sensitive permissions and modern semantic POS/Fuel/Document/Fiscal permissions.
 
-### A. Legacy broad module pairs
-Examples:
+RoleDialog has two confirmed security-relevant administration defects:
+1. every non-`manage` action is displayed as View;
+2. `const [mod, action] = perm.split('.')` truncates multi-segment keys such as `pos.audit.export`, `fuel.shift.approve`, `documents.center.review`, then reconstructs invalid shorter keys.
+
+The UI must treat the exact canonical key as opaque and use backend-provided metadata for group/action/label/risk/dependencies. Sensitive permissions should receive visible risk treatment. Any legacy decomposition must preserve effective access unless explicitly approved.
+
+## 16. Cash / bank ACL — CODE-BACKED MONEY-PATH AUDIT
+AWJ has a meaningful treasury resource ACL, not just module-level RBAC. `CashBankAccountService::assertAllowed()` evaluates the selected CashBankAccount's `deposit` or `withdraw` scope against the authenticated actor and active branch context. The inspected core money paths show good enforcement at the moment of financial effect.
+
+### 16.1 PaymentService — GOOD
+`PaymentService::post()` resolves the actual CashBankAccount and calls:
 ```text
-partners.view / partners.manage
-products.view / products.manage
-invoices.view / invoices.manage
-payments.view / payments.manage
-purchases.view / purchases.manage
-returns.view / returns.manage
-hr.view / hr.manage
-expenses.view / expenses.manage
-assets.view / assets.manage
-cost_centers.view / cost_centers.manage
-accounts.view / accounts.manage
-branches.view / branches.manage
-users.view / users.manage
-roles.view / roles.manage
+received -> assertAllowed(deposit)
+paid     -> assertAllowed(withdraw)
 ```
-These are simple operational permissions but several `manage` keys aggregate create/update/delete and sometimes domain-sensitive actions. They should not be decomposed in one big-bang migration.
+The check occurs at posting time after allocation validation and before `LedgerService::post()`. This is the correct security boundary: a draft can exist, but financial effect cannot occur without current resource authority.
 
-### B. Intermediate explicit actions
-Examples:
+This covers the canonical customer-receipt and supplier-payment voucher path, including POS/Fuel flows that deliberately create/post `Payment` records through `PaymentService`.
+
+### 16.2 CashBankTransferService — GOOD
+Internal transfer checks both sides before posting:
 ```text
-delivery_notes.confirm / cancel / invoice
-sales.minimum_price_override
-products.view_cost
-supplier_refunds.view / manage
-accounting_period_locks.view / manage
+source      -> withdraw
+destination -> deposit
 ```
-These correctly isolate a business-sensitive capability from a broad module permission, even where the action name remains `manage`.
+Thus authority on one treasury resource does not imply authority on the other. This is the correct two-resource intersection.
 
-### C. Modern semantic/action catalogues
-POS, Fuel, Document Center and Fiscal Years demonstrate the target direction:
+### 16.3 EmployeeCustodyService — GOOD
+Issuing employee custody resolves the selected cash/bank entity and checks `withdraw` before posting the custody debit / cash-bank credit entry.
+
+### 16.4 SupplierRefundService — GOOD
+Supplier refund is intentionally modeled as money entering AWJ treasury after a posted purchase return. It resolves the cash/bank entity and checks `deposit` before posting. This is directionally correct for the implemented refund semantic.
+
+### 16.5 Purchase payment architecture — GOOD BY DELEGATION
+`PurchaseService` documents that settlement is a separate `PaymentService` financial document rather than embedding cash/bank movement in the purchase invoice journal. Therefore the canonical purchase-payment path inherits `PaymentService` withdraw ACL rather than bypassing it.
+
+## 17. Treasury ACL boundary exceptions / special cases
+Not every journal line touching a cash account is a `CashBankAccount` user-selected movement. These cases need explicit classification rather than blindly inserting ACL checks everywhere.
+
+### 17.1 POS drawer `cash_in` / `cash_out` — NOT AN ACCOUNTING MONEY MOVEMENT
+`PosSessionService::recordCashMovement()` explicitly records physical drawer movement for session reconciliation and does **not** post a journal entry or alter the cash account. It enforces session actor branch/warehouse scope and applies POS operation-policy approval for `cash_out`. Therefore absence of `CashBankAccountService::assertAllowed()` here is not currently a treasury ACL bypass; it is a POS operational-control surface.
+
+If AWJ later changes drawer cash-out to represent an actual expense/treasury transfer, that conclusion must be revisited.
+
+### 17.2 POS variance settlement — SPECIAL SERVER-DERIVED JOURNAL
+`PosSessionService::settleVariance()` posts shortage/overage directly against the server-resolved session cash account and variance account after `pos.variance.approve`, closed-session state, acknowledgement, optional SoD self-approval policy, and one-time settlement guard.
+
+It resolves the session cash account through `CashBankAccountService::resolveForPayment()` but does **not** call `assertAllowed()` before posting the debit/credit.
+
+This is not an arbitrary user-selected cash account: the server derives the account from the session/payment-method configuration and the action has a dedicated high-impact POS permission. Therefore it is **not yet classified as a confirmed bypass**.
+
+However, it creates a policy question that must be explicit in Access Control V2:
 ```text
-view, create, manage, assign, resolve, export,
-approve, review, recalculate, open, close, confirm,
-finalize, collect, authorize, ingest, retry,
-transition, inspect, verify, build_draft, audit_export,
-reopen
+Does pos.variance.approve authorize accounting adjustment of the session treasury
+regardless of that user's deposit/withdraw ACL on the CashBankAccount?
 ```
-This is already a rich semantic authorization model in the backend. The role editor has not caught up with it.
+If treasury ACL is intended as an absolute resource boundary, variance settlement is a gap. If POS variance authority is intentionally a privileged domain override over a server-bound session account, that exception must be documented, auditable and visibly high-risk. Status: **Policy ambiguity / verify before changing code.**
 
-## 16. RoleDialog — STRUCTURAL PARSING BUG, NOT ONLY A LABEL BUG
-Direct inspection confirms two distinct defects.
+### 17.3 Cash sales inside InvoiceService — LEGACY ACCOUNTING PATH OUTSIDE CASHBANK ACL
+Static inspection confirms `InvoiceService` still contains a legacy/direct cash-sale posting path using a server-defined cash account (`1110`) and comments explicitly state that this debit does not pass through `CashBankAccountService`, unlike separate payment settlement.
 
-### 16.1 Every non-`manage` action is displayed as View
-The renderer is effectively:
+This is materially different from `PaymentService`: a cash invoice can create a cash-account journal effect without evaluating the actor's CashBankAccount deposit ACL.
+
+Because the account is server-defined rather than caller-selected, tenant/account isolation is not the issue. The access-control question is whether `invoices.manage` should permit posting cash receipts into a treasury resource the actor is otherwise forbidden to deposit into.
+
+Status: **Strong candidate treasury ACL consistency gap; verify exact current post route, actor propagation and cash-sale semantics with restricted-user executable test before implementation.**
+
+## 18. Treasury security invariant — TARGET
+For user-initiated financial effects that select or economically affect a treasury resource:
 ```text
-action == manage ? Manage : View
-```
-So `approve`, `export`, `close`, `reopen`, `retry`, `resolve`, `assign`, `inspect`, `verify`, etc. are all mislabeled as View. This can cause an administrator to grant a materially stronger authority while believing they granted read access.
-
-This is a **security-relevant admin UX defect**, not cosmetic polish.
-
-### 16.2 Multi-segment permission keys are parsed incorrectly
-RoleDialog currently does:
-```text
-const [mod, action] = perm.split('.')
-```
-This assumes exactly two segments. Many modern AWJ permissions contain 3 or 4 segments, for example:
-```text
-pos.audit.export
-pos.audit.settings.manage
-pos.investigations.resolve
-fuel.shift.approve
-fuel.sale.price.manage
-documents.center.audit_export
-```
-For these, the UI discards all segments after the second when constructing the module/action pair. It then reconstructs a different key as `${mod}.${action}`.
-
-Examples:
-```text
-pos.audit.export            -> module=pos, action=audit -> reconstructed pos.audit
-fuel.shift.approve          -> module=fuel, action=shift -> reconstructed fuel.shift
-documents.center.review     -> module=documents, action=center -> reconstructed documents.center
-```
-Those reconstructed strings are not the canonical permissions from `Rbac::PERMISSIONS`.
-
-### Consequences
-1. Existing modern permissions may not render as selected correctly.
-2. Multiple distinct permissions collapse to duplicate buttons/keys.
-3. Toggling can add invalid truncated permission strings to local selection.
-4. Saving may be rejected by backend validation, or existing intended permissions may be unintentionally changed depending on selection state.
-5. The UI cannot faithfully administer the backend permission catalogue.
-
-Status: **Confirmed high-priority Role Administration defect.** Before expanding the catalogue further, the editor needs a semantic metadata model rather than positional `split('.')` parsing.
-
-## 17. Permission metadata model — TARGET
-Do not make the UI infer security semantics from punctuation. The canonical permission key should remain stable, while presentation metadata describes it.
-
-Conceptual shape (not approved implementation contract):
-```text
-key: fiscal_years.close
-module/group: accounting / fiscal_years
-action: close
-label_ar / label_en
-risk: normal | sensitive | critical
-requires: [fiscal_years.view]
-conflicts_with: []
-feature/app gate: optional
-help/description: optional
+Domain action permission
+∩ Branch/Data scope
+∩ CashBank resource permission for economic direction
+∩ Accounting state/invariants
 ```
 
-The UI should always toggle the **exact canonical key** supplied by the backend.
-
-## 18. Dependency candidates — RESEARCH, NOT YET ENFORCEMENT RULES
-There is no confirmed generic dependency engine in the inspected role editor/RBAC path. Candidates must be domain-defined, not guessed globally.
-
-Safe conceptual examples to evaluate:
+Direction:
 ```text
-*.manage usually requires corresponding *.view
-fiscal_years.close/reopen -> fiscal_years.view
-pos.audit.export/review/recalculate -> pos.audit.view
-pos.investigations.assign/resolve/export -> pos.investigations.view
-fuel.shift.approve/correct/close -> fuel.shift.view
-fuel.*.manage/action -> corresponding resource view
+money into treasury  -> deposit
+money out of treasury -> withdraw
+internal transfer     -> source withdraw ∩ destination deposit
 ```
-But dependency behavior must specify whether selecting a child auto-selects prerequisites, blocks invalid combinations, or backend computes effective implied permissions. Do not silently add implication semantics without a migration/BC plan.
 
-## 19. Sensitive / critical permission candidates
-The current catalogue already contains permissions that should receive stronger role-admin UX treatment.
+Server-derived system adjustments may require an explicit documented exception rather than silently bypassing resource ACL. The exception must identify the domain permission, immutable audit source and why user resource selection cannot occur.
 
-### Critical/high-impact candidates
-- `roles.manage`, `users.manage` — can alter who has access and what they can do.
-- `apps.manage`, `developer.manage` — can alter enabled capabilities/integration credentials or surfaces.
-- `accounting_settings.manage` — changes accounting configuration.
-- `accounting_period_locks.manage` — controls posting availability.
-- `fiscal_years.close`, `fiscal_years.reopen` — creates/reverses year-close accounting effect.
-- `supplier_refunds.manage` — moves/refunds money.
-- `pos.override.approve`, `pos.variance.approve`, `pos.audit.settings.manage`, `pos.audit.recalculate` — override/audit control plane.
-- `sales.minimum_price_override` — bypasses commercial pricing floor.
-- `products.view_cost` — exposes commercially sensitive cost/profit data.
-- `fuel.sale.price.manage`, `fuel.avi.authorize`, `fuel.integration.retry/ingest`, and similar operational-control actions — domain-sensitive.
-- Document Center operations/retry/build-draft/settings/audit-export — sensitive according to operation/data exposure.
+## 19. Cash/bank audit matrix — current
+| Money path | Cash/bank effect | Resource ACL status | Classification |
+|---|---|---|---|
+| Customer receipt / receipt voucher | deposit | `PaymentService::post()` checks deposit | Good |
+| Supplier payment / payment voucher | withdraw | `PaymentService::post()` checks withdraw | Good |
+| Internal cash/bank transfer | source withdraw + destination deposit | both checked | Good |
+| Employee custody issue | withdraw | checked | Good |
+| Supplier refund received | deposit | checked | Good |
+| Purchase settlement | withdraw | delegated to PaymentService | Good |
+| POS/Fuel payment created via PaymentService | direction-dependent | inherits PaymentService check | Good where canonical service used |
+| POS drawer cash_in/out | no ledger/cash-account mutation | N/A; POS operational policy | Not treasury movement |
+| POS variance settlement | server-derived debit/credit to session cash | no `assertAllowed()` | Policy ambiguity |
+| Direct cash sale in InvoiceService | debit cash account | no CashBank ACL | Strong candidate consistency gap |
 
-Risk classification is a UX/governance layer; it must not replace backend permission checks.
-
-## 20. Legacy role compatibility
-`owner` and `admin` still use wildcard `*`. `accountant` and `staff` retain legacy matrices; modern sensitive permissions are deliberately not automatically added to them in many newer modules. This is an important security-compatible evolution pattern.
-
-The `Rbac::resolve()` path reads tenant role rows first and falls back to the static MATRIX, preserving pre-migration/test safety. Any Access Control V2 migration must preserve existing effective access unless a specific tightening is explicitly approved and tested.
+## 20. Dependency / sensitive permission principles
+Permission dependencies remain domain-defined rather than inferred globally. Sensitive/critical candidates include role/user administration, app/developer management, accounting settings, period locks, fiscal close/reopen, supplier refunds, POS override/variance/audit control plane, minimum-price override, product cost visibility, Fuel operational controls and Document Center control-plane actions.
 
 ## 21. Accounting invariants
 Authorization and accounting validity are separate. Permissions never override tenant isolation, ledger integrity, source-generated/immutable rules, period/fiscal locks or ZATCA lifecycle restrictions.
@@ -252,10 +212,16 @@ If added later: restricted permission, preserve original actor, audit trail, obv
 | Custom/system roles | RBAC + RoleController | Present | Preserve |
 | Login enable/disable | `users.is_active` | Present | Preserve |
 | User branch/warehouse scope | assignments + predicates | Present | Audit consumers |
-| Cash/bank ACL | deposit/withdraw subjects | Present | Verify all money paths |
+| Cash/bank ACL foundation | deposit/withdraw subjects | Present | Preserve |
+| Payment receipt/payment ACL | posting-time deposit/withdraw | Present/good | Preserve |
+| Cash/bank transfer ACL | both resource directions | Present/good | Preserve |
+| Employee custody ACL | withdraw | Present/good | Preserve |
+| Supplier refund ACL | deposit | Present/good | Preserve |
+| POS variance vs treasury ACL | server-derived cash journal, no assertAllowed | Ambiguous | Decide privileged exception vs gap |
+| Direct invoice cash-sale treasury ACL | cash debit outside CashBank ACL | Strong candidate gap | Restricted-user test |
 | Canonical permission catalogue | `Rbac::PERMISSIONS` | Present/rich | Preserve exact keys |
-| Role arbitrary-action labels | non-manage shown as View | **Confirmed defect** | Metadata-driven labels |
-| Role multi-segment keys | positional split truncates keys | **Confirmed high-priority defect** | Never reconstruct keys |
+| Role arbitrary-action labels | non-manage shown as View | Confirmed defect | Metadata-driven labels |
+| Role multi-segment keys | positional split truncates keys | Confirmed high-priority defect | Never reconstruct keys |
 | Permission dependencies | no generic engine confirmed | Missing/verify | Domain metadata + BC design |
 | Sensitive risk labels/warnings | not present in RoleDialog | Missing | Add governance UX |
 | Role cloning | not found | Missing | Candidate parity feature |
@@ -269,24 +235,25 @@ If added later: restricted permission, preserve original actor, audit trail, obv
 | Tenant Recycle Bin | no general workflow found | Missing | Product/security design |
 
 ## 25. Architectural conclusions
-1. AWJ backend permission vocabulary is substantially more mature than the current role editor.
-2. The RoleDialog issue is not merely translation: multi-segment keys are structurally mishandled.
-3. The exact canonical permission key must become an opaque identifier to the UI; labels/groups/actions/risk/dependencies belong in metadata.
-4. Modern semantic permissions should remain separate rather than collapse back into broad `manage`.
-5. Legacy broad permissions need gradual decomposition with explicit backward compatibility.
-6. Sensitive permissions need visible warnings/risk treatment in role administration.
-7. Report scope remains the clearest systemic data-authorization risk; role-editor repair does not replace those backend fixes/tests.
+1. AWJ already has a useful treasury resource ACL and most canonical money-document paths enforce it at posting time.
+2. Do not rebuild treasury ACL; close consistency gaps and define privileged server-derived exceptions.
+3. PaymentService's posting-time check is the reference pattern because draft creation does not confer financial authority.
+4. Direct cash sales are the clearest remaining treasury consistency candidate and require an executable restricted-user proof.
+5. POS variance settlement needs a deliberate policy decision, not an automatic code change.
+6. POS physical drawer movement is not currently an accounting treasury movement and should not be misclassified.
+7. Backend permission vocabulary remains more mature than RoleDialog; its structural key parsing defect is still high priority.
+8. Report scope remains the clearest systemic data-authorization risk overall.
 
 ## 26. Current-data status
 Safwan confirmed on 2026-09-08 that **all current AWJ data and transactions are experimental/test-only and not important production records**. This does not relax tenant isolation, authorization, accounting invariants, schema safety or future production readiness.
 
 ## 27. Documentation reconciliation
-This living reference now contains the full RBAC-catalogue generation analysis, the confirmed arbitrary-action label defect, the more serious multi-segment-key truncation defect, target permission metadata principles, dependency candidates, risk-classification candidates and backward-compatibility requirements. No substantive finding from this inspection is intentionally left only in chat.
+This living reference now includes the cash/bank money-path audit: PaymentService, transfers, employee custody, supplier refunds, purchase-payment delegation, POS drawer movement classification, POS variance policy ambiguity and direct cash-sale candidate gap. No substantive finding from this inspection is intentionally left only in chat.
 
 ## 28. Next inspection pass
-1. Enumerate every cash/bank money movement path and prove `CashBankAccountService::assertAllowed()` coverage for deposit/withdraw direction.
-2. Audit specialized Fuel/POS data scope where still relevant.
-3. Then run targeted restricted-user executable tests for static P1 candidates before proposing fixes.
+1. Audit specialized Fuel/POS scope and verify that all domain flows using PaymentService propagate the real actor rather than `null`/system authority at posting time.
+2. Prepare targeted restricted-user executable-test matrix for report-scope candidates and direct cash-sale treasury ACL candidate.
+3. Run those tests with a code-capable tool only after choosing the lowest-cost appropriate execution path; inspection/documentation alone does not require Codex.
 4. After evidence closure, draft the AWJ Access Control V2 Master Plan with small independent PRs.
 
 **Process rule:** research/inspect → verify → update this file → confirm commit → summarize to Safwan.
