@@ -336,6 +336,69 @@ class ProductWorkbookTest extends TestCase
             ->assertStatus(422);
     }
 
+    /**
+     * `resolvePriceList()` يجب أن يرفض قائمة سعرٍ معطّلة مركزياً — لا يكفي
+     * فحص `PriceListService::upsertItem()` وحده لأنه لا يُستدعى أصلاً حين
+     * تكون ورقة Unit Prices فارغة (preview/apply) أو في مسار التصدير الذي
+     * لا يستدعي `upsertItem()` إطلاقاً.
+     *
+     * @test
+     */
+    public function an_inactive_price_list_is_rejected_on_preview(): void
+    {
+        $auth = $this->registerTenant();
+        $priceListId = $this->withToken($auth['token'])
+            ->postJson('/api/price-lists', ['name' => 'قائمة معطّلة', 'is_active' => false])
+            ->assertCreated()['data']['id'];
+
+        $file = $this->workbook([
+            ['name' => 'Products', 'headers' => ['sku'], 'rows' => []],
+            ['name' => 'Barcodes', 'headers' => ['sku', 'code'], 'rows' => []],
+            ['name' => 'Unit Prices', 'headers' => ['sku', 'unit_name', 'price'], 'rows' => []],
+        ]);
+
+        $this->withToken($auth['token'])
+            ->post('/api/products/workbook/preview', ['file' => $file, 'price_list_id' => $priceListId])
+            ->assertStatus(422);
+    }
+
+    /** @test */
+    public function an_inactive_price_list_is_rejected_on_apply_even_with_no_unit_price_rows(): void
+    {
+        $auth = $this->registerTenant();
+        $priceListId = $this->withToken($auth['token'])
+            ->postJson('/api/price-lists', ['name' => 'قائمة معطّلة', 'is_active' => false])
+            ->assertCreated()['data']['id'];
+
+        // ورقة Unit Prices فارغة عمداً: لا سطر يستدعي `upsertItem()` — الفشل
+        // المغلق يجب أن يقع في `resolvePriceList()` نفسها قبل أي معالجة.
+        $file = $this->workbook([
+            ['name' => 'Products', 'headers' => ['sku', 'name', 'type', 'sale_price'], 'rows' => [['SKU-WB-1', 'منتج', 'good', '10.00']]],
+            ['name' => 'Barcodes', 'headers' => ['sku', 'code'], 'rows' => []],
+            ['name' => 'Unit Prices', 'headers' => ['sku', 'unit_name', 'price'], 'rows' => []],
+        ]);
+
+        $this->withToken($auth['token'])
+            ->post('/api/products/workbook/apply', ['file' => $file, 'mode' => 'create', 'price_list_id' => $priceListId])
+            ->assertStatus(422);
+
+        $this->assertSame(0, Product::count(), 'لا كتابة حين تُرفض قائمة السعر مركزياً.');
+    }
+
+    /** @test */
+    public function an_inactive_price_list_is_rejected_on_export(): void
+    {
+        $auth = $this->registerTenant();
+        $priceListId = $this->withToken($auth['token'])
+            ->postJson('/api/price-lists', ['name' => 'قائمة معطّلة', 'is_active' => false])
+            ->assertCreated()['data']['id'];
+        $this->createProduct($auth['token']);
+
+        $this->withToken($auth['token'])
+            ->get('/api/products/workbook/export?scope=all&price_list_id='.$priceListId)
+            ->assertStatus(422);
+    }
+
     // ═══════════════════════════════ عزل المستأجر ═══════════════════════════════
 
     /** @test */

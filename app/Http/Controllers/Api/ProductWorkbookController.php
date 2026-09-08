@@ -21,12 +21,22 @@ class ProductWorkbookController extends ApiController
 {
     public function __construct(protected ProductWorkbookService $workbooks) {}
 
-    /** قائمة سعرٍ واحدة يملكها المستأجر الحالي — القرار D-F: بلا تخمين، فشلٌ مغلقٌ إن غابت أو خرجت عن النطاق. */
+    /**
+     * قائمة سعرٍ واحدة يملكها المستأجر الحالي، ونشطة — القرار D-F: بلا
+     * تخمين، فشلٌ مغلقٌ إن غابت أو خرجت عن النطاق أو كانت معطّلة. مركزيٌّ
+     * هنا كي يشمل الحارس preview/apply/export معاً بلا استثناء — لا يكفي
+     * فحص النشاط داخل `PriceListService::upsertItem()` وحده لأنه لا يُستدعى
+     * أصلاً حين تكون ورقة Unit Prices فارغة أو غائبة، ولا يُستدعى إطلاقاً
+     * في مسار التصدير.
+     */
     private function resolvePriceList(?string $priceListId): PriceList
     {
         $priceList = $priceListId !== null ? PriceList::query()->find($priceListId) : null;
         if ($priceList === null) {
             abort(422, 'قائمة السعر المحدَّدة غير موجودة في نطاق المؤسسة.');
+        }
+        if (! $priceList->is_active) {
+            abort(422, 'قائمة السعر المحدَّدة غير نشطة.');
         }
 
         return $priceList;
