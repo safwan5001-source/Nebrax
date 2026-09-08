@@ -1,10 +1,12 @@
 # AWJ Users, Roles & Permissions — Daftra Functional Reference
 
-**Status:** Living reference — research + code inspection in progress  
+**Status:** Living reference — verification pass complete for Groups A / C / D / E / F  
 **Date started:** 2026-09-08  
 **Last research update:** 2026-09-08 — POS/Fuel PaymentService actor propagation audit  
+**Last verification update:** 2026-09-08 — treasury actor propagation + report branch scope + direct cash-sale executable verification  
 **Scope:** Users, Employees, Roles, Permissions, Branch Scope, Resource Access, Record Scope, Workflow/Record State, Reports, permission-aware UX.  
 **Reference product:** Daftra official documentation.  
+**Verification detail:** [`AWJ_ACCESS_CONTROL_V2_VERIFICATION_REPORT.md`](./AWJ_ACCESS_CONTROL_V2_VERIFICATION_REPORT.md) — evidence matrix, per-gap severity, recommended PR breakdown.
 
 > This document is a functional research/reference artifact. It does **not** authorize implementation, database changes, permission migrations, merge/deploy, or changes to accounting/security rules.
 
@@ -273,20 +275,25 @@ Permission never activates an unavailable feature.
 If added later: restricted permission, preserve original actor, audit trail, obvious impersonation state, no tenant crossing and sensitive-operation review.
 
 ## 26. Code-backed gap matrix — current
+
+Verdicts marked **[V]** were closed by executable evidence in the 2026-09-08
+verification pass (see the verification report for the exact test names and
+line-referenced sources).
+
 | Capability | AWJ evidence | Status | Direction |
 |---|---|---|---|
-| Tenant isolation | tenant-scoped models | Present | Preserve |
+| Tenant isolation | tenant-scoped models; cross-tenant `branch_id` filter returns ∅ **[V]** | Confirmed correct | Preserve |
 | Custom/system roles | RBAC + RoleController | Present | Preserve |
 | Login enable/disable | users.is_active | Present | Preserve |
 | User branch/warehouse scope | assignments + predicates | Present | Audit consumers |
-| Cash/bank ACL foundation | deposit/withdraw subjects | Present | Preserve |
-| Direct Payment API actor propagation | request user passed | Present/good | Preserve |
-| POS Payment actor propagation | actor omitted at post | **Confirmed defect** | Targeted fix + tests |
-| Fuel Payment actor propagation | actor omitted at post | **Confirmed defect** | Targeted fix + tests |
-| Invoice auto-settlement actor | actor omitted | Confirmed omission | Verify workflow then fix contract |
-| Purchase auto-settlement actor | actor omitted | Confirmed omission | Verify workflow then fix contract |
-| POS variance vs treasury ACL | server-derived cash journal | Ambiguous | Policy decision |
-| Direct invoice cash-sale treasury ACL | outside CashBank ACL | Strong candidate gap | Restricted-user test |
+| Cash/bank ACL foundation | deposit/withdraw subjects; null actor semantics match §16.1 exactly **[V]** | Confirmed correct | Preserve |
+| Direct Payment API actor propagation | `PaymentController.php:146` passes `$request->user()` **[V]** | Confirmed correct baseline | Preserve |
+| POS Payment actor propagation | `PosService.php:248` omits actor **[V]** | **Confirmed gap — P1** | Pass `$data['actor']` as second arg |
+| Fuel Payment actor propagation | `FuelSaleService.php:330` omits actor **[V]** | **Confirmed gap — P1** | Pass `$actor` as second arg |
+| Invoice auto-settlement actor | `InvoiceService.php:1052` omits actor **[V]** | **Confirmed gap — P2** (reachability of `is_paid=true` route to verify in fix PR) | Plumb actor through `settle()` callers |
+| Purchase auto-settlement actor | `PurchaseService.php:563` omits actor **[V]** | **Confirmed gap — P2** | Same shape as Invoice |
+| POS variance vs treasury ACL | `PosSessionService::settleVariance` has no `assertAllowed` **[V]** | **Policy decision required** | Product picks privileged-override vs absolute-boundary |
+| Direct invoice cash-sale treasury ACL | `InvoiceService.php:44,863` debit 1110 directly; stranger-scoped deposit still succeeds **[V]** | **Confirmed gap — P1** | Reroute through `CashBankAccountService::assertAllowed(deposit)` |
 | Canonical permission catalogue | Rbac::PERMISSIONS | Present/rich | Preserve exact keys |
 | Role arbitrary-action labels | non-manage shown as View | Confirmed defect | Metadata-driven labels |
 | Role multi-segment keys | positional split truncates keys | Confirmed high-priority defect | Never reconstruct keys |
@@ -295,12 +302,18 @@ If added later: restricted permission, preserve original actor, audit trail, obv
 | Role cloning | not found | Missing | Candidate parity |
 | Invoice own/assigned scope | predicate absent | Missing | Define semantics |
 | Partner owner/assignee scope | no model | Missing capability | Product/data decision |
-| Generic report effective scope | multiple likely bypasses | Likely/strong likely P1 | Restricted-user tests |
+| Purchase report branch scope | `PurchaseReportService.php:65,82` — `withoutGlobalScope(BranchScope)` + no `allowedBranchIds` intersection **[V]** | **Confirmed gap — P1** | Shared `RestrictedBranchScope` helper |
+| Sales report branch scope | `SalesReportService.php:80-83` — no `allowedBranchIds` intersection; forbidden `branch_id[]` returns forbidden data **[V]** | **Confirmed gap — P1** | Same helper |
+| Inventory warehouse balance scope | `InventoryReportService.php:63,104` — no user warehouse/branch intersection **[V]** | **Confirmed gap — P1** | Helper + warehouse-intersection variant |
+| Customer / Classification analytics scope | same `withoutGlobalScope` pattern — inferred not runtime-tested | Confirmed gap (inferred) | Same helper; add runtime test in fix PR |
+| Report exports (CSV/PDF/print) scope | inherits API scope per §26 | Not verified this pass — deferred | Mirror A2.1/A1.2/A3.1 in export tests |
+| Accounting-core reports scope | `ReportService.php:811-836` intersects with `allowedBranchIds()` | Confirmed correct pattern | Reuse as reference for the fix helper |
 | HR approval workflow membership | broad hr.manage | Missing | Define policy |
 | POS audit branch/drill-down/export | scoped | Present/good | Reuse |
 | Generic Activity Log | not confirmed | Missing/unknown | Decide parity scope |
 | Soft-delete foundation | widespread SoftDeletes | Present | Not recycle bin |
 | Tenant Recycle Bin | no general workflow found | Missing | Product/security design |
+| CashBankTransfer / EmployeeCustody / SupplierRefund | still call `assertAllowed` **[V]** | Confirmed correct | Preserve |
 
 ## 27. Architectural conclusions
 1. AWJ treasury ACL foundation is worth preserving; the current issue is integration consistency, not architecture absence.
@@ -319,9 +332,19 @@ Safwan confirmed on 2026-09-08 that **all current AWJ data and transactions are 
 This living reference now includes the actor-propagation audit and the exact semantics of null actor under `all`, `branch`, `role` and `user` treasury scopes. POS and Fuel are documented as confirmed defects; Invoice/Purchase automatic settlement omissions are recorded for workflow-impact verification. No substantive finding from this pass is intentionally left only in chat.
 
 ## 30. Next inspection / execution pass
-1. Run targeted restricted-user executable tests for POS/Fuel actor propagation and characterize Invoice/Purchase auto-settlement.
-2. In the same focused security test pass, verify the direct cash-invoice treasury candidate and selected report-scope P1 candidates.
+1. ~~Run targeted restricted-user executable tests for POS/Fuel actor propagation and characterize Invoice/Purchase auto-settlement.~~ **Done (2026-09-08).**
+2. ~~In the same focused security test pass, verify the direct cash-invoice treasury candidate and selected report-scope P1 candidates.~~ **Done (2026-09-08).**
 3. Do not change POS variance semantics until the privileged-exception policy is decided.
-4. After executable evidence closure, draft small independent Access Control V2 PRs rather than one broad security refactor.
+4. After executable evidence closure, draft small independent Access Control V2 PRs rather than one broad security refactor. Recommended breakdown: PR-ACL-PAYMENT-ACTOR (POS/Fuel), PR-ACL-CASH-SALE, PR-ACL-INVOICE-PURCHASE-SETTLE-ACTOR, PR-ACL-REPORT-SCOPE, PR-ACL-REPORT-EXPORT-SCOPE, and (BLOCKED on product decision) PR-ACL-POS-VARIANCE-POLICY. See §20 in the verification report for the full contract per PR.
+
+## 31. Verification pass — 2026-09-08
+
+Executable evidence added in `tests/Feature/AccessControlV2VerificationTest.php`
+(18 tests, treasury actor + direct cash sale + policy characterization) and
+`tests/Feature/AccessControlV2ReportScopeVerificationTest.php` (7 tests,
+report branch scope + tenant negative control). All 25 pass under
+`php artisan test --filter=AccessControlV2`. Verdicts folded into §26.
+Full report (evidence matrix, per-gap severity, PR breakdown) in
+[`AWJ_ACCESS_CONTROL_V2_VERIFICATION_REPORT.md`](./AWJ_ACCESS_CONTROL_V2_VERIFICATION_REPORT.md).
 
 **Process rule:** research/inspect → verify → update this file → confirm commit → summarize to Safwan.
