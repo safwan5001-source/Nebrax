@@ -2,12 +2,42 @@
 
 **Task / PR:** Phase 2A — Multiple UOM / Barcode Completion, **PR #4 of 4 (الأخيرة)**: Workbook round-trip — Products / Barcodes / Unit Prices
 **Date:** 2026-09-08
-**Status:** مكتمل — PR مفتوحة، `mergeable_state: clean`، CI خضراء بالكامل على المحرِّكين. بانتظار مراجعتكم. لا دمج ولا نشر.
+**Status:** مكتمل — PR مفتوحة، بانتظار CI على آخر تحديث ومراجعتكم. لا دمج ولا نشر.
 **Branch:** `claude/phase-2-pr-uom2-4`
 **PR:** [#705](https://github.com/safwan5001-source/Nebrax/pull/705)
 **Base SHA (عند فتح PR):** `74d2ed6` (PR-UOM2-3، مُدمَجة ومنشورة Production)
 **Base SHA (الحالي، بعد تقدّم `main` بمهامَّ أخرى موازية):** `c4d3471` — `mergeable_state: clean` رغم ذلك، لا تعارض
-**Head SHA:** `9f3ce74`
+**Head SHA:** `362ed06` (يشمل تصحيح ما بعد المراجعة — انظر §0 أدناه)
+
+---
+
+## 0. تصحيح ما بعد المراجعة (٢٠٢٦-٠٩-٠٨، بعد التسليم الأول)
+
+راجع المالك التقرير الأول (Head `9f3ce74`) ورصد أن **الكود لا يطابق ما ادّعاه
+التقرير نفسه عن القرار D-F**: `ProductWorkbookController::resolvePriceList()`
+كان يتحقّق من ملكية المستأجر للقائمة فقط، ولا يتحقّق من `is_active` إطلاقاً —
+رغم أن التقرير وجسم الـPR كتبا صراحةً «قائمة غير نشطة → ٤٢٢». الفحص الفعلي
+الوحيد لـ`is_active` كان داخل `PriceListService::upsertItem()`، وهو **لا
+يُستدعى أصلاً** حين تكون ورقة Unit Prices فارغة أو غائبة (الحالة الشائعة في
+معظم اختبارات هذه المهمّة)، ولا يُستدعى **إطلاقاً** في مسار التصدير.
+
+**الإصلاح (بأصغر Scope ممكن):**
+- `resolvePriceList()` أصبحت ترفض ٤٢٢ صراحةً حين `! $priceList->is_active`،
+  فور التحقّق من الوجود ضمن نطاق المستأجر — نفس الدالة المركزية التي تستدعيها
+  `preview()`/`apply()`/`export()` الثلاث، فيشملها الحارس معاً دون تكرار.
+- لا تغيير على سلوك اكتشاف مستأجرٍ آخر: يبقى ٤٢٢ عاماً «غير موجودة» بلا أي
+  تمييزٍ يكشف وجود القائمة لمستأجرٍ آخر.
+- **صفر تعديل** على `PriceList`/`PriceListService` — الفحص الإضافي داخل
+  `upsertItem()` بقي كما هو (طبقة دفاعٍ ثانية غير ضارّة، لن تُستدعى فعلياً
+  بعد أن أصبح `resolvePriceList()` يرفض القائمة المعطّلة أولاً).
+- أُضيفت ٣ اختبارات انحدار صريحة: قائمة معطّلة على `preview`، وعلى `apply`
+  **مع ورقة Unit Prices فارغة عمداً** (لإثبات أن الحارس لا يعتمد على استدعاء
+  `upsertItem()`)، وعلى `export`.
+
+**النتيجة بعد الإصلاح:** `ProductWorkbookTest` **20/20** (كانت 17) على
+SQLite وPostgreSQL معاً؛ ومجموعة الانحدار المباشرة **211/211** (كانت 208)
+على المحرِّكين معاً — صفر انحدار، ٣ اختبارات جديدة فقط. تفاصيل الأرقام
+والملفات المتأثرة في §3/§11 أدناه (مُحدَّثة).
 
 **العقد:** أُضيف قسمٌ جديد (§6) في
 `docs/plans/products-inventory/phase-2-completion/MULTIPLE-UOM-BARCODE-DECOMPOSITION.md`
@@ -78,10 +108,11 @@
 | `app/Http/Requests/ProductWorkbookExportRequest.php` | **جديد** — مدخلات التصدير |
 | `app/Http/Controllers/Api/ProductWorkbookController.php` | **جديد** — متحكّمٌ مستقلّ (على غرار `InventoryOpeningController`) |
 | `routes/api.php` | إضافة ستة مسارات `products/workbook/*` قبل `products/{id}` |
-| `tests/Feature/ProductWorkbookTest.php` | **جديد** — 17 اختباراً |
+| `tests/Feature/ProductWorkbookTest.php` | **جديد**، ثم +٣ اختبارات بعد تصحيح §0 — **20 اختباراً إجمالاً** |
 | `docs/plans/.../MULTIPLE-UOM-BARCODE-DECOMPOSITION.md` | إضافة عقد §6؛ تحديث حالة PR-UOM2-3 إلى «مُدمَجة» في جدول §2 |
 
-**12 ملفاً — صفر migrations، صفر أعمدة جديدة.**
+**12 ملفاً — صفر migrations، صفر أعمدة جديدة.** (`ProductWorkbookController.php`
+عُدِّل مرّةً ثانية بعد التسليم الأول — انظر §0.)
 
 ---
 
@@ -141,7 +172,7 @@ is_active`. **مطابقةٌ حرفيةٌ لملف الاستيراد/التصد
 |---|---|
 | `price_list_id` غائبٌ عن الطلب | ٤٢٢ عند التحقّق من الطلب — فشلٌ مغلقٌ فوري |
 | `price_list_id` من مستأجرٍ آخر أو غير موجود | ٤٢٢ «غير موجود» — بلا تسريب وجود |
-| `price_list_id` لقائمةٍ غير نشطة | ٤٢٢ (نفس حارس `PriceListService`) |
+| `price_list_id` لقائمةٍ غير نشطة | ٤٢٢ — مُفروضٌ مركزياً في `resolvePriceList()`، يشمل preview/apply/export الثلاثة (انظر §0: غابت هذه القاعدة عن أول تسليم، أُصلحت بعد المراجعة) |
 | صفّ Barcodes/Unit Prices لا يطابق منتجاً في نطاق المستأجر | خطأ صفٍّ، الصفّ يُتخطّى |
 | `code` فارغٌ، أو مكرّرٌ داخل الملف، أو مُتنازَعٌ عليه حيّاً لمنتجٍ آخر | خطأ صفٍّ — نفس فئة رسائل `storeBarcode()` |
 | `code` مطابقٌ لباركودٍ موجودٍ **لنفس المنتج المستهدَف** | **لا خطأ، تخطٍّ صامت** — round-trip حقيقي، لا إعادة إنشاء |
@@ -238,30 +269,35 @@ is_active`. **مطابقةٌ حرفيةٌ لملف الاستيراد/التصد
 
 ## 11. Tests + exact results
 
-### الجديد لهذه المهمّة
+### الجديد لهذه المهمّة (بعد تصحيح §0)
 
 | Suite | SQLite | PostgreSQL |
 |---|---|---|
-| `ProductWorkbookTest` (17 اختباراً) | **17/17 ✅** | **17/17 ✅** |
+| `ProductWorkbookTest` (20 اختباراً — 17 أصلية + 3 لقائمة السعر المعطّلة) | **20/20 ✅ (113 assertion)** | **20/20 ✅ (113 assertion)** |
 
 ### فحص الانحدار المباشر (بلا تعديل)
 
 | Suite | SQLite | PostgreSQL |
 |---|---|---|
-| `ProductImportV2Test` + `ProductImportTest` + `ProductExportTest` + `InventoryOpeningImportTest` + `BarcodeNamespaceTest` + `UnitTemplateTest` + `UnitTemplateMutationGuardTest` + `ProductDefaultUnitsTest` + `ProductBarcodeAndMediaTest` + `PosCheckoutTest` | **208/208 ✅ (1488 assertion)** | **208/208 ✅ (1488 assertion)** |
+| `ProductImportV2Test` + `ProductImportTest` + `ProductExportTest` + `InventoryOpeningImportTest` + `BarcodeNamespaceTest` + `UnitTemplateTest` + `UnitTemplateMutationGuardTest` + `ProductDefaultUnitsTest` + `ProductBarcodeAndMediaTest` + `PosCheckoutTest` + `ProductWorkbookTest` | **211/211 ✅ (1499 assertion)** | **211/211 ✅ (1499 assertion)** |
+
+(الرقم الأول 208/208 كان في التسليم الأول قبل الإصلاح؛ 211 = 208 + 3 اختبارات
+جديدة، صفر انحدار.)
 
 ### المجموعة الكاملة
 
 | Engine | النتيجة |
 |---|---|
-| SQLite | **2829 نجح، 25 فشل (بيئي معروف)، 8 تخطٍّ — 19396 assertion** |
+| SQLite (قبل تصحيح §0؛ التعديل بعدها لا يمسّ أي مسارٍ آخر في المجموعة الكاملة) | **2829 نجح، 25 فشل (بيئي معروف)، 8 تخطٍّ — 19396 assertion** |
 
 الـ٢٥ فشلاً مطابقةٌ حرفياً للأساس المُقاس مسبقاً في هذا البرنامج (24 اختبار
 `Fuel*` تحتاج `bcmul()`/`ext-bcmath` غير المثبَّتة في هذه البيئة الرملية، و
 اختبارٌ واحدٌ لملف PDF في `DocumentCenterSecureIntakeTest`) — مؤكَّدةٌ بيئيةً
-لا كوداً عبر CI الحقيقي في PR-UOM2-1/2/3 (تثبيت `ext-bcmath` هناك). لم يشغَّل
-المجموعة الكاملة على PostgreSQL (استهلاك وقتٍ كبير بلا فائدةٍ إضافية —
-الانحدار المباشر ذو الصلة، وهو الأهمّ، ركض على المحرِّكين معاً).
+لا كوداً عبر CI الحقيقي في PR-UOM2-1/2/3 (تثبيت `ext-bcmath` هناك). لم تُعَد
+المجموعة الكاملة بعد تصحيح §0 لأن التعديل محصورٌ في ملفٍ واحدٍ جديدٍ
+(`ProductWorkbookController`) لا يستدعيه أي مسارٍ آخر في النظام؛ الانحدار
+المباشر ذو الصلة (211/211) أُعيد تشغيله كاملاً على كلا المحرِّكين بعد
+التصحيح مباشرةً، وهو ما يغطّي كل مسارٍ يمكن أن يتأثّر فعلياً.
 
 **لا اختبار أُضعف أو حُذف.**
 
@@ -283,15 +319,14 @@ is_active`. **مطابقةٌ حرفيةٌ لملف الاستيراد/التصد
 
 ## 13. CI
 
-**خضراء بالكامل، ومتوافقة (`mergeable_state: clean`).** على Head `9f3ce74`،
-اكتملت الوظائف الأربع المسجَّلة (تشغيلا `push`/`pull_request` × `ci.yml`
-[sqlite, pgsql] — لا `web-ci.yml` لأن هذه المهمّة لم تلمس `web/` إطلاقاً)
-بنجاح:
+على Head السابق `9f3ce74` (قبل تصحيح §0): خضراء بالكامل، `mergeable_state:
+clean`، أربع وظائف ناجحة (`ci.yml` sqlite/pgsql × تشغيلَين، لا `web-ci.yml`
+لأن هذه المهمّة لم تلمس `web/`).
 
-| Job | Result |
-|---|---|
-| `php artisan test (L11, sqlite)` | ✅ success (×2 تشغيلَين) |
-| `php artisan test (L11, pgsql)` | ✅ success (×2 تشغيلَين) |
+بعد دفع كومِت التصحيح (Head `362ed06`) سيُعاد تشغيل CI تلقائياً على الرأس
+الجديد — لم يُتحقَّق من نتيجته بعد لحظة كتابة هذا القسم؛ التحقّق المحلّي
+(§11: 211/211 على المحرِّكين معاً بعد التصحيح مباشرةً) هو الدليل المتاح
+الآن، وسيُراجَع CI الحقيقي عند توفّره.
 
 تعليقٌ واحدٌ على الـPR من بوت `chatgpt-codex-connector` يفيد بتجاوز حدّ
 استخدام مراجعاته الآلية — إشعارٌ تلقائيٌّ لا مراجعة فعلية، لا يحتاج رداً أو
@@ -310,6 +345,11 @@ is_active`. **مطابقةٌ حرفيةٌ لملف الاستيراد/التصد
   لباركودٍ مُصدَّرٍ موجودٍ سلفاً لنفس المنتج، (ج) تمرير اسم وحدةٍ مُحلَّل بدل
   الخام إلى `PriceListService::upsertItem()`. الثلاثة أُثبتت بفشل اختبارٍ
   حقيقي، أُصلحت، ثم أُعيد التحقّق (لا افتراض «يجب أن يعمل»).
+- **رابعة اكتُشفت بعد التسليم الأول عبر مراجعة المالك، لا داخلياً:** قائمة
+  سعرٍ معطّلة كانت تُقبَل في `preview`/`apply` (حين ورقة Unit Prices فارغة)
+  وفي `export` (لا يستدعي `upsertItem()` إطلاقاً) رغم أن D-A/D-F والتقرير
+  الأول يدّعيان رفضها. أُصلحت مركزياً في `resolvePriceList()` — التفاصيل
+  الكاملة في §0.
 - سقف صفوف/أعمدة المصنّف هو نفسه سقف `ProductImportService`
   (`MAX_ROWS=2000`, `MAX_COLUMNS=200`) مُطبَّقاً **لكل ورقةٍ على حدة** لا
   للمصنّف كلّه — لم يُختبَر صراحةً في هذه المهمّة (الحدود نفسها مختبرةٌ
@@ -340,7 +380,7 @@ is_active`. **مطابقةٌ حرفيةٌ لملف الاستيراد/التصد
 - **Branch:** `claude/phase-2-pr-uom2-4`
 - **PR:** [#705](https://github.com/safwan5001-source/Nebrax/pull/705)
 - **Base SHA (عند فتح PR):** `74d2ed6`
-- **Head SHA:** `9f3ce74`
+- **Head SHA:** `362ed06` (يشمل تصحيح §0)
 
 ---
 
