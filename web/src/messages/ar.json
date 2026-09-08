@@ -6650,6 +6650,14 @@
       "read": "مقروء"
     }
   },
+  "whatsNew": {
+    "pageTitle": "ما الجديد",
+    "pageSubtitle": "آخر تحديثات وتحسينات النظام.",
+    "empty": "لا توجد تحديثات حالياً.",
+    "loadFailed": "تعذّر تحميل التحديثات.",
+    "retry": "إعادة المحاولة",
+    "publishedAt": "نُشر في {date}"
+  },
   "numberingSettings": {
     "title": "إعدادات الترقيم المتسلسل",
     "picker_title": "نوع المستند",
