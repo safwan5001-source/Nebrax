@@ -29,17 +29,7 @@ The AWJ shell should feel like a mature daily ERP tool:
 
 The shell is not the visual hero. The invoice, journal, grid, report, product record, customer record, or POS workspace is the hero.
 
-Modernity should come from:
-
-- excellent hierarchy;
-- responsive composition;
-- precise spacing;
-- strong search/navigation behavior;
-- state continuity;
-- keyboard/touch/accessibility quality;
-- deliberate Arabic RTL behavior;
-- refined interaction feedback;
-- consistent component behavior.
+Modernity should come from excellent hierarchy, responsive composition, precise spacing, strong search/navigation behavior, state continuity, keyboard/touch/accessibility quality, deliberate Arabic RTL behavior, refined interaction feedback, and consistent component behavior.
 
 It should not come from glass effects, gradients, oversized chrome, decorative icon containers, excessive pills, floating novelty, or generic AI-dashboard styling.
 
@@ -59,15 +49,7 @@ An optional contextual side panel may be used only when a workflow materially be
 
 A control should live at the highest layer where its meaning is truly global — and no higher.
 
-Examples:
-
-- active company/branch context: global;
-- current invoice status: page/document;
-- post/save/print invoice: contextual command;
-- invoice line editing: workspace;
-- module destination: primary navigation.
-
-This prevents duplicate controls and ambiguous ownership.
+Examples: active company/branch context is global; current invoice status is page/document context; post/save/print belongs to contextual commands; invoice line editing belongs to the workspace; module destinations belong to primary navigation.
 
 ## 4. Primary Navigation visual direction
 
@@ -83,180 +65,73 @@ The entire shell must be logically mirrored, not merely CSS-flipped. Directional
 
 For normal desktop/laptop working conditions, the baseline should be an expanded navigation state with readable Arabic labels.
 
-Why:
-
-- AWJ contains semantically close financial/business domains;
-- icon-only navigation increases memorization cost;
-- Arabic labels are important orientation signals;
-- accounting software benefits from predictable explicit naming.
+AWJ contains semantically close financial/business domains; icon-only navigation increases memorization cost; Arabic labels are important orientation signals; accounting software benefits from predictable explicit naming.
 
 A compact icon rail is **not approved as a mandatory state**. It may be prototyped only if it provides meaningful workspace gain without harming recognition/accessibility.
 
 ### 4.3 Width
 
-No exact production width is approved yet.
+No exact production width is approved yet. Prototype the narrowest expanded width that comfortably supports real Arabic labels, active states, grouping, badges/indicators where justified, and browser text scaling.
 
-Prototype the narrowest expanded width that comfortably supports real Arabic labels, active states, grouping, badges/indicators where justified, and browser text scaling.
-
-Do not select a width merely because it matches the 2026-09-06 concepts or another ERP.
-
-Validation must include long Arabic labels and 125–200% browser/text scaling scenarios.
+Do not select a width merely because it matches the 2026-09-06 concepts or another ERP. Validation must include long Arabic labels and 125–200% browser/text scaling scenarios.
 
 ### 4.4 Visual treatment
 
-Target:
+Target low visual noise, clear separation from workspace without a heavy wall, restrained borders/surface contrast, no large colored icon tiles, Lucide-style line icons consistent with AWJ, labels as the primary meaning carrier, unmistakable hover/focus/current states, quiet non-interactive section labels, and no accordion theatrics.
 
-- low visual noise;
-- clear separation from workspace without a heavy wall;
-- restrained borders/surface contrast;
-- no large colored icon tiles;
-- Lucide-style line icons consistent with AWJ;
-- labels carry meaning; icons assist recognition;
-- active destination visible without relying on color alone;
-- hover/focus states subtle but unmistakable;
-- section labels quiet and non-interactive;
-- no accordion theatrics.
+The active destination must remain clear in light/dark themes and high zoom and must not rely on color alone.
 
-The navigation should feel dense enough for ERP but not compressed to the point of touch/accessibility failure.
+### 4.5 Sidebar surface color — research-informed position
 
-### 4.5 Grouping
+**Do not assume that a colored or dark Sidebar is inherently more modern or more appropriate for AWJ.**
 
-Use the Navigation IA V2 content model.
+Current enterprise shell guidance demonstrates that a neutral navigation surface with strong state treatment is a valid modern approach. AWJ's shell should therefore treat Sidebar color as a visual hypothesis to validate, not a branding requirement.
 
-Prototype quiet non-interactive section labels rather than a third interactive hierarchy level.
+The default direction for the next prototype is:
 
-Candidate scanning groups:
+- preserve a **neutral/quiet Sidebar candidate as the primary baseline**;
+- compare a restrained AWJ brand-tinted candidate only if it improves orientation without competing with financial data;
+- keep brand color concentrated where it carries interaction or state meaning;
+- reject large saturated navigation surfaces if they dominate long daily ERP sessions or reduce the prominence of workspace data;
+- evaluate light and dark themes independently rather than mechanically inverting the same treatment.
 
-- Core business.
-- Financial.
-- People & Operations.
-- Administration.
+The final decision must be based on long-session comfort, navigation/workspace separation, active-state clarity, RTL readability, accessibility, and full viewport behavior — not a single attractive mockup.
 
-Exact Arabic wording remains open and should be tested with the actual menu content.
+### 4.6 Grouping
 
-### 4.6 Active state
+Use the Navigation IA V2 content model. Prototype quiet non-interactive section labels rather than a third interactive hierarchy level.
 
-The active state should communicate location through at least two cues, for example:
-
-- tonal surface/background change;
-- stronger text/icon emphasis;
-- a restrained positional indicator if it improves scanning.
-
-Do not use a large saturated block that visually dominates the workspace.
-
-The active state must remain clear in light/dark themes and high zoom.
+Candidate scanning groups: Core business; Financial; People & Operations; Administration. Exact Arabic wording remains open and should be tested with the actual menu content.
 
 ## 5. Global Header visual direction
 
-### 5.1 Role
+The Global Header should be **small, stable, and genuinely global**. It should not become a second module-navigation row or a place to dump current-page actions.
 
-The Global Header should be **small, stable, and genuinely global**.
+Candidate contents include AWJ identity/product mark, global search/command entry, current company/legal-entity context where applicable, active branch context where applicable, notifications, Help Center, user/account menu, and language/appearance controls through appropriately compact affordances.
 
-It should not become a second module-navigation row or a place to dump current-page actions.
+Company and branch context must be understandable without consuming excessive header width. The user should be able to tell which business context they are operating in before performing a sensitive transaction. Switching active context and entering branch/company administration are different operations and must remain distinguishable.
 
-### 5.2 Candidate contents
-
-The prototype should evaluate:
-
-- AWJ identity / product mark;
-- global search / command entry;
-- current company/legal-entity context where applicable;
-- active branch context where applicable;
-- notifications;
-- Help Center;
-- user/account menu;
-- language/appearance controls, likely through user/settings affordances rather than permanent clutter.
-
-Exact order and placement remain open until prototype review.
-
-### 5.3 Context visibility
-
-Company and branch context must be understandable without consuming excessive header width.
-
-Critical requirement:
-
-**the user should be able to tell which business context they are operating in before performing a sensitive transaction.**
-
-The visual design must distinguish:
-
-- switching active working context;
-- entering branch/company administration.
-
-These are different operations.
-
-### 5.4 Search
-
-Search is a first-class productivity capability.
-
-The visual prototype should reserve a strong but compact search affordance that can support AWJ's existing global business-object search direction.
-
-Navigation discovery and business-object search are conceptually distinct even if a future command surface coordinates them.
-
-Do not make search disappear at laptop/tablet widths simply to keep the header visually clean. It may compact into an icon/trigger, but its availability must remain obvious and keyboard-accessible.
+Search is a first-class productivity capability. Navigation discovery and business-object search are conceptually distinct even if a future command surface coordinates them. Search must not simply disappear at laptop/tablet widths to keep the header visually clean; it may compact into an obvious keyboard-accessible trigger.
 
 ## 6. Page Header direction
 
-The Page Header belongs to the current workspace, not the global shell.
+The Page Header belongs to the current workspace, not the global shell. It should carry only the information needed to establish location/context: page/document title, compact breadcrumbs when useful, document number/status or record identity where appropriate, and concise supporting text only when useful.
 
-It should carry only the information needed to establish location/context, such as:
-
-- page/document title;
-- compact breadcrumbs when they materially help orientation;
-- document number/status or record identity where appropriate;
-- a concise supporting description only when useful.
-
-Avoid giant SaaS-style page titles and repeated descriptions that consume vertical working space.
-
-On constrained-height laptops, the Page Header must be particularly disciplined.
+Avoid giant SaaS-style page titles and repeated descriptions that consume vertical working space. On constrained-height laptops, the Page Header must be particularly disciplined.
 
 ## 7. Contextual Command Bar direction
 
-The Command Bar owns actions for the current record/workspace.
+The Command Bar owns actions for the current record/workspace: Save, Post, Approve, Print/PDF, Duplicate, More actions, Create/Add where appropriate, and similar contextual operations.
 
-Examples:
-
-- Save.
-- Post.
-- Approve.
-- Print/PDF.
-- Duplicate.
-- More actions.
-- Create/add where appropriate.
-
-Principles:
-
-- prioritize frequent/important actions;
-- preserve dangerous/destructive distinction;
-- overflow secondary actions deliberately;
-- do not scatter the same primary action across Sidebar, Global Header, Page Header, and body;
-- keyboard operation and visible focus are mandatory;
-- financial/accounting state must determine action availability truthfully.
+Prioritize frequent/important actions, preserve destructive distinction, overflow secondary actions deliberately, avoid duplicating the same primary action across shell layers, require keyboard operation/visible focus, and reflect financial/accounting state truthfully.
 
 The exact command layout is pattern-owned: Document Workspace, Master Record, List, Report, Settings, and Operational workspaces may differ within a shared interaction grammar.
 
 ## 8. Workspace frame
 
-The shell should maximize usable working area.
+The shell should maximize usable working area. Desktop/laptop workspaces should use remaining width efficiently; data-dense screens should not be trapped in decorative max-width containers; lists/grids/reports/documents may use broad width; forms may use controlled widths/columns according to their pattern; fixed shell heights must be budgeted together so short laptops do not become scroll traps.
 
-### Desktop/laptop
-
-- workspace uses remaining width efficiently;
-- avoid decorative max-width containers on data-dense screens;
-- lists/grids/reports/documents can use broad width where needed;
-- forms may use controlled readable widths/columns according to their pattern;
-- fixed shell heights must be budgeted together so short laptops do not become scroll traps.
-
-### Surface hierarchy
-
-Use AWJ's existing token philosophy:
-
-- restrained page background;
-- clear surface/background distinction;
-- subtle borders;
-- minimal shadow;
-- no gradients/glass.
-
-The shell must remain visually secondary to the data.
+Use AWJ's existing token philosophy: restrained page background, clear surface/background distinction, subtle borders, minimal shadow, no gradients/glass. The shell remains visually secondary to the data.
 
 ## 9. Responsive shell states
 
@@ -264,186 +139,107 @@ Breakpoints must ultimately be content-pressure-driven, not copied from device m
 
 ### State A — Persistent expanded
 
-Best for wide/standard desktop and laptops where the workspace remains productive.
-
-- full navigation labels;
-- stable Global Header;
-- workspace fills remainder.
+Best for wide/standard desktop and laptops where the workspace remains productive: full navigation labels, stable Global Header, workspace fills remainder.
 
 ### State B — Compact/persistent candidate
 
-Optional state for constrained width only if prototype testing proves it useful.
-
-Possible behaviors:
-
-- narrower labeled navigation;
-- or compact rail with explicit accessible label discovery.
-
-This state is **experimental**, not mandatory. If recognition cost is worse than the saved width, skip it.
+Optional for constrained width only if prototype testing proves it useful. It may be a narrower labeled navigation or a compact rail with explicit accessible label discovery. This state is experimental, not mandatory; if recognition cost exceeds the saved width, skip it.
 
 ### State C — Overlay navigation
 
-For tablet, high zoom/text scaling, or intermediate widths where persistent navigation harms the workspace.
-
-- menu trigger remains globally available;
-- navigation opens as an overlay/drawer;
-- focus moves into the drawer;
-- Escape/backdrop/close behavior is defined;
-- closing restores focus to the trigger;
-- underlying workspace is not interactable while modal drawer semantics apply.
+For tablet, high zoom/text scaling, or intermediate widths where persistent navigation harms the workspace: menu trigger remains globally available; navigation opens as overlay/drawer; focus moves into it; Escape/backdrop/close behavior is defined; closing restores focus; underlying workspace is not interactable when modal drawer semantics apply.
 
 ### State D — Phone shell
 
-- non-persistent primary navigation;
-- compact global utilities;
-- current context remains visible enough for safe work;
-- page/workspace patterns recompose independently;
-- do not turn every page into generic cards;
-- high-frequency actions remain reachable without excessive menu drilling.
+The phone shell uses **non-persistent global navigation** with a compact Mobile Header plus a full Navigation Drawer/Search path. The page/workspace pattern then recomposes independently.
 
-## 10. Height-responsive behavior
+**A persistent global Bottom Navigation bar is not the default AWJ mobile model.** AWJ has too many role-dependent ERP destinations for a small fixed tab bar to represent the global IA truthfully. The Sidebar must not be mechanically converted into 3–5 bottom icons.
 
-Width alone is insufficient.
+High-frequency actions must remain reachable without excessive menu drilling, but that requirement is solved by contextual pattern actions, search/command affordances, and specialized operational patterns — not by misrepresenting the global IA.
 
-The shell must explicitly support short laptop/browser viewports.
+## 10. Mobile bottom-area policy — research-informed
 
-Rules:
+The bottom edge of a phone is valuable interaction space. In AWJ it should be **pattern-owned, not globally reserved for navigation**.
 
-- avoid stacking tall Global Header + tall Page Header + tall Command Bar;
-- sticky/fixed elements must earn their vertical cost;
-- Sidebar footer/profile controls must not push core navigation off-screen without a usable scroll model;
-- active destination must remain reachable/visible;
-- menus/popovers must respect available viewport height;
-- workspace should receive the largest practical vertical budget.
+### Default rule
 
-A design that works at 1440×1000 but becomes cramped at a common laptop-height viewport fails the Quality Bar.
+**Mobile Global Navigation = compact Header + Navigation Drawer/Search.**
 
-## 11. Navigation motion and feedback
+**Mobile Bottom Area = Contextual Actions when the current Page Pattern genuinely benefits from them.**
 
-Motion should explain state, not decorate it.
+Examples:
 
-Use restrained transitions for:
+- Sales Invoice may expose draft/save/post or other approved document actions in a mobile action area when this materially improves completion speed.
+- POS may use the bottom region for checkout/payment/high-frequency operational actions because POS is a specialized Operational Workspace.
+- A report may use no bottom action area at all.
+- A read-only master record may not need persistent bottom actions.
 
-- opening/closing overlay navigation;
-- expanding a justified navigation disclosure;
-- popovers/menus;
-- contextual panel entry/exit.
+### What not to do
 
-Avoid:
+Do not create a global `Home | Sales | More` bar merely because it is familiar in consumer mobile apps. Do not reserve vertical space for global tabs when the current ERP task benefits more from contextual actions. Do not mix global destinations and current-record actions in the same bottom bar.
 
-- springy playful movement;
-- slow sidebar animation;
-- animated gradients;
-- attention-seeking active indicators;
-- motion that delays accounting work.
+### Exceptions
 
-Respect reduced-motion preferences.
+A future role-specific or specialized workflow may justify a small bottom navigation model, but it must be documented as a deliberate **Operational Workspace exception**, not a new global App Shell rule.
 
-## 12. Accessibility interaction contract
+## 11. Height-responsive behavior
 
-The shell prototype/spec must demonstrate:
+Width alone is insufficient. The shell must explicitly support short laptop/browser viewports.
 
-- semantic navigation landmark;
-- current page via `aria-current` or equivalent semantics;
-- disclosure state via `aria-expanded` where applicable;
-- logical keyboard tab order in RTL and LTR;
-- visible focus on every interactive control;
-- accessible names for icon-only controls;
-- no hover-only required interaction;
-- mobile drawer focus management;
-- Escape close where appropriate;
-- screen-reader understandable company/branch context;
-- active state not conveyed by color alone;
-- zoom/text scaling without lost functionality;
-- adequate touch targets on tablet/phone;
-- reduced-motion support.
+Avoid stacking tall Global Header + Page Header + Command Bar; sticky/fixed elements must earn their vertical cost; Sidebar footer/profile controls must not push core navigation off-screen without a usable scroll model; active destination must remain reachable; menus/popovers must respect available viewport height; workspace receives the largest practical vertical budget.
 
-## 13. Visual freshness gate
+A design that works at a tall mockup viewport but becomes cramped on a common short laptop fails the Quality Bar.
+
+## 12. Navigation motion and feedback
+
+Motion should explain state, not decorate it. Use restrained transitions for opening/closing overlay navigation, justified disclosures, popovers/menus, and contextual panels. Avoid springy playful movement, slow Sidebar animation, animated gradients, attention-seeking indicators, or motion that delays accounting work. Respect reduced-motion preferences.
+
+## 13. Accessibility interaction contract
+
+The shell prototype/spec must demonstrate semantic navigation landmarks, current-page semantics, disclosure state semantics, logical keyboard order in RTL/LTR, visible focus, accessible names for icon-only controls, no hover-only required interaction, mobile drawer focus management, Escape close where appropriate, understandable company/branch context, active state not conveyed by color alone, zoom/text scaling without lost functionality, adequate touch targets, and reduced-motion support.
+
+## 14. Visual freshness gate
 
 Before approving the shell, compare each material visual/interaction choice against current enterprise guidance rather than copying historical ERP conventions.
 
-Evaluate:
-
-- whether the pattern is still actively supported;
-- whether a newer alternative improves accessibility or responsive behavior;
-- whether it works with Arabic RTL;
-- whether it protects data density and accounting productivity;
-- whether it survives laptop/tablet/mobile/zoom;
-- whether it will remain maintainable within AWJ's Next.js/Tailwind/shadcn architecture.
+Evaluate current support status, newer accessibility/responsive alternatives, Arabic RTL fitness, data-density/accounting productivity, laptop/tablet/mobile/zoom behavior, and maintainability within AWJ's Next.js/Tailwind/shadcn architecture.
 
 Newer is not automatically better, and older is not automatically obsolete. The target is the best current solution for AWJ.
 
-## 14. Prototype content scenarios
+## 15. Prototype content scenarios
 
-A meaningful visual prototype must not use one idealized menu/data state.
+A meaningful visual prototype must not use one idealized menu/data state. Prototype at least:
 
-Prototype at least:
-
-### Persona/menu shape 1 — broad administrator/accountant
-
-Most core, financial, reporting, and administration destinations visible.
-
-### Persona/menu shape 2 — sales user
-
-Sales, Customers, relevant Products/Reports, POS if entitled; sensitive accounting/admin destinations absent.
-
-### Persona/menu shape 3 — inventory/purchasing user
-
-Purchases, Products & Inventory, relevant Reports; limited financial/admin access.
-
-### Persona/menu shape 4 — specialized/restricted user
-
-Only a small number of operational destinations visible.
+1. **Broad administrator/accountant** — most core, financial, reporting, administration destinations.
+2. **Sales user** — Sales, Customers, relevant Products/Reports, POS if entitled; sensitive accounting/admin absent.
+3. **Inventory/purchasing user** — Purchases, Products & Inventory, relevant Reports; limited financial/admin.
+4. **Specialized/restricted user** — only a small number of operational destinations.
 
 The shell should look intentional in all four states.
 
-## 15. Required viewport prototype matrix
+## 16. Required viewport prototype matrix
 
-At minimum, visual validation must cover:
-
-- wide desktop;
-- standard desktop;
-- constrained-height laptop;
-- tablet landscape;
-- tablet portrait;
-- large phone;
-- standard/narrow phone;
-- at least one intermediate width where navigation changes mode;
-- browser zoom/text scaling stress state;
-- Arabic RTL;
-- English LTR mirror.
+At minimum: wide desktop, standard desktop, constrained-height laptop, tablet landscape, tablet portrait, large phone, standard/narrow phone, an intermediate width where navigation changes mode, browser zoom/text scaling stress state, Arabic RTL, and English LTR mirror.
 
 Do not create one desktop and one phone screenshot and call the shell responsive.
 
-## 16. Prototype visual brief
+## 17. Prototype visual brief
 
 The first high-fidelity shell prototype should use a real AWJ work surface rather than placeholder dashboard cards.
 
-Recommended primary proving screen:
+Recommended primary proving screen: **Sales Invoice / Document Workspace** because it stresses horizontal/vertical workspace capacity and exposes Global Header, Page Header, Command Bar, document form, line grid, totals, and contextual actions together.
 
-**Sales Invoice / Document Workspace**
+Secondary proving screens: Product Master Record, Customer Master Record, Reports workspace/list. The same shell must support all of them without inventing a new global grammar per screen.
 
-Why:
+For the mobile Sales Invoice prototype, do **not** include a persistent global Bottom Navigation bar by default. Demonstrate compact Header + Drawer/Search, and separately test a pattern-owned contextual bottom action area if useful.
 
-- it is one of the strongest existing AWJ V2 visual references;
-- it stresses horizontal and vertical workspace capacity;
-- it exposes Global Header, Page Header, Command Bar, document form, line grid, totals, and contextual actions together;
-- it makes an oversized or noisy shell immediately obvious.
-
-Secondary proving screens:
-
-- Product Master Record.
-- Customer Master Record.
-- Reports workspace/list.
-
-The same shell must support all of them without inventing a new global grammar per screen.
-
-## 17. Explicit non-approvals
+## 18. Explicit non-approvals
 
 This direction does **not** approve:
 
 - the Sidebar shown in the 2026-09-06 reference concepts as-is;
 - the Global Header shown in those concepts as-is;
+- the global mobile Bottom Navigation shown in the first App Shell reference image;
 - Microsoft Dynamics colors/navigation visuals;
 - SAP Launchpad visuals;
 - Oracle Redwood styling as an AWJ skin;
@@ -460,39 +256,29 @@ This direction does **not** approve:
 - final search/command UI;
 - implementation in production.
 
-## 18. Proposed visual decision set for owner review
-
-The following are now mature enough to review as a set:
+## 19. Proposed visual decision set for owner review
 
 1. **Arabic Sidebar on the right; English mirrors left.** — PROPOSED.
 2. **Expanded labeled navigation is the desktop baseline.** — PROPOSED.
-3. **No mandatory icon-only rail.** — PROPOSED; prototype only if useful.
-4. **Global Header is compact and global-only.** — PROPOSED.
-5. **Reports is a first-class navigation destination.** — PROPOSED from IA.
-6. **Ordinary create routes move out of primary Sidebar.** — PROPOSED from IA.
-7. **Workspace owns internal module navigation.** — PROPOSED.
-8. **Navigation switches to overlay when content pressure/zoom makes persistence harmful.** — PROPOSED.
-9. **Shell visual language is quiet/flat/precise; no decorative modernity.** — PROPOSED.
-10. **Sales Invoice is the first shell proving screen.** — PROPOSED.
+3. **Neutral/quiet Sidebar is the baseline visual candidate; colored Sidebar remains a comparison candidate, not a requirement.** — PROPOSED.
+4. **No mandatory icon-only rail.** — PROPOSED; prototype only if useful.
+5. **Global Header is compact and global-only.** — PROPOSED.
+6. **Reports is a first-class navigation destination.** — PROPOSED from IA.
+7. **Ordinary create routes move out of primary Sidebar.** — PROPOSED from IA.
+8. **Workspace owns internal module navigation.** — PROPOSED.
+9. **Navigation switches to overlay when content pressure/zoom makes persistence harmful.** — PROPOSED.
+10. **Mobile global navigation is Header + Drawer/Search, not persistent Bottom Navigation by default.** — PROPOSED after reference research.
+11. **Phone bottom area is pattern-owned for contextual actions when useful.** — PROPOSED.
+12. **Shell visual language is quiet/flat/precise; no decorative modernity.** — PROPOSED.
+13. **Sales Invoice is the first shell proving screen.** — PROPOSED.
 
 None of these authorizes production implementation until owner approval and prototype review.
 
-## 19. Next deliverable
+## 20. Next deliverable
 
 After owner agreement with this direction, produce a **high-fidelity AWJ App Shell V2 reference prototype/visual specification** using the Sales Invoice Document Workspace as the proving surface.
 
-That prototype should explicitly show:
-
-- Arabic RTL desktop/laptop shell;
-- Sidebar expanded and overlay state;
-- compact Global Header;
-- active company/branch context;
-- global search affordance;
-- Page Header + Command Bar ownership;
-- realistic invoice workspace density;
-- tablet and phone recomposition;
-- permission-restricted navigation example;
-- light/dark compatibility direction.
+That prototype should explicitly show Arabic RTL desktop/laptop shell, Sidebar expanded and overlay state, compact Global Header, active company/branch context, global search affordance, Page Header + Command Bar ownership, realistic invoice workspace density, tablet and phone recomposition, permission-restricted navigation example, light/dark compatibility direction, and the mobile Header + Drawer model without global Bottom Navigation.
 
 Only after visual/prototype approval should implementation planning begin.
 
