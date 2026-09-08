@@ -36,8 +36,8 @@ Ordering follows `PHASE2_PLANNING_HANDOFFS.md`: *"Decompose backend master-data 
 | PR | Title | Schema | Depends on | Status |
 |---|---|---|---|---|
 | **PR-UOM2-1** | Default sales/purchase UOM (backend master-data) | 2 nullable columns | — | ✅ merged (`fa050c2`) |
-| **PR-UOM2-2** | Product UX: units + alternate barcodes | none | PR-UOM2-1 (displays defaults) | in progress, this PR |
-| PR-UOM2-3 | POS UOM selection, server-authoritative | none expected | PR-UOM2-1, PR-UOM2-2 | not started |
+| **PR-UOM2-2** | Product UX: units + alternate barcodes | none | PR-UOM2-1 (displays defaults) | ✅ merged (`e47b249`) |
+| **PR-UOM2-3** | POS UOM selection, server-authoritative | none | PR-UOM2-1, PR-UOM2-2 | in progress, this PR |
 | PR-UOM2-4 | Workbook: Products / Barcodes / Unit Prices round-trip | none | PR-UOM2-1 | not started |
 
 Each is opened, reviewed and merged separately. No mega-PR.
@@ -157,3 +157,71 @@ Give the Product screens a UI for what PR-UOM-1 and PR-UOM2-1 already built on t
 ### Deviations requiring owner sign-off
 
 None expected — this PR touches no schema, no API contract, and no accounting/GL path. If mid-implementation something outside this scope turns out to be required, stop and ask rather than expanding it.
+
+---
+
+## 5. PR-UOM2-3 — contract
+
+### Goal
+
+Close the last open item named in PR-UOM2-2's own report: decide, and implement, whether `default_sales_unit` becomes an initial suggestion in the POS cart, and finish whatever POS UOM-switching gap that decision leaves open.
+
+### Current-main baseline (measured before implementation — this is the load-bearing finding of this PR)
+
+POS UOM switching is **not greenfield**. It is already built and tested, end to end, from before this PR:
+
+| Capability | State | Evidence |
+|---|---|---|
+| POS catalog exposes `pos_units` (base + alternates with an explicit customer price) and `pos_barcodes` (filtered to allowed units) | ✅ done | `PosController::products()`, `PosCustomerPriceListResolver::catalogUnitsFor()` |
+| Cart line carries `unit: string \| null`; a `<select>` lets the cashier switch it when >1 priced unit exists | ✅ done | `pos-active-cart.ts` `PosCartLine`; `page.tsx` `setUnit()` and the unit `<select>` |
+| Scanning an alternate barcode pre-fills that barcode's own `unit_name`/`default_quantity` into the new line | ✅ done | `pos-barcode.ts` `matchPosBarcode()` / `appendPosCartProduct()` |
+| Checkout resolves the unit server-side via the same `UnitConversion::resolve()` every document uses, snapshots `unit_name`/`unit_factor` on the line, and inventory posting reads `baseQuantity()` (`quantity × factor`) — never the entered quantity directly | ✅ done | `InvoiceService::create()`, `HasUnitConversion::baseQuantity()`, `InventoryService::recordSaleCogs()` |
+| An alternate unit can only be sold at an explicit `PriceListItem` price (or, if `allow_unit_price_override` is on, any cashier-entered price re-validated at checkout) — never a price derived from `factor` | ✅ done | `PosCustomerPriceListResolver::posPriceFor()`, `PosService::assertUnitPricesAllowedForPos()` |
+| Held sales (`PosHeldSale`) and the localStorage cart snapshot (`pos-cart-snapshot.ts`, versioned) both already carry `unit` per line | ✅ done | `StorePosHeldSaleRequest`, `isPosCartLine()` |
+| Regression tests already exist for all of the above | ✅ done | `PosCheckoutTest`, `PosReturnUomTest`, `pos-barcode.test.ts`, `pos-cart-snapshot.test.ts` (see Implementation Report §10 for the full list) |
+| **`default_sales_unit` pre-selecting a unit when a product is added by tap/click (not barcode scan)** | ❌ **the only real gap** | `addProduct(p)` with no `unitName` always resolves `pos_units[0]` (base); `default_sales_unit` is declared nowhere in `page.tsx`'s `Product` interface before this PR |
+
+### Owner decision recorded (this session)
+
+| # | Decision | Chosen |
+|---|---|---|
+| D-E | Does `default_sales_unit` pre-select the unit when a product is added to the POS cart by tap/click? | **NO.** Tap/click-add stays on the base unit exactly as today — D-A (presentation-only) is extended to POS verbatim, not narrowed or reinterpreted. `default_sales_unit` may be shown as a passive label only (never changes `unitName`/`unitFactor`/`quantity`/`price`). Only an explicit, manual unit choice by the cashier (the existing `<select>`) changes a line's unit. Barcode-scan pre-fill is unrelated to `default_sales_unit` — it is (and remains) driven by the scanned barcode's own `unit_name`/`default_quantity`, per its own established contract, not by this decision. |
+
+### In scope
+
+- One informational marker: the unit `<select>` in a cart line appends `(افتراضي)`/`(default)` to the option whose name equals the product's `default_sales_unit`, when set. Pure label; the `<select>`'s `value`, `onChange`, and every downstream computation are untouched.
+- `Product.default_sales_unit?: string | null` added to `page.tsx`'s own `Product` type (the field was already on the wire via the shared `ProductResource`, just not typed/read here).
+- A structural regression test asserting `default_sales_unit` appears in `page.tsx` in exactly those two places (type + label) — nowhere inside `addProduct`/`pricedUnit`/checkout-payload construction — so a future edit that quietly wires it into unit selection breaks the build instead of shipping silently.
+- New translation keys: `products.default_sales_unit_marker` (ar/en).
+- This §5 contract itself, and marking PR-UOM2-2's row merged in §2.
+
+### Explicitly out of scope
+
+- Any change to `addProduct()`, `pricedUnit()`, `setUnit()`, checkout payload construction, or any backend file — D-A/D-E mean zero behavior change to unit selection.
+- `default_purchase_unit` in POS — POS is a sales-only surface; the purchase default has no POS relevance and is not touched.
+- Weighted Barcode (D-02), Product Variants (D-03) — unchanged, still `NEEDS DECISION`.
+- PR-UOM2-4 (workbook round-trip) — not started.
+- Any accounting/GL, tax, discount, minimum-price, invoice-posting, or inventory-valuation change.
+- Any widening of tenant/branch scope or relaxing of an existing guard.
+- General POS redesign — the only visual change is a short suffix inside an option string of an already-existing `<select>`.
+
+### Invariants inherited (must not regress)
+
+- `entered quantity × unit_factor = base_quantity`, computed exactly as before, exclusively by `HasUnitConversion::baseQuantity()`, and it alone drives stock movement.
+- Money is never derived from `unit_factor`; POS pricing stays exactly `PosCustomerPriceListResolver`'s explicit-price-or-null rule.
+- `default_sales_unit`/`default_purchase_unit` remain presentation-only everywhere, POS included (D-A extended by D-E, not reopened).
+- Unified `barcode_registry` namespace and barcode→unit/default-quantity resolution unchanged.
+- A product with no template or no alternate units keeps today's base-unit-only behavior byte-identically.
+- Tenant isolation / branch scope / RBAC guards unchanged — zero backend files touched.
+
+### Acceptance criteria
+
+1. Tapping/clicking a product tile still adds it at the base unit, regardless of whether `default_sales_unit` is set — verified structurally (guard test) and by the full existing POS test suite staying green unmodified.
+2. When `default_sales_unit` is set and the product has ≥2 priced units, the unit `<select>` shows `(افتراضي)`/`(default)` next to the matching option; when unset, or the product has only the base unit, the select renders exactly as before.
+3. Manually switching a cart line's unit, barcode-scan pre-fill, checkout `entered qty × factor = base qty`, POS UOM pricing, and held-sale/localStorage-cart round-trip all continue to pass their existing test suites unmodified.
+4. No backend file changes; no schema/migration; no new route.
+5. `npm run build` and the full frontend test suite stay green; no test weakened or removed.
+
+### Deviations requiring owner sign-off
+
+The only architecturally significant open question (whether `default_sales_unit` pre-selects in POS) was put to the owner before implementation, per the task's own instruction to stop rather than guess — see the "D-E" decision above. No further deviation.
