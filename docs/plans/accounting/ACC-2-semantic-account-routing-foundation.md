@@ -1,6 +1,6 @@
 # ACC-2 — Semantic Accounting Roles & Mapping Foundation
 
-**Status:** READY AFTER ACC-1  
+**Status:** MERGED — PR [#679](https://github.com/safwan5001-source/Nebrax/pull/679), merge `9957cf5fba68faa88cc418115800f457df2b1d09`. Migration strategy executed: **Clean Seeded Cutover**. Delivery record: `reports/ACC-2-implementation-report.md`.  
 **Parent plan:** `docs/plans/accounting/AWJ_ACCOUNTING_SETTINGS_PLAN.md`  
 **Planning baseline:** `58513fe77d1dd34ba4eaa797f2b12ab55996e3fd`  
 **Dependency:** ACC-1 reviewed and merged first.  

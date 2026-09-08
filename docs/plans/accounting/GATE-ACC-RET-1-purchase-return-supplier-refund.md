@@ -1,6 +1,6 @@
 # GATE-ACC-RET-1 — Purchase Return & Supplier Refund Financial Contract
 
-**Status:** ARCHITECTURE CONTRACT RESOLVED — IMPLEMENTATION STILL REQUIRES EXPLICIT APPROVAL  
+**Status:** CONTRACT RESOLVED AND IMPLEMENTED by ACC-RET-1 — PR [#684](https://github.com/safwan5001-source/Nebrax/pull/684), merge `a19c42a02570173d25b5abaf48cf4263c71e48ef`. Delivery record: `reports/ACC-RET-1-implementation-report.md`.  
 **Parent plan:** `docs/plans/accounting/AWJ_ACCOUNTING_SETTINGS_PLAN.md`  
 **Audited baseline:** `58513fe77d1dd34ba4eaa797f2b12ab55996e3fd`  
 **Risk:** High financial/accounting + settlement integrity.  
