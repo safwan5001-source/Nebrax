@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useLocale, useTranslations } from 'next-intl';
 import {
   BookOpen,
+  Banknote,
   Boxes,
   Calculator,
   ChevronLeft,
@@ -34,6 +35,7 @@ const CATEGORY_ICONS: Record<HelpCategoryKey, LucideIcon> = {
   purchases: ShoppingCart,
   inventory: Boxes,
   accounting: Calculator,
+  finance: Banknote,
   pos: Store,
 };
 

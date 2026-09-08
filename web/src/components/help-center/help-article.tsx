@@ -24,7 +24,9 @@ export function HelpArticle({ slug }: { slug: string }) {
   }
 
   const category = getHelpCategory(article.category);
-  const related = HELP_ARTICLES.filter((candidate) => candidate.category === article.category && candidate.slug !== article.slug).slice(0, 3);
+  const related = article.related
+    ? article.related.map((slug) => getHelpArticle(slug)).filter((candidate) => candidate !== undefined)
+    : HELP_ARTICLES.filter((candidate) => candidate.category === article.category && candidate.slug !== article.slug).slice(0, 3);
 
   return (
     <div className="mx-auto max-w-5xl space-y-5">
