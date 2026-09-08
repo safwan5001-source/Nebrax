@@ -16,7 +16,7 @@ The goal is not merely to make the interface modern or visually attractive. The 
 - Interaction design.
 - Information architecture.
 - Data-dense application design.
-- Responsive desktop, tablet, and mobile UX.
+- Responsive desktop, laptop, tablet, and mobile UX.
 - Accessibility.
 - Front-end engineering and design-system implementation.
 
@@ -71,13 +71,52 @@ Innovation is encouraged when it measurably improves comprehension, speed, confi
 
 ## 5. Reference policy
 
-External products such as Microsoft Dynamics 365 may be studied for enterprise UX and pattern discipline, but AWJ must not become a visual clone of another product.
+External enterprise products and design systems may be studied for enterprise UX and pattern discipline, including Microsoft Dynamics 365 Finance & Operations, SAP Fiori, Oracle Redwood, and other high-quality ERP/business applications. AWJ must not become a visual clone of any one product.
 
 References are inputs to expert judgment, not templates to copy.
 
 The intended outcome is recognizably **AWJ**.
 
-## 6. Review gate
+## 6. Full responsive and viewport coverage — mandatory
+
+AWJ V2 is not a desktop design with a mobile fallback. Every approved pattern must be deliberately designed and validated across the full practical range of supported viewport sizes and input modes.
+
+Required coverage includes:
+
+- Large desktop / wide monitors.
+- Standard desktop monitors.
+- Laptop displays, including constrained-height laptop viewports.
+- Tablet / iPad in landscape.
+- Tablet / iPad in portrait.
+- Large phones.
+- Standard phones.
+- Narrow/small phones.
+- Intermediate widths and heights between named device categories.
+- Portrait and landscape where the workflow is realistically used in both.
+- Browser zoom and text scaling scenarios required for accessibility.
+
+Do not design only for a few named device screenshots. Responsive behavior must be **content- and pattern-driven**, with deliberate breakpoints or container behavior where the interface actually needs to recompose.
+
+The system must handle both width and height constraints. A layout that works at a wide desktop resolution but breaks on a laptop because of reduced vertical space is not considered responsive.
+
+Each pattern specification must define what happens to, as applicable:
+
+- Primary navigation and App Shell.
+- Page Header and contextual actions.
+- Forms and field groups.
+- Tabs, sections, accordions, drawers, dialogs, and side panels.
+- Data grids, document line items, sticky regions, and horizontal overflow.
+- Filters, search, bulk actions, and pagination.
+- Totals and financial summaries.
+- Touch targets and pointer/keyboard interactions.
+- Long Arabic labels, large monetary values, validation messages, and localization expansion.
+- Loading, empty, error, permission, disabled, read-only, and unsaved-change states.
+
+Responsive adaptation must preserve the business relationships in the data. Do not automatically convert every table into cards, hide important financial columns, or remove actions merely to make a narrow screenshot look clean.
+
+Desktop/laptop should prioritize high-productivity, data-dense workflows; tablet should remain a serious working surface; mobile should deliberately recompose workflows for touch and narrow space rather than mechanically shrink the desktop layout.
+
+## 7. Review gate
 
 No AWJ V2 pattern or representative screen should be considered design-approved solely from a generated mockup or a single attractive screenshot.
 
@@ -87,14 +126,17 @@ Before approval, it should be reviewed for:
 2. Information hierarchy and density.
 3. Consistency with approved AWJ V2 patterns and design foundations.
 4. Arabic RTL quality and English mirroring implications.
-5. Desktop, tablet/iPad, and mobile behavior as applicable.
-6. Keyboard/touch efficiency for the workflow.
-7. Accessibility and complete interaction states.
-8. Absence of generic/template/AI-generated visual patterns.
-9. Feasibility and maintainability through shared tokens and components.
-10. Visual craft at a level appropriate for a premium global ERP product.
+5. Full responsive/viewport coverage: desktop, laptop, tablet/iPad, mobile, and meaningful intermediate sizes.
+6. Width and height constraints, orientation, zoom/text scaling, and localization stress cases where applicable.
+7. Keyboard, pointer, and touch efficiency for the workflow.
+8. Accessibility and complete interaction states.
+9. Absence of generic/template/AI-generated visual patterns.
+10. Feasibility and maintainability through shared tokens and components.
+11. Visual craft at a level appropriate for a premium global ERP product.
 
-## 7. Relationship to the Blueprint
+A design that looks correct only at its mockup size fails this review gate.
+
+## 8. Relationship to the Blueprint
 
 This document supplements:
 
@@ -102,8 +144,8 @@ This document supplements:
 
 The Blueprint defines the current V2 direction and pattern architecture. This document defines the **mandatory quality bar** for evaluating those patterns and their implementation.
 
-If a future design is technically consistent with the Blueprint but feels generic, templated, mechanically generated, or below this quality standard, it is **not sufficient for AWJ V2 approval**.
+If a future design is technically consistent with the Blueprint but feels generic, templated, mechanically generated, fails at realistic viewport sizes, or falls below this quality standard, it is **not sufficient for AWJ V2 approval**.
 
 ---
 
-**Core rule:** AWJ V2 must feel deliberately designed and meticulously implemented as a mature, premium, global ERP product — never as a generic AI-generated interface.
+**Core rule:** AWJ V2 must feel deliberately designed and meticulously implemented as a mature, premium, global ERP product across the full range of real working screens — never as a generic AI-generated interface or a desktop-only design with responsive patches.
