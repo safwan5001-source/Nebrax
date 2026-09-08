@@ -2,32 +2,16 @@
 
 namespace App\Support;
 
-/**
- * ═══════════════════════════════════════════════════════════════
- *  قائمة إجراءات الإشعار المصرَّح بها — الخادم مصدر الحقيقة الوحيد
- * ═══════════════════════════════════════════════════════════════
- *  إشعار قد يشير إلى مصدر، لكن فتحه يمرّ دوماً على تفويض المصدر نفسه من
- *  جديد؛ هذه القائمة تمنع فقط أن يحمل الإشعار إجراءً حرّاً (رابطاً خارجياً
- *  أو أمر واجهة اختُرع وقت الإنتاج) — لا تُستخدم كبديل عن تفويض المصدر.
- *
- *  كانت فارغة عمداً في PR-NOTIF-1 (لا مُنتِج بعد). كل مُنتِج جديد (مخزون، مالية،
- *  ZATCA...) يضيف هنا إدخاله الخاص فقط — لا يُعدَّل هذا الملف من خارج نطاق
- *  ميزته. `NotificationService::deliver()` يرفض أي `action` غائب عن هذه
- *  القائمة، أو حاملاً `source_type` غير موافق لمدخله.
- */
+/** Server allowlist for notification navigation. Source authorization is rechecked on open. */
 final class NotificationActions
 {
-    /** action => source_type المطلوب لهذا الإجراء. */
+    /** action => required source_type */
     public const ALLOWED = [
-        // PR-NOTIF-3: تنبيهات المخزون (نفاد/انخفاض) تفتح صفحة المنتج مباشرة.
-        // فتحها يعيد تفويض `products.view` من جديد؛ هذا المدخل لا يمنح وصولاً بذاته.
         'view_product' => 'product',
-        // PR-NOTIF-4: تنبيه رقابة مالية يفتح قائمة التنبيهات المالية — تعيد
-        // تفويض `reports.view` من جديد عبر GET /financial-control-alerts.
         'view_financial_alert' => 'financial_control_alert',
-        // PR-NOTIF-4: فشل/رفض إرسال ZATCA يفتح الفاتورة نفسها — تعيد تفويض
-        // `zatca.view`/`invoices.view` من جديد عبر مسارات الفاتورة القائمة.
-        // لا صفحة مستقلة لمحاولة الإرسال؛ الفاتورة هي المصدر القابل للفتح.
         'view_zatca_submission' => 'invoice',
+        // PR-NOTIF-5
+        'view_receivable_invoice' => 'invoice',
+        'view_pos_session' => 'pos_session',
     ];
 }
