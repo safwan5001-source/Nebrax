@@ -6650,6 +6650,14 @@
       "read": "Read"
     }
   },
+  "whatsNew": {
+    "pageTitle": "What's New",
+    "pageSubtitle": "Latest system updates and improvements.",
+    "empty": "No updates at this time.",
+    "loadFailed": "Failed to load updates.",
+    "retry": "Retry",
+    "publishedAt": "Published on {date}"
+  },
   "numberingSettings": {
     "title": "Document numbering",
     "picker_title": "Document type",

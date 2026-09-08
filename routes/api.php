@@ -19,6 +19,7 @@ use App\Http\Controllers\Api\PlatformDocumentOperationsController;
 use App\Http\Controllers\Api\PlatformIntegrationController;
 use App\Http\Controllers\Api\PlatformDocumentFileScanExceptionController;
 use App\Http\Controllers\Api\PlatformSubscriptionController;
+use App\Http\Controllers\Api\PlatformSystemUpdateController;
 use App\Http\Controllers\Api\PlatformTenantController;
 use App\Http\Controllers\Api\BranchController;
 use App\Http\Controllers\Api\BrandController;
@@ -111,6 +112,7 @@ use App\Http\Controllers\Api\StockPermitController;
 use App\Http\Controllers\Api\InventoryOpeningController;
 use App\Http\Controllers\Api\StocktakeController;
 use App\Http\Controllers\Api\SubscriptionController;
+use App\Http\Controllers\Api\SystemUpdateController;
 use App\Http\Controllers\Api\SupplierRefundController;
 use App\Http\Controllers\Api\TenantApplicationController;
 use App\Http\Controllers\Api\UserController;
@@ -183,11 +185,19 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::get('document-usage', [PlatformDocumentOperationsController::class, 'usage']);
         Route::get('document-diagnostics', [PlatformDocumentOperationsController::class, 'diagnostics']);
         Route::get('document-file-scan-exceptions', [PlatformDocumentFileScanExceptionController::class, 'index']);
+        // PR-NOTIF-6: تحديثات النظام / What's New — قراءة فقط للمشغّل.
+        Route::get('system-updates', [PlatformSystemUpdateController::class, 'index']);
+        Route::get('system-updates/{id}', [PlatformSystemUpdateController::class, 'show'])->whereUuid('id');
     });
     Route::middleware(['auth:sanctum', EnsurePlatformAdministrator::class . ':platform:manage'])
         ->prefix('platform')
         ->group(function () {
             Route::patch('tenants/{tenant}', [PlatformTenantController::class, 'update']);
+            // PR-NOTIF-6: تحديثات النظام / What's New — كتابة ونشر.
+            Route::post('system-updates', [PlatformSystemUpdateController::class, 'store']);
+            Route::put('system-updates/{id}', [PlatformSystemUpdateController::class, 'update'])->whereUuid('id');
+            Route::post('system-updates/{id}/publish', [PlatformSystemUpdateController::class, 'publish'])->whereUuid('id');
+            Route::delete('system-updates/{id}', [PlatformSystemUpdateController::class, 'destroy'])->whereUuid('id');
             Route::put('integrations/{integration}', [PlatformIntegrationController::class, 'update']);
             Route::post('integrations/{integration}/test', [PlatformIntegrationController::class, 'test']);
             Route::post('document-file-scan-exceptions', [PlatformDocumentFileScanExceptionController::class, 'store']);
@@ -256,6 +266,10 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::get('notifications/unread-count', [NotificationController::class, 'unreadCount']);
         Route::post('notifications/mark-all-read', [NotificationController::class, 'markAllRead']);
         Route::post('notifications/{id}/read', [NotificationController::class, 'markRead']);
+
+        // PR-NOTIF-6: تحديثات النظام / What's New — تحديثات منشورة مستهدفة لهذا المستأجر/المستخدم.
+        // متاح دائماً (حتى مع اشتراك منتهٍ) — محتوى من المنصة لا مورد عمل.
+        Route::get('system-updates', [SystemUpdateController::class, 'index']);
 
         $perm = fn (string $p) => EnsurePermission::class . ':' . $p;
         $app = fn (string $k) => EnsureApplicationActive::class . ':' . $k;

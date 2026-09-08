@@ -77,6 +77,8 @@ const ACTION_PATHS: Record<string, (sourceId: string) => string> = {
   // PR-NOTIF-5: الاستحقاق يفتح الفاتورة، وتنبيه POS يفتح جلسة نقطة البيع.
   view_receivable_invoice: (invoiceId) => `/invoices/${invoiceId}`,
   view_pos_session: (sessionId) => `/pos/sessions/${sessionId}`,
+  // PR-NOTIF-6: تحديث النظام يفتح صفحة What's New.
+  view_system_update: () => '/whats-new',
 };
 
 export function notificationHref(notification: AppNotification): string | null {

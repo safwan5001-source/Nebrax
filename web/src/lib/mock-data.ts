@@ -3815,6 +3815,36 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
     return resolve({ data: { updated } });
   }
 
+  // PR-NOTIF-6: تحديثات النظام / What's New
+  if (clean === '/system-updates' && notificationMethod === 'GET') {
+    return resolve({
+      data: [
+        {
+          id: 'su-1',
+          status: 'published',
+          target_type: 'all',
+          title_ar: 'تحسينات على نظام الفوترة',
+          title_en: 'Invoicing system improvements',
+          content_ar: 'تم تحسين أداء إنشاء الفواتير وإضافة خيارات تصفية جديدة.',
+          content_en: 'Improved invoice creation performance and added new filtering options.',
+          published_at: '2026-09-08T10:00:00Z',
+          created_at: '2026-09-07T08:00:00Z',
+        },
+        {
+          id: 'su-2',
+          status: 'published',
+          target_type: 'all',
+          title_ar: 'دعم نقطة البيع للباركود',
+          title_en: 'POS barcode scanning support',
+          content_ar: 'أصبح بإمكانك الآن مسح الباركود مباشرة من شاشة نقطة البيع.',
+          content_en: 'You can now scan barcodes directly from the POS screen.',
+          published_at: '2026-09-05T14:00:00Z',
+          created_at: '2026-09-04T09:00:00Z',
+        },
+      ],
+    });
+  }
+
   // افتراضي: لا بيانات بعد (حالة فارغة).
   return resolve({ data: [] });
 

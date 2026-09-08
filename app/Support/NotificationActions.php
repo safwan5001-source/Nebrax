@@ -32,5 +32,8 @@ final class NotificationActions
         // PR-NOTIF-5: الاستحقاق يفتح الفاتورة، وحدث POS يفتح الجلسة؛ المساران يعيدان التفويض.
         'view_receivable_invoice' => 'invoice',
         'view_pos_session' => 'pos_session',
+        // PR-NOTIF-6: تحديث النظام / What's New يفتح صفحة التحديثات — لا يحتاج
+        // تفويضاً مستقلاً لأن المحتوى عام من المنصة ومتاح لكل مستخدم مصادَق.
+        'view_system_update' => 'system_update',
     ];
 }
