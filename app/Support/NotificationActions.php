@@ -22,5 +22,12 @@ final class NotificationActions
         // PR-NOTIF-3: تنبيهات المخزون (نفاد/انخفاض) تفتح صفحة المنتج مباشرة.
         // فتحها يعيد تفويض `products.view` من جديد؛ هذا المدخل لا يمنح وصولاً بذاته.
         'view_product' => 'product',
+        // PR-NOTIF-4: تنبيه رقابة مالية يفتح قائمة التنبيهات المالية — تعيد
+        // تفويض `reports.view` من جديد عبر GET /financial-control-alerts.
+        'view_financial_alert' => 'financial_control_alert',
+        // PR-NOTIF-4: فشل/رفض إرسال ZATCA يفتح الفاتورة نفسها — تعيد تفويض
+        // `zatca.view`/`invoices.view` من جديد عبر مسارات الفاتورة القائمة.
+        // لا صفحة مستقلة لمحاولة الإرسال؛ الفاتورة هي المصدر القابل للفتح.
+        'view_zatca_submission' => 'invoice',
     ];
 }
