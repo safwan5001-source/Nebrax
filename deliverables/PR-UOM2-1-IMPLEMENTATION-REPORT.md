@@ -6,7 +6,8 @@
 **Branch:** `claude/phase-2-pr-uom2-1`
 **PR:** [#688](https://github.com/safwan5001-source/Nebrax/pull/688)
 **Base SHA (نقطة التفرّع الأصلية):** `528a2f78619158d0ffdbd3c730f27311a9ca5e26` (مدمَجة الآن ضمن الفرع)
-**Head SHA:** `603172ec7c5c83373346679df0f8c0c9950c0b22`
+**Head SHA (الكود + الدمج، ما اختبرته CI):** `603172ec7c5c83373346679df0f8c0c9950c0b22`
+**Head SHA لتحديث هذا التقرير نفسه:** `9a43b225cdaad55fdfe9363d90ea599aa7d3e764`
 
 **العقد:** `docs/plans/products-inventory/phase-2-completion/MULTIPLE-UOM-BARCODE-DECOMPOSITION.md` (أُنشئ في هذه المهمّة — انظر §2).
 
