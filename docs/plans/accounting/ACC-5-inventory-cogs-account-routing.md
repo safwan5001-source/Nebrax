@@ -1,6 +1,6 @@
 # ACC-5 — Inventory / COGS Account Routing
 
-**Status:** PREPARED — execute after prior routing slices are stable  
+**Status:** MERGED — PR [#687](https://github.com/safwan5001-source/Nebrax/pull/687), merge `f649fa69350c3319d77a44d836a92af6578ae056`. Delivery record: `reports/ACC-5-implementation-report.md`.  
 **Risk:** High inventory + accounting integrity.  
 **Merge / Deploy:** PROHIBITED without explicit Safwan approval.
 

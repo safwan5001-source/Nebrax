@@ -1,6 +1,6 @@
 # ACC-3 — Sales + Payment Counterparty Account Routing
 
-**Status:** PREPARED — execute only after ACC-2 review/merge  
+**Status:** MERGED — PR [#682](https://github.com/safwan5001-source/Nebrax/pull/682), merge `a1268d4df5e0061c9dd0fc51c0f6abe7c17b1c94`. Delivery record: `reports/ACC-3-implementation-report.md`.  
 **Parent plan:** `docs/plans/accounting/AWJ_ACCOUNTING_SETTINGS_PLAN.md`  
 **Risk:** High accounting correctness.  
 **Merge / Deploy:** PROHIBITED without explicit Safwan approval.

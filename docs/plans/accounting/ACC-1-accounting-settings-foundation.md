@@ -1,6 +1,6 @@
 # ACC-1 — Accounting Settings Foundation + Workspace + RBAC
 
-**Status:** READY FOR IMPLEMENTATION  
+**Status:** MERGED — PR [#676](https://github.com/safwan5001-source/Nebrax/pull/676), merge `4963a6b5c1427c753b492dc7d43672c9a64e208e`. Delivery record: `reports/ACC-1-implementation-report.md`.  
 **Parent plan:** `docs/plans/accounting/AWJ_ACCOUNTING_SETTINGS_PLAN.md`  
 **Planning baseline:** `58513fe77d1dd34ba4eaa797f2b12ab55996e3fd`  
 **Risk:** Low functional risk; security/RBAC correctness is mandatory.  

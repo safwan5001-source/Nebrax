@@ -1,6 +1,6 @@
 # ACC-4 — Purchase & Purchase Return Account Routing
 
-**Status:** PREPARED / BLOCKED BY `GATE-ACC-RET-1`  
+**Status:** MERGED — PR [#685](https://github.com/safwan5001-source/Nebrax/pull/685), merge `70c80b7d37aab13c3c5c181757ae0db8f3494428`. The `GATE-ACC-RET-1` dependency was cleared by ACC-RET-1. Delivery record: `reports/ACC-4-implementation-report.md`.  
 **Dependency:** ACC-2 + GATE-ACC-RET-1 approved implementation contract.  
 **Risk:** High accounting correctness.  
 **Merge / Deploy:** PROHIBITED without explicit Safwan approval.

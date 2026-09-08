@@ -1,9 +1,9 @@
 # ACC-6 — Accounting Period Lock Architecture Contract
 
-**Status:** ARCHITECTURE READY — implementation still requires explicit approval  
+**Status:** IMPLEMENTED AND MERGED — PR [#689](https://github.com/safwan5001-source/Nebrax/pull/689), merge `643b7d9d1e5638aea92f38c59fbf7555c8bd8948`. Delivery record: `reports/ACC-6-implementation-report.md`.  
 **Risk:** Critical accounting control  
 **Audited baseline:** `6a49a956f19e91911662467d9cdf197ce0a295af`  
-**Implementation / Merge / Deploy:** NOT authorized by this document alone.
+**Implementation / Merge / Deploy:** this document never authorized them on its own; ACC-6 was implemented and merged under separate explicit approval (see Status).
 
 ## Objective
 Provide a server-enforced Accounting Date Lock that prevents new accounting effects from being posted or reversed into locked dates. It creates no closing journals and is not a fiscal close.
