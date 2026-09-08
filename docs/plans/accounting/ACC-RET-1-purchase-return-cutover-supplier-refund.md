@@ -1,6 +1,6 @@
 # ACC-RET-1 — Purchase Return Cutover + Supplier Refund Foundation
 
-**Status:** PREPARED — execute only after ACC-2 is available and explicit Safwan approval  
+**Status:** MERGED — PR [#684](https://github.com/safwan5001-source/Nebrax/pull/684), merge `a19c42a02570173d25b5abaf48cf4263c71e48ef`. Delivery record: `reports/ACC-RET-1-implementation-report.md`.  
 **Dependency:** ACC-2 semantic resolver + resolved `GATE-ACC-RET-1`.  
 **Blocks:** ACC-4.  
 **Risk:** High financial settlement.  

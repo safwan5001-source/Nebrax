@@ -1,6 +1,6 @@
 # FISCAL-1 — Fiscal Year Close Architecture Contract
 
-**Status:** ARCHITECTURE READY FOR IMPLEMENTATION TASK PREPARATION — coding still requires explicit approval  
+**Status:** IMPLEMENTED AND MERGED as FISCAL-2 — PR [#698](https://github.com/safwan5001-source/Nebrax/pull/698), merge `5abd555519befe196e08c5ce870f5526259aa23f`. Delivery record: `reports/FISCAL-2-implementation-report.md`.  
 **Risk:** Critical financial statements + Saudi compliance integrity  
 **Audited baseline:** `6a49a956f19e91911662467d9cdf197ce0a295af`
 
