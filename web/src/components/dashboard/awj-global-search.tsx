@@ -157,7 +157,10 @@ export function AwjGlobalSearch({ className }: { className?: string }) {
         e.preventDefault();
         inputRef.current?.focus();
       }
-      if (e.key === 'Escape') setOpen(false);
+      if (e.key === 'Escape') {
+        setOpen(false);
+        setTypeMenuOpen(false);
+      }
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
@@ -165,7 +168,10 @@ export function AwjGlobalSearch({ className }: { className?: string }) {
 
   useEffect(() => {
     const onPointer = (e: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
+        setOpen(false);
+        setTypeMenuOpen(false);
+      }
     };
     document.addEventListener('mousedown', onPointer);
     return () => document.removeEventListener('mousedown', onPointer);
@@ -254,8 +260,12 @@ export function AwjGlobalSearch({ className }: { className?: string }) {
             onChange={(e) => {
               setQuery(e.target.value);
               setOpen(true);
+              setTypeMenuOpen(false);
             }}
-            onFocus={() => setOpen(true)}
+            onFocus={() => {
+              setOpen(true);
+              setTypeMenuOpen(false);
+            }}
             onKeyDown={onKeyDown}
             placeholder={placeholder}
             aria-label={placeholder}
@@ -281,7 +291,10 @@ export function AwjGlobalSearch({ className }: { className?: string }) {
         <div className="relative shrink-0 border-s border-border">
           <button
             type="button"
-            onClick={() => setTypeMenuOpen((o) => !o)}
+            onClick={() => {
+              setTypeMenuOpen((o) => !o);
+              setOpen(false);
+            }}
             aria-haspopup="listbox"
             aria-expanded={typeMenuOpen}
             aria-label={t('type_selector_label')}
@@ -290,35 +303,48 @@ export function AwjGlobalSearch({ className }: { className?: string }) {
             <span className="max-w-24 truncate sm:max-w-none">{t(`type_${type}` as 'type_all')}</span>
             <ChevronDown className="h-3.5 w-3.5 shrink-0" strokeWidth={1.8} />
           </button>
-
-          {typeMenuOpen && (
-            <div
-              role="listbox"
-              className="absolute end-0 top-full z-50 mt-1 w-48 overflow-hidden rounded-[10px] border border-border bg-surface p-1 shadow-md"
-            >
-              {(['all', ...allowedCategories.map((c) => c.key)] as SearchCategory[]).map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  role="option"
-                  aria-selected={type === c}
-                  onClick={() => {
-                    setType(c);
-                    setTypeMenuOpen(false);
-                    inputRef.current?.focus();
-                  }}
-                  className={cn(
-                    'flex w-full items-center rounded-md px-2.5 py-2 text-start text-sm',
-                    type === c ? 'bg-primary-soft text-primary' : 'text-text hover:bg-background'
-                  )}
-                >
-                  {t(`type_${c}` as 'type_all')}
-                </button>
-              ))}
-            </div>
-          )}
         </div>
       </div>
+
+      {/*
+       * القائمة يجب أن تكون شقيقة لشريط البحث (`rootRef` وليس الغلاف الداخلي
+       * الضيّق) لا حفيدة له: الغلاف الداخلي يقع ضمن الشريط ذي `overflow-hidden`
+       * (مطلوب فقط ليقصّ زوايا الشريط الدائرية على تمرير الفأرة داخله)، وأي
+       * صندوق مموضع بـ`absolute` بداخله يُقصّ بصرياً بغضّ النظر عن `z-index` —
+       * يبقى في الـDOM وله إحداثيات، لكن المتصفح لا يرسمه فعلياً، فتذهب لمسة
+       * المستخدم لما تحته (تأكّدنا بـ`elementFromPoint` في الفحص المباشر). هذا
+       * تحديداً ما جعل القائمة لا تظهر إطلاقاً على الجوال (ودون أن يُلاحَظ على
+       * سطح المكتب أيضاً). `rootRef` نفسه `position: relative` بلا أي قصّ —
+       * نفس النمط المستعمل أصلاً في لوحة نتائج البحث أدناه.
+       */}
+      {typeMenuOpen && (
+        <div
+          role="listbox"
+          className="absolute end-0 top-full z-50 mt-1 max-h-72 w-48 overflow-y-auto rounded-[10px] border border-border bg-surface p-1 shadow-md"
+        >
+          {(['all', ...allowedCategories.map((c) => c.key)] as SearchCategory[]).map((c) => (
+            <button
+              key={c}
+              type="button"
+              role="option"
+              aria-selected={type === c}
+              onClick={() => {
+                setType(c);
+                setTypeMenuOpen(false);
+                inputRef.current?.focus();
+              }}
+              className={cn(
+                // py-3 بدل py-2 السابقة: هدف لمس ٤٤px تقريباً (لا يقلّ عن توصية iOS/Android) —
+                // نفس مقياس Tailwind القياسي، لا رمز لون خام ولا نمط منفصل عن نظام أَوْج.
+                'flex w-full items-center rounded-md px-2.5 py-3 text-start text-sm',
+                type === c ? 'bg-primary-soft text-primary' : 'text-text hover:bg-background'
+              )}
+            >
+              {t(`type_${c}` as 'type_all')}
+            </button>
+          ))}
+        </div>
+      )}
 
       {showPanel && (
         <div className="absolute end-0 start-0 top-full z-50 mt-1.5 max-h-96 overflow-y-auto rounded-[10px] border border-border bg-surface p-1.5 shadow-lg">
