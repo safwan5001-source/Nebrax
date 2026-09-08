@@ -53,6 +53,76 @@ function getSafeCanvasBreaks(el: HTMLElement, canvas: HTMLCanvasElement): number
 }
 
 /**
+ * نطاقات الحرف العربي (وأشكاله التقديمية) — العلّة في html2canvas تخصّ النص المتصل
+ * العربي وحده، فنقصر التطبيع عليه كي تبقى اللاتينية مطابقةً تماماً للمعاينة/الطباعة.
+ */
+const ARABIC_SCRIPT = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
+
+/** هل يحمل العنصر عقدة نصّ مباشرة غير فارغة تتضمّن حرفاً عربياً؟ (عنصر نصّ عربي طرفي) */
+export function hasDirectArabicText(el: Element): boolean {
+  for (let node = el.firstChild; node; node = node.nextSibling) {
+    if (node.nodeType === 3 /* TEXT_NODE */) {
+      const text = node.textContent ?? '';
+      if (text.trim() !== '' && ARABIC_SCRIPT.test(text)) return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * طبقة توافق تصدير PDF لـ AWJ — تُطبَّق على النسخة المؤقتة التي يبنيها html2canvas
+ * (عبر `onclone`) وحدها، فلا تمسّ المستند الحيّ: المعاينة والطباعة تبقيان طبق
+ * تصميمهما. تعالج عيبين مؤكَّدين في html2canvas مع النص العربي المتصل:
+ *
+ *  RC1 — أي `letter-spacing` غير `normal` يجعل html2canvas يرسم النص حرفاً حرفاً
+ *        (segmentGraphemes) من اليسار لليمين، فيكسر التشكيل السياقي للعربية ويعكس
+ *        ترتيبها. نُعيد التباعد إلى `normal` في النسخة فقط.
+ *  RC2 — `overflow:hidden` أو `-webkit-line-clamp` أو `max-height` المُقيِّد يقصّ
+ *        صعود ونزول الحروف العربية خطأً (html2canvas يحسب صندوق القص أضيق من
+ *        المتصفح). نُبطله على عناصر النصّ العربية الطرفية فقط، لا حاويات التخطيط.
+ *
+ * القاعدة عامّة على مستوى محرّك التصدير: **أي** مستند AWJ يمرّ عبر هذا المسار يرث
+ * الحماية تلقائياً — بلا اعتماد على معرّف قالب أو نوع مستند أو محدِّد خاص بأي وثيقة،
+ * فتشمل المستندات الحالية والمستقبلية دون ترقيع إضافي. والتمييز دلاليّ: يُقصر التطبيع
+ * على النصّ العربي (مصدر العلّة وحده) فتبقى اللاتينية مطابقةً للمعاينة، ويُشترط في RC2
+ * وجود عقدة نصّ عربية مباشرة فلا تُبطَل حاويات القص البنيوية (جداول، إجماليات،
+ * شعار/رمز QR، أغلفة التخطيط) لأنها لا تحمل نصاً عربياً مباشراً.
+ */
+export function normalizePdfCloneForArabic(root: HTMLElement): void {
+  const view = root.ownerDocument.defaultView;
+  if (!view) return;
+  // ملاحظة: لا نستعمل `instanceof HTMLElement` للحَرس — عناصر النسخة تعيش في إطار
+  // html2canvas، فيفشل الفحص عبر النوافذ (cross-realm) ويُعطّل التطبيع كله بصمت.
+  // كل عناصر `*` تملك `style` ويعمل عليها getComputedStyle، فالعمليات آمنة بلا حَرس.
+  const elements: HTMLElement[] = [root, ...Array.from(root.querySelectorAll<HTMLElement>('*'))];
+  for (const el of elements) {
+    const cs = view.getComputedStyle(el);
+
+    // RC1: تباعد الأحرف — على النصّ العربي فقط (اللاتينية تُصيَّر سليمة مع التباعد،
+    // فنُبقيها مطابقةً للمعاينة). `textContent` يشمل الأبناء لأن التباعد يورَّث.
+    const hasNonNormalSpacing = !!cs.letterSpacing && cs.letterSpacing !== 'normal' && parseFloat(cs.letterSpacing) !== 0;
+    if (hasNonNormalSpacing && ARABIC_SCRIPT.test(el.textContent ?? '')) {
+      el.style.letterSpacing = 'normal';
+    }
+
+    // RC2: القص — على عناصر النصّ العربية الطرفية وحدها، فلا تُمسّ حاويات التخطيط.
+    if (hasDirectArabicText(el)) {
+      const lineClamp = cs.getPropertyValue('-webkit-line-clamp');
+      const clipsOverflow = cs.overflow === 'hidden' || cs.overflowX === 'hidden' || cs.overflowY === 'hidden';
+      const clamps = lineClamp !== '' && lineClamp !== 'none';
+      const boundedHeight = cs.maxHeight !== 'none' && cs.maxHeight !== '' && cs.maxHeight !== '0px';
+      if (clipsOverflow || clamps || boundedHeight) {
+        el.style.overflow = 'visible';
+        el.style.maxHeight = 'none';
+        // فكّ display:-webkit-box المرافق لـ line-clamp حتى لا يبقى القص فعّالاً.
+        if (cs.display === '-webkit-box') el.style.display = 'block';
+        el.style.setProperty('-webkit-line-clamp', 'unset');
+      }
+    }
+  }
+}
+
+/**
  * بعض صفحات المستند تُبقي القالب الحقيقي في DOM لكنه مخفي إلى أن يطلب المستخدم
  * معاينته. نكشفه مؤقتاً كي يلتقطه المصدر نفسه في PDF، بدلاً من العودة إلى قالب
  * متجه موازٍ يختلف عن التصميم المنشور.
@@ -118,6 +188,8 @@ async function elementToPdfBlob(el: HTMLElement, paper: PdfPaper = A4): Promise<
       backgroundColor: '#ffffff',
       useCORS: true,
       windowWidth: el.scrollWidth,
+      // طبقة توافق العربية على نسخة الالتقاط وحدها — لا تمسّ المستند الحيّ.
+      onclone: (_clonedDoc, clonedEl) => normalizePdfCloneForArabic(clonedEl),
     });
   } finally {
     for (const [node, style] of restore) {
