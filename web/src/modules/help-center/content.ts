@@ -1,5 +1,17 @@
 export type HelpLocale = 'ar' | 'en';
 
+export type HelpArticleSlug =
+  | 'first-steps'
+  | 'switch-active-branch'
+  | 'create-sales-invoice'
+  | 'record-customer-payment'
+  | 'record-purchase-invoice'
+  | 'create-product'
+  | 'run-stocktake'
+  | 'manual-journal-entry'
+  | 'period-locks'
+  | 'pos-session-and-sale';
+
 export type HelpCategoryKey =
   | 'gettingStarted'
   | 'sales'
@@ -18,7 +30,7 @@ export interface HelpSection {
 }
 
 export interface HelpArticle {
-  slug: string;
+  slug: HelpArticleSlug;
   category: HelpCategoryKey;
   title: LocalizedText;
   summary: LocalizedText;

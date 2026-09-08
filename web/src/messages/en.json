@@ -6076,7 +6076,10 @@
     "relatedArticles": "Related articles",
     "backToHelp": "Back to Help Center",
     "articleNotFound": "Article not found",
-    "articleNotFoundHint": "The link may be incorrect or the article title may have changed."
+    "articleNotFoundHint": "The link may be incorrect or the article title may have changed.",
+    "contextualTitle": "Help for this screen",
+    "openFullArticle": "Open full article",
+    "closeContextualHelp": "Close contextual help"
   },
   "users": {
     "title": "Users",
