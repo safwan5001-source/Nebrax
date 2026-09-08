@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import type { RefObject } from 'react';
 import { useTranslations } from 'next-intl';
-import { LogOut, Search, Menu, Plus, Settings, ChevronDown, FilePlus, FilePlus2, UserPlus, Building2, Check, CircleHelp } from 'lucide-react';
+import { LogOut, Search, Menu, Plus, Settings, ChevronDown, FilePlus, FilePlus2, UserPlus, Building2, Check } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Dropdown, DropdownItem } from '../ui/dropdown';
 import { ThemeToggle } from './theme-toggle';
@@ -13,6 +13,7 @@ import { CompanyLogoMark } from '@/components/layout/company-logo-mark';
 import { useCompany } from '@/lib/company';
 import { currentUser, logout } from '@/lib/auth';
 import { useBranches } from '@/lib/branch';
+import { ContextualHelpTrigger } from '@/components/help-center/contextual-help-trigger';
 
 export function Topbar({
   onMenuClick,
@@ -74,16 +75,7 @@ export function Topbar({
           <DropdownItem icon={UserPlus} href="/partners/new">{t('new_customer')}</DropdownItem>
         </Dropdown>
 
-        <Button
-          variant="ghost"
-          size="icon"
-          className="hidden h-11 w-11 text-muted hover:bg-primary-soft hover:text-primary sm:inline-flex"
-          aria-label={t('help')}
-          title={t('help')}
-          onClick={() => router.push('/help')}
-        >
-          <CircleHelp className="h-4 w-4" strokeWidth={1.7} />
-        </Button>
+        <ContextualHelpTrigger placement="topbar" />
 
         <NotificationBell />
         <LangToggle />
@@ -133,7 +125,7 @@ export function Topbar({
             </>
           )}
 
-          <DropdownItem icon={CircleHelp} href="/help">{t('help')}</DropdownItem>
+          <ContextualHelpTrigger placement="menu" />
           <DropdownItem icon={Settings} href="/settings">{t('settings')}</DropdownItem>
           <DropdownItem icon={LogOut} tone="danger" onClick={handleLogout}>{t('logout')}</DropdownItem>
         </Dropdown>

@@ -6037,7 +6037,10 @@
     "relatedArticles": "مقالات ذات صلة",
     "backToHelp": "العودة إلى مركز المساعدة",
     "articleNotFound": "المقال غير موجود",
-    "articleNotFoundHint": "قد يكون الرابط غير صحيح أو تغيّر عنوان المقال."
+    "articleNotFoundHint": "قد يكون الرابط غير صحيح أو تغيّر عنوان المقال.",
+    "contextualTitle": "مساعدة هذه الشاشة",
+    "openFullArticle": "فتح المقال الكامل",
+    "closeContextualHelp": "إغلاق المساعدة السياقية"
   },
   "users": {
     "title": "المستخدمون",
