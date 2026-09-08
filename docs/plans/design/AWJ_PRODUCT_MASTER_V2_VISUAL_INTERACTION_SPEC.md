@@ -124,7 +124,44 @@ Item-only inventory actions, when applicable and authorized:
 
 Service never receives fake inventory actions for visual symmetry.
 
-## 7. Compact operational summary
+## 7. Product Profile V2 — subtype-aware saved-record behavior
+
+The saved profile must recompose itself by type; dynamic behavior does not stop after Create/Edit.
+
+### Item profile
+For an inventory-tracked Item, the profile may show:
+- Item badge/status and normal identity/media.
+- Quantity on hand.
+- Average inventory cost when authorized.
+- Sale price.
+- Reorder context where meaningful.
+- Inventory Movements section.
+- Receipt, Issue and Transfer actions when authorized.
+- Inventory-related configuration and supplier context where supported.
+
+If an Item is explicitly not inventory-tracked, inventory presentation must follow the actual tracking semantics rather than pretending it has normal stock history.
+
+### Service profile
+For Service, the profile is intentionally non-inventory:
+- Service badge/status and normal identity/media.
+- Sale price and relevant unit/tax/commercial context.
+- Purchase/cost information only when semantically supported and authorized.
+- No Quantity on Hand card.
+- No Average Inventory Cost card.
+- No Reorder Level presentation.
+- No Inventory Movements section/tab.
+- No Receive, Issue or Transfer stock commands.
+- No opening-stock action.
+
+These elements are **omitted**, not shown as zero, disabled, or “not applicable”. This keeps the profile truthful and reduces noise.
+
+The Service profile remains a full Master Workspace: identity, media, commercial/tax/unit information, timeline/activity and future service-specific relations when a real AWJ workflow requires them.
+
+### Profile invariant
+
+`type` controls both **record fields and operational affordances**. A saved Service must never look like an Item with empty inventory cards, and an Item must not lose valid inventory context merely to share a generic layout.
+
+## 8. Compact operational summary
 
 ### Item with inventory tracking
 Prioritize:
@@ -138,7 +175,7 @@ Prioritize non-inventory commercial facts such as sale price and relevant unit/t
 
 Financial/cost values must use authoritative backend values and preserve AWJ money precision/permission rules.
 
-## 8. Information architecture
+## 9. Information architecture
 
 ### Identity & catalog
 - Names.
@@ -181,7 +218,7 @@ Units remain available to Service where meaningful; examples can include hour/se
 ### Media
 The current profile supports multiple images. V2 keeps media as a genuine record capability rather than decorative avatar behavior.
 
-## 9. Consequential inventory rule
+## 10. Consequential inventory rule
 
 Stock quantity is not a normal mutable Item property.
 
@@ -189,7 +226,7 @@ Opening quantity is an initialization/action concept; subsequent quantity change
 
 V2 must never provide a generic Edit Item field that silently overwrites quantity-on-hand. Service has no opening-stock concept.
 
-## 10. Quick Create/Edit versus Full Workspace
+## 11. Quick Create/Edit versus Full Workspace
 
 Quick Create/Edit remains necessary inside invoice, purchase, quotation and other transactional contexts.
 
@@ -197,7 +234,7 @@ The type choice appears early and dynamically controls applicable fields. Quick 
 
 It must not expose full inventory history or consequential stock operations.
 
-## 11. Section model
+## 12. Section model
 
 Shared:
 - Overview / information.
@@ -211,7 +248,7 @@ Item-only when inventory applies:
 
 Do not create empty Service tabs to force symmetry with Item.
 
-## 12. Responsive behavior
+## 13. Responsive behavior
 
 Desktop/laptop: dense summary + sections + information grid; media and structured data may use a balanced two-column region.
 
@@ -225,7 +262,7 @@ Mobile:
 
 No global mobile bottom navigation is introduced by this pattern.
 
-## 13. Arabic RTL / English LTR
+## 14. Arabic RTL / English LTR
 
 Verify deliberately:
 - Item / Service terminology;
@@ -237,13 +274,13 @@ Verify deliberately:
 - dynamic field appearance/disappearance;
 - desktop/laptop/tablet/mobile.
 
-## 14. Cost and security visibility
+## 15. Cost and security visibility
 
 Average cost, purchase price and other sensitive cost/profit information must respect the existing centralized permission model (including `products.view_cost` where applicable).
 
 V2 defines graceful absence/redaction states instead of leaking cost through summaries, derived values, exports or secondary sections.
 
-## 15. Master Record pattern validation
+## 16. Master Record pattern validation
 
 Product proves that Master Record V2 is not limited to business parties and that a master-record subtype can change behavior without becoming a separate generic form clone.
 
@@ -251,7 +288,7 @@ Shared grammar with Customer/Supplier remains identity header, contextual action
 
 Product-specific semantics remain Item/Service type, multi-image media, SKU/barcodes/units, Item inventory state/actions, and cost visibility permissions.
 
-## 16. Known implementation work intentionally deferred
+## 17. Known implementation work intentionally deferred
 
 - Final Item/Service create/edit UI.
 - Type-change lifecycle guards.
