@@ -2,7 +2,7 @@
 
 **Status:** Living reference — research + code inspection in progress  
 **Date started:** 2026-09-08  
-**Last research update:** 2026-09-08 — cash/bank ACL money-path inspection  
+**Last research update:** 2026-09-08 — POS/Fuel PaymentService actor propagation audit  
 **Scope:** Users, Employees, Roles, Permissions, Branch Scope, Resource Access, Record Scope, Workflow/Record State, Reports, permission-aware UX.  
 **Reference product:** Daftra official documentation.  
 
@@ -98,68 +98,115 @@ RoleDialog has two confirmed security-relevant administration defects:
 The UI must treat the exact canonical key as opaque and use backend-provided metadata for group/action/label/risk/dependencies. Sensitive permissions should receive visible risk treatment. Any legacy decomposition must preserve effective access unless explicitly approved.
 
 ## 16. Cash / bank ACL — CODE-BACKED MONEY-PATH AUDIT
-AWJ has a meaningful treasury resource ACL, not just module-level RBAC. `CashBankAccountService::assertAllowed()` evaluates the selected CashBankAccount's `deposit` or `withdraw` scope against the authenticated actor and active branch context. The inspected core money paths show good enforcement at the moment of financial effect.
+AWJ has a meaningful treasury resource ACL, not just module-level RBAC. `CashBankAccountService::assertAllowed()` evaluates the selected CashBankAccount's `deposit` or `withdraw` scope against the actor and active branch context.
 
-### 16.1 PaymentService — GOOD
-`PaymentService::post()` resolves the actual CashBankAccount and calls:
+### 16.1 PaymentService — REFERENCE PATTERN, WITH ACTOR REQUIREMENT
+`PaymentService::post(Payment $payment, ?User $actor = null)` resolves the actual CashBankAccount and calls:
 ```text
 received -> assertAllowed(deposit)
 paid     -> assertAllowed(withdraw)
 ```
-The check occurs at posting time after allocation validation and before `LedgerService::post()`. This is the correct security boundary: a draft can exist, but financial effect cannot occur without current resource authority.
+The check occurs at posting time before `LedgerService::post()`. This is the correct resource-security boundary **only when a real actor is propagated for user-initiated operations**.
 
-This covers the canonical customer-receipt and supplier-payment voucher path, including POS/Fuel flows that deliberately create/post `Payment` records through `PaymentService`.
+`CashBankAccount::allows()` behavior is important:
+```text
+scope=all    -> true even with actor=null
+scope=branch -> branch match can succeed with actor=null
+scope=role   -> requires non-null actor with matching role
+scope=user   -> requires non-null actor with matching user id
+```
+Therefore omitting the actor is not a universal bypass. It produces inconsistent semantics: `all`/matching `branch` may pass, while `role`/`user` scopes fail even for a user who should be authorized. User-initiated callers must propagate the authenticated actor rather than rely on nullable service defaults.
 
-### 16.2 CashBankTransferService — GOOD
+### 16.2 PaymentController — GOOD
+The direct API posting path calls:
+```text
+$this->payments->post($payment, $request->user())
+```
+so the authenticated actor reaches treasury ACL evaluation.
+
+### 16.3 CashBankTransferService — GOOD
 Internal transfer checks both sides before posting:
 ```text
 source      -> withdraw
 destination -> deposit
 ```
-Thus authority on one treasury resource does not imply authority on the other. This is the correct two-resource intersection.
+Thus authority on one treasury resource does not imply authority on the other.
 
-### 16.3 EmployeeCustodyService — GOOD
-Issuing employee custody resolves the selected cash/bank entity and checks `withdraw` before posting the custody debit / cash-bank credit entry.
+### 16.4 EmployeeCustodyService — GOOD
+Issuing employee custody resolves the selected cash/bank entity and checks `withdraw` before posting.
 
-### 16.4 SupplierRefundService — GOOD
-Supplier refund is intentionally modeled as money entering AWJ treasury after a posted purchase return. It resolves the cash/bank entity and checks `deposit` before posting. This is directionally correct for the implemented refund semantic.
+### 16.5 SupplierRefundService — GOOD
+Supplier refund resolves the cash/bank entity and checks `deposit` before posting.
 
-### 16.5 Purchase payment architecture — GOOD BY DELEGATION
-`PurchaseService` documents that settlement is a separate `PaymentService` financial document rather than embedding cash/bank movement in the purchase invoice journal. Therefore the canonical purchase-payment path inherits `PaymentService` withdraw ACL rather than bypassing it.
+## 17. CONFIRMED actor-propagation defects in composed payment flows
+Static call-site inspection found user-initiated flows that create a Payment and immediately call `PaymentService::post()` **without passing the actor**, even though the caller already has or can carry the authenticated actor.
 
-## 17. Treasury ACL boundary exceptions / special cases
-Not every journal line touching a cash account is a `CashBankAccount` user-selected movement. These cases need explicit classification rather than blindly inserting ACL checks everywhere.
+### 17.1 POS checkout — CONFIRMED DEFECT
+`PosController::checkout()` correctly sets both:
+```text
+data.created_by = request user id
+data.actor      = request user object
+```
+and `PosService` uses the actor for session/audit controls.
 
-### 17.1 POS drawer `cash_in` / `cash_out` — NOT AN ACCOUNTING MONEY MOVEMENT
-`PosSessionService::recordCashMovement()` explicitly records physical drawer movement for session reconciliation and does **not** post a journal entry or alter the cash account. It enforces session actor branch/warehouse scope and applies POS operation-policy approval for `cash_out`. Therefore absence of `CashBankAccountService::assertAllowed()` here is not currently a treasury ACL bypass; it is a POS operational-control surface.
+However, the POS tender posting call is of the form:
+```text
+$this->payments->post($this->payments->create([...]))
+```
+with no second actor argument.
 
-If AWJ later changes drawer cash-out to represent an actual expense/treasury transfer, that conclusion must be revisited.
+Consequence:
+- `deposit_scope=all`: payment can post;
+- matching `deposit_scope=branch`: payment can post based on BranchContext;
+- `deposit_scope=role`: fails because actor is null, even when the cashier has the permitted role;
+- `deposit_scope=user`: fails because actor is null, even when the cashier is the explicitly permitted user.
 
-### 17.2 POS variance settlement — SPECIAL SERVER-DERIVED JOURNAL
-`PosSessionService::settleVariance()` posts shortage/overage directly against the server-resolved session cash account and variance account after `pos.variance.approve`, closed-session state, acknowledgement, optional SoD self-approval policy, and one-time settlement guard.
+This means the current POS path does **not faithfully enforce configured treasury ACL semantics**. It can deny legitimate authorized POS checkout under role/user-scoped treasury configuration. Status: **Confirmed high-priority authorization integration defect.**
 
-It resolves the session cash account through `CashBankAccountService::resolveForPayment()` but does **not** call `assertAllowed()` before posting the debit/credit.
+This is primarily a fail-closed availability/functional authorization bug for role/user scopes, not evidence that a forbidden user can bypass those scopes. The security issue is inconsistent policy enforcement and future fragility from nullable actor propagation.
 
-This is not an arbitrary user-selected cash account: the server derives the account from the session/payment-method configuration and the action has a dedicated high-impact POS permission. Therefore it is **not yet classified as a confirmed bypass**.
+### 17.2 Fuel sale collection — CONFIRMED DEFECT
+`FuelSaleService` receives a real `User $actor`, stores `created_by => $actor->id`, and uses actor context throughout the domain flow. But the payment collection call likewise uses:
+```text
+$this->payments->post($this->payments->create([...]))
+```
+without passing `$actor` to `post()`.
 
-However, it creates a policy question that must be explicit in Access Control V2:
+The same ACL consequence applies: role/user-scoped cash/bank deposit permissions cannot recognize the authorized fuel operator because the actor is lost at the PaymentService boundary. Status: **Confirmed high-priority authorization integration defect.**
+
+### 17.3 InvoiceService automatic settlement — CONFIRMED CALL-SITE RISK
+`InvoiceService` contains an internal settlement path that creates a Payment and calls:
+```text
+$this->payments->post($payment)
+```
+without actor propagation. The exact externally reachable workflows and intended authority semantics must be covered by executable tests before deciding the repair signature/BC strategy. Status: **Confirmed actor omission; impact to verify by workflow.**
+
+### 17.4 PurchaseService automatic settlement — CONFIRMED CALL-SITE RISK
+`PurchaseService` likewise creates a payment and calls `post($payment)` without actor propagation. Status: **Confirmed actor omission; impact to verify by workflow.**
+
+## 18. Treasury ACL boundary exceptions / special cases
+Not every journal line touching a cash account is a user-selected CashBankAccount movement.
+
+### 18.1 POS drawer cash_in / cash_out — NOT AN ACCOUNTING MONEY MOVEMENT
+`PosSessionService::recordCashMovement()` records physical drawer movement for reconciliation and does not post a journal entry or alter the cash account. It enforces session actor branch/warehouse scope and POS operation policy. Absence of CashBank `assertAllowed()` here is not currently a treasury ACL bypass.
+
+### 18.2 POS variance settlement — POLICY AMBIGUITY
+`PosSessionService::settleVariance()` posts shortage/overage against a server-resolved session cash account after `pos.variance.approve`, state/acknowledgement/one-time guards and optional SoD. It resolves through `resolveForPayment()` but does not call `assertAllowed()`.
+
+Policy question:
 ```text
 Does pos.variance.approve authorize accounting adjustment of the session treasury
-regardless of that user's deposit/withdraw ACL on the CashBankAccount?
+regardless of the user's deposit/withdraw ACL?
 ```
-If treasury ACL is intended as an absolute resource boundary, variance settlement is a gap. If POS variance authority is intentionally a privileged domain override over a server-bound session account, that exception must be documented, auditable and visibly high-risk. Status: **Policy ambiguity / verify before changing code.**
+If treasury ACL is absolute, this is a gap. If variance authority is a privileged domain override over a server-bound account, that exception must be explicit, auditable and high-risk. Status: **Policy ambiguity; do not change automatically.**
 
-### 17.3 Cash sales inside InvoiceService — LEGACY ACCOUNTING PATH OUTSIDE CASHBANK ACL
-Static inspection confirms `InvoiceService` still contains a legacy/direct cash-sale posting path using a server-defined cash account (`1110`) and comments explicitly state that this debit does not pass through `CashBankAccountService`, unlike separate payment settlement.
+### 18.3 Direct cash sale in InvoiceService — STRONG CANDIDATE CONSISTENCY GAP
+`InvoiceService` has a legacy/direct cash-sale journal path using server-defined cash account `1110` and explicitly does not pass through CashBankAccountService. A cash invoice can therefore create cash-account effect without evaluating CashBank deposit ACL.
 
-This is materially different from `PaymentService`: a cash invoice can create a cash-account journal effect without evaluating the actor's CashBankAccount deposit ACL.
+Status: **Strong candidate treasury ACL consistency gap; restricted-user executable test required before implementation.**
 
-Because the account is server-defined rather than caller-selected, tenant/account isolation is not the issue. The access-control question is whether `invoices.manage` should permit posting cash receipts into a treasury resource the actor is otherwise forbidden to deposit into.
-
-Status: **Strong candidate treasury ACL consistency gap; verify exact current post route, actor propagation and cash-sale semantics with restricted-user executable test before implementation.**
-
-## 18. Treasury security invariant — TARGET
-For user-initiated financial effects that select or economically affect a treasury resource:
+## 19. Treasury security invariant — TARGET
+For user-initiated financial effects:
 ```text
 Domain action permission
 ∩ Branch/Data scope
@@ -174,86 +221,107 @@ money out of treasury -> withdraw
 internal transfer     -> source withdraw ∩ destination deposit
 ```
 
-Server-derived system adjustments may require an explicit documented exception rather than silently bypassing resource ACL. The exception must identify the domain permission, immutable audit source and why user resource selection cannot occur.
+For user-initiated composed services, the actor must remain explicit across service boundaries. `created_by` is audit attribution and must not be silently substituted for the authenticated authorization principal unless a deliberately designed trusted execution contract says so.
 
-## 19. Cash/bank audit matrix — current
-| Money path | Cash/bank effect | Resource ACL status | Classification |
+Server/system jobs, migrations and deterministic system adjustments may legitimately have no interactive actor, but those need an explicit system-authority contract rather than accidentally inheriting nullable actor behavior.
+
+## 20. Cash/bank audit matrix — current
+| Money path | Cash/bank effect | Actor/resource ACL status | Classification |
 |---|---|---|---|
-| Customer receipt / receipt voucher | deposit | `PaymentService::post()` checks deposit | Good |
-| Supplier payment / payment voucher | withdraw | `PaymentService::post()` checks withdraw | Good |
-| Internal cash/bank transfer | source withdraw + destination deposit | both checked | Good |
-| Employee custody issue | withdraw | checked | Good |
-| Supplier refund received | deposit | checked | Good |
-| Purchase settlement | withdraw | delegated to PaymentService | Good |
-| POS/Fuel payment created via PaymentService | direction-dependent | inherits PaymentService check | Good where canonical service used |
-| POS drawer cash_in/out | no ledger/cash-account mutation | N/A; POS operational policy | Not treasury movement |
-| POS variance settlement | server-derived debit/credit to session cash | no `assertAllowed()` | Policy ambiguity |
+| Direct receipt/payment API | deposit/withdraw | request user passed to PaymentService | Good |
+| Internal cash/bank transfer | source withdraw + destination deposit | actor checked on both | Good |
+| Employee custody issue | withdraw | actor checked | Good |
+| Supplier refund received | deposit | actor checked | Good |
+| POS checkout tenders | deposit | actor exists upstream but omitted at PaymentService post | **Confirmed defect** |
+| Fuel sale collection | deposit | actor exists upstream but omitted at PaymentService post | **Confirmed defect** |
+| Invoice automatic settlement | deposit | PaymentService post called without actor | Confirmed omission / impact verify |
+| Purchase automatic settlement | withdraw | PaymentService post called without actor | Confirmed omission / impact verify |
+| POS drawer cash_in/out | no ledger/cash-account mutation | POS operational policy | Not treasury movement |
+| POS variance settlement | server-derived session cash journal | no assertAllowed | Policy ambiguity |
 | Direct cash sale in InvoiceService | debit cash account | no CashBank ACL | Strong candidate consistency gap |
 
-## 20. Dependency / sensitive permission principles
-Permission dependencies remain domain-defined rather than inferred globally. Sensitive/critical candidates include role/user administration, app/developer management, accounting settings, period locks, fiscal close/reopen, supplier refunds, POS override/variance/audit control plane, minimum-price override, product cost visibility, Fuel operational controls and Document Center control-plane actions.
+## 21. Restricted-user executable test matrix — REQUIRED NEXT
+Before code repair, tests should prove current behavior and prevent accidental accounting/security regressions.
 
-## 21. Accounting invariants
+Minimum treasury cases:
+1. POS + `deposit_scope=user` matching cashier -> should succeed; expected current failure due null actor.
+2. POS + `deposit_scope=user` different cashier -> must fail.
+3. POS + `deposit_scope=role` matching role -> should succeed; expected current failure.
+4. POS + `deposit_scope=branch` matching active branch -> succeeds; ensure this remains intentional.
+5. Fuel collection with matching user/role scope -> should succeed; expected current failure.
+6. Fuel collection with non-matching user/role -> must fail.
+7. Invoice automatic paid/settlement flow with restricted deposit scope -> characterize current behavior and desired actor.
+8. Purchase automatic settlement with restricted withdraw scope -> characterize current behavior and desired actor.
+9. Direct cash invoice posting by user forbidden from default cash deposit -> determine whether policy requires rejection.
+10. POS variance settlement by actor lacking session cash resource authority -> determine policy, not merely current behavior.
+
+All financial tests must assert **no partial side effects on rejection**: no posted Payment, no duplicate journal, no paid_amount drift, no inconsistent invoice/purchase state, and transaction rollback remains atomic.
+
+## 22. Dependency / sensitive permission principles
+Permission dependencies remain domain-defined rather than inferred globally. Sensitive candidates include role/user administration, apps/developer, accounting settings, period locks, fiscal close/reopen, treasury movement, supplier refunds, POS override/variance/audit, minimum-price override, product cost visibility, Fuel controls and Document Center control-plane actions.
+
+## 23. Accounting invariants
 Authorization and accounting validity are separate. Permissions never override tenant isolation, ledger integrity, source-generated/immutable rules, period/fiscal locks or ZATCA lifecycle restrictions.
 
-## 22. Feature/application state
+## 24. Feature/application state
 ```text
 Tenant entitlement / enabled feature AND tenant policy AND user permission AND applicable scope
 ```
 Permission never activates an unavailable feature.
 
-## 23. Impersonation
+## 25. Impersonation
 If added later: restricted permission, preserve original actor, audit trail, obvious impersonation state, no tenant crossing and sensitive-operation review.
 
-## 24. Code-backed gap matrix — current
+## 26. Code-backed gap matrix — current
 | Capability | AWJ evidence | Status | Direction |
 |---|---|---|---|
 | Tenant isolation | tenant-scoped models | Present | Preserve |
 | Custom/system roles | RBAC + RoleController | Present | Preserve |
-| Login enable/disable | `users.is_active` | Present | Preserve |
+| Login enable/disable | users.is_active | Present | Preserve |
 | User branch/warehouse scope | assignments + predicates | Present | Audit consumers |
 | Cash/bank ACL foundation | deposit/withdraw subjects | Present | Preserve |
-| Payment receipt/payment ACL | posting-time deposit/withdraw | Present/good | Preserve |
-| Cash/bank transfer ACL | both resource directions | Present/good | Preserve |
-| Employee custody ACL | withdraw | Present/good | Preserve |
-| Supplier refund ACL | deposit | Present/good | Preserve |
-| POS variance vs treasury ACL | server-derived cash journal, no assertAllowed | Ambiguous | Decide privileged exception vs gap |
-| Direct invoice cash-sale treasury ACL | cash debit outside CashBank ACL | Strong candidate gap | Restricted-user test |
-| Canonical permission catalogue | `Rbac::PERMISSIONS` | Present/rich | Preserve exact keys |
+| Direct Payment API actor propagation | request user passed | Present/good | Preserve |
+| POS Payment actor propagation | actor omitted at post | **Confirmed defect** | Targeted fix + tests |
+| Fuel Payment actor propagation | actor omitted at post | **Confirmed defect** | Targeted fix + tests |
+| Invoice auto-settlement actor | actor omitted | Confirmed omission | Verify workflow then fix contract |
+| Purchase auto-settlement actor | actor omitted | Confirmed omission | Verify workflow then fix contract |
+| POS variance vs treasury ACL | server-derived cash journal | Ambiguous | Policy decision |
+| Direct invoice cash-sale treasury ACL | outside CashBank ACL | Strong candidate gap | Restricted-user test |
+| Canonical permission catalogue | Rbac::PERMISSIONS | Present/rich | Preserve exact keys |
 | Role arbitrary-action labels | non-manage shown as View | Confirmed defect | Metadata-driven labels |
 | Role multi-segment keys | positional split truncates keys | Confirmed high-priority defect | Never reconstruct keys |
 | Permission dependencies | no generic engine confirmed | Missing/verify | Domain metadata + BC design |
-| Sensitive risk labels/warnings | not present in RoleDialog | Missing | Add governance UX |
-| Role cloning | not found | Missing | Candidate parity feature |
-| Invoice own/assigned scope | fields exist, predicate absent | Missing | Define semantics |
-| Partner owner/assignee scope | no field/model | Missing capability | Product/data-model decision |
+| Sensitive risk labels/warnings | absent | Missing | Governance UX |
+| Role cloning | not found | Missing | Candidate parity |
+| Invoice own/assigned scope | predicate absent | Missing | Define semantics |
+| Partner owner/assignee scope | no model | Missing capability | Product/data decision |
 | Generic report effective scope | multiple likely bypasses | Likely/strong likely P1 | Restricted-user tests |
-| HR approval workflow membership | broad `hr.manage` | Missing | Define policy |
-| POS audit branch/drill-down/export | scoped pattern | Present/good | Reuse |
+| HR approval workflow membership | broad hr.manage | Missing | Define policy |
+| POS audit branch/drill-down/export | scoped | Present/good | Reuse |
 | Generic Activity Log | not confirmed | Missing/unknown | Decide parity scope |
-| Soft-delete foundation | widespread `SoftDeletes` | Present | Not a recycle bin |
+| Soft-delete foundation | widespread SoftDeletes | Present | Not recycle bin |
 | Tenant Recycle Bin | no general workflow found | Missing | Product/security design |
 
-## 25. Architectural conclusions
-1. AWJ already has a useful treasury resource ACL and most canonical money-document paths enforce it at posting time.
-2. Do not rebuild treasury ACL; close consistency gaps and define privileged server-derived exceptions.
-3. PaymentService's posting-time check is the reference pattern because draft creation does not confer financial authority.
-4. Direct cash sales are the clearest remaining treasury consistency candidate and require an executable restricted-user proof.
-5. POS variance settlement needs a deliberate policy decision, not an automatic code change.
-6. POS physical drawer movement is not currently an accounting treasury movement and should not be misclassified.
-7. Backend permission vocabulary remains more mature than RoleDialog; its structural key parsing defect is still high priority.
-8. Report scope remains the clearest systemic data-authorization risk overall.
+## 27. Architectural conclusions
+1. AWJ treasury ACL foundation is worth preserving; the current issue is integration consistency, not architecture absence.
+2. Nullable actor propagation is now a concrete defect pattern in composed financial services.
+3. POS and Fuel have confirmed user-initiated actor loss at PaymentService posting.
+4. `scope=all/branch` succeeding with null while `scope=user/role` fails makes this defect configuration-dependent and easy to miss in normal tests.
+5. Never use `created_by` as an implicit authorization principal merely to patch the symptom; actor/system authority should be explicit.
+6. Direct cash invoice posting remains a separate treasury-consistency candidate because it bypasses CashBankAccountService entirely.
+7. POS variance remains a deliberate policy decision.
+8. Report scope remains the broadest systemic data-authorization risk and needs executable restricted-user verification too.
 
-## 26. Current-data status
+## 28. Current-data status
 Safwan confirmed on 2026-09-08 that **all current AWJ data and transactions are experimental/test-only and not important production records**. This does not relax tenant isolation, authorization, accounting invariants, schema safety or future production readiness.
 
-## 27. Documentation reconciliation
-This living reference now includes the cash/bank money-path audit: PaymentService, transfers, employee custody, supplier refunds, purchase-payment delegation, POS drawer movement classification, POS variance policy ambiguity and direct cash-sale candidate gap. No substantive finding from this inspection is intentionally left only in chat.
+## 29. Documentation reconciliation
+This living reference now includes the actor-propagation audit and the exact semantics of null actor under `all`, `branch`, `role` and `user` treasury scopes. POS and Fuel are documented as confirmed defects; Invoice/Purchase automatic settlement omissions are recorded for workflow-impact verification. No substantive finding from this pass is intentionally left only in chat.
 
-## 28. Next inspection pass
-1. Audit specialized Fuel/POS scope and verify that all domain flows using PaymentService propagate the real actor rather than `null`/system authority at posting time.
-2. Prepare targeted restricted-user executable-test matrix for report-scope candidates and direct cash-sale treasury ACL candidate.
-3. Run those tests with a code-capable tool only after choosing the lowest-cost appropriate execution path; inspection/documentation alone does not require Codex.
-4. After evidence closure, draft the AWJ Access Control V2 Master Plan with small independent PRs.
+## 30. Next inspection / execution pass
+1. Run targeted restricted-user executable tests for POS/Fuel actor propagation and characterize Invoice/Purchase auto-settlement.
+2. In the same focused security test pass, verify the direct cash-invoice treasury candidate and selected report-scope P1 candidates.
+3. Do not change POS variance semantics until the privileged-exception policy is decided.
+4. After executable evidence closure, draft small independent Access Control V2 PRs rather than one broad security refactor.
 
 **Process rule:** research/inspect → verify → update this file → confirm commit → summarize to Safwan.
