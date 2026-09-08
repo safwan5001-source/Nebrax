@@ -12,7 +12,7 @@ Earlier Document Workspace and Sales Invoice design documents correctly rejected
 
 > **No decorative or universal wizard/stepper. An Actual Workflow Stepper may be used when it truthfully represents the document's verified workflow without inventing persisted lifecycle states or fragmenting the Single Document Workspace.**
 
-Therefore phrases such as `no permanent wizard/stepper`, `the visible 1 → 2 → 3 → 4 stepper is not approved`, or `no rigid 4-step wizard` remain valid **only as rejection of a universal/decorative/sequential wizard model**. They must not be interpreted as a ban on an Actual Workflow Stepper.
+Therefore phrases such as `no permanent wizard/stepper`, `no wizard/stepper`, `the visible 1 → 2 → 3 → 4 stepper is not approved`, or `no rigid 4-step wizard` remain valid **only as rejection of a universal/decorative/sequential wizard model**. They must not be interpreted as a ban on an Actual Workflow Stepper.
 
 ## 3. Actual Workflow Stepper semantics
 
@@ -99,7 +99,11 @@ This decision applies to the interpretation of:
 - `AWJ_SALES_INVOICE_V2_VISUAL_SPEC.md`
 - `AWJ_DOCUMENT_VIEW_WORKSPACE_V2_SPEC.md`
 
-If older wording conflicts with this reconciliation, **this reconciliation governs the Stepper/lifecycle interpretation until the older wording is mechanically edited in a later docs cleanup**.
+The legacy phrases currently found in the Sales Invoice IA (`no permanent wizard/stepper`) and Sales Invoice Visual Spec (`no wizard/stepper`) are explicitly reconciled by the authoritative rule above: they reject a decorative/universal/sequential wizard, not an Actual Workflow Stepper grounded in the verified workflow.
+
+The generic Pattern wording rejecting a `universal four-step stepper`, and the Invoice Interaction wording rejecting a permanent `1 → 2 → 3 → 4` wizard as the default, are already consistent with this rule.
+
+If any older wording is read more broadly, **this reconciliation governs the Stepper/lifecycle interpretation**. Future edits to those documents should use the authoritative wording above and must not reintroduce a blanket ban on truthful workflow orientation.
 
 ## 10. Safety boundary
 
