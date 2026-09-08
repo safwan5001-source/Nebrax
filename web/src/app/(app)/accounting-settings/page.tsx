@@ -24,7 +24,8 @@ const ITEMS: AccountingSettingItem[] = [
   { key: 'c_accountRouting', href: '/accounting-settings/account-routing', icon: Route },
   { key: 'c_costCenters', href: '/cost-centers', icon: Network },
   { key: 'c_fiscalPeriods', href: null, icon: CalendarClock },
-  { key: 'c_periodLocks', href: null, icon: Lock },
+  // ACC-6: أقفال الفترات — الرابط حقيقي الآن.
+  { key: 'c_periodLocks', href: '/accounting-settings/period-locks', icon: Lock },
 ];
 
 /**

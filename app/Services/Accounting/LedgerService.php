@@ -19,11 +19,19 @@ use RuntimeException;
  *  - كل المبالغ بالـ minor units (هللات) كأعداد صحيحة.
  *  - القيود المرحّلة immutable — التصحيح بقيد عكسي فقط.
  *  - يُحدّث لقطات الأرصدة ذرّياً داخل transaction.
+ *
+ *  ACC-6 — **أقفال الفترات تُنفَّذ هنا وهنا وحدها.** كل أثر محاسبي في نبراس
+ *  يمرّ بـ`post()`/`reverse()`، فالحارس (`AccountingDateGuard`) يُستدعى أوّل
+ *  شيءٍ داخل معاملة كلٍّ منهما — قبل إنشاء القيد. لا مفتاح تجاوز، ولا وسيط
+ *  `force`، ولا استثناء لخدمة: للترحيل داخل فترة مقفلة يُحرَّر القفل صراحةً
+ *  بصلاحية وسببٍ مسجَّلين. الحارس لا يمسّ حساباً ولا مبلغاً ولا اتجاهاً؛
+ *  يسمح أو يمنع بالتاريخ المحاسبي وحده.
  */
 class LedgerService
 {
     public function __construct(
-        protected TenantContext $tenant
+        protected TenantContext $tenant,
+        protected AccountingDateGuard $dateGuard,
     ) {}
 
     /**
@@ -45,6 +53,11 @@ class LedgerService
             : app(BranchContext::class)->id();
 
         return DB::transaction(function () use ($lines, $meta, $branchId) {
+            // ACC-6: التاريخ **النهائي** هو المحكوم — الصريح إن مُرّر، وإلا اليوم.
+            // داخل المعاملة وقبل أي كتابة: يقفل مِرساة المستأجر ثم يقرأ الأقفال،
+            // فلا يتسرّب قيدٌ بين فحصٍ ناجح وقفلٍ يُثبَّت في اللحظة نفسها.
+            $this->dateGuard->assertOpen($meta['entry_date'] ?? null, 'ترحيل قيد');
+
             $entry = JournalEntry::create([
                 'number'      => $this->nextNumber($meta['entry_date'] ?? now()->toDateString()),
                 'entry_date'  => $meta['entry_date'] ?? now()->toDateString(),
@@ -100,6 +113,11 @@ class LedgerService
             if (! $entry->isPosted()) {
                 throw new RuntimeException('لا يمكن عكس قيد غير مرحّل.');
             }
+
+            // ACC-6: المحكوم هو تاريخ **العكس المقترح** لا تاريخ الأصل. قيدٌ أصليّ
+            // داخل فترة مقفلة يبقى ثابتاً ويُصحَّح بعكسٍ مؤرَّخ في فترة مفتوحة؛
+            // ومنعُ عكسه لمجرّد قِدَمه كان سيحبس الخطأ في الدفاتر بلا تصحيح.
+            $this->dateGuard->assertOpen($date, 'عكس قيد');
 
             $reversal = JournalEntry::create([
                 'number'      => $this->nextNumber($date ?? now()->toDateString()),
