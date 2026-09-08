@@ -214,6 +214,9 @@ const GROUPS: NavGroup[] = [
       // سلطة رقابية لا سلطة توجيه حسابات، فمدخلها في الشريط لا يتبع بوابة
       // مركز الإعدادات. نفس نمط `supplierRefunds` أعلاه.
       { href: '/accounting-settings/period-locks', icon: Lock, key: 'periodLocks', built: true, permission: 'accounting_period_locks.view' },
+      // FISCAL-2: نفس الدرس — السنوات المالية نطاق صلاحيات مستقل، فمدخلها
+      // لا يتبع بوابة مركز إعدادات المحاسبة.
+      { href: '/accounting-settings/fiscal-years', icon: CalendarClock, key: 'fiscalYears', built: true, permission: 'fiscal_years.view' },
     ],
   },
   {

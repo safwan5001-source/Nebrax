@@ -13,9 +13,10 @@ namespace App\Support;
  * حلٍّ بديل وقت الترحيل. لا Legacy Fallback في المحلِّل
  * (`AccountRoleResolver`)؛ الحل الوحيد المعتمد هو التعيين الصريح.
  *
- * لا يضمّ هذا الكتالوج `retained_earnings`/`opening_balances`: الأول محجوز
- * لتنفيذ الإقفال السنوي (FISCAL-2) والثاني غير مُقرَّر جعله قابلاً للضبط
- * بعد — كلاهما خارج نطاق ACC-2 صراحةً بنص الخطة الأم.
+ * `retained_earnings` أُضيف في FISCAL-2 (الإقفال السنوي) وحده. أمّا
+ * `opening_balances` (3130) فيبقى **خارج** الكتالوج: لم يُقرَّر جعله قابلاً
+ * للضبط، وهو حساب الأرصدة الافتتاحية/التحويل لا حساب إقفال — لا يُستعمل
+ * للإقفال السنوي بأي حال (FISCAL-1، «Prohibited shortcuts»).
  */
 final class AccountingRoles
 {
@@ -140,6 +141,17 @@ final class AccountingRoles
             'domain' => 'inventory',
             'configurable' => true,
         ],
+        // FISCAL-2: وجهة الإقفال السنوي. الافتراضي 3120 «الأرباح المرحّلة»
+        // — وليس 3130 «الأرصدة الافتتاحية» الذي يخصّ الافتتاح/التحويل وحده.
+        'retained_earnings' => [
+            'label_ar' => 'الأرباح المرحّلة',
+            'label_en' => 'Retained Earnings',
+            'description_ar' => 'حساب حقوق الملكية الذي يُرحَّل إليه صافي ربح/خسارة السنة عند الإقفال السنوي.',
+            'description_en' => 'The equity account the fiscal year net profit or loss is transferred to on annual close.',
+            'legacy_code' => '3120',
+            'domain' => 'equity',
+            'configurable' => true,
+        ],
     ];
 
     /** @var array<string, array{label_ar:string,label_en:string}> ترتيب العرض للمجموعات في واجهة توجيه الحسابات. */
@@ -151,6 +163,7 @@ final class AccountingRoles
         'inventory' => ['label_ar' => 'المخزون', 'label_en' => 'Inventory'],
         'tax' => ['label_ar' => 'الضرائب', 'label_en' => 'Tax'],
         'shared' => ['label_ar' => 'مشترك بين المستندات', 'label_en' => 'Shared across documents'],
+        'equity' => ['label_ar' => 'حقوق الملكية', 'label_en' => 'Equity'],
     ];
 
     /** @return array<string, array{label_ar:string,label_en:string,description_ar:string,description_en:string,legacy_code:string,domain:string,configurable:bool}> */
