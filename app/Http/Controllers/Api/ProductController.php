@@ -74,6 +74,57 @@ class ProductController extends ApiController
         return $template;
     }
 
+    /**
+     * ═══════════════════════════════════════════════════════════════
+     *  PR-UOM2-1 — تحقّق وحدتَي البيع/الشراء الافتراضيتين
+     * ═══════════════════════════════════════════════════════════════
+     *  الافتراضي **اقتراحٌ للواجهة**، لكن اسمه يجب أن يبقى صحيحاً دائماً: اسمٌ
+     *  خارج قالب المنتج كان سيصل إلى شاشة البيع فيقترح وحدةً لا يعرفها
+     *  `UnitConversion`، فينكسر السطر عند الحفظ لا عند الإدخال. لذلك يُرفض
+     *  هنا مغلقاً (٤٢٢) ولا يُفترَض له بديل أبداً — نفس مبدأ رفض الوحدة
+     *  المجهولة في `UnitConversion::resolve()`.
+     *
+     *  **القالب الفعّال لا المُرسَل فقط:** التعديل الجزئي قد لا يحمل
+     *  `unit_template_id` أصلاً، فيُقرأ حينها قالب المنتج القائم. لولا ذلك
+     *  لمرّت وحدة افتراضية غير صالحة في كل تعديلٍ لا يذكر القالب.
+     *
+     *  ومنتجٌ بلا قالب لا وحدات بديلة له، فوحدته الوحيدة المقبولة هي وحدته
+     *  الأساسية نفسها — لا نقبل نصّاً حرّاً يوهم بوجود وحدة ثانية.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function assertDefaultUnitsAreValid(array $data, ?UnitTemplate $template, ?Product $product = null): void
+    {
+        $effectiveTemplate = $template ?? $product?->unitTemplate;
+        $baseUnit = $effectiveTemplate?->base_unit
+            ?? ($data['unit'] ?? $product?->unit);
+
+        $allowed = $effectiveTemplate
+            ? collect([$effectiveTemplate->base_unit])
+                ->concat($effectiveTemplate->units->pluck('name'))
+                ->all()
+            : array_values(array_filter([$baseUnit]));
+
+        foreach ([
+            'default_sales_unit' => 'وحدة البيع الافتراضية',
+            'default_purchase_unit' => 'وحدة الشراء الافتراضية',
+        ] as $field => $label) {
+            if (! array_key_exists($field, $data)) {
+                continue;
+            }
+
+            $value = is_string($data[$field]) ? trim($data[$field]) : $data[$field];
+            // `null` أو فراغ = «وحدة الأساس» — الافتراض القائم، ويُقبل دائماً.
+            if ($value === null || $value === '') {
+                continue;
+            }
+
+            if (! in_array($value, $allowed, true)) {
+                abort(422, "{$label} «{$value}» يجب أن تكون وحدة الأساس أو وحدة بديلة معرّفة في قالب وحدات المنتج.");
+            }
+        }
+    }
+
     /** قالب CSV ثابت لفتح الاستيراد في Excel أو أي محرر جداول. */
     public function importTemplate()
     {
@@ -220,6 +271,7 @@ class ProductController extends ApiController
         if ($template !== null) {
             $data['unit'] = $template->base_unit;
         }
+        $this->assertDefaultUnitsAreValid($data, $template);
 
         // مسار الإنشاء القانوني الموحّد (خدمة الدومين) — نفسه يستعمله الـ Public API.
         $product = $this->domain(fn () => $this->products->create($data, $request->user()?->id));
@@ -245,6 +297,7 @@ class ProductController extends ApiController
         if ($template !== null) {
             $data['unit'] = $template->base_unit;
         }
+        $this->assertDefaultUnitsAreValid($data, $template, $product);
         $product = $this->domain(fn () => $this->lifecycle->update($product, $data, $request->user()?->id));
 
         return (new ProductResource($product))->response();

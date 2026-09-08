@@ -75,6 +75,11 @@ class StoreProductRequest extends FormRequest
             ],
             'type'            => ['required', 'in:good,service'],
             'unit'            => ['nullable', 'string', 'max:255'],
+            // PR-UOM2-1: الشكل فقط هنا؛ عضوية الاسم في قالب المنتج يحرسها
+            // `ProductController::assertDefaultUnitsAreValid` لأنها تحتاج
+            // القالب الفعّال (المُرسَل أو القائم على المنتج) لا الطلب وحده.
+            'default_sales_unit'    => ['nullable', 'string', 'max:255'],
+            'default_purchase_unit' => ['nullable', 'string', 'max:255'],
             'description'     => ['nullable', 'string', 'max:2000'],
             // النصّان الحرّان يبقيان مقبولَين للتوافق الخلفي مع أي مستهلك قائم
             // للـ API؛ المُعرّفان أدناه هما مصدر الحقيقة الجديد.
