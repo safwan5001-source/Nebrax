@@ -12,6 +12,7 @@ use App\Models\Partner;
 use App\Models\Payment;
 use App\Models\Purchase;
 use App\Models\ReturnDocument;
+use App\Support\FiscalCloseJournals;
 use App\Tenancy\BranchScope;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -26,6 +27,20 @@ use Illuminate\Support\Collection;
  *  • trialBalance   — ميزان المراجعة (Σ مدين = Σ دائن).
  *  • incomeStatement — قائمة الدخل (إيرادات − مصروفات = صافي الدخل).
  *  • balanceSheet   — الميزانية العمومية (أصول = خصوم + حقوق ملكية + صافي الدخل).
+ *
+ *  ═══ قيود الإقفال السنوي (FISCAL-2) — قاعدةٌ واحدة تحكم كل تقرير ═══
+ *  قيد الإقفال يصفّر حسابات النتيجة في نهاية السنة. فلو دخل **قائمة الدخل**
+ *  لظهرت كل سنةٍ مقفلة بإيرادٍ صفر ومصروفٍ صفر — وهو محوٌ للتاريخ لا عرضٌ له.
+ *  ولذلك تستثنيه قائمة الدخل وحدها (ومعه عاكسُه عند الفتح).
+ *
+ *  أمّا **ميزان المراجعة وكشف الأستاذ والميزانية** فتشمله: قيدٌ مرحَّل حقيقيّ
+ *  في الدفاتر، وإخفاؤه يجعل الأرباح المرحّلة تظهر بلا مصدر.
+ *
+ *  وفي **الميزانية** تحديداً: صافي الدخل المعروض يُحسب من الدفتر كاملاً بما
+ *  فيه قيود الإقفال — فيصير صفراً تلقائياً عند نهاية سنةٍ مقفلة (القيد صفّر
+ *  حساباتها)، ويبقى محصوراً في النشاط غير المقفل بعدها. هذا يمنع ازدواج
+ *  الاحتساب بين الأرباح المرحّلة الحقيقية وصافي الدخل المشتقّ **بنيوياً**، لا
+ *  بقصٍّ على تاريخ آخر إقفال قد يخطئ حين تُترك سنةٌ بلا إقفال بين سنتين مقفلتين.
  */
 class ReportService
 {
@@ -80,7 +95,9 @@ class ReportService
      */
     public function incomeStatement(array $filters = []): array
     {
-        $movements = $this->movementsByAccount($filters);
+        // تستثني قيود الإقفال السنوي وعواكسها: قائمة دخل السنة المقفلة يجب أن
+        // تبقى معروضةً بأرقامها الحقيقية لا مصفَّرة بقيد الإقفال.
+        $movements = $this->movementsByAccount($filters, false, true);
 
         // الإيرادات طبيعتها دائنة: المبلغ = دائن − مدين (−net)
         $revenues = $this->rowsForType($movements, 'revenue', fn ($net) => -$net);
@@ -103,7 +120,7 @@ class ReportService
         // بلا تفسير — والمستخدم لا يعرف أين ذهبت المصروفات.
         // في العرض المجمّع لا يُحسب: غير الموزَّع داخل الإجماليات أصلاً.
         if ($this->branchIds($filters) !== null) {
-            $un        = $this->movementsByAccount($filters, true);
+            $un        = $this->movementsByAccount($filters, true, true);
             $unRevenue = array_sum(array_column($this->rowsForType($un, 'revenue', fn ($net) => -$net), 'amount'));
             $unExpense = array_sum(array_column($this->rowsForType($un, 'expense', fn ($net) => $net), 'amount'));
 
@@ -141,6 +158,10 @@ class ReportService
                 if ($to) {
                     $q->whereDate('entry_date', '<=', $to);
                 }
+                // ربحية مركز التكلفة قائمةُ دخلٍ بمنظورٍ آخر، فتستثني الإقفال مثلها.
+                // سطور الإقفال بلا مركز تكلفة أصلاً (FISCAL-2) فلا تصل هنا، والاستثناء
+                // الصريح يحفظ الصحّة لو تغيّر ذلك يوماً.
+                FiscalCloseJournals::exclude($q);
             })
             ->groupBy('cost_center_id', 'account_id')
             ->get();
@@ -219,7 +240,16 @@ class ReportService
         $totalLiabilities = array_sum(array_column($liabilities, 'amount'));
         $totalEquity      = array_sum(array_column($equity, 'amount'));
 
-        $netIncome        = $this->incomeStatement($filters)['net_income'];
+        // صافي الدخل هنا يُحسب من **نفس** الحركات أعلاه — أي من الدفتر كاملاً
+        // **بما فيه قيود الإقفال**، لا عبر `incomeStatement()` التي تستثنيها.
+        // الفرق جوهري: قيد الإقفال ينقل الربح إلى الأرباح المرحّلة (فيظهر ضمن
+        // `total_equity`) ويصفّر حسابات النتيجة معاً. فحسابُه من الدفتر كاملاً
+        // يجعل الطرفين متسقين حتماً: عند نهاية سنةٍ مقفلة يصير صافي الدخل صفراً
+        // من تلقائه، وبعدها يعكس النشاط غير المقفل وحده. أمّا استعمال قائمة
+        // الدخل (التي تستثني الإقفال) فكان سيضيف الربح مرّتين: مرّةً في الأرباح
+        // المرحّلة ومرّةً كصافي دخلٍ مشتق.
+        $netIncome = array_sum(array_column($this->rowsForType($movements, 'revenue', fn ($net) => -$net), 'amount'))
+            - array_sum(array_column($this->rowsForType($movements, 'expense', fn ($net) => $net), 'amount'));
         $equityWithIncome = $totalEquity + $netIncome;
 
         return [
@@ -243,8 +273,11 @@ class ReportService
     /**
      * @param  bool  $unallocatedOnly  يقصر النتيجة على السطور **بلا فرع** — المصروفات
      *                                 المركزية (كالرواتب) والقيود السابقة للفروع.
+     * @param  bool  $excludeFiscalClose  يستبعد قيود الإقفال السنوي وعواكسها. الافتراض
+     *                                    `false`: الدفتر كما هو — لا يستثنيها إلا من
+     *                                    يحتاج ذلك صراحةً (قائمة الدخل).
      */
-    protected function movementsByAccount(array $filters, bool $unallocatedOnly = false): Collection
+    protected function movementsByAccount(array $filters, bool $unallocatedOnly = false, bool $excludeFiscalClose = false): Collection
     {
         $from   = $filters['from'] ?? null;
         $to     = $filters['to'] ?? null;
@@ -258,13 +291,16 @@ class ReportService
                 fn ($q) => $q->whereNull('journal_lines.branch_id'),
                 fn ($q) => $q->when($branch, fn ($inner) => $inner->whereIn('journal_lines.branch_id', $branch)),
             )
-            ->whereHas('entry', function ($q) use ($from, $to) {
+            ->whereHas('entry', function ($q) use ($from, $to, $excludeFiscalClose) {
                 $q->whereIn('status', ['posted', 'reversed']); // المعكوس يبقى في الدفاتر (الأصل + العاكس = صفر)
                 if ($from) {
                     $q->whereDate('entry_date', '>=', $from);
                 }
                 if ($to) {
                     $q->whereDate('entry_date', '<=', $to);
+                }
+                if ($excludeFiscalClose) {
+                    FiscalCloseJournals::exclude($q);
                 }
             })
             ->groupBy('account_id')
