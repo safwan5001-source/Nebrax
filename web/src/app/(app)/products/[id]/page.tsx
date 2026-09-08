@@ -25,6 +25,7 @@ type Product = ProductFormProduct & {
 };
 
 type ProductMedia = { id: string; original_name: string; download_url: string; sort_order: number; previewUrl?: string | null };
+type ProductBarcode = { id: string; code: string; unit_name: string | null; default_quantity: number; label: string | null };
 type Activity = { id: string; action: string; created_at: string | null; user: { id: string; name: string } | null };
 type Movement = { id: string; type: string; quantity: number; unit_cost: string; total_cost: string; balance_quantity: number; movement_date: string | null; notes: string | null };
 
@@ -41,6 +42,7 @@ export default function ProductProfilePage() {
   const { success, error: showError } = useToast();
   const [product, setProduct] = useState<Product | null>(null);
   const [media, setMedia] = useState<ProductMedia[]>([]);
+  const [barcodes, setBarcodes] = useState<ProductBarcode[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [movements, setMovements] = useState<Movement[] | null>(null);
   const [selectedMediaId, setSelectedMediaId] = useState<string | null>(null);
@@ -62,9 +64,10 @@ export default function ProductProfilePage() {
     setLoading(true);
     setError(null);
     try {
-      const [productResult, mediaResult, activityResult] = await Promise.all([
+      const [productResult, mediaResult, barcodeResult, activityResult] = await Promise.all([
         api<{ data: Product }>(`/products/${id}`),
         api<{ data: ProductMedia[] }>(`/products/${id}/media`),
+        api<{ data: ProductBarcode[] }>(`/products/${id}/barcodes`),
         api<{ data: Activity[] }>(`/products/${id}/activity`),
       ]);
       const hydrated = await Promise.all(mediaResult.data.map(async (item) => ({
@@ -75,6 +78,7 @@ export default function ProductProfilePage() {
       mediaObjectUrls.current = hydrated.flatMap((item) => item.previewUrl ? [item.previewUrl] : []);
       setProduct(productResult.data);
       setMedia(hydrated);
+      setBarcodes(barcodeResult.data);
       setActivities(activityResult.data);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : t('load_profile_failed'));
@@ -286,6 +290,32 @@ export default function ProductProfilePage() {
                 <div><dt className="text-muted">{t('purchase_price')}</dt><dd className="mt-1 font-semibold num text-text">{formatRiyal(product.purchase_price)} <span className="font-normal text-muted">/ {product.unit}</span></dd></div>
                 <div><dt className="text-muted">{t('category')}</dt><dd className="mt-1 font-medium text-text">{product.category || t('unclassified')}</dd></div>
                 <div><dt className="text-muted">{t('brand')}</dt><dd className="mt-1 font-medium text-text">{product.brand || '—'}</dd></div>
+                <div><dt className="text-muted">{t('default_sales_unit')}</dt><dd className="mt-1 font-medium text-text">{product.default_sales_unit || t('default_unit_base_option')}</dd></div>
+                <div><dt className="text-muted">{t('default_purchase_unit')}</dt><dd className="mt-1 font-medium text-text">{product.default_purchase_unit || t('default_unit_base_option')}</dd></div>
+                <div className="sm:col-span-2">
+                  <dt className="text-muted">{t('units')}</dt>
+                  <dd className="mt-1.5 flex flex-wrap gap-1.5">
+                    {product.units.length === 0 ? (
+                      <Badge tone="muted">{product.unit}</Badge>
+                    ) : product.units.map((unit) => (
+                      <Badge key={unit.name} tone={unit.factor === 1 ? 'neutral' : 'muted'}>
+                        {unit.name}{unit.factor === 1 ? ` (${t('unit_base_badge')})` : ` ×${unit.factor}`}
+                      </Badge>
+                    ))}
+                  </dd>
+                </div>
+                <div className="sm:col-span-2">
+                  <dt className="text-muted">{t('alternate_barcodes')}</dt>
+                  <dd className="mt-1.5 flex flex-wrap gap-1.5">
+                    {barcodes.length === 0 ? (
+                      <span className="text-sm text-muted">{t('no_alternate_barcodes')}</span>
+                    ) : barcodes.map((item) => (
+                      <Badge key={item.id} tone="muted" className="num" dir="ltr">
+                        {item.code} · {item.unit_name ?? product.unit}
+                      </Badge>
+                    ))}
+                  </dd>
+                </div>
               </dl>
             </CardContent>
           </Card>
