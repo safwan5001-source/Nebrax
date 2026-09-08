@@ -2,6 +2,8 @@ export interface ProductUnitTemplate {
   id: string;
   name: string;
   base_unit: string;
+  /** الوحدات البديلة فقط — الأساس عمودٌ منفصل، ليس عنصراً هنا. */
+  units?: Array<{ id: string; name: string; factor: number }>;
 }
 
 /**

@@ -1,14 +1,15 @@
 'use client';
 
-import { ChangeEvent, useCallback, useEffect, useRef, useState } from 'react';
+import { ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
 import { useTranslations } from 'next-intl';
-import { ImagePlus, Trash2 } from 'lucide-react';
+import { ImagePlus, Plus, Trash2 } from 'lucide-react';
 import { Dialog } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { api, ApiError, fetchImageUrl } from '@/lib/api';
 import { useNumberPreview } from '@/lib/use-number-preview';
@@ -30,6 +31,8 @@ export interface Product {
   category_id: string | null;
   brand_id: string | null;
   unit_template_id: string | null;
+  default_sales_unit: string | null;
+  default_purchase_unit: string | null;
   reorder_level: number | null;
   min_sale_price: string | null;
   discount: number | null;
@@ -59,6 +62,8 @@ interface FormState {
   category_id: string;
   brand_id: string;
   unit_template_id: string;
+  default_sales_unit: string;
+  default_purchase_unit: string;
   reorder_level: string;
   min_sale_price: string;
   discount: string;
@@ -79,6 +84,7 @@ interface Acct { id: string; code: string; name: string; type: string; is_group:
 /** عنصر قائمة مُدارة (تصنيف/علامة) — الاسم وحده يكفي للاختيار. */
 interface Listed { id: string; name: string }
 interface ProductMedia { id: string; original_name: string; download_url: string; sort_order: number; previewUrl?: string | null }
+interface ProductBarcode { id: string; code: string; unit_name: string | null; default_quantity: number; label: string | null }
 
 const MAX_PRODUCT_IMAGES = 8;
 const MAX_PRODUCT_IMAGE_SIZE = 5 * 1024 * 1024;
@@ -86,7 +92,8 @@ const PRODUCT_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 const emptyForm = (): FormState => ({
   name: '', sku: '', barcode: '', name_en: '', type: 'good', unit: 'piece',
-  description: '', category_id: '', brand_id: '', unit_template_id: '', reorder_level: '',
+  description: '', category_id: '', brand_id: '', unit_template_id: '',
+  default_sales_unit: '', default_purchase_unit: '', reorder_level: '',
   min_sale_price: '', discount: '', discount_type: 'percent', profit_margin: '', tags: '', internal_notes: '',
   sales_account_id: '', cogs_account_id: '',
   sale_price: '', purchase_price: '', tax_rate: '15', track_inventory: false, is_active: true,
@@ -95,7 +102,9 @@ const emptyForm = (): FormState => ({
 function fromProduct(p: Product): FormState {
   return {
     name: p.name, sku: p.sku ?? '', barcode: p.barcode ?? '', name_en: p.name_en ?? '', type: p.type, unit: p.unit,
-    description: p.description ?? '', category_id: p.category_id ?? '', brand_id: p.brand_id ?? '', unit_template_id: p.unit_template_id ?? '', reorder_level: p.reorder_level != null ? String(p.reorder_level) : '',
+    description: p.description ?? '', category_id: p.category_id ?? '', brand_id: p.brand_id ?? '', unit_template_id: p.unit_template_id ?? '',
+    default_sales_unit: p.default_sales_unit ?? '', default_purchase_unit: p.default_purchase_unit ?? '',
+    reorder_level: p.reorder_level != null ? String(p.reorder_level) : '',
     min_sale_price: p.min_sale_price ?? '', discount: p.discount != null ? String(p.discount) : '', discount_type: p.discount_type ?? 'percent',
     profit_margin: p.profit_margin != null ? String(p.profit_margin) : '', tags: p.tags ?? '', internal_notes: p.internal_notes ?? '',
     sales_account_id: p.sales_account_id ?? '', cogs_account_id: p.cogs_account_id ?? '',
@@ -129,6 +138,13 @@ export function ProductDialog({
   const [media, setMedia] = useState<ProductMedia[]>([]);
   const [loadingMedia, setLoadingMedia] = useState(false);
   const [uploadingMedia, setUploadingMedia] = useState(false);
+  const [barcodes, setBarcodes] = useState<ProductBarcode[]>([]);
+  const [loadingBarcodes, setLoadingBarcodes] = useState(false);
+  const [newBarcodeCode, setNewBarcodeCode] = useState('');
+  const [newBarcodeUnit, setNewBarcodeUnit] = useState('');
+  const [newBarcodeQty, setNewBarcodeQty] = useState('1');
+  const [newBarcodeLabel, setNewBarcodeLabel] = useState('');
+  const [savingBarcode, setSavingBarcode] = useState(false);
   const { number: suggestedSku } = useNumberPreview('product', { enabled: open && !product?.id });
   const mediaObjectUrls = useRef<string[]>([]);
 
@@ -156,6 +172,19 @@ export function ProductDialog({
     }
   }, [product?.id, revokeMediaObjectUrls, t]);
 
+  const loadBarcodes = useCallback(async () => {
+    if (!product?.id) return;
+    setLoadingBarcodes(true);
+    try {
+      const result = await api<{ data: ProductBarcode[] }>(`/products/${product.id}/barcodes`);
+      setBarcodes(result.data);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : t('load_profile_failed'));
+    } finally {
+      setLoadingBarcodes(false);
+    }
+  }, [product?.id, t]);
+
   useEffect(() => {
     if (!open) return;
     getSystemTaxInclusive().then(setTaxInclusive).catch(() => {});
@@ -171,18 +200,28 @@ export function ProductDialog({
       .catch(() => {});
   }, [open]);
   useEffect(() => {
-    if (open && product?.id) void loadMedia();
-  }, [loadMedia, open, product?.id]);
+    if (open && product?.id) { void loadMedia(); void loadBarcodes(); }
+  }, [loadMedia, loadBarcodes, open, product?.id]);
   useEffect(() => () => revokeMediaObjectUrls(), [revokeMediaObjectUrls]);
   const [saving, setSaving] = useState(false);
 
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) => setForm((f) => ({ ...f, [k]: v }));
+
+  // الوحدات البديلة للقالب المختار — الأساس اختيارٌ منفصل (الخانة الفارغة).
+  const alternateUnits = useMemo(
+    () => templates.find((template) => template.id === form.unit_template_id)?.units ?? [],
+    [templates, form.unit_template_id],
+  );
 
   function selectUnitTemplate(templateId: string) {
     setForm((current) => ({
       ...current,
       unit_template_id: templateId,
       unit: productUnitForTemplate(templateId, templates, current.unit),
+      // تغيير القالب قد يُسقط الوحدة الافتراضية القائمة من عضويته؛ إفراغها هنا
+      // أوضح للمستخدم من رفضٍ لاحقٍ عند الحفظ لسببٍ لم يعد ظاهراً في الشاشة.
+      default_sales_unit: '',
+      default_purchase_unit: '',
     }));
   }
 
@@ -201,6 +240,8 @@ export function ProductDialog({
       category_id: form.category_id || null,
       brand_id: form.brand_id || null,
       unit_template_id: form.unit_template_id || null,
+      default_sales_unit: form.default_sales_unit || null,
+      default_purchase_unit: form.default_purchase_unit || null,
       reorder_level: form.track_inventory && form.reorder_level !== '' ? Number(form.reorder_level) || 0 : null,
       min_sale_price: form.min_sale_price !== '' ? riyalToMinor(form.min_sale_price) : null,
       discount: form.discount !== '' ? Number(form.discount) || 0 : null,
@@ -230,6 +271,50 @@ export function ProductDialog({
       setError(err instanceof ApiError ? err.message : tc('saveFailed'));
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function addBarcode() {
+    if (!product?.id || !newBarcodeCode.trim() || savingBarcode) return;
+    const qty = newBarcodeQty.trim() === '' ? 1 : Number(newBarcodeQty);
+    if (!Number.isInteger(qty) || qty < 1 || qty > 1000000) {
+      setError(t('barcode_quantity_invalid'));
+      return;
+    }
+    setSavingBarcode(true);
+    setError(null);
+    try {
+      await api(`/products/${product.id}/barcodes`, {
+        method: 'POST',
+        body: {
+          code: newBarcodeCode.trim(),
+          unit_name: newBarcodeUnit || null,
+          default_quantity: qty,
+          label: newBarcodeLabel.trim() || null,
+        },
+      });
+      setNewBarcodeCode('');
+      setNewBarcodeUnit('');
+      setNewBarcodeQty('1');
+      setNewBarcodeLabel('');
+      await loadBarcodes();
+      success(t('barcode_added'));
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : tc('saveFailed'));
+    } finally {
+      setSavingBarcode(false);
+    }
+  }
+
+  async function deleteBarcode(barcode: ProductBarcode) {
+    if (!product?.id || !window.confirm(t('barcode_delete_confirm', { code: barcode.code }))) return;
+    setError(null);
+    try {
+      await api(`/products/${product.id}/barcodes/${barcode.id}`, { method: 'DELETE' });
+      await loadBarcodes();
+      success(t('barcode_deleted'));
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : tc('saveFailed'));
     }
   }
 
@@ -311,6 +396,21 @@ export function ProductDialog({
               {templates.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
             </Select>
             <p className="text-xs text-muted">{t('unit_template_hint')}</p>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="default_sales_unit">{t('default_sales_unit')}</Label>
+            <Select id="default_sales_unit" value={form.default_sales_unit} onChange={(e) => set('default_sales_unit', e.target.value)}>
+              <option value="">{t('default_unit_base_option')}</option>
+              {alternateUnits.map((u) => <option key={u.name} value={u.name}>{u.name}</option>)}
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="default_purchase_unit">{t('default_purchase_unit')}</Label>
+            <Select id="default_purchase_unit" value={form.default_purchase_unit} onChange={(e) => set('default_purchase_unit', e.target.value)}>
+              <option value="">{t('default_unit_base_option')}</option>
+              {alternateUnits.map((u) => <option key={u.name} value={u.name}>{u.name}</option>)}
+            </Select>
+            <p className="text-xs text-muted">{t('default_units_hint')}</p>
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="category">{t('category')}</Label>
@@ -426,6 +526,65 @@ export function ProductDialog({
             <Label htmlFor="reorder">{t('reorder_level')}</Label>
             <Input id="reorder" className="num text-end w-40" type="number" min={0} value={form.reorder_level} onChange={(e) => set('reorder_level', e.target.value)} />
           </div>
+        )}
+
+        {product?.id && (
+          <section className="space-y-3 rounded-md border border-border p-3" aria-labelledby="edit-product-barcodes-title">
+            <div>
+              <h3 id="edit-product-barcodes-title" className="text-sm font-medium text-text">{t('alternate_barcodes')}</h3>
+              <p className="mt-1 text-xs leading-relaxed text-muted">{t('alternate_barcodes_hint')}</p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="new-barcode-code">{t('barcode_code')}</Label>
+                <Input id="new-barcode-code" dir="ltr" className="num" value={newBarcodeCode} onChange={(e) => setNewBarcodeCode(e.target.value)} disabled={savingBarcode} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="new-barcode-unit">{t('unit')}</Label>
+                <Select id="new-barcode-unit" value={newBarcodeUnit} onChange={(e) => setNewBarcodeUnit(e.target.value)} disabled={savingBarcode}>
+                  <option value="">{t('default_unit_base_option')}</option>
+                  {alternateUnits.map((u) => <option key={u.name} value={u.name}>{u.name}</option>)}
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="new-barcode-qty">{t('barcode_default_quantity')}</Label>
+                <Input id="new-barcode-qty" type="number" min={1} max={1000000} className="num text-end" value={newBarcodeQty} onChange={(e) => setNewBarcodeQty(e.target.value)} disabled={savingBarcode} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="new-barcode-label">{t('barcode_label')}</Label>
+                <Input id="new-barcode-label" value={newBarcodeLabel} onChange={(e) => setNewBarcodeLabel(e.target.value)} disabled={savingBarcode} />
+              </div>
+            </div>
+            <div className="flex justify-end">
+              <Button type="button" variant="outline" size="sm" disabled={!newBarcodeCode.trim() || savingBarcode} onClick={() => void addBarcode()}>
+                <Plus className="h-4 w-4" strokeWidth={1.7} />{t('add_barcode')}
+              </Button>
+            </div>
+
+            {loadingBarcodes ? (
+              <Skeleton className="h-14 w-full" />
+            ) : barcodes.length === 0 ? (
+              <p className="rounded-md bg-background px-3 py-2 text-sm text-muted">{t('no_alternate_barcodes')}</p>
+            ) : (
+              <ul className="divide-y divide-border rounded-md border border-border">
+                {barcodes.map((item) => (
+                  <li key={item.id} className="flex items-center gap-2 px-3 py-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="num text-sm font-medium text-text" dir="ltr">{item.code}</p>
+                      <p className="text-xs text-muted">
+                        {item.unit_name ?? form.unit} · {t('barcode_quantity', { quantity: item.default_quantity })}
+                        {item.label ? ` · ${item.label}` : ''}
+                      </p>
+                    </div>
+                    <Button type="button" variant="ghost" size="icon" aria-label={`${t('delete')}: ${item.code}`} onClick={() => void deleteBarcode(item)}>
+                      <Trash2 className="h-4 w-4" strokeWidth={1.7} />
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
         )}
 
         {product?.id && (
