@@ -6,51 +6,57 @@ use App\Models\PosSession;
 use App\Models\User;
 use App\Services\NotificationService;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
-/** Observer-only projection for actionable POS session states. */
+/**
+ * Read-only POS notification projection. It never changes a session, drawer,
+ * reconciliation or journal; it only mirrors already-authoritative pending states.
+ */
 class PosSessionNotificationBridge
 {
-    public function queueEvaluation(string $tenantId, string $sessionId): void
+    /** @return array{scanned:int} */
+    public function scanTenant(string $tenantId): array
     {
-        DB::afterCommit(function () use ($tenantId, $sessionId): void {
+        $sessions = PosSession::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->where('status', 'closed')
+            ->where(function ($query): void {
+                $query->where('difference_status', 'pending')
+                    ->orWhere('handover_status', 'pending');
+            })
+            ->get();
+
+        foreach ($sessions as $session) {
             try {
-                $this->evaluate($tenantId, $sessionId);
+                $this->evaluate($tenantId, $session);
             } catch (\Throwable $e) {
                 Log::warning('POS session notification projection failed', [
                     'tenant_id' => $tenantId,
-                    'session_id' => $sessionId,
+                    'session_id' => $session->id,
                     'exception' => $e::class,
                 ]);
             }
-        });
-    }
-
-    public function evaluate(string $tenantId, string $sessionId): void
-    {
-        $session = PosSession::withoutGlobalScopes()
-            ->where('tenant_id', $tenantId)
-            ->whereKey($sessionId)
-            ->first();
-        if (! $session || $session->status !== 'closed') {
-            return;
         }
 
+        return ['scanned' => $sessions->count()];
+    }
+
+    private function evaluate(string $tenantId, PosSession $session): void
+    {
         if ($session->difference_status === 'pending') {
             $this->deliver($tenantId, $session, 'pos.variance_pending', 'critical',
                 'فرق صندوق يحتاج اعتماداً', 'أُغلقت جلسة نقطة بيع وبها فرق صندوق يحتاج مراجعة واعتماداً.',
-                'pos.variance.approve', 'view_pos_session', 'variance');
+                'pos.variance.approve', 'variance');
         }
 
         if ($session->handover_status === 'pending') {
             $this->deliver($tenantId, $session, 'pos.handover_pending', 'warning',
                 'عهدة نقطة بيع بانتظار الاستلام', 'أُغلقت جلسة نقطة بيع وقدمت عهدتها وهي بانتظار الاستلام.',
-                'pos.session.handover.confirm', 'view_pos_session', 'handover');
+                'pos.session.handover.confirm', 'handover');
         }
     }
 
-    private function deliver(string $tenantId, PosSession $session, string $type, string $severity, string $title, string $message, string $permission, string $action, string $kind): void
+    private function deliver(string $tenantId, PosSession $session, string $type, string $severity, string $title, string $message, string $permission, string $kind): void
     {
         $notifications = app(NotificationService::class);
         foreach ($this->recipients($tenantId, $session, $permission) as $recipient) {
@@ -64,7 +70,7 @@ class PosSessionNotificationBridge
                 'message' => $message,
                 'source_type' => 'pos_session',
                 'source_id' => $session->id,
-                'action' => $action,
+                'action' => 'view_pos_session',
                 'data' => ['session_number' => $session->number],
                 'dedupe_key' => "pos.{$kind}:{$session->id}",
             ]);
