@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState, type RefObject } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { CircleHelp } from 'lucide-react';
@@ -9,12 +9,20 @@ import { Button } from '@/components/ui/button';
 import { resolveContextualHelp } from '@/modules/help-center/context';
 import { ContextualHelpSheet } from './contextual-help-sheet';
 
-export function ContextualHelpTrigger({ placement }: { placement: 'topbar' | 'menu' }) {
+export function ContextualHelpTrigger({
+  placement,
+  restoreFocusRef,
+}: {
+  placement: 'topbar' | 'menu';
+  restoreFocusRef?: RefObject<HTMLElement>;
+}) {
   const pathname = usePathname();
   const router = useRouter();
   const topbar = useTranslations('topbar');
   const help = useTranslations('helpCenter');
   const [open, setOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const focusTargetRef = restoreFocusRef ?? triggerRef;
   const contextualHelp = resolveContextualHelp(pathname);
   const label = contextualHelp ? help('contextualTitle') : topbar('help');
 
@@ -30,6 +38,7 @@ export function ContextualHelpTrigger({ placement }: { placement: 'topbar' | 'me
     <>
       {placement === 'topbar' ? (
         <Button
+          ref={triggerRef}
           variant="ghost"
           size="icon"
           className="hidden h-11 w-11 text-muted hover:bg-primary-soft hover:text-primary sm:inline-flex"
@@ -44,7 +53,12 @@ export function ContextualHelpTrigger({ placement }: { placement: 'topbar' | 'me
       )}
 
       {contextualHelp ? (
-        <ContextualHelpSheet article={contextualHelp.article} open={open} onOpenChange={setOpen} />
+        <ContextualHelpSheet
+          article={contextualHelp.article}
+          open={open}
+          onOpenChange={setOpen}
+          restoreFocusRef={focusTargetRef}
+        />
       ) : null}
     </>
   );
