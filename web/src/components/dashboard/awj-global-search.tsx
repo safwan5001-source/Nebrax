@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { ChevronDown, FileText, Loader2, Package, Search, X } from 'lucide-react';
+import { ChevronDown, FileText, Loader2, Package, Search, Users, X } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
 import { hasPermission } from '@/lib/permissions';
 import { currentUser } from '@/lib/auth';
@@ -16,16 +16,20 @@ import { cn } from '@/lib/utils';
  * ═══════════════════════════════════════════════════════════════
  *  ليس محرّك بحثٍ موحّداً على الخادم — لا يوجد نقطة `/search` مجمّعة في
  *  المشروع اليوم، وإضافتها معمارية جديدة خارج نطاق هذه المهمة. هذا المكوّن
- *  يستهلك أربع نقاط REST **موجودة وآمنة فعلاً** بمعامل `search` نفسه المتّبع
- *  فيها (فواتير، مشتريات، منتجات، قيود يومية)، فيبقى العزل والصلاحيات على
+ *  يستهلك نقاط REST **موجودة وآمنة فعلاً** بمعامل `search` نفسه المتّبع فيها
+ *  (فواتير، مشتريات، منتجات، قيود يومية، أطراف)، فيبقى العزل والصلاحيات على
  *  حالهما تماماً — كل استعلام يمرّ بـ`SetTenant` والـ RBAC القائم في الخادم.
  *
- *  فئات أُخرى (العملاء/الموردون، الحسابات، المدفوعات، عروض الأسعار...) لا
- *  تملك معامل بحث خادمي اليوم، فلا تُعرض هنا حتى لا يكون البحث خادعاً
- *  (قائمة كاملة تُصفّى في الواجهة توحي بخصوصية لا تحمل ضمان عزل جديد).
+ *  العملاء والموردون كلاهما `Partner` (`type=customer|both` و`type=supplier|both`
+ *  على التوالي) عبر `/partners` المحمي بصلاحية `partners.view` نفسها — نفس
+ *  المسار الرسمي `/partners/{id}` للتنقّل بغضّ النظر عن النوع.
+ *
+ *  فئات أُخرى (الحسابات، المدفوعات، عروض الأسعار...) لا تملك معامل بحث خادمي
+ *  اليوم، فلا تُعرض هنا حتى لا يكون البحث خادعاً (قائمة كاملة تُصفّى في الواجهة
+ *  توحي بخصوصية لا تحمل ضمان عزل جديد).
  */
 
-type SearchCategory = 'all' | 'invoices' | 'purchases' | 'products' | 'journal_entries';
+type SearchCategory = 'all' | 'invoices' | 'purchases' | 'products' | 'journal_entries' | 'customers' | 'suppliers';
 
 interface ResultItem {
   id: string;
@@ -43,7 +47,30 @@ interface CategoryConfig {
   mapItem: (row: Record<string, unknown>) => ResultItem;
 }
 
+/** مشترك بين العملاء والموردين — كلاهما `Partner` بنفس عقد الحقول. */
+function mapPartner(row: Record<string, unknown>): ResultItem {
+  return {
+    id: String(row.id),
+    primary: String(row.name ?? ''),
+    secondary: typeof row.code === 'string' ? row.code : undefined,
+    meta: [row.vat_number, row.mobile ?? row.phone].filter(Boolean).join(' · ') || undefined,
+    href: `/partners/${row.id}`,
+  };
+}
+
 const CATEGORIES: CategoryConfig[] = [
+  {
+    key: 'customers',
+    permission: 'partners.view',
+    endpoint: '/partners?type=customer',
+    mapItem: mapPartner,
+  },
+  {
+    key: 'suppliers',
+    permission: 'partners.view',
+    endpoint: '/partners?type=supplier',
+    mapItem: mapPartner,
+  },
   {
     key: 'invoices',
     permission: 'invoices.view',
@@ -159,11 +186,14 @@ export function AwjGlobalSearch({ className }: { className?: string }) {
       const perPage = type === 'all' ? PER_PAGE_ALL : PER_PAGE_SINGLE;
 
       Promise.allSettled(
-        categories.map((c) =>
-          api<{ data: Record<string, unknown>[] }>(
-            `${c.endpoint}?search=${encodeURIComponent(q)}&per_page=${perPage}`
-          ).then((r) => ({ key: c.key, items: r.data.map(c.mapItem) }))
-        )
+        categories.map((c) => {
+          // بعض النقاط (`/partners?type=customer`) تحمل معامل استعلام مسبقاً؛
+          // الفاصل يتبع ما إذا كان الرابط يحمل `?` أصلاً فلا ينكسر بعلامة سؤال مكرّرة.
+          const separator = c.endpoint.includes('?') ? '&' : '?';
+          return api<{ data: Record<string, unknown>[] }>(
+            `${c.endpoint}${separator}search=${encodeURIComponent(q)}&per_page=${perPage}`
+          ).then((r) => ({ key: c.key, items: r.data.map(c.mapItem) }));
+        })
       ).then((settled) => {
         const next: Record<string, ResultItem[]> = {};
         settled.forEach((s, i) => {
@@ -311,7 +341,7 @@ export function AwjGlobalSearch({ className }: { className?: string }) {
                   items={results[c.key] ?? []}
                   allItems={flatResults}
                   activeIndex={activeIndex}
-                  icon={c.key === 'products' ? Package : FileText}
+                  icon={c.key === 'products' ? Package : c.key === 'customers' || c.key === 'suppliers' ? Users : FileText}
                   onSelect={navigateTo}
                 />
               ))

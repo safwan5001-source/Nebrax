@@ -64,6 +64,30 @@ class ApiTenantIsolationTest extends TestCase
     }
 
     /** @test */
+    public function searching_partners_never_surfaces_another_tenants_matches(): void
+    {
+        $a = $this->registerTenant('alpha', 'a@alpha.test');
+        $b = $this->registerTenant('beta', 'b@beta.test');
+
+        $this->withToken($a['token'])->postJson('/api/partners', [
+            'name' => 'شركة أفق المشتركة', 'type' => 'customer', 'vat_number' => '399999999900003',
+        ])->assertCreated();
+        $this->createPartner($b['token'], 'عميل بيتا');
+
+        // البحث بمصطلح مطابق تماماً لطرف مستأجر A، عبر توكن B → لا نتائج البتّة
+        // (التصفية بـsearch تُبنى فوق استعلامٍ محصورٍ أصلاً بـTenantScope، لا بديلاً عنه).
+        $byName = $this->withToken($b['token'])
+            ->getJson('/api/partners?search='.urlencode('شركة أفق المشتركة'))
+            ->assertOk()->json('data');
+        $this->assertCount(0, $byName);
+
+        $byVat = $this->withToken($b['token'])
+            ->getJson('/api/partners?search=399999999900003')
+            ->assertOk()->json('data');
+        $this->assertCount(0, $byVat);
+    }
+
+    /** @test */
     public function a_tenant_cannot_invoice_against_another_tenants_partner(): void
     {
         $a = $this->registerTenant('alpha', 'a@alpha.test');
