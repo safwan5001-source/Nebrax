@@ -4462,6 +4462,7 @@
     "default_units_hint": "Display only — does not change the unit on any invoice, purchase, or POS line automatically.",
     "units": "Units",
     "unit_base_badge": "Base",
+    "default_sales_unit_marker": "default",
     "product_media": "Product images",
     "product_media_hint": "Upload up to 8 JPG, PNG or WebP images, up to 5 MB each. Images are private and visible only to authorised users.",
     "upload_media": "Upload images",
