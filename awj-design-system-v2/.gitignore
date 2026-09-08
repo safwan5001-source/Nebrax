@@ -1,0 +1,6 @@
+/node_modules
+/dist
+*.tsbuildinfo
+
+# إعادة تضمين lockfile الحزمة (الجذر يستثنيه عالمياً) — لازم لتثبيت متطابق لاحقاً
+!package-lock.json
