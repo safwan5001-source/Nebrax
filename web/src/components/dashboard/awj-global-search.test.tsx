@@ -79,6 +79,141 @@ describe('AwjGlobalSearch', () => {
     expect(options).not.toContain('type_suppliers');
   });
 
+  /**
+   * إصلاح انكشاف عن `overflow-hidden` على شريط البحث كان يقصّ القائمة بصرياً
+   * (تبقى في الـDOM لكن لا تُرسَم، فتذهب لمسة/نقرة المستخدم لما تحتها) — هذه
+   * المجموعة تثبت التفاعل الفعلي (فتح/إغلاق/تبديل) لا مجرد وجود النصوص، لأن
+   * jsdom لا يحاكي القصّ البصري أصلاً ولن يكشف عطلاً من هذا النوع بمفرده؛
+   * التحقق البصري الحقيقي (Playwright) موثَّق في تقرير التنفيذ المرفق.
+   */
+  describe('category selector — open/close interaction', () => {
+    it('shows no listbox until the trigger is clicked, and opens one on click', () => {
+      setUser(['invoices.view']);
+      render(<AwjGlobalSearch />);
+
+      expect(screen.queryByRole('listbox')).toBeNull();
+
+      fireEvent.click(screen.getByRole('button', { name: 'type_selector_label' }));
+
+      expect(screen.getByRole('listbox')).toBeTruthy();
+    });
+
+    it('closes the listbox after a category is selected', () => {
+      setUser(['invoices.view']);
+      render(<AwjGlobalSearch />);
+
+      fireEvent.click(screen.getByRole('button', { name: 'type_selector_label' }));
+      expect(screen.getByRole('listbox')).toBeTruthy();
+
+      fireEvent.click(screen.getByRole('option', { name: 'type_invoices' }));
+
+      expect(screen.queryByRole('listbox')).toBeNull();
+    });
+
+    it('closes the listbox when clicking outside the component', () => {
+      setUser(['invoices.view']);
+      render(<AwjGlobalSearch />);
+
+      fireEvent.click(screen.getByRole('button', { name: 'type_selector_label' }));
+      expect(screen.getByRole('listbox')).toBeTruthy();
+
+      fireEvent.mouseDown(document.body);
+
+      expect(screen.queryByRole('listbox')).toBeNull();
+    });
+
+    it('closes the listbox when the search input is focused (no overlapping panels)', () => {
+      setUser(['invoices.view']);
+      render(<AwjGlobalSearch />);
+
+      fireEvent.click(screen.getByRole('button', { name: 'type_selector_label' }));
+      expect(screen.getByRole('listbox')).toBeTruthy();
+
+      fireEvent.focus(screen.getByPlaceholderText('placeholder_all'));
+
+      expect(screen.queryByRole('listbox')).toBeNull();
+    });
+
+    it('closes the results panel when the type selector is opened (no overlapping panels)', async () => {
+      setUser(['invoices.view']);
+      apiMock.mockResolvedValue({ data: [{ id: 'inv-1', number: 'INV-001' }] });
+      render(<AwjGlobalSearch />);
+
+      fireEvent.change(screen.getByPlaceholderText('placeholder_all'), { target: { value: 'INV' } });
+      await settleDebounce();
+      expect(screen.getByText('INV-001')).toBeTruthy();
+
+      fireEvent.click(screen.getByRole('button', { name: 'type_selector_label' }));
+
+      expect(screen.getByRole('listbox')).toBeTruthy();
+      expect(screen.queryByText('INV-001')).toBeNull();
+    });
+
+    it('closes the listbox on Escape', () => {
+      setUser(['invoices.view']);
+      render(<AwjGlobalSearch />);
+
+      fireEvent.click(screen.getByRole('button', { name: 'type_selector_label' }));
+      expect(screen.getByRole('listbox')).toBeTruthy();
+
+      fireEvent.keyDown(document, { key: 'Escape' });
+
+      expect(screen.queryByRole('listbox')).toBeNull();
+    });
+  });
+
+  it('selecting a category updates the visible label and scopes the next search to it', async () => {
+    setUser(['invoices.view', 'products.view']);
+    apiMock.mockResolvedValue({ data: [{ id: 'inv-1', number: 'INV-777' }] });
+
+    render(<AwjGlobalSearch />);
+    fireEvent.click(screen.getByRole('button', { name: 'type_selector_label' }));
+    fireEvent.click(screen.getByRole('option', { name: 'type_invoices' }));
+
+    // التسمية الظاهرة مكان «الكل» أصبحت الفئة المختارة، والـplaceholder تغيّر معها.
+    expect(screen.getByRole('button', { name: 'type_selector_label' }).textContent).toContain('type_invoices');
+    expect(screen.getByPlaceholderText('placeholder_invoices')).toBeTruthy();
+
+    fireEvent.change(screen.getByPlaceholderText('placeholder_invoices'), { target: { value: 'INV' } });
+    await settleDebounce();
+
+    // فئة واحدة فقط استُدعيت رغم توفّر صلاحية على فئتين — الاختيار فعليّ لا افتراضي.
+    expect(apiMock).toHaveBeenCalledTimes(1);
+    expect(apiMock).toHaveBeenCalledWith(expect.stringContaining('/invoices?search=INV'));
+  });
+
+  it('returning to "all" after picking a single category restores multi-category search', async () => {
+    setUser(['invoices.view', 'products.view']);
+    apiMock.mockImplementation((url: string) =>
+      url.startsWith('/invoices')
+        ? Promise.resolve({ data: [{ id: 'inv-1', number: 'INV-1' }] })
+        : Promise.resolve({ data: [{ id: 'p-1', name: 'Widget' }] })
+    );
+
+    render(<AwjGlobalSearch />);
+    fireEvent.click(screen.getByRole('button', { name: 'type_selector_label' }));
+    fireEvent.click(screen.getByRole('option', { name: 'type_invoices' }));
+    fireEvent.change(screen.getByPlaceholderText('placeholder_invoices'), { target: { value: 'xx' } });
+    await settleDebounce();
+    expect(apiMock).toHaveBeenCalledTimes(1);
+
+    apiMock.mockClear();
+    fireEvent.click(screen.getByRole('button', { name: 'type_selector_label' }));
+    fireEvent.click(screen.getByRole('option', { name: 'type_all' }));
+    expect(screen.getByPlaceholderText('placeholder_all')).toBeTruthy();
+
+    // قيمة مختلفة عن 'xx' السابقة عمداً: React لا يُطلق onChange حين تُعاد نفس
+    // القيمة حرفياً على عنصر إدخال متحكَّم فيه (خاصّية اختبار معروفة في jsdom)،
+    // وهذا لا يمثّل تفاعلاً حقيقياً على متصفّح فعلي بحال إعادة الكتابة.
+    fireEvent.change(screen.getByPlaceholderText('placeholder_all'), { target: { value: 'yy' } });
+    await settleDebounce();
+
+    // كلتا الفئتين المسموحتين استُدعيتا — العودة إلى «الكل» ليست عالقة على آخر اختيار.
+    expect(apiMock).toHaveBeenCalledTimes(2);
+    expect(screen.getByText('INV-1')).toBeTruthy();
+    expect(screen.getByText('Widget')).toBeTruthy();
+  });
+
   it('does not query the backend before 2 characters are typed', async () => {
     setUser(['invoices.view']);
     render(<AwjGlobalSearch />);
