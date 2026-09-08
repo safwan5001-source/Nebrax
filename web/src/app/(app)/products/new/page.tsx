@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { ChangeEvent, useEffect, useRef, useState } from 'react';
+import { ChangeEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { ArrowRight, Package, Tag, Warehouse, SlidersHorizontal, RefreshCw, Trash2 } from 'lucide-react';
@@ -39,6 +39,8 @@ export default function NewProductPage() {
   const [unit, setUnit] = useState('');
   const [unitTemplateId, setUnitTemplateId] = useState('');
   const [templates, setTemplates] = useState<ProductUnitTemplate[]>([]);
+  const [defaultSalesUnit, setDefaultSalesUnit] = useState('');
+  const [defaultPurchaseUnit, setDefaultPurchaseUnit] = useState('');
   const [salePrice, setSalePrice] = useState('');
   const [purchasePrice, setPurchasePrice] = useState('');
   const [taxRate, setTaxRate] = useState('15');
@@ -87,9 +89,17 @@ export default function NewProductPage() {
     productImageUrls.current.forEach((previewUrl) => URL.revokeObjectURL(previewUrl));
   }, []);
 
+  const alternateUnits = useMemo(
+    () => templates.find((template) => template.id === unitTemplateId)?.units ?? [],
+    [templates, unitTemplateId],
+  );
+
   function selectUnitTemplate(templateId: string) {
     setUnitTemplateId(templateId);
     setUnit((currentUnit) => productUnitForTemplate(templateId, templates, currentUnit));
+    // تغيير القالب قد يُسقط الوحدة الافتراضية القائمة من عضويته.
+    setDefaultSalesUnit('');
+    setDefaultPurchaseUnit('');
   }
 
   function selectProductImages(event: ChangeEvent<HTMLInputElement>) {
@@ -137,6 +147,8 @@ export default function NewProductPage() {
           type,
           unit: unit || null,
           unit_template_id: unitTemplateId || null,
+          default_sales_unit: defaultSalesUnit || null,
+          default_purchase_unit: defaultPurchaseUnit || null,
           sale_price: riyalToMinor(salePrice),
           purchase_price: riyalToMinor(purchasePrice),
           tax_rate: Number(taxRate) || 0,
@@ -230,6 +242,21 @@ export default function NewProductPage() {
               <div className="space-y-1.5">
                 <Label htmlFor="unit">{t('unit')}</Label>
                 <Input id="unit" value={unit} onChange={(e) => setUnit(e.target.value)} readOnly={Boolean(unitTemplateId)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="default_sales_unit">{t('default_sales_unit')}</Label>
+                <Select id="default_sales_unit" value={defaultSalesUnit} onChange={(e) => setDefaultSalesUnit(e.target.value)}>
+                  <option value="">{t('default_unit_base_option')}</option>
+                  {alternateUnits.map((u) => <option key={u.name} value={u.name}>{u.name}</option>)}
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="default_purchase_unit">{t('default_purchase_unit')}</Label>
+                <Select id="default_purchase_unit" value={defaultPurchaseUnit} onChange={(e) => setDefaultPurchaseUnit(e.target.value)}>
+                  <option value="">{t('default_unit_base_option')}</option>
+                  {alternateUnits.map((u) => <option key={u.name} value={u.name}>{u.name}</option>)}
+                </Select>
+                <p className="text-xs text-muted">{t('default_units_hint')}</p>
               </div>
               <div className="space-y-1.5 sm:col-span-2">
                 <Label htmlFor="barcode">{t('barcode')}</Label>

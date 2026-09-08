@@ -33,12 +33,12 @@ Four gaps remain. They decompose into four independently reviewable PRs.
 
 Ordering follows `PHASE2_PLANNING_HANDOFFS.md`: *"Decompose backend master-data contract, Product UX, POS UOM selection, workbook round-trip."*
 
-| PR | Title | Schema | Depends on |
-|---|---|---|---|
-| **PR-UOM2-1** | Default sales/purchase UOM (backend master-data) | 2 nullable columns | — |
-| PR-UOM2-2 | Product UX: units + alternate barcodes | none | PR-UOM2-1 (displays defaults) |
-| PR-UOM2-3 | POS UOM selection, server-authoritative | none expected | PR-UOM2-1, PR-UOM2-2 |
-| PR-UOM2-4 | Workbook: Products / Barcodes / Unit Prices round-trip | none | PR-UOM2-1 |
+| PR | Title | Schema | Depends on | Status |
+|---|---|---|---|---|
+| **PR-UOM2-1** | Default sales/purchase UOM (backend master-data) | 2 nullable columns | — | ✅ merged (`fa050c2`) |
+| **PR-UOM2-2** | Product UX: units + alternate barcodes | none | PR-UOM2-1 (displays defaults) | in progress, this PR |
+| PR-UOM2-3 | POS UOM selection, server-authoritative | none expected | PR-UOM2-1, PR-UOM2-2 | not started |
+| PR-UOM2-4 | Workbook: Products / Barcodes / Unit Prices round-trip | none | PR-UOM2-1 | not started |
 
 Each is opened, reviewed and merged separately. No mega-PR.
 
@@ -109,3 +109,51 @@ Give a Product an explicit **default sales UOM** and **default purchase UOM**, v
 ### Migration strategy
 
 Additive, nullable, no backfill, no data rewrite. Down-migration drops both columns. Deterministic on both engines.
+
+---
+
+## 4. PR-UOM2-2 — contract
+
+**Status:** merged to `main` (`fa050c2ccfc7ec5dc960c7797c6f69bb415a6b89`) before this section was authored — see §3.
+
+### Goal
+
+Give the Product screens a UI for what PR-UOM-1 and PR-UOM2-1 already built on the backend: managing alternate barcodes (`ProductBarcode` / `barcode_registry`) and viewing/setting the two default-UOM fields. No new backend capability — this PR is frontend-only, consuming existing endpoints.
+
+### Current-main baseline (measured before implementation)
+
+- `GET/POST/DELETE /products/{id}/barcodes` exist and are fully tested (PR-UOM-1) but **no UI calls them** — confirmed by grep across `web/src`.
+- `default_sales_unit` / `default_purchase_unit` are already returned by `ProductResource` and accepted by `StoreProductRequest`/`UpdateProductRequest` (PR-UOM2-1), but **no form field reads or writes them**.
+- `web/src/messages/{ar,en}.json` already contain unused `products.*` keys for this exact UI (`alternate_barcodes`, `add_barcode`, `barcode_code`, `barcode_default_quantity`, `barcode_label`, `barcode_quantity`, `barcode_quantity_invalid`, `barcode_added`, `barcode_deleted`, `alternate_barcodes_hint`, `no_alternate_barcodes`) — confirmed unused by grep. Reused verbatim rather than inventing new copy.
+- `GET /unit-templates` already returns each template's alternate `units` (name + factor); nothing new needed to populate unit dropdowns.
+
+### In scope
+
+- `ProductDialog` (used for both quick-create and edit, from the product list and profile pages): two new `Select` fields for `default_sales_unit`/`default_purchase_unit` (base unit or any alternate of the selected template); an "Alternate Barcodes" section (add/list/delete), shown only in edit mode (`product?.id` truthy) — a new product has no id yet, so no barcode can be attached before the first save, matching the existing media-upload section's own precedent in the same file.
+- `/products/new` (the full-page create form): the same two default-unit `Select` fields, for parity — no barcode section (same reason: no id yet).
+- `/products/[id]` (profile "info" tab): read-only display of the base+alternate units, the two default units, and the alternate barcodes — Quick View, per the program's UX contract; all mutation stays in `ProductDialog` via the Edit button already on this page.
+- New translation keys only for what did not already exist (`default_sales_unit`, `default_purchase_unit`, `default_unit_base_option`, a short presentation-only hint, `units`, `unit_base_badge`, `barcode_delete_confirm`).
+
+### Explicitly out of scope
+
+- Any backend change: no new route, no new column, no change to `ProductController`, `UnitTemplateController`, `StoreProductBarcodeRequest`, or any validation already shipped in PR-UOM-1/PR-UOM2-1.
+- Any change to how `InvoiceService`/`PurchaseService`/POS resolve a line's unit — D-A (presentation-only) stays in force; the new selects only read/write the two columns, nothing else.
+- Any pricing UI or factor-derived price.
+- POS UOM switching (PR-UOM2-3) and the workbook (PR-UOM2-4).
+- A parallel barcode system, a second `barcode_1`/`barcode_2` style field, or bypassing `barcode_registry`.
+- A general redesign of the product screens: no new tab, no new route, no restructuring of the existing dialog/page layout beyond adding the fields/section above in-place.
+
+### Acceptance criteria
+
+1. From the product list or profile page, an existing product can have alternate barcodes added, listed, and deleted through the UI, using the existing API and its existing validation (unit membership, atomic namespace, tenant isolation) — the UI adds no client-side policy the backend does not already enforce.
+2. A barcode add/delete failure (e.g. duplicate code, invalid unit) surfaces the backend's exact error message; no client-side guess of success.
+3. `default_sales_unit`/`default_purchase_unit` can be set to the base unit or any alternate of the product's current template, in both the quick dialog and the full-page create form, and persist correctly.
+4. Selecting a default unit does not change any invoice/purchase/POS line behavior — verified by not touching those code paths at all (frontend or backend).
+5. The profile page's info tab shows the base+alternate units, the two defaults, and the alternate barcodes without an extra network round trip beyond what the page already fetches in parallel.
+6. Loading, empty, and error states are explicit for the barcode list (skeleton while loading, a translated empty-state message, inline error on failure) — no silent blank sections.
+7. RTL layout, existing design tokens, and existing component primitives (`Card`, `Input`, `Select`, `Button`, `Badge`) only — no new UI primitives.
+8. `npm run build` and the existing frontend test suite stay green; no test weakened or removed.
+
+### Deviations requiring owner sign-off
+
+None expected — this PR touches no schema, no API contract, and no accounting/GL path. If mid-implementation something outside this scope turns out to be required, stop and ask rather than expanding it.
