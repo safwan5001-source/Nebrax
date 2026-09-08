@@ -53,6 +53,30 @@ describe('AwjGlobalSearch', () => {
     expect(options).toContain('type_products');
     expect(options).not.toContain('type_purchases');
     expect(options).not.toContain('type_journal_entries');
+    expect(options).not.toContain('type_customers');
+    expect(options).not.toContain('type_suppliers');
+  });
+
+  it('offers customers and suppliers when the user holds partners.view', () => {
+    setUser(['partners.view']);
+    render(<AwjGlobalSearch />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'type_selector_label' }));
+    const options = screen.getAllByRole('option').map((el) => el.textContent);
+
+    expect(options).toContain('type_customers');
+    expect(options).toContain('type_suppliers');
+  });
+
+  it('hides customers and suppliers for a user without partners.view', () => {
+    setUser(['invoices.view']);
+    render(<AwjGlobalSearch />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'type_selector_label' }));
+    const options = screen.getAllByRole('option').map((el) => el.textContent);
+
+    expect(options).not.toContain('type_customers');
+    expect(options).not.toContain('type_suppliers');
   });
 
   it('does not query the backend before 2 characters are typed', async () => {
@@ -86,6 +110,82 @@ describe('AwjGlobalSearch', () => {
 
     fireEvent.click(screen.getByText('INV-001'));
     expect(pushMock).toHaveBeenCalledWith('/invoices/inv-1');
+  });
+
+  it('queries customers with a type=customer filter and an unbroken search param', async () => {
+    setUser(['partners.view']);
+    apiMock.mockResolvedValue({
+      data: [
+        { id: 'p-1', name: 'مؤسسة الخليج للتجارة', code: 'C-001', vat_number: '311111111100003', mobile: '0551234567' },
+      ],
+    });
+
+    render(<AwjGlobalSearch />);
+    fireEvent.click(screen.getByRole('button', { name: 'type_selector_label' }));
+    fireEvent.click(screen.getByRole('option', { name: 'type_customers' }));
+    fireEvent.change(screen.getByPlaceholderText('placeholder_customers'), { target: { value: 'خليج' } });
+    await settleDebounce();
+
+    expect(apiMock).toHaveBeenCalledTimes(1);
+    const url = apiMock.mock.calls[0][0] as string;
+    expect(url).toContain('/partners?type=customer');
+    expect(url).toContain('&search=');
+    expect(url).not.toMatch(/\?.*\?/); // لا علامة سؤال مكرّرة (رابط غير مكسور)
+    expect(url).toContain(`search=${encodeURIComponent('خليج')}`);
+
+    expect(screen.getByText('مؤسسة الخليج للتجارة')).toBeTruthy();
+    expect(screen.getByText(/C-001/)).toBeTruthy();
+
+    fireEvent.click(screen.getByText('مؤسسة الخليج للتجارة'));
+    expect(pushMock).toHaveBeenCalledWith('/partners/p-1');
+  });
+
+  it('queries suppliers with a type=supplier filter', async () => {
+    setUser(['partners.view']);
+    apiMock.mockResolvedValue({
+      data: [{ id: 's-1', name: 'شركة الجزيرة للتوريدات', code: 'S-001' }],
+    });
+
+    render(<AwjGlobalSearch />);
+    fireEvent.click(screen.getByRole('button', { name: 'type_selector_label' }));
+    fireEvent.click(screen.getByRole('option', { name: 'type_suppliers' }));
+    fireEvent.change(screen.getByPlaceholderText('placeholder_suppliers'), { target: { value: 'جزيرة' } });
+    await settleDebounce();
+
+    expect(apiMock).toHaveBeenCalledTimes(1);
+    const url = apiMock.mock.calls[0][0] as string;
+    expect(url).toContain('/partners?type=supplier');
+    expect(url).toContain('&search=');
+
+    fireEvent.click(screen.getByText('شركة الجزيرة للتوريدات'));
+    expect(pushMock).toHaveBeenCalledWith('/partners/s-1');
+  });
+
+  it('includes customers and suppliers in an "all" search without dropping the older categories', async () => {
+    setUser(['invoices.view', 'products.view', 'partners.view']);
+    apiMock.mockImplementation((url: string) => {
+      if (url.startsWith('/partners?type=customer')) {
+        return Promise.resolve({ data: [{ id: 'c-1', name: 'عميل معاينة' }] });
+      }
+      if (url.startsWith('/partners?type=supplier')) {
+        return Promise.resolve({ data: [{ id: 's-1', name: 'مورّد معاينة' }] });
+      }
+      if (url.startsWith('/invoices')) {
+        return Promise.resolve({ data: [{ id: 'inv-1', number: 'INV-001' }] });
+      }
+      return Promise.resolve({ data: [{ id: 'p-1', name: 'منتج معاينة' }] });
+    });
+
+    render(<AwjGlobalSearch />);
+    fireEvent.change(screen.getByPlaceholderText('placeholder_all'), { target: { value: 'معاينة' } });
+    await settleDebounce();
+
+    // كل الفئات المسموحة الأربع القديمة + العملاء والموردون — لا نداء منها يُسقَط.
+    expect(apiMock).toHaveBeenCalledTimes(4);
+    expect(screen.getByText('عميل معاينة')).toBeTruthy();
+    expect(screen.getByText('مورّد معاينة')).toBeTruthy();
+    expect(screen.getByText('INV-001')).toBeTruthy();
+    expect(screen.getByText('منتج معاينة')).toBeTruthy();
   });
 
   it('shows "no results" when the search comes back empty', async () => {

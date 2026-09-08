@@ -17,11 +17,13 @@ import {
 export interface MockPartner {
   id: string;
   name: string;
+  name_en?: string | null;
   type: string;
   email: string | null;
   phone: string | null;
   city: string | null;
   vat_number: string | null;
+  cr_number?: string | null;
   entity_type?: string;
   mobile?: string | null;
   code?: string | null;
@@ -3369,10 +3371,33 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
   if (clean === '/assets') return resolve({ data: mockAssets });
   if (clean === '/cost-centers') return resolve({ data: mockCostCenters });
   if (clean === '/partners') {
-    const role = new URLSearchParams(path.split('?')[1] ?? '').get('type');
-    const list = role === 'customer' ? mockPartners.filter((p) => p.type === 'customer' || p.type === 'both')
+    const params = new URLSearchParams(path.split('?')[1] ?? '');
+    const role = params.get('type');
+    const search = (params.get('search') ?? '').trim();
+    const perPage = Number(params.get('per_page'));
+
+    let list = role === 'customer' ? mockPartners.filter((p) => p.type === 'customer' || p.type === 'both')
       : role === 'supplier' ? mockPartners.filter((p) => p.type === 'supplier' || p.type === 'both')
       : mockPartners;
+
+    if (search) {
+      list = list.filter((p) => matchesSearchTerm(
+        search,
+        p.name,
+        p.name_en,
+        p.code,
+        p.vat_number,
+        p.cr_number,
+        p.phone,
+        p.mobile,
+        p.email,
+      ));
+    }
+
+    if (Number.isFinite(perPage) && perPage > 0) {
+      list = list.slice(0, perPage);
+    }
+
     return resolve({ data: list });
   }
   if (clean === '/invoices') {
