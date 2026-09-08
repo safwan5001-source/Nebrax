@@ -19,6 +19,7 @@ use ZipArchive;
 class SpreadsheetWriter
 {
     public const TYPE_TEXT = 's';
+
     public const TYPE_NUMBER = 'n';
 
     /** نمط الأرقام العشرية (منزلتان) — فهرسه 1 في `styles.xml` أدناه. */
@@ -87,7 +88,7 @@ class SpreadsheetWriter
         $sheetPath = self::writeSheetFile($headers, $rows, $types);
 
         try {
-            $zip = new ZipArchive();
+            $zip = new ZipArchive;
             if ($zip->open($path, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
                 throw new RuntimeException('تعذر إنشاء ملف XLSX.');
             }
@@ -107,6 +108,109 @@ class SpreadsheetWriter
         } finally {
             @unlink($sheetPath);
         }
+    }
+
+    /**
+     * PR-UOM2-4: يكتب مصنّف XLSX **بعدّة أوراق** — `xlsx()` أعلاه تبقى بلا أي
+     * تعديل (ورقة واحدة دائماً)، فمسار التصدير أحادي الورقة القائم (المنتجات)
+     * لا يتأثر حرفياً. كل عنصر في `$sheets` يُكتب جزءاً مستقلاً
+     * (`sheetN.xml`) بعلاقته وترويسة نوعه الخاصة داخل الأرشيف نفسه.
+     *
+     * @param  array<int, array{name: string, headers: array<int, string>, rows: iterable<int, array<int, string|int|null>>, types?: array<int, string>}>  $sheets
+     */
+    public static function workbookXlsx(string $path, array $sheets): void
+    {
+        if ($sheets === []) {
+            throw new RuntimeException('لا توجد أوراق لكتابتها في المصنّف.');
+        }
+
+        $sheetPaths = [];
+        try {
+            foreach ($sheets as $sheet) {
+                $sheetPaths[] = self::writeSheetFile($sheet['headers'], $sheet['rows'], $sheet['types'] ?? []);
+            }
+
+            $zip = new ZipArchive;
+            if ($zip->open($path, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
+                throw new RuntimeException('تعذر إنشاء ملف XLSX.');
+            }
+
+            $names = array_map(
+                static fn (array $sheet): string => self::sheetName((string) $sheet['name']),
+                $sheets
+            );
+
+            $zip->addFromString('[Content_Types].xml', self::workbookContentTypesXml(count($sheets)));
+            $zip->addFromString('_rels/.rels', self::rootRelsXml());
+            $zip->addFromString('xl/workbook.xml', self::workbookXmlMulti($names));
+            $zip->addFromString('xl/_rels/workbook.xml.rels', self::workbookRelsXmlMulti(count($sheets)));
+            $zip->addFromString('xl/styles.xml', self::stylesXml());
+            foreach ($sheetPaths as $index => $sheetPath) {
+                $zip->addFile($sheetPath, 'xl/worksheets/sheet'.($index + 1).'.xml');
+            }
+
+            if (! $zip->close()) {
+                throw new RuntimeException('تعذر إغلاق ملف XLSX بعد الكتابة.');
+            }
+        } finally {
+            foreach ($sheetPaths as $sheetPath) {
+                @unlink($sheetPath);
+            }
+        }
+    }
+
+    /** @return array<int, string> */
+    private static function workbookContentTypesXmlParts(int $sheetCount): array
+    {
+        $parts = [];
+        for ($i = 1; $i <= $sheetCount; $i++) {
+            $parts[] = '<Override PartName="/xl/worksheets/sheet'.$i.'.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>';
+        }
+
+        return $parts;
+    }
+
+    private static function workbookContentTypesXml(int $sheetCount): string
+    {
+        return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            .'<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+            .'<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+            .'<Default Extension="xml" ContentType="application/xml"/>'
+            .'<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'
+            .implode('', self::workbookContentTypesXmlParts($sheetCount))
+            .'<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>'
+            .'</Types>';
+    }
+
+    /** @param array<int, string> $names */
+    private static function workbookXmlMulti(array $names): string
+    {
+        $sheets = '';
+        foreach (array_values($names) as $index => $name) {
+            $number = $index + 1;
+            $sheets .= '<sheet name="'.self::escape($name).'" sheetId="'.$number.'" r:id="rId'.$number.'"/>';
+        }
+
+        return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            .'<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" '
+            .'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+            .'<sheets>'.$sheets.'</sheets>'
+            .'</workbook>';
+    }
+
+    private static function workbookRelsXmlMulti(int $sheetCount): string
+    {
+        $relationships = '';
+        for ($i = 1; $i <= $sheetCount; $i++) {
+            $relationships .= '<Relationship Id="rId'.$i.'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet'.$i.'.xml"/>';
+        }
+        $stylesRelId = $sheetCount + 1;
+        $relationships .= '<Relationship Id="rId'.$stylesRelId.'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>';
+
+        return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            .'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+            .$relationships
+            .'</Relationships>';
     }
 
     /**
@@ -168,6 +272,7 @@ class SpreadsheetWriter
             if ($type === self::TYPE_NUMBER && preg_match('/^-?\d+(\.\d+)?$/', $text) === 1) {
                 $style = str_contains($text, '.') ? ' s="'.self::STYLE_DECIMAL.'"' : '';
                 $cells .= '<c r="'.$reference.'"'.$style.'><v>'.$text.'</v></c>';
+
                 continue;
             }
 

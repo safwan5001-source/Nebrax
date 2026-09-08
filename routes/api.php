@@ -80,6 +80,7 @@ use App\Http\Controllers\Api\PriceListController;
 use App\Http\Controllers\Api\PayrollController;
 use App\Http\Controllers\Api\ProductCategoryController;
 use App\Http\Controllers\Api\ProductController;
+use App\Http\Controllers\Api\ProductWorkbookController;
 use App\Http\Controllers\Api\PosAuditController;
 use App\Http\Controllers\Api\PosLossPreventionController;
 use App\Http\Controllers\Api\PosInvestigationCaseController;
@@ -345,6 +346,14 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::post('products/import/inspect', [ProductController::class, 'importInspect'])->middleware($perm('products.manage'));
         Route::post('products/import/preview', [ProductController::class, 'importPreview'])->middleware($perm('products.manage'));
         Route::post('products/import/apply', [ProductController::class, 'importApply'])->middleware($perm('products.manage'));
+        // PR-UOM2-4: مصنّف Products/Barcodes/Unit Prices ثلاثي الأوراق — مسارٌ
+        // إضافيٌّ مستقلّ عن الاستيراد/التصدير أحادي الورقة أعلاه، بلا أي تعديل عليه.
+        Route::get('products/workbook/template', [ProductWorkbookController::class, 'template'])->middleware($perm('products.manage'));
+        Route::get('products/workbook/fields', [ProductWorkbookController::class, 'fields'])->middleware($perm('products.manage'));
+        Route::post('products/workbook/inspect', [ProductWorkbookController::class, 'inspect'])->middleware($perm('products.manage'));
+        Route::post('products/workbook/preview', [ProductWorkbookController::class, 'preview'])->middleware($perm('products.manage'));
+        Route::post('products/workbook/apply', [ProductWorkbookController::class, 'apply'])->middleware($perm('products.manage'));
+        Route::get('products/workbook/export', [ProductWorkbookController::class, 'export'])->middleware($perm('products.view'));
         Route::get('products/{id}', [ProductController::class, 'show'])->middleware($perm('products.view'));
         Route::get('products/{id}/activity', [ProductController::class, 'activity'])->middleware($perm('products.view'));
         Route::get('products/{id}/barcodes', [ProductController::class, 'indexBarcodes'])->middleware($perm('products.view'));
