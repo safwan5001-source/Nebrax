@@ -2,7 +2,7 @@
 
 **Status:** Living reference — research + code inspection in progress  
 **Date started:** 2026-09-08  
-**Last research update:** 2026-09-08 — report/export scope audit expanded across analytical, customer and accounting reports  
+**Last research update:** 2026-09-08 — classification analytics, specialized report gates and invoice record-scope inspection  
 **Scope:** Users, Employees, Roles, Permissions, Branch Scope, Resource Access, Record Scope, Workflow/Record State, Reports, permission-aware UX.  
 **Reference product:** Daftra official documentation.  
 
@@ -150,8 +150,6 @@ Record Scope
 └── Workflow-related records
 ```
 
-No generic own/assigned sales-record scope has been confirmed in AWJ yet. Sales invoices do have a `salesperson_id` dimension in reporting, but that is currently a request filter, not evidence of authorization scope.
-
 Do not define a global meaning of "own". Per domain it may mean creator, salesperson, assignee, responsible employee or requester.
 
 ## 12. Reports — mandatory security property
@@ -184,16 +182,14 @@ Therefore branch/warehouse restrictions appear not to be inherited automatically
 Confirmed code facts:
 
 - route uses `reports.view`;
-- `SalesReportRequest::authorize()` returns true;
-- request accepts `branch_id[]` UUID filters but does not constrain them to the user's allowed branches;
-- controller passes filters to the service;
+- request branch IDs are filters, not visibly constrained to user allowed branches;
 - service applies branch filtering only when supplied;
 - no visible intersection with `allowedBranchIds()`;
 - payments view uses the same request-driven pattern;
 - totals use the same query family;
 - salesperson is a filter, not authorization scope.
 
-Static conclusion: a branch-restricted user with `reports.view` appears capable of widening sales report rows/totals outside allowed branches. Tenant isolation remains intact, but intra-tenant branch authorization is not visibly inherited. Verify with executable tests before fixing.
+Static conclusion: a branch-restricted user with `reports.view` appears capable of widening sales report rows/totals outside allowed branches. Verify with executable tests before fixing.
 
 ## 15. Purchase report audit — STRONG LIKELY P1 GAP
 
@@ -203,117 +199,138 @@ For unrestricted users this is intentional reporting behavior. For restricted us
 
 ## 16. Customer report audit — STRONG LIKELY P1 GAP
 
-The wider report inventory found the same design explicitly in `CustomerReportService`:
-
-- invoice-based customer sales/balance reports remove `BranchScope`;
-- code comment states no branch selection = all tenant branches;
-- customer receipt reports remove `BranchScope`;
-- customer appointment reports remove `BranchScope`;
-- branch filters are applied only when the request supplies them;
-- no visible intersection with the authenticated user's `allowedBranchIds()` in the inspected service path.
-
-Therefore customer sales, balances, receipts and appointments appear vulnerable to the same intra-tenant branch-scope widening for a restricted user with `reports.view`.
-
-This confirms the problem spans both financial and operational report sources.
+`CustomerReportService` removes `BranchScope` from invoice, receipt and appointment report sources and uses request branch filters without visible user-scope intersection. Customer report rows/totals therefore show the same likely intra-tenant branch widening pattern.
 
 ## 17. Core accounting reports — IMPORTANT DESIGN CONSTRAINT + AUTHORIZATION RISK
 
-AWJ core accounting reports include at least:
+AWJ core accounting reports include trial balance, income statement, balance sheet, account ledger, journal entries, cash flow, tax report, partner statement, aging and cost-center profitability.
 
-- trial balance;
-- income statement;
-- balance sheet;
-- account ledger;
-- journal entries;
-- cash flow;
-- tax report;
-- partner statement;
-- aging;
-- cost-center profitability.
+Routes are generally protected by `reports.view`. `ReportController::filters()` treats `branch_id` as optional and omission as all-branch aggregation, without visible intersection with user allowed branches.
 
-Routes are generally protected by `reports.view`.
+This must **not** be fixed by applying a normal branch Global Scope to journal lines/entries. Existing AWJ architecture intentionally preserves complete journals and consolidated accounting. Accounting report authorization needs a report-aware scope intersection at the correct accounting dimension/query boundary while preserving journal completeness and balance.
 
-`ReportController::filters()` explicitly treats `branch_id` as optional and documents that omitting it leaves reports aggregated across all branches. The controller does not visibly intersect a requested branch with `request()->user()->allowedBranchIds()`.
+## 18. Export/PDF/print propagation
 
-### Critical accounting constraint
-
-This must **not** be fixed by applying a normal branch Global Scope to journal lines/entries. Existing AWJ multi-branch architecture intentionally keeps accounting data globally complete so a balanced journal is not silently truncated and consolidated accounting remains correct.
-
-`ApiController` itself documents this distinction: operational display lists use explicit branch scoping while `ReportService` accounting calculations must not be damaged by an indiscriminate global branch filter.
-
-Therefore accounting report authorization needs a report-aware scope intersection at the appropriate accounting dimension/query boundary, preserving journal completeness and balancing rules.
-
-Static assessment: **authorization risk confirmed at controller/filter design level; accounting-safe implementation requires dedicated design and tests.**
-
-## 18. Export/PDF/print propagation — CONFIRMED CLIENT-SIDE DERIVATION
-
-The current report workspaces for general, sales, purchases, customers and inventory generate CSV from the already-loaded report document rows (`doc.rows` + totals) in the browser. PDF/print flows are likewise built from the report document state rather than fetching an independently authorized server-side export dataset in the inspected paths.
-
-Security consequence:
+General, sales, purchases, customers and inventory report workspaces generate CSV from already-loaded report rows. PDF/print are likewise derived from report document state in inspected paths.
 
 ```text
 If API report data is over-broad,
 CSV/PDF/print inherit the same over-broad data.
 ```
 
-Conversely, fixing only export buttons would not solve the disclosure because the raw report API response is already the security boundary.
+Backend report scope is therefore the primary security boundary.
 
-This makes the backend report-scope correction the primary requirement. Export tests should verify propagation, but export UI must not become the authorization layer.
+## 19. Classification analytics — STRONG LIKELY P1 GAP CONFIRMED BY CODE
 
-## 19. Systemic report conclusion after wider inventory
+`ClassificationAnalyticsReportService` supports six scopes:
 
-The issue is now clearly systemic rather than isolated:
+```text
+sales_invoice
+purchase_invoice
+customer
+supplier
+receipt
+payment
+```
+
+The route is guarded by generic `reports.view`.
+
+Static code evidence is strong:
+
+- sales/purchase document aggregation calls `withoutGlobalScope(BranchScope::class)`;
+- receipt/payment aggregation also removes `BranchScope`;
+- customer/supplier partner aggregation removes `BranchScope`;
+- `applyDocumentFilters()` applies `branch_id[]` only when provided by the request;
+- partner joins likewise apply requested branch IDs only when present;
+- no visible `allowedBranchIds()` intersection exists in this service;
+- totals are calculated from the same aggregated rows.
+
+Therefore all six classification-analysis scopes appear capable of tenant-wide aggregation for a branch-restricted user who has `reports.view`, unless an unseen outer layer restricts filters. No such outer restriction was found in the inspected route/service path.
+
+Status: **Strong likely P1 authorization gap; verify with restricted-user tests.**
+
+## 20. Specialized reports — IMPORTANT POSITIVE CONTRAST
+
+Specialized modules should not be lumped automatically into generic `reports.view`.
+
+Confirmed examples:
+
+- Fuel-station dashboard/report endpoints require dedicated `fuel.reports.view` **and** the commercial application gate `fuel_stations.maintenance`.
+- POS audit overview/events require `pos.audit.view` plus the `sales.pos` app gate.
+- POS audit export has its own `pos.audit.export` permission plus `sales.pos` app gate.
+
+This is a stronger permission/feature model than the generic reporting subsystem and validates the target rule:
+
+```text
+Feature/App Enabled
+AND
+Semantic Permission
+AND
+Effective Data Scope
+```
+
+However, dedicated permission/app gates do **not** prove branch/resource/record-scope inheritance. Specialized query implementations still need scope audit where relevant.
+
+## 21. Invoice operational access — BRANCH SCOPE PRESENT, RECORD SCOPE MISSING
+
+Direct invoice access is materially better scoped than generic reports.
+
+Confirmed from `Invoice` and `InvoiceController`:
+
+- invoice stores both `created_by` and `salesperson_id`;
+- `store()` sets `created_by` server-side from the authenticated user, preventing client spoofing of creator identity;
+- `salesperson_id` is tenant-validated against `Employee`;
+- invoice list uses `scopeToActiveBranch()`;
+- direct `show()` also uses branch-scoped lookup;
+- route requires `invoices.view`.
+
+This means AWJ already has two credible record-scope dimensions available in the data model:
+
+```text
+Creator scope   -> invoices.created_by == user.id
+Assigned scope  -> invoices.salesperson_id == linked employee.id
+```
+
+But the inspected `index()` does not apply either dimension as authorization. A user with `invoices.view` sees all invoices inside their permitted branch scope, not only records they created or are assigned to.
+
+No separate permission or policy for "own invoices only" / "assigned invoices only" was found in this path.
+
+Status: **Daftra parity gap confirmed at static code level.** This is not a Tenant Isolation bug because branch/tenant controls remain; it is missing record-level scope granularity.
+
+### Important semantic design note
+
+Do not collapse creator and salesperson into one generic "own" rule. Daftra behavior and AWJ fields support a domain-aware model where sales visibility may need configurable semantics such as:
+
+```text
+ALL_ALLOWED
+CREATED_BY_ME
+ASSIGNED_TO_ME
+CREATED_OR_ASSIGNED_TO_ME
+```
+
+Exact product semantics and backward compatibility must be decided before implementation.
+
+## 22. Systemic report conclusion — UPDATED
 
 | Report family | Scope behavior found | Static assessment |
 |---|---|---|
 | Inventory | no visible branch/warehouse user-scope intersection | Likely P1 |
 | Sales | request branch filter; no visible user intersection | Likely P1 |
 | Purchases | explicit tenant-wide scope absent filter | Strong likely P1 |
-| Customers | explicit BranchScope removal across invoices/payments/appointments | Strong likely P1 |
+| Customers | explicit BranchScope removal across multiple sources | Strong likely P1 |
+| Classification analytics | explicit BranchScope removal across six scopes | **Strong likely P1** |
 | Core accounting | optional branch filter; consolidated-all default | Authorization risk; accounting-sensitive |
 | CSV/PDF/print | derived from loaded report rows | Inherits API disclosure |
+| Fuel reports | dedicated permission + app gate | Better gate; data-scope audit still needed |
+| POS audit/export | dedicated view/export permissions + app gate | Better gate; data-scope audit still needed |
 
-The preferred architectural direction is a **shared reporting authorization/scope contract**, not duplicated frontend restrictions and not a blanket Global Scope.
+Preferred direction remains a shared reporting authorization/scope contract, not frontend restrictions and not a blanket Global Scope.
 
-Conceptually:
-
-```text
-Requested Report Scope
-        ∩
-User Allowed Branch Scope
-        ∩
-User Allowed Resource Scope (where relevant)
-        ∩
-Record Scope (where relevant)
-        ↓
-Domain-safe report query
-        ↓
-Rows + Totals + Drilldowns + Exports
-```
-
-For accounting reports, the domain-safe query must preserve complete/balanced journal semantics.
-
-No implementation is authorized by this reference yet.
-
-## 20. Classification analytics and specialized report families — STILL TO VERIFY
-
-`classification-analytics` is a separate report service and remains to be inspected for the same scope rules. Fuel-station reports and POS audit/investigation exports use specialized permissions/application gates and should be audited separately rather than assumed equivalent to generic `reports.view`.
-
-This distinction matters: specialized modules may already have stronger local authorization than the generic report subsystem.
-
-## 21. Sales / invoices — sensitive actions
-
-Daftra research confirms permissions/policies inside invoices: profit visibility, payment-date changes, tax/ZATCA submission, discount controls, free item editing and numbering controls.
-
-AWJ already has some fine-grained sales permissions such as `sales.minimum_price_override` and separate ZATCA-related capabilities. Broader legacy invoice permissions still need route/action mapping before deciding decomposition.
-
-Own/assigned invoice scope remains unconfirmed and requires direct Invoice model/controller inspection.
-
-## 22. Purchasing — workflow granularity
+## 23. Purchasing — workflow granularity
 
 Daftra has a staged purchase workflow with granular actions. AWJ still has broad legacy `purchases.view/manage` in parts of the system. Decompose only where actual AWJ workflow/security value justifies it and preserve compatibility.
 
-## 23. Accounting invariants
+## 24. Accounting invariants
 
 Authorization and accounting validity are separate:
 
@@ -324,7 +341,7 @@ Accounting invariant/state: is the action valid for this object/period?
 
 Permissions must never override tenant isolation, ledger balance/integrity, source-generated journal rules, approved immutable/frozen states, period/fiscal locks or ZATCA lifecycle restrictions. `owner`/`*` does not mean "break accounting".
 
-## 24. HR / self-service / approvals
+## 25. HR / self-service / approvals
 
 Daftra shows stateful approval. Target rule:
 
@@ -339,7 +356,7 @@ permission
 
 AWJ approval implementations still need dedicated inspection.
 
-## 25. Activity/audit
+## 26. Activity/audit
 
 Audit visibility and target-resource authorization are separate:
 
@@ -349,7 +366,7 @@ Can view audit event != Can open/modify audited resource
 
 AWJ activity/audit endpoints still require dedicated inspection.
 
-## 26. Feature/application state
+## 27. Feature/application state
 
 Target ordering:
 
@@ -365,11 +382,11 @@ Applicable scope/policy
 
 Permission never activates an unavailable tenant feature.
 
-## 27. Impersonation
+## 28. Impersonation
 
 Daftra's login-as-user is useful functional reference but not initial priority. If added later: restricted permission, original actor retained, audit trail, obvious impersonation state, no tenant crossing and review of sensitive operations.
 
-## 28. Code-backed gap matrix — current
+## 29. Code-backed gap matrix — current
 
 | Capability | AWJ evidence | Status | Direction |
 |---|---|---|---|
@@ -384,69 +401,59 @@ Daftra's login-as-user is useful functional reference but not initial priority. 
 | Role module grouping | current RoleDialog | Partial | Generalize arbitrary actions |
 | Role cloning | not found in inspected API/UI | Missing | Candidate parity feature |
 | Permission dependencies | not confirmed | Missing/verify | Domain-specific graph only |
-| Own/assigned sales scope | not found; salesperson exists as data/filter | Missing/verify | Inspect invoice semantics |
+| Invoice branch scope | `scopeToActiveBranch()` list/show | Present | Preserve |
+| Invoice creator attribution | server-set `created_by` | Present | Candidate record-scope input |
+| Invoice salesperson assignment | tenant-validated `salesperson_id` | Present | Candidate assigned-scope input |
+| Own/assigned invoice authorization | no record-scope predicate in index/show | **Missing / Daftra parity gap** | Define semantics + BC before implementation |
 | Inventory cost redaction | `SensitiveCostPolicy` | Present | Preserve |
 | Inventory report scope inheritance | no visible branch/warehouse intersection | **Likely P1 gap** | Restricted-user tests, then central fix |
 | Sales report branch inheritance | request filter only; no visible user intersection | **Likely P1 gap** | Restricted-user tests, then central fix |
 | Purchase report branch inheritance | explicit tenant-wide query absent request filter | **Strong likely P1 gap** | Restricted-user tests, then central fix |
 | Customer report branch inheritance | explicit BranchScope removal across multiple sources | **Strong likely P1 gap** | Restricted-user tests, then central fix |
+| Classification analytics scope | explicit BranchScope removal across all six scopes | **Strong likely P1 gap** | Restricted-user tests, then central fix |
 | Core accounting report branch authorization | optional/all-branches report filter | **Risk confirmed; accounting-sensitive** | Design safe intersection; never truncate journals blindly |
 | Report totals scope | derived from same query families | **Likely affected** | Test rows + totals together |
 | CSV/PDF/print | client-side from report rows | **Inherits API scope** | Fix backend; verify exports |
-| Classification analytics | separate service | Unknown | Inspect next |
-| Specialized fuel/POS reports | specialized permissions/app gates | Unknown/possibly stronger | Audit separately |
+| Fuel report permission/app gate | `fuel.reports.view` + commercial app | Present | Audit data scope separately |
+| POS audit export gate | `pos.audit.export` + `sales.pos` | Present | Preserve; audit data scope separately |
 | Stateful approvals | not yet deeply inspected | Unknown | Dedicated pass |
 | Audit drill-down authorization | not yet inspected | Unknown | Dedicated pass |
-| Feature entitlement ∩ permission | exists in parts, not audited globally | Partial/unknown | Coverage audit |
+| Feature entitlement ∩ permission | proven in specialized modules | Present in parts | Standardize coverage |
 
-## 29. Corrections to earlier assumptions
-
-Research initially treated branch scope, warehouse scope and cash/bank ACL as likely gaps. Code inspection corrected this:
+## 30. Corrections to earlier assumptions
 
 1. User branch scope already exists.
 2. User warehouse scope already exists.
 3. Cashbox/bank deposit/withdraw ACL already exists.
 4. The problem is coverage/consistency, not missing foundational models.
-5. Generic report services are now the clearest systemic coverage risk.
-6. Export is mostly a propagation surface of report API data, not a separate authorization boundary in the inspected report workspaces.
-7. Accounting reports require a different technical treatment from operational report rows because journal completeness/balance must never be broken by naive scoping.
+5. Generic report services are the clearest systemic coverage risk.
+6. Classification analytics belongs to the same risk class, not an exception.
+7. Export is mostly a propagation surface of report API data in inspected generic workspaces.
+8. Accounting reports require a domain-safe treatment that preserves complete journals.
+9. Specialized Fuel/POS endpoints demonstrate better semantic permission + feature gating.
+10. Invoice records already carry creator and salesperson fields, so Daftra-like own/assigned scope can be built from real AWJ semantics rather than inventing a new ownership field; the authorization layer itself is currently missing.
 
-## 30. Current-data status
+## 31. Current-data status
 
 Safwan confirmed on 2026-09-08 that **all current AWJ data and transactions are experimental/test-only and not important production records**.
 
-Planning implication: implementation/migration strategy does not need to preserve the business value of current test transactions as if they were live production records. However, this does **not** relax requirements for schema safety, tenant isolation, authorization correctness, accounting invariants, backward-compatible application contracts where still required, or future production readiness.
+This does not relax schema safety, tenant isolation, authorization correctness, accounting invariants, backward-compatible application contracts where required, or future production readiness.
 
-## 31. Documentation reconciliation
+## 32. Documentation reconciliation
 
-This living reference now contains the substantive findings through the wider report/export inventory:
+This living reference now contains substantive findings through classification analytics and the first direct invoice record-scope inspection. No substantive finding from this inspection is intentionally left only in chat.
 
-- Daftra functional model and target authorization formula;
-- current AWJ RBAC/branch/warehouse/cash-bank foundations;
-- Employee/User lifecycle;
-- role editor limitations and cloning gap;
-- permission granularity/dependencies;
-- record-scope concept;
-- accounting/workflow invariants;
-- report scope inheritance requirement;
-- inventory, sales, purchase and customer report scope findings;
-- accounting-report authorization constraint;
-- CSV/PDF/print propagation finding;
-- current test-data status.
-
-No substantive finding from this inspection is intentionally left only in chat.
-
-## 32. Next inspection pass
+## 33. Next inspection pass
 
 Continue before any Master Plan or implementation:
 
-1. Inspect `ClassificationAnalyticsReportService` and specialized report endpoints to complete report-family classification.
-2. Inspect sales/invoice/customer models/controllers to define own/assigned semantics from actual fields.
-3. Inspect HR/purchase/document approval workflows for permission + actor + state enforcement.
-4. Inspect activity/audit endpoints and drill-down authorization.
-5. Map the full `Rbac::PERMISSIONS` catalogue against RoleDialog rendering and identify dependency candidates.
-6. Enumerate every cash/bank money movement path and prove `assertAllowed()` coverage.
-7. After static inventory, use targeted executable tests for restricted branch/warehouse users before proposing a fix.
+1. Inspect partner/customer operational access to determine whether customer visibility also needs own/assigned semantics and how it relates to salesperson ownership.
+2. Inspect HR/purchase/document approval workflows for permission + actor + state enforcement.
+3. Inspect activity/audit endpoints and drill-down authorization.
+4. Map the full `Rbac::PERMISSIONS` catalogue against RoleDialog rendering and identify dependency candidates.
+5. Enumerate every cash/bank money movement path and prove `assertAllowed()` coverage.
+6. Audit Fuel/POS specialized query data scope only where relevant.
+7. After static inventory, use targeted executable tests for restricted branch/warehouse/record-scope users before proposing fixes.
 
 After those checks, update the evidence matrix and only then propose an **AWJ Access Control V2 Master Plan**.
 
