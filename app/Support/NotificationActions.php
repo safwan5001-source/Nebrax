@@ -29,5 +29,8 @@ final class NotificationActions
         // `zatca.view`/`invoices.view` من جديد عبر مسارات الفاتورة القائمة.
         // لا صفحة مستقلة لمحاولة الإرسال؛ الفاتورة هي المصدر القابل للفتح.
         'view_zatca_submission' => 'invoice',
+        // PR-NOTIF-5: الاستحقاق يفتح الفاتورة، وحدث POS يفتح الجلسة؛ المساران يعيدان التفويض.
+        'view_receivable_invoice' => 'invoice',
+        'view_pos_session' => 'pos_session',
     ];
 }
