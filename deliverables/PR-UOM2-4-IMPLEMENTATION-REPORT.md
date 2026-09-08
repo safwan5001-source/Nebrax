@@ -2,11 +2,12 @@
 
 **Task / PR:** Phase 2A — Multiple UOM / Barcode Completion, **PR #4 of 4 (الأخيرة)**: Workbook round-trip — Products / Barcodes / Unit Prices
 **Date:** 2026-09-08
-**Status:** مكتمل — PR مفتوحة، بانتظار CI والمراجعة. لا دمج ولا نشر.
+**Status:** مكتمل — PR مفتوحة، `mergeable_state: clean`، CI خضراء بالكامل على المحرِّكين. بانتظار مراجعتكم. لا دمج ولا نشر.
 **Branch:** `claude/phase-2-pr-uom2-4`
 **PR:** [#705](https://github.com/safwan5001-source/Nebrax/pull/705)
-**Base SHA:** `74d2ed6` (PR-UOM2-3، مُدمَجة ومنشورة Production)
-**Head SHA:** `ca1fb02`
+**Base SHA (عند فتح PR):** `74d2ed6` (PR-UOM2-3، مُدمَجة ومنشورة Production)
+**Base SHA (الحالي، بعد تقدّم `main` بمهامَّ أخرى موازية):** `c4d3471` — `mergeable_state: clean` رغم ذلك، لا تعارض
+**Head SHA:** `9f3ce74`
 
 **العقد:** أُضيف قسمٌ جديد (§6) في
 `docs/plans/products-inventory/phase-2-completion/MULTIPLE-UOM-BARCODE-DECOMPOSITION.md`
@@ -282,9 +283,19 @@ is_active`. **مطابقةٌ حرفيةٌ لملف الاستيراد/التصد
 
 ## 13. CI
 
-قيد التنفيذ لحظة كتابة هذا التقرير على Head `ca1fb02`. سأتحقّق من النتيجة
-وأحدّث هذا القسم فور اكتمالها، على غرار البروتوكول المتّبع في كل PR سابقة
-بهذا البرنامج.
+**خضراء بالكامل، ومتوافقة (`mergeable_state: clean`).** على Head `9f3ce74`،
+اكتملت الوظائف الأربع المسجَّلة (تشغيلا `push`/`pull_request` × `ci.yml`
+[sqlite, pgsql] — لا `web-ci.yml` لأن هذه المهمّة لم تلمس `web/` إطلاقاً)
+بنجاح:
+
+| Job | Result |
+|---|---|
+| `php artisan test (L11, sqlite)` | ✅ success (×2 تشغيلَين) |
+| `php artisan test (L11, pgsql)` | ✅ success (×2 تشغيلَين) |
+
+تعليقٌ واحدٌ على الـPR من بوت `chatgpt-codex-connector` يفيد بتجاوز حدّ
+استخدام مراجعاته الآلية — إشعارٌ تلقائيٌّ لا مراجعة فعلية، لا يحتاج رداً أو
+إجراءً.
 
 ---
 
@@ -328,8 +339,8 @@ is_active`. **مطابقةٌ حرفيةٌ لملف الاستيراد/التصد
 
 - **Branch:** `claude/phase-2-pr-uom2-4`
 - **PR:** [#705](https://github.com/safwan5001-source/Nebrax/pull/705)
-- **Base SHA:** `74d2ed6`
-- **Head SHA:** `ca1fb02`
+- **Base SHA (عند فتح PR):** `74d2ed6`
+- **Head SHA:** `9f3ce74`
 
 ---
 
