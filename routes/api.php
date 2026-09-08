@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AccountController;
+use App\Http\Controllers\Api\AccountingPeriodLockController;
 use App\Http\Controllers\Api\AccountRoutingController;
 use App\Http\Controllers\Api\AccountSettingsController;
 use App\Http\Controllers\Api\AppointmentController;
@@ -475,6 +476,13 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::get('accounting-settings/account-routing', [AccountRoutingController::class, 'index'])->middleware($perm('accounting_settings.view'));
         Route::put('accounting-settings/account-routing/{roleKey}', [AccountRoutingController::class, 'update'])->middleware($perm('accounting_settings.manage'));
         Route::delete('accounting-settings/account-routing/{roleKey}', [AccountRoutingController::class, 'reset'])->middleware($perm('accounting_settings.manage'));
+
+        // ACC-6: أقفال الفترات المحاسبية. لا مسار حذف ولا تعديل في المكان —
+        // التصحيح تحريرٌ بسببٍ مسجَّل ثم إنشاء بديل، فيبقى التاريخ الإداري.
+        Route::get('accounting-settings/period-locks', [AccountingPeriodLockController::class, 'index'])->middleware($perm('accounting_period_locks.view'));
+        Route::get('accounting-settings/period-locks/{id}/events', [AccountingPeriodLockController::class, 'events'])->middleware($perm('accounting_period_locks.view'));
+        Route::post('accounting-settings/period-locks', [AccountingPeriodLockController::class, 'store'])->middleware($perm('accounting_period_locks.manage'));
+        Route::post('accounting-settings/period-locks/{id}/release', [AccountingPeriodLockController::class, 'release'])->middleware($perm('accounting_period_locks.manage'));
 
         // قوائم الأسعار: إعداد شركة مشترك يختاره البائع يدوياً في المسودة؛
         // سعر السطر النهائي يبقى لقطة مستقلة ولا يتغير بتعديل القائمة لاحقاً.
