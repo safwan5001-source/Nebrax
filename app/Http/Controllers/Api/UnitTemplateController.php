@@ -151,8 +151,19 @@ class UnitTemplateController extends ApiController
         $hasStalePriceListItem = PriceListItem::whereIn('product_id', $productIds)
             ->whereIn('unit_name', $affectedNames)->exists();
 
-        if ($hasStaleBarcode || $hasStalePriceListItem) {
-            abort(422, 'لا يمكن تغيير وحدة الأساس أو حذف/تعديل وحدةٍ تستعملها مراجع حيّة (باركود بديل أو بند قائمة أسعار) — عدّل تلك المراجع أولاً.');
+        // PR-UOM2-1: وحدتا البيع/الشراء الافتراضيتان مرجعان حيّان كذلك —
+        // اسمان نصّيان على `products` يشيران إلى وحدةٍ في هذا القالب. لو
+        // بقيا خارج هذا الحارس لصار حذف وحدةٍ أو إعادة تسميتها يترك المنتج
+        // مقترحاً وحدةً لم تعد موجودة، وهو بالضبط «المرجع البائت الصامت»
+        // الذي بُني هذا الحارس لمنعه. الفحص في الذاكرة على `$products`
+        // المحمَّلة سلفاً — بلا استعلامٍ إضافي ولا تصفية فرع.
+        $hasStaleDefaultUnit = $products->contains(
+            fn (Product $product) => in_array($product->default_sales_unit, $affectedNames, true)
+                || in_array($product->default_purchase_unit, $affectedNames, true)
+        );
+
+        if ($hasStaleBarcode || $hasStalePriceListItem || $hasStaleDefaultUnit) {
+            abort(422, 'لا يمكن تغيير وحدة الأساس أو حذف/تعديل وحدةٍ تستعملها مراجع حيّة (باركود بديل أو بند قائمة أسعار أو وحدة بيع/شراء افتراضية) — عدّل تلك المراجع أولاً.');
         }
     }
 

@@ -28,6 +28,8 @@ class Product extends BaseModel implements BranchShareable
 
     protected $fillable = [
         'tenant_id', 'branch_id', 'sku', 'barcode', 'name', 'name_en', 'type', 'unit',
+        // PR-UOM2-1: اقتراحٌ للواجهة لا سلوكٌ في المستندات. `null` = وحدة الأساس.
+        'default_sales_unit', 'default_purchase_unit',
         'description', 'category', 'brand', 'category_id', 'brand_id', 'unit_template_id', 'reorder_level',
         'supplier_id', 'sales_account_id', 'cogs_account_id',
         'min_sale_price', 'discount', 'discount_type', 'profit_margin', 'tags', 'internal_notes',
