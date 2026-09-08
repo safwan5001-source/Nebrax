@@ -41,6 +41,7 @@ import {
   LayoutDashboard,
   LayoutGrid,
   LayoutTemplate,
+  Lock,
   MapPin,
   MapPinPlus,
   Network,
@@ -209,6 +210,10 @@ const GROUPS: NavGroup[] = [
       { href: '/cost-centers', icon: Network, key: 'costCenters', built: true },
       { href: '/cheques', icon: ScrollText, key: 'cheques' },
       { href: '/accounting-settings', icon: SlidersHorizontal, key: 'accountingSettings', built: true, permission: 'accounting_settings.view' },
+      // ACC-6: صلاحية مستقلة عمداً عن `accounting_settings.view` — قفلُ فترة
+      // سلطة رقابية لا سلطة توجيه حسابات، فمدخلها في الشريط لا يتبع بوابة
+      // مركز الإعدادات. نفس نمط `supplierRefunds` أعلاه.
+      { href: '/accounting-settings/period-locks', icon: Lock, key: 'periodLocks', built: true, permission: 'accounting_period_locks.view' },
     ],
   },
   {

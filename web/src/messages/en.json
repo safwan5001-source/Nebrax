@@ -2499,7 +2499,8 @@
     "devDocs": "Documentation",
     "devWebhooks": "Webhooks",
     "devSecurity": "Security",
-    "supplierRefunds": "Supplier refunds"
+    "supplierRefunds": "Supplier refunds",
+    "periodLocks": "Period Locks"
   },
   "partnerProfile": {
     "back": "Back",

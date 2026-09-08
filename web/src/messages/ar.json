@@ -2499,7 +2499,8 @@
     "devDocs": "التوثيق",
     "devWebhooks": "Webhooks",
     "devSecurity": "الأمان",
-    "supplierRefunds": "استردادات الموردين"
+    "supplierRefunds": "استردادات الموردين",
+    "periodLocks": "أقفال الفترات"
   },
   "partnerProfile": {
     "back": "رجوع",
