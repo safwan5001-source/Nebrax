@@ -1,197 +1,171 @@
 # AWJ Master Record Pattern V2 — Specification
 
-Status: Design-system working specification. Documentation only; no production/API/DB/accounting changes.
+Status: Design-system specification. Documentation only; no production/API/DB/accounting changes.
 
 ## 1. Purpose
 
 Master Record V2 defines the reusable ERP grammar for long-lived business entities such as Customer, Supplier and Product. It is distinct from Document Workspace: a master record persists and participates in many transactions; it is not itself a transactional document with posting lifecycle.
 
 Canonical architecture:
-
 `Master Record → Approved Pattern → Shared Components → Design Tokens`
 
-The pattern must preserve ERP density, speed, permission awareness, tenant/branch rules, accounting integrity, Arabic RTL and English LTR.
+The pattern preserves ERP density, speed, permission awareness, tenant/branch rules, accounting integrity, Arabic RTL and English LTR.
 
 ## 2. Two interaction surfaces
 
 ### Quick Create / Edit
-Used inside transactional work such as invoice or purchase entry. It must let the user create the minimum valid record without abandoning the current workflow. It must not become a miniature full profile.
+Used inside transactional work such as invoice, purchase, quotation or purchase-order entry. It captures the minimum valid record/change needed without abandoning the transaction. It must not become a miniature full profile and must not expose consequential financial/inventory operations.
 
 ### Full Master Workspace
-Used to manage the entity after creation. Canonical anatomy:
+Used to manage the entity after creation:
+`Identity Header → Contextual Command Bar → Compact Key Summary → Section Navigation → Active Operational Content`
 
-`Identity Header → Contextual Actions → Key Summary → Details / Relations → Activity & Audit`
+The grammar is shared; semantics are record-specific. Customer uses receivables context, Supplier uses payables/procurement context, and Product uses commercial/inventory context where applicable.
 
-Desktop may use tabs where they improve density. Mobile recomposes the same information vertically and may use accordions where appropriate; it is not a separate information model.
+Desktop/laptop may use dense Tabs. Mobile recomposes the same logical information with compact navigation/Accordion where appropriate. Full View is an operational workspace, not a disabled edit form.
+
+Master Record does not inherit the Document Workspace Stepper. A Stepper appears only if a real verified multi-stage master workflow exists.
 
 ## 3. Property versus consequential action
 
-A core AWJ rule:
-
-> Identity and operational attributes may be edited as record properties. Financial, inventory, or other consequential events must be represented as explicit actions/workflows, not disguised as ordinary form fields.
+> Identity and operational attributes may be edited as record properties. Financial, inventory, or other consequential events must be explicit actions/workflows, not disguised as ordinary form fields.
 
 Examples:
-- Product opening stock is an inventory event, not a normal editable quantity field.
-- Customer/Supplier opening balance is an accounting event, not an ordinary profile property.
+- Product opening stock is an inventory event, not an editable quantity field.
+- Customer/Supplier opening balance is an accounting event, not a profile property.
 - Stock receipt/issue/transfer remain inventory actions.
+- Customer receipts and Supplier outgoing payments remain authorized financial operations.
+
+Consequential actions preserve actual authorization, audit, tenant/branch, accounting and inventory rules.
 
 ## 4. Customer and Supplier domain decision
 
-The user-facing V2 domain SHALL present **Customer** and **Supplier** as separate master experiences.
+V2 presents **Customer** and **Supplier** as separate user-facing master experiences. It SHALL NOT expose `customer / supplier / both` (عميل / مورد / كلاهما).
 
-The UI SHALL NOT expose a selector whose choices are `customer / supplier / both` or the Arabic equivalent "عميل / مورد / كلاهما".
+Current internal `Partner` reuse does not dictate V2 UX. Backend/API/schema implications are inspected separately during implementation. Experimental/demo records are not a reason to preserve obsolete `both` UX; architecture, accounting integrity, tenant isolation and genuine external compatibility remain protected.
 
-Current internal `Partner` reuse does not dictate the V2 UX. During implementation, backend/API/schema implications must be inspected separately. Current/demo records are experimental and are not by themselves a reason to preserve obsolete `both` UX. Architecture, accounting integrity, tenant isolation and genuine external compatibility remain protected.
-
-This decision separates two axes that must not be confused:
+Two distinct axes:
 1. Business role: Customer vs Supplier.
 2. Entity type: Individual vs Commercial.
 
-## 5. Customer entity type — Individual vs Commercial
+Sales-context Quick Create creates a Customer without asking Supplier/Both. Procurement-context Quick Create creates a Supplier without asking Customer/Both.
 
-`Individual / Commercial` is a meaningful entity type, not a decorative classification. It changes labels, visible fields and validation rules.
+## 5. Entity type — Individual versus Commercial
 
-### Individual customer
-Intended for a natural person acting in their own capacity.
+`Individual / Commercial` changes labels, visible fields and validation behavior; it is not decorative.
 
-Candidate V2 identity fields:
-- Full name (Arabic; English where supported)
-- Profile photo
-- National/personal identifier where applicable
-- Gender where business requirements justify it
-- Birth date where business requirements justify it
-- Mobile / phone / email
-- Address
+**Individual:** natural person. Candidate presentation: full name, profile photo, approved applicable personal identifier, contact and address. Gender/birth date only if approved as genuine AWJ requirements.
 
-### Commercial customer
-Intended for a company, establishment or other commercial entity.
+**Commercial:** company/establishment/business entity. Candidate presentation: trade/business name, organization logo, approved commercial identifier/CR, VAT number where applicable, representative/contact person where modeled, contact and address.
 
-Candidate V2 identity fields:
-- Trade/business name (Arabic; English where supported)
-- Company/establishment logo
-- Commercial Registration / relevant commercial identifier
-- VAT number where applicable
-- Contact/representative person
-- Mobile / phone / email
-- Address
+Irrelevant fields are omitted rather than rendered empty. Customer and Supplier validation matrices are verified independently; Supplier validation is not blindly copied from Customer.
 
-### Shared commercial settings
-Where supported by AWJ:
-- Customer classification
-- Default price list
-- Credit period
-- Credit limit
-- Active/inactive state
+Daftra was reviewed only as a product/UX benchmark for dynamic entity-type behavior. Saudi/ZATCA-sensitive requirements require authoritative verification before implementation.
 
-These settings do not make an Individual customer "commercial"; they are business relationship settings independent of legal/entity type.
+## 6. Customer/Supplier profile visual
 
-### External-reference note
-Daftra documentation was reviewed as a benchmark for the Individual/Commercial distinction and customer data behavior. It supports treating the choice as field/validation behavior rather than a cosmetic label. AWJ must still validate Saudi/ZATCA requirements against the authoritative applicable rules before implementation; Daftra is a product reference, not AWJ's legal authority.
-
-## 6. Customer/Supplier profile image
-
-V2 SHALL support a profile visual for both Customer and Supplier.
-
-Presentation rule:
+V2 supports one primary identity visual:
 - Individual: profile photo.
 - Commercial: organization logo.
-- No uploaded image: generated avatar/fallback based on the record name.
+- Absent: generated/fallback avatar based on name.
 
-The visual belongs prominently in the Full Master Workspace identity header. It must not be forced into every dense table, invoice selector or combobox; those surfaces preserve ERP information density unless a specific usability case requires imagery.
+It belongs prominently in the Full Master Workspace header, not automatically in every dense table/selector.
 
-Current AWJ Partner contract does not yet provide this capability, so implementation requires an explicit backend/storage/API/UI scope and must not be smuggled into a visual-only change.
+Current Partner contract lacks this capability, so implementation requires explicit backend/storage/API/UI scope with tenant isolation, authorization, upload validation and cleanup.
 
-## 7. Customer Master — proposed information architecture
+Product media is intentionally different: Product may have multiple product images rather than one party identity image/logo.
 
-### Create/Edit
-1. Identity header: image/logo, Individual/Commercial, active state.
-2. Identity fields: dynamically appropriate to entity type.
-3. Contact information.
-4. Address / national-address information.
-5. Business relationship settings: classification, price list, credit period, credit limit.
-6. Additional information where actually supported.
-7. Save.
+## 7. Customer Master semantics
 
-Opening balance is excluded from the ordinary form-field hierarchy and exposed as an explicit accounting operation where applicable.
+Customer Master is a sales/receivables workspace. Subject to actual support/permissions it may include identity/contact/address, Customer classification, price list, credit period/limit/status, authoritative receivables summary, Sales invoices, received payments, statement/ledger, quotations, applicable returns/credit notes, timeline/activity/audit, and contextual sales/receipt/statement actions.
 
-### View Workspace
-The Customer Full Master Workspace should build on AWJ's existing Partner Profile capability while improving hierarchy:
+Opening balance remains an explicit accounting-sensitive operation. Financial values come from authoritative backend/accounting outputs; V2 invents no alternative accounting calculations.
 
-1. Identity Header
-   - photo/logo/fallback avatar
-   - customer name
-   - Individual/Commercial
-   - active/inactive
-   - customer code where applicable
-2. Contextual Actions
-   - Edit
-   - create relevant sales transaction(s)
-   - receive/register payment where permitted
-   - statement/export actions
-   - additional actions according to permissions and actual domain support
-3. Key Financial Summary
-   - current/closing balance
-   - open amount
-   - overdue/due amount
-   - credit exposure/limit where supported
-4. Details
-   - identity, tax/commercial identity, contact and address
-5. Relations
-   - invoices
-   - payments
-   - ledger/statement
-   - quotations
-   - returns/credit notes where applicable
-6. Activity / Timeline / Audit
+## 8. Supplier Master semantics
 
-Financial values shown in the UI must come from authoritative backend/accounting data; the V2 presentation must not invent new accounting calculations.
+Supplier Master is a procurement/payables workspace, not a renamed Customer screen. Subject to actual support/permissions it may include identity/contact/address, Supplier classification and verified procurement settings, authoritative payables summary, Purchase invoices, outgoing payments, statement/ledger, Purchase Orders where supported, purchase returns/supplier credits, timeline/activity/audit, and contextual procurement/payment/statement actions.
 
-## 8. Product proving case
+Customer-only Sales/Quotation/receivables semantics must not leak into Supplier Master. Do not invent Supplier credit/payment-term settings for visual symmetry. Supplier opening balance and outgoing payments remain explicit accounting-sensitive operations.
 
-Current Product Profile already validates the Full Master Workspace concept: identity + SKU/status, edit/contextual actions, stock/average cost/sale price summary, information, inventory movements, timeline/activity, media, units and barcodes.
+## 9. Product Master semantics — Item versus Service
 
-V2 must preserve the distinction between product properties and inventory events. Transfer, receipt, issue and opening quantity behavior are operational inventory actions, not free edits to stock-on-hand.
+Product Master is the operational/inventory proving case. AWJ already models `type = good | service`; V2 presents this as:
+`صنف (Item) | خدمة (Service)`
 
-Product Quick Create/Edit remains valuable inside invoices/purchases and must coexist with the full Product Master Workspace.
+The choice controls Create/Edit fields, validation, saved-profile content and operational affordances — not merely a badge.
 
-## 9. Responsive and bilingual contract
+Shared capabilities where supported include identity/name, SKU/code, category/brand, description, units/templates, sales/purchase units, barcode where meaningful, pricing, tax, notes/tags, status and product media.
 
-Every Master Record V2 proving case must be deliberately verified in:
-- Arabic RTL
-- English LTR
-- Desktop/laptop
-- Tablet
-- Mobile
-- mixed-direction values: money, SKU, barcode, VAT/CR/IDs, phone/email
-- long labels and text expansion
+### Item
+When inventory tracking applies, Item may expose quantity on hand, authorized average cost, reorder context, inventory movements and authorized receipt/issue/transfer actions. Stock quantity is not an editable Product property; opening stock and subsequent quantity changes flow through inventory operations.
 
-Mirroring direction must not alter logical information order or financial meaning.
+### Service
+Service is intentionally non-inventory: no quantity-on-hand or average-inventory-cost summary, reorder presentation, inventory-movements section, receipt/issue/transfer commands, or opening-stock action. These are omitted rather than shown as zero/disabled/N/A.
 
-## 10. Current implementation gaps intentionally deferred
+Service retains valid non-inventory units, pricing, tax and barcode capabilities. Service-specific fields are added only when an AWJ workflow consumes them; Daftra booking duration is not copied without a real AWJ requirement.
 
-Do not implement as part of this documentation checkpoint. Known candidate gaps include:
-- Customer/Supplier profile image storage/API/UI.
-- Individual-specific identity fields not present in the current Partner contract (for example National ID, gender, birth date if ultimately approved).
-- Commercial representative/contact modeling if not already represented adequately.
-- Removal or internal retention of `Partner.type = both`.
-- Exact validation differences for Individual vs Commercial, including ZATCA-sensitive requirements.
+Changing an existing Item↔Service is not promised as unrestricted editing. Implementation must define lifecycle guards when inventory movements, valuation/history, document references or accounting effects exist.
 
-Each requires repository inspection and a deliberately scoped implementation PR before production change.
+## 10. Summary, permissions and truthful absence
 
-## 11. Proving-case sequence
+Compact summaries are semantic:
+- Customer: receivables.
+- Supplier: payables.
+- Item: inventory/commercial.
+- Service: non-inventory commercial.
 
-1. Customer Master V2 — first human/business-party proving case.
-2. Product Master V2 — operational/inventory proving case.
-3. Supplier Master V2 — validate that shared Partner internals do not force Customer UX onto procurement.
-4. Only then consider extending the pattern to other master entities such as Employee.
+Sensitive information is permission-aware. Product cost/profit values must respect centralized visibility permissions and cannot leak through summaries, derived values, exports or secondary sections.
 
-## 12. Decisions locked in this checkpoint
+If content is semantically inapplicable, omit it rather than forcing misleading zeroes or empty tabs for symmetry.
 
-- Customer and Supplier are separate user-facing master experiences.
-- No user-facing Customer/Supplier/Both selector in V2.
-- Individual/Commercial is an entity-type decision that changes fields/validation.
-- Customer and Supplier support profile photo/logo with fallback avatar.
+## 11. Section navigation and responsive behavior
+
+Customer, Supplier and Product need not have identical sections. Desktop/laptop may use dense Tabs; mobile uses responsive recomposition/Accordion or compact section navigation while preserving logical/deep-link context where supported.
+
+Related transaction, ledger and inventory-history surfaces follow appropriate responsive DataTable/list/document behavior rather than blindly shrinking desktop tables.
+
+No persistent global mobile bottom navigation is introduced by this pattern.
+
+## 12. Arabic RTL / English LTR
+
+Verify every proving case across Arabic RTL, English LTR, desktop/laptop/tablet/mobile, mirrored actions/sections, mixed-direction money/SKU/barcode/VAT/CR/IDs/phone/email/document references, long labels/names, and financial sign/number alignment.
+
+## 13. Proving cases reconciled
+
+1. **Customer** — business-party / receivables.
+2. **Supplier** — procurement / payables; proves shared Partner internals do not force Customer UX.
+3. **Product** — operational/inventory; proves Item|Service subtype behavior, media, units/barcodes, inventory actions and cost visibility fit the shared grammar.
+
+Shared grammar:
+`Identity Header → Contextual Command Bar → Compact Key Summary → Section Navigation → Active Operational Content`
+
+Shared rules: Quick Create/Edit + Full Workspace coexist; Full View is operational; no Stepper by default; consequential actions are separate from properties; permissions/security/tenant/accounting/inventory semantics remain authoritative; inapplicable content is omitted; responsive and bilingual behavior are first-class.
+
+## 14. Implementation gaps intentionally deferred
+
+This checkpoint does not implement:
+- Customer/Supplier profile-image storage/API/UI.
+- approved Individual-specific fields or commercial representative modeling.
+- `Partner.type = both` API/schema cleanup decision.
+- final Customer/Supplier Individual/Commercial validation matrices including Saudi/ZATCA-sensitive rules.
+- dedicated Supplier full-profile route decision.
+- Supplier-specific procurement/payment settings contract.
+- final Item/Service create/edit UI or type-change lifecycle guards.
+- Product profile visual/responsive refactor.
+- inventory valuation/lifecycle/deletion/stock-permit/branch/tenant/accounting-routing/cost-permission changes.
+
+Each requires separately scoped implementation and appropriate tests.
+
+## 15. Decisions locked in this checkpoint
+
+- Customer and Supplier are separate user-facing masters; no Customer/Supplier/Both selector.
+- Individual/Commercial changes fields/validation.
+- Customer/Supplier use one primary photo/logo with fallback; Product retains multi-image media.
+- Product Item|Service changes Create/Edit, saved profile, sections, summary and actions; Service exposes no inventory-only UI.
 - Quick Create/Edit and Full Master Workspace coexist.
-- Consequential financial/inventory events are actions, not ordinary editable profile fields.
-- Customer opening balance remains accounting-sensitive and separate from ordinary profile editing.
+- Full Master Workspace is operational, not a disabled form.
+- No Master Record Stepper by default.
+- Consequential financial/inventory events are actions, not ordinary fields.
+- Financial/cost summaries are authoritative and permission-aware.
+- Inapplicable content is omitted rather than forced for symmetry.
 - Arabic RTL and English LTR are first-class requirements.
