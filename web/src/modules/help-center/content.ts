@@ -321,7 +321,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
       {
         title: { ar: 'مشكلة شائعة', en: 'Common problem' },
         paragraphs: [
-          { ar: 'إذا لم تظهر قائمة أسعار، تحقق من أنها نشطة. قائمة الأسعار الافتراضية تظهر للعملاء وللأطراف من نوع كلاهما فقط.', en: 'If a price list is missing, confirm it is active. The default price list is shown only for customers and partners of type Both.' },
+          { ar: 'إذا كانت قائمة الأسعار فارغة، فتأكد من امتلاك صلاحية عرض الفواتير ومن نجاح تحميل القوائم. تظهر القوائم غير النشطة معطلة ولا يمكن اختيارها، ويظهر الحقل للعملاء وللأطراف من نوع كلاهما فقط.', en: 'If the price-list selector is empty, confirm you have invoice-view permission and that the lists loaded successfully. Inactive lists appear disabled and cannot be selected, and the field is shown only for customers and partners of type Both.' },
         ],
       },
     ],
@@ -448,7 +448,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
           { ar: 'أضف الوصف والمرفقات المطلوبة واحفظ كمسودة.', en: 'Add the description and required attachments, then save as a draft.' },
           { ar: 'من صفحة التفاصيل راجع البيانات والمرفقات، ثم اختر ترحيل المصروف لإنشاء القيد.', en: 'On the detail page, review data and attachments, then choose Post expense to create the journal.' },
         ],
-        note: { ar: 'يمكن تعديل المسودة أو حذفها ما لم تكن مرتبطة بمستند مصدر. المصروف المرحّل لا يقبل التعديل المباشر.', en: 'A draft can be edited or deleted unless linked to a source document. A posted expense cannot be edited directly.' },
+        note: { ar: 'يمكن تعديل أي مسودة. ويمكن حذفها ما لم تكن مرتبطة بمستند مصدر. المصروف المرحّل لا يقبل التعديل المباشر.', en: 'Any draft can be edited. It can be deleted unless it is linked to a source document. A posted expense cannot be edited directly.' },
       },
       {
         title: { ar: 'مشكلة شائعة', en: 'Common problem' },

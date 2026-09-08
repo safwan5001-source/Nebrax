@@ -3,6 +3,7 @@ import { getHelpArticle, type HelpArticle, type HelpArticleSlug } from './conten
 type HelpRoutePattern = {
   kind: 'exact' | 'prefix';
   pathname: `/${string}`;
+  excludedPathnames?: readonly `/${string}`[];
 };
 
 export type HelpContextKey =
@@ -72,7 +73,11 @@ export const CONTEXTUAL_HELP_ROUTES = [
     routes: [{ kind: 'prefix', pathname: '/inventory-openings' }],
   },
   { context: 'stockPermits', articleSlug: 'stock-permits', routes: [{ kind: 'prefix', pathname: '/stock-permits' }] },
-  { context: 'expenses', articleSlug: 'record-expense', routes: [{ kind: 'prefix', pathname: '/expenses' }] },
+  {
+    context: 'expenses',
+    articleSlug: 'record-expense',
+    routes: [{ kind: 'prefix', pathname: '/expenses', excludedPathnames: ['/expenses/categories'] }],
+  },
   {
     context: 'fiscalYears',
     articleSlug: 'fiscal-year-close',
@@ -92,6 +97,9 @@ function normalizePathname(pathname: string): string {
 }
 
 function matchesRoute(pathname: string, route: HelpRoutePattern): boolean {
+  if (route.excludedPathnames?.some((excluded) => pathname === excluded || pathname.startsWith(`${excluded}/`))) {
+    return false;
+  }
   if (route.kind === 'exact') return pathname === route.pathname;
   return pathname === route.pathname || pathname.startsWith(`${route.pathname}/`);
 }

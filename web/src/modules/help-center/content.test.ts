@@ -95,4 +95,18 @@ describe('Help Center content', () => {
     expect(searchHelpArticles('opening balance import', 'en').map((article) => article.slug)).toContain('import-inventory-opening');
     expect(searchHelpArticles('إقفال سنة مالية', 'ar').map((article) => article.slug)).toContain('fiscal-year-close');
   });
+
+  it('documents the reviewed partner price-list and linked-expense edge cases accurately', () => {
+    const partnerProblem = getHelpArticle('create-partner')?.sections.find((section) => section.title.en === 'Common problem');
+    expect(partnerProblem?.paragraphs?.[0].en).toContain('invoice-view permission');
+    expect(partnerProblem?.paragraphs?.[0].en).toContain('Inactive lists appear disabled');
+    expect(partnerProblem?.paragraphs?.[0].ar).toContain('صلاحية عرض الفواتير');
+    expect(partnerProblem?.paragraphs?.[0].ar).toContain('القوائم غير النشطة معطلة');
+
+    const expenseNote = getHelpArticle('record-expense')?.sections[0].note;
+    expect(expenseNote?.en).toContain('Any draft can be edited');
+    expect(expenseNote?.en).toContain('deleted unless it is linked to a source document');
+    expect(expenseNote?.ar).toContain('يمكن تعديل أي مسودة');
+    expect(expenseNote?.ar).toContain('حذفها ما لم تكن مرتبطة بمستند مصدر');
+  });
 });

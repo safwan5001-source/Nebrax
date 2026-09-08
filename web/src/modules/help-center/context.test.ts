@@ -22,6 +22,7 @@ describe('contextual Help Center route mapping', () => {
     ['/inventory-openings/import', 'import-inventory-opening'],
     ['/stock-permits/permit-1', 'stock-permits'],
     ['/expenses/new?edit=expense-1', 'record-expense'],
+    ['/expenses/expense-1', 'record-expense'],
     ['/accounting-settings/fiscal-years', 'fiscal-year-close'],
   ])('maps %s to %s', (pathname, slug) => {
     expect(resolveContextualHelp(pathname)?.article.slug).toBe(slug);
@@ -38,6 +39,8 @@ describe('contextual Help Center route mapping', () => {
     '/partners-archive',
     '/partners/partner-1/statement',
     '/cash-and-bank/transfer',
+    '/expenses/categories',
+    '/expenses/categories/',
     '/returns',
     '/purchase-requests',
     '/',
