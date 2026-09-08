@@ -349,4 +349,140 @@ describe('AwjGlobalSearch', () => {
 
     expect(screen.getByText('Widget')).toBeTruthy();
   });
+
+  /**
+   * انكشاف حقيقي على بيانات حقيقية بعد #692/#697: العملاء والموردون كانا
+   * يعملان بينما الفواتير/المشتريات/المنتجات/القيود لا تعيد نتائج إطلاقاً —
+   * لا لأن استعلامها خاطئ، بل لأن `/invoices`، `/purchases`، `/products`،
+   * و`/journal-entries` تفرض `per_page >= 10` (قيد قائم في تلك النقاط من قبل)
+   * بينما القيمتان القديمتان هنا (٤ و٨) كانتا تحته فيرفضهما الخادم بـ٤٢٢،
+   * ومعالجة الأخطاء الحالية تُسقط أي خطأ غير ٤٠٣ بصمت كـ«لا نتائج». هذه
+   * المجموعة تستعمل بنى استجابة واقعية لكل نقطة (لا شكلاً موحّداً مصطنعاً)
+   * لإثبات أن كل فئة تُستخرَج وتُعرض فعلياً، لا فقط أن apiMock استُدعي.
+   */
+  describe('core categories return real results again (per_page floor fix)', () => {
+    it('shows a matching sales invoice — real InvoiceResource shape (no eager-loaded partner)', async () => {
+      setUser(['invoices.view']);
+      apiMock.mockResolvedValue({
+        data: [
+          {
+            id: 'inv-1', number: 'INV-2026-00039', partner_id: 'p-1',
+            payment_type: 'cash', status: 'draft', payment_status: 'unpaid',
+            invoice_date: '2026-06-24', total: '5750.00',
+          },
+        ],
+        links: { first: 'x', last: 'x', prev: null, next: null },
+        meta: { current_page: 1, last_page: 1, per_page: 10, total: 1 },
+      });
+
+      render(<AwjGlobalSearch />);
+      fireEvent.click(screen.getByRole('button', { name: 'type_selector_label' }));
+      fireEvent.click(screen.getByRole('option', { name: 'type_invoices' }));
+      fireEvent.change(screen.getByPlaceholderText('placeholder_invoices'), { target: { value: '00039' } });
+      await settleDebounce();
+
+      const url = apiMock.mock.calls[0][0] as string;
+      expect(url).toContain('/invoices?search=00039');
+      expect(url).toContain('per_page=20'); // فئة واحدة مختارة — لا القيمة القديمة (8) التي كان الخادم يرفضها
+      expect(screen.getByText('INV-2026-00039')).toBeTruthy();
+
+      fireEvent.click(screen.getByText('INV-2026-00039'));
+      expect(pushMock).toHaveBeenCalledWith('/invoices/inv-1');
+    });
+
+    it('shows a matching purchase — real PurchaseResource shape', async () => {
+      setUser(['purchases.view']);
+      apiMock.mockResolvedValue({
+        data: [{ id: 'pur-1', number: 'PUR-2026-0042', partner_id: 's-1', purchase_date: '2026-06-20', total: '1150.00' }],
+        meta: { current_page: 1, last_page: 1, per_page: 10, total: 1 },
+      });
+
+      render(<AwjGlobalSearch />);
+      fireEvent.click(screen.getByRole('button', { name: 'type_selector_label' }));
+      fireEvent.click(screen.getByRole('option', { name: 'type_purchases' }));
+      fireEvent.change(screen.getByPlaceholderText('placeholder_purchases'), { target: { value: '0042' } });
+      await settleDebounce();
+
+      const url = apiMock.mock.calls[0][0] as string;
+      expect(url).toContain('/purchases?search=0042');
+      expect(url).toContain('per_page=20');
+      expect(screen.getByText('PUR-2026-0042')).toBeTruthy();
+    });
+
+    it('shows a matching product — real ProductResource shape', async () => {
+      setUser(['products.view']);
+      apiMock.mockResolvedValue({
+        data: [{ id: 'prod-1', sku: 'PUMP-XJ500', barcode: '6291000112233', name: 'مضخة وقود ديزل XJ-500', type: 'good', sale_price: '100.00' }],
+      });
+
+      render(<AwjGlobalSearch />);
+      fireEvent.click(screen.getByRole('button', { name: 'type_selector_label' }));
+      fireEvent.click(screen.getByRole('option', { name: 'type_products' }));
+      fireEvent.change(screen.getByPlaceholderText('placeholder_products'), { target: { value: 'XJ500' } });
+      await settleDebounce();
+
+      const url = apiMock.mock.calls[0][0] as string;
+      expect(url).toContain('/products?search=XJ500');
+      expect(url).toContain('per_page=20');
+      expect(screen.getByText('مضخة وقود ديزل XJ-500')).toBeTruthy();
+    });
+
+    it('shows a matching journal entry — real mapEntry() shape (data + meta + facets)', async () => {
+      setUser(['accounts.view']);
+      apiMock.mockResolvedValue({
+        data: [{ id: 'je-1', number: 'JE-2026-0003', entry_date: '2026-06-24', description: 'قيد فاتورة', status: 'posted', total: '1150.00' }],
+        meta: { current_page: 1, last_page: 1, per_page: 10, total: 1 },
+        facets: { source_types: [] },
+      });
+
+      render(<AwjGlobalSearch />);
+      fireEvent.click(screen.getByRole('button', { name: 'type_selector_label' }));
+      fireEvent.click(screen.getByRole('option', { name: 'type_journal_entries' }));
+      fireEvent.change(screen.getByPlaceholderText('placeholder_journal_entries'), { target: { value: '0003' } });
+      await settleDebounce();
+
+      const url = apiMock.mock.calls[0][0] as string;
+      expect(url).toContain('/journal-entries?search=0003');
+      expect(url).toContain('per_page=20');
+      expect(screen.getByText('JE-2026-0003')).toBeTruthy();
+    });
+
+    it('an "all" search sends per_page=10 (satisfies every endpoint\'s floor) and shows results from all matching categories', async () => {
+      setUser(['invoices.view', 'purchases.view', 'products.view', 'accounts.view']);
+      apiMock.mockImplementation((url: string) => {
+        if (url.startsWith('/invoices')) return Promise.resolve({ data: [{ id: 'inv-1', number: 'INV-1' }] });
+        if (url.startsWith('/purchases')) return Promise.resolve({ data: [{ id: 'pur-1', number: 'PUR-1' }] });
+        if (url.startsWith('/products')) return Promise.resolve({ data: [{ id: 'prod-1', name: 'Widget' }] });
+        return Promise.resolve({ data: [{ id: 'je-1', number: 'JE-1' }] });
+      });
+
+      render(<AwjGlobalSearch />);
+      fireEvent.change(screen.getByPlaceholderText('placeholder_all'), { target: { value: 'term' } });
+      await settleDebounce();
+
+      apiMock.mock.calls.forEach(([url]) => {
+        expect(url as string).toContain('per_page=10');
+      });
+      expect(screen.getByText('INV-1')).toBeTruthy();
+      expect(screen.getByText('PUR-1')).toBeTruthy();
+      expect(screen.getByText('Widget')).toBeTruthy();
+      expect(screen.getByText('JE-1')).toBeTruthy();
+    });
+
+    it('does not regress customers/suppliers while fixing the core four', async () => {
+      setUser(['partners.view']);
+      apiMock.mockResolvedValue({ data: [{ id: 'p-1', name: 'مؤسسة الخليج للتجارة', code: 'C-001' }] });
+
+      render(<AwjGlobalSearch />);
+      fireEvent.click(screen.getByRole('button', { name: 'type_selector_label' }));
+      fireEvent.click(screen.getByRole('option', { name: 'type_customers' }));
+      fireEvent.change(screen.getByPlaceholderText('placeholder_customers'), { target: { value: 'خليج' } });
+      await settleDebounce();
+
+      const url = apiMock.mock.calls[0][0] as string;
+      expect(url).toContain('/partners?type=customer');
+      expect(url).toContain('per_page=20');
+      expect(screen.getByText('مؤسسة الخليج للتجارة')).toBeTruthy();
+    });
+  });
 });
