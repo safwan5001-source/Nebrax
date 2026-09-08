@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import type { RefObject } from 'react';
+import { useRef, type RefObject } from 'react';
 import { useTranslations } from 'next-intl';
 import { LogOut, Search, Menu, Plus, Settings, ChevronDown, FilePlus, FilePlus2, UserPlus, Building2, Check } from 'lucide-react';
 import { Button } from '../ui/button';
@@ -28,6 +28,7 @@ export function Topbar({
   const user = currentUser();
   const initial = user?.name?.trim().charAt(0) || '؟';
   const company = useCompany();
+  const userMenuButtonRef = useRef<HTMLButtonElement>(null);
   // مبدّل الفرع النشط — تبديل سريع فقط (الإدارة في عنصر «الفروع» بالشريط الجانبي).
   const { branches, active, activeId, setActiveBranchId } = useBranches();
 
@@ -83,6 +84,7 @@ export function Topbar({
 
         {/* قائمة المستخدم */}
         <Dropdown
+          triggerButtonRef={userMenuButtonRef}
           align="end"
           menuLabel={t('account')}
           triggerLabel={t('account')}
@@ -125,7 +127,7 @@ export function Topbar({
             </>
           )}
 
-          <ContextualHelpTrigger placement="menu" />
+          <ContextualHelpTrigger placement="menu" restoreFocusRef={userMenuButtonRef} />
           <DropdownItem icon={Settings} href="/settings">{t('settings')}</DropdownItem>
           <DropdownItem icon={LogOut} tone="danger" onClick={handleLogout}>{t('logout')}</DropdownItem>
         </Dropdown>

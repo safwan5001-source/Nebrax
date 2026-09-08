@@ -17,6 +17,7 @@ type DropdownChildren = React.ReactNode | ((state: { open: boolean; close: () =>
 
 export function Dropdown({
   trigger,
+  triggerButtonRef,
   children,
   align = 'end',
   menuLabel,
@@ -28,6 +29,7 @@ export function Dropdown({
   onOpenChange,
 }: {
   trigger: React.ReactNode;
+  triggerButtonRef?: React.RefObject<HTMLButtonElement>;
   children: DropdownChildren;
   align?: 'start' | 'end';
   menuLabel?: string;
@@ -43,7 +45,8 @@ export function Dropdown({
   const [open, setOpen] = useState(false);
   const [mobilePopoverPosition, setMobilePopoverPosition] = useState<{ top: number; left: number } | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
+  const internalTriggerRef = useRef<HTMLButtonElement>(null);
+  const triggerRef = triggerButtonRef ?? internalTriggerRef;
   const menuRef = useRef<HTMLDivElement>(null);
   const onOpenChangeRef = useRef(onOpenChange);
   onOpenChangeRef.current = onOpenChange;

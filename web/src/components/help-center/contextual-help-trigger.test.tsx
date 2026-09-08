@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { useRef } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderIntl, TEST_MESSAGES, TEST_LOCALES } from '@/test-utils/intl';
 import { ContextualHelpTrigger } from './contextual-help-trigger';
@@ -42,13 +43,28 @@ describe('ContextualHelpTrigger', () => {
     expect(links[0].getAttribute('href')).toBe('/help/create-sales-invoice');
   });
 
-  it('opens the same contextual sheet from the mobile user-menu action', () => {
-    renderIntl(<ContextualHelpTrigger placement="menu" />);
+  it('opens the same contextual sheet from the mobile user-menu action and restores focus', async () => {
+    function MenuHarness() {
+      const accountButtonRef = useRef<HTMLButtonElement>(null);
+      return (
+        <>
+          <button ref={accountButtonRef} type="button">الحساب</button>
+          <ContextualHelpTrigger placement="menu" restoreFocusRef={accountButtonRef} />
+        </>
+      );
+    }
+
+    renderIntl(<MenuHarness />);
 
     fireEvent.click(screen.getByRole('menuitem', { name: 'مساعدة هذه الشاشة', hidden: true }));
 
     expect(screen.getByRole('dialog')).toBeTruthy();
     expect(screen.getByRole('link', { name: 'فتح المقال الكامل' }).getAttribute('href')).toBe('/help/create-sales-invoice');
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+    await waitFor(() => {
+      expect(document.activeElement).toBe(screen.getByRole('button', { name: 'الحساب' }));
+    });
   });
 
   it('preserves the V1 Help Center navigation on an unmapped route without opening a sheet', () => {

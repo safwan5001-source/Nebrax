@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import type { RefObject } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { BookOpen, Clock, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -11,10 +12,12 @@ export function ContextualHelpSheet({
   article,
   open,
   onOpenChange,
+  restoreFocusRef,
 }: {
   article: HelpArticle;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  restoreFocusRef: RefObject<HTMLElement>;
 }) {
   const t = useTranslations('helpCenter');
   const locale = helpLocale(useLocale());
@@ -22,7 +25,14 @@ export function ContextualHelpSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent closeLabel={t('closeContextualHelp')} dir={locale === 'ar' ? 'rtl' : 'ltr'}>
+      <SheetContent
+        closeLabel={t('closeContextualHelp')}
+        dir={locale === 'ar' ? 'rtl' : 'ltr'}
+        onCloseAutoFocus={(event) => {
+          event.preventDefault();
+          restoreFocusRef.current?.focus();
+        }}
+      >
         <header className="shrink-0 border-b border-border px-5 pb-4 pe-14 pt-4">
           <p className="text-xs font-semibold text-primary">{t('contextualTitle')}</p>
           <SheetTitle className="mt-1 text-lg font-semibold text-text">{article.title[locale]}</SheetTitle>
