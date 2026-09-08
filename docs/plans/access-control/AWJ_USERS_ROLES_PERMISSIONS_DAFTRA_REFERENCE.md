@@ -1,8 +1,8 @@
 # AWJ Users, Roles & Permissions — Daftra Functional Reference
 
-**Status:** Living reference — research in progress  
+**Status:** Living reference — research + code inspection in progress  
 **Date started:** 2026-09-08  
-**Last research update:** 2026-09-08 — reconciliation pass through reports/record scope/activity log/admin findings  
+**Last research update:** 2026-09-08 — first code-backed AWJ access-control inspection  
 **Scope:** Users, Employees, Roles, Permissions, Branch Scope, Resource Access, Record Scope, Workflow/Record State, Reports, permission-aware UX.  
 **Reference product:** Daftra official documentation.  
 
@@ -30,7 +30,7 @@ Current AWJ already has a real tenant-aware RBAC foundation:
 - Employee ↔ User linkage exists (`users.employee_id`), with tenant-safe linking rules documented in the HR/users architecture.
 - AWJ already contains fine-grained sensitive permissions in newer modules, including `products.view_cost`, `sales.minimum_price_override`, POS audit/approval permissions, Document Center permissions, accounting settings/period locks and fiscal-year permissions.
 
-Important current characteristic: AWJ roles are **CompanyWide**. This is acceptable; branch/resource scope should not be implemented by creating branch-specific role copies.
+Important correction after code inspection: AWJ roles remain **CompanyWide**, but AWJ already has **per-user branch scope and per-user warehouse scope**. This is the desired separation: role = what; user scope = where/which resource. It must be preserved rather than replaced with branch-specific role copies.
 
 ## 3. Daftra model observed so far
 
@@ -115,9 +115,17 @@ Observed Daftra behavior:
 - A restricted user's visible navigation and available actions reflect effective permissions.
 - Administrators can use "login as user" to inspect the resulting experience.
 
+### AWJ code-backed status
+
+AWJ `RoleController` already supports create/update/delete custom roles, tenant-safe assigned-user counts, system-role protection, owner immutability and prevention of wildcard `*` for custom roles through the role contract. The role list returns `Rbac::PERMISSIONS` as the canonical assignable catalogue.
+
+The current `RoleDialog` already groups permission strings by the first segment (`module.action`) and displays module rows. However, it is structurally optimized for `view/manage`: `ACTION_ORDER` contains only those two actions and the label logic treats any non-`manage` action as the view label. With AWJ's newer fine-grained keys (`approve`, `close`, `reopen`, audit actions, etc.), the grouping exists but the UX/action labeling is not yet sufficiently expressive.
+
+No clone endpoint/action was found in the inspected `RoleController`/`RoleDialog`; role cloning therefore remains a **confirmed UX/API gap in this inspection**, unless another implementation is discovered later.
+
 ### AWJ target
 
-Keep the backend permission registry canonical, but present role editing in grouped modules/applications. Desired UX includes create/edit/clone, assigned-user counts, module grouping, safe select-all, risk labeling for sensitive permissions, and protection of system roles.
+Keep the backend permission registry canonical, preserve current role safety invariants, and evolve the role editor for arbitrary action names, dependencies, risk labels and cloning without weakening backward compatibility.
 
 ## 6. Permission granularity
 
@@ -163,56 +171,117 @@ AWJ should standardize these behaviors. UI hiding is not authorization; backend 
 
 Daftra allows allowed branches to be associated with a user. Role answers **what** the user may do; scope answers **where**.
 
-Official documentation also describes branch assignment as limiting the user to the branch's sales screens, warehouses and cashboxes when those resources are configured consistently.
+### AWJ code-backed status — PRESENT
 
-### AWJ target
+This is **not a missing foundation** in current AWJ.
 
-Avoid branch-specific role explosion. Branch authorization must be server-enforced and tenant-safe, not merely a frontend filter.
+Current `User` model has a `branches()` many-to-many relation through `branch_user`, plus:
 
-## 10. Resource-level access (ACL / scoped policy)
+- `allowedBranchIds()` — returns assigned IDs, with `null` meaning unrestricted.
+- `canAccessBranch()` — server-side access predicate.
 
-Daftra documentation confirms resource-specific access beyond general role/branch.
+`UserController::syncAccessScope()` persists `branch_ids`, validates IDs through tenant-scoped models, and deliberately treats an empty array as removal of restriction/full access for backward compatibility. `UserResource` exposes `branch_ids`; the User dialog already edits them.
 
-### Warehouses
+`ApiController::scopeToActiveBranch()` intersects list queries with the user's allowed branches. Importantly, `?branch=all` means all **allowed** branches, not all tenant branches. This closes an obvious URL/filter bypass.
 
-Observed permission concepts:
+### Compatibility convention
 
-- View warehouse.
-- Use warehouse when creating an invoice.
-- Modify inventory for warehouse.
+AWJ deliberately uses:
 
-Warehouse **view** also affects reporting: an employee without view access to a warehouse does not see that warehouse's data in inventory movement reports.
+```text
+no branch assignments / [] persisted relation => unrestricted legacy behavior
+allowedBranchIds() => null when unrestricted
+```
 
-### Cashboxes / bank accounts
+This prevents existing users from becoming silently locked out when scope support is introduced. Any V2 work must preserve or deliberately migrate this convention with tests.
 
-Observed permission concepts:
+### Remaining verification
 
-- Incoming/deposit/receipt authority.
-- Withdrawal/payment authority.
-- Assignment to specific employees and, in documented configuration, broader selectors such as roles/branches/all.
-- A default cashbox/account can be assigned to an employee/user.
-- The default does not grant access to other resources; another bank/cashbox is selectable only when the user is authorized for it.
-- Unauthorized cashboxes are omitted from transaction selection, not merely rejected after selection.
+Presence of the foundation does not prove every controller/report/export uses it. End-to-end coverage remains an audit item.
 
-### AWJ target
+## 10. Warehouse resource scope
 
-Resource-level access should be a reusable authorization concept where justified, potentially covering warehouses, cashboxes, bank accounts, POS resources, and future scoped operational resources. Do not generalize prematurely into an over-complex universal ACL engine before concrete AWJ use cases are mapped.
+Daftra distinguishes warehouse visibility/use/modification.
 
-## 11. Sales / invoices — findings so far
+### AWJ code-backed status — PARTIALLY PRESENT, STRONG FOUNDATION
+
+AWJ already has per-user warehouse assignment through `user_warehouse` and the `User::warehouses()` relation. `allowedWarehouseIds()` and `canAccessWarehouse()` provide server-side predicates; empty assignment means unrestricted for backward compatibility.
+
+`UserController` persists `warehouse_ids` and the UI exposes them.
+
+`ApiController` already provides reusable enforcement:
+
+- `assertWarehouseAllowed()` checks tenant visibility, active state, user warehouse scope and warehouse branch scope.
+- `assertRecordAccessible()` protects direct UUID access to branch/warehouse-scoped records and returns 404 for inaccessible records.
+- `scopeToAccessibleWarehouses()` filters list queries by every relevant warehouse column, including both sides of transfers.
+
+This is materially more mature than the earlier research-only gap assessment.
+
+### Remaining gap vs Daftra model
+
+Current inspected AWJ warehouse scope is primarily **which warehouses a user may access**, not separate per-warehouse capabilities equivalent to Daftra's:
+
+```text
+View
+Use in invoice
+Modify inventory
+```
+
+AWJ may combine global role permission (`invoices.*` / inventory action) with user warehouse scope, which can be a cleaner design. The final Master Plan must decide whether separate warehouse-local action bits are actually needed or whether `global action permission ∩ allowed warehouse` gives equivalent functional behavior with less complexity.
+
+Do not add a second ACL engine unless a real use case cannot be expressed by the existing intersection.
+
+## 11. Cashboxes / bank accounts — resource ACL
+
+### Daftra reference
+
+Cashboxes/banks have independent incoming/deposit and withdrawal/payment authority, assignable to subjects such as user/role/branch/all.
+
+### AWJ code-backed status — ALREADY PRESENT
+
+This is another major correction to the earlier gap assumption.
+
+`CashBankAccount` already stores:
+
+```text
+deposit_scope
+deposit_scope_subject
+withdraw_scope
+withdraw_scope_subject
+```
+
+Supported scope types in `CashBankAccountService` are:
+
+```text
+all
+role
+user
+branch
+```
+
+`CashBankAccount::allows(action, user, branchId)` evaluates the selected scope. `CashBankAccountService::assertAllowed()` obtains the active `BranchContext` and rejects unauthorized deposit/withdraw operations server-side.
+
+Enforcement is not merely decorative: inspected callers include `CashBankTransferService` (withdraw source + deposit destination), `EmployeeCustodyService` (withdraw), `SupplierRefundService` (deposit), and documented implementation evidence confirms the same pair is used in payment flows.
+
+Therefore the Daftra-style financial resource ACL is substantially implemented already and should be **reused**, not rebuilt.
+
+### Important limitation to verify
+
+The current representation supports one scope mode + one subject per action, rather than an arbitrary union/list of multiple users/roles/branches. Before changing it, inspect actual product requirements. Do not generalize it merely to imitate Daftra if current semantics satisfy AWJ use cases.
+
+## 12. Sales / invoices — findings so far
 
 Daftra research confirms permissions/policies around operations **inside** the invoice, not merely opening the page. Examples include invoice profit visibility, payment date modification, ZATCA/tax submission, discount controls, manual/free item data entry/modification, and invoice-number-related controls.
 
-Daftra invoice settings also demonstrate the separation of **feature/policy configuration** from **who may use it**: some capabilities are enabled at account/settings level and separately controlled through employee-role permissions.
+Daftra also documents record-level sales visibility concepts such as viewing a user's own invoices/estimates rather than all records.
 
-Daftra also documents record-level sales visibility concepts such as viewing a user's own invoices/estimates rather than all records. In documented contexts, ownership can include the acting user and/or sales-representative assignment associated with the record.
+### AWJ code-backed status from this pass
 
-### AWJ direction
+No clear implementation of generic **own/assigned invoice record scope** was found by targeted code search in this pass. This remains a likely gap, but it must be confirmed by inspecting invoice model/controller fields and sales-representative/customer assignment semantics before defining any key or migration.
 
-Authorization should distinguish sensitive actions rather than treating `invoices.manage` as permanent authority for every sales action. Record visibility must also be considered separately from action permission.
+Candidate scope semantics must be domain-specific: creator, salesperson, assigned employee and requester are not interchangeable meanings of "own".
 
-Candidate permission/scope names remain conceptual until derived from actual AWJ routes/services/workflows.
-
-## 12. Purchasing — findings so far
+## 13. Purchasing — findings so far
 
 Daftra documents a purchasing workflow including Purchase Request → Request for Quotation → Purchase Quotation → Purchase Order → Purchase Invoice/Bill, with controls around viewing and performing operations at multiple stages.
 
@@ -220,218 +289,90 @@ Daftra documents a purchasing workflow including Purchase Request → Request fo
 
 Compare existing `purchases.view/manage` against actual AWJ purchasing workflows and decompose only where business/security value justifies it. No purchasing workflow or permission change is approved by this reference.
 
-## 13. Inventory — findings so far
+## 14. Inventory reports — security finding
 
-Important Daftra concepts found:
+Daftra evidence says reports inherit underlying resource/data scope.
 
-- warehouse-level access,
-- inventory movement permissions,
-- movement price visibility,
-- movement price modification,
-- separation between general inventory capability and access to specific warehouses,
-- warehouse view permission affects report visibility,
-- warehouse permission can be used to model an employee's goods custody/stock responsibility.
+### AWJ code-backed finding — P1 SECURITY GAP TO VERIFY/FIX
 
-### AWJ observation
+The inspected `InventoryReportController` delegates directly to `InventoryReportService::report()` and applies `SensitiveCostPolicy` redaction for cost fields. This is good for `products.view_cost`.
 
-AWJ's explicit `products.view_cost` is a strong pattern: cost visibility should remain an explicit sensitive authorization concern rather than an accidental consequence of unrelated purchase/inventory permissions.
+However, the inspected `InventoryReportService` builds warehouse balances, movements, stock operations and stocktakes from tenant-scoped data plus **request filters**. In the inspected code there is no use of `User::allowedWarehouseIds()` / `allowedBranchIds()` or the `ApiController` scope helpers. It even deliberately removes `BranchScope` for the tracked-products snapshot so it can produce tenant-wide inventory value.
 
-## 14. POS — findings so far
+That means the existing operational branch/warehouse access infrastructure is not visibly inherited by this report service in the inspected path. A restricted user with report permission may therefore be able to receive rows/totals outside their allowed branch/warehouse scope, depending on route/middleware and request validation not yet found to add equivalent restrictions.
+
+This is exactly the class of bypass identified in the Daftra research:
+
+```text
+reports.view must not imply unrestricted source data
+```
+
+This finding must be treated as **high priority** and verified with targeted tests before implementation. It must also be checked for exports and other report services, not assumed universal from one service.
+
+## 15. POS — findings so far
 
 Daftra supports fine restrictions around POS/session behavior, including documented ways to restrict reopening previous sessions. AWJ already has explicit permissions for several sensitive POS actions and should prefer stable semantic permissions over URL/path blocking.
 
-## 15. Blocked pages / explicit restrictions
+## 16. Blocked pages / explicit restrictions
 
-Daftra provides an additional blocked-pages mechanism that can restrict specific pages/actions beyond general role permissions. This is functionally useful but AWJ should **not** copy URL/path-based authorization as its primary design.
+Daftra provides an additional blocked-pages mechanism that can restrict specific pages/actions beyond general role permissions. AWJ should **not** copy URL/path-based authorization as its primary design.
 
 AWJ should use stable semantic permission/policy keys for equivalent restrictions, resilient to route refactoring.
 
-## 16. Application / feature state
+## 17. Application / feature state
 
-Daftra documentation shows feature availability and authorization are separate. For example, general-ledger functionality must be enabled before journal-entry workflows are available; role permissions then govern users within enabled features. Application-specific permission sections can be conditional on the application being enabled while configured assignments can remain conceptually separate from feature state.
+Daftra documentation shows feature availability and authorization are separate. AWJ must preserve the distinction between tenant entitlement/application enabled state, tenant configuration/policy, and user authorization. A permission must not enable a feature the tenant does not have or has disabled.
 
-AWJ must preserve the distinction between tenant entitlement/application enabled state, tenant configuration/policy, and user authorization. A permission must not enable a feature the tenant does not have or has disabled.
-
-## 17. Security and accounting invariants
+## 18. Security and accounting invariants
 
 Permissions must never override hard system invariants: Tenant Isolation, balanced posting/integrity, immutable/frozen states where mandated, period/fiscal locks according to approved policy, ZATCA lifecycle restrictions, and referential/data-integrity constraints.
 
 `owner` / wildcard access means broad authorization inside allowed system behavior; it must not mean permission to violate accounting/compliance invariants.
 
-## 18. Impersonation / "login as user"
+## 19. Impersonation / "login as user"
 
 Daftra documents an administrative ability to inspect the system as another user. This may be useful for AWJ support/permission troubleshooting, but it is not an initial implementation priority.
 
 If implemented later: tightly restricted permission, original actor preserved, audit log, obvious impersonation state/banner, no tenant crossing, and explicit review/restriction of sensitive actions.
 
-## 19. Initial gap assessment
-
-| Capability | AWJ current assessment | Direction |
-|---|---|---|
-| Tenant-aware roles | Present | Keep |
-| Custom roles | Present | Keep |
-| Central permission catalogue | Present | Evolve carefully |
-| Employee/User separation | Present | Keep |
-| Sensitive business permissions | Strong in newer modules | Expand incrementally |
-| Permissions grouped by module in role UX | Needs review/improvement | Adopt Daftra-style grouping |
-| Role cloning | Needs verification | Likely adopt |
-| Login enable/disable independent of deletion | Needs current-code verification | Adopt if missing |
-| User allowed branches | Major gap / needs current-code verification | High priority |
-| Resource-level warehouse access | Needs current-code verification | High priority design candidate |
-| Cashbox/bank resource permissions | Needs current-code verification | High priority design candidate |
-| Own/assigned record scope | Needs current-code verification | High priority for sales/CRM-like domains |
-| Explicit permission dependencies | Needs verification | Add where justified |
-| Workflow/state-aware authorization | Partial / domain-specific | Standardize where needed |
-| Permission-aware hidden/read-only/filter states | Partial / distributed | Standardize |
-| Report/export scope inheritance | Needs end-to-end verification | Mandatory security property |
-| Activity-log access and safe drill-down | Needs current-code verification | Preserve audit visibility without bypass |
-| URL blocked pages | Not desired as architecture | Use semantic permissions instead |
-| Impersonation | Not priority | Later only |
-
-## 20. Research matrix — work in progress
-
-Domains to complete/match against AWJ:
-
-1. Sales and invoices.
-2. Purchasing.
-3. Inventory and warehouses.
-4. Accounting, treasury, cashboxes and banks.
-5. POS.
-6. Customers and suppliers.
-7. Employees / HR / self-service / approvals.
-8. Reports and exports.
-9. Settings, administration and activity/audit access.
-10. Users / roles / access management UX.
-
-For each capability classify Daftra behavior/evidence, AWJ implementation, gap, adopt/adapt/reject decision, security/accounting impact, and backward-compatibility requirement.
-
-## 21. Official Daftra references reviewed so far
-
-Official Daftra documentation reviewed includes topics covering employee permissions/roles; employee vs user; blocked pages; task permissions; invoice profit and settings; ZATCA submission restrictions; inventory movement prices; warehouses and goods custody; branch-specific selling/access; cashbox/bank permissions; employee default cashboxes/banks; purchasing cycle; inventory permits for sales orders; POS sessions; supplier-related custom forms; journal entries; journal entry display/edit/delete/reversal/activity history; general accounting settings; draft journals; financial-period closing; leave-approval permissions; report access and scope behavior; own-invoice/estimate visibility; invoice net-position/report scope inheritance; balance-sheet/report branch scope; and activity-log permission-aware drill-down behavior.
-
-Exact evidence should continue to be retained/expanded rather than replaced with generic ERP assumptions.
-
-## 22. Non-goals
-
-This document does **not** approve a database migration, universal ACL engine, changed permission semantics, removal of legacy permissions, accounting/ZATCA behavior changes, merge, deploy, or production release. Those require a separate reviewed Master Plan and scoped implementation PRs.
-
-## 23. Accounting / general ledger — deeper findings
+## 20. Accounting / general ledger — deeper findings
 
 Daftra's accounting documentation adds an important distinction between **authorization** and **accounting object rules**.
 
-### Journal types and state rules
+- automatic/source journals must not become directly editable merely because a user has broad authority,
+- reversal is a correction mechanism,
+- drafts and final state matter,
+- period/fiscal state remains authoritative.
 
-- Operational transactions can create automatic journal entries.
-- Users can create manual journal entries when the accounting application is enabled.
-- Manual journals can be saved as drafts before final recognition.
-- Automatic journals cannot be edited directly; their source transaction must be changed instead.
-- Deletion is documented for manually added journals; automatic journals are removed through their source transaction rather than direct journal deletion.
-- Reversal is a first-class correction mechanism: a reversing journal can neutralize the original without rewriting history.
-- Journal screens expose activity/change history, and journal creation records the acting user's identity/time.
-- Financial-period closing produces/links accounting close journals and changes the effective accounting state of the period.
-
-### AWJ conclusion
-
-These are **not all permissions**. AWJ must keep two layers separate:
+AWJ must keep two layers separate:
 
 ```text
-Authorization: "may this user request this action?"
-Accounting invariant/state: "is this action valid for this journal/period?"
+Authorization: may this user request this action?
+Accounting invariant/state: is this action valid for this journal/period?
 ```
 
-Example: granting a future `journals.update` permission must never make an automatic/source-generated journal directly editable if AWJ's accounting model forbids that operation.
+Candidate journal permission families remain research candidates until current AWJ journal routes/services are inspected.
 
-Likewise, period/fiscal close rules remain authoritative even for `owner`.
+## 21. HR / self-service / approval workflows
 
-### Candidate permission families (not approved names)
+Daftra separates limited employee/self-service capabilities from full user permissions and makes approval stateful.
 
-Future comparison against AWJ may consider distinct authority for:
-
-```text
-journals.view
-journals.create_manual
-journals.update_manual
-journals.reverse
-journals.delete_manual
-journals.view_audit
-journals.manage_recurring
-```
-
-These names are research candidates only. Current AWJ routes/services and accounting invariants must determine final keys.
-
-## 24. Treasury / cashboxes / banks — deeper findings
-
-Daftra confirms that cashboxes and bank accounts behave as **secured financial resources**, not merely dropdown values.
-
-A cashbox can independently control incoming/receipt authority and withdrawal/payment authority. An unauthorized resource is excluded from the employee's selectable resources when creating the relevant receipt/payment/expense workflow.
-
-Daftra also supports assigning a default cashbox/bank account to an employee. The default is convenience/context, not an authorization bypass: the employee may choose another resource only if access is granted.
-
-The same mechanism is documented as a way to create a financial custody (`عهدة مالية`) for an employee, with reports showing the resource's movements/transfers.
-
-### AWJ conclusion
-
-Cash/bank resource authorization is high priority because it protects **where money can move**, not merely which screen can be opened.
-
-A future AWJ design must preserve:
-
-```text
-General financial permission
-AND
-Allowed branch/scope
-AND
-Specific cashbox/bank authority
-AND
-Accounting/business rule
-```
-
-No resource ACL may grant a financial action that the role lacks globally.
-
-## 25. HR / self-service / approval workflows — deeper findings
-
-Daftra separates limited Employee-role/self-service capabilities from full User-role system permissions. Documented employee-level capabilities include viewing own payslip, self attendance, own attendance records/books, and managing requests.
-
-The employee/user distinction also affects leave submission and access to employment information, while a system user receives operational permissions through the assigned role.
-
-### Approval authorization is stateful
-
-Leave approval documentation confirms that permission alone is insufficient. Effective ability to approve/reject depends on:
-
-- whether the user has approval authority,
-- whether the user is actually included in the configured approval path,
-- the user's current approval level,
-- whether the workflow has reached that level,
-- whether a later approver has already acted,
-- the current request state (processing vs final approved/rejected).
-
-This is a critical architecture lesson for AWJ:
+Target rule remains:
 
 ```text
 canApprove(request, user) =
-  permission
-  ∩ workflow membership
-  ∩ current step
-  ∩ request state
-  ∩ domain rules
+permission
+∩ workflow membership
+∩ current step
+∩ request state
+∩ domain rules
 ```
 
-A static `*.approve` permission must never by itself authorize every approval record.
+Current AWJ approval/workflow implementation still needs a dedicated code pass before status can be finalized.
 
-### AWJ target
+## 22. Reports — scope inheritance target
 
-Where AWJ has approval workflows, policies/services must evaluate record/workflow context server-side. The UI should show actions only when the same effective policy says the action is currently available.
-
-## 26. Reports — scope inheritance
-
-Daftra evidence supports that report authorization inherits underlying data scope rather than granting unrestricted access merely because the user can open a report.
-
-Observed patterns include:
-
-- branch-scoped users seeing report data inside allowed branch scope,
-- warehouse **view** access affecting warehouse data visible in inventory movement reports,
-- own-invoice/estimate restrictions carrying into invoice-related reporting rather than reports becoming a bypass around record visibility.
-
-### AWJ target principle
+The mandatory target remains:
 
 ```text
 Report Result =
@@ -442,32 +383,15 @@ Report Permission
 ∩ Record Scope
 ```
 
-And therefore:
+This applies to rows, totals/KPIs, drill-downs, CSV/Excel/PDF exports, generated files and report APIs.
 
-```text
-Report data scope ⊆ user's effective operational/data scope
-```
+The inventory report inspection above gives a concrete reason to audit this property across AWJ rather than treating it as theoretical.
 
-This rule must apply consistently to:
-
-- report API rows,
-- totals and KPIs,
-- drill-downs,
-- CSV/Excel/PDF exports,
-- background/generated report files,
-- any report-oriented API consumed outside the visible UI.
-
-A general `reports.view` permission must never become a side door around branch, warehouse, cashbox, cost, own/assigned-record, or other sensitive-data restrictions.
-
-## 27. Record scope — own / assigned / workflow-related records
+## 23. Record scope — own / assigned / workflow-related
 
 Daftra evidence adds a distinct authorization dimension beyond company/branch/resource scope.
 
-Documented behavior includes restrictions conceptually equivalent to **view own invoices/estimates**, and in relevant sales contexts a record can be associated with a user through creator/actor ownership and/or sales-representative assignment.
-
-### AWJ target model
-
-Where a domain needs it, record scope should be modeled explicitly rather than encoded through branch-specific roles:
+Target model where a domain needs it:
 
 ```text
 Record Scope
@@ -477,41 +401,21 @@ Record Scope
 └── Workflow-related records
 ```
 
-Example target behavior:
+AWJ does not yet have a confirmed generic record-scope layer from this inspection. Do not invent a universal layer until concrete domains and ownership semantics are mapped.
 
-A sales representative may have `invoices.view` in Dammam branch but still be restricted to their own/assigned invoices rather than every Dammam invoice.
+## 24. Activity log / audit access
 
-Record-scope semantics must be domain-specific and defined precisely. "Own" must not be a vague global concept; each resource must define whether ownership means creator, salesperson, assignee, responsible employee, requester, or another stable relation.
-
-## 28. Activity log / audit access
-
-Daftra documentation indicates that activity/audit visibility can itself be permission-aware.
-
-Important observed behavior:
-
-- activity records can expose who performed a change, when it occurred, affected branch/context, and previous/new values where supported,
-- a user may be allowed to see an audit event without being granted unrestricted navigation into the protected setting/resource that generated it,
-- drill-down/link availability therefore needs to respect the target resource's permission even when the audit event itself is visible.
-
-### AWJ target principle
-
-Audit visibility and target-resource authorization are separate checks:
+Daftra demonstrates that audit-event visibility and target-resource access are separate checks:
 
 ```text
-Can view audit event
-≠
-Can open / modify audited resource
+Can view audit event != Can open/modify audited resource
 ```
 
-This prevents the audit system from becoming an authorization bypass while preserving useful accountability.
+AWJ activity/audit endpoints still require a dedicated inspection pass.
 
-## 29. Administration / application-aware permissions
+## 25. Administration / application-aware permissions
 
-Daftra evidence reinforces the separation between application/feature enablement and authorization. Application-specific permission groups can depend on the relevant application being enabled, while role permission configuration determines what a user can do within the enabled capability.
-
-### AWJ target
-
-Authorization evaluation should preserve this ordering:
+Target ordering remains:
 
 ```text
 Tenant entitlement / enabled feature
@@ -523,11 +427,9 @@ AND
 Applicable scope/policy
 ```
 
-A role permission cannot activate an unavailable application, and disabling an application should not require destructive rewriting of unrelated role history unless the approved product model explicitly requires it.
+A role permission cannot activate an unavailable application.
 
-## 30. Reconciled architecture conclusions
-
-After reconciling all findings captured in this research thread so far, the target authorization dimensions are:
+## 26. Reconciled architecture conclusions
 
 ```text
 AWJ Effective Authorization
@@ -551,84 +453,70 @@ Record State
 Accounting / Compliance Invariants
 ```
 
-This is intentionally broader than traditional RBAC.
+The important implementation lesson from the first AWJ code pass is: **several Daftra-like layers already exist in AWJ and must be reused rather than rebuilt.** The main task is coverage, consistency and missing dimensions — not replacement of the authorization foundation.
 
-The dimensions answer different questions:
+## 27. First code-backed gap matrix
 
-| Dimension | Question |
-|---|---|
-| Tenant Isolation | Which tenant can ever be touched? |
-| Feature/Entitlement | Is the capability available to this tenant? |
-| Role Permission | What class of action may the user request? |
-| Branch/Data Scope | In which organizational/data scope? |
-| Resource Scope | On which warehouse/cashbox/bank/etc.? |
-| Record Scope | Which records inside the allowed scope? |
-| Workflow Position | Is this actor the correct participant now? |
-| Record State | Is this action valid for the current lifecycle state? |
-| Accounting/Compliance | Is the action legally/accountingly/systemically valid at all? |
+| Daftra capability / target | AWJ current implementation found | Status | Decision |
+|---|---|---|---|
+| Tenant isolation | Tenant-scoped models + explicit tenant filtering for `User` | Present | Preserve; non-bypassable |
+| Role permissions | `Rbac`, tenant roles, custom roles | Present | Evolve incrementally |
+| User login enabled/disabled | `users.is_active`; auth rejects inactive users | Present | Preserve independently from employee lifecycle |
+| Employee ↔ User | `users.employee_id`, tenant-safe unique linking | Present | Preserve |
+| Allowed branches per user | `branch_user`, `allowedBranchIds`, UI + controller sync | Present | Reuse; audit coverage |
+| Allowed warehouses per user | `user_warehouse`, `allowedWarehouseIds`, UI + controller sync | Present | Reuse; audit coverage |
+| Direct warehouse access guards | `assertWarehouseAllowed`, `assertRecordAccessible`, list filtering | Present | Reuse centrally |
+| Cashbox/bank deposit/withdraw ACL | `deposit_scope` / `withdraw_scope`: all/role/user/branch + service enforcement | Present | Reuse; verify all money paths |
+| Role permission grouping | RoleDialog derives modules from catalogue | Partial | Generalize beyond view/manage |
+| Role cloning | Not found in inspected role API/UI | Missing | Candidate UX parity feature |
+| Permission dependency graph | Not confirmed | Missing/verify | Add only with explicit domain rules |
+| Own/assigned sales record scope | Not found in targeted search | Missing/verify | Inspect invoice/sales semantics first |
+| Inventory cost redaction in reports | `SensitiveCostPolicy` in InventoryReportController | Present | Preserve |
+| Inventory report branch/warehouse inheritance | Not visible in inspected report path | **Likely security gap (P1)** | Verify with tests; fix centrally if confirmed |
+| Report/export scope inheritance globally | Not yet audited | Unknown | Mandatory audit |
+| Stateful approval authorization | Not yet inspected deeply | Unknown | Dedicated pass |
+| Activity/audit drill-down authorization | Not yet inspected | Unknown | Dedicated pass |
+| Feature/entitlement ∩ permission | Exists in parts of AWJ; not audited globally here | Partial/unknown | Dedicated coverage audit |
 
-## 31. Documentation reconciliation checklist
+## 28. Important corrections to earlier research assumptions
 
-This pass explicitly checked the conversation's accumulated research findings against the living reference. The following are now represented in this file:
+The earlier research-only gap table said user branch scope, warehouse access and cashbox/bank resource permissions "need verification" / appeared to be likely gaps. Current code inspection corrects that:
 
-- Daftra as functional reference, not implementation copy.
-- Existing AWJ tenant-aware RBAC and backward-compatibility requirement.
-- Employee vs User separation.
-- Login enable/disable as a lifecycle concern.
-- Role creation/editing/cloning and module-grouped permissions.
-- Fine-grained sensitive permissions vs legacy broad `*.manage` permissions.
-- Permission dependencies.
-- Permission-aware UI states: hidden/read-only/forbidden/filtered.
-- Allowed branch scope.
-- Warehouse resource permissions.
-- Cashbox/bank deposit/withdraw authority and defaults.
-- Sales/invoice sensitive permissions.
-- Purchasing workflow granularity.
-- Inventory movement/cost visibility concerns.
-- POS sensitive actions and preference for semantic keys over URL blocking.
-- Blocked-page behavior as functional reference only.
-- Feature/application state separate from permission state.
-- Accounting journal type/state invariants, reversal, drafts and audit history.
-- Period/fiscal/ZATCA/accounting invariants above permissions.
-- HR/self-service distinction.
-- Stateful approval authorization.
-- Report scope inheritance.
-- Own/assigned/workflow-related Record Scope.
-- Export/totals/drill-down scope inheritance requirement.
-- Activity-log permission-aware drill-down.
-- Impersonation as a later, high-control capability.
+1. **User branch scope already exists.**
+2. **User warehouse scope already exists.**
+3. **Cashbox/bank deposit/withdraw resource ACL already exists and is enforced in multiple financial services.**
+4. The architectural risk is therefore not "build these from scratch" but **verify complete enforcement and report/export inheritance**.
+5. The first concrete suspicious gap is `InventoryReportService`, which does not visibly consume user branch/warehouse scope in the inspected path.
 
-No known substantive finding from the research performed in this thread through this reconciliation pass is intentionally left only in chat. Future research must follow: **research → verify → update this file → confirm commit → summarize to Safwan**.
+This correction is important for avoiding duplicate ACL infrastructure and unnecessary migrations.
 
-## 32. Current gaps to verify in AWJ code
+## 29. Documentation reconciliation checklist
 
-Before producing the Access Control V2 Master Plan, verify against current `main`:
+All prior research findings remain represented here, and this pass additionally records:
 
-1. User allowed-branch persistence and server enforcement end-to-end.
-2. Warehouse resource access and report inheritance.
-3. Cashbox/bank resource access for receipts/payments/expenses/transfers.
-4. Own/assigned record scope in sales/customers and other relevant domains.
-5. Report APIs/exports/totals respecting effective scope.
-6. Workflow approval policies combining permission + configured actor + current state.
-7. Login enable/disable lifecycle independent of employee/user deletion.
-8. Role-management UX grouping, cloning, dependencies and risk labeling.
-9. Activity/audit permissions and drill-down authorization.
-10. Any existing scope infrastructure that should be reused instead of building a parallel ACL system.
+- concrete `branch_user` / `user_warehouse` implementation,
+- backward-compatible empty-scope = unrestricted convention,
+- `ApiController` branch and warehouse guards,
+- cash/bank scope implementation and enforcement callers,
+- current RoleDialog limitation with fine-grained actions,
+- role clone not found,
+- inventory report scope-inheritance risk,
+- own/assigned record scope not found by targeted search,
+- corrected gap assessment so future work does not rebuild existing infrastructure.
 
-## 33. Next research/inspection pass
+No code was modified in this inspection. No database change, merge, deploy or production action is authorized by this document.
 
-The next pass should be code-backed rather than another broad conceptual survey:
+## 30. Next inspection pass
 
-- inspect current AWJ Users/Branches authorization,
-- inspect Warehouses and inventory query scoping,
-- inspect Cashboxes/Bank Accounts and money-movement authorization,
-- inspect Reports and export endpoints,
-- inspect own/assigned record filters where present,
-- inspect approval/workflow policies,
-- map actual `Rbac::PERMISSIONS` and existing middleware/policies/services.
+Before the Master Plan, continue code-backed inspection in this order:
 
-Then build the first evidence matrix:
+1. **Reports and exports:** inventory first, then financial/sales reports; prove rows + totals + exports inherit user scope.
+2. **Sales/invoices/customers:** inspect creator/salesperson/assignment fields and determine whether own/assigned scope exists or is needed.
+3. **Approval workflows:** HR requests, leave and any purchase/document approvals; map permission + actor + state enforcement.
+4. **Activity/audit:** permissions, branch/resource scope and safe drill-down.
+5. **Role/RBAC catalogue:** map every current fine-grained action to RoleDialog UX and identify dependency candidates.
+6. **Cash/bank coverage:** enumerate every money movement path and ensure `assertAllowed()` cannot be bypassed.
 
-**Daftra behavior | AWJ current implementation | gap | decision | security/accounting risk | backward compatibility**.
+Then update the evidence matrix before proposing any implementation PRs.
 
-Only after that matrix is sufficiently complete should an **AWJ Access Control V2 Master Plan** be proposed. No implementation is authorized by this living reference.
+**Process rule:** research/inspect → verify → update this file → confirm commit → summarize to Safwan.
