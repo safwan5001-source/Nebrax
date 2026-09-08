@@ -4,8 +4,20 @@
   "private": true,
   "description": "AWJ (نبراس) design-system primitives, tokens, and typography — extracted verbatim from web/, buildable standalone for Claude Design sync.",
   "type": "module",
+  "main": "dist/index.js",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "build:js": "tsc -p tsconfig.build.json",
+    "build:css": "tailwindcss -i src/styles/globals.css -o dist/styles.css",
+    "build": "npm run build:js && npm run build:css"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.23",

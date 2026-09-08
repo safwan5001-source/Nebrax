@@ -1,0 +1,14 @@
+{
+  "pkg": "awj-design-system-v2",
+  "globalName": "AWJDesignSystemV2",
+  "shape": "package",
+  "buildCmd": "npm run build",
+  "cssEntry": "dist/styles.css",
+  "readmeHeader": ".design-sync/conventions.md",
+  "overrides": {
+    "Dialog": { "cardMode": "single", "viewport": "480x420" },
+    "Sheet": { "cardMode": "single", "viewport": "480x420" },
+    "ToastProvider": { "cardMode": "single", "viewport": "420x220" },
+    "Table": { "cardMode": "column" }
+  }
+}

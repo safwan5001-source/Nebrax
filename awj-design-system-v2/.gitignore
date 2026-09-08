@@ -4,3 +4,10 @@
 
 # إعادة تضمين lockfile الحزمة (الجذر يستثنيه عالمياً) — لازم لتثبيت متطابق لاحقاً
 !package-lock.json
+
+# design-sync: أدوات محلية مُنسوخة + مخرجات بناء + حالة تحقق آلية (غير مصدر حقيقة)
+/.ds-sync
+/ds-bundle
+/.design-sync/.cache
+/.design-sync/learnings
+/.design-sync/node_modules
