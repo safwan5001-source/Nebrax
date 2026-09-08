@@ -41,17 +41,20 @@ class PartnerController extends ApiController
         };
 
         if ($search = trim((string) ($filters['search'] ?? ''))) {
-            $escaped = addcslashes($search, '%_\\');
-            $query->where(function (Builder $builder) use ($escaped) {
+            // Use an explicit, single-character ESCAPE marker so literal LIKE wildcards
+            // behave identically on SQLite and PostgreSQL.
+            $escaped = str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $search);
+            $pattern = "%{$escaped}%";
+            $query->where(function (Builder $builder) use ($pattern) {
                 $builder
-                    ->where('name', 'like', "%{$escaped}%")
-                    ->orWhere('name_en', 'like', "%{$escaped}%")
-                    ->orWhere('code', 'like', "%{$escaped}%")
-                    ->orWhere('vat_number', 'like', "%{$escaped}%")
-                    ->orWhere('cr_number', 'like', "%{$escaped}%")
-                    ->orWhere('phone', 'like', "%{$escaped}%")
-                    ->orWhere('mobile', 'like', "%{$escaped}%")
-                    ->orWhere('email', 'like', "%{$escaped}%");
+                    ->whereRaw("name LIKE ? ESCAPE '!'", [$pattern])
+                    ->orWhereRaw("name_en LIKE ? ESCAPE '!'", [$pattern])
+                    ->orWhereRaw("code LIKE ? ESCAPE '!'", [$pattern])
+                    ->orWhereRaw("vat_number LIKE ? ESCAPE '!'", [$pattern])
+                    ->orWhereRaw("cr_number LIKE ? ESCAPE '!'", [$pattern])
+                    ->orWhereRaw("phone LIKE ? ESCAPE '!'", [$pattern])
+                    ->orWhereRaw("mobile LIKE ? ESCAPE '!'", [$pattern])
+                    ->orWhereRaw("email LIKE ? ESCAPE '!'", [$pattern]);
             });
         }
 
