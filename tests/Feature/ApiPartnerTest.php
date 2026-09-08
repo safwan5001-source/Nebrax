@@ -130,6 +130,20 @@ class ApiPartnerTest extends TestCase
     }
 
     /** @test */
+    public function searching_partners_still_requires_partners_view_permission(): void
+    {
+        $auth = $this->registerTenant();
+        $this->withToken($auth['token'])->postJson('/api/partners', [
+            'name' => 'عميل', 'type' => 'customer',
+        ])->assertCreated();
+
+        // self_service لا يحمل partners.view في المصفوفة الافتراضية — إضافة
+        // معامل search لا تفتح مساراً موازياً يتجاوز EnsurePermission القائم.
+        $restricted = $this->tokenForRole($auth['tenant_id'], 'self_service', 'ss@acme.test');
+        $this->withToken($restricted)->getJson('/api/partners?search=عميل')->assertForbidden();
+    }
+
+    /** @test */
     public function creating_a_partner_validates_input(): void
     {
         $token = $this->registerTenant()['token'];
