@@ -17,6 +17,17 @@ interface AccountingSettingItem {
   key: string;
   href: string | null;
   icon: LucideIcon;
+  /**
+   * صلاحية إضافية يوجبها هذا العنصر بعينه، فوق بوابة الصفحة العامة
+   * (`accounting_settings.view`). غيابها يعني أن بوابة الصفحة تكفي.
+   *
+   * ACC-6 P2-1: أقفال الفترات صلاحيتها (`accounting_period_locks.view`)
+   * **مستقلة عمداً** عن `accounting_settings.view` — من يملك الأولى بلا
+   * الثانية لا يدخل هذه الصفحة أصلاً (له مدخل شريط مباشر مستقل، انظر
+   * `sidebar.tsx`)، ومن يملك الثانية بلا الأولى يجب ألّا يرى هذه البطاقة
+   * هنا فينتهي به المطاف عند صفحة «ممنوع» بعد نقرة لا تُفيد.
+   */
+  permission?: string;
 }
 
 const ITEMS: AccountingSettingItem[] = [
@@ -24,8 +35,8 @@ const ITEMS: AccountingSettingItem[] = [
   { key: 'c_accountRouting', href: '/accounting-settings/account-routing', icon: Route },
   { key: 'c_costCenters', href: '/cost-centers', icon: Network },
   { key: 'c_fiscalPeriods', href: null, icon: CalendarClock },
-  // ACC-6: أقفال الفترات — الرابط حقيقي الآن.
-  { key: 'c_periodLocks', href: '/accounting-settings/period-locks', icon: Lock },
+  // ACC-6: أقفال الفترات — الرابط حقيقي الآن، بصلاحيتها المستقلة الخاصة.
+  { key: 'c_periodLocks', href: '/accounting-settings/period-locks', icon: Lock, permission: 'accounting_period_locks.view' },
 ];
 
 /**
@@ -33,25 +44,33 @@ const ITEMS: AccountingSettingItem[] = [
  * الشريط الجانبي وحده ليس تفويضاً؛ الوصول المباشر بالرابط يُفحص هنا أيضاً
  * بمرآة `Rbac::allows` نفسها (`hasPermission`). الربط بـ`mounted` يمنع
  * وميض «ممنوع» قبل تركيب جلسة `localStorage` في هذه الصفحات `use client`.
+ *
+ * `canShow(permission)` يفحص صلاحية عنصر بعينه فوق بوابة الصفحة — لا يستبدلها.
  */
-function useAccountingSettingsAccess(): { mounted: boolean; canView: boolean } {
+function useAccountingSettingsAccess(): { mounted: boolean; canView: boolean; canShow: (permission?: string) => boolean } {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
   const user = currentUser();
-  return { mounted, canView: hasPermission(user?.permissions, user?.role, 'accounting_settings.view') };
+  return {
+    mounted,
+    canView: hasPermission(user?.permissions, user?.role, 'accounting_settings.view'),
+    canShow: (permission) => permission === undefined || hasPermission(user?.permissions, user?.role, permission),
+  };
 }
 
 export default function AccountingSettingsPage() {
   const t = useTranslations('accountingSettings');
   const tn = useTranslations('nav');
-  const { mounted, canView } = useAccountingSettingsAccess();
+  const { mounted, canView, canShow } = useAccountingSettingsAccess();
 
   if (!mounted) return <LoadingState variant="cards" rows={4} />;
 
   if (!canView) {
     return <EmptyState icon={Lock} title={t('forbidden')} description={t('forbiddenHint')} />;
   }
+
+  const visibleItems = ITEMS.filter((item) => canShow(item.permission));
 
   return (
     <div className="space-y-6">
@@ -63,7 +82,7 @@ export default function AccountingSettingsPage() {
       <section className="space-y-3" aria-labelledby="accounting-settings-heading">
         <h2 id="accounting-settings-heading" className="text-sm font-medium text-muted">{t('groupSetup')}</h2>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {ITEMS.map((item) => {
+          {visibleItems.map((item) => {
             const Icon = item.icon;
             const body = (
               <>

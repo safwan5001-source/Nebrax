@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { ArrowRight, History, Lock, LockOpen, Plus } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,7 @@ import { useToast } from '@/components/ui/toast';
 import { EmptyState, LoadingState } from '@/components/nebrax';
 import { api, ApiError } from '@/lib/api';
 import { currentUser } from '@/lib/auth';
+import { formatDateTime } from '@/lib/formatting';
 import { hasPermission } from '@/lib/permissions';
 
 /**
@@ -62,14 +63,10 @@ function useAccess(): { mounted: boolean; canView: boolean; canManage: boolean }
   };
 }
 
-function formatDateTime(value: string | null): string {
-  if (!value) return '—';
-  return value.slice(0, 10);
-}
-
 export default function AccountingPeriodLocksPage() {
   const t = useTranslations('accountingSettings');
   const tc = useTranslations('common');
+  const locale = useLocale();
   const { success, error: toastError } = useToast();
   const { mounted, canView, canManage } = useAccess();
 
@@ -226,11 +223,11 @@ export default function AccountingPeriodLocksPage() {
                     <TD className="max-w-xs truncate" title={lock.reason}>{lock.reason}</TD>
                     <TD className="whitespace-nowrap text-sm text-muted">
                       {lock.created_by ?? '—'}
-                      <span className="block text-xs">{formatDateTime(lock.created_at)}</span>
+                      <span className="block text-xs">{formatDateTime(lock.created_at, locale)}</span>
                     </TD>
                     <TD className="whitespace-nowrap text-sm text-muted">
                       {lock.released_by ?? '—'}
-                      <span className="block text-xs">{formatDateTime(lock.released_at)}</span>
+                      <span className="block text-xs">{formatDateTime(lock.released_at, locale)}</span>
                     </TD>
                     <TD className="whitespace-nowrap text-end">
                       <Button
@@ -323,7 +320,7 @@ export default function AccountingPeriodLocksPage() {
                     {event.action === 'lock_created' ? t('lockEventCreated') : t('lockEventReleased')}
                   </Badge>
                   <span className="font-mono text-xs text-muted">{event.start_date} — {event.end_date}</span>
-                  <span className="text-xs text-muted">{formatDateTime(event.created_at)}</span>
+                  <span className="text-xs text-muted">{formatDateTime(event.created_at, locale)}</span>
                 </div>
                 <p className="mt-1 text-text">{event.reason}</p>
                 <p className="text-xs text-muted">{event.actor ?? '—'}</p>
