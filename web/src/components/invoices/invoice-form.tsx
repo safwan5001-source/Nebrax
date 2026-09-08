@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { FieldGrid, FieldSpan, FormActions, FormAlert, FormPage, FormSection } from '@/components/nebrax';
 import { InvoiceLineRow, LINE_GRID } from '@/components/invoices/invoice-line-row';
 import { InvoiceTemplateSelector } from '@/components/invoices/invoice-template-selector';
+import { DocumentLanguageSelector } from '@/components/documents/document-language-selector';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { NumberPreviewField } from '@/components/ui/number-preview-field';
@@ -62,6 +63,10 @@ interface ApiInvoice {
   is_paid?: boolean; payment_method?: string | null; payment_reference?: string | null; cash_account_id?: string | null;
   print_template_override_revision_id?: string | null;
   pdf_template_override_revision_id?: string | null;
+  // لغة المستند من الخلفية بعد PR-LANG-1 — قرار المسودة، لقطة التجميد، والمشتقّة.
+  language?: 'ar' | 'en' | 'bilingual' | null;
+  language_frozen?: 'ar' | 'en' | 'bilingual' | null;
+  language_effective?: 'ar' | 'en' | 'bilingual';
 }
 interface TaxDef { name: string; rate: number; inclusive: boolean }
 
@@ -170,6 +175,9 @@ export function InvoiceForm({ editId }: { editId?: string }) {
   const [designOverrideRevisionId, setDesignOverrideRevisionId] = useState<string | null>(null);
   const [designCompatible, setDesignCompatible] = useState(true);
   const [invoiceBranchId, setInvoiceBranchId] = useState<string | null>(null);
+  // لغة مستند الفاتورة — قرار مسودة مستقل عن UI locale واختيار التصميم.
+  const [documentLanguage, setDocumentLanguage] = useState<'ar' | 'en' | 'bilingual' | null>(null);
+  const [tenantDefaultLanguage, setTenantDefaultLanguage] = useState<'ar' | 'en' | 'bilingual' | null>(null);
   const { number: suggestedNumber, loading: loadingNumber } = useNumberPreview('invoice', { date, enabled: !editId });
 
   const selectPartner = useCallback((nextPartnerId: string, availablePartners = partners) => {
@@ -223,6 +231,10 @@ export function InvoiceForm({ editId }: { editId?: string }) {
     api<{ data: Account[] }>('/accounts')
       .then((r) => setCashAccounts(r.data.filter((a) => !a.is_group && a.type === 'asset' && /^11[12]/.test(a.code))))
       .catch(() => {});
+    // افتراضي المؤسسة للغة المستند — يُعرَض في المحدِّد كسياق فقط ولا يُفرَض.
+    api<{ data: { default_language: 'ar' | 'en' | 'bilingual' | null } }>('/document-display-settings')
+      .then((r) => setTenantDefaultLanguage(r.data.default_language ?? null))
+      .catch(() => {});
     // الافتراضي للإنشاء: من إعدادات الضرائب (هل الضريبة الرئيسية «متضمَّنة»؟).
     if (!editId) {
       api<{ data: TaxDef[] }>('/sales-config/taxes')
@@ -264,6 +276,7 @@ export function InvoiceForm({ editId }: { editId?: string }) {
         setDesignOverrideRevisionId(
           inv.print_template_override_revision_id ?? inv.pdf_template_override_revision_id ?? null,
         );
+        setDocumentLanguage(inv.language ?? null);
         setDiscountMode('amount'); // يُخزَّن الخصم كمبلغ مطلق
         setDiscountInput(Number(inv.discount) > 0 ? inv.discount : '');
         setLines(
@@ -586,6 +599,7 @@ export function InvoiceForm({ editId }: { editId?: string }) {
       cash_account_id: isPaid ? cashAccountId || null : null,
       print_template_override_revision_id: designOverrideRevisionId,
       pdf_template_override_revision_id: designOverrideRevisionId,
+      language: documentLanguage,
     };
     try {
       const id = editId
@@ -662,13 +676,20 @@ export function InvoiceForm({ editId }: { editId?: string }) {
 
       {!editId && <section className="flex flex-col gap-3 rounded border border-primary/25 bg-primary-soft/40 p-4 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="font-medium text-text">{td('invoiceDraftAction')}</h2><p className="mt-1 text-sm text-muted">{td('invoiceDraftBoundaryHint')}</p></div><Button asChild variant="outline" className="shrink-0"><Link href="/delivery-notes/invoice-draft"><FileText className="h-4 w-4" strokeWidth={1.7} />{td('invoiceDraftAction')}</Link></Button></section>}
 
-      <InvoiceTemplateSelector
-        zatcaDocumentType={zatcaDocumentType}
-        branchId={invoiceBranchId}
-        overrideRevisionId={designOverrideRevisionId}
-        onChange={setDesignOverrideRevisionId}
-        onCompatibilityChange={setDesignCompatible}
-      />
+      <div className="grid gap-3 lg:grid-cols-[1fr_320px]">
+        <InvoiceTemplateSelector
+          zatcaDocumentType={zatcaDocumentType}
+          branchId={invoiceBranchId}
+          overrideRevisionId={designOverrideRevisionId}
+          onChange={setDesignOverrideRevisionId}
+          onCompatibilityChange={setDesignCompatible}
+        />
+        <DocumentLanguageSelector
+          value={documentLanguage}
+          tenantDefault={tenantDefaultLanguage}
+          onChange={setDocumentLanguage}
+        />
+      </div>
 
       {/* ═══ ١. العميل وهويّة الفاتورة ═══
           العميل أولاً لأنه يقرّر قائمة الأسعار وشروط السداد، ثم ما يعرّف المستند. */}

@@ -1,7 +1,7 @@
 'use client';
 
 import { useLocale } from 'next-intl';
-import type { Direction, DocumentTypeId, ThemeId, DocSectionLayoutItem } from '@/modules/documents/types';
+import type { Direction, DocumentLanguage, DocumentTypeId, ThemeId, DocSectionLayoutItem } from '@/modules/documents/types';
 import { DocumentView } from '@/modules/documents/components/document-view';
 import {
   buildInvoiceDocumentModel,
@@ -38,6 +38,7 @@ export function InvoiceDocument({
   rootId,
   documentType,
   direction,
+  language,
 }: {
   invoice: InvoiceDoc;
   company: Company | null;
@@ -57,8 +58,19 @@ export function InvoiceDocument({
   rootId?: string | null;
   documentType?: DocumentTypeId;
   direction?: Direction;
+  /**
+   * لغة المستند الصريحة — تفوز على `invoice.language_effective` من عقد الـAPI،
+   * وتفوز على استنتاج UI locale × direction. لا تُخزَّن على الفاتورة.
+   */
+  language?: DocumentLanguage | null;
 }) {
   const locale = useLocale();
+  // اتجاه المستند الأولي: الـprop الصريح ثم اشتقاق من لغة الوثيقة (إن جاءت)،
+  // ثم سلوك ما قبل PR-LANG-1 حرفياً (استنتاج من UI locale). أي انسياب يظل داخل
+  // `buildInvoiceDocumentModel` كذلك، فهذا مجرد fallback لكل مستدعٍ لا يعرف language.
+  const effectiveLanguage = language ?? invoice.language_effective ?? null;
+  const resolvedDirection = direction
+    ?? (effectiveLanguage === 'en' ? 'ltr' : effectiveLanguage === 'ar' || effectiveLanguage === 'bilingual' ? 'rtl' : (locale === 'en' ? 'ltr' : 'rtl'));
   const model = buildInvoiceDocumentModel({
     invoice,
     company,
@@ -72,7 +84,8 @@ export function InvoiceDocument({
     stampUrl,
     signatureUrl,
     type: documentType,
-    direction: direction ?? (locale === 'en' ? 'ltr' : 'rtl'),
+    direction: resolvedDirection,
+    language: effectiveLanguage,
   });
   return (
     <DocumentView model={model} templateId={templateId} themeId={themeId} showLogo={showLogo} layout={layout} rootId={rootId} />

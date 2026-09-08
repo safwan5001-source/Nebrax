@@ -11,6 +11,13 @@
 
 export type Direction = 'rtl' | 'ltr' | 'auto';
 
+/**
+ * لغة عرض المستند — مستقلة عن لغة الواجهة (UI locale) وعن اختيار التصميم.
+ * V1 يدعم `ar` و`en` و`bilingual` حصراً؛ عقد الخلفية في
+ * `App\Support\PrintTemplateContract::DOCUMENT_LANGUAGES`.
+ */
+export type DocumentLanguage = 'ar' | 'en' | 'bilingual';
+
 /** أنواع المستندات التي يدعمها المحرّك (تتوسّع تدريجياً). */
 export type DocumentTypeId =
   | 'tax_invoice'
@@ -146,6 +153,12 @@ export interface DocumentModel {
    * لا تُشتق في العارض ولا تغيّر الترحيل. Modern يوسّم المسودة والملغى فقط.
    */
   status?: string | null;
+  /**
+   * لغة العرض الفعلية للمستند — مصدر الحقيقة الوحيد لوضع التسميات في القالب.
+   * الغياب/`null` يعني «اعتمد على UI locale + direction للتوافق الرجعي»:
+   * سلوك ما قبل PR-LANG-1 حرفياً، فلا انحدار على المستندات القائمة.
+   */
+  language?: DocumentLanguage | null;
 }
 
 /** توكنز الثيم (تُسقَط إلى متغيّرات CSS). */

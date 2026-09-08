@@ -33,6 +33,7 @@ class Invoice extends BaseModel
         'zatca_qr', 'zatca_hash',
         'zatca_uuid', 'zatca_icv', 'zatca_previous_hash', 'zatca_xml', 'zatca_cleared_xml', 'print_template_revision_id', 'pdf_template_revision_id', 'thermal_template_revision_id',
         'print_template_override_revision_id', 'pdf_template_override_revision_id',
+        'language', 'language_frozen',
     ];
 
     protected $casts = [

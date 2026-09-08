@@ -104,6 +104,7 @@ use App\Http\Controllers\Api\RoleController;
 use App\Http\Controllers\Api\SalesConfigController;
 use App\Http\Controllers\Api\SalesReportController;
 use App\Http\Controllers\Api\SalesSettingsController;
+use App\Http\Controllers\Api\DocumentDisplaySettingsController;
 use App\Http\Controllers\Api\SettlementTypeController;
 use App\Http\Controllers\Api\SelfServiceController;
 use App\Http\Controllers\Api\ShiftController;
@@ -1089,6 +1090,11 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         // إعدادات المبيعات (تفضيلات غير محاسبية)
         Route::get('sales-settings', [SalesSettingsController::class, 'show'])->middleware($perm('invoices.view'));
         Route::put('sales-settings', [SalesSettingsController::class, 'update'])->middleware($perm('company.manage'));
+
+        // إعدادات عرض المستندات — لغة العرض الافتراضية للمؤسسة. تفضيل عرضٍ بحت،
+        // مستقلٌّ عن UI locale واختيار التصميم؛ لا يمسّ ZATCA أو المحاسبة.
+        Route::get('document-display-settings', [DocumentDisplaySettingsController::class, 'show'])->middleware($perm('invoices.view'));
+        Route::put('document-display-settings', [DocumentDisplaySettingsController::class, 'update'])->middleware($perm('company.manage'));
 
         // إعدادات المشتريات (تفضيلات؛ تُقرأ فعلاً في خدمتَي الشراء والمشتريات)
         Route::get('purchase-settings', [PurchaseSettingsController::class, 'show'])->middleware([$perm('purchases.view'), $app('purchases.cycle')]);
