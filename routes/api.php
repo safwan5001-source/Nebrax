@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AccountController;
 use App\Http\Controllers\Api\AccountingPeriodLockController;
+use App\Http\Controllers\Api\FiscalYearController;
 use App\Http\Controllers\Api\AccountRoutingController;
 use App\Http\Controllers\Api\AccountSettingsController;
 use App\Http\Controllers\Api\AppointmentController;
@@ -483,6 +484,16 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::get('accounting-settings/period-locks/{id}/events', [AccountingPeriodLockController::class, 'events'])->middleware($perm('accounting_period_locks.view'));
         Route::post('accounting-settings/period-locks', [AccountingPeriodLockController::class, 'store'])->middleware($perm('accounting_period_locks.manage'));
         Route::post('accounting-settings/period-locks/{id}/release', [AccountingPeriodLockController::class, 'release'])->middleware($perm('accounting_period_locks.manage'));
+
+        // FISCAL-2: السنوات المالية والإقفال السنوي. أربع صلاحيات مستقلة —
+        // العرض والتعريف والإقفال والفتح — لا تُورَّث إحداها من الأخرى.
+        Route::get('accounting-settings/fiscal-years', [FiscalYearController::class, 'index'])->middleware($perm('fiscal_years.view'));
+        Route::get('accounting-settings/fiscal-years/{id}/readiness', [FiscalYearController::class, 'readiness'])->middleware($perm('fiscal_years.view'));
+        Route::get('accounting-settings/fiscal-years/{id}/events', [FiscalYearController::class, 'events'])->middleware($perm('fiscal_years.view'));
+        Route::post('accounting-settings/fiscal-years', [FiscalYearController::class, 'store'])->middleware($perm('fiscal_years.manage'));
+        Route::put('accounting-settings/fiscal-years/{id}', [FiscalYearController::class, 'update'])->middleware($perm('fiscal_years.manage'));
+        Route::post('accounting-settings/fiscal-years/{id}/close', [FiscalYearController::class, 'close'])->middleware($perm('fiscal_years.close'));
+        Route::post('accounting-settings/fiscal-years/{id}/reopen', [FiscalYearController::class, 'reopen'])->middleware($perm('fiscal_years.reopen'));
 
         // قوائم الأسعار: إعداد شركة مشترك يختاره البائع يدوياً في المسودة؛
         // سعر السطر النهائي يبقى لقطة مستقلة ولا يتغير بتعديل القائمة لاحقاً.

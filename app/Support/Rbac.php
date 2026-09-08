@@ -152,6 +152,13 @@ class Rbac
             // مؤسسة كاملة. owner/admin يملكانها عبر `*`؛ ولا تُضاف لـ
             // accountant/staff تلقائياً — قفلُ فترةٍ قرارُ إدارةٍ لا عملٍ يومي.
             'accounting_period_locks.view', 'accounting_period_locks.manage',
+            // FISCAL-2: السنة المالية سلطة **رقابية عليا** مقسَّمة أربعاً عمداً:
+            // العرض، وتعريف السنوات، والإقفال، والفتح. الإقفال يولّد قيداً يمسّ
+            // حقوق الملكية، والفتح يعكسه — فمن يعرّف سنةً لا يقفلها بالضرورة،
+            // ومن يقفلها لا يفتحها بالضرورة. owner/admin عبر `*`؛ ولا تُضاف
+            // لـaccountant/staff تلقائياً (نفس نمط ACC-1/ACC-6).
+            'fiscal_years.view', 'fiscal_years.manage',
+            'fiscal_years.close', 'fiscal_years.reopen',
     ];
 
     /**

@@ -34,7 +34,8 @@ const ITEMS: AccountingSettingItem[] = [
   // ACC-2: بنية تحتية فقط (بلا مستهلك ترحيل) — الرابط حقيقي الآن.
   { key: 'c_accountRouting', href: '/accounting-settings/account-routing', icon: Route },
   { key: 'c_costCenters', href: '/cost-centers', icon: Network },
-  { key: 'c_fiscalPeriods', href: null, icon: CalendarClock },
+  // FISCAL-2: السنوات المالية — الرابط حقيقي الآن، بصلاحيتها المستقلة.
+  { key: 'c_fiscalPeriods', href: '/accounting-settings/fiscal-years', icon: CalendarClock, permission: 'fiscal_years.view' },
   // ACC-6: أقفال الفترات — الرابط حقيقي الآن، بصلاحيتها المستقلة الخاصة.
   { key: 'c_periodLocks', href: '/accounting-settings/period-locks', icon: Lock, permission: 'accounting_period_locks.view' },
 ];
