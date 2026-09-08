@@ -31,12 +31,12 @@ before branching. This is the exact SHA the task named.
 
 ## 4. PR
 
-_(filled in on open)_ — opened, **not merged**, not deployed, no production release. No data was reset or
-deleted.
+[#689](https://github.com/safwan5001-source/Nebrax/pull/689) — opened, **not merged**, not deployed, no
+production release. No data was reset or deleted.
 
 ## 5. Head SHA
 
-_(filled in on push)_
+Implementation commit `0b08b096c89186ec372866986671595109732b3c`.
 
 ## 6. Enforcement architecture
 
