@@ -11,8 +11,8 @@ export const VISUAL_V2 = {
   hairline: 'border-[color:var(--border)]',
   sectionLabel: 'text-[10px] font-semibold text-[color:var(--muted)]',
   /** ارتفاع شعار أقصى حتى يبقى الاسم القانوني العنصر الأقوى. */
-  logoMaxPx: 36,
-  logoMaxWidthClass: 'max-h-9 max-w-[5.5rem] w-auto shrink-0 object-contain object-start',
+  logoMaxPx: 44,
+  logoMaxWidthClass: 'max-h-11 max-w-[6.5rem] w-auto shrink-0 object-contain object-start',
   qrSizePx: 76,
   totalsMaxClass: 'w-full max-w-[300px]',
 } as const;

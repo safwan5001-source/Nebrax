@@ -120,6 +120,15 @@ function duplicateKeys(lang: string): string[] {
 }
 
 describe('مفاتيح الترجمة', () => {
+  it('ملفات اللغة JSON خام وكاملة بلا مخرجات أو علامات اقتطاع', () => {
+    for (const lang of ['ar', 'en']) {
+      const raw = readFileSync(join(MESSAGES, `${lang}.json`), 'utf8');
+
+      expect(raw.trimStart().startsWith('{')).toBe(true);
+      expect(raw).not.toMatch(/Warning: truncated output|bytes omitted|original token count|Script completed|Command output/);
+    }
+  });
+
   it('يفحص عدداً معتبراً من الاستدعاءات (حارسٌ للحارس)', () => {
     // لو انكسر التعرّف على الاستدعاءات لصار الحارس أخضرَ بلا فحص — وهو أسوأ
     // من غيابه. الرقم أدنى حدٍّ لا هدف.

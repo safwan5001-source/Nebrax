@@ -147,6 +147,11 @@ class Rbac
             // فمن يحرّر مرتجعاً لا يحرّك بذلك نقداً. owner/admin عبر `*`؛
             // ولا تُضاف لـ accountant/staff تلقائياً (نفس نمط الصلاحيات الحديثة).
             'supplier_refunds.view', 'supplier_refunds.manage',
+            // ACC-6: أقفال الفترات المحاسبية سلطة **رقابية** مستقلة عن بقية
+            // إعدادات المحاسبة: من يوجّه حساباً لا يوقف بذلك الترحيل على
+            // مؤسسة كاملة. owner/admin يملكانها عبر `*`؛ ولا تُضاف لـ
+            // accountant/staff تلقائياً — قفلُ فترةٍ قرارُ إدارةٍ لا عملٍ يومي.
+            'accounting_period_locks.view', 'accounting_period_locks.manage',
     ];
 
     /**

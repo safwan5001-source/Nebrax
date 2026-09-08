@@ -105,7 +105,7 @@ export function DocHeader({ model, showLogo = true }: { model: DocumentModel; sh
               />
             ) : null}
             <div className="min-w-0">
-              <div className="line-clamp-2 break-words text-[13px] font-bold leading-tight text-black">{seller.name || '—'}</div>
+              <div className="line-clamp-2 break-words pt-0.5 text-[13px] font-bold leading-tight text-black">{seller.name || '—'}</div>
               <div className="mt-1 space-y-0">
                 <DocInfoRow label={<ModernFieldLabel field="vat_number" mode={mode} />} value={seller.vatNumber ? <span className="num" dir="ltr">{seller.vatNumber}</span> : null} stacked />
                 <DocInfoRow label={<ModernFieldLabel field="cr_number" mode={mode} />} value={seller.crNumber ? <span className="num" dir="ltr">{seller.crNumber}</span> : null} stacked />
@@ -169,7 +169,7 @@ export function DocHeader({ model, showLogo = true }: { model: DocumentModel; sh
               />
             ) : null}
             <div className="min-w-0">
-              <div className="line-clamp-2 break-words text-[15px] font-bold leading-snug text-black">{seller.name || '—'}</div>
+              <div className="line-clamp-2 break-words pt-0.5 text-[15px] font-bold leading-snug text-black">{seller.name || '—'}</div>
               <div className="mt-1.5 space-y-0.5">
                 <DocInfoRow label={<ModernFieldLabel field="vat_number" mode={mode} />} value={seller.vatNumber ? <span className="num" dir="ltr">{seller.vatNumber}</span> : null} stacked />
                 <DocInfoRow label={<ModernFieldLabel field="cr_number" mode={mode} />} value={seller.crNumber ? <span className="num" dir="ltr">{seller.crNumber}</span> : null} stacked />
@@ -234,7 +234,7 @@ export function DocHeader({ model, showLogo = true }: { model: DocumentModel; sh
               />
             ) : null}
             <div className="min-w-0">
-              <div className="line-clamp-2 break-words text-[16px] font-bold leading-snug text-black">{seller.name || '—'}</div>
+              <div className="line-clamp-2 break-words pt-0.5 text-[16px] font-bold leading-snug text-black">{seller.name || '—'}</div>
               {seller.tagline ? <div className="mt-0.5 line-clamp-1 break-words text-[10px] text-[color:var(--muted)]">{seller.tagline}</div> : null}
               <div className="mt-1.5 space-y-0.5">
                 <DocInfoRow label={<ModernFieldLabel field="vat_number" mode={mode} />} value={seller.vatNumber ? <span className="num" dir="ltr">{seller.vatNumber}</span> : null} stacked />
@@ -317,7 +317,7 @@ export function DocHeader({ model, showLogo = true }: { model: DocumentModel; sh
               />
             ) : null}
             <div className="min-w-0">
-              <div className="line-clamp-2 break-words text-[17px] font-semibold leading-snug text-black">{seller.name || '—'}</div>
+              <div className="line-clamp-2 break-words pt-0.5 text-[17px] font-semibold leading-snug text-black">{seller.name || '—'}</div>
               {seller.tagline ? <div className="mt-1 line-clamp-1 break-words text-[10px] text-[color:var(--muted)]">{seller.tagline}</div> : null}
               <div className="mt-2 space-y-1">
                 <DocInfoRow label={<ModernFieldLabel field="vat_number" mode={mode} />} value={seller.vatNumber ? <span className="num" dir="ltr">{seller.vatNumber}</span> : null} stacked />
@@ -397,7 +397,7 @@ export function DocHeader({ model, showLogo = true }: { model: DocumentModel; sh
               />
             ) : null}
             <div className="min-w-0">
-              <div className="line-clamp-2 break-words text-[14px] font-bold leading-tight text-black">{seller.name || '—'}</div>
+              <div className="line-clamp-2 break-words pt-0.5 text-[14px] font-bold leading-tight text-black">{seller.name || '—'}</div>
               {seller.tagline ? <div className="mt-0.5 line-clamp-1 break-words text-[9px] text-[color:var(--muted)]">{seller.tagline}</div> : null}
               <div className="mt-1 space-y-0">
                 <DocInfoRow label={<ModernFieldLabel field="vat_number" mode={mode} />} value={seller.vatNumber ? <span className="num" dir="ltr">{seller.vatNumber}</span> : null} stacked />
@@ -461,7 +461,7 @@ export function DocHeader({ model, showLogo = true }: { model: DocumentModel; sh
               />
             ) : null}
             <div className="min-w-0">
-              <div className="line-clamp-2 break-words text-[16px] font-semibold leading-snug text-black">{seller.name || '—'}</div>
+              <div className="line-clamp-2 break-words pt-0.5 text-[16px] font-semibold leading-snug text-black">{seller.name || '—'}</div>
               {seller.tagline ? <div className="mt-0.5 line-clamp-1 break-words text-[10px] text-[color:var(--muted)]">{seller.tagline}</div> : null}
               <div className="mt-2 space-y-0.5">
                 <DocInfoRow label={<ModernFieldLabel field="vat_number" mode={mode} />} value={seller.vatNumber ? <span className="num" dir="ltr">{seller.vatNumber}</span> : null} stacked />
@@ -517,7 +517,7 @@ export function DocHeader({ model, showLogo = true }: { model: DocumentModel; sh
               />
             ) : null}
             <div className="min-w-0">
-              <div className="line-clamp-2 break-words text-[14px] font-semibold leading-snug text-black">{seller.name || '—'}</div>
+              <div className="line-clamp-2 break-words pt-0.5 text-[14px] font-semibold leading-snug text-black">{seller.name || '—'}</div>
               {seller.tagline ? <div className="mt-0.5 line-clamp-1 break-words text-[9px] text-[color:var(--muted)]">{seller.tagline}</div> : null}
               <div className="mt-1.5 space-y-0">
                 <DocInfoRow label={<ModernFieldLabel field="vat_number" mode={mode} />} value={seller.vatNumber ? <span className="num" dir="ltr">{seller.vatNumber}</span> : null} stacked />

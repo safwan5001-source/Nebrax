@@ -16,6 +16,18 @@ Schedule::command('inventory:scan-alerts')
     ->withoutOverlapping()
     ->onOneServer();
 
+// PR-NOTIF-5: الاستحقاقات تتغير باليوم فقط؛ الإسقاط قراءة-فقط على الفواتير.
+Schedule::command('receivables:scan-notifications')
+    ->dailyAt('08:00')
+    ->withoutOverlapping()
+    ->onOneServer();
+
+// PR-NOTIF-5: فروق الصندوق والعهد المستلمة حالات تشغيلية قائمة؛ الفحص لا يغيّر POS.
+Schedule::command('pos:scan-notifications')
+    ->hourly()
+    ->withoutOverlapping()
+    ->onOneServer();
+
 // الملخص الرقابي اليومي (Daily LP Digest) — قراءة/تجميع فقط, idempotent لكل (مستأجر، تاريخ).
 // يوماً بعد يوم بتوقيت خادم واحد كي لا يتزاحم توليدان متزامنان لنفس اليوم.
 Schedule::command('pos:generate-lp-digest')

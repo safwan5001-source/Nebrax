@@ -36,7 +36,7 @@ describe('توكنز Quotation Proposal', () => {
   });
 
   it('يسقّف الشعار بهوية مستقلة دون نسخ قوالب الفاتورة ودون QR', () => {
-    expect(QUOTATION_PROPOSAL.logoMaxPx).toBe(38);
+    expect(QUOTATION_PROPOSAL.logoMaxPx).toBe(46);
     expect(QUOTATION_PROPOSAL.logoMaxPx).not.toBe(VISUAL_V2.logoMaxPx);
     expect(QUOTATION_PROPOSAL.logoMaxPx).not.toBe(ERP_V2.logoMaxPx);
     expect(QUOTATION_PROPOSAL.logoMaxPx).not.toBe(CLASSIC_V2.logoMaxPx);

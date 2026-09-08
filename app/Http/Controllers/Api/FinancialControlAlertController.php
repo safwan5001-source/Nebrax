@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Models\FinancialControlAlert;
+use App\Services\Accounting\FinancialAlertNotificationBridge;
 use App\Services\Accounting\FinancialControlService;
 use App\Tenancy\BranchContext;
 use Illuminate\Database\Eloquent\Builder;
@@ -55,7 +56,7 @@ class FinancialControlAlertController extends ApiController
         return response()->json(['data' => $this->mapAlert($alert->fresh())]);
     }
 
-    public function runCheck(FinancialControlService $controls): JsonResponse
+    public function runCheck(FinancialControlService $controls, FinancialAlertNotificationBridge $notifications): JsonResponse
     {
         $result = $controls->scan();
 
@@ -65,6 +66,8 @@ class FinancialControlAlertController extends ApiController
                 'code' => 'financial_alerts_disabled',
             ], 422);
         }
+
+        $notifications->process($result['alerts']);
 
         return response()->json([
             'data' => [

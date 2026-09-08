@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\Tenant;
+use App\Services\Accounting\FinancialAlertNotificationBridge;
 use App\Services\Accounting\FinancialControlService;
 use App\Tenancy\TenantContext;
 use Illuminate\Console\Command;
@@ -16,7 +17,7 @@ class ScanFinancialControlsCommand extends Command
 
     protected $description = 'يفحص اتزان القيود والتقارير والمستندات المرحّلة وينشئ تنبيهات رقابية داخلية فقط';
 
-    public function handle(FinancialControlService $controls, TenantContext $context): int
+    public function handle(FinancialControlService $controls, TenantContext $context, FinancialAlertNotificationBridge $notifications): int
     {
         $tenants = $this->option('tenant')
             ? Tenant::whereKey($this->option('tenant'))->get()
@@ -35,6 +36,12 @@ class ScanFinancialControlsCommand extends Command
             if (! $result['enabled'] && ! $this->option('force')) {
                 $this->line("{$tenant->name}: الرقابة المالية غير مفعّلة.");
                 continue;
+            }
+
+            // الإشعار يتبع إعداد المستأجر الفعلي دوماً، لا `--force` — تشغيلٌ
+            // يدوي على مستأجر مُعطَّل الميزة يعرض النتيجة هنا بلا إشعار أحد.
+            if ($result['enabled']) {
+                $notifications->process($result['alerts']);
             }
 
             $hasIssues = $result['active'] > 0 || $hasIssues;

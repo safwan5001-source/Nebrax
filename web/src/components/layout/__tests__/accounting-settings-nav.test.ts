@@ -27,3 +27,43 @@ describe('accounting settings sidebar leaf visibility', () => {
     expect(isNavEntryVisible(entry, NONE, null)).toBe(false);
   });
 });
+
+/**
+ * ACC-6 P2-1: «أقفال الفترات» صلاحيتها (`accounting_period_locks.view`)
+ * **مستقلة عمداً** عن `accounting_settings.view` — حتى لا يفقد من يملك
+ * الأولى بلا الثانية كل طريق تنقّل إلى الصفحة (مسار الوصول لا الـauthorization
+ * وحده). مدخل الشريط لهذا القفل مستقلّ عن مدخل مركز إعدادات المحاسبة تماماً
+ * كما `supplierRefunds` مستقلّ عن `purchases.view`.
+ */
+const periodLocksEntry = { permission: 'accounting_period_locks.view' };
+
+describe('period locks sidebar leaf visibility (independent of accounting_settings.view)', () => {
+  it('is visible to a custom role granted only accounting_period_locks.view, without accounting_settings.view', () => {
+    expect(isNavEntryVisible(periodLocksEntry, NONE, { role: 'custom_role', permissions: ['accounting_period_locks.view'] })).toBe(true);
+  });
+
+  it('is hidden from a custom role granted only accounting_settings.view, without accounting_period_locks.view', () => {
+    expect(isNavEntryVisible(periodLocksEntry, NONE, { role: 'custom_role', permissions: ['accounting_settings.view'] })).toBe(false);
+  });
+
+  it('is visible when both permissions are granted', () => {
+    expect(isNavEntryVisible(periodLocksEntry, NONE, {
+      role: 'custom_role',
+      permissions: ['accounting_settings.view', 'accounting_period_locks.view'],
+    })).toBe(true);
+  });
+
+  it('is hidden from accountant/staff by default (neither permission granted)', () => {
+    expect(isNavEntryVisible(periodLocksEntry, NONE, { role: 'accountant', permissions: ['invoices.view'] })).toBe(false);
+    expect(isNavEntryVisible(periodLocksEntry, NONE, { role: 'staff', permissions: ['invoices.view'] })).toBe(false);
+  });
+
+  it('is visible to owner/admin via the wildcard fallback (permissions absent)', () => {
+    expect(isNavEntryVisible(periodLocksEntry, NONE, { role: 'owner' })).toBe(true);
+    expect(isNavEntryVisible(periodLocksEntry, NONE, { role: 'admin' })).toBe(true);
+  });
+
+  it('is hidden when the viewer is unknown', () => {
+    expect(isNavEntryVisible(periodLocksEntry, NONE, null)).toBe(false);
+  });
+});

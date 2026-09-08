@@ -42,7 +42,7 @@ describe('توكنز Purchase Order Formal', () => {
   });
 
   it('يسقّف الشعار بهوية مستقلة دون نسخ عرض السعر أو قوالب الفاتورة ودون QR', () => {
-    expect(PURCHASE_ORDER_FORMAL.logoMaxPx).toBe(31);
+    expect(PURCHASE_ORDER_FORMAL.logoMaxPx).toBe(39);
     expect(PURCHASE_ORDER_FORMAL.logoMaxPx).not.toBe(QUOTATION_PROPOSAL.logoMaxPx);
     expect(PURCHASE_ORDER_FORMAL.logoMaxPx).not.toBe(VISUAL_V2.logoMaxPx);
     expect(PURCHASE_ORDER_FORMAL.logoMaxPx).not.toBe(ERP_V2.logoMaxPx);
