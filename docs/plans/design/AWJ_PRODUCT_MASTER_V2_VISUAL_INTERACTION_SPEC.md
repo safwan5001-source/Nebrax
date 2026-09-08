@@ -4,14 +4,14 @@ Status: Design specification / operational proving case for `AWJ_MASTER_RECORD_P
 
 ## 1. Role
 
-Product Master V2 is the operational/inventory proving case for Master Record Pattern V2. It must make product identity, commercial data and inventory state easy to understand without turning inventory movements into editable product properties.
+Product Master V2 is the operational/inventory proving case for Master Record Pattern V2. It must make product/service identity, commercial data and inventory state easy to understand without turning inventory movements into editable product properties.
 
 Primary questions:
-- What product/service is this?
+- Is this an Item (`good`) or Service (`service`)?
 - How is it identified/scanned/sold/purchased?
-- What is its current inventory state when inventory tracking applies?
+- What fields and actions actually apply to this type?
+- What is its current inventory state when inventory applies?
 - What are its authoritative commercial/cost values subject to permissions?
-- What inventory action can the authorized user perform next?
 
 ## 2. Current AWJ baseline
 
@@ -19,54 +19,132 @@ The existing Product Profile already implements a substantial Master Workspace: 
 
 It also already separates inventory actions into explicit operations: transfer, receipt/add inventory operation and issue. Product copy resets opening quantity instead of copying current stock.
 
-V2 should refine this existing capability rather than replace it with an unrelated page model.
+AWJ backend already models `type = good | service`; V2 must make that distinction behavioral rather than merely displaying a badge.
 
-## 3. Canonical Full Product Workspace
+## 3. Daftra reference — Item versus Service
+
+Official Daftra documentation was reviewed as a product/UX reference, not as an AWJ or ZATCA source of truth.
+
+Daftra explicitly starts creation as either “new product” or “new service”. The two share much of the core record, but type-specific fields differ. Shared examples include name, SKU, classification, brand, unit template, barcode, purchase/sale pricing, taxes, notes/tags/status. Daftra also documents unit templates for both products and services, including service-like units such as hour/session.
+
+Daftra product-only behavior includes inventory-management data such as low-stock notification and inventory quantity/unit behavior. Its saved product view exposes stock information, stock movements and stock operations.
+
+Daftra service-only behavior includes a service-duration field in minutes for its booking use case.
+
+AWJ conclusion: adopt the **dynamic type principle**, not Daftra-specific fields blindly. In particular, AWJ must not add service duration until an actual AWJ booking/service workflow requires it.
+
+Reference pages:
+- Daftra: “إضافة منتج جديد أو خدمة جديدة”.
+- Daftra: “ربط قالب وحدة القياس بالمنتج”.
+- Daftra: “باركود المنتج/ الخدمة”.
+
+## 4. Item / Service type contract
+
+At create time, the user chooses one clear type:
+
+`صنف (Item) | خدمة (Service)`
+
+This choice changes the information architecture, validation and available actions.
+
+### Shared fields/capabilities
+Subject to actual AWJ support:
+- name / English name;
+- SKU/code;
+- category;
+- brand where meaningful;
+- description;
+- unit and unit template;
+- default sales/purchase unit where applicable;
+- barcode where useful (do not prohibit service barcode merely because inventory is absent);
+- sale price;
+- purchase price/cost visibility subject to permission;
+- tax rate;
+- pricing rules such as minimum sale price/discount/profit margin where supported;
+- tags/internal notes;
+- active state;
+- media where useful.
+
+### Item (`good`)
+Item exposes inventory semantics when tracking is enabled:
+- inventory tracking;
+- reorder level;
+- quantity-on-hand summary;
+- average cost subject to permission;
+- inventory movements;
+- receipt / issue / transfer actions;
+- supplier relationship where supported;
+- inventory/accounting configuration where applicable.
+
+### Service (`service`)
+Service must not expose inventory-only concepts:
+- no quantity-on-hand summary;
+- no reorder level;
+- no stock movement tab;
+- no receipt / issue / transfer stock actions;
+- no opening stock action;
+- no misleading average inventory cost metric.
+
+Service retains valid non-inventory capabilities such as units, pricing, tax and barcode when supported by the actual business workflow.
+
+Service-specific attributes are added only when an AWJ module genuinely consumes them. A generic “duration in minutes” field is therefore not part of V2 baseline merely because Daftra uses one for bookings.
+
+## 5. Type-change safety
+
+Create-time type selection is straightforward. Changing an existing record between Item and Service is not an ordinary cosmetic edit.
+
+Before implementation, AWJ must define lifecycle guards for type changes, especially when an Item has inventory movements, valuation/history, document references or accounting effects. V2 must not promise unrestricted `good ↔ service` conversion.
+
+No type-change accounting/inventory behavior is invented by this design specification.
+
+## 6. Canonical Full Product Workspace
 
 `Identity Header → Contextual Command Bar → Compact Operational Summary → Section Navigation → Active Operational Content`
 
 ### Identity Header
-- Primary product image where available; restrained fallback when absent.
-- Product name.
-- SKU.
-- Product type: good/service where useful.
+- Primary image where available; restrained fallback when absent.
+- Name.
+- SKU/code.
+- Type: Item / Service.
 - Active/inactive state.
 - Category/brand as secondary identity when useful.
 
 Product media may include multiple images; this differs intentionally from the single identity photo/logo expected for Customer/Supplier.
 
 ### Contextual Command Bar
-Candidate actions based on actual support/permissions:
-- Edit product.
-- Transfer stock.
-- Receive/add stock operation.
-- Issue stock.
-- Copy product.
+Shared candidates:
+- Edit.
+- Copy.
 - Delete/deactivate according to lifecycle rules.
 - Secondary actions in overflow.
 
-Inventory-impacting actions must remain visually distinct from ordinary profile editing.
+Item-only inventory actions, when applicable and authorized:
+- Transfer stock.
+- Receive/add stock operation.
+- Issue stock.
 
-## 4. Compact operational summary
+Service never receives fake inventory actions for visual symmetry.
 
-For inventory-tracked goods, prioritize:
+## 7. Compact operational summary
+
+### Item with inventory tracking
+Prioritize:
 - Quantity on hand.
-- Average cost, only when user has cost visibility permission.
+- Average cost, only with cost visibility permission.
 - Sale price.
-- Reorder context where supported and meaningful.
+- Reorder context where meaningful.
 
-For services/non-inventory products, inventory metrics should be absent or clearly not applicable rather than displaying misleading zeroes.
+### Service
+Prioritize non-inventory commercial facts such as sale price and relevant unit/tax context. Inventory metrics are omitted, not rendered as zero.
 
 Financial/cost values must use authoritative backend values and preserve AWJ money precision/permission rules.
 
-## 5. Information architecture
+## 8. Information architecture
 
 ### Identity & catalog
-- Arabic/primary name and English name where supported.
-- SKU.
-- Primary barcode.
-- Alternate barcodes.
-- Product type.
+- Names.
+- SKU/code.
+- Primary/alternate barcodes where applicable.
+- Item/Service type.
 - Category.
 - Brand.
 - Description.
@@ -79,6 +157,8 @@ Financial/cost values must use authoritative backend values and preserve AWJ mon
 - Default purchase unit.
 - Barcode-to-unit relationships where supported.
 
+Units remain available to Service where meaningful; examples can include hour/session without implying inventory stock.
+
 ### Commercial & tax
 - Sale price.
 - Purchase/cost-related price only for authorized users.
@@ -87,7 +167,7 @@ Financial/cost values must use authoritative backend values and preserve AWJ mon
 - Profit margin where supported and permission-safe.
 - Tax rate.
 
-### Inventory
+### Inventory — Item only
 - Track inventory state.
 - Reorder level.
 - Supplier relationship where supported.
@@ -95,103 +175,91 @@ Financial/cost values must use authoritative backend values and preserve AWJ mon
 
 ### Accounting
 - Sales account.
-- COGS account where applicable.
-- Accounting fields must remain permission-aware and must not be casually changed in a way that rewrites historical accounting.
+- COGS/inventory-related account only where semantically applicable.
+- Accounting fields remain permission-aware and cannot rewrite historical accounting.
 
 ### Media
-The current product profile supports multiple images. V2 keeps media as a genuine product capability rather than treating it as decorative avatar behavior.
+The current profile supports multiple images. V2 keeps media as a genuine record capability rather than decorative avatar behavior.
 
-## 6. Consequential inventory rule
+## 9. Consequential inventory rule
 
-Stock quantity is not a normal mutable Product property.
+Stock quantity is not a normal mutable Item property.
 
-Opening quantity is an initialization/action concept; subsequent quantity changes must flow through inventory movements/permits and their existing authorization, branch/tenant and valuation rules.
+Opening quantity is an initialization/action concept; subsequent quantity changes flow through inventory movements/permits and their authorization, branch/tenant and valuation rules.
 
-Therefore V2 must never provide a generic Edit Product form field that silently overwrites quantity-on-hand.
+V2 must never provide a generic Edit Item field that silently overwrites quantity-on-hand. Service has no opening-stock concept.
 
-This is the Product equivalent of the Master Record principle used for Customer/Supplier opening balances.
+## 10. Quick Create/Edit versus Full Workspace
 
-## 7. Quick Create/Edit versus Full Workspace
+Quick Create/Edit remains necessary inside invoice, purchase, quotation and other transactional contexts.
 
-Product Quick Create/Edit remains necessary inside invoice, purchase, quotation and other transactional contexts.
+The type choice appears early and dynamically controls applicable fields. Quick Create captures only the minimum valid Item/Service identity and commercial configuration required to continue the transaction.
 
-Quick Create should capture the minimum valid product/service identity and commercial configuration needed to continue the transaction. It must not expose a full inventory-history workspace.
+It must not expose full inventory history or consequential stock operations.
 
-Full Product Workspace is where media, units/barcodes, inventory movements, operational actions and activity are managed.
+## 11. Section model
 
-## 8. Section model
-
-Recommended V2 sections based on actual capabilities:
-- Overview / Product information.
-- Inventory movements (only where applicable).
-- Units & barcodes if information density warrants a dedicated section; otherwise keep within information.
-- Media within information or a dedicated area depending final layout density.
+Shared:
+- Overview / information.
+- Media/units/barcodes as appropriate to density.
 - Timeline.
-- Activity / audit.
+- Activity/audit.
 
-Do not create empty tabs merely to force symmetry with Customer/Supplier.
+Item-only when inventory applies:
+- Inventory movements.
+- Inventory operational context.
 
-## 9. Responsive behavior
+Do not create empty Service tabs to force symmetry with Item.
 
-Desktop/laptop: dense summary + Tabs + information grid; media and structured product data may use a balanced two-column region.
+## 12. Responsive behavior
+
+Desktop/laptop: dense summary + sections + information grid; media and structured data may use a balanced two-column region.
 
 Mobile:
-- identity/image/name/status first;
-- compact key metrics;
+- image/name/type/status first;
+- compact applicable metrics;
 - primary action + overflow;
-- vertically recomposed product information;
+- vertically recomposed information;
 - units/barcodes remain readable;
-- inventory movements use responsive record/table behavior rather than a blindly shrunken desktop table.
+- Item inventory movements use responsive record/table behavior.
 
 No global mobile bottom navigation is introduced by this pattern.
 
-## 10. Arabic RTL / English LTR
+## 13. Arabic RTL / English LTR
 
 Verify deliberately:
-- SKU/barcode direction remains readable and scan-friendly.
-- money/quantity/unit combinations.
-- Arabic and English names.
-- mixed-direction category/brand/reference values.
-- action ordering and Tabs.
-- long unit names and conversion factors.
+- Item / Service terminology;
+- SKU/barcode direction;
+- money/quantity/unit combinations;
+- Arabic and English names;
+- action ordering and sections;
+- long unit names and conversion factors;
+- dynamic field appearance/disappearance;
 - desktop/laptop/tablet/mobile.
 
-## 11. Cost and security visibility
+## 14. Cost and security visibility
 
 Average cost, purchase price and other sensitive cost/profit information must respect the existing centralized permission model (including `products.view_cost` where applicable).
 
-The V2 design must define graceful absence/redaction states instead of leaking cost through summary cards, derived values, exports or secondary sections.
+V2 defines graceful absence/redaction states instead of leaking cost through summaries, derived values, exports or secondary sections.
 
-## 12. Master Record pattern validation
+## 15. Master Record pattern validation
 
-Product proves that Master Record V2 is not limited to business parties.
+Product proves that Master Record V2 is not limited to business parties and that a master-record subtype can change behavior without becoming a separate generic form clone.
 
-Shared grammar with Customer/Supplier:
-- identity header;
-- contextual actions;
-- compact summary;
-- organized details/relations;
-- activity/audit;
-- Quick Create + Full Workspace;
-- consequential actions separated from properties;
-- responsive and bilingual behavior.
+Shared grammar with Customer/Supplier remains identity header, contextual actions, compact summary, organized details/relations, activity/audit, Quick Create + Full Workspace, consequential-action separation, responsive and bilingual behavior.
 
-Product-specific semantics:
-- multi-image media;
-- SKU/barcodes/units;
-- inventory state and movements;
-- stock operations;
-- cost visibility permissions;
-- sales/purchase/accounting configuration.
+Product-specific semantics remain Item/Service type, multi-image media, SKU/barcodes/units, Item inventory state/actions, and cost visibility permissions.
 
-The pattern is successful only if these differences remain first-class rather than being flattened into a generic form template.
+## 16. Known implementation work intentionally deferred
 
-## 13. Known implementation work intentionally deferred
+- Final Item/Service create/edit UI.
+- Type-change lifecycle guards.
+- Visual refactor of current Product Profile.
+- Responsive refinements.
+- Any product lifecycle/deletion changes.
+- Any inventory valuation, stock permit, branch/tenant or accounting-routing changes.
+- Any cost-permission changes.
+- Any future Service-only fields such as duration until an actual AWJ workflow requires them.
 
-- Visual refactor of the current Product Profile to the final V2 hierarchy.
-- Responsive mobile refinements.
-- Any changes to product lifecycle/deletion guards.
-- Any changes to inventory valuation, stock permits, branch/tenant rules or accounting routing.
-- Any changes to cost permissions.
-
-Those require separately scoped implementation PRs and appropriate tests; none belong to this documentation checkpoint.
+These require separately scoped implementation PRs and appropriate tests; none belong to this documentation checkpoint.
