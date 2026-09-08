@@ -53,6 +53,88 @@ class SpreadsheetReader
     }
 
     /**
+     * PR-UOM2-4: يقرأ **كل** أوراق مصنّف XLSX، لا الورقة الأولى وحدها كما
+     * تفعل `read()`/`readXlsx()`/`firstSheetPath()` أعلاه — تلك تبقى بلا أي
+     * تعديل، فمسار الاستيراد أحادي الورقة القائم (المنتجات، الأرصدة
+     * الافتتاحية) لا يتأثر حرفياً. CSV لا يحمل مفهوم أوراق متعددة أصلاً،
+     * فمُلزَمٌ هنا بـXLSX فقط — يُرفض غيرها فوراً برسالة واضحة.
+     *
+     * @return array<string, array<int, array<int, string>>> اسم الورقة → صفوفها
+     */
+    public static function readWorkbookXlsx(string $path, int $maxRows, int $maxColumns): array
+    {
+        $zip = new ZipArchive;
+        if ($zip->open($path) !== true) {
+            throw new RuntimeException('تعذر فتح ملف XLSX. تأكد أنه ملف Excel صالح غير تالف.');
+        }
+
+        try {
+            self::assertArchiveIsSane($zip);
+            $sheetPaths = self::allSheetPaths($zip);
+            if ($sheetPaths === []) {
+                throw new RuntimeException('ملف XLSX لا يحتوي ورقة عمل قابلة للقراءة.');
+            }
+
+            $shared = self::sharedStrings($zip);
+            $sheets = [];
+            foreach ($sheetPaths as $name => $sheetPath) {
+                $sheetXml = $zip->getFromName($sheetPath);
+                if ($sheetXml === false) {
+                    continue;
+                }
+                $sheets[$name] = self::parseSheet($sheetXml, $shared, $maxRows, $maxColumns);
+            }
+
+            return $sheets;
+        } finally {
+            $zip->close();
+        }
+    }
+
+    /**
+     * كل أوراق المصنّف بترتيبها، اسماً إلى مسار الجزء داخل الأرشيف — تعميمٌ
+     * لِما تفعله `firstSheetPath()` لورقة واحدة فقط، بلا تعديل تلك الدالة
+     * القائمة (`readWorkbookXlsx()` وحدها تستدعي هذه).
+     *
+     * @return array<string, string> اسم الورقة → مسارها
+     */
+    private static function allSheetPaths(ZipArchive $zip): array
+    {
+        $workbook = $zip->getFromName('xl/workbook.xml');
+        $rels = $zip->getFromName('xl/_rels/workbook.xml.rels');
+        if ($workbook === false || $rels === false) {
+            throw new RuntimeException('بنية ملف XLSX غير صالحة.');
+        }
+
+        $workbookXml = self::parseXml($workbook);
+        $relsXml = self::parseXml($rels);
+
+        $targetByRelId = [];
+        foreach ($relsXml->children() as $relationship) {
+            $targetByRelId[(string) $relationship['Id']] = (string) $relationship['Target'];
+        }
+
+        $paths = [];
+        foreach ($workbookXml->xpath('//*[local-name()="sheets"]/*[local-name()="sheet"]') ?: [] as $sheet) {
+            $name = (string) $sheet['name'];
+            $relationshipId = null;
+            foreach ($sheet->attributes('http://schemas.openxmlformats.org/officeDocument/2006/relationships') ?? [] as $attrName => $value) {
+                if ($attrName === 'id') {
+                    $relationshipId = (string) $value;
+                    break;
+                }
+            }
+            if ($relationshipId === null || ! isset($targetByRelId[$relationshipId])) {
+                continue;
+            }
+            $target = ltrim($targetByRelId[$relationshipId], '/');
+            $paths[$name] = str_starts_with($target, 'xl/') ? $target : 'xl/'.$target;
+        }
+
+        return $paths;
+    }
+
+    /**
      * @return array<int, array<int, string>>
      */
     private static function readCsv(string $path, int $maxRows, int $maxColumns): array
@@ -151,7 +233,7 @@ class SpreadsheetReader
      */
     private static function readXlsx(string $path, int $maxRows, int $maxColumns): array
     {
-        $zip = new ZipArchive();
+        $zip = new ZipArchive;
         if ($zip->open($path) !== true) {
             throw new RuntimeException('تعذر فتح ملف XLSX. تأكد أنه ملف Excel صالح غير تالف.');
         }
@@ -241,7 +323,7 @@ class SpreadsheetReader
         }
 
         $strings = [];
-        $reader = new XMLReader();
+        $reader = new XMLReader;
         if (! $reader->XML($xml, 'UTF-8', LIBXML_NONET)) {
             return [];
         }
@@ -275,7 +357,7 @@ class SpreadsheetReader
      */
     private static function parseSheet(string $xml, array $shared, int $maxRows, int $maxColumns): array
     {
-        $reader = new XMLReader();
+        $reader = new XMLReader;
         if (! $reader->XML($xml, 'UTF-8', LIBXML_NONET)) {
             throw new RuntimeException('تعذر قراءة ورقة العمل داخل ملف XLSX.');
         }

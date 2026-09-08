@@ -30,13 +30,17 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 class ProductExportService
 {
     public const SCOPE_SELECTED = 'selected';
+
     public const SCOPE_FILTERED = 'filtered';
+
     public const SCOPE_ALL = 'all';
 
     public const FORMAT_CSV = 'csv';
+
     public const FORMAT_XLSX = 'xlsx';
 
     public const TEMPLATE_CATALOG = 'catalog';
+
     public const TEMPLATE_ROUND_TRIP = 'round_trip';
 
     /**
@@ -186,10 +190,14 @@ class ProductExportService
     }
 
     /**
+     * PR-UOM2-4: عامّة عمداً — `ProductWorkbookService` تستدعيها مباشرة لبناء
+     * صفوف ورقة Products داخل المصنّف بدل تكرار منطق بناء الصف هنا. تغييرٌ في
+     * الظهور فقط، بلا أي تعديل سلوكي.
+     *
      * @param  array<int, string>  $headers
      * @return array<int, string|null>
      */
-    private function row(Product $product, array $headers, bool $costAuthorized): array
+    public function row(Product $product, array $headers, bool $costAuthorized): array
     {
         $values = [
             'nebrax_id' => (string) $product->id,

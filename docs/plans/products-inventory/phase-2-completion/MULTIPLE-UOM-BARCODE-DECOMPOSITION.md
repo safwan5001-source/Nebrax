@@ -37,8 +37,8 @@ Ordering follows `PHASE2_PLANNING_HANDOFFS.md`: *"Decompose backend master-data 
 |---|---|---|---|---|
 | **PR-UOM2-1** | Default sales/purchase UOM (backend master-data) | 2 nullable columns | — | ✅ merged (`fa050c2`) |
 | **PR-UOM2-2** | Product UX: units + alternate barcodes | none | PR-UOM2-1 (displays defaults) | ✅ merged (`e47b249`) |
-| **PR-UOM2-3** | POS UOM selection, server-authoritative | none | PR-UOM2-1, PR-UOM2-2 | in progress, this PR |
-| PR-UOM2-4 | Workbook: Products / Barcodes / Unit Prices round-trip | none | PR-UOM2-1 | not started |
+| **PR-UOM2-3** | POS UOM selection, server-authoritative | none | PR-UOM2-1, PR-UOM2-2 | ✅ merged (`74d2ed6`) |
+| **PR-UOM2-4** | Workbook: Products / Barcodes / Unit Prices round-trip | none | PR-UOM2-1 | in progress, this PR |
 
 Each is opened, reviewed and merged separately. No mega-PR.
 
@@ -225,3 +225,149 @@ POS UOM switching is **not greenfield**. It is already built and tested, end to 
 ### Deviations requiring owner sign-off
 
 The only architecturally significant open question (whether `default_sales_unit` pre-selects in POS) was put to the owner before implementation, per the task's own instruction to stop rather than guess — see the "D-E" decision above. No further deviation.
+
+---
+
+## 6. PR-UOM2-4 — contract
+
+### Goal
+
+Complete the workbook round-trip: one `.xlsx` file with three independent sheets —
+**Products**, **Barcodes**, **Unit Prices** — that can be exported and re-imported
+without loss, alongside the existing single-sheet Products CSV/XLSX path (untouched).
+
+### Current-main baseline (measured before implementation)
+
+| Capability | State | Evidence |
+|---|---|---|
+| Product round-trip CSV/XLSX (single sheet) — `ProductImportFields`, `ProductImportService`, `ProductExportService`, `/products/import/*`, `/products/export` | ✅ done | unchanged by this PR |
+| `ProductBarcode` + unified `barcode_registry` atomic namespace, `GET/POST/DELETE /products/{id}/barcodes` | ✅ done (PR-UOM-1) | reused unchanged |
+| `PriceListItem(price_list_id, product_id, unit_name, price)` + `PriceListService::resolve()/upsertItem()` — explicit price, never derived from a UOM factor | ✅ done | reused unchanged |
+| `SpreadsheetReader`/`SpreadsheetWriter` | **hardcoded to exactly one worksheet** | `SpreadsheetReader::readXlsx()` always resolves "the first sheet" (`firstSheetPath()`); `SpreadsheetWriter::xlsx()` always writes exactly one `sheet1.xml` |
+| A "Workbook" / multi-sheet concept anywhere in the codebase | ❌ **absent** | fully greenfield — confirmed by grep across `app/`, `web/src`, `routes/` |
+| A tenant-wide default/base `PriceList` concept (`is_default`) | ❌ **absent** | `PriceList` has no such column; every price list is an equal, named, `is_active` row a user picks per-document |
+
+Two real gaps close this PR: (1) `SpreadsheetReader`/`SpreadsheetWriter` need genuine multi-sheet
+capability, added as new methods — the existing single-sheet methods are untouched, so every
+existing caller (product single-sheet import/export, Inventory Opening import) is byte-identical
+before and after. (2) There is no field catalog yet for a Barcodes sheet or a Unit Prices sheet.
+
+### Owner decision recorded (this session)
+
+| # | Decision | Chosen |
+|---|---|---|
+| D-F | Which `PriceList` do a workbook's Unit Prices rows belong to, given `PriceListItem` is scoped by `price_list_id` and no default/base list exists? | **One price list, chosen explicitly by the user before every run — required, never guessed.** `price_list_id` is a mandatory parameter on both the workbook import and export endpoints. Import/export are symmetric round-trips for that one chosen list. No `is_default`/base-list concept is introduced. The endpoint fails closed (422) if the operation needs a price list and none was supplied — never falls back to "the first list" or any implicit choice. The chosen list must belong to the caller's tenant (validated like every other tenant-scoped reference) and be `is_active` (mirrors `PriceListService`'s own guard). Price stays an explicit `(product, unit)` value inside that one list; never derived from `unit_factor`. `PriceList`'s model, invoice/POS price-list behavior, and existing pricing paths are untouched. |
+
+### In scope
+
+- `SpreadsheetReader::readWorkbookXlsx()` (new method) — enumerates every `<sheet>` in an
+  `.xlsx` workbook (not just the first) and returns `sheet name => rows`. XLSX only; CSV/TXT
+  are rejected immediately with a clear error (CSV cannot represent three sheets — the existing
+  single-sheet Products CSV path is untouched and remains the way to work with CSV).
+- `SpreadsheetWriter::workbookXlsx()` (new method) — writes N worksheets (headers/rows/types
+  per sheet) into one `.xlsx`, each with its own content-type, relationship, and worksheet part.
+- `App\Support\BarcodeImportFields` (new) — Barcodes sheet catalog: `nebrax_id, sku, code,
+  unit_name, default_quantity, label`. Product match priority is `nebrax_id` then `sku` —
+  identical rule to the Products sheet, never the name.
+- `App\Support\UnitPriceImportFields` (new) — Unit Prices sheet catalog: `nebrax_id, sku,
+  unit_name, price`. Same product-match rule.
+- `App\Services\ProductWorkbookService` (new) — orchestrates the three sheets:
+  - **Products sheet**: re-uses `ProductImportService`/`ProductExportService` **unchanged** —
+    the Products sheet's rows are round-tripped through the exact existing single-sheet
+    machinery (same validation, same `mode`/`blank_policy`/`master_data_policy`/`mapping`
+    options, same tests), not a reimplementation.
+  - **Barcodes sheet**: create-only, mirroring `ProductController::storeBarcode()`'s exact
+    validation (unit membership against the product's effective template, live duplicate check
+    via `BarcodeRegistryEntry`, same defaults for `unit_name`/`default_quantity`) — no new
+    barcode-writing policy invented.
+  - **Unit Prices sheet**: upsert via `PriceListService::upsertItem()` unchanged, against the
+    one `PriceList` selected for the run.
+  - `apply()` runs all three sheets inside **one outer transaction**: Products first (so a
+    product created by this same file is immediately resolvable), then Barcodes, then Unit
+    Prices — all-or-nothing, matching the existing single-sheet "no error rows before write"
+    invariant, applied workbook-wide.
+- New routes (additive, `products.manage`/`products.view`, no new `EnsureApplicationActive`
+  key — matching the existing product import/export routes): `GET /products/workbook/template`,
+  `GET /products/workbook/fields`, `POST /products/workbook/inspect`,
+  `POST /products/workbook/preview`, `POST /products/workbook/apply`,
+  `GET /products/workbook/export`.
+- Tests on SQLite **and** PostgreSQL.
+
+### Explicitly out of scope
+
+- Any change to `ProductImportService`, `ProductExportService`'s behavior, `ProductImportFields`,
+  `PriceListService`, `PriceList`, `ProductBarcode`, `BarcodeRegistryEntry`, `UnitConversion`, or
+  any accounting/GL/tax/discount/minimum-price/inventory-valuation path. (`ProductExportService::row()`
+  is widened from `private` to `public` — a pure visibility change with no behavior change, so the
+  Products sheet of the workbook export can call the exact same row-building code instead of a copy.)
+- Weighted Barcode (D-02) and Product Variants (D-03) — untouched, still `NEEDS DECISION`. A
+  Barcodes-sheet row is one code for one product/unit, exactly like `storeBarcode()` today.
+- Frontend UI. This PR is **backend-only**, matching how PR-UOM2-1 (backend master-data) preceded
+  PR-UOM2-2 (its UI) in this same program. The workbook upload/mapping/preview screen and the
+  export dialog's price-list picker are a follow-up UI pass, not part of this PR.
+- An `update`/`delete` mode for the Barcodes sheet, or a distinct `mode` option for the Unit
+  Prices sheet — both sheets have exactly one natural semantic each (create-only for barcodes,
+  upsert for prices), so no new mode vocabulary is introduced.
+- Any `is_default`/base price list concept — explicitly rejected by D-F.
+- Any change to how invoices/purchases/POS resolve or display price-list pricing.
+
+### Invariants inherited (must not regress)
+
+- `Product.unit == UnitTemplate.base_unit`; base quantity is inventory truth; commercial UOM
+  is presentation/input only.
+- One tenant-wide atomic barcode namespace; no `barcode_1`/`barcode_2`/parallel namespace.
+- Money is never derived from `unit_factor`; every Unit Prices row is an explicit, stored price.
+- `default_sales_unit`/`default_purchase_unit` remain presentation-only (D-A) — the workbook
+  round-trips their existing columns on the Products sheet exactly as `ProductImportFields`
+  already does; nothing new reads or auto-applies them.
+- Strict tenant isolation; a `price_list_id`/`nebrax_id` from another tenant never resolves,
+  never leaks existence, always reads as "not found."
+- Historical documents stay interpretable regardless of later template/price-list edits.
+
+### Failure semantics
+
+| Case | Result |
+|---|---|
+| `price_list_id` missing on the workbook import/export request | 422 at request validation — fail closed, never guessed |
+| `price_list_id` belongs to another tenant, or doesn't exist | 422 "not found" — no existence leak |
+| `price_list_id` refers to an inactive price list | 422, mirroring `PriceListService`'s own guard |
+| A Barcodes/Unit-Prices row's `nebrax_id`/`sku` resolves no product in tenant scope | row error, row skipped |
+| A Barcodes row's `code` is blank, or already claimed (in-file duplicate or live DB conflict) | row error — same message class as `storeBarcode()` |
+| A Barcodes row's `unit_name` is set but not in the product's effective template (base + alternates) | row error, fail-closed — no default beyond blank-means-base-unit |
+| A Unit Prices row's `unit_name` is unknown to the product's template | row error (via `UnitConversion::resolve()`'s existing fail-closed exception) |
+| A Unit Prices row's `price` is blank or not a valid non-negative money value | row error |
+| The uploaded file is CSV/TXT | 422 immediately — workbook import requires `.xlsx` |
+| The Barcodes or Unit Prices sheet is entirely absent from the uploaded workbook | not an error — that sheet contributes zero rows; only the Products sheet is mandatory |
+| Any row across any of the three sheets is an error | `apply()` refuses the whole workbook — matches the existing single-sheet "no partial write" rule |
+| A product/unit pair has no explicit `PriceListItem` in the selected list | omitted from the Unit Prices export — never a synthesized/derived row |
+
+### Acceptance criteria
+
+1. Exporting Products+Barcodes+Unit Prices for a chosen `price_list_id`, then re-importing the
+   same file unmodified, changes nothing (idempotent round-trip).
+2. A Barcodes-sheet row with `unit_name`/`default_quantity`/`label` creates a `ProductBarcode`
+   identical in shape to one created via `POST /products/{id}/barcodes`.
+3. `default_sales_unit`/`default_purchase_unit` round-trip on the Products sheet exactly as
+   today; no document/POS behavior changes (zero files under `Invoice`/`Purchase`/POS touched).
+4. A duplicate barcode code — within the file or already claimed in the tenant — is rejected,
+   never silently overwritten, never crosses into another tenant's barcode space.
+5. An unknown UOM name on either new sheet is rejected fail-closed, never defaulted to factor 1.
+6. A Unit Prices row with no explicit price for a (product, unit) pair is never fabricated from
+   `unit_factor` on export, and import never derives one either.
+7. The existing single-sheet Products CSV/XLSX import/export (`/products/import/*`,
+   `/products/export`) is provably unaffected — same tests, same results, before and after.
+8. Cross-tenant: a `price_list_id`/`nebrax_id`/`sku` from another tenant never resolves anywhere
+   in the workbook path.
+9. Full regression (existing product import/export + barcode + price-list suites) stays green
+   on SQLite and PostgreSQL.
+
+### Migration strategy
+
+None. Zero new tables or columns — the workbook is a new read/write surface over `Product`,
+`ProductBarcode`, `PriceListItem`, `BarcodeRegistryEntry`, and `PriceList`, all unchanged.
+
+### Deviations requiring owner sign-off
+
+The one real architectural fork (which price list a Unit Prices sheet targets) was put to the
+owner before implementation — D-F above. No further deviation. Frontend UI is explicitly deferred
+(see "Explicitly out of scope"), disclosed rather than silently dropped.
