@@ -8,14 +8,7 @@ use App\Services\NotificationService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 
-/**
- * Read-only receivables notification projection.
- *
- * It never changes an invoice, payment, journal or balance. Eligibility is derived
- * only from posted sales invoices that still have a positive remaining amount.
- * A daily bucket is intentionally part of the dedupe key: due-soon/today notify
- * once for that transition date; overdue may remind once per day while still open.
- */
+/** Read-only projection of actionable sales receivable due states. */
 class ReceivablesNotificationService
 {
     private const DUE_SOON_DAYS = 3;
@@ -36,10 +29,9 @@ class ReceivablesNotificationService
         $notified = 0;
         foreach ($invoices as $invoice) {
             $kind = $this->kind($invoice, $today);
-            if ($kind === null) {
-                continue;
+            if ($kind !== null) {
+                $notified += $this->notify($tenantId, $invoice, $kind, $today);
             }
-            $notified += $this->notify($tenantId, $invoice, $kind, $today);
         }
 
         return ['scanned' => $invoices->count(), 'notified' => $notified];
@@ -49,16 +41,9 @@ class ReceivablesNotificationService
     {
         $due = Carbon::parse($invoice->due_date)->startOfDay();
         $date = $today->copy()->startOfDay();
-        if ($due->lt($date)) {
-            return 'overdue';
-        }
-        if ($due->equalTo($date)) {
-            return 'due_today';
-        }
-        if ($due->lte($date->copy()->addDays(self::DUE_SOON_DAYS))) {
-            return 'due_soon';
-        }
-
+        if ($due->lt($date)) return 'overdue';
+        if ($due->equalTo($date)) return 'due_today';
+        if ($due->lte($date->copy()->addDays(self::DUE_SOON_DAYS))) return 'due_soon';
         return null;
     }
 
@@ -70,6 +55,9 @@ class ReceivablesNotificationService
             'overdue' => ['critical', 'فاتورة متأخرة السداد', 'توجد فاتورة مبيعات مرحلة تجاوزت تاريخ الاستحقاق وما زال عليها رصيد متبقٍ.'],
         ];
         [$severity, $title, $message] = $labels[$kind];
+        $dueDate = $invoice->due_date?->toDateString();
+        // due-soon/today are transition notifications; overdue is a deliberate daily reminder.
+        $bucket = $kind === 'overdue' ? $today->toDateString() : $dueDate;
         $notifications = app(NotificationService::class);
         $count = 0;
 
@@ -85,11 +73,8 @@ class ReceivablesNotificationService
                 'source_type' => 'invoice',
                 'source_id' => $invoice->id,
                 'action' => 'view_receivable_invoice',
-                'data' => [
-                    'due_date' => $invoice->due_date?->toDateString(),
-                    'remaining' => $invoice->remaining(),
-                ],
-                'dedupe_key' => "receivables.{$kind}:{$invoice->id}:{$today->toDateString()}",
+                'data' => ['due_date' => $dueDate, 'remaining' => $invoice->remaining()],
+                'dedupe_key' => "receivables.{$kind}:{$invoice->id}:{$bucket}",
             ]);
             $count++;
         }

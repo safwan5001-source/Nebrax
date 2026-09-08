@@ -59,11 +59,22 @@ export async function markAllNotificationsRead(): Promise<number> {
   return res.data.updated;
 }
 
+/**
+ * إجراء إشعار مصرَّح به من الخادم (`App\Support\NotificationActions::ALLOWED`) → مسار
+ * تنقّل آمن. كل مُنتِج جديد يضيف مدخله هنا بنفس المفتاح الذي يسجّله في الخادم — لا
+ * يُخترع مسار من طرف الواجهة وحدها. فتح المصدر نفسه يعيد تفويضه من جديد (صلاحية
+ * `products.view` على `/products/[id]`)؛ هذه الخريطة لا تمنح وصولاً بذاتها.
+ */
 const ACTION_PATHS: Record<string, (sourceId: string) => string> = {
+  // PR-NOTIF-3: تنبيهات المخزون (نفاد/انخفاض).
   view_product: (id) => `/products/${id}`,
+  // PR-NOTIF-4: تنبيه رقابة مالية — لا صفحة مفردة للتنبيه، يفتح قائمة
+  // التنبيهات المالية (تعيد تفويض `reports.view` من جديد).
   view_financial_alert: () => '/financial-alerts',
+  // PR-NOTIF-4: فشل/رفض إرسال ZATCA — يفتح الفاتورة نفسها (المصدر = invoice)،
+  // حيث تُعرض حالة ZATCA وتُعاد تفويض `zatca.view`/`invoices.view` من جديد.
   view_zatca_submission: (invoiceId) => `/invoices/${invoiceId}`,
-  // PR-NOTIF-5
+  // PR-NOTIF-5: الاستحقاق يفتح الفاتورة، وتنبيه POS يفتح جلسة نقطة البيع.
   view_receivable_invoice: (invoiceId) => `/invoices/${invoiceId}`,
   view_pos_session: (sessionId) => `/pos/sessions/${sessionId}`,
 };
@@ -74,6 +85,7 @@ export function notificationHref(notification: AppNotification): string | null {
   return builder ? builder(notification.source_id) : null;
 }
 
+/** شارة العدّاد غير المقروء: 1..99 كرقمها، وما فوقها "99+". صفر لا يُعرض أصلاً (يقرره العارض). */
 export function formatUnreadBadge(count: number): string {
   return count > 99 ? '99+' : String(count);
 }
