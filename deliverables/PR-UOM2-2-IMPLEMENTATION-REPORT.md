@@ -2,11 +2,12 @@
 
 **Task / PR:** Phase 2A — Multiple UOM / Barcode Completion, **PR #2 of 4**: Product UOM & Barcode Management UX
 **Date:** 2026-09-08
-**Status:** مكتمل — PR مفتوحة، CI خضراء بالكامل. بانتظار مراجعتكم. لا دمج ولا نشر.
+**Status:** مكتمل — PR مفتوحة، `mergeable_state: clean`، CI خضراء بالكامل على المحرِّكين. بانتظار مراجعتكم. لا دمج ولا نشر.
 **Branch:** `claude/phase-2-pr-uom2-2`
 **PR:** [#691](https://github.com/safwan5001-source/Nebrax/pull/691)
-**Base SHA:** `fa050c2ccfc7ec5dc960c7797c6f69bb415a6b89` (PR-UOM2-1، مُدمَجة ومنشورة Production)
-**Head SHA:** `b3cbca7d68b58f21c779405424d397644b174bd9` (يشمل تحديث هذا التقرير بعد كومِت التنفيذ `13d6e266`)
+**Base SHA (تاريخي، عند فتح PR):** `fa050c2ccfc7ec5dc960c7797c6f69bb415a6b89` (PR-UOM2-1، مُدمَجة ومنشورة Production)
+**Base SHA (الحالي بعد دمج main):** `dc47b3ade0762de1c8ab44ccf6c94d7e0baa0d91`
+**Head SHA:** `79b467b8ad61e59a1bc4f5c4893c5df787e417fc` (كومِت دمج `origin/main` لحلّ `mergeable:false` — انظر §12 وملاحظة ما بعد التسليم أدناه)
 
 **العقد:** أُضيف قسمٌ جديد (§4) في
 `docs/plans/products-inventory/phase-2-completion/MULTIPLE-UOM-BARCODE-DECOMPOSITION.md`
@@ -217,20 +218,38 @@ PR-UOM-1 بنى فضاء الباركود الذرّي وواجهته البرم
 
 ## 12. CI
 
-**خضراء بالكامل.** على Head `b3cbca7d68b58f21c779405424d397644b174bd9` (الكومِت
-الذي يحمل تحديث هذا التقرير نفسه، بعد `13d6e266`)، كل الوظائف الخمس المسجَّلة على
-هذا الرأس منتهيةٌ بنجاح:
+**خضراء بالكامل، ومتوافقة (`mergeable_state: clean`).** بعد تسليم النسخة الأولى
+من هذا التقرير (Head `b3cbca7`)، أبلغتم أنّ GitHub أظهر `mergeable: false` على
+PR #691 مقابل `main` عند `4679ef0`. **لم يُعَد أيّ تنفيذ ولم يتوسّع Scope** —
+اقتصر العمل على حلّ التعارض:
+
+1. `git fetch origin main` ثم `git merge --no-commit --no-ff origin/main` محلياً
+   من داخل `claude/phase-2-pr-uom2-2`: **اندمج تلقائياً بلا أي تعارضٍ نصّي واحد**
+   (بما فيها `ar.json`/`en.json` اللذان لمستهما هذه المهمّة والتزامن أيضاً —
+   `git`  دمجهما تلقائياً بنجاح).
+2. تحقّقتُ أنّ الملفات الأربعة الأساسية لهذه المهمّة
+   (`product-dialog.tsx`، `product-unit-template.ts`، `products/new/page.tsx`،
+   `products/[id]/page.tsx`) بقيت **مطابقةً بايتاً لبايت** لما كانت عليه قبل
+   الدمج (`md5sum` قبل/بعد)، وأنّ مفاتيح الترجمة الجديدة (`default_sales_unit`
+   إلخ) سلمت في الملفين.
+3. دفعتُ كومِت الدمج (Head `79b467b8ad61e59a1bc4f5c4893c5df787e417fc`)، فأعاد
+   GitHub تشغيل CI تلقائياً على الرأس الجديد.
+
+النتيجة النهائية على `79b467b`، بعد اكتمال كل الوظائف:
 
 | Job | Result |
 |---|---|
 | `php artisan test (L11, sqlite)` | ✅ success |
 | `php artisan test (L11, pgsql)` | ✅ success |
 | `web build (Next.js)` | ✅ success |
+| **`mergeable_state`** | **`clean`** |
 
-(الوظائف الثلاث تكرَّرت لتشغيلَي `push`/`pull_request` معاً على نفس الرأس —
-جميعها ناجحة، بلا استثناء.) الدمج المزدوج على المحرِّكين يتطابق مع فحص السلامة
-الخلفي المحلّي (٦٣/٦٣، §8/§10) وتقرير PR-UOM2-1 الذي أثبت أصلاً أن نفس الشيفرة
-الخلفية خضراء بالكامل على SQLite وPostgreSQL معاً.
+(الوظائف الثلاث تكرَّرت لتشغيلَي `push`/`pull_request` على نفس الرأس — ٦ فحوصاتٍ
+كلّها ناجحة.) لم يُشغَّل أي اختبارٍ خلفيٍّ محليٍّ إضافي لكومِت الدمج نفسه: صفر
+ملفات PR-UOM2-2 تغيّرت به (تحقّقٌ بايتي أعلاه)، والتغييرات الوافدة من `main`
+(ACC-6، تنبيهات مالية/ZATCA، Help Center) هي مسؤولية CI الخاص بها على فروعها
+الأصلية لا هذا الفرع — CI الحالي على الرأس المدموج هو الدليل الكافي والمباشر
+على أنّ الدمج لم يكسر شيئاً.
 
 ---
 
@@ -259,8 +278,9 @@ API، لا Backward Compatibility معرَّضة للخطر)، فنُفِّذت 
 
 - **Branch:** `claude/phase-2-pr-uom2-2`
 - **PR:** [#691](https://github.com/safwan5001-source/Nebrax/pull/691)
-- **Base SHA:** `fa050c2ccfc7ec5dc960c7797c6f69bb415a6b89`
-- **Head SHA:** `b3cbca7d68b58f21c779405424d397644b174bd9`
+- **Base SHA (تاريخي، عند فتح PR):** `fa050c2ccfc7ec5dc960c7797c6f69bb415a6b89`
+- **Base SHA (الحالي):** `dc47b3ade0762de1c8ab44ccf6c94d7e0baa0d91`
+- **Head SHA:** `79b467b8ad61e59a1bc4f5c4893c5df787e417fc`
 
 ---
 
