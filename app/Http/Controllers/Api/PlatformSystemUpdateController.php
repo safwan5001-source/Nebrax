@@ -5,7 +5,10 @@ namespace App\Http\Controllers\Api;
 use App\Http\Resources\SystemUpdateResource;
 use App\Models\SystemUpdate;
 use App\Models\SystemUpdateTarget;
+use App\Models\Tenant;
+use App\Models\User;
 use App\Services\SystemUpdatePublicationService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -127,6 +130,26 @@ class PlatformSystemUpdateController extends ApiController
 
         if ($targetType !== 'all' && empty($targetIds)) {
             abort(422, 'يجب تحديد مستهدفين عند اختيار استهداف محدد.');
+        }
+
+        if ($targetType === 'tenants') {
+            $this->assertIdsExist(Tenant::query(), $targetIds, 'يحتوي الاستهداف على معرّف مستأجر غير موجود.');
+        }
+
+        if ($targetType === 'users') {
+            // `whereHas('tenant')` يستبعد أي مستخدم مرتبط بمستأجر محذوف (soft-deleted)
+            // — «مرتبط بمستأجر صالح» لا يكفي فيها وجود tenant_id فقط.
+            $this->assertIdsExist(User::query()->whereHas('tenant'), $targetIds, 'يحتوي الاستهداف على معرّف مستخدم غير موجود أو غير مرتبط بمستأجر صالح.');
+        }
+    }
+
+    private function assertIdsExist(Builder $query, array $ids, string $message): void
+    {
+        $uniqueIds = array_unique($ids);
+        $existingCount = $query->whereIn('id', $uniqueIds)->count();
+
+        if ($existingCount !== count($uniqueIds)) {
+            abort(422, $message);
         }
     }
 

@@ -351,6 +351,168 @@ class SystemUpdateTest extends TestCase
     }
 
     /** @test */
+    public function store_accepts_real_tenant_and_user_target_ids(): void
+    {
+        $token = $this->admin->createToken('api')->plainTextToken;
+
+        $tenantResponse = $this->withToken($token)
+            ->postJson('/api/platform/system-updates', [
+                'title_ar' => 'تحديث لمستأجرين محددين',
+                'title_en' => 'Update for specific tenants',
+                'content_ar' => 'محتوى.',
+                'content_en' => 'Content.',
+                'target_type' => 'tenants',
+                'target_ids' => [$this->tenantA->id],
+            ])
+            ->assertCreated();
+        $this->assertCount(1, $tenantResponse->json('data.targets'));
+
+        $userResponse = $this->withToken($token)
+            ->postJson('/api/platform/system-updates', [
+                'title_ar' => 'تحديث لمستخدمين محددين',
+                'title_en' => 'Update for specific users',
+                'content_ar' => 'محتوى.',
+                'content_en' => 'Content.',
+                'target_type' => 'users',
+                'target_ids' => [$this->ownerA->id],
+            ])
+            ->assertCreated();
+        $this->assertCount(1, $userResponse->json('data.targets'));
+    }
+
+    /** @test */
+    public function store_rejects_a_nonexistent_tenant_target_id(): void
+    {
+        $token = $this->admin->createToken('api')->plainTextToken;
+        $countBefore = SystemUpdate::count();
+
+        $this->withToken($token)
+            ->postJson('/api/platform/system-updates', [
+                'title_ar' => 'تحديث',
+                'title_en' => 'Update',
+                'content_ar' => 'محتوى.',
+                'content_en' => 'Content.',
+                'target_type' => 'tenants',
+                'target_ids' => [(string) \Illuminate\Support\Str::uuid()],
+            ])
+            ->assertStatus(422);
+
+        $this->assertSame($countBefore, SystemUpdate::count());
+    }
+
+    /** @test */
+    public function store_rejects_a_nonexistent_user_target_id(): void
+    {
+        $token = $this->admin->createToken('api')->plainTextToken;
+        $countBefore = SystemUpdate::count();
+
+        $this->withToken($token)
+            ->postJson('/api/platform/system-updates', [
+                'title_ar' => 'تحديث',
+                'title_en' => 'Update',
+                'content_ar' => 'محتوى.',
+                'content_en' => 'Content.',
+                'target_type' => 'users',
+                'target_ids' => [(string) \Illuminate\Support\Str::uuid()],
+            ])
+            ->assertStatus(422);
+
+        $this->assertSame($countBefore, SystemUpdate::count());
+    }
+
+    /** @test */
+    public function store_rejects_mixed_valid_and_invalid_tenant_target_ids(): void
+    {
+        $token = $this->admin->createToken('api')->plainTextToken;
+        $countBefore = SystemUpdate::count();
+
+        $this->withToken($token)
+            ->postJson('/api/platform/system-updates', [
+                'title_ar' => 'تحديث',
+                'title_en' => 'Update',
+                'content_ar' => 'محتوى.',
+                'content_en' => 'Content.',
+                'target_type' => 'tenants',
+                'target_ids' => [$this->tenantA->id, (string) \Illuminate\Support\Str::uuid()],
+            ])
+            ->assertStatus(422);
+
+        $this->assertSame($countBefore, SystemUpdate::count());
+    }
+
+    /** @test */
+    public function store_rejects_mixed_valid_and_invalid_user_target_ids(): void
+    {
+        $token = $this->admin->createToken('api')->plainTextToken;
+        $countBefore = SystemUpdate::count();
+
+        $this->withToken($token)
+            ->postJson('/api/platform/system-updates', [
+                'title_ar' => 'تحديث',
+                'title_en' => 'Update',
+                'content_ar' => 'محتوى.',
+                'content_en' => 'Content.',
+                'target_type' => 'users',
+                'target_ids' => [$this->ownerA->id, (string) \Illuminate\Support\Str::uuid()],
+            ])
+            ->assertStatus(422);
+
+        $this->assertSame($countBefore, SystemUpdate::count());
+    }
+
+    /** @test */
+    public function store_rejects_a_user_target_whose_tenant_was_soft_deleted(): void
+    {
+        $orphan = User::create([
+            'tenant_id' => $this->tenantB->id,
+            'name' => 'مستخدم يتيم',
+            'email' => 'orphan@company-b.test',
+            'password' => 'password123',
+            'role' => 'staff',
+            'is_active' => true,
+        ]);
+        $this->tenantB->delete();
+
+        $token = $this->admin->createToken('api')->plainTextToken;
+        $countBefore = SystemUpdate::count();
+
+        $this->withToken($token)
+            ->postJson('/api/platform/system-updates', [
+                'title_ar' => 'تحديث',
+                'title_en' => 'Update',
+                'content_ar' => 'محتوى.',
+                'content_en' => 'Content.',
+                'target_type' => 'users',
+                'target_ids' => [$orphan->id],
+            ])
+            ->assertStatus(422);
+
+        $this->assertSame($countBefore, SystemUpdate::count());
+    }
+
+    /** @test */
+    public function update_rejects_invalid_target_ids_and_leaves_existing_targets_untouched(): void
+    {
+        $token = $this->admin->createToken('api')->plainTextToken;
+        $update = $this->draft(['target_type' => SystemUpdate::TARGET_TENANTS]);
+        SystemUpdateTarget::create([
+            'system_update_id' => $update->id,
+            'target_type' => 'tenant',
+            'target_id' => $this->tenantA->id,
+        ]);
+
+        $this->withToken($token)
+            ->putJson("/api/platform/system-updates/{$update->id}", [
+                'target_type' => 'tenants',
+                'target_ids' => [(string) \Illuminate\Support\Str::uuid()],
+            ])
+            ->assertStatus(422);
+
+        $this->assertSame(1, $update->targets()->count());
+        $this->assertSame($this->tenantA->id, $update->targets()->first()->target_id);
+    }
+
+    /** @test */
     public function published_update_cannot_be_edited_or_deleted(): void
     {
         $token = $this->admin->createToken('api')->plainTextToken;
