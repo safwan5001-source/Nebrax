@@ -201,6 +201,28 @@ describe('NotificationBell — source action safety', () => {
     const link = (await screen.findByText('عرض المصدر')) as HTMLAnchorElement;
     expect(link.closest('a')?.getAttribute('href')).toBe('/products/p1');
   });
+
+  it('renders a source link for a registered financial alert action (PR-NOTIF-4)', async () => {
+    fetchNotifications.mockResolvedValue({
+      data: [notification({ action: 'view_financial_alert', source_type: 'financial_control_alert', source_id: 'fca-1' })],
+    });
+    renderIntl(<NotificationBell />);
+
+    await openPanel();
+    const link = (await screen.findByText('عرض المصدر')) as HTMLAnchorElement;
+    expect(link.closest('a')?.getAttribute('href')).toBe('/financial-alerts');
+  });
+
+  it('renders a source link for a registered ZATCA submission action (PR-NOTIF-4)', async () => {
+    fetchNotifications.mockResolvedValue({
+      data: [notification({ action: 'view_zatca_submission', source_type: 'invoice', source_id: 'inv-1' })],
+    });
+    renderIntl(<NotificationBell />);
+
+    await openPanel();
+    const link = (await screen.findByText('عرض المصدر')) as HTMLAnchorElement;
+    expect(link.closest('a')?.getAttribute('href')).toBe('/invoices/inv-1');
+  });
 });
 
 describe('NotificationBell — locale-sensitive rendering', () => {

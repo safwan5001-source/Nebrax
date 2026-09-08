@@ -68,6 +68,12 @@ export async function markAllNotificationsRead(): Promise<number> {
 const ACTION_PATHS: Record<string, (sourceId: string) => string> = {
   // PR-NOTIF-3: تنبيهات المخزون (نفاد/انخفاض).
   view_product: (id) => `/products/${id}`,
+  // PR-NOTIF-4: تنبيه رقابة مالية — لا صفحة مفردة للتنبيه، يفتح قائمة
+  // التنبيهات المالية (تعيد تفويض `reports.view` من جديد).
+  view_financial_alert: () => '/financial-alerts',
+  // PR-NOTIF-4: فشل/رفض إرسال ZATCA — يفتح الفاتورة نفسها (المصدر = invoice)،
+  // حيث تُعرض حالة ZATCA وتُعاد تفويض `zatca.view`/`invoices.view` من جديد.
+  view_zatca_submission: (invoiceId) => `/invoices/${invoiceId}`,
 };
 
 export function notificationHref(notification: AppNotification): string | null {
