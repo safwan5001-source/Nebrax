@@ -2,98 +2,48 @@
 
 **Status:** Living reference — research + code inspection in progress  
 **Date started:** 2026-09-08  
-**Last research update:** 2026-09-08 — partner/customer ownership semantics and HR approval authorization inspection  
+**Last research update:** 2026-09-08 — activity/audit visibility and deleted-record lifecycle inspection  
 **Scope:** Users, Employees, Roles, Permissions, Branch Scope, Resource Access, Record Scope, Workflow/Record State, Reports, permission-aware UX.  
 **Reference product:** Daftra official documentation.  
 
 > This document is a functional research/reference artifact. It does **not** authorize implementation, database changes, permission migrations, merge/deploy, or changes to accounting/security rules.
 
 ## 1. Decision
-
 Daftra is the functional reference for the AWJ users / roles / permissions experience. AWJ should provide the same overall operating model and flexibility while using AWJ-native stable permission keys and stronger security/accounting invariants. URL/path-based blocked pages are a functional reference only, not the desired AWJ authorization architecture.
 
 ## 2. Target authorization model
-
 ```text
-AWJ Effective Authorization
-
 Tenant Isolation
-        ∩
-Feature / Entitlement
-        ∩
-Role Permission
-        ∩
-Branch / Data Scope
-        ∩
-Resource Scope
-        ∩
-Record Scope
-        ∩
-Workflow Position
-        ∩
-Record State
-        ∩
-Accounting / Compliance Invariants
+∩ Feature / Entitlement
+∩ Role Permission
+∩ Branch / Data Scope
+∩ Resource Scope
+∩ Record Scope
+∩ Workflow Position
+∩ Record State
+∩ Accounting / Compliance Invariants
 ```
-
-All layers are restrictive intersections. Lower-level access never overrides a higher-level denial or hard accounting/compliance invariant.
+All layers are restrictive intersections.
 
 ## 3. Confirmed AWJ baseline
-
-Current AWJ already has substantial access-control infrastructure:
-
-- tenant-scoped roles with JSON permissions and protected system roles;
-- central `Rbac::PERMISSIONS` catalogue;
-- custom roles;
-- Employee ↔ User linking (`users.employee_id`);
-- `users.is_active` independent from employee deletion;
-- per-user branch scope through `branch_user`;
-- per-user warehouse scope through `user_warehouse`;
-- reusable server-side branch/warehouse access guards;
-- cashbox/bank deposit and withdraw ACLs;
-- many explicit sensitive permissions in newer modules;
-- cost/profit redaction via `products.view_cost` / `SensitiveCostPolicy` in relevant report paths.
-
-Important architectural conclusion: **do not rebuild these foundations.** Access Control V2 is primarily a consistency/coverage/granularity project.
+Current AWJ already has tenant-scoped roles, canonical RBAC permissions, custom roles, Employee↔User linking, independent user active state, per-user branch and warehouse scope, reusable branch/warehouse guards, cash/bank deposit-withdraw ACLs, and explicit sensitive permissions in newer modules. Access Control V2 is primarily consistency/coverage/granularity, not rebuilding foundations.
 
 ## 4. Employee vs User
+Preserve employee lifecycle, login status, role assignment and access scope as separate concerns. Disabling login must not delete employee history or alter audit attribution.
 
-Daftra distinguishes employee identity from system login. AWJ already follows the same core model (`User ⊃ Employee`). Preserve employee lifecycle, login status, role assignment and access scope as separate concerns. Disabling login must not delete employee history or alter financial audit attribution.
+## 5. Roles and permission granularity
+Role backend supports custom/system roles and safety controls. Role UI is still optimized around `view/manage` and no clone path was found. Older broad permissions (`invoices.manage`, `partners.manage`, `purchases.manage`, `hr.manage`) coexist with newer semantic permissions. Fine-grained decomposition must be incremental and backward-compatible.
 
-## 5. Roles and role UX
+## 6. Permission-aware UX
+Standardize Hidden, Read-only, Forbidden, Filtered resource set, Scope-filtered rows/totals. UI hiding is never the security boundary.
 
-AWJ `RoleController` already supports create/update/delete custom roles, assigned-user counts, owner immutability and system-role deletion protection. `Rbac::PERMISSIONS` is returned as the canonical catalogue.
+## 7. Branch / warehouse / treasury foundations
+- User branch scope: present.
+- User warehouse scope: present.
+- Cash/bank deposit/withdraw ACL: present with `all`, `role`, `user`, `branch` subjects.
+Reuse these mechanisms and audit consumers rather than create parallel ACL systems.
 
-Current `RoleDialog` groups permissions by module, but its action UX is optimized for `view/manage`. This is insufficient for AWJ's modern fine-grained permissions such as approve/close/reopen/audit/export/recalculate/etc. No clone endpoint/action was found in the inspected role controller/dialog.
-
-Target: preserve role safety, generalize the editor for arbitrary semantic actions, dependencies and risk labels, and consider cloning without changing permission semantics.
-
-## 6. Permission granularity and dependencies
-
-Daftra demonstrates action/field-level permissions beyond `view/manage`. AWJ newer modules already follow this pattern while older areas still rely on broad permissions such as `invoices.manage`, `products.manage`, `partners.manage`, `purchases.manage` and `hr.manage`.
-
-Do not perform a big-bang rewrite. Fine-grained permissions should be introduced incrementally with explicit backward-compatibility behavior for legacy broad permissions.
-
-## 7. Permission-aware UX
-
-Target standardized states: Hidden, Read-only, Forbidden/disabled action, Filtered resource set, Scope-filtered rows/totals. UI hiding is never the security boundary.
-
-## 8. Branch scope — PRESENT
-
-AWJ has per-user branch assignments and `allowedBranchIds()` / `canAccessBranch()`. `ApiController::scopeToActiveBranch()` intersects operational queries with user scope. Preserve the backward-compatible unrestricted convention where no assignments means unrestricted legacy behavior.
-
-## 9. Warehouse scope — PRESENT FOUNDATION
-
-AWJ has `user_warehouse`, user predicates and central warehouse guards. Reuse this foundation; do not create a parallel warehouse ACL engine unless concrete requirements prove it insufficient.
-
-## 10. Cashboxes / bank accounts — ACL ALREADY PRESENT
-
-AWJ supports independent deposit/withdraw scopes using `all`, `role`, `user`, `branch`, with server enforcement. Reuse and audit coverage rather than rebuild.
-
-## 11. Record scope — DOMAIN-AWARE
-
-Daftra supports own/assigned/workflow-related records. AWJ target should remain domain-aware:
-
+## 8. Record scope — domain-aware
 ```text
 Record Scope
 ├── All records inside higher-level scope
@@ -101,239 +51,142 @@ Record Scope
 ├── Assigned records
 └── Workflow-related records
 ```
-
 Do not define one global meaning of "own".
 
-## 12. Reports — mandatory security property
-
+## 9. Reports — mandatory security property
 ```text
-Report Result =
-Report Permission
-∩ Source Data Permission
-∩ Branch Scope
-∩ Resource Scope
-∩ Record Scope
+Report Result = Report Permission ∩ Source Data Permission ∩ Branch Scope ∩ Resource Scope ∩ Record Scope
+```
+Rows, totals, drill-downs and exports must obey the same scope. Static inspection has identified likely/strong-likely P1 scope gaps in Inventory, Sales, Purchases, Customers and Classification Analytics. Core accounting reports need accounting-aware authorization rather than a naive branch Global Scope. Generic CSV/PDF/print inherit loaded API data.
+
+Specialized Fuel/POS endpoints demonstrate stronger semantic permission + feature gating.
+
+## 10. Invoice operational record scope
+Invoices already store server-authored `created_by` and tenant-validated `salesperson_id`; branch scope is present, but own/assigned authorization is missing. Candidate semantics require product/BC decision: ALL_ALLOWED / CREATED_BY_ME / ASSIGNED_TO_ME / CREATED_OR_ASSIGNED_TO_ME.
+
+## 11. Partner/customer operational scope
+`Partner` has no current owner/salesperson/assignee/creator field. Visibility uses BranchScoped plus customer/supplier branch-sharing rules. Therefore customer ownership must not be inferred from invoice salesperson history. If Daftra-like "my customers" is required, AWJ needs an explicit customer relationship/assignment semantic after product/data-model decision.
+
+## 12. HR approvals
+Leave and general employee requests enforce pending state and record approver/time, but routes use broad `hr.manage` for approve/reject/delete. No direct-manager, department-manager, configured chain/step, selected approver, branch approver or self-approval predicate was found in those paths.
+
+Target conceptual rule:
+```text
+canApprove = feature ∩ semantic approval permission ∩ organizational scope ∩ workflow membership ∩ current step ∩ state ∩ SoD/domain rules
+```
+Fuel/POS already contain stronger semantic approval patterns that can inform the target design.
+
+## 13. Activity / audit — POS HAS STRONG SCOPED PATTERN
+Dedicated inspection of POS audit found a materially good authorization pattern:
+
+- overview/events/carts/users use `pos.audit.view` plus `sales.pos` feature gate;
+- export is separately gated by `pos.audit.export` plus the same feature gate;
+- `visibleEvents()` deliberately removes the model BranchScope and then re-applies `scopeToActiveBranch()`, which intersects the query with the authenticated user's allowed branch scope;
+- `visibleApprovals()` follows the same pattern;
+- cart drill-down queries only through `visibleEvents()` and returns 404 when the cart has no events inside the caller's visible scope;
+- event export is derived from the same visible-event query, so export does not intentionally widen branch scope;
+- actor/user aggregation is derived from visible events rather than a tenant-wide user activity source.
+
+This is a useful AWJ reference implementation for audit visibility:
+```text
+Audit permission ∩ feature gate ∩ effective branch/data scope
 ```
 
-This applies to rows, totals/KPIs, drill-downs and exports. `reports.view` is not permission to ignore source-data scope.
-
-## 13. Generic report scope findings
-
-Static inspection has identified likely/strong likely P1 branch/resource scope gaps across:
-
-- Inventory reports;
-- Sales reports;
-- Purchase reports;
-- Customer reports;
-- Classification analytics (all six scopes).
-
-Core accounting reports also have an authorization risk because branch is an optional report filter, but their fix must be accounting-aware and must never truncate balanced journals through a naive Global Scope.
-
-CSV/PDF/print in inspected generic workspaces derive from already-loaded report data and therefore inherit API disclosure.
-
-## 14. Specialized report gates — POSITIVE CONTRAST
-
-Fuel reports use dedicated `fuel.reports.view` plus app gating. POS audit has separate `pos.audit.view`, `pos.audit.export` and app gating. This is stronger semantic permission design, though query-level data scope still needs separate verification.
-
-## 15. Invoice operational access — BRANCH SCOPE PRESENT, RECORD SCOPE MISSING
-
-Invoices store both `created_by` and `salesperson_id`. `created_by` is set server-side; salesperson is tenant-validated. Invoice list/show are branch-scoped and require `invoices.view`.
-
-But creator/salesperson are not currently authorization predicates. A user with invoice view sees all invoices in permitted branch scope.
-
-Candidate domain semantics, subject to product decision and backward compatibility:
-
+### Audit drill-down conclusion
+POS cart/event drill-down is scope-safe at the inspected branch boundary. The event record may contain references/IDs and snapshots, but the inspected controller does not automatically open an unrelated protected operational resource. Therefore the key target invariant remains:
 ```text
-ALL_ALLOWED
-CREATED_BY_ME
-ASSIGNED_TO_ME
-CREATED_OR_ASSIGNED_TO_ME
+Can view audit event != Can open/modify referenced resource
 ```
+Any future clickable links from audit events to invoices/payments/customers/etc. must re-authorize the target resource through its own policy.
 
-## 16. Partner/customer operational access — NO OWNER/SALESPERSON FIELD TODAY
+### Audit architecture is fragmented
+Repository search shows multiple specialized audit/event systems (POS, Corporate Fuel, station readiness, Document Center governance, platform integration). No single generic tenant Activity Log equivalent was established in this pass. Therefore Daftra-style general Activity Log parity should not be assumed from POS audit alone. Each audit surface needs its own permission/scope review, and a future unified activity view must avoid becoming a side-channel across modules.
 
-Direct inspection of `Partner` and `PartnerController` changes an important assumption:
+Status:
+- POS audit branch visibility/export: **good pattern confirmed statically**.
+- Generic cross-module Activity Log: **not found/confirmed**.
+- Cross-module audit drill-down authorization: **still a systemic design requirement**.
 
-- `Partner` has no `created_by`, `salesperson_id`, `assigned_to`, `owner_id` or account-manager field in its current fillable/model contract;
-- customer/supplier visibility is primarily governed by `BranchScoped` + branch-sharing rules (`share_customers` / `share_suppliers`);
-- `PartnerController::index()` relies on the Partner model's branch-sharing/global-scope behavior and supports type/search filtering;
-- `show/update/destroy` use normal `Partner::findOrFail()`, therefore the model's operational branch-sharing scope remains the relevant visibility boundary;
-- no current partner record-level owner/assignee predicate was found.
+## 14. Deleted records / Recycle Bin — SOFT DELETE FOUNDATION, NO TENANT RECYCLE-BIN API FOUND
+Repository inspection confirms widespread Laravel `SoftDeletes` use on important master/config entities including User, Role, Partner, Product and others. Thus deletion often preserves rows internally.
 
-### Consequence
+However, searches for tenant application use of `onlyTrashed`, `withTrashed`, `forceDelete` and restore endpoints did **not** reveal a general user-facing Recycle Bin/restore/permanent-delete API. The meaningful `forceDelete` hit found was test/migration maintenance, not a tenant authorization surface; the meaningful application `restore()` hit found was a platform-administrator CLI recovery path, not tenant Recycle Bin UX.
 
-AWJ cannot safely implement Daftra-like "my customers" by simply reusing the invoice `salesperson_id`. A customer is a master-data entity and may have invoices assigned to multiple salespeople over time.
-
-If AWJ product requirements include salesperson-owned/customer-assigned visibility, it needs an explicit **customer relationship/assignment semantic** rather than inferring ownership from transaction history.
-
-Potential future concepts (not approved implementation keys):
-
+### Important distinction
 ```text
-customer_account_manager / responsible_employee
-customer_sales_assignment
-team/territory assignment
+SoftDeletes present != Recycle Bin capability present
 ```
+A model being recoverable at ORM/database level does not mean an authorized tenant user can list, inspect, restore or permanently delete it.
 
-Do not add any of these until Daftra behavior and AWJ CRM/sales requirements justify the exact model.
+### Daftra parity conclusion
+Daftra's explicit deleted-sales/deleted-purchases management capability is currently **not matched by a confirmed AWJ tenant Recycle Bin workflow**.
 
-Status: **Daftra parity capability not present at Partner master-data level; requires product/data-model decision, not merely a query filter.**
-
-## 17. HR leave approvals — STATE CHECK PRESENT, WORKFLOW/ACTOR SCOPE MISSING
-
-`LeaveRequestController` provides a tenant-wide approval queue. Routes are gated by:
-
+If introduced, keep sensitive actions separate conceptually:
 ```text
-hr.view   -> list approval queue
-hr.manage -> approve / reject / delete
-AND hr.employees app enabled
+deleted_records.view
+sales_deleted.restore / purchases_deleted.restore
+permanent_delete (highest risk, if allowed at all)
 ```
+Names above are research concepts, not approved keys. Financial transaction deletion/restore must additionally respect accounting state, journal integrity, fiscal locks, ZATCA/compliance lifecycle and immutable audit requirements. A permission must never resurrect an accounting object into an invalid state.
 
-Controller approval/rejection checks that the request is still `pending` and records the authenticated user as `approved_by` with timestamp. This is good record-state enforcement and audit attribution.
+Status: **Daftra parity gap / product capability gap; no implementation authorized.**
 
-However, no evidence was found in this approval path for:
+## 15. Accounting invariants
+Authorization and accounting validity are separate. Permissions never override tenant isolation, ledger integrity, source-generated/immutable rules, period/fiscal locks or ZATCA lifecycle restrictions.
 
-- direct-manager relationship;
-- department manager authority;
-- configured approval chain/step;
-- selected approver membership;
-- branch-specific approver scope;
-- self-approval prevention.
-
-Therefore any user with broad `hr.manage` appears able to approve/reject any pending leave request visible in the tenant-level queue, subject to tenant isolation and feature gating.
-
-Status: **Daftra workflow parity gap confirmed at static code level.**
-
-## 18. General employee-request approvals — SAME BROAD PATTERN
-
-`EmployeeRequestController` follows the same pattern:
-
-- `hr.view` lists the cross-employee queue;
-- `hr.manage` approves/rejects/deletes;
-- approval/rejection requires pending state;
-- actor and timestamp are recorded;
-- no configured approver/step/manager/branch membership is visible in the controller path.
-
-Thus `hr.manage` currently represents both HR administration and approval authority. This is broader than the target model.
-
-### Target conceptual rule
-
+## 16. Feature/application state
 ```text
-canApprove(request, user) =
-feature enabled
-∩ semantic approval permission
-∩ branch/organizational scope
-∩ workflow membership
-∩ current approval step
-∩ request state
-∩ separation-of-duties/domain rules
+Tenant entitlement / enabled feature AND tenant policy AND user permission AND applicable scope
 ```
+Permission never activates an unavailable feature.
 
-This does **not** imply introducing a workflow engine immediately. First decide which AWJ HR workflows actually require manager/chain approvals and preserve current behavior through a backward-compatible migration path.
+## 17. Impersonation
+If added later: restricted permission, preserve original actor, audit trail, obvious impersonation state, no tenant crossing and sensitive-operation review.
 
-## 19. Approval architecture contrast inside AWJ
-
-AWJ already contains stronger approval patterns elsewhere:
-
-- Fuel shift service has a dedicated `fuel.shift.approve` semantic permission;
-- POS loss-prevention contains explicit approval concepts and separation-of-duties/self-approval controls in relevant flows.
-
-This proves AWJ does not need to invent approval security from scratch. Access Control V2 should reuse these design principles where appropriate rather than leaving all HR approval authority under `hr.manage`.
-
-## 20. Accounting invariants
-
-Authorization and accounting validity remain separate. Permissions never override tenant isolation, ledger integrity, immutable/source-generated rules, period/fiscal locks or ZATCA lifecycle restrictions.
-
-## 21. Activity/audit
-
-Audit visibility and target-resource authorization are separate:
-
-```text
-Can view audit event != Can open/modify audited resource
-```
-
-Dedicated inspection still required.
-
-## 22. Feature/application state
-
-Target ordering:
-
-```text
-Tenant entitlement / enabled feature
-AND
-Tenant configuration/policy
-AND
-User role permission
-AND
-Applicable scope/policy
-```
-
-## 23. Recycle Bin / deleted transactions — SENSITIVE AUTHORITY
-
-Daftra research identified explicit management permissions for deleted sales and purchase transactions, disabled by default in its role model, with recovery lifecycle for deleted transactions. AWJ should treat restore/permanent-delete/deleted-record access as high-risk authority and must not assume broad `manage` should permanently imply it.
-
-Exact AWJ keys and behavior remain subject to code inspection and backward-compatibility design.
-
-## 24. Impersonation
-
-If added later: restricted permission, original actor retained, audit trail, obvious impersonation state, no tenant crossing and sensitive-operation review.
-
-## 25. Code-backed gap matrix — current
-
+## 18. Code-backed gap matrix — current
 | Capability | AWJ evidence | Status | Direction |
 |---|---|---|---|
-| Tenant isolation | Tenant-scoped models | Present | Preserve |
+| Tenant isolation | tenant-scoped models | Present | Preserve |
 | Custom/system roles | RBAC + RoleController | Present | Preserve |
 | Login enable/disable | `users.is_active` | Present | Preserve |
-| Employee ↔ User | tenant-safe link | Present | Preserve |
-| User allowed branches | branch assignments/predicates | Present | Audit consumers |
-| User allowed warehouses | warehouse assignments/predicates | Present | Audit consumers |
-| Cash/bank deposit/withdraw ACL | all/role/user/branch | Present | Verify all money paths |
-| Role editor arbitrary actions | optimized around view/manage | Partial | Generalize |
+| User branch/warehouse scope | assignments + predicates | Present | Audit consumers |
+| Cash/bank ACL | deposit/withdraw subjects | Present | Verify all money paths |
+| Role arbitrary-action UX | view/manage-centric | Partial | Generalize |
 | Role cloning | not found | Missing | Candidate parity feature |
-| Invoice branch scope | list/show branch-scoped | Present | Preserve |
-| Invoice own/assigned authorization | creator/salesperson fields exist, no predicate | **Missing** | Define domain semantics |
-| Partner branch/share scope | `BranchScoped` + sharing keys | Present | Preserve |
-| Partner owner/assignee scope | no owner/salesperson field | **Missing capability** | Product/data-model decision if required |
-| Generic report effective scope | multiple report families bypass user scope | **Likely/strong likely P1** | Restricted-user tests then shared contract |
-| Accounting report branch authorization | all-branch default | **Risk; accounting-sensitive** | Domain-safe design |
-| HR leave approval state check | pending + actor/time | Present | Preserve |
-| HR leave workflow membership | no manager/step/approver predicate found | **Missing** | Define approval policy |
-| General employee-request workflow membership | same broad `hr.manage` pattern | **Missing** | Define approval policy |
-| Dedicated approval permission pattern | Fuel/POS examples | Present elsewhere | Reuse principles |
-| Audit drill-down authorization | not yet inspected | Unknown | Inspect next |
-| Recycle-bin authority | Daftra reference documented; AWJ code not yet mapped | Unknown | Inspect |
+| Invoice own/assigned scope | fields exist, predicate absent | Missing | Define semantics |
+| Partner owner/assignee scope | no field/model | Missing capability | Product/data-model decision |
+| Generic report effective scope | multiple likely bypasses | Likely/strong likely P1 | Restricted-user tests |
+| HR approval workflow membership | broad `hr.manage` | Missing | Define policy |
+| POS audit view/export gates | dedicated permissions + app | Present | Preserve |
+| POS audit branch scope | `visibleEvents/Approvals` reapply user branch scope | Present/good | Reuse pattern |
+| POS audit cart drill-down | scoped event query + 404 outside scope | Present/good | Preserve |
+| Generic cross-module Activity Log | not confirmed | Missing/unknown | Decide parity scope |
+| Soft-delete foundation | widespread model `SoftDeletes` | Present | Do not confuse with recycle bin |
+| Tenant Recycle Bin list/restore | no general endpoint found | Missing | Product/security design |
+| Permanent-delete authority | no tenant workflow found | Missing | Highest-risk; explicit decision |
 
-## 26. Corrections / architectural conclusions
+## 19. Corrections / architectural conclusions
+1. Branch, warehouse and cash/bank foundations already exist.
+2. Main problem is inconsistent consumption/coverage.
+3. Generic reports remain the clearest systemic authorization risk.
+4. Invoice own/assigned can use existing fields; Partner ownership cannot.
+5. HR approvals enforce state but use broad authority rather than workflow membership.
+6. POS audit demonstrates a strong pattern: semantic permission + feature + user branch scope + scoped drill-down/export.
+7. Specialized audit systems do not equal a general Activity Log.
+8. SoftDeletes do not equal a user-facing Recycle Bin.
+9. Daftra-style deleted transaction management remains an explicit capability gap and must be treated as sensitive, especially for financial documents.
 
-1. Branch, warehouse and cash/bank ACL foundations already exist.
-2. Main issue is inconsistent consumption/coverage.
-3. Generic reports are the clearest systemic authorization risk.
-4. Invoice own/assigned scope can use existing real fields.
-5. Partner/customer ownership cannot: there is no current partner owner/assignee field, and invoice salesperson history must not be treated as customer ownership.
-6. HR approvals enforce state but currently use broad `hr.manage` authority rather than workflow membership.
-7. AWJ already has stronger semantic approval patterns in Fuel/POS that can inform a consistent target architecture.
-8. Deleted-record management is explicitly retained as a sensitive permission area in this reference and must not be lost from the final plan.
+## 20. Current-data status
+Safwan confirmed on 2026-09-08 that **all current AWJ data and transactions are experimental/test-only and not important production records**. This does not relax tenant isolation, authorization, accounting invariants, schema safety or future production readiness.
 
-## 27. Current-data status
+## 21. Documentation reconciliation
+This living reference now includes activity/audit findings, POS audit scope/drill-down/export behavior, fragmented audit architecture, SoftDeletes-vs-Recycle-Bin distinction, and the absence of a confirmed tenant restore/permanent-delete workflow. No substantive finding from this inspection is intentionally left only in chat.
 
-Safwan confirmed on 2026-09-08 that **all current AWJ data and transactions are experimental/test-only and not important production records**.
-
-This does not relax schema safety, tenant isolation, authorization correctness, accounting invariants, backward-compatible contracts where required, or future production readiness.
-
-## 28. Documentation reconciliation
-
-This living reference now includes the partner/customer ownership finding, HR leave/general-request approval findings, the stronger AWJ Fuel/POS approval contrast, and an explicit Recycle Bin/deleted-transactions section so that this previously researched Daftra capability is not omitted from the final plan.
-
-No substantive finding from this inspection is intentionally left only in chat.
-
-## 29. Next inspection pass
-
-1. Inspect activity/audit endpoints, event payload visibility and drill-down authorization.
-2. Inspect deleted-record/restore/permanent-delete behavior in AWJ.
-3. Map the full `Rbac::PERMISSIONS` catalogue against RoleDialog rendering and identify dependency/risk-label candidates.
-4. Enumerate every cash/bank money movement path and prove `assertAllowed()` coverage.
-5. Audit specialized Fuel/POS query data scope where relevant.
-6. Then use targeted executable restricted-user tests before proposing fixes.
+## 22. Next inspection pass
+1. Map the full `Rbac::PERMISSIONS` catalogue against RoleDialog rendering; classify sensitive actions, dependencies and legacy broad-permission compatibility.
+2. Enumerate every cash/bank money movement path and prove `assertAllowed()` coverage.
+3. Audit specialized Fuel/POS data scope where still relevant.
+4. Then use targeted executable restricted-user tests for the static P1 candidates before proposing fixes.
 
 After these checks, update the evidence matrix and only then propose an **AWJ Access Control V2 Master Plan**.
 
