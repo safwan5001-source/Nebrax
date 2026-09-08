@@ -74,6 +74,9 @@ const ACTION_PATHS: Record<string, (sourceId: string) => string> = {
   // PR-NOTIF-4: فشل/رفض إرسال ZATCA — يفتح الفاتورة نفسها (المصدر = invoice)،
   // حيث تُعرض حالة ZATCA وتُعاد تفويض `zatca.view`/`invoices.view` من جديد.
   view_zatca_submission: (invoiceId) => `/invoices/${invoiceId}`,
+  // PR-NOTIF-5: الاستحقاق يفتح الفاتورة، وتنبيه POS يفتح جلسة نقطة البيع.
+  view_receivable_invoice: (invoiceId) => `/invoices/${invoiceId}`,
+  view_pos_session: (sessionId) => `/pos/sessions/${sessionId}`,
 };
 
 export function notificationHref(notification: AppNotification): string | null {
