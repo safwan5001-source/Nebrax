@@ -2,11 +2,11 @@
 
 **Task / PR:** Phase 2A — Multiple UOM / Barcode Completion, **PR #3 of 4**: POS UOM Switching
 **Date:** 2026-09-08
-**Status:** مكتمل — PR مفتوحة، بانتظار CI والمراجعة. لا دمج ولا نشر.
+**Status:** مكتمل — PR مفتوحة، `mergeable_state: clean`، CI خضراء بالكامل على المحرِّكين. بانتظار مراجعتكم. لا دمج ولا نشر.
 **Branch:** `claude/phase-2-pr-uom2-3`
 **PR:** [#699](https://github.com/safwan5001-source/Nebrax/pull/699)
 **Base SHA:** `e47b249` (PR-UOM2-2، مُدمَجة ومنشورة Production)
-**Head SHA:** `4177353` (كومِت التنفيذ — سأتحقق من تطابقه بعد أي دفعٍ لاحق)
+**Head SHA:** `7efa215d9cc030bd180ab0be1bf040d31f4a1489` (يشمل تحديث هذا التقرير)
 
 **العقد:** أُضيف قسمٌ جديد (§5) في
 `docs/plans/products-inventory/phase-2-completion/MULTIPLE-UOM-BARCODE-DECOMPOSITION.md`
@@ -210,8 +210,19 @@ the tenant`, `checkout rejects a foreign tenant payment method...`) — **كله
 
 ## 12. CI
 
-قيد التنفيذ لحظة كتابة هذا التقرير على Head `4177353`. سأتحقّق من النتيجة
-وأحدّث هذا القسم فور اكتمالها، على غرار البروتوكول المتّبع في PR-UOM2-1 وPR-UOM2-2.
+**خضراء بالكامل، ومتوافقة (`mergeable_state: clean`).** على Head
+`7efa215d9cc030bd180ab0be1bf040d31f4a1489`، اكتملت كل الفحوص الخمسة (تشغيلا
+`push`/`pull_request` على كومِت التنفيذ `4177353`) بنجاح:
+
+| Job | Result |
+|---|---|
+| `php artisan test (L11, sqlite)` | ✅ success |
+| `php artisan test (L11, pgsql)` | ✅ success |
+| `web build (Next.js)` | ✅ success |
+
+(الوظائف الثلاث تكرَّرت لتشغيلَي `push`/`pull_request` على نفس الرأس — ٥
+فحوصاتٍ مسجَّلة، كلها ناجحة.) يتطابق هذا مع فحص السلامة الخلفي المحلّي
+(٩٠/٩٠، §10) — لا استثناء ولا فحصٌ مُعلَّق.
 
 ---
 
@@ -243,7 +254,7 @@ PR-UOM2-2): كتابة عقد §5 بنفسي بعد اعتماد القرار، 
 - **Branch:** `claude/phase-2-pr-uom2-3`
 - **PR:** [#699](https://github.com/safwan5001-source/Nebrax/pull/699)
 - **Base SHA:** `e47b249`
-- **Head SHA:** `4177353`
+- **Head SHA:** `7efa215d9cc030bd180ab0be1bf040d31f4a1489`
 
 ---
 
