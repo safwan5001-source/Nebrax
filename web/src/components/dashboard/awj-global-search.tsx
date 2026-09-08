@@ -123,8 +123,17 @@ const CATEGORIES: CategoryConfig[] = [
   },
 ];
 
-const PER_PAGE_ALL = 4;
-const PER_PAGE_SINGLE = 8;
+/**
+ * `/invoices`, `/purchases`, `/products` و`/journal-entries` يفرض كل واحد منها
+ * `per_page >= 10` (قيد موجود مسبقاً في تلك النقاط، لا علاقة له بالبحث الموحّد
+ * أصلاً) — بينما `/partners` وحدها تقبل `per_page >= 1`. القيمتان القديمتان هنا
+ * (٤ و٨) كانتا تحت الحدّ الأدنى لأربع من الفئات الست، فيرفضهما الخادم بخطأ
+ * ٤٢٢ لكل بحث، والمعالجة الحالية للأخطاء تُسقطه بصمت كـ«لا نتائج» — هذا بالضبط
+ * ما بدا وكأن الفواتير والمشتريات والمنتجات والقيود «معطّلة» بينما العملاء
+ * والموردون (`/partners`) يعملان. الإصلاح هنا فهم العقد القائم لا تغييره.
+ */
+const PER_PAGE_ALL = 10;
+const PER_PAGE_SINGLE = 20;
 
 export function AwjGlobalSearch({ className }: { className?: string }) {
   const t = useTranslations('awjSearch');
