@@ -1,7 +1,7 @@
 # AWJ Design System V2 — Blueprint
 
 **Status:** DRAFT / DESIGN DIRECTION
-**Date:** 2026-09-07
+**Date:** 2026-09-08
 **Scope:** Design and UX architecture only. No production UI implementation is approved by this document.
 
 > This document preserves the current agreed design direction so it does not depend on chat history. It is a living design reference and must be updated when Safwan approves a material design decision.
@@ -40,6 +40,8 @@ AWJ is a daily-use accounting and ERP tool. Priorities, in order:
 
 Avoid generic SaaS dashboard styling, excessive whitespace, oversized cards/controls, gradients, glass effects, heavy shadows, decorative icon containers, unnecessary animations, and arbitrary colors.
 
+The mandatory visual and implementation quality bar is defined separately in `AWJ_V2_DESIGN_QUALITY_BAR.md` and applies to all V2 patterns and implementations.
+
 ## 3. Existing design foundations to preserve initially
 
 Unless a later approved V2 decision explicitly changes them:
@@ -70,6 +72,8 @@ Purpose: **Where can I go?**
 
 The sidebar is the primary application/module navigation. Do not duplicate module navigation in a Dynamics-style global top ribbon.
 
+The final V2 sidebar visual treatment remains an open design decision unless separately approved.
+
 ### 4.2 Global Header
 
 Reserved for global/product-level utilities such as global search, notifications, account/user controls, language, and appearance where appropriate.
@@ -90,11 +94,40 @@ Examples for a sales invoice may include Save Draft, Issue/Post, Preview, Print,
 
 Rule: prefer one visually dominant primary action where practical; secondary and overflow actions follow a consistent hierarchy.
 
-## 5. Core AWJ V2 page patterns
+## 5. Pattern-first screen architecture
+
+AWJ may ultimately contain hundreds of screens, but it must **not contain hundreds of independently invented UI designs**.
+
+Every appropriate product screen should be classified into an approved reusable ERP page/workspace pattern before screen-specific design or implementation begins. The pattern supplies the shared design grammar, structure, behavior, responsive rules, states, and reusable components; the screen supplies its business-specific data, rules, actions, and exceptions.
+
+The architectural chain is:
+
+**AWJ Screen → Approved Page/Workspace Pattern → Shared Components → Design Tokens**
+
+This is a mandatory consistency principle, not merely an implementation optimization.
+
+Consequences:
+
+- Do not design or generate each new screen from a blank canvas when an approved pattern applies.
+- Do not force unrelated workflows into the same pattern merely for visual uniformity.
+- Screen-specific differences are expected when required by accounting, business workflow, data relationships, security, permissions, or usability.
+- Improvements to a shared interaction such as Command Bar behavior, lookup behavior, validation presentation, responsive composition, or grid interaction should normally be solved at the appropriate pattern/component level and inherited by the applicable screen family.
+- AI-assisted tools, Claude, Cursor, or other implementation agents must not invent a fresh visual grammar per screen. They must follow the approved pattern and shared components unless an explicit design exception is approved.
+- A representative concept can become the reference implementation for a pattern family after review; it does not mean every member of that family has identical content or workflow.
+
+### 5.1 Reference implementation principle
+
+The first thoroughly specified and reviewed screen in a pattern family should be used to validate the pattern itself, not merely that single screen.
+
+For the initial Document Workspace Pattern V2, the 2026-09-06 sales-invoice concept is the primary visual starting point. The resulting specification must be general enough to govern applicable document families such as sales invoices, purchase invoices, quotations, orders, credit/debit notes, and other line-based business documents while preserving each document's real workflow and accounting differences.
+
+A reference implementation is therefore a **pattern proving ground**, not a template to copy blindly.
+
+## 6. Core AWJ V2 page patterns
 
 Rather than independently designing every screen, screens should map to a small number of reusable ERP patterns.
 
-### 5.1 Document Workspace Pattern
+### 6.1 Document Workspace Pattern
 
 Primary reference concept: sales invoice.
 
@@ -119,7 +152,7 @@ Typical hierarchy:
 
 The line-items grid is the hero working surface. Do not sacrifice it for decorative cards or oversized header sections.
 
-### 5.2 Master Record Pattern
+### 6.2 Master Record Pattern
 
 Primary reference concepts: customer and product.
 
@@ -137,7 +170,7 @@ Typical hierarchy:
 
 Customer and product screens should share the same design grammar without forcing identical content structures.
 
-### 5.3 List Workspace Pattern
+### 6.3 List Workspace Pattern
 
 Intended for invoice, customer, product, supplier, journal, payment, and similar record collections.
 
@@ -151,7 +184,7 @@ Typical hierarchy:
 
 The Data Grid is primary. Do not automatically place dashboard KPI cards above every list.
 
-### 5.4 Report Workspace Pattern
+### 6.4 Report Workspace Pattern
 
 Typical hierarchy:
 
@@ -163,15 +196,15 @@ Typical hierarchy:
 
 Charts assist understanding; detailed tables remain essential for accounting confidence.
 
-### 5.5 Settings Workspace Pattern
+### 6.5 Settings Workspace Pattern
 
 Use clear logical sections, descriptions, fields/toggles, and explicit save behavior. Long settings areas should be structured rather than becoming one undifferentiated form.
 
-### 5.6 Operational Workspace Pattern
+### 6.6 Operational Workspace Pattern
 
 Reserved for workflows whose interaction model differs substantially from CRUD/master-data screens, especially POS and other high-frequency operational surfaces. Do not force Document or Master Record patterns onto these workflows when inappropriate.
 
-## 6. Forms V2 direction
+## 7. Forms V2 direction
 
 Target **balanced ERP density**: denser than generic SaaS forms but more readable than an excessively compressed enterprise form.
 
@@ -181,7 +214,7 @@ Lookups are first-class controls for high-cardinality business entities such as 
 
 Required, validation, disabled, read-only, loading, error, and permission states must be designed explicitly.
 
-## 7. Data Grid V2 direction
+## 8. Data Grid V2 direction
 
 The unified grid specification should eventually cover, as applicable:
 
@@ -201,23 +234,25 @@ The unified grid specification should eventually cover, as applicable:
 
 Financial numbers should be easy to scan, consistently aligned, and use the established financial-number conventions. Color alone must never communicate financial meaning.
 
-## 8. Responsive strategy
+## 9. Responsive strategy
 
 Responsive behavior is **pattern-specific**, not merely desktop shrinking and not an unconditional “tables become cards” rule.
 
-### Desktop
+The complete viewport/device coverage requirements are governed by `AWJ_V2_DESIGN_QUALITY_BAR.md`. Pattern specifications must account for the relevant continuum of widths/heights rather than validating only a few showcase screenshots.
 
-Primary productivity target. Preserve density, keyboard workflows, wide data grids, and efficient use of available workspace.
+### Desktop / Laptop
+
+Primary productivity target. Preserve density, keyboard workflows, wide data grids, and efficient use of available workspace. Laptop and constrained-height desktop environments must be treated as first-class productivity contexts, not assumed equivalent to a large monitor.
 
 ### Tablet / iPad
 
-Deliberately adapt navigation, command placement, sections, and grids while preserving serious ERP productivity.
+Deliberately adapt navigation, command placement, sections, and grids while preserving serious ERP productivity in both relevant orientations.
 
 ### Mobile
 
 Recompose layouts for touch and narrow widths. Master records may use structured sections/accordions. Lists may use compact record representations where appropriate. Complex financial/document tables must be evaluated individually; do not automatically convert every table into large cards if that damages scanability or data relationships.
 
-## 9. Lessons retained from the Stitch exploration
+## 10. Lessons retained from the Stitch exploration
 
 The Stitch prototype is not final, but it established useful constraints:
 
@@ -228,7 +263,7 @@ The Stitch prototype is not final, but it established useful constraints:
 - Dynamics-style density should be interpreted, not copied.
 - AWJ should remain visually calmer and clearer than a literal Dynamics clone.
 
-## 10. Microsoft Dynamics reference policy
+## 11. Microsoft Dynamics reference policy
 
 Dynamics 365 Finance & Operations is a **structural and behavioral ERP reference**, not a branding target.
 
@@ -245,7 +280,7 @@ Study it for:
 
 Do not copy Microsoft branding, proprietary visual identity, colors, typography, icons, or global navigation literally.
 
-## 11. What is explicitly NOT approved by this blueprint
+## 12. What is explicitly NOT approved by this blueprint
 
 This document does not authorize:
 
@@ -257,15 +292,17 @@ This document does not authorize:
 - Treating generated Stitch screens as final specifications.
 - Replacing existing AWJ components before an implementation audit establishes what can be reused.
 
-## 12. Planned next design task
+## 13. Planned next design task
 
 The next recommended design task is to specify the **AWJ Document Workspace Pattern V2** in detail, using the 2026-09-06 sales-invoice concept as the primary visual starting point and Dynamics only as an ERP-pattern reference.
 
-That specification should cover desktop/tablet/mobile structure, Page Header, Command Bar, document metadata, party/customer lookup, line-items grid, totals, states, validation, keyboard/touch behavior, and responsive behavior.
+That specification should cover desktop/laptop/tablet/mobile structure, Page Header, Command Bar, document metadata, party/customer lookup, line-items grid, totals, states, validation, keyboard/touch behavior, and responsive behavior.
+
+It must produce a reusable pattern specification rather than a one-off sales-invoice design.
 
 Only after the pattern is reviewed and approved should implementation planning begin.
 
-## 13. Decision log
+## 14. Decision log
 
 ### 2026-09-07 — Initial V2 direction
 
@@ -277,6 +314,15 @@ Only after the pattern is reviewed and approved should implementation planning b
 - Six initial page-pattern families: Document, Master Record, List, Report, Settings, Operational.
 - Single primary application navigation via Sidebar; no duplicate top module navigation.
 - Responsive behavior becomes pattern-specific; “all tables become cards” is not a universal V2 rule.
+
+### 2026-09-08 — Pattern-first architecture formalized
+
+- AWJ may contain hundreds of screens, but they must derive from a controlled set of approved reusable patterns rather than hundreds of independent designs.
+- Formal architecture: **Screen → Pattern → Components → Tokens**.
+- Pattern consistency is mandatory while business-specific differences remain first-class.
+- The first representative screen in a family validates the reusable pattern rather than becoming a blind copy template.
+- Sales Invoice is the initial proving ground for Document Workspace Pattern V2.
+- AI-assisted design/implementation agents must follow approved patterns and shared components rather than inventing screen-specific visual grammars.
 
 ---
 
