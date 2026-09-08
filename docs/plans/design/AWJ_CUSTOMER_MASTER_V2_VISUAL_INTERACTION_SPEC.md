@@ -4,183 +4,292 @@ Status: Design specification / proving case for `AWJ_MASTER_RECORD_PATTERN_V2_SP
 
 ## 1. Role
 
-Customer Master V2 is the first business-party proving case for Master Record Pattern V2. The page is not a saved form; it is the customer's operational workspace.
+Customer Master V2 is a business-party proving case for Master Record Pattern V2. The saved page is not a disabled form; it is the Customer operational/receivables workspace.
 
-Primary questions it must answer quickly:
+Primary questions:
 - Who is this customer?
 - Is the customer Individual or Commercial?
-- What is the customer's current financial position?
+- What is the customer's authoritative financial position?
 - What is due/overdue?
-- What transactions and payments relate to the customer?
+- What sales transactions and received payments relate to the customer?
 - What action can the authorized user perform next?
 
-## 2. Canonical desktop anatomy
+## 2. Evidence hierarchy
 
-`Identity Header → Contextual Command Bar → Compact Financial Summary → Section Navigation → Active Operational Content`
+Visual implementation and generated references SHALL follow:
 
-### Identity Header
-Show prominently:
-- Profile photo for Individual, organization logo for Commercial, fallback avatar when absent.
-- Customer display name.
-- Customer code where applicable.
-- Entity type badge: Individual / Commercial.
-- Active / inactive state.
-- One compact contact line where useful.
+`Actual AWJ contracts/code → approved Master Record V2 decisions → this Screen Contract → generated visual reference`
 
-Do not expose Customer/Supplier/Both as a user-facing role selector. This workspace is Customer Master.
+Images validate the contract; they do not define it. Do not invent fields, KPIs, tabs, actions, workflow states or accounting calculations to make a mockup look complete.
 
-### Contextual Command Bar
-Prioritize a small number of frequent actions and move secondary actions to overflow.
+## 3. Current AWJ baseline verified
 
-Candidate actions, subject to actual permissions/domain support:
-- Edit customer.
-- New sales invoice.
-- New quotation.
-- Register/receive payment.
-- Customer statement.
-- Export/print/share where supported.
-- Overflow for less frequent actions.
+The shared Partner backend currently supports:
+- name and English name;
+- internal role `customer|supplier|both`;
+- entity type `individual|commercial`;
+- code;
+- VAT and CR values;
+- email, phone and mobile;
+- address/city/building/street/district/postal code/country;
+- customer classification and supplier classification;
+- default price list;
+- credit limit and credit period;
+- opening balance/date as an accounting action input;
+- active state.
 
-Permissions and business state determine visibility/enabled state. Do not present unavailable financial actions as decorative disabled controls without a useful reason.
+The current Partner Quick Create/Edit dialog exposes only name, Individual/Commercial, email, phone and city, with Customer role supplied by context when used as Customer create.
 
-### Compact Financial Summary
-Use dense ERP summary facts rather than oversized dashboard cards. Candidate facts:
-- Current/closing balance.
-- Open amount.
-- Due/overdue amount.
-- Credit limit/exposure where configured.
+The current Partner Profile already provides operational capabilities around details, invoices, payments, ledger/statement, quotations, balance, timeline and activity, with desktop Tabs and mobile Accordion behavior. V2 should rationalize this existing capability rather than invent an unrelated Customer CRM.
 
-All accounting values must be authoritative backend/accounting outputs. The client presentation must not invent alternative accounting calculations.
+V2 does not expose Customer/Supplier/Both to the user. Customer is the domain/route role.
 
-## 3. Section model
+## 4. Screen Contract A — Add / Edit Customer
 
-Preserve and rationalize useful capabilities already present in the current Partner Profile:
-- Details.
-- Sales invoices.
-- Payments.
-- Ledger / customer statement.
-- Quotations.
-- Balance/credit context where needed.
-- Returns / credit notes where functionally relevant.
-- Timeline.
-- Activity / audit where supported.
+### 4.1 Purpose
 
-Avoid tabs that contain no meaningful customer capability. Section names must describe user tasks, not internal model names.
+Create/edit Customer identity and ordinary commercial relationship properties. This is one responsive Master Record workspace, not a wizard.
 
-Desktop/laptop: dense Tabs are preferred when they fit without horizontal chaos.
-Mobile: recompose the same section model using compact navigation/Accordion as appropriate. The user must not lose section context when crossing responsive breakpoints.
+No Stepper is used unless a genuine future multi-stage Customer workflow is verified.
 
-## 4. Details — entity-aware rendering
+### 4.2 Desktop composition
 
-### Individual
-Prioritize personal identity:
-- Full name.
-- Profile photo.
-- National/personal identifier if approved and applicable.
-- Gender/birth date only if approved as genuine business requirements.
-- Contact information.
-- Address.
+Canonical order:
 
-Do not render empty company-only fields such as Commercial Registration merely to preserve form symmetry.
+`Page Identity / Actions → Customer Identity → Contact → Address → Commercial/Personal Identity → Customer Relationship Settings → Save`
 
-### Commercial
-Prioritize organization identity:
-- Trade/business name.
-- Organization logo.
-- Commercial Registration / approved commercial identifier.
-- VAT number where applicable.
-- Representative/contact person when modeled.
-- Contact information.
-- Address.
+Use dense logical sections. Avoid decorative dashboard composition and unnecessary whitespace.
 
-Do not render person-only fields merely as empty placeholders.
+### 4.3 Domain role
 
-## 5. Business relationship settings
+Customer role is implicit from Customer context/route.
 
-Keep separate from legal/entity identity:
-- Customer classification.
-- Default price list.
-- Credit period.
-- Credit limit.
-- Active/inactive state.
+Do not show:
+- Customer / Supplier / Both selector;
+- Supplier classification or Supplier procurement settings.
 
-Individual customers may still have price lists or credit terms; those settings do not change their entity type.
+### 4.4 Entity type
 
-## 6. Consequential accounting actions
+Show early:
 
-Opening balance is not a mutable profile field. It is an explicit accounting-sensitive operation.
+`فردي (Individual) | تجاري (Commercial)`
 
-Any create/correct/reverse opening-balance flow must preserve AWJ accounting rules, authorization, auditability and ledger integrity. A future visual implementation must not provide an ordinary text input that silently rewrites posted accounting history.
+The selection changes applicable identity fields, validation and profile presentation.
 
-The same principle applies to other consequential financial operations reachable from Customer Master.
+#### Individual Customer
+Approved direction:
+- full/display name;
+- personal photo when profile media is implemented;
+- contact information;
+- address;
+- personal/national identifier only when approved and applicable;
+- gender/birth date only if deliberately approved as genuine AWJ business requirements.
 
-## 7. Quick Create versus Full Workspace
+Do not show CR/company fields as empty noise.
 
-Quick Customer Create remains available inside transaction entry where supported. It captures the minimum valid customer identity/contact data needed to continue the transaction.
+#### Commercial Customer
+Approved direction:
+- trade/business name;
+- organization logo when profile media is implemented;
+- CR / approved commercial identifier;
+- VAT number where applicable;
+- contact information;
+- address;
+- representative/contact person only when actually modeled.
 
-It must not duplicate the full workspace or expose consequential accounting operations.
+Do not show person-only fields as empty noise.
 
-After creation, the user may open the Full Customer Master Workspace for complete identity, commercial settings, financial relations and activity.
+### 4.5 Ordinary Customer relationship settings
 
-## 8. Mobile composition
+Actual backend-supported Customer fields include:
+- Customer classification;
+- default price list;
+- credit limit;
+- credit period;
+- active/inactive state.
 
-Mobile priority order:
-1. Identity: avatar/logo, name, type and status.
-2. Essential financial summary.
-3. Primary contextual action(s).
-4. Section navigation/content.
-5. Secondary details/activity.
+These are business relationship properties, not legal entity type. An Individual customer may still have a price list or credit terms.
 
-Avoid a persistent global bottom navigation inside this pattern. Any bottom action area must be pattern-owned and justified by a focused editing/action flow.
+### 4.6 Profile media
 
-Do not shrink desktop tables blindly. Transaction/ledger sections need responsive record presentation or controlled horizontal behavior according to the DataTable/document rules.
+One primary Customer identity asset is an approved V2 requirement:
+- Individual → profile photo;
+- Commercial → organization logo;
+- absent → fallback avatar/initial.
 
-## 9. Arabic RTL / English LTR
+Storage/API/UI is not implemented by this documentation PR. A generated reference may show the intended affordance but must not falsely imply current production upload support.
 
-Verify deliberately:
-- Header/action ordering in both directions.
-- Tabs/Accordion affordances.
-- Money alignment and sign semantics.
-- Customer code, VAT/CR/ID, phone, email and mixed-direction content.
-- Long Arabic and English business names.
-- Long translated action labels.
+### 4.7 Consequential accounting exclusion
 
-Direction mirroring must never change financial meaning or logical workflow order.
+Opening balance is not an ordinary editable Customer field, even though the backend request accepts opening-balance input for accounting workflow purposes.
 
-## 10. Visual character
+Opening balance create/correct/reverse must remain explicit, authorized and auditable and must preserve ledger integrity. Profile editing must never silently rewrite posted financial history.
 
-Follow AWJ Design System V2 direction:
+Receiving a payment is likewise an operation, not a Customer property.
+
+### 4.8 Quick Customer Create
+
+Quick Create inside Sales/Quotation flows remains smaller than Full Add/Edit.
+
+Current verified minimum dialog fields are name + Individual/Commercial + email + phone + city. Future additions should be only what is genuinely required to continue the originating transaction.
+
+Quick Create:
+- keeps Customer role implicit;
+- never shows Customer/Supplier/Both;
+- does not expose opening balance, statement, ledger or payment operations;
+- returns the user to the originating transaction after save.
+
+### 4.9 Actions
+
+Create/Edit keeps actions small:
+- Save;
+- Cancel/back as appropriate.
+
+Do not invent approval/posting/payment workflow controls for ordinary Customer editing.
+
+## 5. Screen Contract B — Full Customer Profile
+
+### 5.1 Canonical anatomy
+
+`Identity Header → Contextual Command Bar → Compact Receivables Summary → Section Navigation → Active Operational Content`
+
+The profile is an operational workspace, not a saved form.
+
+### 5.2 Identity Header
+
+Show:
+- photo/logo/fallback;
+- Customer name;
+- Customer code where available;
+- Individual/Commercial badge;
+- active/inactive state;
+- compact useful contact line.
+
+Do not show internal Partner role terminology.
+
+### 5.3 Contextual Command Bar
+
+Actions must map actual capabilities and permissions.
+
+Customer-domain candidates grounded in current AWJ capabilities include:
+- Edit Customer;
+- New Sales Invoice where route/domain support exists;
+- New Quotation where supported;
+- Receive/Register Payment where supported;
+- Customer Statement / Ledger;
+- statement/ledger export/print/share where actually supported.
+
+Secondary actions belong in overflow. Do not add CRM opportunities, branches, memberships or other attractive-looking actions merely for mockup completeness unless they are real Customer capabilities.
+
+### 5.4 Compact Receivables Summary
+
+Semantic slots may include:
+- current/closing balance;
+- open amount;
+- due/overdue amount;
+- credit limit/exposure where configured.
+
+All financial values must come from authoritative backend/accounting outputs. Current Partner Profile contains display derivations over backend values; implementation must preserve existing accounting semantics and must not create a second client-side accounting model.
+
+Use dense facts rather than oversized SaaS KPI cards. Do not invent annual-sales charts, invoice counts, last-sale metrics or other KPIs unless they are intentionally supported by actual data/contracts.
+
+### 5.5 Section navigation
+
+Customer-oriented sections based on real capabilities:
+- Details;
+- Sales Invoices;
+- Received Payments;
+- Ledger / Customer Statement;
+- Quotations;
+- Balance / credit context where meaningful;
+- Returns / Credit Notes where functionally supported;
+- Timeline;
+- Activity / Audit where supported.
+
+Do not expose Supplier purchase/payables concepts.
+
+Current generic Partner sections such as `membership` are not automatically retained in V2 merely because the shared profile contains them; each section must represent a real Customer task.
+
+Desktop/laptop: dense Tabs/section navigation where appropriate.
+Mobile: same logical sections recomposed through compact navigation/Accordion while preserving section context/deep links where supported.
+
+### 5.6 Details rendering
+
+Individual prioritizes personal identity/contact/address and only approved identifiers.
+
+Commercial prioritizes business identity, CR/approved identifier, VAT where applicable, contact/address and representative only when modeled.
+
+Irrelevant fields are omitted, not rendered as disabled/empty placeholders.
+
+### 5.7 Financial operations
+
+Opening balance, received payment and balance correction are explicit financial operations with permissions and auditability. Edit Customer never mutates posted accounting history.
+
+## 6. Mobile Screen Contract
+
+Mobile is the same Customer information model recomposed, not a separate workflow.
+
+Priority:
+1. identity/photo-logo/name/type/status;
+2. essential authoritative receivables summary;
+3. primary contextual action(s);
+4. section navigation/content;
+5. secondary details/activity.
+
+No persistent global bottom navigation is introduced by Master Record Pattern. A bottom action area is allowed only when owned by a focused pattern flow and justified.
+
+Do not squeeze desktop financial tables into the viewport. Use approved responsive record/table behavior.
+
+## 7. Arabic RTL / English LTR contract
+
+Verify:
+- header/action ordering;
+- tabs/Accordion directionality;
+- money alignment/sign semantics;
+- Customer code, VAT/CR/IDs, phone/email and mixed bidi content;
+- long organization/personal names;
+- translated action labels;
+- desktop/laptop/tablet/mobile.
+
+Direction mirroring never changes financial meaning.
+
+## 8. Visual character
+
+Follow AWJ Design System V2:
 - dense daily-accounting workspace;
-- neutral surfaces;
-- restrained hierarchy;
-- no decorative gradients/heavy shadows;
-- no oversized SaaS dashboard cards;
-- semantic colors only for meaningful state/financial semantics;
-- clear numbers and financial alignment;
-- image/logo supports identity without dominating the workspace.
+- neutral surfaces and restrained hierarchy;
+- no gradients/heavy shadows;
+- no oversized generic dashboard cards;
+- semantic colors only for meaningful states;
+- clear financial number alignment;
+- photo/logo supports identity without dominating the page.
 
-## 11. Current architecture mapping
+## 9. Visual Reference Gate
 
-The existing Partner Profile already provides a substantial base: details, invoices, payments, statement/ledger, quotations, balance-related information, timeline/activity and responsive Tabs/Accordion behavior.
+Before generating/approving Customer imagery verify:
+- no Customer/Supplier/Both selector;
+- Individual/Commercial dynamic behavior is clear;
+- no invented wizard/Stepper;
+- no invented CRM tabs/actions/KPIs;
+- no opening balance as ordinary profile field;
+- no Supplier concepts;
+- financial summaries are semantic slots backed by authoritative data, not invented calculations;
+- profile is operational, not a disabled form;
+- photo/logo is an approved future capability, not falsely presented as already implemented;
+- mobile has no global bottom navigation;
+- RTL/LTR and mixed identifiers/money remain correct.
 
-V2 should evolve this capability rather than replace it with an unrelated screen model.
+A visual violating this gate is concept-only and cannot become implementation documentation.
 
-Known future implementation gaps are intentionally outside this documentation scope:
-- Profile photo/logo storage/API/UI.
-- Approved Individual-specific identity fields missing from the current Partner contract.
+## 10. Known implementation gaps intentionally deferred
+
+- Customer photo/logo storage/API/UI.
+- approved Individual-specific identity fields absent from current Partner contract.
 - Commercial representative modeling if needed.
-- User-facing removal of `both` and any backend contract cleanup.
-- Final Saudi/ZATCA-sensitive validation matrix.
+- user-facing removal of `both` and any backend contract cleanup.
+- final Saudi/ZATCA-sensitive validation matrix.
+- final authoritative Customer summary endpoint/semantics where generic Partner behavior needs hardening.
 
-## 12. Proving-case acceptance
+## 11. Acceptance
 
-Customer Master V2 validates Master Record Pattern V2 when it demonstrates:
-- clear identity without form clutter;
-- entity-aware Individual/Commercial presentation;
-- separate Customer and Supplier UX;
-- fast operational/financial context;
-- explicit consequential actions;
-- coexistence of Quick Create and Full Workspace;
-- usable responsive recomposition;
-- Arabic/English parity;
-- no accounting/security/tenant semantics invented by the UI.
+Customer Master V2 is visually ready only when Add/Edit and Full Profile can be rendered from this contract without inventing business behavior, while preserving Customer receivables semantics, accounting/security/tenant integrity, responsive behavior and Arabic/English parity.
