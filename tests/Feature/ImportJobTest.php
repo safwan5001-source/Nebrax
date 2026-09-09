@@ -190,7 +190,7 @@ class ImportJobTest extends TestCase
     }
 
     /** @test */
-    public function no_code_path_in_this_pr_reaches_queued_processing_or_completed(): void
+    public function no_code_path_reaches_queued_without_a_real_queue_worker(): void
     {
         $auth = $this->registerTenant();
 
@@ -202,7 +202,7 @@ class ImportJobTest extends TestCase
             ->whereIn('status', ImportJobStatus::NOT_YET_REACHABLE)
             ->count();
 
-        $this->assertSame(0, $reached, 'queued/processing/completed مفردات مُقرَّرة سلفاً فقط في PR-DUR-1، لا مساراً حياً.');
+        $this->assertSame(0, $reached, 'queued مفردة مُقرَّرة سلفاً فقط — لا عامل طابور حقيقي بعد. processing/completed صارت مسارَين حيَّين عبر /apply (PR-DUR-2)، وتُختبَران في ImportJobApplyTest.');
     }
 
     /** @test */

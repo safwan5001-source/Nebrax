@@ -19,6 +19,8 @@ class ImportJobResource extends JsonResource
             'content_sha256' => $this->content_sha256,
             'row_count' => $this->row_count === null ? null : (int) $this->row_count,
             'column_count' => $this->column_count === null ? null : (int) $this->column_count,
+            'processed_rows' => (int) $this->processed_rows,
+            'apply_result' => $this->apply_result,
             'error_message' => $this->error_message,
             'created_by' => $this->created_by,
             'cancelled_by' => $this->cancelled_by,

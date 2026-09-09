@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\ImportJob;
+use App\Support\ImportJobDomain;
 use App\Support\ImportJobStatus;
 use App\Support\SpreadsheetReader;
 use App\Tenancy\TenantContext;
@@ -176,6 +177,125 @@ class ImportJobService
         }
 
         return $tmpPath;
+    }
+
+    /**
+     * PR-DUR-2 — يرحّل قطعةً واحدة محدودة الحجم من تشغيلة `product_catalog`
+     * جاهزة أو قيد المعالجة، معيداً استعمال `ProductImportService::apply()`
+     * حصراً كحد الطفرة الوحيد — لا منطق مطابقة/تحقق/كتابة مكرَّر هنا.
+     *
+     * **الأمان من التزامن:** `lockForUpdate()` على صفّ التشغيلة يُمسَك طوال
+     * القراءة والتطبيق والتحديث معاً — لا يُفرَج عنه بين قراءة المؤشّر
+     * وكتابته. محاولتا ترحيل متزامنتان لنفس التشغيلة تتسلسلان فعلياً على
+     * PostgreSQL (قفل صفٍّ حقيقي)، وعلى SQLite ضمن تسلسل الكاتب الوحيد على
+     * مستوى الملف؛ فلا قطعتان تريان نفس `processed_rows` معاً أبداً.
+     *
+     * **الاستئناف/إعادة المحاولة مجانية:** كل استدعاء يعيد قراءة
+     * `processed_rows` الفعلي من القاعدة تحت القفل، لا من ذاكرة العملية —
+     * إعادة محاولة بعد انقطاع (قبل التزام أي شيء) تكرّر نفس نافذة الصفوف
+     * من الصفر بلا أثر مضاعف؛ إعادة محاولة بعد نجاح تتقدّم تلقائياً للقطعة
+     * التالية. تشغيلة `completed` تُعاد كما هي بلا استدعاء ثانٍ للتطبيق.
+     *
+     * **الخيارات تُجمَّد عند أول قطعة فقط** (`apply_options`) — القطع
+     * اللاحقة تتجاهل خيارات الطلب الحالي فلا تُعاد تفسير حالة واجهة تغيّرت
+     * بين الاستدعاءات.
+     */
+    public function applyNextChunk(ImportJob $job, array $options, ?string $userId, bool $costAuthorized): ImportJob
+    {
+        $updated = DB::transaction(function () use ($job, $options, $userId, $costAuthorized) {
+            /** @var ImportJob $locked */
+            $locked = ImportJob::query()->whereKey($job->id)->lockForUpdate()->firstOrFail();
+
+            $this->assertApplicable($locked);
+
+            if ($locked->status === ImportJobStatus::COMPLETED) {
+                return $locked;
+            }
+
+            $firstChunk = $locked->status === ImportJobStatus::READY;
+            $frozenOptions = $firstChunk ? $options : (array) ($locked->apply_options ?? []);
+
+            if ($firstChunk) {
+                $locked->forceFill([
+                    'status' => ImportJobStatus::PROCESSING,
+                    'apply_options' => $frozenOptions,
+                    'started_at' => now(),
+                ])->save();
+            }
+
+            $offset = (int) $locked->processed_rows;
+            $batchSize = min(
+                ProductImportService::APPLY_BATCH_SIZE,
+                max(1, (int) ($frozenOptions['batch_size'] ?? ProductImportService::APPLY_BATCH_SIZE))
+            );
+
+            $tmpPath = $this->materializeLocalCopy((string) $locked->storage_path);
+            try {
+                $file = new UploadedFile(
+                    $tmpPath,
+                    (string) $locked->original_filename,
+                    $locked->mime_type,
+                    null,
+                    true
+                );
+
+                $chunkOptions = array_merge($frozenOptions, [
+                    'batch_offset' => $offset,
+                    'batch_size' => $batchSize,
+                ]);
+
+                try {
+                    $result = app(ProductImportService::class)->apply($file, $chunkOptions, $userId, $costAuthorized);
+                } catch (Throwable $e) {
+                    $locked->forceFill([
+                        'status' => ImportJobStatus::FAILED,
+                        'error_message' => $e->getMessage(),
+                    ])->save();
+
+                    return $locked;
+                }
+
+                $processedInChunk = $result['created'] + $result['updated'] + $result['skipped'];
+                $processed = $offset + $processedInChunk;
+                $totalRows = (int) $locked->row_count;
+                $completed = $processed >= $totalRows;
+
+                $locked->forceFill([
+                    'processed_rows' => min($processed, $totalRows),
+                    'status' => $completed ? ImportJobStatus::COMPLETED : ImportJobStatus::PROCESSING,
+                    'finished_at' => $completed ? now() : null,
+                    'apply_result' => $result,
+                ])->save();
+
+                return $locked;
+            } finally {
+                if (is_file($tmpPath)) {
+                    @unlink($tmpPath);
+                }
+            }
+        });
+
+        if ($updated->status === ImportJobStatus::FAILED) {
+            throw new RuntimeException($updated->error_message ?? 'فشل ترحيل التشغيلة.');
+        }
+
+        return $updated;
+    }
+
+    /**
+     * فشلٌ مغلَق صراحةً على مجالٍ آخر أو حالةٍ لا تقبل الترحيل — لا محاولة
+     * تخمين نيّة الطالب. `product_catalog` وحده مربوطٌ بمعالجة فعلية اليوم.
+     */
+    private function assertApplicable(ImportJob $job): void
+    {
+        if ($job->domain !== ImportJobDomain::PRODUCT_CATALOG) {
+            throw new RuntimeException('لا يوجد محرّك ترحيل مجزّأ لهذا المجال بعد.');
+        }
+
+        $applicable = [ImportJobStatus::READY, ImportJobStatus::PROCESSING, ImportJobStatus::COMPLETED];
+        if (! in_array($job->status, $applicable, true)) {
+            throw new RuntimeException('لا يمكن ترحيل تشغيلة استيراد بحالتها الحالية.');
+        }
     }
 
     public function cancel(ImportJob $job, ?string $userId): ImportJob

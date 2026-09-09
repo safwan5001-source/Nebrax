@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Requests\ApplyImportJobRequest;
 use App\Http\Requests\StoreImportJobRequest;
 use App\Http\Resources\ImportJobResource;
 use App\Models\ImportJob;
 use App\Services\ImportJobService;
+use App\Support\SensitiveCostPolicy;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -60,6 +62,26 @@ class ImportJobController extends ApiController
         $status = $job->wasRecentlyCreated ? 201 : 200;
 
         return (new ImportJobResource($job))->response()->setStatusCode($status);
+    }
+
+    /**
+     * PR-DUR-2 — يرحّل قطعة واحدة محدودة الحجم. عميل الاستدعاء (worker أو
+     * زر واجهة) يكرّر النداء حتى `completed`/`failed`. لا ملف في هذا الطلب —
+     * التشغيلة تُقرأ من تخزينها الدائم. صلاحية التكلفة تُفحص حيّة في كل قطعة
+     * (`SensitiveCostPolicy::authorized`) كما في `/products/import/apply`
+     * تماماً — لا تُخزَّن ولا تُفترَض من أول استدعاء.
+     */
+    public function apply(ApplyImportJobRequest $request, string $id): JsonResponse
+    {
+        $job = ImportJob::query()->whereKey($id)->firstOrFail();
+        $job = $this->domain(fn () => $this->jobs->applyNextChunk(
+            $job,
+            $request->applyOptions(),
+            $request->user()?->id,
+            SensitiveCostPolicy::authorized($request->user()),
+        ));
+
+        return (new ImportJobResource($job))->response();
     }
 
     public function cancel(Request $request, string $id): JsonResponse
