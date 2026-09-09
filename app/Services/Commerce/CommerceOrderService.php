@@ -9,6 +9,7 @@ use App\Models\Product;
 use App\Models\SalesChannel;
 use App\Services\Accounting\UnitConversion;
 use App\Tenancy\BranchScope;
+use App\Tenancy\CustomerContext;
 use App\Tenancy\TenantContext;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -39,6 +40,14 @@ use RuntimeException;
  *
  * **بلا idempotency هنا**: لا سطح استدعاء خارجي قابل لإعادة المحاولة بعد
  * (لا API/Checkout بعد — Master Plan §25 يخصّص ذلك لـ PR-COM-7A صراحةً).
+ *
+ * **PR-COM-6A — سياق العميل المشترك**: `partner_id` المُدخل في `$data` سلطةٌ
+ * فقط حين **لا** يوجد `CustomerContext` مُؤسَّس (ضيف، أو نداءٌ داخلي/طاقم —
+ * `EstablishCustomerContext` لا يُشغَّل إطلاقاً على مسارات الطاقم، فلا
+ * يتأسّس السياق هناك أبداً). حين يتأسّس السياق (طلبٌ من هوية عميل موثَّقة)
+ * يصبح **المصدر الوحيد**: `partner_id` من `$data` يُتجاهل كلياً ولا يُقرَأ
+ * حتى كمرشّح — لا يجوز أن يُغيّر مُدخَلٌ من الطالب ملكية الطلب. هذا تكاملٌ
+ * سياقي حصراً (COM-6A) لا تفويضَ ملكية موارد كامل (COM-6B لاحقاً).
  */
 class CommerceOrderService
 {
@@ -74,12 +83,7 @@ class CommerceOrderService
             throw new RuntimeException('قناة البيع غير موجودة.');
         }
 
-        $partnerId = $data['partner_id'] ?? null;
-        if ($partnerId !== null
-            && ! Partner::query()->withoutGlobalScope(BranchScope::class)->whereKey($partnerId)->exists()
-        ) {
-            throw new RuntimeException('العميل غير موجود.');
-        }
+        $partnerId = $this->resolveOrderPartnerId($tenantId, $data);
 
         return DB::transaction(function () use ($salesChannelId, $partnerId, $data, $items) {
             $order = CommerceOrder::create([
@@ -168,5 +172,38 @@ class CommerceOrderService
     private function nextNumber(): string
     {
         return CommerceOrder::nextDocumentNumber('CORD', now()->toDateString());
+    }
+
+    /**
+     * PR-COM-6A: `CustomerContext` — حين مُؤسَّساً — هو المصدر الوحيد
+     * لملكية `partner_id`؛ لا قراءة لـ`$data['partner_id']` في هذه الحالة
+     * إطلاقاً (لا حتى كمرشّح)، فلا يملك الطالب أي وسيلة لتجاوزه. الرابط
+     * نفسه للقراءة فقط هنا — `hasPartnerLink()`/`linkedPartnerId()` يعكسان
+     * تحقُّق `EstablishCustomerContext` القائم (هوية/رابط/Partner نشطون)؛
+     * لا تكرار للتحقّق ولا إنشاء/تعديل رابطٍ من Commerce أبداً.
+     *
+     * غياب السياق (ضيف، أو أي نداءٍ لا يمرّ بمسارات العميل — الطاقم/الداخلي)
+     * يُبقي سلوك COM-5A كما هو حرفياً: `partner_id` من `$data` إن وُجد.
+     */
+    private function resolveOrderPartnerId(string $tenantId, array $data): ?string
+    {
+        $customerContext = app(CustomerContext::class);
+
+        if ($customerContext->isEstablished()) {
+            if ($customerContext->tenantId() !== $tenantId) {
+                throw new RuntimeException('سياق العميل لا يطابق المستأجر النشط.');
+            }
+
+            return $customerContext->hasPartnerLink() ? $customerContext->linkedPartnerId() : null;
+        }
+
+        $partnerId = $data['partner_id'] ?? null;
+        if ($partnerId !== null
+            && ! Partner::query()->withoutGlobalScope(BranchScope::class)->whereKey($partnerId)->exists()
+        ) {
+            throw new RuntimeException('العميل غير موجود.');
+        }
+
+        return $partnerId;
     }
 }
