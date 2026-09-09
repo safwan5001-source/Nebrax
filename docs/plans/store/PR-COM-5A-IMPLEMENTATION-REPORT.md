@@ -559,9 +559,9 @@ flagged, not guessed:
 
 - **Branch:** `claude/pr-com-5a-commerce-order-foundation`
 - **Base SHA:** `49f5dff698cfc116de8d232a506d840c1b9879d0`
-- **PR:** opened against `main` — link recorded in a follow-up commit to
-  this report
-- **Head SHA:** recorded at PR-open time in the follow-up commit above
+- **PR:** [#735](https://github.com/safwan5001-source/Nebrax/pull/735) —
+  opened against `main`, not merged
+- **Head SHA:** `0d28873` (commit before this report-link update)
 
 ## 48. Recommended next step
 
