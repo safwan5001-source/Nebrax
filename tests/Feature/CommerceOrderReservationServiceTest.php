@@ -494,7 +494,10 @@ class CommerceOrderReservationServiceTest extends TestCase
         $tenantB = Tenant::create(['name' => 'شركة حجز رابعة', 'slug' => 'other-cor-tenant-4']);
         app(TenantContext::class)->set($tenantB->id);
 
-        $this->assertCount(0, $this->orchestrator->reservationsFor($order));
+        // fail-closed (P1-3): كائن طلبٍ من مستأجرٍ آخر يُرفض صراحةً، لا يعيد
+        // مجموعة فارغة بصمت — نفس اصطلاح reserve() تماماً.
+        $this->expectException(RuntimeException::class);
+        $this->orchestrator->reservationsFor($order);
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -544,5 +547,193 @@ class CommerceOrderReservationServiceTest extends TestCase
         $this->assertSame($reserved->first()->id, $linked->first()->id);
         $this->assertSame(\App\Models\CommerceOrder::class, $linked->first()->source_type);
         $this->assertSame($order->id, $linked->first()->source_id);
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  Post-Review P1-1 — Non-inventory order lines (ADR-02 §9)
+    // ═══════════════════════════════════════════════════════════
+
+    private function nonTrackedProduct(string $name = 'خدمة حجز'): Product
+    {
+        // track_inventory الافتراض الفعلي على Product هو false — لا حاجة لتمريره صراحة،
+        // لكنه مُثبَّت هنا بوضوح ليعكس نيّة الاختبار لا الاعتماد على افتراض ضمني فقط.
+        return Product::create(['name' => $name, 'sale_price' => 20000, 'track_inventory' => false]);
+    }
+
+    /** @test */
+    public function an_order_of_only_non_inventory_products_reserves_nothing_and_succeeds(): void
+    {
+        $service = $this->nonTrackedProduct();
+        $this->policies->setFixedWarehouse($this->channel->id, $this->warehouse->id);
+
+        $order = $this->orders->create(['sales_channel_id' => $this->channel->id], [
+            ['product_id' => $service->id, 'quantity' => 1],
+        ]);
+        $order = $this->orders->confirm($order);
+
+        $result = $this->orchestrator->reserve($order);
+
+        $this->assertCount(0, $result, 'طلبٌ كله خدمات ينجح بمجموعة حجوزات فارغة — ليس فشلاً.');
+        $this->assertSame(0, InventoryReservation::query()->count());
+    }
+
+    /** @test */
+    public function a_mixed_order_reserves_only_the_tracked_line(): void
+    {
+        $service = $this->nonTrackedProduct();
+        $this->setOnHand(10, $this->product);
+        $this->policies->setFixedWarehouse($this->channel->id, $this->warehouse->id);
+
+        $order = $this->orders->create(['sales_channel_id' => $this->channel->id], [
+            ['product_id' => $this->product->id, 'quantity' => 4],
+            ['product_id' => $service->id, 'quantity' => 1],
+        ]);
+        $order = $this->orders->confirm($order);
+
+        $result = $this->orchestrator->reserve($order);
+
+        $this->assertCount(1, $result, 'سطر الخدمة لا يُنتج حجزاً.');
+        $this->assertSame($this->product->id, $result->first()->product_id);
+        $this->assertSame(4, $result->first()->base_quantity);
+    }
+
+    /** @test */
+    public function a_non_tracked_line_never_affects_on_hand_ats_or_stock_movement(): void
+    {
+        $service = $this->nonTrackedProduct();
+        $this->setOnHand(10, $this->product);
+        $this->policies->setFixedWarehouse($this->channel->id, $this->warehouse->id);
+
+        $order = $this->orders->create(['sales_channel_id' => $this->channel->id], [
+            ['product_id' => $this->product->id, 'quantity' => 4],
+            ['product_id' => $service->id, 'quantity' => 2],
+        ]);
+        $order = $this->orders->confirm($order);
+
+        $this->orchestrator->reserve($order);
+
+        $stock = ProductWarehouseStock::query()
+            ->where('product_id', $this->product->id)->where('warehouse_id', $this->warehouse->id)->first();
+        $this->assertSame(10, $stock->quantity, 'On Hand بلا تغيير — لا للسطر المتتبَّع ولا لسطر الخدمة.');
+
+        $ats = app(AvailableToSellService::class)->forWarehouse($this->product->id, $this->warehouse->id);
+        $this->assertSame(4, $ats->activeReserved, 'المحجوز النشط = سطر المتتبَّع فقط.');
+        $this->assertSame(6, $ats->availableToSell);
+
+        $this->assertSame(0, StockMovement::query()->count(), 'لا حركة مخزون لأي سطر — متتبَّع أو خدمة.');
+    }
+
+    /** @test */
+    public function a_non_tracked_line_creates_no_accounting_or_zatca_effect(): void
+    {
+        $service = $this->nonTrackedProduct();
+        $this->policies->setFixedWarehouse($this->channel->id, $this->warehouse->id);
+
+        $order = $this->orders->create(['sales_channel_id' => $this->channel->id], [
+            ['product_id' => $service->id, 'quantity' => 1],
+        ]);
+        $order = $this->orders->confirm($order);
+
+        $this->orchestrator->reserve($order);
+
+        $this->assertSame(0, Invoice::query()->count());
+        $this->assertSame(0, Payment::query()->count());
+        $this->assertSame(0, JournalEntry::query()->count());
+    }
+
+    /** @test */
+    public function retrying_a_mixed_order_remains_idempotent(): void
+    {
+        $service = $this->nonTrackedProduct();
+        $this->setOnHand(10, $this->product);
+        $this->policies->setFixedWarehouse($this->channel->id, $this->warehouse->id);
+
+        $order = $this->orders->create(['sales_channel_id' => $this->channel->id], [
+            ['product_id' => $this->product->id, 'quantity' => 4],
+            ['product_id' => $service->id, 'quantity' => 1],
+        ]);
+        $order = $this->orders->confirm($order);
+
+        $first = $this->orchestrator->reserve($order);
+        $second = $this->orchestrator->reserve($order);
+
+        $this->assertCount(1, $first);
+        $this->assertCount(1, $second);
+        $this->assertSame($first->first()->id, $second->first()->id, 'إعادة المحاولة تعيد نفس الحجز الوحيد، لا حجزاً ثانياً ولا حجزاً وهمياً لسطر الخدمة.');
+        $this->assertSame(1, InventoryReservation::query()->count());
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  Post-Review P1-3 — reservationsFor() fails closed
+    // ═══════════════════════════════════════════════════════════
+
+    /** @test */
+    public function reservationsFor_fails_closed_without_an_active_tenant_context(): void
+    {
+        $this->setOnHand(10);
+        $this->policies->setFixedWarehouse($this->channel->id, $this->warehouse->id);
+        $order = $this->confirmedOrder(3);
+        $this->orchestrator->reserve($order);
+
+        app(TenantContext::class)->forget();
+
+        $this->expectException(RuntimeException::class);
+        $this->orchestrator->reservationsFor($order);
+    }
+
+    /** @test */
+    public function reservationsFor_returns_only_the_current_tenants_own_reservations(): void
+    {
+        $this->setOnHand(10);
+        $this->policies->setFixedWarehouse($this->channel->id, $this->warehouse->id);
+        $order = $this->confirmedOrder(3);
+        $this->orchestrator->reserve($order);
+
+        $linked = $this->orchestrator->reservationsFor($order);
+
+        $this->assertCount(1, $linked);
+    }
+
+    /** @test */
+    public function switching_tenant_context_cannot_reuse_a_stale_order_object_to_read_another_tenants_reservations(): void
+    {
+        $this->setOnHand(10);
+        $this->policies->setFixedWarehouse($this->channel->id, $this->warehouse->id);
+        $orderA = $this->confirmedOrder(3);
+        $this->orchestrator->reserve($orderA);
+        $tenantAId = app(TenantContext::class)->id();
+
+        // مستأجرٌ ثانٍ حقيقي بحجزه الخاص — لإثبات عدم التلوث في الاتجاهين.
+        $tenantB = Tenant::create(['name' => 'شركة حجز خامسة', 'slug' => 'other-cor-tenant-5']);
+        app(TenantContext::class)->set($tenantB->id);
+        $productB = Product::create(['name' => 'منتج حجز خامس', 'sale_price' => 5000, 'track_inventory' => true]);
+        $channelB = SalesChannel::create(['slug' => 'mobile', 'name' => 'قناة حجز خامسة', 'type' => SalesChannel::TYPE_MOBILE]);
+        $warehouseB = Warehouse::create(['name' => 'مخزن حجز خامس', 'code' => 'CORD-WE']);
+        ProductWarehouseStock::create(['product_id' => $productB->id, 'warehouse_id' => $warehouseB->id, 'quantity' => 10]);
+        app(FulfillmentPolicyService::class)->setFixedWarehouse($channelB->id, $warehouseB->id);
+        $orderB = $this->orders->create(['sales_channel_id' => $channelB->id], [
+            ['product_id' => $productB->id, 'quantity' => 2],
+        ]);
+        $orderB = $this->orders->confirm($orderB);
+        $this->orchestrator->reserve($orderB);
+
+        // كائن الطلب A نفسه (القديم) لا يزال بحوزتنا — العودة إلى سياق مستأجره
+        // الحقيقي يجب أن يُعيد حجزه هو فقط، لا حجز B الذي أُنشئ أثناء تبديل السياق.
+        app(TenantContext::class)->set($tenantAId);
+        $linkedA = $this->orchestrator->reservationsFor($orderA);
+        $this->assertCount(1, $linkedA);
+        $this->assertSame($orderA->id, $linkedA->first()->source_id);
+    }
+
+    /** @test */
+    public function no_tenant_scope_bypass_was_introduced_to_fix_reservationsFor(): void
+    {
+        $source = file_get_contents(app_path('Services/Commerce/CommerceOrderReservationService.php'));
+
+        $this->assertStringNotContainsString(
+            'withoutGlobalScope(TenantScope::class)',
+            $source,
+            'لا يجوز تجاوز TenantScope إطلاقاً لإصلاح P1-3 — الإصلاح الصحيح تحقّقٌ صريح من السياق، لا تجاوز العزل.'
+        );
     }
 }
