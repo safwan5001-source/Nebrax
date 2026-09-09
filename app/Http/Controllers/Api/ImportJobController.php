@@ -53,7 +53,13 @@ class ImportJobController extends ApiController
             $request->user()?->id,
         ));
 
-        return (new ImportJobResource($job))->response()->setStatusCode(201);
+        // `wasRecentlyCreated` هي علامة Eloquent الجاهزة (تُضبط `true` وحصراً
+        // داخل `performInsert()`، وتبقى كذلك عبر أي `update()` لاحق على نفس
+        // الكائن) — تميّز فعلياً بين إنشاءٍ جديد وإرجاع تشغيلة قائمة عبر
+        // idempotency، بلا استعلامٍ إضافي وبلا تخمين من الطوابع الزمنية.
+        $status = $job->wasRecentlyCreated ? 201 : 200;
+
+        return (new ImportJobResource($job))->response()->setStatusCode($status);
     }
 
     public function cancel(Request $request, string $id): JsonResponse

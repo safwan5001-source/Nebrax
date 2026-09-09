@@ -125,7 +125,7 @@ class ImportJobTest extends TestCase
                 'idempotency_key' => 'submit-1',
                 'file' => $this->validCsv('catalog-2.csv'),
             ])
-            ->assertCreated();
+            ->assertOk(); // إعادة محاولة فعلية — 200 لا 201، لا شيء أُنشئ الآن.
 
         $this->assertSame($first->json('data.id'), $second->json('data.id'));
         $this->assertSame(1, ImportJob::count());
@@ -278,7 +278,7 @@ class ImportJobTest extends TestCase
 
         $second = $this->withToken($auth['token'])
             ->post('/api/import-jobs', ['domain' => 'product_catalog', 'idempotency_key' => 'true-retry', 'file' => $this->validCsv()])
-            ->assertCreated();
+            ->assertOk(); // إعادة محاولة فعلية — 200 لا 201.
 
         $this->assertSame($first->json('data.id'), $second->json('data.id'));
         $this->assertSame(1, ImportJob::count());
@@ -394,6 +394,7 @@ class ImportJobTest extends TestCase
             $this->assertSame($winnerId, $job->id, 'الخاسر يجب أن يعيد سجل الفائز نفسه، لا سجلاً جديداً.');
             $this->assertSame(1, ImportJob::where('idempotency_key', 'race-key')->count());
             $this->assertSame([], Storage::disk('local')->allFiles(), 'ملف المحاولة الخاسرة يجب أن يُحذف — لا يتيم.');
+            $this->assertFalse($job->wasRecentlyCreated, 'الخاسر لم يُنشئ شيئاً — يجب أن يُبلَّغ عنه كإعادة استخدام (200) لا إنشاء (201).');
         } finally {
             ImportJob::flushEventListeners();
         }

@@ -352,3 +352,70 @@ touched, no existing import endpoint modified, no infrastructure provisioned, no
 
 Push this revision to the existing PR #746 (same branch, new commit) and await review. Report
 the new Head SHA, changed files, and exact test/CI results in the session reply.
+
+---
+
+## 17. Post-review revision (round 3) — HTTP idempotency response semantics
+
+**Date:** 2026-09-09
+**Trigger:** PR #746 review — a P2 finding, scoped narrowly: `POST /api/import-jobs` returned
+`201 Created` both when a new `ImportJob` was actually created and when a true idempotent retry
+reused an existing one. Every other round-2 finding (storage, concurrency/orphan cleanup,
+payload binding, tenant isolation, durability) was explicitly accepted as resolved and is
+untouched by this round.
+
+### 17.1 Fix
+
+`ImportJobService::create()` needed **no change** — Eloquent's own `wasRecentlyCreated` property
+already carries exactly the right signal with zero extra query: it is set to `true` only inside
+`Model::performInsert()` (i.e. only when *this* call's `ImportJob::create([...])` actually inserts
+a row) and stays `false` on any model fetched via a query (`ImportJob::where(...)->first()`) —
+which is precisely what both the fast idempotency path and the race-loss recovery path in
+`create()` already do. It also survives the `inspect()` step's later `$job->update([...])`
+unchanged, since `update()` goes through `performUpdate()`, which never touches the flag.
+
+So the only code change is in the controller, reading that already-correct signal:
+
+```php
+$status = $job->wasRecentlyCreated ? 201 : 200;
+return (new ImportJobResource($job))->response()->setStatusCode($status);
+```
+
+This is the "smallest clean mechanism" the review asked for: no DTO, no service-layer signature
+change, no additional query, no timestamp inference.
+
+### 17.2 Files changed (round 3)
+
+| File | Change | Why |
+|---|---|---|
+| `app/Http/Controllers/Api/ImportJobController.php` | `store()`: status code now `$job->wasRecentlyCreated ? 201 : 200` | HTTP semantics fix — the only production code change |
+| `tests/Feature/ImportJobTest.php` | 2 existing tests' second-call assertion changed from `assertCreated()` to `assertOk()` (their behavior was already a true retry — only the status-code expectation was outdated); 1 new assertion (`assertFalse($job->wasRecentlyCreated, ...)`) added to the existing concurrency test | prove 201-vs-200 semantics without adding a redundant duplicate test |
+
+No schema, migration, storage architecture, existing import surface, accounting/GL/UOM/pricing,
+or RBAC file touched — exactly as scoped.
+
+### 17.3 Tests (round 3)
+
+| Command / suite | SQLite | PostgreSQL |
+|---|---|---|
+| `php artisan test --filter=ImportJobTest` (15 tests) | ✅ 14 passed, 1 skipped (concurrency test, PostgreSQL-only by design) (72 assertions) | ✅ 15 passed (76 assertions) |
+| `php artisan test --filter="ProductImportTest\|ProductImportV2Test\|ProductWorkbook\|InventoryOpeningImport\|BranchIsolationGuardTest"` | not re-run (unaffected — this change touches only `ImportJobController::store()` and its own tests) | ✅ 114 passed (749 assertions) |
+
+Verified explicitly by the updated tests: first `POST` → 201, same job id on a true retry → 200,
+exactly one `ImportJob` row and one stored file survive the retry either way, and — via the
+existing tests left otherwise unchanged — a different file/domain under the same key still fails
+closed (422) and a real concurrent race still leaves exactly one job with no orphan file (now
+additionally asserting the loser's `wasRecentlyCreated` is `false`).
+
+### 17.4 CI
+
+Reported alongside the new Head SHA once the branch is pushed and the workflow run completes.
+
+### 17.5 Risks / remaining work (round 3)
+
+None new. All round-2 findings remain resolved and untouched. Durable Imports work beyond
+PR-DUR-1 is unchanged: PR-DUR-2..5, none started.
+
+### 17.6 Merge / deploy status (round 3)
+
+**Not merged. Not deployed.** PR-DUR-2 not started.
