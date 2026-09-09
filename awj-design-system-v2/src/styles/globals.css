@@ -18,13 +18,18 @@
   --text: #15181d;
   --muted: #6b7280;
   --border: #eceef1;
+  --border-channel: 236 238 241;
   --primary: #1e40af;
   --primary-hover: #1e3a8a;
   --primary-soft: #eef2ff;
+  --primary-soft-channel: 238 242 255;
   --primary-foreground: #ffffff;
   --positive: #166534;
+  --positive-channel: 22 101 52;
   --negative: #b91c1c;
+  --negative-channel: 185 28 28;
   --warning: #92400e;
+  --warning-channel: 146 64 14;
   --flag-saudi: #006c35;
   --flag-mark: #ffffff;
   --font-sans: 'IBM Plex Sans Arabic', system-ui, sans-serif;
@@ -37,13 +42,18 @@
   --text: #f3f4f6;
   --muted: #9099a5;
   --border: #262a31;
+  --border-channel: 38 42 49;
   --primary: #4f8cff;
   --primary-hover: #6ba0ff;
   --primary-soft: #1b2740;
+  --primary-soft-channel: 27 39 64;
   --primary-foreground: #0e1014;
   --positive: #16a34a;
+  --positive-channel: 22 163 74;
   --negative: #f87171;
+  --negative-channel: 248 113 113;
   --warning: #d97706;
+  --warning-channel: 217 119 6;
   --flag-saudi: #006c35;
   --flag-mark: #ffffff;
 }

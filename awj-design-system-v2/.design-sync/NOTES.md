@@ -1,44 +1,43 @@
 # Sync notes — AWJ Design System V2
 
-## Known issue: `bg-*/<opacity>` on CSS-variable colors does not compile (action required)
+## Fixed: `bg-*/<opacity>` on CSS-variable colors did not compile
 
 **Root cause (verified with a minimal repro, not specific to this package):** Tailwind
 CSS 3.4.19's opacity-modifier syntax (`bg-positive/10`, `bg-border/60`, etc.) cannot
 resolve when the underlying color in `tailwind.config.ts` is defined as a bare
-`var(--token)` string (as `background`, `surface`, `text`, `muted`, `border`,
-`positive`, `negative`, `warning` all are here — copied verbatim from
-`web/tailwind.config.ts`). Tailwind silently emits **no CSS at all** for any
-class using that pattern; there is no build warning.
+`var(--token)` string. Tailwind silently emits **no CSS at all** for any class using
+that pattern; there is no build warning.
 
-**Impact in this package:**
-- `Skeleton` (`bg-border/60`) is **completely invisible** — nothing paints at all.
-  Confirmed both via `package-validate.mjs`'s render check (fired
-  `[RENDER_THIN] mounts have no text and paint nothing`) and by inspecting the
-  compiled `dist/styles.css` directly (`grep bg-border` shows only the plain
-  `.bg-border` rule, no `\/60` variant).
-- `Badge` tones `positive`/`warning`/`negative` (`bg-<tone>/10 text-<tone>`) lose
-  their background tint — the text color still renders correctly (it has no
-  opacity modifier), so the tone is still visually distinguishable, just without
-  the pill background. Same root cause, smaller visual impact.
+**Impact before the fix:** `Skeleton` (`bg-border/60`) was completely invisible;
+`Badge` tones `positive`/`warning`/`negative` and the `Table` row-hover state
+(`hover:bg-primary-soft/40`) lost their background tint (text/border colors without
+opacity modifiers still rendered fine).
 
 **This is very likely present in the real `web/` application too** — it uses the
-identical `tailwind.config.ts` color definitions. Not verified against the live
-app in this session (out of scope: this sync only touches `awj-design-system-v2/`),
-but worth an explicit check there.
+identical `tailwind.config.ts` color-definition pattern (`positive`, `negative`,
+`warning`, `border`, `primary.soft` all as bare `var(--token)`). Not verified
+against the live app in this session (out of scope: this sync only touches
+`awj-design-system-v2/`) — worth an explicit check there.
 
-**Why it wasn't patched here:** fixing it requires changing how colors are
-defined in `tailwind.config.ts` (e.g. switching to space-separated RGB channels
-so Tailwind's opacity math has a value to work with:
-`--positive: 22 101 52; ... positive: 'rgb(var(--positive) / <alpha-value>)'`).
-That's a real token-definition change, not a build/tooling adaptation — out of
-scope for this sync's "no invented tokens, no redesign" constraint. Flagged to
-the user for a decision; **not fixed in this sync**.
+**Fix applied (approved by the user), scoped to `awj-design-system-v2/` only:**
+for the 5 tokens actually used with an opacity modifier anywhere in this package's
+16 components — `border`, `primary-soft`, `positive`, `negative`, `warning` — added
+a companion `--<token>-channel` CSS variable (the same color's decimal RGB
+decomposition, e.g. `--positive-channel: 22 101 52;` for `#166534`) in both
+`:root` and `.dark` in `src/styles/globals.css`, and pointed just those 5 Tailwind
+color entries in `tailwind.config.ts` at `rgb(var(--<token>-channel) / <alpha-value>)`.
 
-**Current grading status:** `Skeleton` is graded `needs-work` and stays pending
-on every re-sync until this is resolved (or the preview is reworked to a
-token that doesn't need an opacity modifier, if the user decides that's
-preferable to a config fix). `Badge` is graded `good` — the tone distinction
-still functions via text color alone, just without the tint background.
+The original hex `--<token>` variables were **left untouched** — `toast.tsx` reads
+`var(--positive)`/`var(--negative)`/`var(--warning)`/`var(--primary)` directly as an
+inline `style={{color}}` value (not through Tailwind), so those needed to keep
+resolving to a real color string. No component logic, class name, or visual value
+changed; unmodified classes (`bg-positive`, `border-border`, etc.) resolve to the
+exact same opaque color as before (`<alpha-value>` defaults to `1`).
+
+**Verified after the fix** (see the "Fixed during this sync" section below for the
+verification steps and results) — `Skeleton`, `Badge`, and `Table`'s hover state now
+render their tints correctly in both light and dark mode. All 16 previews are graded
+`good`; nothing is pending.
 
 ## Known render warns (triaged, non-blocking)
 
@@ -77,20 +76,43 @@ still functions via text color alone, just without the tint background.
   viewport, not the zero-height `.ds-single` wrapper. `ToastProvider`'s toast
   stack uses `bottom`/`end` offsets only (not `inset-0`), so it doesn't hit the
   same auto-height circular dependency.
+- **`bg-*/<opacity>` on CSS-variable colors** (see above) — added `-channel` RGB
+  variables for `border`, `primary-soft`, `positive`, `negative`, `warning` in
+  `src/styles/globals.css` and updated their `tailwind.config.ts` color entries
+  to `rgb(var(--x-channel) / <alpha-value>)`. Verified: `grep` of the compiled
+  `dist/styles.css` shows `.bg-border\/60`, `.bg-positive\/10`,
+  `.bg-negative\/10`, `.bg-warning\/10`, and `.hover\:bg-primary-soft\/40\:hover`
+  all now emit real `rgb(... / 0.N)` rules; the non-opacity classes
+  (`.bg-border`, `.text-positive`, `.border-negative`, etc.) still resolve
+  through `--tw-bg-opacity`/`--tw-text-opacity: 1` — fully opaque, unchanged
+  from before. Re-captured `Skeleton` (now visibly painting its three bars in
+  both themes), `Badge` (all 5 tone chips now show their tinted backgrounds),
+  and `Table` (verified the `hover:bg-primary-soft/40` row tint with a direct
+  Playwright hover screenshot, since a static capture can't show `:hover`).
+  Confirmed dark mode separately for all three (`.dark` class + a fresh
+  screenshot per component) — each resolves its own theme's `-channel` value,
+  not the light one. `Skeleton` re-graded `good`; `Badge` and `Table` grades
+  refreshed via `package-capture.mjs --force` since a CSS-only change doesn't
+  auto-invalidate a source-keyed grade.
 
 ## Re-sync risks
 
-- The `cssEntry` fix above depends on `npm run build` having been run with the
-  current `package.json` (which chains `build:js` then `build:css`). A re-sync
-  that only runs `tsc` (skipping `build:css`) will silently regress to the
-  zero-Tailwind-output bug with no error from the converter — it will just
-  copy whatever's at `dist/styles.css`, stale or missing.
-- The token/opacity issue above is a standing, un-fixed limitation. If a future
-  re-sync adds any new component or preview using a `bg-*/<opacity>` (or
-  similar) class on `background`, `surface`, `text`, `muted`, `border`,
-  `primary`, `positive`, `negative`, or `warning`, expect the same silent
-  failure. Grep `dist/styles.css` for the expected class before trusting a
-  screenshot that "looks close enough."
+- The `cssEntry` fix (raw `globals.css` → compiled `dist/styles.css`) depends
+  on `npm run build` having been run with the current `package.json` (which
+  chains `build:js` then `build:css`). A re-sync that only runs `tsc` (skipping
+  `build:css`) will silently regress to the zero-Tailwind-output bug with no
+  error from the converter — it will just copy whatever's at `dist/styles.css`,
+  stale or missing.
+- **Adding a new `-channel` token pair:** if a future component needs an
+  opacity modifier on a color that doesn't yet have a `-channel` variable
+  (currently only `border`, `primary-soft`, `positive`, `negative`, `warning`
+  have one), it will hit the exact same silent-failure bug. Follow the same
+  pattern: add `--<token>-channel: <R> <G> <B>;` to both `:root` and `.dark`
+  (the exact decimal decomposition of that theme's existing hex value — don't
+  approximate), then point that one Tailwind color entry at
+  `rgb(var(--<token>-channel) / <alpha-value>)`. Leave the original hex
+  variable untouched if anything (like `toast.tsx`'s inline styles) reads it
+  directly via `var(--x)` outside of Tailwind.
 - `dropdown.tsx` remains excluded (documented in the package README) — it
   imports `next/link`, unresolvable outside a Next.js app. Revisit if/when the
   source component is changed to accept a link-renderer prop instead.
