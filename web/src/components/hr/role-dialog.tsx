@@ -20,8 +20,48 @@ export interface Role {
   users_count: number;
 }
 
-/** ترتيب عرض الأفعال داخل كل وحدة. */
-const ACTION_ORDER = ['view', 'manage'];
+/**
+ * ═══════════════════════════════════════════════════════════════
+ *  المفتاح الكنسي بيانات تخويل غير شفّافة — ACL-ROLE-UI-1
+ * ═══════════════════════════════════════════════════════════════
+ *  الواجهة تُحلِّل مفتاح الصلاحية **للعرض فقط**. لا يُعاد بناء المفتاح من
+ *  مقاطعه المحلَّلة أبداً؛ القيمة الأصلية من الكتالوج (`meta.permissions`)
+ *  هي وحدها ما يُخزَّن في `selected` ويُرسَل عند الحفظ — سواء كانت مفتاحاً
+ *  بمقطعين (`products.view`) أو أكثر (`pos.audit.export`،
+ *  `pos.session.handover.confirm`). القديم كان يقتطع `perm.split('.')`
+ *  إلى أول عنصرين فقط ثم يُعيد بناء `${mod}.${action}` — فيُفسد أي صلاحية
+ *  بثلاثة مقاطع أو أكثر (يقتطعها أو يُصادم بأخرى تشارك نفس أول مقطعين).
+ *
+ *  الفعل الحقيقي دائماً **آخر مقطع** — لا افتراض بأن كل صلاحية بمقطعين.
+ */
+
+/** الوحدة: أول مقطع — نفس مفتاح تجميع `perm_modules` كما كان. */
+function permModule(perm: string): string {
+  return perm.split('.')[0];
+}
+
+/** الفعل الحقيقي: آخر مقطع دائماً، بصرف النظر عن عدد المقاطع. */
+function permAction(perm: string): string {
+  const parts = perm.split('.');
+  return parts[parts.length - 1];
+}
+
+/** المقاطع الوسيطة بين الوحدة والفعل — تُفرِّق صلاحيات تشترك نفس الفعل ضمن وحدة واحدة. */
+function permMiddleSegments(perm: string): string[] {
+  return perm.split('.').slice(1, -1);
+}
+
+/** تنسيق آمن لمقطعٍ غير مُترجَم: snake_case → عرض مقروء. لا يمسّ القيمة الكنسية أبداً — عرض فقط. */
+function humanizeSegment(segment: string): string {
+  return segment
+    .split('_')
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
+}
+
+/** ترتيب عرض الأفعال المعروفة داخل كل وحدة: العرض ثم الإدارة، والباقي أبجدياً بعدهما. */
+const ACTION_PRIORITY: Record<string, number> = { view: 0, manage: 1 };
 
 export function RoleDialog({
   open,
@@ -40,6 +80,7 @@ export function RoleDialog({
   const tc = useTranslations('common');
   const { success } = useToast();
   const modLabels = t.raw('perm_modules') as Record<string, string>;
+  const actionLabels = t.raw('perm_actions') as Record<string, string>;
 
   const readOnly = role?.is_owner ?? false;
   const hasWildcard = (role?.permissions ?? []).includes('*');
@@ -49,16 +90,36 @@ export function RoleDialog({
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  // الوحدات وأفعالها، مشتقّةً من الكتالوج (partners → [view, manage] …).
+  /**
+   * تسمية عرضية لصلاحية — الفعل الحقيقي (آخر مقطع) مُترجَم من `perm_actions`
+   * إن عُرف، وإلا تنسيقٌ آمن (`humanizeSegment`) لا يُترجَم «عرض» زوراً أبداً.
+   * أي مقاطع وسيطة (`pos.audit.export` ⇐ الوسيط `audit`) تُضاف بادئةً تفريقاً
+   * عن صلاحية أخرى بنفس الفعل ضمن الوحدة نفسها (`pos.audit.settings.manage`
+   * مقابل `fuel.contract.manage` مثلاً). هذه دالة عرضٍ بحتة — لا تُستهلَك
+   * قيمتها في `selected`/`toggle`/`submit` إطلاقاً.
+   */
+  const permLabel = (perm: string): string => {
+    const action = permAction(perm);
+    const label = actionLabels[action] ?? humanizeSegment(action);
+    const middle = permMiddleSegments(perm);
+    if (middle.length === 0) return label;
+    return `${middle.map(humanizeSegment).join(' · ')} — ${label}`;
+  };
+
+  // الوحدات وصلاحياتها، مشتقّةً من الكتالوج (partners → [partners.view, partners.manage] …).
+  // المفتاح الكامل الأصلي — لا مُعاد بناؤه — هو ما يُخزَّن هنا؛ permLabel() تُشتق عرضاً منه وحده.
   const modules = useMemo(() => {
     const map = new Map<string, string[]>();
     for (const perm of catalog) {
-      const [mod, action] = perm.split('.');
+      const mod = permModule(perm);
       if (!map.has(mod)) map.set(mod, []);
-      map.get(mod)!.push(action);
+      map.get(mod)!.push(perm);
     }
-    for (const actions of map.values()) {
-      actions.sort((a, b) => ACTION_ORDER.indexOf(a) - ACTION_ORDER.indexOf(b));
+    for (const perms of map.values()) {
+      perms.sort((a, b) => {
+        const weight = (ACTION_PRIORITY[permAction(a)] ?? 2) - (ACTION_PRIORITY[permAction(b)] ?? 2);
+        return weight !== 0 ? weight : a.localeCompare(b);
+      });
     }
     return [...map.entries()];
   }, [catalog]);
@@ -124,12 +185,13 @@ export function RoleDialog({
         <div className="space-y-1.5">
           <Label>{t('select_permissions')}</Label>
           <div className="max-h-72 space-y-2 overflow-y-auto rounded border border-border p-2">
-            {modules.map(([mod, actions]) => (
+            {modules.map(([mod, perms]) => (
               <div key={mod} className="flex items-center justify-between gap-3 rounded px-2 py-1.5 hover:bg-background">
                 <span className="text-sm text-text">{modLabels[mod] ?? mod}</span>
-                <div className="flex gap-2">
-                  {actions.map((action) => {
-                    const perm = `${mod}.${action}`;
+                <div className="flex flex-wrap justify-end gap-2">
+                  {perms.map((perm) => {
+                    // `perm` هنا هو المفتاح الكنسي الأصلي من الكتالوج بلا مساس —
+                    // لا إعادة بناء من مقاطع محلَّلة. permLabel() عرضٌ فقط.
                     const active = selected.has(perm);
                     return (
                       <button
@@ -143,7 +205,7 @@ export function RoleDialog({
                           active ? 'border-primary bg-primary-soft font-medium text-primary' : 'border-border bg-surface text-muted hover:bg-background'
                         )}
                       >
-                        {t(action === 'manage' ? 'perm_manage' : 'perm_view')}
+                        {permLabel(perm)}
                       </button>
                     );
                   })}

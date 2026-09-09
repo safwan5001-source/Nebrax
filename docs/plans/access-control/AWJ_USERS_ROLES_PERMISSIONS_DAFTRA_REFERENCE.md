@@ -995,3 +995,123 @@ surfaces this task named in scope — left untouched, flagged as a
 candidate for a future, separately-scoped pass.
 
 **Process rule:** research/inspect → verify → update this file → confirm commit → summarize to Safwan.
+
+## 39. PR-ACL-ROLE-UI-1 — Role Administration Functional Hardening — Implemented (2026-09-09)
+
+**Frontend-only correctness fix, not the Roles/Permissions visual
+redesign.** `web/src/components/hr/role-dialog.tsx` is the sole screen
+that renders `App\Support\Rbac::PERMISSIONS` (122 canonical entries) for
+assignment to a custom role, and it mishandled any permission with more
+than two dot-separated segments.
+
+**Previous defect:** the component derived module/action via
+`const [mod, action] = perm.split('.')` (array destructuring silently
+drops everything past the second element) and later **reconstructed** the
+submitted value as `` `${mod}.${action}` ``. AWJ's real catalogue is 56
+two-segment keys (`products.view`) and **66 three-/four-segment keys**
+(`pos.audit.export`, `pos.session.handover.confirm`,
+`fuel.sale.price.manage`, `documents.center.build_draft`, …) — every one
+of those 66 was silently truncated (e.g. `pos.audit.export` →
+reconstructed as `pos.audit`), and permissions sharing a two-segment
+prefix collided onto the same reconstructed string (`pos.audit.view` /
+`pos.audit.review` / `pos.audit.export` all became `pos.audit`). The same
+component also assumed only `view`/`manage` actions exist and labelled
+every non-`manage` action "View" — wrong for the catalogue's 32 distinct
+terminal actions (`approve`, `export`, `confirm`, `review`, `recalculate`,
+`ingest`, `retry`, `transition`, `inspect`, `verify`, `build_draft`,
+`audit_export`, …).
+
+**Fix — canonical permission key is opaque authorization data:** the
+component never reconstructs a permission string. It stores and
+transacts on the **exact original string from `catalog`** at every step
+— grouping (`modules` groups the full string by its first segment, not
+by an action fragment), `selected` (a `Set<string>` of exact catalogue
+values), `toggle`, the seeding `useEffect` (editing a role seeds
+`selected` from `role.permissions` verbatim), the submitted body
+(`permissions: [...selected]`), and the React `key` on each button (the
+permission string itself — never an index or a reconstructed value).
+Display is a strictly separate, pure derivation:
+- `permAction(perm)` — the **last** dot-separated segment, correct
+  regardless of segment count (2, 3, or 4).
+- `permModule(perm)` — the first segment, unchanged grouping key.
+- `permMiddleSegments(perm)` — segments between module and action, used
+  only to disambiguate the display label when two permissions in the same
+  module share a terminal action (`pos.audit.export` renders "Audit —
+  Export", distinct from a hypothetical `pos.override.export` rendering
+  "Override — Export" — the *canonical values* were already
+  distinguishable; this only makes the *label* distinguishable too).
+- `permLabel(perm)` — the only function that reads `t.raw('perm_actions')`
+  (new i18n key, both `en.json`/`ar.json`, 36 real actions from the
+  catalogue) with a **safe fallback** for an unmapped/future action
+  (`humanizeSegment`: snake_case → Title Case, e.g. an unmapped `retry` →
+  "Retry"), never "View". `permLabel()`'s return value is consumed only
+  by JSX text content — never fed back into `selected`, `toggle`, or the
+  submitted body.
+
+**Regression tests** — `web/src/components/hr/role-dialog.test.tsx`
+(8 tests, all using real `Rbac::PERMISSIONS` values, none invented):
+standard two-segment permission (`products.view`) unchanged through
+selection/submission; a multi-segment permission
+(`documents.center.build_draft`) retained character-for-character;
+collision protection — `pos.audit.view` / `pos.audit.review` /
+`pos.audit.export` render as three distinct buttons, toggling two of them
+never touches the third, and the submitted array never contains the old
+truncated `pos.audit`; an `export`-action permission never labelled
+"View"; an `approve`-action permission (`pos.variance.approve`) gets its
+own label; an unmapped/future action (`future.module.frobnicate` — not a
+real permission, used only to exercise the presentation fallback) gets a
+safe humanized label and its canonical value survives submission
+unchanged; editing an existing role (`permissions: ['products.view',
+'pos.audit.export']`) shows the correct pre-selected state including the
+multi-segment key; submitting a change (toggle one on, one off) sends
+exactly the intended final set, nothing reconstructed or dropped. 8/8
+pass. Full relevant frontend suite (`src/components/hr`, `src/app`, 42
+files) — 252/252 pass, zero regressions. `npm run build` (includes
+TypeScript type-checking, matches Web CI's actual pipeline) — succeeds.
+`npm run lint` was not run: this repository has no committed ESLint
+config (`next lint` prompts interactively to create one), and Web CI
+(`web-ci.yml`) itself only runs `npm run test` and `npm run build` — a
+pre-existing repository/environment characteristic, not introduced or
+altered by this PR.
+
+**Backward compatibility — unchanged, confirmed:**
+- Legacy two-segment permissions (`partners.view`, `products.manage`,
+  `invoices.view`, …) behave identically to before — `permAction()` on a
+  two-segment key returns the same second segment `permAction()`'s
+  predecessor logic did.
+- `*` wildcard and system-role (`owner`/`admin`/`accountant`/`staff`/
+  `self_service`) behavior is untouched: `hasWildcard` detection, the
+  "select all catalogue entries" seeding, and submission logic are
+  unmodified. No backend file was touched — `Rbac::resolve()`,
+  `Rbac::MATRIX`, `Rbac::PERMISSIONS`, and `Rbac::allows()` are byte-
+  identical to before this PR. The backend catalogue and validation
+  remain the sole authority; the frontend cannot create new authorization
+  keys — it can only submit a subset of the `catalog` prop it was given.
+- `web/src/components/users/user-dialog.tsx`,
+  `user-scope-dialog.tsx`, and `access-scope-fields.tsx` were inspected
+  (grep for `.split('.')`, permission-string handling) and confirmed
+  unrelated: they handle role *assignment* (a single `role` slug from
+  `GET /roles`) and branch/warehouse access scope, never parsing or
+  reconstructing individual permission-key strings. No defect found, no
+  change made — correctly out of this PR's bounded scope.
+
+**Deferred to Design System V2 (intentionally not touched):** visual
+redesign of `RoleDialog`, a deeper resource-path navigation hierarchy
+beyond the existing flat module-row grouping, full `perm_modules`
+translation coverage for modules currently falling back to their raw key
+(`pos`, `fuel`, `documents`, `apps`, …— a pre-existing, separate i18n gap),
+Users UI V2, Roles UI V2, Branch/Warehouse Scope UX redesign, role
+cloning, role hierarchy, and any ERP-wide Permission-Aware UX (hiding
+buttons/pages by permission) — this PR only fixes what a role
+administrator sees and submits inside `RoleDialog` itself.
+
+**Accounting/Tenant safety:** no journal, ledger, COGS, Inventory
+valuation, `Product.avg_cost`/`quantity_on_hand`, Fuel costing, Treasury
+ACL, report totals, or business transaction data touched — this PR
+changes zero backend files and zero database schema. Tenant Isolation
+architecture untouched — no backend authorization code was modified.
+
+**Git:** branch `fix/access-control-role-dialog-permission-keys`, Draft
+PR against `main`, base SHA `eea714d9971a3bffe5818a186878d0f7da7f897a`.
+
+**Process rule:** research/inspect → verify → update this file → confirm commit → summarize to Safwan.
