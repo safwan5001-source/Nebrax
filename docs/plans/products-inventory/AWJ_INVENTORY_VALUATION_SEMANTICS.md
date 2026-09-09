@@ -252,9 +252,11 @@ This closes the P2 gap's *quantity* disclosure concern (a warehouse-restricted u
 
 ---
 
-## 16. Recommended Next PR (name only — not started)
+## 16. Recommended Next PR — Implemented (2026-09-09)
 
-**`PR-ACL-INVENTORY-CATALOG-EXPORT-SCOPE`** (retry, now unblocked) — scope `quantity`/`stock_value` in `/api/inventory/export` and `InventoryReportService::trackedProducts()` (`view=value`) to the actor's Effective Warehouse Scope using the §12/§15 contract above (`SUM(product_warehouse_stock.quantity)` intersected with `allowedWarehouseIds()`, multiplied by unchanged tenant-wide `avg_cost`); leave `Product.avg_cost` itself, COGS, GL routing, and all other accounting invariants in this document untouched. Requires the product decision named in §15 before implementation.
+**`PR-ACL-INVENTORY-CATALOG-EXPORT-SCOPE`** was implemented exactly as recommended above: `SUM(product_warehouse_stock.quantity)` intersected with the actor's Effective Warehouse Scope, multiplied by the unchanged tenant-wide `Product.avg_cost`, applied to both `/api/inventory/export` and `view=value`. `Product.avg_cost`, COGS, GL routing, `FuelCostBasisService`, and every other accounting invariant in this document were confirmed untouched by the implementation's own test suite (including this document's own §10 characterization test, `moving_average_and_cogs_are_tenant_wide_across_warehouses`, re-run unmodified and still green). Full details, evidence, and test list: `docs/plans/access-control/AWJ_USERS_ROLES_PERMISSIONS_DAFTRA_REFERENCE.md` §38.
+
+**One clarification surfaced during implementation, not previously noted here:** `GET /api/inventory` (`InventoryController::index()`, the non-export list endpoint) exposes the identical tenant-wide `quantity_on_hand`/`avg_cost`/`stock_value` scalars as the two surfaces this PR fixed, but was not one of the two named in scope — it was deliberately left untouched and is flagged as a candidate for a future, separately-scoped pass rather than folded in here.
 
 ---
 

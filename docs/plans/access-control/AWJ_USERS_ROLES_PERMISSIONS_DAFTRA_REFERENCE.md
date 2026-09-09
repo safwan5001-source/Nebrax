@@ -900,4 +900,98 @@ per-warehouse costing. That recommendation is not yet implemented; it
 requires explicit approval before `PR-ACL-INVENTORY-CATALOG-EXPORT-SCOPE`
 can proceed.
 
+## 38. PR-ACL-INVENTORY-CATALOG-EXPORT-SCOPE — Implemented (2026-09-09)
+
+**The §36 P2 blocker is now closed.** The recommendation from §37's
+inspection was implemented as approved, unchanged: catalog identity
+preserved, `avg_cost` left tenant-wide and untouched, only `quantity`/
+`stock_value` scoped to the actor's Effective Warehouse Scope.
+
+**Both required surfaces**, kept semantically identical:
+
+- `GET /api/inventory/export` — `InventoryController::export()` now
+  resolves `$warehouseIds = ReportWarehouseScope::resolve($filters)` and
+  passes it into `InventoryBalanceExportService::download()`. Per streamed
+  chunk (`rows()`), a restricted actor's quantity is recomputed as
+  `SUM(product_warehouse_stock.quantity)` for that batch's products,
+  intersected with `$warehouseIds` — one small grouped query per 500-row
+  chunk, preserving the existing streaming/memory-bounded design (no
+  whole-catalog map built upfront). An unrestricted actor (`$warehouseIds
+  === null`) is completely unaffected: `$product->quantity_on_hand` is
+  read exactly as before.
+- `InventoryReportService::trackedProducts()`/`inventoryValue()`
+  (`view=value`) — identical contract. `trackedProducts()` no longer
+  applies `hide_zero` at the SQL level (moved to a post-computation filter
+  on the *scoped* quantity, matching what the export does per-chunk) so a
+  restricted actor's zero/nonzero determination is never based on the
+  tenant-wide column.
+
+**`avg_cost` is untouched in both** — same field, same value, same
+`Money::toRiyal()` formatting, same `products.view_cost`/
+`SensitiveCostPolicy` redaction gate. `stock_value` is always `(the
+quantity now shown) × (that unchanged avg_cost)` — so it is scoped
+exactly when quantity is, and stays tenant-wide exactly when quantity does.
+
+**Explicit filter rule:** `/api/inventory/export` has no `warehouse_id`
+request parameter (confirmed unchanged, per §36's exhaustive inspection),
+so there was nothing to intersect against an explicit filter — calling
+`ReportWarehouseScope::resolve()` with no `warehouse_id` key present
+already yields exactly "the actor's full allowed set" for a restricted
+actor and `null` for an unrestricted one, which is the correct behavior
+with zero new request fields. `view=value` already accepted (but
+previously ignored) `warehouse_id`/`branch_id` in `InventoryReportRequest`;
+it now honors `warehouse_id` through the same `ReportWarehouseScope`
+call — a forbidden explicit warehouse falls back to the actor's own
+allowed set, identically to every other report family fixed in
+PR-ACL-REPORT-SCOPE (§33), not a new convention.
+
+**Legacy/pre-warehouse compatibility — proven, not assumed:** an
+unrestricted actor's quantity is never recomputed from
+`product_warehouse_stock`, so quantity that predates warehouses (a
+movement with no `warehouse_id`, present only in `quantity_on_hand`) is
+never dropped for them — proven by
+`ReportEffectiveScopeTest::export_unrestricted_user_keeps_legacy_null_warehouse_quantity`.
+A *restricted* actor correctly does not see that unlocated quantity
+(it cannot be attributed to any warehouse they're provably allowed to
+access) — this is the intended security boundary, not a semantics change.
+
+**Fuel boundary — unchanged, confirmed safe:** neither surface was ever
+warehouse-aware for cost, and remains so — Fuel-linked products (which
+can appear here since `trackedProducts()`/`InventoryBalanceFilters::query()`
+filter only on `track_inventory=true`) still show the same blended
+tenant-wide `Product.avg_cost` they always did. This PR does not read,
+write, or reference `FuelCostBasisService`/`FuelInventoryCostState` at
+all — it only optionally narrows the generic `quantity` field, which
+carries no valuation claim in either direction.
+
+**Cost permission — independent of warehouse scope, proven together:**
+`export_without_cost_permission_redacts_cost_but_still_scopes_quantity`
+proves a `staff`-role actor (has `products.view`, lacks
+`products.view_cost`) sees the correctly warehouse-scoped `quantity`
+while `avg_cost`/`stock_value` stay redacted — the two controls compose
+without interference.
+
+**Tests:** `tests/Feature/ReportEffectiveScopeTest.php` — 11 new tests
+(unrestricted/one-warehouse/multi-warehouse quantity, cost-permission
+independence, `include_zero` true/false against the scoped quantity,
+legacy null-warehouse preservation, cross-tenant isolation of the new SUM
+query, and the `view=value` mirror of the same cases) — 33/33 pass
+(462 assertions). Existing suites re-run unmodified: `InventoryBalanceExportTest`
+(19/19), `InventoryReportTest` (5/5), `SensitiveCostAuthorizationTest`
+(30/30), `InventoryTest` including PR #742's
+`moving_average_and_cogs_are_tenant_wide_across_warehouses` characterization
+(11/11, unchanged) — zero regression, zero accounting/COGS impact. Full
+suite: 3174 passed (up from 3127 in PR #739 as `main` advanced), same
+13 pre-existing untracked/unrelated failures as every prior PR in this
+series (§33, §35, §36's own CI note) — none new.
+
+**Scope confirmed unchanged:** `Product.quantity_on_hand` semantics,
+`Product.avg_cost` semantics, valuation/COGS formulas, stock movements,
+warehouse transfers, ledger/GL, `FuelCostBasisService`, migrations, RBAC
+architecture. `GET /api/inventory` (the non-export list endpoint,
+`InventoryController::index()`) was found to share the identical
+tenant-wide-scalar exposure pattern but is **not** one of the two
+surfaces this task named in scope — left untouched, flagged as a
+candidate for a future, separately-scoped pass.
+
 **Process rule:** research/inspect → verify → update this file → confirm commit → summarize to Safwan.

@@ -8,6 +8,7 @@ use App\Models\StockMovement;
 use App\Services\InventoryBalanceExportService;
 use App\Support\InventoryBalanceFilters;
 use App\Support\Money;
+use App\Support\ReportWarehouseScope;
 use App\Support\SensitiveCostPolicy;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -80,8 +81,12 @@ class InventoryController extends ApiController
         InventoryBalanceFilters::applySort($query, $filters['sort'] ?? null);
 
         $filename = 'nebrax-inventory-balances-'.now()->toDateString();
+        // PR-ACL-INVENTORY-CATALOG-EXPORT-SCOPE: لا مرشّح warehouse_id في عقد
+        // هذا التصدير — resolve() بلا طلب صريح يعيد نطاق المستخدم الكامل
+        // للمقيَّد و null لغير المقيَّد، فلا حاجة لإضافة حقل جديد لتحقيق التقاطع.
+        $warehouseIds = ReportWarehouseScope::resolve($filters);
 
-        return $this->domain(fn () => $this->exports->download($query, $format, $filename, $locale, $includeZero, $authorizedCost));
+        return $this->domain(fn () => $this->exports->download($query, $format, $filename, $locale, $includeZero, $authorizedCost, $warehouseIds));
     }
 
     public function movements(Request $request, string $productId): JsonResponse

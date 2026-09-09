@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Product;
+use App\Models\ProductWarehouseStock;
 use App\Support\Money;
 use App\Support\SpreadsheetWriter;
 use Illuminate\Database\Eloquent\Builder;
@@ -19,8 +20,14 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  *  الشاشة (`InventoryBalanceFilters`) ثم يتجاهل التقسيم — فتتطابق دلالة
  *  «النتائج الحالية» مع ما تعرضه الشاشة حرفياً، لا مع صفحتها المرئية.
  *
- *  المصدر منتجٌ عالميّ: `quantity_on_hand` و`avg_cost` حقلان على `products`،
- *  وقيمة المخزون مشتقّة منهما. لا بُعد مخزن ولا فرع — كما هو حال الشاشة.
+ *  المصدر منتجٌ عالميّ: `avg_cost` حقلٌ على `products` يبقى متوسطاً واحداً
+ *  للمنشأة بلا تغيير — PR-ACL-INVENTORY-CATALOG-EXPORT-SCOPE لا يخترع تكلفة
+ *  لكل مخزن (انظر AWJ_INVENTORY_VALUATION_SEMANTICS.md). **الكمية وحدها**
+ *  تصبح نطاق المخزن الفعّال للمستخدم المقيَّد: مجموع `product_warehouse_stock`
+ *  ضمن مخازنه المسموحة، بدل `products.quantity_on_hand` العالمي. غير المقيَّد
+ *  (`allowedWarehouseIds() === null`) يستمر بالعمود العالمي حرفياً — لا خسارة
+ *  لكمية مرحلة ما قبل المخازن (حركات بلا `warehouse_id`، انظر §10 من مستند
+ *  الدلالات) لأن التوافق الرجعي الكامل يبقيها في `quantity_on_hand` وحده.
  */
 class InventoryBalanceExportService
 {
@@ -82,13 +89,24 @@ class InventoryBalanceExportService
     /**
      * `$costAuthorized=false` يفرغ `avg_cost`/`stock_value` دون حذف عمودَيهما —
      * PR-INV-1: تصدير آمن لمن لا يملك `products.view_cost` بدل حجب التقرير كله.
+     *
+     * `$warehouseIds` نطاق المخزن الفعّال (`ReportWarehouseScope::resolve()`):
+     * `null` = غير مقيَّد، الكمية تبقى `products.quantity_on_hand` كما كانت.
+     * مصفوفة = مقيَّد؛ الكمية تُعاد حسابها لكل دفعة من `product_warehouse_stock`
+     * ضمن هذه المخازن وحدها (`rows()`).
      */
-    public function download(Builder $query, string $format, string $filename, string $locale, bool $includeZero, bool $costAuthorized = true): StreamedResponse|Response
+    public function download(Builder $query, string $format, string $filename, string $locale, bool $includeZero, bool $costAuthorized = true, ?array $warehouseIds = null): StreamedResponse|Response
     {
-        if (! $includeZero) {
+        // فلترة SQL على `quantity_on_hand` العالمي صحيحة لغير المقيَّد فقط —
+        // الكمية المعروضة له هي العمود نفسه. المقيَّد يُستبعد صفره أثناء البث
+        // في rows() على الكمية المحدودة النطاق الفعلية، لا هذا العمود.
+        if (! $includeZero && $warehouseIds === null) {
             $query->where('quantity_on_hand', '!=', 0);
         }
 
+        // السقف يبقى على العدّ العالمي حتى للمقيَّد: تصفية أدق حسب المخزن كانت
+        // تحتاج استعلام تجميع إضافي هنا، والعدّ العالمي حدٌّ أعلى آمن — لا يقل
+        // أبداً عمّا سيُصدَّر فعلاً، فلا يفلت تصديرٌ كان يجب حجبه.
         $total = (clone $query)->toBase()->getCountForPagination();
         if ($total > self::MAX_ROWS) {
             throw new RuntimeException(
@@ -100,22 +118,22 @@ class InventoryBalanceExportService
         $headers = $this->headers($locale);
 
         return $format === self::FORMAT_XLSX
-            ? $this->xlsxResponse($query, $headers, $filename, $costAuthorized)
-            : $this->csvResponse($query, $headers, $filename, $costAuthorized);
+            ? $this->xlsxResponse($query, $headers, $filename, $costAuthorized, $warehouseIds, $includeZero)
+            : $this->csvResponse($query, $headers, $filename, $costAuthorized, $warehouseIds, $includeZero);
     }
 
     /** @param array<int, string> $headers */
-    private function csvResponse(Builder $query, array $headers, string $filename, bool $costAuthorized): StreamedResponse
+    private function csvResponse(Builder $query, array $headers, string $filename, bool $costAuthorized, ?array $warehouseIds, bool $includeZero): StreamedResponse
     {
-        return response()->streamDownload(function () use ($query, $headers, $costAuthorized): void {
-            SpreadsheetWriter::streamCsv($headers, $this->rows($query, $costAuthorized));
+        return response()->streamDownload(function () use ($query, $headers, $costAuthorized, $warehouseIds, $includeZero): void {
+            SpreadsheetWriter::streamCsv($headers, $this->rows($query, $costAuthorized, $warehouseIds, $includeZero));
         }, "{$filename}.csv", [
             'Content-Type' => 'text/csv; charset=UTF-8',
         ]);
     }
 
     /** @param array<int, string> $headers */
-    private function xlsxResponse(Builder $query, array $headers, string $filename, bool $costAuthorized): Response
+    private function xlsxResponse(Builder $query, array $headers, string $filename, bool $costAuthorized, ?array $warehouseIds, bool $includeZero): Response
     {
         $path = tempnam(sys_get_temp_dir(), 'nebrax-inventory-');
         if ($path === false) {
@@ -123,7 +141,7 @@ class InventoryBalanceExportService
         }
 
         try {
-            SpreadsheetWriter::xlsx($path, $headers, $this->rows($query, $costAuthorized), $this->columnTypes(), 'Inventory');
+            SpreadsheetWriter::xlsx($path, $headers, $this->rows($query, $costAuthorized, $warehouseIds, $includeZero), $this->columnTypes(), 'Inventory');
             $contents = file_get_contents($path);
             if ($contents === false) {
                 throw new RuntimeException('تعذر قراءة ملف التصدير بعد بنائه.');
@@ -144,17 +162,38 @@ class InventoryBalanceExportService
      * فتُسقط الفرزَ المطلوب صامتةً)؛ المتحكّم يضمن ترتيباً حتمياً (عمود الفرز
      * ثم `id`) فالتقسيم بالإزاحة مستقرّ.
      *
+     * لكل دفعة، إن كان المستخدم مقيَّداً بمخازن: استعلام تجميع واحد إضافي على
+     * `product_warehouse_stock` لمنتجات الدفعة نفسها فقط — يحافظ على نمط
+     * الذاكرة المحدودة (لا تحميل الكتالوج كله لحساب خريطة عالمية).
+     *
      * @return \Generator<int, array<int, string|null>>
      */
-    private function rows(Builder $query, bool $costAuthorized): \Generator
+    private function rows(Builder $query, bool $costAuthorized, ?array $warehouseIds, bool $includeZero): \Generator
     {
         $page = 1;
 
         do {
             $batch = (clone $query)->forPage($page, self::CHUNK)->get();
 
+            $scopedQuantities = $warehouseIds === null ? null : ProductWarehouseStock::query()
+                ->whereIn('product_id', $batch->pluck('id'))
+                ->whereIn('warehouse_id', $warehouseIds)
+                ->selectRaw('product_id, SUM(quantity) as qty')
+                ->groupBy('product_id')
+                ->pluck('qty', 'product_id');
+
             foreach ($batch as $product) {
-                yield $this->row($product, $costAuthorized);
+                $quantity = $warehouseIds === null
+                    ? (int) $product->quantity_on_hand
+                    : (int) ($scopedQuantities[$product->id] ?? 0);
+
+                // استبعاد الصفر هنا لا في WHERE: الكمية المرجعية للمقيَّد هي
+                // المجموع المحدود النطاق، لا `quantity_on_hand` العالمي.
+                if (! $includeZero && $warehouseIds !== null && $quantity === 0) {
+                    continue;
+                }
+
+                yield $this->row($product, $costAuthorized, $quantity);
             }
 
             $page++;
@@ -162,22 +201,23 @@ class InventoryBalanceExportService
     }
 
     /**
-     * صفٌّ واحد. القيمة تُشتقّ هنا كما تُشتقّ في الشاشة والـAPI تماماً:
-     * `quantity_on_hand × avg_cost` بالهللات ثم تُعرَض ريالاً — فما يجده
-     * المستخدم في الملف هو ما يراه في الجدول.
+     * صفٌّ واحد. `$quantity` مُحسَبة مسبقاً في rows() — العمود العالمي مباشرة
+     * لغير المقيَّد، أو مجموع نطاق المخزن الفعّال للمقيَّد. القيمة تُشتقّ من
+     * نفس `$quantity × avg_cost` بالهللات ثم تُعرَض ريالاً — فما يجده المستخدم
+     * في الملف هو ما يراه في الجدول، ضمن نطاقه.
      *
      * @return array<int, string|null>
      */
-    private function row(Product $product, bool $costAuthorized): array
+    private function row(Product $product, bool $costAuthorized, int $quantity): array
     {
         return [
             $product->sku,
             $product->barcode,
             $product->name,
             $product->unit,
-            (string) $product->quantity_on_hand,
+            (string) $quantity,
             $costAuthorized ? Money::toRiyal($product->avg_cost) : null,
-            $costAuthorized ? Money::toRiyal($product->quantity_on_hand * $product->avg_cost) : null,
+            $costAuthorized ? Money::toRiyal($quantity * $product->avg_cost) : null,
         ];
     }
 }
