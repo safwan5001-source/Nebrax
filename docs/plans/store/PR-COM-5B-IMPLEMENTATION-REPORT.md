@@ -461,9 +461,9 @@ per the task's explicit stop-condition instructions rather than guessed:
 
 - **Branch:** `claude/pr-com-5b-order-reservation-orchestration`
 - **Base SHA:** `b191c52a2c7856da4998cb5a6ffae148e824d8cb`
-- **PR:** opened against `main` — link recorded in a follow-up commit to
-  this report
-- **Head SHA:** recorded at PR-open time in the follow-up commit above
+- **PR:** [#737](https://github.com/safwan5001-source/Nebrax/pull/737) —
+  opened against `main`, not merged
+- **Head SHA:** `d8d5e45` (commit before this report-link update)
 
 ## 44. Recommended next step
 
