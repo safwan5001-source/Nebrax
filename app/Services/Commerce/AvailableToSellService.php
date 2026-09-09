@@ -10,7 +10,7 @@ use RuntimeException;
 
 /**
  * ═══════════════════════════════════════════════════════════════
- *  Available-to-Sell — القراءة الموثوقة الوحيدة لجاهزية البيع (PR-COM-1A)
+ *  Available-to-Sell — القراءة الموثوقة الوحيدة لجاهزية البيع (PR-COM-1A/1B)
  * ═══════════════════════════════════════════════════════════════
  *
  * لا مصدر حقيقة موازياً هنا: `onHand` يُقرأ حصراً من
@@ -19,6 +19,14 @@ use RuntimeException;
  * البيع/الإرجاع اليوم. لا حركة مخزون ولا قيد محاسبي ولا تعديل على
  * `products.quantity_on_hand`/`avg_cost` يصدر من هذه الخدمة — قراءة فقط،
  * بلا استثناء.
+ *
+ * `activeReserved` (منذ PR-COM-1B) مجموع `inventory_reservations.base_quantity`
+ * لصفوف حالتها `active` لنفس المنتج والمخزن، عبر
+ * `InventoryReservationService::activeReservedQuantity()` — لا عدّاد مجمَّع
+ * موازٍ هنا. الاعتماد اتجاهٌ واحد (`AvailableToSellService` ←
+ * `InventoryReservationService`) عمداً: `InventoryReservationService::acquire()`
+ * يقرأ On Hand مباشرةً من `ProductWarehouseStock` دون المرور بهذا الصنف، فلا
+ * تبعية دائرية بين الخدمتين.
  *
  * **مفتاح الموقع الفعلي هو `warehouse_id`** (`App\Models\Warehouse` +
  * `App\Models\ProductWarehouseStock`) — لا `Warehouse` aggregate جديد ولا
@@ -43,6 +51,10 @@ use RuntimeException;
  */
 final class AvailableToSellService
 {
+    public function __construct(
+        private readonly InventoryReservationService $reservations,
+    ) {}
+
     /**
      * @throws RuntimeException إذا كان المنتج أو المخزن غير موجودين لمستأجر السياق الحالي.
      */
@@ -66,8 +78,7 @@ final class AvailableToSellService
             ->where('warehouse_id', $warehouseId)
             ->value('quantity') ?? 0);
 
-        // PR-COM-1B وحده يملأ حجزاً فعلياً؛ العقد هنا صفرٌ ثابت لا تقريب مؤقت.
-        $activeReserved = 0;
+        $activeReserved = $this->reservations->activeReservedQuantity($productId, $warehouseId);
 
         return new AvailableToSellSnapshot(
             onHand: $onHand,

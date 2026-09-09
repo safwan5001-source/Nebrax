@@ -9,6 +9,7 @@ use App\Models\DeliveryNote;
 use App\Models\DeliveryNoteLine;
 use App\Models\InventoryOpening;
 use App\Models\InventoryOpeningLine;
+use App\Models\InventoryReservation;
 use App\Models\InventoryStockAlert;
 use App\Models\InvoiceLine;
 use App\Models\PriceList;
@@ -672,6 +673,10 @@ class ProductReferenceRegistryTest extends TestCase
         $this->assertEqualsCanonicalizing([
             InventoryOpeningLine::class, StockMovement::class, StockPermitLine::class,
             StocktakeLine::class, ProductWarehouseStock::class,
+            // PR-COM-1B: حجزٌ لاحقٌ للعقد الأصلي (وقته Commerce/ADR-02)، مصنَّفٌ
+            // بتطبيق قاعدة العقد نفسها لا سياسة جديدة — تماماً كإضافة FuelSale/
+            // FuelProduct السابقة في هذا السجلّ.
+            InventoryReservation::class,
         ], $semantic, 'تصنيف "مخزنيّ الدلالة" مطابقٌ للعقد.');
 
         // ولا يتسرّب تابعٌ مملوك أو سجلّ تدقيق إلى الموانع أبداً.
