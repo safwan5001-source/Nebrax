@@ -237,7 +237,7 @@ class CommerceOrderReservationServiceTest extends TestCase
             'sales_channel_id' => $this->channel->id, 'partner_id' => $partner->id,
         ], [
             ['product_id' => $boxed->id, 'quantity' => 3, 'unit_name' => 'carton'],
-        ]);
+        ], trustedPartnerSelection: true);
         $order = $this->orders->confirm($order);
 
         $result = $this->orchestrator->reserve($order);
