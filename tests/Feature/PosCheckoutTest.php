@@ -3,9 +3,12 @@
 namespace Tests\Feature;
 
 use App\Models\Account;
+use App\Models\CashBankAccount;
 use App\Models\Invoice;
+use App\Models\JournalEntry;
 use App\Models\Payment;
 use App\Models\PaymentMethod;
+use App\Models\User;
 use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -862,5 +865,81 @@ class PosCheckoutTest extends TestCase
         $this->assertSame($first['zatca']['qr'], $second['zatca']['qr']);
         $this->assertSame($first['total'], $second['total']);
         $this->assertSame(1, Invoice::where('pos_session_id', $sessionId)->count());
+    }
+
+    /**
+     * PR-ACL-PAYMENT-ACTOR — regression: the authenticated actor performing
+     * checkout must reach PaymentService::post() so a user-scoped treasury
+     * ACL that names them explicitly does not spuriously deny a legitimate
+     * checkout. Prior to the fix, `PosService::checkout()` called
+     * `payments->post()` with a null actor, which the treasury ACL treats
+     * as unauthorized for `deposit_scope=user`.
+     *
+     * @test
+     */
+    public function checkout_succeeds_when_deposit_scope_user_matches_the_authenticated_cashier(): void
+    {
+        $auth = $this->registerTenant('pos-actor-allow', 'owner@pos-actor-allow.test');
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $sessionId = $this->openSession($auth);
+        $partnerId = $this->withToken($auth['token'])->postJson('/api/partners', [
+            'name' => 'عميل فحص actor مسموح', 'type' => 'customer',
+        ])->assertCreated()['data']['id'];
+        $cash = $this->methodBySettlement($this->methods($auth), 'cash');
+
+        // الفاعل الحقيقي (حامل التوكن) هو نفسه من يُقفل عليه الإيداع.
+        $cashier = User::where('tenant_id', $auth['tenant_id'])->where('email', 'owner@pos-actor-allow.test')->sole();
+        CashBankAccount::whereKey($cash['cash_bank_account_id'])->update([
+            'deposit_scope' => 'user',
+            'deposit_scope_subject' => $cashier->id,
+        ]);
+
+        $this->checkout($auth['token'], $partnerId, $sessionId, [$this->tender($cash, 11500)])
+            ->assertCreated();
+
+        $this->assertSame(1, Payment::where('status', 'posted')->count());
+    }
+
+    /**
+     * PR-ACL-PAYMENT-ACTOR — regression: a treasury deposit locked to a
+     * DIFFERENT user than the one performing checkout must be denied, and
+     * the denial must leave no partial financial/state effect (no invoice
+     * row, no payment row, no journal entry) — the whole checkout runs
+     * inside one DB transaction that must roll back atomically.
+     *
+     * @test
+     */
+    public function checkout_is_denied_when_deposit_scope_user_does_not_match_the_authenticated_cashier_with_no_partial_effect(): void
+    {
+        $auth = $this->registerTenant('pos-actor-deny', 'owner@pos-actor-deny.test');
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $sessionId = $this->openSession($auth);
+        $partnerId = $this->withToken($auth['token'])->postJson('/api/partners', [
+            'name' => 'عميل فحص actor ممنوع', 'type' => 'customer',
+        ])->assertCreated()['data']['id'];
+        $cash = $this->methodBySettlement($this->methods($auth), 'cash');
+
+        // إيداع مقفل على مستخدم آخر غير حامل التوكن الذي ينفّذ عملية البيع.
+        $stranger = User::create([
+            'tenant_id' => $auth['tenant_id'], 'name' => 'كاشير آخر', 'email' => 'stranger@pos-actor-deny.test',
+            'password' => 'password123', 'role' => 'admin',
+        ]);
+        CashBankAccount::whereKey($cash['cash_bank_account_id'])->update([
+            'deposit_scope' => 'user',
+            'deposit_scope_subject' => $stranger->id,
+        ]);
+
+        $before = [
+            'invoices' => Invoice::count(),
+            'payments' => Payment::count(),
+            'journal_entries' => JournalEntry::count(),
+        ];
+
+        $this->checkout($auth['token'], $partnerId, $sessionId, [$this->tender($cash, 11500)])
+            ->assertStatus(422);
+
+        $this->assertSame($before['invoices'], Invoice::count(), 'رفض التخويل يجب ألا يترك فاتورة POS معلّقة.');
+        $this->assertSame($before['payments'], Payment::count(), 'رفض التخويل يجب ألا يترك سند قبض جزئي.');
+        $this->assertSame($before['journal_entries'], JournalEntry::count(), 'رفض التخويل يجب ألا يترك أثراً محاسبياً جزئياً.');
     }
 }

@@ -338,7 +338,7 @@ class FuelSaleService
                 'payment_details' => $attributes['payment_details'] ?? null,
                 'notes' => "تحصيل بيع وقود {$sale->number}",
                 'created_by' => $actor->id,
-            ]));
+            ]), $actor);
             FuelSalePaymentReceipt::create([
                 'branch_id' => $sale->branch_id,
                 'fuel_sale_id' => $sale->id,

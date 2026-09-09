@@ -254,7 +254,7 @@ class PosService
                 'amount'            => $applied,
                 'notes'             => "{$method->name} — بيع {$invoice->number}",
                 'created_by'        => $data['created_by'] ?? null,
-            ]));
+            ]), $data['actor'] ?? null);
             $paymentIds[] = $payment->id;
 
             $remaining -= $applied;

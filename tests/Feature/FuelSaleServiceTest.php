@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Branch;
+use App\Models\CashBankAccount;
 use App\Models\CorporateFuelContract;
 use App\Models\FuelCardUsage;
 use App\Models\FuelNozzle;
@@ -217,6 +218,141 @@ class FuelSaleServiceTest extends TestCase
         ], $fixture['actor']);
         $this->assertSame($payment->id, $again->id);
         $this->assertSame(1, Payment::count());
+    }
+
+    /**
+     * PR-ACL-PAYMENT-ACTOR — regression: the authenticated actor performing
+     * fuel official-cash collection must reach `PaymentService::post()` so
+     * a user-scoped treasury ACL naming them explicitly does not spuriously
+     * deny a legitimate collection. Prior to the fix, `collectPayment()`
+     * called `payments->post()` with a null actor, which the treasury ACL
+     * treats as unauthorized for `deposit_scope=user`.
+     *
+     * @test
+     */
+    public function it_collects_official_cash_when_deposit_scope_user_matches_the_authenticated_actor(): void
+    {
+        $fixture = $this->fixture('actor-allow');
+        $prices = app(FuelStationProductPriceService::class);
+        $prices->create([
+            'fuel_station_id' => $fixture['station']->id,
+            'fuel_product_id' => $fixture['fuelProduct']->id,
+            'price_per_liter_minor' => 230,
+            'effective_from' => now()->subMinute()->toIso8601String(),
+        ], $fixture['actor']);
+        app(CashBankAccountService::class)->bootstrapDefaults();
+        $cash = PaymentMethod::where('settlement_type', 'cash')->where('is_active', true)->sole();
+
+        // إيداع مقفل على نفس الفاعل الذي يجري التحصيل فعلياً.
+        CashBankAccount::whereKey($cash->cash_bank_account_id)->update([
+            'deposit_scope' => 'user',
+            'deposit_scope_subject' => $fixture['actor']->id,
+        ]);
+
+        app(FuelStationSettingsService::class)->putStationValues($fixture['station'], [
+            'fuel_sales_allowed_payment_method_ids' => [$cash->id],
+            'fuel_sales_allow_deferred_payment' => false,
+        ], $fixture['actor'], 'تهيئة قبض الوقود');
+        $shift = app(FuelShiftService::class)->open([
+            'fuel_station_id' => $fixture['station']->id,
+            'opening_float_minor' => 0,
+            'idempotency_key' => 'actor-allow-shift',
+        ], $fixture['actor']);
+        $service = app(FuelSaleService::class);
+        $sale = $service->finalize($service->createDraft([
+            'fuel_station_id' => $fixture['station']->id,
+            'fuel_nozzle_id' => $fixture['nozzle']->id,
+            'fuel_shift_id' => $shift->id,
+            'partner_id' => $fixture['customer_id'],
+            'quantity_milliliters' => 1000,
+            'idempotency_key' => 'actor-allow-sale',
+        ], $fixture['actor']), $fixture['actor']);
+
+        $payment = $service->collectPayment($sale, [
+            'payment_method_id' => $cash->id,
+            'amount_minor' => $sale->invoice->total,
+            'idempotency_key' => 'actor-allow-payment-1',
+            'reference' => 'CASH-ACTOR-ALLOW',
+        ], $fixture['actor']);
+
+        $this->assertSame('posted', $payment->status);
+        $this->assertSame(1, Payment::count());
+        $this->assertSame(FuelSale::PAYMENT_PAID, $sale->fresh()->payment_status);
+    }
+
+    /**
+     * PR-ACL-PAYMENT-ACTOR — regression: a treasury deposit locked to a
+     * DIFFERENT user than the collecting actor must be denied, with no
+     * partial financial/state effect: no posted payment, no receipt row,
+     * and the sale's payment status remains unchanged. The whole
+     * `collectPayment()` body runs inside one DB transaction that must
+     * roll back atomically on denial.
+     *
+     * @test
+     */
+    public function it_denies_official_cash_collection_when_deposit_scope_user_does_not_match_the_actor_with_no_partial_effect(): void
+    {
+        $fixture = $this->fixture('actor-deny');
+        $prices = app(FuelStationProductPriceService::class);
+        $prices->create([
+            'fuel_station_id' => $fixture['station']->id,
+            'fuel_product_id' => $fixture['fuelProduct']->id,
+            'price_per_liter_minor' => 230,
+            'effective_from' => now()->subMinute()->toIso8601String(),
+        ], $fixture['actor']);
+        app(CashBankAccountService::class)->bootstrapDefaults();
+        $cash = PaymentMethod::where('settlement_type', 'cash')->where('is_active', true)->sole();
+
+        // إيداع مقفل على مستخدم آخر غير الفاعل الذي يحصّل فعلياً.
+        $stranger = \App\Models\User::create([
+            'tenant_id' => $fixture['tenant_id'], 'name' => 'كاشير وقود آخر',
+            'email' => 'fuel-stranger-actor-deny@example.test', 'password' => 'password123', 'role' => 'admin',
+        ]);
+        CashBankAccount::whereKey($cash->cash_bank_account_id)->update([
+            'deposit_scope' => 'user',
+            'deposit_scope_subject' => $stranger->id,
+        ]);
+
+        app(FuelStationSettingsService::class)->putStationValues($fixture['station'], [
+            'fuel_sales_allowed_payment_method_ids' => [$cash->id],
+            'fuel_sales_allow_deferred_payment' => false,
+        ], $fixture['actor'], 'تهيئة قبض الوقود');
+        $shift = app(FuelShiftService::class)->open([
+            'fuel_station_id' => $fixture['station']->id,
+            'opening_float_minor' => 0,
+            'idempotency_key' => 'actor-deny-shift',
+        ], $fixture['actor']);
+        $service = app(FuelSaleService::class);
+        $sale = $service->finalize($service->createDraft([
+            'fuel_station_id' => $fixture['station']->id,
+            'fuel_nozzle_id' => $fixture['nozzle']->id,
+            'fuel_shift_id' => $shift->id,
+            'partner_id' => $fixture['customer_id'],
+            'quantity_milliliters' => 1000,
+            'idempotency_key' => 'actor-deny-sale',
+        ], $fixture['actor']), $fixture['actor']);
+
+        $before = [
+            'payments' => Payment::count(),
+            'journal_entries' => \App\Models\JournalEntry::count(),
+        ];
+
+        try {
+            $service->collectPayment($sale, [
+                'payment_method_id' => $cash->id,
+                'amount_minor' => $sale->invoice->total,
+                'idempotency_key' => 'actor-deny-payment-1',
+                'reference' => 'CASH-ACTOR-DENY',
+            ], $fixture['actor']);
+            $this->fail('كان يجب أن يُرفض التحصيل: الفاعل ليس subject الإيداع المسموح.');
+        } catch (RuntimeException $exception) {
+            $this->assertStringContainsString('صلاحية', $exception->getMessage());
+        }
+
+        $this->assertSame($before['payments'], Payment::count(), 'رفض التخويل يجب ألا يترك سند قبض جزئي.');
+        $this->assertSame($before['journal_entries'], \App\Models\JournalEntry::count(), 'رفض التخويل يجب ألا يترك أثراً محاسبياً جزئياً.');
+        $this->assertSame(0, $sale->paymentReceipts()->count(), 'رفض التخويل يجب ألا يترك إيصال تحصيل جزئي.');
+        $this->assertSame(FuelSale::PAYMENT_UNPAID, $sale->fresh()->payment_status);
     }
 
     /** @test */
