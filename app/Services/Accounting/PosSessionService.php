@@ -596,6 +596,11 @@ class PosSessionService
      * التسوية حدثٌ صريح منفصل عن الاعتماد التشغيلي: الاعتماد يقرّ الحالة، وهذه
      * تُثبّت الأثر المحاسبي مرّة واحدة فقط (`variance_journal_entry_id`). كل الحسابات
      * يحلّها الخادم؛ لا يمرّر الكاشير أي حساب أستاذ.
+     *
+     * ACL-POS-VARIANCE: `pos.variance.approve` صلاحية الفعل التشغيلي فقط. الأثر
+     * على خزينة الجلسة يمرّ إضافةً عبر `CashBankAccountService::assertAllowed()` —
+     * سحب عند العجز، إيداع عند الفائض — قبل أي ترحيل، فلا تتجاوز التسوية صلاحية
+     * المورد المضبوطة على تلك الخزينة تحديداً.
      */
     public function settleVariance(PosSession $session, User $actor): PosSession
     {
@@ -625,6 +630,14 @@ class PosSessionService
 
             $amount = abs($difference);
             $isShortage = $difference < 0;
+
+            // ACL-POS-VARIANCE: صلاحية pos.variance.approve تُقرّ الحدث التشغيلي، لا تخوّل
+            // وحدها الأثر على خزينة بعينها — نفس مبدأ الفصل بين صلاحية الفعل وصلاحية المورد
+            // المطبَّق على كل مسارات المال الأخرى (§16، §35 من المرجع الحي). عجز = نقص نقدية
+            // (سحب)، فائض = زيادة نقدية (إيداع) — مطابقةً لاتجاه القيد أدناه فعلياً لا تخميناً.
+            $cashEntity = $this->cashBankAccounts->resolveForPayment($cashAccountId, 'cash');
+            $this->cashBankAccounts->assertAllowed($cashEntity, $isShortage ? 'withdraw' : 'deposit', $actor);
+
             // عجز: خسارة على حساب الفروق مقابل نقص الصندوق. فائض: زيادة صندوق مقابل حساب الفروق.
             $lines = $isShortage
                 ? [

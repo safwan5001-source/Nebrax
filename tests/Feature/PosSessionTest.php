@@ -3,12 +3,15 @@
 namespace Tests\Feature;
 
 use App\Models\Account;
+use App\Models\Branch;
+use App\Models\CashBankAccount;
 use App\Models\Invoice;
 use App\Models\JournalEntry;
 use App\Models\JournalLine;
 use App\Models\PosCashMovement;
 use App\Models\PosSession;
 use App\Models\PosSessionEvent;
+use App\Models\User;
 use App\Services\Accounting\CashBankAccountService;
 use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -841,5 +844,259 @@ class PosSessionTest extends TestCase
         $this->withToken($auth['token'])->postJson("/api/pos-sessions/{$id}/settle-variance")->assertStatus(422);
         $this->assertSame(0, JournalEntry::where('source_type', PosSession::class)->count());
         $this->assertNull(PosSession::findOrFail($id)->variance_journal_entry_id);
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    //  ACL-POS-VARIANCE — pos.variance.approve لا يتجاوز صلاحية المورد
+    //  المالي (خزينة/بنك). كل حالة تثبت أن assertAllowed() تُستدعى على
+    //  الخزينة الفعلية للجلسة، باتجاهٍ مطابقٍ لأثر القيد الحقيقي، وأن
+    //  الرفض ذرّي بلا أي أثر جزئي.
+    // ═══════════════════════════════════════════════════════════════
+
+    /** يوجّه وسيلة النقد إلى خزينة جديدة بنطاق إيداع/سحب مضبوط صراحةً؛ تُعيد بيانات الخزينة. */
+    private function scopedCashTreasury(
+        array $auth,
+        string $name,
+        string $depositScope,
+        ?string $depositSubject,
+        string $withdrawScope,
+        ?string $withdrawSubject,
+    ): array {
+        $treasury = $this->namedCashTreasury($auth, $name);
+        CashBankAccount::whereKey($treasury['id'])->firstOrFail()->forceFill([
+            'deposit_scope' => $depositScope,
+            'deposit_scope_subject' => $depositSubject,
+            'withdraw_scope' => $withdrawScope,
+            'withdraw_scope_subject' => $withdrawSubject,
+        ])->save();
+        $this->pointCashMethodToTreasury($auth, $treasury['id']);
+
+        return $treasury;
+    }
+
+    /** ممثّل بدور مخصّص يحمل pos.variance.approve فقط — لا وصول تلقائي بحرف البدل `*`. */
+    private function varianceApproverToken(array $auth, string $roleName, string $email): array
+    {
+        $role = $this->withToken($auth['token'])->postJson('/api/roles', [
+            'name' => $roleName,
+            'permissions' => ['pos.variance.approve'],
+        ])->assertCreated()['data'];
+
+        $token = $this->tokenForRole($auth['tenant_id'], $role['slug'], $email);
+        $user = User::where('tenant_id', $auth['tenant_id'])->where('email', $email)->sole();
+
+        return ['token' => $token, 'user' => $user, 'role' => $role];
+    }
+
+    /** @return array{journal_entries:int,variance_entry_exists:bool} */
+    private function varianceSideEffectSnapshot(string $sessionId): array
+    {
+        return [
+            'journal_entries' => JournalEntry::where('source_type', PosSession::class)->where('source_id', $sessionId)->count(),
+            'variance_entry_exists' => PosSession::findOrFail($sessionId)->variance_journal_entry_id !== null,
+        ];
+    }
+
+    /** @test Test 1 — فائض مسموح: الممثّل يملك pos.variance.approve وصلاحية إيداع الخزينة. */
+    public function settlement_succeeds_for_an_overage_when_the_actor_has_treasury_deposit_access(): void
+    {
+        $auth = $this->registerTenant('pos-acl-dep-allow', 'owner@pos-acl-dep-allow.test');
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $approver = $this->varianceApproverToken($auth, 'معتمد فروق ١', 'approver@pos-acl-dep-allow.test');
+
+        $this->scopedCashTreasury($auth, 'خزينة إيداع مسموح', 'user', $approver['user']->id, 'all', null);
+
+        // متوقّع 500.00، معدود 515.00 ⇒ فائض 15.00 (إيداع).
+        $id = $this->closedAcknowledgedSession($auth, 50000, 51500);
+
+        $this->withToken($approver['token'])->postJson("/api/pos-sessions/{$id}/settle-variance")
+            ->assertOk()
+            ->assertJsonPath('data.variance_type', 'overage');
+
+        $this->assertNotNull(PosSession::findOrFail($id)->variance_journal_entry_id);
+        $this->assertSame(1, JournalEntry::where('source_type', PosSession::class)->where('source_id', $id)->count());
+    }
+
+    /** @test Test 2 — فائض مرفوض: الممثّل يملك الصلاحية التشغيلية لكن لا صلاحية إيداع الخزينة. */
+    public function settlement_is_denied_atomically_for_an_overage_when_the_actor_lacks_treasury_deposit_access(): void
+    {
+        $auth = $this->registerTenant('pos-acl-dep-deny', 'owner@pos-acl-dep-deny.test');
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $approver = $this->varianceApproverToken($auth, 'معتمد فروق ٢', 'approver@pos-acl-dep-deny.test');
+        $stranger = User::create([
+            'tenant_id' => $auth['tenant_id'], 'name' => 'غريب', 'email' => 'stranger@pos-acl-dep-deny.test',
+            'password' => 'password123', 'role' => 'staff',
+        ]);
+
+        // الإيداع مقصورٌ على شخصٍ آخر غير المعتمِد.
+        $this->scopedCashTreasury($auth, 'خزينة إيداع محظور', 'user', $stranger->id, 'all', null);
+
+        $id = $this->closedAcknowledgedSession($auth, 50000, 51500); // فائض 15.00
+        $before = $this->varianceSideEffectSnapshot($id);
+        $difference_status_before = PosSession::findOrFail($id)->difference_status;
+
+        $this->withToken($approver['token'])->postJson("/api/pos-sessions/{$id}/settle-variance")->assertStatus(422);
+
+        $this->assertSame($before, $this->varianceSideEffectSnapshot($id), 'الرفض يجب ألا يترك قيداً أو معرّف تسوية جزئياً.');
+        $this->assertSame($difference_status_before, PosSession::findOrFail($id)->difference_status, 'رفض التخويل لا يغيّر حالة الفرق.');
+    }
+
+    /** @test Test 3 — عجز مسموح: الممثّل يملك pos.variance.approve وصلاحية سحب الخزينة. */
+    public function settlement_succeeds_for_a_shortage_when_the_actor_has_treasury_withdraw_access(): void
+    {
+        $auth = $this->registerTenant('pos-acl-wd-allow', 'owner@pos-acl-wd-allow.test');
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $approver = $this->varianceApproverToken($auth, 'معتمد فروق ٣', 'approver@pos-acl-wd-allow.test');
+
+        $this->scopedCashTreasury($auth, 'خزينة سحب مسموح', 'all', null, 'user', $approver['user']->id);
+
+        // متوقّع 500.00، معدود 480.00 ⇒ عجز 20.00 (سحب).
+        $id = $this->closedAcknowledgedSession($auth, 50000, 48000);
+
+        $this->withToken($approver['token'])->postJson("/api/pos-sessions/{$id}/settle-variance")
+            ->assertOk()
+            ->assertJsonPath('data.variance_type', 'shortage');
+
+        $this->assertNotNull(PosSession::findOrFail($id)->variance_journal_entry_id);
+    }
+
+    /** @test Test 4 — عجز مرفوض: الممثّل يملك الصلاحية التشغيلية لكن لا صلاحية سحب الخزينة. */
+    public function settlement_is_denied_atomically_for_a_shortage_when_the_actor_lacks_treasury_withdraw_access(): void
+    {
+        $auth = $this->registerTenant('pos-acl-wd-deny', 'owner@pos-acl-wd-deny.test');
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $approver = $this->varianceApproverToken($auth, 'معتمد فروق ٤', 'approver@pos-acl-wd-deny.test');
+        $stranger = User::create([
+            'tenant_id' => $auth['tenant_id'], 'name' => 'غريب', 'email' => 'stranger@pos-acl-wd-deny.test',
+            'password' => 'password123', 'role' => 'staff',
+        ]);
+
+        $this->scopedCashTreasury($auth, 'خزينة سحب محظور', 'all', null, 'user', $stranger->id);
+
+        $id = $this->closedAcknowledgedSession($auth, 50000, 48000); // عجز 20.00
+        $before = $this->varianceSideEffectSnapshot($id);
+
+        $this->withToken($approver['token'])->postJson("/api/pos-sessions/{$id}/settle-variance")->assertStatus(422);
+
+        $this->assertSame($before, $this->varianceSideEffectSnapshot($id));
+        $this->assertSame('acknowledged', PosSession::findOrFail($id)->difference_status);
+    }
+
+    /** @test Test 5 — استقلالية الاتجاه: صلاحية الإيداع لا تخوّل سحباً، وصلاحية السحب لا تخوّل إيداعاً. */
+    public function deposit_access_never_authorizes_a_shortage_and_withdraw_access_never_authorizes_an_overage(): void
+    {
+        $auth = $this->registerTenant('pos-acl-direction', 'owner@pos-acl-direction.test');
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $approver = $this->varianceApproverToken($auth, 'معتمد فروق ٥', 'approver@pos-acl-direction.test');
+        $stranger = User::create([
+            'tenant_id' => $auth['tenant_id'], 'name' => 'غريب', 'email' => 'stranger@pos-acl-direction.test',
+            'password' => 'password123', 'role' => 'staff',
+        ]);
+
+        // خزينة أ: المعتمِد يودع لكن لا يسحب — جلسة عجز (تحتاج سحباً) يجب أن تُرفض.
+        $this->scopedCashTreasury($auth, 'خزينة أ - إيداع فقط', 'user', $approver['user']->id, 'user', $stranger->id);
+        $shortageId = $this->closedAcknowledgedSession($auth, 50000, 48000); // عجز
+        $this->withToken($approver['token'])->postJson("/api/pos-sessions/{$shortageId}/settle-variance")->assertStatus(422);
+        $this->assertNull(PosSession::findOrFail($shortageId)->variance_journal_entry_id);
+
+        // خزينة ب: المعتمِد يسحب لكن لا يودع — جلسة فائض (تحتاج إيداعاً) يجب أن تُرفض.
+        $this->scopedCashTreasury($auth, 'خزينة ب - سحب فقط', 'user', $stranger->id, 'user', $approver['user']->id);
+        $overageId = $this->closedAcknowledgedSession($auth, 50000, 51500); // فائض
+        $this->withToken($approver['token'])->postJson("/api/pos-sessions/{$overageId}/settle-variance")->assertStatus(422);
+        $this->assertNull(PosSession::findOrFail($overageId)->variance_journal_entry_id);
+    }
+
+    /** @test Test 6 — نطاق الخزينة بالفرع: فرعٌ مسموح ينجح، وفرعٌ مغاير يُرفض. */
+    public function settlement_respects_branch_scoped_treasury_acl(): void
+    {
+        $auth = $this->registerTenant('pos-acl-branch', 'owner@pos-acl-branch.test');
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $mainBranchId = Branch::where('tenant_id', $auth['tenant_id'])->where('is_main', true)->value('id');
+        $otherBranchId = $this->withToken($auth['token'])->postJson('/api/branches', ['name' => 'فرع آخر'])
+            ->assertCreated()->json('data.id');
+
+        // مسموح: نطاق الفرع يطابق فرع الجلسة النشط (الرئيسي الافتراضي).
+        $this->scopedCashTreasury($auth, 'خزينة الفرع الرئيسي', 'branch', $mainBranchId, 'all', null);
+        $allowedId = $this->closedAcknowledgedSession($auth, 50000, 51500); // فائض
+        $this->withToken($auth['token'])->postJson("/api/pos-sessions/{$allowedId}/settle-variance")->assertOk();
+        $this->assertNotNull(PosSession::findOrFail($allowedId)->variance_journal_entry_id);
+
+        // مرفوض: نطاق الفرع يخصّ فرعاً آخر غير الفرع النشط الفعلي للجلسة.
+        $this->scopedCashTreasury($auth, 'خزينة فرع مغاير', 'branch', $otherBranchId, 'all', null);
+        $deniedId = $this->closedAcknowledgedSession($auth, 50000, 51600); // فائض
+        $this->withToken($auth['token'])->postJson("/api/pos-sessions/{$deniedId}/settle-variance")->assertStatus(422);
+        $this->assertNull(PosSession::findOrFail($deniedId)->variance_journal_entry_id);
+    }
+
+    /** @test Test 7 — نطاق الدور (role)، تمييزاً عن نطاق المستخدم (user) المُثبَت في الاختبارات ١-٥. */
+    public function settlement_respects_role_scoped_treasury_acl_distinct_from_user_scope(): void
+    {
+        $auth = $this->registerTenant('pos-acl-role', 'owner@pos-acl-role.test');
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $approver = $this->varianceApproverToken($auth, 'معتمد فروق بالدور', 'role-approver@pos-acl-role.test');
+
+        // النطاق مضبوطٌ على شريحة الدور (slug) لا معرّف المستخدم تحديداً.
+        $this->scopedCashTreasury($auth, 'خزينة نطاق الدور', 'role', $approver['role']['slug'], 'all', null);
+
+        $id = $this->closedAcknowledgedSession($auth, 50000, 51500); // فائض
+        $this->withToken($approver['token'])->postJson("/api/pos-sessions/{$id}/settle-variance")->assertOk();
+        $this->assertNotNull(PosSession::findOrFail($id)->variance_journal_entry_id);
+    }
+
+    /** @test Test 8 — عزل المستأجر: خزينة مستأجرٍ آخر بنفس كود الأستاذ لا تتداخل مع تسوية هذا المستأجر. */
+    public function treasury_resolution_never_crosses_the_tenant_boundary(): void
+    {
+        $auth = $this->registerTenant('pos-acl-tenant-a', 'owner@pos-acl-tenant-a.test');
+        $other = $this->registerTenant('pos-acl-tenant-b', 'owner@pos-acl-tenant-b.test');
+
+        // مستأجر آخر يضبط خزينته الرئيسية (نفس كود الأستاذ 1110 لدى كل مستأجر) على
+        // حظرٍ كامل — لإثبات أن حل خزينة هذا المستأجر لا يتأثر بها إطلاقاً.
+        app(TenantContext::class)->set($other['tenant_id']);
+        $foreignStranger = User::create([
+            'tenant_id' => $other['tenant_id'], 'name' => 'غريب مستأجر آخر', 'email' => 'stranger@pos-acl-tenant-b.test',
+            'password' => 'password123', 'role' => 'staff',
+        ]);
+        app(CashBankAccountService::class)->bootstrapDefaults();
+        CashBankAccount::where('tenant_id', $other['tenant_id'])->where('type', 'cash')->where('is_main', true)
+            ->firstOrFail()->forceFill([
+                'deposit_scope' => 'user', 'deposit_scope_subject' => $foreignStranger->id,
+                'withdraw_scope' => 'user', 'withdraw_scope_subject' => $foreignStranger->id,
+            ])->save();
+
+        // المستأجر الأول يبقى على الإعداد الافتراضي (all) في خزينته الرئيسية الخاصة —
+        // فتسوية فرقه يجب أن تنجح رغم أن خزينة المستأجر الآخر بنفس الكود تحظر الجميع.
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $id = $this->closedAcknowledgedSession($auth, 50000, 51500); // فائض
+        $this->withToken($auth['token'])->postJson("/api/pos-sessions/{$id}/settle-variance")->assertOk();
+
+        $entry = JournalEntry::where('source_type', PosSession::class)->where('source_id', $id)->sole();
+        $line = JournalLine::where('journal_entry_id', $entry->id)->where('account_id', PosSession::findOrFail($id)->cash_account_id)->sole();
+        $this->assertSame(1500, (int) $line->debit);
+
+        // ولا العكس: المستأجر الآخر لا يرى جلسة هذا المستأجر أصلاً (عزل قائم مسبقاً).
+        $this->withToken($other['token'])->postJson("/api/pos-sessions/{$id}/settle-variance")->assertNotFound();
+    }
+
+    /** @test Test 9 — فرق صفري: الرفض يقع قبل أي فحص خزينة، حتى مع خزينة تحظر الجميع. */
+    public function zero_variance_is_rejected_before_any_treasury_authorization_check(): void
+    {
+        $auth = $this->registerTenant('pos-acl-zero', 'owner@pos-acl-zero.test');
+        app(TenantContext::class)->set($auth['tenant_id']);
+
+        // خزينة تحظر الجميع — لو نُفِّذ فحص الخزينة قبل فحص «لا فرق»، لكانت رسالة الرفض مختلفة.
+        $stranger = User::create([
+            'tenant_id' => $auth['tenant_id'], 'name' => 'غريب', 'email' => 'stranger@pos-acl-zero.test',
+            'password' => 'password123', 'role' => 'staff',
+        ]);
+        $this->scopedCashTreasury($auth, 'خزينة حظر كامل', 'user', $stranger->id, 'user', $stranger->id);
+
+        $id = $this->openSession($auth, 50000);
+        $this->withToken($auth['token'])->postJson("/api/pos-sessions/{$id}/close", ['closing_balance' => 50000])
+            ->assertOk()->assertJsonPath('data.difference', '0.00')->assertJsonPath('data.difference_status', 'not_required');
+
+        $response = $this->withToken($auth['token'])->postJson("/api/pos-sessions/{$id}/settle-variance")->assertStatus(422);
+        // رسالة «لا يوجد فرق يتطلب تسوية»، لا رسالة رفض الخزينة («لا تملك صلاحية...»).
+        $this->assertStringContainsString('لا يوجد فرق', $response->json('message'));
+        $this->assertSame(0, JournalEntry::where('source_type', PosSession::class)->count());
     }
 }
