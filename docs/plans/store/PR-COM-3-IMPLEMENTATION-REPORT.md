@@ -592,8 +592,7 @@ The §36 open items are conscious, documented deferrals, not blockers.
 ## 38. Git
 
 - **Branch:** `claude/pr-com-3-commerce-listing`
-- **PR:** opened against `main` — link recorded in a follow-up commit to
-  this report
+- **PR:** [#730](https://github.com/safwan5001-source/Nebrax/pull/730) — opened against `main`, not merged
 - **Base SHA:** `b3815293ad2f065d457e2bd66da4a00ce795f4f4`
 - **Head SHA:** `9047591a9b136507368cdb8096ccd0d6008a11b6` (before adding
   this report)
