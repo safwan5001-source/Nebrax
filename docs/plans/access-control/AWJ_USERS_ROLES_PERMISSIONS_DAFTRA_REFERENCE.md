@@ -492,4 +492,155 @@ repository's git history, leftovers from an earlier abandoned verification
 branch) and one unrelated `DocumentCenterSecureIntakeTest` PDF-fixture
 failure with no relation to reports, branches, or warehouses.
 
+## 34. Treasury Resolution Inspection — Direct Cash Sale (2026-09-09)
+
+**Inspection only — no production code changed.** Answers, with code
+citations, the question §18.3/§20/§26 left open: when a direct cash-sale
+invoice posts, how is the actual Treasury/CashBankAccount determined, and
+how does it relate to the debited GL account?
+
+**Daftra functional rule reaffirmed:** action permission ≠ treasury resource
+permission — posting an invoice must not implicitly grant deposit rights
+into whatever cash account the invoice happens to touch. Functional
+benchmark only; nothing below is architecture borrowed from Daftra.
+
+### Two distinct cash-sale mechanisms in `InvoiceService`, not one
+
+`protected function paymentType(?string $requested, bool $isPaid): string`
+(`InvoiceService.php:312-315`) makes them **mutually exclusive**:
+`$isPaid ? 'credit' : ($requested ?: 'credit')`. `is_paid=true` always
+forces `payment_type='credit'` — it can never be `'cash'`.
+
+1. **`is_paid=true` (any payment_type request) — fully protected, unchanged
+   by this inspection.** Debits `accounts_receivable` (1130) in the
+   invoice's own journal, then `settle()` (`InvoiceService.php:1082-1103`)
+   creates a real `Payment` with `cash_account_id = $invoice->cash_account_id`
+   and calls `PaymentService::post($payment, $actor)` — actor propagated
+   since PR #734. `PaymentService::post()` (`PaymentService.php:244`)
+   resolves the Treasury via `CashBankAccountService::resolveForPayment()`
+   (line 291) and checks `assertAllowed($cashEntity, 'deposit', $actor)`
+   (lines 292-296) **before** posting. Proven by the existing tracked test
+   `the_chosen_treasury_account_receives_the_collection`
+   (`tests/Feature/InvoiceTest.php`) and by `ApiInvoiceTest`'s
+   `invoice_auto_settlement_*_deposit_scope_user_*` pair.
+
+2. **`payment_type='cash'`, `is_paid=false` — the direct/legacy cash sale,
+   the confirmed gap.** `InvoiceService::post()` (`InvoiceService.php:907-909`):
+   ```php
+   $debitAccountId = $invoice->payment_type === 'cash'
+       ? $this->accountId(self::ACC_CASH)   // hardcoded '1110'
+       : $this->accountRoles->resolve('accounts_receivable')->id;
+   ```
+   `accountId()` (`InvoiceService.php:1240-1249`) is a raw
+   `Account::where('code', $code)->first()` lookup — tenant-scoped only
+   (via `Account`'s own global scope), no branch awareness, no settings, no
+   `AccountRoleResolver`/ACC-3 involvement (deliberately, per the comment at
+   `InvoiceService.php:39-43`). **`Invoice.cash_account_id` is never read on
+   this path** — `CashBankAccountService` is never called, neither
+   `resolveForPayment()` nor `assertAllowed()`. The frontend itself only
+   ever sends `cash_account_id` when `is_paid` is checked
+   (`web/src/components/invoices/invoice-form.tsx:599`:
+   `cash_account_id: isPaid ? cashAccountId || null : null`) — for a plain
+   cash sale, no treasury is offered or sent in the first place.
+
+### Does GL `1110` uniquely identify a Treasury Resource? **YES.**
+
+- `cash_bank_accounts` has `$table->unique(['tenant_id', 'account_id'])`
+  (`2025_01_01_000070_create_cash_bank_accounts_and_transfers.php:34`) — at
+  most one `CashBankAccount` per `(tenant, Account)`.
+- `CashBankAccountService::bootstrapDefaults()` seeds exactly one
+  `CashBankAccount` (`account_id` → the tenant's `1110` Account, `is_main =
+  true`, `deposit_scope = 'all'`) the first time it runs, and is called
+  from `AuthController::register()` (`AuthController.php:57`) — i.e. at
+  tenant creation, for every tenant, before any invoice can exist.
+- A `CashBankAccount` that `is_main` can never be deleted
+  (`CashBankAccountService::delete()`), so the link is durable.
+- Therefore `1110` **is** resolvable, deterministically, to exactly one
+  `CashBankAccount` — via `CashBankAccountService::resolveForPayment($glId,
+  'cash')`, the same call `PaymentService` already makes. The direct
+  cash-sale path already computes that exact GL id; it simply never takes
+  the one extra step to resolve and authorize the `CashBankAccount` behind
+  it.
+- Caveat: this always resolves to the tenant's single **main** cash
+  treasury — never an alternate one — because the debit account is
+  hardcoded to `1110` regardless of any `cash_account_id` a caller might
+  send. A future fix authorizes access to *that one* treasury; it does not,
+  by itself, add multi-treasury selection to direct cash sales.
+
+### Normal Payment vs Direct Cash Sale
+
+| Step | Normal Payment (`PaymentService::post`) | Direct Cash Sale (`InvoiceService::post`, `payment_type=cash`) | Difference |
+|---|---|---|---|
+| Actor available | Yes — `PaymentController` passes `$request->user()` | Yes — `InvoiceController::post()` passes `$request->user()` (`InvoiceController.php:335`) | None |
+| Treasury selected/resolved | Yes — `CashBankAccountService::resolveForPayment($payment->cash_account_id, $method)` (`PaymentService.php:291`), defaults to the tenant's `is_main` `CashBankAccount` when null | No — hardcoded `accountId('1110')`; `Invoice.cash_account_id` never read on this path | Payment resolves a Treasury resource; Direct Cash Sale resolves a raw GL code only |
+| Treasury ACL checked | Yes — `assertAllowed($cashEntity, 'deposit', $actor)` (`PaymentService.php:292-296`) | **No — not called anywhere on this path** | **The confirmed gap** |
+| Direction | deposit | (would be deposit, if checked) | — |
+| GL account resolved | `$cashEntity->account_id` — via the Treasury | `accountId('1110')` — hardcoded constant, no Treasury layer | Payment: Treasury→GL; Direct Cash Sale: GL only |
+| Journal posted | Yes, `LedgerService::post()`, source = `Payment` | Yes, `LedgerService::post()`, source = `Invoice` | Same engine |
+| Transaction boundary | `DB::transaction()`, row-locked, draft re-checked | `DB::transaction()`, row-locked, draft re-checked | Same pattern |
+
+### Branch semantics
+
+`CashBankAccount implements CompanyWide` (no `branch_id` column) —
+treasuries are shared across a tenant's branches by design. A `branch`
+deposit/withdraw scope stores a specific branch id in
+`deposit_scope_subject` and is compared, inside `assertAllowed()`
+(`CashBankAccountService.php:260-267`), against **the active
+`BranchContext`** (`app(BranchContext::class)->id()` — the request's active
+branch, set per-request, independent of any resource's stored `branch_id`),
+not against `Invoice.branch_id`. This means a future fix needs no new
+branch plumbing: calling `assertAllowed()` from `InvoiceService::post()`
+picks up the same active-branch semantics every other money path already
+uses, automatically.
+
+### Characterization test — proves the gap executes, not just reads
+
+Added to the existing tracked `tests/Feature/ApiInvoiceTest.php` (no new
+file, no production change):
+`direct_cash_sale_bypasses_treasury_deposit_acl_characterization` — a
+`stranger` user is the *only* one the tenant's main cash treasury allows to
+deposit (`deposit_scope='user'`, subject = stranger); the tenant owner
+(not the stranger) still posts a direct cash-sale invoice successfully,
+and the resulting journal debits exactly that treasury's GL account
+(`1110`), with zero `Payment` rows created — `CashBankAccountService` is
+never consulted. All 8 tests in the file pass (81 assertions), including
+the two pre-existing `deposit_scope=user` tests for the `is_paid` path,
+confirming no regression and an accurate characterization.
+
+### Target Contract classification: **A — Already resolvable**
+
+Direct Cash Sale already has a deterministically resolvable Treasury
+identity (`1110` → the tenant's main cash `CashBankAccount`, proven above);
+it simply bypasses the ACL check. The invariant
+`resolve Treasury → assertAllowed(deposit, actor) → existing posting
+unchanged` is directly implementable without a Treasury selector, API
+change, migration, or GL-routing change — the smallest possible PR shape
+(§14 below), not a resource-selection redesign.
+
+### Recommended `PR-ACL-CASH-SALE` shape (proposal only, not implemented)
+
+In `InvoiceService::post()`, immediately after computing `$debitAccountId`
+for the `payment_type === 'cash'` branch: resolve
+`$this->cashBankAccounts->resolveForPayment($debitAccountId, 'cash')` and
+call `$this->cashBankAccounts->assertAllowed($cashEntity, 'deposit',
+$actor)` before building `$lines`. No change to `$debitAccountId` itself,
+no new request field, no UI change required (the gap is enforcement, not
+resource selection). Requires injecting `CashBankAccountService` into
+`InvoiceService` (not currently a constructor dependency). Test plan:
+flip the new characterization test's expectation to a 422 denial, add the
+symmetric `deposit_scope=user` **allow** case (mirroring
+`invoice_auto_settlement_succeeds_when_deposit_scope_user_matches_the_authenticated_actor`),
+and confirm the `1110`-debiting accounting tests in `InvoiceTest.php` still
+pass unchanged (no formula change — only a `WHERE authorized` gate before
+posting). **Not started. Requires explicit approval first.**
+
+### Scope confirmed unchanged by this inspection
+
+Migration/schema: none. `InvoiceService`, `PaymentService`,
+`CashBankAccountService`, `CashBankAccount` ACL, POS/Fuel, GL `1110`,
+accounting formulas: none touched. `PurchaseService` has no symmetric
+direct-cash-debit shortcut (cash purchase settlement always routes through
+`settle()`/`PaymentService`) — grep-confirmed, not deep-audited; a future
+purchase-side inspection would need its own pass, out of scope here.
+
 **Process rule:** research/inspect → verify → update this file → confirm commit → summarize to Safwan.
