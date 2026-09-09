@@ -43,6 +43,18 @@ describe('ContextualHelpTrigger', () => {
     expect(links[0].getAttribute('href')).toBe('/help/create-sales-invoice');
   });
 
+  it('moves focus into the contextual dialog and restores the desktop trigger on Escape', async () => {
+    renderIntl(<ContextualHelpTrigger placement="topbar" />);
+    const trigger = screen.getByRole('button', { name: 'مساعدة هذه الشاشة' });
+
+    fireEvent.click(trigger);
+    const dialog = screen.getByRole('dialog');
+    await waitFor(() => expect(dialog.contains(document.activeElement)).toBe(true));
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+    await waitFor(() => expect(document.activeElement).toBe(trigger));
+  });
+
   it('opens the same contextual sheet from the mobile user-menu action and restores focus', async () => {
     function MenuHarness() {
       const accountButtonRef = useRef<HTMLButtonElement>(null);

@@ -65,6 +65,7 @@ export function HelpCenterHome() {
           />
           <input
             type="search"
+            aria-labelledby="help-search-heading"
             value={query}
             onChange={(event) => setQuery(event.currentTarget.value)}
             placeholder={t('searchPlaceholder')}

@@ -35,7 +35,9 @@ describe('Help Center content', () => {
   });
 
   it('keeps categories, actions, and curated related-article references valid', () => {
-    const categoryKeys = new Set(HELP_CATEGORIES.map((category) => category.key));
+    const categoryIdentifiers = HELP_CATEGORIES.map((category) => category.key);
+    const categoryKeys = new Set(categoryIdentifiers);
+    expect(categoryKeys.size).toBe(categoryIdentifiers.length);
 
     for (const article of HELP_ARTICLES) {
       expect(categoryKeys.has(article.category)).toBe(true);
@@ -44,7 +46,9 @@ describe('Help Center content', () => {
         expect(article.action.label.ar).toBeTruthy();
         expect(article.action.label.en).toBeTruthy();
       }
-      for (const relatedSlug of article.related ?? []) {
+      const relatedSlugs = article.related ?? [];
+      expect(new Set(relatedSlugs).size).toBe(relatedSlugs.length);
+      for (const relatedSlug of relatedSlugs) {
         expect(relatedSlug).not.toBe(article.slug);
         expect(getHelpArticle(relatedSlug)).toBeDefined();
       }
