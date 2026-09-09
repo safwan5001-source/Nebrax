@@ -409,7 +409,18 @@ additionally asserting the loser's `wasRecentlyCreated` is `false`).
 
 ### 17.4 CI
 
-Reported alongside the new Head SHA once the branch is pushed and the workflow run completes.
+Both workflow runs on Head SHA `bd42fb66d0f12df721a44113834f7c15e042347f` completed successfully
+(full matrix: SQLite + PostgreSQL, per `.github/workflows/ci.yml`):
+
+| Run | Event | Run number | Conclusion | URL |
+|---|---|---|---|---|
+| `34407153002` | `push` | 4428 | ✅ success | https://github.com/safwan5001-source/Nebrax/actions/runs/34407153002 |
+| `34407154517` | `pull_request` (#746) | 4429 | ✅ success | https://github.com/safwan5001-source/Nebrax/actions/runs/34407154517 |
+
+CI installs `bcmath` explicitly (`shivammathur/setup-php@v2`), so unlike this session's local
+verification sandbox, the full-suite run in CI is not expected to show the 26 `bcmath`-related
+Fuel-domain failures disclosed in §12/§13 — CI green here covers the complete suite, not just the
+focused `ImportJobTest` run.
 
 ### 17.5 Risks / remaining work (round 3)
 
