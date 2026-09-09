@@ -644,8 +644,7 @@ documented deferrals.
 ## 31. Git
 
 - **Branch:** `claude/pr-com-1b-inventory-reservation`
-- **PR:** opened against `main` — link recorded in a follow-up commit to
-  this report (see final chat message for the URL)
+- **PR:** [#727](https://github.com/safwan5001-source/Nebrax/pull/727) — opened against `main`, not merged
 - **Base SHA:** `8eeaff24e75e29437db176b2e314ad6e3f1ab730`
 - **Head SHA:** `91e784351ec16af5f42455b4bd0e129962de8d76` (before adding
   this report)
