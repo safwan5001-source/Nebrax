@@ -57,7 +57,7 @@ jobs:
       #  الـ CI هنا** برسالة تقول أين يُضاف.
       - name: حارس قائمة النسخ
         run: |
-          ALLOWED="app/Contracts app/Jobs/Accounting app/Jobs/DocumentCenter app/Models app/Models/Concerns app/Services app/Services/Accounting app/Services/DocumentCenter app/Services/Pos app/Services/Pos/Hardware \
+          ALLOWED="app/Contracts app/Jobs/Accounting app/Jobs/DocumentCenter app/Models app/Models/Concerns app/Services app/Services/Accounting app/Services/Commerce app/Services/DocumentCenter app/Services/Pos app/Services/Pos/Hardware \
                    app/Services/Reporting app/Services/PrintTemplates app/Support app/Tenancy \
                    app/Http/Middleware app/Http/Controllers/Api \
                    app/Http/Requests app/Http/Resources app/Providers \
@@ -104,7 +104,7 @@ jobs:
         run: |
           CORE="$GITHUB_WORKSPACE"
           cd "$APP_DIR"
-          mkdir -p app/Contracts app/Jobs/Accounting app/Jobs/DocumentCenter app/Services app/Services/Accounting app/Services/DocumentCenter app/Services/Pos app/Services/Pos/Hardware app/Services/Reporting app/Services/PrintTemplates app/Support \
+          mkdir -p app/Contracts app/Jobs/Accounting app/Jobs/DocumentCenter app/Services app/Services/Accounting app/Services/Commerce app/Services/DocumentCenter app/Services/Pos app/Services/Pos/Hardware app/Services/Reporting app/Services/PrintTemplates app/Support \
                    app/Tenancy app/Http/Middleware app/Http/Controllers/Api \
                    app/Http/Requests app/Http/Resources app/Console/Commands \
                    app/Models/Concerns tests/Feature routes config docs/openapi
@@ -116,6 +116,7 @@ jobs:
           cp -r "$CORE/app/Models/Concerns/"*.php         app/Models/Concerns/
           cp -r "$CORE/app/Services/"*.php                app/Services/ 2>/dev/null || true
           cp -r "$CORE/app/Services/Accounting/"*.php     app/Services/Accounting/
+          cp -r "$CORE/app/Services/Commerce/"*.php       app/Services/Commerce/
           cp -r "$CORE/app/Services/DocumentCenter/"*.php app/Services/DocumentCenter/
           cp -r "$CORE/app/Services/Pos/"*.php            app/Services/Pos/
           cp -r "$CORE/app/Services/Pos/Hardware/"*.php   app/Services/Pos/Hardware/
