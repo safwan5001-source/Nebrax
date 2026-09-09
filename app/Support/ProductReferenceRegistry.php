@@ -8,6 +8,7 @@ use App\Models\DeliveryNoteLine;
 use App\Models\FuelProduct;
 use App\Models\FuelSale;
 use App\Models\InventoryOpeningLine;
+use App\Models\InventoryReservation;
 use App\Models\InventoryStockAlert;
 use App\Models\InvoiceLine;
 use App\Models\PriceListItem;
@@ -108,6 +109,11 @@ final class ProductReferenceRegistry
         StockPermitLine::class => ['key' => 'stock_permit_lines', 'classes' => [self::INVENTORY_SEMANTIC]],
         StocktakeLine::class => ['key' => 'stocktake_lines', 'classes' => [self::INVENTORY_SEMANTIC]],
         ProductWarehouseStock::class => ['key' => 'warehouse_stocks', 'classes' => [self::INVENTORY_SEMANTIC]],
+        // PR-COM-1B: حجزٌ تشغيلي لا حركة مخزون، لكنه أثرٌ مخزنيّ الدلالة تماماً
+        // مثل `StockMovement`: منتجٌ له حجزٌ (أي حالة — نشط أو منتهٍ) لا يجوز
+        // حذفه، ولا تغيير `type`/`track_inventory` عليه، لأن ذلك يعيد تفسير
+        // كميةٍ محجوزة سلفاً (ADR-02 §9: غير المتتبَّع لا يُحجز أصلاً).
+        InventoryReservation::class => ['key' => 'inventory_reservations', 'classes' => [self::INVENTORY_SEMANTIC]],
 
         // ── ٤) تجاري حيّ ───────────────────────────────────────────────
         PriceListItem::class => ['key' => 'price_list_items', 'classes' => [self::COMMERCIAL_LIVE]],
