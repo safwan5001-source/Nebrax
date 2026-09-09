@@ -78,7 +78,7 @@ This deferral does not weaken the implemented shared foundation and does not blo
 
 - `CustomerPartnerLink` records explicit, auditable active/revoked history, link method, timestamps, and staff actors.
 - One Partner can link to many identities; each identity can have at most one active Partner link while retaining revoked history.
-- The service requires one tenant, a verified/active identity, an active customer/both Partner, and an active staff actor with `customer_access.manage`.
+- Both link and revoke operations require one tenant and an active staff actor with `customer_access.manage`; linking additionally requires a verified/active identity and an active customer/both Partner.
 - The current service path records `staff_verified_claim`; invitation remains disabled until secure proof delivery exists.
 - Email, phone, and name matches never trigger linking. Cross-tenant links are rejected in the service and by composite database foreign keys.
 - No public link endpoint was added.

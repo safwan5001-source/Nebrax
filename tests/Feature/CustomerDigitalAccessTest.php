@@ -332,6 +332,50 @@ class CustomerDigitalAccessTest extends TestCase
         app(CustomerPartnerLinkService::class)->link($identity, $partner, $accountant);
     }
 
+    public function test_staff_with_customer_access_manage_can_revoke_partner_link(): void
+    {
+        [$tenant, $actor] = $this->tenantAndActor('revoke-authorized');
+        $identity = $this->verifiedIdentity($tenant, 'revoke-authorized@example.test');
+        $partner = $this->partner($tenant, 'Authorized Revoke Partner');
+        app(TenantContext::class)->set($tenant->id);
+        $service = app(CustomerPartnerLinkService::class);
+        $link = $service->link($identity, $partner, $actor);
+
+        $revoked = $service->revoke($link, $actor);
+
+        $this->assertSame('revoked', $revoked->status);
+        $this->assertSame($actor->id, $revoked->revoked_by_user_id);
+        $this->assertNotNull($revoked->revoked_at);
+    }
+
+    public function test_staff_without_customer_access_manage_cannot_revoke_and_link_remains_active(): void
+    {
+        [$tenant, $authorizedActor] = $this->tenantAndActor('revoke-permission');
+        $unauthorizedActor = User::create([
+            'tenant_id' => $tenant->id,
+            'name' => 'Unauthorized Staff',
+            'email' => 'staff-without-customer-access@revoke-permission.test',
+            'password' => 'password123',
+            'role' => 'accountant',
+            'is_active' => true,
+        ]);
+        $identity = $this->verifiedIdentity($tenant, 'revoke-permission@example.test');
+        $partner = $this->partner($tenant, 'Denied Revoke Partner');
+        app(TenantContext::class)->set($tenant->id);
+        $service = app(CustomerPartnerLinkService::class);
+        $link = $service->link($identity, $partner, $authorizedActor);
+
+        try {
+            $service->revoke($link, $unauthorizedActor);
+            $this->fail('Staff without customer_access.manage must not revoke a Partner link.');
+        } catch (ValidationException) {
+            $link->refresh();
+            $this->assertSame('active', $link->status);
+            $this->assertNull($link->revoked_by_user_id);
+            $this->assertNull($link->revoked_at);
+        }
+    }
+
     private function tenant(string $slug): Tenant
     {
         return Tenant::create([

@@ -85,6 +85,10 @@ class CustomerPartnerLinkService
                 throw ValidationException::withMessages(['actor' => ['المستخدم المنفذ غير مفعّل.']]);
             }
 
+            if (! $lockedActor->hasPermission('customer_access.manage')) {
+                throw ValidationException::withMessages(['actor' => ['المستخدم غير مخوّل بإدارة وصول العملاء.']]);
+            }
+
             if ($locked->status === 'revoked') {
                 return $locked;
             }
