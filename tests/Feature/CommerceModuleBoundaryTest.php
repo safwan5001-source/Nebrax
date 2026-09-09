@@ -37,7 +37,8 @@ class CommerceModuleBoundaryTest extends TestCase
         // بالضبط ما يفسّره التوثيق أعلاه — الوعد كان بعدم إدخاله *قبل أوانه*،
         // لا منعه للأبد. Class name الفعلي (App\Models\SalesChannel) مطابقٌ
         // حرفياً لهذا الاسم المزال؛ لا نموذج آخر أُضيف باسمٍ مختلف يتطلّب تحديثاً هنا.
-        'App\\Models\\CommerceListing',
+        // 'App\\Models\\CommerceListing' أُزيل هنا بنفس السبب: PR-COM-3 بناه
+        // فعلاً ضمن نطاقه المعتمد (Master Plan §PHASE 3).
     ];
 
     /** @test */
@@ -95,19 +96,13 @@ class CommerceModuleBoundaryTest extends TestCase
         );
     }
 
-    /** @test */
-    public function no_commerce_migration_is_introduced_yet(): void
-    {
-        $migrationFiles = glob(database_path('migrations/*.php')) ?: [];
-        $commerceMigrations = array_values(array_filter(
-            $migrationFiles,
-            fn (string $file): bool => str_contains(strtolower(basename($file)), 'commerce')
-        ));
-
-        $this->assertSame(
-            [],
-            $commerceMigrations,
-            'PR-COM-0 لا يضيف أي ترحيل قاعدة بيانات — وُجد: ' . implode('، ', $commerceMigrations)
-        );
-    }
+    // `no_commerce_migration_is_introduced_yet()` أُزيلت هنا (كانت تفحص أي
+    // ملفّ ترحيل تحوي تسميته «commerce»). وعدها — بنصّ توثيق الصنف أعلاه —
+    // كان محدوداً بـ«قبل PR-COM-1A» أصلاً، لا للأبد؛ ظلّت خضراء بعده صدفةً
+    // فقط لأن COM-1B/2A/2B لم تُسمِّ جداولها الحرفية بكلمة «commerce»
+    // (`inventory_reservations`، `sales_channels`، `fulfillment_policies`).
+    // PR-COM-3 يضيف `commerce_listings` — ترحيلاً حقيقياً متوقَّعاً تماماً في
+    // نطاقه المعتمد (Master Plan §PHASE 3) — فيصطدم بفحصٍ نصّي عام لم يعد
+    // يحرس شيئاً حقيقياً بعد انتهاء نافذته. `no_commerce_api_route_is_registered_yet`
+    // تبقى قائمة لأن PR-COM-3 لا يضيف مساراً فعلاً — ذلك وعدٌ ما زال صحيحاً.
 }
