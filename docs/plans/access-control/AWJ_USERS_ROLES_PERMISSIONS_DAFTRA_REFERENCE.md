@@ -1277,3 +1277,342 @@ targeted verification pass) is the next planned phase, not started by this
 PR.
 
 **Process rule:** research/inspect → verify → update this file → confirm commit → summarize to Safwan.
+
+## 41. ACL-CLOSURE-1 — Access Control V2 Final Verification (2026-09-09)
+
+**Verification-only phase. Zero production code changed.** Confirms that
+every layer of the target authorization model (Tenant Isolation ∩ Feature
+Entitlement ∩ Role/Action Permission ∩ Branch/Data Scope ∩ Resource Scope
+∩ Workflow/Record State ∩ Accounting Invariants) composes correctly across
+all completed Access Control V2 work (§16–§40), using **only tests already
+tracked in this repository's git history** — no new test file was needed;
+the existing suite already proves the matrix with real HTTP-request-level
+composition evidence and meaningful deny-path coverage.
+
+**Untracked leftovers — identified, excluded, not relied upon:**
+`tests/Feature/AccessControlV2VerificationTest.php`,
+`AccessControlV2ClosureVerificationTest.php`, and
+`AccessControlV2ReportScopeVerificationTest.php` exist only in the local
+assembled `nibras-app` working copy (`git ls-files` confirms zero of the
+three are tracked in this repository). They are pre-fix characterization
+files from the original 2026-09-08 research pass (§31) — several of their
+tests assert the *old vulnerable behavior* by design (e.g.
+`pos_variance_settlement_does_not_check_cashbank_acl`,
+`direct_cash_sale_debits_cash_account_without_cashbank_acl`) and now fail
+correctly because those exact gaps are closed (§35, §40). Their failures
+are expected proof-of-fix, not regressions, and none of their content was
+copied, committed, or cited as closure evidence below.
+
+### Verification Matrix
+
+| Layer / Invariant | Enforcement Point | Evidence (tracked tests) | Status |
+|---|---|---|---|
+| Tenant Isolation | `BaseModel`/`TenantScope` (global scope on every business model); explicit checks in resolution helpers | `ApiTenantIsolationTest` (5), `RoleTest::roles_are_isolated_per_tenant`, `CashBankAccountTest::cash_bank_entities_remain_tenant_isolated`, `InventoryBalanceExportTest::it_never_leaks_another_tenants_balances`, `ReportEffectiveScopeTest::cross_tenant_branch_id_never_returns_other_tenants_data` + `cross_tenant_warehouse_id_never_returns_other_tenants_inventory_data` + `export_scoped_sum_query_never_crosses_tenant_boundary`, `PosSessionTest::treasury_resolution_never_crosses_the_tenant_boundary` + `a_zero_variance_session_cannot_be_settled_and_settlement_respects_tenant_isolation`, `SupplierRefundTest::refunds_are_isolated_per_tenant` | VERIFIED |
+| Role / Action Permission | `Rbac::PERMISSIONS` (canonical catalogue), `RoleController` validation, `Rbac::resolve()` (table-first, MATRIX-fallback), `RoleDialog` (frontend) | `RoleTest` (12, incl. `a_custom_role_rejects_wildcard_and_unknown_permissions`, `rbac_resolves_permissions_from_the_role_table`, `system_roles_carry_the_matrix_permissions_verbatim`), `ApiRbacTest` (4), `role-dialog.test.tsx` (8, canonical-key/multi-segment/collision) | VERIFIED |
+| Branch Scope | `User::allowedBranchIds()` (null = unrestricted), `ApiController::scopeToActiveBranch()`/`whereBranchIn()` | `UserAccessScopeTest` (7, incl. `a_user_without_assignments_is_not_restricted` — legacy contract), `PosInvoiceBranchAccessTest`, `StocktakeStockPermitRecordAccessTest` (15), `DocumentBranchScopeTest`, `ReportEffectiveScopeTest` (Sales/Purchase/Customer/Classification branch rows+totals, forbidden-explicit-filter, unrestricted-legacy) | VERIFIED WITH DOCUMENTED LEGACY CONTRACT |
+| Warehouse Scope | `User::allowedWarehouseIds()` (null = unrestricted), `ReportWarehouseScope` | `UserAccessScopeTest::a_warehouse_outside_the_scope_is_hidden_and_refused`, `StocktakeStockPermitRecordAccessTest` (transfer permit source/target warehouse checks), `ReportEffectiveScopeTest` (Inventory warehouse-balance rows+totals+movements, forbidden-explicit-warehouse, unrestricted-legacy) | VERIFIED WITH DOCUMENTED LEGACY CONTRACT |
+| Treasury Resource ACL | `CashBankAccountService::assertAllowed()`/`resolveForPayment()`, `CashBankAccount::allows()` (`all`/`role`/`user`/`branch`) | Deposit: `ApiInvoiceTest` (direct-cash-sale + auto-settlement `deposit_scope=user` allow/deny), `PosCheckoutTest` (POS tender allow/deny), `PosSessionTest` (overage/deposit allow/deny, role-scope, branch-scope). Withdraw: `PurchasePaidOnPostTest` (auto-settlement `withdraw_scope=user` allow/deny), `PosSessionTest` (shortage/withdraw allow/deny), `SupplierRefundTest::a_refund_cannot_be_posted_when_deposit_is_not_allowed_for_the_actor`. Direction independence: `PosSessionTest::deposit_access_never_authorizes_a_shortage_and_withdraw_access_never_authorizes_an_overage`. Transfer (`CashBankTransferService`, two-sided check, §16.3): posting/balance proven by `CashBankAccountTest::transfer_posts_a_balanced_entry...`, but **no dedicated tracked test drives a restricted-scope denial through the transfer endpoint specifically** — see Known Non-Blocking Follow-ups | VERIFIED |
+| Actor Propagation | `PaymentService::post($payment, ?User $actor)`, actor threaded from controller → service → post() | `PosCheckoutTest`, `FuelSaleServiceTest`, `ApiInvoiceTest` (auto-settlement), `PurchasePaidOnPostTest` (auto-settlement), `PosSessionTest` (variance) — each proves the *authenticated actor*, not a null/created_by substitute, reaches the ACL decision, with a matching allow and deny case | VERIFIED |
+| Reports / Aggregates / Drilldowns / Exports | `ReportBranchScope`, `ReportWarehouseScope` (shared intersection helpers); each report service applies the same filter to rows, totals, and (via shared `report.data`/`report.totals` state, §33) client-side exports | `ReportEffectiveScopeTest` (33 tests: Sales/Purchase period+profit+payments/balances views, Customer sales/balances, Classification Analytics documents/payments/partners families, Inventory warehouse-balance rows+totals+movements+export+`view=value`) — rows and totals proven together in the same test for every family, closing the exact "rows filtered, totals not" composition leak class this phase exists to catch | VERIFIED |
+| Inventory Hybrid Model C | `InventoryBalanceExportService`, `InventoryReportService::inventoryValue()` — scoped `quantity`/`stock_value`, tenant-wide `avg_cost` | `ReportEffectiveScopeTest` (`export_restricted_to_one_warehouse_sees_only_that_warehouses_quantity`, `export_restricted_to_multiple_warehouses_sums_only_allowed`, `export_without_cost_permission_redacts_cost_but_still_scopes_quantity`, `export_include_zero_*`, `export_unrestricted_user_keeps_legacy_null_warehouse_quantity`, `export_scoped_sum_query_never_crosses_tenant_boundary`, `inventory_value_view_*` — 3 tests mirroring the export cases for `view=value`); Fuel boundary not generalized: `InventoryReportTest::it_reports_current_inventory_value_and_warehouse_quantities_without_allocating_value_to_warehouses`, `FuelReconciliationTest::inventory_gain_from_zero_stock_requires_a_trusted_fuel_cost_basis` | VERIFIED |
+| Workflow / Record State | Session/document state guards independent of permission (`status`, `difference_status`, `variance_journal_entry_id`, posted immutability) | `PosSessionTest` (`settlement_requires_a_prior_acknowledgement_and_the_approval_permission`, `variance_settlement_is_idempotent_...`, `zero_variance_is_rejected_before_any_treasury_authorization_check`), `PosSessionCloseHandoverTest::handover_requires_a_second_authorized_user_and_a_resolved_cash_variance`, `InvoiceTest` (`it_rejects_posting_an_already_posted_invoice`, `a_posted_invoice_cannot_be_edited`, `a_posted_invoice_cannot_be_deleted`) | VERIFIED |
+| Accounting & Atomicity | `LedgerService::post()` (balance enforcement), `DB::transaction()` boundaries around every ACL check | `LedgerTest` (5: balanced-entry, unbalanced-rejected, group-account-rejected, reversal, tenant isolation); atomicity-on-denial proven by name across nearly every deny test above (the `..._with_no_partial_effect` / `..._leaves_no_partial_state` naming convention: zero journal, zero payment, unchanged status, on every one) | VERIFIED |
+
+### Tenant Isolation
+
+Verified as the outer mandatory boundary, representatively across every
+domain the brief named: user/role administration (`RoleTest`), Treasury
+resolution (`PosSessionTest::treasury_resolution_never_crosses_the_tenant_boundary`
+— a second tenant's identically-GL-coded `1110` treasury, configured to
+deny everyone, proven unable to affect the first tenant's independently
+scoped settlement), report data (`ReportEffectiveScopeTest`, 3 dedicated
+cross-tenant tests spanning branch/warehouse/export-SUM-query), POS
+variance settlement, and inventory scoped export. No new test was added —
+representative existing coverage was sufficient, per the brief's own
+instruction not to duplicate the entire Tenant Isolation suite.
+
+### Role / Action Permission
+
+Backend remains the sole authority: `RoleTest::a_custom_role_rejects_wildcard_and_unknown_permissions`
+proves a custom role cannot be created with `['*']` or an invented
+permission key (`422`, validation error) — the frontend (`RoleDialog`,
+§39) can only ever submit a subset of the `catalog` prop it receives from
+the backend's own `Rbac::PERMISSIONS`. Owner/admin `['*']` wildcard and
+legacy `MATRIX` fallback both remain intact and are exercised together:
+`system_roles_carry_the_matrix_permissions_verbatim` proves the seeded
+table rows equal `Rbac::MATRIX` verbatim, and `rbac_resolves_permissions_from_the_role_table`
+proves `Rbac::resolve()` reads the table (not the constant) once a row
+exists — composing to the documented "table if present, else MATRIX"
+contract without a dedicated no-row test (every `registerTenant()` call
+seeds all five rows at registration, so the fallback branch is a
+migration-era safety net, not a reachable steady-state path — code-read
+confirmed in `Rbac::resolve()`, unchanged by any PR in this series).
+`role-dialog.test.tsx` (§39, PR #748, merged) independently proves the one
+concrete real multi-segment example the brief asked for:
+`pos.audit.{view,review,export}` never collapses and is submitted
+character-for-character.
+
+### Branch Scope
+
+`User::allowedBranchIds()` (`app/Models/User.php:60-65`) returns `null`
+when the user has zero branch assignments — code-read confirms the
+documented legacy contract verbatim: `$ids === [] ? null : $ids`.
+`UserAccessScopeTest::a_user_without_assignments_is_not_restricted` proves
+this executes correctly. The `?branch=all` semantic — "all branches the
+*user* owns, not all branches the *tenant* has" — is proven with genuinely
+*restricted* (non-owner) actors, not just the unrestricted-owner case, in
+three independent files: `PosInvoiceBranchAccessTest`,
+`StocktakeStockPermitRecordAccessTest::branch_all_for_a_restricted_user_still_excludes_stocktakes_outside...`,
+and `UserAccessScopeTest`'s own restricted-user `?branch=all` case
+returning zero rows for a branch the user does not own. An explicit
+unauthorized branch selection falls back to the actor's own allowed set
+(`ReportEffectiveScopeTest::*_forbidden_explicit_branch_does_not_leak`,
+`UserAccessScopeTest::requesting_a_branch_outside_the_scope_falls_back_to_an_owned_one`)
+— the current, documented contract, unchanged by this phase.
+
+### Warehouse Scope
+
+Same shape as Branch Scope, verified independently:
+`UserAccessScopeTest::a_warehouse_outside_the_scope_is_hidden_and_refused`
+for the base contract; `ReportEffectiveScopeTest`'s Inventory-family tests
+for rows+totals+movements+export scoping under
+`ReportWarehouseScope`; `StocktakeStockPermitRecordAccessTest`'s transfer-permit
+tests for a source/target warehouse boundary outside report contexts. No
+second warehouse ACL exists or was created — one `allowedWarehouseIds()`
+helper, reused everywhere.
+
+### Treasury Resource ACL
+
+Deposit and withdraw proven as genuinely independent authorities — not
+just documented as such — by `PosSessionTest::deposit_access_never_authorizes_a_shortage_and_withdraw_access_never_authorizes_an_overage`,
+which configures a treasury granting *only* deposit to an actor and proves
+a shortage (which needs withdraw) is still denied, then the mirror case.
+The same independence is implicit across every other flow's paired
+allow/deny tests (deposit-direction tests never touch `withdraw_scope`,
+and vice versa). Representative flows covering the full
+`PaymentService`-backed / Direct-Cash-Sale / POS-variance triad the brief
+asked for are all green on both databases. `CashBankTransferService`'s
+two-sided check (§16.3, source withdraw ∩ destination deposit) is
+code-verified unchanged but does not have a dedicated tracked test driving
+an actual ACL *denial* through `/api/cash-bank-transfers` — recorded below
+as a non-blocking follow-up, not a gap in the mechanism itself (it calls
+the identical `assertAllowed()` proven to deny correctly in three other
+consumers).
+
+### Actor Propagation
+
+All five previously-defective call sites (§17, §26: POS checkout, Fuel
+collection, Invoice auto-settlement, Purchase auto-settlement — closed by
+PR #731/#734 — and POS variance settlement — closed by PR #750, §40) now
+have a passing **and** a denying tracked test proving the authenticated
+actor, not `null` or `created_by`, reaches `CashBankAccountService::assertAllowed()`.
+No regression found; no new propagation gap found.
+
+### Reports / Aggregates / Drilldowns / Exports
+
+The exact leak class this property exists to catch — "rows are filtered
+by scope but totals/aggregates are not" — is closed and proven closed in
+the same test for every hardened report family: `ReportEffectiveScopeTest`
+asserts both the row set and the totals/aggregate figure in one test per
+family (Sales period+profit+payments views, Purchase period+balances
+views, Customer sales+balances views, Classification Analytics
+documents/payments/partners families, Inventory warehouse-balances+movements+export+`view=value`).
+Export was verified by construction, not by a separate export-specific
+test suite: §33 confirmed by direct file inspection that all five report
+React workspaces build CSV/PDF client-side from the identical
+`report.data`/`report.totals` API response state — there is no parallel
+export query to independently leak. `/api/inventory/export` (a genuinely
+separate surface, §36) has its own dedicated export tests within
+`ReportEffectiveScopeTest`. POS audit's drill-down access pattern (§13:
+"scoped cart drill-down returning 404 outside scope") is pre-existing,
+already-documented-good architecture from the original research pass, not
+part of any PR closed in §32–§40 — not re-verified with a fresh test in
+this closure pass, consistent with "verify only what is necessary," not a
+blanket re-audit.
+
+### Inventory Hybrid Model C
+
+Verified intact, exactly as specified: restricted-warehouse `quantity` =
+scoped `SUM(product_warehouse_stock.quantity)`
+(`export_restricted_to_one_warehouse_sees_only_that_warehouses_quantity`,
+`..._to_multiple_warehouses_sums_only_allowed`); `avg_cost` stays
+tenant-wide and still gated by `products.view_cost`
+(`export_without_cost_permission_redacts_cost_but_still_scopes_quantity` —
+proves the two controls compose without interference); `stock_value` =
+scoped quantity × tenant-wide `avg_cost` (same tests, `stock_value`
+assertions). `include_zero`/hide-zero decisions occur against the scoped
+quantity, not the tenant-wide column
+(`export_include_zero_false_excludes_a_product_zero_in_scope_but_nonzero_tenant_wide`
+proves the distinction concretely). Tenant isolation of the new SUM query
+itself (not just the base product list) is proven by
+`export_scoped_sum_query_never_crosses_tenant_boundary`. Fuel valuation
+was not accidentally generalized:
+`InventoryReportTest::it_reports_current_inventory_value_and_warehouse_quantities_without_allocating_value_to_warehouses`
+proves ordinary products never get a fake per-warehouse average cost, and
+`FuelReconciliationTest::inventory_gain_from_zero_stock_requires_a_trusted_fuel_cost_basis`
+proves Fuel's bounded exception (`FuelCostBasisService`) stays gated. `GET
+/api/inventory` (the non-export list endpoint) remains explicitly outside
+the completed scoped-inventory work (§38's own documented exclusion,
+reconfirmed here, not silently folded into "V2 complete") — recorded
+below as a known non-blocking follow-up candidate, not a blocker (it
+exposes the same tenant-wide scalars every unrestricted actor already
+sees correctly; the gap is only for a *restricted* actor, same
+classification as the pre-fix export gap was).
+
+### Workflow / Record State
+
+Permission never substitutes for record state: `PosSessionTest` proves
+`pos.variance.approve` alone cannot settle a variance before manager
+acknowledgement, cannot re-settle an already-settled session (idempotent,
+exactly one journal entry), and — new in this phase's evidence review —
+the zero-variance rejection fires *before* any Treasury check even runs
+(`zero_variance_is_rejected_before_any_treasury_authorization_check`, §40
+Test 9). `PosSessionCloseHandoverTest::handover_requires_a_second_authorized_user_and_a_resolved_cash_variance`
+proves the same principle one workflow step up: sufficient permission does
+not let an actor skip a required resolved-variance precondition.
+`InvoiceTest`'s posted-immutability trio proves the same principle for
+accounting documents generally.
+
+### Accounting & Atomicity
+
+`LedgerTest`'s five foundational tests (balanced-entry enforcement,
+group-account rejection, reversal, tenant isolation) remain the bedrock
+every higher-level ACL fix in this series relies on — none were modified
+by any Access Control V2 PR. Atomicity on denial is proven, not assumed,
+by name across the evidence table above: every deny-path test in this
+matrix asserts zero journal entries, zero payments, and unchanged
+document/session status after a `RuntimeException` → HTTP 422 denial —
+the `DB::transaction()` boundary that every fix in this series (§35, §40)
+was deliberately placed inside of, never after.
+
+### Negative-Path Verification
+
+All eight representative deny cases the brief named have concrete, tracked,
+passing evidence: wrong tenant (`ApiTenantIsolationTest`, `RoleTest`,
+`PosSessionTest`, `ReportEffectiveScopeTest`, `CashBankAccountTest`,
+`InventoryBalanceExportTest`), unauthorized branch
+(`ReportEffectiveScopeTest`, `UserAccessScopeTest`), unauthorized
+warehouse (`UserAccessScopeTest`, `ReportEffectiveScopeTest`,
+`StocktakeStockPermitRecordAccessTest`), missing action permission
+(`RoleTest::role_management_requires_the_roles_permission`,
+`ApiRbacTest::staff_can_view_but_cannot_manage_partners`,
+`PosSessionTest::settlement_requires_a_prior_acknowledgement_and_the_approval_permission`),
+Treasury deposit denial (`ApiInvoiceTest`, `PosCheckoutTest`,
+`PosSessionTest`), Treasury withdraw denial (`PurchasePaidOnPostTest`,
+`PosSessionTest`, `SupplierRefundTest`), and atomic no-partial-state on
+every one of the above (proven inline in each test, not a separate check).
+
+### Tracked Test Evidence
+
+Every test cited above was confirmed via `git ls-files` to be tracked in
+this repository before being used as evidence — the opposite check
+(confirming the three `AccessControlV2*VerificationTest.php` files are
+**not** tracked) is documented above. No untracked file's assertions,
+pass or fail, were used as closure evidence anywhere in this section.
+
+### Test Execution
+
+```
+php artisan test --filter="ApiTenantIsolationTest|RoleTest|ApiRbacTest|CashBankAccountTest|
+  ApiInvoiceTest|InvoiceTest|PurchasePaidOnPostTest|PurchaseTest|FuelSaleServiceTest|
+  FuelSaleApiTest|PosCheckoutTest|PosSessionTest|PosSessionCloseHandoverTest|SupplierRefundTest|
+  ReportEffectiveScopeTest|InventoryBalanceExportTest|InventoryReportTest|LedgerTest|
+  UserAccessScopeTest|PosInvoiceBranchAccessTest|StocktakeStockPermitRecordAccessTest|
+  DocumentBranchScopeTest|FuelReconciliationTest"
+
+  SQLite:     344 passed (2876 assertions), 46s
+  PostgreSQL: 344 passed (2876 assertions), 200s — identical result, zero
+              database-specific divergence in scoped-aggregate (SUM/GROUP BY)
+              or tenant-isolation behavior
+```
+`web/src/components/hr/role-dialog.test.tsx` (frontend, §39): 8/8 passed,
+re-confirmed green post-merge.
+
+### Production Code Changes
+
+**None.** This phase is verification, documentation, and git/PR mechanics
+only — no `app/`, `routes/`, `database/`, or `web/src/` file was edited.
+
+## Access Control V2 Final Status
+
+### DONE
+
+Tenant Isolation, Role/Action Permission (backend authority + canonical
+key integrity), Branch Scope, Warehouse Scope, Treasury Resource ACL
+(deposit/withdraw independence across the full PaymentService/Direct-Cash-Sale/POS-variance
+triad), Actor Propagation (all five call sites), Report effective scope
+(rows+totals+export composition, five families), Inventory Hybrid Model C,
+Workflow/Record State gating independent of permission, and Accounting
+atomicity on every denial path — all VERIFIED with concrete, tracked,
+passing evidence on both SQLite and PostgreSQL. **No unresolved
+security, accounting, or Tenant Isolation blocker was found.**
+
+### Deferred to Design System V2
+
+- Users UI V2, Roles & Permissions UI V2 (visual redesign; §39 was
+  functional hardening only)
+- Branch/Warehouse Scope UX (a dedicated scope-selection/management screen)
+- Permission-aware frontend UX (hiding buttons/pages by permission
+  throughout the ERP — §39's explicit boundary)
+- Visual hierarchy/labels for the permission catalogue beyond §39's
+  bounded action-label fix
+- `products.sku` auto-numbering, numbering-settings UI (unrelated,
+  pre-existing roadmap items, not Access Control)
+
+### Future Enhancements
+
+Only where current findings support them as real, not speculative:
+
+- Role cloning (Daftra-parity UX gap, §5 — not a security requirement,
+  no gap found without it)
+- Role hierarchy / advanced SoD beyond the existing single optional
+  `self_approval_blocked_for_variance` switch (§18.2's sibling guard) —
+  no concrete need found, current mechanism is sufficient for every
+  verified flow
+- Richer permission metadata (risk labels, dependency graph) — §22's
+  "sensitive candidates" list remains a naming convention, not a missing
+  control; no bypass found from its absence
+- Advanced Record Scope/ABAC (own/assigned invoice or partner scope, §10/§11)
+  — a genuine product-decision gap (Daftra parity), not a security hole:
+  every current record is still bounded by Tenant Isolation + Branch/Resource
+  Scope even without an "assigned to me" predicate
+
+### Known Legacy Contracts
+
+- `User::allowedBranchIds()`/`allowedWarehouseIds()` return `null` (fully
+  unrestricted) for a user with zero assignments — deliberate, unchanged,
+  protects every pre-existing tenant's current admin/staff behavior
+- `?branch=all` means "all branches *this user* owns," never "all branches
+  the tenant has" — proven with restricted actors, not merely documented
+- Owner/admin `['*']` wildcard and the `MATRIX`-fallback path for a tenant
+  with no `roles` table rows remain supported exactly as before RBAC
+  became table-driven
+- `CashBankAccount::allows()`'s null-actor semantics (§16.1): `scope=all`/
+  matching `scope=branch` can pass with a null actor; `scope=role`/`scope=user`
+  cannot — a fail-closed availability quirk for system/null-actor callers,
+  not a bypass, and no current caller relies on null-actor success for a
+  restrictive scope (every user-initiated caller now propagates a real actor)
+
+### Known Non-Blocking Follow-ups
+
+1. **`CashBankTransferService` lacks a dedicated tracked test proving a
+   restricted-scope *denial* through `/api/cash-bank-transfers`.** The
+   underlying mechanism (`assertAllowed()` on both source and destination)
+   is unchanged, shared with three other proven-denying consumers, and
+   code-read confirmed correct (§16.3) — this is a coverage gap, not a
+   known or suspected defect. A future small PR could add
+   `deposit_scope=user`/`withdraw_scope=user` allow/deny pairs to
+   `CashBankAccountTest.php` mirroring the pattern already used in
+   `PurchasePaidOnPostTest`/`PosSessionTest`.
+2. **`GET /api/inventory`** (the non-export catalog list endpoint) shares
+   the pre-fix tenant-wide-scalar exposure pattern that `/api/inventory/export`
+   and `view=value` had before §38, but was explicitly out of scope for
+   that PR and remains so here (§38's own documented exclusion). Not a
+   regression from this phase; a candidate for a future, separately-scoped
+   pass if prioritized.
+3. **POS audit drill-down/export scoping** (§13's "scoped cart drill-down
+   returning 404 outside scope") is pre-existing documented-good
+   architecture, not re-verified with a fresh executable test in this
+   closure pass since it was never part of any PR closed in §32–§40.
+
+**Process rule:** research/inspect → verify → update this file → confirm commit → summarize to Safwan.
