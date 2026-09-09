@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\BarcodeRegistryEntry;
+use App\Models\CommerceListing;
 use App\Models\CreditNoteLine;
 use App\Models\DeliveryNoteLine;
 use App\Models\FuelProduct;
@@ -117,6 +118,11 @@ final class ProductReferenceRegistry
 
         // ── ٤) تجاري حيّ ───────────────────────────────────────────────
         PriceListItem::class => ['key' => 'price_list_items', 'classes' => [self::COMMERCIAL_LIVE]],
+        // PR-COM-3: عرضٌ تجاري حيّ لمنتج على قناة — بنفس منطق PriceListItem
+        // حرفياً: ليس تاريخاً ولا هوية مخزون، لكن حذف المنتج صامتاً بينما هو
+        // معروضٌ فعلياً على قناة يكسر تهيئة نشر حيّة (restrictOnDelete في
+        // الترحيل نفسه يعكس هذا القرار على مستوى القاعدة أيضاً).
+        CommerceListing::class => ['key' => 'commerce_listings', 'classes' => [self::COMMERCIAL_LIVE]],
 
         // ── ٥) توابع مملوكة ────────────────────────────────────────────
         ProductBarcode::class => ['key' => 'alternate_barcodes', 'classes' => [self::OWNED_CHILD]],
