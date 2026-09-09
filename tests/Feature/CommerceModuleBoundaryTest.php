@@ -30,7 +30,6 @@ class CommerceModuleBoundaryTest extends TestCase
      * @var list<string>
      */
     private const NOT_YET_MODELS = [
-        'App\\Models\\CommerceOrder',
         'App\\Models\\Reservation',
         'App\\Models\\PaymentIntent',
         // 'App\\Models\\SalesChannel' أُزيل هنا: PR-COM-2A بناه فعلاً، وهذا
@@ -39,6 +38,10 @@ class CommerceModuleBoundaryTest extends TestCase
         // حرفياً لهذا الاسم المزال؛ لا نموذج آخر أُضيف باسمٍ مختلف يتطلّب تحديثاً هنا.
         // 'App\\Models\\CommerceListing' أُزيل هنا بنفس السبب: PR-COM-3 بناه
         // فعلاً ضمن نطاقه المعتمد (Master Plan §PHASE 3).
+        // 'App\\Models\\CommerceOrder' أُزيل هنا بنفس السبب: PR-COM-5A بناه
+        // فعلاً ضمن نطاقه المعتمد (Master Plan §PHASE 5) — بلا أثر محاسبي أو
+        // مخزني عند التأكيد (ADR-01 §2/§6)، مثبتاً بحارسٍ صريح في
+        // CommerceOrderServiceTest، لا بهذا الملف.
     ];
 
     /** @test */
