@@ -401,6 +401,7 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::get('import-jobs/{id}', [ImportJobController::class, 'show'])->middleware($perm('products.view'));
         Route::post('import-jobs', [ImportJobController::class, 'store'])->middleware($perm('products.manage'));
         Route::post('import-jobs/{id}/cancel', [ImportJobController::class, 'cancel'])->middleware($perm('products.manage'));
+        Route::post('import-jobs/{id}/apply', [ImportJobController::class, 'apply'])->middleware($perm('products.manage'));
         Route::get('products/{id}', [ProductController::class, 'show'])->middleware($perm('products.view'));
         Route::get('products/{id}/activity', [ProductController::class, 'activity'])->middleware($perm('products.view'));
         Route::get('products/{id}/barcodes', [ProductController::class, 'indexBarcodes'])->middleware($perm('products.view'));
