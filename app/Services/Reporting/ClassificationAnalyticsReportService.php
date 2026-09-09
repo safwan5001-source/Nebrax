@@ -6,6 +6,7 @@ use App\Models\Invoice;
 use App\Models\Partner;
 use App\Models\Payment;
 use App\Models\Purchase;
+use App\Support\ReportBranchScope;
 use App\Tenancy\BranchScope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
@@ -100,8 +101,8 @@ class ClassificationAnalyticsReportService
         $query = Partner::query()->withoutGlobalScope(BranchScope::class)
             ->whereIn('partners.type', $kind === 'customer' ? ['customer', 'both'] : ['supplier', 'both']);
 
-        $branches = array_filter((array) ($filters['branch_id'] ?? []));
-        if ($branches !== []) {
+        $branches = ReportBranchScope::resolve($filters);
+        if ($branches !== null) {
             // الطرف المركزي (بلا فرع) مرئي في التقارير متعددة الفروع، أما الطرف
             // المنسوب لفرع فيحترم اختيار الفروع كي لا يزيد عدّ «بلا حركة» خارج النطاق.
             $query->where(fn (Builder $partners) => $partners
@@ -110,7 +111,7 @@ class ClassificationAnalyticsReportService
         }
 
         $query
-            ->leftJoin($table, function ($join) use ($table, $dateColumn, $filters) {
+            ->leftJoin($table, function ($join) use ($table, $dateColumn, $filters, $branches) {
                 $join->on("{$table}.partner_id", '=', 'partners.id')
                     ->where("{$table}.status", '=', 'posted');
                 if (! empty($filters['from'])) {
@@ -119,8 +120,7 @@ class ClassificationAnalyticsReportService
                 if (! empty($filters['to'])) {
                     $join->whereDate("{$table}.{$dateColumn}", '<=', $filters['to']);
                 }
-                $branches = array_filter((array) ($filters['branch_id'] ?? []));
-                if ($branches !== []) {
+                if ($branches !== null) {
                     $join->whereIn("{$table}.branch_id", $branches);
                 }
             });
@@ -149,8 +149,8 @@ class ClassificationAnalyticsReportService
         if (! empty($filters['to'])) {
             $query->whereDate("{$table}.{$dateColumn}", '<=', $filters['to']);
         }
-        $branches = array_filter((array) ($filters['branch_id'] ?? []));
-        if ($branches !== []) {
+        $branches = ReportBranchScope::resolve($filters);
+        if ($branches !== null) {
             $query->whereIn("{$table}.branch_id", $branches);
         }
         if (! empty($filters['classification_id'])) {

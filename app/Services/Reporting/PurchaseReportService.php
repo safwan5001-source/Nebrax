@@ -5,6 +5,7 @@ namespace App\Services\Reporting;
 use App\Models\Payment;
 use App\Models\Purchase;
 use App\Models\PurchaseLine;
+use App\Support\ReportBranchScope;
 use App\Tenancy\BranchScope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
@@ -79,8 +80,8 @@ class PurchaseReportService
             $query->whereDate('purchases.purchase_date', '<=', $filters['to']);
         }
 
-        $branches = array_filter((array) ($filters['branch_id'] ?? []));
-        if ($branches !== []) {
+        $branches = ReportBranchScope::resolve($filters);
+        if ($branches !== null) {
             $query->whereIn('purchases.branch_id', $branches);
         }
         if (! empty($filters['supplier_id'])) {
@@ -281,8 +282,8 @@ class PurchaseReportService
         if (! empty($filters['to'])) {
             $query->whereDate('payments.payment_date', '<=', $filters['to']);
         }
-        $branches = array_filter((array) ($filters['branch_id'] ?? []));
-        if ($branches !== []) {
+        $branches = ReportBranchScope::resolve($filters);
+        if ($branches !== null) {
             $query->whereIn('payments.branch_id', $branches);
         }
         if (! empty($filters['supplier_id'])) {

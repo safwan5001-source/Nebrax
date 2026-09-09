@@ -5,6 +5,7 @@ namespace App\Services\Reporting;
 use App\Models\Appointment;
 use App\Models\Invoice;
 use App\Models\Payment;
+use App\Support\ReportBranchScope;
 use App\Tenancy\BranchScope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
@@ -81,8 +82,8 @@ class CustomerReportService
             $query->whereDate('invoices.invoice_date', '<=', $filters['to']);
         }
 
-        $branches = array_filter((array) ($filters['branch_id'] ?? []));
-        if ($branches !== []) {
+        $branches = ReportBranchScope::resolve($filters);
+        if ($branches !== null) {
             $query->whereIn('invoices.branch_id', $branches);
         }
         if (! empty($filters['customer_id'])) {
@@ -158,8 +159,8 @@ class CustomerReportService
         if (! empty($filters['to'])) {
             $query->whereDate('payments.payment_date', '<=', $filters['to']);
         }
-        $branches = array_filter((array) ($filters['branch_id'] ?? []));
-        if ($branches !== []) {
+        $branches = ReportBranchScope::resolve($filters);
+        if ($branches !== null) {
             $query->whereIn('payments.branch_id', $branches);
         }
         if (! empty($filters['customer_id'])) {
@@ -205,8 +206,8 @@ class CustomerReportService
         if (! empty($filters['to'])) {
             $query->whereDate('appointments.appointment_at', '<=', $filters['to']);
         }
-        $branches = array_filter((array) ($filters['branch_id'] ?? []));
-        if ($branches !== []) {
+        $branches = ReportBranchScope::resolve($filters);
+        if ($branches !== null) {
             $query->whereIn('appointments.branch_id', $branches);
         }
         if (! empty($filters['customer_id'])) {

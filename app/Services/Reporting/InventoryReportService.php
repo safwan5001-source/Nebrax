@@ -7,6 +7,8 @@ use App\Models\ProductWarehouseStock;
 use App\Models\StockMovement;
 use App\Models\StockPermit;
 use App\Models\Stocktake;
+use App\Support\ReportBranchScope;
+use App\Support\ReportWarehouseScope;
 use App\Tenancy\BranchScope;
 use Illuminate\Database\Eloquent\Builder;
 use RuntimeException;
@@ -56,7 +58,19 @@ class InventoryReportService
         ];
     }
 
-    /** المنتجات المتتبعة فقط؛ بلا اختيار فروع = لقطة مجمعة لكل المستأجر. */
+    /**
+     * المنتجات المتتبعة فقط؛ بلا اختيار فروع = لقطة مجمعة لكل المستأجر.
+     *
+     * **`view=value` خارج نطاق PR-ACL-REPORT-SCOPE عمداً**: `quantity_on_hand`
+     * و`avg_cost` قيمتان عالميتان على `Product` نفسه (متوسط متحرك واحد للمنشأة
+     * — انظر `2025_01_01_000033_create_warehouses.php`)، لا مجموعتان قابلتان
+     * للتفكيك حسب المخزن دون إعادة بناء الاستعلام من `product_warehouse_stock`
+     * (نفس شكل فجوة `/api/inventory/export` الفئة P2 المؤجَّلة أصلاً لـ
+     * PR-ACL-INVENTORY-CATALOG-EXPORT-SCOPE). تصفية قائمة المنتجات دون تصحيح
+     * القيمة المعروضة تعطي أماناً زائفاً؛ الإصلاح الحقيقي يحتاج نفس القرار
+     * المعماري المؤجَّل هناك. `view=warehouses` أدناه هو المسار P1 المُصلَح —
+     * فيه `warehouse_id`/`branch_id` صريحان لكل صف فيُقاطَعان بنطاق المستخدم.
+     */
     private function trackedProducts(array $filters): Builder
     {
         $query = Product::query()
@@ -126,7 +140,7 @@ class InventoryReportService
         if (! empty($filters['warehouse_id'])) {
             $query->where('product_warehouse_stock.warehouse_id', $filters['warehouse_id']);
         }
-        $this->applyWarehouseBranchFilter($query, $filters, 'warehouses.branch_id');
+        $this->applyWarehouseBranchFilter($query, $filters, 'warehouses.branch_id', 'product_warehouse_stock.warehouse_id');
         if (! empty($filters['hide_zero'])) {
             $query->where('product_warehouse_stock.quantity', '!=', 0);
         }
@@ -186,7 +200,7 @@ class InventoryReportService
         if (! empty($filters['warehouse_id'])) {
             $query->where('stock_movements.warehouse_id', $filters['warehouse_id']);
         }
-        $this->applyWarehouseBranchFilter($query, $filters, 'stock_movements.branch_id');
+        $this->applyWarehouseBranchFilter($query, $filters, 'stock_movements.branch_id', 'stock_movements.warehouse_id');
         if (! empty($filters['movement_type'])) {
             $query->where('stock_movements.type', $filters['movement_type']);
         }
@@ -305,7 +319,7 @@ class InventoryReportService
         if (! empty($filters['warehouse_id'])) {
             $query->where('stocktakes.warehouse_id', $filters['warehouse_id']);
         }
-        $this->applyWarehouseBranchFilter($query, $filters, 'warehouses.branch_id');
+        $this->applyWarehouseBranchFilter($query, $filters, 'warehouses.branch_id', 'stocktakes.warehouse_id');
         if (! empty($filters['product_id'])) {
             $query->whereNotNull('stocktake_lines.id');
         }
@@ -343,25 +357,47 @@ class InventoryReportService
         }
     }
 
-    private function applyWarehouseBranchFilter(Builder $query, array $filters, string $column): void
+    /**
+     * نطاق الفرع الفعّال دائماً، ونطاق المخزن الفعّال إضافياً حين يُمرَّر عمود
+     * المخزن — Inventory Data Access = Branch Scope ∩ Warehouse Scope.
+     */
+    private function applyWarehouseBranchFilter(Builder $query, array $filters, string $branchColumn, ?string $warehouseColumn = null): void
     {
-        $branches = array_values(array_filter((array) ($filters['branch_id'] ?? [])));
-        if ($branches !== []) {
-            $query->whereIn($column, $branches);
+        $branches = ReportBranchScope::resolve($filters);
+        if ($branches !== null) {
+            $query->whereIn($branchColumn, $branches);
+        }
+
+        if ($warehouseColumn === null) {
+            return;
+        }
+        $warehouses = ReportWarehouseScope::resolve($filters);
+        if ($warehouses !== null) {
+            $query->whereIn($warehouseColumn, $warehouses);
         }
     }
 
-    /** التحويل يُرى من فرع المصدر أو الوجهة؛ ليس وثيقة أحادية الفرع. */
+    /**
+     * التحويل يُرى من فرع/مخزن المصدر أو الوجهة؛ ليس وثيقة أحادية الفرع أو
+     * المخزن — نفس OR الموجود أصلاً بين المصدر والوجهة، مطبَّقاً على نطاق
+     * الفرع والمخزن الفعّالين كليهما.
+     */
     private function applyOperationBranchFilter(Builder $query, array $filters): void
     {
-        $branches = array_values(array_filter((array) ($filters['branch_id'] ?? [])));
-        if ($branches === []) {
-            return;
+        $branches = ReportBranchScope::resolve($filters);
+        if ($branches !== null) {
+            $query->where(function (Builder $branchQuery) use ($branches) {
+                $branchQuery->whereIn('source_warehouses.branch_id', $branches)
+                    ->orWhereIn('target_warehouses.branch_id', $branches);
+            });
         }
 
-        $query->where(function (Builder $branchQuery) use ($branches) {
-            $branchQuery->whereIn('source_warehouses.branch_id', $branches)
-                ->orWhereIn('target_warehouses.branch_id', $branches);
-        });
+        $warehouses = ReportWarehouseScope::resolve($filters);
+        if ($warehouses !== null) {
+            $query->where(function (Builder $warehouseQuery) use ($warehouses) {
+                $warehouseQuery->whereIn('stock_permits.warehouse_id', $warehouses)
+                    ->orWhereIn('stock_permits.target_warehouse_id', $warehouses);
+            });
+        }
     }
 }
