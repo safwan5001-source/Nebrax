@@ -1,5 +1,7 @@
 # PR-COM-6A — Commerce ↔ Shared Customer Platform Context Integration — Implementation Report
 
+**Status:** Implemented, P1 review finding fixed on the same PR/branch.
+
 ## 1. Executive Summary
 
 Commerce's only current write path, `CommerceOrderService::create()`, now
@@ -7,17 +9,21 @@ derives an order's optional `Partner` reference from
 `App\Tenancy\CustomerContext` whenever an authenticated customer context is
 established, instead of trusting the caller-supplied `partner_id`. Guest,
 staff, and internal callers — none of which ever establish
-`CustomerContext` — keep PR-COM-5A's exact prior behavior, byte-for-byte
-unchanged. No new authentication, identity model, migration, route, or
-middleware was added. This is context-integration only, per the task's
-explicit scope: COM-6B (resource ownership/authorization) and COM-6C
-(immutable order snapshots) are **not** implemented here.
+`CustomerContext` — keep PR-COM-5A's exact prior behavior for the ownership
+decision, **except** that the previously implicit trust extended to *every*
+contextless caller has been replaced by an explicit, caller-set
+`trustedPartnerSelection` flag (§21 — P1 fix). No new authentication,
+identity model, migration, route, or middleware was added. This is
+context-integration only, per the task's explicit scope: COM-6B (resource
+ownership/authorization) and COM-6C (immutable order snapshots) are
+**not** implemented here.
 
-14 new focused tests (`CommerceCustomerContextIntegrationTest`), all
-passing on first run on both SQLite and PostgreSQL. Zero new full-suite
-failures on either engine; the pre-existing 27-failure baseline
-(`Fuel*Test` missing `bcmath`, `DocumentCenterSecureIntakeTest` PDF-fixture
-gap) is unchanged and verified identical by name on both engines.
+19 focused tests (`CommerceCustomerContextIntegrationTest` — 14 original +
+5 added for the P1 fix), all passing on first run on both SQLite and
+PostgreSQL. Zero new full-suite failures on either engine, both before and
+after the P1 fix; the pre-existing 27-failure baseline (`Fuel*Test` missing
+`bcmath`, `DocumentCenterSecureIntakeTest` PDF-fixture gap) is unchanged
+and verified identical by name on both engines at every stage.
 
 ## 2. Git
 
@@ -25,8 +31,10 @@ gap) is unchanged and verified identical by name on both engines.
   HEAD at task start — the tip commit is `CUS-COM-GATE-1 — Align Commerce
   with Shared Customer Platform (#744)`, confirming the gate is merged).
 - **Branch:** `claude/commerce-customer-platform-context-2t4oj8`.
-- **PR:** opened against `main`, not merged (see §12 for number/link).
-- **Head SHA:** recorded in the PR itself at open time.
+- **PR:** [#749](https://github.com/safwan5001-source/Nebrax/pull/749) —
+  opened against `main`, not merged.
+- **Head SHA (initial open):** `1714809`.
+- **Head SHA (after P1 fix, current):** `b4ce26a`.
 
 ## 3. Binding sources read
 
@@ -225,22 +233,35 @@ real middleware and asserts no residual state crosses between them.
 
 ## 12. Changed files
 
-**Modified:**
+**Modified (initial open):**
 - `app/Services/Commerce/CommerceOrderService.php` — `create()`'s
   `partner_id` resolution now branches on `CustomerContext::isEstablished()`
   via a new private `resolveOrderPartnerId()`; `confirm()` and line
   creation are byte-for-byte unchanged.
 
+**Modified (P1 fix, §21):**
+- `app/Services/Commerce/CommerceOrderService.php` — `create()` gains an
+  explicit `bool $trustedPartnerSelection = false` parameter;
+  `resolveOrderPartnerId()` no longer reads `$data['partner_id']` at all
+  in the contextless branch unless that flag is `true`.
+- `tests/Feature/CommerceOrderServiceTest.php` — 6 existing COM-5A call
+  sites that pass a raw `partner_id` (representing today's legitimate
+  staff/internal selection) now pass `trustedPartnerSelection: true`
+  explicitly.
+- `tests/Feature/CommerceOrderReservationServiceTest.php` — 1 existing
+  COM-5B call site (an alternate-UOM pricing test that needs a Partner's
+  price list resolved) updated the same way.
+
 **New:**
 - `tests/Feature/CommerceCustomerContextIntegrationTest.php` — 14 focused
-  tests (§13).
+  tests at initial open (§13), +5 more for the P1 fix (§21) = 19 total.
 - `docs/plans/store/PR-COM-6A-IMPLEMENTATION-REPORT.md` (this file).
 
 No migration, no new model, no new route, no new middleware, no changes
 to `setup.sh`/`.github/workflows/ci.yml`/`deploy/assemble.sh` (no new
-top-level directory was introduced).
+top-level directory was introduced), at either stage.
 
-## 13. Tests added and focused results
+## 13. Tests added and focused results (initial open)
 
 `CommerceCustomerContextIntegrationTest` (14 tests) drives the real
 `App\Http\Middleware\EstablishCustomerContext` (not a re-implementation)
@@ -249,6 +270,9 @@ would, then calls `CommerceOrderService::create()` inside it:
 
 1. `guest_order_creation_invents_no_customer_identity_partner_or_link`
 2. `guest_order_creation_still_accepts_an_explicit_partner_id_unchanged_from_com5a`
+   (superseded by the P1 fix — see §21; this test name/assertion no longer
+   exists on the current head, replaced by
+   `a_contextless_untrusted_caller_cannot_inject_a_partner_id_even_when_valid`)
 3. `authenticated_unlinked_customer_resolves_the_correct_identity_and_a_null_partner`
 4. `authenticated_linked_customer_resolves_partner_only_from_context`
 5. `commerce_never_mutates_the_partner_link_as_a_side_effect_of_ordering`
@@ -267,7 +291,7 @@ would, then calls `CommerceOrderService::create()` inside it:
 **PostgreSQL:** 14/14 passed (within a 102-test regression bundle, see
 §14), first run.
 
-## 14. Regression bundle results
+## 14. Regression bundle results (initial open)
 
 `CommerceCustomerContextIntegrationTest|CommerceOrderServiceTest|
 CommerceOrderReservationServiceTest|CommerceModuleBoundaryTest|
@@ -280,7 +304,13 @@ CustomerDigitalAccessTest|CustomerFoundationDatabaseInvariantTest`:
 
 Zero regressions in any COM-5A, COM-5B, or Customer Foundation test.
 
-## 15. Full-suite results
+**Superseded by the P1 fix (§21):** the same bundle after the fix is
+106/107 passed (SQLite/PostgreSQL) — one additional
+`CommerceOrderReservationServiceTest` call site needed the explicit trust
+flag once the implicit-trust gap was closed. See §21.7 for the current
+numbers, which supersede the ones above.
+
+## 15. Full-suite results (initial open — superseded, see §21.8)
 
 | Engine | Passed | Failed | Skipped | Assertions |
 |---|---|---|---|---|
@@ -301,11 +331,11 @@ SQLite (unchanged by this PR).
 
 ## 16. CI
 
-Not yet run — CI triggers on PR push (`db: [sqlite, pgsql]` matrix in
-`.github/workflows/ci.yml`). Local full-suite results above (§15) were
-produced against a local PostgreSQL 16 instance configured identically to
-the CI service container (`nibras`/`secret`/`nibras`), mirroring exactly
-what CI will run.
+Not yet run as of either commit — CI triggers on PR push (`db: [sqlite,
+pgsql]` matrix in `.github/workflows/ci.yml`). Local full-suite results
+(§15, superseded by §21.8) were produced against a local PostgreSQL 16
+instance configured identically to the CI service container
+(`nibras`/`secret`/`nibras`), mirroring exactly what CI will run.
 
 ## 17. Discovered follow-up for COM-6B (not actioned here)
 
@@ -359,4 +389,200 @@ accounting-inert as PR-COM-5A/5B built them (ADR-01 §2/§6,
 `App\Support\CommerceBoundary`) — this PR only changes *which* Partner
 reference a Commerce order is allowed to carry, never any monetary/ledger
 effect. There is no debit/credit table to present because no accounting
-entry of any kind is produced by this change.
+entry of any kind is produced by this change. Unchanged by the P1 fix
+below.
+
+## 21. P1 review finding — fixed on this PR/branch
+
+### 21.1 The finding
+
+The initial implementation (§7–§8 above) treated **every** call with no
+established `CustomerContext` as equally trusted, falling through to
+COM-5A's original behavior: read `$data['partner_id']`, check it exists
+in-tenant, store it. That is correct for today's actual callers (tests
+representing staff/internal selection — no Commerce HTTP route exists at
+all yet), but unsafe as a *standing* rule: a future guest/public Commerce
+path (COM-7A) would also never run through `EstablishCustomerContext`
+(that middleware lives exclusively on the authenticated customer route
+sub-group), so it would reach `create()` with **no** `CustomerContext`
+either — indistinguishable, under the original logic, from a trusted
+staff/internal caller. A contextless guest could therefore supply
+`partner_id` and have it accepted after only an existence check, with no
+Partner-ownership authority behind it at all.
+
+### 21.2 Exact trust mechanism chosen
+
+**An explicit, caller-set boolean parameter on `CommerceOrderService::
+create()`: `bool $trustedPartnerSelection = false`.**
+
+No new middleware, guard, permission, or authorization framework was
+built — the task explicitly warned against expanding into COM-6B or
+building broad authorization machinery, and none was needed. The fix is
+entirely local to `resolveOrderPartnerId()`:
+
+```php
+private function resolveOrderPartnerId(string $tenantId, array $data, bool $trustedPartnerSelection): ?string
+{
+    $customerContext = app(CustomerContext::class);
+
+    if ($customerContext->isEstablished()) {
+        // unchanged — CustomerContext remains the sole authority,
+        // regardless of $trustedPartnerSelection.
+        ...
+    }
+
+    if (! $trustedPartnerSelection) {
+        return null; // the untrusted default — $data['partner_id'] is never read.
+    }
+
+    // unchanged COM-5A behavior — the only remaining channel for it.
+    $partnerId = $data['partner_id'] ?? null;
+    ...
+}
+```
+
+**Why this is the narrowest correct fix:**
+
+- It closes the exact gap: "absence of `CustomerContext`" is no longer a
+  usable signal of trust by itself. Trust must now be **stated**, not
+  inferred from what's missing.
+- It requires no new class, service, model, or route — the task's own
+  instruction ("do not build a broad authorization framework", "do not
+  implement COM-6B") ruled out a general trusted-caller registry, a
+  request-attribute convention, or a new middleware layer, none of which
+  the actual code demonstrates a need for today (there is still exactly
+  one call site in the entire codebase that needs this — `create()`
+  itself has no HTTP caller yet).
+- It is impossible to satisfy accidentally: unlike inferring trust from
+  request shape (e.g., "no Bearer token" or "no route parameter"), a
+  boolean argument requires the calling code to explicitly opt in at the
+  call site, which is exactly what "existing legitimate staff/internal
+  Partner selection... ONLY through an explicitly trusted path" (the
+  task's own wording) means in a codebase with no controller layer yet to
+  carry a stronger signal (e.g., route middleware or an RBAC permission
+  check). When a real staff-facing Commerce controller is eventually
+  built (COM-6B territory), it becomes the one place responsible for
+  deciding whether to pass `true` — today, that responsibility falls on
+  each direct caller of the service, which is exactly the tests that
+  represent it.
+- `CustomerContext`, when established, is checked **first** and remains
+  authoritative regardless of the flag — an authenticated customer caller
+  can never use `trustedPartnerSelection: true` to smuggle a raw
+  `partner_id` past their own linked/unlinked state (verified by
+  `an_established_customer_context_overrides_the_trust_flag_entirely`,
+  §21.4).
+
+### 21.3 Behavior after the fix
+
+| Caller shape | `CustomerContext` | `trustedPartnerSelection` | `partner_id` result |
+|---|---|---|---|
+| Guest / future public checkout | not established | `false` (default) | always `null` — `$data['partner_id']` never read |
+| Explicitly trusted staff/internal call | not established | `true` | COM-5A behavior: validated in-tenant, stored if present |
+| Authenticated customer, unlinked | established | irrelevant | `null` (unchanged from initial open) |
+| Authenticated customer, linked | established | irrelevant | `CustomerContext::linkedPartnerId()` (unchanged) |
+
+### 21.4 Tests added for the fix
+
+Added to `tests/Feature/CommerceCustomerContextIntegrationTest.php`
+(the vulnerable `guest_order_creation_still_accepts_an_explicit_partner_
+id_unchanged_from_com5a` test was replaced, not merely supplemented, since
+it had encoded the vulnerable behavior as the expected outcome):
+
+1. `a_contextless_untrusted_caller_cannot_inject_a_partner_id_even_when_valid`
+   — a real, existing Partner id in `$data['partner_id']` with no context
+   and no trust flag still resolves to `null`.
+2. `a_contextless_untrusted_caller_supplying_a_nonexistent_partner_id_is_
+   not_validated_or_rejected` — proves the untrusted path does not even
+   *read* `$data['partner_id']` (a garbage UUID causes no
+   `RuntimeException`, unlike the old existence-check path).
+3. `an_explicitly_trusted_caller_can_still_select_a_valid_partner` —
+   `trustedPartnerSelection: true` with a valid Partner id still works
+   exactly as COM-5A did.
+4. `an_explicitly_trusted_caller_selecting_a_nonexistent_partner_is_still_
+   rejected` — the trusted path still validates in-tenant existence
+   (COM-5A's original guard, unchanged).
+5. `untrusted_contextless_execution_cannot_impersonate_the_trusted_path` —
+   the exact same payload as test 3, minus the flag, resolves to `null`;
+   the flag alone is what distinguishes the two outcomes.
+6. `an_established_customer_context_overrides_the_trust_flag_entirely` —
+   an authenticated, unlinked customer passing both a foreign
+   `partner_id` **and** `trustedPartnerSelection: true` still gets `null`
+   — context wins unconditionally.
+
+19 tests total in the file now (14 original + these 5, since one of the
+14 was replaced rather than kept alongside its replacement).
+
+### 21.5 Existing COM-5A/5B call sites updated
+
+Three test files representing today's only "legitimate staff/internal"
+callers were updated to pass `trustedPartnerSelection: true` explicitly,
+since the fix removes their previously implicit trust:
+
+- `tests/Feature/CommerceOrderServiceTest.php` — 6 call sites (Partner
+  reference test, 4 COM-4A pricing-by-partner tests, 1 cross-tenant
+  Partner rejection test).
+- `tests/Feature/CommerceOrderReservationServiceTest.php` — 1 call site
+  (`an_alternate_uom_factor_produces_the_correct_base_reservation`, which
+  needs a Partner's price-list item resolved for an alternate UOM price).
+
+No assertion in either file was weakened — each still proves exactly what
+it proved before (a Partner reference lands on the order; cross-tenant
+Partner references are still rejected; alternate-UOM pricing still
+resolves correctly); only the explicit trust signal was added at the call
+site, matching what the caller already represents.
+
+### 21.6 Focused test results (P1 fix)
+
+`CommerceCustomerContextIntegrationTest` (19 tests):
+
+- **SQLite:** 19/19 passed (40 assertions), first run after the fix.
+- **PostgreSQL:** 19/19 passed (40 assertions), first run after the fix.
+
+### 21.7 Regression bundle results (P1 fix, supersedes §14)
+
+`CommerceCustomerContextIntegrationTest|CommerceOrderServiceTest|
+CommerceOrderReservationServiceTest|CommerceModuleBoundaryTest|
+CustomerDigitalAccessTest|CustomerFoundationDatabaseInvariantTest`:
+
+- **SQLite:** 106 passed, 1 skipped (107 total; the one skip is the same
+  PostgreSQL-only partial-index assertion as before, unrelated to this
+  PR).
+- **PostgreSQL:** 107 passed, 0 skipped.
+
+Zero regressions — every COM-5A/COM-5B/Customer Foundation assertion
+still passes, now with the explicit trust flag at the 7 call sites that
+needed it (§21.5).
+
+### 21.8 Full-suite results (P1 fix, supersedes §15 — current truth)
+
+| Engine | Passed | Failed | Skipped | Assertions |
+|---|---|---|---|---|
+| SQLite | 3167 | 27 | 15 | 20,660 |
+| PostgreSQL | 3182 | 27 | 0 | 20,729 |
+
+Both engines' 27 failures were re-verified **by name** after the fix,
+identical to the pre-fix baseline (§15) and to every prior Commerce PR's
+documented baseline — same 24 `Fuel*Test` cases (missing `bcmath`) plus
+`DocumentCenterSecureIntakeTest` (PDF-fixture gap). The passed-count
+increase versus §15 (3167 vs. 3162 on SQLite, 3182 vs. 3177 on PostgreSQL
+— +5 on each) is exactly the net new focused tests added in §21.4. Zero
+new failures, zero new failure categories, on either engine, before or
+after the fix.
+
+### 21.9 CI (P1 fix)
+
+Not yet run as of the fix commit — CI triggers on push to this PR. Local
+full-suite results (§21.8) were produced against the same local
+PostgreSQL 16 instance configured identically to the CI service container,
+mirroring exactly what CI's `db: [sqlite, pgsql]` matrix will run.
+
+### 21.10 Confirmation
+
+**The P1 finding is fixed.** A contextless caller (guest, or any future
+public/checkout path that never establishes `CustomerContext`) can no
+longer cause `partner_id` to become ownership authority under any
+circumstance — the only remaining channel for a raw `partner_id` is an
+explicit, caller-set `trustedPartnerSelection: true`, which no
+untrusted/public request path can set on its own behalf. COM-6B and
+COM-6C remain unimplemented; no accounting/inventory/ZATCA/payment/POS
+semantics were touched by this fix.
