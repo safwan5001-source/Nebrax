@@ -60,6 +60,25 @@ class ImportJobApplyTest extends TestCase
         return UploadedFile::fake()->createWithContent('catalog.csv', implode("\n", $lines)."\n");
     }
 
+    /**
+     * ملفٌ فيه صفّان صالحان (SKU-1، SKU-2) وثلاثة صفوف فارغة: واحد متخلّل
+     * بينهما، واثنان متذيّلان — لاختبار تصحيح مراجعة PR-DUR-2 (Finding 1):
+     * صفّ فيزيائي = ٥، صفّ بيانات فعلي = ٢.
+     */
+    private function csvWithBlankRows(): UploadedFile
+    {
+        $lines = [
+            'sku,name,type,sale_price',
+            'SKU-1,منتج رقم 1,good,100.00',
+            ',,,',
+            'SKU-2,منتج رقم 2,good,100.00',
+            ',,,',
+            ',,,',
+        ];
+
+        return UploadedFile::fake()->createWithContent('catalog-with-blanks.csv', implode("\n", $lines)."\n");
+    }
+
     private function createReadyJob(string $token, int $rows): string
     {
         return $this->withToken($token)
@@ -314,5 +333,151 @@ class ImportJobApplyTest extends TestCase
             $this->assertSame(0, (int) $product->quantity_on_hand);
             $this->assertSame(0, (int) $product->avg_cost);
         }
+    }
+
+    /**
+     * تصحيح مراجعة PR-DUR-2 (Finding 1 — BLOCKER): صفّ فارغ متخلّل بين
+     * صفّين صالحين، وصفّان فارغان متذيّلان. `row_count` يجب أن يعدّ صفّي
+     * البيانات فقط (٢) لا الصفوف الفيزيائية الخمسة، وحجم دُفعة ١ يجب أن
+     * يعالج صفّاً واحداً حقيقياً في كل استدعاء بلا التوقّف عند الفراغات ولا
+     * أثرٍ مضاعف، وينتهي بحالة `completed` لا `failed`.
+     */
+    /** @test */
+    public function blank_rows_are_excluded_from_row_count_and_do_not_block_completion(): void
+    {
+        $auth = $this->registerTenant();
+
+        $jobId = $this->withToken($auth['token'])
+            ->post('/api/import-jobs', ['domain' => 'product_catalog', 'file' => $this->csvWithBlankRows()])
+            ->assertCreated()
+            ->assertJsonPath('data.status', ImportJobStatus::READY)
+            ->assertJsonPath('data.row_count', 2)
+            ->json('data.id');
+
+        $this->withToken($auth['token'])
+            ->postJson("/api/import-jobs/{$jobId}/apply", ['batch_size' => 1])
+            ->assertOk()
+            ->assertJsonPath('data.status', ImportJobStatus::PROCESSING)
+            ->assertJsonPath('data.processed_rows', 1);
+
+        $this->withToken($auth['token'])
+            ->postJson("/api/import-jobs/{$jobId}/apply", ['batch_size' => 1])
+            ->assertOk()
+            ->assertJsonPath('data.status', ImportJobStatus::COMPLETED)
+            ->assertJsonPath('data.processed_rows', 2);
+
+        $this->assertSame(2, Product::count(), 'الصفوف الفارغة لا تُنشئ منتجات، والصفّان الحقيقيّان يُطبَّقان مرّةً واحدة فقط.');
+        $this->assertSame(['SKU-1', 'SKU-2'], Product::orderBy('sku')->pluck('sku')->all());
+
+        // إعادة محاولة بعد الاكتمال idempotent — لا استدعاء ثانٍ لـ
+        // `ProductImportService::apply()` ولا أثر مضاعف.
+        $this->withToken($auth['token'])
+            ->postJson("/api/import-jobs/{$jobId}/apply", ['batch_size' => 1])
+            ->assertOk()
+            ->assertJsonPath('data.status', ImportJobStatus::COMPLETED)
+            ->assertJsonPath('data.processed_rows', 2);
+
+        $this->assertSame(2, Product::count());
+    }
+
+    /** @test */
+    public function multiple_and_trailing_blank_rows_complete_in_a_single_default_size_call(): void
+    {
+        $auth = $this->registerTenant();
+        $jobId = $this->withToken($auth['token'])
+            ->post('/api/import-jobs', ['domain' => 'product_catalog', 'file' => $this->csvWithBlankRows()])
+            ->assertCreated()
+            ->json('data.id');
+
+        $this->withToken($auth['token'])
+            ->postJson("/api/import-jobs/{$jobId}/apply")
+            ->assertOk()
+            ->assertJsonPath('data.status', ImportJobStatus::COMPLETED)
+            ->assertJsonPath('data.processed_rows', 2);
+
+        $this->assertSame(2, Product::count());
+    }
+
+    /**
+     * توافق رجعي: تشغيلة PR-DUR-1 أُنشئت قبل تصحيح هذه المراجعة تحمل
+     * `row_count` بالحساب الفيزيائي القديم (٥ يشمل الصفوف الفارغة). أول
+     * استدعاء `/apply` يصحّح `row_count` ذاتياً (٢) قبل أن يعتمد عليه
+     * الاكتمال، فتكتمل التشغيلة بدل أن تعلَق أو تفشل.
+     */
+    /** @test */
+    public function a_stale_pre_fix_physical_row_count_self_heals_on_first_apply(): void
+    {
+        $auth = $this->registerTenant();
+        $tenantId = $auth['tenant_id'];
+
+        $file = $this->csvWithBlankRows();
+        $contents = file_get_contents($file->getRealPath());
+        $sha256 = hash('sha256', $contents);
+        $jobId = (string) Str::uuid();
+        $storagePath = "imports/{$tenantId}/{$jobId}/original.csv";
+        Storage::disk('local')->put($storagePath, $contents);
+
+        DB::table('import_jobs')->insert([
+            'id' => $jobId,
+            'tenant_id' => $tenantId,
+            'domain' => 'product_catalog',
+            'status' => ImportJobStatus::READY,
+            'original_filename' => 'catalog-with-blanks.csv',
+            'extension' => 'csv',
+            'mime_type' => 'text/csv',
+            'byte_size' => strlen($contents),
+            'storage_disk' => 'local',
+            'storage_path' => $storagePath,
+            'content_sha256' => $sha256,
+            'row_count' => 5, // الحساب الفيزيائي القديم قبل هذا التصحيح.
+            'column_count' => 4,
+            'processed_rows' => 0,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->withToken($auth['token'])
+            ->postJson("/api/import-jobs/{$jobId}/apply")
+            ->assertOk()
+            ->assertJsonPath('data.status', ImportJobStatus::COMPLETED)
+            ->assertJsonPath('data.processed_rows', 2)
+            ->assertJsonPath('data.row_count', 2);
+
+        $this->assertSame(2, Product::count());
+    }
+
+    /**
+     * تصحيح مراجعة PR-DUR-2 (Finding 2 — P2): `batch_size` جزءٌ من
+     * `apply_options` المجمَّدة عند أول قطعة — تماماً كبقية الخيارات
+     * الدلالية (mode/blank_policy/master_data_policy/mapping). استدعاءٌ
+     * لاحقٌ بقيمة مختلفة يُتجاهَل ولا يغيّر حجم القطع المتبقّية.
+     */
+    /** @test */
+    public function batch_size_is_frozen_from_the_first_apply_call_and_later_requests_cannot_change_it(): void
+    {
+        $auth = $this->registerTenant();
+        $jobId = $this->createReadyJob($auth['token'], 3);
+
+        $this->withToken($auth['token'])
+            ->postJson("/api/import-jobs/{$jobId}/apply", ['batch_size' => 1])
+            ->assertOk()
+            ->assertJsonPath('data.status', ImportJobStatus::PROCESSING)
+            ->assertJsonPath('data.processed_rows', 1);
+
+        // استدعاءٌ لاحقٌ بـ batch_size=100 يُتجاهَل: القيمة المجمَّدة (١) من
+        // أول استدعاء هي التي تحكم حجم كل قطعة تالية طوال عمر التشغيلة.
+        $this->withToken($auth['token'])
+            ->postJson("/api/import-jobs/{$jobId}/apply", ['batch_size' => 100])
+            ->assertOk()
+            ->assertJsonPath('data.status', ImportJobStatus::PROCESSING)
+            ->assertJsonPath('data.processed_rows', 2);
+
+        $this->withToken($auth['token'])
+            ->postJson("/api/import-jobs/{$jobId}/apply", ['batch_size' => 100])
+            ->assertOk()
+            ->assertJsonPath('data.status', ImportJobStatus::COMPLETED)
+            ->assertJsonPath('data.processed_rows', 3);
+
+        $this->assertSame(3, Product::count());
     }
 }

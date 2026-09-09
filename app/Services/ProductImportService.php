@@ -120,7 +120,7 @@ class ProductImportService
         return [
             'columns' => $columns,
             // دقيقٌ لا تقديري: الملف الذي يتجاوز الحد يُرفض قبل الوصول إلى هنا.
-            'total_rows' => count(array_filter($rows, fn (array $row): bool => ! $this->isBlankRow($row))),
+            'total_rows' => count(array_filter($rows, fn (array $row): bool => ! self::isBlankRow($row))),
             'fields' => $this->fieldContract(),
         ];
     }
@@ -409,7 +409,7 @@ class ProductImportService
         $dataIndex = 0;
 
         foreach ($raw as $offset => $values) {
-            if ($this->isBlankRow($values)) {
+            if (self::isBlankRow($values)) {
                 continue;
             }
 
@@ -1439,8 +1439,15 @@ class ProductImportService
         return SpreadsheetReader::read($path, $extension, self::MAX_ROWS, self::MAX_COLUMNS);
     }
 
-    /** @param array<int, string> $values */
-    private function isBlankRow(array $values): bool
+    /**
+     * تعريف «الصف الفارغ» الوحيد في مسار استيراد المنتجات — يستعمله `inspect()`
+     * و`parse()` هنا، و`ImportJobService` (PR-DUR-2) ليُطابق `row_count`/الاكتمال
+     * الدائم نفس تعريف صفوف البيانات المستعمل في ترقيم `dataIndex` أدناه، بلا
+     * نسخة ثانية من المنطق قد تنحرف عنه.
+     *
+     * @param  array<int, string>  $values
+     */
+    public static function isBlankRow(array $values): bool
     {
         foreach ($values as $value) {
             if (trim((string) $value) !== '') {

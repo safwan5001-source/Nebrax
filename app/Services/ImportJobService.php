@@ -121,6 +121,14 @@ class ImportJobService
      * الصفوف/الأعمدة، ثم `ready`. فشلٌ هنا يُفشل التشغيلة (لا الطلب) ويحذف
      * الملف المخزَّن — السجل يبقى للتدقيق (لا نجاح خفي جزئي). يعمل بلا علمٍ
      * بسائق التخزين (`materializeLocalCopy` يُحيّد الفرق بين local وs3).
+     *
+     * **`row_count` صفوف بيانات لا صفوف فيزيائية:** يُستثنى الصف الفارغ
+     * بنفس تعريف `ProductImportService::isBlankRow()` — تماماً كما يعدّ
+     * `ProductImportService::parse()` نافذة الدُفعة عبر `dataIndex` (يتجاوز
+     * الفارغ بلا زيادته). عدّادٌ يشمل الفارغ هنا بينما تستثنيه نافذة التطبيق
+     * كان يجعل `processed_rows` لا يبلغ `row_count` أبداً عند وجود صفوف
+     * فارغة، فتبقى التشغيلة `processing` للأبد ثم تفشل عند أول قطعة تالية لا
+     * تجد صفوفاً قابلة للتطبيق (انظر تصحيح المراجعة PR-DUR-2).
      */
     private function inspect(ImportJob $job): ImportJob
     {
@@ -131,7 +139,7 @@ class ImportJobService
 
             $job->update([
                 'status' => ImportJobStatus::READY,
-                'row_count' => max(0, count($rows) - 1),
+                'row_count' => $this->countDataRows($rows),
                 'column_count' => $rows === [] ? 0 : count($rows[0]),
             ]);
 
@@ -180,6 +188,23 @@ class ImportJobService
     }
 
     /**
+     * عدد صفوف البيانات الفعلية (بلا صف العناوين ولا الصفوف الفارغة) —
+     * التعريف الوحيد المستعمل لـ`row_count` ولاكتمال الترحيل معاً، مطابقاً
+     * حرفياً لتعريف `dataIndex` في `ProductImportService::parse()`.
+     *
+     * @param  array<int, array<int, string>>  $rows  ناتج `SpreadsheetReader::read()` كاملاً (يشمل صف العناوين).
+     */
+    private function countDataRows(array $rows): int
+    {
+        $dataRows = $rows === [] ? [] : array_slice($rows, 1);
+
+        return count(array_filter(
+            $dataRows,
+            static fn (array $row): bool => ! ProductImportService::isBlankRow($row)
+        ));
+    }
+
+    /**
      * PR-DUR-2 — يرحّل قطعةً واحدة محدودة الحجم من تشغيلة `product_catalog`
      * جاهزة أو قيد المعالجة، معيداً استعمال `ProductImportService::apply()`
      * حصراً كحد الطفرة الوحيد — لا منطق مطابقة/تحقق/كتابة مكرَّر هنا.
@@ -215,22 +240,28 @@ class ImportJobService
             $firstChunk = $locked->status === ImportJobStatus::READY;
             $frozenOptions = $firstChunk ? $options : (array) ($locked->apply_options ?? []);
 
-            if ($firstChunk) {
-                $locked->forceFill([
-                    'status' => ImportJobStatus::PROCESSING,
-                    'apply_options' => $frozenOptions,
-                    'started_at' => now(),
-                ])->save();
-            }
-
-            $offset = (int) $locked->processed_rows;
-            $batchSize = min(
-                ProductImportService::APPLY_BATCH_SIZE,
-                max(1, (int) ($frozenOptions['batch_size'] ?? ProductImportService::APPLY_BATCH_SIZE))
-            );
-
             $tmpPath = $this->materializeLocalCopy((string) $locked->storage_path);
             try {
+                if ($firstChunk) {
+                    // إعادة حساب `row_count` بتعريف صفوف البيانات دون الفيزيائي
+                    // مرّة واحدة هنا — تصحيحٌ ذاتيٌّ لتشغيلات `ready` أُنشئت
+                    // بالحساب الفيزيائي القديم (قبل تصحيح المراجعة) قبل أن يعتمد
+                    // عليها الاكتمال أدناه، بلا نقل بيانات (migration) منفصل.
+                    $rows = SpreadsheetReader::read($tmpPath, $locked->extension, self::MAX_ROWS, self::MAX_COLUMNS);
+                    $locked->forceFill([
+                        'status' => ImportJobStatus::PROCESSING,
+                        'apply_options' => $frozenOptions,
+                        'started_at' => now(),
+                        'row_count' => $this->countDataRows($rows),
+                    ])->save();
+                }
+
+                $offset = (int) $locked->processed_rows;
+                $batchSize = min(
+                    ProductImportService::APPLY_BATCH_SIZE,
+                    max(1, (int) ($frozenOptions['batch_size'] ?? ProductImportService::APPLY_BATCH_SIZE))
+                );
+
                 $file = new UploadedFile(
                     $tmpPath,
                     (string) $locked->original_filename,
@@ -255,13 +286,17 @@ class ImportJobService
                     return $locked;
                 }
 
+                // كلاهما الآن بتعريف صفوف البيانات نفسه (بلا الفارغة): `processed`
+                // مجموع ما طبّقته النوافذ الفعلية عبر `dataIndex`، و`row_count`
+                // معاد حسابه أعلاه بنفس التعريف — فلا حاجة لتقليم `processed`
+                // بحدّ أقصى، لأن نافذة `parse()` لا تتجاوز `row_count` رياضياً.
                 $processedInChunk = $result['created'] + $result['updated'] + $result['skipped'];
                 $processed = $offset + $processedInChunk;
                 $totalRows = (int) $locked->row_count;
                 $completed = $processed >= $totalRows;
 
                 $locked->forceFill([
-                    'processed_rows' => min($processed, $totalRows),
+                    'processed_rows' => $processed,
                     'status' => $completed ? ImportJobStatus::COMPLETED : ImportJobStatus::PROCESSING,
                     'finished_at' => $completed ? now() : null,
                     'apply_result' => $result,

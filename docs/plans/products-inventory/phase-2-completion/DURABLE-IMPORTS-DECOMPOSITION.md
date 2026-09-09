@@ -317,11 +317,51 @@ table:
 | Column | Type | Purpose |
 |---|---|---|
 | `processed_rows` | `unsignedInteger`, default `0` | Durable cursor — next chunk's `batch_offset`. Advances only after a chunk's `DB::transaction()` (including the outer lock transaction) commits. |
-| `apply_options` | `json`, nullable | Options frozen from the **first** `/apply` call (`mode`, `blank_policy`, `master_data_policy`, `mapping`, `batch_size`). Every later chunk reuses this frozen value — a later call's request body is ignored for anything but which cursor to resume from, so a mid-run UI/client change can never reinterpret rows already committed under different semantics. |
+| `apply_options` | `json`, nullable | Options frozen from the **first** `/apply` call, verbatim — **including `batch_size`**: it is a semantic option like `mode`/`blank_policy`/`master_data_policy`/`mapping`, not an operational per-request knob. Every later chunk reuses this frozen value in full — a later call's request body (batch_size included) is ignored for anything but which cursor to resume from, so a mid-run UI/client change can never reinterpret rows already committed under different semantics, nor change how big the remaining chunks are mid-run. Proven by `ImportJobApplyTest::batch_size_is_frozen_from_the_first_apply_call_and_later_requests_cannot_change_it`. |
 | `apply_result` | `json`, nullable | Last chunk's raw `ProductImportService::apply()` return (`created`/`updated`/`skipped`/`results`) — exposed for polling; overwritten each chunk, not accumulated (row-level detail is already inside `apply_result.results` for that chunk only). |
 
 Reused, not duplicated: `row_count` (whole-file total, from PR-DUR-1's `inspect()`) is the completion threshold;
 `error_message` carries the terminal failure reason; `started_at`/`finished_at` mark apply start/completion.
+
+### Review-round fix — `row_count`/`processed_rows`/completion must share one "data row" definition
+
+**Finding (BLOCKER, pre-merge review of this PR):** `ImportJob.row_count` was set by PR-DUR-1's `inspect()` as
+a **physical** row count (`count($rows) - 1`, including blank rows), while `ProductImportService::parse()`'s
+`dataIndex` — the counter that actually drives batch windowing (`batch_offset`/`batch_size`) and that
+`created`/`updated`/`skipped` are summed from — **skips blank rows without incrementing it**. A file with a blank
+row anywhere (interleaved or trailing) therefore had `processed_rows` (blank-excluded) permanently short of
+`row_count` (blank-included): the job could never reach `processed_rows >= row_count`, stayed `processing`
+forever, and the next `/apply` call — now requesting a window past the true end of data — hit
+`ProductImportService::apply()`'s `total_rows === 0` guard and was misclassified as `failed` instead of
+`completed`.
+
+**Fix — same source of truth everywhere, not a special-cased "empty chunk = done":**
+
+- `ProductImportService::isBlankRow()` is now `public static` (was `private`) — the **single** blank-row
+  definition shared by `ProductImportService::inspect()`/`parse()` (unchanged behavior there) and by
+  `ImportJobService`, instead of a second copy of the predicate that could drift.
+- `ImportJobService::inspect()` (PR-DUR-1's structural inspect) now computes `row_count` the same way
+  `ProductImportService::inspect()` computes its own `total_rows`: header row dropped, then blank rows excluded.
+  `row_count` is now **defined as the data-row count**, matching `dataIndex` exactly — the only number
+  `processed_rows` is ever compared against.
+- **Backward compatibility for jobs already `ready` under the pre-fix code:** `ImportJobService::applyNextChunk()`
+  recomputes `row_count` from the durably-stored file **once, on the first `/apply` call** (same point where
+  `apply_options` is already frozen), before the completion check runs — self-healing a stale physical-count
+  `row_count` with zero migration/backfill. Any job that had *already* taken a chunk under the pre-fix bug would,
+  by the state machine, already be in the terminal `failed` state (not resumable) — there is no "already stuck
+  mid-flight" case left to handle. Proven by
+  `ImportJobApplyTest::a_stale_pre_fix_physical_row_count_self_heals_on_first_apply`.
+- `processed_rows` is now set to the exact cumulative applied count (`$offset + $processedInChunk`) with no
+  `min()` cap against `row_count` — the cap is now provably a no-op (both sides share the same data-row
+  definition, and `parse()`'s window can never exceed it), and removing it makes `processed_rows` visibly equal
+  to "actual applicable data rows applied," per the review's explicit requirement.
+
+Regression coverage in `ImportJobApplyTest`: a blank row between two valid rows, multiple interleaved and
+trailing blank rows, `batch_size = 1` (one data row per call), final status `completed` (not `failed`),
+`processed_rows` reflecting the true data-row count (not the physical one), each product created exactly once,
+and idempotent retry after completion — see
+`blank_rows_are_excluded_from_row_count_and_do_not_block_completion` and
+`multiple_and_trailing_blank_rows_complete_in_a_single_default_size_call`.
 
 ### State machine
 
