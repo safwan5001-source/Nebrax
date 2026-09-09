@@ -33,7 +33,10 @@ class CommerceModuleBoundaryTest extends TestCase
         'App\\Models\\CommerceOrder',
         'App\\Models\\Reservation',
         'App\\Models\\PaymentIntent',
-        'App\\Models\\SalesChannel',
+        // 'App\\Models\\SalesChannel' أُزيل هنا: PR-COM-2A بناه فعلاً، وهذا
+        // بالضبط ما يفسّره التوثيق أعلاه — الوعد كان بعدم إدخاله *قبل أوانه*،
+        // لا منعه للأبد. Class name الفعلي (App\Models\SalesChannel) مطابقٌ
+        // حرفياً لهذا الاسم المزال؛ لا نموذج آخر أُضيف باسمٍ مختلف يتطلّب تحديثاً هنا.
         'App\\Models\\CommerceListing',
     ];
 
