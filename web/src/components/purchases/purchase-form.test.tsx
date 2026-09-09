@@ -53,6 +53,16 @@ const { api, push, translate } = vi.hoisted(() => {
     tax_inclusive: 'Tax inclusive',
     back: 'Back',
     cancel: 'Cancel',
+    title: 'Document language',
+    option_ar: 'Arabic',
+    option_en: 'English',
+    option_bilingual: 'Bilingual',
+    option_bilingual_hint: 'Shows both languages',
+    follows_tenant_default: 'Follows organization default ({language})',
+    follows_system_default: 'Follows system default',
+    override_hint: 'Overrides the organization default for this document only',
+    reset_to_default: 'Reset to default',
+    frozen_note: 'Frozen at posting; no longer editable',
   };
   const translator = Object.assign(
     (key: string, values?: Record<string, unknown>) =>
@@ -284,6 +294,83 @@ describe('PurchaseForm — line card', () => {
         items: [expect.objectContaining({ product_id: 'prod-1', quantity: 7, unit_price: 2000, tax_rate: 15 })],
       }),
     })));
+  });
+});
+
+describe('PurchaseForm — document language', () => {
+  afterEach(cleanup);
+  beforeEach(() => { api.mockReset(); push.mockReset(); });
+
+  it('sends the chosen language override to the create payload', async () => {
+    respondWithReferenceData({
+      '/document-display-settings': { data: { default_language: null } },
+    });
+    api.mockImplementation((path: string, options?: { method?: string }) => {
+      if (path === '/purchases' && options?.method === 'POST') return Promise.resolve({ data: { id: 'pu-9' } });
+      if (path.startsWith('/partners')) return Promise.resolve({ data: [supplier] });
+      if (path.startsWith('/products')) return Promise.resolve({ data: [product] });
+      if (path.startsWith('/document-display-settings')) return Promise.resolve({ data: { default_language: null } });
+      return Promise.resolve({ data: [] });
+    });
+    render(<PurchaseForm />);
+    await firstLineQty();
+
+    await userEvent.selectOptions(screen.getByLabelText(/Supplier/), 'sup-1');
+    await userEvent.selectOptions(screen.getAllByLabelText('Item')[0], 'prod-1');
+    await userEvent.type(await firstLineQty(), '1');
+    await userEvent.click(screen.getByTestId('document-language-en'));
+
+    const save = screen.getByRole('button', { name: 'Save draft' }) as HTMLButtonElement;
+    await waitFor(() => expect(save.disabled).toBe(false));
+    await userEvent.click(save);
+
+    await waitFor(() => expect(api).toHaveBeenCalledWith('/purchases', expect.objectContaining({
+      method: 'POST',
+      body: expect.objectContaining({ language: 'en' }),
+    })));
+  });
+
+  it('leaves language null (tenant default) when the selector is untouched', async () => {
+    respondWithReferenceData();
+    api.mockImplementation((path: string, options?: { method?: string }) => {
+      if (path === '/purchases' && options?.method === 'POST') return Promise.resolve({ data: { id: 'pu-10' } });
+      if (path.startsWith('/partners')) return Promise.resolve({ data: [supplier] });
+      if (path.startsWith('/products')) return Promise.resolve({ data: [product] });
+      return Promise.resolve({ data: [] });
+    });
+    render(<PurchaseForm />);
+    await firstLineQty();
+
+    await userEvent.selectOptions(screen.getByLabelText(/Supplier/), 'sup-1');
+    await userEvent.selectOptions(screen.getAllByLabelText('Item')[0], 'prod-1');
+    await userEvent.type(await firstLineQty(), '1');
+
+    const save = screen.getByRole('button', { name: 'Save draft' }) as HTMLButtonElement;
+    await waitFor(() => expect(save.disabled).toBe(false));
+    await userEvent.click(save);
+
+    await waitFor(() => expect(api).toHaveBeenCalledWith('/purchases', expect.objectContaining({
+      method: 'POST',
+      body: expect.objectContaining({ language: null }),
+    })));
+  });
+
+  it('loads the stored language override when editing an existing draft', async () => {
+    respondWithReferenceData({
+      '/purchases/pu-1': {
+        data: {
+          partner_id: 'sup-1', warehouse_id: null, cost_center_id: null, payment_type: 'credit',
+          purchase_date: '2026-06-20', supplier_invoice_no: null, tax_inclusive: false, notes: null,
+          language: 'bilingual',
+          lines: [{ product_id: 'prod-1', description: 'Portland cement', quantity: 12, unit_name: null, unit_price: '2000', tax_rate: 15 }],
+          attachments: [],
+        },
+      },
+    });
+    render(<PurchaseForm editId="pu-1" />);
+    await firstLineQty();
+
+    await waitFor(() => expect(screen.getByTestId('document-language-bilingual').getAttribute('aria-checked')).toBe('true'));
   });
 });
 

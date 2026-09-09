@@ -3,6 +3,8 @@
 namespace App\Http\Resources;
 
 use App\Support\Money;
+use App\Support\PrintTemplateContract;
+use App\Support\Settings;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -48,6 +50,13 @@ class PurchaseResource extends JsonResource
             'pdf_template_revision' => new PrintTemplateRevisionResource($this->whenLoaded('pdfTemplateRevision')),
             'thermal_template_revision_id' => $this->thermal_template_revision_id,
             'thermal_template_revision' => new PrintTemplateRevisionResource($this->whenLoaded('thermalTemplateRevision')),
+            'language' => $this->language,
+            'language_frozen' => $this->language_frozen,
+            'language_effective' => PrintTemplateContract::resolveEffectiveLanguage(
+                $this->language_frozen,
+                $this->language,
+                Settings::get('documents', 'default_language'),
+            ),
             'remaining'           => Money::toRiyal($this->remaining()),
             'attachments'         => $this->whenLoaded('attachments', fn () => $this->attachments->map(fn ($attachment) => [
                 'id' => $attachment->id,

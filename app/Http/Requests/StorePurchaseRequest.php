@@ -57,6 +57,9 @@ class StorePurchaseRequest extends FormRequest
             'items.*.unit_price'  => ['required', 'integer', 'min:0', 'max:100000000000'],
             'tax_inclusive'       => ['nullable', 'boolean'], // هل تكاليف السطور متضمّنة الضريبة (تُستخرَج) أم لا (تُضاف)
             'items.*.tax_rate'    => ['nullable', 'integer', 'min:0', 'max:100'],
+            // لغة مستند فاتورة المشتريات — مستقلة عن UI locale وعن التصميم. الغياب/`null`
+            // = اتبع افتراضي المؤسسة ثم `ar`. القيمة الصريحة مقيدة بمفردات V1.
+            'language'            => ['nullable', 'string', 'in:ar,en,bilingual'],
         ];
     }
 

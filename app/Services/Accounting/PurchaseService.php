@@ -9,6 +9,7 @@ use App\Models\PurchaseLine;
 use App\Models\FuelSupplierInvoice;
 use App\Models\User;
 use App\Services\PrintTemplates\PrintTemplateService;
+use App\Support\PrintTemplateContract;
 use App\Support\Settings;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -73,6 +74,7 @@ class PurchaseService
 
             // الغياب يعني «استخدم تفضيل المستأجر»؛ القيمة المرسلة تسبقه دائماً.
             $inclusive = (bool) ($data['tax_inclusive'] ?? Settings::get('purchases', 'default_tax_inclusive'));
+            $language = $this->languageAttribute($data);
 
             $purchase = Purchase::create([
                 'number'              => $data['number'] ?? $this->nextNumber($date),
@@ -94,6 +96,7 @@ class PurchaseService
                 'received_date'       => $data['received_date'] ?? null,
                 'notes'               => $data['notes'] ?? null,
                 'created_by'          => $data['created_by'] ?? null,
+                'language'            => $language,
             ]);
 
             $this->writeLines($purchase, $items, $inclusive);
@@ -262,6 +265,7 @@ class PurchaseService
             // فكان تعديلُ ملاحظةٍ يقلب `tax_inclusive` إلى `false` **ويغيّر
             // الإجمالي** في فاتورة لم يُمسّ مبلغُها — نفس علّة الفواتير (#166).
             $keep = fn (string $key, $current) => array_key_exists($key, $data) ? $data[$key] : $current;
+            $language = $this->languageAttribute($data, $purchase);
 
             $purchase->update([
                 'partner_id'          => $data['partner_id'],
@@ -280,12 +284,45 @@ class PurchaseService
                 'received_status'     => $keep('received_status', $purchase->received_status) ?? $purchase->received_status,
                 'received_date'       => $keep('received_date', $purchase->received_date),
                 'notes'               => $keep('notes', $purchase->notes),
+                'language'            => $language,
             ]);
 
             $this->writeLines($purchase, $items, (bool) $purchase->fresh()->tax_inclusive);
 
             return $purchase->fresh('lines');
         });
+    }
+
+    /**
+     * لغة مستند فاتورة المشتريات — نفس منطق `InvoiceService::languageAttribute()`
+     * حرفياً. الغياب يُبقي القيمة عند التعديل، وnull يصفّر الاختيار (يعود لسقوط
+     * افتراضي المؤسسة ثم `ar`). القيمة الصريحة تخضع لعقد V1 حصراً
+     * (`ar`/`en`/`bilingual`).
+     */
+    private function languageAttribute(array $data, ?Purchase $existing = null): ?string
+    {
+        if ($existing === null) {
+            return PrintTemplateContract::assertLanguage($data['language'] ?? null);
+        }
+        if (! array_key_exists('language', $data)) {
+            return $existing->language;
+        }
+
+        return PrintTemplateContract::assertLanguage($data['language']);
+    }
+
+    /**
+     * لقطة لغة المستند عند الترحيل: قرار المسودة الحيّ ← افتراضي المؤسسة ← `ar`.
+     * كتابة واحدة على `language_frozen` ضمن معاملة الترحيل نفسها — لا مسار
+     * يعدّلها بعد ذلك. لا تمسّ الأرقام أو الضرائب أو المخزون — قرار عرض بحت.
+     */
+    private function freezeLanguage(Purchase $purchase): string
+    {
+        return PrintTemplateContract::resolveEffectiveLanguage(
+            null,
+            $purchase->language,
+            Settings::get('documents', 'default_language'),
+        );
     }
 
     /** حذف مسوّدة. المرحّلة لا تُحذف إطلاقاً — سلامة الأثر المحاسبي. */
@@ -511,12 +548,16 @@ class PurchaseService
             $printAssignment = $this->printTemplates->resolve('purchase_invoice', 'print', $purchase->branch_id);
             $pdfAssignment = $this->printTemplates->resolve('purchase_invoice', 'pdf', $purchase->branch_id);
             $thermalAssignment = $this->printTemplates->resolve('purchase_invoice', 'thermal', $purchase->branch_id);
+            // لغة المستند تُجمّد بنفس نقطة التزام لقطات القوالب — كتابة أولى
+            // وحيدة على `language_frozen`، مستقلة تماماً عن اختيار القالب.
+            $language = $this->freezeLanguage($purchase);
 
             $purchase->update([
                 'status'           => 'posted',
                 'print_template_revision_id' => $printAssignment?->print_template_revision_id,
                 'pdf_template_revision_id' => $pdfAssignment?->print_template_revision_id,
                 'thermal_template_revision_id' => $thermalAssignment?->print_template_revision_id,
+                'language_frozen'  => $language,
                 'subtotal'         => $subtotal,
                 'tax_amount'       => $taxTotal,
                 'total'            => $total,

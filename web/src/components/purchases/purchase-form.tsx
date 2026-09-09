@@ -16,6 +16,7 @@ import { Combobox, type ComboOption } from '@/components/ui/combobox';
 import { useToast } from '@/components/ui/toast';
 import { PartnerDialog } from '@/components/partners/partner-dialog';
 import { ProductDialog } from '@/components/products/product-dialog';
+import { DocumentLanguageSelector } from '@/components/documents/document-language-selector';
 import { api, ApiError } from '@/lib/api';
 import { useNumberPreview } from '@/lib/use-number-preview';
 import { formatRiyal, riyalToMinor } from '@/lib/money';
@@ -45,6 +46,7 @@ interface ApiPurchase {
   paid_on_post?: string; payment_method?: string;
   received_status?: string; received_date?: string | null;
   attachments?: StoredAttachment[];
+  language?: 'ar' | 'en' | 'bilingual' | null;
 }
 
 interface Line {
@@ -152,6 +154,8 @@ export function PurchaseForm({ editId }: { editId?: string } = {}) {
   const [receivedStatus, setReceivedStatus] = useState('received');
   const [receivedDate, setReceivedDate] = useState('');
   const [lines, setLines] = useState<Line[]>([newLine()]);
+  const [documentLanguage, setDocumentLanguage] = useState<'ar' | 'en' | 'bilingual' | null>(null);
+  const [tenantDefaultLanguage, setTenantDefaultLanguage] = useState<'ar' | 'en' | 'bilingual' | null>(null);
   const [newSupplier, setNewSupplier] = useState(false);
   // السطر الذي فُتحت من منتقيه نافذة «منتج جديد» — ليُختار فيه تلقائياً بعد الحفظ.
   const [newProductFor, setNewProductFor] = useState<string | null>(null);
@@ -189,6 +193,9 @@ export function PurchaseForm({ editId }: { editId?: string } = {}) {
       if (!editId) setWarehouseId((current) => current || active.find((warehouse) => warehouse.is_default)?.id || active[0]?.id || '');
     }).catch(() => {});
     getSystemTaxInclusive().then(setTaxInclusive).catch(() => {});
+    api<{ data: { default_language: 'ar' | 'en' | 'bilingual' | null } }>('/document-display-settings')
+      .then((r) => setTenantDefaultLanguage(r.data.default_language ?? null))
+      .catch(() => {});
   }, [editId, loadPartners, loadProducts]);
 
   // تحميل المسوّدة للتعديل وملء الحقول. المرحّلة يرفضها الخادم، وزرّ التعديل
@@ -216,6 +223,7 @@ export function PurchaseForm({ editId }: { editId?: string } = {}) {
         setReceivedStatus(d.received_status ?? 'received');
         setReceivedDate(d.received_date ?? '');
         setStoredAttachments(d.attachments ?? []);
+        setDocumentLanguage(d.language ?? null);
         setLines(
           d.lines.length
             ? d.lines.map((l) => ({
@@ -420,6 +428,7 @@ export function PurchaseForm({ editId }: { editId?: string } = {}) {
           received_status: receivedStatus,
           received_date: receivedDate || null,
           notes: notes || null,
+          language: documentLanguage,
           items,
       };
       const id = editId
@@ -505,6 +514,12 @@ export function PurchaseForm({ editId }: { editId?: string } = {}) {
         />
       }
     >
+      <DocumentLanguageSelector
+        value={documentLanguage}
+        tenantDefault={tenantDefaultLanguage}
+        onChange={setDocumentLanguage}
+      />
+
       {/* ═══ المورد ═══ */}
       <Card>
         <CardHeader>

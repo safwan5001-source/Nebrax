@@ -88,6 +88,9 @@ interface Purchase {
   pdf_template_revision?: FrozenPrintTemplateRevision | null;
   thermal_template_revision_id?: string | null;
   thermal_template_revision?: FrozenPrintTemplateRevision | null;
+  language?: 'ar' | 'en' | 'bilingual' | null;
+  language_frozen?: 'ar' | 'en' | 'bilingual' | null;
+  language_effective?: 'ar' | 'en' | 'bilingual';
   attachments: PurchaseAttachment[];
 }
 
