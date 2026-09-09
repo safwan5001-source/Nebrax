@@ -1,0 +1,432 @@
+# AWJ Implementation Report — PR-DUR-1 (Durable Imports — Job/File Infrastructure)
+
+**Date:** 2026-09-09
+**Status:** Implemented, tested, not merged
+**Branch:** `claude/sharp-tesla-490skb`
+**PR:** opened against `main` (see PR link in the pull request created from this branch)
+**Base SHA:** `001fe92fc89bdec72b8c39f694d976cd97dd6c3e`
+**Head SHA:** see the commit created alongside this report
+
+## 1. Summary
+
+Phase 2B (Durable Imports) had no PR-level decomposition yet — only the program-level
+`DURABLE-IMPORTS.md` contract existed. Per the task instructions, this session:
+
+1. Verified Durable Imports' stated prerequisites (`PR-INV-1`, `PR-UOM-1`, `PR-PROD-LIFE-1`,
+   finalized Multiple-UOM workbook) are actually satisfied on current `main` — by reading code
+   directly, since none of those literal identifiers appear in `main`'s commit history (the
+   plan docs' PR names don't match the actual merged commit titles).
+2. Measured the concrete gap between the `DURABLE-IMPORTS.md` plan and current `main`: all
+   three import surfaces (`ProductImportService`, `ProductWorkbookService`,
+   `InventoryOpeningImportService`) require the client to re-transmit the entire file on every
+   `inspect`/`preview`/`apply` call — there is no durable, tenant-owned file/job identity.
+3. Wrote `DURABLE-IMPORTS-DECOMPOSITION.md`, decomposing Durable Imports into five PRs
+   (PR-DUR-1..5), mirroring the rigor of the existing `MULTIPLE-UOM-BARCODE-DECOMPOSITION.md`.
+4. Found no unresolved Decision Gate blocking PR-DUR-1 (D-08 "Product Catalog import stock
+   effects" is already `DECIDED: NO`; no other Decision Register row applies).
+5. Implemented **PR-DUR-1 only**: the durable import job/file infrastructure foundation —
+   upload → tenant-owned storage → sha-256 fingerprint → structural inspect (row/column bounds
+   reusing `ProductImportService`'s existing constants) → `ready`/`failed` → cancel → retention
+   pruning. **Zero wiring into any existing import path** — `/products/import/*`,
+   `/products/workbook/*`, `/inventory-openings/import/*` are untouched.
+
+No merge, no deploy. No second PR started.
+
+## 2. Scope implemented
+
+New, fully additive surface: `POST/GET /import-jobs`, `GET /import-jobs/{id}`,
+`POST /import-jobs/{id}/cancel`, plus `imports:prune` maintenance command. Domain catalog
+limited to `product_catalog` only in this PR (see decomposition doc §4, decision D-G) —
+`product_workbook` and `inventory_opening` are added in PR-DUR-3/PR-DUR-4 alongside their own
+wiring, not pre-declared here as dead vocabulary.
+
+Full contract, decisions (D-G through D-J), failure semantics and acceptance criteria are in
+`docs/plans/products-inventory/phase-2-completion/DURABLE-IMPORTS-DECOMPOSITION.md` §4.
+
+## 3. Files changed
+
+| File | Change | Why |
+|---|---|---|
+| `docs/plans/products-inventory/phase-2-completion/DURABLE-IMPORTS-DECOMPOSITION.md` | new | PR-DUR-1..5 decomposition — prerequisite verification, measured gap, per-PR contracts |
+| `database/migrations/2026_09_17_010000_create_import_jobs_table.php` | new | `import_jobs` table — one new table, fully additive |
+| `app/Models/ImportJob.php` | new | `CompanyWide` model (tenant-wide operation, not branch-scoped — matches `ProductBarcode`/`BarcodeRegistryEntry`/`InventoryOpening` precedent) |
+| `app/Support/ImportJobDomain.php` | new | Domain catalog — `product_catalog` only in this PR |
+| `app/Support/ImportJobStatus.php` | new | Full status vocabulary declared now; only `uploaded→ready\|failed` and `{uploaded,ready}→cancelled` are reachable in this PR (asserted by a dedicated test) |
+| `app/Services/ImportJobFileStorage.php` | new | Local private-disk storage (D-I) — sha-256 fingerprint, store/delete |
+| `app/Services/ImportJobService.php` | new | `create()` (idempotent-by-key), `inspect()` (reuses `SpreadsheetReader` + `ProductImportService::MAX_ROWS`/`MAX_COLUMNS`), `cancel()` |
+| `app/Http/Requests/StoreImportJobRequest.php` | new | File/domain/idempotency_key validation — file rules copied verbatim from `ImportProductsRequest` |
+| `app/Http/Resources/ImportJobResource.php` | new | API response shape |
+| `app/Http/Controllers/Api/ImportJobController.php` | new | `index`/`show`/`store`/`cancel`, extends `ApiController` for the standard `RuntimeException`→422 mapping |
+| `app/Console/Commands/PruneImportJobs.php` | new | `imports:prune` — retention cleanup for `cancelled`/`failed` jobs past `purge_after`, mirrors `PruneWebhooks` |
+| `config/imports.php` | new | `retention_days` (default 14) |
+| `routes/api.php` | +6 lines | 4 new routes under existing `products.manage`/`products.view` gates — no new RBAC permission |
+| `routes/console.php` | +5 lines | `imports:prune` daily schedule entry, same deferred-activation note as the existing `webhooks:prune` entry |
+| `tests/Feature/ImportJobTest.php` | new | 9 tests covering upload/inspect/fail/idempotency/tenant-isolation/cancel/status-vocabulary/prune |
+
+## 4. Schema / migrations / API contract
+
+**Schema:** one new table, `import_jobs` (see migration for full column list: domain, status,
+idempotency_key, original_filename/extension/mime_type/byte_size, storage_disk/storage_path,
+content_sha256, row_count/column_count, error_message, created_by/cancelled_by, timestamps,
+purge_after). No existing table altered. Down-migration drops the table cleanly.
+
+**API (all new, additive):**
+- `POST /api/import-jobs` (`products.manage`) — multipart `file`, `domain` (`product_catalog`
+  only), optional `idempotency_key`. Returns 201 with the job resource.
+- `GET /api/import-jobs` (`products.view`) — paginated list, filterable by `domain`/`status`.
+- `GET /api/import-jobs/{id}` (`products.view`) — show; 404 for another tenant's job.
+- `POST /api/import-jobs/{id}/cancel` (`products.manage`) — 422 outside `uploaded`/`ready`.
+
+None of the three existing import surfaces' routes, requests, services, or controllers were
+modified.
+
+## 5. Security / Tenant / Branch / Warehouse evidence
+
+- **Tenant isolation:** `ImportJob` inherits `BaseModel`'s `BelongsToTenant`/`TenantScope`.
+  Tested explicitly: `a_job_cannot_be_read_or_cancelled_from_another_tenant` (404 on cross-tenant
+  `show`/`cancel`), `the_same_idempotency_key_in_another_tenant_does_not_collide` (uniqueness is
+  `(tenant_id, idempotency_key)`, never global).
+- **Branch classification:** `ImportJob implements CompanyWide` — verified by
+  `BranchIsolationGuardTest` (all 4 assertions pass, including "declared company-wide is never
+  also branch-scoped").
+- **RBAC:** reuses the existing `products.manage`/`products.view` permissions — identical gate
+  to the three existing import surfaces; no new permission invented.
+- **No cost fields exposed:** this PR carries no monetary/cost field at all (file metadata only),
+  so `SensitiveCostPolicy` has nothing to redact here.
+
+## 6. Accounting / Inventory reconciliation
+
+**Not applicable.** This PR creates, updates, or deletes zero rows in `products`,
+`product_barcodes`, `price_list_items`, `barcode_registry`, `inventory_openings`,
+`inventory_opening_lines`, `journal_entries`, or `journal_lines`. It stores a file and a job
+record about it — nothing else. Verified explicitly by test assertion
+`$this->assertSame(0, Product::count(), ...)` after every job-creating test.
+
+**No journal entry is generated by this PR.** There is no accounting entry table to present.
+
+## 7. UOM / historical semantics
+
+Not applicable — no `Product`, `UnitTemplate`, or UOM-bearing row is touched.
+
+## 8. Concurrency / idempotency
+
+- **Job-creation idempotency:** a client-supplied `idempotency_key`, unique per
+  `(tenant_id, idempotency_key)`. A repeated `POST` with the same key returns the existing job
+  (200-shape via the same 201 resource) instead of creating a second row or storing the file
+  twice — tested (`repeating_the_same_idempotency_key_returns_the_same_job_without_a_second_write`,
+  asserts `ImportJob::count() === 1`).
+- **Cancellation race:** `cancel()` checks `ImportJobStatus::CANCELLABLE_FROM` and throws
+  (422, no state change) outside `uploaded`/`ready` — tested explicitly (double-cancel rejected).
+- **Chunked/resumable apply, retry-safe row-level idempotency:** out of scope for this PR by
+  design (PR-DUR-2) — this PR does no processing beyond a synchronous structural inspect.
+
+## 9. Tests
+
+| Command / suite | Result | Notes |
+|---|---|---|
+| `php artisan test --filter=ImportJobTest` (SQLite) | ✅ 9 passed (52 assertions) | new tests, isolated run |
+| `php artisan test --filter=ImportJobTest` (PostgreSQL) | ✅ 9 passed (52 assertions) | identical |
+| `php artisan test --filter="ProductImportTest\|ProductImportV2Test\|ProductWorkbook\|InventoryOpeningImport"` (SQLite) | ✅ 110 passed (635 assertions) | existing import surfaces, zero regression |
+| `php artisan test --filter="ProductImportTest\|ProductImportV2Test\|ProductWorkbook\|InventoryOpeningImport\|BranchIsolationGuardTest"` (PostgreSQL) | ✅ 114 passed (749 assertions) | existing import surfaces + architecture guard, zero regression |
+| `php artisan test --filter=BranchIsolationGuardTest` (SQLite) | ✅ 4 passed (114 assertions) | confirms `ImportJob`'s `CompanyWide` classification |
+| **Full suite, SQLite** (clean, single run, no concurrent DB access) | 26 failed, 15 skipped, **3147 passed** (20499 assertions), 428.52s | see §13 — all 26 failures are one pre-existing, unrelated cause |
+| **Full suite, PostgreSQL** (clean, single run) | 26 failed, **3162 passed** (20568 assertions), 936.73s | same 26 failures (the 15 SQLite-skipped concurrent-connection tests run for real here — 3147+15=3162, consistent) |
+| Copy-list guard (`.github/workflows/ci.yml`'s directory-allowlist check, run manually) | ✅ passes | every new file's directory is already in the allowed list — no CI guard update needed |
+
+**Two initial full-suite attempts were discarded as invalid** before the clean runs above: the
+first full-suite run was contaminated by a concurrent `--filter` run I started against the same
+SQLite file mid-suite (`SQLSTATE[HY000]: database is locked`, cascading into 78 false failures);
+both clean runs above were single, uninterrupted, single-process runs against a freshly migrated
+database.
+
+## 10. Build / Lint / Typecheck
+
+`php -l` on every new/changed PHP file: no syntax errors. No `web/` changes in this PR — Web CI
+is not applicable.
+
+## 11. CI
+
+Not run on GitHub Actions from this session (no push yet at report-writing time). Locally
+assembled the exact Laravel 11 project `ci.yml`/`setup.sh` describe (`composer create-project
+laravel/laravel:^11.0`, `laravel/sanctum`, core files merged per the same copy list, service
+providers registered, `install:api`) and ran `php artisan test` directly — the same command CI
+runs — on both SQLite and a local PostgreSQL 16 instance configured with CI's exact
+`DB_DATABASE=nibras`/`DB_USERNAME=nibras`/`DB_PASSWORD=secret` values. `league/flysystem-aws-s3-v3`
+and `predis/predis` (S3/Redis support, unrelated to this PR and unreachable via this session's
+network policy for a large `git clone` of `aws/aws-sdk-php`) were omitted from this **local
+verification build only** — nothing in PR-DUR-1 or the existing suite depends on either package
+being installed (S3 storage requires `document_center.storage.persistent_enabled=true`, which
+defaults `false`; Redis is not exercised by any test in this run). The actual CI workflow file is
+unmodified and still installs both.
+
+## 12. Deviations from approved plan
+
+None on scope. Two **local-verification-environment** gaps were found and are disclosed rather
+than worked around in code:
+
+1. `poppler-utils` was missing from this sandbox initially (one `DocumentCenterSecureIntakeTest`
+   PDF-page-limit test failed); installed via `apt-get install poppler-utils` before the clean
+   runs — CI already installs this (`ci.yml`: "تثبيت محركات PDF وXML" step).
+2. The PHP `bcmath` extension is unavailable in this sandbox and could not be installed (the
+   `ppa.launchpadcontent.net/ondrej/php` source needed for `php8.4-bcmath` is blocked by this
+   session's outbound network policy, returning `403 Forbidden`). This causes exactly 26 test
+   failures across exactly 6 classes — `FuelAviRfidServiceTest`, `FuelReconciliationTest`,
+   `FuelSaleApiTest`, `FuelSaleServiceTest`, `FuelSupplyReceivingApiTest`,
+   `FuelSupplyReceivingTest` — all with the identical error `Call to undefined function
+   App\Services\bcmul()` in `app/Services/FuelCostBasisService.php:380`, a file this PR does not
+   touch and a domain (fuel station cost-basis accounting) entirely unrelated to Durable Imports.
+   Both SQLite and PostgreSQL clean runs show the **exact same 26 failures, nothing more** —
+   confirming this is one pre-existing, environment-specific gap, not a regression. GitHub
+   Actions CI installs `bcmath` explicitly (`shivammathur/setup-php@v2`'s `extensions:` list
+   includes `bcmath`) and will not exhibit this failure.
+
+No scope expansion: no accounting/GL/UOM/pricing file was touched; no existing import
+endpoint/service/request was modified; no new RBAC permission was invented.
+
+## 13. Risks / remaining work
+
+- **Risk:** none identified against the stated invariants (tenant isolation, no accounting
+  effect, backward compatibility) — all covered by the tests in §9.
+- **Remaining, by design (not this PR's scope):** chunked/resumable `apply()` wired to Product
+  Catalog import (PR-DUR-2), then Product Workbook (PR-DUR-3) and Inventory Opening (PR-DUR-4)
+  through the same engine, then a frontend (PR-DUR-5). None of these are started.
+- **Verify in real CI:** the `bcmath`-dependent Fuel suite and the PDF-page-limit test, which
+  this local sandbox could not fully validate due to network-policy-blocked package sources
+  (§12) — expected to pass identically to how they did before this PR, since this PR touches
+  neither the Fuel domain nor Document Center.
+
+## 14. Merge / deploy status
+
+**Not merged. Not deployed.** No autonomous merge/deploy was performed or requested.
+
+## 15. Next step
+
+Await review of this report and the opened PR. Per the task's own gate, do not start PR-DUR-2
+(chunked apply engine wired to Product Catalog import) until this PR is reviewed/merged — each
+PR in the decomposition is opened, reviewed, and merged separately.
+
+---
+
+## 16. Post-review revision (round 2)
+
+**Date:** 2026-09-09
+**Trigger:** PR #746 review — three findings (storage durability, idempotency race/orphan
+cleanup, idempotency payload binding). Full findings and the approved decision are recorded in
+`DURABLE-IMPORTS-DECOMPOSITION.md` §4a; this section records the implementation and evidence.
+
+### 16.1 Storage durability — resolved by owner decision
+
+The original PR-DUR-1 D-I ("local disk, S3/R2 later is just a config change — not blocking")
+understated the risk: AWJ's production container (Render today, Railway named explicitly in the
+review) has no persistent volume, so local files are lost on redeploy/restart, not eventually.
+Asked to choose between (a) a configurable local/S3 contract defaulting to local (inheriting the
+system's already-documented interim posture), (b) wiring in real credentials, or (c) something
+else, **Safwan approved (a)** with mandatory constraints. Implemented exactly as approved:
+
+- `app/Services/ImportJobFileStorage.php` rewritten: driver-neutral (`local`/`s3`), independent
+  `config/imports.php` `storage` section (own env vars — `IMPORTS_STORAGE_DRIVER`/`KEY`/`SECRET`/
+  `REGION`/`BUCKET`/`ENDPOINT`/`URL`/`PATH_STYLE`), **no dependency on `DocumentStorageService` or
+  `PlatformIntegrationResolver`** — the driver-neutral *pattern* is reused, Document Center's
+  class and domain logic are not.
+- Fail-closed: `driver=s3` with any of `key`/`secret`/`bucket`/`endpoint` blank throws before any
+  write — never a silent fallback to `local` (test: `s3_driver_with_missing_configuration_fails_closed_before_any_write`).
+- Private visibility and tenant-separated paths preserved and now explicitly tested
+  (`storage_paths_are_tenant_separated_and_private`).
+- `readStream()` replaces the old `absolutePath()` — driver-agnostic. `ImportJobService::inspect()`
+  now materializes a short-lived local temp copy via `materializeLocalCopy()` before handing a
+  real file path to `SpreadsheetReader` (which needs one for XLSX's `ZipArchive`/`XMLReader`), so
+  `inspect()` works identically regardless of the configured driver.
+- `config/imports.php` and the service class both carry an explicit, prominent comment: **local
+  storage is not production-durable** — it does not survive a Render/Railway redeploy, restart,
+  or container replacement. No later Durable Imports PR may claim cross-deploy persistence as a
+  guaranteed invariant until real S3/R2 (or another explicitly approved backend) is provisioned.
+- **Nothing provisioned in this PR**: no bucket, no credentials, no Railway Volume, no change to
+  the project-wide storage posture outside Durable Imports. `IMPORTS_STORAGE_DRIVER` defaults to
+  `local`, unchanged from before this fix — the fix is the *contract*, not a behavior flip.
+
+### 16.2 Idempotency race / orphan cleanup
+
+`ImportJobService::create()`'s pre-check was a fast path only, not a guarantee: two concurrent
+requests with the same `(tenant_id, idempotency_key)` could both pass it and both store a file
+before either inserted its row. Fixed:
+
+- The insert is now wrapped in `DB::transaction()` and the catch targets
+  `Illuminate\Database\UniqueConstraintViolationException` — portable across SQLite and
+  PostgreSQL (Laravel maps each driver's native unique-violation error to this one class; verified
+  by reading `Illuminate\Database\Connection::runQueryCallback()` and each driver's
+  `isUniqueConstraintError()`).
+- On conflict, the loser deletes its own just-stored file immediately (no orphan), re-queries for
+  the winner's row, validates it against the same payload-binding rule as a normal retry (§16.3),
+  and returns it — never a second row, never a silent return of an unrelated job.
+- **The `DB::transaction()` wrapper itself was a required fix, not a stylistic choice**: on
+  PostgreSQL, a failed `INSERT` poisons the ambient transaction (`SQLSTATE 25P02`) — even the
+  recovery `SELECT` afterward fails unless the transaction is properly rolled back first, which
+  `DB::transaction()`'s own catch-rollback-rethrow does automatically. This was caught by the
+  PostgreSQL test run (see §16.4) after the SQLite run passed — SQLite does not exhibit this
+  failure mode, so a SQLite-only run would have shipped it.
+- Regression test: `concurrent_duplicate_creation_leaves_exactly_one_job_and_no_orphan_file`,
+  using a real second database connection (mirroring the existing
+  `DocumentNumberingTest::two_concurrent_requests_cannot_take_the_same_number` convention) to
+  commit a competing row independently of the test's own wrapping transaction, right as
+  `ImportJob::create()`'s own insert is about to run (via the `creating` Eloquent event). Runs on
+  PostgreSQL only — genuine cross-connection concurrency is untestable on SQLite, which
+  serializes all writes behind one file-level lock (confirmed empirically: the first attempt at
+  this test, using the *same* connection for both the "rival" insert and the code under test,
+  self-deadlocked on SQLite and had to be redesigned to use a second connection, then skipped on
+  SQLite exactly as the codebase's existing dual-connection concurrency tests already do).
+
+### 16.3 Idempotency payload binding
+
+The original contract never defined what happens when a reused `idempotency_key` carries a
+*different* file or domain. Fixed: `assertSameRequestOrFail()` compares the existing job's
+`domain` and `content_sha256` against the new request's; any mismatch throws (422, fail-closed) —
+the existing job is never returned for a request it does not represent, and no new row or file is
+created for the rejected attempt. Mapping/options are not part of the comparison because PR-DUR-1
+captures none (D-H, unchanged) — a later PR that adds them must extend this same binding function,
+not invent a second one.
+
+Regression tests: `a_true_retry_reuses_the_existing_job_and_stores_no_second_file` (byte-identical
+file + same domain → existing job, exactly one stored file total), `the_same_key_with_a_different_file_fails_closed_and_leaves_no_orphan`
+(different file content, same key → 422, still exactly one job/file), `the_same_key_with_a_different_domain_fails_closed`
+(exercised at the service layer directly, since `product_catalog` is the only HTTP-valid domain
+value in this PR per D-G — the binding logic itself is domain-aware now, ready for PR-DUR-3/4's
+additional domains).
+
+### 16.4 Files changed (round 2)
+
+| File | Change | Why |
+|---|---|---|
+| `config/imports.php` | rewritten | driver-neutral `storage` section, explicit ephemeral-local-disk warning (§16.1) |
+| `app/Services/ImportJobFileStorage.php` | rewritten | local/S3-compatible dispatch, fail-closed on incomplete `s3` config, `readStream()` replaces `absolutePath()`, `store()` takes a pre-computed sha-256 |
+| `app/Services/ImportJobService.php` | rewritten | race-safe insert-or-fetch (`DB::transaction()` + `UniqueConstraintViolationException`), `assertSameRequestOrFail()` payload binding, `materializeLocalCopy()` for driver-agnostic `inspect()` |
+| `app/Console/Commands/PruneImportJobs.php` | 1 line | `storage->delete()` call site updated to the new (path-only) signature |
+| `tests/Feature/ImportJobTest.php` | +182 lines, 6 new tests | fail-closed S3 config, tenant-separated/private paths, true retry, different-file/different-domain fail-closed, real concurrent race (PostgreSQL) |
+| `docs/plans/products-inventory/phase-2-completion/DURABLE-IMPORTS-DECOMPOSITION.md` | updated | D-I rewritten, D-K/D-L added, new §4a recording the review/decision, in-scope/out-of-scope/failure-semantics/acceptance-criteria updated to match |
+| `docs/plans/products-inventory/phase-2-completion/PR-DUR-1-IMPLEMENTATION-REPORT.md` | this section | — |
+
+No file outside this list changed. No accounting/GL/UOM/pricing file touched. No existing import
+surface (`/products/import/*`, `/products/workbook/*`, `/inventory-openings/import/*`) modified.
+
+### 16.5 Tests (round 2)
+
+| Command / suite | SQLite | PostgreSQL |
+|---|---|---|
+| `php artisan test --filter=ImportJobTest` (15 tests: 9 original + 6 new) | ✅ 14 passed, 1 skipped (72 assertions) — the concurrency test skips by design (§16.2) | ✅ 15 passed (75 assertions) |
+| `php artisan test --filter="ProductImportTest\|ProductImportV2Test\|ProductWorkbook\|InventoryOpeningImport\|BranchIsolationGuardTest"` | ✅ 128 passed, 1 skipped (821 assertions, combined with ImportJobTest) | ✅ 114 passed (749 assertions) |
+| **Full suite** | 26 failed, 16 skipped, **3152 passed** (20519 assertions), 270.02s | 26 failed, **3168 passed** (20591 assertions), 594.75s |
+
+Both full-suite numbers are internally consistent (3152 + 16 = 3168) and show the **same 26
+failures in the same 6 pre-existing, unrelated classes** already disclosed in §12/§13 of this
+report (the local sandbox's missing `bcmath` PHP extension, entirely inside
+`app/Services/FuelCostBasisService.php`, a file this PR never touches) — zero new failures from
+this revision, on either engine.
+
+### 16.6 CI
+
+Not run on GitHub Actions from this session at report-writing time (push happens immediately
+after this report is finalized). Locally reproduced the same `php artisan test` command CI runs,
+on both SQLite and a local PostgreSQL 16 instance configured with CI's exact database name/user/
+password, exactly as in the original §11.
+
+### 16.7 Deviations from approved plan (round 2)
+
+None beyond what Safwan explicitly approved in the storage discussion (§16.1, recorded verbatim
+in `DURABLE-IMPORTS-DECOMPOSITION.md` §4a). No scope expansion: no accounting/GL/UOM/pricing file
+touched, no existing import endpoint modified, no infrastructure provisioned, no RBAC change.
+
+### 16.8 Risks / remaining work (round 2)
+
+- **Local storage remains non-durable across a Railway/Render redeploy** until Safwan provisions
+  real S3/R2 (or another approved backend) and sets `IMPORTS_STORAGE_DRIVER=s3` — this is now
+  explicitly documented rather than implicitly assumed, per the approved decision. No PR in this
+  decomposition may claim otherwise until that provisioning happens.
+- Same `bcmath`/`poppler-utils` local-sandbox verification gaps as the original report (§12),
+  unrelated to this PR, unaffected by this revision.
+- Remaining Durable Imports work is unchanged: PR-DUR-2..5, none started.
+
+### 16.9 Merge / deploy status (round 2)
+
+**Not merged. Not deployed.** PR-DUR-2 not started.
+
+### 16.10 Next step (round 2)
+
+Push this revision to the existing PR #746 (same branch, new commit) and await review. Report
+the new Head SHA, changed files, and exact test/CI results in the session reply.
+
+---
+
+## 17. Post-review revision (round 3) — HTTP idempotency response semantics
+
+**Date:** 2026-09-09
+**Trigger:** PR #746 review — a P2 finding, scoped narrowly: `POST /api/import-jobs` returned
+`201 Created` both when a new `ImportJob` was actually created and when a true idempotent retry
+reused an existing one. Every other round-2 finding (storage, concurrency/orphan cleanup,
+payload binding, tenant isolation, durability) was explicitly accepted as resolved and is
+untouched by this round.
+
+### 17.1 Fix
+
+`ImportJobService::create()` needed **no change** — Eloquent's own `wasRecentlyCreated` property
+already carries exactly the right signal with zero extra query: it is set to `true` only inside
+`Model::performInsert()` (i.e. only when *this* call's `ImportJob::create([...])` actually inserts
+a row) and stays `false` on any model fetched via a query (`ImportJob::where(...)->first()`) —
+which is precisely what both the fast idempotency path and the race-loss recovery path in
+`create()` already do. It also survives the `inspect()` step's later `$job->update([...])`
+unchanged, since `update()` goes through `performUpdate()`, which never touches the flag.
+
+So the only code change is in the controller, reading that already-correct signal:
+
+```php
+$status = $job->wasRecentlyCreated ? 201 : 200;
+return (new ImportJobResource($job))->response()->setStatusCode($status);
+```
+
+This is the "smallest clean mechanism" the review asked for: no DTO, no service-layer signature
+change, no additional query, no timestamp inference.
+
+### 17.2 Files changed (round 3)
+
+| File | Change | Why |
+|---|---|---|
+| `app/Http/Controllers/Api/ImportJobController.php` | `store()`: status code now `$job->wasRecentlyCreated ? 201 : 200` | HTTP semantics fix — the only production code change |
+| `tests/Feature/ImportJobTest.php` | 2 existing tests' second-call assertion changed from `assertCreated()` to `assertOk()` (their behavior was already a true retry — only the status-code expectation was outdated); 1 new assertion (`assertFalse($job->wasRecentlyCreated, ...)`) added to the existing concurrency test | prove 201-vs-200 semantics without adding a redundant duplicate test |
+
+No schema, migration, storage architecture, existing import surface, accounting/GL/UOM/pricing,
+or RBAC file touched — exactly as scoped.
+
+### 17.3 Tests (round 3)
+
+| Command / suite | SQLite | PostgreSQL |
+|---|---|---|
+| `php artisan test --filter=ImportJobTest` (15 tests) | ✅ 14 passed, 1 skipped (concurrency test, PostgreSQL-only by design) (72 assertions) | ✅ 15 passed (76 assertions) |
+| `php artisan test --filter="ProductImportTest\|ProductImportV2Test\|ProductWorkbook\|InventoryOpeningImport\|BranchIsolationGuardTest"` | not re-run (unaffected — this change touches only `ImportJobController::store()` and its own tests) | ✅ 114 passed (749 assertions) |
+
+Verified explicitly by the updated tests: first `POST` → 201, same job id on a true retry → 200,
+exactly one `ImportJob` row and one stored file survive the retry either way, and — via the
+existing tests left otherwise unchanged — a different file/domain under the same key still fails
+closed (422) and a real concurrent race still leaves exactly one job with no orphan file (now
+additionally asserting the loser's `wasRecentlyCreated` is `false`).
+
+### 17.4 CI
+
+Both workflow runs on Head SHA `bd42fb66d0f12df721a44113834f7c15e042347f` completed successfully
+(full matrix: SQLite + PostgreSQL, per `.github/workflows/ci.yml`):
+
+| Run | Event | Run number | Conclusion | URL |
+|---|---|---|---|---|
+| `34407153002` | `push` | 4428 | ✅ success | https://github.com/safwan5001-source/Nebrax/actions/runs/34407153002 |
+| `34407154517` | `pull_request` (#746) | 4429 | ✅ success | https://github.com/safwan5001-source/Nebrax/actions/runs/34407154517 |
+
+CI installs `bcmath` explicitly (`shivammathur/setup-php@v2`), so unlike this session's local
+verification sandbox, the full-suite run in CI is not expected to show the 26 `bcmath`-related
+Fuel-domain failures disclosed in §12/§13 — CI green here covers the complete suite, not just the
+focused `ImportJobTest` run.
+
+### 17.5 Risks / remaining work (round 3)
+
+None new. All round-2 findings remain resolved and untouched. Durable Imports work beyond
+PR-DUR-1 is unchanged: PR-DUR-2..5, none started.
+
+### 17.6 Merge / deploy status (round 3)
+
+**Not merged. Not deployed.** PR-DUR-2 not started.
