@@ -394,8 +394,7 @@ instruction not to begin it in this task):
 ## Git
 
 - **Branch:** `claude/pr-com-1a-ats-read-model`
-- **PR:** opened against `main` (link added after this report is
-  committed — see final chat message for the URL)
+- **PR:** [#726](https://github.com/safwan5001-source/Nebrax/pull/726) — opened against `main`, not merged
 - **Base SHA:** `f44f0fcf6d48f80cea4f4b6bbacf84a609993a54`
 - **Head SHA:** `26dae60cc502848a0e4d2ef59fc090f799ce3292` (before adding this report)
 
