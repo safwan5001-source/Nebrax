@@ -170,7 +170,7 @@ class CustomerDigitalAccessTest extends TestCase
 
         $this->withToken($token)
             ->getJson("/api/customer/v1/{$beta->slug}/me")
-            ->assertUnauthorized();
+            ->assertForbidden();
     }
 
     public function test_login_is_generic_for_invalid_unverified_and_inactive_identities(): void
