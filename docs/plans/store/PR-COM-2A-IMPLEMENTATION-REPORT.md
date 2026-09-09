@@ -410,8 +410,7 @@ conscious, documented deferrals, not blockers.
 ## 27. Git
 
 - **Branch:** `claude/pr-com-2a-sales-channel`
-- **PR:** opened against `main` — link recorded in a follow-up commit to
-  this report
+- **PR:** [#728](https://github.com/safwan5001-source/Nebrax/pull/728) — opened against `main`, not merged
 - **Base SHA:** `5d21c04e202d9d75841940ed720af0674fb9f92a`
 - **Head SHA:** `b867443d8a79f9a86d5a3ebca6e67e61170aaaca` (before adding
   this report)
