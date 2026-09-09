@@ -1,5 +1,5 @@
 import { riyalToMinor } from '@/lib/money';
-import type { DocumentModel } from '../types';
+import type { DocumentModel, Direction, DocumentLanguage } from '../types';
 import type { SourceCompany, SourceCustomer } from './from-invoice';
 
 /** أشكال مصدر فاتورة المشتريات كما يعيدها عقد الـ API، ومبالغها بالريال نصّاً. */
@@ -25,6 +25,15 @@ export interface SourcePurchase {
   total: string;
   notes?: string | null;
   lines: SourcePurchaseLine[];
+  /**
+   * `language_effective` هي القرار النهائي المحسوب في `PurchaseResource` عبر
+   * `PrintTemplateContract::resolveEffectiveLanguage` — لقطة التجميد بعد
+   * الترحيل، ثم قرار المسودة، ثم افتراضي المؤسسة، ثم `ar`. يُستهلك مباشرة إن
+   * لم يمرِّر المستدعي `language` صريحاً في `input.language`.
+   */
+  language?: 'ar' | 'en' | 'bilingual' | null;
+  language_frozen?: 'ar' | 'en' | 'bilingual' | null;
+  language_effective?: 'ar' | 'en' | 'bilingual';
 }
 
 /**
@@ -43,6 +52,13 @@ export function buildPurchaseDocumentModel(input: {
   bank?: string | null;
   stampUrl?: string | null;
   signatureUrl?: string | null;
+  direction?: Direction;
+  /**
+   * لغة عرض المستند من الخلفية (`language_effective`). المسوّغ الوحيد لتمريرها
+   * هنا صراحةً هو معاينة لغة لم تُحفَظ بعد؛ المستدعي المعتاد يترك القيمة تسقط
+   * إلى `input.purchase.language_effective`.
+   */
+  language?: DocumentLanguage | null;
 }): DocumentModel {
   const {
     purchase,
@@ -57,10 +73,18 @@ export function buildPurchaseDocumentModel(input: {
     signatureUrl,
   } = input;
 
+  // أولوية الـprop الصريح ثم `language_effective` من عقد الـAPI، فالإسقاط إلى
+  // `null` يُبقي سلوك ما قبل PR-LANG-2 حرفياً (اتجاهٌ ثابت `rtl`).
+  const language = input.language ?? purchase.language_effective ?? null;
+  // عندما تكون لغة المستند إنجليزية صريحة ولم يمرِّر المستدعي direction، اقلب
+  // الاتجاه فعلياً — وإلا بقي RTL يعرض نصاً إنجليزياً بمحاذاة معكوسة.
+  const direction: Direction = input.direction ?? (language === 'en' ? 'ltr' : 'rtl');
+
   return {
     type: 'purchase_invoice',
     currency: 'SAR',
-    direction: 'rtl',
+    direction,
+    language,
     seller: {
       name: company?.name ?? '—',
       vatNumber: company?.vat_number ?? null,

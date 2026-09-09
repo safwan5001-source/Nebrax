@@ -1,6 +1,7 @@
 'use client';
 
-import type { ThemeId, DocSectionLayoutItem } from '@/modules/documents/types';
+import { useLocale } from 'next-intl';
+import type { Direction, DocumentLanguage, ThemeId, DocSectionLayoutItem } from '@/modules/documents/types';
 import { DocumentView } from '@/modules/documents/components/document-view';
 import {
   buildPurchaseDocumentModel,
@@ -29,6 +30,8 @@ export function PurchaseDocument({
   logoHeight,
   layout,
   rootId,
+  direction,
+  language,
 }: {
   purchase: PurchaseDoc;
   company: PurchaseCompany | null;
@@ -45,7 +48,17 @@ export function PurchaseDocument({
   logoHeight?: number | null;
   layout?: DocSectionLayoutItem[] | null;
   rootId?: string | null;
+  direction?: Direction;
+  /**
+   * لغة المستند الصريحة — تفوز على `purchase.language_effective` من عقد الـAPI،
+   * وتفوز على استنتاج UI locale × direction. لا تُخزَّن على الفاتورة.
+   */
+  language?: DocumentLanguage | null;
 }) {
+  const locale = useLocale();
+  const effectiveLanguage = language ?? purchase.language_effective ?? null;
+  const resolvedDirection = direction
+    ?? (effectiveLanguage === 'en' ? 'ltr' : effectiveLanguage === 'ar' || effectiveLanguage === 'bilingual' ? 'rtl' : (locale === 'en' ? 'ltr' : 'rtl'));
   const model = buildPurchaseDocumentModel({
     purchase,
     company,
@@ -57,6 +70,8 @@ export function PurchaseDocument({
     bank,
     stampUrl,
     signatureUrl,
+    direction: resolvedDirection,
+    language: effectiveLanguage,
   });
 
   return (
