@@ -38,8 +38,9 @@ was touched.
   named, confirmed still current via `git fetch origin main` before
   branching).
 - **Branch:** `claude/pr-com-6b-commerce-ownership-authorization`.
-- **Head SHA:** `25b069f` (pushed).
-- **PR:** opened against `main`, not merged (see §26 for number/link).
+- **Head SHA:** `25b069f` (code); `a85b498` (report commit).
+- **PR:** [#752](https://github.com/safwan5001-source/Nebrax/pull/752) —
+  opened against `main`, not merged.
 
 ## 3. Binding sources read
 
@@ -523,8 +524,8 @@ between the approved architecture and the actual merged code.
 - **Base SHA:** `26d58d8fb1ca6acee9d585f09dcd039565662a97`
 - **Head SHA:** `25b069f` (code) — this report is added in a follow-up
   commit on the same branch/PR.
-- **PR:** number/link recorded at open time (this section is updated by
-  the opening commit's companion message).
+- **PR:** [#752](https://github.com/safwan5001-source/Nebrax/pull/752) —
+  opened against `main`, not merged.
 
 **Recommended next step:** owner review of the ownership-authority
 boundary (§6–§12) and the COM-6B/6C planning-text resolution (§5/§24).
