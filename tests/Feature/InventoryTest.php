@@ -8,8 +8,10 @@ use App\Models\JournalEntry;
 use App\Models\JournalLine;
 use App\Models\Partner;
 use App\Models\Product;
+use App\Models\ProductWarehouseStock;
 use App\Models\StockMovement;
 use App\Models\Tenant;
+use App\Models\Warehouse;
 use App\Services\Accounting\ChartOfAccountsSeeder;
 use App\Services\Accounting\InventoryService;
 use App\Services\Accounting\InvoiceService;
@@ -264,5 +266,79 @@ class InventoryTest extends TestCase
         $tb = app(ReportService::class)->trialBalance();
         $this->assertTrue($tb['balanced']);
         $this->assertEquals($tb['total_debit'], $tb['total_credit']);
+    }
+
+    /**
+     * ═══════════════════════════════════════════════════════════════
+     *  Inventory Valuation Semantics Inspection (2026-09-09) — CHARACTERIZATION
+     * ═══════════════════════════════════════════════════════════════
+     *  Executable proof of Scenarios A/B/D from the inspection: `avg_cost`
+     *  is one tenant-wide moving average across every warehouse a product
+     *  is received into, and COGS at sale time reads that same average
+     *  regardless of which warehouse the sale is issued from. Documents
+     *  existing behavior only — no production code changed by this test.
+     *
+     *  Scenario A: Warehouse A receives 10 @ 10 SAR (1000 halalas/unit).
+     *  Scenario B: Warehouse B then receives 10 @ 20 SAR (2000 halalas/unit).
+     *  Scenario D: selling 1 unit from A and 1 unit from B posts identical
+     *  COGS — the tenant-wide average, not a warehouse-specific cost.
+     *
+     * @test
+     */
+    public function moving_average_and_cogs_are_tenant_wide_across_warehouses(): void
+    {
+        $warehouseA = Warehouse::create(['name' => 'مخزن أ', 'code' => 'INV-SEM-A', 'is_default' => true]);
+        $warehouseB = Warehouse::create(['name' => 'مخزن ب', 'code' => 'INV-SEM-B']);
+        $product = $this->trackedProduct();
+
+        // Scenario A — Warehouse A: 10 units @ 10 SAR (1000 halalas).
+        $this->inventory->applyReceipt($product, 10, 1000, ['warehouse_id' => $warehouseA->id]);
+        $product->refresh();
+        $this->assertSame(10, $product->quantity_on_hand, 'Scenario A: tenant-wide quantity.');
+        $this->assertSame(1000, (int) $product->avg_cost, 'Scenario A: avg_cost = the only receipt so far.');
+        $this->assertSame(10, $this->stockIn($warehouseA->id, $product->id));
+        $this->assertSame(0, $this->stockIn($warehouseB->id, $product->id));
+
+        // Scenario B — Warehouse B: 10 units @ 20 SAR (2000 halalas).
+        $this->inventory->applyReceipt($product->fresh(), 10, 2000, ['warehouse_id' => $warehouseB->id]);
+        $product->refresh();
+        $this->assertSame(20, $product->quantity_on_hand, 'Scenario B: tenant-wide quantity across both warehouses.');
+        // (10*1000 + 10*2000) / 20 = 1500 — a single tenant-wide moving
+        // average blending both warehouses' receipts; nothing in stored
+        // state records "Warehouse A's 10 units are still worth 1000/unit".
+        $this->assertSame(1500, (int) $product->avg_cost, 'Scenario B: one blended tenant-wide average.');
+        $this->assertSame(10, $this->stockIn($warehouseA->id, $product->id), 'Warehouse A quantity is untouched by Warehouse B\'s receipt.');
+        $this->assertSame(10, $this->stockIn($warehouseB->id, $product->id));
+
+        // Scenario D — sell 1 unit from Warehouse A and 1 from Warehouse B;
+        // both must post identical COGS (the same tenant-wide average),
+        // proving COGS does not differ by source warehouse.
+        $invoices = app(InvoiceService::class);
+        $fromA = $invoices->post($invoices->create(
+            ['partner_id' => $this->customer->id, 'payment_type' => 'cash', 'warehouse_id' => $warehouseA->id],
+            [['product_id' => $product->id, 'quantity' => 1, 'unit_price' => 10000, 'tax_rate' => 0]]
+        ));
+        $fromB = $invoices->post($invoices->create(
+            ['partner_id' => $this->customer->id, 'payment_type' => 'cash', 'warehouse_id' => $warehouseB->id],
+            [['product_id' => $product->id, 'quantity' => 1, 'unit_price' => 10000, 'tax_rate' => 0]]
+        ));
+
+        $cogsFromA = StockMovement::where('source_type', Invoice::class)->where('source_id', $fromA->id)->sole();
+        $cogsFromB = StockMovement::where('source_type', Invoice::class)->where('source_id', $fromB->id)->sole();
+        $this->assertSame(1500, (int) $cogsFromA->unit_cost, 'Sale from Warehouse A uses the tenant-wide average, not Warehouse A\'s own 1000/unit.');
+        $this->assertSame(1500, (int) $cogsFromB->unit_cost, 'Sale from Warehouse B uses the same tenant-wide average.');
+        $this->assertSame($cogsFromA->unit_cost, $cogsFromB->unit_cost, 'Scenario D: COGS does not differ by source warehouse.');
+
+        // Warehouse-level quantity still correctly decremented per source —
+        // only the *cost* is tenant-wide, not the physical location tracking.
+        $this->assertSame(9, $this->stockIn($warehouseA->id, $product->id));
+        $this->assertSame(9, $this->stockIn($warehouseB->id, $product->id));
+    }
+
+    /** كمية منتج في مخزن معيّن. */
+    private function stockIn(string $warehouseId, string $productId): int
+    {
+        return (int) ProductWarehouseStock::where('warehouse_id', $warehouseId)
+            ->where('product_id', $productId)->value('quantity');
     }
 }
