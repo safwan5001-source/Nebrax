@@ -38,7 +38,7 @@ class PruneImportJobs extends Command
         $query->chunkById(200, function ($jobs) use ($storage, &$deleted) {
             foreach ($jobs as $job) {
                 if ($job->storage_path !== null) {
-                    $storage->delete($job->storage_disk, $job->storage_path);
+                    $storage->delete($job->storage_path);
                 }
                 $job->delete();
                 $deleted++;

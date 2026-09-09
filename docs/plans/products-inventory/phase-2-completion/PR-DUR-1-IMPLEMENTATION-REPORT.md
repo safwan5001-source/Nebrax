@@ -204,3 +204,151 @@ endpoint/service/request was modified; no new RBAC permission was invented.
 Await review of this report and the opened PR. Per the task's own gate, do not start PR-DUR-2
 (chunked apply engine wired to Product Catalog import) until this PR is reviewed/merged — each
 PR in the decomposition is opened, reviewed, and merged separately.
+
+---
+
+## 16. Post-review revision (round 2)
+
+**Date:** 2026-09-09
+**Trigger:** PR #746 review — three findings (storage durability, idempotency race/orphan
+cleanup, idempotency payload binding). Full findings and the approved decision are recorded in
+`DURABLE-IMPORTS-DECOMPOSITION.md` §4a; this section records the implementation and evidence.
+
+### 16.1 Storage durability — resolved by owner decision
+
+The original PR-DUR-1 D-I ("local disk, S3/R2 later is just a config change — not blocking")
+understated the risk: AWJ's production container (Render today, Railway named explicitly in the
+review) has no persistent volume, so local files are lost on redeploy/restart, not eventually.
+Asked to choose between (a) a configurable local/S3 contract defaulting to local (inheriting the
+system's already-documented interim posture), (b) wiring in real credentials, or (c) something
+else, **Safwan approved (a)** with mandatory constraints. Implemented exactly as approved:
+
+- `app/Services/ImportJobFileStorage.php` rewritten: driver-neutral (`local`/`s3`), independent
+  `config/imports.php` `storage` section (own env vars — `IMPORTS_STORAGE_DRIVER`/`KEY`/`SECRET`/
+  `REGION`/`BUCKET`/`ENDPOINT`/`URL`/`PATH_STYLE`), **no dependency on `DocumentStorageService` or
+  `PlatformIntegrationResolver`** — the driver-neutral *pattern* is reused, Document Center's
+  class and domain logic are not.
+- Fail-closed: `driver=s3` with any of `key`/`secret`/`bucket`/`endpoint` blank throws before any
+  write — never a silent fallback to `local` (test: `s3_driver_with_missing_configuration_fails_closed_before_any_write`).
+- Private visibility and tenant-separated paths preserved and now explicitly tested
+  (`storage_paths_are_tenant_separated_and_private`).
+- `readStream()` replaces the old `absolutePath()` — driver-agnostic. `ImportJobService::inspect()`
+  now materializes a short-lived local temp copy via `materializeLocalCopy()` before handing a
+  real file path to `SpreadsheetReader` (which needs one for XLSX's `ZipArchive`/`XMLReader`), so
+  `inspect()` works identically regardless of the configured driver.
+- `config/imports.php` and the service class both carry an explicit, prominent comment: **local
+  storage is not production-durable** — it does not survive a Render/Railway redeploy, restart,
+  or container replacement. No later Durable Imports PR may claim cross-deploy persistence as a
+  guaranteed invariant until real S3/R2 (or another explicitly approved backend) is provisioned.
+- **Nothing provisioned in this PR**: no bucket, no credentials, no Railway Volume, no change to
+  the project-wide storage posture outside Durable Imports. `IMPORTS_STORAGE_DRIVER` defaults to
+  `local`, unchanged from before this fix — the fix is the *contract*, not a behavior flip.
+
+### 16.2 Idempotency race / orphan cleanup
+
+`ImportJobService::create()`'s pre-check was a fast path only, not a guarantee: two concurrent
+requests with the same `(tenant_id, idempotency_key)` could both pass it and both store a file
+before either inserted its row. Fixed:
+
+- The insert is now wrapped in `DB::transaction()` and the catch targets
+  `Illuminate\Database\UniqueConstraintViolationException` — portable across SQLite and
+  PostgreSQL (Laravel maps each driver's native unique-violation error to this one class; verified
+  by reading `Illuminate\Database\Connection::runQueryCallback()` and each driver's
+  `isUniqueConstraintError()`).
+- On conflict, the loser deletes its own just-stored file immediately (no orphan), re-queries for
+  the winner's row, validates it against the same payload-binding rule as a normal retry (§16.3),
+  and returns it — never a second row, never a silent return of an unrelated job.
+- **The `DB::transaction()` wrapper itself was a required fix, not a stylistic choice**: on
+  PostgreSQL, a failed `INSERT` poisons the ambient transaction (`SQLSTATE 25P02`) — even the
+  recovery `SELECT` afterward fails unless the transaction is properly rolled back first, which
+  `DB::transaction()`'s own catch-rollback-rethrow does automatically. This was caught by the
+  PostgreSQL test run (see §16.4) after the SQLite run passed — SQLite does not exhibit this
+  failure mode, so a SQLite-only run would have shipped it.
+- Regression test: `concurrent_duplicate_creation_leaves_exactly_one_job_and_no_orphan_file`,
+  using a real second database connection (mirroring the existing
+  `DocumentNumberingTest::two_concurrent_requests_cannot_take_the_same_number` convention) to
+  commit a competing row independently of the test's own wrapping transaction, right as
+  `ImportJob::create()`'s own insert is about to run (via the `creating` Eloquent event). Runs on
+  PostgreSQL only — genuine cross-connection concurrency is untestable on SQLite, which
+  serializes all writes behind one file-level lock (confirmed empirically: the first attempt at
+  this test, using the *same* connection for both the "rival" insert and the code under test,
+  self-deadlocked on SQLite and had to be redesigned to use a second connection, then skipped on
+  SQLite exactly as the codebase's existing dual-connection concurrency tests already do).
+
+### 16.3 Idempotency payload binding
+
+The original contract never defined what happens when a reused `idempotency_key` carries a
+*different* file or domain. Fixed: `assertSameRequestOrFail()` compares the existing job's
+`domain` and `content_sha256` against the new request's; any mismatch throws (422, fail-closed) —
+the existing job is never returned for a request it does not represent, and no new row or file is
+created for the rejected attempt. Mapping/options are not part of the comparison because PR-DUR-1
+captures none (D-H, unchanged) — a later PR that adds them must extend this same binding function,
+not invent a second one.
+
+Regression tests: `a_true_retry_reuses_the_existing_job_and_stores_no_second_file` (byte-identical
+file + same domain → existing job, exactly one stored file total), `the_same_key_with_a_different_file_fails_closed_and_leaves_no_orphan`
+(different file content, same key → 422, still exactly one job/file), `the_same_key_with_a_different_domain_fails_closed`
+(exercised at the service layer directly, since `product_catalog` is the only HTTP-valid domain
+value in this PR per D-G — the binding logic itself is domain-aware now, ready for PR-DUR-3/4's
+additional domains).
+
+### 16.4 Files changed (round 2)
+
+| File | Change | Why |
+|---|---|---|
+| `config/imports.php` | rewritten | driver-neutral `storage` section, explicit ephemeral-local-disk warning (§16.1) |
+| `app/Services/ImportJobFileStorage.php` | rewritten | local/S3-compatible dispatch, fail-closed on incomplete `s3` config, `readStream()` replaces `absolutePath()`, `store()` takes a pre-computed sha-256 |
+| `app/Services/ImportJobService.php` | rewritten | race-safe insert-or-fetch (`DB::transaction()` + `UniqueConstraintViolationException`), `assertSameRequestOrFail()` payload binding, `materializeLocalCopy()` for driver-agnostic `inspect()` |
+| `app/Console/Commands/PruneImportJobs.php` | 1 line | `storage->delete()` call site updated to the new (path-only) signature |
+| `tests/Feature/ImportJobTest.php` | +182 lines, 6 new tests | fail-closed S3 config, tenant-separated/private paths, true retry, different-file/different-domain fail-closed, real concurrent race (PostgreSQL) |
+| `docs/plans/products-inventory/phase-2-completion/DURABLE-IMPORTS-DECOMPOSITION.md` | updated | D-I rewritten, D-K/D-L added, new §4a recording the review/decision, in-scope/out-of-scope/failure-semantics/acceptance-criteria updated to match |
+| `docs/plans/products-inventory/phase-2-completion/PR-DUR-1-IMPLEMENTATION-REPORT.md` | this section | — |
+
+No file outside this list changed. No accounting/GL/UOM/pricing file touched. No existing import
+surface (`/products/import/*`, `/products/workbook/*`, `/inventory-openings/import/*`) modified.
+
+### 16.5 Tests (round 2)
+
+| Command / suite | SQLite | PostgreSQL |
+|---|---|---|
+| `php artisan test --filter=ImportJobTest` (15 tests: 9 original + 6 new) | ✅ 14 passed, 1 skipped (72 assertions) — the concurrency test skips by design (§16.2) | ✅ 15 passed (75 assertions) |
+| `php artisan test --filter="ProductImportTest\|ProductImportV2Test\|ProductWorkbook\|InventoryOpeningImport\|BranchIsolationGuardTest"` | ✅ 128 passed, 1 skipped (821 assertions, combined with ImportJobTest) | ✅ 114 passed (749 assertions) |
+| **Full suite** | 26 failed, 16 skipped, **3152 passed** (20519 assertions), 270.02s | 26 failed, **3168 passed** (20591 assertions), 594.75s |
+
+Both full-suite numbers are internally consistent (3152 + 16 = 3168) and show the **same 26
+failures in the same 6 pre-existing, unrelated classes** already disclosed in §12/§13 of this
+report (the local sandbox's missing `bcmath` PHP extension, entirely inside
+`app/Services/FuelCostBasisService.php`, a file this PR never touches) — zero new failures from
+this revision, on either engine.
+
+### 16.6 CI
+
+Not run on GitHub Actions from this session at report-writing time (push happens immediately
+after this report is finalized). Locally reproduced the same `php artisan test` command CI runs,
+on both SQLite and a local PostgreSQL 16 instance configured with CI's exact database name/user/
+password, exactly as in the original §11.
+
+### 16.7 Deviations from approved plan (round 2)
+
+None beyond what Safwan explicitly approved in the storage discussion (§16.1, recorded verbatim
+in `DURABLE-IMPORTS-DECOMPOSITION.md` §4a). No scope expansion: no accounting/GL/UOM/pricing file
+touched, no existing import endpoint modified, no infrastructure provisioned, no RBAC change.
+
+### 16.8 Risks / remaining work (round 2)
+
+- **Local storage remains non-durable across a Railway/Render redeploy** until Safwan provisions
+  real S3/R2 (or another approved backend) and sets `IMPORTS_STORAGE_DRIVER=s3` — this is now
+  explicitly documented rather than implicitly assumed, per the approved decision. No PR in this
+  decomposition may claim otherwise until that provisioning happens.
+- Same `bcmath`/`poppler-utils` local-sandbox verification gaps as the original report (§12),
+  unrelated to this PR, unaffected by this revision.
+- Remaining Durable Imports work is unchanged: PR-DUR-2..5, none started.
+
+### 16.9 Merge / deploy status (round 2)
+
+**Not merged. Not deployed.** PR-DUR-2 not started.
+
+### 16.10 Next step (round 2)
+
+Push this revision to the existing PR #746 (same branch, new commit) and await review. Report
+the new Head SHA, changed files, and exact test/CI results in the session reply.

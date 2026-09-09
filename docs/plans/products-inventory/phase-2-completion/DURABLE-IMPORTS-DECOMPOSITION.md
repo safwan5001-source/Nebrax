@@ -95,8 +95,36 @@ exists. This is the substrate PR-DUR-2..4 attach to. It changes zero behavior on
 |---|---|---|
 | D-G | Which domains can a job target in this PR? | **`product_catalog` only.** `product_workbook` and `inventory_opening` are added as their own enum values in PR-DUR-3/PR-DUR-4, each alongside the PR that actually wires processing for it — an unwired domain value sitting in the database is dead vocabulary a later PR would have to re-justify. `App\Support\ImportJobDomain` is a plain string-backed catalog (not a DB enum type), so adding a domain is an application-layer change, not a migration. |
 | D-H | Does this PR dispatch any queued job or process any chunk? | **No.** `QUEUE_CONNECTION=sync` in production today (no real background worker) per `CLAUDE.md`'s explicit note; inventing `ShouldQueue` machinery with nothing to consume it is scope creep this PR does not need. `inspect` (header/row-count/column-count validation reusing `SpreadsheetReader`) is cheap enough to run synchronously within request time, exactly as the existing three surfaces already do it. Chunked, queue-dispatched `apply` is PR-DUR-2's entire subject. |
-| D-I | Storage backend | **Local private disk**, mirroring `DocumentStorageService`'s existing `persistent_enabled=false → local` default posture (`document_center.php`) rather than coupling to that service directly — Durable Imports is a distinct domain per `DURABLE-IMPORTS.md`'s explicit domain-separation rule, so it gets its own small, independent storage helper instead of borrowing Document Center's S3/R2-capable one. Promoting to S3/R2 later is a config change, matching `CLAUDE.md`'s "Storage: S3/R2" stack note for the platform generally — not blocking, not decided against, simply not this PR's contract. |
-| D-J | Job-creation idempotency mechanism | **Client-supplied `idempotency_key`, unique per `(tenant_id, idempotency_key)`.** A network retry of the same `POST /import-jobs` returns the existing job (200) instead of creating a duplicate row. This is upload-idempotency only; row-level/apply-level duplicate-write prevention against Products/barcodes/opening lines is PR-DUR-2's contract (reusing `ProductImportService`'s existing match-by-`nebrax_id`-then-`sku` semantics, unchanged). |
+| D-I | Storage backend | **Updated after owner review (see §4a).** A driver-neutral (local/S3-compatible) storage contract, config-driven via `config/imports.php`, fully independent of `DocumentStorageService`/`PlatformIntegrationResolver` (infrastructure *pattern* reused, not Document Center code or domain logic). Defaults to `local` today — inheriting the system-wide interim posture already documented in `deploy/DEPLOY.md` ("مخاطرة مؤقتة مقبولة خلال مرحلة التطوير"), not a new decision. **`local` is explicitly documented as non-durable across a Railway/Render redeploy or restart** — this PR makes no cross-deploy persistence claim while so configured. Switching to real S3/R2 is a config/env change only (`IMPORTS_STORAGE_DRIVER=s3` + credentials); no Durable Imports code changes. Provisioning real credentials/bucket/cost is explicitly **not** this PR's decision — owner-only, deferred. |
+| D-J | Job-creation idempotency mechanism | **Client-supplied `idempotency_key`, unique per `(tenant_id, idempotency_key)`.** A network retry of the same `POST /import-jobs` returns the existing job instead of creating a duplicate row. This is upload-idempotency only; row-level/apply-level duplicate-write prevention against Products/barcodes/opening lines is PR-DUR-2's contract (reusing `ProductImportService`'s existing match-by-`nebrax_id`-then-`sku` semantics, unchanged). |
+| D-K | Idempotency race safety (added after owner review, see §4a) | The DB unique index `(tenant_id, idempotency_key)` is the sole arbiter — the pre-check query is a fast path, never the guarantee. `ImportJobService::create()` wraps its insert in `DB::transaction()` and catches `Illuminate\Database\UniqueConstraintViolationException` (portable across SQLite/PostgreSQL — Laravel maps each driver's native unique-violation error to this one class); the losing request deletes its own just-stored file (no orphan) and returns the winner's row after the same payload-binding check as D-L. The explicit transaction matters on PostgreSQL specifically: without it, a failed insert poisons the ambient transaction (`25P02`) and even the recovery `SELECT` afterward fails — SQLite does not exhibit this, but the fix is engine-agnostic. |
+| D-L | Idempotency payload binding (added after owner review, see §4a) | Reusing an `idempotency_key` **only** counts as a genuine retry when the new request's `domain` and content **SHA-256** both match the existing job's stored values, byte-for-byte. Any mismatch (different file or different domain under the same key) is rejected fail-closed (422, `RuntimeException`) — the existing job is never silently returned for a request it does not represent, and no new row/file is created for the rejected attempt. Mapping/options are not part of the comparison because PR-DUR-1 captures none (D-H) — a later PR that adds them must extend this same binding, not invent a second one. |
+
+### 4a. Post-review fixes (same PR, before merge)
+
+A first review of PR #746 raised three findings, resolved with Safwan's explicit sign-off before merge —
+recorded here so this document (not just the PR thread) carries the approved decision:
+
+1. **Storage durability blocker.** The original D-I ("local disk, promoting to S3/R2 later is a config
+   change — not blocking") undersold the risk: AWJ's production container filesystem (Render today, Railway
+   named explicitly in review) has **no persistent volume**, so a redeploy, restart, or container replacement
+   loses local files immediately — not eventually. Asked whether to (a) build the configurable local/S3
+   contract with local as the default (inheriting the system's already-documented interim posture, `deploy/DEPLOY.md`),
+   (b) wire in real credentials the owner already has, or (c) something else (e.g. a Railway Volume), **Safwan
+   approved (a)** with mandatory constraints carried into D-I above and into `config/imports.php`'s own
+   documentation: never describe local storage as production-durable; the storage abstraction must let a later
+   S3/R2 switch happen through configuration alone, with no Durable Imports domain/application code change;
+   private visibility and tenant-separated paths are preserved; **this PR provisions no infrastructure** (no
+   bucket, no credentials, no Railway Volume); and no later Durable Imports PR may claim cross-deploy/restart
+   persistence as a guaranteed production invariant until real persistent storage is actually provisioned.
+2. **Idempotency race / orphan cleanup.** The original `create()` treated its pre-check as sufficient; two
+   concurrent requests with the same `(tenant_id, idempotency_key)` could both pass it, both store a file, and
+   race on the insert — leaving the loser's file orphaned with no row pointing at it. Fixed per D-K.
+3. **Idempotency payload binding.** The original contract never said what happens when a reused key carries a
+   *different* file or domain — a real risk once request retries and this key are conflated. Fixed per D-L:
+   fail closed, never silently return an unrelated job.
+
+None of this changes PR-DUR-1's boundary with PR-DUR-2..5, D-08, or any accounting/UOM/pricing invariant.
 
 ### In scope
 
@@ -109,11 +137,18 @@ exists. This is the substrate PR-DUR-2..4 attach to. It changes zero behavior on
   `uploaded → ready|failed` and `{uploaded,ready} → cancelled` are reachable by any code path in this PR.**
   `queued`/`processing`/`completed` are forward-declared vocabulary, not live transitions — this PR asserts
   that explicitly in tests (no code path can reach them yet).
-- `App\Services\ImportJobFileStorage` — private local-disk storage keyed by `imports/{tenant_id}/{job_id}/…`,
-  sha-256 fingerprint computed on upload, delete-on-cancel.
-- `App\Services\ImportJobService` — `create()` (store file, fingerprint, idempotency check, row), `inspect()`
-  (reuses `SpreadsheetReader::read()` and the existing `MAX_ROWS`/`MAX_COLUMNS` ceilings — **the exact same
-  constants `ProductImportService` already enforces**, not a second copy), `cancel()`.
+- `App\Services\ImportJobFileStorage` — driver-neutral private storage (local today; S3-compatible, R2
+  included, via config alone — D-I), tenant-and-job-separated keys (`imports/{tenant_id}/{job_id}/…`),
+  fail-closed on an incomplete `s3` configuration (missing key/secret/bucket/endpoint throws before any
+  write, mirroring `DocumentStorageService`'s own guard — pattern reused, class/dependency not shared).
+  `store()` takes a pre-computed sha-256 from the caller (one hash, one source); `readStream()` is
+  driver-agnostic so `inspect()` never assumes a local filesystem path.
+- `App\Services\ImportJobService` — `create()` (fingerprint, idempotency pre-check + payload-binding — D-L,
+  race-safe insert-or-fetch — D-K, store, row), `inspect()` (materializes a local temp copy via
+  `readStream()` so `SpreadsheetReader::read()` — which needs a real file path for XLSX's
+  `ZipArchive`/`XMLReader` — works identically regardless of storage driver; reuses the existing
+  `MAX_ROWS`/`MAX_COLUMNS` ceilings, **the exact same constants `ProductImportService` already enforces**,
+  not a second copy), `cancel()`.
 - `App\Http\Controllers\Api\ImportJobController` — `index`, `show`, `store`, `cancel`. Extends `ApiController`
   (its `domain()` helper maps `RuntimeException` → 422, matching every other import surface's error shape).
 - `App\Http\Requests\StoreImportJobRequest` — file rules copied verbatim from `ImportProductsRequest`
@@ -147,7 +182,8 @@ exists. This is the substrate PR-DUR-2..4 attach to. It changes zero behavior on
 - Any accounting/GL, UOM, pricing, or inventory-quantity effect — this PR does not create, update, or delete a
   single `Product`, `ProductBarcode`, `PriceListItem`, or `InventoryOpening` row. It only stores a file and a
   job record about it.
-- S3/R2 storage — local disk only, per D-I.
+- Actually provisioning S3/R2 (bucket, credentials, cost) — the storage *contract* is driver-neutral and
+  config-switchable (D-I), but no infrastructure is created, requested, or defaulted-on by this PR.
 - Frontend — backend-only, matching PR-UOM2-1's precedent (schema + API first, UI in its own later PR).
 
 ### Invariants inherited (must not regress)
@@ -169,8 +205,11 @@ exists. This is the substrate PR-DUR-2..4 attach to. It changes zero behavior on
 | File exceeds 5 MB | 422 at request validation |
 | Unknown `domain` value | 422 — fail closed, never silently coerced to `product_catalog` |
 | File exceeds `MAX_ROWS`/`MAX_COLUMNS` during inspect | job created, then transitioned to `failed` with a row/column-count error — **not** a 422 on the upload request itself, because the file *was* durably stored; the failure is job state, queryable after the fact, per the plan's "no partial invisible success" |
-| Duplicate `POST` with an already-used `idempotency_key` for the same tenant | 200, returns the existing job unchanged — no second file stored, no second row created |
+| Duplicate `POST` with an already-used `idempotency_key`, same domain and same file content (SHA-256) | returns the existing job unchanged — no second file stored, no second row created (D-L) |
+| Duplicate `POST` with an already-used `idempotency_key`, but a *different* file or domain | 422, `RuntimeException` — fail closed, the unrelated existing job is never returned (D-L) |
+| Two requests race on the same `(tenant_id, idempotency_key)` and both pass the pre-check | the DB unique index resolves it; the loser catches `UniqueConstraintViolationException`, deletes its own just-stored file, and returns the winner's row (after the same D-L check) — never two rows, never an orphan file (D-K) |
 | `idempotency_key` reused for a *different* tenant | no collision — uniqueness is `(tenant_id, idempotency_key)`, never global |
+| `imports.storage.driver=s3` with a missing key/secret/bucket/endpoint | 422 before any write — fail closed, never a silent fallback to `local` |
 | `cancel` on a job already `cancelled`/`failed` | 422 — cancellation is only valid from `uploaded`/`ready` |
 | `cancel` on another tenant's job id | 404 |
 | Cross-tenant `GET /import-jobs/{id}` | 404 |
@@ -182,8 +221,15 @@ exists. This is the substrate PR-DUR-2..4 attach to. It changes zero behavior on
    `ProductImportService` at all.
 2. A file that fails `MAX_ROWS`/`MAX_COLUMNS` reaches `failed` with a durable, queryable error — the file is
    deleted from storage, the job row is kept (auditable).
-3. Re-submitting the same `idempotency_key` for the same tenant never creates a second job or a second stored
-   file; a different tenant using the identical key is unaffected.
+3. Re-submitting the same `idempotency_key` for the same tenant, with the same domain and byte-identical file,
+   never creates a second job or a second stored file; a different tenant using the identical key is unaffected.
+3a. The same `idempotency_key` reused with a different file or domain is rejected (422); the original job is
+   untouched and no new row/file is created for the rejected attempt (D-L).
+3b. Two requests racing on the same `(tenant_id, idempotency_key)` leave exactly one job row and zero orphan
+   files, on both SQLite and PostgreSQL (D-K; genuine cross-connection concurrency is exercised on PostgreSQL,
+   matching this codebase's existing convention for such tests — SQLite serializes writes at the file level).
+3c. `imports.storage.driver=s3` with incomplete credentials fails closed (422) before any file is written;
+   storage paths remain tenant-and-job-separated and private regardless of driver.
 4. `GET /import-jobs`, `GET /import-jobs/{id}` never return another tenant's rows; a direct-UUID cross-tenant
    `show`/`cancel` returns 404.
 5. `cancel` succeeds only from `uploaded`/`ready`, deletes the stored file, and is rejected (422, no state
