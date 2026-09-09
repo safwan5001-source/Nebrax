@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Account;
+use App\Models\CashBankAccount;
 use App\Models\JournalEntry;
 use App\Models\JournalLine;
 use App\Models\Partner;
@@ -11,6 +12,7 @@ use App\Models\Product;
 use App\Models\Purchase;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Services\Accounting\CashBankAccountService;
 use App\Services\Accounting\ChartOfAccountsSeeder;
 use App\Services\Accounting\PurchaseService;
 use App\Services\Reporting\ReportService;
@@ -343,5 +345,108 @@ class PurchasePaidOnPostTest extends TestCase
                 'unit_price' => 10000, 'tax_rate' => 15,
             ]],
         ])->assertStatus(422)->assertJsonValidationErrors('payment_method');
+    }
+
+    /**
+     * PR-ACL-INVOICE-PURCHASE-SETTLE-ACTOR — regression: `paid_on_post` reaches
+     * `PurchaseService::settle()` → `PaymentService::post()`. Settlement here
+     * is money OUT of the treasury (`direction: 'paid'`), so the authorization
+     * boundary is `withdraw_scope`, not `deposit_scope`. The authenticated
+     * actor posting the purchase must reach that boundary so a
+     * `withdraw_scope=user` naming them explicitly does not spuriously deny a
+     * legitimate auto-settlement. Prior to the fix, `PurchaseController::post()`
+     * called `$this->purchases->post($purchase)` with no actor, and `settle()`
+     * called `payments->post($payment)` with no actor either.
+     *
+     * @test
+     */
+    public function purchase_auto_settlement_succeeds_when_withdraw_scope_user_matches_the_authenticated_actor(): void
+    {
+        $owner = User::create([
+            'tenant_id' => $this->tenant->id, 'name' => 'مدير مطابق',
+            'email' => 'owner@pur-actor-allow.test', 'password' => bcrypt('secret'), 'role' => 'owner',
+        ]);
+        Sanctum::actingAs($owner);
+
+        app(CashBankAccountService::class)->bootstrapDefaults();
+        $cash = CashBankAccount::where('type', 'cash')->where('is_main', true)->firstOrFail();
+        $cash->forceFill([
+            'withdraw_scope' => 'user',
+            'withdraw_scope_subject' => $owner->id,
+        ])->save();
+
+        $created = $this->postJson('/api/purchases', [
+            'partner_id'     => $this->supplier->id,
+            'payment_type'   => 'credit',
+            'paid_on_post'   => 40000,
+            'payment_method' => 'cash',
+            'items'          => [[
+                'product_id' => $this->product->id, 'quantity' => 10,
+                'unit_price' => 10000, 'tax_rate' => 15,
+            ]],
+        ])->assertCreated();
+
+        $this->postJson("/api/purchases/{$created->json('data.id')}/post")
+            ->assertOk()
+            ->assertJsonPath('data.payment_status', 'partial')
+            ->assertJsonPath('data.paid_amount', '400.00');
+
+        $this->assertSame(1, Payment::where('status', 'posted')->count());
+    }
+
+    /**
+     * PR-ACL-INVOICE-PURCHASE-SETTLE-ACTOR — regression: a treasury withdrawal
+     * locked to a DIFFERENT user than the one posting the purchase must be
+     * denied, with no partial financial/state effect. `PurchaseService::post()`
+     * wraps purchase status update, journal entry creation AND `settle()`
+     * inside one `DB::transaction()`, so a denial inside `settle()` must roll
+     * back the purchase's own posting too — the purchase stays `draft`, no
+     * journal entry, no posted payment.
+     *
+     * @test
+     */
+    public function purchase_auto_settlement_is_denied_when_withdraw_scope_user_does_not_match_the_actor_with_no_partial_effect(): void
+    {
+        $owner = User::create([
+            'tenant_id' => $this->tenant->id, 'name' => 'مدير غير مطابق',
+            'email' => 'owner@pur-actor-deny.test', 'password' => bcrypt('secret'), 'role' => 'owner',
+        ]);
+        Sanctum::actingAs($owner);
+
+        app(CashBankAccountService::class)->bootstrapDefaults();
+        $cash = CashBankAccount::where('type', 'cash')->where('is_main', true)->firstOrFail();
+        $stranger = User::create([
+            'tenant_id' => $this->tenant->id, 'name' => 'محاسب آخر',
+            'email' => 'stranger@pur-actor-deny.test', 'password' => 'password123', 'role' => 'admin',
+        ]);
+        $cash->forceFill([
+            'withdraw_scope' => 'user',
+            'withdraw_scope_subject' => $stranger->id,
+        ])->save();
+
+        $created = $this->postJson('/api/purchases', [
+            'partner_id'     => $this->supplier->id,
+            'payment_type'   => 'credit',
+            'paid_on_post'   => 40000,
+            'payment_method' => 'cash',
+            'items'          => [[
+                'product_id' => $this->product->id, 'quantity' => 10,
+                'unit_price' => 10000, 'tax_rate' => 15,
+            ]],
+        ])->assertCreated();
+        $purchaseId = $created->json('data.id');
+
+        $before = [
+            'purchases_posted' => Purchase::where('status', 'posted')->count(),
+            'payments' => Payment::count(),
+            'journal_entries' => JournalEntry::count(),
+        ];
+
+        $this->postJson("/api/purchases/{$purchaseId}/post")->assertStatus(422);
+
+        $this->assertSame('draft', Purchase::findOrFail($purchaseId)->status, 'رفض التخويل يجب ألا يترك فاتورة الشراء مرحّلة جزئياً.');
+        $this->assertSame($before['purchases_posted'], Purchase::where('status', 'posted')->count());
+        $this->assertSame($before['payments'], Payment::count(), 'رفض التخويل يجب ألا يترك سند صرف جزئي.');
+        $this->assertSame($before['journal_entries'], JournalEntry::count(), 'رفض التخويل يجب ألا يترك أثراً محاسبياً جزئياً — حتى قيد فاتورة الشراء نفسه.');
     }
 }

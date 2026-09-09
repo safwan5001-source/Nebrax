@@ -2,10 +2,14 @@
 
 namespace Tests\Feature;
 
+use App\Models\CashBankAccount;
 use App\Models\Invoice;
+use App\Models\Payment;
 use App\Models\Product;
 use App\Models\JournalEntry;
 use App\Models\JournalLine;
+use App\Models\User;
+use App\Services\Accounting\CashBankAccountService;
 use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -187,5 +191,101 @@ class ApiInvoiceTest extends TestCase
         $this->assertSame('1150.00', $statement['rows'][0]['debit']);  // الفاتورة على 1130
         $this->assertSame('1150.00', $statement['rows'][1]['credit']); // سند القبض يقفلها
         $this->assertSame('0.00', $statement['closing_balance']);
+    }
+
+    /**
+     * PR-ACL-INVOICE-PURCHASE-SETTLE-ACTOR — regression: `is_paid=true` reaches
+     * `InvoiceService::settle()` → `PaymentService::post()`. The authenticated
+     * actor performing the post request must reach that treasury authorization
+     * boundary so a `deposit_scope=user` naming them explicitly does not
+     * spuriously deny a legitimate auto-settlement. Prior to the fix,
+     * `InvoiceController::post()` called `$this->invoices->post($invoice)`
+     * with no actor, and `settle()` called `payments->post($payment)` with no
+     * actor either.
+     *
+     * @test
+     */
+    public function invoice_auto_settlement_succeeds_when_deposit_scope_user_matches_the_authenticated_actor(): void
+    {
+        $auth = $this->registerTenant('inv-actor-allow', 'owner@inv-actor-allow.test');
+        $token = $auth['token'];
+        app(TenantContext::class)->set($auth['tenant_id']);
+
+        $partnerId = $this->withToken($token)->postJson('/api/partners', [
+            'name' => 'عميل فحص actor مسموح', 'type' => 'customer',
+        ])->assertCreated()['data']['id'];
+
+        app(CashBankAccountService::class)->bootstrapDefaults();
+        $cash = CashBankAccount::where('type', 'cash')->where('is_main', true)->firstOrFail();
+        $owner = User::where('tenant_id', $auth['tenant_id'])->where('email', 'owner@inv-actor-allow.test')->sole();
+        $cash->forceFill([
+            'deposit_scope' => 'user',
+            'deposit_scope_subject' => $owner->id,
+        ])->save();
+
+        $create = $this->withToken($token)->postJson('/api/invoices', [
+            'partner_id'     => $partnerId,
+            'is_paid'        => true,
+            'payment_method' => 'cash',
+            'items'          => [['quantity' => 1, 'unit_price' => 100000, 'tax_rate' => 15]],
+        ])->assertCreated();
+
+        $posted = $this->withToken($token)->postJson("/api/invoices/{$create['data']['id']}/post")->assertOk();
+        $this->assertSame('paid', $posted['data']['payment_status']);
+        $this->assertSame(1, Payment::where('status', 'posted')->count());
+    }
+
+    /**
+     * PR-ACL-INVOICE-PURCHASE-SETTLE-ACTOR — regression: a treasury deposit
+     * locked to a DIFFERENT user than the one posting the invoice must be
+     * denied, and the denial must leave no partial financial/state effect.
+     * `InvoiceService::post()` wraps invoice status update, journal entry
+     * creation AND `settle()` inside one `DB::transaction()`, so a denial
+     * inside `settle()` must roll back the invoice's own posting too — the
+     * invoice stays `draft`, no journal entry, no posted payment.
+     *
+     * @test
+     */
+    public function invoice_auto_settlement_is_denied_when_deposit_scope_user_does_not_match_the_actor_with_no_partial_effect(): void
+    {
+        $auth = $this->registerTenant('inv-actor-deny', 'owner@inv-actor-deny.test');
+        $token = $auth['token'];
+        app(TenantContext::class)->set($auth['tenant_id']);
+
+        $partnerId = $this->withToken($token)->postJson('/api/partners', [
+            'name' => 'عميل فحص actor ممنوع', 'type' => 'customer',
+        ])->assertCreated()['data']['id'];
+
+        app(CashBankAccountService::class)->bootstrapDefaults();
+        $cash = CashBankAccount::where('type', 'cash')->where('is_main', true)->firstOrFail();
+        $stranger = User::create([
+            'tenant_id' => $auth['tenant_id'], 'name' => 'محاسب آخر', 'email' => 'stranger@inv-actor-deny.test',
+            'password' => 'password123', 'role' => 'admin',
+        ]);
+        $cash->forceFill([
+            'deposit_scope' => 'user',
+            'deposit_scope_subject' => $stranger->id,
+        ])->save();
+
+        $create = $this->withToken($token)->postJson('/api/invoices', [
+            'partner_id'     => $partnerId,
+            'is_paid'        => true,
+            'payment_method' => 'cash',
+            'items'          => [['quantity' => 1, 'unit_price' => 100000, 'tax_rate' => 15]],
+        ])->assertCreated();
+        $invoiceId = $create['data']['id'];
+
+        $before = [
+            'invoices_posted' => Invoice::where('status', 'posted')->count(),
+            'payments' => Payment::count(),
+            'journal_entries' => JournalEntry::count(),
+        ];
+
+        $this->withToken($token)->postJson("/api/invoices/{$invoiceId}/post")->assertStatus(422);
+
+        $this->assertSame('draft', Invoice::findOrFail($invoiceId)->status, 'رفض التخويل يجب ألا يترك الفاتورة مرحّلة جزئياً.');
+        $this->assertSame($before['invoices_posted'], Invoice::where('status', 'posted')->count());
+        $this->assertSame($before['payments'], Payment::count(), 'رفض التخويل يجب ألا يترك سند قبض جزئي.');
+        $this->assertSame($before['journal_entries'], JournalEntry::count(), 'رفض التخويل يجب ألا يترك أثراً محاسبياً جزئياً — حتى قيد الفاتورة نفسه.');
     }
 }

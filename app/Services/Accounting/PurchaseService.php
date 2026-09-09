@@ -7,6 +7,7 @@ use App\Models\Product;
 use App\Models\Purchase;
 use App\Models\PurchaseLine;
 use App\Models\FuelSupplierInvoice;
+use App\Models\User;
 use App\Services\PrintTemplates\PrintTemplateService;
 use App\Support\Settings;
 use Illuminate\Support\Facades\DB;
@@ -334,14 +335,17 @@ class PurchaseService
 
     /**
      * ترحيل فاتورة المشتريات: توليد القيد المتوازن + إدخال البضاعة للمخزون.
+     *
+     * @param  ?User  $actor  الفاعل المصادَق عليه لمسار HTTP الحقيقي — يصل حتى
+     *                        حدّ تخويل الخزينة في `settle()`.
      */
-    public function post(Purchase $purchase): Purchase
+    public function post(Purchase $purchase, ?User $actor = null): Purchase
     {
         if (! $purchase->isDraft()) {
             throw new RuntimeException('لا يمكن ترحيل فاتورة مشتريات غير مسوّدة (draft).');
         }
 
-        return DB::transaction(function () use ($purchase) {
+        return DB::transaction(function () use ($purchase, $actor) {
             // قفل الصف وإعادة فحص الحالة — يمنع الترحيل المزدوج المتزامن.
             $purchase = Purchase::lockForUpdate()->findOrFail($purchase->id);
             if (! $purchase->isDraft()) {
@@ -523,7 +527,7 @@ class PurchaseService
                     ?? ($purchase->received_status === 'received' ? $purchase->purchase_date : null),
             ]);
 
-            $this->settle($purchase, $total);
+            $this->settle($purchase, $total, $actor);
 
             return $purchase->fresh('lines');
         });
@@ -540,7 +544,7 @@ class PurchaseService
      *  `payment_status` ويتحقق أن المبلغ لا يتجاوز المتبقي. تكرارُ ذلك هنا
      *  كان سيُنشئ نسخةً ثانية من قاعدة السداد تنحرف عن الأولى.
      */
-    protected function settle(Purchase $purchase, int $total): void
+    protected function settle(Purchase $purchase, int $total, ?User $actor = null): void
     {
         $paid = $purchase->payment_type === 'cash'
             ? $total
@@ -560,7 +564,9 @@ class PurchaseService
             'created_by'   => $purchase->created_by,
         ], [['purchase_id' => $purchase->id, 'amount' => $paid]]);
 
-        $this->payments->post($payment);
+        // الفاعل المصادَق عليه هو مبدأ التخويل عند حدّ الخزينة — created_by أعلاه
+        // مجرد إسناد تدقيقي ولا يُستبدل به.
+        $this->payments->post($payment, $actor);
     }
 
     /**
