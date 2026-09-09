@@ -16,8 +16,9 @@ use Symfony\Component\HttpFoundation\Response;
  * يمرّ المصادقة ويصبح `user()` كائن `ApiClient` (لا دور RBAC له). دون هذا الحارس
  * كان الاعتماد على أنّ `EnsurePermission` يرفض «بلا دور» ضمنيًّا — أمانٌ عرضيّ هشّ.
  *
- * هنا نرفض صراحةً: مسارات الإدارة الداخلية `/api/developer/*` تُحلّ مستخدمًا
- * (`User`) فقط. يوضع **قبل** `SetTenant` فلا يُشتقّ سياق مستأجر من عميل API.
+ * هنا نرفض صراحةً: مجموعة ERP الداخلية الكاملة ومسارات `/api/developer/*` تُحلّ
+ * مستخدمًا (`User`) فقط. يوضع **قبل** `SetTenant` فلا يُشتقّ سياق مستأجر من
+ * CustomerIdentity أو ApiClient أو أي principal آخر.
  */
 class EnsureUserPrincipal
 {

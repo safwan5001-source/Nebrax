@@ -55,6 +55,9 @@ class Rbac
      */
     public const PERMISSIONS = [
         'partners.view', 'partners.manage',
+        // إدارة ربط الوصول الرقمي للعميل سلطة مستقلة عن إدارة بيانات Partner.
+        // owner/admin عبر `*` فقط؛ لا تُمنح للمحاسب أو الموظف تلقائياً.
+        'customer_access.manage',
         'products.view', 'products.manage',
         'invoices.view', 'invoices.manage',
         'delivery_notes.view', 'delivery_notes.manage', 'delivery_notes.confirm', 'delivery_notes.cancel', 'delivery_notes.invoice',
