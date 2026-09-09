@@ -37,6 +37,15 @@ class PrintTemplateContract
         PrintTemplateAssignment::USAGE_THERMAL,
     ];
 
+    /**
+     * لغات المستند المدعومة في V1 حصراً.
+     *
+     * `ar` — عربي كامل RTL. `en` — إنجليزي كامل LTR. `bilingual` — ثنائي مقصود.
+     * `null` = اترك لخانة الاختيار السقوط إلى افتراضي المستأجر ثم إلى `ar`.
+     * القرار هنا مستقل عن لغة الواجهة (UI locale) واختيار القالب/التصميم.
+     */
+    public const DOCUMENT_LANGUAGES = ['ar', 'en', 'bilingual'];
+
     /** معرفات العارضين الحراريين المسجلين فعلياً في الواجهة. */
     private const THERMAL_TEMPLATE_IDS = [
         'tax-invoice-thermal58',
@@ -107,6 +116,39 @@ class PrintTemplateContract
         }
 
         return $usage;
+    }
+
+    /**
+     * يحرس قيمة لغة مستند قبل الحفظ. الغياب/`null` صحيحان — يعنيان السقوط
+     * إلى افتراضي المستأجر ثم إلى `ar` وقت العرض. القيمة الصريحة تُقصَر على
+     * `DOCUMENT_LANGUAGES` بلا استثناء، فلا مسار يكتب لغة غير مدعومة على المستند.
+     */
+    public static function assertLanguage(?string $language): ?string
+    {
+        if ($language === null || $language === '') {
+            return null;
+        }
+        if (! in_array($language, self::DOCUMENT_LANGUAGES, true)) {
+            throw new RuntimeException("لغة المستند «{$language}» غير مدعومة.");
+        }
+
+        return $language;
+    }
+
+    /**
+     * يحسم لغة العرض الفعلية لأي مستند AWJ عبر تسلسل قرار موحّد:
+     * لقطة التجميد بعد الترحيل ← قرار المسودة الحيّ ← افتراضي المستأجر ← `ar`.
+     * قاعدة واحدة تخدم كل الأنواع، بلا اعتماد على معرّف قالب أو نوع مستند.
+     */
+    public static function resolveEffectiveLanguage(
+        ?string $frozen,
+        ?string $draft,
+        ?string $tenantDefault,
+    ): string {
+        return self::assertLanguage($frozen)
+            ?? self::assertLanguage($draft)
+            ?? self::assertLanguage($tenantDefault)
+            ?? 'ar';
     }
 
     /**

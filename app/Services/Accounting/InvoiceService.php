@@ -88,6 +88,7 @@ class InvoiceService
             $branchId = $data['branch_id'] ?? app(BranchContext::class)->id();
             $zatcaType = $this->zatcaDocumentType($data, $data['partner_id']);
             $overrides = $this->designOverrideAttributes($data, $zatcaType);
+            $language = $this->languageAttribute($data);
 
             $invoice = Invoice::create([
                 'number'            => $data['number'] ?? $this->nextNumber($date, $branchId),
@@ -115,6 +116,7 @@ class InvoiceService
                 'created_by'        => $data['created_by'] ?? null,
                 'print_template_override_revision_id' => $overrides['print_template_override_revision_id'],
                 'pdf_template_override_revision_id' => $overrides['pdf_template_override_revision_id'],
+                'language' => $language,
             ]);
 
             $this->applyItemsAndTotals($invoice, $items, $data);
@@ -181,6 +183,7 @@ class InvoiceService
             $isPaid = (bool) ($keep('is_paid', $invoice->is_paid) ?? false);
             $zatcaType = $this->zatcaDocumentType($data, $data['partner_id'], $invoice->zatca_document_type);
             $overrides = $this->designOverrideAttributes($data, $zatcaType, $invoice);
+            $language = $this->languageAttribute($data, $invoice);
 
             $invoice->update([
                 'partner_id'        => $data['partner_id'],
@@ -200,6 +203,7 @@ class InvoiceService
                 'notes'             => $keep('notes', $invoice->notes),
                 'print_template_override_revision_id' => $overrides['print_template_override_revision_id'],
                 'pdf_template_override_revision_id' => $overrides['pdf_template_override_revision_id'],
+                'language' => $language,
             ]);
 
             $this->applyItemsAndTotals($invoice, $items, $data);
@@ -342,6 +346,40 @@ class InvoiceService
             'pdf_template_override_revision_id' => $pdf,
         ];
     }
+
+    /**
+     * لغة مستند الفاتورة على المسودة — سيمنطيقس مطابقة لتجاوز التصميم (#633):
+     * الغياب يُبقي القيمة عند التعديل، وnull يصفّر الاختيار (يعود لسقوط
+     * افتراضي المؤسسة ثم `ar`). القيمة الصريحة تخضع لعقد V1 حصراً
+     * (`ar`/`en`/`bilingual`).
+     */
+    private function languageAttribute(array $data, ?Invoice $existing = null): ?string
+    {
+        if ($existing === null) {
+            return PrintTemplateContract::assertLanguage($data['language'] ?? null);
+        }
+        if (! array_key_exists('language', $data)) {
+            return $existing->language;
+        }
+
+        return PrintTemplateContract::assertLanguage($data['language']);
+    }
+
+    /**
+     * لقطة لغة المستند عند الترحيل: قرار المسودة الحيّ ← افتراضي المؤسسة ← `ar`.
+     * كتابة واحدة على `language_frozen` ضمن معاملة الترحيل نفسها — لا مسار
+     * يعدّلها بعد ذلك (invariant الترحيل الموحّد في AWJ). لا تمسّ الأرقام أو
+     * الضرائب أو QR أو حقول ZATCA — قرار عرض بحت.
+     */
+    private function freezeLanguage(Invoice $invoice): string
+    {
+        return PrintTemplateContract::resolveEffectiveLanguage(
+            null,
+            $invoice->language,
+            Settings::get('documents', 'default_language'),
+        );
+    }
+
 
     /**
      * لقطة الإخراج عند الترحيل: تجاوز المسودة المتحقق منه يجمَّد في print/pdf،
@@ -959,6 +997,9 @@ class InvoiceService
             // تُحل المراجعة داخل معاملة الترحيل وتُخزَّن لقطةً؛ لا تغيّر
             // تعيينات الفرع أو القالب لاحقاً إعادة طباعة فاتورة صدرت بالفعل.
             $revisionIds = $this->freezeOutputRevisionIds($invoice);
+            // لغة المستند تُجمّد بنفس النقطة (كتابة أولى وحيدة على `language_frozen`).
+            // مستقلة تماماً عن اختيار القالب — لا تخترع نوع مستند ولا تُغيّر ZATCA.
+            $language = $this->freezeLanguage($invoice);
 
             $invoice->update([
                 'status'              => 'posted',
@@ -966,6 +1007,7 @@ class InvoiceService
                 'print_template_revision_id' => $revisionIds['print_template_revision_id'],
                 'pdf_template_revision_id' => $revisionIds['pdf_template_revision_id'],
                 'thermal_template_revision_id' => $revisionIds['thermal_template_revision_id'],
+                'language_frozen'     => $language,
                 'subtotal'            => $subtotal,
                 'discount'            => $discount,
                 'shipping'            => $shipping,

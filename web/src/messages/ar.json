@@ -1400,6 +1400,27 @@
     "revision_path_layout": "ترتيب الكتل",
     "revision_path_unknown": "خاصية القالب: {path}"
   },
+  "documentLanguageSelector": {
+    "title": "لغة المستند",
+    "option_ar": "العربية",
+    "option_en": "English",
+    "option_bilingual": "ثنائي اللغة",
+    "option_bilingual_hint": "عربي + English",
+    "follows_tenant_default": "يتبع افتراضي المؤسسة ({language})",
+    "follows_system_default": "يتبع افتراضي النظام (العربية)",
+    "override_hint": "قرار خاصّ بهذا المستند، لا يغيّر الافتراضي.",
+    "reset_to_default": "إعادة إلى الافتراضي",
+    "frozen_note": "لغة المستند مجمّدة بعد الترحيل."
+  },
+  "documentDisplaySettings": {
+    "title": "لغة المستندات الافتراضية",
+    "description": "تُستخدَم لمسودات جديدة لا تحمل لغة صريحة. لا تمسّ مستنداً قائماً — مسودة أو مرحّلاً.",
+    "option_system": "اترك للنظام (العربية)",
+    "option_ar": "العربية",
+    "option_en": "English",
+    "option_bilingual": "ثنائي اللغة (عربي + English)",
+    "saved": "حُفظ الإعداد."
+  },
   "documentQa": {
     "title": "مركز معاينة المستندات",
     "subtitle": "معاينة يدوية آمنة للقوالب والاتجاهات وسيناريوهات المحتوى قبل اعتمادها.",

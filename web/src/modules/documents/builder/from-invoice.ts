@@ -1,6 +1,6 @@
 import { riyalToMinor } from '@/lib/money';
 import { getCurrency } from '../constants/currencies';
-import type { CurrencyCode, Direction, DocumentModel, DocumentTypeId } from '../types';
+import type { CurrencyCode, Direction, DocumentLanguage, DocumentModel, DocumentTypeId } from '../types';
 
 /**
  * أشكال المصدر (عقد الـ API للفاتورة) — المبالغ بالريال نصّاً كما يعيدها الـ backend.
@@ -34,6 +34,15 @@ export interface SourceInvoice {
   shipping?: string;
   adjustment?: string;
   lines: SourceInvoiceLine[];
+  /**
+   * لغة المستند من الخلفية بعد PR-LANG-1 — الحقول الثلاثة اختيارية للحفاظ
+   * على التوافق مع المستدعين القدامى (POS، معاينات مسودة، فواتير قبل الترحيل).
+   * `language_effective` هي القرار النهائي المحسوب في `InvoiceResource` عبر
+   * `PrintTemplateContract::resolveEffectiveLanguage` — لا يعيد العميل حسابه.
+   */
+  language?: 'ar' | 'en' | 'bilingual' | null;
+  language_frozen?: 'ar' | 'en' | 'bilingual' | null;
+  language_effective?: 'ar' | 'en' | 'bilingual';
 }
 export interface SourceCompany {
   name: string;
@@ -113,14 +122,27 @@ export function buildInvoiceDocumentModel(input: {
   type?: DocumentTypeId;
   /** اتجاه المستند؛ الافتراضي RTL لسياق أَوْج. */
   direction?: Direction;
+  /**
+   * لغة عرض المستند من الخلفية (`language_effective`). المسوّغ الوحيد لتمريرها
+   * كـprop مستقل هو `POS` القديم والاختبارات — الفواتير المحفوظة تمرّرها ضمن
+   * `input.invoice.language_effective`.
+   */
+  language?: DocumentLanguage | null;
 }): DocumentModel {
   const { invoice, company, customer, qr, footerText, logoUrl, logoHeight, terms, bank, stampUrl, signatureUrl } = input;
   const currency = getCurrency(company?.currency).code as CurrencyCode;
+  // أولوية الـprop الصريح ثم `language_effective` من عقد الـAPI، فالإسقاط إلى
+  // `null` يُبقي سلوك ما قبل PR-LANG-1 حرفياً (استنتاج من UI locale × direction).
+  const language = input.language ?? invoice.language_effective ?? null;
+  // عندما تكون لغة المستند إنجليزية صريحة ولم يمرِّر المستدعي direction، اقلب
+  // الاتجاه إلى ltr كي يخدم قرار المستخدم بلا تعديل props في كل مسار قائم.
+  const direction: Direction = input.direction ?? (language === 'en' ? 'ltr' : 'rtl');
 
   return {
     type: input.type ?? 'tax_invoice',
     currency,
-    direction: input.direction ?? 'rtl',
+    direction,
+    language,
     seller: {
       name: company?.name ?? '—',
       vatNumber: company?.vat_number ?? null,

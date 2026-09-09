@@ -3,6 +3,8 @@
 namespace App\Http\Resources;
 
 use App\Support\Money;
+use App\Support\PrintTemplateContract;
+use App\Support\Settings;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -94,6 +96,16 @@ class InvoiceResource extends JsonResource
                 'definition' => $this->pdfTemplateOverrideRevision->definition,
                 'document_types' => $this->pdfTemplateOverrideRevision->document_types,
             ]),
+            // لغة المستند — قرار مسودة، لقطة تجميد، ولغة العرض الفعلية المشتقّة.
+            // الأخيرة تُحسب هنا وحسب نفس التسلسل الذي يعتمده الترحيل تماماً؛
+            // فلا اجتهاد للعميل في سلسلة السقوط.
+            'language' => $this->language,
+            'language_frozen' => $this->language_frozen,
+            'language_effective' => PrintTemplateContract::resolveEffectiveLanguage(
+                $this->language_frozen,
+                $this->language,
+                Settings::get('documents', 'default_language'),
+            ),
             'subtotal'       => Money::toRiyal($this->subtotal),
             'discount'       => Money::toRiyal($this->discount),
             'shipping'       => Money::toRiyal($this->shipping),
