@@ -856,14 +856,20 @@ class InvoiceService
      * صريح غير صالح/معطّل يوقف الترحيل (RuntimeException ⇒ 422) بلا أي سقوط
      * صامت لكودٍ قديم.
      */
-    /** @param (callable(Invoice): ?\App\Models\JournalEntry)|null $cogsResolver */
-    public function post(Invoice $invoice, ?callable $cogsResolver = null): Invoice
+    /**
+     * @param  (callable(Invoice): ?\App\Models\JournalEntry)|null  $cogsResolver
+     * @param  ?User  $actor  الفاعل المصادَق عليه لمسار HTTP الحقيقي — يصل حتى
+     *                        حدّ تخويل الخزينة في `settle()`. غيابه (استدعاءات
+     *                        POS/Fuel الداخلية) لا يغيّر سلوكها: فواتيرها تُنشأ
+     *                        دوماً بـ`is_paid=false` فيتخطّى `settle()` نفسه.
+     */
+    public function post(Invoice $invoice, ?callable $cogsResolver = null, ?User $actor = null): Invoice
     {
         if (! $invoice->isDraft()) {
             throw new RuntimeException('لا يمكن ترحيل فاتورة غير مسوّدة (draft).');
         }
 
-        return DB::transaction(function () use ($invoice, $cogsResolver) {
+        return DB::transaction(function () use ($invoice, $cogsResolver, $actor) {
             // قفل الصف وإعادة فحص الحالة داخل المعاملة — يمنع الترحيل المزدوج المتزامن
             // (طلبان متوازيان يريان draft معاً ⇒ قيدان وخصم مخزون مرتان).
             $invoice = Invoice::lockForUpdate()->findOrFail($invoice->id);
@@ -1024,7 +1030,7 @@ class InvoiceService
                 'zatca_xml'           => $zatca['xml'],
             ]);
 
-            $this->settle($invoice, $total);
+            $this->settle($invoice, $total, $actor);
 
             return $invoice->fresh('lines.costCenterAllocations.costCenter');
         });
@@ -1073,7 +1079,7 @@ class InvoiceService
      *  فمسوّدةٌ تغيّرت سطورُها بعد التأشير تُسدَّد بقيمتها الحقيقية لا بقيمة
      *  قديمة محفوظة.
      */
-    protected function settle(Invoice $invoice, int $total): void
+    protected function settle(Invoice $invoice, int $total, ?User $actor = null): void
     {
         if (! $invoice->is_paid || $total <= 0) {
             return;
@@ -1091,7 +1097,9 @@ class InvoiceService
             'created_by'      => $invoice->created_by,
         ], [['invoice_id' => $invoice->id, 'amount' => $total]]);
 
-        $this->payments->post($payment);
+        // الفاعل المصادَق عليه هو مبدأ التخويل عند حدّ الخزينة — created_by أعلاه
+        // مجرد إسناد تدقيقي ولا يُستبدل به.
+        $this->payments->post($payment, $actor);
     }
 
     /**

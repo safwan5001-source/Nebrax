@@ -300,7 +300,7 @@ class PurchaseController extends ApiController
     {
         $purchase = Purchase::findOrFail($id);
         $this->assertWarehouseAllowed($purchase->warehouse_id, $purchase->branch_id);
-        $posted = $this->domain(fn () => $this->purchases->post($purchase));
+        $posted = $this->domain(fn () => $this->purchases->post($purchase, $request->user()));
 
         return (new PurchaseResource($posted->load(['lines', 'printTemplateRevision', 'pdfTemplateRevision', 'thermalTemplateRevision'])))->response();
     }

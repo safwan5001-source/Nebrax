@@ -332,7 +332,7 @@ class InvoiceController extends ApiController
     {
         $invoice = Invoice::findOrFail($id);
         $this->assertWarehouseAllowed($invoice->warehouse_id, $invoice->branch_id);
-        $posted = $this->domain(fn () => $this->invoices->post($invoice));
+        $posted = $this->domain(fn () => $this->invoices->post($invoice, null, $request->user()));
 
         return (new InvoiceResource($posted->load(['priceList', 'lines.product', 'lines.costCenterAllocations.costCenter', 'printTemplateRevision', 'pdfTemplateRevision', 'thermalTemplateRevision', 'printTemplateOverrideRevision', 'pdfTemplateOverrideRevision'])))->response();
     }
