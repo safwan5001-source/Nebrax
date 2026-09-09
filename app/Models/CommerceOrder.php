@@ -24,6 +24,12 @@ use LogicException;
  *
  * `status`: بُعدان مستقلّان لم يُبنَيا بعد (الدفع والتنفيذ) لا يُضغَطان هنا
  * (ADR-01 §4) — هذا العمود يمثّل بُعد الطلب التجاري وحده: `draft`/`confirmed`.
+ *
+ * `customer_identity_id` (PR-COM-6B): مصدر الملكية الرقمية الوحيد —
+ * `App\Tenancy\CustomerContext::customerIdentityId()` حين مُؤسَّساً، و`null`
+ * دوماً للضيف/الطاقم. لا مُدخَل طالبٍ يصل إليه إطلاقاً؛ لا علاقة له بـ
+ * `trustedPartnerSelection` (يبقى محصوراً بـ`partner_id` وحده). `Partner`
+ * يبقى علاقةً تجاريةً وصفية — لا يمنح وصولاً لمورد بذاته.
  */
 class CommerceOrder extends BaseModel implements CompanyWide
 {
@@ -35,7 +41,7 @@ class CommerceOrder extends BaseModel implements CompanyWide
     public const STATUS_CONFIRMED = 'confirmed';
 
     protected $fillable = [
-        'tenant_id', 'sales_channel_id', 'partner_id', 'number', 'status', 'total', 'confirmed_at',
+        'tenant_id', 'sales_channel_id', 'partner_id', 'customer_identity_id', 'number', 'status', 'total', 'confirmed_at',
     ];
 
     protected $casts = [
@@ -76,6 +82,15 @@ class CommerceOrder extends BaseModel implements CompanyWide
     public function partner(): BelongsTo
     {
         return $this->referenceBelongsTo(Partner::class);
+    }
+
+    /**
+     * مالك الطلب الرقمي (PR-COM-6B) — `CustomerIdentity` مُشترَكٌ لا يُصفّى
+     * بالفرع (`CompanyWide` من أساسه)، فعلاقةٌ مباشرة تكفي دون `referenceBelongsTo`.
+     */
+    public function customerIdentity(): BelongsTo
+    {
+        return $this->belongsTo(CustomerIdentity::class);
     }
 
     public function isDraft(): bool

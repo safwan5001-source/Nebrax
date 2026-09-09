@@ -11,6 +11,7 @@ use App\Services\Accounting\UnitConversion;
 use App\Tenancy\BranchScope;
 use App\Tenancy\CustomerContext;
 use App\Tenancy\TenantContext;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -44,8 +45,7 @@ use RuntimeException;
  * **PR-COM-6A — سياق العميل المشترك**: حين يتأسّس `CustomerContext` (طلبٌ من
  * هوية عميل موثَّقة) يصبح **المصدر الوحيد**: `partner_id` من `$data` يُتجاهل
  * كلياً ولا يُقرَأ حتى كمرشّح — لا يجوز أن يُغيّر مُدخَلٌ من الطالب ملكية
- * الطلب. هذا تكاملٌ سياقي حصراً (COM-6A) لا تفويضَ ملكية موارد كامل
- * (COM-6B لاحقاً).
+ * الطلب.
  *
  * **P1 hardening — لا ثقة ضمنية بمجرد غياب السياق**: غياب `CustomerContext`
  * لا يعني «طاقم/داخلي موثوق» — فمسار ضيف/عام مستقبلي (COM-7A) لن يمرّ
@@ -54,6 +54,22 @@ use RuntimeException;
  * `create()`، لا اشتقاقٌ من غياب أي شيء. حين لا يوجد سياقٌ **ولا** علامة
  * ثقة صريحة (الافتراض — أي طالبٍ لم يُثبت ثقته، بما فيه ضيفٌ عامٌّ مستقبلي)
  * لا يُقرَأ `$data['partner_id']` إطلاقاً؛ `partner_id` يبقى `null` دوماً.
+ * `$trustedPartnerSelection` **علامةٌ داخليةٌ خادميّة بحتة** — لا يجوز
+ * اشتقاقها أو تمريرها من أي مُدخَل HTTP (نص طلب/معامل استعلام/رأس/كوكي)
+ * إطلاقاً؛ راجع
+ * `docs/plans/store/COMMERCE_TRUSTED_PARTNER_SELECTION_SECURITY_NOTE.md`.
+ *
+ * **PR-COM-6B — ملكية العميل الرقمية والتفويض**: `customer_identity_id`
+ * (عمود إضافي على `commerce_orders`) مصدره الوحيد `CustomerContext::
+ * customerIdentityId()` حين مُؤسَّساً، و`null` دوماً للضيف/الطاقم — لا علاقة
+ * له بـ`trustedPartnerSelection` ولا بـ`$data` إطلاقاً؛ لا مسار طاقمٍ
+ * «موثوق» يمكنه تعيين ملكية طلبٍ لهوية عميل بديلة (خلافاً لـ`partner_id`
+ * الذي يبقى قابلاً للتحديد اليدوي عبر المسار الموثوق فقط). `ownedOrders()`/
+ * `findOwnedOrder()` أدناه هما الحد التفويضي القابل لإعادة الاستخدام لأي
+ * مسار Commerce عميلٍ مستقبلي (سلة/دفع/سجل طلبات) — مطابقان لنمط
+ * `NotificationController::ownNotifications()` القائم: الاستعلام نفسه
+ * مُصفّى بالمالك المُستمَدّ خادمياً، لا تحميل عامّ ثم تفويضٌ بمعرّفٍ من الطالب.
+ * `Partner` يبقى علاقةً تجاريةً وصفية فقط — لا يمنح وصولاً لموردٍ بذاته.
  */
 class CommerceOrderService
 {
@@ -97,11 +113,12 @@ class CommerceOrderService
             throw new RuntimeException('قناة البيع غير موجودة.');
         }
 
-        $partnerId = $this->resolveOrderPartnerId($tenantId, $data, $trustedPartnerSelection);
+        [$customerIdentityId, $partnerId] = $this->resolveOwnership($tenantId, $data, $trustedPartnerSelection);
 
-        return DB::transaction(function () use ($salesChannelId, $partnerId, $data, $items) {
+        return DB::transaction(function () use ($salesChannelId, $customerIdentityId, $partnerId, $data, $items) {
             $order = CommerceOrder::create([
                 'sales_channel_id' => $salesChannelId,
+                'customer_identity_id' => $customerIdentityId,
                 'partner_id' => $partnerId,
                 'number' => $data['number'] ?? $this->nextNumber(),
             ]);
@@ -189,23 +206,28 @@ class CommerceOrderService
     }
 
     /**
-     * PR-COM-6A: `CustomerContext` — حين مُؤسَّساً — هو المصدر الوحيد
-     * لملكية `partner_id`؛ لا قراءة لـ`$data['partner_id']` في هذه الحالة
-     * إطلاقاً (لا حتى كمرشّح)، فلا يملك الطالب أي وسيلة لتجاوزه. الرابط
-     * نفسه للقراءة فقط هنا — `hasPartnerLink()`/`linkedPartnerId()` يعكسان
-     * تحقُّق `EstablishCustomerContext` القائم (هوية/رابط/Partner نشطون)؛
-     * لا تكرار للتحقّق ولا إنشاء/تعديل رابطٍ من Commerce أبداً.
+     * PR-COM-6A/6B: `CustomerContext` — حين مُؤسَّساً — هو المصدر الوحيد
+     * لكل من هوية العميل المالكة والرابط التجاري؛ لا قراءة لـ`$data` في هذه
+     * الحالة إطلاقاً (لا حتى كمرشّح)، فلا يملك الطالب أي وسيلة لتجاوزها.
+     * الرابط نفسه للقراءة فقط هنا — `hasPartnerLink()`/`linkedPartnerId()`
+     * يعكسان تحقُّق `EstablishCustomerContext` القائم (هوية/رابط/Partner
+     * نشطون)؛ لا تكرار للتحقّق ولا إنشاء/تعديل رابطٍ من Commerce أبداً.
      *
-     * **P1 hardening**: غياب السياق **لا** يعني ثقةً — ذاك كان الخلل. حين
-     * لا يوجد سياقٌ مُؤسَّس، `$data['partner_id']` لا يُقرَأ إطلاقاً (ولا
-     * يُفحَص وجوده حتى) إلا حين يحمل الطالب علامة الثقة الصريحة
-     * `$trustedPartnerSelection === true` — وهي وحدها القناة المتبقية
-     * لسلوك COM-5A الأصلي (تحقّق الوجود داخل المستأجر ثم الإرجاع). أي طالبٍ
-     * آخر — بما فيه أيّ مسار عام/ضيف لا يمرّ بـ`EstablishCustomerContext`
-     * ولا يحمل هذه العلامة — يحصل على `null` دوماً، بصرف النظر عمّا يحمله
-     * `$data`.
+     * **P1 hardening (COM-6A) — لا ثقة ضمنية بمجرد غياب السياق**: غياب
+     * السياق **لا** يعني ثقةً. حين لا يوجد سياقٌ مُؤسَّس، `$data['partner_id']`
+     * لا يُقرَأ إطلاقاً (ولا يُفحَص وجوده حتى) إلا حين يحمل الطالب علامة
+     * الثقة الصريحة `$trustedPartnerSelection === true` — وهي وحدها القناة
+     * المتبقية لسلوك COM-5A الأصلي (تحقّق الوجود داخل المستأجر ثم الإرجاع).
+     *
+     * **COM-6B — لا مسار موثوق لملكية الهوية**: بخلاف `partner_id`،
+     * `customer_identity_id` ليس له أي قناة `trustedPartnerSelection` مطلقاً
+     * — مصدره الوحيد الدائم `CustomerContext`، فيبقى `null` لكل غياب سياق
+     * بصرف النظر عن العلامة. لا مسار طاقمٍ يمكنه «تعيين» عميلٍ مالكاً لطلبٍ
+     * بديلاً عن مصادقته الفعلية — ذلك سيكسر ركيزة الملكية نفسها.
+     *
+     * @return array{0: ?string, 1: ?string} [customerIdentityId, partnerId]
      */
-    private function resolveOrderPartnerId(string $tenantId, array $data, bool $trustedPartnerSelection): ?string
+    private function resolveOwnership(string $tenantId, array $data, bool $trustedPartnerSelection): array
     {
         $customerContext = app(CustomerContext::class);
 
@@ -214,11 +236,14 @@ class CommerceOrderService
                 throw new RuntimeException('سياق العميل لا يطابق المستأجر النشط.');
             }
 
-            return $customerContext->hasPartnerLink() ? $customerContext->linkedPartnerId() : null;
+            return [
+                $customerContext->customerIdentityId(),
+                $customerContext->hasPartnerLink() ? $customerContext->linkedPartnerId() : null,
+            ];
         }
 
         if (! $trustedPartnerSelection) {
-            return null;
+            return [null, null];
         }
 
         $partnerId = $data['partner_id'] ?? null;
@@ -228,6 +253,44 @@ class CommerceOrderService
             throw new RuntimeException('العميل غير موجود.');
         }
 
-        return $partnerId;
+        return [null, $partnerId];
+    }
+
+    /**
+     * PR-COM-6B — حدّ الملكية القابل لإعادة الاستخدام: استعلامٌ **مُصفّى
+     * بالمالك المُستمَدّ خادمياً من `CustomerContext`** منذ سطره الأول، لا
+     * تحميلٌ عامٌّ للطلب يُتبَع بتفويضٍ بمعرّفٍ من الطالب — نفس نمط
+     * `NotificationController::ownNotifications()` القائم. `TenantScope`
+     * (عبر `BaseModel`) يبقى دفاعاً في العمق، ليس السلطة الوحيدة: التصفية
+     * الحقيقية بـ`customer_identity_id` صراحةً، فطلب ضيفٍ (`null`) لا يُطابق
+     * أي هوية مهما كانت، ولا يُعاد أبداً.
+     *
+     * فاشلٌ مغلقاً (`RuntimeException`) بلا سياقٍ مُؤسَّس أو بتعارض المستأجر
+     * — لا استعلام غير مُصفّى يُشغَّل مطلقاً تحت أي ظرف.
+     */
+    public function ownedOrders(): Builder
+    {
+        $customerContext = app(CustomerContext::class);
+        if (! $customerContext->isEstablished()) {
+            throw new RuntimeException('لا سياق عميل موثَّق نشط.');
+        }
+
+        $tenantId = app(TenantContext::class)->id();
+        if ($tenantId === null || $customerContext->tenantId() !== $tenantId) {
+            throw new RuntimeException('سياق العميل لا يطابق المستأجر النشط.');
+        }
+
+        return CommerceOrder::query()->where('customer_identity_id', $customerContext->customerIdentityId());
+    }
+
+    /**
+     * طلبٌ واحدٌ ضمن حدّ `ownedOrders()` — `null` لغير المملوك أو غير
+     * الموجود بلا تمييز بينهما، مطابقةً للاتفاقية غير المُعرِّفة للوجود
+     * (non-enumerating) في منصة العميل (`CUS-ARCH-0` §10.2): معرّفٌ غير
+     * مملوكٍ للطالب يُعامَل تماماً كمعرّفٍ غير موجود.
+     */
+    public function findOwnedOrder(string $orderId): ?CommerceOrder
+    {
+        return $this->ownedOrders()->find($orderId);
     }
 }
