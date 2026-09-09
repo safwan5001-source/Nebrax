@@ -61,15 +61,10 @@ class InventoryReportService
     /**
      * المنتجات المتتبعة فقط؛ بلا اختيار فروع = لقطة مجمعة لكل المستأجر.
      *
-     * **`view=value` خارج نطاق PR-ACL-REPORT-SCOPE عمداً**: `quantity_on_hand`
-     * و`avg_cost` قيمتان عالميتان على `Product` نفسه (متوسط متحرك واحد للمنشأة
-     * — انظر `2025_01_01_000033_create_warehouses.php`)، لا مجموعتان قابلتان
-     * للتفكيك حسب المخزن دون إعادة بناء الاستعلام من `product_warehouse_stock`
-     * (نفس شكل فجوة `/api/inventory/export` الفئة P2 المؤجَّلة أصلاً لـ
-     * PR-ACL-INVENTORY-CATALOG-EXPORT-SCOPE). تصفية قائمة المنتجات دون تصحيح
-     * القيمة المعروضة تعطي أماناً زائفاً؛ الإصلاح الحقيقي يحتاج نفس القرار
-     * المعماري المؤجَّل هناك. `view=warehouses` أدناه هو المسار P1 المُصلَح —
-     * فيه `warehouse_id`/`branch_id` صريحان لكل صف فيُقاطَعان بنطاق المستخدم.
+     * **هوية الكتالوج تبقى كما هي عمداً**: هذا الاستعلام يختار صفوف المنتجات
+     * نفسها بلا تصفية فرع إضافية — `withoutGlobalScope(BranchScope::class)`
+     * قائمة كما كانت. ما تغيَّر هو الكمية المعروضة وحدها، في `inventoryValue()`
+     * أدناه لا هنا.
      */
     private function trackedProducts(array $filters): Builder
     {
@@ -80,29 +75,66 @@ class InventoryReportService
         if (! empty($filters['product_id'])) {
             $query->where('products.id', $filters['product_id']);
         }
-        if (! empty($filters['hide_zero'])) {
-            $query->where('products.quantity_on_hand', '!=', 0);
-        }
 
         return $query;
     }
 
-    /** @return array{rows:array<int,array<string,mixed>>,totals:array<string,int>} */
+    /**
+     * قيمة المخزون الحالية — عقد PR-ACL-INVENTORY-CATALOG-EXPORT-SCOPE:
+     * الكمية والقيمة وحدهما يُقاطَعان بنطاق المخزن الفعّال؛ `avg_cost` يبقى
+     * متوسط `Product` العالمي بلا تغيير (لا تكلفة مخترَعة لكل مخزن — انظر
+     * AWJ_INVENTORY_VALUATION_SEMANTICS.md). هذا يشمل منتجات الوقود المرتبطة
+     * أيضاً: `avg_cost` هنا كان دوماً القيمة الممزوجة على مستوى المنتج، لا
+     * أساس تكلفة `FuelCostBasisService` الخاص بكل مخزن — لم يتغيّر هذا الفارق،
+     * ولا يدّعي هذا التقرير خلاف ذلك.
+     *
+     * غير المقيَّد (`allowedWarehouseIds() === null`): الكمية تبقى
+     * `products.quantity_on_hand` العالمي حرفياً — يشمل كمية ما قبل المخازن
+     * (حركات بلا `warehouse_id`) التي لا يمكن نسبتها لأي مخزن. المقيَّد يرى
+     * مجموع `product_warehouse_stock` ضمن مخازنه المسموحة فقط؛ تلك الكمية
+     * غير المنسوبة لا تُحسب له لأنها غير مثبتة داخل نطاقه — سلوكٌ صحيح لا فقدان.
+     *
+     * `hide_zero` يُطبَّق بعد حساب الكمية الفعلية (لا `WHERE` عالمي مسبق)
+     * ليطابق ما يراه المستخدم فعلاً، لا رقماً عالمياً قد يخالف نطاقه.
+     *
+     * @return array{rows:array<int,array<string,mixed>>,totals:array<string,int>}
+     */
     private function inventoryValue(array $filters): array
     {
-        $rows = $this->trackedProducts($filters)
+        $warehouseIds = ReportWarehouseScope::resolve($filters);
+
+        $products = $this->trackedProducts($filters)
             ->orderBy('products.name')
-            ->get(['id', 'sku', 'name', 'unit', 'quantity_on_hand', 'reorder_level', 'avg_cost', 'sale_price'])
-            ->map(fn (Product $product) => [
-                'key' => (string) $product->id,
-                'sku' => $product->sku,
-                'label' => $product->name,
-                'unit' => $product->unit,
-                'quantity' => (int) $product->quantity_on_hand,
-                'reorder_level' => $product->reorder_level === null ? null : (int) $product->reorder_level,
-                'avg_cost' => (int) $product->avg_cost,
-                'stock_value' => (int) $product->quantity_on_hand * (int) $product->avg_cost,
-            ])->all();
+            ->get(['id', 'sku', 'name', 'unit', 'quantity_on_hand', 'reorder_level', 'avg_cost', 'sale_price']);
+
+        $scopedQuantities = $warehouseIds === null ? null : ProductWarehouseStock::query()
+            ->whereIn('product_id', $products->pluck('id'))
+            ->whereIn('warehouse_id', $warehouseIds)
+            ->selectRaw('product_id, SUM(quantity) as qty')
+            ->groupBy('product_id')
+            ->pluck('qty', 'product_id');
+
+        $hideZero = ! empty($filters['hide_zero']);
+
+        $rows = $products
+            ->map(function (Product $product) use ($warehouseIds, $scopedQuantities) {
+                $quantity = $warehouseIds === null
+                    ? (int) $product->quantity_on_hand
+                    : (int) ($scopedQuantities[$product->id] ?? 0);
+
+                return [
+                    'key' => (string) $product->id,
+                    'sku' => $product->sku,
+                    'label' => $product->name,
+                    'unit' => $product->unit,
+                    'quantity' => $quantity,
+                    'reorder_level' => $product->reorder_level === null ? null : (int) $product->reorder_level,
+                    'avg_cost' => (int) $product->avg_cost,
+                    'stock_value' => $quantity * (int) $product->avg_cost,
+                ];
+            })
+            ->when($hideZero, fn ($rows) => $rows->filter(fn (array $row) => $row['quantity'] !== 0)->values())
+            ->all();
 
         return [
             'rows' => $rows,

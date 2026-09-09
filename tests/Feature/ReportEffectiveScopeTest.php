@@ -5,8 +5,10 @@ namespace Tests\Feature;
 use App\Models\Product;
 use App\Models\ProductWarehouseStock;
 use App\Models\User;
+use App\Support\SpreadsheetReader;
 use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
 /**
@@ -44,6 +46,7 @@ class ReportEffectiveScopeTest extends TestCase
     protected string $otherBranchId;
     protected string $mainWarehouseId;
     protected string $otherWarehouseId;
+    protected string $thirdWarehouseId;
     protected string $supplierId;
     protected string $customerId;
     protected string $productId;
@@ -78,6 +81,10 @@ class ReportEffectiveScopeTest extends TestCase
         $this->otherWarehouseId = $this->withToken($this->ownerToken)->postJson('/api/warehouses', [
             'name' => 'مخزن محظور', 'code' => 'RPT-WH-OTHER',
             'branch_id' => $this->otherBranchId, 'is_active' => true,
+        ])->assertCreated()['data']['id'];
+        $this->thirdWarehouseId = $this->withToken($this->ownerToken)->postJson('/api/warehouses', [
+            'name' => 'مخزن ثالث مسموح', 'code' => 'RPT-WH-THIRD',
+            'branch_id' => $this->mainBranchId, 'is_active' => true,
         ])->assertCreated()['data']['id'];
 
         $this->productId = $this->withToken($this->ownerToken)->postJson('/api/products', [
@@ -121,6 +128,59 @@ class ReportEffectiveScopeTest extends TestCase
         $user->warehouses()->sync([$this->mainWarehouseId]);
 
         return $user->createToken('api')->plainTextToken;
+    }
+
+    /** Persona D — restricted to MAIN branch AND two warehouses (main + third). */
+    protected function restrictedToMainAndThirdWarehouse(string $email): string
+    {
+        app(TenantContext::class)->set($this->tenantId);
+        $user = User::create([
+            'tenant_id' => $this->tenantId, 'name' => 'موظف مقيّد بمخزنين',
+            'email' => $email, 'password' => 'password123', 'role' => 'admin',
+        ]);
+        $user->branches()->sync([$this->mainBranchId]);
+        $user->warehouses()->sync([$this->mainWarehouseId, $this->thirdWarehouseId]);
+
+        return $user->createToken('api')->plainTextToken;
+    }
+
+    /**
+     * Persona E — restricted to MAIN branch/warehouse but on the `staff`
+     * system role, which carries `products.view` without `products.view_cost`
+     * (`Rbac::MATRIX['staff']`) — proves cost redaction and warehouse scope
+     * are independent controls.
+     */
+    protected function restrictedToMainWarehouseWithoutCostPermission(string $email): string
+    {
+        app(TenantContext::class)->set($this->tenantId);
+        $user = User::create([
+            'tenant_id' => $this->tenantId, 'name' => 'موظف بلا صلاحية تكلفة',
+            'email' => $email, 'password' => 'password123', 'role' => 'staff',
+        ]);
+        $user->branches()->sync([$this->mainBranchId]);
+        $user->warehouses()->sync([$this->mainWarehouseId]);
+
+        return $user->createToken('api')->plainTextToken;
+    }
+
+    /** @return array<int, array<int, string>> */
+    protected function readCsv(TestResponse $response): array
+    {
+        $path = tempnam(sys_get_temp_dir(), 'rpt-scope-csv-');
+        file_put_contents($path, $response->streamedContent());
+        $rows = SpreadsheetReader::read($path, 'csv', 60000, 200);
+        @unlink($path);
+
+        return $rows;
+    }
+
+    /** @param array<int, array<int, string>> $rows */
+    protected function csvColumn(array $rows, string $header): array
+    {
+        $index = array_search($header, $rows[0], true);
+        $this->assertNotFalse($index, "العمود «{$header}» غير موجود في الملف المصدَّر.");
+
+        return array_column(array_slice($rows, 1), $index);
     }
 
     protected function money(mixed $riyalString): int
@@ -556,5 +616,210 @@ class ReportEffectiveScopeTest extends TestCase
             ->getJson('/api/reports/inventory?view=warehouses')->assertOk()->json();
 
         $this->assertSame(12, $report['totals']['quantity'], 'Unrestricted owner was unexpectedly narrowed on inventory — backward compatibility broken.');
+    }
+
+    // ═════════════════════════════════════════════════════════════════
+    //  PR-ACL-INVENTORY-CATALOG-EXPORT-SCOPE — /api/inventory/export and
+    //  InventoryReportService::inventoryValue() (view=value). Quantity and
+    //  stock_value are scoped to the actor's Effective Warehouse Scope;
+    //  avg_cost stays the tenant-wide Product.avg_cost, unchanged — never
+    //  recomputed per warehouse (docs/plans/products-inventory/
+    //  AWJ_INVENTORY_VALUATION_SEMANTICS.md).
+    // ═════════════════════════════════════════════════════════════════
+
+    /** @test — Export: unrestricted user still sees the full tenant-wide quantity — backward compatibility. */
+    public function export_unrestricted_user_sees_full_tenant_wide_quantity(): void
+    {
+        Product::whereKey($this->trackedProductId)->update(['quantity_on_hand' => 12, 'avg_cost' => 10000]);
+        ProductWarehouseStock::create(['tenant_id' => $this->tenantId, 'product_id' => $this->trackedProductId, 'warehouse_id' => $this->mainWarehouseId, 'quantity' => 5]);
+        ProductWarehouseStock::create(['tenant_id' => $this->tenantId, 'product_id' => $this->trackedProductId, 'warehouse_id' => $this->otherWarehouseId, 'quantity' => 7]);
+
+        $rows = $this->readCsv($this->withToken($this->ownerToken)
+            ->get('/api/inventory/export?format=csv&locale=en&include_zero=1')->assertOk());
+
+        $index = array_search('RPT-SCOPE-TRACKED', $this->csvColumn($rows, 'SKU'), true);
+        $this->assertNotFalse($index);
+        $this->assertSame('12', $this->csvColumn($rows, 'Quantity')[$index], 'Unrestricted export must keep the tenant-wide quantity.');
+    }
+
+    /** @test — Export: a user restricted to one warehouse sees only that warehouse's quantity, not the tenant total. */
+    public function export_restricted_to_one_warehouse_sees_only_that_warehouses_quantity(): void
+    {
+        Product::whereKey($this->trackedProductId)->update(['quantity_on_hand' => 12, 'avg_cost' => 10000]);
+        ProductWarehouseStock::create(['tenant_id' => $this->tenantId, 'product_id' => $this->trackedProductId, 'warehouse_id' => $this->mainWarehouseId, 'quantity' => 5]);
+        ProductWarehouseStock::create(['tenant_id' => $this->tenantId, 'product_id' => $this->trackedProductId, 'warehouse_id' => $this->otherWarehouseId, 'quantity' => 7]);
+
+        $restricted = $this->restrictedToMainBranchAndWarehouse('export-one-wh@rpt-scope.test');
+        $rows = $this->readCsv($this->withToken($restricted)
+            ->get('/api/inventory/export?format=csv&locale=en&include_zero=1')->assertOk());
+
+        $index = array_search('RPT-SCOPE-TRACKED', $this->csvColumn($rows, 'SKU'), true);
+        $this->assertNotFalse($index);
+        $this->assertSame('5', $this->csvColumn($rows, 'Quantity')[$index], 'Restricted export leaked the forbidden warehouse quantity.');
+        // Stock value must follow the SAME scoped quantity, not the tenant-wide one: 5 * 100.00 SAR = 500.00.
+        $this->assertSame('500.00', $this->csvColumn($rows, 'Inventory value')[$index]);
+    }
+
+    /** @test — Export: a user restricted to two warehouses sees the sum of exactly those two, excluding the third. */
+    public function export_restricted_to_multiple_warehouses_sums_only_allowed(): void
+    {
+        Product::whereKey($this->trackedProductId)->update(['quantity_on_hand' => 15, 'avg_cost' => 10000]);
+        ProductWarehouseStock::create(['tenant_id' => $this->tenantId, 'product_id' => $this->trackedProductId, 'warehouse_id' => $this->mainWarehouseId, 'quantity' => 5]);
+        ProductWarehouseStock::create(['tenant_id' => $this->tenantId, 'product_id' => $this->trackedProductId, 'warehouse_id' => $this->thirdWarehouseId, 'quantity' => 3]);
+        ProductWarehouseStock::create(['tenant_id' => $this->tenantId, 'product_id' => $this->trackedProductId, 'warehouse_id' => $this->otherWarehouseId, 'quantity' => 7]);
+
+        $restricted = $this->restrictedToMainAndThirdWarehouse('export-two-wh@rpt-scope.test');
+        $rows = $this->readCsv($this->withToken($restricted)
+            ->get('/api/inventory/export?format=csv&locale=en&include_zero=1')->assertOk());
+
+        $index = array_search('RPT-SCOPE-TRACKED', $this->csvColumn($rows, 'SKU'), true);
+        $this->assertNotFalse($index);
+        $this->assertSame('8', $this->csvColumn($rows, 'Quantity')[$index], 'Must sum exactly the two allowed warehouses (5+3), never the forbidden third (+7=15).');
+    }
+
+    /** @test — Export: without products.view_cost, avg_cost/stock_value stay redacted while quantity remains correctly scoped — independent controls. */
+    public function export_without_cost_permission_redacts_cost_but_still_scopes_quantity(): void
+    {
+        Product::whereKey($this->trackedProductId)->update(['quantity_on_hand' => 12, 'avg_cost' => 10000]);
+        ProductWarehouseStock::create(['tenant_id' => $this->tenantId, 'product_id' => $this->trackedProductId, 'warehouse_id' => $this->mainWarehouseId, 'quantity' => 5]);
+        ProductWarehouseStock::create(['tenant_id' => $this->tenantId, 'product_id' => $this->trackedProductId, 'warehouse_id' => $this->otherWarehouseId, 'quantity' => 7]);
+
+        $restricted = $this->restrictedToMainWarehouseWithoutCostPermission('export-no-cost@rpt-scope.test');
+        $rows = $this->readCsv($this->withToken($restricted)
+            ->get('/api/inventory/export?format=csv&locale=en&include_zero=1')->assertOk());
+
+        $index = array_search('RPT-SCOPE-TRACKED', $this->csvColumn($rows, 'SKU'), true);
+        $this->assertNotFalse($index);
+        $this->assertSame('5', $this->csvColumn($rows, 'Quantity')[$index], 'Quantity scope must still apply regardless of cost permission.');
+        $this->assertSame('', $this->csvColumn($rows, 'Average cost')[$index], 'avg_cost must stay redacted without products.view_cost.');
+        $this->assertSame('', $this->csvColumn($rows, 'Inventory value')[$index], 'stock_value must stay redacted without products.view_cost.');
+    }
+
+    /** @test — Export: include_zero=false drops a product whose SCOPED quantity is zero, even though its tenant-wide quantity is not. */
+    public function export_include_zero_false_excludes_a_product_zero_in_scope_but_nonzero_tenant_wide(): void
+    {
+        // All of this product's real stock sits in the FORBIDDEN warehouse.
+        // Tenant-wide quantity_on_hand is 7 (nonzero), but the restricted
+        // user's effective scope is 0 — must be excluded, not shown as 7.
+        Product::whereKey($this->trackedProductId)->update(['quantity_on_hand' => 7, 'avg_cost' => 10000]);
+        ProductWarehouseStock::create(['tenant_id' => $this->tenantId, 'product_id' => $this->trackedProductId, 'warehouse_id' => $this->otherWarehouseId, 'quantity' => 7]);
+
+        $restricted = $this->restrictedToMainBranchAndWarehouse('export-zero-scope@rpt-scope.test');
+        $rows = $this->readCsv($this->withToken($restricted)
+            ->get('/api/inventory/export?format=csv&locale=en&include_zero=0')->assertOk());
+
+        $this->assertNotContains('RPT-SCOPE-TRACKED', $this->csvColumn($rows, 'SKU'), 'A product with zero SCOPED quantity must be excluded by include_zero=false, even though the tenant-wide quantity is 7.');
+    }
+
+    /** @test — Export: include_zero=true keeps that same product, now showing its correctly scoped zero. */
+    public function export_include_zero_true_shows_the_scoped_zero_not_the_tenant_wide_quantity(): void
+    {
+        Product::whereKey($this->trackedProductId)->update(['quantity_on_hand' => 7, 'avg_cost' => 10000]);
+        ProductWarehouseStock::create(['tenant_id' => $this->tenantId, 'product_id' => $this->trackedProductId, 'warehouse_id' => $this->otherWarehouseId, 'quantity' => 7]);
+
+        $restricted = $this->restrictedToMainBranchAndWarehouse('export-zero-scope-shown@rpt-scope.test');
+        $rows = $this->readCsv($this->withToken($restricted)
+            ->get('/api/inventory/export?format=csv&locale=en&include_zero=1')->assertOk());
+
+        $index = array_search('RPT-SCOPE-TRACKED', $this->csvColumn($rows, 'SKU'), true);
+        $this->assertNotFalse($index);
+        $this->assertSame('0', $this->csvColumn($rows, 'Quantity')[$index], 'Must show the scoped 0, not the tenant-wide 7.');
+    }
+
+    /** @test — Export: pre-warehouse/null-warehouse legacy quantity is never lost for an unrestricted user. */
+    public function export_unrestricted_user_keeps_legacy_null_warehouse_quantity(): void
+    {
+        // Simulates quantity that predates warehouses (a movement with no
+        // warehouse_id): present in quantity_on_hand but in NO
+        // product_warehouse_stock row at all — the exact case
+        // AWJ_INVENTORY_VALUATION_SEMANTICS.md §2 documents.
+        Product::whereKey($this->trackedProductId)->update(['quantity_on_hand' => 9, 'avg_cost' => 10000]);
+        // Deliberately no ProductWarehouseStock rows at all for this product.
+
+        $rows = $this->readCsv($this->withToken($this->ownerToken)
+            ->get('/api/inventory/export?format=csv&locale=en&include_zero=1')->assertOk());
+
+        $index = array_search('RPT-SCOPE-TRACKED', $this->csvColumn($rows, 'SKU'), true);
+        $this->assertNotFalse($index);
+        $this->assertSame('9', $this->csvColumn($rows, 'Quantity')[$index], 'Unrestricted export must not silently lose pre-warehouse legacy quantity.');
+    }
+
+    /** @test — Export: tenant isolation holds for the new per-warehouse SUM query itself, not just the base product list. */
+    public function export_scoped_sum_query_never_crosses_tenant_boundary(): void
+    {
+        Product::whereKey($this->trackedProductId)->update(['quantity_on_hand' => 5, 'avg_cost' => 10000]);
+        ProductWarehouseStock::create(['tenant_id' => $this->tenantId, 'product_id' => $this->trackedProductId, 'warehouse_id' => $this->mainWarehouseId, 'quantity' => 5]);
+
+        $other = $this->registerTenant('rpt-scope-nt-export', 'nt-export@rpt-scope.test');
+        app(TenantContext::class)->set($other['tenant_id']);
+        $otherProductId = Product::create([
+            'tenant_id' => $other['tenant_id'], 'name' => 'صنف مستأجر آخر',
+            'sku' => 'RPT-SCOPE-TRACKED', 'unit' => 'piece', 'type' => 'good',
+            'track_inventory' => true, 'quantity_on_hand' => 999, 'avg_cost' => 10000,
+        ])->id;
+        $otherWarehouseId = $this->withToken($other['token'])->postJson('/api/warehouses', [
+            'name' => 'مخزن مستأجر آخر', 'code' => 'NT-WH',
+        ])->assertCreated()['data']['id'];
+        ProductWarehouseStock::create(['tenant_id' => $other['tenant_id'], 'product_id' => $otherProductId, 'warehouse_id' => $otherWarehouseId, 'quantity' => 999]);
+        app(TenantContext::class)->set($this->tenantId);
+
+        $restricted = $this->restrictedToMainBranchAndWarehouse('export-cross-tenant@rpt-scope.test');
+        $rows = $this->readCsv($this->withToken($restricted)
+            ->get('/api/inventory/export?format=csv&locale=en&include_zero=1')->assertOk());
+
+        // Only tenant A's row for this SKU, at tenant A's scoped quantity — never tenant B's 999.
+        $skus = $this->csvColumn($rows, 'SKU');
+        $this->assertCount(1, array_filter($skus, fn ($sku) => $sku === 'RPT-SCOPE-TRACKED'), 'CRITICAL — cross-tenant row leaked into the export.');
+        $index = array_search('RPT-SCOPE-TRACKED', $skus, true);
+        $this->assertSame('5', $this->csvColumn($rows, 'Quantity')[$index], 'CRITICAL — cross-tenant warehouse quantity leaked into the scoped sum.');
+    }
+
+    /** @test — view=value: scopes quantity and stock_value to the allowed warehouse; avg_cost stays tenant-wide unchanged. */
+    public function inventory_value_view_scopes_quantity_and_stock_value_to_allowed_warehouses(): void
+    {
+        Product::whereKey($this->trackedProductId)->update(['quantity_on_hand' => 12, 'avg_cost' => 10000]);
+        ProductWarehouseStock::create(['tenant_id' => $this->tenantId, 'product_id' => $this->trackedProductId, 'warehouse_id' => $this->mainWarehouseId, 'quantity' => 5]);
+        ProductWarehouseStock::create(['tenant_id' => $this->tenantId, 'product_id' => $this->trackedProductId, 'warehouse_id' => $this->otherWarehouseId, 'quantity' => 7]);
+
+        $restricted = $this->restrictedToMainBranchAndWarehouse('value-scoped@rpt-scope.test');
+        $report = $this->withToken($restricted)
+            ->getJson('/api/reports/inventory?view=value')->assertOk()->json();
+
+        $row = collect($report['data'])->firstWhere('sku', 'RPT-SCOPE-TRACKED');
+        $this->assertNotNull($row);
+        $this->assertSame(5, $row['quantity'], 'view=value leaked the forbidden warehouse quantity into the row.');
+        $this->assertSame('100.00', $row['avg_cost'], 'avg_cost must stay the unchanged tenant-wide Product.avg_cost.');
+        $this->assertSame('500.00', $row['stock_value'], 'stock_value must be the scoped quantity (5) times the unchanged tenant-wide avg_cost, not 12 * avg_cost.');
+        // Totals must reflect the same scope — no leak through the aggregate.
+        $this->assertSame(5, $report['totals']['quantity'], 'view=value totals leaked the forbidden warehouse quantity.');
+    }
+
+    /** @test — view=value: unrestricted user keeps the tenant-wide totals — backward compatibility, mirrors view=warehouses. */
+    public function inventory_value_view_unrestricted_shows_tenant_wide_totals(): void
+    {
+        Product::whereKey($this->trackedProductId)->update(['quantity_on_hand' => 12, 'avg_cost' => 10000]);
+        ProductWarehouseStock::create(['tenant_id' => $this->tenantId, 'product_id' => $this->trackedProductId, 'warehouse_id' => $this->mainWarehouseId, 'quantity' => 5]);
+        ProductWarehouseStock::create(['tenant_id' => $this->tenantId, 'product_id' => $this->trackedProductId, 'warehouse_id' => $this->otherWarehouseId, 'quantity' => 7]);
+
+        $report = $this->withToken($this->ownerToken)
+            ->getJson('/api/reports/inventory?view=value')->assertOk()->json();
+
+        $row = collect($report['data'])->firstWhere('sku', 'RPT-SCOPE-TRACKED');
+        $this->assertSame(12, $row['quantity'], 'Unrestricted owner was unexpectedly narrowed on view=value — backward compatibility broken.');
+        $this->assertSame(12, $report['totals']['quantity']);
+    }
+
+    /** @test — view=value: hide_zero excludes a product whose SCOPED quantity is zero, even though its tenant-wide quantity is not. */
+    public function inventory_value_view_hide_zero_uses_the_scoped_quantity_not_the_tenant_wide_one(): void
+    {
+        Product::whereKey($this->trackedProductId)->update(['quantity_on_hand' => 7, 'avg_cost' => 10000]);
+        ProductWarehouseStock::create(['tenant_id' => $this->tenantId, 'product_id' => $this->trackedProductId, 'warehouse_id' => $this->otherWarehouseId, 'quantity' => 7]);
+
+        $restricted = $this->restrictedToMainBranchAndWarehouse('value-hide-zero@rpt-scope.test');
+        $report = $this->withToken($restricted)
+            ->getJson('/api/reports/inventory?view=value&hide_zero=1')->assertOk()->json();
+
+        $row = collect($report['data'])->firstWhere('sku', 'RPT-SCOPE-TRACKED');
+        $this->assertNull($row, 'hide_zero must exclude a product whose scoped quantity is 0, even though tenant-wide quantity is 7.');
     }
 }
