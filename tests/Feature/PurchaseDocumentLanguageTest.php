@@ -46,7 +46,7 @@ class PurchaseDocumentLanguageTest extends TestCase
 
         $this->supplier = Partner::create(['name' => 'مورد', 'type' => 'supplier']);
         $this->product = Product::create([
-            'name' => 'صنف', 'type' => 'stock', 'track_inventory' => true,
+            'name' => 'صنف', 'type' => 'good', 'track_inventory' => true,
             'purchase_price' => 10000, 'sale_price' => 15000, 'tax_rate' => 15,
         ]);
         $this->purchases = app(PurchaseService::class);
