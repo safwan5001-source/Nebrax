@@ -3,7 +3,7 @@
 **Status:** Living reference — verification pass complete for Groups A / C / D / E / F  
 **Date started:** 2026-09-08  
 **Last research update:** 2026-09-08 — POS/Fuel PaymentService actor propagation audit  
-**Last verification update:** 2026-09-08 — treasury actor propagation + report branch scope + direct cash-sale executable verification  
+**Last verification update:** 2026-09-08 — treasury actor propagation + report branch scope + direct cash-sale executable verification; closure pass same day for Group B (report exports), Customer report, Classification Analytics, Invoice/Purchase settle reachability  
 **Scope:** Users, Employees, Roles, Permissions, Branch Scope, Resource Access, Record Scope, Workflow/Record State, Reports, permission-aware UX.  
 **Reference product:** Daftra official documentation.  
 **Verification detail:** [`AWJ_ACCESS_CONTROL_V2_VERIFICATION_REPORT.md`](./AWJ_ACCESS_CONTROL_V2_VERIFICATION_REPORT.md) — evidence matrix, per-gap severity, recommended PR breakdown.
@@ -290,8 +290,8 @@ line-referenced sources).
 | Direct Payment API actor propagation | `PaymentController.php:146` passes `$request->user()` **[V]** | Confirmed correct baseline | Preserve |
 | POS Payment actor propagation | `PosService.php:248` omits actor **[V]** | **Confirmed gap — P1** | Pass `$data['actor']` as second arg |
 | Fuel Payment actor propagation | `FuelSaleService.php:330` omits actor **[V]** | **Confirmed gap — P1** | Pass `$actor` as second arg |
-| Invoice auto-settlement actor | `InvoiceService.php:1052` omits actor **[V]** | **Confirmed gap — P2** (reachability of `is_paid=true` route to verify in fix PR) | Plumb actor through `settle()` callers |
-| Purchase auto-settlement actor | `PurchaseService.php:563` omits actor **[V]** | **Confirmed gap — P2** | Same shape as Invoice |
+| Invoice auto-settlement actor | `InvoiceService.php:1052` omits actor + user-controlled `is_paid=true` on `StoreInvoiceRequest.php:30` reaches the path **[V]** | **Confirmed reachable gap — P1** (upgraded from P2 after closure verification) | Plumb actor through `settle()` callers |
+| Purchase auto-settlement actor | `PurchaseService.php:563` omits actor + user-controlled `paid_on_post` on `StorePurchaseRequest.php:36` reaches the path **[V]** | **Confirmed reachable gap — P1** (upgraded from P2) | Same shape as Invoice |
 | POS variance vs treasury ACL | `PosSessionService::settleVariance` has no `assertAllowed` **[V]** | **Policy decision required** | Product picks privileged-override vs absolute-boundary |
 | Direct invoice cash-sale treasury ACL | `InvoiceService.php:44,863` debit 1110 directly; stranger-scoped deposit still succeeds **[V]** | **Confirmed gap — P1** | Reroute through `CashBankAccountService::assertAllowed(deposit)` |
 | Canonical permission catalogue | Rbac::PERMISSIONS | Present/rich | Preserve exact keys |
@@ -305,8 +305,10 @@ line-referenced sources).
 | Purchase report branch scope | `PurchaseReportService.php:65,82` — `withoutGlobalScope(BranchScope)` + no `allowedBranchIds` intersection **[V]** | **Confirmed gap — P1** | Shared `RestrictedBranchScope` helper |
 | Sales report branch scope | `SalesReportService.php:80-83` — no `allowedBranchIds` intersection; forbidden `branch_id[]` returns forbidden data **[V]** | **Confirmed gap — P1** | Same helper |
 | Inventory warehouse balance scope | `InventoryReportService.php:63,104` — no user warehouse/branch intersection **[V]** | **Confirmed gap — P1** | Helper + warehouse-intersection variant |
-| Customer / Classification analytics scope | same `withoutGlobalScope` pattern — inferred not runtime-tested | Confirmed gap (inferred) | Same helper; add runtime test in fix PR |
-| Report exports (CSV/PDF/print) scope | inherits API scope per §26 | Not verified this pass — deferred | Mirror A2.1/A1.2/A3.1 in export tests |
+| Customer report branch scope | `CustomerReportService.php:66,149,198` — same `withoutGlobalScope` pattern; runtime-verified restricted user sees both branches **[V]** | **Confirmed gap — P1** | Same helper as Purchase/Sales |
+| Classification Analytics branch scope | `ClassificationAnalyticsReportService.php:53-56,73-77,100` — all six scopes route through three helpers, each stripping BranchScope; runtime-verified for `sales_invoice` **[V]** | **Confirmed gap — P1** (source-shape covers the other five scopes) | Apply the helper inside `documents()` / `payments()` / `partners()` |
+| Report exports (CSV/PDF/print) scope | five report controllers have NO server-side export method (reflection-verified); web/ renders CSV+PDF client-side from JSON via `@/lib/export` + jsPDF **[V]** | **Not applicable (server-side)** — export ≡ API scope by construction | Fix at the API layer only |
+| Inventory catalog export (`/api/inventory/export`, separate surface) | `InventoryController.php:57-85` + `InventoryBalanceFilters.php:57-59` — tenant-wide `Product::query()`, no warehouse intersection; runtime-verified aggregate leaks **[V]** | **Confirmed gap — P2** (aggregate, no per-warehouse breakdown) | Warehouse-intersect the aggregate or add per-warehouse breakdown |
 | Accounting-core reports scope | `ReportService.php:811-836` intersects with `allowedBranchIds()` | Confirmed correct pattern | Reuse as reference for the fix helper |
 | HR approval workflow membership | broad hr.manage | Missing | Define policy |
 | POS audit branch/drill-down/export | scoped | Present/good | Reuse |
@@ -339,12 +341,27 @@ This living reference now includes the actor-propagation audit and the exact sem
 
 ## 31. Verification pass — 2026-09-08
 
-Executable evidence added in `tests/Feature/AccessControlV2VerificationTest.php`
-(18 tests, treasury actor + direct cash sale + policy characterization) and
+Two passes on the same day.
+
+**Initial pass:** executable evidence added in
+`tests/Feature/AccessControlV2VerificationTest.php` (18 tests, treasury
+actor + direct cash sale + policy characterization) and
 `tests/Feature/AccessControlV2ReportScopeVerificationTest.php` (7 tests,
-report branch scope + tenant negative control). All 25 pass under
-`php artisan test --filter=AccessControlV2`. Verdicts folded into §26.
-Full report (evidence matrix, per-gap severity, PR breakdown) in
+report branch scope + tenant negative control).
+
+**Closure pass** (same day): `tests/Feature/AccessControlV2ClosureVerificationTest.php`
+(9 tests). Closes Group B (report exports architecture + inventory
+catalog export), Customer report runtime, Classification Analytics
+runtime, Invoice `is_paid=true` reachability, Purchase `paid_on_post`
+reachability. The two `settle()` gaps are upgraded from P2 → P1 by
+proven HTTP reachability.
+
+All 34 tests pass under `php artisan test --filter=AccessControlV2`
+(284 assertions, ~11s). Verdicts folded into §26. Full report — with
+evidence matrix, per-gap severity, PR breakdown and testability
+blockers — in
 [`AWJ_ACCESS_CONTROL_V2_VERIFICATION_REPORT.md`](./AWJ_ACCESS_CONTROL_V2_VERIFICATION_REPORT.md).
+
+Remaining decision: POS variance policy (product-side).
 
 **Process rule:** research/inspect → verify → update this file → confirm commit → summarize to Safwan.
