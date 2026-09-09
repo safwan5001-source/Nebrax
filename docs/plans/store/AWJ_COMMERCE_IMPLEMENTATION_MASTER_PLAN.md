@@ -5,6 +5,15 @@
 **Base:** `f78508af038cd0c7dfee3828259b006f90106ff4`  
 **Scope:** AWJ Commerce Core, AWJ web commerce, Mobile Commerce API for «متجرنا», and future connected channels.
 
+**Amendment (CUS-COM-GATE-1, 2026-09-09):** PHASE 6 below is rewritten to
+integrate the now-merged shared AWJ Customer Platform foundation
+(`CustomerIdentity`/`CustomerPartnerLink`/`CustomerContext` — PR #743,
+CUS-FOUNDATION-1) instead of the original Commerce-owned customer
+account/auth design. §16 and §19 are updated to match. Full rationale,
+evidence, and the resumption-gate verdict:
+`docs/plans/customers/CUS-COM-GATE-1-COMMERCE-INTEGRATION-GATE.md`.
+COM-0 through COM-5B history below is preserved unchanged.
+
 ## 1. Purpose
 
 This plan converts the merged Commerce architecture audit, research, ADR-01 through ADR-05, and Evidence Passes 01–03 into a dependency-ordered implementation program.
@@ -281,9 +290,25 @@ No universal tenant default is assumed by this plan. The first launch slice must
 
 # PHASE 6 — Customer/mobile identity
 
-## PR-COM-6A — Commerce Customer Account foundation
+**SUPERSEDED (CUS-COM-GATE-1):** the three subsections below described the
+*original* plan — a Commerce-owned customer account/auth subsystem
+(PR-COM-6A building its own tenant-scoped account, PR-COM-6B building its
+own auth/ownership guard, PR-COM-6C bundling both order snapshots and
+saved addresses together) — kept here only as historical record of what
+was originally scoped. It was superseded once `CUS-ARCH-0` (architecture)
+and `CUS-FOUNDATION-1` (implementation, PR #743, merged) delivered a
+**shared, AWJ-wide** Customer Platform — `CustomerIdentity` +
+`CustomerPartnerLink` + `App\Tenancy\CustomerContext` — consumed by AWJ
+Web Store, «متجرنا», Customer Portal, and Commerce alike. Commerce must
+not build a second, Commerce-private customer identity/auth system.
+**Original text (superseded):**
 
-**Dependency:** can proceed after PR-COM-3, but must be merged before authenticated customer APIs.  
+<details>
+<summary>Original PR-COM-6A/6B/6C (superseded — click to expand)</summary>
+
+### PR-COM-6A — Commerce Customer Account foundation *(superseded)*
+
+**Dependency:** can proceed after PR-COM-3, but must be merged before authenticated customer APIs.
 **ADR:** ADR-05.
 
 **Goal:** tenant-owned customer-facing account separate from ERP User and Partner.
@@ -295,7 +320,7 @@ No universal tenant default is assumed by this plan. The first launch slice must
 - identity matching does not silently merge Partners;
 - registration/browsing/cart does not automatically create Partner unless a later approved resolution milestone requires it.
 
-## PR-COM-6B — Commerce authentication & ownership guard
+### PR-COM-6B — Commerce authentication & ownership guard *(superseded)*
 
 **Dependency:** PR-COM-6A.
 
@@ -308,11 +333,126 @@ Exact auth provider/method remains implementation/provider decision; phone-first
 - guest-to-account claim requires proof;
 - no ERP staff session/token accepted as an implicit consumer identity contract unless explicitly designed and approved.
 
-## PR-COM-6C — Customer addresses & immutable order address snapshot
+### PR-COM-6C — Customer addresses & immutable order address snapshot *(superseded)*
 
 **Dependency:** PR-COM-6B.
 
 Multiple commerce addresses are separate from the flat Partner address. Order snapshots remain immutable after order agreement even if account address changes later.
+
+</details>
+
+## Revised PHASE 6 (CUS-COM-GATE-1)
+
+Non-negotiable, locked by `CUS-ARCH-0`/`CUS-FOUNDATION-1` and restated here
+so no implementation agent re-derives it:
+
+```text
+Partner            = AWJ commercial/accounting Customer Master.
+CustomerIdentity    = shared AWJ customer-facing authentication principal.
+CustomerContext     = server-derived shared customer context (per request).
+User                = ERP staff principal.
+```
+
+Commerce **consumes** the shared Customer Platform. Commerce must **not**
+create: a `CommerceCustomerAccount`; separate Commerce customer
+credentials; customer authentication based on ERP `User`; credentials on
+`Partner`; or any duplicate customer database. There is no independent
+"store customer" — AWJ Web Store, «متجرنا», Customer Portal and every
+future customer-facing service authenticate through the same
+`CustomerIdentity`.
+
+## PR-COM-6A — Commerce ↔ Shared Customer Platform Context Integration
+
+**Dependency:** PR-COM-5B (merged) **and** `CUS-FOUNDATION-1` (merged, PR #743).
+**ADR:** ADR-05 (conceptual boundary); superseded in identity/model detail
+by `CUS-ARCH-0`.
+
+**Goal:** wire Commerce to consume `App\Tenancy\CustomerContext` —
+`tenantId()`, `customerIdentityId()`, `linkedPartnerId()`,
+`hasPartnerLink()` — as the sole source of authenticated customer
+ownership. No new authentication, no new identity model, no new database.
+
+**Rules:**
+- Commerce derives authenticated customer ownership **server-side**, from
+  `CustomerContext`, established only after tenant resolution + Sanctum
+  authentication + `EnsureCustomerPrincipal` (all already implemented by
+  CUS-FOUNDATION-1);
+- Commerce must **not** accept a public `customer_identity_id`,
+  `partner_id`, or `tenant_id` as ownership authority from request
+  input — the exact IDOR invariant already enforced elsewhere in the
+  Customer Platform (`CUS-ARCH-0` §10.2);
+- guest commerce remains fully supported — `CustomerContext` is simply
+  absent/not required for a guest request;
+- linking to an existing `Partner` remains an explicit, staff-mediated,
+  proof-backed action per `CUS-ARCH-0` §8 — Commerce never triggers a
+  Partner link as a side effect of browsing, cart, or checkout.
+
+## PR-COM-6B — Commerce Customer Ownership & Authorization Integration
+
+**Dependency:** PR-COM-6A.
+
+Replaces the original Commerce-owned authentication work. **Do not build
+another login/register/token subsystem** — `CUS-FOUNDATION-1` already
+shipped customer register/login/logout/me, tenant resolution
+(`ResolveCustomerTenant`), principal separation (`EnsureCustomerPrincipal`
+vs. `EnsureUserPrincipal`), and IDOR-safe ownership patterns. This PR
+applies those existing primitives to Commerce resources only.
+
+**Define, using `CustomerContext` and existing shared Customer Platform
+authentication:**
+- authenticated ownership (a `CommerceOrder`/Commerce resource query is
+  scoped by `customer_identity_id` derived from context, never by a
+  request-supplied ID);
+- tenant isolation (Commerce inherits the same `TenantScope` guarantees
+  already proven for `CustomerIdentity`/`CustomerPartnerLink`);
+- IDOR protection (non-owned resource IDs return a non-enumerating 404,
+  matching the `NotificationController`/`SelfServiceController` pattern
+  `CUS-ARCH-0` cites as precedent);
+- customer-vs-staff principal separation (Commerce customer routes accept
+  only `CustomerIdentity` tokens; staff `User` tokens are rejected, and
+  vice versa — reusing `EnsureCustomerPrincipal`/`EnsureUserPrincipal`
+  verbatim);
+- guest ownership boundary (a guest-created `CommerceOrder` has no
+  `CustomerIdentity` owner; it is not retroactively claimable without the
+  separate proof-backed claim design `CUS-ARCH-0` §8.3 explicitly defers).
+
+## PR-COM-6C — Immutable Commerce Order Customer/Contact/Address Snapshots
+
+**Dependency:** PR-COM-6B.
+
+Splits the old combined PR-COM-6C responsibility, per `CUS-ARCH-0` §9.2's
+correction of the original Commerce Master Plan assumption:
+
+**Commerce's responsibility (this PR):** immutable order snapshots
+required for historical correctness — the minimum approved
+customer/contact/shipping/billing data needed by checkout, captured onto
+`CommerceOrder`/`CommerceOrderLine` at confirmation time and never
+rewritten by later Partner/CustomerIdentity/address changes. This is
+Commerce-owned historical evidence, structurally the same pattern already
+used for price/UOM/product-name snapshots (COM-4A/5A).
+
+**Customer Platform's responsibility (not this PR, not Commerce-owned):**
+saved/reusable customer addresses and any future contact/address book
+(`CUS-CONTACT-1`, unscheduled). **Saved addresses are not required to
+resume Commerce** — `CUS-ARCH-0` §9.2 already locked
+`CUS-CONTACT-1-MIN = NOT REQUIRED BEFORE COMMERCE RESUMES`, and
+`CUS-FOUNDATION-1`'s implementation confirms this remains true post-merge.
+**Do not introduce a shared Contact/Address model in PR-COM-6C** — Partner's
+existing flat address fields (for a linked, authenticated customer) plus a
+guest/unlinked checkout's own direct-entry snapshot are sufficient inputs
+to the immutable snapshot; PR-COM-6C only defines and persists the
+snapshot itself, never a reusable address entity.
+
+**Not implemented by this PR (future implementation work — schema TBD in
+its own PR, not decided here):**
+- `CommerceOrder` gains a nullable customer-identity ownership reference
+  (name/column TBD at implementation time), derived server-side from
+  `CustomerContext`, null for guests;
+- optional linked `Partner`, also server-derived (never client-supplied)
+  from the active `CustomerPartnerLink`, null when unlinked or guest;
+- immutable customer/contact/shipping/billing snapshot fields sufficient
+  for order history and fulfillment, for both the authenticated and guest
+  case.
 
 ---
 
@@ -623,6 +763,11 @@ Material asynchronous operations should expose enough correlation/audit data to 
 
 # 16. Recommended implementation order
 
+**Updated by CUS-COM-GATE-1** — `COM-6A..6C` is now placed explicitly in
+the critical path (not "in parallel," since it depends on the now-merged
+`CUS-FOUNDATION-1`, which was not available when this section was first
+written) between `COM-5B` and `COM-7A`:
+
 Critical path:
 
 ```text
@@ -632,13 +777,19 @@ COM-0
  -> COM-3
  -> COM-4A
  -> COM-5A -> COM-5B
+ -> COM-6A -> COM-6B -> COM-6C     (requires merged CUS-FOUNDATION-1)
  -> COM-7A -> COM-7B
  -> COM-8A -> COM-8B -> COM-8C
  -> COM-9A / COM-9B
  -> COM-10A -> COM-10B
 ```
 
-Customer identity `COM-6A..6C` should be inserted before authenticated customer functionality; it can proceed partly in parallel after catalog contracts stabilize, but merging parallel branches must not bypass dependency review.
+`COM-6A` cannot start before `CUS-FOUNDATION-1` is merged (it now is —
+PR #743) and before `COM-5B` is merged (it now is). `COM-7A`
+(Cart/checkout commercial validation) depends on `COM-6A`/`COM-6B` for
+authenticated ownership and on `COM-6C` for the immutable snapshot it
+must write at checkout — so `COM-6A→6B→6C` is a hard prerequisite of
+`COM-7A`, not an optional parallel track.
 
 Returns follow a working fulfillment/payment/invoice slice. External channels follow proof of the native AWJ/«متجرنا» Commerce Core.
 
@@ -703,11 +854,17 @@ Required as applicable:
 
 1. Saudi invoice trigger for each launch scenario.
 2. Launch reservation timing policy.
-3. Launch checkout identity policy.
+3. ~~Launch checkout identity policy.~~ **RESOLVED (CUS-FOUNDATION-1
+   approved decision #5):** both Guest checkout and Authenticated
+   customer-account checkout are supported at launch; account creation is
+   never mandatory merely to browse/cart/checkout unless a later explicit
+   product decision changes this.
 4. First payment provider and capture mode.
 5. Whether launch shipping scope can safely retain current AWJ shipping VAT semantics.
 6. Whether launch needs any promotion at all.
-7. Customer-to-Partner resolution/creation milestone.
+7. Customer-to-Partner resolution/creation milestone — still **OPEN**;
+   `CUS-ARCH-0` §15 confirms this is explicitly deferred to the
+   Commerce-to-Invoice bridge (Phase 10), not Foundation or Phase 6.
 8. Partial fulfillment inclusion in first release.
 9. First external provider after native pilot.
 10. Future Product Variant architecture.
