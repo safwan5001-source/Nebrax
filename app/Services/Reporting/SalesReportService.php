@@ -6,6 +6,7 @@ use App\Models\Invoice;
 use App\Models\InvoiceLine;
 use App\Models\JournalLine;
 use App\Models\Payment;
+use App\Support\ReportBranchScope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -77,8 +78,8 @@ class SalesReportService
             $query->whereDate('invoices.invoice_date', '<=', $filters['to']);
         }
 
-        $branches = array_filter((array) ($filters['branch_id'] ?? []));
-        if ($branches !== []) {
+        $branches = ReportBranchScope::resolve($filters);
+        if ($branches !== null) {
             $query->whereIn('invoices.branch_id', $branches);
         }
         if (! empty($filters['customer_id'])) {
@@ -282,8 +283,8 @@ class SalesReportService
         if (! empty($filters['to'])) {
             $query->whereDate('payments.payment_date', '<=', $filters['to']);
         }
-        $branches = array_filter((array) ($filters['branch_id'] ?? []));
-        if ($branches !== []) {
+        $branches = ReportBranchScope::resolve($filters);
+        if ($branches !== null) {
             $query->whereIn('payments.branch_id', $branches);
         }
         if (! empty($filters['customer_id'])) {

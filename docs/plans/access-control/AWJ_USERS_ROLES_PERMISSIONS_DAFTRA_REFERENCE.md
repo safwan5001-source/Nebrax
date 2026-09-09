@@ -1,10 +1,12 @@
 # AWJ Users, Roles & Permissions — Daftra Functional Reference
 
-**Status:** Living reference — research + code inspection in progress  
+**Status:** Living reference — verification pass complete for Groups A / C / D / E / F  
 **Date started:** 2026-09-08  
 **Last research update:** 2026-09-08 — POS/Fuel PaymentService actor propagation audit  
+**Last verification update:** 2026-09-08 — treasury actor propagation + report branch scope + direct cash-sale executable verification; closure pass same day for Group B (report exports), Customer report, Classification Analytics, Invoice/Purchase settle reachability  
 **Scope:** Users, Employees, Roles, Permissions, Branch Scope, Resource Access, Record Scope, Workflow/Record State, Reports, permission-aware UX.  
 **Reference product:** Daftra official documentation.  
+**Verification detail:** [`AWJ_ACCESS_CONTROL_V2_VERIFICATION_REPORT.md`](./AWJ_ACCESS_CONTROL_V2_VERIFICATION_REPORT.md) — evidence matrix, per-gap severity, recommended PR breakdown.
 
 > This document is a functional research/reference artifact. It does **not** authorize implementation, database changes, permission migrations, merge/deploy, or changes to accounting/security rules.
 
@@ -273,20 +275,25 @@ Permission never activates an unavailable feature.
 If added later: restricted permission, preserve original actor, audit trail, obvious impersonation state, no tenant crossing and sensitive-operation review.
 
 ## 26. Code-backed gap matrix — current
+
+Verdicts marked **[V]** were closed by executable evidence in the 2026-09-08
+verification pass (see the verification report for the exact test names and
+line-referenced sources).
+
 | Capability | AWJ evidence | Status | Direction |
 |---|---|---|---|
-| Tenant isolation | tenant-scoped models | Present | Preserve |
+| Tenant isolation | tenant-scoped models; cross-tenant `branch_id` filter returns ∅ **[V]** | Confirmed correct | Preserve |
 | Custom/system roles | RBAC + RoleController | Present | Preserve |
 | Login enable/disable | users.is_active | Present | Preserve |
 | User branch/warehouse scope | assignments + predicates | Present | Audit consumers |
-| Cash/bank ACL foundation | deposit/withdraw subjects | Present | Preserve |
-| Direct Payment API actor propagation | request user passed | Present/good | Preserve |
-| POS Payment actor propagation | actor omitted at post | **Confirmed defect** | Targeted fix + tests |
-| Fuel Payment actor propagation | actor omitted at post | **Confirmed defect** | Targeted fix + tests |
-| Invoice auto-settlement actor | actor omitted | Confirmed omission | Verify workflow then fix contract |
-| Purchase auto-settlement actor | actor omitted | Confirmed omission | Verify workflow then fix contract |
-| POS variance vs treasury ACL | server-derived cash journal | Ambiguous | Policy decision |
-| Direct invoice cash-sale treasury ACL | outside CashBank ACL | Strong candidate gap | Restricted-user test |
+| Cash/bank ACL foundation | deposit/withdraw subjects; null actor semantics match §16.1 exactly **[V]** | Confirmed correct | Preserve |
+| Direct Payment API actor propagation | `PaymentController.php:146` passes `$request->user()` **[V]** | Confirmed correct baseline | Preserve |
+| POS Payment actor propagation | `PosService.php:248` omits actor **[V]** | **Confirmed gap — P1** | Pass `$data['actor']` as second arg |
+| Fuel Payment actor propagation | `FuelSaleService.php:330` omits actor **[V]** | **Confirmed gap — P1** | Pass `$actor` as second arg |
+| Invoice auto-settlement actor | `InvoiceService.php:1052` omits actor + user-controlled `is_paid=true` on `StoreInvoiceRequest.php:30` reaches the path **[V]** | **Confirmed reachable gap — P1** (upgraded from P2 after closure verification) | Plumb actor through `settle()` callers |
+| Purchase auto-settlement actor | `PurchaseService.php:563` omits actor + user-controlled `paid_on_post` on `StorePurchaseRequest.php:36` reaches the path **[V]** | **Confirmed reachable gap — P1** (upgraded from P2) | Same shape as Invoice |
+| POS variance vs treasury ACL | `PosSessionService::settleVariance` has no `assertAllowed` **[V]** | **Policy decision required** | Product picks privileged-override vs absolute-boundary |
+| Direct invoice cash-sale treasury ACL | `InvoiceService.php:44,863` debit 1110 directly; stranger-scoped deposit still succeeds **[V]** | **Confirmed gap — P1** | Reroute through `CashBankAccountService::assertAllowed(deposit)` |
 | Canonical permission catalogue | Rbac::PERMISSIONS | Present/rich | Preserve exact keys |
 | Role arbitrary-action labels | non-manage shown as View | Confirmed defect | Metadata-driven labels |
 | Role multi-segment keys | positional split truncates keys | Confirmed high-priority defect | Never reconstruct keys |
@@ -295,12 +302,20 @@ If added later: restricted permission, preserve original actor, audit trail, obv
 | Role cloning | not found | Missing | Candidate parity |
 | Invoice own/assigned scope | predicate absent | Missing | Define semantics |
 | Partner owner/assignee scope | no model | Missing capability | Product/data decision |
-| Generic report effective scope | multiple likely bypasses | Likely/strong likely P1 | Restricted-user tests |
+| Purchase report branch scope | `PurchaseReportService.php:65,82` — `withoutGlobalScope(BranchScope)` + no `allowedBranchIds` intersection **[V]** | **Confirmed gap — P1** | Shared `RestrictedBranchScope` helper |
+| Sales report branch scope | `SalesReportService.php:80-83` — no `allowedBranchIds` intersection; forbidden `branch_id[]` returns forbidden data **[V]** | **Confirmed gap — P1** | Same helper |
+| Inventory warehouse balance scope | `InventoryReportService.php:63,104` — no user warehouse/branch intersection **[V]** | **Confirmed gap — P1** | Helper + warehouse-intersection variant |
+| Customer report branch scope | `CustomerReportService.php:66,149,198` — same `withoutGlobalScope` pattern; runtime-verified restricted user sees both branches **[V]** | **Confirmed gap — P1** | Same helper as Purchase/Sales |
+| Classification Analytics branch scope | `ClassificationAnalyticsReportService.php:53-56,73-77,100` — all six scopes route through three helpers, each stripping BranchScope; runtime-verified for `sales_invoice` **[V]** | **Confirmed gap — P1** (source-shape covers the other five scopes) | Apply the helper inside `documents()` / `payments()` / `partners()` |
+| Report exports (CSV/PDF/print) scope | five report controllers have NO server-side export method (reflection-verified); web/ renders CSV+PDF client-side from JSON via `@/lib/export` + jsPDF **[V]** | **Not applicable (server-side)** — export ≡ API scope by construction | Fix at the API layer only |
+| Inventory catalog export (`/api/inventory/export`, separate surface) | `InventoryController.php:57-85` + `InventoryBalanceFilters.php:57-59` — tenant-wide `Product::query()`, no warehouse intersection; runtime-verified aggregate leaks **[V]** | **Confirmed gap — P2** (aggregate, no per-warehouse breakdown) | Warehouse-intersect the aggregate or add per-warehouse breakdown |
+| Accounting-core reports scope | `ReportService.php:811-836` intersects with `allowedBranchIds()` | Confirmed correct pattern | Reuse as reference for the fix helper |
 | HR approval workflow membership | broad hr.manage | Missing | Define policy |
 | POS audit branch/drill-down/export | scoped | Present/good | Reuse |
 | Generic Activity Log | not confirmed | Missing/unknown | Decide parity scope |
 | Soft-delete foundation | widespread SoftDeletes | Present | Not recycle bin |
 | Tenant Recycle Bin | no general workflow found | Missing | Product/security design |
+| CashBankTransfer / EmployeeCustody / SupplierRefund | still call `assertAllowed` **[V]** | Confirmed correct | Preserve |
 
 ## 27. Architectural conclusions
 1. AWJ treasury ACL foundation is worth preserving; the current issue is integration consistency, not architecture absence.
@@ -319,9 +334,162 @@ Safwan confirmed on 2026-09-08 that **all current AWJ data and transactions are 
 This living reference now includes the actor-propagation audit and the exact semantics of null actor under `all`, `branch`, `role` and `user` treasury scopes. POS and Fuel are documented as confirmed defects; Invoice/Purchase automatic settlement omissions are recorded for workflow-impact verification. No substantive finding from this pass is intentionally left only in chat.
 
 ## 30. Next inspection / execution pass
-1. Run targeted restricted-user executable tests for POS/Fuel actor propagation and characterize Invoice/Purchase auto-settlement.
-2. In the same focused security test pass, verify the direct cash-invoice treasury candidate and selected report-scope P1 candidates.
+1. ~~Run targeted restricted-user executable tests for POS/Fuel actor propagation and characterize Invoice/Purchase auto-settlement.~~ **Done (2026-09-08).**
+2. ~~In the same focused security test pass, verify the direct cash-invoice treasury candidate and selected report-scope P1 candidates.~~ **Done (2026-09-08).**
 3. Do not change POS variance semantics until the privileged-exception policy is decided.
-4. After executable evidence closure, draft small independent Access Control V2 PRs rather than one broad security refactor.
+4. After executable evidence closure, draft small independent Access Control V2 PRs rather than one broad security refactor. Recommended breakdown: PR-ACL-PAYMENT-ACTOR (POS/Fuel), PR-ACL-CASH-SALE, PR-ACL-INVOICE-PURCHASE-SETTLE-ACTOR, PR-ACL-REPORT-SCOPE, PR-ACL-REPORT-EXPORT-SCOPE, and (BLOCKED on product decision) PR-ACL-POS-VARIANCE-POLICY. See §20 in the verification report for the full contract per PR.
+
+## 31. Verification pass — 2026-09-08
+
+Two passes on the same day.
+
+**Initial pass:** executable evidence added in
+`tests/Feature/AccessControlV2VerificationTest.php` (18 tests, treasury
+actor + direct cash sale + policy characterization) and
+`tests/Feature/AccessControlV2ReportScopeVerificationTest.php` (7 tests,
+report branch scope + tenant negative control).
+
+**Closure pass** (same day): `tests/Feature/AccessControlV2ClosureVerificationTest.php`
+(9 tests). Closes Group B (report exports architecture + inventory
+catalog export), Customer report runtime, Classification Analytics
+runtime, Invoice `is_paid=true` reachability, Purchase `paid_on_post`
+reachability. The two `settle()` gaps are upgraded from P2 → P1 by
+proven HTTP reachability.
+
+All 34 tests pass under `php artisan test --filter=AccessControlV2`
+(284 assertions, ~11s). Verdicts folded into §26. Full report — with
+evidence matrix, per-gap severity, PR breakdown and testability
+blockers — in
+[`AWJ_ACCESS_CONTROL_V2_VERIFICATION_REPORT.md`](./AWJ_ACCESS_CONTROL_V2_VERIFICATION_REPORT.md).
+
+Remaining decision: POS variance policy (product-side).
+
+## 32. PR-ACL-PAYMENT-ACTOR and PR-ACL-INVOICE-PURCHASE-SETTLE-ACTOR — shipped (2026-09-09)
+
+The two P1 actor-propagation gaps recorded in §26/§31 above are now **closed
+in `main`**, merged as two separate PRs. Historical verdicts in §26/§31 are
+left as written (evidence of what was found, when) rather than rewritten;
+this entry records disposition only:
+
+- **PR #731** (`fix/access-control-payment-actor`) — POS (`PosService.php`)
+  and Fuel (`FuelSaleService.php`) now pass `$actor` into
+  `PaymentService::post()`'s second argument.
+- **PR #734** (`fix/access-control-invoice-purchase-settle-actor`) —
+  `InvoiceService::settle()` and `PurchaseService::settle()` now plumb actor
+  through to the same call, closing the `is_paid=true` / `paid_on_post`
+  reachable gaps.
+- Merge commit for #734 (which contains #731): `c5a12aa701f7c65c0a19a8a0d169ffdd2a170701`.
+
+POS variance policy (§30.3, §31) remains the one open, product-side decision
+from that pass — untouched by either PR, as intended.
+
+## 33. PR-ACL-REPORT-SCOPE — verification and fix (2026-09-09)
+
+**Base:** `c5a12aa701f7c65c0a19a8a0d169ffdd2a170701` (PR #734 merge, includes #731).
+**Branch:** `fix/access-control-report-scope`.
+
+**Daftra remains the functional benchmark only** — no new authorization
+architecture was introduced in its name. The fix reuses AWJ's own existing
+Effective Branch Scope primitive (`ReportService::branchIds()`'s pattern,
+mirrored — not reinvented — for services that don't extend `ReportService`)
+and `User::allowedBranchIds()` / `allowedWarehouseIds()`.
+
+This round closes the five **Confirmed gap — P1** report-scope rows recorded
+in §26 (`Purchase report branch scope`, `Sales report branch scope`,
+`Inventory warehouse balance scope`, `Customer report branch scope`,
+`Classification Analytics branch scope`) with executable proof in
+`tests/Feature/ReportEffectiveScopeTest.php` (22 tests, 284 assertions) —
+the permanent regression suite that replaces the now-obsolete
+characterization test `AccessControlV2ReportScopeVerificationTest.php`
+(an untracked, unmerged leftover from the verification branch; it fails
+under this fix because it asserted the pre-fix leaking behavior by design —
+expected, not a regression).
+
+**What was proven, per module:**
+
+- **Sales / Purchase** (`SalesReportService.php`, `PurchaseReportService.php`):
+  branch-filtered rows and totals (period view, profit view, payments-by-period,
+  balances view) are now `requested branch_id ∩ User::allowedBranchIds() ∩ tenant`.
+  A restricted user requesting an explicitly forbidden branch never receives
+  that branch's rows or totals — falls back to the user's own allowed set
+  (the existing `ReportService::branchIds()` behavior, mirrored exactly, not
+  reinvented per-report). Proven with a two-branch fixture (allowed MAIN,
+  forbidden OTHER) on both the no-filter and forbidden-explicit-filter cases.
+
+- **Inventory** (`InventoryReportService.php`): `view=warehouses`,
+  `view=movements`, and `view=stocktakes` are now
+  `Tenant ∩ Effective Branch Scope ∩ Effective Warehouse Scope` (new
+  `App\Support\ReportWarehouseScope` helper, same intersection pattern as
+  branch scope, applied to `allowedWarehouseIds()`). Proven with an
+  allowed/forbidden warehouse pair: forbidden-warehouse rows and their
+  quantity/cost never appear in rows or totals, and an explicit forbidden
+  `warehouse_id` request returns empty rather than leaking.
+  **`view=value` is explicitly excluded from this fix** — `quantity_on_hand`
+  and `avg_cost` are global scalars on `Product` (one moving average per
+  tenant, not decomposable per warehouse without the same query redesign
+  needed for the already-deferred P2 `/api/inventory/export` gap). Filtering
+  the product list without correcting the displayed value would be false
+  security; documented in-code as a deliberate deferral on
+  `InventoryReportService::trackedProducts()`, not a silent gap.
+
+- **Customer** (`CustomerReportService.php`): master identity (`GET /api/partners/{id}`)
+  is unchanged and stays visible per the existing identity contract (§9 of
+  the Target Contract) — a customer with activity in a forbidden branch is
+  still findable by name/id. What changed is the branch-derived financial
+  aggregates: sales total, invoice count, and balance (`view=sales`,
+  `view=balances`) now derive only from the user's allowed branch activity.
+  Proven with one customer having posted invoices in both an allowed and a
+  forbidden branch — the aggregate reflects only the allowed branch's amount.
+
+- **Classification Analytics** (`ClassificationAnalyticsReportService.php`):
+  all three helper families — `documents()` (sales_invoice/purchase_invoice
+  scopes), `payments()` (receipt/payment scopes), and `partners()`
+  (customer/supplier scopes) — are now branch-scoped via the same
+  `ReportBranchScope::resolve()` call, applied both to the base filter and,
+  in `partners()`, to the `leftJoin` closure that pulls in each partner's
+  transaction amount (the existing `orWhereNull('partners.branch_id')`
+  company-wide-partner-visibility semantic was preserved unchanged). Proven
+  for `sales_invoice`, `purchase_invoice`, `receipt`, and the customer side
+  of `partners()` with an allowed/forbidden branch pair each.
+
+**Export relationship — verified, not assumed:** all five report React
+workspaces (`reports-workspace.tsx`, `purchases-reports-workspace.tsx`,
+`inventory-reports-workspace.tsx`, `customers-reports-workspace.tsx`,
+`classification-analytics-workspace.tsx`) build their CSV/PDF exports
+directly from the same `report.data`/`report.totals` state populated by the
+JSON API response — confirmed by reading each file, not inferred. There is
+no separate export query or endpoint for any of the five report families,
+so fixing rows+totals fixes the export by construction; no separate
+export-specific test was needed for this PR.
+
+**Explicitly left out of scope — not conflated with this P1 fix:**
+`/api/inventory/export` (`InventoryController.php` +
+`InventoryBalanceFilters.php`) is a **separate surface** from
+`/api/reports/inventory` (different controller, different query, feeds the
+product-catalog inventory-balance export screen, not the analytical report
+workspace). Its confirmed gap is tracked in §26 as **P2** (tenant-wide
+aggregate, no per-warehouse breakdown) and is reserved for a future,
+separately-scoped `PR-ACL-INVENTORY-CATALOG-EXPORT-SCOPE`. Nothing in that
+controller or its export path was touched here.
+
+**Shared boundary, not a forced shared service:** two small, focused helper
+classes were added — `App\Support\ReportBranchScope` and
+`App\Support\ReportWarehouseScope` — each a literal mirror of
+`ReportService::branchIds()`'s existing intersection logic, reused across
+the five report services that don't extend `ReportService`. No centralized
+`ReportScopeService` was introduced; each report service still owns its own
+query shape and filter semantics, only the branch/warehouse intersection
+itself is shared (proven identical semantics, no scope widening, covered by
+tests, per the Target Contract's "shared contract, not forced shared
+helper" instruction).
+
+**CI:** full suite green on SQLite locally (3073 passed, 11 skipped); the
+only failures are the pre-existing orphaned/untracked verification
+characterization files (`AccessControlV2VerificationTest.php`,
+`AccessControlV2ClosureVerificationTest.php`,
+`AccessControlV2ReportScopeVerificationTest.php` — none tracked in this
+repository's git history, leftovers from an earlier abandoned verification
+branch) and one unrelated `DocumentCenterSecureIntakeTest` PDF-fixture
+failure with no relation to reports, branches, or warehouses.
 
 **Process rule:** research/inspect → verify → update this file → confirm commit → summarize to Safwan.
