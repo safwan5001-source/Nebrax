@@ -49,6 +49,12 @@ export interface HelpArticle {
   sections: HelpSection[];
 }
 
+export interface HelpSearchAlias {
+  aliases: readonly string[];
+  canonical: string;
+  articleSlugs: readonly HelpArticleSlug[];
+}
+
 export const HELP_CATEGORIES: { key: HelpCategoryKey; title: LocalizedText; description: LocalizedText }[] = [
   {
     key: 'gettingStarted',
@@ -485,6 +491,25 @@ export const HELP_ARTICLES: HelpArticle[] = [
   },
 ];
 
+/**
+ * بدائل بحث منتقاة من مصطلحات أَوْج الفعلية. ترتبط بالمقالات صراحةً حتى لا
+ * يتحول التوسع اللغوي إلى fuzzy matching عام أو يكشف مسارات خارج محتوى المساعدة.
+ */
+export const HELP_SEARCH_ALIASES: Record<HelpLocale, readonly HelpSearchAlias[]> = {
+  ar: [
+    { aliases: ['سند قبض'], canonical: 'دفعة عميل', articleSlugs: ['record-customer-payment'] },
+    { aliases: ['رصيد اول المدة', 'مخزون اول المدة'], canonical: 'رصيد افتتاحي مخزون', articleSlugs: ['import-inventory-opening'] },
+    { aliases: ['اغلاق السنة'], canonical: 'اقفال سنة مالية', articleSlugs: ['fiscal-year-close'] },
+  ],
+  en: [
+    { aliases: ['client'], canonical: 'customer', articleSlugs: ['create-partner'] },
+    { aliases: ['receipt voucher'], canonical: 'customer payment', articleSlugs: ['record-customer-payment'] },
+    { aliases: ['stock count'], canonical: 'stocktake', articleSlugs: ['run-stocktake'] },
+    { aliases: ['vendor bill'], canonical: 'purchase invoice', articleSlugs: ['record-purchase-invoice'] },
+    { aliases: ['year end close'], canonical: 'fiscal year close', articleSlugs: ['fiscal-year-close'] },
+  ],
+};
+
 export function helpLocale(locale: string): HelpLocale {
   return locale.toLowerCase().startsWith('ar') ? 'ar' : 'en';
 }
@@ -497,10 +522,13 @@ export function getHelpArticle(slug: string) {
   return HELP_ARTICLES.find((article) => article.slug === slug);
 }
 
-/** Arabic-friendly search: ignores tashkeel, tatweel, hamza forms, and punctuation. */
+const ARABIC_DIGITS = '٠١٢٣٤٥٦٧٨٩';
+const PERSIAN_DIGITS = '۰۱۲۳۴۵۶۷۸۹';
+
+/** Arabic-friendly search: deterministic script normalization without fuzzy matching. */
 export function normalizeHelpSearch(value: string) {
   return value
-    .toLocaleLowerCase()
+    .toLowerCase()
     .normalize('NFKD')
     .replace(/[\u064B-\u065F\u0670ـ]/g, '')
     .replace(/[أإآٱ]/g, 'ا')
@@ -508,26 +536,67 @@ export function normalizeHelpSearch(value: string) {
     .replace(/ة/g, 'ه')
     .replace(/ؤ/g, 'و')
     .replace(/ئ/g, 'ي')
+    .replace(/[کڪ]/g, 'ك')
+    .replace(/ی/g, 'ي')
+    .replace(/[ۀە]/g, 'ه')
+    .replace(/[٠-٩]/g, (digit) => String(ARABIC_DIGITS.indexOf(digit)))
+    .replace(/[۰-۹]/g, (digit) => String(PERSIAN_DIGITS.indexOf(digit)))
     .replace(/[^\p{L}\p{N}]+/gu, ' ')
     .trim();
 }
 
 export function searchHelpArticles(query: string, locale: HelpLocale, category?: HelpCategoryKey) {
-  const tokens = normalizeHelpSearch(query).split(' ').filter(Boolean);
+  const normalizedQuery = normalizeHelpSearch(query);
+  const tokens = normalizedQuery.split(' ').filter(Boolean);
 
-  return HELP_ARTICLES.filter((article) => {
-    if (category && article.category !== category) return false;
-    if (tokens.length === 0) return true;
-    const searchable = normalizeHelpSearch([
-      article.title[locale],
-      article.summary[locale],
-      article.keywords[locale],
-      ...article.sections.flatMap((section) => [
-        section.title[locale],
+  if (tokens.length === 0) {
+    return HELP_ARTICLES.filter((article) => !category || article.category === category);
+  }
+
+  return HELP_ARTICLES
+    .map((article, index) => {
+      if (category && article.category !== category) return undefined;
+
+      const title = normalizeHelpSearch(article.title[locale]);
+      const keywords = normalizeHelpSearch(article.keywords[locale]);
+      const summary = normalizeHelpSearch(article.summary[locale]);
+      const sectionTitles = normalizeHelpSearch(article.sections.map((section) => section.title[locale]).join(' '));
+      const body = normalizeHelpSearch(article.sections.flatMap((section) => [
         ...(section.paragraphs ?? []).map((value) => value[locale]),
         ...(section.steps ?? []).map((value) => value[locale]),
-      ]),
-    ].join(' '));
-    return tokens.every((token) => searchable.includes(token));
-  });
+        ...(section.note ? [section.note[locale]] : []),
+      ]).join(' '));
+      const aliases = HELP_SEARCH_ALIASES[locale]
+        .filter((entry) => entry.articleSlugs.includes(article.slug))
+        .flatMap((entry) => [...entry.aliases, entry.canonical])
+        .map(normalizeHelpSearch);
+      const aliasText = aliases.join(' ');
+      const allFields = [title, keywords, aliasText, summary, sectionTitles, body];
+
+      if (!tokens.every((token) => allFields.some((field) => field.includes(token)))) return undefined;
+
+      let score = 0;
+      if (title === normalizedQuery) score += 1200;
+      else if (title.includes(normalizedQuery)) score += 700;
+      if (aliases.some((alias) => alias === normalizedQuery)) score += 600;
+      else if (aliases.some((alias) => alias.includes(normalizedQuery))) score += 500;
+      if (keywords.includes(normalizedQuery)) score += 450;
+      if (summary.includes(normalizedQuery)) score += 250;
+      if (sectionTitles.includes(normalizedQuery)) score += 180;
+      if (body.includes(normalizedQuery)) score += 100;
+
+      for (const token of tokens) {
+        if (title.includes(token)) score += 60;
+        if (aliasText.includes(token)) score += 50;
+        if (keywords.includes(token)) score += 40;
+        if (summary.includes(token)) score += 20;
+        if (sectionTitles.includes(token)) score += 12;
+        if (body.includes(token)) score += 5;
+      }
+
+      return { article, index, score };
+    })
+    .filter((match): match is { article: HelpArticle; index: number; score: number } => match !== undefined)
+    .sort((left, right) => right.score - left.score || left.index - right.index)
+    .map((match) => match.article);
 }
