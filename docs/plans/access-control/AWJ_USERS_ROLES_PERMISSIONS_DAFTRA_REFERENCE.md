@@ -1115,3 +1115,165 @@ architecture untouched — no backend authorization code was modified.
 PR against `main`, base SHA `eea714d9971a3bffe5818a186878d0f7da7f897a`.
 
 **Process rule:** research/inspect → verify → update this file → confirm commit → summarize to Safwan.
+
+## 40. PR-ACL-POS-VARIANCE — POS Variance Treasury ACL — Implemented (2026-09-09)
+
+**Closes the §18.2 policy ambiguity.** The product decision: `pos.variance.approve`
+is the operational action permission (may this event happen at all), not a
+treasury resource override. It never implicitly authorizes the accounting
+effect on the session's specific Cash/Bank treasury — that follows the same
+`CashBankAccountService::assertAllowed()` boundary every other money path
+(§16, §35) already enforces. No override framework, no new scope type, no
+change to `Rbac`, `CashBankAccount::allows()`, or `pos.variance.approve`'s
+meaning.
+
+**Traced workflow (current code, not the old report):**
+```text
+POST /api/pos-sessions/{id}/settle-variance   [middleware: perm(pos.variance.approve)]
+  → PosSessionController::settleVariance()      — $request->user() passed as $actor (already correct)
+    → PosSessionService::settleVariance($session, $actor)
+        permission gate: $actor->hasPermission('pos.variance.approve')
+        DB::transaction():
+          lockForUpdate($session); status/acknowledgement/idempotency/self-approval guards
+          $cashAccountId = sessionCashAccountId($session)   — session's frozen-at-open GL account
+          $varianceAccountId = varianceAccountId()          — 5170, tenant chart
+          NEW: resolveForPayment($cashAccountId,'cash') → assertAllowed(direction, $actor)
+          build $lines (shortage: debit 5170/credit cash; overage: debit cash/credit 5170)
+          LedgerService::post($lines, [...])
+          $session->update(['variance_journal_entry_id' => $entry->id])
+```
+`CashBankAccountService` was already a constructor dependency of
+`PosSessionService` (used by `resolveSessionCashAccountId()` at session-open
+time) — no new dependency, no new class.
+
+**Root cause (previous gap):** `sessionCashAccountId($session)` returned a
+raw `Account` (GL) id — `$session->cash_account_id`, frozen at session-open
+time via the same `resolveForPayment()` `PaymentService` uses (§16.1) — but
+`settleVariance()` posted directly against that GL id without ever calling
+`resolveForPayment()`/`assertAllowed()` again at settlement time. The GL
+identity was already deterministically resolvable to exactly one
+`CashBankAccount` (same "Target Contract classification: A — Already
+resolvable" shape as §34's Direct Cash Sale gap); the settlement simply
+never took that resolve-then-authorize step before posting.
+
+**Implemented fix** (`PosSessionService::settleVariance()`, right after
+`$isShortage` is computed, before `$lines` is built):
+```php
+$cashEntity = $this->cashBankAccounts->resolveForPayment($cashAccountId, 'cash');
+$this->cashBankAccounts->assertAllowed($cashEntity, $isShortage ? 'withdraw' : 'deposit', $actor);
+```
+
+**Treasury resource resolution — tenant-safe, no new mapping model:**
+`resolveForPayment($accountId, 'cash')` (unchanged, the same method
+`PaymentService`/Direct Cash Sale already call) looks up
+`CashBankAccount::where('account_id', $accountId)` — `CashBankAccount
+extends BaseModel`, so `TenantScope` applies automatically; there is no
+manual `tenant_id` filter to forget. `$cashAccountId` itself is never
+attacker-influenced — it is the session's own `cash_account_id`, stamped
+once at session-open time from the tenant's own payment-method resolution,
+never accepted from the request. §41/Test 8 below proves a second tenant's
+`CashBankAccount` on the same GL code (`1110`) cannot interfere in either
+direction.
+
+**Variance direction mapping — verified against the actual posting lines,
+not guessed from names:**
+
+| Variance | Journal effect on session cash account | Required ACL |
+|---|---|---|
+| Shortage (counted < expected, `$isShortage=true`) | **credited** (decreases) — debit 5170 / credit cash | `withdraw` |
+| Overage (counted > expected, `$isShortage=false`) | **debited** (increases) — debit cash / credit 5170 | `deposit` |
+
+This matches the conceptual rule (`cash increases → deposit`, `cash
+decreases → withdraw`) exactly, confirmed by reading the existing `$lines`
+ternary in `settleVariance()` itself (unchanged by this PR) rather than
+assumed.
+
+**Actor / branch context:** `PosSessionController::settleVariance()`
+already passed `$request->user()` as `$actor` before this PR (no actor
+gap here, unlike §17's POS/Fuel `PaymentService::post()` omissions) — the
+authenticated actor now simply reaches one more check.
+`CashBankAccountService::assertAllowed()` reads `app(BranchContext::class)->id()`
+internally exactly as every other money path does (§16, §35) — no new
+branch plumbing, no POS-specific branch ACL semantics.
+
+**Atomicity:** the entire guard chain, `assertAllowed()` included, runs
+*inside* the same `DB::transaction()` that already wrapped the whole
+method (row-locked on the session). `assertAllowed()` throws a
+`RuntimeException` on denial, which `ApiController::domain()` turns into
+HTTP 422 — and because it is thrown before `$lines` is built or
+`LedgerService::post()` is called, Laravel's transaction rolls back
+automatically: no journal entry, no `variance_journal_entry_id` write, no
+`difference_status` change, no partial session state. Proven by Tests 2, 4,
+5, 6 (deny case) below asserting an identical before/after snapshot
+(`journal_entries` count and `variance_journal_entry_id` presence) across
+the denied call.
+
+**Tenant isolation:** proven, not just structurally assumed — Test 8 below
+configures a *second* tenant's own main cash treasury (same GL code `1110`
+as every tenant, since `bootstrapDefaults()` seeds it identically per
+tenant) to deny literally everyone, then confirms the first tenant's
+variance settlement still succeeds on its own independently-scoped
+treasury, unaffected.
+
+**Backward compatibility:** the two pre-existing accounting-semantics
+tests (`settling_a_shortage_debits_the_variance_account_and_credits_cash_in_one_balanced_entry`,
+`settling_an_overage_debits_cash_and_credits_the_variance_account`) run
+unmodified and still pass — both use the bootstrap-default `deposit_scope=
+'all'`/`withdraw_scope='all'` main treasury, so the new check is a no-op
+for them, exactly as intended: authorized users retain existing behavior,
+this PR only tightens the previously-open gap.
+
+**Tests** (`tests/Feature/PosSessionTest.php`, 10 new, all using a custom
+role granting exactly `pos.variance.approve` — none of the built-in
+`accountant`/`staff` system roles carry it — plus the existing
+`namedCashTreasury`/`pointCashMethodToTreasury` fixture helpers extended
+with a new `scopedCashTreasury()` helper for explicit deposit/withdraw
+scope+subject):
+
+| Test | Proves |
+|---|---|
+| 1 — overage, deposit access granted | Succeeds; journal posted |
+| 2 — overage, deposit access denied | 422; zero journal, no `variance_journal_entry_id`, `difference_status` unchanged |
+| 3 — shortage, withdraw access granted | Succeeds; journal posted |
+| 4 — shortage, withdraw access denied | 422; atomic, no partial effect |
+| 5 — direction independence | Deposit-only access still denies a shortage; withdraw-only access still denies an overage |
+| 6 — branch scope | Session's active branch (main, default) allowed; a different branch's subject denied |
+| 7 — role scope | `deposit_scope='role'` with the custom role's slug (not a user id) succeeds — the mechanism distinct from Tests 1-5's `user` scope |
+| 8 — tenant isolation | A second tenant's identically-coded (`1110`) treasury, configured to deny everyone, cannot affect the first tenant's independently-configured settlement |
+| 9 — zero variance | Rejected with the pre-existing "no difference to settle" error (asserted by message content) even against a deny-all treasury — proves the treasury check is never reached, not merely that it wouldn't matter |
+| 10 (accounting semantics) | Covered by the two pre-existing, unmodified shortage/overage journal-shape tests continuing to pass — this PR added authorization, no new formula |
+
+**Test execution:**
+```
+php artisan test --filter=PosSessionTest                                   → 36 passed (483 assertions)  [SQLite]
+php artisan test --filter="PosSessionTest|PosSessionCloseHandoverTest|
+  CashBankAccountTest|CashBankTransferTest|ApiInvoiceTest|InvoiceTest|
+  PosLossPreventionPhase4Test"                                             → 120 passed (1059 assertions) [SQLite]
+php artisan test --env=pgsql --filter="<same filter>"                      → 120 passed (1059 assertions) [PostgreSQL]
+```
+Zero modified/weakened existing tests; zero new failures on either database.
+
+**Accounting invariants — unchanged, confirmed:** variance amount formula
+(`abs($difference)`), debit/credit direction per shortage/overage, GL
+account selection (session's frozen `cash_account_id`, tenant's `5170`),
+journal balancing, session totals, rounding, currency — none touched. The
+only behavioral difference on an already-authorized actor: none at all
+(same journal, same amounts, same accounts). On a previously-unauthorized
+actor: the settlement now correctly denies with HTTP 422 instead of
+silently posting against a treasury the actor has no configured access to.
+
+**Scope confirmed unchanged:** no database migration; `Rbac`,
+`CashBankAccount` scope types, `LedgerService`, `PosSettings`, Fuel
+authorization, Inventory, report scope, Users/Roles UI, Design System V2 —
+none touched. `assertVarianceSelfApprovalAllowed()` (SoD, §18.2's sibling
+guard) is untouched and composes independently with the new treasury check
+(both must pass; neither implies the other).
+
+**Git:** branch `fix/access-control-pos-variance-treasury`, Draft PR
+against `main`, base SHA `9f5b4727b982b258a8d46614f5d8ff6ab997d16f`.
+
+**Access Control V2 status:** not yet complete. `ACL-CLOSURE-1` (final
+targeted verification pass) is the next planned phase, not started by this
+PR.
+
+**Process rule:** research/inspect → verify → update this file → confirm commit → summarize to Safwan.
