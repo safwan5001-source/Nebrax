@@ -30,6 +30,7 @@ use App\Http\Controllers\Api\ClassificationController;
 use App\Http\Controllers\Api\CompanyController;
 use App\Http\Controllers\Api\CorporateFuelContractController;
 use App\Http\Controllers\Api\ContactController;
+use App\Http\Controllers\Api\CustomerAuthController;
 use App\Http\Controllers\Api\CostCenterController;
 use App\Http\Controllers\Api\CreditNoteController;
 use App\Http\Controllers\Api\CrmActivityController;
@@ -130,10 +131,13 @@ use App\Http\Middleware\EnsureActiveSubscription;
 use App\Http\Middleware\EnsureApplicationActive;
 use App\Http\Middleware\EnsureApplicationOperationActive;
 use App\Http\Middleware\EnsureCommercialApplicationAccess;
+use App\Http\Middleware\EnsureCustomerPrincipal;
 use App\Http\Middleware\EnsurePermission;
 use App\Http\Middleware\EnsurePlatformAdministrator;
 use App\Http\Middleware\EnsureUserPrincipal;
 use App\Http\Middleware\ForceJsonResponse;
+use App\Http\Middleware\EstablishCustomerContext;
+use App\Http\Middleware\ResolveCustomerTenant;
 use App\Http\Middleware\SetBranch;
 use App\Http\Middleware\SetTenant;
 use App\Http\Controllers\Api\DeveloperApiClientController;
@@ -173,6 +177,26 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
     // عام (بلا مصادقة)
     Route::post('register', [AuthController::class, 'register'])->middleware('throttle:register');
     Route::post('login', [AuthController::class, 'login'])->middleware('throttle:5,1');
+
+    // Customer Platform: tenant authority is established from the globally
+    // unique route slug before credential/token lookup. It never uses payload IDs.
+    Route::prefix('customer/v1/{tenantSlug}')
+        ->middleware(ResolveCustomerTenant::class)
+        ->group(function () {
+            Route::post('auth/register', [CustomerAuthController::class, 'register'])
+                ->middleware('throttle:customer-register');
+            Route::post('auth/login', [CustomerAuthController::class, 'login'])
+                ->middleware('throttle:customer-login');
+
+            Route::middleware([
+                'auth:sanctum',
+                EnsureCustomerPrincipal::class,
+                EstablishCustomerContext::class,
+            ])->group(function () {
+                Route::post('auth/logout', [CustomerAuthController::class, 'logout']);
+                Route::get('me', [CustomerAuthController::class, 'me']);
+            });
+        });
 
     // منصة التشغيل الداخلية: مصادقة مستقلة تماماً عن المستأجرين، ولا تمر عبر SetTenant.
     Route::post('platform/login', [PlatformAuthController::class, 'login'])->middleware('throttle:5,1');
@@ -248,7 +272,7 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         });
 
     // محمي: مصادقة Sanctum + ضبط المستأجر (العزل التلقائي)
-    Route::middleware(['auth:sanctum', SetTenant::class, SetBranch::class])->group(function () {
+    Route::middleware(['auth:sanctum', EnsureUserPrincipal::class, SetTenant::class, SetBranch::class])->group(function () {
         // متاح دائماً (حتى مع اشتراك منتهٍ) لرؤية الحالة والخروج
         Route::post('logout', [AuthController::class, 'logout']);
         Route::get('me', [AuthController::class, 'me']);

@@ -10,6 +10,7 @@ use Closure;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * طرف تجاري: عميل أو مورد (أو كلاهما).
@@ -71,6 +72,12 @@ class Partner extends BaseModel implements BranchShareable
     public function isSupplier(): bool
     {
         return in_array($this->type, ['supplier', 'both'], true);
+    }
+
+    /** Explicit, audited customer-side access relationships. */
+    public function customerIdentityLinks(): HasMany
+    {
+        return $this->hasMany(CustomerPartnerLink::class);
     }
 
     /**
