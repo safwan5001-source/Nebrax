@@ -4,7 +4,7 @@
 
 **Base SHA:** `d3f4c58f173c51fb92856776dd809ff581ec3842`
 
-**Validated implementation SHA:** `18eb9c6a136c9afd3e07f60f98894b775c54946e`
+**Validated implementation SHA:** `090c0da7109a6c4b52190f94791858417885ecef`
 
 **Branch:** `feat/cus-foundation-1`
 
@@ -105,8 +105,8 @@ This deferral does not weaken the implemented shared foundation and does not blo
 
 **VERIFIED**
 
-- SQLite, PHP 8.4: **PASS** — 3,161 passed, 15 PostgreSQL-only tests skipped, 20,619 assertions.
-- PostgreSQL, PHP 8.4: **PASS** — 3,176 passed, 20,688 assertions.
+- SQLite, PHP 8.4: **PASS** — 3,163 passed, 15 PostgreSQL-only tests skipped, 20,625 assertions.
+- PostgreSQL, PHP 8.4: **PASS** — 3,178 passed, 20,694 assertions.
 - Both jobs ran the complete repository suite after fresh migration.
 - The first run exposed one incorrect new assertion: a valid customer principal presented to another tenant correctly failed as `403`, while the test expected `401`. The test was corrected without changing application behavior; no latest-main baseline failure required reconciliation.
 
