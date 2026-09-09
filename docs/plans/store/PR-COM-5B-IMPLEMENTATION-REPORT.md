@@ -745,12 +745,12 @@ failure categories, on either engine.
   (CI Run #4362 — SUCCESS)
 - **PR:** [#737](https://github.com/safwan5001-source/Nebrax/pull/737) —
   still open against `main`, not merged
-- **New Head SHA:** recorded in the final chat report and in a follow-up
-  commit to this file once pushed
+- **New Head SHA:** `b5ab530334e19e9df309902fba3133b3f5325f4a` — CI green
+  (both `php artisan test (L11, sqlite)` and `php artisan test (L11,
+  pgsql)` jobs, `conclusion: success`, across both workflow triggers)
 
 ### 45.12 Recommended next step (post-hardening)
 
-**All 3 P1 findings fixed, tested, and regression-clean on this same
-PR/branch.** Awaiting new CI run on the new Head SHA (§45.11) before
-requesting re-review. Per instructions: no new PR created, no merge, no
-deploy, no COM-6/COM-7 work started.
+**All 3 P1 findings fixed, tested, regression-clean, and CI-green on this
+same PR/branch.** Ready for re-review. Per instructions: no new PR
+created, no merge, no deploy, no COM-6/COM-7 work started.
