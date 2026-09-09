@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { getHelpArticle } from './content';
 import { CONTEXTUAL_HELP_ROUTES, resolveContextualHelp } from './context';
 
 describe('contextual Help Center route mapping', () => {
@@ -51,7 +52,18 @@ describe('contextual Help Center route mapping', () => {
 
   it('keeps every mapped slug connected to the existing V1 article source', () => {
     for (const entry of CONTEXTUAL_HELP_ROUTES) {
+      expect(getHelpArticle(entry.articleSlug)).toBeDefined();
       expect(resolveContextualHelp(entry.routes[0].pathname)?.article.slug).toBe(entry.articleSlug);
     }
+  });
+
+  it('keeps contextual identifiers and route patterns unique', () => {
+    const contexts = CONTEXTUAL_HELP_ROUTES.map((entry) => entry.context);
+    const routes = CONTEXTUAL_HELP_ROUTES.flatMap((entry) =>
+      entry.routes.map((route) => `${route.kind}:${route.pathname}`)
+    );
+
+    expect(new Set(contexts).size).toBe(contexts.length);
+    expect(new Set(routes).size).toBe(routes.length);
   });
 });

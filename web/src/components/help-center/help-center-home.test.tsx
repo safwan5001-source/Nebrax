@@ -11,6 +11,12 @@ vi.mock('next-intl', () => ({
 afterEach(cleanup);
 
 describe('HelpCenterHome', () => {
+  it('exposes the Help search as a named searchbox', () => {
+    render(<HelpCenterHome />);
+
+    expect(screen.getByRole('searchbox', { name: 'searchTitle' })).toBeTruthy();
+  });
+
   it('filters articles with Arabic search and clears the query', () => {
     render(<HelpCenterHome />);
 
