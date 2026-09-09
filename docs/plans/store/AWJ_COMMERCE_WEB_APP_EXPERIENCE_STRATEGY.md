@@ -202,52 +202,155 @@ Examples include banners, homepage sections, campaigns, or approved promotions.
 
 This enables legitimate experiences such as an app-only acquisition campaign without creating a second product/customer/order system.
 
-## 11. App delivery direction
+## 11. Merchant Mobile App target: a complete real commerce application
+
+The target Mobile App is **not** a lightweight storefront companion, a simple theme preview, or a Web Store wrapped in a mobile shell. It is intended to be a **complete merchant-branded commerce application in both presentation and capability**.
+
+Subject to the capabilities ultimately approved and implemented in the Commerce Master Plan, the customer-facing application should be capable of providing the full commerce journey, including areas such as:
+
+- native-quality home/storefront experience;
+- categories, collections and merchandising;
+- search, filtering and discovery;
+- product detail, media, options/variants when the underlying Commerce capability exists, quantity and availability;
+- favorites/wishlist;
+- cart;
+- promotions/coupons where supported by the authoritative Commerce promotion engine;
+- checkout;
+- customer addresses;
+- shipping, delivery and pickup choices where supported;
+- payment methods and payment experience through approved payment authorities;
+- customer account/profile;
+- order history and order status/tracking;
+- returns/refunds where supported by the Commerce lifecycle;
+- notifications, including push notifications where approved;
+- deep links and appropriate sharing/navigation integration;
+- merchant support/contact and store policy surfaces;
+- other customer-facing Commerce capabilities approved in later phases.
+
+The application must remain a client of AWJ Commerce authorities. A complete app experience does not authorize the mobile client to calculate authoritative totals, pricing, tax, ATS, reservation, payment, accounting, invoice or ZATCA state independently.
+
+## 12. App Builder and App Factory are separate responsibilities
+
+AWJ should distinguish two substantial product capabilities:
+
+### 12.1 App Builder
+
+The App Builder controls **what the merchant's customers see and how the commerce application experience is composed**, within approved AWJ components and UX constraints.
+
+It may manage areas such as:
+
+- brand/theme inheritance and app-specific overrides;
+- home composition and section ordering;
+- supported section/component configuration;
+- app-specific banners/content;
+- product-card and merchandising presentation variants;
+- bottom navigation and approved destinations;
+- splash/app visual assets;
+- preview;
+- draft/published experience configuration;
+- app-specific presentation and channel visibility where supported.
+
+The App Builder should produce validated configuration, not arbitrary application source code.
+
+### 12.2 App Factory / Delivery Pipeline
+
+The App Factory is the separate capability responsible for turning the merchant's configured application into a distributable merchant-branded app and maintaining its binary lifecycle.
+
+Potential responsibilities include:
+
+- merchant-specific app identity;
+- app name/icon/assets;
+- bundle/package identifiers;
+- build orchestration;
+- signing and certificates/provisioning;
+- Apple/Google developer-account integration and ownership rules;
+- push credentials;
+- store metadata;
+- release submission/management;
+- version upgrades;
+- failed-build/release handling;
+- operational status/audit of application releases.
+
+The exact automation, ownership model, framework, and publication workflow remain unresolved and require dedicated architecture/product research before implementation.
+
+## 13. Preferred runtime architecture
 
 The preferred long-term direction is:
 
-> **Native-quality application shell + server-driven Commerce experience/configuration.**
+> **One robust AWJ Commerce App Runtime + merchant/channel configuration, rather than a separately maintained application codebase for every merchant.**
 
-Store content, supported home-section ordering, banners, theme configuration, navigation configuration, and feature flags should be capable of changing server-side where safe, without requiring an App Store / Google Play binary release for every content change.
+Conceptually:
+
+```text
+                 AWJ Commerce APIs / Authorities
+                            │
+                    Commerce App Runtime
+                            │
+              ┌─────────────┴─────────────┐
+              │                           │
+      Merchant App Configuration     Commerce Data
+              │
+      ┌───────┼────────┐
+      │       │        │
+    Theme   Layout   Navigation
+      │
+ Merchant-branded App Experience
+```
+
+The App Builder should primarily generate validated, versioned configuration consumed by the runtime rather than generate a new source-code application for every visual/content change.
+
+This does **not** mean every merchant app must look identical. The runtime should support approved themes, component variants, layout composition, navigation configuration, channel-specific content and other safe customization capabilities.
+
+## 14. Server-driven configuration, preview and publishing
+
+Store content, supported home-section ordering, banners, theme configuration, navigation configuration, feature flags and other safe presentation settings should be capable of changing server-side without requiring an App Store / Google Play binary release for every content change.
+
+A mature direction should account for:
+
+- draft configuration;
+- live preview/device preview;
+- validation before publish;
+- explicit publish state;
+- versioned published configuration;
+- safe rollback/version history where justified;
+- compatibility between configuration versions and app-runtime versions.
 
 Native capability changes that require a new binary remain normal application releases.
 
-A WebView-only wrapper should not be treated as the primary strategic experience merely because it is cheaper to ship.
+A WebView-only wrapper should **not** be treated as the primary strategic application architecture merely because it is cheaper to ship. The final target is a genuine, complete, high-quality commerce app experience.
 
-## 12. Relationship to POS
+## 15. Product scope principle
+
+The target is deliberately **not** a general-purpose app-design platform comparable to Figma, Canva or Webflow.
+
+AWJ should build a specialized **Commerce App Builder** whose power comes from a deep library of high-quality commerce components, layouts, merchandising capabilities and controlled customization.
+
+This preserves:
+
+- strong customer UX;
+- accessibility and responsive/native safety;
+- compatibility across runtime upgrades;
+- merchant customization power;
+- maintainability across many merchant applications;
+- the ability to add new Commerce capabilities to the shared runtime without maintaining a separate source-code fork per merchant.
+
+The product should be powerful and sophisticated without making the merchant manually solve low-level application design or engineering problems.
+
+## 16. Relationship to POS
 
 POS is another AWJ sales channel but is not required to share Web/App presentation and must not be forced through CommerceOrder merely for conceptual symmetry.
 
 Existing AWJ ERP/POS flows and backward compatibility remain protected by the existing Commerce architecture decisions.
 
-## 13. Merchant management model
+## 17. Merchant management model
 
-The target product concept is a Commerce workspace in AWJ from which the merchant can manage channels while retaining shared commercial truth.
+The target product concept is a Commerce capability/workspace in AWJ from which the merchant can manage sales channels while retaining shared commercial truth.
 
-Conceptually:
+The final Commerce workspace information architecture is intentionally **not locked here**. AWJ Core capabilities such as products, customers, inventory, invoices, payments, accounting and reporting must not be duplicated merely because Commerce needs to surface them in a channel context.
 
-```text
-AWJ Commerce Workspace
-│
-├── Commerce operations
-│   ├── Orders
-│   ├── Customers
-│   ├── Catalog/listings
-│   ├── Marketing/promotions
-│   ├── Fulfillment/shipping
-│   └── Reports/analytics
-│
-└── Sales channels
-    ├── Web Store
-    │   └── Web Store Builder
-    │
-    └── Mobile App
-        └── App Builder
-```
+The final workspace model must be reconciled with the separate Commerce workspace open-decision research and the future-state AWJ capability map before its navigation is approved.
 
-The exact sidebar/top-navigation information architecture remains a UX research/design decision and is not locked by this document.
-
-## 14. Safety and authority boundaries
+## 18. Safety and authority boundaries
 
 This experience strategy must not weaken existing AWJ invariants:
 
@@ -258,8 +361,10 @@ This experience strategy must not weaken existing AWJ invariants:
 5. Commerce continues to use existing approved AWJ financial/inventory authorities for their responsibilities.
 6. Channel-specific presentation must not silently mutate historical commercial/accounting truth.
 7. Backward compatibility for existing ERP/POS flows remains a release gate.
+8. App configuration must be tenant-owned, validated and safe for the runtime consuming it.
+9. App Builder/Factory concerns must not create a second Product, Customer, Inventory, Order, Payment or accounting authority.
 
-## 15. Current UX research references
+## 19. Current UX research references
 
 Current research uses different products for different lessons rather than copying one platform end-to-end:
 
@@ -271,7 +376,7 @@ Current research uses different products for different lessons rather than copyi
 
 These are research references, not specifications to clone.
 
-## 16. Decisions recorded
+## 20. Decisions recorded
 
 The following direction is approved for continued planning:
 
@@ -281,12 +386,17 @@ The following direction is approved for continued planning:
 4. Brand identity may be shared across Web and App.
 5. App Builder supports shared inheritance, inheritance with overrides, and independent presentation.
 6. Property-level overrides are preferred where practical.
-7. App Builder should allow broader but constrained customization rather than only a small fixed theme picker.
+7. App Builder should allow broad but constrained customization rather than only a small fixed theme picker.
 8. Channel-specific content/visibility is a supported product direction.
-9. Native-quality + server-driven configuration is preferred over a WebView-only strategic architecture.
-10. No separate App product/customer/inventory/order/accounting truth is created.
+9. The merchant Mobile App target is a **real, complete commerce application in both form and function**, not a lightweight companion or permanent reduced-function MVP.
+10. Native-quality application experience + server-driven safe configuration is preferred over a WebView-only strategic architecture.
+11. App Builder should primarily produce validated configuration consumed by a robust shared Commerce App Runtime rather than generate arbitrary source code.
+12. App Builder and App Factory/build-release automation are separate product/architecture responsibilities and should be planned separately.
+13. The App Builder is specialized for commerce and should not become a general-purpose Figma/Canva/Webflow-like freeform application designer.
+14. No separate App product/customer/inventory/order/accounting truth is created.
+15. Exact Commerce workspace navigation remains unresolved and must avoid duplicating AWJ Core capabilities.
 
-## 17. Explicitly not decided yet
+## 21. Explicitly not decided yet
 
 The following remain under research and must not be inferred as approved implementation requirements:
 
@@ -295,13 +405,17 @@ The following remain under research and must not be inferred as approved impleme
 - exact Commerce workspace sidebar vs horizontal navigation;
 - exact App Builder component catalogue;
 - exact number/names of themes or presets;
+- exact limits of customization on secondary screens such as product detail, search, cart, checkout and account;
+- exact App Runtime framework/native technology;
+- exact configuration schema/versioning implementation;
+- exact preview/publish/rollback mechanics;
 - exact app build/signing/publishing automation;
 - Apple/Google developer-account ownership model;
+- exact App Factory architecture and CI/CD pipeline;
 - pricing/subscription model for merchant apps;
-- exact framework/native technology;
 - exact promotion types or channel-price rules;
 - final Design System V2 tokens.
 
 ---
 
-**Implementation note:** This document records product/experience direction only. Any implementation must be reconciled with the merged Commerce ADRs, the AWJ Commerce Implementation Master Plan, Customer Platform architecture, security/tenant-isolation requirements, and the normal PR/test/review/approval process before merge or deployment.
+**Implementation note:** This document records product/experience direction only. Any implementation must be reconciled with the merged Commerce ADRs, the AWJ Commerce Implementation Master Plan, Customer Platform architecture, security/tenant-isolation requirements, the Commerce workspace open-decision research, and the normal PR/test/review/approval process before merge or deployment.
