@@ -14,9 +14,11 @@ use Illuminate\Http\JsonResponse;
  * الجديدة. لا يمسّ مستنداً قائماً (مسودة أو مرحّلاً)، ولا يغيّر ZATCA/QR/
  * الأرقام/المحاسبة — قرار عرض بحت مستقل عن UI locale واختيار التصميم.
  *
- * الحارس صلاحية `documents.settings.manage` (مالك/مدير)، وتُقرأ التقييمات
- * الفعلية عبر `PrintTemplateContract::resolveEffectiveLanguage` نفسها في
- * كل من الخدمة والعميل، فلا يخترع مسار جديد سلسلة سقوط موازية.
+ * الحارس صلاحيات قائمة لا يوسّع RBAC: `invoices.view` للقراءة (كل من يفتح
+ * فاتورة يرى الافتراضي كسياق)، و`company.manage` للكتابة (مالك/مدير فقط —
+ * نفس نمط `sales-settings`/`company` في `routes/api.php`). وتُقرأ سلسلة
+ * السقوط الفعلية عبر `PrintTemplateContract::resolveEffectiveLanguage`
+ * نفسها في كل من الخدمة والعميل، فلا يخترع مسار جديد سلسلة سقوط موازية.
  */
 class DocumentDisplaySettingsController extends ApiController
 {

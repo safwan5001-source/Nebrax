@@ -2,10 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Models\Invoice;
 use App\Models\Partner;
-use App\Services\Accounting\ChartOfAccountsSeeder;
-use App\Support\Settings;
 use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -18,12 +15,17 @@ class InvoiceDocumentLanguageApiTest extends TestCase
     use RefreshDatabase;
     use InteractsWithApi;
 
+    /**
+     * ملاحظة: `registerTenant` تمرّ عبر مسار `POST /api/register`، وهو يزرع دليل
+     * الحسابات تلقائياً (`ChartOfAccountsSeeder::seed()` داخل معاملة الإنشاء —
+     * راجع `AuthController::register`). فلا نُعيد الزرع هنا: تكراره يكسر
+     * الفريد `(tenant_id, code)` على `accounts`. نضبط سياق المستأجر فقط.
+     */
     private function bootstrapTenant(string $slug = 'lang-api'): array
     {
         $out = $this->registerTenant($slug, "owner+{$slug}@acme.test");
         $tenantId = $out['tenant_id'];
         app(TenantContext::class)->set($tenantId);
-        app(ChartOfAccountsSeeder::class)->seed($tenantId);
         $customer = Partner::create(['name' => 'عميل', 'type' => 'customer']);
 
         return ['token' => $out['token'], 'tenant_id' => $tenantId, 'customer_id' => $customer->id];
