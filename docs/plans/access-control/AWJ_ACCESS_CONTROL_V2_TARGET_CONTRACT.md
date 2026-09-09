@@ -256,7 +256,7 @@ The verification pass proved that report exports on Sales / Purchases / Inventor
 Report Export Scope = Report API JSON Scope   (by construction)
 ```
 
-A single fix at the API layer covers rows, totals and exports for all five report families.
+Client-side exports inherit the scope of the JSON data supplied to them. This does not mean `rows` and `totals`/KPIs are guaranteed to share one query implementation today — the verification pass observed report families where they do not. For each report family, the implementation PR must independently prove that rows, totals/KPIs, drill-down data where applicable, and the JSON used by client-side exports are all constrained by the same Effective Scope. They do not have to share the same query implementation, but they must produce authorization-equivalent scope.
 
 ### 8.2 One separate export surface
 `GET /api/inventory/export` is a **catalog balance export**, not a report export. It sits on `Product::query()` and returns tenant-wide aggregate quantity / avg_cost per product. It is treated as its own fix in the PR breakdown — not bundled with the five report services.
@@ -285,22 +285,20 @@ The verification pass confirmed a P1 gap: `InvoiceService::post()` debits ledger
 ### 10.1 Target invariant
 ```text
 For every user-initiated cash-account effect:
-  1. Resolve the affected Treasury Resource (a real CashBankAccount row).
-  2. Verify deposit authority on that resource via CashBankAccountService::assertAllowed('deposit', $actor).
-  3. Resolve / use the correct GL account THROUGH the resource (not a hard-coded '1110').
-  4. Post the balanced journal via LedgerService.
+  1. Resolve the affected Treasury Resource.
+  2. Verify the required deposit/withdraw authority for the authenticated actor.
+  3. Resolve the accounting GL account according to the verified
+     Treasury ↔ GL mapping/selection contract.
+  4. Post the balanced journal through the normal accounting path.
 ```
+
+This contract does not yet define whether `CashBankAccount` owns, references, derives, or is otherwise mapped to the GL account. That relationship must be established by the Treasury Resource ↔ GL Account inspection before `PR-ACL-CASH-SALE` is designed.
 
 ### 10.2 Deliberate non-decision
 
-The exact selection rule for the CashBankAccount on a direct cash-sale invoice is NOT decided in this contract. Options include:
+The exact selection rule for the Treasury Resource on a direct cash-sale invoice is NOT decided in this contract, and neither is the mapping step in invariant 3 above. Candidate selection inputs mentioned during research include the invoice's own `cash_account_id` if provided, the tenant's main cash CashBankAccount, a branch-designated cash CashBankAccount if branch-scoped cash resources are ever introduced, or the POS session's cash CashBankAccount when the invoice originated from POS — none of these is adopted as the target rule here.
 
-* the invoice's own `cash_account_id` if provided,
-* the tenant's main cash CashBankAccount if not,
-* the branch's designated cash CashBankAccount if branch-scoped cash resources are ever introduced,
-* the POS session's cash CashBankAccount when the invoice originated from POS.
-
-Before opening `PR-ACL-CASH-SALE` an inspection pass must confirm the treasury-resource ↔ GL-account resolution semantics AWJ intends. That inspection is out of scope for this contract.
+Before opening `PR-ACL-CASH-SALE` an inspection pass must confirm both the treasury-resource selection semantics and the Treasury ↔ GL Account mapping AWJ intends. That inspection is out of scope for this contract.
 
 ---
 
@@ -366,7 +364,7 @@ Sequenced to keep each PR small, self-contained and independently reviewable. Th
 
 2. **PR-ACL-INVOICE-PURCHASE-SETTLE-ACTOR.** Plumb the authenticated actor from `InvoiceController::post()` / `PurchaseController::post()` through the respective service `post()` → `settle()` → `payments->post()` chain. Regression tests are already characterized in `AccessControlV2ClosureVerificationTest`; convert them from characterization to secure-invariant form when the fix lands.
 
-3. **PR-ACL-REPORT-SCOPE.** Introduce a shared `RestrictedBranchScope` helper (mirror of `ReportService::branchIds()` at `ReportService.php:811-836`). Apply it in Sales / Purchase / Inventory / Customer / Classification Analytics report services. All five characterization tests flip to secure-invariant form. One PR, one helper, five call-site edits.
+3. **PR-ACL-REPORT-SCOPE.** One shared Effective Scope contract with the minimum module-specific integrations required — not a single mandated helper or a fixed call-site count. `ReportService::branchIds()` at `ReportService.php:811-836` is the reference pattern for branch intersection, and Sales/Purchase can likely share that logic directly. Inventory additionally needs warehouse scope on top of branch scope. Customer must preserve the §9 separation between CompanyWide customer identity and branch-derived financial aggregates — the fix scopes the aggregates, not the customer list. Classification Analytics must apply scope inside whichever shared query paths its `documents()` / `payments()` / `partners()` helpers actually use. A shared helper may be used where the inspection during implementation shows it fits; this contract does not prescribe one helper or a specific number of call sites. All five characterization tests flip to secure-invariant form.
 
 4. **Treasury Resource ↔ GL Account resolution inspection** (docs / research only, no code). Decides how a direct cash sale selects its `CashBankAccount`. Pre-requisite for PR 5.
 
