@@ -877,4 +877,27 @@ management figures, not per-location secrets? This decision affects
 `view=value` identically and should be made once, for both surfaces
 together, not endpoint-by-endpoint.
 
+## 37. Cross-reference — Inventory Valuation Semantics Inspection (2026-09-09)
+
+The §36 blocked decision (whether/how Warehouse Scope should affect
+`/api/inventory/export` and `view=value`'s `quantity`/`avg_cost`) is now
+**answered by a dedicated inspection**, not resolved here — see
+[`docs/plans/products-inventory/AWJ_INVENTORY_VALUATION_SEMANTICS.md`](../products-inventory/AWJ_INVENTORY_VALUATION_SEMANTICS.md).
+
+Summary of that document's finding: AWJ's inventory valuation is **Model
+A (tenant-wide moving average)** for regular products — code-verified
+across every writer (Purchases, Sales/POS, Returns, Stock Permits/
+Transfers, Stocktake, Opening) — with Fuel carrying a genuine, bounded,
+warehouse-specific cost-basis exception (Model B, `FuelCostBasisService`)
+that neither export nor report surface currently reads. `avg_cost` cannot
+be validly recomputed per warehouse (no warehouse-specific cost data
+exists in `product_warehouse_stock`), but `quantity` can be validly
+warehouse-scoped (it is real, per-warehouse data). The document
+recommends: scope displayed `quantity`/`stock_value` to the actor's
+Effective Warehouse Scope while leaving the authoritative tenant-wide
+`avg_cost` untouched — closing the disclosure concern without inventing
+per-warehouse costing. That recommendation is not yet implemented; it
+requires explicit approval before `PR-ACL-INVENTORY-CATALOG-EXPORT-SCOPE`
+can proceed.
+
 **Process rule:** research/inspect → verify → update this file → confirm commit → summarize to Safwan.
