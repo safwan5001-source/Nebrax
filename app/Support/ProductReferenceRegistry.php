@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Models\BarcodeRegistryEntry;
 use App\Models\CommerceListing;
+use App\Models\CommerceOrderLine;
 use App\Models\CreditNoteLine;
 use App\Models\DeliveryNoteLine;
 use App\Models\FuelProduct;
@@ -94,6 +95,10 @@ final class ProductReferenceRegistry
         ProcurementLine::class => ['key' => 'procurement_lines', 'classes' => [self::BUSINESS_HISTORICAL]],
         // الفجوة الأولى المعروفة في العقد — سند تسليم مؤكَّد حجّة تسليمٍ قائمة.
         DeliveryNoteLine::class => ['key' => 'delivery_note_lines', 'classes' => [self::BUSINESS_HISTORICAL]],
+        // PR-COM-5A: سطر التزامٍ تجاري — بنفس منطق QuoteLine حرفياً (حجّة
+        // قائمة غير محاسبية، لا أثر مخزني). CommerceOrder != Invoice
+        // (ADR-01 §2)، لكنه يبقى مستنداً تاريخياً يجب ألّا يُمحى مرجعه صامتاً.
+        CommerceOrderLine::class => ['key' => 'commerce_order_lines', 'classes' => [self::BUSINESS_HISTORICAL]],
 
         // ── ٢) تاريخي **و** مخزنيّ الدلالة معاً ────────────────────────
         // الفجوة الثانية المعروفة في العقد، وكانت مزدوجة: غائبة عن منع الحذف

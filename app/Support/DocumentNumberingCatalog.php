@@ -5,6 +5,7 @@ namespace App\Support;
 use App\Models\Asset;
 use App\Models\Branch;
 use App\Models\CashBankTransfer;
+use App\Models\CommerceOrder;
 use App\Models\CorporateFuelContract;
 use App\Models\CreditNote;
 use App\Models\DeliveryNote;
@@ -110,6 +111,11 @@ class DocumentNumberingCatalog
             'yearly'  => true,
             'setting' => ['group' => 'sales', 'key' => 'quote_prefix'],
             'series'  => [['key' => 'default', 'prefix' => 'QUO']],
+        ],
+        'commerce_order' => [
+            'model'  => CommerceOrder::class,
+            'yearly' => true,
+            'series' => [['key' => 'default', 'prefix' => 'CORD']],
         ],
         'return' => [
             'model'  => ReturnDocument::class,
