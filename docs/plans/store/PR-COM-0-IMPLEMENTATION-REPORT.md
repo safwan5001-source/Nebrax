@@ -298,8 +298,7 @@ instruction not to begin it in this task):
 ## Git
 
 - **Branch:** `claude/pr-com-0-commerce-boundary-nutcqd`
-- **PR:** opened against `main` (see PR link in the final chat message —
-  not embedded here since the PR is created after this report is written)
+- **PR:** [#724](https://github.com/safwan5001-source/Nebrax/pull/724) — opened against `main`, not merged
 - **Base SHA:** `244e2de645476e695276959030832589c55e1c76`
 - **Head SHA:** `2d746b1a0cfd7ce59e18fb9cca80053528bd711f`
 
