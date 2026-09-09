@@ -41,13 +41,19 @@ use RuntimeException;
  * **بلا idempotency هنا**: لا سطح استدعاء خارجي قابل لإعادة المحاولة بعد
  * (لا API/Checkout بعد — Master Plan §25 يخصّص ذلك لـ PR-COM-7A صراحةً).
  *
- * **PR-COM-6A — سياق العميل المشترك**: `partner_id` المُدخل في `$data` سلطةٌ
- * فقط حين **لا** يوجد `CustomerContext` مُؤسَّس (ضيف، أو نداءٌ داخلي/طاقم —
- * `EstablishCustomerContext` لا يُشغَّل إطلاقاً على مسارات الطاقم، فلا
- * يتأسّس السياق هناك أبداً). حين يتأسّس السياق (طلبٌ من هوية عميل موثَّقة)
- * يصبح **المصدر الوحيد**: `partner_id` من `$data` يُتجاهل كلياً ولا يُقرَأ
- * حتى كمرشّح — لا يجوز أن يُغيّر مُدخَلٌ من الطالب ملكية الطلب. هذا تكاملٌ
- * سياقي حصراً (COM-6A) لا تفويضَ ملكية موارد كامل (COM-6B لاحقاً).
+ * **PR-COM-6A — سياق العميل المشترك**: حين يتأسّس `CustomerContext` (طلبٌ من
+ * هوية عميل موثَّقة) يصبح **المصدر الوحيد**: `partner_id` من `$data` يُتجاهل
+ * كلياً ولا يُقرَأ حتى كمرشّح — لا يجوز أن يُغيّر مُدخَلٌ من الطالب ملكية
+ * الطلب. هذا تكاملٌ سياقي حصراً (COM-6A) لا تفويضَ ملكية موارد كامل
+ * (COM-6B لاحقاً).
+ *
+ * **P1 hardening — لا ثقة ضمنية بمجرد غياب السياق**: غياب `CustomerContext`
+ * لا يعني «طاقم/داخلي موثوق» — فمسار ضيف/عام مستقبلي (COM-7A) لن يمرّ
+ * بـ`EstablishCustomerContext` أبداً، فسيصل بلا سياق تماماً كالطاقم اليوم.
+ * الثقة الآن **علامةٌ صريحة منفصلة**: `$trustedPartnerSelection = true` عبر
+ * `create()`، لا اشتقاقٌ من غياب أي شيء. حين لا يوجد سياقٌ **ولا** علامة
+ * ثقة صريحة (الافتراض — أي طالبٍ لم يُثبت ثقته، بما فيه ضيفٌ عامٌّ مستقبلي)
+ * لا يُقرَأ `$data['partner_id']` إطلاقاً؛ `partner_id` يبقى `null` دوماً.
  */
 class CommerceOrderService
 {
@@ -60,6 +66,14 @@ class CommerceOrderService
      * إنشاء طلب Commerce بحالة `draft` مع سطوره ذرّياً — فشل أي سطر يُسقط
      * الطلب كاملاً (لا مسودة جزئية تنجو من معاملة فاشلة).
      *
+     * `$trustedPartnerSelection`: علامة ثقة **صريحة** يضبطها الطالب فقط —
+     * لا تُشتقّ من غياب `CustomerContext`. مُخصّصةٌ حصراً لمسارٍ طاقمٍ/داخليٍّ
+     * صريح خارج Commerce نفسها (مثال: متحكّم طاقمٍ محروسٌ بصلاحية RBAC —
+     * لا يوجد اليوم؛ اختبارات COM-5A التي تمرّر `partner_id` تُمثّل هذا
+     * المسار حتى يوجد). أي طالبٍ لا يُثبتها (الافتراض `false` — يشمل أي
+     * مسار عام/ضيف مستقبلي) لا يملك أي وسيلة لجعل `partner_id` سلطةً على
+     * الطلب، مهما كانت قيمته في `$data`.
+     *
      * @param  array{sales_channel_id: string, partner_id?: ?string, number?: ?string}  $data
      * @param  array<int, array{product_id: string, quantity: int, unit_name?: ?string}>  $items
      *
@@ -67,7 +81,7 @@ class CommerceOrderService
      *                          كمية غير موجبة، أو وحدة غير معرَّفة.
      * @throws CommerceOrderPriceUnresolvedException سطرٌ بلا سعر قابل للحسم.
      */
-    public function create(array $data, array $items): CommerceOrder
+    public function create(array $data, array $items, bool $trustedPartnerSelection = false): CommerceOrder
     {
         $tenantId = app(TenantContext::class)->id();
         if ($tenantId === null) {
@@ -83,7 +97,7 @@ class CommerceOrderService
             throw new RuntimeException('قناة البيع غير موجودة.');
         }
 
-        $partnerId = $this->resolveOrderPartnerId($tenantId, $data);
+        $partnerId = $this->resolveOrderPartnerId($tenantId, $data, $trustedPartnerSelection);
 
         return DB::transaction(function () use ($salesChannelId, $partnerId, $data, $items) {
             $order = CommerceOrder::create([
@@ -182,10 +196,16 @@ class CommerceOrderService
      * تحقُّق `EstablishCustomerContext` القائم (هوية/رابط/Partner نشطون)؛
      * لا تكرار للتحقّق ولا إنشاء/تعديل رابطٍ من Commerce أبداً.
      *
-     * غياب السياق (ضيف، أو أي نداءٍ لا يمرّ بمسارات العميل — الطاقم/الداخلي)
-     * يُبقي سلوك COM-5A كما هو حرفياً: `partner_id` من `$data` إن وُجد.
+     * **P1 hardening**: غياب السياق **لا** يعني ثقةً — ذاك كان الخلل. حين
+     * لا يوجد سياقٌ مُؤسَّس، `$data['partner_id']` لا يُقرَأ إطلاقاً (ولا
+     * يُفحَص وجوده حتى) إلا حين يحمل الطالب علامة الثقة الصريحة
+     * `$trustedPartnerSelection === true` — وهي وحدها القناة المتبقية
+     * لسلوك COM-5A الأصلي (تحقّق الوجود داخل المستأجر ثم الإرجاع). أي طالبٍ
+     * آخر — بما فيه أيّ مسار عام/ضيف لا يمرّ بـ`EstablishCustomerContext`
+     * ولا يحمل هذه العلامة — يحصل على `null` دوماً، بصرف النظر عمّا يحمله
+     * `$data`.
      */
-    private function resolveOrderPartnerId(string $tenantId, array $data): ?string
+    private function resolveOrderPartnerId(string $tenantId, array $data, bool $trustedPartnerSelection): ?string
     {
         $customerContext = app(CustomerContext::class);
 
@@ -195,6 +215,10 @@ class CommerceOrderService
             }
 
             return $customerContext->hasPartnerLink() ? $customerContext->linkedPartnerId() : null;
+        }
+
+        if (! $trustedPartnerSelection) {
+            return null;
         }
 
         $partnerId = $data['partner_id'] ?? null;

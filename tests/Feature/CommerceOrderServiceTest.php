@@ -137,7 +137,7 @@ class CommerceOrderServiceTest extends TestCase
 
         $order = $this->orders->create([
             'sales_channel_id' => $this->channel->id, 'partner_id' => $partner->id,
-        ], $this->items());
+        ], $this->items(), trustedPartnerSelection: true);
 
         $this->assertSame($partner->id, $order->partner_id);
     }
@@ -155,7 +155,7 @@ class CommerceOrderServiceTest extends TestCase
 
         $order = $this->orders->create([
             'sales_channel_id' => $this->channel->id, 'partner_id' => $partner->id,
-        ], $this->items(1));
+        ], $this->items(1), trustedPartnerSelection: true);
 
         $this->assertSame(9900, $order->lines->first()->unit_price);
     }
@@ -220,7 +220,7 @@ class CommerceOrderServiceTest extends TestCase
 
         $order = $this->orders->create([
             'sales_channel_id' => $this->channel->id, 'partner_id' => $partner->id,
-        ], $this->items(1));
+        ], $this->items(1), trustedPartnerSelection: true);
 
         app(PriceListService::class)->upsertItem($priceList, $this->product, ['price' => 500]);
 
@@ -257,7 +257,7 @@ class CommerceOrderServiceTest extends TestCase
 
         $order = $this->orders->create([
             'sales_channel_id' => $this->channel->id, 'partner_id' => $partner->id,
-        ], [['product_id' => $boxed->id, 'quantity' => 2, 'unit_name' => 'carton']]);
+        ], [['product_id' => $boxed->id, 'quantity' => 2, 'unit_name' => 'carton']], trustedPartnerSelection: true);
 
         $line = $order->lines->first();
         $this->assertSame('carton', $line->unit_name);
@@ -294,7 +294,7 @@ class CommerceOrderServiceTest extends TestCase
 
         $order = $this->orders->create([
             'sales_channel_id' => $this->channel->id, 'partner_id' => $partner->id,
-        ], [['product_id' => $boxed->id, 'quantity' => 3, 'unit_name' => 'carton']]);
+        ], [['product_id' => $boxed->id, 'quantity' => 3, 'unit_name' => 'carton']], trustedPartnerSelection: true);
 
         $line = $order->lines->first();
         $this->assertSame(3, $line->quantity);
@@ -344,7 +344,11 @@ class CommerceOrderServiceTest extends TestCase
         Product::create(['name' => 'منتج ب ٢', 'sale_price' => 5000]);
 
         $this->expectException(RuntimeException::class);
-        $this->orders->create(['sales_channel_id' => $channelUnderB->id, 'partner_id' => $foreignPartnerId], $this->items());
+        $this->orders->create(
+            ['sales_channel_id' => $channelUnderB->id, 'partner_id' => $foreignPartnerId],
+            $this->items(),
+            trustedPartnerSelection: true,
+        );
     }
 
     /** @test */

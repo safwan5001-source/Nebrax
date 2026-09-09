@@ -145,16 +145,117 @@ class CommerceCustomerContextIntegrationTest extends TestCase
         $this->assertSame(0, CustomerPartnerLink::query()->count());
     }
 
+    /**
+     * P1 fix: absence of `CustomerContext` used to be treated as implicit
+     * trust, so a contextless caller (the shape a future guest/public
+     * checkout would have) could inject a real `partner_id` and have it
+     * accepted after only an existence check. It must now resolve to
+     * `null` regardless — the default (`trustedPartnerSelection = false`)
+     * never even reads `$data['partner_id']`.
+     */
     /** @test */
-    public function guest_order_creation_still_accepts_an_explicit_partner_id_unchanged_from_com5a(): void
+    public function a_contextless_untrusted_caller_cannot_inject_a_partner_id_even_when_valid(): void
     {
-        $partner = $this->partner('عميل ضيف يدوي');
+        $partner = $this->partner('عميل ضيف غير موثوق');
 
         $order = $this->orders->create([
             'sales_channel_id' => $this->channel->id, 'partner_id' => $partner->id,
         ], $this->items());
 
+        $this->assertNull($order->partner_id);
+    }
+
+    /**
+     * Proves the untrusted path does not even validate `partner_id` — a
+     * nonexistent id is silently ignored, not rejected. If it were being
+     * read-then-discarded, a lookup would still run; it must not.
+     */
+    /** @test */
+    public function a_contextless_untrusted_caller_supplying_a_nonexistent_partner_id_is_not_validated_or_rejected(): void
+    {
+        $order = $this->orders->create([
+            'sales_channel_id' => $this->channel->id, 'partner_id' => (string) \Illuminate\Support\Str::uuid(),
+        ], $this->items());
+
+        $this->assertNull($order->partner_id);
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  Explicit trust — the only remaining channel for a raw partner_id
+    // ═══════════════════════════════════════════════════════════
+
+    /**
+     * The one narrow, explicit trust mechanism this fix introduces:
+     * `trustedPartnerSelection = true` on `create()` itself. It is a
+     * caller-set flag, never inferred from the absence of anything, so it
+     * represents an existing legitimate staff/internal call site (today:
+     * these very tests — no Commerce controller exists yet) rather than a
+     * general authorization framework.
+     */
+    /** @test */
+    public function an_explicitly_trusted_caller_can_still_select_a_valid_partner(): void
+    {
+        $partner = $this->partner('عميل طاقم موثوق');
+
+        $order = $this->orders->create(
+            ['sales_channel_id' => $this->channel->id, 'partner_id' => $partner->id],
+            $this->items(),
+            trustedPartnerSelection: true,
+        );
+
         $this->assertSame($partner->id, $order->partner_id);
+    }
+
+    /** @test */
+    public function an_explicitly_trusted_caller_selecting_a_nonexistent_partner_is_still_rejected(): void
+    {
+        $this->expectException(RuntimeException::class);
+
+        $this->orders->create(
+            ['sales_channel_id' => $this->channel->id, 'partner_id' => (string) \Illuminate\Support\Str::uuid()],
+            $this->items(),
+            trustedPartnerSelection: true,
+        );
+    }
+
+    /**
+     * The flag alone cannot impersonate the trusted path unless a caller
+     * genuinely sets it — an untrusted call carrying the exact same
+     * payload as the trusted one above still resolves to `null`. The only
+     * difference between the two tests is the flag itself.
+     */
+    /** @test */
+    public function untrusted_contextless_execution_cannot_impersonate_the_trusted_path(): void
+    {
+        $partner = $this->partner('عميل يحاول انتحال المسار الموثوق');
+
+        $order = $this->orders->create(
+            ['sales_channel_id' => $this->channel->id, 'partner_id' => $partner->id],
+            $this->items(),
+            // trustedPartnerSelection intentionally omitted — defaults to false.
+        );
+
+        $this->assertNull($order->partner_id);
+    }
+
+    /**
+     * `CustomerContext`, when established, remains the sole authority even
+     * if a caller mistakenly also passes `trustedPartnerSelection: true` —
+     * the trust flag only matters in the branch where no context exists.
+     */
+    /** @test */
+    public function an_established_customer_context_overrides_the_trust_flag_entirely(): void
+    {
+        $identity = $this->identity('trust-vs-context@nibras-com6a.test');
+        $foreignPartner = $this->partner('عميل غريب حتى مع علامة الثقة');
+
+        $order = $this->withEstablishedContext($identity, fn () => $this->orders->create(
+            ['sales_channel_id' => $this->channel->id, 'partner_id' => $foreignPartner->id],
+            $this->items(),
+            trustedPartnerSelection: true,
+        ));
+
+        $this->assertNull($order->partner_id);
     }
 
     // ═══════════════════════════════════════════════════════════
