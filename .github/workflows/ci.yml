@@ -82,6 +82,10 @@ jobs:
 
       - name: تثبيت محركات PDF وXML
         run: |
+          # مصدر Google Chrome APT مثبَّت مسبقاً على عدّاد GitHub-hosted ولا علاقة له
+          # بالمشروع؛ يفشل أحياناً بـ"Hash Sum mismatch" فيوقف كل خطوة apt-get update.
+          # نعطّل ملف مصدره فقط دون المساس بأي مصدر آخر أو كبت أخطاء apt عامة.
+          sudo rm -f /etc/apt/sources.list.d/google-chrome.list
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends poppler-utils libxml2-utils
 
