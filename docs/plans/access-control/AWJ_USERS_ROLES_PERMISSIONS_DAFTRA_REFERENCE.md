@@ -11,6 +11,38 @@
 ## 1. Decision
 Daftra is the functional reference for the AWJ users / roles / permissions experience. AWJ should provide the same overall operating model and flexibility while using AWJ-native stable permission keys and stronger security/accounting invariants. URL/path-based blocked pages are a functional reference only, not the desired AWJ authorization architecture.
 
+## 1.1 External benchmarks — how each source is used
+
+Two external sources feed Access Control V2 research. They play different roles and must not be confused.
+
+### Functional benchmark — Daftra
+Daftra's official product documentation is the **functional benchmark** for AWJ users, roles, permissions and adjacent capabilities:
+
+* users / employees / login state / role assignment,
+* branch access,
+* warehouse access,
+* treasury and bank resource permissions (deposit / withdraw),
+* customer / supplier / branch sharing concepts,
+* approval and workflow concepts (leave, requests, POS/fuel approvals).
+
+Daftra tells us **what capabilities Saudi accounting users expect to find**. It does not dictate implementation — AWJ keeps its own stable permission keys, its own accounting invariants and its own security model. URL/path blocking that appears in Daftra's UI is treated as a UX pattern only, never as the security boundary.
+
+### Enterprise validation reference — Microsoft Dynamics 365
+Microsoft Dynamics 365's security documentation is used as an **enterprise validation reference** to sanity-check the maturity of the model, specifically:
+
+* separation between role/action authority and data security,
+* least privilege,
+* business responsibility vs technical access,
+* Segregation of Duties (SoD).
+
+Dynamics tells us **the shape a mature enterprise authorization model should have**. It does not dictate a database model.
+
+### Explicit non-adoption
+AWJ Access Control V2 **does not adopt** Dynamics' `Role → Duty → Privilege → Permission` database model as a new schema in AWJ. Introducing Duty / Privilege tables today would rewrite RBAC without fixing any of the runtime-confirmed gaps. The existing AWJ RBAC keys, `allowedBranchIds()`, `allowedWarehouseIds()` and `CashBankAccount.deposit_scope/withdraw_scope` are sufficient to close every confirmed P1 gap.
+
+### Reference authority
+Where an external reference model conflicts with AWJ runtime-verified behavior, the runtime behavior wins unless the deviation is a documented product decision. External references are read-only inputs to research, not overrides to `php artisan test` results or observed production behavior.
+
 ## 2. Target authorization model
 ```text
 Tenant Isolation
@@ -190,15 +222,20 @@ Not every journal line touching a cash account is a user-selected CashBankAccoun
 ### 18.1 POS drawer cash_in / cash_out — NOT AN ACCOUNTING MONEY MOVEMENT
 `PosSessionService::recordCashMovement()` records physical drawer movement for reconciliation and does not post a journal entry or alter the cash account. It enforces session actor branch/warehouse scope and POS operation policy. Absence of CashBank `assertAllowed()` here is not currently a treasury ACL bypass.
 
-### 18.2 POS variance settlement — POLICY AMBIGUITY
+### 18.2 POS variance settlement — TARGET POLICY DECIDED, IMPLEMENTATION PENDING
 `PosSessionService::settleVariance()` posts shortage/overage against a server-resolved session cash account after `pos.variance.approve`, state/acknowledgement/one-time guards and optional SoD. It resolves through `resolveForPayment()` but does not call `assertAllowed()`.
 
-Policy question:
+**Target policy (decided):**
 ```text
-Does pos.variance.approve authorize accounting adjustment of the session treasury
-regardless of the user's deposit/withdraw ACL?
+canSettleVariance =
+  pos.variance.approve
+  ∩ session/branch authority
+  ∩ affected CashBankAccount authority (deposit / withdraw)
+  ∩ valid session/state/SoD requirements
 ```
-If treasury ACL is absolute, this is a gap. If variance authority is a privileged domain override over a server-bound account, that exception must be explicit, auditable and high-risk. Status: **Policy ambiguity; do not change automatically.**
+`pos.variance.approve` does **not** grant an implicit treasury override. A user authorized to approve a variance must still hold the appropriate `deposit` / `withdraw` authority on the session's cash entity.
+
+No new permission is being introduced for this decision. Any future privileged override — if one is ever added — must be an explicit, audited authority (its own key + its own trail), never an implicit bypass. Status: **Target policy decided; implementation pending — no code change here.**
 
 ### 18.3 Direct cash sale in InvoiceService — STRONG CANDIDATE CONSISTENCY GAP
 `InvoiceService` has a legacy/direct cash-sale journal path using server-defined cash account `1110` and explicitly does not pass through CashBankAccountService. A cash invoice can therefore create cash-account effect without evaluating CashBank deposit ACL.
