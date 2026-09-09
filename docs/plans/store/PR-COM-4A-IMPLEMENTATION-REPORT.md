@@ -588,8 +588,8 @@ conscious, documented deferrals, not blockers.
 ## 43. Git
 
 - **Branch:** `claude/pr-com-4a-price-resolution`
-- **PR:** opened against `main` — link recorded in a follow-up commit to
-  this report
+- **PR:** [#732](https://github.com/safwan5001-source/Nebrax/pull/732) —
+  opened against `main`, not merged
 - **Base SHA:** `8d67d2e4cc34440b1e4f2d54a89452efb4349a6e`
 - **Head SHA:** `64c1c32b5a840d68a6bfa9cc4305205e25f6eb40` (before adding
   this report)
