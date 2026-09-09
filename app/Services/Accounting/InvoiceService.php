@@ -37,10 +37,12 @@ class InvoiceService
     // بأكواد ثابتة هنا بعد اليوم.
     //
     // البيع النقدي وحده يبقى على 1110 صراحةً — عمداً خارج ACC-3: `debitCode`
-    // لا يمرّ عبر CashBankAccountService (على خلاف السند اليدوي في settle()
-    // أدناه)، فتوسيعه بدور `cash`/`bank` دلالي كان سيبتدع دوراً محاسبياً
-    // عاماً للنقد ممنوعاً صراحةً بعقد ACC-2/ACC-3 (الحساب النقدي المحدد يبقى
-    // ملك نطاق CashBankAccount وحده). هذا الفارق موثَّق في تقرير التنفيذ.
+    // نفسه لا يُستبدل بدور دلالي عام (كان سيبتدع دوراً محاسبياً عاماً للنقد
+    // ممنوعاً صراحةً بعقد ACC-2/ACC-3؛ الحساب النقدي المحدد يبقى ملك نطاق
+    // CashBankAccount وحده). لكن منذ PR-ACL-CASH-SALE، الخزينة *وراء* 1110
+    // تُحلّ وتُخوَّل عبر CashBankAccountService قبل الترحيل (انظر `post()`) —
+    // تماماً كما يفعل `settle()` أدناه لمسار `is_paid=true`. هذا الفارق
+    // موثَّق في تقرير التنفيذ.
     private const ACC_CASH        = '1110'; // الصندوق (بيع نقدي)
     private const VAT_RATE        = 15;     // نسبة ضريبة القيمة المضافة للشحن
 
@@ -60,6 +62,7 @@ class InvoiceService
         protected ClassificationService $classifications,
         protected InvoiceLinePrecision $linePrecision,
         protected AccountRoleResolver $accountRoles,
+        protected CashBankAccountService $cashBankAccounts,
     ) {}
 
     /**
@@ -907,6 +910,17 @@ class InvoiceService
             $debitAccountId = $invoice->payment_type === 'cash'
                 ? $this->accountId(self::ACC_CASH)
                 : $this->accountRoles->resolve('accounts_receivable')->id;
+
+            // PR-ACL-CASH-SALE: البيع النقدي المباشر يمدِّن 1110 كما هو —
+            // GL routing لا يتغيّر — لكن الخزينة *وراء* هذا الحساب تُحلّ
+            // وتُخوَّل الآن قبل الترحيل، تماماً كما يفعل السند الحقيقي في
+            // settle() أدناه لمسار is_paid=true. resolveForPayment() يعيد
+            // بالضبط نفس كيان الخزينة الرئيسية التي أنشأها bootstrapDefaults()
+            // على حساب 1110 نفسه — لا خزينة بديلة، لا مسار اختيار جديد.
+            if ($invoice->payment_type === 'cash') {
+                $cashEntity = $this->cashBankAccounts->resolveForPayment($debitAccountId, 'cash');
+                $this->cashBankAccounts->assertAllowed($cashEntity, 'deposit', $actor);
+            }
 
             $lines = [[
                 'account_id'   => $debitAccountId,

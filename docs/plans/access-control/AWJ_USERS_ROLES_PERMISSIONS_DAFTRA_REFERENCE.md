@@ -643,4 +643,126 @@ direct-cash-debit shortcut (cash purchase settlement always routes through
 `settle()`/`PaymentService`) — grep-confirmed, not deep-audited; a future
 purchase-side inspection would need its own pass, out of scope here.
 
+## 35. Direct Cash Sale Treasury ACL — Implemented (2026-09-09)
+
+**PR-ACL-CASH-SALE**, `fix/access-control-direct-cash-sale-treasury`. Closes
+exactly the gap §34 classified as **A — Already resolvable**. §34 itself is
+left unedited as historical characterization of the pre-fix state.
+
+**Daftra functional principle (reaffirmed, unchanged):** action permission
+≠ treasury resource permission. Posting an invoice must not implicitly
+grant deposit rights into whatever cash account it happens to touch.
+Functional benchmark only — nothing below is imported architecture.
+
+**Pre-fix gap:** `InvoiceService::post()`, `payment_type === 'cash'`
+branch, computed `$debitAccountId = accountId('1110')` and posted directly
+— no call to `CashBankAccountService` anywhere on that path, so no
+resolution and no `assertAllowed()`. `is_paid=true` (a separate, mutually
+exclusive path via `paymentType()`) was already fully protected since PR
+#734.
+
+**Exact fix** (`InvoiceService.php`, `post()`, right after `$debitAccountId`
+is computed, before `$lines` is built):
+```php
+if ($invoice->payment_type === 'cash') {
+    $cashEntity = $this->cashBankAccounts->resolveForPayment($debitAccountId, 'cash');
+    $this->cashBankAccounts->assertAllowed($cashEntity, 'deposit', $actor);
+}
+```
+`CashBankAccountService` added as a constructor dependency (same DI style
+as every other collaborator). No other line in `post()` changed.
+
+**Treasury resolution remains 1110 → existing CashBankAccount:**
+`$debitAccountId` itself is untouched — still the hardcoded `accountId('1110')`
+lookup. `resolveForPayment($debitAccountId, 'cash')` (the same method
+`PaymentService` already calls) resolves the *existing* `CashBankAccount`
+row that `bootstrapDefaults()` seeded on that exact GL account at tenant
+registration (§34, §7) — no new treasury, no selection, no alternate
+routing. The journal still debits `1110` with the identical amount as
+before.
+
+**Deposit ACL now enforced:** `assertAllowed()` throws (→ HTTP 422 via the
+same `RuntimeException` → `domain()` handling every other money path uses)
+before any journal line is built, so the entire `DB::transaction()`
+(invoice status, journal entry, inventory/COGS if any) rolls back
+atomically on denial — the invoice stays `draft`.
+
+**Actor semantics — no new policy invented:** `InvoiceController::post()`
+already passed `$request->user()` as the third argument to
+`InvoiceService::post()` before this fix (established in §34); that actor
+now reaches `assertAllowed()` unchanged. Call-site audit of every caller of
+`InvoiceService::post()`:
+- `InvoiceController.php:335` — HTTP path, always an authenticated,
+  non-null actor (Sanctum guarantees this before the controller runs).
+  **The only caller that can produce `payment_type === 'cash'`.**
+- `PosService.php:228` and `FuelSaleService.php:205` — call `post()` with
+  no actor (`null`), but both always create their invoices with
+  `payment_type: 'credit'` (`PosService.php:222`,
+  `FuelSaleService.php:177`) — **grep-confirmed neither ever reaches the
+  `'cash'` branch**, so the new gate never executes for them. Zero
+  backward-compatibility risk from internal null-actor callers; none
+  needed a fallback or policy change.
+
+**Branch semantics unchanged:** no branch parameter was added anywhere.
+`assertAllowed()` reads `app(BranchContext::class)->id()` internally
+exactly as it already did for the `is_paid`/`PaymentService` path (§34,
+§8) — a `branch`-scoped treasury on a direct cash sale is authorized
+against the same active request branch every other money path uses,
+automatically, with no new plumbing.
+
+**Test evidence** (`tests/Feature/ApiInvoiceTest.php`, all tracked, all
+passing):
+
+| Case | Expected | Result |
+|---|---|---|
+| `deposit_scope=all` (bootstrap default, unmodified) | allow | `creating_and_posting_an_invoice_via_api_generates_a_balanced_entry` — unmodified, still passes; direct cash sale still succeeds, debits 1110 |
+| `deposit_scope=user`, subject = actor | allow | `direct_cash_sale_succeeds_when_deposit_scope_user_matches_the_authenticated_actor` — posts, debits 1110 for the identical amount (115000), zero `Payment` rows |
+| `deposit_scope=user`, subject ≠ actor | deny, atomically | `direct_cash_sale_is_denied_when_deposit_scope_user_does_not_match_the_actor_with_no_partial_effect` — HTTP 422, invoice stays `draft`, no new `JournalEntry`, no `Payment` |
+| Existing `is_paid=true` protected path | unchanged | `invoice_auto_settlement_succeeds_/_is_denied_when_deposit_scope_user_...` (pre-existing, PR #734) — both still pass unmodified |
+
+The prior "characterization" test from PR #738
+(`direct_cash_sale_bypasses_treasury_deposit_acl_characterization`, which
+asserted the pre-fix leak) was replaced by the Deny test above — same
+fixture shape, flipped expectation, per the explicit instruction not to
+leave a test asserting vulnerable behavior once the vulnerability is
+closed.
+
+**Accounting invariants — proven unchanged:** invoice totals, VAT, revenue
+account, debit amount, GL `1110`, journal balance (Σdebit=Σcredit), source
+type/id, posting date, document numbering, settlement behavior — all
+verified by the full existing `InvoiceTest.php` suite (60 tests, 332
+assertions, zero modified) passing unchanged, plus the Allow test above
+asserting the exact same 115000 debit on 1110 as pre-fix. The only
+behavioral difference: `cash sale → 1110 → post` becomes `cash sale → 1110
+→ resolve corresponding Treasury → authorize deposit → post`.
+
+**`is_paid=true` confirmed unchanged:** `settle()`, `PaymentService::post()`,
+and `cash_account_id` selection for that path were not touched. Both
+pre-existing `invoice_auto_settlement_*_deposit_scope_user_*` tests
+(PR #734) re-ran unmodified and still pass.
+
+**CI:** full suite green on SQLite locally (3127 passed, 11 skipped, up
+from 3073 in PR #736 as expected — 54 more from `main` advancing). The 16
+failures are unrelated to this fix: the same three untracked/unmerged
+verification-branch leftovers as before
+(`AccessControlV2VerificationTest.php`,
+`AccessControlV2ClosureVerificationTest.php`,
+`AccessControlV2ReportScopeVerificationTest.php` — none tracked in this
+repository's git history), **plus one new failure inside that same
+untracked `AccessControlV2VerificationTest.php`**
+(`direct_cash_sale_debits_cash_account_without_cashbank_acl`) — it
+asserted the pre-fix leak by design (posts successfully, no ACL check),
+and now correctly fails because the gap it characterized is closed. This
+is the expected, direct proof the fix works, not a regression. Plus the
+same pre-existing, unrelated `DocumentCenterSecureIntakeTest` PDF-fixture
+failure.
+
+**Remaining Access Control V2 gaps:** none from the treasury/actor audit
+(§17–§21) remain — POS/Fuel actor propagation (#731), Invoice/Purchase
+settle actor propagation (#734), Report Scope (#736), and now Direct Cash
+Sale treasury ACL are all closed. Open items: POS variance vs treasury ACL
+(§18.2 — explicit product policy decision, not started) and Report Export
+Scope for `/api/inventory/export` (P2, tracked separately for
+`PR-ACL-INVENTORY-CATALOG-EXPORT-SCOPE`).
+
 **Process rule:** research/inspect → verify → update this file → confirm commit → summarize to Safwan.

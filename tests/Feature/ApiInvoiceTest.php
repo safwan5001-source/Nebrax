@@ -290,36 +290,30 @@ class ApiInvoiceTest extends TestCase
     }
 
     /**
-     * Treasury Resolution Inspection (2026-09-09) — CHARACTERIZATION, not a
-     * fix. Proves the CONFIRMED gap in §18.3/§20/§26 of the living reference:
-     * `InvoiceService::post()` debits GL `1110` directly for a direct cash
-     * sale (`payment_type=cash`, no `is_paid`) via a hardcoded `accountId()`
-     * lookup, and never calls `CashBankAccountService::resolveForPayment()`
-     * or `assertAllowed()` for that path — unlike the `is_paid=true` path
-     * immediately above, which is fully protected since PR #734.
-     *
-     * A "stranger" whom the tenant's main cash treasury explicitly excludes
-     * (`deposit_scope=user` naming someone else) can still post a direct
-     * cash sale and successfully debit that exact treasury's GL account.
-     * This is the current, live, unfixed behavior — asserted here so a
-     * future fix flips this test's expectation deliberately, not silently.
+     * PR-ACL-CASH-SALE — regression: the direct cash-sale path
+     * (`payment_type=cash`, no `is_paid`) now resolves the treasury behind
+     * GL `1110` and checks `deposit` authorization before posting, exactly
+     * like `settle()` already does for the `is_paid=true` path. This
+     * replaces the prior "characterization" test from the Treasury
+     * Resolution Inspection (PR #738), which asserted the pre-fix leak —
+     * flipped here to assert the fix denies it, atomically.
      *
      * @test
      */
-    public function direct_cash_sale_bypasses_treasury_deposit_acl_characterization(): void
+    public function direct_cash_sale_is_denied_when_deposit_scope_user_does_not_match_the_actor_with_no_partial_effect(): void
     {
-        $auth = $this->registerTenant('cash-sale-gap', 'owner@cash-sale-gap.test');
+        $auth = $this->registerTenant('cash-sale-deny', 'owner@cash-sale-deny.test');
         $token = $auth['token'];
         app(TenantContext::class)->set($auth['tenant_id']);
 
         $partnerId = $this->withToken($token)->postJson('/api/partners', [
-            'name' => 'عميل فحص فجوة البيع النقدي المباشر', 'type' => 'customer',
+            'name' => 'عميل فحص رفض البيع النقدي المباشر', 'type' => 'customer',
         ])->assertCreated()['data']['id'];
 
         app(CashBankAccountService::class)->bootstrapDefaults();
         $cash = CashBankAccount::where('type', 'cash')->where('is_main', true)->firstOrFail();
         $stranger = User::create([
-            'tenant_id' => $auth['tenant_id'], 'name' => 'محاسب آخر', 'email' => 'stranger@cash-sale-gap.test',
+            'tenant_id' => $auth['tenant_id'], 'name' => 'محاسب آخر', 'email' => 'stranger@cash-sale-deny.test',
             'password' => 'password123', 'role' => 'admin',
         ]);
         // الخزينة الرئيسية تستثني صراحةً من يرحّل الفاتورة أدناه (المالك).
@@ -334,16 +328,62 @@ class ApiInvoiceTest extends TestCase
             'payment_type' => 'cash',
             'items'        => [['quantity' => 1, 'unit_price' => 100000, 'tax_rate' => 15]],
         ])->assertCreated();
+        $invoiceId = $create['data']['id'];
 
-        // يُرحَّل بنجاح رغم أن المالك (الفاعل الفعلي) ليس subject الخزينة —
-        // لا رفض 422، لا سند قبض يتحقق، لا CashBankAccountService متورطة.
+        $before = [
+            'invoices_posted' => Invoice::where('status', 'posted')->count(),
+            'journal_entries' => JournalEntry::count(),
+            'payments' => Payment::count(),
+        ];
+
+        $this->withToken($token)->postJson("/api/invoices/{$invoiceId}/post")->assertStatus(422);
+
+        $this->assertSame('draft', Invoice::findOrFail($invoiceId)->status, 'رفض التخويل يجب ألا يترك الفاتورة مرحّلة جزئياً.');
+        $this->assertSame($before['invoices_posted'], Invoice::where('status', 'posted')->count());
+        $this->assertSame($before['journal_entries'], JournalEntry::count(), 'رفض التخويل يجب ألا يترك قيداً جزئياً — حتى قيد 1110 نفسه.');
+        $this->assertSame($before['payments'], Payment::count());
+    }
+
+    /**
+     * PR-ACL-CASH-SALE — regression: a treasury deposit locked to the
+     * *matching* authenticated actor must still allow the direct cash sale,
+     * and — critically — the resulting journal must still debit `1110` with
+     * the exact same amount as before the fix. Proves the fix is an
+     * authorization gate only, not a GL-routing change.
+     *
+     * @test
+     */
+    public function direct_cash_sale_succeeds_when_deposit_scope_user_matches_the_authenticated_actor(): void
+    {
+        $auth = $this->registerTenant('cash-sale-allow', 'owner@cash-sale-allow.test');
+        $token = $auth['token'];
+        app(TenantContext::class)->set($auth['tenant_id']);
+
+        $partnerId = $this->withToken($token)->postJson('/api/partners', [
+            'name' => 'عميل فحص سماح البيع النقدي المباشر', 'type' => 'customer',
+        ])->assertCreated()['data']['id'];
+
+        app(CashBankAccountService::class)->bootstrapDefaults();
+        $cash = CashBankAccount::where('type', 'cash')->where('is_main', true)->firstOrFail();
+        $owner = User::where('tenant_id', $auth['tenant_id'])->where('email', 'owner@cash-sale-allow.test')->sole();
+        $cash->forceFill([
+            'deposit_scope' => 'user',
+            'deposit_scope_subject' => $owner->id,
+        ])->save();
+
+        $create = $this->withToken($token)->postJson('/api/invoices', [
+            'partner_id'   => $partnerId,
+            'payment_type' => 'cash',
+            'items'        => [['quantity' => 1, 'unit_price' => 100000, 'tax_rate' => 15]],
+        ])->assertCreated();
+
         $posted = $this->withToken($token)->postJson("/api/invoices/{$create['data']['id']}/post")->assertOk();
 
         app(TenantContext::class)->set($auth['tenant_id']);
         $entry = JournalEntry::with('lines.account')
             ->where('source_type', Invoice::class)->where('source_id', $posted['data']['id'])->firstOrFail();
-        $this->assertEquals(115000, $this->line($entry, '1110')->debit, 'القيد يمدِّن 1110 — نفس حساب أستاذ الخزينة الرئيسية.');
-        $this->assertSame($cash->account_id, $this->line($entry, '1110')->account_id, 'حساب 1110 هو بالضبط account_id للخزينة الرئيسية المقفلة على "stranger".');
-        $this->assertSame(0, Payment::count(), 'لا سند قبض ولا CashBankAccountService في هذا المسار إطلاقاً.');
+        $this->assertEquals(115000, $this->line($entry, '1110')->debit, 'GL routing لم يتغيّر — لا يزال 1110 بنفس المبلغ.');
+        $this->assertSame($cash->account_id, $this->line($entry, '1110')->account_id);
+        $this->assertSame(0, Payment::count(), 'لا يزال البيع النقدي المباشر بلا سند قبض — مسار settle() منفصل تماماً.');
     }
 }
