@@ -765,4 +765,116 @@ Sale treasury ACL are all closed. Open items: POS variance vs treasury ACL
 Scope for `/api/inventory/export` (P2, tracked separately for
 `PR-ACL-INVENTORY-CATALOG-EXPORT-SCOPE`).
 
+## 36. PR-ACL-INVENTORY-CATALOG-EXPORT-SCOPE — inspection: BLOCKED (2026-09-09)
+
+**Outcome: BLOCKED — requires an inventory valuation/data-model decision,
+not an authorization bug fix.** No production code changed. §34/§35 remain
+unedited as historical characterization; this entry documents disposition
+on the P2 row §26 tracked as `Inventory catalog export`.
+
+### Endpoint call chain
+
+`GET /api/inventory/export` (`routes/api.php:410`, guarded by
+`products.view` + `EnsureApplicationActive:inventory.core`, no branch/
+warehouse middleware) → `InventoryController::export()`
+(`InventoryController.php:57-85`) → `InventoryBalanceFilters::query()` +
+`::apply()` (`InventoryBalanceFilters.php:56-116`) → `InventoryBalanceExportService::download()`
+(`InventoryBalanceExportService.php:86-105`) → CSV/XLSX streamed response.
+
+### Pre-fix exposure — exhaustively enumerated
+
+`InventoryBalanceFilters::query()` is exactly `Product::query()->where('track_inventory', true)`
+— no `withoutGlobalScope`, no join to `product_warehouse_stock`. Accepted
+filters (`InventoryBalanceFilters::rules()` + `ExportInventoryBalancesRequest`):
+`search`, `unit`, `qty_min`/`qty_max`, `avg_cost_min`/`avg_cost_max`,
+`stock_value_min`/`stock_value_max`, `scope`, `format`, `include_zero`.
+**No `branch_id` or `warehouse_id` parameter exists anywhere in this
+endpoint's contract** — there is nothing to accept, validate, or intersect.
+Exported columns (`InventoryBalanceExportService::COLUMNS` /
+`row()`, lines 51-59, 171-182): `sku`, `barcode`, `name`, `unit`,
+`quantity` (= `Product.quantity_on_hand`), `avg_cost` (=
+`Product.avg_cost`, already redacted to `null` for a user lacking
+`products.view_cost` via `SensitiveCostPolicy` — pre-existing, unrelated
+control, untouched here), `stock_value` (derived,
+`quantity_on_hand × avg_cost`, same redaction). No warehouse column, no
+branch column, no per-warehouse breakdown anywhere in the payload.
+
+### Catalog identity vs inventory facts
+
+| Field / Aggregate | Source | Tenant-global / Branch / Warehouse | Authorization treatment |
+|---|---|---|---|
+| `sku`, `barcode`, `name`, `unit` | `products.*` (catalog identity) | Tenant-global, subject to `Product`'s own implicit `BranchScope` (see below) | Existing, standard — not a report-scope leak; identity visibility is a separate, already-governed concern |
+| `quantity` | `products.quantity_on_hand` | **Tenant-global scalar** — one moving total per product per tenant, not decomposed per warehouse in this query | Not warehouse-scoped; no such dimension exists in the data this query reads |
+| `avg_cost` | `products.avg_cost` | **Tenant-global scalar** — one moving average per product per tenant | Not warehouse-scoped (same reason); separately gated by `SensitiveCostPolicy` on `products.view_cost` (cost-visibility permission, not warehouse/branch scope) |
+| `stock_value` | derived `quantity_on_hand × avg_cost` | **Tenant-global**, inherits both scalars above | Same as `avg_cost` |
+| (no warehouse-derived field exists in the export) | — | — | — |
+
+`Product` uses the `BranchScoped` trait (implicit `BranchScope` global
+scope, `Product.php:23-25`) — **already** filters to
+`branch_id = active BranchContext OR branch_id IS NULL`, and `BranchContext`
+is **already** validated against `User::canAccessBranch()` by the
+pre-existing `SetBranch` middleware (`SetBranch.php:44-53`) before any
+controller runs — the same mechanism protecting every other `BranchScoped`
+model (`Partner`, etc.) tenant-wide, not something specific to or missing
+from this endpoint. No new branch-scope work was needed or done here.
+
+### Why this is BLOCKED, not a missing-filter bug
+
+`quantity_on_hand` and `avg_cost` are the **identical** tenant-global
+`Product` scalars that `InventoryReportService::trackedProducts()`
+(feeding `view=value`) already deferred in PR #736, for the identical
+reason, stated in that method's own doc-comment
+(`InventoryReportService.php:64-73`): *"not decomposable per warehouse
+without a query redesign identical to the deferred P2 export fix"* — a
+comment written during PR #736 that names this exact endpoint. Producing
+a "warehouse-scoped quantity/avg_cost" would mean sourcing the exported
+numbers from `product_warehouse_stock` (per-warehouse rows) instead of
+`products` columns (one tenant-wide moving average) — changing what
+`quantity`/`avg_cost` **mean** for a restricted export, not adding a
+`WHERE` clause to an existing warehouse-scoped query. That is the exact
+inventory-valuation/data-model decision §10 and §13 of this PR's brief
+forbid making unilaterally, and the brief's own §3 names this precise
+scenario as the stop condition. **No warehouse-specific values were
+manufactured to stand in as equivalent.**
+
+### Effective scope contract — not applicable to the tenant-global fields
+
+No `ReportWarehouseScope`/`ReportBranchScope` intersection was added:
+there is no `warehouse_id`/`branch_id` request parameter to intersect
+against, and forcing one onto a query with no warehouse dimension would
+either (a) be a no-op decoration, or (b) require the same forbidden
+per-warehouse redesign above. Catalog identity's existing `BranchScope`
+protection (validated via `SetBranch`) is unchanged and was not touched.
+
+### Scope confirmation — unchanged
+
+`Product.quantity_on_hand` semantics: **unchanged.** `Product.avg_cost`
+semantics: **unchanged.** Valuation/COGS: **unchanged.** Stock movements:
+**unchanged.** Ledger: **unchanged.** `InventoryBalanceFilters`,
+`InventoryBalanceExportService`, `InventoryController::export()`: **no
+lines edited.** No migration. No API contract change. No UI change.
+
+### Tests
+
+No new tests — no production code changed. Existing
+`tests/Feature/InventoryBalanceExportTest.php` (20 tests, 107 assertions)
+re-run unmodified and still pass, including its own pre-existing tenant-
+isolation proof (`it never leaks another tenants balances`) — confirming
+the baseline this inspection characterized is accurate and unregressed.
+
+### Recommendation for the blocked decision
+
+A future `PR-ACL-INVENTORY-CATALOG-EXPORT-SCOPE` (or a combined pass with
+`view=value`) needs a **product decision** first, not more inspection:
+should a warehouse-restricted user's export show (a) the product excluded
+entirely when it has zero stock in their allowed warehouses, (b) a
+recomputed quantity/cost derived only from `product_warehouse_stock` rows
+in their allowed warehouses (a materially different number than the
+tenant's actual moving average — cost accounting implications), or (c) the
+tenant-global figures they see today, treated as an accepted, documented
+exception because `quantity_on_hand`/`avg_cost` are catalog-level
+management figures, not per-location secrets? This decision affects
+`view=value` identically and should be made once, for both surfaces
+together, not endpoint-by-endpoint.
+
 **Process rule:** research/inspect → verify → update this file → confirm commit → summarize to Safwan.
