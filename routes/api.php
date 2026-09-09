@@ -64,6 +64,7 @@ use App\Http\Controllers\Api\FuelReconciliationController;
 use App\Http\Controllers\Api\FuelSupplyReceivingController;
 use App\Http\Controllers\Api\FinancialControlAlertController;
 use App\Http\Controllers\Api\HealthController;
+use App\Http\Controllers\Api\ImportJobController;
 use App\Http\Controllers\Api\InventoryController;
 use App\Http\Controllers\Api\InventoryReportController;
 use App\Http\Controllers\Api\InventorySettingsController;
@@ -393,6 +394,13 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::post('products/workbook/preview', [ProductWorkbookController::class, 'preview'])->middleware($perm('products.manage'));
         Route::post('products/workbook/apply', [ProductWorkbookController::class, 'apply'])->middleware($perm('products.manage'));
         Route::get('products/workbook/export', [ProductWorkbookController::class, 'export'])->middleware($perm('products.view'));
+
+        // PR-DUR-1: بنية تشغيلة الاستيراد الدائم — رفع/فحص هيكلي/عرض/إلغاء فقط.
+        // إضافيّ ومستقل تماماً عن مسارات الاستيراد أعلاه؛ لا شيء هنا يستهلكها بعد.
+        Route::get('import-jobs', [ImportJobController::class, 'index'])->middleware($perm('products.view'));
+        Route::get('import-jobs/{id}', [ImportJobController::class, 'show'])->middleware($perm('products.view'));
+        Route::post('import-jobs', [ImportJobController::class, 'store'])->middleware($perm('products.manage'));
+        Route::post('import-jobs/{id}/cancel', [ImportJobController::class, 'cancel'])->middleware($perm('products.manage'));
         Route::get('products/{id}', [ProductController::class, 'show'])->middleware($perm('products.view'));
         Route::get('products/{id}/activity', [ProductController::class, 'activity'])->middleware($perm('products.view'));
         Route::get('products/{id}/barcodes', [ProductController::class, 'indexBarcodes'])->middleware($perm('products.view'));

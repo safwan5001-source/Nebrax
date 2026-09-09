@@ -50,3 +50,9 @@ Schedule::command('webhooks:prune')
     ->dailyAt('02:00')
     ->withoutOverlapping()
     ->onOneServer();
+
+// PR-DUR-1: تقليم تشغيلات الاستيراد الدائم الملغاة/الفاشلة — نفس ملاحظة التفعيل أعلاه.
+Schedule::command('imports:prune')
+    ->dailyAt('02:15')
+    ->withoutOverlapping()
+    ->onOneServer();
