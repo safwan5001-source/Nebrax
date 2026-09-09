@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test';
 
+const baseUrl = process.env.PLAYWRIGHT_BASE_URL ?? 'http://127.0.0.1:3001';
+
 test.beforeEach(async ({ context, page }) => {
   await page.addInitScript(() => {
     localStorage.setItem('demo', 'true');
@@ -12,7 +14,7 @@ test.beforeEach(async ({ context, page }) => {
       tenant_id: 'demo-tenant',
     }));
   });
-  await context.addCookies([{ name: 'locale', value: 'ar', domain: '127.0.0.1', path: '/' }]);
+  await context.addCookies([{ name: 'locale', value: 'ar', url: baseUrl }]);
 });
 
 test('searches help articles and opens an article', async ({ page }) => {
@@ -31,7 +33,7 @@ test('searches help articles and opens an article', async ({ page }) => {
 });
 
 test('supports English LTR search and article navigation', async ({ context, page }) => {
-  await context.addCookies([{ name: 'locale', value: 'en', domain: '127.0.0.1', path: '/' }]);
+  await context.addCookies([{ name: 'locale', value: 'en', url: baseUrl }]);
   await page.goto('/help');
 
   await expect(page.locator('html')).toHaveAttribute('lang', 'en');
@@ -43,7 +45,7 @@ test('supports English LTR search and article navigation', async ({ context, pag
 });
 
 test('falls back safely to Arabic for an unexpected locale cookie', async ({ context, page }) => {
-  await context.addCookies([{ name: 'locale', value: 'unexpected', domain: '127.0.0.1', path: '/' }]);
+  await context.addCookies([{ name: 'locale', value: 'unexpected', url: baseUrl }]);
   await page.goto('/help');
 
   await expect(page.locator('html')).toHaveAttribute('lang', 'ar');
