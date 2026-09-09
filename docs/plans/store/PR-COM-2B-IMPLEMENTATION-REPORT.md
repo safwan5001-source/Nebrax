@@ -526,8 +526,7 @@ blockers.
 ## 33. Git
 
 - **Branch:** `claude/pr-com-2b-fulfillment-policy`
-- **PR:** opened against `main` — link recorded in a follow-up commit to
-  this report
+- **PR:** [#729](https://github.com/safwan5001-source/Nebrax/pull/729) — opened against `main`, not merged
 - **Base SHA:** `fef85790894f0bd83d518c985ad4bdc0eee00c2e`
 - **Head SHA:** `ff30489c4563c924accad47defc7dd79e00f934f` (before adding
   this report)
