@@ -70,8 +70,8 @@ accounting posting."*
 |---|---|---|---|---|
 | **PR-DUR-1** | Durable import job/file infrastructure (foundation) | 1 new table | — | merged |
 | **PR-DUR-2** | Chunked/resumable apply engine, wired to Product Catalog import only | job columns only (no new table) | PR-DUR-1 | merged |
-| **PR-DUR-3** | Wire Product Workbook (3-sheet) apply through the same engine | none | PR-DUR-1, PR-DUR-2 | **this PR** |
-| **PR-DUR-4** | Wire Inventory Opening import through the same engine (Draft-only) | none | PR-DUR-1, PR-DUR-2 | not started |
+| **PR-DUR-3** | Wire Product Workbook (3-sheet) apply through the same engine | none | PR-DUR-1, PR-DUR-2 | merged |
+| **PR-DUR-4** | Wire Inventory Opening import through the same engine (Draft-only) | none | PR-DUR-1, PR-DUR-2 | **this PR** |
 | **PR-DUR-5** | Frontend: durable import UI (upload-once, poll, cancel, result download) | none | PR-DUR-2..4 | not started |
 
 Each is opened, reviewed and merged separately. No mega-PR. Every existing synchronous endpoint
@@ -543,3 +543,129 @@ that the whole operation is a no-op.
 In scope: `product_workbook` wiring only, as above. Out of scope, explicitly not touched: Inventory Opening
 wiring (PR-DUR-4), any frontend (PR-DUR-5), S3/R2 provisioning, any change to PR-UOM2-4's business rules, any
 change to `product_catalog`'s PR-DUR-2 behavior, any inventory or accounting effect.
+
+## 8. PR-DUR-4 — contract (this PR)
+
+### Goal
+
+Wire `inventory_opening` (Draft-only) into the durable `ImportJob` lifecycle, reusing
+`InventoryOpeningImportService::apply()` **unchanged** as the sole mutation boundary. Zero stock or ledger
+effect — `apply()` here calls `InventoryOpeningService::createDraft()` only; `InventoryOpeningService::post()`
+(movements, average cost, one journal entry) is a completely separate, human-triggered path that this PR does
+not touch and does not wire to the durable engine.
+
+### Prerequisite check (measured against current `main` before writing any code)
+
+Confirmed PR-DUR-3 merged at `9e8ed1a` (`main` HEAD at branch time). Read `InventoryOpeningImportService.php`
+and `InventoryOpeningService.php` in full, plus `InventoryOpeningController`/`ImportInventoryOpeningRequest`
+(the existing session-only surface) and `InventoryOpeningImportTest`/`InventoryOpeningPostingTest` (the existing
+regression suites) before writing any code.
+
+### Same design fork as PR-DUR-3, same resolution
+
+`InventoryOpeningImportService::apply(UploadedFile $file, array $options, ?string $userId = null):
+InventoryOpening` has **no `batch_offset`/`batch_size` contract at all** — it parses the *entire* file, then
+calls `InventoryOpeningService::createDraft()` once for every valid line together, inside one transaction,
+producing exactly one `InventoryOpening` document with one document number and totals computed across all its
+lines. This is the same atomic shape PR-DUR-3 already found in `ProductWorkbookService::apply()`, for the same
+underlying reason (one document, one number, totals that must reconcile against the lines that produced them —
+slicing rows across several draft-creation calls would mean either multiple documents from one file, breaking
+"one document per file," or rewriting `createDraft()`'s contract, out of scope). **Resolution, identical to
+PR-DUR-3:** the file is one non-divisible chunk, driven through the exact same PR-DUR-2/3 lock/transaction/
+state-machine scaffolding (`ImportJobService::applyNextChunk()`, `runChunk()`'s domain dispatch). No new
+chunking mechanism was invented; the existing `runProductWorkbookChunk()` pattern was replicated for this
+domain's own service call.
+
+### What changed, concretely
+
+- **`app/Support/ImportJobDomain.php`**: added `INVENTORY_OPENING = 'inventory_opening'`.
+- **`app/Services/ImportJobService.php`**:
+  - `inspectCounts()`: **no change needed.** `inventory_opening` is a single-sheet CSV/XLSX file with the same
+    blank-row definition as `product_catalog` (`InventoryOpeningImportService::isBlankRow()` is a byte-identical
+    predicate to `ProductImportService::isBlankRow()`, already reused generically) — it falls straight into the
+    existing generic (non-workbook) branch with zero code change. Only `product_workbook`'s multi-sheet shape
+    ever needed a special case.
+  - `runChunk()`: added an `INVENTORY_OPENING` arm dispatching to the new `runInventoryOpeningChunk()`.
+  - `runInventoryOpeningChunk()` (new): forwards only `opening_date`/`allow_zero_cost`/`notes`/`mapping` to
+    `InventoryOpeningImportService::apply()` (no cost-authorization parameter exists on that service — it never
+    had one, so none is invented here), reports `processed_in_chunk = row_count` (the one-chunk resolution
+    above), and normalizes the returned `InventoryOpening` model into a small JSON-safe summary
+    (`inventory_opening_id`, `number`, `status`, `total_quantity`, `total_value`, `lines_count`) for
+    `apply_result` — the only domain whose `apply()` returns a model instead of an array, so this is the one
+    place a normalization step was needed.
+  - `assertApplicable()`: now accepts all three domains.
+- **`app/Http/Requests/ApplyImportJobRequest.php`**: added `opening_date` (`sometimes|date_format:Y-m-d`),
+  `allow_zero_cost` (`sometimes|boolean`), `notes` (`sometimes|nullable|string|max:500`) — structural only, same
+  philosophy as `price_list_id` in PR-DUR-3 (the service's own `options()` enforces the real requirement and
+  format). `mapping.*`'s `Rule::in` widened to the union of `ProductImportFields::keys()` and
+  `InventoryOpeningFields::keys()` (plus `ignore`) — a value outside the *target* domain's actual vocabulary is
+  still caught downstream by that domain's own service (`InventoryOpeningImportService::options()` throws for an
+  unknown key exactly as before), so this widening only relaxes an accidental over-restriction, not a real gate.
+- **`app/Http/Requests/StoreImportJobRequest.php`**: **no change.** `inventory_opening` accepts the same
+  `csv|txt|xlsx` set `product_catalog` already does; only `product_workbook`'s XLSX-only narrowing was ever a
+  domain-specific rule.
+- **No migration.** `apply_options`/`apply_result` already generic JSON columns.
+- **No new endpoint.** `POST /import-jobs/{id}/apply` now also accepts `inventory_opening` jobs.
+
+### Draft-only invariant — how it's enforced, not just asserted
+
+`runInventoryOpeningChunk()` calls `InventoryOpeningImportService::apply()`, and nothing else. That method's own
+body (unchanged, byte-for-byte) calls only `InventoryOpeningService::createDraft()` — never `::post()`. There is
+no code path in this PR, anywhere, that can reach `post()`; posting remains reachable only via
+`InventoryOpeningController::post()`, the existing separate, human-triggered endpoint. This is structural, not
+just tested: the new code has no reference to `InventoryOpeningService::post()` at all.
+
+### Tenant / warehouse / product ownership evidence
+
+- **Product ownership**: `Product::query()` (used by `InventoryOpeningImportService::resolveProduct()`,
+  unchanged) is tenant-scoped via `BaseModel`/`TenantScope` automatically — a SKU/barcode/`nebrax_id` from
+  another tenant simply doesn't resolve, surfacing as `product_not_found`, never revealing the other tenant's
+  data. Proven fresh for the durable path by
+  `ImportJobInventoryOpeningApplyTest::a_row_referencing_a_product_from_another_tenant_is_rejected`.
+- **Warehouse ownership**: `Warehouse::query()` (used by `resolveWarehouse()`, unchanged) is tenant-scoped the
+  same way. Proven by `a_row_referencing_a_warehouse_from_another_tenant_is_rejected`.
+- **Job ownership**: inherited `TenantScope` on `ImportJob` itself, zero new code — proven by
+  `apply_cannot_be_called_from_another_tenant`.
+- **UOM**: does not apply to this domain. `InventoryOpeningFields` has no unit-of-measure field at all —
+  `opening_quantity` is a plain base-unit integer with no per-line unit conversion, confirmed by reading
+  `app/Support/InventoryOpeningFields.php` in full before writing any code. Nothing was added or assumed here.
+- **Branch ownership**: does not apply either. `InventoryOpening` is `CompanyWide` by explicit, documented
+  design (a single document can span warehouses from different branches, including the branchless central
+  warehouse) — see the model's own docblock and `CLAUDE.md`'s architecture note. Branch attribution lives on the
+  *posting* step's stock movements and journal lines (from each line's warehouse), which this PR never reaches.
+- **Live re-check, not client-trusted IDs**: `resolveProduct()`/`resolveWarehouse()` run fresh inside
+  `InventoryOpeningImportService::parse()`, called fresh on every `apply()` call (not from a cached preview) —
+  unchanged behavior, inherited for free by reusing `apply()` as-is.
+
+### Quantity / cost contracts preserved (not re-tested here, wiring only)
+
+Zero lines of `InventoryOpeningImportService`'s parsing/validation logic changed: `parseQuantity()` (positive
+integer, range-checked), `parseMoney()` (halalas, no float, two-decimal cap), the zero-cost consent gate, and
+the duplicate-row-within-file check are all exactly as they shipped. This PR's own tests
+(`an_invalid_quantity_row_fails_the_job_and_creates_no_draft`,
+`a_zero_cost_row_is_refused_unless_explicitly_allowed`) prove the durable wiring surfaces these existing
+rejections correctly rather than re-implementing or loosening them. The full pre-existing
+`InventoryOpeningImportTest` suite (33 tests) and `InventoryOpeningPostingTest` suite (17 tests) pass unmodified.
+
+### Concurrency / idempotency — inherited, not reimplemented
+
+Same `lockForUpdate()`-for-the-whole-chunk mechanism, proven again for this domain:
+`ImportJobInventoryOpeningApplyTest::a_concurrent_apply_attempt_is_blocked_by_a_real_row_lock` (genuine second
+PostgreSQL connection, same `lock_timeout` proof as PR-DUR-2/3). Retry-after-crash and retry-after-completion
+proven the same way (interrupt via an `ImportJob::saving` hook mid-transaction; assert no partial draft; assert
+a clean resume with no duplicate document).
+
+### Accounting / inventory non-effect (D-08-equivalent for this domain)
+
+`ImportJobInventoryOpeningApplyTest::apply_creates_zero_stock_or_ledger_effect` asserts `StockMovement::count()
+=== 0`, `JournalEntry::count() === 0`, `JournalLine::count() === 0`, `ProductWarehouseStock::count() === 0`, and
+the product's `quantity_on_hand`/`avg_cost` remain `0` — while the durable-upload test separately confirms the
+Draft (with its lines) *is* created, so the non-effect test demonstrates the forbidden effects are absent, not
+that nothing happened.
+
+### In scope / out of scope
+
+In scope: `inventory_opening` Draft-only wiring, as above. Out of scope, explicitly not touched: `post()` /
+posting workflow (remains a separate, human-triggered endpoint, never reachable from this engine), any frontend
+(PR-DUR-5), S3/R2 provisioning, any change to `InventoryOpeningImportService`'s or `InventoryOpeningService`'s
+business rules, any change to `product_catalog`/`product_workbook`'s PR-DUR-2/3 behavior.

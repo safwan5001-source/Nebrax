@@ -18,10 +18,10 @@ use Throwable;
  * PR-DUR-1 — بنية تشغيلة الاستيراد الدائم: رفع → تخزين → بصمة → فحص هيكلي
  * (inspect) → `ready`/`failed`، وإلغاء قبل أيّ معالجة. PR-DUR-2 أضاف
  * `applyNextChunk()` لمجال `product_catalog` (يستهلك `ProductImportService`
- * حصراً)، وPR-DUR-3 وسّعه لمجال `product_workbook` (يستهلك
- * `ProductWorkbookService` حصراً). `InventoryOpeningImportService` لا يزال
- * غير مربوط (PR-DUR-4). عقود PR-DUR-1..3 كاملةً في
- * `DURABLE-IMPORTS-DECOMPOSITION.md` §4/§6/§7.
+ * حصراً)، PR-DUR-3 وسّعه لمجال `product_workbook` (يستهلك
+ * `ProductWorkbookService` حصراً)، وPR-DUR-4 وسّعه لمجال `inventory_opening`
+ * (يستهلك `InventoryOpeningImportService` حصراً — **مسودة فقط، لا ترحيل**).
+ * عقود PR-DUR-1..4 كاملةً في `DURABLE-IMPORTS-DECOMPOSITION.md` §4/§6/§7/§8.
  */
 class ImportJobService
 {
@@ -190,14 +190,16 @@ class ImportJobService
     }
 
     /**
-     * PR-DUR-3 — عدّاد الصفوف/الأعمدة يتفرّع حسب المجال، لا محرّكان منفصلان:
-     * `product_catalog` ملفٌّ أحادي الورقة (`SpreadsheetReader::read()`،
-     * سلوك PR-DUR-1/2 حرفياً)، و`product_workbook` مصنّفٌ ثلاثي الأوراق
+     * PR-DUR-3/4 — عدّاد الصفوف/الأعمدة يتفرّع حسب شكل الملف، لا حسب عدد
+     * المجالات: `product_workbook` مصنّفٌ ثلاثي الأوراق
      * (`SpreadsheetReader::readWorkbookXlsx()` — نفس القارئ الذي تستهلكه
-     * `ProductWorkbookService::readWorkbook()` بلا نسخة ثانية). `row_count`
-     * لمصنّف = مجموع صفوف البيانات في الأوراق الثلاث الحاضرة، بنفس تعريف
-     * `ProductImportService::isBlankRow()` — يطابق حرفياً ما تحسبه
-     * `ProductWorkbookService::inspect()` لكل ورقة على حدة اليوم.
+     * `ProductWorkbookService::readWorkbook()` بلا نسخة ثانية)، `row_count`
+     * له = مجموع صفوف البيانات في الأوراق الثلاث الحاضرة. **كل ما عداه**
+     * (`product_catalog` و`inventory_opening` معاً) ملفٌّ أحادي الورقة بنفس
+     * الشكل تماماً (`SpreadsheetReader::read()`، سلوك PR-DUR-1/2 حرفياً) —
+     * `InventoryOpeningImportService::isBlankRow()` تعريفٌ مطابقٌ حرفياً
+     * لـ`ProductImportService::isBlankRow()` (كل خلية تُقلَّم فارغة)، فلا
+     * حاجة لفرعٍ ثالث؛ يكفي أن يبقى `product_workbook` وحده استثناءً صريحاً.
      *
      * @return array{0: int, 1: int} [row_count, column_count]
      */
@@ -373,6 +375,7 @@ class ImportJobService
         return match ($job->domain) {
             ImportJobDomain::PRODUCT_CATALOG => $this->runProductCatalogChunk($file, $options, $offset, $batchSize, $userId, $costAuthorized),
             ImportJobDomain::PRODUCT_WORKBOOK => $this->runProductWorkbookChunk($file, $options, (int) $job->row_count, $userId, $costAuthorized),
+            ImportJobDomain::INVENTORY_OPENING => $this->runInventoryOpeningChunk($file, $options, (int) $job->row_count, $userId),
             default => throw new RuntimeException('لا يوجد محرّك ترحيل مجزّأ لهذا المجال بعد.'),
         };
     }
@@ -425,13 +428,55 @@ class ImportJobService
     }
 
     /**
+     * الرصيد الافتتاحي ذرّيٌّ بطبيعته تماماً كمصنّف Products/Barcodes/Unit
+     * Prices (PR-DUR-3): `InventoryOpeningImportService::apply()` لا يقبل
+     * `batch_offset`/`batch_size` أصلاً — يحلّل الملف كاملاً ثم يستدعي
+     * `InventoryOpeningService::createDraft()` مرّةً واحدة لكل أسطره معاً
+     * داخل معاملةٍ واحدة (رقم مستند واحد، إجماليات محسوبة من كل السطور).
+     * تقطيعه سطراً سطراً كان يعني إمّا توليد عدّة مستندات مسودة من ملفٍ واحد
+     * (كسرٌ لعقد «مستندٍ واحد لكل ملف») أو إعادة كتابة `createDraft()` نفسها
+     * — كلاهما خارج نطاق هذا الـPR. **القطعة الوحيدة الممكنة: الملف كله.**
+     *
+     * **مسودة فقط — لا ترحيل:** `apply()` هنا يستدعي `createDraft()` حصراً؛
+     * `InventoryOpeningService::post()` (الحركات + المتوسط + القيد) مسارٌ
+     * منفصل تماماً بفعلٍ بشريٍّ صريح لاحق، غير مربوطٍ بهذا المحرّك ولن يُربط
+     * به في هذا الـPR.
+     *
+     * @param array<string, mixed> $options
+     * @return array{processed_in_chunk: int, result: array<string, mixed>}
+     */
+    private function runInventoryOpeningChunk(UploadedFile $file, array $options, int $totalRows, ?string $userId): array
+    {
+        $openingOptions = array_intersect_key($options, array_flip(['opening_date', 'allow_zero_cost', 'notes', 'mapping']));
+
+        $opening = app(InventoryOpeningImportService::class)->apply($file, $openingOptions, $userId);
+
+        return [
+            'processed_in_chunk' => $totalRows,
+            'result' => [
+                'inventory_opening_id' => $opening->id,
+                'number' => $opening->number,
+                'status' => $opening->status,
+                'total_quantity' => $opening->total_quantity,
+                'total_value' => $opening->total_value,
+                'lines_count' => $opening->lines->count(),
+            ],
+        ];
+    }
+
+    /**
      * فشلٌ مغلَق صراحةً على مجالٍ بلا محرّك ترحيل أو حالةٍ لا تقبل الترحيل —
-     * لا محاولة تخمين نيّة الطالب. `product_catalog` (PR-DUR-2) و
-     * `product_workbook` (PR-DUR-3) مربوطان بمعالجة فعلية اليوم.
+     * لا محاولة تخمين نيّة الطالب. `product_catalog` (PR-DUR-2)،
+     * `product_workbook` (PR-DUR-3)، و`inventory_opening` (PR-DUR-4) مربوطة
+     * بمعالجة فعلية اليوم.
      */
     private function assertApplicable(ImportJob $job): void
     {
-        $enginesAvailable = [ImportJobDomain::PRODUCT_CATALOG, ImportJobDomain::PRODUCT_WORKBOOK];
+        $enginesAvailable = [
+            ImportJobDomain::PRODUCT_CATALOG,
+            ImportJobDomain::PRODUCT_WORKBOOK,
+            ImportJobDomain::INVENTORY_OPENING,
+        ];
         if (! in_array($job->domain, $enginesAvailable, true)) {
             throw new RuntimeException('لا يوجد محرّك ترحيل مجزّأ لهذا المجال بعد.');
         }
