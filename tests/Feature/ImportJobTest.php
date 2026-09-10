@@ -190,7 +190,7 @@ class ImportJobTest extends TestCase
     }
 
     /** @test */
-    public function no_code_path_in_this_pr_reaches_queued_processing_or_completed(): void
+    public function no_code_path_reaches_queued_without_a_real_queue_worker(): void
     {
         $auth = $this->registerTenant();
 
@@ -202,7 +202,7 @@ class ImportJobTest extends TestCase
             ->whereIn('status', ImportJobStatus::NOT_YET_REACHABLE)
             ->count();
 
-        $this->assertSame(0, $reached, 'queued/processing/completed مفردات مُقرَّرة سلفاً فقط في PR-DUR-1، لا مساراً حياً.');
+        $this->assertSame(0, $reached, 'queued مفردة مُقرَّرة سلفاً فقط — لا عامل طابور حقيقي بعد. processing/completed صارت مسارَين حيَّين عبر /apply (PR-DUR-2)، وتُختبَران في ImportJobApplyTest.');
     }
 
     /** @test */
@@ -233,6 +233,34 @@ class ImportJobTest extends TestCase
 
         $this->assertNotNull(ImportJob::withoutGlobalScopes()->find($readyId), 'ready لا تُقلَّم مهما تقادمت.');
         $this->assertNull(ImportJob::withoutGlobalScopes()->find($cancelledId), 'cancelled بعد النافذة تُقلَّم.');
+    }
+
+    /**
+     * تصحيح مراجعة PR-DUR-2: `completed` صارت حالة نهائية فعلية (PR-DUR-2)،
+     * فيجب أن يقلّمها `imports:prune` كـ`cancelled`/`failed` تماماً — وإلا
+     * سرّب كل استيراد ناجح صفّه وملفه إلى الأبد.
+     */
+    /** @test */
+    public function prune_also_removes_completed_jobs_past_their_retention_window(): void
+    {
+        $auth = $this->registerTenant();
+        app(TenantContext::class)->set($auth['tenant_id']);
+
+        $file = UploadedFile::fake()->createWithContent(
+            'completed.csv',
+            "sku,name,type,sale_price\nSKU-1,منتج تجريبي,good,100.00\n"
+        );
+
+        $service = app(ImportJobService::class);
+        $job = $service->create($file, 'product_catalog', null, null);
+        $job = $service->applyNextChunk($job, [], null, true);
+        $this->assertSame(ImportJobStatus::COMPLETED, $job->status);
+
+        $job->forceFill(['purge_after' => now()->subDay()])->save();
+
+        Artisan::call('imports:prune');
+
+        $this->assertNull(ImportJob::withoutGlobalScopes()->find($job->id), 'completed بعد النافذة تُقلَّم كـ cancelled/failed.');
     }
 
     // ═══════════════════════════════════════════════════════════

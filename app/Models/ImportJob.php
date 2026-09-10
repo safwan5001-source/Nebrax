@@ -19,6 +19,7 @@ class ImportJob extends BaseModel implements CompanyWide
         'original_filename', 'extension', 'mime_type', 'byte_size',
         'storage_disk', 'storage_path', 'content_sha256',
         'row_count', 'column_count', 'error_message',
+        'processed_rows', 'apply_options', 'apply_result',
         'created_by', 'cancelled_by',
         'queued_at', 'started_at', 'finished_at', 'cancelled_at', 'purge_after',
     ];
@@ -29,6 +30,9 @@ class ImportJob extends BaseModel implements CompanyWide
             'byte_size' => 'integer',
             'row_count' => 'integer',
             'column_count' => 'integer',
+            'processed_rows' => 'integer',
+            'apply_options' => 'array',
+            'apply_result' => 'array',
             'queued_at' => 'datetime',
             'started_at' => 'datetime',
             'finished_at' => 'datetime',

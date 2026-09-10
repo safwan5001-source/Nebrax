@@ -5,11 +5,15 @@ namespace App\Support;
 /**
  * مفردات حالة تشغيلة استيراد دائم (`ImportJob::status`).
  *
- * كامل المفردات معلَنة الآن (PR-DUR-1) كي لا تحتاج بنية المعالجة المجزّأة
- * (PR-DUR-2) هجرة جديدة لمجرّد توسعة enum — لكن **القابل للوصول فعلياً في
- * هذا الـPR فقط**: `UPLOADED → READY|FAILED`، و`{UPLOADED,READY} → CANCELLED`.
- * `QUEUED`/`PROCESSING`/`COMPLETED` مفردات مُقرَّرة سلفاً بلا أي مسار كودٍ
- * يبلغها بعد — تثبته اختبارات هذا الـPR صراحة.
+ * كامل المفردات معلَنة منذ PR-DUR-1 كي لا تحتاج بنية المعالجة المجزّأة
+ * هجرة جديدة لمجرّد توسعة enum. **القابل للوصول فعلياً اليوم (PR-DUR-2):**
+ * `UPLOADED → READY|FAILED`، `{UPLOADED,READY} → CANCELLED`، و
+ * `READY → PROCESSING → COMPLETED|FAILED` عبر `POST /import-jobs/{id}/apply`
+ * لمجال `product_catalog` فقط (`ImportJobService::applyNextChunk`) — قطعةٌ
+ * محدودة الحجم لكل استدعاء، لا معالجة خلفية دفعة واحدة.
+ * `QUEUED` وحدها تبقى مفردة مُقرَّرة سلفاً بلا مسار كودٍ يبلغها — لا عامل
+ * طابور حقيقي بعد (`QUEUE_CONNECTION=sync`)؛ الترحيل اليوم مُحرَّك بطلب HTTP
+ * صريح لكل قطعة، لا بإرسالٍ لطابور.
  */
 final class ImportJobStatus
 {
@@ -27,11 +31,9 @@ final class ImportJobStatus
 
     public const CANCELLED = 'cancelled';
 
-    /** الحالات التي لا مسار كودٍ في PR-DUR-1 يبلغها — مفردات مُقرَّرة سلفاً فقط. */
+    /** الحالة الوحيدة التي لا مسار كودٍ اليوم يبلغها — مفردة مُقرَّرة سلفاً فقط. */
     public const NOT_YET_REACHABLE = [
         self::QUEUED,
-        self::PROCESSING,
-        self::COMPLETED,
     ];
 
     /** الحالات التي يقبل منها الإلغاء. */

@@ -263,10 +263,11 @@ Full contracts for these are written immediately before each one starts, against
 time (per `PHASE2_PLANNING_HANDOFFS.md`'s handoff rule — no contract is pre-authorized this far ahead). Recorded
 here only to make the dependency chain and non-negotiable boundaries explicit:
 
-- **PR-DUR-2** wires chunked, queue-dispatched `apply` to **Product Catalog import only**, reusing
-  `ProductImportService`'s existing row-validation/matching/payload-building logic (parse stays pure, per
-  `CLAUDE.md`'s own note that `ProductImportService::parse` is already written to not need rewriting for this).
-  New endpoints only (`/import-jobs/{id}/apply` or similar) — `/products/import/apply` is untouched.
+- **PR-DUR-2** (superseded by §6 below — kept here only for history) wires chunked `apply` to **Product Catalog
+  import only**, reusing `ProductImportService`'s existing row-validation/matching/payload-building logic (parse
+  stays pure, per `CLAUDE.md`'s own note that `ProductImportService::parse` is already written to not need
+  rewriting for this). New endpoints only (`/import-jobs/{id}/apply` or similar) — `/products/import/apply` is
+  untouched.
 - **PR-DUR-3** wires `ProductWorkbookService` the same way, reusing PR-DUR-2's engine — no second chunking
   implementation.
 - **PR-DUR-4** wires `InventoryOpeningImportService` the same way, with the explicit constraint from
@@ -277,3 +278,151 @@ here only to make the dependency chain and non-negotiable boundaries explicit:
 
 No PR beyond PR-DUR-1 is authorized to start by this document. Each requires its own contract, written against
 `main` at that time, before implementation begins.
+
+## 6. PR-DUR-2 — contract (this PR)
+
+### Goal
+
+Chunked, resumable `apply` for `product_catalog` `ImportJob`s only, built strictly on top of merged/deployed
+PR-DUR-1 (`main` at base SHA `26d58d8fb1ca6acee9d585f09dcd039565662a97`). No re-upload for apply; bounded
+per-call chunk size; exactly-once logical effect per source row under retry and under concurrent apply attempts;
+zero inventory/accounting effect (D-08 unchanged); no frontend, no Workbook/Inventory-Opening wiring, no S3/R2
+work.
+
+### Mutation boundary reused (inspected before writing any code)
+
+`App\Services\ProductImportService::apply(UploadedFile $file, array $options, ?string $userId = null, bool
+$costAuthorized = true): array` is the exact and only reuse point. It already:
+
+- accepts `batch_offset`/`batch_size` in `$options`, resolved and capped at `self::APPLY_BATCH_SIZE` (100) by its
+  private `options()` method;
+- internally calls a pure `parse()` that filters rows to the `[batchOffset+1, batchOffset+batchSize]` window
+  **before** validating/building payloads for them — so a chunk call only ever touches its own row window;
+- wraps all writes for that window in one `DB::transaction()` (materializes pending category/brand references live,
+  then per-row `Product::create()`/`ProductLifecycleService::update()`/skip with live SKU/barcode conflict
+  re-checks);
+- re-checks `SensitiveCostPolicy::authorized($costAuthorized)` live on every call — never cached from a prior
+  preview or chunk.
+
+PR-DUR-2 adds **zero** lines to `ProductImportService`. `ImportJobService::applyNextChunk()` is the only new
+caller, and it drives `apply()` exactly the way `ProductController::importApply()` already does (same live
+cost-authorization argument, same options shape) — just sourcing the file from durable storage instead of a
+fresh HTTP upload, and sourcing `batch_offset` from `ImportJob.processed_rows` instead of a client-supplied value.
+
+### Durable progress model (additive migration only)
+
+One additive migration on `import_jobs` (`2026_09_18_010000_add_apply_progress_to_import_jobs.php`), no new
+table:
+
+| Column | Type | Purpose |
+|---|---|---|
+| `processed_rows` | `unsignedInteger`, default `0` | Durable cursor — next chunk's `batch_offset`. Advances only after a chunk's `DB::transaction()` (including the outer lock transaction) commits. |
+| `apply_options` | `json`, nullable | Options frozen from the **first** `/apply` call, verbatim — **including `batch_size`**: it is a semantic option like `mode`/`blank_policy`/`master_data_policy`/`mapping`, not an operational per-request knob. Every later chunk reuses this frozen value in full — a later call's request body (batch_size included) is ignored for anything but which cursor to resume from, so a mid-run UI/client change can never reinterpret rows already committed under different semantics, nor change how big the remaining chunks are mid-run. Proven by `ImportJobApplyTest::batch_size_is_frozen_from_the_first_apply_call_and_later_requests_cannot_change_it`. |
+| `apply_result` | `json`, nullable | Last chunk's raw `ProductImportService::apply()` return (`created`/`updated`/`skipped`/`results`) — exposed for polling; overwritten each chunk, not accumulated (row-level detail is already inside `apply_result.results` for that chunk only). |
+
+Reused, not duplicated: `row_count` (whole-file total, from PR-DUR-1's `inspect()`) is the completion threshold;
+`error_message` carries the terminal failure reason; `started_at`/`finished_at` mark apply start/completion.
+
+### Review-round fix — `row_count`/`processed_rows`/completion must share one "data row" definition
+
+**Finding (BLOCKER, pre-merge review of this PR):** `ImportJob.row_count` was set by PR-DUR-1's `inspect()` as
+a **physical** row count (`count($rows) - 1`, including blank rows), while `ProductImportService::parse()`'s
+`dataIndex` — the counter that actually drives batch windowing (`batch_offset`/`batch_size`) and that
+`created`/`updated`/`skipped` are summed from — **skips blank rows without incrementing it**. A file with a blank
+row anywhere (interleaved or trailing) therefore had `processed_rows` (blank-excluded) permanently short of
+`row_count` (blank-included): the job could never reach `processed_rows >= row_count`, stayed `processing`
+forever, and the next `/apply` call — now requesting a window past the true end of data — hit
+`ProductImportService::apply()`'s `total_rows === 0` guard and was misclassified as `failed` instead of
+`completed`.
+
+**Fix — same source of truth everywhere, not a special-cased "empty chunk = done":**
+
+- `ProductImportService::isBlankRow()` is now `public static` (was `private`) — the **single** blank-row
+  definition shared by `ProductImportService::inspect()`/`parse()` (unchanged behavior there) and by
+  `ImportJobService`, instead of a second copy of the predicate that could drift.
+- `ImportJobService::inspect()` (PR-DUR-1's structural inspect) now computes `row_count` the same way
+  `ProductImportService::inspect()` computes its own `total_rows`: header row dropped, then blank rows excluded.
+  `row_count` is now **defined as the data-row count**, matching `dataIndex` exactly — the only number
+  `processed_rows` is ever compared against.
+- **Backward compatibility for jobs already `ready` under the pre-fix code:** `ImportJobService::applyNextChunk()`
+  recomputes `row_count` from the durably-stored file **once, on the first `/apply` call** (same point where
+  `apply_options` is already frozen), before the completion check runs — self-healing a stale physical-count
+  `row_count` with zero migration/backfill. Any job that had *already* taken a chunk under the pre-fix bug would,
+  by the state machine, already be in the terminal `failed` state (not resumable) — there is no "already stuck
+  mid-flight" case left to handle. Proven by
+  `ImportJobApplyTest::a_stale_pre_fix_physical_row_count_self_heals_on_first_apply`.
+- `processed_rows` is now set to the exact cumulative applied count (`$offset + $processedInChunk`) with no
+  `min()` cap against `row_count` — the cap is now provably a no-op (both sides share the same data-row
+  definition, and `parse()`'s window can never exceed it), and removing it makes `processed_rows` visibly equal
+  to "actual applicable data rows applied," per the review's explicit requirement.
+
+Regression coverage in `ImportJobApplyTest`: a blank row between two valid rows, multiple interleaved and
+trailing blank rows, `batch_size = 1` (one data row per call), final status `completed` (not `failed`),
+`processed_rows` reflecting the true data-row count (not the physical one), each product created exactly once,
+and idempotent retry after completion — see
+`blank_rows_are_excluded_from_row_count_and_do_not_block_completion` and
+`multiple_and_trailing_blank_rows_complete_in_a_single_default_size_call`.
+
+### State machine
+
+`ready` → (first `/apply`) → `processing` → (further `/apply` calls advance `processed_rows`) → `completed`
+once `processed_rows >= row_count`. Any exception from `ProductImportService::apply()` inside a chunk →
+`failed` (terminal, `error_message` set, HTTP 422). `failed`/`cancelled`/`uploaded` reject `/apply` with a
+`RuntimeException` (422) — fail-closed on any status outside `{ready, processing, completed}`. A domain other
+than `product_catalog` is rejected the same way — no engine exists for it yet (PR-DUR-3/4's job).
+`completed` short-circuits: `/apply` returns the cached final state immediately, calling
+`ProductImportService::apply()` a further time.
+
+### Concurrency and idempotency mechanism
+
+**One row lock held for the entire chunk, not released between reading the cursor and persisting the result.**
+`ImportJobService::applyNextChunk()` opens a single `DB::transaction()` that: takes `lockForUpdate()` on the
+`ImportJob` row, validates domain/status, freezes options on the first call, reads `processed_rows` as the
+chunk's `batch_offset`, materializes the durably-stored file to a temp path, calls
+`ProductImportService::apply()` for that window, and persists the new `processed_rows`/`status`/`apply_result` —
+all before the transaction commits and the lock is released.
+
+- **Concurrent apply attempts on the same job**: a second call's `lockForUpdate()` blocks until the first
+  commits (a true row lock on PostgreSQL; SQLite's single-writer file lock serializes the same way). It then
+  reads the already-advanced `processed_rows` and processes the *next* window — never the same one twice. Proven
+  by `ImportJobApplyTest::a_concurrent_apply_attempt_is_blocked_by_a_real_row_lock`, a genuine dual-connection
+  PostgreSQL test (same convention as `DocumentNumberingTest`): a separate connection's `SELECT ... FOR UPDATE`
+  on the same row, fired from an `ImportJob::saving` hook while our transaction still holds the lock, is proven
+  to fail under a short `lock_timeout` — not inferred from SQLite.
+- **Retry after a crash before commit**: nothing was persisted (the whole outer transaction, including the
+  options-freeze save, rolls back together), so a retry re-reads the same unchanged `processed_rows` and
+  reprocesses the identical window from scratch — no double effect, because nothing from the failed attempt
+  ever committed. Proven by
+  `ImportJobApplyTest::an_interrupted_first_chunk_leaves_no_partial_state_and_a_retry_completes_cleanly`.
+- **Retry after a completed job**: short-circuits without calling `ProductImportService::apply()` again.
+  Proven by `ImportJobApplyTest::retrying_a_completed_job_is_idempotent_and_creates_nothing_twice`.
+- **A chunk that fails a business rule** (e.g. a live SKU conflict) is **not** resumable — it is a deterministic
+  terminal `failed`, matching the requirement for "failed row tracking or deterministic failure state" with the
+  smallest mechanism: no separate per-row failure ledger, `error_message` carries the reason.
+
+### Deviation from §5's forward-contract wording (recorded, not silent)
+
+§5 above (written before this PR's own contract) said "queue-dispatched apply." This PR does **not** dispatch a
+queued job. Production runs `QUEUE_CONNECTION=sync` (per `CLAUDE.md`), under which a queued dispatch executes
+synchronously in the same request with no actual deferral — so wrapping the chunk call in `dispatch()` would add
+indirection without changing behavior, and a self-chaining dispatch (each chunk dispatching the next) would
+under `sync` collapse into processing the *entire* file in one request, defeating the bounded-chunk purpose this
+PR exists for. Instead, `POST /import-jobs/{id}/apply` processes exactly one bounded chunk per call and returns;
+the caller (a future frontend polling loop in PR-DUR-5, or a script) repeats the call until `completed`/`failed`.
+This preserves every literal requirement (chunked, resumable, retry-safe, idempotent, concurrency-safe) without
+inventing queue machinery nothing in this environment consumes yet.
+
+### New endpoint
+
+`POST /import-jobs/{id}/apply`, gated `products.manage` (same as `store`/`cancel`). Body (all optional, only
+read on the **first** call for this job — `ApplyImportJobRequest`): `mode`, `blank_policy`,
+`master_data_policy`, `mapping`, `batch_size` (capped at `ProductImportService::APPLY_BATCH_SIZE`). No `file`,
+no `batch_offset` — the cursor is server-owned. `ImportJobResource` now also exposes `processed_rows` and
+`apply_result` for polling via the existing `GET /import-jobs/{id}`.
+
+### In scope / out of scope (unchanged from the top-level requirements)
+
+In scope: `product_catalog` only, additive schema, the concurrency/idempotency mechanism above, the required
+test list (see PR-DUR-2 Implementation Report). Out of scope, explicitly not touched: Product Workbook wiring,
+Inventory Opening wiring, any frontend, S3/R2 provisioning, any inventory effect (`quantity_on_hand`, `avg_cost`,
+`StockMovement`) or accounting effect (`JournalEntry`/`JournalLine`) — D-08 remains **No**.
