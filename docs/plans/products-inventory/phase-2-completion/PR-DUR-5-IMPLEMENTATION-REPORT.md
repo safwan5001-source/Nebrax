@@ -232,7 +232,7 @@ Reported once available — see §16 for Base/Head SHA and PR link.
 
 - **Branch:** `claude/pr-dur-5-frontend-durable-imports`
 - **Base SHA:** `44a0d1d17dc17908feaebb57ebd8a9c2f36ee71d` (`main`, includes merged PR-DUR-1..4)
-- **Head SHA:** reported with the PR
+- **Head SHA:** `1441450d3a5b1c9c74ebd1326a4f2b5954e9efd8`
 - **PR:** opened as a dedicated PR, separate from #746/#753/#754/#755/#756.
 - **Next step:** monitor CI on this PR; report CI status. This is the final PR of the approved Durable Imports
   decomposition — no PR-DUR-6 is planned. No merge, no deploy, per the approved scope.
