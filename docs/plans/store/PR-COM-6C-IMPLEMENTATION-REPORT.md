@@ -41,7 +41,11 @@ stock movement, COGS, POS. Saved/reusable customer addresses were not built
   Workbook into the same engine (#755)`, confirming COM-6B (#752) is merged
   well before this point).
 - **Branch:** `claude/commerce-order-snapshots-o5m5i9`.
-- **Head SHA:** recorded at PR open (§29).
+- **PR:** [#757](https://github.com/safwan5001-source/Nebrax/pull/757) —
+  opened against `main`, not merged.
+- **Head SHA (code + focused-test results):** `26d15d6`.
+- **Head SHA (current, after recording PostgreSQL full-suite results):**
+  `5241093`.
 
 ## 3. Binding sources read
 
@@ -534,13 +538,17 @@ validation layer in front of `normalizeSnapshotInput()`'s structural checks.
 
 ## 30. PR number
 
-Recorded after PR creation (see final delivery message).
+[#757](https://github.com/safwan5001-source/Nebrax/pull/757) — opened
+against `main`, not merged.
 
 ## 31. Base SHA / Head SHA
 
 - **Base SHA:** `9e8ed1a18f1782bd1f159dd95aecb473d0aef2d0`
-- **Head SHA:** recorded after the report commit (see final delivery
-  message).
+- **Head SHA (code + focused-test results):** `26d15d6`.
+- **Head SHA (current, after recording PostgreSQL full-suite results):**
+  `5241093` — this documentation-only update is added in a follow-up commit
+  on the same branch/PR, following the same convention as
+  `PR-COM-6B-IMPLEMENTATION-REPORT.md` §26.
 
 ## 32. Recommended next step
 
