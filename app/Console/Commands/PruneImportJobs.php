@@ -9,9 +9,14 @@ use Illuminate\Console\Command;
 
 /**
  * تقليم تشغيلات الاستيراد الدائم المنتهية (PR-DUR-1) — احتفاظٌ حتميّ يمنع
- * نمو الجدول بلا حدّ، على غرار `webhooks:prune`. يمسّ فقط `cancelled`/`failed`
- * الأقدم من `purge_after`؛ لا يمسّ `uploaded`/`ready` مهما تقادمت — التقليم
- * ليس فحصاً لحالة نشطة. `completed` غير قابلة للوصول بعد (PR-DUR-2).
+ * نمو الجدول بلا حدّ، على غرار `webhooks:prune`. يمسّ `cancelled`/`failed`/
+ * `completed` الأقدم من `purge_after`؛ لا يمسّ `uploaded`/`ready` مهما
+ * تقادمت — التقليم ليس فحصاً لحالة نشطة.
+ *
+ * **`completed` مُضافة هنا (تصحيح مراجعة PR-DUR-2):** لم تكن قابلة للوصول
+ * وقت PR-DUR-1 فاستُثنيت وقتها بحق؛ PR-DUR-2 جعلها حالة نهائية فعلية، وتشغيلة
+ * `completed` تحمل `storage_path`/صفّاً كأي حالة نهائية أخرى — استثناؤها هنا
+ * كان يسرّب الملف والصفّ إلى الأبد لكل استيراد ناجح.
  *
  * يتجاوز نطاق المستأجر عمداً (صيانة منصّة). `--dry-run` يَعُدّ فقط.
  */
@@ -19,13 +24,13 @@ class PruneImportJobs extends Command
 {
     protected $signature = 'imports:prune {--dry-run : عُدّ المرشّح للحذف دون حذف}';
 
-    protected $description = 'يقلّم تشغيلات الاستيراد الدائم الملغاة/الفاشلة الأقدم من نافذة الاحتفاظ';
+    protected $description = 'يقلّم تشغيلات الاستيراد الدائم المنتهية (ملغاة/فاشلة/مكتملة) الأقدم من نافذة الاحتفاظ';
 
     public function handle(ImportJobFileStorage $storage): int
     {
         $query = ImportJob::query()
             ->withoutGlobalScopes()
-            ->whereIn('status', [ImportJobStatus::CANCELLED, ImportJobStatus::FAILED])
+            ->whereIn('status', [ImportJobStatus::CANCELLED, ImportJobStatus::FAILED, ImportJobStatus::COMPLETED])
             ->where('purge_after', '<', now());
 
         if ((bool) $this->option('dry-run')) {
