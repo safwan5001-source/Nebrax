@@ -113,38 +113,47 @@ New file `tests/Feature/ImportJobApplyTest.php`, 8 tests:
 `tests/Feature/ImportJobTest.php`'s PR-DUR-1 suite: one test renamed/narrowed (`NOT_YET_REACHABLE` now covers
 only `QUEUED`), the other 14 unchanged and still green.
 
-### Results
+### Results (review round, measured on the actual PR branch tree — see note on methodology below)
 
 **PostgreSQL 16** (local harness, `.github/workflows/ci.yml`'s copy-list):
-- `ImportJobApplyTest`: **12/12 passed** (1 skipped: `a_concurrent_apply_attempt_is_blocked_by_a_real_row_lock` runs
-  and passes on PostgreSQL — "skipped" count is 0 there), assertions above 66 from the original 8 plus the 4 new
-  tests.
-- `ImportJobTest`: **15/15 passed**.
-- Product Import regression (`ProductImportTest` 7 tests + `ProductImportV2Test` 49 tests = 56 tests, 305
-  assertions): **56/56 passed** — including the existing `import creates no stock movement and no journal entry`
-  test, unmodified. (`ProductWorkbookTest`/`InventoryOpeningImport*` were run in this same regression pass in the
-  original PR-DUR-2 report; not re-run in this review round since neither `ProductWorkbookService` nor
-  `InventoryOpeningImportService` was touched by this round's fix.)
-- Full local `php artisan test` run: launched in the background for this round; the pre-existing
-  `bcmath`/`FuelCostBasisService` gap noted in the original report is environment-only (CI installs `bcmath`) and
-  unrelated to this diff — see original results below for its exact shape.
+- `ImportJobApplyTest`: **12/12 passed, 0 skipped** — `a_concurrent_apply_attempt_is_blocked_by_a_real_row_lock`
+  actually runs (and passes) on PostgreSQL instead of being skipped. Combined with `ImportJobTest`: **27/27
+  passed**, 183 assertions.
+- `ImportJobTest`: **15/15 passed** (counted in the 27 above).
+- Product Import regression (`ProductImportTest` 7 tests + `ProductImportV2Test` 49 tests = 56 tests):
+  **56/56 passed**, 305 assertions — including the existing `import creates no stock movement and no journal
+  entry` test, unmodified.
 
 **SQLite** (same harness, `DB_CONNECTION=sqlite`):
-- `ImportJobApplyTest`: **11/11 passed, 1 skipped** (the PostgreSQL-only lock test, correctly skipped with reason)
-  — 12 tests total including the 4 new ones.
+- `ImportJobApplyTest`: **11/11 passed, 1 skipped** (the PostgreSQL-only lock test, correctly skipped with
+  reason) — 12 tests total including the 4 new ones.
 - `ImportJobTest`: **14/14 passed, 1 skipped** (the pre-existing PR-DUR-1 concurrency test, unchanged).
 - Product Import regression: **56/56 passed**, 305 assertions.
 
-**Original PR-DUR-2 results (pre-review-round, unchanged by this fix's diff outside `ImportJob*`):**
+**Full `php artisan test` (no `--filter`), SQLite, on a from-scratch `nibras-app` rebuilt from this exact
+branch's tree** (methodology note: an earlier in-place file-copy attempt onto a `nibras-app` that had been
+built from a newer, unrelated `main` state produced 6 spurious `CommerceOrderOwnershipTest` failures — a tree
+contamination artifact of the copy, not a real regression; discarded, and a clean `bash setup.sh` rebuild from
+this branch used instead for the number below):
 
-- PostgreSQL: `ImportJobApplyTest` 8/8, `ImportJobTest` 15/15, Product Import regression 110/110 (635
-  assertions, includes `ProductWorkbookTest`/`InventoryOpeningImport*`), full suite 3176 passed / 26 failed
-  (`bcmath`-only, disclosed in PR-DUR-1's report) / 20658 assertions / 605.28s.
-- SQLite: `ImportJobApplyTest` 6/6 (2 skipped), `ImportJobTest` 13/13 (2 skipped), Product Import regression
-  110/110, full suite 3159 passed / 26 failed (same `bcmath` cause) / 17 skipped / 20581 assertions / 246.58s.
+- **3201 passed, 27 failed, 17 skipped, 20968 assertions, 329.47s.**
+- All 27 failures are pre-existing environment gaps in this sandbox, unrelated to this diff or to
+  `ImportJob`/`Product*`:
+  - **26** are `Call to undefined function App\Services\bcmul()` in `FuelCostBasisService` (`FuelAviRfidServiceTest`,
+    `FuelReconciliationTest`, `FuelSaleApiTest`, `FuelSaleServiceTest`, `FuelSupplyReceivingTest`,
+    `FuelSupplyReceivingApiTest`) — the sandbox PHP build lacks the `bcmath` extension that
+    `.github/workflows/ci.yml` installs via `shivammathur/setup-php@v2`. Identically disclosed in the original
+    PR-DUR-2 report (as 26 failures there too).
+  - **1** is `DocumentCenterSecureIntakeTest > a_valid_pdf_is_counted_and_stored`, which shells out to the
+    `pdfinfo` binary (`app/Services/DocumentCenter/PdfPageCounter.php`) — not installed in this sandbox
+    (`which pdfinfo` → not found), same class of environment gap as `bcmath`. Not in the original report because
+    that report's run predates this review round; verified in isolation (`--filter=DocumentCenterSecureIntakeTest`)
+    to reproduce identically and independently of any `ImportJob`/`Product` code path.
+- Zero failures in any file this diff touches or in any file this diff's blast radius could plausibly reach
+  (`ImportJob*`, `Product*`, `Commerce*`, `DocumentCenter*` outside the one `pdfinfo`-dependent test).
 
-CI (`shivammathur/setup-php@v2` installs `bcmath`) is expected to show 0 Fuel-domain failures, matching PR-DUR-1's
-precedent.
+CI (`shivammathur/setup-php@v2` installs `bcmath`; the workflow also has PDF tooling available) is expected to
+show 0 failures in both categories, matching PR-DUR-1/PR-DUR-2's precedent.
 
 ## 6. Review-round fix — blank rows and the `batch_size` contract
 
