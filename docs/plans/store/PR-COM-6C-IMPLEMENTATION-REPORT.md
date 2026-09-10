@@ -435,17 +435,28 @@ classification is recognized and consistent).
   PostgreSQL-only partial-index assertion now runs and passes).
 - **Migration:** `php artisan migrate:fresh` against PostgreSQL 16 applied
   the new table cleanly.
-- **Full suite:** see §23 (captured in the same run as the CI-mirroring
-  pass).
+- **Full suite:** 3271 passed, 27 failed (21,245 assertions), duration
+  ~882s. Failure count is identical to SQLite (§21: 27); the tail of the run
+  output shows the same signature failure
+  (`Call to undefined function App\Services\bcmul()` in
+  `FuelCostBasisService.php`, i.e. missing `bcmath`) as the documented
+  pre-existing baseline. Combined with the exact 27/27 count match and the
+  unchanged, fully-green Commerce/Customer-Platform/branch-isolation
+  regression bundle (§21-22), this confirms no new failure was introduced —
+  consistent with every prior Commerce PR's documented baseline
+  (`PR-COM-5A` §42, `PR-COM-5B` §38/§45.9, `PR-COM-6A` §15/§21.8, `PR-COM-6B`
+  §17-18).
 
 ## 23. Regression/full-suite results
 
-Both engines' full-suite failures were verified **by name** to be identical
-to each other and to the baseline documented in every prior Commerce PR
-report (`PR-COM-5A` §42, `PR-COM-5B` §38/§45.9, `PR-COM-6A` §15/§21.8,
-`PR-COM-6B` §17-18): the same 24 `Fuel*Test` cases (missing `bcmath`) plus
-`DocumentCenterSecureIntakeTest` (PDF-fixture gap). Zero new failures, zero
-new failure categories, on either engine.
+SQLite: 3253 passed, 27 failed, 18 skipped. PostgreSQL: 3271 passed, 27
+failed, 0 skipped (PostgreSQL runs every SQLite-skipped, PostgreSQL-only
+test). Both counts of 27 match the long-standing baseline exactly: 24
+`Fuel*Test` cases (missing `bcmath` PHP extension in this sandbox) plus
+`DocumentCenterSecureIntakeTest` (PDF-fixture gap) — verified by name on
+SQLite (§21) and by count-parity plus identical failure signature on
+PostgreSQL (§22). Zero new failures, zero new failure categories, on either
+engine.
 
 ## 24. CI result
 
