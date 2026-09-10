@@ -232,7 +232,10 @@ Reported once available — see §16 for Base/Head SHA and PR link.
 
 - **Branch:** `claude/pr-dur-5-frontend-durable-imports`
 - **Base SHA:** `44a0d1d17dc17908feaebb57ebd8a9c2f36ee71d` (`main`, includes merged PR-DUR-1..4)
-- **Head SHA:** `1441450d3a5b1c9c74ebd1326a4f2b5954e9efd8`
-- **PR:** opened as a dedicated PR, separate from #746/#753/#754/#755/#756.
+- **Head SHA (code, CI-relevant):** `1441450d3a5b1c9c74ebd1326a4f2b5954e9efd8` — CI referenced in §14 ran on
+  this commit. A trailing docs-only follow-up commit (`3a6f3cb1510b53bdfd88dcd200dc332ef04c6c3a`, recording this
+  SHA in this same file) sits on top and touches no code, so it does not change CI-relevant content.
+- **PR:** [#758](https://github.com/safwan5001-source/Nebrax/pull/758), opened as a dedicated PR, separate from
+  #746/#753/#754/#755/#756.
 - **Next step:** monitor CI on this PR; report CI status. This is the final PR of the approved Durable Imports
   decomposition — no PR-DUR-6 is planned. No merge, no deploy, per the approved scope.
