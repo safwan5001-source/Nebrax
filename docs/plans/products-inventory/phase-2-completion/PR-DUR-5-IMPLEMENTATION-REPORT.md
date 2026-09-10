@@ -182,7 +182,7 @@ by accident. The atomic nature of the apply step is presented honestly (§8).
 6. Production build (`npm run build`, includes Next.js's own TypeScript check): **succeeded**, zero errors. All
    three routes present in the build output: `/products/import` (6.1 kB), `/products/workbook-import` (3.46 kB),
    `/inventory-openings/import` (6.45 kB).
-7. GitHub Actions CI on the exact final Head SHA: reported in §14 below once available.
+7. GitHub Actions CI on the exact final Head SHA: **passed** — see §14.
 
 ## 13. Mobile and RTL/LTR evidence
 
@@ -199,7 +199,18 @@ not claimed as coverage that doesn't exist.
 
 ## 14. CI
 
-Reported once available — see §16 for Base/Head SHA and PR link.
+Both workflows passed on every commit pushed to this branch, `pull_request`-triggered included:
+
+| Head SHA | CI (backend) | Web CI |
+|---|---|---|
+| `1441450d3a5b1c9c74ebd1326a4f2b5954e9efd8` (code-relevant) | [run #4484 — success](https://github.com/safwan5001-source/Nebrax/actions/runs/34440907158) | [run #2547 — success](https://github.com/safwan5001-source/Nebrax/actions/runs/34440907241) |
+| `3a6f3cb1510b53bdfd88dcd200dc332ef04c6c3a` (docs-only) | [run #4486 — success](https://github.com/safwan5001-source/Nebrax/actions/runs/34440947489) | [run #2548 — success](https://github.com/safwan5001-source/Nebrax/actions/runs/34440947476) |
+| `296d054e6017632504d372f59c89d2f0e9c925d6` (final, docs-only) | [run #4488 — success](https://github.com/safwan5001-source/Nebrax/actions/runs/34440970796) | [run #2549 — success](https://github.com/safwan5001-source/Nebrax/actions/runs/34440970793) |
+
+Backend `CI` passing here confirms no accounting/tenant-isolation/security suite was weakened or broken —
+the same PostgreSQL+SQLite `php artisan test` run this codebase always runs, unaffected by this frontend-only
+change. `Web CI` passing confirms `npm run test` (all frontend tests, including this PR's 50 new/rewritten
+ones) and `npm run build` both succeeded on GitHub's own runner, not just locally.
 
 ## 15. Known limitations / risks / remaining work
 
@@ -237,5 +248,6 @@ Reported once available — see §16 for Base/Head SHA and PR link.
   SHA in this same file) sits on top and touches no code, so it does not change CI-relevant content.
 - **PR:** [#758](https://github.com/safwan5001-source/Nebrax/pull/758), opened as a dedicated PR, separate from
   #746/#753/#754/#755/#756.
-- **Next step:** monitor CI on this PR; report CI status. This is the final PR of the approved Durable Imports
-  decomposition — no PR-DUR-6 is planned. No merge, no deploy, per the approved scope.
+- **Status:** CI green on the final head; PR ready for human review. This is the final PR of the approved
+  Durable Imports decomposition — no PR-DUR-6 is planned. No merge, no deploy — awaiting explicit review/approval
+  per the approved scope.
