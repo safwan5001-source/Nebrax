@@ -418,6 +418,121 @@ class CommerceOrderSnapshotTest extends TestCase
         $snapshot->update(['customer_name' => 'تجاوز طبقة الخدمة مباشرة']);
     }
 
+    /**
+     * P1 hardening — the P0 guard only covered `updating`. A confirmed
+     * order's snapshot must also survive a direct model-level delete.
+     */
+    /** @test */
+    public function a_direct_model_delete_on_a_confirmed_orders_snapshot_is_rejected_centrally(): void
+    {
+        $order = $this->orders->create([
+            'sales_channel_id' => $this->channel->id,
+            'customer_snapshot' => $this->customerSnapshot(),
+        ], $this->items());
+        $this->orders->confirm($order);
+
+        $snapshot = $order->snapshot()->firstOrFail();
+
+        $this->expectException(LogicException::class);
+        $snapshot->delete();
+    }
+
+    /**
+     * P1 hardening — a snapshot must never be creatable at all for an order
+     * that is already confirmed, independent of the service layer (which
+     * never attempts this itself, but the guard must not depend on that).
+     */
+    /** @test */
+    public function creating_a_snapshot_for_an_already_confirmed_order_is_rejected_centrally(): void
+    {
+        $order = $this->orders->create(['sales_channel_id' => $this->channel->id], $this->items());
+        $this->orders->confirm($order);
+
+        $this->expectException(LogicException::class);
+        $order->snapshot()->create($this->customerSnapshot());
+    }
+
+    /**
+     * P1 hardening — the exact finding: `commerce_order_id` reassignment
+     * must not be a bypass. A confirmed order's snapshot can never be
+     * re-pointed at a different (draft) order to escape the freeze.
+     */
+    /** @test */
+    public function reassigning_a_confirmed_snapshot_to_a_draft_order_is_rejected(): void
+    {
+        $confirmedOrder = $this->orders->create([
+            'sales_channel_id' => $this->channel->id,
+            'customer_snapshot' => $this->customerSnapshot(),
+        ], $this->items());
+        $this->orders->confirm($confirmedOrder);
+        $snapshot = $confirmedOrder->snapshot()->firstOrFail();
+
+        $draftOrder = $this->orders->create(['sales_channel_id' => $this->channel->id], $this->items());
+
+        $this->expectException(LogicException::class);
+        $snapshot->update(['commerce_order_id' => $draftOrder->id]);
+    }
+
+    /**
+     * P1 hardening — reassignment is rejected structurally
+     * (`commerce_order_id` is immutable after creation), not only when the
+     * target happens to be confirmed. A draft-owned snapshot re-pointed at
+     * another draft order must be rejected exactly the same way — there is
+     * no state combination that makes reassignment acceptable.
+     */
+    /** @test */
+    public function reassigning_a_draft_snapshot_to_another_draft_order_is_also_rejected(): void
+    {
+        $orderA = $this->orders->create([
+            'sales_channel_id' => $this->channel->id,
+            'customer_snapshot' => $this->customerSnapshot(),
+        ], $this->items());
+        $orderB = $this->orders->create(['sales_channel_id' => $this->channel->id], $this->items());
+        $snapshot = $orderA->snapshot()->firstOrFail();
+
+        $this->expectException(LogicException::class);
+        $snapshot->update(['commerce_order_id' => $orderB->id]);
+    }
+
+    /**
+     * P1 hardening — confirmation must freeze whatever snapshot already
+     * exists at that moment across every mutation path in one pass (update,
+     * delete, reassignment), not merely the specific path exercised by the
+     * other individual tests above.
+     */
+    /** @test */
+    public function confirmation_freezes_the_existing_snapshot_against_every_mutation_path(): void
+    {
+        $order = $this->orders->create([
+            'sales_channel_id' => $this->channel->id,
+            'customer_snapshot' => $this->customerSnapshot(),
+        ], $this->items());
+        $snapshot = $order->snapshot()->firstOrFail();
+
+        $this->orders->confirm($order);
+        $otherDraft = $this->orders->create(['sales_channel_id' => $this->channel->id], $this->items());
+
+        $this->assertThrows(fn () => $snapshot->fresh()->update(['customer_name' => 'محاولة بعد التأكيد']), LogicException::class);
+        $this->assertThrows(fn () => $snapshot->fresh()->delete(), LogicException::class);
+        $this->assertThrows(fn () => $snapshot->fresh()->update(['commerce_order_id' => $otherDraft->id]), LogicException::class);
+    }
+
+    /**
+     * Backward compatibility (unaffected by the P1 hardening): a historical
+     * confirmed order that never had a snapshot captured remains completely
+     * valid — no snapshot is fabricated, and confirming it (already
+     * confirmed here) raises nothing.
+     */
+    /** @test */
+    public function an_existing_confirmed_order_with_no_snapshot_remains_valid(): void
+    {
+        $order = $this->orders->create(['sales_channel_id' => $this->channel->id], $this->items());
+        $confirmed = $this->orders->confirm($order);
+
+        $this->assertTrue($confirmed->isConfirmed());
+        $this->assertNull($confirmed->snapshot);
+    }
+
     // ═══════════════════════════════════════════════════════════
     //  Shipping / billing
     // ═══════════════════════════════════════════════════════════

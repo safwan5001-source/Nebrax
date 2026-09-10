@@ -34,21 +34,56 @@ class CommerceOrderSnapshot extends BaseModel implements CompanyWide
     ];
 
     /**
-     * حراسة مركزية للجمود (§ Immutability) — لا تعتمد على انضباط الواجهة
-     * أو طبقة الخدمة وحدها: أي محاولة تعديلٍ على لقطة تابعة لطلبٍ مؤكَّد
-     * تُرفض هنا مباشرةً، بنفس أسلوب `CommerceOrder::booted()` لمنع حذف
-     * المؤكَّد. `CommerceOrderService::updateSnapshot()` يتحقّق من نفس الشرط
-     * مسبقاً لرسالة تطبيقية أوضح، لكن هذا الحارس هو الضمانة التي لا يمكن
-     * تجاوزها مهما كان مسار الاستدعاء.
+     * حراسة مركزية للجمود (§ Immutability, P1 hardening) — تغطي **كل** مسار
+     * تحوير ممكن على النموذج، لا التعديل وحده: إنشاءٌ لطلبٍ مؤكَّدٍ سلفاً،
+     * تعديلٌ، حذفٌ، أو إعادة ربطٍ بطلبٍ آخر عبر `commerce_order_id` — بلا
+     * اعتمادٍ على انضباط الواجهة أو طبقة الخدمة وحدها. `CommerceOrderService::
+     * updateSnapshot()` يتحقّق من نفس الشرط مسبقاً لرسالة تطبيقية أوضح، لكن
+     * هذا الحارس هو الضمانة التي لا يمكن تجاوزها مهما كان مسار الاستدعاء
+     * (بنفس أسلوب `CommerceOrder::booted()` لمنع حذف المؤكَّد).
+     *
+     * **`commerce_order_id` غير قابلٍ للتغيير بنيوياً بعد الإنشاء** — لا
+     * فحص «هل الطلب الجديد مؤكَّد؟» وحده: ذلك كان سيسمح بإعادة ربط لقطةٍ
+     * تابعة لطلبٍ مسودة بطلبٍ آخر مسودة أيضاً فتُفلت من كل قيدٍ مستقبلي على
+     * تلك اللقطة تحديداً، أو الأخطر — إعادة ربط لقطةٍ مؤكَّدة الطلب بمسودة
+     * لتحويرها ثم إعادتها. الحلّ الأضيق: `isDirty('commerce_order_id')`
+     * يُرفَض مطلقاً قبل أي فحص حالة — لا حاجة لمقارنة المالك الأصلي بالجديد
+     * لأن إعادة الربط نفسها ممنوعة، لا حالة بعينها منه.
      */
     protected static function booted(): void
     {
-        static::updating(function (self $snapshot): void {
-            $order = $snapshot->order()->first();
-            if ($order !== null && $order->isConfirmed()) {
-                throw new LogicException('لا يمكن تعديل لقطة طلب Commerce مؤكَّد — لقطة تاريخية مجمَّدة.');
-            }
+        static::creating(function (self $snapshot): void {
+            self::rejectIfOwningOrderIsConfirmed(
+                $snapshot,
+                'لا يمكن إنشاء لقطة لطلب Commerce مؤكَّد — اللقطة تُلتقط وقت الطلب فقط، لا بعد تأكيده.'
+            );
         });
+
+        static::updating(function (self $snapshot): void {
+            if ($snapshot->isDirty('commerce_order_id')) {
+                throw new LogicException('لا يمكن إعادة ربط لقطة طلب Commerce بطلبٍ آخر — الملكية غير قابلة للتغيير بنيوياً بعد الإنشاء.');
+            }
+
+            self::rejectIfOwningOrderIsConfirmed(
+                $snapshot,
+                'لا يمكن تعديل لقطة طلب Commerce مؤكَّد — لقطة تاريخية مجمَّدة.'
+            );
+        });
+
+        static::deleting(function (self $snapshot): void {
+            self::rejectIfOwningOrderIsConfirmed(
+                $snapshot,
+                'لا يمكن حذف لقطة طلب Commerce مؤكَّد — لقطة تاريخية مجمَّدة.'
+            );
+        });
+    }
+
+    private static function rejectIfOwningOrderIsConfirmed(self $snapshot, string $message): void
+    {
+        $order = $snapshot->order()->first();
+        if ($order !== null && $order->isConfirmed()) {
+            throw new LogicException($message);
+        }
     }
 
     public function order(): BelongsTo
