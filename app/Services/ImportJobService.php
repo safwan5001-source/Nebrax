@@ -16,10 +16,12 @@ use Throwable;
 
 /**
  * PR-DUR-1 — بنية تشغيلة الاستيراد الدائم: رفع → تخزين → بصمة → فحص هيكلي
- * (inspect) → `ready`/`failed`، وإلغاء قبل أيّ معالجة. لا يستهلك ولا يُستهلَك
- * من أيّ من `ProductImportService`/`ProductWorkbookService`/
- * `InventoryOpeningImportService` — عقد PR-DUR-1 كاملاً في
- * `DURABLE-IMPORTS-DECOMPOSITION.md` §4.
+ * (inspect) → `ready`/`failed`، وإلغاء قبل أيّ معالجة. PR-DUR-2 أضاف
+ * `applyNextChunk()` لمجال `product_catalog` (يستهلك `ProductImportService`
+ * حصراً)، وPR-DUR-3 وسّعه لمجال `product_workbook` (يستهلك
+ * `ProductWorkbookService` حصراً). `InventoryOpeningImportService` لا يزال
+ * غير مربوط (PR-DUR-4). عقود PR-DUR-1..3 كاملةً في
+ * `DURABLE-IMPORTS-DECOMPOSITION.md` §4/§6/§7.
  */
 class ImportJobService
 {
@@ -135,12 +137,12 @@ class ImportJobService
         $tmpPath = null;
         try {
             $tmpPath = $this->materializeLocalCopy($job->storage_path);
-            $rows = SpreadsheetReader::read($tmpPath, $job->extension, self::MAX_ROWS, self::MAX_COLUMNS);
+            [$rowCount, $columnCount] = $this->inspectCounts($job->domain, $tmpPath, $job->extension);
 
             $job->update([
                 'status' => ImportJobStatus::READY,
-                'row_count' => $this->countDataRows($rows),
-                'column_count' => $rows === [] ? 0 : count($rows[0]),
+                'row_count' => $rowCount,
+                'column_count' => $columnCount,
             ]);
 
             return $job;
@@ -185,6 +187,55 @@ class ImportJobService
         }
 
         return $tmpPath;
+    }
+
+    /**
+     * PR-DUR-3 — عدّاد الصفوف/الأعمدة يتفرّع حسب المجال، لا محرّكان منفصلان:
+     * `product_catalog` ملفٌّ أحادي الورقة (`SpreadsheetReader::read()`،
+     * سلوك PR-DUR-1/2 حرفياً)، و`product_workbook` مصنّفٌ ثلاثي الأوراق
+     * (`SpreadsheetReader::readWorkbookXlsx()` — نفس القارئ الذي تستهلكه
+     * `ProductWorkbookService::readWorkbook()` بلا نسخة ثانية). `row_count`
+     * لمصنّف = مجموع صفوف البيانات في الأوراق الثلاث الحاضرة، بنفس تعريف
+     * `ProductImportService::isBlankRow()` — يطابق حرفياً ما تحسبه
+     * `ProductWorkbookService::inspect()` لكل ورقة على حدة اليوم.
+     *
+     * @return array{0: int, 1: int} [row_count, column_count]
+     */
+    private function inspectCounts(string $domain, string $tmpPath, string $extension): array
+    {
+        if ($domain === ImportJobDomain::PRODUCT_WORKBOOK) {
+            $sheets = SpreadsheetReader::readWorkbookXlsx($tmpPath, self::MAX_ROWS, self::MAX_COLUMNS);
+            if (! isset($sheets[ProductWorkbookService::SHEET_PRODUCTS])) {
+                throw new RuntimeException(
+                    'المصنّف لا يحتوي ورقة «'.ProductWorkbookService::SHEET_PRODUCTS.'» — هي الورقة الإلزامية الوحيدة.'
+                );
+            }
+
+            $rowCount = 0;
+            $sheetNames = [
+                ProductWorkbookService::SHEET_PRODUCTS,
+                ProductWorkbookService::SHEET_BARCODES,
+                ProductWorkbookService::SHEET_UNIT_PRICES,
+            ];
+            foreach ($sheetNames as $sheetName) {
+                if (! isset($sheets[$sheetName])) {
+                    continue;
+                }
+                $dataRows = array_slice($sheets[$sheetName], 1);
+                $rowCount += count(array_filter(
+                    $dataRows,
+                    static fn (array $row): bool => ! ProductImportService::isBlankRow($row)
+                ));
+            }
+
+            $productsHeader = $sheets[ProductWorkbookService::SHEET_PRODUCTS][0] ?? [];
+
+            return [$rowCount, count($productsHeader)];
+        }
+
+        $rows = SpreadsheetReader::read($tmpPath, $extension, self::MAX_ROWS, self::MAX_COLUMNS);
+
+        return [$this->countDataRows($rows), $rows === [] ? 0 : count($rows[0])];
     }
 
     /**
@@ -243,17 +294,24 @@ class ImportJobService
             $tmpPath = $this->materializeLocalCopy((string) $locked->storage_path);
             try {
                 if ($firstChunk) {
-                    // إعادة حساب `row_count` بتعريف صفوف البيانات دون الفيزيائي
-                    // مرّة واحدة هنا — تصحيحٌ ذاتيٌّ لتشغيلات `ready` أُنشئت
-                    // بالحساب الفيزيائي القديم (قبل تصحيح المراجعة) قبل أن يعتمد
-                    // عليها الاكتمال أدناه، بلا نقل بيانات (migration) منفصل.
-                    $rows = SpreadsheetReader::read($tmpPath, $locked->extension, self::MAX_ROWS, self::MAX_COLUMNS);
-                    $locked->forceFill([
+                    $fill = [
                         'status' => ImportJobStatus::PROCESSING,
                         'apply_options' => $frozenOptions,
                         'started_at' => now(),
-                        'row_count' => $this->countDataRows($rows),
-                    ])->save();
+                    ];
+
+                    if ($locked->domain === ImportJobDomain::PRODUCT_CATALOG) {
+                        // إعادة حساب `row_count` بتعريف صفوف البيانات دون الفيزيائي
+                        // مرّة واحدة هنا — تصحيحٌ ذاتيٌّ لتشغيلات `ready` أُنشئت
+                        // بالحساب الفيزيائي القديم (قبل تصحيح المراجعة) قبل أن
+                        // يعتمد عليها الاكتمال أدناه، بلا نقل بيانات منفصل.
+                        // `product_workbook` (PR-DUR-3) أُضيف بعد هذا التصحيح —
+                        // `inspect()` يحسبه بالتعريف الصحيح من أول يوم.
+                        $rows = SpreadsheetReader::read($tmpPath, $locked->extension, self::MAX_ROWS, self::MAX_COLUMNS);
+                        $fill['row_count'] = $this->countDataRows($rows);
+                    }
+
+                    $locked->forceFill($fill)->save();
                 }
 
                 $offset = (int) $locked->processed_rows;
@@ -262,21 +320,8 @@ class ImportJobService
                     max(1, (int) ($frozenOptions['batch_size'] ?? ProductImportService::APPLY_BATCH_SIZE))
                 );
 
-                $file = new UploadedFile(
-                    $tmpPath,
-                    (string) $locked->original_filename,
-                    $locked->mime_type,
-                    null,
-                    true
-                );
-
-                $chunkOptions = array_merge($frozenOptions, [
-                    'batch_offset' => $offset,
-                    'batch_size' => $batchSize,
-                ]);
-
                 try {
-                    $result = app(ProductImportService::class)->apply($file, $chunkOptions, $userId, $costAuthorized);
+                    $chunk = $this->runChunk($locked, $tmpPath, $frozenOptions, $offset, $batchSize, $userId, $costAuthorized);
                 } catch (Throwable $e) {
                     $locked->forceFill([
                         'status' => ImportJobStatus::FAILED,
@@ -286,12 +331,7 @@ class ImportJobService
                     return $locked;
                 }
 
-                // كلاهما الآن بتعريف صفوف البيانات نفسه (بلا الفارغة): `processed`
-                // مجموع ما طبّقته النوافذ الفعلية عبر `dataIndex`، و`row_count`
-                // معاد حسابه أعلاه بنفس التعريف — فلا حاجة لتقليم `processed`
-                // بحدّ أقصى، لأن نافذة `parse()` لا تتجاوز `row_count` رياضياً.
-                $processedInChunk = $result['created'] + $result['updated'] + $result['skipped'];
-                $processed = $offset + $processedInChunk;
+                $processed = $offset + $chunk['processed_in_chunk'];
                 $totalRows = (int) $locked->row_count;
                 $completed = $processed >= $totalRows;
 
@@ -299,7 +339,7 @@ class ImportJobService
                     'processed_rows' => $processed,
                     'status' => $completed ? ImportJobStatus::COMPLETED : ImportJobStatus::PROCESSING,
                     'finished_at' => $completed ? now() : null,
-                    'apply_result' => $result,
+                    'apply_result' => $chunk['result'],
                 ])->save();
 
                 return $locked;
@@ -318,12 +358,81 @@ class ImportJobService
     }
 
     /**
-     * فشلٌ مغلَق صراحةً على مجالٍ آخر أو حالةٍ لا تقبل الترحيل — لا محاولة
-     * تخمين نيّة الطالب. `product_catalog` وحده مربوطٌ بمعالجة فعلية اليوم.
+     * يبني ملف الإدخال المشترك ثم يوزّع على محرّك المجال — لا منطق مطابقة/
+     * تحقق/كتابة هنا نفسه، فقط تحويل النتيجة إلى شكلٍ موحّد يفهمه
+     * `applyNextChunk()`: كم صفاً اعتُبر منجَزاً في هذه القطعة، والنتيجة
+     * الخام لتخزينها في `apply_result`.
+     *
+     * @param  array<string, mixed>  $options
+     * @return array{processed_in_chunk: int, result: array<string, mixed>}
+     */
+    private function runChunk(ImportJob $job, string $tmpPath, array $options, int $offset, int $batchSize, ?string $userId, bool $costAuthorized): array
+    {
+        $file = new UploadedFile($tmpPath, (string) $job->original_filename, $job->mime_type, null, true);
+
+        return match ($job->domain) {
+            ImportJobDomain::PRODUCT_CATALOG => $this->runProductCatalogChunk($file, $options, $offset, $batchSize, $userId, $costAuthorized),
+            ImportJobDomain::PRODUCT_WORKBOOK => $this->runProductWorkbookChunk($file, $options, (int) $job->row_count, $userId, $costAuthorized),
+            default => throw new RuntimeException('لا يوجد محرّك ترحيل مجزّأ لهذا المجال بعد.'),
+        };
+    }
+
+    /** @param array<string, mixed> $options @return array{processed_in_chunk: int, result: array<string, mixed>} */
+    private function runProductCatalogChunk(UploadedFile $file, array $options, int $offset, int $batchSize, ?string $userId, bool $costAuthorized): array
+    {
+        $chunkOptions = array_merge($options, [
+            'batch_offset' => $offset,
+            'batch_size' => $batchSize,
+        ]);
+
+        $result = app(ProductImportService::class)->apply($file, $chunkOptions, $userId, $costAuthorized);
+
+        return [
+            'processed_in_chunk' => $result['created'] + $result['updated'] + $result['skipped'],
+            'result' => $result,
+        ];
+    }
+
+    /**
+     * المصنّف ثلاثي الأوراق (Products/Barcodes/Unit Prices) ذرّيٌّ بطبيعته:
+     * `ProductWorkbookService::apply()` يطبّق أوراقه الثلاث داخل معاملةٍ
+     * واحدة بترتيبٍ مقصود (Products أولاً فيصبح مرئياً لبقية الأوراق داخل
+     * نفس المعاملة — تعليق `ProductWorkbookService::apply()` نفسه)، ولا
+     * يقبل `batch_offset`/`batch_size` أصلاً. تقطيعه صفّاً صفّاً كان يكسر
+     * هذه الرؤية المتبادلة بين الأوراق أو يعيد تصميم عقد PR-UOM2-4 المعتمد —
+     * كلاهما خارج نطاق هذا الـPR («لا تعِد تصميم Durable Imports»، «لا تغيّر
+     * قواعد UOM/barcode/pricing المعتمدة»). القطعة الوحيدة الممكنة هنا هي
+     * المصنّف كله؛ الاستئناف/التزامن/عدم التكرار محفوظة عبر نفس القفل
+     * والمعاملة في `applyNextChunk()` تماماً كمجال `product_catalog` — لا
+     * عبر تقسيم صفوف. تشغيلةٌ تنجح تكتمل من أول استدعاء؛ تشغيلةٌ فشلت
+     * تصبح نهائية (`failed`) كبقية المجالات — لا حالة وسيطة قابلة للاستئناف
+     * لمصنّفٍ فشل جزئياً، لأن معاملته الداخلية تتراجع كلها أصلاً.
+     *
+     * @param array<string, mixed> $options
+     * @return array{processed_in_chunk: int, result: array<string, mixed>}
+     */
+    private function runProductWorkbookChunk(UploadedFile $file, array $options, int $totalRows, ?string $userId, bool $costAuthorized): array
+    {
+        $priceList = app(ProductWorkbookService::class)->resolveActivePriceList($options['price_list_id'] ?? null);
+        $productOptions = array_intersect_key($options, array_flip(['mode', 'blank_policy', 'master_data_policy', 'mapping']));
+
+        $result = app(ProductWorkbookService::class)->apply($file, $productOptions, $priceList, $userId, $costAuthorized);
+
+        return [
+            'processed_in_chunk' => $totalRows,
+            'result' => $result,
+        ];
+    }
+
+    /**
+     * فشلٌ مغلَق صراحةً على مجالٍ بلا محرّك ترحيل أو حالةٍ لا تقبل الترحيل —
+     * لا محاولة تخمين نيّة الطالب. `product_catalog` (PR-DUR-2) و
+     * `product_workbook` (PR-DUR-3) مربوطان بمعالجة فعلية اليوم.
      */
     private function assertApplicable(ImportJob $job): void
     {
-        if ($job->domain !== ImportJobDomain::PRODUCT_CATALOG) {
+        $enginesAvailable = [ImportJobDomain::PRODUCT_CATALOG, ImportJobDomain::PRODUCT_WORKBOOK];
+        if (! in_array($job->domain, $enginesAvailable, true)) {
             throw new RuntimeException('لا يوجد محرّك ترحيل مجزّأ لهذا المجال بعد.');
         }
 

@@ -17,8 +17,16 @@ class StoreImportJobRequest extends FormRequest
     {
         return [
             // نفس قواعد `ImportProductsRequest` حرفياً — سقف حجم وامتداد موحّد
-            // عبر كل أسطح الاستيراد.
-            'file' => ['required', 'file', 'mimes:csv,txt,xlsx', 'max:5120'],
+            // عبر كل أسطح الاستيراد. `mimes` سقفٌ عامٌّ يشمل امتدادات كل
+            // المجالات معاً؛ التضييق لكل مجال (XLSX حصراً لـ`product_workbook`،
+            // مطابقاً `ProductWorkbookImportRequest` حرفياً) في الإغلاق أدناه.
+            'file' => ['required', 'file', 'mimes:csv,txt,xlsx', 'max:5120', function ($attribute, $value, $fail) {
+                $domain = (string) $this->input('domain');
+                $extension = strtolower((string) $value->getClientOriginalExtension());
+                if ($domain === ImportJobDomain::PRODUCT_WORKBOOK && $extension !== 'xlsx') {
+                    $fail('مصنّف Products/Barcodes/Unit Prices يجب أن يكون بصيغة XLSX.');
+                }
+            }],
             'domain' => ['required', Rule::in(ImportJobDomain::values())],
             'idempotency_key' => ['sometimes', 'nullable', 'string', 'max:191'],
         ];

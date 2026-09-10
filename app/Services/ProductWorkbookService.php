@@ -246,6 +246,30 @@ class ProductWorkbookService
     }
 
     // ═══════════════════════════════════════════════════════════════
+    //  قائمة السعر — القرار D-F: لا تخمين، فشلٌ مغلقٌ إن غابت/خرجت عن النطاق/كانت معطّلة
+    // ═══════════════════════════════════════════════════════════════
+
+    /**
+     * مصدر الحقيقة الوحيد لتحليل `price_list_id` — يستهلكه `ProductWorkbookController`
+     * (عبر `abort(422,...)` كما كان حرفياً) و`ImportJobService::applyNextChunk()`
+     * (عبر `RuntimeException` تلتقطها `ApiController::domain()` فتنتج 422 مطابقاً).
+     * `PriceList::query()` يُطبَّق عليه عزل المستأجر تلقائياً (`BaseModel`/`TenantScope`)
+     * فلا حاجة لفحصٍ يدويّ — معرّفٌ من مؤسسة أخرى لا يُحلّ أصلاً.
+     */
+    public function resolveActivePriceList(?string $priceListId): PriceList
+    {
+        $priceList = $priceListId !== null ? PriceList::query()->find($priceListId) : null;
+        if ($priceList === null) {
+            throw new RuntimeException('قائمة السعر المحدَّدة غير موجودة في نطاق المؤسسة.');
+        }
+        if (! $priceList->is_active) {
+            throw new RuntimeException('قائمة السعر المحدَّدة غير نشطة.');
+        }
+
+        return $priceList;
+    }
+
+    // ═══════════════════════════════════════════════════════════════
     //  التصدير
     // ═══════════════════════════════════════════════════════════════
 
