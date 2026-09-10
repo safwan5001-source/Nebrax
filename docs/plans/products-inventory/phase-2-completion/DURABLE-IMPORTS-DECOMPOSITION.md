@@ -71,8 +71,8 @@ accounting posting."*
 | **PR-DUR-1** | Durable import job/file infrastructure (foundation) | 1 new table | — | merged |
 | **PR-DUR-2** | Chunked/resumable apply engine, wired to Product Catalog import only | job columns only (no new table) | PR-DUR-1 | merged |
 | **PR-DUR-3** | Wire Product Workbook (3-sheet) apply through the same engine | none | PR-DUR-1, PR-DUR-2 | merged |
-| **PR-DUR-4** | Wire Inventory Opening import through the same engine (Draft-only) | none | PR-DUR-1, PR-DUR-2 | **this PR** |
-| **PR-DUR-5** | Frontend: durable import UI (upload-once, poll, cancel, result download) | none | PR-DUR-2..4 | not started |
+| **PR-DUR-4** | Wire Inventory Opening import through the same engine (Draft-only) | none | PR-DUR-1, PR-DUR-2 | merged |
+| **PR-DUR-5** | Frontend: durable import UI (upload-once, poll, cancel, result download) | none | PR-DUR-2..4 | **this PR** |
 
 Each is opened, reviewed and merged separately. No mega-PR. Every existing synchronous endpoint
 (`/products/import/*`, `/products/workbook/*`, `/inventory-openings/import/*`) stays untouched through the
@@ -669,3 +669,144 @@ In scope: `inventory_opening` Draft-only wiring, as above. Out of scope, explici
 posting workflow (remains a separate, human-triggered endpoint, never reachable from this engine), any frontend
 (PR-DUR-5), S3/R2 provisioning, any change to `InventoryOpeningImportService`'s or `InventoryOpeningService`'s
 business rules, any change to `product_catalog`/`product_workbook`'s PR-DUR-2/3 behavior.
+
+## 9. PR-DUR-5 — contract (this PR, final)
+
+### Goal
+
+Replace the browser-session-dependent import execution flow with the durable `ImportJob` workflow (PR-DUR-1..4)
+across all three wired domains, without a Design System V2 visual redesign and without changing any backend
+contract.
+
+### Shared engine, not three bespoke integrations
+
+`web/src/modules/import-jobs/` is new: `client.ts` (typed `POST /import-jobs`, `GET /import-jobs/{id}`, `POST
+/import-jobs/{id}/apply`, `POST /import-jobs/{id}/cancel` — mirrors `ImportJobResource`/`ImportJobController`
+literally, no invented fields or states), `useImportJobEngine.ts` (the state machine: upload, resume, a chunk-
+apply loop driven entirely by the server's `processed_rows`/`row_count`/`status`, cancel), and
+`ImportJobStatusPanel.tsx` (one status/progress UI reused by all three pages). All three domain pages consume
+this one engine — no per-domain reimplementation of the durable mechanics.
+
+### Old 7-step wizard → final workflow (Product Catalog)
+
+The legacy wizard was `file → mode → mapping → rules → preview → apply → result` (7 screens), with `apply`
+owning its own client-computed `batch_offset` loop against the session-only endpoint (re-uploading the file on
+every batch).
+
+| Old step | Disposition | Why |
+|---|---|---|
+| file | **Consolidated** into step 1 ("Setup") | No mutation happens yet — a decision, not a distinct moment. |
+| mode | **Consolidated** into step 1 | Same reason; still a pre-commit choice. |
+| mapping | **Consolidated** into step 1 | Same reason — shown as a section within Setup, not a separate screen, with all the same columns/samples/target-field controls intact. |
+| rules (blank/master-data policy) | **Consolidated** into step 1 | Same reason. |
+| preview | **Retained**, as step 2 | A genuinely different moment (validated read, still using the local file and the existing session-only `/products/import/preview` — stateless, no durable job needed yet). |
+| apply | **Replaced** with the durable engine, as step 3 | The file is uploaded to a durable `ImportJob` **only at this transition** (the one and only upload); every subsequent chunk call addresses the job id, never the file again. |
+| result | **Retained**, as step 4 | Distinct terminal moment. |
+
+Net: **4 steps**, not 7 — three decisions that don't need separate screens were merged into one ("Setup"); the
+three genuinely distinct moments (nothing written yet → durable write in progress → done) stayed separate.
+Every control the 7-step wizard had is still present; none were dropped to make the flow look shorter.
+
+Inventory Opening's 5-step wizard (`file → mapping → preview → confirm → result`) was consolidated the same way
+into 4 (`setup → preview → apply → result`), preserving every field (opening date, notes, allow-zero-cost
+switch, mapping table).
+
+Product Workbook has **no prior frontend** — `/products/workbook-import` is a new page, built directly on the
+durable engine from day one (no legacy flow to map).
+
+### ImportJob identity and recovery
+
+The job id is written to the page URL (`?job=<id>`) the moment a job exists (upload or resume), via
+`useImportJobUrlParam`. On mount, `useResumeFromUrl` reads that param and calls `GET /import-jobs/{id}` — the
+**only** source of truth for what the page shows next; no browser-only job state exists anywhere. A page
+refresh, tab close/reopen, or back/forward navigation that preserves the URL query string recovers the exact
+backend state (`ready`/`processing`/`completed`/`failed`/`cancelled`) with no re-upload.
+
+**One disclosed gap**: if a refresh happens *before* the very first successful `/apply` call (job still
+`ready`), the browser has lost the original `File` object and any column-mapping selections (browsers don't
+persist `File` handles across reloads, and the durable API's `inspect` step stores only row/column *counts*, not
+per-column headers/samples — that richer detail lives only in the session-only `/inspect` endpoints, which need
+the file). In that narrow window, the page shows a compact "continuing an existing import" form (domain-specific
+required fields only — e.g. `opening_date` for Inventory Opening, `price_list_id` for Workbook) and lets column
+mapping fall back to the API's own auto-match-by-header-name default (already the documented default when no
+`mapping` is sent) rather than blocking the user. This is a real, disclosed frontend limitation — not a backend
+gap — since the durable API never promised to carry column-level inspection detail; extending it to do so would
+be a backend contract change, explicitly out of scope for this PR.
+
+### Backend state → frontend state mapping
+
+`ImportJobStatusPanel` renders exactly `ImportJobStatus`'s values (`uploaded`, `ready`, `queued`, `processing`,
+`completed`, `failed`, `cancelled`) via one `importJobs` i18n namespace — no invented state names. Actions are
+gated by the same sets the backend itself enforces: `APPLICABLE_STATUSES` (`ready`/`processing`/`completed`) for
+the apply button, `CANCELLABLE_STATUSES` (`uploaded`/`ready`) for the cancel button — both mirrored client-side
+from `App\Support\ImportJobStatus`'s own constants, not invented. A terminal status (`completed`/`failed`/
+`cancelled`) always wins: `useImportJobEngine`'s only state update path is "whatever the server just returned,"
+so a stale in-flight response can never overwrite a status the server has since moved past — the reducer simply
+has no code path that keeps an older client belief once a newer server response has landed via `resume`.
+
+### Progress / resume / duplicate-click protection
+
+- **Product Catalog (chunked)**: `applyLoop` calls `POST /import-jobs/{id}/apply` in a `while(true)` loop,
+  reading `processed_rows`/`row_count` from **each response** to decide whether to continue — the browser never
+  computes or stores a batch offset. `ImportJobStatusPanel` renders a real progress bar only when
+  `row_count > 0` and status is `processing`, sourced from that same server-reported pair.
+- **Product Workbook / Inventory Opening (atomic)**: no `batch_offset`/`batch_size` exists in either domain's
+  `apply()` contract (PR-DUR-3/4 both record this explicitly) — `ImportJobStatusPanel`'s `atomic` prop suppresses
+  the progress bar entirely and shows an honest "processing the whole file as one step" message instead. No
+  client-side chunking of an atomic domain was invented.
+- **Duplicate-click protection**: `useImportJobEngine` holds an in-memory `inFlight` ref (not React state, so no
+  render lag) — a second `upload`/`applyLoop`/`cancel` call while one is already running is a silent no-op until
+  the first resolves. Proven in `useImportJobEngine.test.tsx`.
+- **Safety cap**: `applyLoop`'s loop carries a hard 5000-iteration ceiling that surfaces an explicit error if a
+  response ever fails to advance status/cursor recognizably — defense-in-depth against an unbounded tight loop
+  freezing the tab on a malformed or unexpected server response; discovered and hardened while writing this
+  PR's own tests (an incomplete test mock reproduced exactly this failure mode).
+
+### Network interruption vs. failure
+
+`applyLoop` distinguishes a thrown `ApiError` (an explicit HTTP rejection — treated as a real, actionable error,
+message shown verbatim) from any other thrown error (a network-level failure — fetch never got a response). On
+the latter, it sets `networkUncertain` (rendered as a banner, not an error), **re-fetches the job from the
+server**, and only then decides: if the re-fetch shows a terminal status, that's shown as-is; otherwise the loop
+retries the same job id — safe by construction, since a retry either re-sends an unapplied chunk (nothing
+committed, so nothing duplicates) or lands on an already-advanced cursor (backend idempotency, unchanged from
+PR-DUR-2). The user is never told "import failed" for a connectivity blip, and is never encouraged to re-upload
+a file whose job already exists.
+
+### Product Catalog / Product Workbook / Inventory Opening contracts — preserved, not reinterpreted
+
+- **Product Catalog**: mode/mapping/blank-policy/master-data-policy are unchanged fields sent exactly as before;
+  cost-authorization stays a backend decision (`SensitiveCostPolicy`, never evaluated or cached client-side —
+  the frontend has no code path that could).
+- **Product Workbook**: one `price_list_id` selected before the run (dropdown built from `GET /price-lists`,
+  filtered to `is_active` client-side for UX — the backend's own live tenant-ownership + active-state check in
+  `ProductWorkbookService::resolveActivePriceList()` remains authoritative and is what actually gates apply);
+  no default/base price list concept anywhere in the new code; no per-row price list; explicit Product+UOM
+  prices only (the frontend never computes or displays a price derived from a UOM conversion factor — it has no
+  pricing logic at all, it only displays sheet-level counts from the backend's own preview/apply responses); the
+  atomic behavior is presented honestly (see Progress section above).
+- **Inventory Opening**: completion wording (`draft_created`, `draft_next_step`) states explicitly that a
+  **draft** was created and that posting is a separate, later, explicit action — unchanged wording from the
+  pre-existing page, now sourced from the durable `apply_result` (`{inventory_opening_id, number, ...}`,
+  PR-DUR-4's normalized summary) instead of the session-only endpoint's response shape. **No code path in the
+  new page calls `POST /inventory-openings/{id}/post`** — confirmed by grep and by
+  `page.test.tsx`'s explicit assertion that no `/post`-containing path is ever called during the import flow.
+
+### Mobile / RTL / LTR
+
+All three pages reuse the existing responsive/logical-CSS conventions already established in the codebase
+(`text-start`, `ms-auto`, `dir="ltr"` only on inherently-LTR content like filenames/ids, the existing mobile
+card-vs-table pattern for the preview tables, the fixed bottom action bar on narrow viewports) — no new layout
+system, no hardcoded `left`/`right`. `useTranslations`/`useLocale` from `next-intl` are used exactly as the
+pre-existing pages used them; both `ar.json` and `en.json` got the same new keys. This PR did not introduce any
+automated viewport or locale-rendering test harness beyond what the codebase already has (none of the pre-
+existing import pages had one either) — RTL/LTR and mobile-width correctness were verified by re-using the same
+CSS conventions the rest of the app already relies on, not by new automated visual assertions. This is disclosed
+as a testing-scope limitation in the Implementation Report, not claimed as automated coverage that doesn't
+exist.
+
+### In scope / out of scope
+
+In scope: the frontend wiring above for all three durable domains, the shared engine, updated tests, i18n keys.
+Out of scope, explicitly not touched: any backend endpoint/schema (zero backend files changed in this PR), the
+posting workflow, S3/R2 provisioning, Design System V2, a broad visual redesign, PR-DUR-1..4's own behavior.

@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
 import * as React from 'react';
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import ProductImportPage from './page';
+import { ApiError } from '@/lib/api';
 
 const { api, downloadFile, downloadCsv, translate, toast, toastSuccess } = vi.hoisted(() => {
   const translator = Object.assign(
@@ -27,15 +28,10 @@ vi.mock('next/link', () => ({
     <a href={href} {...rest}>{children}</a>
   ),
 }));
-vi.mock('@/lib/api', () => ({
-  api,
-  downloadFile,
-  ApiError: class ApiError extends Error {
-    constructor(public status: number, message: string) {
-      super(message);
-    }
-  },
-}));
+vi.mock('@/lib/api', async () => {
+  const actual = await vi.importActual<typeof import('@/lib/api')>('@/lib/api');
+  return { ...actual, api, downloadFile };
+});
 vi.mock('@/lib/export', () => ({ downloadCsv, toCsv: (h: unknown, r: unknown) => JSON.stringify({ h, r }) }));
 vi.mock('@/components/ui/toast', () => ({
   useToast: () => ({ toast, success: toastSuccess, error: vi.fn() }),
@@ -57,7 +53,6 @@ const fields = [
   { key: 'name', label_ar: 'الاسم', label_en: 'Name', type: 'text', required: true, clearable: false, update_locked: false, writable: true },
   { key: 'type', label_ar: 'النوع', label_en: 'Type', type: 'enum', required: true, clearable: false, update_locked: true, writable: true },
   { key: 'sale_price', label_ar: 'سعر البيع', label_en: 'Sale price', type: 'money', required: true, clearable: false, update_locked: false, writable: true },
-  { key: 'barcode', label_ar: 'الباركود', label_en: 'Barcode', type: 'text', required: false, clearable: true, update_locked: false, writable: true },
 ];
 
 const inspection = {
@@ -66,51 +61,58 @@ const inspection = {
     { index: 1, header: 'Product Name', samples: ['قهوة'], suggested_field: 'name' },
     { index: 2, header: 'Price', samples: ['35.00'], suggested_field: 'sale_price' },
     { index: 3, header: 'Kind', samples: ['good'], suggested_field: 'type' },
-    { index: 4, header: 'Mystery', samples: [''], suggested_field: null },
   ],
-  total_rows: 1,
+  total_rows: 3,
   fields,
 };
 
 const cleanPreview = {
   mode: 'create', blank_policy: 'ignore', master_data_policy: 'match_or_error',
-  total_rows: 2, create_rows: 2, update_rows: 0, skipped_rows: 0, warning_rows: 0, error_rows: 0,
+  total_rows: 3, create_rows: 3, update_rows: 0, skipped_rows: 0, warning_rows: 0, error_rows: 0,
   rows: [
     { row: 2, action: 'create', status: 'ok', valid: true, sku: 'SKU-1', name: 'قهوة', type: 'good', barcode: null, messages: [] },
-    { row: 3, action: 'create', status: 'ok', valid: true, sku: 'SKU-2', name: 'شاي', type: 'good', barcode: null, messages: [] },
   ],
-  rows_shown: 2, rows_truncated: false, errors: [],
-};
-
-const brokenPreview = {
-  ...cleanPreview,
-  create_rows: 1, error_rows: 1,
-  rows: [
-    cleanPreview.rows[0],
-    { row: 3, action: 'error', status: 'error', valid: false, sku: 'SKU-2', name: 'شاي', type: 'good', barcode: null, messages: ['رمز SKU مكرر داخل الملف'] },
-  ],
-  errors: [{ row: 3, messages: ['رمز SKU مكرر داخل الملف'] }],
+  rows_shown: 1, rows_truncated: false, errors: [],
 };
 
 function csvFile(name = 'products.csv'): File {
   return new File(['sku,name\nSKU-1,قهوة\n'], name, { type: 'text/csv' });
 }
 
-/** يرفع ملفاً ويصل بالتدفّق إلى خطوة مطابقة الأعمدة. */
-async function uploadTo(step: 'mode' | 'mapping' | 'rules', user: ReturnType<typeof userEvent.setup>) {
+function jobFixture(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'job-1',
+    domain: 'product_catalog',
+    status: 'ready',
+    original_filename: 'products.csv',
+    extension: 'csv',
+    byte_size: 20,
+    content_sha256: 'x',
+    row_count: 3,
+    column_count: 4,
+    processed_rows: 0,
+    apply_result: null,
+    error_message: null,
+    created_by: null,
+    cancelled_by: null,
+    cancelled_at: null,
+    purge_after: null,
+    created_at: '2026-01-01T00:00:00Z',
+    updated_at: '2026-01-01T00:00:00Z',
+    ...overrides,
+  };
+}
+
+/** يرفع الملف ويصل بالتدفّق حتى شاشة المعاينة. */
+async function uploadAndPreview(user: ReturnType<typeof userEvent.setup>) {
   await user.upload(screen.getByLabelText('import_file'), csvFile());
   await waitFor(() => expect(screen.getByLabelText('import_mode_create')).toBeTruthy());
-  if (step === 'mode') return;
-
-  await user.click(screen.getByRole('button', { name: 'import_next' }));
-  await waitFor(() => expect(screen.getByText('import_mapping_source')).toBeTruthy());
-  if (step === 'mapping') return;
-
-  await user.click(screen.getByRole('button', { name: 'import_next' }));
-  await waitFor(() => expect(screen.getByLabelText('import_blank_policy')).toBeTruthy());
+  await user.click(screen.getByRole('button', { name: 'import_run_preview' }));
+  await waitFor(() => expect(screen.getByRole('button', { name: 'import_apply' })).toBeTruthy());
 }
 
 beforeEach(() => {
+  window.history.replaceState({}, '', '/products/import');
   api.mockReset();
   downloadFile.mockReset();
   downloadFile.mockResolvedValue('downloaded');
@@ -120,267 +122,105 @@ beforeEach(() => {
   api.mockImplementation((path: string) => {
     if (path === '/products/import/inspect') return Promise.resolve({ data: inspection });
     if (path === '/products/import/preview') return Promise.resolve({ data: cleanPreview });
-    if (path === '/products/import/apply') {
-      return Promise.resolve({
-        data: { mode: 'create', created: 2, updated: 0, skipped: 0, total_rows: 2, results: cleanPreview.rows },
-      });
-    }
+    if (path === '/import-jobs') return Promise.resolve({ data: jobFixture() });
     return Promise.resolve({ data: {} });
   });
 });
 
 afterEach(cleanup);
 
-describe('شاشة استيراد المنتجات', () => {
-  it('تبدأ عند خطوة الملف وتقبل CSV وXLSX معاً', () => {
-    render(<ProductImportPage />);
-
-    const input = screen.getByLabelText('import_file') as HTMLInputElement;
-    expect(input.accept).toContain('.csv');
-    expect(input.accept).toContain('.xlsx');
-    expect(screen.getByText('import_drop_hint')).toBeTruthy();
-  });
-
-  it('ترسل الملف للفحص وتنتقل إلى خطوة العملية باقتراح مطابقة', async () => {
+describe('شاشة استيراد المنتجات — المحرّك الدائم', () => {
+  it('الخطوة الأولى مدمجة: الملف والوضع والمطابقة والقواعد معاً بلا تنقّل بينها', async () => {
     const user = userEvent.setup();
     render(<ProductImportPage />);
 
-    await uploadTo('mode', user);
+    await user.upload(screen.getByLabelText('import_file'), csvFile());
+    await waitFor(() => expect(screen.getByLabelText('import_mode_create')).toBeTruthy());
 
-    expect(api).toHaveBeenCalledWith('/products/import/inspect', expect.objectContaining({ method: 'POST' }));
-    expect(screen.getByLabelText('import_mode_create')).toBeTruthy();
-    expect(screen.getByLabelText('import_mode_update')).toBeTruthy();
-    expect(screen.getByLabelText('import_mode_upsert')).toBeTruthy();
+    // كلّها ظاهرة معاً في نفس الشاشة — لا خطوة منفصلة لكل قرار.
+    expect(screen.getByText('import_step_mapping')).toBeTruthy();
+    expect(screen.getByLabelText('import_blank_policy')).toBeTruthy();
   });
 
-  it('تعرض جدول مطابقة الأعمدة بالعيّنات والاقتراح', async () => {
+  it('الرفع الفعلي إلى تشغيلة دائمة يحدث مرّة واحدة فقط عند التأكيد النهائي', async () => {
     const user = userEvent.setup();
     render(<ProductImportPage />);
-    await uploadTo('mapping', user);
+    await uploadAndPreview(user);
 
-    expect((screen.getByLabelText('Code') as HTMLSelectElement).value).toBe('sku');
-    expect((screen.getByLabelText('Product Name') as HTMLSelectElement).value).toBe('name');
-    expect((screen.getByLabelText('Mystery') as HTMLSelectElement).value).toBe('');
-    expect(screen.getByText('SKU-1')).toBeTruthy();
-  });
+    // لم يُرفع الملف إلى `/import-jobs` بعد — ذاك فقط عند التأكيد.
+    expect(api).not.toHaveBeenCalledWith('/import-jobs', expect.anything());
 
-  it('تمنع المتابعة حين يبقى حقل مطلوب بلا مطابقة', async () => {
-    const user = userEvent.setup();
-    render(<ProductImportPage />);
-    await uploadTo('mapping', user);
-
-    await user.selectOptions(screen.getByLabelText('Product Name'), '');
-
-    expect(screen.getByRole('alert').textContent).toContain('import_mapping_missing_required');
-    expect((screen.getByRole('button', { name: 'import_next' }) as HTMLButtonElement).disabled).toBe(true);
-  });
-
-  it('تطالب بمعرّف في وضع التحديث ولا تقبل الاسم بديلاً', async () => {
-    const user = userEvent.setup();
-    render(<ProductImportPage />);
-    await uploadTo('mode', user);
-
-    await user.click(screen.getByLabelText('import_mode_update'));
-    await user.click(screen.getByRole('button', { name: 'import_next' }));
-    await user.selectOptions(screen.getByLabelText('Code'), '');
-
-    expect(screen.getByRole('alert').textContent).toContain('import_mapping_missing_identifier');
-  });
-
-  it('لا تسمح بربط عمودين بالحقل نفسه', async () => {
-    const user = userEvent.setup();
-    render(<ProductImportPage />);
-    await uploadTo('mapping', user);
-
-    await user.selectOptions(screen.getByLabelText('Mystery'), 'name');
-
-    expect(screen.getByRole('alert').textContent).toContain('import_mapping_duplicate');
-  });
-
-  it('تعطّل سياسة الفراغ في وضع الإنشاء وتتيحها في التحديث', async () => {
-    const user = userEvent.setup();
-    render(<ProductImportPage />);
-    await uploadTo('rules', user);
-
-    expect((screen.getByLabelText('import_blank_policy') as HTMLSelectElement).disabled).toBe(true);
-    expect((screen.getByLabelText('import_master_data_policy') as HTMLSelectElement).value).toBe('match_or_error');
-  });
-
-  it('ترسل السياسات المختارة والمطابقة إلى مسار المعاينة', async () => {
-    const user = userEvent.setup();
-    render(<ProductImportPage />);
-    await uploadTo('rules', user);
-
-    await user.selectOptions(screen.getByLabelText('import_master_data_policy'), 'create_missing');
-    await user.click(screen.getByRole('button', { name: 'import_next' }));
-
-    await waitFor(() => expect(api).toHaveBeenCalledWith('/products/import/preview', expect.anything()));
-    const body = api.mock.calls.find((call) => call[0] === '/products/import/preview')?.[1].body as FormData;
-    expect(body.get('mode')).toBe('create');
-    expect(body.get('master_data_policy')).toBe('create_missing');
-    expect(body.get('mapping[0]')).toBe('sku');
-    expect(body.get('mapping[4]')).toBe('ignore');
-  });
-
-  it('تعرض عدادات المعاينة الست وتفاصيل الصفوف', async () => {
-    const user = userEvent.setup();
-    render(<ProductImportPage />);
-    await uploadTo('rules', user);
-    await user.click(screen.getByRole('button', { name: 'import_next' }));
-
-    await waitFor(() => expect(screen.getByText('import_kpi_total')).toBeTruthy());
-    ['import_kpi_create', 'import_kpi_update', 'import_kpi_skip', 'import_kpi_warning', 'import_kpi_error'].forEach(
-      (key) => expect(screen.getByText(key)).toBeTruthy()
-    );
-    expect(screen.getAllByText('قهوة').length).toBeGreaterThan(0);
-  });
-
-  it('تمنع التنفيذ حين توجد أخطاء مانعة وتتيح تنزيل تقريرها', async () => {
-    api.mockImplementation((path: string) => {
-      if (path === '/products/import/inspect') return Promise.resolve({ data: inspection });
-      if (path === '/products/import/preview') return Promise.resolve({ data: brokenPreview });
-      return Promise.resolve({ data: {} });
-    });
-
-    const user = userEvent.setup();
-    render(<ProductImportPage />);
-    await uploadTo('rules', user);
-    await user.click(screen.getByRole('button', { name: 'import_next' }));
-
-    await waitFor(() => expect(screen.getByText('import_kpi_error')).toBeTruthy());
-    expect((screen.getByRole('button', { name: 'import_next' }) as HTMLButtonElement).disabled).toBe(true);
-
-    await user.click(screen.getByRole('button', { name: 'import_download_errors' }));
-    expect(downloadCsv).toHaveBeenCalledWith('nebrax-products-import-errors', expect.any(String));
-  });
-
-  it('توضّح أن قائمة الصفوف مختصرة بينما العدادات كاملة', async () => {
-    api.mockImplementation((path: string) => {
-      if (path === '/products/import/inspect') return Promise.resolve({ data: inspection });
-      if (path === '/products/import/preview') {
+    api.mockImplementation((path: string, options?: { method?: string }) => {
+      if (path === '/import-jobs' && options?.method === 'POST') return Promise.resolve({ data: jobFixture() });
+      if (path === '/import-jobs/job-1/apply') {
         return Promise.resolve({
-          data: { ...cleanPreview, total_rows: 900, create_rows: 900, rows_shown: 2, rows_truncated: true },
+          data: jobFixture({ status: 'completed', processed_rows: 3, apply_result: { created: 3, updated: 0, skipped: 0, results: [] } }),
         });
       }
       return Promise.resolve({ data: {} });
     });
 
-    const user = userEvent.setup();
-    render(<ProductImportPage />);
-    await uploadTo('rules', user);
-    await user.click(screen.getByRole('button', { name: 'import_next' }));
-
-    await waitFor(() => expect(screen.getByText('import_rows_truncated:2,900')).toBeTruthy());
-  });
-
-  it('تؤكّد قبل التنفيذ ثم تعرض النتيجة وتتيح تنزيل تقريرها', async () => {
-    const user = userEvent.setup();
-    render(<ProductImportPage />);
-    await uploadTo('rules', user);
-    await user.click(screen.getByRole('button', { name: 'import_next' }));
-    await waitFor(() => expect(screen.getByText('import_kpi_total')).toBeTruthy());
-
-    await user.click(screen.getByRole('button', { name: 'import_next' }));
-    expect(screen.getByText('import_confirm_body:2,0,0')).toBeTruthy();
-
     await user.click(screen.getByRole('button', { name: 'import_apply' }));
-    await waitFor(() => expect(screen.getByText('import_result_title')).toBeTruthy());
 
-    expect(api).toHaveBeenCalledWith('/products/import/apply', expect.anything());
-    await user.click(screen.getByRole('button', { name: 'import_download_result' }));
-    expect(downloadCsv).toHaveBeenCalledWith('nebrax-products-import-result', expect.any(String));
+    await waitFor(() => expect(api).toHaveBeenCalledWith('/import-jobs', expect.objectContaining({ method: 'POST' })));
+    // هوية التشغيلة تُحفَظ في رابط الصفحة فوراً — تحديثٌ لاحق يستعيدها بلا رفعٍ ثانٍ.
+    await waitFor(() => expect(window.location.search).toContain('job=job-1'));
   });
 
-  it('تعرض فشل الخادم كرسالة خطأ مرئية لا صمتاً', async () => {
-    api.mockImplementation((path: string) => {
-      if (path === '/products/import/inspect') {
-        return Promise.reject(Object.assign(new Error('صيغة الملف غير مدعومة.'), { status: 422 }));
+  it('يعرض تقدّماً حقيقياً من الخادم عبر عدّة قطع حتى الاكتمال، ثم شاشة النتيجة', async () => {
+    const user = userEvent.setup();
+    render(<ProductImportPage />);
+    await uploadAndPreview(user);
+
+    let call = 0;
+    api.mockImplementation((path: string, options?: { method?: string }) => {
+      if (path === '/import-jobs' && options?.method === 'POST') return Promise.resolve({ data: jobFixture() });
+      if (path === '/import-jobs/job-1/apply') {
+        call += 1;
+        if (call === 1) return Promise.resolve({ data: jobFixture({ status: 'processing', processed_rows: 1 }) });
+        if (call === 2) return Promise.resolve({ data: jobFixture({ status: 'processing', processed_rows: 2 }) });
+        return Promise.resolve({
+          data: jobFixture({ status: 'completed', processed_rows: 3, apply_result: { created: 3, updated: 0, skipped: 0, results: [] } }),
+        });
       }
       return Promise.resolve({ data: {} });
     });
 
-    const user = userEvent.setup();
-    render(<ProductImportPage />);
-    await user.upload(screen.getByLabelText('import_file'), csvFile());
+    await user.click(screen.getByRole('button', { name: 'import_apply' }));
 
-    await waitFor(() => expect(screen.getByRole('alert')).toBeTruthy());
+    await waitFor(() => expect(screen.getByText('import_result_title')).toBeTruthy());
+    expect(call).toBe(3);
   });
 
-  it('تنزّل القالب من الخادم لا من المتصفح', async () => {
-    const user = userEvent.setup();
-    render(<ProductImportPage />);
+  it('تستأنف تشغيلةً موجودة من رابط الصفحة بلا إعادة رفع الملف', async () => {
+    window.history.replaceState({}, '', '/products/import?job=job-1');
+    api.mockImplementation((path: string) => {
+      if (path === '/import-jobs/job-1') return Promise.resolve({ data: jobFixture({ status: 'processing', processed_rows: 1 }) });
+      return Promise.resolve({ data: {} });
+    });
 
-    await user.click(screen.getByRole('button', { name: 'import_template' }));
-    expect(downloadFile).toHaveBeenCalledWith(
-      '/products/import/template',
-      'nebrax-products-import-template.csv'
-    );
-    await waitFor(() => expect(toast).not.toHaveBeenCalled());
-    expect(downloadCsv).not.toHaveBeenCalled();
-  });
-
-  // انحدار: الزر في المعاينة كان يبتلع النتيجة فلا شيء يحدث ولا شيء يُقال.
-  it('تخبر أن تنزيل القالب غير متاح في وضع المعاينة بدل الصمت', async () => {
-    downloadFile.mockResolvedValue('demo-unavailable');
-    const user = userEvent.setup();
     render(<ProductImportPage />);
 
-    await user.click(screen.getByRole('button', { name: 'import_template' }));
-
-    await waitFor(() =>
-      expect(toast).toHaveBeenCalledWith({ title: 'export_demo_unavailable', variant: 'info' })
-    );
-    expect(toastSuccess).not.toHaveBeenCalled();
-    expect(downloadCsv).not.toHaveBeenCalled();
-  });
-
-  it('تبقي كل تسميات الحقول مترجَمة بلا نص عربي مكتوب في الشيفرة', async () => {
-    const user = userEvent.setup();
-    const { container } = render(<ProductImportPage />);
-    await uploadTo('mapping', user);
-
-    // بيانات العيّنة عربية عمداً، فالفحص على التسميات والأزرار وحدها.
-    const chrome = [
-      ...container.querySelectorAll('label, button, th, legend'),
-    ].map((node) => node.textContent ?? '');
-    expect(chrome.some((text) => /[؀-ۿ]/.test(text))).toBe(false);
-  });
-});
-
-describe('جدول معاينة الاستيراد على الجوال', () => {
-  it('يقدّم بطاقة مضغوطة بجانب الجدول بدل تمرير أفقي للصفحة', async () => {
-    const user = userEvent.setup();
-    const { container } = render(<ProductImportPage />);
-    await uploadTo('rules', user);
-    await user.click(screen.getByRole('button', { name: 'import_next' }));
-    await waitFor(() => expect(screen.getByText('import_kpi_total')).toBeTruthy());
-
-    const desktop = container.querySelector('.hidden.overflow-x-auto.rounded-md.border.md\\:block');
-    const mobile = container.querySelector('ul.md\\:hidden');
-    expect(desktop).toBeTruthy();
-    expect(mobile).toBeTruthy();
-    expect(within(mobile as HTMLElement).getAllByText('قهوة').length).toBe(1);
-  });
-});
-
-describe('حد حجم الملف في الواجهة', () => {
-  it('يرفض ملفاً يتجاوز الحد محلياً بلا رحلة إلى الخادم', async () => {
-    const user = userEvent.setup();
-    render(<ProductImportPage />);
-
-    const huge = new File([new Uint8Array(6 * 1024 * 1024)], 'huge.csv', { type: 'text/csv' });
-    await user.upload(screen.getByLabelText('import_file'), huge);
-
-    await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('import_file_too_large'));
+    await waitFor(() => expect(screen.getByText('import_resumed_title')).toBeTruthy());
     expect(api).not.toHaveBeenCalledWith('/products/import/inspect', expect.anything());
   });
 
-  it('يمرّر ملفاً ضمن الحد إلى الفحص', async () => {
+  it('حالة الفشل تعرض رسالة الخادم الفعلية لا رسالة عامّة', async () => {
     const user = userEvent.setup();
     render(<ProductImportPage />);
+    await uploadAndPreview(user);
 
-    await user.upload(screen.getByLabelText('import_file'), csvFile());
+    api.mockImplementation((path: string, options?: { method?: string }) => {
+      if (path === '/import-jobs' && options?.method === 'POST') return Promise.resolve({ data: jobFixture() });
+      if (path === '/import-jobs/job-1/apply') {
+        return Promise.reject(new ApiError(422, 'رمز الصنف مكرر داخل الملف.', {}));
+      }
+      if (path === '/import-jobs/job-1') return Promise.resolve({ data: jobFixture({ status: 'failed', error_message: 'رمز الصنف مكرر داخل الملف.' }) });
+      return Promise.resolve({ data: {} });
+    });
 
-    await waitFor(() => expect(api).toHaveBeenCalledWith('/products/import/inspect', expect.anything()));
+    await user.click(screen.getByRole('button', { name: 'import_apply' }));
+
+    await waitFor(() => expect(screen.getByText('رمز الصنف مكرر داخل الملف.')).toBeTruthy());
   });
 });
