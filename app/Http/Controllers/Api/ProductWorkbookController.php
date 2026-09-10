@@ -31,15 +31,11 @@ class ProductWorkbookController extends ApiController
      */
     private function resolvePriceList(?string $priceListId): PriceList
     {
-        $priceList = $priceListId !== null ? PriceList::query()->find($priceListId) : null;
-        if ($priceList === null) {
-            abort(422, 'قائمة السعر المحدَّدة غير موجودة في نطاق المؤسسة.');
+        try {
+            return $this->workbooks->resolveActivePriceList($priceListId);
+        } catch (\RuntimeException $e) {
+            abort(422, $e->getMessage());
         }
-        if (! $priceList->is_active) {
-            abort(422, 'قائمة السعر المحدَّدة غير نشطة.');
-        }
-
-        return $priceList;
     }
 
     public function template()

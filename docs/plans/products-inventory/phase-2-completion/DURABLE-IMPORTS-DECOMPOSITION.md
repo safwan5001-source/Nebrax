@@ -68,9 +68,9 @@ accounting posting."*
 
 | PR | Title | Schema | Depends on | Status |
 |---|---|---|---|---|
-| **PR-DUR-1** | Durable import job/file infrastructure (foundation) | 1 new table | — | **this PR** |
-| **PR-DUR-2** | Chunked/resumable apply engine, wired to Product Catalog import only | job columns only (no new table) | PR-DUR-1 | not started |
-| **PR-DUR-3** | Wire Product Workbook (3-sheet) apply through the same engine | none | PR-DUR-1, PR-DUR-2 | not started |
+| **PR-DUR-1** | Durable import job/file infrastructure (foundation) | 1 new table | — | merged |
+| **PR-DUR-2** | Chunked/resumable apply engine, wired to Product Catalog import only | job columns only (no new table) | PR-DUR-1 | merged |
+| **PR-DUR-3** | Wire Product Workbook (3-sheet) apply through the same engine | none | PR-DUR-1, PR-DUR-2 | **this PR** |
 | **PR-DUR-4** | Wire Inventory Opening import through the same engine (Draft-only) | none | PR-DUR-1, PR-DUR-2 | not started |
 | **PR-DUR-5** | Frontend: durable import UI (upload-once, poll, cancel, result download) | none | PR-DUR-2..4 | not started |
 
@@ -426,3 +426,120 @@ In scope: `product_catalog` only, additive schema, the concurrency/idempotency m
 test list (see PR-DUR-2 Implementation Report). Out of scope, explicitly not touched: Product Workbook wiring,
 Inventory Opening wiring, any frontend, S3/R2 provisioning, any inventory effect (`quantity_on_hand`, `avg_cost`,
 `StockMovement`) or accounting effect (`JournalEntry`/`JournalLine`) — D-08 remains **No**.
+
+## 7. PR-DUR-3 — contract (this PR)
+
+### Goal
+
+Wire `product_workbook` (Products/Barcodes/Unit Prices, PR-UOM2-4) into the durable `ImportJob` lifecycle built
+by PR-DUR-1/2, reusing `ProductWorkbookService::apply()` **unchanged** as the sole mutation boundary, without
+inventing a parallel mutation path and without redesigning PR-UOM2-4's atomic contract, the PR-DUR-2 state
+machine, or its concurrency mechanism.
+
+### Prerequisite check (measured against current `main` before writing any code)
+
+Confirmed PR-DUR-2 merged at `d6dcd17` (`main` HEAD at branch time). Read `ImportJobService.php` in full as
+merged — it already carries a post-merge review fix (blank-row-aware `row_count`/`processed_rows`, not present
+in this session's own PR-DUR-2 report) — this PR builds on that fix as-is, does not touch its `product_catalog`
+behavior, and does not re-litigate it.
+
+### The one real design fork: `ProductWorkbookService::apply()` has no chunking contract
+
+`ProductImportService::apply()` (product_catalog's reuse point) accepts `batch_offset`/`batch_size` because its
+private `parse()` filters rows to a window before validating/writing them. **`ProductWorkbookService::apply()`
+has no such parameters at all** — it reads all three sheets, validates all three together
+(`productsPreview()`/`parseBarcodesSheet()`/`parseUnitPricesSheet()`, matching Barcodes/Unit Prices rows against
+the database **as it exists before this call**, not against rows the Products sheet is about to create), then
+writes all three inside one `DB::transaction()` with Products applied first so a brand-new SKU from this same
+file becomes visible to later sheets **within that transaction**. Slicing this into row-level chunks would mean
+either (a) rewriting `ProductWorkbookService`'s validation/write ordering — a redesign of an approved PR-UOM2-4
+contract, explicitly out of scope — or (b) inventing a second, parallel apply path that duplicates its
+sheet-ordering logic — explicitly forbidden by this task's own instruction not to create a parallel mutation
+path when the existing engine already covers what's needed.
+
+**Resolution, recorded as a deliberate, disclosed scope boundary:** the workbook is treated as **one
+non-divisible chunk**. `POST /import-jobs/{id}/apply` for a `product_workbook` job runs
+`ProductWorkbookService::apply()` once, for the entire remaining file, inside the *same* PR-DUR-2 lock/
+transaction/state-machine scaffolding (`ImportJobService::applyNextChunk()`'s `lockForUpdate()` held end-to-end,
+options frozen on first call, `processed_rows`/`row_count` bookkeeping, `COMPLETED`/`FAILED` transitions) — every
+concurrency, resume-after-crash, and retry-after-completion guarantee PR-DUR-2 established is fully preserved;
+only the "multiple chunks across several HTTP calls" behavior is inapplicable, because the underlying service
+genuinely has no smaller safe unit of work to offer. This is not a redesign of Durable Imports — the engine
+(`applyNextChunk`, the lock, the state machine) is untouched in shape; only the domain-specific inner call
+(`runChunk()`'s new `product_workbook` branch) differs in how large a bite it takes.
+
+### What changed, concretely
+
+- **`app/Support/ImportJobDomain.php`**: added `PRODUCT_WORKBOOK = 'product_workbook'`.
+- **`app/Services/ImportJobService.php`**:
+  - `inspectCounts()` (new, replacing inline row/column counting in `inspect()`): branches on domain —
+    `product_catalog` unchanged (`SpreadsheetReader::read()`); `product_workbook` uses
+    `SpreadsheetReader::readWorkbookXlsx()` (the same static reader `ProductWorkbookService::readWorkbook()`
+    already wraps — no second implementation), asserts the mandatory `Products` sheet is present, and sums
+    non-blank data rows across all three sheets present as `row_count` (same blank-row definition,
+    `ProductImportService::isBlankRow()`, used identically for both domains).
+  - `applyNextChunk()`: the PR-DUR-2 review fix's row_count-recompute-on-first-chunk block is now gated to
+    `product_catalog` only (`product_workbook` is new code with no pre-existing `ready` jobs from before that
+    fix, so it doesn't need the backward-compat recompute).
+  - `runChunk()` (new): builds the shared `UploadedFile` from the materialized temp path, then dispatches by
+    domain to `runProductCatalogChunk()` (extracted, behavior-identical to PR-DUR-2) or
+    `runProductWorkbookChunk()` (new) — both return a normalized `{processed_in_chunk, result}` shape so
+    `applyNextChunk()`'s lock/persist logic stays domain-agnostic.
+  - `runProductWorkbookChunk()` (new): resolves the frozen `price_list_id` via
+    `ProductWorkbookService::resolveActivePriceList()` (live, every call — not cached from freeze time), forwards
+    only `mode`/`blank_policy`/`master_data_policy`/`mapping` to `ProductWorkbookService::apply()`, and reports
+    `processed_in_chunk = row_count` (the whole job, per the one-chunk resolution above).
+  - `assertApplicable()`: now accepts both `product_catalog` and `product_workbook` as domains with an engine.
+- **`app/Services/ProductWorkbookService.php`**: added `resolveActivePriceList(?string): PriceList` — the exact
+  lookup+active-check `ProductWorkbookController::resolvePriceList()` already performed, extracted so
+  `ImportJobService` can reuse it without duplicating the rule. Throws `RuntimeException` (not `abort()`) so it
+  composes with `ApiController::domain()`'s existing RuntimeException→422 convention from either caller.
+- **`app/Http/Controllers/Api/ProductWorkbookController.php`**: `resolvePriceList()` now delegates to the new
+  service method, catching its `RuntimeException` and calling `abort(422, ...)` exactly as before — **byte-
+  identical external behavior**, confirmed by the full existing `ProductWorkbookTest` suite staying green
+  unmodified.
+- **`app/Http/Requests/ApplyImportJobRequest.php`**: added `price_list_id` as a structural `sometimes|nullable|uuid`
+  rule and to `applyOptions()`. Business validation (exists, tenant-owned, active) stays in
+  `ProductWorkbookService::resolveActivePriceList()`, not the FormRequest — consistent with how `mode`/
+  `blank_policy` business rules already live in `ProductImportService::options()`, not the FormRequest.
+- **`app/Http/Requests/StoreImportJobRequest.php`**: the file rule gained one closure narrowing the accepted
+  extension to `xlsx` when `domain === product_workbook` (matching `ProductWorkbookImportRequest` exactly);
+  `product_catalog`'s existing `csv|txt|xlsx` acceptance is untouched.
+- **No migration.** `apply_options`/`apply_result` (PR-DUR-2's JSON columns) hold `price_list_id` and the
+  workbook's `{products, barcodes, unit_prices}` result shape with no schema change.
+- **No new endpoint.** `POST /import-jobs/{id}/apply` (PR-DUR-2) now also accepts `product_workbook` jobs; the
+  request/response shape is identical, just with an optional `price_list_id`.
+
+### PriceList / UOM / barcode contract preserved (not re-tested here, wiring only)
+
+- **D-F unchanged**: no default/base PriceList, no per-row `price_list_id` — one `price_list_id` selected before
+  apply, frozen on the first (only) chunk, re-validated live every call for tenant ownership and `is_active`.
+- **UOM/barcode/pricing rules untouched**: `ProductWorkbookService::apply()`, `parseBarcodesSheet()`,
+  `parseUnitPricesSheet()`, `resolveBarcodeUnit()` — zero lines changed. Unit prices remain explicit-only (never
+  derived from a conversion factor); barcode unit validation against the product's unit template is identical.
+  The full pre-existing `ProductWorkbookTest` suite (30 tests covering these rules in detail) passes unmodified,
+  proving the durable wiring adds no regression.
+- **Product Lifecycle / cost authorization untouched**: `SensitiveCostPolicy::authorized()` is still passed
+  through live on every call, exactly as `ProductWorkbookController::apply()` already did.
+
+### Concurrency / idempotency — inherited, not reimplemented
+
+Same `lockForUpdate()`-for-the-whole-chunk mechanism as PR-DUR-2, proven again independently for this domain:
+`ImportJobWorkbookApplyTest::a_concurrent_apply_attempt_is_blocked_by_a_real_row_lock` (genuine second PostgreSQL
+connection, `lock_timeout`-based proof, same convention as `ImportJobApplyTest`'s and `DocumentNumberingTest`'s).
+Retry-after-crash and retry-after-completion are proven the same way as PR-DUR-2 (interrupt via an
+`ImportJob::saving` hook mid-transaction; assert no partial state; assert a clean resume).
+
+### Accounting / inventory non-effect (D-08 unchanged)
+
+`ImportJobWorkbookApplyTest::completed_workbook_apply_creates_zero_stock_or_ledger_effect` asserts
+`StockMovement::count() === 0`, `JournalEntry::count() === 0`, `JournalLine::count() === 0`, and the created
+product's `quantity_on_hand`/`avg_cost` still `0`, **while** asserting the workbook's genuine, expected outputs
+(`ProductBarcode`, `PriceListItem`) are non-zero — the point is proving the *forbidden* effects are absent, not
+that the whole operation is a no-op.
+
+### In scope / out of scope
+
+In scope: `product_workbook` wiring only, as above. Out of scope, explicitly not touched: Inventory Opening
+wiring (PR-DUR-4), any frontend (PR-DUR-5), S3/R2 provisioning, any change to PR-UOM2-4's business rules, any
+change to `product_catalog`'s PR-DUR-2 behavior, any inventory or accounting effect.
