@@ -12,10 +12,19 @@ address, and billing address exactly as they were entered at order time.
 `shipping_snapshot`, `billing_snapshot` — that, if present, are validated
 structurally and persisted atomically with the order. A new
 `CommerceOrderService::updateSnapshot()` method is the only mutation channel,
-allowed only while the order is `draft`; a `confirmed` order's snapshot is
-rejected centrally by **two independent layers**: the service method itself
-and `CommerceOrderSnapshot::booted()`'s `updating` guard (the same pattern
-`CommerceOrder::booted()` already uses to block deleting a confirmed order).
+allowed only while the order is `draft`.
+
+**P1 review finding — fixed on this branch (§33):** the initial
+implementation's immutability guard intercepted only the model's `updating`
+event, leaving a confirmed order's snapshot mutable through three other
+paths: direct delete, creating a *new* snapshot for an already-confirmed
+order, and reassigning `commerce_order_id` to a different order (which is
+unsafe to check by resolving `order()` only *after* the foreign key has
+already changed). `CommerceOrderSnapshot::booted()` now guards `creating`,
+`updating`, and `deleting` together, and makes `commerce_order_id`
+**structurally immutable** after creation — any reassignment attempt is
+rejected outright, independent of either order's status, closing the exact
+bypass rather than special-casing it.
 
 No column was added to `commerce_orders` or `commerce_order_lines`. No
 existing behavior changed: every COM-5A/5B/6A/6B call site that does not pass
@@ -23,11 +32,11 @@ a snapshot key behaves byte-for-byte as before, and `resolveOwnership()`
 (ownership/`trustedPartnerSelection`) is untouched — snapshot input is read
 by an entirely separate code path and never influences ownership.
 
-24 new focused tests (`CommerceOrderSnapshotTest`), all passing on first run
-on both SQLite and PostgreSQL. Zero new full-suite failures on either engine;
-the pre-existing 27-failure baseline (`Fuel*Test` missing `bcmath`,
-`DocumentCenterSecureIntakeTest` PDF-fixture gap) is unchanged and verified
-identical by name on both engines.
+30 focused tests (`CommerceOrderSnapshotTest` — 24 at initial open + 6 added
+for the P1 fix), all passing on both SQLite and PostgreSQL. Zero new
+full-suite failures on either engine; the pre-existing 27-failure baseline
+(`Fuel*Test` missing `bcmath`, `DocumentCenterSecureIntakeTest` PDF-fixture
+gap) is unchanged and verified identical by name on both engines.
 
 **Not implemented, and not touched:** checkout, cart, public/mobile API,
 guest token, payments, fulfillment, invoice bridge, ZATCA, accounting,
@@ -192,15 +201,28 @@ invent a new state machine or a new document status dimension.
    `isDraft()` inside the transaction, and throws a `RuntimeException` with a
    clear message before touching any snapshot row if the order is not a
    draft.
-2. **Model layer** (`CommerceOrderSnapshot::booted()`): an `updating` guard
-   that loads the owning order and throws `LogicException` if it is
-   `confirmed` — this fires **regardless of caller**, including a future
-   direct `$snapshot->update(...)` call that bypasses the service entirely.
-   Verified directly by `a_direct_model_update_on_a_confirmed_orders_snapshot_is_rejected_centrally`.
+2. **Model layer** (`CommerceOrderSnapshot::booted()`, hardened by the P1 fix
+   — §33): guards **every** mutation path the model exposes, not only
+   `updating`:
+   - `creating` — rejects creating a snapshot at all if the target order is
+     already `confirmed`;
+   - `updating` — rejects any field change once the owning order is
+     `confirmed`, **and** rejects any attempt to change `commerce_order_id`
+     itself unconditionally (§33.2 explains why this must not be
+     conditioned on either order's status);
+   - `deleting` — rejects deleting a snapshot whose order is `confirmed`.
 
-Creation (`create()`) is unaffected by this rule — a fresh order is always
-`draft` by construction, so the very first snapshot capture (at order
-creation) never needs the guard.
+   This fires **regardless of caller**, including a future direct
+   `$snapshot->update(...)`/`delete()` call that bypasses the service
+   entirely. Verified by `a_direct_model_update_on_a_confirmed_orders_snapshot_is_rejected_centrally`,
+   `a_direct_model_delete_on_a_confirmed_orders_snapshot_is_rejected_centrally`,
+   `creating_a_snapshot_for_an_already_confirmed_order_is_rejected_centrally`,
+   `reassigning_a_confirmed_snapshot_to_a_draft_order_is_rejected`, and
+   `reassigning_a_draft_snapshot_to_another_draft_order_is_also_rejected`.
+
+Creation via `CommerceOrderService::create()` is unaffected by this rule — a
+fresh order is always `draft` by construction, so the very first snapshot
+capture (at order creation) never trips the `creating` guard.
 
 ## 7. Customer/contact snapshot contract
 
@@ -350,13 +372,13 @@ rewrite. `down()` drops only the new table.
 
 ## 19. Files changed
 
-**New:**
+**New (initial open):**
 - `app/Models/CommerceOrderSnapshot.php`
 - `database/migrations/2026_09_19_010000_create_commerce_order_snapshots_table.php`
 - `tests/Feature/CommerceOrderSnapshotTest.php` — 24 focused tests.
 - `docs/plans/store/PR-COM-6C-IMPLEMENTATION-REPORT.md` (this file).
 
-**Modified:**
+**Modified (initial open):**
 - `app/Models/CommerceOrder.php` — new `snapshot(): HasOne` relation and a
   doc-comment addendum; no existing field, relation, or behavior changed.
 - `app/Services/Commerce/CommerceOrderService.php` — `create()` gains
@@ -366,14 +388,22 @@ rewrite. `down()` drops only the new table.
   helpers. `resolveOwnership()`, `confirm()`, `createLine()`, `ownedOrders()`,
   `findOwnedOrder()` are byte-for-byte unchanged.
 
+**Modified (P1 fix, §33):**
+- `app/Models/CommerceOrderSnapshot.php` — `booted()` now also guards
+  `creating` and `deleting`, and the `updating` guard additionally rejects
+  any `commerce_order_id` change unconditionally. No schema/migration
+  change was needed.
+- `tests/Feature/CommerceOrderSnapshotTest.php` — 6 tests added (§20, §33.4).
+
 No route, no controller, no middleware, no changes to
 `setup.sh`/`.github/workflows/ci.yml`/`deploy/assemble.sh`, no changes to any
-existing test file, no changes to any accounting/inventory/ZATCA/payment/POS
+other existing test file, no changes to any accounting/inventory/ZATCA/payment/POS
 file.
 
 ## 20. Focused tests
 
-`tests/Feature/CommerceOrderSnapshotTest.php` — 24 tests:
+`tests/Feature/CommerceOrderSnapshotTest.php` — 30 tests (24 at initial
+open, +6 added for the P1 fix, §33):
 
 **Capture:** `guest_order_creation_can_capture_a_customer_and_shipping_snapshot`,
 `authenticated_unlinked_customer_can_capture_a_snapshot`,
@@ -392,7 +422,14 @@ file.
 `a_snapshot_can_be_attached_for_the_first_time_while_still_draft`,
 `attaching_a_first_time_snapshot_still_requires_a_customer_name`,
 `updating_a_snapshot_is_rejected_once_the_order_is_confirmed_service_level`,
-`a_direct_model_update_on_a_confirmed_orders_snapshot_is_rejected_centrally`.
+`a_direct_model_update_on_a_confirmed_orders_snapshot_is_rejected_centrally`,
+`a_direct_model_delete_on_a_confirmed_orders_snapshot_is_rejected_centrally` (P1),
+`creating_a_snapshot_for_an_already_confirmed_order_is_rejected_centrally` (P1),
+`reassigning_a_confirmed_snapshot_to_a_draft_order_is_rejected` (P1),
+`reassigning_a_draft_snapshot_to_another_draft_order_is_also_rejected` (P1),
+`confirmation_freezes_the_existing_snapshot_against_every_mutation_path` (P1),
+`an_existing_confirmed_order_with_no_snapshot_remains_valid` (P1 — backward
+compatibility).
 
 **Shipping/billing:** `shipping_and_billing_snapshots_are_independent`,
 `a_missing_snapshot_is_backward_compatible_for_orders_created_without_one`,
@@ -415,32 +452,38 @@ Plus full re-runs (unchanged) of `CommerceOrderServiceTest`,
 `BranchIsolationGuardTest` (confirms `CommerceOrderSnapshot`'s `CompanyWide`
 classification is recognized and consistent).
 
-## 21. SQLite results
+## 21. SQLite results (supersedes the initial-open numbers — current, after the P1 fix)
 
-- **Focused (`CommerceOrderSnapshotTest`):** 24/24 passed (55 assertions),
-  first run.
+- **Focused (`CommerceOrderSnapshotTest`):** 30/30 passed (64 assertions).
 - **Regression bundle** (`CommerceOrderSnapshotTest|CommerceOrderServiceTest|
   CommerceOrderReservationServiceTest|CommerceOrderOwnershipTest|
   CommerceCustomerContextIntegrationTest|CommerceModuleBoundaryTest|
-  CustomerDigitalAccessTest|CustomerFoundationDatabaseInvariantTest`): 150
+  CustomerDigitalAccessTest|CustomerFoundationDatabaseInvariantTest`): 156
   passed, 1 skipped (the pre-existing PostgreSQL-only partial-index
   assertion, unrelated to this PR).
 - `BranchIsolationGuardTest`: 4/4 passed (115 assertions) — confirms
-  `CommerceOrderSnapshot`'s `CompanyWide` declaration.
-- **Full suite:** 3253 passed, 27 failed, 18 skipped (21,163 assertions).
+  `CommerceOrderSnapshot`'s `CompanyWide` declaration is unaffected by the
+  P1 fix.
+- **Full suite:** 3259 passed, 27 failed, 18 skipped (21,172 assertions).
   The 27 failures verified **by name** identical to the documented
   pre-existing baseline (`Fuel*Test` — missing `bcmath` — plus
   `DocumentCenterSecureIntakeTest`, a PDF-fixture gap): zero new failures,
-  zero new failure categories.
+  zero new failure categories. One earlier run (executed concurrently with
+  the PostgreSQL full-suite run below, competing for CPU) showed a transient
+  28th failure in the same `Fuel*`/`DocumentCenter*` group; a clean, isolated
+  re-run reproduced the documented 27 exactly, confirming the 28th was a
+  timing-sensitive flake unrelated to this change (`CommerceOrderSnapshot`
+  shares no code path with `FuelCostBasisService`/`DocumentCenter*`).
 
-## 22. PostgreSQL results
+## 22. PostgreSQL results (supersedes the initial-open numbers — current, after the P1 fix)
 
-- **Regression bundle** (same filter as §21): 151 passed, 0 skipped (the
-  PostgreSQL-only partial-index assertion now runs and passes).
+- **Focused (`CommerceOrderSnapshotTest`):** 30/30 passed (64 assertions).
+- **Regression bundle** (same filter as §21): 157 passed, 0 skipped (the
+  PostgreSQL-only partial-index assertion runs and passes).
 - **Migration:** `php artisan migrate:fresh` against PostgreSQL 16 applied
-  the new table cleanly.
-- **Full suite:** 3271 passed, 27 failed (21,245 assertions), duration
-  ~882s. Failure count is identical to SQLite (§21: 27); the tail of the run
+  cleanly — no schema change was needed for the P1 fix (guard logic only).
+- **Full suite:** 3277 passed, 27 failed (21,254 assertions), duration
+  ~876s. Failure count is identical to SQLite (§21: 27); the run's own
   output shows the same signature failure
   (`Call to undefined function App\Services\bcmul()` in
   `FuelCostBasisService.php`, i.e. missing `bcmath`) as the documented
@@ -451,16 +494,16 @@ classification is recognized and consistent).
   (`PR-COM-5A` §42, `PR-COM-5B` §38/§45.9, `PR-COM-6A` §15/§21.8, `PR-COM-6B`
   §17-18).
 
-## 23. Regression/full-suite results
+## 23. Regression/full-suite results (current, after the P1 fix)
 
-SQLite: 3253 passed, 27 failed, 18 skipped. PostgreSQL: 3271 passed, 27
+SQLite: 3259 passed, 27 failed, 18 skipped. PostgreSQL: 3277 passed, 27
 failed, 0 skipped (PostgreSQL runs every SQLite-skipped, PostgreSQL-only
 test). Both counts of 27 match the long-standing baseline exactly: 24
 `Fuel*Test` cases (missing `bcmath` PHP extension in this sandbox) plus
 `DocumentCenterSecureIntakeTest` (PDF-fixture gap) — verified by name on
 SQLite (§21) and by count-parity plus identical failure signature on
 PostgreSQL (§22). Zero new failures, zero new failure categories, on either
-engine.
+engine, before or after the P1 fix.
 
 ## 24. CI result
 
@@ -544,15 +587,194 @@ against `main`, not merged.
 ## 31. Base SHA / Head SHA
 
 - **Base SHA:** `9e8ed1a18f1782bd1f159dd95aecb473d0aef2d0`
-- **Head SHA (code + focused-test results):** `26d15d6`.
-- **Head SHA (current, after recording PostgreSQL full-suite results):**
-  `5241093` — this documentation-only update is added in a follow-up commit
-  on the same branch/PR, following the same convention as
-  `PR-COM-6B-IMPLEMENTATION-REPORT.md` §26.
+- **Head SHA (initial open):** `a897e7b` (code `26d15d6` + doc commits
+  `5241093`/`a897e7b`).
+- **Head SHA (P1 fix code):** `cac0c56` — `app/Models/CommerceOrderSnapshot.php`
+  hardened, 6 tests added.
+- **Head SHA (current, after recording the P1 fix in this report):**
+  recorded in the same follow-up commit as this update, per the final
+  delivery message — following the same convention as
+  `PR-COM-6A-IMPLEMENTATION-REPORT.md` §2/§21.
 
 ## 32. Recommended next step
 
-Owner review of the storage-design rationale (§5) and the
-draft-editable/confirmed-frozen immutability rule (§6). Once approved and
-merged, `PR-COM-7A` (cart/checkout) may proceed — it is not started here,
-and this PR does not implement any part of it.
+Owner review of the storage-design rationale (§5), the
+draft-editable/confirmed-frozen immutability rule (§6), and the P1 hardening
+(§33). Once approved and merged, `PR-COM-7A` (cart/checkout) may proceed —
+it is not started here, and this PR does not implement any part of it.
+
+## 33. P1 review finding — fixed on this PR/branch
+
+### 33.1 The finding
+
+The initial implementation's immutability guard (§6, initial version)
+intercepted only the model's `updating` event. That left three other
+mutation paths on `CommerceOrderSnapshot` completely unguarded once an
+order was `confirmed`:
+
+1. **Direct delete** — `$snapshot->delete()` had no guard at all; a
+   confirmed order's historical evidence could simply be removed.
+2. **Creating a new snapshot for an already-confirmed order** —
+   `$order->snapshot()->create([...])` on a confirmed `$order` had nothing
+   to stop it; the `updating` guard only ever fires on an existing row.
+3. **Reassignment via `commerce_order_id`** — the `updating` guard resolved
+   `$snapshot->order()->first()`, which reads the model's *current*
+   in-memory `commerce_order_id`. During an `updating` event that attribute
+   already reflects the *new*, not-yet-persisted value the caller just set,
+   so a caller reassigning a confirmed snapshot to a draft order would have
+   the guard check the **draft** order (not confirmed → guard passes) and
+   let the reassignment through, silently detaching the evidence from its
+   real, confirmed order.
+
+### 33.2 Exact guard strategy chosen
+
+**`CommerceOrderSnapshot::booted()` now registers three event guards
+instead of one, and makes `commerce_order_id` structurally immutable after
+creation:**
+
+```php
+protected static function booted(): void
+{
+    static::creating(function (self $snapshot): void {
+        self::rejectIfOwningOrderIsConfirmed($snapshot, '...');
+    });
+
+    static::updating(function (self $snapshot): void {
+        if ($snapshot->isDirty('commerce_order_id')) {
+            throw new LogicException('...'); // rejected unconditionally
+        }
+        self::rejectIfOwningOrderIsConfirmed($snapshot, '...');
+    });
+
+    static::deleting(function (self $snapshot): void {
+        self::rejectIfOwningOrderIsConfirmed($snapshot, '...');
+    });
+}
+```
+
+**Why `commerce_order_id` is rejected unconditionally, not by comparing
+old vs. new order status:** the task's own finding named the exact trap —
+"do not rely on resolving `order()` only after the foreign key has
+changed." A comparison-based fix (load the *original* order via
+`getOriginal('commerce_order_id')`, check if *it* was confirmed, reject
+only then) would still have a gap: reassigning a **draft** snapshot to
+another **draft** order is harmless to check today, but it silently
+detaches a snapshot from the order it was captured for and lets it
+re-attach to an unrelated one — a snapshot is defined as *this order's*
+point-in-time evidence, not a floating record that can be re-homed while
+both ends happen to be drafts. Making the foreign key immutable outright
+removes the entire reassignment surface in one narrow rule, rather than
+enumerating which combination of source/target states would be "safe" —
+consistent with the task's own suggested alternative ("make ownership
+structurally immutable using the narrowest safe approach"). No schema
+change was needed: `isDirty()` is an Eloquent-level check, not a database
+constraint.
+
+**Why `creating` needed its own guard:** the `updating` guard only ever
+fires for a row that already exists; a brand-new `CommerceOrderSnapshot`
+row aimed at an already-confirmed order would never trigger it. The
+`creating` guard checks the same condition (owning order confirmed →
+reject) at the one point in the lifecycle `updating` cannot reach.
+
+**Why `deleting` needed its own guard:** deleting a snapshot leaves no row
+at all — the exact same historical-integrity loss as freely mutating one
+requires an explicit reject, using the same `rejectIfOwningOrderIsConfirmed()`
+helper as `creating`/`updating` for one consistent rule and one consistent
+message style.
+
+### 33.3 Behavior after the fix
+
+| Mutation attempt | Order status | Result |
+|---|---|---|
+| Create snapshot | `draft` | Allowed (unchanged — `create()`'s own flow) |
+| Create snapshot | `confirmed` | **Rejected** (`LogicException`, new) |
+| Update fields, `commerce_order_id` unchanged | `draft` | Allowed (unchanged — `updateSnapshot()`'s flow) |
+| Update fields, `commerce_order_id` unchanged | `confirmed` | Rejected (unchanged from initial open) |
+| Update `commerce_order_id` (reassign) | any/any | **Rejected unconditionally** (new — no status check needed) |
+| Delete snapshot | `draft` | Allowed (cascades naturally when the draft order itself is deleted; a direct delete of just the snapshot while the order stays draft is also allowed — no rule in this PR forbids editing/removing a draft's own evidence) |
+| Delete snapshot | `confirmed` | **Rejected** (`LogicException`, new) |
+
+### 33.4 Tests added for the fix
+
+Added to `tests/Feature/CommerceOrderSnapshotTest.php` (6 tests, none of
+the original 24 were removed or weakened):
+
+1. `a_direct_model_delete_on_a_confirmed_orders_snapshot_is_rejected_centrally`
+2. `creating_a_snapshot_for_an_already_confirmed_order_is_rejected_centrally`
+3. `reassigning_a_confirmed_snapshot_to_a_draft_order_is_rejected` — the
+   exact finding: a confirmed snapshot reassigned to a draft order.
+4. `reassigning_a_draft_snapshot_to_another_draft_order_is_also_rejected` —
+   proves the fix is structural (no status combination is exempt), not a
+   targeted patch for only the confirmed-source case.
+5. `confirmation_freezes_the_existing_snapshot_against_every_mutation_path` —
+   one order/snapshot pair, confirmed once, then update/delete/reassign are
+   each attempted and each rejected in the same test.
+6. `an_existing_confirmed_order_with_no_snapshot_remains_valid` — backward
+   compatibility: a historical confirmed order that never had a snapshot
+   is unaffected by any of the new guards (`$order->snapshot` stays `null`,
+   nothing throws).
+
+### 33.5 Existing tests re-verified unaffected
+
+`a_direct_model_update_on_a_confirmed_orders_snapshot_is_rejected_centrally`
+(the original P0 test) still passes unchanged — the `updating` guard's
+confirmed-order rejection is preserved exactly, only extended. Every draft
+lifecycle test (`a_draft_orders_snapshot_can_be_updated`,
+`a_snapshot_can_be_attached_for_the_first_time_while_still_draft`, etc.)
+also still passes unchanged — none of them touch `commerce_order_id` at
+all, so the new immutability rule never engages for them.
+
+### 33.6 Focused test results (P1 fix)
+
+`CommerceOrderSnapshotTest` (30 tests): **SQLite 30/30 passed** (64
+assertions); **PostgreSQL 30/30 passed** (64 assertions).
+
+### 33.7 Regression bundle results (P1 fix, supersedes §21/§22's initial-open numbers)
+
+`CommerceOrderSnapshotTest|CommerceOrderServiceTest|
+CommerceOrderReservationServiceTest|CommerceOrderOwnershipTest|
+CommerceCustomerContextIntegrationTest|CommerceModuleBoundaryTest|
+CustomerDigitalAccessTest|CustomerFoundationDatabaseInvariantTest`:
+
+- **SQLite:** 156 passed, 1 skipped (the same pre-existing PostgreSQL-only
+  partial-index skip as before).
+- **PostgreSQL:** 157 passed, 0 skipped.
+
+Zero regressions — every COM-5A/COM-5B/COM-6A/COM-6B/initial-open-COM-6C
+assertion still passes.
+
+### 33.8 Full-suite results (P1 fix, supersedes §21-§23's initial-open numbers — current truth)
+
+| Engine | Passed | Failed | Skipped | Assertions |
+|---|---|---|---|---|
+| SQLite | 3259 | 27 | 18 | 21,172 |
+| PostgreSQL | 3277 | 27 | 0 | 21,254 |
+
+Both engines' 27 failures re-verified identical to the pre-fix baseline
+(§21-§23) and to every prior Commerce PR's documented baseline — the same
+24 `Fuel*Test` cases (missing `bcmath`) plus `DocumentCenterSecureIntakeTest`
+(PDF-fixture gap). Zero new failures, zero new failure categories, on
+either engine, before or after the fix. (One transient 28th SQLite failure
+was observed in a run executed concurrently with the ~15-minute PostgreSQL
+full-suite run competing for CPU; a clean, isolated re-run reproduced
+exactly 27, confirming it was a timing flake in the unrelated `Fuel*`/
+`DocumentCenter*` group, not a regression from this change — see §21.)
+
+### 33.9 CI (P1 fix)
+
+Not yet run as of the fix commit — CI triggers on push to this PR. Local
+full-suite results (§33.8) were produced against the same local PostgreSQL
+16 instance configured identically to the CI service container.
+
+### 33.10 Confirmation
+
+**The P1 finding is fixed.** A confirmed `CommerceOrder`'s snapshot can no
+longer be updated, deleted, or reassigned to another order through any
+mutation path this model exposes — the guard covers `creating`, `updating`,
+and `deleting` together, and `commerce_order_id` is structurally immutable
+after creation rather than re-checked conditionally. Draft behavior
+(create, update, confirm-freezes) is unchanged and re-verified. Backward
+compatibility for historical confirmed orders with no snapshot is
+unaffected. No scope expansion: no COM-7, saved addresses, checkout,
+payments, fulfillment, invoicing, accounting, inventory, ZATCA, or POS code
+was touched.
