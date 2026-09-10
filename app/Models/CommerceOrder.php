@@ -7,6 +7,7 @@ use App\Tenancy\CompanyWide;
 use App\Tenancy\ResolvesBranchReferences;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use LogicException;
 
 /**
@@ -30,6 +31,10 @@ use LogicException;
  * دوماً للضيف/الطاقم. لا مُدخَل طالبٍ يصل إليه إطلاقاً؛ لا علاقة له بـ
  * `trustedPartnerSelection` (يبقى محصوراً بـ`partner_id` وحده). `Partner`
  * يبقى علاقةً تجاريةً وصفية — لا يمنح وصولاً لمورد بذاته.
+ *
+ * `snapshot` (PR-COM-6C): لقطة العميل/الاتصال/الشحن/الفوترة وقت الطلب —
+ * حجّة تاريخية اختيارية (صفرٌ أو سطرٌ واحد)، منفصلة تماماً عن الملكية
+ * أعلاه. لا سلطة تفويضٍ فيها إطلاقاً — راجع `CommerceOrderSnapshot`.
  */
 class CommerceOrder extends BaseModel implements CompanyWide
 {
@@ -91,6 +96,12 @@ class CommerceOrder extends BaseModel implements CompanyWide
     public function customerIdentity(): BelongsTo
     {
         return $this->belongsTo(CustomerIdentity::class);
+    }
+
+    /** لقطة العميل/الاتصال/الشحن/الفوترة وقت الطلب (PR-COM-6C) — صفرٌ أو سطرٌ واحد. */
+    public function snapshot(): HasOne
+    {
+        return $this->hasOne(CommerceOrderSnapshot::class);
     }
 
     public function isDraft(): bool

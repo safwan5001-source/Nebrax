@@ -70,6 +70,16 @@ use RuntimeException;
  * `NotificationController::ownNotifications()` القائم: الاستعلام نفسه
  * مُصفّى بالمالك المُستمَدّ خادمياً، لا تحميل عامّ ثم تفويضٌ بمعرّفٍ من الطالب.
  * `Partner` يبقى علاقةً تجاريةً وصفية فقط — لا يمنح وصولاً لموردٍ بذاته.
+ *
+ * **PR-COM-6C — لقطة العميل/الاتصال/الشحن/الفوترة**: `$data['customer_snapshot']`/
+ * `shipping_snapshot`/`billing_snapshot` (كلها اختيارية) بيانات وصفية بحتة —
+ * لا سلطة تفويض إطلاقاً، ولا علاقة لها بـ`resolveOwnership()`/
+ * `trustedPartnerSelection` أعلاه (تُقرأ بمعزل تامٍ عن حسم الملكية). القيم
+ * تُنسخ حرفياً كما مرَّرها الطالب — لا قراءة حيّة من `Partner`/`CustomerIdentity`
+ * هنا؛ COM-7 لاحقاً قرارٌ منفصل تماماً بشأن ما إذا كان يملأ هذه الحقول من
+ * عنوان Partner الحالي أم من إدخال العميل المباشر. الجمود: مسودة قابلة
+ * للتعديل عبر `updateSnapshot()`، ومؤكَّدة مجمَّدة تماماً — يرفضها كلٌّ من
+ * هذه الطبقة و`CommerceOrderSnapshot::booted()` مركزياً.
  */
 class CommerceOrderService
 {
@@ -90,11 +100,12 @@ class CommerceOrderService
      * مسار عام/ضيف مستقبلي) لا يملك أي وسيلة لجعل `partner_id` سلطةً على
      * الطلب، مهما كانت قيمته في `$data`.
      *
-     * @param  array{sales_channel_id: string, partner_id?: ?string, number?: ?string}  $data
+     * @param  array{sales_channel_id: string, partner_id?: ?string, number?: ?string, customer_snapshot?: array<string, mixed>, shipping_snapshot?: array<string, mixed>, billing_snapshot?: array<string, mixed>}  $data
      * @param  array<int, array{product_id: string, quantity: int, unit_name?: ?string}>  $items
      *
      * @throws RuntimeException المستأجر/القناة/العميل/المنتج غير موجودين، أو
-     *                          كمية غير موجبة، أو وحدة غير معرَّفة.
+     *                          كمية غير موجبة، أو وحدة غير معرَّفة، أو حمولة
+     *                          لقطة غير صالحة بنيوياً.
      * @throws CommerceOrderPriceUnresolvedException سطرٌ بلا سعر قابل للحسم.
      */
     public function create(array $data, array $items, bool $trustedPartnerSelection = false): CommerceOrder
@@ -115,7 +126,12 @@ class CommerceOrderService
 
         [$customerIdentityId, $partnerId] = $this->resolveOwnership($tenantId, $data, $trustedPartnerSelection);
 
-        return DB::transaction(function () use ($salesChannelId, $customerIdentityId, $partnerId, $data, $items) {
+        // يُبنى/يُتحقَّق قبل فتح المعاملة — بنفس منطق فحوصات القناة/الملكية
+        // أعلاه: حمولة لقطة غير صالحة بنيوياً يجب أن تُسقط الطلب كاملاً قبل
+        // أي كتابة، لا أن تُترك لتفشل منتصف المعاملة.
+        $snapshot = $this->normalizeSnapshotInput($data, customerNameRequired: true);
+
+        return DB::transaction(function () use ($salesChannelId, $customerIdentityId, $partnerId, $data, $items, $snapshot) {
             $order = CommerceOrder::create([
                 'sales_channel_id' => $salesChannelId,
                 'customer_identity_id' => $customerIdentityId,
@@ -130,7 +146,50 @@ class CommerceOrderService
 
             $order->update(['total' => $total]);
 
-            return $order->fresh('lines');
+            if ($snapshot !== null) {
+                $order->snapshot()->create($snapshot);
+            }
+
+            return $order->fresh(['lines', 'snapshot']);
+        });
+    }
+
+    /**
+     * تحديث/إنشاء لقطة طلبٍ قائم — القناة الوحيدة لتعديل لقطةٍ بعد الإنشاء
+     * (مثلاً: عميلٌ يبدّل عنوان الشحن أثناء مراجعة السلة قبل COM-7). مسودة
+     * فقط: طلبٌ مؤكَّد يُرفض مركزياً هنا **وكذلك** في
+     * `CommerceOrderSnapshot::booted()` — طبقتا حراسة مستقلتان، لا انضباط
+     * واجهة وحده. تحديثٌ جزئي: أجزاءٌ غير مُرسَلة من `$data` تبقى كما هي في
+     * سطرٍ قائم؛ سطرٌ جديدٌ كليّاً ما زال يتطلّب `customer_snapshot.
+     * customer_name` (نفس قيد قاعدة البيانات `NOT NULL`).
+     *
+     * @param  array{customer_snapshot?: array<string, mixed>, shipping_snapshot?: array<string, mixed>, billing_snapshot?: array<string, mixed>}  $data
+     *
+     * @throws RuntimeException الطلب ليس مسودة، أو حمولة لقطة غير صالحة بنيوياً.
+     */
+    public function updateSnapshot(CommerceOrder $order, array $data): CommerceOrder
+    {
+        return DB::transaction(function () use ($order, $data) {
+            $order = CommerceOrder::query()->lockForUpdate()->findOrFail($order->id);
+
+            if (! $order->isDraft()) {
+                throw new RuntimeException('لا يمكن تعديل لقطة طلبٍ ليس بحالة مسودة — اللقطة تجمَّدت نهائياً عند التأكيد.');
+            }
+
+            $existing = $order->snapshot()->first();
+            $attributes = $this->normalizeSnapshotInput($data, customerNameRequired: $existing === null);
+
+            if ($attributes === null) {
+                return $order->fresh(['lines', 'snapshot']);
+            }
+
+            if ($existing === null) {
+                $order->snapshot()->create($attributes);
+            } else {
+                $existing->update($attributes);
+            }
+
+            return $order->fresh(['lines', 'snapshot']);
         });
     }
 
@@ -203,6 +262,91 @@ class CommerceOrderService
     private function nextNumber(): string
     {
         return CommerceOrder::nextDocumentNumber('CORD', now()->toDateString());
+    }
+
+    /**
+     * PR-COM-6C — يبني سمات `CommerceOrderSnapshot` من مُدخَل الطالب، أو
+     * `null` إن لم يُطلَب أي جزءٍ من اللقطة إطلاقاً (لا سطر يُنشأ حينها —
+     * التوافق الرجعي الافتراضي لكل طلبٍ لا يمرّر أي مفتاح لقطة).
+     *
+     * تحقّقٌ بنيويٌّ بحت هنا — لا تطبيع هوية (لا `CustomerIdentity::
+     * normalizeEmail`): القيم حجّةٌ تاريخية معروضة، لا معرّف دخول، فتُحفَظ
+     * كما أدخلها الطالب بعد `trim()` فقط (§ Validation — لا إفراط في التطبيع).
+     *
+     * @param  array<string, mixed>  $data
+     *
+     * @throws RuntimeException بنية غير صالحة (ليست مصفوفة، قيمة غير قابلة
+     *                          للتحويل نصياً)، أو غياب اسم العميل حين يكون
+     *                          إلزامياً.
+     */
+    private function normalizeSnapshotInput(array $data, bool $customerNameRequired): ?array
+    {
+        $hasCustomer = array_key_exists('customer_snapshot', $data);
+        $hasShipping = array_key_exists('shipping_snapshot', $data);
+        $hasBilling = array_key_exists('billing_snapshot', $data);
+
+        if (! $hasCustomer && ! $hasShipping && ! $hasBilling) {
+            return null;
+        }
+
+        $attributes = [];
+
+        $customer = $this->snapshotBlock($data['customer_snapshot'] ?? [], 'لقطة العميل');
+        $customerName = $this->snapshotField($customer['customer_name'] ?? null, 'اسم العميل');
+        if ($customerNameRequired && ($customerName === null)) {
+            throw new RuntimeException('لقطة العميل تتطلب اسم العميل.');
+        }
+        if ($customerName !== null) {
+            $attributes['customer_name'] = $customerName;
+        }
+        foreach (['contact_name', 'company_name', 'email', 'phone', 'vat_number', 'cr_number'] as $field) {
+            if (array_key_exists($field, $customer)) {
+                $attributes[$field] = $this->snapshotField($customer[$field], $field);
+            }
+        }
+
+        foreach (['shipping' => 'shipping_snapshot', 'billing' => 'billing_snapshot'] as $prefix => $key) {
+            if (! array_key_exists($key, $data)) {
+                continue;
+            }
+
+            $block = $this->snapshotBlock($data[$key], $key);
+            $fields = ['recipient_name', 'phone', 'country', 'city', 'district', 'street', 'building_no', 'postal_code'];
+            if ($prefix === 'shipping') {
+                $fields[] = 'notes';
+            }
+
+            foreach ($fields as $field) {
+                if (array_key_exists($field, $block)) {
+                    $attributes["{$prefix}_{$field}"] = $this->snapshotField($block[$field], "{$prefix}_{$field}");
+                }
+            }
+        }
+
+        return $attributes;
+    }
+
+    private function snapshotBlock(mixed $block, string $label): array
+    {
+        if (! is_array($block)) {
+            throw new RuntimeException("«{$label}» يجب أن تكون كائناً منظَّماً.");
+        }
+
+        return $block;
+    }
+
+    private function snapshotField(mixed $value, string $label): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+        if (! is_string($value) && ! is_numeric($value)) {
+            throw new RuntimeException("قيمة «{$label}» في لقطة الطلب غير صالحة.");
+        }
+
+        $value = trim((string) $value);
+
+        return $value === '' ? null : $value;
     }
 
     /**
