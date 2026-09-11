@@ -2,13 +2,6 @@
 
 namespace App\Providers;
 
-use App\Http\Controllers\Api\PaymentController;
-use App\Http\Middleware\EnsureActiveSubscription;
-use App\Http\Middleware\EnsurePermission;
-use App\Http\Middleware\EnsureUserPrincipal;
-use App\Http\Middleware\ForceJsonResponse;
-use App\Http\Middleware\SetBranch;
-use App\Http\Middleware\SetTenant;
 use App\Support\RevisionBuffer;
 use App\Tenancy\BranchContext;
 use App\Tenancy\BranchSharing;
@@ -17,7 +10,6 @@ use App\Tenancy\TenantContext;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
-use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
 
@@ -73,18 +65,5 @@ class TenancyServiceProvider extends ServiceProvider
                 Limit::perMinute(5)->by("customer-login|{$tenant}|email|{$email}"),
             ];
         });
-
-        // PAY-V2-1B: نفس مجموعة حماية سندات القبض/الصرف. المسار يجاور
-        // `POST payments/{id}/post` من حيث العقد والصلاحية.
-        Route::middleware([
-            ForceJsonResponse::class,
-            'auth:sanctum',
-            EnsureUserPrincipal::class,
-            SetTenant::class,
-            SetBranch::class,
-            EnsureActiveSubscription::class,
-            EnsurePermission::class.':payments.manage',
-        ])->post('api/payments/{id}/reverse', [PaymentController::class, 'reverse'])
-            ->whereUuid('id');
     }
 }
