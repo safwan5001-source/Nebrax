@@ -6,11 +6,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import InventoryPage from './page';
 import { ApiError } from '@/lib/api';
 
-const { api, translate, exportDialog, searchParams } = vi.hoisted(() => ({
+const { api, exportDialog, searchParams, translations } = vi.hoisted(() => ({
   api: vi.fn(),
   exportDialog: vi.fn(),
   searchParams: new URLSearchParams(),
-  translate: (namespace: string) => (key: string) => `${namespace}.${key}`,
+  translations: {
+    inventory: (key: string) => `inventory.${key}`,
+    warehouses: (key: string) => `warehouses.${key}`,
+    products: (key: string) => `products.${key}`,
+    common: (key: string) => `common.${key}`,
+  },
 }));
 
 vi.mock('react', async () => {
@@ -21,7 +26,8 @@ vi.mock('react', async () => {
   };
 });
 vi.mock('next-intl', () => ({
-  useTranslations: (namespace = 'inventory') => translate(namespace),
+  useTranslations: (namespace = 'inventory') =>
+    translations[namespace as keyof typeof translations] ?? translations.inventory,
   useLocale: () => 'ar',
 }));
 vi.mock('next/navigation', () => ({
