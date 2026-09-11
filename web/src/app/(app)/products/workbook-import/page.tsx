@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { useToast } from '@/components/ui/toast';
+import { FormActions } from '@/components/nebrax';
 import { api, ApiError } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { Stepper } from '@/modules/products/import/stepper';
@@ -196,10 +197,14 @@ export default function ProductWorkbookImportPage() {
             <CardContent className="space-y-4">
               <p className="text-sm leading-relaxed text-muted">{t('resumed_hint', { name: engine.job.original_filename })}</p>
               <PriceListSelect value={priceListId} onChange={setPriceListId} options={activePriceLists} t={t} />
-              <Button disabled={!priceListId} onClick={() => void confirmAndApply()}>
-                <Upload className="h-4 w-4" strokeWidth={1.7} />
-                {t('apply')}
-              </Button>
+              <FormActions
+                primary={
+                  <Button disabled={!priceListId} onClick={() => void confirmAndApply()}>
+                    <Upload className="h-4 w-4" strokeWidth={1.7} />
+                    {t('apply')}
+                  </Button>
+                }
+              />
             </CardContent>
           </Card>
         ) : (
@@ -283,12 +288,14 @@ export default function ProductWorkbookImportPage() {
               </CardContent>
             </Card>
 
-            <div className="flex justify-end">
-              <Button disabled={!canPreview} onClick={() => void runPreview()}>
-                {previewing ? <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.7} /> : <CheckCircle2 className="h-4 w-4" strokeWidth={1.7} />}
-                {t('run_preview')}
-              </Button>
-            </div>
+            <FormActions
+              primary={
+                <Button disabled={!canPreview} onClick={() => void runPreview()}>
+                  {previewing ? <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.7} /> : <CheckCircle2 className="h-4 w-4" strokeWidth={1.7} />}
+                  {t('run_preview')}
+                </Button>
+              }
+            />
           </div>
         )
       ) : null}
@@ -332,15 +339,19 @@ export default function ProductWorkbookImportPage() {
               </p>
             ) : null}
 
-            <div className="flex flex-wrap justify-between gap-2">
-              <Button type="button" variant="outline" onClick={() => setStep(0)}>
-                {tp('import_back')}
-              </Button>
-              <Button disabled={!preview.ready} onClick={() => void confirmAndApply()}>
-                <Upload className="h-4 w-4" strokeWidth={1.7} />
-                {t('apply')}
-              </Button>
-            </div>
+            <FormActions
+              secondary={
+                <Button type="button" variant="outline" onClick={() => setStep(0)}>
+                  {tp('import_back')}
+                </Button>
+              }
+              primary={
+                <Button disabled={!preview.ready} onClick={() => void confirmAndApply()}>
+                  <Upload className="h-4 w-4" strokeWidth={1.7} />
+                  {t('apply')}
+                </Button>
+              }
+            />
           </CardContent>
         </Card>
       ) : null}
@@ -384,14 +395,18 @@ export default function ProductWorkbookImportPage() {
                 <dd className="num mt-0.5 text-sm text-text">{applyResult?.unit_prices?.created ?? 0}</dd>
               </div>
             </dl>
-            <div className="flex flex-wrap gap-2">
-              <Button asChild variant="primary">
-                <Link href="/products">{tp('import_back_to_products')}</Link>
-              </Button>
-              <Button variant="outline" onClick={reset}>
-                {tp('import_start_another')}
-              </Button>
-            </div>
+            <FormActions
+              secondary={
+                <Button variant="outline" onClick={reset}>
+                  {tp('import_start_another')}
+                </Button>
+              }
+              primary={
+                <Button asChild variant="primary">
+                  <Link href="/products">{tp('import_back_to_products')}</Link>
+                </Button>
+              }
+            />
           </CardContent>
         </Card>
       ) : null}

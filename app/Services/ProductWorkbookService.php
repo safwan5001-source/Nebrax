@@ -47,7 +47,17 @@ class ProductWorkbookService
 
     public const SHEET_UNIT_PRICES = 'Unit Prices';
 
-    public const MAX_ROWS = ProductImportService::MAX_ROWS;
+    /**
+     * PR-DUR-HARDEN-1 — قيمةٌ صريحة مستقلّة الآن، لا مستعارة من
+     * `ProductImportService::MAX_ROWS` كما كانت. المصنّف ذرّيٌّ بطبيعته
+     * (`apply()` يطبّق أوراقه الثلاث معاً داخل معاملةٍ واحدة، بلا
+     * `batch_offset`/`batch_size` أصلاً — PR-DUR-3)، فسقفه يخضع لنفس منطق
+     * `apply()` المتزامن غير المجزَّأ الذي أبقى `ProductImportService::MAX_ROWS`
+     * عند ٢٠٠٠: التحقّق والكتابة كلاهما لكامل الملف في طلبٍ واحد. رفع سقف
+     * `product_catalog` الدائم المجزَّأ (`DURABLE_MAX_ROWS`) لا يمسّ هذا
+     * المجال، فالاستعارة القديمة كانت ستربطهما سهواً بقيمةٍ واحدة تتغيّر معاً.
+     */
+    public const MAX_ROWS = 2000;
 
     public const MAX_COLUMNS = ProductImportService::MAX_COLUMNS;
 

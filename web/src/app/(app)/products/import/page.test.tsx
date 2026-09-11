@@ -205,6 +205,40 @@ describe('شاشة استيراد المنتجات — المحرّك الدائ
     expect(api).not.toHaveBeenCalledWith('/products/import/inspect', expect.anything());
   });
 
+  /**
+   * PR-DUR-HARDEN-1 — الصفحة لا تستدعي مسار التطبيق المتزامن إطلاقاً
+   * (تعتمد حصراً على `/import-jobs`)، فترسل `for_durable=1` على الفحص
+   * والمعاينة معاً كي يستعمل الخادم سقف الاستيراد الدائم الأعلى
+   * (`DURABLE_MAX_ROWS`) بدل سقف المسار المتزامن القديم.
+   */
+  it('يرسل for_durable=1 على نداءي الفحص والمعاينة كليهما', async () => {
+    const user = userEvent.setup();
+    render(<ProductImportPage />);
+    await uploadAndPreview(user);
+
+    const inspectBody = api.mock.calls.find((call) => call[0] === '/products/import/inspect')?.[1]?.body as FormData;
+    const previewBody = api.mock.calls.find((call) => call[0] === '/products/import/preview')?.[1]?.body as FormData;
+
+    expect(inspectBody.get('for_durable')).toBe('1');
+    expect(previewBody.get('for_durable')).toBe('1');
+  });
+
+  /**
+   * PR-DUR-HARDEN-1 (Part B) — الأزرار الأساسية تستعمل `FormActions` (شريطٌ
+   * ملتصق بأسفل الجوال مع `pb-safe`) بدل صفٍّ عاديّ داخل البطاقة، فلا يقع
+   * زرّ التطبيق تحت شريط Safari السفلي على iPhone.
+   */
+  it('زرّ التطبيق داخل شريط إجراءاتٍ ملتصق وآمن الحافّة السفلية على الجوال', async () => {
+    const user = userEvent.setup();
+    render(<ProductImportPage />);
+    await uploadAndPreview(user);
+
+    const applyButton = screen.getByRole('button', { name: 'import_apply' });
+    const actionsBar = applyButton.closest('.pb-safe');
+    expect(actionsBar).toBeTruthy();
+    expect(actionsBar?.className).toContain('fixed');
+  });
+
   it('حالة الفشل تعرض رسالة الخادم الفعلية لا رسالة عامّة', async () => {
     const user = userEvent.setup();
     render(<ProductImportPage />);
