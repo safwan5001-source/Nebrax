@@ -1,0 +1,16 @@
+AWJ Store — Storefront
+
+This directory contains a fork of Spree Storefront, used as the foundation
+for AWJ Store's buyer-facing storefront.
+
+Upstream origin:
+  Repository : https://github.com/spree/storefront
+  Revision   : 2ad6ad5bd1bcc055467064bd57cf20ab5f711c88 (2026-09-06)
+  License    : MIT (see LICENSE file in this directory)
+  Copyright  : Vendo Connect Inc., Vendo Sp. z o.o.
+
+The original LICENSE file is preserved as required by the MIT License terms.
+
+AWJ modifications are documented in the commit history. The storefront UI
+is adapted to consume AWJ Commerce APIs (Laravel) instead of the original
+Spree Rails backend. The Spree Rails backend is not used or included.
