@@ -103,7 +103,9 @@ vi.mock('@/components/data-table', () => ({
         <tbody>
           {data.map((row) => (
             <tr key={String(row.id)}>
-              <td>{String(row.name ?? '')}</td>
+              <td>
+                <a href={`/products/${String(row.product_id ?? '')}`}>{String(row.name ?? '')}</a>
+              </td>
               <td>{String(row.warehouse_name ?? '')}</td>
               <td>{row.avg_cost == null ? 'hidden-cost' : String(row.avg_cost)}</td>
             </tr>
