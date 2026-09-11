@@ -5,6 +5,7 @@ namespace App\Services\Accounting;
 use App\Models\Invoice;
 use App\Models\Partner;
 use App\Models\Payment;
+use App\Models\PaymentGateway;
 use App\Models\PaymentMethod;
 use App\Models\User;
 use App\Models\PaymentAllocation;
@@ -14,29 +15,13 @@ use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
 /**
- * ═══════════════════════════════════════════════════════════════
- *  PaymentService — سندات القبض والصرف + تخصيصها على الفواتير
- * ═══════════════════════════════════════════════════════════════
- *  - create(): ينشئ سنداً بحالة draft، ويبني تخصيصاته على الفواتير.
- *  - post():   يرحّل السند، يولّد قيداً متوازناً عبر LedgerService،
- *              ويحدّث سداد كل فاتورة مخصَّصة (unpaid → partial → paid).
+ * PaymentService — سندات القبض والصرف + تخصيصها على الفواتير.
  *
- *  قبض من عميل (received):  مدين نقد/بنك (CashBankAccount) │ دائن دور accounts_receivable (افتراضياً 1130)
- *  صرف لمورد  (paid):       مدين دور accounts_payable (افتراضياً 2110) │ دائن نقد/بنك (CashBankAccount)
- *
- *  ACC-3: طرف العميل/المورد يُحلّ عبر `AccountRoleResolver`؛ الطرف النقدي/
- *  البنكي يبقى بالكامل ملك `CashBankAccountService::resolveForPayment()`.
- *
- *  التخصيص (allocation) للقبض فقط: مجموع التخصيصات = مبلغ السند،
- *  وكل تخصيص ≤ متبقي فاتورته، والفاتورة مرحّلة وتخص طرف السند.
- *  لا كتابة مباشرة في journal_lines — القيد عبر المحرك حصراً.
+ * PAY-V2-5: قبض مربوط ببوابة يُمدّن دور gateway_clearing بدل النقد/البنك.
+ * التسوية إلى البنك حدث منفصل عبر PaymentGatewaySettlementService.
  */
 class PaymentService
 {
-    // ACC-3: accounts_receivable/accounts_payable تُحلّان عبر AccountRoleResolver
-    // أدناه بدل هذين الكودين — الجانب النقدي/البنكي يبقى بالكامل ملك
-    // CashBankAccountService (`resolveForPayment()`)، ولا يُستبدل بدور دلالي عام.
-
     public function __construct(
         protected LedgerService $ledger,
         protected PrintTemplateService $printTemplates,
@@ -44,15 +29,6 @@ class PaymentService
         protected AccountRoleResolver $accountRoles,
     ) {}
 
-    /**
-     * إنشاء سند قبض/صرف بحالة draft.
-     *
-     * @param  array  $data         ['partner_id'=>uuid, 'amount'=>int, 'direction'=>'received|paid',
-     *                               'method'=>'cash|bank', 'reference'=>?, 'cash_account_id'=>?,
-     *                               'invoice_id'=>?, 'purchase_id'=>?, 'payment_date'=>?, 'notes'=>?, 'number'=>?]
-     * @param  array  $allocations  قبض: [['invoice_id'=>uuid,'amount'=>int], ...]
-     *                              صرف: [['purchase_id'=>uuid,'amount'=>int], ...]
-     */
     public function create(array $data, array $allocations = []): Payment
     {
         $amount = (int) ($data['amount'] ?? 0);
@@ -63,13 +39,12 @@ class PaymentService
         $direction = $data['direction'] ?? 'received';
         $date      = $data['payment_date'] ?? now()->toDateString();
         [$method, $cashAccountId, $paymentMethod] = $this->resolvePaymentSetup($data);
+        $gatewayId = $this->resolvePaymentGatewayId($data, $direction);
 
-        // المستند المستهدَف حسب الاتجاه: قبض→فاتورة مبيعات، صرف→فاتورة مشتريات.
         [$targetClass, $key] = $direction === 'received'
             ? [Invoice::class, 'invoice_id']
             : [Purchase::class, 'purchase_id'];
 
-        // بناء التخصيصات: صريحة، أو ضمنياً من معرّف المستند المفرد.
         $items = ! empty($allocations)
             ? $allocations
             : (! empty($data[$key]) ? [[$key => $data[$key], 'amount' => $amount]] : []);
@@ -89,9 +64,7 @@ class PaymentService
             throw new RuntimeException("مجموع التخصيصات ({$sum}) يجب أن يساوي مبلغ السند ({$amount}).");
         }
 
-        return DB::transaction(function () use ($data, $amount, $direction, $date, $allocs, $method, $cashAccountId, $paymentMethod) {
-            // النسخ قد يكون لمستند تاريخي بلا فرع. نحفظ نطاق المصدر صراحةً،
-            // فلا تنتقل النسخة إلى الفرع الرئيسي للطلب ثم تصطدم برقمه القديم.
+        return DB::transaction(function () use ($data, $amount, $direction, $date, $allocs, $method, $cashAccountId, $paymentMethod, $gatewayId) {
             $hasExplicitBranch = array_key_exists('branch_id', $data);
             $number = $data['number'] ?? (
                 $hasExplicitBranch
@@ -102,12 +75,13 @@ class PaymentService
             $attributes = [
                 'number'          => $number,
                 'partner_id'      => $data['partner_id'],
-                'invoice_id'      => $data['invoice_id'] ?? null, // مرجع اختياري للقبض
+                'invoice_id'      => $data['invoice_id'] ?? null,
                 'pos_session_id'  => $data['pos_session_id'] ?? null,
                 'direction'       => $direction,
                 'method'          => $method,
                 'payment_method_id' => $paymentMethod['id'],
                 'payment_method_name' => $paymentMethod['name'],
+                'payment_gateway_id' => $gatewayId,
                 'reference'       => $data['reference'] ?? null,
                 'payment_details' => $data['payment_details'] ?? null,
                 'collector_employee_id' => $data['collector_employee_id'] ?? null,
@@ -137,11 +111,6 @@ class PaymentService
         });
     }
 
-    /**
-     * تعديل مسودة السند. لا يتغير اتجاه السند بعد إنشائه؛ فاستبدال قبض بصرف
-     * يبدّل طرفي القيد ولا يُعد تعديلاً آمناً. تُستبدل التخصيصات كاملةً داخل
-     * المعاملة نفسها، ثم يُعاد التحقق النهائي عند الترحيل.
-     */
     public function update(Payment $payment, array $data, array $allocations = []): Payment
     {
         if (! $payment->isDraft()) {
@@ -155,6 +124,9 @@ class PaymentService
 
         $direction = $payment->direction;
         [$method, $cashAccountId, $paymentMethod] = $this->resolvePaymentSetup($data);
+        $gatewayId = array_key_exists('payment_gateway_id', $data)
+            ? $this->resolvePaymentGatewayId($data, $direction)
+            : $payment->payment_gateway_id;
         [$targetClass, $key] = $direction === 'received'
             ? [Invoice::class, 'invoice_id']
             : [Purchase::class, 'purchase_id'];
@@ -176,13 +148,14 @@ class PaymentService
             throw new RuntimeException("مجموع التخصيصات ({$sum}) يجب أن يساوي مبلغ السند ({$amount}).");
         }
 
-        return DB::transaction(function () use ($payment, $data, $amount, $normalized, $method, $cashAccountId, $paymentMethod) {
+        return DB::transaction(function () use ($payment, $data, $amount, $normalized, $method, $cashAccountId, $paymentMethod, $gatewayId) {
             $payment->update([
                 'partner_id'      => $data['partner_id'],
                 'invoice_id'      => $data['invoice_id'] ?? null,
                 'method'          => $method,
                 'payment_method_id' => $paymentMethod['id'],
                 'payment_method_name' => $paymentMethod['name'],
+                'payment_gateway_id' => $gatewayId,
                 'reference'       => $data['reference'] ?? null,
                 'payment_details' => array_key_exists('payment_details', $data) ? $data['payment_details'] : $payment->payment_details,
                 'collector_employee_id' => array_key_exists('collector_employee_id', $data) ? $data['collector_employee_id'] : $payment->collector_employee_id,
@@ -206,7 +179,6 @@ class PaymentService
         });
     }
 
-    /** نسخة المسودة لا تنسخ التخصيصات كي لا تحجز متبقي فاتورة مرتين. */
     public function duplicate(Payment $payment, ?string $createdBy = null): Payment
     {
         $date = now()->toDateString();
@@ -215,6 +187,7 @@ class PaymentService
             'direction'       => $payment->direction,
             'method'          => $payment->method,
             'payment_method_id' => $payment->payment_method_id,
+            'payment_gateway_id' => $payment->payment_gateway_id,
             'reference'       => $payment->reference,
             'payment_details' => $payment->payment_details,
             'collector_employee_id' => $payment->collector_employee_id,
@@ -225,10 +198,6 @@ class PaymentService
             'created_by'      => $createdBy,
         ];
 
-        // فرع المصدر المحدد هو نطاق الوثيقة وسلسلته؛ لا نعتمد على السياق الذي
-        // قد يتبدل بين قراءة السند وتنفيذ طلب API. صفوف ما قبل الفروع تُنشأ
-        // في الفرع النشط، لكن رقمها التالي يُقرأ من سلسلتها القديمة حتى لا
-        // يعاد رقمٌ ما زال محمياً بالقيد الفريد في SQLite.
         if ($payment->branch_id !== null) {
             $data['branch_id'] = $payment->branch_id;
         } else {
@@ -238,9 +207,6 @@ class PaymentService
         return $this->create($data);
     }
 
-    /**
-     * ترحيل السند: توليد القيد المتوازن عبر LedgerService + تحديث سداد الفواتير.
-     */
     public function post(Payment $payment, ?User $actor = null): Payment
     {
         if (! $payment->isDraft()) {
@@ -248,7 +214,6 @@ class PaymentService
         }
 
         return DB::transaction(function () use ($payment, $actor) {
-            // قفل الصف وإعادة فحص الحالة — يمنع الترحيل المزدوج المتزامن.
             $payment = Payment::lockForUpdate()->findOrFail($payment->id);
             if (! $payment->isDraft()) {
                 throw new RuntimeException('لا يمكن ترحيل سند غير مسوّد (draft).');
@@ -256,15 +221,13 @@ class PaymentService
 
             $allocations = $payment->allocations()->get();
 
-            // التحقق من كل تخصيص قبل توليد القيد (لا أثر عند الرفض).
-            // المستند polymorphic: فاتورة مبيعات (قبض) أو فاتورة مشتريات (صرف).
             $targets = [];
             foreach ($allocations as $alloc) {
                 $class  = $alloc->allocatable_type;
                 $target = $class::lockForUpdate()->find($alloc->allocatable_id);
 
                 if (! $target) {
-                    throw new RuntimeException('المستند المخصَّص غير موجود.');
+                    throw new RuntimeException('المستند المخصَّص غير موجود.');
                 }
                 if (! $target->isPosted()) {
                     throw new RuntimeException(
@@ -274,7 +237,7 @@ class PaymentService
                     );
                 }
                 if ($target->partner_id !== $payment->partner_id) {
-                    throw new RuntimeException('الفاتورة المخصَّصة لا تخص طرف السند.');
+                    throw new RuntimeException('الفاتورة المخصَّصة لا تخص طرف السند.');
                 }
 
                 $remaining = $target->total - $target->paid_amount;
@@ -287,18 +250,28 @@ class PaymentService
                 $targets[$alloc->id] = $target;
             }
 
-            // الحساب المختار كيان خزينة/بنك فعلي؛ تُفحص صلاحية الإيداع أو السحب عند الأثر المالي لا عند إنشاء المسودة فقط.
+            $usesGatewayClearing = $this->usesGatewayClearing($payment);
+            if ($usesGatewayClearing) {
+                $this->assertGatewayStillValid($payment);
+            }
+
             $cashEntity = $this->cashBankAccounts->resolveForPayment($payment->cash_account_id, $payment->method);
-            $this->cashBankAccounts->assertAllowed(
-                $cashEntity,
-                $payment->direction === 'received' ? 'deposit' : 'withdraw',
-                $actor
-            );
+            if (! $usesGatewayClearing) {
+                $this->cashBankAccounts->assertAllowed(
+                    $cashEntity,
+                    $payment->direction === 'received' ? 'deposit' : 'withdraw',
+                    $actor
+                );
+            }
             $cashAccountId = $cashEntity->account_id;
 
             if ($payment->direction === 'received') {
+                $collectionAccountId = $usesGatewayClearing
+                    ? $this->accountRoles->resolve('gateway_clearing')->id
+                    : $cashAccountId;
+
                 $lines = [[
-                    'account_id' => $cashAccountId,
+                    'account_id' => $collectionAccountId,
                     'debit'      => $payment->amount,
                 ], [
                     'account_id'   => $this->accountRoles->resolve('accounts_receivable')->id,
@@ -328,8 +301,6 @@ class PaymentService
                 'created_by'  => $payment->created_by,
             ]);
 
-            // يُختار قالب السند داخل معاملة الترحيل ثم يُثبت على المستند؛
-            // لا يؤدي نشر مراجعة أحدث لاحقاً إلى إعادة تفسير سندٍ صدر بالفعل.
             $documentType = $payment->direction === 'received' ? 'receipt_voucher' : 'payment_voucher';
             $printAssignment = $this->printTemplates->resolve($documentType, 'print', $payment->branch_id);
             $pdfAssignment = $this->printTemplates->resolve($documentType, 'pdf', $payment->branch_id);
@@ -343,7 +314,6 @@ class PaymentService
                 'journal_entry_id' => $entry->id,
             ]);
 
-            // تطبيق التخصيصات: تحديث سداد كل مستند وحالته.
             foreach ($allocations as $alloc) {
                 $target  = $targets[$alloc->id];
                 $newPaid = $target->paid_amount + $alloc->amount;
@@ -357,10 +327,38 @@ class PaymentService
         });
     }
 
+    private function usesGatewayClearing(Payment $payment): bool
+    {
+        return $payment->direction === 'received' && filled($payment->payment_gateway_id);
+    }
+
+    private function resolvePaymentGatewayId(array $data, string $direction): ?string
+    {
+        $gatewayId = $data['payment_gateway_id'] ?? null;
+        if (! filled($gatewayId)) {
+            return null;
+        }
+        if ($direction !== 'received') {
+            throw new RuntimeException('بوابة الدفع تخص سندات القبض فقط.');
+        }
+
+        $gateway = PaymentGateway::query()->whereKey($gatewayId)->first();
+        if ($gateway === null) {
+            throw new RuntimeException('بوابة الدفع يجب أن تخص المستأجر النشط.');
+        }
+
+        return $gateway->id;
+    }
+
+    private function assertGatewayStillValid(Payment $payment): void
+    {
+        $gateway = PaymentGateway::query()->whereKey($payment->payment_gateway_id)->first();
+        if ($gateway === null) {
+            throw new RuntimeException('بوابة الدفع يجب أن تخص المستأجر النشط.');
+        }
+    }
+
     /**
-     * يطابق الطريقة النشطة بخزينتها أو حسابها البنكي ويلتقط اسمها على السند.
-     * تبقى المدفوعات القديمة التي لا تحمل payment_method_id على عقد cash|bank السابق.
-     *
      * @return array{0:string,1:string,2:array{id:?string,name:?string}}
      */
     private function resolvePaymentSetup(array $data): array
@@ -385,9 +383,6 @@ class PaymentService
         return [$method, $cashAccount->account_id, ['id' => $paymentMethod->id, 'name' => $paymentMethod->name]];
     }
 
-    /**
-     * حالة سداد الفاتورة حسب المسدَّد مقابل الإجمالي.
-     */
     protected function paymentStatus(int $paid, int $total): string
     {
         if ($paid <= 0) {
@@ -397,9 +392,6 @@ class PaymentService
         return $paid >= $total ? 'paid' : 'partial';
     }
 
-    /**
-     * توليد رقم سند تسلسلي: REC-2025-00001 (قبض) | PAY-2025-00001 (صرف)
-     */
     protected function nextNumber(string $direction, string $date, string|null|false $branchId = false): string
     {
         return Payment::nextDocumentNumber(
