@@ -56,7 +56,7 @@ class PaymentReversalService
                 throw new RuntimeException('القيد الأصلي للسند غير موجود.');
             }
 
-            // ترتيب ثابت قبل الأقفال لتقليل احتمال الـ deadlock عند تعدد المستندات.
+            // ترتيب ثابت قبل الأقفال لتقليل احتمال deadlock عند تعدد المستندات.
             $allocations = $payment->allocations()
                 ->orderBy('allocatable_type')
                 ->orderBy('allocatable_id')
