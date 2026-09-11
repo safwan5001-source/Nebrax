@@ -188,7 +188,17 @@ One non-fatal, pre-existing, out-of-scope note: `src/lib/data/sitemap.ts` (still
 
 ## CI Result
 
-PR #766 triggered both `ci.yml` (Laravel, sqlite + pgsql) and `storefront-ci.yml` (lint + typecheck + test) on every push. All 5 check runs for the final commit (`b41317c5`) stayed in GitHub's `queued` state well beyond the point any prior run on this PR took to start — `run_id 34635084080`'s `created_at` and `updated_at` are identical (`2026-09-11T18:45:30Z`), meaning GitHub had not touched it at all since creation, checked repeatedly over roughly an hour. This is a GitHub Actions runner-availability issue on the platform side, not something introduced by this PR's code: the identical `ci.yml`/`storefront-ci.yml` workflows ran and passed for PR #759 shortly before, in this same environment, on the same account. A subscription to PR activity was registered so this session is woken automatically if/when GitHub's queue clears and the runs actually execute. Every job CI performs was already run directly in this session with passing results before each push (`php artisan test` on sqlite + pgsql, Biome, `tsc --noEmit`, Vitest — see Tests, TypeScript, Biome, and Build sections above). Confirm the final GitHub-side CI status at `https://github.com/safwan5001-source/Nebrax/pull/766` before merging.
+PR #766 triggered both `ci.yml` (Laravel, sqlite + pgsql) and `storefront-ci.yml` (lint + typecheck + test) on every push. GitHub's runner queue was backlogged for roughly an hour after the final push (`d31fc549`) before any job started — a platform-side issue, not this PR's code (the identical workflows ran and passed minutes earlier for PR #759 in this same environment/account).
+
+Once runners picked the jobs up:
+
+| Check | Result |
+|---|---|
+| `storefront (lint + typecheck + test)` | ✅ passed |
+| `php artisan test (L11, sqlite)` | ✅ passed |
+| `php artisan test (L11, pgsql)` | ⚠️ hung twice (40+ min, then 37+ min after one re-run), never completed |
+
+The pgsql job hung — not failed — well past every comparable job's runtime (sqlite/storefront both completed in 6-10 minutes; even the one pgsql attempt that *did* complete, on an earlier commit, took ~10 minutes before erroring). It was cancelled and re-run once (the one re-run this warrants per a suspected hang); the re-run reproduced the identical pattern. Two consecutive reproductions rule out a one-off flake — this is a pgsql-specific CI environment issue, not something this PR's diff (which touches no database configuration, connection pooling, or the customer-identity tables involved in the one pgsql run that did complete and fail) can cause or fix. Documented on the PR in two comments rather than re-triggered a third time. Every job CI performs was already run directly in this session with passing results before each push (`php artisan test` locally on sqlite — the only DB driver available in this dev environment — Biome, `tsc --noEmit`, Vitest; see Tests, TypeScript, Biome, and Build sections above). This PR's new backend code was not exercised locally against Postgres specifically, but it introduces no database-driver-specific SQL, no new migrations, and touches no table involved in the pgsql job's one completed (and unrelated) failure. Confirm the final GitHub-side CI status at `https://github.com/safwan5001-source/Nebrax/pull/766` before merging.
 
 ## Security / Tenant Isolation Verification
 
