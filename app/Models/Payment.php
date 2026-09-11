@@ -8,6 +8,14 @@ use App\Tenancy\ResolvesBranchReferences;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+/**
+ * سند قبض/صرف. تُنشأ بحالة draft ثم تُرحَّل عبر PaymentService::post
+ * الذي يولّد قيداً متوازناً عبر LedgerService. السند المرحّل يُصحَّح بالعكس
+ * ولا يُعاد فتحه أو حذف أثره التاريخي.
+ *  - direction=received: قبض من عميل  (دائن 1130 العملاء)
+ *  - direction=paid:     صرف لمورد    (مدين 2110 الموردون)
+ * كل المبالغ بالـ minor units (هللات) كـ bigint.
+ */
 class Payment extends BaseModel
 {
     use ResolvesBranchReferences;
@@ -34,11 +42,13 @@ class Payment extends BaseModel
         'amount'    => 0,
     ];
 
+    /** مرجع مخزَّن — لا يُصفّى بالفرع أبداً (المستند حجّة قائمة، لا نتيجة تصفّح). */
     public function partner(): BelongsTo
     {
         return $this->referenceBelongsTo(Partner::class);
     }
 
+    /** تصنيف تحليلي لسند قبض أو صرف؛ نطاقه يتحقق منه في الخدمة. */
     public function classification(): BelongsTo
     {
         return $this->referenceBelongsTo(Classification::class);
@@ -49,56 +59,67 @@ class Payment extends BaseModel
         return $this->belongsTo(Invoice::class);
     }
 
+    /** جلسة POS التي أنشأت سند القبض؛ مرجع تشغيلي ثابت للتقرير والمطابقة. */
     public function posSession(): BelongsTo
     {
         return $this->referenceBelongsTo(PosSession::class);
     }
 
+    /** الخزينة/الحساب البنكي المستلِم — مرجع اختياري، غيابه يعني الافتراضي بحسب الطريقة. */
     public function cashAccount(): BelongsTo
     {
         return $this->belongsTo(Account::class, 'cash_account_id');
     }
 
+    /** الطريقة المختارة؛ تبقى لقطة الاسم على السند حتى بعد تعديل الإعداد. */
     public function paymentMethod(): BelongsTo
     {
         return $this->belongsTo(PaymentMethod::class);
     }
 
+    /** بوابة الدفع المربوطة عند التحصيل الإلكتروني — اختيارية، وتُحوّل القبض إلى مقاصة البوابة لا إلى البنك. */
     public function paymentGateway(): BelongsTo
     {
         return $this->belongsTo(PaymentGateway::class);
     }
 
+    /** القيد الأصلي الذي ولّده ترحيل السند. */
     public function journalEntry(): BelongsTo
     {
         return $this->belongsTo(JournalEntry::class, 'journal_entry_id');
     }
 
+    /** القيد العكسي؛ يبقى القيد الأصلي محفوظاً ولا يعاد تفسير حساباته. */
     public function reversalEntry(): BelongsTo
     {
         return $this->belongsTo(JournalEntry::class, 'reversal_entry_id');
     }
 
+    /** الموظف الذي استلم التحصيل؛ مستقل عن المستخدم الذي أنشأ السند. */
     public function collectorEmployee(): BelongsTo
     {
         return $this->referenceBelongsTo(Employee::class, 'collector_employee_id');
     }
 
+    /** مرفقات إثبات الدفع الخاصة بالسند. */
     public function attachments(): HasMany
     {
         return $this->hasMany(PaymentAttachment::class);
     }
 
+    /** المرجع التاريخي للقالب الذي كان منشوراً عند ترحيل السند. */
     public function printTemplateRevision(): BelongsTo
     {
         return $this->belongsTo(PrintTemplateRevision::class, 'print_template_revision_id');
     }
 
+    /** المرجع التاريخي للمراجعة المختارة لإخراج PDF. */
     public function pdfTemplateRevision(): BelongsTo
     {
         return $this->belongsTo(PrintTemplateRevision::class, 'pdf_template_revision_id');
     }
 
+    /** المرجع التاريخي للمراجعة المختارة للطباعة الحرارية. */
     public function thermalTemplateRevision(): BelongsTo
     {
         return $this->belongsTo(PrintTemplateRevision::class, 'thermal_template_revision_id');

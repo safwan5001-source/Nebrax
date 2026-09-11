@@ -5,15 +5,29 @@ namespace App\Services\Accounting;
 use App\Models\Account;
 use Illuminate\Support\Facades\DB;
 
+/**
+ * يُنشئ دليل حسابات سعودي قياسي لمستأجر جديد.
+ * يُستدعى عند إنشاء الشركة.
+ *
+ * ACC-2/ACC-3: دليلٌ مُهيَّأ حديثاً غير مكتمل من دون تعيين صريح لكل دور
+ * محاسبي دلالي إلى حساباته الافتراضية (Clean Seeded Cutover — لا مستأجر
+ * يبقى بلا تعيين). `seed()` يزرع الاثنين معاً ذرّياً؛ المستدعي الوحيد
+ * (`AuthController::register`) لا يستدعي `AccountRoleMappingSeeder` بنفسه.
+ */
 class ChartOfAccountsSeeder
 {
     public function __construct(private AccountRoleMappingSeeder $roleMappings) {}
 
+    /**
+     * البنية: [code, name_ar, name_en, type, is_group, children[]]
+     */
     protected array $tree = [
         ['1', 'الأصول', 'Assets', 'asset', true, [
             ['11', 'الأصول المتداولة', 'Current Assets', 'asset', true, [
+                // الحسابان النظاميان القائمان يظلان قابلين للترحيل لتوافق المستندات التاريخية.
                 ['1110', 'الصندوق', 'Cash', 'asset', false, []],
                 ['1120', 'البنك', 'Bank', 'asset', false, []],
+                // الحسابات المسماة في وحدة الخزائن والبنوك تُنشأ فرعية تحت هاتين المجموعتين.
                 ['111', 'الخزائن', 'Cash Treasuries', 'asset', true, []],
                 ['112', 'الحسابات البنكية', 'Bank Accounts', 'asset', true, []],
                 ['1130', 'العملاء (المدينون)', 'Accounts Receivable', 'asset', false, []],
@@ -50,7 +64,13 @@ class ChartOfAccountsSeeder
         ['5', 'المصروفات', 'Expenses', 'expense', true, [
             ['51', 'تكلفة المبيعات', 'Cost of Sales', 'expense', true, [
                 ['5110', 'تكلفة البضاعة المباعة', 'COGS', 'expense', false, []],
+                // مصروف مقابل (contra): حركته دائنة فيخفّض إجمالي المصروفات.
+                // يستقبل الإشعارات المدينة — خصومات المورّد بلا حركة مخزون.
                 ['5115', 'مردودات ومسموحات المشتريات', 'Purchase Returns & Allowances', 'expense', false, []],
+                // فرق تقييمٍ بحت بين اعتماد المورّد التجاري لمرتجع مشترياتٍ
+                // مخزني والقيمة الدفترية (avg_cost) الفعلية المُزالة من 1140 —
+                // ليس فرق جردٍ أو تلفٍ فيزيائي فلا يُستخدم له 5180. حركته
+                // مدينة أو دائنة بحسب اتجاه الفرق (انظر ReturnService::postPurchaseReturn).
                 ['5116', 'فروق تقييم مردودات المشتريات', 'Purchase Return Valuation Variance', 'expense', false, []],
             ]],
             ['52', 'مصروفات إدارية وعمومية', 'Administrative & General Expenses', 'expense', true, [
