@@ -2,7 +2,6 @@
 
 namespace App\Support;
 
-use App\Models\ProductWarehouseStock;
 use Illuminate\Database\Eloquent\Builder;
 
 /**
@@ -46,14 +45,9 @@ class InventoryWorkspaceFilters
 
     public static function query(): Builder
     {
-        return ProductWarehouseStock::query()
-            ->join('products', 'products.id', '=', 'product_warehouse_stock.product_id')
-            ->join('warehouses', 'warehouses.id', '=', 'product_warehouse_stock.warehouse_id')
+        return ProductWarehouseBalanceQuery::baseQuery()
             ->leftJoin('product_categories', 'product_categories.id', '=', 'products.category_id')
-            ->leftJoin('branches as warehouse_branches', 'warehouse_branches.id', '=', 'warehouses.branch_id')
-            ->where('products.track_inventory', true)
             ->whereNull('products.deleted_at')
-            ->whereColumn('products.tenant_id', 'product_warehouse_stock.tenant_id')
             ->whereColumn('warehouses.tenant_id', 'product_warehouse_stock.tenant_id');
     }
 
@@ -68,15 +62,7 @@ class InventoryWorkspaceFilters
             );
         }
 
-        $warehouseIds = ReportWarehouseScope::resolve($filters);
-        if ($warehouseIds !== null) {
-            $query->whereIn('product_warehouse_stock.warehouse_id', $warehouseIds);
-        }
-
-        $branchIds = ReportBranchScope::resolve($filters);
-        if ($branchIds !== null) {
-            $query->whereIn('warehouses.branch_id', $branchIds);
-        }
+        ProductWarehouseBalanceQuery::applyScope($query, $filters);
 
         if (filled($filters['category_id'] ?? null)) {
             $query->where('products.category_id', $filters['category_id']);
