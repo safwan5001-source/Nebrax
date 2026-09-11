@@ -46,6 +46,25 @@ use Symfony\Component\HttpFoundation\Response;
  *  بعد ضبط السياق من مستأجر النطاق — تحقّقٌ إضافي مستقلّ عن قيد FK وحده، بنفس
  *  نمط `FulfillmentPolicyService`: لا اعتماد على أن `storefront_id`/
  *  `sales_channel_id` المخزَّنين صحيحان بالضرورة، بل إعادة تحقّق فعلية.
+ *
+ *  ═══════════════════════════════════════════════════════════════
+ *  COM-7-P2B — مصدر «الـ Host الوارد» عبر بوابة Next.js
+ *  ═══════════════════════════════════════════════════════════════
+ *  storefront/ (Next.js) هو المستدعي الوحيد لهذا المسار إنتاجياً، لا متصفح
+ *  مباشرة — فـ`$request->getHost()` كما يراه Laravel يعكس دومًا نطاق Laravel
+ *  نفسه (خادم Next.js هو من يفتح الاتصال)، لا نطاق المتجر الذي كتبه الزائر
+ *  فعلاً. لذلك يقبل هذا الوسيط ترويسة `X-Storefront-Forwarded-Host` بديلاً
+ *  **فقط** حين تُرفَق بترويسة `X-Storefront-Gateway-Secret` تطابق
+ *  `config('storefront.gateway_secret')` (`hash_equals`، مقارنة ثابتة الزمن)
+ *  — سرٌّ خادم-فقط يعرفه Next.js وLaravel حصراً، لا يصل المتصفح إليه إطلاقاً.
+ *
+ *  فشل التطابق (سرّ خاطئ/غائب، أو تكوين السرّ فارغ في هذه البيئة) يعني تجاهل
+ *  الترويسة كليةً والعودة لـ `$request->getHost()` كالمعتاد — وهذا آمن دوماً:
+ *  مهاجمٌ يرسل الترويسة مباشرة بلا السرّ الصحيح يُعامَل تماماً كما لو لم
+ *  يرسلها، فيُحسم من نطاق Laravel الحقيقي الذي لن يطابق أي `StorefrontDomain`
+ *  غالباً → 404 كالمعتاد. **هذا ليس آلية حسم منافسة**: خوارزمية الحسم
+ *  (StorefrontDomain → Storefront → SalesChannel، فشلٌ مغلق في كل خطوة) لا
+ *  تتغيّر حرفياً؛ يتغيّر فقط مصدر نص الـ hostname المُدخَل إليها.
  */
 class ResolveStorefrontDomain
 {
@@ -62,7 +81,7 @@ class ResolveStorefrontDomain
         $this->storefrontContext->forget();
 
         try {
-            $hostname = HostnameNormalizer::normalize($request->getHost());
+            $hostname = HostnameNormalizer::normalize($this->incomingHostname($request));
         } catch (InvalidHostnameException) {
             abort(404, 'تعذّر تحديد متجر صالح.');
         }
@@ -106,5 +125,22 @@ class ResolveStorefrontDomain
             $this->branchContext->forget();
             $this->storefrontContext->forget();
         }
+    }
+
+    /**
+     * الـ hostname الموثوق لهذا الطلب — راجع تعليق رأس الملف. مقارنة السرّ
+     * بزمن ثابت (`hash_equals`) لمنع قياس التوقيت لاستنتاج السرّ حرفاً بحرف.
+     */
+    private function incomingHostname(Request $request): string
+    {
+        $secret = (string) config('storefront.gateway_secret', '');
+        $forwardedHost = $request->header('X-Storefront-Forwarded-Host');
+        $providedSecret = (string) $request->header('X-Storefront-Gateway-Secret', '');
+
+        if ($secret !== '' && $forwardedHost !== null && hash_equals($secret, $providedSecret)) {
+            return $forwardedHost;
+        }
+
+        return (string) $request->getHost();
     }
 }

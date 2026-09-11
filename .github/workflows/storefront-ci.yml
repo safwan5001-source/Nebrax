@@ -48,6 +48,9 @@ jobs:
       - name: Biome check (lint + format)
         run: pnpm check
 
+      - name: Locale parity check (COM-7-P2B — ar/de/es/fr/pl vs en)
+        run: pnpm check:locales
+
       - name: TypeScript type check
         run: npx tsc --noEmit
 

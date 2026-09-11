@@ -58,10 +58,12 @@ export function getDefaultCountry(): string {
 }
 
 /**
- * Get the default locale code.
+ * Get the default locale code. Falls back to "ar" — AWJ Store's primary
+ * language (AWJ_STORE_LANGUAGE_DECISION.md §1) — not to the original
+ * Spree Storefront template's "en" default.
  */
 export function getDefaultLocale(): string {
-  return process.env.NEXT_PUBLIC_DEFAULT_LOCALE || "en";
+  return process.env.NEXT_PUBLIC_DEFAULT_LOCALE || "ar";
 }
 
 /**

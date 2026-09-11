@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\StorefrontCategoryController;
+use App\Http\Controllers\Api\StorefrontConfigController;
 use App\Http\Controllers\Api\StorefrontMediaController;
 use App\Http\Controllers\Api\StorefrontProductController;
 use App\Http\Middleware\EnforcePublicApiRateLimit;
@@ -40,6 +41,8 @@ Route::middleware([
     Route::get('products/{id}', [StorefrontProductController::class, 'show'])->whereUuid('id')->name('products.show');
 
     Route::get('media/{id}', [StorefrontMediaController::class, 'show'])->whereUuid('id')->name('media.show');
+
+    Route::get('storefront', [StorefrontConfigController::class, 'show'])->name('storefront.show');
 });
 
 /*
@@ -68,5 +71,7 @@ if (! app()->environment('production')) {
         Route::get('products/{id}', [StorefrontProductController::class, 'show'])->whereUuid('id')->name('legacy.products.show');
 
         Route::get('media/{id}', [StorefrontMediaController::class, 'show'])->whereUuid('id')->name('legacy.media.show');
+
+        Route::get('storefront', [StorefrontConfigController::class, 'show'])->name('legacy.storefront.show');
     });
 }

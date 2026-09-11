@@ -61,18 +61,18 @@ export function ProductCarousel({
         type="button"
         aria-label={t("carouselPrev")}
         disabled={isBeginning}
-        className={`${NAV_BUTTON_BASE} -left-5 ${isBeginning ? "opacity-0" : ""}`}
+        className={`${NAV_BUTTON_BASE} -start-5 ${isBeginning ? "opacity-0" : ""}`}
       >
-        <ChevronLeft className="w-5 h-5" />
+        <ChevronLeft className="w-5 h-5 rtl:rotate-180" />
       </button>
       <button
         ref={nextRef}
         type="button"
         aria-label={t("carouselNext")}
         disabled={isEnd}
-        className={`${NAV_BUTTON_BASE} -right-5 ${isEnd ? "opacity-0" : ""}`}
+        className={`${NAV_BUTTON_BASE} -end-5 ${isEnd ? "opacity-0" : ""}`}
       >
-        <ChevronRight className="w-5 h-5" />
+        <ChevronRight className="w-5 h-5 rtl:rotate-180" />
       </button>
       <SwiperComponent
         modules={[Navigation]}

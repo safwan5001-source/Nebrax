@@ -193,4 +193,58 @@ describe("CountryLocaleLayout Market fallback", () => {
       }),
     ).rejects.toThrow("redirect:/us/en/products/coffee?sort=price");
   });
+
+  // ── COM-7-P2B — Arabic default + locale switching preserves identity ──
+
+  it("renders Arabic directly with no redirect when the Market supports it as default", async () => {
+    mocks.getMarkets.mockResolvedValue({
+      data: [
+        market({
+          default_locale: "ar",
+          supported_locales: ["ar", "en"],
+          country_isos: ["SA"],
+          countries: [country("SA")],
+        }),
+      ],
+    });
+
+    await expect(
+      CountryLocaleLayoutContent({
+        children: <main />,
+        params: Promise.resolve({ country: "sa", locale: "ar" }),
+      }),
+    ).resolves.toBeDefined();
+    expect(mocks.redirect).not.toHaveBeenCalled();
+  });
+
+  it("does not redirect when switching between Arabic and English within the same enabled Market", async () => {
+    mocks.getMarkets.mockResolvedValue({
+      data: [
+        market({
+          default_locale: "ar",
+          supported_locales: ["ar", "en"],
+          country_isos: ["SA"],
+          countries: [country("SA")],
+        }),
+      ],
+    });
+
+    await expect(
+      CountryLocaleLayoutContent({
+        children: <main />,
+        params: Promise.resolve({ country: "sa", locale: "ar" }),
+      }),
+    ).resolves.toBeDefined();
+    await expect(
+      CountryLocaleLayoutContent({
+        children: <main />,
+        params: Promise.resolve({ country: "sa", locale: "en" }),
+      }),
+    ).resolves.toBeDefined();
+
+    // نفس السياق (السوق/الدولة) في الطلبين — تبديل اللغة وحده لا يستدعي أي
+    // إعادة توجيه، فهو لا يغيّر هوية المتجر (Tenant/Storefront/Channel).
+    expect(mocks.redirect).not.toHaveBeenCalled();
+    expect(mocks.getMarkets).toHaveBeenCalledTimes(2);
+  });
 });

@@ -7,6 +7,7 @@ import { canonicalizeLocale, matchLocale } from "@/i18n/normalize";
  * active route chunk.
  */
 const MESSAGE_LOADERS = {
+  ar: () => import("../../messages/ar.json"),
   de: () => import("../../messages/de.json"),
   en: () => import("../../messages/en.json"),
   es: () => import("../../messages/es.json"),
@@ -16,7 +17,14 @@ const MESSAGE_LOADERS = {
 
 export type SupportedLocale = keyof typeof MESSAGE_LOADERS;
 
-export const DEFAULT_LOCALE: SupportedLocale = "en";
+/**
+ * العربية هي اللغة الأساسية لمتجر أَوْج (AWJ_STORE_LANGUAGE_DECISION.md §1)
+ * — ليست مرحلة تعريب لاحقة. هذا هو السقوط الآمن الوحيد حين لا يوجد
+ * `Storefront.default_locale` صالح مُهيَّأ (انظر `getStorefrontDefaultLocale`
+ * في `src/lib/store.ts`)؛ الافتراض العالمي هنا يبقى ثابتاً بصرف النظر عن أي
+ * إعداد بيئة — القرار الفعلي يأتي من أَوْج (Storefront)، لا من متغيّر بيئة.
+ */
+export const DEFAULT_LOCALE: SupportedLocale = "ar";
 
 export const SUPPORTED_LOCALES = Object.freeze(
   Object.keys(MESSAGE_LOADERS) as SupportedLocale[],
