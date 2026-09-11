@@ -80,6 +80,16 @@ class InventoryWorkspaceTest extends TestCase
         return $user->createToken('api')->plainTextToken;
     }
 
+    /** @return array<int,string> */
+    private function quantityPairs(array $rows): array
+    {
+        return collect($rows)
+            ->map(fn (array $row) => $row['warehouse_id'].'|'.$row['sku'].'|'.$row['quantity'])
+            ->sort()
+            ->values()
+            ->all();
+    }
+
     /** @test */
     public function it_lists_product_warehouse_rows_with_server_pagination(): void
     {
@@ -196,19 +206,29 @@ class InventoryWorkspaceTest extends TestCase
         $report = $this->withToken($this->token)->getJson('/api/reports/inventory?view=warehouses')->assertOk();
         $workspace = $this->withToken($this->token)->getJson('/api/inventory?view=workspace&per_page=100')->assertOk();
 
-        $reportPairs = collect($report['data'])
-            ->map(fn (array $row) => $row['warehouse_id'].'|'.$row['sku'].'|'.$row['quantity'])
-            ->sort()
-            ->values()
-            ->all();
-        $workspacePairs = collect($workspace['data'])
-            ->map(fn (array $row) => $row['warehouse_id'].'|'.$row['sku'].'|'.$row['quantity'])
-            ->sort()
-            ->values()
-            ->all();
+        $this->assertSame($this->quantityPairs($report['data']), $this->quantityPairs($workspace['data']));
+        $this->assertNotSame([], $report['data']);
+    }
 
-        $this->assertSame($reportPairs, $workspacePairs);
-        $this->assertNotSame([], $reportPairs);
+    /** @test */
+    public function workspace_quantities_match_warehouse_report_under_restricted_warehouse_scope(): void
+    {
+        $this->withToken($this->token)->postJson('/api/users', [
+            'name' => 'أمين مقيّد', 'email' => 'wh-parity@inv-ws.test', 'password' => 'password123',
+            'role' => 'admin', 'warehouse_ids' => [$this->warehouseA->id],
+        ])->assertCreated();
+        $token = $this->postJson('/api/login', ['email' => 'wh-parity@inv-ws.test', 'password' => 'password123'])->assertOk()['token'];
+
+        $report = $this->withToken($token)->getJson('/api/reports/inventory?view=warehouses')->assertOk();
+        $workspace = $this->withToken($token)->getJson('/api/inventory?view=workspace&per_page=100')->assertOk();
+
+        $this->assertSame($this->quantityPairs($report['data']), $this->quantityPairs($workspace['data']));
+        $this->assertNotSame([], $report['data']);
+        $this->assertSame([$this->warehouseA->id], array_values(array_unique(array_column($report['data'], 'warehouse_id'))));
+        $this->assertSame([$this->warehouseA->id], array_values(array_unique(array_column($workspace['data'], 'warehouse_id'))));
+        $this->assertNotContains($this->warehouseB->id, array_column($report['data'], 'warehouse_id'));
+        $this->assertNotContains($this->warehouseB->id, array_column($workspace['data'], 'warehouse_id'));
+        $this->assertNotContains($this->branchB->id, array_column($workspace['data'], 'branch_id'));
     }
 
     /** @test */
