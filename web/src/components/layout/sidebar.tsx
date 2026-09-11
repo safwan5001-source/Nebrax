@@ -71,3 +71,10 @@ import {
   Wrench,
   X,
 } from 'lucide-react';
+import { CompanyLogoMark } from '@/components/layout/company-logo-mark';
+import { useCompany } from '@/lib/company';
+import { cn } from '@/lib/utils';
+import { api } from '@/lib/api';
+import { currentUser } from '@/lib/auth';
+import { hiddenApplicationKeys, isNavEntryVisible } from '@/components/layout/nav-visibility';
+import { POS_SIDEBAR_LAUNCH_ITEMS, posNavNewTabAnchorProps } from '@/lib/pos-workspace';
