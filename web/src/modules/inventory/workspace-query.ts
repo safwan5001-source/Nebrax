@@ -45,6 +45,7 @@ export interface InventoryWorkspaceMeta {
 
 export function inventoryWorkspaceFilterQuery(state: DataExplorerState): string {
   const params = new URLSearchParams();
+  params.set('view', 'workspace');
   if (state.search.trim()) params.set('search', state.search.trim());
   if (state.sort) params.set('sort', state.sort);
 
@@ -63,4 +64,21 @@ export function inventoryWorkspaceQuery(state: DataExplorerState): string {
   params.set('page', String(state.page ?? 1));
   params.set('per_page', String(state.perPage ?? 25));
   return params.toString();
+}
+
+export function inventoryWorkspacePath(state: DataExplorerState): string {
+  return `/inventory?${inventoryWorkspaceQuery(state)}`;
+}
+
+export function stockStateLabel(state: InventoryStockState | string, locale: string): string {
+  const english = locale.toLowerCase().startsWith('en');
+  const labels: Record<string, { ar: string; en: string }> = {
+    in_stock: { ar: 'متوفر', en: 'In stock' },
+    low: { ar: 'منخفض', en: 'Low' },
+    out: { ar: 'نفد', en: 'Out' },
+    negative: { ar: 'سالب', en: 'Negative' },
+  };
+  const pair = labels[state];
+  if (!pair) return state;
+  return english ? pair.en : pair.ar;
 }
