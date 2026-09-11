@@ -6,19 +6,28 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import InventoryPage from './page';
 import { ApiError } from '@/lib/api';
 
-const { api, translate, exportDialog } = vi.hoisted(() => ({
+const { api, translate, exportDialog, searchParams } = vi.hoisted(() => ({
   api: vi.fn(),
   exportDialog: vi.fn(),
+  searchParams: new URLSearchParams(),
   translate: (namespace: string) => (key: string) => `${namespace}.${key}`,
 }));
 
+vi.mock('react', async () => {
+  const actual = await vi.importActual<typeof import('react')>('react');
+  return {
+    ...actual,
+    Suspense: ({ children }: { children: React.ReactNode }) => children,
+  };
+});
 vi.mock('next-intl', () => ({
   useTranslations: (namespace = 'inventory') => translate(namespace),
   useLocale: () => 'ar',
 }));
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ replace: vi.fn() }),
-  useSearchParams: () => new URLSearchParams(),
+  useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
+  usePathname: () => '/inventory',
+  useSearchParams: () => searchParams,
 }));
 vi.mock('next/link', () => ({
   default: ({ href, children }: { href: string; children: React.ReactNode }) => <a href={href}>{children}</a>,
@@ -138,6 +147,7 @@ function workspaceResponse(overrides: Record<string, unknown> = {}) {
 beforeEach(() => {
   api.mockReset();
   exportDialog.mockReset();
+  searchParams.forEach((_, key) => searchParams.delete(key));
   api.mockImplementation((path: string) => {
     if (path.startsWith('/inventory')) return Promise.resolve(workspaceResponse());
     if (path === '/warehouses') return Promise.resolve({ data: [{ id: 'w1', name: 'المخزن الرئيسي' }] });
