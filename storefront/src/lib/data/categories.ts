@@ -1,71 +1,47 @@
 "use server";
 
 import type { CategoryListParams, ProductListParams } from "@spree/sdk";
-import { cacheLife, cacheTag } from "next/cache";
-import { getAccessToken, getClient, getLocaleOptions } from "@/lib/spree";
+import { fetchCategories, fetchCategory } from "@/lib/commerce/categories";
+import { fetchProducts } from "@/lib/commerce/products";
 
-async function cachedListCategories(
-  params: CategoryListParams | undefined,
-  options: { locale?: string; country?: string },
-) {
-  "use cache: remote";
-  cacheLife("hours");
-  cacheTag("categories");
-  return getClient().categories.list(params, options);
-}
-
+/**
+ * COM-7-P1: category data now comes from the AWJ Store catalog adapter
+ * (`@/lib/commerce/categories`), not `@spree/sdk`. Signatures kept
+ * identical to the pre-P1 implementation so existing call sites
+ * (StorefrontLayout nav, CategoryPage) keep working unmodified. See
+ * `src/lib/data/products.ts` for why no `"use cache: remote"` is used.
+ *
+ * `params`/`options` are accepted for signature compatibility only.
+ * AWJ's category tree has no Ransack-style facet params (`depth_eq`,
+ * `parent_id_not_null`, ...) and no locale/country dependence yet — the
+ * adapter always returns the full active root→2-level tree for the
+ * resolved tenant/channel (see `StorefrontCategoryController::index()`).
+ */
 export async function getCategories(
-  params?: CategoryListParams,
-  options?: { locale?: string; country?: string },
+  _params?: CategoryListParams,
+  _options?: { locale?: string; country?: string },
 ) {
-  const localeOptions = options ?? (await getLocaleOptions());
-  return cachedListCategories(params, localeOptions);
-}
-
-export async function cachedGetCategory(
-  idOrPermalink: string,
-  params: { expand?: string[] } | undefined,
-  options: { locale?: string; country?: string },
-) {
-  "use cache: remote";
-  cacheLife("tenMinutes");
-  cacheTag("category");
-  return getClient().categories.get(idOrPermalink, params, options);
+  return fetchCategories();
 }
 
 export async function getCategory(
   idOrPermalink: string,
-  params?: { expand?: string[] },
+  _params?: { expand?: string[] },
 ) {
-  const options = await getLocaleOptions();
-  return cachedGetCategory(idOrPermalink, params, options);
+  return fetchCategory(idOrPermalink);
 }
 
-/**
- * Persistent cached category products fetch. Cache key is derived from
- * all function arguments (categoryId, params, locale, country, userToken).
- * Guest users pass undefined so the cache entry is shared.
- */
-async function cachedListCategoryProducts(
-  categoryId: string,
-  params: ProductListParams | undefined,
-  options: { locale?: string; country?: string },
-  _userToken?: string,
+export async function cachedGetCategory(
+  idOrPermalink: string,
+  _params?: { expand?: string[] },
+  _options?: { locale?: string; country?: string },
 ) {
-  "use cache: remote";
-  cacheLife("tenMinutes");
-  cacheTag("products", `category-products:${categoryId}`);
-  return getClient().products.list(
-    { ...params, in_category: categoryId },
-    options,
-  );
+  return fetchCategory(idOrPermalink);
 }
 
 export async function getCategoryProducts(
   categoryId: string,
   params?: ProductListParams,
 ) {
-  const options = await getLocaleOptions();
-  const userToken = await getAccessToken();
-  return cachedListCategoryProducts(categoryId, params, options, userToken);
+  return fetchProducts({ ...params, in_category: categoryId });
 }

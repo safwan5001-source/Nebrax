@@ -6,6 +6,7 @@ use App\Support\RevisionBuffer;
 use App\Tenancy\BranchContext;
 use App\Tenancy\BranchSharing;
 use App\Tenancy\CustomerContext;
+use App\Tenancy\StorefrontContext;
 use App\Tenancy\TenantContext;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
@@ -25,6 +26,8 @@ class TenancyServiceProvider extends ServiceProvider
     {
         $this->app->singleton(TenantContext::class, fn () => new TenantContext());
         $this->app->scoped(CustomerContext::class, fn () => new CustomerContext());
+        // سياق متجر Commerce العام (tenant + sales channel) — تصفح مجهول، لا مصادقة.
+        $this->app->scoped(StorefrontContext::class, fn () => new StorefrontContext());
         // سياق الفرع النشط — بُعد كتابة (وسم المستندات)، لا حاجز عزل.
         $this->app->singleton(BranchContext::class, fn () => new BranchContext());
         // مفاتيح مشاركة البيانات بين الفروع — تُقرأ مرة واحدة للطلب (حاسم للأداء).
