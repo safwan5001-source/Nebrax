@@ -32,6 +32,9 @@ Dense accounting-grade DataTable, fast filters, sticky context, clear warehouse 
 ## Acceptance
 Warehouse totals reconcile to Product aggregate; displayed stock is server-authoritative; unauthorized branches/warehouses/costs cannot be inferred; pagination/filter/export agree; movement drilldown never changes stock/GL.
 
+## Sidebar navigation
+The existing inventory workspace route remains `/inventory` and is labeled **مساحة عمل المخزون** in Arabic and **Inventory Workspace** in English. This is a label-only navigation update; no second `/inventory` item is introduced.
+
 ## PR-INV-WS-1 foundation (merged)
 
 Merged to `main` via PR #762 on 2026-09-12. Final PR Head: `802f9b73bcff85cf2582e62dab2085f50b1f974d`; merge commit: `748fc1201f9b76589f18426779a64d1bd081c421`. CI and Web CI were green before merge.
