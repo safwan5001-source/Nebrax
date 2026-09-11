@@ -3,15 +3,45 @@
 import type { Market } from "@spree/sdk";
 import { cacheLife, cacheTag } from "next/cache";
 import { getClient, getLocaleOptions } from "@/lib/spree";
+import { getDefaultCountry } from "@/lib/store";
 
-async function cachedListMarkets(options: {
-  locale?: string;
-  country?: string;
-}) {
-  "use cache: remote";
-  cacheLife("hours");
-  cacheTag("markets");
-  return getClient().markets.list(options);
+/**
+ * COM-7-P1: a single static AWJ Market, not a Spree Markets API call.
+ *
+ * AWJ has no Market/multi-country/multi-currency concept — every tenant
+ * is single-currency (`Tenant.currency`, SAR by default; see
+ * AWJ_SPREE_TECHNICAL_FIT_AUDIT.md §3/§4) and Saudi Arabia is the only
+ * market today (international expansion is an explicit future product
+ * decision, not a COM-7-P1 concern — see AWJ_SPREE_ADMIN_SANDBOX_GAP_MAP.md
+ * "الأسواق/الدول"). `default_locale`/`supported_locales` reflect what is
+ * actually registered in `src/i18n/locales.ts` today (`ar` is not yet
+ * registered — see AWJ_STORE_LANGUAGE_DECISION.md; adding it is
+ * deliberately out of COM-7-P1's scope, not silently broken: the root
+ * layout already falls back to `DEFAULT_LOCALE` for an unregistered
+ * locale). This still only backs `getMarkets()`/`resolveCurrency()` (root
+ * layout + catalog pricing display); `resolveMarket()`/`getMarketCountries()`
+ * below remain Spree-backed and unused by any COM-7-P1 catalog page.
+ */
+function staticAwjMarket(): Market {
+  return {
+    id: "awj-sa",
+    name: "AWJ Store — Saudi Arabia",
+    currency: "SAR",
+    default_locale: "en",
+    tax_inclusive: true,
+    default: true,
+    country_isos: [getDefaultCountry().toUpperCase()],
+    supported_locales: ["en"],
+    countries: [
+      {
+        iso: getDefaultCountry().toUpperCase(),
+        iso3: "SAU",
+        name: "Saudi Arabia",
+        states_required: false,
+        zipcode_required: false,
+      },
+    ],
+  };
 }
 
 async function cachedResolveMarket(
@@ -34,12 +64,11 @@ async function cachedListMarketCountries(
   return getClient().markets.countries.list(marketId, options);
 }
 
-export async function getMarkets(options?: {
+export async function getMarkets(_options?: {
   locale?: string;
   country?: string;
 }): Promise<{ data: Market[] }> {
-  const resolvedOptions = options ?? (await getLocaleOptions());
-  return cachedListMarkets(resolvedOptions);
+  return { data: [staticAwjMarket()] };
 }
 
 export async function resolveMarket(country: string) {
