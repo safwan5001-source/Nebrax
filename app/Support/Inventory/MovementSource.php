@@ -9,12 +9,12 @@ final class MovementSource
 {
     public function __construct(
         public readonly string $type,
+        public readonly string $label,
         public readonly ?string $reference,
         public readonly ?string $date,
         public readonly ?string $status,
         public readonly bool $canOpen,
         public readonly ?string $route,
-        public readonly string $label,
     ) {}
 
     public static function unavailable(string $type, string $label): self
