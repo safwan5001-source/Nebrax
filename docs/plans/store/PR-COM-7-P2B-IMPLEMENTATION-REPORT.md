@@ -203,7 +203,7 @@ This is the first time the storefront has rendered real bilingual data resolved 
 
 ## CI Status
 
-GitHub Actions: pending — will be confirmed after the PR is opened and pushed. `storefront-ci.yml` now also runs `pnpm check:locales`.
+GitHub Actions: **all green** on head `7d8799ef2f188360f2b9943c6097b07e0a80bb99` — `php artisan test (L11, sqlite)` ✅, `php artisan test (L11, pgsql)` ✅, `storefront (lint + typecheck + test)` ✅ (now includes `pnpm check:locales`). `mergeable_state: clean` (no conflict with `main`). No actionable review comments (one non-actionable Codex usage-limit notice).
 
 ## Risks
 
