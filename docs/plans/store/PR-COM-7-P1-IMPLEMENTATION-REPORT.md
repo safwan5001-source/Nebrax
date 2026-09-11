@@ -188,7 +188,7 @@ One non-fatal, pre-existing, out-of-scope note: `src/lib/data/sitemap.ts` (still
 
 ## CI Result
 
-PR #766 triggered both `ci.yml` (Laravel, sqlite + pgsql) and `storefront-ci.yml` (lint + typecheck + test) — all runs were queued at report time; check `https://github.com/safwan5001-source/Nebrax/pull/766` for final status before any further action.
+PR #766 triggered both `ci.yml` (Laravel, sqlite + pgsql) and `storefront-ci.yml` (lint + typecheck + test) on push. As of this report, all 5 check runs (2× Laravel sqlite/pgsql per workflow trigger, 1× storefront) remained in GitHub's `queued` state for over 10 minutes with no progress — a GitHub Actions runner-availability issue on the platform side, not something introduced by this PR's code (the identical `ci.yml`/`storefront-ci.yml` workflows ran successfully for PR #759 minutes earlier in this same environment). All the checks CI would run were already run locally and are green (see Tests, TypeScript, Biome, and Build sections above) — every job CI performs (`php artisan test` on sqlite + pgsql, Biome, `tsc --noEmit`, Vitest) was executed directly in this session with passing results before the push. Confirm final CI status at `https://github.com/safwan5001-source/Nebrax/pull/766` before merging.
 
 ## Security / Tenant Isolation Verification
 
