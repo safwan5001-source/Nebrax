@@ -9,6 +9,7 @@ use App\Services\InventoryBalanceExportService;
 use App\Services\InventoryWorkspaceQuery;
 use App\Support\InventoryBalanceFilters;
 use App\Support\InventoryWorkspaceFilters;
+use App\Support\Inventory\MovementSourceResolver;
 use App\Support\Money;
 use App\Support\ReportWarehouseScope;
 use App\Support\SensitiveCostPolicy;
@@ -19,7 +20,7 @@ use Symfony\Component\HttpFoundation\Response;
 /**
  * تقرير المخزون — قراءة فقط. يعرض أرصدة الأصناف المتتبَّعة وقيمتها (متوسط متحرك)
  * وحركاتها. لا يولّد أي قيد محاسبي ولا يكتب في journal_*؛ القيم محسوبة من حقول
- * المنتج وحركات المخزون المسجّلة مسبقاً عبر InventoryService.
+ * المنتج وحركات المخزون المسجلة مسبقاً عبر InventoryService.
  */
 class InventoryController extends ApiController
 {
@@ -28,10 +29,6 @@ class InventoryController extends ApiController
         protected InventoryWorkspaceQuery $workspaceQuery,
     ) {}
 
-    /**
-     * مساحة عمل المخزون — قراءة فقط، حبة Product × Warehouse، تقسيم خادمي.
-     * لا يغيّر عقد GET /inventory القديم (إجمالي المنتج للشاشة/التصدير التاريخيين).
-     */
     public function workspace(Request $request): JsonResponse
     {
         $filters = $request->validate(InventoryWorkspaceFilters::rules());
@@ -89,14 +86,10 @@ class InventoryController extends ApiController
 
         return response()->json([
             'data'        => $items,
-            // PR-INV-1: الإجمالي مشتقّ من قيمة المخزون — نفس الحقل الحسّاس تجميعاً.
             'total_value' => $authorizedCost ? Money::toRiyal($totalMinor) : null,
         ]);
     }
 
-    /**
-     * تصدير أرصدة المخزون إلى CSV أو XLSX — **قراءة محضة**.
-     */
     public function export(ExportInventoryBalancesRequest $request): Response
     {
         $filters = $request->validated();
@@ -130,10 +123,13 @@ class InventoryController extends ApiController
         Product::findOrFail($productId);
         $authorizedCost = SensitiveCostPolicy::authorized($request->user());
 
-        $rows = StockMovement::where('product_id', $productId)
+        $movements = StockMovement::where('product_id', $productId)
             ->orderByDesc('movement_date')
             ->orderByDesc('id')
-            ->get()
+            ->get();
+        $sources = MovementSourceResolver::make()->resolveMany($movements, $request->user());
+
+        $rows = $movements
             ->map(fn (StockMovement $m) => [
                 'id'               => $m->id,
                 'type'             => $m->type,
@@ -143,6 +139,7 @@ class InventoryController extends ApiController
                 'balance_quantity' => $m->balance_quantity,
                 'movement_date'    => optional($m->movement_date)->toDateString(),
                 'notes'            => $m->notes,
+                'source'           => ($sources[$m->id] ?? null)?->toArray(),
             ]);
 
         return response()->json(['data' => $rows]);
