@@ -1,6 +1,6 @@
 # Warehouse Inventory Workspace
 
-**Status:** PLANNED
+**Status:** IN PROGRESS — PR-INV-WS-1 foundation on branch `feat/pr-inv-ws-1-inventory-workspace-foundation` (PR #762). Movement-source drilldown, reservations, and replenishment remain planned.
 
 ## Goal
 Turn the existing inventory balance/reporting foundation into the daily warehouse-aware operational workspace without creating a second inventory core.
@@ -31,3 +31,14 @@ Dense accounting-grade DataTable, fast filters, sticky context, clear warehouse 
 
 ## Acceptance
 Warehouse totals reconcile to Product aggregate; displayed stock is server-authoritative; unauthorized branches/warehouses/costs cannot be inferred; pagination/filter/export agree; movement drilldown never changes stock/GL.
+
+## PR-INV-WS-1 foundation (current)
+
+Read-only workspace query: `GET /api/inventory?view=workspace`.
+
+- Grain: Product × Warehouse from `product_warehouse_stock.quantity`.
+- Global `products.quantity_on_hand` remains the product-level report/export contract.
+- Avg cost remains the global Product moving average.
+- Stock states: `in_stock` / `low` (only when `products.reorder_level > 0`) / `out` / `negative`.
+- Cost columns and cost sorts require `products.view_cost` via `SensitiveCostPolicy`.
+- Not in this PR: serial/lot/expiry, reservations, stock requests, replenishment, movement-source drilldown, valuation/posting changes.
