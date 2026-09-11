@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useLocale, useTranslations } from 'next-intl';
+import { useTranslations } from 'next-intl';
 import { Dialog } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -36,9 +36,6 @@ const typeTone: Record<string, 'positive' | 'warning' | 'muted'> = { in: 'positi
 
 export function MovementsDialog({ product, onClose }: { product: { id: string; name: string } | null; onClose: () => void }) {
   const t = useTranslations('inventory');
-  const locale = useLocale();
-  const sourceHeading = locale.startsWith('en') ? 'Source' : 'المصدر';
-  const openSourceLabel = locale.startsWith('en') ? 'Open source' : 'فتح المصدر';
   const [rows, setRows] = useState<Movement[] | null>(null);
 
   useEffect(() => {
@@ -65,7 +62,7 @@ export function MovementsDialog({ product, onClose }: { product: { id: string; n
               <TR>
                 <TH>{t('date')}</TH>
                 <TH>{t('type')}</TH>
-                <TH>{sourceHeading}</TH>
+                <TH>{t('source')}</TH>
                 <TH className="text-end">{t('qty')}</TH>
                 <TH className="text-end">{t('avg_cost')}</TH>
                 <TH className="text-end">{t('stock_value')}</TH>
@@ -86,7 +83,7 @@ export function MovementsDialog({ product, onClose }: { product: { id: string; n
                         ) : null}
                         {m.source.can_open && m.source.route ? (
                           <Link href={m.source.route} className="mt-0.5 inline-block text-xs text-primary hover:underline">
-                            {openSourceLabel}
+                            {t('open_source')}
                           </Link>
                         ) : null}
                       </div>
