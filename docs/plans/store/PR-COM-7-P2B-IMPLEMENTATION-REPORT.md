@@ -4,7 +4,7 @@
 
 | Field | Value |
 |-------|-------|
-| PR | (to be opened) |
+| PR | [#775](https://github.com/safwan5001-source/Nebrax/pull/775) |
 | Branch | `claude/com-7-p2b-arabic-english` |
 | Base SHA | `70a75361ca9d406c6c77207a8692daec17b42eec` (main, includes merged PR #769/#770) |
 | Head SHA | `5aa71fec895957823a38e9660c50ea42440151b1` |
