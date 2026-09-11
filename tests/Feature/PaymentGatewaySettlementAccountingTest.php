@@ -181,6 +181,71 @@ class PaymentGatewaySettlementAccountingTest extends TestCase
     }
 
     /** @test */
+    public function unsupported_provider_deductions_are_rejected_before_any_settlement_or_journal(): void
+    {
+        $invoice = $this->postedInvoice(100000);
+        $gateway = $this->gateway();
+        $payment = $this->collectGateway($invoice, 115000, $gateway);
+        $journalsBefore = JournalEntry::count();
+        $feeBefore = (int) (Account::where('code', '5510')->first()->balance?->balance ?? 0);
+        $clearingBefore = Account::where('code', '1170')->first()->balance->fresh()->balance;
+
+        try {
+            $this->settlements->post([
+                'payment_gateway_id' => $gateway->id,
+                'cash_bank_account_id' => $this->mainBank()->id,
+                'provider_settlement_ref' => 'SET-DED',
+                'net_bank_amount' => 110000,
+                'provider_fee_ex_tax' => 3000,
+                'provider_deductions' => 2000,
+                'items' => [['payment_id' => $payment->id, 'gross_amount' => 115000]],
+            ]);
+            $this->fail('Unsupported provider deductions were posted as fee expense.');
+        } catch (DomainException $e) {
+            $this->assertStringContainsString('Unsupported provider deductions', $e->getMessage());
+            $this->assertStringContainsString('provider_fee_expense', $e->getMessage());
+        }
+
+        $this->assertSame($journalsBefore, JournalEntry::count());
+        $this->assertSame(0, PaymentGatewaySettlement::count());
+        $this->assertSame($feeBefore, (int) (Account::where('code', '5510')->first()->balance?->fresh()->balance ?? 0));
+        $this->assertEquals($clearingBefore, Account::where('code', '1170')->first()->balance->fresh()->balance);
+        $this->assertSame(115000, $invoice->fresh()->paid_amount);
+        $this->assertSame('posted', $payment->fresh()->status);
+    }
+
+    /** @test */
+    public function unsupported_provider_credits_are_rejected_before_any_settlement_or_journal(): void
+    {
+        $invoice = $this->postedInvoice(100000);
+        $gateway = $this->gateway();
+        $payment = $this->collectGateway($invoice, 115000, $gateway);
+        $journalsBefore = JournalEntry::count();
+        $feeBefore = (int) (Account::where('code', '5510')->first()->balance?->balance ?? 0);
+
+        try {
+            $this->settlements->post([
+                'payment_gateway_id' => $gateway->id,
+                'cash_bank_account_id' => $this->mainBank()->id,
+                'provider_settlement_ref' => 'SET-CR',
+                'net_bank_amount' => 116000,
+                'provider_fee_ex_tax' => 0,
+                'provider_credits' => 1000,
+                'items' => [['payment_id' => $payment->id, 'gross_amount' => 115000]],
+            ]);
+            $this->fail('Unsupported provider credits were posted against fee expense.');
+        } catch (DomainException $e) {
+            $this->assertStringContainsString('Unsupported provider credits', $e->getMessage());
+            $this->assertStringContainsString('provider_fee_expense', $e->getMessage());
+        }
+
+        $this->assertSame($journalsBefore, JournalEntry::count());
+        $this->assertSame(0, PaymentGatewaySettlement::count());
+        $this->assertSame($feeBefore, (int) (Account::where('code', '5510')->first()->balance?->fresh()->balance ?? 0));
+        $this->assertEquals(115000, Account::where('code', '1170')->first()->balance->fresh()->balance);
+    }
+
+    /** @test */
     public function floating_point_amounts_are_rejected(): void
     {
         $this->expectException(DomainException::class);
