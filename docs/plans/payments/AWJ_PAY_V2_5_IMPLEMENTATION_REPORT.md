@@ -17,7 +17,7 @@ Status: **IMPLEMENTED ON PR — NOT MERGED — NOT DEPLOYED**
 | Branch | `feat/pay-v2-5-gateway-fees-settlement` |
 | PR | [#774](https://github.com/safwan5001-source/Nebrax/pull/774) |
 | Base SHA | `f9a3febd6363897bc8481d1f02b1c93dbb1dba87` (main / PAY-V2-4 merge) |
-| Head SHA at report time | `b476c32e96757a340f46295e9166f6b3a654f40e` (tests). Report commit follows. |
+| Head SHA | `31f8eb81f4a8ac9a9a382a2bd3db3cb469856afb` |
 | Draft / merge / deploy | Open PR. Not merged. Not deployed. |
 
 ## What was implemented
@@ -172,7 +172,7 @@ Local focused run was **not** executed in this sandbox (no application PHPUnit e
 
 ## SQLite CI / PostgreSQL CI
 
-Pending on PR #774 at report time. Do not treat this report as CI-green until both jobs are inspected.
+Queued / in progress on PR #774 at report time (`php artisan test (L11, sqlite)` and `php artisan test (L11, pgsql)`). Do not treat this report as CI-green until both jobs are inspected.
 
 ## Architecture / tool-limitations audit
 
