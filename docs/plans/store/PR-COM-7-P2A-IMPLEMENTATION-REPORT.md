@@ -7,7 +7,7 @@
 | PR | (to be opened) |
 | Branch | `claude/com-7-p2a-storefront-domain` |
 | Base SHA | `6f36400f26e0c0795f4e807f399af48ce58f66ed` (main) |
-| Head SHA | (set after final commit) |
+| Head SHA | `6b1457f3f405bdc25a2d483f70915de74645c749` |
 | Predecessor | PR #766 (COM-7-P1), merged as `a31ad154`; PR #768 (docs, the P2 decision) |
 
 ## Executive Summary
