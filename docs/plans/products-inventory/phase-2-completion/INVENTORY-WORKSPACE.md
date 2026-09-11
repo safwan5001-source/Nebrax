@@ -46,6 +46,19 @@ Read-only workspace query: `GET /api/inventory?view=workspace`.
 - Shared read-side Product × Warehouse foundation: `app/Support/ProductWarehouseBalanceQuery.php` (used by Inventory Report warehouse view and Inventory Workspace).
 - Deferred beyond PR-INV-WS-1: serial/lot/expiry, reservations, stock requests, replenishment, movement-source drilldown, valuation/posting changes.
 
+## Sidebar navigation
+
+The merged Inventory Workspace at `/inventory` is reachable from the existing Inventory sidebar leaf (`stockBalances`, `appKey: inventory.core`).
+
+User-facing label:
+
+- Arabic: مساحة عمل المخزون
+- English: Inventory Workspace
+
+This is a label/IA change only. The route, `inventory.core` visibility, and RBAC behavior are unchanged. No second `/inventory` sidebar item was added.
+
+The deferred forbidden `warehouse_id` decision below is unchanged.
+
 ## NOTE / DEFERRED DECISION — explicit forbidden warehouse_id
 
 Explicit forbidden `warehouse_id` behavior differs between the existing Inventory Report warehouse view and Inventory Workspace for a warehouse-restricted user:
