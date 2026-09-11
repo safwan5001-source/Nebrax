@@ -12,19 +12,31 @@ use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * يحلّ مستأجر ومتجر Commerce العام من شريحة الرابط `{tenantSlug}`، قبل أي
- * استعلام كتالوج — بلا مصادقة عميل (تصفح مجهول). لا يثق بأي `tenant_id`/
- * `X-Tenant-ID` من العميل إطلاقاً؛ المصدر الوحيد هو `Tenant.slug` المخزَّن،
- * تماماً كما يفعل `ResolveCustomerTenant` لمسار العميل المصادَق.
+ * ⚠️ **متوارَث COM-7-P1 — تطويري/اختباري محضٌ فقط منذ COM-7-P2A، ليس سلطة
+ * إنتاج.** يحلّ مستأجر ومتجر Commerce العام من شريحة الرابط `{tenantSlug}`.
+ * سلطة الإنتاج المعتمدة أصبحت `ResolveStorefrontDomain` (حسم عبر Host/
+ * `StorefrontDomain`، AWJ_COM_7_P2_STOREFRONT_DOMAIN_RESOLUTION_DECISION.md
+ * §7). هذا الوسيط **يرفض العمل في بيئة `production`** (تحقّق دفاعي مباشر
+ * أدناه)، بالإضافة إلى أن مساراته لا تُسجَّل أصلاً هناك
+ * (`routes/api_storefront.php`) — طبقتا حماية مستقلتان، لا نقطة فشل واحدة.
+ * يبقى مفيداً حصراً للتطوير المحلي/الاختبار الآلي بلا DNS حقيقي (القرار
+ * السابق AWJ_STOREFRONT_PLACEMENT_TENANT_RESOLUTION_DECISION.md §11 يسمح
+ * صراحةً بآلية development-only كهذه، بشرط ألا تعمل في الإنتاج ولا تتحول
+ * backdoor لاختيار مستأجر).
+ *
+ * لا يثق بأي `tenant_id`/`X-Tenant-ID` من العميل إطلاقاً؛ المصدر الوحيد هو
+ * `Tenant.slug` المخزَّن، تماماً كما يفعل `ResolveCustomerTenant` لمسار
+ * العميل المصادَق.
  *
  * القناة: تُحلّ إلى قناة البيع النشطة الوحيدة من نوع `web` للمستأجر — لا
- * دعم متعدد المتاجر/القنوات في COM-7-P1 (مؤجَّل، انظر
- * AWJ_STOREFRONT_PLACEMENT_TENANT_RESOLUTION_DECISION.md §4). غياب قناة
+ * دعم متعدد المتاجر/القنوات في هذا المسار المتوارَث (تعدّد المتاجر الحقيقي
+ * عبر `Storefront`/`StorefrontDomain` في المسار الموثوق فقط). غياب قناة
  * `web` نشطة يعني «لا متجر مهيَّأ لهذا المستأجر» — 404 غير كاشف، لا سقوط
- * على أي قناة أخرى.
+ * على أي قناة أخرى. لا `storefrontId` في السياق الناتج هنا عمداً — هذا
+ * المسار سابقٌ لوجود نموذج `Storefront` أصلاً.
  *
  * فشل الحلّ دائماً 404 غير كاشف (لا فرق بين مستأجر غير موجود ومستأجر معطّل
- * ومتجر غير مهيَّأ) — لا يُسرَّب أي تلميح يفيد في تعداد المستأجرين.
+ * ومتجر غير مهيَّأ وبيئة إنتاج) — لا يُسرَّب أي تلميح يفيد في تعداد المستأجرين.
  */
 class ResolveStorefrontTenant
 {
@@ -39,6 +51,13 @@ class ResolveStorefrontTenant
         $this->tenantContext->forget();
         $this->branchContext->forget();
         $this->storefrontContext->forget();
+
+        // حارسٌ دفاعي مستقلّ عن عدم تسجيل هذه المسارات في الإنتاج أصلاً
+        // (`routes/api_storefront.php`) — لا يعتمد أمن هذا المسار المتوارَث
+        // على طبقة واحدة فقط.
+        if (app()->environment('production')) {
+            abort(404, 'تعذّر تحديد متجر صالح.');
+        }
 
         $slug = (string) $request->route('tenantSlug');
 
