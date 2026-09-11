@@ -6,7 +6,7 @@ use App\Models\PaymentMethod;
 use App\Models\PaymentMethodChannelAvailability;
 use App\Models\SalesChannel;
 use App\Models\Tenant;
-use App\Services\Payments\PaymentMethodChannelAvailabilityService;
+use App\Services\PaymentMethodChannelAvailabilityService;
 use App\Tenancy\TenantContext;
 use DomainException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
