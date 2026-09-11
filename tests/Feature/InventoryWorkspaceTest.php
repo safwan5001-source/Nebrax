@@ -8,6 +8,7 @@ use App\Models\Product;
 use App\Models\ProductCategory;
 use App\Models\ProductWarehouseStock;
 use App\Models\StockMovement;
+use App\Models\User;
 use App\Models\Warehouse;
 use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -63,6 +64,22 @@ class InventoryWorkspaceTest extends TestCase
         ProductWarehouseStock::create(['tenant_id' => $this->tenantId, 'product_id' => $this->rebar->id, 'warehouse_id' => $this->warehouseA->id, 'quantity' => 0]);
     }
 
+    private function userToken(string $role, string $email): string
+    {
+        app(TenantContext::class)->set($this->tenantId);
+
+        $user = User::create([
+            'tenant_id' => $this->tenantId,
+            'name' => $role,
+            'email' => $email,
+            'password' => 'password123',
+            'role' => $role,
+            'is_active' => true,
+        ]);
+
+        return $user->createToken('api')->plainTextToken;
+    }
+
     /** @test */
     public function it_lists_product_warehouse_rows_with_server_pagination(): void
     {
@@ -113,7 +130,7 @@ class InventoryWorkspaceTest extends TestCase
     /** @test */
     public function staff_without_view_cost_does_not_see_cost_or_value(): void
     {
-        $staff = $this->tokenForRole($this->tenantId, 'staff', 'staff@inv-ws.test');
+        $staff = $this->userToken('staff', 'staff@inv-ws.test');
         $res = $this->withToken($staff)->getJson('/api/inventory?view=workspace')->assertOk();
         $this->assertFalse($res['meta']['can_view_cost']);
         $this->assertNull($res['meta']['total_value']);
@@ -169,7 +186,7 @@ class InventoryWorkspaceTest extends TestCase
     public function unauthenticated_and_unpermitted_users_are_rejected(): void
     {
         $this->getJson('/api/inventory?view=workspace')->assertUnauthorized();
-        $self = $this->tokenForRole($this->tenantId, 'self_service', 'ss@inv-ws.test');
+        $self = $this->userToken('self_service', 'ss@inv-ws.test');
         $this->withToken($self)->getJson('/api/inventory?view=workspace')->assertForbidden();
     }
 
