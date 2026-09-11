@@ -7,7 +7,7 @@
 | PR | [#766](https://github.com/safwan5001-source/Nebrax/pull/766) |
 | Branch | `claude/com-7-p1-catalog-adapter` |
 | Base SHA | `e33b52ef353d4d1e85b6dba847056ead963ddf1e` (main) |
-| Head SHA | `2292c2c7048bb1b789c385e708e885fbba53aae4` |
+| Head SHA | `c8a4dea21cae3dfa3086938762b5ffa39260ce3c` (CI fully green) |
 | Predecessor | PR #759 (COM-7-P0), merged as `00576540` |
 
 ## Executive Summary
@@ -186,17 +186,19 @@ One non-fatal, pre-existing, out-of-scope note: `src/lib/data/sitemap.ts` (still
 - `GET /sa/en/products/{id}` → 200, shows real SKU (`DEMO-1`), SAR-formatted price (`١٠٠٫٠٠ ر.س.`), category, `in_stock: true`, JSON-LD product/breadcrumb structured data.
 - `GET /sa/en/c/{categoryId}` → 200, shows the real category name and breadcrumb.
 
-## CI Result
+## CI Result — final: all green ✅
 
-PR #766 triggered both `ci.yml` (Laravel, sqlite + pgsql) and `storefront-ci.yml` (lint + typecheck + test) on every push. GitHub's runner queue was backlogged for roughly an hour after the final push (`d31fc549`) before any job started — a platform-side issue, not this PR's code (the identical workflows ran and passed minutes earlier for PR #759 in this same environment/account).
+**Final status on head `c8a4dea2`: all 5 check runs passed** (`storefront (lint + typecheck + test)`, `php artisan test (L11, sqlite)`, `php artisan test (L11, pgsql)`). No open review threads.
 
-Once runners picked the jobs up:
+PR #766 triggered both `ci.yml` (Laravel, sqlite + pgsql) and `storefront-ci.yml` (lint + typecheck + test) on every push. GitHub's runner queue was backlogged for roughly an hour after an early push (`d31fc549`) before any job started — a platform-side issue, not this PR's code (the identical workflows ran and passed minutes earlier for PR #759 in this same environment/account). Once runners picked the jobs up, the pgsql job's real test-execution step took ~14 minutes end to end versus sqlite's ~6 — genuinely running, not stuck, though it looked that way mid-run against the ~9-10 minute runtime pattern established by earlier attempts. All three Laravel/storefront checks completed successfully on `c8a4dea2`, confirmed via `get_check_runs` after the fact.
+
+Two real pgsql findings surfaced along the way (both resolved before the final green run):
 
 | Check | Result |
 |---|---|
 | `storefront (lint + typecheck + test)` | ✅ passed |
 | `php artisan test (L11, sqlite)` | ✅ passed |
-| `php artisan test (L11, pgsql)` | ❌ failed on commit `2292c2c7` (unrelated, pre-existing — see below); appeared to hang on `d31fc549` (checked repeatedly over 40+ minutes with the check-run API reporting `in_progress`), cancelled and re-run |
+| `php artisan test (L11, pgsql)` | ❌ failed on commit `2292c2c7` (unrelated, pre-existing — see below); ❌ failed on `d31fc549` with a real bug this PR introduced (see below, fixed in `3602ccbc`); ✅ passed on `c8a4dea2` |
 
 **Two distinct pgsql findings, not one:**
 
