@@ -75,8 +75,11 @@ class InventoryMovementSourceTest extends TestCase
     {
         $foreign = $this->registerTenant('other-mov', 'owner@other-mov.test');
         app(TenantContext::class)->set($foreign['tenant_id']);
+        $foreignPartner = Partner::create([
+            'tenant_id' => $foreign['tenant_id'], 'name' => 'عميل أجنبي', 'type' => 'customer', 'is_active' => true,
+        ]);
         $foreignInvoice = Invoice::create([
-            'tenant_id' => $foreign['tenant_id'], 'number' => 'FOREIGN-9', 'status' => 'posted',
+            'tenant_id' => $foreign['tenant_id'], 'partner_id' => $foreignPartner->id, 'number' => 'FOREIGN-9', 'status' => 'posted',
             'invoice_date' => '2026-09-01', 'type' => 'tax_invoice', 'payment_type' => 'credit',
             'subtotal' => 0, 'tax_amount' => 0, 'total' => 0,
         ]);
