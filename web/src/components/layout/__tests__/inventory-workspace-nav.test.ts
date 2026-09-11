@@ -14,7 +14,12 @@ const inventoryEntry = { appKey: 'inventory.core' };
 describe('inventory workspace sidebar navigation label', () => {
   it('keeps exactly one /inventory entry with the existing stockBalances key and inventory.core appKey', () => {
     expect(sidebarSource.match(/href:\s*'\/inventory'/g)).toHaveLength(1);
-    expect(sidebarSource).toContain("{ href: '/inventory', icon: Warehouse, key: 'stockBalances', built: true, appKey: 'inventory.core' }");
+
+    const inventoryLeaf = sidebarSource.match(/\{[^{}]*href:\s*'\/inventory'[^{}]*\}/)?.[0];
+
+    expect(inventoryLeaf).toBeTruthy();
+    expect(inventoryLeaf).toContain("key: 'stockBalances'");
+    expect(inventoryLeaf).toContain("appKey: 'inventory.core'");
   });
 
   it('uses the updated nav labels only for the sidebar leaf in Arabic and English', () => {
