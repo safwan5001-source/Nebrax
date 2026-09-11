@@ -191,6 +191,27 @@ class InventoryWorkspaceTest extends TestCase
     }
 
     /** @test */
+    public function workspace_quantities_match_warehouse_report_for_the_same_scope(): void
+    {
+        $report = $this->withToken($this->token)->getJson('/api/reports/inventory?view=warehouses')->assertOk();
+        $workspace = $this->withToken($this->token)->getJson('/api/inventory?view=workspace&per_page=100')->assertOk();
+
+        $reportPairs = collect($report['data'])
+            ->map(fn (array $row) => $row['warehouse_id'].'|'.$row['sku'].'|'.$row['quantity'])
+            ->sort()
+            ->values()
+            ->all();
+        $workspacePairs = collect($workspace['data'])
+            ->map(fn (array $row) => $row['warehouse_id'].'|'.$row['sku'].'|'.$row['quantity'])
+            ->sort()
+            ->values()
+            ->all();
+
+        $this->assertSame($reportPairs, $workspacePairs);
+        $this->assertNotSame([], $reportPairs);
+    }
+
+    /** @test */
     public function the_endpoint_does_not_mutate_stock_movements_or_journals(): void
     {
         $stockBefore = ProductWarehouseStock::query()->orderBy('id')->get(['id', 'quantity', 'revision'])->toArray();
