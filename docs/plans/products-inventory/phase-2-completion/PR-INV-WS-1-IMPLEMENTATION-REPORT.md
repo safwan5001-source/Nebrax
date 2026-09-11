@@ -1,56 +1,79 @@
 # PR-INV-WS-1 — Inventory Workspace Foundation
 
 **Date:** 2026-09-11
-**Status:** Implemented on a dedicated branch. Not merged. Not deployed.
+**Status:** Implemented on dedicated branch. Not merged. Not deployed.
 **Branch:** `feat/pr-inv-ws-1-inventory-workspace-foundation`
 **PR:** https://github.com/safwan5001-source/Nebrax/pull/762
 **Base SHA:** `e33b52ef353d4d1e85b6dba847056ead963ddf1e` (`main`)
-**Head SHA:** `41c952fac0d9fc70c5401b389d655543b19b8e48` (additional UI/test commits may follow on the same branch)
+**Head SHA:** `dd7365da0de25840a5677ca97efeb869f0fea0ea` (this docs commit may follow on the same branch)
 
 ## 1. Executive summary
 
-PR-INV-WS-1 adds the first production-safe Inventory Workspace foundation: a read-only Product×Warehouse query over existing `product_warehouse_stock` rows. It does not add a second inventory engine, does not post stock or GL, and does not change valuation.
+PR-INV-WS-1 is the first production-safe Inventory Workspace: a read-only Product × Warehouse table on `/inventory`, fed by `GET /api/inventory?view=workspace`. It does not add a second inventory engine, does not post stock or GL, and does not change valuation.
 
-`GET /api/inventory` remains the product-level report when `view` is omitted. `GET /api/inventory?view=workspace` returns the paginated warehouse workspace.
+Legacy `GET /api/inventory` (no `view`) remains the product-level report used by the existing export contract.
 
 ## 2. What was implemented
 
-- `InventoryWorkspaceFilters` and `InventoryWorkspaceQuery`
-- `InventoryController::workspace()` dispatched from `index()` when `view=workspace`
-- Server-side search, warehouse, branch, category, stock-state filters and pagination
-- Cost/value redaction via `SensitiveCostPolicy` / `products.view_cost`
-- Frontend workspace query contract (`web/src/modules/inventory/workspace-query.ts`)
+- `InventoryWorkspaceFilters` + `InventoryWorkspaceQuery` over `product_warehouse_stock.quantity`.
+- `InventoryController::workspace()` dispatched from `index()` when `view=workspace`.
+- Server-side search, warehouse, branch, category, stock-state filters, sort, and pagination.
+- Cost/value redaction via `SensitiveCostPolicy` / `products.view_cost`.
+- `/inventory` page loads the workspace query (no client-side full-set filter).
+- Warehouse and branch columns, stock-state badge, product + movements drill-in.
+- Loading / empty / error states. Mobile record layout using the existing DataTable pattern.
+- Frontend query helper always sends `view=workspace`.
+- Focused backend `InventoryWorkspaceTest` and frontend page/query tests on this branch.
 
 ## 3. What was intentionally not implemented
 
 Serial/lot/expiry, reservations/available, stock requests, replenishment automation, movement-source drilldown architecture, import/accounting/valuation/schema changes, Design System V2, warehouse-grain export.
 
-## 4. API / schema
+## 4. Changed files
+
+- `app/Http/Controllers/Api/InventoryController.php`
+- `app/Services/InventoryWorkspaceQuery.php`
+- `app/Support/InventoryWorkspaceFilters.php`
+- `tests/Feature/InventoryWorkspaceTest.php`
+- `web/src/modules/inventory/workspace-query.ts`
+- `web/src/modules/inventory/workspace-query.test.ts`
+- `web/src/app/(app)/inventory/page.tsx`
+- `web/src/app/(app)/inventory/page.test.tsx`
+- `docs/plans/products-inventory/phase-2-completion/INVENTORY-WORKSPACE.md`
+- `docs/plans/products-inventory/phase-2-completion/PR-INV-WS-1-IMPLEMENTATION-REPORT.md`
+
+Demo `mock-data.ts` still returns the product-level `/inventory` payload. Authenticated API is the production contract.
+
+## 5. API / schema
 
 - Schema/migrations: None
 - New behavior: `GET /api/inventory?view=workspace`
 - Unchanged: `GET /api/inventory` (no view), export, movements
 
-## 5. Permissions
+## 6. Permissions
 
 Same gates as inventory read: `products.view` + `inventory.core`. Cost fields require `products.view_cost`.
 
-## 6. Tenant / branch / warehouse
+## 7. Tenant / branch / warehouse
 
-TenantScope on `ProductWarehouseStock`. Effective warehouse scope via `ReportWarehouseScope`. Effective branch scope via `ReportBranchScope` on `warehouses.branch_id`.
+TenantScope on `ProductWarehouseStock`. Effective warehouse scope via `ReportWarehouseScope`. Effective branch scope via `ReportBranchScope` on `warehouses.branch_id`. Covered by `InventoryWorkspaceTest`.
 
-## 7. Accounting / stock / valuation impact
+## 8. Accounting / stock / valuation impact
 
 NONE / NONE / NONE.
 
-## 8. Tests / CI
+## 9. Tests
 
-Focused backend suite `InventoryWorkspaceTest` and frontend page tests were written locally. Record exact CI results from PR #762 checks; do not treat as green until observed.
+Backend `InventoryWorkspaceTest` covers authorized listing, pagination, filters, tenant isolation, branch scope, warehouse scope, cost hidden without permission, cost visible with permission, unauthorized cost sort 403, and no stock/journal/avg-cost mutation.
 
-## 9. Merge / deploy
+Frontend tests cover `view=workspace` request, warehouse row rendering, cost hidden/shown, error/empty states, and export button.
+
+Exact CI results must be read from PR #762 checks on this Head. Do not treat PHP/web as green until observed.
+
+## 10. Merge / deploy
 
 Neither merge nor deploy was performed.
 
-## 10. Recommended next step
+## 11. Recommended next step
 
-Safwan review of PR #762. After merge: warehouse-grain export or movement-source drilldown — not Serial/Lot or Reservations.
+Safwan review of PR #762 after CI on the latest Head. After merge: warehouse-grain export or movement-source drilldown — not Serial/Lot or Reservations.
