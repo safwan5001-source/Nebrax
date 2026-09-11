@@ -14,7 +14,7 @@ namespace App\Support;
  * (`AccountRoleResolver`)؛ الحل الوحيد المعتمد هو التعيين الصريح.
  *
  * `retained_earnings` أُضيف في FISCAL-2 (الإقفال السنوي) وحده. أمّا
- * `opening_balances` (3130) فيبقى **خارج** الكتالوج: لم يُقرَّر جعله قابلاً
+ * `opening_balances` (3130) فيبقى **خارج** الكتالوج: لم يُقرَّ جعله قابلاً
  * للضبط، وهو حساب الأرصدة الافتتاحية/التحويل لا حساب إقفال — لا يُستعمل
  * للإقفال السنوي بأي حال (FISCAL-1، «Prohibited shortcuts»).
  */
@@ -27,7 +27,7 @@ final class AccountingRoles
         'accounts_receivable' => [
             'label_ar' => 'حسابات العملاء (المدينون)',
             'label_en' => 'Accounts Receivable',
-            'description_ar' => 'الحساب الذي تُقيَّد عليه مديونيات العملاء عند البيع الآجل.',
+            'description_ar' => 'الحساب الذي تُقيَّد عليه مديونيات العملاء عند البيع الآجل.',
             'description_en' => 'The account customer debts are posted to on credit sales.',
             'legacy_code' => '1130',
             'domain' => 'receivables',
@@ -36,7 +36,7 @@ final class AccountingRoles
         'accounts_payable' => [
             'label_ar' => 'حسابات الموردين (الدائنون)',
             'label_en' => 'Accounts Payable',
-            'description_ar' => 'الحساب الذي تُقيَّد عليه مديونيات المؤسسة للموردين عند الشراء الآجل.',
+            'description_ar' => 'الحساب الذي تُقيَّد عليه مديونيات المؤسسة للموردين عند الشراء الآجل.',
             'description_en' => 'The account supplier debts are posted to on credit purchases.',
             'legacy_code' => '2110',
             'domain' => 'payables',
@@ -141,15 +141,31 @@ final class AccountingRoles
             'domain' => 'inventory',
             'configurable' => true,
         ],
-        // FISCAL-2: وجهة الإقفال السنوي. الافتراضي 3120 «الأرباح المرحّلة»
-        // — وليس 3130 «الأرصدة الافتتاحية» الذي يخصّ الافتتاح/التحويل وحده.
         'retained_earnings' => [
             'label_ar' => 'الأرباح المرحّلة',
             'label_en' => 'Retained Earnings',
-            'description_ar' => 'حساب حقوق الملكية الذي يُرحَّل إليه صافي ربح/خسارة السنة عند الإقفال السنوي.',
+            'description_ar' => 'حساب حقوق الملكية الذي يُرحَّل إليه صافي ربح/خسارة السنة عند الإقفال السنوي.',
             'description_en' => 'The equity account the fiscal year net profit or loss is transferred to on annual close.',
             'legacy_code' => '3120',
             'domain' => 'equity',
+            'configurable' => true,
+        ],
+        'gateway_clearing' => [
+            'label_ar' => 'مستحقات بوابات الدفع',
+            'label_en' => 'Payment Gateway Clearing',
+            'description_ar' => 'حساب المقاصة الذي يمثل المبالغ المحصّلة عبر البوابة ولم تُسوَّ بعد إلى الحساب البنكي.',
+            'description_en' => 'Clearing asset for gateway collections not yet settled to the final bank account.',
+            'legacy_code' => '1170',
+            'domain' => 'payments',
+            'configurable' => true,
+        ],
+        'provider_fee_expense' => [
+            'label_ar' => 'عمولات بوابات الدفع',
+            'label_en' => 'Payment Gateway Provider Fees',
+            'description_ar' => 'مصروف العمولة التي يخصمها مزوّد بوابة الدفع من التسوية.',
+            'description_en' => 'Merchant/provider fee expense deducted by the payment gateway on settlement.',
+            'legacy_code' => '5510',
+            'domain' => 'payments',
             'configurable' => true,
         ],
     ];
@@ -164,6 +180,7 @@ final class AccountingRoles
         'tax' => ['label_ar' => 'الضرائب', 'label_en' => 'Tax'],
         'shared' => ['label_ar' => 'مشترك بين المستندات', 'label_en' => 'Shared across documents'],
         'equity' => ['label_ar' => 'حقوق الملكية', 'label_en' => 'Equity'],
+        'payments' => ['label_ar' => 'المدفوعات وبوابات الدفع', 'label_en' => 'Payments & gateways'],
     ];
 
     /** @return array<string, array{label_ar:string,label_en:string,description_ar:string,description_en:string,legacy_code:string,domain:string,configurable:bool}> */
@@ -189,7 +206,6 @@ final class AccountingRoles
         return array_key_exists($key, self::ROLES);
     }
 
-    /** الحساب الافتراضي (بالكود القديم) الذي يُزرع صراحةً عند التهيئة/الاستعادة — لا يُستخدم كمسار حلٍّ بديل وقت الترحيل. */
     public static function legacyCodeFor(string $key): ?string
     {
         return self::ROLES[$key]['legacy_code'] ?? null;
