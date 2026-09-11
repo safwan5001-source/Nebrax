@@ -228,7 +228,7 @@ Full suite, SQLite: same 27 pre-existing failures, all storefront/P2A/P1 tests g
 
 No frontend (`storefront/`) files were touched by this PR — confirmed via `git status` (0 files under `storefront/`). Per the task's own testing strategy (§13.G), TypeScript/Vitest/build steps are **not applicable** to this PR and were not run; the existing `storefront-ci.yml` workflow is expected to pass unchanged since no file it builds was modified.
 
-GitHub Actions CI status: pending — will be confirmed after the PR is opened and pushed (see PR link above once available).
+GitHub Actions CI status: **all green** on head `e8b48c7bf79fefc85bf23cffbd2a373c6ffc7a8a` — `php artisan test (L11, sqlite)` ✅ and `php artisan test (L11, pgsql)` ✅. `mergeable_state: clean` (no conflict with `main`). No `storefront-ci.yml` run triggered, as expected (no frontend files changed).
 
 ## Caching Finding
 
