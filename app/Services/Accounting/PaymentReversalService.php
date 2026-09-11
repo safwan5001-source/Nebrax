@@ -15,6 +15,9 @@ use RuntimeException;
 /**
  * يعكس سند قبض/صرف مرحّلاً دون تعديل القيد الأصلي أو حذف تخصيصاته التاريخية.
  *
+ * مصدر حقيقة السداد بعد العكس هو مجموع تخصيصات السندات التي ما زالت posted،
+ * لا طرح مبلغ السند المعكوس من paid_amount بصورة عمياء.
+ *
  * PAY-V2-5: عكس السند لا يفترض استرداد رسوم المزوّد. إذا كان السند
  * جزءاً من تسوية بوابة مرحّلة يُرفض العكس حتى توجد سياسة رد مستقلة.
  */
@@ -29,6 +32,7 @@ class PaymentReversalService
         }
 
         return DB::transaction(function () use ($payment, $date, $reason) {
+            // يمنع عكس السند نفسه مرتين بالتزامن؛ LedgerService يعيد قفل القيد أيضاً.
             $payment = Payment::lockForUpdate()->findOrFail($payment->id);
             if (! $payment->isPosted()) {
                 throw new RuntimeException('لا يمكن عكس سند غير مرحّل.');
@@ -52,6 +56,7 @@ class PaymentReversalService
                 throw new RuntimeException('القيد الأصلي للسند غير موجود.');
             }
 
+            // ترتيب ثابت قبل الأقفال لتقليل احتمال الـ deadlock عند تعدد المستندات.
             $allocations = $payment->allocations()
                 ->orderBy('allocatable_type')
                 ->orderBy('allocatable_id')
@@ -62,25 +67,28 @@ class PaymentReversalService
             foreach ($allocations as $allocation) {
                 $class = $allocation->allocatable_type;
                 if (! in_array($class, [Invoice::class, Purchase::class], true)) {
-                    throw new RuntimeException('نوع المستند المخصَّص غير مدعوم لعكس السند.');
+                    throw new RuntimeException('نوع المستند المخصَّص غير مدعوم لعكس السند.');
                 }
 
                 $key = $class.'|'.$allocation->allocatable_id;
                 if (! isset($targets[$key])) {
                     $target = $class::lockForUpdate()->find($allocation->allocatable_id);
                     if (! $target) {
-                        throw new RuntimeException('المستند المخصَّص غير موجود.');
+                        throw new RuntimeException('المستند المخصَّص غير موجود.');
                     }
                     $targets[$key] = $target;
                 }
             }
 
+            // يعكس السطور الفعلية المخزنة في القيد الأصلي، ويحترم قفل الفترة
+            // وتوارث فرع الأصل داخل LedgerService. لا إعادة حل لمسارات الحسابات.
             $reversal = $this->ledger->reverse(
                 $entry,
                 $date,
                 $reason ?? "عكس سند {$payment->number}"
             );
 
+            // غيّر الحالة قبل إعادة التجميع كي لا تدخل تخصيصات هذا السند في المجموع.
             $payment->update([
                 'status' => 'reversed',
                 'reversal_entry_id' => $reversal->id,
