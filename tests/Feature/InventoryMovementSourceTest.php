@@ -80,7 +80,7 @@ class InventoryMovementSourceTest extends TestCase
         ]);
         $foreignInvoice = Invoice::create([
             'tenant_id' => $foreign['tenant_id'], 'partner_id' => $foreignPartner->id, 'number' => 'FOREIGN-9', 'status' => 'posted',
-            'invoice_date' => '2026-09-01', 'type' => 'tax_invoice', 'payment_type' => 'credit',
+            'invoice_date' => '2026-09-01', 'type' => 'sale', 'payment_type' => 'credit',
             'subtotal' => 0, 'tax_amount' => 0, 'total' => 0,
         ]);
 
@@ -159,7 +159,7 @@ class InventoryMovementSourceTest extends TestCase
 
         return Invoice::create([
             'tenant_id' => $this->tenantId, 'partner_id' => $partner->id, 'number' => $number,
-            'status' => 'posted', 'invoice_date' => '2026-09-01', 'type' => 'tax_invoice',
+            'status' => 'posted', 'invoice_date' => '2026-09-01', 'type' => 'sale',
             'payment_type' => 'credit', 'subtotal' => 0, 'tax_amount' => 0, 'total' => 0,
         ]);
     }
