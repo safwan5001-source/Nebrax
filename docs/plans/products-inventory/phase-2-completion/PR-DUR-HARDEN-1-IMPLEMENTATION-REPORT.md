@@ -6,7 +6,7 @@ Large Import Limits + Mobile Functional Hardening (post-Durable-Imports)
 
 - **Branch:** `claude/pr-dur-harden-1`
 - **Base SHA:** `64402d2b0dc33dc6615d98583e900387a2683e0d` (`main`, PR-DUR-5 #758 merged)
-- **Head SHA:** recorded in §17 once committed/pushed.
+- **Head SHA:** `25a39810ada6aa362c202ad9bbc18071ccf3e6f1` (code-relevant; a trailing docs-only commit may follow to record CI results).
 - **PR:** opened as a dedicated PR after PR-DUR-5 #758 (Durable Imports sequence).
 
 ## 2. Exact cause of the old 2,000-row limit
