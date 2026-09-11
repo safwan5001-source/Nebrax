@@ -6,25 +6,27 @@ Status: **COMPLETE FOR REVIEW — NOT MERGED — NOT DEPLOYED**
 
 - Repository: `safwan5001-source/Nebrax`
 - Branch: `feat/pay-v2-1b-payment-reversal`
-- PR: [#763](https://github.com/safwan5001-source/Nebrax/pull/763) (draft)
+- PR: [#763](https://github.com/safwan5001-source/Nebrax/pull/763) (draft, open, not merged)
 - Base SHA: `e33b52ef353d4d1e85b6dba847056ead963ddf1e`
-- Head SHA: `e69798ba60a39549fcd0b91aa9680afb5738ed3e` (report commit will follow)
-- Previous accounting Head (CI-green): `2ab87e6ed5ccc40925bdb6d20e90562a62626384`
+- Verified implementation Head (full CI green): `c402707ea12bfcc389fb01f4e9fa88d8854da631`
+- Previous accounting Head (also CI-green): `2ab87e6ed5ccc40925bdb6d20e90562a62626384`
 
 ## Implementation summary
 
 PAY-V2-1B finishes safe reversal of posted receipt/payment vouchers.
 
-Accounting core was already on the branch and passed full GitHub Actions CI on SQLite and PostgreSQL at `2ab87e6`. This completion exposed `POST /api/payments/{id}/reverse` with existing `payments.manage` and added focused API / RBAC / tenant / branch / period-lock coverage.
+Accounting core already existed on this branch and passed full GitHub Actions CI on SQLite and PostgreSQL at `2ab87e6`. This completion exposed `POST /api/payments/{id}/reverse` with existing `payments.manage` and added focused API / RBAC / tenant / branch / original-journal / period-lock coverage.
 
 What this completion added:
 
 - `POST /api/payments/{id}/reverse` using the same protection stack as other payment mutations (`ForceJsonResponse`, Sanctum, user principal, tenant, branch, active subscription, `payments.manage`).
 - Focused API/RBAC tests for authorized reverse, 403 without `payments.manage`, response metadata, double-reverse rejection, and draft-only mutation protections on a reversed voucher.
 - Focused tenant and active-branch isolation negatives, including proof that reversal copies the original stored journal and does not reroute from the caller’s current cash/bank defaults.
-- Focused period-lock regression through existing `LedgerService::reverse()` / `AccountingDateGuard` behavior.
+- Focused period-lock regression through existing `LedgerService::reverse()` / `AccountingDateGuard` behavior. Failure leaves Payment, original journal, allocations, and Invoice/Purchase paid state unchanged.
 - Removal of the temporary API-integration note and interim report.
 - This report as the final documentation file.
+
+Route registration: `app/Providers/TenancyServiceProvider.php` registers `POST api/payments/{id}/reverse` with `whereUuid('id')`. Contract and guards match `POST payments/{id}/post`. Placement is in the provider rather than `routes/api.php` so the large route file is not rewritten.
 
 ## Changed files
 
@@ -38,7 +40,7 @@ Accounting / model / resource (already on `2ab87e6`):
 - `tests/Feature/PaymentReversalTest.php`
 - `tests/Feature/SupplierPaymentTest.php`
 
-Integration / hardening (this completion):
+Integration / hardening:
 
 - `app/Providers/TenancyServiceProvider.php` — registers `POST api/payments/{id}/reverse`
 - `tests/Feature/PaymentReversalApiTest.php`
@@ -49,6 +51,8 @@ Removed:
 
 - `docs/plans/payments/PAY-V2-1B-NOTE.md`
 - `docs/plans/payments/PAY-V2-1B-IMPLEMENTATION-REPORT.md`
+
+No leftover temporary notes remain under `docs/plans/payments/`.
 
 ## Database / migration changes
 
@@ -78,32 +82,63 @@ Preserved; not redesigned:
 ## Tenant / Branch / security guarantees
 
 - `POST /api/payments/{id}/reverse` requires `payments.manage`. `staff` has `payments.view` only and receives 403.
-- Cross-tenant Payment id cannot be shown or reversed (404).
+- Cross-tenant Payment id cannot be shown or reversed (404). Tenant context is restored before asserting the source Payment remains posted.
 - A Payment stamped to another branch is not visible under the caller’s active `X-Branch-Id` and cannot be reversed from that branch (404).
 - Successful reverse from the Payment’s own branch still uses the original journal routing, even after the tenant’s main cash account is changed.
 - No new RBAC permission and no change to tenant/branch middleware.
 
 ## Focused tests and exact results
 
-Pending the completion CI run on this Head. Intended focused set:
+Focused suites included in the full GitHub Actions run on Head `c402707ea12bfcc389fb01f4e9fa88d8854da631`:
 
-- `php artisan test --filter=PaymentReversalTest`
-- `php artisan test --filter=PaymentReversalApiTest`
-- `php artisan test --filter=SupplierPaymentTest`
+`PaymentReversalTest`
 
-Existing accounting tests at Head `2ab87e6` already passed full CI on SQLite and PostgreSQL.
+- posted receipt is reversed from its original journal and keeps allocation history
+- reversing one of multiple receipts recalculates from remaining posted allocations
+- draft payment cannot be reversed
+- payment cannot be reversed twice
+- missing original journal fails without changing payment or invoice
+- reversal into a locked period fails without changing payment, journal, allocations, or invoice
+
+`PaymentReversalApiTest`
+
+- `payments.manage` user can reverse a posted Payment; response exposes `status=reversed`, `reversal_entry_id`, `reversed_at`
+- user without `payments.manage` receives 403; Payment stays posted
+- reversed Payment cannot be reversed twice (422); only one reversal journal exists; update/post/delete remain 422
+- cross-tenant Payment cannot be shown or reversed (404)
+- Payment outside the caller’s active branch cannot be reversed (404); same-branch reverse succeeds
+- reversal uses the original stored journal and ignores current cash/method defaults
+- API reversal dated inside a locked period returns 422 and leaves Payment, original journal, allocations, and invoice paid state unchanged
+
+`SupplierPaymentTest` (existing + reversal cases)
+
+- reversing a supplier payment restores purchase payable and keeps original routing
+- reversing one supplier payment recalculates purchase from other posted payments
+
+Exact engine results for the full suite that contains those tests:
+
+| Engine | Job | Result | Tests step |
+|---|---|---|---|
+| SQLite | `php artisan test (L11, sqlite)` | **success** | 17:30:14Z – 17:35:10Z |
+| PostgreSQL | `php artisan test (L11, pgsql)` | **success** | 17:30:15Z – 17:41:56Z |
 
 ## Full CI results for SQLite and PostgreSQL
 
-Already verified on previous Head `2ab87e6ed5ccc40925bdb6d20e90562a62626384`:
+Verified on Head `c402707ea12bfcc389fb01f4e9fa88d8854da631`:
 
-- `php artisan test (L11, sqlite)` — success — https://github.com/safwan5001-source/Nebrax/actions/runs/34623933095
-- `php artisan test (L11, pgsql)` — success — https://github.com/safwan5001-source/Nebrax/actions/runs/34623933095
+- Push run [#34627929738](https://github.com/safwan5001-source/Nebrax/actions/runs/34627929738) — **success**
+  - `php artisan test (L11, sqlite)` — success — [job 103357439190](https://github.com/safwan5001-source/Nebrax/actions/runs/34627929738/job/103357439190)
+  - `php artisan test (L11, pgsql)` — success — [job 103357438865](https://github.com/safwan5001-source/Nebrax/actions/runs/34627929738/job/103357438865)
 
-Completion CI is running on later commits; this section will be treated as PASS only after those jobs succeed.
+Previously verified on accounting Head `2ab87e6ed5ccc40925bdb6d20e90562a62626384`:
+
+- Push run [#34623933095](https://github.com/safwan5001-source/Nebrax/actions/runs/34623933095) — **success** (sqlite + pgsql)
+
+A docs-only follow-up commit on this branch may start another CI run. It does not change application code.
 
 ## Build / CI status
 
+- Full CI on verified implementation Head `c402707e`: **PASS** (SQLite + PostgreSQL)
 - Merge: **NOT MERGED**
 - Deploy: **NOT DEPLOYED**
 - Draft PR #763 remains open.
@@ -111,7 +146,7 @@ Completion CI is running on later commits; this section will be treated as PASS 
 ## Risks and remaining work
 
 - No UI for reverse. Operators can only reverse through the API until a later scoped UI task.
-- The reverse route is registered from `TenancyServiceProvider` with the same mutation guards as other payment writes. Moving the one-line registration into `routes/api.php` beside `POST payments/{id}/post` is a documentation/placement cleanup only and does not change behavior.
+- The reverse route lives in `TenancyServiceProvider` with the same mutation guards as other payment writes. Moving the one-line registration into `routes/api.php` beside `POST payments/{id}/post` is placement cleanup only and does not change behavior.
 - `cancelled` remains in the status contract; this task does not introduce a cancel flow.
 - Classification update on a reversed voucher is unchanged existing behavior and was not redesigned here.
 - Duplicate of a reversed voucher still creates a new draft without allocations (existing `PaymentService::duplicate` contract).
@@ -119,4 +154,4 @@ Completion CI is running on later commits; this section will be treated as PASS 
 
 ## Next recommended step
 
-Safwan review of draft PR #763 after completion CI is green. Do not merge or deploy without explicit approval.
+Safwan review of draft PR #763. Do not merge or deploy without explicit approval.
