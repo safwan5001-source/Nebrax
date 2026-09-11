@@ -10,6 +10,7 @@ use App\Models\Payment;
 use App\Models\Purchase;
 use App\Models\Tenant;
 use App\Services\Accounting\ChartOfAccountsSeeder;
+use App\Services\Accounting\PaymentReversalService;
 use App\Services\Accounting\PaymentService;
 use App\Services\Accounting\PurchaseService;
 use App\Tenancy\TenantContext;
@@ -82,7 +83,6 @@ class SupplierPaymentTest extends TestCase
 
         $payment = $this->pay($purchase, 46000);
 
-        // القيد: مدين 2110 الموردون (مربوط بالمورد) / دائن 1110 الصندوق — متوازن ومربوط بالمصدر
         $entry = JournalEntry::with('lines.account')
             ->where('source_type', Payment::class)
             ->where('source_id', $payment->id)
@@ -93,7 +93,6 @@ class SupplierPaymentTest extends TestCase
         $this->assertEquals($this->supplier->id, $this->line($entry, '2110')->partner_id);
         $this->assertEquals(46000, $this->line($entry, '1110')->credit);
 
-        // الفاتورة مدفوعة بالكامل ورصيد الموردين صفر
         $purchase->refresh();
         $this->assertSame('paid', $purchase->payment_status);
         $this->assertSame(46000, $purchase->paid_amount);
@@ -104,8 +103,7 @@ class SupplierPaymentTest extends TestCase
     /** @test */
     public function partial_supplier_payment_marks_purchase_partial(): void
     {
-        $purchase = $this->postedPurchase(); // 46000
-
+        $purchase = $this->postedPurchase();
         $this->pay($purchase, 20000);
 
         $purchase->refresh();
@@ -119,19 +117,18 @@ class SupplierPaymentTest extends TestCase
     public function bank_supplier_payment_credits_the_bank_account(): void
     {
         $purchase = $this->postedPurchase();
-
         $payment = $this->pay($purchase, 46000, 'bank');
 
         $entry = $payment->journalEntry()->with('lines.account')->first();
-        $this->assertEquals(46000, $this->line($entry, '1120')->credit); // البنك
+        $this->assertEquals(46000, $this->line($entry, '1120')->credit);
         $this->assertNull($this->line($entry, '1110'));
     }
 
     /** @test */
     public function overpaying_a_supplier_beyond_remaining_is_rejected(): void
     {
-        $purchase = $this->postedPurchase(); // 46000
-        $this->pay($purchase, 40000);        // متبقٍ 6000
+        $purchase = $this->postedPurchase();
+        $this->pay($purchase, 40000);
 
         $this->expectExceptionMessage('يتجاوز المتبقي');
         $this->pay($purchase, 10000);
@@ -140,8 +137,8 @@ class SupplierPaymentTest extends TestCase
     /** @test */
     public function one_payment_allocated_across_two_purchases_settles_both(): void
     {
-        $p1 = $this->postedPurchase(); // 46000
-        $p2 = $this->postedPurchase(); // 46000
+        $p1 = $this->postedPurchase();
+        $p2 = $this->postedPurchase();
 
         $payment = $this->payments->create(
             ['partner_id' => $this->supplier->id, 'direction' => 'paid', 'amount' => 92000],
@@ -152,7 +149,6 @@ class SupplierPaymentTest extends TestCase
         );
         $posted = $this->payments->post($payment);
 
-        // قيد واحد متوازن: مدين 2110 بـ 92000 / دائن 1110 بـ 92000
         $entry = $posted->journalEntry()->with('lines.account')->first();
         $this->assertEquals(92000, $entry->lines->sum('debit'));
         $this->assertEquals(92000, $entry->lines->sum('credit'));
@@ -167,13 +163,13 @@ class SupplierPaymentTest extends TestCase
     public function paying_a_purchase_of_another_supplier_is_rejected(): void
     {
         $purchase = $this->postedPurchase();
-        $other    = Partner::create(['name' => 'مورد آخر', 'type' => 'supplier']);
+        $other = Partner::create(['name' => 'مورد آخر', 'type' => 'supplier']);
 
         $payment = $this->payments->create([
-            'partner_id'  => $other->id,
-            'direction'   => 'paid',
+            'partner_id' => $other->id,
+            'direction' => 'paid',
             'purchase_id' => $purchase->id,
-            'amount'      => 46000,
+            'amount' => 46000,
         ]);
 
         $this->expectExceptionMessage('لا تخص طرف السند');
@@ -186,16 +182,66 @@ class SupplierPaymentTest extends TestCase
         $draft = app(PurchaseService::class)->create(
             ['partner_id' => $this->supplier->id, 'payment_type' => 'credit'],
             [['quantity' => 1, 'unit_price' => 40000]]
-        ); // draft
+        );
 
         $payment = $this->payments->create([
-            'partner_id'  => $this->supplier->id,
-            'direction'   => 'paid',
+            'partner_id' => $this->supplier->id,
+            'direction' => 'paid',
             'purchase_id' => $draft->id,
-            'amount'      => 46000,
+            'amount' => 46000,
         ]);
 
         $this->expectExceptionMessage('غير مرحّلة');
         $this->payments->post($payment);
+    }
+
+    /** @test */
+    public function reversing_supplier_payment_restores_purchase_payable_and_keeps_original_routing(): void
+    {
+        $purchase = $this->postedPurchase();
+        $payment = $this->pay($purchase, 46000, 'bank');
+        $original = $payment->journalEntry()->with('lines.account')->firstOrFail();
+        $originalLineSnapshot = $original->lines->map(fn (JournalLine $line) => [
+            'account_id' => $line->account_id,
+            'debit' => $line->debit,
+            'credit' => $line->credit,
+            'partner_id' => $line->partner_id,
+        ])->all();
+
+        $reversed = app(PaymentReversalService::class)->reverse($payment);
+
+        $purchase->refresh();
+        $this->assertTrue($reversed->isReversed());
+        $this->assertSame(0, $purchase->paid_amount);
+        $this->assertSame('unpaid', $purchase->payment_status);
+        $this->assertSame(46000, $purchase->remaining());
+        $this->assertEquals(46000, Account::where('code', '2110')->first()->balance->fresh()->balance);
+        $this->assertEquals(0, Account::where('code', '1120')->first()->balance->fresh()->balance);
+
+        $original->refresh()->load('lines');
+        $this->assertSame('reversed', $original->status);
+        $this->assertSame($originalLineSnapshot, $original->lines->map(fn (JournalLine $line) => [
+            'account_id' => $line->account_id,
+            'debit' => $line->debit,
+            'credit' => $line->credit,
+            'partner_id' => $line->partner_id,
+        ])->all());
+    }
+
+    /** @test */
+    public function reversing_one_supplier_payment_recalculates_purchase_from_other_posted_payments(): void
+    {
+        $purchase = $this->postedPurchase();
+        $first = $this->pay($purchase, 20000);
+        $second = $this->pay($purchase, 26000);
+        $this->assertSame('paid', $purchase->fresh()->payment_status);
+
+        app(PaymentReversalService::class)->reverse($second);
+
+        $purchase->refresh();
+        $this->assertSame(20000, $purchase->paid_amount);
+        $this->assertSame('partial', $purchase->payment_status);
+        $this->assertTrue($first->fresh()->isPosted());
+        $this->assertTrue($second->fresh()->isReversed());
     }
 }

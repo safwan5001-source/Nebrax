@@ -12,6 +12,7 @@ use App\Models\Invoice;
 use App\Models\Payment;
 use App\Models\PaymentMethod;
 use App\Models\Purchase;
+use App\Services\Accounting\PaymentReversalService;
 use App\Services\Accounting\PaymentService;
 use App\Services\ClassificationService;
 use Illuminate\Http\JsonResponse;
@@ -23,6 +24,7 @@ class PaymentController extends ApiController
 {
     public function __construct(
         protected PaymentService $payments,
+        protected PaymentReversalService $paymentReversals,
         protected ClassificationService $classifications,
     ) {}
 
@@ -146,6 +148,30 @@ class PaymentController extends ApiController
         $posted = $this->domain(fn () => $this->payments->post($payment, $request->user()));
 
         return (new PaymentResource($posted->load(['partner', 'cashAccount', 'paymentMethod', 'collectorEmployee', 'attachments', 'allocations.allocatable', 'printTemplateRevision', 'pdfTemplateRevision', 'thermalTemplateRevision'])))->response();
+    }
+
+    /**
+     * يعكس سنداً مرحّلاً فقط. الحساب النقدي/البنكي لا يُقبل من الطلب؛ العكس
+     * يستخدم القيد الأصلي المخزّن حصراً. التاريخ اختياري ويخضع لقفل الفترة.
+     */
+    public function reverse(Request $request, string $id): JsonResponse
+    {
+        $payment = $this->visiblePayment($request, $id);
+        $validated = $request->validate([
+            'date' => ['nullable', 'date_format:Y-m-d'],
+            'reason' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $reversed = $this->domain(fn () => $this->paymentReversals->reverse(
+            $payment,
+            $validated['date'] ?? null,
+            $validated['reason'] ?? null,
+        ));
+
+        return (new PaymentResource($reversed->load([
+            'partner', 'cashAccount', 'paymentMethod', 'collectorEmployee', 'attachments',
+            'allocations.allocatable', 'printTemplateRevision', 'pdfTemplateRevision', 'thermalTemplateRevision',
+        ])))->response();
     }
 
     /** تنزيل مرفق خاص بعد إثبات أنه يعود لسند مرئي في الفرع النشط. */
