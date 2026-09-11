@@ -22,6 +22,7 @@ import { Select } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/toast';
+import { FormActions } from '@/components/nebrax';
 import { api, ApiError, downloadFile } from '@/lib/api';
 import { downloadCsv, toCsv } from '@/lib/export';
 import { formatRiyal } from '@/lib/money';
@@ -275,10 +276,14 @@ export default function InventoryOpeningImportPage() {
                 t={t}
               />
               <p className="text-xs leading-relaxed text-muted">{t('resumed_automap_hint')}</p>
-              <Button disabled={!openingDate} onClick={() => void confirmAndApply()}>
-                <Upload className="h-4 w-4" strokeWidth={1.7} />
-                {t('create_draft')}
-              </Button>
+              <FormActions
+                primary={
+                  <Button disabled={!openingDate} onClick={() => void confirmAndApply()}>
+                    <Upload className="h-4 w-4" strokeWidth={1.7} />
+                    {t('create_draft')}
+                  </Button>
+                }
+              />
             </CardContent>
           </Card>
         ) : (
@@ -409,11 +414,15 @@ export default function InventoryOpeningImportPage() {
               </Card>
             ) : null}
 
-            <div className="lg:col-span-2 flex justify-end">
-              <Button disabled={!canPreview} onClick={() => void runPreview()}>
-                {previewing ? <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.7} /> : null}
-                {t('run_preview')}
-              </Button>
+            <div className="lg:col-span-2">
+              <FormActions
+                primary={
+                  <Button disabled={!canPreview} onClick={() => void runPreview()}>
+                    {previewing ? <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.7} /> : null}
+                    {t('run_preview')}
+                  </Button>
+                }
+              />
             </div>
           </div>
         )
@@ -544,15 +553,19 @@ export default function InventoryOpeningImportPage() {
 
           {!canApplyPreview ? <p className="text-sm text-negative">{t('confirm_blocked')}</p> : null}
 
-          <div className="flex flex-wrap justify-between gap-2">
-            <Button variant="outline" onClick={() => setStep(0)}>
-              {t('previous')}
-            </Button>
-            <Button disabled={!canApplyPreview} onClick={() => void confirmAndApply()}>
-              <Upload className="h-4 w-4" strokeWidth={1.7} />
-              {t('create_draft')}
-            </Button>
-          </div>
+          <FormActions
+            secondary={
+              <Button variant="outline" onClick={() => setStep(0)}>
+                {t('previous')}
+              </Button>
+            }
+            primary={
+              <Button disabled={!canApplyPreview} onClick={() => void confirmAndApply()}>
+                <Upload className="h-4 w-4" strokeWidth={1.7} />
+                {t('create_draft')}
+              </Button>
+            }
+          />
         </div>
       ) : null}
 
@@ -581,17 +594,21 @@ export default function InventoryOpeningImportPage() {
               {t('draft_created', { number: applyResult?.number ?? '' })}
             </p>
             <p className="text-sm leading-relaxed text-muted">{t('draft_next_step')}</p>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                disabled={!applyResult?.inventory_opening_id}
-                onClick={() => applyResult?.inventory_opening_id && router.push(`/inventory-openings/${applyResult.inventory_opening_id}`)}
-              >
-                {t('open_draft')}
-              </Button>
-              <Button variant="outline" onClick={reset}>
-                {t('import_another')}
-              </Button>
-            </div>
+            <FormActions
+              secondary={
+                <Button variant="outline" onClick={reset}>
+                  {t('import_another')}
+                </Button>
+              }
+              primary={
+                <Button
+                  disabled={!applyResult?.inventory_opening_id}
+                  onClick={() => applyResult?.inventory_opening_id && router.push(`/inventory-openings/${applyResult.inventory_opening_id}`)}
+                >
+                  {t('open_draft')}
+                </Button>
+              }
+            />
           </CardContent>
         </Card>
       ) : null}

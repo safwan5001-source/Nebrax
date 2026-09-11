@@ -15,6 +15,14 @@ export interface StepDefinition {
  * على الجوال يبقى سطراً واحداً ممرَّراً أفقياً **داخل حاويته** لا على مستوى
  * الصفحة، ويُسبَق بسطر «الخطوة ٣ من ٧» كي يبقى الموضع معلوماً حتى لو خرجت
  * بقية الخطوات عن الشاشة.
+ *
+ * **تمرير الخطوة النشطة تلقائياً إلى منظور المستخدم** (مراجعة إنتاج/جوال):
+ * `overflow-x-auto` وحده لا يكفي — بلا هذا، شاشةٌ ضيّقة (iPhone) تُبقي تمرير
+ * الحاوية عند نقطة بدايته (الخطوة الأولى) ما لم يسحب المستخدم يدوياً، فتبدو
+ * الخطوات اللاحقة (٣، ٤) مقطوعةً أو مخفيّة تماماً رغم أن العنصر موجودٌ فعلاً
+ * ويمكن الوصول إليه بالتمرير — وهذا بالضبط ما رُصد إنتاجياً. الحل: مرّر
+ * الخطوة النشطة إلى المنتصف تلقائياً كلما تغيّرت `current`، بلا أي عنصر
+ * تصميمٍ جديد.
  */
 export function Stepper({
   steps,
@@ -29,16 +37,28 @@ export function Stepper({
   className?: string;
   label: string;
 }) {
+  const listRef = React.useRef<HTMLOListElement | null>(null);
+  const activeRef = React.useRef<HTMLLIElement | null>(null);
+
+  React.useEffect(() => {
+    // `scrollIntoView` غائبة عن jsdom وعن بعض بيئات العرض الأقدم — تصريحٌ
+    // دفاعي، لا مجرّد التفاف حول الاختبار.
+    if (typeof activeRef.current?.scrollIntoView === 'function') {
+      activeRef.current.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [current]);
+
   return (
     <nav aria-label={label} className={cn('rounded border border-border bg-surface', className)}>
-      <ol className="flex items-center gap-1 overflow-x-auto p-2">
+      <ol ref={listRef} className="flex items-center gap-1 overflow-x-auto p-2">
         {steps.map((step, index) => {
           const done = index < current;
           const active = index === current;
           const reachable = index <= current && Boolean(onSelect);
 
           return (
-            <li key={step.key} className="flex shrink-0 items-center gap-1">
+            <li key={step.key} ref={active ? activeRef : undefined} className="flex shrink-0 items-center gap-1">
               <button
                 type="button"
                 onClick={reachable ? () => onSelect?.(index) : undefined}

@@ -480,4 +480,78 @@ class ImportJobApplyTest extends TestCase
 
         $this->assertSame(3, Product::count());
     }
+
+    /**
+     * PR-DUR-HARDEN-1 — الملف يتجاوز سقف الاستيراد المتزامن القديم (٢٠٠٠
+     * صفّ) لكنه دون `DURABLE_MAX_ROWS` الجديد (٢٠٠٠٠) الخاص بالمحرّك الدائم
+     * وحده. صفوفٌ فارغة تتخلّل حول حاجز الـ٢٠٠٠ القديم تحديداً (لا حول حدود
+     * القطعة العادية فقط) لإثبات أن الرفع الجديد لا يفقد ولا يكرّر صفّاً عند
+     * هذا الحاجز بالذات.
+     */
+    private function csvBeyondLegacyLimit(int $rows): UploadedFile
+    {
+        $lines = ['sku,name,type,sale_price'];
+        for ($i = 1; $i <= $rows; $i++) {
+            $lines[] = "SKU-{$i},منتج رقم {$i},good,100.00";
+            // صفّان فارغان متخلّلان حول حاجز الـ٢٠٠٠ الصفّي القديم تحديداً.
+            if ($i === 1999 || $i === 2000) {
+                $lines[] = ',,,';
+            }
+        }
+
+        return UploadedFile::fake()->createWithContent('large-catalog.csv', implode("\n", $lines)."\n");
+    }
+
+    /** @test */
+    public function a_durable_upload_beyond_the_legacy_row_limit_is_accepted_and_completes_without_loss_or_duplication(): void
+    {
+        $auth = $this->registerTenant();
+        $rows = 2200;
+
+        $jobId = $this->withToken($auth['token'])
+            ->post('/api/import-jobs', ['domain' => 'product_catalog', 'file' => $this->csvBeyondLegacyLimit($rows)])
+            ->assertCreated()
+            ->assertJsonPath('data.status', ImportJobStatus::READY)
+            ->assertJsonPath('data.row_count', $rows)
+            ->json('data.id');
+
+        $status = null;
+        $iterations = 0;
+        do {
+            $iterations++;
+            $this->assertLessThan(200, $iterations, 'يجب أن تكتمل التشغيلة خلال عدد قطعٍ معقول.');
+            $response = $this->withToken($auth['token'])->postJson("/api/import-jobs/{$jobId}/apply")->assertOk();
+            $status = $response->json('data.status');
+        } while ($status !== ImportJobStatus::COMPLETED);
+
+        $this->assertSame($rows, Product::count(), 'كل الصفوف الصالحة تُطبَّق مرّةً واحدة فقط — لا فقدان ولا تكرار حول الحاجز القديم.');
+        // أول صفّ، وصفّان قبل/بعد حاجز الـ٢٠٠٠ القديم مباشرةً، وآخر صفّ.
+        foreach ([1, 1999, 2000, 2001, 2200] as $index) {
+            $this->assertNotNull(Product::where('sku', "SKU-{$index}")->first(), "SKU-{$index} يجب أن يكون قد استُورد.");
+        }
+
+        $this->assertSame(0, StockMovement::count());
+        $this->assertSame(0, JournalEntry::count());
+        $this->assertSame(0, JournalLine::count());
+    }
+
+    /**
+     * العكس: ملفٌ يتجاوز حتى `DURABLE_MAX_ROWS` نفسها — السقف الجديد أعلى
+     * لكنه ليس معدوماً. الفشل هنا فشل فحصٍ هيكلي (كحال تجاوز سقف الأعمدة
+     * في `ImportJobTest`) — تشغيلةٌ تُنشأ بحالة `failed` لا رفض ٤٢٢ للطلب،
+     * لأن `inspect()` يلتقط الفشل ويسجّله على التشغيلة نفسها للتدقيق.
+     */
+    /** @test */
+    public function a_durable_upload_beyond_the_new_durable_row_limit_fails_the_job_at_inspect(): void
+    {
+        $auth = $this->registerTenant();
+
+        $response = $this->withToken($auth['token'])
+            ->post('/api/import-jobs', ['domain' => 'product_catalog', 'file' => $this->csv(\App\Services\ProductImportService::DURABLE_MAX_ROWS + 1)])
+            ->assertCreated()
+            ->assertJsonPath('data.status', ImportJobStatus::FAILED);
+
+        $this->assertNotEmpty($response->json('data.error_message'));
+        $this->assertSame(0, Product::count());
+    }
 }

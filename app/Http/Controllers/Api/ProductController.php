@@ -145,7 +145,7 @@ class ProductController extends ApiController
     public function importInspect(ImportProductsRequest $request): JsonResponse
     {
         return response()->json([
-            'data' => $this->domain(fn () => $this->imports->inspect($request->file('file'))),
+            'data' => $this->domain(fn () => $this->imports->inspect($request->file('file'), $request->maxRows())),
         ]);
     }
 
@@ -157,6 +157,7 @@ class ProductController extends ApiController
                 $request->file('file'),
                 $request->importOptions(),
                 SensitiveCostPolicy::authorized($request->user()),
+                $request->maxRows(),
             )),
         ]);
     }

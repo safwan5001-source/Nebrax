@@ -19,6 +19,7 @@ import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/toast';
+import { FormActions } from '@/components/nebrax';
 import { api, ApiError, downloadFile } from '@/lib/api';
 import { downloadCsv, toCsv } from '@/lib/export';
 import { Stepper } from '@/modules/products/import/stepper';
@@ -136,7 +137,7 @@ export default function ProductImportPage() {
     try {
       const response = await api<{ data: InspectResult }>('/products/import/inspect', {
         method: 'POST',
-        body: importFormData(next),
+        body: importFormData(next, { forDurable: true }),
       });
       setInspection(response.data);
       setMapping(suggestedMapping(response.data.columns));
@@ -163,7 +164,7 @@ export default function ProductImportPage() {
     try {
       const response = await api<{ data: ImportPreview }>('/products/import/preview', {
         method: 'POST',
-        body: importFormData(file, { mode, blankPolicy, masterDataPolicy, mapping }),
+        body: importFormData(file, { mode, blankPolicy, masterDataPolicy, mapping, forDurable: true }),
       });
       setPreview(response.data);
       setStep(1);
@@ -286,10 +287,14 @@ export default function ProductImportPage() {
                 t={t}
               />
               <p className="text-xs leading-relaxed text-muted">{t('import_resumed_automap_hint')}</p>
-              <Button onClick={() => void confirmAndApply()}>
-                <Upload className="h-4 w-4" strokeWidth={1.7} />
-                {t('import_apply')}
-              </Button>
+              <FormActions
+                primary={
+                  <Button onClick={() => void confirmAndApply()}>
+                    <Upload className="h-4 w-4" strokeWidth={1.7} />
+                    {t('import_apply')}
+                  </Button>
+                }
+              />
             </CardContent>
           </Card>
         ) : (
@@ -482,12 +487,14 @@ export default function ProductImportPage() {
               ))}
             </ol>
 
-            <div className="flex justify-end">
-              <Button disabled={!canPreview} onClick={() => void runPreview()}>
-                {previewing ? <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.7} /> : <CheckCircle2 className="h-4 w-4" strokeWidth={1.7} />}
-                {t('import_run_preview')}
-              </Button>
-            </div>
+            <FormActions
+              primary={
+                <Button disabled={!canPreview} onClick={() => void runPreview()}>
+                  {previewing ? <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.7} /> : <CheckCircle2 className="h-4 w-4" strokeWidth={1.7} />}
+                  {t('import_run_preview')}
+                </Button>
+              }
+            />
           </div>
         )
       ) : null}
@@ -550,15 +557,19 @@ export default function ProductImportPage() {
 
             <p className="text-xs leading-relaxed text-muted">{t('import_confirm_revalidate')}</p>
 
-            <div className="flex flex-wrap justify-between gap-2">
-              <Button type="button" variant="outline" onClick={() => setStep(0)}>
-                {t('import_back')}
-              </Button>
-              <Button disabled={!canApplyPreview} onClick={() => void confirmAndApply()}>
-                <Upload className="h-4 w-4" strokeWidth={1.7} />
-                {t('import_apply')}
-              </Button>
-            </div>
+            <FormActions
+              secondary={
+                <Button type="button" variant="outline" onClick={() => setStep(0)}>
+                  {t('import_back')}
+                </Button>
+              }
+              primary={
+                <Button disabled={!canApplyPreview} onClick={() => void confirmAndApply()}>
+                  <Upload className="h-4 w-4" strokeWidth={1.7} />
+                  {t('import_apply')}
+                </Button>
+              }
+            />
           </CardContent>
         </Card>
       ) : null}
@@ -605,20 +616,26 @@ export default function ProductImportPage() {
             </dl>
             <p className="text-xs leading-relaxed text-muted">{t('import_result_last_chunk_hint')}</p>
 
-            <div className="flex flex-wrap gap-2">
-              <Button asChild variant="primary">
-                <Link href="/products">{t('import_back_to_products')}</Link>
-              </Button>
-              <Button variant="outline" onClick={reset}>
-                {t('import_start_another')}
-              </Button>
-              {applyResult?.results ? (
-                <Button variant="ghost" onClick={() => downloadReport(applyResult.results ?? [], 'nebrax-products-import-result')}>
-                  <Download className="h-4 w-4" strokeWidth={1.7} />
-                  {t('import_download_result')}
+            <FormActions
+              secondary={
+                <>
+                  <Button variant="outline" onClick={reset}>
+                    {t('import_start_another')}
+                  </Button>
+                  {applyResult?.results ? (
+                    <Button variant="ghost" onClick={() => downloadReport(applyResult.results ?? [], 'nebrax-products-import-result')}>
+                      <Download className="h-4 w-4" strokeWidth={1.7} />
+                      {t('import_download_result')}
+                    </Button>
+                  ) : null}
+                </>
+              }
+              primary={
+                <Button asChild variant="primary">
+                  <Link href="/products">{t('import_back_to_products')}</Link>
                 </Button>
-              ) : null}
-            </div>
+              }
+            />
           </CardContent>
         </Card>
       ) : null}

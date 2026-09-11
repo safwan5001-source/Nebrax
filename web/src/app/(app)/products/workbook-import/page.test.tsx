@@ -105,6 +105,20 @@ describe('استيراد مصنّف المنتجات — أول واجهة دا�
     expect((screen.getByRole('button', { name: 'run_preview' }) as HTMLButtonElement).disabled).toBe(true);
   });
 
+  /**
+   * PR-DUR-HARDEN-1 (Part B) — زرّ المعاينة داخل شريط إجراءاتٍ ملتصق وآمن
+   * الحافّة السفلية على الجوال (`FormActions`/`pb-safe`).
+   */
+  it('زرّ المعاينة داخل شريط إجراءاتٍ ملتصق وآمن الحافّة السفلية', async () => {
+    render(<ProductWorkbookImportPage />);
+
+    await waitFor(() => expect(screen.getByLabelText('price_list')).toBeTruthy());
+    const runPreviewButton = screen.getByRole('button', { name: 'run_preview' });
+    const actionsBar = runPreviewButton.closest('.pb-safe');
+    expect(actionsBar).toBeTruthy();
+    expect(actionsBar?.className).toContain('fixed');
+  });
+
   it('التطبيق ذرّيٌّ: لا شريط تقدّم، والنتيجة تلخّص الأوراق الثلاث معاً', async () => {
     const user = userEvent.setup();
     render(<ProductWorkbookImportPage />);

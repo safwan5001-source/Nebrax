@@ -25,9 +25,27 @@ use Throwable;
  */
 class ImportJobService
 {
-    /** يعيد استخدام نفس سقفَي الصفوف/الأعمدة المفروضين على استيراد المنتجات — لا نسخة ثانية. */
-    private const MAX_ROWS = ProductImportService::MAX_ROWS;
+    /**
+     * PR-DUR-HARDEN-1 — سقف الصفوف لم يعد واحداً مشتركاً بين المجالات
+     * الثلاثة: `product_catalog` مجزَّأٌ فعلياً فسقفه `DURABLE_MAX_ROWS`
+     * (أعلى بعشر مرّات، مبرَّرٌ بالقياس — راجع توثيقه)؛ `product_workbook`
+     * و`inventory_opening` ذرّيّان (تطبيقهما كتلةٌ واحدة بلا تجزئة ممكنة
+     * أصلاً — PR-DUR-3/4)، فسقفهما يبقى سقف خدمة كلٍّ منهما نفسه، غير
+     * مرفوعٍ هنا ولا في أي مكانٍ آخر. `maxRowsFor()` يفرض هذا التمييز صراحةً
+     * بدل ثابتٍ واحد يُطبَّق على الجميع سهواً (`MAX_COLUMNS` وحده يبقى
+     * ثابتاً موحَّداً أدناه — لم يظهر ما يبرّر تفريقه).
+     */
+    private function maxRowsFor(string $domain): int
+    {
+        return match ($domain) {
+            ImportJobDomain::PRODUCT_CATALOG => ProductImportService::DURABLE_MAX_ROWS,
+            ImportJobDomain::PRODUCT_WORKBOOK => ProductWorkbookService::MAX_ROWS,
+            ImportJobDomain::INVENTORY_OPENING => InventoryOpeningImportService::MAX_ROWS,
+            default => ProductImportService::MAX_ROWS,
+        };
+    }
 
+    /** الأعمدة لم تتغيّر لأي مجال — سقفٌ واحد (٢٠٠) يبقى كافياً وموحَّداً. */
     private const MAX_COLUMNS = ProductImportService::MAX_COLUMNS;
 
     public function __construct(private readonly ImportJobFileStorage $storage) {}
@@ -206,7 +224,7 @@ class ImportJobService
     private function inspectCounts(string $domain, string $tmpPath, string $extension): array
     {
         if ($domain === ImportJobDomain::PRODUCT_WORKBOOK) {
-            $sheets = SpreadsheetReader::readWorkbookXlsx($tmpPath, self::MAX_ROWS, self::MAX_COLUMNS);
+            $sheets = SpreadsheetReader::readWorkbookXlsx($tmpPath, $this->maxRowsFor($domain), self::MAX_COLUMNS);
             if (! isset($sheets[ProductWorkbookService::SHEET_PRODUCTS])) {
                 throw new RuntimeException(
                     'المصنّف لا يحتوي ورقة «'.ProductWorkbookService::SHEET_PRODUCTS.'» — هي الورقة الإلزامية الوحيدة.'
@@ -235,7 +253,7 @@ class ImportJobService
             return [$rowCount, count($productsHeader)];
         }
 
-        $rows = SpreadsheetReader::read($tmpPath, $extension, self::MAX_ROWS, self::MAX_COLUMNS);
+        $rows = SpreadsheetReader::read($tmpPath, $extension, $this->maxRowsFor($domain), self::MAX_COLUMNS);
 
         return [$this->countDataRows($rows), $rows === [] ? 0 : count($rows[0])];
     }
@@ -309,7 +327,7 @@ class ImportJobService
                         // يعتمد عليها الاكتمال أدناه، بلا نقل بيانات منفصل.
                         // `product_workbook` (PR-DUR-3) أُضيف بعد هذا التصحيح —
                         // `inspect()` يحسبه بالتعريف الصحيح من أول يوم.
-                        $rows = SpreadsheetReader::read($tmpPath, $locked->extension, self::MAX_ROWS, self::MAX_COLUMNS);
+                        $rows = SpreadsheetReader::read($tmpPath, $locked->extension, ProductImportService::DURABLE_MAX_ROWS, self::MAX_COLUMNS);
                         $fill['row_count'] = $this->countDataRows($rows);
                     }
 
@@ -388,7 +406,7 @@ class ImportJobService
             'batch_size' => $batchSize,
         ]);
 
-        $result = app(ProductImportService::class)->apply($file, $chunkOptions, $userId, $costAuthorized);
+        $result = app(ProductImportService::class)->apply($file, $chunkOptions, $userId, $costAuthorized, ProductImportService::DURABLE_MAX_ROWS);
 
         return [
             'processed_in_chunk' => $result['created'] + $result['updated'] + $result['skipped'],

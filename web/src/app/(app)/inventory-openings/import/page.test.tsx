@@ -137,6 +137,22 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe('استيراد الرصيد الافتتاحي — المحرّك الدائم (مسودة فقط)', () => {
+  /**
+   * PR-DUR-HARDEN-1 (Part B) — زرّ إنشاء المسودة داخل شريط إجراءاتٍ ملتصق
+   * وآمن الحافّة السفلية على الجوال (`FormActions`/`pb-safe`)، لا صفٍّ عاديّ
+   * داخل البطاقة قد يقع تحت شريط Safari السفلي على iPhone.
+   */
+  it('زرّ إنشاء المسودة داخل شريط إجراءاتٍ ملتصق وآمن الحافّة السفلية', async () => {
+    const user = userEvent.setup();
+    render(<InventoryOpeningImportPage />);
+    await uploadAndPreview(user);
+
+    const createDraftButton = screen.getByRole('button', { name: 'create_draft' });
+    const actionsBar = createDraftButton.closest('.pb-safe');
+    expect(actionsBar).toBeTruthy();
+    expect(actionsBar?.className).toContain('fixed');
+  });
+
   it('التطبيق ذرّيٌّ: قطعةٌ واحدة تُنجز المستند كله، ولا شريط تقدّم مزيَّف', async () => {
     const user = userEvent.setup();
     render(<InventoryOpeningImportPage />);

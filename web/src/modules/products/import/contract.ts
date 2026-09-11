@@ -85,7 +85,14 @@ export interface ImportResult {
 export type ColumnMapping = Record<number, string | null>;
 
 export const IMPORT_MODES: ImportMode[] = ['create', 'update', 'upsert'];
-export const MAX_IMPORT_ROWS = 2000;
+/**
+ * PR-DUR-HARDEN-1: السقف الفعلي لهذه الصفحة صار سقف الاستيراد الدائم
+ * (`ProductImportService::DURABLE_MAX_ROWS`) لا سقف الاستيراد المتزامن
+ * القديم — هذه الصفحة ترسل `for_durable=true` على كل نداء فحص/معاينة
+ * (`importFormData(..., {forDurable: true})`) لأنها لا تستدعي مسار التطبيق
+ * المتزامن `/products/import/apply` إطلاقاً؛ تعتمد حصراً على `/import-jobs`.
+ */
+export const MAX_IMPORT_ROWS = 20000;
 export const APPLY_BATCH_SIZE = 100;
 export const MAX_IMPORT_BYTES = 5 * 1024 * 1024;
 export const ACCEPTED_IMPORT_TYPES = '.csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
@@ -107,6 +114,12 @@ export function importFormData(
     mapping?: ColumnMapping;
     batchOffset?: number;
     batchSize?: number;
+    /**
+     * PR-DUR-HARDEN-1: يرفع سقف صفوف `inspect()`/`preview()` الخادميّ إلى
+     * `DURABLE_MAX_ROWS` بدل سقف الاستيراد المتزامن القديم. هذه الصفحة
+     * ترسله دوماً `true` لأنها تتابع حصراً بتشغيلة `/import-jobs` دائمة.
+     */
+    forDurable?: boolean;
   } = {}
 ): FormData {
   const form = new FormData();
@@ -116,6 +129,7 @@ export function importFormData(
   if (options.masterDataPolicy) form.append('master_data_policy', options.masterDataPolicy);
   if (options.batchOffset !== undefined) form.append('batch_offset', String(options.batchOffset));
   if (options.batchSize !== undefined) form.append('batch_size', String(options.batchSize));
+  if (options.forDurable) form.append('for_durable', '1');
 
   if (options.mapping) {
     for (const [index, key] of Object.entries(options.mapping)) {

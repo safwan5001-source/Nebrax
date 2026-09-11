@@ -12,7 +12,9 @@ use App\Support\SensitiveCostPolicy;
 use App\Support\Settings;
 use App\Support\SpreadsheetReader;
 use App\Support\SpreadsheetWriter;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -76,6 +78,43 @@ class ProductImportService
      */
     public const MAX_ROWS = 2000;
 
+    /**
+     * PR-DUR-HARDEN-1 — سقف مستقلّ لمحرّك الاستيراد الدائم (`ImportJobService`)
+     * وحده، لا لـ`inspect()`/`preview()`/`apply()` المتزامنة تماماً كما كانت.
+     *
+     * **لماذا سقفٌ أعلى هنا تحديداً؟** الترحيل الدائم مجزَّأ فعلياً: كل استدعاء
+     * `apply()` عبر التشغيلة يكتب نافذة `APPLY_BATCH_SIZE` صفٍّ فقط (١٠٠،
+     * ثابتة بصرف النظر عن حجم الملف)، فتكلفة الكتابة الفعلية لكل طلب لا تكبر
+     * مع حجم الملف إطلاقاً. القياس الفعلي (سكربت قياسٍ محليّ، لا افتراض):
+     * قراءة ملفّ CSV واقعيّ الأعمدة بحجم ٥ م.ب (~١٨٨٠٠ صفّ) تتمّ خلال ~٣٠٠ms
+     * وتستهلك ~٢٤ م.ب ذاكرة لكل قراءة — وحتى أسوأ حالة (أعمدة نحيلة، ٥ م.ب
+     * تسع ~٢٨٢ ألف صفّ) تُقرأ خلال ~١.٣ ثانية وتستهلك ~٩٨ م.ب، لكلٍّ من
+     * `inspect()` الدائم و`apply()` الدائم يعيدان قراءة الملف كاملاً في كل
+     * قطعة (انظر `ImportJobService::applyNextChunk()`). السقف هنا (٢٠٠٠٠)
+     * يحدّ عدد القطع الكلي بـ٢٠٠ (٢٠٠٠٠/١٠٠) فتبقى كلفة إعادة القراءة
+     * التراكمية على كامل الاستيراد محدودةً (~٤٤ ثانية قياساً في أسوأ حالة
+     * مقيسة عند هذا الحجم) بدل نموّها بلا حد، مع بقاء كل طلبٍ فرديٍّ آمناً
+     * زمنياً وذاكرياً بهامشٍ واسع.
+     *
+     * **`preview()` ترتفع إلى هذا السقف أيضاً — لكن بشرط.** قبل هذا الـPR
+     * كانت `matchExisting`/`assertLiveConflicts` تستعلمان القاعدة مرّتين لكل
+     * صفّ؛ عند آلاف الصفوف يعني ذلك آلاف الاستعلامات في طلب معاينة واحد —
+     * هذا وحده، لا قراءة الملف، كان يفرض سقفاً منخفضاً حقاً على `preview()`.
+     * `prefetchProductMatches()` جمّعت هذا التحقّق في ٢-٣ استعلامات لكل نافذة
+     * تحليل (قياسٌ فعلي: تحديث ٥٠٠٠ صفّ ضد ٥٠٠٠ منتج قائم = ١٣ استعلاماً لا
+     * ~١٠٠٠٠؛ معاينة إنشاء ٢٠٠٠٠ صفّ كاملةً = ٧٥٠ms و٨٤ م.ب فقط) — فارتفع
+     * سقفها الآمن الفعلي معها، ويطلبه المستدعي صراحةً بعلَم `for_durable`
+     * تماماً كـ`inspect()`.
+     *
+     * **لماذا ليس أعلى من ٢٠٠٠٠ في هذا الـPR إذن؟** لأن `inspect()`/`apply()`
+     * الدائمين ما زالا يعيدان قراءة الملف كاملاً من القرص في كل قطعة (انظر
+     * `ImportJobService::applyNextChunk()`) — رفعٌ أعلى يحتاج أولاً تجزئة
+     * قراءة الملف نفسها (بدل إعادة قراءته كاملاً في كل قطعة)، إعادة تصميمٍ
+     * حقيقية للقارئ خارج نطاق هذا الـPR الضيّق عمداً (راجع
+     * `PR-DUR-HARDEN-1-IMPLEMENTATION-REPORT.md`).
+     */
+    public const DURABLE_MAX_ROWS = 20000;
+
     /** أقصى عدد صفوف في طلب تطبيق واحد كي يبقى الطلب تحت مهلة منصة التشغيل. */
     public const APPLY_BATCH_SIZE = 100;
 
@@ -91,11 +130,16 @@ class ProductImportService
     /**
      * أعمدة الملف وعيّنة منه واقتراح المطابقة — بلا أي تحقق أو كتابة.
      *
+     * `$maxRows`: `MAX_ROWS` افتراضياً (توافقٌ خلفي حرفي لكل مستدعٍ لا يعرف
+     * غيره)؛ `ImportJobService` يمرّر `DURABLE_MAX_ROWS` صراحةً عند فحص تشغيلة
+     * دائمة، و`ProductController::importInspect` يمرّره أيضاً حين يطلب طلبٌ
+     * صريحاً `for_durable` (الملف سيُطبَّق عبر تشغيلة دائمة، لا مساراً متزامناً).
+     *
      * @return array{columns: array<int, array{index: int, header: string, samples: array<int, string>, suggested_field: string|null}>, total_rows: int, fields: array<int, array<string, mixed>>}
      */
-    public function inspect(UploadedFile $file): array
+    public function inspect(UploadedFile $file, int $maxRows = self::MAX_ROWS): array
     {
-        $rows = $this->readFile($file);
+        $rows = $this->readFile($file, $maxRows);
         $headers = array_map(static fn ($value): string => trim((string) $value), array_shift($rows) ?? []);
         if ($headers === [] || implode('', $headers) === '') {
             throw new RuntimeException('صف العناوين في الملف فارغ. ضع أسماء الأعمدة في الصف الأول.');
@@ -178,12 +222,17 @@ class ProductImportService
     /**
      * معاينة غير مغيّرة للبيانات.
      *
+     * `$maxRows` — نفس معنى `apply()`: `MAX_ROWS` افتراضياً؛ `for_durable`
+     * في `ImportProductsRequest` يرفعه إلى `DURABLE_MAX_ROWS` الآن بعد أن صار
+     * تحقّق SKU/الباركود/معرّف نبراكس مجمَّعاً (`prefetchProductMatches()`،
+     * PR-DUR-HARDEN-1) لا استعلامَين لكل صفّ كما كان قبله.
+     *
      * @param  array<string, mixed>  $options
      * @return array<string, mixed>
      */
-    public function preview(UploadedFile $file, array $options, bool $costAuthorized = true): array
+    public function preview(UploadedFile $file, array $options, bool $costAuthorized = true, int $maxRows = self::MAX_ROWS): array
     {
-        $parsed = $this->parse($file, $this->options($options));
+        $parsed = $this->parse($file, $this->options($options), $maxRows);
         // PR-INV-1: فشلٌ مبكر متّسق — لا يترك المستخدم يظن أن المعاينة تفويضٌ
         // للتطبيق حين تُرفض مطابقة سعر الشراء لاحقاً هناك حتماً.
         $this->assertCostMappingAuthorized($parsed['mapping'], $costAuthorized);
@@ -215,13 +264,19 @@ class ProductImportService
     /**
      * يعيد التحليل والتحقق كاملاً قبل الكتابة، ثم يكتب في معاملة واحدة.
      *
+     * `$maxRows`: `MAX_ROWS` افتراضياً للمسار المتزامن (توافقٌ خلفي حرفي —
+     * طلبٌ بلا `batch_offset`/`batch_size` يكتب الملف كله في معاملةٍ واحدة،
+     * فيبقى محكوماً بنفس السقف الذي وُجد لأجله أصلاً). `ImportJobService`
+     * وحده يمرّر `DURABLE_MAX_ROWS` هنا، لأن ترحيله عبر قطعةٍ واحدة (١٠٠ صفّ
+     * كحدٍّ أقصى) لا يكتب سوى نافذته، بصرف النظر عن حجم الملف الكلي.
+     *
      * @param  array<string, mixed>  $options
      * @return array<string, mixed>
      */
-    public function apply(UploadedFile $file, array $options, ?string $userId = null, bool $costAuthorized = true): array
+    public function apply(UploadedFile $file, array $options, ?string $userId = null, bool $costAuthorized = true, int $maxRows = self::MAX_ROWS): array
     {
         $resolved = $this->options($options);
-        $parsed = $this->parse($file, $resolved);
+        $parsed = $this->parse($file, $resolved, $maxRows);
         // PR-INV-1: لا تُوثَق صلاحية جلسة معاينة قديمة — تُعاد قراءتها هنا حيّةً
         // على المطابقة الفعلية المطبَّقة قبل أي كتابة.
         $this->assertCostMappingAuthorized($parsed['mapping'], $costAuthorized);
@@ -382,12 +437,16 @@ class ProductImportService
     // ═══════════════════════════════════════════════════════════════
 
     /**
+     * `$maxRows` — راجع توثيق `apply()`/`inspect()`/`preview()`: `MAX_ROWS`
+     * افتراضياً لكل مسارٍ لا يعرف غيره؛ يرتفع إلى `DURABLE_MAX_ROWS` فقط حين
+     * يمرّره المستدعي صراحةً (تشغيلة دائمة، أو طلبٌ صريح `for_durable`).
+     *
      * @param  array{mode: string, blank_policy: string, master_data_policy: string, mapping: array<int, string>|null}  $options
      * @return array<string, mixed>
      */
-    private function parse(UploadedFile $file, array $options): array
+    private function parse(UploadedFile $file, array $options, int $maxRows = self::MAX_ROWS): array
     {
-        $raw = $this->readFile($file);
+        $raw = $this->readFile($file, $maxRows);
         $headers = array_map(static fn ($value): string => trim((string) $value), array_shift($raw) ?? []);
         if ($headers === [] || implode('', $headers) === '') {
             throw new RuntimeException('صف العناوين في الملف فارغ. ضع أسماء الأعمدة في الصف الأول.');
@@ -407,6 +466,10 @@ class ProductImportService
         $batchOffset = (int) ($options['batch_offset'] ?? 0);
         $batchSize = $options['batch_size'] ?? null;
         $dataIndex = 0;
+        // PR-DUR-HARDEN-1 — استعلامان دفعةً واحدة بدل استعلامين لكل صفّ
+        // (`matchExisting`/`assertLiveConflicts` أدناه)؛ راجع توثيق
+        // `prefetchProductMatches()`.
+        $matches = $this->prefetchProductMatches($raw, $mapping, $batchOffset, $batchSize);
 
         foreach ($raw as $offset => $values) {
             if (self::isBlankRow($values)) {
@@ -434,7 +497,7 @@ class ProductImportService
             $normalized = $this->normalize($cells, $mapping, $options, $references, $pending, $messages, $warnings);
 
             $this->assertUniqueWithinFile($cells, $rowNumber, $seen, $messages);
-            $existing = $this->matchExisting($cells, $options['mode'], $messages);
+            $existing = $this->matchExisting($cells, $options['mode'], $matches, $messages);
             $action = $this->resolveAction($cells, $options['mode'], $existing, $messages);
 
             $payload = [];
@@ -450,7 +513,7 @@ class ProductImportService
             }
 
             if ($messages === []) {
-                $this->assertLiveConflicts($payload, $action, $existing, $messages);
+                $this->assertLiveConflicts($payload, $action, $existing, $matches, $messages);
             }
 
             $status = $messages !== [] ? 'error' : ($warnings !== [] ? 'warning' : 'ok');
@@ -970,13 +1033,16 @@ class ProductImportService
     /**
      * أولوية المطابقة: معرّف نبراكس ثم رمز الصنف. **الاسم ليس معرّفاً أبداً.**
      *
-     * المعرّف يمرّ عبر `Product::query()` فيخضع لنطاق المستأجر تلقائياً؛ معرّفٌ
-     * من مستأجر آخر لا يُحلّ فيتحوّل إلى خطأ صف، ولا يتسرّب وجوده في رسالة.
+     * المعرّف يُحلّ من فهرس `prefetchProductMatches()` المجلوب دفعةً واحدة قبل
+     * الحلقة (لا استعلامٌ هنا نفسه) — والفهرس نفسه مبنيٌّ من `Product::query()`
+     * فيخضع لنطاق المستأجر تلقائياً؛ معرّفٌ من مستأجر آخر لا يُحلّ فيتحوّل إلى
+     * خطأ صف، ولا يتسرّب وجوده في رسالة.
      *
      * @param  array<string, string>  $cells
+     * @param  array{by_sku: array<string, Product>, by_id: array<string, Product>, by_barcode: array<string, string>}  $matches
      * @param  array<int, string>  $messages
      */
-    private function matchExisting(array $cells, string $mode, array &$messages): ?Product
+    private function matchExisting(array $cells, string $mode, array $matches, array &$messages): ?Product
     {
         $nebraxId = trim((string) ($cells['nebrax_id'] ?? ''));
         $sku = trim((string) ($cells['sku'] ?? ''));
@@ -988,7 +1054,7 @@ class ProductImportService
                 return null;
             }
 
-            $product = Product::query()->whereKey($nebraxId)->first();
+            $product = $matches['by_id'][$nebraxId] ?? null;
             if ($product === null && $mode !== self::MODE_CREATE) {
                 $messages[] = 'معرّف نبراكس لا يطابق أي منتج في نطاقك. تحقق أن الملف مُصدَّر من المؤسسة نفسها.';
             }
@@ -997,10 +1063,93 @@ class ProductImportService
         }
 
         if ($sku !== '' && $mode !== self::MODE_CREATE) {
-            return Product::query()->where('sku', $sku)->first();
+            return $matches['by_sku'][$sku] ?? null;
         }
 
         return null;
+    }
+
+    /**
+     * فهرس مطابقة/تعارض المنتجات مرّة واحدة لكل نافذة تحليل — بدل استعلامين
+     * حيّين لكل صفّ (`matchExisting`/`assertLiveConflicts` أعلاه/أدناه) كما
+     * كان الحال قبل PR-DUR-HARDEN-1. يجمع كل قيم SKU/معرّف نبراكس/الباركود
+     * المرشَّحة ضمن النافذة الحالية فقط — نافذة القطعة عند الترحيل الدائم
+     * المجزَّأ، أو الملف كله عند المعاينة أو التطبيق المتزامن — ثم يجلبها
+     * بدفعاتٍ محدودة (`fetchInChunks()`) بدل استعلامٍ فرديّ متكرّر؛ نفس نمط
+     * `referenceIndex()` القائم للتصنيف/العلامة/قالب الوحدات، معمَّماً هنا على
+     * مطابقة/تعارض المنتج نفسه. هذا وحده ما يجعل تحقّق ملفٍ بآلاف الصفوف آمناً
+     * في طلبٍ واحد بدل تحويله إلى آلاف الاستعلامات المتزامنة.
+     *
+     * **لا علاقة لهذا بالتحقّق الحيّ داخل معاملة `apply()` النهائية**
+     * (`assertNoLiveSkuConflict`/`assertNoLiveBarcodeConflict`، غير مُمَسَّتين
+     * هنا مطلقاً): ذاك تحقّقٌ متعمَّدٌ حيّ وقت الكتابة الفعلية بلا تخزين مؤقت،
+     * يحمي من صفٍّ يتعارض مع طلبٍ متزامنٍ التزم بين لحظة هذا الفهرس ولحظة
+     * الكتابة. هذا الفهرس يخدم مرحلة التحليل/المعاينة فقط — «حيٌّ» بمعنى أنه
+     * يُقرأ من القاعدة الفعلية لا من ذاكرة، لا بمعنى إعادة قراءته لحظة الكتابة.
+     *
+     * @param  array<int, array<int, string>>  $raw  نفس ناتج `readFile()` (بلا صفّ العناوين).
+     * @param  array<int, string>  $mapping
+     * @return array{by_sku: array<string, Product>, by_id: array<string, Product>, by_barcode: array<string, string>}
+     */
+    private function prefetchProductMatches(array $raw, array $mapping, int $batchOffset, ?int $batchSize): array
+    {
+        $skus = [];
+        $nebraxIds = [];
+        $barcodes = [];
+        $dataIndex = 0;
+
+        foreach ($raw as $values) {
+            if (self::isBlankRow($values)) {
+                continue;
+            }
+            $dataIndex++;
+            if ($batchSize !== null && ($dataIndex <= $batchOffset || $dataIndex > $batchOffset + $batchSize)) {
+                continue;
+            }
+
+            $cells = $this->cells($values, $mapping);
+            $sku = trim((string) ($cells['sku'] ?? ''));
+            $nebraxId = trim((string) ($cells['nebrax_id'] ?? ''));
+            $barcode = trim((string) ($cells['barcode'] ?? ''));
+
+            if ($sku !== '') {
+                $skus[$sku] = true;
+            }
+            if ($nebraxId !== '' && preg_match('/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/', $nebraxId)) {
+                $nebraxIds[$nebraxId] = true;
+            }
+            if ($barcode !== '') {
+                $barcodes[$barcode] = true;
+            }
+        }
+
+        return [
+            'by_sku' => $this->fetchInChunks(Product::query(), 'sku', array_keys($skus))->keyBy('sku')->all(),
+            'by_id' => $this->fetchInChunks(Product::query(), 'id', array_keys($nebraxIds))->keyBy('id')->all(),
+            'by_barcode' => $this->fetchInChunks(BarcodeRegistryEntry::query(), 'code', array_keys($barcodes))
+                ->pluck('product_id', 'code')->all(),
+        ];
+    }
+
+    /**
+     * `whereIn()` واحد قد يحمل آلاف القيم؛ يُجزَّأ إلى دفعات معتدلة الحجم
+     * لتفادي حدّ عدد مُعامِلات SQLite الافتراضي ولإبقاء كل استعلام صغيراً
+     * وسريع التخطيط على أي محرّك.
+     *
+     * @param  array<int, string>  $values
+     */
+    private function fetchInChunks(Builder $query, string $column, array $values): Collection
+    {
+        if ($values === []) {
+            return new Collection;
+        }
+
+        $results = new Collection;
+        foreach (array_chunk($values, 500) as $chunk) {
+            $results = $results->merge((clone $query)->whereIn($column, $chunk)->get());
+        }
+
+        return $results;
     }
 
     /**
@@ -1337,10 +1486,17 @@ class ProductImportService
     // ═══════════════════════════════════════════════════════════════
 
     /**
+     * تحقّقٌ من فهرس `prefetchProductMatches()` المجلوب دفعةً واحدة قبل حلقة
+     * `parse()` — لا استعلامٌ حيٌّ لكل صفّ هنا بعد PR-DUR-HARDEN-1؛ راجع
+     * توثيق `prefetchProductMatches()` للفارق عن التحقّق الحيّ الحقيقي وقت
+     * الكتابة (`assertNoLiveSkuConflict`/`assertNoLiveBarcodeConflict` أدناه،
+     * غير مُمَسَّتين هنا، ولا يزالان يستعلمان حيّاً عمداً داخل معاملة `apply()`).
+     *
      * @param  array<string, mixed>  $payload
+     * @param  array{by_sku: array<string, Product>, by_id: array<string, Product>, by_barcode: array<string, string>}  $matches
      * @param  array<int, string>  $messages
      */
-    private function assertLiveConflicts(array $payload, string $action, ?Product $existing, array &$messages): void
+    private function assertLiveConflicts(array $payload, string $action, ?Product $existing, array $matches, array &$messages): void
     {
         // الاستثناء يُشتقّ من **المنتج المطابَق** لا من اسم الإجراء: صفٌّ لا
         // يغيّر شيئاً يتحوّل إلى «تخطٍّ» قبل هذا الفحص، فلو قرأنا الإجراء وحده
@@ -1349,16 +1505,43 @@ class ProductImportService
         $exceptId = $existing?->id;
 
         $sku = (string) ($payload['sku'] ?? '');
-        if ($sku !== '' && $this->hasLiveSkuConflict($sku, $exceptId)) {
+        if ($sku !== '' && $this->hasBatchedSkuConflict($sku, $matches, $exceptId)) {
             $messages[] = 'رمز SKU مستخدم بالفعل في نطاق الكتالوج الحالي.';
         }
 
         $barcode = (string) ($payload['barcode'] ?? '');
-        if ($barcode !== '' && $this->hasLiveBarcodeConflict($barcode, $exceptId)) {
+        if ($barcode !== '' && $this->hasBatchedBarcodeConflict($barcode, $matches, $exceptId)) {
             $messages[] = 'الباركود مستخدم بالفعل لمنتج آخر في المؤسسة.';
         }
     }
 
+    /** @param array{by_sku: array<string, Product>, by_id: array<string, Product>, by_barcode: array<string, string>} $matches */
+    private function hasBatchedSkuConflict(string $sku, array $matches, ?string $exceptProductId = null): bool
+    {
+        if ($sku === '') {
+            return false;
+        }
+        $product = $matches['by_sku'][$sku] ?? null;
+
+        return $product !== null && $product->id !== $exceptProductId;
+    }
+
+    /** @param array{by_sku: array<string, Product>, by_id: array<string, Product>, by_barcode: array<string, string>} $matches */
+    private function hasBatchedBarcodeConflict(string $barcode, array $matches, ?string $exceptProductId = null): bool
+    {
+        if ($barcode === '') {
+            return false;
+        }
+        $productId = $matches['by_barcode'][$barcode] ?? null;
+
+        return $productId !== null && $productId !== $exceptProductId;
+    }
+
+    /**
+     * تحقّقٌ حيٌّ حقيقي وقت الكتابة الفعلية داخل معاملة `apply()` — بلا فهرسٍ
+     * مسبق ولا تخزين مؤقت عمداً: يحمي من صفٍّ يتعارض مع طلبٍ متزامنٍ التزم
+     * بين لحظة `assertLiveConflicts()` (فهرسٌ مسبق) ولحظة هذه الكتابة.
+     */
     private function hasLiveSkuConflict(string $sku, ?string $exceptProductId = null): bool
     {
         if ($sku === '') {
@@ -1424,7 +1607,7 @@ class ProductImportService
     }
 
     /** @return array<int, array<int, string>> */
-    private function readFile(UploadedFile $file): array
+    private function readFile(UploadedFile $file, int $maxRows = self::MAX_ROWS): array
     {
         $extension = strtolower((string) ($file->getClientOriginalExtension() ?: $file->extension()));
         if (! SpreadsheetReader::isSupportedExtension($extension)) {
@@ -1436,7 +1619,7 @@ class ProductImportService
             throw new RuntimeException('تعذر قراءة ملف الاستيراد.');
         }
 
-        return SpreadsheetReader::read($path, $extension, self::MAX_ROWS, self::MAX_COLUMNS);
+        return SpreadsheetReader::read($path, $extension, $maxRows, self::MAX_COLUMNS);
     }
 
     /**
