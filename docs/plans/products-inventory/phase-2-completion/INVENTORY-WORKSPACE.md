@@ -1,6 +1,6 @@
 # Warehouse Inventory Workspace
 
-**Status:** IN PROGRESS — PR-INV-WS-1 foundation on branch `feat/pr-inv-ws-1-inventory-workspace-foundation` (PR #762). Movement-source drilldown, reservations, and replenishment remain planned.
+**Status:** IN PROGRESS — PR-INV-WS-1 foundation merged to `main` via PR #762 on 2026-09-12 (merge commit `748fc1201f9b76589f18426779a64d1bd081c421`). Movement-source drilldown, reservations, and replenishment remain planned.
 
 ## Goal
 Turn the existing inventory balance/reporting foundation into the daily warehouse-aware operational workspace without creating a second inventory core.
@@ -32,7 +32,9 @@ Dense accounting-grade DataTable, fast filters, sticky context, clear warehouse 
 ## Acceptance
 Warehouse totals reconcile to Product aggregate; displayed stock is server-authoritative; unauthorized branches/warehouses/costs cannot be inferred; pagination/filter/export agree; movement drilldown never changes stock/GL.
 
-## PR-INV-WS-1 foundation (current)
+## PR-INV-WS-1 foundation (merged)
+
+Merged to `main` via PR #762 on 2026-09-12. Final PR Head: `802f9b73bcff85cf2582e62dab2085f50b1f974d`; merge commit: `748fc1201f9b76589f18426779a64d1bd081c421`. CI and Web CI were green before merge.
 
 Read-only workspace query: `GET /api/inventory?view=workspace`.
 
@@ -42,7 +44,7 @@ Read-only workspace query: `GET /api/inventory?view=workspace`.
 - Stock states: `in_stock` / `low` (only when `products.reorder_level > 0`) / `out` / `negative`.
 - Cost columns and cost sorts require `products.view_cost` via `SensitiveCostPolicy`.
 - Shared read-side Product × Warehouse foundation: `app/Support/ProductWarehouseBalanceQuery.php` (used by Inventory Report warehouse view and Inventory Workspace).
-- Not in this PR: serial/lot/expiry, reservations, stock requests, replenishment, movement-source drilldown, valuation/posting changes.
+- Deferred beyond PR-INV-WS-1: serial/lot/expiry, reservations, stock requests, replenishment, movement-source drilldown, valuation/posting changes.
 
 ## NOTE / DEFERRED DECISION — explicit forbidden warehouse_id
 
@@ -59,7 +61,7 @@ Explicit forbidden `warehouse_id` behavior differs between the existing Inventor
 
 **Decision:** DEFERRED.
 
-Do not change production behavior in PR #762.
+PR #762 did not change this production behavior.
 Do not unify either behavior without an explicit AWJ product/API semantics decision.
 
 A future decision should determine the canonical behavior for an explicitly requested resource/filter outside the user's effective scope:
@@ -68,4 +70,4 @@ A future decision should determine the canonical behavior for an explicitly requ
 - B) validation/authorization error
 - C) silently constrain to allowed scope
 
-Do not select A/B/C in PR-INV-WS-1.
+Do not select A/B/C without an explicit AWJ product/API semantics decision.
