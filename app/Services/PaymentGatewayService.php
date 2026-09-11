@@ -7,7 +7,6 @@ use App\Models\PaymentMethod;
 use App\Tenancy\TenantContext;
 use DomainException;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Database\Eloquent\ModelNotFoundException;
 
 /**
  * أساس إعداد بوابات الدفع للمستأجر.
