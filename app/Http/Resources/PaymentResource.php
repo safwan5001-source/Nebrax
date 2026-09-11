@@ -34,6 +34,8 @@ class PaymentResource extends JsonResource
             'cash_account_code' => $this->whenLoaded('cashAccount', fn () => $this->cashAccount?->code),
             'cash_account_name' => $this->whenLoaded('cashAccount', fn () => $this->cashAccount?->name),
             'journal_entry_id' => $this->journal_entry_id,
+            'reversal_entry_id' => $this->reversal_entry_id,
+            'reversed_at' => optional($this->reversed_at)?->toISOString(),
             'status'       => $this->status,
             'payment_date' => optional($this->payment_date)->toDateString(),
             'amount'       => Money::toRiyal($this->amount),

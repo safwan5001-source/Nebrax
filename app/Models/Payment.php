@@ -10,7 +10,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * سند قبض/صرف. تُنشأ بحالة draft ثم تُرحَّل عبر PaymentService::post
- * الذي يولّد قيداً متوازناً عبر LedgerService.
+ * الذي يولّد قيداً متوازناً عبر LedgerService. السند المرحّل يُصحَّح بالعكس
+ * ولا يُعاد فتحه أو حذف أثره التاريخي.
  *  - direction=received: قبض من عميل  (دائن 1130 العملاء)
  *  - direction=paid:     صرف لمورد    (مدين 2110 الموردون)
  * كل المبالغ بالـ minor units (هللات) كـ bigint.
@@ -25,11 +26,12 @@ class Payment extends BaseModel
         'branch_id',
         'tenant_id', 'number', 'partner_id', 'invoice_id', 'pos_session_id', 'classification_id',
         'direction', 'method', 'payment_method_id', 'payment_method_name', 'reference', 'payment_details', 'cash_account_id', 'payment_date', 'amount',
-        'status', 'notes', 'journal_entry_id', 'print_template_revision_id', 'pdf_template_revision_id', 'thermal_template_revision_id', 'created_by', 'collector_employee_id',
+        'status', 'notes', 'journal_entry_id', 'reversal_entry_id', 'reversed_at', 'print_template_revision_id', 'pdf_template_revision_id', 'thermal_template_revision_id', 'created_by', 'collector_employee_id',
     ];
 
     protected $casts = [
         'payment_date' => 'date',
+        'reversed_at'  => 'datetime',
         'amount'       => 'integer',
     ];
 
@@ -46,7 +48,7 @@ class Payment extends BaseModel
         return $this->referenceBelongsTo(Partner::class);
     }
 
-    /** تصنيف تحليلي لسند القبض أو الصرف؛ نطاقه يتحقق منه في الخدمة. */
+    /** تصنيف تحليلي لسند قبض أو صرف؛ نطاقه يتحقق منه في الخدمة. */
     public function classification(): BelongsTo
     {
         return $this->referenceBelongsTo(Classification::class);
@@ -75,9 +77,16 @@ class Payment extends BaseModel
         return $this->belongsTo(PaymentMethod::class);
     }
 
+    /** القيد الأصلي الذي ولّده ترحيل السند. */
     public function journalEntry(): BelongsTo
     {
         return $this->belongsTo(JournalEntry::class, 'journal_entry_id');
+    }
+
+    /** القيد العكسي؛ يبقى القيد الأصلي محفوظاً ولا يعاد تفسير حساباته. */
+    public function reversalEntry(): BelongsTo
+    {
+        return $this->belongsTo(JournalEntry::class, 'reversal_entry_id');
     }
 
     /** الموظف الذي استلم التحصيل؛ مستقل عن المستخدم الذي أنشأ السند. */
@@ -123,5 +132,10 @@ class Payment extends BaseModel
     public function isPosted(): bool
     {
         return $this->status === 'posted';
+    }
+
+    public function isReversed(): bool
+    {
+        return $this->status === 'reversed';
     }
 }

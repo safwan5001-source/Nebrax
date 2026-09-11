@@ -921,6 +921,7 @@ Route::middleware(ForceJsonResponse::class)->group(function () {
         Route::post('payments/{id}/duplicate', [PaymentController::class, 'duplicate'])->middleware($perm('payments.manage'));
         Route::delete('payments/{id}', [PaymentController::class, 'destroy'])->middleware($perm('payments.manage'));
         Route::post('payments/{id}/post', [PaymentController::class, 'post'])->middleware($perm('payments.manage'));
+        Route::post('payments/{id}/reverse', [PaymentController::class, 'reverse'])->middleware($perm('payments.manage'));
 
         // عُهَد الموظفين — مسودة ثم صرف مرحّل، وتسوية أحادية السطر بنوع نشط وقيد مستقل.
         Route::get('employee-custodies', [EmployeeCustodyController::class, 'index'])->middleware([$perm('payments.view'), $app('finance.operations')]);
