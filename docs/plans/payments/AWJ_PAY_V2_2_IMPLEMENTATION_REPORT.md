@@ -16,6 +16,7 @@ Implements the minimum shared payment-method availability abstraction required b
 - The existing `available_online` flag remains the backward-compatible fallback when no channel-specific override exists.
 - `PaymentMethodChannelAvailability` stores only an explicit enable/disable override for one existing `SalesChannel`.
 - No duplicate Store-owned payment-method master is introduced.
+- `PaymentMethodChannelAvailabilityService` lives in the repository's existing canonical `App\Services` layer; no new service directory or CI/deploy allow-list exception is introduced.
 - POS is deliberately excluded from this resolver. Existing `PosSettings` (`all_active` / `only` / `none`, enabled IDs, server enforcement) remains authoritative and unchanged.
 - Inactive payment methods and inactive sales channels are never available even when an override says enabled.
 - Model-level tenant-scoped reference guards prevent direct cross-tenant policy writes; the service also rejects cross-tenant objects and missing TenantContext.
@@ -24,10 +25,17 @@ Implements the minimum shared payment-method availability abstraction required b
 
 - `database/migrations/2026_09_14_010000_create_payment_method_channel_availabilities_table.php`
 - `app/Models/PaymentMethodChannelAvailability.php`
-- `app/Services/Payments/PaymentMethodChannelAvailabilityService.php`
+- `app/Services/PaymentMethodChannelAvailabilityService.php`
 - `tests/Feature/PaymentMethodChannelAvailabilityTest.php`
 - `tests/Feature/PaymentMethodChannelAvailabilityTenantGuardTest.php`
 - `docs/plans/payments/AWJ_PAY_V2_2_IMPLEMENTATION_REPORT.md`
+
+## CI Finding and Fix
+
+- Initial CI #4638 stopped before tests because `app/Services/Payments` was not in the repository assembly allow-list.
+- The failure was treated as an architecture-placement signal, not worked around by expanding CI/deploy configuration.
+- The service was moved to the already-established `app/Services` layer and test imports were updated accordingly.
+- No CI/deploy allow-list files were changed.
 
 ## Explicit Non-Goals
 
