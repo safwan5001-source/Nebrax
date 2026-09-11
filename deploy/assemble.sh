@@ -18,13 +18,11 @@ cd "$APP_DIR"
 
 echo "▶ 2/4  Sanctum + تخزين S3/R2 + تفعيل طبقة الـ API..."
 composer require laravel/sanctum league/flysystem-aws-s3-v3:^3.0 predis/predis:^2.2 --no-interaction
-# --without-migration-prompt: لا نرحّل وقت البناء (الترحيل الحقيقي في entrypoint على pgsql)
 php artisan install:api --no-interaction --without-migration-prompt || true
-# جدول personal_access_tokens مضمَّن في migration النواة — نحذف نسخة Sanctum لتجنّب التكرار
 rm -f database/migrations/*_create_personal_access_tokens_table.php 2>/dev/null || true
 
 echo "▶ 3/4  دمج ملفات النواة وطبقة الـ API..."
-mkdir -p app/Contracts app/Jobs/Accounting app/Jobs/DocumentCenter app/Services app/Services/Accounting app/Services/Commerce app/Services/Pos app/Services/Pos/Hardware app/Services/Reporting app/Services/PrintTemplates app/Support \
+mkdir -p app/Contracts app/Jobs/Accounting app/Jobs/DocumentCenter app/Services app/Services/Accounting app/Services/Commerce app/Services/Pos app/Services/Pos/Hardware app/Services/Reporting app/Services/PrintTemplates app/Support app/Support/Inventory \
          app/Tenancy app/Http/Middleware app/Http/Controllers/Api \
          app/Http/Requests app/Http/Resources app/Console/Commands \
          app/Models/Concerns tests/Feature routes config docs/openapi
@@ -32,7 +30,6 @@ cp -r "$CORE_DIR/app/Models/"*.php               app/Models/
 cp -r "$CORE_DIR/app/Contracts/"*.php             app/Contracts/
 cp -r "$CORE_DIR/app/Jobs/DocumentCenter/"*.php   app/Jobs/DocumentCenter/
 cp -r "$CORE_DIR/app/Jobs/Accounting/"*.php       app/Jobs/Accounting/
-# المجلدات الفرعية لا يلتقطها الـ glob أعلاه — كل مجلد جديد يُضاف صراحةً
 cp -r "$CORE_DIR/app/Models/Concerns/"*.php      app/Models/Concerns/
 cp -r "$CORE_DIR/app/Services/"*.php               app/Services/ 2>/dev/null || true
 cp -r "$CORE_DIR/app/Services/Accounting/"*.php  app/Services/Accounting/
@@ -44,6 +41,8 @@ cp -r "$CORE_DIR/app/Services/Pos/Hardware/"*.php app/Services/Pos/Hardware/
 cp -r "$CORE_DIR/app/Services/Reporting/"*.php   app/Services/Reporting/
 cp -r "$CORE_DIR/app/Services/PrintTemplates/"*.php app/Services/PrintTemplates/
 cp -r "$CORE_DIR/app/Support/"*.php              app/Support/
+mkdir -p app/Support/Inventory
+cp -r "$CORE_DIR/app/Support/Inventory/"*.php    app/Support/Inventory/
 cp -r "$CORE_DIR/app/Tenancy/"*.php              app/Tenancy/
 cp -r "$CORE_DIR/app/Http/Middleware/"*.php      app/Http/Middleware/
 cp -r "$CORE_DIR/app/Http/Controllers/"*.php     app/Http/Controllers/ 2>/dev/null || true
@@ -52,17 +51,14 @@ cp -r "$CORE_DIR/app/Http/Requests/"*.php        app/Http/Requests/
 cp -r "$CORE_DIR/app/Http/Resources/"*.php       app/Http/Resources/
 cp -r "$CORE_DIR/app/Providers/"*.php            app/Providers/
 cp -r "$CORE_DIR/config/"*.php                   config/
-# أوامر artisan (تشخيص/صيانة) — بلا هذا السطر لا تصل صورة الإنتاج
 cp -r "$CORE_DIR/app/Console/Commands/"*.php    app/Console/Commands/ 2>/dev/null || true
 cp -r "$CORE_DIR/database/migrations/"*.php      database/migrations/
 cp -r "$CORE_DIR/routes/api.php"                 routes/api.php
 cp -r "$CORE_DIR/routes/api_public.php"          routes/api_public.php
 cp -r "$CORE_DIR/routes/console.php"             routes/console.php
 cp -r "$CORE_DIR/tests/Feature/"*.php            tests/Feature/ 2>/dev/null || true
-# عقد OpenAPI (توثيق فقط) — يقرأه اختبار المطابقة عبر base_path('docs/openapi/…')
 cp -r "$CORE_DIR/docs/openapi/"*.yaml            docs/openapi/ 2>/dev/null || true
 
-# تسجيل TenancyServiceProvider (حاسم للعزل) إن لم يكن مسجلاً
 if ! grep -q "TenancyServiceProvider" bootstrap/providers.php; then
   sed -i "s|return \[|return [\n    App\\\\Providers\\\\TenancyServiceProvider::class,|" bootstrap/providers.php
 fi
@@ -76,12 +72,10 @@ if ! grep -q "WebhookServiceProvider" bootstrap/providers.php; then
   sed -i "s|return \[|return [\n    App\\\\Providers\\\\WebhookServiceProvider::class,|" bootstrap/providers.php
 fi
 
-# حذف users migration الافتراضية (لدينا واحدة خاصة بالمستأجرين)
 rm -f database/migrations/*_create_users_table.php \
       database/migrations/*_add_api_columns* \
       database/migrations/0001_01_01_000000_create_users_table.php 2>/dev/null || true
 
-# CORS: السماح لطلبات الواجهة (Bearer token، بلا كوكيز) — يُضبط النطاق عبر env عند التشغيل
 mkdir -p config
 cp "$CORE_DIR/deploy/cors.php" config/cors.php
 
