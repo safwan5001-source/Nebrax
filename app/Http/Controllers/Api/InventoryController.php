@@ -6,7 +6,9 @@ use App\Http\Requests\ExportInventoryBalancesRequest;
 use App\Models\Product;
 use App\Models\StockMovement;
 use App\Services\InventoryBalanceExportService;
+use App\Services\InventoryWorkspaceQuery;
 use App\Support\InventoryBalanceFilters;
+use App\Support\InventoryWorkspaceFilters;
 use App\Support\Money;
 use App\Support\ReportWarehouseScope;
 use App\Support\SensitiveCostPolicy;
@@ -21,10 +23,55 @@ use Symfony\Component\HttpFoundation\Response;
  */
 class InventoryController extends ApiController
 {
-    public function __construct(protected InventoryBalanceExportService $exports) {}
+    public function __construct(
+        protected InventoryBalanceExportService $exports,
+        protected InventoryWorkspaceQuery $workspaceQuery,
+    ) {}
+
+    /**
+     * مساحة عمل المخزون — قراءة فقط، حبة Product × Warehouse، تقسيم خادمي.
+     * لا يغيّر عقد GET /inventory القديم (إجمالي المنتج للشاشة/التصدير التاريخيين).
+     */
+    public function workspace(Request $request): JsonResponse
+    {
+        $filters = $request->validate(InventoryWorkspaceFilters::rules());
+        $authorizedCost = SensitiveCostPolicy::authorized($request->user());
+
+        if (SensitiveCostPolicy::queryBlocked(
+            $filters,
+            $filters['sort'] ?? null,
+            $authorizedCost,
+            [],
+            InventoryWorkspaceFilters::COST_SORT_KEYS
+        )) {
+            abort(403, 'فرز المخزون بحقل تكلفة يحتاج صلاحية عرض التكلفة.');
+        }
+
+        $page = $this->workspaceQuery->page($filters, $authorizedCost);
+        $paginator = $page['paginator'];
+
+        return response()->json([
+            'data' => $page['rows'],
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+                'can_view_cost' => $page['can_view_cost'],
+                'total_quantity' => $page['total_quantity'],
+                'total_value' => $page['can_view_cost']
+                    ? Money::toRiyal($page['total_value_minor'])
+                    : null,
+            ],
+        ]);
+    }
 
     public function index(Request $request): JsonResponse
     {
+        if ($request->query('view') === 'workspace') {
+            return $this->workspace($request);
+        }
+
         $authorizedCost = SensitiveCostPolicy::authorized($request->user());
         $products = Product::where('track_inventory', true)->orderBy('name')->get();
 
@@ -49,24 +96,16 @@ class InventoryController extends ApiController
 
     /**
      * تصدير أرصدة المخزون إلى CSV أو XLSX — **قراءة محضة**.
-     *
-     * `scope=filtered` يطبّق مرشّحات الشاشة نفسها (البحث والوحدة والمدى
-     * والفرز) عبر `InventoryBalanceFilters`، فيصدّر **كل** المطابق لا الصفحة
-     * المرئية. `scope=all` يتجاهل المرشّحات ويصدّر كل الأصناف المتتبَّعة
-     * المرئية للمستأجر. العزل تلقائيّ بحكم `TenantScope`.
      */
     public function export(ExportInventoryBalancesRequest $request): Response
     {
         $filters = $request->validated();
         $scope = $filters['scope'] ?? InventoryBalanceExportService::SCOPE_FILTERED;
         $format = $filters['format'] ?? InventoryBalanceExportService::FORMAT_XLSX;
-        // الافتراض: تضمين الصفر (كما تعرضه الشاشة). خيار تصدير فقط.
         $includeZero = ! $request->has('include_zero') || $request->boolean('include_zero');
         $locale = str_starts_with((string) $request->query('locale'), 'en') ? 'en' : 'ar';
 
         $authorizedCost = SensitiveCostPolicy::authorized($request->user());
-        // PR-INV-1: مدى تكلفة/قيمة في الفلترة أو الفرز قناة استدلال حتى لو
-        // أُفرغت أعمدة النتيجة نفسها.
         if (SensitiveCostPolicy::queryBlocked(
             $filters, $filters['sort'] ?? null, $authorizedCost,
             SensitiveCostPolicy::INVENTORY_FILTER_KEYS, SensitiveCostPolicy::INVENTORY_SORT_KEYS
@@ -81,9 +120,6 @@ class InventoryController extends ApiController
         InventoryBalanceFilters::applySort($query, $filters['sort'] ?? null);
 
         $filename = 'nebrax-inventory-balances-'.now()->toDateString();
-        // PR-ACL-INVENTORY-CATALOG-EXPORT-SCOPE: لا مرشّح warehouse_id في عقد
-        // هذا التصدير — resolve() بلا طلب صريح يعيد نطاق المستخدم الكامل
-        // للمقيَّد و null لغير المقيَّد، فلا حاجة لإضافة حقل جديد لتحقيق التقاطع.
         $warehouseIds = ReportWarehouseScope::resolve($filters);
 
         return $this->domain(fn () => $this->exports->download($query, $format, $filename, $locale, $includeZero, $authorizedCost, $warehouseIds));
@@ -91,7 +127,6 @@ class InventoryController extends ApiController
 
     public function movements(Request $request, string $productId): JsonResponse
     {
-        // findOrFail يضمن وجود الصنف ضمن نطاق المستأجر (BaseModel + TenantScope).
         Product::findOrFail($productId);
         $authorizedCost = SensitiveCostPolicy::authorized($request->user());
 

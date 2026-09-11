@@ -7,6 +7,7 @@ use App\Models\ProductWarehouseStock;
 use App\Models\StockMovement;
 use App\Models\StockPermit;
 use App\Models\Stocktake;
+use App\Support\ProductWarehouseBalanceQuery;
 use App\Support\ReportBranchScope;
 use App\Support\ReportWarehouseScope;
 use App\Tenancy\BranchScope;
@@ -63,7 +64,7 @@ class InventoryReportService
      *
      * **هوية الكتالوج تبقى كما هي عمداً**: هذا الاستعلام يختار صفوف المنتجات
      * نفسها بلا تصفية فرع إضافية — `withoutGlobalScope(BranchScope::class)`
-     * قائمة كما كانت. ما تغيَّر هو الكمية المعروضة وحدها، في `inventoryValue()`
+     * قائمة كما كانت. ما تغيَّر هو الكمية المعروضة وحدها، في `inventoryValue()`
      * أدناه لا هنا.
      */
     private function trackedProducts(array $filters): Builder
@@ -88,13 +89,13 @@ class InventoryReportService
      * أساس تكلفة `FuelCostBasisService` الخاص بكل مخزن — لم يتغيّر هذا الفارق،
      * ولا يدّعي هذا التقرير خلاف ذلك.
      *
-     * غير المقيَّد (`allowedWarehouseIds() === null`): الكمية تبقى
+     * غير المقيَّد (`allowedWarehouseIds() === null`): الكمية تبقى
      * `products.quantity_on_hand` العالمي حرفياً — يشمل كمية ما قبل المخازن
-     * (حركات بلا `warehouse_id`) التي لا يمكن نسبتها لأي مخزن. المقيَّد يرى
+     * (حركات بلا `warehouse_id`) التي لا يمكن نسبتها لأي مخزن. المقيَّد يرى
      * مجموع `product_warehouse_stock` ضمن مخازنه المسموحة فقط؛ تلك الكمية
      * غير المنسوبة لا تُحسب له لأنها غير مثبتة داخل نطاقه — سلوكٌ صحيح لا فقدان.
      *
-     * `hide_zero` يُطبَّق بعد حساب الكمية الفعلية (لا `WHERE` عالمي مسبق)
+     * `hide_zero` يُطبَّق بعد حساب الكمية الفعلية (لا `WHERE` عالمي مسبق)
      * ليطابق ما يراه المستخدم فعلاً، لا رقماً عالمياً قد يخالف نطاقه.
      *
      * @return array{rows:array<int,array<string,mixed>>,totals:array<string,int>}
@@ -146,15 +147,15 @@ class InventoryReportService
         ];
     }
 
-    /** @return array{rows:array<int,array<string,mixed>>,totals:array<string,int>} */
+    /**
+     * أرصدة المخازن — كمّية حصراً على حبة Product × Warehouse.
+     * الاستعلام والنطاق من `ProductWarehouseBalanceQuery`؛ العقد والتعيين كما كانا.
+     *
+     * @return array{rows:array<int,array<string,mixed>>,totals:array<string,int>}
+     */
     private function warehouseBalances(array $filters): array
     {
-        $query = ProductWarehouseStock::query()
-            ->join('warehouses', 'warehouses.id', '=', 'product_warehouse_stock.warehouse_id')
-            ->join('products', 'products.id', '=', 'product_warehouse_stock.product_id')
-            ->leftJoin('branches as warehouse_branches', 'warehouse_branches.id', '=', 'warehouses.branch_id')
-            ->where('products.track_inventory', true)
-            ->whereColumn('products.tenant_id', 'product_warehouse_stock.tenant_id')
+        $query = ProductWarehouseBalanceQuery::baseQuery()
             ->select([
                 'product_warehouse_stock.product_id as bucket_key',
                 'product_warehouse_stock.warehouse_id',
@@ -172,7 +173,7 @@ class InventoryReportService
         if (! empty($filters['warehouse_id'])) {
             $query->where('product_warehouse_stock.warehouse_id', $filters['warehouse_id']);
         }
-        $this->applyWarehouseBranchFilter($query, $filters, 'warehouses.branch_id', 'product_warehouse_stock.warehouse_id');
+        ProductWarehouseBalanceQuery::applyScope($query, $filters);
         if (! empty($filters['hide_zero'])) {
             $query->where('product_warehouse_stock.quantity', '!=', 0);
         }
@@ -389,10 +390,6 @@ class InventoryReportService
         }
     }
 
-    /**
-     * نطاق الفرع الفعّال دائماً، ونطاق المخزن الفعّال إضافياً حين يُمرَّر عمود
-     * المخزن — Inventory Data Access = Branch Scope ∩ Warehouse Scope.
-     */
     private function applyWarehouseBranchFilter(Builder $query, array $filters, string $branchColumn, ?string $warehouseColumn = null): void
     {
         $branches = ReportBranchScope::resolve($filters);
@@ -409,11 +406,6 @@ class InventoryReportService
         }
     }
 
-    /**
-     * التحويل يُرى من فرع/مخزن المصدر أو الوجهة؛ ليس وثيقة أحادية الفرع أو
-     * المخزن — نفس OR الموجود أصلاً بين المصدر والوجهة، مطبَّقاً على نطاق
-     * الفرع والمخزن الفعّالين كليهما.
-     */
     private function applyOperationBranchFilter(Builder $query, array $filters): void
     {
         $branches = ReportBranchScope::resolve($filters);
