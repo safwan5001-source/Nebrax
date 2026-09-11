@@ -227,6 +227,109 @@ class ProductImportV2Test extends TestCase
         $this->assertSame(0, Product::count());
     }
 
+    /**
+     * PR-DUR-HARDEN-1 — `preview()`/`inspect()` كلتاهما ترفعان سقفهما إلى
+     * `DURABLE_MAX_ROWS` حين يصرّح الطلب `for_durable=true` (الواجهة الجديدة
+     * ترسله دوماً لأنها ستتابع بتشغيلةٍ دائمة لا مساراً متزامناً). غيابه
+     * يبقي سلوك أي عميلٍ قديم كما كان حرفياً — لا يتغيّر سقفه أبداً، ولا
+     * تُكتب أي منتجات من `preview()` بأي حال (معاينةٌ غير مغيّرة للبيانات).
+     */
+    /** @test */
+    public function inspect_and_preview_accept_a_file_beyond_the_legacy_limit_only_when_for_durable_is_explicit(): void
+    {
+        $auth = $this->registerTenant();
+        $rows = [];
+        for ($index = 0; $index < ProductImportService::MAX_ROWS + 500; $index++) {
+            $rows[] = ['SKU-BIG-'.$index, 'منتج '.$index, 'good', '10.00'];
+        }
+        $file = $this->csv(['sku', 'name', 'type', 'sale_price'], $rows);
+
+        $this->withToken($auth['token'])
+            ->post('/api/products/import/inspect', ['file' => $file])
+            ->assertStatus(422);
+        $this->withToken($auth['token'])
+            ->post('/api/products/import/inspect', ['file' => $file, 'for_durable' => true])
+            ->assertOk()
+            ->assertJsonPath('data.total_rows', ProductImportService::MAX_ROWS + 500);
+
+        $file2 = $this->csv(['sku', 'name', 'type', 'sale_price'], $rows, 'preview.csv');
+        $this->withToken($auth['token'])
+            ->post('/api/products/import/preview', ['file' => $file2, 'mode' => 'create'])
+            ->assertStatus(422);
+        $this->withToken($auth['token'])
+            ->post('/api/products/import/preview', ['file' => $file2, 'mode' => 'create', 'for_durable' => true])
+            ->assertOk()
+            ->assertJsonPath('data.total_rows', ProductImportService::MAX_ROWS + 500)
+            ->assertJsonPath('data.create_rows', ProductImportService::MAX_ROWS + 500);
+
+        $this->assertSame(0, Product::count(), 'preview لا تكتب شيئاً بصرف النظر عن السقف المستعمل.');
+    }
+
+    /** @test */
+    public function inspect_and_preview_still_refuse_a_file_beyond_the_durable_row_limit_even_with_for_durable(): void
+    {
+        $auth = $this->registerTenant();
+        $rows = [];
+        for ($index = 0; $index <= ProductImportService::DURABLE_MAX_ROWS; $index++) {
+            $rows[] = ['SKU-BIG-'.$index, 'منتج '.$index, 'good', '10.00'];
+        }
+        $file = $this->csv(['sku', 'name', 'type', 'sale_price'], $rows);
+
+        $this->withToken($auth['token'])
+            ->post('/api/products/import/inspect', ['file' => $file, 'for_durable' => true])
+            ->assertStatus(422);
+
+        $file2 = $this->csv(['sku', 'name', 'type', 'sale_price'], $rows, 'preview-huge.csv');
+        $this->withToken($auth['token'])
+            ->post('/api/products/import/preview', ['file' => $file2, 'mode' => 'create', 'for_durable' => true])
+            ->assertStatus(422);
+
+        $this->assertSame(0, Product::count());
+    }
+
+    /**
+     * PR-DUR-HARDEN-1 (Finding: N+1) — مطابقة/تعارض SKU والباركود ومعرّف
+     * نبراكس أصبحت مجمَّعةً بدفعتين إلى ثلاث استعلامات لكل نافذة تحليل
+     * (`prefetchProductMatches()`)، لا استعلامين لكل صفّ كما كانت. عدد
+     * الاستعلامات على منتج (`product`+`barcode_registry`) يجب أن يبقى شبه
+     * ثابت بصرف النظر عن عدد صفوف الملف — لا متناسباً معه.
+     */
+    /** @test */
+    public function product_matching_queries_are_batched_not_issued_once_per_row(): void
+    {
+        $auth = $this->registerTenant();
+
+        $countMatchQueries = function (int $rowCount) use ($auth): int {
+            $rows = [];
+            for ($index = 0; $index < $rowCount; $index++) {
+                $rows[] = ['SKU-BATCH-'.$index, 'منتج '.$index, 'good', '10.00', '628'.str_pad((string) $index, 10, '0', STR_PAD_LEFT)];
+            }
+            $file = $this->csv(['sku', 'name', 'type', 'sale_price', 'barcode'], $rows, 'batch-'.$rowCount.'.csv');
+
+            \Illuminate\Support\Facades\DB::enableQueryLog();
+            \Illuminate\Support\Facades\DB::flushQueryLog();
+            $this->withToken($auth['token'])
+                ->post('/api/products/import/preview', ['file' => $file, 'mode' => 'create'])
+                ->assertOk();
+            $log = \Illuminate\Support\Facades\DB::getQueryLog();
+            \Illuminate\Support\Facades\DB::disableQueryLog();
+
+            return count(array_filter(
+                $log,
+                static fn (array $entry): bool => str_contains($entry['query'], '"products"') || str_contains($entry['query'], '"barcode_registry"')
+                    || str_contains($entry['query'], 'products') || str_contains($entry['query'], 'barcode_registry')
+            ));
+        };
+
+        $queriesFor10 = $countMatchQueries(10);
+        $queriesFor200 = $countMatchQueries(200);
+
+        // ينمو عدد الاستعلامات مع عدد الأعمدة المرجعية (فرز مذاهب تنفيذ)، لا
+        // مع عدد الصفوف — الفارق بين ١٠ و٢٠٠ صفّاً يجب أن يبقى صغيراً جداً
+        // (لا يقارب ١٩٠ استعلاماً إضافياً كما كان حال استعلامٍ لكل صفّ).
+        $this->assertLessThan(5, $queriesFor200 - $queriesFor10, 'عدد الاستعلامات يجب ألا يتناسب مع عدد صفوف الملف.');
+    }
+
     // ═══════════════════════════════ الأوضاع ═══════════════════════════════
 
     /** @test */

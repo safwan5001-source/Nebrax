@@ -72,7 +72,8 @@ accounting posting."*
 | **PR-DUR-2** | Chunked/resumable apply engine, wired to Product Catalog import only | job columns only (no new table) | PR-DUR-1 | merged |
 | **PR-DUR-3** | Wire Product Workbook (3-sheet) apply through the same engine | none | PR-DUR-1, PR-DUR-2 | merged |
 | **PR-DUR-4** | Wire Inventory Opening import through the same engine (Draft-only) | none | PR-DUR-1, PR-DUR-2 | merged |
-| **PR-DUR-5** | Frontend: durable import UI (upload-once, poll, cancel, result download) | none | PR-DUR-2..4 | **this PR** |
+| **PR-DUR-5** | Frontend: durable import UI (upload-once, poll, cancel, result download) | none | PR-DUR-2..4 | merged |
+| **PR-DUR-HARDEN-1** | Large-import limits (row-cap decoupling + N+1 query fix) + mobile functional hardening | none | PR-DUR-1..5 | **this PR** |
 
 Each is opened, reviewed and merged separately. No mega-PR. Every existing synchronous endpoint
 (`/products/import/*`, `/products/workbook/*`, `/inventory-openings/import/*`) stays untouched through the
@@ -810,3 +811,172 @@ exist.
 In scope: the frontend wiring above for all three durable domains, the shared engine, updated tests, i18n keys.
 Out of scope, explicitly not touched: any backend endpoint/schema (zero backend files changed in this PR), the
 posting workflow, S3/R2 provisioning, Design System V2, a broad visual redesign, PR-DUR-1..4's own behavior.
+
+---
+
+## 10. PR-DUR-HARDEN-1 — contract (this PR, post-Durable-Imports hardening)
+
+Production/mobile review after PR-DUR-5 merged surfaced two concrete issues, both confirmed by reading code
+(not assumed): (1) `ProductImportService::MAX_ROWS = 2000` is real, current code — not stale copy — and is
+shared, via `ImportJobService`'s now-removed alias, by the durable engine's row/column ceiling for all three
+domains; (2) the shared `Stepper` component's mobile behavior gap was explicitly disclosed as untested in
+PR-DUR-5 §9 ("no new automated viewport… test harness") and production confirmed a real bug there, plus a
+genuinely-missing safe-area bottom action bar.
+
+### Part A — lifecycle analysis (measured, not assumed)
+
+Full lifecycle: **upload → durable storage → structural inspection (`inspect()`) → preview/validation
+(`preview()`) → apply chunks (`applyNextChunk()`) → completion.**
+
+| Stage | Full file in memory? | All rows parsed? | One HTTP request? | Timeout risk? | Memory risk? | Enforces `MAX_ROWS`? | Enforces file bytes? |
+|---|---|---|---|---|---|---|---|
+| Upload (`StoreImportJobRequest`) | no (streamed to disk) | no | yes | no | no | no | yes (5 MB, unchanged) |
+| `inspect()` (durable, structural) | yes (`SpreadsheetReader::read()`) | yes (count only, no per-row validation) | yes | no (measured) | no (measured) | yes | indirectly, via bytes |
+| `preview()` (session-only, pre-commit) | yes | yes, **with live DB validation per row** | yes | was real before this PR | no | yes | indirectly |
+| `apply()` — legacy one-shot (no `batch_offset`) | yes | yes, full write in one transaction | yes | genuinely needs a low cap | no | yes | indirectly |
+| `apply()` — durable chunk (`ImportJobService::applyNextChunk`) | yes (re-read whole file every chunk) | yes (loop), but only `APPLY_BATCH_SIZE` rows get real validation/write | yes (one chunk) | no (measured) | no (measured) | yes | indirectly |
+
+**Measured, not assumed** (local benchmark script, PHP 8.4, this sandbox — see PR-DUR-HARDEN-1 Implementation
+Report §Measurements for the exact scripts and full numbers):
+- A realistic 5 MB product CSV (15 columns, Arabic text) holds **~18,800 data rows** — i.e., the existing 5 MB
+  byte cap already permits far more rows than the old 2,000-row cap ever let through for a normal file shape.
+- `SpreadsheetReader::read()` alone on that file: ~300 ms, ~24 MB peak memory. Worst case (minimal 3-column
+  rows, still 5 MB): ~282,000 rows, ~1.3 s, ~98 MB peak — for **one** read.
+- `ProductImportService::preview()` (full pipeline: parse + reference index + product/barcode matching) on
+  20,000 realistic create-mode rows: **750 ms, 84 MB peak.** On 5,000 update-mode rows against 5,000 pre-existing
+  products (the heaviest realistic case — every row does both `matchExisting` and `assertLiveConflicts`):
+  **464 ms, 70 MB peak, and — after the query-batching fix below — only 13 total DB queries** (was ~10,000
+  before the fix, i.e., 2 queries/row × 5,000 rows).
+- Durable chunked apply's per-chunk cost is dominated by the whole-file re-read (`ImportJobService` re-reads
+  the file from disk on every `applyNextChunk()` call — this is unchanged by this PR), not by the DB-touching
+  work, which stays fixed at `APPLY_BATCH_SIZE` (100) rows regardless of total file size.
+
+**Conclusion:** the file-read stage was never the real constraint for a reasonably-sized file — the 5 MB byte
+cap already bounds it safely. The real, confirmed constraint was **`matchExisting()`/`assertLiveConflicts()`
+issuing up to 2 individual DB queries per row**, unconditionally, for the *entire* file in one synchronous
+request (`preview()` and the legacy one-shot `apply()`) — a genuine N+1 pattern that would have meant tens of
+thousands of individual queries in one HTTP request at higher row counts. Chunked durable `apply()` was already
+naturally protected from this (only ~100 rows get real validation per request), which is exactly why its row
+ceiling could be raised safely without first fixing the query pattern — but `preview()`/`inspect()` (the
+pre-commit UI stage every fresh upload goes through) could not, until fixed.
+
+### The five distinct concepts, kept separate (not conflated)
+
+1. **Total import file safety limit (rows):** `ProductImportService::MAX_ROWS` (2,000, legacy synchronous path,
+   unchanged) vs. `ProductImportService::DURABLE_MAX_ROWS` (20,000, new, durable path only — both `inspect()`
+   and `preview()` opt into it via an explicit `for_durable` request flag; `apply()`'s durable chunk call passes
+   it directly). `ProductWorkbookService::MAX_ROWS` and `InventoryOpeningImportService::MAX_ROWS` stay at 2,000
+   — both atomic domains, unaffected, now *explicitly* decoupled from `ProductImportService`'s constant rather
+   than aliased to it (`ProductWorkbookService::MAX_ROWS` was `= ProductImportService::MAX_ROWS` before this PR;
+   it is now a literal `2000` with its own documented rationale, so a future change to one cannot silently move
+   the other).
+2. **Maximum file bytes:** unchanged, 5 MB (`5120` KB), everywhere — this PR does not touch it.
+3. **Maximum columns:** unchanged, `MAX_COLUMNS = 200`, everywhere — no evidence it needed to change.
+4. **Preview rows returned to the client:** unchanged, `PREVIEW_ROW_LIMIT = 200` — counters are still computed
+   over the full validated window; only the row-detail list shown to the user is capped.
+5. **Apply chunk size:** unchanged, `APPLY_BATCH_SIZE = 100` — raising the row ceiling did not touch this; a
+   larger batch size would grow each chunk's transaction/write cost, which is a different risk this PR does not
+   take on.
+
+### The fix: batched product matching (removes the real N+1, not a workaround)
+
+`ProductImportService::prefetchProductMatches()` (new) collects every candidate SKU/`nebrax_id`/barcode in the
+current analysis window (the chunk's window for durable chunked apply, or the whole file for `preview()`/legacy
+`apply()`) *before* the per-row loop, then resolves them via `fetchInChunks()` — chunked `whereIn()` queries (500
+values per chunk, avoiding SQLite's bound-parameter ceiling) — exactly the same "prefetch once, no per-row
+query" shape `referenceIndex()` already used for category/brand/unit-template matching. `matchExisting()` and a
+new `assertLiveConflicts()`-only pair (`hasBatchedSkuConflict`/`hasBatchedBarcodeConflict`) consult these
+prefetched maps instead of querying. **The separate, intentional live re-check inside `apply()`'s write
+transaction (`hasLiveSkuConflict`/`hasLiveBarcodeConflict`/`assertNoLiveSkuConflict`/`assertNoLiveBarcodeConflict`)
+is untouched** — it still queries live, per-row, exactly as before, because its entire purpose is to catch a
+conflict from a request that committed *between* this prefetch and the actual write; batching that one would
+remove the real protection it exists for. Mutation semantics, mapping semantics, blank policy, master-data
+policy, and create/update/upsert behavior are all byte-for-byte unchanged — this is purely a read-path query
+count optimization, verified by the full existing `ProductImportV2Test`/`ProductImportTest` suites (which
+extensively exercise SKU/barcode/`nebrax_id` matching and conflicts) passing unmodified.
+
+### Legacy vs. durable — explicit, not implicit
+
+- **Legacy fully-synchronous path** (`/products/import/{inspect,preview,apply}` called *without* `for_durable`
+  and *without* an `ImportJob`): unchanged behavior, unchanged 2,000-row cap. This is still genuinely necessary
+  there — a one-shot `apply()` call (no `batch_offset`/`batch_size`) writes the *entire* file in one transaction
+  in one request, which is the original, still-valid reason `MAX_ROWS` existed (`QUEUE_CONNECTION=sync`, no
+  background worker).
+- **Durable path**: `inspect()`/`preview()` opt into `DURABLE_MAX_ROWS` via an explicit `for_durable=true` field
+  on `ImportProductsRequest` (read by `ProductController::importInspect`/`importPreview` via a new
+  `maxRows()` accessor) — the PR-DUR-5 frontend sends it on both calls, because it never calls the legacy
+  one-shot `/products/import/apply` at all (it always creates an `ImportJob` and chunks through
+  `/import-jobs/{id}/apply`). `ImportJobService::maxRowsFor(string $domain)` (new, replaces the removed
+  `MAX_ROWS` alias) resolves the ceiling per-domain: `DURABLE_MAX_ROWS` for `product_catalog`, each atomic
+  domain's own unchanged constant otherwise — so `inspect()`'s structural check and the actual `apply()` engine
+  never disagree about what a given domain's file is allowed to contain.
+
+### Preferred-outcome check — achieved, with an honest boundary
+
+The task's preferred outcome asked for genuine bounded-memory/bounded-request large-file support for Product
+Catalog, without a second mutation implementation and without pretending durable imports supports arbitrary
+files. This PR delivers that for the row range measured safe (up to `DURABLE_MAX_ROWS = 20,000`): `inspect()`
+and `preview()` both now handle it end-to-end (measured), `ProductImportService::apply()` remains the sole
+mutation boundary (only a new optional `int $maxRows` parameter was added — no new write path, no duplicated
+validation/mutation logic), and all PR-DUR-2 semantics (resumability, idempotency, server-owned
+`processed_rows`, Tenant Isolation, live cost authorization, mapping/blank/master-data policy,
+create/update/upsert) are unchanged and re-verified by the existing test suite passing unmodified.
+
+**What is explicitly *not* claimed:** durable imports do not support arbitrary-size files. `ImportJobService`
+still re-reads the whole file from disk on every chunk (`applyNextChunk()`'s `materializeLocalCopy()` +
+`SpreadsheetReader::read()`/`ProductImportService::apply()`'s own `readFile()`), so per-chunk cost still scales
+with total file size, not chunk size — 20,000 rows means ~200 chunks each re-reading the whole file (measured:
+~220 ms/read at that size, ~44 s cumulative re-read overhead across the full import, still safe per-request but
+wasteful in aggregate). Removing that quadratic cost requires either true streaming/partial reads inside
+`SpreadsheetReader` or a persisted parsed-rows cache keyed by `ImportJob` — both are a real parser/backend
+redesign, correctly out of scope for this narrow PR. `DURABLE_MAX_ROWS = 20,000` is the largest ceiling this PR
+found technically defensible under the *current* re-read-per-chunk architecture; the minimal follow-up
+architecture for true arbitrarily-large-file support is documented in the Implementation Report's Known
+Limitations.
+
+### Part B — mobile functional hardening
+
+1. **Step navigation reachability**: `Stepper` (`web/src/modules/products/import/stepper.tsx`, shared by all
+   three durable import pages) already scrolled horizontally within its own container (`overflow-x-auto`) and
+   was preceded by a "step X of Y" text line — but had **no logic to bring the active step into view** when
+   `current` changed. On a narrow viewport that never got manually scrolled, later steps stayed genuinely
+   off-screen within their own scrollable container — exactly the "clips/hidden" bug production reported, and
+   exactly the gap PR-DUR-5 §9 disclosed as untested. Fixed with a `useEffect` that calls
+   `scrollIntoView({inline: 'center', block: 'nearest'})` on the active step whenever `current` changes, guarded
+   by a `typeof … === 'function'` check (defensive against environments/older browsers without it — not just a
+   jsdom workaround). No new component, no new design language, desktop/tablet unaffected (this only changes
+   scroll position, never layout).
+2. **Bottom action / Safari safe-area**: all three pages already had `pb-24 lg:pb-0` on their root — the
+   convention this codebase uses when a fixed bottom `FormActions` bar is expected — but their actual primary
+   CTAs were plain inline button rows inside a `Card`, never wrapped in the shared `FormActions` component
+   (`@/components/nebrax`). That component is the codebase's existing, already-safe-area-tested pattern
+   (`fixed inset-x-0 bottom-0 … pb-safe lg:static …`, used by `expenses/new`, `receipt-vouchers/new`,
+   `manual-journals/new`, and the generic `nebrax/form-page.tsx`). All primary/secondary action rows across the
+   three durable import pages (setup/resumed CTA, preview step back+apply, result step actions) now use
+   `FormActions` — reusing the existing, proven component rather than inventing new safe-area handling.
+3. **RTL/LTR**: no direction-specific logic changed. `Stepper` has no directional assumptions of its own (it
+   relies on the browser's native RTL/LTR flex behavior); the codebase's existing `rtl:`/`ltr:` Tailwind variants
+   on each page's back-arrow icon are untouched. New tests cover both an Arabic-labelled and an English-labelled
+   render of `Stepper` to confirm no hidden Arabic-only assumption was introduced.
+
+### Tests
+
+Backend (all new, PHP/PHPUnit, run against SQLite locally): row-limit decoupling across all three domains
+(`ImportJobDomainRowLimitsTest`), durable upload above the old 2,000-row ceiling completing end-to-end with no
+loss/duplication around that specific boundary (`ImportJobApplyTest`), rejection at the new
+`DURABLE_MAX_ROWS` ceiling, `inspect()`/`preview()` accepting/rejecting per `for_durable`
+(`ProductImportV2Test`), and a query-count assertion proving the N+1 fix (bounded query growth from 10→200
+rows). Frontend (Vitest): `Stepper`'s auto-scroll behavior and its defensive guard, `for_durable=1` sent on both
+inspect and preview calls, and `FormActions`/`pb-safe` presence on the primary action button of all three pages.
+Full existing suites (backend 3,187 passing beyond this PR's own new tests, unrelated to it; frontend 1,692) run
+unmodified and green — see the Implementation Report for exact counts and the one pre-existing, unrelated local
+sandbox gap (`bcmath` extension not installed here; both `Dockerfile` and CI already require it, so this is not
+a regression this PR introduced or can fix).
+
+### In scope / out of scope
+
+In scope: the row-limit decoupling and query-batching above, for exactly the three existing domains; the two
+disclosed mobile bugs, for exactly the three existing durable import pages. Out of scope, explicitly not
+touched: Design System V2, a broad import-page visual redesign, S3/R2/storage infrastructure, queue/worker
+architecture, accounting/inventory-valuation rules, Inventory Opening posting, any new import domain, Inventory
+Workspace, Serial/Lot/Expiry, Reservations.

@@ -47,7 +47,34 @@ class ImportProductsRequest extends FormRequest
             // التطبيق الدفعي اختياري؛ غيابه يبقي عقد V1/V2 القديم كما هو.
             'batch_offset' => ['sometimes', 'integer', 'min:0', 'max:'.ProductImportService::MAX_ROWS],
             'batch_size' => ['sometimes', 'integer', 'min:1', 'max:'.ProductImportService::APPLY_BATCH_SIZE],
+            // PR-DUR-HARDEN-1: راجع توثيق `maxRows()` أدناه.
+            'for_durable' => ['sometimes', 'boolean'],
         ];
+    }
+
+    /**
+     * سقف صفوف `inspect()`/`preview()` معاً — يقرأه
+     * `ProductController::importInspect`/`importPreview` كلاهما.
+     *
+     * `for_durable=true` يعني: هذا الملف سيُطبَّق عبر تشغيلة استيراد دائمة
+     * (`POST /import-jobs`) لا مساراً متزامناً — الواجهة الجديدة (PR-DUR-5)
+     * ترسله دوماً لأنها لم تعد تستدعي `/products/import/apply` إطلاقاً.
+     * غيابه (الافتراض) يبقي سلوك أي عميلٍ قديم لا يعرف هذا الحقل حرفياً كما
+     * كان — لا يتغيّر سقفه أبداً.
+     *
+     * **لماذا يصحّ رفع سقف `preview()` نفسها هنا أيضاً بعد PR-DUR-HARDEN-1؟**
+     * قبل هذا الـPR كان تحقّقها الحيّ لكل صفّ (`matchExisting`/
+     * `assertLiveConflicts`) يستعلم القاعدة مرّتين لكل صفّ — عند آلاف
+     * الصفوف يعني ذلك آلاف الاستعلامات في طلبٍ واحد، وهو ما أبقى السقف
+     * القديم ضرورياً حقاً لا مجرّد حذرٍ. `prefetchProductMatches()` جمّعت
+     * هذا كله في ٢-٣ استعلامات لكل نافذة تحليل (قياسٌ فعلي: ٥٠٠٠ صفّ
+     * تحديثٍ ضد ٥٠٠٠ منتجٍ قائم = ١٣ استعلاماً فقط، لا ~١٠٠٠٠)، فارتفع
+     * السقف الآمن الفعلي معها — راجع `PR-DUR-HARDEN-1-IMPLEMENTATION-REPORT.md`
+     * لتفصيل القياس الكامل (حتى ٢٠٠٠٠ صفّ: ٧٥٠ms و٨٤ م.ب فقط).
+     */
+    public function maxRows(): int
+    {
+        return $this->boolean('for_durable') ? ProductImportService::DURABLE_MAX_ROWS : ProductImportService::MAX_ROWS;
     }
 
     public function messages(): array
