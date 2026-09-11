@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import Link from 'next/link';
@@ -48,7 +48,7 @@ function stockTone(state: InventoryStockState): 'positive' | 'warning' | 'muted'
   return 'muted';
 }
 
-export default function InventoryPage() {
+function InventoryWorkspacePage() {
   const t = useTranslations('inventory');
   const tWarehouses = useTranslations('warehouses');
   const tProducts = useTranslations('products');
@@ -400,5 +400,13 @@ export default function InventoryPage() {
 
       <MovementsDialog product={active} onClose={() => setActive(null)} />
     </div>
+  );
+}
+
+export default function InventoryPage() {
+  return (
+    <Suspense fallback={<div className="text-sm text-muted">…</div>}>
+      <InventoryWorkspacePage />
+    </Suspense>
   );
 }
