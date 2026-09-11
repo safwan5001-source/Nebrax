@@ -44,6 +44,17 @@ jobs:
       - name: Checkout core (النواة)
         uses: actions/checkout@v4
 
+      # ═══════════════════════════════════════════════════════════════
+      #  حارس قائمة النسخ — لا ملفَّ نواة يسقط صامتاً
+      # ═══════════════════════════════════════════════════════════════
+      #  المستودع نواةٌ فقط، ويُجمَّع مشروع Laravel كامل أدناه بنسخ **قوائم
+      #  صريحة** من المجلدات. والـ glob `*.php` لا يلتقط المجلدات الفرعية،
+      #  فمجلدٌ جديد يبقى في المستودع ولا يصل إلى الخادم — ويسقط الترحيل
+      #  بخطأ «صنف غير موجود» بعد أن مرّ محلياً.
+      #
+      #  حدث هذا مرّتين (`app/Console`، ثم `app/Models/Concerns`). فبدل
+      #  انتظار الثالثة: أي مجلد يحمل ملفات PHP وليس في القائمة **يُفشل
+      #  الـ CI هنا** برسالة تقول أين يُضاف.
       - name: حارس قائمة النسخ
         run: |
           ALLOWED="app/Contracts app/Jobs/Accounting app/Jobs/DocumentCenter app/Models app/Models/Concerns app/Services app/Services/Accounting app/Services/Commerce app/Services/DocumentCenter app/Services/Pos app/Services/Pos/Hardware \
@@ -71,10 +82,15 @@ jobs:
 
       - name: تثبيت محركات PDF وXML
         run: |
+          # مصدر Google Chrome APT مثبَّت مسبقاً على عدّاد GitHub-hosted ولا علاقة له
+          # بالمشروع؛ يفشل أحياناً بـ"Hash Sum mismatch" فيوقف كل خطوة apt-get update.
+          # نعطّل ملف مصدره فقط دون المساس بأي مصدر آخر أو كبت أخطاء apt عامة.
           sudo rm -f /etc/apt/sources.list.d/google-chrome.list
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends poppler-utils libxml2-utils
 
+      # Laravel 11 دخل الدعم الأمني فقط، فصارت إصداراته تحمل تنبيهات أمنية
+      # يحجبها Composer 2.10+ افتراضياً. نعطّل الحجب في بيئة CI المؤقتة فقط.
       - name: السماح بتثبيت Laravel 11 (بيئة CI مؤقتة)
         run: composer config --global policy.advisories.block false
 
@@ -100,6 +116,7 @@ jobs:
           cp -r "$CORE/app/Contracts/"*.php                app/Contracts/
           cp -r "$CORE/app/Jobs/DocumentCenter/"*.php      app/Jobs/DocumentCenter/
           cp -r "$CORE/app/Jobs/Accounting/"*.php          app/Jobs/Accounting/
+          # المجلدات الفرعية لا يلتقطها الـ glob أعلاه — كل مجلد جديد يُضاف صراحةً
           cp -r "$CORE/app/Models/Concerns/"*.php         app/Models/Concerns/
           cp -r "$CORE/app/Services/"*.php                app/Services/ 2>/dev/null || true
           cp -r "$CORE/app/Services/Accounting/"*.php     app/Services/Accounting/
@@ -118,6 +135,7 @@ jobs:
           cp -r "$CORE/app/Http/Resources/"*.php          app/Http/Resources/
           cp -r "$CORE/app/Providers/"*.php               app/Providers/
           cp -r "$CORE/config/"*.php                      config/
+          # أوامر artisan (تشخيص/صيانة) — بلا هذا السطر توجد في المستودع ولا تصل الاختبار
           cp -r "$CORE/app/Console/Commands/"*.php       app/Console/Commands/ 2>/dev/null || true
           cp -r "$CORE/database/migrations/"*.php         database/migrations/
           cp -r "$CORE/routes/api.php"                    routes/api.php
@@ -125,6 +143,7 @@ jobs:
           cp -r "$CORE/routes/api_storefront.php"      routes/api_storefront.php
           cp -r "$CORE/routes/console.php"                routes/console.php
           cp -r "$CORE/tests/Feature/"*.php               tests/Feature/
+          # عقد OpenAPI (توثيق فقط) — يقرأه اختبار المطابقة عبر base_path('docs/openapi/…')
           cp -r "$CORE/docs/openapi/"*.yaml               docs/openapi/
 
       - name: تسجيل TenancyServiceProvider + حذف users migration الافتراضية
