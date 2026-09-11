@@ -69,4 +69,42 @@ class PaymentMethodDefaultsTest extends TestCase
         $this->assertSame(3, PaymentMethod::count());
         $this->assertFalse(PaymentMethod::where('name', 'شيك')->exists());
     }
+
+    /** @test */
+    public function payment_methods_are_strictly_isolated_by_tenant_context(): void
+    {
+        $tenantA = Tenant::create([
+            'name' => 'شركة ألف',
+            'slug' => 'payment-methods-tenant-a',
+            'vat_number' => '300000000000005',
+            'currency' => 'SAR',
+        ]);
+        $tenantB = Tenant::create([
+            'name' => 'شركة باء',
+            'slug' => 'payment-methods-tenant-b',
+            'vat_number' => '300000000000006',
+            'currency' => 'SAR',
+        ]);
+
+        $context = app(TenantContext::class);
+
+        $context->set($tenantA->id);
+        app(ChartOfAccountsSeeder::class)->seed($tenantA->id);
+        app(CashBankAccountService::class)->bootstrapDefaults();
+        $tenantAMethodId = PaymentMethod::where('name', 'نقدي')->sole()->id;
+
+        $context->set($tenantB->id);
+        app(ChartOfAccountsSeeder::class)->seed($tenantB->id);
+        app(CashBankAccountService::class)->bootstrapDefaults();
+
+        $this->assertCount(4, PaymentMethod::all());
+        $this->assertNull(PaymentMethod::find($tenantAMethodId));
+        $this->assertFalse(PaymentMethod::whereKey($tenantAMethodId)->exists());
+        $this->assertTrue(PaymentMethod::where('name', 'نقدي')->exists());
+
+        $context->set($tenantA->id);
+
+        $this->assertCount(4, PaymentMethod::all());
+        $this->assertNotNull(PaymentMethod::find($tenantAMethodId));
+    }
 }
