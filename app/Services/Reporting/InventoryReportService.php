@@ -59,6 +59,14 @@ class InventoryReportService
         ];
     }
 
+    /**
+     * المنتجات المتتبعة فقط؛ بلا اختيار فروع = لقطة مجمعة لكل المستأجر.
+     *
+     * **هوية الكتالوج تبقى كما هي عمداً**: هذا الاستعلام يختار صفوف المنتجات
+     * نفسها بلا تصفية فرع إضافية — `withoutGlobalScope(BranchScope::class)`
+     * قائمة كما كانت. ما تغيَّر هو الكمية المعروضة وحدها، في `inventoryValue()`
+     * أدناه لا هنا.
+     */
     private function trackedProducts(array $filters): Builder
     {
         $query = Product::query()
@@ -72,6 +80,26 @@ class InventoryReportService
         return $query;
     }
 
+    /**
+     * قيمة المخزون الحالية — عقد PR-ACL-INVENTORY-CATALOG-EXPORT-SCOPE:
+     * الكمية والقيمة وحدهما يُقاطَعان بنطاق المخزن الفعّال؛ `avg_cost` يبقى
+     * متوسط `Product` العالمي بلا تغيير (لا تكلفة مخترَعة لكل مخزن — انظر
+     * AWJ_INVENTORY_VALUATION_SEMANTICS.md). هذا يشمل منتجات الوقود المرتبطة
+     * أيضاً: `avg_cost` هنا كان دوماً القيمة الممزوجة على مستوى المنتج، لا
+     * أساس تكلفة `FuelCostBasisService` الخاص بكل مخزن — لم يتغيّر هذا الفارق،
+     * ولا يدّعي هذا التقرير خلاف ذلك.
+     *
+     * غير المقيَّد (`allowedWarehouseIds() === null`): الكمية تبقى
+     * `products.quantity_on_hand` العالمي حرفياً — يشمل كمية ما قبل المخازن
+     * (حركات بلا `warehouse_id`) التي لا يمكن نسبتها لأي مخزن. المقيَّد يرى
+     * مجموع `product_warehouse_stock` ضمن مخازنه المسموحة فقط؛ تلك الكمية
+     * غير المنسوبة لا تُحسب له لأنها غير مثبتة داخل نطاقه — سلوكٌ صحيح لا فقدان.
+     *
+     * `hide_zero` يُطبَّق بعد حساب الكمية الفعلية (لا `WHERE` عالمي مسبق)
+     * ليطابق ما يراه المستخدم فعلاً، لا رقماً عالمياً قد يخالف نطاقه.
+     *
+     * @return array{rows:array<int,array<string,mixed>>,totals:array<string,int>}
+     */
     private function inventoryValue(array $filters): array
     {
         $warehouseIds = ReportWarehouseScope::resolve($filters);
@@ -119,6 +147,12 @@ class InventoryReportService
         ];
     }
 
+    /**
+     * أرصدة المخازن — كمّية حصراً على حبة Product × Warehouse.
+     * الاستعلام والنطاق من `ProductWarehouseBalanceQuery`؛ العقد والتعيين كما كانا.
+     *
+     * @return array{rows:array<int,array<string,mixed>>,totals:array<string,int>}
+     */
     private function warehouseBalances(array $filters): array
     {
         $query = ProductWarehouseBalanceQuery::baseQuery()
@@ -163,6 +197,7 @@ class InventoryReportService
         ];
     }
 
+    /** @return array{rows:array<int,array<string,mixed>>,totals:array<string,int>} */
     private function movements(array $filters): array
     {
         $query = StockMovement::query()
@@ -230,6 +265,7 @@ class InventoryReportService
         ];
     }
 
+    /** @return array{rows:array<int,array<string,mixed>>,totals:array<string,int>} */
     private function operations(array $filters): array
     {
         $query = StockPermit::query()
@@ -292,6 +328,7 @@ class InventoryReportService
         ];
     }
 
+    /** @return array{rows:array<int,array<string,mixed>>,totals:array<string,int>} */
     private function stocktakes(array $filters): array
     {
         $query = Stocktake::query()
