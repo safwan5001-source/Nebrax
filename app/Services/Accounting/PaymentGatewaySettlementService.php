@@ -52,6 +52,8 @@ final class PaymentGatewaySettlementService
             );
         }
 
+        $this->assertUnsupportedAdjustmentsAreZero($deductions, $credits);
+
         return DB::transaction(function () use (
             $tenantId, $gatewayId, $cashBankId, $ref, $date, $itemsInput,
             $net, $feeExTax, $feeTax, $deductions, $credits, $input, $actor
@@ -103,8 +105,6 @@ final class PaymentGatewaySettlementService
                 $clearing->id,
                 $net,
                 $feeExTax,
-                $deductions,
-                $credits,
                 $gross,
             );
 
@@ -155,6 +155,21 @@ final class PaymentGatewaySettlementService
 
             return $settlement->fresh(['items', 'journalEntry.lines']);
         });
+    }
+
+    private function assertUnsupportedAdjustmentsAreZero(int $deductions, int $credits): void
+    {
+        if ($deductions > 0) {
+            throw new DomainException(
+                'Unsupported provider deductions cannot be posted. PAY-V2-5 has no approved accounting role for non-fee gateway deductions; do not classify them as provider_fee_expense.'
+            );
+        }
+
+        if ($credits > 0) {
+            throw new DomainException(
+                'Unsupported provider credits cannot be posted. PAY-V2-5 has no approved accounting role for gateway credits; do not classify them as provider_fee_expense.'
+            );
+        }
     }
 
     private function replayOrReject(
@@ -267,8 +282,6 @@ final class PaymentGatewaySettlementService
         string $clearingAccountId,
         int $net,
         int $feeExTax,
-        int $deductions,
-        int $credits,
         int $gross,
     ): array {
         $lines = [];
@@ -277,13 +290,8 @@ final class PaymentGatewaySettlementService
             $lines[] = ['account_id' => $bankAccountId, 'debit' => $net, 'description' => 'صافي تسوية البوابة'];
         }
 
-        $expense = $feeExTax + $deductions;
-        if ($expense > 0) {
-            $lines[] = ['account_id' => $feeAccountId, 'debit' => $expense, 'description' => 'عمولة/خصم المزوّد'];
-        }
-
-        if ($credits > 0) {
-            $lines[] = ['account_id' => $feeAccountId, 'credit' => $credits, 'description' => 'ائتمان مزوّد صريح'];
+        if ($feeExTax > 0) {
+            $lines[] = ['account_id' => $feeAccountId, 'debit' => $feeExTax, 'description' => 'عمولة بوابة الدفع'];
         }
 
         $lines[] = ['account_id' => $clearingAccountId, 'credit' => $gross, 'description' => 'إقفال مقاصة البوابة'];
