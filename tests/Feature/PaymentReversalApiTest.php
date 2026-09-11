@@ -90,12 +90,13 @@ class PaymentReversalApiTest extends TestCase
     /** @test */
     public function cross_tenant_payment_cannot_be_reversed_or_shown(): void
     {
-        ['payment' => $payment] = $this->postedReceipt('alpha-rev', 'owner-a@alpha-rev.test');
+        ['tenant_id' => $tenantA, 'payment' => $payment] = $this->postedReceipt('alpha-rev', 'owner-a@alpha-rev.test');
         $b = $this->registerTenant('beta-rev', 'owner-b@beta-rev.test');
 
         $this->withToken($b['token'])->getJson("/api/payments/{$payment['id']}")->assertNotFound();
         $this->withToken($b['token'])->postJson("/api/payments/{$payment['id']}/reverse")->assertNotFound();
 
+        app(TenantContext::class)->set($tenantA);
         $this->assertSame('posted', Payment::findOrFail($payment['id'])->status);
         $this->assertNull(Payment::findOrFail($payment['id'])->reversal_entry_id);
     }
