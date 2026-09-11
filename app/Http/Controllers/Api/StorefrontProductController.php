@@ -74,7 +74,9 @@ class StorefrontProductController extends PublicApiController
 
         $currency = Tenant::findOrFail($storefront->tenantId())->currency;
         $inStockByProduct = $this->batchAvailability($paginator->getCollection(), $channelId);
-        $tenantSlug = (string) $request->route('tenantSlug');
+        // `null` على المسار الموثوق (لا شريحة رابط في COM-7-P2A) — المورد يبني
+        // رابط الوسائط من المسار المناسب وفق ذلك (راجع StorefrontProductResource).
+        $tenantSlug = $request->route('tenantSlug');
 
         // السعر لتصفّح مجهول (بلا partnerId) مطابقٌ حتماً لناتج
         // CommercePriceResolver::resolve() في هذه الحالة: لا قائمة سعر عميل
@@ -155,7 +157,7 @@ class StorefrontProductController extends PublicApiController
             $inStock = null;
         }
 
-        $tenantSlug = (string) $request->route('tenantSlug');
+        $tenantSlug = $request->route('tenantSlug');
 
         $resource = new StorefrontProductResource(
             $product,

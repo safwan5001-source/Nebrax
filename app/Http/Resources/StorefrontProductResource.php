@@ -15,6 +15,11 @@ use Illuminate\Support\Facades\Route as RouteFacade;
  *
  * السعر والتوفر يُحسبان في المتحكّم (`CommercePriceResolver`/`AvailableToSellService`
  * أو نظيرهما المجمّع) لا هنا — هذا المورد عرضٌ فقط.
+ *
+ * `tenantSlug`: **اختياري** — غير `null` فقط على المسار المتوارَث
+ * (`{tenantSlug}/...`، COM-7-P1)؛ `null` على المسار الموثوق (COM-7-P2A) الذي
+ * يحسم المستأجر من الـ Host بلا شريحة رابط. `mediaUrl()` تبني الرابط من
+ * اسم المسار المناسب تبعاً لذلك — لا افتراض لمسار واحد.
  */
 class StorefrontProductResource extends JsonResource
 {
@@ -24,7 +29,7 @@ class StorefrontProductResource extends JsonResource
         private readonly string $currency,
         private readonly ?bool $inStock,
         private readonly bool $detailed,
-        private readonly string $tenantSlug,
+        private readonly ?string $tenantSlug,
     ) {
         parent::__construct($resource);
     }
@@ -68,8 +73,14 @@ class StorefrontProductResource extends JsonResource
 
     private function mediaUrl(string $mediaId): string
     {
+        if ($this->tenantSlug !== null) {
+            return RouteFacade::has('storefront.v1.legacy.media.show')
+                ? route('storefront.v1.legacy.media.show', ['tenantSlug' => $this->tenantSlug, 'id' => $mediaId])
+                : "/store/v1/{$this->tenantSlug}/media/{$mediaId}";
+        }
+
         return RouteFacade::has('storefront.v1.media.show')
-            ? route('storefront.v1.media.show', ['tenantSlug' => $this->tenantSlug, 'id' => $mediaId])
-            : "/store/v1/{$this->tenantSlug}/media/{$mediaId}";
+            ? route('storefront.v1.media.show', ['id' => $mediaId])
+            : "/store/v1/media/{$mediaId}";
     }
 }
