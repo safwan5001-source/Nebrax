@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Tenancy\CompanyWide;
+use DomainException;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
@@ -21,6 +22,21 @@ class PaymentMethodChannelAvailability extends BaseModel implements CompanyWide
     protected $casts = [
         'is_enabled' => 'boolean',
     ];
+
+    protected static function booted(): void
+    {
+        static::saving(function (self $policy): void {
+            // Both lookups retain TenantScope. A foreign-tenant UUID therefore
+            // cannot be persisted even when a caller somehow knows that UUID.
+            if (! PaymentMethod::query()->whereKey($policy->payment_method_id)->exists()) {
+                throw new DomainException('Payment method must belong to the active tenant.');
+            }
+
+            if (! SalesChannel::query()->whereKey($policy->sales_channel_id)->exists()) {
+                throw new DomainException('Sales channel must belong to the active tenant.');
+            }
+        });
+    }
 
     public function paymentMethod(): BelongsTo
     {
