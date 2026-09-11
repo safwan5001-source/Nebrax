@@ -3,9 +3,12 @@
 namespace Tests\Feature;
 
 use App\Models\Invoice;
+use App\Models\JournalEntry;
 use App\Models\Partner;
 use App\Models\Payment;
 use App\Models\Tenant;
+use App\Services\Accounting\AccountingPeriodLockedException;
+use App\Services\Accounting\AccountingPeriodLockService;
 use App\Services\Accounting\ChartOfAccountsSeeder;
 use App\Services\Accounting\InvoiceService;
 use App\Services\Accounting\PaymentReversalService;
@@ -142,7 +145,6 @@ class PaymentReversalTest extends TestCase
         $payment = $this->collect($invoice, $invoice->total);
         $paidBefore = $invoice->fresh()->paid_amount;
 
-        // يحاكي مرجعاً تاريخياً مفقوداً؛ يجب أن يتوقف العكس قبل أي أثر جديد.
         $payment->update(['journal_entry_id' => null]);
 
         try {
@@ -158,5 +160,46 @@ class PaymentReversalTest extends TestCase
         $this->assertNull($payment->reversal_entry_id);
         $this->assertSame($paidBefore, $invoice->paid_amount);
         $this->assertSame('paid', $invoice->payment_status);
+    }
+
+    /** @test */
+    public function reversal_into_a_locked_period_fails_without_changing_payment_journal_or_invoice(): void
+    {
+        $invoice = $this->invoice();
+        $payment = $this->collect($invoice, $invoice->total);
+        $allocationIds = $payment->allocations()->pluck('id')->all();
+        $original = $payment->journalEntry()->with('lines')->firstOrFail();
+        $originalStatus = $original->status;
+        $originalLineFingerprint = $original->lines->map->only(['account_id', 'debit', 'credit'])->toArray();
+
+        $lockedDate = now()->toDateString();
+        app(AccountingPeriodLockService::class)->create(
+            now()->startOfMonth()->toDateString(),
+            now()->endOfMonth()->toDateString(),
+            'إقفال الفترة الحالية',
+            null
+        );
+
+        try {
+            $this->reversals->reverse($payment->fresh(), $lockedDate, 'عكس داخل فترة مقفلة');
+            $this->fail('Expected reversal into a locked period to fail.');
+        } catch (AccountingPeriodLockedException $e) {
+            $this->assertNotSame('', $e->getMessage());
+        }
+
+        $payment->refresh();
+        $invoice->refresh();
+        $original->refresh()->load('lines');
+
+        $this->assertSame('posted', $payment->status);
+        $this->assertNull($payment->reversal_entry_id);
+        $this->assertNull($payment->reversed_at);
+        $this->assertSame($original->id, $payment->journal_entry_id);
+        $this->assertSame($allocationIds, $payment->allocations()->pluck('id')->all());
+        $this->assertSame($originalStatus, $original->status);
+        $this->assertSame($originalLineFingerprint, $original->lines->map->only(['account_id', 'debit', 'credit'])->toArray());
+        $this->assertSame($invoice->total, $invoice->paid_amount);
+        $this->assertSame('paid', $invoice->payment_status);
+        $this->assertSame(0, JournalEntry::where('reversal_of', $original->id)->count());
     }
 }
