@@ -7,7 +7,7 @@
 | PR | (to be opened) |
 | Branch | `claude/com-7-p2b-arabic-english` |
 | Base SHA | `70a75361ca9d406c6c77207a8692daec17b42eec` (main, includes merged PR #769/#770) |
-| Head SHA | (set after final commit) |
+| Head SHA | `5aa71fec895957823a38e9660c50ea42440151b1` |
 | Predecessor | PR #769 (COM-7-P2A), merged as `c60722cd` |
 
 ## Executive Summary
