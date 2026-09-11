@@ -63,7 +63,7 @@ class StorefrontCatalogApiTest extends TestCase
             'is_active' => true,
             // بيانات حسّاسة يجب ألا تظهر في أي استجابة عامة.
             'avg_cost' => 9999, 'purchase_price' => 8000, 'min_sale_price' => 20000,
-            'discount' => 500, 'discount_type' => 'fixed', 'profit_margin' => 17,
+            'discount' => 500, 'discount_type' => 'amount', 'profit_margin' => 17,
             'quantity_on_hand' => 42, 'internal_notes' => 'سرّي جداً', 'tags' => 'internal-tag',
         ], $attrs));
 
