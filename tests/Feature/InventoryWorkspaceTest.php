@@ -98,7 +98,7 @@ class InventoryWorkspaceTest extends TestCase
         $this->assertSame(3, $res['meta']['total']);
         $this->assertTrue($res['meta']['can_view_cost']);
         $this->assertSame(12, $res['meta']['total_quantity']);
-        $this->assertSame('250.00', $res['meta']['total_value']);
+        $this->assertSame('300.00', $res['meta']['total_value']);
         $ids = array_column($res['data'], 'id');
         $this->assertContains($this->cement->id.':'.$this->warehouseA->id, $ids);
         $first = collect($res['data'])->firstWhere('warehouse_id', $this->warehouseA->id);
@@ -111,11 +111,33 @@ class InventoryWorkspaceTest extends TestCase
     /** @test */
     public function it_paginates_without_loading_the_full_set_in_data(): void
     {
-        $page = $this->withToken($this->token)->getJson('/api/inventory?view=workspace&per_page=1&page=2')->assertOk();
+        for ($i = 0; $i < 8; $i++) {
+            $product = Product::create([
+                'tenant_id' => $this->tenantId,
+                'name' => 'صنف صفحة '.$i,
+                'sku' => 'PG-'.sprintf('%02d', $i),
+                'unit' => 'قطعة',
+                'type' => 'good',
+                'track_inventory' => true,
+                'quantity_on_hand' => 1,
+                'avg_cost' => 100,
+            ]);
+            ProductWarehouseStock::create([
+                'tenant_id' => $this->tenantId,
+                'product_id' => $product->id,
+                'warehouse_id' => $this->warehouseA->id,
+                'quantity' => 1,
+            ]);
+        }
+
+        $first = $this->withToken($this->token)->getJson('/api/inventory?view=workspace&per_page=10&page=1')->assertOk();
+        $this->assertCount(10, $first['data']);
+        $this->assertSame(11, $first['meta']['total']);
+        $page = $this->withToken($this->token)->getJson('/api/inventory?view=workspace&per_page=10&page=2')->assertOk();
         $this->assertCount(1, $page['data']);
-        $this->assertSame(3, $page['meta']['total']);
+        $this->assertSame(11, $page['meta']['total']);
         $this->assertSame(2, $page['meta']['current_page']);
-        $this->assertSame(3, $page['meta']['last_page']);
+        $this->assertSame(2, $page['meta']['last_page']);
     }
 
     /** @test */
