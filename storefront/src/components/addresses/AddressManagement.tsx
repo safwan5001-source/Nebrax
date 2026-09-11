@@ -184,7 +184,7 @@ export function AddressManagement({
       {showAddButton && (
         <div className="mb-6">
           <Button onClick={handleAdd}>
-            <Plus className="w-4 h-4 mr-2" />
+            <Plus className="w-4 h-4 me-2" />
             {t("addAddress")}
           </Button>
         </div>

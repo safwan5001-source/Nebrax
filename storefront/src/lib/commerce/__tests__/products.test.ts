@@ -1,11 +1,22 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { StorefrontApiError } from "../config";
-import { fetchProduct, fetchProductFilters, fetchProducts } from "../products";
 import type {
   AwjListResponse,
   AwjProduct,
   AwjResourceResponse,
 } from "../types";
+
+const mocks = vi.hoisted(() => ({
+  headers: vi.fn(async () => new Headers({ host: "shop.example.com" })),
+  getLocaleOptions: vi.fn(async () => ({ locale: "ar", country: "sa" })),
+}));
+
+vi.mock("next/headers", () => ({ headers: mocks.headers }));
+vi.mock("@/lib/spree", () => ({ getLocaleOptions: mocks.getLocaleOptions }));
+
+const { StorefrontApiError } = await import("../config");
+const { fetchProduct, fetchProductFilters, fetchProducts } = await import(
+  "../products"
+);
 
 function jsonResponse(body: unknown, ok = true, status = 200): Response {
   return {
@@ -35,8 +46,10 @@ function sampleAwjProduct(overrides: Partial<AwjProduct> = {}): AwjProduct {
 describe("commerce/products", () => {
   beforeEach(() => {
     vi.stubEnv("AWJ_COMMERCE_API_URL", "http://awj-api.test");
-    vi.stubEnv("AWJ_STORE_TENANT_SLUG", "demo-tenant");
     vi.stubGlobal("fetch", vi.fn());
+    mocks.headers.mockClear();
+    mocks.getLocaleOptions.mockClear();
+    mocks.getLocaleOptions.mockResolvedValue({ locale: "ar", country: "sa" });
   });
 
   afterEach(() => {
@@ -76,10 +89,13 @@ describe("commerce/products", () => {
       next: null,
     });
 
-    const [url] = vi.mocked(fetch).mock.calls[0];
+    const [url, init] = vi.mocked(fetch).mock.calls[0];
     expect(String(url)).toBe(
-      "http://awj-api.test/store/v1/demo-tenant/products?page=1&per_page=12",
+      "http://awj-api.test/store/v1/products?page=1&per_page=12",
     );
+    expect(
+      (init?.headers as Record<string, string>)["X-Storefront-Forwarded-Host"],
+    ).toBe("shop.example.com");
   });
 
   it("returns an empty list without error when there are no results", async () => {
@@ -140,6 +156,48 @@ describe("commerce/products", () => {
 
     expect(product.id).toBe("p42");
     expect(product.default_variant?.sku).toBe("SKU-42");
+  });
+
+  it("displays the English name when the visitor locale is English (COM-7-P2B)", async () => {
+    mocks.getLocaleOptions.mockResolvedValue({ locale: "en", country: "sa" });
+    vi.mocked(fetch).mockResolvedValueOnce(
+      jsonResponse({
+        data: sampleAwjProduct({ name: "منتج", name_en: "Product" }),
+        meta: { request_id: "req-en" },
+      }),
+    );
+
+    const product = await fetchProduct("p1");
+
+    expect(product.name).toBe("Product");
+  });
+
+  it("keeps the Arabic name when the visitor locale is Arabic, even if name_en exists", async () => {
+    mocks.getLocaleOptions.mockResolvedValue({ locale: "ar", country: "sa" });
+    vi.mocked(fetch).mockResolvedValueOnce(
+      jsonResponse({
+        data: sampleAwjProduct({ name: "منتج", name_en: "Product" }),
+        meta: { request_id: "req-ar" },
+      }),
+    );
+
+    const product = await fetchProduct("p1");
+
+    expect(product.name).toBe("منتج");
+  });
+
+  it("falls back to the Arabic name in English when no name_en is set", async () => {
+    mocks.getLocaleOptions.mockResolvedValue({ locale: "en", country: "sa" });
+    vi.mocked(fetch).mockResolvedValueOnce(
+      jsonResponse({
+        data: sampleAwjProduct({ name: "منتج", name_en: null }),
+        meta: { request_id: "req-en-fallback" },
+      }),
+    );
+
+    const product = await fetchProduct("p1");
+
+    expect(product.name).toBe("منتج");
   });
 
   it("throws a StorefrontApiError on a non-ok response instead of returning malformed data", async () => {

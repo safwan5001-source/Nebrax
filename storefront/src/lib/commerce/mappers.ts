@@ -131,14 +131,30 @@ function toCategoryRefViewModel(ref: AwjCategoryRef): Category {
   };
 }
 
-export function mapAwjProductToViewModel(product: AwjProduct): Product {
+/**
+ * `products.name_en` already exists in AWJ's schema and is already returned
+ * by `store/v1/products` — this is display selection, not new persistence
+ * (COM-7-P2B). `product_categories` has no equivalent English column yet;
+ * category names always render in Arabic regardless of locale until that
+ * schema gap is addressed (documented in the P2B implementation report,
+ * not silently patched here with a new column).
+ */
+function displayProductName(product: AwjProduct, locale?: string): string {
+  const isEnglish = locale?.toLowerCase().startsWith("en") ?? false;
+  return isEnglish && product.name_en ? product.name_en : product.name;
+}
+
+export function mapAwjProductToViewModel(
+  product: AwjProduct,
+  locale?: string,
+): Product {
   const price = toPrice(product.price.amount_minor, product.price.currency);
   const media = (product.media ?? []).map((item) => toMedia(item, product.id));
   const purchasable = product.in_stock !== false;
 
   return {
     id: product.id,
-    name: product.name,
+    name: displayProductName(product, locale),
     slug: product.id,
     meta_title: null,
     meta_description: null,

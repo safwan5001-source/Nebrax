@@ -15,6 +15,7 @@ vi.mock("next-intl", () => ({
       myAccount: "My Account",
       wholesale: "Wholesale",
     })[key] ?? key,
+  useLocale: () => "en",
 }));
 
 vi.mock("@/components/layout/RegionPreferences", () => ({

@@ -146,25 +146,25 @@ export function MediaLightbox({
         <>
           <button
             type="button"
-            className="absolute left-4 top-1/2 -translate-y-1/2 z-10 text-white p-3 hover:bg-white/10 rounded-lg transition-colors"
+            className="absolute start-4 top-1/2 -translate-y-1/2 z-10 text-white p-3 hover:bg-white/10 rounded-lg transition-colors"
             onClick={(e) => {
               e.stopPropagation();
               goPrev();
             }}
             aria-label={t("lightboxPrev")}
           >
-            <ChevronLeft className="w-8 h-8" />
+            <ChevronLeft className="w-8 h-8 rtl:rotate-180" />
           </button>
           <button
             type="button"
-            className="absolute right-4 top-1/2 -translate-y-1/2 z-10 text-white p-3 hover:bg-white/10 rounded-lg transition-colors"
+            className="absolute end-4 top-1/2 -translate-y-1/2 z-10 text-white p-3 hover:bg-white/10 rounded-lg transition-colors"
             onClick={(e) => {
               e.stopPropagation();
               goNext();
             }}
             aria-label={t("lightboxNext")}
           >
-            <ChevronRight className="w-8 h-8" />
+            <ChevronRight className="w-8 h-8 rtl:rotate-180" />
           </button>
         </>
       )}

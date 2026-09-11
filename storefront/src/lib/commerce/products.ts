@@ -5,6 +5,7 @@ import type {
   ProductFiltersResponse,
   ProductListParams,
 } from "@spree/sdk";
+import { getLocaleOptions } from "@/lib/spree";
 import { storefrontFetch } from "./config";
 import { mapAwjProductToViewModel } from "./mappers";
 import type { AwjListResponse, AwjProduct, AwjResourceResponse } from "./types";
@@ -71,7 +72,10 @@ export async function fetchProducts(
     },
   );
 
-  const data = response.data.map(mapAwjProductToViewModel);
+  const { locale } = await getLocaleOptions();
+  const data = response.data.map((product) =>
+    mapAwjProductToViewModel(product, locale),
+  );
 
   return {
     data,
@@ -83,8 +87,9 @@ export async function fetchProduct(idOrSlug: string): Promise<Product> {
   const response = await storefrontFetch<AwjResourceResponse<AwjProduct>>(
     `products/${idOrSlug}`,
   );
+  const { locale } = await getLocaleOptions();
 
-  return mapAwjProductToViewModel(response.data);
+  return mapAwjProductToViewModel(response.data, locale);
 }
 
 /**

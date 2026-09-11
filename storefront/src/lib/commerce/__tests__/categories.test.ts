@@ -1,10 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { fetchCategories, fetchCategory } from "../categories";
 import type {
   AwjCategory,
   AwjListResponse,
   AwjResourceResponse,
 } from "../types";
+
+const mocks = vi.hoisted(() => ({
+  headers: vi.fn(async () => new Headers({ host: "shop.example.com" })),
+}));
+
+vi.mock("next/headers", () => ({ headers: mocks.headers }));
+
+const { fetchCategories, fetchCategory } = await import("../categories");
 
 function jsonResponse(body: unknown, ok = true, status = 200): Response {
   return { ok, status, json: async () => body } as Response;
@@ -13,8 +20,8 @@ function jsonResponse(body: unknown, ok = true, status = 200): Response {
 describe("commerce/categories", () => {
   beforeEach(() => {
     vi.stubEnv("AWJ_COMMERCE_API_URL", "http://awj-api.test");
-    vi.stubEnv("AWJ_STORE_TENANT_SLUG", "demo-tenant");
     vi.stubGlobal("fetch", vi.fn());
+    mocks.headers.mockClear();
   });
 
   afterEach(() => {
@@ -51,10 +58,11 @@ describe("commerce/categories", () => {
     expect(result.data[0].children).toHaveLength(1);
     expect(result.data[0].children?.[0].id).toBe("c2");
 
-    const [url] = vi.mocked(fetch).mock.calls[0];
-    expect(String(url)).toBe(
-      "http://awj-api.test/store/v1/demo-tenant/categories",
-    );
+    const [url, init] = vi.mocked(fetch).mock.calls[0];
+    expect(String(url)).toBe("http://awj-api.test/store/v1/categories");
+    expect(
+      (init?.headers as Record<string, string>)["X-Storefront-Forwarded-Host"],
+    ).toBe("shop.example.com");
   });
 
   it("returns an empty tree when the tenant has no categories", async () => {

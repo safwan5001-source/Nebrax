@@ -52,6 +52,29 @@ describe("mapAwjProductToViewModel", () => {
     ]);
   });
 
+  it("uses name_en when locale is English (COM-7-P2B)", () => {
+    const viewModel = mapAwjProductToViewModel(baseProduct(), "en");
+    expect(viewModel.name).toBe("Demo Product");
+  });
+
+  it("uses the Arabic name when locale is Arabic", () => {
+    const viewModel = mapAwjProductToViewModel(baseProduct(), "ar");
+    expect(viewModel.name).toBe("منتج تجريبي");
+  });
+
+  it("uses the Arabic name when no locale is passed at all", () => {
+    const viewModel = mapAwjProductToViewModel(baseProduct());
+    expect(viewModel.name).toBe("منتج تجريبي");
+  });
+
+  it("falls back to the Arabic name in English when name_en is null", () => {
+    const viewModel = mapAwjProductToViewModel(
+      baseProduct({ name_en: null }),
+      "en",
+    );
+    expect(viewModel.name).toBe("منتج تجريبي");
+  });
+
   it("carries the SKU onto a synthetic default variant (AWJ has no variant model)", () => {
     const viewModel = mapAwjProductToViewModel(baseProduct({ sku: "SKU-XYZ" }));
 

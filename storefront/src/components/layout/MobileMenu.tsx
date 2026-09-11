@@ -3,7 +3,7 @@
 import type { Category } from "@spree/sdk";
 import { ArrowLeft, ChevronRight, X } from "lucide-react";
 import Link from "next/link";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { RegionPreferences } from "@/components/layout/RegionPreferences";
@@ -15,6 +15,7 @@ import {
   SheetFooter,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { localeDirection } from "@/i18n/locales";
 
 type PanelType = { kind: "main" } | { kind: "category"; category: Category };
 
@@ -31,6 +32,9 @@ export function MobileMenu({
   wholesaleEnabled,
 }: MobileMenuProps) {
   const t = useTranslations("header");
+  // القائمة تُفتَح دائماً من حافة «البداية» بلا اعتماد على جانب فيزيائي ثابت
+  // — يمينٌ في العربية، يساراً في الإنجليزية.
+  const drawerSide = localeDirection(useLocale()) === "rtl" ? "right" : "left";
   const [open, setOpen] = useState(false);
   const [hasInteracted, setHasInteracted] = useState(false);
   const [panelStack, setPanelStack] = useState<PanelType[]>([{ kind: "main" }]);
@@ -146,7 +150,7 @@ export function MobileMenu({
       </Button>
 
       <SheetContent
-        side="left"
+        side={drawerSide}
         className="flex flex-col !gap-0 !rounded-none overflow-hidden max-md:!top-16 max-md:!h-[calc(100%-4rem)] max-md:!w-full max-md:!max-w-none max-md:!border-r-0"
         showCloseButton={false}
         overlayClassName="max-md:!top-16 max-md:!bg-transparent"
@@ -168,13 +172,13 @@ export function MobileMenu({
           <button
             type="button"
             onClick={popPanel}
-            className={`flex items-center gap-2 text-gray-700 hover:text-gray-900 text-base font-semibold cursor-pointer transition-all duration-300 ease-in-out absolute left-4 ${
+            className={`flex items-center gap-2 text-gray-700 hover:text-gray-900 text-base font-semibold cursor-pointer transition-all duration-300 ease-in-out absolute start-4 ${
               currentPanel.kind !== "main"
                 ? "translate-x-0 opacity-100"
                 : "translate-x-8 opacity-0 pointer-events-none"
             }`}
           >
-            <ArrowLeft className="w-5 h-5" />
+            <ArrowLeft className="w-5 h-5 rtl:rotate-180" />
             <span>
               {currentPanel.kind === "category"
                 ? currentPanel.category.name
@@ -225,7 +229,7 @@ export function MobileMenu({
                     className={categoryButtonClass}
                   >
                     <span>{category.name}</span>
-                    <ChevronRight className="w-4 h-4 text-gray-400" />
+                    <ChevronRight className="w-4 h-4 text-gray-400 rtl:rotate-180" />
                   </button>
                 ) : (
                   <Link
@@ -294,7 +298,7 @@ export function MobileMenu({
                     onClick={popPanel}
                     className="flex items-center gap-2 text-gray-700 hover:text-gray-900 py-2 text-base font-medium"
                   >
-                    <ArrowLeft className="w-5 h-5" />
+                    <ArrowLeft className="w-5 h-5 rtl:rotate-180" />
                     <span>{panel.category.name}</span>
                   </button>
                 </div>
@@ -312,7 +316,7 @@ export function MobileMenu({
                         className={categoryButtonClass}
                       >
                         <span>{child.name}</span>
-                        <ChevronRight className="w-4 h-4 text-gray-400" />
+                        <ChevronRight className="w-4 h-4 text-gray-400 rtl:rotate-180" />
                       </button>
                     ) : (
                       <Link

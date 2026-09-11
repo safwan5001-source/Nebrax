@@ -4,7 +4,7 @@ import { ShoppingBag, Trash, X } from "lucide-react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
 import { QuantityPickerField } from "@/components/cart/QuantityPickerField";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { useCart } from "@/contexts/CartContext";
+import { localeDirection } from "@/i18n/locales";
 import { trackRemoveFromCart, trackViewCart } from "@/lib/analytics/gtm";
 import { extractBasePath } from "@/lib/utils/path";
 
@@ -42,6 +43,9 @@ export function CartDrawer() {
   } = useCart();
   const t = useTranslations("cart");
   const tc = useTranslations("common");
+  // السلة تُفتَح دائماً من حافة «النهاية» — يساراً في العربية، يميناً في
+  // الإنجليزية — مطابقةً لموضع أيقونة السلة المعتاد في الترويسة.
+  const drawerSide = localeDirection(useLocale()) === "rtl" ? "left" : "right";
   const [expressProcessing, setExpressProcessing] = useState(false);
   const pathname = usePathname();
   const basePath = extractBasePath(pathname);
@@ -87,8 +91,8 @@ export function CartDrawer() {
       }}
     >
       <SheetContent
-        side="right"
-        className="data-[side=right]:w-full data-[side=right]:sm:max-w-md flex flex-col p-0 gap-0"
+        side={drawerSide}
+        className="w-full sm:max-w-md flex flex-col p-0 gap-0"
         showCloseButton={false}
         aria-describedby={undefined}
       >
@@ -208,7 +212,7 @@ export function CartDrawer() {
                           parseFloat(item.compare_at_amount) >
                             parseFloat(item.price) ? (
                             <>
-                              <span className="text-gray-400 line-through mr-2">
+                              <span className="text-gray-400 line-through me-2">
                                 {item.display_compare_at_amount}
                               </span>
                               <span className="text-red-600">

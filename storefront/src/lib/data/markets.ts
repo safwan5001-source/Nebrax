@@ -2,36 +2,48 @@
 
 import type { Market } from "@spree/sdk";
 import { cacheLife, cacheTag } from "next/cache";
+import { DEFAULT_LOCALE, resolveSupportedLocale } from "@/i18n/locales";
+import { fetchStorefrontDefaultLocale } from "@/lib/commerce/storefront";
 import { getClient, getLocaleOptions } from "@/lib/spree";
 import { getDefaultCountry } from "@/lib/store";
 
 /**
- * COM-7-P1: a single static AWJ Market, not a Spree Markets API call.
+ * COM-7-P1/P2B: a single static AWJ Market, not a Spree Markets API call.
  *
  * AWJ has no Market/multi-country/multi-currency concept — every tenant
  * is single-currency (`Tenant.currency`, SAR by default; see
  * AWJ_SPREE_TECHNICAL_FIT_AUDIT.md §3/§4) and Saudi Arabia is the only
  * market today (international expansion is an explicit future product
- * decision, not a COM-7-P1 concern — see AWJ_SPREE_ADMIN_SANDBOX_GAP_MAP.md
- * "الأسواق/الدول"). `default_locale`/`supported_locales` reflect what is
- * actually registered in `src/i18n/locales.ts` today (`ar` is not yet
- * registered — see AWJ_STORE_LANGUAGE_DECISION.md; adding it is
- * deliberately out of COM-7-P1's scope, not silently broken: the root
- * layout already falls back to `DEFAULT_LOCALE` for an unregistered
- * locale). This still only backs `getMarkets()`/`resolveCurrency()` (root
- * layout + catalog pricing display); `resolveMarket()`/`getMarketCountries()`
- * below remain Spree-backed and unused by any COM-7-P1 catalog page.
+ * decision, not a COM-7 concern — see AWJ_SPREE_ADMIN_SANDBOX_GAP_MAP.md
+ * "الأسواق/الدول"). `supported_locales` reflects what is actually
+ * registered in `src/i18n/locales.ts` (`ar`/`en` — the two AWJ_STORE_
+ * LANGUAGE_DECISION.md §1-2 requires). This still only backs
+ * `getMarkets()`/`resolveCurrency()` (root layout + catalog pricing
+ * display); `resolveMarket()`/`getMarketCountries()` below remain
+ * Spree-backed and unused by any AWJ catalog page.
  */
-function staticAwjMarket(): Market {
+async function resolveAwjDefaultLocale() {
+  try {
+    const configured = await fetchStorefrontDefaultLocale();
+    return resolveSupportedLocale(configured ?? undefined) ?? DEFAULT_LOCALE;
+  } catch {
+    // إعداد اللغة أدنى شأناً من فشل الكتالوج كاملاً — العربية سقوطٌ آمن دائماً
+    // (AWJ_COM_7_P2_STOREFRONT_DOMAIN_RESOLUTION_DECISION.md §9، القرار
+    // السابق: «العربية ليست مرحلة تعريب لاحقة»).
+    return DEFAULT_LOCALE;
+  }
+}
+
+async function staticAwjMarket(): Promise<Market> {
   return {
     id: "awj-sa",
     name: "AWJ Store — Saudi Arabia",
     currency: "SAR",
-    default_locale: "en",
+    default_locale: await resolveAwjDefaultLocale(),
     tax_inclusive: true,
     default: true,
     country_isos: [getDefaultCountry().toUpperCase()],
-    supported_locales: ["en"],
+    supported_locales: ["ar", "en"],
     countries: [
       {
         iso: getDefaultCountry().toUpperCase(),
@@ -68,7 +80,7 @@ export async function getMarkets(_options?: {
   locale?: string;
   country?: string;
 }): Promise<{ data: Market[] }> {
-  return { data: [staticAwjMarket()] };
+  return { data: [await staticAwjMarket()] };
 }
 
 export async function resolveMarket(country: string) {

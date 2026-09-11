@@ -6,10 +6,11 @@ import type {
   ProductFiltersResponse,
 } from "@spree/sdk";
 import { Check, X } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { localeDirection } from "@/i18n/locales";
 import {
   getActiveFilterCount,
   getAvailabilityLabel,
@@ -40,6 +41,7 @@ export function MobileFilterDrawer({
   onApply,
 }: MobileFilterDrawerProps) {
   const t = useTranslations("products");
+  const drawerSide = localeDirection(useLocale()) === "rtl" ? "right" : "left";
   const [stagedFilters, setStagedFilters] =
     useState<ActiveFilters>(activeFilters);
 
@@ -92,7 +94,7 @@ export function MobileFilterDrawer({
       }}
     >
       <SheetContent
-        side="left"
+        side={drawerSide}
         className="w-full max-w-sm flex flex-col p-0 gap-0"
         showCloseButton={false}
         aria-describedby={undefined}

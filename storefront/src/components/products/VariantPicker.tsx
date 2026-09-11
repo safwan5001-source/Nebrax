@@ -223,7 +223,7 @@ export function VariantPicker({
                     >
                       {optionValue?.label || value}
                       {!isPurchasable && isAvailable && (
-                        <span className="ml-1 text-xs text-gray-400">
+                        <span className="ms-1 text-xs text-gray-400">
                           {t("outOfStockVariant")}
                         </span>
                       )}

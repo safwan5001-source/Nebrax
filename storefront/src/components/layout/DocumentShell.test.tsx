@@ -38,4 +38,24 @@ describe("DocumentShell", () => {
 
     expect(document.props.dir).toBe("rtl");
   });
+
+  it("renders Arabic — AWJ Store's primary language — with lang=ar and dir=rtl", () => {
+    const document = DocumentShell({
+      children: <main>Storefront</main>,
+      locale: "ar",
+    });
+
+    expect(document.props.lang).toBe("ar");
+    expect(document.props.dir).toBe("rtl");
+  });
+
+  it("renders English with lang=en and dir=ltr", () => {
+    const document = DocumentShell({
+      children: <main>Storefront</main>,
+      locale: "en",
+    });
+
+    expect(document.props.lang).toBe("en");
+    expect(document.props.dir).toBe("ltr");
+  });
 });

@@ -2,12 +2,18 @@
  * AWJ Store data adapter — server-only configuration.
  *
  * This module is the ONLY place in the storefront that knows the AWJ
- * Commerce API's base URL and tenant resolution. Nothing else under
- * `src/lib/commerce/` or `src/lib/data/` talks to `fetch` against the AWJ
- * backend directly without going through `storefrontFetch()` below — see
+ * Commerce API's base URL and how the visitor's storefront identity is
+ * conveyed to it. Nothing else under `src/lib/commerce/` or `src/lib/data/`
+ * talks to `fetch` against the AWJ backend directly without going through
+ * `storefrontFetch()` below — see
  * docs/plans/store/AWJ_COM_7_SPREE_INTEGRATION_GATE.md §4 (the "AWJ Store
  * data/actions boundary" between the Spree-derived UI and the AWJ API).
  */
+
+import { headers } from "next/headers";
+
+const FORWARDED_HOST_HEADER = "X-Storefront-Forwarded-Host";
+const GATEWAY_SECRET_HEADER = "X-Storefront-Gateway-Secret";
 
 function getApiBaseUrl(): string {
   const raw = process.env.AWJ_COMMERCE_API_URL;
@@ -21,37 +27,59 @@ function getApiBaseUrl(): string {
 }
 
 /**
- * Resolves which tenant's storefront this Next.js deployment serves.
+ * Resolves the hostname the visitor actually used to reach this storefront —
+ * the production authority for Tenant/Storefront/SalesChannel resolution
+ * (COM-7-P2A/P2B), replacing COM-7-P1's provisional `AWJ_STORE_TENANT_SLUG`.
  *
- * **Provisional, single-tenant-per-deployment fallback — not the
- * production model.** COM-7-P0/P1 explicitly do not implement
- * hostname/domain-based multi-tenant resolution; that is COM-7-P2's job
- * (see AWJ_STOREFRONT_PLACEMENT_TENANT_RESOLUTION_DECISION.md §4, §11,
- * §12). This value is a fixed, server-only deployment variable —
- * `AWJ_STORE_TENANT_SLUG` is never read from `NEXT_PUBLIC_*`, a request
- * header, a cookie, or a query parameter, so nothing a browser sends can
- * change which tenant's catalog is served. It establishes no
- * multi-tenant *authority* (there is exactly one tenant per deployment,
- * chosen at deploy time by whoever configures the environment) — it only
- * lets COM-7-P1 validate the catalog adapter end-to-end against a real
- * AWJ tenant before real domain resolution exists.
+ * This reads the real `Host` header Next.js's own server received for this
+ * request (`next/headers`), exactly the value Laravel's own
+ * `$request->getHost()` would see if a browser hit it directly. Never a
+ * client-supplied header, cookie, query parameter, or locale — this is the
+ * literal transport-level Host of the request the visitor's browser made
+ * to reach *this* server, which nothing downstream of the browser can alter.
+ *
+ * `AWJ_STOREFRONT_DEV_HOST` is a **non-production-only** escape hatch for
+ * local development without real DNS/`StorefrontDomain` records pointing at
+ * this machine — mirroring the backend's own non-production-only
+ * `{tenantSlug}` route (`ResolveStorefrontTenant`). It is never read when
+ * `NODE_ENV === "production"`, so it can never become a production
+ * authority no matter how a deployment is misconfigured.
  */
-function getTenantSlug(): string {
-  const slug = process.env.AWJ_STORE_TENANT_SLUG;
-  if (!slug) {
+async function resolveVisitorHostname(): Promise<string> {
+  if (
+    process.env.NODE_ENV !== "production" &&
+    process.env.AWJ_STOREFRONT_DEV_HOST
+  ) {
+    return process.env.AWJ_STOREFRONT_DEV_HOST;
+  }
+
+  const requestHeaders = await headers();
+  const host = requestHeaders.get("host");
+  if (!host) {
     throw new Error(
-      "AWJ_STORE_TENANT_SLUG is not configured. COM-7-P1 resolves the storefront's tenant from a " +
-        "fixed, server-only deployment variable — real per-request hostname resolution is COM-7-P2.",
+      "Unable to resolve the storefront hostname: the incoming request carried no Host header.",
     );
   }
-  return slug;
+  return host;
+}
+
+/**
+ * The Next.js storefront server — not the browser — is the sole caller of
+ * `store/v1` in production, so the literal connection Host Laravel sees is
+ * always Laravel's own domain, never the visitor's. This shared secret lets
+ * Laravel trust an explicit forwarded-host header conveying the visitor's
+ * real hostname instead (see `config/storefront.php` on the backend for the
+ * full trust rationale). Never exposed to the browser — read only here,
+ * server-side, never via `NEXT_PUBLIC_*`.
+ */
+function getGatewaySecret(): string | undefined {
+  return process.env.STOREFRONT_GATEWAY_SECRET || undefined;
 }
 
 function buildStorefrontUrl(path: string): URL {
   const base = getApiBaseUrl();
-  const tenantSlug = getTenantSlug();
   const cleanPath = path.replace(/^\/+/, "");
-  return new URL(`${base}/store/v1/${tenantSlug}/${cleanPath}`);
+  return new URL(`${base}/store/v1/${cleanPath}`);
 }
 
 export class StorefrontApiError extends Error {
@@ -71,9 +99,9 @@ export type StorefrontQueryParams = Record<
 >;
 
 /**
- * Fetches from the AWJ Store public catalog API (`store/v1/{tenant}/...`).
+ * Fetches from the AWJ Store public catalog API (`store/v1/...`).
  * Anonymous, read-only — no auth header, matching the backend's
- * unauthenticated `ResolveStorefrontTenant` + rate-limited catalog routes.
+ * unauthenticated `ResolveStorefrontDomain` + rate-limited catalog routes.
  */
 export async function storefrontFetch<T>(
   path: string,
@@ -89,9 +117,17 @@ export async function storefrontFetch<T>(
     }
   }
 
-  const response = await fetch(url.toString(), {
-    headers: { Accept: "application/json" },
-  });
+  const hostname = await resolveVisitorHostname();
+  const requestHeaders: Record<string, string> = {
+    Accept: "application/json",
+    [FORWARDED_HOST_HEADER]: hostname,
+  };
+  const secret = getGatewaySecret();
+  if (secret) {
+    requestHeaders[GATEWAY_SECRET_HEADER] = secret;
+  }
+
+  const response = await fetch(url.toString(), { headers: requestHeaders });
 
   if (!response.ok) {
     let code = "http_error";
