@@ -4,7 +4,7 @@
 
 | Field | Value |
 |-------|-------|
-| PR | (to be opened) |
+| PR | [#769](https://github.com/safwan5001-source/Nebrax/pull/769) |
 | Branch | `claude/com-7-p2a-storefront-domain` |
 | Base SHA | `6f36400f26e0c0795f4e807f399af48ce58f66ed` (main) |
 | Head SHA | `6b1457f3f405bdc25a2d483f70915de74645c749` |
