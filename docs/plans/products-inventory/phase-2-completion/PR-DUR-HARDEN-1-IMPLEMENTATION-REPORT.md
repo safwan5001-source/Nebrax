@@ -231,7 +231,16 @@ No database migration, no schema change, no route added/removed, no accounting-r
 
 ## 17. CI
 
-Reported once available — see the PR for the exact Head SHA and run links.
+Both workflows passed on the final Head SHA `72f0ff4833b274783ff16cdbed69f0dfbd4bc0cb` (`pull_request`-triggered,
+PR #760):
+
+| Workflow | Run | Conclusion |
+|---|---|---|
+| CI (backend, PHP on SQLite+PostgreSQL) | [#4506](https://github.com/safwan5001-source/Nebrax/actions/runs/34609253993) | success |
+| Web CI (frontend tests + build) | [#2554](https://github.com/safwan5001-source/Nebrax/actions/runs/34609254014) | success |
+
+Backend CI passing confirms the `bcmath`-extension gap noted in §14 is genuinely local-sandbox-only — CI's own
+PostgreSQL+SQLite `php artisan test` run, which includes `FuelSupplyReceivingTest`, is green with no failures.
 
 ## 18. Risks / known limitations
 
