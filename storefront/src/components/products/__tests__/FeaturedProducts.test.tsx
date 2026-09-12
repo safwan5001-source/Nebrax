@@ -42,7 +42,7 @@ describe("FeaturedProducts (COM-7-PREVIEW-FIX-1)", () => {
 
     const { findByText, queryByTestId } = render(element);
     expect(queryByTestId("carousel")).toBeNull();
-    expect(await findByText("emptyCatalog")).toBeTruthy();
+    expect(await findByText("noProductsFound")).toBeTruthy();
   });
 
   it("passes through the fetched products on success", async () => {

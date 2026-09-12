@@ -63,9 +63,9 @@ export async function Header({
   storeName,
 }: HeaderProps) {
   const t = await getTranslations({ locale, namespace: "header" });
-  const home = await getTranslations({ locale, namespace: "home" });
+  const footer = await getTranslations({ locale, namespace: "footer" });
   const wholesaleEnabled = isWholesaleEnabled();
-  const displayName = storeName?.trim() || home("identityFallback");
+  const displayName = storeName?.trim() || footer("shop");
 
   return (
     <SearchToggle
@@ -81,8 +81,6 @@ export async function Header({
       }
       rightStart={
         <div className="hidden lg:flex lg:items-center lg:gap-1">
-          {/* Trade portal entry point — understated, secondary to the catalog nav.
-              Only shown when the wholesale addon is enabled. */}
           {wholesaleEnabled && (
             <Link
               href={`${basePath}/wholesale`}
@@ -96,7 +94,6 @@ export async function Header({
       }
       rightEnd={
         <>
-          {/* Account - desktop only */}
           <div className="hidden md:block">
             <Button variant="ghost" size="icon-lg" asChild>
               <Link href={`${basePath}/account`} aria-label={t("account")}>
@@ -104,8 +101,6 @@ export async function Header({
               </Link>
             </Button>
           </div>
-
-          {/* Cart */}
           <CartButton />
         </>
       }
