@@ -30,9 +30,7 @@ export async function HeroSection({
           <h1 className="text-3xl md:text-5xl font-bold tracking-tight text-gray-900">
             {t("welcome", { storeName: displayName })}
           </h1>
-          <p className="mt-4 text-lg text-gray-600">
-            {t("heroDescription", { storeName: displayName })}
-          </p>
+          <p className="mt-4 text-lg text-gray-600">{t("qualityDescription")}</p>
           <div className="mt-8 flex flex-wrap gap-4">
             <Button size="lg" asChild>
               <Link href={`${basePath}/products`}>{t("shopNow")}</Link>

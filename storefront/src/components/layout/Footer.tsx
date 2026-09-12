@@ -43,6 +43,7 @@ export async function Footer({
   const tp = await getTranslations({ locale, namespace: "policies" });
   const wholesaleEnabled = isWholesaleEnabled();
   const displayName = storeName?.trim() || t("shop");
+  const year = new Date().getFullYear();
 
   return (
     <footer className="bg-primary text-gray-300">
@@ -50,7 +51,6 @@ export async function Footer({
         <div className="grid grid-cols-1 gap-8 md:grid-cols-5">
           <div className="col-span-1 md:col-span-2">
             <span className="text-xl font-bold text-white">{displayName}</span>
-            <p className="mt-4 text-sm text-neutral-400">{t("description")}</p>
           </div>
           <div>
             <h3 className="text-sm font-medium text-neutral-300">{t("shop")}</h3>
@@ -127,10 +127,7 @@ export async function Footer({
         </div>
         <div className="mt-8 pt-8 border-t border-neutral-800 text-xs text-neutral-400 text-center">
           <p>
-            {t("copyright", {
-              year: new Date().getFullYear(),
-              storeName: displayName,
-            })}
+            © {year} {displayName}
           </p>
         </div>
       </div>
