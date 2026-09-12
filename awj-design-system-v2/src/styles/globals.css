@@ -1,0 +1,87 @@
+/* تكييف للبناء المستقل فقط: التطبيق الأصلي يحمّل هذين الخطين ذاتياً عبر
+ * `next/font` (آلية خاصة بـ Next.js تنتج متغيّر CSS مُجزَّأ الاسم)، وهذه الحزمة
+ * ليست تطبيق Next.js. النتيجة البصرية نفسها — IBM Plex Sans Arabic / IBM Plex
+ * Mono، لا خط بديل — محمَّلة هنا عبر Google Fonts بدلاً من ذلك.
+ * ملاحظة: `@import` يجب أن يسبق كل قاعدة أخرى (بما فيها `@tailwind`) وإلا أُسقط صامتاً. */
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+/* اتجاه التصميم: «المكتب الواثق» — تباين هادئ، تركيز صريح، وحركة تحترم تفضيل المستخدم.
+ * منسوخ حرفياً من web/src/app/globals.css (طبقة التوكِن + الأساس فقط) —
+ * قواعد الطباعة/الإيصال الحراري/تراكيب المستندات الخاصة بتطبيق AWJ لا تخص هذه الحزمة. */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #f6f7f9;
+  --surface: #ffffff;
+  --text: #15181d;
+  --muted: #6b7280;
+  --border: #eceef1;
+  --border-channel: 236 238 241;
+  --primary: #1e40af;
+  --primary-hover: #1e3a8a;
+  --primary-soft: #eef2ff;
+  --primary-soft-channel: 238 242 255;
+  --primary-foreground: #ffffff;
+  --positive: #166534;
+  --positive-channel: 22 101 52;
+  --negative: #b91c1c;
+  --negative-channel: 185 28 28;
+  --warning: #92400e;
+  --warning-channel: 146 64 14;
+  --flag-saudi: #006c35;
+  --flag-mark: #ffffff;
+  --font-sans: 'IBM Plex Sans Arabic', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+}
+
+.dark {
+  --background: #0e1014;
+  --surface: #181b20;
+  --text: #f3f4f6;
+  --muted: #9099a5;
+  --border: #262a31;
+  --border-channel: 38 42 49;
+  --primary: #4f8cff;
+  --primary-hover: #6ba0ff;
+  --primary-soft: #1b2740;
+  --primary-soft-channel: 27 39 64;
+  --primary-foreground: #0e1014;
+  --positive: #16a34a;
+  --positive-channel: 22 163 74;
+  --negative: #f87171;
+  --negative-channel: 248 113 113;
+  --warning: #d97706;
+  --warning-channel: 217 119 6;
+  --flag-saudi: #006c35;
+  --flag-mark: #ffffff;
+}
+
+@layer base {
+  body {
+    background-color: var(--background);
+    color: var(--text);
+    font-family: var(--font-sans);
+  }
+  :where(a[href], button, input, select, textarea, summary):focus-visible {
+    outline: 3px solid var(--primary);
+    outline-offset: 3px;
+  }
+  /* الأرقام المالية والأكواد بخط Mono ومحاذاة عمودية */
+  .num {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation: none;
+    transition-duration: 0.01ms !important;
+  }
+}
