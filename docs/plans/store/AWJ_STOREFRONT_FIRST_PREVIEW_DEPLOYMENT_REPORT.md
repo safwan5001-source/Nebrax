@@ -149,7 +149,7 @@ No application code changed, so the existing `php artisan test` (68 passed, from
 | Field | Value |
 |---|---|
 | Branch | `claude/storefront-preview-deploy` |
-| PR | *(added after opening — see next commit)* |
+| PR | [#777](https://github.com/safwan5001-source/Nebrax/pull/777) |
 | Base SHA | `a4b614fd0a893296236fefba2db02e29e65b8c1d` (main) |
 | Head SHA | `b605ded6af616b6c420a47a09b6d212afc3b7ef1` |
 | Deployment identifier | **None — no deployment occurred** |
