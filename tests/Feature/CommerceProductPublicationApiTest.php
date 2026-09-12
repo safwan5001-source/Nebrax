@@ -76,6 +76,7 @@ class CommerceProductPublicationApiTest extends TestCase
     public function tenant_a_cannot_publish_its_product_to_tenant_b_store(): void
     {
         $a = $this->registerTenant('pub-a2', 'pub-a2@example.test');
+        app(TenantContext::class)->forget();
         $b = $this->registerTenant('pub-b2', 'pub-b2@example.test');
         $sceneA = $this->seedProductAndStore($a['tenant_id'], 'a2');
         $sceneB = $this->seedProductAndStore($b['tenant_id'], 'b2');
@@ -96,6 +97,7 @@ class CommerceProductPublicationApiTest extends TestCase
     public function tenant_a_cannot_read_or_mutate_tenant_b_product_publication(): void
     {
         $a = $this->registerTenant('pub-a3', 'pub-a3@example.test');
+        app(TenantContext::class)->forget();
         $b = $this->registerTenant('pub-b3', 'pub-b3@example.test');
         $this->seedProductAndStore($a['tenant_id'], 'a3');
         $sceneB = $this->seedProductAndStore($b['tenant_id'], 'b3');
