@@ -1,5 +1,6 @@
 import type { Category } from "@spree/sdk";
 import Link from "next/link";
+import { connection } from "next/server";
 import { getTranslations } from "next-intl/server";
 import type { ReactNode } from "react";
 import { POLICY_LINKS } from "@/lib/constants/policies";
@@ -43,6 +44,7 @@ export async function Footer({
   const tp = await getTranslations({ locale, namespace: "policies" });
   const wholesaleEnabled = isWholesaleEnabled();
   const displayName = storeName?.trim() || t("shop");
+  await connection();
   const year = new Date().getFullYear();
 
   return (
