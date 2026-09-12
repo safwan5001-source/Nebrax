@@ -52,15 +52,20 @@ final class CommerceProductPublicationService
         $this->assertProductTenant($product, $tenantId);
 
         $storefronts = $this->webStorefronts($tenantId);
-        $authorizedIds = $storefronts->pluck('id')->all();
-        $requestedIds = array_values(array_unique($storefrontIds));
+        $authorizedIds = $storefronts->pluck('id')->map(fn ($id) => (string) $id)->all();
+        $requestedIds = array_values(array_unique(array_map('strval', $storefrontIds)));
 
-        if (array_diff($requestedIds, $authorizedIds) !== []) {
-            abort(422, 'أحد المتاجر المحددة غير متاح لهذا المستأجر.');
+        // Collection::whereIn() uses loose comparison. Validate the raw requested ids
+        // strictly against the tenant-authorized set before resolving sales channels so a
+        // foreign storefront can never be silently ignored or coerced into a valid choice.
+        foreach ($requestedIds as $requestedId) {
+            if (! in_array($requestedId, $authorizedIds, true)) {
+                abort(422, 'أحد المتاجر المحددة غير متاح لهذا المستأجر.');
+            }
         }
 
         $requestedChannelIds = $storefronts
-            ->whereIn('id', $requestedIds)
+            ->filter(fn (Storefront $storefront) => in_array((string) $storefront->id, $requestedIds, true))
             ->pluck('sales_channel_id')
             ->all();
         $webChannelIds = $storefronts->pluck('sales_channel_id')->all();
