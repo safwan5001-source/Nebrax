@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Requests\LoginRequest;
 use App\Http\Requests\RegisterRequest;
+use App\Mail\AuthActionMail;
 use App\Models\Branch;
 use App\Models\Warehouse;
 use App\Models\Tenant;
@@ -13,6 +14,7 @@ use App\Models\User;
 use App\Services\Accounting\CashBankAccountService;
 use App\Services\Accounting\ChartOfAccountsSeeder;
 use App\Services\TenantReferenceNumberService;
+use App\Services\AuthRecoveryService;
 use App\Support\PlanGate;
 use App\Support\Rbac;
 use App\Tenancy\HostnameTenantContext;
@@ -21,6 +23,9 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Validation\ValidationException;
+use Throwable;
 
 class AuthController extends ApiController
 {
@@ -94,6 +99,13 @@ class AuthController extends ApiController
             return [$tenant, $user];
         });
 
+        try {
+            $verificationToken = app(AuthRecoveryService::class)->issue($user, AuthRecoveryService::EMAIL_VERIFICATION);
+            Mail::to($user->email)->send(new AuthActionMail('verify', rtrim((string) env('FRONTEND_URL', ''), '/') . '/verify-email?token=' . urlencode($verificationToken)));
+        } catch (Throwable $exception) {
+            report($exception);
+        }
+
         return response()->json([
             'token'  => $this->issueToken($user),
             'user'   => $this->userPayload($user),
@@ -142,6 +154,68 @@ class AuthController extends ApiController
             'token' => $this->issueToken($user),
             'user'  => $this->userPayload($user),
         ]);
+    }
+
+    public function forgotPassword(Request $request, AuthRecoveryService $recovery): JsonResponse
+    {
+        $data = $request->validate(['email' => ['required', 'email', 'max:255']]);
+        $query = User::where('email', $data['email'])->where('is_active', true);
+        if ($tenantId = app(HostnameTenantContext::class)->id()) {
+            $query->where('tenant_id', $tenantId);
+        }
+        if ($user = $query->first()) {
+            try {
+                $token = $recovery->issue($user, AuthRecoveryService::PASSWORD_RESET);
+                Mail::to($user->email)->send(new AuthActionMail('reset', rtrim((string) env('FRONTEND_URL', ''), '/') . '/reset-password?token=' . urlencode($token)));
+            } catch (Throwable $exception) {
+                report($exception);
+            }
+        }
+
+        return response()->json(['message' => 'إذا كان الحساب موجوداً لهذا البريد، فقد أُرسلت تعليمات الاسترداد.']);
+    }
+
+    public function resetPassword(Request $request, AuthRecoveryService $recovery): JsonResponse
+    {
+        $data = $request->validate([
+            'token' => ['required', 'string', 'size:64'],
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
+        ]);
+        $user = $recovery->consume($data['token'], AuthRecoveryService::PASSWORD_RESET);
+        if (! $user) {
+            throw ValidationException::withMessages(['token' => 'رابط الاسترداد غير صالح أو منتهي الصلاحية.']);
+        }
+        $user->forceFill(['password' => $data['password']])->save();
+        $user->tokens()->delete();
+
+        return response()->json(['message' => 'تم تحديث كلمة المرور. يمكنك تسجيل الدخول الآن.']);
+    }
+
+    public function resendVerification(Request $request, AuthRecoveryService $recovery): JsonResponse
+    {
+        $user = $request->user();
+        if ($user->email_verified_at === null) {
+            try {
+                $token = $recovery->issue($user, AuthRecoveryService::EMAIL_VERIFICATION);
+                Mail::to($user->email)->send(new AuthActionMail('verify', rtrim((string) env('FRONTEND_URL', ''), '/') . '/verify-email?token=' . urlencode($token)));
+            } catch (Throwable $exception) {
+                report($exception);
+            }
+        }
+
+        return response()->json(['message' => 'إذا كان الحساب يحتاج إلى التحقق، فقد أُرسلت رسالة التحقق.']);
+    }
+
+    public function verifyEmail(Request $request, AuthRecoveryService $recovery): JsonResponse
+    {
+        $data = $request->validate(['token' => ['required', 'string', 'size:64']]);
+        $user = $recovery->consume($data['token'], AuthRecoveryService::EMAIL_VERIFICATION);
+        if (! $user) {
+            throw ValidationException::withMessages(['token' => 'رابط التحقق غير صالح أو منتهي الصلاحية.']);
+        }
+        $user->forceFill(['email_verified_at' => now()])->save();
+
+        return response()->json(['message' => 'تم تأكيد البريد الإلكتروني بنجاح.']);
     }
 
     public function logout(Request $request): JsonResponse
