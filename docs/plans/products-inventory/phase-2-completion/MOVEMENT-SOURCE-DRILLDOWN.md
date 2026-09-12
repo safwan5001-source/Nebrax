@@ -1,24 +1,51 @@
 # Inventory Movement Source Drilldown
 
-**Status:** PLANNED
+**Status:** IN PROGRESS — PR-INV-MOV-1 resolver foundation implemented on `feat/pr-inv-mov-1-movement-source-resolver` (not merged).
 
 ## Goal
 Make each inventory movement operationally explainable from the Inventory Workspace while preserving authorization and cost redaction.
 
 ## Contract
-Movement source_type/source_id remains durable domain provenance. A resolver maps supported source classes to safe labels/routes/resources. Unknown/legacy source remains displayable as movement without unsafe generic model loading.
+Movement `source_type`/`source_id` remains durable domain provenance. A centralized resolver maps supported source classes to safe labels/routes/resources. Unknown/legacy source remains displayable as a movement without unsafe generic model loading.
 
-## Security
-TenantScope first; then source-specific branch/warehouse authorization. Cost fields use PR-INV-1 policy. A movement visible in an allowed warehouse must not automatically reveal an otherwise inaccessible source document.
+## What PR-INV-MOV-1 implemented
 
-## Supported domains
-Inventory Opening, invoice/sale, purchase receipt, sales/purchase returns, Stock Permit, Stocktake and future tracked/reservation-related stock-moving sources as applicable. Reservation itself is not a movement source because it does not move stock.
+Read-only enrichment of `GET /api/inventory/{productId}/movements`.
 
-## UX
-From movement row: source type/number/date, safe status/context and explicit Open Source action when authorized. No duplicated document editor inside inventory history.
+Central resolver: `App\\Support\\Inventory\\MovementSourceResolver`.
 
-## Extensibility
-New stock-moving domain must register source resolution and lifecycle classification as part of DoD. Avoid switch statements scattered across controllers/resources.
+Persisted `source_type` values are Eloquent FQCN strings written by existing posting services. The API never returns those class names.
 
-## Acceptance
-Every known source resolves deterministically; inaccessible source returns safe non-leaking behavior; unknown source does not crash; no drilldown action changes stock/GL; cost redaction is preserved.
+### Supported persisted values
+
+| persisted source_type | public type | authorization | route when authorized |
+|---|---|---|---|
+| `App\\Models\\Invoice` | `invoice` | `invoices.view` + branch assignment | `/invoices/{id}` |
+| `App\\Models\\Purchase` | `purchase` | `purchases.view` + branch assignment | `/purchases/{id}` |
+| `App\\Models\\ReturnDocument` (`type=sales`) | `sales_return` | `returns.view` + branch/warehouse assignment | `/returns/{id}` |
+| `App\\Models\\ReturnDocument` (other) | `purchase_return` | `returns.view` + branch/warehouse assignment | `/purchase-returns/{id}` |
+| `App\\Models\\InventoryOpening` | `inventory_opening` | `products.view` | `/inventory-openings/{id}` |
+| `App\\Models\\StockPermit` | `stock_permit` | `products.view` + branch/warehouse assignment | `/stock-permits/{id}` |
+| `App\\Models\\Stocktake` | `stocktake` | `products.view` + branch/warehouse assignment | `/stocktaking/{id}` |
+
+### Unauthorized source
+Movement remains visible. Response includes generic `type` + `label` only. `reference`, `date`, `status`, `route` are null and `can_open` is false.
+
+### Unknown / missing / cross-tenant
+`type=unknown`, `can_open=false`, no route, no foreign reference. TenantScope prevents loading another tenant's document.
+
+### API metadata
+Existing movement fields are unchanged. Added:
+
+`source: { type, label, reference, date, status, can_open, route }`
+
+No cost/value fields on `source`. Movement costs still follow `SensitiveCostPolicy`.
+
+### Not supported in this PR
+Fuel sale / fuel delivery / fuel reconciliation movements fall through the unknown fallback. Reservations are not movement sources.
+
+## Tests
+`tests/Feature/InventoryMovementSourceTest.php`
+
+## Deferred
+Forbidden `warehouse_id` workspace-filter semantics remain deferred and are not used by this endpoint.

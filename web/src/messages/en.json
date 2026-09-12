@@ -2008,7 +2008,9 @@
     "export_working": "Preparing the file…",
     "export_success": "The file is ready and the download has started.",
     "export_failed": "Could not prepare the export file.",
-    "export_demo_unavailable": "Downloads are unavailable in preview mode. Sign in with a real account to export an actual file."
+    "export_demo_unavailable": "Downloads are unavailable in preview mode. Sign in with a real account to export an actual file.",
+    "source": "Source",
+    "open_source": "Open source"
   },
   "invoiceDetail": {
     "back": "Back",
