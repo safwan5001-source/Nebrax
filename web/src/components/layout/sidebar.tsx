@@ -156,6 +156,13 @@ const GROUPS: NavGroup[] = [
     })),
   },
   {
+    title: 'ecommerce',
+    icon: ShoppingCart,
+    items: [
+      { href: '/commerce', icon: ShoppingCart, key: 'ecommerce', built: true },
+    ],
+  },
+  {
     title: 'customers',
     icon: Users,
     items: [
@@ -337,10 +344,10 @@ const GROUPS: NavGroup[] = [
  * الخافت يقسمها إلى أربع كتل تُمسَح بنظرة. **هو عنوان لا زرّ**: لا يُفتح ولا
  * يُطوى ولا يُنقر — وإلا صار مستوى ثالثاً في شجرة عمقُها اثنان يكفيان.
  *
- * التغطية كاملة بلا بقايا: ٣ + ٤ + ٣ + ٣ = ١٣.
+ * التغطية كاملة بلا بقايا: ٤ + ٤ + ٣ + ٣ = ١٤.
  */
 const SUPER_GROUPS: { label: string; titles: string[] }[] = [
-  { label: 'revenue', titles: ['sales', 'pos', 'customers'] },
+  { label: 'revenue', titles: ['sales', 'pos', 'ecommerce', 'customers'] },
   { label: 'operations', titles: ['inventory', 'purchases', 'logistics', 'fuelStations'] },
   { label: 'finance', titles: ['accounting', 'finance', 'hr', 'operations'] },
   { label: 'admin', titles: ['branches', 'settings', 'developer'] },

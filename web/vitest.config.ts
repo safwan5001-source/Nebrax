@@ -33,6 +33,8 @@ export default defineConfig({
       // مجلد Next.js route group لا يطابقها micromatch حرفياً كنمط ثابت.
       ['src/app/**/pos/**/*.test.tsx', 'jsdom'],
       ['src/app/(app)/inventory/**/*.test.tsx', 'jsdom'],
+      ['src/app/**/commerce/**/*.test.tsx', 'jsdom'],
+      ['src/components/commerce-workspace/**/*.test.tsx', 'jsdom'],
       ['src/app/(app)/accounts/**/*.test.tsx', 'jsdom'],
       ['src/app/platform/tenants/**/*.test.tsx', 'jsdom'],
     ],
