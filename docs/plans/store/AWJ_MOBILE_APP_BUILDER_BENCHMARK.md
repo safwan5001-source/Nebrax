@@ -13,154 +13,49 @@ A ready-made standalone storefront application may still be useful for a specifi
 
 ## 2. Commercial benchmark direction
 
-The benchmark is based on documented behavior of established commerce platforms and mobile app builders. No single platform is the complete reference; AWJ should combine the strongest patterns while keeping AWJ's own commerce model and product constraints.
+No single platform is the complete reference. Current lessons:
 
-### 2.1 Salla — regional merchant journey
-
-Use as a primary regional reference for:
-
-- merchant-facing mobile app builder workflow;
-- branded iOS/Android applications;
-- configurable home-page elements and templates;
-- navigation and launch/welcome screens;
-- in-builder application preview;
-- publishing / launch workflow;
-- ability to update significant presentation configuration without requiring a new store release for every visual change.
-
-### 2.2 Zid — unified commerce administration
-
-Use as a reference for the principle that the mobile application must not become a second commerce-management system:
-
-- products, categories, orders, payments, shipping, and other commerce data continue to be managed through the main platform;
-- the mobile application is a customer-facing sales channel over the existing commerce platform;
-- merchant operations should remain unified rather than duplicated in a separate app-management back office.
-
-### 2.3 Tapcart — primary architecture/product reference
-
-Tapcart is currently the strongest benchmark for the **overall builder architecture and extensibility model**.
-
-Patterns to study/adapt:
-
-- App Studio based on reusable blocks;
-- add/remove/reorder components;
-- navigation and branding controls;
-- multi-page layouts;
-- saved/duplicated experience versions;
-- scheduled publishing;
-- ability to target/differentiate experiences where appropriate;
-- developer extensibility through custom blocks/components;
-- separation between developer-defined component capabilities and merchant-editable properties.
-
-A particularly important pattern is the two-layer model:
-
-1. **Merchant layer:** visual/no-code editing.
-2. **Developer layer:** SDK/tooling for defining new commerce-aware blocks and the properties merchants are allowed to configure.
-
-AWJ should preserve this extensibility direction even if a public/custom developer SDK is not part of V1.
-
-### 2.4 OneMobile — screen + blocks simplicity
-
-Use as a reference for a simple mental model for merchants:
-
-> Select screen → add blocks → configure properties → preview.
-
-Relevant patterns include:
-
-- explicit screen selection (Home, Search, Product Details, Cart, Account, etc.);
-- commerce-oriented blocks;
-- direct manipulation/reordering;
-- block-level image/text/layout/spacing configuration;
-- custom screens as a possible later capability.
-
-This model is preferable to presenting merchants with a generic concept of “building an app.”
-
-### 2.5 Shopney — preview and release boundary
-
-Use as a primary reference for:
-
-- drag-and-drop composition;
-- commerce-oriented blocks and sections;
-- live/mobile preview;
-- reusable layouts/showcases;
-- testing the experience before launch;
-- separation between remotely configurable experience changes and changes that require a new application binary/version.
-
-A key lesson is that design/navigation/merchandising changes should be remotely publishable when technically and policy-wise appropriate, while binary/native changes follow a separate application release lifecycle.
-
-### 2.6 Vajro / Superfans — widgets and scheduling
-
-Use as a reference for:
-
-- Theme / Branding / Content / Navigation separation;
-- commerce widgets such as product grids/sliders, banners, image grids, video, countdowns, etc.;
-- widget operations such as duplicate, hide, delete, and schedule;
-- scheduled merchandising content.
-
-Scheduling is strategically useful for campaigns such as seasonal offers, launches, and time-limited promotions.
-
-### 2.7 Shopify ecosystem
-
-Use the Shopify Mobile App Builder ecosystem as a wider competitive benchmark for:
-
-- drag-and-drop mobile storefront editors;
-- push notifications;
-- templates;
-- merchandising components;
-- app publishing and lifecycle management;
-- mature third-party builder UX patterns;
-- extensibility and integrations.
-
-Further deep review may include Tapcart, Vajro/Superfans, OneMobile, Shopney, and other high-quality Shopify mobile app builders where they expose useful architecture/product behavior.
+- **Salla:** regional merchant journey, templates, preview, launch/publishing workflow.
+- **Zid:** unified commerce administration; the app must not become a second product/order/payment management system.
+- **Tapcart:** strongest current reference for builder architecture, reusable blocks, extensibility, versions and publishing.
+- **OneMobile:** merchant-friendly Screen → Blocks → Properties → Preview mental model.
+- **Shopney:** strong preview model and clear separation between remotely configurable experience changes and application binary updates.
+- **Vajro / Superfans:** commerce widgets, content controls, scheduling and navigation.
+- **Shopify ecosystem:** broad competitive reference for mobile builders, push, integrations and mature editor patterns.
 
 ## 3. Product principle
 
-**AWJ App Builder is not a generic no-code application builder.**
+**AWJ App Builder is not a generic no-code application builder.** It is a specialized mobile-commerce experience builder tightly integrated with AWJ Store.
 
-It should be a specialized mobile-commerce experience builder tightly integrated with AWJ Store.
+When a merchant inserts a `Products` block, they should not configure an API endpoint. AWJ already knows the tenant's products, categories, prices, availability and commerce configuration.
 
-For example, when a merchant inserts a `Products` block, they should not configure an API endpoint. AWJ already knows the tenant's products, categories, prices, availability, and commerce configuration.
+Commerce operations remain backed by AWJ Store capabilities, including products, customers, inventory, pricing, orders, payments, shipping and related business data.
 
-The builder should expose business-aware choices such as:
-
-- select category;
-- select collection/product set;
-- featured products;
-- offers/promotions;
-- brands;
-- banners and calls to action;
-- navigation destinations.
-
-Commerce operations remain backed by AWJ Store capabilities, including products, customers, inventory, pricing, orders, payments, shipping, and related business data.
-
-## 4. Proposed architecture direction
-
-The current direction is composed of four major parts.
+## 4. Architecture direction
 
 ### 4.1 Visual Experience Builder
 
-Merchant-facing workspace for composing the application experience:
+Merchant-facing workspace:
 
 - screens/pages;
 - sections/blocks;
-- drag and drop/reordering;
-- block properties;
+- drag/drop and reordering;
+- property inspector;
 - navigation;
-- themes and branding;
-- visibility controls;
-- scheduling where applicable;
+- themes/branding;
+- visibility and scheduling;
 - live mobile preview;
-- draft/save/publish workflow;
+- draft/save/publish;
 - experience version history.
 
-A conceptual workspace:
+Conceptually:
 
 ```text
 ┌─────────────────────────────────────────────┐
 │ Home | Search | Product | Cart | Account    │
 ├────────────┬───────────────────┬────────────┤
 │ BLOCKS     │                   │ PROPERTIES │
-│            │    LIVE PREVIEW   │            │
-│ Banner     │                   │ Content    │
+│ Banner     │    LIVE PREVIEW   │ Content    │
 │ Products   │     ┌───────┐     │ Layout     │
 │ Categories │     │ Phone │     │ Spacing    │
 │ Slider     │     │       │     │ Visibility │
@@ -171,100 +66,167 @@ A conceptual workspace:
 Branding | Navigation | Push | Releases
 ```
 
-This is a conceptual product model, not a locked visual specification.
+This is conceptual, not a locked visual specification.
 
-### 4.2 App Experience Schema
+### 4.2 AWJ Experience Contract / Schema
 
-The builder should produce a structured, versioned representation of the application experience rather than hard-coding a unique application for every merchant.
-
-Conceptually:
+The builder should produce a structured, versioned contract rather than hard-coding a unique application per merchant.
 
 ```text
 Merchant edits experience
         ↓
 AWJ App Builder
         ↓
-Versioned App Experience Schema
+Versioned AWJ Experience Contract
         ↓
-Save / Preview / Publish
+Validate → Save → Preview → Publish
         ↓
 AWJ Store API
         ↓
-Mobile Commerce Runtime
+Trusted Mobile Commerce Runtime
 ```
 
-JSON or an equivalent structured format is a candidate representation. The exact schema and storage model are **not yet decided**.
+The exact serialized format is not decided. JSON is a candidate, but the important decision is that the contract is **typed, versioned, validated and capability-limited**.
 
-The schema should be designed for compatibility/version evolution rather than allowing arbitrary unversioned configuration.
+Candidate conceptual node:
 
-### 4.3 Mobile Commerce Runtime
+```text
+Component
+├── id
+├── type
+├── typed props
+├── children
+├── visibility
+├── data binding reference
+└── controlled action reference
+```
 
-A reusable iOS/Android runtime interprets the published experience configuration and renders the merchant's storefront while communicating with AWJ Store APIs.
+### 4.3 Trusted Mobile Commerce Runtime
 
-This runtime should provide the native/mobile commerce capabilities that should not be recreated by the visual editor itself, such as:
+A reusable iOS/Android runtime interprets only supported AWJ Experience Contract capabilities.
+
+The runtime owns trusted commerce behavior:
 
 - authentication/customer session;
-- catalog and product details;
-- cart and checkout;
+- catalog/product behavior;
+- cart;
+- checkout;
+- payments;
 - orders;
-- payment integrations;
-- shipping/delivery experience;
+- shipping/delivery;
 - push notifications;
 - deep links;
 - device/platform integrations.
 
-The runtime technology (Flutter, React Native, native, or another approach) is **not decided**.
+The runtime technology (Flutter, React Native, native, or another approach) remains undecided.
 
 ### 4.4 AWJ Store API
 
-AWJ remains the commerce source of truth. The application builder and runtime must respect existing AWJ requirements for:
+AWJ remains the commerce source of truth. The builder/runtime must preserve:
 
 - tenant isolation;
 - authorization;
 - data integrity;
 - inventory consistency;
-- pricing and tax rules;
+- pricing/tax rules;
 - backward compatibility;
 - secure customer access.
 
-The mobile app builder must not introduce an independent copy of core commerce data unless a deliberately designed cache/read model is required.
+The builder must not create an independent copy of core commerce data unless a deliberately designed cache/read model is required.
 
-## 5. Block model and future extensibility
+## 5. Security boundary — server controls experience, runtime controls behavior
 
-AWJ should ship with a curated library of official commerce blocks. The exact V1 list is not yet decided, but candidate categories include:
+This is now a core architecture direction.
 
-- banners and sliders;
+**The server-driven contract may control presentation and approved experience configuration, but it must not be allowed to inject arbitrary business logic.**
+
+Preferred boundary:
+
+```text
+AWJ Server / Builder
+   │
+   ├── layout
+   ├── section ordering
+   ├── content
+   ├── approved navigation
+   ├── visual properties
+   ├── visibility
+   └── scheduling
+            ↓
+     Experience Contract
+            ↓
+┌─────────────────────────┐
+│ Trusted AWJ App Runtime │
+├─────────────────────────┤
+│ Products                │
+│ Cart                    │
+│ Checkout                │
+│ Payments                │
+│ Customer                │
+│ Orders                  │
+│ Shipping                │
+└─────────────────────────┘
+```
+
+For example, the contract may request an approved `CheckoutButton`, but it must not provide arbitrary payment execution logic. `CheckoutButton` behavior remains compiled, reviewed AWJ runtime code subject to AWJ rules.
+
+This boundary is particularly important for payment, authentication, tenant isolation, authorization, pricing/tax and other sensitive operations.
+
+## 6. Runtime contract safeguards
+
+Current recommended safeguards for the eventual AWJ runtime:
+
+### 6.1 Versioned schema
+
+Every published experience must identify a supported schema/contract version. Runtime compatibility must be explicit rather than inferred.
+
+### 6.2 Allowlisted Component Registry
+
+The runtime renders only component types registered in the shipped AWJ runtime. Unknown/arbitrary component types must not gain execution capability.
+
+### 6.3 Typed properties
+
+Component properties should be validated against explicit definitions. Avoid arbitrary untyped property bags where security or compatibility can be affected.
+
+### 6.4 Controlled actions
+
+Actions should resolve through an approved action/capability registry rather than arbitrary executable expressions or remote code.
+
+### 6.5 Compatibility validation
+
+Publishing should verify that the target runtime/app version supports the requested schema version, components, properties and capabilities.
+
+### 6.6 Safe fallback behavior
+
+The contract/runtime design must define behavior for unsupported components or newer schema capabilities. A malformed/new experience must not unnecessarily break the entire storefront.
+
+## 7. Block model and extensibility
+
+AWJ should ship a curated official commerce block library. Candidate categories:
+
+- banners/sliders;
 - category grids/lists;
 - product grids/sliders;
 - featured/recommended products;
 - brands;
 - image + CTA;
 - video;
-- countdown/campaign blocks;
+- countdown/campaign;
 - promotional content;
 - navigation shortcuts.
 
-The architecture should allow AWJ to add new blocks without redesigning the builder.
+The architecture should allow AWJ to add blocks without redesigning the builder.
 
-A future developer/extension model should allow a developer to define a new block and explicitly expose only safe merchant-editable properties. Examples of future blocks could include:
+A future extension model may allow developers to define new blocks while exposing only safe merchant-editable properties. This does **not** mean a public SDK is required in V1; V1 should simply avoid blocking future extensibility.
 
-- loyalty;
-- store locator;
-- size guide;
-- restaurant booking where relevant;
-- custom upsell;
-- specialized industry components.
-
-This does **not** mean a public App Builder SDK must ship in V1. It means V1 architecture must avoid making future extensibility unnecessarily difficult.
-
-## 6. Experience versioning and publishing
-
-Inspired particularly by mature commercial builders, AWJ should treat experience publishing as a controlled lifecycle rather than direct mutation of the live application.
+## 8. Experience versioning and publishing
 
 Target conceptual lifecycle:
 
 ```text
 Draft
+  ↓
+Validate
   ↓
 Preview / Test
   ↓
@@ -273,171 +235,193 @@ Publish
 Published Experience Version
 ```
 
-Future capabilities may include:
+Future capabilities may include duplicate version, scheduled publish, scheduled block visibility, rollback, audit history and—only if justified later—targeted experiences/segments.
 
-- duplicate version;
-- scheduled publish;
-- scheduled block visibility;
-- rollback to a prior known-good experience;
-- audit history;
-- targeted experiences/segments, only if later justified.
+AWJ should distinguish:
 
-Rollback/version history is particularly valuable because a merchant should be able to recover from a bad layout/configuration without requiring a new mobile release.
+1. **Experience Publish** — remote configuration/content change.
+2. **Application Release** — build, QA, signing, store submission and binary version lifecycle.
 
-## 7. Server-driven experience principle
+Ordinary merchandising changes should not require rebuilding/resubmitting the app where platform rules and runtime capabilities permit.
 
-A key architecture direction is to avoid rebuilding and resubmitting an application merely because a merchant changes presentation configuration.
-
-Examples that should preferably be remotely publishable where platform rules and runtime capabilities permit:
-
-- home-page section order;
-- banners;
-- product/category sections;
-- content blocks;
-- navigation configuration;
-- selected theme/design tokens;
-- merchandising layout;
-- scheduled campaigns/content.
-
-The mobile runtime retrieves/interprets the published experience and reflects those changes without requiring a new App Store / Google Play release for ordinary merchandising changes.
-
-## 8. Binary/version changes
-
-Some changes may still require a new application build/version. Candidate examples include:
-
-- application identity/package configuration;
-- bundle/package identifiers;
-- native permissions/capabilities;
-- certain SDK/native integrations;
-- platform signing/provisioning configuration;
-- changes to runtime code itself.
-
-The exact boundary must be verified against Apple/Google policies and the selected runtime architecture before implementation.
-
-AWJ therefore needs to distinguish between:
-
-1. **Experience Publish** — remote configuration/content change; and
-2. **Application Release** — build, QA, signing, store submission, and version lifecycle.
-
-These must be represented as separate concepts in the product and architecture.
-
-## 9. Preview and testing direction
-
-Preview should eventually go beyond a static phone frame.
+## 9. Preview direction
 
 Target maturity levels:
 
 1. live visual preview inside AWJ;
 2. responsive/state preview for supported screens;
-3. preview/test on a real mobile runtime/device;
-4. test commerce flows before launch, where safe test/sandbox infrastructure is available;
-5. test push/deep-link behavior before production release.
+3. preview/test using the real mobile runtime/device;
+4. safe test commerce flows where sandbox infrastructure exists;
+5. push/deep-link testing before production release.
 
-The exact V1 boundary is not decided.
+V1 boundary remains undecided.
 
-## 10. Initial capability benchmark
+## 10. SDUI / runtime open-source research
 
-| Capability | Target for AWJ | Benchmark signal |
-|---|---|---|
-| Merchant-specific branded app | Required | Salla/Zid/Tapcart/others |
-| iOS + Android | Required | Industry baseline |
-| No-code merchant configuration | Required | All primary references |
-| Screen + block mental model | Required | OneMobile/Tapcart |
-| Commerce-aware blocks/sections | Required | Tapcart/Shopney/Vajro |
-| Drag/drop or equivalent direct manipulation | Required | Tapcart/Shopney/OneMobile |
-| Property inspector | Required | Mature visual builders |
-| Live mobile preview | Required | Salla/Shopney/others |
-| Templates | Required | Salla/Shopney/ecosystem |
-| Navigation editor | Required | Tapcart/Vajro/Shopney |
-| Post-launch experience updates | Required | Salla/Shopney |
-| Server-driven presentation where appropriate | Required | Commercial builder pattern |
-| Draft/publish separation | Required | Product safety requirement |
-| Experience versioning | Required direction | Tapcart |
-| Scheduled content/publishing | Strong target | Tapcart/Vajro |
-| Rollback/history | Strong target | Versioned architecture |
-| Push notifications | Required | Industry baseline |
-| Unified AWJ commerce administration | Required | Zid/Salla principle |
-| App build/release lifecycle | Required | Platform requirement |
-| Extensible/custom block architecture | Required direction | Tapcart |
-| Public developer SDK | Later / undecided | Tapcart reference |
-| AI-assisted design | Later / optional | Competitive enhancement |
+No runtime project is approved for production adoption.
 
-## 11. Current reference ranking
+### Digia UI
 
-This ranking is about **what AWJ should study from each platform**, not an overall commercial-product ranking.
+**Assessment:** strong architecture/reference; do not adopt directly at this stage.
 
-| Reference | Primary lesson for AWJ |
+Why it is relevant:
+
+- Flutter-oriented server-driven UI architecture;
+- visual Studio + runtime pattern;
+- pages/components;
+- data binding/actions/state concepts;
+- custom widget extensibility;
+- supports a hybrid direction where sensitive capabilities can remain compiled/native while presentation is server-driven.
+
+Primary blocker:
+
+- current Business Source License terms create commercial/competitive-use concerns for AWJ App Builder;
+- therefore treat Digia as an architectural reference unless licensing is explicitly cleared.
+
+### ServeDynamicUI
+
+**Assessment:** promising MIT-licensed proof-of-concept/runtime research candidate, not yet an approved dependency.
+
+Relevant ideas/capabilities include:
+
+- JSON-driven Flutter UI;
+- custom widgets;
+- custom actions;
+- forms/state behavior;
+- remote configuration patterns;
+- component/handler registration concepts.
+
+Concern:
+
+- project maturity, maintenance, tests, security posture and long-term suitability require code-level review before considering production dependency.
+
+### flutter-server-driven-ui
+
+**Assessment:** useful architecture reference.
+
+Particularly valuable ideas:
+
+- explicit `schemaVersion`;
+- Component Registry;
+- contract validation;
+- expression/data concepts;
+- structured server-driven component representation.
+
+AWJ may adopt these architectural patterns without adopting the repository itself.
+
+### XWidget
+
+**Assessment:** useful security/release architecture reference.
+
+Most important lesson:
+
+> server controls experience; compiled runtime controls trusted behavior.
+
+Also relevant are concepts around versioned UI bundles, release channels/staged rollout and keeping services/credentials/permissions/business rules in compiled application code.
+
+### Digia licensing conclusion
+
+Do not use Digia code as a core AWJ dependency without explicit license/legal clearance. Architecture study is separate from code adoption.
+
+### Current runtime recommendation
+
+Do **not** select a production SDUI dependency yet.
+
+Preferred current direction:
+
+- AWJ owns the Experience Contract;
+- AWJ owns security/capability boundaries;
+- AWJ owns compatibility/version semantics;
+- evaluate whether an MIT/Apache runtime library can safely provide rendering primitives;
+- otherwise implement the narrow AWJ renderer needed by the commerce runtime rather than adopting a broad low-code execution engine.
+
+## 11. Initial capability benchmark
+
+| Capability | Target for AWJ |
 |---|---|
-| Tapcart | Core builder architecture, blocks, extensibility, versions/publishing |
-| OneMobile | Merchant-friendly Screen + Blocks workflow |
-| Shopney | Preview and Live Experience vs App Release boundary |
-| Vajro / Superfans | Widgets, content controls, scheduling, navigation |
-| Salla | Saudi/regional merchant journey and launch workflow |
-| Zid | Unified commerce administration |
-| Shopify ecosystem | Breadth of mature mobile-builder patterns and integrations |
+| Merchant-specific branded app | Required |
+| iOS + Android | Required |
+| No-code merchant configuration | Required |
+| Screen + Block mental model | Required |
+| Commerce-aware blocks | Required |
+| Drag/drop/direct manipulation | Required |
+| Property inspector | Required |
+| Live mobile preview | Required |
+| Templates | Required |
+| Navigation editor | Required |
+| Server-driven presentation | Required direction |
+| Draft/publish separation | Required |
+| Versioned Experience Contract | Required |
+| Allowlisted Component Registry | Required |
+| Typed/validated props | Required |
+| Controlled Action Registry | Required |
+| Runtime compatibility validation | Required |
+| Experience versioning | Required direction |
+| Scheduled content/publishing | Strong target |
+| Rollback/history | Strong target |
+| Push notifications | Required |
+| Unified AWJ commerce administration | Required |
+| App build/release lifecycle | Required |
+| Extensible/custom block architecture | Required direction |
+| Public developer SDK | Later / undecided |
+| AI-assisted design | Later / optional |
 
 ## 12. Open-source research status
 
-No open-source project or implementation technology is approved yet.
+Research candidates/references currently include:
 
-Current research candidates include:
-
-- OSMEA — commerce/mobile architecture candidate; licensing requires careful review before any reuse;
+- Digia UI — architecture/reference; licensing concern;
+- ServeDynamicUI — MIT runtime research candidate;
+- flutter-server-driven-ui — schema/registry architecture reference;
+- XWidget — security/release architecture reference;
+- OSMEA — commerce/mobile architecture candidate; licensing must be reviewed carefully;
 - App Creaty — visual editor concepts;
 - FlutterBuilder — schema-driven rendering/export concepts;
 - Frappe Studio — visual builder architecture/UX reference.
 
-These are **research candidates only**. Their presence in this document does not authorize copying, dependency adoption, or architectural commitment.
+Presence in this document does not authorize copying, dependency adoption or architectural commitment.
 
-Before reusing code, AWJ must review at minimum:
+Before reusing code, review license compatibility, repository health, security, architecture, RTL/localization, performance, tests and AWJ integration feasibility.
 
-- license compatibility with AWJ's commercial/SaaS model;
-- repository health and maintenance;
-- security posture;
-- architecture and extensibility;
-- mobile runtime quality;
-- localization and RTL suitability;
-- performance;
-- test coverage;
-- feasibility of AWJ Store API integration.
+## 13. Next phase — Visual Editor Architecture Hunt
 
-## 13. GitHub Architecture Hunt — next phase
+The next research target is the **web visual editor inside AWJ**, especially because the AWJ management UI uses Next.js/React.
 
-The next repository research should no longer search only for generic “mobile ecommerce app builder” projects.
+Search/evaluate open-source projects and libraries for:
 
-Search and evaluate engines/components for these specific layers:
+1. drag/drop canvas or structured layout editing;
+2. component/block palette;
+3. component tree/layers;
+4. property inspector;
+5. selection/focus/keyboard behavior;
+6. undo/redo/history;
+7. phone/device preview;
+8. serialization into an AWJ-owned schema rather than vendor-specific runtime data;
+9. RTL/bilingual suitability;
+10. accessibility and keyboard operation;
+11. extensible component definitions;
+12. license compatibility with commercial SaaS.
 
-1. **Visual Editor** — drag/drop, tree/canvas, property inspector.
-2. **Screen/Block Schema** — structured and versionable component representation.
-3. **Live Preview** — accurate rendering of the same schema used by the runtime.
-4. **Server-driven Mobile Runtime** — safe rendering of remote experience configuration.
-5. **Versioning/Publishing** — drafts, publish, rollback, scheduling.
-6. **Extensible Component Model** — custom block definitions and controlled merchant properties.
-7. **Commerce Runtime/Foundation** — catalog, product, cart, checkout, account, orders, notifications.
-
-Candidate repositories should be scored against this architecture rather than judged primarily by screenshots or README claims.
-
-The goal is to determine whether AWJ can responsibly reuse a meaningful portion of the engine, or whether AWJ should build the critical builder/schema layers internally and reuse only selected libraries/runtime components.
+Priority is **not** finding a complete generic website builder. The goal is to identify safe, maintainable primitives for building a commerce-specific Tapcart-style editor inside AWJ.
 
 ## 14. Decisions explicitly NOT made
 
-The following remain open:
+Still open:
 
 - Flutter vs React Native vs native runtime;
-- exact Experience Schema format;
-- exact builder UI;
+- exact serialized Experience Contract format;
+- exact visual builder UI;
+- production SDUI library selection;
 - whether any open-source builder code will be reused;
 - build/signing infrastructure;
 - app-store account ownership model;
-- pricing/plan entitlement for App Builder;
-- public/custom developer SDK timing;
+- pricing/plan entitlement;
+- public SDK timing;
 - AI design generation;
-- final list of V1 components/blocks;
-- exact preview/test-device mechanism;
-- segmentation/personalized experience scope.
-
-Do not treat exploratory prototypes or candidate repositories as the source of truth for these decisions.
+- final V1 block list;
+- preview/test-device mechanism;
+- segmentation/personalization scope.
 
 ---
 
-**Current recommendation:** the commercial benchmark is now sufficiently clear to begin the GitHub Architecture Hunt. Evaluate open-source candidates against the defined AWJ layers (Visual Editor, Schema, Preview, Runtime, Versioning, Extensibility, Commerce foundation) before defining V1 or starting implementation.
+**Current recommendation:** AWJ should own its Experience Contract and trusted commerce behavior. Treat open-source SDUI projects as runtime/reference candidates rather than surrendering the product architecture to a generic low-code engine. Continue with the Visual Editor Architecture Hunt before defining V1 or writing production implementation code.
