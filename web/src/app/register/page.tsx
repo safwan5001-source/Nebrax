@@ -13,12 +13,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { register as registerTenant } from '@/lib/auth';
 import { ApiError } from '@/lib/api';
+import { isReservedTenantSlug, tenantHostSuffix } from '@/lib/tenant-domain';
 
 const schema = z.object({
   company_name: z.string().min(1),
   email: z.string().email(),
   phone: z.string().regex(/^5\d{8}$/),
-  slug: z.string().min(1).regex(/^[a-zA-Z0-9_-]+$/),
+  slug: z.string().min(1).regex(/^[a-zA-Z0-9_-]+$/).refine((value) => !isReservedTenantSlug(value), { message: 'reserved' }),
   password: z.string().min(8),
 });
 
@@ -54,7 +55,7 @@ export default function RegisterPage() {
     try {
       await registerTenant({
         company_name: values.company_name,
-        slug: values.slug,
+        slug: values.slug.toLowerCase(),
         email: values.email,
         password: values.password,
         phone: '+966' + values.phone.replace(/^0+/, ''),
@@ -159,9 +160,9 @@ export default function RegisterPage() {
                 aria-describedby={errors.slug ? 'register-slug-error' : 'register-slug-hint'}
                 {...register('slug')}
               />
-              <span className="flex shrink-0 items-center border-s border-border bg-background px-3 text-sm text-muted">.nebrax.app</span>
+              <span className="flex shrink-0 items-center border-s border-border bg-background px-3 text-sm text-muted">{tenantHostSuffix()}</span>
             </div>
-            {errors.slug ? <p id="register-slug-error" className="mt-1.5 text-xs text-negative" role="alert">{t('slug_invalid')}</p> : <p id="register-slug-hint" className="mt-1.5 text-xs text-muted">{t('slug_hint')}</p>}
+            {errors.slug ? <p id="register-slug-error" className="mt-1.5 text-xs text-negative" role="alert">{errors.slug.message === 'reserved' ? t('slug_reserved') : t('slug_invalid')}</p> : <p id="register-slug-hint" className="mt-1.5 text-xs text-muted">{t('slug_hint')}</p>}
           </div>
 
           <div>

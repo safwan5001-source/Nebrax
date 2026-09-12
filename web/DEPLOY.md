@@ -28,6 +28,7 @@ web
 | الاسم | القيمة |
 |---|---|
 | `NEXT_PUBLIC_API_URL` | `https://<عنوان-الـ-backend>/api` |
+| `NEXT_PUBLIC_TENANT_BASE_DOMAIN` | `awj.app` (لاحقة التسجيل `{slug}.awj.app`؛ للمحلي `localhost`) |
 
 (القيمة الافتراضية في الكود `http://localhost:8000/api` للتطوير فقط — انظر `src/lib/api.ts`.)
 
@@ -43,6 +44,10 @@ web
 - النشر التلقائي عند الدفع إلى `main`.
 
 فلا يتبقّى عليك يدوياً سوى **مجلد الجذر** و**متغيّر `NEXT_PUBLIC_API_URL`** (خطوتان لوحة تحكم).
+
+> نطاقات المستأجر `{slug}.awj.app` تحتاج إعداد Vercel منفصلاً **لم يُنفَّذ في هذا المستودع**: أضف
+> `awj.app` و`*.awj.app` كدومينات للمشروع `web/` بعد ضبط DNS/TLS. التفاصيل في
+> `docs/plans/tenancy/AWJ_TENANT_SUBDOMAIN_V1_IMPLEMENTATION_REPORT.md`. لا توسّع الكوكي إلى `.awj.app`.
 
 ## التحقق محلياً قبل النشر
 
