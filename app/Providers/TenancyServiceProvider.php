@@ -43,6 +43,8 @@ class TenancyServiceProvider extends ServiceProvider
         // POS يملك مزوده التشغيلي حتى لا يعتمد على HR ولا يوسّع ملف routes/api.php
         // الكبير لأجل مسارات Domain صغيرة مستقلة.
         $this->app->register(PosServiceProvider::class);
+        // Commerce Workspace admin routes stay isolated from the public storefront API.
+        $this->app->register(CommerceWorkspaceServiceProvider::class);
     }
 
     public function boot(): void
