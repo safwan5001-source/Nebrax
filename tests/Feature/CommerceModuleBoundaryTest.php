@@ -108,6 +108,7 @@ class CommerceModuleBoundaryTest extends TestCase
             }
         }
 
+        $commerceRoutes = array_values(array_unique($commerceRoutes));
         sort($commerceRoutes);
 
         $this->assertSame(
