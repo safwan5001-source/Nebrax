@@ -21,7 +21,7 @@ const { mockGetCartId } = vi.hoisted(() => ({ mockGetCartId: vi.fn() }));
 
 vi.mock("@/lib/spree", () => ({
   getClient: () => mockClient,
-  getClientForSurface: () => mockClient,
+  getClientForSurface: vi.fn(() => mockClient),
   cacheTagSuffix: () => "",
   DEFAULT_SURFACE: "dtc",
   isWholesaleEnabled: vi.fn().mockReturnValue(false),
@@ -84,6 +84,26 @@ describe("cart server actions", () => {
   });
 
   describe("getCart", () => {
+    it("returns null for a fresh visitor without constructing the Spree client (COM-7-PREVIEW-FIX-1)", async () => {
+      const { getClientForSurface, getCartId, getAccessToken } = await import(
+        "@/lib/spree"
+      );
+      (getCartId as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
+      (getAccessToken as ReturnType<typeof vi.fn>).mockResolvedValue(
+        undefined,
+      );
+      const getClientForSurfaceSpy = vi.mocked(getClientForSurface);
+      getClientForSurfaceSpy.mockClear();
+
+      const result = await getCart();
+
+      expect(result).toBeNull();
+      // A read-only preview visitor with no cart cookie and no auth token
+      // must never require SPREE_API_URL/SPREE_PUBLISHABLE_KEY to be
+      // configured — getClientForSurface() throws when they are unset.
+      expect(getClientForSurfaceSpy).not.toHaveBeenCalled();
+    });
+
     it("fetches cart by ID and token", async () => {
       mockClient.carts.get.mockResolvedValue(mockCart);
       const result = await getCart();

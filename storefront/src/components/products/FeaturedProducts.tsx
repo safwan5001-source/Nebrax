@@ -34,16 +34,26 @@ export async function FeaturedProducts({
   currency,
 }: FeaturedProductsProps) {
   const userToken = await getAccessToken();
-  const productsResponse = await cachedListProducts(
+  // A catalog outage (e.g. the visitor's hostname has no active
+  // StorefrontDomain mapping yet — fail-closed by design, see
+  // ResolveStorefrontDomain) must degrade this section, not crash the whole
+  // homepage. Mirrors the existing defensive pattern already used for
+  // category navigation in StorefrontLayout's getRootCategories.
+  const products = await cachedListProducts(
     { limit: 8, fields: PRODUCT_CARD_FIELDS },
     { locale, country },
     "dtc",
     userToken,
-  );
+  )
+    .then((res) => res.data ?? [])
+    .catch((error) => {
+      console.error("FeaturedProducts: failed to load products", error);
+      return [];
+    });
 
   return (
     <LazyProductCarousel
-      products={productsResponse.data ?? []}
+      products={products}
       basePath={basePath}
       currency={currency}
     />
