@@ -12,6 +12,7 @@ use App\Tenancy\TenantContext;
 use App\Tenancy\TenantScope;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use RuntimeException;
 
 /**
@@ -47,7 +48,16 @@ class RegisterStorefrontDomainCommand extends Command
         $tenantRef = (string) $this->argument('tenant');
         $rawHostname = (string) $this->argument('hostname');
 
-        $tenant = Tenant::where('id', $tenantRef)->orWhere('slug', $tenantRef)->first();
+        // عمود tenants.id من نوع uuid حرفياً في PostgreSQL — مقارنته بقيمة ليست
+        // UUID (مثل slug عادي) تفشل الاستعلام كاملاً هناك (SQLite لا يتحقق من
+        // النوع فيمر بصمت)، فنفس نمط RecordPlatformSubscriptionCommand هنا.
+        $tenant = Tenant::query()
+            ->when(
+                Str::isUuid($tenantRef),
+                fn ($query) => $query->where('id', $tenantRef)->orWhere('slug', $tenantRef),
+                fn ($query) => $query->where('slug', $tenantRef),
+            )
+            ->first();
         if ($tenant === null) {
             $this->error("المستأجر «{$tenantRef}» غير موجود. لم يُغيَّر شيء — زوّد معرّفاً أو slug صحيحاً لمستأجر قائم فعلاً.");
 
@@ -84,7 +94,12 @@ class RegisterStorefrontDomainCommand extends Command
 
             if ($channelOption !== null) {
                 $channelsQuery->where(function ($q) use ($channelOption) {
-                    $q->where('id', $channelOption)->orWhere('slug', $channelOption);
+                    // نفس تحفّظ UUID أعلاه — عمود sales_channels.id من نوع uuid أيضاً.
+                    if (Str::isUuid($channelOption)) {
+                        $q->where('id', $channelOption)->orWhere('slug', $channelOption);
+                    } else {
+                        $q->where('slug', $channelOption);
+                    }
                 });
             }
 
@@ -92,7 +107,7 @@ class RegisterStorefrontDomainCommand extends Command
 
             if ($channels->isEmpty()) {
                 $this->error(
-                    "لا توجد قناة بيع (SalesChannel) من نوع web نشطة لهذا المستأجر".
+                    'لا توجد قناة بيع (SalesChannel) من نوع web نشطة لهذا المستأجر'.
                     ($channelOption !== null ? " مطابقة لـ «{$channelOption}»" : '').
                     '. هذا الأمر لا ينشئ قناة بيع جديدة — أنشئها أولاً عبر المسار المعتمد، ثم أعد التشغيل. لم يُغيَّر شيء.',
                 );
