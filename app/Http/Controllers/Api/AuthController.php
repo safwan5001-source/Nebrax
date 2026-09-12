@@ -15,6 +15,7 @@ use App\Services\Accounting\ChartOfAccountsSeeder;
 use App\Services\TenantReferenceNumberService;
 use App\Support\PlanGate;
 use App\Support\Rbac;
+use App\Tenancy\HostnameTenantContext;
 use App\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -109,6 +110,9 @@ class AuthController extends ApiController
     /**
      * دخول بالبريد وكلمة المرور فقط — البريد فريد عالمياً فيُستنتَج منه المستأجر.
      * (User لا يرث BaseModel، فالاستعلام عالمي بلا نطاق مستأجر.)
+     *
+     * في وضع النطاق الفرعي (`HostnameTenantContext`) يُرفض الدخول إن لم ينتمِ
+     * المستخدم لمستأجر المضيف — بنفس رسالة كلمة المرور الخاطئة، بلا تسريب.
      */
     public function login(LoginRequest $request): JsonResponse
     {
@@ -119,6 +123,12 @@ class AuthController extends ApiController
         if (! $user || ! Hash::check($data['password'], $user->password)) {
             abort(422, 'بيانات الدخول غير صحيحة.');
         }
+
+        $hostnameTenantId = app(HostnameTenantContext::class)->id();
+        if ($hostnameTenantId !== null && $user->tenant_id !== $hostnameTenantId) {
+            abort(422, 'بيانات الدخول غير صحيحة.');
+        }
+
         if (! $user->is_active) {
             abort(403, 'الحساب غير مفعّل.');
         }

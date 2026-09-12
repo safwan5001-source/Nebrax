@@ -7,6 +7,7 @@ use App\Tenancy\BranchContext;
 use App\Tenancy\BranchSharing;
 use App\Tenancy\CustomerContext;
 use App\Tenancy\StorefrontContext;
+use App\Tenancy\HostnameTenantContext;
 use App\Tenancy\TenantContext;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
@@ -25,6 +26,7 @@ class TenancyServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(TenantContext::class, fn () => new TenantContext());
+        $this->app->singleton(HostnameTenantContext::class, fn () => new HostnameTenantContext());
         $this->app->scoped(CustomerContext::class, fn () => new CustomerContext());
         // سياق متجر Commerce العام (tenant + sales channel) — تصفح مجهول، لا مصادقة.
         $this->app->scoped(StorefrontContext::class, fn () => new StorefrontContext());

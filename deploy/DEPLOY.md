@@ -85,12 +85,25 @@ SELECT migration FROM migrations ORDER BY id DESC LIMIT 5;
 | المتغيّر | المصدر | ملاحظة |
 |---|---|---|
 | `APP_KEY` | يدوي | `php artisan key:generate --show` |
-| `FRONTEND_URL` | يدوي | نطاق الواجهة (CORS) |
+| `FRONTEND_URL` | يدوي | نطاق الواجهة (CORS) — أضف أيضاً `https://app.awj.app` و`https://awj.app` عند تفعيل النطاقات |
+| `AWJ_TENANT_BASE_DOMAIN` | `render.yaml` | النطاق الأب لنطاقات المستأجر الفرعية (الافتراض `awj.app`) |
+| `AWJ_TENANT_BASE_DOMAINS` | اختياري | قائمة مفصولة بفواصل إن لزم أكثر من أب (محلي/معاينة) |
 | `DB_*` | من قاعدة Render | مربوطة تلقائياً في `render.yaml` |
 | `APP_ENV`/`APP_DEBUG` | افتراضي | production / false |
 | `DOCUMENT_DURABLE_STORAGE_ENABLED` | `render.yaml` | `false` حالياً؛ قفل مركزي يمنع تفعيل S3/R2 |
 | `DOCUMENT_STORAGE_DRIVER` | `render.yaml` | `local` حالياً |
 | `DOCUMENT_STORAGE_DISK` | `render.yaml` | `local` حالياً |
+
+## نطاقات المستأجر الفرعية `{slug}.awj.app` — لم يُنفَّذ في الإنتاج بعد
+
+الكود يحسم المستأجر من `{slug}.awj.app` (انظر `docs/plans/tenancy/AWJ_TENANT_SUBDOMAIN_V1_IMPLEMENTATION_REPORT.md`).
+**لا يغيّر هذا القسم DNS ولا SSL ولا Vercel.** ما يزال صفوان ينفّذه منفصلاً:
+
+1. سجل DNS: `A`/`AAAA` أو `CNAME` لـ `awj.app` و`*.awj.app` → الواجهة (Vercel) و/أو الـ API حسب مخطط النشر.
+2. شهادة TLS تغطي `awj.app` و`*.awj.app` (wildcard؛ المستوى الأول فقط — `foo.bar.awj.app` خارج V1).
+3. Vercel: أضف `awj.app` و`*.awj.app` كدومينات للمشروع `web/`، واضبط `NEXT_PUBLIC_TENANT_BASE_DOMAIN=awj.app`.
+4. الـ API (Render/Railway): أضف `api.awj.app` إن رُغب؛ اضبط `AWJ_TENANT_BASE_DOMAIN=awj.app`. لا توسّع كوكي الجلسة إلى `.awj.app` — المصادقة Bearer origin-scoped.
+5. CORS: أنماط `{slug}.{base}` تُضاف تلقائياً من `AWJ_TENANT_BASE_DOMAIN`. أبقِ `FRONTEND_URL` للنطاقات غير الفرعية (`https://app.awj.app`, `https://awj.app`, معاينة Vercel).
 
 ## التخزين الدائم — مؤجل
 

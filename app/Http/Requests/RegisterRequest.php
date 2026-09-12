@@ -2,7 +2,9 @@
 
 namespace App\Http\Requests;
 
+use App\Tenancy\ReservedTenantSlugs;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class RegisterRequest extends FormRequest
 {
@@ -11,11 +13,18 @@ class RegisterRequest extends FormRequest
         return true;
     }
 
+    protected function prepareForValidation(): void
+    {
+        if (is_string($this->slug)) {
+            $this->merge(['slug' => mb_strtolower(trim($this->slug))]);
+        }
+    }
+
     public function rules(): array
     {
         return [
             'company_name' => ['required', 'string', 'max:255'],
-            'slug'         => ['required', 'string', 'alpha_dash', 'max:255', 'unique:tenants,slug'],
+            'slug'         => ['required', 'string', 'alpha_dash', 'max:255', 'unique:tenants,slug', Rule::notIn(ReservedTenantSlugs::all())],
             'vat_number'   => ['nullable', 'string', 'size:15'],
             'name'         => ['nullable', 'string', 'max:255'], // اسم المالك — يُشتق من الاسم التجاري إن غاب
             'phone'        => ['nullable', 'string', 'max:255'], // رقم الجوال

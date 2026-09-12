@@ -136,6 +136,7 @@ use App\Http\Middleware\EnsureCustomerPrincipal;
 use App\Http\Middleware\EnsurePermission;
 use App\Http\Middleware\EnsurePlatformAdministrator;
 use App\Http\Middleware\EnsureUserPrincipal;
+use App\Http\Middleware\IdentifyTenantHostname;
 use App\Http\Middleware\ForceJsonResponse;
 use App\Http\Middleware\EstablishCustomerContext;
 use App\Http\Middleware\ResolveCustomerTenant;
@@ -170,7 +171,7 @@ Route::pattern('batch', $uuid);
 Route::pattern('file', $uuid);
 
 // كل مسارات الـ API ترجع JSON موحّداً (بما فيها الأخطاء).
-Route::middleware(ForceJsonResponse::class)->group(function () {
+Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->group(function () {
 
     // فحص صحّة للنشر (بلا مصادقة) — تستخدمه منصّة الاستضافة
     Route::get('health', HealthController::class);

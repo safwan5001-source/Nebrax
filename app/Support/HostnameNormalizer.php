@@ -8,7 +8,8 @@ namespace App\Support;
  * ═══════════════════════════════════════════════════════════════
  *  المصدر الوحيد لتطبيع أسماء النطاقات في المستودع — يستدعيه
  *  `StorefrontDomain::setHostnameAttribute()` (عند التخزين) و
- *  `ResolveStorefrontDomain` (عند حسم كل طلب من الـ Host الوارد). **ممنوع**
+ *  `ResolveStorefrontDomain` (عند حسم كل طلب من الـ Host الوارد) و
+ *  `TenantHostnameResolver` (حسم نطاق مستأجر ERP الفرعي). **ممنوع**
  *  تكرار منطق تحليل hostname في أي وسيط/متحكّم آخر — انظر
  *  `AWJ_COM_7_P2_STOREFRONT_DOMAIN_RESOLUTION_DECISION.md` §3/§7.
  *
