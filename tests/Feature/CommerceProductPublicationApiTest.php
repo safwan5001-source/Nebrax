@@ -45,6 +45,16 @@ class CommerceProductPublicationApiTest extends TestCase
         return compact('product', 'channel', 'storefront');
     }
 
+    /**
+     * Tests run several HTTP requests inside one application process, unlike production.
+     * Clear the mutable TenantContext before each request so SetTenant must derive it again
+     * from the authenticated principal instead of inheriting setup/previous-request state.
+     */
+    private function forgetTenantContext(): void
+    {
+        app(TenantContext::class)->forget();
+    }
+
     /** @test */
     public function owner_can_publish_and_unpublish_a_product_in_its_web_store(): void
     {
@@ -52,11 +62,13 @@ class CommerceProductPublicationApiTest extends TestCase
         $scene = $this->seedProductAndStore($auth['tenant_id'], 'a');
         $path = '/api/commerce/workspace/products/'.$scene['product']->id.'/publication';
 
+        $this->forgetTenantContext();
         $this->withToken($auth['token'])->getJson($path)
             ->assertOk()
             ->assertJsonPath('data.stores.0.id', $scene['storefront']->id)
             ->assertJsonPath('data.stores.0.is_published', false);
 
+        $this->forgetTenantContext();
         $this->withToken($auth['token'])->putJson($path, [
             'storefront_ids' => [$scene['storefront']->id],
         ])->assertOk()->assertJsonPath('data.stores.0.is_published', true);
@@ -68,6 +80,7 @@ class CommerceProductPublicationApiTest extends TestCase
             ->where('is_published', true)->exists());
         app(TenantContext::class)->forget();
 
+        $this->forgetTenantContext();
         $this->withToken($auth['token'])->putJson($path, ['storefront_ids' => []])
             ->assertOk()->assertJsonPath('data.stores.0.is_published', false);
     }
@@ -81,6 +94,7 @@ class CommerceProductPublicationApiTest extends TestCase
         $sceneA = $this->seedProductAndStore($a['tenant_id'], 'a2');
         $sceneB = $this->seedProductAndStore($b['tenant_id'], 'b2');
 
+        $this->forgetTenantContext();
         $this->withToken($a['token'])->putJson(
             '/api/commerce/workspace/products/'.$sceneA['product']->id.'/publication',
             ['storefront_ids' => [$sceneB['storefront']->id]],
@@ -103,7 +117,9 @@ class CommerceProductPublicationApiTest extends TestCase
         $sceneB = $this->seedProductAndStore($b['tenant_id'], 'b3');
         $path = '/api/commerce/workspace/products/'.$sceneB['product']->id.'/publication';
 
+        $this->forgetTenantContext();
         $this->withToken($a['token'])->getJson($path)->assertNotFound();
+        $this->forgetTenantContext();
         $this->withToken($a['token'])->putJson($path, ['storefront_ids' => []])->assertNotFound();
     }
 
@@ -117,8 +133,10 @@ class CommerceProductPublicationApiTest extends TestCase
         app(TenantContext::class)->forget();
 
         $path = '/api/commerce/workspace/products/'.$scene['product']->id.'/publication';
+        $this->forgetTenantContext();
         $this->withToken($auth['token'])->getJson($path)
             ->assertOk()->assertJsonPath('data.stores', []);
+        $this->forgetTenantContext();
         $this->withToken($auth['token'])->putJson($path, [
             'storefront_ids' => [$scene['storefront']->id],
         ])->assertUnprocessable();
