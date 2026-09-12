@@ -4,6 +4,7 @@ import { connection } from "next/server";
 import { cache, Suspense } from "react";
 import { Footer, FooterCategoryLinks } from "@/components/layout/Footer";
 import { Header, HeaderMobileMenu } from "@/components/layout/Header";
+import { fetchStorefrontName } from "@/lib/commerce/storefront";
 import { getCategories } from "@/lib/data/categories";
 
 interface StorefrontLayoutProps {
@@ -129,12 +130,14 @@ export default async function StorefrontLayout({
 }: StorefrontLayoutProps) {
   const { country, locale } = await params;
   const basePath = `/${country}/${locale}`;
+  const storeName = await fetchStorefrontName();
 
   return (
     <>
       <Header
         basePath={basePath}
         locale={locale as Locale}
+        storeName={storeName}
         mobileNavigation={
           <Suspense fallback={<MobileNavigationFallback />}>
             <StorefrontMobileNavigation
@@ -156,6 +159,7 @@ export default async function StorefrontLayout({
       <Footer
         basePath={basePath}
         locale={locale as Locale}
+        storeName={storeName}
         categoryLinks={
           <Suspense fallback={<FooterCategoryLinksFallback />}>
             <StorefrontFooterCategoryLinks
