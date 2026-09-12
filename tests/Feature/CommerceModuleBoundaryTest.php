@@ -45,13 +45,18 @@ class CommerceModuleBoundaryTest extends TestCase
     ];
 
     /**
-     * COM-WS-2 أضاف مسار القراءة الإدارية لمساحة عمل التجارة. وعد
-     * `no_commerce_api_route_is_registered_yet` كان بعدم إدخال مسارات
-     * *قبل أوانها*، لا منع هذا المسار المعتمد بعد أن بُني فعلاً.
+     * مسارات Commerce Workspace المعتمدة حتى COM-WS-3. الوعد الأصلي كان
+     * بعدم إدخال مسارات *قبل أوانها*؛ تبقى هذه القائمة البيضاء حارساً ضد
+     * أي مسار Commerce إضافي غير معتمد.
+     *
+     * GET وPUT لمسار publication يشتركان في URI واحد، وRoute collection
+     * يعرض الـURI مرتين لأن لكل method Route مستقلاً.
      *
      * @var list<string>
      */
     private const ALLOWED_COMMERCE_API_ROUTES = [
+        'api/commerce/workspace/products/{id}/publication',
+        'api/commerce/workspace/products/{id}/publication',
         'api/commerce/workspace/storefronts',
     ];
 
@@ -109,7 +114,7 @@ class CommerceModuleBoundaryTest extends TestCase
         $this->assertSame(
             self::ALLOWED_COMMERCE_API_ROUTES,
             $commerceRoutes,
-            'لا يُسمح بمسارات Commerce API خارج COM-WS-2 — وُجد: ' . implode('، ', $commerceRoutes)
+            'لا يُسمح بمسارات Commerce API خارج القائمة المعتمدة — وُجد: ' . implode('، ', $commerceRoutes)
         );
     }
 
@@ -122,7 +127,6 @@ class CommerceModuleBoundaryTest extends TestCase
     // نطاقه المعتمد (Master Plan §PHASE 3) — فيصطدم بفحصٍ نصّي عام لم يعد
     // يحرس شيئاً حقيقياً بعد انتهاء نافذته.
     //
-    // `no_commerce_api_route_is_registered_yet` بقي يفرض قائمة فارغة حتى
-    // COM-WS-2، الذي أضاف `api/commerce/workspace/storefronts`. القائمة
-    // البيضاء أعلاه تبقي الحارس ضد أي مسار Commerce إضافي غير معتمد.
+    // قائمة ALLOWED_COMMERCE_API_ROUTES أعلاه تُحدَّث فقط عندما يعتمد نطاق
+    // Commerce جديد مساراته صراحةً، وتبقى تمنع أي تسرب لمسارات غير مقصودة.
 }
