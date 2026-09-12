@@ -5,6 +5,7 @@ namespace App\Services\Accounting;
 use App\Models\Invoice;
 use App\Models\Partner;
 use App\Models\Payment;
+use App\Models\PaymentGateway;
 use App\Models\PaymentMethod;
 use App\Models\User;
 use App\Models\PaymentAllocation;
@@ -26,6 +27,9 @@ use RuntimeException;
  *
  *  ACC-3: طرف العميل/المورد يُحلّ عبر `AccountRoleResolver`؛ الطرف النقدي/
  *  البنكي يبقى بالكامل ملك `CashBankAccountService::resolveForPayment()`.
+ *
+ *  PAY-V2-5: قبض مربوط ببوابة يُمدّن دور gateway_clearing بدل النقد/البنك.
+ *  التسوية إلى البنك حدث منفصل عبر PaymentGatewaySettlementService.
  *
  *  التخصيص (allocation) للقبض فقط: مجموع التخصيصات = مبلغ السند،
  *  وكل تخصيص ≤ متبقي فاتورته، والفاتورة مرحّلة وتخص طرف السند.
@@ -63,6 +67,7 @@ class PaymentService
         $direction = $data['direction'] ?? 'received';
         $date      = $data['payment_date'] ?? now()->toDateString();
         [$method, $cashAccountId, $paymentMethod] = $this->resolvePaymentSetup($data);
+        $gatewayId = $this->resolvePaymentGatewayId($data, $direction);
 
         // المستند المستهدَف حسب الاتجاه: قبض→فاتورة مبيعات، صرف→فاتورة مشتريات.
         [$targetClass, $key] = $direction === 'received'
@@ -89,7 +94,7 @@ class PaymentService
             throw new RuntimeException("مجموع التخصيصات ({$sum}) يجب أن يساوي مبلغ السند ({$amount}).");
         }
 
-        return DB::transaction(function () use ($data, $amount, $direction, $date, $allocs, $method, $cashAccountId, $paymentMethod) {
+        return DB::transaction(function () use ($data, $amount, $direction, $date, $allocs, $method, $cashAccountId, $paymentMethod, $gatewayId) {
             // النسخ قد يكون لمستند تاريخي بلا فرع. نحفظ نطاق المصدر صراحةً،
             // فلا تنتقل النسخة إلى الفرع الرئيسي للطلب ثم تصطدم برقمه القديم.
             $hasExplicitBranch = array_key_exists('branch_id', $data);
@@ -108,6 +113,7 @@ class PaymentService
                 'method'          => $method,
                 'payment_method_id' => $paymentMethod['id'],
                 'payment_method_name' => $paymentMethod['name'],
+                'payment_gateway_id' => $gatewayId,
                 'reference'       => $data['reference'] ?? null,
                 'payment_details' => $data['payment_details'] ?? null,
                 'collector_employee_id' => $data['collector_employee_id'] ?? null,
@@ -155,6 +161,9 @@ class PaymentService
 
         $direction = $payment->direction;
         [$method, $cashAccountId, $paymentMethod] = $this->resolvePaymentSetup($data);
+        $gatewayId = array_key_exists('payment_gateway_id', $data)
+            ? $this->resolvePaymentGatewayId($data, $direction)
+            : $payment->payment_gateway_id;
         [$targetClass, $key] = $direction === 'received'
             ? [Invoice::class, 'invoice_id']
             : [Purchase::class, 'purchase_id'];
@@ -176,13 +185,14 @@ class PaymentService
             throw new RuntimeException("مجموع التخصيصات ({$sum}) يجب أن يساوي مبلغ السند ({$amount}).");
         }
 
-        return DB::transaction(function () use ($payment, $data, $amount, $normalized, $method, $cashAccountId, $paymentMethod) {
+        return DB::transaction(function () use ($payment, $data, $amount, $normalized, $method, $cashAccountId, $paymentMethod, $gatewayId) {
             $payment->update([
                 'partner_id'      => $data['partner_id'],
                 'invoice_id'      => $data['invoice_id'] ?? null,
                 'method'          => $method,
                 'payment_method_id' => $paymentMethod['id'],
                 'payment_method_name' => $paymentMethod['name'],
+                'payment_gateway_id' => $gatewayId,
                 'reference'       => $data['reference'] ?? null,
                 'payment_details' => array_key_exists('payment_details', $data) ? $data['payment_details'] : $payment->payment_details,
                 'collector_employee_id' => array_key_exists('collector_employee_id', $data) ? $data['collector_employee_id'] : $payment->collector_employee_id,
@@ -215,6 +225,7 @@ class PaymentService
             'direction'       => $payment->direction,
             'method'          => $payment->method,
             'payment_method_id' => $payment->payment_method_id,
+            'payment_gateway_id' => $payment->payment_gateway_id,
             'reference'       => $payment->reference,
             'payment_details' => $payment->payment_details,
             'collector_employee_id' => $payment->collector_employee_id,
@@ -287,18 +298,29 @@ class PaymentService
                 $targets[$alloc->id] = $target;
             }
 
+            $usesGatewayClearing = $this->usesGatewayClearing($payment);
+            if ($usesGatewayClearing) {
+                $this->assertGatewayStillValid($payment);
+            }
+
             // الحساب المختار كيان خزينة/بنك فعلي؛ تُفحص صلاحية الإيداع أو السحب عند الأثر المالي لا عند إنشاء المسودة فقط.
             $cashEntity = $this->cashBankAccounts->resolveForPayment($payment->cash_account_id, $payment->method);
-            $this->cashBankAccounts->assertAllowed(
-                $cashEntity,
-                $payment->direction === 'received' ? 'deposit' : 'withdraw',
-                $actor
-            );
+            if (! $usesGatewayClearing) {
+                $this->cashBankAccounts->assertAllowed(
+                    $cashEntity,
+                    $payment->direction === 'received' ? 'deposit' : 'withdraw',
+                    $actor
+                );
+            }
             $cashAccountId = $cashEntity->account_id;
 
             if ($payment->direction === 'received') {
+                $collectionAccountId = $usesGatewayClearing
+                    ? $this->accountRoles->resolve('gateway_clearing')->id
+                    : $cashAccountId;
+
                 $lines = [[
-                    'account_id' => $cashAccountId,
+                    'account_id' => $collectionAccountId,
                     'debit'      => $payment->amount,
                 ], [
                     'account_id'   => $this->accountRoles->resolve('accounts_receivable')->id,
@@ -355,6 +377,37 @@ class PaymentService
 
             return $payment->fresh();
         });
+    }
+
+    private function usesGatewayClearing(Payment $payment): bool
+    {
+        return $payment->direction === 'received' && filled($payment->payment_gateway_id);
+    }
+
+    private function resolvePaymentGatewayId(array $data, string $direction): ?string
+    {
+        $gatewayId = $data['payment_gateway_id'] ?? null;
+        if (! filled($gatewayId)) {
+            return null;
+        }
+        if ($direction !== 'received') {
+            throw new RuntimeException('بوابة الدفع تخص سندات القبض فقط.');
+        }
+
+        $gateway = PaymentGateway::query()->whereKey($gatewayId)->first();
+        if ($gateway === null) {
+            throw new RuntimeException('بوابة الدفع يجب أن تخص المستأجر النشط.');
+        }
+
+        return $gateway->id;
+    }
+
+    private function assertGatewayStillValid(Payment $payment): void
+    {
+        $gateway = PaymentGateway::query()->whereKey($payment->payment_gateway_id)->first();
+        if ($gateway === null) {
+            throw new RuntimeException('بوابة الدفع يجب أن تخص المستأجر النشط.');
+        }
     }
 
     /**

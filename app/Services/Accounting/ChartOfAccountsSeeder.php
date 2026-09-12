@@ -34,6 +34,7 @@ class ChartOfAccountsSeeder
                 ['1140', 'المخزون', 'Inventory', 'asset', false, []],
                 ['1150', 'ضريبة القيمة المضافة - مدخلات', 'VAT Input', 'asset', false, []],
                 ['1160', 'عُهَد الموظفين', 'Employee Custodies', 'asset', false, []],
+                ['1170', 'مستحقات بوابات الدفع', 'Payment Gateway Clearing', 'asset', false, []],
             ]],
             ['12', 'الأصول الثابتة', 'Fixed Assets', 'asset', true, [
                 ['1210', 'المعدات والآليات', 'Equipment', 'asset', false, []],
@@ -85,7 +86,9 @@ class ChartOfAccountsSeeder
                 ['5170', 'فروق التقريب والتسويات', 'Rounding & Adjustments', 'expense', false, []],
                 ['5180', 'فروق الجرد والتلف', 'Inventory Adjustments', 'expense', false, []],
             ]],
-            ['55', 'مصاريف الدفع', 'Payment Fees', 'expense', true, []],
+            ['55', 'مصاريف الدفع', 'Payment Fees', 'expense', true, [
+                ['5510', 'عمولات بوابات الدفع', 'Payment Gateway Fees', 'expense', false, []],
+            ]],
         ]],
     ];
 
