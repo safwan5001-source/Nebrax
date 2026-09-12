@@ -8,7 +8,7 @@ vi.mock("next-intl/server", () => ({
       if (key === "heroDescription")
         return `Browse the published catalog for ${values?.storeName}.`;
       if (key === "shopNow") return "Shop all products";
-      if (key === "identityFallback") return "Store";
+      if (key === "shop") return "Shop";
       if (key === "welcomeEyebrow") return "Welcome";
       return key;
     };
@@ -43,7 +43,8 @@ describe("HeroSection (COM-7-P3A)", () => {
     });
     const { getByText, queryByText } = render(element);
 
-    expect(getByText("Store")).toBeTruthy();
+    expect(getByText("Shop")).toBeTruthy();
     expect(queryByText("Spree Store")).toBeNull();
+    expect(queryByText("Store")).toBeNull();
   });
 });
