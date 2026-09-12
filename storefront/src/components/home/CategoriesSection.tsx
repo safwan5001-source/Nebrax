@@ -15,7 +15,7 @@ export async function CategoriesSection({
 }: CategoriesSectionProps) {
   const t = await getTranslations({
     locale: locale as Locale,
-    namespace: "home",
+    namespace: "header",
   });
 
   const categories = await getCategories({ depth_eq: 0 }, { country, locale })
@@ -32,14 +32,12 @@ export async function CategoriesSection({
   return (
     <section className="container mx-auto px-4 sm:px-6 lg:px-8 py-12">
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold text-gray-900">
-          {t("categoriesTitle")}
-        </h2>
+        <h2 className="text-2xl font-bold text-gray-900">{t("categories")}</h2>
         <Link
           href={`${basePath}/products`}
           className="text-sm font-medium text-gray-600 hover:text-gray-900"
         >
-          {t("viewAll")}
+          {t("allProducts")}
         </Link>
       </div>
       <ul className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">

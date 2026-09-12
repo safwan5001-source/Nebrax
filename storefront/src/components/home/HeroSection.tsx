@@ -17,16 +17,17 @@ export async function HeroSection({
     locale: locale as Locale,
     namespace: "home",
   });
-  const displayName = storeName?.trim() || t("identityFallback");
+  const footer = await getTranslations({
+    locale: locale as Locale,
+    namespace: "footer",
+  });
+  const displayName = storeName?.trim() || footer("shop");
 
   return (
     <section className="border-b border-gray-200">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-20">
         <div className="max-w-2xl">
-          <p className="text-sm font-medium tracking-wide text-gray-500">
-            {t("welcomeEyebrow")}
-          </p>
-          <h1 className="mt-3 text-3xl md:text-5xl font-bold tracking-tight text-gray-900">
+          <h1 className="text-3xl md:text-5xl font-bold tracking-tight text-gray-900">
             {t("welcome", { storeName: displayName })}
           </h1>
           <p className="mt-4 text-lg text-gray-600">
