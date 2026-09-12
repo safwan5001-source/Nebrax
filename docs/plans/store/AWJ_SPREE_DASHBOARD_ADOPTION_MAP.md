@@ -1,6 +1,6 @@
 # AWJ × Spree Dashboard — Adoption Map
 
-**Status:** Architecture/design decision support only — no implementation, merge, or deployment authorized
+**Status:** Architecture/design decision support only — implementation explicitly deferred while coding models/agents are unavailable
 **Date:** 2026-09-12
 
 ## 1. Decision
@@ -92,34 +92,84 @@ This changes the earlier default from **"borrow UX, rebuild all admin"** to **"r
 
 The provider pattern is especially relevant: AWJ can remain the pricing and inventory authority while the Commerce UI consumes explicit AWJ providers/contracts. This is preferable to importing Spree product, price or inventory truth.
 
-## 6. Current AWJ implementation that must be preserved
+## 6. Repository evidence pass — 2026-09-12
 
-Repository evidence already contains AWJ Commerce foundations including `CommerceOrder`, `CommerceOrderLine`, order services/reservation work, customer-commerce integration and storefront work. These are not discarded by this decision. The adoption pass is intended to reduce future duplicated admin/UI work, not restart Commerce.
+A focused read-only pass against current `main` confirmed the following:
 
-## 7. Immediate plan change
+### Existing foundation
 
-Before implementing another broad Store Admin surface:
+- `SalesChannel` already exists as a tenant-owned, company-wide Commerce entity and explicitly remains separate from Branch and Warehouse. It supports web, mobile, POS and external channel types.
+- `Storefront` already exists as a tenant-owned hosted-store entity linked to a web `SalesChannel`.
+- Current `Storefront` persistence already carries `slug`, `name`, `is_active` and `default_locale` (Arabic by default).
+- `Storefront` deliberately does **not** currently own branding, theme or SEO configuration; its model documentation explicitly leaves those for later Store Configuration/Design work.
+- The `Storefront` save boundary validates that the selected channel belongs to the same tenant and is of type `web`; this invariant must be preserved by every future admin contract.
+- `StorefrontDomain` and Host-based resolution already establish the Storefront → Tenant → SalesChannel boundary.
+- `CommerceListing`, `CommerceOrder`, fulfillment policy and channel-aware payment availability already build on `SalesChannel`; these foundations must be reused rather than duplicated.
 
-1. Inventory the relevant Spree Dashboard routes/components by capability.
-2. For each **REUSE-CANDIDATE**, check license/dependency boundary, RTL/i18n, accessibility, API coupling and design-system fit.
-3. Define AWJ Store Settings contract before wiring forms.
-4. Preserve deep links into AWJ for ERP-owned resources instead of duplicating CRUD.
-5. Implement commerce-owned settings incrementally behind tenant/store/channel authorization.
-6. Run focused security/tenant tests before wider UI/build tests.
+### Confirmed admin gap
 
-## 8. Recommended next implementation slice
+The existing Commerce Workspace documentation already records that there is **no tenant-scoped ERP admin API** that lists/manages `SalesChannel`, `Storefront` or `StorefrontDomain`. The public storefront endpoint is Host-resolved and must not be repurposed as a client-selected tenant admin endpoint.
 
-**STORE-ADMIN-ADOPT-1 — Store Settings Foundation**
+Because of this gap, the current Commerce Workspace store selector and **View Store** action cannot safely become fully operational yet.
 
-Small scope:
+### Architectural conclusion
 
-- Define/read the existing AWJ Store/SalesChannel/settings evidence first; no speculative schema migration.
-- Map only general store settings and storefront publication/access settings.
+Do **not** create a new Store Settings subsystem from scratch and do not put store configuration directly into `SalesChannel`.
+
+The intended ownership remains:
+
+```text
+SalesChannel
+  = commercial sales channel identity
+        ↓
+Storefront
+  = hosted store identity, status and default locale
+        ↓
+Store Configuration / Design
+  = future commerce-owned branding, storefront access, SEO, theme and other store-specific settings
+```
+
+ERP-owned product, inventory, customer, pricing, payment/accounting and authorization truth remains outside this configuration layer.
+
+## 7. Revised implementation sequence
+
+The earlier broad `STORE-ADMIN-ADOPT-1 — Store Settings Foundation` proposal is split to reduce risk.
+
+### STORE-ADMIN-ADOPT-1A — Store Admin Contract
+
+**Recommended first implementation slice when coding capacity is available.**
+
+Scope:
+
+- Add the minimum authenticated, tenant-scoped ERP admin contract required to read/manage the existing `SalesChannel`, `Storefront` and relevant domain data.
+- Reuse existing models and tenant invariants.
+- Enable the Commerce Workspace store selector and **View Store** against that safe admin contract.
+- Do not repurpose the public Host-resolved storefront API.
+- Do not add branding, SEO, checkout, shipping or payment-gateway configuration.
+- Prefer **no migration** in 1A unless repository evidence during implementation proves one is strictly necessary.
+- Add focused tenant-isolation, authorization and cross-tenant negative tests before broad UI/build tests.
+
+### STORE-ADMIN-ADOPT-1B — Store Settings / Configuration
+
+Only after 1A is stable:
+
+- Define the smallest explicit AWJ Store Configuration contract.
 - Adapt the useful Spree settings information architecture to AWJ design system and Arabic-first RTL.
+- Introduce only commerce-owned settings with a clear persistence owner.
 - Products, inventory, pricing, customers and accounting remain links/read-only context to AWJ authority.
-- No shipping/payment gateway/page-builder expansion in this PR.
-- No merge or deployment without explicit approval.
+- Any DB/API expansion requires a separate tenant-isolation and backward-compatibility review.
 
-## 9. Gate before coding
+## 8. Deferred decision — 2026-09-12
 
-Do not start `STORE-ADMIN-ADOPT-1` until repository evidence confirms where store-scoped settings currently live and whether an existing settings JSON/table/model can safely carry the first slice. Any DB/API expansion requires explicit review for tenant isolation and backward compatibility.
+**Implementation of STORE-ADMIN-ADOPT-1A and 1B is intentionally deferred.**
+
+Reason: the preferred coding models/agents are currently unavailable. There is no operational urgency that justifies spending Work/Codex capacity or starting implementation with a less suitable tool merely to keep the workstream moving.
+
+While deferred:
+
+- The evidence and proposed architecture in this document are the continuation point.
+- Do not restart the Spree/AWJ investigation from zero when coding capacity returns.
+- Do not create migrations, APIs or UI for this workstream in the meantime.
+- Do not merge or deploy anything from this documentation branch without explicit approval.
+
+**Resume point:** `STORE-ADMIN-ADOPT-1A — Store Admin Contract`.
