@@ -3,7 +3,7 @@
 - **Status:** Implemented on branch; PR open; not merged and not deployed.
 - **Summary:** Added a tenant-bound V1 email verification and password recovery flow for AWJ staff authentication, with expiring single-use hashed tokens, neutral recovery responses, rate limiting, conservative token revocation, and minimal Arabic-first UI.
 - **Base SHA:** `23af768262f284f5092fd8922037c291c47aca06`
-- **Head SHA:** `35d04614dca5ceb9b9c77ecab2d557c3a7e0b342`
+- **Head SHA:** `ecb08e29727faf474b5521bc066330767a3f3476`
 - **Branch:** `feat/auth-sec-1-email-password-recovery`
 - **PR:** [#795](https://github.com/safwan5001-source/Nebrax/pull/795)
 
