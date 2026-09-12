@@ -3,9 +3,9 @@
 **Date:** 2026-09-12
 **Status:** IMPLEMENTED ON PR — **NOT MERGED — NOT DEPLOYED**
 **Branch:** `feat/awj-tenant-subdomain-v1`
-**PR:** recorded after PR creation
+**PR:** [#780](https://github.com/safwan5001-source/Nebrax/pull/780)
 **Base SHA:** `50b11b88761682597a418f1c2d465fce2a45e4f8` (`origin/main`, PR-INV-MOV-1 / #773)
-**Head SHA:** recorded after this report commit
+**Head SHA:** `e9b0cbea63d049bcad952fb1a490b55dca7d483a` (implementation). Docs-only SHA is the current branch tip after this PR record.
 
 ---
 
@@ -280,8 +280,9 @@ This PR does not modify production DNS, certificates, or live Vercel/Render sett
 |---|---|
 | Branch | `feat/awj-tenant-subdomain-v1` |
 | Base | `origin/main` @ `50b11b88761682597a418f1c2d465fce2a45e4f8` |
-| PR | recorded after opening |
-| Head SHA | recorded after this report commit |
+| PR | [#780](https://github.com/safwan5001-source/Nebrax/pull/780) |
+| Implementation SHA | `e9b0cbea63d049bcad952fb1a490b55dca7d483a` |
+| Head SHA | `e9b0cbea63d049bcad952fb1a490b55dca7d483a` (code); this docs commit is additive |
 | Merge | **not performed** |
 | Deploy | **not performed** |
 
@@ -289,4 +290,4 @@ This PR does not modify production DNS, certificates, or live Vercel/Render sett
 
 ## Next step
 
-The smallest recommended next action: **review this PR, wait for GitHub CI (PHP SQLite + PostgreSQL and Web CI) to go green, then attach `*.awj.app` DNS + Vercel domains in a separate ops pass — do not merge until CI is green and the security review of the hostname boundary is accepted.**
+The smallest recommended next action: **review [PR #780](https://github.com/safwan5001-source/Nebrax/pull/780), wait for GitHub CI (PHP SQLite + PostgreSQL and Web CI) to go green, then attach `*.awj.app` DNS + Vercel domains in a separate ops pass — do not merge until CI is green and the security review of the hostname boundary is accepted.**
