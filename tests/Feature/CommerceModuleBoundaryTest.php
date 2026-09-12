@@ -49,13 +49,12 @@ class CommerceModuleBoundaryTest extends TestCase
      * بعدم إدخال مسارات *قبل أوانها*؛ تبقى هذه القائمة البيضاء حارساً ضد
      * أي مسار Commerce إضافي غير معتمد.
      *
-     * GET وPUT لمسار publication يشتركان في URI واحد، وRoute collection
-     * يعرض الـURI مرتين لأن لكل method Route مستقلاً.
+     * GET وPUT لمسار publication يشتركان في URI واحد، لذلك يحرس الاختبار
+     * الـURI المعتمد مرة واحدة كما يظهر في Route collection هنا.
      *
      * @var list<string>
      */
     private const ALLOWED_COMMERCE_API_ROUTES = [
-        'api/commerce/workspace/products/{id}/publication',
         'api/commerce/workspace/products/{id}/publication',
         'api/commerce/workspace/storefronts',
     ];
