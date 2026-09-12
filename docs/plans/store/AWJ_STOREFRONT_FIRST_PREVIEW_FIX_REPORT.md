@@ -120,7 +120,7 @@ No other files changed. No migrations. No accounting/inventory/invoice/reservati
 Tests:    74 passed (294 assertions)
 ```
 
-(68 pre-existing + 6 new `RegisterStorefrontDomainCommandTest` tests — all pass, zero regressions.)
+(68 pre-existing + 6 new `RegisterStorefrontDomainCommandTest` tests — all pass, zero regressions.) Re-run a second time directly against a real local **PostgreSQL 16** instance (not just SQLite) after the id-or-slug UUID fix (§15) — same result, 74 passed.
 
 **Full backend suite** (`php artisan test`, no filter): 3433 passed, 19 skipped, 27 failed. **All 27 failures are pre-existing, unrelated to this task** — `FuelReconciliationTest`/`FuelSaleServiceTest`/`FuelSupplyReceivingTest`/`FuelAviRfidServiceTest` (petroleum fuel cost-basis calculations requiring the `bcmath` PHP extension, not installed in this sandbox) and one `DocumentCenterSecureIntakeTest` case — none touch storefront, cart, catalog, or tenant-resolution code. Confirmed by name-matching every failure; zero overlap with files changed in §7.
 
@@ -169,7 +169,7 @@ The new `RegisterStorefrontDomainCommand` was itself tested for the same class o
 
 ## 15. Head SHA
 
-`902d5822615d48a5001540ac4a3c0d01f2666878` (includes a formatting-only follow-up fixing a `biome check` CI failure in the two new test files — no logic change)
+`faa89d2c35b8438d98017ada7d4540b5c8a88ae2` — includes two follow-up commits beyond the initial fix: a formatting-only fix for a `biome check` CI failure in the two new test files, and a real bug fix for the new command (`Tenant`/`SalesChannel` id-or-slug lookups compared a non-UUID slug against a `uuid`-typed PostgreSQL column, which Postgres rejects outright — SQLite let it pass silently, so this only surfaced on the `pgsql` CI job). Fixed with the same `Str::isUuid()` guard already used by `RecordPlatformSubscriptionCommand`; verified against a real local PostgreSQL 16 instance (§8).
 
 ## 16. Risks / Remaining Work
 
