@@ -44,6 +44,17 @@ class CommerceModuleBoundaryTest extends TestCase
         // CommerceOrderServiceTest، لا بهذا الملف.
     ];
 
+    /**
+     * COM-WS-2 أضاف مسار القراءة الإدارية لمساحة عمل التجارة. وعد
+     * `no_commerce_api_route_is_registered_yet` كان بعدم إدخال مسارات
+     * *قبل أوانها*، لا منع هذا المسار المعتمد بعد أن بُني فعلاً.
+     *
+     * @var list<string>
+     */
+    private const ALLOWED_COMMERCE_API_ROUTES = [
+        'api/commerce/workspace/storefronts',
+    ];
+
     /** @test */
     public function the_commerce_boundary_contract_autoloads_and_is_stable(): void
     {
@@ -87,15 +98,18 @@ class CommerceModuleBoundaryTest extends TestCase
         $commerceRoutes = [];
 
         foreach (Route::getRoutes() as $route) {
-            if (str_contains(strtolower($route->uri()), 'commerce')) {
-                $commerceRoutes[] = $route->uri();
+            $uri = $route->uri();
+            if (str_contains(strtolower($uri), 'commerce')) {
+                $commerceRoutes[] = $uri;
             }
         }
 
+        sort($commerceRoutes);
+
         $this->assertSame(
-            [],
+            self::ALLOWED_COMMERCE_API_ROUTES,
             $commerceRoutes,
-            'PR-COM-0 لا يضيف أي مسار API — وُجد: ' . implode('، ', $commerceRoutes)
+            'لا يُسمح بمسارات Commerce API خارج COM-WS-2 — وُجد: ' . implode('، ', $commerceRoutes)
         );
     }
 
@@ -106,6 +120,9 @@ class CommerceModuleBoundaryTest extends TestCase
     // (`inventory_reservations`، `sales_channels`، `fulfillment_policies`).
     // PR-COM-3 يضيف `commerce_listings` — ترحيلاً حقيقياً متوقَّعاً تماماً في
     // نطاقه المعتمد (Master Plan §PHASE 3) — فيصطدم بفحصٍ نصّي عام لم يعد
-    // يحرس شيئاً حقيقياً بعد انتهاء نافذته. `no_commerce_api_route_is_registered_yet`
-    // تبقى قائمة لأن PR-COM-3 لا يضيف مساراً فعلاً — ذلك وعدٌ ما زال صحيحاً.
+    // يحرس شيئاً حقيقياً بعد انتهاء نافذته.
+    //
+    // `no_commerce_api_route_is_registered_yet` بقي يفرض قائمة فارغة حتى
+    // COM-WS-2، الذي أضاف `api/commerce/workspace/storefronts`. القائمة
+    // البيضاء أعلاه تبقي الحارس ضد أي مسار Commerce إضافي غير معتمد.
 }

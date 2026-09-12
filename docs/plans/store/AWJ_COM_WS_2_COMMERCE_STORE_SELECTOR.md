@@ -60,3 +60,11 @@ No commercial entitlement. No new RBAC permission. `self_service` → 403.
 The existing header selector renders returned stores. Selection is in-memory
 workspace state only. View Store is an `<a>` only when the selected row has
 a sanitized server `preview_url`.
+
+## Tests
+
+- PHP isolation: `tests/Feature/CommerceWorkspaceStorefrontsApiTest.php`
+- PR-COM-0 `CommerceModuleBoundaryTest` now allows only
+  `api/commerce/workspace/storefronts` and still fails on any other
+  commerce-named API route (same exception pattern as COM-2A/COM-3 models).
+- Vitest: stores catalog mapping + shell selector / View Store wiring.
