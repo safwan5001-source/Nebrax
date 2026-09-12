@@ -169,7 +169,7 @@ The new `RegisterStorefrontDomainCommand` was itself tested for the same class o
 
 ## 15. Head SHA
 
-`b9a6121ad492b79a7f88b61a0ae6181e317d53a5`
+`902d5822615d48a5001540ac4a3c0d01f2666878` (includes a formatting-only follow-up fixing a `biome check` CI failure in the two new test files — no logic change)
 
 ## 16. Risks / Remaining Work
 
