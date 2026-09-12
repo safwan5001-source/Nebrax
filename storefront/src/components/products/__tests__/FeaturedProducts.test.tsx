@@ -5,6 +5,10 @@ vi.mock("@/lib/spree", () => ({
   getAccessToken: vi.fn().mockResolvedValue(undefined),
 }));
 
+vi.mock("next-intl/server", () => ({
+  getTranslations: vi.fn(async () => (key: string) => key),
+}));
+
 vi.mock("@/components/products/ProductCarousel", () => ({
   ProductCarousel: ({ products }: { products: unknown[] }) => (
     <div data-testid="carousel" data-count={products.length} />
@@ -12,8 +16,11 @@ vi.mock("@/components/products/ProductCarousel", () => ({
 }));
 
 describe("FeaturedProducts (COM-7-PREVIEW-FIX-1)", () => {
-  it("degrades to an empty carousel instead of crashing the homepage when the AWJ catalog API fails", async () => {
+  it("degrades to an empty catalog state instead of crashing the homepage when the AWJ catalog API fails", async () => {
     vi.resetModules();
+    vi.doMock("next-intl/server", () => ({
+      getTranslations: vi.fn(async () => (key: string) => key),
+    }));
     vi.doMock("@/lib/data/products", () => ({
       cachedListProducts: vi
         .fn()
@@ -33,13 +40,16 @@ describe("FeaturedProducts (COM-7-PREVIEW-FIX-1)", () => {
       currency: "SAR",
     });
 
-    const { findByTestId } = render(element);
-    const carousel = await findByTestId("carousel");
-    expect(carousel.getAttribute("data-count")).toBe("0");
+    const { findByText, queryByTestId } = render(element);
+    expect(queryByTestId("carousel")).toBeNull();
+    expect(await findByText("emptyCatalog")).toBeTruthy();
   });
 
   it("passes through the fetched products on success", async () => {
     vi.resetModules();
+    vi.doMock("next-intl/server", () => ({
+      getTranslations: vi.fn(async () => (key: string) => key),
+    }));
     vi.doMock("@/lib/data/products", () => ({
       cachedListProducts: vi.fn().mockResolvedValue({
         data: [{ id: "p1" }, { id: "p2" }],
