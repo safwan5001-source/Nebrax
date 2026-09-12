@@ -181,6 +181,9 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
     // عام (بلا مصادقة)
     Route::post('register', [AuthController::class, 'register'])->middleware('throttle:register');
     Route::post('login', [AuthController::class, 'login'])->middleware('throttle:5,1');
+    Route::post('forgot-password', [AuthController::class, 'forgotPassword'])->middleware('throttle:auth-recovery');
+    Route::post('reset-password', [AuthController::class, 'resetPassword'])->middleware('throttle:auth-reset');
+    Route::post('email/verify', [AuthController::class, 'verifyEmail'])->middleware('throttle:auth-reset');
 
     // Customer Platform: tenant authority is established from the globally
     // unique route slug before credential/token lookup. It never uses payload IDs.
@@ -280,6 +283,7 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         // متاح دائماً (حتى مع اشتراك منتهٍ) لرؤية الحالة والخروج
         Route::post('logout', [AuthController::class, 'logout']);
         Route::get('me', [AuthController::class, 'me']);
+        Route::post('email/verification-notification', [AuthController::class, 'resendVerification'])->middleware('throttle:auth-recovery');
         Route::put('account/preferences', [AccountSettingsController::class, 'updatePreferences']);
         Route::put('account/email', [AccountSettingsController::class, 'updateEmail'])->middleware('throttle:5,1');
         Route::put('account/password', [AccountSettingsController::class, 'updatePassword'])->middleware('throttle:5,1');

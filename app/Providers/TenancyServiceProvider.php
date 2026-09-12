@@ -70,5 +70,13 @@ class TenancyServiceProvider extends ServiceProvider
                 Limit::perMinute(5)->by("customer-login|{$tenant}|email|{$email}"),
             ];
         });
+
+        RateLimiter::for('auth-recovery', fn (Request $request): array => [
+            Limit::perMinute(5)->by('auth-recovery|ip|' . $request->ip()),
+            Limit::perMinute(3)->by('auth-recovery|email|' . Str::lower(trim((string) $request->input('email')))),
+        ]);
+
+        RateLimiter::for('auth-reset', fn (Request $request): Limit =>
+            Limit::perMinute(10)->by('auth-reset|ip|' . $request->ip()));
     }
 }
