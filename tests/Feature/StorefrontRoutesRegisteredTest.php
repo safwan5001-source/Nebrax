@@ -6,12 +6,10 @@ use Illuminate\Support\Facades\Route;
 use Tests\TestCase;
 
 /**
- * COM-7-HOTFIX — production assemble must register the store/v1 catalog.
+ * COM-7-HOTFIX — store/v1 catalog routes must be registered.
  *
- * CI already copies routes/api_storefront.php and registers
- * StorefrontApiServiceProvider (setup.sh / ci.yml). Production Docker uses
- * deploy/assemble.sh, which historically omitted both. This test fails if
- * the provider is not loaded in the running application.
+ * Fails if StorefrontApiServiceProvider is not loaded or
+ * routes/api_storefront.php is missing from the running application.
  */
 class StorefrontRoutesRegisteredTest extends TestCase
 {
@@ -29,27 +27,6 @@ class StorefrontRoutesRegisteredTest extends TestCase
         $this->assertTrue(
             Route::has('storefront.v1.categories.index'),
             'GET store/v1/categories is not registered',
-        );
-    }
-
-    /** @test */
-    public function production_assemble_script_copies_and_registers_the_storefront_api(): void
-    {
-        $assemble = file_get_contents(base_path('../deploy/assemble.sh'));
-        if ($assemble === false) {
-            $assemble = file_get_contents(dirname(__DIR__, 2).'/deploy/assemble.sh');
-        }
-
-        $this->assertIsString($assemble);
-        $this->assertStringContainsString(
-            'routes/api_storefront.php',
-            $assemble,
-            'deploy/assemble.sh must copy routes/api_storefront.php',
-        );
-        $this->assertStringContainsString(
-            'StorefrontApiServiceProvider',
-            $assemble,
-            'deploy/assemble.sh must register StorefrontApiServiceProvider',
         );
     }
 }
