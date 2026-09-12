@@ -28,6 +28,7 @@ use App\Http\Controllers\Api\CashBankAccountController;
 use App\Http\Controllers\Api\ClassificationAnalyticsReportController;
 use App\Http\Controllers\Api\ClassificationController;
 use App\Http\Controllers\Api\CompanyController;
+use App\Http\Controllers\Api\CommerceWorkspaceStorefrontsController;
 use App\Http\Controllers\Api\CorporateFuelContractController;
 use App\Http\Controllers\Api\ContactController;
 use App\Http\Controllers\Api\CustomerAuthController;
@@ -767,6 +768,11 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::get('applications', [TenantApplicationController::class, 'index'])->middleware($perm('apps.view'));
         Route::post('applications/enable', [TenantApplicationController::class, 'enable'])->middleware($perm('apps.manage'));
         Route::post('applications/disable', [TenantApplicationController::class, 'disable'])->middleware($perm('apps.manage'));
+
+        // COM-WS-2: قائمة متاجر الويب للمستأجر الحالي فقط. ليست واجهة
+        // المتجر العامة المحسومة بالنطاق، ولا تُغلق بـ commerce.storefront
+        // (coming_soon كان سيمنع كل مستخدمي مساحة العمل).
+        Route::get('commerce/workspace/storefronts', [CommerceWorkspaceStorefrontsController::class, 'index']);
 
         // Cycle 0: Workspace foundation only. لا CRUD ولا مبيعات ولا اتصال أجهزة
         // قبل دوراتها، لكن هذا المسار يثبت سلسلة RBAC + entitlement + حالة التطبيق.

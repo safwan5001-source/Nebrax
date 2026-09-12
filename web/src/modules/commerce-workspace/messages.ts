@@ -10,7 +10,7 @@ export const COMMERCE_WORKSPACE_MESSAGES = {
     storeSelectorLabel: 'المتجر الحالي',
     storeSelectorUnavailable: 'قائمة المتاجر غير متاحة بعد',
     storeSelectorUnavailableHint:
-      'لا توجد واجهة برمجية إدارية جاهزة لسرد المتاجر أو القنوات داخل أَوْج. لن يُخترع مصدر بيانات موازٍ.',
+      'تعذر تحميل قائمة المتاجر من أَوْج. لن يُخترع مصدر بيانات موازٍ.',
     storeSelectorEmpty: 'لا يوجد متجر يمكن اختياره',
     storeSelectorLoading: 'جارٍ تحميل المتاجر',
     viewStore: 'عرض المتجر',
@@ -51,7 +51,7 @@ export const COMMERCE_WORKSPACE_MESSAGES = {
     storeSelectorLabel: 'Current store',
     storeSelectorUnavailable: 'Store list is not available yet',
     storeSelectorUnavailableHint:
-      'AWJ has no tenant-scoped admin API yet to list stores or sales channels. A parallel data source will not be invented here.',
+      'The store list could not be loaded from AWJ. A parallel data source will not be invented here.',
     storeSelectorEmpty: 'No store is available to select',
     storeSelectorLoading: 'Loading stores',
     viewStore: 'View store',

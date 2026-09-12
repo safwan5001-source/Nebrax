@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import {
   loadCommerceStoreCatalog,
   resolveViewStoreUrl,
@@ -18,8 +18,19 @@ type CommerceStoreContextValue = {
 const CommerceStoreContext = createContext<CommerceStoreContextValue | null>(null);
 
 export function CommerceStoreProvider({ children }: { children: ReactNode }) {
-  const catalog = useMemo(() => loadCommerceStoreCatalog(), []);
+  const [catalog, setCatalog] = useState<CommerceStoreCatalog>({ status: 'loading' });
   const [requestedId, setRequestedId] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    loadCommerceStoreCatalog().then((next) => {
+      if (!cancelled) setCatalog(next);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const selectedStoreId = selectStoreId(catalog, requestedId);
   const viewStoreUrl = resolveViewStoreUrl(catalog, selectedStoreId);
 
