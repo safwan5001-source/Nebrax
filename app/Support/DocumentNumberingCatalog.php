@@ -33,6 +33,7 @@ use App\Models\ReturnDocument;
 use App\Models\StockPermit;
 use App\Models\Stocktake;
 use App\Models\SupplierRefund;
+use App\Models\CustomerRefund;
 use App\Models\Warehouse;
 
 /**
@@ -142,6 +143,11 @@ class DocumentNumberingCatalog
             'model'  => SupplierRefund::class,
             'yearly' => true,
             'series' => [['key' => 'default', 'prefix' => 'SRF']],
+        ],
+        'customer_refund' => [
+            'model'  => CustomerRefund::class,
+            'yearly' => true,
+            'series' => [['key' => 'default', 'prefix' => 'CRF']],
         ],
         'credit_note' => [
             'model'  => CreditNote::class,
