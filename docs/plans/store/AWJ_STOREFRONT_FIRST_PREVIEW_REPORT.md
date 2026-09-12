@@ -163,7 +163,7 @@ End-to-end manual verification: see §6–§9 (live curl requests + two browser 
 | Branch | `claude/storefront-preview-gate` |
 | PR | (to be opened — documentation only, zero application code changes) |
 | Base SHA | `11ed2ff141ec7d6e1faa56d3000820fd4d76e25d` (main) |
-| Head SHA | (set after commit) |
+| Head SHA | `d5cba397dfcb18c39da2c2283c06f7ed34946278` |
 
 ## 14. Recommended Next Action
 
