@@ -59,9 +59,14 @@ export async function getCart(
   const spreeToken = await getCartToken(surface);
   const token = await getAccessToken();
   const cartId = explicitCartId ?? (await getCartId(surface));
-  const client = getClientForSurface(surface);
 
   if (!cartId && !token) return null;
+
+  // Constructed only once we know a lookup is actually needed: a fresh
+  // visitor with no cart cookie and no auth token (every first-time COM-7-P1
+  // preview visit) must never require the Spree client to be configured —
+  // the AWJ storefront's catalog surfaces are read-only and Spree-free.
+  const client = getClientForSurface(surface);
 
   try {
     if (cartId) {
