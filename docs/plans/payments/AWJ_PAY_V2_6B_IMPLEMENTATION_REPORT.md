@@ -14,7 +14,8 @@ Read first (on unmerged [PR #778](https://github.com/safwan5001-source/Nebrax/pu
 | Branch | `feat/pay-v2-6b-customer-refund-foundation` |
 | PR | recorded after open |
 | Base SHA | `50b11b88761682597a418f1c2d465fce2a45e4f8` (`main` / PR-INV-MOV-1 #773) |
-| Head SHA | `e38a0ea32e4f804e32def8d48872901583fe9125` |
+| Implementation SHA | `a128e7bf3fc1e74e58d29481a7052469c476f468` |
+| Head SHA | PR head of `feat/pay-v2-6b-customer-refund-foundation` after push |
 | Draft / merge / deploy | Open PR. **Not merged. Not deployed.** |
 
 ---
