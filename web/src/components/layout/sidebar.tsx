@@ -83,8 +83,75 @@ interface NavItem {
   href: string;
   icon: LucideIcon;
   key: string;
+  /** الوحدات الجاهزة لها شاشة؛ غيرها رابط بشارة «قريباً» حتى تُبنى. */
   built?: boolean;
   appKey?: string;
   permission?: string;
   openInNewTab?: boolean;
 }
+
+interface NavGroup {
+  title: string;
+  icon: LucideIcon;
+  items: NavItem[];
+  appKey?: string;
+  permission?: string;
+}
+
+const POS_NAV_ICONS: Record<(typeof POS_SIDEBAR_LAUNCH_ITEMS)[number]['key'], LucideIcon> = {
+  posStart: Store,
+  posSessions: Clock,
+  posReport: Receipt,
+  posAudit: ClipboardCheck,
+  posSettings: SlidersHorizontal,
+};
+
+const GROUPS: NavGroup[] = [
+  {
+    title: 'sales',
+    icon: Receipt,
+    items: [
+      { href: '/invoices', icon: FileText, key: 'invoicesManage', built: true },
+      { href: '/delivery-notes', icon: ClipboardCheck, key: 'deliveryNotes', built: true, appKey: 'sales.invoicing', permission: 'delivery_notes.view' },
+      { href: '/invoices/new', icon: FilePlus, key: 'invoiceCreate', built: true },
+      { href: '/quotes', icon: ClipboardList, key: 'quotesManage', built: true },
+      { href: '/quotes/new', icon: FilePlus2, key: 'quoteCreate', built: true },
+      { href: '/credit-notes', icon: FileMinus, key: 'creditNotes', built: true },
+      { href: '/returns', icon: Undo2, key: 'salesReturns', built: true },
+      { href: '/recurring-invoices', icon: CalendarClock, key: 'recurringInvoices', built: true },
+      { href: '/payments', icon: CreditCard, key: 'customerPayments', built: true },
+      { href: '/customer-refunds', icon: Banknote, key: 'customerRefunds', built: true, permission: 'customer_refunds.view' },
+      { href: '/sales-settings', icon: SlidersHorizontal, key: 'salesSettings', built: true },
+    ],
+  },
+  {
+    title: 'pos',
+    icon: Store,
+    appKey: 'sales.pos',
+    items: POS_SIDEBAR_LAUNCH_ITEMS.map((item) => ({
+      ...item,
+      icon: POS_NAV_ICONS[item.key],
+      built: true,
+      ...(item.key === 'posAudit' ? { permission: 'pos.audit.view' } : {}),
+    })),
+  },
+  {
+    title: 'ecommerce',
+    icon: ShoppingCart,
+    items: [
+      { href: '/commerce', icon: ShoppingCart, key: 'ecommerce', built: true },
+    ],
+  },
+  {
+    title: 'customers',
+    icon: Users,
+    items: [
+      { href: '/partners', icon: Users, key: 'customersManage', built: true },
+      { href: '/partners/new', icon: UserPlus, key: 'customerCreate', built: true },
+      { href: '/appointments', icon: CalendarCheck, key: 'appointments', built: true },
+      { href: '/contacts', icon: Contact, key: 'contactList', built: true },
+      { href: '/crm', icon: Handshake, key: 'crm', built: true, appKey: 'crm.follow_up' },
+      { href: '/customer-settings', icon: SlidersHorizontal, key: 'customerSettings', built: true },
+    ],
+  },
+];
