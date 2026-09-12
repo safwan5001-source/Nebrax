@@ -1,17 +1,13 @@
 /**
- * Store selector / View Store foundation.
+ * Store selector / View Store catalog.
  *
- * Inspected existing contracts on main:
- * - Public `GET store/v1/storefront` resolves tenant + store from Host via
- *   StorefrontDomain. It is not an ERP admin list and must not be called with
- *   a client-chosen tenant or host.
- * - `SalesChannel` and `Storefront` are tenant-owned models, but there is no
- *   authenticated ERP list/show API for either in `routes/api.php`.
- *
- * This module therefore does not invent a commerce store API. The workspace
- * keeps the selector and View Store action in an explicit unavailable state
- * until a tenant-scoped admin contract exists.
+ * Tenant authority is server-side (SetTenant → TenantContext). This module
+ * only fetches the current session's admin list and never sends a tenant,
+ * storefront, or domain identifier as authority. Public GET store/v1/storefront
+ * is Host-resolved buyer traffic and must not be called here.
  */
+
+import { api } from '@/lib/api';
 
 export type CommerceStoreOption = {
   id: string;
@@ -22,20 +18,74 @@ export type CommerceStoreOption = {
 };
 
 export type CommerceStoreCatalog =
+  | { status: 'loading' }
   | { status: 'unavailable'; reason: 'missing_admin_api' }
   | { status: 'ready'; stores: CommerceStoreOption[] }
   | { status: 'empty' }
   | { status: 'error'; message: string };
 
-/** No tenant-scoped admin list path exists on current main. Keep null. */
-export const COMMERCE_STORE_ADMIN_LIST_PATH: string | null = null;
+/** Tenant-scoped ERP admin list. Not the public Host-resolved storefront API. */
+export const COMMERCE_STORE_ADMIN_LIST_PATH = '/commerce/workspace/storefronts';
 
-export function loadCommerceStoreCatalog(): CommerceStoreCatalog {
-  if (COMMERCE_STORE_ADMIN_LIST_PATH === null) {
+export async function loadCommerceStoreCatalog(): Promise<CommerceStoreCatalog> {
+  if (!COMMERCE_STORE_ADMIN_LIST_PATH) {
     return { status: 'unavailable', reason: 'missing_admin_api' };
   }
 
-  return { status: 'unavailable', reason: 'missing_admin_api' };
+  try {
+    const payload = await api<unknown>(COMMERCE_STORE_ADMIN_LIST_PATH);
+    return mapCommerceStoreAdminList(payload);
+  } catch {
+    return { status: 'error', message: 'load_failed' };
+  }
+}
+
+export function mapCommerceStoreAdminList(payload: unknown): CommerceStoreCatalog {
+  const storesRaw = extractStores(payload);
+  if (storesRaw === null) {
+    return { status: 'error', message: 'invalid_payload' };
+  }
+
+  const stores = storesRaw
+    .map(mapStoreOption)
+    .filter((store): store is CommerceStoreOption => store !== null);
+
+  if (stores.length === 0) return { status: 'empty' };
+  return { status: 'ready', stores };
+}
+
+function extractStores(payload: unknown): unknown[] | null {
+  if (!payload || typeof payload !== 'object') return null;
+  const data = (payload as { data?: unknown }).data;
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return null;
+  const stores = (data as { stores?: unknown }).stores;
+  return Array.isArray(stores) ? stores : null;
+}
+
+function mapStoreOption(raw: unknown): CommerceStoreOption | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const row = raw as Record<string, unknown>;
+  if (typeof row.id !== 'string' || row.id === '') return null;
+  if (typeof row.name !== 'string' || row.name === '') return null;
+
+  return {
+    id: row.id,
+    name: row.name,
+    salesChannelId: typeof row.sales_channel_id === 'string' ? row.sales_channel_id : null,
+    isActive: row.is_active === true,
+    previewUrl: sanitizePreviewUrl(row.preview_url),
+  };
+}
+
+function sanitizePreviewUrl(value: unknown): string | null {
+  if (typeof value !== 'string' || value === '') return null;
+  try {
+    const url = new URL(value);
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') return null;
+    return url.toString();
+  } catch {
+    return null;
+  }
 }
 
 export function resolveViewStoreUrl(
@@ -45,13 +95,7 @@ export function resolveViewStoreUrl(
   if (catalog.status !== 'ready' || !selectedStoreId) return null;
   const store = catalog.stores.find((item) => item.id === selectedStoreId);
   if (!store?.previewUrl) return null;
-  try {
-    const url = new URL(store.previewUrl);
-    if (url.protocol !== 'https:' && url.protocol !== 'http:') return null;
-    return url.toString();
-  } catch {
-    return null;
-  }
+  return sanitizePreviewUrl(store.previewUrl);
 }
 
 export function selectStoreId(

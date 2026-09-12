@@ -3151,6 +3151,7 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
     return resolve({ data: list });
   }
   if (clean === '/manual-journals') return resolve({ data: mockManualJournals });
+  if (clean === '/commerce/workspace/storefronts') return resolve({ data: { stores: [] } });
   if (clean === '/fuel-stations/workspace') return resolve({ data: { stations: mockFuelStations } });
   if (clean === '/fuel-stations/dashboard') return resolve({ data: mockFuelDashboard });
   if (clean === '/fuel-stations/devices') return resolve({ data: mockFuelDevices });

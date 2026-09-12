@@ -98,7 +98,7 @@ export function CommerceWorkspaceShell({ children }: { children: React.ReactNode
           ) : (
             <span
               className="inline-flex h-9 max-w-64 items-center gap-1.5 px-2 text-sm text-muted"
-              title={catalog.status === 'unavailable' ? t('storeSelectorUnavailableHint') : undefined}
+              title={catalog.status === 'unavailable' || catalog.status === 'error' ? t('storeSelectorUnavailableHint') : undefined}
             >
               <Store className="h-4 w-4 shrink-0" strokeWidth={1.7} />
               <span className="truncate">
@@ -106,7 +106,9 @@ export function CommerceWorkspaceShell({ children }: { children: React.ReactNode
                   ? selectedStore.name
                   : catalog.status === 'empty'
                     ? t('storeSelectorEmpty')
-                    : t('storeSelectorUnavailable')}
+                    : catalog.status === 'loading'
+                      ? t('storeSelectorLoading')
+                      : t('storeSelectorUnavailable')}
               </span>
             </span>
           )}
