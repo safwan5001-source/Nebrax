@@ -15,6 +15,7 @@ final class DocumentReadinessCommand extends Command
 
     /** @var list<string> */
     private const REQUIRED_TABLES = [
+        'jobs',
         'document_batches',
         'document_workflow_events',
         'document_files',
@@ -63,6 +64,7 @@ final class DocumentReadinessCommand extends Command
             'schema' => [
                 'all_required_tables_present' => $missingTables === [],
                 'missing_tables' => $missingTables,
+                'failed_jobs_present' => Schema::hasTable('failed_jobs'),
             ],
             'runtime' => [
                 'processing_mode' => $runtime['processing_mode'] ?? 'async',
