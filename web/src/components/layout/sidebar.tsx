@@ -78,3 +78,13 @@ import { api } from '@/lib/api';
 import { currentUser } from '@/lib/auth';
 import { hiddenApplicationKeys, isNavEntryVisible } from '@/components/layout/nav-visibility';
 import { POS_SIDEBAR_LAUNCH_ITEMS, posNavNewTabAnchorProps } from '@/lib/pos-workspace';
+
+interface NavItem {
+  href: string;
+  icon: LucideIcon;
+  key: string;
+  built?: boolean;
+  appKey?: string;
+  permission?: string;
+  openInNewTab?: boolean;
+}
