@@ -23,6 +23,8 @@ services:
         sync: false               # ولّده: php artisan key:generate --show
       - key: FRONTEND_URL
         sync: false               # نطاق الواجهة على Vercel (مثل https://nibras.vercel.app)
+      - key: STOREFRONT_GATEWAY_SECRET
+        sync: false               # سرّ مشترك مع storefront/ (COM-7-P2B) — ولّده عشوائياً، اضبطه بنفس القيمة على Vercel
       - key: APP_ENV
         value: production
       - key: APP_DEBUG
