@@ -885,13 +885,13 @@ class CustomerRefundTest extends TestCase
     {
         $branchA = Branch::create(['code' => '00002', 'name' => 'فرع أ', 'is_main' => false]);
         $branchB = Branch::create(['code' => '00003', 'name' => 'فرع ب', 'is_main' => false]);
-        // أرقام المرتجعات فريدة على (tenant_id, number) بلا فرع — يُوسَم الفرع
-        // بعد الترحيل حتى لا يصطدم تسلسل SRET لكل فرع بنفس الرقم.
+        // أرقام المرتجعات فريدة على (tenant_id, number) بلا فرع. تُنشأ الثلاثة
+        // أولاً حتى يأخذ كلٌّ رقماً متسلسلاً، ثم يُوسَم الفرع.
         $onA = $this->postedSalesReturn(10000, 2);
-        $onA->forceFill(['branch_id' => $branchA->id])->save();
         $onB = $this->postedSalesReturn(5000, 2);
-        $onB->forceFill(['branch_id' => $branchB->id])->save();
         $unbranched = $this->postedSalesReturn(10000, 1);
+        $onA->forceFill(['branch_id' => $branchA->id])->save();
+        $onB->forceFill(['branch_id' => $branchB->id])->save();
 
         $visibleOnA = $this->onBranch($branchA->id, fn () => collect($this->refunds->eligibleSources($this->customer->id)));
         $this->assertTrue($visibleOnA->contains('id', $onA->id));
