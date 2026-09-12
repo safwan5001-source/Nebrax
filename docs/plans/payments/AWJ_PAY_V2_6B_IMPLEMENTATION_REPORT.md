@@ -18,6 +18,8 @@ Read first (on unmerged [PR #778](https://github.com/safwan5001-source/Nebrax/pu
 | Head SHA | PR head of `feat/pay-v2-6b-customer-refund-foundation` (this docs SHA follows the implementation commit) |
 | Draft / merge / deploy | Open PR. **Not merged. Not deployed.** |
 
+**P1 (this pass):** branch attribution — Customer Refund inherits `branch_id` from allocated commercial sources; mixed-branch allocation and independent/unrelated branch choice are rejected. Accounting journal unchanged.
+
 ---
 
 ## Pre-implementation accounting evidence
@@ -83,7 +85,24 @@ Not `Invoice.paid_amount`. Not a stored running balance. Cash commercial documen
 
 ### 6. Is branch attribution unambiguous?
 
-**Yes.** Nearest approved pattern is `SupplierRefund`: `BelongsToBranch` (tagged, no global BranchScope) + journal `branch_id` taken from the refund document, not the active branch at post time. Allocations are `CompanyWide` and follow the header. Controller lists use `scopeToActiveBranch()`; show/post/reverse use `assertRecordAccessible()`.
+**P1 fix:** the refund must **not** choose a branch independently of its allocated commercial correction(s).
+
+Proven canonical evidence (not invented):
+
+- Delivery-note → invoice eligibility rejects `branch_mismatch` and mixed warehouse/customer (`DeliveryNoteSalesInvoiceDraftBuilder`).
+- POS returns require same session/branch/warehouse as the source.
+- Journal lines of a financial document follow **that document's** `branch_id` (`LedgerService` when `branch_id` is passed; Supplier Refund / this refund).
+- A sales return credits AR on the return's branch. A refund that posted `Dr AR` on a **different** branch would silently reclassify per-branch AR with no approved policy.
+
+**Rule implemented (fail closed):**
+
+1. Every allocated source on one Customer Refund must share the exact same `branch_id` (`null` is a distinct value). Mixed-branch allocation is rejected — no approved cross-branch allocation policy exists.
+2. The refund **inherits** that shared source branch. An explicit `branch_id` that differs is rejected. An active `BranchContext` that differs is rejected (same writing-branch contract as delivery-note invoicing).
+3. `BelongsToBranch` must not stamp the active writing branch onto a refund whose sources are unbranched; after create the stored `branch_id` is forced back to the source branch if they diverged.
+4. `post()` re-checks the locked sources against `refund.branch_id` so a later source-branch change cannot post.
+5. `eligibleSources()` under an active `BranchContext` returns only sources on that branch, so the create screen cannot offer documents that would fail allocation.
+
+Controller lists still use `scopeToActiveBranch()`; show/post/reverse still use `assertRecordAccessible()`. Accounting journal is unchanged: `Dr AR / Cr Cash-Bank` tagged with the inherited source branch.
 
 ### HARD STOP rule
 
@@ -205,7 +224,7 @@ No FK onto `return_documents` / `credit_notes` because the target is polymorphic
 - Foreign-tenant cash account rejected by `CashBankAccountService::resolveForPayment()` (`a_refund_cannot_use_another_tenants_cash_account`).
 - Second tenant sees zero refunds/allocations and cannot see the first tenant's returns (`refunds_are_isolated_per_tenant`).
 - Wrong customer rejected (`allocation_to_another_customers_return_is_rejected`). Supplier partner rejected (`a_supplier_partner_cannot_receive_a_customer_refund`).
-- Branch: document tagged; journal lines take the document's `branch_id` (`a_refund_keeps_the_branch_of_its_document_on_the_journal`). Controller `scopeToActiveBranch` / `assertRecordAccessible` follow Supplier Refund.
+- Branch: inherited from allocated sources; mixed-branch allocation rejected; explicit/context mismatch rejected (`a_refund_inherits_the_source_branch_and_posts_the_journal_there`, `an_explicit_refund_branch_that_does_not_match_the_source_is_rejected`, `allocation_across_sources_from_different_branches_is_rejected`, `eligible_sources_under_an_active_branch_do_not_include_other_branch_documents`). Controller `scopeToActiveBranch` / `assertRecordAccessible` follow Supplier Refund.
 
 ---
 
@@ -237,7 +256,7 @@ No silent backdate to invoice / return / original payment date. The refund's own
 
 ## Tests and results
 
-`tests/Feature/CustomerRefundTest.php` — **41 tests**. Mapping to the required coverage:
+`tests/Feature/CustomerRefundTest.php` — **47 tests**. Mapping to the required coverage:
 
 | Required | Test |
 |---|---|
@@ -256,6 +275,8 @@ No silent backdate to invoice / return / original payment date. The refund's own
 | 13 reversal journal correct | `reversing_a_refund_reverses_the_original_entry_and_restores_the_balance`, `reversal_uses_the_original_concrete_accounts_even_after_remapping` |
 | 14 duplicate posting cannot double-post | `posting_the_same_refund_twice_creates_only_one_journal` |
 | 15 reversed refund balance behavior | `a_reversed_refund_frees_the_balance_for_a_new_refund` plus restore-balance assertion in the reverse test |
+
+P1 branch attribution: `a_refund_inherits_the_source_branch_and_posts_the_journal_there`, `an_explicit_refund_branch_that_does_not_match_the_source_is_rejected`, `a_writing_branch_context_that_does_not_match_the_source_is_rejected`, `allocation_across_sources_from_different_branches_is_rejected`, `same_branch_return_and_credit_note_can_share_a_refund`, `posting_rejects_when_a_source_branch_no_longer_matches_the_refund`, `eligible_sources_under_an_active_branch_do_not_include_other_branch_documents`.
 
 Additional: cash-return / cash-credit-note rejection; purchase-return rejection; draft-source rejection; unallocated / partial-allocation-sum rejection; duplicate allocation inside one refund; mixed return+credit-note split; eligible-sources filter; numbering `CRF-{year}-00001`; commercial document unchanged (status/total/journal_entry_id, `Payment` count = 0); period-lock reverse; duplicate reverse rejected; posted cannot be edited/deleted; RBAC independence; accountant API 403.
 

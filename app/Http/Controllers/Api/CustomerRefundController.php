@@ -44,6 +44,8 @@ class CustomerRefundController extends ApiController
     /**
      * التصحيحات التجارية المرحّلة لعميل ولها رصيد قابل للاسترداد — تغذّي
      * شاشة الإنشاء بالأرقام الفعلية بدل أن تحسبها الواجهة بنفسها.
+     * الخدمة تحصر المصادر بفرع الكتابة النشط إن وُجد، فلا تُعرض تصحيحات
+     * لا يمكن تخصيصها تحت قاعدة وراثة الفرع.
      */
     public function eligibleSources(string $partnerId): JsonResponse
     {

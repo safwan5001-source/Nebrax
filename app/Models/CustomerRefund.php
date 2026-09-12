@@ -16,6 +16,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * وهذا المستند وحده يُخرج النقد — مدين العملاء ودائن الخزينة/البنك المختار
  * (CashBankAccount). لا يُعاد استخدام `Payment(direction=paid)` (ذاك صرف مورّد).
  *
+ * الفرع يُورَّث من التصحيح التجاري المخصَّص ولا يُختار مستقلاً عنه.
+ *
  * دورة الحياة: draft → posted → reversed. المرحّل لا يُعدَّل ولا يُحذف؛
  * التصحيح بعكسٍ عبر `LedgerService::reverse()`.
  */

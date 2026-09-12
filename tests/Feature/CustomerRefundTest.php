@@ -25,6 +25,7 @@ use App\Services\Accounting\CreditNoteService;
 use App\Services\Accounting\CustomerRefundService;
 use App\Services\Accounting\ReturnService;
 use App\Support\DocumentNumberingCatalog;
+use App\Tenancy\BranchContext;
 use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use RuntimeException;
@@ -125,6 +126,29 @@ class CustomerRefundTest extends TestCase
             array_merge(['partner_id' => $source->partner_id, 'amount' => $amount, 'method' => 'cash'], $overrides),
             [['source_type' => $kind, 'source_id' => $source->id, 'amount' => $amount]],
         );
+    }
+
+    /** ينفّذ الإغلاق داخل فرع كتابة محدد ثم يعيد السياق السابق. */
+    private function onBranch(?string $branchId, callable $fn): mixed
+    {
+        $ctx = app(BranchContext::class);
+        $previous = $ctx->id();
+        $branchId === null ? $ctx->forget() : $ctx->set($branchId);
+        try {
+            return $fn();
+        } finally {
+            $previous === null ? $ctx->forget() : $ctx->set($previous);
+        }
+    }
+
+    private function postedSalesReturnOnBranch(string $branchId, int $unitPrice = 10000, int $quantity = 2, ?Partner $customer = null): ReturnDocument
+    {
+        return $this->onBranch($branchId, fn () => $this->postedSalesReturn($unitPrice, $quantity, $customer));
+    }
+
+    private function postedCreditNoteOnBranch(string $branchId, int $unitPrice = 10000, int $quantity = 1, ?Partner $customer = null): CreditNote
+    {
+        return $this->onBranch($branchId, fn () => $this->postedCreditNote($unitPrice, $quantity, $customer));
     }
 
     // ─────────────────────── قيد استرداد العميل ───────────────────────
@@ -755,23 +779,129 @@ class CustomerRefundTest extends TestCase
     }
 
     /** @test */
-    public function a_refund_keeps_the_branch_of_its_document_on_the_journal(): void
+    public function a_refund_inherits_the_source_branch_and_posts_the_journal_there(): void
     {
         $branch = Branch::create(['code' => '00002', 'name' => 'فرع ثانٍ', 'is_main' => false]);
-        $return = $this->postedSalesReturn();
+        $return = $this->postedSalesReturnOnBranch($branch->id);
 
-        $refund = $this->refunds->create(
-            ['partner_id' => $this->customer->id, 'amount' => 23000, 'method' => 'cash', 'branch_id' => $branch->id],
-            [['source_type' => 'sales_return', 'source_id' => $return->id, 'amount' => 23000]],
-        );
+        $this->assertSame($branch->id, $return->branch_id);
+
+        $refund = $this->refundFor($return, 23000);
+        $this->assertSame($branch->id, $refund->branch_id);
+
         $posted = $this->refunds->post($refund);
-
         $this->assertSame($branch->id, $posted->branch_id);
+
         $entry = JournalEntry::with('lines')->findOrFail($posted->journal_entry_id);
         $this->assertNotEmpty($entry->lines);
         foreach ($entry->lines as $line) {
             $this->assertSame($branch->id, $line->branch_id);
         }
+    }
+
+    /** @test */
+    public function an_explicit_refund_branch_that_does_not_match_the_source_is_rejected(): void
+    {
+        $sourceBranch = Branch::create(['code' => '00002', 'name' => 'فرع المصدر', 'is_main' => false]);
+        $otherBranch = Branch::create(['code' => '00003', 'name' => 'فرع آخر', 'is_main' => false]);
+        $return = $this->postedSalesReturnOnBranch($sourceBranch->id);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('فرع الاسترداد يجب أن يطابق فرع التصحيح التجاري المخصَّص.');
+        $this->refundFor($return, 23000, ['branch_id' => $otherBranch->id]);
+    }
+
+    /** @test */
+    public function a_writing_branch_context_that_does_not_match_the_source_is_rejected(): void
+    {
+        $sourceBranch = Branch::create(['code' => '00002', 'name' => 'فرع المصدر', 'is_main' => false]);
+        $otherBranch = Branch::create(['code' => '00003', 'name' => 'فرع الكتابة', 'is_main' => false]);
+        $return = $this->postedSalesReturnOnBranch($sourceBranch->id);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('فرع الاسترداد يجب أن يطابق فرع التصحيح التجاري المخصَّص.');
+        $this->onBranch($otherBranch->id, fn () => $this->refundFor($return, 23000));
+    }
+
+    /** @test */
+    public function allocation_across_sources_from_different_branches_is_rejected(): void
+    {
+        $branchA = Branch::create(['code' => '00002', 'name' => 'فرع أ', 'is_main' => false]);
+        $branchB = Branch::create(['code' => '00003', 'name' => 'فرع ب', 'is_main' => false]);
+        $return = $this->postedSalesReturnOnBranch($branchA->id, 10000, 2);
+        $note = $this->postedCreditNoteOnBranch($branchB->id, 10000, 1);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('لا يمكن تخصيص تصحيحات تجارية من فروع مختلفة في استرداد واحد.');
+        $this->refunds->create(
+            ['partner_id' => $this->customer->id, 'amount' => 34500, 'method' => 'cash'],
+            [
+                ['source_type' => 'sales_return', 'source_id' => $return->id, 'amount' => 23000],
+                ['source_type' => 'credit_note', 'source_id' => $note->id, 'amount' => 11500],
+            ],
+        );
+    }
+
+    /** @test */
+    public function same_branch_return_and_credit_note_can_share_a_refund(): void
+    {
+        $branch = Branch::create(['code' => '00002', 'name' => 'فرع مشترك', 'is_main' => false]);
+        $return = $this->postedSalesReturnOnBranch($branch->id, 10000, 2);
+        $note = $this->postedCreditNoteOnBranch($branch->id, 10000, 1);
+
+        $refund = $this->onBranch($branch->id, fn () => $this->refunds->create(
+            ['partner_id' => $this->customer->id, 'amount' => 34500, 'method' => 'cash'],
+            [
+                ['source_type' => 'sales_return', 'source_id' => $return->id, 'amount' => 23000],
+                ['source_type' => 'credit_note', 'source_id' => $note->id, 'amount' => 11500],
+            ],
+        ));
+        $posted = $this->onBranch($branch->id, fn () => $this->refunds->post($refund));
+
+        $this->assertSame($branch->id, $posted->branch_id);
+        $entry = JournalEntry::with('lines')->findOrFail($posted->journal_entry_id);
+        foreach ($entry->lines as $line) {
+            $this->assertSame($branch->id, $line->branch_id);
+        }
+    }
+
+    /** @test */
+    public function posting_rejects_when_a_source_branch_no_longer_matches_the_refund(): void
+    {
+        $sourceBranch = Branch::create(['code' => '00002', 'name' => 'فرع المصدر', 'is_main' => false]);
+        $otherBranch = Branch::create(['code' => '00003', 'name' => 'فرع محرَّف', 'is_main' => false]);
+        $return = $this->postedSalesReturnOnBranch($sourceBranch->id);
+        $refund = $this->refundFor($return, 23000);
+
+        $return->forceFill(['branch_id' => $otherBranch->id])->save();
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('فرع الاسترداد يجب أن يطابق فرع التصحيح التجاري المخصَّص.');
+        $this->refunds->post($refund);
+    }
+
+    /** @test */
+    public function eligible_sources_under_an_active_branch_do_not_include_other_branch_documents(): void
+    {
+        $branchA = Branch::create(['code' => '00002', 'name' => 'فرع أ', 'is_main' => false]);
+        $branchB = Branch::create(['code' => '00003', 'name' => 'فرع ب', 'is_main' => false]);
+        $onA = $this->postedSalesReturnOnBranch($branchA->id, 10000, 2);
+        $onB = $this->postedSalesReturnOnBranch($branchB->id, 5000, 2);
+        $unbranched = $this->postedSalesReturn(10000, 1);
+
+        $visibleOnA = $this->onBranch($branchA->id, fn () => collect($this->refunds->eligibleSources($this->customer->id)));
+        $this->assertTrue($visibleOnA->contains('id', $onA->id));
+        $this->assertFalse($visibleOnA->contains('id', $onB->id));
+        $this->assertFalse($visibleOnA->contains('id', $unbranched->id));
+
+        $visibleOnB = $this->onBranch($branchB->id, fn () => collect($this->refunds->eligibleSources($this->customer->id)));
+        $this->assertTrue($visibleOnB->contains('id', $onB->id));
+        $this->assertFalse($visibleOnB->contains('id', $onA->id));
+
+        $withoutContext = collect($this->refunds->eligibleSources($this->customer->id));
+        $this->assertTrue($withoutContext->contains('id', $onA->id));
+        $this->assertTrue($withoutContext->contains('id', $onB->id));
+        $this->assertTrue($withoutContext->contains('id', $unbranched->id));
     }
 
     // ─────────────────────────── الصلاحيات و API ───────────────────────────

@@ -9,6 +9,7 @@ use App\Models\Partner;
 use App\Models\PaymentMethod;
 use App\Models\ReturnDocument;
 use App\Models\User;
+use App\Tenancy\BranchContext;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -37,6 +38,12 @@ use RuntimeException;
  *  الرصيد القابل للاسترداد = إجمالي التصحيح ناقص تخصيصات الاستردادات
  *  **المرحّلة غير المعكوسة** وحدها. لا مخزون رصيدٍ متغيّر ولا مساس بـ
  *  `Invoice::paid_amount` ولا بتخصيصات `Payment`.
+ *
+ *  **الفرع يُورَّث من التصحيح التجاري ولا يُختار مستقلاً.** كل المصادر في
+ *  استرداد واحد يجب أن تشترك في `branch_id` نفسه (بما في ذلك `null`). لا سياسة
+ *  معتمدة لتخصيص عابر للفروع — المزيج يُرفض مغلقاً. قيد الاسترداد يُوسَم بفرع
+ *  المصدر لا بالفرع النشط ولا بقيمة صريحة مخالفة. سياق فرعٍ نشط يخالف المصدر
+ *  يُرفض كذلك (نفس اصطلاح سند التسليم → فاتورة).
  *
  *  دورة الحياة: draft → posted → reversed. لا كتابة مباشرة في journal_lines.
  */
@@ -79,19 +86,23 @@ class CustomerRefundService
     /**
      * التصحيحات التجارية المرحّلة لعميلٍ ما ولها رصيد قابل للاسترداد — تغذّي
      * شاشة الإنشاء. لا تُرجع مستنداً استُرد بالكامل ولا تصحيحاً نقدياً سبق
-     * أن حرّك الصندوق.
+     * أن حرّك الصندوق. مع فرعٍ نشط لا تُعرض مصادر فرعٍ آخر (لا يمكن تخصيصها
+     * تحت قاعدة وراثة الفرع).
      *
      * @return array<int, array{source_type:string,id:string,number:string,date:string,total:int,refunded:int,refundable:int}>
      */
     public function eligibleSources(string $partnerId): array
     {
         $rows = [];
+        $restrictToBranch = app(BranchContext::class)->has();
+        $branchId = $restrictToBranch ? app(BranchContext::class)->id() : false;
 
         $returns = ReturnDocument::query()
             ->where('type', 'sales')
             ->where('payment_type', 'credit')
             ->where('status', 'posted')
             ->where('partner_id', $partnerId)
+            ->when($restrictToBranch, fn ($q) => $q->where('branch_id', $branchId))
             ->orderBy('return_date')
             ->orderBy('number')
             ->get();
@@ -119,6 +130,7 @@ class CustomerRefundService
             ->where('refund_type', 'credit')
             ->where('status', 'posted')
             ->where('partner_id', $partnerId)
+            ->when($restrictToBranch, fn ($q) => $q->where('branch_id', $branchId))
             ->orderBy('note_date')
             ->orderBy('number')
             ->get();
@@ -166,12 +178,10 @@ class CustomerRefundService
         $this->assertCustomer($data['partner_id'] ?? null);
 
         return DB::transaction(function () use ($data, $amount, $date, $normalized, $method, $cashAccountId, $paymentMethod) {
-            $hasExplicitBranch = array_key_exists('branch_id', $data);
-            $number = $data['number'] ?? (
-                $hasExplicitBranch
-                    ? CustomerRefund::nextDocumentNumber('CRF', $date, $data['branch_id'])
-                    : CustomerRefund::nextDocumentNumber('CRF', $date)
-            );
+            $requestedBranch = array_key_exists('branch_id', $data) ? ($data['branch_id'] ?? null) : false;
+            $sourceBranch = $this->assertAllocatable($normalized, $data['partner_id'], $requestedBranch);
+
+            $number = $data['number'] ?? CustomerRefund::nextDocumentNumber('CRF', $date, $sourceBranch);
 
             $attributes = [
                 'number'              => $number,
@@ -186,14 +196,15 @@ class CustomerRefundService
                 'notes'               => $data['notes'] ?? null,
                 'status'              => 'draft',
                 'created_by'          => $data['created_by'] ?? null,
+                'branch_id'           => $sourceBranch,
             ];
-            if ($hasExplicitBranch) {
-                $attributes['branch_id'] = $data['branch_id'];
-            }
 
             $refund = CustomerRefund::create($attributes);
-
-            $this->assertAllocatable($normalized, $refund->partner_id);
+            // BelongsToBranch يسم الفرع النشط حين يكون branch_id فارغاً — مصدر
+            // بلا فرع (null) لا يجوز أن يُوسَم بفرعٍ نشط غير ذي صلة.
+            if ($refund->branch_id !== $sourceBranch) {
+                $refund->forceFill(['branch_id' => $sourceBranch])->save();
+            }
 
             foreach ($normalized as $allocation) {
                 CustomerRefundAllocation::create([
@@ -232,6 +243,13 @@ class CustomerRefundService
                 throw new RuntimeException('لا يمكن تعديل استرداد مرحّل أو معكوس.');
             }
 
+            $requestedBranch = array_key_exists('branch_id', $data) ? ($data['branch_id'] ?? null) : false;
+            $sourceBranch = $this->assertAllocatable(
+                $normalized,
+                $data['partner_id'] ?? $refund->partner_id,
+                $requestedBranch,
+            );
+
             $refund->update([
                 'partner_id'          => $data['partner_id'] ?? $refund->partner_id,
                 'refund_date'         => $data['refund_date'] ?? $refund->refund_date->toDateString(),
@@ -242,9 +260,8 @@ class CustomerRefundService
                 'cash_account_id'     => $cashAccountId,
                 'reference'           => $data['reference'] ?? null,
                 'notes'               => $data['notes'] ?? null,
+                'branch_id'           => $sourceBranch,
             ]);
-
-            $this->assertAllocatable($normalized, $refund->partner_id);
 
             $refund->allocations()->delete();
             foreach ($normalized as $allocation) {
@@ -315,6 +332,7 @@ class CustomerRefundService
             // يقرأ كلٌّ منهما رصيداً قديماً.
             $this->lockSources($allocations);
 
+            $lockedSources = [];
             foreach ($allocations as $allocation) {
                 $source = $this->loadSource($allocation->source_type, $allocation->source_id);
                 $this->assertSourceEligible($source, $refund->partner_id);
@@ -325,6 +343,12 @@ class CustomerRefundService
                         "مبلغ التخصيص ({$allocation->amount}) يتجاوز الرصيد القابل للاسترداد على التصحيح ({$refundable})."
                     );
                 }
+                $lockedSources[] = $source;
+            }
+
+            $sourceBranch = $this->sharedSourceBranch($lockedSources);
+            if ($sourceBranch !== $refund->branch_id) {
+                throw new RuntimeException('فرع الاسترداد يجب أن يطابق فرع التصحيح التجاري المخصَّص.');
             }
 
             // الوجهة النقدية من نطاق CashBankAccount وحده، وصلاحية السحب
@@ -446,9 +470,11 @@ class CustomerRefundService
 
     /**
      * @param  array<int, array{source_type:string, source_id:string, amount:int}>  $allocations
+     * @param  string|null|false  $requestedBranch  false = لم يُمرَّر فرع صريح — يُورَّث من المصدر
      */
-    private function assertAllocatable(array $allocations, string $partnerId): void
+    private function assertAllocatable(array $allocations, string $partnerId, string|null|false $requestedBranch = false): ?string
     {
+        $sources = [];
         foreach ($allocations as $allocation) {
             $model = self::SOURCE_MODELS[$allocation['source_type']];
             $source = $this->loadSource($model, $allocation['source_id']);
@@ -460,6 +486,47 @@ class CustomerRefundService
                     "مبلغ التخصيص ({$allocation['amount']}) يتجاوز الرصيد القابل للاسترداد على التصحيح ({$refundable})."
                 );
             }
+            $sources[] = $source;
+        }
+
+        $sourceBranch = $this->sharedSourceBranch($sources);
+        $this->assertBranchAgreement($sourceBranch, $requestedBranch);
+
+        return $sourceBranch;
+    }
+
+    /**
+     * فرع واحد لكل المصادر، أو رفض مغلق. لا سياسة معتمدة لتخصيص عابر للفروع
+     * (سند التسليم → فاتورة يرفض branch_mismatch ومزيج المستودعات/العملاء).
+     *
+     * @param  array<int, ReturnDocument|CreditNote>  $sources
+     */
+    private function sharedSourceBranch(array $sources): ?string
+    {
+        $unique = array_values(array_unique(array_map(
+            fn (ReturnDocument|CreditNote $source) => $source->branch_id,
+            $sources,
+        ), SORT_REGULAR));
+
+        if (count($unique) !== 1) {
+            throw new RuntimeException('لا يمكن تخصيص تصحيحات تجارية من فروع مختلفة في استرداد واحد.');
+        }
+
+        return $unique[0];
+    }
+
+    /**
+     * @param  string|null|false  $requestedBranch  false = لم يُطلب فرع صريح
+     */
+    private function assertBranchAgreement(?string $sourceBranch, string|null|false $requestedBranch): void
+    {
+        if ($requestedBranch !== false && $requestedBranch !== $sourceBranch) {
+            throw new RuntimeException('فرع الاسترداد يجب أن يطابق فرع التصحيح التجاري المخصَّص.');
+        }
+
+        $ctx = app(BranchContext::class);
+        if ($ctx->has() && $ctx->id() !== $sourceBranch) {
+            throw new RuntimeException('فرع الاسترداد يجب أن يطابق فرع التصحيح التجاري المخصَّص.');
         }
     }
 
