@@ -41,6 +41,12 @@ class SetTenant
 
         $this->tenant->set($user->tenant_id);
 
-        return $next($request);
+        try {
+            return $next($request);
+        } finally {
+            // TenantContext is a singleton for the application lifetime; never
+            // let one request's tenant become the default for the next request.
+            $this->tenant->forget();
+        }
     }
 }

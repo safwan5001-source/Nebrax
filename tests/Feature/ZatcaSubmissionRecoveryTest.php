@@ -64,11 +64,17 @@ class ZatcaSubmissionRecoveryTest extends TestCase
             ->assertJsonPath('meta.queue_dispatch_error', 'queue_not_ready');
     }
 
+    private function restoreTenantContext(): void
+    {
+        app(TenantContext::class)->set($this->auth['tenant_id']);
+    }
+
     /** @test */
     public function a_pending_attempt_can_be_requeued_after_readiness_is_fixed(): void
     {
         $created = $this->createAttempt();
         $attemptId = $created['data']['id'];
+        $this->restoreTenantContext();
         $credential = ZatcaCredential::sole();
         $credential->update(['environment' => 'simulation']);
         Settings::put('zatca', ['active_environment' => 'simulation']);
