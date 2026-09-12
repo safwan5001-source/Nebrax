@@ -275,13 +275,19 @@ class ProductController extends ApiController
         $this->assertDefaultUnitsAreValid($data, $template);
 
         // مسار الإنشاء القانوني الموحّد (خدمة الدومين) — نفسه يستعمله الـ Public API.
-        $product = $this->domain(fn () => $this->products->create($data, $request->user()?->id));
+        // تغليف العملية كاملة (منتج + باركودات بديلة + مطالبات السجل) في معاملة واحدة:
+        // إما ينجح كل شيء معاً، أو يتراجع كل شيء عند أي فشل.
+        return $this->domain(function () use ($request, $data) {
+            return DB::transaction(function () use ($request, $data) {
+                $product = $this->products->create($data, $request->user()?->id);
 
-        // الBarcode البديلة المُدخلة قبل الحفظ (من نموذج الإنشاء) تُ-register
-        // هنا داخل نفس المعاملة فتبقى متناسقة: إما كل شيء يُ-commit أو لا شيء.
-        $this->storePendingBarcodes($request, $product);
+                // الBarcode البديلة المُدخلة مع نموذج الإنشاء تُنشأ داخل نفس المعاملة
+                // فتبقى متناسقة: إما كل شيء يُ-commit أو لا شيء.
+                $this->storePendingBarcodesWithinTransaction($request, $product);
 
-        return (new ProductResource($product->fresh(['alternateBarcodes'])))->response()->setStatusCode(201);
+                return $product->fresh(['alternateBarcodes']);
+            });
+        })->response()->setStatusCode(201);
     }
 
     /**
@@ -290,16 +296,19 @@ class ProductController extends ApiController
      * ═══════════════════════════════════════════════════════════════
      *  الـ API لا يمتلك «حالة انتظار» — الـ ProductDialog يُنشئ المنتج أولاً
      *  ثم يُضف الBarcode البديلة عبر مسارات منفصلة. لكن نموذج الإنشاء
-     *  يسمح بإضافة الBarcode قبل الحفظ، فيuja تمريرها دفعةً واحدة عند الإنشاء.
+     *  يسمح بإضافة الBarcode قبل الحفظ، فتمرّرها دفعةً واحدة عند الإنشاء.
      *
      *  يُستدعى هذا الأسلوب فقط من `store()`، ويُطابق نفس شروط
      *  `storeBarcode()` بالكامل (الوحدة، الكمية، الفحص المسبق، التزامن) —
-     *  يُستدعى نفس المساعد الداخلي `createAlternateBarcode()` الذي
-     *  يُستعمله مsar التحرير أيضاً، fallen لا يُنشئ منطقاً إنشاءً موازياً.
+     *  يُستدعى نفس منطق التحقق الذي يُستعمله مسار التحرير أيضاً،
+     *  فلا يُنشأ منطق إنشاء موازٍ.
+     *
+     *  يعمل داخل معاملة مفتوحة بالفعل (من `store()`)، لذا لا يُغلف
+     *  بإنشاء معاملة خاصة به.
      *
      *  @param  array<string, mixed>  $barcodes  عناصر من `StoreProductRequest::barcodes()`
      */
-    private function storePendingBarcodes(Request $request, Product $product): void
+    private function storePendingBarcodesWithinTransaction(Request $request, Product $product): void
     {
         $barcodes = $request->input('barcodes');
         if (! is_array($barcodes) || $barcodes === []) {
@@ -313,7 +322,7 @@ class ProductController extends ApiController
                 continue;
             }
 
-            $this->createAlternateBarcode($request, $product, [
+            $this->createAlternateBarcodeWithinTransaction($request, $product, [
                 'code' => $raw['code'] ?? null,
                 'unit_name' => $raw['unit_name'] ?? null,
                 'default_quantity' => $raw['default_quantity'] ?? null,
@@ -324,26 +333,30 @@ class ProductController extends ApiController
 
     /**
      * ═══════════════════════════════════════════════════════════════
-     *  إنشاء Barcode بدلائل واحد — مُستعمل من مسارات الإنشاء والتعديل معاً
+     *  إنشاء Barcode بديل واحد — مستخدم من مساري الإنشاء والتعديل معاً
      * ═══════════════════════════════════════════════════════════════
-     *  يجمع بين الفحص المسبقة (ال unified فحص الBarcode في `barcode_registry`)
-     *  وال transactional insert (الحجز الفريد ي failed سباقاً نادراً).
-     *  يُستدعى من `storeBarcode()` (التعديل) و`storePendingBarcodes()` (ال飒نش)
-     *  لضمان تطابق دقيق للرسائل والconditions.
+     *  يجمع بين الفحوص المسبقة (فحص الباركود الموحّد في `barcode_registry`)
+     *  والإدراج المعاملاتي (القيد الفريد يحمي من حالات السباق النادرة).
+     *  يُستدعى من `storeBarcode()` (التعديل) و`storePendingBarcodesWithinTransaction()`
+     *  (الإنشاء) لضمان تطابق دقيق للرسائل والشروط.
+     *
+     *  هذه النسخة **لا** تُغلف بـ `DB::transaction()` — تستدعي من `store()`
+     *  داخل معاملة مفتوحة بالفعل. مسار التعديل `storeBarcode()` يغلّف
+     *  استدعاءها بـ `DB::transaction()` الخاص به.
      *
      *  @param  array<string, mixed>  $data
      */
-    private function createAlternateBarcode(Request $request, Product $product, array $data): ProductBarcode
+    private function createAlternateBarcodeWithinTransaction(Request $request, Product $product, array $data): ProductBarcode
     {
         $code = trim((string) ($data['code'] ?? ''));
         if ($code === '') {
-            abort(422, 'ال parole code لا يمكن أن يكون فارغًا.');
+            abort(422, 'الباركود لا يمكن أن يكون فارغًا.');
         }
 
         // فحصٌ مقدم برسالة واضحة — الضمان الفعلي تحت التزامن هو القيد
-        // الفريد في `barcode_registry`، ت imposedه `ProductBarcode::created` أدناه.
+        // الفريد في `barcode_registry`، تفرضه `ProductBarcode::created` أدناه.
         if (BarcodeRegistryEntry::isTaken($code)) {
-            abort(422, 'ال parole code مستخدم بالفعل في منتج آخر أو وحدة أخرى.');
+            abort(422, 'الباركود مستخدم بالفعل في منتج آخر أو وحدة أخرى.');
         }
 
         $unitName = trim((string) ($data['unit_name'] ?? $product->unit));
@@ -353,7 +366,7 @@ class ProductController extends ApiController
                 ->all()
             : [$product->unit];
         if ($unitName === '' || ! in_array($unitName, $units, true)) {
-            abort(422, 'وحدة ال parole code يجب أن تكون وحدة Basis أو وحدة بديلة معرّفة في قالب المنتج.');
+            abort(422, 'وحدة الباركود يجب أن تكون وحدة الأساس أو وحدة بديلة معرّفة في قالب المنتج.');
         }
 
         $qty = (int) ($data['default_quantity'] ?? 1);
@@ -361,19 +374,32 @@ class ProductController extends ApiController
             abort(422, 'أدخل كمية صحيحة من 1 إلى 1,000,000.');
         }
 
-        // معاملة صريحة: `ProductBarcode::created` يحجز في `barcode_registry` من
-        // داخل نفس است-stack call `create()` — بلا معاملة تجمعهما، فشل الحجز (سباق
-        // نادر ي.)
-
-        $barcode = $this->domain(fn () => DB::transaction(fn () => $product->alternateBarcodes()->create([
+        // الإدراج داخل المعاملة المفتوحة — حدث `ProductBarcode::created`
+        // سيحجز في `barcode_registry` من داخل نفس المكدس.
+        return $product->alternateBarcodes()->create([
             'code' => $code,
             'unit_name' => $unitName,
             'default_quantity' => $qty,
             'label' => isset($data['label']) ? trim((string) $data['label']) ?: null : null,
             'created_by' => $request->user()?->id,
-        ])));
+        ]);
+    }
 
-        return $barcode;
+    /**
+     * ═══════════════════════════════════════════════════════════════
+     *  إنشاء Barcode بديل واحد — لل مسار التعديل (storeBarcode)
+     * ═══════════════════════════════════════════════════════════════
+     *  يغلف العملية بـ `DB::transaction()` لأنها تُستدعى خارج أي
+     *  معاملة مفتوحة — المنتج موجود مسبقاً.
+     *  يعيد استخدام نفس منطق التحقق عبر `createAlternateBarcodeWithinTransaction()`.
+     *
+     *  @param  array<string, mixed>  $data
+     */
+    private function createAlternateBarcode(Request $request, Product $product, array $data): ProductBarcode
+    {
+        return $this->domain(fn () => DB::transaction(fn () =>
+            $this->createAlternateBarcodeWithinTransaction($request, $product, $data)
+        ));
     }
 
     public function show(string $id): JsonResponse
@@ -412,40 +438,15 @@ class ProductController extends ApiController
     {
         $product = Product::with('unitTemplate.units')->findOrFail($id);
         $data = $request->validated();
-        $code = trim($data['code']);
 
-        if ($code === '') {
-            abort(422, 'الباركود لا يمكن أن يكون فارغاً.');
-        }
-
-        // فحصٌ مسبق برسالة واضحة — الضمان الفعلي تحت التزامن هو القيد
-        // الفريد في `barcode_registry`، تفرضه `ProductBarcode::created` أدناه.
-        if (BarcodeRegistryEntry::isTaken($code)) {
-            abort(422, 'الباركود مستخدم بالفعل في منتج آخر أو كوحدة أخرى.');
-        }
-
-        $unitName = trim((string) ($data['unit_name'] ?? $product->unit));
-        $units = $product->unitTemplate
-            ? collect([$product->unitTemplate->base_unit])
-                ->concat($product->unitTemplate->units->pluck('name'))
-                ->all()
-            : [$product->unit];
-        if ($unitName === '' || ! in_array($unitName, $units, true)) {
-            abort(422, 'وحدة الباركود يجب أن تكون وحدة الأساس أو وحدة بديلة معرّفة في قالب المنتج.');
-        }
-
-        // معاملة صريحة: `ProductBarcode::created` يحجز في `barcode_registry` من
-        // داخل نفس استدعاء `create()` — بلا معاملة تجمعهما، فشل الحجز (سباق
-        // نادر يتجاوز الفحص المسبق أعلاه) كان سيترك سطر الباركود البديل قائماً
-        // بلا سجلٍّ يحميه. `domain()` تبقى الطبقة الخارجية لترجمة `RuntimeException`
-        // (من الفحص المسبق هنا أو من فشل الحجز داخل المعاملة) إلى 422 واحد.
-        $barcode = $this->domain(fn () => DB::transaction(fn () => $product->alternateBarcodes()->create([
-            'code' => $code,
-            'unit_name' => $unitName,
-            'default_quantity' => (int) ($data['default_quantity'] ?? 1),
-            'label' => isset($data['label']) ? trim((string) $data['label']) ?: null : null,
-            'created_by' => $request->user()?->id,
-        ])));
+        $barcode = $this->domain(fn () => DB::transaction(fn () =>
+            $this->createAlternateBarcodeWithinTransaction($request, $product, [
+                'code' => $data['code'],
+                'unit_name' => $data['unit_name'] ?? null,
+                'default_quantity' => $data['default_quantity'] ?? null,
+                'label' => $data['label'] ?? null,
+            ])
+        ));
 
         return (new ProductBarcodeResource($barcode))->response()->setStatusCode(201);
     }

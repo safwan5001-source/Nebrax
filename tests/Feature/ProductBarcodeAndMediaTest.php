@@ -226,6 +226,118 @@ class ProductBarcodeAndMediaTest extends TestCase
             ])->assertStatus(422);
     }
 
+    /** @test
+     * تراجع ذري عند فشل باركود لاحق: إذا كان الباركود الأول صالحاً والثاني
+     * يفشل التحقق، يجب ألا يُنشأ المنتج ولا أي باركود ولا مطالبة في السجل.
+     */
+    public function creating_a_product_rolls_back_when_later_barcode_fails_validation(): void
+    {
+        $auth = $this->registerTenant();
+
+        // المحاولة: باركود أول صالح، باركود ثاني بوحدة غير صالحة
+        $response = $this->withToken($auth['token'])
+            ->postJson('/api/products', [
+                'name' => 'product rollback test',
+                'sku' => 'BARCODE-ROLLBACK-001',
+                'type' => 'good',
+                'unit' => 'piece',
+                'sale_price' => 10000,
+                'barcodes' => [
+                    ['code' => 'VALID-BARCODE-001', 'unit_name' => 'piece', 'default_quantity' => 1],
+                    ['code' => 'INVALID-UNIT-001', 'unit_name' => 'carton', 'default_quantity' => 1], // carton غير معرّف
+                ],
+            ])->assertStatus(422);
+
+        // التأكد من عدم إنشاء المنتج
+        $this->assertDatabaseMissing('products', ['sku' => 'BARCODE-ROLLBACK-001']);
+
+        // التأكد من عدم إنشاء أي باركود بديل
+        $this->assertDatabaseMissing('product_barcodes', ['code' => 'VALID-BARCODE-001']);
+        $this->assertDatabaseMissing('product_barcodes', ['code' => 'INVALID-UNIT-001']);
+
+        // التأكد من عدم وجود مطالبات في سجل الباركود
+        $this->assertDatabaseMissing('barcode_registry', ['code' => 'VALID-BARCODE-001']);
+        $this->assertDatabaseMissing('barcode_registry', ['code' => 'INVALID-UNIT-001']);
+    }
+
+    /** @test
+     * تراجع ذري عند تكرار باركود في نفس الطلب: الباركود الأول يسجل،
+     * والثاني مكرر في نفس الحمولة — يجب أن يفشل الكل ويرتجع.
+     */
+    public function creating_a_product_rolls_back_when_duplicate_barcode_in_same_payload(): void
+    {
+        $auth = $this->registerTenant();
+
+        $response = $this->withToken($auth['token'])
+            ->postJson('/api/products', [
+                'name' => 'product duplicate in payload',
+                'sku' => 'BARCODE-ROLLBACK-DUP',
+                'type' => 'good',
+                'unit' => 'piece',
+                'sale_price' => 10000,
+                'barcodes' => [
+                    ['code' => 'DUP-PAYLOAD-001', 'unit_name' => 'piece', 'default_quantity' => 1],
+                    ['code' => 'DUP-PAYLOAD-001', 'unit_name' => 'piece', 'default_quantity' => 2], // مكرر
+                ],
+            ])->assertStatus(422);
+
+        $this->assertDatabaseMissing('products', ['sku' => 'BARCODE-ROLLBACK-DUP']);
+        $this->assertDatabaseMissing('product_barcodes', ['code' => 'DUP-PAYLOAD-001']);
+        $this->assertDatabaseMissing('barcode_registry', ['code' => 'DUP-PAYLOAD-001']);
+    }
+
+    /** @test
+     * تراجع ذري عند تعارض مع باركود موجود مسبقاً في السجل: الباركود الأول
+     * جديد وصالح، والثاني مستخدم بالفعل في منتج آخر — يجب أن يفشل الكل ويرتجع.
+     */
+    public function creating_a_product_rolls_back_when_later_barcode_conflicts_with_existing_registry(): void
+    {
+        $auth = $this->registerTenant();
+
+        // إنشاء منتج أول بباركود سيسبب التعارض لاحقاً
+        $this->withToken($auth['token'])
+            ->postJson('/api/products', [
+                'name' => 'existing product',
+                'sku' => 'EXISTING-001',
+                'type' => 'good',
+                'unit' => 'piece',
+                'sale_price' => 10000,
+                'barcodes' => [
+                    ['code' => 'CONFLICT-BARCODE', 'unit_name' => 'piece', 'default_quantity' => 1],
+                ],
+            ])->assertCreated();
+
+        // محاولة إنشاء منتج ثاني: باركود أول جديد، باركود ثاني يتعارض مع المنتج الأول
+        $response = $this->withToken($auth['token'])
+            ->postJson('/api/products', [
+                'name' => 'product conflict test',
+                'sku' => 'BARCODE-ROLLBACK-CONFLICT',
+                'type' => 'good',
+                'unit' => 'piece',
+                'sale_price' => 10000,
+                'barcodes' => [
+                    ['code' => 'NEW-VALID-001', 'unit_name' => 'piece', 'default_quantity' => 1],
+                    ['code' => 'CONFLICT-BARCODE', 'unit_name' => 'piece', 'default_quantity' => 1], // مستخدم مسبقاً
+                ],
+            ])->assertStatus(422);
+
+        // المنتج الجديد لم يُنشأ
+        $this->assertDatabaseMissing('products', ['sku' => 'BARCODE-ROLLBACK-CONFLICT']);
+
+        // لا باركودات للمنتج الجديد
+        $this->assertDatabaseMissing('product_barcodes', ['code' => 'NEW-VALID-001']);
+        $this->assertDatabaseMissing('product_barcodes', ['code' => 'CONFLICT-BARCODE', 'product_id' => function ($query) {
+            $query->where('sku', 'BARCODE-ROLLBACK-CONFLICT');
+        }]);
+
+        // الباركود الجديد لم يُسجل في السجل
+        $this->assertDatabaseMissing('barcode_registry', ['code' => 'NEW-VALID-001']);
+
+        // الباركود المتعارض يظل مرتبطاً بالمنتج الأول فقط
+        $this->assertDatabaseHas('barcode_registry', ['code' => 'CONFLICT-BARCODE']);
+        $this->assertDatabaseHas('products', ['sku' => 'EXISTING-001']);
+    }
+
     /** @test */
     public function product_images_are_private_and_individually_deletable(): void
     {
