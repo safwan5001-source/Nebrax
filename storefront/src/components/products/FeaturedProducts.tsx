@@ -1,4 +1,5 @@
 import dynamic from "next/dynamic";
+import { getTranslations } from "next-intl/server";
 import { ProductCardSkeleton } from "@/components/products/ProductCardSkeleton";
 import { PRODUCT_CARD_FIELDS } from "@/lib/data/cached";
 import { cachedListProducts } from "@/lib/data/products";
@@ -50,6 +51,23 @@ export async function FeaturedProducts({
       console.error("FeaturedProducts: failed to load products", error);
       return [];
     });
+
+  if (products.length === 0) {
+    const t = await getTranslations({
+      locale: locale as Locale,
+      namespace: "home",
+    });
+    return (
+      <div className="rounded-lg border border-dashed border-gray-200 px-6 py-16 text-center">
+        <p className="text-base font-medium text-gray-900">
+          {t("emptyCatalog")}
+        </p>
+        <p className="mt-2 text-sm text-gray-500">
+          {t("emptyCatalogDescription")}
+        </p>
+      </div>
+    );
+  }
 
   return (
     <LazyProductCarousel

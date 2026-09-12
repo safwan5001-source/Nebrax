@@ -1,11 +1,8 @@
 import type { Metadata } from "next";
+import { fetchStorefrontName } from "@/lib/commerce/storefront";
 import { buildHreflangLanguages } from "@/lib/metadata/alternates";
 import { buildCanonicalUrl, SOCIAL_IMAGE_PATH } from "@/lib/seo";
-import {
-  getStoreMetaDescription,
-  getStoreSeoTitle,
-  getStoreUrl,
-} from "@/lib/store";
+import { getStoreUrl } from "@/lib/store";
 
 interface HomeMetadataParams {
   country: string;
@@ -16,8 +13,7 @@ export async function generateHomeMetadata({
   country,
   locale,
 }: HomeMetadataParams): Promise<Metadata> {
-  const storeName = getStoreSeoTitle();
-  const description = getStoreMetaDescription();
+  const storeName = await fetchStorefrontName();
   const storeUrl = getStoreUrl();
   const canonicalUrl = storeUrl
     ? buildCanonicalUrl(storeUrl, `/${country}/${locale}`)
@@ -32,8 +28,7 @@ export async function generateHomeMetadata({
     : undefined;
 
   return {
-    title: { absolute: storeName },
-    description,
+    ...(storeName ? { title: { absolute: storeName } } : {}),
     ...(canonicalUrl
       ? {
           alternates: {
@@ -43,8 +38,7 @@ export async function generateHomeMetadata({
         }
       : {}),
     openGraph: {
-      title: storeName,
-      description,
+      ...(storeName ? { title: storeName } : {}),
       ...(canonicalUrl ? { url: canonicalUrl } : {}),
       type: "website",
       images: [SOCIAL_IMAGE_PATH],
