@@ -20,6 +20,7 @@ describe('Fuel Workspace navigation presentation', () => {
     expect(visible).not.toContain('/fuel-stations/safety');
     expect(visible).not.toContain('/fuel-stations/alerts');
     expect(visible).not.toContain('/fuel-stations/readiness');
+    expect(visible).not.toContain('/fuel-stations/reports');
   });
 
   it('hides capability-disabled routes even when their read permissions are present', () => {
@@ -38,7 +39,12 @@ describe('Fuel Workspace navigation presentation', () => {
     expect(visible).not.toContain('/fuel-stations/readiness');
   });
 
+  it('shows the reports destination only for its report-read permission', () => {
+    expect(routes(['fuel.reports.view'])).toContain('/fuel-stations/reports');
+    expect(routes(['fuel_stations.view'])).not.toContain('/fuel-stations/reports');
+  });
+
   it('allows the server-authorized wildcard role to see every built workspace route', () => {
-    expect(routes(['*'])).toHaveLength(13);
+    expect(routes(['*'])).toHaveLength(14);
   });
 });
