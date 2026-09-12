@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# ═════════════════════════════════════════════════════════════════
+# ════════════════════════════════════════════════════════════════
 #  نبراس ERP — تجميع تطبيق Laravel كامل للإنتاج (Production)
 #  نسخة إنتاجية من setup.sh: بلا SQLite وبلا تشغيل اختبارات.
 #  تُستدعى وقت بناء صورة Docker. المخرَج: تطبيق Laravel جاهز في $APP_DIR.
 #  الاستخدام:  bash deploy/assemble.sh /path/to/core /path/to/app
-# ═════════════════════════════════════════════════════════════════
+# ════════════════════════════════════════════════════════════════
 set -euo pipefail
 
 CORE_DIR="${1:?مسار النواة مطلوب}"
@@ -61,23 +61,23 @@ cp -r "$CORE_DIR/tests/Feature/"*.php            tests/Feature/ 2>/dev/null || t
 cp -r "$CORE_DIR/docs/openapi/"*.yaml            docs/openapi/ 2>/dev/null || true
 
 if ! grep -q "TenancyServiceProvider" bootstrap/providers.php; then
-  sed -i "s|return \\[|return [\\n    App\\\\\\\\Providers\\\\\\\\TenancyServiceProvider::class,|" bootstrap/providers.php
+  sed -i "s|return \[|return [\n    App\\\\Providers\\\\TenancyServiceProvider::class,|" bootstrap/providers.php
 fi
 if ! grep -q "DocumentCenterServiceProvider" bootstrap/providers.php; then
-  sed -i "s|return \\[|return [\\n    App\\\\\\\\Providers\\\\\\\\DocumentCenterServiceProvider::class,|" bootstrap/providers.php
+  sed -i "s|return \[|return [\n    App\\\\Providers\\\\DocumentCenterServiceProvider::class,|" bootstrap/providers.php
 fi
 if ! grep -q "PublicApiServiceProvider" bootstrap/providers.php; then
-  sed -i "s|return \\[|return [\\n    App\\\\\\\\Providers\\\\\\\\PublicApiServiceProvider::class,|" bootstrap/providers.php
+  sed -i "s|return \[|return [\n    App\\\\Providers\\\\PublicApiServiceProvider::class,|" bootstrap/providers.php
 fi
 if ! grep -q "StorefrontApiServiceProvider" bootstrap/providers.php; then
-  sed -i "s|return \\[|return [\\n    App\\\\\\\\Providers\\\\\\\\StorefrontApiServiceProvider::class,|" bootstrap/providers.php
+  sed -i "s|return \[|return [\n    App\\\\Providers\\\\StorefrontApiServiceProvider::class,|" bootstrap/providers.php
 fi
 if ! grep -q "WebhookServiceProvider" bootstrap/providers.php; then
-  sed -i "s|return \\[|return [\\n    App\\\\\\\\Providers\\\\\\\\WebhookServiceProvider::class,|" bootstrap/providers.php
+  sed -i "s|return \[|return [\n    App\\\\Providers\\\\WebhookServiceProvider::class,|" bootstrap/providers.php
 fi
 
-rm -f database/migrations/*_create_users_table.php \\
-      database/migrations/*_add_api_columns* \\
+rm -f database/migrations/*_create_users_table.php \
+      database/migrations/*_add_api_columns* \
       database/migrations/0001_01_01_000000_create_users_table.php 2>/dev/null || true
 
 mkdir -p config
