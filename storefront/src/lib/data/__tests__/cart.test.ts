@@ -89,9 +89,7 @@ describe("cart server actions", () => {
         "@/lib/spree"
       );
       (getCartId as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
-      (getAccessToken as ReturnType<typeof vi.fn>).mockResolvedValue(
-        undefined,
-      );
+      (getAccessToken as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
       const getClientForSurfaceSpy = vi.mocked(getClientForSurface);
       getClientForSurfaceSpy.mockClear();
 

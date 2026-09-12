@@ -17,7 +17,9 @@ describe("FeaturedProducts (COM-7-PREVIEW-FIX-1)", () => {
     vi.doMock("@/lib/data/products", () => ({
       cachedListProducts: vi
         .fn()
-        .mockRejectedValue(new Error("AWJ storefront API request failed (404)")),
+        .mockRejectedValue(
+          new Error("AWJ storefront API request failed (404)"),
+        ),
     }));
 
     const { FeaturedProducts } = await import(
