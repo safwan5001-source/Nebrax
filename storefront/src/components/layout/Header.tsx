@@ -1,7 +1,6 @@
 import type { Category } from "@spree/sdk";
 import { User } from "lucide-react";
 import dynamic from "next/dynamic";
-import Image from "next/image";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import type { ReactNode } from "react";
@@ -9,7 +8,6 @@ import { CartButton } from "@/components/layout/CartButton";
 import { SearchToggle } from "@/components/layout/SearchToggle";
 import { Button } from "@/components/ui/button";
 import { isWholesaleEnabled } from "@/lib/spree";
-import { getStoreName } from "@/lib/store";
 
 const LazyMobileMenu = dynamic(
   () =>
@@ -33,12 +31,11 @@ const LazyRegionPreferences = dynamic(
   },
 );
 
-const storeName = getStoreName();
-
 interface HeaderProps {
   basePath: string;
   locale: Locale;
   mobileNavigation: ReactNode;
+  storeName: string | null;
 }
 
 interface HeaderMobileMenuProps {
@@ -63,32 +60,27 @@ export async function Header({
   basePath,
   locale,
   mobileNavigation,
+  storeName,
 }: HeaderProps) {
   const t = await getTranslations({ locale, namespace: "header" });
+  const footer = await getTranslations({ locale, namespace: "footer" });
   const wholesaleEnabled = isWholesaleEnabled();
+  const displayName = storeName?.trim() || footer("shop");
 
   return (
     <SearchToggle
       basePath={basePath}
       left={mobileNavigation}
       center={
-        <Link href={basePath || "/"} className="flex items-center min-w-0">
-          <Image
-            src="/spree.png"
-            alt={storeName}
-            width={90}
-            height={32}
-            className="max-w-full object-contain"
-            style={{ width: "auto", height: "auto" }}
-            fetchPriority="high"
-            loading="eager"
-          />
+        <Link
+          href={basePath || "/"}
+          className="flex items-center min-w-0 text-base md:text-lg font-semibold tracking-tight text-gray-900 truncate"
+        >
+          {displayName}
         </Link>
       }
       rightStart={
         <div className="hidden lg:flex lg:items-center lg:gap-1">
-          {/* Trade portal entry point — understated, secondary to the catalog nav.
-              Only shown when the wholesale addon is enabled. */}
           {wholesaleEnabled && (
             <Link
               href={`${basePath}/wholesale`}
@@ -102,7 +94,6 @@ export async function Header({
       }
       rightEnd={
         <>
-          {/* Account - desktop only */}
           <div className="hidden md:block">
             <Button variant="ghost" size="icon-lg" asChild>
               <Link href={`${basePath}/account`} aria-label={t("account")}>
@@ -110,8 +101,6 @@ export async function Header({
               </Link>
             </Button>
           </div>
-
-          {/* Cart */}
           <CartButton />
         </>
       }

@@ -1,4 +1,5 @@
 import dynamic from "next/dynamic";
+import { getTranslations } from "next-intl/server";
 import { ProductCardSkeleton } from "@/components/products/ProductCardSkeleton";
 import { PRODUCT_CARD_FIELDS } from "@/lib/data/cached";
 import { cachedListProducts } from "@/lib/data/products";
@@ -34,11 +35,6 @@ export async function FeaturedProducts({
   currency,
 }: FeaturedProductsProps) {
   const userToken = await getAccessToken();
-  // A catalog outage (e.g. the visitor's hostname has no active
-  // StorefrontDomain mapping yet — fail-closed by design, see
-  // ResolveStorefrontDomain) must degrade this section, not crash the whole
-  // homepage. Mirrors the existing defensive pattern already used for
-  // category navigation in StorefrontLayout's getRootCategories.
   const products = await cachedListProducts(
     { limit: 8, fields: PRODUCT_CARD_FIELDS },
     { locale, country },
@@ -50,6 +46,21 @@ export async function FeaturedProducts({
       console.error("FeaturedProducts: failed to load products", error);
       return [];
     });
+
+  if (products.length === 0) {
+    const t = await getTranslations({
+      locale: locale as Locale,
+      namespace: "products",
+    });
+    return (
+      <div className="rounded-lg border border-dashed border-gray-200 px-6 py-16 text-center">
+        <p className="text-base font-medium text-gray-900">
+          {t("noProductsFound")}
+        </p>
+        <p className="mt-2 text-sm text-gray-500">{t("browseCollection")}</p>
+      </div>
+    );
+  }
 
   return (
     <LazyProductCarousel
