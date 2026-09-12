@@ -161,7 +161,7 @@ The new `RegisterStorefrontDomainCommand` was itself tested for the same class o
 
 ## 13. PR Number/Link
 
-*(added after opening — see follow-up commit)*
+[#779](https://github.com/safwan5001-source/Nebrax/pull/779)
 
 ## 14. Base SHA
 
@@ -169,7 +169,7 @@ The new `RegisterStorefrontDomainCommand` was itself tested for the same class o
 
 ## 15. Head SHA
 
-*(recorded after final commit)*
+`b9a6121ad492b79a7f88b61a0ae6181e317d53a5`
 
 ## 16. Risks / Remaining Work
 
