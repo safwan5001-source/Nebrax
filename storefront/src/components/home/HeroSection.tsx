@@ -1,53 +1,40 @@
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { Button } from "@/components/ui/button";
-import { getStoreName } from "@/lib/store";
 
 interface HeroSectionProps {
   basePath: string;
   locale: string;
+  storeName: string | null;
 }
 
-export async function HeroSection({ basePath, locale }: HeroSectionProps) {
+export async function HeroSection({
+  basePath,
+  locale,
+  storeName,
+}: HeroSectionProps) {
   const t = await getTranslations({
     locale: locale as Locale,
     namespace: "home",
   });
-  const storeName = getStoreName();
-
-  /* Demo-only: Remove for production. */
-  const githubUrl = "https://github.com/spree/storefront";
-  const quickstartUrl =
-    "https://spreecommerce.org/docs/developer/getting-started/quickstart";
+  const displayName = storeName?.trim() || t("identityFallback");
 
   return (
-    <section className="border-b border-gray-200 min-h-[823px] md:min-h-0 flex items-center">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-24">
-        <div className="text-center">
-          <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-gray-900">
-            {t("welcome", { storeName })}
-          </h1>
-          <p className="mt-4 text-lg text-gray-600 max-w-2xl mx-auto">
-            {t("heroDescription")}
+    <section className="border-b border-gray-200">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-20">
+        <div className="max-w-2xl">
+          <p className="text-sm font-medium tracking-wide text-gray-500">
+            {t("welcomeEyebrow")}
           </p>
-          <div className="mt-8 flex justify-center gap-4 flex-wrap">
+          <h1 className="mt-3 text-3xl md:text-5xl font-bold tracking-tight text-gray-900">
+            {t("welcome", { storeName: displayName })}
+          </h1>
+          <p className="mt-4 text-lg text-gray-600">
+            {t("heroDescription", { storeName: displayName })}
+          </p>
+          <div className="mt-8 flex flex-wrap gap-4">
             <Button size="lg" asChild>
               <Link href={`${basePath}/products`}>{t("shopNow")}</Link>
-            </Button>
-            {/* Demo-only: Remove for production. */}
-            <Button variant="outline" size="lg" asChild>
-              <Link href={githubUrl} target="_blank" rel="noopener noreferrer">
-                {t("forkOnGithub")}
-              </Link>
-            </Button>
-            <Button variant="outline" size="lg" asChild>
-              <Link
-                href={quickstartUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                {t("quickstartGuide")} &rarr;
-              </Link>
             </Button>
           </div>
         </div>
