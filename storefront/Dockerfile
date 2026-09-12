@@ -1,27 +1,23 @@
-# syntax=docker/dockerfile:1.7
-
-# Multi-stage build for Next.js 16 (standalone output) on Node.js 22 (Alpine).
+# Multi-stage build for Next.js (standalone output) on Node.js 22 (Alpine).
 #
-# Build (Spree env required: pages are prerendered against the Spree API at build time):
-#   docker build \
-#     --build-arg SPREE_API_URL=https://your-spree.example.com \
-#     --build-arg SPREE_PUBLISHABLE_KEY=your_publishable_key \
-#     -t storefront .
+# Compatible with Railway's Docker builder: no BuildKit cache or secret mounts.
 #
-# Run:
-#   docker run -p 3001:3001 --env-file .env.local storefront
+# This image serves the AWJ storefront. Catalog reads go to the AWJ Commerce
+# API at runtime (AWJ_COMMERCE_API_URL / STOREFRONT_GATEWAY_SECRET). There is
+# no Spree backend in production and none is required at build time.
 #
-# Optional Sentry source map upload at build time (skipped when SENTRY_DSN is unset).
-# SENTRY_AUTH_TOKEN is read via a BuildKit secret so it never lands in image
-# layers, history, or shared builder caches.
-#   SENTRY_AUTH_TOKEN=... docker build \
-#     --build-arg SPREE_API_URL=... \
-#     --build-arg SPREE_PUBLISHABLE_KEY=... \
-#     --build-arg SENTRY_DSN=... \
-#     --build-arg SENTRY_ORG=... \
-#     --build-arg SENTRY_PROJECT=... \
-#     --secret id=sentry_auth_token,env=SENTRY_AUTH_TOKEN \
-#     -t storefront .
+# Build:
+#   docker build -t storefront .
+#
+# Run (runtime env, not baked into the image):
+#   docker run -p 3001:3001 \
+#     -e AWJ_COMMERCE_API_URL=https://api.example.com \
+#     -e STOREFRONT_GATEWAY_SECRET=... \
+#     storefront
+#
+# Optional Sentry: set SENTRY_DSN / SENTRY_ORG / SENTRY_PROJECT as build-args
+# to wrap the Next config. Do not pass SENTRY_AUTH_TOKEN as ARG/ENV — it would
+# persist in image layers. Source-map upload is skipped without a token.
 
 ARG NODE_VERSION=22-alpine
 
@@ -39,8 +35,7 @@ WORKDIR /app
 RUN apk add --no-cache libc6-compat
 
 COPY package.json pnpm-lock.yaml ./
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
-    pnpm install --frozen-lockfile --store-dir /pnpm/store
+RUN pnpm install --frozen-lockfile
 
 
 # ---- builder: compile the Next.js app ----
@@ -50,18 +45,7 @@ WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 
-# Spree API config — required at build time because the app prerenders pages
-# that fetch from Spree (categories, products, etc.).
-ARG SPREE_API_URL
-ARG SPREE_PUBLISHABLE_KEY
-ENV SPREE_API_URL=$SPREE_API_URL \
-    SPREE_PUBLISHABLE_KEY=$SPREE_PUBLISHABLE_KEY
-
-# Optional Sentry release/source-map upload. When SENTRY_DSN is empty,
-# next.config.ts skips withSentryConfig entirely, so the build still works.
-# SENTRY_AUTH_TOKEN is intentionally not declared as ARG/ENV — it's mounted
-# only for the build step via --mount=type=secret below, so it never persists
-# in image layers or build cache.
+# Optional Sentry wrap (next.config.ts skips withSentryConfig when DSN is empty).
 ARG SENTRY_DSN=""
 ARG SENTRY_ORG=""
 ARG SENTRY_PROJECT=""
@@ -72,9 +56,7 @@ ENV SENTRY_DSN=$SENTRY_DSN \
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-RUN --mount=type=secret,id=sentry_auth_token,required=false \
-    SENTRY_AUTH_TOKEN="$(cat /run/secrets/sentry_auth_token 2>/dev/null || true)" \
-    pnpm run build
+RUN pnpm run build
 
 
 # ---- runner: minimal runtime image ----
