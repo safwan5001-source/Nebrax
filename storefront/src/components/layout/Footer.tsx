@@ -53,7 +53,9 @@ export async function Footer({
             <span className="text-xl font-bold text-white">{displayName}</span>
           </div>
           <div>
-            <h3 className="text-sm font-medium text-neutral-300">{t("shop")}</h3>
+            <h3 className="text-sm font-medium text-neutral-300">
+              {t("shop")}
+            </h3>
             <ul className="mt-4 space-y-3">
               <li>
                 <Link
