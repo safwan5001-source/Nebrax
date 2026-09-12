@@ -150,6 +150,12 @@ class Rbac
             // فمن يحرّر مرتجعاً لا يحرّك بذلك نقداً. owner/admin عبر `*`؛
             // ولا تُضاف لـ accountant/staff تلقائياً (نفس نمط الصلاحيات الحديثة).
             'supplier_refunds.view', 'supplier_refunds.manage',
+            // PAY-V2-6B: استرداد العميل سلطة **مالية تشغيلية** مستقلة عن
+            // `returns.manage` (مرتجعٌ تجاري بلا نقد في المسار الآجل) وعن
+            // إعدادات المحاسبة وعن `payments.manage` (سند الصرف اتجاه مورّد).
+            // owner/admin عبر `*`؛ ولا تُضاف لـ accountant/staff تلقائياً
+            // (نفس نمط `supplier_refunds.*`).
+            'customer_refunds.view', 'customer_refunds.manage',
             // ACC-6: أقفال الفترات المحاسبية سلطة **رقابية** مستقلة عن بقية
             // إعدادات المحاسبة: من يوجّه حساباً لا يوقف بذلك الترحيل على
             // مؤسسة كاملة. owner/admin يملكانها عبر `*`؛ ولا تُضاف لـ

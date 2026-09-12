@@ -71,6 +71,7 @@ class FiscalCloseService
         'expenses'         => ['table' => 'expenses', 'date' => 'expense_date', 'label' => 'المصروفات'],
         'credit_notes'     => ['table' => 'credit_notes', 'date' => 'note_date', 'label' => 'إشعارات الدائن'],
         'supplier_refunds' => ['table' => 'supplier_refunds', 'date' => 'refund_date', 'label' => 'استردادات الموردين'],
+        'customer_refunds' => ['table' => 'customer_refunds', 'date' => 'refund_date', 'label' => 'استردادات العملاء'],
     ];
 
     public function __construct(

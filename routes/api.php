@@ -118,6 +118,7 @@ use App\Http\Controllers\Api\StocktakeController;
 use App\Http\Controllers\Api\SubscriptionController;
 use App\Http\Controllers\Api\SystemUpdateController;
 use App\Http\Controllers\Api\SupplierRefundController;
+use App\Http\Controllers\Api\CustomerRefundController;
 use App\Http\Controllers\Api\TenantApplicationController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\UnitTemplateController;
@@ -1037,6 +1038,18 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::delete('supplier-refunds/{id}', [SupplierRefundController::class, 'destroy'])->middleware($perm('supplier_refunds.manage'));
         Route::post('supplier-refunds/{id}/post', [SupplierRefundController::class, 'post'])->middleware($perm('supplier_refunds.manage'));
         Route::post('supplier-refunds/{id}/reverse', [SupplierRefundController::class, 'reverse'])->middleware($perm('supplier_refunds.manage'));
+
+        // PAY-V2-6B — استرداد العميل: مستندٌ مالي مستقل عن المرتجع/الإشعار.
+        // صلاحيته مستقلة عن `returns.manage` وعن `payments.manage` عمداً:
+        // تحرير مرتجعٍ تجاري أو سند صرف مورّد لا يمنح تحريك نقد للعميل.
+        Route::get('customer-refunds', [CustomerRefundController::class, 'index'])->middleware($perm('customer_refunds.view'));
+        Route::get('customer-refunds/eligible-sources/{partnerId}', [CustomerRefundController::class, 'eligibleSources'])->middleware($perm('customer_refunds.view'));
+        Route::get('customer-refunds/{id}', [CustomerRefundController::class, 'show'])->middleware($perm('customer_refunds.view'));
+        Route::post('customer-refunds', [CustomerRefundController::class, 'store'])->middleware($perm('customer_refunds.manage'));
+        Route::put('customer-refunds/{id}', [CustomerRefundController::class, 'update'])->middleware($perm('customer_refunds.manage'));
+        Route::delete('customer-refunds/{id}', [CustomerRefundController::class, 'destroy'])->middleware($perm('customer_refunds.manage'));
+        Route::post('customer-refunds/{id}/post', [CustomerRefundController::class, 'post'])->middleware($perm('customer_refunds.manage'));
+        Route::post('customer-refunds/{id}/reverse', [CustomerRefundController::class, 'reverse'])->middleware($perm('customer_refunds.manage'));
 
         // الموظفون (HR) — القائمة (`GET employees`) تبقى بلا حجب: مرجع مشترك
         // يستهلكه اختيار البائع في الفاتورة وربط حساب المستخدم بموظف، بلا
