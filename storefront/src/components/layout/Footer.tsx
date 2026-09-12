@@ -40,26 +40,20 @@ export async function Footer({
   storeName,
 }: FooterProps) {
   const t = await getTranslations({ locale, namespace: "footer" });
-  const home = await getTranslations({ locale, namespace: "home" });
   const tp = await getTranslations({ locale, namespace: "policies" });
   const wholesaleEnabled = isWholesaleEnabled();
-  const displayName = storeName?.trim() || home("identityFallback");
+  const displayName = storeName?.trim() || t("shop");
 
   return (
     <footer className="bg-primary text-gray-300">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="grid grid-cols-1 gap-8 md:grid-cols-5">
-          {/* Brand */}
           <div className="col-span-1 md:col-span-2">
             <span className="text-xl font-bold text-white">{displayName}</span>
             <p className="mt-4 text-sm text-neutral-400">{t("description")}</p>
           </div>
-
-          {/* Links */}
           <div>
-            <h3 className="text-sm font-medium text-neutral-300">
-              {t("shop")}
-            </h3>
+            <h3 className="text-sm font-medium text-neutral-300">{t("shop")}</h3>
             <ul className="mt-4 space-y-3">
               <li>
                 <Link
@@ -72,8 +66,6 @@ export async function Footer({
               {categoryLinks}
             </ul>
           </div>
-
-          {/* Account */}
           <div>
             <h3 className="text-sm font-medium text-neutral-300">
               {t("account")}
@@ -115,8 +107,6 @@ export async function Footer({
               )}
             </ul>
           </div>
-
-          {/* Policies */}
           <div>
             <h3 className="text-sm font-medium text-neutral-300">
               {t("policies")}
@@ -135,7 +125,6 @@ export async function Footer({
             </ul>
           </div>
         </div>
-
         <div className="mt-8 pt-8 border-t border-neutral-800 text-xs text-neutral-400 text-center">
           <p>
             {t("copyright", {
