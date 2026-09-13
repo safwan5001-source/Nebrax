@@ -23,6 +23,8 @@ use App\Services\Commerce\CommercePriceResolver;
 use App\Services\Commerce\ResolvedCommercePrice;
 use App\Services\PriceListService;
 use App\Tenancy\TenantContext;
+use DomainException;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use ReflectionClass;
 use RuntimeException;
@@ -186,6 +188,159 @@ class CommercePriceResolverTest extends TestCase
 
         $this->assertTrue($result->resolved);
         $this->assertSame(15000, $result->amount);
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  Channel default pricing (COM-PRICE-1)
+    // ═══════════════════════════════════════════════════════════
+
+    /** @test */
+    public function an_anonymous_base_unit_uses_an_explicit_channel_price_list_item(): void
+    {
+        $list = $this->activePriceList('قائمة قناة الويب');
+        app(PriceListService::class)->upsertItem($list, $this->product, ['price' => 12500]);
+        $this->channel->update(['default_price_list_id' => $list->id]);
+
+        $result = $this->resolver->resolve($this->product->id, $this->channel->id);
+
+        $this->assertSame(12500, $result->amount);
+        $this->assertSame($list->id, $result->priceListId);
+        $this->assertSame(ResolvedCommercePrice::SOURCE_PRICE_LIST, $result->source);
+    }
+
+    /** @test */
+    public function an_anonymous_alternative_unit_requires_and_uses_an_explicit_channel_item(): void
+    {
+        $template = UnitTemplate::create(['name' => 'قالب قناة كراتين', 'base_unit' => 'piece']);
+        $template->units()->create(['name' => 'carton', 'factor' => 12]);
+        $product = Product::create(['name' => 'صنف قناة كرتون', 'unit' => 'piece', 'unit_template_id' => $template->id, 'sale_price' => 1000]);
+        $list = $this->activePriceList('قائمة وحدات القناة');
+        app(PriceListService::class)->upsertItem($list, $product, ['unit_name' => 'carton', 'price' => 11500]);
+        $this->channel->update(['default_price_list_id' => $list->id]);
+
+        $result = $this->resolver->resolve($product->id, $this->channel->id, unitName: 'carton');
+
+        $this->assertTrue($result->resolved);
+        $this->assertSame(11500, $result->amount);
+        $this->assertSame('carton', $result->unitName);
+    }
+
+    /** @test */
+    public function a_channel_list_without_an_item_falls_back_only_for_the_base_unit(): void
+    {
+        $template = UnitTemplate::create(['name' => 'قالب منع الاشتقاق', 'base_unit' => 'piece']);
+        $template->units()->create(['name' => 'carton', 'factor' => 12]);
+        $product = Product::create(['name' => 'صنف بلا سعر كرتون', 'unit' => 'piece', 'unit_template_id' => $template->id, 'sale_price' => 1000]);
+        $list = $this->activePriceList('قائمة ناقصة');
+        $this->channel->update(['default_price_list_id' => $list->id]);
+
+        $base = $this->resolver->resolve($product->id, $this->channel->id);
+        $alternative = $this->resolver->resolve($product->id, $this->channel->id, unitName: 'carton');
+
+        $this->assertSame(1000, $base->amount);
+        $this->assertSame(ResolvedCommercePrice::SOURCE_PRODUCT_DEFAULT, $base->source);
+        $this->assertFalse($alternative->resolved);
+        $this->assertNull($alternative->amount);
+        $this->assertNotSame(12000, $alternative->amount, 'معامل التحويل ليس سلطة تسعير.');
+    }
+
+    /** @test */
+    public function a_partner_price_list_remains_higher_priority_than_the_channel_default(): void
+    {
+        $channelList = $this->activePriceList('قائمة القناة');
+        app(PriceListService::class)->upsertItem($channelList, $this->product, ['price' => 13000]);
+        $this->channel->update(['default_price_list_id' => $channelList->id]);
+        $partnerList = $this->activePriceList('قائمة العميل الأعلى');
+        app(PriceListService::class)->upsertItem($partnerList, $this->product, ['price' => 9000]);
+        $partner = $this->partnerWithDefaultList($partnerList);
+
+        $result = $this->resolver->resolve($this->product->id, $this->channel->id, $partner->id);
+
+        $this->assertSame(9000, $result->amount);
+        $this->assertSame($partnerList->id, $result->priceListId);
+    }
+
+    /** @test */
+    public function an_inactive_channel_list_is_ignored(): void
+    {
+        $list = $this->activePriceList('قائمة قناة ستعطل');
+        app(PriceListService::class)->upsertItem($list, $this->product, ['price' => 12500]);
+        $this->channel->update(['default_price_list_id' => $list->id]);
+        $list->update(['is_active' => false]);
+
+        $result = $this->resolver->resolve($this->product->id, $this->channel->id);
+
+        $this->assertSame(15000, $result->amount);
+        $this->assertNull($result->priceListId);
+    }
+
+    /** @test */
+    public function an_inactive_channel_list_cannot_resolve_an_alternative_unit(): void
+    {
+        $template = UnitTemplate::create(['name' => 'قالب قائمة قناة معطلة', 'base_unit' => 'piece']);
+        $template->units()->create(['name' => 'carton', 'factor' => 10]);
+        $product = Product::create(['name' => 'صنف قائمة معطلة', 'unit' => 'piece', 'unit_template_id' => $template->id, 'sale_price' => 1000]);
+        $list = $this->activePriceList('قائمة قناة معطلة ذات سعر');
+        app(PriceListService::class)->upsertItem($list, $product, ['unit_name' => 'carton', 'price' => 8000]);
+        $this->channel->update(['default_price_list_id' => $list->id]);
+        $list->update(['is_active' => false]);
+
+        $result = $this->resolver->resolve($product->id, $this->channel->id, unitName: 'carton');
+
+        $this->assertFalse($result->resolved);
+        $this->assertNull($result->amount);
+        $this->assertNull($result->priceListId);
+    }
+
+    /** @test */
+    public function assigning_a_cross_tenant_or_inactive_default_price_list_is_rejected(): void
+    {
+        $inactive = PriceList::create(['name' => 'قائمة معطلة', 'is_active' => false]);
+        try {
+            $this->channel->update(['default_price_list_id' => $inactive->id]);
+            $this->fail('تعذر قبول قائمة معطلة كإعداد جديد.');
+        } catch (DomainException) {
+            $this->assertNull($this->channel->fresh()->default_price_list_id);
+        }
+
+        $tenantB = Tenant::create(['name' => 'مالك القائمة الأجنبية', 'slug' => 'foreign-channel-list']);
+        app(TenantContext::class)->set($tenantB->id);
+        $foreignList = $this->activePriceList('قائمة أجنبية');
+
+        app(TenantContext::class)->set($this->channel->tenant_id);
+        $this->expectException(DomainException::class);
+        $this->channel->update(['default_price_list_id' => $foreignList->id]);
+    }
+
+    /** @test */
+    public function a_corrupt_cross_tenant_channel_price_reference_fails_closed_at_resolution(): void
+    {
+        $tenantAId = $this->channel->tenant_id;
+        $tenantB = Tenant::create(['name' => 'مالك مرجع فاسد', 'slug' => 'foreign-resolution-list']);
+        app(TenantContext::class)->set($tenantB->id);
+        $foreignList = $this->activePriceList('قائمة مرجع فاسد');
+
+        app(TenantContext::class)->set($tenantAId);
+        DB::table('sales_channels')->where('id', $this->channel->id)->update(['default_price_list_id' => $foreignList->id]);
+
+        $this->expectException(RuntimeException::class);
+        $this->resolver->resolve($this->product->id, $this->channel->id);
+    }
+
+    /** @test */
+    public function channel_pricing_keeps_the_tenant_currency_and_can_be_cleared(): void
+    {
+        $list = $this->activePriceList('قائمة العملة');
+        app(PriceListService::class)->upsertItem($list, $this->product, ['price' => 12500]);
+        $this->channel->update(['default_price_list_id' => $list->id]);
+
+        $priced = $this->resolver->resolve($this->product->id, $this->channel->id);
+        $this->channel->update(['default_price_list_id' => null]);
+        $withoutDefault = $this->resolver->resolve($this->product->id, $this->channel->id);
+
+        $this->assertSame('SAR', $priced->currency);
+        $this->assertSame(15000, $withoutDefault->amount);
+        $this->assertNull($withoutDefault->priceListId);
     }
 
     // ═══════════════════════════════════════════════════════════

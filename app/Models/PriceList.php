@@ -42,6 +42,12 @@ class PriceList extends BaseModel implements CompanyWide
             ->withoutGlobalScope(BranchScope::class);
     }
 
+    /** قنوات البيع التي تستخدم القائمة كسلطة التسعير الافتراضية. */
+    public function defaultSalesChannels(): HasMany
+    {
+        return $this->hasMany(SalesChannel::class, 'default_price_list_id');
+    }
+
     /** الفواتير تحفظ المرجع لتظهر القائمة المختارة عند مراجعة المستند. */
     public function invoices(): HasMany
     {

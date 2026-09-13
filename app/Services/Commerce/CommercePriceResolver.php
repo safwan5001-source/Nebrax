@@ -25,16 +25,16 @@ use RuntimeException;
  * الحقيقة المالي التاريخي يبقى سطر الفاتورة بعد `InvoiceService::applyItemsAndTotals()`
  * — هذا الصنف لا يستدعيه ولا يقترب منه.
  *
- * **الأسبقية المُعاد استعمالها حرفياً من `PosCustomerPriceListResolver`
- * (AWJ VERIFIED من `PosService::checkout()`، لا اختراع)**:
+ * **الأسبقية (COM-PRICE-1)**:
  *   1. عميلٌ (`Partner`) مُمرَّر ← `forPartner()` يحلّ قائمة سعره الافتراضية
  *      (نشطة فقط)، **مقيّدةً بنفس سياسة POS الحالية** `apply_customer_price_list`
  *      (`App\Support\PosSettings`) — لم تُستنسخ هذه البوابة هنا، بل استُدعيت
  *      كما هي عبر الحقن، فتبقى Commerce والـ POS تحت نفس القرار دائماً؛ لا
  *      قراران منفصلان قد ينحرفان.
- *   2. إن وُجد عنصر صريح لهذا المنتج/الوحدة في القائمة المحلولة ⇐ هو السعر.
- *   3. وإلا، إن كانت الوحدة **وحدة الأساس** ⇐ `Product.sale_price`.
- *   4. وإلا (وحدة بديلة بلا سعرٍ صريح) ⇐ **لا سعر قابل للحسم** — لا يُشتقّ
+ *   2. وإلا قائمة قناة البيع الافتراضية، إن كانت نشطة ومن مستأجر القناة نفسه.
+ *   3. إن وُجد عنصر صريح لهذا المنتج/الوحدة في القائمة المحلولة ⇐ هو السعر.
+ *   4. وإلا، إن كانت الوحدة **وحدة الأساس** ⇐ `Product.sale_price`.
+ *   5. وإلا (وحدة بديلة بلا سعرٍ صريح) ⇐ **لا سعر قابل للحسم** — لا يُشتقّ
  *      سعر عبوة من معامل التحويل أبداً (نفس تحذير `posPriceFor()` حرفياً).
  *
  * **UOM**: يستدعي `UnitConversion::resolve()` — نفس السلطة الوحيدة في
@@ -80,7 +80,8 @@ final class CommercePriceResolver
             throw new RuntimeException('المنتج غير موجود.');
         }
 
-        if (! SalesChannel::query()->whereKey($salesChannelId)->exists()) {
+        $salesChannel = SalesChannel::query()->whereKey($salesChannelId)->first();
+        if ($salesChannel === null) {
             throw new RuntimeException('قناة البيع غير موجودة.');
         }
 
@@ -95,6 +96,16 @@ final class CommercePriceResolver
         $isAlternativeUnit = $resolvedUnitName !== null;
 
         $priceList = $partnerId !== null ? $this->partnerPriceLists->forPartner($partnerId) : null;
+        if ($priceList === null && $salesChannel->default_price_list_id !== null) {
+            $channelPriceList = $salesChannel->defaultPriceList()->first();
+            if ($channelPriceList === null) {
+                // A configured reference that TenantScope cannot resolve is corrupt,
+                // deleted, or cross-tenant. Never turn that into a base-price fallback.
+                throw new RuntimeException('قائمة أسعار قناة البيع غير متاحة لهذا المستأجر.');
+            }
+
+            $priceList = $channelPriceList->is_active ? $channelPriceList : null;
+        }
         $listPrice = $priceList ? $this->priceLists->resolve($priceList, $product, $unitName) : null;
 
         if ($listPrice !== null) {

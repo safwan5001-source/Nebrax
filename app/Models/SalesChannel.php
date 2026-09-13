@@ -3,6 +3,9 @@
 namespace App\Models;
 
 use App\Tenancy\CompanyWide;
+use App\Tenancy\TenantContext;
+use DomainException;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
@@ -31,7 +34,7 @@ class SalesChannel extends BaseModel implements CompanyWide
     public const TYPE_EXTERNAL = 'external';
 
     protected $fillable = [
-        'tenant_id', 'slug', 'name', 'type', 'is_active',
+        'tenant_id', 'slug', 'name', 'type', 'is_active', 'default_price_list_id',
     ];
 
     protected $casts = [
@@ -41,4 +44,33 @@ class SalesChannel extends BaseModel implements CompanyWide
     protected $attributes = [
         'is_active' => true,
     ];
+
+    protected static function booted(): void
+    {
+        static::saving(function (self $channel): void {
+            if ($channel->default_price_list_id === null) {
+                return;
+            }
+
+            $tenantId = $channel->tenant_id ?? app(TenantContext::class)->id();
+            if ($tenantId === null || $tenantId !== app(TenantContext::class)->id()) {
+                throw new DomainException('Sales channel must belong to the active tenant.');
+            }
+
+            // Keep TenantScope in place: a known foreign UUID must be indistinguishable
+            // from an unavailable list and must never become channel pricing authority.
+            if (! PriceList::query()
+                ->whereKey($channel->default_price_list_id)
+                ->where('is_active', true)
+                ->exists()
+            ) {
+                throw new DomainException('Default price list must be active and belong to the active tenant.');
+            }
+        });
+    }
+
+    public function defaultPriceList(): BelongsTo
+    {
+        return $this->belongsTo(PriceList::class, 'default_price_list_id');
+    }
 }

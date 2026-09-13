@@ -74,6 +74,9 @@ class PriceListService
         if ($priceList->defaultPartners()->exists()) {
             throw new RuntimeException('لا يمكن حذف قائمة أسعار معيّنة افتراضياً لعميل. أزلها من العميل أو عطّلها بدلاً من ذلك.');
         }
+        if ($priceList->defaultSalesChannels()->exists()) {
+            throw new RuntimeException('لا يمكن حذف قائمة أسعار معيّنة افتراضياً لقناة بيع. أزلها من القناة أو عطّلها بدلاً من ذلك.');
+        }
 
         $priceList->delete();
     }
