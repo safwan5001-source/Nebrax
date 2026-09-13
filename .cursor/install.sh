@@ -17,20 +17,49 @@ export COMPOSER_MEMORY_LIMIT=-1
 SUDO=""
 [ "$(id -u)" -ne 0 ] && command -v sudo >/dev/null 2>&1 && SUDO="sudo"
 
-# ── 0/4  System toolchain (idempotent; skipped if PHP is already present) ──
+# ── 0/4  System toolchain (idempotent) ──
 # Keeps the environment self-contained on Cursor's default base image, so it
 # needs no prebuilt snapshot. Captured in the build snapshot, so a booted pod
 # does not re-run apt.
+SYSTEM_PACKAGES=()
+
 if ! command -v php >/dev/null 2>&1; then
-  echo "▶ 0/4  Installing PHP 8.3 + system dependencies..."
-  $SUDO apt-get update -qq
-  $SUDO DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-    php8.3-cli php8.3-mbstring php8.3-sqlite3 php8.3-pgsql php8.3-bcmath \
-    php8.3-intl php8.3-zip php8.3-xml php8.3-curl php8.3-gd php8.3-opcache \
-    unzip zip poppler-utils libxml2-utils
-else
-  echo "▶ 0/4  PHP already present ($(php -r 'echo PHP_VERSION;')) — skipping apt."
+  SYSTEM_PACKAGES+=(
+    php8.3-cli php8.3-mbstring php8.3-sqlite3 php8.3-pgsql php8.3-bcmath
+    php8.3-intl php8.3-zip php8.3-xml php8.3-curl php8.3-gd php8.3-opcache
+  )
 fi
+
+command -v unzip >/dev/null 2>&1 || SYSTEM_PACKAGES+=(unzip)
+command -v zip >/dev/null 2>&1 || SYSTEM_PACKAGES+=(zip)
+command -v pdftotext >/dev/null 2>&1 || SYSTEM_PACKAGES+=(poppler-utils)
+command -v xmllint >/dev/null 2>&1 || SYSTEM_PACKAGES+=(libxml2-utils)
+
+if [ "${#SYSTEM_PACKAGES[@]}" -gt 0 ]; then
+  echo "▶ 0/4  Installing missing system dependencies: ${SYSTEM_PACKAGES[*]}"
+  $SUDO apt-get update -qq
+  $SUDO env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+    "${SYSTEM_PACKAGES[@]}"
+else
+  echo "▶ 0/4  System dependencies already present — skipping apt."
+fi
+
+command -v php >/dev/null 2>&1 || { echo "✗ PHP installation failed."; exit 1; }
+command -v xmllint >/dev/null 2>&1 || { echo "✗ xmllint installation failed."; exit 1; }
+php -m | grep -qi '^dom$' || { echo "✗ PHP DOM extension is not available."; exit 1; }
+
+# Raise only this cloud agent's CLI limit; AWJ's Laravel test discovery exceeds
+# the image's 128 MiB default. This does not change application or production config.
+PHP_CLI_MEMORY_LIMIT="${AWJ_PHP_CLI_MEMORY_LIMIT:-512M}"
+PHP_CLI_SCAN_DIR="$(php --ini | sed -n 's/^Scan for additional .ini files in: //p')"
+if [ -z "$PHP_CLI_SCAN_DIR" ] || [ "$PHP_CLI_SCAN_DIR" = "(none)" ]; then
+  echo "✗ PHP CLI does not expose an additional .ini scan directory."
+  exit 1
+fi
+$SUDO mkdir -p "$PHP_CLI_SCAN_DIR"
+printf 'memory_limit=%s\n' "$PHP_CLI_MEMORY_LIMIT" | \
+  $SUDO tee "$PHP_CLI_SCAN_DIR/99-awj-cloud-agent.ini" >/dev/null
+echo "▶      PHP CLI memory_limit: $(php -r 'echo ini_get("memory_limit");')"
 
 if ! command -v composer >/dev/null 2>&1; then
   echo "▶      Installing Composer..."
