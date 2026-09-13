@@ -48,7 +48,7 @@ class SalesChannel extends BaseModel implements CompanyWide
     protected static function booted(): void
     {
         static::saving(function (self $channel): void {
-            if ($channel->default_price_list_id === null) {
+            if (! $channel->isDirty('default_price_list_id') || $channel->default_price_list_id === null) {
                 return;
             }
 
