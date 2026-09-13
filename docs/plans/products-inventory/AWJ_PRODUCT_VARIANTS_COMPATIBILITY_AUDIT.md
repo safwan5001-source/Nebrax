@@ -48,6 +48,43 @@ AWJ has primary and alternate barcode infrastructure plus a tenant-wide barcode 
 
 **Compatibility consequence:** future variant-aware pricing must preserve UOM as a separate pricing dimension and must not bypass minimum-sale-price or authorized override rules.
 
+### 2.6 Alternate barcode + UOM pricing requirement
+
+AWJ product create/edit UX must support assigning the commercial selling price for each sellable UOM represented by an alternate barcode. Typical business usage is not limited to mathematically multiplying the base-unit price:
+
+| UOM | Base factor | Example barcode | Example selling price |
+|---|---:|---|---:|
+| piece / حبة | 1 | Barcode A | 5.00 |
+| pack / شدة | 6 | Barcode B | 27.00 |
+| dozen / درزن | 12 | Barcode C | 50.00 |
+
+The conversion factor determines inventory quantity normalization; it MUST NOT determine the commercial price by multiplication. A merchant may intentionally price a pack or dozen below or above the simple base-unit multiple.
+
+**Authority decision:** price belongs to the **sellable identity + UOM**, not to the barcode string itself. Barcode is a resolver/input identity. This prevents accidental divergent prices if more than one barcode later resolves to the same UOM.
+
+Conceptually:
+
+```text
+Barcode -> Sellable identity + UOM -> Pricing authority
+```
+
+not:
+
+```text
+Barcode -> owns price
+```
+
+For a simple Product today, the sellable identity is Product. For a future variant-capable Product it may be ProductVariant. Therefore the same rule can extend cleanly to:
+
+```text
+Product + UOM -> price
+ProductVariant + UOM -> price
+```
+
+**UX requirement:** when creating/editing an alternate barcode that selects a sellable UOM, the user should be able to see/set that UOM's selling price in the same workflow. The UI may present this as a row containing barcode, UOM, base factor/default quantity and selling price, while persistence continues to respect the central UOM/pricing authority rather than storing an independent price on the barcode record.
+
+This requirement must be included in the future pricing/barcode contract and regression coverage for Product create/edit, POS scanning and invoice price resolution.
+
 ## 3. Financial and historical document evidence
 
 ### 3.1 Invoice lines already use snapshot semantics
@@ -131,10 +168,11 @@ Before implementation, the following authorities should be treated as design req
 | Shared merchandising name/description/category/brand | Product |
 | Option definitions and combinations | Product option/variant domain |
 | Variant SKU | Variant when variants exist; Product for simple products |
-| Barcode | Existing tenant-wide barcode registry, targeting the sellable identity/UOM as appropriate |
+| Barcode | Existing tenant-wide barcode registry, targeting the sellable identity/UOM as appropriate; barcode itself does not own price |
 | Stock / warehouse availability | Sellable inventory identity; variants must be independently distinguishable when stocked independently |
 | Moving-average valuation | Requires explicit migration/design decision; current authority is Product and must not be silently shared across independent variants |
 | UOM conversion | Existing UOM authority, orthogonal to variant |
+| UOM selling price | Sellable identity + UOM; editable alongside alternate-barcode/UOM setup UX |
 | Price list | Variant-aware extension must preserve UOM dimension and existing pricing/min-price rules |
 | Historical document display | Immutable line snapshots |
 | Commerce publication | Commerce listing/channel boundary; do not move `is_online` into Product |
@@ -156,11 +194,11 @@ No Variant implementation should begin until these decisions are explicit:
 
 1. **Sellable identity contract** — define how services address simple Product vs Variant without polymorphic ambiguity or tenant leaks.
 2. **Inventory/valuation contract** — decide variant warehouse balances, stock movements, reservation identity and moving-average valuation semantics.
-3. **Barcode contract** — extend the existing registry; define Product/Variant/UOM targeting and collision rules.
-4. **Pricing contract** — define precedence for Product price, Variant override, PriceListItem and UOM without changing approved price-floor behavior accidentally.
+3. **Barcode contract** — extend the existing registry; define Product/Variant/UOM targeting and collision rules; barcode remains a resolver and does not own price.
+4. **Pricing contract** — define precedence for Product price, Variant override, UOM selling price, PriceListItem and approved minimum-sale-price rules; product create/edit must support setting the UOM price alongside alternate-barcode setup.
 5. **Historical snapshot contract** — define the minimum immutable snapshot for Invoice/Purchase/Return/Quote/Commerce lines.
 6. **Lifecycle contract** — variant deactivate/delete behavior and reference classification.
-7. **POS contract** — scan/search/cart/held-cart behavior for variant + UOM while preserving simple Product behavior.
+7. **POS contract** — scan/search/cart/held-cart behavior for variant + UOM while preserving simple Product behavior, including barcode-resolved UOM price.
 8. **Public/Mobile Commerce API contract** — option selection and stable sellable identity without exposing internal assumptions.
 9. **Tenant Isolation tests** — cross-tenant Product/Variant/Option/Barcode/Inventory negative tests.
 10. **PostgreSQL concurrency tests** — reservations/stock for two variants of the same Product must not contaminate one another.
@@ -169,10 +207,10 @@ No Variant implementation should begin until these decisions are explicit:
 
 If Product Variants are approved for implementation, use small independent PRs:
 
-1. `VAR-ARCH-1` — final sellable-identity + inventory/valuation + barcode/pricing ADR (docs/tests contract only where possible).
+1. `VAR-ARCH-1` — final sellable-identity + inventory/valuation + barcode/UOM/pricing ADR (docs/tests contract only where possible).
 2. `VAR-CORE-1` — Product Option / Option Value / Variant core and tenant/lifecycle constraints.
 3. `VAR-INV-1` — variant inventory, warehouse stock, movement and valuation integration.
-4. `VAR-PRICE-1` — pricing/UOM/price-list integration with min-price regression coverage.
+4. `VAR-PRICE-1` — pricing/UOM/price-list integration, alternate-barcode UOM price workflow and min-price regression coverage.
 5. `VAR-DOC-1` — invoice/purchase/return/quote snapshot and sellable-reference integration.
 6. `VAR-POS-1` — POS search/scan/cart/held-cart UI and API integration.
 7. `VAR-COM-1` — Commerce listing/public API/cart selection integration.
@@ -188,4 +226,6 @@ First-class Product Variants are architecturally feasible in AWJ, and the curren
 
 The preferred direction is **optional first-class variants above Product**, while simple Products remain directly sellable. Variants must become real sellable/inventory identities where independent stock exists; they must not be reduced to storefront-only attributes.
 
-This audit does **not** authorize schema/code implementation and does not change Commerce V1 scope. The next decision artifact should be `VAR-ARCH-1`, with particular attention to inventory valuation and sellable-identity representation before any migration is written.
+Alternate barcode setup is also explicitly a UOM-pricing UX surface: each sellable UOM can have its own commercial selling price, but the price authority is the sellable identity + UOM rather than the barcode string.
+
+This audit does **not** authorize schema/code implementation and does not change Commerce V1 scope. The next decision artifact should be `VAR-ARCH-1`, with particular attention to inventory valuation, sellable-identity representation and the Barcode/UOM/Pricing contract before any migration is written.
