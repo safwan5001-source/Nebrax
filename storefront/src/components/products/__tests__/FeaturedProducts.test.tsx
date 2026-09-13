@@ -1,10 +1,6 @@
 import { render, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("@/lib/spree", () => ({
-  getAccessToken: vi.fn().mockResolvedValue(undefined),
-}));
-
 vi.mock("next-intl/server", () => ({
   getTranslations: vi.fn(async () => (key: string) => key),
 }));
@@ -15,8 +11,8 @@ vi.mock("@/components/products/ProductCarousel", () => ({
   ),
 }));
 
-describe("FeaturedProducts (COM-7-PREVIEW-FIX-1)", () => {
-  it("degrades to an empty catalog state instead of crashing the homepage when the AWJ catalog API fails", async () => {
+describe("FeaturedProducts (AWJ catalog)", () => {
+  it("renders the empty catalog state without requiring Spree configuration when the AWJ API fails", async () => {
     vi.resetModules();
     vi.doMock("next-intl/server", () => ({
       getTranslations: vi.fn(async () => (key: string) => key),
