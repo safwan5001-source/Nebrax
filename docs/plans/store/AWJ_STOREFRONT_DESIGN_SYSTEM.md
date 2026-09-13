@@ -2,8 +2,8 @@
 
 **Status:** Design specification — implementation not started  
 **Date:** 2026-09-13  
-**Scope:** AWJ Store customer-facing storefront only  
-**Reference direction:** approved desktop + mobile visual references supplied by product owner  
+**Scope:** AWJ Store customer-facing storefront and merchant presentation configuration  
+**Reference direction:** approved desktop + mobile storefront and customizer visual references supplied by product owner  
 **Related architecture:** `AWJ_SPREE_TECHNICAL_FIT_AUDIT.md` and existing Commerce ADRs/plans
 
 ---
@@ -34,15 +34,16 @@ The reference design becomes the foundation of the first reusable AWJ storefront
 
 It must be tenant-configurable rather than tied to one merchant. The structural components remain stable while merchant-controlled content and branding can change.
 
-### Merchant-configurable
+### Merchant-configurable presentation
 
 - logo / store identity.
-- primary brand color.
+- primary and supported secondary/accent presentation colors.
+- supported Arabic/English typography choices.
 - hero banners and their links.
-- category imagery.
+- category imagery/presentation overrides where explicitly supported.
 - homepage section visibility.
 - homepage section ordering within supported rules.
-- featured collections/products.
+- featured collections/products selection from AWJ-owned commerce data.
 - promotional banners.
 - store contact/support content.
 - policy links and footer content.
@@ -64,7 +65,73 @@ Theme configuration must never be allowed to alter financial calculations, inven
 
 ---
 
-## 3. Visual direction
+## 3. AWJ is the system of record
+
+**Architectural rule:** AWJ is the system of record for commerce master data. The Store Customizer controls presentation, not commerce master data.
+
+The storefront and its customization UI must not create a second independent catalog taxonomy or duplicate product master data.
+
+### Master data owned by AWJ
+
+The authoritative source remains AWJ for:
+
+- products and product identity.
+- product names/descriptions and core commerce attributes.
+- categories/classifications and their membership relationships.
+- prices and valid discounts/promotions according to implemented Commerce contracts.
+- inventory/availability truth.
+- product media that belongs to the product record.
+- publication/eligibility state for whether a product may appear in the storefront.
+- other commerce facts governed by AWJ backend contracts.
+
+Creation, deletion, renaming and structural maintenance of categories/classifications happen through the appropriate AWJ management capability, not through the Store Customizer.
+
+### What the Store Customizer may control
+
+For AWJ-owned categories/products that are eligible for storefront use, the Customizer may control presentation-only choices such as:
+
+- show/hide a category or homepage category section.
+- choose which eligible categories are promoted on the homepage.
+- reorder supported homepage category/section placements.
+- choose an approved presentation style/layout.
+- assign presentation imagery/banner treatment where the schema explicitly supports an override without changing the underlying category identity.
+- choose featured products/collections from products already exposed by AWJ.
+
+A presentation override must reference the stable AWJ entity identifier. It must not clone the entity into a separate storefront-owned record.
+
+### Lifecycle behavior
+
+- If an AWJ category is renamed, the storefront reads the authoritative updated name unless a separately approved presentation-label feature exists.
+- If an AWJ category/product becomes unavailable, unpublished, deleted, or no longer eligible for storefront exposure, stale Customizer references must fail safely and must not resurrect or expose it.
+- Reordering or hiding an item in the Customizer changes only storefront presentation; it does not mutate AWJ catalog hierarchy or product-category membership.
+- Storefront caches and theme configuration must remain tenant-scoped; an entity reference from one tenant must never resolve in another tenant.
+
+This boundary prevents synchronization drift such as having one category in AWJ and a second conflicting category in the storefront.
+
+---
+
+## 4. Store Customizer boundary
+
+The approved Customizer visual direction consists of the **customization controls, top configuration/preview controls, and the live storefront preview canvas**. Any surrounding ERP navigation/sidebar visible in the supplied reference is contextual only and is explicitly **not** part of the Store Customizer design reference.
+
+The Customizer is a constrained presentation editor, not an unrestricted page builder in V1.
+
+### V1 customization families
+
+- supported theme/template selection.
+- merchant presentation colors through semantic theme tokens.
+- supported Arabic and English typography choices.
+- homepage layout preset where supported.
+- section visibility.
+- safe section ordering.
+- desktop/tablet/mobile preview modes.
+- preview before publish.
+
+The exact persistence schema and publish workflow are implementation decisions for `STORE-UI-6`; they must preserve tenant isolation, validation, backward compatibility and safe defaults.
+
+---
+
+## 5. Visual direction
 
 The storefront should feel modern, calm, commercial and trustworthy — not like an ERP screen and not like an AI-generated landing page.
 
@@ -92,7 +159,7 @@ The storefront should feel modern, calm, commercial and trustworthy — not like
 
 ---
 
-## 4. Responsive strategy
+## 6. Responsive strategy
 
 Desktop and mobile are two coordinated compositions using the same commerce model and component primitives. Mobile is **not** a shrunken desktop.
 
@@ -108,16 +175,16 @@ All layouts must be tested in Arabic RTL and English LTR.
 
 ---
 
-## 5. Desktop storefront anatomy
+## 7. Desktop storefront anatomy
 
 The approved desktop direction contains these regions, in order:
 
 1. Utility/header row: locale/region, account, wishlist, cart.
 2. Brand + prominent search.
-3. Primary category navigation.
+3. Primary category navigation sourced from AWJ-authoritative categories.
 4. Main commerce canvas.
 5. Hero promotional banner/carousel.
-6. Visual category shortcuts.
+6. Visual category shortcuts sourced from AWJ categories and presentation configuration.
 7. Featured products grid/carousel.
 8. Promotional/category banners.
 9. Trust/service benefits.
@@ -142,7 +209,7 @@ At narrower widths it collapses to the normal cart surface/drawer rather than co
 
 ---
 
-## 6. Mobile storefront anatomy
+## 8. Mobile storefront anatomy
 
 ### Global mobile shell
 
@@ -174,7 +241,7 @@ The goal is useful commerce density, not one giant card per viewport.
 
 ---
 
-## 7. Required customer journeys
+## 9. Required customer journeys
 
 The theme is incomplete until the following surfaces share one coherent design language:
 
@@ -235,7 +302,7 @@ No visual implementation may invent unsupported shipping, payment, discount or f
 
 ---
 
-## 8. Component inventory
+## 10. Component inventory
 
 Initial reusable storefront components:
 
@@ -273,7 +340,7 @@ Names are conceptual until implementation confirms existing component convention
 
 ---
 
-## 9. Product card contract
+## 11. Product card contract
 
 Product cards are one of the highest-reuse components and must be standardized early.
 
@@ -293,7 +360,7 @@ No fake ratings, fake discounts, fake stock urgency or placeholder commercial cl
 
 ---
 
-## 10. Theme tokens
+## 12. Theme tokens
 
 Storefront components consume semantic theme tokens instead of hard-coded merchant colors.
 
@@ -318,7 +385,7 @@ The ERP design tokens are **not automatically inherited** by the public storefro
 
 ---
 
-## 11. Typography and imagery
+## 13. Typography and imagery
 
 ### Typography
 
@@ -339,7 +406,7 @@ Merchant imagery is content, not part of the theme code.
 
 ---
 
-## 12. Accessibility and interaction
+## 14. Accessibility and interaction
 
 Minimum requirements:
 
@@ -356,7 +423,7 @@ Minimum requirements:
 
 ---
 
-## 13. Loading, empty and failure states
+## 15. Loading, empty and failure states
 
 Every data-driven block must define:
 
@@ -370,12 +437,12 @@ The UI must not display locally assumed success when an add-to-cart, inventory, 
 
 ---
 
-## 14. Commerce and security guardrails
+## 16. Commerce and security guardrails
 
 These rules override visual convenience:
 
 1. Tenant resolution is mandatory before storefront data access.
-2. No cross-tenant cache, cookie, cart, customer, product or theme leakage.
+2. No cross-tenant cache, cookie, cart, customer, product, category or theme leakage.
 3. Prices/totals are server-authoritative; client math is display-only at most.
 4. Inventory availability follows AWJ Commerce reservation rules.
 5. `CommerceOrder != Invoice`; storefront UI must not blur this accounting boundary.
@@ -384,10 +451,12 @@ These rules override visual convenience:
 8. Theme configuration cannot inject unsafe arbitrary executable code.
 9. Storefront analytics must not expose secrets or sensitive customer data.
 10. Backward compatibility with existing Commerce APIs/contracts is required unless a separate approved change explicitly modifies them.
+11. Storefront configuration may reference only tenant-owned/tenant-visible AWJ entities eligible for storefront exposure.
+12. Presentation configuration must not become an alternate source of product/category truth.
 
 ---
 
-## 15. Relationship to Spree Storefront
+## 17. Relationship to Spree Storefront
 
 The existing technical audit concluded that Spree provides meaningful reusable catalog/browsing/account UI, while its checkout/payment/session assumptions are deeply coupled to Spree and do not match AWJ's approved Commerce boundaries.
 
@@ -400,7 +469,7 @@ Therefore:
 
 ---
 
-## 16. Implementation plan
+## 18. Implementation plan
 
 ### STORE-UI-0 — Design specification
 
@@ -410,6 +479,7 @@ Deliverable:
 - responsive design contract.
 - component inventory.
 - theme model.
+- AWJ master-data / Customizer presentation boundary.
 - security/commerce guardrails.
 
 No production UI code.
@@ -424,6 +494,7 @@ Scope:
 - content container/breakpoints.
 - footer foundation.
 - RTL/LTR behavior.
+- category navigation consumes AWJ-authoritative category data; it does not define a second taxonomy.
 
 No checkout redesign and no Commerce API changes.
 
@@ -431,8 +502,8 @@ No checkout redesign and no Commerce API changes.
 
 Scope:
 - hero.
-- category shortcuts.
-- featured products.
+- category shortcuts sourced from AWJ category data.
+- featured products sourced from AWJ commerce data.
 - promotional blocks.
 - product card/grid foundation.
 - loading/empty/error states.
@@ -464,20 +535,24 @@ Scope:
 - order history/detail.
 - wishlist/address/payment surfaces only where corresponding backend contracts exist.
 
-### STORE-UI-6 — Merchant theme configuration
+### STORE-UI-6 — Merchant theme configuration / Store Customizer
 
 Scope:
 - merchant branding.
-- theme primary color.
-- homepage content configuration.
-- banners/sections ordering within safe schema.
+- supported theme/template selection.
+- theme colors/tokens.
+- supported typography choices.
+- homepage content/layout configuration.
+- visibility and ordering of supported sections.
+- selection/presentation of AWJ-owned categories/products without duplicating their master data.
+- desktop/tablet/mobile preview.
 - preview before publish.
 
-Theme publishing must remain tenant-scoped and validated.
+Theme publishing must remain tenant-scoped and validated. Customizer persistence stores presentation configuration and stable references to eligible AWJ entities; it does not become a product/category master-data store.
 
 ---
 
-## 17. Definition of done for each UI PR
+## 19. Definition of done for each UI PR
 
 A storefront UI PR is not complete from screenshots alone. At minimum it must include:
 
@@ -497,7 +572,7 @@ Financial/security/tenant-isolation tests must not be weakened to make a UI PR p
 
 ---
 
-## 18. Explicit non-goals for STORE-UI-0
+## 20. Explicit non-goals for STORE-UI-0
 
 This design-specification step does **not**:
 
@@ -508,11 +583,13 @@ This design-specification step does **not**:
 - implement shipping/logistics.
 - implement reviews/ratings.
 - implement wishlist persistence.
+- create a second storefront-owned product/category taxonomy.
 - alter ERP back-office design system.
 - redesign unrelated AWJ modules.
+- treat the surrounding ERP sidebar from the Customizer visual reference as part of the Customizer design scope.
 
 ---
 
-## 19. Next action
+## 21. Next action
 
 Proceed with **STORE-UI-1 — Storefront Shell** only after reviewing this specification against the current storefront code structure. The implementation pass should inspect only the files necessary to identify the existing shell/layout/theme seams and then produce a small PR. Do not re-audit the full Commerce architecture.
