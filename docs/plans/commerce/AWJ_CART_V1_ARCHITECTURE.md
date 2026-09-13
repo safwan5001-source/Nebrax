@@ -1,6 +1,6 @@
 # AWJ Cart V1 Architecture Decision
 
-**Status: Proposed — awaiting Safwan approval**
+**Status: Proposed — ready for Safwan final approval**
 
 > هذه الوثيقة قرار معماري مقترح لـ Cart V1 فقط. لا تُعدّ موافقة على التنفيذ، ولا تنشئ Cart أو migrations أو API أو تغييرات Storefront.
 
@@ -8,9 +8,9 @@
 
 يوصى ببناء **AWJ-native server-side Cart V1** ككيان مستقل عن `CommerceOrder`، وعن `Invoice`، وعن Spree. يحتفظ المتصفح بملف cookie يحتوي على مرجع عشوائي opaque عالي الإنتروبيا فقط. يحتفظ AWJ backend بالحالة authoritative، ويربط كل Cart بخادمياً بـ`tenant_id` و`storefront_id` و`sales_channel_id` التي حُلّت من hostname الطلب عبر مسار `ResolveStorefrontDomain` الحالي.
 
-يبدأ Cart عند أول `POST /store/v1/cart/items` ناجح، وليس عند قراءة Cart فارغة. يستخدم Cart في V1 حالة `active` أو `expired` فقط. تحفظ السطور المنتج واسم وحدة القياس القانوني والكمية، بينما يعاد حسم السعر من `CommercePriceResolver` عند كل قراءة أو تغيير. لا يُحفظ snapshot سعري في Cart لأن Cart ليس Order ولا يحتاج إلى تجميد سعر قبل Checkout.
+يبدأ Cart عند أول `POST /store/v1/cart/items` ناجح، وليس عند قراءة Cart فارغة. يستخدم Cart في V1 حالة `active` أو `expired` فقط. تحفظ السطور مرجع المنتج و`unit_key` والكمية، بينما يعاد حسم اسم/عامل الوحدة والسعر من Product/UOM و`CommercePriceResolver` عند كل قراءة أو تغيير. لا يُحفظ snapshot سعري في Cart لأن Cart ليس Order ولا يحتاج إلى تجميد سعر قبل Checkout.
 
-لا توجد هوية variant مستقلة في AWJ الحالية. لذلك يكون sellable identity في V1 هو `product_id + canonical unit_name`. لا يجوز استخدام `${product.id}-default`؛ فهو معرف اصطناعي لطبقة توافق واجهة Spree، وليس هوية AWJ مخزنة.
+لا توجد هوية variant مستقلة في AWJ الحالية. لذلك يكون sellable identity في V1 هو `product_id + unit_key`، حيث تكون قيمة `unit_key` الثابتة هي `base` لوحدة `Product.unit` الأساسية، أو `unit:<UnitTemplateUnit.id>` لوحدة بديلة. لا يجوز استخدام `unit_name` أو `${product.id}-default` كهوية؛ الاسم قابل للتعديل والمعرّف الأخير اصطناعي لطبقة توافق واجهة Spree، وليس هوية AWJ مخزنة.
 
 يجب أن ترفض الخدمة كل محاولة لاجتياز حدود المستأجر أو المتجر أو القناة، وأن تعيد خطأً عاماً غير كاشف. ويجب أن تظل Cart بلا قيود أو حجوزات مخزون أو قيود محاسبية أو Order creation.
 
@@ -22,7 +22,7 @@
 | AWJ catalog eligibility | `StorefrontProductController` requires active products and a published `CommerceListing` on the resolved channel. [2] | Cart add and every retained-line read must use the same effective eligibility rule. |
 | Listing model | `CommerceListing` belongs to a product and sales channel, stores publication state, and stores no price or inventory. [3] | Listing is an eligibility boundary, not a Cart price or stock source. |
 | Pricing | `CommercePriceResolver` validates tenant-owned Product/SalesChannel, resolves UOM with `UnitConversion`, and returns price plus `Tenant.currency`. [4] | Browser prices are ignored; Cart totals are derived from this resolver. |
-| Product/UOM | `Product` has a base `unit` and optional `unit_template_id`; `UnitTemplateUnit` stores named alternative units and integer factors. [5] [6] | V1 does not invent variants. A line stores a canonical unit name and positive integer quantity. |
+| Product/UOM | `Product` has a base `unit` and optional `unit_template_id`; `UnitTemplateUnit` is a UUID-backed row storing a named alternative unit and integer factor, while the base unit has no child row. [5] [6] [13] | V1 does not invent variants. A line stores `unit_key=base` for the base unit or `unit:<UnitTemplateUnit.id>` for an alternative, plus a positive integer quantity. |
 | Inventory | `AvailableToSellService` reads warehouse stock minus active reservations and creates no stock effects. [7] | Cart does not reserve or mutate stock. Hard stock commitment remains a Checkout concern. |
 | Existing Order | `CommerceOrderService` creates draft Orders, snapshots price and quantity, and explicitly excludes Cart semantics. [8] | Cart must not call or repurpose Order creation. |
 | Existing Cart | `storefront/src/lib/data/cart.ts` calls Spree cart get/list/create/item APIs and uses Spree cookies/tokens. [9] | The future adapter must replace runtime Spree calls only on the Cart path. |
@@ -35,9 +35,13 @@ The task's preferred conceptual route shape matches the existing AWJ `/store/v1`
 
 The task asks whether Cart should use a variant identity. The repository has no confirmed AWJ variant model. The safe decision is **no variant identity in V1**. The synthetic UI identifier is explicitly excluded from the backend contract.
 
+The repository does provide a stable UUID for each `UnitTemplateUnit`, but the base unit has no child row: the migration documents that it is represented by `Product.unit`/the template base unit with factor 1. The safe representation is one non-null namespaced `unit_key`: the reserved literal `base` means the current base unit, and `unit:<UUID>` identifies an alternative row. The service resolves the key to the current name and factor before pricing and rejects an alternative UUID not attached to the current Product's `unit_template_id`. This avoids using a mutable name as identity without inventing a variant subsystem.
+
 The task asks whether quantity should be decimal or integer. Current Product/UOM factors and Commerce order lines use integer quantities, and stock quantities are represented as integer base quantities. The safe V1 decision is positive integer quantity only. Decimal quantities require a separate domain decision and are out of scope.
 
 The task's word “token” could suggest storing a bearer secret directly. The safer repository-compatible decision is to store only a SHA-256 hash of a random cookie secret; the raw secret remains in the browser cookie and is never stored in the database.
+
+The repository's `ProductLifecycleService` blocks destructive deletion only for references classified by `ProductReferenceRegistry`; otherwise it soft-deletes the Product after cleaning owned children. Anonymous abandoned Carts are not currently classified as historical or commercial-live Product references. Cart V1 must therefore not add a restrictive Product FK or add Cart to the deletion-blocker registry. A nullable Product reference with a required display snapshot is the safe future design: Product deletion remains governed by the existing lifecycle policy, while the retained Cart line remains visible as unavailable.
 
 ## 3. Proposed Cart aggregate
 
@@ -65,16 +69,17 @@ The proposed line table/model is `CommerceCartItem` or `CartItem`, owned by the 
 | `id` | Yes | UUID stable item reference. Operations always scope it through the current Cart loaded from the cookie and current context. |
 | `tenant_id` | Yes | Consistent with existing Commerce line tables and useful for tenant-scoped guards and indexes. It must equal the parent Cart tenant. |
 | `cart_id` | Yes | Parent Cart foreign key with cascade delete for active ephemeral state. |
-| `product_id` | Yes | Authoritative AWJ sellable product identity. It is validated under the current tenant and current storefront channel. |
-| `unit_name` | Yes | Canonical unit key. The base unit is stored as `Product.unit`; an alternative unit is stored by its exact `UnitTemplateUnit.name`. This avoids nullable uniqueness ambiguity and matches the repository's actual UOM identity. |
+| `product_id` | No | Authoritative AWJ sellable product identity while the Product exists. It is nullable only to permit the existing allowed Product soft-delete path without making abandoned anonymous Carts deletion blockers; `product_name_snapshot` remains required for retained-line display. |
+| `product_name_snapshot` | Yes | Last safe display name. It is not pricing or eligibility authority; it keeps a deleted/inaccessible Product line visible as unavailable. |
+| `unit_key` | Yes | Stable namespaced identity: literal `base` for the current `Product.unit`, or `unit:<UnitTemplateUnit.id>` for an alternative UUID. The server resolves the key to the current unit name and factor. |
 | `quantity` | Yes | Positive unsigned integer. It is never accepted from the browser as a precomputed total. |
 | `created_at` / `updated_at` | Yes | Standard line timestamps. |
 
-No `variant_id` is proposed. No `unit_factor` is persisted in Cart V1 because the authoritative unit definition is resolved from the current Product/UnitTemplate through `UnitConversion`. The resolved factor is needed for downstream stock/order semantics, not as a Cart price or identity snapshot.
+No `variant_id` is proposed. No `unit_name` is used as identity. No `unit_factor` is persisted in Cart V1 because the authoritative unit definition is resolved from the current Product/UnitTemplate through the `unit_key` and `UnitConversion`. A `unit_name_snapshot` may be added only as a display fallback for a deleted/renamed alternative; it is never used for lookup, pricing, or uniqueness. The resolved factor is needed for downstream stock/order semantics, not as a Cart price or identity snapshot.
 
 No `unit_price`, `line_total`, `subtotal`, tax, discount, shipping, or payment field is persisted. These values are calculated for each response by the server.
 
-The service canonicalizes omitted unit input to the product base unit. It validates an explicit alternative unit through `UnitConversion`; unknown units fail closed. If a later product/UOM edit makes a stored line invalid, the line remains a retained but unavailable line until the customer removes it or a future policy explicitly defines cleanup.
+The service canonicalizes omitted unit input to `unit_key=base`. It validates an explicit `unit:<UUID>` against the current Product's unit template and then passes the resolved unit name to `UnitConversion`; unknown, detached, deleted, or mismatched units fail closed. If a later product/UOM edit makes a stored line invalid, the line remains visible as a retained but unavailable line until the customer removes it. It is always removable, never contributes to subtotal, and no update, re-add, or other Cart mutation may make it orderable without a fresh eligibility and UOM validation.
 
 ## 5. Identity/token model
 
@@ -146,16 +151,16 @@ The product must be loaded through the current tenant scope. Because `Product` i
 
 The current repository has the rule in `StorefrontProductController` as a query boundary, but no single reusable `isEligibleForStorefront()` service is confirmed. COM-CART-2 should either call a small shared eligibility service extracted from that exact rule or create a narrowly scoped query object. It must not create a second definition that can drift from catalog publication.
 
-Eligibility is checked on add, update, and read/serialization. If an already-added product becomes inactive or unpublished, the Cart item is not silently converted into an orderable item. V1 should retain the row for customer visibility, mark it unavailable, exclude it from the authoritative subtotal, and require removal before any future Checkout boundary accepts the Cart. Mutation of an unavailable item is rejected until eligibility is restored or the item is removed. The exact response flag should be fixed in COM-CART-2 tests.
+Eligibility is checked on add, update, and read/serialization. If an already-added product becomes inactive or unpublished, the Cart item remains visible with `eligible=false`/`unavailable=true`, contributes zero to the authoritative subtotal, and is always removable. No quantity update, add/increment, price refresh, or other mutation may make that line orderable without a fresh successful eligibility check; Checkout must also re-check eligibility. The only permitted mutation on an unavailable line is `DELETE` (or an equivalent explicit removal operation). The response flags and this invariant are mandatory COM-CART-2 tests.
 
 ## 9. Pricing authority
 
 For every eligible line, the server performs:
 
 ```text
-CartItem(product_id, canonical unit_name)
-  → Product/UOM under current TenantContext
-  → CommercePriceResolver::resolve(product_id, sales_channel_id, null, unit_name)
+CartItem(product_id, unit_key)
+  → Product/UOM under current TenantContext, resolved from unit_key
+  → CommercePriceResolver::resolve(product_id, sales_channel_id, null, resolved_unit_name)
   → authoritative unit price in minor units
   → quantity × unit price
   → sum of eligible line totals = subtotal
@@ -216,12 +221,12 @@ The request bodies are intentionally narrow:
 POST /store/v1/cart/items
 {
   "product_id": "uuid",
-  "unit_name": "box",
+  "unit_key": "unit:uuid-of-unit-template-unit",
   "quantity": 2
 }
 ```
 
-`unit_name` may be omitted to select the product base unit. `PATCH` accepts only `{ "quantity": 3 }`. `DELETE` has no body. No endpoint accepts Cart ID, tenant ID, storefront ID, sales channel ID, price, subtotal, total, currency, partner ID, or variant ID as authority.
+`unit_key` may be omitted, or explicitly set to `base`, to select the product base unit. `PATCH` accepts only `{ "quantity": 3 }`. `DELETE` has no body. No endpoint accepts Cart ID, tenant ID, storefront ID, sales channel ID, price, subtotal, total, currency, partner ID, or variant ID as authority. A retained unavailable line accepts only `DELETE`.
 
 Every successful mutation recalculates the complete response from server-side state. The backend returns a fresh `Set-Cookie` only on first creation or an explicit future rotation event.
 
@@ -239,6 +244,7 @@ The response is AWJ-native and intentionally smaller than the Spree Cart model.
         "id": "uuid",
         "product_id": "uuid",
         "product_name": "اسم المنتج",
+        "unit_key": "base",
         "unit_name": "piece",
         "quantity": 2,
         "unit_price": { "amount_minor": 25000, "currency": "SAR" },
@@ -292,7 +298,7 @@ If a concurrent first-add can create duplicate lines, the unique line constraint
 
 ## 18. Idempotency and line uniqueness
 
-V1 line identity is `(cart_id, product_id, unit_name)`. Adding the same product and canonical unit twice **increments the existing line quantity** rather than creating a second line. Different UOMs are different lines because the UOM can change price and quantity semantics.
+V1 line identity is `(cart_id, product_id, unit_key)`. Adding the same eligible product and unit key twice **increments the existing line quantity** rather than creating a second line. Different UOM keys are different lines because the UOM can change price and quantity semantics. An unavailable retained line cannot be incremented or updated; a new add is a fresh eligibility decision and may create a new line only after that decision succeeds.
 
 No general request-level idempotency-key infrastructure is proposed for V1. The repository has no existing Cart idempotency contract, and adding one would expand the scope. This means a retried add request may increment twice; the COM-CART-2 API documentation and storefront adapter must avoid blind retries. A future Checkout/payment boundary must introduce request idempotency before externally consequential operations.
 
@@ -311,7 +317,7 @@ No general request-level idempotency-key infrastructure is proposed for V1. The 
 | Expired tokens | Expiry is checked before use; expired state is unusable, cookie is cleared, and the next add creates a new Cart. |
 | Malformed quantity | Strict positive integer validation rejects zero, negative, fractional, null, and malformed values before any write. |
 | Timing/data disclosure | Use generic not-found/context errors and avoid reporting whether a token exists in another store. |
-| CSRF on cookie-authenticated mutation | SameSite=Lax reduces cross-site submission; COM-CART-2 must confirm whether the Next.js server adapter or Laravel endpoint also requires a CSRF/origin control for the deployment topology. |
+| CSRF/cross-site mutation | The browser does not call Laravel directly. The Next.js server action validates `Origin` (and, when present, `Referer`) against the current storefront host allowlist before forwarding the request. Laravel requires the secret-gated Next gateway and trusted forwarded-host resolution for mutations; it rejects missing/invalid gateway authentication. `SameSite=Lax` is defense in depth, not the sole control, and Laravel's session CSRF middleware is not the mechanism because this topology is server-to-server and does not use a Laravel browser session. |
 
 ## 20. Database constraints and indexes
 
@@ -324,10 +330,10 @@ The following is the minimum proposed constraint set; it is a design proposal, n
 | FK `cart.storefront_id → storefronts.id` restrict or controlled delete | Prevent deleting a storefront while active customer state still refers to it, unless an explicit cleanup policy exists. |
 | FK `cart.sales_channel_id → sales_channels.id` restrict | Preserve context identity for Cart rows. |
 | FK `cart_item.cart_id → carts.id` cascade | Ephemeral line cleanup with parent Cart. |
-| FK `cart_item.product_id → products.id` restrict or application-managed retention | The Cart is not historical Order evidence. COM-CART-2 must choose whether product deletion is blocked or items are marked unavailable. |
+| Nullable `cart_item.product_id → products.id` with `nullOnDelete` (or an equivalent application-managed nullable reference) | Cart is not historical Order evidence and abandoned anonymous Cart state must not block the existing ProductLifecycleService deletion policy. `product_name_snapshot` preserves display after deletion; the line becomes unavailable, is excluded from subtotal, and can only be removed. Do not add Cart to `ProductReferenceRegistry` deletion blockers. |
 | Unique `token_hash` | Prevent two Carts sharing one bearer reference. |
 | Index `(tenant_id, storefront_id, sales_channel_id, status, expires_at)` | Context-scoped active/expiry lookups and cleanup. |
-| Unique `(cart_id, product_id, unit_name)` | Deterministic line merge. `unit_name` is non-null and canonical to avoid NULL uniqueness differences across PostgreSQL and SQLite. |
+| Unique `(cart_id, product_id, unit_key)` for non-deleted product references | Deterministic line merge without mutable names. The implementation must choose a database-portable representation for the nullable Product reference (for example, a partial unique index where supported or application-enforced locking plus a compatible unique key); it must not use `unit_name` as identity. |
 | Index `(tenant_id, cart_id)` on items | Tenant-safe parent and item queries. |
 
 Individual foreign keys do not prove that all referenced rows belong to the same tenant. That invariant must remain an explicit service check, matching existing AWJ patterns such as `CommerceListingService`, `FulfillmentPolicyService`, and `ResolveStorefrontDomain`. A composite cross-tenant foreign-key design is not proposed without repository evidence that the database portability and migration conventions support it.
@@ -354,14 +360,14 @@ The smallest future adapter preserves the existing `CartContext` and visual UI w
 
 1. `CartContext.refreshCart()` calls the AWJ Cart server action.
 2. The server action forwards the host context and `awj_cart_token` to `/store/v1/cart` through the existing server-side gateway pattern.
-3. `addItem` sends AWJ `product_id`, optional `unit_name`, and integer quantity, never a synthetic variant ID or price.
+3. `addItem` sends AWJ `product_id`, optional `unit_key` (`base` or `unit:<UUID>`), and integer quantity, never a synthetic variant ID or price.
 4. `updateItem` sends the AWJ CartItem UUID and replacement quantity.
 5. `removeItem` sends the AWJ CartItem UUID.
 6. The adapter maps the compact AWJ response to a local Cart view type; it does not recreate every Spree field.
 7. The existing UI remains visually unchanged unless a response field is genuinely unavailable. Unavailable retained lines need a clear non-checkout state and removal action.
 8. Product detail obtains the authoritative product ID from the AWJ product response. It does not pass `${product.id}-default` to AWJ.
 
-The adapter must continue to resolve the visitor hostname server-side and must not let browser JavaScript choose tenant or channel. Cookie setting and deletion should occur only in server actions/route handlers where the Next.js runtime permits cookie mutation.
+The adapter must continue to resolve the visitor hostname server-side and must not let browser JavaScript choose tenant or channel. Cookie setting and deletion should occur only in server actions/route handlers where the Next.js runtime permits cookie mutation. For every mutation, the Next.js server action must validate the request `Origin` against the resolved storefront host (and validate `Referer` when `Origin` is absent), reject missing or mismatched values, forward the visitor host in `X-Storefront-Forwarded-Host`, and send `X-Storefront-Gateway-Secret`. Laravel must require the gateway secret for Cart mutations and apply the existing forwarded-host trust path; it must not expose a direct browser mutation route that bypasses this gateway. This is an Origin/gateway trust boundary, not Laravel session CSRF, because the current topology has no Laravel browser session or CSRF token exchange.
 
 ## 23. COM-CART-2 backend scope
 
@@ -424,12 +430,12 @@ Backend tests must assert tenant/channel context from the request hostname and m
 |---|---|---:|
 | Anonymous Cart retention | Start with 30 days and lazy expiry. | Yes |
 | Public Cart reference in JSON | Omit it unless UI needs a non-authorizing display reference. | Yes |
-| Product deletion with Cart items | Prefer blocking deletion while active Cart references exist, or explicitly mark retained items unavailable. Do not silently null the identity. | Yes |
+| Product deletion with Cart items | Follow existing `ProductLifecycleService`/`ProductReferenceRegistry`: Cart is not a deletion blocker. Use nullable Product reference plus required name snapshot; after deletion the line is unavailable, excluded from subtotal, and removable only. | No |
 | Product/UOM edits after add | Revalidate on every read; retain and flag ineligible lines rather than silently deleting them. | Yes |
 | Hard stock validation in Cart | Defer commitment to Checkout; expose read-only availability only. | Yes |
-| CSRF/origin control | Confirm based on the actual Next.js-to-Laravel deployment topology. | Yes |
+| CSRF/origin control | Next server validates Origin/Referer; Laravel requires the secret-gated forwarded-host gateway for Cart mutations. SameSite=Lax is defense in depth. | No |
 | Authenticated customer adoption | Defer association and merge semantics to a separate customer/cart decision. | Yes |
-| Base unit rename | Canonicalize and store the current base unit name in V1; define rename handling before implementation if base-unit edits are common. | Yes |
+| Base/alternative UOM edits | `unit_key=base` continues to mean the current Product base unit; alternative UUIDs remain identity while their current names/factors are re-resolved. Any missing/detached UOM makes the line unavailable and removable, never silently orderable. | No |
 | Route status for missing Cart | Prefer `200` empty response for `GET`, generic `404` for item mutations. | No, unless API standards differ |
 | Cart model name | Use a Commerce-prefixed name if `Cart` conflicts with existing framework/vendor semantics. | Yes |
 
@@ -463,3 +469,8 @@ It also does not modify any application file, create migrations, add routes, cre
 [10]: https://github.com/safwan5001-source/Nebrax/blob/556679ac8bffcb38ee769b444ace13bdf44aed99/storefront/src/lib/commerce/mappers.ts "AWJ-to-Spree-shaped storefront view-model mapper"
 [11]: https://github.com/safwan5001-source/Nebrax/blob/556679ac8bffcb38ee769b444ace13bdf44aed99/routes/api_storefront.php "AWJ public storefront routes"
 [12]: https://github.com/safwan5001-source/Nebrax/blob/556679ac8bffcb38ee769b444ace13bdf44aed99/app/Tenancy/CustomerContext.php "Trusted AWJ customer context"
+[13]: https://github.com/safwan5001-source/Nebrax/blob/556679ac8bffcb38ee769b444ace13bdf44aed99/database/migrations/2025_01_01_000046_create_unit_templates.php "AWJ UOM schema: UUID alternative units and base-unit semantics"
+[14]: https://github.com/safwan5001-source/Nebrax/blob/556679ac8bffcb38ee769b444ace13bdf44aed99/app/Services/ProductLifecycleService.php "AWJ Product lifecycle and deletion policy"
+[15]: https://github.com/safwan5001-source/Nebrax/blob/556679ac8bffcb38ee769b444ace13bdf44aed99/app/Support/ProductReferenceRegistry.php "AWJ Product reference classification"
+[16]: https://github.com/safwan5001-source/Nebrax/blob/556679ac8bffcb38ee769b444ace13bdf44aed99/storefront/src/lib/commerce/config.ts "Next.js server-side AWJ gateway transport"
+[17]: https://github.com/safwan5001-source/Nebrax/blob/556679ac8bffcb38ee769b444ace13bdf44aed99/tests/Feature/StorefrontGatewayAndConfigTest.php "AWJ forwarded-host gateway tests"
