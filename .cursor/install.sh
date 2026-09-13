@@ -61,10 +61,15 @@ if [ -z "$PHP_CLI_SCAN_DIR" ] || [ "$PHP_CLI_SCAN_DIR" = "(none)" ]; then
   echo "✗ PHP CLI does not expose an additional .ini scan directory."
   exit 1
 fi
-$SUDO mkdir -p "$PHP_CLI_SCAN_DIR"
-PHP_CLI_INI="$PHP_CLI_SCAN_DIR/99-awj-cloud-agent.ini"
-printf 'memory_limit=%s\n' "$PHP_CLI_MEMORY_LIMIT" | \
-  $SUDO tee "$PHP_CLI_INI" >/dev/null
+if [ -d "$PHP_CLI_SCAN_DIR" ] && [ -w "$PHP_CLI_SCAN_DIR" ]; then
+  PHP_CLI_CONFIG_DIR="$PHP_CLI_SCAN_DIR"
+else
+  PHP_CLI_CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/awj/php/conf.d"
+  mkdir -p "$PHP_CLI_CONFIG_DIR"
+  export PHP_INI_SCAN_DIR="$PHP_CLI_SCAN_DIR:$PHP_CLI_CONFIG_DIR"
+fi
+PHP_CLI_INI="$PHP_CLI_CONFIG_DIR/99-awj-cloud-agent.ini"
+printf 'memory_limit=%s\n' "$PHP_CLI_MEMORY_LIMIT" > "$PHP_CLI_INI"
 [ -f "$PHP_CLI_INI" ] || { echo "✗ PHP CLI configuration was not written to $PHP_CLI_INI."; exit 1; }
 EFFECTIVE_PHP_CLI_MEMORY_LIMIT="$(php -r 'echo ini_get("memory_limit");')"
 if [ "$EFFECTIVE_PHP_CLI_MEMORY_LIMIT" != "$PHP_CLI_MEMORY_LIMIT" ]; then
