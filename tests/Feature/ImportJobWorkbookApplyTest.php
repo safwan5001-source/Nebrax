@@ -165,6 +165,7 @@ class ImportJobWorkbookApplyTest extends TestCase
             ->postJson("/api/import-jobs/{$jobId}/apply", ['mode' => 'create', 'price_list_id' => $foreignPriceListId])
             ->assertStatus(422);
 
+        app(TenantContext::class)->set($authA['tenant_id']);
         $this->assertSame(ImportJobStatus::FAILED, ImportJob::findOrFail($jobId)->status);
         $this->assertSame(0, ProductBarcode::where('product_id', $product['id'])->count());
     }
