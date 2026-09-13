@@ -13,7 +13,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { login } from '@/lib/auth';
 import { ApiError } from '@/lib/api';
-import { enableDemo } from '@/lib/demo';
 
 const schema = z.object({
   email: z.string().email(),
@@ -42,11 +41,6 @@ export default function LoginPage() {
     } catch (error) {
       setServerError(error instanceof ApiError ? error.message : t('error'));
     }
-  }
-
-  function enterDemo() {
-    enableDemo();
-    router.replace('/dashboard');
   }
 
   return (
@@ -114,15 +108,6 @@ export default function LoginPage() {
           </Button>
         </form>
 
-        <div className="my-5 flex items-center gap-3 text-xs text-muted" aria-hidden="true">
-          <span className="h-px flex-1 bg-border" />
-          <span>{t('or')}</span>
-          <span className="h-px flex-1 bg-border" />
-        </div>
-        <Button type="button" variant="outline" className="h-11 w-full" onClick={enterDemo} disabled={isSubmitting}>
-          {t('demo')}
-        </Button>
-        <p className="mt-2 text-center text-xs text-muted">{t('demo_hint')}</p>
       </section>
 
       <footer className="pt-5 text-center">

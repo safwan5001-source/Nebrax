@@ -7,11 +7,9 @@
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useTheme } from 'next-themes';
 import {
-  ArrowLeft,
   BarChart3,
   BookOpen,
   Building2,
@@ -21,7 +19,6 @@ import {
   UsersRound,
   Wrench,
   Check,
-  ChevronLeft,
   Package,
   QrCode,
   ShieldCheck,
@@ -29,11 +26,9 @@ import {
   UserCog,
   type LucideIcon,
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/layout/theme-toggle';
 import { LangToggle } from '@/components/layout/lang-toggle';
 import { AwjLogo } from '@/components/layout/awj-logo';
-import { enableDemo } from '@/lib/demo';
 
 const FEATURES: { icon: LucideIcon; title: string; desc: string }[] = [
   { icon: QrCode, title: 'f_zatca_title', desc: 'f_zatca_desc' },
@@ -70,7 +65,6 @@ const JOURNEY: { icon: LucideIcon; title: string; desc: string }[] = [
 
 export default function LandingPage() {
   const t = useTranslations('landing');
-  const router = useRouter();
   const { resolvedTheme } = useTheme();
   const [themeReady, setThemeReady] = useState(false);
 
@@ -79,11 +73,6 @@ export default function LandingPage() {
   }, []);
 
   const isDark = themeReady && resolvedTheme === 'dark';
-
-  function enterDemo() {
-    enableDemo();
-    router.push('/dashboard');
-  }
 
   const ghostActionClass = 'inline-flex h-8 items-center justify-center rounded px-3 text-sm font-medium text-text transition-colors hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background';
   const outlineActionClass = 'inline-flex h-11 w-full items-center justify-center rounded border border-border bg-surface px-5 text-base font-medium text-text transition-colors hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:w-auto';
@@ -109,10 +98,6 @@ export default function LandingPage() {
             <LangToggle />
             <ThemeToggle />
             <Link href="/login" className={`hidden sm:inline-flex ${ghostActionClass}`}>{t('cta_login')}</Link>
-            <Button size="sm" className="px-3 sm:px-4" onClick={enterDemo}>
-              {t('cta_demo')}
-              <ArrowLeft className="h-4 w-4" strokeWidth={2} />
-            </Button>
           </div>
         </div>
       </header>
@@ -133,10 +118,6 @@ export default function LandingPage() {
               </p>
 
               <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
-                <Button size="md" className="h-11 w-full px-5 text-base sm:w-auto" onClick={enterDemo}>
-                  {t('cta_demo')}
-                  <ArrowLeft className="h-4 w-4" strokeWidth={2} />
-                </Button>
                 <Link href="#modules" className="w-full sm:w-auto">
                   <span className={outlineActionClass}>{t('hero_secondary_cta')}</span>
                 </Link>
@@ -339,14 +320,6 @@ export default function LandingPage() {
                 <h2 className="mt-4 text-2xl font-bold leading-tight sm:text-3xl">{t('final_title')}</h2>
                 <p className="mt-3 max-w-2xl text-sm leading-7 text-white/75 sm:text-base">{t('final_subtitle')}</p>
               </div>
-              <Button
-                size="md"
-                className="h-11 w-full bg-white px-5 text-base text-primary hover:bg-primary-soft md:w-auto"
-                onClick={enterDemo}
-              >
-                {t('cta_demo')}
-                <ChevronLeft className="h-4 w-4" strokeWidth={2} />
-              </Button>
             </div>
           </div>
         </section>
