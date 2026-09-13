@@ -3,7 +3,7 @@
 **Gate:** PRODUCT-VARIANTS-COMPAT-1  
 **Status:** Architecture / compatibility decision — documentation only  
 **Date:** 2026-09-14  
-**Scope:** Product, inventory, UOM/barcode, pricing, POS, financial-document snapshots, Commerce compatibility. No production code, schema, API, accounting, merge or deployment change.
+**Scope:** Product, inventory, UOM/barcode, pricing, media, POS, financial-document snapshots, Commerce compatibility. No production code, schema, API, accounting, merge or deployment change.
 
 ## 1. Context and evidence boundary
 
@@ -85,6 +85,39 @@ ProductVariant + UOM -> price
 
 This requirement must be included in the future pricing/barcode contract and regression coverage for Product create/edit, POS scanning and invoice price resolution.
 
+### 2.7 Product and variant media contract
+
+AWJ already has `ProductMedia`. The current model is explicitly product-owned, tenant-aware, stores file metadata and `sort_order`, and serves media through guarded access that verifies product/tenant ownership before exposing the file. Current product UI supports multiple images (currently capped at 8 in the product dialog).
+
+The product-media capability should be preserved and extended rather than replaced when variants are introduced.
+
+**Required media layers:**
+
+1. **Product gallery** — common images that describe the product family and apply regardless of selected option/variant.
+2. **Option-value / visual selection media** — images associated with a visual option value where appropriate, especially color. Example: selecting `Black` should show black-product images without requiring duplicate uploads for Black/M, Black/L and Black/XL.
+3. **Variant-specific override media** — optional escape hatch only when one exact combination genuinely requires distinct media. It must not be the default storage model for every combination.
+
+**Decision:** do not model the storefront gallery as `variant_id -> duplicated image files` only. That would cause unnecessary duplication for dimensions such as size that normally do not change appearance.
+
+Preferred conceptual resolution:
+
+```text
+Product gallery
+      +
+selected visual option-value media (for example Color=Black)
+      +
+optional exact-variant overrides
+      -> resolved storefront/POS product gallery
+```
+
+Media inheritance/fallback must be deterministic. If no selection-specific media exists, Product gallery remains the fallback. An exact variant override may augment or replace selection-specific media only according to the future approved media contract; clients must not invent their own precedence.
+
+**Primary image requirement:** AWJ needs an explicit, deterministic primary-image/cover concept for product listing cards, POS/store search results and Commerce listing. `sort_order` alone can remain part of ordering, but the architecture must define how the cover is selected and what fallback applies if it is deleted or unavailable.
+
+**Commerce requirement:** public/storefront media URLs must remain tenant-safe and must not expose internal storage paths. Publication of a Product/Variant does not imply publication of arbitrary tenant media; only media resolved through the approved product-media boundary may be exposed.
+
+**Historical-document boundary:** invoice/purchase/accounting documents do not need to persist live product-gallery relationships as financial truth. Media changes must not mutate posted financial document meaning. If a future document template snapshots an image, that is a separate presentation decision, not part of inventory/accounting identity.
+
 ## 3. Financial and historical document evidence
 
 ### 3.1 Invoice lines already use snapshot semantics
@@ -136,10 +169,12 @@ This is the recommended domain boundary, not an approved physical schema.
 ```text
 Product
   shared merchandising identity
-  name / description / category / brand / common media
+  name / description / category / brand
+  common product gallery
         |
         +-- Product Options
         |     color / size / material / ...
+        |     visual option values may own/refer to media selections
         |
         +-- Sellable Variants (optional)
               option-value combination
@@ -147,7 +182,7 @@ Product
               barcode identity
               inventory identity
               pricing eligibility/overrides
-              variant media where needed
+              optional exact-variant media override
 
 UOM remains orthogonal:
   Sellable identity + UOM -> normalized base quantity / unit-aware pricing
@@ -166,6 +201,10 @@ Before implementation, the following authorities should be treated as design req
 | Concern | Recommended authority |
 |---|---|
 | Shared merchandising name/description/category/brand | Product |
+| Product gallery/common images | ProductMedia / Product media boundary |
+| Visual option images (e.g. Color=Black) | Future option-value media mapping; reuse media rather than duplicate per size combination |
+| Exact variant image exception | Optional variant-media override, not default ownership for every image |
+| Primary/cover image | Explicit deterministic media contract with fallback; not client guesswork |
 | Option definitions and combinations | Product option/variant domain |
 | Variant SKU | Variant when variants exist; Product for simple products |
 | Barcode | Existing tenant-wide barcode registry, targeting the sellable identity/UOM as appropriate; barcode itself does not own price |
@@ -176,7 +215,7 @@ Before implementation, the following authorities should be treated as design req
 | Price list | Variant-aware extension must preserve UOM dimension and existing pricing/min-price rules |
 | Historical document display | Immutable line snapshots |
 | Commerce publication | Commerce listing/channel boundary; do not move `is_online` into Product |
-| Tenant ownership | Every new variant/option/inventory reference must fail closed within trusted TenantContext |
+| Tenant ownership | Every new variant/option/media/inventory reference must fail closed within trusted TenantContext |
 
 ## 8. Pre-production data posture
 
@@ -196,25 +235,27 @@ No Variant implementation should begin until these decisions are explicit:
 2. **Inventory/valuation contract** — decide variant warehouse balances, stock movements, reservation identity and moving-average valuation semantics.
 3. **Barcode contract** — extend the existing registry; define Product/Variant/UOM targeting and collision rules; barcode remains a resolver and does not own price.
 4. **Pricing contract** — define precedence for Product price, Variant override, UOM selling price, PriceListItem and approved minimum-sale-price rules; product create/edit must support setting the UOM price alongside alternate-barcode setup.
-5. **Historical snapshot contract** — define the minimum immutable snapshot for Invoice/Purchase/Return/Quote/Commerce lines.
-6. **Lifecycle contract** — variant deactivate/delete behavior and reference classification.
-7. **POS contract** — scan/search/cart/held-cart behavior for variant + UOM while preserving simple Product behavior, including barcode-resolved UOM price.
-8. **Public/Mobile Commerce API contract** — option selection and stable sellable identity without exposing internal assumptions.
-9. **Tenant Isolation tests** — cross-tenant Product/Variant/Option/Barcode/Inventory negative tests.
-10. **PostgreSQL concurrency tests** — reservations/stock for two variants of the same Product must not contaminate one another.
+5. **Media contract** — define product gallery, visual option-value media, optional exact-variant override, primary image, deterministic fallback, tenant-safe public exposure and deletion behavior without per-combination duplication.
+6. **Historical snapshot contract** — define the minimum immutable snapshot for Invoice/Purchase/Return/Quote/Commerce lines.
+7. **Lifecycle contract** — variant deactivate/delete behavior and reference classification.
+8. **POS contract** — scan/search/cart/held-cart behavior for variant + UOM while preserving simple Product behavior, including barcode-resolved UOM price and resolved cover image where UI needs it.
+9. **Public/Mobile Commerce API contract** — option selection, resolved gallery and stable sellable identity without exposing internal assumptions.
+10. **Tenant Isolation tests** — cross-tenant Product/Variant/Option/Media/Barcode/Inventory negative tests.
+11. **PostgreSQL concurrency tests** — reservations/stock for two variants of the same Product must not contaminate one another.
 
 ## 10. Recommended implementation order — not authorized yet
 
 If Product Variants are approved for implementation, use small independent PRs:
 
-1. `VAR-ARCH-1` — final sellable-identity + inventory/valuation + barcode/UOM/pricing ADR (docs/tests contract only where possible).
+1. `VAR-ARCH-1` — final sellable-identity + inventory/valuation + barcode/UOM/pricing + media ADR (docs/tests contract only where possible).
 2. `VAR-CORE-1` — Product Option / Option Value / Variant core and tenant/lifecycle constraints.
 3. `VAR-INV-1` — variant inventory, warehouse stock, movement and valuation integration.
 4. `VAR-PRICE-1` — pricing/UOM/price-list integration, alternate-barcode UOM price workflow and min-price regression coverage.
-5. `VAR-DOC-1` — invoice/purchase/return/quote snapshot and sellable-reference integration.
-6. `VAR-POS-1` — POS search/scan/cart/held-cart UI and API integration.
-7. `VAR-COM-1` — Commerce listing/public API/cart selection integration.
-8. `VAR-REPORT-1` — reports/search/import/export/workbook compatibility.
+5. `VAR-MEDIA-1` — product/option-value/variant media mapping, cover/fallback and tenant-safe Commerce resolution.
+6. `VAR-DOC-1` — invoice/purchase/return/quote snapshot and sellable-reference integration.
+7. `VAR-POS-1` — POS search/scan/cart/held-cart UI and API integration.
+8. `VAR-COM-1` — Commerce listing/public API/cart selection integration.
+9. `VAR-REPORT-1` — reports/search/import/export/workbook compatibility.
 
 Do not combine these into one broad refactor.
 
@@ -222,10 +263,12 @@ Do not combine these into one broad refactor.
 
 **PRODUCT-VARIANTS-COMPAT-1: PASS WITH REQUIRED DESIGN GATES.**
 
-First-class Product Variants are architecturally feasible in AWJ, and the current demo-only data posture gives freedom to choose a clean pre-production schema. The implementation must nevertheless preserve the established boundaries for UOM, barcode registry, pricing authority, financial snapshots, lifecycle, Tenant Isolation and accounting/inventory correctness.
+First-class Product Variants are architecturally feasible in AWJ, and the current demo-only data posture gives freedom to choose a clean pre-production schema. The implementation must nevertheless preserve the established boundaries for UOM, barcode registry, pricing authority, media security, financial snapshots, lifecycle, Tenant Isolation and accounting/inventory correctness.
 
 The preferred direction is **optional first-class variants above Product**, while simple Products remain directly sellable. Variants must become real sellable/inventory identities where independent stock exists; they must not be reduced to storefront-only attributes.
 
 Alternate barcode setup is also explicitly a UOM-pricing UX surface: each sellable UOM can have its own commercial selling price, but the price authority is the sellable identity + UOM rather than the barcode string.
 
-This audit does **not** authorize schema/code implementation and does not change Commerce V1 scope. The next decision artifact should be `VAR-ARCH-1`, with particular attention to inventory valuation, sellable-identity representation and the Barcode/UOM/Pricing contract before any migration is written.
+Product imagery remains product-owned by default, with future visual option-value media and optional exact-variant overrides. AWJ should avoid duplicating the same color images across every size combination and must define an explicit cover/fallback contract before implementation.
+
+This audit does **not** authorize schema/code implementation and does not change Commerce V1 scope. The next decision artifact should be `VAR-ARCH-1`, with particular attention to inventory valuation, sellable-identity representation, Barcode/UOM/Pricing and Product/Variant Media contracts before any migration is written.
