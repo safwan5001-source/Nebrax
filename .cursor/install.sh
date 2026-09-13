@@ -52,14 +52,26 @@ php -m | grep -qi '^dom$' || { echo "✗ PHP DOM extension is not available."; e
 # the image's 128 MiB default. This does not change application or production config.
 PHP_CLI_MEMORY_LIMIT="${AWJ_PHP_CLI_MEMORY_LIMIT:-512M}"
 PHP_CLI_SCAN_DIR="$(php --ini | sed -n 's/^Scan for additional .ini files in: //p')"
+if [[ ${#PHP_CLI_SCAN_DIR} -ge 2 &&
+      ( ( ${PHP_CLI_SCAN_DIR:0:1} = '"' && ${PHP_CLI_SCAN_DIR: -1} = '"' ) ||
+        ( ${PHP_CLI_SCAN_DIR:0:1} = "'" && ${PHP_CLI_SCAN_DIR: -1} = "'" ) ) ]]; then
+  PHP_CLI_SCAN_DIR="${PHP_CLI_SCAN_DIR:1:${#PHP_CLI_SCAN_DIR}-2}"
+fi
 if [ -z "$PHP_CLI_SCAN_DIR" ] || [ "$PHP_CLI_SCAN_DIR" = "(none)" ]; then
   echo "✗ PHP CLI does not expose an additional .ini scan directory."
   exit 1
 fi
 $SUDO mkdir -p "$PHP_CLI_SCAN_DIR"
+PHP_CLI_INI="$PHP_CLI_SCAN_DIR/99-awj-cloud-agent.ini"
 printf 'memory_limit=%s\n' "$PHP_CLI_MEMORY_LIMIT" | \
-  $SUDO tee "$PHP_CLI_SCAN_DIR/99-awj-cloud-agent.ini" >/dev/null
-echo "▶      PHP CLI memory_limit: $(php -r 'echo ini_get("memory_limit");')"
+  $SUDO tee "$PHP_CLI_INI" >/dev/null
+[ -f "$PHP_CLI_INI" ] || { echo "✗ PHP CLI configuration was not written to $PHP_CLI_INI."; exit 1; }
+EFFECTIVE_PHP_CLI_MEMORY_LIMIT="$(php -r 'echo ini_get("memory_limit");')"
+if [ "$EFFECTIVE_PHP_CLI_MEMORY_LIMIT" != "$PHP_CLI_MEMORY_LIMIT" ]; then
+  echo "✗ PHP CLI memory_limit is $EFFECTIVE_PHP_CLI_MEMORY_LIMIT; expected $PHP_CLI_MEMORY_LIMIT."
+  exit 1
+fi
+echo "▶      PHP CLI memory_limit: $EFFECTIVE_PHP_CLI_MEMORY_LIMIT"
 
 if ! command -v composer >/dev/null 2>&1; then
   echo "▶      Installing Composer..."
