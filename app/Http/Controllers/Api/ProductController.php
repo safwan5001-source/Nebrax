@@ -433,7 +433,9 @@ class ProductController extends ApiController
     {
         $product = Product::findOrFail($id);
 
-        return ProductBarcodeResource::collection($product->alternateBarcodes()->latest()->get())->response();
+        return ProductBarcodeResource::collection(
+            $product->alternateBarcodes()->latest()->orderByDesc('id')->get()
+        )->response();
     }
 
     public function storeBarcode(StoreProductBarcodeRequest $request, string $id): JsonResponse

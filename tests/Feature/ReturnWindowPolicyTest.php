@@ -34,6 +34,7 @@ use Tests\TestCase;
 class ReturnWindowPolicyTest extends TestCase
 {
     use RefreshDatabase;
+    use InteractsWithApi;
 
     protected Tenant $tenant;
     protected Partner $customer;

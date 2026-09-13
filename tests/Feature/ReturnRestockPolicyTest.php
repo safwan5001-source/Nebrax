@@ -34,6 +34,7 @@ use Tests\TestCase;
 class ReturnRestockPolicyTest extends TestCase
 {
     use RefreshDatabase;
+    use InteractsWithApi;
 
     protected Tenant $tenant;
     protected Partner $customer;

@@ -25,19 +25,24 @@ trait InteractsWithApi
     {
         $this->app['auth']->forgetGuards();
 
-        // Feature tests often establish a tenant explicitly for setup/assertions
-        // around an HTTP request. Production SetTenant must still clear the
-        // request tenant; restore only the test's pre-request context afterward.
+        // Feature tests often perform model assertions after an HTTP request.
+        // Production SetTenant still clears the request tenant; retain the
+        // authenticated request tenant only in this in-process test harness.
         $tenant = app(TenantContext::class);
         $setupTenantId = $tenant->id();
+        $requestTenantId = null;
 
         try {
-            return parent::call($method, $uri, $parameters, $cookies, $files, $server, $content);
+            $response = parent::call($method, $uri, $parameters, $cookies, $files, $server, $content);
+            $requestTenantId = $this->app['auth']->user()?->tenant_id;
+
+            return $response;
         } finally {
-            if ($setupTenantId === null) {
+            $assertionTenantId = $requestTenantId ?? $setupTenantId;
+            if ($assertionTenantId === null) {
                 $tenant->forget();
             } else {
-                $tenant->set($setupTenantId);
+                $tenant->set($assertionTenantId);
             }
         }
     }

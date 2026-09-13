@@ -7,6 +7,7 @@ use App\Tenancy\TenantContext;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * يضبط المستأجر الحالي من المستخدم المصادَق عليه.
@@ -42,7 +43,26 @@ class SetTenant
         $this->tenant->set($user->tenant_id);
 
         try {
-            return $next($request);
+            $response = $next($request);
+
+            // Symfony executes streamed callbacks after the middleware stack
+            // returns. Re-establish this request's tenant only for that callback
+            // and clear it again so exports cannot run unscoped or cross-tenant.
+            if ($response instanceof StreamedResponse) {
+                $callback = $response->getCallback();
+                $tenantId = $user->tenant_id;
+                $response->setCallback(function () use ($callback, $tenantId): void {
+                    $this->tenant->set($tenantId);
+
+                    try {
+                        $callback();
+                    } finally {
+                        $this->tenant->forget();
+                    }
+                });
+            }
+
+            return $response;
         } finally {
             // TenantContext is a singleton for the application lifetime; never
             // let one request's tenant become the default for the next request.
