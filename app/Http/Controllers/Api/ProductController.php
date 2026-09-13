@@ -277,7 +277,7 @@ class ProductController extends ApiController
         // مسار الإنشاء القانوني الموحّد (خدمة الدومين) — نفسه يستعمله الـ Public API.
         // تغليف العملية كاملة (منتج + باركودات بديلة + مطالبات السجل) في معاملة واحدة:
         // إما ينجح كل شيء معاً، أو يتراجع كل شيء عند أي فشل.
-        return $this->domain(function () use ($request, $data) {
+        $product = $this->domain(function () use ($request, $data) {
             return DB::transaction(function () use ($request, $data) {
                 $product = $this->products->create($data, $request->user()?->id);
 
@@ -287,8 +287,10 @@ class ProductController extends ApiController
 
                 return $product->fresh(['alternateBarcodes']);
             });
-        })->response()->setStatusCode(201);
-}
+        });
+
+        return (new ProductResource($product))->response()->setStatusCode(201);
+    }
 
     /**
      * ═════════════════════════════════════════════════════════════════
@@ -431,7 +433,9 @@ class ProductController extends ApiController
     {
         $product = Product::findOrFail($id);
 
-        return ProductBarcodeResource::collection($product->alternateBarcodes()->latest()->get())->response();
+        return ProductBarcodeResource::collection(
+            $product->alternateBarcodes()->latest()->orderByDesc('id')->get()
+        )->response();
     }
 
     public function storeBarcode(StoreProductBarcodeRequest $request, string $id): JsonResponse

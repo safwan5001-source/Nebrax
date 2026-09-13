@@ -16,6 +16,9 @@ import { useNumberPreview } from '@/lib/use-number-preview';
 import { riyalToMinor, formatRiyal, extractInclusiveTax } from '@/lib/money';
 import { getSystemTaxInclusive } from '@/lib/tax';
 import { productUnitForTemplate, type ProductUnitTemplate } from '@/lib/product-unit-template';
+import { ProductPublicationFields } from '@/components/products/product-publication-fields';
+import { replaceProductPublication } from '@/modules/products/publication';
+import { useProductPublication } from '@/modules/products/use-product-publication';
 
 interface Partner { id: string; name: string; type?: string }
 interface Account { id: string; code: string; name: string; type: string; is_group: boolean }
@@ -67,6 +70,7 @@ export default function NewProductPage() {
   const [taxInclusive, setTaxInclusive] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [createdProductId, setCreatedProductId] = useState<string | null>(null);
   const [productImages, setProductImages] = useState<SelectedProductImage[]>([]);
   const [pendingBarcodes, setPendingBarcodes] = useState<PendingBarcode[]>([]);
   const [newBarcodeCode, setNewBarcodeCode] = useState('');
@@ -75,6 +79,7 @@ export default function NewProductPage() {
   const [newBarcodeLabel, setNewBarcodeLabel] = useState('');
   const { number: suggestedSku } = useNumberPreview('product');
   const productImageUrls = useRef<string[]>([]);
+  const publication = useProductPublication();
 
   useEffect(() => {
     getSystemTaxInclusive().then(setTaxInclusive).catch(() => {});
@@ -162,58 +167,75 @@ export default function NewProductPage() {
   }
 
   async function submit() {
-    if (!name.trim()) { setError(tc('saveFailed')); return; }
+    if (!createdProductId && !name.trim()) { setError(tc('saveFailed')); return; }
     setSaving(true);
     setError(null);
     try {
-      const created = await api<{ data: { id: string } }>('/products', {
-        method: 'POST',
-        body: {
-          name,
-          name_en: nameEn || null,
-          sku: sku || null,
-          barcode: barcode || null,
-          type,
-          unit: unit || null,
-          unit_template_id: unitTemplateId || null,
-          default_sales_unit: defaultSalesUnit || null,
-          default_purchase_unit: defaultPurchaseUnit || null,
-          sale_price: riyalToMinor(salePrice),
-          purchase_price: riyalToMinor(purchasePrice),
-          tax_rate: Number(taxRate) || 0,
-          description: description || null,
-          category: category || null,
-          brand: brand || null,
-          reorder_level: trackInventory && reorderLevel !== '' ? Number(reorderLevel) || 0 : null,
-          initial_quantity: trackInventory && initialQty !== '' ? Number(initialQty) || 0 : null,
-          supplier_id: supplierId || null,
-          sales_account_id: salesAccountId || null,
-          cogs_account_id: cogsAccountId || null,
-          min_sale_price: minSalePrice !== '' ? riyalToMinor(minSalePrice) : null,
-          discount: discount !== '' ? Number(discount) || 0 : null,
-          discount_type: discount !== '' ? discountType : null,
-          profit_margin: profitMargin !== '' ? Number(profitMargin) || 0 : null,
-          tags: tags || null,
-          internal_notes: internalNotes || null,
-          track_inventory: trackInventory,
-          is_active: isActive,
-          barcodes: pendingBarcodes.map((item) => ({
-            code: item.code,
-            unit_name: item.unit_name || null,
-            default_quantity: Number(item.default_quantity) || 1,
-            label: item.label || null,
-          })),
-        },
-      });
+      let productId = createdProductId;
+      if (!productId) {
+        const created = await api<{ data: { id: string } }>('/products', {
+          method: 'POST',
+          body: {
+            name,
+            name_en: nameEn || null,
+            sku: sku || null,
+            barcode: barcode || null,
+            type,
+            unit: unit || null,
+            unit_template_id: unitTemplateId || null,
+            default_sales_unit: defaultSalesUnit || null,
+            default_purchase_unit: defaultPurchaseUnit || null,
+            sale_price: riyalToMinor(salePrice),
+            purchase_price: riyalToMinor(purchasePrice),
+            tax_rate: Number(taxRate) || 0,
+            description: description || null,
+            category: category || null,
+            brand: brand || null,
+            reorder_level: trackInventory && reorderLevel !== '' ? Number(reorderLevel) || 0 : null,
+            initial_quantity: trackInventory && initialQty !== '' ? Number(initialQty) || 0 : null,
+            supplier_id: supplierId || null,
+            sales_account_id: salesAccountId || null,
+            cogs_account_id: cogsAccountId || null,
+            min_sale_price: minSalePrice !== '' ? riyalToMinor(minSalePrice) : null,
+            discount: discount !== '' ? Number(discount) || 0 : null,
+            discount_type: discount !== '' ? discountType : null,
+            profit_margin: profitMargin !== '' ? Number(profitMargin) || 0 : null,
+            tags: tags || null,
+            internal_notes: internalNotes || null,
+            track_inventory: trackInventory,
+            is_active: isActive,
+            barcodes: pendingBarcodes.map((item) => ({
+              code: item.code,
+              unit_name: item.unit_name || null,
+              default_quantity: Number(item.default_quantity) || 1,
+              label: item.label || null,
+            })),
+          },
+        });
+        productId = created.data.id;
+        // Persist immediately in client state. Any retry from this point is a
+        // publication retry for this id, never another POST /products.
+        setCreatedProductId(productId);
+      }
+
+      if (publication.status === 'ready') {
+        try {
+          await replaceProductPublication(productId, publication.selectedIds);
+        } catch {
+          setError(t('publication_failed_after_create'));
+          toastError(t('product_created_publication_pending'));
+          return;
+        }
+      }
 
       if (productImages.length > 0) {
         const mediaBody = new FormData();
         productImages.forEach(({ file }) => mediaBody.append('media[]', file));
         try {
-          await api(`/products/${created.data.id}/media`, { method: 'POST', body: mediaBody });
+          await api(`/products/${productId}/media`, { method: 'POST', body: mediaBody });
         } catch {
           toastError(t('media_upload_failed_after_create'));
-          router.push(`/products/${created.data.id}`);
+          router.push(`/products/${productId}`);
           return;
         }
       }
@@ -237,7 +259,9 @@ export default function NewProductPage() {
         <h1 className="text-xl font-semibold text-text">{t('new_title')}</h1>
         <div className="ms-auto flex items-center gap-2">
           <Button asChild variant="ghost"><Link href='/products'>{t('cancel')}</Link></Button>
-          <Button disabled={saving || !name.trim()} onClick={submit}>{t('save')}</Button>
+          <Button disabled={saving || publication.status === 'loading' || (!createdProductId && !name.trim())} onClick={submit}>
+            {createdProductId ? t('retry_publication') : t('save')}
+          </Button>
         </div>
       </div>
 
@@ -491,6 +515,24 @@ export default function NewProductPage() {
             )}
           </CardContent>
         </Card>
+
+        <ProductPublicationFields
+          status={publication.status}
+          stores={publication.stores}
+          selectedIds={publication.selectedIds}
+          disabled={saving}
+          onChange={publication.setSelectedIds}
+          onRetry={() => void publication.reload()}
+          labels={{
+            title: t('online_store'),
+            availableOnline: t('available_online'),
+            hint: t('publication_hint'),
+            loading: t('publication_loading'),
+            empty: t('publication_empty'),
+            loadFailed: t('publication_load_failed'),
+            retry: t('retry'),
+          }}
+        />
 
         {/* خيارات أكثر */}
         <Card>

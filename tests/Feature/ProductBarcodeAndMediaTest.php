@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Product;
+use App\Models\ProductBarcode;
 use App\Models\ProductMedia;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -326,9 +327,10 @@ class ProductBarcodeAndMediaTest extends TestCase
 
         // لا باركودات للمنتج الجديد
         $this->assertDatabaseMissing('product_barcodes', ['code' => 'NEW-VALID-001']);
-        $this->assertDatabaseMissing('product_barcodes', ['code' => 'CONFLICT-BARCODE', 'product_id' => function ($query) {
-            $query->where('sku', 'BARCODE-ROLLBACK-CONFLICT');
-        }]);
+        $this->assertFalse(ProductBarcode::query()
+            ->where('code', 'CONFLICT-BARCODE')
+            ->whereHas('product', fn ($query) => $query->where('sku', 'BARCODE-ROLLBACK-CONFLICT'))
+            ->exists());
 
         // الباركود الجديد لم يُسجل في السجل
         $this->assertDatabaseMissing('barcode_registry', ['code' => 'NEW-VALID-001']);

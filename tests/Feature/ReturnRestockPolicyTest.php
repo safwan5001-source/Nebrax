@@ -87,6 +87,7 @@ class ReturnRestockPolicyTest extends TestCase
         ], $head))->assertCreated()->json('data.id');
 
         $this->postJson("/api/returns/{$id}/post")->assertOk();
+        app(TenantContext::class)->set($this->tenant->id);
 
         return ReturnDocument::findOrFail($id);
     }
@@ -216,11 +217,13 @@ class ReturnRestockPolicyTest extends TestCase
             ]],
         ])->assertCreated()->json('data.id');
 
+        app(TenantContext::class)->set($this->tenant->id);
         $this->assertNull(ReturnDocument::findOrFail($id)->restock);
 
         Settings::put('inventory', ['restock_sales_returns' => false]);
         $this->postJson("/api/returns/{$id}/post")->assertOk();
 
+        app(TenantContext::class)->set($this->tenant->id);
         $this->assertFalse(ReturnDocument::findOrFail($id)->restock);
         $this->assertSame(8000, $this->bal('5180'));
     }
