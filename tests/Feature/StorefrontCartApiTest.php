@@ -236,12 +236,22 @@ class StorefrontCartApiTest extends TestCase
         $item = $created->json('data.items.0.id');
 
         app(TenantContext::class)->set($tenant->id);
+        $product->update(['name' => 'Renamed cart product']);
+        app(TenantContext::class)->forget();
+
+        $this->withCredentials()->withUnencryptedCookie(CommerceCartService::COOKIE_NAME, $token)
+            ->getJson('http://unavailable-cart.test/store/v1/cart')->assertOk()
+            ->assertJsonPath('data.items.0.available', true)
+            ->assertJsonPath('data.items.0.product_name', 'Renamed cart product');
+
+        app(TenantContext::class)->set($tenant->id);
         CommerceListing::query()->where('product_id', $product->id)->update(['is_published' => false]);
         app(TenantContext::class)->forget();
 
         $this->withCredentials()->withUnencryptedCookie(CommerceCartService::COOKIE_NAME, $token)
             ->getJson('http://unavailable-cart.test/store/v1/cart')->assertOk()
-            ->assertJsonPath('data.items.0.available', false);
+            ->assertJsonPath('data.items.0.available', false)
+            ->assertJsonPath('data.items.0.product_name', 'Cart product');
 
         app(TenantContext::class)->set($tenant->id);
         CommerceListing::query()->where('product_id', $product->id)->update(['is_published' => true]);

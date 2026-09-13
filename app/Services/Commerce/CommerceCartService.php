@@ -41,12 +41,31 @@ final class CommerceCartService
             return ['cart' => null, 'invalid' => true];
         }
 
-        if ($cart->status !== CommerceCart::STATUS_ACTIVE || $cart->expires_at->isPast()) {
-            if ($cart->status === CommerceCart::STATUS_ACTIVE) {
-                $cart->update(['status' => CommerceCart::STATUS_EXPIRED]);
-            }
-
+        if ($cart->status !== CommerceCart::STATUS_ACTIVE) {
             return ['cart' => null, 'invalid' => true];
+        }
+
+        if ($cart->expires_at->isPast()) {
+            return DB::transaction(function () use ($cart, $context): array {
+                $current = CommerceCart::query()
+                    ->whereKey($cart->id)
+                    ->where('storefront_id', $context->storefrontId())
+                    ->where('sales_channel_id', $context->salesChannelId())
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($current === null || $current->status !== CommerceCart::STATUS_ACTIVE) {
+                    return ['cart' => null, 'invalid' => true];
+                }
+
+                if (! $current->expires_at->isPast()) {
+                    return ['cart' => $current, 'invalid' => false];
+                }
+
+                $current->update(['status' => CommerceCart::STATUS_EXPIRED]);
+
+                return ['cart' => null, 'invalid' => true];
+            });
         }
 
         return ['cart' => $cart, 'invalid' => false];
@@ -55,10 +74,9 @@ final class CommerceCartService
     /** @return array{cart: CommerceCart, token: ?string, created: bool, data: array<string, mixed>} */
     public function add(?CommerceCart $knownCart, string $productId, string $unitKey, int $quantity): array
     {
-        $candidate = $this->purchasable($productId, $unitKey);
         $rawToken = null;
 
-        return DB::transaction(function () use ($knownCart, $candidate, $quantity, &$rawToken): array {
+        return DB::transaction(function () use ($knownCart, $productId, $unitKey, $quantity, &$rawToken): array {
             $context = $this->context();
             $created = false;
 
@@ -74,6 +92,8 @@ final class CommerceCartService
             } else {
                 $cart = $this->lockUsableCart($knownCart->id);
             }
+
+            $candidate = $this->purchasable($productId, $unitKey);
 
             $line = CommerceCartItem::query()
                 ->where('cart_id', $cart->id)
@@ -168,6 +188,7 @@ final class CommerceCartService
         $subtotal = 0;
         foreach ($cart->items()->orderBy('created_at')->orderBy('id')->get() as $line) {
             $available = false;
+            $productName = $line->product_name_snapshot;
             $unitName = $line->unit_name_snapshot;
             $unitPrice = 0;
 
@@ -175,6 +196,7 @@ final class CommerceCartService
                 try {
                     $resolved = $this->purchasable($line->product_id, $line->unit_key);
                     $available = true;
+                    $productName = $resolved['product']->name;
                     $unitName = $resolved['unit_name'];
                     $unitPrice = $resolved['amount'];
                 } catch (RuntimeException) {
@@ -187,7 +209,7 @@ final class CommerceCartService
             $items[] = [
                 'id' => $line->id,
                 'product_id' => $line->product_id,
-                'product_name' => $line->product_name_snapshot,
+                'product_name' => $productName,
                 'unit_key' => $line->unit_key,
                 'unit_name' => $unitName,
                 'quantity' => $line->quantity,
