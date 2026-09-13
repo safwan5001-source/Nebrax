@@ -11,7 +11,11 @@ return new class extends Migration
         Schema::create('commerce_carts', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->foreignUuid('tenant_id')->constrained()->cascadeOnDelete();
-            $table->foreignUuid('storefront_id')->constrained('storefronts')->restrictOnDelete();
+            // `storefronts.id` is VARCHAR in the established PostgreSQL schema.
+            // Keep this reference on that authoritative legacy key type rather
+            // than inferring UUID from the UUID-shaped model value.
+            $table->string('storefront_id');
+            $table->foreign('storefront_id')->references('id')->on('storefronts')->restrictOnDelete();
             $table->foreignUuid('sales_channel_id')->constrained('sales_channels')->restrictOnDelete();
             $table->string('token_hash', 64)->unique();
             $table->enum('status', ['active', 'expired'])->default('active');
