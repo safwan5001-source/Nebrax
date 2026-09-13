@@ -97,6 +97,7 @@ class ProductReferenceClassificationGuardTest extends TestCase
             '  COMMERCIAL_LIVE     — مرجع تجاري حيّ كالتسعير (يمنع الحذف)',
             '  OWNED_CHILD         — تابعٌ مملوك (لا يمنع، ويُنظَّف مع الحذف)',
             '  AUDIT_HISTORY       — سجلّ تدقيق (لا يمنع، ويبقى بعد الحذف)',
+            '  EPHEMERAL_REFERENCE — مرجع مؤقت (لا يمنع، ويبقى غير متاح بعد الحذف)',
             '',
             'التصنيف قرارٌ يُتخذ مرّة، لا فحصٌ يُنسى: القائمة اليدوية أغفلت',
             'DeliveryNoteLine و InventoryOpeningLine من قبل، وهذا الحارس يمنع تكرارها.',
@@ -127,6 +128,7 @@ class ProductReferenceClassificationGuardTest extends TestCase
             ProductReferenceRegistry::COMMERCIAL_LIVE,
             ProductReferenceRegistry::OWNED_CHILD,
             ProductReferenceRegistry::AUDIT_HISTORY,
+            ProductReferenceRegistry::EPHEMERAL_REFERENCE,
         ];
 
         foreach (ProductReferenceRegistry::all() as $model => $entry) {
