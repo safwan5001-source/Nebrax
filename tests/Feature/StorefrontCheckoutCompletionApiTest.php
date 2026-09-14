@@ -344,6 +344,59 @@ class StorefrontCheckoutCompletionApiTest extends TestCase
         $this->assertDatabaseCount('inventory_reservations', 0);
     }
 
+    /**
+     * Post-Review P1 — documents the real, honest contract rather than
+     * asserting a false one: the availability check in `revalidateAndPrice()`
+     * is a point-in-time read, not an allocation. Two independent checkouts
+     * for the same product, each individually within available stock at the
+     * moment each completes, can BOTH succeed even though their combined
+     * quantity exceeds on-hand stock — because completion never consumes or
+     * reserves anything (no InventoryReservation, no StockMovement is
+     * created anywhere in 1B). Overselling prevention requires an
+     * allocation/reservation policy, which is explicitly out of scope here
+     * (ADR-02 §5, still undecided). This is not a bug to fix in this PR; it
+     * is the documented boundary of what a stock *check* (vs. a stock
+     * *reservation*) can guarantee.
+     *
+     * @test
+     */
+    public function two_independent_checkouts_can_both_complete_against_the_same_limited_stock(): void
+    {
+        ['tenant' => $tenant, 'channel' => $channel] = $this->store('checkout-complete-oversell.test');
+        $product = $this->product($tenant, $channel, ['track_inventory' => true]);
+        app(TenantContext::class)->set($tenant->id);
+        $warehouse = Warehouse::create(['name' => 'مخزن تعارض', 'code' => 'CHKC-W2', 'is_default' => true]);
+        app(FulfillmentPolicyService::class)->setFixedWarehouse($channel->id, $warehouse->id);
+        ProductWarehouseStock::create(['product_id' => $product->id, 'warehouse_id' => $warehouse->id, 'quantity' => 5]);
+        app(TenantContext::class)->forget();
+
+        // Both raw cart tokens are minted before either checkout is touched:
+        // withUnencryptedCookie() (used by createCheckout()/readyCheckout())
+        // persists as a default cookie across subsequent calls within one
+        // test method (Laravel TestCase behavior), so minting token B after
+        // driving checkout A through readyCheckout() would silently reuse
+        // cart A's cookie instead of creating an independent cart.
+        $tokenA = $this->cartTokenWithItem('checkout-complete-oversell.test', $product, 5);
+        $tokenB = $this->cartTokenWithItem('checkout-complete-oversell.test', $product, 5);
+
+        $this->createCheckout('checkout-complete-oversell.test', $tokenA)->assertCreated();
+        $this->readyCheckout('checkout-complete-oversell.test', $tokenA);
+        $this->createCheckout('checkout-complete-oversell.test', $tokenB)->assertCreated();
+        $this->readyCheckout('checkout-complete-oversell.test', $tokenB);
+
+        // Both checkouts independently saw 5 available and both complete —
+        // the second is not blocked by the first, because the first never
+        // consumed or reserved the stock it checked.
+        $this->complete('checkout-complete-oversell.test', $tokenA, 'idem-key-oversell-a')->assertCreated();
+        $this->complete('checkout-complete-oversell.test', $tokenB, 'idem-key-oversell-b')->assertCreated();
+
+        $this->assertDatabaseCount('commerce_orders', 2);
+        $this->assertDatabaseCount('inventory_reservations', 0);
+        app(TenantContext::class)->set($tenant->id);
+        $this->assertSame(5, ProductWarehouseStock::first()->quantity); // on-hand is untouched by either completion
+        app(TenantContext::class)->forget();
+    }
+
     /** @test */
     public function an_expired_checkout_cannot_be_completed(): void
     {

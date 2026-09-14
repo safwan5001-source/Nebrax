@@ -31,6 +31,22 @@ use RuntimeException;
  * `CommerceCartService`/`CommerceOrderService` بدل توسيع واجهتيهما العامتين
  * — Checkout لا يغيّر قواعد Cart ولا يُدخلها في التزامٍ جديد؛ `create()`
  * القديم في `CommerceOrderService` يبقى بلا أيّ تعديل.
+ *
+ * ═══════════════════════════════════════════════════════════════
+ *  عقد فحص التوفّر (Post-Review P1) — قراءةٌ لحظية، لا تخصيص
+ * ═══════════════════════════════════════════════════════════════
+ * `complete()` يتحقّق من توفّر مخزونٍ **كافٍ وقت الإتمام** فقط. هو **ليس**
+ * ضماناً ضد البيع الزائد (overselling): لا يستهلك الكمية ولا يحجزها (لا
+ * `InventoryReservation`، لا `StockMovement` — ممنوعان صراحةً في 1B). فور
+ * التزام (commit) معاملة الإتمام، الكمية «المتاحة» تعود كما كانت — أي
+ * Checkout آخر لنفس المنتج يرى نفس الرصيد ويمكنه إنشاء طلبٍ آخر عليه أيضاً.
+ * منع البيع الزائد فعلياً يتطلّب سياسة تخصيص/حجز (`ADR-02 §5`، ما زالت غير
+ * محسومة عمداً) — خارج نطاق 1B تماماً. `lockForUpdate()` على صفّ
+ * `ProductWarehouseStock` (انظر `revalidateAndPrice()`) قيمته الحقيقية
+ * الوحيدة: قراءة الرصيد **بعد** أي كاتبٍ حقيقي آخر يقفل نفس الصفّ فعلاً
+ * (مثل `InventoryService::adjustWarehouseStock()` من بيعٍ حقيقي في مكانٍ
+ * آخر من النظام) بدل قيمةٍ قديمة — لا لأنه يحمي من إتمامَي Checkout
+ * متنافسين، فكلاهما قارئٌ فقط لا يكتب شيئاً يُسلسِل الآخر ضده.
  */
 final class CommerceCheckoutService
 {
@@ -244,6 +260,12 @@ final class CommerceCheckoutService
      * (§9 حرفياً). لا يثق بأي إجمالي/سعر/مبلغ توصيل من العميل — كل شيء
      * يُعاد حسمه هنا من سلطاته المعتمدة فقط.
      *
+     * **فحص المخزون هنا لحظيٌّ لا تخصيصي** (راجع توثيق رأس الصنف): نجاح هذه
+     * الدالة يعني أن كل سطر كان كافياً **وقت** استدعائها، لا أنه محجوزٌ لهذا
+     * الطلب. Checkout آخر منافس على نفس المنتج قد ينجح أيضاً بعد التزام هذه
+     * المعاملة مباشرة — منع البيع الزائد فعلياً مؤجَّلٌ لسياسة تخصيص/حجز لم
+     * تُقرَّر بعد (`ADR-02 §5`)، خارج نطاق 1B.
+     *
      * @return array{order: CommerceOrder, replayed: bool}
      *
      * @throws CheckoutNotFoundException Checkout/Cart غير متاحين (غائب/منتهٍ/سياق مختلف).
@@ -375,9 +397,11 @@ final class CommerceCheckoutService
     /**
      * إعادة التحقّق النهائية لكل سطر — نفس أهلية `CommerceCartService::
      * purchasable()` (منتج نشط + عرضٌ منشور على القناة + وحدة صالحة + سعرٌ
-     * محسوم) بالإضافة لفحص توفّرٍ نهائي (قراءة فقط، **لا** `InventoryReservationService
-     * ::acquire()` — لا حجز في 1B). فشل أي سطر لا يوقف الحلقة: كل الأسباب
-     * تُجمَع لتُعرَض معاً في استجابة review-required واحدة.
+     * محسوم) بالإضافة لفحص توفّرٍ **لحظي** (قراءة فقط، **لا** `InventoryReservationService
+     * ::acquire()` — لا حجز في 1B، ولا تخصيصٌ فعلي للكمية؛ راجع "عقد فحص
+     * التوفّر" في توثيق رأس الصنف — النجاح هنا لا يمنع Checkout آخر من رؤية
+     * نفس الكمية «المتاحة» ونجاح إتمامه هو أيضاً). فشل أي سطر لا يوقف الحلقة:
+     * كل الأسباب تُجمَع لتُعرَض معاً في استجابة review-required واحدة.
      *
      * @param  Collection<int, CommerceCartItem>  $items
      * @return array<int, array{product_id: string, product_name_snapshot: string, quantity: int, unit_name: ?string, unit_factor: int, unit_price: int, line_total: int}>
@@ -457,6 +481,11 @@ final class CommerceCheckoutService
                     }
                 }
 
+                // lockForUpdate() هنا يضمن قراءة الرصيد بعد أي كاتبٍ حقيقي
+                // آخر يقفل نفس الصفّ (بيعٌ فعلي في مكانٍ آخر من النظام)، لا
+                // أنه يمنع إتمامَي Checkout متنافسين من كليهما رؤية نفس
+                // الكمية والنجاح معاً — لا كتابة هنا تُسلسِلهما ضد بعضهما
+                // (راجع "عقد فحص التوفّر" في توثيق رأس الصنف).
                 $stockRow = ProductWarehouseStock::query()
                     ->where('product_id', $product->id)
                     ->where('warehouse_id', $warehouse->id)
