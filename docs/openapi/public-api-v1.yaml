@@ -923,6 +923,7 @@ components:
             - invalid_idempotency_key
             - idempotency_conflict
             - idempotency_in_progress
+            - review_required
         message: { type: string }
         details:
           type: object

@@ -54,14 +54,15 @@ Route::middleware([
         Route::delete('cart/items/{item}', [StorefrontCartController::class, 'destroy'])->whereUuid('item')->name('cart.items.destroy');
     });
 
-    // COM-CHECKOUT-1A — أساس فقط (لا /checkout/complete هنا، عمداً: تلك
-    // CHECKOUT-1B مع idempotency والتزام صريح، راجع AWJ_CHECKOUT_V1_ARCHITECTURE.md §9).
+    // COM-CHECKOUT-1A أساسٌ؛ COM-CHECKOUT-1B يضيف /checkout/complete —
+    // idempotency إلزامية + التزامٌ صريح، راجع AWJ_CHECKOUT_V1_ARCHITECTURE.md §9.
     Route::get('checkout', [StorefrontCheckoutController::class, 'show'])->name('checkout.show');
     Route::middleware(RequireStorefrontMutationGateway::class)->group(function () {
         Route::post('checkout', [StorefrontCheckoutController::class, 'store'])->name('checkout.store');
         Route::patch('checkout/contact', [StorefrontCheckoutController::class, 'updateContact'])->name('checkout.contact.update');
         Route::patch('checkout/address', [StorefrontCheckoutController::class, 'updateAddress'])->name('checkout.address.update');
         Route::patch('checkout/delivery', [StorefrontCheckoutController::class, 'updateDelivery'])->name('checkout.delivery.update');
+        Route::post('checkout/complete', [StorefrontCheckoutController::class, 'complete'])->name('checkout.complete');
     });
 });
 

@@ -4,14 +4,19 @@ namespace App\Models;
 
 use App\Tenancy\CompanyWide;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
- * جلسة إتمام شراء مؤقتة — COM-CHECKOUT-1A. ليست مستنداً مالياً ولا طلباً
- * (`CommerceCheckout != CommerceOrder`؛ ملاحظة تسمية: يوجد بالفعل
- * `App\Models\CommerceOrder` من نطاق PR-COM-5A/6B/6C غير متعلّق بهذا —
- * سجلّ التزامٍ تجاريّ بحالتَي draft/confirmed منفصلتَين تماماً عن سلسلة
- * Cart→Checkout→Order التي تبنيها هذه الهجرة؛ الفصل بينهما قرار CHECKOUT-1B
- * لا 1A).
+ * جلسة إتمام شراء مؤقتة — أساسها COM-CHECKOUT-1A. ليست مستنداً مالياً ولا
+ * طلباً بحدّ ذاتها (`CommerceCheckout != CommerceOrder`).
+ *
+ * **COM-CHECKOUT-1B (قرار الهوية — Unify/Migrate)**: `App\Models\CommerceOrder`
+ * القائم (PR-COM-5A/6B/6C) هو ذاته وجهة إتمام هذا الـ Checkout — لا كيان
+ * Order ثانٍ. `order()` أدناه يربط 0-أو-1 طلبٍ ناتج؛
+ * `completion_idempotency_key_hash`/`completion_idempotency_fingerprint`
+ * يُملآن حصراً داخل نفس معاملة `CommerceCheckoutService::complete()` التي
+ * تنشئ ذلك الطلب وتنقل `status` إلى `completed` — راجع توثيق migration
+ * إضافتهما لتفصيل عقد Idempotency-Key الكامل.
  *
  * **`CompanyWide`**: تتبع تصنيف Cart/CommerceListing/FulfillmentPolicy —
  * جلسةٌ تابعة لقناة بيع، لا فرعٍ بعينه (`SalesChannel != Branch`).
@@ -38,6 +43,7 @@ class CommerceCheckout extends BaseModel implements CompanyWide
         'delivery_country', 'delivery_region', 'delivery_city', 'delivery_district',
         'delivery_street', 'delivery_postal_code', 'delivery_notes',
         'delivery_method', 'delivery_amount_minor',
+        'completion_idempotency_key_hash', 'completion_idempotency_fingerprint',
     ];
 
     protected $casts = [
@@ -68,5 +74,11 @@ class CommerceCheckout extends BaseModel implements CompanyWide
     public function isOpen(): bool
     {
         return in_array($this->status, self::OPEN_STATUSES, true);
+    }
+
+    /** COM-CHECKOUT-1B — الطلب الناتج عن إتمام هذا الـ Checkout، إن وُجد. */
+    public function order(): HasOne
+    {
+        return $this->hasOne(CommerceOrder::class, 'commerce_checkout_id');
     }
 }
