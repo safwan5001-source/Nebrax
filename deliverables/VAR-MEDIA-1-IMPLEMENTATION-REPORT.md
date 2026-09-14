@@ -381,9 +381,125 @@ response-shape change occurred at all).
 
 - Branch: `claude/var-media-1-variant-media`
 - Base SHA: `4689f1bba1d285b4f8b57b96ad0522bf253fbc8e`
-- Head SHA: `5e254ab12f42cf666ecfc5c747586168d79e4dd5`
+- Head SHA (Round 1, pre-fix): `0e29cde17be7197035ad04bb905b10aa07fb9c47`
 - Working tree: clean after commit (verified before push)
+
+## Round 2 — CI Closure Only (ReportEffectiveScopeTest fixture fix)
+
+**Scope:** fix the one remaining CI blocker on PR #814 — the pre-existing,
+already-disclosed `ReportEffectiveScopeTest` regression documented above.
+No VAR-MEDIA-1 implementation code was touched in this round.
+
+### Root cause
+
+`ReportEffectiveScopeTest` seeds `$this->trackedProductId`'s inventory state
+in 11 places using the static query-builder form:
+
+```php
+Product::whereKey($this->trackedProductId)->update(['quantity_on_hand' => N, 'avg_cost' => 10000]);
+```
+
+`Model::whereKey(...)->update([...])` is a bulk query-builder update — it
+never instantiates the model and never fires Eloquent's `saving`/`saved`
+events. VAR-INV-1 moved `quantity_on_hand`/`avg_cost` authority to
+`InventoryState`, and `Product`'s own accessor (`app/Models/Product.php`)
+captures direct assignment to these two attributes as a *pending* value on
+`set()`, then flushes it into `InventoryState` inside a `saved` listener
+(`flushPendingInventorySeed`). Because the bulk update bypasses model events
+entirely, it wrote straight into the frozen physical `products` columns,
+which `InventoryState`-backed report/export queries never read — hence the
+report/export assertions on quantity and `avg_cost` reading back `0`/`'0.00'`.
+
+This predates VAR-MEDIA-1 (confirmed via `git show origin/main:tests/Feature/ReportEffectiveScopeTest.php`
+in Round 1) and is unrelated to Product/Option-Value/Variant media.
+
+### Fix
+
+Replaced all 11 occurrences of `Product::whereKey($this->trackedProductId)->update([...])`
+with `Product::find($this->trackedProductId)->update([...])` — an Eloquent
+*model instance* `update()` call. This still ends in a single `UPDATE`
+statement, but because it goes through a hydrated model instance it correctly
+fires `saving`/`saved`, so the accessor's pending-capture mechanism runs and
+`flushPendingInventorySeed` applies the seeded quantity/avg-cost into
+`InventoryState` exactly as any other legitimate direct-assignment call path
+does (see `InventoryStateTest::direct_assignment_on_a_simple_product_still_seeds_its_inventory_state`,
+unaffected and still green).
+
+The one adjacent, already-correct usage at `Product::create([... 'quantity_on_hand' => 999, 'avg_cost' => 10000])`
+(inside `export_scoped_sum_query_never_crosses_tenant_boundary()`, seeding a
+different tenant's product) was left untouched — it already fires Eloquent
+events and was never part of the regression.
+
+### Why this is test-fixture compatibility, not a production-behavior change
+
+- No production file was modified. Only `tests/Feature/ReportEffectiveScopeTest.php` changed.
+- `Product.quantity_on_hand`/`avg_cost` remain frozen physical columns; no
+  unfreezing, no restored direct-write path.
+- `InventoryState` remains the sole read authority for reports/exports;
+  nothing about its semantics changed.
+- The fixture now seeds inventory the same way every other passing test in
+  the suite already does (an Eloquent model `update()`/`save()`), not a new
+  or special-cased mechanism.
+- Every existing assertion in `ReportEffectiveScopeTest` is unchanged —
+  only the seeding mechanism for 11 lines was corrected.
+
+### Tests run (in the required order)
+
+**A. `ReportEffectiveScopeTest` alone:** 33 passed (462 assertions). All
+inventory-value/export/warehouse-scoping assertions that were previously
+failing (`avg_cost`, quantity totals) now pass with the fixture correctly
+routed through `InventoryState`.
+
+**B. Report/inventory regression tests:** `InventoryReportTest` (5 passed),
+`InventoryStateTest` (25 passed, 101 assertions) — confirms `InventoryState`
+authority, lazy row creation, direct-assignment capture/rejection semantics,
+and Tenant Isolation are all unaffected.
+
+**C. VAR-MEDIA-1 targeted tests:** `ProductMediaGalleryTest` (19 passed, 34
+assertions) and `ProductVariantCoreTest` (31 passed, 233 assertions) —
+confirms zero regression in variant/media behavior from this fixture-only
+change.
+
+**D. Full suite:** `php artisan test` (no filter) on SQLite: 3685 passed,
+27 failed, 39 skipped (23327 assertions). All 27 failures are pre-existing,
+unrelated environment gaps present before this fix and before VAR-MEDIA-1:
+`bcmath` PHP extension not installed in this sandbox (`Fuel*Test` classes —
+`FuelAviRfidServiceTest`, `FuelReconciliationTest`, `FuelSaleApiTest`,
+`FuelSaleServiceTest`, `FuelSupplyReceivingTest`, `FuelSupplyReceivingApiTest`),
+and one PDF-parsing environment gap (`DocumentCenterSecureIntakeTest`, one
+sub-test rejecting a fake generated PDF as corrupted). None reference
+`Product`, `ProductMedia`, `ProductVariant`, `InventoryState`, or
+`ReportEffectiveScopeTest`.
+
+### GitHub Actions status
+
+Fix committed and pushed to `claude/var-media-1-variant-media` (PR #814).
+CI run pending/in-progress as of push — see PR #814 for live status.
+
+### Files changed (Round 2)
+
+- `tests/Feature/ReportEffectiveScopeTest.php` — 11 lines changed
+  (`Product::whereKey(...)->update(...)` → `Product::find(...)->update(...)`),
+  no assertions added, removed, or weakened.
+
+### Remaining risks / blockers
+
+- None identified specific to this fix. The pre-existing `bcmath`/PDF
+  environment gaps remain (documented, unrelated to this PR across all four
+  VAR-* milestones so far) and are outside this PR's scope to fix.
+- Actual GitHub Actions CI result on the pushed commit should still be
+  confirmed once it completes, since this local run used SQLite only (per
+  the original VAR-MEDIA-1 scope, matching CI's own sqlite+pgsql matrix
+  expectations already validated in Round 1).
+
+### Branch / PR
+
+- Branch: `claude/var-media-1-variant-media`
+- PR: #814
+- Previous Head SHA: `0e29cde17be7197035ad04bb905b10aa07fb9c47`
+- New Head SHA: filled in below after push.
 
 ## Recommendation
 
-**READY FOR REVIEW.**
+**READY FOR REVIEW** (pending final GitHub Actions confirmation on the newly
+pushed commit). Not READY FOR MERGE — that determination is the reviewer's.

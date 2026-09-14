@@ -630,7 +630,7 @@ class ReportEffectiveScopeTest extends TestCase
     /** @test — Export: unrestricted user still sees the full tenant-wide quantity — backward compatibility. */
     public function export_unrestricted_user_sees_full_tenant_wide_quantity(): void
     {
-        Product::whereKey($this->trackedProductId)->update(['quantity_on_hand' => 12, 'avg_cost' => 10000]);
+        Product::find($this->trackedProductId)->update(['quantity_on_hand' => 12, 'avg_cost' => 10000]);
         ProductWarehouseStock::create(['tenant_id' => $this->tenantId, 'product_id' => $this->trackedProductId, 'warehouse_id' => $this->mainWarehouseId, 'quantity' => 5]);
         ProductWarehouseStock::create(['tenant_id' => $this->tenantId, 'product_id' => $this->trackedProductId, 'warehouse_id' => $this->otherWarehouseId, 'quantity' => 7]);
 
@@ -645,7 +645,7 @@ class ReportEffectiveScopeTest extends TestCase
     /** @test — Export: a user restricted to one warehouse sees only that warehouse's quantity, not the tenant total. */
     public function export_restricted_to_one_warehouse_sees_only_that_warehouses_quantity(): void
     {
-        Product::whereKey($this->trackedProductId)->update(['quantity_on_hand' => 12, 'avg_cost' => 10000]);
+        Product::find($this->trackedProductId)->update(['quantity_on_hand' => 12, 'avg_cost' => 10000]);
         ProductWarehouseStock::create(['tenant_id' => $this->tenantId, 'product_id' => $this->trackedProductId, 'warehouse_id' => $this->mainWarehouseId, 'quantity' => 5]);
         ProductWarehouseStock::create(['tenant_id' => $this->tenantId, 'product_id' => $this->trackedProductId, 'warehouse_id' => $this->otherWarehouseId, 'quantity' => 7]);
 
@@ -663,7 +663,7 @@ class ReportEffectiveScopeTest extends TestCase
     /** @test — Export: a user restricted to two warehouses sees the sum of exactly those two, excluding the third. */
     public function export_restricted_to_multiple_warehouses_sums_only_allowed(): void
     {
-        Product::whereKey($this->trackedProductId)->update(['quantity_on_hand' => 15, 'avg_cost' => 10000]);
+        Product::find($this->trackedProductId)->update(['quantity_on_hand' => 15, 'avg_cost' => 10000]);
         ProductWarehouseStock::create(['tenant_id' => $this->tenantId, 'product_id' => $this->trackedProductId, 'warehouse_id' => $this->mainWarehouseId, 'quantity' => 5]);
         ProductWarehouseStock::create(['tenant_id' => $this->tenantId, 'product_id' => $this->trackedProductId, 'warehouse_id' => $this->thirdWarehouseId, 'quantity' => 3]);
         ProductWarehouseStock::create(['tenant_id' => $this->tenantId, 'product_id' => $this->trackedProductId, 'warehouse_id' => $this->otherWarehouseId, 'quantity' => 7]);
@@ -680,7 +680,7 @@ class ReportEffectiveScopeTest extends TestCase
     /** @test — Export: without products.view_cost, avg_cost/stock_value stay redacted while quantity remains correctly scoped — independent controls. */
     public function export_without_cost_permission_redacts_cost_but_still_scopes_quantity(): void
     {
-        Product::whereKey($this->trackedProductId)->update(['quantity_on_hand' => 12, 'avg_cost' => 10000]);
+        Product::find($this->trackedProductId)->update(['quantity_on_hand' => 12, 'avg_cost' => 10000]);
         ProductWarehouseStock::create(['tenant_id' => $this->tenantId, 'product_id' => $this->trackedProductId, 'warehouse_id' => $this->mainWarehouseId, 'quantity' => 5]);
         ProductWarehouseStock::create(['tenant_id' => $this->tenantId, 'product_id' => $this->trackedProductId, 'warehouse_id' => $this->otherWarehouseId, 'quantity' => 7]);
 
@@ -701,7 +701,7 @@ class ReportEffectiveScopeTest extends TestCase
         // All of this product's real stock sits in the FORBIDDEN warehouse.
         // Tenant-wide quantity_on_hand is 7 (nonzero), but the restricted
         // user's effective scope is 0 — must be excluded, not shown as 7.
-        Product::whereKey($this->trackedProductId)->update(['quantity_on_hand' => 7, 'avg_cost' => 10000]);
+        Product::find($this->trackedProductId)->update(['quantity_on_hand' => 7, 'avg_cost' => 10000]);
         ProductWarehouseStock::create(['tenant_id' => $this->tenantId, 'product_id' => $this->trackedProductId, 'warehouse_id' => $this->otherWarehouseId, 'quantity' => 7]);
 
         $restricted = $this->restrictedToMainBranchAndWarehouse('export-zero-scope@rpt-scope.test');
@@ -714,7 +714,7 @@ class ReportEffectiveScopeTest extends TestCase
     /** @test — Export: include_zero=true keeps that same product, now showing its correctly scoped zero. */
     public function export_include_zero_true_shows_the_scoped_zero_not_the_tenant_wide_quantity(): void
     {
-        Product::whereKey($this->trackedProductId)->update(['quantity_on_hand' => 7, 'avg_cost' => 10000]);
+        Product::find($this->trackedProductId)->update(['quantity_on_hand' => 7, 'avg_cost' => 10000]);
         ProductWarehouseStock::create(['tenant_id' => $this->tenantId, 'product_id' => $this->trackedProductId, 'warehouse_id' => $this->otherWarehouseId, 'quantity' => 7]);
 
         $restricted = $this->restrictedToMainBranchAndWarehouse('export-zero-scope-shown@rpt-scope.test');
@@ -733,7 +733,7 @@ class ReportEffectiveScopeTest extends TestCase
         // warehouse_id): present in quantity_on_hand but in NO
         // product_warehouse_stock row at all — the exact case
         // AWJ_INVENTORY_VALUATION_SEMANTICS.md §2 documents.
-        Product::whereKey($this->trackedProductId)->update(['quantity_on_hand' => 9, 'avg_cost' => 10000]);
+        Product::find($this->trackedProductId)->update(['quantity_on_hand' => 9, 'avg_cost' => 10000]);
         // Deliberately no ProductWarehouseStock rows at all for this product.
 
         $rows = $this->readCsv($this->withToken($this->ownerToken)
@@ -747,7 +747,7 @@ class ReportEffectiveScopeTest extends TestCase
     /** @test — Export: tenant isolation holds for the new per-warehouse SUM query itself, not just the base product list. */
     public function export_scoped_sum_query_never_crosses_tenant_boundary(): void
     {
-        Product::whereKey($this->trackedProductId)->update(['quantity_on_hand' => 5, 'avg_cost' => 10000]);
+        Product::find($this->trackedProductId)->update(['quantity_on_hand' => 5, 'avg_cost' => 10000]);
         ProductWarehouseStock::create(['tenant_id' => $this->tenantId, 'product_id' => $this->trackedProductId, 'warehouse_id' => $this->mainWarehouseId, 'quantity' => 5]);
 
         $other = $this->registerTenant('rpt-scope-nt-export', 'nt-export@rpt-scope.test');
@@ -777,7 +777,7 @@ class ReportEffectiveScopeTest extends TestCase
     /** @test — view=value: scopes quantity and stock_value to the allowed warehouse; avg_cost stays tenant-wide unchanged. */
     public function inventory_value_view_scopes_quantity_and_stock_value_to_allowed_warehouses(): void
     {
-        Product::whereKey($this->trackedProductId)->update(['quantity_on_hand' => 12, 'avg_cost' => 10000]);
+        Product::find($this->trackedProductId)->update(['quantity_on_hand' => 12, 'avg_cost' => 10000]);
         ProductWarehouseStock::create(['tenant_id' => $this->tenantId, 'product_id' => $this->trackedProductId, 'warehouse_id' => $this->mainWarehouseId, 'quantity' => 5]);
         ProductWarehouseStock::create(['tenant_id' => $this->tenantId, 'product_id' => $this->trackedProductId, 'warehouse_id' => $this->otherWarehouseId, 'quantity' => 7]);
 
@@ -797,7 +797,7 @@ class ReportEffectiveScopeTest extends TestCase
     /** @test — view=value: unrestricted user keeps the tenant-wide totals — backward compatibility, mirrors view=warehouses. */
     public function inventory_value_view_unrestricted_shows_tenant_wide_totals(): void
     {
-        Product::whereKey($this->trackedProductId)->update(['quantity_on_hand' => 12, 'avg_cost' => 10000]);
+        Product::find($this->trackedProductId)->update(['quantity_on_hand' => 12, 'avg_cost' => 10000]);
         ProductWarehouseStock::create(['tenant_id' => $this->tenantId, 'product_id' => $this->trackedProductId, 'warehouse_id' => $this->mainWarehouseId, 'quantity' => 5]);
         ProductWarehouseStock::create(['tenant_id' => $this->tenantId, 'product_id' => $this->trackedProductId, 'warehouse_id' => $this->otherWarehouseId, 'quantity' => 7]);
 
@@ -812,7 +812,7 @@ class ReportEffectiveScopeTest extends TestCase
     /** @test — view=value: hide_zero excludes a product whose SCOPED quantity is zero, even though its tenant-wide quantity is not. */
     public function inventory_value_view_hide_zero_uses_the_scoped_quantity_not_the_tenant_wide_one(): void
     {
-        Product::whereKey($this->trackedProductId)->update(['quantity_on_hand' => 7, 'avg_cost' => 10000]);
+        Product::find($this->trackedProductId)->update(['quantity_on_hand' => 7, 'avg_cost' => 10000]);
         ProductWarehouseStock::create(['tenant_id' => $this->tenantId, 'product_id' => $this->trackedProductId, 'warehouse_id' => $this->otherWarehouseId, 'quantity' => 7]);
 
         $restricted = $this->restrictedToMainBranchAndWarehouse('value-hide-zero@rpt-scope.test');
