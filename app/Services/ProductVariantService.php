@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\PriceListItem;
 use App\Models\Product;
 use App\Models\ProductActivity;
 use App\Models\ProductOption;
@@ -596,6 +597,13 @@ class ProductVariantService
             // بحذف الهويّة (VAR_ARCH_1 §7.3 — «الصفر ضروري لا كافٍ»).
             if ($variant->inventoryState()->exists()) {
                 throw new RuntimeException('لا يمكن حذف هذا المتغيّر لأن له تاريخاً مخزنياً (استلام/صرف). عطّله بدلاً من ذلك.');
+            }
+
+            // VAR-PRICE-1: سعرٌ صريح أو عنصر قائمة أسعار قائم لهذا المتغيّر
+            // تهيئةٌ تجارية حيّة (COMMERCIAL_LIVE) — حذف المتغيّر صامتاً كان
+            // سيُسقطها عبر cascadeOnDelete بلا تراجع.
+            if ($variant->unitPrices()->exists() || PriceListItem::where('product_variant_id', $variant->id)->exists()) {
+                throw new RuntimeException('لا يمكن حذف هذا المتغيّر لأن له سعراً صريحاً قائماً. عطّله بدلاً من ذلك.');
             }
 
             DB::table('product_variant_option_values')->where('product_variant_id', $variant->id)->delete();

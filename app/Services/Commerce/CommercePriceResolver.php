@@ -9,6 +9,7 @@ use App\Models\Tenant;
 use App\Services\Accounting\PosCustomerPriceListResolver;
 use App\Services\Accounting\UnitConversion;
 use App\Services\PriceListService;
+use App\Services\ProductPricingService;
 use App\Support\Settings;
 use App\Tenancy\BranchScope;
 use App\Tenancy\TenantContext;
@@ -33,9 +34,11 @@ use RuntimeException;
  *      قراران منفصلان قد ينحرفان.
  *   2. وإلا قائمة قناة البيع الافتراضية، إن كانت نشطة ومن مستأجر القناة نفسه.
  *   3. إن وُجد عنصر صريح لهذا المنتج/الوحدة في القائمة المحلولة ⇐ هو السعر.
- *   4. وإلا، إن كانت الوحدة **وحدة الأساس** ⇐ `Product.sale_price`.
- *   5. وإلا (وحدة بديلة بلا سعرٍ صريح) ⇐ **لا سعر قابل للحسم** — لا يُشتقّ
- *      سعر عبوة من معامل التحويل أبداً (نفس تحذير `posPriceFor()` حرفياً).
+ *   4. وإلا، السعر الأساسي الصريح لهذا المنتج/الوحدة (VAR-PRICE-1:
+ *      `ProductPricingService`) — لوحدة الأساس هذا فعلياً `Product.sale_price`
+ *      نفسه (سلطةٌ واحدة عبر القراءة الشفافة)، ولوحدةٍ بديلة سعرٌ صريحٌ إن
+ *      وُجد، لا سعرٌ مشتقٌّ من معامل التحويل أبداً.
+ *   5. وإلا ⇐ **لا سعر قابل للحسم**.
  *
  * **UOM**: يستدعي `UnitConversion::resolve()` — نفس السلطة الوحيدة في
  * أَوْج — فيرث تحققها ورفضها لوحدة غير معرَّفة بلا أي منطق تحويل جديد هنا.
@@ -58,6 +61,7 @@ final class CommercePriceResolver
         private readonly PriceListService $priceLists,
         private readonly PosCustomerPriceListResolver $partnerPriceLists,
         private readonly UnitConversion $units,
+        private readonly ProductPricingService $pricing,
     ) {}
 
     /**
@@ -123,8 +127,15 @@ final class CommercePriceResolver
             $amount = (int) $product->sale_price;
             $source = ResolvedCommercePrice::SOURCE_PRODUCT_DEFAULT;
         } else {
-            $amount = null;
-            $source = ResolvedCommercePrice::SOURCE_NONE;
+            // VAR-PRICE-1: السلطة الأساسية الصريحة لوحدةٍ بديلة (لا قائمة
+            // أسعار طبّقت) — لم تكن موجودة أصلاً قبل هذا المعيار، فالنتيجة
+            // كانت دائماً `null` هنا. الآن تُستشار قبل الاستسلام لـ«لا سعر»،
+            // بلا أي اشتقاقٍ من معامل التحويل (نفس تحذير العقد حرفياً).
+            $canonicalUnitPrice = $this->pricing->resolveExplicit($product, null, $unitName);
+            $amount = $canonicalUnitPrice;
+            $source = $canonicalUnitPrice !== null
+                ? ResolvedCommercePrice::SOURCE_PRODUCT_DEFAULT
+                : ResolvedCommercePrice::SOURCE_NONE;
         }
 
         $minSalePrice = null;

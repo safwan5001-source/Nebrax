@@ -7,6 +7,7 @@ use App\Tenancy\ResolvesBranchReferences;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
@@ -77,6 +78,12 @@ class ProductVariant extends BaseModel implements CompanyWide
     protected function avgCost(): Attribute
     {
         return Attribute::make(get: fn () => (int) ($this->inventoryState?->avg_cost ?? 0));
+    }
+
+    /** الأسعار الصريحة لهذا المتغيّر بعينه (VAR-PRICE-1) — @see App\Services\ProductPricingService. */
+    public function unitPrices(): HasMany
+    {
+        return $this->hasMany(ProductUnitPrice::class, 'product_variant_id');
     }
 
     public function optionValues(): BelongsToMany
