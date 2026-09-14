@@ -3,10 +3,19 @@
 namespace Tests\Feature;
 
 use App\Models\Account;
+use App\Models\CommerceCart;
+use App\Models\CommerceListing;
 use App\Models\JournalEntry;
+use App\Models\PriceList;
 use App\Models\Product;
+use App\Models\SalesChannel;
 use App\Models\StockMovement;
+use App\Models\Storefront;
 use App\Models\UnitTemplateUnit;
+use App\Services\Commerce\CommerceCartService;
+use App\Services\PriceListService;
+use App\Tenancy\StorefrontContext;
+use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -112,6 +121,135 @@ class UnitTemplateTest extends TestCase
             [['name' => 'كيس', 'factor' => 1], ['name' => 'طبلية', 'factor' => 50]],
             $product['units']
         );
+    }
+
+    /** @test */
+    public function renaming_a_template_preserves_existing_alternative_unit_uuids(): void
+    {
+        $template = $this->template();
+        $unitId = UnitTemplateUnit::where('unit_template_id', $template['id'])->where('name', 'طبلية')->value('id');
+
+        $this->withToken($this->token)->putJson("/api/unit-templates/{$template['id']}", [
+            'name' => 'وحدات الإسمنت المحدثة', 'base_unit' => 'كيس',
+            'units' => [['name' => '  طبلية  ', 'factor' => 50]],
+        ])->assertOk();
+
+        $this->assertSame($unitId, UnitTemplateUnit::where('unit_template_id', $template['id'])->where('name', 'طبلية')->value('id'));
+    }
+
+    /** @test */
+    public function adding_an_alternative_unit_preserves_existing_unit_uuids(): void
+    {
+        $template = $this->template();
+        $unitId = UnitTemplateUnit::where('unit_template_id', $template['id'])->where('name', 'طبلية')->value('id');
+
+        $this->withToken($this->token)->putJson("/api/unit-templates/{$template['id']}", [
+            'name' => $template['name'], 'base_unit' => 'كيس',
+            'units' => [
+                ['name' => 'طبلية', 'factor' => 50],
+                ['name' => 'كرتون', 'factor' => 10],
+            ],
+        ])->assertOk();
+
+        $this->assertSame($unitId, UnitTemplateUnit::where('unit_template_id', $template['id'])->where('name', 'طبلية')->value('id'));
+        $this->assertNotNull(UnitTemplateUnit::where('unit_template_id', $template['id'])->where('name', 'كرتون')->value('id'));
+    }
+
+    /** @test */
+    public function an_allowed_factor_change_preserves_the_alternative_unit_uuid(): void
+    {
+        $template = $this->template();
+        $unitId = UnitTemplateUnit::where('unit_template_id', $template['id'])->where('name', 'طبلية')->value('id');
+
+        $this->withToken($this->token)->putJson("/api/unit-templates/{$template['id']}", [
+            'name' => $template['name'], 'base_unit' => 'كيس',
+            'units' => [['name' => 'طبلية', 'factor' => 40]],
+        ])->assertOk();
+
+        $unit = UnitTemplateUnit::where('unit_template_id', $template['id'])->where('name', 'طبلية')->firstOrFail();
+        $this->assertSame($unitId, $unit->id);
+        $this->assertSame(40, $unit->factor);
+    }
+
+    /** @test */
+    public function removing_an_alternative_unit_deletes_its_old_identity(): void
+    {
+        $template = $this->template();
+        $unitId = UnitTemplateUnit::where('unit_template_id', $template['id'])->where('name', 'طبلية')->value('id');
+
+        $this->withToken($this->token)->putJson("/api/unit-templates/{$template['id']}", [
+            'name' => $template['name'], 'base_unit' => 'كيس', 'units' => [],
+        ])->assertOk();
+
+        $this->assertDatabaseMissing('unit_template_units', ['id' => $unitId]);
+    }
+
+    /** @test */
+    public function renaming_an_alternative_unit_replaces_it_with_a_new_uuid(): void
+    {
+        $template = $this->template();
+        $unitId = UnitTemplateUnit::where('unit_template_id', $template['id'])->where('name', 'طبلية')->value('id');
+
+        $this->withToken($this->token)->putJson("/api/unit-templates/{$template['id']}", [
+            'name' => $template['name'], 'base_unit' => 'كيس',
+            'units' => [['name' => 'منصة', 'factor' => 50]],
+        ])->assertOk();
+
+        $this->assertDatabaseMissing('unit_template_units', ['id' => $unitId]);
+        $this->assertNotSame(
+            $unitId,
+            UnitTemplateUnit::where('unit_template_id', $template['id'])->where('name', 'منصة')->value('id'),
+        );
+    }
+
+    /** @test */
+    public function a_cart_alternative_unit_stays_available_after_a_non_semantic_template_update(): void
+    {
+        $template = $this->template();
+        $unitId = UnitTemplateUnit::where('unit_template_id', $template['id'])->where('name', 'طبلية')->value('id');
+        $productData = $this->product($template['id']);
+        $product = Product::findOrFail($productData['id']);
+        $channel = SalesChannel::create([
+            'slug' => 'cart-uom', 'name' => 'Cart UOM', 'type' => SalesChannel::TYPE_WEB, 'is_active' => true,
+        ]);
+        $storefront = Storefront::create([
+            'slug' => 'cart-uom', 'name' => 'Cart UOM', 'sales_channel_id' => $channel->id, 'is_active' => true,
+        ]);
+        CommerceListing::create([
+            'product_id' => $product->id, 'sales_channel_id' => $channel->id, 'is_published' => true,
+        ]);
+        $priceList = PriceList::create(['name' => 'Cart UOM prices', 'is_active' => true]);
+        app(PriceListService::class)->upsertItem($priceList, $product, [
+            'unit_name' => 'طبلية', 'price' => 45000,
+        ]);
+        $channel->update(['default_price_list_id' => $priceList->id]);
+
+        $tenantId = (string) app(TenantContext::class)->id();
+        app(StorefrontContext::class)->set($tenantId, $channel->id, $storefront->id);
+        $cart = CommerceCart::create([
+            'storefront_id' => $storefront->id,
+            'sales_channel_id' => $channel->id,
+            'token_hash' => hash('sha256', 'stable-uom-cart-token'),
+            'expires_at' => now()->addDay(),
+        ]);
+        $created = app(CommerceCartService::class)->add($cart, $product->id, 'unit:'.$unitId, 1);
+        $itemId = $created['data']['items'][0]['id'];
+
+        $this->withToken($this->token)->putJson("/api/unit-templates/{$template['id']}", [
+            'name' => 'وحدات الإسمنت للمتجر', 'base_unit' => 'كيس',
+            'units' => [
+                ['name' => 'طبلية', 'factor' => 50],
+                ['name' => 'كرتون', 'factor' => 10],
+            ],
+        ])->assertOk();
+
+        app(TenantContext::class)->set($tenantId);
+        app(StorefrontContext::class)->set($tenantId, $channel->id, $storefront->id);
+        $this->assertSame($unitId, UnitTemplateUnit::where('unit_template_id', $template['id'])->where('name', 'طبلية')->value('id'));
+        $this->assertTrue(app(CommerceCartService::class)->serialize($cart->fresh())['items'][0]['available']);
+        $updated = app(CommerceCartService::class)->update($cart->fresh(), $itemId, 2);
+        $this->assertSame(2, $updated['items'][0]['quantity']);
+        $this->assertTrue($updated['items'][0]['available']);
     }
 
     /** اختيار قالب الوحدة يجعل وحدة المنتج هي وحدة الأساس، لا قيمة العميل الحرة. */

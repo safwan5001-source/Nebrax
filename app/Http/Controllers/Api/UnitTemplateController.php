@@ -63,6 +63,8 @@ class UnitTemplateController extends ApiController
         $this->assertNameFree($data['name'], $template->id);
 
         $this->domain(fn () => DB::transaction(function () use ($template, $data) {
+            $template = UnitTemplate::query()->whereKey($template->id)->lockForUpdate()->firstOrFail();
+            $template->setRelation('units', $template->units()->lockForUpdate()->get());
             $this->assertSemanticEditIsSafe($template, $data);
             $baseChanged = $data['base_unit'] !== $template->base_unit;
 
@@ -72,9 +74,9 @@ class UnitTemplateController extends ApiController
                 'is_active' => $data['is_active'] ?? $template->is_active,
             ]);
 
-            // الوحدات تُستبدَل كاملةً: القائمة المرسَلة هي الحالة المطلوبة.
-            // المستندات المرحَّلة لا تتأثّر — نسخت معاملها وقت إنشائها.
-            $template->units()->delete();
+            // القائمة المرسَلة هي الحالة المطلوبة، لكن الوحدة ذات الاسم
+            // نفسه تُحدَّث في مكانها لتبقى UUID هويتها الدائمة. الاسم مطابقةٌ لحمولة
+            // API القائمة فقط؛ إعادة التسمية تبقى حذفاً وإنشاءً بهوية جديدة.
             $this->syncUnits($template, $data);
 
             if ($baseChanged) {
@@ -190,6 +192,7 @@ class UnitTemplateController extends ApiController
     private function syncUnits(UnitTemplate $template, array $data): void
     {
         $seen = [];
+        $normalized = [];
 
         foreach ($data['units'] ?? [] as $unit) {
             $name = trim($unit['name']);
@@ -202,11 +205,35 @@ class UnitTemplateController extends ApiController
             }
             $seen[$name] = true;
 
+            $normalized[] = ['name' => $name, 'factor' => (int) $unit['factor']];
+        }
+
+        $existing = ($template->relationLoaded('units')
+            ? $template->getRelation('units')
+            : $template->units()->get())
+            ->keyBy(fn (UnitTemplateUnit $unit): string => $unit->name);
+
+        foreach ($normalized as $unit) {
+            /** @var UnitTemplateUnit|null $current */
+            $current = $existing->pull($unit['name']);
+
+            if ($current !== null) {
+                if ($current->factor !== $unit['factor']) {
+                    $current->update(['factor' => $unit['factor']]);
+                }
+
+                continue;
+            }
+
             UnitTemplateUnit::create([
                 'unit_template_id' => $template->id,
-                'name' => $name,
-                'factor' => (int) $unit['factor'],
+                'name' => $unit['name'],
+                'factor' => $unit['factor'],
             ]);
+        }
+
+        if ($existing->isNotEmpty()) {
+            $template->units()->whereIn('id', $existing->pluck('id')->all())->delete();
         }
     }
 

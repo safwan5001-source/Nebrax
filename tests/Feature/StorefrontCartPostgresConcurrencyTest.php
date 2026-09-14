@@ -1,0 +1,696 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\CommerceCart;
+use App\Models\CommerceListing;
+use App\Models\PriceList;
+use App\Models\PriceListItem;
+use App\Models\Product;
+use App\Models\SalesChannel;
+use App\Models\Storefront;
+use App\Models\StorefrontDomain;
+use App\Models\Tenant;
+use App\Models\UnitTemplate;
+use App\Models\UnitTemplateUnit;
+use App\Services\Commerce\CommerceCartService;
+use App\Tenancy\StorefrontContext;
+use App\Tenancy\TenantContext;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+use Tests\TestCase;
+
+/** PostgreSQL row-lock regressions for COM-CART-2. */
+class StorefrontCartPostgresConcurrencyTest extends TestCase
+{
+    private const SECRET = 'cart-concurrency-gateway-secret';
+
+    private ?Tenant $tenant = null;
+
+    private ?SalesChannel $channel = null;
+
+    private ?Storefront $storefront = null;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        if (DB::connection()->getDriverName() !== 'pgsql') {
+            $this->markTestSkipped('يتطلب PostgreSQL حقيقياً لإثبات أقفال الصفوف.');
+        }
+        if (! function_exists('pcntl_fork')) {
+            $this->markTestSkipped('امتداد pcntl غير متاح في هذه البيئة.');
+        }
+
+        $this->tenant = Tenant::create([
+            'name' => 'Cart concurrency',
+            'slug' => 'cart-concurrency-'.Str::random(8),
+            'vat_number' => '300000000000003',
+            'currency' => 'SAR',
+            'is_active' => true,
+        ]);
+        app(TenantContext::class)->set($this->tenant->id);
+        $this->channel = SalesChannel::create([
+            'slug' => 'web',
+            'name' => 'Web',
+            'type' => SalesChannel::TYPE_WEB,
+            'is_active' => true,
+        ]);
+        $this->storefront = Storefront::create([
+            'slug' => 'main',
+            'name' => 'Main',
+            'sales_channel_id' => $this->channel->id,
+            'is_active' => true,
+        ]);
+        $this->establishContext();
+    }
+
+    protected function tearDown(): void
+    {
+        if ($this->tenant !== null) {
+            $tenantId = $this->tenant->id;
+            DB::table('commerce_cart_items')->where('tenant_id', $tenantId)->delete();
+            DB::table('commerce_carts')->where('tenant_id', $tenantId)->delete();
+            DB::table('commerce_listings')->where('tenant_id', $tenantId)->delete();
+            DB::table('storefront_domains')->where('tenant_id', $tenantId)->delete();
+            DB::table('storefronts')->where('tenant_id', $tenantId)->delete();
+            DB::table('sales_channels')->where('tenant_id', $tenantId)->delete();
+            DB::table('products')->where('tenant_id', $tenantId)->delete();
+            DB::table('tenants')->where('id', $tenantId)->delete();
+        }
+
+        parent::tearDown();
+    }
+
+    /** @test */
+    public function add_revalidates_after_waiting_for_the_cart_lock(): void
+    {
+        $product = Product::create([
+            'name' => 'Race product',
+            'sku' => 'RACE-'.Str::random(8),
+            'unit' => 'piece',
+            'sale_price' => 1250,
+            'is_active' => true,
+        ]);
+        $listing = CommerceListing::create([
+            'product_id' => $product->id,
+            'sales_channel_id' => $this->channel->id,
+            'is_published' => true,
+        ]);
+        $cart = $this->cart(now()->addDay());
+        $lockReady = $this->signalPath('cart_lock_');
+        $addStarted = $this->signalPath('cart_add_');
+        $resultFile = tempnam(sys_get_temp_dir(), 'cart_result_');
+
+        $locker = pcntl_fork();
+        if ($locker === 0) {
+            DB::purge(config('database.default'));
+            DB::transaction(function () use ($cart, $listing, $lockReady, $addStarted): void {
+                DB::table('commerce_carts')->where('id', $cart->id)->lockForUpdate()->first();
+                touch($lockReady);
+                $this->waitForSignal($addStarted);
+                usleep(500000);
+                DB::table('commerce_listings')->where('id', $listing->id)->update(['is_published' => false]);
+            });
+            exit(0);
+        }
+        $this->assertGreaterThan(0, $locker);
+        $this->waitForSignal($lockReady);
+
+        $adder = pcntl_fork();
+        if ($adder === 0) {
+            DB::purge(config('database.default'));
+            $this->establishContext();
+            touch($addStarted);
+            try {
+                app(CommerceCartService::class)->add(
+                    CommerceCart::query()->findOrFail($cart->id),
+                    $product->id,
+                    'base',
+                    1,
+                );
+                file_put_contents($resultFile, json_encode(['ok' => true]));
+            } catch (\Throwable $exception) {
+                file_put_contents($resultFile, json_encode([
+                    'ok' => false,
+                    'message' => $exception->getMessage(),
+                ]));
+            }
+            exit(0);
+        }
+        $this->assertGreaterThan(0, $adder);
+
+        pcntl_waitpid($locker, $status);
+        pcntl_waitpid($adder, $status);
+        $result = json_decode((string) file_get_contents($resultFile), true);
+        $this->cleanupSignals([$lockReady, $addStarted, $resultFile]);
+
+        $this->assertFalse($result['ok'], json_encode($result));
+        $this->assertSame('المنتج غير متاح للشراء.', $result['message']);
+        $this->assertSame(0, DB::table('commerce_cart_items')->where('cart_id', $cart->id)->count());
+    }
+
+    /** @test */
+    public function add_holds_product_and_listing_eligibility_through_the_line_write(): void
+    {
+        $product = Product::create([
+            'name' => 'Add eligibility product',
+            'sku' => 'ADD-'.Str::random(8),
+            'unit' => 'piece',
+            'sale_price' => 1250,
+            'is_active' => true,
+        ]);
+        $listing = CommerceListing::create([
+            'product_id' => $product->id,
+            'sales_channel_id' => $this->channel->id,
+            'is_published' => true,
+        ]);
+        $cart = $this->cart(now()->addDay());
+        $eligibilityLocked = $this->signalPath('cart_add_eligibility_');
+        $productChangeStarted = $this->signalPath('cart_add_product_change_');
+        $listingChangeStarted = $this->signalPath('cart_add_listing_change_');
+        $resultFile = tempnam(sys_get_temp_dir(), 'cart_add_eligibility_result_');
+
+        $adder = pcntl_fork();
+        if ($adder === 0) {
+            DB::purge(config('database.default'));
+            $this->establishContext();
+            DB::listen(function ($query) use ($eligibilityLocked, $productChangeStarted, $listingChangeStarted): void {
+                if (str_contains($query->sql, 'commerce_listings')
+                    && str_contains(strtolower($query->sql), 'for update')
+                ) {
+                    touch($eligibilityLocked);
+                    $this->waitForSignal($productChangeStarted);
+                    $this->waitForSignal($listingChangeStarted);
+                }
+            });
+            try {
+                $result = app(CommerceCartService::class)->add(
+                    CommerceCart::query()->findOrFail($cart->id),
+                    $product->id,
+                    'base',
+                    1,
+                );
+                file_put_contents($resultFile, json_encode([
+                    'ok' => true,
+                    'available' => $result['data']['items'][0]['available'],
+                ]));
+            } catch (\Throwable $exception) {
+                file_put_contents($resultFile, json_encode([
+                    'ok' => false,
+                    'message' => $exception->getMessage(),
+                ]));
+            }
+            exit(0);
+        }
+        $this->assertGreaterThan(0, $adder);
+        $this->waitForSignal($eligibilityLocked);
+
+        $productChanger = pcntl_fork();
+        if ($productChanger === 0) {
+            DB::purge(config('database.default'));
+            touch($productChangeStarted);
+            DB::table('products')->where('id', $product->id)->update(['is_active' => false]);
+            exit(0);
+        }
+        $this->assertGreaterThan(0, $productChanger);
+
+        $listingChanger = pcntl_fork();
+        if ($listingChanger === 0) {
+            DB::purge(config('database.default'));
+            touch($listingChangeStarted);
+            DB::table('commerce_listings')->where('id', $listing->id)->update(['is_published' => false]);
+            exit(0);
+        }
+        $this->assertGreaterThan(0, $listingChanger);
+
+        pcntl_waitpid($adder, $status);
+        pcntl_waitpid($productChanger, $status);
+        pcntl_waitpid($listingChanger, $status);
+        $result = json_decode((string) file_get_contents($resultFile), true);
+        $this->cleanupSignals([
+            $eligibilityLocked,
+            $productChangeStarted,
+            $listingChangeStarted,
+            $resultFile,
+        ]);
+
+        $this->assertTrue($result['ok'], json_encode($result));
+        $this->assertTrue($result['available']);
+        $this->assertSame(1, DB::table('commerce_cart_items')->where('cart_id', $cart->id)->count());
+        $this->assertFalse((bool) DB::table('products')->where('id', $product->id)->value('is_active'));
+        $this->assertFalse((bool) DB::table('commerce_listings')->where('id', $listing->id)->value('is_published'));
+    }
+
+    /**
+     * PR-CART-PRICE-1: مطابقة نمط `add_holds_product_and_listing_eligibility_through_the_line_write`
+     * لكن على مصدر السعر بدل الأهلية — حذف `PriceListItem` الوحدة البديلة بالتزامن
+     * أثناء الكتابة يجب أن يوقفه القفل حتى تلتزم الإضافة، لا أن يفلت فيترك السطر
+     * مكتوباً بنجاح بناءً على سعرٍ لم يعد له مصدر.
+     *
+     * @test
+     */
+    public function add_holds_alternative_unit_price_eligibility_through_the_line_write(): void
+    {
+        $template = UnitTemplate::create(['name' => 'Price race units', 'base_unit' => 'piece', 'is_active' => true]);
+        $unit = UnitTemplateUnit::create(['unit_template_id' => $template->id, 'name' => 'carton', 'factor' => 10]);
+        $product = Product::create([
+            'name' => 'Price race product',
+            'sku' => 'PRICE-'.Str::random(8),
+            'unit' => 'piece',
+            'unit_template_id' => $template->id,
+            'sale_price' => 1250,
+            'is_active' => true,
+        ]);
+        CommerceListing::create([
+            'product_id' => $product->id,
+            'sales_channel_id' => $this->channel->id,
+            'is_published' => true,
+        ]);
+        $priceList = PriceList::create(['name' => 'Price race list', 'is_active' => true]);
+        $item = PriceListItem::create([
+            'price_list_id' => $priceList->id,
+            'product_id' => $product->id,
+            'unit_name' => 'carton',
+            'price' => 9000,
+        ]);
+        $this->channel->update(['default_price_list_id' => $priceList->id]);
+
+        $cart = $this->cart(now()->addDay());
+        $eligibilityLocked = $this->signalPath('cart_price_eligibility_');
+        $deleteStarted = $this->signalPath('cart_price_delete_');
+        $resultFile = tempnam(sys_get_temp_dir(), 'cart_price_result_');
+
+        $adder = pcntl_fork();
+        if ($adder === 0) {
+            DB::purge(config('database.default'));
+            $this->establishContext();
+            DB::listen(function ($query) use ($eligibilityLocked, $deleteStarted): void {
+                if (str_contains($query->sql, 'price_list_items')
+                    && str_contains(strtolower($query->sql), 'for update')
+                ) {
+                    touch($eligibilityLocked);
+                    $this->waitForSignal($deleteStarted);
+                    usleep(500000);
+                }
+            });
+            try {
+                $result = app(CommerceCartService::class)->add(
+                    CommerceCart::query()->findOrFail($cart->id),
+                    $product->id,
+                    'unit:'.$unit->id,
+                    1,
+                );
+                file_put_contents($resultFile, json_encode([
+                    'ok' => true,
+                    'available' => $result['data']['items'][0]['available'],
+                ]));
+            } catch (\Throwable $exception) {
+                file_put_contents($resultFile, json_encode([
+                    'ok' => false,
+                    'message' => $exception->getMessage(),
+                ]));
+            }
+            exit(0);
+        }
+        $this->assertGreaterThan(0, $adder);
+        $this->waitForSignal($eligibilityLocked);
+
+        $deleter = pcntl_fork();
+        if ($deleter === 0) {
+            DB::purge(config('database.default'));
+            touch($deleteStarted);
+            DB::table('price_list_items')->where('id', $item->id)->delete();
+            exit(0);
+        }
+        $this->assertGreaterThan(0, $deleter);
+
+        pcntl_waitpid($adder, $status);
+        pcntl_waitpid($deleter, $status);
+        $result = json_decode((string) file_get_contents($resultFile), true);
+        $this->cleanupSignals([$eligibilityLocked, $deleteStarted, $resultFile]);
+
+        // القفل يعطي الإضافة أولوية: يلتزم السطر أولاً بالسعر الذي كان موجوداً
+        // حتماً وقت القفل، ثم يمضي الحذف — تماماً كما تبقى إضافةٌ آمنة رغم
+        // إلغاء نشر قائمة تنتظر نفس القفل. المهم إثباته هنا هو الحصر: الحذف لا
+        // يستطيع أن يتم أثناء القفل ويجعل الإضافة تلتزم بسعرٍ محذوفٍ فعلاً وقت
+        // كتابة السطر — لا حالة تعليق صامتة.
+        $this->assertTrue($result['ok'], json_encode($result));
+        $this->assertTrue($result['available']);
+        $this->assertSame(1, DB::table('commerce_cart_items')->where('cart_id', $cart->id)->count());
+        $this->assertSame(0, DB::table('price_list_items')->where('id', $item->id)->count());
+    }
+
+    /** @test */
+    public function expiry_read_does_not_overwrite_a_concurrent_renewal(): void
+    {
+        $token = 'expiry-race-token';
+        $cart = $this->cart(now()->subSecond(), hash('sha256', $token));
+        $renewalReady = $this->signalPath('cart_renewal_');
+        $resultFile = tempnam(sys_get_temp_dir(), 'cart_expiry_result_');
+
+        $renewer = pcntl_fork();
+        if ($renewer === 0) {
+            DB::purge(config('database.default'));
+            DB::transaction(function () use ($cart, $renewalReady): void {
+                DB::table('commerce_carts')->where('id', $cart->id)->lockForUpdate()->first();
+                DB::table('commerce_carts')->where('id', $cart->id)->update([
+                    'expires_at' => now()->addDays(CommerceCartService::LIFETIME_DAYS),
+                ]);
+                touch($renewalReady);
+                usleep(500000);
+            });
+            exit(0);
+        }
+        $this->assertGreaterThan(0, $renewer);
+        $this->waitForSignal($renewalReady);
+
+        $reader = pcntl_fork();
+        if ($reader === 0) {
+            DB::purge(config('database.default'));
+            $this->establishContext();
+            $result = app(CommerceCartService::class)->findByToken($token);
+            file_put_contents($resultFile, json_encode([
+                'invalid' => $result['invalid'],
+                'cart_id' => $result['cart']?->id,
+            ]));
+            exit(0);
+        }
+        $this->assertGreaterThan(0, $reader);
+
+        pcntl_waitpid($renewer, $status);
+        pcntl_waitpid($reader, $status);
+        $result = json_decode((string) file_get_contents($resultFile), true);
+        $this->cleanupSignals([$renewalReady, $resultFile]);
+
+        $this->assertFalse($result['invalid']);
+        $this->assertSame($cart->id, $result['cart_id']);
+        $fresh = DB::table('commerce_carts')->where('id', $cart->id)->first();
+        $this->assertSame(CommerceCart::STATUS_ACTIVE, $fresh->status);
+        $this->assertTrue(now()->isBefore($fresh->expires_at));
+    }
+
+    /** @test */
+    public function add_returns_not_found_and_clears_the_cookie_when_the_cart_is_lost_after_lookup(): void
+    {
+        $host = 'cart-lost-'.Str::random(8).'.test';
+        StorefrontDomain::create([
+            'storefront_id' => $this->storefront->id,
+            'hostname' => $host,
+            'type' => StorefrontDomain::TYPE_CUSTOM,
+            'is_active' => true,
+            'verification_status' => StorefrontDomain::VERIFICATION_VERIFIED,
+        ]);
+        $product = Product::create([
+            'name' => 'Lost cart product',
+            'sku' => 'LOST-'.Str::random(8),
+            'unit' => 'piece',
+            'sale_price' => 1250,
+            'is_active' => true,
+        ]);
+        CommerceListing::create([
+            'product_id' => $product->id,
+            'sales_channel_id' => $this->channel->id,
+            'is_published' => true,
+        ]);
+        $token = 'lost-cart-race-token';
+        $cart = $this->cart(now()->addDay(), hash('sha256', $token));
+        $lockReady = $this->signalPath('cart_lost_lock_');
+        $lookupDone = $this->signalPath('cart_lost_lookup_');
+        $resultFile = tempnam(sys_get_temp_dir(), 'cart_lost_result_');
+
+        $locker = pcntl_fork();
+        if ($locker === 0) {
+            DB::purge(config('database.default'));
+            DB::transaction(function () use ($cart, $lockReady, $lookupDone): void {
+                DB::table('commerce_carts')->where('id', $cart->id)->lockForUpdate()->first();
+                touch($lockReady);
+                $this->waitForSignal($lookupDone);
+                DB::table('commerce_carts')->where('id', $cart->id)->update([
+                    'status' => CommerceCart::STATUS_EXPIRED,
+                ]);
+            });
+            exit(0);
+        }
+        $this->assertGreaterThan(0, $locker);
+        $this->waitForSignal($lockReady);
+
+        $requester = pcntl_fork();
+        if ($requester === 0) {
+            DB::purge(config('database.default'));
+            config(['storefront.gateway_secret' => self::SECRET]);
+            DB::listen(function ($query) use ($lookupDone): void {
+                if (str_contains($query->sql, 'commerce_carts') && str_contains($query->sql, 'token_hash')) {
+                    touch($lookupDone);
+                }
+            });
+            $response = $this->withHeaders([
+                'X-Storefront-Forwarded-Host' => $host,
+                'X-Storefront-Gateway-Secret' => self::SECRET,
+            ])->withCredentials()
+                ->withUnencryptedCookie(CommerceCartService::COOKIE_NAME, $token)
+                ->postJson('http://laravel-internal.test/store/v1/cart/items', [
+                    'product_id' => $product->id,
+                    'quantity' => 1,
+                ]);
+            $cookie = $response->getCookie(CommerceCartService::COOKIE_NAME, false);
+            file_put_contents($resultFile, json_encode([
+                'status' => $response->status(),
+                'cookie_expires' => $cookie?->getExpiresTime(),
+            ]));
+            exit(0);
+        }
+        $this->assertGreaterThan(0, $requester);
+
+        pcntl_waitpid($locker, $status);
+        pcntl_waitpid($requester, $status);
+        $result = json_decode((string) file_get_contents($resultFile), true);
+        $this->cleanupSignals([$lockReady, $lookupDone, $resultFile]);
+
+        $this->assertSame(404, $result['status']);
+        $this->assertNotNull($result['cookie_expires']);
+        $this->assertLessThanOrEqual(time(), $result['cookie_expires']);
+        $this->assertSame(0, DB::table('commerce_cart_items')->where('cart_id', $cart->id)->count());
+    }
+
+    /** @test */
+    public function patch_clears_the_cookie_when_the_cart_is_lost_after_lookup(): void
+    {
+        $this->assertLostCartMutationClearsCookie('patch');
+    }
+
+    /** @test */
+    public function delete_clears_the_cookie_when_the_cart_is_lost_after_lookup(): void
+    {
+        $this->assertLostCartMutationClearsCookie('delete');
+    }
+
+    /** @test */
+    public function update_holds_product_eligibility_through_the_quantity_change(): void
+    {
+        $this->assertEligibilityChangeWaitsForUpdate('product');
+    }
+
+    /** @test */
+    public function update_holds_listing_eligibility_through_the_quantity_change(): void
+    {
+        $this->assertEligibilityChangeWaitsForUpdate('listing');
+    }
+
+    private function assertEligibilityChangeWaitsForUpdate(string $target): void
+    {
+        $product = Product::create([
+            'name' => 'Update eligibility product',
+            'sku' => 'UPDATE-'.Str::random(8),
+            'unit' => 'piece',
+            'sale_price' => 1250,
+            'is_active' => true,
+        ]);
+        $listing = CommerceListing::create([
+            'product_id' => $product->id,
+            'sales_channel_id' => $this->channel->id,
+            'is_published' => true,
+        ]);
+        $cart = $this->cart(now()->addDay());
+        $created = app(CommerceCartService::class)->add($cart, $product->id, 'base', 1);
+        $itemId = $created['data']['items'][0]['id'];
+        $eligibilityLocked = $this->signalPath("cart_{$target}_eligibility_");
+        $changeStarted = $this->signalPath("cart_{$target}_change_");
+        $resultFile = tempnam(sys_get_temp_dir(), "cart_{$target}_result_");
+
+        $updater = pcntl_fork();
+        if ($updater === 0) {
+            DB::purge(config('database.default'));
+            $this->establishContext();
+            DB::listen(function ($query) use ($eligibilityLocked, $changeStarted): void {
+                if (str_contains($query->sql, 'commerce_listings')
+                    && str_contains(strtolower($query->sql), 'for update')
+                ) {
+                    touch($eligibilityLocked);
+                    $this->waitForSignal($changeStarted);
+                }
+            });
+            try {
+                $data = app(CommerceCartService::class)->update(
+                    CommerceCart::query()->findOrFail($cart->id),
+                    $itemId,
+                    2,
+                );
+                file_put_contents($resultFile, json_encode([
+                    'ok' => true,
+                    'quantity' => $data['items'][0]['quantity'],
+                    'available' => $data['items'][0]['available'],
+                ]));
+            } catch (\Throwable $exception) {
+                file_put_contents($resultFile, json_encode([
+                    'ok' => false,
+                    'message' => $exception->getMessage(),
+                ]));
+            }
+            exit(0);
+        }
+        $this->assertGreaterThan(0, $updater);
+        $this->waitForSignal($eligibilityLocked);
+
+        $changer = pcntl_fork();
+        if ($changer === 0) {
+            DB::purge(config('database.default'));
+            touch($changeStarted);
+            if ($target === 'product') {
+                DB::table('products')->where('id', $product->id)->update(['is_active' => false]);
+            } else {
+                DB::table('commerce_listings')->where('id', $listing->id)->update(['is_published' => false]);
+            }
+            exit(0);
+        }
+        $this->assertGreaterThan(0, $changer);
+
+        pcntl_waitpid($updater, $status);
+        pcntl_waitpid($changer, $status);
+        $result = json_decode((string) file_get_contents($resultFile), true);
+        $this->cleanupSignals([$eligibilityLocked, $changeStarted, $resultFile]);
+
+        $this->assertTrue($result['ok'], json_encode($result));
+        $this->assertSame(2, $result['quantity']);
+        $this->assertTrue($result['available']);
+        $this->assertSame(2, DB::table('commerce_cart_items')->where('id', $itemId)->value('quantity'));
+        $this->assertFalse((bool) DB::table($target === 'product' ? 'products' : 'commerce_listings')
+            ->where('id', $target === 'product' ? $product->id : $listing->id)
+            ->value($target === 'product' ? 'is_active' : 'is_published'));
+    }
+
+    private function assertLostCartMutationClearsCookie(string $method): void
+    {
+        $host = "cart-lost-{$method}-".Str::random(8).'.test';
+        StorefrontDomain::create([
+            'storefront_id' => $this->storefront->id,
+            'hostname' => $host,
+            'type' => StorefrontDomain::TYPE_CUSTOM,
+            'is_active' => true,
+            'verification_status' => StorefrontDomain::VERIFICATION_VERIFIED,
+        ]);
+        $token = "lost-cart-{$method}-token";
+        $cart = $this->cart(now()->addDay(), hash('sha256', $token));
+        $lockReady = $this->signalPath("cart_{$method}_lock_");
+        $lookupDone = $this->signalPath("cart_{$method}_lookup_");
+        $resultFile = tempnam(sys_get_temp_dir(), "cart_{$method}_result_");
+
+        $locker = pcntl_fork();
+        if ($locker === 0) {
+            DB::purge(config('database.default'));
+            DB::transaction(function () use ($cart, $lockReady, $lookupDone): void {
+                DB::table('commerce_carts')->where('id', $cart->id)->lockForUpdate()->first();
+                touch($lockReady);
+                $this->waitForSignal($lookupDone);
+                DB::table('commerce_carts')->where('id', $cart->id)->update([
+                    'status' => CommerceCart::STATUS_EXPIRED,
+                ]);
+            });
+            exit(0);
+        }
+        $this->assertGreaterThan(0, $locker);
+        $this->waitForSignal($lockReady);
+
+        $requester = pcntl_fork();
+        if ($requester === 0) {
+            DB::purge(config('database.default'));
+            config(['storefront.gateway_secret' => self::SECRET]);
+            DB::listen(function ($query) use ($lookupDone): void {
+                if (str_contains($query->sql, 'commerce_carts') && str_contains($query->sql, 'token_hash')) {
+                    touch($lookupDone);
+                }
+            });
+            $request = $this->withHeaders([
+                'X-Storefront-Forwarded-Host' => $host,
+                'X-Storefront-Gateway-Secret' => self::SECRET,
+            ])->withCredentials()->withUnencryptedCookie(CommerceCartService::COOKIE_NAME, $token);
+            $uri = 'http://laravel-internal.test/store/v1/cart/items/'.Str::uuid();
+            $response = $method === 'patch'
+                ? $request->patchJson($uri, ['quantity' => 2])
+                : $request->deleteJson($uri);
+            $cookie = $response->getCookie(CommerceCartService::COOKIE_NAME, false);
+            file_put_contents($resultFile, json_encode([
+                'status' => $response->status(),
+                'cookie_expires' => $cookie?->getExpiresTime(),
+            ]));
+            exit(0);
+        }
+        $this->assertGreaterThan(0, $requester);
+
+        pcntl_waitpid($locker, $status);
+        pcntl_waitpid($requester, $status);
+        $result = json_decode((string) file_get_contents($resultFile), true);
+        $this->cleanupSignals([$lockReady, $lookupDone, $resultFile]);
+
+        $this->assertSame(404, $result['status']);
+        $this->assertNotNull($result['cookie_expires']);
+        $this->assertLessThanOrEqual(time(), $result['cookie_expires']);
+    }
+
+    private function cart($expiresAt, ?string $tokenHash = null): CommerceCart
+    {
+        return CommerceCart::create([
+            'storefront_id' => $this->storefront->id,
+            'sales_channel_id' => $this->channel->id,
+            'token_hash' => $tokenHash ?? hash('sha256', Str::random(43)),
+            'expires_at' => $expiresAt,
+        ]);
+    }
+
+    private function establishContext(): void
+    {
+        app(TenantContext::class)->set($this->tenant->id);
+        app(StorefrontContext::class)->set(
+            $this->tenant->id,
+            $this->channel->id,
+            $this->storefront->id,
+        );
+    }
+
+    private function signalPath(string $prefix): string
+    {
+        $path = tempnam(sys_get_temp_dir(), $prefix);
+        unlink($path);
+
+        return $path;
+    }
+
+    private function waitForSignal(string $path): void
+    {
+        $deadline = microtime(true) + 5.0;
+        while (! file_exists($path) && microtime(true) < $deadline) {
+            usleep(1000);
+        }
+        if (! file_exists($path)) {
+            throw new \RuntimeException("Timed out waiting for {$path}");
+        }
+    }
+
+    /** @param list<string> $paths */
+    private function cleanupSignals(array $paths): void
+    {
+        foreach ($paths as $path) {
+            @unlink($path);
+        }
+    }
+}

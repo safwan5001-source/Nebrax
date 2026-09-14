@@ -20,9 +20,19 @@ class PriceListService
     /**
      * يعيد سعر القائمة بالهللات أو null حين لا يملك المنتج/الوحدة عنصراً فيها.
      * لا يوجد ضبط نسبة أو float: كل قائمة تسجل سعراً صريحاً لكل وحدة.
+     *
+     * `$lock` اختياريٌ (افتراضه `false`، بلا أثر على الاستدعاءات القائمة):
+     * يفعّله فقط مسارٌ يكتب أثراً بناءً على هذا السعر داخل نفس المعاملة (مثل
+     * إضافة/تعديل سطر سلة)، فيعيد قفل صفّ القائمة وصفّ العنصر المطابق
+     * (إن وُجد) بـ `lockForUpdate()` قبل الحسم — فحذف العنصر أو تعطيل القائمة
+     * أثناء الانتظار يُعاد فحصه بعد القفل بدل الاعتماد على قراءة سابقة له.
      */
-    public function resolve(PriceList $priceList, Product $product, ?string $unitName): ?int
+    public function resolve(PriceList $priceList, Product $product, ?string $unitName, bool $lock = false): ?int
     {
+        if ($lock) {
+            $priceList = PriceList::query()->whereKey($priceList->id)->lockForUpdate()->firstOrFail();
+        }
+
         if (! $priceList->is_active) {
             throw new RuntimeException('قائمة الأسعار المحددة غير نشطة.');
         }
@@ -30,10 +40,15 @@ class PriceListService
         [$resolvedUnit] = $this->units->resolve($product, $unitName);
         $storedUnit = $resolvedUnit ?? $product->unit;
 
-        $item = PriceListItem::where('price_list_id', $priceList->id)
+        $query = PriceListItem::where('price_list_id', $priceList->id)
             ->where('product_id', $product->id)
-            ->where('unit_name', $storedUnit)
-            ->first();
+            ->where('unit_name', $storedUnit);
+
+        if ($lock) {
+            $query->lockForUpdate();
+        }
+
+        $item = $query->first();
 
         return $item ? (int) $item->price : null;
     }

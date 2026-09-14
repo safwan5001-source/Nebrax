@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\BarcodeRegistryEntry;
+use App\Models\CommerceCartItem;
 use App\Models\CommerceListing;
 use App\Models\CommerceOrderLine;
 use App\Models\CreditNoteLine;
@@ -42,7 +43,7 @@ use App\Models\StocktakeLine;
  *  `ProductLifecycleService` وحدها. الفصل متعمَّد: التصنيف بيانٌ ثابتٌ يُراجَع
  *  بالعين، والتنفيذ سلوكٌ يُختبر.
  *
- *  **الفئات الخمس** (بنصّ العقد):
+ *  **فئات المراجع**:
  *
  *  1. `BUSINESS_HISTORICAL` — سطر مستندٍ تجاري/تاريخي. حجّة قائمة: حذف المنتج
  *     يترك المستند يشير إلى بطاقةٍ مُحرَّرة، ويحرّر SKU/باركوداً قد يُعاد
@@ -56,6 +57,8 @@ use App\Models\StocktakeLine;
  *  5. `AUDIT_HISTORY` — سجلّ تدقيق. **لا يمنع الحذف أبداً**: صفّ «أُنشئ» موجود
  *     لكل منتج بلا استثناء، فجعله مانعاً كان سيجعل كل منتج غير قابل للحذف.
  *     يُحتفظ به بعد الحذف عمداً — الحذف نفسه حدثٌ يجب أن يبقى مدوَّناً.
+ *  6. `EPHEMERAL_REFERENCE` — مرجعٌ مؤقت غير تاريخي، مثل سطر سلة مجهولة.
+ *     **لا يمنع الحذف أبداً**؛ يبقى الصفّ بلقطة اسمٍ آمنة بعد تصفير مرجع المنتج.
  *
  *  نموذجٌ واحد قد يحمل أكثر من فئة: `InventoryOpeningLine` تاريخيٌّ **و**
  *  مخزنيّ الدلالة معاً — وهو بالضبط ما أغفلته القائمة القديمة في الموضعين.
@@ -74,6 +77,8 @@ final class ProductReferenceRegistry
     public const OWNED_CHILD = 'owned_child';
 
     public const AUDIT_HISTORY = 'audit_history';
+
+    public const EPHEMERAL_REFERENCE = 'ephemeral_reference';
 
     /**
      * التصنيف الكامل: صنف النموذج ⇐ [مفتاح التقرير، الفئات].
@@ -142,7 +147,12 @@ final class ProductReferenceRegistry
         // حالةٍ مشتقّة يعيد النظام حسابها بنفسه.
         InventoryStockAlert::class => ['key' => 'stock_alerts', 'classes' => [self::OWNED_CHILD]],
 
-        // ── ٦) تدقيق ───────────────────────────────────────────────────
+        // COM-CART-2: السلة المجهولة حالة مؤقتة وليست دليلاً تاريخياً ولا
+        // تهيئةً تجارية حية. حذف المنتج لا تمنعه سلة مهجورة؛ يبقى السطر
+        // بلقطة الاسم ويصبح غير متاح وفق عقد Cart V1.
+        CommerceCartItem::class => ['key' => 'commerce_cart_items', 'classes' => [self::EPHEMERAL_REFERENCE]],
+
+        // ── ٧) تدقيق ───────────────────────────────────────────────────
         ProductActivity::class => ['key' => 'activity', 'classes' => [self::AUDIT_HISTORY]],
 
         // ── مراجع نطاق الوقود ──────────────────────────────────────────

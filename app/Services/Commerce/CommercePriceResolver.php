@@ -61,6 +61,13 @@ final class CommercePriceResolver
     ) {}
 
     /**
+     * `$lockEligibility` اختياريٌ (افتراضه `false`): يفعّله فقط استدعاءٌ يكتب
+     * أثراً بناءً على هذا السعر داخل نفس المعاملة (سطر سلة تجارة — Cart V1)،
+     * فيقفل صفّ قائمة السعر المختارة وعنصرها المطابق حتى تمام الالتزام — راجع
+     * `PriceListService::resolve()`. لا أثر له على المسار المباشر
+     * `Product.sale_price` (وحدة أساس بلا قائمة سعر مطابقة): ذاك يبقى بلا أي
+     * استعلام أو قفل إضافي، كما كان قبل هذا الخيار.
+     *
      * @throws RuntimeException المنتج/القناة/العميل غير موجودين لمستأجر السياق
      *                          الحالي، أو وحدة غير معرَّفة على قالب وحدات المنتج.
      */
@@ -69,6 +76,7 @@ final class CommercePriceResolver
         string $salesChannelId,
         ?string $partnerId = null,
         ?string $unitName = null,
+        bool $lockEligibility = false,
     ): ResolvedCommercePrice {
         $tenantId = app(TenantContext::class)->id();
         if ($tenantId === null) {
@@ -106,7 +114,7 @@ final class CommercePriceResolver
 
             $priceList = $channelPriceList->is_active ? $channelPriceList : null;
         }
-        $listPrice = $priceList ? $this->priceLists->resolve($priceList, $product, $unitName) : null;
+        $listPrice = $priceList ? $this->priceLists->resolve($priceList, $product, $unitName, $lockEligibility) : null;
 
         if ($listPrice !== null) {
             $amount = $listPrice;
