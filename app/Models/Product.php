@@ -359,8 +359,22 @@ class Product extends BaseModel implements BranchShareable
         return $this->hasMany(ProductBarcode::class);
     }
 
-    /** صور المنتج الخاصة، مرتبةً عند طلبها في ملف المنتج لا في الكتالوج. */
+    /**
+     * صور المنتج المشتركة فقط (VAR-MEDIA-1: بلا قيمة خيارٍ ولا متغيّر) —
+     * السلوك القائم حرفياً قبل هذا المعيار لكل مستهلكٍ حالي (`ProductController`،
+     * `PosController`، `StorefrontProductController`، `pos_image`) دون أي
+     * تعديلٍ في تلك المواضع؛ النطاقان الجديدان إضافةٌ لا يراها هذا الاستعلام.
+     * لتنظيفٍ شاملٍ عابرٍ لكل النطاقات الثلاثة عند حذف المنتج نفسه، @see allMedia().
+     */
     public function media(): HasMany
+    {
+        return $this->hasMany(ProductMedia::class)
+            ->whereNull('product_option_value_id')
+            ->whereNull('product_variant_id');
+    }
+
+    /** كل وسائط المنتج عبر النطاقات الثلاثة معاً — لتنظيف حذف المنتج الحقيقي فقط. */
+    public function allMedia(): HasMany
     {
         return $this->hasMany(ProductMedia::class);
     }
