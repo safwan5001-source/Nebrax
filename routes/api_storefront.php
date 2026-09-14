@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\StorefrontCartController;
 use App\Http\Controllers\Api\StorefrontCategoryController;
+use App\Http\Controllers\Api\StorefrontCheckoutController;
 use App\Http\Controllers\Api\StorefrontConfigController;
 use App\Http\Controllers\Api\StorefrontMediaController;
 use App\Http\Controllers\Api\StorefrontProductController;
@@ -51,6 +52,16 @@ Route::middleware([
         Route::post('cart/items', [StorefrontCartController::class, 'store'])->name('cart.items.store');
         Route::patch('cart/items/{item}', [StorefrontCartController::class, 'update'])->whereUuid('item')->name('cart.items.update');
         Route::delete('cart/items/{item}', [StorefrontCartController::class, 'destroy'])->whereUuid('item')->name('cart.items.destroy');
+    });
+
+    // COM-CHECKOUT-1A — أساس فقط (لا /checkout/complete هنا، عمداً: تلك
+    // CHECKOUT-1B مع idempotency والتزام صريح، راجع AWJ_CHECKOUT_V1_ARCHITECTURE.md §9).
+    Route::get('checkout', [StorefrontCheckoutController::class, 'show'])->name('checkout.show');
+    Route::middleware(RequireStorefrontMutationGateway::class)->group(function () {
+        Route::post('checkout', [StorefrontCheckoutController::class, 'store'])->name('checkout.store');
+        Route::patch('checkout/contact', [StorefrontCheckoutController::class, 'updateContact'])->name('checkout.contact.update');
+        Route::patch('checkout/address', [StorefrontCheckoutController::class, 'updateAddress'])->name('checkout.address.update');
+        Route::patch('checkout/delivery', [StorefrontCheckoutController::class, 'updateDelivery'])->name('checkout.delivery.update');
     });
 });
 
