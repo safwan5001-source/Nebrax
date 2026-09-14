@@ -354,7 +354,24 @@ class ImportJobWorkbookApplyTest extends TestCase
 
         app(TenantContext::class)->set($tenantId);
         $token = $this->tokenForRole($tenantId, 'owner', 'owner@wb-lock.test');
-        $product = $this->createProduct($token, ['sku' => 'SKU-WB-LOCK']);
+
+        // بلا أحداث النموذج عمداً، لا عبر `createProduct()` — نفس سبب
+        // `ImportJobInventoryOpeningApplyTest::a_concurrent_apply_attempt_is_blocked_by_a_real_row_lock`
+        // حرفياً: `Product::booted()` يطالب بـ SKU عبر `SkuRegistryEntry::claim()`،
+        // فيقفل صفّ المستأجر (`lockTenantAnchor()`) حتى نهاية معاملة الاختبار —
+        // قفلٌ صحيحٌ ومقصود في الإنتاج، لكنه يتصادم هنا مع اتصال `rival` اللاحق
+        // الذي يفحص قفلاً حقيقياً مختلفاً تماماً (`import_jobs`). هذا الاختبار لا
+        // يفحص مسار الإنشاء عبر الـAPI أصلاً (تفحصه اختبارات أخرى في هذا الملف) —
+        // فتخطّي الحدث هنا آمنٌ ولا يغيّر ما يفحصه الاختبار.
+        // `id` ليس ضمن `$fillable`، فالاعتماد على قيمةٍ مُمرَّرة له عبر `create()`
+        // غير موثوق — نلتقط النموذج الفعلي المُنشأ بدل افتراض مُعرّفه.
+        $createdProduct = Product::withoutEvents(function () use ($tenantId) {
+            return Product::create([
+                'tenant_id' => $tenantId,
+                'name' => 'منتج قائم', 'sku' => 'SKU-WB-LOCK', 'type' => 'good', 'sale_price' => 10000,
+            ]);
+        });
+        $product = ['id' => $createdProduct->id, 'sku' => $createdProduct->sku];
 
         $priceListId = (string) Str::uuid();
         $rival->table('price_lists')->insert([
