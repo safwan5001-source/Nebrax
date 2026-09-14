@@ -9,6 +9,7 @@ use App\Models\PurchaseLine;
 use App\Models\FuelSupplierInvoice;
 use App\Models\User;
 use App\Services\PrintTemplates\PrintTemplateService;
+use App\Support\DocumentLineVariantResolver;
 use App\Support\PrintTemplateContract;
 use App\Support\Settings;
 use Illuminate\Support\Facades\DB;
@@ -159,6 +160,11 @@ class PurchaseService
             $rate      = (int) ($item['tax_rate'] ?? $defaultRate);
 
             $product = ! empty($item['product_id']) ? Product::find($item['product_id']) : null;
+            // VAR-DOC-1: منتجٌ متعدد الخيارات يلزمه متغيّرٌ فعلي — لا مسار
+            // شراء غامض على الأب. Fail closed.
+            $variant = $product !== null
+                ? DocumentLineVariantResolver::resolve($product, $item['product_variant_id'] ?? null, $purchase->tenant_id)
+                : null;
 
             // الوحدة تُحلّ إلى (اسم، معامل) وتُنسَخ على السطر: لقطةٌ لا مرجع،
             // فتعديل القالب لاحقاً لا يعيد تفسير مستندٍ مرحَّل.
@@ -187,6 +193,8 @@ class PurchaseService
             PurchaseLine::create([
                 'purchase_id'   => $purchase->id,
                 'product_id'    => $item['product_id'] ?? null,
+                'product_variant_id' => $variant?->id,
+                'variant_descriptor_snapshot' => $variant !== null ? DocumentLineVariantResolver::descriptor($variant) : null,
                 'description'   => $description,
                 'quantity'      => $qty,
                 'unit_name'     => $unitName,
@@ -398,7 +406,7 @@ class PurchaseService
             }
 
             // الإجماليات مشتقة من السطور (مصدر الحقيقة) قبل توليد القيد.
-            $purchase->loadMissing('lines.product');
+            $purchase->loadMissing('lines.product', 'lines.variant');
 
             $inventoryTotal = 0; // تكلفة البنود المخزنية (تذهب إلى 1140)
             $expenseTotal   = 0; // تكلفة البنود غير المخزنية (تذهب إلى 5150)
@@ -539,7 +547,8 @@ class PurchaseService
                         'date'        => $purchase->purchase_date->toDateString(),
                         'notes'       => "شراء عبر الفاتورة {$purchase->number}",
                     ],
-                    max(0, $lineValue)
+                    max(0, $lineValue),
+                    $line->variant
                 );
             }
 

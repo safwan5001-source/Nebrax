@@ -15,6 +15,7 @@ class DeliveryNoteLine extends BaseModel implements CompanyWide
 
     protected $fillable = [
         'tenant_id', 'branch_id', 'delivery_note_id', 'line_number', 'product_id',
+        'product_variant_id', 'variant_descriptor_snapshot',
         'product_name_snapshot', 'product_sku_snapshot', 'product_barcode_snapshot',
         'unit_name', 'unit_factor', 'quantity', 'quantity_numerator', 'quantity_denominator', 'description',
     ];
@@ -36,5 +37,11 @@ class DeliveryNoteLine extends BaseModel implements CompanyWide
     public function product(): BelongsTo
     {
         return $this->referenceBelongsTo(Product::class);
+    }
+
+    /** VAR-DOC-1: المتغيّر الفعلي حين يكون المنتج متعدد الخيارات — فارغٌ لمنتجٍ بسيط. */
+    public function variant(): BelongsTo
+    {
+        return $this->referenceBelongsTo(ProductVariant::class, 'product_variant_id');
     }
 }

@@ -6,7 +6,9 @@ use App\Models\Account;
 use App\Models\CreditNote;
 use App\Models\CreditNoteLine;
 use App\Models\Partner;
+use App\Models\Product;
 use App\Services\PrintTemplates\PrintTemplateService;
+use App\Support\DocumentLineVariantResolver;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -82,9 +84,17 @@ class CreditNoteService
                 $lineSubtotal = $qty * $unitPrice;
                 $lineTax      = $this->calcTax($lineSubtotal, $rate);
 
+                $product = ! empty($item['product_id']) ? Product::find($item['product_id']) : null;
+                // VAR-DOC-1: منتجٌ متعدد الخيارات يلزمه متغيّرٌ فعلي. Fail closed.
+                $variant = $product !== null
+                    ? DocumentLineVariantResolver::resolve($product, $item['product_variant_id'] ?? null, $note->tenant_id)
+                    : null;
+
                 CreditNoteLine::create([
                     'credit_note_id' => $note->id,
                     'product_id'     => $item['product_id'] ?? null,
+                    'product_variant_id' => $variant?->id,
+                    'variant_descriptor_snapshot' => $variant !== null ? DocumentLineVariantResolver::descriptor($variant) : null,
                     'description'    => $item['description'] ?? null,
                     'quantity'       => $qty,
                     'unit_price'     => $unitPrice,

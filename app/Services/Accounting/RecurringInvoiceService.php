@@ -3,8 +3,10 @@
 namespace App\Services\Accounting;
 
 use App\Models\Invoice;
+use App\Models\Product;
 use App\Models\RecurringInvoice;
 use App\Models\RecurringInvoiceLine;
+use App\Support\DocumentLineVariantResolver;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -64,9 +66,17 @@ class RecurringInvoiceService
                 $lineSubtotal = $qty * $unitPrice;
                 $lineTax      = $this->calcTax($lineSubtotal, $rate);
 
+                $product = ! empty($item['product_id']) ? Product::find($item['product_id']) : null;
+                // VAR-DOC-1: منتجٌ متعدد الخيارات يلزمه متغيّرٌ فعلي. Fail closed.
+                $variant = $product !== null
+                    ? DocumentLineVariantResolver::resolve($product, $item['product_variant_id'] ?? null, $rec->tenant_id)
+                    : null;
+
                 RecurringInvoiceLine::create([
                     'recurring_invoice_id' => $rec->id,
                     'product_id'           => $item['product_id'] ?? null,
+                    'product_variant_id'   => $variant?->id,
+                    'variant_descriptor_snapshot' => $variant !== null ? DocumentLineVariantResolver::descriptor($variant) : null,
                     'description'          => $item['description'] ?? null,
                     'quantity'             => $qty,
                     'unit_price'           => $unitPrice,
@@ -103,7 +113,8 @@ class RecurringInvoiceService
             $rec->loadMissing('lines');
 
             $items = $rec->lines->map(fn (RecurringInvoiceLine $l) => [
-                'product_id'  => $l->product_id,
+                'product_id'         => $l->product_id,
+                'product_variant_id' => $l->product_variant_id,
                 'description' => $l->description,
                 'quantity'    => $l->quantity,
                 'unit_price'  => $l->unit_price,
