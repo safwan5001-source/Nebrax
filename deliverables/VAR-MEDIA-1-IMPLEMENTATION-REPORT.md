@@ -381,7 +381,7 @@ response-shape change occurred at all).
 
 - Branch: `claude/var-media-1-variant-media`
 - Base SHA: `4689f1bba1d285b4f8b57b96ad0522bf253fbc8e`
-- Head SHA: *(filled in after commit/push, see final report message)*
+- Head SHA: `5e254ab12f42cf666ecfc5c747586168d79e4dd5`
 - Working tree: clean after commit (verified before push)
 
 ## Recommendation
