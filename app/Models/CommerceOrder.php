@@ -35,18 +35,34 @@ use LogicException;
  * `snapshot` (PR-COM-6C): لقطة العميل/الاتصال/الشحن/الفوترة وقت الطلب —
  * حجّة تاريخية اختيارية (صفرٌ أو سطرٌ واحد)، منفصلة تماماً عن الملكية
  * أعلاه. لا سلطة تفويضٍ فيها إطلاقاً — راجع `CommerceOrderSnapshot`.
+ *
+ * ═══════════════════════════════════════════════════════════════
+ *  COM-CHECKOUT-1B — هويةٌ موحَّدة مع سلسلة Cart→Checkout→Order
+ * ═══════════════════════════════════════════════════════════════
+ * هذا النموذج نفسه هو الوجهة النهائية لـ`AWJ_CHECKOUT_V1_ARCHITECTURE.md §10`
+ * — لا كيان Order ثانٍ (`AWJ_COMMERCE_ORDER_IDENTITY_DECISION_REPORT.md`،
+ * القرار C: Unify/Migrate). `storefront_id`/`commerce_checkout_id`
+ * (الفريد)/`delivery_method` أعمدةٌ إضافية بحتة — `null` دائماً لطلبات
+ * المسار القديم (staff/trusted، PR-COM-5A/6A/6B). طلب Checkout يُنشأ عبر
+ * `CommerceOrderService::createFromCheckout()` (مسارٌ مستقل تماماً عن
+ * `create()` القديم، لا يغيّر سلوكه) **مباشرةً بحالة `confirmed` النهائية**
+ * داخل معاملةٍ واحدة ذرّية مع سطوره ولقطته — `draft` يبقى حالةً داخلية
+ * عابرة غير مرئية خارج تلك المعاملة، فلا حاجة لقيمة `status` جديدة ولا
+ * لإعادة تفسير `confirmed` القديم: يعني تماماً ما كان يعنيه دوماً — التزامٌ
+ * تجاريٌّ نهائي بلا أثرٍ محاسبي أو مخزني بعد، لكلا المصدرين.
  */
 class CommerceOrder extends BaseModel implements CompanyWide
 {
-    use ResolvesBranchReferences;
     use GeneratesDocumentNumbers;
+    use ResolvesBranchReferences;
 
     public const STATUS_DRAFT = 'draft';
 
     public const STATUS_CONFIRMED = 'confirmed';
 
     protected $fillable = [
-        'tenant_id', 'sales_channel_id', 'partner_id', 'customer_identity_id', 'number', 'status', 'total', 'confirmed_at',
+        'tenant_id', 'sales_channel_id', 'storefront_id', 'commerce_checkout_id',
+        'partner_id', 'customer_identity_id', 'number', 'status', 'total', 'delivery_method', 'confirmed_at',
     ];
 
     protected $casts = [
@@ -83,6 +99,24 @@ class CommerceOrder extends BaseModel implements CompanyWide
         return $this->belongsTo(SalesChannel::class);
     }
 
+    /**
+     * المتجر المصدر لطلب Checkout — `null` دائماً لطلبات المسار القديم
+     * (staff/trusted) التي لا مصدر متجرٍ لها (COM-CHECKOUT-1B).
+     */
+    public function storefront(): BelongsTo
+    {
+        return $this->belongsTo(Storefront::class);
+    }
+
+    /**
+     * جلسة الدفع المصدر — `null` دائماً لطلبات المسار القديم. الفريدة على
+     * العمود (migration) تضمن طلباً واحداً كحدٍّ أقصى لكل Checkout.
+     */
+    public function checkout(): BelongsTo
+    {
+        return $this->belongsTo(CommerceCheckout::class, 'commerce_checkout_id');
+    }
+
     /** مرجع مخزَّن اختياري — لا يُصفّى بالفرع أبداً (المستند حجّة قائمة، لا نتيجة تصفّح). */
     public function partner(): BelongsTo
     {
@@ -112,5 +146,11 @@ class CommerceOrder extends BaseModel implements CompanyWide
     public function isConfirmed(): bool
     {
         return $this->status === self::STATUS_CONFIRMED;
+    }
+
+    /** COM-CHECKOUT-1B — طلبٌ أُنشئ عبر `createFromCheckout()`، لا المسار القديم. */
+    public function originatesFromCheckout(): bool
+    {
+        return $this->commerce_checkout_id !== null;
     }
 }
