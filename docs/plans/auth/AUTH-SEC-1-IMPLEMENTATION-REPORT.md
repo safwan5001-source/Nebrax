@@ -3,7 +3,7 @@
 - **Status:** P1 fix implemented on the existing branch; PR open; not merged and not deployed.
 - **Summary:** Hardened the tenant-bound V1 email verification and password recovery flow for AWJ staff authentication. Recovery and verification now fail closed without a valid tenant hostname, and all generated links target the tenant’s configured frontend subdomain.
 - **Base SHA:** `23af768262f284f5092fd8922037c291c47aca06`
-- **Head SHA:** Updated by the final P1 commit below.
+- **Head SHA:** `c9af32232a0b17a7748788fa9c7b4ec8fd2e515c` (P1 implementation commit; the final report metadata commit follows it).
 - **Branch:** `feat/auth-sec-1-email-password-recovery`
 - **PR:** [#795](https://github.com/safwan5001-source/Nebrax/pull/795)
 
