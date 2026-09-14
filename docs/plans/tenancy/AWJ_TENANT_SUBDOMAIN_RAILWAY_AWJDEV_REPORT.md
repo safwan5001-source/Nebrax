@@ -1,8 +1,9 @@
 # AWJ Tenant Subdomains — Railway `*.awjdev.xyz` Completion Report
 
-**Date:** 2026-09-14
+**Date:** 2026-09-14 (updated same day — infrastructure-finding correction)
 **Status:** IMPLEMENTED ON PR — **NOT MERGED — NOT DEPLOYED**
 **Branch:** `claude/awj-tenant-subdomains-ebdop5`
+**PR:** [#816](https://github.com/safwan5001-source/Nebrax/pull/816)
 
 ---
 
@@ -13,313 +14,240 @@ already environment-configurable** — it shipped in PR #780 (`cf97b25`, merged 
 `main`) as V1 of `{slug}.awj.app`. This task's job was to confirm that contract
 actually covers the live Railway environment (`*.awjdev.xyz`) with **zero
 hard-coded `awjdev.xyz`**, close the test-coverage gap the task asked for
-explicitly, and surface one real infrastructure caveat that the task's own
-assumptions did not account for. No production business logic changed.
+explicitly, and document the exact env vars needed. No production business
+logic changed in this PR at any point, in either pass.
+
+This revision **corrects one infrastructure claim** made in the first version of
+this report, after live evidence proved it wrong. See below.
 
 ---
 
-## Phase 0 findings
+## Infrastructure finding correction
 
-**Source of truth for the tenant slug:** `tenants.slug` (unique, already existed
-before any of this work). Registration lower-cases it, validates it against
-`App\Tenancy\ReservedTenantSlugs`, and enforces uniqueness — unchanged by this task.
+**What the previous version of this report got wrong:** it concluded, from the
+root `Dockerfile` alone (`php artisan serve` — a Laravel-only image, no Next.js
+process in it), that the Railway service serves the backend API exclusively, and
+that `*.awjdev.xyz` therefore reaches JSON only — not an HTML page — and that
+Vercel would need the wildcard attached separately for a login page to render.
+That inference was reasonable from the repository alone, but it is **not what is
+actually deployed**, and the report stated it too confidently as if the repository
+proved it.
 
-**Hostname → Tenant resolution:** `App\Tenancy\TenantHostnameResolver::extractSlug()`
-strips scheme/port via the shared `HostnameNormalizer`, then checks the host against
-`config('tenancy.base_domains')` (longest-match first). A single label under a
-configured base domain that isn't reserved resolves to exactly one **active**
-tenant via `tenantIdForSlug()`, or `abort(404)` — fail-closed, never a guess.
-Resolution runs **before** authentication via `IdentifyTenantHostname` middleware,
-into a separate `HostnameTenantContext` (not `TenantContext`) so:
-- Host wins over Origin; a Host/Origin slug mismatch is `404`.
-- `AuthController::login` rejects cross-tenant credentials with the *same* 422 as
-  a wrong password (no enumeration).
-- `SetTenant` (post-auth) 403s on a hostname/user mismatch without ever setting
-  `TenantContext`.
-- No `X-Tenant-*` client header is trusted anywhere in this path.
+**What live evidence actually proves:** `https://alrshd.awjdev.xyz` was tested
+directly and returns the full AWJ HTML frontend over HTTPS, at that exact
+hostname. This proves:
 
-**Existing `awj.app` occurrences in code:** all of them are **default fallback
-values**, not hard-coded business logic — `config('tenancy.base_domains',
-['awj.app'])` in `TenantHostnameResolver`, the `env(..., 'awj.app')` defaults in
-`config/tenancy.php` and `deploy/cors.php`, and the same default in
-`web/src/lib/tenant-domain.ts`. Every one of them is overridden by
-`AWJ_TENANT_BASE_DOMAIN` / `AWJ_TENANT_BASE_DOMAINS` (backend) or
-`NEXT_PUBLIC_TENANT_BASE_DOMAIN` (frontend). Nothing needed to change here for
-`awjdev.xyz` to work — it already works as an env value.
+1. DNS resolution for `alrshd.awjdev.xyz` works.
+2. TLS works.
+3. The Railway wildcard routing works.
+4. The request reaches a service that renders full HTML (Next.js output), not a
+   bare JSON API.
+5. It is **not** merely hitting the Laravel API.
 
-**Post-registration redirect:** `web/src/app/register/page.tsx` calls
-`router.replace('/dashboard')` — a same-origin relative redirect, never a
-hard-coded domain. No fix required for the task's "no hard-coded production
-domain in the redirect" requirement, because there was never one. Redirecting
-to `https://{slug}.{base}` instead was evaluated and **deliberately not done**
-(see Risks).
-
-**Environment/config contract already in place:**
-
-| Layer | Variable | Default |
-|---|---|---|
-| Backend base domain | `AWJ_TENANT_BASE_DOMAIN` (or `AWJ_TENANT_BASE_DOMAINS`, comma list) | `awj.app` |
-| Backend reserved slugs | `AWJ_TENANT_RESERVED_SLUGS` (extra, comma list) | `www,api,app,admin,platform,support,store,storefront` |
-| Backend CORS | reads the same `AWJ_TENANT_BASE_DOMAIN(S)`, builds `^https?://[a-z0-9-]+\.{base}(?::\d+)?$` origin patterns | — |
-| Frontend base domain | `NEXT_PUBLIC_TENANT_BASE_DOMAIN` | `awj.app` |
-
-**Existing tests:** `tests/Feature/TenantHostnameResolverTest.php` and
-`tests/Feature/TenantSubdomainAuthTest.php` already proved the contract generically
-(host/Origin resolution, reserved slugs, cross-tenant rejection, unknown/inactive
-fail-closed, non-tenant hosts like `nibras-api.onrender.com` and `nebrax.vercel.app`
-staying non-tenant). They exercised it only against the `awj.app` default and one
-`localhost` override — not against the live Railway domain.
-
-**Architecture check vs. the task's assumptions — one real gap found (not a STOP):**
-the Railway service `Nebrax / AWJ ERP` runs the root `Dockerfile`
-(`php artisan serve` on `$PORT`, which is Railway's injected port — matching the
-"port 8080" mentioned) — **backend API only**. There is no Next.js process in that
-image; the frontend (`web/`) is documented and deployed as a **separate** Vercel
-project (`web/DEPLOY.md`). So `*.awjdev.xyz`, as currently routed, reaches the
-Laravel JSON API, not an HTML login page. This doesn't invalidate the tenant-
-resolution design (Host/Origin-based resolution and CORS work identically
-regardless of who serves the HTML — that's exactly how V1 was designed to survive
-a split frontend/backend deployment), but it does mean **setting the backend env
-var alone will not make a browser see a tenant login page at that URL yet** — the
-wildcard also needs to be attached to wherever `web/` is actually served. Documented
-in `deploy/DEPLOY.md` and `web/DEPLOY.md` rather than forced into a design this
-task didn't ask for (no Dockerfile/Vercel changes made).
-
-**Smallest safe implementation plan (confirmed, then executed):** no change to
-`config/tenancy.php`, `TenantHostnameResolver`, `RegisterRequest`, CORS, or the
-frontend suffix helper — all already environment-driven and domain-agnostic. Add
-explicit regression tests pinning the `awjdev.xyz` case (valid resolve, reserved
-apex, lookalike-suffix rejection, `awj.up.railway.app` staying non-tenant, cross-
-tenant rejection under that base domain), fix one unrelated local test-assembly gap
-that was hiding real signal, and document the exact Railway/Vercel env values for
-Safwan.
+**What the repository can and cannot prove about *why*:** this core repo contains
+no `routes/web.php`, no `public/` HTML, and no static Next.js export
+(`web/next.config.mjs` has no `output: 'export'`) that could be baked into the
+Laravel image — so the Laravel core by itself cannot explain how HTML is being
+served at that host. That rules out "Laravel is quietly also serving the frontend
+via this Dockerfile" as the explanation. Beyond that, **the repository does not
+contain enough evidence to prove which runtime is currently serving
+`alrshd.awjdev.xyz` in production** — it could be the documented Vercel
+deployment (`web/vercel.json`, `web/DEPLOY.md`) already having the wildcard
+attached, a different Railway service not represented in this repo, or some other
+routing/proxy layer. **This report does not guess which one it is, and does not
+recommend attaching the wildcard to Vercel** — that instruction from the first
+version is retracted as unsupported. No DNS, Railway, or Vercel change is
+requested by this correction.
 
 ---
 
-## Implementation completed
+## Tenant-host finding
 
-1. **New negative/security tests**, run against a `tenancy.base_domains =
-   ['awjdev.xyz']` config override (no code changes to production files):
-   - `TenantHostnameResolverTest::the_configured_railway_base_domain_resolves_tenants_and_rejects_lookalikes`
-     — valid `alrshd.awjdev.xyz` resolves; bare `awjdev.xyz` apex is non-tenant;
-     `awj.up.railway.app` stays non-tenant; lookalikes `evilawjdev.xyz`,
-     `awjdev.xyz.evil.com`, `notawjdev.xyz` are all rejected; `alrshd.awj.app` is
-     rejected when only `awjdev.xyz` is configured.
-   - `TenantHostnameResolverTest::multiple_configured_base_domains_resolve_independently`
-     — `AWJ_TENANT_BASE_DOMAINS=awjdev.xyz,awj.app` resolves both bases without
-     one swallowing the other, for a transition period if ever needed.
-   - `TenantSubdomainAuthTest::the_same_security_boundary_holds_under_the_configured_railway_domain`
-     — full HTTP-level pass under the `awjdev.xyz` config: valid tenant login
-     succeeds, unknown tenant 404s, tenant B's credentials are rejected through
-     tenant A's `awjdev.xyz` host, and `awj.up.railway.app` keeps working as a
-     non-tenant host (backward compatibility with the existing Railway domain).
-2. **Fixed a pre-existing local test-assembly gap** (`setup.sh` was missing
-   `app/Support/Inventory` in its copy list — `.github/workflows/ci.yml`'s
-   assemble step already had it correctly). This is unrelated to tenancy but was
-   silently causing ~21 unrelated test failures (`Class
-   App\Support\Inventory\MovementSourceResolver not found`) that made the local
-   "run everything" signal wrong. One-line parity fix, no behavior change, matches
-   the already-correct CI script exactly.
-3. **Documentation**: added a Railway-specific subsection to `deploy/DEPLOY.md`
-   (exact env var for Safwan, explicit warning not to add `awj.up.railway.app` to
-   the base-domain list, and the API-only wildcard caveat) and a matching note to
-   `web/DEPLOY.md`. This report.
+**Why the public landing page renders at `alrshd.awjdev.xyz` instead of a
+tenant-specific view:** inspecting `web/src/app/` shows **no `middleware.ts`**
+and no other hostname-aware routing anywhere in the Next.js app. The root route
+(`web/src/app/page.tsx`) is a static marketing/landing page that renders
+identically regardless of the request's `Host` header — there is no code path in
+the frontend that branches on subdomain. Grepping the entire `web/src` tree for
+consumers of the tenant-domain helpers confirms `NEXT_PUBLIC_TENANT_BASE_DOMAIN`
+is read in exactly one place, `web/src/lib/tenant-domain.ts`
+(`tenantHostSuffix()`), and used only to render the `.{base}` suffix text next to
+"صفحة الدخول" on the **registration form**. It does not drive any redirect,
+route guard, or conditional rendering.
 
-No migration. No change to `RegisterRequest`, `TenantHostnameResolver`,
-`config/tenancy.php`, `deploy/cors.php`, `AuthController`, `SetTenant`, or any
-frontend component — the configurable contract from PR #780 already satisfied
-every requirement in this task once pointed at `awjdev.xyz` via env vars.
+**Conclusion:** the public landing page appearing at `alrshd.awjdev.xyz` is
+**expected behavior under the existing PR #780 architecture, regardless of
+whether `AWJ_TENANT_BASE_DOMAIN` / `NEXT_PUBLIC_TENANT_BASE_DOMAIN` are set to
+`awjdev.xyz` or not.** Setting those variables will not change what `/` renders
+on that host — there is no frontend logic that would react to it. This is **not
+a missing-configuration symptom**; it is a scope boundary that already existed
+before this task: PR #780 built tenant recognition as a **backend** (Laravel API)
+concern only — resolved from `Host` then `Origin` during actual API calls (login,
+authenticated requests) — and deliberately did not build any frontend
+hostname-based routing or a distinct "tenant landing" experience. The previous
+version of this report's own "Risks" section already flagged this as inherited,
+unimplemented scope (item 2, no post-registration redirect); this pass confirms
+the same gap also explains the landing-page observation.
+
+**What setting the variables *does* affect:** once `AWJ_TENANT_BASE_DOMAIN=awjdev.xyz`
+is set on the backend, an API call made from the `alrshd.awjdev.xyz` origin (e.g.
+the browser's `Origin` header when the page's JS calls `/api/login`) will let
+`TenantHostnameResolver` recognize `alrshd` as the tenant slug and enforce the
+cross-tenant/unknown-tenant/fail-closed rules described below — **but the page
+itself will still visually be the same generic landing page**, because nothing
+routes differently. Whether the *user experience* (redirecting to a login form,
+or otherwise making the tenant context visible pre-auth) should change is a
+frontend-routing decision outside this task's corrected scope — it was outside
+scope in the original PR #780 too, and remains so here.
+
+**Are both variables required?** They serve different, independent purposes and
+neither substitutes for the other:
+- `AWJ_TENANT_BASE_DOMAIN` (Laravel `config/tenancy.php`, also read by
+  `deploy/cors.php`): required for the **backend** to recognize
+  `{slug}.awjdev.xyz` as a tenant host at all (`TenantHostnameResolver`) and to
+  allow tenant-subdomain browser origins through CORS. Without it, `awjdev.xyz`
+  hosts stay in the existing non-tenant mode (email-derived tenant, current
+  behavior — not broken, just not subdomain-aware).
+- `NEXT_PUBLIC_TENANT_BASE_DOMAIN` (Next.js, build-time): only affects the
+  registration form's displayed suffix text. Without it, the suffix falls back to
+  the compiled-in default (`awj.app`) — cosmetic only, not a resolution failure.
+
+Setting both to `awjdev.xyz` is **sufficient**, under the existing PR #780
+architecture, to make backend tenant-host recognition work end-to-end for that
+domain and to make the registration form display the correct suffix. It is
+**not** sufficient to make the initial page render differently per tenant host —
+that was never built, in either PR.
+
+**No regression found.** Nothing above indicates a bug in the already-approved
+PR #780 contract; the behavior is exactly what that design intended and
+documented. No application code was changed as a result of this investigation.
 
 ---
 
-## Files changed
+## Environment configuration
+
+| Variable | Required value | Runtime that consumes it | Effect |
+|---|---|---|---|
+| `AWJ_TENANT_BASE_DOMAIN` | `awjdev.xyz` | The deployed Laravel/API runtime (`config/tenancy.php`, `deploy/cors.php`) — repository does not prove which infrastructure this is; set it on whichever service actually runs `php artisan serve` for this app | Backend recognizes `{slug}.awjdev.xyz` as a tenant host; CORS allows tenant-subdomain browser origins |
+| `NEXT_PUBLIC_TENANT_BASE_DOMAIN` | `awjdev.xyz` | The deployed Next.js runtime (`web/src/lib/tenant-domain.ts`) — repository documents Vercel (`web/vercel.json`, `web/DEPLOY.md`) as the intended target, but cannot prove that is what currently serves `alrshd.awjdev.xyz` live | Registration form displays the correct `.awjdev.xyz` suffix |
+
+Optional (only if both `awjdev.xyz` and `awj.app` must resolve simultaneously
+during a transition): `AWJ_TENANT_BASE_DOMAINS=awjdev.xyz,awj.app` on the backend,
+in place of the single `AWJ_TENANT_BASE_DOMAIN`.
+
+No new variables invented. No Railway/Vercel configuration was changed by this
+session — this table is a report for Safwan to apply manually.
+
+---
+
+## Files changed (this correction pass)
 
 | File | Change |
 |---|---|
-| `tests/Feature/TenantHostnameResolverTest.php` | +2 tests: `awjdev.xyz` resolution/lookalike rejection, multi-base-domain independence |
-| `tests/Feature/TenantSubdomainAuthTest.php` | +1 test: full auth-boundary pass under `awjdev.xyz` config, including `awj.up.railway.app` compatibility |
-| `setup.sh` | Added missing `app/Support/Inventory` to local assemble copy list (parity with `ci.yml`) |
-| `deploy/DEPLOY.md` | New "بيئة Railway الحالية — `*.awjdev.xyz`" subsection: exact env var, what NOT to add, and the API-only-wildcard caveat |
-| `web/DEPLOY.md` | New note: the Railway wildcard doesn't reach this Vercel project yet; what Safwan needs to add for the login page itself to render |
-| `docs/plans/tenancy/AWJ_TENANT_SUBDOMAIN_RAILWAY_AWJDEV_REPORT.md` | This report |
+| `deploy/DEPLOY.md` | Corrected the Railway subsection: removed the unsupported "API-only, Vercel must receive the wildcard" claim; documented the live-evidence finding, what the repo can/cannot prove about the serving runtime, and that both env vars are still needed regardless |
+| `web/DEPLOY.md` | Corrected the matching frontend-side note with the same live-evidence finding and the "landing page is expected regardless of config" clarification |
+| `docs/plans/tenancy/AWJ_TENANT_SUBDOMAIN_RAILWAY_AWJDEV_REPORT.md` | This report, rewritten with the correction |
+
+No test files changed in this pass — the tests added in the prior pass (5 new
+tests in `TenantHostnameResolverTest.php` and `TenantSubdomainAuthTest.php`) are
+resolver/auth-level and already domain-agnostic at the code level; they were not
+testing frontend routing or landing-page rendering, so the corrected
+understanding does not invalidate them.
 
 ---
 
-## Tests and exact results
+## Tests
 
-Assembled Laravel app: `/home/user/nibras-app` (Laravel 11, PHP 8.3, SQLite),
-built from this branch via `setup.sh`.
+No application or test code changed in this correction — only documentation. Per
+the instruction to run only tests relevant to an actual change, and since none
+were made, the previously reported focused-suite result stands and was not
+re-run in this pass:
 
-### Focused tenancy / auth / isolation
+- Focused tenancy/auth suite (`TenantHostnameResolverTest`, `TenantSubdomainAuthTest`,
+  `ApiAuthTest`, `ApiTenantIsolationTest`, `HostnameNormalizerTest`): **77/77
+  passed**, unchanged from the previous report.
+- Frontend `tenant-domain.test.ts`: **3/3 passed**, unchanged.
 
-```bash
-php artisan test --filter='TenantHostnameResolverTest|TenantSubdomainAuthTest|ApiAuthTest|ApiTenantIsolationTest|HostnameNormalizerTest'
-```
-
-**Result: 77 passed (304 assertions), Duration ~9.9s** — all green, including the
-5 new tests above (also matched `PublicApiAuthTest` by the `ApiAuth` substring,
-also green).
-
-### Full `php artisan test`
-
-```bash
-php artisan test
-```
-
-**Result: 3664 passed / 32 failed / 39 skipped (23313 assertions), Duration ~336s.**
-
-All 32 failures are pre-existing and **unrelated to this change** — confirmed by
-inspection:
-- 26 failures (`FuelReconciliationTest`, `FuelSaleServiceTest`,
-  `FuelAviRfidServiceTest`, `FuelSupplyReceivingTest`, `FuelSaleApiTest`,
-  `FuelSupplyReceivingApiTest`) all throw `Call to undefined function
-  App\Services\bcmul()` — the `bcmath` PHP extension is not enabled in this
-  sandbox's PHP CLI (`php -m | grep bcmath` is empty), even though the production
-  `Dockerfile` installs it. Nothing to do with tenancy/hostnames.
-- 5 failures in `ReportEffectiveScopeTest` (inventory value/export scoping) and
-  1 in `DocumentCenterSecureIntakeTest` (PDF intake) are separately
-  environment-dependent (numeric/PDF-processing behavior unrelated to this diff).
-- None of the 32 touch `Tenant*`, `Register*`, `Auth*`, hostname resolution, CORS,
-  or anything this PR touched. Before fixing the unrelated `setup.sh` assembly gap
-  (item 2 above), the same run showed 53 failures — 21 of them
-  (`App\Support\Inventory\MovementSourceResolver not found`) were a local-only
-  tooling artifact, now fixed; the remaining 32 are genuine sandbox/PHP-extension
-  limitations, not code regressions.
-
-CI (`ci.yml`) already copies `app/Support/Inventory` correctly and — per the
-project's own Dockerfile — installs `bcmath`, so these two categories are not
-expected to reproduce on GitHub Actions.
-
-### Frontend
-
-```bash
-cd web && npm test -- --run src/lib/tenant-domain.test.ts   # 3 passed
-npm run build                                                 # succeeded, no errors
-```
-
-No frontend source file changed (the register page already reads the suffix from
-`tenantHostSuffix()`), so the build run is a no-regression confirmation.
+The full-suite pre-existing failures (`bcmath` extension absent in this sandbox,
+etc.) reported previously were left as-is, per instruction not to spend effort
+re-chasing unrelated failures in this pass.
 
 ---
 
-## Build / CI status
+## Security / Tenant Isolation
 
-| Check | Result |
-|---|---|
-| Focused PHP tenancy/auth suites | 77 passed |
-| Full `php artisan test` | 3664 passed / 32 failed (all pre-existing, unrelated — see above) / 39 skipped |
-| `web` vitest `tenant-domain.test.ts` | 3 passed |
-| `web` `npm run build` | Succeeded |
-| GitHub Actions `CI` / `Web CI` | Not yet run on this PR — recommended before merge, per standard protocol |
-
----
-
-## Security / Tenant Isolation verification
-
-All of the task's required negative cases are covered, either by tests that
-already existed generically (domain-agnostic — they don't hard-code `awj.app`
-in a way that would only pass for that one base domain) or by the new
-`awjdev.xyz`-specific tests added here:
-
-| Requirement | Covered by |
-|---|---|
-| Valid tenant hostname resolves the correct tenant | `TenantHostnameResolverTest::the_configured_railway_base_domain_resolves_tenants_and_rejects_lookalikes`, `TenantSubdomainAuthTest::the_same_security_boundary_holds_under_the_configured_railway_domain` |
-| Unknown tenant hostname fails closed (404, no token) | same two tests |
-| Tenant A hostname cannot resolve tenant B / tenant B credentials rejected on tenant A's host | same `TenantSubdomainAuthTest` test, plus pre-existing `tenant_b_credentials_are_rejected_through_tenant_a_hostname` (domain-agnostic) |
-| Configured base-domain matching does not trust lookalike/suffix hosts | new resolver test: `evilawjdev.xyz`, `awjdev.xyz.evil.com`, `notawjdev.xyz`, apex `awjdev.xyz` all rejected |
-| Existing canonical/non-tenant host stays compatible | new tests assert `awj.up.railway.app` stays non-tenant and can still log in the existing way, both at the resolver level and through a real HTTP login |
-| Client cannot supply `tenant_id`/hostname via headers | pre-existing `a_client_supplied_tenant_header_cannot_override_the_hostname` (domain-agnostic, still green) |
-
-No cookies were introduced or broadened — auth stays Bearer-token-in-`localStorage`,
-`supports_credentials` stays `false`. No new trust boundary was added; the existing
-Host-then-Origin resolution and fail-closed 404/403/422 behavior is exactly what's
-exercised against the new domain.
+**No security boundary changed.** This pass made no changes to
+`TenantHostnameResolver`, `IdentifyTenantHostname`, `AuthController`, `SetTenant`,
+`config/tenancy.php`, `deploy/cors.php`, or any frontend routing/auth code —
+documentation only. The Host-then-Origin resolution, fail-closed 404 on
+unknown/inactive tenants, 422-on-cross-tenant-credentials (same message as a
+wrong password), 403-on-hostname/user mismatch post-auth, and rejection of
+client-supplied `X-Tenant-*` headers all remain exactly as verified in the prior
+pass — none of that logic is affected by which runtime happens to render the
+public landing page.
 
 ---
 
-## Environment variables Safwan must add (not applied by this session)
+## Backward compatibility
 
-| Variable | Value | Service | Purpose |
-|---|---|---|---|
-| `AWJ_TENANT_BASE_DOMAIN` | `awjdev.xyz` | Railway — `Nebrax / AWJ ERP` | Backend recognizes `{slug}.awjdev.xyz` as a tenant host |
-| `NEXT_PUBLIC_TENANT_BASE_DOMAIN` | `awjdev.xyz` | Wherever `web/` (Next.js) is deployed | Registration UI suffix + any future subdomain-aware frontend logic |
-
-Optional, only if a transition period needs both bases live simultaneously:
-`AWJ_TENANT_BASE_DOMAINS=awjdev.xyz,awj.app` on the backend instead of the single
-`AWJ_TENANT_BASE_DOMAIN`.
-
-**Do not** add `awj.up.railway.app` (or any part of it) to either variable — it
-must stay a non-tenant host so the existing Railway URL keeps working exactly as
-it does today.
-
-**Separately (infrastructure, not an env var):** for a browser hitting
-`https://alrshd.awjdev.xyz` to actually see a login page, `*.awjdev.xyz` also
-needs to be attached wherever the Next.js frontend is served (currently a
-separate Vercel project) — the Railway wildcard only reaches the backend API
-container today. See the caveat above and in `deploy/DEPLOY.md`.
+**`awj.up.railway.app`:** unaffected by this correction. No base-domain
+configuration change was made or recommended. The resolver tests added in the
+prior pass (`TenantHostnameResolverTest`, `TenantSubdomainAuthTest`) already
+assert `awj.up.railway.app` stays a non-tenant host under an `awjdev.xyz`-only
+`tenancy.base_domains` config — that guarantee is untouched by this correction and
+remains true regardless of which runtime turns out to be serving
+`alrshd.awjdev.xyz`. Do not add `awj.up.railway.app` to `AWJ_TENANT_BASE_DOMAIN`
+or `AWJ_TENANT_BASE_DOMAINS` — same guidance as before, unchanged.
 
 ---
 
-## Backward compatibility notes
+## Remaining production verification
 
-- `awj.up.railway.app` was never added to any base-domain config and is proven,
-  by the new tests, to keep resolving as a non-tenant host — existing login there
-  is untouched.
-- `*.store.awjdev.xyz` / `StorefrontDomain` — untouched. `store` and `storefront`
-  remain reserved slugs on the ERP base domain (unchanged from PR #780); this task
-  did not read or modify `StorefrontDomain`, `HostnameNormalizer`'s storefront
-  path, or `config/storefront.php`.
-- No migration. `tenants.slug` (already unique) is the only source of truth, same
-  as before.
-- Local development and the SQLite test suite are unaffected — `awj.app` stays the
-  compiled-in default; nothing behaves differently unless `AWJ_TENANT_BASE_DOMAIN`
-  is actually set.
+Once Safwan applies `AWJ_TENANT_BASE_DOMAIN=awjdev.xyz` (backend) and
+`NEXT_PUBLIC_TENANT_BASE_DOMAIN=awjdev.xyz` (frontend), the following should be
+verified live — none of this is proven yet, only the code contract that should
+produce it:
 
----
-
-## Risks / remaining work
-
-1. **Frontend wildcard not attached.** As above — setting the Railway env var
-   alone does not make `https://alrshd.awjdev.xyz` show a login page. This is
-   explicitly Safwan's infra step, not a code gap.
-2. **No post-registration redirect to the tenant subdomain**, by design (inherited
-   from PR #780's own decision): the auth token is stored in `localStorage`, which
-   is origin-scoped. Redirecting straight to `https://{slug}.{base}` after
-   registration would drop the just-issued session and force an immediate second
-   login — a UX regression, not an improvement — unless a deliberate one-time
-   token-handoff mechanism is designed (out of scope here; flagged, not built,
-   per the task's "do not redesign the page" instruction).
-3. **`bcmath` PHP extension absent in this sandbox** masked 26 Fuel-module test
-   results during the full-suite run; confirmed unrelated to this diff and
-   expected to run fine in CI (Dockerfile installs it), but worth Safwan's
-   awareness if the same sandbox is reused for other work.
-4. Custom ERP domains, ZATCA Phase 2, and anything Storefront-related remain
-   explicitly out of scope, unchanged.
+1. `https://alrshd.awjdev.xyz` — a real API call from that origin (e.g.
+   submitting the login form for a user belonging to tenant `alrshd`) is
+   recognized as tenant `alrshd` by the backend (check via a successful login
+   response, or inspect that `HostnameTenantContext` is set — not observable from
+   outside, so a functional login test is the practical check).
+2. Confirm explicitly that step 1 still shows the **generic landing page** on
+   first load at `/` — that is expected, not a bug — and that tenant recognition
+   only becomes observable once a form actually calls the API from that origin.
+   Do not treat continued display of the landing page as a failure, and do not
+   treat it as proof of success either — only an actual login/API round trip
+   confirms resolution.
+3. An unknown tenant hostname (e.g. `https://does-not-exist.awjdev.xyz`) fails
+   closed — a login attempt from that origin returns 404, not a guess or a
+   fallback to non-tenant mode.
+4. A lookalike hostname (e.g. `https://evilawjdev.xyz` or
+   `https://awjdev.xyz.example.com`, if reachable at all under whatever DNS
+   exists for them) is never treated as a tenant host — already proven at the
+   code level by the added tests; worth a live spot-check only if such a host is
+   actually reachable.
+5. `https://awj.up.railway.app` continues to work exactly as it does today
+   (non-tenant login path) — unaffected by any of the above.
 
 ---
 
-## Git information
+## Git
 
 | Field | Value |
 |---|---|
+| PR | [#816](https://github.com/safwan5001-source/Nebrax/pull/816) |
 | Branch | `claude/awj-tenant-subdomains-ebdop5` |
-| Base | `origin/main` @ `d9b88d6` |
-| PR | Not created yet in this session — see next step |
+| Base SHA | `d9b88d6` (`origin/main`) |
+| Previous head SHA | `29d6f12` (tests + docs + `setup.sh` parity fix) |
+| Updated head SHA | set after this correction commit — see PR for current tip |
 | Merge | **not performed** |
 | Deploy | **not performed** |
 
 ---
 
-## Next recommended step
+## Next step
 
-1. Push this branch and open a PR against `main` (not merged, per instructions).
-2. Wait for GitHub CI (`ci.yml` PHP on SQLite + PostgreSQL, `web-ci.yml`) to go
-   green — the local `bcmath`/assembly gaps found here are not expected to
-   reproduce there, but confirm.
-3. Safwan adds `AWJ_TENANT_BASE_DOMAIN=awjdev.xyz` on the Railway backend service
-   and `NEXT_PUBLIC_TENANT_BASE_DOMAIN=awjdev.xyz` wherever `web/` is deployed.
-4. Separately, attach `*.awjdev.xyz` to the frontend's hosting project (Vercel or
-   otherwise) so the wildcard actually reaches a login page, not just the API.
-5. Only after 2–4: manually verify `https://alrshd.awjdev.xyz` end-to-end (real
-   tenant resolves, unknown slug 404s, cross-tenant login rejected) before
-   considering this production-ready.
+Do not merge or deploy. Waiting on Safwan's review and approval, and on Safwan
+to apply the two environment variables above wherever the respective runtimes
+actually run (their identity not being provable from this repository alone).

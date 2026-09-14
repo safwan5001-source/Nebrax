@@ -49,14 +49,23 @@ web
 > `awj.app` و`*.awj.app` كدومينات للمشروع `web/` بعد ضبط DNS/TLS. التفاصيل في
 > `docs/plans/tenancy/AWJ_TENANT_SUBDOMAIN_V1_IMPLEMENTATION_REPORT.md`. لا توسّع الكوكي إلى `.awj.app`.
 
-> **بيئة Railway الحالية (`*.awjdev.xyz`):** الويلدكارد اليوم مُوجَّه فقط إلى خدمة
-> Railway للـ backend (JSON API)، وليس إلى هذا المشروع (Next.js). ليعرض
-> `https://<slug>.awjdev.xyz` فعلياً صفحة دخول، على **صفوان** أيضاً إضافة
-> `*.awjdev.xyz` كدومين على مشروع Vercel هذا (أو نشر `web/` على خدمة تصلها هذه
-> الشبكة)، وضبط `NEXT_PUBLIC_TENANT_BASE_DOMAIN=awjdev.xyz` هنا. بدون ذلك يبقى
-> السلوك الحالي كما هو (الدخول عبر مضيف الواجهة الحالي، والـ API يفرض حدود
-> المستأجر على مستوى Host/Origin كما توثّقه
-> `docs/plans/tenancy/AWJ_TENANT_SUBDOMAIN_RAILWAY_AWJDEV_REPORT.md`).
+> **بيئة Railway الحالية (`*.awjdev.xyz`) — مُصحَّح بدليل حيّ:** صياغة سابقة هنا
+> افترضت أن الويلدكارد يصل فقط إلى backend الـ API وأن Vercel لا بد أن يستقبله
+> منفصلاً. **دليل حيّ يبطل هذا الافتراض:** `https://alrshd.awjdev.xyz` يعرض
+> فعلياً صفحة AWJ العامة (الهبوط) عبر HTTPS بنجاح — فالطلب يصل إلى خدمة قادرة
+> على تقديم HTML كامل، أياً كانت. **لا يثبت المستودع أي هذه الخدمة فعلياً**
+> (لا Dockerfile لهذا المشروع، ولا دليل نشر حالي غير `web/vercel.json` الموثّق
+> أعلاه) — فلا تفترض Vercel تحديداً ولا تطلب أي تغيير نطاق بناءً على ذلك.
+>
+> **ما لم يثبته ظهور الصفحة:** الصفحة المعروضة هي صفحة الهبوط العامة نفسها بلا
+> فرق حسب المضيف — هذا متوقّع لأن `web/` لا يحمل `middleware.ts` ولا أي منطق
+> توجيه يقرأ hostname الطلب، و`NEXT_PUBLIC_TENANT_BASE_DOMAIN` يُستهلَك هنا في
+> مكان واحد فقط (لاحقة `صفحة الدخول` في شاشة التسجيل)، بلا أثر على التوجيه. فضبط
+> `NEXT_PUBLIC_TENANT_BASE_DOMAIN=awjdev.xyz` **لن يغيّر** ما تعرضه `/` على هذا
+> المضيف. حسم المستأجر الفعلي يحدث على مستوى الـ backend فقط (Host ثم Origin،
+> `TenantHostnameResolver`) عند نداء API حقيقي (مثل تسجيل الدخول)، لا عبر أي
+> صفحة تُعرَض — انظر التفصيل الكامل في
+> `docs/plans/tenancy/AWJ_TENANT_SUBDOMAIN_RAILWAY_AWJDEV_REPORT.md`.
 
 ## التحقق محلياً قبل النشر
 
