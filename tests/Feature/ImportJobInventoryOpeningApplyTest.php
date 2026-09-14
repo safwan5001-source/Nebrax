@@ -366,29 +366,6 @@ class ImportJobInventoryOpeningApplyTest extends TestCase
 
         app(TenantContext::class)->set($tenantId);
         $token = $this->tokenForRole($tenantId, 'owner', 'owner@io-lock.test');
-        $warehouse = Warehouse::create(['name' => 'مستودع القفل', 'code' => 'WH-LOCK']);
-
-        // بلا أحداث النموذج عمداً: `Product::booted()` يطالب بـ SKU عبر
-        // `SkuRegistryEntry::claim()`، وهذا يقفل صفّ المستأجر (`lockTenantAnchor()`)
-        // حتى نهاية معاملة الاختبار (RefreshDatabase لا تلتزم إلا في tearDown) —
-        // قفلٌ صحيحٌ ومقصود في الإنتاج (يُغلَق فوراً مع التزام الطلب الحقيقي)، لكنه
-        // هنا يتصادم مع اتصال `rival` اللاحق الذي يفحص قفلاً حقيقياً مختلفاً تماماً
-        // (`import_jobs`)، فيُفشل الاختبار بمهلة القفل القصيرة (200ms) المخصَّصة
-        // لتلك الفحصة وحدها. هذا المنتج لا يُختبَر تسجيله في سجلّ الـSKU إطلاقاً —
-        // مطابقة الاستيراد تقرأ `products.sku` مباشرة (`InventoryOpeningImportService`)
-        // — فتخطّي الحدث هنا آمنٌ ولا يغيّر ما يفحصه الاختبار.
-        Product::withoutEvents(function () use ($tenantId) {
-            // `withoutEvents()` يعطّل أحداث النموذج كلها، بما فيها `BelongsToTenant`
-            // (تعبئة `tenant_id` من السياق) — فنعوّضها صراحةً هنا؛ المقصود تعطيله
-            // وحده هو حدث `saved()` الذي يطالب بـ SKU عبر `SkuRegistryEntry::claim()`
-            // (انظر التعليق أعلاه). توليد `id` عبر `HasUuids` ليس حدثاً بل جزءٌ من
-            // `Model::performInsert()` نفسه، فيبقى يعمل بلا تأثّر.
-            Product::create([
-                'tenant_id' => $tenantId,
-                'name' => 'صنف القفل', 'sku' => 'SKU-LOCK', 'type' => 'good',
-                'sale_price' => 1000, 'track_inventory' => true,
-            ]);
-        });
 
         $file = $this->csv(['sku', 'warehouse', 'opening_quantity', 'opening_unit_cost'], [['SKU-LOCK', 'WH-LOCK', '10', '5.00']]);
         $contents = file_get_contents($file->getRealPath());
@@ -397,6 +374,14 @@ class ImportJobInventoryOpeningApplyTest extends TestCase
         $storagePath = "imports/{$tenantId}/{$jobId}/original.csv";
         Storage::disk('local')->put($storagePath, $contents);
 
+        // `$rival`'s FK-referencing insert must run before any Eloquent write
+        // on the default connection that claims this tenant's SKU-registry
+        // anchor lock (`SkuRegistryEntry::lockTenantAnchor()`, fired from
+        // `Product::create()`'s `saved` hook) — that lock is a real Postgres
+        // `FOR UPDATE` held for the rest of this test's still-open
+        // `RefreshDatabase` transaction, and would otherwise starve `$rival`'s
+        // own `FOR KEY SHARE` FK check on the same tenant row past its
+        // 200ms `lock_timeout`, unrelated to the actual row lock under test.
         $rival->table('import_jobs')->insert([
             'id' => $jobId,
             'tenant_id' => $tenantId,
@@ -414,6 +399,12 @@ class ImportJobInventoryOpeningApplyTest extends TestCase
             'processed_rows' => 0,
             'created_at' => now(),
             'updated_at' => now(),
+        ]);
+
+        $warehouse = Warehouse::create(['name' => 'مستودع القفل', 'code' => 'WH-LOCK']);
+        Product::create([
+            'name' => 'صنف القفل', 'sku' => 'SKU-LOCK', 'type' => 'good',
+            'sale_price' => 1000, 'track_inventory' => true,
         ]);
 
         $blocked = false;

@@ -6,6 +6,7 @@ use App\Tenancy\CompanyWide;
 use App\Tenancy\ResolvesBranchReferences;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * قيمة واحدة لخيار منتج (أسود لخيار اللون، XL لخيار المقاس). تنتمي لخيارٍ
@@ -49,5 +50,11 @@ class ProductOptionValue extends BaseModel implements CompanyWide
             'product_option_value_id',
             'product_variant_id',
         );
+    }
+
+    /** وسائط هذه القيمة (VAR-MEDIA-1) — يرثها كل متغيّرٍ يختارها. */
+    public function media(): HasMany
+    {
+        return $this->hasMany(ProductMedia::class, 'product_option_value_id');
     }
 }

@@ -355,24 +355,6 @@ class ImportJobWorkbookApplyTest extends TestCase
         app(TenantContext::class)->set($tenantId);
         $token = $this->tokenForRole($tenantId, 'owner', 'owner@wb-lock.test');
 
-        // بلا أحداث النموذج عمداً، لا عبر `createProduct()` — نفس سبب
-        // `ImportJobInventoryOpeningApplyTest::a_concurrent_apply_attempt_is_blocked_by_a_real_row_lock`
-        // حرفياً: `Product::booted()` يطالب بـ SKU عبر `SkuRegistryEntry::claim()`،
-        // فيقفل صفّ المستأجر (`lockTenantAnchor()`) حتى نهاية معاملة الاختبار —
-        // قفلٌ صحيحٌ ومقصود في الإنتاج، لكنه يتصادم هنا مع اتصال `rival` اللاحق
-        // الذي يفحص قفلاً حقيقياً مختلفاً تماماً (`import_jobs`). هذا الاختبار لا
-        // يفحص مسار الإنشاء عبر الـAPI أصلاً (تفحصه اختبارات أخرى في هذا الملف) —
-        // فتخطّي الحدث هنا آمنٌ ولا يغيّر ما يفحصه الاختبار.
-        // `id` ليس ضمن `$fillable`، فالاعتماد على قيمةٍ مُمرَّرة له عبر `create()`
-        // غير موثوق — نلتقط النموذج الفعلي المُنشأ بدل افتراض مُعرّفه.
-        $createdProduct = Product::withoutEvents(function () use ($tenantId) {
-            return Product::create([
-                'tenant_id' => $tenantId,
-                'name' => 'منتج قائم', 'sku' => 'SKU-WB-LOCK', 'type' => 'good', 'sale_price' => 10000,
-            ]);
-        });
-        $product = ['id' => $createdProduct->id, 'sku' => $createdProduct->sku];
-
         $priceListId = (string) Str::uuid();
         $rival->table('price_lists')->insert([
             'id' => $priceListId,
@@ -383,13 +365,22 @@ class ImportJobWorkbookApplyTest extends TestCase
             'updated_at' => now(),
         ]);
 
-        $file = $this->barcodeAndPriceWorkbook($product['sku']);
+        $file = $this->barcodeAndPriceWorkbook('SKU-WB-LOCK');
         $contents = file_get_contents($file->getRealPath());
         $sha256 = hash('sha256', $contents);
         $jobId = (string) Str::uuid();
         $storagePath = "imports/{$tenantId}/{$jobId}/original.xlsx";
         Storage::disk('local')->put($storagePath, $contents);
 
+        // `$rival`'s FK-referencing inserts above/below must run before any
+        // Eloquent write on the default connection that claims this tenant's
+        // SKU-registry anchor lock (`SkuRegistryEntry::lockTenantAnchor()`,
+        // fired from `Product::create()`'s `saved` hook via `createProduct()`
+        // below) — that lock is a real Postgres `FOR UPDATE` held for the
+        // rest of this test's still-open `RefreshDatabase` transaction, and
+        // would otherwise starve `$rival`'s own `FOR KEY SHARE` FK checks on
+        // the same tenant row past its 200ms `lock_timeout`, unrelated to
+        // the actual row lock under test.
         $rival->table('import_jobs')->insert([
             'id' => $jobId,
             'tenant_id' => $tenantId,
@@ -408,6 +399,8 @@ class ImportJobWorkbookApplyTest extends TestCase
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+
+        $product = $this->createProduct($token, ['sku' => 'SKU-WB-LOCK']);
 
         $blocked = false;
         ImportJob::saving(function ($model) use ($jobId, $rival, &$blocked) {

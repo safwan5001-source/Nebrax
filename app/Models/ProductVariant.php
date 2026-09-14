@@ -95,4 +95,10 @@ class ProductVariant extends BaseModel implements CompanyWide
             'product_option_value_id',
         )->withPivot('product_option_id')->orderBy('product_option_values.sort_order');
     }
+
+    /** وسائط هذا المتغيّر بعينه (VAR-MEDIA-1) — إضافةٌ/تجاوزٌ فوق ما يرثه من قيم خياراته. */
+    public function media(): HasMany
+    {
+        return $this->hasMany(ProductMedia::class, 'product_variant_id');
+    }
 }
