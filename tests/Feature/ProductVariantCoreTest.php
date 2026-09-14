@@ -237,6 +237,88 @@ class ProductVariantCoreTest extends TestCase
         $this->assertCount(1, $result['failed']);
     }
 
+    /**
+     * معاينة التركيبات تعرض القيم الفعّالة فقط، لكن ذلك تصفيةٌ في الواجهة لا
+     * سلطة — معرّف قيمةٍ معطَّلة مُرسَلٌ مباشرةً عبر الـ API يجب أن يُرفض من
+     * الخدمة نفسها، لا أن يمرّ لأن الواجهة "لا تعرضه" عادةً.
+     *
+     * @test
+     */
+    public function a_variant_cannot_use_an_inactive_option_value(): void
+    {
+        $auth = $this->registerTenant();
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $product = $this->createSimpleProduct($auth['token']);
+        $this->enableVariants($auth['token'], $product['id']);
+        $color = $this->addOption($auth['token'], $product['id'], 'اللون');
+        $black = $this->addValue($auth['token'], $product['id'], $color['id'], 'أسود');
+
+        $this->withToken($auth['token'])
+            ->putJson("/api/products/{$product['id']}/options/{$color['id']}/values/{$black['id']}", ['is_active' => false])
+            ->assertOk();
+
+        $service = app(ProductVariantService::class);
+        $productModel = Product::find($product['id']);
+
+        $result = $service->createVariants($productModel, [[$black['id']]], null);
+
+        $this->assertCount(0, $result['created']);
+        $this->assertCount(1, $result['failed']);
+        $this->assertSame(0, ProductVariant::where('product_id', $product['id'])->count());
+    }
+
+    /**
+     * نفس المنطق على مستوى الخيار كلّه: قيمةٌ فعّالة لكن مالكها (الخيار)
+     * معطَّل لا تصلح لتركيبةٍ جديدة. تعطيل الخيار يُخرجه من تغطية الخيارات
+     * الفعّالة المطلوبة، فالفحص القائم على "التغطية" وحده لا يكفي — يجب رفض
+     * القيمة صراحةً حتى لو أُرسلت رغم ذلك.
+     *
+     * @test
+     */
+    public function a_variant_cannot_use_a_value_belonging_to_an_inactive_option(): void
+    {
+        $auth = $this->registerTenant();
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $product = $this->createSimpleProduct($auth['token']);
+        $this->enableVariants($auth['token'], $product['id']);
+        $color = $this->addOption($auth['token'], $product['id'], 'اللون');
+        $black = $this->addValue($auth['token'], $product['id'], $color['id'], 'أسود');
+
+        $this->withToken($auth['token'])
+            ->putJson("/api/products/{$product['id']}/options/{$color['id']}", ['is_active' => false])
+            ->assertOk();
+
+        $service = app(ProductVariantService::class);
+        $productModel = Product::find($product['id']);
+
+        $result = $service->createVariants($productModel, [[$black['id']]], null);
+
+        $this->assertCount(0, $result['created']);
+        $this->assertCount(1, $result['failed']);
+        $this->assertSame(0, ProductVariant::where('product_id', $product['id'])->count());
+    }
+
+    /** انضباطٌ لا انحصار: تركيبةٌ عادية بخيارات/قيم فعّالة بالكامل تُنشأ بلا مشكلة. */
+    /** @test */
+    public function an_all_active_combination_still_succeeds(): void
+    {
+        $auth = $this->registerTenant();
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $product = $this->createSimpleProduct($auth['token']);
+        $this->enableVariants($auth['token'], $product['id']);
+        $color = $this->addOption($auth['token'], $product['id'], 'اللون');
+        $black = $this->addValue($auth['token'], $product['id'], $color['id'], 'أسود');
+
+        $service = app(ProductVariantService::class);
+        $productModel = Product::find($product['id']);
+
+        $result = $service->createVariants($productModel, [[$black['id']]], null);
+
+        $this->assertCount(1, $result['created']);
+        $this->assertCount(0, $result['failed']);
+        $this->assertSame(1, ProductVariant::where('product_id', $product['id'])->count());
+    }
+
     // ───────────────────────── فضاء SKU الموحّد ─────────────────────────
 
     /** @test */

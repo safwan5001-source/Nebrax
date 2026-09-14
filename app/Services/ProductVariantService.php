@@ -628,6 +628,16 @@ class ProductVariantService
             if ($option === null || $option->product_id !== $product->id) {
                 throw new RuntimeException('لا يمكن استعمال قيمة خيارٍ لا تخصّ هذا المنتج.');
             }
+            // معاينة التركيبات تعرض القيم/الخيارات الفعّالة فقط، لكن معرّفاً
+            // مُرسَلاً مباشرةً عبر الـ API يتجاوز تلك الواجهة — فالتحقّق هنا
+            // وحده هو السلطة الفعلية. قيمةٌ أو خيارٌ معطَّل يبقى قابلاً للحلّ
+            // تاريخياً (لا يُحذف)، لكنه ليس مؤهَّلاً لتركيبة *جديدة* أبداً.
+            if (! $option->is_active) {
+                throw new RuntimeException('لا يمكن استعمال خيارٍ معطَّل لإنشاء متغيّرٍ جديد.');
+            }
+            if (! $value->is_active) {
+                throw new RuntimeException('لا يمكن استعمال قيمةٍ معطَّلة لإنشاء متغيّرٍ جديد.');
+            }
             if (isset($seenOptions[$option->id])) {
                 throw new RuntimeException('لا يمكن اختيار قيمتين من الخيار نفسه لمتغيّرٍ واحد.');
             }

@@ -2,7 +2,8 @@
 
 ## Status
 
-**PASS.** Round 2 closed both remaining review items from Round 1:
+**PASS.** Round 2 closed both remaining review items from Round 1, and Round 3 closed
+one further server-side integrity gap found in review:
 
 1. The documented residual SKU-authority edge case (branch-isolated Product vs.
    company-wide Variant/Product) is now closed as an **integrity/registry
@@ -14,6 +15,91 @@
    explicit multi-select bulk activate/deactivate, a Variant detail side-sheet
    (full-screen on mobile via the same `Sheet` component), and keyboard
    Enter-to-add-value entry — backed by 10 new targeted frontend tests.
+3. **(Round 3)** `ProductVariantService::resolveAndValidateValues()` now rejects an
+   inactive `ProductOptionValue`, or a value belonging to an inactive `ProductOption`,
+   when creating a new Variant — closing a gap where the combinations-preview UI
+   filtered to active configuration, but a caller submitting option-value UUIDs
+   directly to the API was not stopped from selecting deactivated configuration.
+
+## Round 3 — inactive option/value integrity fix
+
+**Finding:** `resolveAndValidateValues()` verified product/tenant ownership, rejected
+duplicate-option selections, and required full coverage of *active* Options — but
+never checked whether an individual selected `ProductOptionValue`, or its owning
+`ProductOption`, was itself `is_active`. The combinations-preview endpoint
+(`combinationsMatrix()`) already filters to active options/values only, but that is a
+UI convenience, not a server authority: a caller could submit a deactivated value's
+UUID directly to `POST products/{id}/variants` and it would silently be accepted, as
+long as the (separately-computed) active-option coverage check still passed.
+
+**Fix (smallest safe change, one file):** two explicit checks added to the per-value
+loop in `resolveAndValidateValues()`, before the existing duplicate-option check —
+an inactive `ProductOption` or an inactive `ProductOptionValue` is now rejected with
+the same fail-closed `RuntimeException` → 422 pattern already used by every other rule
+in that method. Nothing else changed: ownership/tenant checks, duplicate-option
+rejection, active-option coverage, the server-derived order-independent
+`combination_key`, and the "no automatic Cartesian persistence" workflow are all
+untouched. No schema/migration change; no inventory/pricing/media/document/POS/
+Commerce change; no accounting change; no change to the Round 2 SKU concurrency
+solution or branch-isolation SKU behavior. Deactivated Options/Values remain
+resolvable for existing/historical Variants (lifecycle semantics unchanged) — they
+are only barred from *new* combination creation.
+
+No documented business contract requires inactive option/value acceptance at
+creation time (checked `AWJ_PRODUCT_VARIANTS_VAR_CORE_1_PLAN.md` and
+`AWJ_PRODUCT_VARIANTS_VAR_ARCH_1.md` — neither mentions `is_active` in the creation
+path; the plan's own combination-generation invariant already assumes *active*
+options/values are the population to draw from). Treated as a straightforward
+integrity fix, not a policy question — proceeded without stopping.
+
+**Files changed:**
+- `app/Services/ProductVariantService.php` — the two-check addition above.
+- `tests/Feature/ProductVariantCoreTest.php` — 3 new tests (see below). No existing
+  test was weakened or rewritten.
+
+**New tests:**
+- `a_variant_cannot_use_an_inactive_option_value` — creates an option/value,
+  deactivates the value via `PUT .../values/{id}`, then attempts to create a variant
+  with it → rejected, zero variants created.
+- `a_variant_cannot_use_a_value_belonging_to_an_inactive_option` — deactivates the
+  *option* (not the value) via `PUT .../options/{id}`, then attempts to create a
+  variant with one of its (still-active) values → rejected, zero variants created.
+- `an_all_active_combination_still_succeeds` — regression guard proving an ordinary
+  all-active combination is unaffected and still creates a variant.
+
+**Test results:**
+- Targeted (3 new tests), SQLite: **3/3 passing**, 23 assertions.
+- Full `ProductVariantCoreTest`, SQLite: **31/31 passing** (was 28; +3 new), 233
+  assertions — no existing test changed behavior.
+- Full `ProductVariantCoreTest`, PostgreSQL 16 (real, local): **31/31 passing**.
+- `ProductVariantPostgresConcurrencyTest`, PostgreSQL 16 (real, fork-based): run
+  together with the full `ProductVariantCoreTest` class — **34/34 passing** as one
+  combined run (this fix only touches request-time validation before any DB write or
+  lock is taken, so it cannot affect the combination-race or SKU-race paths; run
+  anyway for direct confirmation). One isolated re-run of the third concurrency test
+  (`a_registry_claim_racing_a_branch_isolated_product_for_the_same_sku_leaves_exactly_one_winner`)
+  showed a single transient failure (`2 is identical to 1` — both sides of the fork
+  raced past the barrier and briefly appeared to both win) when run back-to-back with
+  the full `ProductVariantCoreTest` class under load; three immediate isolated re-runs
+  and one further combined re-run all passed cleanly. This is consistent with a
+  timing-sensitive flake in the fork/barrier harness under CPU contention, not a
+  regression from this change — the fix touches none of the SKU-registry or locking
+  code paths that test exercises. Final combined run before commit: **34/34 passing**.
+- Broader `--filter=Product` regression, PostgreSQL 16: **not required** by this
+  round's instructions given the targeted 34/34 pass was already sufficient, and
+  explicitly not to be treated as the primary verification — but a run was already
+  in flight from an earlier step in this session and completed on its own (121s)
+  before being told to stop further waiting: **407 passed, 2 failed** (2,412
+  assertions). Both failures are the same pre-existing, environment-level issues
+  already documented in this report (`ApiInventoryTest` —
+  `App\Support\Inventory\MovementSourceResolver` not found, a `setup.sh` copy gap;
+  `FuelReconciliationTest` — missing `bcmath` extension in this container) — present
+  on `main` independent of this branch, not touched by this fix. Reported here as
+  informational corroboration only, not as the round's required verification, per
+  instruction not to rely on or wait for broader/full suite runs this round.
+- Full unfiltered backend suite: **not run this round** (per explicit instruction not
+  to restart it); still an open item noted from Round 2.
+- Frontend: unaffected — no frontend file changed in this round.
 
 ## What was implemented
 
@@ -501,6 +587,7 @@ Branch: claude/var-core-1-product-variants-b9hdzf
 Base SHA: ba621e66fb0254c1261468f6ab63bd8eb8d40d02
 Round 1 Head SHA: 25c2466d9acd800d42e45c934389836552b88531
 Round 2 Head SHA: e8e37a4f84bbe3fcd9b63f2726efdef24b6f95a0
+Round 3 Head SHA: (recorded at the commit that includes this report update)
 PR: https://github.com/safwan5001-source/Nebrax/pull/806 — NOT merged.
 ```
 
