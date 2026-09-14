@@ -1,5 +1,7 @@
 "use server";
 
+import { createHash } from "node:crypto";
+import { getAwjCartToken } from "@/lib/commerce/cart-cookies";
 import {
   type AwjAddressInput,
   type AwjContactInput,
@@ -43,6 +45,29 @@ export async function getAwjCheckout(): Promise<StorefrontCheckout | null> {
   } catch {
     return null;
   }
+}
+
+/**
+ * A stable, opaque identity for "the checkout this browser is currently
+ * working on" — used purely client-side to scope a persisted
+ * Idempotency-Key so it survives a reload for the *same* checkout attempt
+ * without leaking across genuinely different ones (see
+ * `@/lib/commerce/checkout-idempotency`).
+ *
+ * The backend never exposes a `CommerceCheckout` id to the storefront
+ * (COM-CHECKOUT-1A/1B — same convention as `AwjCart` carrying no cart id),
+ * and `awj_cart_token` itself is HttpOnly, so client JS cannot read it
+ * directly. This returns a one-way SHA-256 hash of that token instead —
+ * safe to hand to the client (it cannot be reversed into the token) while
+ * still changing exactly when the cart identity changes (a new guest
+ * session, an expired cart replaced by a new one). `null` when there is no
+ * cart token at all (nothing to key a persisted key to).
+ */
+export async function getAwjCheckoutIdentity(): Promise<string | null> {
+  const token = await getAwjCartToken();
+  if (!token) return null;
+
+  return createHash("sha256").update(token).digest("hex");
 }
 
 /**
@@ -107,8 +132,9 @@ function isReviewRequiredDetails(
 /**
  * Completes the checkout. `idempotencyKey` MUST be generated once per
  * logical attempt by the caller (a client component — see
- * `generateIdempotencyKey` in `AwjCheckoutFlow`) and reused verbatim on any
- * retry of that same attempt; this function never generates or alters it.
+ * `resolveIdempotencyKey` in `@/lib/commerce/checkout-idempotency`, which
+ * also persists it across a reload) and reused verbatim on any retry of
+ * that same attempt; this function never generates or alters it.
  *
  * A `409 review_required` failure is **not** collapsed into a generic
  * error: it is returned as its own `kind` carrying the backend's

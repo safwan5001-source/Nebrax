@@ -25,6 +25,11 @@ const mockActions = vi.hoisted(() => ({
   updateAwjAddress: vi.fn(),
   updateAwjDelivery: vi.fn(),
   completeAwjCheckoutAction: vi.fn(),
+  // Fixed by default — real localStorage-backed persistence
+  // (`@/lib/commerce/checkout-idempotency`) is exercised for real via
+  // jsdom's real `localStorage`, not mocked, so these tests prove actual
+  // reload/retry/new-checkout/cleanup behavior rather than a mock's say-so.
+  getAwjCheckoutIdentity: vi.fn().mockResolvedValue("identity-a"),
 }));
 
 vi.mock("@/lib/data/awj-checkout", () => mockActions);
@@ -149,6 +154,8 @@ describe("AwjCheckoutFlow", () => {
     for (const mock of Object.values(mockActions)) {
       mock.mockReset();
     }
+    mockActions.getAwjCheckoutIdentity.mockResolvedValue("identity-a");
+    localStorage.clear();
   });
 
   it("creates/resumes the checkout on mount via the real backend API, not client-side totals", async () => {
@@ -413,6 +420,257 @@ describe("AwjCheckoutFlow", () => {
     await waitFor(() => {
       expect(mockActions.updateAwjDelivery).toHaveBeenCalledWith("pickup");
       expect(mockActions.updateAwjDelivery.mock.calls[0]).toHaveLength(1);
+    });
+  });
+
+  describe("Idempotency-Key persistence across reload", () => {
+    async function completeOnceAndCaptureKey(
+      user: ReturnType<typeof userEvent.setup>,
+    ): Promise<string> {
+      mockActions.startOrResumeAwjCheckout.mockResolvedValue({
+        success: true,
+        checkout: checkoutWith(),
+      });
+      mockActions.updateAwjContact.mockResolvedValue({
+        success: true,
+        checkout: checkoutWith({ contact: sampleOrder.contact }),
+      });
+      mockActions.updateAwjAddress.mockResolvedValue({
+        success: true,
+        checkout: checkoutWith({ contact: sampleOrder.contact }),
+      });
+      mockActions.updateAwjDelivery.mockResolvedValue({
+        success: true,
+        checkout: checkoutWith({
+          contact: sampleOrder.contact,
+          delivery: {
+            amount: { amount_minor: 0, currency: "SAR" },
+            method: "pickup",
+            address: checkoutWith().delivery.address,
+          },
+        }),
+      });
+      mockActions.completeAwjCheckoutAction.mockResolvedValue({
+        success: false,
+        kind: "error",
+        message: "transient failure — response lost",
+      });
+
+      const { unmount } = render(<AwjCheckoutFlow />);
+      await fillDetailsAndContinue(user);
+      await screen.findByText("awjCheckout.review.heading");
+      await user.click(
+        screen.getByRole("button", { name: "awjCheckout.completeOrder" }),
+      );
+      await waitFor(() =>
+        expect(mockActions.completeAwjCheckoutAction).toHaveBeenCalledTimes(1),
+      );
+
+      const [key] = mockActions.completeAwjCheckoutAction.mock.calls[0];
+      unmount(); // simulate the tab/page going away before the next render below
+      return key as string;
+    }
+
+    it("a remount for the same checkout identity (reload) sends the same Idempotency-Key as before — a lost success response can still replay", async () => {
+      const user = userEvent.setup();
+      const firstKey = await completeOnceAndCaptureKey(user);
+
+      // Simulate a page reload: unmount, then mount fresh. Same identity
+      // ("identity-a", the mock default) — the checkout was never confirmed
+      // successful, so nothing was cleared.
+      mockActions.completeAwjCheckoutAction.mockClear();
+      mockActions.startOrResumeAwjCheckout.mockResolvedValue({
+        success: true,
+        checkout: checkoutWith({ contact: sampleOrder.contact }),
+      });
+      mockActions.completeAwjCheckoutAction.mockResolvedValue({
+        success: true,
+        order: sampleOrder,
+        replayed: true, // the earlier attempt actually succeeded server-side
+      });
+
+      render(<AwjCheckoutFlow />);
+      const user2 = userEvent.setup();
+      await fillDetailsAndContinue(user2);
+      await screen.findByText("awjCheckout.review.heading");
+      await user2.click(
+        screen.getByRole("button", { name: "awjCheckout.completeOrder" }),
+      );
+
+      await waitFor(() =>
+        expect(mockActions.completeAwjCheckoutAction).toHaveBeenCalledTimes(1),
+      );
+      const [secondKey] = mockActions.completeAwjCheckoutAction.mock.calls[0];
+      expect(secondKey).toBe(firstKey);
+      await screen.findByText("awjCheckout.success.heading");
+    });
+
+    it("a different checkout identity (genuinely new checkout) never reuses the previous identity's persisted key", async () => {
+      const user = userEvent.setup();
+      const firstKey = await completeOnceAndCaptureKey(user);
+
+      mockActions.completeAwjCheckoutAction.mockClear();
+      mockActions.getAwjCheckoutIdentity.mockResolvedValue("identity-b");
+      mockActions.startOrResumeAwjCheckout.mockResolvedValue({
+        success: true,
+        checkout: checkoutWith(),
+      });
+      mockActions.completeAwjCheckoutAction.mockResolvedValue({
+        success: true,
+        order: sampleOrder,
+        replayed: false,
+      });
+
+      render(<AwjCheckoutFlow />);
+      const user2 = userEvent.setup();
+      await fillDetailsAndContinue(user2);
+      await screen.findByText("awjCheckout.review.heading");
+      await user2.click(
+        screen.getByRole("button", { name: "awjCheckout.completeOrder" }),
+      );
+
+      await waitFor(() =>
+        expect(mockActions.completeAwjCheckoutAction).toHaveBeenCalledTimes(1),
+      );
+      const [secondKey] = mockActions.completeAwjCheckoutAction.mock.calls[0];
+      expect(secondKey).not.toBe(firstKey);
+    });
+
+    it("clicking Complete twice within the same mount (retry) sends the identical key both times", async () => {
+      const user = userEvent.setup();
+      mockActions.startOrResumeAwjCheckout.mockResolvedValue({
+        success: true,
+        checkout: checkoutWith(),
+      });
+      mockActions.updateAwjContact.mockResolvedValue({
+        success: true,
+        checkout: checkoutWith({ contact: sampleOrder.contact }),
+      });
+      mockActions.updateAwjAddress.mockResolvedValue({
+        success: true,
+        checkout: checkoutWith({ contact: sampleOrder.contact }),
+      });
+      mockActions.updateAwjDelivery.mockResolvedValue({
+        success: true,
+        checkout: checkoutWith({
+          contact: sampleOrder.contact,
+          delivery: {
+            amount: { amount_minor: 0, currency: "SAR" },
+            method: "pickup",
+            address: checkoutWith().delivery.address,
+          },
+        }),
+      });
+      mockActions.completeAwjCheckoutAction
+        .mockResolvedValueOnce({
+          success: false,
+          kind: "error",
+          message: "transient",
+        })
+        .mockResolvedValueOnce({
+          success: true,
+          order: sampleOrder,
+          replayed: false,
+        });
+
+      render(<AwjCheckoutFlow />);
+      await fillDetailsAndContinue(user);
+      await screen.findByText("awjCheckout.review.heading");
+      const completeButton = () =>
+        screen.getByRole("button", { name: "awjCheckout.completeOrder" });
+
+      await user.click(completeButton());
+      await waitFor(() =>
+        expect(mockActions.completeAwjCheckoutAction).toHaveBeenCalledTimes(1),
+      );
+      await user.click(completeButton());
+      await waitFor(() =>
+        expect(mockActions.completeAwjCheckoutAction).toHaveBeenCalledTimes(2),
+      );
+
+      const [firstKey] = mockActions.completeAwjCheckoutAction.mock.calls[0];
+      const [secondKey] = mockActions.completeAwjCheckoutAction.mock.calls[1];
+      expect(secondKey).toBe(firstKey);
+    });
+
+    it("the persisted key is cleared only after a confirmed success — not on review_required or a transient failure", async () => {
+      const user = userEvent.setup();
+      mockActions.startOrResumeAwjCheckout.mockResolvedValue({
+        success: true,
+        checkout: checkoutWith(),
+      });
+      mockActions.updateAwjContact.mockResolvedValue({
+        success: true,
+        checkout: checkoutWith({ contact: sampleOrder.contact }),
+      });
+      mockActions.updateAwjAddress.mockResolvedValue({
+        success: true,
+        checkout: checkoutWith({ contact: sampleOrder.contact }),
+      });
+      mockActions.updateAwjDelivery.mockResolvedValue({
+        success: true,
+        checkout: checkoutWith({
+          contact: sampleOrder.contact,
+          delivery: {
+            amount: { amount_minor: 0, currency: "SAR" },
+            method: "pickup",
+            address: checkoutWith().delivery.address,
+          },
+        }),
+      });
+      mockActions.completeAwjCheckoutAction.mockResolvedValue({
+        success: false,
+        kind: "review_required",
+        items: [{ item_id: "line-1", reason: "insufficient_stock" }],
+        checkout: checkoutWith({ contact: sampleOrder.contact }),
+        message: "بعض عناصر السلة تغيّرت.",
+      });
+
+      render(<AwjCheckoutFlow />);
+      await fillDetailsAndContinue(user);
+      await screen.findByText("awjCheckout.review.heading");
+      await user.click(
+        screen.getByRole("button", { name: "awjCheckout.completeOrder" }),
+      );
+      await screen.findByText("awjCheckout.reviewRequired.title");
+
+      // Still persisted — a retry after fixing the issue must reuse it.
+      expect(
+        localStorage.getItem("awj-checkout-idempotency-key:identity-a"),
+      ).not.toBeNull();
+    });
+
+    it("the persisted key is removed once completion is confirmed successful", async () => {
+      const user = userEvent.setup();
+      await completeOnceAndCaptureKey(user); // fails transiently — key stays persisted here
+
+      expect(
+        localStorage.getItem("awj-checkout-idempotency-key:identity-a"),
+      ).not.toBeNull();
+
+      mockActions.completeAwjCheckoutAction.mockClear();
+      mockActions.startOrResumeAwjCheckout.mockResolvedValue({
+        success: true,
+        checkout: checkoutWith({ contact: sampleOrder.contact }),
+      });
+      mockActions.completeAwjCheckoutAction.mockResolvedValue({
+        success: true,
+        order: sampleOrder,
+        replayed: false,
+      });
+
+      render(<AwjCheckoutFlow />);
+      const user2 = userEvent.setup();
+      await fillDetailsAndContinue(user2);
+      await screen.findByText("awjCheckout.review.heading");
+      await user2.click(
+        screen.getByRole("button", { name: "awjCheckout.completeOrder" }),
+      );
+      await screen.findByText("awjCheckout.success.heading");
+
+      expect(
+        localStorage.getItem("awj-checkout-idempotency-key:identity-a"),
+      ).toBeNull();
     });
   });
 });
