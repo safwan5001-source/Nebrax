@@ -27,11 +27,17 @@ class InventoryBalanceFilters
         'name'             => 'name',
         'sku'              => 'sku',
         'unit'             => 'unit',
-        'quantity_on_hand' => 'quantity_on_hand',
-        'avg_cost'         => 'avg_cost',
+        // VAR-INV-1: `products.quantity_on_hand`/`avg_cost` مجمَّدان — القراءة
+        // من الهويّة البسيطة المضمومة في query() أدناه.
+        'quantity_on_hand' => 'COALESCE(inventory_states.quantity_on_hand, 0)',
+        'avg_cost'         => 'COALESCE(inventory_states.avg_cost, 0)',
         // قيمة المخزون مشتقّة: تُفرَز بتعبيرها لا بعمود مخزَّن.
-        'stock_value'      => 'quantity_on_hand * avg_cost',
+        'stock_value'      => 'COALESCE(inventory_states.quantity_on_hand, 0) * COALESCE(inventory_states.avg_cost, 0)',
     ];
+
+    private const QTY_EXPR = 'COALESCE(inventory_states.quantity_on_hand, 0)';
+
+    private const COST_EXPR = 'COALESCE(inventory_states.avg_cost, 0)';
 
     /**
      * قواعد التحقق المشتركة (بلا `page`/`per_page` — تخصّان الشاشة وحدها).
@@ -56,7 +62,13 @@ class InventoryBalanceFilters
     /** الاستعلام الأساس: الأصناف المتتبَّعة وحدها — نطاق الشاشة نفسه. */
     public static function query(): Builder
     {
-        return Product::query()->where('track_inventory', true);
+        return Product::query()
+            ->where('track_inventory', true)
+            ->leftJoin('inventory_states', function ($join): void {
+                $join->on('inventory_states.product_id', '=', 'products.id')
+                    ->whereNull('inventory_states.product_variant_id');
+            })
+            ->select('products.*');
     }
 
     /**
@@ -89,27 +101,27 @@ class InventoryBalanceFilters
         // integer، بخلاف SQLite المتساهل): حدٌّ عشري يكافئ `ceil` عند `>=`
         // و`floor` عند `<=`. فحدُّ 5.5 يستبعد الكمية 5 (ceil→6) تماماً كالشاشة.
         if (filled($filters['qty_min'] ?? null)) {
-            $query->where('quantity_on_hand', '>=', (int) ceil((float) $filters['qty_min']));
+            $query->whereRaw(self::QTY_EXPR.' >= ?', [(int) ceil((float) $filters['qty_min'])]);
         }
         if (filled($filters['qty_max'] ?? null)) {
-            $query->where('quantity_on_hand', '<=', (int) floor((float) $filters['qty_max']));
+            $query->whereRaw(self::QTY_EXPR.' <= ?', [(int) floor((float) $filters['qty_max'])]);
         }
 
         // المدى المالي: قيمة الفلتر بالريال، والمقارنة بالهللات — كما تفعل
         // الشاشة حين تقارن `Number(item.avg_cost)` وهو ريال معروض.
         if (filled($filters['avg_cost_min'] ?? null)) {
-            $query->where('avg_cost', '>=', self::moneyToMinor((string) $filters['avg_cost_min']));
+            $query->whereRaw(self::COST_EXPR.' >= ?', [self::moneyToMinor((string) $filters['avg_cost_min'])]);
         }
         if (filled($filters['avg_cost_max'] ?? null)) {
-            $query->where('avg_cost', '<=', self::moneyToMinor((string) $filters['avg_cost_max']));
+            $query->whereRaw(self::COST_EXPR.' <= ?', [self::moneyToMinor((string) $filters['avg_cost_max'])]);
         }
 
         // قيمة المخزون = الكمية × متوسط التكلفة (بالهللات). تعبيرٌ حسابيّ لا عمود.
         if (filled($filters['stock_value_min'] ?? null)) {
-            $query->whereRaw('quantity_on_hand * avg_cost >= ?', [self::moneyToMinor((string) $filters['stock_value_min'])]);
+            $query->whereRaw(self::QTY_EXPR.' * '.self::COST_EXPR.' >= ?', [self::moneyToMinor((string) $filters['stock_value_min'])]);
         }
         if (filled($filters['stock_value_max'] ?? null)) {
-            $query->whereRaw('quantity_on_hand * avg_cost <= ?', [self::moneyToMinor((string) $filters['stock_value_max'])]);
+            $query->whereRaw(self::QTY_EXPR.' * '.self::COST_EXPR.' <= ?', [self::moneyToMinor((string) $filters['stock_value_max'])]);
         }
 
         return $query;
@@ -127,9 +139,9 @@ class InventoryBalanceFilters
 
         $expression = self::SORTS[$key] ?? self::SORTS['name'];
 
-        // تعبير قيمة المخزون يُفرَز بـ`orderByRaw`؛ الأعمدة العادية بـ`orderBy`.
-        if ($key === 'stock_value') {
-            return $query->orderByRaw("{$expression} {$direction}")->orderByDesc('id');
+        // تعابير `COALESCE`/الحسابية تُفرَز بـ`orderByRaw`؛ الأعمدة العادية بـ`orderBy`.
+        if (in_array($key, ['stock_value', 'quantity_on_hand', 'avg_cost'], true)) {
+            return $query->orderByRaw("{$expression} {$direction}")->orderByDesc('products.id');
         }
 
         return $query->orderBy($expression, $direction)->orderByDesc('id');

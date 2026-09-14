@@ -289,7 +289,7 @@ class InventoryOpeningImportTest extends TestCase
             'stock' => ProductWarehouseStock::count(),
             'products' => Product::count(),
             'warehouses' => Warehouse::count(),
-            'quantity' => Product::where('sku', 'SKU-1001')->value('quantity_on_hand'),
+            'quantity' => Product::where('sku', 'SKU-1001')->first()?->quantity_on_hand ?? 0,
         ];
 
         $this->preview($scene['token'], $this->csv(
@@ -308,7 +308,7 @@ class InventoryOpeningImportTest extends TestCase
         $this->assertSame($before['stock'], ProductWarehouseStock::count());
         $this->assertSame($before['products'], Product::count(), 'لا يُنشئ منتجاً ناقصاً.');
         $this->assertSame($before['warehouses'], Warehouse::count(), 'لا يُنشئ مخزناً ناقصاً.');
-        $this->assertSame($before['quantity'], Product::where('sku', 'SKU-1001')->value('quantity_on_hand'));
+        $this->assertSame($before['quantity'], Product::where('sku', 'SKU-1001')->first()?->quantity_on_hand ?? 0);
     }
 
     /** @test */
@@ -542,7 +542,7 @@ class InventoryOpeningImportTest extends TestCase
         app(TenantContext::class)->set($scene['tenant_id']);
         $this->assertSame(0, StockMovement::count(), 'المسودة لا تحرّك مخزوناً.');
         $this->assertSame(0, JournalEntry::count(), 'المسودة لا تولّد قيداً.');
-        $this->assertSame(0, Product::where('sku', 'SKU-1001')->value('quantity_on_hand'));
+        $this->assertSame(0, Product::where('sku', 'SKU-1001')->first()?->quantity_on_hand ?? 0);
     }
 
     /** @test */
@@ -587,8 +587,8 @@ class InventoryOpeningImportTest extends TestCase
         $this->assertNotNull($posted['journal_entry_id']);
 
         app(TenantContext::class)->set($scene['tenant_id']);
-        $this->assertSame(120, Product::where('sku', 'SKU-1001')->value('quantity_on_hand'));
-        $this->assertSame(1850, Product::where('sku', 'SKU-1001')->value('avg_cost'));
+        $this->assertSame(120, Product::where('sku', 'SKU-1001')->first()?->quantity_on_hand ?? 0);
+        $this->assertSame(1850, Product::where('sku', 'SKU-1001')->first()?->avg_cost ?? 0);
         $this->assertSame(1, StockMovement::count());
         $this->assertSame(1, JournalEntry::count());
 

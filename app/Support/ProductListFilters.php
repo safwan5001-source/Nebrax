@@ -93,12 +93,14 @@ class ProductListFilters
             match ($filters['stock_state']) {
                 'tracked' => $query->where('track_inventory', true),
                 'not_tracked' => $query->where('track_inventory', false),
-                'out' => $query->where('track_inventory', true)->where('quantity_on_hand', '<=', 0),
-                'low' => $query
+                'out' => self::withSimpleInventoryState($query)
                     ->where('track_inventory', true)
-                    ->where('quantity_on_hand', '>', 0)
+                    ->where(fn (Builder $q) => $q->whereNull('inventory_states.quantity_on_hand')->orWhere('inventory_states.quantity_on_hand', '<=', 0)),
+                'low' => self::withSimpleInventoryState($query)
+                    ->where('track_inventory', true)
+                    ->where('inventory_states.quantity_on_hand', '>', 0)
                     ->where('reorder_level', '>', 0)
-                    ->whereColumn('quantity_on_hand', '<=', 'reorder_level'),
+                    ->whereColumn('inventory_states.quantity_on_hand', '<=', 'reorder_level'),
                 default => null,
             };
         }
@@ -126,6 +128,12 @@ class ProductListFilters
         $key = ltrim($sort, '-');
 
         if ($sort !== '' && isset(self::SORTS[$key])) {
+            if ($key === 'quantity_on_hand') {
+                self::withSimpleInventoryState($query);
+
+                return $query->orderByRaw('COALESCE(inventory_states.quantity_on_hand, 0) '.$direction)->orderByDesc('products.id');
+            }
+
             return $query->orderBy(self::SORTS[$key], $direction)->orderByDesc('id');
         }
 
@@ -136,6 +144,30 @@ class ProductListFilters
 
         // توافق خلفي مع كل مستهلك قديم لـ GET /products بلا pagination.
         return $query->latest();
+    }
+
+    /**
+     * VAR-INV-1: `products.quantity_on_hand` مجمَّدٌ بلا كتابة — `InventoryState`
+     * هي السلطة الوحيدة الآن. تصفية/فرزٌ بـ SQL خام على العمود القديم كان
+     * سيقرأ صفراً دائماً؛ الضمّ هنا لهويّة المنتج البسيطة (`product_variant_id
+     * IS NULL`) وحدها — لا مسارٍ هنا يعي المتغيّرات بعد (VAR-DOC-1/VAR-POS-1
+     * لاحقاً)، فمنتجٌ `variant_managed` يظهر بكميةٍ `NULL`/صفر هنا كسلوكه
+     * السابق تقريباً (لم يكن لهذه القائمة مفهوم متغيّرٍ أصلاً من قبل).
+     * انضمامٌ مرةً واحدة فقط — استدعاءٌ متكرر آمن.
+     */
+    private static function withSimpleInventoryState(Builder $query): Builder
+    {
+        $joins = $query->getQuery()->joins ?? [];
+        foreach ($joins as $join) {
+            if ($join->table === 'inventory_states') {
+                return $query;
+            }
+        }
+
+        return $query->leftJoin('inventory_states', function ($join): void {
+            $join->on('inventory_states.product_id', '=', 'products.id')
+                ->whereNull('inventory_states.product_variant_id');
+        })->select('products.*');
     }
 
     /** «12.5» → 1250 هللة. بلا `float` كي لا يفلت مرشّح سعر من الحافة. */

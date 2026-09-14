@@ -12,6 +12,7 @@ use App\Models\FuelProduct;
 use App\Models\FuelSale;
 use App\Models\InventoryOpeningLine;
 use App\Models\InventoryReservation;
+use App\Models\InventoryState;
 use App\Models\InventoryStockAlert;
 use App\Models\InvoiceLine;
 use App\Models\PriceListItem;
@@ -128,6 +129,11 @@ final class ProductReferenceRegistry
         // حذفه، ولا تغيير `type`/`track_inventory` عليه، لأن ذلك يعيد تفسير
         // كميةٍ محجوزة سلفاً (ADR-02 §9: غير المتتبَّع لا يُحجز أصلاً).
         InventoryReservation::class => ['key' => 'inventory_reservations', 'classes' => [self::INVENTORY_SEMANTIC]],
+        // VAR-INV-1: هويّة المخزون والتقييم الموحّدة. إنشاؤها **كسول** (أول
+        // عملية تمسّ الهويّة فعلاً — @see App\Models\InventoryState)، فوجود
+        // الصفّ نفسه دليل أثرٍ حقيقي بالضبط مثل StockMovement/ProductWarehouseStock
+        // أعلاه، لا صفّاً فارغاً يُنشأ تلقائياً لكل منتج فيُسقط هذا الحارس دائماً.
+        InventoryState::class => ['key' => 'inventory_states', 'classes' => [self::INVENTORY_SEMANTIC]],
 
         // ── ٤) تجاري حيّ ───────────────────────────────────────────────
         PriceListItem::class => ['key' => 'price_list_items', 'classes' => [self::COMMERCIAL_LIVE]],

@@ -589,6 +589,15 @@ class ProductVariantService
             $product = $variant->product;
             $sku = $variant->sku;
 
+            // VAR-INV-1: وجود صفّ هويّة مخزونٍ لهذا المتغيّر دليل أثرٍ مخزني
+            // حقيقي (الإنشاء كسولٌ — لا صفّ بلا استعمالٍ فعلي، @see
+            // App\Models\InventoryState). كميته الحالية صفرٌ لا يكفي: متغيّرٌ
+            // استُلمت له بضاعة ثم صُرفت بالكامل له تاريخٌ محاسبي لا يجوز محوه
+            // بحذف الهويّة (VAR_ARCH_1 §7.3 — «الصفر ضروري لا كافٍ»).
+            if ($variant->inventoryState()->exists()) {
+                throw new RuntimeException('لا يمكن حذف هذا المتغيّر لأن له تاريخاً مخزنياً (استلام/صرف). عطّله بدلاً من ذلك.');
+            }
+
             DB::table('product_variant_option_values')->where('product_variant_id', $variant->id)->delete();
             $variant->delete();
             SkuRegistryEntry::release($sku);

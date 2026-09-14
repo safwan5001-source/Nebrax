@@ -4,12 +4,15 @@ namespace App\Services\Accounting;
 
 use App\Models\Account;
 use App\Models\Invoice;
+use App\Models\InventoryState;
 use App\Models\Partner;
 use App\Models\Product;
+use App\Models\ProductVariant;
 use App\Models\ProductWarehouseStock;
 use App\Models\StockMovement;
 use App\Models\Warehouse;
 use App\Support\Settings;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -47,10 +50,10 @@ class InventoryService
      *
      * @param  array  $meta  ['offset_account'=>code?, 'partner_id'=>?, 'date'=>?, 'notes'=>?]
      */
-    public function receiveStock(Product $product, int $quantity, int $unitCost, array $meta = []): StockMovement
+    public function receiveStock(Product $product, int $quantity, int $unitCost, array $meta = [], ?ProductVariant $variant = null): StockMovement
     {
-        return DB::transaction(function () use ($product, $quantity, $unitCost, $meta) {
-            $movement = $this->applyReceipt($product, $quantity, $unitCost, $meta);
+        return DB::transaction(function () use ($product, $quantity, $unitCost, $meta, $variant) {
+            $movement = $this->applyReceipt($product, $quantity, $unitCost, $meta, variant: $variant);
 
             // قيد: مدين المخزون (دور `inventory_asset`) / دائن الحساب المقابل
             $offset = $meta['offset_account'] ?? self::ACC_PAYABLE;
@@ -86,7 +89,7 @@ class InventoryService
      * للمشتريات المتضمَّنة الضريبة حيث الصافي = الإجمالي − الضريبة المستخرَجة.
      * حين تُحذَف يبقى السلوك السابق تماماً: القيمة = الكمية × تكلفة الوحدة.
      */
-    public function applyReceipt(Product $product, int $quantity, int $unitCost, array $meta = [], ?int $totalCost = null): StockMovement
+    public function applyReceipt(Product $product, int $quantity, int $unitCost, array $meta = [], ?int $totalCost = null, ?ProductVariant $variant = null): StockMovement
     {
         if ($quantity <= 0 || $unitCost < 0) {
             throw new RuntimeException('كمية الاستلام يجب أن تكون موجبة والتكلفة غير سالبة.');
@@ -102,9 +105,14 @@ class InventoryService
         }
         $recordedUnit = $totalCost !== null ? intdiv($totalCost, $quantity) : $unitCost;
 
-        // متوسط متحرك: المتوسط الجديد = (قيمة المخزون القديمة + قيمة الوارد) ÷ الكمية الكلية
-        $oldQty   = $product->quantity_on_hand;
-        $oldValue = $oldQty * $product->avg_cost;
+        // VAR-INV-1: المتوسط المتحرك يُحسب على هويّة المخزون المحلولة (منتج
+        // بسيط أو متغيّر فعلي بعينه) — لا على `Product` مباشرة. قفلٌ على صفّ
+        // الهويّة يسري حتى انتهاء المعاملة، فتُسلسَل الاستلامات المتزامنة لنفس
+        // الهويّة تماماً كقفل `adjustWarehouseStock` القائم.
+        $state = $this->resolveInventoryState($product, $variant);
+
+        $oldQty   = $state->quantity_on_hand;
+        $oldValue = $oldQty * $state->avg_cost;
         $newQty   = $oldQty + $quantity;
         $newValue = $oldValue + $lineValue;
         $newAvg   = $newQty > 0 ? intdiv($newValue, $newQty) : 0;
@@ -124,8 +132,8 @@ class InventoryService
             'notes'            => $meta['notes'] ?? 'استلام بضاعة',
         ]);
 
-        $product->update(['quantity_on_hand' => $newQty, 'avg_cost' => $newAvg]);
-        $this->adjustWarehouseStock($warehouseId, $product->id, $quantity);
+        $state->update(['quantity_on_hand' => $newQty, 'avg_cost' => $newAvg]);
+        $this->adjustWarehouseStock($warehouseId, $product->id, $quantity, $variant?->id);
         app(InventoryAlertService::class)->queueEvaluation($product->id);
 
         return $movement;
@@ -136,7 +144,7 @@ class InventoryService
      * يُستخدم عندما يكون القيد جزءاً من عملية أكبر (مثل مرتجع المشتريات).
      * المتوسط لا يتغيّر عند الإخراج. يجب استدعاؤه ضمن معاملة الطرف المستدعي.
      */
-    public function applyIssue(Product $product, int $quantity, int $unitCost, array $meta = [], ?int $totalCost = null): StockMovement
+    public function applyIssue(Product $product, int $quantity, int $unitCost, array $meta = [], ?int $totalCost = null, ?ProductVariant $variant = null): StockMovement
     {
         if ($quantity <= 0 || $unitCost < 0) {
             throw new RuntimeException('كمية الإخراج يجب أن تكون موجبة والتكلفة غير سالبة.');
@@ -147,13 +155,14 @@ class InventoryService
         }
         $recordedUnit = $totalCost !== null ? intdiv($totalCost, $quantity) : $unitCost;
 
-        $newQty      = $product->quantity_on_hand - $quantity;
+        $state       = $this->resolveInventoryState($product, $variant);
+        $newQty      = $state->quantity_on_hand - $quantity;
         $warehouseId = $this->resolveWarehouseId($meta);
 
         // يمرّ المسار التشغيلي الصريح بهذا المفتاح؛ أما الجرد والتصحيح فيظلان
         // قادرين على تسجيل فرق فعلي من دون أن يحظره حارس البيع.
         if (($meta['enforce_stock'] ?? false) === true) {
-            $this->assertStockAvailable($product, $quantity, $warehouseId);
+            $this->assertStockAvailable($product, $quantity, $warehouseId, $variant);
         }
 
         $movement = StockMovement::create([
@@ -171,8 +180,9 @@ class InventoryService
             'notes'            => $meta['notes'] ?? 'إخراج بضاعة',
         ]);
 
-        $product->update(['quantity_on_hand' => $newQty]);
-        $this->adjustWarehouseStock($warehouseId, $product->id, -$quantity);
+        // المتوسط لا يتغيّر عند الإخراج (§3 الملف — ثابت VAR-INV-1 المستمَدّ من AWJ_INVENTORY_VALUATION_SEMANTICS).
+        $state->update(['quantity_on_hand' => $newQty]);
+        $this->adjustWarehouseStock($warehouseId, $product->id, -$quantity, $variant?->id);
         app(InventoryAlertService::class)->queueEvaluation($product->id);
 
         return $movement;
@@ -231,11 +241,15 @@ class InventoryService
             // الحارس قبل أي حركة: الرفض هنا يُبطل المعاملة كلها، فلا فاتورة
             // نصفها مرحَّل ونصفها لا. ويقارن بوحدة المخزون لا بوحدة السطر —
             // «طبليتان» و«رصيد ٦٠ كيساً» لا يُقارَنان قبل التحويل.
+            //
+            // VAR-INV-1: سطر الفاتورة لا يحمل متغيّراً بعد (VAR-DOC-1 لاحقاً) —
+            // الهويّة المحلولة هنا دائماً هويّة المنتج البسيط، كالسلوك السابق حرفياً.
             $this->assertStockAvailable($product, $quantity, $warehouseId);
+            $state = $this->resolveInventoryState($product);
 
-            $unitCost = $product->avg_cost;
+            $unitCost = $state->avg_cost;
             $cost     = $quantity * $unitCost;
-            $newQty   = $product->quantity_on_hand - $quantity;
+            $newQty   = $state->quantity_on_hand - $quantity;
 
             StockMovement::create([
                 'product_id'       => $product->id,
@@ -252,7 +266,7 @@ class InventoryService
                 'notes'            => "بيع عبر الفاتورة {$invoice->number}",
             ]);
 
-            $product->update(['quantity_on_hand' => $newQty]);
+            $state->update(['quantity_on_hand' => $newQty]);
             $this->adjustWarehouseStock($warehouseId, $product->id, -$quantity);
             app(InventoryAlertService::class)->queueEvaluation($product->id);
             $totalCogs += $cost;
@@ -340,7 +354,7 @@ class InventoryService
      *  عجز، وحظرٌ أعمى في البدائية كان سيمنع **مسار التصحيح نفسه**. الحارس
      *  يُستدعى صراحةً من مسارات البيع والمرتجع، ويبقى التصحيح حرّاً.
      */
-    public function assertStockAvailable(Product $product, int $quantity, ?string $warehouseId = null): void
+    public function assertStockAvailable(Product $product, int $quantity, ?string $warehouseId = null, ?ProductVariant $variant = null): void
     {
         if (Settings::get('inventory', 'allow_negative_stock')) {
             return;
@@ -349,11 +363,20 @@ class InventoryService
         // إن عُرف المخزن فالرصيد المطلوب هو رصيده هو، لا إجمالي المنشأة.
         // أما المستندات السابقة على المخازن فتستمر بفحص الإجمالي كي لا تعيد
         // الترقية تفسير حركة تاريخية بلا موقع كمية.
-        $available = $warehouseId === null
-            ? (int) $product->quantity_on_hand
-            : (int) (ProductWarehouseStock::where('product_id', $product->id)
-                ->where('warehouse_id', $warehouseId)
-                ->value('quantity') ?? 0);
+        //
+        // قراءةٌ بلا إنشاء صفّ هويّة: فحصٌ يُرفض لا يجوز أن يترك أثراً
+        // مخزنيّ الدلالة (`INVENTORY_SEMANTIC`) خلفه — @see findInventoryState().
+        if ($warehouseId === null) {
+            $available = $variant !== null
+                ? (int) ($this->findInventoryState($product, $variant)?->quantity_on_hand ?? 0)
+                : (int) $product->quantity_on_hand;
+        } else {
+            $query = ProductWarehouseStock::where('warehouse_id', $warehouseId);
+            $query = $variant !== null
+                ? $query->where('product_variant_id', $variant->id)
+                : $query->where('product_id', $product->id)->whereNull('product_variant_id');
+            $available = (int) ($query->value('quantity') ?? 0);
+        }
 
         if ($available >= $quantity) {
             return;
@@ -424,18 +447,84 @@ class InventoryService
      * الفتح (PR-INV-4)، لا مقارنة الكمية النهائية وحدها التي تعمى عن حركة
      * ذهاب-وعودة (ABA) صافيها صفر.
      */
-    protected function adjustWarehouseStock(?string $warehouseId, string $productId, int $delta): void
+    protected function adjustWarehouseStock(?string $warehouseId, string $productId, int $delta, ?string $variantId = null): void
     {
         if ($warehouseId === null || $delta === 0) {
             return;
         }
 
-        $row = ProductWarehouseStock::firstOrCreate(
-            ['product_id' => $productId, 'warehouse_id' => $warehouseId],
-            ['quantity' => 0, 'revision' => 0]
-        );
+        $keys = ['product_id' => $productId, 'warehouse_id' => $warehouseId, 'product_variant_id' => $variantId];
+
+        try {
+            $row = ProductWarehouseStock::firstOrCreate($keys, ['quantity' => 0, 'revision' => 0]);
+        } catch (QueryException) {
+            // سباقٌ على نفس مفتاح الهويّة×المخزن — القيد الفريد الجزئي (الترحيل)
+            // هو الضامن الحقيقي؛ نعيد القراءة بعد فشل الإدراج المتنافس.
+            $row = ProductWarehouseStock::where($keys)->firstOrFail();
+        }
         $row->increment('quantity', $delta);
         $row->increment('revision');
+    }
+
+    /**
+     * يحلّ صفّ هويّة المخزون (بسيطة أو متغيّر)، ينشئه كسولاً عند أول استعمالٍ
+     * حقيقي، ويقفله (`lockForUpdate`) حتى نهاية معاملة الاستدعاء — فتُسلسَل
+     * الاستلامات/الإخراجات المتزامنة على نفس الهويّة، ولا تتلوّث هويّة متغيّرٍ
+     * شقيق مهما تزامنت حركاتهما (VAR_ARCH_1 §6).
+     *
+     * **فشلٌ مغلَق** عند أي تعارض هويّة: متغيّرٌ من منتجٍ آخر، منتجٌ
+     * `variant_managed` بلا متغيّر محدَّد (لا هويّة أب موازية)، أو منتجٌ بسيط
+     * ومتغيّرٌ معاً بالخطأ.
+     */
+    protected function resolveInventoryState(Product $product, ?ProductVariant $variant = null): InventoryState
+    {
+        $this->assertIdentityConsistent($product, $variant);
+
+        $keys = ['product_id' => $product->id, 'product_variant_id' => $variant?->id];
+
+        try {
+            InventoryState::firstOrCreate($keys, ['tenant_id' => $product->tenant_id]);
+        } catch (QueryException) {
+            // سباقٌ على نفس الهويّة — القيد الفريد (الجزئي للبسيطة، العادي
+            // للمتغيّر) في الترحيل هو الضامن الحقيقي، لا `firstOrCreate` وحدها.
+        }
+
+        return InventoryState::where($keys)->lockForUpdate()->firstOrFail();
+    }
+
+    /** قراءةٌ بلا إنشاء — لفحوصات لا يجوز أن تترك أثراً مخزنيّاً خلفها (مثل `assertStockAvailable`). */
+    protected function findInventoryState(Product $product, ?ProductVariant $variant = null): ?InventoryState
+    {
+        $this->assertIdentityConsistent($product, $variant);
+
+        return InventoryState::where('product_id', $product->id)
+            ->where('product_variant_id', $variant?->id)
+            ->first();
+    }
+
+    /**
+     * فشلٌ مغلَق قبل أي حلّ هويّة: عزلٌ صريح لا يعتمد على `TenantScope` وحدها
+     * للدفاع في العمق (VAR-INV-1 يطلب فحصاً صريحاً على كل عملية مخزنية)،
+     * وربط المتغيّر بمنتجه الفعلي، وعدم توليد هويّة أبٍ موازية لمنتجٍ
+     * `variant_managed` — @see docs/plans/products-inventory/AWJ_PRODUCT_VARIANTS_VAR_ARCH_1.md §3.
+     */
+    private function assertIdentityConsistent(Product $product, ?ProductVariant $variant): void
+    {
+        if ($variant === null) {
+            if ($product->isVariantManaged()) {
+                throw new RuntimeException('لا يمكن تحديد هويّة مخزون للمنتج الأب مباشرة وهو مُدار بالمتغيّرات — حدّد المتغيّر الفعلي.');
+            }
+
+            return;
+        }
+
+        if ($variant->product_id !== $product->id) {
+            throw new RuntimeException('المتغيّر المحدَّد لا يتبع هذا المنتج.');
+        }
+
+        if ($variant->tenant_id !== $product->tenant_id) {
+            throw new RuntimeException('تعارض عزل مستأجر بين المنتج والمتغيّر.');
+        }
     }
 
     protected function accountId(string $code): string

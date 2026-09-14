@@ -22,8 +22,10 @@ class InventoryWorkspaceFilters
         'sku' => 'products.sku',
         'warehouse' => 'warehouses.name',
         'quantity' => 'product_warehouse_stock.quantity',
-        'avg_cost' => 'products.avg_cost',
-        'stock_value' => 'product_warehouse_stock.quantity * products.avg_cost',
+        // VAR-INV-1: `products.avg_cost` مجمَّدٌ بلا كتابة — القراءة من الهويّة
+        // البسيطة المضمومة في `ProductWarehouseBalanceQuery::baseQuery()`.
+        'avg_cost' => 'COALESCE(inventory_states.avg_cost, 0)',
+        'stock_value' => 'product_warehouse_stock.quantity * COALESCE(inventory_states.avg_cost, 0)',
     ];
 
     public const COST_SORT_KEYS = ['avg_cost', 'stock_value'];
@@ -99,7 +101,7 @@ class InventoryWorkspaceFilters
         $key = ltrim($sort, '-');
         $expression = self::SORTS[$key] ?? self::SORTS['name'];
 
-        if ($key === 'stock_value') {
+        if ($key === 'stock_value' || $key === 'avg_cost') {
             return $query
                 ->orderByRaw("{$expression} {$direction}")
                 ->orderBy('products.name')
