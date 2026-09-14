@@ -11,6 +11,39 @@ AWJ Commerce Evidence Pass 03 already established Gate C6: first-class Product V
 
 All current AWJ business data is test/demo data. Therefore preservation of current rows is not an architecture constraint. However code/API compatibility, accounting correctness, inventory correctness, Tenant Isolation, historical-document integrity and safe rollout remain mandatory. A cleaner pre-production schema correction is preferable to permanent compatibility complexity when evidence supports it.
 
+### 1.1 AWJ configurable-policy decision rule
+
+When an architecture or product-design decision reaches two or more genuinely valid business behaviors, AWJ should prefer a **safe configurable policy in Settings** over permanently forcing every tenant into one workflow.
+
+This rule is a decision aid, not permission to make every ambiguity configurable.
+
+Use a tenant setting / selectable policy when ALL of the following are true:
+
+1. more than one behavior is legitimate for real businesses or industries;
+2. each supported behavior preserves accounting correctness, inventory integrity, Tenant Isolation, security and required regulatory behavior;
+3. the behavior can be switched without corrupting historical transactions or silently reinterpreting posted documents;
+4. there is a clear, safe default suitable for the majority of tenants;
+5. the setting has a stable business meaning and is not merely hiding an unresolved engineering decision.
+
+Do **not** expose a setting when one option would weaken accounting correctness, stock integrity, security/Tenant Isolation, regulatory compliance or historical-document truth. Those are system invariants, not tenant preferences.
+
+When a configurable policy affects transaction calculation or posting, the transaction must snapshot any policy-derived result needed to preserve its historical meaning. Changing the setting later MUST NOT recalculate or reinterpret already-posted documents.
+
+When a configurable policy is introduced, its contract should explicitly define:
+
+- tenant-level scope and permission to change it;
+- safe default;
+- allowed values and their business meaning;
+- whether the change applies immediately or only to future transactions;
+- historical-document behavior;
+- API/POS/Commerce consistency;
+- auditability where financially or operationally material;
+- tests for each supported mode, including Tenant Isolation where relevant.
+
+**Working principle:** one objectively correct/safe behavior → enforce it as an invariant. Multiple genuinely correct business behaviors → consider a Settings policy with a safe default.
+
+This rule applies beyond Product Variants and should be reused by future AWJ architecture/design decisions rather than requiring the owner to restate it each time.
+
 ## 2. Current AWJ model — verified
 
 ### 2.1 Product is currently the sellable/inventory identity
@@ -242,6 +275,7 @@ No Variant implementation should begin until these decisions are explicit:
 9. **Public/Mobile Commerce API contract** — option selection, resolved gallery and stable sellable identity without exposing internal assumptions.
 10. **Tenant Isolation tests** — cross-tenant Product/Variant/Option/Media/Barcode/Inventory negative tests.
 11. **PostgreSQL concurrency tests** — reservations/stock for two variants of the same Product must not contaminate one another.
+12. **Configurable-policy gate** — where more than one valid business behavior remains, explicitly decide whether it is a system invariant or a tenant setting under §1.1; do not use Settings to defer unresolved correctness questions.
 
 ## 10. Recommended implementation order — not authorized yet
 
@@ -270,5 +304,7 @@ The preferred direction is **optional first-class variants above Product**, whil
 Alternate barcode setup is also explicitly a UOM-pricing UX surface: each sellable UOM can have its own commercial selling price, but the price authority is the sellable identity + UOM rather than the barcode string.
 
 Product imagery remains product-owned by default, with future visual option-value media and optional exact-variant overrides. AWJ should avoid duplicating the same color images across every size combination and must define an explicit cover/fallback contract before implementation.
+
+AWJ also adopts the configurable-policy decision rule in §1.1: genuinely different but equally correct business behaviors may become tenant Settings with a safe default; correctness, security, Tenant Isolation, regulatory and historical-truth invariants remain non-configurable.
 
 This audit does **not** authorize schema/code implementation and does not change Commerce V1 scope. The next decision artifact should be `VAR-ARCH-1`, with particular attention to inventory valuation, sellable-identity representation, Barcode/UOM/Pricing and Product/Variant Media contracts before any migration is written.
