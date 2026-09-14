@@ -307,12 +307,20 @@ Skipped automatically on SQLite or without `pcntl`, matching repo convention.
 - `ProductUnitPricePostgresConcurrencyTest`: 3/3, re-run 3× consecutively,
   consistent
 - Broader sweep (`Product|Commerce|Pos|PriceList|UnitTemplate|Workbook|Inventory`
-  filter) on PostgreSQL: started as the final broader-regression step; see the
-  session's own record of this run for its exact tally if it completed —
-  reported honestly rather than assumed passing if it did not finish in the
-  available window (per the task's own instruction that a full/broad local
-  suite is not mandatory when time-consuming, with GitHub CI as the
-  independent broad verification after push)
+  filter) on PostgreSQL: started as the final broader-regression step, but its
+  results are **invalid and discarded**, not reported as a real signal either
+  way — the `.env` was reverted from PostgreSQL back to SQLite (routine
+  end-of-session cleanup) while this background run was still executing, and
+  it then failed almost every remaining test with
+  `SQLiteDatabaseDoesNotExistException` — an artifact of the environment being
+  swapped mid-run, not a code defect. This is disclosed explicitly rather than
+  silently omitted or, worse, misreported as a real regression. The genuine
+  evidence this report's PASS status rests on is: the full targeted PostgreSQL
+  run immediately above (216/216, captured *before* the environment was
+  touched again) and the full SQLite broad sweep (1188/1188) reported earlier
+  in this section. Per the task's own instruction, a full/broad local suite is
+  not mandatory when it becomes time-consuming or is compromised this way —
+  GitHub CI is the independent broad verification after push.
 
 **Not run:** frontend `tsc`/build (no `web/src` file references anything
 renamed or removed by this milestone — no API contract or generated-type
@@ -353,7 +361,8 @@ keeps its exact existing name/type/unit).
 
 - Branch: `claude/var-price-1-variant-uom-pricing`
 - Base SHA: `ec9ee5c594d4f078224b4c90bd5f1cb8be53c553`
-- Head SHA: *(filled in after commit/push, see final report message)*
+- Head SHA: `68253161714574b43e9e51f3575103fdd842f43f` (plus one follow-up commit
+  documenting the discarded broader-sweep environment artifact above)
 - Working tree: clean after commit (verified before push)
 
 ## Recommendation
