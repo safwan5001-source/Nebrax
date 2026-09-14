@@ -499,7 +499,197 @@ CI run pending/in-progress as of push — see PR #814 for live status.
 - Previous Head SHA: `0e29cde17be7197035ad04bb905b10aa07fb9c47`
 - New Head SHA: `6e7dac7ab7eab2c5bf88d36f707fe7caac8c6b08`
 
+## Round 3 — CI Closure Only (PostgreSQL concurrency-test fixture fix)
+
+**Scope:** fix the remaining PostgreSQL CI failures on PR #814. No VAR-MEDIA-1
+implementation code was touched in this round either.
+
+### Investigation
+
+The task brief assumed the same InventoryState/frozen-column pattern as
+Round 2, and named `ImportJobInventoryOpeningApplyTest` and
+`ProductVariantCoreTest` as the failing classes. Before making any change,
+the actual GitHub Actions pgsql job log for PR #814 (job `104130759778`,
+run `34890223277`) was fetched and read in full. The real failures were:
+
+```
+FAILED  Tests\Feature\ImportJobInventoryOpeningApplyTest…   QueryException
+FAILED  Tests\Feature\ImportJobWorkbookApplyTest > a conc…  QueryException
+Tests:  2 failed, 3749 passed (23718 assertions)
+```
+
+Both failures are the same test method name,
+`a_concurrent_apply_attempt_is_blocked_by_a_real_row_lock`, in two different
+classes. **`ProductVariantCoreTest` does not appear anywhere in the actual
+CI log** — it ran and passed cleanly on this job (confirmed again locally
+on PostgreSQL below: 31/31 green). This is flagged transparently since it
+diverges from the task brief's assumption.
+
+### Root cause (not the InventoryState pattern — a different, unrelated mechanism)
+
+Neither failing test touches `Product.quantity_on_hand` or `Product.avg_cost`
+at all — grepped both files, zero matches. The real cause:
+
+```
+SQLSTATE[55P03]: Lock not available: 7 ERROR: canceling statement due to lock timeout
+CONTEXT: while locking tuple (...) in relation "tenants"
+SQL statement "SELECT 1 FROM ONLY "public"."tenants" x WHERE "id" = $1 FOR KEY SHARE OF x"
+(Connection: rival, SQL: insert into "import_jobs" (...))
+```
+
+Both tests follow the same fixture pattern (documented in their own
+docblocks as shared with `ImportJobApplyTest`): create a fresh tenant via a
+**separate, real PostgreSQL connection** (`rival`, autocommit, `lock_timeout
+= 200ms`) to later prove a genuine row lock, then continue building the rest
+of the fixture — including an Eloquent `Product::create()` — on the
+**default connection**, which `RefreshDatabase` keeps inside **one open,
+uncommitted transaction for the whole test**.
+
+`Product::create()`'s `saved` hook claims the product's SKU into the shared
+namespace via `SkuRegistryEntry::claim()` (`app/Models/Product.php:127-144`,
+triggered here because the fixture's product has `branch_id === null`).
+`SkuRegistryEntry::claim()` calls `lockTenantAnchor()`
+(`app/Models/SkuRegistryEntry.php:185-192`):
+
+```php
+private static function lockTenantAnchor(): void
+{
+    $tenantId = app(TenantContext::class)->id();
+    if ($tenantId !== null) {
+        Tenant::whereKey($tenantId)->lockForUpdate()->first();
+    }
+}
+```
+
+This is a real, **intentional** Postgres `SELECT ... FOR UPDATE` on the
+tenant row — the same anchor-locking pattern already documented and used by
+`GeneratesDocumentNumbers::lockNumberingAnchor()` (the SkuRegistryEntry
+docblock says so explicitly: "نفس نمط `GeneratesDocumentNumbers::
+lockNumberingAnchor()` حرفياً"). In real production use this lock is held
+only for the few milliseconds until the enclosing request's transaction
+commits. In these two tests, `RefreshDatabase` keeps the transaction open
+for the *entire remaining test body*, so the lock is held far longer than
+production ever holds it — long enough that the `rival` connection's later,
+unrelated `FOR KEY SHARE` FK check (inserting `import_jobs`/`price_lists`,
+which merely reference the same tenant by id) queues behind it and times
+out at 200ms.
+
+This is **not** an InventoryState/VAR-INV-1 issue, not a production defect,
+and not something introduced by VAR-MEDIA-1, VAR-PRICE-1, or VAR-INV-1. It
+is a **pre-existing test-fixture ordering fragility**: the fixture happens
+to run its own `Product::create()` (which incidentally takes a real,
+by-design tenant lock) before the `rival` connection's own FK-dependent
+inserts on the same tenant, inside a transaction that — only in
+`RefreshDatabase` tests — never lets that lock go.
+
+### Changes
+
+- `tests/Feature/ImportJobInventoryOpeningApplyTest.php` —
+  `a_concurrent_apply_attempt_is_blocked_by_a_real_row_lock()`: moved
+  `Warehouse::create()`/`Product::create()` to run **after** `$rival`'s
+  `import_jobs` insert instead of before it. The CSV fixture already
+  referenced the literal strings `'SKU-LOCK'`/`'WH-LOCK'`, so nothing else
+  needed to change.
+- `tests/Feature/ImportJobWorkbookApplyTest.php` — same test: moved
+  `$this->createProduct($token, ['sku' => 'SKU-WB-LOCK'])` to run **after**
+  both `$rival` inserts (`price_lists`, `import_jobs`) instead of before
+  them; `barcodeAndPriceWorkbook()` was already called with the literal SKU
+  string, so the reorder needed no other change. `$product` is still used
+  (only) in the post-creation assertion at the end of the test.
+
+No production code changed. No assertion added, removed, or weakened — both
+tests still prove exactly what they did before: a real Postgres row lock on
+the `import_jobs` row blocks a concurrent reader during `apply()`. The only
+change is *when*, inside the fixture, an unrelated real lock (SKU-registry
+tenant anchor) gets taken, so it no longer starves the `rival` connection's
+setup inserts.
+
+### Why this is test-fixture ordering, not a production-behavior change
+
+- Zero production files touched.
+- `SkuRegistryEntry::lockTenantAnchor()` and `GeneratesDocumentNumbers`
+  keep their exact existing locking semantics — nothing about how or when
+  they lock was changed.
+- Tenant Isolation, InventoryState authority, and accounting/inventory
+  correctness are untouched — this fix doesn't reach any of those systems.
+- The concurrency assertion each test makes (`$this->assertTrue($blocked, ...)`)
+  and every other assertion in both tests are byte-for-byte unchanged.
+
+### Tests run
+
+**A. The two originally failing tests, isolated, on PostgreSQL:**
+`ImportJobInventoryOpeningApplyTest` — 12/12 passed (was 11 passed, 1 failed).
+`ImportJobWorkbookApplyTest` — 12/12 passed (was 11 passed, 1 failed). Re-ran
+the concurrency test method 3× across both classes to rule out a lucky pass;
+consistently green all 3 runs.
+
+**B. Adjacent import/inventory-opening and variant/inventory tests, on
+PostgreSQL:** `ProductVariantCoreTest` (31/31, confirms the task brief's
+named class was never actually broken), `InventoryStateTest` (20/20),
+`InventoryReportTest` (5/5), `ProductMediaGalleryTest` (19/19) — combined
+run: 58 passed, 0 failed.
+
+**C. `ReportEffectiveScopeTest` on PostgreSQL** (verifying no regression to
+the Round 2 fix on the second engine): 33/33 passed.
+
+**D. Full suite, PostgreSQL:** 3724 passed, 27 failed. The 27 are the exact
+same pre-existing, unrelated environment gaps as Round 2's SQLite run
+(`bcmath` extension not installed → `FuelAviRfidServiceTest`,
+`FuelReconciliationTest`, `FuelSaleApiTest`, `FuelSaleServiceTest`,
+`FuelSupplyReceivingTest`, `FuelSupplyReceivingApiTest`; a PDF-parsing
+environment gap → one `DocumentCenterSecureIntakeTest` case) — confirmed by
+re-running exactly that filter set in isolation: 27 failed, 51 passed,
+matching the full run's count precisely. None reference `Product`,
+`ProductMedia`, `ProductVariant`, `InventoryState`, `ImportJob`, or
+`ReportEffectiveScopeTest`.
+
+### GitHub CI status
+
+Fix committed and pushed to `claude/var-media-1-variant-media` (PR #814).
+Local evidence: the exact two tests GitHub's own pgsql job failed on now
+pass consistently on PostgreSQL; SQLite is unaffected (these two tests
+`markTestSkipped` on any non-pgsql connection, so the change has zero
+SQLite-side surface at all). GitHub Actions run on the new commit should be
+checked for final confirmation before any merge decision.
+
+### Files changed (Round 3)
+
+- `tests/Feature/ImportJobInventoryOpeningApplyTest.php` — reordered 3
+  statements within one test method; added an explanatory comment.
+- `tests/Feature/ImportJobWorkbookApplyTest.php` — reordered 2 statements
+  within one test method (one literal-string change: `$product['sku']` →
+  `'SKU-WB-LOCK'`, the same value `$product['sku']` would have held); added
+  an explanatory comment.
+
+### Remaining risks / blockers
+
+- None identified. The pre-existing `bcmath`/PDF environment gaps remain
+  (unrelated, outside this PR's scope).
+- GitHub Actions confirmation on the pushed commit is still pending as of
+  writing.
+
+### Branch / PR (Round 3)
+
+- Branch: `claude/var-media-1-variant-media`
+- PR: #814
+- Previous Head SHA: `6e7dac7ab7eab2c5bf88d36f707fe7caac8c6b08` (Round 2's, after report SHA fill-in `2acf6ba`)
+- New Head SHA: filled in below after push.
+
+## Scope Check (Round 3)
+
+- No production behavior change — only two test files reordered, zero
+  application code touched.
+- No accounting changes.
+- No inventory architecture changes — `InventoryState`, `Product`'s frozen
+  columns, and their accessors are untouched.
+- No API or schema changes.
+- No VAR-DOC-1 or any later milestone work started.
+- No merge performed.
+- No deploy performed.
+
 ## Recommendation
 
 **READY FOR REVIEW** (pending final GitHub Actions confirmation on the newly
 pushed commit). Not READY FOR MERGE — that determination is the reviewer's.
+Stopping here per instruction, awaiting Safwan's review before any further
+action on this PR.
