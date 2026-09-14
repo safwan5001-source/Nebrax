@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\User;
 use App\Tenancy\HostnameTenantContext;
+use App\Tenancy\TenantHostnameResolver;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -13,6 +14,13 @@ class AuthRecoveryService
     public const PASSWORD_RESET = 'password_reset';
     public const EMAIL_VERIFICATION = 'email_verification';
     private const TTL_MINUTES = 60;
+
+    public function frontendLink(User $user, string $path, string $token): string
+    {
+        $slug = (string) $user->tenant()->value('slug');
+
+        return app(TenantHostnameResolver::class)->frontendUrlForTenant($slug, $path, ['token' => $token]);
+    }
 
     public function issue(User $user, string $type): string
     {
@@ -82,6 +90,6 @@ class AuthRecoveryService
     {
         $hostnameTenantId = app(HostnameTenantContext::class)->id();
 
-        return $hostnameTenantId === null || $hostnameTenantId === $tenantId;
+        return $hostnameTenantId !== null && $hostnameTenantId === $tenantId;
     }
 }

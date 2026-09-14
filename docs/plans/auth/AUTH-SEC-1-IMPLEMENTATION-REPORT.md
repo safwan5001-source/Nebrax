@@ -1,9 +1,9 @@
 # AUTH-SEC-1 Implementation Report
 
-- **Status:** Implemented on branch; PR open; not merged and not deployed.
-- **Summary:** Added a tenant-bound V1 email verification and password recovery flow for AWJ staff authentication, with expiring single-use hashed tokens, neutral recovery responses, rate limiting, conservative token revocation, and minimal Arabic-first UI.
+- **Status:** P1 fix implemented on the existing branch; PR open; not merged and not deployed.
+- **Summary:** Hardened the tenant-bound V1 email verification and password recovery flow for AWJ staff authentication. Recovery and verification now fail closed without a valid tenant hostname, and all generated links target the tenant’s configured frontend subdomain.
 - **Base SHA:** `23af768262f284f5092fd8922037c291c47aca06`
-- **Head SHA:** `ecb08e29727faf474b5521bc066330767a3f3476`
+- **Head SHA:** Updated by the final P1 commit below.
 - **Branch:** `feat/auth-sec-1-email-password-recovery`
 - **PR:** [#795](https://github.com/safwan5001-source/Nebrax/pull/795)
 
@@ -18,6 +18,8 @@ The web application now includes minimal responsive pages for password recovery,
 | File | Purpose |
 |---|---|
 | `app/Services/AuthRecoveryService.php` | Issues and atomically consumes tenant-bound, expiring, single-use token records. |
+| `app/Tenancy/TenantHostnameResolver.php` | Reused V1 tenant authority to construct environment-aware tenant frontend links. |
+| `config/tenancy.php` | Adds the configurable frontend scheme for tenant links. |
 | `database/migrations/2026_09_12_120000_create_auth_action_tokens_table.php` | Adds the token table with tenant/user foreign keys and lookup indexes. |
 | `app/Http/Controllers/Api/AuthController.php` | Adds forgot, reset, verify, and resend handlers; sends verification on registration. |
 | `app/Mail/AuthActionMail.php` | Mailable for verification and recovery links. |
@@ -25,7 +27,7 @@ The web application now includes minimal responsive pages for password recovery,
 | `routes/api.php` | Registers public and authenticated auth routes with throttles. |
 | `app/Providers/TenancyServiceProvider.php` | Adds dedicated recovery/reset rate limiters. |
 | `deploy/assemble.sh` | Ensures the Mailable and view are included in Docker/CI Laravel assembly. |
-| `tests/Feature/AuthRecoveryTest.php` | Focused regression/security coverage for neutral responses, reset, replay, expiry, resend throttling, and tenant boundary. |
+| `tests/Feature/AuthRecoveryTest.php` | Focused regression/security coverage for neutral responses, reset, replay, expiry, resend throttling, strict tenant boundaries, missing context, and tenant links. |
 | `web/src/app/forgot-password/page.tsx` | Forgot-password form and neutral success state. |
 | `web/src/app/reset-password/page.tsx` | Reset-password form. |
 | `web/src/app/verify-email/page.tsx` | Verification result state. |
@@ -34,8 +36,10 @@ The web application now includes minimal responsive pages for password recovery,
 
 ## Security
 
-- **Tenant isolation:** Token records carry `tenant_id`; consumption checks the resolved `HostnameTenantContext` before any state change. A token issued in Tenant A is rejected on Tenant B’s tenant hostname. The existing hostname-before-credential behavior is preserved.
-- **Account enumeration protection:** Forgot-password always returns the same semantic response for known and unknown email addresses. Mail delivery failures are reported server-side without changing the response.
+- **Tenant isolation:** Token records carry `tenant_id`; consumption now requires a non-null `HostnameTenantContext` and an exact tenant ID match before any state change. A token issued in Tenant A is rejected on Tenant B and on generic/no-tenant hosts. The existing hostname-before-credential behavior is preserved.
+- **P1 strict binding:** `AuthRecoveryService::matchesHostname()` is fail-closed; the previous `hostnameTenantId === null || ...` behavior was removed.
+- **Tenant-aware links:** Password-reset and verification links use `TenantHostnameResolver` and `config('tenancy.base_domains')`, with `AWJ_TENANT_FRONTEND_SCHEME` / local-testing defaults. No second domain architecture or hard-coded production domain was introduced.
+- **Account enumeration protection:** Forgot-password only queries within a resolved tenant. Without valid tenant context it does not perform a global lookup or issue a token, while returning the same neutral response. Mail delivery failures are reported server-side without changing the response.
 - **Token handling:** Plain tokens are returned only in generated links; the database stores only SHA-256 hashes. Existing outstanding tokens of the same type are invalidated when a new token is issued.
 - **Expiration:** Tokens expire after 60 minutes and are rejected after expiry.
 - **Single-use behavior:** Consumption is performed inside a transaction with a row lock and marks the token used before returning the user. Replays therefore fail.
@@ -55,19 +59,20 @@ The deployment environment must provide the existing Laravel mail configuration 
 | `cd web && npm ci` | Passed; npm reported 14 pre-existing dependency audit findings (6 moderate, 6 high, 2 critical). |
 | `cd web && npm run test` | Passed: **266 test files, 1,731 tests**. Existing `next-intl` warnings about dotted keys in `developer.events` were observed; they are unrelated to this change. |
 | `cd web && npm run build` | Passed: Next.js compiled successfully and generated 170 static pages. |
+| `cd web && npm run test` after P1 changes | Passed: **266 test files, 1,731 tests**. |
 | `php artisan test --filter=AuthRecoveryTest` | Not run locally: this checkout contains Laravel core files assembled by Docker/CI and the sandbox has no PHP, Composer, or Docker. The focused test file is included for CI. |
 
 ## Build / CI
 
-The PR’s GitHub Actions checks were queued when this report was authored: four Laravel matrix checks and two Web CI checks were pending, with no failures or successes reported yet. The PR is open at [#795](https://github.com/safwan5001-source/Nebrax/pull/795). CI must complete before merge review; this task does not merge or deploy.
+Before the P1 commit, the current PR checks were green: four Laravel matrix checks and one Web CI check succeeded. The P1 commit requires a fresh CI run; its final status must be recorded after GitHub Actions completes. The PR remains open at [#795](https://github.com/safwan5001-source/Nebrax/pull/795). This task does not merge or deploy.
 
 ## Deferred / Follow-up
 
-A production policy decision is still required before making email verification mandatory for existing users. Email-provider credentials, sender identity, delivery monitoring, and `FRONTEND_URL` remain deployment configuration and were intentionally not changed. No broader auth architecture, Customer Platform architecture, or unrelated findings were addressed.
+A production policy decision is still required before making email verification mandatory for existing users. Email-provider credentials, sender identity, delivery monitoring, and the configured tenant base domains/scheme remain deployment configuration and were intentionally not changed. No broader auth architecture, Customer Platform architecture, or unrelated findings were addressed.
 
 ## Risks
 
-The repository cannot validate the Laravel tests locally without the Docker/CI toolchain. CI must validate the migration and full backend test matrix on SQLite and PostgreSQL. Mail delivery remains dependent on the configured provider; failed delivery is logged but requires operational monitoring and retry policy outside this narrow V1.
+The repository cannot validate the Laravel tests locally without the Docker/CI toolchain. The fresh CI run must validate the migration and full backend test matrix on SQLite and PostgreSQL. Mail delivery remains dependent on the configured provider; failed delivery is logged but requires operational monitoring and retry policy outside this narrow V1.
 
 ## Next Step
 

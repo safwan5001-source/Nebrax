@@ -29,6 +29,7 @@ $extraReserved = array_values(array_filter(array_map(
 
 return [
     'base_domains' => $baseDomains !== [] ? $baseDomains : ['awj.app'],
+    'frontend_scheme' => env('AWJ_TENANT_FRONTEND_SCHEME', app()->environment(['local', 'testing']) ? 'http' : 'https'),
 
     /*
      * أسماء بنية تحتية/نظام لا يجوز تسجيلها كـ slug ولا تُفسَّر كمستأجر.

@@ -101,7 +101,7 @@ class AuthController extends ApiController
 
         try {
             $verificationToken = app(AuthRecoveryService::class)->issue($user, AuthRecoveryService::EMAIL_VERIFICATION);
-            Mail::to($user->email)->send(new AuthActionMail('verify', rtrim((string) env('FRONTEND_URL', ''), '/') . '/verify-email?token=' . urlencode($verificationToken)));
+            Mail::to($user->email)->send(new AuthActionMail('verify', app(AuthRecoveryService::class)->frontendLink($user, '/verify-email', $verificationToken)));
         } catch (Throwable $exception) {
             report($exception);
         }
@@ -159,14 +159,17 @@ class AuthController extends ApiController
     public function forgotPassword(Request $request, AuthRecoveryService $recovery): JsonResponse
     {
         $data = $request->validate(['email' => ['required', 'email', 'max:255']]);
-        $query = User::where('email', $data['email'])->where('is_active', true);
-        if ($tenantId = app(HostnameTenantContext::class)->id()) {
-            $query->where('tenant_id', $tenantId);
+        $tenantId = app(HostnameTenantContext::class)->id();
+        if ($tenantId === null) {
+            return response()->json(['message' => 'إذا كان الحساب موجوداً لهذا البريد، فقد أُرسلت تعليمات الاسترداد.']);
         }
+        $query = User::where('email', $data['email'])
+            ->where('tenant_id', $tenantId)
+            ->where('is_active', true);
         if ($user = $query->first()) {
             try {
                 $token = $recovery->issue($user, AuthRecoveryService::PASSWORD_RESET);
-                Mail::to($user->email)->send(new AuthActionMail('reset', rtrim((string) env('FRONTEND_URL', ''), '/') . '/reset-password?token=' . urlencode($token)));
+                Mail::to($user->email)->send(new AuthActionMail('reset', $recovery->frontendLink($user, '/reset-password', $token)));
             } catch (Throwable $exception) {
                 report($exception);
             }
@@ -197,7 +200,7 @@ class AuthController extends ApiController
         if ($user->email_verified_at === null) {
             try {
                 $token = $recovery->issue($user, AuthRecoveryService::EMAIL_VERIFICATION);
-                Mail::to($user->email)->send(new AuthActionMail('verify', rtrim((string) env('FRONTEND_URL', ''), '/') . '/verify-email?token=' . urlencode($token)));
+                Mail::to($user->email)->send(new AuthActionMail('verify', $recovery->frontendLink($user, '/verify-email', $token)));
             } catch (Throwable $exception) {
                 report($exception);
             }

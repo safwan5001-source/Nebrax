@@ -104,6 +104,16 @@ final class TenantHostnameResolver
         return (string) $matches->first()->id;
     }
 
+    /** رابط واجهة AWJ للمستأجر باستخدام نفس نطاقات V1 المعتمدة للحسم. */
+    public function frontendUrlForTenant(string $slug, string $path, array $query = []): string
+    {
+        $base = $this->baseDomains()[0];
+        $scheme = (string) config('tenancy.frontend_scheme', app()->environment(['local', 'testing']) ? 'http' : 'https');
+        $url = rtrim($scheme, ':').'://'.strtolower($slug).'.'.$base.'/'.ltrim($path, '/');
+
+        return $query === [] ? $url : $url.'?'.http_build_query($query);
+    }
+
     /** @return list<string> أطول نطاقاً أولاً حتى لا يبتلع أبٌ أقصر ابناً. */
     private function baseDomains(): array
     {
