@@ -204,6 +204,48 @@ class StorefrontCartApiTest extends TestCase
         $this->assertNotSame(24000, $response->json('data.items.0.line_total.amount_minor'));
     }
 
+    /**
+     * PR-CART-PRICE-1: تكملة `canonical_uom_rules_and_explicit_alternative_pricing_are_enforced`
+     * — بعد أن أصبح للوحدة البديلة سعرٌ صريح، حذفه لاحقاً (مثل عملية
+     * `PriceListController::destroyItem()`) يجب أن يُسقِط الأهلية فوراً: قراءةٌ
+     * لاحقة تُبقي السطر القديم محفوظاً غير متاح (لا حذفاً صامتاً)، وإضافةٌ جديدة
+     * لنفس الوحدة البديلة تُرفض بدل أن تلتزم بسعرٍ لم يعد له مصدر.
+     *
+     * @test
+     */
+    public function deleting_an_alternative_unit_price_makes_the_line_unavailable_and_blocks_new_adds(): void
+    {
+        ['tenant' => $tenant, 'channel' => $channel] = $this->store('price-gone.test');
+        app(TenantContext::class)->set($tenant->id);
+        $template = UnitTemplate::create(['name' => 'Price gone units', 'base_unit' => 'piece']);
+        $carton = $template->units()->create(['name' => 'carton', 'factor' => 10]);
+        $list = PriceList::create(['name' => 'Price gone list', 'is_active' => true]);
+        $channel->update(['default_price_list_id' => $list->id]);
+        app(TenantContext::class)->forget();
+        $product = $this->product($tenant, $channel, ['unit_template_id' => $template->id]);
+        app(TenantContext::class)->set($tenant->id);
+        $item = app(PriceListService::class)->upsertItem($list, $product, ['unit_name' => 'carton', 'price' => 9000]);
+        app(TenantContext::class)->forget();
+
+        $created = $this->add('price-gone.test', $product, ['unit_key' => 'unit:'.$carton->id])
+            ->assertCreated()
+            ->assertJsonPath('data.items.0.available', true);
+        $token = $created->getCookie(CommerceCartService::COOKIE_NAME, false)->getValue();
+
+        app(TenantContext::class)->set($tenant->id);
+        $item->delete();
+        app(TenantContext::class)->forget();
+
+        $this->withCredentials()->withUnencryptedCookie(CommerceCartService::COOKIE_NAME, $token)
+            ->getJson('http://price-gone.test/store/v1/cart')->assertOk()
+            ->assertJsonPath('data.items.0.available', false)
+            ->assertJsonPath('data.items.0.line_total.amount_minor', 0)
+            ->assertJsonCount(1, 'data.items');
+
+        $this->add('price-gone.test', $product, ['unit_key' => 'unit:'.$carton->id], $token)
+            ->assertUnprocessable();
+    }
+
     /** @test */
     public function repeated_identity_merges_different_uom_separates_and_patch_delete_work(): void
     {

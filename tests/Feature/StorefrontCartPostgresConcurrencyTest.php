@@ -4,11 +4,15 @@ namespace Tests\Feature;
 
 use App\Models\CommerceCart;
 use App\Models\CommerceListing;
+use App\Models\PriceList;
+use App\Models\PriceListItem;
 use App\Models\Product;
 use App\Models\SalesChannel;
 use App\Models\Storefront;
 use App\Models\StorefrontDomain;
 use App\Models\Tenant;
+use App\Models\UnitTemplate;
+use App\Models\UnitTemplateUnit;
 use App\Services\Commerce\CommerceCartService;
 use App\Tenancy\StorefrontContext;
 use App\Tenancy\TenantContext;
@@ -236,6 +240,105 @@ class StorefrontCartPostgresConcurrencyTest extends TestCase
         $this->assertSame(1, DB::table('commerce_cart_items')->where('cart_id', $cart->id)->count());
         $this->assertFalse((bool) DB::table('products')->where('id', $product->id)->value('is_active'));
         $this->assertFalse((bool) DB::table('commerce_listings')->where('id', $listing->id)->value('is_published'));
+    }
+
+    /**
+     * PR-CART-PRICE-1: مطابقة نمط `add_holds_product_and_listing_eligibility_through_the_line_write`
+     * لكن على مصدر السعر بدل الأهلية — حذف `PriceListItem` الوحدة البديلة بالتزامن
+     * أثناء الكتابة يجب أن يوقفه القفل حتى تلتزم الإضافة، لا أن يفلت فيترك السطر
+     * مكتوباً بنجاح بناءً على سعرٍ لم يعد له مصدر.
+     *
+     * @test
+     */
+    public function add_holds_alternative_unit_price_eligibility_through_the_line_write(): void
+    {
+        $template = UnitTemplate::create(['name' => 'Price race units', 'base_unit' => 'piece', 'is_active' => true]);
+        $unit = UnitTemplateUnit::create(['unit_template_id' => $template->id, 'name' => 'carton', 'factor' => 10]);
+        $product = Product::create([
+            'name' => 'Price race product',
+            'sku' => 'PRICE-'.Str::random(8),
+            'unit' => 'piece',
+            'unit_template_id' => $template->id,
+            'sale_price' => 1250,
+            'is_active' => true,
+        ]);
+        CommerceListing::create([
+            'product_id' => $product->id,
+            'sales_channel_id' => $this->channel->id,
+            'is_published' => true,
+        ]);
+        $priceList = PriceList::create(['name' => 'Price race list', 'is_active' => true]);
+        $item = PriceListItem::create([
+            'price_list_id' => $priceList->id,
+            'product_id' => $product->id,
+            'unit_name' => 'carton',
+            'price' => 9000,
+        ]);
+        $this->channel->update(['default_price_list_id' => $priceList->id]);
+
+        $cart = $this->cart(now()->addDay());
+        $eligibilityLocked = $this->signalPath('cart_price_eligibility_');
+        $deleteStarted = $this->signalPath('cart_price_delete_');
+        $resultFile = tempnam(sys_get_temp_dir(), 'cart_price_result_');
+
+        $adder = pcntl_fork();
+        if ($adder === 0) {
+            DB::purge(config('database.default'));
+            $this->establishContext();
+            DB::listen(function ($query) use ($eligibilityLocked, $deleteStarted): void {
+                if (str_contains($query->sql, 'price_list_items')
+                    && str_contains(strtolower($query->sql), 'for update')
+                ) {
+                    touch($eligibilityLocked);
+                    $this->waitForSignal($deleteStarted);
+                    usleep(500000);
+                }
+            });
+            try {
+                $result = app(CommerceCartService::class)->add(
+                    CommerceCart::query()->findOrFail($cart->id),
+                    $product->id,
+                    'unit:'.$unit->id,
+                    1,
+                );
+                file_put_contents($resultFile, json_encode([
+                    'ok' => true,
+                    'available' => $result['data']['items'][0]['available'],
+                ]));
+            } catch (\Throwable $exception) {
+                file_put_contents($resultFile, json_encode([
+                    'ok' => false,
+                    'message' => $exception->getMessage(),
+                ]));
+            }
+            exit(0);
+        }
+        $this->assertGreaterThan(0, $adder);
+        $this->waitForSignal($eligibilityLocked);
+
+        $deleter = pcntl_fork();
+        if ($deleter === 0) {
+            DB::purge(config('database.default'));
+            touch($deleteStarted);
+            DB::table('price_list_items')->where('id', $item->id)->delete();
+            exit(0);
+        }
+        $this->assertGreaterThan(0, $deleter);
+
+        pcntl_waitpid($adder, $status);
+        pcntl_waitpid($deleter, $status);
+        $result = json_decode((string) file_get_contents($resultFile), true);
+        $this->cleanupSignals([$eligibilityLocked, $deleteStarted, $resultFile]);
+
+        // القفل يعطي الإضافة أولوية: يلتزم السطر أولاً بالسعر الذي كان موجوداً
+        // حتماً وقت القفل، ثم يمضي الحذف — تماماً كما تبقى إضافةٌ آمنة رغم
+        // إلغاء نشر قائمة تنتظر نفس القفل. المهم إثباته هنا هو الحصر: الحذف لا
+        // يستطيع أن يتم أثناء القفل ويجعل الإضافة تلتزم بسعرٍ محذوفٍ فعلاً وقت
+        // كتابة السطر — لا حالة تعليق صامتة.
+        $this->assertTrue($result['ok'], json_encode($result));
+        $this->assertTrue($result['available']);
+        $this->assertSame(1, DB::table('commerce_cart_items')->where('cart_id', $cart->id)->count());
+        $this->assertSame(0, DB::table('price_list_items')->where('id', $item->id)->count());
     }
 
     /** @test */

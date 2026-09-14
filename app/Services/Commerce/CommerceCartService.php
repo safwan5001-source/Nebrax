@@ -257,7 +257,7 @@ final class CommerceCartService
         }
 
         [$canonicalKey, $unitName, $resolverUnit] = $this->resolveUnit($product, $unitKey);
-        $price = $this->prices->resolve($product->id, $context->salesChannelId(), null, $resolverUnit);
+        $price = $this->prices->resolve($product->id, $context->salesChannelId(), null, $resolverUnit, $lockEligibility);
         if (! $price->resolved || $price->amount === null) {
             throw new RuntimeException('لا يوجد سعر معتمد لهذه الوحدة.');
         }
