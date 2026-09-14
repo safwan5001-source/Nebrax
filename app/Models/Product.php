@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\BranchSettings;
 use App\Support\GeneratesDocumentNumbers;
 use App\Tenancy\BranchScoped;
 use App\Tenancy\BranchShareable;
@@ -85,20 +86,72 @@ class Product extends BaseModel implements BranchShareable
     protected static function booted(): void
     {
         static::saved(function (Product $product) {
-            if (! $product->isDirty('barcode')) {
-                return;
+            if ($product->isDirty('barcode')) {
+                $old = $product->getOriginal('barcode');
+                $new = $product->barcode;
+
+                if ($old !== null && $old !== '') {
+                    BarcodeRegistryEntry::release($old);
+                }
+                if ($new !== null && $new !== '') {
+                    BarcodeRegistryEntry::claim($new, $product->id, 'primary');
+                }
             }
 
-            $old = $product->getOriginal('barcode');
-            $new = $product->barcode;
+            // فضاء SKU الموحّد (VAR-CORE-1): يغطي المنتج والمتغيّر معاً بقيدٍ
+            // فريدٍ واحد — @see App\Models\SkuRegistryEntry.
+            //
+            // **مطالبةٌ مشروطة لا مطلقة:** على عكس الباركود، رمز منتجٍ بسيطٍ
+            // موسومٍ بفرعٍ وغير مشترك (`share_products=false`) نطاقُه الفرعُ
+            // وحده منذ عقدٍ سابق (migration 000085) — فرعان يستعملان الرمز
+            // نفسه باستقلالٍ سلوكٌ قائم يجب ألّا يكسره هذا العقد. فالمطالبة
+            // التنافسية على مستوى المستأجر تنطبق فقط حين لا معنى لعزل الفرع:
+            // منتجٌ بلا فرع، أو مشتركٌ، أو **متعدد الخيارات** (المتغيّرات
+            // بلا مفهوم فرعٍ أصلاً في VAR-CORE-1، فهويتها تنافسية على مستوى
+            // المستأجر دائماً — فما إن يصبح المنتج كذلك يلتحق SKU الأب بها).
+            if ($product->isDirty('sku')) {
+                $old = $product->getOriginal('sku');
+                $new = $product->sku;
 
-            if ($old !== null && $old !== '') {
-                BarcodeRegistryEntry::release($old);
-            }
-            if ($new !== null && $new !== '') {
-                BarcodeRegistryEntry::claim($new, $product->id, 'primary');
+                if (self::sharesSkuNamespace($product)) {
+                    if ($old !== null && $old !== '') {
+                        SkuRegistryEntry::releaseOwnedByProduct($old, $product->id);
+                    }
+                    if ($new !== null && $new !== '') {
+                        SkuRegistryEntry::claim($new, 'product', productId: $product->id);
+                    }
+                } elseif ($new !== null && $new !== '') {
+                    // منتجٌ فرعي معزول: لا ينضمّ إلى الجدول، لكن رمزه يجب ألّا
+                    // يصطدم صامتةً بهويةٍ مرئية من كل الفروع بالفعل (منتجٌ
+                    // مشترك/بلا فرع/متعدد الخيارات، أو أي متغيّر) — الاتجاه
+                    // المعاكس بالضبط لما يتحقق منه `claim()` نفسه.
+                    SkuRegistryEntry::assertFreeForIsolatedProduct($new, $product->id);
+                }
             }
         });
+    }
+
+    /**
+     * هل يشترك رمز هذا المنتج في الفضاء الموحّد الآن، بحسب الحالة الراهنة
+     * (فرعه وإعداد المشاركة الحالي)؟ يستعمله `ProductVariantService` عند
+     * التراجع عن إدارة المتغيّرات ليقرر تحرير عضوية السجلّ أو إبقاءها.
+     */
+    public function claimsSkuNamespace(): bool
+    {
+        return self::sharesSkuNamespace($this);
+    }
+
+    /** @see booted() — نطاق مطالبة SKU الموحّدة. */
+    private static function sharesSkuNamespace(Product $product): bool
+    {
+        if ($product->isVariantManaged()) {
+            return true;
+        }
+        if ($product->branch_id === null) {
+            return true;
+        }
+
+        return (bool) BranchSettings::sharing()['share_products'];
     }
 
     public function isService(): bool
@@ -109,6 +162,23 @@ class Product extends BaseModel implements BranchShareable
     public function movements(): HasMany
     {
         return $this->hasMany(StockMovement::class);
+    }
+
+    /** خيارات المتغيّرات (اللون/المقاس/...) — فارغة لمنتجٍ بسيط. */
+    public function options(): HasMany
+    {
+        return $this->hasMany(ProductOption::class)->orderBy('sort_order');
+    }
+
+    /** المتغيّرات الفعلية (VAR-CORE-1) — فارغة إلا لمنتجٍ `variant_managed`. */
+    public function variants(): HasMany
+    {
+        return $this->hasMany(ProductVariant::class);
+    }
+
+    public function isVariantManaged(): bool
+    {
+        return $this->variant_state === 'variant_managed';
     }
 
     /** الباركودات البديلة؛ الباركود الأساسي التاريخي يبقى في عمود المنتج. */

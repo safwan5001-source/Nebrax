@@ -6,6 +6,7 @@ use App\Models\BarcodeRegistryEntry;
 use App\Models\InventoryStockAlert;
 use App\Models\Product;
 use App\Models\ProductActivity;
+use App\Models\SkuRegistryEntry;
 use App\Services\DocumentCenter\DocumentStorageService;
 use App\Support\ProductReferenceRegistry;
 use App\Tenancy\BranchScope;
@@ -123,6 +124,15 @@ class ProductLifecycleService
             BarcodeRegistryEntry::releaseAllForProduct($product->id);
             $product->alternateBarcodes()->delete();
             $product->media()->delete();
+            // VAR-CORE-1: `ProductVariant` مصنَّف `COMMERCIAL_LIVE` فيمنع هذا
+            // المسار من المتابعة أصلاً ما دام للمنتج أي متغيّر — فبهذه اللحظة
+            // لا يوجد أي متغيّر، ولا سجلّ SKU مملوكٍ لمتغيّرٍ يخصّه. يبقى تحرير
+            // SKU المنتج نفسه وحذف خياراته (بلا قيمٍ تخصّها تستعملها متغيّرات).
+            SkuRegistryEntry::releaseAllForProduct($product->id);
+            foreach ($product->options()->get() as $option) {
+                $option->values()->delete();
+            }
+            $product->options()->delete();
             // تابعٌ مملوك مصنَّف في السجلّ ولا علاقة Eloquent له على المنتج؛
             // بقاؤه كان سيترك حالة تنبيهٍ معلَّقة لبطاقةٍ لم تعد قائمة. (عملياً
             // لا يُرصد تنبيه بلا رصيد أو حركة، وكلاهما مانعٌ للحذف — فهذا
