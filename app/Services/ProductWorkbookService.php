@@ -312,9 +312,13 @@ class ProductWorkbookService
         $priceRows = [];
         $ids = $products->pluck('id')->all();
         if ($ids !== []) {
+            // VAR-PRICE-1: مسار منتجٍ فقط — لا يعي المتغيّرات بعد (خارج نطاق
+            // هذا المعيار عمداً، §18)، فيُستبعد أي عنصر سعرٍ خاصٍّ بمتغيّرٍ
+            // بعينه صراحةً كي لا يختلط بكتالوج المنتج البسيط.
             $items = PriceListItem::query()
                 ->where('price_list_id', $priceList->id)
                 ->whereIn('product_id', $ids)
+                ->whereNull('product_variant_id')
                 ->get();
             $bySkuProduct = $products->keyBy('id');
             foreach ($items as $item) {

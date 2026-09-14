@@ -45,7 +45,6 @@ class Product extends BaseModel implements BranchShareable
         'min_sale_price' => 'integer',
         'discount' => 'integer',
         'profit_margin' => 'integer',
-        'sale_price' => 'integer',
         'purchase_price' => 'integer',
         'tax_rate' => 'integer',
         'track_inventory' => 'boolean',
@@ -148,6 +147,9 @@ class Product extends BaseModel implements BranchShareable
             // VAR-INV-1: توافقٌ خلفي للإسناد المباشر القديم (تجهيزات اختبارات
             // موجودة، وأدوات artisan/seed) — @see $pendingQuantityOnHand أدناه.
             $product->flushPendingInventorySeed();
+
+            // VAR-PRICE-1: نفس التوافق الخلفي لـ`sale_price` — @see $pendingSalePrice أدناه.
+            $product->flushPendingUnitPriceSeed();
         });
     }
 
@@ -276,6 +278,62 @@ class Product extends BaseModel implements BranchShareable
             $state->avg_cost = $avgCost;
         }
         $state->save();
+    }
+
+    /** أسعار الوحدات (VAR-PRICE-1) — سعرٌ أساسي واحد للمنتج نفسه لكل وحدة (لا متغيّرات هنا). */
+    public function unitPrices(): HasMany
+    {
+        return $this->hasMany(ProductUnitPrice::class)->whereNull('product_variant_id');
+    }
+
+    /**
+     * VAR-PRICE-1: `sale_price` لم يعد يُقرأ من عمود هذا الجدول — `ProductUnitPrice`
+     * (وحدة الأساس، `product_variant_id = NULL`) هي السلطة الوحيدة الآن. خلافاً
+     * لـ`quantity_on_hand`: **لا استثناء لمنتجٍ `variant_managed`** — سعر الأب
+     * يبقى مرجعاً تراجعياً صالحاً ومعتمَداً صراحةً لمتغيّرٍ بلا سعرٍ خاص لنفس
+     * الوحدة (البند ٦ من عقد VAR-PRICE-1)، فلا معنى لمنعه هنا كما مُنع المخزون.
+     */
+    protected function salePrice(): Attribute
+    {
+        return Attribute::make(
+            // إسنادٌ لم يُحفَظ بعد يبقى مرئياً فوراً للقراءة — كسلوك أي عمود
+            // Eloquent عادي (`$model->x = 1; $model->x === 1` قبل `save()`
+            // أيضاً). بلا هذا كان `$product->setAttribute('sale_price', ...)`
+            // العابر لعرض سعرٍ مُحسَّب من قائمة أسعارٍ (`PosController::products()`)
+            // يُقرأ فوراً بعده فيعود صامتاً إلى السعر الأساسي القديم — القيمة
+            // العابرة لم تُكتب ولن تُكتب أصلاً (لا `save()` بعدها إطلاقاً).
+            get: fn () => $this->pendingSalePrice
+                ?? (int) ($this->unitPrices()->where('unit_name', $this->unit)->value('price') ?? 0),
+            set: function ($value) {
+                $this->pendingSalePrice = (int) $value;
+
+                return [];
+            },
+        );
+    }
+
+    /** @see flushPendingUnitPriceSeed() */
+    private ?int $pendingSalePrice = null;
+
+    /**
+     * يوازي `flushPendingInventorySeed()` حرفياً لكن بلا أي استثناء لمنتجٍ
+     * `variant_managed` — سعر الأب سلطةٌ صالحة دائماً (خلافاً للمخزون).
+     */
+    private function flushPendingUnitPriceSeed(): void
+    {
+        if ($this->pendingSalePrice === null) {
+            return;
+        }
+
+        $price = $this->pendingSalePrice;
+        $this->pendingSalePrice = null;
+
+        $row = ProductUnitPrice::firstOrNew([
+            'product_id' => $this->id, 'product_variant_id' => null, 'unit_name' => $this->unit,
+        ]);
+        $row->tenant_id = $this->tenant_id;
+        $row->price = $price;
+        $row->save();
     }
 
     /** خيارات المتغيّرات (اللون/المقاس/...) — فارغة لمنتجٍ بسيط. */
