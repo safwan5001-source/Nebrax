@@ -147,7 +147,7 @@ final class CommerceCartService
                 throw new CartNotFoundException('عنصر السلة غير متاح للتحديث.');
             }
 
-            $this->purchasable($line->product_id, $line->unit_key);
+            $this->purchasable($line->product_id, $line->unit_key, lockEligibility: true);
             $line->update(['quantity' => $quantity]);
             $cart->update(['expires_at' => now()->addDays(self::LIFETIME_DAYS)]);
 
@@ -232,21 +232,27 @@ final class CommerceCartService
     }
 
     /** @return array{product: Product, unit_key: string, unit_name: string, amount: int} */
-    private function purchasable(string $productId, string $unitKey): array
+    private function purchasable(string $productId, string $unitKey, bool $lockEligibility = false): array
     {
         $context = $this->context();
-        $product = Product::query()
+        $productQuery = Product::query()
             ->withoutGlobalScope(BranchScope::class)
             ->whereKey($productId)
-            ->where('is_active', true)
-            ->first();
-
-        if ($product === null || ! CommerceListing::query()
-            ->where('product_id', $product->id)
+            ->where('is_active', true);
+        $listingQuery = CommerceListing::query()
+            ->where('product_id', $productId)
             ->where('sales_channel_id', $context->salesChannelId())
-            ->where('is_published', true)
-            ->exists()
-        ) {
+            ->where('is_published', true);
+
+        if ($lockEligibility) {
+            $productQuery->lockForUpdate();
+            $listingQuery->lockForUpdate();
+        }
+
+        $product = $productQuery->first();
+        $listing = $listingQuery->first(['id']);
+
+        if ($product === null || $listing === null) {
             throw new RuntimeException('المنتج غير متاح للشراء.');
         }
 

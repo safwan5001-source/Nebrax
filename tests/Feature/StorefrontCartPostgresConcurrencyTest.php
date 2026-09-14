@@ -290,6 +290,100 @@ class StorefrontCartPostgresConcurrencyTest extends TestCase
         $this->assertLostCartMutationClearsCookie('delete');
     }
 
+    /** @test */
+    public function update_holds_product_eligibility_through_the_quantity_change(): void
+    {
+        $this->assertEligibilityChangeWaitsForUpdate('product');
+    }
+
+    /** @test */
+    public function update_holds_listing_eligibility_through_the_quantity_change(): void
+    {
+        $this->assertEligibilityChangeWaitsForUpdate('listing');
+    }
+
+    private function assertEligibilityChangeWaitsForUpdate(string $target): void
+    {
+        $product = Product::create([
+            'name' => 'Update eligibility product',
+            'sku' => 'UPDATE-'.Str::random(8),
+            'unit' => 'piece',
+            'sale_price' => 1250,
+            'is_active' => true,
+        ]);
+        $listing = CommerceListing::create([
+            'product_id' => $product->id,
+            'sales_channel_id' => $this->channel->id,
+            'is_published' => true,
+        ]);
+        $cart = $this->cart(now()->addDay());
+        $created = app(CommerceCartService::class)->add($cart, $product->id, 'base', 1);
+        $itemId = $created['data']['items'][0]['id'];
+        $eligibilityLocked = $this->signalPath("cart_{$target}_eligibility_");
+        $changeStarted = $this->signalPath("cart_{$target}_change_");
+        $resultFile = tempnam(sys_get_temp_dir(), "cart_{$target}_result_");
+
+        $updater = pcntl_fork();
+        if ($updater === 0) {
+            DB::purge(config('database.default'));
+            $this->establishContext();
+            DB::listen(function ($query) use ($eligibilityLocked, $changeStarted): void {
+                if (str_contains($query->sql, 'commerce_listings')
+                    && str_contains(strtolower($query->sql), 'for update')
+                ) {
+                    touch($eligibilityLocked);
+                    $this->waitForSignal($changeStarted);
+                }
+            });
+            try {
+                $data = app(CommerceCartService::class)->update(
+                    CommerceCart::query()->findOrFail($cart->id),
+                    $itemId,
+                    2,
+                );
+                file_put_contents($resultFile, json_encode([
+                    'ok' => true,
+                    'quantity' => $data['items'][0]['quantity'],
+                    'available' => $data['items'][0]['available'],
+                ]));
+            } catch (\Throwable $exception) {
+                file_put_contents($resultFile, json_encode([
+                    'ok' => false,
+                    'message' => $exception->getMessage(),
+                ]));
+            }
+            exit(0);
+        }
+        $this->assertGreaterThan(0, $updater);
+        $this->waitForSignal($eligibilityLocked);
+
+        $changer = pcntl_fork();
+        if ($changer === 0) {
+            DB::purge(config('database.default'));
+            touch($changeStarted);
+            if ($target === 'product') {
+                DB::table('products')->where('id', $product->id)->update(['is_active' => false]);
+            } else {
+                DB::table('commerce_listings')->where('id', $listing->id)->update(['is_published' => false]);
+            }
+            exit(0);
+        }
+        $this->assertGreaterThan(0, $changer);
+
+        pcntl_waitpid($updater, $status);
+        pcntl_waitpid($changer, $status);
+        $result = json_decode((string) file_get_contents($resultFile), true);
+        $this->cleanupSignals([$eligibilityLocked, $changeStarted, $resultFile]);
+
+        $this->assertTrue($result['ok'], json_encode($result));
+        $this->assertSame(2, $result['quantity']);
+        $this->assertTrue($result['available']);
+        $this->assertSame(2, DB::table('commerce_cart_items')->where('id', $itemId)->value('quantity'));
+        $this->assertFalse((bool) DB::table($target === 'product' ? 'products' : 'commerce_listings')
+            ->where('id', $target === 'product' ? $product->id : $listing->id)
+            ->value($target === 'product' ? 'is_active' : 'is_published'));
+    }
+
     private function assertLostCartMutationClearsCookie(string $method): void
     {
         $host = "cart-lost-{$method}-".Str::random(8).'.test';
