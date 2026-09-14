@@ -1,9 +1,9 @@
 # AUTH-SEC-1 Implementation Report
 
-- **Status:** P1 fix implemented on the existing branch; PR open; not merged and not deployed.
-- **Summary:** Hardened the tenant-bound V1 email verification and password recovery flow for AWJ staff authentication. Recovery and verification now fail closed without a valid tenant hostname, and all generated links target the tenant’s configured frontend subdomain.
+- **Status:** P1 fix and the scoped Laravel CI fix are implemented on the existing branch; PR open; not merged and not deployed.
+- **Summary:** Hardened the tenant-bound V1 email verification and password recovery flow for AWJ staff authentication, then fixed the CI configuration-load regression introduced by the tenant frontend scheme setting.
 - **Base SHA:** `4689f1bba1d285b4f8b57b96ad0522bf253fbc8e`
-- **Head SHA:** `a24c4910f64a948bb1248debcb13b897bc4b55d5` (current PR head before this report metadata commit).
+- **Head SHA:** Updated by the final metadata commit for this CI-fix pass.
 - **Branch:** `feat/auth-sec-1-email-password-recovery`
 - **PR:** [#795](https://github.com/safwan5001-source/Nebrax/pull/795)
 
@@ -28,6 +28,7 @@ The web application now includes minimal responsive pages for password recovery,
 | `app/Providers/TenancyServiceProvider.php` | Adds dedicated recovery/reset rate limiters. |
 | `deploy/assemble.sh` | Ensures the Mailable and view are included in Docker/CI Laravel assembly. |
 | `tests/Feature/AuthRecoveryTest.php` | Focused regression/security coverage for neutral responses, reset, replay, expiry, resend throttling, strict tenant boundaries, missing context, and tenant links. |
+| `docs/plans/auth/AUTH-SEC-1-IMPLEMENTATION-REPORT.md` | Records P1 behavior, CI root causes, validation, and remaining unrelated CI status. |
 | `web/src/app/forgot-password/page.tsx` | Forgot-password form and neutral success state. |
 | `web/src/app/reset-password/page.tsx` | Reset-password form. |
 | `web/src/app/verify-email/page.tsx` | Verification result state. |
@@ -61,10 +62,13 @@ The deployment environment must provide the existing Laravel mail configuration 
 | `cd web && npm run build` | Passed: Next.js compiled successfully and generated 170 static pages. |
 | `cd web && npm run test` after P1 changes | Passed: **266 test files, 1,731 tests**. |
 | `php artisan test --filter=AuthRecoveryTest` | Not run locally: this checkout contains Laravel core files assembled by Docker/CI and the sandbox has no PHP, Composer, or Docker. The focused test file is included for CI. |
+| `cd web && npm run test -- src/modules/developer/docs/__tests__/openapi-model.drift.test.ts` | Passed locally: 1 file, 3 tests. The corresponding Web CI failure was an unrelated OpenAPI model drift assertion in `openapi-model.drift.test.ts`; no Web source or contract change was made within this scope. |
 
 ## Build / CI
 
-Before the P1 commit, the current PR checks were green: four Laravel matrix checks and one Web CI check succeeded. The P1 commit requires a fresh CI run; its final status must be recorded after GitHub Actions completes. The PR remains open at [#795](https://github.com/safwan5001-source/Nebrax/pull/795). This task does not merge or deploy.
+The CI run at the starting Head failed before tests. **Laravel root cause:** `config/tenancy.php` evaluated `app()->environment(...)` while the temporary Laravel assembly was loading configuration; in that CI bootstrap state the `env` binding/helper was unavailable, producing `Target class [env] does not exist` / `Class "env" does not exist` for both SQLite and PostgreSQL. The scoped fix removes the application-container call from config evaluation and uses the existing environment variables with a plain `APP_ENV` comparison.
+
+**Web CI root cause:** the first failing test was the pre-existing `src/modules/developer/docs/__tests__/openapi-model.drift.test.ts`, which reported a committed OpenAPI model mismatch (`1 failed, 268 passed`, `1,744 passed, 1 failed`). This is outside AUTH-SEC-1 and passed locally; no unrelated OpenAPI/Developer change was made. A fresh CI run after the Laravel fix is required to record the final check state. The PR remains open at [#795](https://github.com/safwan5001-source/Nebrax/pull/795). This task does not merge or deploy.
 
 ## Deferred / Follow-up
 
@@ -72,7 +76,7 @@ A production policy decision is still required before making email verification 
 
 ## Risks
 
-The repository cannot validate the Laravel tests locally without the Docker/CI toolchain. The fresh CI run must validate the migration and full backend test matrix on SQLite and PostgreSQL. Mail delivery remains dependent on the configured provider; failed delivery is logged but requires operational monitoring and retry policy outside this narrow V1.
+The repository cannot validate the Laravel tests locally without the Docker/CI toolchain. The fresh CI run must validate the migration and full backend test matrix on SQLite and PostgreSQL. Web CI still needs a fresh result; if the OpenAPI drift failure recurs, it remains a pre-existing unrelated blocker and should not be fixed under AUTH-SEC-1 without a separate scope decision. Mail delivery remains dependent on the configured provider; failed delivery is logged but requires operational monitoring and retry policy outside this narrow V1.
 
 ## Next Step
 
