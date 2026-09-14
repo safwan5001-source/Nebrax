@@ -364,8 +364,8 @@ Deferred explicitly to later milestones, per the mission's own scope boundary:
 ```
 Branch: claude/var-core-1-product-variants-b9hdzf
 Base SHA: ba621e66fb0254c1261468f6ab63bd8eb8d40d02
-Head SHA: (recorded at the commit that includes this report)
-PR: opened against safwan5001-source/Nebrax main — NOT merged.
+Head SHA: 4ffaab989033b69293c5d228bd826336acf7f3ab
+PR: https://github.com/safwan5001-source/Nebrax/pull/806 — NOT merged.
 ```
 
 ## Next recommended step
