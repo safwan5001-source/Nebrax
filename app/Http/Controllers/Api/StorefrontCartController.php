@@ -42,6 +42,8 @@ final class StorefrontCartController extends PublicApiController
                 $data['unit_key'] ?? 'base',
                 $data['quantity'],
             );
+        } catch (CartNotFoundException) {
+            return $this->clearCookie($this->notFound($request));
         } catch (RuntimeException $e) {
             abort(422, $e->getMessage());
         }
