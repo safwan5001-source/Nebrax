@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\InventoryState;
 use App\Models\Product;
 use App\Models\ProductWarehouseStock;
 use App\Models\User;
@@ -619,6 +620,57 @@ class ReportEffectiveScopeTest extends TestCase
     }
 
     // ═════════════════════════════════════════════════════════════════
+    //  VAR-INV-1 fixture contract guard — every test below this line seeds
+    //  quantity/avg_cost for `trackedProductId` and then reads it back
+    //  through a report. Since VAR-INV-1, `Product::quantity_on_hand`/
+    //  `avg_cost` are Eloquent *accessors* backed by `InventoryState`
+    //  (App\Models\InventoryState, product_id + product_variant_id = null
+    //  for a simple product) — the physical `products.quantity_on_hand`/
+    //  `avg_cost` columns are frozen and never read again. A seed via
+    //  `Product::whereKey($id)->update([...])` (a query-builder mass
+    //  update) bypasses the accessor entirely and writes only the frozen
+    //  column, so every report below would silently read back 0 — exactly
+    //  what broke here once main picked up VAR-INV-1 while this class
+    //  itself was never touched. The correct seed goes through a *model
+    //  instance* `update()`/`save()` (`Product::findOrFail($id)->update([...])`),
+    //  which routes through the accessor's pending-seed mechanism
+    //  (`Product::flushPendingInventorySeed()`) into `InventoryState` —
+    //  exactly what the accessor reads. This guard test pins that
+    //  contract directly so a new report test seeded the wrong way fails
+    //  here first, with a clear explanation, instead of as a confusing
+    //  "0 instead of N" report assertion.
+    // ═════════════════════════════════════════════════════════════════
+
+    /** @test — the only seeding pattern this whole class relies on actually reaches InventoryState, not the frozen products columns. */
+    public function seeding_quantity_and_avg_cost_via_model_update_reaches_inventory_state_not_the_frozen_columns(): void
+    {
+        Product::findOrFail($this->trackedProductId)->update(['quantity_on_hand' => 21, 'avg_cost' => 4200]);
+
+        $state = InventoryState::where('product_id', $this->trackedProductId)
+            ->whereNull('product_variant_id')
+            ->first();
+
+        $this->assertNotNull($state, 'A model-instance update() must lazily create the simple InventoryState row.');
+        $this->assertSame($this->tenantId, $state->tenant_id, 'InventoryState must carry the product\'s own tenant — Tenant Isolation.');
+        $this->assertSame(21, $state->quantity_on_hand);
+        $this->assertSame(4200, $state->avg_cost);
+
+        // The accessor reads InventoryState, never the physical column —
+        // this is what every report in this class ultimately depends on.
+        $fresh = Product::findOrFail($this->trackedProductId);
+        $this->assertSame(21, $fresh->quantity_on_hand);
+        $this->assertSame(4200, $fresh->avg_cost);
+
+        // The trap this whole guard exists to catch: a query-builder mass
+        // update writes the frozen column only — InventoryState (and so
+        // every accessor read, and every report) never sees it.
+        Product::whereKey($this->trackedProductId)->update(['quantity_on_hand' => 999, 'avg_cost' => 999999]);
+        $stillFresh = Product::findOrFail($this->trackedProductId);
+        $this->assertSame(21, $stillFresh->quantity_on_hand, 'A mass update() must NOT reach InventoryState — proves the trap this guard documents is real.');
+        $this->assertSame(4200, $stillFresh->avg_cost);
+    }
+
+    // ═════════════════════════════════════════════════════════════════
     //  PR-ACL-INVENTORY-CATALOG-EXPORT-SCOPE — /api/inventory/export and
     //  InventoryReportService::inventoryValue() (view=value). Quantity and
     //  stock_value are scoped to the actor's Effective Warehouse Scope;
@@ -630,7 +682,7 @@ class ReportEffectiveScopeTest extends TestCase
     /** @test — Export: unrestricted user still sees the full tenant-wide quantity — backward compatibility. */
     public function export_unrestricted_user_sees_full_tenant_wide_quantity(): void
     {
-        Product::find($this->trackedProductId)->update(['quantity_on_hand' => 12, 'avg_cost' => 10000]);
+        Product::findOrFail($this->trackedProductId)->update(['quantity_on_hand' => 12, 'avg_cost' => 10000]);
         ProductWarehouseStock::create(['tenant_id' => $this->tenantId, 'product_id' => $this->trackedProductId, 'warehouse_id' => $this->mainWarehouseId, 'quantity' => 5]);
         ProductWarehouseStock::create(['tenant_id' => $this->tenantId, 'product_id' => $this->trackedProductId, 'warehouse_id' => $this->otherWarehouseId, 'quantity' => 7]);
 
@@ -645,7 +697,7 @@ class ReportEffectiveScopeTest extends TestCase
     /** @test — Export: a user restricted to one warehouse sees only that warehouse's quantity, not the tenant total. */
     public function export_restricted_to_one_warehouse_sees_only_that_warehouses_quantity(): void
     {
-        Product::find($this->trackedProductId)->update(['quantity_on_hand' => 12, 'avg_cost' => 10000]);
+        Product::findOrFail($this->trackedProductId)->update(['quantity_on_hand' => 12, 'avg_cost' => 10000]);
         ProductWarehouseStock::create(['tenant_id' => $this->tenantId, 'product_id' => $this->trackedProductId, 'warehouse_id' => $this->mainWarehouseId, 'quantity' => 5]);
         ProductWarehouseStock::create(['tenant_id' => $this->tenantId, 'product_id' => $this->trackedProductId, 'warehouse_id' => $this->otherWarehouseId, 'quantity' => 7]);
 
@@ -663,7 +715,7 @@ class ReportEffectiveScopeTest extends TestCase
     /** @test — Export: a user restricted to two warehouses sees the sum of exactly those two, excluding the third. */
     public function export_restricted_to_multiple_warehouses_sums_only_allowed(): void
     {
-        Product::find($this->trackedProductId)->update(['quantity_on_hand' => 15, 'avg_cost' => 10000]);
+        Product::findOrFail($this->trackedProductId)->update(['quantity_on_hand' => 15, 'avg_cost' => 10000]);
         ProductWarehouseStock::create(['tenant_id' => $this->tenantId, 'product_id' => $this->trackedProductId, 'warehouse_id' => $this->mainWarehouseId, 'quantity' => 5]);
         ProductWarehouseStock::create(['tenant_id' => $this->tenantId, 'product_id' => $this->trackedProductId, 'warehouse_id' => $this->thirdWarehouseId, 'quantity' => 3]);
         ProductWarehouseStock::create(['tenant_id' => $this->tenantId, 'product_id' => $this->trackedProductId, 'warehouse_id' => $this->otherWarehouseId, 'quantity' => 7]);
@@ -680,7 +732,7 @@ class ReportEffectiveScopeTest extends TestCase
     /** @test — Export: without products.view_cost, avg_cost/stock_value stay redacted while quantity remains correctly scoped — independent controls. */
     public function export_without_cost_permission_redacts_cost_but_still_scopes_quantity(): void
     {
-        Product::find($this->trackedProductId)->update(['quantity_on_hand' => 12, 'avg_cost' => 10000]);
+        Product::findOrFail($this->trackedProductId)->update(['quantity_on_hand' => 12, 'avg_cost' => 10000]);
         ProductWarehouseStock::create(['tenant_id' => $this->tenantId, 'product_id' => $this->trackedProductId, 'warehouse_id' => $this->mainWarehouseId, 'quantity' => 5]);
         ProductWarehouseStock::create(['tenant_id' => $this->tenantId, 'product_id' => $this->trackedProductId, 'warehouse_id' => $this->otherWarehouseId, 'quantity' => 7]);
 
@@ -701,7 +753,7 @@ class ReportEffectiveScopeTest extends TestCase
         // All of this product's real stock sits in the FORBIDDEN warehouse.
         // Tenant-wide quantity_on_hand is 7 (nonzero), but the restricted
         // user's effective scope is 0 — must be excluded, not shown as 7.
-        Product::find($this->trackedProductId)->update(['quantity_on_hand' => 7, 'avg_cost' => 10000]);
+        Product::findOrFail($this->trackedProductId)->update(['quantity_on_hand' => 7, 'avg_cost' => 10000]);
         ProductWarehouseStock::create(['tenant_id' => $this->tenantId, 'product_id' => $this->trackedProductId, 'warehouse_id' => $this->otherWarehouseId, 'quantity' => 7]);
 
         $restricted = $this->restrictedToMainBranchAndWarehouse('export-zero-scope@rpt-scope.test');
@@ -714,7 +766,7 @@ class ReportEffectiveScopeTest extends TestCase
     /** @test — Export: include_zero=true keeps that same product, now showing its correctly scoped zero. */
     public function export_include_zero_true_shows_the_scoped_zero_not_the_tenant_wide_quantity(): void
     {
-        Product::find($this->trackedProductId)->update(['quantity_on_hand' => 7, 'avg_cost' => 10000]);
+        Product::findOrFail($this->trackedProductId)->update(['quantity_on_hand' => 7, 'avg_cost' => 10000]);
         ProductWarehouseStock::create(['tenant_id' => $this->tenantId, 'product_id' => $this->trackedProductId, 'warehouse_id' => $this->otherWarehouseId, 'quantity' => 7]);
 
         $restricted = $this->restrictedToMainBranchAndWarehouse('export-zero-scope-shown@rpt-scope.test');
@@ -733,7 +785,7 @@ class ReportEffectiveScopeTest extends TestCase
         // warehouse_id): present in quantity_on_hand but in NO
         // product_warehouse_stock row at all — the exact case
         // AWJ_INVENTORY_VALUATION_SEMANTICS.md §2 documents.
-        Product::find($this->trackedProductId)->update(['quantity_on_hand' => 9, 'avg_cost' => 10000]);
+        Product::findOrFail($this->trackedProductId)->update(['quantity_on_hand' => 9, 'avg_cost' => 10000]);
         // Deliberately no ProductWarehouseStock rows at all for this product.
 
         $rows = $this->readCsv($this->withToken($this->ownerToken)
@@ -747,7 +799,7 @@ class ReportEffectiveScopeTest extends TestCase
     /** @test — Export: tenant isolation holds for the new per-warehouse SUM query itself, not just the base product list. */
     public function export_scoped_sum_query_never_crosses_tenant_boundary(): void
     {
-        Product::find($this->trackedProductId)->update(['quantity_on_hand' => 5, 'avg_cost' => 10000]);
+        Product::findOrFail($this->trackedProductId)->update(['quantity_on_hand' => 5, 'avg_cost' => 10000]);
         ProductWarehouseStock::create(['tenant_id' => $this->tenantId, 'product_id' => $this->trackedProductId, 'warehouse_id' => $this->mainWarehouseId, 'quantity' => 5]);
 
         $other = $this->registerTenant('rpt-scope-nt-export', 'nt-export@rpt-scope.test');
@@ -777,7 +829,7 @@ class ReportEffectiveScopeTest extends TestCase
     /** @test — view=value: scopes quantity and stock_value to the allowed warehouse; avg_cost stays tenant-wide unchanged. */
     public function inventory_value_view_scopes_quantity_and_stock_value_to_allowed_warehouses(): void
     {
-        Product::find($this->trackedProductId)->update(['quantity_on_hand' => 12, 'avg_cost' => 10000]);
+        Product::findOrFail($this->trackedProductId)->update(['quantity_on_hand' => 12, 'avg_cost' => 10000]);
         ProductWarehouseStock::create(['tenant_id' => $this->tenantId, 'product_id' => $this->trackedProductId, 'warehouse_id' => $this->mainWarehouseId, 'quantity' => 5]);
         ProductWarehouseStock::create(['tenant_id' => $this->tenantId, 'product_id' => $this->trackedProductId, 'warehouse_id' => $this->otherWarehouseId, 'quantity' => 7]);
 
@@ -797,7 +849,7 @@ class ReportEffectiveScopeTest extends TestCase
     /** @test — view=value: unrestricted user keeps the tenant-wide totals — backward compatibility, mirrors view=warehouses. */
     public function inventory_value_view_unrestricted_shows_tenant_wide_totals(): void
     {
-        Product::find($this->trackedProductId)->update(['quantity_on_hand' => 12, 'avg_cost' => 10000]);
+        Product::findOrFail($this->trackedProductId)->update(['quantity_on_hand' => 12, 'avg_cost' => 10000]);
         ProductWarehouseStock::create(['tenant_id' => $this->tenantId, 'product_id' => $this->trackedProductId, 'warehouse_id' => $this->mainWarehouseId, 'quantity' => 5]);
         ProductWarehouseStock::create(['tenant_id' => $this->tenantId, 'product_id' => $this->trackedProductId, 'warehouse_id' => $this->otherWarehouseId, 'quantity' => 7]);
 
@@ -812,7 +864,7 @@ class ReportEffectiveScopeTest extends TestCase
     /** @test — view=value: hide_zero excludes a product whose SCOPED quantity is zero, even though its tenant-wide quantity is not. */
     public function inventory_value_view_hide_zero_uses_the_scoped_quantity_not_the_tenant_wide_one(): void
     {
-        Product::find($this->trackedProductId)->update(['quantity_on_hand' => 7, 'avg_cost' => 10000]);
+        Product::findOrFail($this->trackedProductId)->update(['quantity_on_hand' => 7, 'avg_cost' => 10000]);
         ProductWarehouseStock::create(['tenant_id' => $this->tenantId, 'product_id' => $this->trackedProductId, 'warehouse_id' => $this->otherWarehouseId, 'quantity' => 7]);
 
         $restricted = $this->restrictedToMainBranchAndWarehouse('value-hide-zero@rpt-scope.test');
