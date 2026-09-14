@@ -109,6 +109,7 @@
     "itemCount": "({count, plural, one {# item} other {# items}})",
     "shippingCalculatedAtCheckout": "Calculated at checkout",
     "removeItemLabel": "Remove {name}",
+    "itemUnavailable": "This item is no longer available",
     "giftCard": "Gift card",
     "storeCredit": "Store credit",
     "amountDue": "Amount due",

@@ -12,6 +12,11 @@ import { Button } from "@/components/ui/button";
 import { ProductImage } from "@/components/ui/product-image";
 import { useCart } from "@/contexts/CartContext";
 import { trackRemoveFromCart, trackViewCart } from "@/lib/analytics/gtm";
+import {
+  formatMinorAmount,
+  isStorefrontCart,
+  type StorefrontCartLine,
+} from "@/lib/commerce/cart-types";
 import { extractBasePath } from "@/lib/utils/path";
 
 const ExpressCheckoutButton = dynamic(
@@ -30,23 +35,28 @@ export default function CartPage() {
   const viewCartFiredRef = useRef(false);
   const t = useTranslations("cart");
   const tc = useTranslations("common");
+  const isAwj = isStorefrontCart(cart);
 
-  // Track view_cart when cart loads with items
+  // Track view_cart when cart loads with items. AWJ carts don't fire this
+  // yet — see CartDrawer's identical note (GA4's view_cart payload wants
+  // Spree's Cart/Order shape; adapting analytics is a deferred, separate
+  // concern from wiring the cart data itself).
   useEffect(() => {
     if (
       !loading &&
       cart &&
+      !isAwj &&
       cart.total_quantity > 0 &&
       !viewCartFiredRef.current
     ) {
       trackViewCart(cart);
       viewCartFiredRef.current = true;
     }
-  }, [cart, loading]);
+  }, [cart, loading, isAwj]);
 
-  const handleRemove = async (item: LineItem) => {
+  const handleRemoveSpreeLine = async (item: LineItem) => {
     await removeItem(item.id);
-    if (cart) {
+    if (cart && !isAwj) {
       trackRemoveFromCart(item, cart.currency);
     }
   };
@@ -100,55 +110,110 @@ export default function CartPage() {
         {/* Cart Items */}
         <div className="lg:col-span-2">
           <div className="bg-white rounded-xl border border-gray-200 divide-y">
-            {cart.items.map((item) => (
-              <div key={item.id} className="p-6 flex gap-6">
-                {/* Image */}
-                <div className="relative w-24 h-24 bg-gray-100 rounded-xl overflow-hidden flex-shrink-0">
-                  <ProductImage
-                    src={item.thumbnail_url}
-                    alt={item.name}
-                    fill
-                    className="object-cover"
-                    sizes="96px"
-                  />
-                </div>
+            {cart.items.map((item) => {
+              if (isAwj) {
+                const line = item as StorefrontCartLine;
+                return (
+                  <div key={line.id} className="p-6 flex gap-6">
+                    <div className="relative w-24 h-24 bg-gray-100 rounded-xl overflow-hidden flex-shrink-0">
+                      <ProductImage
+                        src={null}
+                        alt={line.name}
+                        fill
+                        className="object-cover"
+                        sizes="96px"
+                      />
+                    </div>
 
-                {/* Details */}
-                <div className="flex-1 min-w-0">
-                  <h3 className="text-lg font-medium text-gray-900 truncate">
-                    {item.name}
-                  </h3>
-                  {item.options_text && (
-                    <p className="mt-1 text-sm text-gray-500">
-                      {item.options_text}
+                    <div className="flex-1 min-w-0">
+                      <h3
+                        className={`text-lg font-medium truncate ${line.available ? "text-gray-900" : "text-gray-400"}`}
+                      >
+                        {line.name}
+                      </h3>
+                      {!line.available && (
+                        <p className="mt-1 text-sm text-red-600">
+                          {t("itemUnavailable")}
+                        </p>
+                      )}
+                      <p className="mt-2 text-lg font-semibold text-gray-900">
+                        {formatMinorAmount(line.unitPrice)}
+                      </p>
+                    </div>
+
+                    <div className="flex flex-col items-end gap-2">
+                      <QuantityPickerField
+                        quantity={line.quantity}
+                        onQuantityChange={(quantity) =>
+                          updateItem(line.id, quantity)
+                        }
+                        disabled={updating || !line.available}
+                      />
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        aria-label={t("removeItemLabel", { name: line.name })}
+                        onClick={() => removeItem(line.id)}
+                        disabled={updating}
+                      >
+                        {tc("remove")}
+                      </Button>
+                    </div>
+                  </div>
+                );
+              }
+
+              const line = item as LineItem;
+              return (
+                <div key={line.id} className="p-6 flex gap-6">
+                  {/* Image */}
+                  <div className="relative w-24 h-24 bg-gray-100 rounded-xl overflow-hidden flex-shrink-0">
+                    <ProductImage
+                      src={line.thumbnail_url}
+                      alt={line.name}
+                      fill
+                      className="object-cover"
+                      sizes="96px"
+                    />
+                  </div>
+
+                  {/* Details */}
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-lg font-medium text-gray-900 truncate">
+                      {line.name}
+                    </h3>
+                    {line.options_text && (
+                      <p className="mt-1 text-sm text-gray-500">
+                        {line.options_text}
+                      </p>
+                    )}
+                    <p className="mt-2 text-lg font-semibold text-gray-900">
+                      {line.display_price}
                     </p>
-                  )}
-                  <p className="mt-2 text-lg font-semibold text-gray-900">
-                    {item.display_price}
-                  </p>
-                </div>
+                  </div>
 
-                {/* Quantity & Actions */}
-                <div className="flex flex-col items-end gap-2">
-                  <QuantityPickerField
-                    quantity={item.quantity}
-                    onQuantityChange={(quantity) =>
-                      updateItem(item.id, quantity)
-                    }
-                    disabled={updating}
-                  />
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    aria-label={t("removeItemLabel", { name: item.name })}
-                    onClick={() => handleRemove(item)}
-                    disabled={updating}
-                  >
-                    {tc("remove")}
-                  </Button>
+                  {/* Quantity & Actions */}
+                  <div className="flex flex-col items-end gap-2">
+                    <QuantityPickerField
+                      quantity={line.quantity}
+                      onQuantityChange={(quantity) =>
+                        updateItem(line.id, quantity)
+                      }
+                      disabled={updating}
+                    />
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      aria-label={t("removeItemLabel", { name: line.name })}
+                      onClick={() => handleRemoveSpreeLine(line)}
+                      disabled={updating}
+                    >
+                      {tc("remove")}
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 
@@ -159,69 +224,98 @@ export default function CartPage() {
               {tc("orderSummary")}
             </h2>
 
-            <dl className="mt-6 space-y-4">
-              <div className="flex justify-between">
-                <dt className="text-gray-500">{tc("subtotal")}</dt>
-                <dd className="text-gray-900">{cart.display_item_total}</dd>
-              </div>
-              {cart.discount_total && parseFloat(cart.discount_total) < 0 && (
-                <div className="flex justify-between text-green-600">
-                  <dt>{tc("discount")}</dt>
-                  <dd>{cart.display_discount_total}</dd>
-                </div>
-              )}
-              {cart.delivery_total && parseFloat(cart.delivery_total) > 0 && (
+            {isAwj ? (
+              <dl className="mt-6 space-y-4">
                 <div className="flex justify-between">
-                  <dt className="text-gray-500">{tc("shipping")}</dt>
+                  <dt className="text-gray-500">{tc("subtotal")}</dt>
                   <dd className="text-gray-900">
-                    {cart.display_delivery_total}
+                    {formatMinorAmount(cart.subtotal)}
                   </dd>
                 </div>
-              )}
-              {cart.tax_total && parseFloat(cart.tax_total) > 0 && (
                 <div className="flex justify-between">
-                  <dt className="text-gray-500">{tc("tax")}</dt>
-                  <dd className="text-gray-900">{cart.display_tax_total}</dd>
+                  <dt className="text-gray-500">{tc("shipping")}</dt>
+                  <dd className="text-gray-500">
+                    {t("shippingCalculatedAtCheckout")}
+                  </dd>
                 </div>
-              )}
-              <div className="border-t pt-4 flex justify-between">
-                <dt className="text-lg font-medium text-gray-900">
-                  {tc("total")}
-                </dt>
-                <dd className="text-lg font-bold text-gray-900">
-                  {cart.display_total}
-                </dd>
-              </div>
-
-              {cart.gift_card && parseFloat(cart.gift_card_total ?? "0") > 0 ? (
-                <div className="flex justify-between text-green-600">
-                  <dt>{t("giftCard")}</dt>
-                  <dd>-{cart.display_gift_card_total}</dd>
+                <div className="border-t pt-4 flex justify-between">
+                  <dt className="text-lg font-medium text-gray-900">
+                    {tc("total")}
+                  </dt>
+                  <dd className="text-lg font-bold text-gray-900">
+                    {formatMinorAmount(cart.subtotal)}
+                  </dd>
                 </div>
-              ) : cart.store_credit_total &&
-                parseFloat(cart.store_credit_total) > 0 ? (
-                <div className="flex justify-between text-green-600">
-                  <dt>{t("storeCredit")}</dt>
-                  <dd>-{cart.display_store_credit_total}</dd>
+              </dl>
+            ) : (
+              <dl className="mt-6 space-y-4">
+                <div className="flex justify-between">
+                  <dt className="text-gray-500">{tc("subtotal")}</dt>
+                  <dd className="text-gray-900">{cart.display_item_total}</dd>
                 </div>
-              ) : null}
-
-              {cart.amount_due &&
-                cart.amount_due !== cart.total &&
-                parseFloat(cart.amount_due) > 0 && (
-                  <div className="border-t pt-4 flex justify-between">
-                    <dt className="text-lg font-medium text-gray-900">
-                      {t("amountDue")}
-                    </dt>
-                    <dd className="text-lg font-bold text-gray-900">
-                      {cart.display_amount_due}
+                {cart.discount_total && parseFloat(cart.discount_total) < 0 && (
+                  <div className="flex justify-between text-green-600">
+                    <dt>{tc("discount")}</dt>
+                    <dd>{cart.display_discount_total}</dd>
+                  </div>
+                )}
+                {cart.delivery_total && parseFloat(cart.delivery_total) > 0 && (
+                  <div className="flex justify-between">
+                    <dt className="text-gray-500">{tc("shipping")}</dt>
+                    <dd className="text-gray-900">
+                      {cart.display_delivery_total}
                     </dd>
                   </div>
                 )}
-            </dl>
+                {cart.tax_total && parseFloat(cart.tax_total) > 0 && (
+                  <div className="flex justify-between">
+                    <dt className="text-gray-500">{tc("tax")}</dt>
+                    <dd className="text-gray-900">{cart.display_tax_total}</dd>
+                  </div>
+                )}
+                <div className="border-t pt-4 flex justify-between">
+                  <dt className="text-lg font-medium text-gray-900">
+                    {tc("total")}
+                  </dt>
+                  <dd className="text-lg font-bold text-gray-900">
+                    {cart.display_total}
+                  </dd>
+                </div>
+
+                {cart.gift_card &&
+                parseFloat(cart.gift_card_total ?? "0") > 0 ? (
+                  <div className="flex justify-between text-green-600">
+                    <dt>{t("giftCard")}</dt>
+                    <dd>-{cart.display_gift_card_total}</dd>
+                  </div>
+                ) : cart.store_credit_total &&
+                  parseFloat(cart.store_credit_total) > 0 ? (
+                  <div className="flex justify-between text-green-600">
+                    <dt>{t("storeCredit")}</dt>
+                    <dd>-{cart.display_store_credit_total}</dd>
+                  </div>
+                ) : null}
+
+                {cart.amount_due &&
+                  cart.amount_due !== cart.total &&
+                  parseFloat(cart.amount_due) > 0 && (
+                    <div className="border-t pt-4 flex justify-between">
+                      <dt className="text-lg font-medium text-gray-900">
+                        {t("amountDue")}
+                      </dt>
+                      <dd className="text-lg font-bold text-gray-900">
+                        {cart.display_amount_due}
+                      </dd>
+                    </div>
+                  )}
+              </dl>
+            )}
 
             <div className="mt-6 space-y-3">
-              {parseFloat(cart.total ?? "0") > 0 && (
+              {/* AWJ carts have no checkout yet (no client-visible cart id
+                  at all) and no Payments integration — neither renders for
+                  an AWJ cart, matching CartDrawer's identical boundary. */}
+              {!isAwj && parseFloat(cart.total ?? "0") > 0 && (
                 <ExpressCheckoutButton
                   cart={cart}
                   basePath={basePath}
@@ -229,7 +323,7 @@ export default function CartPage() {
                   onProcessingChange={setExpressProcessing}
                 />
               )}
-              {!expressProcessing && (
+              {!expressProcessing && !isAwj && (
                 <>
                   <Button size="lg" asChild className="w-full">
                     <Link href={`${basePath}/checkout/${cart.id}`}>
@@ -242,6 +336,13 @@ export default function CartPage() {
                     </Link>
                   </Button>
                 </>
+              )}
+              {isAwj && (
+                <Button variant="link" asChild className="w-full">
+                  <Link href={`${basePath}/products`}>
+                    {tc("continueShopping")}
+                  </Link>
+                </Button>
               )}
             </div>
           </div>

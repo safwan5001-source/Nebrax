@@ -109,6 +109,7 @@
     "itemCount": "({count, plural, one {# produkt} few {# produkty} many {# produktów} other {# produktów}})",
     "shippingCalculatedAtCheckout": "Obliczona przy kasie",
     "removeItemLabel": "Usuń {name}",
+    "itemUnavailable": "Ten produkt nie jest już dostępny",
     "giftCard": "Karta podarunkowa",
     "storeCredit": "Kredyt sklepowy",
     "amountDue": "Do zapłaty",

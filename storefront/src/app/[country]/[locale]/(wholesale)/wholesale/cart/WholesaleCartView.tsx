@@ -1,6 +1,6 @@
 "use client";
 
-import type { LineItem } from "@spree/sdk";
+import type { Cart, LineItem } from "@spree/sdk";
 import { ShoppingBag } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -19,7 +19,19 @@ import { WHOLESALE_MIN_QUANTITY } from "@/lib/wholesale";
  * (checkout) flow, which resolves the wholesale surface from the cart id.
  */
 export function WholesaleCartView() {
-  const { cart, loading, updating, updateItem, removeItem } = useCart();
+  // This view only ever runs inside WholesaleGate's own
+  // <CartProvider surface="wholesale">, which is always Spree-backed — the
+  // AWJ_CART_WIRING only made the DTC surface AWJ-native. The cast keeps
+  // this Spree-only view compiling against CartContext's now-shared
+  // (DTC + wholesale) type without changing its behavior.
+  const {
+    cart: rawCart,
+    loading,
+    updating,
+    updateItem,
+    removeItem,
+  } = useCart();
+  const cart = rawCart as Cart | null;
   const pathname = usePathname();
   // extractBasePath strips to /{country}/{locale}; the shared checkout lives there.
   const storeBase = extractBasePath(pathname);
