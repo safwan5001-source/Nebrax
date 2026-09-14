@@ -266,6 +266,20 @@ final class CommerceCheckoutService
      * المعاملة مباشرة — منع البيع الزائد فعلياً مؤجَّلٌ لسياسة تخصيص/حجز لم
      * تُقرَّر بعد (`ADR-02 §5`)، خارج نطاق 1B.
      *
+     * **محاولات = 3 (Post-Review P2)** — بنفس نمط `createOrResume()`/
+     * `updateContact()`/`updateAddress()`/`updateDelivery()` أعلاه حرفياً،
+     * لا استثناءً جديداً. `lockForUpdate()` متسلسلة (checkout ثم cart) تحت
+     * حمل PostgreSQL حقيقي قابلة نادراً لـ`40P01 deadlock_detected` عابر —
+     * ليس بسبب ترتيب أقفالٍ متعارض بنيوياً هنا، بل تفاعل قفل الصفّ مع فحص
+     * قيد FK عند إدراج `commerce_orders` المرتبط، تحت جدولة نظامٍ محمَّل
+     * (راجع commit الإصلاح لتفصيل الفحص). `handleTransactionException()` في
+     * Laravel **لا** يعيد المحاولة إلا لاستثناء تزامنٍ فعلي (`40P01`/`40001`/
+     * رسائل deadlock معروفة) — أي استثناء عملٍ آخر يُرمى فوراً بلا انتظار
+     * (`CheckoutReviewRequiredException`، `CheckoutNotFoundException`،
+     * `CheckoutIdempotencyConflictException` تبقى فورية كما هي). معاملة
+     * متعارضة تُلغى بالكامل قبل إعادة المحاولة — لا طلب جزئي، لا تكرار،
+     * ونفس منطق Idempotency-Key يُعاد تنفيذه بأمان لأن لا شيء التزم فعلياً.
+     *
      * @return array{order: CommerceOrder, replayed: bool}
      *
      * @throws CheckoutNotFoundException Checkout/Cart غير متاحين (غائب/منتهٍ/سياق مختلف).
@@ -366,7 +380,7 @@ final class CommerceCheckoutService
             ]);
 
             return ['order' => $order, 'replayed' => false];
-        });
+        }, 3);
     }
 
     /**
