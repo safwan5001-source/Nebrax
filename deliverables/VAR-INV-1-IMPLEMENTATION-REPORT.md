@@ -306,6 +306,12 @@ All run against this branch's actual code, not simulated.
   gap in 6 Fuel tests (confirmed via `php -m | grep bcmath` — not installed in this
   sandbox; unrelated to this change, same gap noted in the prior VAR-CORE-1 rounds
   for a different reason)
+- Re-confirmed after restoring the SQLite test environment (post-PostgreSQL work,
+  `.env.sqlite.bak` → `.env`, fresh `migrate:fresh`): `InventoryStateTest`,
+  `InventoryTest`, `ProductVariantCoreTest`, `ProductReferenceClassificationGuardTest`,
+  `ProductReferenceRegistryTest`, `BranchIsolationGuardTest`, `ProductLifecycleTest`,
+  `InventoryOpeningImportTest`, `InventoryOpeningPostingTest`, `ApiInventoryTest`,
+  `DiagnoseInventoryTest` — **156/156 passed, 1077 assertions**
 
 **PostgreSQL 16 (targeted + concurrency):**
 - Full `migrate:fresh` succeeded
@@ -321,10 +327,19 @@ All run against this branch's actual code, not simulated.
   the same pre-existing, previously-documented timing flake from the VAR-CORE-1
   Round 3 report, not a regression; re-run clean 3/3 in isolation)
 
-**Broader/full-suite run:** a full `php artisan test` on PostgreSQL was started as
-the final broader-regression step; see the accompanying session notes for its
-concrete pass/fail tally if it completed before this report was finalized — if it
-did not finish in time, that is stated honestly rather than reported as passing.
+**Broader/full-suite run — did not complete, stopped intentionally, not reported as
+passing.** A full `php artisan test` on PostgreSQL was started as the final
+broader-regression step (background, 590s timeout). It was cut off by the timeout
+partway through the alphabetical test order (last class reached:
+`PaymentGatewayFoundationTest`, roughly the "P" range of ~1450+ test classes) with
+**no failures observed in the portion that did run**, but it never produced a final
+`Tests: X passed/failed` tally and was explicitly not restarted or re-polled per
+instruction. This is reported honestly as **incomplete**, not as a pass — the
+targeted suites in this section (217/217 on PostgreSQL, plus the 156/1077-assertion
+SQLite re-confirmation after the environment was restored) are the actual evidence
+this report's PASS status rests on, together with the full `Pos|Commerce|Storefront|
+ProductImport|ProductExport|Product`-filtered sweep (1201/1201 excluding the
+pre-existing `bcmath` gap) run earlier and reported in full above.
 
 ## 11. Deviations from the task brief
 
@@ -366,5 +381,7 @@ both achievable and are covered by explicit tests (§3, §13).
 ## Git state
 
 - Branch: `claude/var-inv-1-inventory-identity`
-- Base: `origin/main` @ `c152e3ee634be3e7c2bb12db299a5ddd44472558` (VAR-CORE-1, PR #806, merged)
-- No PR opened yet, per the task's instruction not to merge/deploy.
+- PR: [#812](https://github.com/safwan5001-source/Nebrax/pull/812) — **open, not merged**
+- Base SHA: `c152e3ee634be3e7c2bb12db299a5ddd44472558` (`origin/main`, VAR-CORE-1 / PR #806, merged)
+- Head SHA: `f25c73af761f5d9378df0fca6af965a78e3cc708` (single commit on top of base; working tree clean, nothing uncommitted)
+- Not merged, not deployed, per instruction.
