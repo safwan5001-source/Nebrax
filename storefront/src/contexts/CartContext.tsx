@@ -13,23 +13,49 @@ import {
   useState,
 } from "react";
 import { toast } from "sonner";
+import type {
+  StorefrontCart,
+  StorefrontCartLine,
+} from "@/lib/commerce/cart-types";
 import {
+  addAwjItem,
   addToCart as addToCartAction,
+  getAwjCart,
   getCart as getCartAction,
+  removeAwjItem,
   removeCartItem as removeCartItemAction,
+  updateAwjItem,
   updateCartItem as updateCartItemAction,
 } from "@/lib/data/cart";
 import type { Surface } from "@/lib/spree/surface";
 
+/**
+ * The DTC surface's cart is AWJ-native (`StorefrontCart`); wholesale stays
+ * Spree-backed (`Cart`) — see `@/lib/data/cart`'s module doc. Components
+ * that only ever run under one surface's `<CartProvider>` narrow this with
+ * `isStorefrontCart()` (`@/lib/commerce/cart-types`) or a direct cast when
+ * they are provably Spree-only (wholesale-specific views, the pre-existing
+ * Spree checkout flow) — see AWJ_CART_WIRING's Spree-boundary notes.
+ */
+export type AnyCart = Cart | StorefrontCart;
+
 interface CartContextType {
-  cart: Cart | null;
+  cart: AnyCart | null;
+  /** Which surface this provider's cart belongs to — "dtc" carts are AWJ-native. */
+  surface: Surface;
   loading: boolean;
   updating: boolean;
   itemCount: number;
   isOpen: boolean;
   openCart: () => void;
   closeCart: () => void;
-  addItem: (variantId: string, quantity?: number) => Promise<void>;
+  /**
+   * `id` is a Spree variant id on the wholesale surface, an AWJ product id
+   * on the DTC surface. `unitKey` is DTC-only (AWJ UOM identity,
+   * `"base"` unless the catalog names another canonical unit) and ignored
+   * on the wholesale surface.
+   */
+  addItem: (id: string, quantity?: number, unitKey?: string) => Promise<void>;
   updateItem: (lineItemId: string, quantity: number) => Promise<void>;
   removeItem: (lineItemId: string) => Promise<void>;
   refreshCart: () => Promise<void>;
@@ -45,33 +71,36 @@ export function CartProvider({
   /** Which surface's cart this provider manages. Defaults to the DTC cart. */
   surface?: Surface;
 }) {
-  const [cart, setCart] = useState<Cart | null>(null);
+  const [cart, setCart] = useState<AnyCart | null>(null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
   const t = useTranslations("cart");
+  const isAwj = surface === "dtc";
 
   const openCart = useCallback(() => setIsOpen(true), []);
   const closeCart = useCallback(() => setIsOpen(false), []);
 
   const refreshCart = useCallback(async () => {
     try {
-      const cartData = await getCartAction(undefined, surface);
+      const cartData = isAwj
+        ? await getAwjCart()
+        : await getCartAction(undefined, surface);
       setCart(cartData);
     } catch {
       setCart(null);
     } finally {
       setLoading(false);
     }
-  }, [surface]);
+  }, [surface, isAwj]);
 
   const mutateCart = useCallback(
     async (
       action: () => Promise<{
         success: boolean;
-        cart?: Cart | null;
+        cart?: AnyCart | null;
         error?: string;
       }>,
       fallbackMessage: string,
@@ -97,34 +126,43 @@ export function CartProvider({
   );
 
   const addItem = useCallback(
-    async (variantId: string, quantity = 1) => {
+    async (id: string, quantity = 1, unitKey?: string) => {
       await mutateCart(
-        () => addToCartAction(variantId, quantity, surface),
+        () =>
+          isAwj
+            ? addAwjItem(id, quantity, unitKey ?? "base")
+            : addToCartAction(id, quantity, surface),
         t("failedToAddItem"),
         () => setIsOpen(true),
       );
     },
-    [mutateCart, t, surface],
+    [mutateCart, t, surface, isAwj],
   );
 
   const updateItem = useCallback(
     async (lineItemId: string, quantity: number) => {
       await mutateCart(
-        () => updateCartItemAction(lineItemId, quantity, surface),
+        () =>
+          isAwj
+            ? updateAwjItem(lineItemId, quantity)
+            : updateCartItemAction(lineItemId, quantity, surface),
         t("failedToUpdateItem"),
       );
     },
-    [mutateCart, t, surface],
+    [mutateCart, t, surface, isAwj],
   );
 
   const removeItem = useCallback(
     async (lineItemId: string) => {
       await mutateCart(
-        () => removeCartItemAction(lineItemId, surface),
+        () =>
+          isAwj
+            ? removeAwjItem(lineItemId)
+            : removeCartItemAction(lineItemId, surface),
         t("failedToRemoveItem"),
       );
     },
-    [mutateCart, t, surface],
+    [mutateCart, t, surface, isAwj],
   );
 
   // Re-fetch cart on navigation (e.g., after checkout completes, the stale
@@ -145,7 +183,8 @@ export function CartProvider({
   const itemCount = useMemo<number>(
     () =>
       cart?.items?.reduce(
-        (sum: number, item: LineItem) => sum + item.quantity,
+        (sum: number, item: LineItem | StorefrontCartLine) =>
+          sum + item.quantity,
         0,
       ) ?? 0,
     [cart],
@@ -154,6 +193,7 @@ export function CartProvider({
   const value = useMemo<CartContextType>(
     () => ({
       cart,
+      surface,
       loading,
       updating,
       itemCount,
@@ -167,6 +207,7 @@ export function CartProvider({
     }),
     [
       cart,
+      surface,
       loading,
       updating,
       itemCount,

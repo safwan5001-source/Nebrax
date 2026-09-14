@@ -22,7 +22,7 @@ interface ProductDetailsProps {
 }
 
 export function ProductDetails({ product, basePath }: ProductDetailsProps) {
-  const { addItem } = useCart();
+  const { addItem, surface } = useCart();
   const { currency } = useStore();
   const t = useTranslations("products");
   const tw = useTranslations("wholesale");
@@ -106,6 +106,23 @@ export function ProductDetails({ product, basePath }: ProductDetailsProps) {
     : (product.in_stock ?? false);
 
   const handleAddToCart = async () => {
+    // The wholesale surface still runs on real Spree variants — pass its own
+    // variant id unchanged. The DTC surface is AWJ Cart V1 (product + UOM,
+    // no variants yet — VAR-COM-1 is a separate later workstream): its
+    // catalog products carry a synthetic `${product.id}-default` variant id
+    // purely so this Spree-shaped UI has something to render (SKU row,
+    // variant picker fallback) — see `mapAwjProductToViewModel`'s own
+    // warning that id "is not a real Spree variant and never will back a
+    // real cart." `product.id` is the real AWJ product UUID `mappers.ts`
+    // copies through verbatim; that's the one Cart V1 accepts.
+    if (surface !== "wholesale") {
+      setLoading(true);
+      await addItem(product.id, quantity, "base");
+      setLoading(false);
+      trackAddToCart(product, selectedVariant, quantity, currency);
+      return;
+    }
+
     const variantId =
       selectedVariant?.id ||
       product.default_variant?.id ||

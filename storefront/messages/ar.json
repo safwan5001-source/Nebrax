@@ -109,6 +109,7 @@
     "itemCount": "({count, plural, zero {} one {# عنصر} two {عنصران} few {# عناصر} many {# عنصراً} other {# عنصر}})",
     "shippingCalculatedAtCheckout": "يُحتسَب عند الدفع",
     "removeItemLabel": "إزالة {name}",
+    "itemUnavailable": "لم يعد هذا الصنف متاحاً",
     "giftCard": "بطاقة هدية",
     "storeCredit": "رصيد المتجر",
     "amountDue": "المبلغ المستحق",

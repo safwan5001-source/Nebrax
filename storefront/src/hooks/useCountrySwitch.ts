@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { useCart } from "@/contexts/CartContext";
 import type { CountryWithMarket } from "@/contexts/StoreContext";
+import { isStorefrontCart } from "@/lib/commerce/cart-types";
 import { updateCartMarket } from "@/lib/data/checkout";
 import { rebaseAccountRedirectSearch } from "@/lib/utils/account-redirect";
 import { setStoreCookies } from "@/lib/utils/cookies";
@@ -62,8 +63,13 @@ export function useCountrySwitch({
     const nextBasePath = `/${nextCountry}/${newLocale}`;
 
     try {
+      // AWJ Cart V1 (the DTC surface) has no market/locale-per-cart concept
+      // yet — no new currency/pricing rules are in scope for the cart
+      // wiring, so this Spree-only market sync simply skips an AWJ cart
+      // rather than persisting anything to it.
       if (
         cart &&
+        !isStorefrontCart(cart) &&
         (cart.currency !== newCurrency || cart.locale !== newLocale)
       ) {
         const result = await updateCartMarket(cart.id, {

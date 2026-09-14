@@ -3,6 +3,13 @@
 import type { Cart, CreateCartParams } from "@spree/sdk";
 import { updateTag } from "next/cache";
 import {
+  addAwjCartItem,
+  fetchAwjCart,
+  removeAwjCartItem,
+  updateAwjCartItem,
+} from "@/lib/commerce/cart";
+import type { StorefrontCart } from "@/lib/commerce/cart-types";
+import {
   cacheTagSuffix,
   clearCartCookies,
   DEFAULT_SURFACE,
@@ -18,6 +25,67 @@ import {
   setCartCookies,
 } from "@/lib/spree";
 import { actionResult } from "./utils";
+
+/**
+ * The AWJ Cart V1 actions below (`getAwjCart`/`addAwjItem`/`updateAwjItem`/
+ * `removeAwjItem`) are the DTC surface's cart data authority — see
+ * `CartContext`, which calls these instead of the Spree-backed functions
+ * further down whenever `surface === "dtc"`.
+ *
+ * The Spree-backed functions in the rest of this file (`getCart`,
+ * `getOrCreateCart`, `addToCart`, `updateCartItem`, `removeCartItem`,
+ * `clearCart`, `associateCartWithUser`) are UNCHANGED and keep serving the
+ * wholesale surface exactly as before (a distinct sales context with its
+ * own Spree channel, not part of this wiring — see AWJ_CART_WIRING §
+ * scope) and the shared checkout/payment data layer (`checkout.ts`,
+ * `payment.ts`), which resolve carts by explicit id + surface and never
+ * assume `surface: "dtc"` means an AWJ cart. Splitting the two cart
+ * authorities into separate exported functions — rather than branching
+ * inside `getCart` et al. — keeps every existing Spree caller's signature
+ * and return type untouched, so nothing outside `CartContext` needed to
+ * change to accommodate this wiring.
+ */
+
+function awjCartTag(): string {
+  return "cart"; // DTC's unsuffixed tag — same tag `cartTag("dtc")` already used.
+}
+
+/** GET the AWJ cart. Never creates one (see `fetchAwjCart`). */
+export async function getAwjCart(): Promise<StorefrontCart | null> {
+  try {
+    return await fetchAwjCart();
+  } catch {
+    return null;
+  }
+}
+
+export async function addAwjItem(
+  productId: string,
+  quantity: number,
+  unitKey = "base",
+) {
+  return actionResult(async () => {
+    const cart = await addAwjCartItem(productId, quantity, unitKey);
+    updateTag(awjCartTag());
+    return { cart };
+  }, "Failed to add item to cart");
+}
+
+export async function updateAwjItem(itemId: string, quantity: number) {
+  return actionResult(async () => {
+    const cart = await updateAwjCartItem(itemId, quantity);
+    updateTag(awjCartTag());
+    return { cart };
+  }, "Failed to update cart item");
+}
+
+export async function removeAwjItem(itemId: string) {
+  return actionResult(async () => {
+    const cart = await removeAwjCartItem(itemId);
+    updateTag(awjCartTag());
+    return { cart };
+  }, "Failed to remove cart item");
+}
 
 /** Cache tag for a surface's cart, so DTC and wholesale carts invalidate independently. */
 function cartTag(surface: Surface): string {

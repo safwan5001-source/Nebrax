@@ -11,6 +11,11 @@
  */
 
 import { headers } from "next/headers";
+import {
+  AWJ_CART_COOKIE_NAME,
+  applyAwjSetCookie,
+  getAwjCartToken,
+} from "./cart-cookies";
 
 const FORWARDED_HOST_HEADER = "X-Storefront-Forwarded-Host";
 const GATEWAY_SECRET_HEADER = "X-Storefront-Gateway-Secret";
@@ -98,6 +103,21 @@ export type StorefrontQueryParams = Record<
   string | number | boolean | undefined | null
 >;
 
+async function raiseForErrorResponse(response: Response): Promise<never> {
+  let code = "http_error";
+  let message = `AWJ storefront API request failed (${response.status})`;
+  try {
+    const body = (await response.json()) as {
+      error?: { code?: string; message?: string };
+    };
+    code = body.error?.code ?? code;
+    message = body.error?.message ?? message;
+  } catch {
+    // Non-JSON error body — keep the generic message.
+  }
+  throw new StorefrontApiError(response.status, code, message);
+}
+
 /**
  * Fetches from the AWJ Store public catalog API (`store/v1/...`).
  * Anonymous, read-only — no auth header, matching the backend's
@@ -130,18 +150,66 @@ export async function storefrontFetch<T>(
   const response = await fetch(url.toString(), { headers: requestHeaders });
 
   if (!response.ok) {
-    let code = "http_error";
-    let message = `AWJ storefront API request failed (${response.status})`;
-    try {
-      const body = (await response.json()) as {
-        error?: { code?: string; message?: string };
-      };
-      code = body.error?.code ?? code;
-      message = body.error?.message ?? message;
-    } catch {
-      // Non-JSON error body — keep the generic message.
-    }
-    throw new StorefrontApiError(response.status, code, message);
+    await raiseForErrorResponse(response);
+  }
+
+  return (await response.json()) as T;
+}
+
+export type StorefrontCartMethod = "GET" | "POST" | "PATCH" | "DELETE";
+
+/**
+ * Fetches/mutates the AWJ Store Cart V1 API (`store/v1/cart*`) — the one
+ * extension this module makes beyond `storefrontFetch()`'s anonymous
+ * catalog reads, per AWJ_CART_WIRING's "extend the existing AWJ commerce
+ * boundary safely rather than creating an unrelated second HTTP client."
+ *
+ * Differences from `storefrontFetch()`, both required by the strict
+ * backend storefront mutation gateway (`RequireStorefrontMutationGateway`)
+ * and by the cart's own token cookie contract, never by loosening
+ * anything: forwards the visitor's `awj_cart_token` cookie (fetch() never
+ * forwards a Next.js server's own incoming cookies to a cross-origin
+ * call), sends a JSON body for POST/PATCH, and mirrors any `Set-Cookie`
+ * Laravel returns back onto the Next.js response — see
+ * `applyAwjSetCookie()`. The gateway secret and forwarded-host headers are
+ * unconditionally attached exactly as `storefrontFetch()` already does;
+ * this never widens what the backend trusts, it only adds the pieces a
+ * mutation additionally needs.
+ */
+export async function storefrontCartRequest<T>(
+  method: StorefrontCartMethod,
+  path: string,
+  body?: unknown,
+): Promise<T> {
+  const url = buildStorefrontUrl(path);
+  const hostname = await resolveVisitorHostname();
+  const requestHeaders: Record<string, string> = {
+    Accept: "application/json",
+    [FORWARDED_HOST_HEADER]: hostname,
+  };
+  const secret = getGatewaySecret();
+  if (secret) {
+    requestHeaders[GATEWAY_SECRET_HEADER] = secret;
+  }
+  const cartToken = await getAwjCartToken();
+  if (cartToken) {
+    requestHeaders.Cookie = `${AWJ_CART_COOKIE_NAME}=${cartToken}`;
+  }
+  if (body !== undefined) {
+    requestHeaders["Content-Type"] = "application/json";
+  }
+
+  const response = await fetch(url.toString(), {
+    method,
+    headers: requestHeaders,
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+    cache: "no-store",
+  });
+
+  await applyAwjSetCookie(response);
+
+  if (!response.ok) {
+    await raiseForErrorResponse(response);
   }
 
   return (await response.json()) as T;
