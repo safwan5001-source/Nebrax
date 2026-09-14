@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use RuntimeException;
 
 /**
  * منتج أو خدمة. الأسعار بالـ minor units (هللات) كـ bigint — لا float إطلاقاً.
@@ -84,6 +85,22 @@ class Product extends BaseModel implements BranchShareable
      */
     protected static function booted(): void
     {
+        // VAR-INV-1 (P2): فشلٌ مغلَق قبل أي كتابة فعلية — `saving` لا `saved`،
+        // فيُلغى الحفظ **بالكامل** (لا سطر واحد يُكتب على `products` ولا على
+        // `InventoryState`) حين يحمل الحفظ إسناداً مباشراً لـ`quantity_on_hand`/
+        // `avg_cost` على منتجٍ `variant_managed`. الأب في هذه الحالة **لا هويّة
+        // مخزونٍ موازية له** (VAR_ARCH_1 §3) — فلا توزيعٌ على المتغيّرات، ولا
+        // صفّ أبٍ يُنشأ، ولا تجاهلٌ صامت كما كان سابقاً.
+        static::saving(function (Product $product) {
+            if (($product->pendingQuantityOnHand !== null || $product->pendingAvgCost !== null)
+                && $product->isVariantManaged()) {
+                throw new RuntimeException(
+                    'لا يمكن إسناد كمية أو متوسط تكلفة مباشرة لمنتجٍ متعدد الخيارات — '
+                    .'لا هويّة مخزونٍ للأب؛ حدِّد المتغيّر الفعلي وأسند مخزونه عبر InventoryService.'
+                );
+            }
+        });
+
         static::saved(function (Product $product) {
             if ($product->isDirty('barcode')) {
                 $old = $product->getOriginal('barcode');
@@ -230,9 +247,10 @@ class Product extends BaseModel implements BranchShareable
 
     /**
      * يطبّق إسناداً مباشراً قديم لهذا الحفظ فقط (إن وُجد) على `InventoryState`
-     * البسيطة لهذا المنتج. لا أثر لمنتجٍ `variant_managed` — لا هويّة أبٍ
-     * موازية له (VAR_ARCH_1 §3)، فيُهمَل صامتاً بنفس منطق «لا كتابة على
-     * هويّة غير موجودة أصلاً» الذي يحرسه `InventoryService::resolveInventoryState()`.
+     * البسيطة لهذا المنتج. يعمل على منتجٍ بسيط فقط — `saving()` أعلاه يرفض
+     * الحفظ مغلَقاً قبل الوصول هنا أصلاً لو كان المنتج `variant_managed`، فهذا
+     * الفرع دفاعٌ في العمق لا مساراً حياً (لا هويّة أبٍ موازية تُكتب هنا أبداً،
+     * VAR_ARCH_1 §3).
      */
     private function flushPendingInventorySeed(): void
     {
