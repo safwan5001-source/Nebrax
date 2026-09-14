@@ -497,7 +497,7 @@ CI run pending/in-progress as of push — see PR #814 for live status.
 - Branch: `claude/var-media-1-variant-media`
 - PR: #814
 - Previous Head SHA: `0e29cde17be7197035ad04bb905b10aa07fb9c47`
-- New Head SHA: filled in below after push.
+- New Head SHA: `6e7dac7ab7eab2c5bf88d36f707fe7caac8c6b08`
 
 ## Recommendation
 
