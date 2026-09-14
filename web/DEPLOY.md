@@ -49,6 +49,15 @@ web
 > `awj.app` و`*.awj.app` كدومينات للمشروع `web/` بعد ضبط DNS/TLS. التفاصيل في
 > `docs/plans/tenancy/AWJ_TENANT_SUBDOMAIN_V1_IMPLEMENTATION_REPORT.md`. لا توسّع الكوكي إلى `.awj.app`.
 
+> **بيئة Railway الحالية (`*.awjdev.xyz`):** الويلدكارد اليوم مُوجَّه فقط إلى خدمة
+> Railway للـ backend (JSON API)، وليس إلى هذا المشروع (Next.js). ليعرض
+> `https://<slug>.awjdev.xyz` فعلياً صفحة دخول، على **صفوان** أيضاً إضافة
+> `*.awjdev.xyz` كدومين على مشروع Vercel هذا (أو نشر `web/` على خدمة تصلها هذه
+> الشبكة)، وضبط `NEXT_PUBLIC_TENANT_BASE_DOMAIN=awjdev.xyz` هنا. بدون ذلك يبقى
+> السلوك الحالي كما هو (الدخول عبر مضيف الواجهة الحالي، والـ API يفرض حدود
+> المستأجر على مستوى Host/Origin كما توثّقه
+> `docs/plans/tenancy/AWJ_TENANT_SUBDOMAIN_RAILWAY_AWJDEV_REPORT.md`).
+
 ## التحقق محلياً قبل النشر
 
 ```bash

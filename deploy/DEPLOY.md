@@ -105,6 +105,34 @@ SELECT migration FROM migrations ORDER BY id DESC LIMIT 5;
 4. الـ API (Render/Railway): أضف `api.awj.app` إن رُغب؛ اضبط `AWJ_TENANT_BASE_DOMAIN=awj.app`. لا توسّع كوكي الجلسة إلى `.awj.app` — المصادقة Bearer origin-scoped.
 5. CORS: أنماط `{slug}.{base}` تُضاف تلقائياً من `AWJ_TENANT_BASE_DOMAIN`. أبقِ `FRONTEND_URL` للنطاقات غير الفرعية (`https://app.awj.app`, `https://awj.app`, معاينة Vercel).
 
+### بيئة Railway الحالية — `*.awjdev.xyz`
+
+خدمة Railway (`Nebrax / AWJ ERP`) تخدم اليوم **حاوية الـ backend فقط**
+(`Dockerfile` في الجذر — `php artisan serve` خلف بروكسي Railway على `$PORT`؛
+هذا هو "المنفذ 8080" المذكور تشغيلياً). النطاق الشامل `*.awjdev.xyz` مُفعَّل
+ومُوجَّه Railway-جهة إلى هذه الخدمة، وDNS/TLS مكتملان.
+
+لتفعيل حسم `{slug}.awjdev.xyz` على هذه الخدمة، على **صفوان** إضافة (لا يُضبط من هنا):
+
+| المتغيّر | القيمة | الخدمة |
+|---|---|---|
+| `AWJ_TENANT_BASE_DOMAIN` | `awjdev.xyz` | Railway (`Nebrax / AWJ ERP`) |
+
+اختياري (لبيئة انتقالية تخدم القاعدتين معاً بلا فصل بيئات):
+`AWJ_TENANT_BASE_DOMAINS=awjdev.xyz,awj.app` بدل المتغيّر الفردي أعلاه.
+
+**لا تُضف `awj.up.railway.app` ولا أي جزء منه لهذين المتغيّرين** — يجب أن يبقى
+مضيفاً غير-مستأجر (كما هو اليوم) ليستمر الدخول الحالي عبره بلا كسر.
+
+> **مهم — النطاق الفرعي يخدم الـ API فقط اليوم، لا صفحة الدخول:** حسم
+> `alrshd.awjdev.xyz` في الكود يعمل بمجرد ضبط المتغيّر أعلاه (تحقّقه اختبارات
+> `TenantHostnameResolverTest`/`TenantSubdomainAuthTest`)، لكن هذه الخدمة لا
+> تُخرج صفحة HTML — واجهة Next.js (`web/`) منشورة اليوم على Vercel منفصلة (انظر
+> `web/DEPLOY.md`). فتح `https://alrshd.awjdev.xyz` في متصفّح **لن يعرض شاشة
+> دخول** ما لم يُضَف `*.awjdev.xyz` أيضاً كدومين على مشروع Vercel نفسه (أو
+> يُنشر `web/` على خدمة تصل إليها هذه الشبكة). هذا عمل تشغيلي منفصل تماماً عن
+> هذا الـ PR — راجع `docs/plans/tenancy/AWJ_TENANT_SUBDOMAIN_RAILWAY_AWJDEV_REPORT.md`.
+
 ## التخزين الدائم — مؤجل
 
 بنية S3/R2 وإعداد التكامل تبقى في الكود للمستقبل، لكنها لا تدخل المسار التشغيلي ما دام
