@@ -383,5 +383,73 @@ both achievable and are covered by explicit tests (§3, §13).
 - Branch: `claude/var-inv-1-inventory-identity`
 - PR: [#812](https://github.com/safwan5001-source/Nebrax/pull/812) — **open, not merged**
 - Base SHA: `c152e3ee634be3e7c2bb12db299a5ddd44472558` (`origin/main`, VAR-CORE-1 / PR #806, merged)
-- Head SHA: `f25c73af761f5d9378df0fca6af965a78e3cc708` (single commit on top of base; working tree clean, nothing uncommitted)
+- Head SHA: `4742dcbdbc90a06010472ab0850ed80edaad834c` (Round 2 / P2 fix; working tree clean, nothing uncommitted)
 - Not merged, not deployed, per instruction.
+
+## Round 2 (P2) — fail-closed on direct inventory assignment to a `variant_managed` Product
+
+**GitHub CI #5054 confirmed green on the Round-1 head** (SQLite + PostgreSQL,
+3676 tests / 16919 assertions on PostgreSQL) before this round started.
+
+**Root cause:** `flushPendingInventorySeed()` (a `static::saved()` hook) silently
+discarded a direct `quantity_on_hand`/`avg_cost` assignment on a `variant_managed`
+Product (`if ($this->isVariantManaged()) { return; }`) — the assignment appeared to
+succeed (no error), the `products` row's other dirty fields still committed (since
+`saved()` fires after the write), and no inventory state of any kind changed. A
+caller had no way to know their assignment had no effect.
+
+**Fix:** a new `static::saving()` hook on `Product` throws a `RuntimeException`
+*before* any write reaches the database whenever a save carries a pending direct
+`quantity_on_hand`/`avg_cost` value **and** the product is `variant_managed`. Since
+`saving()` runs before the `UPDATE`/`INSERT`, a rejected assignment aborts the
+entire `save()` call — no `products` row change persists (verified: other dirty
+fields like `name` in the same call are not partially written either), no parent
+`InventoryState` is created, and no existing Variant `InventoryState` is touched.
+Simple-Product direct assignment (the existing backward-compatible seed path) is
+completely unchanged. `flushPendingInventorySeed()`'s own `isVariantManaged()`
+branch is now unreachable defense-in-depth (documented as such), not a live path.
+
+**Changed files:**
+- `app/Models/Product.php` — new `static::saving()` guard (+`use RuntimeException`)
+- `tests/Feature/InventoryStateTest.php` — 6 new tests + 2 existing tests
+  strengthened with an explicit `InventoryState::count()` before/after assertion
+
+**Tests + exact results (SQLite, targeted + progressive, no full-suite re-run per
+instruction since this round touches no locking/concurrency path):**
+- `InventoryStateTest`: **20/20 passed**, 43 assertions (14 pre-existing + 6 new:
+  simple-product assignment still works; `quantity_on_hand`/`avg_cost` direct
+  assignment on `variant_managed` each rejected; rejection creates no parent state
+  and leaves an existing sibling Variant's state untouched; rejection leaves no
+  partial write on other dirty fields in the same `save()`; rejection never
+  distributes quantity across Variants)
+- `ProductVariantCoreTest`, `ProductLifecycleTest`, `ProductReferenceClassificationGuardTest`,
+  `InventoryTest`, `InventoryOpeningImportTest`, `InventoryOpeningPostingTest`,
+  `ApiInventoryTest`, `DiagnoseInventoryTest`, `ProductDataExplorerTest`,
+  `ProductSkuValidationTest`: **126/126 passed**, 853 assertions — no regression
+
+**Backward compatibility:** simple Products are unaffected — the pending-seed path
+that lets `Product::create([...'quantity_on_hand'=>…])`/`$product->update([...])`
+keep working for ~30 existing test fixtures across ~15 files (documented in the
+Round-1 report §2/§11) is untouched for the non-`variant_managed` case.
+
+**Tenant Isolation verification:** unaffected by this round (no query/scope change);
+the two mismatch tests in `InventoryStateTest`
+(`a_variant_from_a_different_product_is_rejected_fail_closed`,
+`a_guessed_cross_tenant_variant_id_cannot_be_used_to_receive_stock_for_this_tenants_product`)
+were strengthened with an explicit `InventoryState::count()` assertion proving the
+rejection creates or modifies zero rows, confirming
+`InventoryService::assertIdentityConsistent()` (unchanged this round) still runs
+strictly before any row touch.
+
+**Inventory/valuation invariant verification:** "no parent stock identity for
+`variant_managed`" and "no invented parent `avg_cost`" (VAR_ARCH_1 §3) are now
+enforced fail-closed on the write side too, not just on read (the Round-1 accessor
+already returned `0`/derived-sum for a `variant_managed` parent; this round closes
+the corresponding write-side gap).
+
+**Risks/remaining:** none identified. No DB/domain gap was found beyond the
+Product-model write path itself — `InventoryService::assertIdentityConsistent()`
+already rejected mismatched/cross-tenant Variants correctly before this round; no
+schema redesign was needed or performed.
+
+**Recommendation: READY FOR REVIEW.**
