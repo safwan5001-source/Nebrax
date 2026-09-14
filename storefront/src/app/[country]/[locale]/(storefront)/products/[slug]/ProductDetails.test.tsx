@@ -1,6 +1,7 @@
 import type { Product } from "@spree/sdk";
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import userEvent from "@testing-library/user-event";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PRODUCT_PAGE_EXPAND } from "@/lib/data/cached";
 import { ProductDetails } from "./ProductDetails";
 
@@ -16,8 +17,11 @@ vi.mock("@/components/products/ProductCustomFields", () => ({
   ProductCustomFields: () => null,
 }));
 
+const mockAddItem = vi.fn();
+const mockSurface = { current: "dtc" as "dtc" | "wholesale" };
+
 vi.mock("@/contexts/CartContext", () => ({
-  useCart: () => ({ addItem: vi.fn() }),
+  useCart: () => ({ addItem: mockAddItem, surface: mockSurface.current }),
 }));
 
 vi.mock("@/contexts/HiddenPricingContext", () => ({
@@ -70,6 +74,11 @@ const productWithoutCustomVariants = {
 } as unknown as Product;
 
 describe("ProductDetails", () => {
+  beforeEach(() => {
+    mockAddItem.mockClear();
+    mockSurface.current = "dtc";
+  });
+
   it("requests the default variant for the product page", () => {
     expect(PRODUCT_PAGE_EXPAND).toContain("default_variant");
   });
@@ -84,5 +93,39 @@ describe("ProductDetails", () => {
 
     expect(screen.getByText("sku")).toBeInTheDocument();
     expect(screen.getByText("MASTER-SKU-001")).toBeInTheDocument();
+  });
+
+  it("on the DTC (AWJ) surface, add-to-cart sends the real AWJ product id and base unit key — never the synthetic default-variant id", async () => {
+    const user = userEvent.setup();
+    render(
+      <ProductDetails
+        product={productWithoutCustomVariants}
+        basePath="/us/en"
+      />,
+    );
+
+    await user.click(screen.getByText("addToCart"));
+
+    expect(mockAddItem).toHaveBeenCalledWith("product-1", 1, "base");
+    expect(mockAddItem).not.toHaveBeenCalledWith(
+      "variant-master",
+      expect.anything(),
+      expect.anything(),
+    );
+  });
+
+  it("on the wholesale surface, add-to-cart still sends the Spree variant id (unchanged behavior)", async () => {
+    mockSurface.current = "wholesale";
+    const user = userEvent.setup();
+    render(
+      <ProductDetails
+        product={productWithoutCustomVariants}
+        basePath="/us/en"
+      />,
+    );
+
+    await user.click(screen.getByText("addToCart"));
+
+    expect(mockAddItem).toHaveBeenCalledWith("variant-master", 1);
   });
 });

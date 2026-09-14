@@ -4,6 +4,7 @@ namespace App\Http\Requests;
 
 use App\Models\BarcodeRegistryEntry;
 use App\Models\Product;
+use App\Models\SkuRegistryEntry;
 use App\Support\BranchSettings;
 use App\Tenancy\BranchContext;
 use App\Tenancy\BranchScope;
@@ -51,6 +52,15 @@ class StoreProductRequest extends FormRequest
 
                     if ($duplicates->exists()) {
                         $fail('رمز المنتج (SKU) مستخدم بالفعل في نطاق الكتالوج الحالي.');
+
+                        return;
+                    }
+
+                    // VAR-CORE-1: فضاء SKU موحّد عبر المنتج والمتغيّر معاً —
+                    // فحصٌ إضافي يمنع تصادماً مع SKU لمتغيّر منتجٍ آخر لا
+                    // يظهر في جدول `products` أصلاً.
+                    if (SkuRegistryEntry::isTaken($value, exceptProductId: $productId)) {
+                        $fail('رمز المنتج (SKU) مستخدم بالفعل لمتغيّر منتجٍ آخر في المؤسسة.');
                     }
                 },
             ],

@@ -7,11 +7,11 @@ import type {
 
 const mocks = vi.hoisted(() => ({
   headers: vi.fn(async () => new Headers({ host: "shop.example.com" })),
-  getLocaleOptions: vi.fn(async () => ({ locale: "ar", country: "sa" })),
+  getLocale: vi.fn(async () => "ar"),
 }));
 
 vi.mock("next/headers", () => ({ headers: mocks.headers }));
-vi.mock("@/lib/spree", () => ({ getLocaleOptions: mocks.getLocaleOptions }));
+vi.mock("next-intl/server", () => ({ getLocale: mocks.getLocale }));
 
 const { StorefrontApiError } = await import("../config");
 const { fetchProduct, fetchProductFilters, fetchProducts } = await import(
@@ -48,8 +48,8 @@ describe("commerce/products", () => {
     vi.stubEnv("AWJ_COMMERCE_API_URL", "http://awj-api.test");
     vi.stubGlobal("fetch", vi.fn());
     mocks.headers.mockClear();
-    mocks.getLocaleOptions.mockClear();
-    mocks.getLocaleOptions.mockResolvedValue({ locale: "ar", country: "sa" });
+    mocks.getLocale.mockClear();
+    mocks.getLocale.mockResolvedValue("ar");
   });
 
   afterEach(() => {
@@ -159,7 +159,7 @@ describe("commerce/products", () => {
   });
 
   it("displays the English name when the visitor locale is English (COM-7-P2B)", async () => {
-    mocks.getLocaleOptions.mockResolvedValue({ locale: "en", country: "sa" });
+    mocks.getLocale.mockResolvedValue("en");
     vi.mocked(fetch).mockResolvedValueOnce(
       jsonResponse({
         data: sampleAwjProduct({ name: "منتج", name_en: "Product" }),
@@ -173,7 +173,7 @@ describe("commerce/products", () => {
   });
 
   it("keeps the Arabic name when the visitor locale is Arabic, even if name_en exists", async () => {
-    mocks.getLocaleOptions.mockResolvedValue({ locale: "ar", country: "sa" });
+    mocks.getLocale.mockResolvedValue("ar");
     vi.mocked(fetch).mockResolvedValueOnce(
       jsonResponse({
         data: sampleAwjProduct({ name: "منتج", name_en: "Product" }),
@@ -187,7 +187,7 @@ describe("commerce/products", () => {
   });
 
   it("falls back to the Arabic name in English when no name_en is set", async () => {
-    mocks.getLocaleOptions.mockResolvedValue({ locale: "en", country: "sa" });
+    mocks.getLocale.mockResolvedValue("en");
     vi.mocked(fetch).mockResolvedValueOnce(
       jsonResponse({
         data: sampleAwjProduct({ name: "منتج", name_en: null }),

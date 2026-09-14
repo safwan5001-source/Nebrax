@@ -94,7 +94,7 @@ class ReturnWindowPolicyTest extends TestCase
         $line = $source->lines()->first();
         $sales = $source instanceof Invoice;
 
-        return $this->postJson('/api/returns', array_merge([
+        $response = $this->postJson('/api/returns', array_merge([
             'type'         => $sales ? 'sales' : 'purchase',
             'partner_id'   => $sales ? $this->customer->id : $this->supplier->id,
             'payment_type' => 'credit',
@@ -105,6 +105,10 @@ class ReturnWindowPolicyTest extends TestCase
                 'quantity' => 1, 'unit_price' => (int) $line->unit_price, 'tax_rate' => 15,
             ]],
         ], $head));
+
+        app(TenantContext::class)->set($this->tenant->id);
+
+        return $response;
     }
 
     // ── الافتراض: بلا حدّ ────────────────────────────────────────
@@ -218,6 +222,7 @@ class ReturnWindowPolicyTest extends TestCase
             ->assertCreated()->json('data.id');
 
         $this->postJson("/api/returns/{$id}/post")->assertOk();
+        app(TenantContext::class)->set($this->tenant->id);
         $this->assertSame('posted', ReturnDocument::findOrFail($id)->status);
     }
 
@@ -232,6 +237,7 @@ class ReturnWindowPolicyTest extends TestCase
         Settings::put('sales', ['return_window_days' => 14]);
 
         $this->postJson("/api/returns/{$id}/post")->assertStatus(422);
+        app(TenantContext::class)->set($this->tenant->id);
         $this->assertSame('draft', ReturnDocument::findOrFail($id)->status);
     }
 }

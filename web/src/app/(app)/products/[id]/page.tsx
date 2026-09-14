@@ -19,6 +19,7 @@ import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
 import { Tabs, TabPanel, type TabDef } from '@/components/ui/tabs';
 import { useToast } from '@/components/ui/toast';
 import { ProductDialog, type Product as ProductFormProduct } from '@/components/products/product-dialog';
+import { ProductVariantsPanel } from '@/components/products/product-variants-panel';
 
 type Product = ProductFormProduct & {
   units: Array<{ name: string; factor: number }>;
@@ -103,6 +104,7 @@ export default function ProductProfilePage() {
   const selectedMediaIndex = selectedMedia ? media.findIndex((item) => item.id === selectedMedia.id) + 1 : 0;
   const tabs = useMemo<TabDef[]>(() => [
     { id: 'info', label: t('product_info') },
+    { id: 'variants', label: t('variants_tab_label') },
     { id: 'movements', label: t('inventory_movements') },
     { id: 'timeline', label: t('timeline') },
     { id: 'activity', label: t('activity'), count: activities.length },
@@ -319,6 +321,16 @@ export default function ProductProfilePage() {
               </dl>
             </CardContent>
           </Card>
+        </TabPanel>
+      )}
+
+      {activeTab === 'variants' && (
+        <TabPanel id="variants">
+          <ProductVariantsPanel
+            productId={id}
+            variantState={product.variant_state ?? 'simple'}
+            onProductChanged={() => void load()}
+          />
         </TabPanel>
       )}
 

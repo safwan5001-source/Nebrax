@@ -6,7 +6,7 @@ import {
   fetchProductFilters,
   fetchProducts,
 } from "@/lib/commerce/products";
-import { DEFAULT_SURFACE, type Surface } from "@/lib/spree";
+import type { Surface } from "@/lib/spree";
 
 /**
  * COM-7-P1: product data now comes from the AWJ Store catalog adapter
@@ -42,7 +42,7 @@ export async function cachedListProducts(
 
 export async function getProducts(
   params?: ProductListParams,
-  surface: Surface = DEFAULT_SURFACE,
+  surface: Surface = "dtc",
 ) {
   return cachedListProducts(params, undefined, surface, undefined);
 }
@@ -60,7 +60,7 @@ export async function cachedGetProduct(
 export async function getProduct(
   slugOrId: string,
   params?: { expand?: string[] },
-  surface: Surface = DEFAULT_SURFACE,
+  surface: Surface = "dtc",
 ) {
   return cachedGetProduct(
     slugOrId,
@@ -82,7 +82,7 @@ async function cachedGetProductFilters(
 
 export async function getProductFilters(
   params?: Record<string, unknown>,
-  surface: Surface = DEFAULT_SURFACE,
+  surface: Surface = "dtc",
 ) {
   return cachedGetProductFilters(params, undefined, surface, undefined);
 }

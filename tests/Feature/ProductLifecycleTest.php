@@ -78,7 +78,9 @@ class ProductLifecycleTest extends TestCase
         $this->withToken($auth['token'])
             ->deleteJson("/api/products/{$product['id']}")
             ->assertStatus(422)
-            ->assertJsonPath('message', 'لا يمكن حذف المنتج لأنه مرتبط بـ 2 سجلّاً. عطّله بدلاً من ذلك حفاظاً على حركاته ومستنداته.');
+            // VAR-INV-1: هويّة المخزون (InventoryState) صارت مرجعاً ثالثاً — إلى
+            // جانب حركة المخزون وسطر الرصيد الافتتاحي القائمَين سلفاً.
+            ->assertJsonPath('message', 'لا يمكن حذف المنتج لأنه مرتبط بـ 3 سجلّاً. عطّله بدلاً من ذلك حفاظاً على حركاته ومستنداته.');
 
         $this->withToken($auth['token'])
             ->putJson("/api/products/{$product['id']}", $this->payload([

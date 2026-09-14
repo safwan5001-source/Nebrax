@@ -16,6 +16,9 @@ import { useNumberPreview } from '@/lib/use-number-preview';
 import { riyalToMinor, formatRiyal, extractInclusiveTax } from '@/lib/money';
 import { getSystemTaxInclusive } from '@/lib/tax';
 import { productUnitForTemplate, type ProductUnitTemplate } from '@/lib/product-unit-template';
+import { ProductPublicationFields } from './product-publication-fields';
+import { replaceProductPublication } from '@/modules/products/publication';
+import { useProductPublication } from '@/modules/products/use-product-publication';
 
 export interface Product {
   id: string;
@@ -49,6 +52,8 @@ export interface Product {
   quantity_on_hand: number;
   avg_cost: string;
   is_active: boolean;
+  /** VAR-CORE-1: 'simple' | 'variant_managed'. اختياري للتوافق مع مستهلكين أقدم للنوع. */
+  variant_state?: string;
 }
 
 interface FormState {
@@ -145,8 +150,10 @@ export function ProductDialog({
   const [newBarcodeQty, setNewBarcodeQty] = useState('1');
   const [newBarcodeLabel, setNewBarcodeLabel] = useState('');
   const [savingBarcode, setSavingBarcode] = useState(false);
+  const [createdProductId, setCreatedProductId] = useState<string | null>(null);
   const { number: suggestedSku } = useNumberPreview('product', { enabled: open && !product?.id });
   const mediaObjectUrls = useRef<string[]>([]);
+  const publication = useProductPublication(product?.id, open);
 
   const revokeMediaObjectUrls = useCallback(() => {
     mediaObjectUrls.current.forEach((url) => URL.revokeObjectURL(url));
@@ -202,6 +209,10 @@ export function ProductDialog({
   useEffect(() => {
     if (open && product?.id) { void loadMedia(); void loadBarcodes(); }
   }, [loadMedia, loadBarcodes, open, product?.id]);
+  useEffect(() => {
+    if (!open) return;
+    setCreatedProductId(null);
+  }, [open, product?.id]);
   useEffect(() => () => revokeMediaObjectUrls(), [revokeMediaObjectUrls]);
   const [saving, setSaving] = useState(false);
 
@@ -258,13 +269,27 @@ export function ProductDialog({
       is_active: form.is_active,
     };
     try {
+      let productId = product?.id ?? createdProductId;
       if (product?.id) {
         await api(`/products/${product.id}`, { method: 'PUT', body });
-        success(tc('updated'));
-      } else {
-        await api('/products', { method: 'POST', body });
-        success(tc('created'));
+      } else if (!productId) {
+        const created = await api<{ data: { id: string } }>('/products', { method: 'POST', body });
+        productId = created.data.id;
+        // A failed publication retry must target this created product instead
+        // of issuing a second POST /products.
+        setCreatedProductId(productId);
       }
+
+      if (publication.status === 'ready' && productId) {
+        try {
+          await replaceProductPublication(productId, publication.selectedIds);
+        } catch {
+          setError(t(product?.id ? 'publication_failed_after_update' : 'publication_failed_after_create'));
+          return;
+        }
+      }
+
+      success(product?.id ? tc('updated') : tc('created'));
       onSaved();
       onClose();
     } catch (err) {
@@ -528,6 +553,24 @@ export function ProductDialog({
           </div>
         )}
 
+        <ProductPublicationFields
+          status={publication.status}
+          stores={publication.stores}
+          selectedIds={publication.selectedIds}
+          disabled={saving}
+          onChange={publication.setSelectedIds}
+          onRetry={() => void publication.reload()}
+          labels={{
+            title: t('online_store'),
+            availableOnline: t('available_online'),
+            hint: t('publication_hint'),
+            loading: t('publication_loading'),
+            empty: t('publication_empty'),
+            loadFailed: t('publication_load_failed'),
+            retry: t('retry'),
+          }}
+        />
+
         {product?.id && (
           <section className="space-y-3 rounded-md border border-border p-3" aria-labelledby="edit-product-barcodes-title">
             <div>
@@ -646,8 +689,8 @@ export function ProductDialog({
           <Button type="button" variant="outline" onClick={onClose}>
             {t('cancel')}
           </Button>
-          <Button type="submit" disabled={saving || uploadingMedia || loadingMedia}>
-            {t('save')}
+          <Button type="submit" disabled={saving || uploadingMedia || loadingMedia || publication.status === 'loading'}>
+            {createdProductId ? t('retry_publication') : t('save')}
           </Button>
         </div>
       </form>

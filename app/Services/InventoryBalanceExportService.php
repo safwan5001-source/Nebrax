@@ -101,7 +101,9 @@ class InventoryBalanceExportService
         // الكمية المعروضة له هي العمود نفسه. المقيَّد يُستبعد صفره أثناء البث
         // في rows() على الكمية المحدودة النطاق الفعلية، لا هذا العمود.
         if (! $includeZero && $warehouseIds === null) {
-            $query->where('quantity_on_hand', '!=', 0);
+            // VAR-INV-1: `products.quantity_on_hand` مجمَّد — القراءة من الهويّة
+            // البسيطة المضمومة في `InventoryBalanceFilters::query()`.
+            $query->whereRaw('COALESCE(inventory_states.quantity_on_hand, 0) != 0');
         }
 
         // السقف يبقى على العدّ العالمي حتى للمقيَّد: تصفية أدق حسب المخزن كانت

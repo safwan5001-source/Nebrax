@@ -7,6 +7,7 @@ use App\Models\PriceList;
 use App\Models\PriceListItem;
 use App\Models\Product;
 use App\Services\PriceListService;
+use App\Services\ProductPricingService;
 use App\Support\PosSettings;
 
 /**
@@ -17,7 +18,7 @@ use App\Support\PosSettings;
  */
 class PosCustomerPriceListResolver
 {
-    public function __construct(protected PriceListService $priceLists) {}
+    public function __construct(protected PriceListService $priceLists, protected ProductPricingService $pricing) {}
 
     /** يعيد قائمة العميل النشطة فقط عندما تكون سياسة POS مفعلة. */
     public function forPartner(?string $partnerId): ?PriceList
@@ -55,7 +56,12 @@ class PosCustomerPriceListResolver
             return $this->priceFor($priceList, $product, $unitName);
         }
 
-        return $priceList ? $this->priceLists->resolve($priceList, $product, $unitName) : null;
+        $listPrice = $priceList ? $this->priceLists->resolve($priceList, $product, $unitName) : null;
+
+        // VAR-PRICE-1: السلطة الأساسية الصريحة للوحدة البديلة — لم تكن موجودة
+        // من قبل (كان الغياب هنا يعني «لا سعر» دائماً)، فهذه إضافة سلوك لا
+        // كسرٌ له؛ لا اشتقاقٌ من معامل التحويل أبداً.
+        return $listPrice ?? $this->pricing->resolveExplicit($product, null, $unitName);
     }
 
     /**
@@ -77,9 +83,13 @@ class PosCustomerPriceListResolver
             return [];
         }
 
+        // VAR-PRICE-1: `product_variant_id` موجودٌ الآن على هذا الجدول — استبعاده
+        // صراحةً هنا إلزاميّ، وإلا اختلط سعرٌ خاصٌّ بمتغيّرٍ بعينه في كتالوج
+        // المنتج نفسه (هذا المسار منتجٌ بسيط فقط — حدود POS، VAR-POS-1 لاحقاً).
         $listed = $priceList
             ? PriceListItem::where('price_list_id', $priceList->id)
                 ->whereIn('product_id', array_keys($byId))
+                ->whereNull('product_variant_id')
                 ->get(['product_id', 'unit_name', 'price'])
                 ->groupBy('product_id')
             : collect();
@@ -95,16 +105,19 @@ class PosCustomerPriceListResolver
                 'price' => $baseItem ? (int) $baseItem->price : (int) $product->sale_price,
             ]];
 
-            // لا تظهر الوحدات البديلة إلا عندما تكون القائمة نشطة وتحتوي سعراً
-            // صريحاً لها. لا يصل خيارٌ تعرضه الواجهة إلى حارس يرفضه لاحقاً.
-            if ($priceList && $product->unitTemplate) {
+            // لا تظهر الوحدة البديلة إلا حين تملك سعراً صريحاً حقيقياً —
+            // من قائمة السعر النشطة أولاً، وإلا السلطة الأساسية الصريحة
+            // (VAR-PRICE-1). لا يصل خيارٌ تعرضه الواجهة إلى حارس يرفضه لاحقاً،
+            // ولا يُشتقّ سعرٌ من معامل التحويل أبداً.
+            if ($product->unitTemplate) {
                 foreach ($product->unitTemplate->units as $unit) {
                     $item = $items->get($unit->name);
-                    if ($item) {
+                    $price = $item ? (int) $item->price : $this->pricing->resolveExplicit($product, null, $unit->name);
+                    if ($price !== null) {
                         $units[] = [
                             'name' => $unit->name,
                             'factor' => (int) $unit->factor,
-                            'price' => (int) $item->price,
+                            'price' => $price,
                         ];
                     }
                 }

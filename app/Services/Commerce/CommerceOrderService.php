@@ -155,6 +155,89 @@ class CommerceOrderService
     }
 
     /**
+     * ═══════════════════════════════════════════════════════════════
+     *  COM-CHECKOUT-1B — مسار إنشاءٍ مستقلّ تماماً عن `create()` أعلاه
+     * ═══════════════════════════════════════════════════════════════
+     * يُستدعى حصراً من `CommerceCheckoutService::complete()` **داخل** معاملة
+     * الإتمام التي أعادت التحقّق فعلاً من كل شيء (منتج/نشر/وحدة/سعر/مخزون) —
+     * هذه الدالة لا تعيد التحقّق ولا تحلّ سعراً؛ `$lines` حمولةٌ **موثوقة
+     * بالفعل** (نتيجة `CommerceCheckoutService`، لا مُدخَل طالبٍ خامّ إطلاقاً).
+     *
+     * **بلا Partner/CustomerIdentity**: ضيفٌ دائماً في نطاق 1B (لا تبنّي حساب
+     * عميل هنا) — كلاهما `null` بنيوياً، لا حتى قراءة `CustomerContext`.
+     *
+     * **لماذا `draft` عابرة داخلياً لا حالة API جديدة**: `CommerceOrderSnapshot::
+     * booted()` يرفض إنشاء لقطة لطلبٍ مؤكَّد بالفعل (حارسٌ قائم من PR-COM-6C) —
+     * فالترتيب هنا: إنشاء الطلب بحالته الافتراضية `draft` ← سطور ← لقطة ← نقل
+     * صريح إلى `confirmed` أخيراً، كل ذلك داخل معاملةٍ واحدة لا تُلتزَم
+     * (commit) إلا بعد اكتمال الأربعة. لا أحد خارج هذه الدالة يرى الصفّ
+     * بحالة `draft` إطلاقاً؛ لا تغيير في enum `status` ولا في معنى `confirmed`
+     * القديم (AWJ_COMMERCE_ORDER_IDENTITY_DECISION_REPORT.md، القرار C).
+     *
+     * @param  array{sales_channel_id: string, storefront_id: string, commerce_checkout_id: string, delivery_method: ?string, contact_name: ?string, contact_phone: ?string, contact_email: ?string, delivery_country: ?string, delivery_city: ?string, delivery_district: ?string, delivery_street: ?string, delivery_postal_code: ?string, delivery_notes: ?string}  $header
+     * @param  array<int, array{product_id: string, product_name_snapshot: string, quantity: int, unit_name: ?string, unit_factor: int, unit_price: int, line_total: int}>  $lines  نتيجة إعادة تحقّق موثوقة بالفعل — لا يُعاد حسم سعرٍ أو وحدةٍ هنا.
+     *
+     * @throws RuntimeException `$lines` فارغة، أو `sales_channel_id` غير موجود.
+     */
+    public function createFromCheckout(array $header, array $lines): CommerceOrder
+    {
+        $tenantId = app(TenantContext::class)->id();
+        if ($tenantId === null) {
+            throw new RuntimeException('لا سياق مستأجر نشط.');
+        }
+
+        if (empty($lines)) {
+            throw new RuntimeException('طلب Commerce يجب أن يحتوي على سطر واحد على الأقل.');
+        }
+
+        if (! SalesChannel::query()->whereKey($header['sales_channel_id'])->exists()) {
+            throw new RuntimeException('قناة البيع غير موجودة.');
+        }
+
+        return DB::transaction(function () use ($header, $lines) {
+            $order = CommerceOrder::create([
+                'sales_channel_id' => $header['sales_channel_id'],
+                'storefront_id' => $header['storefront_id'],
+                'commerce_checkout_id' => $header['commerce_checkout_id'],
+                'partner_id' => null,
+                'customer_identity_id' => null,
+                'number' => $this->nextNumber(),
+                'delivery_method' => $header['delivery_method'],
+            ]);
+
+            $total = 0;
+            foreach ($lines as $line) {
+                $created = $order->lines()->create($line);
+                $total += $created->line_total;
+            }
+            $order->update(['total' => $total]);
+
+            $order->snapshot()->create([
+                'customer_name' => $header['contact_name'],
+                'contact_name' => $header['contact_name'],
+                'email' => $header['contact_email'],
+                'phone' => $header['contact_phone'],
+                'shipping_recipient_name' => $header['contact_name'],
+                'shipping_phone' => $header['contact_phone'],
+                'shipping_country' => $header['delivery_country'],
+                'shipping_city' => $header['delivery_city'],
+                'shipping_district' => $header['delivery_district'],
+                'shipping_street' => $header['delivery_street'],
+                'shipping_postal_code' => $header['delivery_postal_code'],
+                'shipping_notes' => $header['delivery_notes'],
+            ]);
+
+            // نقلٌ صريحٌ أخير إلى confirmed — لا مسار خارجي رأى draft قط
+            // (انظر توثيق الدالة أعلاه). لا استدعاء لـ confirm() القائمة:
+            // تلك تفتح معاملتها/تقفل صفّها الخاص لسيناريو مختلف (طلبٌ قد
+            // يكون قديماً وغير مقفولٍ أصلاً هنا).
+            $order->update(['status' => CommerceOrder::STATUS_CONFIRMED, 'confirmed_at' => now()]);
+
+            return $order->fresh(['lines', 'snapshot']);
+        });
+    }
+
+    /**
      * تحديث/إنشاء لقطة طلبٍ قائم — القناة الوحيدة لتعديل لقطةٍ بعد الإنشاء
      * (مثلاً: عميلٌ يبدّل عنوان الشحن أثناء مراجعة السلة قبل COM-7). مسودة
      * فقط: طلبٌ مؤكَّد يُرفض مركزياً هنا **وكذلك** في

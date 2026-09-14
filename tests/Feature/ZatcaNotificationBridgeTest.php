@@ -61,6 +61,11 @@ class ZatcaNotificationBridgeTest extends TestCase
         return ZatcaSubmissionAttempt::findOrFail($response['data']['id']);
     }
 
+    private function restoreTenantContext(string $tenantId): void
+    {
+        app(TenantContext::class)->set($tenantId);
+    }
+
     /** @return Collection<int, Notification> */
     private function notificationsFor(Invoice $invoice): Collection
     {
@@ -77,6 +82,7 @@ class ZatcaNotificationBridgeTest extends TestCase
         $invoice = $this->postedInvoice();
         $attempt = $this->pendingAttempt($invoice, 'rejected-1');
 
+        $this->restoreTenantContext($this->auth['tenant_id']);
         app(ZatcaSubmissionService::class)->complete($attempt, 'rejected', 400, 'invalid_signature', 'توقيع غير صالح');
 
         $notifications = $this->notificationsFor($invoice);
@@ -93,6 +99,7 @@ class ZatcaNotificationBridgeTest extends TestCase
         $invoice = $this->postedInvoice();
         $attempt = $this->pendingAttempt($invoice, 'failed-1');
 
+        $this->restoreTenantContext($this->auth['tenant_id']);
         app(ZatcaSubmissionService::class)->complete($attempt, 'failed', 503, 'gateway_unavailable', 'Temporary failure');
 
         $notifications = $this->notificationsFor($invoice);
@@ -106,6 +113,7 @@ class ZatcaNotificationBridgeTest extends TestCase
         $invoice = $this->postedInvoice();
         $attempt = $this->pendingAttempt($invoice, 'accepted-1');
 
+        $this->restoreTenantContext($this->auth['tenant_id']);
         app(ZatcaSubmissionService::class)->complete($attempt, 'accepted', 200, 'accepted');
 
         $this->assertCount(0, $this->notificationsFor($invoice));
@@ -116,10 +124,12 @@ class ZatcaNotificationBridgeTest extends TestCase
     {
         $invoice = $this->postedInvoice();
         $first = $this->pendingAttempt($invoice, 'retry-1');
+        $this->restoreTenantContext($this->auth['tenant_id']);
         app(ZatcaSubmissionService::class)->complete($first, 'failed', 503, 'gateway_unavailable');
         $this->assertCount(1, $this->notificationsFor($invoice));
 
         $second = $this->pendingAttempt($invoice, 'retry-2');
+        $this->restoreTenantContext($this->auth['tenant_id']);
         app(ZatcaSubmissionService::class)->complete($second, 'rejected', 400, 'invalid_signature');
 
         $notifications = $this->notificationsFor($invoice);
@@ -132,6 +142,7 @@ class ZatcaNotificationBridgeTest extends TestCase
     {
         $invoice = $this->postedInvoice();
         $attempt = $this->pendingAttempt($invoice, 'double-1');
+        $this->restoreTenantContext($this->auth['tenant_id']);
         app(ZatcaSubmissionService::class)->complete($attempt, 'failed', 503, 'gateway_unavailable');
 
         $this->expectException(RuntimeException::class);
@@ -143,6 +154,7 @@ class ZatcaNotificationBridgeTest extends TestCase
     {
         $invoice = $this->postedInvoice();
         $attempt = $this->pendingAttempt($invoice, 'tenant-a-1');
+        $this->restoreTenantContext($this->auth['tenant_id']);
         app(ZatcaSubmissionService::class)->complete($attempt, 'failed', 503, 'gateway_unavailable');
 
         $authB = $this->registerTenant('zatca-notif-b', 'zatca-notif-b@example.test');
@@ -161,6 +173,7 @@ class ZatcaNotificationBridgeTest extends TestCase
             ->withHeader('Idempotency-Key', 'tenant-b-1')
             ->postJson("/api/invoices/{$invoiceB->id}/zatca/submissions")
             ->assertStatus(202);
+        $this->restoreTenantContext($authB['tenant_id']);
         app(ZatcaSubmissionService::class)->complete(ZatcaSubmissionAttempt::findOrFail($attemptB['data']['id']), 'failed', 503, 'gateway_unavailable');
 
         $this->assertSame(1, Notification::withoutGlobalScopes()->where('tenant_id', $this->auth['tenant_id'])->count());
@@ -175,6 +188,7 @@ class ZatcaNotificationBridgeTest extends TestCase
 
         $invoice = $this->postedInvoice();
         $attempt = $this->pendingAttempt($invoice, 'rbac-1');
+        $this->restoreTenantContext($this->auth['tenant_id']);
         app(ZatcaSubmissionService::class)->complete($attempt, 'failed', 503, 'gateway_unavailable');
 
         $recipients = $this->notificationsFor($invoice)->pluck('recipient_id')->all();
@@ -189,6 +203,7 @@ class ZatcaNotificationBridgeTest extends TestCase
         $invoice = $this->postedInvoice();
         $attempt = $this->pendingAttempt($invoice, 'leak-1');
 
+        $this->restoreTenantContext($this->auth['tenant_id']);
         app(ZatcaSubmissionService::class)->complete(
             $attempt,
             'rejected',
@@ -223,6 +238,7 @@ class ZatcaNotificationBridgeTest extends TestCase
         };
         app()->instance(NotificationService::class, $broken);
 
+        $this->restoreTenantContext($this->auth['tenant_id']);
         $result = app(ZatcaSubmissionService::class)->complete($attempt, 'failed', 500, 'gateway_error');
 
         $this->assertSame('failed', $result->status);

@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\BarcodeRegistryEntry;
+use App\Models\CommerceCartItem;
 use App\Models\CommerceListing;
 use App\Models\CommerceOrderLine;
 use App\Models\CreditNoteLine;
@@ -11,6 +12,7 @@ use App\Models\FuelProduct;
 use App\Models\FuelSale;
 use App\Models\InventoryOpeningLine;
 use App\Models\InventoryReservation;
+use App\Models\InventoryState;
 use App\Models\InventoryStockAlert;
 use App\Models\InvoiceLine;
 use App\Models\PriceListItem;
@@ -18,11 +20,15 @@ use App\Models\ProcurementLine;
 use App\Models\ProductActivity;
 use App\Models\ProductBarcode;
 use App\Models\ProductMedia;
+use App\Models\ProductOption;
+use App\Models\ProductUnitPrice;
+use App\Models\ProductVariant;
 use App\Models\ProductWarehouseStock;
 use App\Models\PurchaseLine;
 use App\Models\QuoteLine;
 use App\Models\RecurringInvoiceLine;
 use App\Models\ReturnLine;
+use App\Models\SkuRegistryEntry;
 use App\Models\StockMovement;
 use App\Models\StockPermitLine;
 use App\Models\StocktakeLine;
@@ -42,7 +48,7 @@ use App\Models\StocktakeLine;
  *  `ProductLifecycleService` وحدها. الفصل متعمَّد: التصنيف بيانٌ ثابتٌ يُراجَع
  *  بالعين، والتنفيذ سلوكٌ يُختبر.
  *
- *  **الفئات الخمس** (بنصّ العقد):
+ *  **فئات المراجع**:
  *
  *  1. `BUSINESS_HISTORICAL` — سطر مستندٍ تجاري/تاريخي. حجّة قائمة: حذف المنتج
  *     يترك المستند يشير إلى بطاقةٍ مُحرَّرة، ويحرّر SKU/باركوداً قد يُعاد
@@ -56,6 +62,8 @@ use App\Models\StocktakeLine;
  *  5. `AUDIT_HISTORY` — سجلّ تدقيق. **لا يمنع الحذف أبداً**: صفّ «أُنشئ» موجود
  *     لكل منتج بلا استثناء، فجعله مانعاً كان سيجعل كل منتج غير قابل للحذف.
  *     يُحتفظ به بعد الحذف عمداً — الحذف نفسه حدثٌ يجب أن يبقى مدوَّناً.
+ *  6. `EPHEMERAL_REFERENCE` — مرجعٌ مؤقت غير تاريخي، مثل سطر سلة مجهولة.
+ *     **لا يمنع الحذف أبداً**؛ يبقى الصفّ بلقطة اسمٍ آمنة بعد تصفير مرجع المنتج.
  *
  *  نموذجٌ واحد قد يحمل أكثر من فئة: `InventoryOpeningLine` تاريخيٌّ **و**
  *  مخزنيّ الدلالة معاً — وهو بالضبط ما أغفلته القائمة القديمة في الموضعين.
@@ -74,6 +82,8 @@ final class ProductReferenceRegistry
     public const OWNED_CHILD = 'owned_child';
 
     public const AUDIT_HISTORY = 'audit_history';
+
+    public const EPHEMERAL_REFERENCE = 'ephemeral_reference';
 
     /**
      * التصنيف الكامل: صنف النموذج ⇐ [مفتاح التقرير، الفئات].
@@ -120,9 +130,19 @@ final class ProductReferenceRegistry
         // حذفه، ولا تغيير `type`/`track_inventory` عليه، لأن ذلك يعيد تفسير
         // كميةٍ محجوزة سلفاً (ADR-02 §9: غير المتتبَّع لا يُحجز أصلاً).
         InventoryReservation::class => ['key' => 'inventory_reservations', 'classes' => [self::INVENTORY_SEMANTIC]],
+        // VAR-INV-1: هويّة المخزون والتقييم الموحّدة. إنشاؤها **كسول** (أول
+        // عملية تمسّ الهويّة فعلاً — @see App\Models\InventoryState)، فوجود
+        // الصفّ نفسه دليل أثرٍ حقيقي بالضبط مثل StockMovement/ProductWarehouseStock
+        // أعلاه، لا صفّاً فارغاً يُنشأ تلقائياً لكل منتج فيُسقط هذا الحارس دائماً.
+        InventoryState::class => ['key' => 'inventory_states', 'classes' => [self::INVENTORY_SEMANTIC]],
 
         // ── ٤) تجاري حيّ ───────────────────────────────────────────────
         PriceListItem::class => ['key' => 'price_list_items', 'classes' => [self::COMMERCIAL_LIVE]],
+        // VAR-CORE-1: متغيّرٌ فعلي هويةٌ قابلة للبيع حيّة — ليس تاريخاً بعدُ
+        // (لا مستند/حركة تشير إليه اليوم، ذلك VAR-DOC-1/VAR-INV-1)، لكن حذف
+        // المنتج صامتاً بينما له متغيّرات يفقد تركيبات/SKU حيّة بلا تراجع.
+        // يمنع الحذف حتى يُزال كل متغيّر صراحةً أولاً (تحويلٌ صريح إلى بسيط).
+        ProductVariant::class => ['key' => 'product_variants', 'classes' => [self::COMMERCIAL_LIVE]],
         // PR-COM-3: عرضٌ تجاري حيّ لمنتج على قناة — بنفس منطق PriceListItem
         // حرفياً: ليس تاريخاً ولا هوية مخزون، لكن حذف المنتج صامتاً بينما هو
         // معروضٌ فعلياً على قناة يكسر تهيئة نشر حيّة (restrictOnDelete في
@@ -141,8 +161,29 @@ final class ProductReferenceRegistry
         // مانعاً كان سيجعل منتجاً «منخفض المخزون» غير قابلٍ للحذف أبداً بسبب
         // حالةٍ مشتقّة يعيد النظام حسابها بنفسه.
         InventoryStockAlert::class => ['key' => 'stock_alerts', 'classes' => [self::OWNED_CHILD]],
+        // VAR-CORE-1: خيارات المتغيّرات (اللون/المقاس) تابعةٌ بالكامل للمنتج —
+        // بلا معنى مستقلّ، وتُنظَّف مع الحذف الحقيقي وحده. حماية قيمها من
+        // الحذف وهي مستعملة في متغيّرٍ قائم مسؤولية الخدمة، لا هذا التصنيف.
+        ProductOption::class => ['key' => 'product_options', 'classes' => [self::OWNED_CHILD]],
+        // فضاء SKU الموحّد (VAR-CORE-1) — تابعٌ مملوكٌ تماماً كـ
+        // `BarcodeRegistryEntry` حرفياً، ولنفس السبب: وجود سجلٍّ لرمز المنتج
+        // حالةٌ طبيعية لا مرجعٌ تاريخي، ويُحرَّر ضمن الحذف الحقيقي وحده.
+        SkuRegistryEntry::class => ['key' => 'sku_registry_entries', 'classes' => [self::OWNED_CHILD]],
+        // VAR-PRICE-1: السعر الأساسي الصريح (منتج/أب أو متغيّر × وحدة). صفّ
+        // المنتج ذاته ليس مرجعاً مستقلاً بل جزءٌ من بطاقته (يُنشأ إلزامياً مع
+        // كل منتج لأن `sale_price` إلزاميٌّ عند الإنشاء) — تصنيفه `COMMERCIAL_LIVE`
+        // كان سيمنع حذف **كل** منتجٍ للأبد. حماية سعر متغيّرٍ قائمٍ فعلياً
+        // مسؤولية `ProductVariantService::deleteVariant()` الصريحة (تحقّقٌ
+        // مباشر لا هذا التصنيف)، لا هذا السجلّ — الموازي هنا تماماً حالة
+        // `ProductOption` نفسها أعلاه.
+        ProductUnitPrice::class => ['key' => 'product_unit_prices', 'classes' => [self::OWNED_CHILD]],
 
-        // ── ٦) تدقيق ───────────────────────────────────────────────────
+        // COM-CART-2: السلة المجهولة حالة مؤقتة وليست دليلاً تاريخياً ولا
+        // تهيئةً تجارية حية. حذف المنتج لا تمنعه سلة مهجورة؛ يبقى السطر
+        // بلقطة الاسم ويصبح غير متاح وفق عقد Cart V1.
+        CommerceCartItem::class => ['key' => 'commerce_cart_items', 'classes' => [self::EPHEMERAL_REFERENCE]],
+
+        // ── ٧) تدقيق ───────────────────────────────────────────────────
         ProductActivity::class => ['key' => 'activity', 'classes' => [self::AUDIT_HISTORY]],
 
         // ── مراجع نطاق الوقود ──────────────────────────────────────────

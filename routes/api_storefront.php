@@ -1,10 +1,13 @@
 <?php
 
+use App\Http\Controllers\Api\StorefrontCartController;
 use App\Http\Controllers\Api\StorefrontCategoryController;
+use App\Http\Controllers\Api\StorefrontCheckoutController;
 use App\Http\Controllers\Api\StorefrontConfigController;
 use App\Http\Controllers\Api\StorefrontMediaController;
 use App\Http\Controllers\Api\StorefrontProductController;
 use App\Http\Middleware\EnforcePublicApiRateLimit;
+use App\Http\Middleware\RequireStorefrontMutationGateway;
 use App\Http\Middleware\ResolveStorefrontDomain;
 use App\Http\Middleware\ResolveStorefrontTenant;
 use App\Support\PublicApiRateLimits;
@@ -43,6 +46,24 @@ Route::middleware([
     Route::get('media/{id}', [StorefrontMediaController::class, 'show'])->whereUuid('id')->name('media.show');
 
     Route::get('storefront', [StorefrontConfigController::class, 'show'])->name('storefront.show');
+
+    Route::get('cart', [StorefrontCartController::class, 'show'])->name('cart.show');
+    Route::middleware(RequireStorefrontMutationGateway::class)->group(function () {
+        Route::post('cart/items', [StorefrontCartController::class, 'store'])->name('cart.items.store');
+        Route::patch('cart/items/{item}', [StorefrontCartController::class, 'update'])->whereUuid('item')->name('cart.items.update');
+        Route::delete('cart/items/{item}', [StorefrontCartController::class, 'destroy'])->whereUuid('item')->name('cart.items.destroy');
+    });
+
+    // COM-CHECKOUT-1A أساسٌ؛ COM-CHECKOUT-1B يضيف /checkout/complete —
+    // idempotency إلزامية + التزامٌ صريح، راجع AWJ_CHECKOUT_V1_ARCHITECTURE.md §9.
+    Route::get('checkout', [StorefrontCheckoutController::class, 'show'])->name('checkout.show');
+    Route::middleware(RequireStorefrontMutationGateway::class)->group(function () {
+        Route::post('checkout', [StorefrontCheckoutController::class, 'store'])->name('checkout.store');
+        Route::patch('checkout/contact', [StorefrontCheckoutController::class, 'updateContact'])->name('checkout.contact.update');
+        Route::patch('checkout/address', [StorefrontCheckoutController::class, 'updateAddress'])->name('checkout.address.update');
+        Route::patch('checkout/delivery', [StorefrontCheckoutController::class, 'updateDelivery'])->name('checkout.delivery.update');
+        Route::post('checkout/complete', [StorefrontCheckoutController::class, 'complete'])->name('checkout.complete');
+    });
 });
 
 /*

@@ -93,22 +93,32 @@ class ProductListFilters
             match ($filters['stock_state']) {
                 'tracked' => $query->where('track_inventory', true),
                 'not_tracked' => $query->where('track_inventory', false),
-                'out' => $query->where('track_inventory', true)->where('quantity_on_hand', '<=', 0),
-                'low' => $query
+                'out' => self::withSimpleInventoryState($query)
                     ->where('track_inventory', true)
-                    ->where('quantity_on_hand', '>', 0)
+                    ->where(fn (Builder $q) => $q->whereNull('inventory_states.quantity_on_hand')->orWhere('inventory_states.quantity_on_hand', '<=', 0)),
+                'low' => self::withSimpleInventoryState($query)
+                    ->where('track_inventory', true)
+                    ->where('inventory_states.quantity_on_hand', '>', 0)
                     ->where('reorder_level', '>', 0)
-                    ->whereColumn('quantity_on_hand', '<=', 'reorder_level'),
+                    ->whereColumn('inventory_states.quantity_on_hand', '<=', 'reorder_level'),
                 default => null,
             };
         }
 
-        foreach (['sale_price', 'purchase_price'] as $column) {
-            foreach (['gte' => '>=', 'lte' => '<=', 'eq' => '='] as $suffix => $operator) {
-                $key = "{$column}_{$suffix}";
-                if (filled($filters[$key] ?? null)) {
-                    $query->where($column, $operator, self::moneyFilterToMinor((string) $filters[$key]));
-                }
+        foreach (['gte' => '>=', 'lte' => '<=', 'eq' => '='] as $suffix => $operator) {
+            $key = "purchase_price_{$suffix}";
+            if (filled($filters[$key] ?? null)) {
+                $query->where('purchase_price', $operator, self::moneyFilterToMinor((string) $filters[$key]));
+            }
+        }
+
+        // VAR-PRICE-1: `products.sale_price` مجمَّدٌ — القراءة من السعر
+        // الأساسي المضموم أدناه.
+        foreach (['gte' => '>=', 'lte' => '<=', 'eq' => '='] as $suffix => $operator) {
+            $key = "sale_price_{$suffix}";
+            if (filled($filters[$key] ?? null)) {
+                self::withSimpleUnitPrice($query)
+                    ->where('product_unit_prices.price', $operator, self::moneyFilterToMinor((string) $filters[$key]));
             }
         }
 
@@ -126,6 +136,18 @@ class ProductListFilters
         $key = ltrim($sort, '-');
 
         if ($sort !== '' && isset(self::SORTS[$key])) {
+            if ($key === 'quantity_on_hand') {
+                self::withSimpleInventoryState($query);
+
+                return $query->orderByRaw('COALESCE(inventory_states.quantity_on_hand, 0) '.$direction)->orderByDesc('products.id');
+            }
+
+            if ($key === 'sale_price') {
+                self::withSimpleUnitPrice($query);
+
+                return $query->orderByRaw('COALESCE(product_unit_prices.price, 0) '.$direction)->orderByDesc('products.id');
+            }
+
             return $query->orderBy(self::SORTS[$key], $direction)->orderByDesc('id');
         }
 
@@ -136,6 +158,52 @@ class ProductListFilters
 
         // توافق خلفي مع كل مستهلك قديم لـ GET /products بلا pagination.
         return $query->latest();
+    }
+
+    /**
+     * VAR-INV-1: `products.quantity_on_hand` مجمَّدٌ بلا كتابة — `InventoryState`
+     * هي السلطة الوحيدة الآن. تصفية/فرزٌ بـ SQL خام على العمود القديم كان
+     * سيقرأ صفراً دائماً؛ الضمّ هنا لهويّة المنتج البسيطة (`product_variant_id
+     * IS NULL`) وحدها — لا مسارٍ هنا يعي المتغيّرات بعد (VAR-DOC-1/VAR-POS-1
+     * لاحقاً)، فمنتجٌ `variant_managed` يظهر بكميةٍ `NULL`/صفر هنا كسلوكه
+     * السابق تقريباً (لم يكن لهذه القائمة مفهوم متغيّرٍ أصلاً من قبل).
+     * انضمامٌ مرةً واحدة فقط — استدعاءٌ متكرر آمن.
+     */
+    private static function withSimpleInventoryState(Builder $query): Builder
+    {
+        $joins = $query->getQuery()->joins ?? [];
+        foreach ($joins as $join) {
+            if ($join->table === 'inventory_states') {
+                return $query;
+            }
+        }
+
+        return $query->leftJoin('inventory_states', function ($join): void {
+            $join->on('inventory_states.product_id', '=', 'products.id')
+                ->whereNull('inventory_states.product_variant_id');
+        })->select('products.*');
+    }
+
+    /**
+     * VAR-PRICE-1: `products.sale_price` مجمَّدٌ بلا كتابة — `ProductUnitPrice`
+     * (السعر الأساسي، `product_variant_id IS NULL`) هي السلطة الوحيدة الآن.
+     * الانضمام على `unit_name = products.unit` (لا قيمة ثابتة) لأن وحدة
+     * الأساس تختلف بين المنتجات. انضمامٌ مرةً واحدة فقط — استدعاءٌ متكرر آمن.
+     */
+    private static function withSimpleUnitPrice(Builder $query): Builder
+    {
+        $joins = $query->getQuery()->joins ?? [];
+        foreach ($joins as $join) {
+            if ($join->table === 'product_unit_prices') {
+                return $query;
+            }
+        }
+
+        return $query->leftJoin('product_unit_prices', function ($join): void {
+            $join->on('product_unit_prices.product_id', '=', 'products.id')
+                ->on('product_unit_prices.unit_name', '=', 'products.unit')
+                ->whereNull('product_unit_prices.product_variant_id');
+        })->select('products.*');
     }
 
     /** «12.5» → 1250 هللة. بلا `float` كي لا يفلت مرشّح سعر من الحافة. */

@@ -25,7 +25,21 @@ trait InteractsWithApi
     {
         $this->app['auth']->forgetGuards();
 
-        return parent::call($method, $uri, $parameters, $cookies, $files, $server, $content);
+        // Feature tests often establish a tenant explicitly for setup/assertions
+        // around an HTTP request. Production SetTenant must still clear the
+        // request tenant; restore only the test's pre-request context afterward.
+        $tenant = app(TenantContext::class);
+        $setupTenantId = $tenant->id();
+
+        try {
+            return parent::call($method, $uri, $parameters, $cookies, $files, $server, $content);
+        } finally {
+            if ($setupTenantId === null) {
+                $tenant->forget();
+            } else {
+                $tenant->set($setupTenantId);
+            }
+        }
     }
 
     /**

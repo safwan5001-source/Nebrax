@@ -91,7 +91,17 @@ function CheckoutPageContentInner({
   const searchParams = useSearchParams();
   const basePath = extractBasePath(pathname);
   const { setSummaryContent } = useCheckout();
-  const { cart: contextCart } = useCart();
+  // AWJ_CART_WIRING: the shared CartContext now also carries AWJ's
+  // StorefrontCart for the DTC surface (Cart V1 has no checkout yet — see
+  // docs/plans/store/AWJ_COM_7_SPREE_INTEGRATION_GATE.md). This checkout
+  // flow is unchanged Spree/Stripe logic and out of that wiring's scope;
+  // the cast keeps it compiling exactly as before. A DTC visitor's
+  // `contextCart` is simply never a Spree `Cart` post-wiring, so the
+  // `contextCart.id !== cartId` guard below naturally short-circuits
+  // instead of matching — this page was already unreachable for an AWJ
+  // cart (there is no client-visible AWJ cart id to build its URL from).
+  const { cart: rawContextCart } = useCart();
+  const contextCart = rawContextCart as Cart | null;
   const t = useTranslations("checkout");
   const tc = useTranslations("common");
   const { user, loading: authLoading } = useAuth();

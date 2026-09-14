@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { ChangeEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { ArrowRight, Package, Tag, Warehouse, SlidersHorizontal, RefreshCw, Trash2 } from 'lucide-react';
+import { ArrowRight, Package, Tag, Warehouse, SlidersHorizontal, RefreshCw, Trash2, Plus } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,10 +16,14 @@ import { useNumberPreview } from '@/lib/use-number-preview';
 import { riyalToMinor, formatRiyal, extractInclusiveTax } from '@/lib/money';
 import { getSystemTaxInclusive } from '@/lib/tax';
 import { productUnitForTemplate, type ProductUnitTemplate } from '@/lib/product-unit-template';
+import { ProductPublicationFields } from '@/components/products/product-publication-fields';
+import { replaceProductPublication } from '@/modules/products/publication';
+import { useProductPublication } from '@/modules/products/use-product-publication';
 
 interface Partner { id: string; name: string; type?: string }
 interface Account { id: string; code: string; name: string; type: string; is_group: boolean }
 interface SelectedProductImage { file: File; previewUrl: string }
+interface PendingBarcode { code: string; unit_name: string; default_quantity: string; label: string }
 
 const MAX_PRODUCT_IMAGES = 8;
 const MAX_PRODUCT_IMAGE_SIZE = 5 * 1024 * 1024;
@@ -66,9 +70,16 @@ export default function NewProductPage() {
   const [taxInclusive, setTaxInclusive] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [createdProductId, setCreatedProductId] = useState<string | null>(null);
   const [productImages, setProductImages] = useState<SelectedProductImage[]>([]);
+  const [pendingBarcodes, setPendingBarcodes] = useState<PendingBarcode[]>([]);
+  const [newBarcodeCode, setNewBarcodeCode] = useState('');
+  const [newBarcodeUnit, setNewBarcodeUnit] = useState('');
+  const [newBarcodeQty, setNewBarcodeQty] = useState('1');
+  const [newBarcodeLabel, setNewBarcodeLabel] = useState('');
   const { number: suggestedSku } = useNumberPreview('product');
   const productImageUrls = useRef<string[]>([]);
+  const publication = useProductPublication();
 
   useEffect(() => {
     getSystemTaxInclusive().then(setTaxInclusive).catch(() => {});
@@ -132,53 +143,99 @@ export default function NewProductPage() {
     setProductImages((current) => current.filter((image) => image.previewUrl !== previewUrl));
   }
 
+  function addPendingBarcode() {
+    const code = newBarcodeCode.trim();
+    if (!code) return;
+    const qty = newBarcodeQty.trim() === '' ? 1 : Number(newBarcodeQty);
+    if (!Number.isInteger(qty) || qty < 1 || qty > 1000000) {
+      setError(t('barcode_quantity_invalid'));
+      return;
+    }
+    setError(null);
+    setPendingBarcodes((current) => [
+      ...current,
+      { code, unit_name: newBarcodeUnit, default_quantity: String(qty), label: newBarcodeLabel.trim() },
+    ]);
+    setNewBarcodeCode('');
+    setNewBarcodeUnit('');
+    setNewBarcodeQty('1');
+    setNewBarcodeLabel('');
+  }
+
+  function removePendingBarcode(code: string) {
+    setPendingBarcodes((current) => current.filter((item) => item.code !== code));
+  }
+
   async function submit() {
-    if (!name.trim()) { setError(tc('saveFailed')); return; }
+    if (!createdProductId && !name.trim()) { setError(tc('saveFailed')); return; }
     setSaving(true);
     setError(null);
     try {
-      const created = await api<{ data: { id: string } }>('/products', {
-        method: 'POST',
-        body: {
-          name,
-          name_en: nameEn || null,
-          sku: sku || null,
-          barcode: barcode || null,
-          type,
-          unit: unit || null,
-          unit_template_id: unitTemplateId || null,
-          default_sales_unit: defaultSalesUnit || null,
-          default_purchase_unit: defaultPurchaseUnit || null,
-          sale_price: riyalToMinor(salePrice),
-          purchase_price: riyalToMinor(purchasePrice),
-          tax_rate: Number(taxRate) || 0,
-          description: description || null,
-          category: category || null,
-          brand: brand || null,
-          reorder_level: trackInventory && reorderLevel !== '' ? Number(reorderLevel) || 0 : null,
-          initial_quantity: trackInventory && initialQty !== '' ? Number(initialQty) || 0 : null,
-          supplier_id: supplierId || null,
-          sales_account_id: salesAccountId || null,
-          cogs_account_id: cogsAccountId || null,
-          min_sale_price: minSalePrice !== '' ? riyalToMinor(minSalePrice) : null,
-          discount: discount !== '' ? Number(discount) || 0 : null,
-          discount_type: discount !== '' ? discountType : null,
-          profit_margin: profitMargin !== '' ? Number(profitMargin) || 0 : null,
-          tags: tags || null,
-          internal_notes: internalNotes || null,
-          track_inventory: trackInventory,
-          is_active: isActive,
-        },
-      });
+      let productId = createdProductId;
+      if (!productId) {
+        const created = await api<{ data: { id: string } }>('/products', {
+          method: 'POST',
+          body: {
+            name,
+            name_en: nameEn || null,
+            sku: sku || null,
+            barcode: barcode || null,
+            type,
+            unit: unit || null,
+            unit_template_id: unitTemplateId || null,
+            default_sales_unit: defaultSalesUnit || null,
+            default_purchase_unit: defaultPurchaseUnit || null,
+            sale_price: riyalToMinor(salePrice),
+            purchase_price: riyalToMinor(purchasePrice),
+            tax_rate: Number(taxRate) || 0,
+            description: description || null,
+            category: category || null,
+            brand: brand || null,
+            reorder_level: trackInventory && reorderLevel !== '' ? Number(reorderLevel) || 0 : null,
+            initial_quantity: trackInventory && initialQty !== '' ? Number(initialQty) || 0 : null,
+            supplier_id: supplierId || null,
+            sales_account_id: salesAccountId || null,
+            cogs_account_id: cogsAccountId || null,
+            min_sale_price: minSalePrice !== '' ? riyalToMinor(minSalePrice) : null,
+            discount: discount !== '' ? Number(discount) || 0 : null,
+            discount_type: discount !== '' ? discountType : null,
+            profit_margin: profitMargin !== '' ? Number(profitMargin) || 0 : null,
+            tags: tags || null,
+            internal_notes: internalNotes || null,
+            track_inventory: trackInventory,
+            is_active: isActive,
+            barcodes: pendingBarcodes.map((item) => ({
+              code: item.code,
+              unit_name: item.unit_name || null,
+              default_quantity: Number(item.default_quantity) || 1,
+              label: item.label || null,
+            })),
+          },
+        });
+        productId = created.data.id;
+        // Persist immediately in client state. Any retry from this point is a
+        // publication retry for this id, never another POST /products.
+        setCreatedProductId(productId);
+      }
+
+      if (publication.status === 'ready') {
+        try {
+          await replaceProductPublication(productId, publication.selectedIds);
+        } catch {
+          setError(t('publication_failed_after_create'));
+          toastError(t('product_created_publication_pending'));
+          return;
+        }
+      }
 
       if (productImages.length > 0) {
         const mediaBody = new FormData();
         productImages.forEach(({ file }) => mediaBody.append('media[]', file));
         try {
-          await api(`/products/${created.data.id}/media`, { method: 'POST', body: mediaBody });
+          await api(`/products/${productId}/media`, { method: 'POST', body: mediaBody });
         } catch {
           toastError(t('media_upload_failed_after_create'));
-          router.push(`/products/${created.data.id}`);
+          router.push(`/products/${productId}`);
           return;
         }
       }
@@ -202,7 +259,9 @@ export default function NewProductPage() {
         <h1 className="text-xl font-semibold text-text">{t('new_title')}</h1>
         <div className="ms-auto flex items-center gap-2">
           <Button asChild variant="ghost"><Link href='/products'>{t('cancel')}</Link></Button>
-          <Button disabled={saving || !name.trim()} onClick={submit}>{t('save')}</Button>
+          <Button disabled={saving || publication.status === 'loading' || (!createdProductId && !name.trim())} onClick={submit}>
+            {createdProductId ? t('retry_publication') : t('save')}
+          </Button>
         </div>
       </div>
 
@@ -266,6 +325,53 @@ export default function NewProductPage() {
                     <RefreshCw className="h-4 w-4" strokeWidth={1.7} />
                   </Button>
                 </div>
+              </div>
+              <div className="space-y-1.5 sm:col-span-2">
+                <Label htmlFor="new-barcode-code">{t('barcode_code')}</Label>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Input id="new-barcode-code" dir="ltr" className="num" value={newBarcodeCode} onChange={(e) => setNewBarcodeCode(e.target.value)} disabled={saving} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Select id="new-barcode-unit" value={newBarcodeUnit} onChange={(e) => setNewBarcodeUnit(e.target.value)} disabled={saving}>
+                      <option value="">{t('default_unit_base_option')}</option>
+                      {alternateUnits.map((u) => <option key={u.name} value={u.name}>{u.name}</option>)}
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="new-barcode-qty">{t('barcode_default_quantity')}</Label>
+                    <Input id="new-barcode-qty" type="number" min={1} max={1000000} className="num text-end" value={newBarcodeQty} onChange={(e) => setNewBarcodeQty(e.target.value)} disabled={saving} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="new-barcode-label">{t('barcode_label')}</Label>
+                    <Input id="new-barcode-label" value={newBarcodeLabel} onChange={(e) => setNewBarcodeLabel(e.target.value)} disabled={saving} />
+                  </div>
+                </div>
+                <div className="flex justify-end">
+                  <Button type="button" variant="outline" size="sm" disabled={!newBarcodeCode.trim() || saving} onClick={addPendingBarcode}>
+                    <Plus className="h-4 w-4" strokeWidth={1.7} />{t('add_barcode')}
+                  </Button>
+                </div>
+                {pendingBarcodes.length === 0 ? (
+                  <p className="rounded-md bg-background px-3 py-2 text-sm text-muted">{t('no_alternate_barcodes')}</p>
+                ) : (
+                  <ul className="divide-y divide-border rounded-md border border-border">
+                    {pendingBarcodes.map((item) => (
+                      <li key={item.code} className="flex items-center gap-2 px-3 py-2">
+                        <div className="min-w-0 flex-1">
+                          <p className="num text-sm font-medium text-text" dir="ltr">{item.code}</p>
+                          <p className="text-xs text-muted">
+                            {item.unit_name ?? t('default_unit_base_option')} · {t('barcode_quantity', { quantity: Number(item.default_quantity) || 1 })}
+                            {item.label ? ` · ${item.label}` : ''}
+                          </p>
+                        </div>
+                        <Button type="button" variant="ghost" size="icon" aria-label={`${t('delete')}: ${item.code}`} disabled={saving} onClick={() => removePendingBarcode(item.code)}>
+                          <Trash2 className="h-4 w-4" strokeWidth={1.7} />
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="category">{t('category')}</Label>
@@ -409,6 +515,24 @@ export default function NewProductPage() {
             )}
           </CardContent>
         </Card>
+
+        <ProductPublicationFields
+          status={publication.status}
+          stores={publication.stores}
+          selectedIds={publication.selectedIds}
+          disabled={saving}
+          onChange={publication.setSelectedIds}
+          onRetry={() => void publication.reload()}
+          labels={{
+            title: t('online_store'),
+            availableOnline: t('available_online'),
+            hint: t('publication_hint'),
+            loading: t('publication_loading'),
+            empty: t('publication_empty'),
+            loadFailed: t('publication_load_failed'),
+            retry: t('retry'),
+          }}
+        />
 
         {/* خيارات أكثر */}
         <Card>
