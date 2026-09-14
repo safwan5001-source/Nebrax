@@ -12,6 +12,7 @@ use App\Models\FuelProduct;
 use App\Models\FuelSale;
 use App\Models\InventoryOpeningLine;
 use App\Models\InventoryReservation;
+use App\Models\InventoryState;
 use App\Models\InventoryStockAlert;
 use App\Models\InvoiceLine;
 use App\Models\PriceListItem;
@@ -20,6 +21,7 @@ use App\Models\ProductActivity;
 use App\Models\ProductBarcode;
 use App\Models\ProductMedia;
 use App\Models\ProductOption;
+use App\Models\ProductUnitPrice;
 use App\Models\ProductVariant;
 use App\Models\ProductWarehouseStock;
 use App\Models\PurchaseLine;
@@ -128,6 +130,11 @@ final class ProductReferenceRegistry
         // حذفه، ولا تغيير `type`/`track_inventory` عليه، لأن ذلك يعيد تفسير
         // كميةٍ محجوزة سلفاً (ADR-02 §9: غير المتتبَّع لا يُحجز أصلاً).
         InventoryReservation::class => ['key' => 'inventory_reservations', 'classes' => [self::INVENTORY_SEMANTIC]],
+        // VAR-INV-1: هويّة المخزون والتقييم الموحّدة. إنشاؤها **كسول** (أول
+        // عملية تمسّ الهويّة فعلاً — @see App\Models\InventoryState)، فوجود
+        // الصفّ نفسه دليل أثرٍ حقيقي بالضبط مثل StockMovement/ProductWarehouseStock
+        // أعلاه، لا صفّاً فارغاً يُنشأ تلقائياً لكل منتج فيُسقط هذا الحارس دائماً.
+        InventoryState::class => ['key' => 'inventory_states', 'classes' => [self::INVENTORY_SEMANTIC]],
 
         // ── ٤) تجاري حيّ ───────────────────────────────────────────────
         PriceListItem::class => ['key' => 'price_list_items', 'classes' => [self::COMMERCIAL_LIVE]],
@@ -162,6 +169,14 @@ final class ProductReferenceRegistry
         // `BarcodeRegistryEntry` حرفياً، ولنفس السبب: وجود سجلٍّ لرمز المنتج
         // حالةٌ طبيعية لا مرجعٌ تاريخي، ويُحرَّر ضمن الحذف الحقيقي وحده.
         SkuRegistryEntry::class => ['key' => 'sku_registry_entries', 'classes' => [self::OWNED_CHILD]],
+        // VAR-PRICE-1: السعر الأساسي الصريح (منتج/أب أو متغيّر × وحدة). صفّ
+        // المنتج ذاته ليس مرجعاً مستقلاً بل جزءٌ من بطاقته (يُنشأ إلزامياً مع
+        // كل منتج لأن `sale_price` إلزاميٌّ عند الإنشاء) — تصنيفه `COMMERCIAL_LIVE`
+        // كان سيمنع حذف **كل** منتجٍ للأبد. حماية سعر متغيّرٍ قائمٍ فعلياً
+        // مسؤولية `ProductVariantService::deleteVariant()` الصريحة (تحقّقٌ
+        // مباشر لا هذا التصنيف)، لا هذا السجلّ — الموازي هنا تماماً حالة
+        // `ProductOption` نفسها أعلاه.
+        ProductUnitPrice::class => ['key' => 'product_unit_prices', 'classes' => [self::OWNED_CHILD]],
 
         // COM-CART-2: السلة المجهولة حالة مؤقتة وليست دليلاً تاريخياً ولا
         // تهيئةً تجارية حية. حذف المنتج لا تمنعه سلة مهجورة؛ يبقى السطر

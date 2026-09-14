@@ -677,6 +677,9 @@ class ProductReferenceRegistryTest extends TestCase
             // بتطبيق قاعدة العقد نفسها لا سياسة جديدة — تماماً كإضافة FuelSale/
             // FuelProduct السابقة في هذا السجلّ.
             InventoryReservation::class,
+            // VAR-INV-1: هويّة المخزون والتقييم الموحّدة — إنشاؤها كسولٌ (أول
+            // استعمال فعلي)، فوجود الصفّ دليل أثرٍ حقيقي كبقية هذه الفئة.
+            \App\Models\InventoryState::class,
         ], $semantic, 'تصنيف "مخزنيّ الدلالة" مطابقٌ للعقد.');
 
         // ولا يتسرّب تابعٌ مملوك أو سجلّ تدقيق إلى الموانع أبداً.

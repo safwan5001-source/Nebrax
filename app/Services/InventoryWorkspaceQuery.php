@@ -41,7 +41,9 @@ class InventoryWorkspaceQuery
             'products.unit',
             'products.category_id',
             'products.reorder_level',
-            'products.avg_cost',
+            // VAR-INV-1: `products.avg_cost` مجمَّدٌ — يُقرأ من الهويّة البسيطة
+            // المضمومة في `ProductWarehouseBalanceQuery::baseQuery()`.
+            'inventory_states.avg_cost',
             'product_categories.name as category_name',
             'warehouses.name as warehouse_name',
             'warehouses.branch_id',
@@ -78,7 +80,7 @@ class InventoryWorkspaceQuery
             ->cloneWithout(['columns', 'orders', 'limit', 'offset'])
             ->cloneWithoutBindings(['select', 'order'])
             ->selectRaw('COALESCE(SUM(product_warehouse_stock.quantity), 0) as qty')
-            ->selectRaw('COALESCE(SUM(product_warehouse_stock.quantity * products.avg_cost), 0) as value_minor')
+            ->selectRaw('COALESCE(SUM(product_warehouse_stock.quantity * COALESCE(inventory_states.avg_cost, 0)), 0) as value_minor')
             ->first();
 
         return [

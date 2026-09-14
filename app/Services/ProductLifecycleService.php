@@ -138,6 +138,10 @@ class ProductLifecycleService
             // لا يُرصد تنبيه بلا رصيد أو حركة، وكلاهما مانعٌ للحذف — فهذا
             // شبكة أمانٍ لا مسارٌ متوقَّع.)
             $this->referenceQuery(InventoryStockAlert::class, $product)->delete();
+            // VAR-PRICE-1: السعر الأساسي الصريح تابعٌ مملوك (OWNED_CHILD) —
+            // بلا متغيّرات قائمة الآن (`ProductVariant` مانعٌ أعلى)، فالباقي
+            // صفّ المنتج نفسه فقط.
+            $product->unitPrices()->delete();
             $product->delete();
 
             // إعادة الفحص بعد الحذف وقبل الـcommit: تحت READ COMMITTED (افتراض

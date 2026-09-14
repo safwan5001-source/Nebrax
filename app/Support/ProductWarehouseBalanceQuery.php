@@ -20,6 +20,14 @@ class ProductWarehouseBalanceQuery
             ->join('warehouses', 'warehouses.id', '=', 'product_warehouse_stock.warehouse_id')
             ->join('products', 'products.id', '=', 'product_warehouse_stock.product_id')
             ->leftJoin('branches as warehouse_branches', 'warehouse_branches.id', '=', 'warehouses.branch_id')
+            // VAR-INV-1: `products.avg_cost` مجمَّدٌ بلا كتابة — من يحتاج التكلفة
+            // (مثل `InventoryWorkspaceFilters`) يقرأ من الهويّة البسيطة المضمومة
+            // هنا (`product_variant_id IS NULL`)؛ من لا يحتاجها (أرصدة الكمية
+            // فقط) يتجاهل الانضمام الزائد بلا أثر.
+            ->leftJoin('inventory_states', function ($join): void {
+                $join->on('inventory_states.product_id', '=', 'products.id')
+                    ->whereNull('inventory_states.product_variant_id');
+            })
             ->where('products.track_inventory', true)
             ->whereColumn('products.tenant_id', 'product_warehouse_stock.tenant_id');
     }
