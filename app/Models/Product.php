@@ -109,18 +109,36 @@ class Product extends BaseModel implements BranchShareable
             // منتجٌ بلا فرع، أو مشتركٌ، أو **متعدد الخيارات** (المتغيّرات
             // بلا مفهوم فرعٍ أصلاً في VAR-CORE-1، فهويتها تنافسية على مستوى
             // المستأجر دائماً — فما إن يصبح المنتج كذلك يلتحق SKU الأب بها).
-            if ($product->isDirty('sku') && self::sharesSkuNamespace($product)) {
+            if ($product->isDirty('sku')) {
                 $old = $product->getOriginal('sku');
                 $new = $product->sku;
 
-                if ($old !== null && $old !== '') {
-                    SkuRegistryEntry::releaseOwnedByProduct($old, $product->id);
-                }
-                if ($new !== null && $new !== '') {
-                    SkuRegistryEntry::claim($new, 'product', productId: $product->id);
+                if (self::sharesSkuNamespace($product)) {
+                    if ($old !== null && $old !== '') {
+                        SkuRegistryEntry::releaseOwnedByProduct($old, $product->id);
+                    }
+                    if ($new !== null && $new !== '') {
+                        SkuRegistryEntry::claim($new, 'product', productId: $product->id);
+                    }
+                } elseif ($new !== null && $new !== '') {
+                    // منتجٌ فرعي معزول: لا ينضمّ إلى الجدول، لكن رمزه يجب ألّا
+                    // يصطدم صامتةً بهويةٍ مرئية من كل الفروع بالفعل (منتجٌ
+                    // مشترك/بلا فرع/متعدد الخيارات، أو أي متغيّر) — الاتجاه
+                    // المعاكس بالضبط لما يتحقق منه `claim()` نفسه.
+                    SkuRegistryEntry::assertFreeForIsolatedProduct($new, $product->id);
                 }
             }
         });
+    }
+
+    /**
+     * هل يشترك رمز هذا المنتج في الفضاء الموحّد الآن، بحسب الحالة الراهنة
+     * (فرعه وإعداد المشاركة الحالي)؟ يستعمله `ProductVariantService` عند
+     * التراجع عن إدارة المتغيّرات ليقرر تحرير عضوية السجلّ أو إبقاءها.
+     */
+    public function claimsSkuNamespace(): bool
+    {
+        return self::sharesSkuNamespace($this);
     }
 
     /** @see booted() — نطاق مطالبة SKU الموحّدة. */

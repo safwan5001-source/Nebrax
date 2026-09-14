@@ -4733,7 +4733,15 @@
     "variants_status_new": "New",
     "variants_table_title": "Variants ({count})",
     "variants_empty": "Add options such as color or size to create variants.",
-    "variants_delete_confirm": "Delete variant \"{name}\"?"
+    "variants_delete_confirm": "Delete variant \"{name}\"?",
+    "close": "Close",
+    "variants_multi_select": "Multi-select",
+    "variants_search_placeholder": "Search by combination or SKU",
+    "variants_bulk_success": "{count} variants updated.",
+    "variants_bulk_partial_failure": "{failed} of {total} failed — review the list and retry.",
+    "variants_saved": "Variant saved.",
+    "variants_deleted": "Variant deleted.",
+    "variants_detail_title": "Variant detail"
   },
   "purchaseForm": {
     "title": "New purchase invoice",

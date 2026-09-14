@@ -59,6 +59,7 @@ class ProductVariantPostgresConcurrencyTest extends TestCase
             DB::table('product_option_values')->where('tenant_id', $this->tenant->id)->delete();
             DB::table('product_options')->where('tenant_id', $this->tenant->id)->delete();
             DB::table('products')->where('tenant_id', $this->tenant->id)->delete();
+            DB::table('branches')->where('tenant_id', $this->tenant->id)->delete();
             DB::table('tenants')->where('id', $this->tenant->id)->delete();
         }
 
@@ -224,5 +225,59 @@ class ProductVariantPostgresConcurrencyTest extends TestCase
             DB::table('sku_registry')->where('tenant_id', $tenantId)->where('sku', 'RACE-SKU')->count(),
             'يجب أن يوجد تسجيلٌ واحدٌ بالضبط لـ SKU المتنازَع عليه.'
         );
+    }
+
+    /**
+     * الفجوة المتبقّية التي أُغلقت: مطالبةٌ في الفضاء الموحّد (منتجٌ مشترك
+     * هنا؛ السلوك نفسه لمتغيّرٍ أو منتجٍ متعدد الخيارات) تتسابق فعلياً — عبر
+     * عمليتَي نظام منفصلتين حقيقيتين — مع منتجٍ فرعي معزول يحاول الرمز نفسه.
+     * القفل على صفّ المستأجر (`SkuRegistryEntry::lockTenantAnchor()`) يضمن
+     * تسلسل الفحص العابر للجدولين (`sku_registry` و`products`)؛ النتيجة يجب
+     * أن تكون فائزاً واحداً بالضبط — لا كلا الجدولين معاً، ولا لا شيء.
+     *
+     * @test
+     */
+    public function a_registry_claim_racing_a_branch_isolated_product_for_the_same_sku_leaves_exactly_one_winner(): void
+    {
+        $tenantId = $this->tenant->id;
+        app(TenantContext::class)->set($tenantId);
+
+        $branch = \App\Models\Branch::create([
+            'tenant_id' => $tenantId, 'code' => 'BR-RACE', 'name' => 'فرع السباق', 'is_main' => true,
+        ]);
+        \App\Support\BranchSettings::merge(['share_products' => false]);
+
+        $results = $this->runConcurrently([
+            function () use ($tenantId) {
+                app(TenantContext::class)->set($tenantId);
+                // منتجٌ بلا فرع (مشترك) — يطالب بالرمز في الفضاء الموحّد.
+                $p = Product::create(['tenant_id' => $tenantId, 'name' => 'منتج مشترك', 'sku' => 'XRACE-SKU']);
+
+                return $p->id;
+            },
+            function () use ($tenantId, $branch) {
+                app(TenantContext::class)->set($tenantId);
+                // منتجٌ فرعي معزول — يتحقق ألّا يصطدم بالفضاء الموحّد.
+                $p = Product::create([
+                    'tenant_id' => $tenantId, 'branch_id' => $branch->id, 'name' => 'منتج معزول', 'sku' => 'XRACE-SKU',
+                ]);
+
+                return $p->id;
+            },
+        ]);
+
+        $successes = array_filter($results, fn (array $r) => $r['ok'] === true);
+        $failures = array_filter($results, fn (array $r) => $r['ok'] === false);
+
+        $this->assertCount(1, $successes, 'يجب أن ينجح طرفٌ واحدٌ فقط في أخذ الرمز: '.json_encode($results));
+        $this->assertCount(1, $failures, 'يجب أن يُرفض الطرف الآخر بخطأ SKU مُدار، لا استثناءً خاماً: '.json_encode($results));
+
+        app(TenantContext::class)->set($tenantId);
+        $registryCount = DB::table('sku_registry')->where('tenant_id', $tenantId)->where('sku', 'XRACE-SKU')->count();
+        $isolatedCount = DB::table('products')->where('tenant_id', $tenantId)->where('sku', 'XRACE-SKU')
+            ->whereNotNull('branch_id')->whereNull('deleted_at')->count();
+
+        $this->assertSame(1, $registryCount + $isolatedCount, 'يجب أن يفوز طرفٌ واحدٌ بالضبط بالرمز، محسوباً عبر الجدولين معاً.');
+        $this->assertFalse($registryCount === 1 && $isolatedCount === 1, 'لا يجوز أن يفوز الطرفان معاً بنفس الرمز عبر جدولين مختلفين.');
     }
 }

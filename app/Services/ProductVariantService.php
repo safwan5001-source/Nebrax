@@ -283,6 +283,17 @@ class ProductVariantService
                 );
             }
 
+            // منتجٌ متعدد الخيارات مرئيٌّ من كل الفروع دائماً (لا مفهوم فرعٍ
+            // للمتغيّرات في VAR-CORE-1) — فرمزه يجب أن ينضمّ إلى الفضاء
+            // الموحّد الآن، لا عند أول تعديل لاحق لرمزه. تغيير `variant_state`
+            // وحده لا يُدَخِّن `sku` (`isDirty('sku')` في `booted()` لا يلتقط
+            // هذا التحوّل)، فالمطالبة هنا صريحة قبل الحفظ — إن تصادمت مع رمز
+            // منتجٍ آخر يفشل التحويل كاملاً (المعاملة تتراجع)، لا أن يترك
+            // المنتج متعدد الخيارات برمزٍ لم يُحجز فعلياً.
+            if (! blank($product->sku)) {
+                SkuRegistryEntry::claim($product->sku, 'product', productId: $product->id);
+            }
+
             $product->variant_state = 'variant_managed';
             $product->save();
 
@@ -308,6 +319,14 @@ class ProductVariantService
 
             $product->variant_state = 'simple';
             $product->save();
+
+            // عكس ما فعله enableVariantManagement(): إن عاد المنتج فرعياً
+            // معزولاً بحسب الفرع/الإعداد الحاليين، يُحرَّر انضمامه الصريح إلى
+            // الفضاء الموحّد — وإلا بقي صفٌّ يتيمٌ يحجز رمزاً لن يستفيد منه
+            // هذا المنتج بعد الآن، ويمنع غيره من استعماله في فرعٍ آخر بلا سبب.
+            if (! blank($product->sku) && ! $product->claimsSkuNamespace()) {
+                SkuRegistryEntry::releaseOwnedByProduct($product->sku, $product->id);
+            }
 
             $this->recordActivity($product, 'variant_management_disabled', ['variant_state' => ['variant_managed', 'simple']], $userId);
 

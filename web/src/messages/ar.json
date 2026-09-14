@@ -4733,7 +4733,15 @@
     "variants_status_new": "جديد",
     "variants_table_title": "المتغيّرات ({count})",
     "variants_empty": "أضِف خياراتٍ مثل اللون أو المقاس لإنشاء متغيّرات.",
-    "variants_delete_confirm": "هل تريد حذف المتغيّر «{name}»؟"
+    "variants_delete_confirm": "هل تريد حذف المتغيّر «{name}»؟",
+    "close": "إغلاق",
+    "variants_multi_select": "تحديد متعدد",
+    "variants_search_placeholder": "بحث بالتركيبة أو SKU",
+    "variants_bulk_success": "تم تحديث {count} متغيّر.",
+    "variants_bulk_partial_failure": "فشل {failed} من أصل {total} — راجع القائمة وأعد المحاولة.",
+    "variants_saved": "تم حفظ المتغيّر.",
+    "variants_deleted": "تم حذف المتغيّر.",
+    "variants_detail_title": "تفاصيل المتغيّر"
   },
   "purchaseForm": {
     "title": "فاتورة مشتريات جديدة",

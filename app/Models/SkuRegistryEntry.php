@@ -2,7 +2,9 @@
 
 namespace App\Models;
 
+use App\Tenancy\BranchScope;
 use App\Tenancy\CompanyWide;
+use App\Tenancy\TenantContext;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\QueryException;
 use RuntimeException;
@@ -19,6 +21,18 @@ use RuntimeException;
  *
  *  **الضمان الذرّي حقيقةً هو القيد الفريد في قاعدة البيانات، لا `isTaken()`
  *  وحدها** — نفس تحذير `BarcodeRegistryEntry` حرفياً.
+ *
+ *  ═══ العضوية مشروطة — وهذا مقصود، لا فجوة ═══
+ *  `Product::sharesSkuNamespace()` لا يُدرج منتجاً فرعياً غير مشترك
+ *  (`share_products=false`) هنا أصلاً — نطاق SKU لمثل هذا المنتج فرعُه وحده
+ *  منذ عقدٍ سابق (migration 000085)، وإدراجه هنا قسراً كان سيكسر استقلال
+ *  الفروع القائم فعلياً (راجع `ProductSkuValidationTest`). **لكن** كل هويةٍ
+ *  تنضمّ فعلياً إلى هذا الجدول — منتجٌ مشترك/بلا فرع/متعدد الخيارات، أو أي
+ *  متغيّر — مرئيةٌ من كل الفروع بحكم طبيعتها، فيجب ألّا تتصادم صامتةً مع رمز
+ *  منتجٍ فرعي معزول. لذلك يتحقق `claim()` أيضاً من عدم وجود منتجٍ فرعي معزول
+ *  يحمل الرمز نفسه قبل الحجز — تحت قفل صفّ المستأجر (نفس نمط
+ *  `GeneratesDocumentNumbers::lockNumberingAnchor()` حرفياً) كي لا يفلت
+ *  تصادمٌ عابرٌ بين الجدولين من فحصٍ عابرٍ للمعاملات.
  */
 class SkuRegistryEntry extends BaseModel implements CompanyWide
 {
@@ -39,9 +53,15 @@ class SkuRegistryEntry extends BaseModel implements CompanyWide
     /**
      * يحجز SKU لمنتج أو لمتغيّر. حفظٌ متكرّر لنفس (الرمز، المالك، النوع) بلا
      * تغيير آمنٌ تماماً — لا يُنشئ صفّاً ثانياً ولا يرفض.
+     *
+     * يقفل صفّ المستأجر أولاً: هذا الفحص يمتدّ عبر جدولين (`sku_registry` و
+     * `products`) لا يجمعهما قيدٌ فريدٌ واحد، فالقفل هو الضامن الفعلي لعدم
+     * إفلات تصادمٍ عابر — انظر توثيق الصنف أعلاه.
      */
     public static function claim(string $sku, string $kind, ?string $productId = null, ?string $variantId = null): void
     {
+        self::lockTenantAnchor();
+
         $existing = static::where('sku', $sku)->first();
 
         if ($existing !== null) {
@@ -53,6 +73,10 @@ class SkuRegistryEntry extends BaseModel implements CompanyWide
                 return;
             }
 
+            throw new RuntimeException('رمز المنتج (SKU) مستخدم بالفعل في هذه المؤسسة، سواء لمنتج أو لأحد متغيّراته.');
+        }
+
+        if (self::isClaimedByAnIsolatedProduct($sku, $kind === 'product' ? $productId : null)) {
             throw new RuntimeException('رمز المنتج (SKU) مستخدم بالفعل في هذه المؤسسة، سواء لمنتج أو لأحد متغيّراته.');
         }
 
@@ -69,6 +93,21 @@ class SkuRegistryEntry extends BaseModel implements CompanyWide
             }
 
             throw $e;
+        }
+    }
+
+    /**
+     * الاتجاه المعاكس لـ`claim()`: يتحقق منتجٌ فرعي معزول (`sharesSkuNamespace()`
+     * = false) أن رمزه لا يصطدم بهويةٍ مرئية من كل الفروع بالفعل — بلا أن
+     * ينضمّ هو نفسه إلى الجدول (يبقى نطاقه فرعه وحده كما كان). نفس قفل
+     * المستأجر، فيتسلسل مع `claim()` على المستأجر نفسه بدل أن يتسابقا.
+     */
+    public static function assertFreeForIsolatedProduct(string $sku, ?string $exceptProductId = null): void
+    {
+        self::lockTenantAnchor();
+
+        if (static::isTaken($sku, exceptProductId: $exceptProductId)) {
+            throw new RuntimeException('رمز المنتج (SKU) مستخدم بالفعل في هذه المؤسسة، سواء لمنتج أو لأحد متغيّراته.');
         }
     }
 
@@ -116,5 +155,39 @@ class SkuRegistryEntry extends BaseModel implements CompanyWide
         $driverCode = (int) ($e->errorInfo[1] ?? 0);
 
         return $sqlState === '23505' || $driverCode === 19 || str_contains(strtolower($e->getMessage()), 'unique');
+    }
+
+    /**
+     * منتجٌ فرعي معزول لا صفّ له هنا أبداً (بالتصميم)، فتحقّق `claim()` من
+     * تفرّد الرمز يفوته بلا هذا الفحص المباشر على `products`. `branch_id`
+     * غير فارغ وحده يكفي معياراً: منتجٌ مشترك حالياً (`share_products=true`)
+     * انضمّ فعلاً إلى هذا الجدول أصلاً عبر `claim()` الاعتيادي — فحصه هنا
+     * مكرَّرٌ لا مؤذٍ؛ المهمّ ألّا يُغفَل المعزول الذي لم ينضمّ إطلاقاً.
+     */
+    private static function isClaimedByAnIsolatedProduct(string $sku, ?string $exceptProductId): bool
+    {
+        return Product::withoutGlobalScope(BranchScope::class)
+            ->whereNotNull('branch_id')
+            ->whereNull('deleted_at')
+            ->where('sku', $sku)
+            ->when($exceptProductId, fn ($q) => $q->where('id', '!=', $exceptProductId))
+            ->exists();
+    }
+
+    /**
+     * قفل **مِرساة** صفّ المستأجر — نفس نمط
+     * `GeneratesDocumentNumbers::lockNumberingAnchor()` حرفياً: صفٌّ موجودٌ
+     * حتماً يُسلسِل الطلبات المتزامنة التي تتنافس على الفحص العابر للجدولين
+     * أعلاه. لا يستبدل القيد الفريد في التصادم داخل `sku_registry` نفسه —
+     * ذاك يبقى الضامن الذرّي القائم — بل يغلق النافذة التي لا يغطيها قيدٌ
+     * واحد لأنها تمتدّ إلى جدول `products` المنفصل.
+     */
+    private static function lockTenantAnchor(): void
+    {
+        $tenantId = app(TenantContext::class)->id();
+
+        if ($tenantId !== null) {
+            Tenant::whereKey($tenantId)->lockForUpdate()->first();
+        }
     }
 }

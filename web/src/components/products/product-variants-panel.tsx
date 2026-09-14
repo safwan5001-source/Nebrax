@@ -1,14 +1,17 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { Plus, Trash2, X } from 'lucide-react';
+import type { ColumnDef } from '@tanstack/react-table';
+import { CheckSquare, Plus, Square, Trash2, X } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { DataTable } from '@/components/data-table';
 import { Input } from '@/components/ui/input';
-import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
+import { Select } from '@/components/ui/select';
+import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
 import { useToast } from '@/components/ui/toast';
 
 type OptionValue = { id: string; value: string; value_en: string | null; is_active: boolean };
@@ -31,8 +34,11 @@ type Matrix = { options: Option[]; total_possible: number; combinations: Combina
 /**
  * VAR-CORE-1 — قسم «الخيارات والمتغيّرات» ضمن ملف المنتج.
  *
- * لا يعرض حقول مخزون/تسعير/وسائط وهمية — الأعمدة هنا مقصورة على ما تملك
- * سلطته الفعلية اليوم (التركيبة، SKU، الحالة)، بحسب عقد VAR-CORE-1 الواجهي.
+ * يستعمل `DataTable` المشترك (نفسه المستعمَل في `/products`) لا جدولاً
+ * يدوياً: فيرث الاستجابة للجوال (`mobileRecord`) والبحث والتحديد الجماعي
+ * مجاناً وباتساقٍ مع بقية الشاشات، بدل اختراع نمط جوالٍ موازٍ لهذه الشاشة
+ * وحدها. لا يعرض حقول مخزون/تسعير/وسائط وهمية — الأعمدة والتفاصيل هنا
+ * مقصورة على ما تملك سلطته الفعلية اليوم (التركيبة، SKU، الحالة).
  */
 export function ProductVariantsPanel({ productId, variantState, onProductChanged }: {
   productId: string;
@@ -45,11 +51,15 @@ export function ProductVariantsPanel({ productId, variantState, onProductChanged
   const [options, setOptions] = useState<Option[]>([]);
   const [variants, setVariants] = useState<Variant[]>([]);
   const [matrix, setMatrix] = useState<Matrix | null>(null);
-  const [selected, setSelected] = useState<Record<string, boolean>>({});
+  const [selectedCombos, setSelectedCombos] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [enabling, setEnabling] = useState(false);
   const [newOptionName, setNewOptionName] = useState('');
   const [newValueByOption, setNewValueByOption] = useState<Record<string, string>>({});
+  const [multiSelect, setMultiSelect] = useState(false);
+  const [selectedVariantIds, setSelectedVariantIds] = useState<string[]>([]);
+  const [detailVariant, setDetailVariant] = useState<Variant | null>(null);
+  const valueInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const isManaged = variantState === 'variant_managed';
 
@@ -65,9 +75,8 @@ export function ProductVariantsPanel({ productId, variantState, onProductChanged
       setOptions(optionsRes.data);
       setVariants(variantsRes.data);
       setMatrix(matrixRes);
-      const preselected: Record<string, boolean> = {};
-      matrixRes.combinations.forEach((c) => { if (!c.exists) preselected[c.combination_key] = true; });
-      setSelected(preselected);
+      const preselected = matrixRes.combinations.filter((c) => !c.exists).map((c) => c.combination_key);
+      setSelectedCombos(preselected);
     } catch (err) {
       showError(err instanceof ApiError ? err.message : t('action_failed'));
     } finally {
@@ -77,13 +86,9 @@ export function ProductVariantsPanel({ productId, variantState, onProductChanged
 
   useEffect(() => { void load(); }, [load]);
 
-  const newCombinationsCount = useMemo(
-    () => (matrix ? matrix.combinations.filter((c) => !c.exists).length : 0),
+  const newCombinations = useMemo(
+    () => (matrix ? matrix.combinations.filter((c) => !c.exists) : []),
     [matrix]
-  );
-  const selectedCount = useMemo(
-    () => Object.values(selected).filter(Boolean).length,
-    [selected]
   );
 
   async function enable() {
@@ -132,6 +137,11 @@ export function ProductVariantsPanel({ productId, variantState, onProductChanged
     }
   }
 
+  /**
+   * إدخالٌ متتابع فعّال: كتابة قيمة ← Enter ← تُنشأ الرقاقة ← التركيز يبقى
+   * جاهزاً للقيمة التالية فوراً بلا لمس الفأرة. التحقّق من التكرار المطبَّع
+   * يبقى على الخادم وحده — النجاح المتفائل هنا تجربة استخدامٍ لا سلطة حسم.
+   */
   async function addValue(optionId: string) {
     const value = (newValueByOption[optionId] ?? '').trim();
     if (!value) return;
@@ -141,6 +151,12 @@ export function ProductVariantsPanel({ productId, variantState, onProductChanged
       await load();
     } catch (err) {
       showError(err instanceof ApiError ? err.message : t('action_failed'));
+    } finally {
+      // `load()` يعيد جلب الخيارات فيُعاد رسم نفس الحقل (نفس `key`)، لكن
+      // التركيز الصريح هنا ضمانٌ لا افتراض — خصوصاً بعد فشلٍ يُبقي القيمة.
+      // بلا `requestAnimationFrame`: عنصر الإدخال نفسه لا يُعاد تركيبه (نفس
+      // المفتاح)، فالتركيز الفوري يعمل بلا انتظار إطار عرضٍ إضافي.
+      valueInputRefs.current[optionId]?.focus();
     }
   }
 
@@ -156,8 +172,8 @@ export function ProductVariantsPanel({ productId, variantState, onProductChanged
 
   async function createSelectedVariants() {
     if (!matrix) return;
-    const combos = matrix.combinations
-      .filter((c) => !c.exists && selected[c.combination_key])
+    const combos = newCombinations
+      .filter((c) => selectedCombos.includes(c.combination_key))
       .map((c) => c.option_values.map((v) => v.value_id));
     if (combos.length === 0) return;
 
@@ -190,9 +206,37 @@ export function ProductVariantsPanel({ productId, variantState, onProductChanged
     if (!window.confirm(t('variants_delete_confirm', { name: variant.display_name }))) return;
     try {
       await api(`/products/${productId}/variants/${variant.id}`, { method: 'DELETE' });
+      if (detailVariant?.id === variant.id) setDetailVariant(null);
       await load();
     } catch (err) {
       showError(err instanceof ApiError ? err.message : t('action_failed'));
+    }
+  }
+
+  /**
+   * إجراءٌ جماعي آمن فقط: تفعيل/تعطيل — بلا نقطة نهاية جماعية جديدة في
+   * الخادم، بل استدعاءات مسارٍ موجودٍ واحدة تلو الأخرى، مع تقرير صريح عند
+   * فشل جزئي بدل ادّعاء نجاحٍ كامل.
+   */
+  async function bulkSetActive(active: boolean) {
+    const targets = variants.filter((v) => selectedVariantIds.includes(v.id) && v.is_active !== active);
+    if (targets.length === 0) return;
+
+    let failed = 0;
+    for (const variant of targets) {
+      try {
+        await api(`/products/${productId}/variants/${variant.id}`, { method: 'PUT', body: { is_active: active } });
+      } catch {
+        failed += 1;
+      }
+    }
+
+    await load();
+    setSelectedVariantIds([]);
+    if (failed > 0) {
+      showError(t('variants_bulk_partial_failure', { failed, total: targets.length }));
+    } else {
+      success(t('variants_bulk_success', { count: targets.length }));
     }
   }
 
@@ -212,6 +256,65 @@ export function ProductVariantsPanel({ productId, variantState, onProductChanged
     );
   }
 
+  const combinationColumns: ColumnDef<Combination, unknown>[] = [
+    {
+      id: 'combination',
+      accessorFn: (c) => c.option_values.map((v) => v.value).join(' / '),
+      header: t('variants_column_combination'),
+    },
+    {
+      id: 'status',
+      header: t('variants_column_status'),
+      cell: () => <Badge tone="neutral">{t('variants_status_new')}</Badge>,
+    },
+  ];
+
+  const variantColumns: ColumnDef<Variant, unknown>[] = [
+    {
+      id: 'combination',
+      accessorKey: 'display_name',
+      header: t('variants_column_combination'),
+      cell: ({ row }) => (
+        <button
+          type="button"
+          className="text-start text-primary hover:underline"
+          onClick={() => setDetailVariant(row.original)}
+        >
+          {row.original.display_name}
+        </button>
+      ),
+    },
+    {
+      id: 'sku',
+      accessorKey: 'sku',
+      header: t('sku'),
+      cell: ({ row }) => <span className="num" dir="ltr">{row.original.sku}</span>,
+    },
+    {
+      id: 'status',
+      header: t('variants_column_status'),
+      cell: ({ row }) => (
+        <Badge tone={row.original.is_active ? 'positive' : 'muted'}>
+          {row.original.is_active ? t('active') : t('inactive')}
+        </Badge>
+      ),
+    },
+    {
+      id: 'actions',
+      header: t('actions'),
+      cell: ({ row }) => (
+        <div className="flex items-center gap-2">
+          <Button type="button" variant="ghost" size="sm" onClick={() => void toggleVariantActive(row.original)}>
+            {row.original.is_active ? t('deactivate') : t('activate')}
+          </Button>
+          <Button type="button" variant="ghost" size="sm" onClick={() => void deleteVariant(row.original)}>
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      ),
+    },
+  ];
+
   return (
     <div className="space-y-4">
       <Card>
@@ -230,15 +333,21 @@ export function ProductVariantsPanel({ productId, variantState, onProductChanged
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 {option.values.map((value) => (
-                  <span key={value.id} className="inline-flex items-center gap-1 rounded border border-border bg-surface px-2 py-1 text-xs text-text">
+                  <span key={value.id} className="inline-flex min-h-9 items-center gap-1.5 rounded border border-border bg-surface px-2.5 py-1 text-xs text-text">
                     {value.value}
-                    <button type="button" aria-label={t('remove')} onClick={() => void removeValue(option.id, value.id)}>
+                    <button
+                      type="button"
+                      aria-label={t('remove')}
+                      className="flex h-5 w-5 items-center justify-center rounded hover:bg-primary-soft"
+                      onClick={() => void removeValue(option.id, value.id)}
+                    >
                       <X className="h-3 w-3" />
                     </button>
                   </span>
                 ))}
                 <Input
-                  className="h-8 w-32 text-xs"
+                  ref={(el) => { valueInputRefs.current[option.id] = el; }}
+                  className="h-9 w-32 text-xs"
                   placeholder={t('variants_add_value_placeholder')}
                   value={newValueByOption[option.id] ?? ''}
                   onChange={(e) => setNewValueByOption((prev) => ({ ...prev, [option.id]: e.target.value }))}
@@ -263,93 +372,215 @@ export function ProductVariantsPanel({ productId, variantState, onProductChanged
           </div>
 
           {matrix && matrix.total_possible > 0 && (
-            <div className="flex flex-wrap items-center justify-between gap-2 rounded bg-primary-soft/40 px-3 py-2 text-sm">
-              <span>{t('variants_possible_combinations', { count: matrix.total_possible })}</span>
-              {newCombinationsCount > 0 && (
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-muted">{t('variants_selected_of_new', { selected: selectedCount, total: newCombinationsCount })}</span>
-                  <Button type="button" size="sm" onClick={() => void createSelectedVariants()} disabled={selectedCount === 0}>
-                    {t('variants_create_selected', { count: selectedCount })}
-                  </Button>
-                </div>
-              )}
-            </div>
+            <p className="rounded bg-primary-soft/40 px-3 py-2 text-sm">
+              {t('variants_possible_combinations', { count: matrix.total_possible })}
+            </p>
           )}
         </CardContent>
       </Card>
 
-      {matrix && newCombinationsCount > 0 && (
+      {newCombinations.length > 0 && (
         <Card>
-          <CardHeader><CardTitle>{t('variants_review_title')}</CardTitle></CardHeader>
-          <CardContent className="p-0">
-            <Table>
-              <THead>
-                <TR>
-                  <TH className="w-10" />
-                  <TH>{t('variants_column_combination')}</TH>
-                  <TH>{t('variants_column_status')}</TH>
-                </TR>
-              </THead>
-              <TBody>
-                {matrix.combinations.filter((c) => !c.exists).map((combo) => (
-                  <TR key={combo.combination_key}>
-                    <TD>
-                      <input
-                        type="checkbox"
-                        checked={Boolean(selected[combo.combination_key])}
-                        onChange={(e) => setSelected((prev) => ({ ...prev, [combo.combination_key]: e.target.checked }))}
-                      />
-                    </TD>
-                    <TD>{combo.option_values.map((v) => v.value).join(' / ')}</TD>
-                    <TD><Badge tone="neutral">{t('variants_status_new')}</Badge></TD>
-                  </TR>
-                ))}
-              </TBody>
-            </Table>
+          <CardHeader className="flex-row items-center justify-between gap-4 space-y-0">
+            <CardTitle>{t('variants_review_title')}</CardTitle>
+            <span className="text-xs text-muted">
+              {t('variants_selected_of_new', { selected: selectedCombos.length, total: newCombinations.length })}
+            </span>
+          </CardHeader>
+          <CardContent className="space-y-3 p-4 pt-0">
+            <DataTable
+              columns={combinationColumns}
+              data={newCombinations}
+              showToolbar={false}
+              emptyLabel={t('variants_empty')}
+              selection={{
+                selectedIds: selectedCombos,
+                onChange: setSelectedCombos,
+                getRowId: (c) => c.combination_key,
+              }}
+              mobileRecord={(c) => ({
+                title: c.option_values.map((v) => v.value).join(' / '),
+                status: <Badge tone="neutral">{t('variants_status_new')}</Badge>,
+              })}
+            />
+            {/* شريطٌ ثابتٌ سفلياً على الجوال يحترم منطقة الأمان — لا يختفي
+                إجراء الإنشاء الرئيسي خلف حافة الشاشة أو لوحة المفاتيح. */}
+            <div className="sticky bottom-0 -mx-4 -mb-4 flex items-center justify-end gap-2 border-t border-border bg-surface px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 sm:static sm:m-0 sm:border-0 sm:p-0">
+              <Button type="button" size="sm" onClick={() => void createSelectedVariants()} disabled={selectedCombos.length === 0}>
+                {t('variants_create_selected', { count: selectedCombos.length })}
+              </Button>
+            </div>
           </CardContent>
         </Card>
       )}
 
       <Card>
-        <CardHeader><CardTitle>{t('variants_table_title', { count: variants.length })}</CardTitle></CardHeader>
-        <CardContent className="p-0">
-          {loading ? (
-            <p className="p-4 text-sm text-muted">{t('loading')}</p>
-          ) : variants.length === 0 ? (
-            <p className="p-4 text-sm text-muted">{t('variants_empty')}</p>
-          ) : (
-            <Table>
-              <THead>
-                <TR>
-                  <TH>{t('variants_column_combination')}</TH>
-                  <TH>{t('sku')}</TH>
-                  <TH>{t('variants_column_status')}</TH>
-                  <TH>{t('actions')}</TH>
-                </TR>
-              </THead>
-              <TBody>
-                {variants.map((variant) => (
-                  <TR key={variant.id}>
-                    <TD className="font-medium text-text">{variant.display_name}</TD>
-                    <TD className="num">{variant.sku}</TD>
-                    <TD><Badge tone={variant.is_active ? 'positive' : 'muted'}>{variant.is_active ? t('active') : t('inactive')}</Badge></TD>
-                    <TD>
-                      <div className="flex items-center gap-2">
-                        <Button type="button" variant="ghost" size="sm" onClick={() => void toggleVariantActive(variant)}>
-                          {variant.is_active ? t('deactivate') : t('activate')}
-                        </Button>
-                        <Button type="button" variant="ghost" size="sm" onClick={() => void deleteVariant(variant)}>
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                    </TD>
-                  </TR>
-                ))}
-              </TBody>
-            </Table>
+        <CardHeader className="flex-row items-center justify-between gap-4 space-y-0">
+          <CardTitle>{t('variants_table_title', { count: variants.length })}</CardTitle>
+          {variants.length > 0 && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => { setMultiSelect((v) => !v); setSelectedVariantIds([]); }}
+            >
+              {multiSelect ? <CheckSquare className="h-3.5 w-3.5" /> : <Square className="h-3.5 w-3.5" />}
+              {t('variants_multi_select')}
+            </Button>
           )}
+        </CardHeader>
+        <CardContent className="space-y-3 p-4 pt-0">
+          {multiSelect && selectedVariantIds.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 rounded border border-border bg-surface px-3 py-2 text-sm">
+              <span className="num text-text">{t('selected_count', { count: selectedVariantIds.length })}</span>
+              <Button type="button" variant="ghost" size="sm" onClick={() => setSelectedVariantIds([])}>{t('clear_selection')}</Button>
+              <div className="ms-auto flex items-center gap-2">
+                <Button type="button" variant="outline" size="sm" onClick={() => void bulkSetActive(true)}>{t('activate')}</Button>
+                <Button type="button" variant="outline" size="sm" onClick={() => void bulkSetActive(false)}>{t('deactivate')}</Button>
+              </div>
+            </div>
+          )}
+          <DataTable
+            columns={variantColumns}
+            data={variants}
+            loading={loading}
+            showToolbar
+            searchPlaceholder={t('variants_search_placeholder')}
+            emptyLabel={t('variants_empty')}
+            selection={multiSelect ? {
+              selectedIds: selectedVariantIds,
+              onChange: setSelectedVariantIds,
+              getRowId: (v) => v.id,
+            } : undefined}
+            mobileRecord={(variant) => ({
+              title: (
+                <button type="button" className="text-start text-primary hover:underline" onClick={() => setDetailVariant(variant)}>
+                  {variant.display_name}
+                </button>
+              ),
+              meta: <span dir="ltr">{variant.sku}</span>,
+              status: (
+                <Badge tone={variant.is_active ? 'positive' : 'muted'}>
+                  {variant.is_active ? t('active') : t('inactive')}
+                </Badge>
+              ),
+            })}
+          />
         </CardContent>
       </Card>
+
+      <VariantDetailSheet
+        productId={productId}
+        variant={detailVariant}
+        onClose={() => setDetailVariant(null)}
+        onSaved={() => { void load(); }}
+        onDeleted={() => { setDetailVariant(null); void load(); }}
+      />
     </div>
+  );
+}
+
+/**
+ * تفاصيل متغيّرٍ واحد — نفس مكوّن `Sheet` المشترك (لوحةٌ جانبية على سطح
+ * المكتب، وملء الشاشة تلقائياً على الجوال بحكم عرضه المتجاوب القائم) بدل
+ * اختراع محرّرَين منفصلين لسطح المكتب والجوال.
+ */
+function VariantDetailSheet({ productId, variant, onClose, onSaved, onDeleted }: {
+  productId: string;
+  variant: Variant | null;
+  onClose: () => void;
+  onSaved: () => void;
+  onDeleted: () => void;
+}) {
+  const t = useTranslations('products');
+  const { success, error: showError } = useToast();
+  const [sku, setSku] = useState('');
+  const [isActive, setIsActive] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (variant) {
+      setSku(variant.sku);
+      setIsActive(variant.is_active);
+    }
+  }, [variant]);
+
+  async function save() {
+    if (!variant) return;
+    setSaving(true);
+    try {
+      await api(`/products/${productId}/variants/${variant.id}`, {
+        method: 'PUT',
+        body: { sku, is_active: isActive },
+      });
+      success(t('variants_saved'));
+      onSaved();
+      onClose();
+    } catch (err) {
+      showError(err instanceof ApiError ? err.message : t('action_failed'));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function remove() {
+    if (!variant || !window.confirm(t('variants_delete_confirm', { name: variant.display_name }))) return;
+    try {
+      await api(`/products/${productId}/variants/${variant.id}`, { method: 'DELETE' });
+      success(t('variants_deleted'));
+      onDeleted();
+    } catch (err) {
+      showError(err instanceof ApiError ? err.message : t('action_failed'));
+    }
+  }
+
+  return (
+    <Sheet open={variant != null} onOpenChange={(open) => { if (!open) onClose(); }}>
+      {variant && (
+        <SheetContent closeLabel={t('close')}>
+          <header className="shrink-0 border-b border-border px-5 pb-4 pe-14 pt-4">
+            <p className="text-xs font-medium text-muted">{t('variants_detail_title')}</p>
+            <SheetTitle className="mt-1 text-lg font-semibold text-text">{variant.display_name}</SheetTitle>
+          </header>
+
+          <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-5">
+            <div>
+              <p className="text-xs font-medium text-muted">{t('variants_column_combination')}</p>
+              <dl className="mt-2 space-y-1">
+                {variant.option_values.map((v) => (
+                  <div key={v.value_id} className="flex items-center justify-between text-sm">
+                    <dt className="text-muted">{v.option_name}</dt>
+                    <dd className="text-text">{v.value}</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted" htmlFor="variant-detail-sku">{t('sku')}</label>
+              <Input id="variant-detail-sku" dir="ltr" value={sku} onChange={(e) => setSku(e.target.value)} />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted" htmlFor="variant-detail-status">{t('variants_column_status')}</label>
+              <Select id="variant-detail-status" value={isActive ? '1' : '0'} onChange={(e) => setIsActive(e.target.value === '1')}>
+                <option value="1">{t('active')}</option>
+                <option value="0">{t('inactive')}</option>
+              </Select>
+            </div>
+          </div>
+
+          <footer className="flex shrink-0 items-center justify-between gap-2 border-t border-border px-5 py-4">
+            <Button type="button" variant="ghost" size="sm" onClick={() => void remove()}>
+              <Trash2 className="h-3.5 w-3.5" />{t('delete')}
+            </Button>
+            <div className="flex items-center gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={onClose}>{t('cancel')}</Button>
+              <Button type="button" size="sm" onClick={() => void save()} disabled={saving}>{t('save')}</Button>
+            </div>
+          </footer>
+        </SheetContent>
+      )}
+    </Sheet>
   );
 }

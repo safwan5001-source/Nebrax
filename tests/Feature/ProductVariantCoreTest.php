@@ -319,6 +319,188 @@ class ProductVariantCoreTest extends TestCase
         $this->assertSame('SHIRT-003-BLACK-2', $result['variant']->sku);
     }
 
+    // ── الفجوة المتبقّية الموثَّقة: فرعٌ معزولٌ مقابل متغيّرٍ/منتجٍ موحَّد ──
+
+    /**
+     * `Product::sharesSkuNamespace()` عمداً لا يُدرج منتجاً فرعياً معزولاً في
+     * السجلّ — فذلك يحافظ على استقلال كتالوجات الفروع. لكن هذا لا يعني أن
+     * SKU ذلك المنتج متاحٌ لأي هويةٍ مرئية من كل الفروع (منتجٌ مشترك/بلا
+     * فرع/متعدد الخيارات، أو أي متغيّر): `SkuRegistryEntry::claim()` يتحقق
+     * الآن من هذا الاتجاه صراحةً عبر `isClaimedByAnIsolatedProduct()`.
+     *
+     * @test
+     */
+    public function a_variant_cannot_silently_collide_with_a_branch_isolated_products_sku(): void
+    {
+        $auth = $this->registerTenant();
+        app(TenantContext::class)->set($auth['tenant_id']);
+
+        $main = $this->withToken($auth['token'])->getJson('/api/branches')['data'][0]['id'];
+        $khobar = $this->withToken($auth['token'])->postJson('/api/branches', ['name' => 'فرع الخبر'])
+            ->assertCreated()['data']['id'];
+        \App\Support\BranchSettings::merge(['share_products' => false]);
+
+        // منتجٌ فرعي معزول في فرع الخبر — لا ينضمّ إلى السجلّ الموحّد.
+        $this->withToken($auth['token'])->withHeaders(['X-Branch-Id' => $khobar])
+            ->postJson('/api/products', ['name' => 'صنف الخبر', 'sku' => 'ISO-SKU', 'type' => 'good', 'sale_price' => 10000])
+            ->assertCreated();
+
+        // منتجٌ آخر متعدد الخيارات في الفرع الرئيسي — مرئيٌّ من كل الفروع
+        // بحكم طبيعة المتغيّرات (بلا مفهوم فرعٍ في VAR-CORE-1).
+        $variantManaged = $this->withToken($auth['token'])->withHeaders(['X-Branch-Id' => $main])
+            ->postJson('/api/products', ['name' => 'قميص متعدد', 'sku' => 'SHIRT-ISO', 'type' => 'good', 'sale_price' => 10000])
+            ->assertCreated()['data'];
+        $this->enableVariants($auth['token'], $variantManaged['id'])->assertOk();
+        $color = $this->addOption($auth['token'], $variantManaged['id'], 'اللون');
+        $black = $this->addValue($auth['token'], $variantManaged['id'], $color['id'], 'أسود');
+
+        $service = app(ProductVariantService::class);
+        $productModel = Product::find($variantManaged['id']);
+
+        $this->expectException(\RuntimeException::class);
+        try {
+            $service->createSingleVariant($productModel, [$black['id']], null, sku: 'ISO-SKU');
+        } finally {
+            $this->assertDatabaseMissing('product_variants', ['sku' => 'ISO-SKU']);
+        }
+    }
+
+    /**
+     * إتمام العملية المعاكسة أيضاً: منتجٌ فرعي معزولٌ لا يجوز أن يأخذ SKU
+     * منتجٍ متعدد الخيارات (أو أي متغيّرٍ) قائمٍ بالفعل — `Product::booted()`
+     * يستدعي `SkuRegistryEntry::assertFreeForIsolatedProduct()` قبل قبول
+     * التغيير.
+     *
+     * @test
+     */
+    public function a_branch_isolated_product_cannot_take_the_sku_of_an_existing_variant(): void
+    {
+        $auth = $this->registerTenant();
+        app(TenantContext::class)->set($auth['tenant_id']);
+
+        $main = $this->withToken($auth['token'])->getJson('/api/branches')['data'][0]['id'];
+        $khobar = $this->withToken($auth['token'])->postJson('/api/branches', ['name' => 'فرع الخبر'])
+            ->assertCreated()['data']['id'];
+
+        $variantManaged = $this->withToken($auth['token'])->withHeaders(['X-Branch-Id' => $main])
+            ->postJson('/api/products', ['name' => 'قميص متعدد', 'sku' => 'SHIRT-V', 'type' => 'good', 'sale_price' => 10000])
+            ->assertCreated()['data'];
+        $this->enableVariants($auth['token'], $variantManaged['id'])->assertOk();
+        $color = $this->addOption($auth['token'], $variantManaged['id'], 'اللون');
+        $black = $this->addValue($auth['token'], $variantManaged['id'], $color['id'], 'أسود');
+        $variant = $this->withToken($auth['token'])->postJson("/api/products/{$variantManaged['id']}/variants", [
+            'combinations' => [[$black['id']]],
+        ])->assertStatus(201)->json('created')[0];
+
+        \App\Support\BranchSettings::merge(['share_products' => false]);
+
+        $this->withToken($auth['token'])->withHeaders(['X-Branch-Id' => $khobar])
+            ->postJson('/api/products', ['name' => 'صنف الخبر', 'sku' => $variant['sku'], 'type' => 'good', 'sale_price' => 5000])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('sku');
+    }
+
+    /**
+     * تفعيل إدارة المتغيّرات يُلحق SKU المنتج نفسه بالفضاء الموحّد فوراً — لا
+     * عند أول تعديلٍ لاحقٍ للرمز. قبل هذا الإصلاح كان `variant_state` وحده لا
+     * يُدَخِّن `sku` فتُفلت هذه اللحظة من `booted()`، فيبقى المنتج متعدد
+     * الخيارات برمزٍ لم يُحجز فعلياً.
+     *
+     * @test
+     */
+    public function enabling_variant_management_claims_the_products_own_sku_immediately(): void
+    {
+        $auth = $this->registerTenant();
+        app(TenantContext::class)->set($auth['tenant_id']);
+
+        $main = $this->withToken($auth['token'])->getJson('/api/branches')['data'][0]['id'];
+        $khobar = $this->withToken($auth['token'])->postJson('/api/branches', ['name' => 'فرع الخبر'])
+            ->assertCreated()['data']['id'];
+        \App\Support\BranchSettings::merge(['share_products' => false]);
+
+        // منتجٌ فرعي معزول يتحوّل لاحقاً إلى متعدد الخيارات دون أن يُعدَّل
+        // رمزه إطلاقاً — الانتقال نفسه هو الحدث الذي يجب أن يُلحقه بالسجلّ.
+        $product = $this->withToken($auth['token'])->withHeaders(['X-Branch-Id' => $main])
+            ->postJson('/api/products', ['name' => 'صنف رئيسي', 'sku' => 'ENABLE-SKU', 'type' => 'good', 'sale_price' => 10000])
+            ->assertCreated()['data'];
+
+        $this->enableVariants($auth['token'], $product['id'])->assertOk();
+
+        $this->assertSame(1, SkuRegistryEntry::where('sku', 'ENABLE-SKU')->where('kind', 'product')->count());
+
+        // فرعٌ آخر يحاول الآن أخذ الرمز نفسه — يجب أن يُرفض، لأن صاحبه صار
+        // مرئياً من كل الفروع بمجرد التحوّل، لا عند أول تعديل رمزٍ لاحق.
+        $this->withToken($auth['token'])->withHeaders(['X-Branch-Id' => $khobar])
+            ->postJson('/api/products', ['name' => 'صنف الخبر', 'sku' => 'ENABLE-SKU', 'type' => 'good', 'sale_price' => 5000])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('sku');
+    }
+
+    /**
+     * الاتجاه المعاكس: التراجع عن إدارة المتغيّرات يُحرِّر انضمام المنتج إلى
+     * الفضاء الموحّد إن عاد فرعياً معزولاً بحسب الفرع/الإعداد الحاليين —
+     * وإلا بقي صفٌّ يتيمٌ يحجز رمزاً لن يستفيد منه هذا المنتج، ويمنع فرعاً
+     * آخر من استعماله بلا سبب.
+     *
+     * @test
+     */
+    public function disabling_variant_management_releases_the_registry_claim_for_an_isolated_product(): void
+    {
+        $auth = $this->registerTenant();
+        app(TenantContext::class)->set($auth['tenant_id']);
+
+        $main = $this->withToken($auth['token'])->getJson('/api/branches')['data'][0]['id'];
+        $khobar = $this->withToken($auth['token'])->postJson('/api/branches', ['name' => 'فرع الخبر'])
+            ->assertCreated()['data']['id'];
+        \App\Support\BranchSettings::merge(['share_products' => false]);
+
+        $product = $this->withToken($auth['token'])->withHeaders(['X-Branch-Id' => $main])
+            ->postJson('/api/products', ['name' => 'صنف رئيسي', 'sku' => 'REVERT-SKU', 'type' => 'good', 'sale_price' => 10000])
+            ->assertCreated()['data'];
+
+        $this->enableVariants($auth['token'], $product['id'])->assertOk();
+        $this->withToken($auth['token'])->postJson("/api/products/{$product['id']}/variants/disable")->assertOk();
+
+        $this->assertSame(0, SkuRegistryEntry::where('sku', 'REVERT-SKU')->count());
+
+        // والآن فرعٌ آخر يستطيع استعمال الرمز نفسه بأمان — استقلال الفروع
+        // استُعيد بعد التراجع، لا بقي مقفولاً بذريعة تاريخ عابر بالمتغيّرات.
+        $this->withToken($auth['token'])->withHeaders(['X-Branch-Id' => $khobar])
+            ->postJson('/api/products', ['name' => 'صنف الخبر', 'sku' => 'REVERT-SKU', 'type' => 'good', 'sale_price' => 5000])
+            ->assertCreated();
+    }
+
+    /**
+     * فحص السجلّ الجديد (`isClaimedByAnIsolatedProduct`) مُقيَّدٌ بالمستأجر
+     * الحالي فقط — منتجٌ فرعي معزول في مستأجرٍ آخر لا يمنع متغيّراً هنا.
+     *
+     * @test
+     */
+    public function isolated_product_collision_check_is_scoped_to_the_current_tenant(): void
+    {
+        $authA = $this->registerTenant('acme-iso-a', 'iso-a@acme.test');
+        $authB = $this->registerTenant('acme-iso-b', 'iso-b@acme.test');
+
+        app(TenantContext::class)->set($authA['tenant_id']);
+        $mainA = $this->withToken($authA['token'])->getJson('/api/branches')['data'][0]['id'];
+        \App\Support\BranchSettings::merge(['share_products' => false]);
+        $this->withToken($authA['token'])->withHeaders(['X-Branch-Id' => $mainA])
+            ->postJson('/api/products', ['name' => 'صنف أ', 'sku' => 'CROSS-TENANT-SKU', 'type' => 'good', 'sale_price' => 10000])
+            ->assertCreated();
+
+        app(TenantContext::class)->set($authB['tenant_id']);
+        $product = $this->createSimpleProduct($authB['token'], 'قميص ب', 'SHIRT-XT');
+        $this->enableVariants($authB['token'], $product['id']);
+        $color = $this->addOption($authB['token'], $product['id'], 'اللون');
+        $black = $this->addValue($authB['token'], $product['id'], $color['id'], 'أسود');
+
+        $service = app(ProductVariantService::class);
+        $productModel = Product::find($product['id']);
+
+        $result = $service->createSingleVariant($productModel, [$black['id']], null, sku: 'CROSS-TENANT-SKU');
+        $this->assertSame('created', $result['status']);
+    }
+
     // ───────────────────────── الانتقال بسيط ⇄ متعدد ─────────────────────────
 
     /** @test */
