@@ -629,5 +629,64 @@
       "signInForPricing": "Inicia sesión para ver precios",
       "signInToOrder": "Inicia sesión para pedir"
     }
+  },
+  "awjCheckout": {
+    "title": "Checkout",
+    "emptyCartTitle": "Your cart is empty",
+    "emptyCartDescription": "Add something to your cart before checking out.",
+    "unavailableTitle": "Checkout is not available",
+    "unavailableDescription": "Your cart or checkout session could not be found or has expired. Please start again from your cart.",
+    "returnToCart": "Return to cart",
+    "continueToReview": "Continue to review",
+    "editDetails": "Edit details",
+    "completeOrder": "Complete order",
+    "contact": {
+      "heading": "Contact information",
+      "name": "Full name",
+      "phone": "Phone number",
+      "email": "Email (optional)"
+    },
+    "address": {
+      "heading": "Delivery address",
+      "country": "Country",
+      "region": "Region",
+      "city": "City",
+      "district": "District",
+      "street": "Street",
+      "postalCode": "Postal code",
+      "notes": "Notes (optional)"
+    },
+    "delivery": {
+      "heading": "Delivery method",
+      "methods": {
+        "pickup": "Pickup",
+        "standard": "Standard delivery"
+      },
+      "amountPending": "Calculated later"
+    },
+    "review": {
+      "heading": "Review your order",
+      "lineDetail": "{quantity} × {unit}"
+    },
+    "reviewRequired": {
+      "title": "Your order needs review",
+      "itemIssue": "{name}: {reason}",
+      "reasons": {
+        "unavailable": "This item is no longer available",
+        "uom_invalid": "This item's unit is no longer valid",
+        "price_unresolved": "This item's price could not be confirmed",
+        "insufficient_stock": "Not enough stock is available for this item",
+        "fulfillment_not_configured": "Delivery is not currently configured for this store",
+        "contact_incomplete": "Your contact information is incomplete",
+        "delivery_method_missing": "Please select a delivery method",
+        "empty_cart": "Your cart is empty",
+        "unknown": "This item needs your attention"
+      }
+    },
+    "success": {
+      "heading": "Order placed",
+      "orderNumber": "Order number: {number}",
+      "notPaidNote": "This order is confirmed as a commercial commitment. No payment has been processed."
+    }
   }
 }

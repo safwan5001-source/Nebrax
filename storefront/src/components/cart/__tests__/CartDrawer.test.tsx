@@ -90,4 +90,12 @@ describe("CartDrawer — AWJ unavailable line", () => {
     removeButton.click();
     expect(mockRemoveItem).toHaveBeenCalledWith("line-1");
   });
+
+  // COM-CHECKOUT-1C — Cart → Checkout navigation.
+  it("links Proceed to Checkout to the AWJ checkout route under the current base path — never the Spree checkout/[id] route", () => {
+    render(<CartDrawer />);
+
+    const checkoutLink = screen.getByRole("link", { name: "checkout" });
+    expect(checkoutLink).toHaveAttribute("href", "/us/ar/checkout");
+  });
 });

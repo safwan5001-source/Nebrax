@@ -629,5 +629,64 @@
       "signInForPricing": "سجّل الدخول لعرض السعر",
       "signInToOrder": "سجّل الدخول للطلب"
     }
+  },
+  "awjCheckout": {
+    "title": "إتمام الطلب",
+    "emptyCartTitle": "سلتك فارغة",
+    "emptyCartDescription": "أضِف شيئاً إلى سلتك قبل إتمام الطلب.",
+    "unavailableTitle": "إتمام الطلب غير متاح",
+    "unavailableDescription": "تعذّر العثور على سلتك أو جلسة الدفع، أو انتهت صلاحيتها. الرجاء البدء من جديد من السلة.",
+    "returnToCart": "العودة إلى السلة",
+    "continueToReview": "متابعة إلى المراجعة",
+    "editDetails": "تعديل البيانات",
+    "completeOrder": "إتمام الطلب",
+    "contact": {
+      "heading": "معلومات التواصل",
+      "name": "الاسم الكامل",
+      "phone": "رقم الهاتف",
+      "email": "البريد الإلكتروني (اختياري)"
+    },
+    "address": {
+      "heading": "عنوان التوصيل",
+      "country": "الدولة",
+      "region": "المنطقة",
+      "city": "المدينة",
+      "district": "الحي",
+      "street": "الشارع",
+      "postalCode": "الرمز البريدي",
+      "notes": "ملاحظات (اختياري)"
+    },
+    "delivery": {
+      "heading": "طريقة الاستلام",
+      "methods": {
+        "pickup": "استلام من المتجر",
+        "standard": "توصيل عادي"
+      },
+      "amountPending": "يُحدَّد لاحقاً"
+    },
+    "review": {
+      "heading": "مراجعة طلبك",
+      "lineDetail": "{quantity} × {unit}"
+    },
+    "reviewRequired": {
+      "title": "طلبك يحتاج إلى مراجعة",
+      "itemIssue": "{name}: {reason}",
+      "reasons": {
+        "unavailable": "هذا العنصر لم يعد متاحاً",
+        "uom_invalid": "وحدة هذا العنصر لم تعد صالحة",
+        "price_unresolved": "تعذّر تأكيد سعر هذا العنصر",
+        "insufficient_stock": "الكمية المتاحة من هذا العنصر غير كافية",
+        "fulfillment_not_configured": "التوصيل غير مهيأ حالياً لهذا المتجر",
+        "contact_incomplete": "بيانات التواصل غير مكتملة",
+        "delivery_method_missing": "الرجاء اختيار طريقة استلام",
+        "empty_cart": "سلتك فارغة",
+        "unknown": "هذا العنصر يحتاج إلى مراجعتك"
+      }
+    },
+    "success": {
+      "heading": "تم إنشاء الطلب",
+      "orderNumber": "رقم الطلب: {number}",
+      "notPaidNote": "هذا الطلب مؤكَّد كالتزام تجاري فقط، ولم تتم أي عملية دفع بعد."
+    }
   }
 }
