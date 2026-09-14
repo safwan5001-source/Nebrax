@@ -108,6 +108,9 @@ class ProductResource extends JsonResource
             'quantity_on_hand' => $this->quantity_on_hand,
             'avg_cost'         => $this->when(! $hidesCostProfit, fn () => Money::toRiyal($this->avg_cost)),
             'is_active'        => $this->is_active,
+            // VAR-CORE-1: 'simple' | 'variant_managed'. لا يُعرض عدد المتغيّرات
+            // هنا عمداً — هذا المورد يخصّ بطاقة المنتج، لا قائمة متغيّراته.
+            'variant_state'    => $this->variant_state,
         ];
     }
 }

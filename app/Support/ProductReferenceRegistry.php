@@ -19,11 +19,14 @@ use App\Models\ProcurementLine;
 use App\Models\ProductActivity;
 use App\Models\ProductBarcode;
 use App\Models\ProductMedia;
+use App\Models\ProductOption;
+use App\Models\ProductVariant;
 use App\Models\ProductWarehouseStock;
 use App\Models\PurchaseLine;
 use App\Models\QuoteLine;
 use App\Models\RecurringInvoiceLine;
 use App\Models\ReturnLine;
+use App\Models\SkuRegistryEntry;
 use App\Models\StockMovement;
 use App\Models\StockPermitLine;
 use App\Models\StocktakeLine;
@@ -128,6 +131,11 @@ final class ProductReferenceRegistry
 
         // ── ٤) تجاري حيّ ───────────────────────────────────────────────
         PriceListItem::class => ['key' => 'price_list_items', 'classes' => [self::COMMERCIAL_LIVE]],
+        // VAR-CORE-1: متغيّرٌ فعلي هويةٌ قابلة للبيع حيّة — ليس تاريخاً بعدُ
+        // (لا مستند/حركة تشير إليه اليوم، ذلك VAR-DOC-1/VAR-INV-1)، لكن حذف
+        // المنتج صامتاً بينما له متغيّرات يفقد تركيبات/SKU حيّة بلا تراجع.
+        // يمنع الحذف حتى يُزال كل متغيّر صراحةً أولاً (تحويلٌ صريح إلى بسيط).
+        ProductVariant::class => ['key' => 'product_variants', 'classes' => [self::COMMERCIAL_LIVE]],
         // PR-COM-3: عرضٌ تجاري حيّ لمنتج على قناة — بنفس منطق PriceListItem
         // حرفياً: ليس تاريخاً ولا هوية مخزون، لكن حذف المنتج صامتاً بينما هو
         // معروضٌ فعلياً على قناة يكسر تهيئة نشر حيّة (restrictOnDelete في
@@ -146,6 +154,14 @@ final class ProductReferenceRegistry
         // مانعاً كان سيجعل منتجاً «منخفض المخزون» غير قابلٍ للحذف أبداً بسبب
         // حالةٍ مشتقّة يعيد النظام حسابها بنفسه.
         InventoryStockAlert::class => ['key' => 'stock_alerts', 'classes' => [self::OWNED_CHILD]],
+        // VAR-CORE-1: خيارات المتغيّرات (اللون/المقاس) تابعةٌ بالكامل للمنتج —
+        // بلا معنى مستقلّ، وتُنظَّف مع الحذف الحقيقي وحده. حماية قيمها من
+        // الحذف وهي مستعملة في متغيّرٍ قائم مسؤولية الخدمة، لا هذا التصنيف.
+        ProductOption::class => ['key' => 'product_options', 'classes' => [self::OWNED_CHILD]],
+        // فضاء SKU الموحّد (VAR-CORE-1) — تابعٌ مملوكٌ تماماً كـ
+        // `BarcodeRegistryEntry` حرفياً، ولنفس السبب: وجود سجلٍّ لرمز المنتج
+        // حالةٌ طبيعية لا مرجعٌ تاريخي، ويُحرَّر ضمن الحذف الحقيقي وحده.
+        SkuRegistryEntry::class => ['key' => 'sku_registry_entries', 'classes' => [self::OWNED_CHILD]],
 
         // COM-CART-2: السلة المجهولة حالة مؤقتة وليست دليلاً تاريخياً ولا
         // تهيئةً تجارية حية. حذف المنتج لا تمنعه سلة مهجورة؛ يبقى السطر

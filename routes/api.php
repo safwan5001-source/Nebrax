@@ -84,6 +84,7 @@ use App\Http\Controllers\Api\PriceListController;
 use App\Http\Controllers\Api\PayrollController;
 use App\Http\Controllers\Api\ProductCategoryController;
 use App\Http\Controllers\Api\ProductController;
+use App\Http\Controllers\Api\ProductVariantController;
 use App\Http\Controllers\Api\ProductWorkbookController;
 use App\Http\Controllers\Api\PosAuditController;
 use App\Http\Controllers\Api\PosLossPreventionController;
@@ -417,6 +418,26 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::post('products', [ProductController::class, 'store'])->middleware($perm('products.manage'));
         Route::put('products/{id}', [ProductController::class, 'update'])->middleware($perm('products.manage'));
         Route::delete('products/{id}', [ProductController::class, 'destroy'])->middleware($perm('products.manage'));
+
+        // VAR-CORE-1: خيارات/قيم/متغيّرات المنتج — نفس صلاحيتَي الكتالوج
+        // العامتين (`products.view`/`products.manage`)، بلا نطاقٍ جديد.
+        Route::post('products/{id}/variants/enable', [ProductVariantController::class, 'enable'])->middleware($perm('products.manage'));
+        Route::post('products/{id}/variants/disable', [ProductVariantController::class, 'disable'])->middleware($perm('products.manage'));
+
+        Route::get('products/{id}/options', [ProductVariantController::class, 'indexOptions'])->middleware($perm('products.view'));
+        Route::post('products/{id}/options', [ProductVariantController::class, 'storeOption'])->middleware($perm('products.manage'));
+        Route::put('products/{id}/options/{optionId}', [ProductVariantController::class, 'updateOption'])->middleware($perm('products.manage'));
+        Route::delete('products/{id}/options/{optionId}', [ProductVariantController::class, 'destroyOption'])->middleware($perm('products.manage'));
+
+        Route::post('products/{id}/options/{optionId}/values', [ProductVariantController::class, 'storeOptionValue'])->middleware($perm('products.manage'));
+        Route::put('products/{id}/options/{optionId}/values/{valueId}', [ProductVariantController::class, 'updateOptionValue'])->middleware($perm('products.manage'));
+        Route::delete('products/{id}/options/{optionId}/values/{valueId}', [ProductVariantController::class, 'destroyOptionValue'])->middleware($perm('products.manage'));
+
+        Route::get('products/{id}/variants/combinations', [ProductVariantController::class, 'combinations'])->middleware($perm('products.view'));
+        Route::get('products/{id}/variants', [ProductVariantController::class, 'indexVariants'])->middleware($perm('products.view'));
+        Route::post('products/{id}/variants', [ProductVariantController::class, 'storeVariants'])->middleware($perm('products.manage'));
+        Route::put('products/{id}/variants/{variantId}', [ProductVariantController::class, 'updateVariant'])->middleware($perm('products.manage'));
+        Route::delete('products/{id}/variants/{variantId}', [ProductVariantController::class, 'destroyVariant'])->middleware($perm('products.manage'));
 
         // تصنيفات المنتجات والعلامات التجارية (قوائم تصنيف — لا أثر محاسبي)
         Route::get('product-categories', [ProductCategoryController::class, 'index'])->middleware($perm('products.view'));

@@ -52,6 +52,8 @@ export interface Product {
   quantity_on_hand: number;
   avg_cost: string;
   is_active: boolean;
+  /** VAR-CORE-1: 'simple' | 'variant_managed'. اختياري للتوافق مع مستهلكين أقدم للنوع. */
+  variant_state?: string;
 }
 
 interface FormState {
