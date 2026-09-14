@@ -193,9 +193,9 @@
 ## Git
 
 - Branch: `claude/var-doc-1-variant-document-snapshots`
-- PR: يُفتح بعد هذا التقرير.
+- PR: #817
 - Base SHA: `fbc3fc1b96b7d30199131c10b9770fe9a8829879`
-- Head SHA: يُملأ بعد الدفع.
+- Head SHA: `d00a018d226921110957747e066bc537b431021a`
 
 ## Next Step
 
