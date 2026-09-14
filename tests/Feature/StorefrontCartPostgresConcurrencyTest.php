@@ -278,6 +278,86 @@ class StorefrontCartPostgresConcurrencyTest extends TestCase
         $this->assertSame(0, DB::table('commerce_cart_items')->where('cart_id', $cart->id)->count());
     }
 
+    /** @test */
+    public function patch_clears_the_cookie_when_the_cart_is_lost_after_lookup(): void
+    {
+        $this->assertLostCartMutationClearsCookie('patch');
+    }
+
+    /** @test */
+    public function delete_clears_the_cookie_when_the_cart_is_lost_after_lookup(): void
+    {
+        $this->assertLostCartMutationClearsCookie('delete');
+    }
+
+    private function assertLostCartMutationClearsCookie(string $method): void
+    {
+        $host = "cart-lost-{$method}-".Str::random(8).'.test';
+        StorefrontDomain::create([
+            'storefront_id' => $this->storefront->id,
+            'hostname' => $host,
+            'type' => StorefrontDomain::TYPE_CUSTOM,
+            'is_active' => true,
+            'verification_status' => StorefrontDomain::VERIFICATION_VERIFIED,
+        ]);
+        $token = "lost-cart-{$method}-token";
+        $cart = $this->cart(now()->addDay(), hash('sha256', $token));
+        $lockReady = $this->signalPath("cart_{$method}_lock_");
+        $lookupDone = $this->signalPath("cart_{$method}_lookup_");
+        $resultFile = tempnam(sys_get_temp_dir(), "cart_{$method}_result_");
+
+        $locker = pcntl_fork();
+        if ($locker === 0) {
+            DB::purge(config('database.default'));
+            DB::transaction(function () use ($cart, $lockReady, $lookupDone): void {
+                DB::table('commerce_carts')->where('id', $cart->id)->lockForUpdate()->first();
+                touch($lockReady);
+                $this->waitForSignal($lookupDone);
+                DB::table('commerce_carts')->where('id', $cart->id)->update([
+                    'status' => CommerceCart::STATUS_EXPIRED,
+                ]);
+            });
+            exit(0);
+        }
+        $this->assertGreaterThan(0, $locker);
+        $this->waitForSignal($lockReady);
+
+        $requester = pcntl_fork();
+        if ($requester === 0) {
+            DB::purge(config('database.default'));
+            config(['storefront.gateway_secret' => self::SECRET]);
+            DB::listen(function ($query) use ($lookupDone): void {
+                if (str_contains($query->sql, 'commerce_carts') && str_contains($query->sql, 'token_hash')) {
+                    touch($lookupDone);
+                }
+            });
+            $request = $this->withHeaders([
+                'X-Storefront-Forwarded-Host' => $host,
+                'X-Storefront-Gateway-Secret' => self::SECRET,
+            ])->withCredentials()->withUnencryptedCookie(CommerceCartService::COOKIE_NAME, $token);
+            $uri = 'http://laravel-internal.test/store/v1/cart/items/'.Str::uuid();
+            $response = $method === 'patch'
+                ? $request->patchJson($uri, ['quantity' => 2])
+                : $request->deleteJson($uri);
+            $cookie = $response->getCookie(CommerceCartService::COOKIE_NAME, false);
+            file_put_contents($resultFile, json_encode([
+                'status' => $response->status(),
+                'cookie_expires' => $cookie?->getExpiresTime(),
+            ]));
+            exit(0);
+        }
+        $this->assertGreaterThan(0, $requester);
+
+        pcntl_waitpid($locker, $status);
+        pcntl_waitpid($requester, $status);
+        $result = json_decode((string) file_get_contents($resultFile), true);
+        $this->cleanupSignals([$lockReady, $lookupDone, $resultFile]);
+
+        $this->assertSame(404, $result['status']);
+        $this->assertNotNull($result['cookie_expires']);
+        $this->assertLessThanOrEqual(time(), $result['cookie_expires']);
+    }
+
     private function cart($expiresAt, ?string $tokenHash = null): CommerceCart
     {
         return CommerceCart::create([

@@ -319,4 +319,64 @@ class StorefrontCartApiTest extends TestCase
             $this->assertSame(0, DB::table($table)->count(), "Unexpected side effect in {$table}");
         }
     }
+
+    /** @test */
+    public function database_failures_are_server_errors_without_leaking_details_or_zeroing_lines(): void
+    {
+        ['tenant' => $tenant, 'channel' => $channel] = $this->store('cart-db-failure.test');
+        $product = $this->product($tenant, $channel);
+        $failNextListingQuery = function (string $message): void {
+            $armed = true;
+            DB::listen(function ($query) use (&$armed, $message): void {
+                if ($armed && str_contains($query->sql, 'commerce_listings')) {
+                    $armed = false;
+                    throw new \PDOException($message);
+                }
+            });
+        };
+
+        $failNextListingQuery('sensitive-store-database-detail');
+        $storeFailure = $this->add('cart-db-failure.test', $product)->assertStatus(500);
+        $this->assertStringNotContainsString('sensitive-store-database-detail', $storeFailure->getContent());
+
+        $created = $this->add('cart-db-failure.test', $product)->assertCreated();
+        $token = $created->getCookie(CommerceCartService::COOKIE_NAME, false)->getValue();
+        $item = $created->json('data.items.0.id');
+
+        $failNextListingQuery('sensitive-update-database-detail');
+        $updateFailure = $this->withHeaders($this->mutationHeaders('cart-db-failure.test'))
+            ->withCredentials()->withUnencryptedCookie(CommerceCartService::COOKIE_NAME, $token)
+            ->patchJson("http://laravel-internal.test/store/v1/cart/items/{$item}", ['quantity' => 2])
+            ->assertStatus(500);
+        $this->assertStringNotContainsString('sensitive-update-database-detail', $updateFailure->getContent());
+
+        $failNextListingQuery('sensitive-read-database-detail');
+        $readFailure = $this->withCredentials()
+            ->withUnencryptedCookie(CommerceCartService::COOKIE_NAME, $token)
+            ->getJson('http://cart-db-failure.test/store/v1/cart')
+            ->assertStatus(500);
+        $this->assertStringNotContainsString('sensitive-read-database-detail', $readFailure->getContent());
+    }
+
+    /** @test */
+    public function a_missing_item_does_not_clear_an_otherwise_usable_cart_cookie(): void
+    {
+        ['tenant' => $tenant, 'channel' => $channel] = $this->store('cart-missing-item.test');
+        $product = $this->product($tenant, $channel);
+        $created = $this->add('cart-missing-item.test', $product)->assertCreated();
+        $token = $created->getCookie(CommerceCartService::COOKIE_NAME, false)->getValue();
+        $missing = (string) Str::uuid();
+
+        $patch = $this->withHeaders($this->mutationHeaders('cart-missing-item.test'))
+            ->withCredentials()->withUnencryptedCookie(CommerceCartService::COOKIE_NAME, $token)
+            ->patchJson("http://laravel-internal.test/store/v1/cart/items/{$missing}", ['quantity' => 2])
+            ->assertNotFound();
+        $this->assertNull($patch->getCookie(CommerceCartService::COOKIE_NAME, false));
+
+        $delete = $this->withHeaders($this->mutationHeaders('cart-missing-item.test'))
+            ->withCredentials()->withUnencryptedCookie(CommerceCartService::COOKIE_NAME, $token)
+            ->deleteJson("http://laravel-internal.test/store/v1/cart/items/{$missing}")
+            ->assertNotFound();
+        $this->assertNull($delete->getCookie(CommerceCartService::COOKIE_NAME, false));
+    }
 }

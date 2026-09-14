@@ -13,6 +13,7 @@ use App\Tenancy\StorefrontContext;
 use App\Tenancy\TenantContext;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use PDOException;
 use RuntimeException;
 
 final class CommerceCartService
@@ -199,6 +200,8 @@ final class CommerceCartService
                     $productName = $resolved['product']->name;
                     $unitName = $resolved['unit_name'];
                     $unitPrice = $resolved['amount'];
+                } catch (PDOException $exception) {
+                    throw $exception;
                 } catch (RuntimeException) {
                     // Retained unavailable lines are display/removal-only and total zero.
                 }

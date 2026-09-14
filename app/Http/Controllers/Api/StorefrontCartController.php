@@ -9,6 +9,7 @@ use App\Support\PublicApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
+use PDOException;
 use RuntimeException;
 
 final class StorefrontCartController extends PublicApiController
@@ -44,6 +45,8 @@ final class StorefrontCartController extends PublicApiController
             );
         } catch (CartNotFoundException) {
             return $this->clearCookie($this->notFound($request));
+        } catch (PDOException $e) {
+            throw $e;
         } catch (RuntimeException $e) {
             abort(422, $e->getMessage());
         }
@@ -73,7 +76,9 @@ final class StorefrontCartController extends PublicApiController
         try {
             $data = $carts->update($lookup['cart'], (string) $request->route('item'), $data['quantity']);
         } catch (CartNotFoundException) {
-            return $this->notFound($request);
+            return $this->notFoundAfterMutation($request, $carts);
+        } catch (PDOException $e) {
+            throw $e;
         } catch (RuntimeException $e) {
             abort(422, $e->getMessage());
         }
@@ -97,7 +102,7 @@ final class StorefrontCartController extends PublicApiController
         try {
             $data = $carts->remove($lookup['cart'], (string) $request->route('item'));
         } catch (CartNotFoundException) {
-            return $this->notFound($request);
+            return $this->notFoundAfterMutation($request, $carts);
         }
 
         $response = PublicApiResponse::success($request, $data);
@@ -120,6 +125,14 @@ final class StorefrontCartController extends PublicApiController
     private function notFound(Request $request): JsonResponse
     {
         return PublicApiResponse::error($request, PublicApiErrorCode::NOT_FOUND, 'السلة غير متاحة.');
+    }
+
+    private function notFoundAfterMutation(Request $request, CommerceCartService $carts): JsonResponse
+    {
+        $response = $this->notFound($request);
+        $lookup = $carts->findByToken($request->cookie(CommerceCartService::COOKIE_NAME));
+
+        return $lookup['invalid'] ? $this->clearCookie($response) : $response;
     }
 
     private function clearCookie(JsonResponse $response): JsonResponse
