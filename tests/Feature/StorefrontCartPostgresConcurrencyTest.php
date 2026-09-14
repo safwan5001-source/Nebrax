@@ -147,6 +147,98 @@ class StorefrontCartPostgresConcurrencyTest extends TestCase
     }
 
     /** @test */
+    public function add_holds_product_and_listing_eligibility_through_the_line_write(): void
+    {
+        $product = Product::create([
+            'name' => 'Add eligibility product',
+            'sku' => 'ADD-'.Str::random(8),
+            'unit' => 'piece',
+            'sale_price' => 1250,
+            'is_active' => true,
+        ]);
+        $listing = CommerceListing::create([
+            'product_id' => $product->id,
+            'sales_channel_id' => $this->channel->id,
+            'is_published' => true,
+        ]);
+        $cart = $this->cart(now()->addDay());
+        $eligibilityLocked = $this->signalPath('cart_add_eligibility_');
+        $productChangeStarted = $this->signalPath('cart_add_product_change_');
+        $listingChangeStarted = $this->signalPath('cart_add_listing_change_');
+        $resultFile = tempnam(sys_get_temp_dir(), 'cart_add_eligibility_result_');
+
+        $adder = pcntl_fork();
+        if ($adder === 0) {
+            DB::purge(config('database.default'));
+            $this->establishContext();
+            DB::listen(function ($query) use ($eligibilityLocked, $productChangeStarted, $listingChangeStarted): void {
+                if (str_contains($query->sql, 'commerce_listings')
+                    && str_contains(strtolower($query->sql), 'for update')
+                ) {
+                    touch($eligibilityLocked);
+                    $this->waitForSignal($productChangeStarted);
+                    $this->waitForSignal($listingChangeStarted);
+                }
+            });
+            try {
+                $result = app(CommerceCartService::class)->add(
+                    CommerceCart::query()->findOrFail($cart->id),
+                    $product->id,
+                    'base',
+                    1,
+                );
+                file_put_contents($resultFile, json_encode([
+                    'ok' => true,
+                    'available' => $result['data']['items'][0]['available'],
+                ]));
+            } catch (\Throwable $exception) {
+                file_put_contents($resultFile, json_encode([
+                    'ok' => false,
+                    'message' => $exception->getMessage(),
+                ]));
+            }
+            exit(0);
+        }
+        $this->assertGreaterThan(0, $adder);
+        $this->waitForSignal($eligibilityLocked);
+
+        $productChanger = pcntl_fork();
+        if ($productChanger === 0) {
+            DB::purge(config('database.default'));
+            touch($productChangeStarted);
+            DB::table('products')->where('id', $product->id)->update(['is_active' => false]);
+            exit(0);
+        }
+        $this->assertGreaterThan(0, $productChanger);
+
+        $listingChanger = pcntl_fork();
+        if ($listingChanger === 0) {
+            DB::purge(config('database.default'));
+            touch($listingChangeStarted);
+            DB::table('commerce_listings')->where('id', $listing->id)->update(['is_published' => false]);
+            exit(0);
+        }
+        $this->assertGreaterThan(0, $listingChanger);
+
+        pcntl_waitpid($adder, $status);
+        pcntl_waitpid($productChanger, $status);
+        pcntl_waitpid($listingChanger, $status);
+        $result = json_decode((string) file_get_contents($resultFile), true);
+        $this->cleanupSignals([
+            $eligibilityLocked,
+            $productChangeStarted,
+            $listingChangeStarted,
+            $resultFile,
+        ]);
+
+        $this->assertTrue($result['ok'], json_encode($result));
+        $this->assertTrue($result['available']);
+        $this->assertSame(1, DB::table('commerce_cart_items')->where('cart_id', $cart->id)->count());
+        $this->assertFalse((bool) DB::table('products')->where('id', $product->id)->value('is_active'));
+        $this->assertFalse((bool) DB::table('commerce_listings')->where('id', $listing->id)->value('is_published'));
+    }
+
+    /** @test */
     public function expiry_read_does_not_overwrite_a_concurrent_renewal(): void
     {
         $token = 'expiry-race-token';

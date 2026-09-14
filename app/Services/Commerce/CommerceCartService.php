@@ -94,7 +94,7 @@ final class CommerceCartService
                 $cart = $this->lockUsableCart($knownCart->id);
             }
 
-            $candidate = $this->purchasable($productId, $unitKey);
+            $candidate = $this->purchasable($productId, $unitKey, lockEligibility: true);
 
             $line = CommerceCartItem::query()
                 ->where('cart_id', $cart->id)
