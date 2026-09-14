@@ -304,7 +304,7 @@ class InventoryOpeningPostingTest extends TestCase
 
         $this->assertSame(1, JournalEntry::count(), 'لا قيد ثانٍ.');
         $this->assertSame(1, StockMovement::count(), 'لا حركة ثانية.');
-        $this->assertSame(10, Product::where('sku', 'P-1')->value('quantity_on_hand'), 'الكمية لم تتضاعف.');
+        $this->assertSame(10, Product::where('sku', 'P-1')->first()?->quantity_on_hand ?? 0, 'الكمية لم تتضاعف.');
     }
 
     /**
@@ -359,7 +359,7 @@ class InventoryOpeningPostingTest extends TestCase
             $this->assertSame(0, StockMovement::count(), 'حتى السطر السليم لم يُكتب.');
             $this->assertSame(0, JournalEntry::count());
             $this->assertSame(0, ProductWarehouseStock::count());
-            $this->assertSame(0, Product::where('sku', 'P-1')->value('quantity_on_hand'));
+            $this->assertSame(0, Product::where('sku', 'P-1')->first()?->quantity_on_hand ?? 0);
             $this->assertSame('draft', $opening->fresh()->status);
         }
     }
@@ -384,7 +384,7 @@ class InventoryOpeningPostingTest extends TestCase
         try {
             $this->openings->post($opening);
         } finally {
-            $this->assertSame(4, Product::where('sku', 'P-1')->value('quantity_on_hand'), 'الشراء وحده باقٍ.');
+            $this->assertSame(4, Product::where('sku', 'P-1')->first()?->quantity_on_hand ?? 0, 'الشراء وحده باقٍ.');
             $this->assertSame($entriesAfterPurchase, JournalEntry::count());
         }
     }
@@ -416,7 +416,7 @@ class InventoryOpeningPostingTest extends TestCase
         } finally {
             $this->assertSame(0, StockMovement::count(), 'لا حركة.');
             $this->assertSame(0, JournalEntry::count(), 'لا قيد.');
-            $this->assertSame(0, Product::where('sku', 'P-1')->value('quantity_on_hand'));
+            $this->assertSame(0, Product::where('sku', 'P-1')->first()?->quantity_on_hand ?? 0);
             $this->assertSame('draft', $opening->fresh()->status);
         }
     }
@@ -437,7 +437,7 @@ class InventoryOpeningPostingTest extends TestCase
         $posted = $this->openings->post($opening);
 
         $this->assertSame('posted', $posted->status);
-        $this->assertSame(10, Product::where('sku', 'P-1')->value('quantity_on_hand'));
+        $this->assertSame(10, Product::where('sku', 'P-1')->first()?->quantity_on_hand ?? 0);
         $this->assertSame(1, StockMovement::count());
         $this->assertTrue($posted->allow_zero_cost, 'الموافقة تبقى مقروءة بعد الترحيل.');
     }
@@ -474,7 +474,7 @@ class InventoryOpeningPostingTest extends TestCase
             [['product_id' => $product->id, 'warehouse_id' => $warehouse->id, 'quantity' => 10, 'unit_cost' => 0]]
         ));
 
-        $this->assertSame(10, Product::where('sku', 'P-1')->value('quantity_on_hand'));
+        $this->assertSame(10, Product::where('sku', 'P-1')->first()?->quantity_on_hand ?? 0);
         $this->assertSame(1, StockMovement::count());
         $this->assertSame(0, JournalEntry::count(), 'قيدٌ بصفرين ضجيجٌ في كشف الأستاذ.');
         $this->assertNull($opening->journal_entry_id);

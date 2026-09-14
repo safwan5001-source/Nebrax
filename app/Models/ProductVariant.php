@@ -4,8 +4,10 @@ namespace App\Models;
 
 use App\Tenancy\CompanyWide;
 use App\Tenancy\ResolvesBranchReferences;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
  * تركيبة محدَّدة من قيم خيارات منتجٍ ما (مثلاً: أسود + XL). هويةٌ قابلة للبيع
@@ -58,6 +60,23 @@ class ProductVariant extends BaseModel implements CompanyWide
     public function product(): BelongsTo
     {
         return $this->referenceBelongsTo(Product::class);
+    }
+
+    /** هويّة مخزون هذا المتغيّر بعينه (VAR-INV-1) — قد تكون غائبة إن لم تُستعمل بعد. */
+    public function inventoryState(): HasOne
+    {
+        return $this->hasOne(InventoryState::class, 'product_variant_id');
+    }
+
+    /** بلا عمودٍ فيزيائي على هذا الجدول أبداً — `InventoryState` سلطتها الوحيدة منذ الإنشاء. */
+    protected function quantityOnHand(): Attribute
+    {
+        return Attribute::make(get: fn () => (int) ($this->inventoryState?->quantity_on_hand ?? 0));
+    }
+
+    protected function avgCost(): Attribute
+    {
+        return Attribute::make(get: fn () => (int) ($this->inventoryState?->avg_cost ?? 0));
     }
 
     public function optionValues(): BelongsToMany

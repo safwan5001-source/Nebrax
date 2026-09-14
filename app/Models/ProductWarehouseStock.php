@@ -21,7 +21,7 @@ class ProductWarehouseStock extends BaseModel implements CompanyWide
 
     protected $table = 'product_warehouse_stock';
 
-    protected $fillable = ['tenant_id', 'product_id', 'warehouse_id', 'quantity', 'revision'];
+    protected $fillable = ['tenant_id', 'product_id', 'product_variant_id', 'warehouse_id', 'quantity', 'revision'];
 
     protected $casts = ['quantity' => 'integer', 'revision' => 'integer'];
 

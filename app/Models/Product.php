@@ -8,6 +8,7 @@ use App\Tenancy\BranchScoped;
 use App\Tenancy\BranchShareable;
 use App\Tenancy\BranchSharing;
 use Closure;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -47,8 +48,6 @@ class Product extends BaseModel implements BranchShareable
         'purchase_price' => 'integer',
         'tax_rate' => 'integer',
         'track_inventory' => 'boolean',
-        'quantity_on_hand' => 'integer',
-        'avg_cost' => 'integer',
         'is_active' => 'boolean',
     ];
 
@@ -128,6 +127,10 @@ class Product extends BaseModel implements BranchShareable
                     SkuRegistryEntry::assertFreeForIsolatedProduct($new, $product->id);
                 }
             }
+
+            // VAR-INV-1: توافقٌ خلفي للإسناد المباشر القديم (تجهيزات اختبارات
+            // موجودة، وأدوات artisan/seed) — @see $pendingQuantityOnHand أدناه.
+            $product->flushPendingInventorySeed();
         });
     }
 
@@ -162,6 +165,99 @@ class Product extends BaseModel implements BranchShareable
     public function movements(): HasMany
     {
         return $this->hasMany(StockMovement::class);
+    }
+
+    /** هويّات المخزون (VAR-INV-1) — صفٌّ واحد بسيط، أو واحد لكل متغيّر فعلي. */
+    public function inventoryStates(): HasMany
+    {
+        return $this->hasMany(InventoryState::class);
+    }
+
+    /**
+     * VAR-INV-1: الكمية والمتوسط لم يعودا يُقرآن من عمودَي هذا الجدول —
+     * `InventoryState` هي السلطة الوحيدة الآن (لا حقيقتان قابلتان للتعارض،
+     * @see docs/plans/products-inventory/AWJ_PRODUCT_VARIANTS_VAR_ARCH_1.md §3.1).
+     * العمودان الفيزيائيان (`products.quantity_on_hand`/`avg_cost`) يبقيان في
+     * المخطَّط مجمَّدين بلا كتابة — إسقاطهما عبر ترحيل `Schema::table` كان
+     * يخاطر بإعادة بناء SQLite المعروفة (تحذير VAR-INV-1 الصريح)، فتجميدهما
+     * أرخص وأأمن من الإسقاط، وما زال يحقّق «لا كتابة مزدوجة دائمة» فعلياً.
+     *
+     * منتجٌ `variant_managed`: الكمية مجموعٌ مشتقٌّ لعرضٍ/تقريرٍ فقط عبر كل
+     * المتغيّرات؛ المتوسط **لا يُخترع** (0 صراحةً) لأن الأب ليس هويّة تقييمٍ
+     * موازية ولا يجوز خلط تكاليف متغيّرات مختلفة اقتصادياً في رقمٍ واحد.
+     */
+    /**
+     * إسنادٌ مباشرٌ قديم (`Product::create(['quantity_on_hand'=>..., 'avg_cost'=>...])`
+     * أو `$product->update([...])`) لا يكتب العمود الفيزيائي بعد الآن (مجمَّد
+     * — أعلاه)، لكنه **لا يُهمَل صامتاً** أيضاً: كان توافقٌ صامت كهذا سيكسر
+     * عشرات تجهيزات الاختبارات القائمة التي تفترض بذراً مباشراً لرصيدٍ
+     * افتتاحي، وهو نمطٌ بلا أثرٍ محاسبي حقيقي (لا حركة، لا قيد) فلا يستحق
+     * إعادة كتابة كل موضعٍ يستعمله إلى `InventoryService`. القيمة تُحفظ هنا
+     * مؤقتاً وتُطبَّق على `InventoryState` بعد الحفظ (`flushPendingInventorySeed`)
+     * — توجيهٌ شفّاف لا كتابةٌ مزدوجة: العمود الفيزيائي يبقى بلا كتابة أبداً.
+     */
+    private ?int $pendingQuantityOnHand = null;
+
+    private ?int $pendingAvgCost = null;
+
+    protected function quantityOnHand(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => $this->isVariantManaged()
+                ? (int) $this->inventoryStates()->sum('quantity_on_hand')
+                : (int) ($this->inventoryStates()->whereNull('product_variant_id')->value('quantity_on_hand') ?? 0),
+            set: function ($value) {
+                $this->pendingQuantityOnHand = (int) $value;
+
+                return [];
+            },
+        );
+    }
+
+    protected function avgCost(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => $this->isVariantManaged()
+                ? 0
+                : (int) ($this->inventoryStates()->whereNull('product_variant_id')->value('avg_cost') ?? 0),
+            set: function ($value) {
+                $this->pendingAvgCost = (int) $value;
+
+                return [];
+            },
+        );
+    }
+
+    /**
+     * يطبّق إسناداً مباشراً قديم لهذا الحفظ فقط (إن وُجد) على `InventoryState`
+     * البسيطة لهذا المنتج. لا أثر لمنتجٍ `variant_managed` — لا هويّة أبٍ
+     * موازية له (VAR_ARCH_1 §3)، فيُهمَل صامتاً بنفس منطق «لا كتابة على
+     * هويّة غير موجودة أصلاً» الذي يحرسه `InventoryService::resolveInventoryState()`.
+     */
+    private function flushPendingInventorySeed(): void
+    {
+        if ($this->pendingQuantityOnHand === null && $this->pendingAvgCost === null) {
+            return;
+        }
+
+        $quantity = $this->pendingQuantityOnHand;
+        $avgCost = $this->pendingAvgCost;
+        $this->pendingQuantityOnHand = null;
+        $this->pendingAvgCost = null;
+
+        if ($this->isVariantManaged()) {
+            return;
+        }
+
+        $state = InventoryState::firstOrNew(['product_id' => $this->id, 'product_variant_id' => null]);
+        $state->tenant_id = $this->tenant_id;
+        if ($quantity !== null) {
+            $state->quantity_on_hand = $quantity;
+        }
+        if ($avgCost !== null) {
+            $state->avg_cost = $avgCost;
+        }
+        $state->save();
     }
 
     /** خيارات المتغيّرات (اللون/المقاس/...) — فارغة لمنتجٍ بسيط. */
