@@ -672,8 +672,8 @@ checked for final confirmation before any merge decision.
 
 - Branch: `claude/var-media-1-variant-media`
 - PR: #814
-- Previous Head SHA: `6e7dac7ab7eab2c5bf88d36f707fe7caac8c6b08` (Round 2's, after report SHA fill-in `2acf6ba`)
-- New Head SHA: filled in below after push.
+- Previous Head SHA: `2acf6ba` (Round 2's, after report SHA fill-in)
+- New Head SHA: `a92e205ebef4ee57e110896005f184e4b45b351f`
 
 ## Scope Check (Round 3)
 
