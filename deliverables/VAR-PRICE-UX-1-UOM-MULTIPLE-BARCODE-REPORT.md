@@ -247,7 +247,11 @@ Variant code.
 ### PostgreSQL
 
 `ProductUnitPriceMultipleBarcodeHttpTest`: **21/21 passed**.
-Full suite: *(filled in below once the background run completes)*.
+Full suite: **3865 passed, 35 failed** — the same 35 pre-existing,
+environment-caused failures as SQLite (missing `bcmath` extension breaking
+`FuelCostBasisService`/`FuelSupplyReceivingTest`; mail/file-scanning
+environment dependencies for `AuthRecoveryTest`/`DocumentCenterSecureIntakeTest`),
+none touching Product/Barcode/UnitPrice/Variant code.
 
 ### Web
 
@@ -331,7 +335,7 @@ this repository's CI composition (`ci.yml`, `web-ci.yml`).
 
 - Branch: `claude/var-price-ux-1-uom-multiple-barcode`
 - Base SHA: `6f8e18b189f64341ebaca0a45af41f1f5c93bdbf`
-- Head SHA: *(recorded after the commit below)*
+- Head SHA: `ccb50b5ffed6d462c65b31c25a6a86442fb3f952` (before the "record head SHA" follow-up commit)
 
 ## Journal Entries (pre-PR protocol)
 
