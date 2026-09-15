@@ -108,6 +108,10 @@ class PurchaseReportService
         if (! empty($filters['product_id'])) {
             $query->whereHas('lines', fn (Builder $lines) => $lines->where('product_id', $filters['product_id']));
         }
+        // VAR-REPORT-1: إضافيٌّ بحت — نفس نمط SalesReportService حرفياً.
+        if (! empty($filters['product_variant_id'])) {
+            $query->whereHas('lines', fn (Builder $lines) => $lines->where('product_variant_id', $filters['product_variant_id']));
+        }
         if (! empty($filters['product_category_id'])) {
             $query->whereHas('lines.product', fn (Builder $product) => $product->where('category_id', $filters['product_category_id']));
         }
@@ -151,11 +155,20 @@ class PurchaseReportService
         return ['rows' => $rows, 'totals' => $this->purchaseTotals($filters)];
     }
 
-    /** @return array{rows:array<int,array<string,mixed>>, totals:array<string,int>} */
+    /**
+     * VAR-REPORT-1 — نفس مبدأ `SalesReportService::byProduct()` حرفياً:
+     * الهويّة `product_id` + `product_variant_id`، والتسمية من لقطة السطر
+     * (`purchase_lines.description` — يُملأ بالفعل من `$product?->name`
+     * لحظة الإنشاء فقط في `PurchaseService::createLine()`، لا يُعاد قراءته
+     * لاحقاً؛ هذا الجدول لا يملك عمود اسمٍ منفصلاً، `description` يؤدّي هذا
+     * الدور تاريخياً — لا تصميم جديد هنا) بدل `products.name` الحيّ.
+     *
+     * @return array{rows:array<int,array<string,mixed>>, totals:array<string,int>}
+     */
     private function byProduct(array $filters): array
     {
         $purchaseFilters = $filters;
-        unset($purchaseFilters['product_id'], $purchaseFilters['product_category_id']);
+        unset($purchaseFilters['product_id'], $purchaseFilters['product_category_id'], $purchaseFilters['product_variant_id']);
         $purchaseIds = $this->purchases($purchaseFilters)->select('purchases.id');
 
         $query = PurchaseLine::query()
@@ -165,21 +178,39 @@ class PurchaseReportService
         if (! empty($filters['product_id'])) {
             $query->where('purchase_lines.product_id', $filters['product_id']);
         }
+        if (! empty($filters['product_variant_id'])) {
+            $query->where('purchase_lines.product_variant_id', $filters['product_variant_id']);
+        }
         if (! empty($filters['product_category_id'])) {
             $query->where('products.category_id', $filters['product_category_id']);
         }
 
         $rows = $query
-            ->selectRaw('purchase_lines.product_id as bucket_key, products.name as bucket_label, SUM(purchase_lines.quantity) as quantity, SUM(purchase_lines.line_total) as amount')
-            ->groupBy('purchase_lines.product_id', 'products.name')
+            ->selectRaw('purchase_lines.product_id as bucket_key, purchase_lines.product_variant_id as bucket_variant_id, '
+                .'MAX(purchase_lines.description) as bucket_description, MAX(purchase_lines.variant_descriptor_snapshot) as bucket_variant_descriptor, '
+                .'products.name as bucket_live_name, SUM(purchase_lines.quantity) as quantity, SUM(purchase_lines.line_total) as amount')
+            ->groupBy('purchase_lines.product_id', 'purchase_lines.product_variant_id', 'products.name')
             ->orderByDesc('amount')
             ->get()
-            ->map(fn ($row) => [
-                'key'      => $row->bucket_key === null ? null : (string) $row->bucket_key,
-                'label'    => $row->bucket_label === null || $row->bucket_label === '' ? null : (string) $row->bucket_label,
-                'quantity' => (int) $row->quantity,
-                'amount'   => (int) $row->amount,
-            ])->all();
+            ->map(function ($row) {
+                $name = $row->bucket_description ?: $row->bucket_live_name;
+                $label = $name === null || $name === ''
+                    ? null
+                    : ($row->bucket_variant_descriptor ? "{$name} — {$row->bucket_variant_descriptor}" : $name);
+                $key = $row->bucket_key === null
+                    ? null
+                    : ($row->bucket_variant_id !== null ? "{$row->bucket_key}:{$row->bucket_variant_id}" : (string) $row->bucket_key);
+
+                return [
+                    'key'                => $key,
+                    'label'              => $label,
+                    'product_id'         => $row->bucket_key === null ? null : (string) $row->bucket_key,
+                    'product_variant_id' => $row->bucket_variant_id === null ? null : (string) $row->bucket_variant_id,
+                    'variant_descriptor' => $row->bucket_variant_descriptor,
+                    'quantity'           => (int) $row->quantity,
+                    'amount'             => (int) $row->amount,
+                ];
+            })->all();
 
         return [
             'rows' => $rows,

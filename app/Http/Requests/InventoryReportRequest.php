@@ -28,6 +28,7 @@ class InventoryReportRequest extends FormRequest
             'branch_id' => ['nullable', 'array'],
             'branch_id.*' => ['uuid'],
             'product_id' => ['nullable', 'uuid'],
+            'product_variant_id' => ['nullable', 'uuid'],
             'warehouse_id' => ['nullable', 'uuid'],
             'movement_type' => ['nullable', Rule::in(InventoryReportService::MOVEMENT_TYPES)],
             'operation_type' => ['nullable', Rule::in(StockPermit::TYPES)],

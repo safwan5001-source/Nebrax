@@ -31,6 +31,7 @@ class SalesReportRequest extends FormRequest
             'customer_id'     => ['nullable', 'uuid'],
             'customer_classification_id' => ['nullable', 'uuid'],
             'product_id'      => ['nullable', 'uuid'],
+            'product_variant_id' => ['nullable', 'uuid'],
             'product_category_id' => ['nullable', 'uuid'],
             'classification_id' => ['nullable', 'uuid'],
             'salesperson_id'  => ['nullable', 'uuid'],
