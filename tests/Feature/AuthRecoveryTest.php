@@ -96,7 +96,9 @@ class AuthRecoveryTest extends TestCase
         $this->postJson($this->tenantUrl('alpha', 'forgot-password'), ['email' => 'owner@alpha.test']);
         Mail::assertSent(AuthActionMail::class, function (AuthActionMail $mail) use (&$url): bool { $url = $mail->url; return $mail->action === 'reset'; });
         parse_str((string) parse_url($url, PHP_URL_QUERY), $query);
-        $this->postJson('/api/reset-password', ['token' => $query['token'], 'password' => 'new-password-123', 'password_confirmation' => 'new-password-123'])->assertStatus(422);
+        // مضيف مطلق غير-مستأجر صراحةً: مسار نسبي هنا يرث جذر آخر طلب مُعالَج
+        // (alpha.awj.app أعلاه) عبر مساعد url()، فيُبطل ما يفحصه هذا الاختبار.
+        $this->postJson('http://localhost/api/reset-password', ['token' => $query['token'], 'password' => 'new-password-123', 'password_confirmation' => 'new-password-123'])->assertStatus(422);
     }
 
     /** @test */
