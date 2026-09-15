@@ -547,7 +547,7 @@ prior milestone in this program.
 - Branch: `claude/var-fu-2-document-conversion-return-integrity`
 - PR: VAR-FU-2: Preserve variant identity across document conversions and returns
 - Base SHA: `3794738`
-- Head SHA: يُملأ بعد الدفع.
+- Head SHA: `959c8ae`
 
 ## Final Verdict
 
