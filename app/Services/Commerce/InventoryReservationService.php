@@ -165,13 +165,18 @@ final class InventoryReservationService
     }
 
     /**
-     * مجموع الحجوزات النشطة لمنتج × مخزن — يستهلكه `AvailableToSellService`
+     * مجموع الحجوزات النشطة لهويّةٍ (منتج بسيط، أو متغيّرٌ فعلي عبر
+     * `$variantId` — VAR-COM-1) × مخزن — يستهلكه `AvailableToSellService`
      * حصراً كمصدر `activeReserved`. لا عدّاد مجمَّع مخزَّن يوازيه.
+     *
+     * `$variantId = null` **حصراً** لمنتجٍ بسيط — تصفيةٌ صريحة بـ`IS NULL`،
+     * لا تجميعٌ لكل متغيّرات المنتج معاً، وإلا اختلط حجز متغيّرٍ بشقيقه.
      */
-    public function activeReservedQuantity(string $productId, string $warehouseId): int
+    public function activeReservedQuantity(string $productId, string $warehouseId, ?string $variantId = null): int
     {
         return (int) InventoryReservation::query()
             ->where('product_id', $productId)
+            ->where('product_variant_id', $variantId)
             ->where('warehouse_id', $warehouseId)
             ->where('status', InventoryReservation::STATUS_ACTIVE)
             ->sum('base_quantity');

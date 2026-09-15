@@ -260,9 +260,9 @@ final class ProductReferenceRegistry
     }
 
     /**
-     * سطور المستندات التجارية التي تحمل `product_variant_id` فعلياً (VAR-DOC-1)
-     * — مجموعةٌ فرعية **صريحة** من `BUSINESS_HISTORICAL`، لا كل أعضائه: بعضها
-     * (`CommerceOrderLine` خارج النطاق صراحةً/VAR-COM-1، `FuelSale`،
+     * سطور المستندات التجارية التي تحمل `product_variant_id` فعلياً (VAR-DOC-1
+     * + `CommerceOrderLine` عبر VAR-COM-1) — مجموعةٌ فرعية **صريحة** من
+     * `BUSINESS_HISTORICAL`، لا كل أعضائه: بعضها (`FuelSale`،
      * `InventoryOpeningLine`) لا يحمل هذا العمود إطلاقاً، فتصفيةٌ عامة عبر
      * `inClass()` كانت ستكسر استعلاماً على عمودٍ غير موجود. يستهلكه
      * `ProductVariantService::deleteVariant()` وحده اليوم — حارس حذفٍ حقيقي
@@ -281,6 +281,7 @@ final class ProductReferenceRegistry
             RecurringInvoiceLine::class,
             ProcurementLine::class,
             DeliveryNoteLine::class,
+            CommerceOrderLine::class,
         ];
     }
 }

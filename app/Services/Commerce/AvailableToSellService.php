@@ -56,9 +56,14 @@ final class AvailableToSellService
     ) {}
 
     /**
+     * `$variantId` (VAR-COM-1): `null` حصراً لمنتجٍ بسيط — يقرأ صفّ
+     * `product_warehouse_stock` بـ`product_variant_id IS NULL`. متغيّرٌ فعليٌّ
+     * يقرأ صفّه المستقل الخاص فقط (VAR-INV-1) — لا مخزون أبٍ موازٍ، ولا خلطٌ
+     * بين شقيقين.
+     *
      * @throws RuntimeException إذا كان المنتج أو المخزن غير موجودين لمستأجر السياق الحالي.
      */
-    public function forWarehouse(string $productId, string $warehouseId): AvailableToSellSnapshot
+    public function forWarehouse(string $productId, string $warehouseId, ?string $variantId = null): AvailableToSellSnapshot
     {
         $productExists = Product::query()
             ->withoutGlobalScope(BranchScope::class)
@@ -75,10 +80,11 @@ final class AvailableToSellService
 
         $onHand = (int) (ProductWarehouseStock::query()
             ->where('product_id', $productId)
+            ->where('product_variant_id', $variantId)
             ->where('warehouse_id', $warehouseId)
             ->value('quantity') ?? 0);
 
-        $activeReserved = $this->reservations->activeReservedQuantity($productId, $warehouseId);
+        $activeReserved = $this->reservations->activeReservedQuantity($productId, $warehouseId, $variantId);
 
         return new AvailableToSellSnapshot(
             onHand: $onHand,
