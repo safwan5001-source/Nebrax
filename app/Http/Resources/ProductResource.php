@@ -86,6 +86,10 @@ class ProductResource extends JsonResource
                     'sku' => $variant['sku'],
                     'descriptor' => $variant['descriptor'],
                     'price' => Money::toRiyal((int) $variant['price']),
+                    // VAR-FU-5/GAP-06: غلاف الوسائط المحلول لهذا المتغيّر بعينه
+                    // (ProductMediaGalleryService) — إضافيٌّ فقط، `null` حين لا
+                    // وسائط محلولة (لا سقوط تخمينيّ لصورة شقيقٍ آخر).
+                    'image' => $variant['image'] ?? null,
                 ])->values()
             ),
             // كتالوج POS يطلب الوسائط صراحةً، فتصل أول صورة حقيقية فقط كرابط
