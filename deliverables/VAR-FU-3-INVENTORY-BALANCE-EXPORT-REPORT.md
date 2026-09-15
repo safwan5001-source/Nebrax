@@ -292,7 +292,7 @@ PostgreSQL) to cover the broader suite per the mission's instruction.
   export variant-aware"
 - Base SHA: `5fc13364b56f7b9d3ab5a499d6f15a2d74b107d3` (`origin/main`, matches
   the last confirmed merge — PR #827, VAR-PRICE-UX-1)
-- Head SHA: *(recorded after the commit below)*
+- Head SHA: `b536579907f992d7ffe5c38674ff6d304a4cd320` (before this "record head SHA" follow-up commit)
 
 ## Journal Entries (pre-PR protocol)
 
