@@ -8,12 +8,14 @@ use App\Models\InvoiceLine;
 use App\Models\Partner;
 use App\Models\PosSession;
 use App\Models\PosSessionEvent;
+use App\Models\Product;
 use App\Models\Purchase;
 use App\Models\PurchaseLine;
 use App\Models\ReturnDocument;
 use App\Models\ReturnLine;
 use App\Models\User;
 use App\Services\Pos\PosAuditService;
+use App\Support\DocumentLineVariantResolver;
 use App\Support\Money;
 use App\Support\Settings;
 use Carbon\Carbon;
@@ -179,9 +181,18 @@ class ReturnService
                     throw new RuntimeException('ضريبة سطر المرتجع لا يمكن أن تكون سالبة.');
                 }
 
+                $lineProduct = ! empty($item['product_id']) ? Product::find($item['product_id']) : null;
+                // VAR-DOC-1: منتجٌ متعدد الخيارات يلزمه متغيّرٌ فعلي — لا مسار
+                // إرجاع غامض على الأب. Fail closed.
+                $lineVariant = $lineProduct !== null
+                    ? DocumentLineVariantResolver::resolve($lineProduct, $item['product_variant_id'] ?? null, $return->tenant_id)
+                    : null;
+
                 ReturnLine::create([
                     'return_id'      => $return->id,
                     'product_id'     => $item['product_id'] ?? null,
+                    'product_variant_id' => $lineVariant?->id,
+                    'variant_descriptor_snapshot' => $lineVariant !== null ? DocumentLineVariantResolver::descriptor($lineVariant) : null,
                     'source_line_id' => $item['source_line_id'] ?? null,
                     'description'   => $item['description'] ?? null,
                     'quantity'      => $qty,
@@ -411,7 +422,7 @@ class ReturnService
      */
     protected function postSalesReturn(ReturnDocument $return): ReturnDocument
     {
-        $return->loadMissing('lines.product');
+        $return->loadMissing('lines.product', 'lines.variant');
 
         $subtotal = (int) $return->lines->sum(fn (ReturnLine $line) => (int) $line->line_subtotal - (int) $line->line_discount);
         $taxAmount = (int) $return->lines->sum('line_tax');
@@ -464,8 +475,10 @@ class ReturnService
                 continue;
             }
 
-            // التكلفة بمتوسط اليوم في الحالتين — هو الأساس الذي خرجت به.
-            $unitCost = $product->avg_cost;
+            // VAR-DOC-1: التكلفة والهويّة المستهدفة تتبعان متغيّر السطر حين
+            // يحمله — لا هويّة المنتج البسيط الأب دائماً.
+            $variant = $line->variant;
+            $unitCost = $variant?->avg_cost ?? $product->avg_cost;
             $baseQuantity = $this->returnLineBaseQuantity($line, $sourceLines->get($line->source_line_id));
 
             if ($restock) {
@@ -476,7 +489,7 @@ class ReturnService
                     'branch_id'    => $return->branch_id,
                     'date'         => $return->return_date->toDateString(),
                     'notes'        => "إرجاع عبر المرتجع {$return->number}",
-                ]);
+                ], null, $variant);
             }
             // بلا إرجاع: **لا حركة مخزون إطلاقاً**. إدخالُ بضاعةٍ تالفة بكميةٍ
             // وتكلفةٍ لا وجود لهما على الرفّ يُفسد المتوسط المتحرك، فتخرج كل
@@ -678,7 +691,7 @@ class ReturnService
      */
     protected function postPurchaseReturn(ReturnDocument $return): ReturnDocument
     {
-        $return->loadMissing('lines.product');
+        $return->loadMissing('lines.product', 'lines.variant');
 
         // مرجع سطر الشراء المصدر — عامل التحويل الثابت وقت الشراء، لا حالة
         // قالب الوحدات الحالية. استعلامٌ واحد لكل أسطر المستند لا واحد لكل سطر.
@@ -704,7 +717,8 @@ class ReturnService
             if ($product && $product->track_inventory) {
                 $inventoryCommercialTotal += $commercial;
                 $baseQuantity = $this->purchaseReturnLineBaseQuantity($line, $sourcePurchaseLines->get($line->source_line_id));
-                $inventoryCarryingTotal += $baseQuantity * (int) $product->avg_cost;
+                $lineUnitCost = $line->variant?->avg_cost ?? $product->avg_cost;
+                $inventoryCarryingTotal += $baseQuantity * $lineUnitCost;
             } else {
                 $expenseTotal += $commercial;
             }
@@ -762,10 +776,11 @@ class ReturnService
         foreach ($return->lines as $line) {
             $product = $line->product;
             if ($product && $product->track_inventory && $line->quantity > 0) {
+                $variant = $line->variant;
                 $baseQuantity = $this->purchaseReturnLineBaseQuantity($line, $sourcePurchaseLines->get($line->source_line_id));
                 // إرجاع للمورّد إخراجٌ من المخزون كالبيع، لكن الرصيد المقارن
                 // هو رصيد المخزن المثبت على المرتجع لا إجمالي كل المستودعات.
-                $this->inventory->applyIssue($product, $baseQuantity, (int) $product->avg_cost, [
+                $this->inventory->applyIssue($product, $baseQuantity, $variant?->avg_cost ?? $product->avg_cost, [
                     'source_type'   => ReturnDocument::class,
                     'source_id'     => $return->id,
                     'warehouse_id'  => $return->warehouse_id,
@@ -773,7 +788,7 @@ class ReturnService
                     'enforce_stock' => true,
                     'date'          => $return->return_date->toDateString(),
                     'notes'         => "إرجاع للمورد عبر المرتجع {$return->number}",
-                ]);
+                ], null, $variant);
             }
         }
 

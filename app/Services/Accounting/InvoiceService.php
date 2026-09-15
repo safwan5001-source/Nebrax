@@ -11,6 +11,7 @@ use App\Models\InvoiceLineCostCenterAllocation;
 use App\Models\JournalLine;
 use App\Models\Product;
 use App\Models\User;
+use App\Support\DocumentLineVariantResolver;
 use App\Support\PrintTemplateContract;
 use App\Support\Settings;
 use App\Services\PrintTemplates\PrintTemplateService;
@@ -275,6 +276,7 @@ class InvoiceService
 
             $item = [
                 'product_id' => $line->product_id,
+                'product_variant_id' => $line->product_variant_id,
                 'description' => $line->description,
                 'quantity' => $line->quantity,
                 'unit' => $line->unit_name,
@@ -503,6 +505,11 @@ class InvoiceService
             $lineDisc  = (int) ($item['discount'] ?? 0);
 
             $product = ! empty($item['product_id']) ? Product::find($item['product_id']) : null;
+            // VAR-DOC-1: منتجٌ متعدد الخيارات يلزمه متغيّرٌ فعلي — لا مسار بيع
+            // غامض على الأب. Fail closed، ويعزل المستأجر عن قيمةٍ مرسلة من العميل.
+            $variant = $product !== null
+                ? DocumentLineVariantResolver::resolve($product, $item['product_variant_id'] ?? null, $invoice->tenant_id)
+                : null;
             $precision = $this->linePrecision->fromItem($item, $unitPrice);
 
             // السطر النسبي يحفظ مقدار العرض في البسط/المقام؛ تبقى quantity القديمة
@@ -583,6 +590,7 @@ class InvoiceService
             $lines[] = [
                 'item' => $item,
                 'product' => $product,
+                'variant' => $variant,
                 'qty' => $qty,
                 'unitName' => $unitName,
                 'unitFactor' => $unitFactor,
@@ -621,6 +629,7 @@ class InvoiceService
         foreach ($lines as $index => $ctx) {
             $item = $ctx['item'];
             $product = $ctx['product'];
+            $variant = $ctx['variant'];
             $precision = $ctx['precision'];
 
             // الاقتصاد الفعلي النهائي = صافي السطر ناقص حصته من خصم الرأس —
@@ -641,6 +650,8 @@ class InvoiceService
             $line = InvoiceLine::create([
                 'invoice_id'               => $invoice->id,
                 'product_id'               => $item['product_id'] ?? null,
+                'product_variant_id'       => $variant?->id,
+                'variant_descriptor_snapshot' => $variant !== null ? DocumentLineVariantResolver::descriptor($variant) : null,
                 'product_name_snapshot'    => $product?->name ?? $ctx['description'],
                 'product_sku_snapshot'     => $product?->sku,
                 'product_barcode_snapshot' => $product?->barcode,

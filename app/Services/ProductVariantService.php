@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\PriceListItem;
+use App\Support\ProductReferenceRegistry;
 use App\Models\Product;
 use App\Models\ProductActivity;
 use App\Models\ProductMedia;
@@ -632,6 +633,16 @@ class ProductVariantService
             // سيُسقطها عبر cascadeOnDelete بلا تراجع.
             if ($variant->unitPrices()->exists() || PriceListItem::where('product_variant_id', $variant->id)->exists()) {
                 throw new RuntimeException('لا يمكن حذف هذا المتغيّر لأن له سعراً صريحاً قائماً. عطّله بدلاً من ذلك.');
+            }
+
+            // VAR-DOC-1: مرجعٌ في أي سطر مستندٍ تجاري (فاتورة/مشترى/مرتجع/
+            // إشعار دائن/عرض سعر/فاتورة متكررة/مستند توريد/سند تسليم) تاريخٌ
+            // تجاري حقيقي — يُمنع الحذف فيه بنفس منطق InventoryState/UnitPrices
+            // أعلاه حرفياً، لا استثناءً جديداً.
+            foreach (ProductReferenceRegistry::variantScopedBusinessDocumentLines() as $lineModel) {
+                if ($lineModel::where('product_variant_id', $variant->id)->exists()) {
+                    throw new RuntimeException('لا يمكن حذف هذا المتغيّر لأن له مرجعاً في مستندٍ تجاري. عطّله بدلاً من ذلك.');
+                }
             }
 
             // VAR-MEDIA-1: وسائط المتغيّر الحصرية تابعةٌ مملوكة لا تاريخاً

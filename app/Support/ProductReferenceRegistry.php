@@ -258,4 +258,29 @@ final class ProductReferenceRegistry
     {
         return array_key_exists($model, self::CLASSIFICATION);
     }
+
+    /**
+     * سطور المستندات التجارية التي تحمل `product_variant_id` فعلياً (VAR-DOC-1)
+     * — مجموعةٌ فرعية **صريحة** من `BUSINESS_HISTORICAL`، لا كل أعضائه: بعضها
+     * (`CommerceOrderLine` خارج النطاق صراحةً/VAR-COM-1، `FuelSale`،
+     * `InventoryOpeningLine`) لا يحمل هذا العمود إطلاقاً، فتصفيةٌ عامة عبر
+     * `inClass()` كانت ستكسر استعلاماً على عمودٍ غير موجود. يستهلكه
+     * `ProductVariantService::deleteVariant()` وحده اليوم — حارس حذفٍ حقيقي
+     * fail-closed لأي متغيّرٍ يحمل مرجعاً في أيٍّ من هذه الجداول.
+     *
+     * @return list<class-string>
+     */
+    public static function variantScopedBusinessDocumentLines(): array
+    {
+        return [
+            InvoiceLine::class,
+            PurchaseLine::class,
+            ReturnLine::class,
+            CreditNoteLine::class,
+            QuoteLine::class,
+            RecurringInvoiceLine::class,
+            ProcurementLine::class,
+            DeliveryNoteLine::class,
+        ];
+    }
 }

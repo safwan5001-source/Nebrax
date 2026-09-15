@@ -9,6 +9,7 @@ use App\Models\Partner;
 use App\Models\Product;
 use App\Models\User;
 use App\Models\Warehouse;
+use App\Support\DocumentLineVariantResolver;
 use App\Support\Settings;
 use App\Tenancy\BranchContext;
 use App\Tenancy\TenantContext;
@@ -233,11 +234,15 @@ class DeliveryNoteService
                 throw new RuntimeException('الكمية النسبية تحتاج اسم وحدة عرض صريحاً.');
             }
             [$unitName, $unitFactor] = $this->units->resolve($product, $requestedUnit);
+            $tenantId = app(TenantContext::class)->id();
+            $variant = DocumentLineVariantResolver::resolve($product, $item['product_variant_id'] ?? null, $tenantId);
             $resolved[] = [
-                'tenant_id' => app(TenantContext::class)->id(),
+                'tenant_id' => $tenantId,
                 'branch_id' => $branchId,
                 'line_number' => $position + 1,
                 'product_id' => $product->id,
+                'product_variant_id' => $variant?->id,
+                'variant_descriptor_snapshot' => $variant !== null ? DocumentLineVariantResolver::descriptor($variant) : null,
                 'product_name_snapshot' => $product->name,
                 'product_sku_snapshot' => $product->sku,
                 'product_barcode_snapshot' => $product->barcode,
