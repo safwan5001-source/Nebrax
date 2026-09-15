@@ -57,6 +57,7 @@ class CommerceModuleBoundaryTest extends TestCase
     private const ALLOWED_COMMERCE_API_ROUTES = [
         'api/commerce/workspace/products/{id}/publication',
         'api/commerce/workspace/storefronts',
+        'commerce/v1/storefront',
     ];
 
     /** @test */
