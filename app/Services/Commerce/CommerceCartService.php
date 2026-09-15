@@ -7,6 +7,7 @@ use App\Models\CommerceCartItem;
 use App\Models\CommerceListing;
 use App\Models\Product;
 use App\Models\ProductVariant;
+use App\Models\SalesChannel;
 use App\Models\Tenant;
 use App\Models\UnitTemplateUnit;
 use App\Support\DocumentLineVariantResolver;
@@ -34,10 +35,8 @@ final class CommerceCartService
         }
 
         $context = $this->context();
-        $cart = CommerceCart::query()
+        $cart = $this->scopeToContext(CommerceCart::query(), $context)
             ->where('token_hash', hash('sha256', $rawToken))
-            ->where('storefront_id', $context->storefrontId())
-            ->where('sales_channel_id', $context->salesChannelId())
             ->first();
 
         if ($cart === null) {
@@ -50,10 +49,8 @@ final class CommerceCartService
 
         if ($cart->expires_at->isPast()) {
             return DB::transaction(function () use ($cart, $context): array {
-                $current = CommerceCart::query()
+                $current = $this->scopeToContext(CommerceCart::query(), $context)
                     ->whereKey($cart->id)
-                    ->where('storefront_id', $context->storefrontId())
-                    ->where('sales_channel_id', $context->salesChannelId())
                     ->lockForUpdate()
                     ->first();
 
@@ -86,7 +83,7 @@ final class CommerceCartService
             if ($knownCart === null) {
                 $rawToken = $this->newToken();
                 $cart = CommerceCart::create([
-                    'storefront_id' => $context->storefrontId(),
+                    'storefront_id' => $context->hasStorefront() ? $context->storefrontId() : null,
                     'sales_channel_id' => $context->salesChannelId(),
                     'token_hash' => hash('sha256', $rawToken),
                     'expires_at' => now()->addDays(self::LIFETIME_DAYS),
@@ -338,10 +335,8 @@ final class CommerceCartService
     private function lockUsableCart(string $cartId): CommerceCart
     {
         $context = $this->context();
-        $cart = CommerceCart::query()
+        $cart = $this->scopeToContext(CommerceCart::query(), $context)
             ->whereKey($cartId)
-            ->where('storefront_id', $context->storefrontId())
-            ->where('sales_channel_id', $context->salesChannelId())
             ->where('status', CommerceCart::STATUS_ACTIVE)
             ->where('expires_at', '>', now())
             ->lockForUpdate()
@@ -354,14 +349,55 @@ final class CommerceCartService
         return $cart;
     }
 
+    /**
+     * يقيّد استعلام Cart إلى السياق الموثوق الحالي: مطابقة صريحة لـ`storefront_id`
+     * لمسار الويب (كما كان دائماً)، أو `whereNull('storefront_id')` صراحةً
+     * لمسار الجوال — `whereNull` لا `where(..., null)` لأن الأخيرة تصير
+     * `storefront_id = NULL` في SQL، وهذا شرطٌ لا يتحقق أبداً على أي محرك.
+     * `sales_channel_id` مطابقٌ دائماً في كلا المسارين. راجع
+     * docs/plans/commerce/PR3_GUEST_CART_ARCHITECTURE_RECONCILIATION.md.
+     *
+     * @template TModel of CommerceCart
+     * @param  \Illuminate\Database\Eloquent\Builder<TModel>  $query
+     * @return \Illuminate\Database\Eloquent\Builder<TModel>
+     */
+    private function scopeToContext($query, StorefrontContext $context)
+    {
+        $query->where('sales_channel_id', $context->salesChannelId());
+
+        if ($context->hasStorefront()) {
+            $query->where('storefront_id', $context->storefrontId());
+        } else {
+            $query->whereNull('storefront_id');
+        }
+
+        return $query;
+    }
+
+    /**
+     * السياق الموثوق الحالي — يقبل شكلين حصراً:
+     *  - سياق ويب: `hasStorefront() === true` (كما كان دائماً، بلا تغيير).
+     *  - سياق جوّال: `hasStorefront() === false` **و** القناة المحلولة فعلياً
+     *    من نوع `mobile` — تحقّقٌ إيجابي صريح، لا قبولاً ضمنياً لغياب Storefront
+     *    كحالة عامة ناقصة. المسار المتوارَث `ResolveStorefrontTenant` (تطويري/
+     *    اختباري محض) يُنتج أيضاً `hasStorefront() === false` لكن لقناة `web` —
+     *    فغياب Storefront وحده **لا يكفي** دليلاً على أن هذا سياق جوّال حقيقي؛
+     *    التحقق من نوع القناة نفسها هو الفيصل.
+     */
     private function context(): StorefrontContext
     {
         $context = app(StorefrontContext::class);
         if (! $context->isEstablished()
-            || ! $context->hasStorefront()
             || app(TenantContext::class)->id() !== $context->tenantId()
         ) {
             throw new RuntimeException('لا يوجد سياق متجر موثوق.');
+        }
+
+        if (! $context->hasStorefront()) {
+            $channel = SalesChannel::query()->find($context->salesChannelId());
+            if ($channel === null || $channel->type !== SalesChannel::TYPE_MOBILE) {
+                throw new RuntimeException('لا يوجد سياق متجر موثوق.');
+            }
         }
 
         return $context;
