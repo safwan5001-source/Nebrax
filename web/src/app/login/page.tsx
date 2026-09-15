@@ -106,6 +106,9 @@ export default function LoginPage() {
             {isSubmitting ? <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
             {isSubmitting ? t('submitting') : t('submit')}
           </Button>
+          <Link href="/forgot-password" className="block text-center text-sm font-semibold text-primary hover:underline">
+            {t('forgot_link')}
+          </Link>
         </form>
 
       </section>
