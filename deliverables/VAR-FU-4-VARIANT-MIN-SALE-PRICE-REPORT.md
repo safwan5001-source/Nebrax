@@ -402,7 +402,7 @@ re-run byte-for-byte unmodified and green.
   start — main had moved one commit past the given last-confirmed-merge
   SHA `632ed82c136695983404928940e24d79d00d09a6`/PR #829, via an unrelated
   docs commit #830; confirmed `632ed82c` is an ancestor of this base)
-- Head SHA: *(recorded after the commit below)*
+- Head SHA: `ed2690c0542a509d9c27edc2a5f16b53bfde8291` (before this "record head SHA" follow-up commit)
 
 ## Journal Entries (pre-PR protocol)
 
