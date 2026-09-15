@@ -40,6 +40,10 @@ interface PurchaseRow {
   payments?: number;
   amount?: Money;
   balance?: Money;
+  /** VAR-REPORT-1 — إضافيّان، موجودان فقط في عرض `product`؛ `label` نفسه يحمل الوصف مركَّباً بالفعل. */
+  product_id?: string | null;
+  product_variant_id?: string | null;
+  variant_descriptor?: string | null;
 }
 interface PurchaseTotals {
   purchases?: number;

@@ -37,10 +37,15 @@ class DashboardController extends ApiController
         return response()->json([
             'dimension' => $result['dimension'],
             // الهللات تُحوَّل إلى ريال في طبقة العرض وحدها — كبقية الموارد.
+            // VAR-REPORT-1: product_id/product_variant_id إضافيّان — موجودان
+            // فقط لبُعد `product` (DashboardService::byProductDimension())،
+            // فـ`?? null` يبقي بقية الأبعاد (يوم/فئة/فرع/بائع) بلا أي تغيير.
             'data'      => array_map(fn ($r) => [
-                'key'    => $r['key'],
-                'label'  => $r['label'],
-                'amount' => Money::toRiyal($r['amount']),
+                'key'                => $r['key'],
+                'label'              => $r['label'],
+                'amount'             => Money::toRiyal($r['amount']),
+                'product_id'         => $r['product_id'] ?? null,
+                'product_variant_id' => $r['product_variant_id'] ?? null,
             ], $result['rows']),
         ]);
     }

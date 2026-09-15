@@ -31,6 +31,7 @@ class PurchaseReportRequest extends FormRequest
             'supplier_id'     => ['nullable', 'uuid'],
             'supplier_classification_id' => ['nullable', 'uuid'],
             'product_id'      => ['nullable', 'uuid'],
+            'product_variant_id' => ['nullable', 'uuid'],
             'product_category_id' => ['nullable', 'uuid'],
             'classification_id' => ['nullable', 'uuid'],
             'creator_id'      => ['nullable', 'uuid'],
