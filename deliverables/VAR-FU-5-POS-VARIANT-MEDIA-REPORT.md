@@ -427,7 +427,7 @@ by `allMedia()` still being scoped to `$product->id`).
   media in POS"
 - Base SHA: `dd495dcdabdebc60ebc75ff1c9830e128d62c160` (`origin/main`,
   matches the last confirmed merge — PR #831, VAR-FU-4)
-- Head SHA: *(recorded after the commit below)*
+- Head SHA: `8863dd2fa4c2b48fa3b026ae7435a4e7c2c31e4e` (before this "record head SHA" follow-up commit)
 
 ## Journal Entries (pre-PR protocol)
 
