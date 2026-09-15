@@ -120,13 +120,20 @@ class InventoryBalanceExportTest extends TestCase
         $rows = $this->readXlsx($response);
 
         $this->assertSame(
-            ['رمز الصنف', 'الباركود', 'اسم الصنف', 'الوحدة', 'الكمية', 'متوسط التكلفة', 'قيمة المخزون'],
+            [
+                'رمز الصنف', 'الباركود', 'اسم الصنف', 'الوحدة', 'الكمية', 'متوسط التكلفة', 'قيمة المخزون',
+                // VAR-FU-3/GAP-04: أعمدةٌ إضافيّة في نهاية الترتيب القائم فقط.
+                'معرّف الصنف', 'معرّف المتغيّر', 'وصف المتغيّر',
+            ],
             $rows[0]
         );
         $this->assertSame('100', $this->column($rows, 'الكمية')[0]);
         $this->assertSame('18.50', $this->column($rows, 'متوسط التكلفة')[0]);
         // قيمة المخزون = 100 × 18.50 = 1850.00 (= الكمية × المتوسط بالهللات).
         $this->assertSame('1850.00', $this->column($rows, 'قيمة المخزون')[0]);
+        // منتجٌ بسيط: لا معرّف متغيّر ولا وصف — العمودان فارغان.
+        $this->assertSame('', $this->column($rows, 'معرّف المتغيّر')[0]);
+        $this->assertSame('', $this->column($rows, 'وصف المتغيّر')[0]);
     }
 
     /** @test */
@@ -139,7 +146,7 @@ class InventoryBalanceExportTest extends TestCase
             ->get('/api/inventory/export?scope=all&format=csv&locale=en')->assertOk());
 
         $this->assertSame(
-            ['SKU', 'Barcode', 'Product name', 'Unit', 'Quantity', 'Average cost', 'Inventory value'],
+            ['SKU', 'Barcode', 'Product name', 'Unit', 'Quantity', 'Average cost', 'Inventory value', 'Product ID', 'Variant ID', 'Variant'],
             $rows[0]
         );
     }
