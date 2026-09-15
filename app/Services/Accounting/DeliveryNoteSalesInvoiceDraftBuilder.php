@@ -573,8 +573,12 @@ class DeliveryNoteSalesInvoiceDraftBuilder
                 $decision = $pricing[$line->id];
                 $product = Product::query()->findOrFail($line->product_id);
                 $this->assertPriceDecision($line, $product, $decision, $priceList);
+                // VAR-FU-2 (GAP-07): يدخل المتغيّر في مفتاح التجميع — وإلا اندمج
+                // متغيّران شقيقان من نفس المنتج بنفس الوحدة/السعر في سطر فاتورةٍ
+                // واحد فاقدٍ لهويّة المتغيّر (دمجٌ خاطئ، لا مجرّد فقدان حقل).
                 $key = implode('|', [
                     $line->product_id,
+                    $line->product_variant_id ?? '',
                     $line->unit_name,
                     $line->unit_factor,
                     $decision['unit_price'],
@@ -583,6 +587,8 @@ class DeliveryNoteSalesInvoiceDraftBuilder
                 ]);
                 $groups[$key] ??= [
                     'product' => $product,
+                    // كل سطورٍ ضمن نفس المفتاح تتفق على هذا الحقل حتماً (هو جزءٌ من المفتاح نفسه).
+                    'product_variant_id' => $line->product_variant_id,
                     'unit_name' => $line->unit_name,
                     'unit_factor' => (int) $line->unit_factor,
                     'decision' => $decision,
@@ -603,6 +609,11 @@ class DeliveryNoteSalesInvoiceDraftBuilder
             $baseUnit = $group['unit_name'] === $product->unit && $group['unit_factor'] === 1;
             $invoiceItem = [
                 'product_id' => $product->id,
+                // VAR-FU-2 (GAP-07): هويّة المتغيّر تُنقَل حرفياً من سطر سند
+                // التسليم المصدر — لا استنتاج من الكتالوج الحيّ، ولا اختيارٌ
+                // للعميل؛ `DocumentLineVariantResolver` داخل `InvoiceService::create()`
+                // يبقى الحكم النهائي كما في أي سطر فاتورةٍ آخر.
+                'product_variant_id' => $group['product_variant_id'],
                 'description' => $this->sourceDescription($group['sources'], $groupKey),
                 'unit' => $baseUnit ? null : $group['unit_name'],
                 'unit_price' => $group['decision']['unit_price'],
