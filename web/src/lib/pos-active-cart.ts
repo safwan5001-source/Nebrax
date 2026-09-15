@@ -8,6 +8,10 @@ import type { PosCustomer } from '@/components/pos/customer-picker';
 export interface PosCartLine {
   key: string;
   productId: string | null;
+  /** VAR-POS-1: فارغ لمنتجٍ بسيط، إلزاميّ فعلياً لمنتجٍ متعدد الخيارات. */
+  productVariantId?: string | null;
+  /** VAR-POS-1: لقطة عرض فقط («أسود / كبير») — لا تُستعمل في أي حساب. */
+  variantDescriptor?: string | null;
   description: string;
   sku: string | null;
   unit: string | null;

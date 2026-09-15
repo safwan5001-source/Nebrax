@@ -283,7 +283,7 @@ class PosCheckoutTest extends TestCase
         $customerCatalog = $this->withToken($auth['token'])->getJson("/api/pos/products?partner_id={$customerId}")
             ->assertOk()['data'];
         $shown = collect($customerCatalog)->firstWhere('id', $product['id']);
-        $this->assertSame([['code' => $code, 'unit_name' => 'carton', 'default_quantity' => 5]], $shown['pos_barcodes']);
+        $this->assertSame([['code' => $code, 'unit_name' => 'carton', 'default_quantity' => 5, 'product_variant_id' => null]], $shown['pos_barcodes']);
 
         $cashCatalog = $this->withToken($auth['token'])->getJson('/api/pos/products')->assertOk()['data'];
         $this->assertSame([], collect($cashCatalog)->firstWhere('id', $product['id'])['pos_barcodes']);

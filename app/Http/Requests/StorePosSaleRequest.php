@@ -25,6 +25,9 @@ class StorePosSaleRequest extends FormRequest
             'tax_inclusive'       => ['nullable', 'boolean'],
             'items'               => ['required', 'array', 'min:1'],
             'items.*.product_id'  => ['nullable', 'uuid'],
+            // VAR-POS-1: هويّة المتغيّر الفعلي — إضافيّ، فارغ لمنتجٍ بسيط.
+            // إلزاميّته لمنتجٍ متعدد الخيارات تُفرَض خادمياً في PosService/InvoiceService، لا هنا.
+            'items.*.product_variant_id' => ['nullable', 'uuid'],
             'items.*.description' => ['nullable', 'string'],
             'items.*.quantity'    => ['required', 'integer', 'min:1', 'max:1000000'],
             'items.*.unit'        => ['nullable', 'string', 'max:100'],

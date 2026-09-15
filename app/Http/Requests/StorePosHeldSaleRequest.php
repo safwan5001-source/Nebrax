@@ -20,6 +20,7 @@ class StorePosHeldSaleRequest extends FormRequest
             'tax_inclusive' => ['nullable', 'boolean'],
             'items' => ['required', 'array', 'min:1', 'max:500'],
             'items.*.product_id' => ['nullable', 'uuid'],
+            'items.*.product_variant_id' => ['nullable', 'uuid'],
             'items.*.description' => ['nullable', 'string', 'max:1000'],
             'items.*.sku' => ['nullable', 'string', 'max:255'],
             'items.*.quantity' => ['required', 'integer', 'min:1', 'max:1000000'],

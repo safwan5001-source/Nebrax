@@ -3327,6 +3327,9 @@
   },
   "pos": {
     "pos_title": "Point of sale",
+    "select_variant": "Select variant",
+    "select_variant_hint": "This product has variants — pick the exact combination before adding it to the cart.",
+    "no_sellable_variants": "No sellable variant is available for this product right now.",
     "search_products": "Search by name, barcode or code…",
     "barcode_search": "Barcode search",
     "filter": "Filter",

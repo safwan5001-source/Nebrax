@@ -46,6 +46,7 @@ import { PosShortcuts } from '@/components/pos/pos-shortcuts';
 import { PosPayment, type PaymentSummaryItem, type PosPaymentMethod, type PosTender } from '@/components/pos/pos-payment';
 import { PosExchangeDialog } from '@/components/pos/pos-exchange-dialog';
 import { PosHeldSalesDialog, type PosHeldSale } from '@/components/pos/pos-held-sales-dialog';
+import { PosVariantPickerDialog, type PosVariantPickerOption } from '@/components/pos/pos-variant-picker-dialog';
 import { PosReturnDialog } from '@/components/pos/pos-return-dialog';
 import { PosNumericEditor } from '@/components/pos/pos-numeric-editor';
 import { PosProductTile } from '@/components/pos/pos-product-tile';
@@ -145,7 +146,9 @@ const POS_DEFAULTS: PosConfig = {
 };
 
 interface PosUnit { name: string; factor: number; price: string }
-interface PosBarcode { code: string; unit_name: string; default_quantity: number }
+interface PosBarcode { code: string; unit_name: string; default_quantity: number; product_variant_id?: string | null }
+/** VAR-POS-1: متغيّرٌ فعلي نشِط قابل للبيع — لا يظهر متغيّرٌ معطَّل هنا إطلاقاً. */
+interface PosVariant { id: string; sku: string | null; descriptor: string | null; price: string }
 interface Product {
   id: string;
   sku: string | null;
@@ -154,6 +157,8 @@ interface Product {
   sale_price: string;
   pos_units: PosUnit[];
   pos_barcodes: PosBarcode[];
+  /** VAR-POS-1: متعدد الخيارات حين غير فارغة؛ منتجٌ بسيط يحمل مصفوفةً فارغة. */
+  pos_variants: PosVariant[];
   /**
    * PR-UOM2-3: عرضٌ بحتٌ — يُستعمَل فقط لوسم خيار الوحدة الافتراضية في قائمة
    * اختيار الوحدة بالسطر (`(افتراضي)`). لا يُقرأ في `addProduct`/`pricedUnit`
@@ -736,7 +741,18 @@ export default function PosPage() {
       items: cartState.items.map((line) => {
         if (line.productId === null) return line;
         const product = products.find((item) => item.id === line.productId);
-        const unit = product ? pricedUnit(product, line.unit) : undefined;
+        if (!product) return line;
+
+        // VAR-POS-1: سطر متغيّرٍ يُعاد تسعيره من `pos_variants` بمعرّفه —
+        // لا `pricedUnit` (تسعير الأب). متغيّرٌ لم يعد نشطاً/موجوداً في
+        // الكتالوج الطازج يبقى بسعره المحلي القديم هنا؛ Checkout الخادمي هو
+        // من يرفضه فشلاً مغلَقاً، لا هذا التزامن العرضي البحت.
+        if (line.productVariantId) {
+          const variant = product.pos_variants.find((item) => item.id === line.productVariantId);
+          return variant && variant.price !== line.price ? { ...line, price: variant.price } : line;
+        }
+
+        const unit = pricedUnit(product, line.unit);
         return unit && (unit.name !== line.unit || unit.price !== line.price)
           ? { ...line, unit: unit.name, price: unit.price }
           : line;
@@ -744,15 +760,35 @@ export default function PosPage() {
     })));
   }, [posCfg.allow_unit_price_override, products, updateCarts]);
 
-  function addProduct(p: Product, unitName: string | null = null, quantity = 1): string | null {
-    const unit = pricedUnit(p, unitName);
+  // VAR-POS-1: منتجٌ متعدد الخيارات (`pos_variants` غير فارغة) بلا متغيّرٍ
+  // محدَّد صراحةً يفتح لائحة الاختيار بدل إضافةٍ غامضة على الأب — لا مسار
+  // بيعٍ يتجاوز هذا الحارس (النقر المباشر، البحث السريع، ونتيجة الباركود
+  // التي أخفقت في حلّ متغيّرٍ كلاهما يمرّان عبر نفس الدالة).
+  const [variantPicker, setVariantPicker] = useState<{ product: Product; unitName: string | null; quantity: number } | null>(null);
+
+  function addProduct(p: Product, unitName: string | null = null, quantity = 1, variant: PosVariantPickerOption | null = null): string | null {
+    if (p.pos_variants.length > 0 && !variant) {
+      setVariantPicker({ product: p, unitName, quantity });
+      return null;
+    }
+
+    const unit = variant ? { name: p.pos_units[0]?.name ?? p.sku ?? 'piece', factor: 1, price: variant.price } : pricedUnit(p, unitName);
     if (!unit) return null;
-    const lineKey = `${p.id}:${unit.name}`;
+    const lineKey = `${p.id}:${variant?.id ?? '-'}:${unit.name}`;
     const before = cart.find((line) => line.key === lineKey);
-    setCart((current) => appendPosCartProduct(current, p, unit, quantity));
+    setCart((current) => appendPosCartProduct(current, p, unit, quantity, variant));
     void recordCartForensics('item_added', {
-      item: { product_id: p.id, description: p.name, sku: p.sku, quantity, unit: unit.name, unit_price: riyalToMinor(unit.price) },
-      before: { item: before ? auditLine(before) : null }, after: { item: { product_id: p.id, quantity: (before?.qty ?? 0) + quantity, unit: unit.name } },
+      item: {
+        product_id: p.id,
+        product_variant_id: variant?.id ?? null,
+        description: variant?.descriptor ? `${p.name} — ${variant.descriptor}` : p.name,
+        sku: variant?.sku ?? p.sku,
+        quantity,
+        unit: unit.name,
+        unit_price: riyalToMinor(unit.price),
+      },
+      before: { item: before ? auditLine(before) : null },
+      after: { item: { product_id: p.id, product_variant_id: variant?.id ?? null, quantity: (before?.qty ?? 0) + quantity, unit: unit.name } },
     });
     return lineKey;
   }
@@ -938,6 +974,7 @@ export default function PosPage() {
           tax_inclusive: taxInclusive,
           items: cart.map((line) => ({
             product_id: line.productId,
+            product_variant_id: line.productVariantId ?? null,
             description: line.description,
             sku: line.sku,
             quantity: line.qty,
@@ -966,6 +1003,7 @@ export default function PosPage() {
     restored.items = held.items.map((item, index) => ({
       key: `${restored.id}:${held.id}-${index}`,
       productId: item.product_id,
+      productVariantId: item.product_variant_id ?? null,
       description: item.description ?? '—',
       sku: item.sku,
       unit: item.unit,
@@ -1003,7 +1041,7 @@ export default function PosPage() {
         return false;
       }
 
-      const lineKey = addProduct(match.product, match.unitName, match.quantity);
+      const lineKey = addProduct(match.product, match.unitName, match.quantity, match.variant ?? null);
       if (!lineKey) {
         errorToast(t('scan_error'));
         playPosFeedback('scan_error');
@@ -1279,6 +1317,7 @@ export default function PosPage() {
         const submitOnce = async () => {
           const items = cart.map((l) => ({
             product_id: l.productId,
+            product_variant_id: l.productVariantId ?? null,
             description: l.description,
             quantity: l.qty,
             unit: l.unit,
@@ -1819,7 +1858,10 @@ export default function PosPage() {
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-semibold text-text">{line.description}</div>
-                    {line.productId !== null && units.length > 1 ? (
+                    {/* VAR-POS-1: سطر متغيّرٍ مثبَّتٌ على وحدة الأساس عمداً — الكتالوج
+                        يحلّ سعر المتغيّر لوحدة الأساس فقط اليوم، فتبديل الوحدة هنا
+                        كان سيستعمل تسعير الأب صامتاً. */}
+                    {line.productId !== null && !line.productVariantId && units.length > 1 ? (
                       <select aria-label={tprod('unit')} value={line.unit ?? ''} onChange={(event) => setUnit(line.key, event.target.value)} onClick={(event) => event.stopPropagation()} className="mt-1 min-h-11 max-w-28 rounded border border-border bg-background px-1.5 text-xs text-text outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
                         {units.map((unit) => (
                           <option key={unit.name} value={unit.name}>
@@ -2225,6 +2267,18 @@ export default function PosPage() {
         onClose={() => setRetrieveOpen(false)}
         onResumed={retrieveSale}
         onChanged={refreshHeldCount}
+      />
+
+      <PosVariantPickerDialog
+        open={variantPicker !== null}
+        productName={variantPicker?.product.name ?? null}
+        variants={variantPicker?.product.pos_variants ?? []}
+        onClose={() => setVariantPicker(null)}
+        onSelect={(variant) => {
+          if (!variantPicker) return;
+          addProduct(variantPicker.product, variantPicker.unitName, variantPicker.quantity, variant);
+          setVariantPicker(null);
+        }}
       />
 
       <PosProductQuickView

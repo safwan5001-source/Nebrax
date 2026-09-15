@@ -663,6 +663,7 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::post('pos-devices/{id}/cash-drawer/test/unavailable', [PosDeviceController::class, 'drawerBridgeUnavailable'])->middleware([$perm('pos.cash_drawer.open'), $app('sales.pos')]);
         Route::delete('pos-devices/{id}', [PosDeviceController::class, 'destroy'])->middleware([$perm('company.manage'), $app('sales.pos')]);
         Route::get('pos/products', [PosController::class, 'products'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);
+        Route::post('pos/barcode', [PosController::class, 'resolveBarcode'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);
         // الأدلة التشغيلية للسلة تُسجل في PosSessionEvent القائم ولا تنشئ مستنداً أو قيداً.
         Route::post('pos/carts', [PosAuditController::class, 'createCart'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);
         Route::post('pos/carts/{cartId}/events', [PosAuditController::class, 'recordCartEvent'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);
