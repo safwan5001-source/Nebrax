@@ -6,8 +6,10 @@ use App\Models\CommerceCart;
 use App\Models\CommerceCartItem;
 use App\Models\CommerceListing;
 use App\Models\Product;
+use App\Models\ProductVariant;
 use App\Models\Tenant;
 use App\Models\UnitTemplateUnit;
+use App\Support\DocumentLineVariantResolver;
 use App\Tenancy\BranchScope;
 use App\Tenancy\StorefrontContext;
 use App\Tenancy\TenantContext;
@@ -73,11 +75,11 @@ final class CommerceCartService
     }
 
     /** @return array{cart: CommerceCart, token: ?string, created: bool, data: array<string, mixed>} */
-    public function add(?CommerceCart $knownCart, string $productId, string $unitKey, int $quantity): array
+    public function add(?CommerceCart $knownCart, string $productId, string $unitKey, int $quantity, ?string $variantId = null): array
     {
         $rawToken = null;
 
-        return DB::transaction(function () use ($knownCart, $productId, $unitKey, $quantity, &$rawToken): array {
+        return DB::transaction(function () use ($knownCart, $productId, $unitKey, $quantity, $variantId, &$rawToken): array {
             $context = $this->context();
             $created = false;
 
@@ -94,27 +96,32 @@ final class CommerceCartService
                 $cart = $this->lockUsableCart($knownCart->id);
             }
 
-            $candidate = $this->purchasable($productId, $unitKey, lockEligibility: true);
+            $candidate = $this->purchasable($productId, $unitKey, $variantId, lockEligibility: true);
+            $variant = $candidate['variant'];
 
             $line = CommerceCartItem::query()
                 ->where('cart_id', $cart->id)
                 ->where('product_id', $candidate['product']->id)
+                ->where('product_variant_id', $variant?->id)
                 ->where('unit_key', $candidate['unit_key'])
                 ->lockForUpdate()
                 ->first();
+
+            $nameSnapshot = $this->nameSnapshot($candidate['product'], $variant);
 
             if ($line !== null) {
                 $quantity = $this->safeQuantityAdd($line->quantity, $quantity);
                 $line->update([
                     'quantity' => $quantity,
-                    'product_name_snapshot' => $candidate['product']->name,
+                    'product_name_snapshot' => $nameSnapshot,
                     'unit_name_snapshot' => $candidate['unit_name'],
                 ]);
             } else {
                 CommerceCartItem::create([
                     'cart_id' => $cart->id,
                     'product_id' => $candidate['product']->id,
-                    'product_name_snapshot' => $candidate['product']->name,
+                    'product_variant_id' => $variant?->id,
+                    'product_name_snapshot' => $nameSnapshot,
                     'unit_key' => $candidate['unit_key'],
                     'unit_name_snapshot' => $candidate['unit_name'],
                     'quantity' => $quantity,
@@ -147,7 +154,7 @@ final class CommerceCartService
                 throw new CartNotFoundException('عنصر السلة غير متاح للتحديث.');
             }
 
-            $this->purchasable($line->product_id, $line->unit_key, lockEligibility: true);
+            $this->purchasable($line->product_id, $line->unit_key, $line->product_variant_id, lockEligibility: true);
             $line->update(['quantity' => $quantity]);
             $cart->update(['expires_at' => now()->addDays(self::LIFETIME_DAYS)]);
 
@@ -192,14 +199,18 @@ final class CommerceCartService
             $productName = $line->product_name_snapshot;
             $unitName = $line->unit_name_snapshot;
             $unitPrice = 0;
+            $variantDescriptor = null;
 
             if ($line->product_id !== null) {
                 try {
-                    $resolved = $this->purchasable($line->product_id, $line->unit_key);
+                    $resolved = $this->purchasable($line->product_id, $line->unit_key, $line->product_variant_id);
                     $available = true;
                     $productName = $resolved['product']->name;
                     $unitName = $resolved['unit_name'];
                     $unitPrice = $resolved['amount'];
+                    $variantDescriptor = $resolved['variant'] !== null
+                        ? DocumentLineVariantResolver::descriptor($resolved['variant'])
+                        : null;
                 } catch (PDOException $exception) {
                     throw $exception;
                 } catch (RuntimeException) {
@@ -212,6 +223,8 @@ final class CommerceCartService
             $items[] = [
                 'id' => $line->id,
                 'product_id' => $line->product_id,
+                'product_variant_id' => $line->product_variant_id,
+                'variant_descriptor' => $variantDescriptor,
                 'product_name' => $productName,
                 'unit_key' => $line->unit_key,
                 'unit_name' => $unitName,
@@ -231,8 +244,8 @@ final class CommerceCartService
         ];
     }
 
-    /** @return array{product: Product, unit_key: string, unit_name: string, amount: int} */
-    private function purchasable(string $productId, string $unitKey, bool $lockEligibility = false): array
+    /** @return array{product: Product, variant: ?ProductVariant, unit_key: string, unit_name: string, amount: int} */
+    private function purchasable(string $productId, string $unitKey, ?string $variantId = null, bool $lockEligibility = false): array
     {
         $context = $this->context();
         $productQuery = Product::query()
@@ -256,18 +269,43 @@ final class CommerceCartService
             throw new RuntimeException('المنتج غير متاح للشراء.');
         }
 
+        // فشلٌ مغلَق واحد لا نسخة ثانية: منتجٌ بسيط يرفض متغيّراً صريحاً،
+        // منتجٌ متعدد الخيارات يلزمه متغيّرٌ فعليٌّ نشِط تابعٌ له ولنفس المستأجر
+        // (VAR-DOC-1/VAR-POS-1 السلطة نفسها حرفياً).
+        $variant = DocumentLineVariantResolver::resolve($product, $variantId, $context->tenantId());
+
         [$canonicalKey, $unitName, $resolverUnit] = $this->resolveUnit($product, $unitKey);
-        $price = $this->prices->resolve($product->id, $context->salesChannelId(), null, $resolverUnit, $lockEligibility);
+        $price = $this->prices->resolve(
+            $product->id,
+            $context->salesChannelId(),
+            null,
+            $resolverUnit,
+            $lockEligibility,
+            $variant?->id,
+        );
         if (! $price->resolved || $price->amount === null) {
             throw new RuntimeException('لا يوجد سعر معتمد لهذه الوحدة.');
         }
 
         return [
             'product' => $product,
+            'variant' => $variant,
             'unit_key' => $canonicalKey,
             'unit_name' => $unitName,
             'amount' => $price->amount,
         ];
+    }
+
+    /** لقطة اسم السطر: اسم المنتج، وإن وُجد متغيّرٌ فعلي يُلحَق وصفه الحتمي — نفس اصطلاح POS (VAR-POS-1) حرفياً. */
+    private function nameSnapshot(Product $product, ?ProductVariant $variant): string
+    {
+        if ($variant === null) {
+            return $product->name;
+        }
+
+        $descriptor = DocumentLineVariantResolver::descriptor($variant);
+
+        return $descriptor === null ? $product->name : "{$product->name} — {$descriptor}";
     }
 
     /** @return array{string, string, ?string} */

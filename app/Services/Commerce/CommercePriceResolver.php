@@ -10,6 +10,7 @@ use App\Services\Accounting\PosCustomerPriceListResolver;
 use App\Services\Accounting\UnitConversion;
 use App\Services\PriceListService;
 use App\Services\ProductPricingService;
+use App\Support\DocumentLineVariantResolver;
 use App\Support\Settings;
 use App\Tenancy\BranchScope;
 use App\Tenancy\TenantContext;
@@ -72,8 +73,15 @@ final class CommercePriceResolver
      * `Product.sale_price` (وحدة أساس بلا قائمة سعر مطابقة): ذاك يبقى بلا أي
      * استعلام أو قفل إضافي، كما كان قبل هذا الخيار.
      *
-     * @throws RuntimeException المنتج/القناة/العميل غير موجودين لمستأجر السياق
-     *                          الحالي، أو وحدة غير معرَّفة على قالب وحدات المنتج.
+     * `$variantId`: VAR-COM-1 — `null` لمنتجٍ بسيط (السلوك الحالي حرفياً، لا
+     * تغيير). لمنتجٍ متعدد الخيارات، متغيّرٌ فعليٌّ محلولٌ عبر
+     * `DocumentLineVariantResolver::resolve()` — نفس سلطة VAR-DOC-1/VAR-POS-1
+     * الوحيدة (فشلٌ مغلَق: انتماءٌ للمنتج، عزل مستأجر، نشاطٌ تجاري)، لا نسخة
+     * تحقّقٍ ثانية هنا.
+     *
+     * @throws RuntimeException المنتج/القناة/العميل/المتغيّر غير صالحين
+     *                          لمستأجر السياق الحالي، أو وحدة غير معرَّفة على
+     *                          قالب وحدات المنتج.
      */
     public function resolve(
         string $productId,
@@ -81,6 +89,7 @@ final class CommercePriceResolver
         ?string $partnerId = null,
         ?string $unitName = null,
         bool $lockEligibility = false,
+        ?string $variantId = null,
     ): ResolvedCommercePrice {
         $tenantId = app(TenantContext::class)->id();
         if ($tenantId === null) {
@@ -91,6 +100,8 @@ final class CommercePriceResolver
         if ($product === null) {
             throw new RuntimeException('المنتج غير موجود.');
         }
+
+        $variant = DocumentLineVariantResolver::resolve($product, $variantId, $tenantId);
 
         $salesChannel = SalesChannel::query()->whereKey($salesChannelId)->first();
         if ($salesChannel === null) {
@@ -118,11 +129,25 @@ final class CommercePriceResolver
 
             $priceList = $channelPriceList->is_active ? $channelPriceList : null;
         }
-        $listPrice = $priceList ? $this->priceLists->resolve($priceList, $product, $unitName, $lockEligibility) : null;
+        $listPrice = $priceList
+            ? $this->priceLists->resolve($priceList, $product, $unitName, $lockEligibility, $variant)
+            : null;
 
         if ($listPrice !== null) {
             $amount = $listPrice;
             $source = ResolvedCommercePrice::SOURCE_PRICE_LIST;
+        } elseif ($variant !== null) {
+            // VAR-PRICE-1: سعر المتغيّر الصريح ← وإلا سعر المنتج الأساسي لنفس
+            // الوحدة ← وإلا لا سعر — نفس سلطة `resolveSellable()` المستعملة
+            // حرفياً في POS (VAR-POS-1)، بلا تراجعٍ عبر وحداتٍ مختلفة ولا على
+            // شقيقٍ آخر. توحيدٌ واحد لوحدة الأساس والوحدة البديلة معاً — خلافاً
+            // للفرع أدناه، لا حاجة لتمييز `isAlternativeUnit` لأن `resolveSellable()`
+            // تتعامل مع كليهما بنفس الاصطلاح (`null` = وحدة الأساس).
+            $canonicalUnitPrice = $this->pricing->resolveSellable($product, $variant, $unitName);
+            $amount = $canonicalUnitPrice;
+            $source = $canonicalUnitPrice !== null
+                ? ResolvedCommercePrice::SOURCE_PRODUCT_DEFAULT
+                : ResolvedCommercePrice::SOURCE_NONE;
         } elseif (! $isAlternativeUnit) {
             $amount = (int) $product->sale_price;
             $source = ResolvedCommercePrice::SOURCE_PRODUCT_DEFAULT;

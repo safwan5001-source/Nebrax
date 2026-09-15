@@ -11,6 +11,7 @@ use App\Models\Product;
 use App\Models\ProductWarehouseStock;
 use App\Models\UnitTemplateUnit;
 use App\Services\Accounting\UnitConversion;
+use App\Support\DocumentLineVariantResolver;
 use App\Tenancy\BranchScope;
 use App\Tenancy\StorefrontContext;
 use App\Tenancy\TenantContext;
@@ -445,6 +446,17 @@ final class CommerceCheckoutService
                 continue;
             }
 
+            // إعادة تحقّقٍ نهائية من هويّة المتغيّر — قد يكون تعطَّل أو انتمى
+            // لمنتجٍ آخر بين الإضافة للسلة والإتمام؛ لا إعادة تفسيرٍ إلى شقيقٍ
+            // أبداً، فشلٌ مغلَقٌ صريح (VAR-DOC-1/VAR-POS-1 السلطة نفسها).
+            try {
+                $variant = DocumentLineVariantResolver::resolve($product, $item->product_variant_id, $context->tenantId());
+            } catch (RuntimeException) {
+                $failures[] = ['item_id' => $item->id, 'reason' => 'unavailable'];
+
+                continue;
+            }
+
             try {
                 [, , $resolverUnit] = $this->resolveUnit($product, $item->unit_key);
             } catch (RuntimeException) {
@@ -453,7 +465,7 @@ final class CommerceCheckoutService
                 continue;
             }
 
-            $price = $this->prices->resolve($product->id, $context->salesChannelId(), null, $resolverUnit, true);
+            $price = $this->prices->resolve($product->id, $context->salesChannelId(), null, $resolverUnit, true, $variant?->id);
             if (! $price->resolved || $price->amount === null) {
                 $failures[] = ['item_id' => $item->id, 'reason' => 'price_unresolved'];
 
@@ -486,13 +498,17 @@ final class CommerceCheckoutService
                 // أنه يمنع إتمامَي Checkout متنافسين من كليهما رؤية نفس
                 // الكمية والنجاح معاً — لا كتابة هنا تُسلسِلهما ضد بعضهما
                 // (راجع "عقد فحص التوفّر" في توثيق رأس الصنف).
+                // VAR-COM-1: مخزون المتغيّر الفعلي مستقلٌّ عن شقيقه — نفس صفّ
+                // `product_warehouse_stock` الذي وسمته VAR-INV-1 بعمود
+                // `product_variant_id` اختياري؛ `null` صريحاً لمنتجٍ بسيط.
                 $stockRow = ProductWarehouseStock::query()
                     ->where('product_id', $product->id)
+                    ->where('product_variant_id', $variant?->id)
                     ->where('warehouse_id', $warehouse->id)
                     ->lockForUpdate()
                     ->first();
                 $onHand = (int) ($stockRow->quantity ?? 0);
-                $activeReserved = $this->reservations->activeReservedQuantity($product->id, $warehouse->id);
+                $activeReserved = $this->reservations->activeReservedQuantity($product->id, $warehouse->id, $variant?->id);
                 $available = max(0, $onHand - $activeReserved);
                 $baseQuantity = $item->quantity * max(1, $unitFactor);
 
@@ -505,6 +521,8 @@ final class CommerceCheckoutService
 
             $lines[] = [
                 'product_id' => $product->id,
+                'product_variant_id' => $variant?->id,
+                'variant_descriptor_snapshot' => $variant !== null ? DocumentLineVariantResolver::descriptor($variant) : null,
                 'product_name_snapshot' => $product->name,
                 'quantity' => $item->quantity,
                 'unit_name' => $snapshotUnitName,
