@@ -49,6 +49,10 @@ class StoreInvoiceRequest extends FormRequest
             'language' => ['nullable', 'string', 'in:ar,en,bilingual'],
             'items'               => ['required', 'array', 'min:1'],
             'items.*.product_id'  => ['nullable', 'uuid'],
+            // VAR-FU-1: تحقّقٌ بنيويّ فقط هنا (nullable+uuid) — عزل المستأجر/
+            // انتماء المنتج/إلزامية المتغيّر للمنتج متعدد الخيارات كلها سلطة
+            // `DocumentLineVariantResolver` (VAR-DOC-1) داخل الخدمة، لا هنا.
+            'items.*.product_variant_id' => ['nullable', 'uuid'],
             'items.*.discount'    => ['nullable', 'integer', 'min:0', 'max:100000000000'], // هللات — خصم على مستوى السطر
             // لا يمر السبب وحده: الخدمة تطلبه فقط إن خالف السعر الصافي الحد
             // وسياسة المبيعات مفعّلة، ثم تتحقق من صلاحية الفاعل الفعلية.

@@ -26,6 +26,9 @@ class StoreCreditNoteRequest extends FormRequest
             'original_invoice_id' => ['nullable', 'uuid'],
             'items'               => ['required', 'array', 'min:1'],
             'items.*.product_id'  => ['nullable', 'uuid'],
+            // VAR-FU-1: تحقّقٌ بنيويّ فقط — `DocumentLineVariantResolver` (VAR-DOC-1)
+            // داخل الخدمة هو السلطة الوحيدة للاعتماد/العزل/الإلزامية.
+            'items.*.product_variant_id' => ['nullable', 'uuid'],
             'items.*.description' => ['nullable', 'string'],
             'items.*.quantity'    => ['required', 'integer', 'min:1', 'max:1000000'],
             'items.*.unit_price'  => ['required', 'integer', 'min:0', 'max:100000000000'], // هللات

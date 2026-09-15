@@ -21,6 +21,9 @@ class StoreDeliveryNoteRequest extends FormRequest
             'notes' => ['nullable', 'string', 'max:5000'],
             'items' => ['required', 'array', 'min:1', 'max:200'],
             'items.*.product_id' => ['required', 'uuid'],
+            // VAR-FU-1: تحقّقٌ بنيويّ فقط — `DocumentLineVariantResolver` (VAR-DOC-1)
+            // داخل الخدمة هو السلطة الوحيدة للاعتماد/العزل/الإلزامية.
+            'items.*.product_variant_id' => ['nullable', 'uuid'],
             'items.*.unit' => ['nullable', 'string', 'max:255'],
             'items.*.quantity' => ['required', 'integer', 'min:1', 'max:1000000'],
             'items.*.quantity_numerator' => ['nullable', 'required_with:items.*.quantity_denominator', 'integer', 'min:1', 'max:1000000'],

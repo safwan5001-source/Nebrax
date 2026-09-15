@@ -48,6 +48,9 @@ class StorePurchaseRequest extends FormRequest
             // **خدمي غير متابَع مخزونياً**، فيبقى ترحيلها إلى 5150 كما هو —
             // لكنها تصير بنداً مُدارَاً يُبحث عنه ويُقاس، لا نصّاً حرّاً.
             'items.*.product_id'  => ['required', 'uuid'],
+            // VAR-FU-1: تحقّقٌ بنيويّ فقط — سلطة الاعتماد/العزل/الإلزامية
+            // كلها في `DocumentLineVariantResolver` (VAR-DOC-1) داخل الخدمة.
+            'items.*.product_variant_id' => ['nullable', 'uuid'],
             'items.*.description' => ['nullable', 'string'],
             'items.*.quantity'    => ['required', 'integer', 'min:1', 'max:1000000'],
             // اسم الوحدة كما في قالب المنتج. الغياب = وحدة الأساس بمعامل ١؛
