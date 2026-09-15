@@ -89,6 +89,10 @@ class QuoteService
 
             $items = $quote->lines->map(fn (QuoteLine $l) => [
                 'product_id'  => $l->product_id,
+                // VAR-FU-2 (GAP-07): هويّة المتغيّر تُنقَل حرفياً من سطر عرض
+                // السعر — لا استنتاج من الكتالوج الحيّ. `DocumentLineVariantResolver`
+                // داخل `InvoiceService::create()` يبقى الحكم النهائي.
+                'product_variant_id' => $l->product_variant_id,
                 'description' => $l->description,
                 'quantity'    => $l->quantity,
                 'unit_price'  => $l->unit_price,
