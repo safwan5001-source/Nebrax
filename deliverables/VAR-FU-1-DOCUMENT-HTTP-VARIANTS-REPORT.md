@@ -478,7 +478,7 @@ documented across every prior milestone in this program.
 - Branch: `claude/var-fu-1-document-http-variants`
 - PR: VAR-FU-1: Complete variant support across ERP document HTTP flows
 - Base SHA: `0b2f9a7c0ece44d9e41c87e2c793c495c62370aa`
-- Head SHA: يُملأ بعد الدفع.
+- Head SHA: `da4e7a4`
 
 ## Final Verdict
 
