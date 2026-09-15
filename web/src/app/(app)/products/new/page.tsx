@@ -23,7 +23,7 @@ import { useProductPublication } from '@/modules/products/use-product-publicatio
 interface Partner { id: string; name: string; type?: string }
 interface Account { id: string; code: string; name: string; type: string; is_group: boolean }
 interface SelectedProductImage { file: File; previewUrl: string }
-interface PendingBarcode { code: string; unit_name: string; default_quantity: string; label: string }
+interface PendingBarcode { code: string; unit_name: string; default_quantity: string; label: string; price: string }
 
 const MAX_PRODUCT_IMAGES = 8;
 const MAX_PRODUCT_IMAGE_SIZE = 5 * 1024 * 1024;
@@ -77,6 +77,7 @@ export default function NewProductPage() {
   const [newBarcodeUnit, setNewBarcodeUnit] = useState('');
   const [newBarcodeQty, setNewBarcodeQty] = useState('1');
   const [newBarcodeLabel, setNewBarcodeLabel] = useState('');
+  const [newBarcodePrice, setNewBarcodePrice] = useState('');
   const { number: suggestedSku } = useNumberPreview('product');
   const productImageUrls = useRef<string[]>([]);
   const publication = useProductPublication();
@@ -151,15 +152,21 @@ export default function NewProductPage() {
       setError(t('barcode_quantity_invalid'));
       return;
     }
+    const priceInput = newBarcodePrice.trim();
+    if (priceInput !== '' && !Number.isFinite(riyalToMinor(priceInput))) {
+      setError(t('unit_price_invalid'));
+      return;
+    }
     setError(null);
     setPendingBarcodes((current) => [
       ...current,
-      { code, unit_name: newBarcodeUnit, default_quantity: String(qty), label: newBarcodeLabel.trim() },
+      { code, unit_name: newBarcodeUnit, default_quantity: String(qty), label: newBarcodeLabel.trim(), price: priceInput },
     ]);
     setNewBarcodeCode('');
     setNewBarcodeUnit('');
     setNewBarcodeQty('1');
     setNewBarcodeLabel('');
+    setNewBarcodePrice('');
   }
 
   function removePendingBarcode(code: string) {
@@ -210,6 +217,13 @@ export default function NewProductPage() {
               default_quantity: Number(item.default_quantity) || 1,
               label: item.label || null,
             })),
+            unit_prices: Array.from(
+              new Map(
+                pendingBarcodes
+                  .filter((item) => item.price.trim() !== '')
+                  .map((item) => [item.unit_name || '', { unit_name: item.unit_name || null, price: riyalToMinor(item.price) }]),
+              ).values(),
+            ),
           },
         });
         productId = created.data.id;
@@ -346,6 +360,10 @@ export default function NewProductPage() {
                     <Label htmlFor="new-barcode-label">{t('barcode_label')}</Label>
                     <Input id="new-barcode-label" value={newBarcodeLabel} onChange={(e) => setNewBarcodeLabel(e.target.value)} disabled={saving} />
                   </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="new-barcode-price">{t('multi_barcode_col_price')}</Label>
+                    <Input id="new-barcode-price" type="text" inputMode="decimal" dir="ltr" className="num text-end" placeholder="0.00" value={newBarcodePrice} onChange={(e) => setNewBarcodePrice(e.target.value)} disabled={saving} />
+                  </div>
                 </div>
                 <div className="flex justify-end">
                   <Button type="button" variant="outline" size="sm" disabled={!newBarcodeCode.trim() || saving} onClick={addPendingBarcode}>
@@ -363,6 +381,7 @@ export default function NewProductPage() {
                           <p className="text-xs text-muted">
                             {item.unit_name ?? t('default_unit_base_option')} · {t('barcode_quantity', { quantity: Number(item.default_quantity) || 1 })}
                             {item.label ? ` · ${item.label}` : ''}
+                            {item.price ? ` · ${formatRiyal(riyalToMinor(item.price))}` : ''}
                           </p>
                         </div>
                         <Button type="button" variant="ghost" size="icon" aria-label={`${t('delete')}: ${item.code}`} disabled={saving} onClick={() => removePendingBarcode(item.code)}>

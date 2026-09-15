@@ -18,6 +18,10 @@ class StoreProductBarcodeRequest extends FormRequest
             'unit_name' => ['nullable', 'string', 'max:255'],
             'default_quantity' => ['nullable', 'integer', 'min:1', 'max:1000000'],
             'label' => ['nullable', 'string', 'max:255'],
+            // VAR-PRICE-UX-1: تحقّقٌ بنيويّ فقط (nullable+uuid) — الانتماء
+            // للمنتج نفسه وعزل المستأجر كلاهما سلطة حارس `ProductBarcode::booted()`
+            // (`saving`)، لا هذا الطلب. راجع نمط VAR-FU-1 نفسه.
+            'product_variant_id' => ['nullable', 'uuid'],
         ];
     }
 }

@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Requests\DestroyProductUnitPriceRequest;
 use App\Http\Requests\ExportProductsRequest;
 use App\Http\Requests\ImportProductsRequest;
 use App\Http\Requests\StoreProductBarcodeRequest;
+use App\Http\Requests\UpdateProductUnitPriceRequest;
 use App\Http\Requests\StoreProductMediaRequest;
 use App\Http\Requests\StoreProductRequest;
 use App\Http\Requests\UpdateProductRequest;
@@ -12,10 +14,13 @@ use App\Http\Resources\ProductActivityResource;
 use App\Http\Resources\ProductBarcodeResource;
 use App\Http\Resources\ProductMediaResource;
 use App\Http\Resources\ProductResource;
+use App\Http\Resources\ProductUnitPriceResource;
 use App\Models\BarcodeRegistryEntry;
 use App\Models\Product;
 use App\Models\ProductBarcode;
 use App\Models\ProductMedia;
+use App\Models\ProductUnitPrice;
+use App\Models\ProductVariant;
 use App\Models\Account;
 use App\Models\Brand;
 use App\Models\Partner;
@@ -26,6 +31,7 @@ use App\Services\DocumentCenter\DocumentStorageService;
 use App\Services\ProductExportService;
 use App\Services\ProductImportService;
 use App\Services\ProductLifecycleService;
+use App\Services\ProductPricingService;
 use App\Services\ProductService;
 use App\Support\ProductListFilters;
 use App\Support\SensitiveCostPolicy;
@@ -45,6 +51,7 @@ class ProductController extends ApiController
         protected ProductExportService $exports,
         protected ProductLifecycleService $lifecycle,
         protected ProductService $products,
+        protected ProductPricingService $pricing,
     ) {}
 
     /**
@@ -284,6 +291,10 @@ class ProductController extends ApiController
                 // الباركودات البديلة المُدخلة مع نموذج الإنشاء تُنشأ داخل نفس المعاملة
                 // فتبقى متناسقة: إما كل شيء يُعتمد أو لا شيء.
                 $this->storePendingBarcodesWithinTransaction($request, $product);
+                // أسعار الوحدة الصريحة (VAR-PRICE-UX-1/GAP-02) — نفس مبدأ
+                // الباركودات أعلاه حرفياً: تُكتب داخل المعاملة نفسها، فلا تنجو
+                // حالة «باركودٌ حُفظ وسعرٌ فشل» أو العكس.
+                $this->storePendingUnitPricesWithinTransaction($request, $product);
 
                 return $product->fresh(['alternateBarcodes']);
             });
@@ -329,9 +340,85 @@ class ProductController extends ApiController
                 'unit_name' => $raw['unit_name'] ?? null,
                 'default_quantity' => $raw['default_quantity'] ?? null,
                 'label' => $raw['label'] ?? null,
+                // منتجٌ جديدٌ قيد الإنشاء بلا متغيّرات بعد عملياً (VAR-CORE-1:
+                // الانتقال لمتعدد الخيارات فعلٌ لاحق)، لكن الحقل يُمرَّر
+                // إضافياً لاتساق العقد لا لأنه مُتوقَّعٌ اليوم.
+                'product_variant_id' => $raw['product_variant_id'] ?? null,
             ]);
         }
 }
+
+    /**
+     * ═════════════════════════════════════════════════════════════════
+     *  أسعار الوحدة الصريحة المُدخلة مع نموذج الإنشاء (VAR-PRICE-UX-1/GAP-02)
+     * ═════════════════════════════════════════════════════════════════
+     *  نفس مبدأ `storePendingBarcodesWithinTransaction()` حرفياً — لا حالة
+     *  انتظار في الـAPI، فتُمرَّر دفعةً واحدة عند الإنشاء وتُكتب داخل نفس
+     *  المعاملة المفتوحة. `product_variant_id` دائماً `null` عملياً عند
+     *  الإنشاء (لا متغيّرات لمنتجٍ جديد بعد)، لكنه يُمرَّر إضافياً لنفس سبب
+     *  الباركودات: اتساق العقد لمن يستهلك هذا المسار لاحقاً.
+     *
+     *  الكتابة عبر `ProductPricingService::setPrice()` حصراً — لا منطق
+     *  تسعير موازٍ هنا.
+     */
+    private function storePendingUnitPricesWithinTransaction(Request $request, Product $product): void
+    {
+        $prices = $request->input('unit_prices');
+        if (! is_array($prices) || $prices === []) {
+            return;
+        }
+
+        foreach ($prices as $raw) {
+            if (! is_array($raw)) {
+                continue;
+            }
+
+            $this->setUnitPriceWithinTransaction($product, $raw);
+        }
+    }
+
+    /**
+     * يحلّ المتغيّر (إن وُجد) ويكتب السعر عبر `ProductPricingService::setPrice()`.
+     * فشلٌ مغلَق صريح على معرّفٍ لا يُحلّ — لا يُعامَل صمتاً كـ«بلا متغيّر».
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function setUnitPriceWithinTransaction(Product $product, array $data): ProductUnitPrice
+    {
+        $priceRaw = $data['price'] ?? null;
+        if (! is_int($priceRaw) && ! ctype_digit((string) $priceRaw)) {
+            abort(422, 'السعر يجب أن يكون عدداً صحيحاً بالهللات.');
+        }
+        $price = (int) $priceRaw;
+        if ($price < 0) {
+            abort(422, 'السعر لا يكون سالباً.');
+        }
+
+        $variant = $this->resolveVariantOrFail($data['product_variant_id'] ?? null);
+        $unitName = isset($data['unit_name']) && $data['unit_name'] !== '' ? (string) $data['unit_name'] : null;
+
+        return $this->pricing->setPrice($product, $variant, $unitName, $price);
+    }
+
+    /**
+     * معرّفٌ غير موجود (أو محجوبٌ بعزل المستأجر) يُرفَض مغلقاً هنا صراحةً —
+     * لا يُترَك لـ`ProductPricingService::assertIdentityConsistent()` وحدها،
+     * لأن تلك تتجاهل `null` باعتباره «منتجٌ بسيط لا متغيّر»، فمعرّفاً خاطئاً
+     * كان سيُصبح صمتاً سعراً على مستوى المنتج الأب بدل الرفض.
+     */
+    private function resolveVariantOrFail(mixed $variantId): ?ProductVariant
+    {
+        if ($variantId === null || $variantId === '') {
+            return null;
+        }
+
+        $variant = ProductVariant::find($variantId);
+        if ($variant === null) {
+            abort(422, 'المتغيّر المحدَّد غير موجود.');
+        }
+
+        return $variant;
+    }
 
     /**
      * ═════════════════════════════════════════════════════════════════
@@ -377,12 +464,16 @@ class ProductController extends ApiController
         }
 
         // الإدراج داخل المعاملة المفتوحة — حدث `ProductBarcode::created`
-        // سيحجز في `barcode_registry` من داخل نفس المكدس.
+        // سيحجز في `barcode_registry` من داخل نفس المكدس. `product_variant_id`
+        // اختياريّ دائماً (VAR-PRICE-UX-1/GAP-03) — انتماؤه للمنتج نفسه
+        // وعزل المستأجر كلاهما يحرسهما `ProductBarcode::booted()` (`saving`)
+        // فلا يتكرّر الفحص هنا.
         return $product->alternateBarcodes()->create([
             'code' => $code,
             'unit_name' => $unitName,
             'default_quantity' => $qty,
             'label' => isset($data['label']) ? trim((string) $data['label']) ?: null : null,
+            'product_variant_id' => $data['product_variant_id'] ?? null,
             'created_by' => $request->user()?->id,
         ]);
 }
@@ -434,7 +525,7 @@ class ProductController extends ApiController
         $product = Product::findOrFail($id);
 
         return ProductBarcodeResource::collection(
-            $product->alternateBarcodes()->latest()->orderByDesc('id')->get()
+            $product->alternateBarcodes()->with('variant.optionValues.option')->latest()->orderByDesc('id')->get()
         )->response();
     }
 
@@ -449,6 +540,7 @@ class ProductController extends ApiController
                 'unit_name' => $data['unit_name'] ?? null,
                 'default_quantity' => $data['default_quantity'] ?? null,
                 'label' => $data['label'] ?? null,
+                'product_variant_id' => $data['product_variant_id'] ?? null,
             ])
         ));
 
@@ -471,6 +563,50 @@ class ProductController extends ApiController
         });
 
         return response()->json(['message' => 'تم حذف الباركود البديل.']);
+    }
+
+    /**
+     * ═════════════════════════════════════════════════════════════════
+     *  أسعار الوحدة الصريحة — قراءة/كتابة/مسح (VAR-PRICE-UX-1/GAP-02)
+     * ═════════════════════════════════════════════════════════════════
+     *  سلطة الكتابة الوحيدة `ProductPricingService`. هذه الطبقة HTTP بحتة —
+     *  لا منطق تسعير هنا (لا تراجع، لا اشتقاقٌ من المعامل). صفوفٌ صريحة
+     *  للمنتج نفسه (`product_variant_id = null`) وكل متغيّرٍ فعليّ له سعرٌ
+     *  خاص — القراءة الواحدة تكفي شاشة «باركود متعدد» لعرض السعر القانوني
+     *  نفسه عبر كل صفوفها المطابقة لنفس الهويّة×الوحدة.
+     */
+    public function indexUnitPrices(string $id): JsonResponse
+    {
+        $product = Product::findOrFail($id);
+
+        return ProductUnitPriceResource::collection(
+            ProductUnitPrice::where('product_id', $product->id)->orderBy('unit_name')->get()
+        )->response();
+    }
+
+    public function storeUnitPrice(UpdateProductUnitPriceRequest $request, string $id): JsonResponse
+    {
+        $product = Product::findOrFail($id);
+        $data = $request->validated();
+
+        $row = $this->domain(fn () => DB::transaction(
+            fn () => $this->setUnitPriceWithinTransaction($product, $data)
+        ));
+
+        return (new ProductUnitPriceResource($row))->response()->setStatusCode(201);
+    }
+
+    /** «لا سعر» بعدها، لا صفرٌ ضمني — نفس عقد `ProductPricingService::clearPrice()`. */
+    public function destroyUnitPrice(DestroyProductUnitPriceRequest $request, string $id): JsonResponse
+    {
+        $product = Product::findOrFail($id);
+        $data = $request->validated();
+        $variant = $this->resolveVariantOrFail($data['product_variant_id'] ?? null);
+        $unitName = isset($data['unit_name']) && $data['unit_name'] !== '' ? (string) $data['unit_name'] : null;
+
+        $this->domain(fn () => $this->pricing->clearPrice($product, $variant, $unitName));
+
+        return response()->json(['message' => 'تم مسح السعر الصريح لهذه الوحدة.']);
     }
 
     public function indexMedia(string $id): JsonResponse

@@ -17,6 +17,7 @@ import { riyalToMinor, formatRiyal, extractInclusiveTax } from '@/lib/money';
 import { getSystemTaxInclusive } from '@/lib/tax';
 import { productUnitForTemplate, type ProductUnitTemplate } from '@/lib/product-unit-template';
 import { ProductPublicationFields } from './product-publication-fields';
+import { ProductMultiBarcodeTable } from './product-multi-barcode-table';
 import { replaceProductPublication } from '@/modules/products/publication';
 import { useProductPublication } from '@/modules/products/use-product-publication';
 
@@ -89,7 +90,6 @@ interface Acct { id: string; code: string; name: string; type: string; is_group:
 /** عنصر قائمة مُدارة (تصنيف/علامة) — الاسم وحده يكفي للاختيار. */
 interface Listed { id: string; name: string }
 interface ProductMedia { id: string; original_name: string; download_url: string; sort_order: number; previewUrl?: string | null }
-interface ProductBarcode { id: string; code: string; unit_name: string | null; default_quantity: number; label: string | null }
 
 const MAX_PRODUCT_IMAGES = 8;
 const MAX_PRODUCT_IMAGE_SIZE = 5 * 1024 * 1024;
@@ -143,13 +143,7 @@ export function ProductDialog({
   const [media, setMedia] = useState<ProductMedia[]>([]);
   const [loadingMedia, setLoadingMedia] = useState(false);
   const [uploadingMedia, setUploadingMedia] = useState(false);
-  const [barcodes, setBarcodes] = useState<ProductBarcode[]>([]);
-  const [loadingBarcodes, setLoadingBarcodes] = useState(false);
-  const [newBarcodeCode, setNewBarcodeCode] = useState('');
-  const [newBarcodeUnit, setNewBarcodeUnit] = useState('');
-  const [newBarcodeQty, setNewBarcodeQty] = useState('1');
-  const [newBarcodeLabel, setNewBarcodeLabel] = useState('');
-  const [savingBarcode, setSavingBarcode] = useState(false);
+  const [variants, setVariants] = useState<{ id: string; descriptor: string }[]>([]);
   const [createdProductId, setCreatedProductId] = useState<string | null>(null);
   const { number: suggestedSku } = useNumberPreview('product', { enabled: open && !product?.id });
   const mediaObjectUrls = useRef<string[]>([]);
@@ -179,18 +173,21 @@ export function ProductDialog({
     }
   }, [product?.id, revokeMediaObjectUrls, t]);
 
-  const loadBarcodes = useCallback(async () => {
-    if (!product?.id) return;
-    setLoadingBarcodes(true);
-    try {
-      const result = await api<{ data: ProductBarcode[] }>(`/products/${product.id}/barcodes`);
-      setBarcodes(result.data);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : t('load_profile_failed'));
-    } finally {
-      setLoadingBarcodes(false);
+  // VAR-PRICE-UX-1: قائمة المتغيّرات النشطة — تُستهلَك فقط لاختيار المتغيّر
+  // في جدول «باركود متعدد» لمنتجٍ متعدد الخيارات؛ فارغةٌ دائماً لمنتجٍ بسيط.
+  const loadVariants = useCallback(async () => {
+    if (!product?.id || product.variant_state !== 'variant_managed') {
+      setVariants([]);
+
+      return;
     }
-  }, [product?.id, t]);
+    try {
+      const result = await api<{ data: { id: string; is_active: boolean; display_name: string }[] }>(`/products/${product.id}/variants`);
+      setVariants(result.data.filter((v) => v.is_active).map((v) => ({ id: v.id, descriptor: v.display_name })));
+    } catch {
+      setVariants([]);
+    }
+  }, [product?.id, product?.variant_state]);
 
   useEffect(() => {
     if (!open) return;
@@ -207,8 +204,8 @@ export function ProductDialog({
       .catch(() => {});
   }, [open]);
   useEffect(() => {
-    if (open && product?.id) { void loadMedia(); void loadBarcodes(); }
-  }, [loadMedia, loadBarcodes, open, product?.id]);
+    if (open && product?.id) { void loadMedia(); void loadVariants(); }
+  }, [loadMedia, loadVariants, open, product?.id]);
   useEffect(() => {
     if (!open) return;
     setCreatedProductId(null);
@@ -296,50 +293,6 @@ export function ProductDialog({
       setError(err instanceof ApiError ? err.message : tc('saveFailed'));
     } finally {
       setSaving(false);
-    }
-  }
-
-  async function addBarcode() {
-    if (!product?.id || !newBarcodeCode.trim() || savingBarcode) return;
-    const qty = newBarcodeQty.trim() === '' ? 1 : Number(newBarcodeQty);
-    if (!Number.isInteger(qty) || qty < 1 || qty > 1000000) {
-      setError(t('barcode_quantity_invalid'));
-      return;
-    }
-    setSavingBarcode(true);
-    setError(null);
-    try {
-      await api(`/products/${product.id}/barcodes`, {
-        method: 'POST',
-        body: {
-          code: newBarcodeCode.trim(),
-          unit_name: newBarcodeUnit || null,
-          default_quantity: qty,
-          label: newBarcodeLabel.trim() || null,
-        },
-      });
-      setNewBarcodeCode('');
-      setNewBarcodeUnit('');
-      setNewBarcodeQty('1');
-      setNewBarcodeLabel('');
-      await loadBarcodes();
-      success(t('barcode_added'));
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : tc('saveFailed'));
-    } finally {
-      setSavingBarcode(false);
-    }
-  }
-
-  async function deleteBarcode(barcode: ProductBarcode) {
-    if (!product?.id || !window.confirm(t('barcode_delete_confirm', { code: barcode.code }))) return;
-    setError(null);
-    try {
-      await api(`/products/${product.id}/barcodes/${barcode.id}`, { method: 'DELETE' });
-      await loadBarcodes();
-      success(t('barcode_deleted'));
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : tc('saveFailed'));
     }
   }
 
@@ -572,62 +525,13 @@ export function ProductDialog({
         />
 
         {product?.id && (
-          <section className="space-y-3 rounded-md border border-border p-3" aria-labelledby="edit-product-barcodes-title">
-            <div>
-              <h3 id="edit-product-barcodes-title" className="text-sm font-medium text-text">{t('alternate_barcodes')}</h3>
-              <p className="mt-1 text-xs leading-relaxed text-muted">{t('alternate_barcodes_hint')}</p>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="new-barcode-code">{t('barcode_code')}</Label>
-                <Input id="new-barcode-code" dir="ltr" className="num" value={newBarcodeCode} onChange={(e) => setNewBarcodeCode(e.target.value)} disabled={savingBarcode} />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="new-barcode-unit">{t('unit')}</Label>
-                <Select id="new-barcode-unit" value={newBarcodeUnit} onChange={(e) => setNewBarcodeUnit(e.target.value)} disabled={savingBarcode}>
-                  <option value="">{t('default_unit_base_option')}</option>
-                  {alternateUnits.map((u) => <option key={u.name} value={u.name}>{u.name}</option>)}
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="new-barcode-qty">{t('barcode_default_quantity')}</Label>
-                <Input id="new-barcode-qty" type="number" min={1} max={1000000} className="num text-end" value={newBarcodeQty} onChange={(e) => setNewBarcodeQty(e.target.value)} disabled={savingBarcode} />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="new-barcode-label">{t('barcode_label')}</Label>
-                <Input id="new-barcode-label" value={newBarcodeLabel} onChange={(e) => setNewBarcodeLabel(e.target.value)} disabled={savingBarcode} />
-              </div>
-            </div>
-            <div className="flex justify-end">
-              <Button type="button" variant="outline" size="sm" disabled={!newBarcodeCode.trim() || savingBarcode} onClick={() => void addBarcode()}>
-                <Plus className="h-4 w-4" strokeWidth={1.7} />{t('add_barcode')}
-              </Button>
-            </div>
-
-            {loadingBarcodes ? (
-              <Skeleton className="h-14 w-full" />
-            ) : barcodes.length === 0 ? (
-              <p className="rounded-md bg-background px-3 py-2 text-sm text-muted">{t('no_alternate_barcodes')}</p>
-            ) : (
-              <ul className="divide-y divide-border rounded-md border border-border">
-                {barcodes.map((item) => (
-                  <li key={item.id} className="flex items-center gap-2 px-3 py-2">
-                    <div className="min-w-0 flex-1">
-                      <p className="num text-sm font-medium text-text" dir="ltr">{item.code}</p>
-                      <p className="text-xs text-muted">
-                        {item.unit_name ?? form.unit} · {t('barcode_quantity', { quantity: item.default_quantity })}
-                        {item.label ? ` · ${item.label}` : ''}
-                      </p>
-                    </div>
-                    <Button type="button" variant="ghost" size="icon" aria-label={`${t('delete')}: ${item.code}`} onClick={() => void deleteBarcode(item)}>
-                      <Trash2 className="h-4 w-4" strokeWidth={1.7} />
-                    </Button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
+          <ProductMultiBarcodeTable
+            productId={product.id}
+            baseUnitName={form.unit || product.unit}
+            alternateUnits={alternateUnits}
+            isVariantManaged={product.variant_state === 'variant_managed'}
+            variants={variants}
+          />
         )}
 
         {product?.id && (

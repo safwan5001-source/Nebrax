@@ -415,6 +415,11 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::get('products/{id}/barcodes', [ProductController::class, 'indexBarcodes'])->middleware($perm('products.view'));
         Route::post('products/{id}/barcodes', [ProductController::class, 'storeBarcode'])->middleware($perm('products.manage'));
         Route::delete('products/{id}/barcodes/{barcodeId}', [ProductController::class, 'destroyBarcode'])->middleware($perm('products.manage'));
+        // VAR-PRICE-UX-1/GAP-02: أسعار الوحدة الصريحة (ProductPricingService) —
+        // نفس صلاحيتَي الباركود حرفياً، لا صلاحية جديدة.
+        Route::get('products/{id}/unit-prices', [ProductController::class, 'indexUnitPrices'])->middleware($perm('products.view'));
+        Route::put('products/{id}/unit-prices', [ProductController::class, 'storeUnitPrice'])->middleware($perm('products.manage'));
+        Route::delete('products/{id}/unit-prices', [ProductController::class, 'destroyUnitPrice'])->middleware($perm('products.manage'));
         Route::get('products/{id}/media', [ProductController::class, 'indexMedia'])->middleware($perm('products.view'));
         Route::post('products/{id}/media', [ProductController::class, 'storeMedia'])->middleware($perm('products.manage'));
         Route::get('products/{id}/media/{mediaId}/download', [ProductController::class, 'downloadMedia'])->middleware($perm('products.view'));
