@@ -346,6 +346,23 @@ class ReturnService
                 throw new RuntimeException('البند المحدَّد لا يخصّ المستند المصدر.');
             }
 
+            // VAR-FU-2 (GAP-08): الهويّة التجارية/المخزنية المُرتجَعة يجب أن
+            // تطابق سطر المصدر المُعلَن **حرفياً** — لا يكفي أن يكون المنتج/
+            // المتغيّر صالحاً بمعزل عن ذلك (شقيقٌ من نفس المنتج، مثلاً). كان
+            // هذا الحقل يمرّ بلا مقارنة أصلاً حتى قبل المتغيّرات — الفحص هنا
+            // صحّةٌ تقنية على مطابقة السطر المُعلَن، لا سياسة عمل، فلا حاجة
+            // لإعدادٍ يُفعِّلها. الهويّة الخالية (منتجٌ بسيط) يجب أن تطابق
+            // خلوّاً، والهويّة المحدَّدة يجب أن تطابق نفس المعرّف تماماً —
+            // مقارنةٌ صارمة بـ`===` لا `==` كي لا يتساوى `null` مع `''`.
+            $itemProductId = $item['product_id'] ?? null;
+            if ($itemProductId !== $sourceLine->product_id) {
+                throw new RuntimeException('منتج بند المرتجع لا يطابق منتج سطر المستند المصدر.');
+            }
+            $itemVariantId = $item['product_variant_id'] ?? null;
+            if ($itemVariantId !== $sourceLine->product_variant_id) {
+                throw new RuntimeException('متغيّر بند المرتجع لا يطابق متغيّر سطر المستند المصدر.');
+            }
+
             // السعر يُسقَّف ولا يُثبَّت: الردّ بأقلّ استردادٌ جزئي مشروع، والردّ
             // بأكثر ممّا قُبض يخلق ربحاً وهمياً في القيد العكسي.
             $price = (int) ($item['unit_price'] ?? 0);
@@ -402,9 +419,16 @@ class ReturnService
                     $this->assertWithinSource(
                         $source,
                         $return->lines()->get()->map(fn ($l) => [
-                            'source_line_id' => $l->source_line_id,
-                            'quantity'       => $l->quantity,
-                            'unit_price'     => $l->unit_price,
+                            'source_line_id'     => $l->source_line_id,
+                            'quantity'           => $l->quantity,
+                            'unit_price'         => $l->unit_price,
+                            // VAR-FU-2 (GAP-08): إعادة الفحص عند الترحيل يجب أن
+                            // تشمل الهويّة أيضاً — وإلا أعاد `assertWithinSource()`
+                            // فحص الكمية/السعر فقط، فتنجو مسوّدتان مُتزامنتان
+                            // بهويّةٍ مُختلَقة من الحاجز الثاني (نفس سبب إعادة
+                            // الفحص أصلاً: منع تجاوز السباق للفحص الأول).
+                            'product_id'         => $l->product_id,
+                            'product_variant_id' => $l->product_variant_id,
                         ])->all(),
                         $return->id
                     );
