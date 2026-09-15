@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\Api\CommerceCategoryController;
+use App\Http\Controllers\Api\CommerceProductController;
 use App\Http\Controllers\Api\CommerceStorefrontController;
 use App\Http\Middleware\AuthenticateApiClient;
 use App\Http\Middleware\EnsureActiveSubscription;
@@ -12,7 +14,8 @@ use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
-| Public/Mobile Commerce API — v1  (PR-1: Skeleton + Identity/Config)
+| Public/Mobile Commerce API — v1  (PR-1: Skeleton + Identity/Config;
+| PR-2: Read-only Catalog)
 |--------------------------------------------------------------------------
 | Loaded via App\Providers\CommerceApiServiceProvider under prefix
 | `commerce/v1`, with its own middleware group and error envelope. Reference:
@@ -52,4 +55,14 @@ Route::middleware([
     EnsureActiveSubscription::class,
 ])->group(function () {
     Route::get('storefront', [CommerceStorefrontController::class, 'show'])->name('storefront.show');
+
+    // PR-2 — read-only catalog. Categories carry no publication/channel gate
+    // (shared browsing structure); products are gated by CommerceListing on
+    // the resolved mobile sales channel, exactly as /store/v1's equivalent
+    // route is gated by the resolved web channel — see CommerceProductController.
+    Route::get('categories', [CommerceCategoryController::class, 'index'])->name('categories.index');
+    Route::get('categories/{id}', [CommerceCategoryController::class, 'show'])->whereUuid('id')->name('categories.show');
+
+    Route::get('products', [CommerceProductController::class, 'index'])->name('products.index');
+    Route::get('products/{id}', [CommerceProductController::class, 'show'])->whereUuid('id')->name('products.show');
 });
