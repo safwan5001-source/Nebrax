@@ -451,7 +451,7 @@ zero failures.
 - Branch: `claude/var-report-1-variant-reporting`
 - PR: VAR-REPORT-1: Variant-aware reporting and analytics
 - Base SHA: `92acb428d60e15d269aede728e10b6d2422fa42c`
-- Head SHA: يُملأ بعد الدفع (انظر رسالة الإغلاق في المحادثة للرابط النهائي).
+- Head SHA: `ce31c96` (سيُحدَّث بعد أي دفعة تالية تحمل هذا التحديث نفسه)
 
 ## Next Step
 
