@@ -3,8 +3,10 @@
 namespace App\Services;
 
 use App\Models\PriceListItem;
+use App\Support\ProductReferenceRegistry;
 use App\Models\Product;
 use App\Models\ProductActivity;
+use App\Models\ProductMedia;
 use App\Models\ProductOption;
 use App\Models\ProductOptionValue;
 use App\Models\ProductVariant;
@@ -19,8 +21,10 @@ use RuntimeException;
  * ═══════════════════════════════════════════════════════════════
  *  VAR-CORE-1 — خدمة خيارات/قيم/متغيّرات المنتج
  * ═══════════════════════════════════════════════════════════════
- *  هذا المسار لا يمسّ مخزوناً ولا تسعيراً ولا وسائط ولا قيداً محاسبياً. يضبط
- *  هوية «التركيبة القابلة للبيع» فقط: خيار ← قيمة ← متغيّر.
+ *  يضبط هوية «التركيبة القابلة للبيع»: خيار ← قيمة ← متغيّر. لا قيداً
+ *  محاسبياً هنا؛ حماية المخزون (VAR-INV-1)، السعر (VAR-PRICE-1)، والوسائط
+ *  (VAR-MEDIA-1) القائمة فعلياً على متغيّرٍ/قيمةٍ هي حراسُ حذفٍ صريحون في
+ *  `deleteVariant()`/`deleteOptionValue()` أدناه، لا منطقٌ محاسبيٌّ جديد هنا.
  *
  *  **هوية التركيبة خادميّة حتماً:** `combination_key` معرّفات قيمٍ مرتّبة
  *  أبجدياً — لا تسلسل عرضٍ ولا نصّ مترجَم. القيد الفريد
@@ -39,8 +43,10 @@ class ProductVariantService
      */
     private const MAX_COMBINATIONS = 500;
 
-    public function __construct(private readonly ProductLifecycleService $lifecycle)
-    {
+    public function __construct(
+        private readonly ProductLifecycleService $lifecycle,
+        private readonly ProductMediaService $media,
+    ) {
     }
 
     // ───────────────────────── خيارات ─────────────────────────
@@ -135,9 +141,16 @@ class ProductVariantService
      * حذفٌ حقيقي مسموحٌ فقط لخيارٍ لا تستعمل أيٌّ من قيمه أي متغيّر. تعطيله
      * (`is_active=false`) هو المسار الآمن لخيارٍ مستعمَل — لا حذف تدريجي.
      */
+    /**
+     * VAR-MEDIA-1: يحذف وسائط كل قيمةٍ تابعة قبل حذف القيم أنفسها بالجملة —
+     * `$option->values()->delete()` استعلامٌ مجمّع لا يمرّ بـ`deleteOptionValue()`
+     * ولا يطلق أي حدث Eloquent لكل صفّ، فلا تُنظَّف ملفات التخزين الفعلية
+     * تلقائياً (صفوف `product_media` تُحذَف عبر `cascadeOnDelete()` فقط).
+     */
     public function deleteOption(ProductOption $option, ?string $userId): void
     {
-        DB::transaction(function () use ($option, $userId) {
+        $mediaFiles = [];
+        DB::transaction(function () use ($option, $userId, &$mediaFiles) {
             $option = ProductOption::lockForUpdate()->findOrFail($option->id);
             $usedCount = DB::table('product_variant_option_values')->where('product_option_id', $option->id)->count();
 
@@ -147,11 +160,16 @@ class ProductVariantService
 
             $product = $option->product;
             $name = $option->name;
+            $mediaFiles = $this->media->collectAndQueueDeletion(ProductMedia::whereIn(
+                'product_option_value_id',
+                $option->values()->pluck('id')
+            ));
             $option->values()->delete();
             $option->delete();
 
             $this->recordActivity($product, 'variant_option_deleted', ['option' => [$name, null]], $userId);
         });
+        $this->media->deleteFiles($mediaFiles);
     }
 
     // ───────────────────────── قيم الخيارات ─────────────────────────
@@ -242,10 +260,18 @@ class ProductVariantService
         });
     }
 
-    /** حذفٌ حقيقي مسموحٌ فقط لقيمةٍ لا يستعملها أي متغيّر. */
+    /**
+     * حذفٌ حقيقي مسموحٌ فقط لقيمةٍ لا يستعملها أي متغيّر.
+     *
+     * VAR-MEDIA-1: وسائط هذه القيمة تابعةٌ مملوكة (لا معنى مستقلّ عنها) —
+     * تُنظَّف صفوفاً وملفاتٍ فعلية معاً، لا تُترك يتيمة. القيد الفريد
+     * `cascadeOnDelete()` على `product_media.product_option_value_id` يكفل
+     * صفوف القاعدة وحدها؛ تنظيف بايتات التخزين الفعلية مسؤولية هذا الصنف.
+     */
     public function deleteOptionValue(ProductOptionValue $value, ?string $userId): void
     {
-        DB::transaction(function () use ($value, $userId) {
+        $mediaFiles = [];
+        DB::transaction(function () use ($value, $userId, &$mediaFiles) {
             $value = ProductOptionValue::lockForUpdate()->findOrFail($value->id);
             $usedCount = DB::table('product_variant_option_values')->where('product_option_value_id', $value->id)->count();
 
@@ -255,10 +281,12 @@ class ProductVariantService
 
             $option = $value->option;
             $label = $value->value;
+            $mediaFiles = $this->media->collectAndQueueDeletion($value->media());
             $value->delete();
 
             $this->recordActivity($option->product, 'variant_option_value_deleted', ['value' => [$label, null]], $userId);
         });
+        $this->media->deleteFiles($mediaFiles);
     }
 
     // ───────────────────────── حالة المنتج (بسيط ⇄ متعدد الخيارات) ─────────────────────────
@@ -585,7 +613,8 @@ class ProductVariantService
      */
     public function deleteVariant(ProductVariant $variant, ?string $userId): void
     {
-        DB::transaction(function () use ($variant, $userId) {
+        $mediaFiles = [];
+        DB::transaction(function () use ($variant, $userId, &$mediaFiles) {
             $variant = ProductVariant::lockForUpdate()->findOrFail($variant->id);
             $product = $variant->product;
             $sku = $variant->sku;
@@ -606,12 +635,28 @@ class ProductVariantService
                 throw new RuntimeException('لا يمكن حذف هذا المتغيّر لأن له سعراً صريحاً قائماً. عطّله بدلاً من ذلك.');
             }
 
+            // VAR-DOC-1: مرجعٌ في أي سطر مستندٍ تجاري (فاتورة/مشترى/مرتجع/
+            // إشعار دائن/عرض سعر/فاتورة متكررة/مستند توريد/سند تسليم) تاريخٌ
+            // تجاري حقيقي — يُمنع الحذف فيه بنفس منطق InventoryState/UnitPrices
+            // أعلاه حرفياً، لا استثناءً جديداً.
+            foreach (ProductReferenceRegistry::variantScopedBusinessDocumentLines() as $lineModel) {
+                if ($lineModel::where('product_variant_id', $variant->id)->exists()) {
+                    throw new RuntimeException('لا يمكن حذف هذا المتغيّر لأن له مرجعاً في مستندٍ تجاري. عطّله بدلاً من ذلك.');
+                }
+            }
+
+            // VAR-MEDIA-1: وسائط المتغيّر الحصرية تابعةٌ مملوكة لا تاريخاً
+            // ولا تهيئةً تجارية حيّة (خلافاً للمخزون/السعر أعلاه) — تُنظَّف لا
+            // تمنع الحذف، بنفس فلسفة `ProductMedia` على مستوى المنتج نفسه.
+            $mediaFiles = $this->media->collectAndQueueDeletion($variant->media());
+
             DB::table('product_variant_option_values')->where('product_variant_id', $variant->id)->delete();
             $variant->delete();
             SkuRegistryEntry::release($sku);
 
             $this->recordActivity($product, 'variant_deleted', ['sku' => [$sku, null]], $userId);
         });
+        $this->media->deleteFiles($mediaFiles);
     }
 
     // ───────────────────────── مساعدات داخلية ─────────────────────────

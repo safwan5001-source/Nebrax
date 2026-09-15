@@ -13,6 +13,8 @@ class ProcurementLineResource extends JsonResource
         return [
             'id'            => $this->id,
             'product_id'    => $this->product_id,
+            'product_variant_id' => $this->product_variant_id,
+            'variant_descriptor' => $this->variant_descriptor_snapshot,
             'description'   => $this->description,
             'quantity'      => $this->quantity,
             'unit_price'    => Money::toRiyal($this->unit_price),

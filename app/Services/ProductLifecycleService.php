@@ -116,14 +116,17 @@ class ProductLifecycleService
             ], $userId);
             // لا تبقى باركودات أو صور لمنتج حُذف فعلياً بلا مراجع. نحفظ
             // قائمة الملفات قبل حذف الصفوف، ثم ننظف التخزين بعد نجاح المعاملة.
-            $media = $product->media()->get(['disk', 'path'])->all();
+            // VAR-MEDIA-1: `allMedia()` لا `media()` — يشمل وسائط قيم الخيارات
+            // أيضاً (لا متغيّر يمكن أن يبقى هنا، `assertNoBlockingReferences()`
+            // يمنع ذلك أعلاه، لكن قيمة خيارٍ غير مستعملة أصلاً ممكنة).
+            $media = $product->allMedia()->get(['disk', 'path'])->all();
             // فضاء الباركود الموحّد أولاً: حذف العلاقة أدناه استعلامٌ مجمّع
             // لا يُطلق حدث Eloquent لكل صفّ، فتحرير التسجيل هنا صراحةً هو
             // الوحيد. مسارٌ لا يُكمِل أصلاً إلا بلا مراجع تاريخية — تحريره
             // آمنٌ دائماً هنا.
             BarcodeRegistryEntry::releaseAllForProduct($product->id);
             $product->alternateBarcodes()->delete();
-            $product->media()->delete();
+            $product->allMedia()->delete();
             // VAR-CORE-1: `ProductVariant` مصنَّف `COMMERCIAL_LIVE` فيمنع هذا
             // المسار من المتابعة أصلاً ما دام للمنتج أي متغيّر — فبهذه اللحظة
             // لا يوجد أي متغيّر، ولا سجلّ SKU مملوكٍ لمتغيّرٍ يخصّه. يبقى تحرير

@@ -289,4 +289,45 @@ class TenantSubdomainAuthTest extends TestCase
             'email' => 'owner@dormant.test', 'password' => 'password123',
         ])->assertStatus(404)->assertJsonMissingPath('token');
     }
+
+    /**
+     * بيئة Railway الحالية تضبط `AWJ_TENANT_BASE_DOMAIN=awjdev.xyz` بدل
+     * `awj.app`. نفس حدود الأمن (حسم صحيح، فشل مغلق، منع العبور) يجب أن
+     * تصمد بلا أي فرق في الكود — العقد مضبوط لا مُثبَّت.
+     *
+     * @test
+     */
+    public function the_same_security_boundary_holds_under_the_configured_railway_domain(): void
+    {
+        config(['tenancy.base_domains' => ['awjdev.xyz']]);
+
+        $a = $this->registerTenant('company-a', 'a@alpha.test');
+        $b = $this->registerTenant('company-b', 'b@beta.test');
+        $this->forgetTenancy();
+
+        // نطاق فرعي صحيح تحت awjdev.xyz يحسم مستأجره الصحيح.
+        $this->postJson('http://company-a.awjdev.xyz/api/login', [
+            'email' => 'a@alpha.test', 'password' => 'password123',
+        ])->assertOk()->assertJsonPath('user.email', 'a@alpha.test');
+
+        // مستأجر غير معروف تحت awjdev.xyz يفشل بإغلاق (404)، لا بتخمين.
+        $this->postJson('http://missing.awjdev.xyz/api/login', [
+            'email' => 'a@alpha.test', 'password' => 'password123',
+        ])->assertStatus(404)->assertJsonMissingPath('token');
+
+        // مستأجر B لا يمكنه الدخول عبر مضيف مستأجر A، حتى ببياناته الصحيحة.
+        $this->postJson('http://company-a.awjdev.xyz/api/login', [
+            'email' => 'b@beta.test', 'password' => 'password123',
+        ])->assertStatus(422)->assertJsonMissingPath('token');
+        $this->assertFalse(app(TenantContext::class)->has());
+
+        // نطاق Railway الحالي (`awj.up.railway.app`) يبقى غير-مستأجر —
+        // التوافق الرجعي مع الدخول الحالي غير المرتبط بنطاق فرعي محفوظ.
+        $this->postJson('http://awj.up.railway.app/api/login', [
+            'email' => 'b@beta.test', 'password' => 'password123',
+        ])->assertOk()->assertJsonPath('user.email', 'b@beta.test');
+        $this->assertFalse(app(HostnameTenantContext::class)->has());
+
+        $this->assertNotSame($a['tenant_id'], $b['tenant_id']);
+    }
 }

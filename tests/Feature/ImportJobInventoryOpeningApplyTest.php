@@ -366,11 +366,6 @@ class ImportJobInventoryOpeningApplyTest extends TestCase
 
         app(TenantContext::class)->set($tenantId);
         $token = $this->tokenForRole($tenantId, 'owner', 'owner@io-lock.test');
-        $warehouse = Warehouse::create(['name' => 'مستودع القفل', 'code' => 'WH-LOCK']);
-        Product::create([
-            'name' => 'صنف القفل', 'sku' => 'SKU-LOCK', 'type' => 'good',
-            'sale_price' => 1000, 'track_inventory' => true,
-        ]);
 
         $file = $this->csv(['sku', 'warehouse', 'opening_quantity', 'opening_unit_cost'], [['SKU-LOCK', 'WH-LOCK', '10', '5.00']]);
         $contents = file_get_contents($file->getRealPath());
@@ -379,6 +374,14 @@ class ImportJobInventoryOpeningApplyTest extends TestCase
         $storagePath = "imports/{$tenantId}/{$jobId}/original.csv";
         Storage::disk('local')->put($storagePath, $contents);
 
+        // `$rival`'s FK-referencing insert must run before any Eloquent write
+        // on the default connection that claims this tenant's SKU-registry
+        // anchor lock (`SkuRegistryEntry::lockTenantAnchor()`, fired from
+        // `Product::create()`'s `saved` hook) — that lock is a real Postgres
+        // `FOR UPDATE` held for the rest of this test's still-open
+        // `RefreshDatabase` transaction, and would otherwise starve `$rival`'s
+        // own `FOR KEY SHARE` FK check on the same tenant row past its
+        // 200ms `lock_timeout`, unrelated to the actual row lock under test.
         $rival->table('import_jobs')->insert([
             'id' => $jobId,
             'tenant_id' => $tenantId,
@@ -396,6 +399,12 @@ class ImportJobInventoryOpeningApplyTest extends TestCase
             'processed_rows' => 0,
             'created_at' => now(),
             'updated_at' => now(),
+        ]);
+
+        $warehouse = Warehouse::create(['name' => 'مستودع القفل', 'code' => 'WH-LOCK']);
+        Product::create([
+            'name' => 'صنف القفل', 'sku' => 'SKU-LOCK', 'type' => 'good',
+            'sale_price' => 1000, 'track_inventory' => true,
         ]);
 
         $blocked = false;

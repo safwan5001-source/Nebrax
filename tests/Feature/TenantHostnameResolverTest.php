@@ -72,4 +72,50 @@ class TenantHostnameResolverTest extends TestCase
         $this->assertSame('alnoor', $this->resolver()->extractSlug('alnoor.localhost'));
         $this->assertNull($this->resolver()->extractSlug('localhost'));
     }
+
+    /**
+     * بيئة Railway الحالية (`*.awjdev.xyz`) تُثبَت عبر نفس عقد
+     * `tenancy.base_domains` — بلا أي حرف `awjdev.xyz` في الكود. تُحاكي هذه
+     * الحالة ضبط `AWJ_TENANT_BASE_DOMAIN=awjdev.xyz` على Railway.
+     *
+     * @test
+     */
+    public function the_configured_railway_base_domain_resolves_tenants_and_rejects_lookalikes(): void
+    {
+        config(['tenancy.base_domains' => ['awjdev.xyz']]);
+
+        // نطاق فرعي صحيح تحت القاعدة المضبوطة.
+        $this->assertSame('alrshd', $this->resolver()->extractSlug('alrshd.awjdev.xyz'));
+
+        // النطاق الأساسي عاريًا (بلا شريحة) ليس مستأجراً.
+        $this->assertNull($this->resolver()->extractSlug('awjdev.xyz'));
+
+        // نطاق Railway القياسي (`awj.up.railway.app`) يجب أن يبقى غير-مستأجر
+        // ما دام غير مطابق للقاعدة المضبوطة — التوافق الرجعي محفوظ.
+        $this->assertNull($this->resolver()->extractSlug('awj.up.railway.app'));
+
+        // نطاقات شبيهة يجب ألا تُقبل كمطابقة للاحقة: لا بادئة بلا نقطة فاصلة،
+        // ولا القاعدة كلاحقة داخل نطاق أبٍ مختلف.
+        $this->assertNull($this->resolver()->extractSlug('evilawjdev.xyz'));
+        $this->assertNull($this->resolver()->extractSlug('awjdev.xyz.evil.com'));
+        $this->assertNull($this->resolver()->extractSlug('notawjdev.xyz'));
+
+        // نطاق الإنتاج المستقبلي (`awj.app`) لا يُقبل ما لم يُضَف صراحةً للقائمة.
+        $this->assertNull($this->resolver()->extractSlug('alrshd.awj.app'));
+    }
+
+    /**
+     * ضبط أكثر من قاعدة معاً (بيئة انتقالية: Railway الحالي + الإنتاج المستقبلي)
+     * يحسم كليهما دون أن يبتلع أحدهما الآخر.
+     *
+     * @test
+     */
+    public function multiple_configured_base_domains_resolve_independently(): void
+    {
+        config(['tenancy.base_domains' => ['awjdev.xyz', 'awj.app']]);
+
+        $this->assertSame('alrshd', $this->resolver()->extractSlug('alrshd.awjdev.xyz'));
+        $this->assertSame('alrshd', $this->resolver()->extractSlug('alrshd.awj.app'));
+        $this->assertNull($this->resolver()->extractSlug('alrshd.example.com'));
+    }
 }
