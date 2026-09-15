@@ -13,6 +13,9 @@ export interface PosVariantDefinition {
   sku: string | null;
   descriptor: string | null;
   price: string;
+  /** VAR-FU-5/GAP-06: نفس هويّة الصورة التي يعرضها اختيار المتغيّر يدوياً —
+   *  كلا المسارين يقرآن من `pos_variants` نفسها، فلا حلٌّ مستقلٌّ هنا. */
+  image?: { download_url: string } | null;
 }
 
 export interface PosBarcodeProduct {

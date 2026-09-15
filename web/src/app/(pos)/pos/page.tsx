@@ -148,7 +148,14 @@ const POS_DEFAULTS: PosConfig = {
 interface PosUnit { name: string; factor: number; price: string }
 interface PosBarcode { code: string; unit_name: string; default_quantity: number; product_variant_id?: string | null }
 /** VAR-POS-1: متغيّرٌ فعلي نشِط قابل للبيع — لا يظهر متغيّرٌ معطَّل هنا إطلاقاً. */
-interface PosVariant { id: string; sku: string | null; descriptor: string | null; price: string }
+interface PosVariant {
+  id: string;
+  sku: string | null;
+  descriptor: string | null;
+  price: string;
+  /** VAR-FU-5/GAP-06: غلاف الوسائط المحلول لهذا المتغيّر (ProductMediaGalleryService). */
+  image?: { download_url: string } | null;
+}
 interface Product {
   id: string;
   sku: string | null;
@@ -2273,6 +2280,7 @@ export default function PosPage() {
         open={variantPicker !== null}
         productName={variantPicker?.product.name ?? null}
         variants={variantPicker?.product.pos_variants ?? []}
+        showImages={posCfg.show_product_images}
         onClose={() => setVariantPicker(null)}
         onSelect={(variant) => {
           if (!variantPicker) return;

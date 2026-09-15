@@ -659,7 +659,12 @@ class ProductController extends ApiController
     public function downloadMedia(string $id, string $mediaId)
     {
         $product = Product::findOrFail($id);
-        $media = $product->media()->whereKey($mediaId)->firstOrFail();
+        // VAR-FU-5/GAP-06: يشمل النطاقات الثلاث معاً (مشتركة/قيمة خيار/متغيّر
+        // حصري) — لا `media()` (مشتركة فقط)، وإلا كانت صورة متغيّرٍ محلولة
+        // (عبر ProductMediaGalleryService) تُعيد ٤٠٤ رغم كونها ملك المنتج
+        // نفسه فعلياً. عزل المستأجر والصلاحية (`products.view`) لا يتغيّران —
+        // كلاهما على مستوى المنتج نفسه (`Product::findOrFail` مُعزول tenant).
+        $media = $product->allMedia()->whereKey($mediaId)->firstOrFail();
         if ($media->disk === 'document') {
             try {
                 $stream = $this->documentStorage->readStream($this->documentStorage->profile(), $media->path);
