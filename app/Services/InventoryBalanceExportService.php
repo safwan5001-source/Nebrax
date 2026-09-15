@@ -3,11 +3,14 @@
 namespace App\Services;
 
 use App\Models\Product;
+use App\Models\ProductVariant;
 use App\Models\ProductWarehouseStock;
+use App\Support\DocumentLineVariantResolver;
 use App\Support\Money;
 use App\Support\SpreadsheetWriter;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Response;
+use Illuminate\Support\Collection;
 use RuntimeException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -20,14 +23,21 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  *  الشاشة (`InventoryBalanceFilters`) ثم يتجاهل التقسيم — فتتطابق دلالة
  *  «النتائج الحالية» مع ما تعرضه الشاشة حرفياً، لا مع صفحتها المرئية.
  *
- *  المصدر منتجٌ عالميّ: `avg_cost` حقلٌ على `products` يبقى متوسطاً واحداً
- *  للمنشأة بلا تغيير — PR-ACL-INVENTORY-CATALOG-EXPORT-SCOPE لا يخترع تكلفة
- *  لكل مخزن (انظر AWJ_INVENTORY_VALUATION_SEMANTICS.md). **الكمية وحدها**
- *  تصبح نطاق المخزن الفعّال للمستخدم المقيَّد: مجموع `product_warehouse_stock`
- *  ضمن مخازنه المسموحة، بدل `products.quantity_on_hand` العالمي. غير المقيَّد
- *  (`allowedWarehouseIds() === null`) يستمر بالعمود العالمي حرفياً — لا خسارة
- *  لكمية مرحلة ما قبل المخازن (حركات بلا `warehouse_id`، انظر §10 من مستند
- *  الدلالات) لأن التوافق الرجعي الكامل يبقيها في `quantity_on_hand` وحده.
+ *  المصدر منتجٌ عالميّ **لمنتجٍ بسيط فقط**: `avg_cost` حقلٌ على `products`
+ *  يبقى متوسطاً واحداً للمنشأة بلا تغيير — PR-ACL-INVENTORY-CATALOG-EXPORT-SCOPE
+ *  لا يخترع تكلفة لكل مخزن (انظر AWJ_INVENTORY_VALUATION_SEMANTICS.md).
+ *  **الكمية وحدها** تصبح نطاق المخزن الفعّال للمستخدم المقيَّد: مجموع
+ *  `product_warehouse_stock` ضمن مخازنه المسموحة، بدل `products.quantity_on_hand`
+ *  العالمي. غير المقيَّد (`allowedWarehouseIds() === null`) يستمر بالعمود
+ *  العالمي حرفياً — لا خسارة لكمية مرحلة ما قبل المخازن (حركات بلا
+ *  `warehouse_id`، انظر §10 من مستند الدلالات) لأن التوافق الرجعي الكامل
+ *  يبقيها في `quantity_on_hand` وحده.
+ *
+ *  **منتجٌ متعدد الخيارات (VAR-FU-3/GAP-04):** لا صفّ للأب إطلاقاً — صفٌّ لكل
+ *  `ProductVariant` فعّالٍ بعينه، وكميته ومتوسط تكلفته من `InventoryState`
+ *  الخاصّة بهذا المتغيّر وحده. يطابق دلالة
+ *  `InventoryReportService::inventoryValue()` (VAR-REPORT-1) حرفياً — لا سلطة
+ *  هويّة مخزونٍ موازية جديدة هنا.
  */
 class InventoryBalanceExportService
 {
@@ -63,6 +73,13 @@ class InventoryBalanceExportService
         'quantity'    => ['ar' => 'الكمية', 'en' => 'Quantity', 'type' => SpreadsheetWriter::TYPE_NUMBER],
         'avg_cost'    => ['ar' => 'متوسط التكلفة', 'en' => 'Average cost', 'type' => SpreadsheetWriter::TYPE_NUMBER],
         'stock_value' => ['ar' => 'قيمة المخزون', 'en' => 'Inventory value', 'type' => SpreadsheetWriter::TYPE_NUMBER],
+        // VAR-FU-3/GAP-04: هويّةٌ صريحة إضافية — المستلم يميّز صفوف متغيّرات
+        // نفس المنتج بلا الاعتماد على `name` وحده (قد يتكرّر حرفياً بين صفوف
+        // متغيّرات نفس المنتج). أعمدةٌ إضافيّة في نهاية الترتيب القائم فقط —
+        // العقد القديم (سبعة أعمدة، منتجٌ بسيط = صفٌّ واحد) يبقى بلا تغيير.
+        'product_id'          => ['ar' => 'معرّف الصنف', 'en' => 'Product ID', 'type' => SpreadsheetWriter::TYPE_TEXT],
+        'product_variant_id'  => ['ar' => 'معرّف المتغيّر', 'en' => 'Variant ID', 'type' => SpreadsheetWriter::TYPE_TEXT],
+        'variant_descriptor'  => ['ar' => 'وصف المتغيّر', 'en' => 'Variant', 'type' => SpreadsheetWriter::TYPE_TEXT],
     ];
 
     /** @return array<int, string> */
@@ -100,16 +117,31 @@ class InventoryBalanceExportService
         // فلترة SQL على `quantity_on_hand` العالمي صحيحة لغير المقيَّد فقط —
         // الكمية المعروضة له هي العمود نفسه. المقيَّد يُستبعد صفره أثناء البث
         // في rows() على الكمية المحدودة النطاق الفعلية، لا هذا العمود.
+        //
+        // VAR-FU-3: منتجٌ `variant_managed` **لا هويّة مخزونٍ بسيطة خاصة به**
+        // — الانضمام في `InventoryBalanceFilters::query()` مقيَّدٌ بـ
+        // `product_variant_id IS NULL`، فيعود NULL له دائماً بلا علاقة بمخزونه
+        // الفعلي عبر متغيّراته. استبعاده هنا بنفس الشرط كان يُسقط كل منتجٍ
+        // متعدد الخيارات من تصديرٍ يستبعد الصفر — فيُستثنى صراحةً من فلترة SQL
+        // هذه، ويُطبَّق استبعاد الصفر لكل متغيّرٍ بعينه في rows() بدلاً منه.
         if (! $includeZero && $warehouseIds === null) {
             // VAR-INV-1: `products.quantity_on_hand` مجمَّد — القراءة من الهويّة
             // البسيطة المضمومة في `InventoryBalanceFilters::query()`.
-            $query->whereRaw('COALESCE(inventory_states.quantity_on_hand, 0) != 0');
+            $query->where(function (Builder $scope): void {
+                $scope->where('products.variant_state', 'variant_managed')
+                    ->orWhereRaw('COALESCE(inventory_states.quantity_on_hand, 0) != 0');
+            });
         }
 
         // السقف يبقى على العدّ العالمي حتى للمقيَّد: تصفية أدق حسب المخزن كانت
         // تحتاج استعلام تجميع إضافي هنا، والعدّ العالمي حدٌّ أعلى آمن — لا يقل
         // أبداً عمّا سيُصدَّر فعلاً، فلا يفلت تصديرٌ كان يجب حجبه.
-        $total = (clone $query)->toBase()->getCountForPagination();
+        //
+        // VAR-FU-3: عدد الصفوف الفعلي لم يعد يساوي عدد المنتجات — منتجٌ متعدد
+        // الخيارات يصدّر صفاً لكل متغيّرٍ فعّال، لا صفاً واحداً. الحدّ الأعلى
+        // يُحسَب من عدد المنتجات البسيطة + عدد المتغيّرات الفعّالة للمنتجات
+        // متعددة الخيارات، فيبقى حداً أعلى آمناً حقيقياً لا مجرد عدّ منتجات.
+        $total = $this->estimatedRowCount($query);
         if ($total > self::MAX_ROWS) {
             throw new RuntimeException(
                 'عدد الأصناف المطلوب تصديره ('.$total.') يتجاوز الحد الأقصى البالغ '.self::MAX_ROWS
@@ -160,13 +192,48 @@ class InventoryBalanceExportService
     }
 
     /**
+     * حدٌّ أعلى آمن على **صفوف** الملف، لا على عدد المنتجات — كل منتجٍ متعدد
+     * الخيارات يصدّر صفاً لكل متغيّرٍ فعّال، لا صفاً واحداً (VAR-FU-3). يُحسب
+     * كـ«عدد المنتجات البسيطة» + «عدد المتغيّرات الفعّالة للمنتجات متعددة
+     * الخيارات المطابقة» — استعلامان إضافيّان خفيفان مرّة واحدة فقط لكل طلب
+     * تصدير، لا لكل صفّ.
+     */
+    private function estimatedRowCount(Builder $query): int
+    {
+        $productTotal = (clone $query)->toBase()->getCountForPagination();
+
+        $variantManagedIds = (clone $query)->toBase()
+            ->where('products.variant_state', 'variant_managed')
+            ->pluck('products.id');
+
+        if ($variantManagedIds->isEmpty()) {
+            return $productTotal;
+        }
+
+        $variantRowCount = ProductVariant::query()
+            ->whereIn('product_id', $variantManagedIds)
+            ->where('is_active', true)
+            ->count();
+
+        return $productTotal - $variantManagedIds->count() + $variantRowCount;
+    }
+
+    /**
      * مرور على دفعات يحترم ترتيب الشاشة. لا `lazyById` (تفرض ترتيباً بالمفتاح
      * فتُسقط الفرزَ المطلوب صامتةً)؛ المتحكّم يضمن ترتيباً حتمياً (عمود الفرز
      * ثم `id`) فالتقسيم بالإزاحة مستقرّ.
      *
      * لكل دفعة، إن كان المستخدم مقيَّداً بمخازن: استعلام تجميع واحد إضافي على
      * `product_warehouse_stock` لمنتجات الدفعة نفسها فقط — يحافظ على نمط
-     * الذاكرة المحدودة (لا تحميل الكتالوج كله لحساب خريطة عالمية).
+     * الذاكرة المحدودة (لا تحميل الكتالوج كله لحساب خريطة عالمية). التجميع
+     * بـ(product_id, product_variant_id) معاً منذ VAR-FU-3 — لا جمع أرصدة
+     * متغيّرات إخوة في دلوٍ واحد كما كان قبلها.
+     *
+     * منتجٌ متعدد الخيارات (VAR-FU-3): لا صفّ للأب إطلاقاً — صفٌّ لكل متغيّرٍ
+     * فعّالٍ بعينه، كميته ومتوسط تكلفته من `InventoryState` الخاصّة به وحده
+     * (`ProductVariant::quantity_on_hand`/`avg_cost`) — لا مجموع الأب المشتقّ
+     * ولا 0 الأب المتحفّظ. يطابق دلالة `InventoryReportService::inventoryValue()`
+     * حرفياً (VAR-REPORT-1) بلا سلطةٍ موازية جديدة.
      *
      * @return \Generator<int, array<int, string|null>>
      */
@@ -177,17 +244,46 @@ class InventoryBalanceExportService
         do {
             $batch = (clone $query)->forPage($page, self::CHUNK)->get();
 
+            $variantManagedProducts = $batch->filter(fn (Product $p) => $p->isVariantManaged());
+            $variantsByProduct = $variantManagedProducts->isEmpty() ? collect() : ProductVariant::query()
+                ->whereIn('product_id', $variantManagedProducts->pluck('id'))
+                ->where('is_active', true)
+                ->with('inventoryState')
+                ->orderBy('sku')
+                ->get()
+                ->groupBy('product_id');
+
             $scopedQuantities = $warehouseIds === null ? null : ProductWarehouseStock::query()
                 ->whereIn('product_id', $batch->pluck('id'))
                 ->whereIn('warehouse_id', $warehouseIds)
-                ->selectRaw('product_id, SUM(quantity) as qty')
+                ->selectRaw('product_id, product_variant_id, SUM(quantity) as qty')
+                ->groupBy('product_id', 'product_variant_id')
+                ->get()
                 ->groupBy('product_id')
-                ->pluck('qty', 'product_id');
+                ->map(fn (Collection $rows) => $rows->keyBy(fn ($row) => $row->product_variant_id ?? ''));
 
             foreach ($batch as $product) {
+                if ($product->isVariantManaged()) {
+                    foreach ($variantsByProduct->get($product->id, collect()) as $variant) {
+                        $quantity = $warehouseIds === null
+                            ? (int) $variant->quantity_on_hand
+                            : (int) ($scopedQuantities?->get($product->id)?->get($variant->id)?->qty ?? 0);
+
+                        // لا استبعاد بـWHERE على منتجٍ متعدد الخيارات (download()
+                        // يسمح بمروره كاملاً) — الصفر يُستبعد هنا لكل متغيّرٍ بعينه.
+                        if (! $includeZero && $quantity === 0) {
+                            continue;
+                        }
+
+                        yield $this->row($product, $variant, $costAuthorized, $quantity);
+                    }
+
+                    continue;
+                }
+
                 $quantity = $warehouseIds === null
                     ? (int) $product->quantity_on_hand
-                    : (int) ($scopedQuantities[$product->id] ?? 0);
+                    : (int) ($scopedQuantities?->get($product->id)?->get('')?->qty ?? 0);
 
                 // استبعاد الصفر هنا لا في WHERE: الكمية المرجعية للمقيَّد هي
                 // المجموع المحدود النطاق، لا `quantity_on_hand` العالمي.
@@ -195,7 +291,7 @@ class InventoryBalanceExportService
                     continue;
                 }
 
-                yield $this->row($product, $costAuthorized, $quantity);
+                yield $this->row($product, null, $costAuthorized, $quantity);
             }
 
             $page++;
@@ -208,18 +304,31 @@ class InventoryBalanceExportService
      * نفس `$quantity × avg_cost` بالهللات ثم تُعرَض ريالاً — فما يجده المستخدم
      * في الملف هو ما يراه في الجدول، ضمن نطاقه.
      *
+     * `$variant`: `null` لمنتجٍ بسيط (كما كان تماماً). لهويّة متغيّرٍ بعينه:
+     * الرمز يفضّل رمز المتغيّر (يطابق `InventoryReportService::inventoryValue()`)،
+     * والمتوسط والكمية من `InventoryState` الخاصّة بهذا المتغيّر وحده — أبداً
+     * لا من الأب. `barcode`/`name`/`unit` تبقى من الأب حرفياً (الباركود الأساسي
+     * والاسم والوحدة ليست هويّةً مخزونيّة مستقلّة للمتغيّر) — عمودا الهويّة
+     * الإضافيان (`product_variant_id`/`variant_descriptor`) هما التمييز، لا
+     * إعادة كتابة `name`.
+     *
      * @return array<int, string|null>
      */
-    private function row(Product $product, bool $costAuthorized, int $quantity): array
+    private function row(Product $product, ?ProductVariant $variant, bool $costAuthorized, int $quantity): array
     {
+        $avgCost = $variant !== null ? (int) $variant->avg_cost : (int) $product->avg_cost;
+
         return [
-            $product->sku,
+            $variant?->sku ?? $product->sku,
             $product->barcode,
             $product->name,
             $product->unit,
             (string) $quantity,
-            $costAuthorized ? Money::toRiyal($product->avg_cost) : null,
-            $costAuthorized ? Money::toRiyal($quantity * $product->avg_cost) : null,
+            $costAuthorized ? Money::toRiyal($avgCost) : null,
+            $costAuthorized ? Money::toRiyal($quantity * $avgCost) : null,
+            (string) $product->id,
+            $variant !== null ? (string) $variant->id : null,
+            $variant !== null ? DocumentLineVariantResolver::descriptor($variant) : null,
         ];
     }
 }
