@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\CommerceCartController;
 use App\Http\Controllers\Api\CommerceCategoryController;
 use App\Http\Controllers\Api\CommerceProductController;
 use App\Http\Controllers\Api\CommerceStorefrontController;
@@ -15,7 +16,7 @@ use Illuminate\Support\Facades\Route;
 /*
 |--------------------------------------------------------------------------
 | Public/Mobile Commerce API — v1  (PR-1: Skeleton + Identity/Config;
-| PR-2: Read-only Catalog)
+| PR-2: Read-only Catalog; PR-3: Guest Cart)
 |--------------------------------------------------------------------------
 | Loaded via App\Providers\CommerceApiServiceProvider under prefix
 | `commerce/v1`, with its own middleware group and error envelope. Reference:
@@ -65,4 +66,34 @@ Route::middleware([
 
     Route::get('products', [CommerceProductController::class, 'index'])->name('products.index');
     Route::get('products/{id}', [CommerceProductController::class, 'show'])->whereUuid('id')->name('products.show');
+
+    // PR-3 — guest cart read. Reuses CommerceCartService in full; identity is
+    // the X-Cart-Token header (see CommerceCartController's own docblock),
+    // never the Authorization header, which already carries the unrelated
+    // ApiClient/Sanctum store token resolved above.
+    Route::get('cart', [CommerceCartController::class, 'show'])->name('cart.show');
+});
+
+/*
+|--------------------------------------------------------------------------
+| PR-3 — guest cart mutations
+|--------------------------------------------------------------------------
+| Same chain as the read group above, with EnforcePublicApiRateLimit:write
+| in place of :read — mirrors /api/v1's own read/write split exactly. No
+| Idempotency-Key requirement: /store/v1's cart mutations have none either
+| (only its checkout does), and AWJ_CART_V1_ARCHITECTURE.md §18 explicitly
+| documents that Cart V1 has no request-level idempotency contract by
+| design — this stays consistent with that, not inventing a new guarantee.
+*/
+Route::middleware([
+    AuthenticateApiClient::class,
+    PublicApiTenantGuard::class,
+    ResolveCommerceChannel::class,
+    PublicApiRequestAudit::class,
+    EnforcePublicApiRateLimit::class . ':' . PublicApiRateLimits::CLASS_WRITE,
+    EnsureActiveSubscription::class,
+])->group(function () {
+    Route::post('cart/items', [CommerceCartController::class, 'store'])->name('cart.items.store');
+    Route::patch('cart/items/{item}', [CommerceCartController::class, 'update'])->whereUuid('item')->name('cart.items.update');
+    Route::delete('cart/items/{item}', [CommerceCartController::class, 'destroy'])->whereUuid('item')->name('cart.items.destroy');
 });
