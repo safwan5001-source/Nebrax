@@ -30,6 +30,7 @@ class StorePosExchangeRequest extends FormRequest
             'replacement.tax_inclusive' => ['nullable', 'boolean'],
             'replacement.items' => ['required', 'array', 'min:1'],
             'replacement.items.*.product_id' => ['nullable', 'uuid'],
+            'replacement.items.*.product_variant_id' => ['nullable', 'uuid'],
             'replacement.items.*.description' => ['nullable', 'string'],
             'replacement.items.*.quantity' => ['required', 'integer', 'min:1', 'max:1000000'],
             // R2 — كانت غائبة عن هذا العقد فتُسقَط صامتة من validated()، فيفقد

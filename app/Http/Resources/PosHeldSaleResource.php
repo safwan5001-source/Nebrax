@@ -22,6 +22,7 @@ class PosHeldSaleResource extends JsonResource
             'tax_inclusive' => (bool) ($payload['tax_inclusive'] ?? false),
             'items' => collect($payload['items'] ?? [])->map(static fn (array $item): array => [
                 'product_id' => $item['product_id'] ?? null,
+                'product_variant_id' => $item['product_variant_id'] ?? null,
                 'description' => $item['description'] ?? null,
                 'sku' => $item['sku'] ?? null,
                 'quantity' => (int) ($item['quantity'] ?? 0),

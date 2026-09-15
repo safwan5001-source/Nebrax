@@ -10,6 +10,7 @@ import { api, ApiError } from '@/lib/api';
 
 export interface PosHeldSaleItem {
   product_id: string | null;
+  product_variant_id?: string | null;
   description: string | null;
   sku: string | null;
   quantity: number;

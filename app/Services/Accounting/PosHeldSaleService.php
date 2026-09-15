@@ -50,6 +50,7 @@ class PosHeldSaleService
                     'tax_inclusive' => (bool) ($data['tax_inclusive'] ?? false),
                     'items' => array_map(static fn (array $item): array => [
                         'product_id' => $item['product_id'] ?? null,
+                        'product_variant_id' => $item['product_variant_id'] ?? null,
                         'description' => $item['description'] ?? null,
                         'sku' => $item['sku'] ?? null,
                         'quantity' => (int) $item['quantity'],

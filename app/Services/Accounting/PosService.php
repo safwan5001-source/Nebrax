@@ -9,12 +9,14 @@ use App\Models\PaymentMethod;
 use App\Models\PosCheckoutAttempt;
 use App\Models\PriceList;
 use App\Models\Product;
+use App\Models\ProductVariant;
 use App\Support\PosSettings;
 use App\Support\Settings;
 use App\Services\Pos\CashDrawerService;
 use App\Services\Pos\PosAuditService;
 use App\Services\Pos\PosIdempotencyConflictException;
 use App\Tenancy\BranchContext;
+use App\Tenancy\TenantContext;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -348,6 +350,9 @@ class PosService
             }
             $items[] = [
                 'product_id' => $item['product_id'] ?? null,
+                // VAR-POS-1: يدخل الشيك — إعادة إرسالٍ بنفس المفتاح لكن بمتغيّرٍ
+                // مختلف يُعامَل كمحتوىً مختلفٍ فيُرفض (409)، لا يُعاد تشغيل صامت.
+                'product_variant_id' => $item['product_variant_id'] ?? null,
                 'description' => $item['description'] ?? null,
                 'quantity' => (int) ($item['quantity'] ?? 0),
                 'unit' => $item['unit'] ?? null,
@@ -483,6 +488,10 @@ class PosService
         $products = Product::whereIn('id', array_values(array_unique(array_filter(array_column($items, 'product_id')))))
             ->get()
             ->keyBy('id');
+        $variantIds = array_values(array_unique(array_filter(array_column($items, 'product_variant_id'))));
+        $variants = $variantIds === [] ? collect() : ProductVariant::whereIn('id', $variantIds)->get()->keyBy('id');
+        $tenantId = app(TenantContext::class)->id();
+
         foreach ($items as $item) {
             $productId = $item['product_id'] ?? null;
             if ($productId === null) {
@@ -490,8 +499,22 @@ class PosService
             }
 
             $product = $products->get($productId);
+
+            // VAR-POS-1: متغيّرٌ مرسلٌ من العميل يُعتمَد هنا فقط إن انتمى فعلاً
+            // لهذا المنتج وهذا المستأجر — وإلا `null` صراحةً، فلا يُحسَب سعرٌ
+            // بمزاوجة خاطئة. المطابقة الحقيقية الملزمة تبقى في
+            // `DocumentLineVariantResolver` داخل `InvoiceService::create()` لاحقاً.
+            $variantId = $item['product_variant_id'] ?? null;
+            $variant = null;
+            if ($variantId !== null && $product !== null) {
+                $candidate = $variants->get($variantId);
+                if ($candidate !== null && $candidate->product_id === $product->id && $candidate->tenant_id === $tenantId) {
+                    $variant = $candidate;
+                }
+            }
+
             $expected = $product
-                ? $this->customerPriceLists->posPriceFor($priceList, $product, $item['unit'] ?? null)
+                ? $this->customerPriceLists->posPriceFor($priceList, $product, $item['unit'] ?? null, $variant)
                 : null;
             if ($expected === null) {
                 throw new RuntimeException('وحدة البيع البديلة تحتاج سعراً صريحاً في قائمة السعر النشطة للعميل.');

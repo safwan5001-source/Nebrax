@@ -299,6 +299,9 @@ class PosReturnService
             $items[] = [
                 'source_line_id' => $line->id,
                 'product_id' => $line->product_id,
+                // VAR-POS-1/VAR-DOC-1: المتغيّر يتبع سطر الفاتورة المصدر
+                // حرفياً — لا يُعاد تفسيره من الكتالوج الحيّ عند الإرجاع.
+                'product_variant_id' => $line->product_variant_id,
                 'description' => $line->description ?? $line->product_name_snapshot,
                 'quantity' => $quantity,
                 // يبقى سعر المصدر لقيد «لا أعلى مما بيع» في ReturnService؛ أما

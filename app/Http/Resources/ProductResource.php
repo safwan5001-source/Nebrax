@@ -74,6 +74,18 @@ class ProductResource extends JsonResource
                     'code' => $barcode['code'],
                     'unit_name' => $barcode['unit_name'],
                     'default_quantity' => (int) $barcode['default_quantity'],
+                    'product_variant_id' => $barcode['product_variant_id'] ?? null,
+                ])->values()
+            ),
+            // VAR-POS-1: متغيّرات المنتج النشطة فقط بسعر وحدة الأساس لكلٍّ
+            // منها — فارغة دائماً لمنتجٍ بسيط. لا تظهر في مورد المنتج العام.
+            'pos_variants' => $this->when(
+                array_key_exists('pos_variants', $this->resource->getAttributes()),
+                collect($this->resource->getAttribute('pos_variants'))->map(fn (array $variant) => [
+                    'id' => $variant['id'],
+                    'sku' => $variant['sku'],
+                    'descriptor' => $variant['descriptor'],
+                    'price' => Money::toRiyal((int) $variant['price']),
                 ])->values()
             ),
             // كتالوج POS يطلب الوسائط صراحةً، فتصل أول صورة حقيقية فقط كرابط

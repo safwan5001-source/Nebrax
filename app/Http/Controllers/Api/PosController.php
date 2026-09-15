@@ -19,6 +19,7 @@ use App\Models\Partner;
 use App\Models\PosExchange;
 use App\Models\Payment;
 use App\Models\Product;
+use App\Models\ProductVariant;
 use App\Models\ReturnDocument;
 use App\Models\ReturnLine;
 use App\Support\Money;
@@ -30,9 +31,12 @@ use App\Services\Accounting\PosCustomerPriceListResolver;
 use App\Services\Accounting\PosHeldSaleService;
 use App\Services\Accounting\PosReturnService;
 use App\Services\Accounting\PosSessionService;
+use App\Services\Pos\PosBarcodeResolver;
 use App\Services\Pos\PosIdempotencyConflictException;
+use App\Support\DocumentLineVariantResolver;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use RuntimeException;
 
 class PosController extends ApiController
 {
@@ -43,6 +47,7 @@ class PosController extends ApiController
         protected PosHeldSaleService $heldSales,
         protected PosSessionService $sessions,
         protected PosCustomerPriceListResolver $customerPriceLists,
+        protected PosBarcodeResolver $barcodeResolver,
     ) {}
 
     /**
@@ -66,10 +71,15 @@ class PosController extends ApiController
             'alternateBarcodes',
             // وسائط المنتج خاصة؛ نحمّلها فقط في كتالوج الكاشير لا في قوائم المنتجات العامة.
             'media' => fn ($query) => $query->orderBy('sort_order')->orderByDesc('created_at'),
+            // VAR-POS-1: المتغيّرات النشطة فقط — لا خيار بيعٍ لمتغيّرٍ معطَّل.
+            'variants' => fn ($query) => $query->where('is_active', true)
+                ->with('optionValues.option'),
         ])
             ->latest()
             ->get();
         $catalogUnits = $this->customerPriceLists->catalogUnitsFor($priceList, $products);
+        $allVariants = $products->flatMap(fn (Product $product) => $product->variants);
+        $variantPrices = $this->customerPriceLists->catalogVariantPricesFor($priceList, $allVariants);
 
         // PR-2S: كشف تكلفة/ربحية المنتج في POS يحتاج الصلاحية **والإعداد** معاً؛
         // الإعداد وحده لا يمنح شيئاً، والأكثر تقييداً يفوز دائماً. PR-INV-1:
@@ -78,7 +88,7 @@ class PosController extends ApiController
         $revealCostProfit = SensitiveCostPolicy::authorized($request->user())
             && PosSettings::showsCostProfitInPos();
 
-        $products->each(function (Product $product) use ($catalogUnits, $revealCostProfit): void {
+        $products->each(function (Product $product) use ($catalogUnits, $variantPrices, $revealCostProfit): void {
             $product->setAttribute('pos_hides_cost_profit', ! $revealCostProfit);
             // قيم عرض عابرة للكتالوج؛ لا تعدّل المنتج المخزن ولا تعيد تفسير
             // فاتورة تاريخية. الوحدة الأساسية متاحة دائماً، والبديلة لا تظهر
@@ -86,21 +96,65 @@ class PosController extends ApiController
             $units = $catalogUnits[$product->id] ?? [];
             $allowedUnits = collect($units)->pluck('name')->all();
             $product->setAttribute('pos_units', $units);
-            // لا يحمل الكاشير باركوداً لوحدة بديلة لا تظهر له أصلاً. الباركود
-            // الأساسي التاريخي يبقى في حقل المنتج ويرتبط بوحدة الأساس.
+            // الباركود يحمل هويّة المتغيّر إن وُجدت — لا يحمل الكاشير باركوداً
+            // لوحدة بديلة لا تظهر له أصلاً، ولا سعراً؛ الباركود محلٌّ فقط.
             $product->setAttribute('pos_barcodes', $product->alternateBarcodes
-                ->filter(fn ($barcode) => in_array($barcode->unit_name, $allowedUnits, true))
+                ->filter(fn ($barcode) => $barcode->product_variant_id !== null
+                    || in_array($barcode->unit_name, $allowedUnits, true))
                 ->map(fn ($barcode) => [
                     'code' => $barcode->code,
                     'unit_name' => $barcode->unit_name,
                     'default_quantity' => (int) $barcode->default_quantity,
+                    'product_variant_id' => $barcode->product_variant_id,
                 ])
                 ->values()
                 ->all());
+            // VAR-POS-1: منتجٌ متعدد الخيارات يعرض متغيّراته النشطة بسعر كلٍّ
+            // منها (وحدة الأساس)، لا سعر الأب — لا يُستعمل `pos_units`/`sale_price`
+            // الأب لهذه الحالة في الواجهة إطلاقاً.
+            $product->setAttribute('pos_variants', $product->variants->map(fn ($variant) => [
+                'id' => $variant->id,
+                'sku' => $variant->sku,
+                'descriptor' => DocumentLineVariantResolver::descriptor($variant),
+                'price' => $variantPrices[$variant->id] ?? 0,
+            ])->values()->all());
             $product->setAttribute('sale_price', $units[0]['price'] ?? (int) $product->sale_price);
         });
 
         return ProductResource::collection($products)->response();
+    }
+
+    /**
+     * حلّ باركودٍ مسحه الكاشير خادمياً (VAR-POS-1): منتج + متغيّرٌ اختياري +
+     * وحدة + سعرٌ معياري من سلطة VAR-PRICE-1 — لا سعر مخزَّن على الباركود
+     * نفسه. فشلٌ مغلَق دائماً: باركودٌ غير موجود، خارج المستأجر، أو يحدِّد
+     * منتجاً متعدد الخيارات بلا متغيّرٍ فعلي، يُرفض بنفس الرسالة الموحَّدة —
+     * لا يُسرَّب وجود الباركود في مستأجرٍ آخر.
+     */
+    public function resolveBarcode(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'code' => ['required', 'string', 'max:255'],
+            'partner_id' => ['nullable', 'uuid'],
+        ]);
+
+        $priceList = $this->customerPriceLists->forPartner($data['partner_id'] ?? null);
+
+        try {
+            $resolved = $this->barcodeResolver->resolve($data['code'], $priceList);
+        } catch (RuntimeException $exception) {
+            return response()->json(['message' => $exception->getMessage()], 422);
+        }
+
+        return response()->json(['data' => [
+            'product_id' => $resolved['product']->id,
+            'product_name' => $resolved['product']->name,
+            'product_variant_id' => $resolved['variant']?->id,
+            'variant_descriptor' => $resolved['variant_descriptor'],
+            'unit' => $resolved['unit'],
+            'unit_factor' => $resolved['unit_factor'],
+            'price' => $resolved['price'],
+        ]]);
     }
 
     /**
@@ -120,6 +174,9 @@ class PosController extends ApiController
         Partner::findOrFail($data['partner_id']);
         $this->assertWarehouseAllowed($data['warehouse_id'] ?? null, $this->activeBranchId());
         $this->assertTenantOwnedAll(Product::class, array_column($data['items'], 'product_id'), 'المنتج');
+        // VAR-POS-1: فحصٌ مبكر إضافي — الحكم الملزم يبقى `DocumentLineVariantResolver`
+        // داخل `InvoiceService::create()` لاحقاً (انتماءٌ للمنتج نفسه، نشاطٌ تجاري).
+        $this->assertTenantOwnedAll(ProductVariant::class, array_column($data['items'], 'product_variant_id'), 'المتغيّر');
 
         try {
             $invoice = $this->domain(fn () => $this->pos->checkout($data));
@@ -216,6 +273,7 @@ class PosController extends ApiController
             Partner::findOrFail($data['customer_id']);
         }
         $this->assertTenantOwnedAll(Product::class, array_column($data['items'], 'product_id'), 'المنتج');
+        $this->assertTenantOwnedAll(ProductVariant::class, array_column($data['items'], 'product_variant_id'), 'المتغيّر');
         $held = $this->domain(fn () => $this->heldSales->hold($data, $request->user()));
 
         return (new PosHeldSaleResource($held))->response()->setStatusCode(201);
@@ -326,6 +384,8 @@ class PosController extends ApiController
                 return [
                     'source_line_id' => $line->id,
                     'description' => $line->product_name_snapshot ?? $line->product?->name ?? $line->description,
+                    'product_variant_id' => $line->product_variant_id,
+                    'variant_descriptor' => $line->variant_descriptor_snapshot,
                     'quantity' => (int) $line->quantity,
                     'returned' => $already,
                     'remaining' => max(0, (int) $line->quantity - $already),
@@ -371,6 +431,7 @@ class PosController extends ApiController
     {
         $data = $request->validated();
         $this->assertTenantOwnedAll(Product::class, array_column($data['replacement']['items'], 'product_id'), 'المنتج');
+        $this->assertTenantOwnedAll(ProductVariant::class, array_column($data['replacement']['items'], 'product_variant_id'), 'المتغيّر');
 
         try {
             $result = $this->domain(fn () => $this->exchanges->create($data, $request->user()));

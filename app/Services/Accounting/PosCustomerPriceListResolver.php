@@ -6,6 +6,7 @@ use App\Models\Partner;
 use App\Models\PriceList;
 use App\Models\PriceListItem;
 use App\Models\Product;
+use App\Models\ProductVariant;
 use App\Services\PriceListService;
 use App\Services\ProductPricingService;
 use App\Support\PosSettings;
@@ -37,31 +38,51 @@ class PosCustomerPriceListResolver
         return $priceList?->is_active ? $priceList : null;
     }
 
-    /** سعر القائمة الصريح بالهللات إن وجد، وإلا سعر البيع الأساسي للمنتج. */
-    public function priceFor(?PriceList $priceList, Product $product, ?string $unitName = null): int
+    /**
+     * سعر القائمة الصريح بالهللات إن وجد، وإلا سعر البيع الأساسي للمنتج/المتغيّر.
+     * `$variant = null` يبقي سلوك المنتج البسيط كما كان حرفياً (VAR-POS-1
+     * إضافةٌ لا كسر).
+     */
+    public function priceFor(?PriceList $priceList, Product $product, ?string $unitName = null, ?ProductVariant $variant = null): int
     {
-        return $priceList
-            ? ($this->priceLists->resolve($priceList, $product, $unitName) ?? (int) $product->sale_price)
+        // `null` لا `$unitName`/`$product->unit` صراحةً: يعني «وحدة الأساس» في
+        // كامل طبقة التسعير (`UnitConversion::resolve()`) بلا حاجة قالب وحدات
+        // إطلاقاً — تمرير الاسم الصريح هنا كان يفشل لمنتجٍ بلا قالب أصلاً.
+        $fallback = $variant !== null
+            ? (int) ($this->pricing->resolveSellable($product, $variant, null) ?? 0)
             : (int) $product->sale_price;
+
+        return $priceList
+            ? ($this->priceLists->resolve($priceList, $product, $unitName, variant: $variant) ?? $fallback)
+            : $fallback;
     }
 
     /**
      * سعر POS الملزم لوحدة السطر. وحدة الأساس تملك دائماً سعر المنتج أو سعرها
      * المخصص في القائمة، أما الوحدة البديلة فلا تُقبل بلا سعر صريح في قائمة
      * العميل النشطة؛ لا نشتق سعر عبوة من معامل التحويل.
+     *
+     * VAR-POS-1: `$variant` — منتجٌ متعدد الخيارات يُسعَّر على **متغيّره
+     * الفعلي**، لا الأب أبداً (VAR-PRICE-1 «لا fallback على شقيقٍ»). وحدة
+     * الأساس بلا متغيّرٍ صريح تسقط دائماً على `sale_price` **الأب** — لا معنى
+     * له لمنتجٍ متعدد الخيارات، فهذه الحالة تُرفض في طبقةٍ أعلى (`DocumentLineVariantResolver`)
+     * قبل الوصول هنا أصلاً؛ هذه الدالة تفترض هويّةً محلولةً سلفاً.
      */
-    public function posPriceFor(?PriceList $priceList, Product $product, ?string $unitName): ?int
+    public function posPriceFor(?PriceList $priceList, Product $product, ?string $unitName, ?ProductVariant $variant = null): ?int
     {
         if (! $this->isAlternativeUnit($product, $unitName)) {
-            return $this->priceFor($priceList, $product, $unitName);
+            // `null` لا `$unitName` نفسه: منتجٌ بلا قالب وحدات (الحالة الشائعة)
+            // كان `UnitConversion::resolve()` يرفضه لمجرد تمرير اسم وحدةٍ صريح
+            // ولو كان هو وحدة الأساس نفسها — `null` هو الاصطلاح الوحيد الآمن.
+            return $this->priceFor($priceList, $product, null, $variant);
         }
 
-        $listPrice = $priceList ? $this->priceLists->resolve($priceList, $product, $unitName) : null;
+        $listPrice = $priceList ? $this->priceLists->resolve($priceList, $product, $unitName, variant: $variant) : null;
 
         // VAR-PRICE-1: السلطة الأساسية الصريحة للوحدة البديلة — لم تكن موجودة
         // من قبل (كان الغياب هنا يعني «لا سعر» دائماً)، فهذه إضافة سلوك لا
         // كسرٌ له؛ لا اشتقاقٌ من معامل التحويل أبداً.
-        return $listPrice ?? $this->pricing->resolveExplicit($product, null, $unitName);
+        return $listPrice ?? $this->pricing->resolveExplicit($product, $variant, $unitName);
     }
 
     /**
@@ -124,6 +145,50 @@ class PosCustomerPriceListResolver
             }
 
             $resolved[$id] = $units;
+        }
+
+        return $resolved;
+    }
+
+    /**
+     * VAR-POS-1 — سعر وحدة الأساس لكل متغيّرٍ فعلي في كتالوج POS (بطاقة
+     * المنتج تعرض متغيّراتها النشطة بسعر كلٍّ منها، لا سعر الأب). نظير
+     * `catalogUnitsFor()` تماماً لكن مصفوفته `product_variant_id` صريحة لا
+     * `whereNull` — عكس استبعادها هناك تماماً.
+     *
+     * @param  iterable<ProductVariant>  $variants  كل المتغيّرات النشطة للمنتجات المعروضة (منتجاتها محمَّلة سلفاً)
+     * @return array<string, int> معرّف المتغيّر ⇐ سعر وحدة الأساس بالهللات
+     */
+    public function catalogVariantPricesFor(?PriceList $priceList, iterable $variants): array
+    {
+        $byId = [];
+        foreach ($variants as $variant) {
+            $byId[$variant->id] = $variant;
+        }
+        if ($byId === []) {
+            return [];
+        }
+
+        $listed = $priceList
+            ? PriceListItem::where('price_list_id', $priceList->id)
+                ->whereIn('product_variant_id', array_keys($byId))
+                ->get(['product_variant_id', 'unit_name', 'price'])
+                ->keyBy('product_variant_id')
+            : collect();
+
+        $resolved = [];
+        foreach ($byId as $id => $variant) {
+            $product = $variant->product;
+            if ($product === null) {
+                continue;
+            }
+            $item = $listed->get($id);
+            if ($item !== null && $item->unit_name === $product->unit) {
+                $resolved[$id] = (int) $item->price;
+
+                continue;
+            }
+            $resolved[$id] = (int) ($this->pricing->resolveSellable($product, $variant, null) ?? 0);
         }
 
         return $resolved;
