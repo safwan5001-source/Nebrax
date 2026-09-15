@@ -306,9 +306,56 @@ GitHub Actions على الفرع بعد الدفع — لم تُفحص بعد ض
 ## Git
 
 - Branch: `claude/var-pos-1-variant-pos`
-- PR: "VAR-POS-1: Variant-aware POS selection and checkout"
+- PR: [#818](https://github.com/safwan5001-source/Nebrax/pull/818) —
+  "VAR-POS-1: Variant-aware POS selection and checkout"
 - Base SHA: `15f6c53d4fddc8fc0a19ac96ab6738eb3ea44d4b`
-- Head SHA: `bb94bcada702b6362b4bd67cc83ed61ef6ce12d1`
+- Head SHA: `61668bc7a423c2b5b54f0ea4c04098abbefd8d43`
+
+## CI Diagnostic — ReportEffectiveScopeTest على PostgreSQL (بعد الدمج بالمراجعة)
+
+صفوان أبلغ عن CI #5140: PostgreSQL FAILED (5 حالات داخل `ReportEffectiveScopeTest`،
+بقية الحزمة 3763 نجح)، SQLite SUCCESS، على نفس الـHead أعلاه بالضبط.
+
+**التشخيص المنفَّذ** (تشخيصي فقط، بلا أي تعديل كود):
+
+1. `git diff origin/main...claude/var-pos-1-variant-pos -- tests/Feature/ReportEffectiveScopeTest.php app/Services/Reporting/`
+   — **صفر أسطر** أي فرق. هذا الـPR لم يلمس ملف الاختبار ولا طبقة
+   `ReportService`/النطاق الفعّال إطلاقاً.
+2. `php artisan test --filter=ReportEffectiveScopeTest` على PostgreSQL معزولاً
+   عند نفس الـHead تماماً (`61668bc`) — **34/34 نجح** (479 تأكيداً)، صفر فشل.
+3. جولة كاملة بلا فلتر (`php artisan test`) على نفس PostgreSQL/Head — 3766 نجح،
+   27 فشل (الأساس المعزول المعروف: `bcmath`/PDF غير مثبَّتين محلياً). `ReportEffectiveScopeTest`
+   ظهر ضمن هذه الجولة أيضاً **PASS كاملاً** — لا فرق بين التشغيل المعزول والتشغيل
+   الكامل بترتيب التصريح نفسه المستخدَم في CI (`php artisan test` بلا فلتر ولا
+   `--parallel`، مطابقٌ لأمر `.github/workflows/ci.yml` سطراً بسطر).
+4. راجعت GitHub Actions API مباشرةً لكل تشغيلات هذا الفرع على هذا الـHead
+   (`61668bc`): يوجد تشغيلان فقط مسجَّلان — [run 34916954065](https://github.com/safwan5001-source/Nebrax/actions/runs/34916954065)
+   (حدث `pull_request`، **نجاح كامل**) و[run 34916951740](https://github.com/safwan5001-source/Nebrax/actions/runs/34916951740)
+   (حدث `push`، **فشل — لكن في SQLite لا PostgreSQL**، وسببه اختبارٌ آخر تماماً:
+   `ZatcaQrCertificateMaterialExtractorTest` — فشلٌ عشوائي معروف في ترميز مفتاح
+   ECDSA (بِت إشارة/بايت صفري بارز، احتمالٌ ~1/256 لكل تشغيل، عشوائيةٌ من
+   `openssl` وقت توليد الشهادة المؤقتة في الاختبار نفسه) — لا علاقة له بـPostgreSQL
+   ولا بـ`ReportEffectiveScopeTest` ولا بأي تغيير في هذا الـPR). لم أجد أي
+   تشغيلٍ باسم "CI #5140"، ولا أي تشغيلٍ آخر لهذا الفرع/الـHead يُظهر فشلاً في
+   `ReportEffectiveScopeTest` على PostgreSQL.
+
+**الخلاصة**: الفشل الذي وصفه صفوان **لم يتكرّر عندي إطلاقاً** — لا في نسخة
+معزولة، ولا في نسخة كاملة بنفس ترتيب CI، ولا في سجلّات GitHub Actions الفعلية
+التي أمكنني الوصول إليها لهذا الـHead بالتحديد. الفرق بين main والـPR في ملفات
+التقرير/الاختبار **صفر حرفياً**، فلا يوجد "سبب جذري" أعدّله لأنه لا يوجد كودٌ
+هذا الـPR غيّره ليكون مسؤولاً. هذا يطابق حالة VAR-MEDIA-1 السابقة التي وثّقت
+نمط تلوّثٍ مشابه في نفس ملف الاختبار (كان سببه استخدام `Product::whereKey()->update()`
+بدل نمط النموذج — لكن `ReportEffectiveScopeTest` الحالي **يستعمل النمط الصحيح
+بالفعل** في كل مكان، `Product::findOrFail($id)->update()`، فتلك الثغرة مُغلَقة
+مسبقاً).
+
+**لم أطبّق أي تعديل** — لا على `ReportEffectiveScopeTest`، ولا على
+`ReportService`/طبقة النطاق، ولا على `InventoryState`/عزل المستأجر أو الفرع،
+تماشياً مع تعليمات التشخيص الصريحة وعدم وجود دليلٍ يثبت أن هذا الـPR هو السبب.
+إن تكرّر الفشل فعلياً على GitHub (تشغيلٌ مستقبلي حقيقي يمكن الوصول إلى سجلّه)،
+أحتاج رابط التشغيل/رقم الـjob الفعلي لأقرأ رسالة الفشل والمكدّس الدقيقين —
+الأرقام المذكورة ("CI #5140"، "3763 passed") لا تقابل أي تشغيلٍ ظهر في واجهة
+GitHub Actions API لهذا الفرع حتى وقت هذا التشخيص.
 
 ## Next Step
 
