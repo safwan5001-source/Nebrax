@@ -92,6 +92,13 @@ export class StorefrontApiError extends Error {
     public readonly status: number,
     public readonly code: string,
     message: string,
+    /**
+     * The error envelope's optional structured `details` — e.g. a
+     * `review_required` (409) response's `{ items, checkout }` from
+     * COM-CHECKOUT-1B. Untyped here (this module doesn't know about
+     * checkout shapes); callers narrow it themselves.
+     */
+    public readonly details?: unknown,
   ) {
     super(message);
     this.name = "StorefrontApiError";
@@ -106,16 +113,18 @@ export type StorefrontQueryParams = Record<
 async function raiseForErrorResponse(response: Response): Promise<never> {
   let code = "http_error";
   let message = `AWJ storefront API request failed (${response.status})`;
+  let details: unknown;
   try {
     const body = (await response.json()) as {
-      error?: { code?: string; message?: string };
+      error?: { code?: string; message?: string; details?: unknown };
     };
     code = body.error?.code ?? code;
     message = body.error?.message ?? message;
+    details = body.error?.details;
   } catch {
     // Non-JSON error body — keep the generic message.
   }
-  throw new StorefrontApiError(response.status, code, message);
+  throw new StorefrontApiError(response.status, code, message, details);
 }
 
 /**
@@ -180,10 +189,18 @@ export async function storefrontCartRequest<T>(
   method: StorefrontCartMethod,
   path: string,
   body?: unknown,
+  /**
+   * Extra request headers, merged in after the trust-boundary headers below
+   * (so a caller can never override them). The only current use is
+   * `Idempotency-Key` on `POST checkout/complete` (COM-CHECKOUT-1B) — no new
+   * transport, same gateway.
+   */
+  extraHeaders?: Record<string, string>,
 ): Promise<T> {
   const url = buildStorefrontUrl(path);
   const hostname = await resolveVisitorHostname();
   const requestHeaders: Record<string, string> = {
+    ...extraHeaders,
     Accept: "application/json",
     [FORWARDED_HOST_HEADER]: hostname,
   };

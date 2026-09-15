@@ -1,0 +1,833 @@
+"use client";
+
+/**
+ * COM-CHECKOUT-1C — AWJ-native checkout UI. Wires the existing AWJ Store
+ * cart to the existing AWJ Checkout V1 backend (COM-CHECKOUT-1A/1B) end to
+ * end: create/resume checkout → contact/address/delivery → authoritative
+ * review → idempotent completion → success. This is Storefront wiring
+ * only — no backend/pricing/shipping/payment logic lives here; every
+ * purchase-affecting value (prices, line totals, subtotal, delivery
+ * amount) is read verbatim from the server response, never computed or
+ * remembered client-side as a source of truth.
+ *
+ * Deliberately NOT the Spree `(checkout)` route group's `CheckoutProvider`/
+ * `CheckoutContext` — this is a fully separate AWJ-native flow (no cart id
+ * in the URL, no Spree state machine) per AWJ_CHECKOUT_V1_ARCHITECTURE.md
+ * and the Storefront architecture boundary: AWJ DTC Cart/Checkout stays
+ * AWJ-native, Wholesale/Spree checkout is untouched.
+ */
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useTranslations } from "next-intl";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  clearPersistedIdempotencyKey,
+  resolveIdempotencyKey,
+} from "@/lib/commerce/checkout-idempotency";
+import {
+  AWJ_DELIVERY_METHODS,
+  type AwjDeliveryMethod,
+  type AwjReviewIssue,
+  formatMinorAmount,
+  type StorefrontCheckout,
+  type StorefrontOrder,
+} from "@/lib/commerce/checkout-types";
+import {
+  completeAwjCheckoutAction,
+  getAwjCheckoutIdentity,
+  startOrResumeAwjCheckout,
+  updateAwjAddress,
+  updateAwjContact,
+  updateAwjDelivery,
+} from "@/lib/data/awj-checkout";
+import { extractBasePath } from "@/lib/utils/path";
+
+type Stage =
+  | "loading"
+  | "empty"
+  | "unavailable"
+  | "details"
+  | "review"
+  | "success"
+  | "error";
+
+interface ContactForm {
+  name: string;
+  phone: string;
+  email: string;
+}
+
+interface AddressForm {
+  country: string;
+  region: string;
+  city: string;
+  district: string;
+  street: string;
+  postalCode: string;
+  notes: string;
+}
+
+const EMPTY_CONTACT: ContactForm = { name: "", phone: "", email: "" };
+const EMPTY_ADDRESS: AddressForm = {
+  country: "",
+  region: "",
+  city: "",
+  district: "",
+  street: "",
+  postalCode: "",
+  notes: "",
+};
+
+function toContactForm(checkout: StorefrontCheckout): ContactForm {
+  return {
+    name: checkout.contact.name ?? "",
+    phone: checkout.contact.phone ?? "",
+    email: checkout.contact.email ?? "",
+  };
+}
+
+function toAddressForm(checkout: StorefrontCheckout): AddressForm {
+  const address = checkout.delivery.address;
+  return {
+    country: address.country ?? "",
+    region: address.region ?? "",
+    city: address.city ?? "",
+    district: address.district ?? "",
+    street: address.street ?? "",
+    postalCode: address.postal_code ?? "",
+    notes: address.notes ?? "",
+  };
+}
+
+export function AwjCheckoutFlow() {
+  const t = useTranslations("awjCheckout");
+  const tc = useTranslations("common");
+  const pathname = usePathname();
+  const basePath = extractBasePath(pathname);
+
+  const [stage, setStage] = useState<Stage>("loading");
+  const [checkout, setCheckout] = useState<StorefrontCheckout | null>(null);
+  const [order, setOrder] = useState<StorefrontOrder | null>(null);
+  const [contact, setContact] = useState<ContactForm>(EMPTY_CONTACT);
+  const [address, setAddress] = useState<AddressForm>(EMPTY_ADDRESS);
+  const [deliveryMethod, setDeliveryMethod] =
+    useState<AwjDeliveryMethod | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [completing, setCompleting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [reviewIssues, setReviewIssues] = useState<AwjReviewIssue[]>([]);
+
+  // One Idempotency-Key per checkout *attempt*, persisted in localStorage
+  // scoped to this checkout's identity (see `checkout-idempotency.ts`) so
+  // it survives a reload — not just a re-render or a retry within the same
+  // mount. Resolved inside `initialize()` below (never during render:
+  // `localStorage` doesn't exist during SSR) before the visitor can reach
+  // the complete button. `identityRef` is kept alongside the key so a
+  // confirmed success can clear exactly this checkout's persisted entry.
+  const idempotencyKeyRef = useRef<string | null>(null);
+  const checkoutIdentityRef = useRef<string | null>(null);
+
+  const initialize = useCallback(async () => {
+    setStage("loading");
+    const identity = await getAwjCheckoutIdentity();
+    checkoutIdentityRef.current = identity;
+    idempotencyKeyRef.current = resolveIdempotencyKey(identity);
+
+    const result = await startOrResumeAwjCheckout();
+    if (!result.success) {
+      setStage("unavailable");
+      return;
+    }
+    const nextCheckout = result.checkout;
+    if (nextCheckout.cart.items.length === 0) {
+      setStage("empty");
+      return;
+    }
+    setCheckout(nextCheckout);
+    setContact(toContactForm(nextCheckout));
+    setAddress(toAddressForm(nextCheckout));
+    setDeliveryMethod(
+      AWJ_DELIVERY_METHODS.includes(
+        nextCheckout.delivery.method as AwjDeliveryMethod,
+      )
+        ? (nextCheckout.delivery.method as AwjDeliveryMethod)
+        : null,
+    );
+    setStage("details");
+  }, []);
+
+  useEffect(() => {
+    initialize();
+  }, [initialize]);
+
+  const handleSaveDetails = useCallback(async () => {
+    setFormError(null);
+    setSaving(true);
+    try {
+      const contactResult = await updateAwjContact({
+        name: contact.name.trim(),
+        phone: contact.phone.trim(),
+        email: contact.email.trim() ? contact.email.trim() : null,
+      });
+      if (!contactResult.success) {
+        setFormError(contactResult.error);
+        return;
+      }
+
+      const addressResult = await updateAwjAddress({
+        country: address.country.trim(),
+        region: address.region.trim() ? address.region.trim() : null,
+        city: address.city.trim(),
+        district: address.district.trim() ? address.district.trim() : null,
+        street: address.street.trim(),
+        postal_code: address.postalCode.trim()
+          ? address.postalCode.trim()
+          : null,
+        notes: address.notes.trim() ? address.notes.trim() : null,
+      });
+      if (!addressResult.success) {
+        setFormError(addressResult.error);
+        return;
+      }
+
+      let latest = addressResult.checkout;
+      if (deliveryMethod) {
+        const deliveryResult = await updateAwjDelivery(deliveryMethod);
+        if (!deliveryResult.success) {
+          setFormError(deliveryResult.error);
+          return;
+        }
+        latest = deliveryResult.checkout;
+      }
+
+      setCheckout(latest);
+      setStage("review");
+    } finally {
+      setSaving(false);
+    }
+  }, [contact, address, deliveryMethod]);
+
+  const handleComplete = useCallback(async () => {
+    if (!idempotencyKeyRef.current) return;
+    setCompleting(true);
+    setFormError(null);
+    try {
+      const result = await completeAwjCheckoutAction(idempotencyKeyRef.current);
+      if (result.success) {
+        // Confirmed success only — never clear on review_required,
+        // idempotency_conflict, or a transient error, all of which must
+        // keep the same persisted key so a retry (or a reload after a lost
+        // response) still replays correctly if this attempt actually
+        // landed server-side.
+        if (checkoutIdentityRef.current !== null) {
+          clearPersistedIdempotencyKey(checkoutIdentityRef.current);
+        }
+        setOrder(result.order);
+        setStage("success");
+        return;
+      }
+
+      if (result.kind === "review_required") {
+        setReviewIssues(result.items);
+        setCheckout(result.checkout);
+        setContact(toContactForm(result.checkout));
+        setAddress(toAddressForm(result.checkout));
+        // A contact/delivery gap sends the visitor back to the details
+        // step to fix it; a cart-content issue (item availability/price/
+        // stock) stays on the review step, where the refreshed cart items
+        // (now carrying up-to-date `available` flags) explain what changed.
+        const needsDetails = result.items.some(
+          (issue) =>
+            issue.reason === "contact_incomplete" ||
+            issue.reason === "delivery_method_missing",
+        );
+        setStage(needsDetails ? "details" : "review");
+        return;
+      }
+
+      if (result.kind === "not_found") {
+        setStage("unavailable");
+        return;
+      }
+
+      setFormError(result.message);
+    } finally {
+      setCompleting(false);
+    }
+  }, []);
+
+  const reviewIssueMessages = useMemo(
+    () =>
+      reviewIssues.map((issue) => {
+        const item = checkout?.cart.items.find((i) => i.id === issue.item_id);
+        const reasonKey = `reviewRequired.reasons.${issue.reason}` as const;
+        const reasonText = t.has(reasonKey)
+          ? t(reasonKey)
+          : t("reviewRequired.reasons.unknown");
+        return item
+          ? t("reviewRequired.itemIssue", {
+              name: item.name,
+              reason: reasonText,
+            })
+          : reasonText;
+      }),
+    [reviewIssues, checkout, t],
+  );
+
+  if (stage === "loading") {
+    return (
+      <div className="animate-pulse space-y-4">
+        <div className="h-8 bg-gray-200 rounded w-48" />
+        <div className="h-40 bg-gray-200 rounded" />
+        <div className="h-40 bg-gray-200 rounded" />
+      </div>
+    );
+  }
+
+  if (stage === "empty") {
+    return (
+      <div className="text-center py-16">
+        <h1 className="text-2xl font-bold text-gray-900">
+          {t("emptyCartTitle")}
+        </h1>
+        <p className="mt-2 text-gray-500">{t("emptyCartDescription")}</p>
+        <Button asChild size="lg" className="mt-6">
+          <Link href={`${basePath}/products`}>{tc("continueShopping")}</Link>
+        </Button>
+      </div>
+    );
+  }
+
+  if (stage === "unavailable") {
+    return (
+      <div className="text-center py-16">
+        <h1 className="text-2xl font-bold text-gray-900">
+          {t("unavailableTitle")}
+        </h1>
+        <p className="mt-2 text-gray-500">{t("unavailableDescription")}</p>
+        <Button asChild size="lg" className="mt-6">
+          <Link href={`${basePath}/cart`}>{t("returnToCart")}</Link>
+        </Button>
+      </div>
+    );
+  }
+
+  if (stage === "success" && order) {
+    return <AwjOrderSuccess order={order} basePath={basePath} />;
+  }
+
+  if (!checkout) {
+    return null;
+  }
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="lg:col-span-2 space-y-8">
+        {stage === "details" && (
+          <>
+            {reviewIssueMessages.length > 0 && (
+              <ReviewIssuesBanner messages={reviewIssueMessages} t={t} />
+            )}
+            <ContactSection contact={contact} onChange={setContact} t={t} />
+            <AddressSection address={address} onChange={setAddress} t={t} />
+            <DeliverySection
+              method={deliveryMethod}
+              onChange={setDeliveryMethod}
+              t={t}
+            />
+            {formError && (
+              <p className="text-sm text-red-600" role="alert">
+                {formError}
+              </p>
+            )}
+            <Button
+              size="lg"
+              className="w-full sm:w-auto"
+              onClick={handleSaveDetails}
+              disabled={
+                saving ||
+                !contact.name.trim() ||
+                !contact.phone.trim() ||
+                !address.country.trim() ||
+                !address.city.trim() ||
+                !address.street.trim() ||
+                !deliveryMethod
+              }
+            >
+              {saving ? tc("saving") : t("continueToReview")}
+            </Button>
+          </>
+        )}
+
+        {stage === "review" && (
+          <>
+            {reviewIssueMessages.length > 0 && (
+              <ReviewIssuesBanner messages={reviewIssueMessages} t={t} />
+            )}
+            <OrderReview
+              checkout={checkout}
+              deliveryMethod={deliveryMethod}
+              t={t}
+              tc={tc}
+            />
+            <div className="flex flex-col sm:flex-row gap-3">
+              <Button
+                variant="outline"
+                onClick={() => setStage("details")}
+                disabled={completing}
+              >
+                {t("editDetails")}
+              </Button>
+              <Button
+                size="lg"
+                className="flex-1"
+                onClick={handleComplete}
+                disabled={completing}
+              >
+                {completing ? tc("processing") : t("completeOrder")}
+              </Button>
+            </div>
+            {formError && (
+              <p className="text-sm text-red-600" role="alert">
+                {formError}
+              </p>
+            )}
+          </>
+        )}
+      </div>
+
+      <div className="lg:col-span-1">
+        <OrderSummarySidebar checkout={checkout} tc={tc} t={t} />
+      </div>
+    </div>
+  );
+}
+
+function ReviewIssuesBanner({
+  messages,
+  t,
+}: {
+  messages: string[];
+  t: ReturnType<typeof useTranslations>;
+}) {
+  return (
+    <div
+      role="alert"
+      className="rounded-lg border border-amber-300 bg-amber-50 p-4"
+    >
+      <p className="font-medium text-amber-900">{t("reviewRequired.title")}</p>
+      <ul className="mt-2 list-disc list-inside text-sm text-amber-800 space-y-1">
+        {messages.map((message) => (
+          <li key={message}>{message}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function ContactSection({
+  contact,
+  onChange,
+  t,
+}: {
+  contact: ContactForm;
+  onChange: (contact: ContactForm) => void;
+  t: ReturnType<typeof useTranslations>;
+}) {
+  return (
+    <section aria-labelledby="awj-checkout-contact-heading">
+      <h2
+        id="awj-checkout-contact-heading"
+        className="text-lg font-medium text-gray-900 mb-4"
+      >
+        {t("contact.heading")}
+      </h2>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <Label htmlFor="awj-contact-name">{t("contact.name")}</Label>
+          <Input
+            id="awj-contact-name"
+            value={contact.name}
+            onChange={(e) => onChange({ ...contact, name: e.target.value })}
+            required
+            className="mt-1.5"
+          />
+        </div>
+        <div>
+          <Label htmlFor="awj-contact-phone">{t("contact.phone")}</Label>
+          <Input
+            id="awj-contact-phone"
+            type="tel"
+            value={contact.phone}
+            onChange={(e) => onChange({ ...contact, phone: e.target.value })}
+            required
+            className="mt-1.5"
+          />
+        </div>
+        <div className="sm:col-span-2">
+          <Label htmlFor="awj-contact-email">{t("contact.email")}</Label>
+          <Input
+            id="awj-contact-email"
+            type="email"
+            value={contact.email}
+            onChange={(e) => onChange({ ...contact, email: e.target.value })}
+            className="mt-1.5"
+          />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function AddressSection({
+  address,
+  onChange,
+  t,
+}: {
+  address: AddressForm;
+  onChange: (address: AddressForm) => void;
+  t: ReturnType<typeof useTranslations>;
+}) {
+  return (
+    <section aria-labelledby="awj-checkout-address-heading">
+      <h2
+        id="awj-checkout-address-heading"
+        className="text-lg font-medium text-gray-900 mb-4"
+      >
+        {t("address.heading")}
+      </h2>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <Label htmlFor="awj-address-country">{t("address.country")}</Label>
+          <Input
+            id="awj-address-country"
+            value={address.country}
+            onChange={(e) => onChange({ ...address, country: e.target.value })}
+            required
+            className="mt-1.5"
+          />
+        </div>
+        <div>
+          <Label htmlFor="awj-address-region">{t("address.region")}</Label>
+          <Input
+            id="awj-address-region"
+            value={address.region}
+            onChange={(e) => onChange({ ...address, region: e.target.value })}
+            className="mt-1.5"
+          />
+        </div>
+        <div>
+          <Label htmlFor="awj-address-city">{t("address.city")}</Label>
+          <Input
+            id="awj-address-city"
+            value={address.city}
+            onChange={(e) => onChange({ ...address, city: e.target.value })}
+            required
+            className="mt-1.5"
+          />
+        </div>
+        <div>
+          <Label htmlFor="awj-address-district">{t("address.district")}</Label>
+          <Input
+            id="awj-address-district"
+            value={address.district}
+            onChange={(e) => onChange({ ...address, district: e.target.value })}
+            className="mt-1.5"
+          />
+        </div>
+        <div className="sm:col-span-2">
+          <Label htmlFor="awj-address-street">{t("address.street")}</Label>
+          <Input
+            id="awj-address-street"
+            value={address.street}
+            onChange={(e) => onChange({ ...address, street: e.target.value })}
+            required
+            className="mt-1.5"
+          />
+        </div>
+        <div>
+          <Label htmlFor="awj-address-postal-code">
+            {t("address.postalCode")}
+          </Label>
+          <Input
+            id="awj-address-postal-code"
+            value={address.postalCode}
+            onChange={(e) =>
+              onChange({ ...address, postalCode: e.target.value })
+            }
+            className="mt-1.5"
+          />
+        </div>
+        <div className="sm:col-span-2">
+          <Label htmlFor="awj-address-notes">{t("address.notes")}</Label>
+          <Textarea
+            id="awj-address-notes"
+            value={address.notes}
+            onChange={(e) => onChange({ ...address, notes: e.target.value })}
+            className="mt-1.5"
+          />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function DeliverySection({
+  method,
+  onChange,
+  t,
+}: {
+  method: AwjDeliveryMethod | null;
+  onChange: (method: AwjDeliveryMethod) => void;
+  t: ReturnType<typeof useTranslations>;
+}) {
+  return (
+    <section aria-labelledby="awj-checkout-delivery-heading">
+      <h2
+        id="awj-checkout-delivery-heading"
+        className="text-lg font-medium text-gray-900 mb-4"
+      >
+        {t("delivery.heading")}
+      </h2>
+      <RadioGroup
+        value={method ?? undefined}
+        onValueChange={(value) => onChange(value as AwjDeliveryMethod)}
+      >
+        {AWJ_DELIVERY_METHODS.map((option) => (
+          <Label
+            key={option}
+            htmlFor={`awj-delivery-${option}`}
+            className="flex items-center gap-3 rounded-lg border border-gray-200 p-4 cursor-pointer has-[[data-state=checked]]:border-black"
+          >
+            <RadioGroupItem id={`awj-delivery-${option}`} value={option} />
+            <span className="flex-1">
+              <span className="block font-medium text-gray-900">
+                {t(`delivery.methods.${option}`)}
+              </span>
+              <span className="block text-sm text-gray-500">
+                {t("delivery.amountPending")}
+              </span>
+            </span>
+          </Label>
+        ))}
+      </RadioGroup>
+    </section>
+  );
+}
+
+function OrderReview({
+  checkout,
+  deliveryMethod,
+  t,
+  tc,
+}: {
+  checkout: StorefrontCheckout;
+  deliveryMethod: AwjDeliveryMethod | null;
+  t: ReturnType<typeof useTranslations>;
+  tc: ReturnType<typeof useTranslations>;
+}) {
+  return (
+    <section aria-labelledby="awj-checkout-review-heading">
+      <h2
+        id="awj-checkout-review-heading"
+        className="text-lg font-medium text-gray-900 mb-4"
+      >
+        {t("review.heading")}
+      </h2>
+      <div className="rounded-xl border border-gray-200 divide-y">
+        {checkout.cart.items.map((line) => (
+          <div key={line.id} className="p-4 flex justify-between gap-4">
+            <div>
+              <p className="font-medium text-gray-900">{line.name}</p>
+              <p className="text-sm text-gray-500">
+                {t("review.lineDetail", {
+                  quantity: line.quantity,
+                  unit: line.unitName,
+                })}
+              </p>
+            </div>
+            <p className="font-medium text-gray-900 whitespace-nowrap">
+              {formatMinorAmount(line.lineTotal)}
+            </p>
+          </div>
+        ))}
+      </div>
+      <dl className="mt-4 space-y-2">
+        <div className="flex justify-between">
+          <dt className="text-gray-500">{tc("subtotal")}</dt>
+          <dd className="text-gray-900">
+            {formatMinorAmount(checkout.cart.subtotal)}
+          </dd>
+        </div>
+        <div className="flex justify-between">
+          <dt className="text-gray-500">{tc("shipping")}</dt>
+          <dd className="text-gray-900">
+            {formatMinorAmount(checkout.delivery.amount)}
+          </dd>
+        </div>
+        <div className="border-t pt-2 flex justify-between">
+          <dt className="text-lg font-medium text-gray-900">{tc("total")}</dt>
+          <dd className="text-lg font-bold text-gray-900">
+            {formatMinorAmount({
+              amount_minor:
+                checkout.cart.subtotal.amount_minor +
+                checkout.delivery.amount.amount_minor,
+              currency: checkout.cart.currency,
+            })}
+          </dd>
+        </div>
+      </dl>
+      <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+        <div>
+          <p className="font-medium text-gray-900">{t("contact.heading")}</p>
+          <p className="text-gray-600">{checkout.contact.name}</p>
+          <p className="text-gray-600">{checkout.contact.phone}</p>
+          {checkout.contact.email && (
+            <p className="text-gray-600">{checkout.contact.email}</p>
+          )}
+        </div>
+        <div>
+          <p className="font-medium text-gray-900">{t("address.heading")}</p>
+          <p className="text-gray-600">
+            {[
+              checkout.delivery.address.street,
+              checkout.delivery.address.district,
+              checkout.delivery.address.city,
+              checkout.delivery.address.region,
+              checkout.delivery.address.country,
+            ]
+              .filter(Boolean)
+              .join("، ")}
+          </p>
+          {deliveryMethod && (
+            <p className="mt-1 text-gray-600">
+              {t(`delivery.methods.${deliveryMethod}`)}
+            </p>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function OrderSummarySidebar({
+  checkout,
+  tc,
+  t,
+}: {
+  checkout: StorefrontCheckout;
+  tc: ReturnType<typeof useTranslations>;
+  t: ReturnType<typeof useTranslations>;
+}) {
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 p-6 sticky top-24">
+      <h2 className="text-lg font-medium text-gray-900">
+        {tc("orderSummary")}
+      </h2>
+      <ul className="mt-4 space-y-3">
+        {checkout.cart.items.map((line) => (
+          <li key={line.id} className="flex justify-between text-sm gap-3">
+            <span className="text-gray-600">
+              {line.name} × {line.quantity}
+            </span>
+            <span className="text-gray-900 whitespace-nowrap">
+              {formatMinorAmount(line.lineTotal)}
+            </span>
+          </li>
+        ))}
+      </ul>
+      <div className="mt-4 pt-4 border-t space-y-2">
+        <div className="flex justify-between">
+          <span className="text-gray-500">{tc("subtotal")}</span>
+          <span className="text-gray-900">
+            {formatMinorAmount(checkout.cart.subtotal)}
+          </span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-gray-500">{tc("shipping")}</span>
+          <span className="text-gray-500">{t("delivery.amountPending")}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AwjOrderSuccess({
+  order,
+  basePath,
+}: {
+  order: StorefrontOrder;
+  basePath: string;
+}) {
+  const t = useTranslations("awjCheckout");
+  const tc = useTranslations("common");
+  return (
+    <div className="max-w-2xl mx-auto text-center py-8">
+      <h1 className="text-2xl font-bold text-gray-900">
+        {t("success.heading")}
+      </h1>
+      <p className="mt-2 text-gray-500">
+        {t("success.orderNumber", { number: order.number })}
+      </p>
+      {/* `confirmed` is a commercial commitment only — no payment has
+          happened. Never imply otherwise here. */}
+      <p className="mt-1 text-sm text-gray-500">{t("success.notPaidNote")}</p>
+
+      <div className="mt-8 text-start rounded-xl border border-gray-200 divide-y">
+        {order.items.map((item, index) => (
+          <div
+            key={`${item.productId ?? "item"}-${index}`}
+            className="p-4 flex justify-between gap-4"
+          >
+            <div>
+              <p className="font-medium text-gray-900">{item.productName}</p>
+              <p className="text-sm text-gray-500">
+                {t("review.lineDetail", {
+                  quantity: item.quantity,
+                  unit: item.unitName ?? "",
+                })}
+              </p>
+            </div>
+            <p className="font-medium text-gray-900 whitespace-nowrap">
+              {formatMinorAmount(item.lineTotal)}
+            </p>
+          </div>
+        ))}
+      </div>
+
+      <dl className="mt-4 flex justify-between">
+        <dt className="text-lg font-medium text-gray-900">{tc("total")}</dt>
+        <dd className="text-lg font-bold text-gray-900">
+          {formatMinorAmount(order.total)}
+        </dd>
+      </dl>
+
+      <div className="mt-6 text-start text-sm text-gray-600 space-y-1">
+        <p className="font-medium text-gray-900">{t("contact.heading")}</p>
+        <p>{order.contact.name}</p>
+        <p>{order.contact.phone}</p>
+        {order.delivery.street && (
+          <p>
+            {[
+              order.delivery.street,
+              order.delivery.district,
+              order.delivery.city,
+            ]
+              .filter(Boolean)
+              .join("، ")}
+          </p>
+        )}
+      </div>
+
+      <Button asChild size="lg" className="mt-8">
+        <Link href={`${basePath}/products`}>{tc("continueShopping")}</Link>
+      </Button>
+    </div>
+  );
+}

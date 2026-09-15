@@ -338,11 +338,18 @@ export default function CartPage() {
                 </>
               )}
               {isAwj && (
-                <Button variant="link" asChild className="w-full">
-                  <Link href={`${basePath}/products`}>
-                    {tc("continueShopping")}
-                  </Link>
-                </Button>
+                <>
+                  <Button size="lg" asChild className="w-full">
+                    <Link href={`${basePath}/checkout`}>
+                      {t("proceedToCheckout")}
+                    </Link>
+                  </Button>
+                  <Button variant="link" asChild className="w-full">
+                    <Link href={`${basePath}/products`}>
+                      {tc("continueShopping")}
+                    </Link>
+                  </Button>
+                </>
               )}
             </div>
           </div>

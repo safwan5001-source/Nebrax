@@ -382,6 +382,11 @@ export function CartDrawer() {
             )}
             {!expressProcessing && isAwj && (
               <div className="space-y-2">
+                <Button size="lg" className="w-full" asChild>
+                  <Link href={`${basePath}/checkout`} onClick={closeCart}>
+                    {t("checkout")}
+                  </Link>
+                </Button>
                 <Button size="lg" className="w-full" variant="link" asChild>
                   <Link href={`${basePath}/cart`} onClick={closeCart}>
                     {t("viewCart")}
