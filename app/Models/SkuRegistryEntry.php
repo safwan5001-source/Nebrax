@@ -7,6 +7,7 @@ use App\Tenancy\CompanyWide;
 use App\Tenancy\TenantContext;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
 /**
@@ -57,58 +58,73 @@ class SkuRegistryEntry extends BaseModel implements CompanyWide
      * يقفل صفّ المستأجر أولاً: هذا الفحص يمتدّ عبر جدولين (`sku_registry` و
      * `products`) لا يجمعهما قيدٌ فريدٌ واحد، فالقفل هو الضامن الفعلي لعدم
      * إفلات تصادمٍ عابر — انظر توثيق الصنف أعلاه.
+     *
+     * **يفتح معاملته الذاتية**: `lockForUpdate()` لا يحجز الصفّ فعلياً إلا
+     * داخل معاملة مفتوحة — خارجها ينفَّذ كعبارة مفردة تُحرَّر قفلها فوراً،
+     * فلا يمنع تسابقاً حقيقياً. هذا الكلاس لا يفترض أن المستدعي فتح معاملة
+     * (`Product::create()` مباشرة بلا خدمة وسيطة يجب أن يبقى آمناً — انظر
+     * تعليق `Product::booted()`)، فيضمن الذرّية بنفسه. متداخلةٌ بأمان
+     * (savepoint) إن كان المستدعي already داخل `DB::transaction()` خاصّته.
      */
     public static function claim(string $sku, string $kind, ?string $productId = null, ?string $variantId = null): void
     {
-        self::lockTenantAnchor();
+        DB::transaction(function () use ($sku, $kind, $productId, $variantId) {
+            self::lockTenantAnchor();
 
-        $existing = static::where('sku', $sku)->first();
+            $existing = static::where('sku', $sku)->first();
 
-        if ($existing !== null) {
-            $sameOwner = $kind === 'product'
-                ? ($existing->kind === 'product' && $existing->product_id === $productId)
-                : ($existing->kind === 'variant' && $existing->product_variant_id === $variantId);
+            if ($existing !== null) {
+                $sameOwner = $kind === 'product'
+                    ? ($existing->kind === 'product' && $existing->product_id === $productId)
+                    : ($existing->kind === 'variant' && $existing->product_variant_id === $variantId);
 
-            if ($sameOwner) {
-                return;
-            }
+                if ($sameOwner) {
+                    return;
+                }
 
-            throw new RuntimeException('رمز المنتج (SKU) مستخدم بالفعل في هذه المؤسسة، سواء لمنتج أو لأحد متغيّراته.');
-        }
-
-        if (self::isClaimedByAnIsolatedProduct($sku, $kind === 'product' ? $productId : null)) {
-            throw new RuntimeException('رمز المنتج (SKU) مستخدم بالفعل في هذه المؤسسة، سواء لمنتج أو لأحد متغيّراته.');
-        }
-
-        try {
-            static::create([
-                'sku' => $sku,
-                'kind' => $kind,
-                'product_id' => $kind === 'product' ? $productId : null,
-                'product_variant_id' => $kind === 'variant' ? $variantId : null,
-            ]);
-        } catch (QueryException $e) {
-            if (self::isUniqueViolation($e)) {
                 throw new RuntimeException('رمز المنتج (SKU) مستخدم بالفعل في هذه المؤسسة، سواء لمنتج أو لأحد متغيّراته.');
             }
 
-            throw $e;
-        }
+            if (self::isClaimedByAnIsolatedProduct($sku, $kind === 'product' ? $productId : null)) {
+                throw new RuntimeException('رمز المنتج (SKU) مستخدم بالفعل في هذه المؤسسة، سواء لمنتج أو لأحد متغيّراته.');
+            }
+
+            try {
+                static::create([
+                    'sku' => $sku,
+                    'kind' => $kind,
+                    'product_id' => $kind === 'product' ? $productId : null,
+                    'product_variant_id' => $kind === 'variant' ? $variantId : null,
+                ]);
+            } catch (QueryException $e) {
+                if (self::isUniqueViolation($e)) {
+                    throw new RuntimeException('رمز المنتج (SKU) مستخدم بالفعل في هذه المؤسسة، سواء لمنتج أو لأحد متغيّراته.');
+                }
+
+                throw $e;
+            }
+        });
     }
 
     /**
      * الاتجاه المعاكس لـ`claim()`: يتحقق منتجٌ فرعي معزول (`sharesSkuNamespace()`
      * = false) أن رمزه لا يصطدم بهويةٍ مرئية من كل الفروع بالفعل — بلا أن
      * ينضمّ هو نفسه إلى الجدول (يبقى نطاقه فرعه وحده كما كان). نفس قفل
-     * المستأجر، فيتسلسل مع `claim()` على المستأجر نفسه بدل أن يتسابقا.
+     * المستأجر، فيتسلسل مع `claim()` على المستأجر نفسه بدل أن يتسابقا —
+     * **حقيقةً لا اسمياً**، إذ يفتح معاملته الذاتية للسبب نفسه أعلاه: لا
+     * قيدٌ فريدٌ في قاعدة البيانات يحمي هذا الاتجاه (منتجٌ فرعي معزول لا
+     * ينضمّ إلى `sku_registry` أصلاً)، فالقفلُ المعاملاتي الحقيقي هو الضامن
+     * الوحيد هنا.
      */
     public static function assertFreeForIsolatedProduct(string $sku, ?string $exceptProductId = null): void
     {
-        self::lockTenantAnchor();
+        DB::transaction(function () use ($sku, $exceptProductId) {
+            self::lockTenantAnchor();
 
-        if (static::isTaken($sku, exceptProductId: $exceptProductId)) {
-            throw new RuntimeException('رمز المنتج (SKU) مستخدم بالفعل في هذه المؤسسة، سواء لمنتج أو لأحد متغيّراته.');
-        }
+            if (static::isTaken($sku, exceptProductId: $exceptProductId)) {
+                throw new RuntimeException('رمز المنتج (SKU) مستخدم بالفعل في هذه المؤسسة، سواء لمنتج أو لأحد متغيّراته.');
+            }
+        });
     }
 
     public static function release(string $sku): void
