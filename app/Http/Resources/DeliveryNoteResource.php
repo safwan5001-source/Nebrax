@@ -40,6 +40,9 @@ class DeliveryNoteResource extends JsonResource
                 'id' => $line->id,
                 'line_number' => (int) $line->line_number,
                 'product_id' => $line->product_id,
+                // VAR-FU-1: إضافيّان يطابقان نمط بقية الموارد (VAR-DOC-1) — فارغان لمنتجٍ بسيط.
+                'product_variant_id' => $line->product_variant_id,
+                'variant_descriptor' => $line->variant_descriptor_snapshot,
                 'product_name' => $line->product_name_snapshot,
                 'product_sku' => $line->product_sku_snapshot,
                 'product_barcode' => $line->product_barcode_snapshot,

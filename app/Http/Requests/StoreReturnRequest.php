@@ -41,6 +41,12 @@ class StoreReturnRequest extends FormRequest
             // والبنود الخدمية لم تُغلَق: تُدخَل بمنتج **غير متابَع مخزونياً**،
             // فيبقى ترحيلها إلى 5150 كما هو.
             'items.*.product_id'  => ['required', 'uuid'],
+            // VAR-FU-1: تحقّقٌ بنيويّ فقط — `DocumentLineVariantResolver` (VAR-DOC-1)
+            // داخل الخدمة هو السلطة الوحيدة للاعتماد/العزل/الإلزامية. لا يتحقّق
+            // هذا المسار من تطابق المتغيّر مع سطر `source_line_id` (إن وُجد) —
+            // فجوةٌ موثّقةٌ مسبقاً في `ReturnService::assertWithinSource()`، غير
+            // ناتجة عن هذا التغيير ولا مُصلَحة هنا (انظر التقرير — GAP-08).
+            'items.*.product_variant_id' => ['nullable', 'uuid'],
             'items.*.description' => ['nullable', 'string'],
             'items.*.quantity'    => ['required', 'integer', 'min:1', 'max:1000000'],
             'items.*.unit_price'  => ['required', 'integer', 'min:0', 'max:100000000000'],
