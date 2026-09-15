@@ -295,9 +295,9 @@ Actions على الفرع بعد الدفع — لم تُفحص بعد.
 ## Git
 
 - Branch: `claude/var-pos-1-variant-pos`
-- PR: يُفتح بعد هذا التقرير.
+- PR: "VAR-POS-1: Variant-aware POS selection and checkout"
 - Base SHA: `15f6c53d4fddc8fc0a19ac96ab6738eb3ea44d4b`
-- Head SHA: يُملأ بعد الدفع.
+- Head SHA: `bb94bcada702b6362b4bd67cc83ed61ef6ce12d1`
 
 ## Next Step
 
