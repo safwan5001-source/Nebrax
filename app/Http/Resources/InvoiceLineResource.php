@@ -13,6 +13,10 @@ class InvoiceLineResource extends JsonResource
         return [
             'id'            => $this->id,
             'product_id'    => $this->product_id,
+            // VAR-DOC-1: هويّة إضافية لا تكسر عملاء موجودين — فارغة لمنتجٍ بسيط.
+            'product_variant_id' => $this->product_variant_id,
+            // اللقطة الحتمية وحدها — لا تُشتقّ من المتغيّر الحيّ عند عرض مستندٍ تاريخي.
+            'variant_descriptor' => $this->variant_descriptor_snapshot,
             // اللقطة أولاً لحفظ المستند التاريخي؛ المرجع الحالي احتياط للسطور السابقة للترحيل.
             'product_name'  => $this->product_name_snapshot ?? $this->product?->name ?? $this->description,
             'product_code'  => $this->product_sku_snapshot ?? $this->product?->sku,

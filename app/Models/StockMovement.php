@@ -24,7 +24,7 @@ class StockMovement extends BaseModel
     protected $fillable = [
         // `warehouse_id` كان ساقطاً من القائمة منذ إضافة المخازن، فكان يُحذف صامتاً
         // عند الإنشاء. بدونه لا يمكن للحركة أن تتبع فرع مخزنها أصلاً.
-        'tenant_id', 'branch_id', 'warehouse_id', 'product_id', 'type', 'quantity',
+        'tenant_id', 'branch_id', 'warehouse_id', 'product_id', 'product_variant_id', 'type', 'quantity',
         'unit_cost', 'total_cost', 'balance_quantity',
         'source_type', 'source_id', 'movement_date', 'notes',
     ];
@@ -47,5 +47,11 @@ class StockMovement extends BaseModel
     public function warehouse(): BelongsTo
     {
         return $this->referenceBelongsTo(Warehouse::class);
+    }
+
+    /** VAR-DOC-1: المتغيّر الفعلي الذي خصّته هذه الحركة — فارغٌ لمنتجٍ بسيط. */
+    public function variant(): BelongsTo
+    {
+        return $this->referenceBelongsTo(ProductVariant::class, 'product_variant_id');
     }
 }

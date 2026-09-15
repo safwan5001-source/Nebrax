@@ -20,7 +20,8 @@ class InvoiceLine extends BaseModel implements CompanyWide
     use ResolvesBranchReferences;
 
     protected $fillable = [
-        'tenant_id', 'invoice_id', 'product_id', 'product_name_snapshot',
+        'tenant_id', 'invoice_id', 'product_id', 'product_variant_id', 'variant_descriptor_snapshot',
+        'product_name_snapshot',
         'product_sku_snapshot', 'product_barcode_snapshot', 'description',
         'quantity', 'unit_name', 'unit_factor', 'unit_price', 'unit_price_before_tax', 'tax_rate',
         'quantity_numerator', 'quantity_denominator', 'pricing_numerator', 'pricing_denominator',
@@ -68,6 +69,12 @@ class InvoiceLine extends BaseModel implements CompanyWide
     public function product(): BelongsTo
     {
         return $this->referenceBelongsTo(Product::class);
+    }
+
+    /** VAR-DOC-1: المتغيّر الفعلي حين يكون المنتج متعدد الخيارات — فارغٌ لمنتجٍ بسيط. */
+    public function variant(): BelongsTo
+    {
+        return $this->referenceBelongsTo(ProductVariant::class, 'product_variant_id');
     }
 
     /** تخصيصات صافي السطر بين مراكز التكلفة؛ تحذف مع المسودة عند إعادة بناء السطور. */

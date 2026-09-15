@@ -16,7 +16,7 @@ class ProcurementLine extends BaseModel implements CompanyWide
     use ResolvesBranchReferences;
 
     protected $fillable = [
-        'tenant_id', 'procurement_document_id', 'product_id', 'description',
+        'tenant_id', 'procurement_document_id', 'product_id', 'product_variant_id', 'variant_descriptor_snapshot', 'description',
         'quantity', 'unit_price', 'tax_rate',
         'line_subtotal', 'line_tax', 'line_total',
     ];
@@ -39,5 +39,11 @@ class ProcurementLine extends BaseModel implements CompanyWide
     public function product(): BelongsTo
     {
         return $this->referenceBelongsTo(Product::class);
+    }
+
+    /** VAR-DOC-1: المتغيّر الفعلي حين يكون المنتج متعدد الخيارات — فارغٌ لمنتجٍ بسيط. */
+    public function variant(): BelongsTo
+    {
+        return $this->referenceBelongsTo(ProductVariant::class, 'product_variant_id');
     }
 }

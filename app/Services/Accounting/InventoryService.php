@@ -119,6 +119,7 @@ class InventoryService
 
         $movement = StockMovement::create([
             'product_id'       => $product->id,
+            'product_variant_id' => $variant?->id,
             'warehouse_id'     => $warehouseId,
             'branch_id'        => $this->branchOfWarehouse($warehouseId), // الحركة تتبع فرع المخزن
             'type'             => 'in',
@@ -167,6 +168,7 @@ class InventoryService
 
         $movement = StockMovement::create([
             'product_id'       => $product->id,
+            'product_variant_id' => $variant?->id,
             'warehouse_id'     => $warehouseId,
             'branch_id'        => $this->branchOfWarehouse($warehouseId), // الحركة تتبع فرع المخزن
             'type'             => 'out',
@@ -212,7 +214,7 @@ class InventoryService
 
     public function recordSaleCogs(Invoice $invoice): ?\App\Models\JournalEntry
     {
-        $invoice->loadMissing('lines.product', 'lines.costCenterAllocations');
+        $invoice->loadMissing('lines.product', 'lines.variant', 'lines.costCenterAllocations');
 
         $totalCogs = 0;
         $cogsByAccountAndCenter = []; // account_id|cost_center_id => amount
@@ -234,6 +236,10 @@ class InventoryService
                 continue;
             }
 
+            // VAR-DOC-1: هويّة المخزون المستهدفة الآن تتبع سطر الفاتورة —
+            // متغيّرٌ فعلي حين يحمله السطر، وإلا هويّة المنتج البسيط كالسابق.
+            $variant = $line->variant;
+
             // الكمية بوحدة المخزون: السطر قد يكون بوحدة أكبر (طبلية = ٥٠ كيساً).
             // المعامل ١ لكل سطر لا يحدّد وحدة، فالسلوك القائم لا يتغيّر.
             $quantity = $line->baseQuantity();
@@ -241,11 +247,8 @@ class InventoryService
             // الحارس قبل أي حركة: الرفض هنا يُبطل المعاملة كلها، فلا فاتورة
             // نصفها مرحَّل ونصفها لا. ويقارن بوحدة المخزون لا بوحدة السطر —
             // «طبليتان» و«رصيد ٦٠ كيساً» لا يُقارَنان قبل التحويل.
-            //
-            // VAR-INV-1: سطر الفاتورة لا يحمل متغيّراً بعد (VAR-DOC-1 لاحقاً) —
-            // الهويّة المحلولة هنا دائماً هويّة المنتج البسيط، كالسلوك السابق حرفياً.
-            $this->assertStockAvailable($product, $quantity, $warehouseId);
-            $state = $this->resolveInventoryState($product);
+            $this->assertStockAvailable($product, $quantity, $warehouseId, $variant);
+            $state = $this->resolveInventoryState($product, $variant);
 
             $unitCost = $state->avg_cost;
             $cost     = $quantity * $unitCost;
@@ -253,6 +256,7 @@ class InventoryService
 
             StockMovement::create([
                 'product_id'       => $product->id,
+                'product_variant_id' => $variant?->id,
                 'warehouse_id'     => $warehouseId,
                 'branch_id'        => $this->branchOfWarehouse($warehouseId), // الحركة تتبع فرع المخزن
                 'type'             => 'out',
@@ -267,7 +271,7 @@ class InventoryService
             ]);
 
             $state->update(['quantity_on_hand' => $newQty]);
-            $this->adjustWarehouseStock($warehouseId, $product->id, -$quantity);
+            $this->adjustWarehouseStock($warehouseId, $product->id, -$quantity, $variant?->id);
             app(InventoryAlertService::class)->queueEvaluation($product->id);
             $totalCogs += $cost;
             $cogsAcct = $product->cogs_account_id ?: $defaultCogs;

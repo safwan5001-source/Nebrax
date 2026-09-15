@@ -8,6 +8,8 @@ use App\Models\ProcurementLine;
 use App\Models\Purchase;
 use App\Models\RfqInvitation;
 use App\Services\PrintTemplates\PrintTemplateService;
+use App\Models\Product;
+use App\Support\DocumentLineVariantResolver;
 use App\Support\Settings;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -316,9 +318,17 @@ class ProcurementService
             $lineGross = $qty * $unitPrice;
             [$lineNet, $lineTax] = $this->splitLineTax($lineGross, $rate, $inclusive);
 
+            $product = ! empty($item['product_id']) ? Product::find($item['product_id']) : null;
+            // VAR-DOC-1: منتجٌ متعدد الخيارات يلزمه متغيّرٌ فعلي. Fail closed.
+            $variant = $product !== null
+                ? DocumentLineVariantResolver::resolve($product, $item['product_variant_id'] ?? null, $doc->tenant_id)
+                : null;
+
             ProcurementLine::create([
                 'procurement_document_id' => $doc->id,
                 'product_id'              => $item['product_id'] ?? null,
+                'product_variant_id'      => $variant?->id,
+                'variant_descriptor_snapshot' => $variant !== null ? DocumentLineVariantResolver::descriptor($variant) : null,
                 'description'             => $item['description'] ?? null,
                 'quantity'                => $qty,
                 'unit_price'              => $unitPrice,
