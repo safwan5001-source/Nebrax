@@ -103,6 +103,13 @@ class SalesReportService
         if (! empty($filters['product_id'])) {
             $query->whereHas('lines', fn (Builder $lines) => $lines->where('product_id', $filters['product_id']));
         }
+        // VAR-REPORT-1: إضافيٌّ بحت — منتجٌ بسيط لا يملك متغيّراً فلا يتأثر.
+        // منتجٌ متعدد الخيارات: تحديد متغيّرٍ فعليٍّ بعينه (لا نسخة تحقّقٍ
+        // جديدة هنا — عدم تطابق منتجٍ آخر أو مستأجرٍ آخر يُرجع صفوفاً فارغة
+        // فحسب عبر WHERE عادي، بلا أي تسريب).
+        if (! empty($filters['product_variant_id'])) {
+            $query->whereHas('lines', fn (Builder $lines) => $lines->where('product_variant_id', $filters['product_variant_id']));
+        }
         if (! empty($filters['product_category_id'])) {
             $query->whereHas('lines.product', fn (Builder $product) => $product->where('category_id', $filters['product_category_id']));
         }
@@ -146,11 +153,26 @@ class SalesReportService
         return ['rows' => $rows, 'totals' => $this->invoiceTotals($filters)];
     }
 
-    /** @return array{rows:array<int,array<string,mixed>>, totals:array<string,int>} */
+    /**
+     * VAR-REPORT-1 — الهويّة الآن `product_id` + `product_variant_id` (لا
+     * `product_id` وحده): متغيّرٌ شقيقٌ (أسود/كبير مقابل أسود/صغير) يُنتج
+     * سطراً مستقلاً، لا يندمجان معاً. منتجٌ بسيطٌ (`product_variant_id
+     * IS NULL`) يحتفظ بنفس المفتاح/التجميع حرفياً كما كان قبل هذا المعيار.
+     *
+     * **الحقيقة التاريخية**: التسمية تُبنى من لقطة السطر نفسه
+     * (`product_name_snapshot`/`variant_descriptor_snapshot`، VAR-DOC-1) لا
+     * من `products.name` الحيّ — إعادة تسمية منتجٍ اليوم لا تُعيد كتابة
+     * تقرير الأمس. `products.name` يبقى **احتياطاً فقط** لسطورٍ قديمة
+     * أُنشئت قبل إضافة اللقطة (عمودٌ اختياريٌّ بلا ترحيلٍ عكسي) — نفس
+     * السلوك الحيّ الذي كانت عليه كل الصفوف قبل هذا المعيار، فلا صفَّ
+     * موجود يفقد تسميته.
+     *
+     * @return array{rows:array<int,array<string,mixed>>, totals:array<string,int>}
+     */
     private function byProduct(array $filters): array
     {
         $invoiceFilters = $filters;
-        unset($invoiceFilters['product_id'], $invoiceFilters['product_category_id']);
+        unset($invoiceFilters['product_id'], $invoiceFilters['product_category_id'], $invoiceFilters['product_variant_id']);
         $invoiceIds = $this->invoices($invoiceFilters)->select('invoices.id');
 
         $query = InvoiceLine::query()
@@ -160,21 +182,43 @@ class SalesReportService
         if (! empty($filters['product_id'])) {
             $query->where('invoice_lines.product_id', $filters['product_id']);
         }
+        if (! empty($filters['product_variant_id'])) {
+            $query->where('invoice_lines.product_variant_id', $filters['product_variant_id']);
+        }
         if (! empty($filters['product_category_id'])) {
             $query->where('products.category_id', $filters['product_category_id']);
         }
 
         $rows = $query
-            ->selectRaw('invoice_lines.product_id as bucket_key, products.name as bucket_label, SUM(invoice_lines.quantity) as quantity, SUM(invoice_lines.line_total) as amount')
-            ->groupBy('invoice_lines.product_id', 'products.name')
+            ->selectRaw('invoice_lines.product_id as bucket_key, invoice_lines.product_variant_id as bucket_variant_id, '
+                .'MAX(invoice_lines.product_name_snapshot) as bucket_name_snapshot, MAX(invoice_lines.variant_descriptor_snapshot) as bucket_variant_descriptor, '
+                .'products.name as bucket_live_name, SUM(invoice_lines.quantity) as quantity, SUM(invoice_lines.line_total) as amount')
+            ->groupBy('invoice_lines.product_id', 'invoice_lines.product_variant_id', 'products.name')
             ->orderByDesc('amount')
             ->get()
-            ->map(fn ($row) => [
-                'key'      => $row->bucket_key === null ? null : (string) $row->bucket_key,
-                'label'    => $row->bucket_label === null || $row->bucket_label === '' ? null : (string) $row->bucket_label,
-                'quantity' => (int) $row->quantity,
-                'amount'   => (int) $row->amount,
-            ])->all();
+            ->map(function ($row) {
+                $name = $row->bucket_name_snapshot ?: $row->bucket_live_name;
+                $label = $name === null || $name === ''
+                    ? null
+                    : ($row->bucket_variant_descriptor ? "{$name} — {$row->bucket_variant_descriptor}" : $name);
+
+                // مفتاحٌ فريد لكل سطر: منتجٌ بسيطٌ يبقى `product_id` وحده
+                // حرفياً (لا متغيّر له فيتطابق حتماً)؛ متغيّرٌ فعليٌّ يُلحَق
+                // معرّفه فلا يتصادم مفتاحا شقيقين على نفس المنتج.
+                $key = $row->bucket_key === null
+                    ? null
+                    : ($row->bucket_variant_id !== null ? "{$row->bucket_key}:{$row->bucket_variant_id}" : (string) $row->bucket_key);
+
+                return [
+                    'key'                => $key,
+                    'label'              => $label,
+                    'product_id'         => $row->bucket_key === null ? null : (string) $row->bucket_key,
+                    'product_variant_id' => $row->bucket_variant_id === null ? null : (string) $row->bucket_variant_id,
+                    'variant_descriptor' => $row->bucket_variant_descriptor,
+                    'quantity'           => (int) $row->quantity,
+                    'amount'             => (int) $row->amount,
+                ];
+            })->all();
 
         return [
             'rows' => $rows,

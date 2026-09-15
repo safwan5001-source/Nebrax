@@ -12,7 +12,7 @@ class CommerceCartItem extends BaseModel implements CompanyWide
     use ResolvesBranchReferences;
 
     protected $fillable = [
-        'tenant_id', 'cart_id', 'product_id', 'product_name_snapshot',
+        'tenant_id', 'cart_id', 'product_id', 'product_variant_id', 'product_name_snapshot',
         'unit_key', 'unit_name_snapshot', 'quantity',
     ];
 
@@ -26,5 +26,10 @@ class CommerceCartItem extends BaseModel implements CompanyWide
     public function product(): BelongsTo
     {
         return $this->referenceBelongsTo(Product::class);
+    }
+
+    public function variant(): BelongsTo
+    {
+        return $this->referenceBelongsTo(ProductVariant::class, 'product_variant_id');
     }
 }

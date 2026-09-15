@@ -20,7 +20,8 @@ class CommerceOrderLine extends BaseModel implements CompanyWide
     use ResolvesBranchReferences;
 
     protected $fillable = [
-        'tenant_id', 'commerce_order_id', 'product_id', 'product_name_snapshot',
+        'tenant_id', 'commerce_order_id', 'product_id', 'product_variant_id',
+        'product_name_snapshot', 'variant_descriptor_snapshot',
         'quantity', 'unit_name', 'unit_factor', 'unit_price', 'line_total',
     ];
 
@@ -44,6 +45,12 @@ class CommerceOrderLine extends BaseModel implements CompanyWide
     public function product(): BelongsTo
     {
         return $this->referenceBelongsTo(Product::class);
+    }
+
+    /** مرجع مخزَّن — نفس فلسفة `product()`؛ اللقطة التاريخية (`variant_descriptor_snapshot`) لا تعتمد عليه بعد الإنشاء. */
+    public function variant(): BelongsTo
+    {
+        return $this->referenceBelongsTo(ProductVariant::class, 'product_variant_id');
     }
 
     /** الكمية بوحدة المخزون — نفس اصطلاح InvoiceLine/PurchaseLine (لا تحويل نقدي). */

@@ -8,6 +8,7 @@ use App\Models\Partner;
 use App\Models\Product;
 use App\Models\SalesChannel;
 use App\Services\Accounting\UnitConversion;
+use App\Support\DocumentLineVariantResolver;
 use App\Tenancy\BranchScope;
 use App\Tenancy\CustomerContext;
 use App\Tenancy\TenantContext;
@@ -101,7 +102,7 @@ class CommerceOrderService
      * الطلب، مهما كانت قيمته في `$data`.
      *
      * @param  array{sales_channel_id: string, partner_id?: ?string, number?: ?string, customer_snapshot?: array<string, mixed>, shipping_snapshot?: array<string, mixed>, billing_snapshot?: array<string, mixed>}  $data
-     * @param  array<int, array{product_id: string, quantity: int, unit_name?: ?string}>  $items
+     * @param  array<int, array{product_id: string, product_variant_id?: ?string, quantity: int, unit_name?: ?string}>  $items
      *
      * @throws RuntimeException المستأجر/القناة/العميل/المنتج غير موجودين، أو
      *                          كمية غير موجبة، أو وحدة غير معرَّفة، أو حمولة
@@ -175,7 +176,7 @@ class CommerceOrderService
      * القديم (AWJ_COMMERCE_ORDER_IDENTITY_DECISION_REPORT.md، القرار C).
      *
      * @param  array{sales_channel_id: string, storefront_id: string, commerce_checkout_id: string, delivery_method: ?string, contact_name: ?string, contact_phone: ?string, contact_email: ?string, delivery_country: ?string, delivery_city: ?string, delivery_district: ?string, delivery_street: ?string, delivery_postal_code: ?string, delivery_notes: ?string}  $header
-     * @param  array<int, array{product_id: string, product_name_snapshot: string, quantity: int, unit_name: ?string, unit_factor: int, unit_price: int, line_total: int}>  $lines  نتيجة إعادة تحقّق موثوقة بالفعل — لا يُعاد حسم سعرٍ أو وحدةٍ هنا.
+     * @param  array<int, array{product_id: string, product_variant_id?: ?string, variant_descriptor_snapshot?: ?string, product_name_snapshot: string, quantity: int, unit_name: ?string, unit_factor: int, unit_price: int, line_total: int}>  $lines  نتيجة إعادة تحقّق موثوقة بالفعل — لا يُعاد حسم سعرٍ أو وحدةٍ هنا.
      *
      * @throws RuntimeException `$lines` فارغة، أو `sales_channel_id` غير موجود.
      */
@@ -310,6 +311,9 @@ class CommerceOrderService
             throw new RuntimeException('المنتج غير موجود.');
         }
 
+        $tenantId = app(TenantContext::class)->id();
+        $variant = DocumentLineVariantResolver::resolve($product, $item['product_variant_id'] ?? null, (string) $tenantId);
+
         $quantity = (int) ($item['quantity'] ?? 0);
         if ($quantity <= 0) {
             throw new RuntimeException('الكمية يجب أن تكون أكبر من صفر.');
@@ -322,7 +326,7 @@ class CommerceOrderService
         // والمحسوم داخل حلّ السعر.
         [$resolvedUnitName, $unitFactor] = $this->units->resolve($product, $unitName);
 
-        $resolved = $this->prices->resolve($productId, $salesChannelId, $partnerId, $unitName);
+        $resolved = $this->prices->resolve($productId, $salesChannelId, $partnerId, $unitName, variantId: $variant?->id);
         if (! $resolved->resolved) {
             throw new CommerceOrderPriceUnresolvedException(
                 "لا سعر قابل للحسم للمنتج «{$product->name}» بالوحدة المطلوبة."
@@ -333,6 +337,8 @@ class CommerceOrderService
 
         return $order->lines()->create([
             'product_id' => $product->id,
+            'product_variant_id' => $variant?->id,
+            'variant_descriptor_snapshot' => $variant !== null ? DocumentLineVariantResolver::descriptor($variant) : null,
             'product_name_snapshot' => $product->name,
             'quantity' => $quantity,
             'unit_name' => $resolvedUnitName,

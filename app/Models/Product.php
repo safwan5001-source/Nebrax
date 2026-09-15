@@ -128,19 +128,35 @@ class Product extends BaseModel implements BranchShareable
                 $old = $product->getOriginal('sku');
                 $new = $product->sku;
 
-                if (self::sharesSkuNamespace($product)) {
-                    if ($old !== null && $old !== '') {
-                        SkuRegistryEntry::releaseOwnedByProduct($old, $product->id);
+                // الصفّ نفسه إدرج/حُدِّث بالفعل قبل وصول `saved` — لا معاملة
+                // محيطة نضمنها من المستدعي (`Product::create()` مباشرة بلا
+                // خدمة وسيطة يجب أن يبقى آمناً، كما يوثّق أعلى الصنف).
+                // `SkuRegistryEntry::claim()`/`assertFreeForIsolatedProduct()`
+                // يضمنان الآن الذرّية داخلياً (معاملتهما الذاتية)، لكن رفض
+                // المطالبة لا يمكنه محو إدراج هذا الصفّ الذي سبقه — فيُعوَّض
+                // هنا صراحةً: صفٌّ أُنشئ للتوّ ورُفض رمزه يُحذف (حذفاً ناعماً)
+                // بدل أن يبقى يتيماً يخالف تفرّد الرمز.
+                try {
+                    if (self::sharesSkuNamespace($product)) {
+                        if ($old !== null && $old !== '') {
+                            SkuRegistryEntry::releaseOwnedByProduct($old, $product->id);
+                        }
+                        if ($new !== null && $new !== '') {
+                            SkuRegistryEntry::claim($new, 'product', productId: $product->id);
+                        }
+                    } elseif ($new !== null && $new !== '') {
+                        // منتجٌ فرعي معزول: لا ينضمّ إلى الجدول، لكن رمزه يجب ألّا
+                        // يصطدم صامتةً بهويةٍ مرئية من كل الفروع بالفعل (منتجٌ
+                        // مشترك/بلا فرع/متعدد الخيارات، أو أي متغيّر) — الاتجاه
+                        // المعاكس بالضبط لما يتحقق منه `claim()` نفسه.
+                        SkuRegistryEntry::assertFreeForIsolatedProduct($new, $product->id);
                     }
-                    if ($new !== null && $new !== '') {
-                        SkuRegistryEntry::claim($new, 'product', productId: $product->id);
+                } catch (\Throwable $e) {
+                    if ($product->wasRecentlyCreated) {
+                        static::withoutEvents(fn () => $product->delete());
                     }
-                } elseif ($new !== null && $new !== '') {
-                    // منتجٌ فرعي معزول: لا ينضمّ إلى الجدول، لكن رمزه يجب ألّا
-                    // يصطدم صامتةً بهويةٍ مرئية من كل الفروع بالفعل (منتجٌ
-                    // مشترك/بلا فرع/متعدد الخيارات، أو أي متغيّر) — الاتجاه
-                    // المعاكس بالضبط لما يتحقق منه `claim()` نفسه.
-                    SkuRegistryEntry::assertFreeForIsolatedProduct($new, $product->id);
+
+                    throw $e;
                 }
             }
 

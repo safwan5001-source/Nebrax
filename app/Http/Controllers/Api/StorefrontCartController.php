@@ -24,9 +24,10 @@ final class StorefrontCartController extends PublicApiController
 
     public function store(Request $request, CommerceCartService $carts): JsonResponse
     {
-        $this->rejectUnknown($request, ['product_id', 'unit_key', 'quantity']);
+        $this->rejectUnknown($request, ['product_id', 'product_variant_id', 'unit_key', 'quantity']);
         $data = $request->validate([
             'product_id' => ['required', 'uuid'],
+            'product_variant_id' => ['sometimes', 'nullable', 'uuid'],
             'unit_key' => ['sometimes', 'string', 'max:80'],
             'quantity' => ['required', 'integer', 'min:1', 'max:2147483647'],
         ]);
@@ -42,6 +43,7 @@ final class StorefrontCartController extends PublicApiController
                 $data['product_id'],
                 $data['unit_key'] ?? 'base',
                 $data['quantity'],
+                $data['product_variant_id'] ?? null,
             );
         } catch (CartNotFoundException) {
             return $this->clearCookie($this->notFound($request));

@@ -3,10 +3,12 @@
 namespace App\Services\Reporting;
 
 use App\Models\Product;
+use App\Models\ProductVariant;
 use App\Models\ProductWarehouseStock;
 use App\Models\StockMovement;
 use App\Models\StockPermit;
 use App\Models\Stocktake;
+use App\Support\DocumentLineVariantResolver;
 use App\Support\ProductWarehouseBalanceQuery;
 use App\Support\ReportBranchScope;
 use App\Support\ReportWarehouseScope;
@@ -81,22 +83,33 @@ class InventoryReportService
     }
 
     /**
+    /**
      * قيمة المخزون الحالية — عقد PR-ACL-INVENTORY-CATALOG-EXPORT-SCOPE:
      * الكمية والقيمة وحدهما يُقاطَعان بنطاق المخزن الفعّال؛ `avg_cost` يبقى
-     * متوسط `Product` العالمي بلا تغيير (لا تكلفة مخترَعة لكل مخزن — انظر
-     * AWJ_INVENTORY_VALUATION_SEMANTICS.md). هذا يشمل منتجات الوقود المرتبطة
-     * أيضاً: `avg_cost` هنا كان دوماً القيمة الممزوجة على مستوى المنتج، لا
-     * أساس تكلفة `FuelCostBasisService` الخاص بكل مخزن — لم يتغيّر هذا الفارق،
-     * ولا يدّعي هذا التقرير خلاف ذلك.
+     * متوسط `Product` العالمي بلا تغيير لمنتجٍ بسيط (لا تكلفة مخترَعة لكل
+     * مخزن — انظر AWJ_INVENTORY_VALUATION_SEMANTICS.md). هذا يشمل منتجات
+     * الوقود المرتبطة أيضاً: `avg_cost` هنا كان دوماً القيمة الممزوجة على
+     * مستوى المنتج، لا أساس تكلفة `FuelCostBasisService` الخاص بكل مخزن —
+     * لم يتغيّر هذا الفارق، ولا يدّعي هذا التقرير خلاف ذلك.
      *
-     * غير المقيَّد (`allowedWarehouseIds() === null`): الكمية تبقى
+     * غير المقيَّد (`allowedWarehouseIds() === null`): الكمية تبقى
      * `products.quantity_on_hand` العالمي حرفياً — يشمل كمية ما قبل المخازن
-     * (حركات بلا `warehouse_id`) التي لا يمكن نسبتها لأي مخزن. المقيَّد يرى
+     * (حركات بلا `warehouse_id`) التي لا يمكن نسبتها لأي مخزن. المقيَّد يرى
      * مجموع `product_warehouse_stock` ضمن مخازنه المسموحة فقط؛ تلك الكمية
      * غير المنسوبة لا تُحسب له لأنها غير مثبتة داخل نطاقه — سلوكٌ صحيح لا فقدان.
      *
-     * `hide_zero` يُطبَّق بعد حساب الكمية الفعلية (لا `WHERE` عالمي مسبق)
+     * `hide_zero` يُطبَّق بعد حساب الكمية الفعلية (لا `WHERE` عالمي مسبق)
      * ليطابق ما يراه المستخدم فعلاً، لا رقماً عالمياً قد يخالف نطاقه.
+     *
+     * **VAR-REPORT-1 — منتجٌ متعدد الخيارات لا يظهر كصفٍّ أبٍ واحد بعد الآن**:
+     * `Product::avg_cost` يُعيد `0` صراحةً لمنتجٍ كهذا (بتصميم VAR-INV-1 —
+     * «لا خلط تكاليف متغيّرات مختلفة اقتصادياً») — صفٌّ واحدٌ بكميةٍ حقيقية
+     * وقيمةٍ صفرية كان سيقرأه المستخدم خطأً كمخزونٍ بلا قيمة، وهذا بالضبط ما
+     * يحذّر منه العقد («لا misleading parent avg_cost»). البديل الصريح الذي
+     * يسمح به العقد نفسه («اعرض per-Variant بدلاً منه») هو المطبَّق هنا:
+     * توسيعٌ لصفٍّ واحدٍ لكل متغيّرٍ فعلي (نشِط)، بكميته ومتوسط تكلفته
+     * الحقيقيَّين من `InventoryState` الخاصة به وحدها — منتجٌ بسيطٌ يبقى
+     * صفاً واحداً حرفياً كما كان قبل هذا المعيار، بلا أي تغيير.
      *
      * @return array{rows:array<int,array<string,mixed>>,totals:array<string,int>}
      */
@@ -106,34 +119,84 @@ class InventoryReportService
 
         $products = $this->trackedProducts($filters)
             ->orderBy('products.name')
-            ->get(['id', 'sku', 'name', 'unit', 'quantity_on_hand', 'reorder_level', 'avg_cost', 'sale_price']);
+            ->get(['id', 'sku', 'name', 'unit', 'quantity_on_hand', 'reorder_level', 'avg_cost', 'sale_price', 'variant_state']);
 
-        $scopedQuantities = $warehouseIds === null ? null : ProductWarehouseStock::query()
-            ->whereIn('product_id', $products->pluck('id'))
-            ->whereIn('warehouse_id', $warehouseIds)
-            ->selectRaw('product_id, SUM(quantity) as qty')
-            ->groupBy('product_id')
-            ->pluck('qty', 'product_id');
+        $variantManagedIds = $products->filter(fn (Product $p) => $p->isVariantManaged())->pluck('id');
+
+        // كمّيةٌ مُقاطَعة بنطاق المخزن: مجموعةٌ بـ(product_id, product_variant_id)
+        // معاً — منتجٌ بسيطٌ صفّه الوحيد product_variant_id IS NULL فيسلك
+        // كما كان تماماً؛ متغيّرٌ فعليٌّ يحصل على مجموعه المستقل الخاص.
+        $scopedQuantities = null;
+        if ($warehouseIds !== null) {
+            $scopedQuantities = ProductWarehouseStock::query()
+                ->whereIn('product_id', $products->pluck('id'))
+                ->whereIn('warehouse_id', $warehouseIds)
+                ->selectRaw('product_id, product_variant_id, SUM(quantity) as qty')
+                ->groupBy('product_id', 'product_variant_id')
+                ->get()
+                ->groupBy('product_id')
+                ->map(fn ($rows) => $rows->keyBy(fn ($row) => $row->product_variant_id ?? ''));
+        }
+
+        $variants = $variantManagedIds->isEmpty() ? collect() : ProductVariant::query()
+            ->whereIn('product_id', $variantManagedIds)
+            ->where('is_active', true)
+            ->orderBy('sku')
+            ->get()
+            ->groupBy('product_id');
 
         $hideZero = ! empty($filters['hide_zero']);
 
-        $rows = $products
-            ->map(function (Product $product) use ($warehouseIds, $scopedQuantities) {
-                $quantity = $warehouseIds === null
-                    ? (int) $product->quantity_on_hand
-                    : (int) ($scopedQuantities[$product->id] ?? 0);
+        $rows = collect();
+        foreach ($products as $product) {
+            if ($product->isVariantManaged()) {
+                foreach ($variants->get($product->id, collect()) as $variant) {
+                    $quantity = $warehouseIds === null
+                        ? (int) $variant->quantity_on_hand
+                        : (int) ($scopedQuantities?->get($product->id)?->get($variant->id)?->qty ?? 0);
+                    $avgCost = (int) $variant->avg_cost;
+                    $descriptor = DocumentLineVariantResolver::descriptor($variant);
 
-                return [
-                    'key' => (string) $product->id,
-                    'sku' => $product->sku,
-                    'label' => $product->name,
-                    'unit' => $product->unit,
-                    'quantity' => $quantity,
-                    'reorder_level' => $product->reorder_level === null ? null : (int) $product->reorder_level,
-                    'avg_cost' => (int) $product->avg_cost,
-                    'stock_value' => $quantity * (int) $product->avg_cost,
-                ];
-            })
+                    $rows->push([
+                        'key' => "{$product->id}:{$variant->id}",
+                        'product_id' => (string) $product->id,
+                        'product_variant_id' => (string) $variant->id,
+                        'variant_descriptor' => $descriptor,
+                        'sku' => $variant->sku ?? $product->sku,
+                        'label' => $descriptor ? "{$product->name} — {$descriptor}" : $product->name,
+                        'unit' => $product->unit,
+                        'quantity' => $quantity,
+                        'reorder_level' => $product->reorder_level === null ? null : (int) $product->reorder_level,
+                        'avg_cost' => $avgCost,
+                        'stock_value' => $quantity * $avgCost,
+                    ]);
+                }
+
+                continue;
+            }
+
+            $quantity = $warehouseIds === null
+                ? (int) $product->quantity_on_hand
+                : (int) ($scopedQuantities?->get($product->id)?->get('')?->qty ?? 0);
+
+            $rows->push([
+                'key' => (string) $product->id,
+                'product_id' => (string) $product->id,
+                'product_variant_id' => null,
+                'variant_descriptor' => null,
+                'sku' => $product->sku,
+                'label' => $product->name,
+                'unit' => $product->unit,
+                'quantity' => $quantity,
+                'reorder_level' => $product->reorder_level === null ? null : (int) $product->reorder_level,
+                'avg_cost' => (int) $product->avg_cost,
+                'stock_value' => $quantity * (int) $product->avg_cost,
+            ]);
+        }
+
+        $variantFilter = $filters['product_variant_id'] ?? null;
+        $rows = $rows
+            ->when($variantFilter, fn ($rows) => $rows->filter(fn (array $row) => $row['product_variant_id'] === $variantFilter)->values())
             ->when($hideZero, fn ($rows) => $rows->filter(fn (array $row) => $row['quantity'] !== 0)->values())
             ->all();
 
@@ -148,19 +211,28 @@ class InventoryReportService
     }
 
     /**
-     * أرصدة المخازن — كمّية حصراً على حبة Product × Warehouse.
-     * الاستعلام والنطاق من `ProductWarehouseBalanceQuery`؛ العقد والتعيين كما كانا.
+     * أرصدة المخازن — كمّية حصراً على حبة Product × Warehouse (×Variant).
+     * الاستعلام والنطاق من `ProductWarehouseBalanceQuery` بلا أي تعديلٍ
+     * عليه (يخدم مستهلكين آخرين خارج التقارير — `InventoryWorkspaceQuery`/
+     * `InventoryWorkspaceFilters` — لا يجوز المساس بعقده المشترك). ما
+     * أُضيف هنا محليّاً فقط: `product_warehouse_stock.product_variant_id`
+     * في التحديد (كان موجوداً على الجدول أصلاً منذ VAR-INV-1 لكن التقرير
+     * لم يقرأه) + `leftJoin` مستقل لاسم/رمز المتغيّر — منتجٌ بسيطٌ
+     * (`product_variant_id IS NULL`) يبقى صفاً واحداً بنفس الشكل حرفياً.
      *
      * @return array{rows:array<int,array<string,mixed>>,totals:array<string,int>}
      */
     private function warehouseBalances(array $filters): array
     {
         $query = ProductWarehouseBalanceQuery::baseQuery()
+            ->leftJoin('product_variants', 'product_variants.id', '=', 'product_warehouse_stock.product_variant_id')
             ->select([
                 'product_warehouse_stock.product_id as bucket_key',
+                'product_warehouse_stock.product_variant_id as bucket_variant_id',
                 'product_warehouse_stock.warehouse_id',
                 'product_warehouse_stock.quantity',
                 'products.sku',
+                'product_variants.sku as variant_sku',
                 'products.name as bucket_label',
                 'products.unit',
                 'warehouses.name as warehouse_label',
@@ -170,6 +242,9 @@ class InventoryReportService
         if (! empty($filters['product_id'])) {
             $query->where('product_warehouse_stock.product_id', $filters['product_id']);
         }
+        if (! empty($filters['product_variant_id'])) {
+            $query->where('product_warehouse_stock.product_variant_id', $filters['product_variant_id']);
+        }
         if (! empty($filters['warehouse_id'])) {
             $query->where('product_warehouse_stock.warehouse_id', $filters['warehouse_id']);
         }
@@ -178,17 +253,32 @@ class InventoryReportService
             $query->where('product_warehouse_stock.quantity', '!=', 0);
         }
 
-        $rows = $query->orderBy('warehouses.name')->orderBy('products.name')->get()
-            ->map(fn ($row) => [
-                'key' => (string) $row->bucket_key,
-                'warehouse_id' => (string) $row->warehouse_id,
-                'warehouse' => (string) $row->warehouse_label,
-                'branch' => $row->branch_label === null ? null : (string) $row->branch_label,
-                'sku' => $row->sku === null ? null : (string) $row->sku,
-                'label' => (string) $row->bucket_label,
-                'unit' => (string) $row->unit,
-                'quantity' => (int) $row->quantity,
-            ])->all();
+        $fetched = $query->orderBy('warehouses.name')->orderBy('products.name')->get();
+
+        $variantIds = $fetched->pluck('bucket_variant_id')->filter()->unique();
+        $descriptors = $variantIds->isEmpty() ? collect() : ProductVariant::query()
+            ->whereIn('id', $variantIds)
+            ->get()
+            ->mapWithKeys(fn (ProductVariant $v) => [$v->id => DocumentLineVariantResolver::descriptor($v)]);
+
+        $rows = $fetched
+            ->map(function ($row) use ($descriptors) {
+                $descriptor = $row->bucket_variant_id === null ? null : ($descriptors[$row->bucket_variant_id] ?? null);
+
+                return [
+                    'key' => $row->bucket_variant_id !== null ? "{$row->bucket_key}:{$row->bucket_variant_id}" : (string) $row->bucket_key,
+                    'product_id' => (string) $row->bucket_key,
+                    'product_variant_id' => $row->bucket_variant_id === null ? null : (string) $row->bucket_variant_id,
+                    'variant_descriptor' => $descriptor,
+                    'warehouse_id' => (string) $row->warehouse_id,
+                    'warehouse' => (string) $row->warehouse_label,
+                    'branch' => $row->branch_label === null ? null : (string) $row->branch_label,
+                    'sku' => ($row->variant_sku ?? $row->sku) === null ? null : (string) ($row->variant_sku ?? $row->sku),
+                    'label' => $descriptor ? "{$row->bucket_label} — {$descriptor}" : (string) $row->bucket_label,
+                    'unit' => (string) $row->unit,
+                    'quantity' => (int) $row->quantity,
+                ];
+            })->all();
 
         return [
             'rows' => $rows,
@@ -200,11 +290,21 @@ class InventoryReportService
         ];
     }
 
-    /** @return array{rows:array<int,array<string,mixed>>,totals:array<string,int>} */
+    /**
+     * VAR-REPORT-1: `stock_movements.product_variant_id` (VAR-DOC-1/VAR-INV-1)
+     * أُضيف للتحديد والفلترة. **لا عمود لقطة اسمٍ على هذا الجدول إطلاقاً**
+     * (خلافاً لسطور المستندات) — الوصف هنا حتماً من `product_variants` الحيّ
+     * عبر `leftJoin`، لا اختراعاً لعمود لقطةٍ جديد خارج نطاق هذه المهمة. هذا
+     * لا يخالف مبدأ «لا حقيقة تاريخية حيّة» لأنه لا توجد لقطة أصلاً يُستبدَل
+     * بها — الحركة نفسها (الكمية/التكلفة/الرصيد) تبقى مقروءة كما سُجّلت.
+     *
+     * @return array{rows:array<int,array<string,mixed>>,totals:array<string,int>}
+     */
     private function movements(array $filters): array
     {
         $query = StockMovement::query()
             ->join('products', 'products.id', '=', 'stock_movements.product_id')
+            ->leftJoin('product_variants', 'product_variants.id', '=', 'stock_movements.product_variant_id')
             ->leftJoin('warehouses', 'warehouses.id', '=', 'stock_movements.warehouse_id')
             ->leftJoin('branches as movement_branches', 'movement_branches.id', '=', 'stock_movements.branch_id')
             ->where('products.track_inventory', true)
@@ -218,8 +318,10 @@ class InventoryReportService
                 'stock_movements.balance_quantity',
                 'stock_movements.movement_date',
                 'stock_movements.notes',
+                'stock_movements.product_variant_id as bucket_variant_id',
                 'products.id as bucket_key',
                 'products.sku',
+                'product_variants.sku as variant_sku',
                 'products.name as bucket_label',
                 'products.unit',
                 'warehouses.name as warehouse_label',
@@ -230,6 +332,9 @@ class InventoryReportService
         if (! empty($filters['product_id'])) {
             $query->where('stock_movements.product_id', $filters['product_id']);
         }
+        if (! empty($filters['product_variant_id'])) {
+            $query->where('stock_movements.product_variant_id', $filters['product_variant_id']);
+        }
         if (! empty($filters['warehouse_id'])) {
             $query->where('stock_movements.warehouse_id', $filters['warehouse_id']);
         }
@@ -238,22 +343,37 @@ class InventoryReportService
             $query->where('stock_movements.type', $filters['movement_type']);
         }
 
-        $rows = $query->orderByDesc('stock_movements.movement_date')->orderByDesc('stock_movements.id')->get()
-            ->map(fn ($row) => [
-                'key' => (string) $row->movement_id,
-                'date' => (string) $row->movement_date,
-                'type' => (string) $row->type,
-                'sku' => $row->sku === null ? null : (string) $row->sku,
-                'label' => (string) $row->bucket_label,
-                'unit' => (string) $row->unit,
-                'warehouse' => $row->warehouse_label === null ? null : (string) $row->warehouse_label,
-                'branch' => $row->branch_label === null ? null : (string) $row->branch_label,
-                'quantity' => (int) $row->quantity,
-                'unit_cost' => (int) $row->unit_cost,
-                'total_cost' => (int) $row->total_cost,
-                'balance_quantity' => (int) $row->balance_quantity,
-                'notes' => $row->notes === null ? null : (string) $row->notes,
-            ])->all();
+        $fetched = $query->orderByDesc('stock_movements.movement_date')->orderByDesc('stock_movements.id')->get();
+
+        $variantIds = $fetched->pluck('bucket_variant_id')->filter()->unique();
+        $descriptors = $variantIds->isEmpty() ? collect() : ProductVariant::query()
+            ->whereIn('id', $variantIds)
+            ->get()
+            ->mapWithKeys(fn (ProductVariant $v) => [$v->id => DocumentLineVariantResolver::descriptor($v)]);
+
+        $rows = $fetched
+            ->map(function ($row) use ($descriptors) {
+                $descriptor = $row->bucket_variant_id === null ? null : ($descriptors[$row->bucket_variant_id] ?? null);
+
+                return [
+                    'key' => (string) $row->movement_id,
+                    'date' => (string) $row->movement_date,
+                    'type' => (string) $row->type,
+                    'product_id' => (string) $row->bucket_key,
+                    'product_variant_id' => $row->bucket_variant_id === null ? null : (string) $row->bucket_variant_id,
+                    'variant_descriptor' => $descriptor,
+                    'sku' => ($row->variant_sku ?? $row->sku) === null ? null : (string) ($row->variant_sku ?? $row->sku),
+                    'label' => $descriptor ? "{$row->bucket_label} — {$descriptor}" : (string) $row->bucket_label,
+                    'unit' => (string) $row->unit,
+                    'warehouse' => $row->warehouse_label === null ? null : (string) $row->warehouse_label,
+                    'branch' => $row->branch_label === null ? null : (string) $row->branch_label,
+                    'quantity' => (int) $row->quantity,
+                    'unit_cost' => (int) $row->unit_cost,
+                    'total_cost' => (int) $row->total_cost,
+                    'balance_quantity' => (int) $row->balance_quantity,
+                    'notes' => $row->notes === null ? null : (string) $row->notes,
+                ];
+            })->all();
 
         return [
             'rows' => $rows,

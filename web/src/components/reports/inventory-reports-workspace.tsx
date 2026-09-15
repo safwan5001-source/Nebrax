@@ -37,6 +37,10 @@ interface InventoryRow {
   sku?: string | null;
   label?: string | null;
   unit?: string | null;
+  /** VAR-REPORT-1 — إضافيّة؛ `label` نفسه يحمل الوصف مركَّباً بالفعل لمنتجٍ متعدد الخيارات. */
+  product_id?: string | null;
+  product_variant_id?: string | null;
+  variant_descriptor?: string | null;
   quantity?: number;
   reorder_level?: number | null;
   avg_cost?: Money;

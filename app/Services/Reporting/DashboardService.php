@@ -45,7 +45,7 @@ class DashboardService
 
         $rows = match ($by) {
             'day'         => $this->byDay($filters),
-            'product'     => $this->byLineDimension($filters, 'products.name', 'products.id'),
+            'product'     => $this->byProductDimension($filters),
             'category'    => $this->byLineDimension($filters, 'products.category', 'products.category'),
             'branch'      => $this->byHeaderDimension($filters, 'branches', 'branches.name', 'invoices.branch_id'),
             'salesperson' => $this->byHeaderDimension($filters, 'employees', 'employees.name', 'invoices.salesperson_id'),
@@ -113,6 +113,46 @@ class DashboardService
             ->get();
 
         return $this->mapRows($rows);
+    }
+
+    /**
+     * VAR-REPORT-1 — بُعد المنتج تحديداً: هويّةٌ `product_id` + `product_variant_id`
+     * (متغيّرٌ شقيقٌ سطرٌ مستقل)، وتسمية من لقطة السطر التاريخية
+     * (`product_name_snapshot`/`variant_descriptor_snapshot`) لا `products.name`
+     * الحيّ — نفس مبدأ `SalesReportService::byProduct()` حرفياً. `category`
+     * يبقى على `byLineDimension()` العامة بلا أي تغيير.
+     */
+    protected function byProductDimension(array $filters): array
+    {
+        $invoiceIds = $this->base($filters)->select('invoices.id');
+
+        $rows = InvoiceLine::query()
+            ->join('products', 'products.id', '=', 'invoice_lines.product_id')
+            ->whereIn('invoice_lines.invoice_id', $invoiceIds)
+            ->selectRaw('products.id as bucket_key, invoice_lines.product_variant_id as bucket_variant_id, '
+                .'MAX(invoice_lines.product_name_snapshot) as bucket_name_snapshot, MAX(invoice_lines.variant_descriptor_snapshot) as bucket_variant_descriptor, '
+                .'products.name as bucket_live_name, SUM(invoice_lines.line_total) as amount')
+            ->groupBy('products.id', 'invoice_lines.product_variant_id', 'products.name')
+            ->orderByDesc('amount')
+            ->get();
+
+        return $rows->map(function ($row) {
+            $name = $row->bucket_name_snapshot ?: $row->bucket_live_name;
+            $label = $name === null || $name === ''
+                ? 'غير محدّد'
+                : ($row->bucket_variant_descriptor ? "{$name} — {$row->bucket_variant_descriptor}" : $name);
+            $key = $row->bucket_key === null
+                ? null
+                : ($row->bucket_variant_id !== null ? "{$row->bucket_key}:{$row->bucket_variant_id}" : (string) $row->bucket_key);
+
+            return [
+                'key'                => $key,
+                'label'              => $label,
+                'product_id'         => $row->bucket_key === null ? null : (string) $row->bucket_key,
+                'product_variant_id' => $row->bucket_variant_id === null ? null : (string) $row->bucket_variant_id,
+                'amount'             => (int) $row->amount,
+            ];
+        })->all();
     }
 
     /** أبعاد على مستوى **الرأس** (فرع/بائع): إجمالي الفاتورة ينسب كاملاً إليها. */
