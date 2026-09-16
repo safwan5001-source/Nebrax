@@ -7,6 +7,7 @@ import {
   COMMERCE_STORE_ADMIN_LIST_PATH,
   loadCommerceStoreCatalog,
   mapCommerceStoreAdminList,
+  provisionCommerceStorefront,
   resolveViewStoreUrl,
   selectStoreId,
   type CommerceStoreCatalog,
@@ -112,5 +113,45 @@ describe('commerce store selector catalog', () => {
   it('fails closed when the admin list cannot be loaded', async () => {
     apiMock.mockRejectedValue(new Error('network'));
     await expect(loadCommerceStoreCatalog()).resolves.toEqual({ status: 'error', message: 'load_failed' });
+  });
+});
+
+describe('commerce storefront provisioning (COM-STORE-PROVISION-1)', () => {
+  it('posts to the same tenant-scoped admin path and never sends a client hostname/tenant', async () => {
+    apiMock.mockResolvedValue({
+      data: { store: { id: 'store-x', name: 'X', sales_channel_id: 'ch-x', is_active: true, preview_url: 'https://x.example/' } },
+      meta: { created: true },
+    });
+
+    const result = await provisionCommerceStorefront();
+
+    expect(apiMock).toHaveBeenCalledTimes(1);
+    expect(apiMock).toHaveBeenCalledWith('/commerce/workspace/storefronts', { method: 'POST', body: {} });
+    expect(result).toEqual({
+      ok: true,
+      store: { id: 'store-x', name: 'X', salesChannelId: 'ch-x', isActive: true, previewUrl: 'https://x.example/' },
+    });
+  });
+
+  it('sends an optional trimmed display name only, no other identity field', async () => {
+    apiMock.mockResolvedValue({
+      data: { store: { id: 'store-y', name: 'متجري', sales_channel_id: 'ch-y', is_active: true, preview_url: null } },
+    });
+
+    await provisionCommerceStorefront('  متجري  ');
+
+    expect(apiMock).toHaveBeenCalledWith('/commerce/workspace/storefronts', { method: 'POST', body: { name: 'متجري' } });
+  });
+
+  it('surfaces a failure instead of throwing when provisioning is rejected', async () => {
+    apiMock.mockRejectedValue(new Error('forbidden'));
+
+    await expect(provisionCommerceStorefront()).resolves.toEqual({ ok: false, message: 'forbidden' });
+  });
+
+  it('fails closed on an unexpected response shape instead of returning a fabricated store', async () => {
+    apiMock.mockResolvedValue({ data: {} });
+
+    await expect(provisionCommerceStorefront()).resolves.toEqual({ ok: false, message: 'invalid_payload' });
   });
 });

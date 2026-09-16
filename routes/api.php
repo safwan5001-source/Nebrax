@@ -801,9 +801,16 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::post('applications/disable', [TenantApplicationController::class, 'disable'])->middleware($perm('apps.manage'));
 
         // COM-WS-2: قائمة متاجر الويب للمستأجر الحالي فقط. ليست واجهة
-        // المتجر العامة المحسومة بالنطاق، ولا تُغلق بـ commerce.storefront
-        // (coming_soon كان سيمنع كل مستخدمي مساحة العمل).
+        // المتجر العامة المحسومة بالنطاق. سلوكها الحالي (بلا حراسة RBAC
+        // إضافية غير استثناء الخدمة الذاتية) محفوظ بلا تغيير بعد ترقية
+        // commerce.storefront إلى built — لا نوسّع نطاق هذه التذكرة لإعادة
+        // حراسة مسار قراءة قائم.
         Route::get('commerce/workspace/storefronts', [CommerceWorkspaceStorefrontsController::class, 'index']);
+
+        // COM-STORE-PROVISION-1: تزويد أول متجر إلكتروني صريح — فعلٌ كتابي
+        // حقيقي (قناة بيع + متجر + نطاق مُدار من AWJ)، فيُحرَس بصلاحية
+        // مخصَّصة (commerce.manage) لا استثناء الخدمة الذاتية وحده.
+        Route::post('commerce/workspace/storefronts', [CommerceWorkspaceStorefrontsController::class, 'store'])->middleware($perm('commerce.manage'));
 
         // Cycle 0: Workspace foundation only. لا CRUD ولا مبيعات ولا اتصال أجهزة
         // قبل دوراتها، لكن هذا المسار يثبت سلسلة RBAC + entitlement + حالة التطبيق.

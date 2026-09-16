@@ -19,7 +19,29 @@
  * السرّ **خادم-فقط**: متغيّر بيئة واحد يُضبط في كلا الطرفين (Laravel
  * وNext.js)، لا يُشتقّ من أي مدخل عميل، ولا يُعرَض في أي استجابة JSON. تركه
  * فارغاً (الافتراض) يعطّل آلية إعادة التوجيه بالكامل بأمان — لا نصف تفعيل.
+ *
+ * ═══════════════════════════════════════════════════════════════
+ *  `managed_base_domain` — النطاق الأساسي لمتاجر Commerce المُدارة من AWJ
+ *  (COM-STORE-PROVISION-1)
+ * ═══════════════════════════════════════════════════════════════
+ *  عقدٌ منفصلٌ تماماً عن `config/tenancy.php` (`AWJ_TENANT_BASE_DOMAIN`):
+ *  ذاك نطاق ERP الفرعي `{tenant}.awjdev.xyz`/`{tenant}.awj.app`، وهذا نطاق
+ *  المتجر العام `{tenant}.store.awjdev.xyz`/`{tenant}.store.awj.app` —
+ *  حدّا توجيه/أمان مختلفان تماماً، لا يجوز خلطهما.
+ *
+ *  القيمة **نطاقٌ أساسي فقط** (hostname بلا مخطط/مسار/نجمة wildcard)؛
+ *  `App\Support\ManagedStorefrontHostname` هو المستهلك الوحيد، ويطبّعها عبر
+ *  `HostnameNormalizer` نفسه قبل استعمالها — لا تكرار منطق تطبيع هنا.
+ *  تغييرها لاحقاً إلى `store.awj.app` كافٍ وحده لتوليد
+ *  `{tenant}.store.awj.app` بلا أي تعديل كودٍ في منطق العمل.
+ *
+ *  الافتراض أدناه هو **عقد الإنتاج المستقبلي** (نفس نمط `AWJ_TENANT_BASE_DOMAIN`
+ *  الذي افتراضه `awj.app`) — بيئة AWJ الحالية المؤقتة تُشغِّل القيمة الفعلية
+ *  `store.awjdev.xyz` عبر متغيّر البيئة `AWJ_STOREFRONT_BASE_DOMAIN` (يُضبط في
+ *  Railway، لا يُعدَّل هنا).
  */
 return [
     'gateway_secret' => env('STOREFRONT_GATEWAY_SECRET'),
+
+    'managed_base_domain' => env('AWJ_STOREFRONT_BASE_DOMAIN', 'store.awj.app'),
 ];
