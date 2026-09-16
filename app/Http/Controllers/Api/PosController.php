@@ -33,6 +33,7 @@ use App\Services\Accounting\PosReturnService;
 use App\Services\Accounting\PosSessionService;
 use App\Services\Pos\PosBarcodeResolver;
 use App\Services\Pos\PosIdempotencyConflictException;
+use App\Services\ProductMediaGalleryService;
 use App\Support\DocumentLineVariantResolver;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -80,6 +81,13 @@ class PosController extends ApiController
         $catalogUnits = $this->customerPriceLists->catalogUnitsFor($priceList, $products);
         $allVariants = $products->flatMap(fn (Product $product) => $product->variants);
         $variantPrices = $this->customerPriceLists->catalogVariantPricesFor($priceList, $allVariants);
+        // VAR-FU-5/GAP-06: غلاف الوسائط المحلول لكل متغيّرٍ نشِط، مُجمَّعاً على
+        // دفعتين إضافيتين فقط بصرف النظر عن عدد المتغيّرات (لا استعلامٍ لكل
+        // متغيّر) — نفس سلطة `ProductMediaGalleryService` الموحّدة (VAR-MEDIA-1)،
+        // والوسائط المشتركة من علاقة `media` المحمَّلة سلفاً أعلاه (نفس ترتيب
+        // `pos_image` حرفياً، فلا انحراف بين غلاف الأب وسقوط المتغيّر إليه).
+        $variantCovers = app(ProductMediaGalleryService::class)
+            ->resolveCoversForVariants($allVariants, $products->pluck('media', 'id'));
 
         // PR-2S: كشف تكلفة/ربحية المنتج في POS يحتاج الصلاحية **والإعداد** معاً؛
         // الإعداد وحده لا يمنح شيئاً، والأكثر تقييداً يفوز دائماً. PR-INV-1:
@@ -88,7 +96,7 @@ class PosController extends ApiController
         $revealCostProfit = SensitiveCostPolicy::authorized($request->user())
             && PosSettings::showsCostProfitInPos();
 
-        $products->each(function (Product $product) use ($catalogUnits, $variantPrices, $revealCostProfit): void {
+        $products->each(function (Product $product) use ($catalogUnits, $variantPrices, $variantCovers, $revealCostProfit): void {
             $product->setAttribute('pos_hides_cost_profit', ! $revealCostProfit);
             // قيم عرض عابرة للكتالوج؛ لا تعدّل المنتج المخزن ولا تعيد تفسير
             // فاتورة تاريخية. الوحدة الأساسية متاحة دائماً، والبديلة لا تظهر
@@ -112,12 +120,19 @@ class PosController extends ApiController
             // VAR-POS-1: منتجٌ متعدد الخيارات يعرض متغيّراته النشطة بسعر كلٍّ
             // منها (وحدة الأساس)، لا سعر الأب — لا يُستعمل `pos_units`/`sale_price`
             // الأب لهذه الحالة في الواجهة إطلاقاً.
-            $product->setAttribute('pos_variants', $product->variants->map(fn ($variant) => [
-                'id' => $variant->id,
-                'sku' => $variant->sku,
-                'descriptor' => DocumentLineVariantResolver::descriptor($variant),
-                'price' => $variantPrices[$variant->id] ?? 0,
-            ])->values()->all());
+            $product->setAttribute('pos_variants', $product->variants->map(function ($variant) use ($product, $variantPrices, $variantCovers) {
+                $cover = $variantCovers[$variant->id] ?? null;
+
+                return [
+                    'id' => $variant->id,
+                    'sku' => $variant->sku,
+                    'descriptor' => DocumentLineVariantResolver::descriptor($variant),
+                    'price' => $variantPrices[$variant->id] ?? 0,
+                    // VAR-FU-5/GAP-06: نفس شكل `pos_image` حرفياً — رابط تحميلٍ
+                    // مصادَقٌ عليه فقط، أو null، بلا كشف مسار تخزينٍ داخلي.
+                    'image' => $cover ? ['download_url' => "/api/products/{$product->id}/media/{$cover->id}/download"] : null,
+                ];
+            })->values()->all());
             $product->setAttribute('sale_price', $units[0]['price'] ?? (int) $product->sale_price);
         });
 
