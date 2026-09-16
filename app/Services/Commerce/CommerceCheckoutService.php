@@ -135,11 +135,20 @@ final class CommerceCheckoutService
      * كان سيُرجع 404 دوماً لأي محاولة إتمامٍ ثانية، فيُسقط عقد Idempotency-Key
      * بالكامل بمجرد نجاح أول إتمام.
      *
+     * **`allowConsumed: true` (Cart One-Shot Lifecycle)**: أول إتمامٍ ناجح
+     * ينقل السلة إلى `consumed` في نفس معاملة `complete()` — فإعادة تشغيل
+     * نفس مفتاح Idempotency-Key بعد ذلك يجب أن تصل لهذا Checkout رغم أن
+     * سلته لم تعد `active`. هذا لا يفتح باباً لإنشاء Checkout/Order جديد:
+     * `complete()` نفسها ترى `status === STATUS_COMPLETED` فتذهب مباشرةً
+     * إلى `replayOrConflict()` بلا أي قفلٍ جديدٍ على السلة، ومسارا
+     * `current()`/`createOrResume()` أدناه يبقيان بلا `allowConsumed` عمداً
+     * فيرفضان سلةً مُستهلَكة كأي سلةٍ غير `active`.
+     *
      * @return array{checkout: ?CommerceCheckout, invalid: bool}
      */
     public function resolveForCompletion(?string $cartToken): array
     {
-        $cartLookup = $this->carts->findByToken($cartToken);
+        $cartLookup = $this->carts->findByToken($cartToken, allowConsumed: true);
         if ($cartLookup['cart'] === null) {
             return ['checkout' => null, 'invalid' => $cartLookup['invalid']];
         }
@@ -161,21 +170,22 @@ final class CommerceCheckoutService
      * لا ينشئ سلةً أبداً (§ ممنوع صراحةً) — سلة غير موجودة/غير صالحة تفشل
      * مغلقاً بـ CheckoutNotFoundException.
      *
-     * **حارس عدم التكرار (Post-Review P1، PR-4)**: إن وُجد Checkout **مكتمل
-     * بالفعل** لنفس `cart_id` — يُستأنَف هو نفسه، ولا يُنشأ Checkout جديد
-     * أبداً. السلة تبقى `status=active` بعد `complete()` (لا تُلمَس، لا
-     * تُفرَّغ)، فبلا هذا الحارس كانت إعادة `POST checkout` بعد إتمام ناجح
-     * تفشل أن تجد صفّاً بحالة مفتوحة (`OPEN_STATUSES` يستبعد `completed`)
-     * فتُنشئ Checkout **ثانياً** لنفس السلة — وإتمامه بمفتاح idempotency
-     * مختلف كان يُنتج `CommerceOrder` **ثانياً** لنفس العناصر (لا قيد فريد
-     * يمنع ذلك: `commerce_orders.commerce_checkout_id` فريد **لكل صفّ
-     * Checkout**، لا لكل `cart_id`). الاستئناف هنا يُعيد كل إتمامٍ لاحق إلى
-     * `complete()`/`replayOrConflict()` الموجودتين أصلاً وآمنتين تماماً
-     * (نفس المفتاح ⇐ إعادة نفس الطلب، مفتاحٌ مختلف ⇐ 409 تعارض) — لا آلية
-     * idempotency موازية جديدة، ولا عمود/جدول جديد، ولا تغيير على عقد
-     * `POST checkout` (لا يزال بلا Idempotency-Key، مطابقاً لعقد
-     * `AWJ_CHECKOUT_V1_ARCHITECTURE.md` §9 حرفياً). ويب وجوال كلاهما محميان
-     * معاً لأن الإصلاح في هذه الخدمة المشتركة، لا في متحكّمٍ واحد.
+     * **حارس عدم التكرار (Post-Review P1، PR-4) — تراجعيٌّ الآن (Cart
+     * One-Shot Lifecycle)**: كان هذا الحارس أساسياً حين تبقى السلة
+     * `status=active` بعد `complete()`. بعد أن أصبح `complete()` ينقل السلة
+     * إلى `CommerceCart::STATUS_CONSUMED` في نفس معاملة الإتمام (راجع
+     * توثيقها)، `lockActiveCart()` أدناه — الذي يشترط `status=active` — يرفض
+     * أي `POST checkout` على سلةٍ استُهلكت **قبل** الوصول لهذا الفرع أصلاً؛
+     * فلا مسارٍ حيٍّ يبلغه بعد اليوم لسلةٍ استُهلكت عبر هذا الإصلاح نفسه.
+     * يبقى **دفاعاً احتياطياً** لبيانات تاريخية من قبل هذا الإصلاح (سلةٌ
+     * `active` قديمة تحمل Checkout `completed` بالفعل من النسخة السابقة) —
+     * إن وُجد، يُستأنَف هو نفسه ولا يُنشأ Checkout جديد أبداً، فيُعاد كل
+     * إتمامٍ لاحق إلى `complete()`/`replayOrConflict()` الموجودتين أصلاً
+     * وآمنتين تماماً (نفس المفتاح ⇐ إعادة نفس الطلب، مفتاحٌ مختلف ⇐ 409
+     * تعارض) — لا آلية idempotency موازية جديدة، ولا عمود/جدول جديد، ولا
+     * تغيير على عقد `POST checkout` (لا يزال بلا Idempotency-Key، مطابقاً
+     * لعقد `AWJ_CHECKOUT_V1_ARCHITECTURE.md` §9 حرفياً). ويب وجوال كلاهما
+     * محميان معاً لأن الإصلاح في هذه الخدمة المشتركة، لا في متحكّمٍ واحد.
      *
      * @return array{checkout: CommerceCheckout, cart: CommerceCart, created: bool}
      */
@@ -389,6 +399,12 @@ final class CommerceCheckoutService
                 'completion_idempotency_key_hash' => $idempotencyKeyHash,
                 'completion_idempotency_fingerprint' => $idempotencyFingerprint,
             ]);
+
+            // Cart One-Shot Lifecycle: نفس المعاملة، نفس الصفّ المُقفَل أعلاه —
+            // Order + Checkout مكتمل + Cart مُستهلَكة يلتزمون معاً أو لا شيء
+            // منهم. سلةٌ واحدة تدعم طلباً ناجحاً واحداً على الأكثر؛ شراءٌ
+            // تالٍ يبدأ سلةً ورمزاً جديدين دوماً (لا إعادة فتح `consumed`).
+            $cart->update(['status' => CommerceCart::STATUS_CONSUMED]);
 
             return ['order' => $order, 'replayed' => false];
         }, 3);

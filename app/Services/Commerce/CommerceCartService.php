@@ -27,8 +27,17 @@ final class CommerceCartService
 
     public function __construct(private readonly CommercePriceResolver $prices) {}
 
-    /** @return array{cart: ?CommerceCart, invalid: bool} */
-    public function findByToken(?string $rawToken): array
+    /**
+     * @param  bool  $allowConsumed  `true` فقط لمسار إتمامٍ يحتاج الوصول إلى Checkout
+     *                                سلةٍ استُهلكت بالفعل (إعادة تشغيل Idempotency-Key
+     *                                بعد نجاح الشراء) — راجع
+     *                                `CommerceCheckoutService::resolveForCompletion()`.
+     *                                لا يُستعمَل أبداً لمسارات الإضافة/التعديل/بدء
+     *                                Checkout جديد؛ تلك تبقى ترفض `consumed` كأي حالةٍ
+     *                                غير `active`.
+     * @return array{cart: ?CommerceCart, invalid: bool}
+     */
+    public function findByToken(?string $rawToken, bool $allowConsumed = false): array
     {
         if ($rawToken === null || $rawToken === '') {
             return ['cart' => null, 'invalid' => false];
@@ -41,6 +50,10 @@ final class CommerceCartService
 
         if ($cart === null) {
             return ['cart' => null, 'invalid' => true];
+        }
+
+        if ($allowConsumed && $cart->status === CommerceCart::STATUS_CONSUMED) {
+            return ['cart' => $cart, 'invalid' => false];
         }
 
         if ($cart->status !== CommerceCart::STATUS_ACTIVE) {

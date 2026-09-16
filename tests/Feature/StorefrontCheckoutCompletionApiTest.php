@@ -260,15 +260,21 @@ class StorefrontCheckoutCompletionApiTest extends TestCase
     }
 
     /**
-     * P1 (Codex review, PR #836) — إثباتٌ على مسار الويب أن `POST checkout`
-     * بعد اكتمال Checkout الأول لنفس السلة لا يفتح دورة جديدة: يستأنف نفس
-     * الصفّ المكتمل (`CommerceCheckoutService::createOrResume()` مشتركة بين
-     * `/store/v1` و`/commerce/v1`، فالإصلاح يحمي الاثنين معاً بلا أي تغيير
-     * في عقد `/store/v1` نفسه — لا Idempotency-Key جديدة على `POST checkout`).
+     * P1 (Codex review, PR #836) — closed by the Cart One-Shot Lifecycle
+     * (owner decision: one CommerceCart backs at most one successful
+     * CommerceOrder), on the web path too — `CommerceCheckoutService` is
+     * shared between `/store/v1` and `/commerce/v1`, so the same fix
+     * protects both without any change to `/store/v1`'s own contract (no
+     * new Idempotency-Key on `POST checkout`). `complete()` now moves the
+     * Cart to `consumed` in the same transaction that completes the
+     * Checkout, so a second `POST checkout` on the same cart cookie no
+     * longer resumes anything — it 404s like any other non-active cart.
+     * `POST checkout/complete` keeps replaying/conflicting correctly via
+     * `resolveForCompletion()`'s `allowConsumed: true` lookup.
      *
      * @test
      */
-    public function a_second_post_checkout_after_completion_resumes_the_completed_checkout_on_the_web_path_too(): void
+    public function a_second_post_checkout_after_completion_is_rejected_on_the_web_path_too_because_the_cart_is_consumed(): void
     {
         ['tenant' => $tenant, 'channel' => $channel] = $this->store('checkout-complete-dup-guard.test');
         $product = $this->product($tenant, $channel);
@@ -277,9 +283,9 @@ class StorefrontCheckoutCompletionApiTest extends TestCase
         $first = $this->complete('checkout-complete-dup-guard.test', $token, 'idem-web-guard-A')->assertCreated();
         $this->assertDatabaseCount('commerce_checkouts', 1);
         $this->assertDatabaseCount('commerce_orders', 1);
+        $this->assertSame(\App\Models\CommerceCart::STATUS_CONSUMED, \App\Models\CommerceCart::withoutGlobalScopes()->firstOrFail()->status);
 
-        $resumed = $this->createCheckout('checkout-complete-dup-guard.test', $token)->assertOk();
-        $resumed->assertJsonPath('data.status', CommerceCheckout::STATUS_COMPLETED);
+        $this->createCheckout('checkout-complete-dup-guard.test', $token)->assertStatus(404);
         $this->assertDatabaseCount('commerce_checkouts', 1);
 
         $this->complete('checkout-complete-dup-guard.test', $token, 'idem-web-guard-B')

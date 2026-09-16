@@ -507,17 +507,23 @@ class CommerceCheckoutApiTest extends TestCase
     }
 
     /**
-     * P1 (Codex review, PR #836): يثبت أن `POST checkout` بعد اكتمال
-     * Checkout الأول على نفس السلة لا يفتح دورة جديدة أبداً — يُستأنَف نفس
-     * الصفّ المكتمل (`created: false`, نفس `checkout` id)، والسلة تبقى
-     * status=active بلا تغيير (لم تُلمَس، بالتصميم — راجع توثيق `complete()`).
-     * محاولة إتمامٍ لاحقة بمفتاح idempotency مختلف على هذا الصفّ المستأنَف
-     * تدخل `replayOrConflict()` الموجودة أصلاً فتُرفَض 409 — لا `CommerceOrder`
-     * ثانٍ يُنشأ إطلاقاً مهما تكررت محاولات `POST checkout`.
+     * P1 (Codex review, PR #836) — closed by the Cart One-Shot Lifecycle
+     * (owner decision: one CommerceCart backs at most one successful
+     * CommerceOrder). `complete()` now moves the Cart to
+     * `CommerceCart::STATUS_CONSUMED` in the same transaction that
+     * completes the Checkout, so a second `POST checkout` on the same cart
+     * token no longer resumes anything — the cart itself is no longer
+     * `active`, so `CommerceCartService::findByToken()` treats it like any
+     * other non-active cart and the request 404s with its token cleared.
+     * `POST checkout/complete` keeps working via
+     * `resolveForCompletion()`'s `allowConsumed: true` lookup, so
+     * idempotency-key replay/conflict semantics are unaffected: no
+     * `CommerceOrder` is ever created twice, and the original completed
+     * order stays reachable by its own key.
      *
      * @test
      */
-    public function a_second_post_checkout_after_completion_resumes_the_completed_checkout_and_never_creates_a_second_order(): void
+    public function a_second_post_checkout_after_completion_is_rejected_because_the_cart_is_consumed(): void
     {
         $store = $this->seedMobileStore('dup-order-guard');
         $product = $this->publishedProduct($store['tenant'], $store['channel']);
@@ -528,10 +534,15 @@ class CommerceCheckoutApiTest extends TestCase
         $this->assertDatabaseCount('commerce_checkouts', 1);
         $this->assertDatabaseCount('commerce_orders', 1);
 
-        // نفس توكن السلة — السلة لم تُغيَّر ولم تُنهَ، فما زالت تُحلّ. POST
-        // checkout يجب أن يستأنف نفس الصفّ المكتمل، لا أن يفتح صفّاً جديداً.
-        $resumed = $this->createCheckout($store, $cartToken)->assertOk();
-        $resumed->assertJsonPath('data.status', CommerceCheckout::STATUS_COMPLETED);
+        app(TenantContext::class)->set($store['tenant']->id);
+        $this->assertSame(
+            \App\Models\CommerceCart::STATUS_CONSUMED,
+            \App\Models\CommerceCart::withoutGlobalScopes()->firstOrFail()->status,
+        );
+        app(TenantContext::class)->forget();
+
+        // نفس توكن السلة — السلة استُهلكت الآن، فلا POST checkout يفتح دورةً جديدة.
+        $this->createCheckout($store, $cartToken)->assertStatus(404);
         $this->assertDatabaseCount('commerce_checkouts', 1);
 
         app(TenantContext::class)->set($store['tenant']->id);
@@ -542,7 +553,7 @@ class CommerceCheckoutApiTest extends TestCase
         $this->complete($store, $cartToken, 'idem-guard-B')->assertStatus(409)
             ->assertJsonPath('error.code', 'idempotency_conflict');
 
-        // ونفس المفتاح الأصلي يُعيد نفس الطلب (replay)، لا طلباً ثانياً.
+        // ونفس المفتاح الأصلي يُعيد نفس الطلب (replay)، لا طلباً ثانياً — رغم أن السلة استُهلكت.
         $replay = $this->complete($store, $cartToken, 'idem-guard-A')->assertOk();
         $replay->assertJsonPath('data.replayed', true);
         $this->assertSame($first->json('data.order.id'), $replay->json('data.order.id'));
