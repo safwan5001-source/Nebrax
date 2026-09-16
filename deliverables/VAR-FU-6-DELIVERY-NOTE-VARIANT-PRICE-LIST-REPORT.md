@@ -229,7 +229,7 @@ Closure Pass; `origin/main` had not moved since the last confirmed merge).
 
 ## Head SHA
 
-Recorded at push time — see the PR's commit list.
+`b08511ef867a86db9ac852d241fda7c9ea2b1a54`
 
 ## CI
 
