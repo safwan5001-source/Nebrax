@@ -180,7 +180,9 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
     Route::get('health', HealthController::class);
 
     // عام (بلا مصادقة)
-    Route::post('register', [AuthController::class, 'register'])->middleware('throttle:register');
+    Route::post('register', [AuthController::class, 'register'])
+        ->middleware('throttle:register')
+        ->name('auth.public-register');
     Route::post('login', [AuthController::class, 'login'])->middleware('throttle:5,1');
     Route::post('forgot-password', [AuthController::class, 'forgotPassword'])->middleware('throttle:auth-recovery');
     Route::post('reset-password', [AuthController::class, 'resetPassword'])->middleware('throttle:auth-reset');
