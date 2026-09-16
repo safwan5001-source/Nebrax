@@ -605,4 +605,4 @@ consistent with this pass's Fix Policy.
   Pass"
 - Base SHA: `ff5cfb88f49c7107470fd9afbaae4ca7dfd49a32` (`origin/main`,
   matches the given last-confirmed-merge SHA exactly — PR #832, VAR-FU-5)
-- Head SHA: *(recorded after the commit below)*
+- Head SHA: `8c163b4b1b80ede5488fe547a0cd7e699fcd60a1` (before this "record head SHA" follow-up commit)
