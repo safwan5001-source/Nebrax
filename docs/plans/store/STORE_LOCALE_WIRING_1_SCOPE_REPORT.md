@@ -467,4 +467,4 @@ work (none needed), or any backend API change (none needed).
 
 - **Branch:** `docs/store-locale-wiring-1-scope`
 - **Base SHA:** `69707de3` (latest `origin/main` at evidence-pass start)
-- **Head SHA:** filled in after commit (see PR)
+- **Head SHA:** `a0196ccb4f2c3bfdf8a4e30e095dcd2ba1212301`
