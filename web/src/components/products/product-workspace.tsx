@@ -16,6 +16,7 @@ import { riyalToMinor, formatRiyal, extractInclusiveTax } from '@/lib/money';
 import { getSystemTaxInclusive } from '@/lib/tax';
 import { productUnitForTemplate, type ProductUnitTemplate } from '@/lib/product-unit-template';
 import type { Product } from './product-dialog';
+import { ProductMultiBarcodeTable, type PendingBarcodeRow } from './product-multi-barcode-table';
 
 interface Partner { id: string; name: string; type?: string }
 interface Account { id: string; code: string; name: string; type: string; is_group: boolean }
@@ -121,13 +122,6 @@ export interface ProductWorkspaceProps {
   mode: 'create' | 'edit';
   /** مطلوب في وضع التعديل — المنتج الحالي كما تُعيده `GET /products/{id}`. */
   product?: Product | null;
-  /**
-   * حقولٌ إضافية تُدمَج في نفس طلب `POST /products` الأول فقط (مثل `barcodes`/
-   * `unit_prices` المُعلَّقة من صفحة `/products/new`) — تبقى مملوكةً بالكامل
-   * لصفحة الاستدعاء؛ هذا المكوّن لا يعرف شكلها ولا يعدّلها، فقط يدمجها حرفياً
-   * ضمن جسم الطلب الواحد فيحافظ على عقد «طلبٌ واحدٌ بالضبط».
-   */
-  extraCreatePayload?: Record<string, unknown>;
   /** يُستدعى فور نجاح أول إنشاء (POST) — قبل أي تحويل مسار. */
   onCreated?: (productId: string) => void | Promise<void>;
   /** يُستدعى فور نجاح كل تحديث لاحق (PUT). */
@@ -135,12 +129,6 @@ export interface ProductWorkspaceProps {
   /** رابط زر الإلغاء (وضع الإنشاء فقط عادةً). */
   cancelHref?: string;
   onCancel?: () => void;
-  /**
-   * يُستدعى عند تغيّر الوحدات البديلة للقالب المختار (أو الوحدة الأساسية) —
-   * تحتاجه صفحة `/products/new` وحدها لعرض نفس قائمة الوحدات في مُنتقي
-   * الباركود المتعدّد المُعلَّق (خارج هذا المكوّن، انظر تعليق الصنف).
-   */
-  onAlternateUnitsChange?: (units: { name: string; factor: number }[], baseUnit: string) => void;
   /**
    * يتجاوز نصّ زرّ الحفظ الافتراضي — تستعمله `/products/new` وحدها لتُبقي
    * «إعادة محاولة النشر» ظاهراً بعد نجاح الإنشاء وفشل متابعة النشر، بدل
@@ -151,27 +139,30 @@ export interface ProductWorkspaceProps {
 
 /**
  * ═══════════════════════════════════════════════════════════════
- *  ProductWorkspace — مساحة عمل المنتج الموحّدة (PR-PROD-UX-1)
+ *  ProductWorkspace — مساحة عمل المنتج الموحّدة (PR-PROD-UX-1/2)
  * ═══════════════════════════════════════════════════════════════
  *  نطاقها اليوم: المعلومات الأساسية + التسعير القياسي + المحاسبة/الضرائب +
- *  المخزون + معلومات إضافية — الحقول المتطابقة فعلياً بين `/products/new`
- *  و`ProductDialog` سابقاً، بلا قدرة جديدة. الباركود المتعدد المُصرَّح
- *  (`ProductMultiBarcodeTable`)، الوسائط، والنشر التجاري تبقى خارج هذا
- *  المكوّن عمداً — تُدار من صفحة الاستدعاء تماماً كسابقاً حتى PR-2/PR-3/PR-4.
+ *  المخزون + معلومات إضافية + الوحدات/الباركود المتعدد/السعر القانوني لكل
+ *  وحدة (`ProductMultiBarcodeTable`, PR-PROD-UX-2). الوسائط، الخيارات
+ *  والمتغيّرات، والنشر التجاري تبقى خارج هذا المكوّن عمداً حتى PR-3/PR-4.
  *
  *  عقد «الحفظ الأول»: وضع الإنشاء يبقى مثبَّتاً (mounted) بعد نجاح `POST`
  *  الأول — لا تنقّل، لا إغلاق نافذة. `productId` المُستحدَث يُحفَظ داخلياً،
- *  وأي حفظٍ لاحق يستخدم `PUT` حصراً — لا طلب إنشاءٍ ثانٍ أبداً.
+ *  وأي حفظٍ لاحق يستخدم `PUT` حصراً — لا طلب إنشاءٍ ثانٍ أبداً. الباركود/
+ *  الأسعار المُعلَّقة (`pendingBarcodes`) تُدمَج ذرّياً في نفس طلب `POST
+ *  /products` الأول (`barcodes[]`/`unit_prices[]`، مدعومان فعلياً ومختبَران
+ *  خلفياً في معاملةٍ واحدة مع إنشاء المنتج — انظر تقرير Phase 0)، فلا حاجة
+ *  لأي نداءٍ إضافي بعد النجاح ولا لأي «إعادة إنشاء» لصفوفٍ أُنشئت فعلاً؛
+ *  `ProductMultiBarcodeTable` نفسه ينتقل تلقائياً من الحالة المحلية إلى
+ *  الحالة الحيّة بمجرد وجود `productId` (انظر تعليق ذلك المكوّن).
  */
 export function ProductWorkspace({
   mode,
   product,
-  extraCreatePayload,
   onCreated,
   onUpdated,
   cancelHref,
   onCancel,
-  onAlternateUnitsChange,
   saveLabel: saveLabelOverride,
 }: ProductWorkspaceProps) {
   const t = useTranslations('products');
@@ -182,6 +173,8 @@ export function ProductWorkspace({
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pendingBarcodes, setPendingBarcodes] = useState<PendingBarcodeRow[]>([]);
+  const [variants, setVariants] = useState<{ id: string; descriptor: string }[]>([]);
 
   const [templates, setTemplates] = useState<ProductUnitTemplate[]>([]);
   const [categories, setCategories] = useState<Listed[]>([]);
@@ -194,6 +187,7 @@ export function ProductWorkspace({
   const { number: suggestedSku } = useNumberPreview('product', { enabled: mode === 'create' && !persistedId });
 
   const persisted = persistedId !== null;
+  const isVariantManaged = product?.variant_state === 'variant_managed';
 
   useEffect(() => {
     getSystemTaxInclusive().then(setTaxInclusive).catch(() => {});
@@ -215,15 +209,25 @@ export function ProductWorkspace({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode]);
 
+  // VAR-PRICE-UX-1: قائمة المتغيّرات النشطة — تُستهلَك فقط لاختيار المتغيّر في
+  // جدول «باركود متعدد» لمنتجٍ متعدد الخيارات؛ فارغةٌ دائماً لمنتجٍ بسيط أو في
+  // وضع الإنشاء (لا متغيّرات قبل أول حفظٍ أصلاً — تكامل الخيارات/المتغيّرات
+  // ذاته مؤجَّلٌ لـ PR-PROD-UX-3).
+  useEffect(() => {
+    if (!persistedId || !isVariantManaged) {
+      setVariants([]);
+
+      return;
+    }
+    api<{ data: { id: string; is_active: boolean; display_name: string }[] }>(`/products/${persistedId}/variants`)
+      .then((r) => setVariants(r.data.filter((v) => v.is_active).map((v) => ({ id: v.id, descriptor: v.display_name }))))
+      .catch(() => setVariants([]));
+  }, [persistedId, isVariantManaged]);
+
   const alternateUnits = useMemo(
     () => templates.find((template) => template.id === form.unit_template_id)?.units ?? [],
     [templates, form.unit_template_id],
   );
-
-  useEffect(() => {
-    onAlternateUnitsChange?.(alternateUnits, form.unit);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [alternateUnits, form.unit]);
 
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) => {
     setForm((current) => ({ ...current, [key]: value }));
@@ -248,12 +252,35 @@ export function ProductWorkspace({
     setError(null);
     try {
       if (!persistedId) {
-        const body = { ...buildPayload(form, 'create'), ...(extraCreatePayload ?? {}) };
+        const body = {
+          ...buildPayload(form, 'create'),
+          barcodes: pendingBarcodes.map((row) => ({
+            code: row.code,
+            unit_name: row.unit_name,
+            default_quantity: row.default_quantity,
+            label: row.label,
+          })),
+          // نفس الهويّة×الوحدة تشارك سعراً واحداً بالفعل في الواجهة (انظر
+          // `ProductMultiBarcodeTable::savePrice` في وضع الإنشاء) — الدمج هنا
+          // دفاعيٌّ بحت، لا يفترض تناقضاً لم يعد ممكناً أصلاً.
+          unit_prices: Array.from(
+            new Map(
+              pendingBarcodes
+                .filter((row) => row.price.trim() !== '')
+                .map((row) => [row.unit_name ?? '', { unit_name: row.unit_name, price: riyalToMinor(row.price) }]),
+            ).values(),
+          ),
+        };
         const created = await api<{ data: { id: string } }>('/products', { method: 'POST', body });
         const newId = created.data.id;
         // يُحفَظ فوراً في حالة المكوّن — أي محاولة لاحقة (نجحت أم فشلت متابعتها
         // كنشرٍ أو وسائط) تستخدم `PUT` على هذا المعرّف، لا `POST` ثانياً أبداً.
+        // `pendingBarcodes` تُفرَّغ هنا: الصفوف صارت حقيقيةً على الخادم ضمن نفس
+        // المعاملة الذرّية، و`ProductMultiBarcodeTable` سيُعيد جلبها فعلياً
+        // بمجرد أن يصبح `persistedId` غير فارغ — إبقاؤها كان سيُظهرها صفوفاً
+        // معلَّقةً زائفة فوق الصفوف الحقيقية المُعاد جلبها.
         setPersistedId(newId);
+        setPendingBarcodes([]);
         setDirty(false);
         await onCreated?.(newId);
       } else {
@@ -495,6 +522,19 @@ export function ProductWorkspace({
           </CardContent>
         </Card>
       </div>
+
+      {/* الوحدات والأسعار / الباركود متعدد — الباركود الأساسي يبقى بسيطاً في
+          البطاقة أعلاه؛ هذا الجدول هو نفس «باركود متعدد» الموسَّع، الآن داخل
+          مساحة العمل نفسها بلا نافذة منفصلة (PR-PROD-UX-2). */}
+      <ProductMultiBarcodeTable
+        productId={persistedId ?? undefined}
+        baseUnitName={form.unit || 'piece'}
+        alternateUnits={alternateUnits}
+        isVariantManaged={isVariantManaged}
+        variants={variants}
+        pendingRows={pendingBarcodes}
+        onPendingRowsChange={setPendingBarcodes}
+      />
 
       {error && <p role="alert" className="rounded bg-negative/10 px-3 py-2 text-xs text-negative">{error}</p>}
     </div>

@@ -23,6 +23,7 @@ vi.mock('@/lib/api', () => ({
 
 vi.mock('@/lib/tax', () => ({ getSystemTaxInclusive: () => Promise.resolve(false) }));
 vi.mock('@/lib/use-number-preview', () => ({ useNumberPreview: () => ({ number: '' }) }));
+vi.mock('@/components/ui/toast', () => ({ useToast: () => ({ success: vi.fn(), error: vi.fn() }) }));
 
 vi.mock('lucide-react', () => {
   const iconStub = () => <span />;
@@ -227,5 +228,78 @@ describe('ProductWorkspace', () => {
     expect(screen.getByText('Brand')).toBeTruthy();
     expect(screen.getByLabelText('SKU').getAttribute('dir')).toBe('ltr');
     expect(screen.getByLabelText('Barcode').getAttribute('dir')).toBe('ltr');
+  });
+
+  it('primary barcode stays simple by default; the multi-barcode editor is present but collapsed', async () => {
+    render(wrapAr(<ProductWorkspace mode="create" />));
+    expect(await screen.findByLabelText('الباركود')).toBeTruthy();
+    expect(screen.getByText('باركود متعدد')).toBeTruthy();
+    expect(screen.queryByText('المعامل')).toBeNull();
+  });
+
+  it('PR-PROD-UX-2: first Save merges pending barcodes/unit_prices into the single atomic POST body', async () => {
+    const user = userEvent.setup();
+    const bodies: Array<Record<string, unknown>> = [];
+    installApiMock({
+      'POST /products': ({ body }: { body?: unknown }) => {
+        bodies.push(body as Record<string, unknown>);
+        return { data: { id: 'created-with-barcodes' } };
+      },
+    });
+    render(wrapAr(<ProductWorkspace mode="create" />));
+
+    await user.type(screen.getByLabelText(/الاسم \*/), 'قميص');
+    await user.type(screen.getByLabelText('سعر البيع'), '10');
+
+    await user.click(screen.getByText('باركود متعدد'));
+    await user.type(screen.getAllByLabelText('رمز الباركود')[0]!, 'PACK-1');
+    await user.type(screen.getAllByLabelText('سعر البيع')[1]!, '27.00');
+    await user.click(screen.getAllByRole('button', { name: /إضافة باركود/ })[0]!);
+
+    await user.click(screen.getByRole('button', { name: 'حفظ' }));
+
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    expect(bodies[0]!.barcodes).toEqual([{ code: 'PACK-1', unit_name: null, default_quantity: 1, label: null }]);
+    expect(bodies[0]!.unit_prices).toEqual([{ unit_name: null, price: 2700 }]);
+    expect(apiMock.mock.calls.filter(([path, options]) => path === '/products' && options?.method === 'POST')).toHaveLength(1);
+  });
+
+  it('PR-PROD-UX-2: after a successful first Save, atomically-created barcodes/prices are never re-submitted', async () => {
+    const user = userEvent.setup();
+    installApiMock();
+    render(wrapAr(<ProductWorkspace mode="create" />));
+
+    await user.type(screen.getByLabelText(/الاسم \*/), 'قميص');
+    await user.type(screen.getByLabelText('سعر البيع'), '10');
+    await user.click(screen.getByText('باركود متعدد'));
+    await user.type(screen.getAllByLabelText('رمز الباركود')[0]!, 'PACK-1');
+    await user.click(screen.getAllByRole('button', { name: /إضافة باركود/ })[0]!);
+    await user.click(screen.getByRole('button', { name: 'حفظ' }));
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'حفظ التغييرات' })).toBeTruthy());
+
+    // الانتقال إلى الحالة الحيّة: جلب فعلي واحد، لا إعادة POST/PUT للصفوف
+    // التي أُنشئت ذرّياً بالفعل ضمن نفس معاملة الإنشاء.
+    await waitFor(() => {
+      const getBarcodes = apiMock.mock.calls.filter(([path, options]) => path === '/products/created-product-1/barcodes' && (options?.method ?? 'GET') === 'GET');
+      expect(getBarcodes).toHaveLength(1);
+    });
+    expect(apiMock.mock.calls.filter(([path, options]) => path === '/products/created-product-1/barcodes' && options?.method === 'POST')).toHaveLength(0);
+    expect(apiMock.mock.calls.filter(([path, options]) => path === '/products/created-product-1/unit-prices' && options?.method === 'PUT')).toHaveLength(0);
+  });
+
+  it('edit mode: existing barcode/unit-price records load through the live authority, not pending state', async () => {
+    installApiMock({
+      'GET /products/product-1/barcodes': () => ({
+        data: [{ id: 'bc-1', code: '999', unit_name: null, default_quantity: 1, label: null, product_variant_id: null, variant_descriptor: null }],
+      }),
+      'GET /products/product-1/unit-prices': () => ({
+        data: [{ id: 'price-1', product_variant_id: null, unit_name: 'piece', price: '100.00' }],
+      }),
+    });
+    render(wrapAr(<ProductWorkspace mode="edit" product={EXISTING_PRODUCT} />));
+
+    await waitFor(() => expect(screen.getAllByText('999').length).toBeGreaterThan(0));
+    expect(screen.getAllByDisplayValue('100.00').length).toBeGreaterThan(0);
   });
 });

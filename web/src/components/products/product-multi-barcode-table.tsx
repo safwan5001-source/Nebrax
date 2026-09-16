@@ -40,8 +40,23 @@ interface UnitPriceRow {
 }
 
 /**
- * VAR-PRICE-UX-1 (GAP-02/GAP-03) — جدول «باركود متعدد»: الوحدة × المعامل ×
- * الباركود × الكمية × سعر البيع × الإجراءات، وفق
+ * سطرٌ معلَّقٌ — قبل وجود `product_id` — لهويّة باركود×وحدة×سعر. الشكل نفسه
+ * الذي كانت `/products/new` تجمعه محلياً قبل PR-PROD-UX-2؛ لا سلطة منفصلة:
+ * يُدمَج حرفياً ضمن `barcodes[]`/`unit_prices[]` في نفس طلب `POST /products`
+ * الذرّي (`ProductWorkspace`), الذي يبقى المصدر الوحيد لبنائه.
+ */
+export interface PendingBarcodeRow {
+  code: string;
+  unit_name: string | null;
+  default_quantity: number;
+  label: string | null;
+  /** نصٌّ بالريال — فارغٌ يعني «بلا سعرٍ صريح لهذه الوحدة بعد». */
+  price: string;
+}
+
+/**
+ * VAR-PRICE-UX-1 (GAP-02/GAP-03) + PR-PROD-UX-2 — جدول «باركود متعدد»: الوحدة
+ * × المعامل × الباركود × الكمية × سعر البيع × الإجراءات، وفق
  * docs/plans/products-inventory/AWJ_MULTIPLE_BARCODE_UOM_SELLING_PRICE_UX_CONTRACT.md.
  *
  * **السعر ليس ملكاً للسطر.** كل صفٍّ يعرض سعر الهويّة (المنتج أو المتغيّر
@@ -52,6 +67,15 @@ interface UnitPriceRow {
  *
  * لا معامل×سعرٍ محسوبٍ هنا إطلاقاً — كل سعرٍ صريحٌ مستقل، والمعامل عمودٌ
  * معلوماتيٌّ بحت.
+ *
+ * **وضعان بمكوّنٍ واحد، لا تطبيقين (PR-PROD-UX-2):** حين لا يوجد `productId`
+ * بعد (منتجٌ لم يُحفَظ أول مرّة)، الجدول محليٌّ بحت — لا نداء شبكة، والصفوف
+ * تُدار عبر `pendingRows`/`onPendingRowsChange` التي يملكها المستدعي
+ * (`ProductWorkspace`) ليدمجها ذرّياً في `POST /products` الأول. حين يوجد
+ * `productId`، يعمل الجدول بسلطته الحقيقية القائمة (`/barcodes`,
+ * `/unit-prices`) دون أي تغيير. الانتقال بين الحالتين تلقائيٌّ ببساطة: بمجرد
+ * ظهور `productId` (بعد الحفظ الأول)، يُعاد الجلب من الخادم فعلياً — لا إعادة
+ * إرسالٍ للصفوف المُنشأة ذرّياً بالفعل ضمن نفس المعاملة.
  */
 export function ProductMultiBarcodeTable({
   productId,
@@ -59,22 +83,28 @@ export function ProductMultiBarcodeTable({
   alternateUnits,
   isVariantManaged,
   variants,
+  pendingRows,
+  onPendingRowsChange,
 }: {
-  productId: string;
+  productId?: string;
   baseUnitName: string;
   alternateUnits: UnitOption[];
   isVariantManaged: boolean;
   variants: VariantOption[];
+  /** وضع الإنشاء فقط — الصفوف المُعلَّقة يملكها المستدعي (`ProductWorkspace`). */
+  pendingRows?: PendingBarcodeRow[];
+  onPendingRowsChange?: (rows: PendingBarcodeRow[]) => void;
 }) {
   const t = useTranslations('products');
   const tc = useTranslations('common');
   const { success, error: toastError } = useToast();
+  const isCreateMode = !productId;
 
   const [expanded, setExpanded] = useState(false);
   const autoExpandedRef = useRef(false);
   const [loading, setLoading] = useState(false);
-  const [barcodes, setBarcodes] = useState<BarcodeRow[]>([]);
-  const [prices, setPrices] = useState<UnitPriceRow[]>([]);
+  const [liveBarcodes, setLiveBarcodes] = useState<BarcodeRow[]>([]);
+  const [livePrices, setLivePrices] = useState<UnitPriceRow[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const [newUnit, setNewUnit] = useState('');
@@ -85,6 +115,30 @@ export function ProductMultiBarcodeTable({
   const [newLabel, setNewLabel] = useState('');
   const [saving, setSaving] = useState(false);
   const [savingPriceKey, setSavingPriceKey] = useState<string | null>(null);
+
+  const pending = pendingRows ?? [];
+
+  // في وضع الإنشاء، الصفوف والأسعار مُشتقّةٌ محلياً من `pendingRows` — لا نداء
+  // شبكة، ولا هويّة متغيّرٍ (لا متغيّرات قبل أول حفظ أصلاً). بمجرد وجود
+  // `productId` تصبح `liveBarcodes`/`livePrices` (المُحمَّلتان فعلياً من
+  // الخادم) هما المصدر الوحيد — هذا هو الانتقال الكامل، بلا كودٍ خاصٍّ إضافي.
+  const barcodes: BarcodeRow[] = isCreateMode
+    ? pending.map((row, index) => ({
+        id: `pending-${index}`,
+        code: row.code,
+        unit_name: row.unit_name,
+        default_quantity: row.default_quantity,
+        label: row.label,
+        product_variant_id: null,
+        variant_descriptor: null,
+      }))
+    : liveBarcodes;
+  const prices: UnitPriceRow[] = isCreateMode
+    ? pending
+        .filter((row) => row.price.trim() !== '')
+        .map((row, index) => ({ id: `pending-price-${index}`, product_variant_id: null, unit_name: row.unit_name ?? baseUnitName, price: row.price }))
+    : livePrices;
+  const showVariantColumn = isVariantManaged && !isCreateMode;
 
   const unitOptions = useMemo(
     () => [{ name: baseUnitName, factor: 1 }, ...alternateUnits],
@@ -120,6 +174,7 @@ export function ProductMultiBarcodeTable({
   );
 
   const load = useCallback(async () => {
+    if (!productId) return;
     setLoading(true);
     setError(null);
     try {
@@ -127,8 +182,8 @@ export function ProductMultiBarcodeTable({
         api<{ data: BarcodeRow[] }>(`/products/${productId}/barcodes`),
         api<{ data: UnitPriceRow[] }>(`/products/${productId}/unit-prices`),
       ]);
-      setBarcodes(barcodeResult.data);
-      setPrices(priceResult.data);
+      setLiveBarcodes(barcodeResult.data);
+      setLivePrices(priceResult.data);
       if (!autoExpandedRef.current && barcodeResult.data.length > 0) {
         autoExpandedRef.current = true;
         setExpanded(true);
@@ -141,8 +196,16 @@ export function ProductMultiBarcodeTable({
   }, [productId, t]);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    if (productId) void load();
+  }, [load, productId]);
+
+  useEffect(() => {
+    if (isCreateMode && !autoExpandedRef.current && pending.length > 0) {
+      autoExpandedRef.current = true;
+      setExpanded(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isCreateMode, pending.length]);
 
   async function savePrice(unitName: string | null, variantId: string | null, riyalValue: string) {
     const storedUnit = unitName ?? baseUnitName;
@@ -151,6 +214,14 @@ export function ProductMultiBarcodeTable({
     const minor = riyalToMinor(riyalValue);
     if (!Number.isFinite(minor) || minor < 0) {
       toastError(t('unit_price_invalid'));
+      return;
+    }
+    if (isCreateMode) {
+      // نفس الهويّة×الوحدة تشارك سعراً واحداً — تحديثه هنا يُحدِّث كل الصفوف
+      // المُعلَّقة لهذه الوحدة معاً، لا صفّاً واحداً، فيطابق سلوك السلطة
+      // القانونية الحقيقية (`ProductPricingService::setPrice`) بصرياً حتى قبل
+      // أن توجد فعلياً.
+      onPendingRowsChange?.(pending.map((row) => ((row.unit_name ?? baseUnitName) === storedUnit ? { ...row, price: riyalValue } : row)));
       return;
     }
     setSavingPriceKey(key);
@@ -168,11 +239,37 @@ export function ProductMultiBarcodeTable({
     }
   }
 
+  function resetNewRowFields() {
+    setNewUnit('');
+    setNewCode('');
+    setNewQty('1');
+    setNewPrice('');
+    setNewVariantId('');
+    setNewLabel('');
+  }
+
   async function addRow() {
     if (!newCode.trim() || saving) return;
     const qty = newQty.trim() === '' ? 1 : Number(newQty);
     if (!Number.isInteger(qty) || qty < 1 || qty > 1000000) {
       setError(t('barcode_quantity_invalid'));
+      return;
+    }
+    const priceInput = newPrice.trim();
+    if (isCreateMode) {
+      // وضع الإنشاء يرفض سعراً غير صالح فوراً (لا حفظ ذرّي مؤجَّلٍ لخطأٍ
+      // كامنٍ) — يطابق سلوك مُنتقي الباركود المُعلَّق القديم على `/products/new`
+      // حرفياً قبل هذا التوحيد.
+      if (priceInput !== '' && !Number.isFinite(riyalToMinor(priceInput))) {
+        setError(t('unit_price_invalid'));
+        return;
+      }
+      setError(null);
+      onPendingRowsChange?.([
+        ...pending,
+        { code: newCode.trim(), unit_name: newUnit || null, default_quantity: qty, label: newLabel.trim() || null, price: priceInput },
+      ]);
+      resetNewRowFields();
       return;
     }
     setSaving(true);
@@ -188,8 +285,8 @@ export function ProductMultiBarcodeTable({
           product_variant_id: isVariantManaged && newVariantId ? newVariantId : null,
         },
       });
-      if (newPrice.trim() !== '') {
-        const minor = riyalToMinor(newPrice);
+      if (priceInput !== '') {
+        const minor = riyalToMinor(priceInput);
         if (Number.isFinite(minor) && minor >= 0) {
           await api(`/products/${productId}/unit-prices`, {
             method: 'PUT',
@@ -201,12 +298,7 @@ export function ProductMultiBarcodeTable({
           });
         }
       }
-      setNewUnit('');
-      setNewCode('');
-      setNewQty('1');
-      setNewPrice('');
-      setNewVariantId('');
-      setNewLabel('');
+      resetNewRowFields();
       await load();
       success(t('barcode_added'));
     } catch (err) {
@@ -217,6 +309,11 @@ export function ProductMultiBarcodeTable({
   }
 
   async function deleteRow(row: BarcodeRow) {
+    if (isCreateMode) {
+      const index = Number(row.id.replace('pending-', ''));
+      onPendingRowsChange?.(pending.filter((_, i) => i !== index));
+      return;
+    }
     if (!window.confirm(t('barcode_delete_confirm', { code: row.code }))) return;
     setError(null);
     try {
@@ -264,7 +361,7 @@ export function ProductMultiBarcodeTable({
                       <th className="px-2 py-2 text-start font-medium">{t('multi_barcode_col_barcode')}</th>
                       <th className="px-2 py-2 text-start font-medium">{t('multi_barcode_col_quantity')}</th>
                       <th className="px-2 py-2 text-start font-medium">{t('multi_barcode_col_price')}</th>
-                      {isVariantManaged && <th className="px-2 py-2 text-start font-medium">{t('multi_barcode_col_variant')}</th>}
+                      {showVariantColumn && <th className="px-2 py-2 text-start font-medium">{t('multi_barcode_col_variant')}</th>}
                       <th className="px-2 py-2 text-start font-medium">{t('multi_barcode_col_actions')}</th>
                     </tr>
                   </thead>
@@ -289,7 +386,7 @@ export function ProductMultiBarcodeTable({
                               onBlur={(e) => void savePrice(row.unit_name, row.product_variant_id, e.target.value)}
                             />
                           </td>
-                          {isVariantManaged && (
+                          {showVariantColumn && (
                             <td className="px-2 py-1.5 text-xs text-muted">{variantLabel(row.product_variant_id, row.variant_descriptor)}</td>
                           )}
                           <td className="px-2 py-1.5">
@@ -317,7 +414,7 @@ export function ProductMultiBarcodeTable({
                       <td className="px-2 py-1.5">
                         <Input aria-label={t('multi_barcode_col_price')} className="num w-24 text-end" value={newPrice} onChange={(e) => setNewPrice(e.target.value)} disabled={saving} placeholder="0.00" />
                       </td>
-                      {isVariantManaged && (
+                      {showVariantColumn && (
                         <td className="px-2 py-1.5">
                           <Select aria-label={t('multi_barcode_col_variant')} value={newVariantId} onChange={(e) => setNewVariantId(e.target.value)} disabled={saving}>
                             <option value="">{t('multi_barcode_no_variant')}</option>
@@ -354,7 +451,7 @@ export function ProductMultiBarcodeTable({
                       <div className="grid grid-cols-2 gap-2 text-xs text-muted">
                         <span>{t('multi_barcode_col_factor')}: ×{factorFor(row.unit_name)}</span>
                         <span>{t('multi_barcode_col_quantity')}: {row.default_quantity}</span>
-                        {isVariantManaged && <span className="col-span-2">{t('multi_barcode_col_variant')}: {variantLabel(row.product_variant_id, row.variant_descriptor)}</span>}
+                        {showVariantColumn && <span className="col-span-2">{t('multi_barcode_col_variant')}: {variantLabel(row.product_variant_id, row.variant_descriptor)}</span>}
                       </div>
                       <div className="space-y-1.5">
                         <Label htmlFor={`${priceInputId(row)}-m`}>{t('multi_barcode_col_price')}</Label>
@@ -394,7 +491,7 @@ export function ProductMultiBarcodeTable({
                       <Input id="mb-new-price-m" className="num h-11 w-full text-end" value={newPrice} onChange={(e) => setNewPrice(e.target.value)} disabled={saving} placeholder="0.00" />
                     </div>
                   </div>
-                  {isVariantManaged && (
+                  {showVariantColumn && (
                     <div className="space-y-1.5">
                       <Label htmlFor="mb-new-variant-m">{t('multi_barcode_col_variant')}</Label>
                       <Select id="mb-new-variant-m" className="h-11 w-full" value={newVariantId} onChange={(e) => setNewVariantId(e.target.value)} disabled={saving}>
