@@ -40,6 +40,35 @@ export async function loadCommerceStoreCatalog(): Promise<CommerceStoreCatalog> 
   }
 }
 
+/**
+ * COM-STORE-PROVISION-1 — يزوّد أول متجر إلكتروني للمستأجر الحالي. لا يقبل
+ * أي هوية (مستأجر/نطاق/قناة) — الخادم وحده يشتقّها من `TenantContext`
+ * الموثوق. `name` اختياري ويُستعمل فقط عند إنشاء متجر جديد فعلياً.
+ */
+export async function provisionCommerceStorefront(
+  name?: string,
+): Promise<{ ok: true; store: CommerceStoreOption } | { ok: false; message: string }> {
+  try {
+    const payload = await api<unknown>(COMMERCE_STORE_ADMIN_LIST_PATH, {
+      method: 'POST',
+      body: name && name.trim() !== '' ? { name: name.trim() } : {},
+    });
+    const store = extractProvisionedStore(payload);
+    if (!store) return { ok: false, message: 'invalid_payload' };
+    return { ok: true, store };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'provision_failed';
+    return { ok: false, message };
+  }
+}
+
+function extractProvisionedStore(payload: unknown): CommerceStoreOption | null {
+  if (!payload || typeof payload !== 'object') return null;
+  const data = (payload as { data?: unknown }).data;
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return null;
+  return mapStoreOption((data as { store?: unknown }).store);
+}
+
 export function mapCommerceStoreAdminList(payload: unknown): CommerceStoreCatalog {
   const storesRaw = extractStores(payload);
   if (storesRaw === null) {

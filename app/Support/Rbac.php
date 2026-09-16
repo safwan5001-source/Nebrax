@@ -168,6 +168,11 @@ class Rbac
             // لـaccountant/staff تلقائياً (نفس نمط ACC-1/ACC-6).
             'fiscal_years.view', 'fiscal_years.manage',
             'fiscal_years.close', 'fiscal_years.reopen',
+            // COM-STORE-PROVISION-1: تزويد أول متجر إلكتروني (قناة بيع web +
+            // Storefront + نطاق مُدار من AWJ) بنية تحتية تجارية حقيقية، لا
+            // قراءة مساحة عمل. owner/admin يملكانها عبر `*`؛ لا تُضاف لـ
+            // accountant/staff تلقائياً — نفس نمط الصلاحيات الحديثة أعلاه.
+            'commerce.manage',
     ];
 
     /**

@@ -12,3 +12,4 @@ composer.lock
 package-lock.json
 /.claude/settings.local.json
 lefthook.yml
+.claude/worktrees/

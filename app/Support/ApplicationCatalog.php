@@ -338,9 +338,18 @@ final class ApplicationCatalog
             'mandatory' => false,
             'dependencies' => [],
         ],
+        // COM-STORE-PROVISION-1: مُرقّاة من coming_soon — التزويد الصريح
+        // (قناة بيع web + Storefront + نطاق مُدار من AWJ عبر
+        // `POST commerce/workspace/storefronts`) مبنيٌّ ومختبَرٌ فعلياً الآن،
+        // فلم تعد «القدرة» نفسها غير موجودة. هذا لا يُفعِّلها لأي مستأجر
+        // تلقائياً — التفعيل الفعلي يبقى قرار `TenantApplicationService` لكل
+        // مستأجر (مستأجرو ما قبل `ENFORCEMENT_CUTOVER_AT` يُعامَلون كمفعَّلين
+        // افتراضاً بلا قرار صريح، بنفس نمط أي قدرة built أخرى — لا سلوك خاص
+        // لهذا المفتاح). لا إنفاذ `EnsureApplicationActive` جديد على مسارات
+        // مساحة عمل Commerce في هذه الدفعة — خارج نطاق هذه التذكرة صراحةً.
         'commerce.storefront' => [
             'group' => 'sales',
-            'maturity' => self::MATURITY_COMING_SOON,
+            'maturity' => self::MATURITY_BUILT,
             'mandatory' => false,
             'dependencies' => ['sales.invoicing'],
         ],
