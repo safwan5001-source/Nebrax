@@ -6,7 +6,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { ArrowRight, ArrowLeftRight, Copy, ImageOff, ImagePlus, MoreVertical, Pencil, Plus, ReceiptText, RefreshCw, Trash2, Upload } from 'lucide-react';
+import { ArrowRight, ArrowLeftRight, Copy, ImageOff, ImagePlus, MoreVertical, Plus, ReceiptText, RefreshCw, Trash2, Upload } from 'lucide-react';
 import { api, ApiError, fetchImageUrl } from '@/lib/api';
 import { formatRiyal } from '@/lib/money';
 import { Badge } from '@/components/ui/badge';
@@ -18,7 +18,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
 import { Tabs, TabPanel, type TabDef } from '@/components/ui/tabs';
 import { useToast } from '@/components/ui/toast';
-import { ProductDialog, type Product as ProductFormProduct } from '@/components/products/product-dialog';
+import { type Product as ProductFormProduct } from '@/components/products/product-dialog';
+import { ProductWorkspace } from '@/components/products/product-workspace';
+import { ProductMultiBarcodeTable } from '@/components/products/product-multi-barcode-table';
 import { ProductVariantsPanel } from '@/components/products/product-variants-panel';
 
 type Product = ProductFormProduct & {
@@ -51,8 +53,9 @@ export default function ProductProfilePage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
-  const [editing, setEditing] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [alternateUnits, setAlternateUnits] = useState<{ name: string; factor: number }[]>([]);
+  const [variants, setVariants] = useState<{ id: string; descriptor: string }[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mediaObjectUrls = useRef<string[]>([]);
 
@@ -88,7 +91,25 @@ export default function ProductProfilePage() {
     }
   }, [id, revokeMediaObjectUrls, t]);
 
+  // VAR-PRICE-UX-1: قائمة المتغيّرات النشطة — تُستهلَك فقط لاختيار المتغيّر
+  // في جدول «باركود متعدد» لمنتجٍ متعدد الخيارات؛ فارغةٌ دائماً لمنتجٍ بسيط.
+  // منقولةٌ حرفياً من `ProductDialog` (PR-PROD-UX-1) — لا تغيير في منطقها.
+  const loadVariants = useCallback(async () => {
+    if (!product || product.variant_state !== 'variant_managed') {
+      setVariants([]);
+
+      return;
+    }
+    try {
+      const result = await api<{ data: { id: string; is_active: boolean; display_name: string }[] }>(`/products/${id}/variants`);
+      setVariants(result.data.filter((v) => v.is_active).map((v) => ({ id: v.id, descriptor: v.display_name })));
+    } catch {
+      setVariants([]);
+    }
+  }, [id, product]);
+
   useEffect(() => { void load(); }, [load]);
+  useEffect(() => { void loadVariants(); }, [loadVariants]);
   useEffect(() => () => revokeMediaObjectUrls(), [revokeMediaObjectUrls]);
   useEffect(() => {
     setSelectedMediaId((current) => media.some((item) => item.id === current) ? current : (media[0]?.id ?? null));
@@ -222,7 +243,6 @@ export default function ProductProfilePage() {
         </div>
         <div className="ms-auto flex items-center gap-2">
           <Badge tone={product.is_active ? 'positive' : 'muted'}>{product.is_active ? t('active') : t('inactive')}</Badge>
-          <Button type="button" variant="outline" size="sm" onClick={() => setEditing(true)}><Pencil className="h-4 w-4" />{t('edit')}</Button>
           <Dropdown
             trigger={<MoreVertical className="h-5 w-5" strokeWidth={1.8} />}
             triggerLabel={t('more_actions')}
@@ -251,76 +271,95 @@ export default function ProductProfilePage() {
 
       {activeTab === 'info' && (
         <TabPanel id="info">
-          <Card>
-            <CardHeader className="flex-row items-start justify-between gap-4 space-y-0">
-              <div>
-                <CardTitle>{t('item_details')}</CardTitle>
-                <p className="mt-1 text-xs text-muted">{t('product_media_hint')}</p>
-              </div>
-              <Button type="button" size="sm" onClick={() => fileInputRef.current?.click()} disabled={uploading || media.length >= MAX_PRODUCT_IMAGES}>
-                <Upload className="h-4 w-4" />{t('upload_media')}
-              </Button>
-            </CardHeader>
-            <CardContent className="grid gap-6 lg:grid-cols-[minmax(15rem,0.72fr)_minmax(0,1.28fr)]">
-              <div className="space-y-3">
+          <div className="space-y-5">
+            {/* الصور والوسائط — تبقى كما كانت تماماً (خارج نطاق PR-PROD-UX-1؛
+                توحيدها مع نافذة التعديل السابقة مؤجَّلٌ لـ PR-PROD-UX-4). */}
+            <Card>
+              <CardHeader className="flex-row items-start justify-between gap-4 space-y-0">
+                <div>
+                  <CardTitle>{t('product_media')}</CardTitle>
+                  <p className="mt-1 text-xs text-muted">{t('product_media_hint')}</p>
+                </div>
+                <Button type="button" size="sm" onClick={() => fileInputRef.current?.click()} disabled={uploading || media.length >= MAX_PRODUCT_IMAGES}>
+                  <Upload className="h-4 w-4" />{t('upload_media')}
+                </Button>
+              </CardHeader>
+              <CardContent className="space-y-3">
                 <Input ref={fileInputRef} id="product-media" type="file" accept={PRODUCT_IMAGE_TYPES.join(',')} multiple disabled={uploading || media.length >= MAX_PRODUCT_IMAGES} onChange={uploadMedia} className="sr-only" />
-                <div className="relative flex aspect-square items-center justify-center overflow-hidden rounded border border-border bg-muted/20">
-                  {selectedMedia?.previewUrl ? (
-                    <Image src={selectedMedia.previewUrl} alt={selectedMedia.original_name} fill priority unoptimized sizes="(max-width: 1024px) 100vw, 34vw" className="object-cover" />
-                  ) : selectedMedia ? (
-                    <div className="flex flex-col items-center gap-2 px-5 text-center text-muted" role="status"><ImageOff className="h-8 w-8" strokeWidth={1.5} aria-hidden /><span className="text-sm">{t('image_preview', { number: selectedMediaIndex })}</span><Button type="button" variant="outline" size="sm" onClick={() => void load()}><RefreshCw className="h-4 w-4" />{t('retry')}</Button></div>
-                  ) : (
-                    <button type="button" className="flex h-full w-full flex-col items-center justify-center gap-3 text-muted hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" onClick={() => fileInputRef.current?.click()}><ImagePlus className="h-10 w-10" strokeWidth={1.35} aria-hidden /><span className="text-sm">{t('upload_media')}</span></button>
-                  )}
-                </div>
-                {media.length > 0 && (
-                  <div className="grid grid-cols-5 gap-2">
-                    {media.map((item, index) => (
-                      <button key={item.id} type="button" className={`relative aspect-square overflow-hidden rounded border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${selectedMedia?.id === item.id ? 'border-primary ring-2 ring-primary/25' : 'border-border'}`} aria-label={t('image_preview', { number: index + 1 })} aria-pressed={selectedMedia?.id === item.id} onClick={() => setSelectedMediaId(item.id)}>
-                        {item.previewUrl ? <Image src={item.previewUrl} alt={item.original_name} fill unoptimized sizes="100px" className="object-cover" /> : <span className="grid h-full place-items-center text-muted" aria-hidden><ImageOff className="h-4 w-4" /></span>}
-                      </button>
-                    ))}
+                <div className="grid gap-6 lg:grid-cols-[minmax(15rem,0.5fr)_minmax(0,0.5fr)]">
+                  <div className="space-y-3">
+                    <div className="relative flex aspect-square items-center justify-center overflow-hidden rounded border border-border bg-muted/20">
+                      {selectedMedia?.previewUrl ? (
+                        <Image src={selectedMedia.previewUrl} alt={selectedMedia.original_name} fill priority unoptimized sizes="(max-width: 1024px) 100vw, 34vw" className="object-cover" />
+                      ) : selectedMedia ? (
+                        <div className="flex flex-col items-center gap-2 px-5 text-center text-muted" role="status"><ImageOff className="h-8 w-8" strokeWidth={1.5} aria-hidden /><span className="text-sm">{t('image_preview', { number: selectedMediaIndex })}</span><Button type="button" variant="outline" size="sm" onClick={() => void load()}><RefreshCw className="h-4 w-4" />{t('retry')}</Button></div>
+                      ) : (
+                        <button type="button" className="flex h-full w-full flex-col items-center justify-center gap-3 text-muted hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" onClick={() => fileInputRef.current?.click()}><ImagePlus className="h-10 w-10" strokeWidth={1.35} aria-hidden /><span className="text-sm">{t('upload_media')}</span></button>
+                      )}
+                    </div>
+                    {media.length > 0 && (
+                      <div className="grid grid-cols-5 gap-2">
+                        {media.map((item, index) => (
+                          <button key={item.id} type="button" className={`relative aspect-square overflow-hidden rounded border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${selectedMedia?.id === item.id ? 'border-primary ring-2 ring-primary/25' : 'border-border'}`} aria-label={t('image_preview', { number: index + 1 })} aria-pressed={selectedMedia?.id === item.id} onClick={() => setSelectedMediaId(item.id)}>
+                            {item.previewUrl ? <Image src={item.previewUrl} alt={item.original_name} fill unoptimized sizes="100px" className="object-cover" /> : <span className="grid h-full place-items-center text-muted" aria-hidden><ImageOff className="h-4 w-4" /></span>}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {selectedMedia && <div className="flex items-center gap-2 rounded bg-muted/30 px-2.5 py-2"><span className="min-w-0 flex-1 truncate text-xs text-muted" title={selectedMedia.original_name}>{selectedMedia.original_name}</span><Button type="button" variant="ghost" size="icon" aria-label={`${t('delete')}: ${selectedMedia.original_name}`} onClick={() => void removeMedia(selectedMedia.id)} disabled={uploading}><Trash2 className="h-4 w-4" /></Button></div>}
                   </div>
-                )}
-                {selectedMedia && <div className="flex items-center gap-2 rounded bg-muted/30 px-2.5 py-2"><span className="min-w-0 flex-1 truncate text-xs text-muted" title={selectedMedia.original_name}>{selectedMedia.original_name}</span><Button type="button" variant="ghost" size="icon" aria-label={`${t('delete')}: ${selectedMedia.original_name}`} onClick={() => void removeMedia(selectedMedia.id)} disabled={uploading}><Trash2 className="h-4 w-4" /></Button></div>}
-              </div>
 
-              <dl className="grid content-start gap-4 text-sm sm:grid-cols-2">
-                <div><dt className="text-muted">{t('sku')}</dt><dd className="mt-1 font-medium num text-text">{product.sku ?? '—'}</dd></div>
-                <div><dt className="text-muted">{t('barcode')}</dt><dd className="mt-1 font-medium num text-text" dir="ltr">{product.barcode ?? '—'}</dd></div>
-                <div><dt className="text-muted">{t('sale_price')}</dt><dd className="mt-1 font-semibold num text-text">{formatRiyal(product.sale_price)} <span className="font-normal text-muted">/ {product.unit}</span></dd></div>
-                <div><dt className="text-muted">{t('purchase_price')}</dt><dd className="mt-1 font-semibold num text-text">{formatRiyal(product.purchase_price)} <span className="font-normal text-muted">/ {product.unit}</span></dd></div>
-                <div><dt className="text-muted">{t('category')}</dt><dd className="mt-1 font-medium text-text">{product.category || t('unclassified')}</dd></div>
-                <div><dt className="text-muted">{t('brand')}</dt><dd className="mt-1 font-medium text-text">{product.brand || '—'}</dd></div>
-                <div><dt className="text-muted">{t('default_sales_unit')}</dt><dd className="mt-1 font-medium text-text">{product.default_sales_unit || t('default_unit_base_option')}</dd></div>
-                <div><dt className="text-muted">{t('default_purchase_unit')}</dt><dd className="mt-1 font-medium text-text">{product.default_purchase_unit || t('default_unit_base_option')}</dd></div>
-                <div className="sm:col-span-2">
-                  <dt className="text-muted">{t('units')}</dt>
-                  <dd className="mt-1.5 flex flex-wrap gap-1.5">
-                    {product.units.length === 0 ? (
-                      <Badge tone="muted">{product.unit}</Badge>
-                    ) : product.units.map((unit) => (
-                      <Badge key={unit.name} tone={unit.factor === 1 ? 'neutral' : 'muted'}>
-                        {unit.name}{unit.factor === 1 ? ` (${t('unit_base_badge')})` : ` ×${unit.factor}`}
-                      </Badge>
-                    ))}
-                  </dd>
+                  <dl className="grid content-start gap-4 text-sm sm:grid-cols-2">
+                    <div className="sm:col-span-2">
+                      <dt className="text-muted">{t('units')}</dt>
+                      <dd className="mt-1.5 flex flex-wrap gap-1.5">
+                        {product.units.length === 0 ? (
+                          <Badge tone="muted">{product.unit}</Badge>
+                        ) : product.units.map((unit) => (
+                          <Badge key={unit.name} tone={unit.factor === 1 ? 'neutral' : 'muted'}>
+                            {unit.name}{unit.factor === 1 ? ` (${t('unit_base_badge')})` : ` ×${unit.factor}`}
+                          </Badge>
+                        ))}
+                      </dd>
+                    </div>
+                    <div className="sm:col-span-2">
+                      <dt className="text-muted">{t('alternate_barcodes')}</dt>
+                      <dd className="mt-1.5 flex flex-wrap gap-1.5">
+                        {barcodes.length === 0 ? (
+                          <span className="text-sm text-muted">{t('no_alternate_barcodes')}</span>
+                        ) : barcodes.map((item) => (
+                          <Badge key={item.id} tone="muted" className="num" dir="ltr">
+                            {item.code} · {item.unit_name ?? product.unit}
+                          </Badge>
+                        ))}
+                      </dd>
+                    </div>
+                  </dl>
                 </div>
-                <div className="sm:col-span-2">
-                  <dt className="text-muted">{t('alternate_barcodes')}</dt>
-                  <dd className="mt-1.5 flex flex-wrap gap-1.5">
-                    {barcodes.length === 0 ? (
-                      <span className="text-sm text-muted">{t('no_alternate_barcodes')}</span>
-                    ) : barcodes.map((item) => (
-                      <Badge key={item.id} tone="muted" className="num" dir="ltr">
-                        {item.code} · {item.unit_name ?? product.unit}
-                      </Badge>
-                    ))}
-                  </dd>
-                </div>
-              </dl>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+
+            {/* المعلومات الأساسية والتسعير والمحاسبة والمخزون — قابلة للتحرير
+                مباشرةً الآن عبر مساحة العمل المشتركة، بلا نافذة منبثقة
+                (PR-PROD-UX-1؛ `ProductDialog` يبقى قائماً للإضافة السريعة فقط). */}
+            <ProductWorkspace
+              mode="edit"
+              product={product}
+              onUpdated={() => void load()}
+              onAlternateUnitsChange={(units) => setAlternateUnits(units)}
+            />
+
+            {/* الباركود المتعدّد والأسعار لكل وحدة — نُقل مكان تركيبه من نافذة
+                التعديل السابقة إلى هنا حرفياً بلا أي تغيير في المكوّن أو عقده
+                (تكامله الكامل ضمن مساحة العمل مؤجَّلٌ لـ PR-PROD-UX-2). */}
+            <ProductMultiBarcodeTable
+              productId={product.id}
+              baseUnitName={product.unit}
+              alternateUnits={alternateUnits}
+              isVariantManaged={product.variant_state === 'variant_managed'}
+              variants={variants}
+            />
+          </div>
         </TabPanel>
       )}
 
@@ -361,8 +400,6 @@ export default function ProductProfilePage() {
           </Card>
         </TabPanel>
       )}
-
-      <ProductDialog key={product.id} open={editing} onClose={() => setEditing(false)} onSaved={() => { setEditing(false); void load(); }} product={product} />
     </div>
   );
 }

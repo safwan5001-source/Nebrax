@@ -297,4 +297,14 @@ describe('ProductsPage server-side export, sorting and selection', () => {
     expect(screen.queryByLabelText('Scope selected')).toBeNull();
     expect(screen.getByLabelText('Scope all')).toBeTruthy();
   });
+
+  it('PR-PROD-UX-1: the Edit row action navigates to the unified product workspace instead of opening a dialog', async () => {
+    respondWith([baseProduct]);
+    render(<ProductsPage />);
+    await screen.findByRole('list');
+
+    const editLinks = screen.getAllByRole('link', { name: 'Edit' }) as HTMLAnchorElement[];
+    expect(editLinks.length).toBeGreaterThan(0);
+    editLinks.forEach((link) => expect(link.getAttribute('href')).toBe('/products/p1'));
+  });
 });
