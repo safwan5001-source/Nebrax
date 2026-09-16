@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\CommerceCartController;
 use App\Http\Controllers\Api\CommerceCategoryController;
+use App\Http\Controllers\Api\CommerceCheckoutController;
 use App\Http\Controllers\Api\CommerceProductController;
 use App\Http\Controllers\Api\CommerceStorefrontController;
 use App\Http\Middleware\AuthenticateApiClient;
@@ -72,6 +73,11 @@ Route::middleware([
     // never the Authorization header, which already carries the unrelated
     // ApiClient/Sanctum store token resolved above.
     Route::get('cart', [CommerceCartController::class, 'show'])->name('cart.show');
+
+    // PR-4 — mobile checkout read. Reuses CommerceCheckoutService in full;
+    // same X-Cart-Token identity as Cart (see CommerceCheckoutController's
+    // own docblock) — Checkout has no token of its own, it shares Cart's.
+    Route::get('checkout', [CommerceCheckoutController::class, 'show'])->name('checkout.show');
 });
 
 /*
@@ -96,4 +102,15 @@ Route::middleware([
     Route::post('cart/items', [CommerceCartController::class, 'store'])->name('cart.items.store');
     Route::patch('cart/items/{item}', [CommerceCartController::class, 'update'])->whereUuid('item')->name('cart.items.update');
     Route::delete('cart/items/{item}', [CommerceCartController::class, 'destroy'])->whereUuid('item')->name('cart.items.destroy');
+
+    // PR-4 — mobile checkout mutations. Same X-Cart-Token identity as Cart's
+    // mutation group above. Idempotency-Key is required only on
+    // checkout/complete — CommerceCheckoutController's own docblock explains
+    // why POST checkout itself needs none (matches the reused service's
+    // actual contract, not an assumption).
+    Route::post('checkout', [CommerceCheckoutController::class, 'store'])->name('checkout.store');
+    Route::patch('checkout/contact', [CommerceCheckoutController::class, 'updateContact'])->name('checkout.contact.update');
+    Route::patch('checkout/address', [CommerceCheckoutController::class, 'updateAddress'])->name('checkout.address.update');
+    Route::patch('checkout/delivery', [CommerceCheckoutController::class, 'updateDelivery'])->name('checkout.delivery.update');
+    Route::post('checkout/complete', [CommerceCheckoutController::class, 'complete'])->name('checkout.complete');
 });
