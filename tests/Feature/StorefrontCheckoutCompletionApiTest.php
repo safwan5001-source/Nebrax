@@ -260,6 +260,38 @@ class StorefrontCheckoutCompletionApiTest extends TestCase
     }
 
     /**
+     * P1 (Codex review, PR #836) — إثباتٌ على مسار الويب أن `POST checkout`
+     * بعد اكتمال Checkout الأول لنفس السلة لا يفتح دورة جديدة: يستأنف نفس
+     * الصفّ المكتمل (`CommerceCheckoutService::createOrResume()` مشتركة بين
+     * `/store/v1` و`/commerce/v1`، فالإصلاح يحمي الاثنين معاً بلا أي تغيير
+     * في عقد `/store/v1` نفسه — لا Idempotency-Key جديدة على `POST checkout`).
+     *
+     * @test
+     */
+    public function a_second_post_checkout_after_completion_resumes_the_completed_checkout_on_the_web_path_too(): void
+    {
+        ['tenant' => $tenant, 'channel' => $channel] = $this->store('checkout-complete-dup-guard.test');
+        $product = $this->product($tenant, $channel);
+        $token = $this->fullyReadyCheckout('checkout-complete-dup-guard.test', $tenant, $channel, $product);
+
+        $first = $this->complete('checkout-complete-dup-guard.test', $token, 'idem-web-guard-A')->assertCreated();
+        $this->assertDatabaseCount('commerce_checkouts', 1);
+        $this->assertDatabaseCount('commerce_orders', 1);
+
+        $resumed = $this->createCheckout('checkout-complete-dup-guard.test', $token)->assertOk();
+        $resumed->assertJsonPath('data.status', CommerceCheckout::STATUS_COMPLETED);
+        $this->assertDatabaseCount('commerce_checkouts', 1);
+
+        $this->complete('checkout-complete-dup-guard.test', $token, 'idem-web-guard-B')
+            ->assertStatus(409)->assertJsonPath('error.code', 'idempotency_conflict');
+
+        $replay = $this->complete('checkout-complete-dup-guard.test', $token, 'idem-web-guard-A')->assertOk();
+        $this->assertSame($first->json('data.order.id'), $replay->json('data.order.id'));
+        $this->assertDatabaseCount('commerce_checkouts', 1);
+        $this->assertDatabaseCount('commerce_orders', 1);
+    }
+
+    /**
      * يعيد استعمال نمط `StorefrontCartApiTest::deleting_an_alternative_unit_price_...`
      * حرفياً: سعرٌ صريح لوحدة بديلة كان محسوماً وقت الإضافة للسلة، ثم يُحذف
      * قبل الإتمام — أقرب سيناريو حقيقي قابل للاختبار لـ"تغيّر السعر" في نظامٍ

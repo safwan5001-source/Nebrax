@@ -161,6 +161,22 @@ final class CommerceCheckoutService
      * لا ينشئ سلةً أبداً (§ ممنوع صراحةً) — سلة غير موجودة/غير صالحة تفشل
      * مغلقاً بـ CheckoutNotFoundException.
      *
+     * **حارس عدم التكرار (Post-Review P1، PR-4)**: إن وُجد Checkout **مكتمل
+     * بالفعل** لنفس `cart_id` — يُستأنَف هو نفسه، ولا يُنشأ Checkout جديد
+     * أبداً. السلة تبقى `status=active` بعد `complete()` (لا تُلمَس، لا
+     * تُفرَّغ)، فبلا هذا الحارس كانت إعادة `POST checkout` بعد إتمام ناجح
+     * تفشل أن تجد صفّاً بحالة مفتوحة (`OPEN_STATUSES` يستبعد `completed`)
+     * فتُنشئ Checkout **ثانياً** لنفس السلة — وإتمامه بمفتاح idempotency
+     * مختلف كان يُنتج `CommerceOrder` **ثانياً** لنفس العناصر (لا قيد فريد
+     * يمنع ذلك: `commerce_orders.commerce_checkout_id` فريد **لكل صفّ
+     * Checkout**، لا لكل `cart_id`). الاستئناف هنا يُعيد كل إتمامٍ لاحق إلى
+     * `complete()`/`replayOrConflict()` الموجودتين أصلاً وآمنتين تماماً
+     * (نفس المفتاح ⇐ إعادة نفس الطلب، مفتاحٌ مختلف ⇐ 409 تعارض) — لا آلية
+     * idempotency موازية جديدة، ولا عمود/جدول جديد، ولا تغيير على عقد
+     * `POST checkout` (لا يزال بلا Idempotency-Key، مطابقاً لعقد
+     * `AWJ_CHECKOUT_V1_ARCHITECTURE.md` §9 حرفياً). ويب وجوال كلاهما محميان
+     * معاً لأن الإصلاح في هذه الخدمة المشتركة، لا في متحكّمٍ واحد.
+     *
      * @return array{checkout: CommerceCheckout, cart: CommerceCart, created: bool}
      */
     public function createOrResume(?string $cartToken): array
@@ -176,9 +192,14 @@ final class CommerceCheckoutService
 
             $existing = $this->scopeToContext(CommerceCheckout::query(), $context)
                 ->where('cart_id', $cart->id)
-                ->whereIn('status', CommerceCheckout::OPEN_STATUSES)
+                ->whereIn('status', [...CommerceCheckout::OPEN_STATUSES, CommerceCheckout::STATUS_COMPLETED])
+                ->orderByDesc('created_at')
                 ->lockForUpdate()
                 ->first();
+
+            if ($existing !== null && $existing->status === CommerceCheckout::STATUS_COMPLETED) {
+                return ['checkout' => $existing, 'cart' => $cart, 'created' => false];
+            }
 
             if ($existing !== null && ! $existing->expires_at->isPast()) {
                 return ['checkout' => $existing, 'cart' => $cart, 'created' => false];

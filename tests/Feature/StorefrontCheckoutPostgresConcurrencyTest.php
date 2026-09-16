@@ -75,6 +75,99 @@ class StorefrontCheckoutPostgresConcurrencyTest extends TestCase
         parent::tearDown();
     }
 
+    /**
+     * P1 (Codex review, PR #836) — نفس نمط الاختبار أعلاه، لكن للحالة
+     * المكتملة: `createOrResume()` يجب أن يستأنف نفس Checkout المكتمل تحت
+     * قفل صفٍّ حقيقي، لا أن يفتح صفّاً ثانياً حتى مع تزامن حقيقي — هذا هو
+     * الحارس الذي يمنع `CommerceOrder` مكرَّراً عبر إعادة POST checkout.
+     *
+     * @test
+     */
+    public function two_concurrent_checkout_creations_after_completion_resolve_to_the_same_completed_checkout(): void
+    {
+        $product = Product::create([
+            'name' => 'Completed checkout race product', 'sku' => 'CHKCOMPRACE-'.Str::random(8),
+            'unit' => 'piece', 'sale_price' => 1250, 'is_active' => true,
+        ]);
+        CommerceListing::create([
+            'product_id' => $product->id, 'sales_channel_id' => $this->channel->id, 'is_published' => true,
+        ]);
+        $rawToken = 'completed-checkout-race-token-'.Str::random(16);
+        $cart = CommerceCart::create([
+            'storefront_id' => $this->storefront->id,
+            'sales_channel_id' => $this->channel->id,
+            'token_hash' => hash('sha256', $rawToken),
+            'expires_at' => now()->addDay(),
+        ]);
+        $completed = CommerceCheckout::create([
+            'storefront_id' => $this->storefront->id,
+            'sales_channel_id' => $this->channel->id,
+            'cart_id' => $cart->id,
+            'status' => CommerceCheckout::STATUS_COMPLETED,
+            'expires_at' => now()->addHour(),
+        ]);
+
+        $lockReady = $this->signalPath('checkout_completed_lock_');
+        $resumeStarted = $this->signalPath('checkout_completed_resume_');
+        $resultFile = tempnam(sys_get_temp_dir(), 'checkout_completed_race_result_');
+
+        $locker = pcntl_fork();
+        if ($locker === 0) {
+            DB::purge(config('database.default'));
+            DB::transaction(function () use ($cart, $lockReady, $resumeStarted): void {
+                DB::table('commerce_carts')->where('id', $cart->id)->lockForUpdate()->first();
+                touch($lockReady);
+                $this->waitForSignal($resumeStarted);
+                usleep(500000);
+            });
+            exit(0);
+        }
+        $this->assertGreaterThan(0, $locker);
+        $this->waitForSignal($lockReady);
+
+        $resumer = pcntl_fork();
+        if ($resumer === 0) {
+            DB::purge(config('database.default'));
+            $this->establishContext();
+            touch($resumeStarted);
+            try {
+                $result = app(CommerceCheckoutService::class)->createOrResume($rawToken);
+                file_put_contents($resultFile, json_encode([
+                    'ok' => true,
+                    'checkout_id' => $result['checkout']->id,
+                    'created' => $result['created'],
+                ]));
+            } catch (\Throwable $exception) {
+                file_put_contents($resultFile, json_encode([
+                    'ok' => false,
+                    'message' => $exception->getMessage(),
+                ]));
+            }
+            exit(0);
+        }
+        $this->assertGreaterThan(0, $resumer);
+
+        pcntl_waitpid($locker, $status);
+        pcntl_waitpid($resumer, $status);
+        $result = json_decode((string) file_get_contents($resultFile), true);
+        $this->cleanupSignals([$lockReady, $resumeStarted, $resultFile]);
+
+        $this->assertTrue($result['ok'], json_encode($result));
+        $this->assertFalse($result['created']);
+        $this->assertSame($completed->id, $result['checkout_id']);
+        $this->assertSame(1, DB::table('commerce_checkouts')->where('cart_id', $cart->id)->count());
+
+        // استدعاءٌ ثالث لنفس السلة يجب أن يستأنف نفس الصفّ المكتمل أيضاً، لا صفّاً ثالثاً.
+        $third = app(CommerceCheckoutService::class)->createOrResume($rawToken);
+        $this->assertFalse($third['created']);
+        $this->assertSame($completed->id, $third['checkout']->id);
+        $this->assertSame(1, DB::table('commerce_checkouts')->where('cart_id', $cart->id)->count());
+        $this->assertSame(
+            CommerceCheckout::STATUS_COMPLETED,
+            DB::table('commerce_checkouts')->where('cart_id', $cart->id)->value('status'),
+        );
+    }
+
     /** @test */
     public function two_concurrent_checkout_creations_for_the_same_cart_resolve_to_one_open_checkout(): void
     {
