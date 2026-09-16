@@ -17,6 +17,7 @@ import { getSystemTaxInclusive } from '@/lib/tax';
 import { productUnitForTemplate, type ProductUnitTemplate } from '@/lib/product-unit-template';
 import type { Product } from './product-dialog';
 import { ProductMultiBarcodeTable, type PendingBarcodeRow } from './product-multi-barcode-table';
+import { ProductVariantsPanel } from './product-variants-panel';
 
 interface Partner { id: string; name: string; type?: string }
 interface Account { id: string; code: string; name: string; type: string; is_group: boolean }
@@ -143,8 +144,10 @@ export interface ProductWorkspaceProps {
  * ═══════════════════════════════════════════════════════════════
  *  نطاقها اليوم: المعلومات الأساسية + التسعير القياسي + المحاسبة/الضرائب +
  *  المخزون + معلومات إضافية + الوحدات/الباركود المتعدد/السعر القانوني لكل
- *  وحدة (`ProductMultiBarcodeTable`, PR-PROD-UX-2). الوسائط، الخيارات
- *  والمتغيّرات، والنشر التجاري تبقى خارج هذا المكوّن عمداً حتى PR-3/PR-4.
+ *  وحدة (`ProductMultiBarcodeTable`, PR-PROD-UX-2) + الخيارات والمتغيّرات
+ *  (`ProductVariantsPanel`, PR-PROD-UX-3 — مُتبنّى كما هو حرفياً، لا نسخة
+ *  موازية؛ مقفلٌ بشرحٍ صريح قبل أوّل حفظٍ ناجح لأن لا `productId` بعد).
+ *  الوسائط والنشر التجاري يبقيان خارج هذا المكوّن عمداً حتى PR-4.
  *
  *  عقد «الحفظ الأول»: وضع الإنشاء يبقى مثبَّتاً (mounted) بعد نجاح `POST`
  *  الأول — لا تنقّل، لا إغلاق نافذة. `productId` المُستحدَث يُحفَظ داخلياً،
@@ -175,6 +178,12 @@ export function ProductWorkspace({
   const [error, setError] = useState<string | null>(null);
   const [pendingBarcodes, setPendingBarcodes] = useState<PendingBarcodeRow[]>([]);
   const [variants, setVariants] = useState<{ id: string; descriptor: string }[]>([]);
+  // حالة الخيارات/المتغيّرات (PR-PROD-UX-3) — تُدار محلياً هنا بدل الاعتماد
+  // فقط على `product.variant_state` القادم من الأب: في وضع الإنشاء لا يوجد
+  // `product` أصلاً، وحتى بعد أوّل حفظٍ ناجح لا يُعاد جلب المنتج كاملاً من
+  // الأب (`onCreated` لا يُمرَّر منتَجاً محدَّثاً) — فتبقى هذه الحالة مصدر
+  // الحقيقة الوحيد لعرض/قفل قسم «الخيارات والمتغيّرات» داخل مساحة العمل.
+  const [variantState, setVariantState] = useState<string>(product?.variant_state ?? 'simple');
 
   const [templates, setTemplates] = useState<ProductUnitTemplate[]>([]);
   const [categories, setCategories] = useState<Listed[]>([]);
@@ -187,7 +196,21 @@ export function ProductWorkspace({
   const { number: suggestedSku } = useNumberPreview('product', { enabled: mode === 'create' && !persistedId });
 
   const persisted = persistedId !== null;
-  const isVariantManaged = product?.variant_state === 'variant_managed';
+  const isVariantManaged = variantState === 'variant_managed';
+
+  // بعد تفعيل/تعطيل إدارة المتغيّرات (`ProductVariantsPanel`)، تُعاد قراءة
+  // المنتج لتحديث `variantState` محلياً فقط — بلا استدعاء `onUpdated` الذي
+  // يُنقّل الصفحة (`/products/new` يستعمله لإنهاء الإنشاء والتنقّل إلى
+  // القائمة)، فتغيير حالة المتغيّرات ليس «حفظ تغييرات» بمعنى ذلك المسار.
+  async function refreshVariantState() {
+    if (!persistedId) return;
+    try {
+      const r = await api<{ data: { variant_state?: string } }>(`/products/${persistedId}`);
+      setVariantState(r.data.variant_state ?? 'simple');
+    } catch {
+      // تجاهلٌ آمن: `ProductVariantsPanel` يعرض رسالة الخطأ الخاصة به بالفعل.
+    }
+  }
 
   useEffect(() => {
     getSystemTaxInclusive().then(setTaxInclusive).catch(() => {});
@@ -210,9 +233,10 @@ export function ProductWorkspace({
   }, [mode]);
 
   // VAR-PRICE-UX-1: قائمة المتغيّرات النشطة — تُستهلَك فقط لاختيار المتغيّر في
-  // جدول «باركود متعدد» لمنتجٍ متعدد الخيارات؛ فارغةٌ دائماً لمنتجٍ بسيط أو في
-  // وضع الإنشاء (لا متغيّرات قبل أول حفظٍ أصلاً — تكامل الخيارات/المتغيّرات
-  // ذاته مؤجَّلٌ لـ PR-PROD-UX-3).
+  // جدول «باركود متعدد» لمنتجٍ متعدد الخيارات؛ فارغةٌ دائماً لمنتجٍ بسيط أو
+  // قبل أوّل حفظٍ (لا `persistedId` بعد). تُعاد تلقائياً بمجرد أن يصبح
+  // `isVariantManaged` صحيحاً — بما في ذلك مباشرةً بعد التفعيل من قسم
+  // «الخيارات والمتغيّرات» أسفله (PR-PROD-UX-3)، عبر `refreshVariantState`.
   useEffect(() => {
     if (!persistedId || !isVariantManaged) {
       setVariants([]);
@@ -535,6 +559,25 @@ export function ProductWorkspace({
         pendingRows={pendingBarcodes}
         onPendingRowsChange={setPendingBarcodes}
       />
+
+      {/* الخيارات والمتغيّرات (PR-PROD-UX-3) — قسمٌ واحد ضمن مساحة العمل
+          نفسها، لا صفحة/تبويب منفصل. قبل أوّل حفظٍ ناجح لا يوجد `productId`
+          بعد فلا هوية يُعلَّق عليها خيار/متغيّر حقيقي — يظهر القسم مقفلاً
+          بشرحٍ صريح بدل إخفائه أو اختراع منتجٍ وهمي لفتحه مبكراً. */}
+      {persistedId ? (
+        <ProductVariantsPanel
+          productId={persistedId}
+          variantState={variantState}
+          onProductChanged={() => void refreshVariantState()}
+        />
+      ) : (
+        <Card>
+          <CardHeader><CardTitle className="flex items-center gap-2"><SlidersHorizontal className="h-4 w-4 text-primary" strokeWidth={1.8} />{t('variants_entry_title')}</CardTitle></CardHeader>
+          <CardContent>
+            <p className="text-xs text-muted">{t('variants_locked_hint')}</p>
+          </CardContent>
+        </Card>
+      )}
 
       {error && <p role="alert" className="rounded bg-negative/10 px-3 py-2 text-xs text-negative">{error}</p>}
     </div>

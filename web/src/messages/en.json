@@ -4746,6 +4746,7 @@
     "variants_tab_label": "Options & Variants",
     "variants_entry_title": "Options & Variants",
     "variants_entry_hint": "Sell this product in multiple options such as color or size.",
+    "variants_locked_hint": "Save the product first to add options such as color or size and create variants.",
     "variants_add_options": "Add options",
     "variants_enabled": "Variant management enabled.",
     "variants_disable": "Revert to simple",

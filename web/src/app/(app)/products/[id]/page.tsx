@@ -20,7 +20,6 @@ import { Tabs, TabPanel, type TabDef } from '@/components/ui/tabs';
 import { useToast } from '@/components/ui/toast';
 import { type Product as ProductFormProduct } from '@/components/products/product-dialog';
 import { ProductWorkspace } from '@/components/products/product-workspace';
-import { ProductVariantsPanel } from '@/components/products/product-variants-panel';
 
 type Product = ProductFormProduct & {
   units: Array<{ name: string; factor: number }>;
@@ -100,7 +99,6 @@ export default function ProductProfilePage() {
   const selectedMediaIndex = selectedMedia ? media.findIndex((item) => item.id === selectedMedia.id) + 1 : 0;
   const tabs = useMemo<TabDef[]>(() => [
     { id: 'info', label: t('product_info') },
-    { id: 'variants', label: t('variants_tab_label') },
     { id: 'movements', label: t('inventory_movements') },
     { id: 'timeline', label: t('timeline') },
     { id: 'activity', label: t('activity'), count: activities.length },
@@ -303,25 +301,16 @@ export default function ProductProfilePage() {
             </Card>
 
             {/* المعلومات الأساسية والتسعير والمحاسبة والمخزون والوحدات/الباركود
-                المتعدّد/السعر لكل وحدة — كلّها قابلة للتحرير مباشرةً عبر مساحة
-                العمل المشتركة، بلا نافذة منبثقة (PR-PROD-UX-1/2؛ `ProductDialog`
-                يبقى قائماً للإضافة السريعة فقط). */}
+                المتعدّد/السعر لكل وحدة والخيارات/المتغيّرات — كلّها قابلة
+                للتحرير مباشرةً عبر مساحة العمل المشتركة، بلا نافذة منبثقة
+                ولا تبويبٌ منفصل (PR-PROD-UX-1/2/3؛ `ProductDialog` يبقى
+                قائماً للإضافة السريعة فقط). */}
             <ProductWorkspace
               mode="edit"
               product={product}
               onUpdated={() => void load()}
             />
           </div>
-        </TabPanel>
-      )}
-
-      {activeTab === 'variants' && (
-        <TabPanel id="variants">
-          <ProductVariantsPanel
-            productId={id}
-            variantState={product.variant_state ?? 'simple'}
-            onProductChanged={() => void load()}
-          />
         </TabPanel>
       )}
 

@@ -302,4 +302,54 @@ describe('ProductWorkspace', () => {
     await waitFor(() => expect(screen.getAllByText('999').length).toBeGreaterThan(0));
     expect(screen.getAllByDisplayValue('100.00').length).toBeGreaterThan(0);
   });
+
+  // PR-PROD-UX-3: الخيارات والمتغيّرات داخل مساحة العمل نفسها — لا صفحة/تبويب منفصل.
+  it('PR-PROD-UX-3: create mode before first Save shows the Options & Variants section locked, with no variant API calls', async () => {
+    render(wrapAr(<ProductWorkspace mode="create" />));
+
+    await screen.findByText('الخيارات والمتغيّرات');
+    expect(screen.getByText('احفظ المنتج أولاً لإضافة خيارات مثل اللون أو المقاس وإنشاء متغيّرات.')).toBeTruthy();
+    // لا `productId` بعد — لا نقطة دخول تفاعلية (زر «إضافة خيارات») ولا أي طلب متغيّرات.
+    expect(screen.queryByRole('button', { name: 'إضافة خيارات' })).toBeNull();
+    expect(apiMock.mock.calls.some(([path]) => typeof path === 'string' && path.includes('/options'))).toBe(false);
+    expect(apiMock.mock.calls.some(([path]) => typeof path === 'string' && path.includes('/variants'))).toBe(false);
+  });
+
+  it('PR-PROD-UX-3: a successful first Save unlocks the Options & Variants entry point in place (no navigation, no duplicate POST)', async () => {
+    const user = userEvent.setup();
+    render(wrapAr(<ProductWorkspace mode="create" />));
+
+    await user.type(screen.getByLabelText(/الاسم \*/), 'منتج جديد');
+    await user.type(screen.getByLabelText('سعر البيع'), '10');
+    await user.click(screen.getByRole('button', { name: 'حفظ' }));
+
+    // يبقى مثبَّتاً في نفس الشجرة، ويظهر الآن زر تفعيل المتغيّرات الحقيقي.
+    await waitFor(() => expect(screen.getByRole('button', { name: 'إضافة خيارات' })).toBeTruthy());
+    expect(screen.queryByText('احفظ المنتج أولاً لإضافة خيارات مثل اللون أو المقاس وإنشاء متغيّرات.')).toBeNull();
+    expect(apiMock.mock.calls.filter(([path, options]) => path === '/products' && options?.method === 'POST')).toHaveLength(1);
+  });
+
+  it('a failed first Save keeps Options & Variants locked (no persisted-only capability unlocked)', async () => {
+    const user = userEvent.setup();
+    installApiMock({
+      'POST /products': () => { throw new Error('rejected'); },
+    });
+    render(wrapAr(<ProductWorkspace mode="create" />));
+
+    await user.type(screen.getByLabelText(/الاسم \*/), 'منتج جديد');
+    await user.type(screen.getByLabelText('سعر البيع'), '10');
+    await user.click(screen.getByRole('button', { name: 'حفظ' }));
+
+    await waitFor(() => expect(screen.getByRole('alert')).toBeTruthy());
+    expect(screen.getByText('احفظ المنتج أولاً لإضافة خيارات مثل اللون أو المقاس وإنشاء متغيّرات.')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'إضافة خيارات' })).toBeNull();
+  });
+
+  it('PR-PROD-UX-3: edit mode renders the existing Options & Variants panel through the same section (no separate tab)', async () => {
+    render(wrapAr(<ProductWorkspace mode="edit" product={EXISTING_PRODUCT} />));
+
+    await screen.findByDisplayValue('منتج قائم');
+    // منتجٌ بسيطٌ في وضع التعديل: نفس نقطة الدخول الحقيقية، لا حالة قفلٍ زائفة.
+    expect(await screen.findByRole('button', { name: 'إضافة خيارات' })).toBeTruthy();
+  });
 });
