@@ -14,7 +14,7 @@ Opened after this report was finalized — see the PR section of the final execu
 
 ## 4. Head SHA
 
-Recorded at push time — see the PR's commit list, and the follow-up "record head SHA" note appended to this report.
+`f360239608693ea40f47393b1c9dbed3cb40d566`
 
 ## 5. Phase 0 — Existing authority map
 
