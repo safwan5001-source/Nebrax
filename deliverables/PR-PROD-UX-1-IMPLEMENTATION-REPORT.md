@@ -14,7 +14,7 @@ Opened after this report was finalized — see the PR section of the final execu
 
 ## 4. Head SHA
 
-Recorded at push time (see PR commit list).
+`6f61b7a4cb801b7bef2a4d5ccab53a04aea4738b`
 
 ## 5. Phase 0 — Category/Brand findings
 
