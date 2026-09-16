@@ -4538,6 +4538,8 @@
     "search": "Search products…",
     "empty": "No products",
     "save": "Save",
+    "save_changes": "Save changes",
+    "unsaved_indicator": "Unsaved",
     "cancel": "Cancel",
     "new_title": "Add product",
     "back": "Back",

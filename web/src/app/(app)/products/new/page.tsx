@@ -1,27 +1,23 @@
 'use client';
 
 import Link from 'next/link';
-import { ChangeEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { ChangeEvent, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { ArrowRight, Package, Tag, Warehouse, SlidersHorizontal, RefreshCw, Trash2, Plus } from 'lucide-react';
+import { ArrowRight, Trash2, Plus } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { useToast } from '@/components/ui/toast';
-import { api, ApiError } from '@/lib/api';
-import { useNumberPreview } from '@/lib/use-number-preview';
-import { riyalToMinor, formatRiyal, extractInclusiveTax } from '@/lib/money';
-import { getSystemTaxInclusive } from '@/lib/tax';
-import { productUnitForTemplate, type ProductUnitTemplate } from '@/lib/product-unit-template';
+import { ApiError, api } from '@/lib/api';
+import { riyalToMinor, formatRiyal } from '@/lib/money';
 import { ProductPublicationFields } from '@/components/products/product-publication-fields';
+import { ProductWorkspace } from '@/components/products/product-workspace';
 import { replaceProductPublication } from '@/modules/products/publication';
 import { useProductPublication } from '@/modules/products/use-product-publication';
 
-interface Partner { id: string; name: string; type?: string }
-interface Account { id: string; code: string; name: string; type: string; is_group: boolean }
 interface SelectedProductImage { file: File; previewUrl: string }
 interface PendingBarcode { code: string; unit_name: string; default_quantity: string; label: string; price: string }
 
@@ -29,48 +25,22 @@ const MAX_PRODUCT_IMAGES = 8;
 const MAX_PRODUCT_IMAGE_SIZE = 5 * 1024 * 1024;
 const PRODUCT_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
+/**
+ * غلافٌ رقيقٌ حول `ProductWorkspace` (PR-PROD-UX-1). الباركود المتعدّد وقت
+ * الإنشاء، الوسائط، والنشر التجاري تبقى مملوكةً لهذه الصفحة تماماً كما كانت —
+ * `ProductWorkspace` لا يعرف عنها شيئاً؛ حقول الباركود/الأسعار المُعلَّقة تُدمَج
+ * في نفس طلب `POST /products` الأول عبر `extraCreatePayload` فقط، فيبقى العقد
+ * «طلبٌ واحدٌ بالضبط» قائماً حرفياً كما كان قبل هذا الإصلاح.
+ */
 export default function NewProductPage() {
   const t = useTranslations('products');
   const tc = useTranslations('common');
   const router = useRouter();
   const { success, error: toastError } = useToast();
 
-  const [name, setName] = useState('');
-  const [nameEn, setNameEn] = useState('');
-  const [sku, setSku] = useState('');
-  const [barcode, setBarcode] = useState('');
-  const [type, setType] = useState('good');
-  const [unit, setUnit] = useState('');
-  const [unitTemplateId, setUnitTemplateId] = useState('');
-  const [templates, setTemplates] = useState<ProductUnitTemplate[]>([]);
-  const [defaultSalesUnit, setDefaultSalesUnit] = useState('');
-  const [defaultPurchaseUnit, setDefaultPurchaseUnit] = useState('');
-  const [salePrice, setSalePrice] = useState('');
-  const [purchasePrice, setPurchasePrice] = useState('');
-  const [taxRate, setTaxRate] = useState('15');
-  const [description, setDescription] = useState('');
-  const [category, setCategory] = useState('');
-  const [brand, setBrand] = useState('');
-  const [reorderLevel, setReorderLevel] = useState('');
-  const [initialQty, setInitialQty] = useState('');
-  const [trackInventory, setTrackInventory] = useState(false);
-  const [isActive, setIsActive] = useState(true);
-  const [suppliers, setSuppliers] = useState<Partner[]>([]);
-  const [supplierId, setSupplierId] = useState('');
-  const [minSalePrice, setMinSalePrice] = useState('');
-  const [discount, setDiscount] = useState('');
-  const [discountType, setDiscountType] = useState('percent');
-  const [profitMargin, setProfitMargin] = useState('');
-  const [tags, setTags] = useState('');
-  const [internalNotes, setInternalNotes] = useState('');
-  const [revenueAccounts, setRevenueAccounts] = useState<Account[]>([]);
-  const [expenseAccounts, setExpenseAccounts] = useState<Account[]>([]);
-  const [salesAccountId, setSalesAccountId] = useState('');
-  const [cogsAccountId, setCogsAccountId] = useState('');
-  const [taxInclusive, setTaxInclusive] = useState(false);
+  const [productId, setProductId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [createdProductId, setCreatedProductId] = useState<string | null>(null);
+  const [finishing, setFinishing] = useState(false);
   const [productImages, setProductImages] = useState<SelectedProductImage[]>([]);
   const [pendingBarcodes, setPendingBarcodes] = useState<PendingBarcode[]>([]);
   const [newBarcodeCode, setNewBarcodeCode] = useState('');
@@ -78,41 +48,9 @@ export default function NewProductPage() {
   const [newBarcodeQty, setNewBarcodeQty] = useState('1');
   const [newBarcodeLabel, setNewBarcodeLabel] = useState('');
   const [newBarcodePrice, setNewBarcodePrice] = useState('');
-  const { number: suggestedSku } = useNumberPreview('product');
+  const [alternateUnits, setAlternateUnits] = useState<{ name: string; factor: number }[]>([]);
   const productImageUrls = useRef<string[]>([]);
   const publication = useProductPublication();
-
-  useEffect(() => {
-    getSystemTaxInclusive().then(setTaxInclusive).catch(() => {});
-    api<{ data: Partner[] }>('/partners')
-      .then((r) => setSuppliers(r.data.filter((p) => p.type === 'supplier' || p.type === 'both')))
-      .catch(() => {});
-    api<{ data: ProductUnitTemplate[] }>('/unit-templates').then((r) => setTemplates(r.data)).catch(() => {});
-    api<{ data: Account[] }>('/accounts')
-      .then((r) => {
-        const leaf = r.data.filter((a) => !a.is_group);
-        setRevenueAccounts(leaf.filter((a) => a.type === 'revenue'));
-        setExpenseAccounts(leaf.filter((a) => a.type === 'expense'));
-      })
-      .catch(() => {});
-  }, []);
-
-  useEffect(() => () => {
-    productImageUrls.current.forEach((previewUrl) => URL.revokeObjectURL(previewUrl));
-  }, []);
-
-  const alternateUnits = useMemo(
-    () => templates.find((template) => template.id === unitTemplateId)?.units ?? [],
-    [templates, unitTemplateId],
-  );
-
-  function selectUnitTemplate(templateId: string) {
-    setUnitTemplateId(templateId);
-    setUnit((currentUnit) => productUnitForTemplate(templateId, templates, currentUnit));
-    // تغيير القالب قد يُسقط الوحدة الافتراضية القائمة من عضويته.
-    setDefaultSalesUnit('');
-    setDefaultPurchaseUnit('');
-  }
 
   function selectProductImages(event: ChangeEvent<HTMLInputElement>) {
     const files = Array.from(event.target.files ?? []);
@@ -173,68 +111,35 @@ export default function NewProductPage() {
     setPendingBarcodes((current) => current.filter((item) => item.code !== code));
   }
 
-  async function submit() {
-    if (!createdProductId && !name.trim()) { setError(tc('saveFailed')); return; }
-    setSaving(true);
+  const extraCreatePayload = {
+    barcodes: pendingBarcodes.map((item) => ({
+      code: item.code,
+      unit_name: item.unit_name || null,
+      default_quantity: Number(item.default_quantity) || 1,
+      label: item.label || null,
+    })),
+    unit_prices: Array.from(
+      new Map(
+        pendingBarcodes
+          .filter((item) => item.price.trim() !== '')
+          .map((item) => [item.unit_name || '', { unit_name: item.unit_name || null, price: riyalToMinor(item.price) }]),
+      ).values(),
+    ),
+  };
+
+  /** يُستدعى مرّةً واحدة فور نجاح `POST /products` — لا يُعاد استدعاؤه لاحقاً. */
+  async function afterCreated(id: string) {
+    setProductId(id);
+    await finishUp(id);
+  }
+
+  async function finishUp(id: string) {
+    setFinishing(true);
     setError(null);
     try {
-      let productId = createdProductId;
-      if (!productId) {
-        const created = await api<{ data: { id: string } }>('/products', {
-          method: 'POST',
-          body: {
-            name,
-            name_en: nameEn || null,
-            sku: sku || null,
-            barcode: barcode || null,
-            type,
-            unit: unit || null,
-            unit_template_id: unitTemplateId || null,
-            default_sales_unit: defaultSalesUnit || null,
-            default_purchase_unit: defaultPurchaseUnit || null,
-            sale_price: riyalToMinor(salePrice),
-            purchase_price: riyalToMinor(purchasePrice),
-            tax_rate: Number(taxRate) || 0,
-            description: description || null,
-            category: category || null,
-            brand: brand || null,
-            reorder_level: trackInventory && reorderLevel !== '' ? Number(reorderLevel) || 0 : null,
-            initial_quantity: trackInventory && initialQty !== '' ? Number(initialQty) || 0 : null,
-            supplier_id: supplierId || null,
-            sales_account_id: salesAccountId || null,
-            cogs_account_id: cogsAccountId || null,
-            min_sale_price: minSalePrice !== '' ? riyalToMinor(minSalePrice) : null,
-            discount: discount !== '' ? Number(discount) || 0 : null,
-            discount_type: discount !== '' ? discountType : null,
-            profit_margin: profitMargin !== '' ? Number(profitMargin) || 0 : null,
-            tags: tags || null,
-            internal_notes: internalNotes || null,
-            track_inventory: trackInventory,
-            is_active: isActive,
-            barcodes: pendingBarcodes.map((item) => ({
-              code: item.code,
-              unit_name: item.unit_name || null,
-              default_quantity: Number(item.default_quantity) || 1,
-              label: item.label || null,
-            })),
-            unit_prices: Array.from(
-              new Map(
-                pendingBarcodes
-                  .filter((item) => item.price.trim() !== '')
-                  .map((item) => [item.unit_name || '', { unit_name: item.unit_name || null, price: riyalToMinor(item.price) }]),
-              ).values(),
-            ),
-          },
-        });
-        productId = created.data.id;
-        // Persist immediately in client state. Any retry from this point is a
-        // publication retry for this id, never another POST /products.
-        setCreatedProductId(productId);
-      }
-
       if (publication.status === 'ready') {
         try {
-          await replaceProductPublication(productId, publication.selectedIds);
+          await replaceProductPublication(id, publication.selectedIds);
         } catch {
           setError(t('publication_failed_after_create'));
           toastError(t('product_created_publication_pending'));
@@ -246,10 +151,10 @@ export default function NewProductPage() {
         const mediaBody = new FormData();
         productImages.forEach(({ file }) => mediaBody.append('media[]', file));
         try {
-          await api(`/products/${productId}/media`, { method: 'POST', body: mediaBody });
+          await api(`/products/${id}/media`, { method: 'POST', body: mediaBody });
         } catch {
           toastError(t('media_upload_failed_after_create'));
-          router.push(`/products/${productId}`);
+          router.push(`/products/${id}`);
           return;
         }
       }
@@ -259,319 +164,132 @@ export default function NewProductPage() {
     } catch (err) {
       setError(err instanceof ApiError ? err.message : tc('saveFailed'));
     } finally {
-      setSaving(false);
+      setFinishing(false);
     }
   }
 
   return (
     <div className="space-y-5">
-      {/* شريط الإجراءات */}
       <div className="flex flex-wrap items-center gap-3">
         <Button asChild variant="ghost" size="icon" aria-label={t('back')}><Link href='/products'>
           <ArrowRight className="h-4 w-4" strokeWidth={1.7} />
         </Link></Button>
         <h1 className="text-xl font-semibold text-text">{t('new_title')}</h1>
-        <div className="ms-auto flex items-center gap-2">
-          <Button asChild variant="ghost"><Link href='/products'>{t('cancel')}</Link></Button>
-          <Button disabled={saving || publication.status === 'loading' || (!createdProductId && !name.trim())} onClick={submit}>
-            {createdProductId ? t('retry_publication') : t('save')}
-          </Button>
-        </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-        {/* تفاصيل البند */}
-        <Card>
-          <CardHeader><CardTitle className="flex items-center gap-2"><Package className="h-4 w-4 text-primary" strokeWidth={1.8} />{t('item_details')}</CardTitle></CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <Label htmlFor="name">{t('name')} <span className="text-negative">*</span></Label>
-                <Input id="name" value={name} onChange={(e) => setName(e.target.value)} required />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="sku">{t('sku')}</Label>
-                <Input id="sku" dir="ltr" value={sku || suggestedSku} onChange={(e) => setSku(e.target.value)} />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="name_en">{t('name_en')}</Label>
-                <Input id="name_en" dir="ltr" value={nameEn} onChange={(e) => setNameEn(e.target.value)} />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="type">{t('type')}</Label>
-                <Select id="type" value={type} onChange={(e) => setType(e.target.value)}>
-                  <option value="good">{t('good')}</option>
-                  <option value="service">{t('service')}</option>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="unit-template">{t('unit_template')}</Label>
-                <Select id="unit-template" value={unitTemplateId} onChange={(e) => selectUnitTemplate(e.target.value)}>
-                  <option value="">{t('no_unit_template')}</option>
-                  {templates.map((template) => <option key={template.id} value={template.id}>{template.name}</option>)}
-                </Select>
-                <p className="text-xs text-muted">{t('unit_template_hint')}</p>
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="unit">{t('unit')}</Label>
-                <Input id="unit" value={unit} onChange={(e) => setUnit(e.target.value)} readOnly={Boolean(unitTemplateId)} />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="default_sales_unit">{t('default_sales_unit')}</Label>
-                <Select id="default_sales_unit" value={defaultSalesUnit} onChange={(e) => setDefaultSalesUnit(e.target.value)}>
-                  <option value="">{t('default_unit_base_option')}</option>
-                  {alternateUnits.map((u) => <option key={u.name} value={u.name}>{u.name}</option>)}
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="default_purchase_unit">{t('default_purchase_unit')}</Label>
-                <Select id="default_purchase_unit" value={defaultPurchaseUnit} onChange={(e) => setDefaultPurchaseUnit(e.target.value)}>
-                  <option value="">{t('default_unit_base_option')}</option>
-                  {alternateUnits.map((u) => <option key={u.name} value={u.name}>{u.name}</option>)}
-                </Select>
-                <p className="text-xs text-muted">{t('default_units_hint')}</p>
-              </div>
-              <div className="space-y-1.5 sm:col-span-2">
-                <Label htmlFor="barcode">{t('barcode')}</Label>
-                <div className="flex gap-2">
-                  <Input id="barcode" dir="ltr" className="num" value={barcode} onChange={(e) => setBarcode(e.target.value)} />
-                  <Button type="button" variant="outline" size="icon" aria-label={t('generate_barcode')} onClick={() => setBarcode('2' + String(Date.now()).slice(-12))}>
-                    <RefreshCw className="h-4 w-4" strokeWidth={1.7} />
-                  </Button>
-                </div>
-              </div>
-              <div className="space-y-1.5 sm:col-span-2">
-                <Label htmlFor="new-barcode-code">{t('barcode_code')}</Label>
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <div className="space-y-1.5">
-                    <Input id="new-barcode-code" dir="ltr" className="num" value={newBarcodeCode} onChange={(e) => setNewBarcodeCode(e.target.value)} disabled={saving} />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Select id="new-barcode-unit" value={newBarcodeUnit} onChange={(e) => setNewBarcodeUnit(e.target.value)} disabled={saving}>
-                      <option value="">{t('default_unit_base_option')}</option>
-                      {alternateUnits.map((u) => <option key={u.name} value={u.name}>{u.name}</option>)}
-                    </Select>
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="new-barcode-qty">{t('barcode_default_quantity')}</Label>
-                    <Input id="new-barcode-qty" type="number" min={1} max={1000000} className="num text-end" value={newBarcodeQty} onChange={(e) => setNewBarcodeQty(e.target.value)} disabled={saving} />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="new-barcode-label">{t('barcode_label')}</Label>
-                    <Input id="new-barcode-label" value={newBarcodeLabel} onChange={(e) => setNewBarcodeLabel(e.target.value)} disabled={saving} />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="new-barcode-price">{t('multi_barcode_col_price')}</Label>
-                    <Input id="new-barcode-price" type="text" inputMode="decimal" dir="ltr" className="num text-end" placeholder="0.00" value={newBarcodePrice} onChange={(e) => setNewBarcodePrice(e.target.value)} disabled={saving} />
-                  </div>
-                </div>
-                <div className="flex justify-end">
-                  <Button type="button" variant="outline" size="sm" disabled={!newBarcodeCode.trim() || saving} onClick={addPendingBarcode}>
-                    <Plus className="h-4 w-4" strokeWidth={1.7} />{t('add_barcode')}
-                  </Button>
-                </div>
-                {pendingBarcodes.length === 0 ? (
-                  <p className="rounded-md bg-background px-3 py-2 text-sm text-muted">{t('no_alternate_barcodes')}</p>
-                ) : (
-                  <ul className="divide-y divide-border rounded-md border border-border">
-                    {pendingBarcodes.map((item) => (
-                      <li key={item.code} className="flex items-center gap-2 px-3 py-2">
-                        <div className="min-w-0 flex-1">
-                          <p className="num text-sm font-medium text-text" dir="ltr">{item.code}</p>
-                          <p className="text-xs text-muted">
-                            {item.unit_name ?? t('default_unit_base_option')} · {t('barcode_quantity', { quantity: Number(item.default_quantity) || 1 })}
-                            {item.label ? ` · ${item.label}` : ''}
-                            {item.price ? ` · ${formatRiyal(riyalToMinor(item.price))}` : ''}
-                          </p>
-                        </div>
-                        <Button type="button" variant="ghost" size="icon" aria-label={`${t('delete')}: ${item.code}`} disabled={saving} onClick={() => removePendingBarcode(item.code)}>
-                          <Trash2 className="h-4 w-4" strokeWidth={1.7} />
-                        </Button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="category">{t('category')}</Label>
-                <Input id="category" value={category} onChange={(e) => setCategory(e.target.value)} />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="brand">{t('brand')}</Label>
-                <Input id="brand" value={brand} onChange={(e) => setBrand(e.target.value)} />
-              </div>
-              {suppliers.length > 0 && (
-                <div className="space-y-1.5 sm:col-span-2">
-                  <Label htmlFor="supplier">{t('supplier')}</Label>
-                  <Select id="supplier" value={supplierId} onChange={(e) => setSupplierId(e.target.value)}>
-                    <option value="">{t('no_supplier')}</option>
-                    {suppliers.map((s) => (<option key={s.id} value={s.id}>{s.name}</option>))}
-                  </Select>
-                </div>
-              )}
-              <div className="space-y-2 sm:col-span-2">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <Label htmlFor="product-images">{t('product_media')}</Label>
-                  <span className="text-xs text-muted">{t('selected_media_count', { count: productImages.length, max: MAX_PRODUCT_IMAGES })}</span>
-                </div>
-                <Input id="product-images" type="file" accept="image/jpeg,image/png,image/webp" multiple disabled={saving || productImages.length === MAX_PRODUCT_IMAGES} onChange={selectProductImages} aria-describedby="product-images-hint" />
-                <p id="product-images-hint" className="text-xs leading-relaxed text-muted">{t('product_media_hint')}</p>
-                {productImages.length > 0 && (
-                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                    {productImages.map((image, index) => (
-                      <div key={image.previewUrl} className="overflow-hidden rounded border border-border bg-surface">
-                        <div className="aspect-square bg-muted/30">
-                          <img src={image.previewUrl} alt={t('image_preview', { number: index + 1 })} className="h-full w-full object-cover" />
-                        </div>
-                        <div className="flex items-center gap-1 p-2">
-                          <span className="min-w-0 flex-1 truncate text-xs text-text" title={image.file.name}>{image.file.name}</span>
-                          <Button type="button" variant="ghost" size="icon" aria-label={`${t('delete')}: ${image.file.name}`} disabled={saving} onClick={() => removeProductImage(image.previewUrl)}>
-                            <Trash2 className="h-4 w-4" strokeWidth={1.7} />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <div className="space-y-1.5 sm:col-span-2">
-                <Label htmlFor="description">{t('description')}</Label>
-                <textarea id="description" rows={3} value={description} onChange={(e) => setDescription(e.target.value)} className="min-h-16 w-full resize-y rounded-md border border-border bg-surface px-3 py-2 text-sm text-text outline-none placeholder:text-muted focus:border-primary" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      <ProductWorkspace
+        mode="create"
+        extraCreatePayload={extraCreatePayload}
+        onCreated={afterCreated}
+        onUpdated={(id) => void finishUp(id)}
+        onAlternateUnitsChange={(units) => setAlternateUnits(units)}
+        saveLabel={productId ? t('retry_publication') : undefined}
+        cancelHref="/products"
+      />
 
-        {/* تفاصيل التسعير */}
-        <Card>
-          <CardHeader><CardTitle className="flex items-center gap-2"><Tag className="h-4 w-4 text-primary" strokeWidth={1.8} />{t('pricing_details')}</CardTitle></CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <Label htmlFor="purchase_price">{t('purchase_price')}</Label>
-                <Input id="purchase_price" inputMode="decimal" className="num text-end" placeholder="0.00" value={purchasePrice} onChange={(e) => setPurchasePrice(e.target.value)} />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="sale_price">{t('sale_price')}</Label>
-                <Input id="sale_price" inputMode="decimal" className="num text-end" placeholder="0.00" value={salePrice} onChange={(e) => setSalePrice(e.target.value)} />
-                {(() => {
-                  // تلميح وضع الضريبة (من إعدادات النظام): يوضّح دلالة السعر ويعرض المكمّل.
-                  const pm = riyalToMinor(salePrice);
-                  const rate = Number(taxRate) || 0;
-                  if (!Number.isFinite(pm) || pm <= 0 || rate <= 0) return null;
-                  const other = taxInclusive ? pm - extractInclusiveTax(pm, rate) : pm + Math.round((pm * rate) / 100);
-                  return (
-                    <p className="text-[11px] text-muted">
-                      {t(taxInclusive ? 'price_hint_incl' : 'price_hint_excl', { amount: formatRiyal(other / 100) })}
+      {/* الباركود المتعدّد وقت الإنشاء — يبقى كما كان تماماً، خارج ProductWorkspace
+          (تكامله الكامل ضمن مساحة العمل مؤجَّلٌ لـ PR-PROD-UX-2). */}
+      <Card>
+        <CardHeader><CardTitle>{t('barcode_code')}</CardTitle></CardHeader>
+        <CardContent className="space-y-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Input id="new-barcode-code" dir="ltr" className="num" value={newBarcodeCode} onChange={(e) => setNewBarcodeCode(e.target.value)} disabled={finishing || Boolean(productId)} />
+            </div>
+            <div className="space-y-1.5">
+              <Select id="new-barcode-unit" value={newBarcodeUnit} onChange={(e) => setNewBarcodeUnit(e.target.value)} disabled={finishing || Boolean(productId)}>
+                <option value="">{t('default_unit_base_option')}</option>
+                {alternateUnits.map((u) => <option key={u.name} value={u.name}>{u.name}</option>)}
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="new-barcode-qty">{t('barcode_default_quantity')}</Label>
+              <Input id="new-barcode-qty" type="number" min={1} max={1000000} className="num text-end" value={newBarcodeQty} onChange={(e) => setNewBarcodeQty(e.target.value)} disabled={finishing || Boolean(productId)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="new-barcode-label">{t('barcode_label')}</Label>
+              <Input id="new-barcode-label" value={newBarcodeLabel} onChange={(e) => setNewBarcodeLabel(e.target.value)} disabled={finishing || Boolean(productId)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="new-barcode-price">{t('multi_barcode_col_price')}</Label>
+              <Input id="new-barcode-price" type="text" inputMode="decimal" dir="ltr" className="num text-end" placeholder="0.00" value={newBarcodePrice} onChange={(e) => setNewBarcodePrice(e.target.value)} disabled={finishing || Boolean(productId)} />
+            </div>
+          </div>
+          <div className="flex justify-end">
+            <Button type="button" variant="outline" size="sm" disabled={!newBarcodeCode.trim() || finishing || Boolean(productId)} onClick={addPendingBarcode}>
+              <Plus className="h-4 w-4" strokeWidth={1.7} />{t('add_barcode')}
+            </Button>
+          </div>
+          {pendingBarcodes.length === 0 ? (
+            <p className="rounded-md bg-background px-3 py-2 text-sm text-muted">{t('no_alternate_barcodes')}</p>
+          ) : (
+            <ul className="divide-y divide-border rounded-md border border-border">
+              {pendingBarcodes.map((item) => (
+                <li key={item.code} className="flex items-center gap-2 px-3 py-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="num text-sm font-medium text-text" dir="ltr">{item.code}</p>
+                    <p className="text-xs text-muted">
+                      {item.unit_name ?? t('default_unit_base_option')} · {t('barcode_quantity', { quantity: Number(item.default_quantity) || 1 })}
+                      {item.label ? ` · ${item.label}` : ''}
+                      {item.price ? ` · ${formatRiyal(riyalToMinor(item.price))}` : ''}
                     </p>
-                  );
-                })()}
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="tax_rate">{t('tax_rate')}</Label>
-                <Input id="tax_rate" type="number" min={0} max={100} dir="ltr" className="num text-end" value={taxRate} onChange={(e) => setTaxRate(e.target.value)} />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="min_sale">{t('min_sale_price')}</Label>
-                <Input id="min_sale" inputMode="decimal" className="num text-end" placeholder="0.00" value={minSalePrice} onChange={(e) => setMinSalePrice(e.target.value)} />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="margin">{t('profit_margin')}</Label>
-                <Input id="margin" type="number" min={0} dir="ltr" className="num text-end" value={profitMargin} onChange={(e) => setProfitMargin(e.target.value)} />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="disc">{t('discount')}</Label>
-                <div className="flex gap-2">
-                  <Input id="disc" type="number" min={0} dir="ltr" className="num text-end" value={discount} onChange={(e) => setDiscount(e.target.value)} />
-                  <Select className="w-24" value={discountType} onChange={(e) => setDiscountType(e.target.value)}>
-                    <option value="percent">%</option>
-                    <option value="amount">﷼</option>
-                  </Select>
-                </div>
-              </div>
-              {revenueAccounts.length > 0 && (
-                <div className="space-y-1.5">
-                  <Label htmlFor="sales_acc">{t('sales_account')}</Label>
-                  <Select id="sales_acc" value={salesAccountId} onChange={(e) => setSalesAccountId(e.target.value)}>
-                    <option value="">{t('default_account')}</option>
-                    {revenueAccounts.map((a) => (<option key={a.id} value={a.id}>{a.code} — {a.name}</option>))}
-                  </Select>
-                </div>
-              )}
-              {expenseAccounts.length > 0 && (
-                <div className="space-y-1.5">
-                  <Label htmlFor="cogs_acc">{t('cogs_account')}</Label>
-                  <Select id="cogs_acc" value={cogsAccountId} onChange={(e) => setCogsAccountId(e.target.value)}>
-                    <option value="">{t('default_account')}</option>
-                    {expenseAccounts.map((a) => (<option key={a.id} value={a.id}>{a.code} — {a.name}</option>))}
-                  </Select>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+                  </div>
+                  <Button type="button" variant="ghost" size="icon" aria-label={`${t('delete')}: ${item.code}`} disabled={finishing || Boolean(productId)} onClick={() => removePendingBarcode(item.code)}>
+                    <Trash2 className="h-4 w-4" strokeWidth={1.7} />
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
 
-        {/* إدارة المخزون */}
-        <Card>
-          <CardHeader><CardTitle className="flex items-center gap-2"><Warehouse className="h-4 w-4 text-primary" strokeWidth={1.8} />{t('inventory_mgmt')}</CardTitle></CardHeader>
-          <CardContent className="space-y-3">
-            <label className="flex items-center gap-2 text-sm text-text">
-              <input type="checkbox" checked={trackInventory} onChange={(e) => setTrackInventory(e.target.checked)} />
-              {t('track_inventory')}
-            </label>
-            {trackInventory && (
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div className="space-y-1.5">
-                  <Label htmlFor="initial_qty">{t('initial_quantity')}</Label>
-                  <Input id="initial_qty" type="number" min={0} dir="ltr" className="num text-end" placeholder="0" value={initialQty} onChange={(e) => setInitialQty(e.target.value)} />
-                  <p className="text-[11px] text-muted">{t('initial_quantity_hint')}</p>
+      <Card>
+        <CardHeader><CardTitle>{t('product_media')}</CardTitle></CardHeader>
+        <CardContent className="space-y-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <Label htmlFor="product-images">{t('product_media')}</Label>
+            <span className="text-xs text-muted">{t('selected_media_count', { count: productImages.length, max: MAX_PRODUCT_IMAGES })}</span>
+          </div>
+          <Input id="product-images" type="file" accept="image/jpeg,image/png,image/webp" multiple disabled={finishing || productImages.length === MAX_PRODUCT_IMAGES} onChange={selectProductImages} aria-describedby="product-images-hint" />
+          <p id="product-images-hint" className="text-xs leading-relaxed text-muted">{t('product_media_hint')}</p>
+          {productImages.length > 0 && (
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {productImages.map((image, index) => (
+                <div key={image.previewUrl} className="overflow-hidden rounded border border-border bg-surface">
+                  <div className="aspect-square bg-muted/30">
+                    <img src={image.previewUrl} alt={t('image_preview', { number: index + 1 })} className="h-full w-full object-cover" />
+                  </div>
+                  <div className="flex items-center gap-1 p-2">
+                    <span className="min-w-0 flex-1 truncate text-xs text-text" title={image.file.name}>{image.file.name}</span>
+                    <Button type="button" variant="ghost" size="icon" aria-label={`${t('delete')}: ${image.file.name}`} disabled={finishing} onClick={() => removeProductImage(image.previewUrl)}>
+                      <Trash2 className="h-4 w-4" strokeWidth={1.7} />
+                    </Button>
+                  </div>
                 </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="reorder">{t('reorder_level')}</Label>
-                  <Input id="reorder" type="number" min={0} dir="ltr" className="num text-end" placeholder="0" value={reorderLevel} onChange={(e) => setReorderLevel(e.target.value)} />
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <ProductPublicationFields
-          status={publication.status}
-          stores={publication.stores}
-          selectedIds={publication.selectedIds}
-          disabled={saving}
-          onChange={publication.setSelectedIds}
-          onRetry={() => void publication.reload()}
-          labels={{
-            title: t('online_store'),
-            availableOnline: t('available_online'),
-            hint: t('publication_hint'),
-            loading: t('publication_loading'),
-            empty: t('publication_empty'),
-            loadFailed: t('publication_load_failed'),
-            retry: t('retry'),
-          }}
-        />
-
-        {/* خيارات أكثر */}
-        <Card>
-          <CardHeader><CardTitle className="flex items-center gap-2"><SlidersHorizontal className="h-4 w-4 text-primary" strokeWidth={1.8} />{t('more_options')}</CardTitle></CardHeader>
-          <CardContent className="space-y-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="tags">{t('tags')}</Label>
-              <Input id="tags" placeholder={t('tags_hint')} value={tags} onChange={(e) => setTags(e.target.value)} />
+              ))}
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="notes">{t('internal_notes')}</Label>
-              <textarea id="notes" rows={2} value={internalNotes} onChange={(e) => setInternalNotes(e.target.value)} className="w-full resize-y rounded-md border border-border bg-surface px-3 py-2 text-sm text-text outline-none focus:border-primary" />
-            </div>
-            <label className="flex items-center gap-2 text-sm text-text">
-              <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
-              {t('active')}
-            </label>
-          </CardContent>
-        </Card>
-      </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <ProductPublicationFields
+        status={publication.status}
+        stores={publication.stores}
+        selectedIds={publication.selectedIds}
+        disabled={finishing}
+        onChange={publication.setSelectedIds}
+        onRetry={() => void publication.reload()}
+        labels={{
+          title: t('online_store'),
+          availableOnline: t('available_online'),
+          hint: t('publication_hint'),
+          loading: t('publication_loading'),
+          empty: t('publication_empty'),
+          loadFailed: t('publication_load_failed'),
+          retry: t('retry'),
+        }}
+      />
 
       {error && <p className="rounded bg-negative/10 px-3 py-2 text-xs text-negative">{error}</p>}
     </div>
