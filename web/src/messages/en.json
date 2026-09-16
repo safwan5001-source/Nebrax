@@ -2493,7 +2493,10 @@
     "verify_title": "Verify your email",
     "verify_loading": "Verifying…",
     "verify_success": "Your email was verified successfully.",
-    "verify_failed": "We could not verify this email."
+    "verify_failed": "We could not verify this email.",
+    "handoff_title": "Moving you to your organization…",
+    "handoff_loading": "Setting up your session on your organization's domain…",
+    "handoff_failed": "Could not complete the transition. Please log in again."
   },
   "selfService": {
     "portal_title": "Employee Portal",

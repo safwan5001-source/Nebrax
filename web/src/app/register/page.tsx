@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { register as registerTenant } from '@/lib/auth';
 import { ApiError } from '@/lib/api';
-import { isReservedTenantSlug, tenantHostSuffix } from '@/lib/tenant-domain';
+import { isReservedTenantSlug, isTenantSubdomainHost, tenantHostFor, tenantHostSuffix } from '@/lib/tenant-domain';
 
 const schema = z.object({
   company_name: z.string().min(1),
@@ -53,13 +53,36 @@ export default function RegisterPage() {
   async function onSubmit(values: FormValues) {
     setServerError(null);
     try {
-      await registerTenant({
+      const result = await registerTenant({
         company_name: values.company_name,
         slug: values.slug.toLowerCase(),
         email: values.email,
         password: values.password,
         phone: '+966' + values.phone.replace(/^0+/, ''),
       });
+
+      // TENANT-PROVISIONING-E2E-1: التسجيل يصل من نطاق فرعي عام غير محسوم
+      // (`test.{base}` — استثناء PR #845)، لا من نطاق المستأجر الجديد
+      // (`{slug}.{base}`). البقاء على النطاق الحالي (SPA) كان يترك كل طلب
+      // لاحق (بما فيه قائمة متاجر Commerce Workspace) يفشل مغلقاً 404 لأن
+      // `test` لا يحسم مستأجراً حقيقياً أبداً. الانتقال هنا حصراً حين يكون
+      // المتصفح فعلاً في وضع النطاقات الفرعية (`isTenantSubdomainHost`) —
+      // في التطوير المحلي العادي (`localhost:3000` بلا نطاق فرعي) يبقى
+      // السلوك الحالي (`router.replace`) كما هو تماماً، بلا أي تغيير.
+      const targetHost = tenantHostFor(result.tenant.slug);
+      const currentHost = typeof window !== 'undefined' ? window.location.hostname : null;
+      if (
+        result.handoffCode
+        && currentHost !== null
+        && isTenantSubdomainHost(currentHost)
+        && currentHost.toLowerCase() !== targetHost
+      ) {
+        window.location.assign(
+          `${window.location.protocol}//${targetHost}/auth/handoff?code=${encodeURIComponent(result.handoffCode)}`,
+        );
+        return;
+      }
+
       router.replace('/dashboard');
     } catch (error) {
       setServerError(error instanceof ApiError ? error.message : t('error'));
