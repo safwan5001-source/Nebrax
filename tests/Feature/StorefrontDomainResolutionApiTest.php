@@ -130,6 +130,37 @@ class StorefrontDomainResolutionApiTest extends TestCase
         $this->getJson($this->url('no-such-domain.example.com', 'categories'))->assertStatus(404);
     }
 
+    /**
+     * VERIFY-STOREFRONT-HOST-1 §9 — نطاقات شبيهة (lookalike) بنطاقٍ موثَّق
+     * فعلياً يجب ألا تُحسم كأنها إياه. `ResolveStorefrontDomain` يبحث عن
+     * تطابق **حرفي كامل** لـ`hostname` (لا بادئة/لاحقة/احتواء)، فأي محاولة
+     * إلحاق نطاقٍ مهاجم ببداية أو نهاية النطاق الحقيقي تبقى تسمية مختلفة
+     * تماماً تفشل بنفس 404 غير الكاشف — يثبت هذا الاختبار ذلك صراحةً حتى
+     * حين يكون النطاق الحقيقي نفسه موجوداً وموثَّقاً في نفس القاعدة.
+     *
+     * @test
+     */
+    public function lookalike_hostnames_around_a_real_verified_domain_fail_closed(): void
+    {
+        $this->seedDomainStore('alrshd.store.awjdev.xyz');
+
+        $lookalikes = [
+            'awjdev.xyz.evil.com',
+            'alrshd.store.awjdev.xyz.evil.com',
+            'alrshd.store.evilawjdev.xyz',
+            'evil-alrshd.store.awjdev.xyz',
+        ];
+
+        foreach ($lookalikes as $lookalike) {
+            $this->getJson($this->url($lookalike, 'products'))->assertStatus(404);
+            $this->getJson($this->url($lookalike, 'storefront'))->assertStatus(404);
+        }
+
+        // النطاق الحقيقي نفسه يبقى يعمل — الفشل أعلاه خاصٌّ بالشبيه لا بغياب
+        // أي بيانات مطابقة إطلاقاً.
+        $this->getJson($this->url('alrshd.store.awjdev.xyz', 'storefront'))->assertOk();
+    }
+
     /** @test */
     public function a_malformed_hostname_fails_closed_instead_of_crashing(): void
     {
