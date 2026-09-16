@@ -12,7 +12,8 @@ import { currentUser } from '@/lib/auth';
 import { hasPermission } from '@/lib/permissions';
 import { commerceWorkspaceMessage } from '@/modules/commerce-workspace/messages';
 import { useCommerceStoreContext } from '@/modules/commerce-workspace/store-context';
-import { provisionCommerceStorefront } from '@/modules/commerce-workspace/stores';
+import { provisionCommerceStorefront, type CommerceStoreOption } from '@/modules/commerce-workspace/stores';
+import { StoreSettingsDialog } from '@/modules/commerce-workspace/store-settings-dialog';
 
 /**
  * COM-STORE-PROVISION-1 — شاشة «المتاجر»: تعرض الكتالوج الموثوق من
@@ -24,8 +25,9 @@ export default function CommerceStoresPage() {
   const locale = useLocale();
   const t = (key: Parameters<typeof commerceWorkspaceMessage>[1]) => commerceWorkspaceMessage(locale, key);
   const { catalog, refresh } = useCommerceStoreContext();
-  const { error: showErrorToast } = useToast();
+  const { error: showErrorToast, success: showSuccessToast } = useToast();
   const [creating, setCreating] = useState(false);
+  const [settingsStore, setSettingsStore] = useState<CommerceStoreOption | null>(null);
 
   const user = currentUser();
   const canManage = hasPermission(user?.permissions, user?.role, 'commerce.manage');
@@ -77,6 +79,7 @@ export default function CommerceStoresPage() {
               <TH>{t('storesListName')}</TH>
               <TH>{t('storesListStatus')}</TH>
               <TH>{t('storesListPreview')}</TH>
+              {canManage ? <TH>{t('storesListActions')}</TH> : null}
             </TR>
           </THead>
           <TBody>
@@ -102,10 +105,30 @@ export default function CommerceStoresPage() {
                     <span className="text-muted">{t('storesListNoPreview')}</span>
                   )}
                 </TD>
+                {canManage ? (
+                  <TD>
+                    <Button type="button" variant="outline" size="sm" onClick={() => setSettingsStore(store)}>
+                      {t('storeSettingsAction')}
+                    </Button>
+                  </TD>
+                ) : null}
               </TR>
             ))}
           </TBody>
         </Table>
+      ) : null}
+
+      {settingsStore ? (
+        <StoreSettingsDialog
+          open
+          store={settingsStore}
+          locale={locale}
+          onClose={() => setSettingsStore(null)}
+          onSaved={async (storeId) => {
+            await refresh(storeId);
+            showSuccessToast(t('storeSettingsSuccess'));
+          }}
+        />
       ) : null}
     </div>
   );

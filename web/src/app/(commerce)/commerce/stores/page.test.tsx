@@ -114,3 +114,139 @@ describe('Commerce stores page — explicit provisioning', () => {
     await waitFor(() => expect(screen.queryByText('Creating…')).toBeNull());
   });
 });
+
+/**
+ * STORE-ADMIN-ADOPT-1B-1 — coverage for the per-store settings action: opens
+ * pre-populated with current values, permission-gated, calls the trusted
+ * Commerce Workspace mutation, refreshes the authoritative list on success,
+ * and keeps validation/server errors visible instead of a false success.
+ */
+describe('Commerce stores page — store identity settings', () => {
+  afterEach(() => {
+    cleanup();
+    apiMock.mockReset();
+    user.current = { role: 'owner', permissions: undefined };
+  });
+
+  const existingStore = {
+    id: 's1',
+    name: 'My Store',
+    sales_channel_id: 'ch1',
+    is_active: true,
+    preview_url: 'https://my.store.test/',
+    default_locale: 'ar',
+  };
+
+  it('shows the settings action for an authorized user with an existing store', async () => {
+    apiMock.mockResolvedValueOnce({ data: { stores: [existingStore] } });
+    renderPage();
+
+    expect(await screen.findByText('My Store')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Store settings' })).toBeTruthy();
+  });
+
+  it('hides the settings action for a user without commerce.manage', async () => {
+    user.current = { role: 'staff', permissions: ['products.view'] };
+    apiMock.mockResolvedValueOnce({ data: { stores: [existingStore] } });
+    renderPage();
+
+    expect(await screen.findByText('My Store')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Store settings' })).toBeNull();
+  });
+
+  it('opens pre-populated with the current store name and locale', async () => {
+    apiMock.mockResolvedValueOnce({ data: { stores: [existingStore] } });
+    renderPage();
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Store settings' }));
+
+    const nameInput = screen.getByLabelText('Store name') as HTMLInputElement;
+    expect(nameInput.value).toBe('My Store');
+    const localeSelect = screen.getByLabelText('Default language') as HTMLSelectElement;
+    expect(localeSelect.value).toBe('ar');
+  });
+
+  it('allows switching the default language between Arabic and English', async () => {
+    apiMock.mockResolvedValueOnce({ data: { stores: [existingStore] } });
+    renderPage();
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Store settings' }));
+    const localeSelect = screen.getByLabelText('Default language') as HTMLSelectElement;
+    await userEvent.selectOptions(localeSelect, 'en');
+
+    expect(localeSelect.value).toBe('en');
+  });
+
+  it('saves via the trusted client, refreshes the list, and closes only after confirmed success', async () => {
+    apiMock
+      .mockResolvedValueOnce({ data: { stores: [existingStore] } }) // initial load
+      .mockResolvedValueOnce({
+        data: { store: { ...existingStore, name: 'Renamed Store', default_locale: 'en' } },
+      }) // PUT update
+      .mockResolvedValueOnce({
+        data: { stores: [{ ...existingStore, name: 'Renamed Store', default_locale: 'en' }] },
+      }); // refresh GET
+
+    renderPage();
+    await userEvent.click(await screen.findByRole('button', { name: 'Store settings' }));
+
+    const nameInput = screen.getByLabelText('Store name');
+    await userEvent.clear(nameInput);
+    await userEvent.type(nameInput, 'Renamed Store');
+    await userEvent.selectOptions(screen.getByLabelText('Default language'), 'en');
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(await screen.findByText('Renamed Store')).toBeTruthy();
+    expect(apiMock).toHaveBeenNthCalledWith(2, '/commerce/workspace/storefronts/s1', {
+      method: 'PUT',
+      body: { name: 'Renamed Store', default_locale: 'en' },
+    });
+    expect(apiMock).toHaveBeenNthCalledWith(3, '/commerce/workspace/storefronts');
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('keeps a validation error visible and does not close or falsely show success', async () => {
+    apiMock.mockResolvedValueOnce({ data: { stores: [existingStore] } });
+    renderPage();
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Store settings' }));
+    const nameInput = screen.getByLabelText('Store name');
+    await userEvent.clear(nameInput);
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(await screen.findByText('Store name is required.')).toBeTruthy();
+    expect(screen.getByRole('dialog')).toBeTruthy();
+    expect(apiMock).toHaveBeenCalledTimes(1); // only the initial load — no request fired
+  });
+
+  it('keeps a server error visible and does not close or falsely show success', async () => {
+    apiMock
+      .mockResolvedValueOnce({ data: { stores: [existingStore] } })
+      .mockRejectedValueOnce(new Error('forbidden'));
+
+    renderPage();
+    await userEvent.click(await screen.findByRole('button', { name: 'Store settings' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(await screen.findByText('Could not save store settings. Please try again.')).toBeTruthy();
+    expect(screen.getByRole('dialog')).toBeTruthy();
+  });
+
+  it('prevents a duplicate submission while saving is in flight', async () => {
+    let resolvePut: (value: unknown) => void = () => {};
+    apiMock
+      .mockResolvedValueOnce({ data: { stores: [existingStore] } })
+      .mockImplementationOnce(() => new Promise((resolve) => { resolvePut = resolve; }));
+
+    renderPage();
+    await userEvent.click(await screen.findByRole('button', { name: 'Store settings' }));
+    const saveButton = screen.getByRole('button', { name: 'Save' });
+    await userEvent.click(saveButton);
+    await userEvent.click(saveButton);
+
+    expect(apiMock).toHaveBeenCalledTimes(2); // 1 initial load + exactly 1 PUT call
+
+    resolvePut({ data: { store: existingStore } });
+    await waitFor(() => expect(screen.queryByText('Saving…')).toBeNull());
+  });
+});
