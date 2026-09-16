@@ -4746,6 +4746,7 @@
     "variants_tab_label": "الخيارات والمتغيّرات",
     "variants_entry_title": "الخيارات والمتغيّرات",
     "variants_entry_hint": "بع هذا المنتج بخيارات متعددة مثل اللون أو المقاس.",
+    "variants_locked_hint": "احفظ المنتج أولاً لإضافة خيارات مثل اللون أو المقاس وإنشاء متغيّرات.",
     "variants_add_options": "إضافة خيارات",
     "variants_enabled": "تم تفعيل إدارة المتغيّرات.",
     "variants_disable": "التراجع عن المتغيّرات",
