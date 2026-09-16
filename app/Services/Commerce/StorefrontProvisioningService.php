@@ -48,7 +48,7 @@ final class StorefrontProvisioningService
     private const STOREFRONT_SLUG = 'main';
 
     /**
-     * @return array{id: string, name: string, sales_channel_id: string, is_active: bool, preview_url: string, created: bool}
+     * @return array{id: string, name: string, sales_channel_id: string, is_active: bool, preview_url: string, default_locale: string, created: bool}
      */
     public function provisionFirstStorefrontForCurrentTenant(?string $displayName = null): array
     {
@@ -81,6 +81,7 @@ final class StorefrontProvisioningService
                 'sales_channel_id' => $channel->id,
                 'is_active' => (bool) $storefront->is_active,
                 'preview_url' => 'https://'.$domain->hostname.'/',
+                'default_locale' => $storefront->default_locale,
                 'created' => (bool) $domain->wasRecentlyCreated,
             ];
         });

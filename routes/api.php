@@ -814,6 +814,11 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         // مخصَّصة (commerce.manage) لا استثناء الخدمة الذاتية وحده.
         Route::post('commerce/workspace/storefronts', [CommerceWorkspaceStorefrontsController::class, 'store'])->middleware($perm('commerce.manage'));
 
+        // STORE-ADMIN-ADOPT-1B-1: تصحيح/تعريب هوية متجر قائم — name/default_locale
+        // فقط. نفس صلاحية التزويد (commerce.manage): فعلٌ كتابي حقيقي على بنية
+        // تحتية تجارية، لا قراءة.
+        Route::put('commerce/workspace/storefronts/{id}', [CommerceWorkspaceStorefrontsController::class, 'update'])->middleware($perm('commerce.manage'));
+
         // Cycle 0: Workspace foundation only. لا CRUD ولا مبيعات ولا اتصال أجهزة
         // قبل دوراتها، لكن هذا المسار يثبت سلسلة RBAC + entitlement + حالة التطبيق.
         Route::get('fuel-stations/workspace', [FuelStationsWorkspaceController::class, 'index'])

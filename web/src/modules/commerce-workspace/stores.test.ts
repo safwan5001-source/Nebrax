@@ -10,6 +10,7 @@ import {
   provisionCommerceStorefront,
   resolveViewStoreUrl,
   selectStoreId,
+  updateCommerceStorefrontIdentity,
   type CommerceStoreCatalog,
 } from './stores';
 
@@ -42,6 +43,7 @@ describe('commerce store selector catalog', () => {
             sales_channel_id: 'ch-a',
             is_active: true,
             preview_url: 'https://a.example/',
+            default_locale: 'ar',
             tenant_id: 'tenant-b',
             hostname: 'b.example',
           },
@@ -58,6 +60,7 @@ describe('commerce store selector catalog', () => {
           salesChannelId: 'ch-a',
           isActive: true,
           previewUrl: 'https://a.example/',
+          defaultLocale: 'ar',
         },
       ],
     });
@@ -85,7 +88,7 @@ describe('commerce store selector catalog', () => {
     const catalog: CommerceStoreCatalog = {
       status: 'ready',
       stores: [
-        { id: 'store-a', name: 'Store A', salesChannelId: 'ch-a', isActive: true, previewUrl: 'https://a.example' },
+        { id: 'store-a', name: 'Store A', salesChannelId: 'ch-a', isActive: true, previewUrl: 'https://a.example', defaultLocale: 'ar' },
       ],
     };
 
@@ -100,8 +103,8 @@ describe('commerce store selector catalog', () => {
     const catalog: CommerceStoreCatalog = {
       status: 'ready',
       stores: [
-        { id: 'store-a', name: 'Store A', salesChannelId: 'ch-a', isActive: true, previewUrl: 'https://shop.example/' },
-        { id: 'store-b', name: 'Store B', salesChannelId: 'ch-b', isActive: true, previewUrl: 'javascript:alert(1)' },
+        { id: 'store-a', name: 'Store A', salesChannelId: 'ch-a', isActive: true, previewUrl: 'https://shop.example/', defaultLocale: 'ar' },
+        { id: 'store-b', name: 'Store B', salesChannelId: 'ch-b', isActive: true, previewUrl: 'javascript:alert(1)', defaultLocale: 'ar' },
       ],
     };
 
@@ -119,7 +122,7 @@ describe('commerce store selector catalog', () => {
 describe('commerce storefront provisioning (COM-STORE-PROVISION-1)', () => {
   it('posts to the same tenant-scoped admin path and never sends a client hostname/tenant', async () => {
     apiMock.mockResolvedValue({
-      data: { store: { id: 'store-x', name: 'X', sales_channel_id: 'ch-x', is_active: true, preview_url: 'https://x.example/' } },
+      data: { store: { id: 'store-x', name: 'X', sales_channel_id: 'ch-x', is_active: true, preview_url: 'https://x.example/', default_locale: 'ar' } },
       meta: { created: true },
     });
 
@@ -129,7 +132,7 @@ describe('commerce storefront provisioning (COM-STORE-PROVISION-1)', () => {
     expect(apiMock).toHaveBeenCalledWith('/commerce/workspace/storefronts', { method: 'POST', body: {} });
     expect(result).toEqual({
       ok: true,
-      store: { id: 'store-x', name: 'X', salesChannelId: 'ch-x', isActive: true, previewUrl: 'https://x.example/' },
+      store: { id: 'store-x', name: 'X', salesChannelId: 'ch-x', isActive: true, previewUrl: 'https://x.example/', defaultLocale: 'ar' },
     });
   });
 
@@ -153,5 +156,43 @@ describe('commerce storefront provisioning (COM-STORE-PROVISION-1)', () => {
     apiMock.mockResolvedValue({ data: {} });
 
     await expect(provisionCommerceStorefront()).resolves.toEqual({ ok: false, message: 'invalid_payload' });
+  });
+});
+
+describe('commerce storefront identity update (STORE-ADMIN-ADOPT-1B-1)', () => {
+  it('PUTs to the tenant-scoped storefront id path with only name/default_locale', async () => {
+    apiMock.mockResolvedValue({
+      data: { store: { id: 'store-x', name: 'الاسم الجديد', sales_channel_id: 'ch-x', is_active: true, preview_url: null, default_locale: 'en' } },
+    });
+
+    const result = await updateCommerceStorefrontIdentity('store-x', { name: 'الاسم الجديد', default_locale: 'en' });
+
+    expect(apiMock).toHaveBeenCalledTimes(1);
+    expect(apiMock).toHaveBeenCalledWith('/commerce/workspace/storefronts/store-x', {
+      method: 'PUT',
+      body: { name: 'الاسم الجديد', default_locale: 'en' },
+    });
+    expect(result).toEqual({
+      ok: true,
+      store: { id: 'store-x', name: 'الاسم الجديد', salesChannelId: 'ch-x', isActive: true, previewUrl: null, defaultLocale: 'en' },
+    });
+  });
+
+  it('surfaces a failure instead of throwing when the update is rejected', async () => {
+    apiMock.mockRejectedValue(new Error('forbidden'));
+
+    await expect(updateCommerceStorefrontIdentity('store-x', { name: 'X' })).resolves.toEqual({
+      ok: false,
+      message: 'forbidden',
+    });
+  });
+
+  it('fails closed on an unexpected response shape', async () => {
+    apiMock.mockResolvedValue({ data: {} });
+
+    await expect(updateCommerceStorefrontIdentity('store-x', { name: 'X' })).resolves.toEqual({
+      ok: false,
+      message: 'invalid_payload',
+    });
   });
 });
