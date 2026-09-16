@@ -53,19 +53,39 @@ export interface RegisterPayload {
   vat_number?: string | null;
 }
 
+export interface RegisterTenant {
+  id: string;
+  name: string;
+  slug: string;
+  account_number?: string | null;
+  support_number?: string | null;
+}
+
+export interface RegisterResult {
+  user: AuthUser;
+  tenant: RegisterTenant;
+  /**
+   * رمز انتقال أحادي الاستخدام قصير الأجل (دقيقتان) لاستبداله بتوكن دخول
+   * عبر `POST /auth/handoff` بعد الانتقال إلى نطاق المستأجر الفعلي — انظر
+   * `TENANT-PROVISIONING-E2E-1`. `null` فقط إذا فشل الخادم في إصداره (لا
+   * يمنع نجاح التسجيل نفسه)؛ حينها يبقى المستخدم على النطاق الحالي.
+   */
+  handoffCode: string | null;
+}
+
 // تسجيل مؤسسة جديدة: ينشئ المستأجر + المالك + دليل الحسابات، ويعيد توكن الدخول.
-export async function register(payload: RegisterPayload): Promise<AuthUser> {
+export async function register(payload: RegisterPayload): Promise<RegisterResult> {
   // كان هنا `disableDemo()` وحده: يمسح علم المعاينة **ويترك فرعها** في التخزين.
   // فالحساب الحقيقي الجديد كان يرث `nibras_active_branch = "br-1"` ويرسله في
   // كل طلب — وهو منشأ عطل الإنتاج. المسح الآن يشمل الاثنين معاً.
   clearSessionPreferences();
-  const res = await api<{ token: string; user: AuthUser }>('/register', {
-    method: 'POST',
-    body: payload,
-  });
+  const res = await api<{ token: string; user: AuthUser; tenant: RegisterTenant; handoff?: { code?: string | null } }>(
+    '/register',
+    { method: 'POST', body: payload },
+  );
   setToken(res.token);
   persistUser(res.user);
-  return res.user;
+  return { user: res.user, tenant: res.tenant, handoffCode: res.handoff?.code ?? null };
 }
 
 export async function logout(): Promise<void> {

@@ -188,6 +188,11 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
     Route::post('reset-password', [AuthController::class, 'resetPassword'])->middleware('throttle:auth-reset');
     Route::post('email/verify', [AuthController::class, 'verifyEmail'])->middleware('throttle:auth-reset');
 
+    // TENANT-PROVISIONING-E2E-1: يستبدل رمز الانتقال أحادي الاستخدام الصادر
+    // من `register()` بتوكن دخول — يعمل تحت نطاق المستأجر الفعلي فقط
+    // (`IdentifyTenantHostname` أعلاه يحسمه كأي مسار آخر؛ لا استثناء هنا).
+    Route::post('auth/handoff', [AuthController::class, 'handoff'])->middleware('throttle:auth-handoff');
+
     // Customer Platform: tenant authority is established from the globally
     // unique route slug before credential/token lookup. It never uses payload IDs.
     Route::prefix('customer/v1/{tenantSlug}')
