@@ -20,7 +20,6 @@ import { Tabs, TabPanel, type TabDef } from '@/components/ui/tabs';
 import { useToast } from '@/components/ui/toast';
 import { type Product as ProductFormProduct } from '@/components/products/product-dialog';
 import { ProductWorkspace } from '@/components/products/product-workspace';
-import { ProductMultiBarcodeTable } from '@/components/products/product-multi-barcode-table';
 import { ProductVariantsPanel } from '@/components/products/product-variants-panel';
 
 type Product = ProductFormProduct & {
@@ -28,7 +27,6 @@ type Product = ProductFormProduct & {
 };
 
 type ProductMedia = { id: string; original_name: string; download_url: string; sort_order: number; previewUrl?: string | null };
-type ProductBarcode = { id: string; code: string; unit_name: string | null; default_quantity: number; label: string | null };
 type Activity = { id: string; action: string; created_at: string | null; user: { id: string; name: string } | null };
 type Movement = { id: string; type: string; quantity: number; unit_cost: string; total_cost: string; balance_quantity: number; movement_date: string | null; notes: string | null };
 
@@ -45,7 +43,6 @@ export default function ProductProfilePage() {
   const { success, error: showError } = useToast();
   const [product, setProduct] = useState<Product | null>(null);
   const [media, setMedia] = useState<ProductMedia[]>([]);
-  const [barcodes, setBarcodes] = useState<ProductBarcode[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [movements, setMovements] = useState<Movement[] | null>(null);
   const [selectedMediaId, setSelectedMediaId] = useState<string | null>(null);
@@ -54,8 +51,6 @@ export default function ProductProfilePage() {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [alternateUnits, setAlternateUnits] = useState<{ name: string; factor: number }[]>([]);
-  const [variants, setVariants] = useState<{ id: string; descriptor: string }[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mediaObjectUrls = useRef<string[]>([]);
 
@@ -68,10 +63,9 @@ export default function ProductProfilePage() {
     setLoading(true);
     setError(null);
     try {
-      const [productResult, mediaResult, barcodeResult, activityResult] = await Promise.all([
+      const [productResult, mediaResult, activityResult] = await Promise.all([
         api<{ data: Product }>(`/products/${id}`),
         api<{ data: ProductMedia[] }>(`/products/${id}/media`),
-        api<{ data: ProductBarcode[] }>(`/products/${id}/barcodes`),
         api<{ data: Activity[] }>(`/products/${id}/activity`),
       ]);
       const hydrated = await Promise.all(mediaResult.data.map(async (item) => ({
@@ -82,7 +76,6 @@ export default function ProductProfilePage() {
       mediaObjectUrls.current = hydrated.flatMap((item) => item.previewUrl ? [item.previewUrl] : []);
       setProduct(productResult.data);
       setMedia(hydrated);
-      setBarcodes(barcodeResult.data);
       setActivities(activityResult.data);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : t('load_profile_failed'));
@@ -91,25 +84,7 @@ export default function ProductProfilePage() {
     }
   }, [id, revokeMediaObjectUrls, t]);
 
-  // VAR-PRICE-UX-1: قائمة المتغيّرات النشطة — تُستهلَك فقط لاختيار المتغيّر
-  // في جدول «باركود متعدد» لمنتجٍ متعدد الخيارات؛ فارغةٌ دائماً لمنتجٍ بسيط.
-  // منقولةٌ حرفياً من `ProductDialog` (PR-PROD-UX-1) — لا تغيير في منطقها.
-  const loadVariants = useCallback(async () => {
-    if (!product || product.variant_state !== 'variant_managed') {
-      setVariants([]);
-
-      return;
-    }
-    try {
-      const result = await api<{ data: { id: string; is_active: boolean; display_name: string }[] }>(`/products/${id}/variants`);
-      setVariants(result.data.filter((v) => v.is_active).map((v) => ({ id: v.id, descriptor: v.display_name })));
-    } catch {
-      setVariants([]);
-    }
-  }, [id, product]);
-
   useEffect(() => { void load(); }, [load]);
-  useEffect(() => { void loadVariants(); }, [loadVariants]);
   useEffect(() => () => revokeMediaObjectUrls(), [revokeMediaObjectUrls]);
   useEffect(() => {
     setSelectedMediaId((current) => media.some((item) => item.id === current) ? current : (media[0]?.id ?? null));
@@ -322,42 +297,19 @@ export default function ProductProfilePage() {
                         ))}
                       </dd>
                     </div>
-                    <div className="sm:col-span-2">
-                      <dt className="text-muted">{t('alternate_barcodes')}</dt>
-                      <dd className="mt-1.5 flex flex-wrap gap-1.5">
-                        {barcodes.length === 0 ? (
-                          <span className="text-sm text-muted">{t('no_alternate_barcodes')}</span>
-                        ) : barcodes.map((item) => (
-                          <Badge key={item.id} tone="muted" className="num" dir="ltr">
-                            {item.code} · {item.unit_name ?? product.unit}
-                          </Badge>
-                        ))}
-                      </dd>
-                    </div>
                   </dl>
                 </div>
               </CardContent>
             </Card>
 
-            {/* المعلومات الأساسية والتسعير والمحاسبة والمخزون — قابلة للتحرير
-                مباشرةً الآن عبر مساحة العمل المشتركة، بلا نافذة منبثقة
-                (PR-PROD-UX-1؛ `ProductDialog` يبقى قائماً للإضافة السريعة فقط). */}
+            {/* المعلومات الأساسية والتسعير والمحاسبة والمخزون والوحدات/الباركود
+                المتعدّد/السعر لكل وحدة — كلّها قابلة للتحرير مباشرةً عبر مساحة
+                العمل المشتركة، بلا نافذة منبثقة (PR-PROD-UX-1/2؛ `ProductDialog`
+                يبقى قائماً للإضافة السريعة فقط). */}
             <ProductWorkspace
               mode="edit"
               product={product}
               onUpdated={() => void load()}
-              onAlternateUnitsChange={(units) => setAlternateUnits(units)}
-            />
-
-            {/* الباركود المتعدّد والأسعار لكل وحدة — نُقل مكان تركيبه من نافذة
-                التعديل السابقة إلى هنا حرفياً بلا أي تغيير في المكوّن أو عقده
-                (تكامله الكامل ضمن مساحة العمل مؤجَّلٌ لـ PR-PROD-UX-2). */}
-            <ProductMultiBarcodeTable
-              productId={product.id}
-              baseUnitName={product.unit}
-              alternateUnits={alternateUnits}
-              isVariantManaged={product.variant_state === 'variant_managed'}
-              variants={variants}
             />
           </div>
         </TabPanel>

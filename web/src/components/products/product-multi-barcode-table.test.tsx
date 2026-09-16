@@ -412,3 +412,133 @@ describe('جدول الباركود المتعدد وسعر الوحدة', () =>
     expect(screen.getByText(en.products.multi_barcode_col_actions)).toBeTruthy();
   });
 });
+
+describe('وضع الإنشاء — بلا product_id بعد (PR-PROD-UX-2)', () => {
+  it('لا نداء شبكة إطلاقاً قبل وجود product_id', async () => {
+    const user = userEvent.setup();
+    render(wrapAr(<ProductMultiBarcodeTable baseUnitName="piece" alternateUnits={[]} isVariantManaged={false} variants={[]} pendingRows={[]} onPendingRowsChange={vi.fn()} />));
+
+    await user.click(screen.getByText(ar.products.multi_barcode_expand));
+    await waitFor(() => expect(screen.getAllByText(ar.products.multi_barcode_col_unit).length).toBeGreaterThan(0));
+
+    expect(apiMock).not.toHaveBeenCalled();
+  });
+
+  it('إضافة صفٍّ محلياً تستدعي onPendingRowsChange بالصف الجديد، بلا POST', async () => {
+    const user = userEvent.setup();
+    const onPendingRowsChange = vi.fn();
+    render(wrapAr(<ProductMultiBarcodeTable baseUnitName="piece" alternateUnits={[{ name: 'pack', factor: 6 }]} isVariantManaged={false} variants={[]} pendingRows={[]} onPendingRowsChange={onPendingRowsChange} />));
+
+    await user.click(screen.getByText(ar.products.multi_barcode_expand));
+    await user.type(screen.getAllByLabelText(ar.products.barcode_code)[0]!, 'PACK-001');
+    await user.type(screen.getAllByLabelText(ar.products.multi_barcode_col_price)[0]!, '27.00');
+    await user.click(screen.getAllByRole('button', { name: new RegExp(ar.products.add_barcode) })[0]!);
+
+    expect(onPendingRowsChange).toHaveBeenCalledWith([
+      { code: 'PACK-001', unit_name: null, default_quantity: 1, label: null, price: '27.00' },
+    ]);
+    expect(apiMock).not.toHaveBeenCalled();
+  });
+
+  it('كل وحدةٍ صريحةٍ تحمل سعرها الخاص — لا اشتقاق من معامل التحويل (حبة=5، باكيت×6=27، كرتون×12=50)', async () => {
+    const pending = [
+      { code: 'PIECE-1', unit_name: null, default_quantity: 1, label: null, price: '5.00' },
+      { code: 'PACK-1', unit_name: 'pack', default_quantity: 1, label: null, price: '27.00' },
+      { code: 'CARTON-1', unit_name: 'carton', default_quantity: 1, label: null, price: '50.00' },
+    ];
+    render(
+      wrapAr(
+        <ProductMultiBarcodeTable
+          baseUnitName="piece"
+          alternateUnits={[{ name: 'pack', factor: 6 }, { name: 'carton', factor: 12 }]}
+          isVariantManaged={false}
+          variants={[]}
+          pendingRows={pending}
+          onPendingRowsChange={vi.fn()}
+        />,
+      ),
+    );
+    // القسم يتوسَّع تلقائياً هنا: صفوفٌ معلَّقة موجودة سلفاً عند التركيب.
+    await screen.findByText(ar.products.multi_barcode_collapse);
+
+    // ثلاثة صفوفٍ × هيكلا سطح المكتب/الجوال معاً في DOM = ستة حقول.
+    const priceInputs = (await screen.findAllByDisplayValue(/5\.00|27\.00|50\.00/)) as HTMLInputElement[];
+    const values = [...new Set(priceInputs.map((el) => el.value))].sort();
+    // القيم الثلاث صريحةٌ ومستقلة — 27 ليست 6×5، و50 ليست 12×5.
+    expect(values).toEqual(['27.00', '5.00', '50.00']);
+    expect(screen.getByText('×6')).toBeTruthy();
+    expect(screen.getByText('×12')).toBeTruthy();
+  });
+
+  it('حذف صفٍّ معلَّقٍ يستدعي onPendingRowsChange بالقائمة بعد الحذف', async () => {
+    const user = userEvent.setup();
+    const onPendingRowsChange = vi.fn();
+    const pending = [
+      { code: 'AAA', unit_name: null, default_quantity: 1, label: null, price: '' },
+      { code: 'BBB', unit_name: null, default_quantity: 1, label: null, price: '' },
+    ];
+    render(wrapAr(<ProductMultiBarcodeTable baseUnitName="piece" alternateUnits={[]} isVariantManaged={false} variants={[]} pendingRows={pending} onPendingRowsChange={onPendingRowsChange} />));
+
+    await waitFor(() => expect(screen.getAllByText('AAA').length).toBeGreaterThan(0));
+    const deleteButtons = screen.getAllByRole('button', { name: /AAA/ });
+    await user.click(deleteButtons[0]!);
+
+    expect(onPendingRowsChange).toHaveBeenCalledWith([{ code: 'BBB', unit_name: null, default_quantity: 1, label: null, price: '' }]);
+  });
+
+  it('صفّان معلَّقان لنفس الوحدة يشتركان بصريّاً بنفس السعر، وتعديل أحدهما يُحدِّث كليهما محلياً', async () => {
+    const user = userEvent.setup();
+    const onPendingRowsChange = vi.fn();
+    const pending = [
+      { code: 'AAA', unit_name: 'pack', default_quantity: 1, label: null, price: '27.00' },
+      { code: 'BBB', unit_name: 'pack', default_quantity: 6, label: null, price: '27.00' },
+    ];
+    render(
+      wrapAr(
+        <ProductMultiBarcodeTable
+          baseUnitName="piece"
+          alternateUnits={[{ name: 'pack', factor: 6 }]}
+          isVariantManaged={false}
+          variants={[]}
+          pendingRows={pending}
+          onPendingRowsChange={onPendingRowsChange}
+        />,
+      ),
+    );
+    // صفّان × هيكلا سطح المكتب/الجوال معاً في DOM = أربعة حقول تعرض نفس القيمة.
+    await waitFor(() => expect(screen.getAllByDisplayValue('27.00').length).toBe(4));
+
+    const priceInputs = screen.getAllByDisplayValue('27.00');
+    await user.clear(priceInputs[0]!);
+    await user.type(priceInputs[0]!, '30.00');
+    await user.tab();
+
+    expect(onPendingRowsChange).toHaveBeenCalledWith([
+      { code: 'AAA', unit_name: 'pack', default_quantity: 1, label: null, price: '30.00' },
+      { code: 'BBB', unit_name: 'pack', default_quantity: 6, label: null, price: '30.00' },
+    ]);
+  });
+
+  it('سعرٌ غير صالح في وضع الإنشاء يمنع إضافة الصف كاملاً', async () => {
+    const user = userEvent.setup();
+    const onPendingRowsChange = vi.fn();
+    render(wrapAr(<ProductMultiBarcodeTable baseUnitName="piece" alternateUnits={[]} isVariantManaged={false} variants={[]} pendingRows={[]} onPendingRowsChange={onPendingRowsChange} />));
+
+    await user.click(screen.getByText(ar.products.multi_barcode_expand));
+    await user.type(screen.getAllByLabelText(ar.products.barcode_code)[0]!, 'ZZZ');
+    await user.type(screen.getAllByLabelText(ar.products.multi_barcode_col_price)[0]!, 'not-a-number');
+    await user.click(screen.getAllByRole('button', { name: new RegExp(ar.products.add_barcode) })[0]!);
+
+    expect(onPendingRowsChange).not.toHaveBeenCalled();
+    expect(screen.getByText(ar.products.unit_price_invalid)).toBeTruthy();
+  });
+
+  it('لا عمود متغيّر في وضع الإنشاء حتى لو مُرِّر isVariantManaged', async () => {
+    const user = userEvent.setup();
+    render(wrapAr(<ProductMultiBarcodeTable baseUnitName="piece" alternateUnits={[]} isVariantManaged variants={[{ id: 'v-1', descriptor: 'أسود' }]} pendingRows={[]} onPendingRowsChange={vi.fn()} />));
+
+    await user.click(screen.getByText(ar.products.multi_barcode_expand));
+    await waitFor(() => expect(screen.getAllByText(ar.products.multi_barcode_col_unit).length).toBeGreaterThan(0));
+    expect(screen.queryByText(ar.products.multi_barcode_col_variant)).toBeNull();
+  });
+});
