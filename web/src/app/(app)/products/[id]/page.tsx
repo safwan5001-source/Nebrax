@@ -1,19 +1,17 @@
 'use client';
 import { formatDateTime } from '@/lib/formatting';
 
-import { ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import Image from 'next/image';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { ArrowRight, ArrowLeftRight, Copy, ImageOff, ImagePlus, MoreVertical, Plus, ReceiptText, RefreshCw, Trash2, Upload } from 'lucide-react';
-import { api, ApiError, fetchImageUrl } from '@/lib/api';
+import { ArrowRight, ArrowLeftRight, Copy, MoreVertical, Plus, ReceiptText, Trash2 } from 'lucide-react';
+import { api, ApiError } from '@/lib/api';
 import { formatRiyal } from '@/lib/money';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dropdown, DropdownItem } from '@/components/ui/dropdown';
-import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
 import { Tabs, TabPanel, type TabDef } from '@/components/ui/tabs';
@@ -25,13 +23,9 @@ type Product = ProductFormProduct & {
   units: Array<{ name: string; factor: number }>;
 };
 
-type ProductMedia = { id: string; original_name: string; download_url: string; sort_order: number; previewUrl?: string | null };
 type Activity = { id: string; action: string; created_at: string | null; user: { id: string; name: string } | null };
 type Movement = { id: string; type: string; quantity: number; unit_cost: string; total_cost: string; balance_quantity: number; movement_date: string | null; notes: string | null };
 
-const MAX_PRODUCT_IMAGES = 8;
-const MAX_PRODUCT_IMAGE_SIZE = 5 * 1024 * 1024;
-const PRODUCT_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const movementTone: Record<string, 'positive' | 'warning' | 'muted'> = { in: 'positive', out: 'warning', adjustment: 'muted' };
 
 export default function ProductProfilePage() {
@@ -41,53 +35,31 @@ export default function ProductProfilePage() {
   const ti = useTranslations('inventory');
   const { success, error: showError } = useToast();
   const [product, setProduct] = useState<Product | null>(null);
-  const [media, setMedia] = useState<ProductMedia[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [movements, setMovements] = useState<Movement[] | null>(null);
-  const [selectedMediaId, setSelectedMediaId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('info');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [uploading, setUploading] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const mediaObjectUrls = useRef<string[]>([]);
-
-  const revokeMediaObjectUrls = useCallback(() => {
-    mediaObjectUrls.current.forEach((url) => URL.revokeObjectURL(url));
-    mediaObjectUrls.current = [];
-  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [productResult, mediaResult, activityResult] = await Promise.all([
+      const [productResult, activityResult] = await Promise.all([
         api<{ data: Product }>(`/products/${id}`),
-        api<{ data: ProductMedia[] }>(`/products/${id}/media`),
         api<{ data: Activity[] }>(`/products/${id}/activity`),
       ]);
-      const hydrated = await Promise.all(mediaResult.data.map(async (item) => ({
-        ...item,
-        previewUrl: await fetchImageUrl(item.download_url),
-      })));
-      revokeMediaObjectUrls();
-      mediaObjectUrls.current = hydrated.flatMap((item) => item.previewUrl ? [item.previewUrl] : []);
       setProduct(productResult.data);
-      setMedia(hydrated);
       setActivities(activityResult.data);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : t('load_profile_failed'));
     } finally {
       setLoading(false);
     }
-  }, [id, revokeMediaObjectUrls, t]);
+  }, [id, t]);
 
   useEffect(() => { void load(); }, [load]);
-  useEffect(() => () => revokeMediaObjectUrls(), [revokeMediaObjectUrls]);
-  useEffect(() => {
-    setSelectedMediaId((current) => media.some((item) => item.id === current) ? current : (media[0]?.id ?? null));
-  }, [media]);
   useEffect(() => {
     if (activeTab !== 'movements' || movements !== null) return;
     api<{ data: Movement[] }>(`/inventory/${id}/movements`)
@@ -95,61 +67,12 @@ export default function ProductProfilePage() {
       .catch(() => setMovements([]));
   }, [activeTab, id, movements]);
 
-  const selectedMedia = media.find((item) => item.id === selectedMediaId) ?? media[0] ?? null;
-  const selectedMediaIndex = selectedMedia ? media.findIndex((item) => item.id === selectedMedia.id) + 1 : 0;
   const tabs = useMemo<TabDef[]>(() => [
     { id: 'info', label: t('product_info') },
     { id: 'movements', label: t('inventory_movements') },
     { id: 'timeline', label: t('timeline') },
     { id: 'activity', label: t('activity'), count: activities.length },
   ], [activities.length, t]);
-
-  async function uploadMediaFiles(files: File[]) {
-    if (files.length === 0) return;
-    if (media.length + files.length > MAX_PRODUCT_IMAGES) {
-      setError(t('media_limit_reached'));
-      return;
-    }
-    if (files.some((file) => !PRODUCT_IMAGE_TYPES.includes(file.type) || file.size > MAX_PRODUCT_IMAGE_SIZE)) {
-      setError(t('media_invalid_file'));
-      return;
-    }
-
-    setUploading(true);
-    setError(null);
-    try {
-      const body = new FormData();
-      files.forEach((file) => body.append('media[]', file));
-      await api(`/products/${id}/media`, { method: 'POST', body });
-      await load();
-      success(t('media_uploaded'));
-    } catch (err) {
-      const message = err instanceof ApiError ? err.message : t('load_profile_failed');
-      setError(message);
-      showError(message);
-    } finally {
-      setUploading(false);
-    }
-  }
-
-  function uploadMedia(event: ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(event.target.files ?? []);
-    event.target.value = '';
-    void uploadMediaFiles(files);
-  }
-
-  async function removeMedia(mediaId: string) {
-    setError(null);
-    try {
-      await api(`/products/${id}/media/${mediaId}`, { method: 'DELETE' });
-      await load();
-      success(t('media_deleted'));
-    } catch (err) {
-      const message = err instanceof ApiError ? err.message : t('load_profile_failed');
-      setError(message);
-      showError(message);
-    }
-  }
 
   async function copyProduct() {
     if (!product) return;
@@ -234,10 +157,24 @@ export default function ProductProfilePage() {
 
       {error && <p role="alert" className="rounded bg-negative/10 px-3 py-2 text-sm text-negative">{error}</p>}
 
-      <section className="grid gap-3 sm:grid-cols-3" aria-label={t('product_info')}>
+      <section className="grid gap-3 sm:grid-cols-4" aria-label={t('product_info')}>
         <Card><CardContent className="p-4"><p className="text-xs text-muted">{t('stock')}</p><p className="mt-1 text-lg font-semibold num text-text">{product.track_inventory ? product.quantity_on_hand : '—'}</p></CardContent></Card>
         <Card><CardContent className="p-4"><p className="text-xs text-muted">{t('avg_cost')}</p><p className="mt-1 text-lg font-semibold num text-text">{formatRiyal(product.avg_cost)}</p></CardContent></Card>
         <Card><CardContent className="p-4"><p className="text-xs text-muted">{t('sale_price')}</p><p className="mt-1 text-lg font-semibold num text-text">{formatRiyal(product.sale_price)}</p></CardContent></Card>
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-xs text-muted">{t('units')}</p>
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
+              {product.units.length === 0 ? (
+                <Badge tone="muted">{product.unit}</Badge>
+              ) : product.units.map((unit) => (
+                <Badge key={unit.name} tone={unit.factor === 1 ? 'neutral' : 'muted'}>
+                  {unit.name}{unit.factor === 1 ? ` (${t('unit_base_badge')})` : ` ×${unit.factor}`}
+                </Badge>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       </section>
 
       <Tabs tabs={tabs} value={activeTab} onChange={setActiveTab} />
@@ -245,66 +182,11 @@ export default function ProductProfilePage() {
       {activeTab === 'info' && (
         <TabPanel id="info">
           <div className="space-y-5">
-            {/* الصور والوسائط — تبقى كما كانت تماماً (خارج نطاق PR-PROD-UX-1؛
-                توحيدها مع نافذة التعديل السابقة مؤجَّلٌ لـ PR-PROD-UX-4). */}
-            <Card>
-              <CardHeader className="flex-row items-start justify-between gap-4 space-y-0">
-                <div>
-                  <CardTitle>{t('product_media')}</CardTitle>
-                  <p className="mt-1 text-xs text-muted">{t('product_media_hint')}</p>
-                </div>
-                <Button type="button" size="sm" onClick={() => fileInputRef.current?.click()} disabled={uploading || media.length >= MAX_PRODUCT_IMAGES}>
-                  <Upload className="h-4 w-4" />{t('upload_media')}
-                </Button>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <Input ref={fileInputRef} id="product-media" type="file" accept={PRODUCT_IMAGE_TYPES.join(',')} multiple disabled={uploading || media.length >= MAX_PRODUCT_IMAGES} onChange={uploadMedia} className="sr-only" />
-                <div className="grid gap-6 lg:grid-cols-[minmax(15rem,0.5fr)_minmax(0,0.5fr)]">
-                  <div className="space-y-3">
-                    <div className="relative flex aspect-square items-center justify-center overflow-hidden rounded border border-border bg-muted/20">
-                      {selectedMedia?.previewUrl ? (
-                        <Image src={selectedMedia.previewUrl} alt={selectedMedia.original_name} fill priority unoptimized sizes="(max-width: 1024px) 100vw, 34vw" className="object-cover" />
-                      ) : selectedMedia ? (
-                        <div className="flex flex-col items-center gap-2 px-5 text-center text-muted" role="status"><ImageOff className="h-8 w-8" strokeWidth={1.5} aria-hidden /><span className="text-sm">{t('image_preview', { number: selectedMediaIndex })}</span><Button type="button" variant="outline" size="sm" onClick={() => void load()}><RefreshCw className="h-4 w-4" />{t('retry')}</Button></div>
-                      ) : (
-                        <button type="button" className="flex h-full w-full flex-col items-center justify-center gap-3 text-muted hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" onClick={() => fileInputRef.current?.click()}><ImagePlus className="h-10 w-10" strokeWidth={1.35} aria-hidden /><span className="text-sm">{t('upload_media')}</span></button>
-                      )}
-                    </div>
-                    {media.length > 0 && (
-                      <div className="grid grid-cols-5 gap-2">
-                        {media.map((item, index) => (
-                          <button key={item.id} type="button" className={`relative aspect-square overflow-hidden rounded border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${selectedMedia?.id === item.id ? 'border-primary ring-2 ring-primary/25' : 'border-border'}`} aria-label={t('image_preview', { number: index + 1 })} aria-pressed={selectedMedia?.id === item.id} onClick={() => setSelectedMediaId(item.id)}>
-                            {item.previewUrl ? <Image src={item.previewUrl} alt={item.original_name} fill unoptimized sizes="100px" className="object-cover" /> : <span className="grid h-full place-items-center text-muted" aria-hidden><ImageOff className="h-4 w-4" /></span>}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                    {selectedMedia && <div className="flex items-center gap-2 rounded bg-muted/30 px-2.5 py-2"><span className="min-w-0 flex-1 truncate text-xs text-muted" title={selectedMedia.original_name}>{selectedMedia.original_name}</span><Button type="button" variant="ghost" size="icon" aria-label={`${t('delete')}: ${selectedMedia.original_name}`} onClick={() => void removeMedia(selectedMedia.id)} disabled={uploading}><Trash2 className="h-4 w-4" /></Button></div>}
-                  </div>
-
-                  <dl className="grid content-start gap-4 text-sm sm:grid-cols-2">
-                    <div className="sm:col-span-2">
-                      <dt className="text-muted">{t('units')}</dt>
-                      <dd className="mt-1.5 flex flex-wrap gap-1.5">
-                        {product.units.length === 0 ? (
-                          <Badge tone="muted">{product.unit}</Badge>
-                        ) : product.units.map((unit) => (
-                          <Badge key={unit.name} tone={unit.factor === 1 ? 'neutral' : 'muted'}>
-                            {unit.name}{unit.factor === 1 ? ` (${t('unit_base_badge')})` : ` ×${unit.factor}`}
-                          </Badge>
-                        ))}
-                      </dd>
-                    </div>
-                  </dl>
-                </div>
-              </CardContent>
-            </Card>
-
             {/* المعلومات الأساسية والتسعير والمحاسبة والمخزون والوحدات/الباركود
-                المتعدّد/السعر لكل وحدة والخيارات/المتغيّرات — كلّها قابلة
-                للتحرير مباشرةً عبر مساحة العمل المشتركة، بلا نافذة منبثقة
-                ولا تبويبٌ منفصل (PR-PROD-UX-1/2/3؛ `ProductDialog` يبقى
-                قائماً للإضافة السريعة فقط). */}
+                المتعدّد/السعر لكل وحدة والخيارات/المتغيّرات والوسائط والنشر
+                التجاري — كلّها قابلة للتحرير مباشرةً عبر مساحة العمل
+                المشتركة، بلا نافذة منبثقة ولا تبويبٌ منفصل (PR-PROD-UX-1/2/3/4؛
+                `ProductDialog` يبقى قائماً للإضافة السريعة فقط). */}
             <ProductWorkspace
               mode="edit"
               product={product}

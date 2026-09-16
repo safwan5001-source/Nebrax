@@ -4630,6 +4630,7 @@
     "media_limit_reached": "You can select up to 8 product images.",
     "media_invalid_file": "Choose JPG, PNG or WebP images up to 5 MB each.",
     "media_upload_failed_after_create": "The product was created, but its images could not be uploaded. You can upload them from the product profile.",
+    "media_pending_hint": "Selected images upload automatically as soon as the product is first saved.",
     "delete": "Delete",
     "loading_profile": "Loading product profile…",
     "load_profile_failed": "Could not load the product profile.",
