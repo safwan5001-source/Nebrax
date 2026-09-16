@@ -15,10 +15,12 @@ use App\Models\InvoiceLine;
 use App\Models\Partner;
 use App\Models\Product;
 use App\Models\PriceList;
+use App\Models\ProductVariant;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Models\Warehouse;
 use App\Services\PriceListService;
+use App\Support\DocumentLineVariantResolver;
 use App\Support\PlanGate;
 use App\Tenancy\BranchContext;
 use App\Tenancy\TenantContext;
@@ -58,7 +60,7 @@ class DeliveryNoteSalesInvoiceDraftBuilder
      */
     public function preview(array $data): array
     {
-        [, $branchId] = $this->trustedScope();
+        [$tenantId, $branchId] = $this->trustedScope();
         $noteIds = $this->noteIds($data['delivery_note_ids'] ?? null);
         $notes = DeliveryNote::query()
             ->with(['customer.defaultPriceList', 'warehouse', 'lines.product', 'invoiceAllocations.invoice'])
@@ -82,7 +84,7 @@ class DeliveryNoteSalesInvoiceDraftBuilder
 
             $issues = $this->eligibilityIssues($note, $branchId, false);
             $recommendedPriceList = $requestedPriceList ?? $this->activeDefaultPriceList($note);
-            if ($issues === [] && $recommendedPriceList !== null && $this->hasMissingPriceListItem($note, $recommendedPriceList)) {
+            if ($issues === [] && $recommendedPriceList !== null && $this->hasMissingPriceListItem($note, $recommendedPriceList, $tenantId)) {
                 $issues[] = 'price_list_item_missing';
             }
             $rows[] = [
@@ -106,7 +108,7 @@ class DeliveryNoteSalesInvoiceDraftBuilder
                     'quantity' => (int) $line->quantity,
                     'quantity_numerator' => $line->quantity_numerator === null ? null : (int) $line->quantity_numerator,
                     'quantity_denominator' => $line->quantity_denominator === null ? null : (int) $line->quantity_denominator,
-                    'suggested_unit_price' => $this->suggestedPrice($line, $recommendedPriceList),
+                    'suggested_unit_price' => $this->suggestedPrice($line, $recommendedPriceList, $tenantId),
                     'suggested_tax_rate' => $line->product?->tax_rate,
                     'recommended_price_list_id' => $recommendedPriceList?->id,
                 ])->values()->all(),
@@ -190,7 +192,7 @@ class DeliveryNoteSalesInvoiceDraftBuilder
             $priceList = $command['price_list_id'] === null
                 ? $this->activeDefaultPriceList($notes->first())
                 : PriceList::query()->findOrFail($command['price_list_id']);
-            $invoiceItems = $this->buildInvoiceItems($notes->all(), $lines->all(), $command['line_pricing'], $priceList);
+            $invoiceItems = $this->buildInvoiceItems($notes->all(), $lines->all(), $command['line_pricing'], $priceList, $tenantId);
 
             $invoiceData = [
                 'partner_id' => $notes->first()->customer_id,
@@ -564,7 +566,7 @@ class DeliveryNoteSalesInvoiceDraftBuilder
      * @param array<string,array<string,mixed>> $pricing
      * @return array<int,array{item:array<string,mixed>,sources:array<int,DeliveryNoteLine>}>
      */
-    private function buildInvoiceItems(array $notes, array $lines, array $pricing, ?PriceList $priceList): array
+    private function buildInvoiceItems(array $notes, array $lines, array $pricing, ?PriceList $priceList, string $tenantId): array
     {
         $notesById = collect($notes)->keyBy('id');
         $groups = [];
@@ -572,7 +574,8 @@ class DeliveryNoteSalesInvoiceDraftBuilder
             foreach ($noteLines as $line) {
                 $decision = $pricing[$line->id];
                 $product = Product::query()->findOrFail($line->product_id);
-                $this->assertPriceDecision($line, $product, $decision, $priceList);
+                $variant = $this->resolveLineVariant($line, $product, $tenantId);
+                $this->assertPriceDecision($line, $product, $decision, $priceList, $variant);
                 // VAR-FU-2 (GAP-07): يدخل المتغيّر في مفتاح التجميع — وإلا اندمج
                 // متغيّران شقيقان من نفس المنتج بنفس الوحدة/السعر في سطر فاتورةٍ
                 // واحد فاقدٍ لهويّة المتغيّر (دمجٌ خاطئ، لا مجرّد فقدان حقل).
@@ -640,14 +643,14 @@ class DeliveryNoteSalesInvoiceDraftBuilder
     }
 
     /** @param array<string,mixed> $decision */
-    private function assertPriceDecision(DeliveryNoteLine $line, Product $product, array $decision, ?PriceList $priceList): void
+    private function assertPriceDecision(DeliveryNoteLine $line, Product $product, array $decision, ?PriceList $priceList, ?ProductVariant $variant): void
     {
         if ($decision['unit_price'] <= 0) {
             throw new RuntimeException('لا يمكن إنشاء مسودة بسعر وحدة صفري أو فارغ.');
         }
         if ($priceList !== null) {
             $requestedUnit = $line->unit_name === $product->unit ? null : $line->unit_name;
-            $listedPrice = $this->priceLists->resolve($priceList, $product, $requestedUnit);
+            $listedPrice = $this->priceLists->resolve($priceList, $product, $requestedUnit, variant: $variant);
             if ($listedPrice === null || $listedPrice !== $decision['unit_price']) {
                 throw new RuntimeException('قرار تسعير أحد السطور لا يطابق قائمة الأسعار المحددة.');
             }
@@ -800,15 +803,16 @@ class DeliveryNoteSalesInvoiceDraftBuilder
         return $priceList?->is_active ? $priceList : null;
     }
 
-    private function hasMissingPriceListItem(DeliveryNote $note, PriceList $priceList): bool
+    private function hasMissingPriceListItem(DeliveryNote $note, PriceList $priceList, string $tenantId): bool
     {
         foreach ($note->lines as $line) {
             $product = $line->product;
             if (! $product || ! $product->is_active) {
                 continue;
             }
+            $variant = $this->resolveLineVariant($line, $product, $tenantId);
             $unit = $line->unit_name === $product->unit ? null : $line->unit_name;
-            if ($this->priceLists->resolve($priceList, $product, $unit) === null) {
+            if ($this->priceLists->resolve($priceList, $product, $unit, variant: $variant) === null) {
                 return true;
             }
         }
@@ -816,22 +820,34 @@ class DeliveryNoteSalesInvoiceDraftBuilder
         return false;
     }
 
-    private function suggestedPrice(DeliveryNoteLine $line, ?PriceList $priceList = null): ?int
+    private function suggestedPrice(DeliveryNoteLine $line, ?PriceList $priceList, string $tenantId): ?int
     {
         $product = $line->product;
         if (! $product || ! $product->is_active) {
             return null;
         }
         if ($priceList !== null) {
+            $variant = $this->resolveLineVariant($line, $product, $tenantId);
             $unit = $line->unit_name === $product->unit ? null : $line->unit_name;
 
-            return $this->priceLists->resolve($priceList, $product, $unit);
+            return $this->priceLists->resolve($priceList, $product, $unit, variant: $variant);
         }
         if ($line->unit_name === $product->unit && (int) $line->unit_factor === 1) {
             return (int) $product->sale_price > 0 ? (int) $product->sale_price : null;
         }
 
         return null;
+    }
+
+    /**
+     * هويّة المتغيّر الموثوقة لسطر سند تسليم — نفس السلطة الفاشلة-إغلاقاً
+     * (`DocumentLineVariantResolver`) المستعملة في كل مسار مستندٍ آخر؛ لا
+     * استنتاج من وصفٍ أو رمزٍ أو باركود، فقط `product_id` + `product_variant_id`
+     * المخزَّنين على السطر نفسه (VAR-FU-2/GAP-07).
+     */
+    private function resolveLineVariant(DeliveryNoteLine $line, Product $product, string $tenantId): ?ProductVariant
+    {
+        return DocumentLineVariantResolver::resolve($product, $line->product_variant_id, $tenantId);
     }
 
     private function dateString(mixed $value): string
