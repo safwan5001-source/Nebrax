@@ -11,7 +11,7 @@ import { AdvancedFilterDialog } from '@/components/data-explorer/advanced-filter
 import { ListToolbar, PageHeader, Pagination, type PageAction, type SortOption } from '@/components/nebrax';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ProductDialog, type Product } from '@/components/products/product-dialog';
+import { type Product } from '@/components/products/product-dialog';
 import { ProductExportDialog } from '@/components/products/product-export-dialog';
 import { api, ApiError } from '@/lib/api';
 import { formatRiyal } from '@/lib/money';
@@ -72,8 +72,6 @@ export default function ProductsPage() {
   const [categories, setCategories] = useState<ProductCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [dialog, setDialog] = useState(false);
-  const [editing, setEditing] = useState<Product | null>(null);
   const [taxInclusive, setTaxInclusive] = useState(false);
   const [showStock, setShowStock] = useState(true);
   const [workingId, setWorkingId] = useState<string | null>(null);
@@ -251,8 +249,8 @@ export default function ProductsPage() {
         <Button asChild type="button" variant="ghost" size="icon" aria-label={t('view')}>
           <Link href={`/products/${product.id}`}><Eye className="h-4 w-4" strokeWidth={1.7} /></Link>
         </Button>
-        <Button type="button" variant="ghost" size="icon" aria-label={t('edit')} disabled={working} onClick={() => { setEditing(product); setDialog(true); }}>
-          <Pencil className="h-4 w-4" strokeWidth={1.7} />
+        <Button asChild type="button" variant="ghost" size="icon" aria-label={t('edit')}>
+          <Link href={`/products/${product.id}`}><Pencil className="h-4 w-4" strokeWidth={1.7} /></Link>
         </Button>
         <Button type="button" variant="ghost" size="icon" aria-label={t('copy')} disabled={working} onClick={() => void copyProduct(product)}>
           <Copy className="h-4 w-4" strokeWidth={1.7} />
@@ -427,8 +425,6 @@ export default function ProductsPage() {
         selectedIds={selectedIds}
         filteredTotal={total}
       />
-
-      <ProductDialog key={editing?.id ?? 'new'} open={dialog} onClose={() => setDialog(false)} onSaved={load} product={editing} />
     </div>
   );
 }

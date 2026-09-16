@@ -4538,6 +4538,8 @@
     "search": "بحث في المنتجات…",
     "empty": "لا توجد منتجات",
     "save": "حفظ",
+    "save_changes": "حفظ التغييرات",
+    "unsaved_indicator": "لم يُحفظ",
     "cancel": "إلغاء",
     "new_title": "إضافة منتج",
     "back": "رجوع",
