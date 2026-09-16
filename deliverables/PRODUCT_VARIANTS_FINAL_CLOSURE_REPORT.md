@@ -1,5 +1,14 @@
 # AWJ Product Variants — Final Closure Report
 
+> **Update (VAR-FU-6, PR follow-up to #834):** GAP-09, the sole blocker
+> described throughout this report, has since been **CLOSED**. See the
+> "GAP-09 — CLOSED" note directly under its evidence below, the revised
+> Gap Ledger row, the revised "Remaining P2 Blocking Closure" section, and
+> the revised Final Verdict at the bottom of this file. Everything else in
+> this report — including the Executive Summary's own narrative below,
+> written at the time GAP-09 was still open — is left as accurate history
+> of what this pass found and is not rewritten.
+
 ## Executive Summary
 
 This is the final closure pass for the Product Variants epic, run after all
@@ -77,7 +86,7 @@ transparency rather than silently corrected.*
 | GAP-06 | POS resolved Variant media | #832 | ✅ CLOSED |
 | GAP-07 | Document *conversion* helpers dropped `product_variant_id` (discovered in VAR-FU-1) | #825 | ✅ CLOSED |
 | GAP-08 | `ReturnService::assertWithinSource()` didn't cross-validate returned product/variant identity against the declared source line (discovered in VAR-FU-1) | #825 | ✅ CLOSED |
-| **GAP-09** *(new, this pass)* | `DeliveryNoteSalesInvoiceDraftBuilder` resolves price-list validation at **Product level, never Variant level**, in `assertPriceDecision()`/`hasMissingPriceListItem()`/`suggestedPrice()` — reproduced live: a variant with its own correct price-list entry is rejected building the invoice draft even when the submitted price exactly matches that entry | *(none — undispatched)* | ❌ **OPEN — P2, blocks closure verdict A** |
+| **GAP-09** *(found in this pass)* | `DeliveryNoteSalesInvoiceDraftBuilder` resolves price-list validation at **Product level, never Variant level**, in `assertPriceDecision()`/`hasMissingPriceListItem()`/`suggestedPrice()` — reproduced live: a variant with its own correct price-list entry is rejected building the invoice draft even when the submitted price exactly matches that entry | VAR-FU-6 | ✅ **CLOSED** — all three call sites now thread `DocumentLineVariantResolver`-resolved `ProductVariant` into `PriceListService::resolve()`; 10 new regression tests + 93 pre-existing tests re-verified green on SQLite and PostgreSQL (`tests/Feature/DeliveryNoteVariantPriceListTest.php`, `deliverables/VAR-FU-6-DELIVERY-NOTE-VARIANT-PRICE-LIST-REPORT.md`) |
 
 ## Domain Invariants
 
@@ -460,7 +469,14 @@ concurrency defect was found anywhere in this pass's evidence gathering or
 
 ## Remaining P2 Blocking Closure
 
-**GAP-09** — `DeliveryNoteSalesInvoiceDraftBuilder::assertPriceDecision()`
+**NONE.** GAP-09 (below) was the sole item in this section and is now
+**CLOSED** by VAR-FU-6 — see "GAP-09 — CLOSED" immediately following its
+evidence, and `deliverables/VAR-FU-6-DELIVERY-NOTE-VARIANT-PRICE-LIST-REPORT.md`
+for the full fix, test, and verification record. The narrative below is left
+exactly as written when GAP-09 was still open, as accurate history of this
+pass's own findings.
+
+**GAP-09 (historical description, now closed)** — `DeliveryNoteSalesInvoiceDraftBuilder::assertPriceDecision()`
 (and its siblings `hasMissingPriceListItem()`/`suggestedPrice()`, same
 root cause) call `PriceListService::resolve($priceList, $product,
 $requestedUnit)` **without the variant argument**, even though
@@ -516,9 +532,23 @@ delivery note line already stores per GAP-07) into the three
 parameter `resolve()` already accepts. No schema change, no new authority
 — purely threading an argument that already exists on both ends.
 
-**This finding blocks a Final Verdict of (A).** Per the mission's Fix
-Policy, this closure pass documents it and stops for approval rather than
-fixing it silently inside this PR.
+**This finding blocked a Final Verdict of (A) at the time this pass was
+written.** Per the mission's Fix Policy, this closure pass documented it and
+stopped for approval rather than fixing it silently inside this PR.
+
+**GAP-09 — CLOSED (VAR-FU-6).** The proposed smallest follow-up described
+immediately above was implemented exactly as scoped: the already-resolved
+`ProductVariant` (via `DocumentLineVariantResolver::resolve()`, not inferred
+from descriptor/SKU/barcode) is now threaded into all three
+`PriceListService::resolve()` call sites in
+`DeliveryNoteSalesInvoiceDraftBuilder`. No schema change, no new pricing
+authority, no API contract change, no frontend change — matching the
+proposal precisely. Verified with 10 new dedicated regression tests plus
+93 pre-existing tests (`DeliveryNoteInvoiceDraftBuilderTest`,
+`DocumentConversionReturnIntegrityTest`/VAR-FU-2,
+`ProductUnitPriceTest`/VAR-PRICE-1, `PosVariantCheckoutTest`/VAR-POS-1,
+`VariantMinimumSalePriceGuardTest`/GAP-05) all green on both SQLite and
+PostgreSQL. Full detail: `deliverables/VAR-FU-6-DELIVERY-NOTE-VARIANT-PRICE-LIST-REPORT.md`.
 
 ## Production / Deployment Status
 
@@ -553,8 +583,8 @@ green in this pass without modification.
 
 ## Risks
 
-- **GAP-09** (above) — the one real, open risk from this pass, fully
-  evidenced.
+- **GAP-09** (above) — the one real risk found in this pass, fully
+  evidenced, and now **CLOSED** by VAR-FU-6 (see above).
 - The Deferred items listed above (numeric export filters, generic
   min-price absence on six document types) remain permanently-acceptable
   limitations unless a future task's evidence proves otherwise — re-litigating
@@ -564,14 +594,46 @@ green in this pass without modification.
 
 ## Changed Files
 
-`deliverables/PRODUCT_VARIANTS_FINAL_CLOSURE_REPORT.md` (this file, new).
-No production code, test, or other documentation file was modified —
-`deliverables/PRODUCT_VARIANTS_FINAL_CLOSURE_REVIEW.md` (the prior
-closure review) is untouched, preserving its history as instructed.
+`deliverables/PRODUCT_VARIANTS_FINAL_CLOSURE_REPORT.md` (this file — new at
+the time of the closure pass; subsequently updated in place by VAR-FU-6 to
+record GAP-09's closure, preserving the original narrative as history).
+No production code, test, or other documentation file was modified by the
+original closure pass itself — `deliverables/PRODUCT_VARIANTS_FINAL_CLOSURE_REVIEW.md`
+(the prior closure review) remains untouched, preserving its history as
+instructed. VAR-FU-6 separately changed
+`app/Services/Accounting/DeliveryNoteSalesInvoiceDraftBuilder.php`,
+`tests/Feature/DeliveryNoteVariantPriceListTest.php`, and added
+`deliverables/VAR-FU-6-DELIVERY-NOTE-VARIANT-PRICE-LIST-REPORT.md` — see
+that report for VAR-FU-6's own Changed Files list.
 
 ## FINAL VERDICT
 
-**B) CORE CLOSED — BLOCKING FOLLOW-UP REMAINS**
+**A) PRODUCT VARIANTS CLOSED**
+
+*(Updated by VAR-FU-6; this pass's own original verdict was B — see the
+"Update" note at the top of this file and the historical paragraph below,
+left unchanged.)*
+
+All eight CORE milestones and all six mission-listed GAPs (GAP-01 through
+GAP-06) are verified closed on `main` with direct evidence. GAP-07 and
+GAP-08 (discovered during follow-up) are also closed. GAP-09 — the one
+P2-severity defect found during this closure pass, in
+`DeliveryNoteSalesInvoiceDraftBuilder`'s price-list validation for
+variant-managed lines — is now **also closed**, by VAR-FU-6, with the
+smallest possible scoped fix and full regression coverage on both database
+engines (see "GAP-09 — CLOSED" above). Product Variants domain correctness
+(identity, inventory, core pricing authority, barcode, document/historical
+truth, POS, Commerce, reporting, media, tenant isolation) is sound and
+production-ready by every invariant verified across the closure pass and
+VAR-FU-6, with no new genuine P1/P2 blocker surfaced. Remaining deferred
+items (numeric export filters, generic `min_sale_price` gaps on other
+document types, optional UX nuances) are explicitly non-blocking and do not
+reopen this epic.
+
+---
+
+*Historical paragraph, written when this pass's own verdict was B (left
+unchanged as a record of the pass's own conclusion at the time):*
 
 All eight CORE milestones and all six mission-listed GAPs (GAP-01 through
 GAP-06) are verified closed on `main` with direct evidence. GAP-07 and
