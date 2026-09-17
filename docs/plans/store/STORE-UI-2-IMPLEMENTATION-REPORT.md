@@ -27,7 +27,7 @@ zero overlap with `storefront/`). The branch was rebased onto it; no conflicts.
 
 ## 4. Head SHA
 
-`3823d3673e0d9328aeeeba02d49a35ac5860c7f3` (code) — plus this report commit; see the PR's commit list for the current head.
+`bee29329afaec51dbb96e65340d6eb3835cfbfbd` — includes the final visual polish pass (§30).
 
 ## 5. Branch
 
