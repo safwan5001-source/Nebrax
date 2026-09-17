@@ -38,10 +38,15 @@
     "allProducts": "Alle Produkte",
     "contact": "Kontakt",
     "viewAllCategory": "Alle {category} anzeigen",
-    "openSearch": "Suche öffnen",
-    "closeSearch": "Suche schließen",
     "myAccount": "Mein Konto",
-    "wholesale": "Großhandel"
+    "wholesale": "Großhandel",
+    "shop": "Produkte",
+    "cart": "Warenkorb",
+    "primaryNavigation": "Hauptnavigation",
+    "categoryNavigation": "Shop-Kategorien",
+    "scrollCategoriesBack": "Vorherige Kategorien anzeigen",
+    "scrollCategoriesForward": "Weitere Kategorien anzeigen",
+    "skipToContent": "Zum Inhalt springen"
   },
   "regionPreferences": {
     "title": "Region und Sprache",

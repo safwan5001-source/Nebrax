@@ -18,17 +18,45 @@
   --animate-hamburger-bottom-open: hamburger-bottom-open 0.35s ease-in-out forwards;
   --animate-hamburger-bottom-close: hamburger-bottom-close 0.35s ease-in-out forwards;
 
-  --color-primary-50: #eff6ff;
-  --color-primary-100: #dbeafe;
-  --color-primary-200: #bfdbfe;
-  --color-primary-300: #93c5fd;
-  --color-primary-400: #60a5fa;
-  --color-primary-500: #0077ff;
-  --color-primary-600: #0066dd;
-  --color-primary-700: #0055bb;
-  --color-primary-800: #004499;
-  --color-primary-900: #003377;
-  --color-primary-950: #001d4d;
+  /* AWJ Modern primary ramp. Derived from --store-primary so the Store
+     Customizer changes one token instead of eleven literals. */
+  --color-primary-50: var(--store-primary-50);
+  --color-primary-100: var(--store-primary-100);
+  --color-primary-200: var(--store-primary-200);
+  --color-primary-300: var(--store-primary-300);
+  --color-primary-400: var(--store-primary-400);
+  --color-primary-500: var(--store-primary-500);
+  --color-primary-600: var(--store-primary-600);
+  --color-primary-700: var(--store-primary-700);
+  --color-primary-800: var(--store-primary-800);
+  --color-primary-900: var(--store-primary-900);
+  --color-primary-950: var(--store-primary-950);
+
+  /* Semantic storefront theme utilities (bg-store-surface, text-store-muted-foreground, ...) */
+  --color-store-background: var(--store-background);
+  --color-store-surface: var(--store-surface);
+  --color-store-surface-muted: var(--store-surface-muted);
+  --color-store-foreground: var(--store-foreground);
+  --color-store-muted: var(--store-muted);
+  --color-store-muted-foreground: var(--store-muted-foreground);
+  --color-store-border: var(--store-border);
+  --color-store-border-strong: var(--store-border-strong);
+  --color-store-primary: var(--store-primary);
+  --color-store-primary-hover: var(--store-primary-hover);
+  --color-store-primary-foreground: var(--store-primary-foreground);
+  --color-store-primary-soft: var(--store-primary-soft);
+  --color-store-destructive: var(--store-destructive);
+  --color-store-success: var(--store-success);
+  --color-store-warning: var(--store-warning);
+
+  /* Shell metrics. Kept as theme values so shell components never hard-code
+     a header/nav height that a sibling component has to guess again. */
+  --container-store: var(--store-content-max);
+  --spacing-store-header: var(--store-header-height);
+  --spacing-store-header-lg: var(--store-header-height-lg);
+  --spacing-store-nav: var(--store-nav-height);
+  --spacing-store-bottom-nav: var(--store-bottom-nav-height);
+  --radius-store: var(--store-radius);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -115,9 +143,38 @@
   100% { transform: translateY(0) rotate(0); }
 }
 
+/*
+ * One stack, two scripts. Latin glyphs resolve in Geist; Arabic glyphs are not
+ * in Geist so the browser falls through per-character to Tajawal — the approved
+ * AWJ Store default face (AWJ_STORE_DEFAULT_DESIGN_DIRECTION.md §5). Arabic is
+ * the storefront's default locale, so it must not land on a system fallback.
+ */
 body {
-  font-family: var(--font-geist), system-ui, sans-serif;
+  font-family: var(--font-geist), var(--font-tajawal), system-ui, sans-serif;
   font-weight: 400;
+}
+
+/*
+ * Horizontal rail used by the desktop category navigation. The scrollbar is
+ * suppressed because the rail carries its own paging controls and edge fades;
+ * keyboard and touch scrolling are untouched.
+ */
+@utility store-rail {
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  overscroll-behavior-inline: contain;
+  scroll-behavior: smooth;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .store-rail {
+    scroll-behavior: auto;
+  }
 }
 
 /* Style native search clear button */
@@ -178,30 +235,89 @@ input[type="search"]::-webkit-search-cancel-button {
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
+  /*
+   * AWJ Store Theme Tokens — the single presentation seam for the storefront.
+   *
+   * Components consume the semantic token (`--store-primary`), never the literal
+   * colour. STORE-UI-6 (Store Customizer) can therefore override a merchant's
+   * presentation by re-declaring these few custom properties without touching a
+   * component, and without any access to commerce truth. Values below are the
+   * approved `AWJ Modern` default presentation, not a merchant setting.
+   */
+
+  /* Surfaces & text */
+  --store-background: oklch(0.977 0.002 160);
+  --store-surface: oklch(1 0 0);
+  --store-surface-muted: oklch(0.955 0.004 160);
+  --store-foreground: oklch(0.205 0.006 160);
+  --store-muted: oklch(0.955 0.003 160);
+  /* 5.49:1 on --store-surface — safe for secondary copy and icon-only actions. */
+  --store-muted-foreground: oklch(0.52 0.008 160);
+  --store-border: oklch(0.915 0.004 160);
+  --store-border-strong: oklch(0.855 0.005 160);
+
+  /* Primary ramp (AWJ Modern green) */
+  --store-primary-50: oklch(0.972 0.016 162);
+  --store-primary-100: oklch(0.945 0.032 162);
+  --store-primary-200: oklch(0.893 0.055 162);
+  --store-primary-300: oklch(0.815 0.08 162);
+  --store-primary-400: oklch(0.706 0.1 162);
+  --store-primary-500: oklch(0.606 0.11 162);
+  --store-primary-600: oklch(0.52 0.105 162);
+  --store-primary-700: oklch(0.45 0.095 162);
+  --store-primary-800: oklch(0.385 0.08 162);
+  --store-primary-900: oklch(0.325 0.066 162);
+  --store-primary-950: oklch(0.235 0.048 162);
+
+  /* 5.22:1 against --store-primary-foreground — AA for button and badge labels. */
+  --store-primary: var(--store-primary-600);
+  --store-primary-hover: var(--store-primary-700);
+  --store-primary-foreground: oklch(1 0 0);
+  --store-primary-soft: var(--store-primary-50);
+
+  /* Status */
+  --store-destructive: oklch(0.58 0.2 27);
+  --store-success: oklch(0.55 0.13 150);
+  --store-warning: oklch(0.68 0.14 70);
+
+  /* Shell metrics */
+  --store-content-max: 80rem;
+  --store-radius: 0.625rem;
+  --store-header-height: 3.5rem;
+  --store-header-height-lg: 4.5rem;
+  --store-nav-height: 2.75rem;
+  --store-bottom-nav-height: 3.5rem;
+  --store-focus-ring: var(--store-foreground);
+
+  /*
+   * shadcn aliases. The storefront already renders 40+ components through these
+   * names; pointing them at the store tokens gives the whole surface one source
+   * of truth instead of a green shell bolted onto a neutral catalogue.
+   */
+  --background: var(--store-background);
+  --foreground: var(--store-foreground);
+  --card: var(--store-surface);
+  --card-foreground: var(--store-foreground);
+  --popover: var(--store-surface);
+  --popover-foreground: var(--store-foreground);
+  --primary: var(--store-primary);
+  --primary-foreground: var(--store-primary-foreground);
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
+  --muted: var(--store-muted);
+  --muted-foreground: var(--store-muted-foreground);
   --accent: oklch(0.97 0 0);
   --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.58 0.22 27);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --destructive: var(--store-destructive);
+  --border: var(--store-border);
+  --input: var(--store-border);
+  --ring: var(--store-primary);
   --chart-1: oklch(0.809 0.105 251.813);
   --chart-2: oklch(0.623 0.214 259.815);
   --chart-3: oklch(0.546 0.245 262.881);
   --chart-4: oklch(0.488 0.243 264.376);
   --chart-5: oklch(0.424 0.199 265.638);
-  --radius: 0.625rem;
+  --radius: var(--store-radius);
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
   --sidebar-primary: oklch(0.205 0 0);
@@ -252,6 +368,7 @@ input[type="search"]::-webkit-search-cancel-button {
   }
   :focus-visible {
     outline: 1px solid black;
+    outline-offset: 2px;
     border-radius: 2px;
   }
   @media (prefers-color-scheme: dark) {

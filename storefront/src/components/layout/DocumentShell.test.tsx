@@ -3,6 +3,7 @@ import { DocumentShell } from "./DocumentShell";
 
 vi.mock("next/font/google", () => ({
   Geist: () => ({ variable: "--font-geist" }),
+  Tajawal: () => ({ variable: "--font-tajawal" }),
 }));
 
 vi.mock("@next/third-parties/google", () => ({
@@ -57,5 +58,19 @@ describe("DocumentShell", () => {
 
     expect(document.props.lang).toBe("en");
     expect(document.props.dir).toBe("ltr");
+  });
+
+  it("declares the Arabic face on every document, not only on Arabic routes", () => {
+    const document = DocumentShell({
+      children: <main>Storefront</main>,
+      locale: "en",
+    });
+    const body = document.props.children.find(
+      (child: { type?: string } | false | null) =>
+        child && typeof child === "object" && child.type === "body",
+    );
+
+    expect(body.props.className).toContain("--font-geist");
+    expect(body.props.className).toContain("--font-tajawal");
   });
 });

@@ -38,10 +38,15 @@
     "allProducts": "جميع المنتجات",
     "contact": "تواصل معنا",
     "viewAllCategory": "عرض الكل في {category}",
-    "openSearch": "فتح البحث",
-    "closeSearch": "إغلاق البحث",
     "myAccount": "حسابي",
-    "wholesale": "الجملة"
+    "wholesale": "الجملة",
+    "shop": "المنتجات",
+    "cart": "السلة",
+    "primaryNavigation": "التنقل الرئيسي",
+    "categoryNavigation": "تصنيفات المتجر",
+    "scrollCategoriesBack": "عرض التصنيفات السابقة",
+    "scrollCategoriesForward": "عرض المزيد من التصنيفات",
+    "skipToContent": "تخطي إلى المحتوى"
   },
   "regionPreferences": {
     "title": "المنطقة واللغة",

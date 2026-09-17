@@ -38,10 +38,15 @@
     "allProducts": "Wszystkie produkty",
     "contact": "Kontakt",
     "viewAllCategory": "Zobacz wszystkie {category}",
-    "openSearch": "Otwórz wyszukiwanie",
-    "closeSearch": "Zamknij wyszukiwanie",
     "myAccount": "Moje konto",
-    "wholesale": "Hurt"
+    "wholesale": "Hurt",
+    "shop": "Produkty",
+    "cart": "Koszyk",
+    "primaryNavigation": "Nawigacja główna",
+    "categoryNavigation": "Kategorie sklepu",
+    "scrollCategoriesBack": "Pokaż poprzednie kategorie",
+    "scrollCategoriesForward": "Pokaż więcej kategorii",
+    "skipToContent": "Przejdź do treści"
   },
   "regionPreferences": {
     "title": "Region i język",

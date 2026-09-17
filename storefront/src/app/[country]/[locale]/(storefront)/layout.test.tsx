@@ -20,45 +20,64 @@ vi.mock("@/components/layout/Footer", () => ({
   Footer: () => null,
   FooterCategoryLinks: () => null,
 }));
+vi.mock("@/components/layout/MobileBottomNav", () => ({
+  MobileBottomNav: () => null,
+}));
 
 import { Footer } from "@/components/layout/Footer";
 import { Header } from "@/components/layout/Header";
+import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
 import StorefrontLayout from "./layout";
 
 interface LayoutElementProps {
   children?: ReactNode;
   mobileNavigation?: ReactElement<{ fallback: ReactNode }>;
+  categoryNavigation?: ReactElement<{ fallback: ReactNode }>;
   categoryLinks?: ReactElement<{ fallback: ReactNode }>;
   fallback?: ReactNode;
+  id?: string;
+}
+
+async function renderLayout(content: ReactNode) {
+  const layout = (await StorefrontLayout({
+    children: content,
+    params: Promise.resolve({ country: "us", locale: "en" }),
+  })) as ReactElement<LayoutElementProps>;
+
+  expect(layout.type).toBe(Fragment);
+
+  return Children.toArray(
+    layout.props.children,
+  ) as ReactElement<LayoutElementProps>[];
 }
 
 describe("StorefrontLayout", () => {
   it("keeps page chrome outside the category navigation Suspense boundaries", async () => {
     const content = <section>Storefront content</section>;
-    const layout = (await StorefrontLayout({
-      children: content,
-      params: Promise.resolve({ country: "us", locale: "en" }),
-    })) as ReactElement<LayoutElementProps>;
-
-    expect(layout.type).toBe(Fragment);
-
-    const [header, hiddenNavigation, main, footer] = Children.toArray(
-      layout.props.children,
-    ) as ReactElement<LayoutElementProps>[];
+    const [header, main, footer] = await renderLayout(content);
 
     expect(header.type).toBe(Header);
-    expect(hiddenNavigation.type).toBe(Suspense);
     expect(main.type).toBe("main");
     expect(main.props.children).toBe(content);
     expect(footer.type).toBe(Footer);
 
     const mobileNavigation = header.props.mobileNavigation;
+    const categoryNavigation = header.props.categoryNavigation;
     const categoryLinks = footer.props.categoryLinks;
 
     expect(mobileNavigation?.type).toBe(Suspense);
     expect(mobileNavigation?.props.fallback).not.toBeNull();
-    expect(hiddenNavigation.props.fallback).toBeNull();
+    expect(categoryNavigation?.type).toBe(Suspense);
+    expect(categoryNavigation?.props.fallback).not.toBeNull();
     expect(categoryLinks?.type).toBe(Suspense);
     expect(categoryLinks?.props.fallback).not.toBeNull();
+  });
+
+  it("gives the skip link a target and renders the mobile bottom navigation last", async () => {
+    const elements = await renderLayout(<section>Storefront content</section>);
+    const main = elements.find((element) => element.type === "main");
+
+    expect(main?.props.id).toBe("main-content");
+    expect(elements.at(-1)?.type).toBe(MobileBottomNav);
   });
 });

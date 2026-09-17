@@ -38,10 +38,15 @@
     "allProducts": "Todos los productos",
     "contact": "Contacto",
     "viewAllCategory": "Ver todo en {category}",
-    "openSearch": "Abrir busqueda",
-    "closeSearch": "Cerrar busqueda",
     "myAccount": "Mi cuenta",
-    "wholesale": "Mayorista"
+    "wholesale": "Mayorista",
+    "shop": "Productos",
+    "cart": "Carrito",
+    "primaryNavigation": "Navegación principal",
+    "categoryNavigation": "Categorías de la tienda",
+    "scrollCategoriesBack": "Ver categorías anteriores",
+    "scrollCategoriesForward": "Ver más categorías",
+    "skipToContent": "Saltar al contenido"
   },
   "regionPreferences": {
     "title": "Región e idioma",

@@ -38,10 +38,15 @@
     "allProducts": "All Products",
     "contact": "Contact",
     "viewAllCategory": "View all {category}",
-    "openSearch": "Open search",
-    "closeSearch": "Close search",
     "myAccount": "My Account",
-    "wholesale": "Wholesale"
+    "wholesale": "Wholesale",
+    "shop": "Products",
+    "cart": "Cart",
+    "primaryNavigation": "Primary navigation",
+    "categoryNavigation": "Store categories",
+    "scrollCategoriesBack": "Show previous categories",
+    "scrollCategoriesForward": "Show more categories",
+    "skipToContent": "Skip to content"
   },
   "regionPreferences": {
     "title": "Region and language",

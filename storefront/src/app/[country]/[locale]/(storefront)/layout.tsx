@@ -1,9 +1,11 @@
 import type { Category } from "@spree/sdk";
-import Link from "next/link";
 import { connection } from "next/server";
 import { cache, Suspense } from "react";
+import type { StoreNavCategory } from "@/components/layout/CategoryNav";
+import { CategoryNav } from "@/components/layout/CategoryNav";
 import { Footer, FooterCategoryLinks } from "@/components/layout/Footer";
 import { Header, HeaderMobileMenu } from "@/components/layout/Header";
+import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
 import { fetchStorefrontName } from "@/lib/commerce/storefront";
 import { getCategories } from "@/lib/data/categories";
 
@@ -24,7 +26,20 @@ function MobileNavigationFallback() {
   return (
     <div
       aria-hidden="true"
-      className="size-10 rounded-md bg-gray-100 animate-pulse motion-reduce:animate-none"
+      className="size-10 rounded-md bg-store-surface-muted animate-pulse motion-reduce:animate-none"
+    />
+  );
+}
+
+/**
+ * Reserves the category rail's row so the page below it does not jump when the
+ * categories resolve. It is only rendered where the rail itself is visible.
+ */
+function CategoryNavigationFallback() {
+  return (
+    <div
+      aria-hidden="true"
+      className="hidden h-store-nav border-b border-store-border bg-store-surface md:block"
     />
   );
 }
@@ -32,7 +47,7 @@ function MobileNavigationFallback() {
 function FooterCategoryLinksFallback() {
   return (
     <li aria-hidden="true">
-      <span className="block h-4 w-24 rounded bg-white/10 animate-pulse motion-reduce:animate-none" />
+      <span className="block h-4 w-24 rounded bg-store-border animate-pulse motion-reduce:animate-none" />
     </li>
   );
 }
@@ -61,27 +76,16 @@ const getRootCategories = cache(async (country: string, locale: string) => {
     });
 });
 
-function CategoryLinks({
-  categories,
-  basePath,
-}: {
-  categories: Category[];
-  basePath: string;
-}) {
-  return (
-    <ul>
-      {categories.map((category) => (
-        <li key={category.id}>
-          <Link href={`${basePath}/c/${category.permalink}`}>
-            {category.name}
-          </Link>
-          {category.children && category.children.length > 0 && (
-            <CategoryLinks categories={category.children} basePath={basePath} />
-          )}
-        </li>
-      ))}
-    </ul>
-  );
+/**
+ * Narrows an authoritative category to the fields the rail renders. The rail is
+ * a view over the catalogue, so nothing here may add to or reinterpret it.
+ */
+function toNavCategories(categories: Category[]): StoreNavCategory[] {
+  return categories.map((category) => ({
+    id: String(category.id),
+    name: category.name,
+    permalink: category.permalink,
+  }));
 }
 
 async function StorefrontMobileNavigation({
@@ -103,12 +107,17 @@ async function StorefrontCategoryNavigation({
 }: StorefrontNavigationProps) {
   const rootCategories = await getRootCategories(country, locale);
 
+  // A storefront with no categories yet keeps a clean header instead of an
+  // empty strip advertising a catalogue that has not been built.
   if (rootCategories.length === 0) return null;
 
   return (
-    <nav aria-label="Category navigation" className="sr-only">
-      <CategoryLinks categories={rootCategories} basePath={basePath} />
-    </nav>
+    <div className="hidden md:block">
+      <CategoryNav
+        categories={toNavCategories(rootCategories)}
+        basePath={basePath}
+      />
+    </div>
   );
 }
 
@@ -147,15 +156,19 @@ export default async function StorefrontLayout({
             />
           </Suspense>
         }
+        categoryNavigation={
+          <Suspense fallback={<CategoryNavigationFallback />}>
+            <StorefrontCategoryNavigation
+              basePath={basePath}
+              country={country}
+              locale={locale}
+            />
+          </Suspense>
+        }
       />
-      <Suspense fallback={null}>
-        <StorefrontCategoryNavigation
-          basePath={basePath}
-          country={country}
-          locale={locale}
-        />
-      </Suspense>
-      <main className="flex-1">{children}</main>
+      <main id="main-content" className="flex-1">
+        {children}
+      </main>
       <Footer
         basePath={basePath}
         locale={locale as Locale}
@@ -170,6 +183,12 @@ export default async function StorefrontLayout({
           </Suspense>
         }
       />
+      {/* Keeps the end of the page clear of the fixed bottom navigation. */}
+      <div
+        aria-hidden="true"
+        className="h-[calc(var(--store-bottom-nav-height)+env(safe-area-inset-bottom))] shrink-0 md:hidden"
+      />
+      <MobileBottomNav basePath={basePath} />
     </>
   );
 }

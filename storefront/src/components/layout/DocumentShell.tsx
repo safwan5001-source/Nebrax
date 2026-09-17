@@ -1,7 +1,7 @@
 import { GoogleTagManager } from "@next/third-parties/google";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
-import { Geist } from "next/font/google";
+import { Geist, Tajawal } from "next/font/google";
 import { Suspense } from "react";
 import { localeDirection } from "@/i18n/locales";
 
@@ -19,6 +19,21 @@ const spreeApiOrigin = (() => {
 const geist = Geist({
   variable: "--font-geist",
   subsets: ["latin"],
+  display: "swap",
+});
+
+/**
+ * Arabic is the storefront's default locale, and Geist ships no Arabic glyphs —
+ * without this the primary language rendered in whatever the device happened to
+ * have. Tajawal is the approved AWJ Store default face
+ * (AWJ_STORE_DEFAULT_DESIGN_DIRECTION.md §5). Both faces are declared on every
+ * document and the browser resolves per character, so an Arabic product title
+ * inside an English page (and the reverse) still renders in the right face.
+ */
+const tajawal = Tajawal({
+  variable: "--font-tajawal",
+  subsets: ["arabic"],
+  weight: ["400", "500", "700"],
   display: "swap",
 });
 
@@ -42,7 +57,7 @@ export function DocumentShell({ children, locale }: DocumentShellProps) {
       </head>
       {gtmId && <GoogleTagManager gtmId={gtmId} />}
       <body
-        className={`${geist.variable} antialiased min-h-screen flex flex-col`}
+        className={`${geist.variable} ${tajawal.variable} antialiased min-h-screen flex flex-col`}
       >
         <Suspense fallback={null}>{children}</Suspense>
         <Analytics />

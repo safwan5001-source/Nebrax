@@ -38,10 +38,15 @@
     "allProducts": "Tous les produits",
     "contact": "Contact",
     "viewAllCategory": "Voir tout dans {category}",
-    "openSearch": "Ouvrir la recherche",
-    "closeSearch": "Fermer la recherche",
     "myAccount": "Mon compte",
-    "wholesale": "Vente en gros"
+    "wholesale": "Vente en gros",
+    "shop": "Produits",
+    "cart": "Panier",
+    "primaryNavigation": "Navigation principale",
+    "categoryNavigation": "Catégories de la boutique",
+    "scrollCategoriesBack": "Afficher les catégories précédentes",
+    "scrollCategoriesForward": "Afficher plus de catégories",
+    "skipToContent": "Aller au contenu"
   },
   "regionPreferences": {
     "title": "Région et langue",
