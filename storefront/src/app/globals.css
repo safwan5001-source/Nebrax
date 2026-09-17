@@ -48,6 +48,11 @@
   --color-store-destructive: var(--store-destructive);
   --color-store-success: var(--store-success);
   --color-store-warning: var(--store-warning);
+  --color-store-footer: var(--store-footer);
+  --color-store-footer-foreground: var(--store-footer-foreground);
+  --color-store-footer-muted: var(--store-footer-muted);
+  --color-store-footer-link: var(--store-footer-link);
+  --color-store-footer-border: var(--store-footer-border);
 
   /* Shell metrics. Kept as theme values so shell components never hard-code
      a header/nav height that a sibling component has to guess again. */
@@ -55,6 +60,7 @@
   --spacing-store-header: var(--store-header-height);
   --spacing-store-header-lg: var(--store-header-height-lg);
   --spacing-store-nav: var(--store-nav-height);
+  --spacing-store-utility: var(--store-utility-height);
   --spacing-store-bottom-nav: var(--store-bottom-nav-height);
   --radius-store: var(--store-radius);
   --color-sidebar-ring: var(--sidebar-ring);
@@ -145,15 +151,15 @@
 
 /*
  * One stack, two scripts. Latin glyphs resolve in Geist; Arabic glyphs are not
- * in Geist so the browser falls through per-character to Tajawal — the approved
- * AWJ Store default face (AWJ_STORE_DEFAULT_DESIGN_DIRECTION.md §5). Arabic is
- * the storefront's default locale, so it must not land on a system fallback.
+ * in Geist so the browser falls through per-character to Cairo — the face the
+ * approved Responsive Visual Baseline V1 reference is drawn in. Arabic is the
+ * storefront's default locale, so it must not land on a system fallback.
  *
- * This only works because Geist names Tajawal as its own fallback; read the
+ * This only works because Geist names Cairo as its own fallback; read the
  * rationale in DocumentShell.tsx before reordering this stack.
  */
 body {
-  font-family: var(--font-geist), var(--font-tajawal), system-ui, sans-serif;
+  font-family: var(--font-geist), var(--font-cairo), system-ui, sans-serif;
   font-weight: 400;
 }
 
@@ -248,48 +254,71 @@ input[type="search"]::-webkit-search-cancel-button {
    * approved `AWJ Modern` default presentation, not a merchant setting.
    */
 
+  /*
+   * Values are the approved reference's literal hex, not a conversion of them.
+   * A perceptual re-encoding would drift a shade or two from what the product
+   * owner signed off, and this palette is the thing under review.
+   */
+
   /* Surfaces & text */
-  --store-background: oklch(0.977 0.002 160);
-  --store-surface: oklch(1 0 0);
-  --store-surface-muted: oklch(0.955 0.004 160);
-  --store-foreground: oklch(0.205 0.006 160);
-  --store-muted: oklch(0.955 0.003 160);
-  /* 5.49:1 on --store-surface — safe for secondary copy and icon-only actions. */
-  --store-muted-foreground: oklch(0.52 0.008 160);
-  --store-border: oklch(0.915 0.004 160);
-  --store-border-strong: oklch(0.855 0.005 160);
+  --store-background: #f8f9fa;
+  --store-surface: #ffffff;
+  --store-surface-muted: #f3f4f6;
+  --store-foreground: #111827;
+  --store-muted: #f3f4f6;
+  /*
+   * One step darker than the reference's #6b7280, which measures 4.39:1 on
+   * --store-surface-muted — under AA for the category rail and the utility bar,
+   * both of which sit on that surface. This reads identically and clears 4.94:1
+   * there, 5.44:1 on white.
+   */
+  --store-muted-foreground: #636a78;
+  --store-border: #e5e7eb;
+  --store-border-strong: #d1d5db;
 
-  /* Primary ramp (AWJ Modern green) */
-  --store-primary-50: oklch(0.972 0.016 162);
-  --store-primary-100: oklch(0.945 0.032 162);
-  --store-primary-200: oklch(0.893 0.055 162);
-  --store-primary-300: oklch(0.815 0.08 162);
-  --store-primary-400: oklch(0.706 0.1 162);
-  --store-primary-500: oklch(0.606 0.11 162);
-  --store-primary-600: oklch(0.52 0.105 162);
-  --store-primary-700: oklch(0.45 0.095 162);
-  --store-primary-800: oklch(0.385 0.08 162);
-  --store-primary-900: oklch(0.325 0.066 162);
-  --store-primary-950: oklch(0.235 0.048 162);
+  /* Primary ramp, built around the reference's #12372A */
+  --store-primary-50: #ebf3ee;
+  --store-primary-100: #d3e5da;
+  --store-primary-200: #a9cbb7;
+  --store-primary-300: #77ac90;
+  --store-primary-400: #4a8a6b;
+  --store-primary-500: #2a6a50;
+  --store-primary-600: #12372a;
+  --store-primary-700: #0f2e23;
+  --store-primary-800: #0b241c;
+  --store-primary-900: #071810;
+  --store-primary-950: #040e0a;
 
-  /* 5.22:1 against --store-primary-foreground — AA for button and badge labels. */
+  /* 13.08:1 against --store-primary-foreground. */
   --store-primary: var(--store-primary-600);
-  --store-primary-hover: var(--store-primary-700);
-  --store-primary-foreground: oklch(1 0 0);
+  --store-primary-hover: var(--store-primary-800);
+  --store-primary-foreground: #ffffff;
   --store-primary-soft: var(--store-primary-50);
 
   /* Status */
-  --store-destructive: oklch(0.58 0.2 27);
-  --store-success: oklch(0.55 0.13 150);
-  --store-warning: oklch(0.68 0.14 70);
+  --store-destructive: #dc2626;
+  --store-success: #059669;
+  --store-warning: #d97706;
+
+  /*
+   * Footer surface. The approved footer is a dark band closing the page, so it
+   * cannot be expressed with the light surface tokens; these are shell concepts
+   * the Customizer can retheme alongside the rest.
+   */
+  --store-footer: #111827;
+  --store-footer-foreground: #ffffff;
+  --store-footer-muted: #9ca3af;
+  --store-footer-link: #d1d5db;
+  --store-footer-border: #1f2937;
 
   /* Shell metrics */
-  --store-content-max: 80rem;
-  --store-radius: 0.625rem;
-  --store-header-height: 3.5rem;
-  --store-header-height-lg: 4.5rem;
-  --store-nav-height: 2.75rem;
-  --store-bottom-nav-height: 3.5rem;
+  --store-content-max: 85rem;
+  --store-radius: 0.75rem;
+  --store-header-height: 3.375rem;
+  --store-header-height-lg: 4.25rem;
+  --store-utility-height: 2rem;
+  --store-nav-height: 2.5rem;
+  --store-bottom-nav-height: 3.75rem;
   --store-focus-ring: var(--store-foreground);
 
   /*

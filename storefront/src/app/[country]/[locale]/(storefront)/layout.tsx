@@ -39,7 +39,7 @@ function CategoryNavigationFallback() {
   return (
     <div
       aria-hidden="true"
-      className="hidden h-store-nav border-b border-store-border bg-store-surface md:block"
+      className="hidden h-store-nav border-b border-store-border bg-store-surface-muted md:block"
     />
   );
 }
@@ -47,7 +47,7 @@ function CategoryNavigationFallback() {
 function FooterCategoryLinksFallback() {
   return (
     <li aria-hidden="true">
-      <span className="block h-4 w-24 rounded bg-store-border animate-pulse motion-reduce:animate-none" />
+      <span className="block h-4 w-24 rounded bg-store-footer-border animate-pulse motion-reduce:animate-none" />
     </li>
   );
 }

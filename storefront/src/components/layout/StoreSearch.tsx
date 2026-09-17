@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 
 /**
@@ -29,12 +30,24 @@ const SearchBar = dynamic(
 interface StoreSearchProps {
   basePath: string;
   className?: string;
+  /** The submit control only fits where the field has room for it. */
+  withSubmit?: boolean;
 }
 
-export function StoreSearch({ basePath, className }: StoreSearchProps) {
+export function StoreSearch({
+  basePath,
+  className,
+  withSubmit,
+}: StoreSearchProps) {
+  const t = useTranslations("header");
+
   return (
     <div className={cn("w-full", className)}>
-      <SearchBar basePath={basePath} />
+      <SearchBar
+        basePath={basePath}
+        className="h-11 rounded-store border-store-border bg-store-surface-muted"
+        submitLabel={withSubmit ? t("submitSearch") : undefined}
+      />
     </div>
   );
 }

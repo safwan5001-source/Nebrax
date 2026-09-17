@@ -3,6 +3,7 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { getTranslations } from "next-intl/server";
 import type { ReactNode } from "react";
+import { StoreBrand } from "@/components/layout/StoreBrand";
 import { StoreContainer } from "@/components/layout/StoreContainer";
 import { POLICY_LINKS } from "@/lib/constants/policies";
 import { isWholesaleEnabled } from "@/lib/spree";
@@ -19,8 +20,12 @@ interface FooterCategoryLinksProps {
   basePath: string;
 }
 
+/*
+ * The global focus ring is a black outline, which is invisible on this band, so
+ * the footer states its own.
+ */
 const footerLinkClassName =
-  "text-sm text-store-muted-foreground transition-colors hover:text-store-foreground";
+  "text-sm text-store-footer-link transition-colors hover:text-store-footer-foreground focus-visible:outline-store-footer-foreground";
 
 /**
  * How many categories the footer lists. A catalogue with forty root categories
@@ -55,7 +60,7 @@ interface FooterColumnProps {
 function FooterColumn({ id, title, children }: FooterColumnProps) {
   return (
     <nav aria-labelledby={id}>
-      <h2 id={id} className="text-sm font-semibold text-store-foreground">
+      <h2 id={id} className="text-sm font-bold text-store-footer-foreground">
         {title}
       </h2>
       <ul className="mt-4 space-y-2.5">{children}</ul>
@@ -66,11 +71,13 @@ function FooterColumn({ id, title, children }: FooterColumnProps) {
 /**
  * The storefront footer.
  *
+ * A dark band closing the page, as the approved baseline draws it.
+ *
  * It carries only navigation the storefront actually has — categories from the
- * catalogue, the account routes, and the configured policy pages. There are no
- * service promises, payment marks, social accounts or contact details here,
- * because none of those are configured anywhere in AWJ yet and a footer is
- * exactly where an invented claim reads as a commitment.
+ * catalogue, the account routes, and the configured policy pages. The
+ * reference's about paragraph, payment marks and registration badge are absent:
+ * none of them are configured anywhere in AWJ, and a footer is exactly where an
+ * invented claim reads as a commitment.
  */
 export async function Footer({
   basePath,
@@ -86,9 +93,22 @@ export async function Footer({
   const year = new Date().getFullYear();
 
   return (
-    <footer className="border-t border-store-border bg-store-surface-muted">
+    <footer className="bg-store-footer text-store-footer-link">
       <StoreContainer className="py-10 md:py-12">
-        <div className="grid grid-cols-2 gap-x-6 gap-y-8 sm:grid-cols-3">
+        {/*
+          Four even columns, not the reference's five: its fifth column is an
+          about paragraph and payment marks, neither of which AWJ configures
+          anywhere, and a stretched brand column reads as an empty gap.
+        */}
+        <div className="grid grid-cols-2 gap-x-6 gap-y-8 sm:grid-cols-4">
+          <div className="col-span-2 sm:col-span-1">
+            <StoreBrand
+              href={basePath || "/"}
+              name={displayName}
+              tone="dark"
+              className="focus-visible:outline-store-footer-foreground"
+            />
+          </div>
           <FooterColumn id="footer-shop" title={t("shop")}>
             <li>
               <Link
@@ -150,15 +170,9 @@ export async function Footer({
         </div>
       </StoreContainer>
 
-      <div className="border-t border-store-border">
-        <StoreContainer className="flex flex-col gap-1 py-5 sm:flex-row sm:items-center sm:justify-between">
-          <Link
-            href={basePath || "/"}
-            className="w-fit text-base font-semibold text-store-foreground"
-          >
-            <bdi>{displayName}</bdi>
-          </Link>
-          <p className="text-xs text-store-muted-foreground">
+      <div className="border-t border-store-footer-border">
+        <StoreContainer className="py-5">
+          <p className="text-xs text-store-footer-muted">
             © {year} <bdi>{displayName}</bdi>
           </p>
         </StoreContainer>

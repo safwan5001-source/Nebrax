@@ -5,9 +5,11 @@ import { Search } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useCallback, useRef, useState } from "react";
+import { storeContainerClassName } from "@/components/layout/StoreContainer";
 import {
   InputGroup,
   InputGroupAddon,
+  InputGroupButton,
   InputGroupInput,
 } from "@/components/ui/input-group";
 import { ProductImage } from "@/components/ui/product-image";
@@ -19,9 +21,23 @@ interface SearchBarProps {
   basePath: string;
   autoFocus?: boolean;
   onNavigate?: () => void;
+  /** Field styling supplied by the shell, so the field matches its band. */
+  className?: string;
+  /**
+   * Renders a submit control inside the field. The shell passes it where the
+   * field is wide enough to carry one; the form already submits on Enter, so
+   * this adds an affordance, not a behaviour.
+   */
+  submitLabel?: string;
 }
 
-export function SearchBar({ basePath, autoFocus, onNavigate }: SearchBarProps) {
+export function SearchBar({
+  basePath,
+  autoFocus,
+  onNavigate,
+  className,
+  submitLabel,
+}: SearchBarProps) {
   const router = useRouter();
   const { currency } = useStore();
   const t = useTranslations("products");
@@ -158,7 +174,7 @@ export function SearchBar({ basePath, autoFocus, onNavigate }: SearchBarProps) {
   return (
     <div className="relative">
       <form onSubmit={handleSubmit}>
-        <InputGroup>
+        <InputGroup className={className}>
           <InputGroupInput
             ref={inputRef}
             type="search"
@@ -181,6 +197,18 @@ export function SearchBar({ basePath, autoFocus, onNavigate }: SearchBarProps) {
           <InputGroupAddon>
             <Search />
           </InputGroupAddon>
+          {submitLabel && (
+            <InputGroupAddon align="inline-end">
+              <InputGroupButton
+                type="submit"
+                variant="default"
+                size="sm"
+                className="h-8 rounded-store bg-store-primary px-4 font-semibold text-store-primary-foreground hover:bg-store-primary-hover"
+              >
+                {submitLabel}
+              </InputGroupButton>
+            </InputGroupAddon>
+          )}
         </InputGroup>
       </form>
 
@@ -190,7 +218,7 @@ export function SearchBar({ basePath, autoFocus, onNavigate }: SearchBarProps) {
           className="fixed left-0 right-0 mt-1 bg-white border-b border-gray-200 z-50"
           onMouseDown={handleSuggestionsMouseDown}
         >
-          <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+          <div className={storeContainerClassName}>
             {loading ? (
               <div className="p-4 text-center text-gray-500 text-sm">
                 {t("searching")}

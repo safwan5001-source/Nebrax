@@ -46,7 +46,8 @@
     "categoryNavigation": "تصنيفات المتجر",
     "scrollCategoriesBack": "عرض التصنيفات السابقة",
     "scrollCategoriesForward": "عرض المزيد من التصنيفات",
-    "skipToContent": "تخطي إلى المحتوى"
+    "skipToContent": "تخطي إلى المحتوى",
+    "submitSearch": "بحث"
   },
   "regionPreferences": {
     "title": "المنطقة واللغة",

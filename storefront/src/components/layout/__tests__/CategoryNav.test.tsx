@@ -80,11 +80,12 @@ describe("CategoryNav", () => {
     pathname = "/us/en/c/electronics/phones";
     render(<CategoryNav categories={CATEGORIES} basePath="/us/en" />);
 
-    expect(screen.getByRole("link", { name: "Electronics" })).toHaveClass(
-      "after:opacity-100",
+    expect(screen.getByRole("link", { name: "Electronics" })).toHaveAttribute(
+      "aria-current",
+      "page",
     );
-    expect(screen.getByRole("link", { name: "Home" })).not.toHaveClass(
-      "after:opacity-100",
+    expect(screen.getByRole("link", { name: "Home" })).not.toHaveAttribute(
+      "aria-current",
     );
   });
 

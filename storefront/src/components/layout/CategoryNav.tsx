@@ -29,10 +29,10 @@ interface CategoryNavProps {
 const PAGE_RATIO = 0.8;
 
 const itemClassName =
-  "relative inline-flex h-store-nav shrink-0 items-center whitespace-nowrap px-3 text-sm text-store-muted-foreground transition-colors hover:text-store-foreground after:absolute after:inset-x-3 after:bottom-0 after:h-0.5 after:bg-store-primary after:opacity-0 after:transition-opacity";
+  "inline-flex shrink-0 items-center whitespace-nowrap rounded-store px-3.5 py-1.5 text-sm font-medium text-store-muted-foreground transition-colors hover:bg-store-border/50 hover:text-store-foreground";
 
 const activeItemClassName =
-  "font-medium text-store-foreground after:opacity-100";
+  "bg-store-primary-soft font-bold text-store-primary hover:bg-store-primary-soft";
 
 export function CategoryNav({ categories, basePath }: CategoryNavProps) {
   const t = useTranslations("header");
@@ -81,7 +81,7 @@ export function CategoryNav({ categories, basePath }: CategoryNavProps) {
   return (
     <nav
       aria-label={t("categoryNavigation")}
-      className="border-b border-store-border bg-store-surface"
+      className="border-b border-store-border bg-store-surface-muted"
     >
       <div className={cn(storeContainerClassName, "relative")}>
         {/* The rail is pulled into the gutter so the first label lines up with
@@ -89,10 +89,11 @@ export function CategoryNav({ categories, basePath }: CategoryNavProps) {
         <div
           ref={railRef}
           onScroll={measure}
-          className="store-rail -mx-3 flex items-stretch"
+          className="store-rail -mx-3.5 flex h-store-nav items-center gap-0.5"
         >
           <Link
             href={allProductsHref}
+            aria-current={isActive(allProductsHref) ? "page" : undefined}
             className={cn(
               itemClassName,
               isActive(allProductsHref) && activeItemClassName,
@@ -106,6 +107,7 @@ export function CategoryNav({ categories, basePath }: CategoryNavProps) {
               <Link
                 key={category.id}
                 href={href}
+                aria-current={isActive(href) ? "page" : undefined}
                 className={cn(
                   itemClassName,
                   isActive(href) && activeItemClassName,
@@ -160,7 +162,7 @@ function PagingControl({
   return (
     <div
       className={cn(
-        "pointer-events-none absolute inset-y-0 flex items-center from-store-surface from-65% to-transparent",
+        "pointer-events-none absolute inset-y-0 flex items-center from-store-surface-muted from-65% to-transparent",
         pointsToStart
           ? "start-0 ps-4 pe-10 sm:ps-6 lg:ps-8 bg-linear-to-r rtl:bg-linear-to-l"
           : "end-0 pe-4 ps-10 sm:pe-6 lg:pe-8 bg-linear-to-l rtl:bg-linear-to-r",
@@ -170,7 +172,7 @@ function PagingControl({
         type="button"
         onClick={onClick}
         aria-label={label}
-        className="pointer-events-auto inline-flex size-8 items-center justify-center rounded-full border border-store-border bg-store-surface text-store-muted-foreground transition-colors hover:border-store-border-strong hover:text-store-foreground"
+        className="pointer-events-auto inline-flex size-8 items-center justify-center rounded-full border border-store-border bg-store-surface text-store-muted-foreground shadow-xs transition-colors hover:border-store-border-strong hover:text-store-foreground"
       >
         <Icon className="size-4" aria-hidden="true" />
       </button>

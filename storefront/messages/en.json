@@ -46,7 +46,8 @@
     "categoryNavigation": "Store categories",
     "scrollCategoriesBack": "Show previous categories",
     "scrollCategoriesForward": "Show more categories",
-    "skipToContent": "Skip to content"
+    "skipToContent": "Skip to content",
+    "submitSearch": "Search"
   },
   "regionPreferences": {
     "title": "Region and language",

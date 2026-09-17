@@ -46,7 +46,8 @@
     "categoryNavigation": "Shop-Kategorien",
     "scrollCategoriesBack": "Vorherige Kategorien anzeigen",
     "scrollCategoriesForward": "Weitere Kategorien anzeigen",
-    "skipToContent": "Zum Inhalt springen"
+    "skipToContent": "Zum Inhalt springen",
+    "submitSearch": "Suchen"
   },
   "regionPreferences": {
     "title": "Region und Sprache",

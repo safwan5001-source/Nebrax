@@ -84,10 +84,10 @@ export function MobileBottomNav({ basePath }: MobileBottomNavProps) {
                 href={item.href}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "flex h-store-bottom-nav flex-col items-center justify-center gap-1 px-1 text-[0.6875rem] leading-none transition-colors",
+                  "flex h-store-bottom-nav flex-col items-center justify-center gap-1.5 px-1 text-[0.625rem] leading-none transition-colors",
                   active
-                    ? "font-medium text-store-primary"
-                    : "text-store-muted-foreground",
+                    ? "font-bold text-store-primary"
+                    : "font-medium text-store-muted-foreground",
                 )}
               >
                 <span className="relative">

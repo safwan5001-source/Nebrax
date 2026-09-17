@@ -46,7 +46,8 @@
     "categoryNavigation": "Catégories de la boutique",
     "scrollCategoriesBack": "Afficher les catégories précédentes",
     "scrollCategoriesForward": "Afficher plus de catégories",
-    "skipToContent": "Aller au contenu"
+    "skipToContent": "Aller au contenu",
+    "submitSearch": "Rechercher"
   },
   "regionPreferences": {
     "title": "Région et langue",
