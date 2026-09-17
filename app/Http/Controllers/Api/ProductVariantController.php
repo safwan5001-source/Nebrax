@@ -60,7 +60,7 @@ class ProductVariantController extends ApiController
         $product = Product::findOrFail($id);
 
         return ProductOptionResource::collection(
-            $product->options()->with('values')->get()
+            $product->options()->with('values.imageMedia')->get()
         )->response();
     }
 
@@ -69,7 +69,7 @@ class ProductVariantController extends ApiController
         $product = Product::findOrFail($id);
         $option = $this->domain(fn () => $this->variants->createOption($product, $request->validated(), $request->user()?->id));
 
-        return (new ProductOptionResource($option->fresh('values')))->response()->setStatusCode(201);
+        return (new ProductOptionResource($option->fresh('values.imageMedia')))->response()->setStatusCode(201);
     }
 
     public function updateOption(UpdateProductOptionRequest $request, string $id, string $optionId): JsonResponse
@@ -77,7 +77,7 @@ class ProductVariantController extends ApiController
         $option = $this->resolveOption($id, $optionId);
         $option = $this->domain(fn () => $this->variants->updateOption($option, $request->validated(), $request->user()?->id));
 
-        return (new ProductOptionResource($option->fresh('values')))->response();
+        return (new ProductOptionResource($option->fresh('values.imageMedia')))->response();
     }
 
     public function destroyOption(Request $request, string $id, string $optionId): JsonResponse
@@ -95,7 +95,7 @@ class ProductVariantController extends ApiController
         $option = $this->resolveOption($id, $optionId);
         $value = $this->domain(fn () => $this->variants->addOptionValue($option, $request->validated(), $request->user()?->id));
 
-        return (new ProductOptionValueResource($value))->response()->setStatusCode(201);
+        return (new ProductOptionValueResource($value->fresh('imageMedia')))->response()->setStatusCode(201);
     }
 
     public function updateOptionValue(UpdateProductOptionValueRequest $request, string $id, string $optionId, string $valueId): JsonResponse
@@ -103,7 +103,7 @@ class ProductVariantController extends ApiController
         $value = $this->resolveOptionValue($id, $optionId, $valueId);
         $value = $this->domain(fn () => $this->variants->updateOptionValue($value, $request->validated(), $request->user()?->id));
 
-        return (new ProductOptionValueResource($value))->response();
+        return (new ProductOptionValueResource($value->fresh('imageMedia')))->response();
     }
 
     public function destroyOptionValue(Request $request, string $id, string $optionId, string $valueId): JsonResponse
