@@ -4,13 +4,19 @@
 **Date:** 2026-09-17
 **Repository:** safwan5001-source/Nebrax
 **Authorities:** `docs/plans/store/AWJ_STOREFRONT_RESPONSIVE_BASELINE_V1.md` (LOCKED),
-`docs/plans/store/AWJ_STOREFRONT_DESIGN_SYSTEM.md`
+`docs/plans/store/AWJ_STOREFRONT_DESIGN_SYSTEM.md`, and the product owner's
+approved *Responsive Visual Baseline V1 — Final Candidate* reference
+
+> Regenerated from the final head. Earlier revisions of this file described the
+> state at `d0f63f3`, before the design-fidelity pass and the review rounds that
+> followed; every section below reflects the head named in §2.
 
 ---
 
 ## 1. Status
 
-**Completed** — implemented, validated, pushed, PR open and unmerged.
+**Completed** — implemented, refined against the approved visual reference,
+reviewed, validated, and pushed.
 
 Not merged. Not deployed. Auto-merge not enabled. Waiting on product-owner
 visual review.
@@ -26,24 +32,36 @@ visual review.
 - **Base SHA:** `0beee2374396c338e5a211b0fddbe87b989be6bd`
   Verified as the current `main` after `git fetch origin main`, and identical to
   PR #854's merge SHA.
-- **Head SHA:** `d0f63f3529c4074dc08e62d10faf263f067dbfe9`
-  (`35d7aeb` shell implementation → `28cff77` this report → `d0f63f3` review fixes)
-- **Diff:** 23 files, confined to `storefront/` plus this report.
+- **Head SHA:** `0b13bef0e9d990bb77126731a4ad51022ecf9e19`
+- **Diff against base:** 28 files, +1947 / −371. All of it under `storefront/`
+  except this report.
+
+| Commit | What it did |
+| --- | --- |
+| `35d7aeb` | The shell: tokens, header, real category rail, bottom navigation, footer, RTL/LTR |
+| `28cff77` | First revision of this report |
+| `d0f63f3` | Codex round 1 — Arabic face unreachable; category routes lost the bottom-nav selection |
+| `9e35199` | Recorded round 1 in this report |
+| `83d4ff7` | Design-fidelity pass against the approved final-candidate reference |
+| `89e3a86` | Codex round 2 — skip-link target behind the header; two search instances |
+| `dde154b` | Product-owner visual corrections (brand, title, density, rail, footer) |
+| `0b13bef` | Codex round 3 — category rail collapsed its own reserved row |
 
 ---
 
 ## 3. Existing architecture reused
 
-Nothing was rebuilt from the Stitch prototype. The existing `storefront/`
-Next.js app and its AWJ commerce seams are the foundation.
+Nothing was rebuilt from a prototype. The existing `storefront/` Next.js app and
+its AWJ commerce seams are the foundation.
 
 | Seam | How it was used |
 | --- | --- |
-| `(storefront)/layout.tsx` | Its request-cached `getRootCategories`, its `connection()` deferral and its Suspense boundaries are kept verbatim. The shell renders the categories the layout already fetched — one fetch, one taxonomy, no second catalogue. |
+| `(storefront)/layout.tsx` | Its request-cached `getRootCategories`, its `connection()` deferral and its Suspense boundaries are kept. The shell renders the categories the layout already fetched — one fetch, one taxonomy, no second catalogue. |
 | `Header`, `Footer`, `CartButton`, `MobileMenu`, `RegionPreferences`, `DocumentShell` | Adapted in place rather than replaced. |
 | `SearchToggle.tsx` | Renamed to `StoreSearch.tsx`; git records it as a rename. It was imported only by `Header`. |
-| `SearchBar`, `CartContext`, `POLICY_LINKS`, `isWholesaleEnabled`, `localeDirection` | Consumed unchanged. |
-| `next-intl`, `next-themes`, `next/font/google`, Tailwind v4, shadcn-style UI | Existing stack; no dependency added or upgraded. |
+| `SearchBar` | Extended with two optional props (field `className`, an optional submit control). Its only consumer is `StoreSearch`. |
+| `CartContext`, `POLICY_LINKS`, `isWholesaleEnabled`, `localeDirection` | Consumed unchanged. |
+| `next-intl`, `next-themes`, `next/font/google`, Tailwind v4, shadcn-style UI | Existing stack; **no dependency added or upgraded**. |
 
 Category data still comes from `getCategories` → `fetchCategories` →
 `storefrontFetch("categories")`, i.e. the AWJ `store/v1` catalogue. The shell
@@ -57,217 +75,259 @@ nothing to it.
 ### 4.1 Store Theme Token foundation
 
 A semantic `--store-*` layer in `globals.css` is the single presentation seam a
-later Store Customizer can override without touching a component:
+later Store Customizer can override without touching a component. Values are the
+approved reference's **literal hex**, not a perceptual re-encoding of them, so
+nothing drifts from what was signed off.
 
-- **Surfaces / text:** `background`, `surface`, `surface-muted`, `foreground`,
-  `muted`, `muted-foreground`, `border`, `border-strong`.
-- **Primary:** an 11-step AWJ Modern green ramp plus `primary`,
-  `primary-hover`, `primary-foreground`, `primary-soft`.
-- **Status:** `destructive`, `success`, `warning`.
-- **Shell metrics:** `content-max`, `radius`, `header-height`,
-  `header-height-lg`, `nav-height`, `bottom-nav-height`, `focus-ring`.
+- **Surfaces / text:** `background` `#f8f9fa`, `surface` `#ffffff`,
+  `surface-muted` `#f3f4f6`, `foreground` `#111827`, `muted-foreground`
+  `#636a78`, `border` `#e5e7eb`, `border-strong` `#d1d5db`.
+- **Primary:** an 11-step ramp built around the reference's `#12372a`, plus
+  `primary`, `primary-hover`, `primary-foreground`, `primary-soft`.
+- **Status:** `destructive` `#dc2626`, `success` `#059669`, `warning` `#d97706`.
+- **Footer band:** `footer`, `footer-foreground`, `footer-muted`, `footer-link`,
+  `footer-border` — the approved footer is dark and cannot be expressed with the
+  light surface tokens.
+- **Shell metrics:** `content-max` `85rem`, `radius` `0.75rem`, `header-height`
+  `3.375rem`, `header-height-lg` `4rem`, `utility-height` `1.75rem`,
+  `nav-height` `2.375rem`, `bottom-nav-height` `3.75rem`, `focus-ring`, and
+  `header-offset` (§4.9).
 
 These are exposed as Tailwind utilities (`bg-store-surface`,
-`text-store-muted-foreground`, `max-w-store`, `h-store-nav`, …), and the
-existing shadcn aliases (`--primary`, `--background`, `--border`, `--ring`,
-`--radius`) plus the `primary-50..950` ramp now resolve to them.
+`text-store-muted-foreground`, `max-w-store`, `h-store-nav`, …), and the existing
+shadcn aliases (`--primary`, `--background`, `--border`, `--ring`, `--radius`)
+plus the `primary-50..950` ramp resolve to them.
 
-`--store-radius` keeps the repository's existing `0.625rem`, so no component's
-corner radius changes.
+**One deliberate deviation from the reference:** `--store-muted-foreground` is
+one step darker than its `#6b7280`, which measures 4.39:1 on
+`--store-surface-muted` — under AA for the category rail and the utility strip,
+both of which sit on that surface. The value used reads the same and clears
+4.94:1 there and 5.44:1 on white.
 
 ### 4.2 Header
 
-Sticky banner whose composition changes twice rather than once:
+A sticky banner, 133px on desktop and 113px on a phone.
 
-- **< md:** 56px identity row (menu, brand, cart) + a dedicated full-width
-  search row; categories live in the drawer.
-- **≥ md:** search moves inline into the row (72px), the category rail appears,
-  the account action surfaces.
-- **≥ lg:** the drawer retires; region and wholesale controls surface in the row.
+- **≥ md:** three bands matching the reference's desktop anatomy — a 28px
+  utility strip carrying region, language and currency; a 64px identity row with
+  the wordmark, search and the shopper actions; a 38px category rail.
+- **< md:** the utility strip and the rail fold away. The identity row compacts
+  to 54px with the wordmark centred between the menu and the cart, and search
+  wraps onto a second line of the same band.
+- **≥ lg:** the drawer retires and the wholesale link surfaces in the row.
 
-Adds a skip link to `#main-content`.
+The identity band is **one grid**, not two stacked rows, so a single search
+instance moves between placements (§11, round 2).
 
-### 4.3 Category navigation
+Two actions in the reference are deliberately absent: wishlist has no
+persistence behind it, and the header cart total has no field on the cart
+context — `CartContext` exposes `itemCount` only.
+
+### 4.3 Store identity
+
+Purely typographic: the merchant's name set in Cairo 800 in the brand colour,
+white on the footer band. AWJ gives the storefront a name and no logo asset; an
+earlier revision generated a monogram tile from the initial, which the product
+owner read — correctly — as a placeholder, because it presents as branding the
+merchant never chose. When the Customizer can supply a logo it replaces this
+without the surrounding layout moving.
+
+### 4.4 Category navigation
 
 `CategoryNav` replaces the previous `sr-only` list with the visible rail:
 
-- Built from the same authoritative categories; renders "All products" plus the
+- Built from the same authoritative categories; renders "all products" plus the
   root categories.
 - Pages horizontally when the categories overrun the width. Controls appear only
   on measured overflow, via a `ResizeObserver` that also observes the items so
   the Arabic webfont swap re-triggers the measurement.
-- Marks the open category, including when a child permalink is active.
-- No categories → no rail, instead of an empty strip.
+- Marks the open category with both styling and `aria-current`, including when a
+  child permalink is active.
+- Inactive items are plain text; only the open category takes a surface, at a
+  tighter radius than the shell's buttons so it reads as a selected tab rather
+  than a row of controls.
+- **Renders for every outcome, including an empty or failed category response**,
+  so the row reserved by the fallback is never dropped (§11, round 3).
 
-### 4.4 Mobile bottom navigation
+### 4.5 Mobile bottom navigation
 
 `MobileBottomNav` — Home / Products / Cart / Account, every one an existing
-storefront route. Cart badge withheld until hydration. `safe-area-inset-bottom`
-padding, plus a spacer element in the layout so no page content sits beneath it.
+storefront route, 60px with `safe-area-inset-bottom` padding and a spacer in the
+layout so no page content sits beneath it. Cart badge withheld until hydration.
+Shop owns the `/c` subtree as well as `/products`, so the bar keeps its
+selection throughout category browsing.
 
-**No wishlist entry:** the storefront has no wishlist persistence, and a dead
-tab would imply a capability the platform does not have.
+**No wishlist entry:** the storefront has no wishlist persistence, and a dead tab
+would imply a capability the platform does not have.
 
-### 4.5 Shared content container
+### 4.6 Shared content container
 
 `StoreContainer` encodes the storefront's one measure
-(`max-w-store px-4 sm:px-6 lg:px-8`) and is used by every shell region — header
-rows, rail, footer — so brand, search, first category and first footer column
-share one vertical line. The 27 existing page-level `container mx-auto` usages
-were deliberately left alone as out-of-scope churn; `--store-content-max` is set
-to `80rem`, which matches their current effective bound.
+(`max-w-store px-4 sm:px-6 lg:px-8`, 1360px) and is used by every shell region —
+header bands, rail, footer, bottom navigation — so the wordmark, the search
+field, the first category and the first footer column share one vertical line.
+The 27 existing page-level `container mx-auto` usages were deliberately left
+alone as out-of-scope churn.
 
-### 4.6 Footer
+### 4.7 Footer
 
-Recomposed onto the store surface: three balanced link columns with labelled
-`nav` landmarks, and a bottom identity bar. Category links capped at
+A dark band closing the page, as the approved reference draws it. Identity takes
+its own full-width line as the band's masthead, with a hairline beneath it, and
+three link groups divide the width evenly below. Category links are capped at
 `FOOTER_CATEGORY_LIMIT = 6`.
 
-It still carries only real navigation. No service promises, payment marks,
-social accounts, contact details, guarantees or regulatory badges were added.
+It carries only navigation the storefront actually has. The reference's about
+paragraph, payment marks and registration badge are absent: AWJ configures none
+of them, and a footer is exactly where an invented claim reads as a commitment.
 
-### 4.7 RTL / LTR
+### 4.8 RTL / LTR
 
-Logical properties throughout (`ms-`/`me-`, `ps-`/`pe-`, `start-`/`end-`).
-The cart badge moved from a physical `right-0` to `end-0`. Paging chevrons
-follow reading direction. The merchant name is isolated with `<bdi>` in the
-header and footer so an Arabic store name inside an English page — and the
-reverse — keeps its surrounding characters in page order.
+Logical properties throughout (`ms-`/`me-`, `ps-`/`pe-`, `start-`/`end-`); the
+mobile wordmark is centred with a grid rather than absolute offsets, so it
+mirrors for free. The cart badge moved from a physical `right-0` to `end-0`.
+Paging chevrons follow reading direction. The merchant name is isolated with
+`<bdi>` in the header and footer so an Arabic name inside an English page — and
+the reverse — keeps its surrounding characters in page order.
 
-### 4.8 Typography
+### 4.9 Typography
 
-Tajawal is declared alongside Geist on every document. Arabic is the
-storefront's default locale and Geist ships no Arabic glyphs, so the primary
-language was rendering in whatever face the device happened to have. One font
-stack serves both scripts because the browser resolves per character.
+Cairo is declared alongside Geist on every document, and Geist names it as its
+own fallback so Arabic glyphs actually reach it (§11, round 1). Arabic is the
+storefront's default locale; the weight hierarchy of the approved reference
+depends on Cairo's heavy cuts. Both faces arrive through the existing
+`next/font/google` seam — no new package. Cairo was approved by the product
+owner for Responsive Baseline V1.
 
-Tajawal is the approved AWJ Store default face
-(`AWJ_STORE_DEFAULT_DESIGN_DIRECTION.md` §5) and arrives through the existing
-`next/font/google` seam — **no new package**.
+Every locale bundle used to wrap the authoritative store name in a generic word
+— `"متجر {storeName}"` in Arabic, `"{storeName} Storefront"` in the other five.
+For a store already called *متجر نبراس الطموح* that rendered the word twice.
+`home.welcome` now presents the name alone, in all six bundles; no component and
+no merchant data was touched.
 
-### 4.9 Accessibility
+### 4.10 Accessibility
 
-Skip link, labelled `nav` landmarks, `aria-current="page"` on the active
-bottom-nav item, accessible names on every icon-only action and on the paging
-controls, `outline-offset` added to the global focus ring, and reduced-motion
-handling on the rail's smooth scrolling.
+Skip link to `#main-content`, with `scroll-margin-top` derived from the band
+metrics so the landing clears the sticky banner. Labelled `nav` landmarks,
+`aria-current="page"` on the active bottom-nav item and the open category,
+accessible names on every icon-only action and on the paging controls, a focus
+indicator on the utility trigger, a footer band that states its own focus ring
+because the global black outline is invisible on it, and reduced-motion handling
+on the rail's smooth scrolling.
 
 ---
 
 ## 5. Design decisions
 
 **Aliasing `--primary` to the store token rather than scattering green.**
-The instruction forbids spreading the prototype's green through components. The
-alternative to aliasing was green shell chrome sitting on a neutral catalogue —
-two palettes, and in `CheckoutPageContent` a literally green button with a blue
-`hover:bg-primary-700`. Pointing the existing aliases and the ramp at one token
-gives the whole surface a single source of truth with zero component churn, and
-leaves the Customizer one property to override.
+Scoping the palette to shell components only would have left green chrome above
+a differently-coloured catalogue — and in `CheckoutPageContent` a green button
+with a blue `hover:bg-primary-700`. See §6 for the scope audit.
 
-**The whole banner sticks, not an inner row.**
-The first build made only the identity row sticky so search and the rail would
-scroll away. Visual QA showed it vanishing on the first scroll: a sticky element
-can only travel inside its parent's box, and the parent was only as tall as the
-header. Full-sticky is the correct behaviour and it keeps search, cart and menu
-permanently reachable — 56px of pinned chrome on a phone, where the bottom
-navigation carries the rest.
+**The whole banner sticks, not an inner row.** The first build made only the
+identity row sticky. Visual QA showed it vanishing on the first scroll: a sticky
+element can only travel inside its parent's box, and the parent was only as tall
+as the header.
 
-**Search is a live field, not a toggle.**
-The previous header hid search behind an icon and an animated overlay. A field
-present in both placements is materially stronger discovery for a commerce
-shell, and removing the overlay also removed its transition and focus-management
-code. Net simplification, not added surface.
+**Search is a live field, not a toggle.** A field present in both placements is
+materially stronger discovery for a commerce shell, and removing the overlay also
+removed its transition and focus-management code.
 
-**A paging rail, not a mega-menu.**
-Subcategory data is already fetched, so a hover mega-menu was available — and
-declined. It is a navigation capability, not shell infrastructure, and it brings
-real keyboard and screen-reader obligations. Subcategories stay in the drawer
-and on the category pages. When uncertain, simplify.
+**A paging rail, not a mega-menu.** Subcategory data is already fetched, so a
+hover mega-menu was available — and declined. It is a navigation capability, not
+shell infrastructure, and it brings real keyboard and screen-reader obligations.
 
-**Footer category cap.**
-With twelve root categories the Shop column became a 13-item sitemap three times
-the height of its neighbours, on both mobile and desktop. Six keeps the footer
-balanced; the full tree stays one tap away behind "All products", the rail and
-the menu.
+**Footer category cap and masthead.** Twelve root categories turned one column
+into a sitemap three times the height of its neighbours. A lone wordmark in a
+quarter-width column then read as a gap where content had been removed, so
+identity took the full measure instead.
 
-**No letter-spacing on translatable strings.**
-`tracking-tight` / `tracking-wide` break Arabic's connected script. The brand
-wordmark and every footer heading avoid them and build hierarchy from size,
-weight and colour instead.
+**No letter-spacing on translatable strings.** `tracking-tight` / `tracking-wide`
+break Arabic's connected script; hierarchy comes from size, weight and colour.
 
 **Restraint check.** No gradients beyond the two functional edge fades on the
-rail, no glassmorphism, no decorative blur, no shadows beyond the skip-link
-chip, no pills, no badges that are not real counts, no invented metrics or trust
-indicators, no card-in-card, no decorative animation.
+rail, no glassmorphism, no decorative blur, no shadows beyond the skip-link chip,
+no badges that are not real counts, no invented metrics or trust indicators, no
+card-in-card, no decorative animation.
 
 ---
 
-## 6. Files changed
+## 6. Token-scope audit
+
+The concern raised was that aliasing `--primary` and the ramp changes surfaces
+outside STORE-UI-1. The audit found the premise does not hold.
+
+Every consumer of `--primary` or the ramp — **24 files** — is inside
+`storefront/src`: account, cart, checkout, product cards, filters, breadcrumbs
+and the UI primitives. Nothing outside the storefront app can reach them; `web/`
+(the ERP) is a separate Next.js app with its own `globals.css` and design system.
+So "outside STORE-UI-1" is not "outside the storefront".
+
+The reference settles the direction: `#12372a` appears **31 times** in it, on
+cart, checkout and product CTAs. A shell-only token boundary would give a
+deep-green header above a near-black "add to cart", contradicting the approved
+design and needing to be undone in STORE-UI-2/3/4.
+
+**Decision: keep the alias.** The boundary was tightened where it genuinely
+could be — `--store-*` is now the declaration and the shadcn names are aliases
+of it, so a Customizer override touches one block.
+
+---
+
+## 7. Files changed
+
+28 files, +1947 / −371.
 
 | File | Purpose |
 | --- | --- |
-| `storefront/src/app/globals.css` | `--store-*` token layer; shadcn aliases repointed; AWJ Modern green ramp; dual-script font stack; `store-rail` utility; focus `outline-offset` |
-| `storefront/src/components/layout/StoreContainer.tsx` | **new** — shared content measure |
-| `storefront/src/components/layout/Header.tsx` | recomposed responsive header; skip link; `<bdi>` brand |
-| `storefront/src/components/layout/CategoryNav.tsx` | **new** — real category rail with RTL-aware overflow paging and active state |
-| `storefront/src/components/layout/MobileBottomNav.tsx` | **new** — primary mobile navigation over existing routes |
-| `storefront/src/components/layout/StoreSearch.tsx` | renamed from `SearchToggle.tsx`; live lazy-loaded search field for both placements |
-| `storefront/src/components/layout/Footer.tsx` | recomposed footer; labelled columns; category cap; `<bdi>` identity |
-| `storefront/src/components/layout/CartButton.tsx` | badge uses store tokens and a logical `end-0` placement |
-| `storefront/src/components/layout/MobileMenu.tsx` | drawer offsets read `--store-header-height` instead of a hard-coded `top-16` |
-| `storefront/src/components/layout/DocumentShell.tsx` | Tajawal font variable on every document |
-| `storefront/src/app/[country]/[locale]/(storefront)/layout.tsx` | wires the rail into the header slot, `#main-content`, the bottom nav and its spacer |
-| `storefront/src/app/[country]/[locale]/(storefront)/layout.test.tsx` | updated for the new shell structure |
-| `storefront/src/components/layout/DocumentShell.test.tsx` | updated; asserts both faces are declared on every locale |
-| `storefront/src/components/layout/__tests__/CategoryNav.test.tsx` | **new** |
-| `storefront/src/components/layout/__tests__/MobileBottomNav.test.tsx` | **new** |
-| `storefront/messages/{ar,de,en,es,fr,pl}.json` | 7 shell keys added; 2 dead search-overlay keys removed |
+| `src/app/globals.css` | `--store-*` token layer, shadcn aliases, AWJ Modern ramp, footer tokens, shell metrics, `--store-header-offset`, dual-script font stack, `store-rail` utility, focus offset |
+| `src/components/layout/StoreBrand.tsx` | **new** — typographic identity, light and dark tones |
+| `src/components/layout/CategoryNav.tsx` | **new** — real category rail, RTL-aware overflow paging, active state |
+| `src/components/layout/MobileBottomNav.tsx` | **new** — primary mobile navigation over existing routes |
+| `src/components/layout/StoreContainer.tsx` | **new** — shared content measure |
+| `src/components/layout/StoreSearch.tsx` | renamed from `SearchToggle.tsx`; live lazy-loaded field |
+| `src/components/layout/Header.tsx` | three responsive bands, one search instance, skip link |
+| `src/components/layout/Footer.tsx` | dark band, masthead, three even columns, own focus ring |
+| `src/components/layout/CartButton.tsx` | `action` variant, store tokens, logical badge placement |
+| `src/components/layout/RegionPreferences.tsx` | `utility` variant and its focus indicator |
+| `src/components/layout/MobileMenu.tsx` | drawer offsets read the header-height token |
+| `src/components/layout/DocumentShell.tsx` | Cairo, and Geist's fallback naming it |
+| `src/components/search/SearchBar.tsx` | optional field styling and submit control; dropdown on the store measure |
+| `src/app/[country]/[locale]/(storefront)/layout.tsx` | wires the rail, `#main-content` and its scroll margin, bottom nav, spacer |
+| `messages/{ar,de,en,es,fr,pl}.json` | 8 shell keys added, 2 dead search-overlay keys removed, `home.welcome` corrected |
+| 6 test files | see §9 |
 
 ---
 
-## 7. Responsive QA
+## 8. Responsive and RTL/LTR QA
 
-Method: Chromium, real render of the running storefront against a local AWJ
-`store/v1` stub carrying 12 root categories with long Arabic names, so the rail
-genuinely overflows. Header, category navigation, content container, bottom
-navigation and footer inspected at the top and bottom of the page at every
-width, in both directions.
+Chromium, real render of the running storefront against a local AWJ `store/v1`
+stub carrying 12 root categories with long Arabic names, so the rail genuinely
+overflows. Header, category navigation, content container, bottom navigation and
+footer inspected at the top and bottom of the page at every width, in both
+directions.
 
 `document.scrollWidth === document.clientWidth` at **all ten** width × direction
 combinations — no unintended horizontal scrolling anywhere.
 
 | Width | Result |
 | --- | --- |
-| **390** | 56px identity row + search row; bottom navigation present with legible labels and no clipping; page content clears the fixed bar; footer balanced and readable. |
-| **768** | Search inline, category rail appears, drawer still available for the full tree; bottom navigation correctly absent; actions not cramped. |
-| **1024** | Search fills the middle of the bar; rail shows its end paging control; active category underline correct. |
-| **1280** | Brand / search / actions in disciplined proportion; rail overflows into the paging control as designed. |
-| **1440** | Content bounded at the 1280px measure; no oversized empty margins; header reads as navigation infrastructure, not a marketing band. |
+| **390** | 54px identity row + wrapped search line (113px total); bottom navigation legible, page content clears it; footer balanced. |
+| **768** | Utility strip, inline search with submit, category rail, drawer still available; bottom navigation correctly absent. |
+| **1024** | Search fills the middle; rail shows its end paging control; active category marked. |
+| **1280** | Wordmark / search / actions in disciplined proportion; rail overflows into the paging control. |
+| **1440** | Content bounded at the 1360px measure; no oversized empty margins. |
 
-Also verified: sticky behaviour after scrolling (390 and 1280), skip-link focus
-chip, drawer offset sitting under the identity row, rail paged to its end in
-RTL, and bottom-navigation clearance at the end of the page.
+Also verified: sticky behaviour after scrolling, skip-link landing (§11), drawer
+offset under the identity row, rail paged to its end in RTL, bottom-navigation
+clearance, and the **empty-catalogue** case — a zero-category stub produces the
+same 133px header as a populated one.
 
-**Four issues were found during QA and fixed before the PR was opened:**
-
-1. A doubled 2px border seam between the identity row and the category rail.
-2. An under-filled desktop search field leaving an awkward gap before the actions.
-3. A lopsided 13-item footer column.
-4. A sticky row that did not stick, because its parent box was only as tall as
-   the header.
-
----
-
-## 8. RTL / LTR QA
-
-- **Arabic RTL:** drawer opens from the start edge; chevrons point in reading
-  order; the rail pages towards negative `scrollLeft`; the cart badge sits on
-  the correct side; footer and bottom navigation mirror correctly;
-  `© 2026 <name>` resolves in page order — verified by measuring element box
-  positions, not by eye.
-- **English LTR:** the same shell mirrored. Arabic category names inside the
-  English page render in Tajawal and disturb neither the surrounding Latin text
-  nor the copyright line.
+**Arabic RTL** — drawer opens from the start edge, chevrons point in reading
+order, the rail pages towards negative `scrollLeft`, the cart badge sits on the
+correct side, `© 2026 <name>` resolves in page order (verified by measuring box
+positions, not by eye). **English LTR** — the same shell mirrored; Arabic
+category names inside the English page render in Cairo and disturb neither the
+surrounding Latin text nor the copyright line.
 
 ---
 
@@ -275,41 +335,33 @@ RTL, and bottom-navigation clearance at the end of the page.
 
 | Command | Result |
 | --- | --- |
-| `pnpm vitest run "src/app/[country]/[locale]/(storefront)/layout.test.tsx"` | 2 passed |
-| `pnpm vitest run src/components/layout/__tests__/CategoryNav.test.tsx` | 4 passed |
-| `pnpm vitest run src/components/layout/__tests__/MobileBottomNav.test.tsx` | 4 passed |
-| `pnpm vitest run src/components/layout/DocumentShell.test.tsx` | 5 passed |
-| `pnpm test` (full suite) | **54 files, 426 tests, all passed** |
-| `pnpm check` (Biome lint + format) | clean, 0 warnings |
+| `pnpm test` (full suite) | **56 files, 431 tests, all passed** |
+| `pnpm check` (Biome lint + format) | clean |
 | `pnpm check:locales` | all locales in sync with `en.json` |
 | `npx tsc --noEmit` | clean |
 
-**Baseline before any change on this branch:** 52 files, 413 passed. So the
-branch adds 2 files and 13 tests and breaks nothing. There were **no
-pre-existing failures** — the suite was green before the work started and is
-green now.
+**Baseline before any change on this branch:** 52 files, 413 passed. The branch
+adds 4 files and 18 tests and breaks nothing. There were no pre-existing
+failures.
 
-New coverage: Geist names the Arabic face as its fallback, so the generated
-Arial fallback cannot silently swallow Arabic again; the bottom navigation keeps
-Shop selected on a nested category path and does not select on a merely
-prefixed route. The rail links only to supplied categories and to nothing else; it
-marks the open category including a child permalink; it hides its paging
-controls when nothing overflows; it pages towards negative `scrollLeft` in RTL.
-The bottom navigation offers only routed destinations and no wishlist, marks the
-current surface without falsely marking Home, shows the cart count after
-hydration, and clears the safe-area inset. The document declares the Arabic face
-on every locale, not only on Arabic routes.
+New coverage: Geist names the Arabic face as its fallback, so the generated Arial
+fallback cannot silently swallow Arabic again; the header mounts exactly one
+search field; the bottom navigation keeps Shop selected on a nested category path
+and does not select on a merely prefixed route; the rail links only to supplied
+categories, marks the open one including a child permalink, hides its paging
+controls when nothing overflows, pages towards negative `scrollLeft` in RTL, and
+still renders a band with zero categories; every locale presents the merchant
+name without wrapping it.
 
-**No existing test was weakened, skipped or removed.** The two modified test
-files were updated because the shell they assert on changed shape.
+**No existing test was weakened, skipped or removed.** Modified test files were
+updated because the shell they assert on changed shape.
 
 ---
 
 ## 10. Build
 
-`pnpm build` — **succeeds**, including the build-time fetch of the added font.
-
-The prerender log lines reading `AWJ_COMMERCE_API_URL is not configured` are the
+`pnpm build` — **succeeds**, including the build-time fetch of both faces. The
+prerender log lines reading `AWJ_COMMERCE_API_URL is not configured` are the
 expected no-backend path in this environment and are present on the baseline
 build too; the build exits 0 and generates all 63 static pages.
 
@@ -317,63 +369,70 @@ build too; the build exits 0 and generates all 63 static pages.
 
 ## 11. CI and review rounds
 
-`storefront (lint + typecheck + test)` passed on head `35d7aeb`. The backend
-suites (`php artisan test` on sqlite and pgsql) run on every branch push; this
-diff touches nothing under `app/`, `routes/`, `database/`, `config/` or `tests/`.
+`storefront (lint + typecheck + test)` has passed on every head pushed. The
+backend suites (`php artisan test` on sqlite and pgsql) run on every branch push;
+this diff touches nothing under `app/`, `routes/`, `database/`, `config/` or
+`tests/`. No merge conflict at any point — the head has stayed based on the
+current `main`.
 
-No merge conflict at any point — the head has stayed based on the current `main`.
+Three automated review rounds from `chatgpt-codex-connector`. **Every finding was
+real**, verified against primary evidence before any code changed, fixed,
+answered on its thread and resolved.
 
-### Review round 1 — `chatgpt-codex-connector`, on `35d7aeb`
+**Round 1 (`35d7aeb`).**
+*Arabic never reached its face.* `--font-geist` expands to `"Geist", "Geist
+Fallback"`, and that generated face is `local(Arial)` with no `unicode-range`, so
+it answered for Arabic. Confirmed by grepping the emitted CSS. The reviewer's
+suggested remedy, `adjustFontFallback: false`, does **not** work — the Turbopack
+build ignores it. Naming the Arabic face as Geist's own fallback does. Verified
+with CDP `CSS.getPlatformFontsForNode` on both locales.
+*Category routes lost the bottom-nav selection*, because category pages live
+under `/c`, not `/products`. Nav items now own additional route subtrees.
 
-Two P2 findings. **Both were real**, verified against primary evidence before
-any code was changed, fixed in `d0f63f3`, answered on their threads and resolved.
+**Round 2 (`9e35199`).**
+*The skip link landed behind the header it had just skipped.* The banner's height
+is now the `--store-header-offset` token, summed from the band metrics and
+switched at `md`; `main` carries it as `scroll-margin-top`. Measured by following
+the link and reading back where `main` landed.
+*Search lost its query across `md`*, because the header mounted two instances and
+hid one with CSS. The identity band is now one grid in which a single instance
+changes placement.
 
-**1. Arabic never actually reached Tajawal.** By default `--font-geist` expands
-to `"Geist", "Geist Fallback"`, and that generated face is `local(Arial)` with
-no `unicode-range` — so it answered for Arabic and Tajawal, declared after it,
-never received the glyph. Confirmed by grepping the emitted CSS. This defeated
-the entire point of §4.8.
-
-The reviewer's suggested remedy, `adjustFontFallback: false`, does **not** work:
-the option is still in the type declarations and the JS loader honours it, but
-the Turbopack build ignores it — after setting it, the variable still expanded
-to `"Geist", "Geist Fallback"`. The fix that does work is naming the Arabic face
-as Geist's own fallback (`fallback: ["Tajawal"]`), which makes the variable
-expand to `"Geist", Tajawal` and stops the `Geist Fallback` face being emitted.
-
-Locale-aware font-family ordering was considered and rejected: it would break
-per-character resolution, so an Arabic product name inside an English page would
-still land on the wrong face.
-
-Verified at runtime with CDP `CSS.getPlatformFontsForNode` on the header store
-name — `["Tajawal x15", "Geist x2"]` on **both** the `ar` and `en` storefronts.
-
-*Trade-off:* Geist's metric-adjusted fallback is no longer emitted, so during the
-swap window Latin falls through `Tajawal Fallback` (Arial at 94.66% size-adjust)
-rather than Arial at 104.76%. Both Arial-based; correct Arabic on the default
-locale outweighs that ~10% metric delta.
-
-**2. Category routes lost the bottom navigation's selected state.** Category
-pages live under `/c`, not under `/products`, so no tab matched and both the
-styling and `aria-current` were dropped for the whole of category browsing —
-which is most of it. `NavItem` now carries an optional `owns` list of extra
-route subtrees and Shop owns `${basePath}/c`; a shared `ownsPath` helper keeps a
-route merely *prefixed* with an owned path (`/cart-recovery`) from selecting an
-item. Verified in a browser at 390px on a category URL.
-
-Three regression tests were added for these (§9).
+**Round 3 (`dde154b`).**
+*The category rail collapsed its own reserved row* when the catalogue returned
+nothing, dropping the 38px the fallback had reserved and shifting the page up —
+the fallback failing at exactly the case it existed for. The guard's
+justification was wrong: the rail always carries its "all products" entry, so it
+is never the empty strip the guard claimed to avoid. Removing it makes every
+outcome resolve to the same height.
+*The report was stale* — this document, regenerated here.
 
 ---
 
-## 12. Visual Preview
+## 12. Product-owner visual review
+
+The owner reviewed the fidelity pass and approved the overall shell direction,
+**Cairo typography**, the dark footer, the responsive structure, search, RTL/LTR
+handling and the mobile bottom navigation, and asked for five corrections, all
+delivered in `dde154b`:
+
+1. **Brand fallback** → typographic wordmark replacing the generated monogram.
+2. **Mixed-language title** → traced to the locale bundles and corrected there
+   (§4.9), with the hero component untouched for STORE-UI-2.
+3. **Desktop density** → bands trimmed from 143px to 133px, nothing removed.
+4. **Category rail** → inactive items lose their hover box; only the open
+   category takes a surface.
+5. **Footer balance** → identity promoted to a full-width masthead.
+
+---
+
+## 13. Visual preview
 
 No preview deployment is wired for this repository, and none was created —
-deploying is out of scope for this task.
-
-Screenshots covering all ten width × direction combinations were captured during
-QA and the representative set was delivered to the product owner in the
-implementation session (mobile RTL 390, desktop RTL 1440, tablet LTR 768, and
-both footer / bottom-navigation views).
+deploying is out of scope. Screenshots covering all ten width × direction
+combinations were captured during QA and delivered to the product owner in the
+implementation session, alongside the rendered approved reference for direct
+comparison.
 
 To inspect it directly:
 
@@ -388,50 +447,49 @@ Check at 390 / 768 / 1024 / 1280 / 1440, in both `/sa/ar` and `/sa/en`.
 
 ---
 
-## 13. Risks / remaining issues
+## 14. Risks / remaining issues
 
-- **Widest visual surface.** `--primary` and the `primary-50..950` ramp now
-  resolve to AWJ Modern green, so surfaces outside the shell — product-card
-  hover, checkout buttons, filter chips, gift-card meters — change colour. This
-  is the approved baseline direction and a token change only, with no behaviour
-  change, but it is the largest visual delta in the PR and the thing most worth
-  the product owner's eye.
-- **Root categories only** appear in the rail. Subcategories remain in the
-  drawer and on the category pages. A desktop mega-menu was deliberately not
-  built.
+- **Widest visual surface.** `--primary` and the ramp resolve to the AWJ Modern
+  green, so surfaces outside the shell — product-card hover, checkout buttons,
+  filter chips — change colour. Token change only, no behaviour change, and the
+  approved direction (§6), but it is the largest visual delta in the PR.
+- **Root categories only** in the rail. Subcategories remain in the drawer and on
+  the category pages; no desktop mega-menu.
 - **Pre-existing, untouched:** prices render with Arabic-Indic digits on the
   English storefront. That is `Intl` formatting in the price component and
   belongs to catalogue/pricing display, not the shell.
+- **The `--store-header-offset` overshoots by 38px** on a storefront whose
+  desktop rail is absent, leaving the skip-link landing slightly lower than
+  necessary — harmless in the direction that matters.
 - **The footer category cap of 6** is a presentation choice, not configuration.
-  If the product owner wants it merchant-controlled it belongs to STORE-UI-6.
+  If it should be merchant-controlled it belongs to STORE-UI-6.
 - **No automated visual-regression coverage.** The repository has none, and
-  adding a framework was out of scope. Visual QA for this task was manual and
-  is recorded in §7.
+  adding a framework was out of scope. Visual QA was manual and is recorded in §8.
 
 ---
 
-## 14. Scope confirmation
+## 15. Scope confirmation
 
 | Boundary | Status |
 | --- | --- |
-| No backend/API changes | ✅ confirmed — diff is confined to `storefront/` |
-| No database/migration changes | ✅ confirmed |
-| No accounting/inventory changes | ✅ confirmed |
-| No tenant/security changes | ✅ confirmed |
-| No checkout/payment/shipping implementation | ✅ confirmed |
-| No duplicate taxonomy, catalogue, price or inventory truth | ✅ confirmed — the rail reads the existing authoritative fetch |
-| No invented commerce capability, content or claim | ✅ confirmed — no wishlist tab, no footer promises |
-| No new external dependency, no dependency upgrade | ✅ confirmed |
-| No changes mixed with PR #794 | ✅ confirmed |
-| No production deployment | ✅ confirmed |
-| PR not merged, auto-merge not enabled | ✅ confirmed |
+| No backend/API changes | ✅ diff confined to `storefront/` plus this report |
+| No database/migration changes | ✅ |
+| No accounting/inventory changes | ✅ |
+| No tenant/security changes | ✅ |
+| No checkout/payment/shipping implementation | ✅ |
+| No duplicate taxonomy, catalogue, price or inventory truth | ✅ the rail reads the existing authoritative fetch |
+| No invented commerce capability, content or claim | ✅ no wishlist tab, no cart total, no footer promises |
+| No homepage/hero/product-section redesign | ✅ reserved for STORE-UI-2 |
+| No new external dependency, no dependency upgrade | ✅ |
+| No changes mixed with PR #794 | ✅ |
+| No production deployment | ✅ |
+| PR not merged, auto-merge not enabled | ✅ |
 
 ---
 
-## 15. Next step
+## 16. Next step
 
-**Product-owner visual review of PR #855 against
-`AWJ Store — Responsive Visual Baseline V1 — LOCKED`.**
+**Product-owner visual review of PR #855 at head `0b13bef`.**
 
 Merge is **not** recommended until that review is complete. Visual revisions may
 be requested even with CI fully green; that is expected and in line with the

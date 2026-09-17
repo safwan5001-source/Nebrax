@@ -159,10 +159,15 @@ export function RegionPreferences({ variant }: RegionPreferencesProps) {
             type="button"
             aria-label={t("title")}
             className={cn(
-              "relative flex w-fit items-center gap-2 text-left font-semibold uppercase outline-none transition-colors",
+              "relative flex w-fit items-center gap-2 text-left font-semibold uppercase transition-colors",
               isUtilityVariant
-                ? "gap-1.5 text-[11px] text-store-muted-foreground hover:text-store-foreground"
-                : "pb-1 tracking-wide text-sm text-foreground hover:text-foreground focus-visible:text-foreground after:absolute after:bottom-0 after:left-0 after:h-px after:w-full after:origin-right after:scale-x-0 after:bg-current after:transition-transform after:duration-500 after:ease-in-out hover:after:origin-left hover:after:scale-x-100 focus-visible:after:origin-left focus-visible:after:scale-x-100 motion-reduce:after:transition-none",
+                ? // No `outline-none` here: the drawer's variant suppresses the
+                  // app's focus ring because it draws its own underline
+                  // instead, and this branch has no such substitute. Letting
+                  // the global ring through gives the control the same focus
+                  // treatment as every other control in the storefront.
+                  "gap-1.5 text-[11px] text-store-muted-foreground hover:text-store-foreground focus-visible:text-store-foreground"
+                : "pb-1 tracking-wide text-sm text-foreground outline-none hover:text-foreground focus-visible:text-foreground after:absolute after:bottom-0 after:left-0 after:h-px after:w-full after:origin-right after:scale-x-0 after:bg-current after:transition-transform after:duration-500 after:ease-in-out hover:after:origin-left hover:after:scale-x-100 focus-visible:after:origin-left focus-visible:after:scale-x-100 motion-reduce:after:transition-none",
             )}
           >
             <CountryFlag
