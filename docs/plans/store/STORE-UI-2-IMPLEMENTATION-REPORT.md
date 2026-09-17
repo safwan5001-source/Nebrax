@@ -26,7 +26,7 @@ zero overlap with `storefront/`). The branch was rebased onto it; no conflicts.
 
 ## 4. Head SHA
 
-`<HEAD_SHA>`
+`3823d3673e0d9328aeeeba02d49a35ac5860c7f3` (code) — plus this report commit; see the PR's commit list for the current head.
 
 ## 5. Branch
 
@@ -34,7 +34,7 @@ zero overlap with `storefront/`). The branch was rebased onto it; no conflicts.
 
 ## 6. PR
 
-`<PR_LINK>`
+[#857](https://github.com/safwan5001-source/Nebrax/pull/857)
 
 ## 7. Repository evidence inspected
 
@@ -280,7 +280,7 @@ posture: the shell and section frames prerender, the shelf streams.
 
 ## 22. CI status
 
-`<CI_STATUS>`
+Running at the time of writing — GitHub Actions `storefront (lint + typecheck + test)` and `php artisan test (L11, sqlite | pgsql)` on PR #857. The same checks were reproduced locally and are green (§20, §21).
 
 ## 23. Visual QA screenshots captured
 
