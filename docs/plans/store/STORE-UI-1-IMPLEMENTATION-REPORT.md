@@ -26,8 +26,9 @@ visual review.
 - **Base SHA:** `0beee2374396c338e5a211b0fddbe87b989be6bd`
   Verified as the current `main` after `git fetch origin main`, and identical to
   PR #854's merge SHA.
-- **Head SHA:** `35d7aeb80318ea847124c07b02018c030e251d5f`
-- **Diff:** 22 files, +1036 / −343, confined to `storefront/`.
+- **Head SHA:** `d0f63f3529c4074dc08e62d10faf263f067dbfe9`
+  (`35d7aeb` shell implementation → `28cff77` this report → `d0f63f3` review fixes)
+- **Diff:** 23 files, confined to `storefront/` plus this report.
 
 ---
 
@@ -278,17 +279,20 @@ RTL, and bottom-navigation clearance at the end of the page.
 | `pnpm vitest run src/components/layout/__tests__/CategoryNav.test.tsx` | 4 passed |
 | `pnpm vitest run src/components/layout/__tests__/MobileBottomNav.test.tsx` | 4 passed |
 | `pnpm vitest run src/components/layout/DocumentShell.test.tsx` | 5 passed |
-| `pnpm test` (full suite) | **54 files, 423 tests, all passed** |
+| `pnpm test` (full suite) | **54 files, 426 tests, all passed** |
 | `pnpm check` (Biome lint + format) | clean, 0 warnings |
 | `pnpm check:locales` | all locales in sync with `en.json` |
 | `npx tsc --noEmit` | clean |
 
 **Baseline before any change on this branch:** 52 files, 413 passed. So the
-branch adds 2 files and 10 tests and breaks nothing. There were **no
+branch adds 2 files and 13 tests and breaks nothing. There were **no
 pre-existing failures** — the suite was green before the work started and is
 green now.
 
-New coverage: the rail links only to supplied categories and to nothing else; it
+New coverage: Geist names the Arabic face as its fallback, so the generated
+Arial fallback cannot silently swallow Arabic again; the bottom navigation keeps
+Shop selected on a nested category path and does not select on a merely
+prefixed route. The rail links only to supplied categories and to nothing else; it
 marks the open category including a child permalink; it hides its paging
 controls when nothing overflows; it pages towards negative `scrollLeft` in RTL.
 The bottom navigation offers only routed destinations and no wishlist, marks the
@@ -311,24 +315,53 @@ build too; the build exits 0 and generates all 63 static pages.
 
 ---
 
-## 11. CI
+## 11. CI and review rounds
 
-On head `35d7aeb`:
+`storefront (lint + typecheck + test)` passed on head `35d7aeb`. The backend
+suites (`php artisan test` on sqlite and pgsql) run on every branch push; this
+diff touches nothing under `app/`, `routes/`, `database/`, `config/` or `tests/`.
 
-| Check | State |
-| --- | --- |
-| `storefront (lint + typecheck + test)` | ✅ success (both triggered runs) |
-| `php artisan test (L11, sqlite)` | in progress at time of writing |
-| `php artisan test (L11, pgsql)` | in progress at time of writing |
+No merge conflict at any point — the head has stayed based on the current `main`.
 
-No merge conflict — the head is based on the current `main`. No review threads.
-`mergeable_state: unstable` reflects the still-running backend jobs, not a
-conflict.
+### Review round 1 — `chatgpt-codex-connector`, on `35d7aeb`
 
-The backend suites are expected green: this diff touches nothing under `app/`,
-`routes/`, `database/`, `config/` or `tests/`. The session is subscribed to PR
-activity with a recurring check-in; if either backend job goes red it will be
-root-caused rather than assumed unrelated.
+Two P2 findings. **Both were real**, verified against primary evidence before
+any code was changed, fixed in `d0f63f3`, answered on their threads and resolved.
+
+**1. Arabic never actually reached Tajawal.** By default `--font-geist` expands
+to `"Geist", "Geist Fallback"`, and that generated face is `local(Arial)` with
+no `unicode-range` — so it answered for Arabic and Tajawal, declared after it,
+never received the glyph. Confirmed by grepping the emitted CSS. This defeated
+the entire point of §4.8.
+
+The reviewer's suggested remedy, `adjustFontFallback: false`, does **not** work:
+the option is still in the type declarations and the JS loader honours it, but
+the Turbopack build ignores it — after setting it, the variable still expanded
+to `"Geist", "Geist Fallback"`. The fix that does work is naming the Arabic face
+as Geist's own fallback (`fallback: ["Tajawal"]`), which makes the variable
+expand to `"Geist", Tajawal` and stops the `Geist Fallback` face being emitted.
+
+Locale-aware font-family ordering was considered and rejected: it would break
+per-character resolution, so an Arabic product name inside an English page would
+still land on the wrong face.
+
+Verified at runtime with CDP `CSS.getPlatformFontsForNode` on the header store
+name — `["Tajawal x15", "Geist x2"]` on **both** the `ar` and `en` storefronts.
+
+*Trade-off:* Geist's metric-adjusted fallback is no longer emitted, so during the
+swap window Latin falls through `Tajawal Fallback` (Arial at 94.66% size-adjust)
+rather than Arial at 104.76%. Both Arial-based; correct Arabic on the default
+locale outweighs that ~10% metric delta.
+
+**2. Category routes lost the bottom navigation's selected state.** Category
+pages live under `/c`, not under `/products`, so no tab matched and both the
+styling and `aria-current` were dropped for the whole of category browsing —
+which is most of it. `NavItem` now carries an optional `owns` list of extra
+route subtrees and Shop owns `${basePath}/c`; a shared `ownsPath` helper keeps a
+route merely *prefixed* with an owned path (`/cart-recovery`) from selecting an
+item. Verified in a browser at 390px on a category URL.
+
+Three regression tests were added for these (§9).
 
 ---
 
