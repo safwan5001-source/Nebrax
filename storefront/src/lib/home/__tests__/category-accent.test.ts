@@ -20,28 +20,26 @@ describe("categoryAccent", () => {
       "var(--store-primary)",
     ]) {
       expect(isValidCategoryColor(hostile)).toBe(false);
-      expect(categoryAccent(hostile).background).toBe(
-        "var(--store-surface-muted)",
-      );
+      expect(categoryAccent(hostile).rule).toBe("var(--store-border-strong)");
     }
   });
 
-  it("falls back to the neutral treatment when no colour is set", () => {
+  it("falls back to the neutral edge when no colour is set", () => {
     const accent = categoryAccent(null);
-    expect(accent.background).toBe("var(--store-surface-muted)");
-    expect(accent.foreground).toBe("var(--store-muted-foreground)");
+    expect(accent.rule).toBe("var(--store-border-strong)");
+    expect(accent.isMerchantColor).toBe(false);
   });
 
-  it("tints from the category's own colour when one is set", () => {
+  it("uses the category's own colour when one is set", () => {
     const accent = categoryAccent("#12372a");
-    expect(accent.background).toContain("#12372a");
-    expect(accent.foreground).toContain("#12372a");
+    expect(accent.rule).toBe("#12372a");
+    expect(accent.isMerchantColor).toBe(true);
   });
 
-  it("keeps the label readable on a pale category colour", () => {
-    // A near-white colour cannot also be the label colour on its own tint.
-    expect(categoryAccent("#fdfdfd").foreground).toBe(
-      "var(--store-foreground)",
-    );
+  it("deepens a near-white colour so the accent stays visible", () => {
+    const accent = categoryAccent("#fdfdfd");
+    expect(accent.rule).toContain("#fdfdfd");
+    expect(accent.rule).toContain("var(--store-foreground)");
+    expect(accent.isMerchantColor).toBe(true);
   });
 });

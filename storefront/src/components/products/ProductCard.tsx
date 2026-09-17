@@ -70,12 +70,13 @@ export const ProductCard = memo(function ProductCard({
   };
 
   return (
-    <div className="group relative flex h-full flex-col rounded-store border border-store-border bg-store-surface p-2.5 shadow-2xs transition-shadow duration-150 hover:shadow-md focus-within:shadow-md motion-reduce:transition-none sm:p-3">
+    <div className="group relative flex h-full flex-col overflow-hidden rounded-store border border-store-border bg-store-surface transition-shadow duration-150 hover:shadow-md focus-within:shadow-md motion-reduce:transition-none">
       {/* Image. Bounded by height rather than aspect ratio: a square tile grows
           with the column and, at desktop widths, turns an eight-product shelf
           into a wall of photography with the catalogue text pushed out of the
-          fold. */}
-      <div className="relative h-36 overflow-hidden rounded-[calc(var(--store-radius)-0.25rem)] bg-store-surface-muted sm:h-44 md:h-52">
+          fold. It sits flush inside the card rather than inset in a rounded
+          tile of its own — one frame per product, not a frame inside a frame. */}
+      <div className="relative h-36 shrink-0 bg-store-surface-muted sm:h-44 md:h-52">
         <ProductImage
           src={imageUrl}
           alt={product.name}
@@ -93,7 +94,7 @@ export const ProductCard = memo(function ProductCard({
       </div>
 
       {/* Content */}
-      <div className="flex grow flex-col pt-2.5">
+      <div className="flex grow flex-col p-3">
         {categoryName && (
           <span className="mb-0.5 line-clamp-1 text-[0.625rem] font-medium text-store-muted-foreground">
             {categoryName}
@@ -113,9 +114,9 @@ export const ProductCard = memo(function ProductCard({
           </Link>
         </h3>
 
-        <div className="mt-2.5 flex flex-wrap items-baseline gap-x-2 gap-y-1 border-t border-store-border pt-2">
+        <div className="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-1">
           {displayPrice ? (
-            <span className="text-sm font-black text-store-primary">
+            <span className="text-sm font-black text-store-primary md:text-base">
               {displayPrice}
             </span>
           ) : (

@@ -1,10 +1,14 @@
 /**
- * Category tiles get their visual identity from the merchant's own category
- * colour. `store/v1/categories` exposes no image, so the alternative would be
- * inventing category photography — which would make the storefront assert
- * something AWJ never said.
+ * The merchant's own category colour, prepared for presentation.
  *
- * The colour reaches us as a free-text column, and it ends up in a `style`
+ * `store/v1/categories` exposes no image, so colour is the only visual
+ * identity a category actually has. It is used as an accent on an otherwise
+ * neutral tile rather than as the tile's surface: a grid of saturated or
+ * pastel blocks reads as decoration and makes every category shout at the same
+ * volume, where a calm grid with a coloured edge keeps the category names the
+ * thing being read.
+ *
+ * The colour reaches us as a free-text column and ends up in a `style`
  * attribute, so it is validated rather than trusted: only a plain hex literal
  * is accepted. Anything else falls back to the neutral treatment, which is a
  * deliberate presentation in its own right, not a broken one.
@@ -13,15 +17,15 @@
 const HEX_COLOR = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
 
 export interface CategoryAccent {
-  /** Tile surface. */
-  background: string;
-  /** Mark and label colour on that surface. */
-  foreground: string;
+  /** The tile's accent edge. */
+  rule: string;
+  /** Whether the value came from the merchant rather than the fallback. */
+  isMerchantColor: boolean;
 }
 
 const NEUTRAL_ACCENT: CategoryAccent = {
-  background: "var(--store-surface-muted)",
-  foreground: "var(--store-muted-foreground)",
+  rule: "var(--store-border-strong)",
+  isMerchantColor: false,
 };
 
 function expandShorthand(hex: string) {
@@ -30,7 +34,7 @@ function expandShorthand(hex: string) {
   return `#${r}${r}${g}${g}${b}${b}`;
 }
 
-/** Relative luminance, used only to keep the label legible on the tile. */
+/** Relative luminance, used only to keep a pale accent visible on the tile. */
 function luminance(hex: string) {
   const full = expandShorthand(hex).slice(1);
   const channels = [0, 2, 4].map((i) => {
@@ -44,25 +48,20 @@ export function isValidCategoryColor(color: string | null | undefined) {
   return typeof color === "string" && HEX_COLOR.test(color.trim());
 }
 
-/**
- * A soft wash of the category's colour rather than the colour at full
- * strength: a grid of saturated blocks reads as decoration, while a tinted
- * surface reads as a category system.
- */
 export function categoryAccent(
   color: string | null | undefined,
 ): CategoryAccent {
   if (!isValidCategoryColor(color)) return NEUTRAL_ACCENT;
 
   const hex = expandShorthand((color as string).trim().toLowerCase());
-  // A light colour would wash out against the page, so the tint strength and
-  // the label colour both follow the colour's own lightness.
-  const isLight = luminance(hex) > 0.6;
 
-  return {
-    background: `color-mix(in srgb, ${hex} ${isLight ? "22%" : "12%"}, var(--store-surface))`,
-    foreground: isLight
-      ? "var(--store-foreground)"
-      : `color-mix(in srgb, ${hex} 78%, var(--store-foreground))`,
-  };
+  // A near-white category colour would be an invisible edge on a white tile,
+  // so it is deepened toward the text colour. The merchant's hue survives;
+  // only its lightness is corrected.
+  const rule =
+    luminance(hex) > 0.75
+      ? `color-mix(in srgb, ${hex} 65%, var(--store-foreground))`
+      : hex;
+
+  return { rule, isMerchantColor: true };
 }

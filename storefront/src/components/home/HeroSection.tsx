@@ -20,9 +20,15 @@ interface HeroSectionProps {
  * It states who the store is and offers one way into the catalogue, and that is
  * all it claims. `store/v1/storefront` carries a name and a default locale —
  * no banner, no tagline, no campaign — so there is nothing else here that would
- * be true. The trailing field is the store's own initial, set in the brand
- * gradient: decoration derived from the merchant's identity rather than stock
- * photography standing in for a hero image AWJ never supplied.
+ * be true.
+ *
+ * With no merchant image to place, the band is deliberately plain: the store's
+ * name set large on the approved palette, one CTA, and nothing else. An earlier
+ * pass filled the empty side with an oversized translucent initial; that read
+ * as placeholder decoration and was removed rather than replaced, because
+ * anything put there — a monogram, an illustration, a stock photograph — would
+ * be storefront invention standing in for merchant content. The band is not
+ * made taller to compensate for the space it no longer fills.
  */
 export async function HeroSection({
   basePath,
@@ -45,16 +51,9 @@ export async function HeroSection({
   return (
     <section
       aria-labelledby="home-hero"
-      className="relative flex min-h-[11rem] items-center overflow-hidden rounded-store bg-linear-to-r rtl:bg-linear-to-l from-primary-700 via-primary-600 to-primary-500 text-store-primary-foreground md:min-h-[16rem] lg:min-h-[18rem]"
+      className="flex min-h-[11rem] items-center rounded-store bg-linear-to-r rtl:bg-linear-to-l from-primary-700 via-primary-600 to-primary-500 text-store-primary-foreground md:min-h-[16rem] lg:min-h-[18rem]"
     >
-      <span
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-y-0 end-0 flex w-2/5 items-center justify-center overflow-hidden text-[7rem] font-black leading-none text-store-primary-foreground/10 select-none md:text-[10rem] lg:text-[12rem]"
-      >
-        {title.trim().slice(0, 1)}
-      </span>
-
-      <div className="relative z-10 max-w-[75%] p-5 sm:max-w-[60%] md:p-10 lg:p-14">
+      <div className="max-w-2xl p-5 md:p-10 lg:p-14">
         <h1
           id="home-hero"
           className="text-xl font-black leading-tight sm:text-2xl lg:text-4xl"

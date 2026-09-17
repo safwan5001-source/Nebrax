@@ -33,34 +33,25 @@ function CategoryTile({
 
   return (
     <li>
+      {/*
+        Typography first. The tile is the category's name on the store's own
+        surface; the merchant's colour is a 3px edge on it, not the surface
+        itself. There is no mark, because AWJ has no category media and a
+        generated initial is pseudo-branding rather than a stand-in for one.
+      */}
       <Link
         href={`${basePath}/c/${category.permalink}`}
-        className="group flex h-full flex-col gap-2.5 rounded-store border border-store-border p-3 transition-colors hover:border-store-border-strong"
-        style={{ backgroundColor: accent.background }}
+        className="group flex h-full flex-col justify-center gap-0.5 rounded-store border border-store-border border-s-[3px] bg-store-surface px-4 py-3.5 transition-colors hover:border-store-border-strong hover:bg-store-surface-muted"
+        style={{ borderInlineStartColor: accent.rule }}
       >
-        {/*
-          The mark is the category's own initial in its own colour. It is not a
-          logo and not a stand-in for a photograph AWJ does not have — it gives
-          the tile a fixed anchor so a grid of them reads as a system rather
-          than as a list of empty boxes.
-        */}
-        <span
-          aria-hidden="true"
-          className="grid size-10 shrink-0 place-items-center rounded-[calc(var(--store-radius)-0.25rem)] bg-store-surface/70 text-lg font-black shadow-2xs"
-          style={{ color: accent.foreground }}
-        >
-          {category.name.trim().slice(0, 1)}
+        <span className="line-clamp-2 text-sm font-bold leading-snug text-store-foreground group-hover:text-store-primary">
+          {category.name}
         </span>
-        <span className="min-w-0">
-          <span className="block line-clamp-2 text-xs font-bold leading-snug text-store-foreground group-hover:text-store-primary sm:text-sm">
-            {category.name}
+        {childCount > 0 && (
+          <span className="text-xs text-store-muted-foreground tabular-nums">
+            {subcategoriesLabel(childCount)}
           </span>
-          {childCount > 0 && (
-            <span className="mt-0.5 block text-[0.625rem] text-store-muted-foreground tabular-nums">
-              {subcategoriesLabel(childCount)}
-            </span>
-          )}
-        </span>
+        )}
       </Link>
     </li>
   );

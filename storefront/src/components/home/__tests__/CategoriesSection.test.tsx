@@ -93,7 +93,7 @@ describe("CategoriesSection", () => {
     expect(container.querySelectorAll("li")).toHaveLength(2);
   });
 
-  it("tints a tile from the merchant's colour and stays neutral without one", async () => {
+  it("accents a tile with the merchant's colour and stays neutral without one", async () => {
     const element = await loadSection(
       vi.fn().mockResolvedValue({
         data: [
@@ -104,8 +104,9 @@ describe("CategoriesSection", () => {
     );
 
     const { getAllByRole } = render(element as React.JSX.Element);
-    const [tinted, neutral] = getAllByRole("link");
-    expect(tinted.getAttribute("style")).toContain("#12372a");
-    expect(neutral.getAttribute("style")).toContain("--store-surface-muted");
+    const [accented, neutral] = getAllByRole("link");
+    // jsdom normalises the literal to rgb() on the way into the attribute.
+    expect(accented.getAttribute("style")).toContain("rgb(18, 55, 42)");
+    expect(neutral.getAttribute("style")).toContain("--store-border-strong");
   });
 });

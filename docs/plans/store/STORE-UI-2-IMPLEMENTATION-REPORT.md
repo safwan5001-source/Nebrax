@@ -2,8 +2,9 @@
 
 ## 1. Status
 
-Implemented, validated and pushed. **Not merged, not deployed.** Awaiting
-product-owner visual approval per `NO VISUAL APPROVAL = NO MERGE`.
+Implemented, validated and pushed, including the **final product-owner visual
+polish pass** (§30). **Not merged, not deployed.** Awaiting product-owner visual
+approval per `NO VISUAL APPROVAL = NO MERGE`.
 
 ## 2. Objective completed
 
@@ -81,10 +82,12 @@ assumed from the Spree-shaped view models:
 - **Claims:** none. No badge, no slogan, no offer, no delivery or trust
   statement, because `store/v1/storefront` supplies nothing that would make one
   true.
-- **The trailing field:** the store's initial set large at 10% opacity in the
-  brand gradient. It is decoration derived from the merchant's own identity.
-  The approved baseline fills that half with a photograph; AWJ has no banner
-  capability, so a stock image there would be invented merchant content.
+- **The empty side stays empty.** The approved baseline fills that half with a
+  photograph; AWJ has no banner capability. An earlier pass put an oversized
+  translucent store initial there; the product owner read it as placeholder
+  decoration and it was **removed, not replaced** — a monogram, an illustration
+  or a stock photograph would each be storefront invention standing in for
+  merchant content. The band was not made taller to compensate.
 - **Customizer seam:** `headline` and `subheadline` props exist and are supplied
   by nothing. When a hero contract lands, the band fills without the homepage
   being restructured. No persistence, no editor, no stored theme.
@@ -98,9 +101,15 @@ assumed from the Spree-shaped view models:
 - **`color` was being dropped by the mapper.** `StoreCategory` (the Spree
   `Category` plus AWJ's `color`) now carries it through `mapAwjCategoryToViewModel`
   and `fetchCategories`. `categoryAccent()` validates hex only — the value
-  reaches a `style` attribute — tints the tile with `color-mix` and picks a
-  readable foreground by luminance. An unset or non-hex colour falls back to the
-  neutral surface.
+  reaches a `style` attribute — and returns it as the tile's **3px inline-start
+  accent edge** on the store's own neutral surface. A near-white colour is
+  deepened toward the text colour so the edge stays visible; the merchant's hue
+  survives, only its lightness is corrected. An unset or non-hex colour falls
+  back to `--store-border-strong`.
+- **No generated category marks.** The tile is typography-first: the category
+  name and its subcategory count. An earlier pass rendered the category's first
+  letter as a mark; there is no repository evidence that a category initial
+  carries any merchant identity, so it was pseudo-branding and was removed.
 - Subcategory counts are `children.length`; the count is omitted at zero rather
   than printed as "0 subcategories".
 - `HOME_CATEGORY_LIMIT = 12` with a "view all" link to `/products`, so a merchant
@@ -306,9 +315,10 @@ rendered section headings in both languages.
 | Content density | Matches. The page is a contained stack of blocks on the page surface, not airy full-bleed bands. |
 | Whitespace | Matches after tightening tile padding and shelf gaps to the baseline's `gap-3 md:gap-5`. |
 | Image dominance | **Fixed during QA.** The square tile grew with the column and turned the desktop shelf into a wall of photography. Now height-bounded (`h-36 / sm:h-44 / md:h-52`), exactly the baseline's ramp. |
-| Category treatment | Deliberate difference — see §25. |
+| Category treatment | Deliberate difference — see §25. Calmer than the first pass: neutral tiles with a coloured edge, not competing pastel surfaces. |
 | Product-card quality | Matches: bordered surface, bounded image, eyebrow, bold title, divided price row, primary-coloured price. |
 | Hero proportion | Close. Contained rounded card, 288px vs the baseline's 340px, because there is no hero image to give the extra height a purpose. |
+| Card segmentation | Matches after the polish pass: one frame per product, image flush to the card edge, no inner tile and no price divider. |
 | Typography | Matches. Cairo/Geist as approved; the baseline's black weights on headings and prices. |
 | Alignment | Matches. Every block starts on the same vertical line as the header brand and the first footer column. |
 | Responsive transitions | Matches at all five widths. |
@@ -325,7 +335,9 @@ All three are capability-driven, not oversights:
    store's initial.
 2. **Category tiles instead of category thumbnails.** The baseline renders a
    96px photo per category. `store/v1/categories` has no image, only `color`.
-   The tinted tile is the honest expression of the data that exists.
+   A neutral tile with the merchant's colour as an accent edge is the honest
+   expression of the data that exists — and it keeps the grid calm, where a
+   surface per colour made every category shout at the same volume.
 3. **No trust strip and no quick-add button.** The strip would state delivery,
    returns and guarantee claims AWJ does not supply; the button needs a cart
    mutation that is explicitly out of scope.
@@ -338,7 +350,9 @@ its own config models them as capability flags, and in AWJ they are all off.
 - **`ProductCard` is shared** with `/products` and category listings, so the card
   restyle reaches those surfaces too. This is intentional and consistent — one
   card treatment across the storefront — but it is a wider blast radius than the
-  homepage alone. The listing grids themselves were not touched.
+  homepage alone. The listing was visually verified at all five widths in both
+  directions (§30) and its grid was brought to the same density; no separate
+  homepage-only card was created to dodge the check.
 - **`category.color` is merchant-controlled.** It reaches a `style` attribute, so
   `categoryAccent()` accepts hex only and everything else falls back to neutral.
   A merchant choosing a very light colour still gets a readable tile because the
@@ -390,3 +404,106 @@ On approval, merge and proceed to the next slice. If a banner capability is
 wanted, it is a backend ticket (a storefront hero contract on
 `store/v1/storefront`), not a storefront change — the hero already has the props
 to consume it.
+
+---
+
+## 30. Final product-owner visual polish pass
+
+Requested after the first visual review. The composition, section order, data
+authority, capability gating, sparse states, STORE-UI-1 shell, Cairo, RTL/LTR,
+performance architecture and accessibility are all unchanged; this pass only
+removed decoration and reduced visual weight.
+
+### 30.1 Hero — monogram removed
+
+The large translucent merchant initial was not approved: it read as decorative
+placeholder UI. It was **removed and not replaced**. With no authoritative
+banner, the hero is now deliberately simple — real store name, existing CTA,
+approved palette, nothing invented. The band was **not** enlarged to compensate;
+heights are unchanged at 176 / 256 / 288px.
+
+`overflow-hidden` and the `relative`/`z-10` stacking that only existed to clip
+and layer the monogram went with it. The text block's `max-w-[75%]` cap, which
+existed to keep the title clear of the monogram, became `max-w-2xl`.
+
+### 30.2 Category tiles — colour demoted to an accent
+
+`categoryAccent()` changed shape rather than losing data. Authoritative
+`category.color` support is fully preserved; it now drives a **3px inline-start
+edge** on the store's own neutral surface instead of tinting the whole tile.
+
+| | Before | After |
+|---|---|---|
+| Tile surface | `color-mix` tint of the merchant colour | `--store-surface` |
+| Merchant colour | the surface | a 3px inline-start edge |
+| No / invalid colour | `--store-surface-muted` | `--store-border-strong` edge |
+| Pale colour | tint strength and label colour adjusted by luminance | edge deepened toward `--store-foreground` so it stays visible |
+
+Hex-only validation is unchanged — the value still reaches a `style` attribute,
+and the hostile-input test still asserts that nothing else gets through.
+
+### 30.3 Category initials — removed
+
+The generated first-letter marks are gone. There is no repository evidence that
+a category initial represents any intentional merchant or category identity, and
+a generated initial is not category media — it was pseudo-branding. The tile is
+now typography-first: the category name, and its subcategory count when there is
+one. No icon or image was invented in its place.
+
+### 30.4 Product card — segmentation removed
+
+`ProductCard` was **not redesigned**; all data and capability rules are
+untouched. Only nested framing came out:
+
+| | Before | After |
+|---|---|---|
+| Frames | card border + padding, then a separately rounded inset image tile | one card frame; the image sits flush inside it |
+| Price row | preceded by a `border-t` divider | no divider |
+| Price | `text-sm` | `text-sm md:text-base` |
+
+Image, product name and the authoritative price now carry the card. The eyebrow
+(the product's own category) stays: it is authoritative data in 10px muted text,
+not segmentation.
+
+### 30.5 Shared-card regression check — and one fix
+
+`/products` was captured at 390 / 768 / 1024 / 1280 / 1440 in both directions
+alongside the homepage. The check found a real regression and it was fixed
+rather than reported:
+
+- The listing grid was `grid-cols-2 lg:grid-cols-3 gap-6`. With no sidebar, three
+  columns at 1440 give ~390px cards, and the new height-bounded image looked
+  squat in them.
+- Fixed with `grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-4 md:gap-5`, applied
+  identically to `ProductGrid`, `ProductGridSkeleton` and `InfiniteProductList`
+  so the grid, its skeleton and the infinite-scroll continuation stay in step.
+- The catalogue card now matches the homepage card's proportions.
+
+No homepage-only `ProductCard` was created to avoid this check.
+
+### 30.6 Validation after the polish pass
+
+```
+npx vitest run     59 files, 449 tests passed
+pnpm check         322 files, no fixes applied
+pnpm check:locales all 6 locales in sync
+npx tsc --noEmit   clean
+pnpm build         exit 0
+```
+
+The build log carries `AWJ_COMMERCE_API_URL is not configured` warnings from
+prerender: that is the sections' catch path degrading gracefully with no backend
+configured in CI, which is the documented zero-data behaviour, not a failure.
+
+20 renders captured: homepage and `/products`, fold and full page, at 390 / 768 /
+1024 / 1280 / 1440 in Arabic RTL and English LTR. No horizontal overflow at any
+width on either page.
+
+### 30.7 What this pass did not change
+
+Section order, `-available_on` New Arrivals semantics, category data authority,
+zero/sparse states, capability gating, the STORE-UI-1 shell, Cairo, RTL/LTR
+handling, the data-fetching architecture and accessibility are all as reported
+above. Nothing was added: no ratings, wishlist, promotions, shipping claims,
+trust strip, stock or category photography, backend banner capability, or
+Customizer persistence.
