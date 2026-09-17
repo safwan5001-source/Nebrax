@@ -19,6 +19,17 @@ interface NavItem {
   icon: LucideIcon;
   /** Home matches only its own path; the rest own their whole subtree. */
   exact?: boolean;
+  /**
+   * Route subtrees this item owns besides its own `href`. Category pages live
+   * under `/c`, not under `/products`, but they are the same shopping surface —
+   * without this the bar would lose its selected state for the whole of
+   * category browsing, which is most of it.
+   */
+  owns?: string[];
+}
+
+function ownsPath(base: string, pathname: string) {
+  return pathname === base || pathname.startsWith(`${base}/`);
 }
 
 /**
@@ -42,7 +53,12 @@ export function MobileBottomNav({ basePath }: MobileBottomNavProps) {
 
   const items: NavItem[] = [
     { key: "home", href: basePath || "/", icon: Home, exact: true },
-    { key: "shop", href: `${basePath}/products`, icon: LayoutGrid },
+    {
+      key: "shop",
+      href: `${basePath}/products`,
+      icon: LayoutGrid,
+      owns: [`${basePath}/c`],
+    },
     { key: "cart", href: `${basePath}/cart`, icon: ShoppingBag },
     { key: "account", href: `${basePath}/account`, icon: User },
   ];
@@ -50,7 +66,8 @@ export function MobileBottomNav({ basePath }: MobileBottomNavProps) {
   const isActive = (item: NavItem) =>
     item.exact
       ? pathname === item.href || pathname === `${item.href}/`
-      : pathname === item.href || pathname.startsWith(`${item.href}/`);
+      : ownsPath(item.href, pathname) ||
+        (item.owns ?? []).some((base) => ownsPath(base, pathname));
 
   return (
     <nav

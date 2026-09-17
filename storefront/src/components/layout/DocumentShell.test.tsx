@@ -1,9 +1,20 @@
 import { describe, expect, it, vi } from "vitest";
 import { DocumentShell } from "./DocumentShell";
 
+const fontOptions = vi.hoisted(() => ({
+  geist: undefined as Record<string, unknown> | undefined,
+  tajawal: undefined as Record<string, unknown> | undefined,
+}));
+
 vi.mock("next/font/google", () => ({
-  Geist: () => ({ variable: "--font-geist" }),
-  Tajawal: () => ({ variable: "--font-tajawal" }),
+  Geist: (options: Record<string, unknown>) => {
+    fontOptions.geist = options;
+    return { variable: "--font-geist" };
+  },
+  Tajawal: (options: Record<string, unknown>) => {
+    fontOptions.tajawal = options;
+    return { variable: "--font-tajawal" };
+  },
 }));
 
 vi.mock("@next/third-parties/google", () => ({
@@ -72,5 +83,13 @@ describe("DocumentShell", () => {
 
     expect(body.props.className).toContain("--font-geist");
     expect(body.props.className).toContain("--font-tajawal");
+  });
+
+  it("names Tajawal as Geist's fallback so Arabic can reach it", () => {
+    // Without this, --font-geist expands to `"Geist", "Geist Fallback"`, and
+    // that generated face is local(Arial) with no unicode-range — it answers
+    // for Arabic, so Tajawal never receives the glyph.
+    expect(fontOptions.geist?.fallback).toContain("Tajawal");
+    expect(fontOptions.tajawal?.subsets).toContain("arabic");
   });
 });

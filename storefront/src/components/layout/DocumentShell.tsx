@@ -16,10 +16,23 @@ const spreeApiOrigin = (() => {
   }
 })();
 
+/**
+ * `fallback` is what makes the Arabic face reachable, and it is load-bearing.
+ *
+ * By default `--font-geist` expands to `"Geist", "Geist Fallback"`, where that
+ * second face is `local(Arial)` with no `unicode-range`. It therefore answers
+ * for Arabic as well, and Tajawal — declared after it in the body stack — never
+ * receives the glyph, so Arabic silently renders in metric-warped Arial.
+ * Naming Tajawal here makes the variable expand to `"Geist", Tajawal` instead.
+ *
+ * `adjustFontFallback: false` would express the same intent, but the Turbopack
+ * build ignores it (verified against the emitted CSS); this option it honours.
+ */
 const geist = Geist({
   variable: "--font-geist",
   subsets: ["latin"],
   display: "swap",
+  fallback: ["Tajawal"],
 });
 
 /**

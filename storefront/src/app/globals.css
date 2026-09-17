@@ -148,6 +148,9 @@
  * in Geist so the browser falls through per-character to Tajawal — the approved
  * AWJ Store default face (AWJ_STORE_DEFAULT_DESIGN_DIRECTION.md §5). Arabic is
  * the storefront's default locale, so it must not land on a system fallback.
+ *
+ * This only works because Geist names Tajawal as its own fallback; read the
+ * rationale in DocumentShell.tsx before reordering this stack.
  */
 body {
   font-family: var(--font-geist), var(--font-tajawal), system-ui, sans-serif;

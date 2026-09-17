@@ -61,6 +61,28 @@ describe("MobileBottomNav", () => {
     );
   });
 
+  it("keeps Shop selected while browsing a category, which is not under /products", () => {
+    pathname = "/us/en/c/electronics/phones";
+    render(<MobileBottomNav basePath="/us/en" />);
+
+    expect(screen.getByRole("link", { name: "Products" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    expect(screen.getByRole("link", { name: "Home" })).not.toHaveAttribute(
+      "aria-current",
+    );
+  });
+
+  it("does not let a route merely prefixed with an owned path select an item", () => {
+    pathname = "/us/en/cart-recovery";
+    render(<MobileBottomNav basePath="/us/en" />);
+
+    expect(screen.getByRole("link", { name: "Cart" })).not.toHaveAttribute(
+      "aria-current",
+    );
+  });
+
   it("shows the cart count once the client cart is known", async () => {
     itemCount = 3;
     render(<MobileBottomNav basePath="/us/en" />);
