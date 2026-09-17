@@ -38,10 +38,16 @@
     "allProducts": "All Products",
     "contact": "Contact",
     "viewAllCategory": "View all {category}",
-    "openSearch": "Open search",
-    "closeSearch": "Close search",
     "myAccount": "My Account",
-    "wholesale": "Wholesale"
+    "wholesale": "Wholesale",
+    "shop": "Products",
+    "cart": "Cart",
+    "primaryNavigation": "Primary navigation",
+    "categoryNavigation": "Store categories",
+    "scrollCategoriesBack": "Show previous categories",
+    "scrollCategoriesForward": "Show more categories",
+    "skipToContent": "Skip to content",
+    "submitSearch": "Search"
   },
   "regionPreferences": {
     "title": "Region and language",
@@ -70,7 +76,7 @@
     "wholesale": "Trade & Wholesale"
   },
   "home": {
-    "welcome": "{storeName} Storefront",
+    "welcome": "{storeName}",
     "heroDescription": "A production-ready, open-source storefront built with Next.js, React, and the Spree TypeScript SDK. Self-host it. Own your stack. No vendor lock-in. Zero platform fees.",
     "shopNow": "Shop All",
     "forkOnGithub": "Fork on GitHub",

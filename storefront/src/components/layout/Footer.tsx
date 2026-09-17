@@ -3,6 +3,8 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { getTranslations } from "next-intl/server";
 import type { ReactNode } from "react";
+import { StoreBrand } from "@/components/layout/StoreBrand";
+import { StoreContainer } from "@/components/layout/StoreContainer";
 import { POLICY_LINKS } from "@/lib/constants/policies";
 import { isWholesaleEnabled } from "@/lib/spree";
 
@@ -18,15 +20,30 @@ interface FooterCategoryLinksProps {
   basePath: string;
 }
 
+/*
+ * The global focus ring is a black outline, which is invisible on this band, so
+ * the footer states its own.
+ */
+const footerLinkClassName =
+  "text-sm text-store-footer-link transition-colors hover:text-store-footer-foreground focus-visible:outline-store-footer-foreground";
+
+/**
+ * How many categories the footer lists. A catalogue with forty root categories
+ * would otherwise turn one footer column into a sitemap three times the height
+ * of the others; the full tree stays one tap away behind "All products", the
+ * category rail and the menu.
+ */
+const FOOTER_CATEGORY_LIMIT = 6;
+
 export function FooterCategoryLinks({
   rootCategories,
   basePath,
 }: FooterCategoryLinksProps) {
-  return rootCategories.map((category) => (
+  return rootCategories.slice(0, FOOTER_CATEGORY_LIMIT).map((category) => (
     <li key={category.id}>
       <Link
         href={`${basePath}/c/${category.permalink}`}
-        className="text-sm text-neutral-400 hover:text-neutral-200 transition-colors"
+        className={footerLinkClassName}
       >
         {category.name}
       </Link>
@@ -34,6 +51,34 @@ export function FooterCategoryLinks({
   ));
 }
 
+interface FooterColumnProps {
+  id: string;
+  title: string;
+  children: ReactNode;
+}
+
+function FooterColumn({ id, title, children }: FooterColumnProps) {
+  return (
+    <nav aria-labelledby={id}>
+      <h2 id={id} className="text-sm font-bold text-store-footer-foreground">
+        {title}
+      </h2>
+      <ul className="mt-4 space-y-2.5">{children}</ul>
+    </nav>
+  );
+}
+
+/**
+ * The storefront footer.
+ *
+ * A dark band closing the page, as the approved baseline draws it.
+ *
+ * It carries only navigation the storefront actually has — categories from the
+ * catalogue, the account routes, and the configured policy pages. The
+ * reference's about paragraph, payment marks and registration badge are absent:
+ * none of them are configured anywhere in AWJ, and a footer is exactly where an
+ * invented claim reads as a commitment.
+ */
 export async function Footer({
   basePath,
   locale,
@@ -48,92 +93,92 @@ export async function Footer({
   const year = new Date().getFullYear();
 
   return (
-    <footer className="bg-primary text-gray-300">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="grid grid-cols-1 gap-8 md:grid-cols-5">
-          <div className="col-span-1 md:col-span-2">
-            <span className="text-xl font-bold text-white">{displayName}</span>
-          </div>
-          <div>
-            <h3 className="text-sm font-medium text-neutral-300">
-              {t("shop")}
-            </h3>
-            <ul className="mt-4 space-y-3">
+    <footer className="bg-store-footer text-store-footer-link">
+      <StoreContainer className="py-10 md:py-12">
+        {/*
+          Identity takes its own line above the navigation rather than a column
+          beside it. The reference pairs the brand with an about paragraph and
+          payment marks to fill that column; AWJ configures neither, and a lone
+          wordmark in a quarter-width column reads as a gap where content was
+          removed. Given the full measure it reads as the band's masthead, and
+          the three real link groups then divide the width evenly.
+        */}
+        <StoreBrand
+          href={basePath || "/"}
+          name={displayName}
+          tone="dark"
+          size="md"
+          className="focus-visible:outline-store-footer-foreground"
+        />
+
+        <div className="mt-8 grid grid-cols-2 gap-x-6 gap-y-8 border-t border-store-footer-border pt-8 sm:grid-cols-3">
+          <FooterColumn id="footer-shop" title={t("shop")}>
+            <li>
+              <Link
+                href={`${basePath}/products`}
+                className={footerLinkClassName}
+              >
+                {t("allProducts")}
+              </Link>
+            </li>
+            {categoryLinks}
+          </FooterColumn>
+
+          <FooterColumn id="footer-account" title={t("account")}>
+            <li>
+              <Link
+                href={`${basePath}/account`}
+                className={footerLinkClassName}
+              >
+                {t("myAccount")}
+              </Link>
+            </li>
+            <li>
+              <Link
+                href={`${basePath}/account/orders`}
+                className={footerLinkClassName}
+              >
+                {t("orderHistory")}
+              </Link>
+            </li>
+            <li>
+              <Link href={`${basePath}/cart`} className={footerLinkClassName}>
+                {t("cart")}
+              </Link>
+            </li>
+            {wholesaleEnabled && (
               <li>
                 <Link
-                  href={`${basePath}/products`}
-                  className="text-sm text-neutral-400 hover:text-neutral-200 transition-colors"
+                  href={`${basePath}/wholesale`}
+                  className={footerLinkClassName}
                 >
-                  {t("allProducts")}
+                  {t("wholesale")}
                 </Link>
               </li>
-              {categoryLinks}
-            </ul>
-          </div>
-          <div>
-            <h3 className="text-sm font-medium text-neutral-300">
-              {t("account")}
-            </h3>
-            <ul className="mt-4 space-y-3">
-              <li>
+            )}
+          </FooterColumn>
+
+          <FooterColumn id="footer-policies" title={t("policies")}>
+            {POLICY_LINKS.map((policy) => (
+              <li key={policy.slug}>
                 <Link
-                  href={`${basePath}/account`}
-                  className="text-sm text-neutral-400 hover:text-neutral-200 transition-colors"
+                  href={`${basePath}/policies/${policy.slug}`}
+                  className={footerLinkClassName}
                 >
-                  {t("myAccount")}
+                  {tp(policy.nameKey)}
                 </Link>
               </li>
-              <li>
-                <Link
-                  href={`${basePath}/account/orders`}
-                  className="text-sm text-neutral-400 hover:text-neutral-200 transition-colors"
-                >
-                  {t("orderHistory")}
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href={`${basePath}/cart`}
-                  className="text-sm text-neutral-400 hover:text-neutral-200 transition-colors"
-                >
-                  {t("cart")}
-                </Link>
-              </li>
-              {wholesaleEnabled && (
-                <li>
-                  <Link
-                    href={`${basePath}/wholesale`}
-                    className="text-sm text-neutral-400 hover:text-neutral-200 transition-colors"
-                  >
-                    {t("wholesale")}
-                  </Link>
-                </li>
-              )}
-            </ul>
-          </div>
-          <div>
-            <h3 className="text-sm font-medium text-neutral-300">
-              {t("policies")}
-            </h3>
-            <ul className="mt-4 space-y-3">
-              {POLICY_LINKS.map((policy) => (
-                <li key={policy.slug}>
-                  <Link
-                    href={`${basePath}/policies/${policy.slug}`}
-                    className="text-sm text-neutral-400 hover:text-neutral-200 transition-colors"
-                  >
-                    {tp(policy.nameKey)}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
+            ))}
+          </FooterColumn>
         </div>
-        <div className="mt-8 pt-8 border-t border-neutral-800 text-xs text-neutral-400 text-center">
-          <p>
-            © {year} {displayName}
+      </StoreContainer>
+
+      <div className="border-t border-store-footer-border">
+        <StoreContainer className="py-5">
+          <p className="text-xs text-store-footer-muted">
+            © {year} <bdi>{displayName}</bdi>
           </p>
-        </div>
+        </StoreContainer>
       </div>
     </footer>
   );

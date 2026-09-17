@@ -5,7 +5,9 @@ import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import type { ReactNode } from "react";
 import { CartButton } from "@/components/layout/CartButton";
-import { SearchToggle } from "@/components/layout/SearchToggle";
+import { StoreBrand } from "@/components/layout/StoreBrand";
+import { StoreContainer } from "@/components/layout/StoreContainer";
+import { StoreSearch } from "@/components/layout/StoreSearch";
 import { Button } from "@/components/ui/button";
 import { isWholesaleEnabled } from "@/lib/spree";
 
@@ -27,7 +29,7 @@ const LazyRegionPreferences = dynamic(
       default: mod.RegionPreferences,
     })),
   {
-    loading: () => <div className="size-11" aria-hidden="true" />,
+    loading: () => <div className="h-4 w-20" aria-hidden="true" />,
   },
 );
 
@@ -35,6 +37,7 @@ interface HeaderProps {
   basePath: string;
   locale: Locale;
   mobileNavigation: ReactNode;
+  categoryNavigation: ReactNode;
   storeName: string | null;
 }
 
@@ -56,54 +59,111 @@ export function HeaderMobileMenu({
   );
 }
 
+/**
+ * The storefront header.
+ *
+ * Three bands from `md` up, matching the approved baseline's desktop anatomy: a
+ * slim utility strip carrying region, language and currency; the identity row
+ * with search and the shopper actions; and the category rail. Below `md` the
+ * utility strip and the rail fold away, the identity row compacts to 54px with
+ * the brand centred, and search wraps onto a second line of the same band.
+ *
+ * That wrap is why the identity band is one grid rather than two stacked rows:
+ * a second `StoreSearch` would own a second query and a second suggestion list,
+ * so crossing `md` mid-search — a tablet rotation — would drop the shopper onto
+ * a blank field. One instance moves between placements instead.
+ *
+ * The whole banner is what sticks. A sticky inner row could only travel inside
+ * this element's own box and would disappear on the first scroll, so search,
+ * cart and menu stay reachable together.
+ *
+ * Two actions in the reference are deliberately absent. Wishlist has no
+ * persistence behind it, and the cart total has no field on the cart context —
+ * inventing either would put a promise in the chrome that the platform cannot
+ * keep.
+ */
 export async function Header({
   basePath,
   locale,
   mobileNavigation,
+  categoryNavigation,
   storeName,
 }: HeaderProps) {
   const t = await getTranslations({ locale, namespace: "header" });
   const footer = await getTranslations({ locale, namespace: "footer" });
   const wholesaleEnabled = isWholesaleEnabled();
   const displayName = storeName?.trim() || footer("shop");
+  const homeHref = basePath || "/";
 
   return (
-    <SearchToggle
-      basePath={basePath}
-      left={mobileNavigation}
-      center={
-        <Link
-          href={basePath || "/"}
-          className="flex items-center min-w-0 text-base md:text-lg font-semibold tracking-tight text-gray-900 truncate"
-        >
-          {displayName}
-        </Link>
-      }
-      rightStart={
-        <div className="hidden lg:flex lg:items-center lg:gap-1">
-          {wholesaleEnabled && (
-            <Link
-              href={`${basePath}/wholesale`}
-              className="px-2 py-1.5 text-sm text-gray-500 hover:text-gray-900 transition-colors whitespace-nowrap"
-            >
-              {t("wholesale")}
-            </Link>
-          )}
-          <LazyRegionPreferences variant="header" />
-        </div>
-      }
-      rightEnd={
-        <>
-          <div className="hidden md:block">
-            <Button variant="ghost" size="icon-lg" asChild>
-              <Link href={`${basePath}/account`} aria-label={t("account")}>
-                <User className="size-5" />
-              </Link>
-            </Button>
+    <header className="sticky top-0 z-40 bg-store-surface">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:start-4 focus:z-50 focus:rounded-store focus:border focus:border-store-border focus:bg-store-surface focus:px-3 focus:py-2 focus:shadow-sm focus:text-sm focus:font-medium focus:text-store-foreground"
+      >
+        {t("skipToContent")}
+      </a>
+
+      <div className="hidden border-b border-store-border bg-store-surface-muted md:block">
+        <StoreContainer>
+          <div className="flex h-store-utility items-center justify-end">
+            <LazyRegionPreferences variant="utility" />
           </div>
-          <CartButton />
-        </>
-      }
-    />
+        </StoreContainer>
+      </div>
+
+      <div className="border-b border-store-border">
+        <StoreContainer>
+          {/*
+            A three-column grid centres the brand between the menu and the cart
+            on handhelds without absolute positioning, and mirrors for free in
+            RTL. Search sits on a second grid line there and moves into the row
+            itself from `md`, where the same children lay out as a flex line.
+          */}
+          <div className="grid grid-cols-[1fr_auto_1fr] grid-rows-[var(--store-header-height)_auto] items-center gap-x-2 gap-y-1 md:flex md:h-store-header-lg md:grid-rows-none md:gap-6">
+            <div className="-ms-2 justify-self-start lg:hidden">
+              {mobileNavigation}
+            </div>
+
+            <StoreBrand
+              href={homeHref}
+              name={displayName}
+              size="md"
+              className="justify-self-center md:justify-self-start"
+            />
+
+            <div className="order-last col-span-3 min-w-0 pb-2.5 md:order-none md:col-span-1 md:flex-1 md:pb-0">
+              <StoreSearch
+                basePath={basePath}
+                className="md:max-w-2xl"
+                withSubmit
+              />
+            </div>
+
+            <div className="flex items-center justify-self-end gap-1 md:ms-auto md:gap-2">
+              {wholesaleEnabled && (
+                <Link
+                  href={`${basePath}/wholesale`}
+                  className="hidden whitespace-nowrap px-2 py-1.5 text-sm text-store-muted-foreground transition-colors hover:text-store-foreground lg:block"
+                >
+                  {t("wholesale")}
+                </Link>
+              )}
+              <div className="hidden md:block">
+                <Button variant="ghost" size="icon-lg" asChild>
+                  <Link href={`${basePath}/account`} aria-label={t("account")}>
+                    <User className="size-5" />
+                  </Link>
+                </Button>
+              </div>
+              <CartButton variant="icon" className="md:hidden" />
+              <CartButton variant="action" className="hidden md:inline-flex" />
+            </div>
+          </div>
+        </StoreContainer>
+      </div>
+
+      {categoryNavigation}
+    </header>
   );
 }

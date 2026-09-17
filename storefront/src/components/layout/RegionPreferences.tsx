@@ -28,7 +28,7 @@ import { useCountrySwitch } from "@/hooks/useCountrySwitch";
 import { cn } from "@/lib/utils";
 
 interface RegionPreferencesProps {
-  variant: "menu" | "header";
+  variant: "menu" | "header" | "utility";
 }
 
 interface CountryFlagProps {
@@ -139,6 +139,9 @@ export function RegionPreferences({ variant }: RegionPreferencesProps) {
   }
 
   const isHeaderVariant = variant === "header";
+  // The utility bar reuses the menu control's flag | locale | currency reading
+  // at the strip's own 11px scale, without the underline the drawer uses.
+  const isUtilityVariant = variant === "utility";
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -156,21 +159,34 @@ export function RegionPreferences({ variant }: RegionPreferencesProps) {
             type="button"
             aria-label={t("title")}
             className={cn(
-              "relative flex w-fit items-center gap-2 pb-1 text-left font-semibold uppercase tracking-wide outline-none transition-colors after:absolute after:bottom-0 after:left-0 after:h-px after:w-full after:origin-right after:scale-x-0 after:bg-current after:transition-transform after:duration-500 after:ease-in-out hover:after:origin-left hover:after:scale-x-100 focus-visible:after:origin-left focus-visible:after:scale-x-100 motion-reduce:after:transition-none",
-              "text-sm text-foreground hover:text-foreground focus-visible:text-foreground",
+              "relative flex w-fit items-center gap-2 text-left font-semibold uppercase transition-colors",
+              isUtilityVariant
+                ? // No `outline-none` here: the drawer's variant suppresses the
+                  // app's focus ring because it draws its own underline
+                  // instead, and this branch has no such substitute. Letting
+                  // the global ring through gives the control the same focus
+                  // treatment as every other control in the storefront.
+                  "gap-1.5 text-[11px] text-store-muted-foreground hover:text-store-foreground focus-visible:text-store-foreground"
+                : "pb-1 tracking-wide text-sm text-foreground outline-none hover:text-foreground focus-visible:text-foreground after:absolute after:bottom-0 after:left-0 after:h-px after:w-full after:origin-right after:scale-x-0 after:bg-current after:transition-transform after:duration-500 after:ease-in-out hover:after:origin-left hover:after:scale-x-100 focus-visible:after:origin-left focus-visible:after:scale-x-100 motion-reduce:after:transition-none",
             )}
           >
             <CountryFlag
               country={country}
               className={cn(
-                "size-3.5 shrink-0 rounded-full shadow-sm ring-1",
-                "ring-black/10",
+                "shrink-0 rounded-full shadow-sm ring-1 ring-black/10",
+                isUtilityVariant ? "size-3" : "size-3.5",
               )}
               sizes="16px"
             />
-            <span aria-hidden="true" className={cn("h-4 w-px", "bg-border")} />
+            <span
+              aria-hidden="true"
+              className={cn("w-px bg-border", isUtilityVariant ? "h-3" : "h-4")}
+            />
             <span>{locale.toUpperCase()}</span>
-            <span aria-hidden="true" className={cn("h-4 w-px", "bg-border")} />
+            <span
+              aria-hidden="true"
+              className={cn("w-px bg-border", isUtilityVariant ? "h-3" : "h-4")}
+            />
             <span>{currency}</span>
           </button>
         )}
