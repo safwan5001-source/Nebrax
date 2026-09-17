@@ -824,6 +824,12 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         // تحتية تجارية، لا قراءة.
         Route::put('commerce/workspace/storefronts/{id}', [CommerceWorkspaceStorefrontsController::class, 'update'])->middleware($perm('commerce.manage'));
 
+        // STORE-ADMIN-ADOPT-1B-2: رؤية نطاقات متجر قائم — قراءة فقط،
+        // بلا أي فعل كتابي على StorefrontDomain. نفس صلاحية 1B-1
+        // (commerce.manage): حالة النطاق/التحقّق أكثر حساسية من قائمة
+        // المتاجر الأساسية (`index`)، فلا تُترك لاستثناء الخدمة الذاتية وحده.
+        Route::get('commerce/workspace/storefronts/{id}/domains', [CommerceWorkspaceStorefrontsController::class, 'domains'])->middleware($perm('commerce.manage'));
+
         // Cycle 0: Workspace foundation only. لا CRUD ولا مبيعات ولا اتصال أجهزة
         // قبل دوراتها، لكن هذا المسار يثبت سلسلة RBAC + entitlement + حالة التطبيق.
         Route::get('fuel-stations/workspace', [FuelStationsWorkspaceController::class, 'index'])
