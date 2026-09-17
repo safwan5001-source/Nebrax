@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\CommerceCart;
+use App\Models\CommerceCheckout;
+use App\Models\CommerceOrder;
 use App\Models\SalesChannel;
 use App\Models\Storefront;
 use App\Models\Tenant;
@@ -59,6 +61,29 @@ class CommerceCartConsumedStatusMigrationTest extends TestCase
             'token_hash' => hash('sha256', 'migration-cart-'.Str::random(16)),
             'status' => $status,
             'expires_at' => now()->addDay(),
+        ]);
+    }
+
+    private function makeCheckout(array $ctx, CommerceCart $cart, string $status): CommerceCheckout
+    {
+        return CommerceCheckout::create([
+            'storefront_id' => $ctx['storefront']->id,
+            'sales_channel_id' => $ctx['channel']->id,
+            'cart_id' => $cart->id,
+            'status' => $status,
+            'expires_at' => now()->addHour(),
+        ]);
+    }
+
+    private function makeOrder(array $ctx, CommerceCheckout $checkout): CommerceOrder
+    {
+        return CommerceOrder::create([
+            'sales_channel_id' => $ctx['channel']->id,
+            'storefront_id' => $ctx['storefront']->id,
+            'commerce_checkout_id' => $checkout->id,
+            'number' => 'CORD-MIG-TEST-'.Str::random(8),
+            'status' => CommerceOrder::STATUS_CONFIRMED,
+            'total' => 1000,
         ]);
     }
 
@@ -253,5 +278,145 @@ class CommerceCartConsumedStatusMigrationTest extends TestCase
         $this->assertSame(CommerceCart::STATUS_ACTIVE, $active->fresh()->status);
         $this->assertSame(CommerceCart::STATUS_CONSUMED, $consumed->fresh()->status);
         $this->assertSame(2, DB::table('commerce_carts')->count());
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    //  Backfill (P1 review follow-up) — historical `active` Cart with a
+    //  provable prior successful CommerceOrder must become `consumed`.
+    // ═══════════════════════════════════════════════════════════════
+
+    /** A) historical active cart + completed checkout + successful CommerceOrder → consumed. */
+    #[Test]
+    public function a_historical_active_cart_with_a_completed_checkout_and_order_is_backfilled_to_consumed(): void
+    {
+        $ctx = $this->seedContext('backfill-a');
+        $cart = $this->makeCart($ctx, CommerceCart::STATUS_ACTIVE);
+        $checkout = $this->makeCheckout($ctx, $cart, CommerceCheckout::STATUS_COMPLETED);
+        $this->makeOrder($ctx, $checkout);
+        app(TenantContext::class)->forget();
+
+        $migration = require database_path('migrations/'.self::MIGRATION);
+        $migration->up();
+
+        $this->assertSame(CommerceCart::STATUS_CONSUMED, $cart->fresh()->status);
+    }
+
+    /** B) historical active cart + open/incomplete checkout, no CommerceOrder → stays active. */
+    #[Test]
+    public function a_historical_active_cart_with_an_open_checkout_and_no_order_stays_active(): void
+    {
+        $ctx = $this->seedContext('backfill-b');
+        $cart = $this->makeCart($ctx, CommerceCart::STATUS_ACTIVE);
+        $this->makeCheckout($ctx, $cart, CommerceCheckout::STATUS_ACTIVE);
+        app(TenantContext::class)->forget();
+
+        $migration = require database_path('migrations/'.self::MIGRATION);
+        $migration->up();
+
+        $this->assertSame(CommerceCart::STATUS_ACTIVE, $cart->fresh()->status);
+    }
+
+    /** C) historical active cart with no Checkout/Order at all → stays active. */
+    #[Test]
+    public function a_historical_active_cart_with_no_checkout_or_order_stays_active(): void
+    {
+        $ctx = $this->seedContext('backfill-c');
+        $cart = $this->makeCart($ctx, CommerceCart::STATUS_ACTIVE);
+        app(TenantContext::class)->forget();
+
+        $migration = require database_path('migrations/'.self::MIGRATION);
+        $migration->up();
+
+        $this->assertSame(CommerceCart::STATUS_ACTIVE, $cart->fresh()->status);
+    }
+
+    /**
+     * D) historical expired cart stays expired — even when it is (however
+     * implausibly) linked to a completed checkout + order, proving the
+     * backfill's `WHERE status = 'active'` guard is unconditional and never
+     * reinterprets `expired`.
+     */
+    #[Test]
+    public function a_historical_expired_cart_stays_expired_even_with_a_completed_checkout_and_order(): void
+    {
+        $ctx = $this->seedContext('backfill-d');
+        $cart = $this->makeCart($ctx, CommerceCart::STATUS_EXPIRED);
+        $checkout = $this->makeCheckout($ctx, $cart, CommerceCheckout::STATUS_COMPLETED);
+        $this->makeOrder($ctx, $checkout);
+        app(TenantContext::class)->forget();
+
+        $migration = require database_path('migrations/'.self::MIGRATION);
+        $migration->up();
+
+        $this->assertSame(CommerceCart::STATUS_EXPIRED, $cart->fresh()->status);
+    }
+
+    /**
+     * E) Cross-tenant fail-closed: a Checkout/Order pair carrying a
+     * *different* tenant_id than the Cart it points `cart_id` at (a data
+     * shape the `cart_id` foreign key alone does not forbid — it has no
+     * same-tenant clause) must never flip that Cart. The explicit
+     * `tenant_id`-matched `EXISTS` join is what refuses this, not
+     * `TenantScope` (inactive inside a migration's raw `DB::table()` calls).
+     */
+    #[Test]
+    public function cross_tenant_checkout_and_order_data_never_backfills_another_tenants_cart(): void
+    {
+        $tenantA = $this->seedContext('backfill-e-a');
+        $cartA = $this->makeCart($tenantA, CommerceCart::STATUS_ACTIVE);
+        app(TenantContext::class)->forget();
+
+        $tenantB = $this->seedContext('backfill-e-b');
+        app(TenantContext::class)->forget();
+
+        // Checkout/Order both carry tenant B's tenant_id but point cart_id
+        // at tenant A's cart — a cross-tenant shape the FK itself permits.
+        app(TenantContext::class)->set($tenantB['tenant']->id);
+        $crossCheckout = CommerceCheckout::create([
+            'storefront_id' => $tenantB['storefront']->id,
+            'sales_channel_id' => $tenantB['channel']->id,
+            'cart_id' => $cartA->id,
+            'status' => CommerceCheckout::STATUS_COMPLETED,
+            'expires_at' => now()->addHour(),
+        ]);
+        $this->makeOrder($tenantB, $crossCheckout);
+        app(TenantContext::class)->forget();
+
+        $migration = require database_path('migrations/'.self::MIGRATION);
+        $migration->up();
+
+        // Tenant A's cart is untouched — the cross-tenant checkout/order pair
+        // never counts as proof for it.
+        $this->assertSame(CommerceCart::STATUS_ACTIVE, $cartA->fresh()->status);
+
+        // Tenant B, meanwhile, has no cart of its own in this scenario, and
+        // the migration must not have created or mutated anything for it.
+        app(TenantContext::class)->set($tenantB['tenant']->id);
+        $this->assertSame(0, CommerceCart::withoutGlobalScopes()->where('tenant_id', $tenantB['tenant']->id)->count());
+        app(TenantContext::class)->forget();
+    }
+
+    /** F) rollback with real backfilled `consumed` rows fails closed, same contract as a normally-consumed row. */
+    #[Test]
+    public function down_refuses_after_a_real_backfill_produced_consumed_rows(): void
+    {
+        $ctx = $this->seedContext('backfill-f');
+        $cart = $this->makeCart($ctx, CommerceCart::STATUS_ACTIVE);
+        $checkout = $this->makeCheckout($ctx, $cart, CommerceCheckout::STATUS_COMPLETED);
+        $this->makeOrder($ctx, $checkout);
+        app(TenantContext::class)->forget();
+
+        $migration = require database_path('migrations/'.self::MIGRATION);
+        $migration->up();
+        $this->assertSame(CommerceCart::STATUS_CONSUMED, $cart->fresh()->status);
+
+        try {
+            $migration->down();
+            $this->fail('يجب أن يرفض down() التراجع بوجود صفّ consumed ناتج عن backfill.');
+        } catch (\RuntimeException $exception) {
+            $this->assertStringContainsString('consumed', $exception->getMessage());
+        }
+
+        $this->assertSame(CommerceCart::STATUS_CONSUMED, $cart->fresh()->status);
     }
 }
