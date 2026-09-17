@@ -76,6 +76,19 @@ describe("CategoryNav", () => {
     ]);
   });
 
+  it("still renders a band when the catalogue returns no categories", () => {
+    // The layout reserves this row before the categories resolve. If the rail
+    // rendered nothing for an empty or failed response the reserved row would
+    // disappear on resolve and shift the page up.
+    render(<CategoryNav categories={[]} basePath="/us/en" />);
+
+    const nav = screen.getByRole("navigation", { name: "Store categories" });
+    expect(within(nav).getAllByRole("link")).toHaveLength(1);
+    expect(
+      within(nav).getByRole("link", { name: "All Products" }),
+    ).toHaveAttribute("href", "/us/en/products");
+  });
+
   it("marks the open category, including a child permalink", () => {
     pathname = "/us/en/c/electronics/phones";
     render(<CategoryNav categories={CATEGORIES} basePath="/us/en" />);

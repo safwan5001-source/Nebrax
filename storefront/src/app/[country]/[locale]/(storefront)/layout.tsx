@@ -33,7 +33,9 @@ function MobileNavigationFallback() {
 
 /**
  * Reserves the category rail's row so the page below it does not jump when the
- * categories resolve. It is only rendered where the rail itself is visible.
+ * categories resolve. It is only rendered where the rail itself is visible, and
+ * it matches the resolved band's height and surface for every outcome —
+ * see `StorefrontCategoryNavigation`.
  */
 function CategoryNavigationFallback() {
   return (
@@ -107,10 +109,11 @@ async function StorefrontCategoryNavigation({
 }: StorefrontNavigationProps) {
   const rootCategories = await getRootCategories(country, locale);
 
-  // A storefront with no categories yet keeps a clean header instead of an
-  // empty strip advertising a catalogue that has not been built.
-  if (rootCategories.length === 0) return null;
-
+  // Rendered whatever the catalogue returns, including nothing. The rail always
+  // carries its "all products" entry, so an empty or failed category response
+  // still resolves to a band of the same height as the fallback above — where
+  // collapsing it to null would drop that reserved row and shift the whole page
+  // up, which is the jump the fallback exists to prevent.
   return (
     <div className="hidden md:block">
       <CategoryNav
