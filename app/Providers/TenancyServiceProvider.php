@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Support\Dns\DnsTxtResolver;
+use App\Support\Dns\NativeDnsTxtResolver;
 use App\Support\RevisionBuffer;
 use App\Tenancy\BranchContext;
 use App\Tenancy\BranchSharing;
@@ -39,6 +41,12 @@ class TenancyServiceProvider extends ServiceProvider
         // الطلب/المهمّة، وإلا دُمج تعديلُ مستندٍ في قيدِ مهمّةٍ سابقة داخل
         // العامل نفسه. الحاوية تُفرغ الـ scoped بين كل طلب وكل مهمّة طابور.
         $this->app->scoped(RevisionBuffer::class, fn () => new RevisionBuffer());
+
+        // STORE-ADMIN-ADOPT-1B-3A — تنفيذ DNS TXT الإنتاجي الوحيد (لا مزوّد
+        // خارجي، `dns_get_record()` المدمجة في PHP). الاختبارات تستبدله بربط
+        // وهمي حتمي عبر الحاوية (`app()->instance(DnsTxtResolver::class, ...)`)
+        // قبل حلّ أي خدمة تعتمد عليه — بلا تغيير هنا.
+        $this->app->bind(DnsTxtResolver::class, NativeDnsTxtResolver::class);
 
         // POS يملك مزوده التشغيلي حتى لا يعتمد على HR ولا يوسّع ملف routes/api.php
         // الكبير لأجل مسارات Domain صغيرة مستقلة.

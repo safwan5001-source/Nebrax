@@ -37,13 +37,22 @@ class StorefrontDomain extends BaseModel implements CompanyWide
 
     public const VERIFICATION_FAILED = 'failed';
 
+    /**
+     * STORE-ADMIN-ADOPT-1B-3A — `verification_token`/`verified_at` مُدرجان
+     * هنا بنفس روح بقية الأعمدة: كلاهما يُكتب حصراً من كود خادمي موثوق
+     * (`CommerceWorkspaceStorefrontsService`)، لا من مُدخل عميل مباشر — لا
+     * `FormRequest` في هذا المسار يمرّر أياً منهما، فـ`fillable` هنا ليس ثغرة
+     * mass-assignment فعلية، تماماً كـ`verification_status` القائم أصلاً.
+     */
     protected $fillable = [
-        'tenant_id', 'storefront_id', 'hostname', 'type', 'is_primary', 'is_active', 'verification_status',
+        'tenant_id', 'storefront_id', 'hostname', 'type', 'is_primary', 'is_active',
+        'verification_status', 'verification_token', 'verified_at',
     ];
 
     protected $casts = [
         'is_primary' => 'boolean',
         'is_active' => 'boolean',
+        'verified_at' => 'datetime',
     ];
 
     protected $attributes = [
