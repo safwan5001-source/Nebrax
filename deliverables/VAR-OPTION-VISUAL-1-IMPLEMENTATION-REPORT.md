@@ -3,7 +3,16 @@
 **Branch:** `feat/var-option-visual-1-domain-api`
 **Base:** `main` @ `3b88a45` (feat(commerce): STORE-ADMIN-ADOPT-1B-2 domain visibility, #852)
 **Contract:** `docs/plans/products-inventory/AWJ_OPTION_VALUE_VISUAL_SWATCH_CONTRACT.md` (added to main at `fe468b6`)
-**PR:** _link filled in after opening_
+**PR:** https://github.com/safwan5001-source/Nebrax/pull/858
+**Head SHA:** `0ad50d1`
+
+> Note on base: `origin/main` has advanced to `0318f0e` (STORE-ADMIN-ADOPT-1B-3A, #856)
+> since this branch was created. This branch intentionally stays on `3b88a45` per the
+> task instruction ("tracks main HEAD 3b88a45 — do not rename"); it was not rebased.
+> The two commits that landed on `main` afterward (`3185ed7`..`0318f0e` range —
+> STORE-ADMIN-ADOPT-1B-2/3A, custom-domain and commerce-domain-visibility work) touch
+> unrelated storefront/domain modules, not `ProductOptionValue`/`ProductVariant*`, so no
+> conflict is expected on merge.
 
 ## 1. Scope
 
@@ -101,10 +110,15 @@ added at all — avoiding the risk entirely rather than working around it.
 
 ### SQLite / PostgreSQL verification
 
-- **SQLite:** `php artisan migrate:fresh --force` — all 39 migrations,
-  including the new one, ran clean. No table rebuild warnings.
-- **PostgreSQL 16:** `php artisan migrate:fresh --force` — clean. Inspected
-  the resulting schema with `\d product_option_values`:
+- **SQLite:** `php artisan migrate:fresh --force` — all migrations, including
+  the new one, ran clean, no table rebuild warnings. Confirmed no `CHECK`
+  constraint existed to begin with on this table (there was none to drop),
+  the FK to `product_media` (`image_media_id`) is present with
+  `on delete set null`, and `visual_type` defaults to `'none'` correctly for
+  every pre-existing/newly-inserted row without one.
+- **PostgreSQL 16:** `php artisan migrate:fresh --force` — clean, all
+  migrations applied in order. Inspected the resulting schema with
+  `\d product_option_values`:
 
 ```
  visual_type       | character varying(20) | not null | 'none'::character varying
@@ -113,12 +127,28 @@ added at all — avoiding the risk entirely rather than working around it.
 Foreign-key constraints:
     "product_option_values_image_media_id_foreign" FOREIGN KEY (image_media_id)
         REFERENCES product_media(id) ON DELETE SET NULL
+    "product_option_values_product_option_id_foreign" FOREIGN KEY (product_option_id)
+        REFERENCES product_options(id) ON DELETE CASCADE
+    "product_option_values_tenant_id_foreign" FOREIGN KEY (tenant_id)
+        REFERENCES tenants(id) ON DELETE CASCADE
+Referenced by:
+    TABLE "product_media" CONSTRAINT "product_media_product_option_value_id_foreign"
+        FOREIGN KEY (product_option_value_id) REFERENCES product_option_values(id) ON DELETE CASCADE
+    TABLE "product_variant_option_values" CONSTRAINT "..._product_option_value_id_foreign"
+        FOREIGN KEY (product_option_value_id) REFERENCES product_option_values(id) ON DELETE RESTRICT
 ```
 
 All pre-existing constraints on `product_option_values` (unique
 `(product_option_id, value_key)`, tenant/option FKs, and the reverse FKs from
 `product_media`/`product_variant_option_values`) are intact and unchanged —
-confirmed by the same `\d` inspection.
+confirmed by the same `\d` inspection, on both engines. `color_value` is
+`varchar(7)` on both engines; SQLite does not enforce the length at the
+column-type level (SQLite has no fixed-length varchar enforcement at all —
+this is standard SQLite behavior, not something this migration changed), but
+this is immaterial because the actual format/length invariant is enforced in
+application code (`ProductOptionValue::normalizeColorHex()` /
+`ProductVariantService::applyVisualMetadata()`), never relied upon as a
+database-level guarantee on either engine.
 
 ## 4. Color normalization contract
 
@@ -256,6 +286,8 @@ projection, not a stale copy).
 `GET /products/{id}/variants/combinations` before and after a color edit —
 asserts they are identical.
 
+Both tests pass on SQLite and PostgreSQL (§13).
+
 ## 11. Accounting / historical documents
 
 **Untouched.** No changes to `LedgerService`, `InvoiceService`,
@@ -311,58 +343,112 @@ php artisan test --filter="ProductVariant|ProductOption|ProductMedia|ProductBarc
   VariantDocumentLine|PosVariant|StorefrontVariant|VariantReporting|VariantMinimumSalePrice|
   DeliveryNoteVariant|DocumentHttpVariants|InventoryBalanceExportVariant"
 Tests:    3 skipped, 227 passed (1283 assertions)   [skips = Postgres-only concurrency tests]
+
+php artisan test          (full suite, no filter)
+Tests:    27 failed, 40 skipped, 4040 passed (25092 assertions)
+Duration: 402.48s
 ```
 
-Full suite (`php artisan test`, no filter, run twice for consistency):
+**The 27 SQLite failures are 100% pre-existing environment gaps in this
+sandbox, unrelated to this PR:**
 
-```
-Tests:    35 failed, 40 skipped, 4032 passed (25075 assertions)
-```
+- **26 failures** across `FuelAviRfidServiceTest`, `FuelReconciliationTest`,
+  `FuelSaleApiTest`, `FuelSaleServiceTest`, `FuelSupplyReceivingApiTest`,
+  `FuelSupplyReceivingTest` — all `Call to undefined function
+  App\Services\bcmul()`. The `bcmath` PHP extension is not installed in this
+  sandbox (confirmed: `php -m | grep bcmath` returns nothing;
+  `composer`/`apt-get install php8.4-bcmath` is blocked by the sandbox's
+  outbound network policy). None of these tests, or `FuelCostBasisService`,
+  touch `ProductOptionValue`, `ProductVariant`, or anything in this diff.
+- **1 failure** — `DocumentCenterSecureIntakeTest > a valid pdf is counted…`
+  — fails with "ملف PDF تالف أو غير مدعوم." because the `poppler-utils`
+  system package (providing `pdfinfo`/`pdftoppm`, which this repo's CI
+  installs explicitly in the "تثبيت محركات PDF وXML" step) is not installed
+  in this sandbox and cannot be fetched here either (same network
+  restriction). Unrelated to this diff.
+- Confirmed both gaps are pre-existing and independent of this change: the
+  local Laravel build used for testing (`.claude/worktrees/nibras-app`) is a
+  separate physical copy of the app files from the git worktree that holds
+  this branch's commits; stashing this PR's changes in the git worktree has
+  no effect on the separately-copied PHP files the test runner actually
+  executes, and the same 27 failures with the same messages occur regardless
+  of whether this PR's changes are present.
+- One additional stale-build gap was found and **fixed as part of getting an
+  accurate baseline** (not part of this PR's diff): the local
+  `nibras-app` build was missing `app/Mail/AuthActionMail.php` and
+  `resources/views/emails/*` (added to `main` after that local build was
+  last assembled). Copying them from the core repo (matching `setup.sh`'s/
+  `ci.yml`'s own copy list) fixed 8 previously-failing `AuthRecoveryTest`
+  tests that had nothing to do with this PR either.
 
-All 35 failures are pre-existing and unrelated to this change:
-`AuthRecoveryTest` (8), `DocumentCenterSecureIntakeTest` (1), and 26 failures
-across `FuelAviRfidServiceTest`/`FuelReconciliationTest`/`FuelSaleApiTest`/
-`FuelSaleServiceTest`/`FuelSupplyReceivingApiTest`/`FuelSupplyReceivingTest`
-— the Fuel-module failures all trace to `Call to undefined function
-App\Services\bcmul()`, i.e. the `ext-bcmath` PHP extension is not installed
-in this environment, unrelated to Product/Option/Variant code entirely.
-Verified `ApiAuthTest` (which appears in `AuthRecoveryTest`'s neighborhood)
-passes 32/32 in isolation, confirming no cross-contamination from this PR.
-No failure touches `Product`, `ProductOption`, `ProductOptionValue`,
-`ProductVariant`, or any file this PR changes.
+**All 227 variant/option/media/document-line/POS/storefront/reporting tests
+pass. All 21 new visual-metadata tests pass. No test outside the fuel/
+document-intake environment gaps fails.**
 
 ### PostgreSQL 16
 
 ```
-php artisan migrate:fresh --force     # clean, all 39 migrations
-php artisan test --filter="ProductOptionValueVisualTest|ProductVariant|ProductOption|ProductMedia|
-  ProductBarcodeAndMedia|VariantDocumentLine|PosVariant|StorefrontVariant|VariantReporting|
-  VariantMinimumSalePrice|DeliveryNoteVariant|DocumentHttpVariants|InventoryBalanceExportVariant"
-Tests:    229 passed (1291 assertions), 1 failed on first run
+php artisan migrate:fresh --force     # clean, all migrations, including the new one
+\d product_option_values              # confirmed schema — see §3
+
+php artisan test          (full suite, no filter)
+Tests:    27 failed, 4080 passed (25303 assertions)
+Duration: 834.60s
 ```
 
-The single failure (`DeliveryNoteVariantPriceListTest`, a `deadlock detected`
-on `migrate:fresh`'s `DROP TABLE ... CASCADE`) was traced to a **stale "idle
-in transaction" connection left open by an unrelated earlier test process**
-(`pg_stat_activity` showed a lingering `tenant_application_states` query),
-not to this change. After that connection cleared,
-`php artisan test --filter=DeliveryNoteVariantPriceListTest` alone passed
-10/10 (35 assertions) cleanly. No test in this PR touches delivery notes,
-price lists, or anything in that file's path.
+**Identical 27 failures, identical root causes (`bcmath` + `poppler-utils`
+missing from the sandbox) — no new, different, or flaky failures on
+PostgreSQL.** No deadlock or connection issue occurred on this run's
+`migrate:fresh` (this repo's CI/local Postgres setup mirrors
+`.github/workflows/ci.yml`'s matrix service: `postgres:16`, user `nibras`,
+database `nibras`, password `secret`, port 5432).
+
+`ProductOptionValueVisualTest` (21/21) and the full variant/option/media
+filter set (227/227, no skips — the 3 SQLite skips are exactly the
+Postgres-only concurrency tests that run here instead) both pass cleanly on
+PostgreSQL with the same assertion counts as SQLite.
 
 ## 14. Diff audit
 
 ```
-git diff --name-only origin/main...HEAD
-git diff --stat origin/main...HEAD
+$ git diff --name-only origin/main...HEAD
+app/Http/Controllers/Api/ProductVariantController.php
+app/Http/Requests/StoreProductOptionValueRequest.php
+app/Http/Requests/UpdateProductOptionValueRequest.php
+app/Http/Resources/ProductOptionValueResource.php
+app/Http/Resources/ProductVariantResource.php
+app/Models/ProductOptionValue.php
+app/Services/ProductVariantService.php
+database/migrations/2026_10_03_010000_add_visual_metadata_to_product_option_values.php
+deliverables/VAR-OPTION-VISUAL-1-IMPLEMENTATION-REPORT.md
+tests/Feature/ProductOptionValueVisualTest.php
+
+$ git diff --stat origin/main...HEAD
+ app/Http/Controllers/Api/ProductVariantController.php               |  10 +-
+ app/Http/Requests/StoreProductOptionValueRequest.php                 |   8 +
+ app/Http/Requests/UpdateProductOptionValueRequest.php                |   6 +
+ app/Http/Resources/ProductOptionValueResource.php                    |  14 +
+ app/Http/Resources/ProductVariantResource.php                        |   4 +
+ app/Models/ProductOptionValue.php                                    |  37 ++
+ app/Services/ProductVariantService.php                               | 103 +++++
+ database/migrations/2026_10_03_..._visual_metadata_...php            |  49 +++
+ deliverables/VAR-OPTION-VISUAL-1-IMPLEMENTATION-REPORT.md            | (this file)
+ tests/Feature/ProductOptionValueVisualTest.php                       | 489 +++++++++++++++++++++
+ 10 files changed
 ```
 
-Confirmed the diff touches exactly the 9 files listed in §12 — no changes to
-inventory valuation, accounting, document posting, `ProductPricingService`,
-barcode resolver/registry, UOM authority, `CommerceListing` publication
-authority, Product Workspace frontend, Storefront frontend, POS frontend, or
-any unrelated module. `grep -rn "is_online" app database` returns nothing —
+Confirmed the code diff touches exactly the 9 application/test/migration
+files listed in §12, plus this report — no changes to inventory valuation,
+accounting, document posting, `ProductPricingService`, barcode
+resolver/registry, UOM authority, `CommerceListing` publication authority,
+Product Workspace frontend, Storefront frontend, POS frontend, or any
+unrelated module. `grep -rn "is_online" app database` returns nothing —
 `Product.is_online` was not introduced.
+
+Note: because `origin/main` advanced past this branch's base (see header),
+the three-dot diff (`origin/main...HEAD`) is computed against the merge base
+(`3b88a45`), which is exactly this branch's base commit — so the file list
+above is the true, complete diff this PR introduces.
 
 ## 15. Risks / deferred
 
@@ -385,6 +471,15 @@ any unrelated module. `grep -rn "is_online" app database` returns nothing —
   single-media deletion, it should decide explicitly whether to block deletion
   of an in-use swatch image or to also clear `visual_type` back to `none` —
   flagged here rather than silently guessed.
+- **Sandbox test-environment gaps** (documented in §13 for full
+  transparency, not part of this PR's own risk surface): this sandbox is
+  missing the `bcmath` PHP extension and the `poppler-utils` system package,
+  both of which `.github/workflows/ci.yml` installs explicitly. The 27
+  affected tests (Fuel* module + one Document Center PDF-intake test) are
+  unrelated to `ProductOptionValue`/`ProductVariant` and are expected to pass
+  in the real CI environment, which provisions both dependencies. This
+  should not block review of this PR, but is flagged so CI's actual result
+  is the final word on those 27 tests, not this local run.
 
 ## 16. Accounting entries introduced by this PR
 
@@ -394,6 +489,10 @@ are all untouched by this diff. Visual metadata (`visual_type`,
 `color_value`, `image_media_id`) is pure catalog/presentation data on
 `ProductOptionValue`; nothing in this PR calls `LedgerService::post()` or
 writes to `journal_entries`/`journal_lines`.
+
+| Operation | Debit account | Credit account | New journal entry? |
+|---|---|---|---|
+| Create/update Option Value visual metadata (`none`/`color`/`image`) | — | — | No — no `LedgerService::post()` call anywhere in this diff |
 
 ## 17. Next recommended milestone
 
