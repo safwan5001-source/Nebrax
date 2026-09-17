@@ -66,7 +66,12 @@ export function HeaderMobileMenu({
  * slim utility strip carrying region, language and currency; the identity row
  * with search and the shopper actions; and the category rail. Below `md` the
  * utility strip and the rail fold away, the identity row compacts to 54px with
- * the brand centred, and search takes the row beneath it.
+ * the brand centred, and search wraps onto a second line of the same band.
+ *
+ * That wrap is why the identity band is one grid rather than two stacked rows:
+ * a second `StoreSearch` would own a second query and a second suggestion list,
+ * so crossing `md` mid-search — a tablet rotation — would drop the shopper onto
+ * a blank field. One instance moves between placements instead.
  *
  * The whole banner is what sticks. A sticky inner row could only travel inside
  * this element's own box and would disappear on the first scroll, so search,
@@ -112,10 +117,10 @@ export async function Header({
           {/*
             A three-column grid centres the brand between the menu and the cart
             on handhelds without absolute positioning, and mirrors for free in
-            RTL. From `md` the same children lay out as a flex row so search can
-            take the space between identity and actions.
+            RTL. Search sits on a second grid line there and moves into the row
+            itself from `md`, where the same children lay out as a flex line.
           */}
-          <div className="grid h-store-header grid-cols-[1fr_auto_1fr] items-center gap-2 md:flex md:h-store-header-lg md:gap-6">
+          <div className="grid grid-cols-[1fr_auto_1fr] grid-rows-[var(--store-header-height)_auto] items-center gap-x-2 gap-y-1 md:flex md:h-store-header-lg md:grid-rows-none md:gap-6">
             <div className="-ms-2 justify-self-start lg:hidden">
               {mobileNavigation}
             </div>
@@ -127,10 +132,10 @@ export async function Header({
               className="justify-self-center md:justify-self-start"
             />
 
-            <div className="hidden min-w-0 flex-1 md:block">
+            <div className="order-last col-span-3 min-w-0 pb-2.5 md:order-none md:col-span-1 md:flex-1 md:pb-0">
               <StoreSearch
                 basePath={basePath}
-                className="max-w-2xl"
+                className="md:max-w-2xl"
                 withSubmit
               />
             </div>
@@ -155,12 +160,6 @@ export async function Header({
               <CartButton variant="action" className="hidden md:inline-flex" />
             </div>
           </div>
-        </StoreContainer>
-      </div>
-
-      <div className="border-b border-store-border md:hidden">
-        <StoreContainer className="py-2">
-          <StoreSearch basePath={basePath} />
         </StoreContainer>
       </div>
 

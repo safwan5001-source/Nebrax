@@ -166,7 +166,15 @@ export default async function StorefrontLayout({
           </Suspense>
         }
       />
-      <main id="main-content" className="flex-1">
+      {/*
+        `scroll-margin-top` keeps the skip link's landing point clear of the
+        sticky banner; a bare `#main-content` jump would put the first content
+        behind the very header the shopper skipped.
+      */}
+      <main
+        id="main-content"
+        className="flex-1 scroll-mt-(--store-header-offset)"
+      >
         {children}
       </main>
       <Footer

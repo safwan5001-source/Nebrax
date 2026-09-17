@@ -29,6 +29,8 @@ interface SearchBarProps {
    * this adds an affordance, not a behaviour.
    */
   submitLabel?: string;
+  /** Lets the shell withhold the submit control where the field is too narrow. */
+  submitClassName?: string;
 }
 
 export function SearchBar({
@@ -37,6 +39,7 @@ export function SearchBar({
   onNavigate,
   className,
   submitLabel,
+  submitClassName,
 }: SearchBarProps) {
   const router = useRouter();
   const { currency } = useStore();
@@ -198,7 +201,7 @@ export function SearchBar({
             <Search />
           </InputGroupAddon>
           {submitLabel && (
-            <InputGroupAddon align="inline-end">
+            <InputGroupAddon align="inline-end" className={submitClassName}>
               <InputGroupButton
                 type="submit"
                 variant="default"

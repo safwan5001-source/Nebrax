@@ -322,6 +322,15 @@ input[type="search"]::-webkit-search-cancel-button {
   --store-focus-ring: var(--store-foreground);
 
   /*
+   * How much of the viewport the sticky banner occupies, so an in-page target
+   * can clear it. Below `md` that is the identity row plus the wrapped search
+   * line; the media query below covers the desktop bands. Without it the skip
+   * link lands the shopper behind the header it just skipped. The extra 0.5rem
+   * covers the bands' hairline borders and leaves the landing a little air.
+   */
+  --store-header-offset: calc(var(--store-header-height) + 3.875rem);
+
+  /*
    * shadcn aliases. The storefront already renders 40+ components through these
    * names; pointing them at the store tokens gives the whole surface one source
    * of truth instead of a green shell bolted onto a neutral catalogue.
@@ -392,6 +401,15 @@ input[type="search"]::-webkit-search-cancel-button {
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+}
+
+@media (min-width: 48rem) {
+  :root {
+    --store-header-offset: calc(
+      var(--store-utility-height) + var(--store-header-height-lg) +
+        var(--store-nav-height) + 0.5rem
+    );
+  }
 }
 
 @layer base {

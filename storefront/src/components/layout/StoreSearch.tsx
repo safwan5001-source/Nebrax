@@ -47,6 +47,9 @@ export function StoreSearch({
         basePath={basePath}
         className="h-11 rounded-store border-store-border bg-store-surface-muted"
         submitLabel={withSubmit ? t("submitSearch") : undefined}
+        // At phone widths the button would take a quarter of the field; the
+        // approved reference shows none there either.
+        submitClassName="max-sm:hidden"
       />
     </div>
   );
