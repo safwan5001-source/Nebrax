@@ -289,7 +289,27 @@ posture: the shell and section frames prerender, the shelf streams.
 
 ## 22. CI status
 
-Running at the time of writing — GitHub Actions `storefront (lint + typecheck + test)` and `php artisan test (L11, sqlite | pgsql)` on PR #857. The same checks were reproduced locally and are green (§20, §21).
+On the current head `d7ea4c0`:
+
+| Check | Result |
+|---|---|
+| `storefront (lint + typecheck + test)` | ✅ pass |
+| `php artisan test (L11, sqlite)` | ✅ pass |
+| `php artisan test (L11, pgsql)` | ❌ fail — **inherited from `main`, not this PR** |
+
+The pgsql leg is red on the base branch itself: green on `main` at `0beee23`
+(#854), red at `19fb6f7` (#855) and red at `0318f0e` (#856, this PR's base),
+where it is the only failed job in the run. Its Postgres log shows
+`relation "webhook_events" does not exist` — a pgsql-only schema gap, which is
+why the sqlite leg passes on `main` and here.
+
+This PR cannot be the cause: every changed file is under `storefront/` or
+`docs/`, with no PHP, migration, model, route or schema change for
+`php artisan test` to reach. No fix for it exists on `main` to port, and writing
+one would be a backend migration change — explicitly outside STORE-UI-2's scope
+and belonging in its own PR. Documented once on the PR
+([comment](https://github.com/safwan5001-source/Nebrax/pull/857#issuecomment-5722269789));
+the branch stays watched until it is green and mergeable.
 
 ## 23. Visual QA screenshots captured
 
