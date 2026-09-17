@@ -830,6 +830,12 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         // المتاجر الأساسية (`index`)، فلا تُترك لاستثناء الخدمة الذاتية وحده.
         Route::get('commerce/workspace/storefronts/{id}/domains', [CommerceWorkspaceStorefrontsController::class, 'domains'])->middleware($perm('commerce.manage'));
 
+        // STORE-ADMIN-ADOPT-1B-3A: إضافة نطاق مخصَّص + تشغيل تحقّق DNS TXT
+        // فعلي. فعلان كتابيان حقيقيان على سلطة Host عامة — نفس صلاحية
+        // 1B-1/1B-2 (commerce.manage) حصراً.
+        Route::post('commerce/workspace/storefronts/{id}/domains', [CommerceWorkspaceStorefrontsController::class, 'storeDomain'])->middleware($perm('commerce.manage'));
+        Route::post('commerce/workspace/storefronts/{id}/domains/{domainId}/verify', [CommerceWorkspaceStorefrontsController::class, 'verifyDomain'])->middleware($perm('commerce.manage'));
+
         // Cycle 0: Workspace foundation only. لا CRUD ولا مبيعات ولا اتصال أجهزة
         // قبل دوراتها، لكن هذا المسار يثبت سلسلة RBAC + entitlement + حالة التطبيق.
         Route::get('fuel-stations/workspace', [FuelStationsWorkspaceController::class, 'index'])
