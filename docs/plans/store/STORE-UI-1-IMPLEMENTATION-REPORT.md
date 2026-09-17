@@ -32,9 +32,13 @@ visual review.
 - **Base SHA:** `0beee2374396c338e5a211b0fddbe87b989be6bd`
   Verified as the current `main` after `git fetch origin main`, and identical to
   PR #854's merge SHA.
-- **Head SHA:** `0b13bef0e9d990bb77126731a4ad51022ecf9e19`
-- **Diff against base:** 28 files, +1947 / −371. All of it under `storefront/`
-  except this report.
+- **Last code commit:** `740384e7619e1e2aeeb0350ce41b8756ff2538c7`
+- **Head SHA:** the PR's current head. This report is committed to the branch it
+  describes, so pinning its own commit's hash here is not possible; the table
+  below is the authoritative record of substantive change, and anything after
+  the last row is documentation only.
+- **Diff against base:** 29 files. All of it under `storefront/` except this
+  report.
 
 | Commit | What it did |
 | --- | --- |
@@ -46,6 +50,7 @@ visual review.
 | `89e3a86` | Codex round 2 — skip-link target behind the header; two search instances |
 | `dde154b` | Product-owner visual corrections (brand, title, density, rail, footer) |
 | `0b13bef` | Codex round 3 — category rail collapsed its own reserved row |
+| `740384e` | Codex round 4 — focus indicator on the utility trigger; this report regenerated |
 
 ---
 
@@ -405,7 +410,17 @@ the fallback failing at exactly the case it existed for. The guard's
 justification was wrong: the rail always carries its "all products" entry, so it
 is never the empty strip the guard claimed to avoid. Removing it makes every
 outcome resolve to the same height.
-*The report was stale* — this document, regenerated here.
+**Round 4 (`0b13bef`).**
+*No focus indicator on the utility trigger.* The shared base className carried
+`outline-none`, which suppresses the app's global `:focus-visible` outline; the
+drawer's variant compensates with its own animated underline, and the utility
+variant had no substitute. `outline-none` moved to the drawer branch, and the
+utility branch now lets the app's own ring through — measured at solid 1px, 2px
+offset, the same treatment the rail links and the skip link get, at 4.94:1
+against the strip it sits on.
+*The report was stale*, still describing `d0f63f3`: a 23-file diff, Tajawal,
+`0.625rem`/`80rem`, and a rail that vanished for an empty catalogue. Regenerated
+as this document.
 
 ---
 
@@ -489,7 +504,7 @@ Check at 390 / 768 / 1024 / 1280 / 1440, in both `/sa/ar` and `/sa/en`.
 
 ## 16. Next step
 
-**Product-owner visual review of PR #855 at head `0b13bef`.**
+**Product-owner visual review of PR #855 at its current head.**
 
 Merge is **not** recommended until that review is complete. Visual revisions may
 be requested even with CI fully green; that is expected and in line with the
