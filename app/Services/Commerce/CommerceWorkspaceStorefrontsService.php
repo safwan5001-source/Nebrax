@@ -141,6 +141,50 @@ final class CommerceWorkspaceStorefrontsService
         ];
     }
 
+    /**
+     * STORE-ADMIN-ADOPT-1B-2 — رؤية نطاقات متجر قائم (قراءة فقط).
+     *
+     * نفس نمط `updateIdentityForCurrentTenant()` حرفياً: يُحلّ المتجر عبر
+     * `Storefront::query()` (يخضع لـ`TenantScope` أصلاً) ثم يُعاد التحقق
+     * صراحةً من `tenant_id === TenantContext::id()` — دفاع متعدد الطبقات.
+     * صفٌّ غير موجود أو يخصّ مستأجراً آخر يُترجَم دوماً إلى `null` (404 لا
+     * 403 على مستوى المتحكم) — لا تسريب وجود. النطاقات تُقرأ بعدها عبر
+     * علاقة `storefront->domains()` فلا حاجة لفحص ملكية إضافي على كل صفّ
+     * نطاق (هي أصلاً محصورة بالمتجر المتحقَّق من ملكيته أعلاه).
+     *
+     * @return list<array{id: string, hostname: string, type: string, is_primary: bool, is_active: bool, verification_status: string}>|null
+     */
+    public function listDomainsForCurrentTenant(string $storefrontId): ?array
+    {
+        $tenantId = app(TenantContext::class)->id();
+        if ($tenantId === null) {
+            throw new RuntimeException('لا سياق مستأجر نشط.');
+        }
+
+        $storefront = Storefront::query()->find($storefrontId);
+        if ($storefront === null || $storefront->tenant_id !== $tenantId) {
+            return null;
+        }
+
+        $domains = $storefront->domains()
+            ->orderByDesc('is_primary')
+            ->orderBy('hostname')
+            ->get();
+
+        return $domains
+            ->filter(fn (StorefrontDomain $domain) => $domain->tenant_id === $tenantId)
+            ->map(fn (StorefrontDomain $domain) => [
+                'id' => $domain->id,
+                'hostname' => $domain->hostname,
+                'type' => $domain->type,
+                'is_primary' => $domain->is_primary,
+                'is_active' => $domain->is_active,
+                'verification_status' => $domain->verification_status,
+            ])
+            ->values()
+            ->all();
+    }
+
     private function authorizedPreviewUrl(Storefront $storefront, string $tenantId): ?string
     {
         $candidates = $storefront->domains

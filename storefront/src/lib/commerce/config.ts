@@ -17,8 +17,8 @@ import {
   getAwjCartToken,
 } from "./cart-cookies";
 
-const FORWARDED_HOST_HEADER = "X-Storefront-Forwarded-Host";
-const GATEWAY_SECRET_HEADER = "X-Storefront-Gateway-Secret";
+export const FORWARDED_HOST_HEADER = "X-Storefront-Forwarded-Host";
+export const GATEWAY_SECRET_HEADER = "X-Storefront-Gateway-Secret";
 
 function getApiBaseUrl(): string {
   const raw = process.env.AWJ_COMMERCE_API_URL;
@@ -77,11 +77,24 @@ async function resolveVisitorHostname(): Promise<string> {
  * full trust rationale). Never exposed to the browser — read only here,
  * server-side, never via `NEXT_PUBLIC_*`.
  */
-function getGatewaySecret(): string | undefined {
+/**
+ * Exported for `edge-storefront-locale.ts` (Edge Middleware runtime, which
+ * has no `next/headers` access — see that module's header comment). This
+ * function itself only reads `process.env`, so it is Edge-safe as-is; it is
+ * exported rather than duplicated so there remains exactly one place that
+ * knows the gateway secret's env var name.
+ */
+export function getGatewaySecret(): string | undefined {
   return process.env.STOREFRONT_GATEWAY_SECRET || undefined;
 }
 
-function buildStorefrontUrl(path: string): URL {
+/**
+ * Exported for `edge-storefront-locale.ts` — same rationale as
+ * `getGatewaySecret()` above: pure env/string logic, no `next/headers`
+ * dependency, so it is safe to reuse from Edge Middleware without
+ * duplicating the `store/v1/{path}` URL contract.
+ */
+export function buildStorefrontUrl(path: string): URL {
   const base = getApiBaseUrl();
   const cleanPath = path.replace(/^\/+/, "");
   return new URL(`${base}/store/v1/${cleanPath}`);

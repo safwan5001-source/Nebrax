@@ -16,6 +16,7 @@ use RuntimeException;
  * COM-WS-2 — قراءة إدارية محدودة لمساحة عمل التجارة.
  * COM-STORE-PROVISION-1 — تزويد أول متجر إلكتروني صريح.
  * STORE-ADMIN-ADOPT-1B-1 — تصحيح/تعريب هوية متجر قائم (`name`/`default_locale`).
+ * STORE-ADMIN-ADOPT-1B-2 — رؤية نطاقات متجر قائم (قراءة فقط).
  *
  * يسرد/يزوّد/يحدّث متاجر الويب للمستأجر الحالي فقط. لا يستقبل معرّف مستأجر/متجر/نطاق
  * من العميل، ولا يستدعي الحسم العام بالنطاق. `index` لا يفرض
@@ -89,6 +90,32 @@ class CommerceWorkspaceStorefrontsController extends ApiController
 
         return response()->json([
             'data' => ['store' => $result],
+        ]);
+    }
+
+    /**
+     * STORE-ADMIN-ADOPT-1B-2 — قائمة نطاقات متجر قائم (قراءة فقط). `{id}`
+     * يحدّد أي صفّ فقط — الملكية تُحسَم حصراً عبر `TenantContext` في
+     * الخدمة. متجرٌ غير موجود أو يخصّ مستأجراً آخر يُرجع 404 دائماً، لا 403،
+     * فلا يتسرّب وجوده. لا فعل كتابي هنا على الإطلاق.
+     */
+    public function domains(
+        Request $request,
+        CommerceWorkspaceStorefrontsService $storefronts,
+        string $id,
+    ): JsonResponse {
+        if ($request->user()?->role === 'self_service') {
+            abort(403, 'مساحة عمل التجارة غير متاحة لحساب الخدمة الذاتية.');
+        }
+
+        $domains = $storefronts->listDomainsForCurrentTenant($id);
+
+        if ($domains === null) {
+            abort(404, 'المتجر غير موجود.');
+        }
+
+        return response()->json([
+            'data' => ['domains' => $domains],
         ]);
     }
 }
