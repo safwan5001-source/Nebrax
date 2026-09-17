@@ -1,9 +1,10 @@
-import type { Category, Media, Price, Product, Variant } from "@spree/sdk";
+import type { Media, Price, Product, Variant } from "@spree/sdk";
 import type {
   AwjCategory,
   AwjCategoryRef,
   AwjProduct,
   AwjProductMedia,
+  StoreCategory,
 } from "./types";
 
 /**
@@ -109,10 +110,11 @@ function toDefaultVariant(
   };
 }
 
-function toCategoryRefViewModel(ref: AwjCategoryRef): Category {
+function toCategoryRefViewModel(ref: AwjCategoryRef): StoreCategory {
   return {
     id: ref.id,
     name: ref.name,
+    color: null,
     permalink: ref.id,
     position: 0,
     depth: 0,
@@ -191,7 +193,7 @@ export function mapAwjProductToViewModel(
 export function mapAwjCategoryToViewModel(
   category: AwjCategory,
   depth = 0,
-): Category {
+): StoreCategory {
   const children = (category.children ?? []).map((child) =>
     mapAwjCategoryToViewModel(child, depth + 1),
   );
@@ -199,6 +201,7 @@ export function mapAwjCategoryToViewModel(
   return {
     id: category.id,
     name: category.name,
+    color: category.color,
     permalink: category.id,
     position: 0,
     depth,

@@ -81,7 +81,6 @@
     "shopNow": "Shop All",
     "forkOnGithub": "Fork on GitHub",
     "quickstartGuide": "Quickstart Guide",
-    "featuredProducts": "Featured Products",
     "viewAll": "View all",
     "qualityProducts": "Quality Products",
     "qualityDescription": "Carefully curated selection of the best products.",
@@ -99,7 +98,10 @@
     "wholesaleBenefitQuickOrderTitle": "Bulk quick-order",
     "wholesaleBenefitQuickOrderDescription": "Enter SKUs and quantities to build a large order in seconds.",
     "wholesaleBenefitOrdersTitle": "Order history",
-    "wholesaleBenefitOrdersDescription": "Review past orders and reorder your regular lines in a couple of clicks."
+    "wholesaleBenefitOrdersDescription": "Review past orders and reorder your regular lines in a couple of clicks.",
+    "browseCategories": "Shop by category",
+    "newArrivals": "New arrivals",
+    "subcategories": "{count, plural, one {# subcategory} other {# subcategories}}"
   },
   "cart": {
     "cart": "Cart",

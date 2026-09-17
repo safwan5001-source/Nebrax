@@ -1,13 +1,13 @@
-import type { Category } from "@spree/sdk";
 import { storefrontFetch } from "./config";
 import { mapAwjCategoryToViewModel } from "./mappers";
 import type {
   AwjCategory,
   AwjListResponse,
   AwjResourceResponse,
+  StoreCategory,
 } from "./types";
 
-export async function fetchCategories(): Promise<{ data: Category[] }> {
+export async function fetchCategories(): Promise<{ data: StoreCategory[] }> {
   const response =
     await storefrontFetch<AwjListResponse<AwjCategory>>("categories");
 
@@ -18,7 +18,7 @@ export async function fetchCategories(): Promise<{ data: Category[] }> {
   };
 }
 
-export async function fetchCategory(id: string): Promise<Category> {
+export async function fetchCategory(id: string): Promise<StoreCategory> {
   const response = await storefrontFetch<AwjResourceResponse<AwjCategory>>(
     `categories/${id}`,
   );

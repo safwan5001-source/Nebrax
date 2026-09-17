@@ -44,6 +44,17 @@ export interface AwjCategoryRef {
   name: string;
 }
 
+/**
+ * The Spree-shaped category view model plus the one AWJ field that has no Spree
+ * equivalent: the merchant's own category colour. It is carried through rather
+ * than dropped because it is the only authoritative visual identity a category
+ * has — `store/v1/categories` exposes no image — and inventing category
+ * photography instead is exactly what the storefront must not do.
+ */
+export type StoreCategory = import("@spree/sdk").Category & {
+  color: string | null;
+};
+
 export interface AwjCategory {
   id: string;
   name: string;
