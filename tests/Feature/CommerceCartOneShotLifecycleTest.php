@@ -317,6 +317,140 @@ class CommerceCartOneShotLifecycleTest extends TestCase
         $this->assertSame(1, CommerceOrder::withoutGlobalScopes()->count());
     }
 
+    // ── P2-1 review follow-up: consumed Cart replay still respects its own expiry ──
+
+    /**
+     * `consumed` is terminal but not "never expires" — `findByToken(...,
+     * allowConsumed: true)` must still honor the Cart's own `expires_at`
+     * bearer lifetime, not just its status. Replay within that window keeps
+     * working exactly as before.
+     */
+    #[Test]
+    public function a_consumed_cart_can_replay_the_completed_order_before_its_token_expires(): void
+    {
+        $store = $this->seedMobileStore('lifecycle-expiry-before');
+        $product = $this->publishedProduct($store['tenant'], $store['channel']);
+        $cartToken = $this->mobileFullyReadyCheckout($store, $product);
+
+        $first = $this->mobileComplete($store, $cartToken, 'lifecycle-expiry-before-key')->assertCreated();
+        $replay = $this->mobileComplete($store, $cartToken, 'lifecycle-expiry-before-key')->assertOk();
+        $replay->assertJsonPath('data.replayed', true);
+        $this->assertSame($first->json('data.order.id'), $replay->json('data.order.id'));
+    }
+
+    /**
+     * Once a consumed Cart's own `expires_at` has passed, its token must fail
+     * closed on resolution (404, cleared token) — even for a replay of the
+     * exact original `Idempotency-Key` — and the Cart's `status` must stay
+     * `consumed` (never silently rewritten to `expired` by this check, unlike
+     * the `active` branch's own lazy demotion).
+     */
+    #[Test]
+    public function a_consumed_cart_cannot_resolve_through_its_token_after_expiry_and_status_stays_consumed(): void
+    {
+        $store = $this->seedMobileStore('lifecycle-expiry-after');
+        $product = $this->publishedProduct($store['tenant'], $store['channel']);
+        $cartToken = $this->mobileFullyReadyCheckout($store, $product);
+        $this->mobileComplete($store, $cartToken, 'lifecycle-expiry-after-key')->assertCreated();
+
+        $cart = $this->cartFor($store['tenant'], $cartToken);
+        app(TenantContext::class)->set($store['tenant']->id);
+        $cart->update(['expires_at' => now()->subMinute()]);
+        app(TenantContext::class)->forget();
+
+        $this->mobileComplete($store, $cartToken, 'lifecycle-expiry-after-key')->assertStatus(404);
+
+        $this->assertSame(CommerceCart::STATUS_CONSUMED, $cart->fresh()->status);
+    }
+
+    /** Web parity: the same expiry boundary applies through `/store/v1`'s shared services. */
+    #[Test]
+    public function the_web_path_enforces_the_same_consumed_cart_expiry_boundary(): void
+    {
+        $store = $this->seedWebStore('lifecycle-expiry-web');
+        $product = $this->publishedProduct($store['tenant'], $store['channel']);
+
+        app(TenantContext::class)->set($store['tenant']->id);
+        app(StorefrontContext::class)->set($store['tenant']->id, $store['channel']->id, $store['storefront']->id);
+        $cart = app(CommerceCartService::class)->add(null, $product->id, 'base', 1);
+        $rawToken = $cart['token'];
+        $created = app(CommerceCheckoutService::class)->createOrResume($rawToken);
+        app(CommerceCheckoutService::class)->updateContact($created['checkout'], ['contact_name' => 'ويب', 'contact_phone' => '0501234567']);
+        app(CommerceCheckoutService::class)->updateAddress($created['checkout'], ['delivery_country' => 'SA', 'delivery_city' => 'الرياض', 'delivery_street' => 'شارع']);
+        app(CommerceCheckoutService::class)->updateDelivery($created['checkout'], 'pickup');
+        app(CommerceCheckoutService::class)->complete($created['checkout'], hash('sha256', 'web-expiry-key'), 'fp-web-expiry');
+        app(StorefrontContext::class)->forget();
+        app(TenantContext::class)->forget();
+
+        $cartRow = $this->cartFor($store['tenant'], $rawToken);
+        app(TenantContext::class)->set($store['tenant']->id);
+        $cartRow->update(['expires_at' => now()->subMinute()]);
+        app(TenantContext::class)->forget();
+
+        app(TenantContext::class)->set($store['tenant']->id);
+        app(StorefrontContext::class)->set($store['tenant']->id, $store['channel']->id, $store['storefront']->id);
+        $lookup = app(CommerceCartService::class)->findByToken($rawToken, allowConsumed: true);
+        app(StorefrontContext::class)->forget();
+        app(TenantContext::class)->forget();
+
+        $this->assertTrue($lookup['invalid']);
+        $this->assertNull($lookup['cart']);
+        $this->assertSame(CommerceCart::STATUS_CONSUMED, $cartRow->fresh()->status);
+    }
+
+    // ── P2-2 review follow-up: consumed-cart replay resolves the order-linked Checkout ──
+
+    /**
+     * Historical shape possible before this PR's fixes: a Cart with a real
+     * completed Checkout (linked to a `CommerceOrder`) *and* a later, still-
+     * open Checkout — the exact shape `createOrResume()`'s original bug could
+     * leave behind before it was fixed. `resolveForCompletion()` must resolve
+     * the order-linked Checkout for a `consumed` Cart's replay, never the
+     * merely-newer open one — otherwise the original `Idempotency-Key` 404s
+     * instead of replaying the real order.
+     */
+    #[Test]
+    public function a_consumed_cart_with_a_later_open_checkout_still_replays_through_the_order_linked_checkout(): void
+    {
+        $store = $this->seedMobileStore('lifecycle-replay-resolution');
+        $product = $this->publishedProduct($store['tenant'], $store['channel']);
+        $cartToken = $this->mobileFullyReadyCheckout($store, $product);
+
+        $first = $this->mobileComplete($store, $cartToken, 'lifecycle-replay-resolution-key')->assertCreated();
+        $orderId = $first->json('data.order.id');
+
+        $cart = $this->cartFor($store['tenant'], $cartToken);
+        app(TenantContext::class)->set($store['tenant']->id);
+        $this->assertSame(CommerceCart::STATUS_CONSUMED, $cart->fresh()->status);
+
+        // Simulate the historical pre-fix shape directly — never reachable
+        // through the current API (createOrResume() blocks it on a consumed
+        // Cart), but real historical rows written before this fix could
+        // carry exactly this shape.
+        $laterCheckout = CommerceCheckout::create([
+            'storefront_id' => null,
+            'sales_channel_id' => $store['channel']->id,
+            'cart_id' => $cart->id,
+            'status' => CommerceCheckout::STATUS_ACTIVE,
+            'expires_at' => now()->addHour(),
+        ]);
+        app(TenantContext::class)->forget();
+
+        // Replay with the ORIGINAL idempotency key must still resolve the
+        // real, order-linked Checkout — not the newer open one — and return
+        // the same order, never a 404 and never a second order.
+        $replay = $this->mobileComplete($store, $cartToken, 'lifecycle-replay-resolution-key')->assertOk();
+        $replay->assertJsonPath('data.replayed', true);
+        $this->assertSame($orderId, $replay->json('data.order.id'));
+
+        $this->assertSame(1, CommerceOrder::withoutGlobalScopes()->count());
+        $this->assertSame(2, CommerceCheckout::withoutGlobalScopes()->where('cart_id', $cart->id)->count());
+
+        app(TenantContext::class)->set($store['tenant']->id);
+        $this->assertSame(CommerceCheckout::STATUS_ACTIVE, $laterCheckout->fresh()->status);
+        app(TenantContext::class)->forget();
+    }
+
     // ── 14/15. old token cannot start a new purchase; a new Cart/token can ──
 
     #[Test]

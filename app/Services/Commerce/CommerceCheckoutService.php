@@ -144,6 +144,24 @@ final class CommerceCheckoutService
      * `current()`/`createOrResume()` أدناه يبقيان بلا `allowConsumed` عمداً
      * فيرفضان سلةً مُستهلَكة كأي سلةٍ غير `active`.
      *
+     * **سلةٌ `consumed`**: القرار أعلاه (أحدث Checkout ضمن حالاتٍ مقبولة)
+     * يفترض ضمناً أن السلة لا تحمل إلا Checkout واحداً ذا صلة — صحيحٌ دائماً
+     * لسلةٍ استُهلكت عبر `complete()` الحالية (تستهلك السلة وتُنشئ الطلب في
+     * نفس المعاملة، فلا Checkout آخر ذو صلة يمكن أن ينشأ بعدها). لكنه **غير
+     * مضمون لبيانات تاريخية** استُهلكت عبر migration الـbackfill: سلةٌ من
+     * قبل Cart One-Shot Lifecycle قد تحمل Checkout مكتملاً حقيقياً (ومرتبطاً
+     * بـ`CommerceOrder` فعلياً) **و** Checkout أحدث فُتح لاحقاً (من علّة
+     * `createOrResume()` الأصلية قبل إصلاحها) وبقي مفتوحاً بلا إتمام. أحدثُ-
+     * أولاً بين `{مفتوح، مكتمل}` كان يختار حينها الـCheckout المفتوح الخاطئ
+     * — لا صلة له بالطلب الفعلي — فتفشل إعادة تشغيل مفتاح Idempotency-Key
+     * الأصلي مغلقاً (404) بدل إعادة الطلب الحقيقي.
+     * لذلك: لسلةٍ `consumed`، السلطة هي وجود `CommerceOrder` مرتبط
+     * (`CommerceCheckout::order()`) — دليلٌ مباشر لا `status` وحده، ونفس
+     * الدليل الذي اعتمده backfill نفسه — لا "الأحدث من أي حالةٍ مقبولة".
+     * `whereHas('order')` يمرّ عبر نفس `TenantScope`/`scopeToContext()`
+     * أعلاه فلا تسرّب مستأجرَ آخر. لا تغيير على القرار الطبيعي (سلةٌ لا تزال
+     * `active` وقت الاستدعاء) إطلاقاً.
+     *
      * @return array{checkout: ?CommerceCheckout, invalid: bool}
      */
     public function resolveForCompletion(?string $cartToken): array
@@ -155,6 +173,16 @@ final class CommerceCheckoutService
 
         $cart = $cartLookup['cart'];
         $context = $this->context();
+
+        if ($cart->status === CommerceCart::STATUS_CONSUMED) {
+            $checkout = $this->scopeToContext(CommerceCheckout::query(), $context)
+                ->where('cart_id', $cart->id)
+                ->whereHas('order')
+                ->orderByDesc('created_at')
+                ->first();
+
+            return ['checkout' => $checkout, 'invalid' => false];
+        }
 
         $checkout = $this->scopeToContext(CommerceCheckout::query(), $context)
             ->where('cart_id', $cart->id)

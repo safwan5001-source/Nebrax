@@ -53,6 +53,17 @@ final class CommerceCartService
         }
 
         if ($allowConsumed && $cart->status === CommerceCart::STATUS_CONSUMED) {
+            // `consumed` is terminal — it must never be rewritten back to
+            // `expired`/`active` by mere passage of time (unlike the `active`
+            // branch below, which actively demotes to `expired`). But the
+            // Cart's own bearer lifetime (`expires_at`) still governs how
+            // long its token stays resolvable at all: past that point, replay
+            // fails closed here — no status mutation, just a refusal to
+            // resolve — rather than remaining valid indefinitely.
+            if ($cart->expires_at->isPast()) {
+                return ['cart' => null, 'invalid' => true];
+            }
+
             return ['cart' => $cart, 'invalid' => false];
         }
 
