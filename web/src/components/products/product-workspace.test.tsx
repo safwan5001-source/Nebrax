@@ -101,6 +101,9 @@ function installApiMock(overrides: Partial<Record<string, unknown>> = {}) {
       const handler = overrides[`${method} ${path}`] as (options: { body?: unknown }) => unknown;
       return handler(options);
     }
+    if (path === '/commerce/workspace/storefronts' && method === 'GET') return { data: { stores: [] } };
+    if (path.startsWith('/commerce/workspace/products/') && path.endsWith('/publication') && method === 'GET') return { data: { stores: [] } };
+    if (path.startsWith('/products/') && path.endsWith('/media') && method === 'GET') return { data: [] };
     if (path === '/products' && method === 'POST') {
       return { data: { id: 'created-product-1' } };
     }
@@ -115,6 +118,10 @@ describe('ProductWorkspace', () => {
   beforeEach(() => {
     apiMock.mockReset();
     installApiMock();
+    // jsdom لا يوفّر `URL.createObjectURL`/`revokeObjectURL` — تُستعمَلان فقط
+    // لمعاينة الملفات المُعلَّقة محلياً قبل الرفع (`ProductMediaSection`).
+    if (!URL.createObjectURL) URL.createObjectURL = vi.fn(() => 'blob:mock');
+    if (!URL.revokeObjectURL) URL.revokeObjectURL = vi.fn();
   });
   afterEach(cleanup);
 
@@ -301,5 +308,180 @@ describe('ProductWorkspace', () => {
 
     await waitFor(() => expect(screen.getAllByText('999').length).toBeGreaterThan(0));
     expect(screen.getAllByDisplayValue('100.00').length).toBeGreaterThan(0);
+  });
+
+  // PR-PROD-UX-3: الخيارات والمتغيّرات داخل مساحة العمل نفسها — لا صفحة/تبويب منفصل.
+  it('PR-PROD-UX-3: create mode before first Save shows the Options & Variants section locked, with no variant API calls', async () => {
+    render(wrapAr(<ProductWorkspace mode="create" />));
+
+    await screen.findByText('الخيارات والمتغيّرات');
+    expect(screen.getByText('احفظ المنتج أولاً لإضافة خيارات مثل اللون أو المقاس وإنشاء متغيّرات.')).toBeTruthy();
+    // لا `productId` بعد — لا نقطة دخول تفاعلية (زر «إضافة خيارات») ولا أي طلب متغيّرات.
+    expect(screen.queryByRole('button', { name: 'إضافة خيارات' })).toBeNull();
+    expect(apiMock.mock.calls.some(([path]) => typeof path === 'string' && path.includes('/options'))).toBe(false);
+    expect(apiMock.mock.calls.some(([path]) => typeof path === 'string' && path.includes('/variants'))).toBe(false);
+  });
+
+  it('PR-PROD-UX-3: a successful first Save unlocks the Options & Variants entry point in place (no navigation, no duplicate POST)', async () => {
+    const user = userEvent.setup();
+    render(wrapAr(<ProductWorkspace mode="create" />));
+
+    await user.type(screen.getByLabelText(/الاسم \*/), 'منتج جديد');
+    await user.type(screen.getByLabelText('سعر البيع'), '10');
+    await user.click(screen.getByRole('button', { name: 'حفظ' }));
+
+    // يبقى مثبَّتاً في نفس الشجرة، ويظهر الآن زر تفعيل المتغيّرات الحقيقي.
+    await waitFor(() => expect(screen.getByRole('button', { name: 'إضافة خيارات' })).toBeTruthy());
+    expect(screen.queryByText('احفظ المنتج أولاً لإضافة خيارات مثل اللون أو المقاس وإنشاء متغيّرات.')).toBeNull();
+    expect(apiMock.mock.calls.filter(([path, options]) => path === '/products' && options?.method === 'POST')).toHaveLength(1);
+  });
+
+  it('a failed first Save keeps Options & Variants locked (no persisted-only capability unlocked)', async () => {
+    const user = userEvent.setup();
+    installApiMock({
+      'POST /products': () => { throw new Error('rejected'); },
+    });
+    render(wrapAr(<ProductWorkspace mode="create" />));
+
+    await user.type(screen.getByLabelText(/الاسم \*/), 'منتج جديد');
+    await user.type(screen.getByLabelText('سعر البيع'), '10');
+    await user.click(screen.getByRole('button', { name: 'حفظ' }));
+
+    await waitFor(() => expect(screen.getByRole('alert')).toBeTruthy());
+    expect(screen.getByText('احفظ المنتج أولاً لإضافة خيارات مثل اللون أو المقاس وإنشاء متغيّرات.')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'إضافة خيارات' })).toBeNull();
+  });
+
+  it('PR-PROD-UX-3: edit mode renders the existing Options & Variants panel through the same section (no separate tab)', async () => {
+    render(wrapAr(<ProductWorkspace mode="edit" product={EXISTING_PRODUCT} />));
+
+    await screen.findByDisplayValue('منتج قائم');
+    // منتجٌ بسيطٌ في وضع التعديل: نفس نقطة الدخول الحقيقية، لا حالة قفلٍ زائفة.
+    expect(await screen.findByRole('button', { name: 'إضافة خيارات' })).toBeTruthy();
+  });
+
+  // PR-PROD-UX-4: الوسائط — قسمٌ واحد ضمن مساحة العمل نفسها، بنمط «وضعان
+  // بمكوّنٍ واحد» المطابق لـ `ProductMultiBarcodeTable` حرفياً.
+  describe('PR-PROD-UX-4: media', () => {
+    it('create mode before first Save shows media safely locked — no live upload control, no media API calls', async () => {
+      render(wrapAr(<ProductWorkspace mode="create" />));
+
+      await screen.findByText('صور المنتج');
+      expect(screen.getByText('سيتم رفع الصور المختارة تلقائياً فور نجاح الحفظ الأول للمنتج.')).toBeTruthy();
+      // لا زرّ رفعٍ حيّ (السلطة الحقيقية) قبل وجود `productId` — فقط منتقي ملفٍّ محلي.
+      expect(screen.queryByRole('button', { name: /رفع الصور/ })).toBeNull();
+      expect(apiMock.mock.calls.some(([path]) => typeof path === 'string' && path.includes('/media'))).toBe(false);
+    });
+
+    it('a successful first Save unlocks the media gallery in place and uploads pending files exactly once', async () => {
+      const user = userEvent.setup();
+      const mediaPosts: Array<{ path: string; hasFormData: boolean }> = [];
+      installApiMock({
+        'POST /products/created-product-1/media': ({ body }: { body?: unknown }) => {
+          mediaPosts.push({ path: '/products/created-product-1/media', hasFormData: body instanceof FormData });
+          return { data: {} };
+        },
+      });
+      render(wrapAr(<ProductWorkspace mode="create" />));
+
+      await user.type(screen.getByLabelText(/الاسم \*/), 'منتج جديد');
+      await user.type(screen.getByLabelText('سعر البيع'), '10');
+
+      const file = new File(['x'], 'photo.png', { type: 'image/png' });
+      const fileInput = screen.getByLabelText('رفع الصور') as HTMLInputElement;
+      await user.upload(fileInput, file);
+
+      await user.click(screen.getByRole('button', { name: 'حفظ' }));
+
+      // الانتقال إلى الحالة الحيّة: زرّ الرفع الحقيقي يظهر الآن.
+      await waitFor(() => expect(screen.getAllByRole('button', { name: /رفع الصور/ }).length).toBeGreaterThan(0));
+      expect(mediaPosts).toHaveLength(1);
+      expect(mediaPosts[0]!.hasFormData).toBe(true);
+      expect(apiMock.mock.calls.filter(([path, options]) => path === '/products' && options?.method === 'POST')).toHaveLength(1);
+    });
+
+    it('a failed first Save keeps media locked — no media API calls at all', async () => {
+      const user = userEvent.setup();
+      installApiMock({ 'POST /products': () => { throw new Error('rejected'); } });
+      render(wrapAr(<ProductWorkspace mode="create" />));
+
+      await user.type(screen.getByLabelText(/الاسم \*/), 'منتج جديد');
+      await user.type(screen.getByLabelText('سعر البيع'), '10');
+      const file = new File(['x'], 'photo.png', { type: 'image/png' });
+      await user.upload(screen.getByLabelText('رفع الصور') as HTMLInputElement, file);
+      await user.click(screen.getByRole('button', { name: 'حفظ' }));
+
+      await waitFor(() => expect(screen.getByRole('alert')).toBeTruthy());
+      expect(apiMock.mock.calls.some(([path]) => typeof path === 'string' && path.includes('/media'))).toBe(false);
+      expect(screen.queryByRole('button', { name: /رفع الصور/ })).toBeNull();
+    });
+
+    it('edit mode loads existing media through the authoritative gallery API', async () => {
+      installApiMock({
+        'GET /products/product-1/media': () => ({
+          data: [{ id: 'media-1', original_name: 'front.jpg', download_url: '/products/product-1/media/media-1/download', sort_order: 0 }],
+        }),
+      });
+      render(wrapAr(<ProductWorkspace mode="edit" product={EXISTING_PRODUCT} />));
+
+      await waitFor(() => {
+        const gets = apiMock.mock.calls.filter(([path, options]) => path === '/products/product-1/media' && (options?.method ?? 'GET') === 'GET');
+        expect(gets.length).toBeGreaterThan(0);
+      });
+    });
+  });
+
+  // PR-PROD-UX-4: النشر التجاري — `CommerceListing.is_published` يبقى مصدر
+  // الحقيقة الوحيد؛ لا `Product.is_online` ولا حالة نشرٍ محلية.
+  describe('PR-PROD-UX-4: publication', () => {
+    it('edit mode loads publication state from the existing commerce authority', async () => {
+      installApiMock({
+        'GET /commerce/workspace/products/product-1/publication': () => ({ data: { stores: [{ id: 'store-1', name: 'المتجر الرئيسي', is_published: true }] } }),
+      });
+      render(wrapAr(<ProductWorkspace mode="edit" product={EXISTING_PRODUCT} />));
+
+      expect(await screen.findByRole('checkbox', { name: /المتجر الرئيسي/ })).toBeTruthy();
+      const checkbox = screen.getByRole('checkbox', { name: /المتجر الرئيسي/ }) as HTMLInputElement;
+      await waitFor(() => expect(checkbox.checked).toBe(true));
+    });
+
+    it('save changes in edit mode applies the publication selection through the authoritative API, not local-only state', async () => {
+      const user = userEvent.setup();
+      const puts: Array<Record<string, unknown>> = [];
+      installApiMock({
+        'GET /commerce/workspace/products/product-1/publication': () => ({ data: { stores: [{ id: 'store-1', name: 'المتجر الرئيسي', is_published: false }] } }),
+        'PUT /commerce/workspace/products/product-1/publication': ({ body }: { body?: unknown }) => {
+          puts.push(body as Record<string, unknown>);
+          return { data: { stores: [{ id: 'store-1', name: 'المتجر الرئيسي', is_published: true }] } };
+        },
+      });
+      render(wrapAr(<ProductWorkspace mode="edit" product={EXISTING_PRODUCT} />));
+
+      const checkbox = await screen.findByRole('checkbox', { name: /المتجر الرئيسي/ });
+      await user.click(checkbox);
+      await user.click(screen.getByRole('button', { name: 'حفظ التغييرات' }));
+
+      await waitFor(() => expect(puts).toHaveLength(1));
+      expect(puts[0]!.storefront_ids).toEqual(['store-1']);
+    });
+
+    it('never introduces a Product.is_online field on create or edit payloads', async () => {
+      const user = userEvent.setup();
+      const bodies: Array<Record<string, unknown>> = [];
+      installApiMock({
+        'POST /products': ({ body }: { body?: unknown }) => {
+          bodies.push(body as Record<string, unknown>);
+          return { data: { id: 'created-product-1' } };
+        },
+      });
+      render(wrapAr(<ProductWorkspace mode="create" />));
+
+      await user.type(screen.getByLabelText(/الاسم \*/), 'منتج جديد');
+      await user.type(screen.getByLabelText('سعر البيع'), '10');
+      await user.click(screen.getByRole('button', { name: 'حفظ' }));
+
+      await waitFor(() => expect(bodies).toHaveLength(1));
+      expect(bodies[0]).not.toHaveProperty('is_online');
+    });
   });
 });

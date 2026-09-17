@@ -106,6 +106,16 @@ class AuthController extends ApiController
             report($exception);
         }
 
+        // TENANT-PROVISIONING-E2E-1: التسجيل العام يصل من نطاق فرعي عام غير
+        // محسوم (`test.{base_domain}` — استثناء PR #845)، فلا يمثّل الجهة
+        // الفعلية للمستأجر الجديد. رمزٌ عشوائي قصير الأجل، أحادي الاستخدام،
+        // بنفس بنية `auth_action_tokens` تماماً — تستهلكه الواجهة عبر
+        // `POST /auth/handoff` **بعد** الانتقال إلى نطاق المستأجر الحقيقي
+        // (`{slug}.{base_domain}`)، فيتحقّق `matchesHostname()` أن الاستهلاك
+        // يتم من نفس مستأجر التسجيل قبل إصدار أي توكن — بلا توكن طويل الأمد
+        // في الرابط، وبلا تخفيف لعزل النطاق الفرعي.
+        $handoffCode = app(AuthRecoveryService::class)->issue($user, AuthRecoveryService::TENANT_HANDOFF);
+
         return response()->json([
             'token'  => $this->issueToken($user),
             'user'   => $this->userPayload($user),
@@ -116,7 +126,41 @@ class AuthController extends ApiController
                 'account_number' => $tenant->account_number,
                 'support_number' => $tenant->support_number,
             ],
+            'handoff' => [
+                'code' => $handoffCode,
+            ],
         ], 201);
+    }
+
+    /**
+     * TENANT-PROVISIONING-E2E-1 — يستبدل رمز الانتقال أحادي الاستخدام الصادر
+     * من `register()` بتوكن دخول حقيقي، **حصراً** حين يصل الطلب من نطاق
+     * المستأجر الفعلي (`AuthRecoveryService::consume()` يرفض بلا ذلك عبر
+     * `matchesHostname()`). لا بريد ولا كلمة مرور هنا — هذا استكمال تقني
+     * لتسجيل تمّ بالفعل، لا مسار دخول بديل.
+     */
+    public function handoff(Request $request): JsonResponse
+    {
+        $data = $request->validate(['code' => ['required', 'string', 'size:64']]);
+
+        $user = app(AuthRecoveryService::class)->consume($data['code'], AuthRecoveryService::TENANT_HANDOFF);
+        if (! $user) {
+            abort(422, 'رابط الانتقال غير صالح أو منتهي الصلاحية.');
+        }
+
+        if (! $user->is_active) {
+            abort(403, 'الحساب غير مفعّل.');
+        }
+
+        $tenant = Tenant::find($user->tenant_id);
+        if (! PlanGate::subscriptionActive($tenant)) {
+            abort(403, 'اشتراك المؤسسة غير نشط أو منتهٍ.');
+        }
+
+        return response()->json([
+            'token' => $this->issueToken($user),
+            'user'  => $this->userPayload($user),
+        ]);
     }
 
     /**

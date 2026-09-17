@@ -180,11 +180,18 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
     Route::get('health', HealthController::class);
 
     // عام (بلا مصادقة)
-    Route::post('register', [AuthController::class, 'register'])->middleware('throttle:register');
+    Route::post('register', [AuthController::class, 'register'])
+        ->middleware('throttle:register')
+        ->name('auth.public-register');
     Route::post('login', [AuthController::class, 'login'])->middleware('throttle:5,1');
     Route::post('forgot-password', [AuthController::class, 'forgotPassword'])->middleware('throttle:auth-recovery');
     Route::post('reset-password', [AuthController::class, 'resetPassword'])->middleware('throttle:auth-reset');
     Route::post('email/verify', [AuthController::class, 'verifyEmail'])->middleware('throttle:auth-reset');
+
+    // TENANT-PROVISIONING-E2E-1: يستبدل رمز الانتقال أحادي الاستخدام الصادر
+    // من `register()` بتوكن دخول — يعمل تحت نطاق المستأجر الفعلي فقط
+    // (`IdentifyTenantHostname` أعلاه يحسمه كأي مسار آخر؛ لا استثناء هنا).
+    Route::post('auth/handoff', [AuthController::class, 'handoff'])->middleware('throttle:auth-handoff');
 
     // Customer Platform: tenant authority is established from the globally
     // unique route slug before credential/token lookup. It never uses payload IDs.
@@ -811,6 +818,11 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         // حقيقي (قناة بيع + متجر + نطاق مُدار من AWJ)، فيُحرَس بصلاحية
         // مخصَّصة (commerce.manage) لا استثناء الخدمة الذاتية وحده.
         Route::post('commerce/workspace/storefronts', [CommerceWorkspaceStorefrontsController::class, 'store'])->middleware($perm('commerce.manage'));
+
+        // STORE-ADMIN-ADOPT-1B-1: تصحيح/تعريب هوية متجر قائم — name/default_locale
+        // فقط. نفس صلاحية التزويد (commerce.manage): فعلٌ كتابي حقيقي على بنية
+        // تحتية تجارية، لا قراءة.
+        Route::put('commerce/workspace/storefronts/{id}', [CommerceWorkspaceStorefrontsController::class, 'update'])->middleware($perm('commerce.manage'));
 
         // Cycle 0: Workspace foundation only. لا CRUD ولا مبيعات ولا اتصال أجهزة
         // قبل دوراتها، لكن هذا المسار يثبت سلسلة RBAC + entitlement + حالة التطبيق.

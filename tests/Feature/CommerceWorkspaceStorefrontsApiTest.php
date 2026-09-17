@@ -99,7 +99,7 @@ class CommerceWorkspaceStorefrontsApiTest extends TestCase
         $this->assertSame($storeA['channel']->id, $res->json('data.stores.0.sales_channel_id'));
         $this->assertTrue($res->json('data.stores.0.is_active'));
         $this->assertSame('https://shop-a.example.com/', $res->json('data.stores.0.preview_url'));
-        $this->assertSame(['id', 'name', 'sales_channel_id', 'is_active', 'preview_url'], array_keys($res->json('data.stores.0')));
+        $this->assertSame(['id', 'name', 'sales_channel_id', 'is_active', 'preview_url', 'default_locale'], array_keys($res->json('data.stores.0')));
         $this->assertStringNotContainsString('shop-b.example.com', $res->getContent());
         $this->assertStringNotContainsString($b['tenant_id'], $res->getContent());
         $this->assertStringNotContainsString($a['tenant_id'], $res->getContent());

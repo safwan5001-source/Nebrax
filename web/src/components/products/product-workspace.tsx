@@ -10,13 +10,19 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
+import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
 import { useNumberPreview } from '@/lib/use-number-preview';
 import { riyalToMinor, formatRiyal, extractInclusiveTax } from '@/lib/money';
 import { getSystemTaxInclusive } from '@/lib/tax';
 import { productUnitForTemplate, type ProductUnitTemplate } from '@/lib/product-unit-template';
+import { replaceProductPublication } from '@/modules/products/publication';
+import { useProductPublication } from '@/modules/products/use-product-publication';
 import type { Product } from './product-dialog';
 import { ProductMultiBarcodeTable, type PendingBarcodeRow } from './product-multi-barcode-table';
+import { ProductVariantsPanel } from './product-variants-panel';
+import { ProductMediaSection, type PendingMediaFile } from './product-media-section';
+import { ProductPublicationFields } from './product-publication-fields';
 
 interface Partner { id: string; name: string; type?: string }
 interface Account { id: string; code: string; name: string; type: string; is_group: boolean }
@@ -142,9 +148,13 @@ export interface ProductWorkspaceProps {
  *  ProductWorkspace — مساحة عمل المنتج الموحّدة (PR-PROD-UX-1/2)
  * ═══════════════════════════════════════════════════════════════
  *  نطاقها اليوم: المعلومات الأساسية + التسعير القياسي + المحاسبة/الضرائب +
- *  المخزون + معلومات إضافية + الوحدات/الباركود المتعدد/السعر القانوني لكل
- *  وحدة (`ProductMultiBarcodeTable`, PR-PROD-UX-2). الوسائط، الخيارات
- *  والمتغيّرات، والنشر التجاري تبقى خارج هذا المكوّن عمداً حتى PR-3/PR-4.
+ *  المخزون + الوحدات/الباركود المتعدد/السعر القانوني لكل وحدة
+ *  (`ProductMultiBarcodeTable`, PR-PROD-UX-2) + الخيارات والمتغيّرات
+ *  (`ProductVariantsPanel`, PR-PROD-UX-3 — مُتبنّى كما هو حرفياً، لا نسخة
+ *  موازية) + الوسائط (`ProductMediaSection`) + النشر التجاري
+ *  (`ProductPublicationFields`, PR-PROD-UX-4) + معلومات إضافية. كل قسمٍ
+ *  يتوقّف على `productId` يظهر مقفلاً بشرحٍ صريح قبل أوّل حفظٍ ناجح — لا
+ *  إخفاء ولا اختراع منتجٍ وهمي لفتحه مبكراً.
  *
  *  عقد «الحفظ الأول»: وضع الإنشاء يبقى مثبَّتاً (mounted) بعد نجاح `POST`
  *  الأول — لا تنقّل، لا إغلاق نافذة. `productId` المُستحدَث يُحفَظ داخلياً،
@@ -155,6 +165,21 @@ export interface ProductWorkspaceProps {
  *  لأي نداءٍ إضافي بعد النجاح ولا لأي «إعادة إنشاء» لصفوفٍ أُنشئت فعلاً؛
  *  `ProductMultiBarcodeTable` نفسه ينتقل تلقائياً من الحالة المحلية إلى
  *  الحالة الحيّة بمجرد وجود `productId` (انظر تعليق ذلك المكوّن).
+ *
+ *  الوسائط (PR-PROD-UX-4): نفس النمط — قبل أوّل حفظٍ، الملفات مُعلَّقةٌ محلياً
+ *  بلا أي نداء شبكة (`ProductMediaSection`)، وتُرفَع بنداءٍ واحدٍ منفصلٍ
+ *  (`POST /products/{id}/media`) فور نجاح `POST /products` الأول — لا يدعم
+ *  عقد إنشاء المنتج إرفاق ملفاتٍ ضمن نفس الطلب فتبقى خطوةً ثانيةً بالضرورة،
+ *  لكنها غير حاجبة (فشلها لا يُسقط نجاح إنشاء المنتج نفسه، ولا يمنع الانتقال
+ *  إلى الحالة الحيّة حيث يمكن إعادة الرفع من نفس القسم).
+ *
+ *  النشر التجاري (PR-PROD-UX-4): `CommerceListing.is_published` يبقى مصدر
+ *  الحقيقة الوحيد — لا `Product.is_online` ولا حالة نشرٍ محلية. `useProductPublication`
+ *  (مبنيٌّ مسبقاً ومُستهلَكٌ فعلاً في `ProductDialog`) يحمّل الاختيار المتاح
+ *  قبل الحفظ، والحالة الفعلية المخزَّنة بعده؛ فشل تطبيقه حاجبٌ عمداً (يُبقي
+ *  زرّ الحفظ نفسه كنقطة إعادة محاولة، ولا يستدعي `onCreated`/`onUpdated`) لأن
+ *  حالة العميل يجب ألا تصبح سلطة نشرٍ زائفة — التأكيد يعيد التحميل من الخادم
+ *  دائماً بعد كل كتابةٍ ناجحة.
  */
 export function ProductWorkspace({
   mode,
@@ -167,6 +192,7 @@ export function ProductWorkspace({
 }: ProductWorkspaceProps) {
   const t = useTranslations('products');
   const tc = useTranslations('common');
+  const { error: toastError } = useToast();
 
   const [form, setForm] = useState<FormState>(product ? fromProduct(product) : emptyForm());
   const [persistedId, setPersistedId] = useState<string | null>(product?.id ?? null);
@@ -174,7 +200,25 @@ export function ProductWorkspace({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pendingBarcodes, setPendingBarcodes] = useState<PendingBarcodeRow[]>([]);
+  const [pendingMedia, setPendingMedia] = useState<PendingMediaFile[]>([]);
+  const [publicationRetryNeeded, setPublicationRetryNeeded] = useState(false);
+  // وضع التعديل فقط يربط الخطّاف بمعرّف منتجٍ حقيقي: `productId` فيه ثابتٌ من
+  // أوّل تركيب (لا يتحوّل مطلقاً لاحقاً)، فإعادة التحميل التلقائية عند تغيّره
+  // آمنةٌ تماماً. في وضع الإنشاء `persistedId` يتحوّل من `null` إلى معرّفٍ
+  // حقيقي أثناء نفس الجلسة (أوّل حفظٍ ناجح) — ربط الخطّاف بهذا التحوّل كان
+  // سيُطلق إعادة تحميلٍ تلقائية تُصفّر اختيار المستخدم المُعلَّق للمتاجر قبل
+  // أن يُطبَّق فعلياً؛ لذا يبقى الخطّاف في وضع «المتاجر المتاحة» طوال جلسة
+  // الإنشاء كاملةً (يطابق `ProductDialog` حرفياً)، و`replaceProductPublication`
+  // نفسها — لا إعادة تحميل الخطّاف — هي ما يُطبِّق الاختيار على المنتج الحقيقي.
+  const publicationTracksProduct = mode === 'edit';
+  const publication = useProductPublication(publicationTracksProduct ? (persistedId ?? undefined) : undefined);
   const [variants, setVariants] = useState<{ id: string; descriptor: string }[]>([]);
+  // حالة الخيارات/المتغيّرات (PR-PROD-UX-3) — تُدار محلياً هنا بدل الاعتماد
+  // فقط على `product.variant_state` القادم من الأب: في وضع الإنشاء لا يوجد
+  // `product` أصلاً، وحتى بعد أوّل حفظٍ ناجح لا يُعاد جلب المنتج كاملاً من
+  // الأب (`onCreated` لا يُمرَّر منتَجاً محدَّثاً) — فتبقى هذه الحالة مصدر
+  // الحقيقة الوحيد لعرض/قفل قسم «الخيارات والمتغيّرات» داخل مساحة العمل.
+  const [variantState, setVariantState] = useState<string>(product?.variant_state ?? 'simple');
 
   const [templates, setTemplates] = useState<ProductUnitTemplate[]>([]);
   const [categories, setCategories] = useState<Listed[]>([]);
@@ -187,7 +231,21 @@ export function ProductWorkspace({
   const { number: suggestedSku } = useNumberPreview('product', { enabled: mode === 'create' && !persistedId });
 
   const persisted = persistedId !== null;
-  const isVariantManaged = product?.variant_state === 'variant_managed';
+  const isVariantManaged = variantState === 'variant_managed';
+
+  // بعد تفعيل/تعطيل إدارة المتغيّرات (`ProductVariantsPanel`)، تُعاد قراءة
+  // المنتج لتحديث `variantState` محلياً فقط — بلا استدعاء `onUpdated` الذي
+  // يُنقّل الصفحة (`/products/new` يستعمله لإنهاء الإنشاء والتنقّل إلى
+  // القائمة)، فتغيير حالة المتغيّرات ليس «حفظ تغييرات» بمعنى ذلك المسار.
+  async function refreshVariantState() {
+    if (!persistedId) return;
+    try {
+      const r = await api<{ data: { variant_state?: string } }>(`/products/${persistedId}`);
+      setVariantState(r.data.variant_state ?? 'simple');
+    } catch {
+      // تجاهلٌ آمن: `ProductVariantsPanel` يعرض رسالة الخطأ الخاصة به بالفعل.
+    }
+  }
 
   useEffect(() => {
     getSystemTaxInclusive().then(setTaxInclusive).catch(() => {});
@@ -210,9 +268,10 @@ export function ProductWorkspace({
   }, [mode]);
 
   // VAR-PRICE-UX-1: قائمة المتغيّرات النشطة — تُستهلَك فقط لاختيار المتغيّر في
-  // جدول «باركود متعدد» لمنتجٍ متعدد الخيارات؛ فارغةٌ دائماً لمنتجٍ بسيط أو في
-  // وضع الإنشاء (لا متغيّرات قبل أول حفظٍ أصلاً — تكامل الخيارات/المتغيّرات
-  // ذاته مؤجَّلٌ لـ PR-PROD-UX-3).
+  // جدول «باركود متعدد» لمنتجٍ متعدد الخيارات؛ فارغةٌ دائماً لمنتجٍ بسيط أو
+  // قبل أوّل حفظٍ (لا `persistedId` بعد). تُعاد تلقائياً بمجرد أن يصبح
+  // `isVariantManaged` صحيحاً — بما في ذلك مباشرةً بعد التفعيل من قسم
+  // «الخيارات والمتغيّرات» أسفله (PR-PROD-UX-3)، عبر `refreshVariantState`.
   useEffect(() => {
     if (!persistedId || !isVariantManaged) {
       setVariants([]);
@@ -250,6 +309,7 @@ export function ProductWorkspace({
     if (!persistedId && !form.name.trim()) { setError(tc('saveFailed')); return; }
     setSaving(true);
     setError(null);
+    setPublicationRetryNeeded(false);
     try {
       if (!persistedId) {
         const body = {
@@ -281,11 +341,66 @@ export function ProductWorkspace({
         // معلَّقةً زائفة فوق الصفوف الحقيقية المُعاد جلبها.
         setPersistedId(newId);
         setPendingBarcodes([]);
+
+        // الوسائط المُعلَّقة: خطوةٌ ثانيةٌ غير ذرّية بالضرورة (لا يدعم عقد
+        // `POST /products` إرفاق ملفات)، لكنها غير حاجبة — فشلها يُبلَّغ
+        // بتنبيهٍ عابر ولا يُسقط نجاح إنشاء المنتج نفسه؛ `ProductMediaSection`
+        // ينتقل تلقائياً إلى الحالة الحيّة حيث يمكن إعادة الرفع.
+        if (pendingMedia.length > 0) {
+          const mediaBody = new FormData();
+          pendingMedia.forEach(({ file }) => mediaBody.append('media[]', file));
+          try {
+            await api(`/products/${newId}/media`, { method: 'POST', body: mediaBody });
+          } catch {
+            toastError(t('media_upload_failed_after_create'));
+          }
+          pendingMedia.forEach((item) => URL.revokeObjectURL(item.previewUrl));
+          setPendingMedia([]);
+        }
+
+        // النشر التجاري: حاجبٌ عمداً — فشله يُبقي المستخدم هنا (زرّ الحفظ
+        // نفسه يتحوّل إلى «إعادة محاولة النشر») بدل إتمام تدفّقٍ يوهم بنشرٍ
+        // لم يتحقّق فعلياً. `CommerceListing.is_published` يبقى السلطة
+        // الوحيدة — إعادة التحميل بعد النجاح تسحب الحالة المؤكَّدة من الخادم.
+        if (publication.status === 'ready') {
+          try {
+            // لا إعادة تحميلٍ هنا: الخطّاف يبقى في وضع «المتاجر المتاحة» طوال
+            // جلسة الإنشاء (انظر تعليق `publicationTracksProduct` أعلاه)؛
+            // إعادة تحميله كانت ستُصفّر الاختيار الذي طُبِّق للتوّ بنجاح.
+            await replaceProductPublication(newId, publication.selectedIds);
+          } catch {
+            setError(t('publication_failed_after_create'));
+            setPublicationRetryNeeded(true);
+            setSaving(false);
+            return;
+          }
+        }
+
         setDirty(false);
         await onCreated?.(newId);
       } else {
         const body = buildPayload(form, 'edit');
         await api(`/products/${persistedId}`, { method: 'PUT', body });
+
+        if (publication.status === 'ready') {
+          try {
+            await replaceProductPublication(persistedId, publication.selectedIds);
+            // فقط حين يكون الخطّاف مربوطاً فعلياً بهويّة منتجٍ حقيقية (وضع
+            // التعديل) تُعيد إعادة التحميل الحالة المؤكَّدة من الخادم بأمان؛
+            // في «إعادة محاولة النشر» بعد أوّل حفظٍ في وضع الإنشاء، الخطّاف
+            // يبقى في وضع «المتاجر المتاحة» عمداً (انظر التعليق أعلاه).
+            if (publicationTracksProduct) await publication.reload();
+          } catch {
+            // هذا الفرع يخدم وضعَين: تعديل منتجٍ قائم، **و** إعادة محاولة
+            // النشر بعد أوّل حفظٍ ناجح في وضع الإنشاء — الرسالة تتبع نيّة
+            // الصفحة (`mode`) لا وجود `persistedId` وحده.
+            setError(t(mode === 'edit' ? 'publication_failed_after_update' : 'publication_failed_after_create'));
+            setPublicationRetryNeeded(true);
+            setSaving(false);
+            return;
+          }
+        }
+
         setDirty(false);
         await onUpdated?.(persistedId);
       }
@@ -296,7 +411,8 @@ export function ProductWorkspace({
     }
   }
 
-  const saveLabel = saveLabelOverride ?? (mode === 'edit' || persisted ? t('save_changes') : t('save'));
+  const saveLabel = saveLabelOverride
+    ?? (publicationRetryNeeded ? t('retry_publication') : (mode === 'edit' || persisted ? t('save_changes') : t('save')));
 
   return (
     <div className="space-y-5">
@@ -503,24 +619,6 @@ export function ProductWorkspace({
           </CardContent>
         </Card>
 
-        {/* معلومات إضافية */}
-        <Card>
-          <CardHeader><CardTitle className="flex items-center gap-2"><SlidersHorizontal className="h-4 w-4 text-primary" strokeWidth={1.8} />{t('more_options')}</CardTitle></CardHeader>
-          <CardContent className="space-y-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="ws-tags">{t('tags')}</Label>
-              <Input id="ws-tags" placeholder={t('tags_hint')} value={form.tags} onChange={(e) => set('tags', e.target.value)} disabled={saving} />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="ws-notes">{t('internal_notes')}</Label>
-              <textarea id="ws-notes" rows={2} value={form.internal_notes} onChange={(e) => set('internal_notes', e.target.value)} disabled={saving} className="w-full resize-y rounded-md border border-border bg-surface px-3 py-2 text-sm text-text outline-none focus:border-primary disabled:opacity-50" />
-            </div>
-            <label className="flex items-center gap-2 text-sm text-text">
-              <input type="checkbox" checked={form.is_active} onChange={(e) => set('is_active', e.target.checked)} disabled={saving} />
-              {t('active')}
-            </label>
-          </CardContent>
-        </Card>
       </div>
 
       {/* الوحدات والأسعار / الباركود متعدد — الباركود الأساسي يبقى بسيطاً في
@@ -535,6 +633,75 @@ export function ProductWorkspace({
         pendingRows={pendingBarcodes}
         onPendingRowsChange={setPendingBarcodes}
       />
+
+      {/* الخيارات والمتغيّرات (PR-PROD-UX-3) — قسمٌ واحد ضمن مساحة العمل
+          نفسها، لا صفحة/تبويب منفصل. قبل أوّل حفظٍ ناجح لا يوجد `productId`
+          بعد فلا هوية يُعلَّق عليها خيار/متغيّر حقيقي — يظهر القسم مقفلاً
+          بشرحٍ صريح بدل إخفائه أو اختراع منتجٍ وهمي لفتحه مبكراً. */}
+      {persistedId ? (
+        <ProductVariantsPanel
+          productId={persistedId}
+          variantState={variantState}
+          onProductChanged={() => void refreshVariantState()}
+        />
+      ) : (
+        <Card>
+          <CardHeader><CardTitle className="flex items-center gap-2"><SlidersHorizontal className="h-4 w-4 text-primary" strokeWidth={1.8} />{t('variants_entry_title')}</CardTitle></CardHeader>
+          <CardContent>
+            <p className="text-xs text-muted">{t('variants_locked_hint')}</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* الوسائط (PR-PROD-UX-4) — معرض المنتج المشترك. بلا `productId` بعد،
+          القسم محليٌّ بحت (لا نداء شبكة)؛ الملفات تُرفَع فور نجاح أوّل حفظ. */}
+      <ProductMediaSection
+        productId={persistedId ?? undefined}
+        pendingFiles={pendingMedia}
+        onPendingFilesChange={setPendingMedia}
+      />
+
+      {/* النشر التجاري (PR-PROD-UX-4) — `CommerceListing.is_published` يبقى
+          مصدر الحقيقة الوحيد. الاختيار يُطبَّق ضمن نفس زرّ الحفظ الرئيسي (لا
+          نداءً فورياً لكل نقرة) لأنه بلا `productId` لا سلطة نشرٍ حقيقية
+          أصلاً يمكن تطبيقها عليها فوراً. */}
+      <ProductPublicationFields
+        status={publication.status}
+        stores={publication.stores}
+        selectedIds={publication.selectedIds}
+        disabled={saving}
+        onChange={publication.setSelectedIds}
+        onRetry={() => void publication.reload()}
+        labels={{
+          title: t('online_store'),
+          availableOnline: t('available_online'),
+          hint: t('publication_hint'),
+          loading: t('publication_loading'),
+          empty: t('publication_empty'),
+          loadFailed: t('publication_load_failed'),
+          retry: t('retry'),
+        }}
+      />
+
+      {/* معلومات إضافية — آخر قسم عمداً (لا حقول تصنيفٍ/تسعيرٍ/تشغيلٍ
+          جوهرية، فترتيبها الأخير لا يُخفي شيئاً حرجاً عن أول قراءة). */}
+      <Card>
+        <CardHeader><CardTitle className="flex items-center gap-2"><SlidersHorizontal className="h-4 w-4 text-primary" strokeWidth={1.8} />{t('more_options')}</CardTitle></CardHeader>
+        <CardContent className="space-y-3">
+          <div className="space-y-1.5">
+            <Label htmlFor="ws-tags">{t('tags')}</Label>
+            <Input id="ws-tags" placeholder={t('tags_hint')} value={form.tags} onChange={(e) => set('tags', e.target.value)} disabled={saving} />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="ws-notes">{t('internal_notes')}</Label>
+            <textarea id="ws-notes" rows={2} value={form.internal_notes} onChange={(e) => set('internal_notes', e.target.value)} disabled={saving} className="w-full resize-y rounded-md border border-border bg-surface px-3 py-2 text-sm text-text outline-none focus:border-primary disabled:opacity-50" />
+          </div>
+          <label className="flex items-center gap-2 text-sm text-text">
+            <input type="checkbox" checked={form.is_active} onChange={(e) => set('is_active', e.target.checked)} disabled={saving} />
+            {t('active')}
+          </label>
+        </CardContent>
+      </Card>
 
       {error && <p role="alert" className="rounded bg-negative/10 px-3 py-2 text-xs text-negative">{error}</p>}
     </div>

@@ -13,7 +13,20 @@ class AuthRecoveryService
 {
     public const PASSWORD_RESET = 'password_reset';
     public const EMAIL_VERIFICATION = 'email_verification';
+
+    /**
+     * TENANT-PROVISIONING-E2E-1 — انتقال ما بعد التسجيل عبر نطاق فرعي مختلف
+     * (`test.{base}` → `{slug}.{base}`). نفس بنية `auth_action_tokens`
+     * تماماً (رمز عشوائي، هاش مخزَّن، استهلاك مرة واحدة، ربط بالمستأجر عبر
+     * `matchesHostname()`) — لا جدول جديد ولا آلية تشفير جديدة. TTL أقصر
+     * بكثير (دقيقتان لا ساعة) لأنه يُستهلك خلال ثوانٍ من التسجيل مباشرة،
+     * لا من رابط بريد قد يُفتح لاحقاً.
+     */
+    public const TENANT_HANDOFF = 'tenant_handoff';
+
     private const TTL_MINUTES = 60;
+
+    private const HANDOFF_TTL_MINUTES = 2;
 
     public function frontendLink(User $user, string $path, string $token): string
     {
@@ -24,7 +37,7 @@ class AuthRecoveryService
 
     public function issue(User $user, string $type): string
     {
-        if (! in_array($type, [self::PASSWORD_RESET, self::EMAIL_VERIFICATION], true)) {
+        if (! in_array($type, [self::PASSWORD_RESET, self::EMAIL_VERIFICATION, self::TENANT_HANDOFF], true)) {
             throw new RuntimeException('Unsupported auth token type.');
         }
 
@@ -34,6 +47,8 @@ class AuthRecoveryService
             ->whereNull('used_at')
             ->update(['used_at' => now()]);
 
+        $ttlMinutes = $type === self::TENANT_HANDOFF ? self::HANDOFF_TTL_MINUTES : self::TTL_MINUTES;
+
         $plain = Str::random(64);
         DB::table('auth_action_tokens')->insert([
             'id' => (string) Str::uuid(),
@@ -41,7 +56,7 @@ class AuthRecoveryService
             'user_id' => $user->id,
             'type' => $type,
             'token_hash' => hash('sha256', $plain),
-            'expires_at' => now()->addMinutes(self::TTL_MINUTES),
+            'expires_at' => now()->addMinutes($ttlMinutes),
             'used_at' => null,
             'created_at' => now(),
             'updated_at' => now(),

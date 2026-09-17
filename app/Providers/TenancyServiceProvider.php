@@ -80,5 +80,11 @@ class TenancyServiceProvider extends ServiceProvider
 
         RateLimiter::for('auth-reset', fn (Request $request): Limit =>
             Limit::perMinute(10)->by('auth-reset|ip|' . $request->ip()));
+
+        // TENANT-PROVISIONING-E2E-1 — استبدال رمز انتقال ما بعد التسجيل.
+        // بالـ IP فقط: لا بريد في هذا الطلب (الرمز وحده هو المعرّف)، ومدة
+        // صلاحية الرمز نفسها دقيقتان فقط (`AuthRecoveryService::HANDOFF_TTL_MINUTES`).
+        RateLimiter::for('auth-handoff', fn (Request $request): Limit =>
+            Limit::perMinute(10)->by('auth-handoff|ip|' . $request->ip()));
     }
 }

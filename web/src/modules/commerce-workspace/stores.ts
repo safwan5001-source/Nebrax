@@ -15,7 +15,12 @@ export type CommerceStoreOption = {
   salesChannelId: string | null;
   isActive: boolean;
   previewUrl: string | null;
+  defaultLocale: string | null;
 };
+
+/** STORE-ADMIN-ADOPT-1B-1 — الحقيقة الوحيدة للغات المدعومة، تطابق الخادم. */
+export const COMMERCE_STORE_LOCALES = ['ar', 'en'] as const;
+export type CommerceStoreLocale = (typeof COMMERCE_STORE_LOCALES)[number];
 
 export type CommerceStoreCatalog =
   | { status: 'loading' }
@@ -62,6 +67,29 @@ export async function provisionCommerceStorefront(
   }
 }
 
+/**
+ * STORE-ADMIN-ADOPT-1B-1 — تحديث `name`/`default_locale` فقط لمتجرٍ قائم.
+ * `{id}` يحدّد أي صفّ — لا هوية مستأجر/قناة/نطاق تُرسَل هنا أبداً؛ الخادم
+ * يحسم الملكية من `TenantContext` وحده. كلا الحقلين اختياري ومستقل.
+ */
+export async function updateCommerceStorefrontIdentity(
+  id: string,
+  attributes: { name?: string; default_locale?: CommerceStoreLocale },
+): Promise<{ ok: true; store: CommerceStoreOption } | { ok: false; message: string }> {
+  try {
+    const payload = await api<unknown>(`${COMMERCE_STORE_ADMIN_LIST_PATH}/${id}`, {
+      method: 'PUT',
+      body: attributes,
+    });
+    const store = extractProvisionedStore(payload);
+    if (!store) return { ok: false, message: 'invalid_payload' };
+    return { ok: true, store };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'update_failed';
+    return { ok: false, message };
+  }
+}
+
 function extractProvisionedStore(payload: unknown): CommerceStoreOption | null {
   if (!payload || typeof payload !== 'object') return null;
   const data = (payload as { data?: unknown }).data;
@@ -103,6 +131,7 @@ function mapStoreOption(raw: unknown): CommerceStoreOption | null {
     salesChannelId: typeof row.sales_channel_id === 'string' ? row.sales_channel_id : null,
     isActive: row.is_active === true,
     previewUrl: sanitizePreviewUrl(row.preview_url),
+    defaultLocale: typeof row.default_locale === 'string' ? row.default_locale : null,
   };
 }
 

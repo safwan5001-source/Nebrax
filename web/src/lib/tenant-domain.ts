@@ -16,6 +16,24 @@ export function tenantHostSuffix(value?: string): string {
   return `.${tenantBaseDomain(value)}`;
 }
 
+/** Builds `{slug}.{base_domain}` — the tenant's own AWJ subdomain. */
+export function tenantHostFor(slug: string, value?: string): string {
+  return `${slug.trim().toLowerCase()}${tenantHostSuffix(value)}`;
+}
+
+/**
+ * True when `hostname` is itself under the configured tenant base domain
+ * (e.g. `test.awjdev.xyz`, or an existing tenant's own subdomain) — i.e. the
+ * browser is genuinely in AWJ's subdomain-hosted mode, as opposed to plain
+ * `localhost:3000` dev or a Vercel preview domain the base domain doesn't
+ * cover. Only in that mode does a post-registration cross-subdomain
+ * transition make sense; everywhere else the existing same-origin behavior
+ * (`router.replace`) is preserved untouched.
+ */
+export function isTenantSubdomainHost(hostname: string, value?: string): boolean {
+  return hostname.trim().toLowerCase().endsWith(tenantHostSuffix(value));
+}
+
 const CLIENT_RESERVED_SLUGS = [
   'www',
   'api',
