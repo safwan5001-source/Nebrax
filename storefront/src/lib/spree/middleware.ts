@@ -30,6 +30,17 @@ export interface SpreeMiddlewareConfig {
   accessTokenCookieName?: string;
   /** Refresh-token cookie used to preserve recoverable account sessions. */
   refreshTokenCookieName?: string;
+  /**
+   * Resolves the current request's Storefront-configured default locale
+   * (STORE-LOCALE-WIRING-1), or `null`/`undefined` when it cannot be
+   * determined. Only consulted for a cookie-less bare-path visit, and only
+   * to pick the redirect target — it never influences which Storefront is
+   * resolved. Omit to keep the pre-existing behavior (Accept-Language →
+   * static `defaultLocale`) exactly as-is.
+   */
+  resolveStorefrontLocale?: (
+    request: NextRequest,
+  ) => Promise<string | null | undefined>;
 }
 
 const PUBLIC_ACCOUNT_PATHS = new Set([
@@ -94,7 +105,7 @@ function nextWithLocaleContext(
  */
 export function createSpreeMiddleware(
   config: SpreeMiddlewareConfig = {},
-): (request: NextRequest) => NextResponse {
+): (request: NextRequest) => Promise<NextResponse> {
   const defaultCountry = config.defaultCountry ?? "us";
   const supportedLocales = config.supportedLocales ?? [];
   const configuredDefaultLocale = config.defaultLocale ?? "en";
@@ -114,8 +125,9 @@ export function createSpreeMiddleware(
     config.accessTokenCookieName ?? ACCESS_TOKEN_COOKIE;
   const refreshTokenCookieName =
     config.refreshTokenCookieName ?? REFRESH_TOKEN_COOKIE;
+  const resolveStorefrontLocale = config.resolveStorefrontLocale;
 
-  return function middleware(request: NextRequest) {
+  return async function middleware(request: NextRequest) {
     const { pathname } = request.nextUrl;
 
     // Skip static routes
@@ -185,18 +197,34 @@ export function createSpreeMiddleware(
       request.headers.get("cf-ipcountry")?.toLowerCase() ??
       defaultCountry;
 
-    // Detect locale: cookie → accept-language → default
+    // Detect locale: cookie → Storefront.default_locale → accept-language → default
+    // (STORE-LOCALE-WIRING-1 — see storefront/src/lib/commerce/edge-storefront-locale.ts
+    // for the resolver's own fail-closed/caching behavior.)
     const cookieValue = request.cookies.get(LOCALE_COOKIE)?.value;
     const cookieLocale =
       supportedLocales.length > 0
         ? negotiateLocale(cookieValue, supportedLocales)
         : canonicalizeLocale(cookieValue);
+
+    let storefrontLocale: string | undefined;
+    if (!cookieLocale && resolveStorefrontLocale) {
+      // Only asked when the buyer has no cookie preference of their own —
+      // a cookie already wins, so the network round-trip would be wasted.
+      const resolved = await resolveStorefrontLocale(request).catch(() => null);
+      storefrontLocale = resolved
+        ? supportedLocales.length > 0
+          ? matchLocale(resolved, supportedLocales)
+          : canonicalizeLocale(resolved)
+        : undefined;
+    }
+
     const acceptLanguage = request.headers.get("accept-language");
     const acceptedLocale =
       supportedLocales.length > 0
         ? negotiateAcceptLanguage(acceptLanguage, supportedLocales)
         : canonicalizeLocale(acceptLanguage?.split(",")[0]?.split(";")[0]);
-    const locale = cookieLocale ?? acceptedLocale ?? defaultLocale;
+    const locale =
+      cookieLocale ?? storefrontLocale ?? acceptedLocale ?? defaultLocale;
 
     const url = request.nextUrl.clone();
     url.pathname = `/${country}/${locale}${pathname === "/" ? "" : pathname}`;
