@@ -96,19 +96,22 @@ export async function Footer({
     <footer className="bg-store-footer text-store-footer-link">
       <StoreContainer className="py-10 md:py-12">
         {/*
-          Four even columns, not the reference's five: its fifth column is an
-          about paragraph and payment marks, neither of which AWJ configures
-          anywhere, and a stretched brand column reads as an empty gap.
+          Identity takes its own line above the navigation rather than a column
+          beside it. The reference pairs the brand with an about paragraph and
+          payment marks to fill that column; AWJ configures neither, and a lone
+          wordmark in a quarter-width column reads as a gap where content was
+          removed. Given the full measure it reads as the band's masthead, and
+          the three real link groups then divide the width evenly.
         */}
-        <div className="grid grid-cols-2 gap-x-6 gap-y-8 sm:grid-cols-4">
-          <div className="col-span-2 sm:col-span-1">
-            <StoreBrand
-              href={basePath || "/"}
-              name={displayName}
-              tone="dark"
-              className="focus-visible:outline-store-footer-foreground"
-            />
-          </div>
+        <StoreBrand
+          href={basePath || "/"}
+          name={displayName}
+          tone="dark"
+          size="md"
+          className="focus-visible:outline-store-footer-foreground"
+        />
+
+        <div className="mt-8 grid grid-cols-2 gap-x-6 gap-y-8 border-t border-store-footer-border pt-8 sm:grid-cols-3">
           <FooterColumn id="footer-shop" title={t("shop")}>
             <li>
               <Link

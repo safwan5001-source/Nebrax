@@ -76,7 +76,7 @@
     "wholesale": "Professionnels & vente en gros"
   },
   "home": {
-    "welcome": "{storeName} Storefront",
+    "welcome": "{storeName}",
     "heroDescription": "Un storefront open source prêt pour la production, construit avec Next.js, React et le SDK TypeScript Spree. Auto-hébergé. Votre stack. Pas de dépendance fournisseur. Zéro frais de plateforme.",
     "shopNow": "Tout parcourir",
     "forkOnGithub": "Forker sur GitHub",

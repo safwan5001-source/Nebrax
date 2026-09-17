@@ -76,7 +76,7 @@
     "wholesale": "التجارة والجملة"
   },
   "home": {
-    "welcome": "متجر {storeName}",
+    "welcome": "{storeName}",
     "heroDescription": "متجر إلكتروني جاهز للإنتاج ومفتوح المصدر، مبني على Next.js وReact وحزمة Spree TypeScript. استضفه بنفسك، واحتفظ بملكية بنيتك التقنية، بلا ارتباط بمزوّد واحد وبلا رسوم منصة.",
     "shopNow": "تسوّق الآن",
     "forkOnGithub": "انسخ على GitHub",

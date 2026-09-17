@@ -28,11 +28,17 @@ interface CategoryNavProps {
 /** How far one press of a paging control travels, as a share of the rail. */
 const PAGE_RATIO = 0.8;
 
+/*
+ * Inactive items are plain text: a hover box on every entry turns the rail into
+ * a row of buttons rather than a category bar. Only the open category takes a
+ * surface, and at a tighter radius than the shell's controls so it reads as a
+ * selected tab.
+ */
 const itemClassName =
-  "inline-flex shrink-0 items-center whitespace-nowrap rounded-store px-3.5 py-1.5 text-sm font-medium text-store-muted-foreground transition-colors hover:bg-store-border/50 hover:text-store-foreground";
+  "inline-flex shrink-0 items-center whitespace-nowrap rounded-sm px-3 py-1 text-[0.8125rem] font-medium text-store-muted-foreground transition-colors hover:text-store-foreground";
 
 const activeItemClassName =
-  "bg-store-primary-soft font-bold text-store-primary hover:bg-store-primary-soft";
+  "bg-store-primary-soft font-semibold text-store-primary";
 
 export function CategoryNav({ categories, basePath }: CategoryNavProps) {
   const t = useTranslations("header");
@@ -89,7 +95,7 @@ export function CategoryNav({ categories, basePath }: CategoryNavProps) {
         <div
           ref={railRef}
           onScroll={measure}
-          className="store-rail -mx-3.5 flex h-store-nav items-center gap-0.5"
+          className="store-rail -mx-3 flex h-store-nav items-center gap-1"
         >
           <Link
             href={allProductsHref}
