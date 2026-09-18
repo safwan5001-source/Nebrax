@@ -205,6 +205,11 @@ class ProductVariantService
                 throw $e;
             }
 
+            $this->applyVisualMetadata($optionValue, $data);
+            if ($optionValue->isDirty()) {
+                $optionValue->save();
+            }
+
             $this->recordActivity($option->product, 'variant_option_value_created', ['value' => [null, $optionValue->value]], $userId);
 
             return $optionValue;
@@ -249,6 +254,16 @@ class ProductVariantService
                 $value->is_active = (bool) $data['is_active'];
             }
 
+            $visualBefore = ['visual_type' => $value->visual_type, 'color_value' => $value->color_value, 'image_media_id' => $value->image_media_id];
+            $this->applyVisualMetadata($value, $data);
+            if ($value->visual_type !== $visualBefore['visual_type']
+                || $value->color_value !== $visualBefore['color_value']
+                || $value->image_media_id !== $visualBefore['image_media_id']) {
+                $diff['visual'] = [$visualBefore, [
+                    'visual_type' => $value->visual_type, 'color_value' => $value->color_value, 'image_media_id' => $value->image_media_id,
+                ]];
+            }
+
             if ($value->isDirty()) {
                 $value->save();
             }
@@ -258,6 +273,93 @@ class ProductVariantService
 
             return $value;
         });
+    }
+
+    /**
+     * VAR-OPTION-VISUAL-1 — يفرض عقد الصريّة البصرية على قيمة خيارٍ واحدة:
+     * `none` بلا لونٍ ولا صورة، `color` بلونٍ معياريٍّ صالح بلا صورة، `image`
+     * بمرجع `product_media` يخصّ **هذه القيمة بالذات** بلا لون. لا يُستدعى إلا
+     * إن لمس الطلب أحد الحقول الثلاثة — تعديلٌ لا يذكرها يترك الصريّة القائمة
+     * كما هي تماماً (توافقٌ رجعيّ حرفي).
+     *
+     * التحقّق من `image_media_id` يمرّ عبر `ProductMedia::where(...)` الخاضع
+     * لـ`TenantScope` تلقائياً — معرّفٌ من مستأجرٍ آخر أو لا يخصّ هذه القيمة
+     * بالذات (`product_option_value_id`) يُحلّ إلى `null` بصمت، فالرسالة
+     * الناتجة عامة ولا تكشف عن وجود صفٍّ لمستأجرٍ آخر إطلاقاً.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function applyVisualMetadata(ProductOptionValue $value, array $data): void
+    {
+        $touchesVisual = array_key_exists('visual_type', $data)
+            || array_key_exists('color_value', $data)
+            || array_key_exists('image_media_id', $data);
+
+        if (! $touchesVisual) {
+            return;
+        }
+
+        $type = (array_key_exists('visual_type', $data) && $data['visual_type'] !== null)
+            ? (string) $data['visual_type']
+            : $value->visual_type;
+
+        if (! in_array($type, ProductOptionValue::VISUAL_TYPES, true)) {
+            throw new RuntimeException('نوع الصريّة البصرية غير معروف.');
+        }
+
+        if ($type === ProductOptionValue::VISUAL_TYPE_NONE) {
+            if (array_key_exists('color_value', $data) && $data['color_value'] !== null) {
+                throw new RuntimeException('لا تُقبل قيمة لونٍ مع صريّةٍ نصّية (none).');
+            }
+            if (array_key_exists('image_media_id', $data) && $data['image_media_id'] !== null) {
+                throw new RuntimeException('لا يُقبل مرجع صورةٍ مع صريّةٍ نصّية (none).');
+            }
+
+            $value->visual_type = ProductOptionValue::VISUAL_TYPE_NONE;
+            $value->color_value = null;
+            $value->image_media_id = null;
+
+            return;
+        }
+
+        if ($type === ProductOptionValue::VISUAL_TYPE_COLOR) {
+            if (array_key_exists('image_media_id', $data) && $data['image_media_id'] !== null) {
+                throw new RuntimeException('لا يُقبل مرجع صورةٍ مع صريّةٍ لونية (color).');
+            }
+
+            $colorInput = array_key_exists('color_value', $data) ? $data['color_value'] : $value->color_value;
+            $normalized = is_string($colorInput) && $colorInput !== ''
+                ? ProductOptionValue::normalizeColorHex($colorInput)
+                : null;
+
+            if ($normalized === null) {
+                throw new RuntimeException('صريّة اللون تتطلب قيمة لونٍ صحيحة بصيغة #RRGGBB (مثال: #AFC9F5).');
+            }
+
+            $value->visual_type = ProductOptionValue::VISUAL_TYPE_COLOR;
+            $value->color_value = $normalized;
+            $value->image_media_id = null;
+
+            return;
+        }
+
+        // image
+        if (array_key_exists('color_value', $data) && $data['color_value'] !== null) {
+            throw new RuntimeException('لا تُقبل قيمة لونٍ مع صريّةٍ من نوع صورة (image).');
+        }
+
+        $mediaId = array_key_exists('image_media_id', $data) ? $data['image_media_id'] : $value->image_media_id;
+        $media = (is_string($mediaId) && $mediaId !== '')
+            ? ProductMedia::where('id', $mediaId)->where('product_option_value_id', $value->id)->first()
+            : null;
+
+        if ($media === null) {
+            throw new RuntimeException('صريّة الصورة تتطلب مرجع صورةٍ موجود ومرفوعٍ مسبقاً لهذه القيمة بالذات.');
+        }
+
+        $value->visual_type = ProductOptionValue::VISUAL_TYPE_IMAGE;
+        $value->color_value = null;
+        $value->image_media_id = $media->id;
     }
 
     /**
@@ -390,6 +492,7 @@ class ProductVariantService
             'name_en' => $o->name_en,
             'values' => $o->values->map(fn (ProductOptionValue $v) => [
                 'id' => $v->id, 'value' => $v->value, 'value_en' => $v->value_en,
+                'visual_type' => $v->visual_type, 'color_value' => $v->color_value,
             ])->values()->all(),
         ])->values()->all();
 
