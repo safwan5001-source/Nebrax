@@ -72,7 +72,10 @@ export function AccountProfileForm({ user }: { user: User }) {
         {t("profile")}
       </h1>
 
-      <form onSubmit={handleSubmit} className="mt-5 max-w-2xl space-y-4">
+      <form
+        onSubmit={handleSubmit}
+        className="mt-4 max-w-3xl space-y-3 xl:max-w-4xl"
+      >
         {error && (
           <Alert variant="destructive">
             <CircleAlert />
@@ -85,7 +88,7 @@ export function AccountProfileForm({ user }: { user: User }) {
           </p>
         )}
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field>
             <FieldLabel htmlFor="first_name">{t("firstName")}</FieldLabel>
             <Input

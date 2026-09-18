@@ -2,7 +2,7 @@
 
 ## 1. Status
 
-**COMPLETE pending visual re-review (correction round 1).** **Not merged, not deployed.**
+**COMPLETE pending visual re-review (correction round 2).** **Not merged, not deployed.**
 `NO VISUAL APPROVAL = NO MERGE` is respected.
 
 ## 2. Git
@@ -61,9 +61,9 @@ Narrow, per the brief. The full Commerce architecture was not re-audited.
 | Orders | Spree `customer.orders.list` | none on `store/v1` | **DESIGN_ONLY** | New `AccountOrderList`. Live route renders empty + gated notice. Designed list lights up from `StorefrontOrder[]`. Spree list is not called. |
 | Order detail | Spree `orders.get` | none on `store/v1` | **DESIGN_ONLY** | New `AccountOrderDetail` against `serializeOrder()`. Live route states lookup is unavailable. Never titled Invoice. |
 | Order status | Spree payment/fulfilment badges | `draft \| confirmed` only | **DESIGN_ONLY** | Journey of four steps. Only **placed** lights up, and only when status is `confirmed`. Tracking absence is stated once under the journey. |
-| Addresses | Spree address CRUD | checkout has one free-text address per checkout; no book | **DESIGN_ONLY** | List / card / add / edit / remove / default shape. Actions refuse, report no success, write no storage. |
+| Addresses | Spree address CRUD | checkout has one free-text address per checkout; no book | **DESIGN_ONLY** | Designed address book of two solid fixture cards (name, street, district, city/postal, country, default, edit/remove). Actions refuse, report no success, write no storage. |
 | Wishlist | STORE-UI-3 heart | none | **DESIGN_ONLY** | Account page on the existing `WishlistContext`. Page-lifetime only. |
-| Payment methods | Spree credit cards | none; ADR-04 unimplemented | **DESIGN_ONLY** | Empty + dashed method shapes. No provider name, no brand mark, no card field, no fake save. |
+| Payment methods | Spree credit cards | none; ADR-04 unimplemented | **DESIGN_ONLY** | Designed method book of two solid fixture cards (generic icon, Card / Bank transfer, synthetic `•••• 0000`, expiry slot on card only, default, remove). No provider name, no brand mark, no card field, no fake save. |
 | Auth entry | Header icon + `MobileBottomNav` Account tab + `/account` | existing session | **LIVE** | Restyled sign-in / register / forgot / reset on `AccountAuthCard`. Routes and session actions unchanged. |
 | Logout | existing `logout()` | existing session | **LIVE** | Explicit control on overview (mobile) and sidebar (desktop). Failure is shown; no optimistic fake success. |
 
@@ -368,9 +368,117 @@ Replacement Visual QA (9 captures) in
 - `desktop-1440-en-order-detail.png`
 - `desktop-1440-ar-profile.png`
 
-## 22. Next step
+## 22. Next step after round 1
 
-Owner visual review of correction round 1. On approval, merge. The
+Owner visual review of correction round 1 withheld approval and requested a
+second, tightly scoped visual pass (desktop workspace width + designed
+Addresses / Payment Methods). Orders / order detail direction was accepted.
+
+## 23. Visual correction round 2
+
+Owner review of round 1 accepted orders / order-detail / overview direction
+and withheld visual approval. This round is visual only: no contract,
+capability, auth, tenant, accounting, cart, checkout, or catalog change.
+
+| Finding | Correction |
+|---|---|
+| Desktop 1440 still left the main column undersized: sidebar `lg:w-72` / `xl:w-80` plus `xl:gap-16`, and profile `max-w-2xl`, read as a mobile-width form in a wide canvas | Sidebar `lg:w-64` (256px) at every `lg+` width; shell gap `lg:gap-8` / `xl:gap-10`. Profile form `max-w-3xl xl:max-w-4xl` with `space-y-3`. Measured: 1024 sidebar 256 / main 672 / form 672; 1280 sidebar 256 / main 920 / form 896; 1440 sidebar 256 / main ~1000 / form 896. Controls are not stretched to the viewport. |
+| Addresses still looked like a dashed wireframe | Two solid `border-store-border` cards in `lg:grid-cols-2`: recipient, street, district, city/postal, country, Default on the first, Edit / Remove. Locale-driven visual fixtures only. |
+| Payment methods still looked like disabled Card / Bank rows | Two solid cards: generic icon in a 40px bordered square (not a brand mark), type, synthetic mask `•••• 0000` (not a PAN, not 4242), expiry `•• / ••` on card only, Default on the first, Remove. No inputs. |
+| Mobile profile had leftover vertical air | Form `mt-4 space-y-3`, name grid `gap-3`. Labels and `h-11` fields unchanged. Save stays the default button. |
+
+**Capability classification (unchanged):**
+
+| Surface | State |
+|---|---|
+| Addresses | **DESIGN_ONLY / GATED** — no `store/v1` address-book contract. Cards are the intended UX. Add / Edit / Remove call `refuse()`, print `addressActionUnavailable`, write no storage, report no success. |
+| Payment methods | **DESIGN_ONLY / GATED** — no saved-instrument contract, ADR-04 unimplemented. Cards are the intended UX. Add / Remove refuse the same way. No provider is named. |
+
+**No fake persistence.** No `localStorage` / `sessionStorage` / cookie writes. No invented API. No brand (Visa / mada / Apple Pay). No card fields. Mask and expiry are synthetic visual-design fixtures in locale strings. Address copy is locale-driven fixture data, not a production customer default.
+
+**Orders / order detail.** Not redesigned. They inherit only the shared shell (narrower sidebar, larger main). Status journey, authoritative totals, `CommerceOrder != Invoice`, and “not paid” honesty are unchanged.
+
+**Responsive verification (programmatic, Playwright Chromium, no overflow):**
+
+| Width | Sidebar | Main | Profile form | Address cards | Payment cards |
+|---|---|---|---|---|---|
+| 390 | hidden | full | 358 | 1-col, 2 cards | 1-col, 2 cards |
+| 1024 | 256 | 672 | 672 | 330 × 2 | 330 × 2 |
+| 1280 | 256 | 920 | 896 | 454 × 2 | 454 × 2 |
+| 1440 | 256 | ~1000 | 896 | 2-col | 2-col |
+
+`scrollWidth === clientWidth` on every capture and inspect width. RTL (AR) sidebar is on the inline-end; LTR (EN) sidebar `aside.x = 72`, main `x = 368`.
+
+**RTL / LTR.** AR captures are `dir=rtl` on the preview root. EN order-detail and a verification EN addresses pass are `dir=ltr` on the preview root (DocumentShell’s document dir stays the store default; the account canvas is the inner `dir`).
+
+**MobileBottomNav / safe-area.** The storefront layout already reserves
+`h-[calc(var(--store-bottom-nav-height)+env(safe-area-inset-bottom))]` after
+the footer (`storefront/src/app/[country]/[locale]/(storefront)/layout.tsx`).
+AccountShell does **not** add a second pad. The `/dev/store-ui-5` harness has
+no bottom nav (it is not the storefront chrome). Live account routes therefore
+clear the bar; preview screenshots do not include it.
+
+**Changed files**
+
+- `storefront/src/components/account/AccountShell.tsx`
+- `storefront/src/components/account/AccountAddresses.tsx`
+- `storefront/src/components/account/AccountPaymentMethods.tsx`
+- `storefront/src/components/account/AccountProfileForm.tsx`
+- `storefront/src/components/account/__tests__/AccountAddresses.test.tsx`
+- `storefront/src/components/account/__tests__/AccountPaymentMethods.test.tsx`
+- `storefront/messages/{ar,de,en,es,fr,pl}.json`
+- `docs/plans/store/STORE-UI-5-IMPLEMENTATION-REPORT.md`
+- `docs/plans/store/store-ui-5-visual-qa/*.png` (8-shot replacement set)
+
+**Tests and exact results**
+
+```
+pnpm test          →  72 files, 528 tests passed
+pnpm check         →  372 files, no fixes applied
+pnpm check:locales →  ar/de/en/es/fr/pl all keys match en.json
+pnpm exec tsc --noEmit → clean
+pnpm build         →  Compiled successfully in 31.3s; TypeScript 14.0s; 68/68 static pages
+```
+
+New in this pass: address book renders two fixture cards; payment book
+renders mask + expiry keys and still has no `<Input>`; add/edit/remove still
+refuse and never match `/saved successfully/i`; architecture guards
+unchanged (no Spree SDK, no brands, no browser storage, no fake success).
+
+**Build result.** `pnpm build` compiled successfully in 31.3s. TypeScript
+finished in 14.0s. `/dev/store-ui-5` is listed and calls `notFound()` when
+`NODE_ENV === "production"`. Sitemap `fetch failed` / `ECONNREFUSED` against
+the local Commerce API is the same local-backend-absent warning as prior
+storefront builds, not a STORE-UI-5 regression. Static generation completed
+68/68.
+
+**Git**
+
+| | |
+|---|---|
+| **Base SHA** | `30979a1bb499cfe8b0e656495805e50225027530` |
+| **Round 1 Head** | `bcef4b37` |
+| **Round 2 Head** | _this commit_ |
+| **PR** | [#868](https://github.com/safwan5001-source/Nebrax/pull/868) — open, not merged |
+
+**Replacement Visual QA (8 captures)** in
+`docs/plans/store/store-ui-5-visual-qa/`:
+
+- `mobile-390-ar-overview.png`
+- `mobile-390-ar-profile.png`
+- `mobile-390-ar-addresses.png`
+- `mobile-390-ar-payment.png`
+- `desktop-1440-ar-profile.png`
+- `desktop-1440-ar-addresses.png`
+- `desktop-1440-ar-payment.png`
+- `desktop-1440-en-order-detail.png`
+
+Round 1 extras (`mobile-390-ar-orders`, `mobile-390-ar-order-detail`,
+`desktop-1440-ar-overview`) were removed so the folder is only this set.
+
+## 24. Next step
+
+Owner visual review of correction round 2. On approval, merge. The
 `DESIGN_ONLY` account capabilities then become dedicated backend tasks
 against UI that is already agreed, each with its contract already written
 down.

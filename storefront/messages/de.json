@@ -388,6 +388,22 @@
     "addressCardExample": "Straße, Stadtteil, Stadt",
     "editAddress": "Bearbeiten",
     "removeAddress": "Entfernen",
+    "addressFixture": {
+      "name": "Noura Alabdullah",
+      "line1": "King-Fahd-Straße",
+      "line2": "Asch-Schati",
+      "cityPostal": "Dammam 32230",
+      "country": "Saudi-Arabien"
+    },
+    "addressFixtureAlt": {
+      "name": "Noura Alabdullah",
+      "line1": "Lager 4, Zweite Industriestadt",
+      "line2": "Al Faisaliyah",
+      "cityPostal": "Dammam 32234",
+      "country": "Saudi-Arabien"
+    },
+    "methodMask": "•••• 0000",
+    "methodExpiry": "•• / ••",
     "wishlistNotEnabledTitle": "Merkliste wird noch nicht im Konto gespeichert",
     "wishlistNotEnabledBody": "Ein Herz gilt nur für diese Seite. Ein Neuladen löscht es. Nichts wird im Browser gespeichert.",
     "wishlistEmpty": "Keine Merkliste auf dieser Seite",

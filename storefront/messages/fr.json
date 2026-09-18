@@ -388,6 +388,22 @@
     "addressCardExample": "Rue, quartier, ville",
     "editAddress": "Modifier",
     "removeAddress": "Retirer",
+    "addressFixture": {
+      "name": "Noura Alabdullah",
+      "line1": "Route du Roi Fahd",
+      "line2": "Al Shati",
+      "cityPostal": "Dammam 32230",
+      "country": "Arabie saoudite"
+    },
+    "addressFixtureAlt": {
+      "name": "Noura Alabdullah",
+      "line1": "Entrepôt 4, deuxième ville industrielle",
+      "line2": "Al Faisaliyah",
+      "cityPostal": "Dammam 32234",
+      "country": "Arabie saoudite"
+    },
+    "methodMask": "•••• 0000",
+    "methodExpiry": "•• / ••",
     "wishlistNotEnabledTitle": "Les favoris ne sont pas encore enregistrés sur le compte",
     "wishlistNotEnabledBody": "Un cœur ne dure que le temps de cette page. Recharger l’efface. Rien n’est stocké dans le navigateur.",
     "wishlistEmpty": "Aucun favori sur cette page",

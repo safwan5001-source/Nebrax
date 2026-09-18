@@ -7,11 +7,36 @@ import { Button } from "@/components/ui/button";
 import { ACCOUNT_ADDRESSES_CAPABILITY } from "@/lib/commerce/capabilities";
 
 /**
+ * Intended address-book cards. Locale strings only — not customer records,
+ * not a production default, and never written anywhere.
+ */
+const ADDRESS_FIXTURES = [
+  {
+    id: "primary",
+    name: "addressFixture.name",
+    line1: "addressFixture.line1",
+    line2: "addressFixture.line2",
+    cityPostal: "addressFixture.cityPostal",
+    country: "addressFixture.country",
+    isDefault: true,
+  },
+  {
+    id: "secondary",
+    name: "addressFixtureAlt.name",
+    line1: "addressFixtureAlt.line1",
+    line2: "addressFixtureAlt.line2",
+    cityPostal: "addressFixtureAlt.cityPostal",
+    country: "addressFixtureAlt.country",
+    isDefault: false,
+  },
+] as const;
+
+/**
  * Saved-address book.
  *
  * **DESIGN_ONLY.** There is no customer-address persistence contract on
  * AWJ. Add / edit / remove never write anything, never report success,
- * and never fall back to browser storage. The card is the intended UX
+ * and never fall back to browser storage. The cards are the intended UX
  * so the surface does not have to be redesigned when the book lands.
  */
 export function AccountAddresses() {
@@ -48,32 +73,51 @@ export function AccountAddresses() {
         </p>
       )}
 
-      <article
+      <ul
         aria-label={t("addressCardShape")}
-        className="mt-5 rounded-store border border-dashed border-store-border px-4 py-4"
+        className="mt-5 grid grid-cols-1 gap-3 lg:grid-cols-2"
       >
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-sm font-medium text-store-foreground">
-              {t("addressCardTitle")}
-            </p>
-            <p className="mt-1 text-sm leading-relaxed text-store-muted-foreground">
-              {t("addressCardExample")}
-            </p>
-          </div>
-          <span className="shrink-0 text-[0.6875rem] font-medium text-store-muted-foreground">
-            {t("defaultAddress")}
-          </span>
-        </div>
-        <div className="mt-3 flex flex-wrap gap-2">
-          <Button type="button" variant="outline" size="sm" onClick={refuse}>
-            {t("editAddress")}
-          </Button>
-          <Button type="button" variant="ghost" size="sm" onClick={refuse}>
-            {t("removeAddress")}
-          </Button>
-        </div>
-      </article>
+        {ADDRESS_FIXTURES.map((fixture) => (
+          <li key={fixture.id}>
+            <article className="flex h-full flex-col rounded-store border border-store-border bg-store-surface px-4 py-4">
+              <div className="flex items-start justify-between gap-3">
+                <p className="min-w-0 text-sm font-medium text-store-foreground">
+                  {t(fixture.name)}
+                </p>
+                {fixture.isDefault ? (
+                  <span className="shrink-0 text-[0.6875rem] font-medium text-store-muted-foreground">
+                    {t("defaultAddress")}
+                  </span>
+                ) : null}
+              </div>
+              <div className="mt-2 space-y-0.5 text-sm leading-relaxed text-store-muted-foreground">
+                <p>{t(fixture.line1)}</p>
+                <p>{t(fixture.line2)}</p>
+                <p>{t(fixture.cityPostal)}</p>
+                <p>{t(fixture.country)}</p>
+              </div>
+              <div className="mt-auto flex flex-wrap gap-2 pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={refuse}
+                >
+                  {t("editAddress")}
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={refuse}
+                >
+                  {t("removeAddress")}
+                </Button>
+              </div>
+            </article>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

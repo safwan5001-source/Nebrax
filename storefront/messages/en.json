@@ -388,6 +388,22 @@
     "addressCardExample": "Street, district, city",
     "editAddress": "Edit",
     "removeAddress": "Remove",
+    "addressFixture": {
+      "name": "Noura Alabdullah",
+      "line1": "King Fahd Road",
+      "line2": "Al Shati",
+      "cityPostal": "Dammam 32230",
+      "country": "Saudi Arabia"
+    },
+    "addressFixtureAlt": {
+      "name": "Noura Alabdullah",
+      "line1": "Warehouse 4, Second Industrial City",
+      "line2": "Al Faisaliyah",
+      "cityPostal": "Dammam 32234",
+      "country": "Saudi Arabia"
+    },
+    "methodMask": "•••• 0000",
+    "methodExpiry": "•• / ••",
     "wishlistNotEnabledTitle": "Favorites are not saved to an account yet",
     "wishlistNotEnabledBody": "A heart on a product lasts for this page only. Reloading clears it. Nothing is stored in the browser.",
     "wishlistEmpty": "No favorites on this page",

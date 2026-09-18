@@ -7,9 +7,13 @@ import { AccountGatedNotice } from "@/components/account/AccountGatedNotice";
 import { Button } from "@/components/ui/button";
 import { ACCOUNT_SAVED_PAYMENT_METHODS_CAPABILITY } from "@/lib/commerce/capabilities";
 
-const METHOD_SHAPES = [
-  { key: "card" as const, Icon: CreditCard },
-  { key: "bank" as const, Icon: Landmark },
+/**
+ * Intended saved-method cards. The mask and expiry are synthetic visual
+ * fixtures (not a PAN, not a brand, not a live instrument).
+ */
+const METHOD_FIXTURES = [
+  { key: "card" as const, Icon: CreditCard, showExpiry: true, isDefault: true },
+  { key: "bank" as const, Icon: Landmark, showExpiry: false, isDefault: false },
 ] as const;
 
 /**
@@ -17,7 +21,7 @@ const METHOD_SHAPES = [
  *
  * **DESIGN_ONLY.** No provider is named, no brand mark is shown, no card
  * field exists, and add/remove never report success or persist anything.
- * The rows are the intended shape of a saved-method list, not a broken
+ * The cards are the intended shape of a saved-method book, not a broken
  * live list.
  */
 export function AccountPaymentMethods() {
@@ -55,21 +59,51 @@ export function AccountPaymentMethods() {
       )}
 
       <ul
-        className="mt-5 divide-y divide-store-border overflow-hidden rounded-store border border-dashed border-store-border"
+        className="mt-5 grid grid-cols-1 gap-3 lg:grid-cols-2"
         aria-label={t("savedMethodShape")}
       >
-        {METHOD_SHAPES.map(({ key, Icon }) => (
-          <li key={key} className="flex items-center gap-3 px-4 py-3">
-            <Icon
-              className="size-4 shrink-0 text-store-muted-foreground"
-              aria-hidden="true"
-            />
-            <span className="min-w-0 flex-1 text-sm text-store-muted-foreground">
-              {t(`savedMethod.${key}`)}
-            </span>
-            <Button type="button" variant="ghost" size="sm" onClick={refuse}>
-              {t("removePaymentMethod")}
-            </Button>
+        {METHOD_FIXTURES.map(({ key, Icon, showExpiry, isDefault }) => (
+          <li key={key}>
+            <article className="flex h-full flex-col rounded-store border border-store-border bg-store-surface px-4 py-4">
+              <div className="flex items-start gap-3">
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-store border border-store-border">
+                  <Icon
+                    className="size-4 text-store-foreground"
+                    aria-hidden="true"
+                  />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="text-sm font-medium text-store-foreground">
+                      {t(`savedMethod.${key}`)}
+                    </p>
+                    {isDefault ? (
+                      <span className="shrink-0 text-[0.6875rem] font-medium text-store-muted-foreground">
+                        {t("defaultAddress")}
+                      </span>
+                    ) : null}
+                  </div>
+                  <p className="mt-1 font-mono text-sm tracking-wide text-store-muted-foreground">
+                    <bdi>{t("methodMask")}</bdi>
+                  </p>
+                  {showExpiry ? (
+                    <p className="mt-0.5 text-xs text-store-muted-foreground">
+                      <bdi>{t("methodExpiry")}</bdi>
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+              <div className="mt-auto pt-4">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={refuse}
+                >
+                  {t("removePaymentMethod")}
+                </Button>
+              </div>
+            </article>
           </li>
         ))}
       </ul>

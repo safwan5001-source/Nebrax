@@ -388,6 +388,22 @@
     "addressCardExample": "Ulica, dzielnica, miasto",
     "editAddress": "Edytuj",
     "removeAddress": "Usuń",
+    "addressFixture": {
+      "name": "Noura Alabdullah",
+      "line1": "Droga Króla Fahda",
+      "line2": "Al Shati",
+      "cityPostal": "Dammam 32230",
+      "country": "Arabia Saudyjska"
+    },
+    "addressFixtureAlt": {
+      "name": "Noura Alabdullah",
+      "line1": "Magazyn 4, Drugie Miasto Przemysłowe",
+      "line2": "Al Faisaliyah",
+      "cityPostal": "Dammam 32234",
+      "country": "Arabia Saudyjska"
+    },
+    "methodMask": "•••• 0000",
+    "methodExpiry": "•• / ••",
     "wishlistNotEnabledTitle": "Ulubione nie są jeszcze zapisywane na koncie",
     "wishlistNotEnabledBody": "Serce działa tylko na tej stronie. Odświeżenie je kasuje. Nic nie jest zapisywane w przeglądarce.",
     "wishlistEmpty": "Brak ulubionych na tej stronie",

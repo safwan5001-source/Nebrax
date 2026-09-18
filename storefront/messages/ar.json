@@ -388,6 +388,22 @@
     "addressCardExample": "الشارع، الحي، المدينة",
     "editAddress": "تعديل",
     "removeAddress": "إزالة",
+    "addressFixture": {
+      "name": "نورة العبدالله",
+      "line1": "طريق الملك فهد",
+      "line2": "حي الشاطئ",
+      "cityPostal": "الدمام 32230",
+      "country": "المملكة العربية السعودية"
+    },
+    "addressFixtureAlt": {
+      "name": "نورة العبدالله",
+      "line1": "المستودع ٤، المدينة الصناعية الثانية",
+      "line2": "حي الفيصلية",
+      "cityPostal": "الدمام 32234",
+      "country": "المملكة العربية السعودية"
+    },
+    "methodMask": "•••• 0000",
+    "methodExpiry": "•• / ••",
     "wishlistNotEnabledTitle": "المفضلة لا تُحفظ في الحساب بعد",
     "wishlistNotEnabledBody": "قلب المنتج يبقى طول هذه الصفحة فقط. إعادة التحميل تمسحه. لا يُخزَّن شيء في المتصفح.",
     "wishlistEmpty": "لا توجد مفضّلات في هذه الصفحة",

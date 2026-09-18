@@ -14,13 +14,18 @@ describe("AccountPaymentMethods — DESIGN_ONLY", () => {
     expect(ACCOUNT_SAVED_PAYMENT_METHODS_CAPABILITY).toBe("design_only");
   });
 
-  it("has no card fields and never reports a successful save", async () => {
+  it("renders intended method cards with a synthetic mask and no card fields", async () => {
     const user = userEvent.setup();
     const setItem = vi.spyOn(Storage.prototype, "setItem");
 
     render(<AccountPaymentMethods />);
 
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+    expect(screen.getAllByText("methodMask")).toHaveLength(2);
+    expect(screen.getByText("methodExpiry")).toBeInTheDocument();
+    expect(screen.getByText("savedMethod.card")).toBeInTheDocument();
+    expect(screen.getByText("savedMethod.bank")).toBeInTheDocument();
+
     await user.click(screen.getByRole("button", { name: "addPaymentMethod" }));
     expect(screen.getByText("paymentActionUnavailable")).toBeInTheDocument();
     expect(screen.queryByText(/visa/i)).not.toBeInTheDocument();

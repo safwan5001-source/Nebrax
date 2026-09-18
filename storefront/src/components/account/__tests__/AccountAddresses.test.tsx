@@ -14,6 +14,20 @@ describe("AccountAddresses — DESIGN_ONLY", () => {
     expect(ACCOUNT_ADDRESSES_CAPABILITY).toBe("design_only");
   });
 
+  it("renders the intended address-book cards", () => {
+    render(<AccountAddresses />);
+    expect(screen.getByText("addressFixture.name")).toBeInTheDocument();
+    expect(screen.getByText("addressFixture.line1")).toBeInTheDocument();
+    expect(screen.getByText("addressFixture.cityPostal")).toBeInTheDocument();
+    expect(screen.getByText("addressFixtureAlt.line1")).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "editAddress" })).toHaveLength(
+      2,
+    );
+    expect(
+      screen.getAllByRole("button", { name: "removeAddress" }),
+    ).toHaveLength(2);
+  });
+
   it("refuses add/edit/remove without reporting success or writing storage", async () => {
     const user = userEvent.setup();
     const setItem = vi.spyOn(Storage.prototype, "setItem");
@@ -23,7 +37,11 @@ describe("AccountAddresses — DESIGN_ONLY", () => {
 
     await user.click(screen.getByRole("button", { name: "addNewAddress" }));
     expect(screen.getByText("addressActionUnavailable")).toBeInTheDocument();
-    expect(screen.queryByText(/saved/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/saved successfully/i)).not.toBeInTheDocument();
+    expect(setItem).not.toHaveBeenCalled();
+    expect(cookieSpy).not.toHaveBeenCalled();
+
+    await user.click(screen.getAllByRole("button", { name: "editAddress" })[0]);
     expect(setItem).not.toHaveBeenCalled();
     expect(cookieSpy).not.toHaveBeenCalled();
 
