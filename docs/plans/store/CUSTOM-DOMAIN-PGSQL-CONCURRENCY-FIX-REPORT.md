@@ -236,24 +236,28 @@ the fact that matters and confirms those 35 are local-only.
 
 ## 17. CI status
 
-On #859:
+**Green.** Every commit after `51b01e2` adds only this markdown file
+(`git diff --stat 51b01e2 e30d7d7` → 1 file, +321), so the code has been
+identical across all of these runs:
 
-| Check | Result |
-|---|---|
-| `php artisan test (L11, sqlite)` | ✅ **success** |
-| `php artisan test (L11, pgsql)` | ✅ **success** |
+| Commit | run | sqlite | pgsql |
+|---|---|---|---|
+| `51b01e2` (the fix) | [35308792767](https://github.com/safwan5001-source/Nebrax/actions/runs/35308792767) push | ✅ | ✅ |
+| `51b01e2` (the fix) | [35309886036](https://github.com/safwan5001-source/Nebrax/actions/runs/35309886036) pull_request | ✅ | ✅ |
+| `cae2b84` (docs) | [35310354895](https://github.com/safwan5001-source/Nebrax/actions/runs/35310354895) | ❌ unrelated flake (§21) | ✅ |
+| `cae2b84` (docs) | [35310358400](https://github.com/safwan5001-source/Nebrax/actions/runs/35310358400) | ✅ | ✅ |
+| `575200f` (docs) | [35311166694](https://github.com/safwan5001-source/Nebrax/actions/runs/35311166694) | ✅ | ✅ |
+| `575200f` (docs) | [35311169702](https://github.com/safwan5001-source/Nebrax/actions/runs/35311169702) | ✅ | ✅ |
 
-**Green on the code commit `51b01e2`, on both the push run
-([35308792767](https://github.com/safwan5001-source/Nebrax/actions/runs/35308792767))
-and the pull_request run
-([35309886036](https://github.com/safwan5001-source/Nebrax/actions/runs/35309886036)).**
-That is the check this PR exists to turn green: it was red on `main` at
-`0318f0e` and on #857 at `f156e29` with this same single failure, and CI's own
-PostgreSQL 16 service now runs the suite clean.
+**`php artisan test (L11, pgsql)` passed on six of six runs** — the check that was
+red on `main` at `0318f0e` and on #857 at `f156e29` with this same single
+failure. CI's own PostgreSQL 16 service now runs the suite clean.
 
-One later sqlite run on the docs commit `cae2b84` failed on an unrelated,
-pre-existing 0.8% flake (`ZatcaQrCertificateMaterialExtractorTest`); the
-parallel run of that same commit passed. See §21.
+The one sqlite failure was the unrelated pre-existing 0.8% EC-padding flake
+documented in §21; the parallel run of that same commit passed, which is what
+identified it as a flake without spending a re-run.
+
+The PR reports `mergeable_state: clean` against `main`.
 
 ## 18. Tenant Isolation assessment
 
