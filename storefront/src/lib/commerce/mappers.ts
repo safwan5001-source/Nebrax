@@ -142,6 +142,29 @@ function toOptionValues(
 }
 
 /**
+ * AWJ media URLs are guarded by Laravel's hostname-resolved storefront
+ * middleware. A browser request cannot carry the server-only forwarded-host
+ * gateway headers, so route AWJ media through the same-origin Next proxy.
+ * Other URLs remain untouched for backward compatibility with existing API
+ * consumers and test fixtures.
+ */
+function toRenderableMediaUrl(url: string | null): string | null {
+  if (!url) return null;
+
+  try {
+    const parsed = new URL(url, "http://awj.invalid");
+    const match = parsed.pathname.match(/^\/store\/v1\/media\/([^/]+)$/);
+    if (match) {
+      return `/api/storefront/media/${encodeURIComponent(match[1])}`;
+    }
+  } catch {
+    // Keep the original URL if an upstream producer sends a non-URL value.
+  }
+
+  return url;
+}
+
+/**
  * Real variants, keyed by their own `option_value_ids` — which is what makes a
  * selection resolve to one variant rather than to a guess. Price, availability
  * and media are taken verbatim from the server for each variant; nothing here
@@ -187,6 +210,8 @@ function toVariants(
 }
 
 function toMedia(media: AwjProductMedia, productId: string): Media {
+  const url = toRenderableMediaUrl(media.url);
+
   return {
     id: media.id,
     product_id: productId,
@@ -197,13 +222,13 @@ function toMedia(media: AwjProductMedia, productId: string): Media {
     focal_point_x: null,
     focal_point_y: null,
     external_video_url: null,
-    original_url: media.url,
-    mini_url: media.url,
-    small_url: media.url,
-    medium_url: media.url,
-    large_url: media.url,
-    xlarge_url: media.url,
-    og_image_url: media.url,
+    original_url: url,
+    mini_url: url,
+    small_url: url,
+    medium_url: url,
+    large_url: url,
+    xlarge_url: url,
+    og_image_url: url,
   };
 }
 
@@ -325,7 +350,7 @@ export function mapAwjProductToViewModel(
      */
     description_html: null,
     default_variant_id: `${product.id}-default`,
-    thumbnail_url: product.thumbnail_url,
+    thumbnail_url: toRenderableMediaUrl(product.thumbnail_url),
     tags: [],
     price,
     original_price: null,
@@ -340,7 +365,11 @@ export function mapAwjProductToViewModel(
      */
     default_variant: isVariantManaged
       ? undefined
-      : toDefaultVariant(product, price, product.thumbnail_url),
+      : toDefaultVariant(
+          product,
+          price,
+          toRenderableMediaUrl(product.thumbnail_url),
+        ),
     option_types: optionTypes,
     option_values: optionValues,
     categories: product.category

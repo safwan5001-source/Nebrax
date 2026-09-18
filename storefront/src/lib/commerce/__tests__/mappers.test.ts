@@ -87,8 +87,30 @@ describe("mapAwjProductToViewModel", () => {
     const viewModel = mapAwjProductToViewModel(baseProduct());
 
     expect(viewModel.media).toHaveLength(2);
+    expect(viewModel.thumbnail_url).toBe("https://example.test/media/1");
     expect(viewModel.media?.[1].alt).toBe("alt text");
     expect(viewModel.primary_media?.id).toBe("media-1");
+  });
+
+  it("routes hostname-resolved AWJ media through the same-origin image proxy", () => {
+    const viewModel = mapAwjProductToViewModel(
+      baseProduct({
+        thumbnail_url: "https://api.example.test/store/v1/media/media-1",
+        media: [
+          {
+            id: "media-1",
+            url: "https://api.example.test/store/v1/media/media-1",
+            alt: null,
+            position: 0,
+          },
+        ],
+      }),
+    );
+
+    expect(viewModel.thumbnail_url).toBe("/api/storefront/media/media-1");
+    expect(viewModel.primary_media?.original_url).toBe(
+      "/api/storefront/media/media-1",
+    );
   });
 
   it("treats in_stock: null as unknown availability, not out-of-stock", () => {

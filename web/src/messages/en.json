@@ -4780,7 +4780,16 @@
     "variants_bulk_partial_failure": "{failed} of {total} failed — review the list and retry.",
     "variants_saved": "Variant saved.",
     "variants_deleted": "Variant deleted.",
-    "variants_detail_title": "Variant detail"
+    "variants_detail_title": "Variant detail",
+    "variants_visual_type_label": "Visual type",
+    "variants_visual_edit": "Edit appearance of {name}",
+    "variants_visual_none": "None",
+    "variants_visual_color": "Color",
+    "variants_color_picker": "Color picker",
+    "variants_hex_label": "Hex value",
+    "variants_visual_title": "Option value appearance",
+    "variants_visual_none_hint": "The value remains text-only with no color metadata.",
+    "variants_visual_saved": "Value appearance saved."
   },
   "purchaseForm": {
     "title": "New purchase invoice",
