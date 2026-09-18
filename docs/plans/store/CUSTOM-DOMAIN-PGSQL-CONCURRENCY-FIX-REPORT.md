@@ -275,6 +275,18 @@ row correctly.
   transient mid-suite schema rebuild). They are environment gaps here, not
   findings about `main`, which CI reports at `1 failed, 4125 passed` on the
   same base. Reported rather than repaired, per the brief's scope rule.
+- **Separate pre-existing flake found in CI, reported not repaired:**
+  `ZatcaQrCertificateMaterialExtractorTest:21` failed once on `cae2b84` while
+  the parallel workflow run on the *same commit* passed. It generates a fresh
+  random EC key per run and compares
+  `$details['ec']['x'].$details['ec']['y']` from `openssl_pkey_get_details()`
+  against the DER-parsed point. OpenSSL does not zero-pad those coordinates to
+  the curve's 32-byte field size, so ~1 run in 125 yields a 31-byte coordinate
+  and a 64-byte expectation. Measured on PHP 8.4.19 / OpenSSL 3.0.13:
+  `24/3000 draws (0.80%)`, against 1 − (255/256)² ≈ 0.78% expected. The
+  production extractor is the correct side — DER's SEC1 point is fixed-width —
+  so the fix belongs in the test (left-pad both coordinates). Out of scope
+  here per the brief's no-opportunistic-cleanup rule; warrants its own small PR.
 - The sibling `StorefrontProvisioningPostgresConcurrencyTest` was checked for
   the same pattern: it derives its hostname from `ManagedStorefrontHostname::forSlug()`,
   not from raw random input, so it is unaffected. No other test in the suite
