@@ -436,10 +436,43 @@ class CommerceWorkspaceMakePrimaryCustomEdgeApiTest extends TestCase
             ->assertStatus(503);
 
         $this->assertSame(1, $this->edge->releaseCalls);
-        app(TenantContext::class)->set($auth['tenant_id']);
-        $this->assertNotNull(StorefrontDomain::query()->find($seeded['custom']->id));
-        app(TenantContext::class)->forget();
         $this->assertArrayHasKey($binding->providerId, $this->edge->byId);
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $kept = StorefrontDomain::query()->find($seeded['custom']->id);
+        $this->assertNotNull($kept);
+        $this->assertTrue($kept->is_active);
+        $this->assertFalse($kept->is_primary);
+        app(TenantContext::class)->forget();
+    }
+
+    /** @test */
+    public function disconnect_fences_make_primary_by_deactivating_before_provider_release(): void
+    {
+        $auth = $this->registerTenant('e3dcfence', 'owner@e3dcfence.test');
+        $hostname = 'shop.e3dcfence.example.com';
+        $binding = $this->edge->seedHostname($hostname, EdgeSnapshot::STATUS_READY, 'dom-e3-dc-fence');
+        $seeded = $this->seedManagedAndCustom($auth['tenant_id'], $hostname, [
+            'edge_status' => StorefrontDomain::EDGE_READY,
+            'edge_provider' => 'railway',
+            'edge_provider_id' => $binding->providerId,
+        ]);
+
+        $this->edge->beforeRelease = function () use ($auth, $seeded): void {
+            $row = StorefrontDomain::withoutGlobalScope(TenantScope::class)->find($seeded['custom']->id);
+            $this->assertNotNull($row);
+            $this->assertFalse($row->is_active);
+            $this->assertFalse($row->is_primary);
+            $this->assertSame($auth['tenant_id'], $row->tenant_id);
+        };
+
+        $this->withToken($auth['token'])
+            ->deleteJson($this->disconnectPath($seeded['storefront']->id, $seeded['custom']->id))
+            ->assertOk();
+
+        $this->assertSame(1, $this->edge->releaseCalls);
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $this->assertNull(StorefrontDomain::query()->find($seeded['custom']->id));
+        app(TenantContext::class)->forget();
     }
 
     /** @test */

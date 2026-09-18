@@ -64,7 +64,9 @@ Final promotion and local delete re-take the existing `lockForUpdate` of **all s
 - still not primary (Disconnect)
 - live-mapped `edge_status === ready` with a provider id (Make Primary)
 
-Documented residual window: a certificate can lapse between the live fetch and the promotion lock. The alternative (HTTP under the lock) is what EDGE-1 Activate/Refresh already do; EDGE-3 follows the ticket’s TOCTOU split. Disconnect eligibility (not primary / not AWJ) is decided **before** any `release()`.
+**Disconnect ↔ Make Primary fence (no new column):** before any Railway `find`/`release`, Disconnect’s first lock rejects current primary, then sets `is_active = false` and **commits**. Make Primary already requires `is_active` in its first lock and again inside the promotion lock, so it cannot promote a domain that Disconnect has already fenced. On provider 503, Disconnect restores `is_active` only if the row is still custom and not primary (binding was not released).
+
+Closed residual: `release()` while the row is concurrently primary, leaving a local primary without a Railway binding. Remaining residual: a certificate can lapse between the live fetch and the promotion lock (unchanged). Disconnect eligibility (not primary / not AWJ) is decided **before** any `release()`.
 
 ## Exactly-One-Primary Invariant
 
@@ -76,11 +78,11 @@ Existing Make Primary tests remain. EDGE-3 adds an explicit test that AWJ promot
 
 ## Provider-First Disconnect
 
-1. Lock: 404 isolation; AWJ → 422; current primary → 422. **No provider call yet.**
+1. Lock: 404 isolation; AWJ → 422; current primary → 422. **No provider call yet.** If eligible, set `is_active = false` and commit (Make Primary fence).
 2. Unlock. `findByHostname(hostname)` on the configured storefront service:
    - found → `release(that id)` (hostname-scoped; never deletes an unrelated Railway domain)
    - absent → confirmed absence; continue
-   - timeout / 429 / 5xx → **503**, local row remains
+   - timeout / 429 / 5xx → **503**, restore `is_active` if still custom/non-primary, local row remains
 3. Lock: revalidate still custom and not primary; hard-delete the local row.
 
 ## Provider Reconciliation
@@ -156,6 +158,7 @@ Tests:
 
 - `tests/Feature/CommerceWorkspaceMakePrimaryCustomEdgeApiTest.php`
 - `tests/Feature/CommerceWorkspaceCustomMakePrimaryPostgresConcurrencyTest.php`
+- `tests/Feature/CommerceWorkspaceDisconnectMakePrimaryPostgresConcurrencyTest.php`
 - `tests/Feature/CommerceWorkspaceMakePrimaryDomainApiTest.php`
 - `tests/Feature/CommerceWorkspaceDisconnectCustomDomainApiTest.php`
 - `tests/Feature/CommerceWorkspaceActivateEdgeApiTest.php`
@@ -217,9 +220,10 @@ No backend schema files changed.
 ## Risks / Remaining
 
 1. Residual TOCTOU: live ISSUED then cert revoked before the promotion lock. Fail-closed on the next Make Primary / Refresh.
-2. Disconnect may `findByHostname` then `release`; if release succeeds and the row became primary in the gap, phase-3 422 keeps the local row without a Railway binding. Merchant can Activate again. Eligibility still rejects primary **before** release in the common path.
+2. Disconnect fences Make Primary by committing `is_active = false` before Railway HTTP. PostgreSQL test `CommerceWorkspaceDisconnectMakePrimaryPostgresConcurrencyTest` asserts the disconnect child never `release()`s if the row remains primary.
 3. No automatic failover. Primary custom that later loses TLS stays primary until the merchant switches.
 4. Railway plan/quota still UNKNOWN (architecture).
+5. 503 after fence: `is_active` is restored so the merchant can retry Disconnect or later Make Primary; the Railway binding was not released.
 
 ## Scope Confirmation
 

@@ -490,6 +490,8 @@ final class CommerceWorkspaceStorefrontsService
      * خدمة المتجر المضبوطة)، ثم حذف الصف المحلي. فشل النقل يُبقي الصف.
      *
      * نطاق AWJ مُدار أو نطاق أساسي حالي → رفض فشلٍ مغلق قبل أي استدعاء مزوّد.
+     * قبل HTTP: إن لم يكن أساسياً يُعطَّل `is_active` (حاجز موجود بلا هجرة)
+     * حتى لا يمر Make Primary أثناء `release()`. فشل النقل يعيد النشاط.
      *
      * `null` = غير موجود / لا يخص هذا المستأجر أو هذا المتجر → 404 غير كاشف.
      *
@@ -526,9 +528,15 @@ final class CommerceWorkspaceStorefrontsService
                 );
             }
 
+            $wasActive = (bool) $domain->is_active;
+            if ($wasActive) {
+                $domain->forceFill(['is_active' => false])->save();
+            }
+
             return [
                 'kind' => 'custom',
                 'hostname' => $domain->hostname,
+                'was_active' => $wasActive,
             ];
         });
 
@@ -536,7 +544,14 @@ final class CommerceWorkspaceStorefrontsService
             return null;
         }
 
-        $this->releaseCustomEdgeBinding($inspection['hostname']);
+        try {
+            $this->releaseCustomEdgeBinding($inspection['hostname']);
+        } catch (StorefrontEdgeUnavailableException|StorefrontEdgeMisconfiguredException $e) {
+            if ($inspection['was_active']) {
+                $this->restoreActiveIfStillDisconnectable($storefront->id, $domainId, $tenantId);
+            }
+            throw $e;
+        }
 
         return DB::transaction(function () use ($storefront, $domainId, $tenantId) {
             $domain = $this->lockedDomainForStorefront($storefront->id, $domainId, $tenantId);
@@ -774,6 +789,27 @@ final class CommerceWorkspaceStorefrontsService
         }
 
         $this->edge->release($existing->providerId);
+    }
+
+    /**
+     * إن فشل إطلاق المزوّد بعد تعطيل الصف لمنع Make Primary، نعيد `is_active`
+     * فقط إن بقي النطاق مخصَّصاً غير أساسي — الربط لدى المزوّد ما زال قائماً.
+     */
+    private function restoreActiveIfStillDisconnectable(string $storefrontId, string $domainId, string $tenantId): void
+    {
+        DB::transaction(function () use ($storefrontId, $domainId, $tenantId) {
+            $domain = $this->lockedDomainForStorefront($storefrontId, $domainId, $tenantId);
+            if ($domain === null) {
+                return;
+            }
+            if ($domain->type !== StorefrontDomain::TYPE_CUSTOM || $domain->is_primary) {
+                return;
+            }
+            if ($domain->is_active) {
+                return;
+            }
+            $domain->forceFill(['is_active' => true])->save();
+        });
     }
 
     /**
