@@ -68,13 +68,15 @@ export function AccountProfileForm({ user }: { user: User }) {
 
   return (
     <div>
-      <h1 className="text-xl font-bold text-store-foreground lg:text-2xl">
-        {t("profile")}
-      </h1>
+      <header className="lg:border-b lg:border-store-border lg:pb-5">
+        <h1 className="text-xl font-bold text-store-foreground lg:text-2xl">
+          {t("profile")}
+        </h1>
+      </header>
 
       <form
         onSubmit={handleSubmit}
-        className="mt-4 w-full space-y-3 lg:mt-6 lg:space-y-5"
+        className="mt-4 w-full space-y-3 lg:mt-8 lg:space-y-6"
       >
         {error && (
           <Alert variant="destructive">
@@ -88,8 +90,8 @@ export function AccountProfileForm({ user }: { user: User }) {
           </p>
         )}
 
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:gap-x-8 lg:gap-y-5">
-          <Field>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:gap-x-8 lg:gap-y-6">
+          <Field className="lg:gap-2.5">
             <FieldLabel htmlFor="first_name">{t("firstName")}</FieldLabel>
             <Input
               type="text"
@@ -101,7 +103,7 @@ export function AccountProfileForm({ user }: { user: User }) {
               }
             />
           </Field>
-          <Field>
+          <Field className="lg:gap-2.5">
             <FieldLabel htmlFor="last_name">{t("lastName")}</FieldLabel>
             <Input
               type="text"
@@ -115,8 +117,8 @@ export function AccountProfileForm({ user }: { user: User }) {
           </Field>
         </div>
 
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 lg:gap-x-8 lg:gap-y-5">
-          <Field>
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 lg:gap-x-8 lg:gap-y-6">
+          <Field className="lg:gap-2.5">
             <FieldLabel htmlFor="email">{t("emailAddress")}</FieldLabel>
             <Input
               type="email"
@@ -130,10 +132,10 @@ export function AccountProfileForm({ user }: { user: User }) {
             />
           </Field>
 
-          <Field>
+          <Field className="lg:gap-2.5">
             <FieldLabel htmlFor="phone">{t("phone")}</FieldLabel>
             <Input type="tel" id="phone" disabled readOnly value="" />
-            <p className="text-sm text-store-muted-foreground">
+            <p className="text-sm leading-relaxed text-store-muted-foreground">
               {t("phoneUnavailable")}
             </p>
           </Field>
@@ -157,7 +159,7 @@ export function AccountProfileForm({ user }: { user: User }) {
             />
             <p
               id="current_password_help"
-              className={`mt-1 text-sm ${
+              className={`mt-1.5 text-sm leading-relaxed ${
                 passwordError
                   ? "text-store-destructive"
                   : "text-store-muted-foreground"
@@ -168,7 +170,7 @@ export function AccountProfileForm({ user }: { user: User }) {
           </div>
         )}
 
-        <div className="pt-1">
+        <div className="pt-1 lg:border-t lg:border-store-border lg:pt-5">
           <Button type="submit" disabled={saving}>
             {saving ? t("saving") : t("saveChanges")}
           </Button>

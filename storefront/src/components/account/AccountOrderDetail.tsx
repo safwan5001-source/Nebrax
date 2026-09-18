@@ -80,11 +80,11 @@ export function AccountOrderDetail({
         {t("backToOrders")}
       </Link>
 
-      <header>
+      <header className="lg:border-b lg:border-store-border lg:pb-5">
         <p className="text-xs font-medium text-store-muted-foreground">
           {t("order")}
         </p>
-        <h1 className="mt-1 text-xl font-bold text-store-foreground">
+        <h1 className="mt-1 text-xl font-bold text-store-foreground lg:text-2xl">
           <bdi>{order.number}</bdi>
         </h1>
         <p className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-sm text-store-muted-foreground">

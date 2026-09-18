@@ -36,16 +36,16 @@ export function AccountPaymentMethods() {
 
   return (
     <div>
-      <div className="flex flex-wrap items-end justify-between gap-3">
+      <header className="flex flex-wrap items-end justify-between gap-3 lg:items-center lg:border-b lg:border-store-border lg:pb-5">
         <h1 className="text-xl font-bold text-store-foreground lg:text-2xl">
           {t("paymentMethods")}
         </h1>
         <Button type="button" variant="outline" size="sm" onClick={refuse}>
           {t("addPaymentMethod")}
         </Button>
-      </div>
+      </header>
 
-      <div className="mt-2">
+      <div className="mt-2 lg:mt-4">
         <AccountGatedNotice
           title={t("paymentNotEnabledTitle")}
           body={t("paymentNotEnabledBody")}
@@ -59,12 +59,12 @@ export function AccountPaymentMethods() {
       )}
 
       <ul
-        className="mt-5 grid grid-cols-1 gap-3 lg:mt-6 lg:grid-cols-2 lg:gap-6"
+        className="mt-5 grid grid-cols-1 gap-3 lg:mt-8 lg:grid-cols-2 lg:gap-6"
         aria-label={t("savedMethodShape")}
       >
         {METHOD_FIXTURES.map(({ key, Icon, showExpiry, isDefault }) => (
           <li key={key}>
-            <article className="flex h-full flex-col rounded-store border border-store-border bg-store-surface px-4 py-4 lg:px-6 lg:py-6">
+            <article className="flex h-full flex-col rounded-store border border-store-border bg-store-surface px-4 py-4 lg:px-8 lg:py-7">
               <div className="flex items-start gap-3 lg:gap-4">
                 <span className="flex size-10 shrink-0 items-center justify-center rounded-store border border-store-border lg:size-12">
                   <Icon
@@ -74,16 +74,16 @@ export function AccountPaymentMethods() {
                 </span>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-start justify-between gap-3">
-                    <p className="text-sm font-medium text-store-foreground lg:text-base">
+                    <p className="text-sm font-medium text-store-foreground lg:text-base lg:font-semibold">
                       {t(`savedMethod.${key}`)}
                     </p>
                     {isDefault ? (
-                      <span className="shrink-0 text-[0.6875rem] font-medium text-store-muted-foreground">
+                      <span className="shrink-0 text-[0.6875rem] font-medium text-store-muted-foreground lg:rounded-store lg:border lg:border-store-border lg:px-2 lg:py-0.5 lg:text-xs">
                         {t("defaultAddress")}
                       </span>
                     ) : null}
                   </div>
-                  <p className="mt-1 font-mono text-sm tracking-wide text-store-muted-foreground lg:mt-1.5 lg:text-base">
+                  <p className="mt-1 font-mono text-sm tracking-wide text-store-muted-foreground lg:mt-2 lg:text-base">
                     <bdi>{t("methodMask")}</bdi>
                   </p>
                   {showExpiry ? (
@@ -93,7 +93,7 @@ export function AccountPaymentMethods() {
                   ) : null}
                 </div>
               </div>
-              <div className="mt-auto pt-4 lg:pt-6">
+              <div className="mt-auto pt-4 lg:mt-6 lg:border-t lg:border-store-border lg:pt-5">
                 <Button
                   type="button"
                   variant="ghost"

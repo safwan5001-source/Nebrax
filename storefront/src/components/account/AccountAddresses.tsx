@@ -51,16 +51,16 @@ export function AccountAddresses() {
 
   return (
     <div>
-      <div className="flex flex-wrap items-end justify-between gap-3">
+      <header className="flex flex-wrap items-end justify-between gap-3 lg:items-center lg:border-b lg:border-store-border lg:pb-5">
         <h1 className="text-xl font-bold text-store-foreground lg:text-2xl">
           {t("addresses")}
         </h1>
         <Button type="button" variant="outline" size="sm" onClick={refuse}>
           {t("addNewAddress")}
         </Button>
-      </div>
+      </header>
 
-      <div className="mt-2">
+      <div className="mt-2 lg:mt-4">
         <AccountGatedNotice
           title={t("addressesNotEnabledTitle")}
           body={t("addressesNotEnabledBody")}
@@ -75,28 +75,28 @@ export function AccountAddresses() {
 
       <ul
         aria-label={t("addressCardShape")}
-        className="mt-5 grid grid-cols-1 gap-3 lg:mt-6 lg:grid-cols-2 lg:gap-6"
+        className="mt-5 grid grid-cols-1 gap-3 lg:mt-8 lg:grid-cols-2 lg:gap-6"
       >
         {ADDRESS_FIXTURES.map((fixture) => (
           <li key={fixture.id}>
-            <article className="flex h-full flex-col rounded-store border border-store-border bg-store-surface px-4 py-4 lg:px-6 lg:py-6">
+            <article className="flex h-full flex-col rounded-store border border-store-border bg-store-surface px-4 py-4 lg:px-8 lg:py-7">
               <div className="flex items-start justify-between gap-3">
-                <p className="min-w-0 text-sm font-medium text-store-foreground lg:text-base">
+                <p className="min-w-0 text-sm font-medium text-store-foreground lg:text-base lg:font-semibold">
                   {t(fixture.name)}
                 </p>
                 {fixture.isDefault ? (
-                  <span className="shrink-0 text-[0.6875rem] font-medium text-store-muted-foreground">
+                  <span className="shrink-0 text-[0.6875rem] font-medium text-store-muted-foreground lg:rounded-store lg:border lg:border-store-border lg:px-2 lg:py-0.5 lg:text-xs">
                     {t("defaultAddress")}
                   </span>
                 ) : null}
               </div>
-              <div className="mt-2 space-y-0.5 text-sm leading-relaxed text-store-muted-foreground lg:mt-3 lg:space-y-1">
+              <div className="mt-2 space-y-0.5 text-sm leading-relaxed text-store-muted-foreground lg:mt-4 lg:space-y-1">
                 <p>{t(fixture.line1)}</p>
                 <p>{t(fixture.line2)}</p>
                 <p>{t(fixture.cityPostal)}</p>
                 <p>{t(fixture.country)}</p>
               </div>
-              <div className="mt-auto flex flex-wrap gap-2 pt-4 lg:pt-6">
+              <div className="mt-auto flex flex-wrap gap-2 pt-4 lg:mt-6 lg:border-t lg:border-store-border lg:pt-5">
                 <Button
                   type="button"
                   variant="outline"
