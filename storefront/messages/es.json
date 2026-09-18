@@ -81,7 +81,6 @@
     "shopNow": "Ver todo",
     "forkOnGithub": "Fork en GitHub",
     "quickstartGuide": "Guía de inicio rápido",
-    "featuredProducts": "Productos destacados",
     "viewAll": "Ver todo",
     "qualityProducts": "Productos de calidad",
     "qualityDescription": "Una seleccion cuidadosamente curada de los mejores productos.",
@@ -99,7 +98,10 @@
     "wholesaleBenefitQuickOrderTitle": "Pedido rápido por lotes",
     "wholesaleBenefitQuickOrderDescription": "Introduce SKUs y cantidades para crear un pedido grande en segundos.",
     "wholesaleBenefitOrdersTitle": "Historial de pedidos",
-    "wholesaleBenefitOrdersDescription": "Consulta pedidos anteriores y vuelve a pedir tus líneas habituales con un par de clics."
+    "wholesaleBenefitOrdersDescription": "Consulta pedidos anteriores y vuelve a pedir tus líneas habituales con un par de clics.",
+    "browseCategories": "Comprar por categoría",
+    "newArrivals": "Novedades",
+    "subcategories": "{count, plural, one {# subcategoría} other {# subcategorías}}"
   },
   "cart": {
     "cart": "Carrito",
