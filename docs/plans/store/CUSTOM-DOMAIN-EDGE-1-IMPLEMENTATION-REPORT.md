@@ -14,7 +14,7 @@ EDGE-2 (frontend) and EDGE-3 (Make Primary opening + provider-first Disconnect) 
 - PR: [#864](https://github.com/safwan5001-source/Nebrax/pull/864)
 - Base SHA: `0b5a868a81ee6746edefc38ea45b8e7f47ef4693`
 - Implementation SHA: `9c72c4137628ceeee0eaaa55078d41899542cfdb`
-- P1 hostname SHA: see the PR head after the ICANN Public Suffix commits
+- P1 hostname SHA: `2de377488429df4e96d7061f6b61c54d909e73a6`
 - Head SHA at report time: see the PR head
 
 `main` was already at #863. Later #862 is in ancestry (parent of #863). Those commits were kept.
@@ -253,17 +253,17 @@ No `web/` or `storefront/` frontend files.
 
 PHP is not installed in this sandbox (kernel-only repo; tests assemble Laravel in CI). Counts below are from GitHub Actions on PR #864.
 
-Original EDGE-1 implementation recorded from [CI run 35376113993](https://github.com/safwan5001-source/Nebrax/actions/runs/35376113993) (`pull_request` on `52cc123`). P1 hostname-fix counts are recorded from the follow-up `pull_request` run on this PR (see Full suite table).
+P1 hostname-fix recorded from [CI run 35379917603](https://github.com/safwan5001-source/Nebrax/actions/runs/35379917603) (`pull_request` on `2de3774`). Original EDGE-1 implementation was [35376113993](https://github.com/safwan5001-source/Nebrax/actions/runs/35376113993) on `52cc123` (4189 sqlite / 4232 pgsql). This P1 adds **8** tests (7 matcher + 1 Activate apex).
 
 ### Targeted backend (CI)
 
 | Suite | sqlite | pgsql |
 |---|---|---|
-| `IcannRegistrableDomainTest` | pending P1 CI | pending P1 CI |
+| `IcannRegistrableDomainTest` | **7 passed** | **7 passed** |
 | `StorefrontDomainEdgeStateMigrationTest` | **3 passed** | **3 passed** |
 | `RailwayEdgeStatusMapperTest` | **8 passed** | **8 passed** |
 | `RailwayStorefrontEdgeClientTest` | **10 passed** | **10 passed** |
-| `CommerceWorkspaceActivateEdgeApiTest` | **21 passed** + P1 apex case | **21 passed** + P1 apex case |
+| `CommerceWorkspaceActivateEdgeApiTest` | **22 passed** | **22 passed** |
 | `CommerceWorkspaceRefreshEdgeApiTest` | **13 passed** | **13 passed** |
 | `CommerceWorkspaceActivateEdgePostgresConcurrencyTest` | **skipped** (sqlite) | **1 passed** |
 | `CommerceWorkspaceMakePrimaryDomainApiTest` | **16 passed** | **16 passed** |
@@ -285,8 +285,8 @@ Concurrent Activate on one verified custom subdomain leaves a single hostname-de
 
 | Gate | Run | Result |
 |---|---|---|
-| `php artisan test (L11, sqlite)` | [35376113993](https://github.com/safwan5001-source/Nebrax/actions/runs/35376113993) job [105701070679](https://github.com/safwan5001-source/Nebrax/actions/runs/35376113993/job/105701070679) | **SUCCESS** — **43 skipped, 4189 passed** (25735 assertions) |
-| `php artisan test (L11, pgsql)` | [35376113993](https://github.com/safwan5001-source/Nebrax/actions/runs/35376113993) job [105701071005](https://github.com/safwan5001-source/Nebrax/actions/runs/35376113993/job/105701071005) | **SUCCESS** — **4232 passed** (25966 assertions), **0 failed, 0 skipped** |
+| `php artisan test (L11, sqlite)` | [35379917603](https://github.com/safwan5001-source/Nebrax/actions/runs/35379917603) job [105713386165](https://github.com/safwan5001-source/Nebrax/actions/runs/35379917603/job/105713386165) | **SUCCESS** — **43 skipped, 4197 passed** (25755 assertions) |
+| `php artisan test (L11, pgsql)` | [35379917603](https://github.com/safwan5001-source/Nebrax/actions/runs/35379917603) job [105713386384](https://github.com/safwan5001-source/Nebrax/actions/runs/35379917603/job/105713386384) | **SUCCESS** — **4240 passed** (25986 assertions), **0 failed, 0 skipped** |
 
 pgsql − sqlite passed = 43, matching the sqlite skip count (includes pgsql-only concurrency tests).
 
