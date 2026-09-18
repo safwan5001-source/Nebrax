@@ -169,13 +169,6 @@ export function ProductVariantsPanel({ productId, variantState, onProductChanged
     setNewVisualByOption((prev) => ({ ...prev, [optionId]: { ...visualDraft(optionId), ...patch } }));
   }
 
-  function visualPayload(draft: VisualDraft) {
-    return {
-      visual_type: draft.visual_type,
-      color_value: draft.visual_type === 'color' ? draft.color_value.trim().toUpperCase() : null,
-    };
-  }
-
   async function addValue(optionId: string) {
     const value = (newValueByOption[optionId] ?? '').trim();
     if (!value) return;
