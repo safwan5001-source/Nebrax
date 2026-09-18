@@ -74,15 +74,18 @@ export function AccountOrderDetail({
     <div>
       <Link
         href={`${basePath}/account/orders`}
-        className="mb-4 inline-flex min-h-11 items-center gap-1 text-sm font-medium text-store-muted-foreground hover:text-store-foreground"
+        className="mb-3 inline-flex min-h-11 items-center gap-1 text-sm font-medium text-store-muted-foreground hover:text-store-foreground"
       >
         <BackChevron className="size-4" aria-hidden="true" />
         {t("backToOrders")}
       </Link>
 
-      <header className="border-b border-store-border pb-4">
-        <h1 className="text-xl font-bold text-store-foreground sm:text-2xl">
-          {t("orderTitle", { number: order.number })}
+      <header>
+        <p className="text-xs font-medium text-store-muted-foreground">
+          {t("order")}
+        </p>
+        <h1 className="mt-1 text-xl font-bold text-store-foreground">
+          <bdi>{order.number}</bdi>
         </h1>
         <p className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-sm text-store-muted-foreground">
           {placed && <span>{t("placedOn", { date: placed })}</span>}
@@ -90,28 +93,21 @@ export function AccountOrderDetail({
         </p>
       </header>
 
-      <div className="mt-4">
+      <div className="mt-6">
         <AccountOrderStatus status={order.status} />
       </div>
 
-      <p
-        role="status"
-        className="mt-4 rounded-store border border-store-border bg-store-surface-muted p-4 text-sm leading-relaxed text-store-muted-foreground"
-      >
-        {tawj("success.notPaidNote")}
-      </p>
-
       <section
         aria-labelledby="account-order-items"
-        className="mt-4 rounded-store border border-store-border bg-store-surface"
+        className="mt-6 border-t border-store-border pt-5"
       >
         <h2
           id="account-order-items"
-          className="border-b border-store-border px-5 py-4 text-sm font-bold text-store-foreground"
+          className="text-sm font-semibold text-store-foreground"
         >
           {t("orderItems")}
         </h2>
-        <ul className="divide-y divide-store-border px-5">
+        <ul className="mt-1 divide-y divide-store-border">
           {order.items.map((item, index) => (
             <li key={`${item.productId ?? "item"}-${index}`}>
               <CartLine
@@ -126,18 +122,21 @@ export function AccountOrderDetail({
             </li>
           ))}
         </ul>
-        <div className="flex items-baseline justify-between border-t border-store-border px-5 py-4">
-          <span className="text-sm font-bold text-store-foreground">
+        <div className="flex items-baseline justify-between border-t border-store-border py-4">
+          <span className="text-sm font-semibold text-store-foreground">
             {tc("total")}
           </span>
-          <span className="text-xl font-bold tabular-nums text-store-foreground">
+          <span className="text-lg font-bold tabular-nums text-store-foreground">
             <bdi>{formatMinorAmount(order.total)}</bdi>
           </span>
         </div>
+        <p className="text-xs leading-relaxed text-store-muted-foreground">
+          {tawj("success.notPaidNote")}
+        </p>
       </section>
 
-      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div className="rounded-store border border-store-border bg-store-surface p-5">
+      <div className="mt-6 grid grid-cols-1 gap-6 border-t border-store-border pt-5 sm:grid-cols-2">
+        <div>
           <h2 className="text-xs font-semibold text-store-muted-foreground">
             {t("contact")}
           </h2>
@@ -155,7 +154,7 @@ export function AccountOrderDetail({
             )}
           </div>
         </div>
-        <div className="rounded-store border border-store-border bg-store-surface p-5">
+        <div>
           <h2 className="text-xs font-semibold text-store-muted-foreground">
             {t("deliveryAddress")}
           </h2>

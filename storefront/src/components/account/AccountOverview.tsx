@@ -53,6 +53,12 @@ const DESTINATIONS = [
     descriptionKey: "paymentMethodsDescription" as const,
     icon: CreditCard,
   },
+  {
+    href: "/policies",
+    key: "help" as const,
+    descriptionKey: "helpDescription" as const,
+    icon: HelpCircle,
+  },
 ];
 
 function displayName(
@@ -90,11 +96,11 @@ export function AccountOverview() {
 
   return (
     <div>
-      <header className="border-b border-store-border pb-4">
-        <p className="text-xs font-semibold text-store-muted-foreground">
+      <header>
+        <p className="text-xs font-medium text-store-muted-foreground">
           {t("signedInAs")}
         </p>
-        <h1 className="mt-1 break-words text-xl font-bold text-store-foreground sm:text-2xl">
+        <h1 className="mt-1 break-words text-xl font-bold text-store-foreground">
           {displayName(user, t("myAccount"))}
         </h1>
         {user?.email && (
@@ -105,11 +111,11 @@ export function AccountOverview() {
       </header>
 
       {ACCOUNT_ORDER_HISTORY_CAPABILITY !== "live" && (
-        <section className="mt-4" aria-labelledby="account-recent-orders">
-          <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+        <section className="mt-6" aria-labelledby="account-recent-orders">
+          <div className="mb-1.5 flex flex-wrap items-baseline justify-between gap-2">
             <h2
               id="account-recent-orders"
-              className="text-sm font-bold text-store-foreground"
+              className="text-sm font-semibold text-store-foreground"
             >
               {t("orders")}
             </h2>
@@ -127,65 +133,38 @@ export function AccountOverview() {
         </section>
       )}
 
-      <ul className="mt-4 divide-y divide-store-border overflow-hidden rounded-store border border-store-border bg-store-surface">
+      <ul className="mt-6 divide-y divide-store-border overflow-hidden rounded-store border border-store-border bg-store-surface sm:grid sm:grid-cols-2 sm:gap-px sm:divide-y-0 sm:bg-store-border">
         {DESTINATIONS.map((item) => {
           const Icon = item.icon;
           return (
-            <li key={item.href}>
+            <li key={item.href} className="bg-store-surface">
               <Link
                 href={`${basePath}${item.href}`}
-                className="flex min-h-14 items-center gap-3 px-4 py-3.5 transition-colors hover:bg-store-surface-muted"
+                className="flex min-h-11 items-center gap-2.5 px-3.5 py-2.5 transition-colors hover:bg-store-surface-muted"
               >
-                <span
+                <Icon
+                  className="size-4 shrink-0 text-store-muted-foreground"
                   aria-hidden="true"
-                  className="flex size-10 shrink-0 items-center justify-center rounded-store bg-store-surface-muted text-store-primary"
-                >
-                  <Icon className="size-5" />
-                </span>
+                />
                 <span className="min-w-0 flex-1">
-                  <span className="block font-medium text-store-foreground">
+                  <span className="block text-sm font-medium text-store-foreground">
                     {t(item.key)}
                   </span>
-                  <span className="mt-0.5 block text-sm leading-snug text-store-muted-foreground">
+                  <span className="mt-0.5 block text-xs leading-snug text-store-muted-foreground">
                     {t(item.descriptionKey)}
                   </span>
                 </span>
                 <Chevron
-                  className="size-4 shrink-0 text-store-muted-foreground"
+                  className="size-3.5 shrink-0 text-store-muted-foreground"
                   aria-hidden="true"
                 />
               </Link>
             </li>
           );
         })}
-        <li>
-          <Link
-            href={`${basePath}/policies`}
-            className="flex min-h-14 items-center gap-3 px-4 py-3.5 transition-colors hover:bg-store-surface-muted"
-          >
-            <span
-              aria-hidden="true"
-              className="flex size-10 shrink-0 items-center justify-center rounded-store bg-store-surface-muted text-store-primary"
-            >
-              <HelpCircle className="size-5" />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block font-medium text-store-foreground">
-                {t("help")}
-              </span>
-              <span className="mt-0.5 block text-sm leading-snug text-store-muted-foreground">
-                {t("helpDescription")}
-              </span>
-            </span>
-            <Chevron
-              className="size-4 shrink-0 text-store-muted-foreground"
-              aria-hidden="true"
-            />
-          </Link>
-        </li>
       </ul>
 
-      <div className="mt-4 lg:hidden">
+      <div className="mt-5 lg:hidden">
         <Button
           variant="outline"
           onClick={handleLogout}

@@ -24,22 +24,23 @@ export function AccountEmptyState({
   const Arrow = rtl ? ArrowLeft : ArrowRight;
 
   return (
-    <div className="flex flex-col items-center px-6 py-14 text-center">
-      <span
+    <div className="flex flex-col items-start py-2">
+      <Icon
+        className="size-5 text-store-muted-foreground"
+        strokeWidth={1.5}
         aria-hidden="true"
-        className="flex size-16 items-center justify-center rounded-full bg-store-surface-muted text-store-muted-foreground"
-      >
-        <Icon className="size-7" strokeWidth={1.5} />
-      </span>
-      <h2 className="mt-5 text-lg font-bold text-store-foreground">{title}</h2>
-      <p className="mt-2 max-w-sm text-sm leading-relaxed text-store-muted-foreground">
+      />
+      <h2 className="mt-3 text-base font-semibold text-store-foreground">
+        {title}
+      </h2>
+      <p className="mt-1 max-w-md text-sm leading-relaxed text-store-muted-foreground">
         {description}
       </p>
       {actionHref && actionLabel && (
-        <Button asChild className="mt-6" size="lg">
+        <Button asChild className="mt-4" size="sm">
           <Link href={actionHref}>
             {actionLabel}
-            <Arrow className="size-4" aria-hidden="true" />
+            <Arrow className="size-3.5" aria-hidden="true" />
           </Link>
         </Button>
       )}

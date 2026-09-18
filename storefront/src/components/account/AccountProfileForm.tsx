@@ -68,117 +68,102 @@ export function AccountProfileForm({ user }: { user: User }) {
 
   return (
     <div>
-      <h1 className="text-xl font-bold text-store-foreground sm:text-2xl">
+      <h1 className="text-xl font-bold text-store-foreground">
         {t("profile")}
       </h1>
 
-      <form
-        onSubmit={handleSubmit}
-        className="mt-4 overflow-hidden rounded-store border border-store-border bg-store-surface"
-      >
-        <div className="space-y-5 p-5 sm:p-6">
-          {error && (
-            <Alert variant="destructive">
-              <CircleAlert />
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-          {success && (
-            <p
-              role="status"
-              className="rounded-store border border-store-success/30 bg-store-success/10 px-3 py-2 text-sm text-store-foreground"
-            >
-              {t("profileUpdated")}
-            </p>
-          )}
+      <form onSubmit={handleSubmit} className="mt-5 max-w-2xl space-y-4">
+        {error && (
+          <Alert variant="destructive">
+            <CircleAlert />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+        {success && (
+          <p role="status" className="text-sm text-store-foreground">
+            {t("profileUpdated")}
+          </p>
+        )}
 
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-            <Field>
-              <FieldLabel htmlFor="first_name">{t("firstName")}</FieldLabel>
-              <Input
-                type="text"
-                id="first_name"
-                autoComplete="given-name"
-                value={formData.first_name}
-                onChange={(event) =>
-                  setFormData({ ...formData, first_name: event.target.value })
-                }
-              />
-            </Field>
-            <Field>
-              <FieldLabel htmlFor="last_name">{t("lastName")}</FieldLabel>
-              <Input
-                type="text"
-                id="last_name"
-                autoComplete="family-name"
-                value={formData.last_name}
-                onChange={(event) =>
-                  setFormData({ ...formData, last_name: event.target.value })
-                }
-              />
-            </Field>
-          </div>
-
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field>
-            <FieldLabel htmlFor="email">{t("emailAddress")}</FieldLabel>
+            <FieldLabel htmlFor="first_name">{t("firstName")}</FieldLabel>
             <Input
-              type="email"
-              id="email"
-              autoComplete="email"
-              required
-              value={formData.email}
+              type="text"
+              id="first_name"
+              autoComplete="given-name"
+              value={formData.first_name}
               onChange={(event) =>
-                setFormData({ ...formData, email: event.target.value })
+                setFormData({ ...formData, first_name: event.target.value })
               }
             />
           </Field>
-
           <Field>
-            <FieldLabel htmlFor="phone">{t("phone")}</FieldLabel>
+            <FieldLabel htmlFor="last_name">{t("lastName")}</FieldLabel>
             <Input
-              type="tel"
-              id="phone"
-              disabled
-              readOnly
-              value=""
-              placeholder={t("phoneUnavailable")}
+              type="text"
+              id="last_name"
+              autoComplete="family-name"
+              value={formData.last_name}
+              onChange={(event) =>
+                setFormData({ ...formData, last_name: event.target.value })
+              }
             />
-            <p className="text-sm text-store-muted-foreground">
-              {t("phoneUnavailable")}
-            </p>
           </Field>
-
-          {emailChanged && (
-            <div>
-              <AccountPasswordField
-                id="current_password"
-                label={t("currentPassword")}
-                value={currentPassword}
-                onChange={(value) => {
-                  setCurrentPassword(value);
-                  if (passwordError) setPasswordError(null);
-                }}
-                autoComplete="current-password"
-                showLabel={ta("showPassword")}
-                hideLabel={ta("hidePassword")}
-                describedBy="current_password_help"
-                invalid={Boolean(passwordError)}
-              />
-              <p
-                id="current_password_help"
-                className={`mt-1 text-sm ${
-                  passwordError
-                    ? "text-store-destructive"
-                    : "text-store-muted-foreground"
-                }`}
-              >
-                {passwordError || t("currentPasswordHelp")}
-              </p>
-            </div>
-          )}
         </div>
 
-        <div className="flex justify-end border-t border-store-border bg-store-surface-muted px-5 py-4">
+        <Field>
+          <FieldLabel htmlFor="email">{t("emailAddress")}</FieldLabel>
+          <Input
+            type="email"
+            id="email"
+            autoComplete="email"
+            required
+            value={formData.email}
+            onChange={(event) =>
+              setFormData({ ...formData, email: event.target.value })
+            }
+          />
+        </Field>
+
+        <Field>
+          <FieldLabel htmlFor="phone">{t("phone")}</FieldLabel>
+          <Input type="tel" id="phone" disabled readOnly value="" />
+          <p className="text-sm text-store-muted-foreground">
+            {t("phoneUnavailable")}
+          </p>
+        </Field>
+
+        {emailChanged && (
+          <div>
+            <AccountPasswordField
+              id="current_password"
+              label={t("currentPassword")}
+              value={currentPassword}
+              onChange={(value) => {
+                setCurrentPassword(value);
+                if (passwordError) setPasswordError(null);
+              }}
+              autoComplete="current-password"
+              showLabel={ta("showPassword")}
+              hideLabel={ta("hidePassword")}
+              describedBy="current_password_help"
+              invalid={Boolean(passwordError)}
+            />
+            <p
+              id="current_password_help"
+              className={`mt-1 text-sm ${
+                passwordError
+                  ? "text-store-destructive"
+                  : "text-store-muted-foreground"
+              }`}
+            >
+              {passwordError || t("currentPasswordHelp")}
+            </p>
+          </div>
+        )}
+
+        <div className="pt-1">
           <Button type="submit" disabled={saving}>
             {saving ? t("saving") : t("saveChanges")}
           </Button>

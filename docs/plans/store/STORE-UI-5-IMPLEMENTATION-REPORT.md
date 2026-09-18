@@ -2,9 +2,8 @@
 
 ## 1. Status
 
-**COMPLETE** and ready for visual review. **Not merged, not deployed.**
-`NO VISUAL APPROVAL = NO MERGE` is respected: this PR is open for the owner's
-visual sign-off and nothing beyond it.
+**COMPLETE pending visual re-review (correction round 1).** **Not merged, not deployed.**
+`NO VISUAL APPROVAL = NO MERGE` is respected.
 
 ## 2. Git
 
@@ -61,7 +60,7 @@ Narrow, per the brief. The full Commerce architecture was not re-audited.
 | Profile | Spree update form | `updateCustomer` (existing session) | **LIVE** | Restyled. Name + email update through the existing contract. Phone is read-only — the session user has no phone field. Loading / success / validation / server error. |
 | Orders | Spree `customer.orders.list` | none on `store/v1` | **DESIGN_ONLY** | New `AccountOrderList`. Live route renders empty + gated notice. Designed list lights up from `StorefrontOrder[]`. Spree list is not called. |
 | Order detail | Spree `orders.get` | none on `store/v1` | **DESIGN_ONLY** | New `AccountOrderDetail` against `serializeOrder()`. Live route states lookup is unavailable. Never titled Invoice. |
-| Order status | Spree payment/fulfilment badges | `draft \| confirmed` only | **DESIGN_ONLY** | Timeline of four steps. Only **placed** lights up, and only when status is `confirmed`. Later steps stay "not tracked". |
+| Order status | Spree payment/fulfilment badges | `draft \| confirmed` only | **DESIGN_ONLY** | Journey of four steps. Only **placed** lights up, and only when status is `confirmed`. Tracking absence is stated once under the journey. |
 | Addresses | Spree address CRUD | checkout has one free-text address per checkout; no book | **DESIGN_ONLY** | List / card / add / edit / remove / default shape. Actions refuse, report no success, write no storage. |
 | Wishlist | STORE-UI-3 heart | none | **DESIGN_ONLY** | Account page on the existing `WishlistContext`. Page-lifetime only. |
 | Payment methods | Spree credit cards | none; ADR-04 unimplemented | **DESIGN_ONLY** | Empty + dashed method shapes. No provider name, no brand mark, no card field, no fake save. |
@@ -337,8 +336,41 @@ Invoice / receipt remains **DEFERRED** (`CommerceOrder != Invoice`).
 - no payment-gateway implementation
 - `customer/v1` was **not** swapped in (auth-architecture stop condition)
 
-## 21. Next step
+## 21. Visual correction round 1
 
-Owner visual review. On approval, merge. The `DESIGN_ONLY` account
-capabilities then become dedicated backend tasks against UI that is already
-agreed, each with its contract already written down.
+Owner review of the first Visual QA accepted the implementation direction
+and withheld visual approval. This round is visual only: no contract,
+capability, auth, tenant or accounting change.
+
+| Finding | Correction |
+|---|---|
+| Desktop 1440 under-uses the store container; sidebar too slight, content floating | Wider sticky sidebar (`lg:w-72` / `xl:w-80`), larger shell gap, overview destinations as a two-column grid so the main column is occupied without stretching a single row to the full remaining width |
+| Mobile overview felt like a settings app | Removed the large pale icon tiles. Rows are `min-h-11` with a 16px line icon, tighter type, same destinations |
+| Orders left a single card in a blank canvas | Quieter heading + one-line gated caption; empty state is start-aligned and compact, not a padded island |
+| Order status was a 2×2 numbered grid repeating “not tracked” | Horizontal four-step journey. Only **placed** fills, and only when `confirmed`. The track is never filled (that would fake progress). Tracking absence is one caption under the journey |
+| Order detail stacked too many cards | Number as the title (isolated in `<bdi>`), items/total as the commercial block, contact and delivery as typography — not extra cards. Payment honesty is one muted line under the total |
+| Gated surfaces led with capability absence | One quiet `AccountGatedNotice` (no banner). Addresses and payments keep the intended surface only; the oversized empty panel is gone. Wishlist is notice + compact empty |
+| Profile was an oversized card in empty canvas | Card chrome removed. Form is `max-w-2xl` with tighter field rhythm. Phone helper is stated once |
+| Login felt tiny on desktop | Card is `max-w-lg` and vertically centered in the remaining viewport. Still an auth form, not a marketing page |
+
+**Unchanged:** capability classifications, session contract, Spree-not-as-AWJ-truth, no browser storage, `CommerceOrder != Invoice`, no fabricated fulfilment.
+
+Replacement Visual QA (9 captures) in
+`docs/plans/store/store-ui-5-visual-qa/`:
+
+- `mobile-390-ar-overview.png`
+- `mobile-390-ar-orders.png`
+- `mobile-390-ar-order-detail.png`
+- `mobile-390-ar-addresses.png`
+- `mobile-390-ar-payment.png`
+- `mobile-390-ar-profile.png`
+- `desktop-1440-ar-overview.png`
+- `desktop-1440-en-order-detail.png`
+- `desktop-1440-ar-profile.png`
+
+## 22. Next step
+
+Owner visual review of correction round 1. On approval, merge. The
+`DESIGN_ONLY` account capabilities then become dedicated backend tasks
+against UI that is already agreed, each with its contract already written
+down.

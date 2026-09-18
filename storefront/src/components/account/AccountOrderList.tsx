@@ -47,12 +47,12 @@ export function AccountOrderList({
 
   return (
     <div>
-      <h1 className="text-xl font-bold text-store-foreground sm:text-2xl">
+      <h1 className="text-xl font-bold text-store-foreground">
         {t("orderHistory")}
       </h1>
 
       {lookupUnavailable && (
-        <div className="mt-4">
+        <div className="mt-2">
           <AccountGatedNotice
             title={t("lookupUnavailableTitle")}
             body={t("lookupUnavailableBody")}
@@ -61,7 +61,7 @@ export function AccountOrderList({
       )}
 
       {orders.length === 0 ? (
-        <div className="mt-4 rounded-store border border-store-border bg-store-surface">
+        <div className="mt-5">
           <AccountEmptyState
             icon={ShoppingBag}
             title={t("noOrders")}
@@ -71,20 +71,20 @@ export function AccountOrderList({
           />
         </div>
       ) : (
-        <ul className="mt-4 divide-y divide-store-border overflow-hidden rounded-store border border-store-border bg-store-surface">
+        <ul className="mt-5 divide-y divide-store-border overflow-hidden rounded-store border border-store-border bg-store-surface">
           {orders.map((order) => {
             const date = formatOrderDate(order.createdAt, locale);
             return (
               <li key={order.id}>
                 <Link
                   href={`${basePath}/account/orders/${order.id}`}
-                  className="flex items-center gap-3 px-4 py-4 transition-colors hover:bg-store-surface-muted"
+                  className="flex min-h-11 items-center gap-3 px-4 py-3 transition-colors hover:bg-store-surface-muted"
                 >
                   <div className="min-w-0 flex-1">
                     <p className="font-medium text-store-foreground">
-                      <bdi className="break-all">{order.number}</bdi>
+                      <bdi>{order.number}</bdi>
                     </p>
-                    <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm text-store-muted-foreground">
+                    <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-sm text-store-muted-foreground">
                       {date && <span>{date}</span>}
                       <span>{statusLabel(order.status, t)}</span>
                       <span>
@@ -92,7 +92,7 @@ export function AccountOrderList({
                       </span>
                     </p>
                   </div>
-                  <p className="shrink-0 text-sm font-bold tabular-nums text-store-foreground">
+                  <p className="shrink-0 text-sm font-semibold tabular-nums text-store-foreground">
                     <bdi>{formatMinorAmount(order.total)}</bdi>
                   </p>
                   <Chevron

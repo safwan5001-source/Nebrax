@@ -78,11 +78,11 @@ export function AccountShell({
   };
 
   return (
-    <StoreContainer className="py-6 sm:py-8 lg:py-10">
-      <div className="flex flex-col gap-6 lg:flex-row lg:gap-10">
-        <aside className="hidden lg:block lg:w-64 lg:shrink-0">
-          <div className="overflow-hidden rounded-store border border-store-border bg-store-surface">
-            <div className="border-b border-store-border px-4 py-4">
+    <StoreContainer className="py-5 sm:py-7 lg:py-8">
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:gap-12 xl:gap-16">
+        <aside className="hidden lg:block lg:w-72 lg:shrink-0 xl:w-80">
+          <div className="overflow-hidden rounded-store border border-store-border bg-store-surface lg:sticky lg:top-24">
+            <div className="border-b border-store-border px-5 py-4">
               <p className="truncate font-medium text-store-foreground">
                 {displayName(user, t("myAccount"))}
               </p>
@@ -161,7 +161,7 @@ export function AccountShell({
           {!onOverview && (
             <Link
               href={`${basePath}/account`}
-              className="mb-4 inline-flex min-h-11 items-center gap-1 text-sm font-medium text-store-muted-foreground hover:text-store-foreground lg:hidden"
+              className="mb-3 inline-flex min-h-11 items-center gap-1 text-sm font-medium text-store-muted-foreground hover:text-store-foreground lg:hidden"
             >
               <BackChevron className="size-4" aria-hidden="true" />
               {t("backToAccount")}

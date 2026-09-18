@@ -55,12 +55,12 @@ export function AccountWishlist({ basePath }: { basePath: string }) {
 
   return (
     <div>
-      <h1 className="text-xl font-bold text-store-foreground sm:text-2xl">
+      <h1 className="text-xl font-bold text-store-foreground">
         {t("wishlist")}
       </h1>
 
       {WISHLIST_CAPABILITY !== "live" && (
-        <div className="mt-4">
+        <div className="mt-2">
           <AccountGatedNotice
             title={t("wishlistNotEnabledTitle")}
             body={t("wishlistNotEnabledBody")}
@@ -69,7 +69,7 @@ export function AccountWishlist({ basePath }: { basePath: string }) {
       )}
 
       {loading ? (
-        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           {ids.map((id) => (
             <div
               key={id}
@@ -78,7 +78,7 @@ export function AccountWishlist({ basePath }: { basePath: string }) {
           ))}
         </div>
       ) : products.length === 0 ? (
-        <div className="mt-4 rounded-store border border-store-border bg-store-surface">
+        <div className="mt-5">
           <AccountEmptyState
             icon={Heart}
             title={t("wishlistEmpty")}
@@ -88,7 +88,7 @@ export function AccountWishlist({ basePath }: { basePath: string }) {
           />
         </div>
       ) : (
-        <ul className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        <ul className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           {products.map((product) => (
             <li key={product.id}>
               <ProductCard product={product} basePath={basePath} />
