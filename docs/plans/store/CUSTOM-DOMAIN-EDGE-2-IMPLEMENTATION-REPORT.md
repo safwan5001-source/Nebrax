@@ -13,7 +13,7 @@ EDGE-3 (custom Make Primary + provider-first Disconnect) is **not** in this slic
 - Branch: `feat/custom-domain-edge-2-activation-ux`
 - PR: [#867](https://github.com/safwan5001-source/Nebrax/pull/867)
 - Base SHA: `85e3dec6abd20e79707d2fcd68ddff90c4f9f3a9`
-- Head SHA: see the PR head
+- Head SHA: `a1cecf06653a683bbe46624299baf8914f78573c` at report time; CI counts from this SHA
 
 `main` already included #864. Later storefront/visual commits on `main` were kept; EDGE-1 was not re-implemented.
 
@@ -186,9 +186,17 @@ EDGE-2 page coverage includes: unverified / none / pending / dns_required / tls_
 
 ## Build / CI
 
-`next build` **compiled** `/commerce/domains`. The sandbox lint gate is polluted by pre-existing eslint errors in untouched print-templates/POS files (same class reported on earlier store PRs). Authoritative web build is GitHub `web-ci.yml` on this PR.
+`next build` **compiled** `/commerce/domains`. The sandbox lint gate is polluted by pre-existing eslint errors in untouched print-templates/POS files (same class reported on earlier store PRs). Authoritative web build is GitHub `web-ci.yml`.
 
-PHP/backend suite is unchanged (no backend files).
+Recorded from PR [#867](https://github.com/safwan5001-source/Nebrax/pull/867) HEAD `a1cecf0`:
+
+| Gate | Run | Result |
+|---|---|---|
+| `web build (Next.js)` + Vitest | [35386885148](https://github.com/safwan5001-source/Nebrax/actions/runs/35386885148) | **SUCCESS** — **278 files / 1888 tests passed**; Next.js compile succeeded |
+| `php artisan test (L11, sqlite)` | [35386885132](https://github.com/safwan5001-source/Nebrax/actions/runs/35386885132) job [105735749965](https://github.com/safwan5001-source/Nebrax/actions/runs/35386885132/job/105735749965) | **SUCCESS** — **43 skipped, 4197 passed** (25755 assertions) |
+| `php artisan test (L11, pgsql)` | [35386885132](https://github.com/safwan5001-source/Nebrax/actions/runs/35386885132) job [105735749645](https://github.com/safwan5001-source/Nebrax/actions/runs/35386885132/job/105735749645) | **SUCCESS** — **4240 passed** (25986 assertions), **0 failed, 0 skipped** |
+
+Backend counts match EDGE-1 after the ICANN hostname fix (no backend files in this PR).
 
 ## Risks / Remaining
 
