@@ -842,6 +842,11 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::post('commerce/workspace/storefronts/{id}/domains/{domainId}/make-primary', [CommerceWorkspaceStorefrontsController::class, 'makePrimaryDomain'])->middleware($perm('commerce.manage'));
         Route::delete('commerce/workspace/storefronts/{id}/domains/{domainId}', [CommerceWorkspaceStorefrontsController::class, 'destroyDomain'])->middleware($perm('commerce.manage'));
 
+        // CUSTOM-DOMAIN-EDGE-1: تفعيل/تحديث حالة Railway للنطاق المخصَّص.
+        // Make Primary للنطاق المخصَّص يبقى مرفوضاً حتى EDGE-3.
+        Route::post('commerce/workspace/storefronts/{id}/domains/{domainId}/activate-edge', [CommerceWorkspaceStorefrontsController::class, 'activateEdge'])->middleware($perm('commerce.manage'));
+        Route::post('commerce/workspace/storefronts/{id}/domains/{domainId}/refresh-edge', [CommerceWorkspaceStorefrontsController::class, 'refreshEdge'])->middleware($perm('commerce.manage'));
+
         // Cycle 0: Workspace foundation only. لا CRUD ولا مبيعات ولا اتصال أجهزة
         // قبل دوراتها، لكن هذا المسار يثبت سلسلة RBAC + entitlement + حالة التطبيق.
         Route::get('fuel-stations/workspace', [FuelStationsWorkspaceController::class, 'index'])

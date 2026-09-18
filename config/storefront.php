@@ -44,4 +44,17 @@ return [
     'gateway_secret' => env('STOREFRONT_GATEWAY_SECRET'),
 
     'managed_base_domain' => env('AWJ_STOREFRONT_BASE_DOMAIN', 'store.awj.app'),
+
+    /*
+     * CUSTOM-DOMAIN-EDGE-1 — Railway GraphQL (workspace/account token).
+     * خادم Laravel فقط. لا NEXT_PUBLIC ولا استجابة JSON ولا git.
+     */
+    'edge' => [
+        'token' => env('RAILWAY_API_TOKEN'),
+        'project_id' => env('RAILWAY_PROJECT_ID'),
+        'environment_id' => env('RAILWAY_ENVIRONMENT_ID'),
+        'service_id' => env('RAILWAY_STOREFRONT_SERVICE_ID'),
+        'target_port' => env('RAILWAY_STOREFRONT_TARGET_PORT'),
+        'endpoint' => env('RAILWAY_GRAPHQL_ENDPOINT', 'https://backboard.railway.com/graphql/v2'),
+    ],
 ];

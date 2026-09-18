@@ -5,6 +5,8 @@ namespace App\Services\Commerce;
 use App\Models\SalesChannel;
 use App\Models\Storefront;
 use App\Models\StorefrontDomain;
+use App\Services\Commerce\Edge\EdgeSnapshot;
+use App\Services\Commerce\Edge\StorefrontEdgeClient;
 use App\Support\HostnameNormalizer;
 use App\Support\InvalidHostnameException;
 use App\Support\ManagedStorefrontHostname;
@@ -28,6 +30,8 @@ use RuntimeException;
  */
 final class CommerceWorkspaceStorefrontsService
 {
+    public function __construct(private readonly StorefrontEdgeClient $edge) {}
+
     /**
      * @return list<array{id: string, name: string, sales_channel_id: string, is_active: bool, preview_url: ?string, default_locale: string}>
      */
@@ -346,8 +350,9 @@ final class CommerceWorkspaceStorefrontsService
     /**
      * STORE-ADMIN-ADOPT-1B-3B — جعل نطاق مؤهل هو الأساسي لمتجر المستأجر الحالي.
      *
-     * نطاق `custom` يُرفض دائماً في هذه الشريحة: لا توجد حالة persisted تُثبت
-     * EDGE/TLS READY، و`verification_status = verified` ليس دليلاً على HTTPS.
+     * نطاق `custom` يُرفض دائماً حتى نهاية EDGE-3: EDGE-1 قد يحفظ
+     * `edge_status = ready` كذاكرة تخزين لشهادة Railway، لكن Make Primary
+     * يبقى فشلاً مغلقاً إلى أن يُعاد استعلام الشهادة الحية في EDGE-3.
      * نطاق `awj_subdomain` موثَّق ونشط يُحوَّل عبر `StorefrontDomain::makePrimary()`
      * القائمة دون إعادة كتابة منطق التبديل.
      *
@@ -406,6 +411,10 @@ final class CommerceWorkspaceStorefrontsService
      * نطاق AWJ مُدار أو نطاق أساسي حالي → رفض فشلٍ مغلق، بلا إعادة تعيين
      * أساسي ضمن هذا المسار.
      *
+     * CUSTOM-DOMAIN-EDGE-1: لا يُستدعى Railway `release` هنا. فصل صفّ DB
+     * وحده يترك ربط Railway يتيماً إلى أن تُغلق EDGE-3 المسار provider-first.
+     * سلوك #861 محفوظ عمداً.
+     *
      * `null` = غير موجود / لا يخص هذا المستأجر أو هذا المتجر → 404 غير كاشف.
      *
      * @throws DomainNotDisconnectableException نطاق غير قابل للفصل — 422.
@@ -447,6 +456,182 @@ final class CommerceWorkspaceStorefrontsService
     }
 
     /**
+     * CUSTOM-DOMAIN-EDGE-1 — تسجيل نطاق مخصَّص موثَّق لدى Railway.
+     * Make Primary يبقى مرفوضاً للنطاق المخصَّص في هذه الشريحة.
+     *
+     * @return array{id: string, hostname: string, type: string, is_primary: bool, is_active: bool, verification_status: string, verification: array{method: string, record_name: string, record_value: string, verified_at: ?string}|null, edge: ?array}|null
+     */
+    public function activateEdgeForCurrentTenant(string $storefrontId, string $domainId): ?array
+    {
+        $tenantId = app(TenantContext::class)->id();
+        if ($tenantId === null) {
+            throw new RuntimeException('لا سياق مستأجر نشط.');
+        }
+
+        $storefront = Storefront::query()->find($storefrontId);
+        if ($storefront === null || $storefront->tenant_id !== $tenantId) {
+            return null;
+        }
+
+        return DB::transaction(function () use ($storefront, $domainId, $tenantId) {
+            $domain = $this->lockedDomainForStorefront($storefront->id, $domainId, $tenantId);
+            if ($domain === null) {
+                return null;
+            }
+
+            $this->assertEligibleForEdgeActivation($domain);
+
+            if (is_string($domain->edge_provider_id) && $domain->edge_provider_id !== '') {
+                $snapshot = $this->edge->fetch($domain->edge_provider_id);
+                if (! $snapshot->missing) {
+                    $this->applyEdgeSnapshot($domain, $snapshot, $domain->edge_provider_id);
+
+                    return $this->presentDomain($domain->refresh());
+                }
+                // المزوّد حذف الكائن خارجياً — نُعيد الاكتشاف/الإنشاء بدل تجميد failed.
+            }
+
+            $existing = $this->edge->findByHostname($domain->hostname);
+            if ($existing !== null) {
+                $this->applyEdgeSnapshot($domain, $existing->snapshot, $existing->providerId);
+
+                return $this->presentDomain($domain->refresh());
+            }
+
+            try {
+                $binding = $this->edge->provision($domain->hostname);
+            } catch (StorefrontEdgeConflictException $e) {
+                $recovered = $this->edge->findByHostname($domain->hostname);
+                if ($recovered === null) {
+                    throw $e;
+                }
+                $this->applyEdgeSnapshot($domain, $recovered->snapshot, $recovered->providerId);
+
+                return $this->presentDomain($domain->refresh());
+            } catch (StorefrontEdgeUnavailableException $e) {
+                $recovered = $this->edge->findByHostname($domain->hostname);
+                if ($recovered === null) {
+                    throw $e;
+                }
+                $this->applyEdgeSnapshot($domain, $recovered->snapshot, $recovered->providerId);
+
+                return $this->presentDomain($domain->refresh());
+            }
+
+            $this->applyEdgeSnapshot($domain, $binding->snapshot, $binding->providerId);
+
+            return $this->presentDomain($domain->refresh());
+        });
+    }
+
+    /**
+     * CUSTOM-DOMAIN-EDGE-1 — مزامنة حالة Railway إلى الصف.
+     *
+     * @return array{id: string, hostname: string, type: string, is_primary: bool, is_active: bool, verification_status: string, verification: array{method: string, record_name: string, record_value: string, verified_at: ?string}|null, edge: ?array}|null
+     */
+    public function refreshEdgeForCurrentTenant(string $storefrontId, string $domainId): ?array
+    {
+        $tenantId = app(TenantContext::class)->id();
+        if ($tenantId === null) {
+            throw new RuntimeException('لا سياق مستأجر نشط.');
+        }
+
+        $storefront = Storefront::query()->find($storefrontId);
+        if ($storefront === null || $storefront->tenant_id !== $tenantId) {
+            return null;
+        }
+
+        return DB::transaction(function () use ($storefront, $domainId, $tenantId) {
+            $domain = $this->lockedDomainForStorefront($storefront->id, $domainId, $tenantId);
+            if ($domain === null) {
+                return null;
+            }
+
+            if ($domain->type !== StorefrontDomain::TYPE_CUSTOM) {
+                throw new DomainNotEligibleForEdgeException(
+                    'نطاقات أَوْج المُدارة لا تحتاج تفعيل حافة.'
+                );
+            }
+
+            $providerId = is_string($domain->edge_provider_id) && $domain->edge_provider_id !== ''
+                ? $domain->edge_provider_id
+                : null;
+
+            if ($providerId === null) {
+                $existing = $this->edge->findByHostname($domain->hostname);
+                if ($existing === null) {
+                    throw new DomainNotActivatedForEdgeException(
+                        'هذا النطاق لم يُفعَّل لدى مزوّد الحافة بعد.'
+                    );
+                }
+                $this->applyEdgeSnapshot($domain, $existing->snapshot, $existing->providerId);
+
+                return $this->presentDomain($domain->refresh());
+            }
+
+            $snapshot = $this->edge->fetch($providerId);
+            $this->applyEdgeSnapshot($domain, $snapshot, $providerId);
+
+            return $this->presentDomain($domain->refresh());
+        });
+    }
+
+    private function assertEligibleForEdgeActivation(StorefrontDomain $domain): void
+    {
+        if ($domain->type !== StorefrontDomain::TYPE_CUSTOM) {
+            throw new DomainNotEligibleForEdgeException(
+                'نطاقات أَوْج المُدارة لا تحتاج تفعيل حافة.'
+            );
+        }
+        if (! $domain->isVerified() || ! $domain->is_active) {
+            throw new DomainNotEligibleForEdgeException(
+                'لا يمكن تفعيل الحافة قبل اكتمال تحقّق ملكية النطاق.'
+            );
+        }
+        if (! $this->isV1SubdomainHostname($domain->hostname)) {
+            throw new DomainNotEligibleForEdgeException(
+                'تفعيل النطاق الجذري غير مدعوم في هذه المرحلة — استخدم نطاقاً فرعياً مثل shop.example.com.'
+            );
+        }
+
+        $base = ManagedStorefrontHostname::configuredBaseDomain();
+        if ($domain->hostname === $base || ManagedStorefrontHostname::isUnderBaseDomain($domain->hostname, $base)) {
+            throw new DomainNotEligibleForEdgeException(
+                'لا يمكن تفعيل نطاق يقع ضمن نطاق أَوْج المُدار.'
+            );
+        }
+    }
+
+    private function isV1SubdomainHostname(string $hostname): bool
+    {
+        $labels = explode('.', $hostname);
+
+        return count($labels) >= 3 && ! in_array('', $labels, true);
+    }
+
+    private function applyEdgeSnapshot(StorefrontDomain $domain, EdgeSnapshot $snapshot, string $providerId): void
+    {
+        $status = $snapshot->missing ? StorefrontDomain::EDGE_FAILED : $snapshot->status;
+        $readyAt = $domain->edge_ready_at;
+        if ($status === StorefrontDomain::EDGE_READY && $readyAt === null) {
+            $readyAt = now();
+        }
+        if ($status !== StorefrontDomain::EDGE_READY) {
+            // Keep first ready_at as historical cache; EDGE-3 re-queries live cert.
+        }
+
+        $domain->forceFill([
+            'edge_status' => $status,
+            'edge_provider' => 'railway',
+            'edge_provider_id' => $snapshot->missing ? $domain->edge_provider_id : $providerId,
+            'edge_dns_instructions' => ['records' => $snapshot->instructionPayload()],
+            'edge_last_error' => $snapshot->lastError,
+            'edge_checked_at' => now(),
+            'edge_ready_at' => $readyAt,
+        ])->save();
+    }
+
+    /**
      * يقفل كل نطاقات المتجر (مرتَّبة بالمعرّف لتفادي deadlock) ثم يعيد الصف
      * المطلوب إن كان مملوكاً للمستأجر الحالي. قفل المجموعة يجعل Make Primary
      * وDisconnect متسلسلَين على نفس المتجر دون معمارية قفل جديدة.
@@ -484,7 +669,11 @@ final class CommerceWorkspaceStorefrontsService
      * `verification_token` فعلياً (كل نطاق `custom` أُنشئ عبر هذا المسار
      * يحمله دوماً)؛ `null` للنطاق المُدار من أَوْج أو أي صفّ تاريخي بلا token.
      *
-     * @return array{id: string, hostname: string, type: string, is_primary: bool, is_active: bool, verification_status: string, verification: array{method: string, record_name: string, record_value: string, verified_at: ?string}|null}
+     * CUSTOM-DOMAIN-EDGE-1: `edge` إضافي بحت. `null` لنطاق AWJ المُدار.
+     * للنطاق المخصَّص يُعرض الوضع/تعليمات DNS/الأزمنة/خطأ آمن فقط — بلا
+     * `edge_provider_id` ولا أسرار Railway.
+     *
+     * @return array{id: string, hostname: string, type: string, is_primary: bool, is_active: bool, verification_status: string, verification: array{method: string, record_name: string, record_value: string, verified_at: ?string}|null, edge: ?array{status: string, dns_instructions: array{records: list<array{type: string, name: string, value: string}>}, checked_at: ?string, ready_at: ?string, last_error: ?string}}
      */
     private function presentDomain(StorefrontDomain $domain): array
     {
@@ -506,6 +695,44 @@ final class CommerceWorkspaceStorefrontsService
             'is_active' => $domain->is_active,
             'verification_status' => $domain->verification_status,
             'verification' => $verification,
+            'edge' => $this->presentEdge($domain),
+        ];
+    }
+
+    /**
+     * @return array{status: string, dns_instructions: array{records: list<array{type: string, name: string, value: string}>}, checked_at: ?string, ready_at: ?string, last_error: ?string}|null
+     */
+    private function presentEdge(StorefrontDomain $domain): ?array
+    {
+        if ($domain->type !== StorefrontDomain::TYPE_CUSTOM) {
+            return null;
+        }
+
+        $instructions = $domain->edge_dns_instructions;
+        $records = [];
+        if (is_array($instructions) && isset($instructions['records']) && is_array($instructions['records'])) {
+            foreach ($instructions['records'] as $record) {
+                if (! is_array($record)) {
+                    continue;
+                }
+                $type = (string) ($record['type'] ?? '');
+                $name = (string) ($record['name'] ?? '');
+                $value = (string) ($record['value'] ?? '');
+                if ($type === '' || $name === '' || $value === '') {
+                    continue;
+                }
+                $records[] = ['type' => $type, 'name' => $name, 'value' => $value];
+            }
+        }
+
+        return [
+            'status' => is_string($domain->edge_status) && $domain->edge_status !== ''
+                ? $domain->edge_status
+                : StorefrontDomain::EDGE_NONE,
+            'dns_instructions' => ['records' => $records],
+            'checked_at' => $domain->edge_checked_at?->toIso8601String(),
+            'ready_at' => $domain->edge_ready_at?->toIso8601String(),
+            'last_error' => $domain->edge_last_error,
         ];
     }
 

@@ -7,11 +7,16 @@ use App\Http\Requests\ProvisionStorefrontRequest;
 use App\Http\Requests\UpdateStorefrontIdentityRequest;
 use App\Services\Commerce\CommerceWorkspaceStorefrontsService;
 use App\Services\Commerce\CustomDomainNotReadyForPrimaryException;
+use App\Services\Commerce\DomainNotActivatedForEdgeException;
 use App\Services\Commerce\DomainNotDisconnectableException;
+use App\Services\Commerce\DomainNotEligibleForEdgeException;
 use App\Services\Commerce\DomainNotEligibleForPrimaryException;
 use App\Services\Commerce\DomainNotEligibleForVerificationException;
 use App\Services\Commerce\ManagedNamespaceHostnameException;
 use App\Services\Commerce\StorefrontDomainVerificationService;
+use App\Services\Commerce\StorefrontEdgeConflictException;
+use App\Services\Commerce\StorefrontEdgeMisconfiguredException;
+use App\Services\Commerce\StorefrontEdgeUnavailableException;
 use App\Services\Commerce\StorefrontHostnameConflictException;
 use App\Services\Commerce\StorefrontProvisioningService;
 use App\Support\Dns\DnsOperationalException;
@@ -28,6 +33,7 @@ use RuntimeException;
  * STORE-ADMIN-ADOPT-1B-2 — رؤية نطاقات متجر قائم (قراءة فقط).
  * STORE-ADMIN-ADOPT-1B-3A — إضافة نطاق مخصَّص + تحقّق DNS TXT.
  * STORE-ADMIN-ADOPT-1B-3B — Make Primary الآمن + فصل نطاق مخصَّص.
+ * CUSTOM-DOMAIN-EDGE-1 — Activate/Refresh Edge (Railway) بلا فتح Make Primary.
  *
  * يسرد/يزوّد/يحدّث متاجر الويب للمستأجر الحالي فقط. لا يستقبل معرّف مستأجر/متجر/نطاق
  * من العميل، ولا يستدعي الحسم العام بالنطاق. `index` لا يفرض
@@ -252,6 +258,72 @@ class CommerceWorkspaceStorefrontsController extends ApiController
 
         return response()->json([
             'data' => ['disconnected' => true],
+        ]);
+    }
+
+    /**
+     * CUSTOM-DOMAIN-EDGE-1 — تسجيل نطاق مخصَّص موثَّق لدى Railway.
+     * الجسم فارغ. العميل لا يمرّر معرّف مزوّد ولا حالة Edge ولا تعليمات DNS.
+     */
+    public function activateEdge(
+        Request $request,
+        CommerceWorkspaceStorefrontsService $storefronts,
+        string $id,
+        string $domainId,
+    ): JsonResponse {
+        if ($request->user()?->role === 'self_service') {
+            abort(403, 'مساحة عمل التجارة غير متاحة لحساب الخدمة الذاتية.');
+        }
+
+        try {
+            $domain = $storefronts->activateEdgeForCurrentTenant($id, $domainId);
+        } catch (DomainNotEligibleForEdgeException $e) {
+            abort(422, $e->getMessage());
+        } catch (StorefrontEdgeConflictException $e) {
+            abort(409, $e->getMessage());
+        } catch (StorefrontEdgeMisconfiguredException|StorefrontEdgeUnavailableException $e) {
+            abort(503, $e->getMessage());
+        }
+
+        if ($domain === null) {
+            abort(404, 'النطاق غير موجود.');
+        }
+
+        return response()->json([
+            'data' => ['domain' => $domain],
+        ]);
+    }
+
+    /**
+     * CUSTOM-DOMAIN-EDGE-1 — مزامنة حالة Railway إلى الصف.
+     * الجسم فارغ. لا يُعلَن جاهزاً إلا بشهادة Railway السلطوية.
+     */
+    public function refreshEdge(
+        Request $request,
+        CommerceWorkspaceStorefrontsService $storefronts,
+        string $id,
+        string $domainId,
+    ): JsonResponse {
+        if ($request->user()?->role === 'self_service') {
+            abort(403, 'مساحة عمل التجارة غير متاحة لحساب الخدمة الذاتية.');
+        }
+
+        try {
+            $domain = $storefronts->refreshEdgeForCurrentTenant($id, $domainId);
+        } catch (DomainNotEligibleForEdgeException|DomainNotActivatedForEdgeException $e) {
+            abort(422, $e->getMessage());
+        } catch (StorefrontEdgeConflictException $e) {
+            abort(409, $e->getMessage());
+        } catch (StorefrontEdgeMisconfiguredException|StorefrontEdgeUnavailableException $e) {
+            abort(503, $e->getMessage());
+        }
+
+        if ($domain === null) {
+            abort(404, 'النطاق غير موجود.');
+        }
+
+        return response()->json([
+            'data' => ['domain' => $domain],
         ]);
     }
 }

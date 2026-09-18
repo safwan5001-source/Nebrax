@@ -151,6 +151,34 @@ class CommerceWorkspaceMakePrimaryDomainApiTest extends TestCase
     }
 
     /** @test */
+    public function a_custom_domain_with_edge_ready_still_cannot_become_primary(): void
+    {
+        $auth = $this->registerTenant('mp-custom-ready', 'owner@mp-custom-ready.test');
+        $seeded = $this->seedTwoAwjDomains($auth['tenant_id'], 'mp-custom-ready');
+        $custom = $this->seedCustomDomainOn($seeded['storefront'], $auth['tenant_id'], 'shop.mp-custom-ready.example.com', [
+            'verification_status' => StorefrontDomain::VERIFICATION_VERIFIED,
+            'verified_at' => now(),
+            'edge_status' => StorefrontDomain::EDGE_READY,
+            'edge_provider' => 'railway',
+            'edge_provider_id' => 'dom-ready-but-make-primary-still-closed',
+            'edge_ready_at' => now(),
+            'edge_checked_at' => now(),
+        ]);
+
+        $res = $this->withToken($auth['token'])
+            ->postJson($this->path($seeded['storefront']->id, $custom['domain']->id));
+
+        $res->assertStatus(422);
+        $this->assertStringContainsString('تفعيل', (string) $res->json('message'));
+
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $this->assertFalse(StorefrontDomain::query()->find($custom['domain']->id)->is_primary);
+        $this->assertTrue(StorefrontDomain::query()->find($seeded['primary']->id)->is_primary);
+        $this->assertSame(StorefrontDomain::EDGE_READY, StorefrontDomain::query()->find($custom['domain']->id)->edge_status);
+        app(TenantContext::class)->forget();
+    }
+
+    /** @test */
     public function a_pending_custom_domain_cannot_become_primary(): void
     {
         $auth = $this->registerTenant('mp-custom-pending', 'owner@mp-custom-pending.test');
