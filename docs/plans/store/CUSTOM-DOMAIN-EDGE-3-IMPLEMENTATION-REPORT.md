@@ -12,9 +12,9 @@ EDGE-1 and EDGE-2 were not re-implemented. No schema migration. No resolver chan
 - Confirmed ancestor of EDGE-1 / PR #864 `85e3dec6abd20e79707d2fcd68ddff90c4f9f3a9`
 - Confirmed ancestor of EDGE-2 / PR #867 `190bd71636980851e4231c3b640989398735bbc7`
 - Branch: `feat/custom-domain-edge-3-lifecycle`
-- PR: _(filled after open)_
+- PR: [#870](https://github.com/safwan5001-source/Nebrax/pull/870)
 - Base SHA: `190bd71636980851e4231c3b640989398735bbc7`
-- Head SHA: `65252862d6b088267a6d7c126de51e59b832d249`
+- Head SHA (CI-verified): `8fc5e54af6b918144af4255b2940ce378334dd14`
 
 ## Architecture Authority
 
@@ -48,7 +48,8 @@ Every custom Make Primary:
 1. Short `lockForUpdate` on all storefront domain rows: 404 isolation, local eligibility. AWJ promotes here. Custom captures hostname + provider id and **does not** promote.
 2. **No DB lock:** `fetch(providerId)` if present; if missing, `findByHostname(hostname)` on the configured storefront service. Never `provision()`.
 3. Transport / 429 / 5xx / misconfigured → **503**, no promotion.
-4. Short lock: persist the observation via existing `applyEdgeSnapshot()`, revalidate local invariants, promote only if live status is `ready`.
+4. Short lock: persist the observation via existing `applyEdgeSnapshot()` and **commit** (so a later 422 cannot roll back the live cache).
+5. Short lock: revalidate local invariants, promote only if live status is `ready`.
 
 If live DNS/TLS is no longer ready: persist the refreshed status, **422**, do **not** promote, do **not** auto-demote an already-primary domain (no failover).
 
@@ -180,11 +181,22 @@ Local Vitest (this environment):
 | `page.edge.test.tsx` (EDGE-2/3) | **13 passed** |
 | commerce-workspace + domains pages | **89 passed** |
 
-PHP: this sandbox has no `php` binary. Authoritative Laravel results are GitHub CI (`ci.yml` sqlite + pgsql). PostgreSQL concurrency test is skipped on sqlite.
+PHP: this sandbox has no `php` binary. Authoritative Laravel results are GitHub CI (`ci.yml` sqlite + pgsql) on Head `8fc5e54af6b918144af4255b2940ce378334dd14`.
+
+| Suite (CI) | sqlite | pgsql |
+|---|---|---|
+| Full `php artisan test` | **44 skipped, 4224 passed** (25871 assertions) | **4268 passed** (26107 assertions), 0 failed |
+| `CommerceWorkspaceMakePrimaryCustomEdgeApiTest` | PASS | PASS |
+| `CommerceWorkspaceMakePrimaryDomainApiTest` | PASS | PASS |
+| `CommerceWorkspaceDisconnectCustomDomainApiTest` | PASS | PASS |
+| `RailwayStorefrontEdgeClientTest` | PASS | PASS |
+| `CommerceWorkspaceCustomMakePrimaryPostgresConcurrencyTest` | skipped | **PASS** (exactly one active primary) |
+
+Delta vs EDGE-2 `190bd71`: sqlite +26, pgsql +27 (EDGE-3 cases + pgsql concurrency).
 
 ## PostgreSQL Concurrency
 
-`CommerceWorkspaceCustomMakePrimaryPostgresConcurrencyTest` forks two live-ready custom Make Primary calls under `lockForUpdate`. Expected: both succeed, exactly one active primary. Recorded from GitHub pgsql job.
+`CommerceWorkspaceCustomMakePrimaryPostgresConcurrencyTest` forks two live-ready custom Make Primary calls. GitHub pgsql job: **PASS** — exactly one active primary remains.
 
 ## TypeScript
 
@@ -192,7 +204,15 @@ Touched files typecheck via Next.js `web-ci.yml` build. Pre-existing `tsc` error
 
 ## Build / CI
 
-_(filled after GitHub runs)_
+Recorded from PR [#870](https://github.com/safwan5001-source/Nebrax/pull/870) Head `8fc5e54af6b918144af4255b2940ce378334dd14`:
+
+| Gate | Run | Result |
+|---|---|---|
+| `web build (Next.js)` + Vitest | [35397137716](https://github.com/safwan5001-source/Nebrax/actions/runs/35397137716) | **SUCCESS** — **1894 tests passed**; Next.js compile succeeded |
+| `php artisan test (L11, sqlite)` | [35397137764](https://github.com/safwan5001-source/Nebrax/actions/runs/35397137764) | **SUCCESS** — **44 skipped, 4224 passed** (25871 assertions) |
+| `php artisan test (L11, pgsql)` | [35397137764](https://github.com/safwan5001-source/Nebrax/actions/runs/35397137764) | **SUCCESS** — **4268 passed** (26107 assertions), **0 failed** |
+
+No backend schema files changed.
 
 ## Risks / Remaining
 
