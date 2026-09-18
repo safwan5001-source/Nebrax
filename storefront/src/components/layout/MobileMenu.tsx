@@ -151,9 +151,9 @@ export function MobileMenu({
 
       <SheetContent
         side={drawerSide}
-        className="flex flex-col !gap-0 !rounded-none overflow-hidden max-md:!top-16 max-md:!h-[calc(100%-4rem)] max-md:!w-full max-md:!max-w-none max-md:!border-r-0"
+        className="flex flex-col !gap-0 !rounded-none overflow-hidden max-md:!top-(--store-header-height) max-md:!h-[calc(100%-var(--store-header-height))] max-md:!w-full max-md:!max-w-none max-md:!border-r-0"
         showCloseButton={false}
-        overlayClassName="max-md:!top-16 max-md:!bg-transparent"
+        overlayClassName="max-md:!top-(--store-header-height) max-md:!bg-transparent"
       >
         <SheetTitle className="sr-only">{t("menu")}</SheetTitle>
         {/* Menu header — changes based on active panel */}

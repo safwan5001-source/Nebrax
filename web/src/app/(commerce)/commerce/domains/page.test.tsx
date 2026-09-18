@@ -10,12 +10,15 @@ vi.mock('next-intl', () => ({ useLocale: () => 'en', useTranslations: () => (key
 
 import CommerceDomainsPage from './page';
 import { CommerceStoreProvider } from '@/modules/commerce-workspace/store-context';
+import { ToastProvider } from '@/components/ui/toast';
 
 function renderPage() {
   return render(
-    <CommerceStoreProvider>
-      <CommerceDomainsPage />
-    </CommerceStoreProvider>,
+    <ToastProvider>
+      <CommerceStoreProvider>
+        <CommerceDomainsPage />
+      </CommerceStoreProvider>
+    </ToastProvider>,
   );
 }
 

@@ -38,10 +38,16 @@
     "allProducts": "Tous les produits",
     "contact": "Contact",
     "viewAllCategory": "Voir tout dans {category}",
-    "openSearch": "Ouvrir la recherche",
-    "closeSearch": "Fermer la recherche",
     "myAccount": "Mon compte",
-    "wholesale": "Vente en gros"
+    "wholesale": "Vente en gros",
+    "shop": "Produits",
+    "cart": "Panier",
+    "primaryNavigation": "Navigation principale",
+    "categoryNavigation": "Catégories de la boutique",
+    "scrollCategoriesBack": "Afficher les catégories précédentes",
+    "scrollCategoriesForward": "Afficher plus de catégories",
+    "skipToContent": "Aller au contenu",
+    "submitSearch": "Rechercher"
   },
   "regionPreferences": {
     "title": "Région et langue",
@@ -70,7 +76,7 @@
     "wholesale": "Professionnels & vente en gros"
   },
   "home": {
-    "welcome": "{storeName} Storefront",
+    "welcome": "{storeName}",
     "heroDescription": "Un storefront open source prêt pour la production, construit avec Next.js, React et le SDK TypeScript Spree. Auto-hébergé. Votre stack. Pas de dépendance fournisseur. Zéro frais de plateforme.",
     "shopNow": "Tout parcourir",
     "forkOnGithub": "Forker sur GitHub",

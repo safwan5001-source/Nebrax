@@ -83,8 +83,10 @@ class CommerceWorkspaceStorefrontDomainsApiTest extends TestCase
 
         $this->assertCount(1, $res->json('data.domains'));
         $row = $res->json('data.domains.0');
+        // STORE-ADMIN-ADOPT-1B-3A: `verification` مضافٌ إضافياً (القرار §32)
+        // بعد الحقول الستة القائمة — بلا حذف/إعادة تسمية لأيٍّ منها.
         $this->assertSame(
-            ['id', 'hostname', 'type', 'is_primary', 'is_active', 'verification_status'],
+            ['id', 'hostname', 'type', 'is_primary', 'is_active', 'verification_status', 'verification'],
             array_keys($row)
         );
         $this->assertSame('domains-owner.awj-commerce.test', $row['hostname']);
@@ -92,6 +94,8 @@ class CommerceWorkspaceStorefrontDomainsApiTest extends TestCase
         $this->assertTrue($row['is_primary']);
         $this->assertTrue($row['is_active']);
         $this->assertSame(StorefrontDomain::VERIFICATION_VERIFIED, $row['verification_status']);
+        // نطاق مُدار من أَوْج — لا يحمل verification_token، فـ`verification` يبقى null.
+        $this->assertNull($row['verification']);
     }
 
     /** @test */

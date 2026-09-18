@@ -22,7 +22,7 @@ php artisan install:api --no-interaction --without-migration-prompt || true
 rm -f database/migrations/*_create_personal_access_tokens_table.php 2>/dev/null || true
 
 echo "▶ 3/4  دمج ملفات النواة وطبقة الـ API..."
-mkdir -p app/Contracts app/Mail app/Jobs/Accounting app/Jobs/DocumentCenter app/Services app/Services/Accounting app/Services/Commerce app/Services/Pos app/Services/Pos/Hardware app/Services/Reporting app/Services/PrintTemplates app/Support app/Support/Inventory \
+mkdir -p app/Contracts app/Mail app/Jobs/Accounting app/Jobs/DocumentCenter app/Services app/Services/Accounting app/Services/Commerce app/Services/Pos app/Services/Pos/Hardware app/Services/Reporting app/Services/PrintTemplates app/Support app/Support/Inventory app/Support/Dns \
          app/Tenancy app/Http/Middleware app/Http/Controllers/Api \
          app/Http/Requests app/Http/Resources app/Console/Commands \
          app/Models/Concerns tests/Feature routes config docs/openapi
@@ -44,6 +44,8 @@ cp -r "$CORE_DIR/app/Services/PrintTemplates/"*.php app/Services/PrintTemplates/
 cp -r "$CORE_DIR/app/Support/"*.php              app/Support/
 mkdir -p app/Support/Inventory
 cp -r "$CORE_DIR/app/Support/Inventory/"*.php    app/Support/Inventory/
+mkdir -p app/Support/Dns
+cp -r "$CORE_DIR/app/Support/Dns/"*.php          app/Support/Dns/
 cp -r "$CORE_DIR/app/Tenancy/"*.php              app/Tenancy/
 cp -r "$CORE_DIR/app/Http/Middleware/"*.php      app/Http/Middleware/
 cp -r "$CORE_DIR/app/Http/Controllers/"*.php     app/Http/Controllers/ 2>/dev/null || true
