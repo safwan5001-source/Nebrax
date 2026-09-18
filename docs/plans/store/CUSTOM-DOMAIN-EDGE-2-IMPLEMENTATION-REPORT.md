@@ -13,16 +13,18 @@ EDGE-3 (custom Make Primary + provider-first Disconnect) is **not** in this slic
 - Branch: `feat/custom-domain-edge-2-activation-ux`
 - PR: [#867](https://github.com/safwan5001-source/Nebrax/pull/867)
 - Base SHA: `855a9adee1e48aa0ff66a0e0f3416a46fcf21f71`
+- Previous Head (pre-sync): `098da2071542827593a5da86160f45700fa061c3`
 - Merge SHA: `602cf5137288fdc130d6fedf2d77473551e391c1`
-- Head SHA: branch tip of `feat/custom-domain-edge-2-activation-ux` on [#867](https://github.com/safwan5001-source/Nebrax/pull/867) (no force-push)
+- Head SHA (post-merge, CI-verified): `6fef2a3b827241e2435d3353b1d348daeb95a34a`
 
 `main` already included #864. Later `main` commits kept via a regular merge (no force-push): #865 color-swatch UI, storefront product-media proxy (#869). EDGE-1/EDGE-2 lifecycle was not re-implemented.
 
 ### Main sync (PR completion)
 
-- Previous Head: `098da2071542827593a5da86160f45700fa061c3`
+- Requested Head: `098da2071542827593a5da86160f45700fa061c3`
+- Requested main: `855a9adee1e48aa0ff66a0e0f3416a46fcf21f71`
 - Merge: `git merge origin/main` (ort, **no conflicts**, no force-push)
-- `web/src/messages/ar.json` and `web/src/messages/en.json` received only `main`’s variant visual keys (`variants_visual_*`). They were **identical to `origin/main` after the merge**. EDGE-2 copy lives in `web/src/modules/commerce-workspace/messages.ts` and was untouched by `main`.
+- `web/src/messages/ar.json` and `web/src/messages/en.json` received only `main`’s variant visual keys (`variants_visual_*`). They were **identical to `origin/main` after the merge**. EDGE-2 copy lives in `web/src/modules/commerce-workspace/messages.ts` and was untouched by `main`. Both sets of translations are present.
 - No EDGE-2 lifecycle, backend, schema, or Railway client edits in the sync.
 
 ## Architecture Authority
@@ -129,6 +131,8 @@ New keys in `COMMERCE_WORKSPACE_MESSAGES` (identical key sets). Distinct terms:
 
 `messages.test.ts` asserts AR/EN key parity and that HTTPS Ready ≠ Ownership verified.
 
+`web/src/messages/ar.json` / `en.json` keep `main`’s `variants_visual_*` keys from #865. EDGE-2 strings were never in those files.
+
 ## Security / Client Authority
 
 Activate and Refresh send **empty bodies**. Tests assert the body has none of:
@@ -174,7 +178,7 @@ No `app/`, `routes/`, `database/`, `storefront/` production files.
 
 ## Tests
 
-Local Vitest (this environment):
+Local Vitest after main sync (this environment):
 
 | Suite | Result |
 |---|---|
@@ -190,21 +194,24 @@ EDGE-2 page coverage includes: unverified / none / pending / dns_required / tls_
 
 ## TypeScript
 
-`npx tsc --noEmit`: **zero errors in touched files**. Pre-existing errors remain in untouched POS/platform/documents/products/import-jobs tests.
+`npx tsc --noEmit`: **zero errors in touched files**. Pre-existing errors remain in untouched POS/platform/documents/products/import-jobs tests (including a `product-variants-panel.test.tsx` error introduced on `main` by #865).
 
 ## Build / CI
 
-`next build` **compiled** `/commerce/domains`. The sandbox lint gate is polluted by pre-existing eslint errors in untouched print-templates/POS files (same class reported on earlier store PRs). Authoritative web build is GitHub `web-ci.yml`.
+`next build` **compiled** `/commerce/domains`. Authoritative web build is GitHub `web-ci.yml`.
 
-Recorded from PR [#867](https://github.com/safwan5001-source/Nebrax/pull/867) HEAD `a1cecf0`:
+Recorded from PR [#867](https://github.com/safwan5001-source/Nebrax/pull/867) HEAD `6fef2a3b827241e2435d3353b1d348daeb95a34a` (after merge of `main` `855a9ad`):
 
 | Gate | Run | Result |
 |---|---|---|
-| `web build (Next.js)` + Vitest | [35386885148](https://github.com/safwan5001-source/Nebrax/actions/runs/35386885148) | **SUCCESS** — **278 files / 1888 tests passed**; Next.js compile succeeded |
-| `php artisan test (L11, sqlite)` | [35386885132](https://github.com/safwan5001-source/Nebrax/actions/runs/35386885132) job [105735749965](https://github.com/safwan5001-source/Nebrax/actions/runs/35386885132/job/105735749965) | **SUCCESS** — **43 skipped, 4197 passed** (25755 assertions) |
-| `php artisan test (L11, pgsql)` | [35386885132](https://github.com/safwan5001-source/Nebrax/actions/runs/35386885132) job [105735749645](https://github.com/safwan5001-source/Nebrax/actions/runs/35386885132/job/105735749645) | **SUCCESS** — **4240 passed** (25986 assertions), **0 failed, 0 skipped** |
+| `web build (Next.js)` + Vitest | [35390337567](https://github.com/safwan5001-source/Nebrax/actions/runs/35390337567) job [105746955663](https://github.com/safwan5001-source/Nebrax/actions/runs/35390337567/job/105746955663) | **SUCCESS** — **278 files / 1890 tests passed**; Next.js compile succeeded |
+| `php artisan test (L11, sqlite)` | [35390337631](https://github.com/safwan5001-source/Nebrax/actions/runs/35390337631) job [105746955979](https://github.com/safwan5001-source/Nebrax/actions/runs/35390337631/job/105746955979) | **SUCCESS** — **43 skipped, 4198 passed** (25760 assertions) |
+| `php artisan test (L11, pgsql)` | [35390337631](https://github.com/safwan5001-source/Nebrax/actions/runs/35390337631) job [105746955786](https://github.com/safwan5001-source/Nebrax/actions/runs/35390337631/job/105746955786) | **SUCCESS** — **4241 passed** (25991 assertions), **0 failed** |
+| Storefront CI | [35390334230](https://github.com/safwan5001-source/Nebrax/actions/runs/35390334230) | **SUCCESS** |
 
-Backend counts match EDGE-1 after the ICANN hostname fix (no backend files in this PR).
+Delta vs pre-sync HEAD `098da20`: +2 Vitest tests and +1 PHP test, from `main` (#865 / #869), not from EDGE-2.
+
+Backend files in this PR remain unchanged.
 
 ## Risks / Remaining
 
@@ -226,6 +233,7 @@ Backend counts match EDGE-1 after the ICANN hostname fix (no backend files in th
 - no accounting changes
 - no unrelated refactor
 - 1B-3A ownership TXT contract unchanged
+- no force-push
 
 ## Recommended Next Action
 
