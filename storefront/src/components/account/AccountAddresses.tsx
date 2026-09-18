@@ -52,7 +52,7 @@ export function AccountAddresses() {
   return (
     <div>
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <h1 className="text-xl font-bold text-store-foreground">
+        <h1 className="text-xl font-bold text-store-foreground lg:text-2xl">
           {t("addresses")}
         </h1>
         <Button type="button" variant="outline" size="sm" onClick={refuse}>
@@ -75,13 +75,13 @@ export function AccountAddresses() {
 
       <ul
         aria-label={t("addressCardShape")}
-        className="mt-5 grid grid-cols-1 gap-3 lg:grid-cols-2"
+        className="mt-5 grid grid-cols-1 gap-3 lg:mt-6 lg:grid-cols-2 lg:gap-6"
       >
         {ADDRESS_FIXTURES.map((fixture) => (
           <li key={fixture.id}>
-            <article className="flex h-full flex-col rounded-store border border-store-border bg-store-surface px-4 py-4">
+            <article className="flex h-full flex-col rounded-store border border-store-border bg-store-surface px-4 py-4 lg:px-6 lg:py-6">
               <div className="flex items-start justify-between gap-3">
-                <p className="min-w-0 text-sm font-medium text-store-foreground">
+                <p className="min-w-0 text-sm font-medium text-store-foreground lg:text-base">
                   {t(fixture.name)}
                 </p>
                 {fixture.isDefault ? (
@@ -90,13 +90,13 @@ export function AccountAddresses() {
                   </span>
                 ) : null}
               </div>
-              <div className="mt-2 space-y-0.5 text-sm leading-relaxed text-store-muted-foreground">
+              <div className="mt-2 space-y-0.5 text-sm leading-relaxed text-store-muted-foreground lg:mt-3 lg:space-y-1">
                 <p>{t(fixture.line1)}</p>
                 <p>{t(fixture.line2)}</p>
                 <p>{t(fixture.cityPostal)}</p>
                 <p>{t(fixture.country)}</p>
               </div>
-              <div className="mt-auto flex flex-wrap gap-2 pt-4">
+              <div className="mt-auto flex flex-wrap gap-2 pt-4 lg:pt-6">
                 <Button
                   type="button"
                   variant="outline"

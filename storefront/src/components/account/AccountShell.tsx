@@ -80,7 +80,7 @@ export function AccountShell({
   return (
     <StoreContainer className="py-5 sm:py-7 lg:py-8">
       <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:gap-8 xl:gap-10">
-        <aside className="hidden lg:block lg:w-64 lg:shrink-0">
+        <aside className="hidden lg:block lg:w-56 lg:shrink-0 xl:w-60">
           <div className="overflow-hidden rounded-store border border-store-border bg-store-surface lg:sticky lg:top-24">
             <div className="border-b border-store-border px-5 py-4">
               <p className="truncate font-medium text-store-foreground">

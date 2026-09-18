@@ -2,7 +2,7 @@
 
 ## 1. Status
 
-**COMPLETE pending visual re-review (correction round 2).** **Not merged, not deployed.**
+**COMPLETE pending visual re-review (correction round 3).** **Not merged, not deployed.**
 `NO VISUAL APPROVAL = NO MERGE` is respected.
 
 ## 2. Git
@@ -12,7 +12,7 @@
 | **Latest main SHA** | `30979a1bb499cfe8b0e656495805e50225027530` — STORE-UI-4 merge (PR #866) |
 | **Base SHA** | `30979a1bb499cfe8b0e656495805e50225027530` (verified ancestor of this branch) |
 | **Branch** | `feat/store-ui-5-customer-account` |
-| **Head SHA** | `4f7d9866f43f86b3856e1fb08a9b50d12dba8c70` |
+| **Head SHA** | round 3 — see §25 |
 | **PR** | [#868](https://github.com/safwan5001-source/Nebrax/pull/868) |
 
 `git merge-base --is-ancestor 30979a1bb499cfe8b0e656495805e50225027530 HEAD` holds.
@@ -476,9 +476,95 @@ storefront builds, not a STORE-UI-5 regression. Static generation completed
 Round 1 extras (`mobile-390-ar-orders`, `mobile-390-ar-order-detail`,
 `desktop-1440-ar-overview`) were removed so the folder is only this set.
 
-## 24. Next step
+## 24. Next step after round 2
 
-Owner visual review of correction round 2. On approval, merge. The
-`DESIGN_ONLY` account capabilities then become dedicated backend tasks
+Owner visual review of correction round 2 accepted **mobile** and withheld
+desktop approval. A third, desktop-only visual pass follows.
+
+## 25. Visual correction round 3 (desktop 1440)
+
+Owner review of round 2 accepted mobile (including MobileBottomNav) and
+withheld visual approval because the 1440 account workspace still read as a
+small, compressed form parked in unused canvas. This round is visual only
+and **desktop-only**: no mobile class changes, no MobileBottomNav change,
+no contract, capability, auth, tenant, accounting, cart, checkout, or
+catalog change.
+
+| Finding | Correction |
+|---|---|
+| Profile form was `max-w-3xl` / `xl:max-w-4xl` (896px) inside a ~1000px main column, so fields sat like a mobile form beside a void | Max-width removed. Form is `w-full` of the main column. First/last stay `sm:grid-cols-2`. Email + phone become `lg:grid-cols-2` so each desktop field is ~492px at 1440 — desktop-sized, not stretched to the viewport, not 358px mobile. Password (when shown) stays `lg:max-w-xl`. |
+| Address / payment cards filled the grid but felt compact on a 1440 canvas | Same two-card `lg:grid-cols-2` book. Desktop-only: `lg:gap-6`, `lg:px-6 lg:py-6`, name `lg:text-base`, payment icon `lg:size-12`. No extra cards, no shadows, no gradients. |
+| Sidebar still competed with the main column | Sidebar `lg:w-56` / `xl:w-60` (224 / 240). Gap unchanged (`lg:gap-8` / `xl:gap-10`). Main is the wider column at every `lg+` width. Mobile aside remains `hidden`. |
+
+**Capability classification (unchanged):**
+
+| Surface | State |
+|---|---|
+| Addresses | **DESIGN_ONLY / GATED** |
+| Payment methods | **DESIGN_ONLY / GATED** |
+
+Add / Edit / Remove still call `refuse()`, write no storage, report no success. No brand, no card field, no invented API.
+
+**Mobile.** Not redesigned. 390 inspect: aside `display:none`, form 358, inputs 358 stacked. `scrollWidth === clientWidth`. MobileBottomNav untouched.
+
+**Orders / order detail.** Not redesigned. They inherit only the slightly narrower desktop sidebar.
+
+**Responsive verification (programmatic, Playwright Chromium, no overflow):**
+
+| Width | Sidebar | Main | Profile form | Field width | Address cards |
+|---|---|---|---|---|---|
+| 390 | hidden | 358 | 358 | 358 (1-col) | 1-col |
+| 1024 | 224 | 704 | 704 | 336 × 2 | 2-col |
+| 1280 | 240 | 936 | 936 | 452 × 2 | 2-col |
+| 1440 | 240 | 1016 | 1016 | 492 × 2 | 496 × 2 |
+
+RTL (AR): sidebar `aside.x = 1128`, main `x = 72`. LTR (EN profile): sidebar `aside.x = 72`, main `x = 352`. `scrollWidth === clientWidth` at every width.
+
+**Changed files**
+
+- `storefront/src/components/account/AccountShell.tsx`
+- `storefront/src/components/account/AccountProfileForm.tsx`
+- `storefront/src/components/account/AccountAddresses.tsx`
+- `storefront/src/components/account/AccountPaymentMethods.tsx`
+- `docs/plans/store/STORE-UI-5-IMPLEMENTATION-REPORT.md`
+- `docs/plans/store/store-ui-5-visual-qa/desktop-1440-ar-profile.png`
+- `docs/plans/store/store-ui-5-visual-qa/desktop-1440-ar-addresses.png`
+- `docs/plans/store/store-ui-5-visual-qa/desktop-1440-ar-payment.png`
+- `docs/plans/store/store-ui-5-visual-qa/desktop-1440-en-profile.png` (new LTR check)
+
+**Tests and exact results**
+
+```
+pnpm exec vitest run src/components/account  →  8 files, 25 tests passed
+pnpm test                                     →  72 files, 528 tests passed
+pnpm exec biome check (changed files)         →  4 files, no fixes applied
+pnpm exec tsc --noEmit                        →  clean
+```
+
+No locale key changes. Architecture guards unchanged (no Spree SDK, no brands, no browser storage, no fake success, no `<Input>` on payment methods).
+
+**Visual QA (this round, 1440 only)** in
+`docs/plans/store/store-ui-5-visual-qa/`:
+
+- `desktop-1440-ar-profile.png`
+- `desktop-1440-ar-addresses.png`
+- `desktop-1440-ar-payment.png`
+- `desktop-1440-en-profile.png`
+
+Mobile captures from round 2 were not regenerated.
+
+**Git**
+
+| | |
+|---|---|
+| **Base SHA** | `30979a1bb499cfe8b0e656495805e50225027530` |
+| **Round 2 Head** | `4f7d9866` / docs `2df605c5` |
+| **Round 3 Head** | see commit after push |
+| **PR** | [#868](https://github.com/safwan5001-source/Nebrax/pull/868) — open, not merged |
+
+## 26. Next step
+
+Owner visual review of correction round 3 (desktop 1440). On approval, merge.
+The `DESIGN_ONLY` account capabilities then become dedicated backend tasks
 against UI that is already agreed, each with its contract already written
 down.

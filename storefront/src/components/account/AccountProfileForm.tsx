@@ -68,13 +68,13 @@ export function AccountProfileForm({ user }: { user: User }) {
 
   return (
     <div>
-      <h1 className="text-xl font-bold text-store-foreground">
+      <h1 className="text-xl font-bold text-store-foreground lg:text-2xl">
         {t("profile")}
       </h1>
 
       <form
         onSubmit={handleSubmit}
-        className="mt-4 max-w-3xl space-y-3 xl:max-w-4xl"
+        className="mt-4 w-full space-y-3 lg:mt-6 lg:space-y-5"
       >
         {error && (
           <Alert variant="destructive">
@@ -88,7 +88,7 @@ export function AccountProfileForm({ user }: { user: User }) {
           </p>
         )}
 
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:gap-x-8 lg:gap-y-5">
           <Field>
             <FieldLabel htmlFor="first_name">{t("firstName")}</FieldLabel>
             <Input
@@ -115,30 +115,32 @@ export function AccountProfileForm({ user }: { user: User }) {
           </Field>
         </div>
 
-        <Field>
-          <FieldLabel htmlFor="email">{t("emailAddress")}</FieldLabel>
-          <Input
-            type="email"
-            id="email"
-            autoComplete="email"
-            required
-            value={formData.email}
-            onChange={(event) =>
-              setFormData({ ...formData, email: event.target.value })
-            }
-          />
-        </Field>
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 lg:gap-x-8 lg:gap-y-5">
+          <Field>
+            <FieldLabel htmlFor="email">{t("emailAddress")}</FieldLabel>
+            <Input
+              type="email"
+              id="email"
+              autoComplete="email"
+              required
+              value={formData.email}
+              onChange={(event) =>
+                setFormData({ ...formData, email: event.target.value })
+              }
+            />
+          </Field>
 
-        <Field>
-          <FieldLabel htmlFor="phone">{t("phone")}</FieldLabel>
-          <Input type="tel" id="phone" disabled readOnly value="" />
-          <p className="text-sm text-store-muted-foreground">
-            {t("phoneUnavailable")}
-          </p>
-        </Field>
+          <Field>
+            <FieldLabel htmlFor="phone">{t("phone")}</FieldLabel>
+            <Input type="tel" id="phone" disabled readOnly value="" />
+            <p className="text-sm text-store-muted-foreground">
+              {t("phoneUnavailable")}
+            </p>
+          </Field>
+        </div>
 
         {emailChanged && (
-          <div>
+          <div className="lg:max-w-xl">
             <AccountPasswordField
               id="current_password"
               label={t("currentPassword")}

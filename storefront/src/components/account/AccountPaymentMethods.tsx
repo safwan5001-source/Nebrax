@@ -37,7 +37,7 @@ export function AccountPaymentMethods() {
   return (
     <div>
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <h1 className="text-xl font-bold text-store-foreground">
+        <h1 className="text-xl font-bold text-store-foreground lg:text-2xl">
           {t("paymentMethods")}
         </h1>
         <Button type="button" variant="outline" size="sm" onClick={refuse}>
@@ -59,22 +59,22 @@ export function AccountPaymentMethods() {
       )}
 
       <ul
-        className="mt-5 grid grid-cols-1 gap-3 lg:grid-cols-2"
+        className="mt-5 grid grid-cols-1 gap-3 lg:mt-6 lg:grid-cols-2 lg:gap-6"
         aria-label={t("savedMethodShape")}
       >
         {METHOD_FIXTURES.map(({ key, Icon, showExpiry, isDefault }) => (
           <li key={key}>
-            <article className="flex h-full flex-col rounded-store border border-store-border bg-store-surface px-4 py-4">
-              <div className="flex items-start gap-3">
-                <span className="flex size-10 shrink-0 items-center justify-center rounded-store border border-store-border">
+            <article className="flex h-full flex-col rounded-store border border-store-border bg-store-surface px-4 py-4 lg:px-6 lg:py-6">
+              <div className="flex items-start gap-3 lg:gap-4">
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-store border border-store-border lg:size-12">
                   <Icon
-                    className="size-4 text-store-foreground"
+                    className="size-4 text-store-foreground lg:size-5"
                     aria-hidden="true"
                   />
                 </span>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-start justify-between gap-3">
-                    <p className="text-sm font-medium text-store-foreground">
+                    <p className="text-sm font-medium text-store-foreground lg:text-base">
                       {t(`savedMethod.${key}`)}
                     </p>
                     {isDefault ? (
@@ -83,17 +83,17 @@ export function AccountPaymentMethods() {
                       </span>
                     ) : null}
                   </div>
-                  <p className="mt-1 font-mono text-sm tracking-wide text-store-muted-foreground">
+                  <p className="mt-1 font-mono text-sm tracking-wide text-store-muted-foreground lg:mt-1.5 lg:text-base">
                     <bdi>{t("methodMask")}</bdi>
                   </p>
                   {showExpiry ? (
-                    <p className="mt-0.5 text-xs text-store-muted-foreground">
+                    <p className="mt-0.5 text-xs text-store-muted-foreground lg:mt-1 lg:text-sm">
                       <bdi>{t("methodExpiry")}</bdi>
                     </p>
                   ) : null}
                 </div>
               </div>
-              <div className="mt-auto pt-4">
+              <div className="mt-auto pt-4 lg:pt-6">
                 <Button
                   type="button"
                   variant="ghost"
