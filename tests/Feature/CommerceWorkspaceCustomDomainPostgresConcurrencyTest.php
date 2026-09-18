@@ -7,6 +7,7 @@ use App\Models\Storefront;
 use App\Models\StorefrontDomain;
 use App\Models\Tenant;
 use App\Services\Commerce\CommerceWorkspaceStorefrontsService;
+use App\Support\HostnameNormalizer;
 use App\Tenancy\TenantContext;
 use App\Tenancy\TenantScope;
 use Illuminate\Support\Facades\DB;
@@ -92,6 +93,18 @@ class CommerceWorkspaceCustomDomainPostgresConcurrencyTest extends TestCase
         $storefrontB = $this->seedStorefront($this->tenantB);
         $raceHostname = 'race-'.Str::random(8).'.example.com';
 
+        // `Str::random()` draws from [A-Za-z0-9], so the contested hostname is
+        // mixed-case in ~98.7% of runs — realistic input, since a hostname is
+        // case-insensitive and a merchant may type it either way. The write
+        // path lower-cases it: `StorefrontDomain::setHostnameAttribute()` is
+        // the single call site of `HostnameNormalizer::normalize()`, and the
+        // normalized form is what `storefront_domains.hostname` — and its
+        // global unique index — actually holds. The assertions below therefore
+        // read the database by the stored form; querying the raw input instead
+        // matched nothing and made this test read a correctly persisted race
+        // as a lost row.
+        $storedHostname = HostnameNormalizer::normalize($raceHostname);
+
         $lockReady = $this->signalPath('domain_race_lock_');
         $callerStarted = $this->signalPath('domain_race_caller_');
         $resultFile = tempnam(sys_get_temp_dir(), 'domain_race_result_');
@@ -153,10 +166,15 @@ class CommerceWorkspaceCustomDomainPostgresConcurrencyTest extends TestCase
 
         $this->assertSame(
             1,
-            StorefrontDomain::withoutGlobalScope(TenantScope::class)->where('hostname', $raceHostname)->count(),
+            StorefrontDomain::withoutGlobalScope(TenantScope::class)->where('hostname', $storedHostname)->count(),
         );
-        $winner = StorefrontDomain::withoutGlobalScope(TenantScope::class)->where('hostname', $raceHostname)->first();
+        $winner = StorefrontDomain::withoutGlobalScope(TenantScope::class)->where('hostname', $storedHostname)->first();
         $this->assertSame($this->tenantA->id, $winner->tenant_id);
+
+        // The survivor is stored normalized, which is what makes the race a
+        // race at all: both tenants contend for one row whatever case either
+        // of them typed.
+        $this->assertSame($storedHostname, $winner->hostname);
     }
 
     private function signalPath(string $prefix): string
