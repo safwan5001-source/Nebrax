@@ -22,7 +22,7 @@ class RailwayEdgeStatusMapperTest extends TestCase
      * @param  array<string, mixed>  $overrides
      * @return array<string, mixed>
      */
-    private function status(array $overrides = []): array
+    private function sampleStatus(array $overrides = []): array
     {
         return array_merge([
             'dnsRecords' => [
@@ -49,7 +49,7 @@ class RailwayEdgeStatusMapperTest extends TestCase
     /** @test */
     public function validating_ownership_without_propagated_dns_is_dns_required(): void
     {
-        $snapshot = $this->mapper()->snapshotFromStatus($this->status());
+        $snapshot = $this->mapper()->snapshotFromStatus($this->sampleStatus());
 
         $this->assertSame(EdgeSnapshot::STATUS_DNS_REQUIRED, $snapshot->status);
         $this->assertFalse($snapshot->missing);
@@ -64,7 +64,7 @@ class RailwayEdgeStatusMapperTest extends TestCase
     /** @test */
     public function propagated_routing_dns_without_valid_cert_is_tls_pending(): void
     {
-        $snapshot = $this->mapper()->snapshotFromStatus($this->status([
+        $snapshot = $this->mapper()->snapshotFromStatus($this->sampleStatus([
             'dnsRecords' => [[
                 'fqdn' => 'shop.example.com',
                 'recordType' => RailwayEdgeStatusMapper::RECORD_CNAME,
@@ -81,7 +81,7 @@ class RailwayEdgeStatusMapperTest extends TestCase
     /** @test */
     public function certificate_valid_is_the_only_ready_evidence(): void
     {
-        $snapshot = $this->mapper()->snapshotFromStatus($this->status([
+        $snapshot = $this->mapper()->snapshotFromStatus($this->sampleStatus([
             'dnsRecords' => [[
                 'fqdn' => 'shop.example.com',
                 'recordType' => RailwayEdgeStatusMapper::RECORD_CNAME,
@@ -99,7 +99,7 @@ class RailwayEdgeStatusMapperTest extends TestCase
     /** @test */
     public function official_docs_issued_enum_is_not_treated_as_ready(): void
     {
-        $snapshot = $this->mapper()->snapshotFromStatus($this->status([
+        $snapshot = $this->mapper()->snapshotFromStatus($this->sampleStatus([
             'certificateStatus' => 'ISSUED',
             'dnsRecords' => [[
                 'fqdn' => 'shop.example.com',
@@ -117,7 +117,7 @@ class RailwayEdgeStatusMapperTest extends TestCase
     /** @test */
     public function certificate_issue_failed_is_failed(): void
     {
-        $snapshot = $this->mapper()->snapshotFromStatus($this->status([
+        $snapshot = $this->mapper()->snapshotFromStatus($this->sampleStatus([
             'certificateStatus' => RailwayEdgeStatusMapper::CERT_FAILED,
             'certificateErrorMessage' => 'rate limited by letsencrypt',
         ]));
@@ -129,7 +129,7 @@ class RailwayEdgeStatusMapperTest extends TestCase
     /** @test */
     public function acme_challenge_cname_is_not_shown_to_the_merchant(): void
     {
-        $snapshot = $this->mapper()->snapshotFromStatus($this->status([
+        $snapshot = $this->mapper()->snapshotFromStatus($this->sampleStatus([
             'dnsRecords' => [
                 [
                     'fqdn' => '_acme-challenge.shop.example.com',
@@ -156,7 +156,7 @@ class RailwayEdgeStatusMapperTest extends TestCase
     /** @test */
     public function secret_like_certificate_errors_are_sanitized(): void
     {
-        $snapshot = $this->mapper()->snapshotFromStatus($this->status([
+        $snapshot = $this->mapper()->snapshotFromStatus($this->sampleStatus([
             'certificateStatus' => RailwayEdgeStatusMapper::CERT_FAILED,
             'certificateErrorMessage' => 'Authorization Bearer railway-secret-token failed',
         ]));
