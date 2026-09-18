@@ -6,12 +6,14 @@ use App\Models\CommerceListing;
 use App\Models\FulfillmentPolicy;
 use App\Models\Product;
 use App\Models\ProductCategory;
+use App\Models\ProductMedia;
 use App\Models\ProductWarehouseStock;
 use App\Models\SalesChannel;
 use App\Models\Tenant;
 use App\Models\Warehouse;
 use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -124,6 +126,41 @@ class StorefrontCatalogApiTest extends TestCase
         $ids = collect($res->json('data'))->pluck('id')->all();
         $this->assertNotContains($mobileOnlyProduct->id, $ids);
         $this->getJson("/store/v1/{$tenant->slug}/products/{$mobileOnlyProduct->id}")->assertStatus(404);
+    }
+
+    /** @test */
+    public function published_product_media_is_returned_as_the_listing_thumbnail_and_detail_gallery(): void
+    {
+        Storage::fake('local');
+        ['tenant' => $tenant, 'channel' => $channel] = $this->seedStore('media');
+        $product = $this->publishedProduct($tenant, $channel, ['name' => 'أناناس شرائح قودي 270 ج']);
+
+        app(TenantContext::class)->set($tenant->id);
+        Storage::disk('local')->put('products/pineapple.webp', 'image-bytes');
+        $media = ProductMedia::create([
+            'product_id' => $product->id,
+            'disk' => 'local',
+            'path' => 'products/pineapple.webp',
+            'original_name' => 'IMG_0363.webp',
+            'mime_type' => 'image/webp',
+            'size' => 11,
+            'sort_order' => 0,
+        ]);
+        app(TenantContext::class)->forget();
+
+        $list = $this->getJson("/store/v1/{$tenant->slug}/products")->assertOk();
+        $item = collect($list->json('data'))->firstWhere('id', $product->id);
+        $this->assertSame(
+            "/store/v1/{$tenant->slug}/media/{$media->id}",
+            parse_url($item['thumbnail_url'], PHP_URL_PATH),
+        );
+
+        $show = $this->getJson("/store/v1/{$tenant->slug}/products/{$product->id}")->assertOk();
+        $this->assertSame($media->id, $show->json('data.media.0.id'));
+        $this->assertSame(
+            "/store/v1/{$tenant->slug}/media/{$media->id}",
+            parse_url($show->json('data.media.0.url'), PHP_URL_PATH),
+        );
     }
 
     // ── 3. Unknown/invalid store context ────────────────────────────────
