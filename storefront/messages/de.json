@@ -38,10 +38,16 @@
     "allProducts": "Alle Produkte",
     "contact": "Kontakt",
     "viewAllCategory": "Alle {category} anzeigen",
-    "openSearch": "Suche öffnen",
-    "closeSearch": "Suche schließen",
     "myAccount": "Mein Konto",
-    "wholesale": "Großhandel"
+    "wholesale": "Großhandel",
+    "shop": "Produkte",
+    "cart": "Warenkorb",
+    "primaryNavigation": "Hauptnavigation",
+    "categoryNavigation": "Shop-Kategorien",
+    "scrollCategoriesBack": "Vorherige Kategorien anzeigen",
+    "scrollCategoriesForward": "Weitere Kategorien anzeigen",
+    "skipToContent": "Zum Inhalt springen",
+    "submitSearch": "Suchen"
   },
   "regionPreferences": {
     "title": "Region und Sprache",
@@ -70,12 +76,11 @@
     "wholesale": "Handel & Großhandel"
   },
   "home": {
-    "welcome": "{storeName} Storefront",
+    "welcome": "{storeName}",
     "heroDescription": "Eine produktionsreife, quelloffene Storefront mit Next.js, React und dem Spree TypeScript SDK. Selbst hosten. Eigener Stack. Kein Vendor Lock-in. Keine Plattformgebühren.",
     "shopNow": "Alle Produkte",
     "forkOnGithub": "Auf GitHub forken",
     "quickstartGuide": "Schnellstartanleitung",
-    "featuredProducts": "Ausgewählte Produkte",
     "viewAll": "Alle ansehen",
     "qualityProducts": "Qualitätsprodukte",
     "qualityDescription": "Sorgfältig kuratierte Auswahl der besten Produkte.",
@@ -93,7 +98,10 @@
     "wholesaleBenefitQuickOrderTitle": "Schnelle Sammelbestellung",
     "wholesaleBenefitQuickOrderDescription": "Geben Sie SKUs und Mengen ein, um in Sekunden eine große Bestellung zusammenzustellen.",
     "wholesaleBenefitOrdersTitle": "Bestellverlauf",
-    "wholesaleBenefitOrdersDescription": "Sehen Sie vergangene Bestellungen ein und bestellen Sie Ihre Standardartikel mit wenigen Klicks nach."
+    "wholesaleBenefitOrdersDescription": "Sehen Sie vergangene Bestellungen ein und bestellen Sie Ihre Standardartikel mit wenigen Klicks nach.",
+    "browseCategories": "Nach Kategorie einkaufen",
+    "newArrivals": "Neu eingetroffen",
+    "subcategories": "{count, plural, one {# Unterkategorie} other {# Unterkategorien}}"
   },
   "cart": {
     "cart": "Warenkorb",
@@ -189,7 +197,12 @@
     "properties": "Eigenschaften",
     "yes": "Ja",
     "no": "Nein",
-    "optionFilterChip": "{filter}: {value}"
+    "optionFilterChip": "{filter}: {value}",
+    "pricedByOption": "Preis je Option",
+    "selectOptions": "Optionen wählen",
+    "priceFromLabel": "Ab",
+    "addToFavorites": "Zu Favoriten hinzufügen",
+    "removeFromFavorites": "Aus Favoriten entfernen"
   },
   "navigation": {
     "home": "Startseite",

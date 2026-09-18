@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { StoreContainer } from "@/components/layout/StoreContainer";
 import { ProductListing } from "@/components/products/ProductListing";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { getCategory, getCategoryProducts } from "@/lib/data/categories";
@@ -68,7 +69,7 @@ export default async function CategoryPage({
 
       <CategoryBanner category={category} basePath={basePath} locale={locale} />
 
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 pt-4">
+      <StoreContainer className="py-5 md:py-6">
         <ProductListing
           state={listingState}
           basePath={basePath}
@@ -81,7 +82,7 @@ export default async function CategoryPage({
           fetchProducts={fetchCategoryProducts}
           fetchFilters={getProductFilters}
         />
-      </div>
+      </StoreContainer>
     </div>
   );
 }

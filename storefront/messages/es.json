@@ -38,10 +38,16 @@
     "allProducts": "Todos los productos",
     "contact": "Contacto",
     "viewAllCategory": "Ver todo en {category}",
-    "openSearch": "Abrir busqueda",
-    "closeSearch": "Cerrar busqueda",
     "myAccount": "Mi cuenta",
-    "wholesale": "Mayorista"
+    "wholesale": "Mayorista",
+    "shop": "Productos",
+    "cart": "Carrito",
+    "primaryNavigation": "Navegación principal",
+    "categoryNavigation": "Categorías de la tienda",
+    "scrollCategoriesBack": "Ver categorías anteriores",
+    "scrollCategoriesForward": "Ver más categorías",
+    "skipToContent": "Saltar al contenido",
+    "submitSearch": "Buscar"
   },
   "regionPreferences": {
     "title": "Región e idioma",
@@ -70,12 +76,11 @@
     "wholesale": "Comercio y venta al por mayor"
   },
   "home": {
-    "welcome": "{storeName} Storefront",
+    "welcome": "{storeName}",
     "heroDescription": "Un storefront de código abierto listo para producción, construido con Next.js, React y el SDK TypeScript de Spree. Alójalo tú mismo. Tu stack. Sin dependencia de proveedores. Sin comisiones de plataforma.",
     "shopNow": "Ver todo",
     "forkOnGithub": "Fork en GitHub",
     "quickstartGuide": "Guía de inicio rápido",
-    "featuredProducts": "Productos destacados",
     "viewAll": "Ver todo",
     "qualityProducts": "Productos de calidad",
     "qualityDescription": "Una seleccion cuidadosamente curada de los mejores productos.",
@@ -93,7 +98,10 @@
     "wholesaleBenefitQuickOrderTitle": "Pedido rápido por lotes",
     "wholesaleBenefitQuickOrderDescription": "Introduce SKUs y cantidades para crear un pedido grande en segundos.",
     "wholesaleBenefitOrdersTitle": "Historial de pedidos",
-    "wholesaleBenefitOrdersDescription": "Consulta pedidos anteriores y vuelve a pedir tus líneas habituales con un par de clics."
+    "wholesaleBenefitOrdersDescription": "Consulta pedidos anteriores y vuelve a pedir tus líneas habituales con un par de clics.",
+    "browseCategories": "Comprar por categoría",
+    "newArrivals": "Novedades",
+    "subcategories": "{count, plural, one {# subcategoría} other {# subcategorías}}"
   },
   "cart": {
     "cart": "Carrito",
@@ -189,7 +197,12 @@
     "properties": "Propiedades",
     "yes": "Si",
     "no": "No",
-    "optionFilterChip": "{filter}: {value}"
+    "optionFilterChip": "{filter}: {value}",
+    "pricedByOption": "Precio según la opción",
+    "selectOptions": "Elegir opciones",
+    "priceFromLabel": "Desde",
+    "addToFavorites": "Añadir a favoritos",
+    "removeFromFavorites": "Quitar de favoritos"
   },
   "navigation": {
     "home": "Inicio",

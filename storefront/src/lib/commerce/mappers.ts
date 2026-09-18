@@ -1,9 +1,19 @@
-import type { Category, Media, Price, Product, Variant } from "@spree/sdk";
+import type {
+  Media,
+  OptionType,
+  OptionValue,
+  Price,
+  Variant,
+} from "@spree/sdk";
 import type {
   AwjCategory,
   AwjCategoryRef,
   AwjProduct,
   AwjProductMedia,
+  AwjProductOption,
+  AwjProductVariant,
+  StoreCategory,
+  StoreProduct,
 } from "./types";
 
 /**
@@ -21,11 +31,12 @@ import type {
  *
  * Known, deliberate gaps (documented in the COM-7-P1 implementation
  * report, not hidden here):
- *  - AWJ has no product-variant model (explicitly deferred — see
- *    AWJ_SPREE_TECHNICAL_FIT_AUDIT.md §4). A single synthetic default
- *    variant carries the SKU/price/availability so variant-aware UI
- *    (SKU row, add-to-cart wiring) still renders sensibly; it is not a
- *    real Spree variant and never will back a real cart.
+ *  - AWJ DOES have a product-variant model (VAR-COM-1): `store/v1`'s
+ *    product detail carries generic `options` and real `variants` with
+ *    per-variant price, availability and media. They are mapped below.
+ *    The listing endpoint carries neither, so a simple product there still
+ *    gets the synthetic default variant that holds its SKU and price —
+ *    that one is not a real variant and must never reach the cart.
  *  - AWJ has no product/category slug field yet, so `slug`/`permalink`
  *    are the entity's UUID — functional routing, not a pretty URL.
  *  - AWJ serves one image size per media item (no responsive/resized
@@ -56,6 +67,123 @@ function toPrice(amountMinor: number, currency: string): Price {
     display_compare_at_amount: null,
     price_list_id: null,
   };
+}
+
+/**
+ * A price the storefront must not print. Every field is null, so
+ * `product.price?.display_amount` is falsy and the UI takes its
+ * "no price to show" branch instead of rendering a formatted zero.
+ */
+function unpricedPrice(currency: string): Price {
+  return {
+    id: `price-unpriced-${currency}`,
+    amount: null,
+    amount_in_cents: null,
+    compare_at_amount: null,
+    compare_at_amount_in_cents: null,
+    currency,
+    display_amount: null,
+    display_compare_at_amount: null,
+    price_list_id: null,
+  };
+}
+
+function optionLabel(
+  option: AwjProductOption,
+  locale: string | undefined,
+): string {
+  const isEnglish = locale?.toLowerCase().startsWith("en") ?? false;
+  return isEnglish && option.name_en ? option.name_en : option.name;
+}
+
+/**
+ * AWJ option groups become Spree option types with `kind: "awj_generic"`.
+ *
+ * That literal is load-bearing. `VariantPicker` draws colour swatches only
+ * for `kind === "color_swatch"`, and AWJ supplies no renderer metadata and
+ * no colour value at all — so every group takes the generic accessible
+ * control. Deriving a swatch from a group merely named "colour" would be
+ * inferring presentation from a label, which the baseline forbids.
+ */
+function toOptionTypes(
+  options: AwjProductOption[],
+  locale: string | undefined,
+): OptionType[] {
+  return options.map((option, index) => ({
+    id: option.id,
+    name: option.name,
+    label: optionLabel(option, locale),
+    position: index,
+    kind: "awj_generic",
+  }));
+}
+
+function toOptionValues(
+  options: AwjProductOption[],
+  locale: string | undefined,
+): OptionValue[] {
+  const isEnglish = locale?.toLowerCase().startsWith("en") ?? false;
+
+  return options.flatMap((option) =>
+    option.values.map((value, index) => ({
+      id: value.id,
+      option_type_id: option.id,
+      name: value.value,
+      label: isEnglish && value.value_en ? value.value_en : value.value,
+      position: index,
+      // Never inferred from a name. AWJ carries no colour value, so there is
+      // none to give, and a guessed one would be invented merchant data.
+      color_code: null,
+      option_type_name: option.name,
+      option_type_label: optionLabel(option, locale),
+      image_url: null,
+    })),
+  );
+}
+
+/**
+ * Real variants, keyed by their own `option_value_ids` — which is what makes a
+ * selection resolve to one variant rather than to a guess. Price, availability
+ * and media are taken verbatim from the server for each variant; nothing here
+ * computes any of them.
+ */
+function toVariants(
+  product: AwjProduct,
+  variants: AwjProductVariant[],
+  optionValues: OptionValue[],
+): Variant[] {
+  const byId = new Map(optionValues.map((value) => [value.id, value]));
+
+  return variants.map((variant) => {
+    const media = variant.media.map((item) => toMedia(item, product.id));
+    const purchasable = variant.in_stock !== false;
+
+    return {
+      id: variant.id,
+      product_id: product.id,
+      sku: variant.sku,
+      options_text: variant.descriptor ?? "",
+      track_inventory: variant.in_stock !== null,
+      media_count: media.length,
+      preorder_ships_at: null,
+      thumbnail_url: media[0]?.small_url ?? product.thumbnail_url,
+      purchasable,
+      in_stock: variant.in_stock ?? true,
+      backorderable: false,
+      preorder: false,
+      weight: null,
+      height: null,
+      width: null,
+      depth: null,
+      price: toPrice(variant.price.amount_minor, variant.price.currency),
+      original_price: null,
+      primary_media: media[0],
+      media,
+      option_values: variant.option_value_ids
+        .map((id) => byId.get(id))
+        .filter((value): value is OptionValue => value !== undefined),
+    };
+  });
 }
 
 function toMedia(media: AwjProductMedia, productId: string): Media {
@@ -109,10 +237,11 @@ function toDefaultVariant(
   };
 }
 
-function toCategoryRefViewModel(ref: AwjCategoryRef): Category {
+function toCategoryRefViewModel(ref: AwjCategoryRef): StoreCategory {
   return {
     id: ref.id,
     name: ref.name,
+    color: null,
     permalink: ref.id,
     position: 0,
     depth: 0,
@@ -147,19 +276,39 @@ function displayProductName(product: AwjProduct, locale?: string): string {
 export function mapAwjProductToViewModel(
   product: AwjProduct,
   locale?: string,
-): Product {
-  const price = toPrice(product.price.amount_minor, product.price.currency);
+): StoreProduct {
+  const isVariantManaged = product.is_variant_managed === true;
+  const awjOptions = product.options ?? [];
+  const awjVariants = product.variants ?? [];
+
+  const optionTypes = toOptionTypes(awjOptions, locale);
+  const optionValues = toOptionValues(awjOptions, locale);
+  const variants = toVariants(product, awjVariants, optionValues);
+
+  /*
+   * A variant-managed product has no price of its own, and the listing
+   * endpoint says so by sending zero. Printing that zero as a formatted
+   * price told shoppers the product was free. Detail responses do carry a
+   * real figure — the cheapest active variant — so the zero is only
+   * meaningless when no variant came with it.
+   */
+  const price =
+    isVariantManaged && awjVariants.length === 0
+      ? unpricedPrice(product.price.currency)
+      : toPrice(product.price.amount_minor, product.price.currency);
+
   const media = (product.media ?? []).map((item) => toMedia(item, product.id));
   const purchasable = product.in_stock !== false;
 
   return {
+    isVariantManaged,
     id: product.id,
     name: displayProductName(product, locale),
     slug: product.id,
     meta_title: null,
     meta_description: null,
     meta_keywords: null,
-    variant_count: 0,
+    variant_count: variants.length,
     available_on: product.created_at,
     preorder_ships_at: null,
     purchasable,
@@ -168,7 +317,13 @@ export function mapAwjProductToViewModel(
     backorderable: false,
     available: purchasable,
     description: product.description,
-    description_html: product.description,
+    /*
+     * AWJ's `description` is a plain text column, not authored HTML. Claiming
+     * it as `description_html` sent merchant-typed text through
+     * `dangerouslySetInnerHTML`, which both dropped its line breaks and treated
+     * input as markup. The PDP renders `description` as text instead.
+     */
+    description_html: null,
     default_variant_id: `${product.id}-default`,
     thumbnail_url: product.thumbnail_url,
     tags: [],
@@ -176,10 +331,18 @@ export function mapAwjProductToViewModel(
     original_price: null,
     primary_media: media[0],
     media,
-    variants: [],
-    default_variant: toDefaultVariant(product, price, product.thumbnail_url),
-    option_types: [],
-    option_values: [],
+    variants,
+    /*
+     * A variant-managed product gets no synthetic default: the synthetic one
+     * carries the parent id, and sending that to the cart would add the parent
+     * rather than the chosen variant. Selection must resolve to a real variant
+     * or to nothing.
+     */
+    default_variant: isVariantManaged
+      ? undefined
+      : toDefaultVariant(product, price, product.thumbnail_url),
+    option_types: optionTypes,
+    option_values: optionValues,
     categories: product.category
       ? [toCategoryRefViewModel(product.category)]
       : [],
@@ -191,7 +354,7 @@ export function mapAwjProductToViewModel(
 export function mapAwjCategoryToViewModel(
   category: AwjCategory,
   depth = 0,
-): Category {
+): StoreCategory {
   const children = (category.children ?? []).map((child) =>
     mapAwjCategoryToViewModel(child, depth + 1),
   );
@@ -199,6 +362,7 @@ export function mapAwjCategoryToViewModel(
   return {
     id: category.id,
     name: category.name,
+    color: category.color,
     permalink: category.id,
     position: 0,
     depth,

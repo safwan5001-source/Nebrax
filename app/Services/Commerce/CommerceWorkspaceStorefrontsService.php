@@ -7,7 +7,11 @@ use App\Models\Storefront;
 use App\Models\StorefrontDomain;
 use App\Support\HostnameNormalizer;
 use App\Support\InvalidHostnameException;
+use App\Support\ManagedStorefrontHostname;
 use App\Tenancy\TenantContext;
+use App\Tenancy\TenantScope;
+use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
 /**
@@ -173,16 +177,336 @@ final class CommerceWorkspaceStorefrontsService
 
         return $domains
             ->filter(fn (StorefrontDomain $domain) => $domain->tenant_id === $tenantId)
-            ->map(fn (StorefrontDomain $domain) => [
-                'id' => $domain->id,
-                'hostname' => $domain->hostname,
-                'type' => $domain->type,
-                'is_primary' => $domain->is_primary,
-                'is_active' => $domain->is_active,
-                'verification_status' => $domain->verification_status,
-            ])
+            ->map(fn (StorefrontDomain $domain) => $this->presentDomain($domain))
             ->values()
             ->all();
+    }
+
+    /**
+     * STORE-ADMIN-ADOPT-1B-3A — إضافة نطاق مخصَّص (`custom`) لمتجر قائم
+     * يخصّ المستأجر الحالي، وبدء تحقّق DNS TXT (لا يُثبَّت `verified` هنا
+     * أبداً — يبدأ `pending` دوماً، القرار §10).
+     *
+     * تسلسل الفحص مطابقٌ للتذكرة حرفياً: ملكية المتجر (404 لا كاشف) →
+     * تطبيع/تحقّق hostname عبر `HostnameNormalizer::normalize()` حصراً →
+     * حماية نطاق AWJ المُدار → فحص تفرّد عالمي (طبقة تطبيق UX + قفل صفّ داخل
+     * معاملة → قيد `unique(hostname)` كسلطة نهائية ضد السباق، القرار §15).
+     *
+     * @throws InvalidHostnameException hostname غير صالح تركيبياً — 422.
+     * @throws ManagedNamespaceHostnameException hostname ضمن نطاق AWJ المُدار — 422.
+     * @throws StorefrontHostnameConflictException hostname مستخدم بالفعل (فحص مسبق أو سباق DB) — 409.
+     *
+     * @return array{id: string, hostname: string, type: string, is_primary: bool, is_active: bool, verification_status: string, verification: array{method: string, record_name: string, record_value: string, verified_at: ?string}|null}|null
+     */
+    public function addCustomDomainForCurrentTenant(string $storefrontId, string $rawHostname): ?array
+    {
+        $tenantId = app(TenantContext::class)->id();
+        if ($tenantId === null) {
+            throw new RuntimeException('لا سياق مستأجر نشط.');
+        }
+
+        $storefront = Storefront::query()->find($storefrontId);
+        if ($storefront === null || $storefront->tenant_id !== $tenantId) {
+            return null;
+        }
+
+        // يرمي InvalidHostnameException مباشرة — لا تقاط هنا، المتحكّم يحوّلها 422.
+        $hostname = HostnameNormalizer::normalize($rawHostname);
+
+        $baseDomain = ManagedStorefrontHostname::configuredBaseDomain();
+        if ($hostname === $baseDomain || ManagedStorefrontHostname::isUnderBaseDomain($hostname, $baseDomain)) {
+            throw new ManagedNamespaceHostnameException(
+                'هذا الاسم ضمن نطاق أَوْج المُدار للمتاجر — لا يمكن إضافته كنطاق مخصَّص.'
+            );
+        }
+
+        // طبقة تطبيق (UX أسرع، ليست السلطة النهائية) — نفس فحص `RegisterStorefrontDomainCommand`.
+        if (StorefrontDomain::withoutGlobalScope(TenantScope::class)->where('hostname', $hostname)->exists()) {
+            throw new StorefrontHostnameConflictException('اسم النطاق مستخدم بالفعل.');
+        }
+
+        $token = StorefrontDomainVerificationService::generateToken();
+
+        try {
+            $domain = DB::transaction(function () use ($storefront, $hostname, $token) {
+                // نقطة تسلسل داخل المعاملة (بنفس نمط `StorefrontProvisioningService::ensureManagedDomain()`):
+                // تمنع أغلب حالات السباق مبكراً، لكنها ليست السلطة النهائية
+                // وحدها — إدراجان متزامنان حقيقيان بلا صفّ سابق أصلاً يتجاوزانها
+                // معاً؛ القيد الفريد على `hostname` (خارج هذه المعاملة، في
+                // catch أدناه) هو ما يحسم فعلياً حينها.
+                $existing = StorefrontDomain::withoutGlobalScope(TenantScope::class)
+                    ->where('hostname', $hostname)
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($existing !== null) {
+                    throw new StorefrontHostnameConflictException('اسم النطاق مستخدم بالفعل.');
+                }
+
+                return StorefrontDomain::create([
+                    'storefront_id' => $storefront->id,
+                    'hostname' => $hostname,
+                    'type' => StorefrontDomain::TYPE_CUSTOM,
+                    'is_primary' => false,
+                    'is_active' => true,
+                    'verification_status' => StorefrontDomain::VERIFICATION_PENDING,
+                    'verification_token' => $token,
+                ]);
+            });
+        } catch (QueryException $e) {
+            // القيد الفريد `storefront_domains.hostname` هو السلطة النهائية —
+            // انظر تعليق أعلاه. يُلتقَط **خارج** `DB::transaction()` عمداً
+            // (نفس نمط `InventoryReservationService::acquire()`): الالتقاط
+            // داخلها يترك معاملة PostgreSQL «مُجهَضة» فتفشل أي قراءة تالية
+            // بلا فائدة.
+            if (! $this->isUniqueHostnameViolation($e)) {
+                throw $e;
+            }
+
+            throw new StorefrontHostnameConflictException('اسم النطاق مستخدم بالفعل.');
+        }
+
+        return $this->presentDomain($domain);
+    }
+
+    /**
+     * STORE-ADMIN-ADOPT-1B-3A — تشغيل تحقّق DNS TXT فعلي لنطاق مخصَّص قائم
+     * يخصّ المستأجر الحالي والمتجر المحدَّد في المسار. مثاليّ التكرار: نطاق
+     * `verified` بالفعل يُعاد حالته الحالية دون أي أثر جانبي (لا إعادة توليد
+     * token، لا تغيير `verified_at`، لا استعلام DNS إضافي — القرار §25).
+     *
+     * `null` يعني «غير موجود/لا يخصّ هذا المستأجر أو هذا المتجر» (404 غير
+     * كاشف) — نفس دلالة بقية طرق هذه الخدمة.
+     *
+     * @throws DomainNotEligibleForVerificationException النطاق ليس `custom` (مثال: `awj_subdomain`) — 422.
+     * @throws \App\Support\Dns\DnsOperationalException فشل تشغيلي في استعلام DNS — 503 قابل لإعادة المحاولة.
+     *
+     * @return array{id: string, hostname: string, type: string, is_primary: bool, is_active: bool, verification_status: string, verification: array{method: string, record_name: string, record_value: string, verified_at: ?string}|null}|null
+     */
+    public function verifyCustomDomainForCurrentTenant(
+        string $storefrontId,
+        string $domainId,
+        StorefrontDomainVerificationService $verifier,
+    ): ?array {
+        $tenantId = app(TenantContext::class)->id();
+        if ($tenantId === null) {
+            throw new RuntimeException('لا سياق مستأجر نشط.');
+        }
+
+        $storefront = Storefront::query()->find($storefrontId);
+        if ($storefront === null || $storefront->tenant_id !== $tenantId) {
+            return null;
+        }
+
+        $domain = StorefrontDomain::query()->find($domainId);
+        if (
+            $domain === null
+            || $domain->tenant_id !== $tenantId
+            || $domain->storefront_id !== $storefront->id
+        ) {
+            return null;
+        }
+
+        if ($domain->type !== StorefrontDomain::TYPE_CUSTOM) {
+            throw new DomainNotEligibleForVerificationException(
+                'هذا النطاق مُدار من أَوْج — لا يخضع لتحقّق DNS TXT الخاص بالنطاقات المخصَّصة.'
+            );
+        }
+
+        // مثالي التكرار (القرار §25/§26): نطاق مُتحقَّق بالفعل لا يُعاد فحصه
+        // DNS إطلاقاً — يعيد حالته الحالية فقط، فتبقى `verified_at` الأصلية
+        // ولا يُستهلَك أي استعلام DNS إضافي بلا فائدة.
+        if ($domain->isVerified()) {
+            return $this->presentDomain($domain);
+        }
+
+        $result = $verifier->verify($domain);
+
+        if ($result->operationalFailure) {
+            throw new \App\Support\Dns\DnsOperationalException(
+                'تعذّر التحقق من سجلات DNS حالياً — حاول مرة أخرى لاحقاً.'
+            );
+        }
+
+        // إثبات ملكية ناجحٌ بالضبط: `verified` + `verified_at` خادمياً فقط.
+        // إثبات غائب/غير مطابق: نُسجّل `failed` صراحةً (تمييز عن `pending`
+        // الأولي — الطلب جرى فعلاً ولم ينجح) بلا مسّ `verification_token`،
+        // فتبقى «تحقّق الآن» قابلة لإعادة المحاولة بلا حاجة لتوليد token جديد
+        // (القرار §23-A/§27). لا `verified_at` تُكتب في هذا الفرع أبداً.
+        $domain->forceFill([
+            'verification_status' => $result->matched
+                ? StorefrontDomain::VERIFICATION_VERIFIED
+                : StorefrontDomain::VERIFICATION_FAILED,
+            'verified_at' => $result->matched ? now() : $domain->verified_at,
+        ])->save();
+
+        return $this->presentDomain($domain->refresh());
+    }
+
+    /**
+     * STORE-ADMIN-ADOPT-1B-3B — جعل نطاق مؤهل هو الأساسي لمتجر المستأجر الحالي.
+     *
+     * نطاق `custom` يُرفض دائماً في هذه الشريحة: لا توجد حالة persisted تُثبت
+     * EDGE/TLS READY، و`verification_status = verified` ليس دليلاً على HTTPS.
+     * نطاق `awj_subdomain` موثَّق ونشط يُحوَّل عبر `StorefrontDomain::makePrimary()`
+     * القائمة دون إعادة كتابة منطق التبديل.
+     *
+     * `null` = غير موجود / لا يخص هذا المستأجر أو هذا المتجر → 404 غير كاشف.
+     *
+     * @throws CustomDomainNotReadyForPrimaryException نطاق مخصَّص — 422.
+     * @throws DomainNotEligibleForPrimaryException نطاق AWJ غير مؤهل — 422.
+     *
+     * @return array{id: string, hostname: string, type: string, is_primary: bool, is_active: bool, verification_status: string, verification: array{method: string, record_name: string, record_value: string, verified_at: ?string}|null}|null
+     */
+    public function makePrimaryForCurrentTenant(string $storefrontId, string $domainId): ?array
+    {
+        $tenantId = app(TenantContext::class)->id();
+        if ($tenantId === null) {
+            throw new RuntimeException('لا سياق مستأجر نشط.');
+        }
+
+        $storefront = Storefront::query()->find($storefrontId);
+        if ($storefront === null || $storefront->tenant_id !== $tenantId) {
+            return null;
+        }
+
+        return DB::transaction(function () use ($storefront, $domainId, $tenantId) {
+            $domain = $this->lockedDomainForStorefront($storefront->id, $domainId, $tenantId);
+            if ($domain === null) {
+                return null;
+            }
+
+            if ($domain->type === StorefrontDomain::TYPE_CUSTOM) {
+                throw new CustomDomainNotReadyForPrimaryException(
+                    $domain->isVerified()
+                        ? 'تم التحقق من ملكية النطاق، لكن تفعيل HTTPS/النطاق لم يكتمل بعد.'
+                        : 'لا يمكن جعل هذا النطاق أساسياً قبل اكتمال التحقّق وتفعيل HTTPS.'
+                );
+            }
+
+            if (! $domain->isVerified() || ! $domain->is_active) {
+                throw new DomainNotEligibleForPrimaryException(
+                    'هذا النطاق غير مؤهل ليكون النطاق الأساسي.'
+                );
+            }
+
+            if (! $domain->is_primary) {
+                $domain->makePrimary();
+            }
+
+            return $this->presentDomain($domain->refresh());
+        });
+    }
+
+    /**
+     * STORE-ADMIN-ADOPT-1B-3B — فصل نطاق مخصَّص غير أساسي. حذف فعلي (الجدول
+     * بلا SoftDeletes عمداً — تحرير `hostname` فوراً). بعد الحذف لا يبقى الصف
+     * قابلاً للحسم العام (`ResolveStorefrontDomain` يبحث بالـ hostname).
+     *
+     * نطاق AWJ مُدار أو نطاق أساسي حالي → رفض فشلٍ مغلق، بلا إعادة تعيين
+     * أساسي ضمن هذا المسار.
+     *
+     * `null` = غير موجود / لا يخص هذا المستأجر أو هذا المتجر → 404 غير كاشف.
+     *
+     * @throws DomainNotDisconnectableException نطاق غير قابل للفصل — 422.
+     */
+    public function disconnectCustomDomainForCurrentTenant(string $storefrontId, string $domainId): ?bool
+    {
+        $tenantId = app(TenantContext::class)->id();
+        if ($tenantId === null) {
+            throw new RuntimeException('لا سياق مستأجر نشط.');
+        }
+
+        $storefront = Storefront::query()->find($storefrontId);
+        if ($storefront === null || $storefront->tenant_id !== $tenantId) {
+            return null;
+        }
+
+        return DB::transaction(function () use ($storefront, $domainId, $tenantId) {
+            $domain = $this->lockedDomainForStorefront($storefront->id, $domainId, $tenantId);
+            if ($domain === null) {
+                return null;
+            }
+
+            if ($domain->type !== StorefrontDomain::TYPE_CUSTOM) {
+                throw new DomainNotDisconnectableException(
+                    'لا يمكن فصل نطاق مُدار من أَوْج.'
+                );
+            }
+
+            if ($domain->is_primary) {
+                throw new DomainNotDisconnectableException(
+                    'لا يمكن فصل النطاق الأساسي الحالي — حوّل النطاق الأساسي أولاً.'
+                );
+            }
+
+            $domain->delete();
+
+            return true;
+        });
+    }
+
+    /**
+     * يقفل كل نطاقات المتجر (مرتَّبة بالمعرّف لتفادي deadlock) ثم يعيد الصف
+     * المطلوب إن كان مملوكاً للمستأجر الحالي. قفل المجموعة يجعل Make Primary
+     * وDisconnect متسلسلَين على نفس المتجر دون معمارية قفل جديدة.
+     */
+    private function lockedDomainForStorefront(string $storefrontId, string $domainId, string $tenantId): ?StorefrontDomain
+    {
+        $locked = StorefrontDomain::query()
+            ->where('storefront_id', $storefrontId)
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->get();
+
+        $domain = $locked->firstWhere('id', $domainId);
+        if ($domain === null || $domain->tenant_id !== $tenantId) {
+            return null;
+        }
+
+        return $domain;
+    }
+
+    private function isUniqueHostnameViolation(QueryException $e): bool
+    {
+        $sqlState = $e->errorInfo[0] ?? null;
+        $driverCode = $e->errorInfo[1] ?? null;
+
+        // PostgreSQL unique_violation = 23505 · SQLite constraint = 19
+        return $sqlState === '23505' || $driverCode === 19 || str_contains(strtolower($e->getMessage()), 'unique');
+    }
+
+    /**
+     * التمثيل الموحَّد لصفّ `StorefrontDomain` عبر القراءة (`listDomainsForCurrentTenant`)
+     * والكتابة (`addCustomDomainForCurrentTenant`/`verifyCustomDomainForCurrentTenant`)
+     * — حقل `verification` إضافيّ بحت فوق حقول 1B-2 الستة القائمة (لا حذف/
+     * إعادة تسمية لأيٍّ منها، القرار §32). يظهر فقط لنطاق `custom` يحمل
+     * `verification_token` فعلياً (كل نطاق `custom` أُنشئ عبر هذا المسار
+     * يحمله دوماً)؛ `null` للنطاق المُدار من أَوْج أو أي صفّ تاريخي بلا token.
+     *
+     * @return array{id: string, hostname: string, type: string, is_primary: bool, is_active: bool, verification_status: string, verification: array{method: string, record_name: string, record_value: string, verified_at: ?string}|null}
+     */
+    private function presentDomain(StorefrontDomain $domain): array
+    {
+        $verification = null;
+        if ($domain->type === StorefrontDomain::TYPE_CUSTOM && $domain->verification_token !== null) {
+            $verification = [
+                'method' => 'dns_txt',
+                'record_name' => StorefrontDomainVerificationService::recordNameFor($domain->hostname),
+                'record_value' => StorefrontDomainVerificationService::expectedValueFor($domain->verification_token),
+                'verified_at' => $domain->verified_at?->toIso8601String(),
+            ];
+        }
+
+        return [
+            'id' => $domain->id,
+            'hostname' => $domain->hostname,
+            'type' => $domain->type,
+            'is_primary' => $domain->is_primary,
+            'is_active' => $domain->is_active,
+            'verification_status' => $domain->verification_status,
+            'verification' => $verification,
+        ];
     }
 
     private function authorizedPreviewUrl(Storefront $storefront, string $tenantId): ?string

@@ -6,10 +6,12 @@ import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { useEffect, useMemo, useState } from "react";
 import { QuantityPickerField } from "@/components/cart/QuantityPickerField";
+import { StoreContainer } from "@/components/layout/StoreContainer";
 import { HiddenPricePrompt } from "@/components/products/HiddenPricePrompt";
 import { MediaGallery } from "@/components/products/MediaGallery";
 import { ProductCustomFields } from "@/components/products/ProductCustomFields";
 import { VariantPicker } from "@/components/products/VariantPicker";
+import { WishlistButton } from "@/components/products/WishlistButton";
 import { Button } from "@/components/ui/button";
 import { useCart } from "@/contexts/CartContext";
 import { useHiddenPricing } from "@/contexts/HiddenPricingContext";
@@ -38,16 +40,28 @@ export function ProductDetails({ product, basePath }: ProductDetailsProps) {
 
   const hasVariants = variants.length > 0;
   const optionTypes = product.option_types || [];
+  /*
+   * AWJ's own flag, not a count. A variant-managed product with every variant
+   * deactivated still must not be purchasable through its parent, and
+   * `variants.length > 0` alone would not say so.
+   */
+  const isVariantManaged =
+    (product as { isVariantManaged?: boolean }).isVariantManaged === true;
 
   // Initialize with default variant or first available variant
   const [selectedVariant, setSelectedVariant] = useState<Variant | null>(() => {
+    /*
+     * AWJ flags no default variant, so preselecting one would assert a merchant
+     * choice that was never made. A variant-managed product therefore starts
+     * with nothing selected and nothing purchasable — the shopper picks.
+     */
+    if (isVariantManaged) return null;
     if (product.default_variant) {
       return product.default_variant;
     }
     if (hasVariants) {
       return variants.find((v) => v.purchasable) || variants[0];
     }
-    // For products without variants, use default variant
     return product.default_variant || null;
   });
 
@@ -59,9 +73,18 @@ export function ProductDetails({ product, basePath }: ProductDetailsProps) {
     trackViewItem(product, currency);
   }, [product, currency]);
 
+  /*
+   * AWJ gives each variant its own media list, so a selected variant shows its
+   * own images rather than the parent's. Spree's `media.variant_ids` route does
+   * not apply here — the adapter has no variant ids to put there — so the swap
+   * is by list, not by index into a merged gallery. A variant with no media of
+   * its own falls back to the product's.
+   */
   const galleryImages = useMemo((): Media[] => {
+    const variantMedia = selectedVariant?.media ?? [];
+    if (variantMedia.length > 0) return variantMedia;
     return product.media || [];
-  }, [product.media]);
+  }, [selectedVariant, product.media]);
 
   const variantImageIndex = useMemo((): number | null => {
     if (!selectedVariant) return null;
@@ -70,6 +93,14 @@ export function ProductDetails({ product, basePath }: ProductDetailsProps) {
     );
     return index >= 0 ? index : null;
   }, [selectedVariant, galleryImages]);
+
+  /*
+   * `description_html` is null on the AWJ adapter now: the API's `description`
+   * is a plain text column and was being piped into `dangerouslySetInnerHTML`.
+   * The wholesale/Spree surface still supplies real authored HTML, so that
+   * branch is kept for it.
+   */
+  const descriptionText = product.description;
 
   const price = selectedVariant?.price ?? product.price;
   const originalPrice =
@@ -97,27 +128,38 @@ export function ProductDetails({ product, basePath }: ProductDetailsProps) {
   const sku = selectedVariant?.sku ?? product.default_variant?.sku;
 
   // Purchasability
-  const isPurchasable = hasVariants
-    ? (selectedVariant?.purchasable ?? false)
-    : (product.purchasable ?? false);
+  const isPurchasable = isVariantManaged
+    ? // Nothing is purchasable until a real variant is resolved, and then only
+      // on that variant's own server-supplied availability.
+      (selectedVariant?.purchasable ?? false)
+    : hasVariants
+      ? (selectedVariant?.purchasable ?? false)
+      : (product.purchasable ?? false);
 
   const inStock = hasVariants
     ? (selectedVariant?.in_stock ?? false)
     : (product.in_stock ?? false);
 
   const handleAddToCart = async () => {
-    // The wholesale surface still runs on real Spree variants — pass its own
-    // variant id unchanged. The DTC surface is AWJ Cart V1 (product + UOM,
-    // no variants yet — VAR-COM-1 is a separate later workstream): its
-    // catalog products carry a synthetic `${product.id}-default` variant id
-    // purely so this Spree-shaped UI has something to render (SKU row,
-    // variant picker fallback) — see `mapAwjProductToViewModel`'s own
-    // warning that id "is not a real Spree variant and never will back a
-    // real cart." `product.id` is the real AWJ product UUID `mappers.ts`
-    // copies through verbatim; that's the one Cart V1 accepts.
+    /*
+     * The wholesale surface runs on real Spree variants — pass its own variant
+     * id unchanged.
+     *
+     * The DTC surface is AWJ Cart V1, which takes a product id AND an optional
+     * `product_variant_id`. A simple product sends only the product: its
+     * `${product.id}-default` variant is synthetic and would never resolve.
+     * A variant-managed product must send the variant the shopper actually
+     * chose — the parent has no sellable identity, and sending it added the
+     * wrong thing.
+     */
     if (surface !== "wholesale") {
+      const awjVariantId = isVariantManaged ? selectedVariant?.id : null;
+      // Guarded by the disabled button below; this is the last line of defence
+      // so a mis-wired caller cannot post a parent id for a variant product.
+      if (isVariantManaged && !awjVariantId) return;
+
       setLoading(true);
-      await addItem(product.id, quantity, "base");
+      await addItem(product.id, quantity, "base", awjVariantId);
       setLoading(false);
       trackAddToCart(product, selectedVariant, quantity, currency);
       return;
@@ -137,11 +179,19 @@ export function ProductDetails({ product, basePath }: ProductDetailsProps) {
     trackAddToCart(product, selectedVariant, quantity, currency);
   };
 
+  const needsOptionChoice = isVariantManaged && selectedVariant === null;
+
   return (
-    <div className="container mx-auto px-4 sm:px-6 lg:px-8  py-8">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-        {/* Media Gallery */}
-        <div>
+    <StoreContainer className="py-5 md:py-6">
+      {/* The product leads. No marketing band above it. */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,34rem)_minmax(0,1fr)] lg:gap-10">
+        {/*
+          The gallery is capped rather than left to fill its track. It is a
+          square, so an uncapped column made it ~880px tall at 1440 and pushed
+          the price and the purchase action below the fold — the opposite of
+          product-first.
+        */}
+        <div className="w-full lg:sticky lg:top-(--store-header-offset) lg:self-start">
           <MediaGallery
             images={galleryImages}
             productName={product.name}
@@ -149,49 +199,90 @@ export function ProductDetails({ product, basePath }: ProductDetailsProps) {
           />
         </div>
 
-        {/* Product Info */}
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">{product.name}</h1>
+        <div className="min-w-0 lg:max-w-2xl">
+          {product.categories?.[0]?.name && (
+            <p className="mb-1 text-xs font-medium text-store-muted-foreground">
+              {product.categories[0].name}
+            </p>
+          )}
 
-          {/* Price */}
-          <div className="mt-4 flex items-center gap-4">
+          <div className="flex items-start justify-between gap-3">
+            <h1 className="min-w-0 text-lg font-extrabold leading-snug text-store-foreground md:text-xl">
+              {product.name}
+            </h1>
+            <WishlistButton
+              productId={product.id}
+              variant="detail"
+              className="shrink-0"
+            />
+          </div>
+
+          <div className="mt-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
             {displayPrice ? (
-              <span className="text-3xl font-bold text-gray-900">
-                {displayPrice}
+              <span className="text-xl font-black text-store-primary md:text-2xl">
+                {/*
+                  For a variant-managed product with nothing selected yet, the
+                  figure the API sends is its cheapest active variant — stating
+                  it bare would claim it is the price. Once a variant is chosen
+                  the figure is that variant's own, and the qualifier goes.
+                */}
+                {needsOptionChoice ? (
+                  <>
+                    <span className="me-1 text-sm font-semibold text-store-muted-foreground">
+                      {t("priceFromLabel")}
+                    </span>
+                    {/*
+                      Prices are always formatted in Arabic numerals by the
+                      adapter, so on the English storefront the qualifier and
+                      the figure are opposite directions. Isolating the figure
+                      keeps the two from reordering into each other.
+                    */}
+                    <bdi>{displayPrice}</bdi>
+                  </>
+                ) : (
+                  <bdi>{displayPrice}</bdi>
+                )}
+              </span>
+            ) : needsOptionChoice ? (
+              <span className="text-sm font-medium text-store-muted-foreground">
+                {t("pricedByOption")}
               </span>
             ) : (
-              <HiddenPricePrompt className="inline-flex items-center gap-1.5 text-base font-medium text-slate-600 underline underline-offset-4 hover:text-slate-900" />
+              <HiddenPricePrompt className="inline-flex items-center gap-1.5 text-sm font-medium text-store-foreground underline underline-offset-4 hover:text-store-primary" />
             )}
+            {/* Only ever rendered from a real compare-at price the server sent. */}
             {onSale && strikethroughPrice && (
-              <>
-                <span className="text-xl text-gray-500 line-through">
-                  {strikethroughPrice}
-                </span>
-                <span className="bg-red-100 text-red-800 text-sm font-medium px-2.5 py-0.5 rounded">
-                  {t("sale")}
-                </span>
-              </>
-            )}
-          </div>
-
-          {/* Stock Status */}
-          <div className="mt-4">
-            {inStock ? (
-              <span className="inline-flex items-center gap-1.5 text-green-600">
-                <CircleCheckBig className="w-5 h-5" />
-                {t("inStock")}
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1.5 text-red-600">
-                <CircleX className="w-5 h-5" />
-                {t("outOfStock")}
+              <span className="text-sm text-store-muted-foreground line-through">
+                {strikethroughPrice}
               </span>
             )}
           </div>
 
-          {/* Variant Picker */}
+          {/*
+            Availability is stated only once it means something. For a
+            variant-managed product that is after a variant is chosen — before
+            then the parent's rolled-up flag would answer a question the shopper
+            has not asked yet.
+          */}
+          {!needsOptionChoice && (
+            <p className="mt-2 text-xs font-medium">
+              {inStock ? (
+                <span className="inline-flex items-center gap-1.5 text-store-success">
+                  <CircleCheckBig className="size-4" aria-hidden="true" />
+                  {t("inStock")}
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 text-store-destructive">
+                  <CircleX className="size-4" aria-hidden="true" />
+                  {t("outOfStock")}
+                </span>
+              )}
+            </p>
+          )}
+
+          {/* Options: rendered only when the merchant actually defined some. */}
           {hasVariants && optionTypes.length > 0 && (
-            <div className="mt-8">
+            <div className="mt-5 border-t border-store-border pt-5">
               <VariantPicker
                 variants={variants}
                 optionTypes={optionTypes}
@@ -201,8 +292,7 @@ export function ProductDetails({ product, basePath }: ProductDetailsProps) {
             </div>
           )}
 
-          {/* Quantity & Add to Cart */}
-          <div className="mt-8">
+          <div className="mt-5 border-t border-store-border pt-5">
             {pricesHidden ? (
               // Guest on a prices-hidden channel: no pricing, no ordering —
               // route them through the wholesale sign-in first.
@@ -212,27 +302,29 @@ export function ProductDetails({ product, basePath }: ProductDetailsProps) {
                 </Link>
               </Button>
             ) : (
-              <div className="flex gap-4">
+              <div className="flex flex-wrap items-center gap-3">
                 <QuantityPickerField
                   quantity={quantity}
                   onQuantityChange={setQuantity}
                   size="lg"
                 />
 
-                {/* Add to Cart Button */}
                 <Button
                   size="lg"
+                  className="min-w-40 flex-1"
                   onClick={handleAddToCart}
                   disabled={loading || !isPurchasable}
                 >
                   {loading ? (
                     <>
-                      <Loader2 className="animate-spin h-5 w-5" />
+                      <Loader2 className="size-5 animate-spin motion-reduce:animate-none" />
                       {t("adding")}
                     </>
+                  ) : needsOptionChoice ? (
+                    t("selectOptions")
                   ) : isPurchasable ? (
                     <>
-                      <ShoppingBag className="w-5 h-5" />
+                      <ShoppingBag className="size-5" />
                       {t("addToCart")}
                     </>
                   ) : (
@@ -243,49 +335,53 @@ export function ProductDetails({ product, basePath }: ProductDetailsProps) {
             )}
           </div>
 
-          {/* Description */}
-          {product.description_html && (
-            <div className="mt-10 border-t pt-8">
-              <h2 className="text-lg font-medium text-gray-900 mb-4">
+          {descriptionText && (
+            <section className="mt-5 border-t border-store-border pt-5">
+              <h2 className="mb-2 text-sm font-bold text-store-foreground">
                 {t("description")}
               </h2>
-              {/* Description is admin-authored HTML from the Spree CMS backend (trusted source) */}
-              <div
-                className="text-gray-600 prose prose-sm max-w-none"
-                dangerouslySetInnerHTML={{
-                  __html: product.description_html,
-                }}
-              />
-            </div>
+              {/*
+                AWJ's description is a plain text column, not authored HTML —
+                rendering it through `dangerouslySetInnerHTML` both lost its
+                line breaks and treated merchant input as markup.
+              */}
+              <p className="whitespace-pre-line text-sm leading-relaxed text-store-muted-foreground">
+                {descriptionText}
+              </p>
+            </section>
           )}
 
-          {/* Custom Fields */}
           <ProductCustomFields customFields={product.custom_fields} />
 
-          {/* Product Details */}
-          <div className="mt-8 border-t pt-8">
-            <h2 className="text-lg font-medium text-gray-900 mb-4">
-              {t("details")}
-            </h2>
-            <dl className="space-y-3">
-              {sku && (
-                <div className="flex">
-                  <dt className="w-32 text-gray-500 text-sm">{t("sku")}</dt>
-                  <dd className="text-gray-900 text-sm">{sku}</dd>
-                </div>
-              )}
-              {selectedVariant?.options_text && (
-                <div className="flex">
-                  <dt className="w-32 text-gray-500 text-sm">{t("options")}</dt>
-                  <dd className="text-gray-900 text-sm">
-                    {selectedVariant.options_text}
-                  </dd>
-                </div>
-              )}
-            </dl>
-          </div>
+          {(sku || selectedVariant?.options_text) && (
+            <section className="mt-5 border-t border-store-border pt-5">
+              <h2 className="mb-2 text-sm font-bold text-store-foreground">
+                {t("details")}
+              </h2>
+              <dl className="space-y-1.5 text-sm">
+                {sku && (
+                  <div className="flex gap-3">
+                    <dt className="w-28 shrink-0 text-store-muted-foreground">
+                      {t("sku")}
+                    </dt>
+                    <dd className="min-w-0 text-store-foreground">{sku}</dd>
+                  </div>
+                )}
+                {selectedVariant?.options_text && (
+                  <div className="flex gap-3">
+                    <dt className="w-28 shrink-0 text-store-muted-foreground">
+                      {t("options")}
+                    </dt>
+                    <dd className="min-w-0 text-store-foreground">
+                      {selectedVariant.options_text}
+                    </dd>
+                  </div>
+                )}
+              </dl>
+            </section>
+          )}
         </div>
       </div>
-    </div>
+    </StoreContainer>
   );
 }

@@ -149,9 +149,17 @@ export const FilterBar = memo(function FilterBar({
     filtersData.filters.some((f) => f.type === "price_range") &&
     priceBuckets.length > 0;
 
+  /** Whether the catalogue exposes anything to filter on at all. */
+  const hasAnyFilter =
+    hasPriceFilter || optionFilters.length > 0 || availabilityFilter != null;
+
   return (
-    <div className="mb-6">
-      <div className="hidden md:flex items-center justify-between pb-4 border-b border-gray-100">
+    // The rule under the controls is what ties them to the grid, so it sits
+    // close to both. It used to carry pb-4 + mb-6 on top of the page's own
+    // vertical rhythm, which opened a gap wide enough to read as a missing
+    // element between the catalogue controls and the products.
+    <div className="mb-3">
+      <div className="hidden items-center justify-between border-b border-store-border pb-3 md:flex">
         <div className="flex items-center gap-3">
           {optionFilters.map((filter) => (
             <FilterDropdown
@@ -223,26 +231,34 @@ export const FilterBar = memo(function FilterBar({
         </div>
       </div>
 
-      <div className="flex items-center gap-3 md:hidden pb-4 border-b border-gray-100">
-        <button
-          type="button"
-          onClick={() => setShowMobileDrawer(true)}
-          className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg border transition-colors ${
-            hasActiveFilters
-              ? "border-gray-500 bg-gray-50 text-primary"
-              : "border-gray-300 text-gray-700"
-          }`}
-        >
-          <SlidersHorizontal className="w-4 h-4" />
-          <span>{t("filters")}</span>
-          {hasActiveFilters && (
-            <span className="flex items-center justify-center w-5 h-5 text-xs bg-primary text-white rounded-lg">
-              {totalActiveFilters}
-            </span>
-          )}
-        </button>
+      <div className="flex items-center gap-3 border-b border-store-border pb-3 md:hidden">
+        {/*
+          The filter trigger appears only when the catalogue actually has facets
+          to filter on. The AWJ catalog API supplies none, so rendering it
+          unconditionally put a button on every phone that opened an empty
+          drawer — a control that looks functional and is not.
+        */}
+        {hasAnyFilter && (
+          <button
+            type="button"
+            onClick={() => setShowMobileDrawer(true)}
+            className={`flex items-center gap-2 rounded-store border px-4 py-2 text-sm font-medium transition-colors ${
+              hasActiveFilters
+                ? "border-store-border-strong bg-store-surface-muted text-store-primary"
+                : "border-store-border text-store-foreground"
+            }`}
+          >
+            <SlidersHorizontal className="size-4" />
+            <span>{t("filters")}</span>
+            {hasActiveFilters && (
+              <span className="flex size-5 items-center justify-center rounded-store bg-store-primary text-xs text-store-primary-foreground">
+                {totalActiveFilters}
+              </span>
+            )}
+          </button>
+        )}
 
-        <div className="ml-auto">
+        <div className="ms-auto">
           <FilterDropdown
             label={t("sort")}
             isOpen={openDropdownId === "sort-mobile"}

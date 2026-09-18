@@ -38,10 +38,16 @@
     "allProducts": "Wszystkie produkty",
     "contact": "Kontakt",
     "viewAllCategory": "Zobacz wszystkie {category}",
-    "openSearch": "Otwórz wyszukiwanie",
-    "closeSearch": "Zamknij wyszukiwanie",
     "myAccount": "Moje konto",
-    "wholesale": "Hurt"
+    "wholesale": "Hurt",
+    "shop": "Produkty",
+    "cart": "Koszyk",
+    "primaryNavigation": "Nawigacja główna",
+    "categoryNavigation": "Kategorie sklepu",
+    "scrollCategoriesBack": "Pokaż poprzednie kategorie",
+    "scrollCategoriesForward": "Pokaż więcej kategorii",
+    "skipToContent": "Przejdź do treści",
+    "submitSearch": "Szukaj"
   },
   "regionPreferences": {
     "title": "Region i język",
@@ -70,12 +76,11 @@
     "wholesale": "Handel i sprzedaż hurtowa"
   },
   "home": {
-    "welcome": "{storeName} Storefront",
+    "welcome": "{storeName}",
     "heroDescription": "Gotowy do produkcji, otwartoźródłowy storefront zbudowany z Next.js, React i Spree TypeScript SDK. Hostuj samodzielnie. Twój stack. Brak vendor lock-in. Zero opłat platformowych.",
     "shopNow": "Wszystkie produkty",
     "forkOnGithub": "Forkuj na GitHubie",
     "quickstartGuide": "Przewodnik szybkiego startu",
-    "featuredProducts": "Polecane produkty",
     "viewAll": "Zobacz wszystkie",
     "qualityProducts": "Produkty wysokiej jakości",
     "qualityDescription": "Starannie wyselekcjonowana kolekcja najlepszych produktów.",
@@ -93,7 +98,10 @@
     "wholesaleBenefitQuickOrderTitle": "Szybkie zamówienie zbiorcze",
     "wholesaleBenefitQuickOrderDescription": "Wprowadź numery SKU i ilości, aby w kilka sekund złożyć duże zamówienie.",
     "wholesaleBenefitOrdersTitle": "Historia zamówień",
-    "wholesaleBenefitOrdersDescription": "Przeglądaj poprzednie zamówienia i zamawiaj ponownie swoje stałe pozycje w kilka kliknięć."
+    "wholesaleBenefitOrdersDescription": "Przeglądaj poprzednie zamówienia i zamawiaj ponownie swoje stałe pozycje w kilka kliknięć.",
+    "browseCategories": "Kupuj według kategorii",
+    "newArrivals": "Nowości",
+    "subcategories": "{count, plural, one {# podkategoria} few {# podkategorie} many {# podkategorii} other {# podkategorii}}"
   },
   "cart": {
     "cart": "Koszyk",
@@ -189,7 +197,12 @@
     "properties": "Właściwości",
     "yes": "Tak",
     "no": "Nie",
-    "optionFilterChip": "{filter}: {value}"
+    "optionFilterChip": "{filter}: {value}",
+    "pricedByOption": "Cena zależna od opcji",
+    "selectOptions": "Wybierz opcje",
+    "priceFromLabel": "Od",
+    "addToFavorites": "Dodaj do ulubionych",
+    "removeFromFavorites": "Usuń z ulubionych"
   },
   "navigation": {
     "home": "Strona główna",

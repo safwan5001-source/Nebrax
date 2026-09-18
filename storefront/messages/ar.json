@@ -38,10 +38,16 @@
     "allProducts": "جميع المنتجات",
     "contact": "تواصل معنا",
     "viewAllCategory": "عرض الكل في {category}",
-    "openSearch": "فتح البحث",
-    "closeSearch": "إغلاق البحث",
     "myAccount": "حسابي",
-    "wholesale": "الجملة"
+    "wholesale": "الجملة",
+    "shop": "المنتجات",
+    "cart": "السلة",
+    "primaryNavigation": "التنقل الرئيسي",
+    "categoryNavigation": "تصنيفات المتجر",
+    "scrollCategoriesBack": "عرض التصنيفات السابقة",
+    "scrollCategoriesForward": "عرض المزيد من التصنيفات",
+    "skipToContent": "تخطي إلى المحتوى",
+    "submitSearch": "بحث"
   },
   "regionPreferences": {
     "title": "المنطقة واللغة",
@@ -70,12 +76,11 @@
     "wholesale": "التجارة والجملة"
   },
   "home": {
-    "welcome": "متجر {storeName}",
+    "welcome": "{storeName}",
     "heroDescription": "متجر إلكتروني جاهز للإنتاج ومفتوح المصدر، مبني على Next.js وReact وحزمة Spree TypeScript. استضفه بنفسك، واحتفظ بملكية بنيتك التقنية، بلا ارتباط بمزوّد واحد وبلا رسوم منصة.",
     "shopNow": "تسوّق الآن",
     "forkOnGithub": "انسخ على GitHub",
     "quickstartGuide": "دليل البدء السريع",
-    "featuredProducts": "منتجات مميزة",
     "viewAll": "عرض الكل",
     "qualityProducts": "منتجات عالية الجودة",
     "qualityDescription": "تشكيلة مختارة بعناية من أفضل المنتجات.",
@@ -93,7 +98,10 @@
     "wholesaleBenefitQuickOrderTitle": "طلب سريع بالجملة",
     "wholesaleBenefitQuickOrderDescription": "أدخل رموز الأصناف والكميات لإنشاء طلب كبير خلال ثوانٍ.",
     "wholesaleBenefitOrdersTitle": "سجل الطلبات",
-    "wholesaleBenefitOrdersDescription": "راجع طلباتك السابقة وأعد طلب أصنافك المعتادة خلال نقرتين."
+    "wholesaleBenefitOrdersDescription": "راجع طلباتك السابقة وأعد طلب أصنافك المعتادة خلال نقرتين.",
+    "browseCategories": "تسوّق حسب القسم",
+    "newArrivals": "أحدث المنتجات",
+    "subcategories": "{count, plural, zero {لا أقسام فرعية} one {قسم فرعي} two {قسمان فرعيان} few {# أقسام فرعية} many {# قسماً فرعياً} other {# قسم فرعي}}"
   },
   "cart": {
     "cart": "السلة",
@@ -142,7 +150,7 @@
     "productCount": "{count, plural, zero {لا منتجات} one {منتج واحد} two {منتجان} few {# منتجات} many {# منتجاً} other {# منتج}}",
     "sale": "تخفيض",
     "outOfStockVariant": "(غير متوفر)",
-    "addToCart": "أضف إلى السلة",
+    "addToCart": "أضف للسلة",
     "adding": "جارٍ الإضافة...",
     "description": "الوصف",
     "details": "التفاصيل",
@@ -189,7 +197,12 @@
     "properties": "الخصائص",
     "yes": "نعم",
     "no": "لا",
-    "optionFilterChip": "{filter}: {value}"
+    "optionFilterChip": "{filter}: {value}",
+    "pricedByOption": "السعر حسب الخيار",
+    "selectOptions": "اختر الخيارات",
+    "priceFromLabel": "ابتداءً من",
+    "addToFavorites": "إضافة إلى المفضلة",
+    "removeFromFavorites": "إزالة من المفضلة"
   },
   "navigation": {
     "home": "الرئيسية",

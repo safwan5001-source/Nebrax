@@ -38,10 +38,16 @@
     "allProducts": "All Products",
     "contact": "Contact",
     "viewAllCategory": "View all {category}",
-    "openSearch": "Open search",
-    "closeSearch": "Close search",
     "myAccount": "My Account",
-    "wholesale": "Wholesale"
+    "wholesale": "Wholesale",
+    "shop": "Products",
+    "cart": "Cart",
+    "primaryNavigation": "Primary navigation",
+    "categoryNavigation": "Store categories",
+    "scrollCategoriesBack": "Show previous categories",
+    "scrollCategoriesForward": "Show more categories",
+    "skipToContent": "Skip to content",
+    "submitSearch": "Search"
   },
   "regionPreferences": {
     "title": "Region and language",
@@ -70,12 +76,11 @@
     "wholesale": "Trade & Wholesale"
   },
   "home": {
-    "welcome": "{storeName} Storefront",
+    "welcome": "{storeName}",
     "heroDescription": "A production-ready, open-source storefront built with Next.js, React, and the Spree TypeScript SDK. Self-host it. Own your stack. No vendor lock-in. Zero platform fees.",
     "shopNow": "Shop All",
     "forkOnGithub": "Fork on GitHub",
     "quickstartGuide": "Quickstart Guide",
-    "featuredProducts": "Featured Products",
     "viewAll": "View all",
     "qualityProducts": "Quality Products",
     "qualityDescription": "Carefully curated selection of the best products.",
@@ -93,7 +98,10 @@
     "wholesaleBenefitQuickOrderTitle": "Bulk quick-order",
     "wholesaleBenefitQuickOrderDescription": "Enter SKUs and quantities to build a large order in seconds.",
     "wholesaleBenefitOrdersTitle": "Order history",
-    "wholesaleBenefitOrdersDescription": "Review past orders and reorder your regular lines in a couple of clicks."
+    "wholesaleBenefitOrdersDescription": "Review past orders and reorder your regular lines in a couple of clicks.",
+    "browseCategories": "Shop by category",
+    "newArrivals": "New arrivals",
+    "subcategories": "{count, plural, one {# subcategory} other {# subcategories}}"
   },
   "cart": {
     "cart": "Cart",
@@ -142,7 +150,7 @@
     "productCount": "{count, plural, one {# product} other {# products}}",
     "sale": "Sale",
     "outOfStockVariant": "(Out of stock)",
-    "addToCart": "Add to Cart",
+    "addToCart": "Add to cart",
     "adding": "Adding...",
     "description": "Description",
     "details": "Details",
@@ -189,7 +197,12 @@
     "properties": "Properties",
     "yes": "Yes",
     "no": "No",
-    "optionFilterChip": "{filter}: {value}"
+    "optionFilterChip": "{filter}: {value}",
+    "pricedByOption": "Priced by option",
+    "selectOptions": "Select options",
+    "priceFromLabel": "From",
+    "addToFavorites": "Add to favorites",
+    "removeFromFavorites": "Remove from favorites"
   },
   "navigation": {
     "home": "Home",

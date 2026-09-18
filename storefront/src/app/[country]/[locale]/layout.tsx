@@ -11,6 +11,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { CartProvider } from "@/contexts/CartContext";
 import { StoreProvider } from "@/contexts/StoreContext";
+import { WishlistProvider } from "@/contexts/WishlistContext";
 import {
   DEFAULT_LOCALE,
   loadMessages,
@@ -195,10 +196,17 @@ function CountryLocaleProviders({
       >
         <AuthProvider>
           <CartProvider>
-            <JsonLd data={buildOrganizationJsonLd()} />
-            {children}
-            <CartDrawer />
-            <Toaster />
+            {/*
+              DESIGN_ONLY / GATED — favourites are held in memory for the life
+              of the page and persist nowhere, because `store/v1` has no
+              wishlist contract yet. See `lib/commerce/capabilities.ts`.
+            */}
+            <WishlistProvider>
+              <JsonLd data={buildOrganizationJsonLd()} />
+              {children}
+              <CartDrawer />
+              <Toaster />
+            </WishlistProvider>
           </CartProvider>
         </AuthProvider>
       </StoreProvider>

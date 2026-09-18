@@ -176,3 +176,152 @@ describe("mapAwjCategoryToViewModel", () => {
     ]);
   });
 });
+
+describe("mapAwjProductToViewModel — options and variants (STORE-UI-3)", () => {
+  function variantProduct(overrides: Partial<AwjProduct> = {}): AwjProduct {
+    return baseProduct({
+      is_variant_managed: true,
+      price: { amount_minor: 0, currency: "SAR" },
+      options: [
+        {
+          id: "opt-size",
+          name: "المقاس",
+          name_en: "Size",
+          values: [
+            { id: "val-s", value: "صغير", value_en: "Small" },
+            { id: "val-l", value: "كبير", value_en: "Large" },
+          ],
+        },
+        {
+          id: "opt-cap",
+          name: "السعة",
+          name_en: "Capacity",
+          values: [{ id: "val-1l", value: "1 لتر", value_en: "1 L" }],
+        },
+      ],
+      variants: [
+        {
+          id: "var-1",
+          sku: "SKU-S-1L",
+          descriptor: "صغير / 1 لتر",
+          option_value_ids: ["val-s", "val-1l"],
+          price: { amount_minor: 5000, currency: "SAR" },
+          in_stock: true,
+          media: [],
+        },
+        {
+          id: "var-2",
+          sku: "SKU-L-1L",
+          descriptor: "كبير / 1 لتر",
+          option_value_ids: ["val-l", "val-1l"],
+          price: { amount_minor: 7500, currency: "SAR" },
+          in_stock: false,
+          media: [
+            {
+              id: "media-v2",
+              url: "https://example.test/media/v2",
+              alt: null,
+              position: 0,
+            },
+          ],
+        },
+      ],
+      ...overrides,
+    });
+  }
+
+  it("maps every merchant-defined option group, whatever it is called", () => {
+    const vm = mapAwjProductToViewModel(variantProduct());
+
+    expect(vm.option_types?.map((o) => o.name)).toEqual(["المقاس", "السعة"]);
+    expect(vm.option_values?.map((v) => v.id)).toEqual([
+      "val-s",
+      "val-l",
+      "val-1l",
+    ]);
+  });
+
+  it("never claims an option is a colour swatch and never invents a colour", () => {
+    const vm = mapAwjProductToViewModel(
+      variantProduct({
+        options: [
+          {
+            id: "opt-color",
+            // Named "colour" on purpose: AWJ still supplies no colour value,
+            // so presentation must not be inferred from the label.
+            name: "اللون",
+            name_en: "Color",
+            values: [{ id: "val-red", value: "أحمر", value_en: "Red" }],
+          },
+        ],
+        variants: [],
+      }),
+    );
+
+    expect(vm.option_types?.every((o) => o.kind === "awj_generic")).toBe(true);
+    expect(vm.option_types?.some((o) => o.kind === "color_swatch")).toBe(false);
+    expect(vm.option_values?.every((v) => v.color_code === null)).toBe(true);
+  });
+
+  it("resolves each variant to its own option values, price, stock and media", () => {
+    const vm = mapAwjProductToViewModel(variantProduct());
+    const [first, second] = vm.variants ?? [];
+
+    expect(first.id).toBe("var-1");
+    expect(first.option_values.map((v) => v.id)).toEqual(["val-s", "val-1l"]);
+    expect(first.price.amount_in_cents).toBe(5000);
+    expect(first.purchasable).toBe(true);
+
+    expect(second.price.amount_in_cents).toBe(7500);
+    expect(second.purchasable).toBe(false);
+    expect(second.media?.[0]?.id).toBe("media-v2");
+  });
+
+  it("gives a variant-managed listing row no price rather than a free one", () => {
+    // The listing endpoint sends amount_minor 0 with no variants attached.
+    const vm = mapAwjProductToViewModel(
+      variantProduct({ options: undefined, variants: undefined }),
+    );
+
+    expect(vm.isVariantManaged).toBe(true);
+    expect(vm.price.display_amount).toBeNull();
+    expect(vm.price.amount_in_cents).toBeNull();
+  });
+
+  it("keeps a real zero price for a simple product that genuinely costs nothing", () => {
+    const vm = mapAwjProductToViewModel(
+      baseProduct({ price: { amount_minor: 0, currency: "SAR" } }),
+    );
+
+    expect(vm.isVariantManaged).toBe(false);
+    expect(vm.price.amount_in_cents).toBe(0);
+    expect(vm.price.display_amount).not.toBeNull();
+  });
+
+  it("withholds the synthetic default variant from a variant-managed product", () => {
+    // That id is `${product.id}-default` and would add the parent to the cart.
+    expect(
+      mapAwjProductToViewModel(variantProduct()).default_variant,
+    ).toBeUndefined();
+    expect(
+      mapAwjProductToViewModel(baseProduct()).default_variant,
+    ).toBeDefined();
+  });
+
+  it("does not present a plain-text description as authored HTML", () => {
+    const vm = mapAwjProductToViewModel(
+      baseProduct({ description: "سطر\nسطر آخر" }),
+    );
+
+    expect(vm.description).toBe("سطر\nسطر آخر");
+    expect(vm.description_html).toBeNull();
+  });
+
+  it("leaves a simple product with no options or variants", () => {
+    const vm = mapAwjProductToViewModel(baseProduct());
+
+    expect(vm.option_types).toEqual([]);
+    expect(vm.variants).toEqual([]);
+    expect(vm.variant_count).toBe(0);
+  });
+});

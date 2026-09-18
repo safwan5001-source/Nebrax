@@ -140,7 +140,12 @@ describe("CartContext", () => {
         await result.current.addItem("product-1", 2, "unit:abc");
       });
 
-      expect(mockAddAwjItem).toHaveBeenCalledWith("product-1", 2, "unit:abc");
+      expect(mockAddAwjItem).toHaveBeenCalledWith(
+        "product-1",
+        2,
+        "unit:abc",
+        undefined,
+      );
       expect(mockAddToCart).not.toHaveBeenCalled();
       expect(result.current.cart).toBe(updatedCart);
       expect(result.current.isOpen).toBe(true);
@@ -160,10 +165,36 @@ describe("CartContext", () => {
         await result.current.addItem("product-1", 1);
       });
 
-      expect(mockAddAwjItem).toHaveBeenCalledWith("product-1", 1, "base");
+      expect(mockAddAwjItem).toHaveBeenCalledWith(
+        "product-1",
+        1,
+        "base",
+        undefined,
+      );
     });
 
-    it("never sends a price — only product id, quantity, unit key", async () => {
+    it("forwards the chosen variant id when one is given", async () => {
+      mockAddAwjItem.mockResolvedValue({
+        success: true as const,
+        cart: updatedCart,
+      });
+
+      const { result } = renderHook(() => useCart(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      await act(async () => {
+        await result.current.addItem("product-1", 1, "base", "variant-7");
+      });
+
+      expect(mockAddAwjItem).toHaveBeenCalledWith(
+        "product-1",
+        1,
+        "base",
+        "variant-7",
+      );
+    });
+
+    it("never sends a price — only product id, quantity, unit key and variant", async () => {
       mockAddAwjItem.mockResolvedValue({
         success: true as const,
         cart: updatedCart,
@@ -176,8 +207,8 @@ describe("CartContext", () => {
       });
 
       const call = mockAddAwjItem.mock.calls[0];
-      expect(call).toHaveLength(3);
-      expect(call).toEqual(["product-1", 1, "base"]);
+      expect(call).toHaveLength(4);
+      expect(call).toEqual(["product-1", 1, "base", undefined]);
     });
 
     it("shows error toast and does not update cart on failure", async () => {

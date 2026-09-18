@@ -109,7 +109,7 @@ function MediaGalleryInner({
 
   if (images.length === 0) {
     return (
-      <div className="relative aspect-square bg-gray-100 rounded-xl overflow-hidden">
+      <div className="relative aspect-square overflow-hidden rounded-store bg-store-surface-muted">
         <ProductImage
           src={null}
           alt={productName}
@@ -134,7 +134,7 @@ function MediaGalleryInner({
       {/* Main Image */}
       <button
         type="button"
-        className="relative aspect-square bg-gray-100 rounded-xl overflow-hidden cursor-zoom-in w-full touch-pan-y"
+        className="relative aspect-square w-full cursor-zoom-in touch-pan-y overflow-hidden rounded-store bg-store-surface-muted"
         onClick={() => {
           if (suppressClickRef.current) {
             suppressClickRef.current = false;
