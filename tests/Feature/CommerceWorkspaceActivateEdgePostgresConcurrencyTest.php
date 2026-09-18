@@ -86,7 +86,7 @@ class CommerceWorkspaceActivateEdgePostgresConcurrencyTest extends TestCase
         ]);
         app(TenantContext::class)->forget();
 
-        return ['storefront' => $storefront, 'domain' => $domain, 'hostname' => $hostname];
+        return ['storefront' => $storefront, 'domain' => $domain, 'hostname' => $domain->hostname];
     }
 
     /** @test */
