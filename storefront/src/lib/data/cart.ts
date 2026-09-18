@@ -63,9 +63,10 @@ export async function addAwjItem(
   productId: string,
   quantity: number,
   unitKey = "base",
+  variantId?: string | null,
 ) {
   return actionResult(async () => {
-    const cart = await addAwjCartItem(productId, quantity, unitKey);
+    const cart = await addAwjCartItem(productId, quantity, unitKey, variantId);
     updateTag(awjCartTag());
     return { cart };
   }, "Failed to add item to cart");

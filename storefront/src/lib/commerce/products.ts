@@ -109,11 +109,20 @@ export async function fetchProductFilters(
 ): Promise<ProductFiltersResponse> {
   return {
     filters: [],
+    /*
+     * Exactly the three columns `StorefrontProductController::SORTS` allows,
+     * in both directions — no more and no less. "Newest" was missing even
+     * though `created_at` has always been supported and the homepage's New
+     * Arrivals shelf already relies on it; `SORT_TO_AWJ` above maps
+     * `available_on` onto it.
+     */
     sort_options: [
       { id: "name" },
       { id: "-name" },
       { id: "price" },
       { id: "-price" },
+      { id: "-available_on" },
+      { id: "available_on" },
     ],
     default_sort: "name",
     total_count: 0,

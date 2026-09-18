@@ -150,7 +150,7 @@
     "productCount": "{count, plural, zero {لا منتجات} one {منتج واحد} two {منتجان} few {# منتجات} many {# منتجاً} other {# منتج}}",
     "sale": "تخفيض",
     "outOfStockVariant": "(غير متوفر)",
-    "addToCart": "أضف إلى السلة",
+    "addToCart": "أضف للسلة",
     "adding": "جارٍ الإضافة...",
     "description": "الوصف",
     "details": "التفاصيل",
@@ -197,7 +197,12 @@
     "properties": "الخصائص",
     "yes": "نعم",
     "no": "لا",
-    "optionFilterChip": "{filter}: {value}"
+    "optionFilterChip": "{filter}: {value}",
+    "pricedByOption": "السعر حسب الخيار",
+    "selectOptions": "اختر الخيارات",
+    "priceFromLabel": "ابتداءً من",
+    "addToFavorites": "إضافة إلى المفضلة",
+    "removeFromFavorites": "إزالة من المفضلة"
   },
   "navigation": {
     "home": "الرئيسية",

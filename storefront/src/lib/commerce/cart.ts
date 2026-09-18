@@ -34,6 +34,11 @@ export async function fetchAwjCart(): Promise<StorefrontCart> {
  * variant and never will back a real cart"). `unitKey` is `"base"` unless
  * the catalog response explicitly names another canonical AWJ UOM
  * identity (`unit:<UnitTemplateUnit UUID>`) — never inferred from a label.
+ * `variantId` is the real AWJ `ProductVariant` UUID for a variant-managed
+ * product, taken from the selection the shopper actually made. Without it the
+ * backend would be asked to add the parent product, which has no sellable
+ * identity of its own.
+ *
  * The cart is lazily created by Laravel on first successful call; this
  * never sends a price — the backend resolves it via `CommercePriceResolver`.
  */
@@ -41,11 +46,20 @@ export async function addAwjCartItem(
   productId: string,
   quantity: number,
   unitKey: string = "base",
+  variantId?: string | null,
 ): Promise<StorefrontCart> {
   const response = await storefrontCartRequest<AwjResourceResponse<AwjCart>>(
     "POST",
     "cart/items",
-    { product_id: productId, quantity, unit_key: unitKey },
+    {
+      product_id: productId,
+      quantity,
+      unit_key: unitKey,
+      // Only sent when a real variant was chosen. `store/v1` rejects unknown
+      // keys outright, and it treats an absent `product_variant_id` as "simple
+      // product" — so a null must not be sent as a key with a null value.
+      ...(variantId ? { product_variant_id: variantId } : {}),
+    },
   );
   return mapAwjCartToViewModel(response.data);
 }

@@ -197,7 +197,12 @@
     "properties": "Eigenschaften",
     "yes": "Ja",
     "no": "Nein",
-    "optionFilterChip": "{filter}: {value}"
+    "optionFilterChip": "{filter}: {value}",
+    "pricedByOption": "Preis je Option",
+    "selectOptions": "Optionen wählen",
+    "priceFromLabel": "Ab",
+    "addToFavorites": "Zu Favoriten hinzufügen",
+    "removeFromFavorites": "Aus Favoriten entfernen"
   },
   "navigation": {
     "home": "Startseite",
