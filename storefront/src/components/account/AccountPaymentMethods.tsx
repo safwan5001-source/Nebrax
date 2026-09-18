@@ -36,16 +36,22 @@ export function AccountPaymentMethods() {
 
   return (
     <div>
-      <header className="flex flex-wrap items-end justify-between gap-3 lg:items-center lg:border-b lg:border-store-border lg:pb-5">
+      <header className="flex flex-wrap items-end justify-between gap-3 lg:grid lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start lg:gap-x-3 lg:border-b lg:border-store-border lg:pb-5">
         <h1 className="text-xl font-bold text-store-foreground lg:text-2xl">
           {t("paymentMethods")}
         </h1>
         <Button type="button" variant="outline" size="sm" onClick={refuse}>
           {t("addPaymentMethod")}
         </Button>
+        <div className="hidden lg:col-start-1 lg:row-start-2 lg:mt-1 lg:block">
+          <AccountGatedNotice
+            title={t("paymentNotEnabledTitle")}
+            body={t("paymentNotEnabledBody")}
+          />
+        </div>
       </header>
 
-      <div className="mt-2 lg:mt-4">
+      <div className="mt-2 lg:hidden">
         <AccountGatedNotice
           title={t("paymentNotEnabledTitle")}
           body={t("paymentNotEnabledBody")}
@@ -59,7 +65,7 @@ export function AccountPaymentMethods() {
       )}
 
       <ul
-        className="mt-5 grid grid-cols-1 gap-3 lg:mt-8 lg:grid-cols-2 lg:gap-6"
+        className="mt-5 grid grid-cols-1 gap-3 lg:mt-6 lg:grid-cols-2 lg:gap-6"
         aria-label={t("savedMethodShape")}
       >
         {METHOD_FIXTURES.map(({ key, Icon, showExpiry, isDefault }) => (

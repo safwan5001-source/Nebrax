@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 
 export function AccountPasswordField({
   id,
@@ -18,6 +19,8 @@ export function AccountPasswordField({
   minLength,
   describedBy,
   invalid,
+  className,
+  controlClassName,
 }: {
   id: string;
   label: string;
@@ -30,13 +33,15 @@ export function AccountPasswordField({
   minLength?: number;
   describedBy?: string;
   invalid?: boolean;
+  className?: string;
+  controlClassName?: string;
 }) {
   const [visible, setVisible] = useState(false);
 
   return (
-    <Field>
+    <Field className={className}>
       <FieldLabel htmlFor={id}>{label}</FieldLabel>
-      <div className="relative">
+      <div className={cn("relative", controlClassName)}>
         <Input
           type={visible ? "text" : "password"}
           id={id}

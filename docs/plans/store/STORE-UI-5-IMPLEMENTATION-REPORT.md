@@ -2,7 +2,7 @@
 
 ## 1. Status
 
-**COMPLETE pending visual re-review (correction round 4).** **Not merged, not deployed.**
+**COMPLETE pending visual re-review (correction round 5 — final desktop polish).** **Not merged, not deployed.**
 `NO VISUAL APPROVAL = NO MERGE` is respected.
 
 ## 2. Git
@@ -12,7 +12,7 @@
 | **Latest main SHA** | `30979a1bb499cfe8b0e656495805e50225027530` — STORE-UI-4 merge (PR #866) |
 | **Base SHA** | `30979a1bb499cfe8b0e656495805e50225027530` (verified ancestor of this branch) |
 | **Branch** | `feat/store-ui-5-customer-account` |
-| **Head SHA** | `ca1a983c0f8006bc5b69e52db1d199e9683787ac` |
+| **Head SHA** | pending round 5 commit |
 | **PR** | [#868](https://github.com/safwan5001-source/Nebrax/pull/868) |
 
 `git merge-base --is-ancestor 30979a1bb499cfe8b0e656495805e50225027530 HEAD` holds.
@@ -642,8 +642,89 @@ Mobile set was not regenerated.
 | **Round 4 Head** | `ca1a983c0f8006bc5b69e52db1d199e9683787ac` |
 | **PR** | [#868](https://github.com/safwan5001-source/Nebrax/pull/868) — open, not merged |
 
-## 28. Next step
+## 28. Next step after round 4
 
-Owner visual review of correction round 4 (desktop 1440 composition).
+Owner visual review of correction round 4 accepted Addresses / Payment
+direction as improved and withheld approval for remaining desktop
+composition (Profile still too light; short pages still reading as small
+content in a large 1440 canvas). A fifth, desktop-only final polish follows.
+
+## 29. Visual correction round 5 (final desktop polish)
+
+Desktop 1440 only. No mobile redesign, no MobileBottomNav change, no
+Orders / Order Detail redesign, no contract, capability, auth, tenant,
+accounting, cart, checkout, or catalog change. No min-height spacer, no
+empty cards, no fake metrics, no new copy keys.
+
+Order Detail remains the density / hierarchy reference. Its content and
+business semantics are untouched.
+
+| Finding | Correction |
+|---|---|
+| Profile was the weakest 1440 screen: a 2-column stacked form whose ~488px fields read as an enlarged mobile form in unused canvas | Desktop settings rows. Each field is `label (11–16rem) \| control (max-w-md = 448px)` with hairlines spanning the full 1008px main column. Fields are not stretched. Mobile stays stacked (`sm:grid-cols-2` for first/last; email/phone 1-col until `lg`). |
+| Profile header had no supporting line, so the workspace had no measure | Desktop-only email identity under the title (`lg:block`), matching Order Detail’s title + meta. Not shown on mobile. |
+| Short-page empty space felt accidental | Top rhythm, not a spacer. Profile form `lg:mt-0` continues from the header hairline as one settings list. Addresses / Payment fold the gated caption into the desktop header (title + caption + action) and follow with `lg:mt-6` instead of notice-then-`lg:mt-8`. Remaining viewport is ordinary page background. |
+| Addresses / Payment card hierarchy was already right | Unchanged: same two cards, same padding, same Default chip, same footer rule, same refuse path. Cards stay 492×282 and 492×219. |
+
+**Capability classification (unchanged):** Addresses and Payment methods remain **DESIGN_ONLY / GATED**. Add / Edit / Remove still `refuse()`, write no storage, report no success. No brand, no card field, no invented API.
+
+**Mobile.** Untouched. 390 inspect: aside `display:none`, first-name input 358, header `border-bottom-width: 0px`, `scrollWidth === clientWidth`. MobileBottomNav not edited.
+
+**Orders / order detail.** Not edited.
+
+**1440 verification (Playwright Chromium, no overflow):**
+
+| Surface | Sidebar | Main | Content |
+|---|---|---|---|
+| AR profile | 240 at x=1128 | 1008 at x=72 | form 1008, label 256 + gap 40 + field 448. RTL: label at inline-start |
+| AR addresses | 240 at x=1128 | 1008 at x=72 | cards 492 × 282 (unchanged size), y=152 |
+| AR payment | 240 at x=1128 | 1008 at x=72 | cards 492 × 219 (unchanged size), y=152 |
+
+`scrollWidth === clientWidth` (1440) on every capture. 390 profile: no overflow.
+
+**Changed files**
+
+- `storefront/src/components/account/AccountProfileForm.tsx`
+- `storefront/src/components/account/AccountPasswordField.tsx` (optional `className` / `controlClassName` only; login/register visuals unchanged)
+- `storefront/src/components/account/AccountAddresses.tsx`
+- `storefront/src/components/account/AccountPaymentMethods.tsx`
+- `docs/plans/store/STORE-UI-5-IMPLEMENTATION-REPORT.md`
+- `docs/plans/store/store-ui-5-visual-qa/desktop-1440-ar-profile.png`
+- `docs/plans/store/store-ui-5-visual-qa/desktop-1440-ar-addresses.png`
+- `docs/plans/store/store-ui-5-visual-qa/desktop-1440-ar-payment.png`
+
+**Tests**
+
+```
+pnpm exec vitest run src/components/account  →  8 files, 25 tests passed
+pnpm test                                     →  72 files, 528 tests passed
+pnpm exec biome check (changed account files) →  4 files, no fixes applied
+pnpm exec tsc --noEmit                        →  clean
+pnpm build                                    →  Compiled successfully in 33.6s; TypeScript 13.9s; 68/68 static pages
+```
+
+No locale key changes. Architecture guards unchanged (no Spree SDK, no brands, no browser storage, no fake success, no `<Input>` on payment methods).
+
+Sitemap `fetch failed` / `ECONNREFUSED` against the local Commerce API is the same local-backend-absent warning as prior storefront builds.
+
+**Visual QA (this round, 1440 AR only)** in `docs/plans/store/store-ui-5-visual-qa/`:
+
+- `desktop-1440-ar-profile.png`
+- `desktop-1440-ar-addresses.png`
+- `desktop-1440-ar-payment.png`
+
+**Git**
+
+| | |
+|---|---|
+| **Base SHA** | `30979a1bb499cfe8b0e656495805e50225027530` |
+| **Round 4 Head** | `ca1a983c0f8006bc5b69e52db1d199e9683787ac` / docs `b5e0f63c` |
+| **Round 5 Head** | pending |
+| **PR** | [#868](https://github.com/safwan5001-source/Nebrax/pull/868) — open, not merged |
+
+## 30. Next step
+
+Owner visual review of correction round 5 (final desktop 1440 polish).
 On approval, merge. No merge and no deploy until then.
+
 

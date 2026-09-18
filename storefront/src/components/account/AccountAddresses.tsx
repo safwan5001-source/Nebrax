@@ -51,16 +51,22 @@ export function AccountAddresses() {
 
   return (
     <div>
-      <header className="flex flex-wrap items-end justify-between gap-3 lg:items-center lg:border-b lg:border-store-border lg:pb-5">
+      <header className="flex flex-wrap items-end justify-between gap-3 lg:grid lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start lg:gap-x-3 lg:border-b lg:border-store-border lg:pb-5">
         <h1 className="text-xl font-bold text-store-foreground lg:text-2xl">
           {t("addresses")}
         </h1>
         <Button type="button" variant="outline" size="sm" onClick={refuse}>
           {t("addNewAddress")}
         </Button>
+        <div className="hidden lg:col-start-1 lg:row-start-2 lg:mt-1 lg:block">
+          <AccountGatedNotice
+            title={t("addressesNotEnabledTitle")}
+            body={t("addressesNotEnabledBody")}
+          />
+        </div>
       </header>
 
-      <div className="mt-2 lg:mt-4">
+      <div className="mt-2 lg:hidden">
         <AccountGatedNotice
           title={t("addressesNotEnabledTitle")}
           body={t("addressesNotEnabledBody")}
@@ -75,7 +81,7 @@ export function AccountAddresses() {
 
       <ul
         aria-label={t("addressCardShape")}
-        className="mt-5 grid grid-cols-1 gap-3 lg:mt-8 lg:grid-cols-2 lg:gap-6"
+        className="mt-5 grid grid-cols-1 gap-3 lg:mt-6 lg:grid-cols-2 lg:gap-6"
       >
         {ADDRESS_FIXTURES.map((fixture) => (
           <li key={fixture.id}>
