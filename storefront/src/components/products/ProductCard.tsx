@@ -3,9 +3,11 @@
 import type { Product } from "@spree/sdk";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { memo } from "react";
+import { memo, useState } from "react";
 import { HiddenPricePrompt } from "@/components/products/HiddenPricePrompt";
+import { WishlistButton } from "@/components/products/WishlistButton";
 import { ProductImage } from "@/components/ui/product-image";
+import { useCart } from "@/contexts/CartContext";
 import { trackSelectItem } from "@/lib/analytics/gtm";
 
 interface ProductCardProps {
@@ -31,6 +33,8 @@ export const ProductCard = memo(function ProductCard({
   currency,
 }: ProductCardProps) {
   const t = useTranslations("products");
+  const { addItem, surface } = useCart();
+  const [adding, setAdding] = useState(false);
   const imageUrl = product.thumbnail_url || null;
 
   // Current display price
@@ -94,6 +98,10 @@ export const ProductCard = memo(function ProductCard({
             {t("sale")}
           </span>
         )}
+        <WishlistButton
+          productId={product.id}
+          className="absolute top-2 end-2"
+        />
       </div>
 
       {/* Content */}
@@ -141,12 +149,76 @@ export const ProductCard = memo(function ProductCard({
               {strikethroughPrice}
             </span>
           )}
-          {!product.purchasable && (
+          {/*
+            Only where the action line below is absent, which is the wholesale
+            surface. Otherwise the card said "out of stock" twice.
+          */}
+          {!product.purchasable && surface === "wholesale" && (
             <span className="text-[0.625rem] font-medium text-store-muted-foreground">
               {t("outOfStock")}
             </span>
           )}
         </div>
+
+        {/*
+          One action line, kept deliberately light: a single full-width control
+          at the foot of the card, no nested footer surface and no icon, so the
+          image still leads and a two-column phone grid stays readable.
+
+          The wholesale surface is untouched — it sells real Spree variants and
+          its listing has no safe single identifier to add, so its cards stay
+          link-only exactly as before.
+        */}
+        {surface !== "wholesale" && (
+          <div className="relative z-10 mt-2.5">
+            {!product.purchasable ? (
+              <span className="block rounded-store border border-store-border px-3 py-1.5 text-center text-xs font-medium text-store-muted-foreground">
+                {t("outOfStock")}
+              </span>
+            ) : isVariantManaged ? (
+              /*
+                Never adds the parent: a variant-managed product has no sellable
+                identity of its own, so the card sends the shopper to the detail
+                page where a real variant can be resolved.
+              */
+              <Link
+                href={`${basePath}/products/${product.slug}${categoryId ? `?category_id=${categoryId}` : ""}`}
+                className="block rounded-store border border-store-primary px-3 py-1.5 text-center text-xs font-bold text-store-primary transition-colors hover:bg-store-primary-soft"
+              >
+                {t("selectOptions")}
+              </Link>
+            ) : (
+              <button
+                type="button"
+                className="block w-full rounded-store bg-store-primary px-3 py-1.5 text-xs font-bold text-store-primary-foreground transition-colors hover:bg-store-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-store-foreground disabled:opacity-60"
+                // Guards a second submit while the first is in flight; the
+                // server remains the authority on whether either succeeds.
+                disabled={adding}
+                onClick={async (event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  if (adding) return;
+                  setAdding(true);
+                  try {
+                    // Product id and quantity only. No variant (this branch is
+                    // the simple product), no price — the backend resolves it.
+                    await addItem(product.id, 1, "base", null);
+                  } catch {
+                    // `CartContext` already surfaces failures through its own
+                    // toast, and it is the single error channel. Catching here
+                    // keeps a rejection from escaping the handler unhandled;
+                    // the card reports nothing, and above all never reports a
+                    // success the server refused.
+                  } finally {
+                    setAdding(false);
+                  }
+                }}
+              >
+                {adding ? t("adding") : t("addToCart")}
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

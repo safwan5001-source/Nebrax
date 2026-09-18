@@ -200,7 +200,9 @@
     "optionFilterChip": "{filter}: {value}",
     "pricedByOption": "Precio según la opción",
     "selectOptions": "Elegir opciones",
-    "priceFromLabel": "Desde"
+    "priceFromLabel": "Desde",
+    "addToFavorites": "Añadir a favoritos",
+    "removeFromFavorites": "Quitar de favoritos"
   },
   "navigation": {
     "home": "Inicio",

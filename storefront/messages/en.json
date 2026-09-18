@@ -150,7 +150,7 @@
     "productCount": "{count, plural, one {# product} other {# products}}",
     "sale": "Sale",
     "outOfStockVariant": "(Out of stock)",
-    "addToCart": "Add to Cart",
+    "addToCart": "Add to cart",
     "adding": "Adding...",
     "description": "Description",
     "details": "Details",
@@ -200,7 +200,9 @@
     "optionFilterChip": "{filter}: {value}",
     "pricedByOption": "Priced by option",
     "selectOptions": "Select options",
-    "priceFromLabel": "From"
+    "priceFromLabel": "From",
+    "addToFavorites": "Add to favorites",
+    "removeFromFavorites": "Remove from favorites"
   },
   "navigation": {
     "home": "Home",

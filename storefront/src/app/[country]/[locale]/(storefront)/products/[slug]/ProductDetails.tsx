@@ -11,6 +11,7 @@ import { HiddenPricePrompt } from "@/components/products/HiddenPricePrompt";
 import { MediaGallery } from "@/components/products/MediaGallery";
 import { ProductCustomFields } from "@/components/products/ProductCustomFields";
 import { VariantPicker } from "@/components/products/VariantPicker";
+import { WishlistButton } from "@/components/products/WishlistButton";
 import { Button } from "@/components/ui/button";
 import { useCart } from "@/contexts/CartContext";
 import { useHiddenPricing } from "@/contexts/HiddenPricingContext";
@@ -205,9 +206,16 @@ export function ProductDetails({ product, basePath }: ProductDetailsProps) {
             </p>
           )}
 
-          <h1 className="text-lg font-extrabold leading-snug text-store-foreground md:text-xl">
-            {product.name}
-          </h1>
+          <div className="flex items-start justify-between gap-3">
+            <h1 className="min-w-0 text-lg font-extrabold leading-snug text-store-foreground md:text-xl">
+              {product.name}
+            </h1>
+            <WishlistButton
+              productId={product.id}
+              variant="detail"
+              className="shrink-0"
+            />
+          </div>
 
           <div className="mt-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
             {displayPrice ? (
