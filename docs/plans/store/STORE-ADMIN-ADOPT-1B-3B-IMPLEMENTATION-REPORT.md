@@ -13,7 +13,8 @@ Custom Domain Edge/TLS provisioning is **not** in this slice. A verified custom 
 - Branch: `feat/store-admin-adopt-1b-3b-domain-lifecycle`
 - PR: [#861](https://github.com/safwan5001-source/Nebrax/pull/861)
 - Base SHA: `b79e51f89e51166310900d723cda203577ff3bca`
-- Head SHA: `dd91a81d75483ffa80c4072053233afa74cad92b`
+- Implementation SHA: `dd91a81d75483ffa80c4072053233afa74cad92b`
+- Head SHA at report time: see the PR head (docs-only follow-ups after the implementation commit do not change behavior)
 
 `main` had moved past #856 (`#859`, `#857`, `#860`). Those commits were kept; 1B-3A was not re-implemented.
 
@@ -137,18 +138,28 @@ Docs:
 | `domains.test.ts` + `messages.test.ts` + domains page tests | **46 passed** |
 | commerce-workspace + stores + domains | **76 passed** |
 
-PHP is not installed in this sandbox (kernel-only repo; tests assemble Laravel in CI). Backend counts below are filled from GitHub Actions after the PR is opened.
+PHP is not installed in this sandbox (kernel-only repo; tests assemble Laravel in CI). Backend counts below are from GitHub Actions on PR #861, SHA `a064db8834ba933dc9493c210ec2800c72af17b9`.
 
 ### Targeted backend (CI)
 
-- `CommerceWorkspaceMakePrimaryDomainApiTest`
-- `CommerceWorkspaceDisconnectCustomDomainApiTest`
-- `CommerceWorkspaceAddCustomDomainApiTest` (1B-3A regression)
-- `CommerceWorkspaceVerifyCustomDomainApiTest` (1B-3A regression)
-- `CommerceWorkspaceStorefrontDomainsApiTest` (1B-2 regression)
-- `StorefrontDomainResolutionApiTest` (resolver regression)
-- `CommerceModuleBoundaryTest`
-- `CommerceWorkspaceDomainLifecyclePostgresConcurrencyTest` (pgsql only; skipped on sqlite)
+Recorded from [CI run 35365149642](https://github.com/safwan5001-source/Nebrax/actions/runs/35365149642) (`pull_request` on HEAD `a064db8`).
+
+| Suite | sqlite | pgsql |
+|---|---|---|
+| `CommerceWorkspaceMakePrimaryDomainApiTest` | **15 passed** | **15 passed** |
+| `CommerceWorkspaceDisconnectCustomDomainApiTest` | **12 passed** | **12 passed** |
+| `CommerceWorkspaceAddCustomDomainApiTest` (1B-3A) | **11 passed** | **11 passed** |
+| `CommerceWorkspaceVerifyCustomDomainApiTest` (1B-3A) | **13 passed** | **13 passed** |
+| `CommerceWorkspaceStorefrontDomainsApiTest` (1B-2) | **11 passed** | **11 passed** |
+| `StorefrontDomainResolutionApiTest` | **17 passed** | **17 passed** |
+| `CommerceModuleBoundaryTest` | **3 passed** | **3 passed** |
+| `CommerceWorkspaceDomainLifecyclePostgresConcurrencyTest` | **skipped** (sqlite) | **1 passed** |
+
+### PostgreSQL
+
+`CommerceWorkspaceDomainLifecyclePostgresConcurrencyTest`: **PASS** on pgsql.
+
+Concurrent Make Primary on two eligible AWJ-managed domains leaves exactly one active primary.
 
 ### Typecheck
 
@@ -160,7 +171,13 @@ PHP is not installed in this sandbox (kernel-only repo; tests assemble Laravel i
 
 ### Full suite / CI
 
-Recorded from GitHub Actions on the PR.
+| Gate | Run | Result |
+|---|---|---|
+| `php artisan test (L11, sqlite)` | [35365149642](https://github.com/safwan5001-source/Nebrax/actions/runs/35365149642) job [105665671551](https://github.com/safwan5001-source/Nebrax/actions/runs/35365149642/job/105665671551) | **SUCCESS** — **42 skipped, 4112 passed** (25364 assertions) |
+| `php artisan test (L11, pgsql)` | [35365149642](https://github.com/safwan5001-source/Nebrax/actions/runs/35365149642) job [105665671919](https://github.com/safwan5001-source/Nebrax/actions/runs/35365149642/job/105665671919) | **SUCCESS** — **4154 passed** (25587 assertions), **0 failed, 0 skipped** |
+| `web build (Next.js)` | [35365149633](https://github.com/safwan5001-source/Nebrax/actions/runs/35365149633) | **SUCCESS** |
+
+pgsql − sqlite = 42, matching the sqlite skip count (includes the pgsql-only concurrency test).
 
 ## Migration
 
