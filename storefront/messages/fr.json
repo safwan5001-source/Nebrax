@@ -24,7 +24,8 @@
     "myAccount": "Mon compte",
     "giftCard": "Carte cadeau",
     "storeCredit": "Credit boutique",
-    "amountDue": "Montant du"
+    "amountDue": "Montant du",
+    "notAvailable": "Non disponible"
   },
   "header": {
     "categories": "Categories",
@@ -123,7 +124,18 @@
     "amountDue": "Montant du",
     "failedToAddItem": "Impossible d'ajouter cet article a votre panier. Veuillez reessayer.",
     "failedToUpdateItem": "Impossible de mettre a jour votre panier. Veuillez reessayer.",
-    "failedToRemoveItem": "Impossible de retirer cet article de votre panier. Veuillez reessayer."
+    "failedToRemoveItem": "Impossible de retirer cet article de votre panier. Veuillez reessayer.",
+    "unavailableItemsNotice": "Certains articles de votre panier ne sont plus disponibles. Vous pouvez les retirer pour continuer ; ils ne sont pas comptes dans votre total.",
+    "summary": {
+      "totalConfirmedOnPlacement": "Le montant final est confirme lors de la validation de la commande, une fois les frais de livraison ajoutes par la boutique."
+    },
+    "coupon": {
+      "label": "Code de reduction",
+      "placeholder": "Saisir le code",
+      "apply": "Appliquer",
+      "unavailable": "Les codes de reduction ne sont pas encore actives pour cette boutique, aucune reduction n'a ete appliquee.",
+      "notEnabledHint": "Les codes de reduction ne sont pas encore actives pour cette boutique."
+    }
   },
   "products": {
     "allProducts": "Tous les produits",
@@ -651,13 +663,14 @@
     "unavailableDescription": "Your cart or checkout session could not be found or has expired. Please start again from your cart.",
     "returnToCart": "Return to cart",
     "continueToReview": "Continue to review",
-    "editDetails": "Edit details",
     "completeOrder": "Complete order",
     "contact": {
       "heading": "Contact information",
       "name": "Full name",
       "phone": "Phone number",
-      "email": "Email (optional)"
+      "email": "Email (optional)",
+      "description": "We use these details to reach you about your order.",
+      "emailHint": "To send you the order details, if you'd like."
     },
     "address": {
       "heading": "Delivery address",
@@ -667,7 +680,9 @@
       "district": "District",
       "street": "Street",
       "postalCode": "Postal code",
-      "notes": "Notes (optional)"
+      "notes": "Notes (optional)",
+      "description": "Where should we deliver your order?",
+      "notesHint": "Anything that helps the driver find you."
     },
     "delivery": {
       "heading": "Delivery method",
@@ -675,11 +690,23 @@
         "pickup": "Pickup",
         "standard": "Standard delivery"
       },
-      "amountPending": "Calculated later"
+      "amountPending": "Calculated later",
+      "description": "Choose how you receive your order.",
+      "descriptions": {
+        "pickup": "You collect the order from the store yourself.",
+        "standard": "Delivered to the address you entered."
+      },
+      "pricingNotice": "No delivery charge is calculated on this screen. The store sets it and confirms it with your order."
     },
     "review": {
       "heading": "Review your order",
-      "lineDetail": "{quantity} × {unit}"
+      "description": "Check your order details before placing it.",
+      "edit": "Edit",
+      "editContact": "Edit contact details",
+      "editAddress": "Edit delivery address",
+      "editDelivery": "Edit delivery method",
+      "notSet": "Not set",
+      "commitmentNotice": "Placing the order records a commercial commitment to buy it. No payment is taken now; the store confirms the final amount and how to pay."
     },
     "reviewRequired": {
       "title": "Your order needs review",
@@ -698,8 +725,34 @@
     },
     "success": {
       "heading": "Order placed",
-      "orderNumber": "Order number: {number}",
-      "notPaidNote": "This order is confirmed as a commercial commitment. No payment has been processed."
-    }
+      "notPaidNote": "This order is confirmed as a commercial commitment. No payment has been processed.",
+      "orderNumberLabel": "Order number",
+      "print": "Print"
+    },
+    "steps": {
+      "contact": "Contact",
+      "address": "Address",
+      "delivery": "Delivery",
+      "payment": "Payment",
+      "review": "Review",
+      "confirmation": "Confirmation"
+    },
+    "stepCounter": "Step {current} of {total}",
+    "payment": {
+      "heading": "Payment",
+      "description": "How the order will be paid for.",
+      "notEnabledTitle": "Online payment is not enabled for this store yet",
+      "notEnabledBody": "Nothing is charged now. Placing the order records a commercial commitment, and the store contacts you to arrange payment.",
+      "notEnabledBadge": "Not enabled",
+      "plannedLabel": "Planned payment methods",
+      "methods": {
+        "card": "Card",
+        "bankTransfer": "Bank transfer",
+        "cashOnDelivery": "Cash on delivery"
+      }
+    },
+    "continueToAddress": "Continue to address",
+    "continueToDelivery": "Continue to delivery",
+    "continueToPayment": "Continue to payment"
   }
 }
