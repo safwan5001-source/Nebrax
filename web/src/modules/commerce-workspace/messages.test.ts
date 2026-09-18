@@ -24,6 +24,18 @@ describe('commerce workspace AR/EN labels', () => {
     expect(COMMERCE_WORKSPACE_MESSAGES.en.makePrimaryNotReady).toContain('HTTPS');
   });
 
+  it('distinguishes ownership verification from HTTPS activation labels', () => {
+    expect(COMMERCE_WORKSPACE_MESSAGES.ar.activateDomainAction).toBe('تفعيل النطاق');
+    expect(COMMERCE_WORKSPACE_MESSAGES.en.activateDomainAction).toBe('Activate Domain');
+    expect(COMMERCE_WORKSPACE_MESSAGES.ar.edgeStatusReady).toBe('HTTPS جاهز');
+    expect(COMMERCE_WORKSPACE_MESSAGES.en.edgeStatusReady).toBe('HTTPS Ready');
+    expect(COMMERCE_WORKSPACE_MESSAGES.ar.edgeStatusDnsRequired).toBe('يلزم إعداد DNS');
+    expect(COMMERCE_WORKSPACE_MESSAGES.en.edgeStatusTlsPending).toBe('Securing HTTPS');
+    expect(COMMERCE_WORKSPACE_MESSAGES.ar.ownershipTxtTitle).toContain('ملكية');
+    expect(COMMERCE_WORKSPACE_MESSAGES.en.edgeDnsHint).toContain('separate');
+    expect(COMMERCE_WORKSPACE_MESSAGES.en.edgeStatusReady).not.toBe(COMMERCE_WORKSPACE_MESSAGES.en.domainsOwnershipVerified);
+  });
+
   it('defaults to Arabic when the locale is not English', () => {
     expect(commerceWorkspaceMessage('ar', 'title')).toBe('التجارة الإلكترونية');
     expect(commerceWorkspaceMessage('en-US', 'title')).toBe('E-commerce');

@@ -15,27 +15,28 @@ import { commerceWorkspaceMessage } from '@/modules/commerce-workspace/messages'
 import { useCommerceStoreContext } from '@/modules/commerce-workspace/store-context';
 import { AddCustomDomainDialog } from '@/modules/commerce-workspace/add-domain-dialog';
 import {
+  activateCommerceDomainEdge,
+  canActivateDomainEdge,
   canDisconnectDomain,
   canMakeDomainPrimary,
+  canRefreshDomainEdge,
   disconnectCommerceCustomDomain,
+  edgeRefreshKind,
   fetchCommerceStorefrontDomains,
   makeCommerceDomainPrimary,
+  refreshCommerceDomainEdge,
   verifyCommerceCustomDomain,
   type CommerceStoreDomain,
   type CommerceStoreDomainCatalog,
+  type CommerceStoreDomainDnsRecord,
 } from '@/modules/commerce-workspace/domains';
 
 /**
- * STORE-ADMIN-ADOPT-1B-2 — شاشة «النطاقات»: قراءة نطاقات المتجر الحالي
- * (المُختار في `CommerceStoreProvider`). لا مُحدِّد متجر خاص بهذه الشاشة؛
- * المتجر المُختار مصدره السياق الموثوق وحده.
- *
- * STORE-ADMIN-ADOPT-1B-3A — يضيف فعلَين محروسَين بـ`commerce.manage` فقط:
- * «إضافة نطاق مخصَّص» و«تحقّق الآن».
- *
- * STORE-ADMIN-ADOPT-1B-3B — يضيف Make Primary فقط حين تسمح دلالات الخادم
- * (نطاق AWJ مؤهل)، وDisconnect لنطاق مخصَّص مع حوار تأكيد. نطاق مخصَّص
- * مُتحقَّق الملكية لا يُعرض كجاهز ولا يُتاح جعله أساسياً — لا دليل Edge/TLS.
+ * STORE-ADMIN-ADOPT-1B-2 — شاشة «النطاقات»: قراءة نطاقات المتجر الحالي.
+ * STORE-ADMIN-ADOPT-1B-3A — إضافة نطاق مخصَّص + تحقّق ملكية TXT.
+ * STORE-ADMIN-ADOPT-1B-3B — Make Primary لنطاق AWJ مؤهل فقط، وDisconnect لمخصَّص.
+ * CUSTOM-DOMAIN-EDGE-2 — تفعيل الحافة / تعليمات DNS / تحقّق HTTPS من سلطة
+ * `edge` الخادمية. نطاق مخصَّص جاهز HTTPS لا يُعرض له Make Primary.
  */
 export default function CommerceDomainsPage() {
   const locale = useLocale();
@@ -46,6 +47,8 @@ export default function CommerceDomainsPage() {
   const [addOpen, setAddOpen] = useState(false);
   const [verifyingId, setVerifyingId] = useState<string | null>(null);
   const [makingPrimaryId, setMakingPrimaryId] = useState<string | null>(null);
+  const [activatingId, setActivatingId] = useState<string | null>(null);
+  const [refreshingId, setRefreshingId] = useState<string | null>(null);
   const [disconnectTarget, setDisconnectTarget] = useState<CommerceStoreDomain | null>(null);
   const [disconnecting, setDisconnecting] = useState(false);
 
@@ -56,6 +59,16 @@ export default function CommerceDomainsPage() {
     if (!selectedStoreId) return;
     setDomainCatalog({ status: 'loading' });
     fetchCommerceStorefrontDomains(selectedStoreId).then(setDomainCatalog);
+  }
+
+  function replaceDomain(domain: CommerceStoreDomain) {
+    setDomainCatalog((prev) => {
+      if (prev.status !== 'ready') return prev;
+      return {
+        status: 'ready',
+        domains: prev.domains.map((row) => (row.id === domain.id ? domain : row)),
+      };
+    });
   }
 
   useEffect(() => {
@@ -101,6 +114,37 @@ export default function CommerceDomainsPage() {
       reload();
     } finally {
       setMakingPrimaryId(null);
+    }
+  }
+
+  async function handleActivate(domain: CommerceStoreDomain) {
+    if (!selectedStoreId || activatingId) return;
+    setActivatingId(domain.id);
+    try {
+      const result = await activateCommerceDomainEdge(selectedStoreId, domain.id);
+      if (!result.ok) {
+        showErrorToast(activateErrorMessage(result.reason, t));
+        return;
+      }
+      showSuccessToast(t('activateDomainSuccess'));
+      replaceDomain(result.domain);
+    } finally {
+      setActivatingId(null);
+    }
+  }
+
+  async function handleRefresh(domain: CommerceStoreDomain) {
+    if (!selectedStoreId || refreshingId) return;
+    setRefreshingId(domain.id);
+    try {
+      const result = await refreshCommerceDomainEdge(selectedStoreId, domain.id);
+      if (!result.ok) {
+        showErrorToast(refreshErrorMessage(result.reason, t));
+        return;
+      }
+      replaceDomain(result.domain);
+    } finally {
+      setRefreshingId(null);
     }
   }
 
@@ -153,8 +197,12 @@ export default function CommerceDomainsPage() {
           canManage={canManage}
           verifyingId={verifyingId}
           makingPrimaryId={makingPrimaryId}
+          activatingId={activatingId}
+          refreshingId={refreshingId}
           onVerify={handleVerify}
           onMakePrimary={handleMakePrimary}
+          onActivate={handleActivate}
+          onRefresh={handleRefresh}
           onDisconnect={setDisconnectTarget}
         />
       ) : null}
@@ -215,6 +263,36 @@ function makePrimaryErrorMessage(
   }
 }
 
+function activateErrorMessage(
+  reason: 'not_eligible' | 'conflict' | 'unavailable' | 'forbidden' | 'not_found' | 'failed',
+  t: (key: Parameters<typeof commerceWorkspaceMessage>[1]) => string,
+): string {
+  switch (reason) {
+    case 'not_eligible':
+      return t('activateDomainNotEligible');
+    case 'conflict':
+      return t('activateDomainConflict');
+    case 'unavailable':
+      return t('activateDomainUnavailable');
+    default:
+      return t('activateDomainFailed');
+  }
+}
+
+function refreshErrorMessage(
+  reason: 'not_activated' | 'unavailable' | 'forbidden' | 'not_found' | 'failed',
+  t: (key: Parameters<typeof commerceWorkspaceMessage>[1]) => string,
+): string {
+  switch (reason) {
+    case 'not_activated':
+      return t('refreshEdgeNotActivated');
+    case 'unavailable':
+      return t('refreshEdgeUnavailable');
+    default:
+      return t('refreshEdgeFailed');
+  }
+}
+
 function disconnectErrorMessage(
   reason: 'managed' | 'primary' | 'forbidden' | 'not_found' | 'failed',
   t: (key: Parameters<typeof commerceWorkspaceMessage>[1]) => string,
@@ -235,8 +313,12 @@ function DomainsPanel({
   canManage,
   verifyingId,
   makingPrimaryId,
+  activatingId,
+  refreshingId,
   onVerify,
   onMakePrimary,
+  onActivate,
+  onRefresh,
   onDisconnect,
 }: {
   catalog: CommerceStoreDomainCatalog;
@@ -244,8 +326,12 @@ function DomainsPanel({
   canManage: boolean;
   verifyingId: string | null;
   makingPrimaryId: string | null;
+  activatingId: string | null;
+  refreshingId: string | null;
   onVerify: (domain: CommerceStoreDomain) => void;
   onMakePrimary: (domain: CommerceStoreDomain) => void;
+  onActivate: (domain: CommerceStoreDomain) => void;
+  onRefresh: (domain: CommerceStoreDomain) => void;
   onDisconnect: (domain: CommerceStoreDomain) => void;
 }) {
   if (catalog.status === 'loading') {
@@ -287,8 +373,12 @@ function DomainsPanel({
             canManage={canManage}
             verifying={verifyingId === domain.id}
             makingPrimary={makingPrimaryId === domain.id}
+            activating={activatingId === domain.id}
+            refreshing={refreshingId === domain.id}
             onVerify={onVerify}
             onMakePrimary={onMakePrimary}
+            onActivate={onActivate}
+            onRefresh={onRefresh}
             onDisconnect={onDisconnect}
           />
         ))}
@@ -303,8 +393,12 @@ function DomainRow({
   canManage,
   verifying,
   makingPrimary,
+  activating,
+  refreshing,
   onVerify,
   onMakePrimary,
+  onActivate,
+  onRefresh,
   onDisconnect,
 }: {
   domain: CommerceStoreDomain;
@@ -312,14 +406,24 @@ function DomainRow({
   canManage: boolean;
   verifying: boolean;
   makingPrimary: boolean;
+  activating: boolean;
+  refreshing: boolean;
   onVerify: (domain: CommerceStoreDomain) => void;
   onMakePrimary: (domain: CommerceStoreDomain) => void;
+  onActivate: (domain: CommerceStoreDomain) => void;
+  onRefresh: (domain: CommerceStoreDomain) => void;
   onDisconnect: (domain: CommerceStoreDomain) => void;
 }) {
   const showVerifyNow = canManage && domain.type === 'custom' && domain.verificationStatus !== 'verified';
   const showMakePrimary = canManage && canMakeDomainPrimary(domain);
+  const showActivate = canManage && canActivateDomainEdge(domain);
+  const showRefresh = canManage && canRefreshDomainEdge(domain);
   const showDisconnect = canManage && canDisconnectDomain(domain);
-  const hasActions = showVerifyNow || showMakePrimary || showDisconnect;
+  const hasActions = showVerifyNow || showMakePrimary || showActivate || showRefresh || showDisconnect;
+  const showOwnershipTxt = Boolean(domain.verification && domain.verificationStatus !== 'verified');
+  const edgeRecords = domain.edge?.dnsInstructions.records ?? [];
+  const showEdgeDns = domain.type === 'custom' && domain.verificationStatus === 'verified' && edgeRecords.length > 0;
+  const showEdgeError = domain.type === 'custom' && domain.edge?.status === 'failed' && Boolean(domain.edge.lastError);
 
   return (
     <>
@@ -360,6 +464,28 @@ function DomainRow({
                     {makingPrimary ? t('makePrimarySaving') : t('makePrimaryAction')}
                   </Button>
                 ) : null}
+                {showActivate ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={activating}
+                    onClick={() => onActivate(domain)}
+                  >
+                    {activating ? t('activateDomainActivating') : t('activateDomainAction')}
+                  </Button>
+                ) : null}
+                {showRefresh ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={refreshing}
+                    onClick={() => onRefresh(domain)}
+                  >
+                    {refreshing ? t('refreshEdgeChecking') : refreshButtonLabel(domain, t)}
+                  </Button>
+                ) : null}
                 {showVerifyNow ? (
                   <Button type="button" variant="outline" size="sm" disabled={verifying} onClick={() => onVerify(domain)}>
                     {verifying ? t('verifyNowChecking') : t('verifyNowAction')}
@@ -377,15 +503,36 @@ function DomainRow({
           </TD>
         ) : null}
       </TR>
-      {domain.verification && domain.verificationStatus !== 'verified' ? (
+      {showOwnershipTxt && domain.verification ? (
         <TR>
           <TD colSpan={canManage ? 6 : 5} className="bg-muted/30">
-            <DnsInstructions verification={domain.verification} t={t} />
+            <OwnershipTxtInstructions verification={domain.verification} t={t} />
+          </TD>
+        </TR>
+      ) : null}
+      {showEdgeDns || showEdgeError ? (
+        <TR>
+          <TD colSpan={canManage ? 6 : 5} className="bg-muted/30">
+            <EdgeInstructions
+              records={edgeRecords}
+              lastError={showEdgeError ? domain.edge?.lastError ?? null : null}
+              t={t}
+            />
           </TD>
         </TR>
       ) : null}
     </>
   );
+}
+
+function refreshButtonLabel(
+  domain: CommerceStoreDomain,
+  t: (key: Parameters<typeof commerceWorkspaceMessage>[1]) => string,
+): string {
+  const kind = edgeRefreshKind(domain);
+  if (kind === 'dns') return t('refreshEdgeActionDns');
+  if (kind === 'https') return t('refreshEdgeActionHttps');
+  return t('refreshEdgeRetry');
 }
 
 function VerificationStatus({
@@ -395,16 +542,49 @@ function VerificationStatus({
   domain: CommerceStoreDomain;
   t: (key: Parameters<typeof commerceWorkspaceMessage>[1]) => string;
 }) {
-  if (domain.type === 'custom' && domain.verificationStatus === 'verified') {
+  if (domain.type !== 'custom') {
+    return <Badge tone={verificationTone(domain.verificationStatus)}>{verificationLabel(domain.verificationStatus, t)}</Badge>;
+  }
+
+  if (domain.verificationStatus !== 'verified') {
+    return <Badge tone={verificationTone(domain.verificationStatus)}>{verificationLabel(domain.verificationStatus, t)}</Badge>;
+  }
+
+  const status = domain.edge?.status ?? 'none';
+  return (
+    <div className="flex flex-col gap-1">
+      <Badge tone="positive">{t('domainsOwnershipVerified')}</Badge>
+      <EdgeStatusBadge status={status} readyAt={domain.edge?.readyAt ?? null} t={t} />
+    </div>
+  );
+}
+
+function EdgeStatusBadge({
+  status,
+  readyAt,
+  t,
+}: {
+  status: NonNullable<CommerceStoreDomain['edge']>['status'];
+  readyAt: string | null;
+  t: (key: Parameters<typeof commerceWorkspaceMessage>[1]) => string;
+}) {
+  if (status === 'ready') {
     return (
-      <div className="flex flex-col gap-1">
-        <Badge tone="positive">{t('domainsOwnershipVerified')}</Badge>
-        <Badge tone="warning">{t('domainsAwaitingActivation')}</Badge>
+      <div className="flex flex-col gap-0.5">
+        <Badge tone="positive">{t('edgeStatusReady')}</Badge>
+        {readyAt ? (
+          <span className="text-[11px] text-muted" dir="ltr">
+            {t('edgeReadyAt')} {readyAt}
+          </span>
+        ) : null}
       </div>
     );
   }
-
-  return <Badge tone={verificationTone(domain.verificationStatus)}>{verificationLabel(domain.verificationStatus, t)}</Badge>;
+  if (status === 'dns_required') return <Badge tone="warning">{t('edgeStatusDnsRequired')}</Badge>;
+  if (status === 'tls_pending') return <Badge tone="warning">{t('edgeStatusTlsPending')}</Badge>;
+  if (status === 'pending') return <Badge tone="muted">{t('edgeStatusPending')}</Badge>;
+  if (status === 'failed') return <Badge tone="negative">{t('edgeStatusFailed')}</Badge>;
+  return <Badge tone="warning">{t('domainsAwaitingActivation')}</Badge>;
 }
 
 function DisconnectConfirmDialog({
@@ -440,7 +620,7 @@ function DisconnectConfirmDialog({
   );
 }
 
-function DnsInstructions({
+function OwnershipTxtInstructions({
   verification,
   t,
 }: {
@@ -448,18 +628,104 @@ function DnsInstructions({
   t: (key: Parameters<typeof commerceWorkspaceMessage>[1]) => string;
 }) {
   return (
-    <div className="space-y-1.5 py-2 text-xs" dir="ltr">
-      <p className="font-medium text-text">{t('dnsInstructionsTitle')}</p>
-      <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
-        <dt className="text-muted">{t('dnsInstructionsType')}</dt>
-        <dd className="font-mono">TXT</dd>
-        <dt className="text-muted">{t('dnsInstructionsName')}</dt>
-        <dd className="break-all font-mono">{verification.recordName}</dd>
-        <dt className="text-muted">{t('dnsInstructionsValue')}</dt>
-        <dd className="break-all font-mono">{verification.recordValue}</dd>
-      </dl>
-      <p className="text-muted">{t('dnsInstructionsHint')}</p>
+    <div className="space-y-1.5 py-2 text-xs">
+      <p className="font-medium text-text">{t('ownershipTxtTitle')}</p>
+      <DnsRecordList
+        records={[{ type: 'TXT', name: verification.recordName, value: verification.recordValue }]}
+        t={t}
+      />
+      <p className="text-muted">{t('ownershipTxtHint')}</p>
     </div>
+  );
+}
+
+function EdgeInstructions({
+  records,
+  lastError,
+  t,
+}: {
+  records: CommerceStoreDomainDnsRecord[];
+  lastError: string | null;
+  t: (key: Parameters<typeof commerceWorkspaceMessage>[1]) => string;
+}) {
+  return (
+    <div className="space-y-1.5 py-2 text-xs">
+      {records.length > 0 ? (
+        <>
+          <p className="font-medium text-text">{t('edgeDnsTitle')}</p>
+          <DnsRecordList records={records} t={t} />
+          <p className="text-muted">{t('edgeDnsHint')}</p>
+        </>
+      ) : null}
+      {lastError ? (
+        <p className="rounded bg-negative/10 px-3 py-2 text-negative" role="alert">
+          {lastError}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function DnsRecordList({
+  records,
+  t,
+}: {
+  records: CommerceStoreDomainDnsRecord[];
+  t: (key: Parameters<typeof commerceWorkspaceMessage>[1]) => string;
+}) {
+  return (
+    <ul className="space-y-2">
+      {records.map((record, index) => (
+        <li
+          key={`${record.type}:${record.name}:${record.value}:${index}`}
+          className="rounded border border-border bg-background px-3 py-2"
+          dir="ltr"
+        >
+          <dl className="grid grid-cols-1 gap-1 sm:grid-cols-[auto_1fr_auto] sm:items-start sm:gap-x-3">
+            <dt className="text-muted">{t('dnsInstructionsType')}</dt>
+            <dd className="font-mono sm:col-span-2">{record.type}</dd>
+            <dt className="text-muted">{t('dnsInstructionsName')}</dt>
+            <dd className="break-all font-mono">{record.name}</dd>
+            <dd>
+              <CopyValueButton label={t('copyNameAction')} copiedLabel={t('copiedAction')} value={record.name} />
+            </dd>
+            <dt className="text-muted">{t('dnsInstructionsValue')}</dt>
+            <dd className="break-all font-mono">{record.value}</dd>
+            <dd>
+              <CopyValueButton label={t('copyValueAction')} copiedLabel={t('copiedAction')} value={record.value} />
+            </dd>
+          </dl>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function CopyValueButton({
+  label,
+  copiedLabel,
+  value,
+}: {
+  label: string;
+  copiedLabel: string;
+  value: string;
+}) {
+  const [copied, setCopied] = useState(false);
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch {
+      setCopied(false);
+    }
+  }
+
+  return (
+    <Button type="button" variant="outline" size="sm" onClick={() => void copy()} aria-label={label}>
+      {copied ? copiedLabel : label}
+    </Button>
   );
 }
 
