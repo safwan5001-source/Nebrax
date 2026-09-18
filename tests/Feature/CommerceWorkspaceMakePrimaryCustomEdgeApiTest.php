@@ -130,12 +130,12 @@ class CommerceWorkspaceMakePrimaryCustomEdgeApiTest extends TestCase
      * @test
      * @dataProvider nonReadyStatuses
      */
-    public function persisted_non_ready_statuses_are_rejected(string $status): void
+    public function persisted_non_ready_statuses_are_rejected(string $status, string $slug): void
     {
-        $slug = 'e3-'.$status;
         $auth = $this->registerTenant($slug, 'owner@'.$slug.'.test');
         $hostname = 'shop.'.$slug.'.example.com';
-        $binding = $this->edge->seedHostname($hostname, $status);
+        $binding = $this->edge->seedHostname($hostname, $status, 'dom-'.$slug);
+        $this->edge->setSnapshotForId($binding->providerId, $status);
         $seeded = $this->seedManagedAndCustom($auth['tenant_id'], $hostname, [
             'edge_status' => $status,
             'edge_provider' => 'railway',
@@ -153,22 +153,23 @@ class CommerceWorkspaceMakePrimaryCustomEdgeApiTest extends TestCase
         app(TenantContext::class)->forget();
     }
 
-    /** @return array<string, array{0: string}> */
+    /** @return array<string, array{0: string, 1: string}> */
     public static function nonReadyStatuses(): array
     {
         return [
-            'dns_required' => [EdgeSnapshot::STATUS_DNS_REQUIRED],
-            'tls_pending' => [EdgeSnapshot::STATUS_TLS_PENDING],
-            'failed' => [EdgeSnapshot::STATUS_FAILED],
+            'dns_required' => [EdgeSnapshot::STATUS_DNS_REQUIRED, 'e3dnsreq'],
+            'tls_pending' => [EdgeSnapshot::STATUS_TLS_PENDING, 'e3tlspend'],
+            'failed' => [EdgeSnapshot::STATUS_FAILED, 'e3failed'],
         ];
     }
 
     /** @test */
     public function persisted_ready_with_live_provider_not_ready_is_rejected_and_persists_the_refresh(): void
     {
-        $auth = $this->registerTenant('e3-stale-ready', 'owner@e3-stale-ready.test');
-        $hostname = 'shop.e3-stale-ready.example.com';
-        $binding = $this->edge->seedHostname($hostname, EdgeSnapshot::STATUS_TLS_PENDING);
+        $auth = $this->registerTenant('e3staleready', 'owner@e3staleready.test');
+        $hostname = 'shop.e3staleready.example.com';
+        $binding = $this->edge->seedHostname($hostname, EdgeSnapshot::STATUS_TLS_PENDING, 'dom-e3-stale-tls');
+        $this->edge->setSnapshotForId($binding->providerId, EdgeSnapshot::STATUS_TLS_PENDING);
         $seeded = $this->seedManagedAndCustom($auth['tenant_id'], $hostname, [
             'edge_status' => StorefrontDomain::EDGE_READY,
             'edge_provider' => 'railway',
@@ -187,6 +188,7 @@ class CommerceWorkspaceMakePrimaryCustomEdgeApiTest extends TestCase
         $this->assertTrue(StorefrontDomain::query()->find($seeded['managed']->id)->is_primary);
         app(TenantContext::class)->forget();
         $this->assertSame(0, $this->edge->provisionCalls);
+        $this->assertGreaterThan(0, $this->edge->fetchCalls);
     }
 
     /** @test */
