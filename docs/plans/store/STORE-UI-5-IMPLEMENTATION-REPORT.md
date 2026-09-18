@@ -13,8 +13,8 @@ visual sign-off and nothing beyond it.
 | **Latest main SHA** | `30979a1bb499cfe8b0e656495805e50225027530` — STORE-UI-4 merge (PR #866) |
 | **Base SHA** | `30979a1bb499cfe8b0e656495805e50225027530` (verified ancestor of this branch) |
 | **Branch** | `feat/store-ui-5-customer-account` |
-| **Head SHA** | recorded on the PR after push |
-| **PR** | recorded after open |
+| **Head SHA** | `7c77b1778e0cdee0611945cd2c049c8cb25c0277` |
+| **PR** | [#868](https://github.com/safwan5001-source/Nebrax/pull/868) |
 
 `git merge-base --is-ancestor 30979a1bb499cfe8b0e656495805e50225027530 HEAD` holds.
 
