@@ -340,7 +340,7 @@ class CommerceWorkspaceActivateEdgeApiTest extends TestCase
     }
 
     /** @test */
-    public function disconnect_after_activate_does_not_release_the_provider_in_edge_1(): void
+    public function disconnect_after_activate_releases_the_provider_then_deletes_the_local_row(): void
     {
         $auth = $this->registerTenant('edge-act-dc', 'owner@edge-act-dc.test');
         $seeded = $this->seedVerifiedCustom($auth['tenant_id'], 'shop.edge-act-dc.example.com');
@@ -349,11 +349,13 @@ class CommerceWorkspaceActivateEdgeApiTest extends TestCase
             ->postJson($this->path($seeded['storefront']->id, $seeded['domain']->id))
             ->assertOk();
 
+        $this->assertSame(0, $this->edge->releaseCalls);
+
         $this->withToken($auth['token'])
             ->deleteJson('/api/commerce/workspace/storefronts/'.$seeded['storefront']->id.'/domains/'.$seeded['domain']->id)
             ->assertOk();
 
-        $this->assertSame(0, $this->edge->releaseCalls);
+        $this->assertSame(1, $this->edge->releaseCalls);
         app(TenantContext::class)->set($auth['tenant_id']);
         $this->assertNull(StorefrontDomain::query()->find($seeded['domain']->id));
         app(TenantContext::class)->forget();

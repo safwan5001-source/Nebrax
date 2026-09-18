@@ -94,8 +94,9 @@ const railwayRecords = [
 
 /**
  * CUSTOM-DOMAIN-EDGE-2 — frontend coverage for Activate / DNS instructions /
- * Check DNS / Check HTTPS / Ready. Ownership TXT stays distinct. Custom
- * HTTPS-ready still has no Make Primary.
+ * Check DNS / Check HTTPS / Ready. Ownership TXT stays distinct.
+ * CUSTOM-DOMAIN-EDGE-3 — custom HTTPS-ready may show Make Primary; backend
+ * still live-refreshes and may reject.
  */
 describe('Commerce domains page — EDGE-2 activation UX', () => {
   afterEach(() => {
@@ -273,7 +274,7 @@ describe('Commerce domains page — EDGE-2 activation UX', () => {
     expect(screen.getByText('g05ns7.up.railway.app')).toBeTruthy();
   });
 
-  it('shows HTTPS Ready with ready_at and still no Make Primary for a custom domain', async () => {
+  it('shows HTTPS Ready with ready_at and Make Primary for a custom domain', async () => {
     apiMock.mockResolvedValueOnce({ data: { stores: [existingStore] } }).mockResolvedValueOnce({
       data: {
         domains: [
@@ -293,8 +294,74 @@ describe('Commerce domains page — EDGE-2 activation UX', () => {
     await screen.findByText('HTTPS Ready');
     expect(screen.getByText(/2026-01-03T00:00:00Z/)).toBeTruthy();
     expect(screen.getByText('Ownership verified')).toBeTruthy();
-    expect(screen.queryByRole('button', { name: 'Make Primary' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Make Primary' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Activate Domain' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Disconnect' })).toBeTruthy();
+  });
+
+  it('does not change local primary state when Make Primary is rejected by the backend', async () => {
+    class RejectError extends FakeApiError {}
+    apiMock
+      .mockResolvedValueOnce({ data: { stores: [existingStore] } })
+      .mockResolvedValueOnce({
+        data: {
+          domains: [
+            awjPrimary,
+            verifiedCustom({
+              status: 'ready',
+              dns_instructions: { records: railwayRecords },
+              ready_at: '2026-01-03T00:00:00Z',
+              checked_at: '2026-01-03T00:00:00Z',
+            }),
+          ],
+        },
+      })
+      .mockRejectedValueOnce(new RejectError(422, 'Domain ownership is verified, but HTTPS/domain activation is not complete yet.'));
+
+    renderPage();
+
+    await screen.findByText('HTTPS Ready');
+    fireEvent.click(screen.getByRole('button', { name: 'Make Primary' }));
+
+    await waitFor(() =>
+      expect(apiMock).toHaveBeenCalledWith('/commerce/workspace/storefronts/s1/domains/d2/make-primary', {
+        method: 'POST',
+        body: {},
+      }),
+    );
+    expect(screen.queryByText('s1.awj-commerce.test')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Make Primary' })).toBeTruthy();
+    expect(screen.getAllByText('Primary').length).toBeGreaterThan(0);
+  });
+
+  it('keeps the domain visible when disconnect fails with a provider outage', async () => {
+    apiMock
+      .mockResolvedValueOnce({ data: { stores: [existingStore] } })
+      .mockResolvedValueOnce({
+        data: {
+          domains: [
+            awjPrimary,
+            verifiedCustom({
+              status: 'ready',
+              dns_instructions: { records: railwayRecords },
+            }),
+          ],
+        },
+      })
+      .mockRejectedValueOnce(new FakeApiError(503, 'Could not disconnect the domain with the edge provider right now — try again later.'));
+
+    renderPage();
+
+    await screen.findAllByText('shop.example.com');
+    fireEvent.click(screen.getByRole('button', { name: 'Disconnect' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Disconnect domain' }));
+
+    await waitFor(() =>
+      expect(apiMock).toHaveBeenCalledWith('/commerce/workspace/storefronts/s1/domains/d2', {
+        method: 'DELETE',
+      }),
+    );
+    expect(screen.getAllByText('shop.example.com').length).toBeGreaterThan(0);
     expect(screen.getByRole('button', { name: 'Disconnect' })).toBeTruthy();
   });
 

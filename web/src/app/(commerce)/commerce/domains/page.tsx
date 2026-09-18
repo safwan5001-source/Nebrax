@@ -36,7 +36,9 @@ import {
  * STORE-ADMIN-ADOPT-1B-3A — إضافة نطاق مخصَّص + تحقّق ملكية TXT.
  * STORE-ADMIN-ADOPT-1B-3B — Make Primary لنطاق AWJ مؤهل فقط، وDisconnect لمخصَّص.
  * CUSTOM-DOMAIN-EDGE-2 — تفعيل الحافة / تعليمات DNS / تحقّق HTTPS من سلطة
- * `edge` الخادمية. نطاق مخصَّص جاهز HTTPS لا يُعرض له Make Primary.
+ * `edge` الخادمية.
+ * CUSTOM-DOMAIN-EDGE-3 — Make Primary لنطاق مخصَّص عندما يعرض الخادم `ready`.
+ * الواجهة لا تقرّر الجاهزية؛ الخادم يعيد سؤال المزوّد الحي.
  */
 export default function CommerceDomainsPage() {
   const locale = useLocale();
@@ -250,7 +252,7 @@ function verifyErrorMessage(
 }
 
 function makePrimaryErrorMessage(
-  reason: 'not_ready' | 'not_eligible' | 'forbidden' | 'not_found' | 'failed',
+  reason: 'not_ready' | 'not_eligible' | 'unavailable' | 'forbidden' | 'not_found' | 'failed',
   t: (key: Parameters<typeof commerceWorkspaceMessage>[1]) => string,
 ): string {
   switch (reason) {
@@ -258,6 +260,8 @@ function makePrimaryErrorMessage(
       return t('makePrimaryNotReady');
     case 'not_eligible':
       return t('makePrimaryNotEligible');
+    case 'unavailable':
+      return t('makePrimaryUnavailable');
     default:
       return t('makePrimaryFailed');
   }
@@ -294,7 +298,7 @@ function refreshErrorMessage(
 }
 
 function disconnectErrorMessage(
-  reason: 'managed' | 'primary' | 'forbidden' | 'not_found' | 'failed',
+  reason: 'managed' | 'primary' | 'unavailable' | 'forbidden' | 'not_found' | 'failed',
   t: (key: Parameters<typeof commerceWorkspaceMessage>[1]) => string,
 ): string {
   switch (reason) {
@@ -302,6 +306,8 @@ function disconnectErrorMessage(
       return t('disconnectManagedForbidden');
     case 'primary':
       return t('disconnectPrimaryForbidden');
+    case 'unavailable':
+      return t('disconnectUnavailable');
     default:
       return t('disconnectFailed');
   }

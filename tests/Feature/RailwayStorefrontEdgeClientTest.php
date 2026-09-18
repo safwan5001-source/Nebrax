@@ -219,4 +219,51 @@ class RailwayStorefrontEdgeClientTest extends TestCase
             $this->assertStringNotContainsString('Bearer', $e->getMessage());
         }
     }
+
+    /** @test */
+    public function release_sends_custom_domain_delete_and_does_not_leak_the_token(): void
+    {
+        Http::fake([self::ENDPOINT => Http::response(['data' => ['customDomainDelete' => true]], 200)]);
+
+        $this->client()->release('dom-1');
+
+        Http::assertSent(function (Request $request) {
+            $body = json_decode($request->body(), true);
+
+            return $request->url() === self::ENDPOINT
+                && str_contains((string) ($body['query'] ?? ''), 'customDomainDelete')
+                && ($body['variables']['id'] ?? null) === 'dom-1'
+                && ($request->header('Authorization')[0] ?? null) === 'Bearer '.self::TOKEN;
+        });
+    }
+
+    /** @test */
+    public function release_treats_already_gone_as_success(): void
+    {
+        Http::fake([self::ENDPOINT => Http::response([
+            'errors' => [['message' => 'Custom domain not found']],
+        ], 200)]);
+
+        $this->client()->release('dom-gone');
+
+        Http::assertSentCount(1);
+    }
+
+    /** @test */
+    public function release_timeout_fails_closed(): void
+    {
+        Http::fake(fn () => throw new ConnectionException('cURL error 28: timeout'));
+
+        $this->expectException(StorefrontEdgeUnavailableException::class);
+        $this->client()->release('dom-1');
+    }
+
+    /** @test */
+    public function release_5xx_fails_closed(): void
+    {
+        Http::fake([self::ENDPOINT => Http::response(['errors' => [['message' => 'internal']]], 500)]);
+
+        $this->expectException(StorefrontEdgeUnavailableException::class);
+        $this->client()->release('dom-1');
+    }
 }

@@ -5,6 +5,8 @@ namespace Tests\Feature;
 use App\Models\SalesChannel;
 use App\Models\Storefront;
 use App\Models\StorefrontDomain;
+use App\Services\Commerce\Edge\FakeStorefrontEdgeClient;
+use App\Services\Commerce\Edge\StorefrontEdgeClient;
 use App\Tenancy\TenantContext;
 use App\Tenancy\TenantScope;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -21,6 +23,15 @@ class CommerceWorkspaceDisconnectCustomDomainApiTest extends TestCase
 {
     use RefreshDatabase;
     use InteractsWithApi;
+
+    private FakeStorefrontEdgeClient $edge;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->edge = new FakeStorefrontEdgeClient();
+        $this->app->instance(StorefrontEdgeClient::class, $this->edge);
+    }
 
     private function path(string $storefrontId, string $domainId): string
     {
@@ -197,6 +208,8 @@ class CommerceWorkspaceDisconnectCustomDomainApiTest extends TestCase
         $this->withToken($a['token'])
             ->deleteJson($this->path($seededB['storefront']->id, $seededB['custom']->id))
             ->assertNotFound();
+
+        $this->assertSame(0, $this->edge->releaseCalls);
 
         app(TenantContext::class)->set($b['tenant_id']);
         $this->assertNotNull(StorefrontDomain::query()->find($seededB['custom']->id));

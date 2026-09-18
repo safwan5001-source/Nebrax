@@ -18,6 +18,8 @@ use Illuminate\Support\Facades\Log;
  */
 final class RailwayStorefrontEdgeClient implements StorefrontEdgeClient
 {
+    private bool $lastGraphqlSignalledGone = false;
+
     private const STATUS_SELECTION = <<<'GQL'
 status {
   dnsRecords {
@@ -126,10 +128,20 @@ GQL;
     public function release(string $providerId): void
     {
         $this->requiredConfig();
-        $this->graphql(
-            'mutation CustomDomainDelete($id: String!) { customDomainDelete(id: $id) }',
-            ['id' => $providerId],
-        );
+        try {
+            $this->graphql(
+                'mutation CustomDomainDelete($id: String!) { customDomainDelete(id: $id) }',
+                ['id' => $providerId],
+            );
+        } catch (StorefrontEdgeUnavailableException $e) {
+            if ($this->lastGraphqlSignalledGone) {
+                $this->lastGraphqlSignalledGone = false;
+
+                return;
+            }
+            throw $e;
+        }
+        $this->lastGraphqlSignalledGone = false;
     }
 
     /**
@@ -180,6 +192,7 @@ GQL;
     private function graphql(string $query, array $variables): array
     {
         $cfg = $this->requiredConfig();
+        $this->lastGraphqlSignalledGone = false;
 
         try {
             $response = Http::timeout(20)
@@ -236,6 +249,11 @@ GQL;
             $messages[] = strtolower((string) ($error['message'] ?? ''));
         }
         $joined = implode(' ', $messages);
+        if ($this->isGoneGraphqlMessage($joined)) {
+            $this->lastGraphqlSignalledGone = true;
+            throw new StorefrontEdgeUnavailableException('تعذّر إكمال العملية لدى مزوّد تفعيل النطاق.');
+        }
+        $this->lastGraphqlSignalledGone = false;
         if (str_contains($joined, 'not authorized') || str_contains($joined, 'unauthorized')) {
             throw new StorefrontEdgeUnavailableException('تعذّر الاتصال بمزوّد تفعيل النطاق. حاول مرة أخرى لاحقاً.');
         }
@@ -245,5 +263,15 @@ GQL;
 
         Log::warning('storefront.edge.graphql', ['count' => count($errors)]);
         throw new StorefrontEdgeUnavailableException('تعذّر إكمال العملية لدى مزوّد تفعيل النطاق.');
+    }
+
+    private function isGoneGraphqlMessage(string $joined): bool
+    {
+        return str_contains($joined, 'not found')
+            || str_contains($joined, 'does not exist')
+            || str_contains($joined, 'already deleted')
+            || str_contains($joined, 'already gone')
+            || str_contains($joined, 'no custom domain')
+            || str_contains($joined, 'could not find');
     }
 }
