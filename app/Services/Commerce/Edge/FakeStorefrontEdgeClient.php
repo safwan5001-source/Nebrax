@@ -33,6 +33,8 @@ final class FakeStorefrontEdgeClient implements StorefrontEdgeClient
 
     public bool $misconfigured = false;
 
+    public ?string $releaseFailure = null;
+
     /** أول N استدعاءات لـ findByHostname تُرجع null حتى مع وجود الصف. */
     public int $findMisses = 0;
 
@@ -92,6 +94,9 @@ final class FakeStorefrontEdgeClient implements StorefrontEdgeClient
     {
         $this->assertConfigured();
         $this->releaseCalls++;
+        if ($this->releaseFailure === 'unavailable') {
+            throw new StorefrontEdgeUnavailableException('تعذّر الاتصال بمزوّد تفعيل النطاق. حاول مرة أخرى لاحقاً.');
+        }
         $binding = $this->byId[$providerId] ?? null;
         unset($this->byId[$providerId]);
         if ($binding !== null) {

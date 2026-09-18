@@ -433,6 +433,16 @@ describe('make primary', () => {
       message: 'Domain ownership is verified, but HTTPS/domain activation is not complete yet.',
     });
   });
+
+  it('classifies a 503 as unavailable, distinct from not_ready', async () => {
+    apiMock.mockRejectedValueOnce(new FakeApiError(503, 'The edge provider is unavailable right now — try again later.'));
+
+    const result = await makeCommerceDomainPrimary('store-1', 'd2');
+
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('unreachable');
+    expect(result.reason).toBe('unavailable');
+  });
 });
 
 describe('disconnect custom domain', () => {
@@ -456,6 +466,16 @@ describe('disconnect custom domain', () => {
     expect(result.ok).toBe(false);
     if (result.ok) throw new Error('unreachable');
     expect(result.reason).toBe('primary');
+  });
+
+  it('classifies a 503 as unavailable and does not treat it as success', async () => {
+    apiMock.mockRejectedValueOnce(new FakeApiError(503, 'Could not disconnect the domain with the edge provider right now — try again later.'));
+
+    const result = await disconnectCommerceCustomDomain('store-1', 'd2');
+
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('unreachable');
+    expect(result.reason).toBe('unavailable');
   });
 });
 
@@ -499,11 +519,11 @@ describe('frontend action eligibility — not a security boundary', () => {
     },
   };
 
-  it('allows Make Primary only for an eligible AWJ-managed domain', () => {
+  it('allows Make Primary for an eligible AWJ-managed domain and for a custom domain the server presents as ready', () => {
     expect(canMakeDomainPrimary(awjSecondary)).toBe(true);
     expect(canMakeDomainPrimary(awjPrimary)).toBe(false);
     expect(canMakeDomainPrimary(customVerified)).toBe(false);
-    expect(canMakeDomainPrimary(customReady)).toBe(false);
+    expect(canMakeDomainPrimary(customReady)).toBe(true);
   });
 
   it('allows Disconnect only for a custom domain', () => {

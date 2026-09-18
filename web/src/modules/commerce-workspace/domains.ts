@@ -271,17 +271,16 @@ function extractDomain(payload: unknown): CommerceStoreDomain | null {
 }
 
 /**
- * Make Primary is allowed by current server semantics only for an eligible
- * AWJ-managed domain. Custom domains stay fail-closed until Edge/TLS
- * readiness exists — verification is not that evidence.
+ * Make Primary: AWJ-managed verified active not-primary, or custom with
+ * server-presented `edge.status === 'ready'`. Frontend is not a security
+ * boundary — the backend re-checks the live provider.
  */
 export function canMakeDomainPrimary(domain: CommerceStoreDomain): boolean {
-  return (
-    domain.type === 'awj_subdomain' &&
-    domain.verificationStatus === 'verified' &&
-    domain.isActive &&
-    !domain.isPrimary
-  );
+  if (domain.verificationStatus !== 'verified' || !domain.isActive || domain.isPrimary) {
+    return false;
+  }
+  if (domain.type === 'awj_subdomain') return true;
+  return domain.type === 'custom' && domain.edge?.status === 'ready';
 }
 
 export function canDisconnectDomain(domain: CommerceStoreDomain): boolean {
@@ -404,7 +403,7 @@ export type MakeCommerceDomainPrimaryOutcome =
   | { ok: true; domain: CommerceStoreDomain }
   | {
       ok: false;
-      reason: 'not_ready' | 'not_eligible' | 'forbidden' | 'not_found' | 'failed';
+      reason: 'not_ready' | 'not_eligible' | 'unavailable' | 'forbidden' | 'not_found' | 'failed';
       message: string;
     };
 
@@ -431,7 +430,8 @@ export async function makeCommerceDomainPrimary(
 
 function classifyMakePrimaryFailure(
   error: unknown,
-): 'not_ready' | 'not_eligible' | 'forbidden' | 'not_found' | 'failed' {
+): 'not_ready' | 'not_eligible' | 'unavailable' | 'forbidden' | 'not_found' | 'failed' {
+  if (hasApiStatus(error, 503)) return 'unavailable';
   if (hasApiStatus(error, 403)) return 'forbidden';
   if (hasApiStatus(error, 404)) return 'not_found';
   if (hasApiStatus(error, 422)) {
@@ -445,7 +445,7 @@ export type DisconnectCommerceCustomDomainOutcome =
   | { ok: true }
   | {
       ok: false;
-      reason: 'managed' | 'primary' | 'forbidden' | 'not_found' | 'failed';
+      reason: 'managed' | 'primary' | 'unavailable' | 'forbidden' | 'not_found' | 'failed';
       message: string;
     };
 
@@ -469,7 +469,8 @@ export async function disconnectCommerceCustomDomain(
 
 function classifyDisconnectFailure(
   error: unknown,
-): 'managed' | 'primary' | 'forbidden' | 'not_found' | 'failed' {
+): 'managed' | 'primary' | 'unavailable' | 'forbidden' | 'not_found' | 'failed' {
+  if (hasApiStatus(error, 503)) return 'unavailable';
   if (hasApiStatus(error, 403)) return 'forbidden';
   if (hasApiStatus(error, 404)) return 'not_found';
   if (hasApiStatus(error, 422)) {

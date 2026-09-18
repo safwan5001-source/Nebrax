@@ -5,6 +5,8 @@ namespace Tests\Feature;
 use App\Models\SalesChannel;
 use App\Models\Storefront;
 use App\Models\StorefrontDomain;
+use App\Services\Commerce\Edge\FakeStorefrontEdgeClient;
+use App\Services\Commerce\Edge\StorefrontEdgeClient;
 use App\Tenancy\TenantContext;
 use App\Tenancy\TenantScope;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -21,6 +23,15 @@ class CommerceWorkspaceMakePrimaryDomainApiTest extends TestCase
 {
     use RefreshDatabase;
     use InteractsWithApi;
+
+    private FakeStorefrontEdgeClient $edge;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->edge = new FakeStorefrontEdgeClient();
+        $this->app->instance(StorefrontEdgeClient::class, $this->edge);
+    }
 
     private function path(string $storefrontId, string $domainId): string
     {
@@ -151,7 +162,7 @@ class CommerceWorkspaceMakePrimaryDomainApiTest extends TestCase
     }
 
     /** @test */
-    public function a_custom_domain_with_edge_ready_still_cannot_become_primary(): void
+    public function a_custom_domain_with_persisted_ready_still_cannot_become_primary_without_live_provider_ready(): void
     {
         $auth = $this->registerTenant('mp-custom-ready', 'owner@mp-custom-ready.test');
         $seeded = $this->seedTwoAwjDomains($auth['tenant_id'], 'mp-custom-ready');
@@ -164,17 +175,18 @@ class CommerceWorkspaceMakePrimaryDomainApiTest extends TestCase
             'edge_ready_at' => now(),
             'edge_checked_at' => now(),
         ]);
+        $this->edge->unknownIdsAreMissing = true;
 
         $res = $this->withToken($auth['token'])
             ->postJson($this->path($seeded['storefront']->id, $custom['domain']->id));
 
         $res->assertStatus(422);
         $this->assertStringContainsString('تفعيل', (string) $res->json('message'));
+        $this->assertSame(0, $this->edge->provisionCalls);
 
         app(TenantContext::class)->set($auth['tenant_id']);
         $this->assertFalse(StorefrontDomain::query()->find($custom['domain']->id)->is_primary);
         $this->assertTrue(StorefrontDomain::query()->find($seeded['primary']->id)->is_primary);
-        $this->assertSame(StorefrontDomain::EDGE_READY, StorefrontDomain::query()->find($custom['domain']->id)->edge_status);
         app(TenantContext::class)->forget();
     }
 

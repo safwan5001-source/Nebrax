@@ -204,8 +204,8 @@ class CommerceWorkspaceStorefrontsController extends ApiController
     }
 
     /**
-     * STORE-ADMIN-ADOPT-1B-3B — جعل نطاق مؤهل هو الأساسي. لا يقبل أي حقل
-     * سلطة من العميل. نطاق مخصَّص يُرفض فشلًا مغلقاً ما دام لا دليل Edge/TLS.
+     * STORE-ADMIN-ADOPT-1B-3B / CUSTOM-DOMAIN-EDGE-3 — جعل نطاق مؤهل هو الأساسي.
+     * لا يقبل أي حقل سلطة من العميل. نطاق مخصَّص يُعاد سؤال جاهزية المزوّد الحيّة.
      */
     public function makePrimaryDomain(
         Request $request,
@@ -221,6 +221,8 @@ class CommerceWorkspaceStorefrontsController extends ApiController
             $domain = $storefronts->makePrimaryForCurrentTenant($id, $domainId);
         } catch (CustomDomainNotReadyForPrimaryException|DomainNotEligibleForPrimaryException $e) {
             abort(422, $e->getMessage());
+        } catch (StorefrontEdgeMisconfiguredException|StorefrontEdgeUnavailableException $e) {
+            abort(503, $e->getMessage());
         }
 
         if ($domain === null) {
@@ -233,8 +235,8 @@ class CommerceWorkspaceStorefrontsController extends ApiController
     }
 
     /**
-     * STORE-ADMIN-ADOPT-1B-3B — فصل نطاق مخصَّص غير أساسي. نطاق AWJ مُدار
-     * أو أساسي حالي يُرفض. لا يقبل أي حقل سلطة من العميل.
+     * STORE-ADMIN-ADOPT-1B-3B / CUSTOM-DOMAIN-EDGE-3 — فصل نطاق مخصَّص غير أساسي.
+     * إطلاق المزوّد أولاً. نطاق AWJ مُدار أو أساسي حالي يُرفض قبل أي استدعاء مزوّد.
      */
     public function destroyDomain(
         Request $request,
@@ -250,6 +252,8 @@ class CommerceWorkspaceStorefrontsController extends ApiController
             $disconnected = $storefronts->disconnectCustomDomainForCurrentTenant($id, $domainId);
         } catch (DomainNotDisconnectableException $e) {
             abort(422, $e->getMessage());
+        } catch (StorefrontEdgeMisconfiguredException|StorefrontEdgeUnavailableException $e) {
+            abort(503, $e->getMessage());
         }
 
         if ($disconnected === null) {

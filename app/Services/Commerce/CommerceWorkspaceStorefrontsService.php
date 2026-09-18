@@ -349,18 +349,19 @@ final class CommerceWorkspaceStorefrontsService
     }
 
     /**
-     * STORE-ADMIN-ADOPT-1B-3B — جعل نطاق مؤهل هو الأساسي لمتجر المستأجر الحالي.
+     * STORE-ADMIN-ADOPT-1B-3B / CUSTOM-DOMAIN-EDGE-3 — جعل نطاق مؤهل هو الأساسي.
      *
-     * نطاق `custom` يُرفض دائماً حتى نهاية EDGE-3: EDGE-1 قد يحفظ
-     * `edge_status = ready` كذاكرة تخزين لشهادة Railway، لكن Make Primary
-     * يبقى فشلاً مغلقاً إلى أن يُعاد استعلام الشهادة الحية في EDGE-3.
+     * نطاق `custom`: لا يُوثَق بـ `edge_status = ready` المخزَّن. يُعاد سؤال
+     * المزوّد حيّاً خارج قفل DB، ثم تُعاد التحققات المحلية داخل المعاملة قبل
+     * `makePrimary()`. فشل النقل → 503 دون ترقية.
      * نطاق `awj_subdomain` موثَّق ونشط يُحوَّل عبر `StorefrontDomain::makePrimary()`
-     * القائمة دون إعادة كتابة منطق التبديل.
+     * دون أي متطلب Railway.
      *
      * `null` = غير موجود / لا يخص هذا المستأجر أو هذا المتجر → 404 غير كاشف.
      *
-     * @throws CustomDomainNotReadyForPrimaryException نطاق مخصَّص — 422.
-     * @throws DomainNotEligibleForPrimaryException نطاق AWJ غير مؤهل — 422.
+     * @throws CustomDomainNotReadyForPrimaryException نطاق مخصَّص غير جاهز — 422.
+     * @throws DomainNotEligibleForPrimaryException نطاق غير مؤهل — 422.
+     * @throws StorefrontEdgeUnavailableException|StorefrontEdgeMisconfiguredException نقل المزوّد — 503.
      *
      * @return array{id: string, hostname: string, type: string, is_primary: bool, is_active: bool, verification_status: string, verification: array{method: string, record_name: string, record_value: string, verified_at: ?string}|null}|null
      */
@@ -376,23 +377,94 @@ final class CommerceWorkspaceStorefrontsService
             return null;
         }
 
-        return DB::transaction(function () use ($storefront, $domainId, $tenantId) {
+        $inspection = DB::transaction(function () use ($storefront, $domainId, $tenantId) {
+            $domain = $this->lockedDomainForStorefront($storefront->id, $domainId, $tenantId);
+            if ($domain === null) {
+                return ['kind' => 'missing'];
+            }
+
+            if ($domain->type !== StorefrontDomain::TYPE_CUSTOM) {
+                if (! $domain->isVerified() || ! $domain->is_active) {
+                    throw new DomainNotEligibleForPrimaryException(
+                        'هذا النطاق غير مؤهل ليكون النطاق الأساسي.'
+                    );
+                }
+
+                if (! $domain->is_primary) {
+                    $domain->makePrimary();
+                }
+
+                return ['kind' => 'awj', 'presented' => $this->presentDomain($domain->refresh())];
+            }
+
+            if (! $domain->isVerified()) {
+                throw new CustomDomainNotReadyForPrimaryException(
+                    'لا يمكن جعل هذا النطاق أساسياً قبل اكتمال التحقّق وتفعيل HTTPS.'
+                );
+            }
+            if (! $domain->is_active) {
+                throw new DomainNotEligibleForPrimaryException(
+                    'هذا النطاق غير مؤهل ليكون النطاق الأساسي.'
+                );
+            }
+
+            $provider = is_string($domain->edge_provider) ? $domain->edge_provider : '';
+            if ($provider !== '' && $provider !== 'railway') {
+                throw new CustomDomainNotReadyForPrimaryException(
+                    'تم التحقق من ملكية النطاق، لكن تفعيل HTTPS/النطاق لم يكتمل بعد.'
+                );
+            }
+
+            $providerId = is_string($domain->edge_provider_id) && $domain->edge_provider_id !== ''
+                ? $domain->edge_provider_id
+                : null;
+
+            return [
+                'kind' => 'custom',
+                'hostname' => $domain->hostname,
+                'provider_id' => $providerId,
+            ];
+        });
+
+        if (($inspection['kind'] ?? null) === 'missing') {
+            return null;
+        }
+        if (($inspection['kind'] ?? null) === 'awj') {
+            return $inspection['presented'];
+        }
+
+        $observation = $this->observeLiveCustomEdge(
+            $inspection['hostname'],
+            $inspection['provider_id'],
+        );
+
+        return DB::transaction(function () use ($storefront, $domainId, $tenantId, $observation) {
             $domain = $this->lockedDomainForStorefront($storefront->id, $domainId, $tenantId);
             if ($domain === null) {
                 return null;
             }
 
-            if ($domain->type === StorefrontDomain::TYPE_CUSTOM) {
+            if ($domain->type !== StorefrontDomain::TYPE_CUSTOM || ! $domain->isVerified() || ! $domain->is_active) {
                 throw new CustomDomainNotReadyForPrimaryException(
-                    $domain->isVerified()
-                        ? 'تم التحقق من ملكية النطاق، لكن تفعيل HTTPS/النطاق لم يكتمل بعد.'
-                        : 'لا يمكن جعل هذا النطاق أساسياً قبل اكتمال التحقّق وتفعيل HTTPS.'
+                    'تم التحقق من ملكية النطاق، لكن تفعيل HTTPS/النطاق لم يكتمل بعد.'
                 );
             }
 
-            if (! $domain->isVerified() || ! $domain->is_active) {
-                throw new DomainNotEligibleForPrimaryException(
-                    'هذا النطاق غير مؤهل ليكون النطاق الأساسي.'
+            $applyId = $observation['provider_id'] ?? '';
+            if ($applyId === '') {
+                $applyId = is_string($domain->edge_provider_id) ? $domain->edge_provider_id : '';
+            }
+            $this->applyEdgeSnapshot($domain, $observation['snapshot'], $applyId);
+            $domain->refresh();
+
+            if (
+                $observation['snapshot']->missing
+                || $observation['provider_id'] === null
+                || $observation['provider_id'] === ''
+                || $domain->edge_status !== StorefrontDomain::EDGE_READY
+            ) {
+                throw new CustomDomainNotReadyForPrimaryException(
+                    'تم التحقق من ملكية النطاق، لكن تفعيل HTTPS/النطاق لم يكتمل بعد.'
                 );
             }
 
@@ -405,20 +477,16 @@ final class CommerceWorkspaceStorefrontsService
     }
 
     /**
-     * STORE-ADMIN-ADOPT-1B-3B — فصل نطاق مخصَّص غير أساسي. حذف فعلي (الجدول
-     * بلا SoftDeletes عمداً — تحرير `hostname` فوراً). بعد الحذف لا يبقى الصف
-     * قابلاً للحسم العام (`ResolveStorefrontDomain` يبحث بالـ hostname).
+     * STORE-ADMIN-ADOPT-1B-3B / CUSTOM-DOMAIN-EDGE-3 — فصل نطاق مخصَّص غير
+     * أساسي. إطلاق المزوّد أولاً (أو تأكيد الغياب السلطوي عبر hostname داخل
+     * خدمة المتجر المضبوطة)، ثم حذف الصف المحلي. فشل النقل يُبقي الصف.
      *
-     * نطاق AWJ مُدار أو نطاق أساسي حالي → رفض فشلٍ مغلق، بلا إعادة تعيين
-     * أساسي ضمن هذا المسار.
-     *
-     * CUSTOM-DOMAIN-EDGE-1: لا يُستدعى Railway `release` هنا. فصل صفّ DB
-     * وحده يترك ربط Railway يتيماً إلى أن تُغلق EDGE-3 المسار provider-first.
-     * سلوك #861 محفوظ عمداً.
+     * نطاق AWJ مُدار أو نطاق أساسي حالي → رفض فشلٍ مغلق قبل أي استدعاء مزوّد.
      *
      * `null` = غير موجود / لا يخص هذا المستأجر أو هذا المتجر → 404 غير كاشف.
      *
      * @throws DomainNotDisconnectableException نطاق غير قابل للفصل — 422.
+     * @throws StorefrontEdgeUnavailableException|StorefrontEdgeMisconfiguredException نقل المزوّد — 503.
      */
     public function disconnectCustomDomainForCurrentTenant(string $storefrontId, string $domainId): ?bool
     {
@@ -431,6 +499,36 @@ final class CommerceWorkspaceStorefrontsService
         if ($storefront === null || $storefront->tenant_id !== $tenantId) {
             return null;
         }
+
+        $inspection = DB::transaction(function () use ($storefront, $domainId, $tenantId) {
+            $domain = $this->lockedDomainForStorefront($storefront->id, $domainId, $tenantId);
+            if ($domain === null) {
+                return ['kind' => 'missing'];
+            }
+
+            if ($domain->type !== StorefrontDomain::TYPE_CUSTOM) {
+                throw new DomainNotDisconnectableException(
+                    'لا يمكن فصل نطاق مُدار من أَوْج.'
+                );
+            }
+
+            if ($domain->is_primary) {
+                throw new DomainNotDisconnectableException(
+                    'لا يمكن فصل النطاق الأساسي الحالي — حوّل النطاق الأساسي أولاً.'
+                );
+            }
+
+            return [
+                'kind' => 'custom',
+                'hostname' => $domain->hostname,
+            ];
+        });
+
+        if (($inspection['kind'] ?? null) === 'missing') {
+            return null;
+        }
+
+        $this->releaseCustomEdgeBinding($inspection['hostname']);
 
         return DB::transaction(function () use ($storefront, $domainId, $tenantId) {
             $domain = $this->lockedDomainForStorefront($storefront->id, $domainId, $tenantId);
@@ -623,6 +721,51 @@ final class CommerceWorkspaceStorefrontsService
             'edge_checked_at' => now(),
             'edge_ready_at' => $readyAt,
         ])->save();
+    }
+
+    /**
+     * TOCTOU: استعلام المزوّد خارج قفل DB. لا يُنشئ موارد. يوفّق بالمعرّف
+     * المخزَّن ثم بالـ hostname داخل خدمة المتجر المضبوطة فقط.
+     *
+     * @return array{provider_id: ?string, snapshot: EdgeSnapshot}
+     */
+    private function observeLiveCustomEdge(string $hostname, ?string $providerId): array
+    {
+        if (is_string($providerId) && $providerId !== '') {
+            $snapshot = $this->edge->fetch($providerId);
+            if (! $snapshot->missing) {
+                return ['provider_id' => $providerId, 'snapshot' => $snapshot];
+            }
+        }
+
+        $existing = $this->edge->findByHostname($hostname);
+        if ($existing !== null) {
+            return ['provider_id' => $existing->providerId, 'snapshot' => $existing->snapshot];
+        }
+
+        return [
+            'provider_id' => null,
+            'snapshot' => new EdgeSnapshot(
+                EdgeSnapshot::STATUS_FAILED,
+                [],
+                'لم يعد نطاق الحافة موجوداً لدى المزوّد.',
+                true,
+            ),
+        ];
+    }
+
+    /**
+     * إطلاق ربط الحافة قبل الحذف المحلي. المصالحة بالـ hostname داخل خدمة
+     * المتجر فقط — لا يُحذف كائن مزوّد لا يطابق hostname هذا الصف.
+     */
+    private function releaseCustomEdgeBinding(string $hostname): void
+    {
+        $existing = $this->edge->findByHostname($hostname);
+        if ($existing === null) {
+            return;
+        }
+
+        $this->edge->release($existing->providerId);
     }
 
     /**
