@@ -438,6 +438,21 @@ final class CommerceWorkspaceStorefrontsService
             $inspection['provider_id'],
         );
 
+        DB::transaction(function () use ($storefront, $domainId, $tenantId, $observation) {
+            $domain = $this->lockedDomainForStorefront($storefront->id, $domainId, $tenantId);
+            if ($domain === null) {
+                return;
+            }
+            if ($domain->type !== StorefrontDomain::TYPE_CUSTOM) {
+                return;
+            }
+            $applyId = $observation['provider_id'] ?? '';
+            if ($applyId === '') {
+                $applyId = is_string($domain->edge_provider_id) ? $domain->edge_provider_id : '';
+            }
+            $this->applyEdgeSnapshot($domain, $observation['snapshot'], $applyId);
+        });
+
         return DB::transaction(function () use ($storefront, $domainId, $tenantId, $observation) {
             $domain = $this->lockedDomainForStorefront($storefront->id, $domainId, $tenantId);
             if ($domain === null) {
@@ -449,13 +464,6 @@ final class CommerceWorkspaceStorefrontsService
                     'تم التحقق من ملكية النطاق، لكن تفعيل HTTPS/النطاق لم يكتمل بعد.'
                 );
             }
-
-            $applyId = $observation['provider_id'] ?? '';
-            if ($applyId === '') {
-                $applyId = is_string($domain->edge_provider_id) ? $domain->edge_provider_id : '';
-            }
-            $this->applyEdgeSnapshot($domain, $observation['snapshot'], $applyId);
-            $domain->refresh();
 
             if (
                 $observation['snapshot']->missing
