@@ -12,7 +12,7 @@
 | **Latest main SHA** | `30979a1bb499cfe8b0e656495805e50225027530` — STORE-UI-4 merge (PR #866) |
 | **Base SHA** | `30979a1bb499cfe8b0e656495805e50225027530` (verified ancestor of this branch) |
 | **Branch** | `feat/store-ui-5-customer-account` |
-| **Head SHA** | round 4 — see §27 |
+| **Head SHA** | `ca1a983c0f8006bc5b69e52db1d199e9683787ac` |
 | **PR** | [#868](https://github.com/safwan5001-source/Nebrax/pull/868) |
 
 `git merge-base --is-ancestor 30979a1bb499cfe8b0e656495805e50225027530 HEAD` holds.
@@ -639,7 +639,7 @@ Mobile set was not regenerated.
 |---|---|
 | **Base SHA** | `30979a1bb499cfe8b0e656495805e50225027530` |
 | **Round 3 Head** | `5199ef7f` / docs `51068401` |
-| **Round 4 Head** | see commit after push |
+| **Round 4 Head** | `ca1a983c0f8006bc5b69e52db1d199e9683787ac` |
 | **PR** | [#868](https://github.com/safwan5001-source/Nebrax/pull/868) — open, not merged |
 
 ## 28. Next step
