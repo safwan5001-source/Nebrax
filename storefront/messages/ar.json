@@ -199,7 +199,8 @@
     "no": "لا",
     "optionFilterChip": "{filter}: {value}",
     "pricedByOption": "السعر حسب الخيار",
-    "selectOptions": "اختر الخيارات"
+    "selectOptions": "اختر الخيارات",
+    "priceFromLabel": "ابتداءً من"
   },
   "navigation": {
     "home": "الرئيسية",

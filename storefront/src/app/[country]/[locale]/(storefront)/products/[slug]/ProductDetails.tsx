@@ -183,8 +183,14 @@ export function ProductDetails({ product, basePath }: ProductDetailsProps) {
   return (
     <StoreContainer className="py-5 md:py-6">
       {/* The product leads. No marketing band above it. */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)] lg:gap-10">
-        <div className="lg:sticky lg:top-(--store-header-offset) lg:self-start">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,34rem)_minmax(0,1fr)] lg:gap-10">
+        {/*
+          The gallery is capped rather than left to fill its track. It is a
+          square, so an uncapped column made it ~880px tall at 1440 and pushed
+          the price and the purchase action below the fold — the opposite of
+          product-first.
+        */}
+        <div className="w-full lg:sticky lg:top-(--store-header-offset) lg:self-start">
           <MediaGallery
             images={galleryImages}
             productName={product.name}
@@ -192,7 +198,7 @@ export function ProductDetails({ product, basePath }: ProductDetailsProps) {
           />
         </div>
 
-        <div className="min-w-0">
+        <div className="min-w-0 lg:max-w-2xl">
           {product.categories?.[0]?.name && (
             <p className="mb-1 text-xs font-medium text-store-muted-foreground">
               {product.categories[0].name}
@@ -206,7 +212,28 @@ export function ProductDetails({ product, basePath }: ProductDetailsProps) {
           <div className="mt-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
             {displayPrice ? (
               <span className="text-xl font-black text-store-primary md:text-2xl">
-                {displayPrice}
+                {/*
+                  For a variant-managed product with nothing selected yet, the
+                  figure the API sends is its cheapest active variant — stating
+                  it bare would claim it is the price. Once a variant is chosen
+                  the figure is that variant's own, and the qualifier goes.
+                */}
+                {needsOptionChoice ? (
+                  <>
+                    <span className="me-1 text-sm font-semibold text-store-muted-foreground">
+                      {t("priceFromLabel")}
+                    </span>
+                    {/*
+                      Prices are always formatted in Arabic numerals by the
+                      adapter, so on the English storefront the qualifier and
+                      the figure are opposite directions. Isolating the figure
+                      keeps the two from reordering into each other.
+                    */}
+                    <bdi>{displayPrice}</bdi>
+                  </>
+                ) : (
+                  <bdi>{displayPrice}</bdi>
+                )}
               </span>
             ) : needsOptionChoice ? (
               <span className="text-sm font-medium text-store-muted-foreground">

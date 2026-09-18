@@ -199,7 +199,8 @@
     "no": "No",
     "optionFilterChip": "{filter}: {value}",
     "pricedByOption": "Precio según la opción",
-    "selectOptions": "Elegir opciones"
+    "selectOptions": "Elegir opciones",
+    "priceFromLabel": "Desde"
   },
   "navigation": {
     "home": "Inicio",
