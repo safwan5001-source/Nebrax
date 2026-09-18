@@ -11,7 +11,7 @@ EDGE-3 (custom Make Primary + provider-first Disconnect) is **not** in this slic
 - Latest `main` SHA used: `85e3dec6abd20e79707d2fcd68ddff90c4f9f3a9`
 - Confirmed ancestor of CUSTOM-DOMAIN-EDGE-1 / PR #864 merge SHA `85e3dec6abd20e79707d2fcd68ddff90c4f9f3a9`
 - Branch: `feat/custom-domain-edge-2-activation-ux`
-- PR: see GitHub (opened after this report is committed)
+- PR: [#867](https://github.com/safwan5001-source/Nebrax/pull/867)
 - Base SHA: `85e3dec6abd20e79707d2fcd68ddff90c4f9f3a9`
 - Head SHA: see the PR head
 
