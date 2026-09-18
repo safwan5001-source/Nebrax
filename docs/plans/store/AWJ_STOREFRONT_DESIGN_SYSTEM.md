@@ -566,10 +566,15 @@ missing contract behind each `DESIGN_ONLY` surface.
 
 ### STORE-UI-5 — Customer account
 
-Scope:
-- profile.
-- order history/detail.
-- wishlist/address/payment surfaces only where corresponding backend contracts exist.
+Scope, under the design-first reconciliation above:
+- profile (session identity; update uses the existing storefront session contract).
+- order history / detail / status presentation.
+- wishlist, addresses and saved payment methods designed even where the
+  backend contract is missing; those surfaces are visibly inert.
+- login / register / logout journey, visually aligned with the store.
+
+No invented account, order-list, address-book or saved-card API. Delivered —
+see `STORE-UI-5-IMPLEMENTATION-REPORT.md`.
 
 ### STORE-UI-6 — Merchant theme configuration / Store Customizer
 

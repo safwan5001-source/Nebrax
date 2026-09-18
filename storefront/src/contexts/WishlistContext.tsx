@@ -17,6 +17,8 @@ interface WishlistContextValue {
   toggle: (productId: string) => Promise<void>;
   /** False while the capability is `design_only` — nothing is persisted. */
   isLive: boolean;
+  /** Product ids favourited for the life of this page. Empty after a reload. */
+  favoriteIds: readonly string[];
 }
 
 const WishlistContext = createContext<WishlistContextValue | null>(null);
@@ -66,6 +68,7 @@ export function WishlistProvider({ children }: { children: React.ReactNode }) {
       stateFor: (productId: string) => states[productId] ?? "idle",
       toggle,
       isLive,
+      favoriteIds: Array.from(favorites),
     }),
     [favorites, states, toggle, isLive],
   );

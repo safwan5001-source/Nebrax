@@ -139,3 +139,106 @@ export const DELIVERY_PRICING_CAPABILITY = "design_only" as CapabilityState;
  * anywhere in this slice.
  */
 export const TAX_PRESENTATION_CAPABILITY = "deferred" as CapabilityState;
+
+/**
+ * Account order history.
+ *
+ * `design_only`: `store/v1` is an anonymous catalog/cart/checkout API
+ * (`routes/api_storefront.php`). Completing checkout returns one
+ * `CommerceOrder` in-session via `POST store/v1/checkout/complete`; there is
+ * no `GET store/v1/account/orders` (or any customer order-list route) to read
+ * that order back later. The leftover Spree `customer.orders.list` path is a
+ * different commerce backend and must not be presented as AWJ order history —
+ * its `payment_status` / `fulfillment_status` vocabulary does not exist on
+ * `CommerceOrder` (`draft` | `confirmed` only).
+ *
+ * The history surface is designed so the account does not have to be
+ * reopened when the contract lands. It never fabricates an order, a total,
+ * a payment state or a shipment state, and it never reads Spree orders onto
+ * the AWJ DTC surface.
+ *
+ * Missing backend contract, for later gap closure:
+ *   GET store/v1/account/orders → the shopper's CommerceOrders, in the
+ *                                 `serializeOrder()` shape, newest first
+ * plus an identity to hang them on: checkout today writes
+ * `CommerceOrder.customer_identity_id` as null because the storefront cart
+ * is an anonymous cookie. Listing orders is an identity problem first.
+ */
+export const ACCOUNT_ORDER_HISTORY_CAPABILITY =
+  "design_only" as CapabilityState;
+
+/**
+ * Account order lookup / detail.
+ *
+ * `design_only`: there is no `GET store/v1/account/orders/{id}` and no guest
+ * order-lookup route. Confirmation is in-session only (STORE-UI-4). The
+ * detail page is designed against `StorefrontOrder` (`serializeOrder()`) so
+ * it can light up without being redesigned. It must never call Spree
+ * `orders.get`, never title a CommerceOrder an invoice, and never offer
+ * Download Invoice / Tax Invoice / Receipt.
+ *
+ * Missing backend contract:
+ *   GET store/v1/account/orders/{id} → one CommerceOrder in the
+ *                                      `serializeOrder()` shape
+ * scoped to the authenticated customer (or a signed guest lookup token).
+ */
+export const ACCOUNT_ORDER_LOOKUP_CAPABILITY = "design_only" as CapabilityState;
+
+/**
+ * Fulfilment / tracking timeline on an order.
+ *
+ * `design_only`: `CommerceOrder.status` is `draft | confirmed`. Payment and
+ * fulfilment dimensions have not been built — the model says so. A timeline
+ * that marks a real order as shipped / out for delivery / delivered would be
+ * a commercial claim with no source. The designed timeline may mark
+ * **placed** when the authoritative status is `confirmed`; later steps stay
+ * visibly untracked.
+ *
+ * Missing backend contract: a fulfilment lifecycle on the order (and a
+ * storefront serializer for it) before any step past "placed" may light up.
+ */
+export const ACCOUNT_ORDER_STATUS_CAPABILITY = "design_only" as CapabilityState;
+
+/**
+ * Saved customer addresses / address book.
+ *
+ * `design_only`: checkout carries one free-text address per checkout
+ * (`PATCH store/v1/checkout/address`). `CommerceOrderSnapshot` is an
+ * immutable historical snapshot, not a reusable address book. There is no
+ * `store/v1` or `customer/v1` address-book route. The leftover Spree
+ * `customer.addresses` CRUD is a different backend and would persist
+ * addresses the AWJ checkout does not read.
+ *
+ * The book is designed (list, card, add, edit, remove, default) and is
+ * visibly inert: adding never reports success and nothing is written to
+ * browser storage.
+ *
+ * Missing backend contract:
+ *   GET    store/v1/account/addresses
+ *   POST   store/v1/account/addresses
+ *   PATCH  store/v1/account/addresses/{id}
+ *   DELETE store/v1/account/addresses/{id}
+ * hanging on the same customer identity the order list needs. Activation
+ * also has to teach checkout to offer a saved address — that is a later
+ * checkout slice, not this one.
+ */
+export const ACCOUNT_ADDRESSES_CAPABILITY = "design_only" as CapabilityState;
+
+/**
+ * Saved payment methods on the account.
+ *
+ * `design_only`: same gap as checkout `PAYMENT_CAPABILITY`. There is no
+ * saved-method route, no tokenization, and ADR-04 is architecture direction
+ * with no implementation approval. The account surface shows the shape of a
+ * saved method and an add action; it names no provider, shows no brand
+ * mark, collects no card data, and never reports a successful save.
+ *
+ * Missing backend contract:
+ *   GET    store/v1/account/payment-methods → methods THIS storefront saved
+ *   POST   is not an AWJ card form — a provider-hosted element creates the
+ *          method; AWJ stores a token reference the provider issued
+ *   DELETE store/v1/account/payment-methods/{id}
+ * Card data must never pass through AWJ.
+ */
+export const ACCOUNT_SAVED_PAYMENT_METHODS_CAPABILITY =
+  "design_only" as CapabilityState;

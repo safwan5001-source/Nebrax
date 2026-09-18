@@ -1,10 +1,11 @@
 "use client";
 
-import type { LucideIcon } from "lucide-react";
 import {
+  ChevronLeft,
+  ChevronRight,
   CreditCard,
-  Gift,
-  Home,
+  Heart,
+  HelpCircle,
   LogOut,
   MapPin,
   ShoppingBag,
@@ -12,100 +13,163 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
+import { useState } from "react";
+import {
+  ACCOUNT_NAV_ITEMS,
+  isAccountNavActive,
+} from "@/components/account/account-nav";
+import { StoreContainer } from "@/components/layout/StoreContainer";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
+import { localeDirection } from "@/i18n/locales";
+import { cn } from "@/lib/utils";
 import { extractBasePath } from "@/lib/utils/path";
 
-function getNavItems(t: ReturnType<typeof useTranslations<"account">>): {
-  href: string;
-  label: string;
-  icon: LucideIcon;
-}[] {
-  return [
-    { href: "/account", label: t("overview"), icon: Home },
-    { href: "/account/orders", label: t("orders"), icon: ShoppingBag },
-    { href: "/account/addresses", label: t("addresses"), icon: MapPin },
-    {
-      href: "/account/credit-cards",
-      label: t("paymentMethods"),
-      icon: CreditCard,
-    },
-    { href: "/account/gift-cards", label: t("giftCards"), icon: Gift },
-    { href: "/account/profile", label: t("profile"), icon: User },
-  ];
+const ICONS = {
+  overview: User,
+  orders: ShoppingBag,
+  profile: User,
+  addresses: MapPin,
+  wishlist: Heart,
+  paymentMethods: CreditCard,
+} as const;
+
+function displayName(
+  user: { first_name?: string | null; last_name?: string | null } | null,
+  fallback: string,
+) {
+  if (!user) return fallback;
+  const name = `${user.first_name ?? ""} ${user.last_name ?? ""}`.trim();
+  return name || fallback;
 }
 
-export function AccountShell({ children }: { children: React.ReactNode }) {
+export function AccountShell({
+  children,
+  pathnameOverride,
+}: {
+  children: React.ReactNode;
+  /** Preview harness only — live routes leave this unset. */
+  pathnameOverride?: string;
+}) {
   const t = useTranslations("account");
-  const pathname = usePathname();
+  const livePathname = usePathname();
+  const pathname = pathnameOverride ?? livePathname;
   const router = useRouter();
   const basePath = extractBasePath(pathname);
   const { user, logout } = useAuth();
-  const navItems = getNavItems(t);
+  const rtl = localeDirection(useLocale()) === "rtl";
+  const BackChevron = rtl ? ChevronRight : ChevronLeft;
+  const [signingOut, setSigningOut] = useState(false);
+  const [signOutError, setSignOutError] = useState<string | null>(null);
+
+  const onOverview = isAccountNavActive(pathname, basePath, "/account", true);
 
   const handleLogout = async () => {
-    await logout();
-    router.replace(`${basePath}/account`);
+    setSignOutError(null);
+    setSigningOut(true);
+    try {
+      await logout();
+      router.replace(`${basePath}/account`);
+    } catch {
+      setSignOutError(t("signOutFailed"));
+      setSigningOut(false);
+    }
   };
 
   return (
-    <div className="container mx-auto px-4 sm:px-6 lg:px-8  py-8">
-      <div className="flex flex-col lg:flex-row gap-8">
-        {/* Sidebar Navigation */}
-        <aside className="lg:w-64 flex-shrink-0">
-          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-            {/* User Info */}
-            <div className="p-4 border-b border-gray-200">
-              <p className="font-medium text-gray-900">
-                {user?.first_name
-                  ? `${user.first_name} ${user.last_name || ""}`.trim()
-                  : t("myAccount")}
+    <StoreContainer className="py-6 sm:py-8 lg:py-10">
+      <div className="flex flex-col gap-6 lg:flex-row lg:gap-10">
+        <aside className="hidden lg:block lg:w-64 lg:shrink-0">
+          <div className="overflow-hidden rounded-store border border-store-border bg-store-surface">
+            <div className="border-b border-store-border px-4 py-4">
+              <p className="truncate font-medium text-store-foreground">
+                {displayName(user, t("myAccount"))}
               </p>
-              <p className="text-sm text-gray-500 truncate">{user?.email}</p>
+              {user?.email && (
+                <p className="mt-0.5 truncate text-sm text-store-muted-foreground">
+                  <bdi>{user.email}</bdi>
+                </p>
+              )}
             </div>
-
-            {/* Navigation */}
-            <nav className="p-2">
-              <ul className="space-y-1">
-                {navItems.map((item) => {
+            <nav aria-label={t("myAccount")} className="p-2">
+              <ul className="space-y-0.5">
+                {ACCOUNT_NAV_ITEMS.map((item) => {
                   const href = `${basePath}${item.href}`;
-                  const isActive =
-                    pathname === href ||
-                    (item.href !== "/account" && pathname.startsWith(href));
-
+                  const active = isAccountNavActive(
+                    pathname,
+                    basePath,
+                    item.href,
+                    "exact" in item ? item.exact : false,
+                  );
+                  const Icon = ICONS[item.key];
                   return (
                     <li key={item.href}>
                       <Link
                         href={href}
-                        className={`flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
-                          isActive
-                            ? "bg-gray-50 text-primary"
-                            : "text-gray-700 hover:bg-gray-50"
-                        }`}
+                        aria-current={active ? "page" : undefined}
+                        className={cn(
+                          "flex min-h-11 items-center gap-3 rounded-store px-3 text-sm font-medium transition-colors",
+                          active
+                            ? "bg-store-primary-soft text-store-primary"
+                            : "text-store-foreground hover:bg-store-surface-muted",
+                        )}
                       >
-                        <item.icon className="w-5 h-5" />
-                        {item.label}
+                        <Icon className="size-4 shrink-0" aria-hidden="true" />
+                        <span className="min-w-0 truncate">{t(item.key)}</span>
                       </Link>
                     </li>
                   );
                 })}
+                <li>
+                  <Link
+                    href={`${basePath}/policies`}
+                    className="flex min-h-11 items-center gap-3 rounded-store px-3 text-sm font-medium text-store-foreground hover:bg-store-surface-muted"
+                  >
+                    <HelpCircle
+                      className="size-4 shrink-0"
+                      aria-hidden="true"
+                    />
+                    {t("help")}
+                  </Link>
+                </li>
               </ul>
             </nav>
-
-            {/* Logout */}
-            <div className="p-2 border-t border-gray-200">
-              <Button variant="ghost" onClick={handleLogout}>
-                <LogOut className="w-5 h-5" />
-                {t("signOut")}
+            <div className="border-t border-store-border p-2">
+              <Button
+                variant="ghost"
+                onClick={handleLogout}
+                disabled={signingOut}
+                className="h-11 w-full justify-start gap-3 text-store-foreground"
+              >
+                <LogOut className="size-4" aria-hidden="true" />
+                {signingOut ? t("signingOut") : t("signOut")}
               </Button>
+              {signOutError && (
+                <p
+                  role="alert"
+                  className="px-3 pb-2 text-xs text-store-destructive"
+                >
+                  {signOutError}
+                </p>
+              )}
             </div>
           </div>
         </aside>
 
-        {/* Main Content */}
-        <main className="flex-1 min-w-0">{children}</main>
+        <div className="min-w-0 flex-1">
+          {!onOverview && (
+            <Link
+              href={`${basePath}/account`}
+              className="mb-4 inline-flex min-h-11 items-center gap-1 text-sm font-medium text-store-muted-foreground hover:text-store-foreground lg:hidden"
+            >
+              <BackChevron className="size-4" aria-hidden="true" />
+              {t("backToAccount")}
+            </Link>
+          )}
+          {children}
+        </div>
       </div>
-    </div>
+    </StoreContainer>
   );
 }

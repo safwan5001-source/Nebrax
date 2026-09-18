@@ -155,6 +155,65 @@ is rendered — a zero would be a monetary assertion with no source.
 
 Not designed, not built.
 
+### 5.10 Account order history — **DESIGN_ONLY / GATED** (STORE-UI-5)
+
+| | |
+|---|---|
+| **Intended UX** | A professional order-history list: number, date, authoritative status, authoritative total, item count. Cards on a phone, the same rows on a desktop — not a squeezed table. Empty state with one action (start shopping). |
+| **Component / surfaces** | `components/account/AccountOrderList.tsx` on `/account/orders` and the account overview entry. |
+| **State** | `DESIGN_ONLY`. Declared as `ACCOUNT_ORDER_HISTORY_CAPABILITY`. |
+| **Missing backend contract** | `GET store/v1/account/orders` → the shopper's `CommerceOrder`s in the `serializeOrder()` shape. Plus an identity to hang them on: checkout today writes `customer_identity_id` as null because the cart is an anonymous cookie. |
+| **Activation requirement** | Implement the list route on a customer identity, flip the capability, pass the mapped `StorefrontOrder[]` into `AccountOrderList`. The leftover Spree `customer.orders.list` path is a different backend and must not be wired in. |
+| **Current behaviour** | Empty list plus the honest capability notice. No fabricated orders, no Spree payment/fulfilment badges. |
+
+### 5.11 Account order detail / lookup — **DESIGN_ONLY / GATED** (STORE-UI-5)
+
+| | |
+|---|---|
+| **Intended UX** | A complete order detail: number, date, `confirmed` status, line items (via `CartLine`), authoritative total, contact, delivery address/method, and a status presentation. Never titled Invoice. No download invoice/receipt. |
+| **Component / surfaces** | `components/account/AccountOrderDetail.tsx` on `/account/orders/[id]`. |
+| **State** | `DESIGN_ONLY`. Declared as `ACCOUNT_ORDER_LOOKUP_CAPABILITY`. |
+| **Missing backend contract** | `GET store/v1/account/orders/{id}` → one `CommerceOrder` in the `serializeOrder()` shape, scoped to the customer (or a signed guest lookup). |
+| **Activation requirement** | Implement the lookup, flip the capability, render `AccountOrderDetail` with the mapped order. |
+| **Current behaviour** | The route states that past orders cannot be looked up yet. The designed component is covered by tests and the development preview. |
+
+### 5.12 Account order status timeline — **DESIGN_ONLY / GATED** (STORE-UI-5)
+
+| | |
+|---|---|
+| **Intended UX** | Four steps: placed / preparing / on the way / delivered. Only **placed** may light up, and only when the authoritative status is `confirmed`. Later steps stay labelled "not tracked". |
+| **Component / surfaces** | `components/account/AccountOrderStatus.tsx`, inside order detail. |
+| **State** | `DESIGN_ONLY`. Declared as `ACCOUNT_ORDER_STATUS_CAPABILITY`. |
+| **Missing backend contract** | A fulfilment lifecycle on `CommerceOrder` (and a storefront serializer for it) before any step past "placed" may light up. |
+| **Activation requirement** | Flip the capability once those statuses are authoritative. |
+| **Current behaviour** | A confirmed order is marked placed. Nothing is claimed as shipped or delivered. |
+
+### 5.13 Saved addresses — **DESIGN_ONLY / GATED** (STORE-UI-5)
+
+| | |
+|---|---|
+| **Intended UX** | Address list, card, add, edit, remove, default badge. |
+| **Component / surfaces** | `components/account/AccountAddresses.tsx` on `/account/addresses`. |
+| **State** | `DESIGN_ONLY`. Declared as `ACCOUNT_ADDRESSES_CAPABILITY`. |
+| **Missing backend contract** | `GET/POST/PATCH/DELETE store/v1/account/addresses`, hanging on the same customer identity as the order list. Checkout must later be taught to offer a saved address — that is a later slice. |
+| **Activation requirement** | Implement the book, flip the capability, replace `refuse()` with the real mutation. |
+| **Current behaviour** | Empty book, dashed card shape, add/edit/remove answer with the capability message. No browser storage. The leftover Spree address CRUD is not called. |
+
+### 5.14 Saved payment methods — **DESIGN_ONLY / GATED** (STORE-UI-5)
+
+| | |
+|---|---|
+| **Intended UX** | Empty state, saved-method card shape, add, remove. No provider name, no brand mark, no card field. |
+| **Component / surfaces** | `components/account/AccountPaymentMethods.tsx` on `/account/payment-methods`. |
+| **State** | `DESIGN_ONLY`. Declared as `ACCOUNT_SAVED_PAYMENT_METHODS_CAPABILITY`. |
+| **Missing backend contract** | `GET/DELETE store/v1/account/payment-methods`. Creating a method is a provider-hosted element; card data never passes through AWJ. |
+| **Activation requirement** | Implement the routes, flip the capability, replace the inert body with the provider's element. |
+| **Current behaviour** | Empty + dashed shapes. Add/remove report no success. No `localStorage`. |
+
+### 5.15 Account wishlist page — **DESIGN_ONLY / GATED** (STORE-UI-5)
+
+Same contract as §5.1. STORE-UI-5 added the account-side surface (`/account/wishlist`, `AccountWishlist`) on the existing `WishlistContext`. Favourites remain page-lifetime only.
+
 ## 6. Applying this to future slices
 
 A slice that meets a missing capability does not stop. It:
