@@ -241,10 +241,19 @@ On #859:
 | Check | Result |
 |---|---|
 | `php artisan test (L11, sqlite)` | ✅ **success** |
-| `php artisan test (L11, pgsql)` | `<PGSQL_CI>` |
+| `php artisan test (L11, pgsql)` | ✅ **success** |
 
-The pgsql leg is the one this PR exists to turn green; it was red on `main` at
-`0318f0e` and on #857 at `f156e29` with this same single failure.
+**Green on the code commit `51b01e2`, on both the push run
+([35308792767](https://github.com/safwan5001-source/Nebrax/actions/runs/35308792767))
+and the pull_request run
+([35309886036](https://github.com/safwan5001-source/Nebrax/actions/runs/35309886036)).**
+That is the check this PR exists to turn green: it was red on `main` at
+`0318f0e` and on #857 at `f156e29` with this same single failure, and CI's own
+PostgreSQL 16 service now runs the suite clean.
+
+One later sqlite run on the docs commit `cae2b84` failed on an unrelated,
+pre-existing 0.8% flake (`ZatcaQrCertificateMaterialExtractorTest`); the
+parallel run of that same commit passed. See §21.
 
 ## 18. Tenant Isolation assessment
 
