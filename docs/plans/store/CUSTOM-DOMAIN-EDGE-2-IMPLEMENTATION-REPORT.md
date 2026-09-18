@@ -8,14 +8,22 @@ EDGE-3 (custom Make Primary + provider-first Disconnect) is **not** in this slic
 
 ## Git
 
-- Latest `main` SHA used: `85e3dec6abd20e79707d2fcd68ddff90c4f9f3a9`
+- Latest `main` SHA used: `855a9adee1e48aa0ff66a0e0f3416a46fcf21f71`
 - Confirmed ancestor of CUSTOM-DOMAIN-EDGE-1 / PR #864 merge SHA `85e3dec6abd20e79707d2fcd68ddff90c4f9f3a9`
 - Branch: `feat/custom-domain-edge-2-activation-ux`
 - PR: [#867](https://github.com/safwan5001-source/Nebrax/pull/867)
-- Base SHA: `85e3dec6abd20e79707d2fcd68ddff90c4f9f3a9`
-- Head SHA: `a1cecf06653a683bbe46624299baf8914f78573c` at report time; CI counts from this SHA
+- Base SHA: `855a9adee1e48aa0ff66a0e0f3416a46fcf21f71`
+- Merge SHA: `602cf5137288fdc130d6fedf2d77473551e391c1`
+- Head SHA: branch tip of `feat/custom-domain-edge-2-activation-ux` on [#867](https://github.com/safwan5001-source/Nebrax/pull/867) (no force-push)
 
-`main` already included #864. Later storefront/visual commits on `main` were kept; EDGE-1 was not re-implemented.
+`main` already included #864. Later `main` commits kept via a regular merge (no force-push): #865 color-swatch UI, storefront product-media proxy (#869). EDGE-1/EDGE-2 lifecycle was not re-implemented.
+
+### Main sync (PR completion)
+
+- Previous Head: `098da2071542827593a5da86160f45700fa061c3`
+- Merge: `git merge origin/main` (ort, **no conflicts**, no force-push)
+- `web/src/messages/ar.json` and `web/src/messages/en.json` received only `main`’s variant visual keys (`variants_visual_*`). They were **identical to `origin/main` after the merge**. EDGE-2 copy lives in `web/src/modules/commerce-workspace/messages.ts` and was untouched by `main`.
+- No EDGE-2 lifecycle, backend, schema, or Railway client edits in the sync.
 
 ## Architecture Authority
 
