@@ -11,9 +11,9 @@ Custom Domain Edge/TLS provisioning is **not** in this slice. A verified custom 
 - Latest `main` SHA used: `b79e51f89e51166310900d723cda203577ff3bca`
 - Confirmed ancestor of PR #856 merge SHA `0318f0eeaac1396283c290a3acfc5f93ce441875`
 - Branch: `feat/store-admin-adopt-1b-3b-domain-lifecycle`
-- PR: see GitHub (filled at open time)
+- PR: [#861](https://github.com/safwan5001-source/Nebrax/pull/861)
 - Base SHA: `b79e51f89e51166310900d723cda203577ff3bca`
-- Head SHA: filled at push time
+- Head SHA: `dd91a81d75483ffa80c4072053233afa74cad92b`
 
 `main` had moved past #856 (`#859`, `#857`, `#860`). Those commits were kept; 1B-3A was not re-implemented.
 
