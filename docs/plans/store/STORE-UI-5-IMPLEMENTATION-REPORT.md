@@ -12,7 +12,7 @@
 | **Latest main SHA** | `30979a1bb499cfe8b0e656495805e50225027530` — STORE-UI-4 merge (PR #866) |
 | **Base SHA** | `30979a1bb499cfe8b0e656495805e50225027530` (verified ancestor of this branch) |
 | **Branch** | `feat/store-ui-5-customer-account` |
-| **Head SHA** | `7c77b1778e0cdee0611945cd2c049c8cb25c0277` |
+| **Head SHA** | `4f7d9866f43f86b3856e1fb08a9b50d12dba8c70` |
 | **PR** | [#868](https://github.com/safwan5001-source/Nebrax/pull/868) |
 
 `git merge-base --is-ancestor 30979a1bb499cfe8b0e656495805e50225027530 HEAD` holds.
@@ -458,7 +458,7 @@ storefront builds, not a STORE-UI-5 regression. Static generation completed
 |---|---|
 | **Base SHA** | `30979a1bb499cfe8b0e656495805e50225027530` |
 | **Round 1 Head** | `bcef4b37` |
-| **Round 2 Head** | _this commit_ |
+| **Round 2 Head** | `4f7d9866f43f86b3856e1fb08a9b50d12dba8c70` |
 | **PR** | [#868](https://github.com/safwan5001-source/Nebrax/pull/868) — open, not merged |
 
 **Replacement Visual QA (8 captures)** in
