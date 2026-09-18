@@ -32,8 +32,10 @@ export default async function HomePage({ params }: HomePageProps) {
   ]);
 
   // Rendered from the section list rather than in fixed JSX order, so a future
-  // merchant configuration changes what appears here without the page being
-  // rewritten around it. Today it always resolves to the default order.
+  // published presentation config changes what appears here without the page
+  // being rewritten around it. Today it always resolves to the default order:
+  // STORE-UI-6 has no persistence contract, so the public storefront must not
+  // read a draft.
   const sections: Record<HomeSectionKey, React.ReactNode> = {
     hero: (
       <HeroSection basePath={basePath} locale={locale} storeName={storeName} />

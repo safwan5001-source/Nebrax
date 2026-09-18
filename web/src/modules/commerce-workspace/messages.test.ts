@@ -5,8 +5,8 @@ describe('commerce workspace AR/EN labels', () => {
   it('keeps the approved main navigation labels', () => {
     expect(COMMERCE_WORKSPACE_MESSAGES.ar.title).toBe('التجارة الإلكترونية');
     expect(COMMERCE_WORKSPACE_MESSAGES.en.title).toBe('E-commerce');
-    expect(COMMERCE_WORKSPACE_MESSAGES.ar.viewStore).toBe('عرض المتجر');
-    expect(COMMERCE_WORKSPACE_MESSAGES.en.viewStore).toBe('View store');
+    expect(COMMERCE_WORKSPACE_MESSAGES.ar.appearance).toBe('بناء تجربة المتجر');
+    expect(COMMERCE_WORKSPACE_MESSAGES.en.appearance).toBe('Store experience');
   });
 
   it('covers every Arabic key in English', () => {

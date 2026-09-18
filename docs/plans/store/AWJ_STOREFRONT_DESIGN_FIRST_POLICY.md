@@ -214,6 +214,97 @@ Not designed, not built.
 
 Same contract as §5.1. STORE-UI-5 added the account-side surface (`/account/wishlist`, `AccountWishlist`) on the existing `WishlistContext`. Favourites remain page-lifetime only.
 
+### 5.16 Theme persistence — **DESIGN_ONLY / GATED** (STORE-UI-6)
+
+| | |
+|---|---|
+| **Intended UX** | Preset, primary colour, density, radius and product-card treatment applied to a live storefront preview. |
+| **Component / surfaces** | `storefront/src/components/customizer/ExperienceBuilder.tsx`, `/commerce/appearance`. |
+| **State** | `DESIGN_ONLY`. `THEME_PERSISTENCE_CAPABILITY`. |
+| **Missing backend contract** | `GET/PUT /api/commerce/workspace/storefronts/{id}/presentation` (Sanctum, `SetTenant`, `commerce.manage`, foreign id → 404) plus published tokens on `GET store/v1/storefront`. Presentation-only body. No product/category master data. |
+| **Activation requirement** | Persist the closed token set, then flip the capability. Preview already consumes `--store-*`. |
+| **Current behaviour** | Page-lifetime draft. Save reports that nothing was stored. |
+
+### 5.17 Merchant branding persistence — **DESIGN_ONLY / GATED** (STORE-UI-6)
+
+| | |
+|---|---|
+| **Intended UX** | Logo, compact logo, favicon, display-name override. Typographic fallback when no logo. Never AWJ corporate branding. |
+| **Component / surfaces** | `StoreBrand` logo slot; Branding panel. |
+| **State** | `DESIGN_ONLY`. `BRANDING_PERSISTENCE_CAPABILITY`. |
+| **Missing backend contract** | Tenant-scoped branding media, not ERP `company.logo` and not product `store/v1/media/{id}`. |
+| **Activation requirement** | Upload + public URL on the presentation payload. |
+| **Current behaviour** | File is read as a data URL for this page only. Not uploaded. |
+
+### 5.18 Homepage composition — **DESIGN_ONLY / GATED** (STORE-UI-6)
+
+| | |
+|---|---|
+| **Intended UX** | Visibility, order, hero copy, gated placeholders for banner/featured/offers/benefits/app/custom. |
+| **Component / surfaces** | Homepage panel; `resolveHomeSections()` remains the public seam. |
+| **State** | `DESIGN_ONLY`. `HOMEPAGE_COMPOSITION_CAPABILITY`. |
+| **Missing backend contract** | `sections: [{ key, visible }]` on presentation, constrained to implemented keys for the public storefront. Featured product/category **ids** must resolve as tenant-owned + published. |
+| **Activation requirement** | Pass published sections into `resolveHomeSections(configured)`. |
+| **Current behaviour** | Public homepage still uses defaults. Preview applies the draft. |
+
+### 5.19 Custom navigation links — **DESIGN_ONLY** (STORE-UI-6)
+
+Missing: validated link list on presentation. External hrefs https-only.
+
+### 5.20 Footer configuration — **DESIGN_ONLY** (STORE-UI-6)
+
+Missing: tagline, copyright, optional contact/social/app columns on presentation.
+
+### 5.21 Contact information — **DESIGN_ONLY** (STORE-UI-6)
+
+Missing: storefront contact fields. ERP company phone is not this contract.
+
+### 5.22 WhatsApp — **DESIGN_ONLY** (STORE-UI-6)
+
+| | |
+|---|---|
+| **Intended UX** | Enable, E.164 number, opening message, floating and/or footer placement. |
+| **State** | `DESIGN_ONLY`. `WHATSAPP_CAPABILITY`. |
+| **Missing backend contract** | `whatsapp: { enabled, phone, message, placement }` on presentation. |
+| **Current behaviour** | Preview-only `wa.me` link. No send. Public storefront does not mount the control without published config. |
+
+### 5.23 Social links — **DESIGN_ONLY** (STORE-UI-6)
+
+Missing: https-only social list on presentation. Spree `STORE_*` env is not an AWJ contract.
+
+### 5.24 Business verification — **GATED** (STORE-UI-6)
+
+| | |
+|---|---|
+| **Intended UX** | Merchant-provided CR/license/source URL, strictly separated from AWJ verified state. |
+| **State** | `GATED`. `BUSINESS_VERIFICATION_CAPABILITY`. |
+| **Missing backend contract** | An AWJ-or-external verified status. Merchant-typed numbers/URLs must never produce a Verified badge. |
+| **Current behaviour** | Preview always shows “Not verified”. The requested-badge toggle is stored on the draft and ignored by the renderer. |
+
+### 5.25 Mobile app links — **DESIGN_ONLY** (STORE-UI-6)
+
+Missing: App Store / Play URLs on presentation. Public app section must stay absent when URLs are missing.
+
+### 5.26 Informational pages — **GATED** (STORE-UI-6)
+
+Missing: `GET/PUT` pages CMS. Spree `policies.get` is not AWJ. Designed entry points only.
+
+### 5.27 Draft persistence — **DESIGN_ONLY** (STORE-UI-6)
+
+Missing: draft revision row. Save is inert. No `localStorage`.
+
+### 5.28 Customizer preview session — **DESIGN_ONLY** (STORE-UI-6)
+
+Missing: preview token / unpublished-theme public route. The in-workspace canvas is the designed preview.
+
+### 5.29 Publish — **GATED** (STORE-UI-6)
+
+Missing: authoritative publish that copies a draft to the live presentation without changing the storefront on save. Publish never reports success.
+
+### 5.30 Version history / restore — **DEFERRED** (STORE-UI-6)
+
+Nothing built. Restore-default in the editor is page-lifetime draft reset only.
+
 ## 6. Applying this to future slices
 
 A slice that meets a missing capability does not stop. It:
