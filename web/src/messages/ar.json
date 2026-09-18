@@ -4780,7 +4780,16 @@
     "variants_bulk_partial_failure": "فشل {failed} من أصل {total} — راجع القائمة وأعد المحاولة.",
     "variants_saved": "تم حفظ المتغيّر.",
     "variants_deleted": "تم حذف المتغيّر.",
-    "variants_detail_title": "تفاصيل المتغيّر"
+    "variants_detail_title": "تفاصيل المتغيّر",
+    "variants_visual_type_label": "نوع المظهر",
+    "variants_visual_edit": "تحرير مظهر {name}",
+    "variants_visual_none": "بدون مظهر",
+    "variants_visual_color": "لون",
+    "variants_color_picker": "اختيار اللون",
+    "variants_hex_label": "قيمة Hex",
+    "variants_visual_title": "مظهر قيمة الخيار",
+    "variants_visual_none_hint": "ستبقى القيمة نصية بلا بيانات لون.",
+    "variants_visual_saved": "تم حفظ مظهر القيمة."
   },
   "purchaseForm": {
     "title": "فاتورة مشتريات جديدة",

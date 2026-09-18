@@ -44,12 +44,47 @@ vi.mock('lucide-react', () => {
         : iconStub,
     has: () => true,
   });
+
+  it('creates a color value with canonical visual metadata without deriving it from the option name', async () => {
+    const fixture = makeFixture();
+    fixture.options[0]!.values = [];
+    installApiMock(fixture);
+    const user = userEvent.setup();
+    render(<ProductVariantsPanel productId={PRODUCT_ID} variantState="variant_managed" onProductChanged={vi.fn()} />);
+    await user.type(screen.getByPlaceholderText('variants_add_value_placeholder'), 'أبيض');
+    await user.selectOptions(screen.getByRole('combobox', { name: 'variants_visual_type_label' }), 'color');
+    await user.type(screen.getByRole('textbox', { name: 'variants_hex_label' }), '#ffffff');
+    await user.click(screen.getByRole('button', { name: 'add' }));
+    await waitFor(() => {
+      const call = apiMock.mock.calls.find((entry) => entry[0] === `/products/${PRODUCT_ID}/options/opt-color/values` && (entry[1] as { method?: string }).method === 'POST');
+      expect((call![1] as { body: Record<string, unknown> }).body).toMatchObject({ value: 'أبيض', visual_type: 'color', color_value: '#FFFFFF' });
+    });
+  });
+
+  it('edits only visual metadata and clears color when switching to none', async () => {
+    const fixture = makeFixture();
+    fixture.options[0]!.values[1] = { ...fixture.options[0]!.values[1]!, visual_type: 'color', color_value: '#AFC9F5' };
+    installApiMock(fixture);
+    const user = userEvent.setup();
+    render(<ProductVariantsPanel productId={PRODUCT_ID} variantState="variant_managed" onProductChanged={vi.fn()} />);
+    await waitFor(() => expect(screen.getByText('أبيض')).toBeTruthy());
+    await user.click(screen.getByRole('button', { name: 'variants_visual_edit:أبيض' }));
+    await user.selectOptions(screen.getByRole('combobox', { name: 'variants_visual_type_label' }), 'none');
+    await user.click(screen.getByRole('button', { name: 'save' }));
+    await waitFor(() => {
+      const call = apiMock.mock.calls.find((entry) => entry[0] === `/products/${PRODUCT_ID}/options/opt-color/values/val-white` && (entry[1] as { method?: string }).method === 'PUT');
+      expect((call![1] as { body: Record<string, unknown> }).body).toEqual({ visual_type: 'none', color_value: null });
+    });
+    expect(fixture.variants[0]!.id).toBe('var-black');
+    expect(fixture.variants[0]!.sku).toBe('SHIRT-BLACK');
+  });
+
 });
 
 const PRODUCT_ID = 'product-1';
 
 type Fixture = {
-  options: Array<{ id: string; name: string; name_en: string | null; is_active: boolean; values: Array<{ id: string; value: string; value_en: string | null; is_active: boolean }> }>;
+  options: Array<{ id: string; name: string; name_en: string | null; is_active: boolean; values: Array<{ id: string; value: string; value_en: string | null; is_active: boolean; visual_type?: 'none' | 'color'; color_value?: string | null }> }>;
   variants: Array<{ id: string; sku: string; is_active: boolean; display_name: string; option_values: Array<{ option_id: string; option_name: string | null; value_id: string; value: string }> }>;
 };
 
@@ -60,8 +95,8 @@ function makeFixture(): Fixture {
       {
         id: 'opt-color', name: 'اللون', name_en: 'Color', is_active: true,
         values: [
-          { id: 'val-black', value: 'أسود', value_en: 'Black', is_active: true },
-          { id: 'val-white', value: 'أبيض', value_en: 'White', is_active: true },
+          { id: 'val-black', value: 'أسود', value_en: 'Black', is_active: true, visual_type: 'none', color_value: null },
+          { id: 'val-white', value: 'أبيض', value_en: 'White', is_active: true, visual_type: 'none', color_value: null },
         ],
       },
     ],
@@ -115,8 +150,8 @@ function installApiMock(fixture: Fixture) {
     const valueMatch = path.match(new RegExp(`^/products/${PRODUCT_ID}/options/([^/]+)/values$`));
     if (valueMatch && method === 'POST') {
       const option = fixture.options.find((o) => o.id === valueMatch[1]);
-      const body = options.body as { value: string };
-      const value = { id: `val-${Math.random().toString(36).slice(2, 8)}`, value: body.value, value_en: null, is_active: true };
+      const body = options.body as { value: string; visual_type?: string; color_value?: string | null };
+      const value = { id: `val-${Math.random().toString(36).slice(2, 8)}`, value: body.value, value_en: null, is_active: true, visual_type: body.visual_type ?? 'none', color_value: body.color_value ?? null };
       option?.values.push(value);
       return { data: value };
     }
@@ -146,6 +181,17 @@ function installApiMock(fixture: Fixture) {
         if (body.sku !== undefined) variant.sku = body.sku;
       }
       return { data: variant };
+    }
+    const valueUpdateMatch = path.match(new RegExp(`^/products/${PRODUCT_ID}/options/([^/]+)/values/([^/]+)$`));
+    if (valueUpdateMatch && method === 'PUT') {
+      const option = fixture.options.find((o) => o.id === valueUpdateMatch[1]);
+      const value = option?.values.find((v) => v.id === valueUpdateMatch[2]);
+      const body = options.body as { visual_type: 'none' | 'color'; color_value: string | null };
+      if (value) {
+        value.visual_type = body.visual_type;
+        value.color_value = body.visual_type === 'color' ? body.color_value : null;
+      }
+      return { data: value };
     }
     if (variantMatch && method === 'DELETE') {
       fixture.variants = fixture.variants.filter((v) => v.id !== variantMatch[1]);
@@ -341,4 +387,41 @@ describe('لوحة خيارات ومتغيّرات المنتج', () => {
     const skuInput = await screen.findByLabelText('sku');
     expect(skuInput.getAttribute('dir')).toBe('ltr');
   });
+
+  it('ينشئ قيمة لون ببيانات بصرية معيارية دون استنتاجها من اسم الخيار', async () => {
+    const fixture = makeFixture();
+    fixture.options[0]!.values = [];
+    installApiMock(fixture);
+    const user = userEvent.setup();
+    render(<ProductVariantsPanel productId={PRODUCT_ID} variantState="variant_managed" onProductChanged={vi.fn()} />);
+    await waitFor(() => expect(screen.getByText('اللون')).toBeTruthy());
+    await user.type(screen.getByPlaceholderText('variants_add_value_placeholder'), 'أبيض');
+    await user.selectOptions(screen.getByRole('combobox', { name: 'variants_visual_type_label' }), 'color');
+    await user.type(screen.getByRole('textbox', { name: 'variants_hex_label' }), '#ffffff');
+    await user.click(screen.getByRole('button', { name: 'add' }));
+    await waitFor(() => {
+      const call = apiMock.mock.calls.find((entry) => entry[0] === `/products/${PRODUCT_ID}/options/opt-color/values` && (entry[1] as { method?: string }).method === 'POST');
+      expect((call![1] as { body: Record<string, unknown> }).body).toMatchObject({ value: 'أبيض', visual_type: 'color', color_value: '#FFFFFF' });
+    });
+  });
+
+  it('يعدل metadata فقط ويمسح اللون عند التحويل إلى None مع بقاء هوية المتغيّر', async () => {
+    const fixture = makeFixture();
+    fixture.options[0]!.values[1] = { ...fixture.options[0]!.values[1]!, visual_type: 'color', color_value: '#AFC9F5' };
+    installApiMock(fixture);
+    const user = userEvent.setup();
+    render(<ProductVariantsPanel productId={PRODUCT_ID} variantState="variant_managed" onProductChanged={vi.fn()} />);
+    await waitFor(() => expect(screen.getByText('أبيض', { selector: 'span' })).toBeTruthy());
+    await user.click(screen.getByRole('button', { name: 'variants_visual_edit:أبيض' }));
+    const visualTypeSelects = screen.getAllByRole('combobox', { name: 'variants_visual_type_label' });
+    await user.selectOptions(visualTypeSelects[visualTypeSelects.length - 1]!, 'none');
+    await user.click(await screen.findByRole('button', { name: 'save' }));
+    await waitFor(() => {
+      const call = apiMock.mock.calls.find((entry) => entry[0] === `/products/${PRODUCT_ID}/options/opt-color/values/val-white` && (entry[1] as { method?: string }).method === 'PUT');
+      expect((call![1] as { body: Record<string, unknown> }).body).toEqual({ visual_type: 'none', color_value: null });
+    });
+    expect(fixture.variants[0]!.id).toBe('var-black');
+    expect(fixture.variants[0]!.sku).toBe('SHIRT-BLACK');
+  });
+
 });

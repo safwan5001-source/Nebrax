@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import type { ColumnDef } from '@tanstack/react-table';
-import { CheckSquare, Plus, Square, Trash2, X } from 'lucide-react';
+import { CheckSquare, Plus, Square, Trash2, X, Pipette } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -14,7 +14,17 @@ import { Select } from '@/components/ui/select';
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
 import { useToast } from '@/components/ui/toast';
 
-type OptionValue = { id: string; value: string; value_en: string | null; is_active: boolean };
+type VisualType = 'none' | 'color';
+type OptionValue = {
+  id: string;
+  value: string;
+  value_en: string | null;
+  is_active: boolean;
+  visual_type?: VisualType;
+  color_value?: string | null;
+};
+
+type VisualDraft = { visual_type: VisualType; color_value: string };
 type Option = { id: string; name: string; name_en: string | null; is_active: boolean; values: OptionValue[] };
 type Variant = {
   id: string;
@@ -30,6 +40,13 @@ type Combination = {
   variant_id: string | null;
 };
 type Matrix = { options: Option[]; total_possible: number; combinations: Combination[] };
+
+function visualPayload(draft: VisualDraft) {
+  return {
+    visual_type: draft.visual_type,
+    color_value: draft.visual_type === 'color' ? draft.color_value.trim().toUpperCase() : null,
+  };
+}
 
 /**
  * VAR-CORE-1 — قسم «الخيارات والمتغيّرات» ضمن ملف المنتج.
@@ -56,6 +73,8 @@ export function ProductVariantsPanel({ productId, variantState, onProductChanged
   const [enabling, setEnabling] = useState(false);
   const [newOptionName, setNewOptionName] = useState('');
   const [newValueByOption, setNewValueByOption] = useState<Record<string, string>>({});
+  const [newVisualByOption, setNewVisualByOption] = useState<Record<string, VisualDraft>>({});
+  const [editingValue, setEditingValue] = useState<{ optionId: string; value: OptionValue } | null>(null);
   const [multiSelect, setMultiSelect] = useState(false);
   const [selectedVariantIds, setSelectedVariantIds] = useState<string[]>([]);
   const [detailVariant, setDetailVariant] = useState<Variant | null>(null);
@@ -142,12 +161,22 @@ export function ProductVariantsPanel({ productId, variantState, onProductChanged
    * جاهزاً للقيمة التالية فوراً بلا لمس الفأرة. التحقّق من التكرار المطبَّع
    * يبقى على الخادم وحده — النجاح المتفائل هنا تجربة استخدامٍ لا سلطة حسم.
    */
+  function visualDraft(optionId: string): VisualDraft {
+    return newVisualByOption[optionId] ?? { visual_type: 'none', color_value: '' };
+  }
+
+  function setVisualDraft(optionId: string, patch: Partial<VisualDraft>) {
+    setNewVisualByOption((prev) => ({ ...prev, [optionId]: { ...visualDraft(optionId), ...patch } }));
+  }
+
   async function addValue(optionId: string) {
     const value = (newValueByOption[optionId] ?? '').trim();
     if (!value) return;
+    const draft = visualDraft(optionId);
     try {
-      await api(`/products/${productId}/options/${optionId}/values`, { method: 'POST', body: { value } });
+      await api(`/products/${productId}/options/${optionId}/values`, { method: 'POST', body: { value, ...visualPayload(draft) } });
       setNewValueByOption((prev) => ({ ...prev, [optionId]: '' }));
+      setNewVisualByOption((prev) => ({ ...prev, [optionId]: { visual_type: 'none', color_value: '' } }));
       await load();
     } catch (err) {
       showError(err instanceof ApiError ? err.message : t('action_failed'));
@@ -334,25 +363,21 @@ export function ProductVariantsPanel({ productId, variantState, onProductChanged
               <div className="flex flex-wrap items-center gap-2">
                 {option.values.map((value) => (
                   <span key={value.id} className="inline-flex min-h-9 items-center gap-1.5 rounded border border-border bg-surface px-2.5 py-1 text-xs text-text">
-                    {value.value}
-                    <button
-                      type="button"
-                      aria-label={t('remove')}
-                      className="flex h-5 w-5 items-center justify-center rounded hover:bg-primary-soft"
-                      onClick={() => void removeValue(option.id, value.id)}
-                    >
+                    {value.visual_type === 'color' && value.color_value ? <Swatch color={value.color_value} /> : null}
+                    <button type="button" aria-label={t('variants_visual_edit', { name: value.value })} className="text-start hover:underline" onClick={() => setEditingValue({ optionId: option.id, value })}>
+                      <span>{value.value}</span>
+                    </button>
+                    <button type="button" aria-label={t('remove')} className="flex h-5 w-5 items-center justify-center rounded hover:bg-primary-soft" onClick={() => void removeValue(option.id, value.id)}>
                       <X className="h-3 w-3" />
                     </button>
                   </span>
                 ))}
-                <Input
-                  ref={(el) => { valueInputRefs.current[option.id] = el; }}
-                  className="h-9 w-32 text-xs"
-                  placeholder={t('variants_add_value_placeholder')}
-                  value={newValueByOption[option.id] ?? ''}
-                  onChange={(e) => setNewValueByOption((prev) => ({ ...prev, [option.id]: e.target.value }))}
-                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void addValue(option.id); } }}
-                />
+                <Input ref={(el) => { valueInputRefs.current[option.id] = el; }} className="h-9 w-32 text-xs" placeholder={t('variants_add_value_placeholder')} value={newValueByOption[option.id] ?? ''} onChange={(e) => setNewValueByOption((prev) => ({ ...prev, [option.id]: e.target.value }))} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void addValue(option.id); } }} />
+                <Select aria-label={t('variants_visual_type_label')} className="h-9 w-32 text-xs" value={visualDraft(option.id).visual_type} onChange={(e) => setVisualDraft(option.id, { visual_type: e.target.value as VisualType })}>
+                  <option value="none">{t('variants_visual_none')}</option>
+                  <option value="color">{t('variants_visual_color')}</option>
+                </Select>
+                {visualDraft(option.id).visual_type === 'color' ? <ColorEditor draft={visualDraft(option.id)} onChange={(patch) => setVisualDraft(option.id, patch)} t={t} /> : null}
                 <Button type="button" variant="outline" size="sm" onClick={() => void addValue(option.id)}>{t('add')}</Button>
               </div>
             </div>
@@ -469,6 +494,12 @@ export function ProductVariantsPanel({ productId, variantState, onProductChanged
         </CardContent>
       </Card>
 
+      <OptionValueVisualSheet
+        productId={productId}
+        editing={editingValue}
+        onClose={() => setEditingValue(null)}
+        onSaved={() => { setEditingValue(null); void load(); }}
+      />
       <VariantDetailSheet
         productId={productId}
         variant={detailVariant}
@@ -583,4 +614,49 @@ function VariantDetailSheet({ productId, variant, onClose, onSaved, onDeleted }:
       )}
     </Sheet>
   );
+}
+
+
+function Swatch({ color }: { color: string }) {
+  return <span aria-hidden="true" className="inline-block h-4 w-4 shrink-0 rounded-full border border-border" style={{ backgroundColor: color }} />;
+}
+
+function ColorEditor({ draft, onChange, t }: { draft: VisualDraft; onChange: (patch: Partial<VisualDraft>) => void; t: (key: string) => string }) {
+  const pickerValue = /^#[0-9A-Fa-f]{6}$/.test(draft.color_value) ? draft.color_value : '#000000';
+  return <div className="flex items-center gap-2">
+    <label className="sr-only" htmlFor="new-option-color">{t('variants_color_picker')}</label>
+    <input id="new-option-color" aria-label={t('variants_color_picker')} type="color" value={pickerValue} onChange={(e) => onChange({ color_value: e.target.value.toUpperCase() })} className="h-9 w-10 cursor-pointer rounded border border-border bg-surface p-1" />
+    <Input aria-label={t('variants_hex_label')} dir="ltr" className="h-9 w-28 font-mono text-xs" placeholder="#RRGGBB" value={draft.color_value} onChange={(e) => onChange({ color_value: e.target.value })} />
+    {/^#[0-9A-Fa-f]{6}$/.test(draft.color_value) ? <Swatch color={draft.color_value} /> : null}
+  </div>;
+}
+
+function OptionValueVisualSheet({ productId, editing, onClose, onSaved }: { productId: string; editing: { optionId: string; value: OptionValue } | null; onClose: () => void; onSaved: () => void }) {
+  const t = useTranslations('products');
+  const { success, error: showError } = useToast();
+  const [draft, setDraft] = useState<VisualDraft>({ visual_type: 'none', color_value: '' });
+  const [saving, setSaving] = useState(false);
+  useEffect(() => {
+    if (editing) setDraft({ visual_type: editing.value.visual_type === 'color' ? 'color' : 'none', color_value: editing.value.color_value ?? '' });
+  }, [editing]);
+  async function save() {
+    if (!editing) return;
+    setSaving(true);
+    try {
+      await api(`/products/${productId}/options/${editing.optionId}/values/${editing.value.id}`, { method: 'PUT', body: visualPayload(draft) });
+      success(t('variants_visual_saved'));
+      onSaved();
+    } catch (err) { showError(err instanceof ApiError ? err.message : t('action_failed')); }
+    finally { setSaving(false); }
+  }
+  return <Sheet open={editing !== null} onOpenChange={(open) => { if (!open) onClose(); }}>
+    {editing ? <SheetContent closeLabel={t('close')}>
+      <header className="shrink-0 border-b border-border px-5 pb-4 pe-14 pt-4"><p className="text-xs font-medium text-muted">{t('variants_visual_title')}</p><SheetTitle className="mt-1 text-lg font-semibold text-text">{editing.value.value}</SheetTitle></header>
+      <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-5">
+        <div className="space-y-1.5"><label className="text-xs font-medium text-muted" htmlFor="edit-visual-type">{t('variants_visual_type_label')}</label><Select id="edit-visual-type" value={draft.visual_type} onChange={(e) => setDraft((prev) => ({ ...prev, visual_type: e.target.value as VisualType }))}><option value="none">{t('variants_visual_none')}</option><option value="color">{t('variants_visual_color')}</option></Select></div>
+        {draft.visual_type === 'color' ? <ColorEditor draft={draft} onChange={(patch) => setDraft((prev) => ({ ...prev, ...patch }))} t={t} /> : <p className="text-xs text-muted">{t('variants_visual_none_hint')}</p>}
+      </div>
+      <footer className="flex shrink-0 justify-end gap-2 border-t border-border px-5 py-4"><Button type="button" variant="outline" size="sm" onClick={onClose}>{t('cancel')}</Button><Button type="button" size="sm" onClick={() => void save()} disabled={saving}>{t('save')}</Button></footer>
+    </SheetContent> : null}
+  </Sheet>;
 }
