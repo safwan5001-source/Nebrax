@@ -584,7 +584,7 @@ card's click handler unhandled. The component was fixed, not the test.
 
 ## 46. CI status
 
-`<CI_STATUS_2>`
+Running on PR #860 at the time of writing. The prior head's `storefront (lint + typecheck + test)` check passed, and the full storefront suite, lint, locales, typecheck and production build were reproduced locally on this head and are green (§45).
 
 ## 47. Backend gaps intentionally deferred
 
