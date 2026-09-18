@@ -15,8 +15,12 @@ vi.mock('@/lib/api', () => ({
 
 import {
   addCommerceCustomDomain,
+  canDisconnectDomain,
+  canMakeDomainPrimary,
   commerceStoreDomainsPath,
+  disconnectCommerceCustomDomain,
   fetchCommerceStorefrontDomains,
+  makeCommerceDomainPrimary,
   mapCommerceStoreDomainCatalog,
   verifyCommerceCustomDomain,
 } from './domains';
@@ -308,5 +312,103 @@ describe('verify custom domain', () => {
     const result = await verifyCommerceCustomDomain('store-1', 'd3');
 
     expect(result).toEqual({ ok: false, reason: 'not_eligible', message: 'not eligible' });
+  });
+});
+
+describe('make primary', () => {
+  afterEach(() => apiMock.mockReset());
+
+  it('sends an empty body and never lets the client set is_primary or edge readiness', async () => {
+    apiMock.mockResolvedValueOnce({
+      data: {
+        domain: {
+          id: 'd1',
+          hostname: 'my-store.awj-commerce.test',
+          type: 'awj_subdomain',
+          is_primary: true,
+          is_active: true,
+          verification_status: 'verified',
+          verification: null,
+        },
+      },
+    });
+
+    await makeCommerceDomainPrimary('store-1', 'd1');
+
+    expect(apiMock).toHaveBeenCalledWith('/commerce/workspace/storefronts/store-1/domains/d1/make-primary', {
+      method: 'POST',
+      body: {},
+    });
+  });
+
+  it('classifies a 422 about HTTPS activation as not_ready, distinct from generic ineligibility', async () => {
+    apiMock.mockRejectedValueOnce(
+      new FakeApiError(422, 'Domain ownership is verified, but HTTPS/domain activation is not complete yet.'),
+    );
+
+    const result = await makeCommerceDomainPrimary('store-1', 'd2');
+
+    expect(result).toEqual({
+      ok: false,
+      reason: 'not_ready',
+      message: 'Domain ownership is verified, but HTTPS/domain activation is not complete yet.',
+    });
+  });
+});
+
+describe('disconnect custom domain', () => {
+  afterEach(() => apiMock.mockReset());
+
+  it('sends DELETE with no body and no authority fields', async () => {
+    apiMock.mockResolvedValueOnce({ data: { disconnected: true } });
+
+    await disconnectCommerceCustomDomain('store-1', 'd2');
+
+    expect(apiMock).toHaveBeenCalledWith('/commerce/workspace/storefronts/store-1/domains/d2', {
+      method: 'DELETE',
+    });
+  });
+
+  it('classifies a 422 about the current primary as primary, not a generic failure', async () => {
+    apiMock.mockRejectedValueOnce(new FakeApiError(422, 'The current primary domain cannot be disconnected'));
+
+    const result = await disconnectCommerceCustomDomain('store-1', 'd2');
+
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('unreachable');
+    expect(result.reason).toBe('primary');
+  });
+});
+
+describe('frontend action eligibility — not a security boundary', () => {
+  const awjPrimary = {
+    id: 'd1',
+    hostname: 'my-store.awj-commerce.test',
+    type: 'awj_subdomain' as const,
+    isPrimary: true,
+    isActive: true,
+    verificationStatus: 'verified' as const,
+    verification: null,
+  };
+  const awjSecondary = { ...awjPrimary, id: 'd1b', isPrimary: false, hostname: 'other.awj-commerce.test' };
+  const customVerified = {
+    id: 'd2',
+    hostname: 'shop.example.com',
+    type: 'custom' as const,
+    isPrimary: false,
+    isActive: true,
+    verificationStatus: 'verified' as const,
+    verification: null,
+  };
+
+  it('allows Make Primary only for an eligible AWJ-managed domain', () => {
+    expect(canMakeDomainPrimary(awjSecondary)).toBe(true);
+    expect(canMakeDomainPrimary(awjPrimary)).toBe(false);
+    expect(canMakeDomainPrimary(customVerified)).toBe(false);
+  });
+
+  it('allows Disconnect only for a custom domain', () => {
+    expect(canDisconnectDomain(customVerified)).toBe(true);
+    expect(canDisconnectDomain(awjPrimary)).toBe(false);
   });
 });

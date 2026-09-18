@@ -836,6 +836,12 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::post('commerce/workspace/storefronts/{id}/domains', [CommerceWorkspaceStorefrontsController::class, 'storeDomain'])->middleware($perm('commerce.manage'));
         Route::post('commerce/workspace/storefronts/{id}/domains/{domainId}/verify', [CommerceWorkspaceStorefrontsController::class, 'verifyDomain'])->middleware($perm('commerce.manage'));
 
+        // STORE-ADMIN-ADOPT-1B-3B: جعل نطاق مؤهل أساسياً + فصل نطاق مخصَّص.
+        // Make Primary لنطاق custom فشلٌ مغلق ما دام لا دليل Edge/TLS.
+        // فصل AWJ-managed أو الأساسي الحالي مرفوض. نفس صلاحية 1B-3A.
+        Route::post('commerce/workspace/storefronts/{id}/domains/{domainId}/make-primary', [CommerceWorkspaceStorefrontsController::class, 'makePrimaryDomain'])->middleware($perm('commerce.manage'));
+        Route::delete('commerce/workspace/storefronts/{id}/domains/{domainId}', [CommerceWorkspaceStorefrontsController::class, 'destroyDomain'])->middleware($perm('commerce.manage'));
+
         // Cycle 0: Workspace foundation only. لا CRUD ولا مبيعات ولا اتصال أجهزة
         // قبل دوراتها، لكن هذا المسار يثبت سلسلة RBAC + entitlement + حالة التطبيق.
         Route::get('fuel-stations/workspace', [FuelStationsWorkspaceController::class, 'index'])

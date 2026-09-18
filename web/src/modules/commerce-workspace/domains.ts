@@ -1,17 +1,18 @@
 /**
  * STORE-ADMIN-ADOPT-1B-2 — Domain Visibility (Read).
  * STORE-ADMIN-ADOPT-1B-3A — Add Custom Domain + DNS TXT Ownership Verification.
+ * STORE-ADMIN-ADOPT-1B-3B — Safe Make Primary + Disconnect Custom Domain.
  *
  * Tenant authority is server-side (SetTenant → TenantContext). This module
  * only fetches/mutates the current session's own storefront's domains,
  * addressed by the storefront id already trusted from `CommerceStoreProvider`
  * — it never sends a tenant identifier and never calls the public
  * Host-resolved storefront API. `addCommerceCustomDomain`/`verifyCommerceCustomDomain`
+ * /`makeCommerceDomainPrimary`/`disconnectCommerceCustomDomain`
  * never send `tenant_id`/`storefront_id`/`type`/`verification_status`/
- * `verification_token`/`verified_at`/`is_primary`/`is_active` — the backend
- * derives all of them server-side and ignores any such field regardless.
- * There is still no Make Primary/Remove/Disconnect/activate-deactivate here
- * — that is 1B-3B's territory.
+ * `verification_token`/`verified_at`/`is_primary`/`is_active`/edge readiness —
+ * the backend derives all of them server-side and ignores any such field
+ * regardless. Frontend gating is not a security boundary.
  */
 
 import { api, hasApiStatus } from '@/lib/api';
@@ -192,4 +193,101 @@ function extractDomain(payload: unknown): CommerceStoreDomain | null {
   const data = (payload as { data?: unknown }).data;
   if (!data || typeof data !== 'object' || Array.isArray(data)) return null;
   return mapDomain((data as { domain?: unknown }).domain);
+}
+
+/**
+ * Make Primary is allowed by current server semantics only for an eligible
+ * AWJ-managed domain. Custom domains stay fail-closed until Edge/TLS
+ * readiness exists — verification is not that evidence.
+ */
+export function canMakeDomainPrimary(domain: CommerceStoreDomain): boolean {
+  return (
+    domain.type === 'awj_subdomain' &&
+    domain.verificationStatus === 'verified' &&
+    domain.isActive &&
+    !domain.isPrimary
+  );
+}
+
+export function canDisconnectDomain(domain: CommerceStoreDomain): boolean {
+  return domain.type === 'custom';
+}
+
+export type MakeCommerceDomainPrimaryOutcome =
+  | { ok: true; domain: CommerceStoreDomain }
+  | {
+      ok: false;
+      reason: 'not_ready' | 'not_eligible' | 'forbidden' | 'not_found' | 'failed';
+      message: string;
+    };
+
+export async function makeCommerceDomainPrimary(
+  storefrontId: string,
+  domainId: string,
+): Promise<MakeCommerceDomainPrimaryOutcome> {
+  try {
+    const payload = await api<unknown>(`${commerceStoreDomainsPath(storefrontId)}/${domainId}/make-primary`, {
+      method: 'POST',
+      body: {},
+    });
+    const domain = extractDomain(payload);
+    if (!domain) return { ok: false, reason: 'failed', message: 'invalid_payload' };
+    return { ok: true, domain };
+  } catch (error) {
+    return {
+      ok: false,
+      reason: classifyMakePrimaryFailure(error),
+      message: error instanceof Error ? error.message : 'make_primary_failed',
+    };
+  }
+}
+
+function classifyMakePrimaryFailure(
+  error: unknown,
+): 'not_ready' | 'not_eligible' | 'forbidden' | 'not_found' | 'failed' {
+  if (hasApiStatus(error, 403)) return 'forbidden';
+  if (hasApiStatus(error, 404)) return 'not_found';
+  if (hasApiStatus(error, 422)) {
+    const message = error instanceof Error ? error.message : '';
+    return message.includes('HTTPS') || message.includes('تفعيل') ? 'not_ready' : 'not_eligible';
+  }
+  return 'failed';
+}
+
+export type DisconnectCommerceCustomDomainOutcome =
+  | { ok: true }
+  | {
+      ok: false;
+      reason: 'managed' | 'primary' | 'forbidden' | 'not_found' | 'failed';
+      message: string;
+    };
+
+export async function disconnectCommerceCustomDomain(
+  storefrontId: string,
+  domainId: string,
+): Promise<DisconnectCommerceCustomDomainOutcome> {
+  try {
+    await api<unknown>(`${commerceStoreDomainsPath(storefrontId)}/${domainId}`, {
+      method: 'DELETE',
+    });
+    return { ok: true };
+  } catch (error) {
+    return {
+      ok: false,
+      reason: classifyDisconnectFailure(error),
+      message: error instanceof Error ? error.message : 'disconnect_failed',
+    };
+  }
+}
+
+function classifyDisconnectFailure(
+  error: unknown,
+): 'managed' | 'primary' | 'forbidden' | 'not_found' | 'failed' {
+  if (hasApiStatus(error, 403)) return 'forbidden';
+  if (hasApiStatus(error, 404)) return 'not_found';
+  if (hasApiStatus(error, 422)) {
+    const message = error instanceof Error ? error.message : '';
+    return message.includes('الأساسي') || message.toLowerCase().includes('primary') ? 'primary' : 'managed';
+  }
+  return 'failed';
 }

@@ -6,6 +6,9 @@ use App\Http\Requests\AddStorefrontCustomDomainRequest;
 use App\Http\Requests\ProvisionStorefrontRequest;
 use App\Http\Requests\UpdateStorefrontIdentityRequest;
 use App\Services\Commerce\CommerceWorkspaceStorefrontsService;
+use App\Services\Commerce\CustomDomainNotReadyForPrimaryException;
+use App\Services\Commerce\DomainNotDisconnectableException;
+use App\Services\Commerce\DomainNotEligibleForPrimaryException;
 use App\Services\Commerce\DomainNotEligibleForVerificationException;
 use App\Services\Commerce\ManagedNamespaceHostnameException;
 use App\Services\Commerce\StorefrontDomainVerificationService;
@@ -23,6 +26,8 @@ use RuntimeException;
  * COM-STORE-PROVISION-1 — تزويد أول متجر إلكتروني صريح.
  * STORE-ADMIN-ADOPT-1B-1 — تصحيح/تعريب هوية متجر قائم (`name`/`default_locale`).
  * STORE-ADMIN-ADOPT-1B-2 — رؤية نطاقات متجر قائم (قراءة فقط).
+ * STORE-ADMIN-ADOPT-1B-3A — إضافة نطاق مخصَّص + تحقّق DNS TXT.
+ * STORE-ADMIN-ADOPT-1B-3B — Make Primary الآمن + فصل نطاق مخصَّص.
  *
  * يسرد/يزوّد/يحدّث متاجر الويب للمستأجر الحالي فقط. لا يستقبل معرّف مستأجر/متجر/نطاق
  * من العميل، ولا يستدعي الحسم العام بالنطاق. `index` لا يفرض
@@ -189,6 +194,64 @@ class CommerceWorkspaceStorefrontsController extends ApiController
 
         return response()->json([
             'data' => ['domain' => $domain],
+        ]);
+    }
+
+    /**
+     * STORE-ADMIN-ADOPT-1B-3B — جعل نطاق مؤهل هو الأساسي. لا يقبل أي حقل
+     * سلطة من العميل. نطاق مخصَّص يُرفض فشلًا مغلقاً ما دام لا دليل Edge/TLS.
+     */
+    public function makePrimaryDomain(
+        Request $request,
+        CommerceWorkspaceStorefrontsService $storefronts,
+        string $id,
+        string $domainId,
+    ): JsonResponse {
+        if ($request->user()?->role === 'self_service') {
+            abort(403, 'مساحة عمل التجارة غير متاحة لحساب الخدمة الذاتية.');
+        }
+
+        try {
+            $domain = $storefronts->makePrimaryForCurrentTenant($id, $domainId);
+        } catch (CustomDomainNotReadyForPrimaryException|DomainNotEligibleForPrimaryException $e) {
+            abort(422, $e->getMessage());
+        }
+
+        if ($domain === null) {
+            abort(404, 'النطاق غير موجود.');
+        }
+
+        return response()->json([
+            'data' => ['domain' => $domain],
+        ]);
+    }
+
+    /**
+     * STORE-ADMIN-ADOPT-1B-3B — فصل نطاق مخصَّص غير أساسي. نطاق AWJ مُدار
+     * أو أساسي حالي يُرفض. لا يقبل أي حقل سلطة من العميل.
+     */
+    public function destroyDomain(
+        Request $request,
+        CommerceWorkspaceStorefrontsService $storefronts,
+        string $id,
+        string $domainId,
+    ): JsonResponse {
+        if ($request->user()?->role === 'self_service') {
+            abort(403, 'مساحة عمل التجارة غير متاحة لحساب الخدمة الذاتية.');
+        }
+
+        try {
+            $disconnected = $storefronts->disconnectCustomDomainForCurrentTenant($id, $domainId);
+        } catch (DomainNotDisconnectableException $e) {
+            abort(422, $e->getMessage());
+        }
+
+        if ($disconnected === null) {
+            abort(404, 'النطاق غير موجود.');
+        }
+
+        return response()->json([
+            'data' => ['disconnected' => true],
         ]);
     }
 }
