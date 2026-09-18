@@ -38,16 +38,28 @@ export function ProductDetails({ product, basePath }: ProductDetailsProps) {
 
   const hasVariants = variants.length > 0;
   const optionTypes = product.option_types || [];
+  /*
+   * AWJ's own flag, not a count. A variant-managed product with every variant
+   * deactivated still must not be purchasable through its parent, and
+   * `variants.length > 0` alone would not say so.
+   */
+  const isVariantManaged =
+    (product as { isVariantManaged?: boolean }).isVariantManaged === true;
 
   // Initialize with default variant or first available variant
   const [selectedVariant, setSelectedVariant] = useState<Variant | null>(() => {
+    /*
+     * AWJ flags no default variant, so preselecting one would assert a merchant
+     * choice that was never made. A variant-managed product therefore starts
+     * with nothing selected and nothing purchasable — the shopper picks.
+     */
+    if (isVariantManaged) return null;
     if (product.default_variant) {
       return product.default_variant;
     }
     if (hasVariants) {
       return variants.find((v) => v.purchasable) || variants[0];
     }
-    // For products without variants, use default variant
     return product.default_variant || null;
   });
 
@@ -97,27 +109,38 @@ export function ProductDetails({ product, basePath }: ProductDetailsProps) {
   const sku = selectedVariant?.sku ?? product.default_variant?.sku;
 
   // Purchasability
-  const isPurchasable = hasVariants
-    ? (selectedVariant?.purchasable ?? false)
-    : (product.purchasable ?? false);
+  const isPurchasable = isVariantManaged
+    ? // Nothing is purchasable until a real variant is resolved, and then only
+      // on that variant's own server-supplied availability.
+      (selectedVariant?.purchasable ?? false)
+    : hasVariants
+      ? (selectedVariant?.purchasable ?? false)
+      : (product.purchasable ?? false);
 
   const inStock = hasVariants
     ? (selectedVariant?.in_stock ?? false)
     : (product.in_stock ?? false);
 
   const handleAddToCart = async () => {
-    // The wholesale surface still runs on real Spree variants — pass its own
-    // variant id unchanged. The DTC surface is AWJ Cart V1 (product + UOM,
-    // no variants yet — VAR-COM-1 is a separate later workstream): its
-    // catalog products carry a synthetic `${product.id}-default` variant id
-    // purely so this Spree-shaped UI has something to render (SKU row,
-    // variant picker fallback) — see `mapAwjProductToViewModel`'s own
-    // warning that id "is not a real Spree variant and never will back a
-    // real cart." `product.id` is the real AWJ product UUID `mappers.ts`
-    // copies through verbatim; that's the one Cart V1 accepts.
+    /*
+     * The wholesale surface runs on real Spree variants — pass its own variant
+     * id unchanged.
+     *
+     * The DTC surface is AWJ Cart V1, which takes a product id AND an optional
+     * `product_variant_id`. A simple product sends only the product: its
+     * `${product.id}-default` variant is synthetic and would never resolve.
+     * A variant-managed product must send the variant the shopper actually
+     * chose — the parent has no sellable identity, and sending it added the
+     * wrong thing.
+     */
     if (surface !== "wholesale") {
+      const awjVariantId = isVariantManaged ? selectedVariant?.id : null;
+      // Guarded by the disabled button below; this is the last line of defence
+      // so a mis-wired caller cannot post a parent id for a variant product.
+      if (isVariantManaged && !awjVariantId) return;
+
       setLoading(true);
-      await addItem(product.id, quantity, "base");
+      await addItem(product.id, quantity, "base", awjVariantId);
       setLoading(false);
       trackAddToCart(product, selectedVariant, quantity, currency);
       return;
