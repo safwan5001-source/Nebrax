@@ -8,6 +8,7 @@ use App\Models\StorefrontDomain;
 use App\Services\Commerce\Edge\EdgeSnapshot;
 use App\Services\Commerce\Edge\StorefrontEdgeClient;
 use App\Support\HostnameNormalizer;
+use App\Support\IcannRegistrableDomain;
 use App\Support\InvalidHostnameException;
 use App\Support\ManagedStorefrontHostname;
 use App\Tenancy\TenantContext;
@@ -588,7 +589,7 @@ final class CommerceWorkspaceStorefrontsService
                 'لا يمكن تفعيل الحافة قبل اكتمال تحقّق ملكية النطاق.'
             );
         }
-        if (! $this->isV1SubdomainHostname($domain->hostname)) {
+        if (! IcannRegistrableDomain::isSubdomain($domain->hostname)) {
             throw new DomainNotEligibleForEdgeException(
                 'تفعيل النطاق الجذري غير مدعوم في هذه المرحلة — استخدم نطاقاً فرعياً مثل shop.example.com.'
             );
@@ -600,13 +601,6 @@ final class CommerceWorkspaceStorefrontsService
                 'لا يمكن تفعيل نطاق يقع ضمن نطاق أَوْج المُدار.'
             );
         }
-    }
-
-    private function isV1SubdomainHostname(string $hostname): bool
-    {
-        $labels = explode('.', $hostname);
-
-        return count($labels) >= 3 && ! in_array('', $labels, true);
     }
 
     private function applyEdgeSnapshot(StorefrontDomain $domain, EdgeSnapshot $snapshot, string $providerId): void

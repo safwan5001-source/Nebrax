@@ -286,6 +286,21 @@ class CommerceWorkspaceActivateEdgeApiTest extends TestCase
     }
 
     /** @test */
+    public function multi_label_public_suffix_apex_is_rejected(): void
+    {
+        $auth = $this->registerTenant('edge-act-psl', 'owner@edge-act-psl.test');
+        $seeded = $this->seedVerifiedCustom($auth['tenant_id'], 'shop.co.uk');
+
+        $res = $this->withToken($auth['token'])
+            ->postJson($this->path($seeded['storefront']->id, $seeded['domain']->id))
+            ->assertStatus(422);
+
+        $this->assertStringContainsString('الجذري', (string) $res->json('message'));
+        $this->assertSame(0, $this->edge->provisionCalls);
+        $this->assertSame(StorefrontDomain::EDGE_NONE, $seeded['domain']->fresh()->edge_status);
+    }
+
+    /** @test */
     public function awj_managed_namespace_is_rejected(): void
     {
         $auth = $this->registerTenant('edge-act-ns', 'owner@edge-act-ns.test');

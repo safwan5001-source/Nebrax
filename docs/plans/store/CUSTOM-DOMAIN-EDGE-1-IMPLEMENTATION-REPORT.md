@@ -2,7 +2,7 @@
 
 ## Status
 
-**COMPLETE.** PR opened, not merged, not deployed.
+**COMPLETE** (including P1 V1-hostname / ICANN Public Suffix fix). PR opened, not merged, not deployed.
 
 EDGE-2 (frontend) and EDGE-3 (Make Primary opening + provider-first Disconnect) are **not** in this slice.
 
@@ -14,7 +14,8 @@ EDGE-2 (frontend) and EDGE-3 (Make Primary opening + provider-first Disconnect) 
 - PR: [#864](https://github.com/safwan5001-source/Nebrax/pull/864)
 - Base SHA: `0b5a868a81ee6746edefc38ea45b8e7f47ef4693`
 - Implementation SHA: `9c72c4137628ceeee0eaaa55078d41899542cfdb`
-- Head SHA at report time: see the PR head (test-fix + this report commits after the implementation commit do not change production behavior)
+- P1 hostname SHA: see the PR head after the ICANN Public Suffix commits
+- Head SHA at report time: see the PR head
 
 `main` was already at #863. Later #862 is in ancestry (parent of #863). Those commits were kept.
 
@@ -146,9 +147,38 @@ EDGE-1 may persist `ready` after that observation. **Make Primary still rejects 
 
 ## V1 hostname rule
 
-Subdomain-only: `count(explode('.', hostname)) >= 3` with no empty labels. Apex (`example.com`) → 422.
+Activate allows a custom hostname only when it is a **subdomain of an ICANN registrable domain**: at least one DNS label to the left of `IcannRegistrableDomain::registrableDomain()`.
 
-No Public Suffix List library is in the repo. **Documented gap:** `shop.co.uk` (registrable apex on a multi-label TLD) is accepted as a 3-label hostname. Do not invent unsafe homemade PSL logic in this PR.
+| Hostname | Result |
+|---|---|
+| `shop.example.com` | allowed (subdomain of `example.com`) |
+| `example.com` | 422 apex |
+| `shop.co.uk` | 422 registrable apex on multi-label suffix `co.uk` |
+| `www.shop.co.uk` | allowed (subdomain of `shop.co.uk`) |
+
+`isV1SubdomainHostname()` (label-count `>= 3`) was removed. That rule accepted `shop.co.uk` and violated the EDGE-1 stop condition against homemade Public Suffix logic.
+
+### Dependency search (no composer package added)
+
+Searched current assembled dependencies and the kernel repo:
+
+| Source | PSL? |
+|---|---|
+| `composer require` in `.github/workflows/ci.yml`, `setup.sh`, `deploy/assemble.sh` | `laravel/sanctum`, `league/flysystem-aws-s3-v3`, `predis/predis` only |
+| Laravel 11 skeleton / `laravel/framework` | no PSL (`league/uri` has no public-suffix parser; `league/uri-hostname-parser` is abandoned) |
+| `web/package.json` / `storefront/package.json` | no `psl` / `tldts` / `parse-domain` |
+| `app/Support` | `HostnameNormalizer` is ASCII label syntax only |
+
+`jeremykendall/php-domain-parser` is the standard PHP library but is **not** in the tree, does **not** ship the PSL dat file, and would require a new `composer require` in all three assembly scripts plus a vendored data file. That is a dependency change. It was **not** added.
+
+### Minimum safe option implemented
+
+- Frozen Mozilla PSL **ICANN** snapshot (2026-09-18) as `IcannPublicSuffixRules` (PHP nowdoc so existing `app/Support/*.php` CI copy picks it up; no new assembly path).
+- Official publicsuffix.org matching algorithm in `IcannRegistrableDomain` (exact / `*.wildcard` / `!exception` / default `*`).
+- Fail closed on empty, malformed, public-suffix-itself, or hostname == registrable domain.
+- **No runtime HTTP** to publicsuffix.org or any other host.
+- PRIVATE suffixes omitted: CNAME-apex is an ICANN-registrable concern (`foo.github.io` remains a V1 subdomain of `github.io`).
+- No schema change. No Railway client/API change.
 
 AWJ managed namespace reused: `ManagedStorefrontHostname::isUnderBaseDomain` + exact base match.
 
@@ -156,7 +186,8 @@ AWJ managed namespace reused: `ManagedStorefrontHostname::isUnderBaseDomain` + e
 
 - Tenant Isolation: 404 lock path; provider id read from the locked row only
 - Client cannot set provider id / DNS / `edge_status`
-- SSRF: no HTTP to merchant hostname; GraphQL endpoint is fixed
+- SSRF: no HTTP to merchant hostname; GraphQL endpoint is fixed; PSL is a frozen in-repo snapshot (no fetch of publicsuffix.org)
+- V1 hostname: ICANN registrable-domain check; `shop.co.uk` cannot Activate
 - Secrets: Laravel env only; never `NEXT_PUBLIC_*`; never merchant JSON; never logs of `Authorization`
 - AWJ namespace: Activate re-checks managed base
 - Ownership TXT unchanged and not replaced by Railway TXT
@@ -190,6 +221,8 @@ Backend / assembly:
 - `app/Services/Commerce/CommerceWorkspaceStorefrontsService.php`
 - `app/Services/Commerce/Edge/*` (client, Railway, fake, mapper, DTOs)
 - `app/Services/Commerce/StorefrontEdge*.php` / `DomainNot*ForEdgeException.php`
+- `app/Support/IcannRegistrableDomain.php`
+- `app/Support/IcannPublicSuffixRules.php` (frozen ICANN PSL snapshot 2026-09-18)
 - `app/Http/Controllers/Api/CommerceWorkspaceStorefrontsController.php`
 - `app/Providers/TenancyServiceProvider.php`
 - `config/storefront.php`
@@ -202,6 +235,7 @@ Tests:
 - `tests/Feature/StorefrontDomainEdgeStateMigrationTest.php`
 - `tests/Feature/RailwayEdgeStatusMapperTest.php`
 - `tests/Feature/RailwayStorefrontEdgeClientTest.php`
+- `tests/Feature/IcannRegistrableDomainTest.php`
 - `tests/Feature/CommerceWorkspaceActivateEdgeApiTest.php`
 - `tests/Feature/CommerceWorkspaceRefreshEdgeApiTest.php`
 - `tests/Feature/CommerceWorkspaceActivateEdgePostgresConcurrencyTest.php`
@@ -217,18 +251,19 @@ No `web/` or `storefront/` frontend files.
 
 ## Tests
 
-PHP is not installed in this sandbox (kernel-only repo; tests assemble Laravel in CI). Counts below are from GitHub Actions on PR #864, HEAD `52cc1238f1f5cf9888b03a8aff75f026030a3894`.
+PHP is not installed in this sandbox (kernel-only repo; tests assemble Laravel in CI). Counts below are from GitHub Actions on PR #864.
 
-Recorded from [CI run 35376113993](https://github.com/safwan5001-source/Nebrax/actions/runs/35376113993) (`pull_request`).
+Original EDGE-1 implementation recorded from [CI run 35376113993](https://github.com/safwan5001-source/Nebrax/actions/runs/35376113993) (`pull_request` on `52cc123`). P1 hostname-fix counts are recorded from the follow-up `pull_request` run on this PR (see Full suite table).
 
 ### Targeted backend (CI)
 
 | Suite | sqlite | pgsql |
 |---|---|---|
+| `IcannRegistrableDomainTest` | pending P1 CI | pending P1 CI |
 | `StorefrontDomainEdgeStateMigrationTest` | **3 passed** | **3 passed** |
 | `RailwayEdgeStatusMapperTest` | **8 passed** | **8 passed** |
 | `RailwayStorefrontEdgeClientTest` | **10 passed** | **10 passed** |
-| `CommerceWorkspaceActivateEdgeApiTest` | **21 passed** | **21 passed** |
+| `CommerceWorkspaceActivateEdgeApiTest` | **21 passed** + P1 apex case | **21 passed** + P1 apex case |
 | `CommerceWorkspaceRefreshEdgeApiTest` | **13 passed** | **13 passed** |
 | `CommerceWorkspaceActivateEdgePostgresConcurrencyTest` | **skipped** (sqlite) | **1 passed** |
 | `CommerceWorkspaceMakePrimaryDomainApiTest` | **16 passed** | **16 passed** |
@@ -270,7 +305,7 @@ pgsql − sqlite passed = 43, matching the sqlite skip count (includes pgsql-onl
 3. **Railway plan / domain quota still UNKNOWN.** Hobby default 2 / Pro 20 per service. Create fails closed on quota.
 4. **Production env credentials/IDs are not configured by this PR.** Activate/Refresh return 503 until ops set `RAILWAY_API_TOKEN`, `RAILWAY_PROJECT_ID`, `RAILWAY_ENVIRONMENT_ID`, `RAILWAY_STOREFRONT_SERVICE_ID` on the **Laravel** service (never Next.js, never git).
 5. Target Railway service **must** be the storefront Next.js service, not the Laravel API. Wrong service id would attach Host to a process that never runs `ResolveStorefrontDomain`.
-6. PSL gap: `shop.co.uk` accepted as a 3-label hostname.
+6. Frozen ICANN PSL snapshot (2026-09-18). New suffixes after that date fall through to the official default `*` rule (last label = public suffix) — fail-closed for 2-label apex, including unknown TLDs. Refresh the snapshot; do not fetch at runtime.
 7. Dual TXT merchant confusion is an EDGE-2 copy problem, not an API contract change.
 
 ## Scope Confirmation
@@ -285,6 +320,9 @@ pgsql − sqlite passed = 43, matching the sqlite skip count (includes pgsql-onl
 - no merge
 - no accounting changes
 - no unrelated refactor
+- no homemade label-count Public Suffix heuristic
+- no new composer dependency
+- no schema change
 - 1B-3A TXT contract unchanged
 
 ## Recommended Next Action
