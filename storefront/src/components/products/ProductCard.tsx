@@ -63,6 +63,9 @@ export const ProductCard = memo(function ProductCard({
    */
   const categoryName = product.categories?.[0]?.name ?? null;
 
+  const isVariantManaged =
+    (product as { isVariantManaged?: boolean }).isVariantManaged === true;
+
   const handleClick = () => {
     if (index != null && listId && listName && currency) {
       trackSelectItem(product, listId, listName, index, currency);
@@ -118,6 +121,15 @@ export const ProductCard = memo(function ProductCard({
           {displayPrice ? (
             <span className="text-sm font-black text-store-primary md:text-base">
               {displayPrice}
+            </span>
+          ) : isVariantManaged ? (
+            /*
+             * A variant-managed product has no price of its own — the listing
+             * endpoint sends zero for it deliberately. Saying where the price
+             * lives is honest; printing that zero said the product was free.
+             */
+            <span className="text-xs font-medium text-store-muted-foreground">
+              {t("pricedByOption")}
             </span>
           ) : (
             // Null price: a deliberate hide inside a HiddenPricingProvider

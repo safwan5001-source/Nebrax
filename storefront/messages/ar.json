@@ -197,7 +197,9 @@
     "properties": "الخصائص",
     "yes": "نعم",
     "no": "لا",
-    "optionFilterChip": "{filter}: {value}"
+    "optionFilterChip": "{filter}: {value}",
+    "pricedByOption": "السعر حسب الخيار",
+    "selectOptions": "اختر الخيارات"
   },
   "navigation": {
     "home": "الرئيسية",

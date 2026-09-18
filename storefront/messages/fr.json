@@ -197,7 +197,9 @@
     "properties": "Proprietes",
     "yes": "Oui",
     "no": "Non",
-    "optionFilterChip": "{filter} : {value}"
+    "optionFilterChip": "{filter} : {value}",
+    "pricedByOption": "Prix selon l'option",
+    "selectOptions": "Choisir les options"
   },
   "navigation": {
     "home": "Accueil",

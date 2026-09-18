@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
+import { StoreContainer } from "@/components/layout/StoreContainer";
 import { ProductListing } from "@/components/products/ProductListing";
 import { resolveCurrency } from "@/lib/data/markets";
 import { getProductFilters, getProducts } from "@/lib/data/products";
@@ -42,20 +43,25 @@ export default async function ProductsPage({
   const listName = query ? "Search Results" : "All Products";
 
   return (
-    <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="mb-8">
-        {query ? (
-          <h1 className="text-3xl font-bold text-gray-900">
-            {t("searchResultsFor", { query })}
+    // One measure and one rhythm, the same `StoreContainer` the shell and the
+    // homepage align to — this page used its own `container mx-auto` and raw
+    // gray-500/900 text, so it sat on a different grid to everything around it.
+    <StoreContainer className="space-y-5 py-5 md:space-y-6 md:py-6">
+      <div className="flex items-start gap-2">
+        <span
+          aria-hidden="true"
+          className="mt-1 h-4 w-1.5 shrink-0 rounded-full bg-store-primary md:mt-1.5 md:h-5"
+        />
+        <div className="min-w-0">
+          <h1 className="text-base font-extrabold leading-tight text-store-foreground md:text-lg">
+            {query ? t("searchResultsFor", { query }) : t("allProducts")}
           </h1>
-        ) : (
-          <>
-            <h1 className="text-3xl font-bold text-gray-900">
-              {t("allProducts")}
-            </h1>
-            <p className="mt-2 text-gray-500">{t("browseCollection")}</p>
-          </>
-        )}
+          {!query && (
+            <p className="mt-0.5 hidden text-xs text-store-muted-foreground md:block">
+              {t("browseCollection")}
+            </p>
+          )}
+        </div>
       </div>
 
       <ProductListing
@@ -71,6 +77,6 @@ export default async function ProductsPage({
           query ? t("noMatchingProducts", { query }) : t("tryAdjustingFilters")
         }
       />
-    </div>
+    </StoreContainer>
   );
 }

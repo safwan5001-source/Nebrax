@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { useEffect, useMemo, useState } from "react";
 import { QuantityPickerField } from "@/components/cart/QuantityPickerField";
+import { StoreContainer } from "@/components/layout/StoreContainer";
 import { HiddenPricePrompt } from "@/components/products/HiddenPricePrompt";
 import { MediaGallery } from "@/components/products/MediaGallery";
 import { ProductCustomFields } from "@/components/products/ProductCustomFields";
@@ -71,9 +72,18 @@ export function ProductDetails({ product, basePath }: ProductDetailsProps) {
     trackViewItem(product, currency);
   }, [product, currency]);
 
+  /*
+   * AWJ gives each variant its own media list, so a selected variant shows its
+   * own images rather than the parent's. Spree's `media.variant_ids` route does
+   * not apply here — the adapter has no variant ids to put there — so the swap
+   * is by list, not by index into a merged gallery. A variant with no media of
+   * its own falls back to the product's.
+   */
   const galleryImages = useMemo((): Media[] => {
+    const variantMedia = selectedVariant?.media ?? [];
+    if (variantMedia.length > 0) return variantMedia;
     return product.media || [];
-  }, [product.media]);
+  }, [selectedVariant, product.media]);
 
   const variantImageIndex = useMemo((): number | null => {
     if (!selectedVariant) return null;
@@ -82,6 +92,14 @@ export function ProductDetails({ product, basePath }: ProductDetailsProps) {
     );
     return index >= 0 ? index : null;
   }, [selectedVariant, galleryImages]);
+
+  /*
+   * `description_html` is null on the AWJ adapter now: the API's `description`
+   * is a plain text column and was being piped into `dangerouslySetInnerHTML`.
+   * The wholesale/Spree surface still supplies real authored HTML, so that
+   * branch is kept for it.
+   */
+  const descriptionText = product.description;
 
   const price = selectedVariant?.price ?? product.price;
   const originalPrice =
@@ -160,11 +178,13 @@ export function ProductDetails({ product, basePath }: ProductDetailsProps) {
     trackAddToCart(product, selectedVariant, quantity, currency);
   };
 
+  const needsOptionChoice = isVariantManaged && selectedVariant === null;
+
   return (
-    <div className="container mx-auto px-4 sm:px-6 lg:px-8  py-8">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-        {/* Media Gallery */}
-        <div>
+    <StoreContainer className="py-5 md:py-6">
+      {/* The product leads. No marketing band above it. */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)] lg:gap-10">
+        <div className="lg:sticky lg:top-(--store-header-offset) lg:self-start">
           <MediaGallery
             images={galleryImages}
             productName={product.name}
@@ -172,49 +192,62 @@ export function ProductDetails({ product, basePath }: ProductDetailsProps) {
           />
         </div>
 
-        {/* Product Info */}
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">{product.name}</h1>
+        <div className="min-w-0">
+          {product.categories?.[0]?.name && (
+            <p className="mb-1 text-xs font-medium text-store-muted-foreground">
+              {product.categories[0].name}
+            </p>
+          )}
 
-          {/* Price */}
-          <div className="mt-4 flex items-center gap-4">
+          <h1 className="text-lg font-extrabold leading-snug text-store-foreground md:text-xl">
+            {product.name}
+          </h1>
+
+          <div className="mt-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
             {displayPrice ? (
-              <span className="text-3xl font-bold text-gray-900">
+              <span className="text-xl font-black text-store-primary md:text-2xl">
                 {displayPrice}
               </span>
+            ) : needsOptionChoice ? (
+              <span className="text-sm font-medium text-store-muted-foreground">
+                {t("pricedByOption")}
+              </span>
             ) : (
-              <HiddenPricePrompt className="inline-flex items-center gap-1.5 text-base font-medium text-slate-600 underline underline-offset-4 hover:text-slate-900" />
+              <HiddenPricePrompt className="inline-flex items-center gap-1.5 text-sm font-medium text-store-foreground underline underline-offset-4 hover:text-store-primary" />
             )}
+            {/* Only ever rendered from a real compare-at price the server sent. */}
             {onSale && strikethroughPrice && (
-              <>
-                <span className="text-xl text-gray-500 line-through">
-                  {strikethroughPrice}
-                </span>
-                <span className="bg-red-100 text-red-800 text-sm font-medium px-2.5 py-0.5 rounded">
-                  {t("sale")}
-                </span>
-              </>
-            )}
-          </div>
-
-          {/* Stock Status */}
-          <div className="mt-4">
-            {inStock ? (
-              <span className="inline-flex items-center gap-1.5 text-green-600">
-                <CircleCheckBig className="w-5 h-5" />
-                {t("inStock")}
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1.5 text-red-600">
-                <CircleX className="w-5 h-5" />
-                {t("outOfStock")}
+              <span className="text-sm text-store-muted-foreground line-through">
+                {strikethroughPrice}
               </span>
             )}
           </div>
 
-          {/* Variant Picker */}
+          {/*
+            Availability is stated only once it means something. For a
+            variant-managed product that is after a variant is chosen — before
+            then the parent's rolled-up flag would answer a question the shopper
+            has not asked yet.
+          */}
+          {!needsOptionChoice && (
+            <p className="mt-2 text-xs font-medium">
+              {inStock ? (
+                <span className="inline-flex items-center gap-1.5 text-store-success">
+                  <CircleCheckBig className="size-4" aria-hidden="true" />
+                  {t("inStock")}
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 text-store-destructive">
+                  <CircleX className="size-4" aria-hidden="true" />
+                  {t("outOfStock")}
+                </span>
+              )}
+            </p>
+          )}
+
+          {/* Options: rendered only when the merchant actually defined some. */}
           {hasVariants && optionTypes.length > 0 && (
-            <div className="mt-8">
+            <div className="mt-5 border-t border-store-border pt-5">
               <VariantPicker
                 variants={variants}
                 optionTypes={optionTypes}
@@ -224,8 +257,7 @@ export function ProductDetails({ product, basePath }: ProductDetailsProps) {
             </div>
           )}
 
-          {/* Quantity & Add to Cart */}
-          <div className="mt-8">
+          <div className="mt-5 border-t border-store-border pt-5">
             {pricesHidden ? (
               // Guest on a prices-hidden channel: no pricing, no ordering —
               // route them through the wholesale sign-in first.
@@ -235,27 +267,29 @@ export function ProductDetails({ product, basePath }: ProductDetailsProps) {
                 </Link>
               </Button>
             ) : (
-              <div className="flex gap-4">
+              <div className="flex flex-wrap items-center gap-3">
                 <QuantityPickerField
                   quantity={quantity}
                   onQuantityChange={setQuantity}
                   size="lg"
                 />
 
-                {/* Add to Cart Button */}
                 <Button
                   size="lg"
+                  className="min-w-40 flex-1"
                   onClick={handleAddToCart}
                   disabled={loading || !isPurchasable}
                 >
                   {loading ? (
                     <>
-                      <Loader2 className="animate-spin h-5 w-5" />
+                      <Loader2 className="size-5 animate-spin motion-reduce:animate-none" />
                       {t("adding")}
                     </>
+                  ) : needsOptionChoice ? (
+                    t("selectOptions")
                   ) : isPurchasable ? (
                     <>
-                      <ShoppingBag className="w-5 h-5" />
+                      <ShoppingBag className="size-5" />
                       {t("addToCart")}
                     </>
                   ) : (
@@ -266,49 +300,53 @@ export function ProductDetails({ product, basePath }: ProductDetailsProps) {
             )}
           </div>
 
-          {/* Description */}
-          {product.description_html && (
-            <div className="mt-10 border-t pt-8">
-              <h2 className="text-lg font-medium text-gray-900 mb-4">
+          {descriptionText && (
+            <section className="mt-5 border-t border-store-border pt-5">
+              <h2 className="mb-2 text-sm font-bold text-store-foreground">
                 {t("description")}
               </h2>
-              {/* Description is admin-authored HTML from the Spree CMS backend (trusted source) */}
-              <div
-                className="text-gray-600 prose prose-sm max-w-none"
-                dangerouslySetInnerHTML={{
-                  __html: product.description_html,
-                }}
-              />
-            </div>
+              {/*
+                AWJ's description is a plain text column, not authored HTML —
+                rendering it through `dangerouslySetInnerHTML` both lost its
+                line breaks and treated merchant input as markup.
+              */}
+              <p className="whitespace-pre-line text-sm leading-relaxed text-store-muted-foreground">
+                {descriptionText}
+              </p>
+            </section>
           )}
 
-          {/* Custom Fields */}
           <ProductCustomFields customFields={product.custom_fields} />
 
-          {/* Product Details */}
-          <div className="mt-8 border-t pt-8">
-            <h2 className="text-lg font-medium text-gray-900 mb-4">
-              {t("details")}
-            </h2>
-            <dl className="space-y-3">
-              {sku && (
-                <div className="flex">
-                  <dt className="w-32 text-gray-500 text-sm">{t("sku")}</dt>
-                  <dd className="text-gray-900 text-sm">{sku}</dd>
-                </div>
-              )}
-              {selectedVariant?.options_text && (
-                <div className="flex">
-                  <dt className="w-32 text-gray-500 text-sm">{t("options")}</dt>
-                  <dd className="text-gray-900 text-sm">
-                    {selectedVariant.options_text}
-                  </dd>
-                </div>
-              )}
-            </dl>
-          </div>
+          {(sku || selectedVariant?.options_text) && (
+            <section className="mt-5 border-t border-store-border pt-5">
+              <h2 className="mb-2 text-sm font-bold text-store-foreground">
+                {t("details")}
+              </h2>
+              <dl className="space-y-1.5 text-sm">
+                {sku && (
+                  <div className="flex gap-3">
+                    <dt className="w-28 shrink-0 text-store-muted-foreground">
+                      {t("sku")}
+                    </dt>
+                    <dd className="min-w-0 text-store-foreground">{sku}</dd>
+                  </div>
+                )}
+                {selectedVariant?.options_text && (
+                  <div className="flex gap-3">
+                    <dt className="w-28 shrink-0 text-store-muted-foreground">
+                      {t("options")}
+                    </dt>
+                    <dd className="min-w-0 text-store-foreground">
+                      {selectedVariant.options_text}
+                    </dd>
+                  </div>
+                )}
+              </dl>
+            </section>
+          )}
         </div>
       </div>
-    </div>
+    </StoreContainer>
   );
 }

@@ -317,7 +317,13 @@ export function mapAwjProductToViewModel(
     backorderable: false,
     available: purchasable,
     description: product.description,
-    description_html: product.description,
+    /*
+     * AWJ's `description` is a plain text column, not authored HTML. Claiming
+     * it as `description_html` sent merchant-typed text through
+     * `dangerouslySetInnerHTML`, which both dropped its line breaks and treated
+     * input as markup. The PDP renders `description` as text instead.
+     */
+    description_html: null,
     default_variant_id: `${product.id}-default`,
     thumbnail_url: product.thumbnail_url,
     tags: [],
