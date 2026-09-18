@@ -13,7 +13,7 @@ merge (#857). Verified by fetch, not assumed.
 
 ## 3. Head SHA
 
-`d9e73345752e5bbeb1e0cd492aad08368e52940d`
+`e931adae7be75f4056eb18cb3e05ac57a661d9bb`
 
 ## 4. Branch
 
@@ -393,3 +393,236 @@ Product-owner visual review of the 25 captures, with attention to the three
 differences in §30 — in particular whether a category-image capability and a
 related-products relationship are wanted as backend slices, since both are
 presentation the reference shows and AWJ cannot currently support.
+
+
+---
+
+# STORE-UI-3 — Final Design Completion Pass
+
+## 35. Heads
+
+| | |
+|---|---|
+| **Previous Head** | `c8fbdc876bd4763a3f1d0f7dae2e995d0a0cf1ab` — verified against the remote before any change |
+| **New Head** | `e931adae7be75f4056eb18cb3e05ac57a661d9bb` |
+
+## 36. The policy this pass operates under
+
+The owner's decision is now recorded in
+`docs/plans/store/AWJ_STOREFRONT_DESIGN_FIRST_POLICY.md`:
+
+> Missing backend capability does not block storefront design completion.
+> It blocks production activation.
+
+with the four states (**LIVE**, **DESIGN_ONLY**, **GATED**, **DEFERRED**), the
+things design-first never licenses, the five facts every unbacked capability
+must record, and a register covering wishlist, category imagery,
+recommendations, ratings, promotions, shipping/payment presentation and
+comparison.
+
+## 37. Changed files
+
+```
+docs/plans/store/AWJ_STOREFRONT_DESIGN_FIRST_POLICY.md
+storefront/messages/ar.json
+storefront/messages/de.json
+storefront/messages/en.json
+storefront/messages/es.json
+storefront/messages/fr.json
+storefront/messages/pl.json
+storefront/src/app/[country]/[locale]/(storefront)/products/[slug]/ProductDetails.tsx
+storefront/src/app/[country]/[locale]/layout.tsx
+storefront/src/components/products/ProductCard.tsx
+storefront/src/components/products/WishlistButton.tsx
+storefront/src/components/products/__tests__/ProductCard.test.tsx
+storefront/src/components/products/filters/ProductFilters.tsx
+storefront/src/contexts/WishlistContext.tsx
+storefront/src/contexts/__tests__/WishlistContext.test.tsx
+storefront/src/lib/commerce/capabilities.ts
+```
+
+## 38. ProductCard purchase action — **LIVE**
+
+One action line at the foot of the **shared** card, so the homepage,
+`/products`, category results and search results all get it from a single
+component — no per-page card design.
+
+| Case | Behaviour |
+|---|---|
+| Simple, purchasable | `أضف للسلة` / `Add to cart`. Adds by **product id** through the cart contract proven in Phase 0: quantity only, no variant, no price. |
+| Variant-managed | `اختر الخيارات` / `Select options`. **Never adds the parent** — it has no sellable identity — and routes to the detail page where a real variant resolves. |
+| Unavailable | A plain unavailable state and no working add action. |
+
+Restraint held to deliberately: no nested action-card footer, no icon in the
+button, no oversized control, no decoration. The image still leads and
+two-column phone browsing stays readable (verified at 390).
+
+Duplicate submission is refused while a request is in flight. A rejection
+re-enables the control and reports nothing — errors stay on `CartContext`'s
+single existing toast channel, and the card never reports a success the server
+refused. No price or total is computed client-side.
+
+**The wholesale surface is untouched.** It sells real Spree variants and its
+listing carries no safe single identifier to add, so its cards stay link-only
+exactly as before.
+
+## 39. Wishlist / favourites — **DESIGN_ONLY / GATED**
+
+Verified, not assumed: `store/v1` exposes **no wishlist endpoint** and this
+repository has **no adapter**. The Spree SDK carries `WishlistItem` types, which
+is why the gap is easy to mistake for a capability.
+
+Designed and built anyway, on `ProductCard` (homepage, `/products`, category,
+search) and on product detail, as one component through one provider.
+
+- **States:** default (outline), selected (filled, primary), hover,
+  focus-visible, pending (dimmed, non-interactive), error (reverts the flip).
+- **Accessibility:** `aria-pressed` plus both names —
+  "إضافة إلى المفضلة" / "إزالة من المفضلة", "Add to favorites" /
+  "Remove from favorites".
+- **Persistence: none.** Not React-persisted, not `localStorage`, not a cookie.
+  State lives for the page only. A favourite surviving a reload would imply an
+  account-level promise the platform has not made, and the policy forbids
+  substituting browser storage for real business persistence. **A test asserts
+  `Storage.prototype.setItem` is never called.**
+- **Renders nothing outside its provider**, so a surface that has not opted in
+  shows no heart rather than a dead control.
+
+**Missing backend contract, for later closure:** `GET store/v1/wishlist` ·
+`POST store/v1/wishlist/items {product_id}` ·
+`DELETE store/v1/wishlist/items/{product}` — plus **an identity to hang it on**,
+since the storefront's cart identity is an anonymous cookie token and a
+favourites list outliving a cart needs an account. That identity decision is the
+substantive part of the gap, not the three routes.
+
+**Activation:** flip `WISHLIST_CAPABILITY` to `"live"` and point
+`WishlistProvider.toggle` at the real mutation. **No consuming component
+changes** — which is the entire purpose of the seam.
+
+## 40. Capability status summary
+
+| Capability | State |
+|---|---|
+| Catalogue browsing, search, sort, pagination | **LIVE** |
+| Product detail, gallery, generic options, variant resolution | **LIVE** |
+| Add to cart (simple + variant, incl. rejection handling) | **LIVE** |
+| Quantity | **LIVE** |
+| Wishlist / favourites | **DESIGN_ONLY / GATED** |
+| Category imagery · related products · ratings · promotions · shipping/payment presentation · comparison | **DEFERRED** |
+
+## 41. Catalogue spacing correction
+
+The rule under the catalogue controls carried `pb-4` + `mb-6` on top of the
+page's own vertical rhythm, which opened a gap wide enough to read as a missing
+element between the controls and the grid. Tightened to `pb-3` + `mb-3` and
+moved onto the store border token, so the grid reads as connected to the
+controls while keeping deliberate breathing room. Verified on `/products` and on
+a category with a single product. **No empty banner was restored.**
+
+Two related honesty fixes the same area exposed:
+
+- The **mobile filter trigger rendered unconditionally.** With AWJ's empty facet
+  list that put a button on every phone which opened an empty drawer — a control
+  that looks functional and is not. It now appears only when the catalogue
+  actually exposes something to filter on.
+- The **sort control used a physical `ml-auto`**, so it sat on the left in both
+  directions instead of mirroring. Now `ms-auto`.
+
+## 42. MobileBottomNav clearance — verified, not redesigned
+
+Measured at 390 after scrolling to the end of the document:
+
+```
+navTop: 783 · lowest footer text bottom: 763.75 · clearance: 19px
+spacer present: true · spacer height: 60px
+```
+
+The existing spacer (`--store-bottom-nav-height` + `env(safe-area-inset-bottom)`)
+already clears the fixed navigation, and no meaningful content is obscured on the
+homepage, catalogue, category or product detail — including the PDP's options,
+purchase controls and description, and the catalogue's final row. The automated
+probe's "1px" reading is the footer *container's* bottom edge meeting the spacer,
+not text. `MobileBottomNav` itself was not touched.
+
+## 43. Screenshots captured
+
+28 renders — fold, full page, and a scrolled-to-end frame at phone width — at
+390 / 768 / 1024 / 1440 in Arabic RTL and English LTR across the homepage,
+`/products`, category results and product detail. Every ProductCard state is
+visible for review in them: add to cart, select options, unavailable, and the
+favourites affordance. The product detail frames show favourites, options,
+quantity, add-to-cart and the end-of-page bottom-nav clearance.
+
+**No horizontal overflow at any width on any page**, asserted per capture.
+
+## 44. RTL / LTR and responsive validation
+
+Both directions at 390 / 768 / 1024 / 1440 on all four surfaces. The card action
+and heart mirror with logical properties; the sort control's physical margin was
+corrected as part of this pass.
+
+## 45. Tests
+
+```
+npx vitest run     →  60 files, 475 tests passed  (12 new in this pass)
+pnpm check         →  326 files, no fixes applied
+pnpm check:locales →  all 6 locales in sync
+npx tsc --noEmit   →  clean
+pnpm build         →  exit 0 (Compiled successfully in 18.4s)
+```
+
+New in this pass: simple-product add sends product id with no variant and no
+price · a variant-managed card never mutates the cart and routes to detail ·
+unavailable offers no working add and says so once · duplicate submit refused
+while in flight · rejection re-enables without claiming success · wholesale left
+link-only · wishlist declared `design_only` · renders nothing outside its
+provider · both accessible names and `aria-pressed` toggle · per-product state
+independence · **no browser storage written**.
+
+A test caught a real defect during this pass — a rejected promise escaped the
+card's click handler unhandled. The component was fixed, not the test.
+
+## 46. CI status
+
+`<CI_STATUS_2>`
+
+## 47. Backend gaps intentionally deferred
+
+Wishlist (contract above) · category imagery · related/recommended products ·
+ratings and reviews · coupons, promotions and compare-at pricing · shipping,
+delivery and payment presentation · product comparison. All registered in the
+design-first policy with intended UX, surface, state, missing contract and
+activation requirement, so each is a backend task with a known target rather
+than a rediscovery.
+
+## 48. Risks and remaining items
+
+- **The favourites heart is interactive but inert.** That is the explicit intent
+  of DESIGN_ONLY and it is documented in code, in the policy and here — but a
+  reviewer clicking it should know the state is not saved anywhere.
+- **`ProductCard` is shared with the wholesale surface.** The new action is
+  branched away from wholesale and its tests pin that, but the blast radius is
+  wider than the DTC catalogue.
+- Category browsing still shows only products assigned directly to that
+  category, per the API's exact-match `category_id` (unchanged from §31).
+
+## 49. Confirmation
+
+- **No backend / API / schema / migration changes.** No Laravel file touched.
+- **No accounting or inventory changes.**
+- **No Tenant Isolation changes.**
+- **No checkout / payment / shipping changes.**
+- **No Store Customizer persistence.**
+- **No fake authoritative persistence, and no browser storage standing in for
+  business persistence.**
+- **Locked surfaces untouched:** Header, utility strip, StoreSearch, CategoryNav,
+  MobileBottomNav, Footer, homepage hero/categories/New Arrivals, and the
+  approved PDP composition. Only the minimum integration required by this pass.
+- **Not merged. Not deployed.** PR #860 stays open.
+
+## 50. Next step
+
+Safwan's visual approval of the captures. On approval, the first gap-closure
+task is the wishlist backend — the routes are trivial; the identity decision is
+the real work, and it should be taken deliberately rather than inherited from
+the cart's anonymous cookie.
