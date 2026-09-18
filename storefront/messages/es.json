@@ -328,7 +328,7 @@
   },
   "account": {
     "myAccount": "Mi cuenta",
-    "signInDescription": "Inicia sesion para acceder a tu cuenta e historial de pedidos.",
+    "signInDescription": "Inicia sesión para acceder a tu cuenta.",
     "email": "Correo electronico",
     "password": "Contrasena",
     "signIn": "Iniciar sesion",
@@ -338,11 +338,11 @@
     "signUp": "Registrate",
     "accountOverview": "Resumen de la cuenta",
     "orderHistory": "Historial de pedidos",
-    "orderHistoryDescription": "Consulta tus pedidos anteriores y rastrea envios",
+    "orderHistoryDescription": "Consulta tus pedidos.",
     "addresses": "Direcciones",
-    "addressesDescription": "Administra tus direcciones de envio y facturacion",
+    "addressesDescription": "Direcciones de entrega guardadas.",
     "paymentMethods": "Metodos de pago",
-    "paymentMethodsDescription": "Administra tus tarjetas de credito guardadas",
+    "paymentMethodsDescription": "Formas de pago guardadas.",
     "profile": "Perfil",
     "profileDescription": "Actualiza tu informacion personal",
     "signOut": "Cerrar sesion",
@@ -358,7 +358,57 @@
     "showPassword": "Mostrar contrasena",
     "hidePassword": "Ocultar contrasena",
     "forgotPassword": "¿Olvidaste tu contrasena?",
-    "policyConsentRequired": "Debes aceptar las politicas de la tienda para crear una cuenta"
+    "policyConsentRequired": "Debes aceptar las politicas de la tienda para crear una cuenta",
+    "wishlist": "Favoritos",
+    "wishlistDescription": "Productos que has guardado en esta página.",
+    "help": "Ayuda",
+    "helpDescription": "Políticas de la tienda y contacto.",
+    "signedInAs": "Sesión iniciada como",
+    "backToAccount": "Volver a la cuenta",
+    "signingOut": "Cerrando sesión...",
+    "signOutFailed": "No se pudo cerrar sesión. Inténtalo de nuevo.",
+    "notEnabledBadge": "No habilitado",
+    "addPaymentMethod": "Añadir método",
+    "removePaymentMethod": "Quitar",
+    "noPaymentMethods": "No hay métodos de pago guardados",
+    "noPaymentMethodsDescription": "Esta tienda aún no puede guardar un método de pago.",
+    "paymentNotEnabledTitle": "Los métodos de pago guardados aún no están habilitados",
+    "paymentNotEnabledBody": "No se guardó nada. Los datos de la tarjeta no se introducen en esta página.",
+    "paymentActionUnavailable": "Esta tienda aún no puede guardar ni quitar un método de pago.",
+    "savedMethodShape": "Forma prevista de los métodos guardados",
+    "savedMethod": {
+      "card": "Tarjeta",
+      "bank": "Transferencia"
+    },
+    "addressesNotEnabledTitle": "La libreta de direcciones aún no está habilitada",
+    "addressesNotEnabledBody": "Las direcciones del pago se usan solo en ese pedido. No se guardó nada.",
+    "addressActionUnavailable": "Esta tienda aún no puede guardar, editar ni quitar una dirección.",
+    "addressCardShape": "Tarjeta de dirección prevista",
+    "addressCardTitle": "Dirección de entrega",
+    "addressCardExample": "Calle, distrito, ciudad",
+    "editAddress": "Editar",
+    "removeAddress": "Quitar",
+    "addressFixture": {
+      "name": "Noura Alabdullah",
+      "line1": "Avenida King Fahd",
+      "line2": "Al Shati",
+      "cityPostal": "Dammam 32230",
+      "country": "Arabia Saudita"
+    },
+    "addressFixtureAlt": {
+      "name": "Noura Alabdullah",
+      "line1": "Almacén 4, Segunda ciudad industrial",
+      "line2": "Al Faisaliyah",
+      "cityPostal": "Dammam 32234",
+      "country": "Arabia Saudita"
+    },
+    "methodMask": "•••• 0000",
+    "methodExpiry": "•• / ••",
+    "wishlistNotEnabledTitle": "Los favoritos aún no se guardan en la cuenta",
+    "wishlistNotEnabledBody": "Un corazón dura solo en esta página. Recargar lo borra. No se guarda nada en el navegador.",
+    "wishlistEmpty": "No hay favoritos en esta página",
+    "wishlistEmptyDescription": "Pulsa el corazón de un producto para mantenerlo aquí hasta que salgas.",
+    "wishlistBrowse": "Ver productos"
   },
   "register": {
     "createAccount": "Crear cuenta",
@@ -380,7 +430,7 @@
   "orders": {
     "orderHistory": "Historial de pedidos",
     "noOrders": "Aun no hay pedidos",
-    "noOrdersDescription": "Cuando realices pedidos, apareceran aqui.",
+    "noOrdersDescription": "Cuando esta tienda pueda consultar tus pedidos, aparecerán aquí.",
     "startShopping": "Empezar a comprar",
     "order": "Pedido",
     "date": "Fecha",
@@ -426,7 +476,22 @@
     "orderTitle": "Pedido #{number}",
     "shipmentCanceledRefund": "Envio cancelado — se ha emitido un reembolso.",
     "shippingMethodUnavailable": "No disponible",
-    "totalColumn": "Total"
+    "totalColumn": "Total",
+    "statusConfirmed": "Confirmado",
+    "statusDraft": "Borrador",
+    "itemCount": "{count, plural, one {# artículo} other {# artículos}}",
+    "lookupUnavailableTitle": "Aún no se pueden consultar pedidos anteriores",
+    "lookupUnavailableBody": "Hacer un pedido sigue creándolo. Esta tienda aún no puede listarlos en tu cuenta.",
+    "timelineTitle": "Estado del pedido",
+    "timeline": {
+      "placed": "Realizado",
+      "preparing": "Preparando",
+      "onTheWay": "En camino",
+      "delivered": "Entregado",
+      "notTracked": "Sin seguimiento",
+      "caption": "Esta tienda aún no publica seguimiento de envío. Solo un pedido confirmado se marca como realizado."
+    },
+    "contact": "Contacto"
   },
   "orderPlaced": {
     "thanksForOrder": "¡Gracias por tu pedido, {name}!",
@@ -480,7 +545,10 @@
     "accountId": "ID de cuenta",
     "loadingProfile": "Cargando perfil...",
     "failedToUpdate": "Error al actualizar el perfil",
-    "email": "Correo electronico"
+    "email": "Correo electronico",
+    "phone": "Teléfono",
+    "phoneUnavailable": "Aún no se puede actualizar un teléfono en esta cuenta.",
+    "validationEmail": "Introduce un correo válido."
   },
   "creditCards": {
     "paymentMethods": "Metodos de pago",

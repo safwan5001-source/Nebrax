@@ -1,8 +1,7 @@
 import Link from "next/link";
-import { connection } from "next/server";
 import { getTranslations } from "next-intl/server";
-import { OrderDetail } from "@/components/account/OrderDetail";
-import { getOrder } from "@/lib/data/orders";
+import { AccountGatedNotice } from "@/components/account/AccountGatedNotice";
+import { ACCOUNT_ORDER_LOOKUP_CAPABILITY } from "@/lib/commerce/capabilities";
 
 interface OrderDetailPageProps {
   params: Promise<{
@@ -12,34 +11,44 @@ interface OrderDetailPageProps {
   }>;
 }
 
+/**
+ * AWJ DTC order detail. There is no `GET store/v1/account/orders/{id}`,
+ * so this route does not call Spree `orders.get`. The designed
+ * `AccountOrderDetail` surface lights up when that contract lands.
+ */
 export default async function OrderDetailPage({
   params,
 }: OrderDetailPageProps) {
-  await connection();
-  const { country, locale, id } = await params;
+  const { country, locale } = await params;
   const t = await getTranslations({
     locale: locale as Locale,
     namespace: "orders",
   });
   const basePath = `/${country}/${locale}`;
-  const order = await getOrder(id);
+  const unavailable = ACCOUNT_ORDER_LOOKUP_CAPABILITY !== "live";
 
-  if (!order || order.completed_at === null) {
-    return (
-      <div className="text-center py-12">
-        <h2 className="text-xl font-medium text-gray-900 mb-2">
-          {t("orderNotFound")}
-        </h2>
-        <p className="text-gray-500 mb-6">{t("orderNotFoundDescription")}</p>
-        <Link
-          href={`${basePath}/account/orders`}
-          className="text-primary hover:text-primary font-medium"
-        >
-          {t("backToOrders")}
-        </Link>
-      </div>
-    );
-  }
-
-  return <OrderDetail order={order} basePath={basePath} locale={locale} />;
+  return (
+    <div>
+      <h1 className="text-xl font-bold text-store-foreground sm:text-2xl">
+        {t("orderNotFound")}
+      </h1>
+      {unavailable && (
+        <div className="mt-4">
+          <AccountGatedNotice
+            title={t("lookupUnavailableTitle")}
+            body={t("lookupUnavailableBody")}
+          />
+        </div>
+      )}
+      <p className="mt-4 text-sm text-store-muted-foreground">
+        {t("orderNotFoundDescription")}
+      </p>
+      <Link
+        href={`${basePath}/account/orders`}
+        className="mt-6 inline-flex min-h-11 items-center text-sm font-medium text-store-primary hover:text-store-primary-hover"
+      >
+        {t("backToOrders")}
+      </Link>
+    </div>
+  );
 }

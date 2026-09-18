@@ -328,7 +328,7 @@
   },
   "account": {
     "myAccount": "حسابي",
-    "signInDescription": "سجّل الدخول للوصول إلى حسابك وسجل طلباتك.",
+    "signInDescription": "سجّل الدخول للوصول إلى حسابك.",
     "email": "البريد الإلكتروني",
     "password": "كلمة المرور",
     "signIn": "تسجيل الدخول",
@@ -338,11 +338,11 @@
     "signUp": "إنشاء حساب",
     "accountOverview": "نظرة عامة على الحساب",
     "orderHistory": "سجل الطلبات",
-    "orderHistoryDescription": "اطّلع على طلباتك السابقة وتتبّع شحناتك",
+    "orderHistoryDescription": "اطّلع على طلباتك.",
     "addresses": "العناوين",
-    "addressesDescription": "أدِر عناوين الشحن والفوترة الخاصة بك",
+    "addressesDescription": "عناوين التوصيل المحفوظة.",
     "paymentMethods": "طرق الدفع",
-    "paymentMethodsDescription": "أدِر بطاقاتك الائتمانية المحفوظة",
+    "paymentMethodsDescription": "وسائل الدفع المحفوظة.",
     "profile": "الملف الشخصي",
     "profileDescription": "حدّث معلوماتك الشخصية",
     "signOut": "تسجيل الخروج",
@@ -358,7 +358,57 @@
     "showPassword": "إظهار كلمة المرور",
     "hidePassword": "إخفاء كلمة المرور",
     "forgotPassword": "نسيت كلمة المرور؟",
-    "policyConsentRequired": "يجب الموافقة على سياسات المتجر لإنشاء حساب"
+    "policyConsentRequired": "يجب الموافقة على سياسات المتجر لإنشاء حساب",
+    "wishlist": "المفضلة",
+    "wishlistDescription": "منتجات حفظتها في هذه الصفحة.",
+    "help": "المساعدة",
+    "helpDescription": "سياسات المتجر وطرق التواصل.",
+    "signedInAs": "مسجّل الدخول باسم",
+    "backToAccount": "العودة إلى الحساب",
+    "signingOut": "جارٍ تسجيل الخروج...",
+    "signOutFailed": "تعذّر تسجيل الخروج. حاول مرة أخرى.",
+    "notEnabledBadge": "غير مفعّل",
+    "addPaymentMethod": "إضافة وسيلة",
+    "removePaymentMethod": "إزالة",
+    "noPaymentMethods": "لا توجد وسائل دفع محفوظة",
+    "noPaymentMethodsDescription": "لا يستطيع هذا المتجر حفظ وسيلة دفع بعد.",
+    "paymentNotEnabledTitle": "وسائل الدفع المحفوظة غير مفعّلة بعد",
+    "paymentNotEnabledBody": "لم يُحفظ شيء. عندما يتمكّن المتجر من حفظ وسيلة ستظهر هنا. لا تُدخل بيانات البطاقة في هذه الصفحة.",
+    "paymentActionUnavailable": "لا يستطيع هذا المتجر حفظ وسيلة دفع أو إزالتها بعد، لذلك لم يتغيّر شيء.",
+    "savedMethodShape": "شكل الوسائل المحفوظة",
+    "savedMethod": {
+      "card": "بطاقة",
+      "bank": "تحويل بنكي"
+    },
+    "addressesNotEnabledTitle": "دفتر العناوين غير مفعّل بعد",
+    "addressesNotEnabledBody": "العنوان الذي تكتبه عند إتمام الشراء يُستخدم لذلك الطلب فقط. لا يستطيع هذا المتجر حفظ دفتر عناوين بعد، لذلك لم يُحفظ شيء.",
+    "addressActionUnavailable": "لا يستطيع هذا المتجر حفظ عنوان أو تعديله أو حذفه بعد، لذلك لم يتغيّر شيء.",
+    "addressCardShape": "شكل بطاقة العنوان",
+    "addressCardTitle": "عنوان التوصيل",
+    "addressCardExample": "الشارع، الحي، المدينة",
+    "editAddress": "تعديل",
+    "removeAddress": "إزالة",
+    "addressFixture": {
+      "name": "نورة العبدالله",
+      "line1": "طريق الملك فهد",
+      "line2": "حي الشاطئ",
+      "cityPostal": "الدمام 32230",
+      "country": "المملكة العربية السعودية"
+    },
+    "addressFixtureAlt": {
+      "name": "نورة العبدالله",
+      "line1": "المستودع ٤، المدينة الصناعية الثانية",
+      "line2": "حي الفيصلية",
+      "cityPostal": "الدمام 32234",
+      "country": "المملكة العربية السعودية"
+    },
+    "methodMask": "•••• 0000",
+    "methodExpiry": "•• / ••",
+    "wishlistNotEnabledTitle": "المفضلة لا تُحفظ في الحساب بعد",
+    "wishlistNotEnabledBody": "قلب المنتج يبقى طول هذه الصفحة فقط. إعادة التحميل تمسحه. لا يُخزَّن شيء في المتصفح.",
+    "wishlistEmpty": "لا توجد مفضّلات في هذه الصفحة",
+    "wishlistEmptyDescription": "اضغط القلب على منتج ليبقى هنا إلى أن تغادر الصفحة.",
+    "wishlistBrowse": "تصفّح المنتجات"
   },
   "register": {
     "createAccount": "إنشاء حساب",
@@ -380,7 +430,7 @@
   "orders": {
     "orderHistory": "سجل الطلبات",
     "noOrders": "لا توجد طلبات بعد",
-    "noOrdersDescription": "ستظهر طلباتك هنا فور إنشائها.",
+    "noOrdersDescription": "عندما يتمكّن المتجر من استرجاع طلباتك ستظهر هنا.",
     "startShopping": "ابدأ التسوق",
     "order": "الطلب",
     "date": "التاريخ",
@@ -426,7 +476,22 @@
     "orderTitle": "الطلب رقم {number}",
     "shipmentCanceledRefund": "أُلغيت الشحنة — تم إصدار استرداد.",
     "shippingMethodUnavailable": "غير متاحة",
-    "totalColumn": "الإجمالي"
+    "totalColumn": "الإجمالي",
+    "statusConfirmed": "مؤكَّد",
+    "statusDraft": "مسودة",
+    "itemCount": "{count, plural, one {عنصر واحد} two {عنصران} few {# عناصر} many {# عنصراً} other {# عنصر}}",
+    "lookupUnavailableTitle": "لا يمكن استرجاع الطلبات السابقة بعد",
+    "lookupUnavailableBody": "إنشاء الطلب ما زال يحدث. لا يملك هذا المتجر بعد طريقة لعرض تلك الطلبات في حسابك.",
+    "timelineTitle": "حالة الطلب",
+    "timeline": {
+      "placed": "تم الطلب",
+      "preparing": "قيد التجهيز",
+      "onTheWay": "في الطريق",
+      "delivered": "تم التسليم",
+      "notTracked": "غير متتبَّع",
+      "caption": "هذا المتجر لا ينشر تتبّع الشحن بعد. الطلب المؤكَّد يُعلَّم أنه تم طلبه فقط."
+    },
+    "contact": "التواصل"
   },
   "orderPlaced": {
     "thanksForOrder": "شكراً لطلبك يا {name}!",
@@ -480,7 +545,10 @@
     "accountId": "معرّف الحساب",
     "loadingProfile": "جارٍ تحميل الملف الشخصي...",
     "failedToUpdate": "تعذّر تحديث الملف الشخصي",
-    "email": "البريد الإلكتروني"
+    "email": "البريد الإلكتروني",
+    "phone": "الهاتف",
+    "phoneUnavailable": "لا يمكن تحديث رقم الهاتف في هذا الحساب بعد.",
+    "validationEmail": "أدخل بريداً إلكترونياً صالحاً."
   },
   "creditCards": {
     "paymentMethods": "طرق الدفع",

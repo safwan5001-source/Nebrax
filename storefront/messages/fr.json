@@ -328,7 +328,7 @@
   },
   "account": {
     "myAccount": "Mon compte",
-    "signInDescription": "Connectez-vous pour acceder a votre compte et a votre historique de commandes.",
+    "signInDescription": "Connectez-vous pour accéder à votre compte.",
     "email": "E-mail",
     "password": "Mot de passe",
     "signIn": "Se connecter",
@@ -338,11 +338,11 @@
     "signUp": "S'inscrire",
     "accountOverview": "Apercu du compte",
     "orderHistory": "Historique des commandes",
-    "orderHistoryDescription": "Consultez vos commandes passees et suivez vos expeditions",
+    "orderHistoryDescription": "Consultez vos commandes.",
     "addresses": "Adresses",
-    "addressesDescription": "Gerez vos adresses de livraison et de facturation",
+    "addressesDescription": "Adresses de livraison enregistrées.",
     "paymentMethods": "Modes de paiement",
-    "paymentMethodsDescription": "Gerez vos cartes de credit enregistrees",
+    "paymentMethodsDescription": "Moyens de paiement enregistrés.",
     "profile": "Profil",
     "profileDescription": "Mettez a jour vos informations personnelles",
     "signOut": "Se deconnecter",
@@ -358,7 +358,57 @@
     "showPassword": "Afficher le mot de passe",
     "hidePassword": "Masquer le mot de passe",
     "forgotPassword": "Mot de passe oublie ?",
-    "policyConsentRequired": "Vous devez accepter les politiques du magasin pour creer un compte"
+    "policyConsentRequired": "Vous devez accepter les politiques du magasin pour creer un compte",
+    "wishlist": "Favoris",
+    "wishlistDescription": "Produits enregistrés sur cette page.",
+    "help": "Aide",
+    "helpDescription": "Politiques de la boutique et contact.",
+    "signedInAs": "Connecté en tant que",
+    "backToAccount": "Retour au compte",
+    "signingOut": "Déconnexion...",
+    "signOutFailed": "Impossible de se déconnecter. Réessayez.",
+    "notEnabledBadge": "Non activé",
+    "addPaymentMethod": "Ajouter un moyen",
+    "removePaymentMethod": "Retirer",
+    "noPaymentMethods": "Aucun moyen de paiement enregistré",
+    "noPaymentMethodsDescription": "Cette boutique ne peut pas encore enregistrer un moyen de paiement.",
+    "paymentNotEnabledTitle": "Les moyens de paiement enregistrés ne sont pas encore activés",
+    "paymentNotEnabledBody": "Rien n’a été enregistré. Les données de carte ne sont jamais saisies sur cette page.",
+    "paymentActionUnavailable": "Cette boutique ne peut pas encore enregistrer ou retirer un moyen de paiement.",
+    "savedMethodShape": "Forme prévue des moyens enregistrés",
+    "savedMethod": {
+      "card": "Carte",
+      "bank": "Virement"
+    },
+    "addressesNotEnabledTitle": "Le carnet d’adresses n’est pas encore activé",
+    "addressesNotEnabledBody": "Les adresses saisies au paiement ne servent que pour cette commande. Rien n’a été enregistré.",
+    "addressActionUnavailable": "Cette boutique ne peut pas encore enregistrer, modifier ou retirer une adresse.",
+    "addressCardShape": "Carte d’adresse prévue",
+    "addressCardTitle": "Adresse de livraison",
+    "addressCardExample": "Rue, quartier, ville",
+    "editAddress": "Modifier",
+    "removeAddress": "Retirer",
+    "addressFixture": {
+      "name": "Noura Alabdullah",
+      "line1": "Route du Roi Fahd",
+      "line2": "Al Shati",
+      "cityPostal": "Dammam 32230",
+      "country": "Arabie saoudite"
+    },
+    "addressFixtureAlt": {
+      "name": "Noura Alabdullah",
+      "line1": "Entrepôt 4, deuxième ville industrielle",
+      "line2": "Al Faisaliyah",
+      "cityPostal": "Dammam 32234",
+      "country": "Arabie saoudite"
+    },
+    "methodMask": "•••• 0000",
+    "methodExpiry": "•• / ••",
+    "wishlistNotEnabledTitle": "Les favoris ne sont pas encore enregistrés sur le compte",
+    "wishlistNotEnabledBody": "Un cœur ne dure que le temps de cette page. Recharger l’efface. Rien n’est stocké dans le navigateur.",
+    "wishlistEmpty": "Aucun favori sur cette page",
+    "wishlistEmptyDescription": "Touchez le cœur d’un produit pour le garder ici jusqu’à votre départ.",
+    "wishlistBrowse": "Parcourir les produits"
   },
   "register": {
     "createAccount": "Creer un compte",
@@ -380,7 +430,7 @@
   "orders": {
     "orderHistory": "Historique des commandes",
     "noOrders": "Aucune commande",
-    "noOrdersDescription": "Lorsque vous passerez des commandes, elles apparaitront ici.",
+    "noOrdersDescription": "Lorsque cette boutique pourra retrouver vos commandes, elles apparaîtront ici.",
     "startShopping": "Commencer les achats",
     "order": "Commande",
     "date": "Date",
@@ -426,7 +476,22 @@
     "orderTitle": "Commande #{number}",
     "shipmentCanceledRefund": "Expedition annulee — un remboursement a ete emis.",
     "shippingMethodUnavailable": "Indisponible",
-    "totalColumn": "Total"
+    "totalColumn": "Total",
+    "statusConfirmed": "Confirmée",
+    "statusDraft": "Brouillon",
+    "itemCount": "{count, plural, one {# article} other {# articles}}",
+    "lookupUnavailableTitle": "Les commandes passées ne peuvent pas encore être consultées",
+    "lookupUnavailableBody": "Passer commande les crée toujours. Cette boutique ne peut pas encore les lister sur le compte.",
+    "timelineTitle": "Statut de la commande",
+    "timeline": {
+      "placed": "Passée",
+      "preparing": "Préparation",
+      "onTheWay": "En route",
+      "delivered": "Livrée",
+      "notTracked": "Non suivi",
+      "caption": "Cette boutique ne publie pas encore de suivi d’expédition. Seule une commande confirmée est marquée comme passée."
+    },
+    "contact": "Contact"
   },
   "orderPlaced": {
     "thanksForOrder": "Merci pour votre commande, {name} !",
@@ -480,7 +545,10 @@
     "accountId": "ID du compte",
     "loadingProfile": "Chargement du profil...",
     "failedToUpdate": "Echec de la mise a jour du profil",
-    "email": "E-mail"
+    "email": "E-mail",
+    "phone": "Téléphone",
+    "phoneUnavailable": "Un numéro de téléphone ne peut pas encore être mis à jour sur ce compte.",
+    "validationEmail": "Saisissez une adresse e-mail valide."
   },
   "creditCards": {
     "paymentMethods": "Modes de paiement",
