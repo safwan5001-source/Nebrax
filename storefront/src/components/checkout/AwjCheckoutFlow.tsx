@@ -1,31 +1,56 @@
 "use client";
 
 /**
- * COM-CHECKOUT-1C — AWJ-native checkout UI. Wires the existing AWJ Store
- * cart to the existing AWJ Checkout V1 backend (COM-CHECKOUT-1A/1B) end to
- * end: create/resume checkout → contact/address/delivery → authoritative
- * review → idempotent completion → success. This is Storefront wiring
- * only — no backend/pricing/shipping/payment logic lives here; every
- * purchase-affecting value (prices, line totals, subtotal, delivery
- * amount) is read verbatim from the server response, never computed or
+ * COM-CHECKOUT-1C wiring, STORE-UI-4 presentation — the AWJ-native checkout.
+ *
+ * Wires the AWJ cart to the AWJ Checkout V1 backend end to end: create/resume →
+ * contact → address → delivery → payment (inert) → authoritative review →
+ * idempotent completion → confirmation. This is storefront wiring only. No
+ * pricing, shipping or payment logic lives here, and every purchase-affecting
+ * value — line prices, line totals, subtotal, delivery amount, order total — is
+ * read verbatim from the server's response and never computed, summed or
  * remembered client-side as a source of truth.
  *
- * Deliberately NOT the Spree `(checkout)` route group's `CheckoutProvider`/
- * `CheckoutContext` — this is a fully separate AWJ-native flow (no cart id
- * in the URL, no Spree state machine) per AWJ_CHECKOUT_V1_ARCHITECTURE.md
- * and the Storefront architecture boundary: AWJ DTC Cart/Checkout stays
- * AWJ-native, Wholesale/Spree checkout is untouched.
+ * Deliberately NOT the Spree `(checkout)` route group's `CheckoutProvider` /
+ * `CheckoutContext`: this is a fully separate AWJ-native flow (no cart id in the
+ * URL, no Spree state machine) per AWJ_CHECKOUT_V1_ARCHITECTURE.md. The
+ * architecture test beside this file enforces that boundary.
+ *
+ * ## Why the stages are sequential
+ *
+ * Each stage owns one endpoint and saves on its own "continue"
+ * (`PATCH checkout/contact`, `/address`, `/delivery`), so the server holds a
+ * complete stage or none of it. The review stage then reads back what the
+ * server actually stored rather than what the forms hold — which is how a save
+ * that silently failed shows up as missing instead of as confirmed.
+ *
+ * The payment stage calls nothing, because there is nothing to call. It is
+ * present and visibly inert; see `PaymentStage`.
  */
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { awjCartLineView, CartLine } from "@/components/cart/CartLine";
+import { CartSummary } from "@/components/cart/CartSummary";
+import { AddressStage } from "@/components/checkout/awj/AddressStage";
+import { AwjOrderConfirmation } from "@/components/checkout/awj/Confirmation";
+import { ContactStage } from "@/components/checkout/awj/ContactStage";
+import { DeliveryStage } from "@/components/checkout/awj/DeliveryStage";
+import { PaymentStage } from "@/components/checkout/awj/PaymentStage";
+import { ReviewStage } from "@/components/checkout/awj/ReviewStage";
+import {
+  type AddressForm,
+  CHECKOUT_STAGES,
+  type CheckoutStage,
+  type ContactForm,
+  EMPTY_ADDRESS,
+  EMPTY_CONTACT,
+} from "@/components/checkout/awj/types";
+import { CheckoutProgress } from "@/components/checkout/CheckoutProgress";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Textarea } from "@/components/ui/textarea";
+import { useCartLineImages } from "@/hooks/useCartLineImages";
 import {
   clearPersistedIdempotencyKey,
   resolveIdempotencyKey,
@@ -34,7 +59,6 @@ import {
   AWJ_DELIVERY_METHODS,
   type AwjDeliveryMethod,
   type AwjReviewIssue,
-  formatMinorAmount,
   type StorefrontCheckout,
   type StorefrontOrder,
 } from "@/lib/commerce/checkout-types";
@@ -48,41 +72,8 @@ import {
 } from "@/lib/data/awj-checkout";
 import { extractBasePath } from "@/lib/utils/path";
 
-type Stage =
-  | "loading"
-  | "empty"
-  | "unavailable"
-  | "details"
-  | "review"
-  | "success"
-  | "error";
-
-interface ContactForm {
-  name: string;
-  phone: string;
-  email: string;
-}
-
-interface AddressForm {
-  country: string;
-  region: string;
-  city: string;
-  district: string;
-  street: string;
-  postalCode: string;
-  notes: string;
-}
-
-const EMPTY_CONTACT: ContactForm = { name: "", phone: "", email: "" };
-const EMPTY_ADDRESS: AddressForm = {
-  country: "",
-  region: "",
-  city: "",
-  district: "",
-  street: "",
-  postalCode: "",
-  notes: "",
-};
+/** The states the flow can be in that are not one of the six stages. */
+type FlowState = "loading" | "empty" | "unavailable" | "stage" | "done";
 
 function toContactForm(checkout: StorefrontCheckout): ContactForm {
   return {
@@ -111,7 +102,8 @@ export function AwjCheckoutFlow() {
   const pathname = usePathname();
   const basePath = extractBasePath(pathname);
 
-  const [stage, setStage] = useState<Stage>("loading");
+  const [flowState, setFlowState] = useState<FlowState>("loading");
+  const [stage, setStage] = useState<CheckoutStage>("contact");
   const [checkout, setCheckout] = useState<StorefrontCheckout | null>(null);
   const [order, setOrder] = useState<StorefrontOrder | null>(null);
   const [contact, setContact] = useState<ContactForm>(EMPTY_CONTACT);
@@ -124,29 +116,27 @@ export function AwjCheckoutFlow() {
   const [reviewIssues, setReviewIssues] = useState<AwjReviewIssue[]>([]);
 
   // One Idempotency-Key per checkout *attempt*, persisted in localStorage
-  // scoped to this checkout's identity (see `checkout-idempotency.ts`) so
-  // it survives a reload — not just a re-render or a retry within the same
-  // mount. Resolved inside `initialize()` below (never during render:
-  // `localStorage` doesn't exist during SSR) before the visitor can reach
-  // the complete button. `identityRef` is kept alongside the key so a
-  // confirmed success can clear exactly this checkout's persisted entry.
+  // scoped to this checkout's identity (see `checkout-idempotency.ts`) so it
+  // survives a reload — not just a re-render or a retry within one mount.
+  // Resolved inside `initialize()` (never during render: `localStorage` does
+  // not exist during SSR) before the visitor can reach the place-order button.
   const idempotencyKeyRef = useRef<string | null>(null);
   const checkoutIdentityRef = useRef<string | null>(null);
 
   const initialize = useCallback(async () => {
-    setStage("loading");
+    setFlowState("loading");
     const identity = await getAwjCheckoutIdentity();
     checkoutIdentityRef.current = identity;
     idempotencyKeyRef.current = resolveIdempotencyKey(identity);
 
     const result = await startOrResumeAwjCheckout();
     if (!result.success) {
-      setStage("unavailable");
+      setFlowState("unavailable");
       return;
     }
     const nextCheckout = result.checkout;
     if (nextCheckout.cart.items.length === 0) {
-      setStage("empty");
+      setFlowState("empty");
       return;
     }
     setCheckout(nextCheckout);
@@ -159,59 +149,82 @@ export function AwjCheckoutFlow() {
         ? (nextCheckout.delivery.method as AwjDeliveryMethod)
         : null,
     );
-    setStage("details");
+    setStage("contact");
+    setFlowState("stage");
   }, []);
 
   useEffect(() => {
     initialize();
   }, [initialize]);
 
-  const handleSaveDetails = useCallback(async () => {
+  const goTo = useCallback((next: CheckoutStage) => {
     setFormError(null);
-    setSaving(true);
-    try {
-      const contactResult = await updateAwjContact({
-        name: contact.name.trim(),
-        phone: contact.phone.trim(),
-        email: contact.email.trim() ? contact.email.trim() : null,
-      });
-      if (!contactResult.success) {
-        setFormError(contactResult.error);
-        return;
-      }
-
-      const addressResult = await updateAwjAddress({
-        country: address.country.trim(),
-        region: address.region.trim() ? address.region.trim() : null,
-        city: address.city.trim(),
-        district: address.district.trim() ? address.district.trim() : null,
-        street: address.street.trim(),
-        postal_code: address.postalCode.trim()
-          ? address.postalCode.trim()
-          : null,
-        notes: address.notes.trim() ? address.notes.trim() : null,
-      });
-      if (!addressResult.success) {
-        setFormError(addressResult.error);
-        return;
-      }
-
-      let latest = addressResult.checkout;
-      if (deliveryMethod) {
-        const deliveryResult = await updateAwjDelivery(deliveryMethod);
-        if (!deliveryResult.success) {
-          setFormError(deliveryResult.error);
-          return;
-        }
-        latest = deliveryResult.checkout;
-      }
-
-      setCheckout(latest);
-      setStage("review");
-    } finally {
-      setSaving(false);
+    setStage(next);
+    // A stage change is a screen change on a phone; the shopper should land at
+    // the top of the new stage, not halfway down where the previous one ended.
+    // Guarded on actually being scrolled, so an already-top page never asks the
+    // browser (or a test environment) to scroll nowhere.
+    if (typeof window !== "undefined" && window.scrollY > 0) {
+      window.scrollTo({ top: 0, behavior: "auto" });
     }
-  }, [contact, address, deliveryMethod]);
+  }, []);
+
+  /**
+   * Saves the current stage to its own endpoint, then advances. A failure keeps
+   * the shopper on the stage with the server's message — it never advances past
+   * something the server refused.
+   */
+  const saveAndAdvance = useCallback(
+    async (from: CheckoutStage, to: CheckoutStage) => {
+      setFormError(null);
+      setSaving(true);
+      try {
+        if (from === "contact") {
+          const result = await updateAwjContact({
+            name: contact.name.trim(),
+            phone: contact.phone.trim(),
+            email: contact.email.trim() ? contact.email.trim() : null,
+          });
+          if (!result.success) {
+            setFormError(result.error);
+            return;
+          }
+          setCheckout(result.checkout);
+        } else if (from === "address") {
+          const result = await updateAwjAddress({
+            country: address.country.trim(),
+            region: address.region.trim() ? address.region.trim() : null,
+            city: address.city.trim(),
+            district: address.district.trim() ? address.district.trim() : null,
+            street: address.street.trim(),
+            postal_code: address.postalCode.trim()
+              ? address.postalCode.trim()
+              : null,
+            notes: address.notes.trim() ? address.notes.trim() : null,
+          });
+          if (!result.success) {
+            setFormError(result.error);
+            return;
+          }
+          setCheckout(result.checkout);
+        } else if (from === "delivery") {
+          if (!deliveryMethod) return;
+          // The only argument is the method. There is no amount parameter,
+          // here or in the client — the delivery amount is the server's alone.
+          const result = await updateAwjDelivery(deliveryMethod);
+          if (!result.success) {
+            setFormError(result.error);
+            return;
+          }
+          setCheckout(result.checkout);
+        }
+        goTo(to);
+      } finally {
+        setSaving(false);
+      }
+    },
+    [contact, address, deliveryMethod, goTo],
+  );
 
   const handleComplete = useCallback(async () => {
     if (!idempotencyKeyRef.current) return;
@@ -220,16 +233,16 @@ export function AwjCheckoutFlow() {
     try {
       const result = await completeAwjCheckoutAction(idempotencyKeyRef.current);
       if (result.success) {
-        // Confirmed success only — never clear on review_required,
-        // idempotency_conflict, or a transient error, all of which must
-        // keep the same persisted key so a retry (or a reload after a lost
-        // response) still replays correctly if this attempt actually
-        // landed server-side.
+        // Confirmed success only — never cleared on review_required,
+        // idempotency_conflict or a transient error, all of which must keep the
+        // same persisted key so a retry (or a reload after a lost response)
+        // still replays correctly if this attempt actually landed server-side.
         if (checkoutIdentityRef.current !== null) {
           clearPersistedIdempotencyKey(checkoutIdentityRef.current);
         }
         setOrder(result.order);
-        setStage("success");
+        setStage("confirmation");
+        setFlowState("done");
         return;
       }
 
@@ -238,29 +251,34 @@ export function AwjCheckoutFlow() {
         setCheckout(result.checkout);
         setContact(toContactForm(result.checkout));
         setAddress(toAddressForm(result.checkout));
-        // A contact/delivery gap sends the visitor back to the details
-        // step to fix it; a cart-content issue (item availability/price/
-        // stock) stays on the review step, where the refreshed cart items
-        // (now carrying up-to-date `available` flags) explain what changed.
-        const needsDetails = result.items.some(
-          (issue) =>
-            issue.reason === "contact_incomplete" ||
-            issue.reason === "delivery_method_missing",
-        );
-        setStage(needsDetails ? "details" : "review");
+        // A contact gap sends the shopper back to the contact stage and a
+        // missing delivery method to the delivery stage; a cart-content issue
+        // (availability, price, stock) keeps them on review, where the
+        // refreshed lines — now carrying up-to-date `available` flags — are
+        // what explains the change.
+        const reasons = new Set(result.items.map((issue) => issue.reason));
+        if (reasons.has("contact_incomplete")) {
+          goTo("contact");
+        } else if (reasons.has("delivery_method_missing")) {
+          goTo("delivery");
+        } else if (reasons.has("empty_cart")) {
+          setFlowState("empty");
+        }
         return;
       }
 
       if (result.kind === "not_found") {
-        setStage("unavailable");
+        setFlowState("unavailable");
         return;
       }
 
+      // Includes `idempotency_conflict`: the shopper is told, and the key is
+      // deliberately kept so a genuine replay still works.
       setFormError(result.message);
     } finally {
       setCompleting(false);
     }
-  }, []);
+  }, [goTo]);
 
   const reviewIssueMessages = useMemo(
     () =>
@@ -280,554 +298,309 @@ export function AwjCheckoutFlow() {
     [reviewIssues, checkout, t],
   );
 
-  if (stage === "loading") {
+  const steps = useMemo(
+    () =>
+      CHECKOUT_STAGES.map((key) => ({
+        key,
+        label: t(`steps.${key}`),
+      })),
+    [t],
+  );
+
+  const stageIndex = CHECKOUT_STAGES.indexOf(stage);
+
+  const lineImages = useCartLineImages(
+    checkout?.cart.items.map((line) => line.productId) ?? [],
+    flowState === "stage",
+  );
+
+  if (flowState === "loading") {
+    return <CheckoutSkeleton />;
+  }
+
+  if (flowState === "empty") {
     return (
-      <div className="animate-pulse space-y-4">
-        <div className="h-8 bg-gray-200 rounded w-48" />
-        <div className="h-40 bg-gray-200 rounded" />
-        <div className="h-40 bg-gray-200 rounded" />
-      </div>
+      <CheckoutNotice
+        title={t("emptyCartTitle")}
+        body={t("emptyCartDescription")}
+        actionHref={`${basePath}/products`}
+        actionLabel={tc("continueShopping")}
+      />
     );
   }
 
-  if (stage === "empty") {
+  if (flowState === "unavailable") {
     return (
-      <div className="text-center py-16">
-        <h1 className="text-2xl font-bold text-gray-900">
-          {t("emptyCartTitle")}
-        </h1>
-        <p className="mt-2 text-gray-500">{t("emptyCartDescription")}</p>
-        <Button asChild size="lg" className="mt-6">
-          <Link href={`${basePath}/products`}>{tc("continueShopping")}</Link>
-        </Button>
-      </div>
+      <CheckoutNotice
+        title={t("unavailableTitle")}
+        body={t("unavailableDescription")}
+        actionHref={`${basePath}/cart`}
+        actionLabel={t("returnToCart")}
+      />
     );
   }
 
-  if (stage === "unavailable") {
-    return (
-      <div className="text-center py-16">
-        <h1 className="text-2xl font-bold text-gray-900">
-          {t("unavailableTitle")}
-        </h1>
-        <p className="mt-2 text-gray-500">{t("unavailableDescription")}</p>
-        <Button asChild size="lg" className="mt-6">
-          <Link href={`${basePath}/cart`}>{t("returnToCart")}</Link>
-        </Button>
-      </div>
-    );
-  }
-
-  if (stage === "success" && order) {
-    return <AwjOrderSuccess order={order} basePath={basePath} />;
+  if (flowState === "done" && order) {
+    return <AwjOrderConfirmation order={order} basePath={basePath} />;
   }
 
   if (!checkout) {
     return null;
   }
 
+  const contactReady = Boolean(contact.name.trim() && contact.phone.trim());
+  const addressReady = Boolean(
+    address.country.trim() && address.city.trim() && address.street.trim(),
+  );
+
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-      <div className="lg:col-span-2 space-y-8">
-        {stage === "details" && (
-          <>
-            {reviewIssueMessages.length > 0 && (
-              <ReviewIssuesBanner messages={reviewIssueMessages} t={t} />
-            )}
-            <ContactSection contact={contact} onChange={setContact} t={t} />
-            <AddressSection address={address} onChange={setAddress} t={t} />
-            <DeliverySection
+    <div className="mx-auto w-full max-w-store px-4 py-6 sm:px-6 lg:px-8 lg:py-10">
+      <h1 className="sr-only">{t("title")}</h1>
+
+      <CheckoutProgress
+        steps={steps}
+        currentIndex={stageIndex}
+        counterLabel={t("stepCounter", {
+          current: stageIndex + 1,
+          total: steps.length,
+        })}
+      />
+
+      <div className="mt-6 grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:gap-8">
+        <div className="space-y-5">
+          {reviewIssueMessages.length > 0 && (
+            <div
+              role="alert"
+              className="rounded-store border border-store-warning/50 bg-store-warning/10 p-4"
+            >
+              <p className="text-sm font-bold text-store-foreground">
+                {t("reviewRequired.title")}
+              </p>
+              <ul className="mt-2 list-inside list-disc space-y-1 text-sm text-store-foreground">
+                {reviewIssueMessages.map((message) => (
+                  <li key={message}>{message}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {stage === "contact" && (
+            <ContactStage contact={contact} onChange={setContact} t={t} />
+          )}
+          {stage === "address" && (
+            <AddressStage address={address} onChange={setAddress} t={t} />
+          )}
+          {stage === "delivery" && (
+            <DeliveryStage
               method={deliveryMethod}
               onChange={setDeliveryMethod}
               t={t}
             />
-            {formError && (
-              <p className="text-sm text-red-600" role="alert">
-                {formError}
-              </p>
-            )}
-            <Button
-              size="lg"
-              className="w-full sm:w-auto"
-              onClick={handleSaveDetails}
-              disabled={
-                saving ||
-                !contact.name.trim() ||
-                !contact.phone.trim() ||
-                !address.country.trim() ||
-                !address.city.trim() ||
-                !address.street.trim() ||
-                !deliveryMethod
-              }
+          )}
+          {stage === "payment" && <PaymentStage t={t} />}
+          {stage === "review" && (
+            <ReviewStage checkout={checkout} onEdit={goTo} t={t} />
+          )}
+
+          {formError && (
+            <p
+              role="alert"
+              className="rounded-store border border-store-destructive/40 bg-store-destructive/10 px-4 py-3 text-sm text-store-destructive"
             >
-              {saving ? tc("saving") : t("continueToReview")}
-            </Button>
-          </>
-        )}
+              {formError}
+            </p>
+          )}
 
-        {stage === "review" && (
-          <>
-            {reviewIssueMessages.length > 0 && (
-              <ReviewIssuesBanner messages={reviewIssueMessages} t={t} />
-            )}
-            <OrderReview
-              checkout={checkout}
-              deliveryMethod={deliveryMethod}
-              t={t}
-              tc={tc}
-            />
-            <div className="flex flex-col sm:flex-row gap-3">
-              <Button
-                variant="outline"
-                onClick={() => setStage("details")}
-                disabled={completing}
-              >
-                {t("editDetails")}
-              </Button>
-              <Button
-                size="lg"
-                className="flex-1"
-                onClick={handleComplete}
-                disabled={completing}
-              >
-                {completing ? tc("processing") : t("completeOrder")}
-              </Button>
-            </div>
-            {formError && (
-              <p className="text-sm text-red-600" role="alert">
-                {formError}
-              </p>
-            )}
-          </>
-        )}
-      </div>
+          <StageActions
+            stage={stage}
+            saving={saving}
+            completing={completing}
+            contactReady={contactReady}
+            addressReady={addressReady}
+            deliveryMethod={deliveryMethod}
+            onBack={goTo}
+            onAdvance={saveAndAdvance}
+            onComplete={handleComplete}
+            t={t}
+            tc={tc}
+          />
+        </div>
 
-      <div className="lg:col-span-1">
-        <OrderSummarySidebar checkout={checkout} tc={tc} t={t} />
+        <CartSummary
+          subtotal={checkout.cart.subtotal}
+          itemCount={checkout.cart.itemCount}
+          showCoupon={false}
+          sticky
+          deliveryLabel={
+            deliveryMethod
+              ? `${t(`delivery.methods.${deliveryMethod}`)} · ${t("delivery.amountPending")}`
+              : null
+          }
+        >
+          <ul className="divide-y divide-store-border">
+            {checkout.cart.items.map((line) => (
+              <li key={line.id}>
+                <CartLine
+                  view={awjCartLineView(
+                    line,
+                    basePath,
+                    line.productId ? lineImages[line.productId] : null,
+                  )}
+                  density="summary"
+                />
+              </li>
+            ))}
+          </ul>
+        </CartSummary>
       </div>
     </div>
   );
 }
 
-function ReviewIssuesBanner({
-  messages,
+function StageActions({
+  stage,
+  saving,
+  completing,
+  contactReady,
+  addressReady,
+  deliveryMethod,
+  onBack,
+  onAdvance,
+  onComplete,
   t,
+  tc,
 }: {
-  messages: string[];
+  stage: CheckoutStage;
+  saving: boolean;
+  completing: boolean;
+  contactReady: boolean;
+  addressReady: boolean;
+  deliveryMethod: AwjDeliveryMethod | null;
+  onBack: (stage: CheckoutStage) => void;
+  onAdvance: (from: CheckoutStage, to: CheckoutStage) => void;
+  onComplete: () => void;
   t: ReturnType<typeof useTranslations>;
+  tc: ReturnType<typeof useTranslations>;
 }) {
+  const back: Partial<Record<CheckoutStage, CheckoutStage>> = {
+    address: "contact",
+    delivery: "address",
+    payment: "delivery",
+    review: "payment",
+  };
+  const previous = back[stage];
+
+  const primary = (() => {
+    switch (stage) {
+      case "contact":
+        return {
+          label: t("continueToAddress"),
+          disabled: !contactReady,
+          onClick: () => onAdvance("contact", "address"),
+        };
+      case "address":
+        return {
+          label: t("continueToDelivery"),
+          disabled: !addressReady,
+          onClick: () => onAdvance("address", "delivery"),
+        };
+      case "delivery":
+        return {
+          label: t("continueToPayment"),
+          disabled: !deliveryMethod,
+          onClick: () => onAdvance("delivery", "payment"),
+        };
+      case "payment":
+        // Nothing to save: the stage is inert by design.
+        return {
+          label: t("continueToReview"),
+          disabled: false,
+          onClick: () => onAdvance("payment", "review"),
+        };
+      default:
+        return null;
+    }
+  })();
+
+  return (
+    <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
+      {previous ? (
+        <Button
+          type="button"
+          variant="ghost"
+          onClick={() => onBack(previous)}
+          disabled={saving || completing}
+        >
+          {tc("back")}
+        </Button>
+      ) : (
+        <span aria-hidden="true" className="hidden sm:block" />
+      )}
+
+      {stage === "review" ? (
+        <Button
+          type="button"
+          size="lg"
+          className="sm:min-w-56"
+          onClick={onComplete}
+          disabled={completing}
+        >
+          {completing ? tc("processing") : t("completeOrder")}
+        </Button>
+      ) : (
+        primary && (
+          <Button
+            type="button"
+            size="lg"
+            className="sm:min-w-56"
+            onClick={primary.onClick}
+            disabled={saving || primary.disabled}
+          >
+            {saving ? tc("saving") : primary.label}
+          </Button>
+        )
+      )}
+    </div>
+  );
+}
+
+function CheckoutNotice({
+  title,
+  body,
+  actionHref,
+  actionLabel,
+}: {
+  title: string;
+  body: string;
+  actionHref: string;
+  actionLabel: string;
+}) {
+  return (
+    <div className="mx-auto w-full max-w-lg px-4 py-20 text-center sm:px-6">
+      <h1 className="text-xl font-bold text-store-foreground sm:text-2xl">
+        {title}
+      </h1>
+      <p className="mt-2 text-sm leading-relaxed text-store-muted-foreground">
+        {body}
+      </p>
+      <Button asChild size="lg" className="mt-6">
+        <Link href={actionHref}>{actionLabel}</Link>
+      </Button>
+    </div>
+  );
+}
+
+function CheckoutSkeleton() {
   return (
     <div
-      role="alert"
-      className="rounded-lg border border-amber-300 bg-amber-50 p-4"
+      aria-hidden="true"
+      className="mx-auto w-full max-w-store animate-pulse px-4 py-6 sm:px-6 lg:px-8 lg:py-10 motion-reduce:animate-none"
     >
-      <p className="font-medium text-amber-900">{t("reviewRequired.title")}</p>
-      <ul className="mt-2 list-disc list-inside text-sm text-amber-800 space-y-1">
-        {messages.map((message) => (
-          <li key={message}>{message}</li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
-function ContactSection({
-  contact,
-  onChange,
-  t,
-}: {
-  contact: ContactForm;
-  onChange: (contact: ContactForm) => void;
-  t: ReturnType<typeof useTranslations>;
-}) {
-  return (
-    <section aria-labelledby="awj-checkout-contact-heading">
-      <h2
-        id="awj-checkout-contact-heading"
-        className="text-lg font-medium text-gray-900 mb-4"
-      >
-        {t("contact.heading")}
-      </h2>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div>
-          <Label htmlFor="awj-contact-name">{t("contact.name")}</Label>
-          <Input
-            id="awj-contact-name"
-            value={contact.name}
-            onChange={(e) => onChange({ ...contact, name: e.target.value })}
-            required
-            className="mt-1.5"
-          />
-        </div>
-        <div>
-          <Label htmlFor="awj-contact-phone">{t("contact.phone")}</Label>
-          <Input
-            id="awj-contact-phone"
-            type="tel"
-            value={contact.phone}
-            onChange={(e) => onChange({ ...contact, phone: e.target.value })}
-            required
-            className="mt-1.5"
-          />
-        </div>
-        <div className="sm:col-span-2">
-          <Label htmlFor="awj-contact-email">{t("contact.email")}</Label>
-          <Input
-            id="awj-contact-email"
-            type="email"
-            value={contact.email}
-            onChange={(e) => onChange({ ...contact, email: e.target.value })}
-            className="mt-1.5"
-          />
-        </div>
+      <div className="h-6 w-full rounded bg-store-surface-muted" />
+      <div className="mt-6 grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:gap-8">
+        <div className="h-80 rounded-store border border-store-border bg-store-surface" />
+        <div className="h-64 rounded-store border border-store-border bg-store-surface" />
       </div>
-    </section>
-  );
-}
-
-function AddressSection({
-  address,
-  onChange,
-  t,
-}: {
-  address: AddressForm;
-  onChange: (address: AddressForm) => void;
-  t: ReturnType<typeof useTranslations>;
-}) {
-  return (
-    <section aria-labelledby="awj-checkout-address-heading">
-      <h2
-        id="awj-checkout-address-heading"
-        className="text-lg font-medium text-gray-900 mb-4"
-      >
-        {t("address.heading")}
-      </h2>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div>
-          <Label htmlFor="awj-address-country">{t("address.country")}</Label>
-          <Input
-            id="awj-address-country"
-            value={address.country}
-            onChange={(e) => onChange({ ...address, country: e.target.value })}
-            required
-            className="mt-1.5"
-          />
-        </div>
-        <div>
-          <Label htmlFor="awj-address-region">{t("address.region")}</Label>
-          <Input
-            id="awj-address-region"
-            value={address.region}
-            onChange={(e) => onChange({ ...address, region: e.target.value })}
-            className="mt-1.5"
-          />
-        </div>
-        <div>
-          <Label htmlFor="awj-address-city">{t("address.city")}</Label>
-          <Input
-            id="awj-address-city"
-            value={address.city}
-            onChange={(e) => onChange({ ...address, city: e.target.value })}
-            required
-            className="mt-1.5"
-          />
-        </div>
-        <div>
-          <Label htmlFor="awj-address-district">{t("address.district")}</Label>
-          <Input
-            id="awj-address-district"
-            value={address.district}
-            onChange={(e) => onChange({ ...address, district: e.target.value })}
-            className="mt-1.5"
-          />
-        </div>
-        <div className="sm:col-span-2">
-          <Label htmlFor="awj-address-street">{t("address.street")}</Label>
-          <Input
-            id="awj-address-street"
-            value={address.street}
-            onChange={(e) => onChange({ ...address, street: e.target.value })}
-            required
-            className="mt-1.5"
-          />
-        </div>
-        <div>
-          <Label htmlFor="awj-address-postal-code">
-            {t("address.postalCode")}
-          </Label>
-          <Input
-            id="awj-address-postal-code"
-            value={address.postalCode}
-            onChange={(e) =>
-              onChange({ ...address, postalCode: e.target.value })
-            }
-            className="mt-1.5"
-          />
-        </div>
-        <div className="sm:col-span-2">
-          <Label htmlFor="awj-address-notes">{t("address.notes")}</Label>
-          <Textarea
-            id="awj-address-notes"
-            value={address.notes}
-            onChange={(e) => onChange({ ...address, notes: e.target.value })}
-            className="mt-1.5"
-          />
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function DeliverySection({
-  method,
-  onChange,
-  t,
-}: {
-  method: AwjDeliveryMethod | null;
-  onChange: (method: AwjDeliveryMethod) => void;
-  t: ReturnType<typeof useTranslations>;
-}) {
-  return (
-    <section aria-labelledby="awj-checkout-delivery-heading">
-      <h2
-        id="awj-checkout-delivery-heading"
-        className="text-lg font-medium text-gray-900 mb-4"
-      >
-        {t("delivery.heading")}
-      </h2>
-      <RadioGroup
-        value={method ?? undefined}
-        onValueChange={(value) => onChange(value as AwjDeliveryMethod)}
-      >
-        {AWJ_DELIVERY_METHODS.map((option) => (
-          <Label
-            key={option}
-            htmlFor={`awj-delivery-${option}`}
-            className="flex items-center gap-3 rounded-lg border border-gray-200 p-4 cursor-pointer has-[[data-state=checked]]:border-black"
-          >
-            <RadioGroupItem id={`awj-delivery-${option}`} value={option} />
-            <span className="flex-1">
-              <span className="block font-medium text-gray-900">
-                {t(`delivery.methods.${option}`)}
-              </span>
-              <span className="block text-sm text-gray-500">
-                {t("delivery.amountPending")}
-              </span>
-            </span>
-          </Label>
-        ))}
-      </RadioGroup>
-    </section>
-  );
-}
-
-function OrderReview({
-  checkout,
-  deliveryMethod,
-  t,
-  tc,
-}: {
-  checkout: StorefrontCheckout;
-  deliveryMethod: AwjDeliveryMethod | null;
-  t: ReturnType<typeof useTranslations>;
-  tc: ReturnType<typeof useTranslations>;
-}) {
-  return (
-    <section aria-labelledby="awj-checkout-review-heading">
-      <h2
-        id="awj-checkout-review-heading"
-        className="text-lg font-medium text-gray-900 mb-4"
-      >
-        {t("review.heading")}
-      </h2>
-      <div className="rounded-xl border border-gray-200 divide-y">
-        {checkout.cart.items.map((line) => (
-          <div key={line.id} className="p-4 flex justify-between gap-4">
-            <div>
-              <p className="font-medium text-gray-900">{line.name}</p>
-              <p className="text-sm text-gray-500">
-                {t("review.lineDetail", {
-                  quantity: line.quantity,
-                  unit: line.unitName,
-                })}
-              </p>
-            </div>
-            <p className="font-medium text-gray-900 whitespace-nowrap">
-              {formatMinorAmount(line.lineTotal)}
-            </p>
-          </div>
-        ))}
-      </div>
-      <dl className="mt-4 space-y-2">
-        <div className="flex justify-between">
-          <dt className="text-gray-500">{tc("subtotal")}</dt>
-          <dd className="text-gray-900">
-            {formatMinorAmount(checkout.cart.subtotal)}
-          </dd>
-        </div>
-        <div className="flex justify-between">
-          <dt className="text-gray-500">{tc("shipping")}</dt>
-          <dd className="text-gray-900">
-            {formatMinorAmount(checkout.delivery.amount)}
-          </dd>
-        </div>
-        <div className="border-t pt-2 flex justify-between">
-          <dt className="text-lg font-medium text-gray-900">{tc("total")}</dt>
-          <dd className="text-lg font-bold text-gray-900">
-            {formatMinorAmount({
-              amount_minor:
-                checkout.cart.subtotal.amount_minor +
-                checkout.delivery.amount.amount_minor,
-              currency: checkout.cart.currency,
-            })}
-          </dd>
-        </div>
-      </dl>
-      <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-        <div>
-          <p className="font-medium text-gray-900">{t("contact.heading")}</p>
-          <p className="text-gray-600">{checkout.contact.name}</p>
-          <p className="text-gray-600">{checkout.contact.phone}</p>
-          {checkout.contact.email && (
-            <p className="text-gray-600">{checkout.contact.email}</p>
-          )}
-        </div>
-        <div>
-          <p className="font-medium text-gray-900">{t("address.heading")}</p>
-          <p className="text-gray-600">
-            {[
-              checkout.delivery.address.street,
-              checkout.delivery.address.district,
-              checkout.delivery.address.city,
-              checkout.delivery.address.region,
-              checkout.delivery.address.country,
-            ]
-              .filter(Boolean)
-              .join("، ")}
-          </p>
-          {deliveryMethod && (
-            <p className="mt-1 text-gray-600">
-              {t(`delivery.methods.${deliveryMethod}`)}
-            </p>
-          )}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function OrderSummarySidebar({
-  checkout,
-  tc,
-  t,
-}: {
-  checkout: StorefrontCheckout;
-  tc: ReturnType<typeof useTranslations>;
-  t: ReturnType<typeof useTranslations>;
-}) {
-  return (
-    <div className="bg-white rounded-xl border border-gray-200 p-6 sticky top-24">
-      <h2 className="text-lg font-medium text-gray-900">
-        {tc("orderSummary")}
-      </h2>
-      <ul className="mt-4 space-y-3">
-        {checkout.cart.items.map((line) => (
-          <li key={line.id} className="flex justify-between text-sm gap-3">
-            <span className="text-gray-600">
-              {line.name} × {line.quantity}
-            </span>
-            <span className="text-gray-900 whitespace-nowrap">
-              {formatMinorAmount(line.lineTotal)}
-            </span>
-          </li>
-        ))}
-      </ul>
-      <div className="mt-4 pt-4 border-t space-y-2">
-        <div className="flex justify-between">
-          <span className="text-gray-500">{tc("subtotal")}</span>
-          <span className="text-gray-900">
-            {formatMinorAmount(checkout.cart.subtotal)}
-          </span>
-        </div>
-        <div className="flex justify-between">
-          <span className="text-gray-500">{tc("shipping")}</span>
-          <span className="text-gray-500">{t("delivery.amountPending")}</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function AwjOrderSuccess({
-  order,
-  basePath,
-}: {
-  order: StorefrontOrder;
-  basePath: string;
-}) {
-  const t = useTranslations("awjCheckout");
-  const tc = useTranslations("common");
-  return (
-    <div className="max-w-2xl mx-auto text-center py-8">
-      <h1 className="text-2xl font-bold text-gray-900">
-        {t("success.heading")}
-      </h1>
-      <p className="mt-2 text-gray-500">
-        {t("success.orderNumber", { number: order.number })}
-      </p>
-      {/* `confirmed` is a commercial commitment only — no payment has
-          happened. Never imply otherwise here. */}
-      <p className="mt-1 text-sm text-gray-500">{t("success.notPaidNote")}</p>
-
-      <div className="mt-8 text-start rounded-xl border border-gray-200 divide-y">
-        {order.items.map((item, index) => (
-          <div
-            key={`${item.productId ?? "item"}-${index}`}
-            className="p-4 flex justify-between gap-4"
-          >
-            <div>
-              <p className="font-medium text-gray-900">{item.productName}</p>
-              <p className="text-sm text-gray-500">
-                {t("review.lineDetail", {
-                  quantity: item.quantity,
-                  unit: item.unitName ?? "",
-                })}
-              </p>
-            </div>
-            <p className="font-medium text-gray-900 whitespace-nowrap">
-              {formatMinorAmount(item.lineTotal)}
-            </p>
-          </div>
-        ))}
-      </div>
-
-      <dl className="mt-4 flex justify-between">
-        <dt className="text-lg font-medium text-gray-900">{tc("total")}</dt>
-        <dd className="text-lg font-bold text-gray-900">
-          {formatMinorAmount(order.total)}
-        </dd>
-      </dl>
-
-      <div className="mt-6 text-start text-sm text-gray-600 space-y-1">
-        <p className="font-medium text-gray-900">{t("contact.heading")}</p>
-        <p>{order.contact.name}</p>
-        <p>{order.contact.phone}</p>
-        {order.delivery.street && (
-          <p>
-            {[
-              order.delivery.street,
-              order.delivery.district,
-              order.delivery.city,
-            ]
-              .filter(Boolean)
-              .join("، ")}
-          </p>
-        )}
-      </div>
-
-      <Button asChild size="lg" className="mt-8">
-        <Link href={`${basePath}/products`}>{tc("continueShopping")}</Link>
-      </Button>
     </div>
   );
 }

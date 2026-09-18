@@ -14,6 +14,8 @@ describe("commerce/cart-types — AWJ Cart V1 view model", () => {
         {
           id: "item-1",
           product_id: "prod-1",
+          product_variant_id: null,
+          variant_descriptor: null,
           product_name: "Cement bag",
           unit_key: "unit:abc",
           unit_name: "pallet",
@@ -48,6 +50,8 @@ describe("commerce/cart-types — AWJ Cart V1 view model", () => {
         {
           id: "item-1",
           product_id: null,
+          product_variant_id: null,
+          variant_descriptor: null,
           product_name: "Deleted product",
           unit_key: "base",
           unit_name: "piece",
@@ -77,6 +81,8 @@ describe("commerce/cart-types — AWJ Cart V1 view model", () => {
         {
           id: "a",
           product_id: "p1",
+          product_variant_id: null,
+          variant_descriptor: null,
           product_name: "A",
           unit_key: "base",
           unit_name: "piece",
@@ -88,6 +94,8 @@ describe("commerce/cart-types — AWJ Cart V1 view model", () => {
         {
           id: "b",
           product_id: "p2",
+          product_variant_id: null,
+          variant_descriptor: null,
           product_name: "B",
           unit_key: "base",
           unit_name: "piece",
