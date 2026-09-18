@@ -4,13 +4,6 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const apiMock = vi.fn();
-class FakeApiError extends Error {
-  status: number;
-  constructor(status: number, message: string) {
-    super(message);
-    this.status = status;
-  }
-}
 vi.mock('@/lib/api', () => ({
   api: (...args: unknown[]) => apiMock(...args),
   hasApiStatus: (error: unknown, status: number) => (error as { status?: number })?.status === status,
@@ -108,7 +101,7 @@ describe('Commerce domains page — commerce.manage actions', () => {
     expect(screen.getByText('awj-domain-verification=abc123')).toBeTruthy();
   });
 
-  it('renders no Make Primary, Delete, or Disconnect controls anywhere', async () => {
+  it('renders Disconnect for a pending custom domain and still no Make Primary', async () => {
     apiMock
       .mockResolvedValueOnce({ data: { stores: [existingStore] } })
       .mockResolvedValueOnce({ data: { domains: [pendingCustomDomain] } });
@@ -116,10 +109,8 @@ describe('Commerce domains page — commerce.manage actions', () => {
     renderPage();
 
     await screen.findByText('shop.example.com');
-    expect(screen.queryByText(/primary/i, { selector: 'button' })).toBeNull();
-    expect(screen.queryByText(/delete/i)).toBeNull();
-    expect(screen.queryByText(/disconnect/i)).toBeNull();
-    expect(screen.queryByText(/remove/i)).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Make Primary' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Disconnect' })).toBeTruthy();
   });
 
   it('shows Verify Now for a pending custom domain and calls the backend on click, without optimistic verification', async () => {

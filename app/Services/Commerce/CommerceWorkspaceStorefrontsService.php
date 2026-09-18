@@ -343,6 +343,130 @@ final class CommerceWorkspaceStorefrontsService
         return $this->presentDomain($domain->refresh());
     }
 
+    /**
+     * STORE-ADMIN-ADOPT-1B-3B — جعل نطاق مؤهل هو الأساسي لمتجر المستأجر الحالي.
+     *
+     * نطاق `custom` يُرفض دائماً في هذه الشريحة: لا توجد حالة persisted تُثبت
+     * EDGE/TLS READY، و`verification_status = verified` ليس دليلاً على HTTPS.
+     * نطاق `awj_subdomain` موثَّق ونشط يُحوَّل عبر `StorefrontDomain::makePrimary()`
+     * القائمة دون إعادة كتابة منطق التبديل.
+     *
+     * `null` = غير موجود / لا يخص هذا المستأجر أو هذا المتجر → 404 غير كاشف.
+     *
+     * @throws CustomDomainNotReadyForPrimaryException نطاق مخصَّص — 422.
+     * @throws DomainNotEligibleForPrimaryException نطاق AWJ غير مؤهل — 422.
+     *
+     * @return array{id: string, hostname: string, type: string, is_primary: bool, is_active: bool, verification_status: string, verification: array{method: string, record_name: string, record_value: string, verified_at: ?string}|null}|null
+     */
+    public function makePrimaryForCurrentTenant(string $storefrontId, string $domainId): ?array
+    {
+        $tenantId = app(TenantContext::class)->id();
+        if ($tenantId === null) {
+            throw new RuntimeException('لا سياق مستأجر نشط.');
+        }
+
+        $storefront = Storefront::query()->find($storefrontId);
+        if ($storefront === null || $storefront->tenant_id !== $tenantId) {
+            return null;
+        }
+
+        return DB::transaction(function () use ($storefront, $domainId, $tenantId) {
+            $domain = $this->lockedDomainForStorefront($storefront->id, $domainId, $tenantId);
+            if ($domain === null) {
+                return null;
+            }
+
+            if ($domain->type === StorefrontDomain::TYPE_CUSTOM) {
+                throw new CustomDomainNotReadyForPrimaryException(
+                    $domain->isVerified()
+                        ? 'تم التحقق من ملكية النطاق، لكن تفعيل HTTPS/النطاق لم يكتمل بعد.'
+                        : 'لا يمكن جعل هذا النطاق أساسياً قبل اكتمال التحقّق وتفعيل HTTPS.'
+                );
+            }
+
+            if (! $domain->isVerified() || ! $domain->is_active) {
+                throw new DomainNotEligibleForPrimaryException(
+                    'هذا النطاق غير مؤهل ليكون النطاق الأساسي.'
+                );
+            }
+
+            if (! $domain->is_primary) {
+                $domain->makePrimary();
+            }
+
+            return $this->presentDomain($domain->refresh());
+        });
+    }
+
+    /**
+     * STORE-ADMIN-ADOPT-1B-3B — فصل نطاق مخصَّص غير أساسي. حذف فعلي (الجدول
+     * بلا SoftDeletes عمداً — تحرير `hostname` فوراً). بعد الحذف لا يبقى الصف
+     * قابلاً للحسم العام (`ResolveStorefrontDomain` يبحث بالـ hostname).
+     *
+     * نطاق AWJ مُدار أو نطاق أساسي حالي → رفض فشلٍ مغلق، بلا إعادة تعيين
+     * أساسي ضمن هذا المسار.
+     *
+     * `null` = غير موجود / لا يخص هذا المستأجر أو هذا المتجر → 404 غير كاشف.
+     *
+     * @throws DomainNotDisconnectableException نطاق غير قابل للفصل — 422.
+     */
+    public function disconnectCustomDomainForCurrentTenant(string $storefrontId, string $domainId): ?bool
+    {
+        $tenantId = app(TenantContext::class)->id();
+        if ($tenantId === null) {
+            throw new RuntimeException('لا سياق مستأجر نشط.');
+        }
+
+        $storefront = Storefront::query()->find($storefrontId);
+        if ($storefront === null || $storefront->tenant_id !== $tenantId) {
+            return null;
+        }
+
+        return DB::transaction(function () use ($storefront, $domainId, $tenantId) {
+            $domain = $this->lockedDomainForStorefront($storefront->id, $domainId, $tenantId);
+            if ($domain === null) {
+                return null;
+            }
+
+            if ($domain->type !== StorefrontDomain::TYPE_CUSTOM) {
+                throw new DomainNotDisconnectableException(
+                    'لا يمكن فصل نطاق مُدار من أَوْج.'
+                );
+            }
+
+            if ($domain->is_primary) {
+                throw new DomainNotDisconnectableException(
+                    'لا يمكن فصل النطاق الأساسي الحالي — حوّل النطاق الأساسي أولاً.'
+                );
+            }
+
+            $domain->delete();
+
+            return true;
+        });
+    }
+
+    /**
+     * يقفل كل نطاقات المتجر (مرتَّبة بالمعرّف لتفادي deadlock) ثم يعيد الصف
+     * المطلوب إن كان مملوكاً للمستأجر الحالي. قفل المجموعة يجعل Make Primary
+     * وDisconnect متسلسلَين على نفس المتجر دون معمارية قفل جديدة.
+     */
+    private function lockedDomainForStorefront(string $storefrontId, string $domainId, string $tenantId): ?StorefrontDomain
+    {
+        $locked = StorefrontDomain::query()
+            ->where('storefront_id', $storefrontId)
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->get();
+
+        $domain = $locked->firstWhere('id', $domainId);
+        if ($domain === null || $domain->tenant_id !== $tenantId) {
+            return null;
+        }
+
+        return $domain;
+    }
+
     private function isUniqueHostnameViolation(QueryException $e): bool
     {
         $sqlState = $e->errorInfo[0] ?? null;
