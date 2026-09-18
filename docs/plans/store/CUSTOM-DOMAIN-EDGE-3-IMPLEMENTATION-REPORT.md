@@ -14,7 +14,7 @@ EDGE-1 and EDGE-2 were not re-implemented. No schema migration. No resolver chan
 - Branch: `feat/custom-domain-edge-3-lifecycle`
 - PR: [#870](https://github.com/safwan5001-source/Nebrax/pull/870)
 - Base SHA: `190bd71636980851e4231c3b640989398735bbc7`
-- Head SHA (CI-verified): `8fc5e54af6b918144af4255b2940ce378334dd14`
+- Head SHA (CI-verified fence fix): `0f601eb46cb8c10c73cc884a0b7f31c2d3bb29f4`
 
 ## Architecture Authority
 
@@ -184,18 +184,17 @@ Local Vitest (this environment):
 | `page.edge.test.tsx` (EDGE-2/3) | **13 passed** |
 | commerce-workspace + domains pages | **89 passed** |
 
-PHP: this sandbox has no `php` binary. Authoritative Laravel results are GitHub CI (`ci.yml` sqlite + pgsql) on Head `8fc5e54af6b918144af4255b2940ce378334dd14`.
+PHP: this sandbox has no `php` binary. Authoritative Laravel results are GitHub CI (`ci.yml` sqlite + pgsql) on Head `0f601eb46cb8c10c73cc884a0b7f31c2d3bb29f4`.
 
 | Suite (CI) | sqlite | pgsql |
 |---|---|---|
-| Full `php artisan test` | **44 skipped, 4224 passed** (25871 assertions) | **4268 passed** (26107 assertions), 0 failed |
-| `CommerceWorkspaceMakePrimaryCustomEdgeApiTest` | PASS | PASS |
+| Full `php artisan test` | **45 skipped, 4225 passed** (25881 assertions) | **4270 passed** (26127 assertions), 0 failed |
+| `CommerceWorkspaceMakePrimaryCustomEdgeApiTest` | PASS (includes deactivate-before-release fence) | PASS |
 | `CommerceWorkspaceMakePrimaryDomainApiTest` | PASS | PASS |
 | `CommerceWorkspaceDisconnectCustomDomainApiTest` | PASS | PASS |
 | `RailwayStorefrontEdgeClientTest` | PASS | PASS |
-| `CommerceWorkspaceCustomMakePrimaryPostgresConcurrencyTest` | skipped | **PASS** (exactly one active primary) |
-
-Delta vs EDGE-2 `190bd71`: sqlite +26, pgsql +27 (EDGE-3 cases + pgsql concurrency).
+| `CommerceWorkspaceCustomMakePrimaryPostgresConcurrencyTest` | skipped | **PASS** |
+| `CommerceWorkspaceDisconnectMakePrimaryPostgresConcurrencyTest` | skipped | **PASS** (0.25s) — primary+released unreachable |
 
 ## PostgreSQL Concurrency
 
@@ -207,13 +206,13 @@ Touched files typecheck via Next.js `web-ci.yml` build. Pre-existing `tsc` error
 
 ## Build / CI
 
-Recorded from PR [#870](https://github.com/safwan5001-source/Nebrax/pull/870) Head `8fc5e54af6b918144af4255b2940ce378334dd14`:
+Recorded from PR [#870](https://github.com/safwan5001-source/Nebrax/pull/870) Head `0f601eb46cb8c10c73cc884a0b7f31c2d3bb29f4`:
 
 | Gate | Run | Result |
 |---|---|---|
-| `web build (Next.js)` + Vitest | [35397137716](https://github.com/safwan5001-source/Nebrax/actions/runs/35397137716) | **SUCCESS** — **1894 tests passed**; Next.js compile succeeded |
-| `php artisan test (L11, sqlite)` | [35397137764](https://github.com/safwan5001-source/Nebrax/actions/runs/35397137764) | **SUCCESS** — **44 skipped, 4224 passed** (25871 assertions) |
-| `php artisan test (L11, pgsql)` | [35397137764](https://github.com/safwan5001-source/Nebrax/actions/runs/35397137764) | **SUCCESS** — **4268 passed** (26107 assertions), **0 failed** |
+| `web build (Next.js)` + Vitest | [35400052940](https://github.com/safwan5001-source/Nebrax/actions/runs/35400052940) | **SUCCESS** — **1894 tests passed**; Next.js compile succeeded |
+| `php artisan test (L11, sqlite)` | [35400052937](https://github.com/safwan5001-source/Nebrax/actions/runs/35400052937) | **SUCCESS** — **45 skipped, 4225 passed** (25881 assertions) |
+| `php artisan test (L11, pgsql)` | [35400052937](https://github.com/safwan5001-source/Nebrax/actions/runs/35400052937) | **SUCCESS** — **4270 passed** (26127 assertions), **0 failed** |
 
 No backend schema files changed.
 
