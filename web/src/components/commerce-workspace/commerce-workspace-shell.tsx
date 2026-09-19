@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { useLocale } from 'next-intl';
+import { usePathname } from 'next/navigation';
 import { ArrowRight, Check, ChevronDown, ExternalLink, Menu, Store, X } from 'lucide-react';
 import { CompanyLogoMark } from '@/components/layout/company-logo-mark';
 import { LangToggle } from '@/components/layout/lang-toggle';
@@ -15,6 +16,7 @@ import { CommerceWorkspaceNav } from './commerce-workspace-nav';
 
 export function CommerceWorkspaceShell({ children }: { children: React.ReactNode }) {
   const locale = useLocale();
+  const pathname = usePathname();
   const t = (key: Parameters<typeof commerceWorkspaceMessage>[1]) => commerceWorkspaceMessage(locale, key);
   const company = useCompany();
   const { catalog, selectedStoreId, setSelectedStoreId, viewStoreUrl } = useCommerceStoreContext();
@@ -43,6 +45,7 @@ export function CommerceWorkspaceShell({ children }: { children: React.ReactNode
   const selectedStore = catalog.status === 'ready'
     ? catalog.stores.find((store) => store.id === selectedStoreId)
     : null;
+  const isExperienceBuilder = pathname === '/commerce/appearance' || Boolean(pathname?.startsWith('/commerce/appearance/'));
 
   return (
     <div className="flex h-screen w-full flex-col overflow-hidden bg-background [height:100dvh]">
@@ -175,10 +178,14 @@ export function CommerceWorkspaceShell({ children }: { children: React.ReactNode
           </div>
         </aside>
 
-        <main id="commerce-workspace-content" className="min-w-0 flex-1 overflow-y-auto">
-          <div className="mx-auto w-full max-w-7xl p-4 sm:p-6">
-            {children}
-          </div>
+        <main id="commerce-workspace-content" className={`min-w-0 flex-1 ${isExperienceBuilder ? 'overflow-hidden' : 'overflow-y-auto'}`}>
+          {isExperienceBuilder ? (
+            <div className="flex h-full min-h-0 flex-col">{children}</div>
+          ) : (
+            <div className="mx-auto w-full max-w-7xl p-4 sm:p-6">
+              {children}
+            </div>
+          )}
         </main>
       </div>
     </div>

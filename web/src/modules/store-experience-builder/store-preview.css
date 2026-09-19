@@ -1,0 +1,44 @@
+.awj-store-preview {
+  --store-background: #f8f9fa;
+  --store-surface: #ffffff;
+  --store-surface-muted: #f3f4f6;
+  --store-foreground: #111827;
+  --store-muted-foreground: #636a78;
+  --store-border: #e5e7eb;
+  --store-border-strong: #d1d5db;
+  --store-primary: #12372a;
+  --store-primary-hover: #0b241c;
+  --store-primary-foreground: #ffffff;
+  --store-footer: #111827;
+  --store-footer-foreground: #ffffff;
+  --store-footer-muted: #9ca3af;
+  --store-footer-link: #d1d5db;
+  --store-footer-border: #1f2937;
+  --store-radius: 0.75rem;
+  --store-content-max: 85rem;
+  background: var(--store-background);
+  color: var(--store-foreground);
+  font-family: Cairo, Geist, sans-serif;
+}
+
+.awj-store-preview .bg-store-background { background-color: var(--store-background); }
+.awj-store-preview .bg-store-surface { background-color: var(--store-surface); }
+.awj-store-preview .bg-store-surface-muted { background-color: var(--store-surface-muted); }
+.awj-store-preview .bg-store-primary { background-color: var(--store-primary); }
+.awj-store-preview .bg-store-primary-foreground { background-color: var(--store-primary-foreground); }
+.awj-store-preview .bg-store-footer { background-color: var(--store-footer); }
+.awj-store-preview .text-store-foreground { color: var(--store-foreground); }
+.awj-store-preview .text-store-muted-foreground { color: var(--store-muted-foreground); }
+.awj-store-preview .text-store-primary { color: var(--store-primary); }
+.awj-store-preview .text-store-primary-foreground { color: var(--store-primary-foreground); }
+.awj-store-preview .text-store-footer-foreground { color: var(--store-footer-foreground); }
+.awj-store-preview .text-store-footer-muted { color: var(--store-footer-muted); }
+.awj-store-preview .text-store-footer-link { color: var(--store-footer-link); }
+.awj-store-preview .border-store-border { border-color: var(--store-border); }
+.awj-store-preview .border-store-border-strong { border-color: var(--store-border-strong); }
+.awj-store-preview .border-store-footer-border { border-color: var(--store-footer-border); }
+.awj-store-preview .rounded-store { border-radius: var(--store-radius); }
+.awj-store-preview .max-w-store { max-width: var(--store-content-max); }
+.awj-store-preview .from-primary-700 { --tw-gradient-from: var(--store-primary-700, #0f2e23); }
+.awj-store-preview .via-primary-600 { --tw-gradient-via: var(--store-primary); }
+.awj-store-preview .to-primary-500 { --tw-gradient-to: var(--store-primary-500, #2a6a50); }
