@@ -4,6 +4,8 @@
 
 **COMPLETE for this slice. PR opened. Not merged. Not deployed.**
 
+The confirmed CI blocker (anonymous subclass of `final` `StorefrontPresentationNormalizer`) is **fixed** on Head `5eb04b9f4e0ae6a3454e1f63625152351197daf8`.
+
 Authority: [`docs/plans/store/AWJ_STORE_CUSTOMIZER_PERSISTENCE_ARCHITECTURE.md`](./AWJ_STORE_CUSTOMIZER_PERSISTENCE_ARCHITECTURE.md) (PR [#874](https://github.com/safwan5001-source/Nebrax/pull/874), SHA `6898384969facbf16990feb82d741ce62217eba7`).
 
 This slice is **only** Draft → Preview → Publish → Published Runtime for `StorefrontPresentation`. STORE-UI-6 chrome was not redesigned.
@@ -425,13 +427,18 @@ CI `web-ci.yml` (`npm ci` → `npm run test` → `npm run build`) is the product
 
 ## 22. CI status
 
-**Not yet green at report time** — this report is committed with the implementation; GitHub Actions will run:
+Head checked: `5eb04b9f4e0ae6a3454e1f63625152351197daf8` ([run 35425930122](https://github.com/safwan5001-source/Nebrax/actions/runs/35425930122)).
 
-- `ci.yml` — php artisan test on sqlite + pgsql, copy-list guard includes `app/Support/Commerce`
-- `storefront-ci.yml` — biome + locales + tsc + vitest
-- `web-ci.yml` — vitest + next build
+| Check | Result |
+|---|---|
+| `storefront-ci.yml` | **success** |
+| `web-ci.yml` | **success** |
+| `ci.yml` sqlite | **success** — 46 skipped, 4267 passed. `StorefrontPresentationPublishApiTest` **PASS**, including `a_failed_publish_leaves_the_previous_published_snapshot_unchanged`. Concurrency test skipped (not pgsql). |
+| `ci.yml` pgsql | **failure** of the **suite**, not of the confirmed blocker. `StorefrontPresentationPublishApiTest` **PASS** (failed-publish case 0.28s / 0.32s). Other presentation tests **PASS** except `StorefrontPresentationPostgresConcurrencyTest` (pcntl lock-signal timeout at `waitFor`, line 160 — **not** the `final` subclass). Also `UserManagementTest` deadlock on `tenant_reference_number_sequences` (unrelated flake). |
 
-Do **not** treat this document as a CI pass. The PR must wait for those checks.
+Confirmed blocker: `Class …Normalizer@anonymous cannot extend final class` — **gone**. The rollback test now uses a genuine oversize draft and still asserts previous `published_config` / `published_at` byte-identical.
+
+Do **not** merge while pgsql is red. Do **not** treat the concurrency timeout or UserManagement deadlock as this `final`-class fix.
 
 ---
 
@@ -495,16 +502,18 @@ Architecture lock SHA `6898384969facbf16990feb82d741ce62217eba7` is an ancestor.
 
 ## 28. Head SHA
 
-Implementation commit: `f52c793211b9d6d44d5b1f7a93fd973714b1f00d`
-
-Branch HEAD: `3d72f6cde0e35f4ee8271d7868399543b49094b1` at PR open. A docs-only follow-up on the same branch may move HEAD; the implementation remains `f52c793`.
+| | |
+|---|---|
+| Implementation | `f52c793211b9d6d44d5b1f7a93fd973714b1f00d` |
+| Confirmed CI-fix (`final` subclass) | `5eb04b9f4e0ae6a3454e1f63625152351197daf8` — this is the SHA GitHub ran above |
+| Docs follow-up | this file; branch HEAD moves after the docs commit |
 
 ---
 
 ## 29. Recommended next step
 
-1. Wait for GitHub CI: sqlite, pgsql, storefront-ci, web-ci.
-2. Review the PR. Confirm no merge until sqlite+pgsql are green.
+1. Confirmed blocker is fixed. `StorefrontPresentationPublishApiTest` is green on sqlite and pgsql.
+2. Do **not** merge while pgsql is red (`UserManagementTest` deadlock flake + presentation concurrency lock-signal timeout). Those are **not** this `final`-class fix.
 3. **Do not merge. Do not deploy.**
 4. Do not continue into another STORE task from this work.
 
