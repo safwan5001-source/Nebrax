@@ -41,11 +41,38 @@ describe("commerce/storefront identity (COM-7-P3A)", () => {
 
     expect(config.name).toBe("شركة دمينة للاستيراد والتصدير");
     expect(config.default_locale).toBe("ar");
+    expect(config.presentation).toBeNull();
     const [url, init] = vi.mocked(fetch).mock.calls[0];
     expect(String(url)).toBe("http://awj-api.test/store/v1/storefront");
+    expect(init?.cache).toBe("no-store");
     expect(
       (init?.headers as Record<string, string>)["X-Storefront-Forwarded-Host"],
     ).toBe("shop.example.com");
+  });
+
+  it("returns a published presentation object additively", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      jsonResponse({
+        data: {
+          name: "المتجر الرئيسي",
+          default_locale: "ar",
+          presentation: {
+            version: 1,
+            themePreset: "navy",
+            primaryColor: "#1e3a5f",
+            homepage: { heroHeadline: "منشور" },
+            verification: { requestedVerifiedLabel: true, crNumber: "101" },
+          },
+        },
+        meta: { request_id: "req-p" },
+      }),
+    );
+
+    const config = await fetchStorefrontConfig();
+    expect(config.presentation?.themePreset).toBe("navy");
+    expect(config.presentation?.homepage.heroHeadline).toBe("منشور");
+    expect(config.presentation?.verification.requestedVerifiedLabel).toBe(true);
+    expect(config.presentation).not.toHaveProperty("is_verified");
   });
 
   it("does not use NEXT_PUBLIC_STORE_NAME as the resolved store identity", async () => {

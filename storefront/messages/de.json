@@ -74,7 +74,12 @@
     "policies": "Richtlinien",
     "poweredBy": "Betrieben von",
     "copyright": "© {year} {storeName}. Unterstützt durch Spree Commerce.",
-    "wholesale": "Handel & Großhandel"
+    "wholesale": "Handel & Großhandel",
+    "whatsapp": "WhatsApp",
+    "whatsappAria": "Kontakt über WhatsApp",
+    "merchantProvided": "Angaben des Händlers",
+    "crNumber": "Handelsregister",
+    "licenseNumber": "Lizenznummer"
   },
   "home": {
     "welcome": "{storeName}",

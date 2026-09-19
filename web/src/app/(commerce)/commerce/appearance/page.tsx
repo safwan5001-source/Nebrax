@@ -15,6 +15,7 @@ export default function CommerceAppearancePage() {
   return (
     <div className="h-full min-h-0" data-store-experience-builder="">
       <ExperienceBuilder
+        storefrontId={selectedStoreId}
         liveStoreName={selectedStore?.name ?? null}
         initialLocale={locale === 'en' ? 'en' : 'ar'}
       />

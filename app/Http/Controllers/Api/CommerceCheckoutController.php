@@ -10,6 +10,7 @@ use App\Services\Commerce\CheckoutNotFoundException;
 use App\Services\Commerce\CheckoutReviewRequiredException;
 use App\Services\Commerce\CommerceCartService;
 use App\Services\Commerce\CommerceCheckoutService;
+use App\Support\CommerceOrderReference;
 use App\Support\PublicApiErrorCode;
 use App\Support\PublicApiIdempotency;
 use App\Support\PublicApiResponse;
@@ -214,7 +215,14 @@ final class CommerceCheckoutController extends PublicApiController
 
         return PublicApiResponse::success(
             $request,
-            ['order' => $this->serializeOrder($result['order']), 'replayed' => $result['replayed']],
+            [
+                'order' => $this->serializeOrder($result['order']),
+                // PR-5: مرجع ضيف موقَّع لقراءة الطلب لاحقاً عبر
+                // GET /commerce/v1/orders/{id} — حقل إضافي بحت، deterministic
+                // (إعادة التشغيل Idempotent تعيد المرجع نفسه حرفياً).
+                'order_reference' => CommerceOrderReference::issue($result['order']),
+                'replayed' => $result['replayed'],
+            ],
             $result['replayed'] ? 200 : 201,
         );
     }

@@ -74,7 +74,12 @@
     "policies": "السياسات",
     "poweredBy": "مشغَّل بواسطة",
     "copyright": "© {year} {storeName}. مشغَّل بواسطة Spree Commerce.",
-    "wholesale": "التجارة والجملة"
+    "wholesale": "التجارة والجملة",
+    "whatsapp": "واتساب",
+    "whatsappAria": "التواصل عبر واتساب",
+    "merchantProvided": "معلومات من التاجر",
+    "crNumber": "السجل التجاري",
+    "licenseNumber": "رقم الترخيص"
   },
   "home": {
     "welcome": "{storeName}",

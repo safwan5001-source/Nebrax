@@ -29,6 +29,7 @@ use App\Http\Controllers\Api\ClassificationAnalyticsReportController;
 use App\Http\Controllers\Api\ClassificationController;
 use App\Http\Controllers\Api\CompanyController;
 use App\Http\Controllers\Api\CommerceWorkspaceStorefrontsController;
+use App\Http\Controllers\Api\CommerceWorkspaceStorefrontPresentationController;
 use App\Http\Controllers\Api\CorporateFuelContractController;
 use App\Http\Controllers\Api\ContactController;
 use App\Http\Controllers\Api\CustomerAuthController;
@@ -852,6 +853,19 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         // Make Primary للنطاق المخصَّص يبقى مرفوضاً حتى EDGE-3.
         Route::post('commerce/workspace/storefronts/{id}/domains/{domainId}/activate-edge', [CommerceWorkspaceStorefrontsController::class, 'activateEdge'])->middleware($perm('commerce.manage'));
         Route::post('commerce/workspace/storefronts/{id}/domains/{domainId}/refresh-edge', [CommerceWorkspaceStorefrontsController::class, 'refreshEdge'])->middleware($perm('commerce.manage'));
+
+        // STORE-BACKEND-1: مسودة مظهر المتجر + نشرها. GET مسودة سرّية
+        // (commerce.manage) لأن المسودة غير المنشورة لا تُعرض للعامة.
+        // `{id}` UUID؛ مشوّه → 404 من التوجيه. أجنبي/مفقود → 404 لا 403.
+        Route::get('commerce/workspace/storefronts/{id}/presentation', [CommerceWorkspaceStorefrontPresentationController::class, 'show'])
+            ->whereUuid('id')
+            ->middleware($perm('commerce.manage'));
+        Route::put('commerce/workspace/storefronts/{id}/presentation', [CommerceWorkspaceStorefrontPresentationController::class, 'update'])
+            ->whereUuid('id')
+            ->middleware($perm('commerce.manage'));
+        Route::post('commerce/workspace/storefronts/{id}/presentation/publish', [CommerceWorkspaceStorefrontPresentationController::class, 'publish'])
+            ->whereUuid('id')
+            ->middleware($perm('commerce.manage'));
 
         // Cycle 0: Workspace foundation only. لا CRUD ولا مبيعات ولا اتصال أجهزة
         // قبل دوراتها، لكن هذا المسار يثبت سلسلة RBAC + entitlement + حالة التطبيق.

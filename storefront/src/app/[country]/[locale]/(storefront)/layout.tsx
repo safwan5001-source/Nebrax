@@ -1,13 +1,28 @@
 import type { Category } from "@spree/sdk";
 import { connection } from "next/server";
+import { getTranslations } from "next-intl/server";
 import { cache, Suspense } from "react";
 import type { StoreNavCategory } from "@/components/layout/CategoryNav";
 import { CategoryNav } from "@/components/layout/CategoryNav";
 import { Footer, FooterCategoryLinks } from "@/components/layout/Footer";
 import { Header, HeaderMobileMenu } from "@/components/layout/Header";
 import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
-import { fetchStorefrontName } from "@/lib/commerce/storefront";
+import { StoreWhatsApp } from "@/components/layout/StoreWhatsApp";
+import { fetchStorefrontConfig } from "@/lib/commerce/storefront";
 import { getCategories } from "@/lib/data/categories";
+import {
+  publishedExtraNav,
+  publishedLogoUrl,
+  publishedSocialLinks,
+  publishedStoreName,
+  publishedThemeStyle,
+  publishedWhatsAppHref,
+} from "@/lib/presentation/public";
+import {
+  isSafeAppStoreUrl,
+  isSafePlayStoreUrl,
+  sanitizeExternalUrl,
+} from "@/lib/presentation/urls";
 
 interface StorefrontLayoutProps {
   children: React.ReactNode;
@@ -142,14 +157,56 @@ export default async function StorefrontLayout({
 }: StorefrontLayoutProps) {
   const { country, locale } = await params;
   const basePath = `/${country}/${locale}`;
-  const storeName = await fetchStorefrontName();
+  const identity = await fetchStorefrontConfig().catch(() => null);
+  const presentation = identity?.presentation ?? null;
+  const liveName = identity?.name?.trim() ? identity.name : null;
+  const footerMessages = await getTranslations({
+    locale: locale as Locale,
+    namespace: "footer",
+  });
+  const displayName = publishedStoreName(
+    presentation,
+    liveName,
+    footerMessages("shop"),
+  );
+  const themeStyle = publishedThemeStyle(presentation);
+  const compact = presentation?.header.style === "compact";
+  const logoUrl = publishedLogoUrl(presentation, compact);
+  const extraLinks = publishedExtraNav(presentation, basePath);
+  const showCategoryNav = presentation
+    ? presentation.header.showCategoryNav
+    : true;
+  const floatingWhatsApp = publishedWhatsAppHref(presentation, "floating");
+  const footerWhatsApp = publishedWhatsAppHref(presentation, "footer");
+  const ios = presentation?.apps.showFooterLinks
+    ? sanitizeExternalUrl(presentation.apps.iosUrl)
+    : null;
+  const android = presentation?.apps.showFooterLinks
+    ? sanitizeExternalUrl(presentation.apps.androidUrl)
+    : null;
+  const appLinks = [
+    ios && isSafeAppStoreUrl(ios)
+      ? { id: "app-ios", label: "App Store", href: ios }
+      : null,
+    android && isSafePlayStoreUrl(android)
+      ? { id: "app-android", label: "Google Play", href: android }
+      : null,
+  ].filter((item): item is { id: string; label: string; href: string } =>
+    Boolean(item),
+  );
 
-  return (
+  const chrome = (
     <>
       <Header
         basePath={basePath}
         locale={locale as Locale}
-        storeName={storeName}
+        storeName={displayName}
+        logoUrl={logoUrl}
+        showSearch={presentation ? presentation.header.showSearch : true}
+        showAccount={presentation ? presentation.header.showAccount : true}
+        showCart={presentation ? presentation.header.showCart : true}
+        compact={compact}
+        extraLinks={extraLinks}
         mobileNavigation={
           <Suspense fallback={<MobileNavigationFallback />}>
             <StorefrontMobileNavigation
@@ -160,13 +217,15 @@ export default async function StorefrontLayout({
           </Suspense>
         }
         categoryNavigation={
-          <Suspense fallback={<CategoryNavigationFallback />}>
-            <StorefrontCategoryNavigation
-              basePath={basePath}
-              country={country}
-              locale={locale}
-            />
-          </Suspense>
+          showCategoryNav ? (
+            <Suspense fallback={<CategoryNavigationFallback />}>
+              <StorefrontCategoryNavigation
+                basePath={basePath}
+                country={country}
+                locale={locale}
+              />
+            </Suspense>
+          ) : null
         }
       />
       {/*
@@ -183,7 +242,17 @@ export default async function StorefrontLayout({
       <Footer
         basePath={basePath}
         locale={locale as Locale}
-        storeName={storeName}
+        storeName={displayName}
+        logoUrl={logoUrl}
+        showLogo={presentation ? presentation.footer.showLogo : true}
+        tagline={presentation?.footer.tagline ?? ""}
+        copyright={presentation?.footer.copyright ?? ""}
+        contact={presentation?.contact ?? null}
+        socialLinks={publishedSocialLinks(presentation)}
+        whatsappHref={footerWhatsApp}
+        appLinks={appLinks}
+        merchantCr={presentation?.verification.crNumber ?? ""}
+        merchantLicense={presentation?.verification.licenseNumber ?? ""}
         categoryLinks={
           <Suspense fallback={<FooterCategoryLinksFallback />}>
             <StorefrontFooterCategoryLinks
@@ -200,6 +269,26 @@ export default async function StorefrontLayout({
         className="h-[calc(var(--store-bottom-nav-height)+env(safe-area-inset-bottom))] shrink-0 md:hidden"
       />
       <MobileBottomNav basePath={basePath} />
+      {floatingWhatsApp ? (
+        <StoreWhatsApp
+          href={floatingWhatsApp}
+          label={footerMessages("whatsappAria")}
+        />
+      ) : null}
     </>
+  );
+
+  if (!themeStyle) {
+    return chrome;
+  }
+
+  return (
+    <div
+      data-published-theme=""
+      className="flex min-h-screen flex-1 flex-col"
+      style={themeStyle}
+    >
+      {chrome}
+    </div>
   );
 }

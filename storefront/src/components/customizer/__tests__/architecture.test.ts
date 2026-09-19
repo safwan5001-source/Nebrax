@@ -21,11 +21,11 @@ function sources(dir: string): string[] {
 }
 
 describe("STORE-UI-6 architecture", () => {
-  it("classifies customizer persistence correctly", () => {
-    expect(THEME_PERSISTENCE_CAPABILITY).toBe("design_only");
-    expect(DRAFT_PERSISTENCE_CAPABILITY).toBe("design_only");
-    expect(CUSTOMIZER_PREVIEW_CAPABILITY).toBe("design_only");
-    expect(PUBLISH_CAPABILITY).toBe("gated");
+  it("classifies customizer persistence correctly after STORE-BACKEND-1", () => {
+    expect(THEME_PERSISTENCE_CAPABILITY).toBe("live");
+    expect(DRAFT_PERSISTENCE_CAPABILITY).toBe("live");
+    expect(CUSTOMIZER_PREVIEW_CAPABILITY).toBe("live");
+    expect(PUBLISH_CAPABILITY).toBe("live");
     expect(BUSINESS_VERIFICATION_CAPABILITY).toBe("gated");
     expect(VERSION_HISTORY_CAPABILITY).toBe("deferred");
   });

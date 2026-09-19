@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "themePreset": "not-a-theme",
+  "primaryColor": "red",
+  "accentColor": "#fff",
+  "unknownTop": "drop-me",
+  "branding": {
+    "displayName": "Safe Name",
+    "logoDataUrl": "data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=",
+    "compactLogoDataUrl": "javascript:alert(1)",
+    "faviconDataUrl": "http://evil.example/logo.png"
+  },
+  "header": {
+    "links": [
+      {
+        "id": "bad",
+        "label": "XSS",
+        "kind": "external",
+        "href": "javascript:alert(1)",
+        "enabled": true
+      },
+      {
+        "id": "ok",
+        "label": "Instagram",
+        "kind": "external",
+        "href": "https://instagram.com/store",
+        "enabled": true
+      }
+    ]
+  },
+  "homepage": {
+    "sections": [
+      { "key": "banner-html", "visible": true },
+      { "key": "hero", "visible": false }
+    ],
+    "heroHeadline": "مسودة سرية فريدة"
+  },
+  "social": [
+    {
+      "id": "ig",
+      "network": "instagram",
+      "url": "http://instagram.com/insecure",
+      "enabled": true
+    }
+  ],
+  "verification": {
+    "crNumber": "1234567890",
+    "requestedVerifiedLabel": true,
+    "sourceUrl": "javascript:alert(1)"
+  },
+  "apps": {
+    "iosUrl": "https://example.com/not-app-store",
+    "androidUrl": "https://play.google.com/store/apps/details?id=com.example"
+  }
+}
