@@ -62,27 +62,30 @@ class StorefrontPresentationPostgresConcurrencyTest extends TestCase
         $this->seedGraph();
 
         $lockReady = $this->signalPath('pres_lock_');
+        $lockerError = $this->signalPath('pres_locker_error_');
         $callerStarted = $this->signalPath('pres_caller_started_');
         $resultFile = tempnam(sys_get_temp_dir(), 'pres_result_');
 
         $locker = pcntl_fork();
         if ($locker === 0) {
-            DB::connection()->reconnect();
-            app(TenantContext::class)->set($this->tenantId);
-            DB::beginTransaction();
-            StorefrontPresentation::query()
-                ->where('storefront_id', $this->storefrontId)
-                ->orderBy('id')
-                ->lockForUpdate()
-                ->first();
-            file_put_contents($lockReady, '1');
-            $this->waitFor($callerStarted);
-            usleep(200000);
-            DB::commit();
+            try {
+                $lockerConnection = $this->fixtureConnection();
+                $lockerConnection->beginTransaction();
+                $lockerConnection->prepare(
+                    'SELECT id FROM storefront_presentations WHERE storefront_id = ? FOR UPDATE'
+                )->execute([$this->storefrontId]);
+                file_put_contents($lockReady, '1');
+                $this->waitFor($callerStarted);
+                usleep(200000);
+                $lockerConnection->commit();
+            } catch (\Throwable $e) {
+                file_put_contents($lockerError, get_class($e).': '.$e->getMessage()."\n".$e->getTraceAsString());
+                exit(1);
+            }
             exit(0);
         }
 
-        $this->waitFor($lockReady);
+        $this->waitFor($lockReady, $lockerError);
 
         $caller = pcntl_fork();
         if ($caller === 0) {
@@ -197,10 +200,13 @@ class StorefrontPresentationPostgresConcurrencyTest extends TestCase
         return tempnam(sys_get_temp_dir(), $prefix);
     }
 
-    private function waitFor(string $path): void
+    private function waitFor(string $path, ?string $errorPath = null): void
     {
         $tries = 0;
         while (! is_file($path) || filesize($path) === 0) {
+            if ($errorPath !== null && is_file($errorPath) && filesize($errorPath) > 0) {
+                $this->fail('فرع قفل التزامن فشل قبل الإشارة: '.file_get_contents($errorPath));
+            }
             usleep(20000);
             $tries++;
             if ($tries > 250) {
