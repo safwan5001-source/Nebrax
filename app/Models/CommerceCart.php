@@ -13,6 +13,9 @@ class CommerceCart extends BaseModel implements CompanyWide
 
     public const STATUS_EXPIRED = 'expired';
 
+    /** الحالة النهائية بعد أول Order ناجح — سلةٌ واحدة تدعم طلباً ناجحاً واحداً على الأكثر. لا تُستأنَف ولا تُعدَّل. */
+    public const STATUS_CONSUMED = 'consumed';
+
     protected $fillable = [
         'tenant_id', 'storefront_id', 'sales_channel_id', 'token_hash', 'status', 'expires_at',
     ];

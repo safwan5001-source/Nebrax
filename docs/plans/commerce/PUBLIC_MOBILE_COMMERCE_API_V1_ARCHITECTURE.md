@@ -246,9 +246,15 @@ all mutation endpoints require the mobile session token described in §4.
   `PATCH /commerce/v1/checkout/{contact,address,delivery}`, `POST /commerce/v1/checkout/complete`
 - Reuses checkout services in full (no Payments per the mandatory constraint — checkout completion
   semantics stay exactly what they are today: order creation, not payment capture).
-- Idempotency: `Idempotency-Key` header required on `POST checkout` and `POST checkout/complete`,
-  using `PublicApiIdempotency`'s pure helpers, with state kept on `CommerceCheckout` — same
-  pattern `/store/v1` already uses, not a new mechanism (§6).
+- Idempotency: `Idempotency-Key` header required on `POST checkout/complete` only, using
+  `PublicApiIdempotency`'s pure helpers, with state kept on `CommerceCheckout` — same pattern
+  `/store/v1` already uses, not a new mechanism (§6). `POST checkout` carries no
+  `Idempotency-Key` of its own — it is naturally idempotent (resume-if-open) via
+  `CommerceCheckoutService::createOrResume()`, and duplicate-order safety is a Cart-lifecycle
+  invariant, not a `POST checkout` idempotency mechanism: one `CommerceCart` backs at most one
+  successful `CommerceOrder` (`CommerceCart::STATUS_CONSUMED`, set in the same transaction that
+  completes the Checkout), so a repeat `POST checkout` on an already-purchased cart 404s — the
+  cart itself is no longer usable, never a second Checkout row to resume.
 
 **CommerceOrder result/status**
 - `GET /commerce/v1/orders/{id}` — **new**, standalone endpoint (does not exist in `/store/v1`
@@ -407,8 +413,10 @@ first PR), analogous in role to `ResolveStorefrontDomain` but built for a non-ho
 3. **PR-3 — Guest token + cart.** Introduce the guest bearer token (issuance, hashing-at-rest,
    revocation), wire `GET/POST/PATCH/DELETE cart[/items...]` onto `CommerceCartService`.
 4. **PR-4 — Checkout + idempotency.** `GET/POST checkout`, contact/address/delivery patches,
-   `POST checkout/complete`, `Idempotency-Key` enforcement on the same `CommerceCheckout`-row
-   pattern `/store/v1` already uses.
+   `POST checkout/complete`, `Idempotency-Key` enforcement (on completion only) on the same
+   `CommerceCheckout`-row pattern `/store/v1` already uses. Follow-up (Cart One-Shot Lifecycle):
+   `CommerceCart::STATUS_CONSUMED` closes the one-Cart-per-Order invariant a completed-but-still-
+   `active` Cart left open — see `AWJ_CHECKOUT_V1_ARCHITECTURE.md` §9.
 5. **PR-5 — Standalone order status.** `GET /commerce/v1/orders/{id}` with the signed-guest-order-
    reference scheme from §3.2.
 6. **Deferred, separate prerequisite work (not part of this API's PR sequence, but blocking for

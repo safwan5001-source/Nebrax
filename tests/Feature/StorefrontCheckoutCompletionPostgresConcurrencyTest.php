@@ -183,6 +183,112 @@ class StorefrontCheckoutCompletionPostgresConcurrencyTest extends TestCase
             CommerceOrder::STATUS_CONFIRMED,
             DB::table('commerce_orders')->where('commerce_checkout_id', $checkout->id)->value('status'),
         );
+
+        // Cart One-Shot Lifecycle: نفس معاملة الإتمام تحت القفل الحقيقي أعلاه
+        // تركت السلة مُستهلَكة أيضاً — لا سباق يُنتج طلبين ولا يُبقي السلة active.
+        $this->assertSame(
+            CommerceCart::STATUS_CONSUMED,
+            DB::table('commerce_carts')->where('id', $cart->id)->value('status'),
+        );
+    }
+
+    /**
+     * Cart One-Shot Lifecycle — القفل الحقيقي على صفّ السلة نفسه
+     * (`lockActiveCart()`) يمنع أي `POST checkout` متزامن من رؤية سلةٍ لا
+     * تزال `active` بعد أن استُهلكت فعلياً: كلا الاستدعاءين يرفضان بـ
+     * `CheckoutNotFoundException` ولا صفّ Checkout ثانٍ يُنشأ مهما تكرّرت
+     * المحاولات المتزامنة.
+     *
+     * @test
+     */
+    public function two_concurrent_checkout_creation_attempts_after_consumption_create_zero_new_checkouts(): void
+    {
+        $product = Product::create([
+            'name' => 'Consumed cart race product', 'sku' => 'CHKCONSRACE-'.Str::random(8),
+            'unit' => 'piece', 'sale_price' => 1800, 'is_active' => true,
+        ]);
+        CommerceListing::create([
+            'product_id' => $product->id, 'sales_channel_id' => $this->channel->id, 'is_published' => true,
+        ]);
+        $rawToken = 'consumed-cart-race-token-'.Str::random(16);
+        $cart = CommerceCart::create([
+            'storefront_id' => $this->storefront->id,
+            'sales_channel_id' => $this->channel->id,
+            'token_hash' => hash('sha256', $rawToken),
+            'expires_at' => now()->addDay(),
+        ]);
+        CommerceCartItem::create([
+            'cart_id' => $cart->id, 'product_id' => $product->id, 'product_name_snapshot' => $product->name,
+            'unit_key' => 'base', 'unit_name_snapshot' => 'piece', 'quantity' => 1,
+        ]);
+        $checkout = CommerceCheckout::create([
+            'storefront_id' => $this->storefront->id,
+            'sales_channel_id' => $this->channel->id,
+            'cart_id' => $cart->id,
+            'status' => CommerceCheckout::STATUS_COMPLETED,
+            'expires_at' => now()->addHour(),
+            'contact_name' => 'مستهلِك', 'contact_phone' => '0500000000',
+            'delivery_country' => 'SA', 'delivery_city' => 'الدمام', 'delivery_street' => 'شارع',
+            'delivery_method' => 'pickup',
+        ]);
+        // السلة استُهلكت فعلياً — الحالة التي يتركها complete() الحقيقي دوماً الآن.
+        $cart->update(['status' => CommerceCart::STATUS_CONSUMED]);
+
+        $lockReady = $this->signalPath('consumed_cart_lock_');
+        $attemptStarted = $this->signalPath('consumed_cart_attempt_');
+        $resultFile = tempnam(sys_get_temp_dir(), 'consumed_cart_race_result_');
+
+        $locker = pcntl_fork();
+        if ($locker === 0) {
+            DB::purge(config('database.default'));
+            DB::transaction(function () use ($cart, $lockReady, $attemptStarted): void {
+                DB::table('commerce_carts')->where('id', $cart->id)->lockForUpdate()->first();
+                touch($lockReady);
+                $this->waitForSignal($attemptStarted);
+                usleep(500000);
+            });
+            exit(0);
+        }
+        $this->assertGreaterThan(0, $locker);
+        $this->waitForSignal($lockReady);
+
+        $attempter = pcntl_fork();
+        if ($attempter === 0) {
+            DB::purge(config('database.default'));
+            $this->establishContext();
+            touch($attemptStarted);
+            try {
+                app(CommerceCheckoutService::class)->createOrResume($rawToken);
+                file_put_contents($resultFile, json_encode(['ok' => true, 'created' => true]));
+            } catch (\Throwable $exception) {
+                file_put_contents($resultFile, json_encode([
+                    'ok' => false,
+                    'class' => get_class($exception),
+                ]));
+            }
+            exit(0);
+        }
+        $this->assertGreaterThan(0, $attempter);
+
+        pcntl_waitpid($locker, $status);
+        pcntl_waitpid($attempter, $status);
+        $result = json_decode((string) file_get_contents($resultFile), true);
+        $this->cleanupSignals([$lockReady, $attemptStarted, $resultFile]);
+
+        // معطَّلة تحت قفل صفّ السلة الحقيقي — ترفض بمجرد تحريره لأن السلة
+        // مُستهلَكة فعلياً، لا صفّ Checkout ثانٍ يُنشأ تحت أي تزامن.
+        $this->assertFalse($result['ok'], json_encode($result));
+        $this->assertSame(\App\Services\Commerce\CheckoutNotFoundException::class, $result['class']);
+        $this->assertSame(1, DB::table('commerce_checkouts')->where('cart_id', $cart->id)->count());
+
+        // محاولة ثالثة، تسلسلية، تؤكد نفس النتيجة الحتمية.
+        try {
+            app(CommerceCheckoutService::class)->createOrResume($rawToken);
+            $this->fail('كان يجب أن يُرفض بدء Checkout على سلةٍ مُستهلَكة.');
+        } catch (\App\Services\Commerce\CheckoutNotFoundException) {
+            // متوقَّع.
+        }
+        $this->assertSame(1, DB::table('commerce_checkouts')->where('cart_id', $cart->id)->count());
     }
 
     private function establishContext(): void
