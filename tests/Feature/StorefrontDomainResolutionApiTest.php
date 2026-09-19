@@ -356,11 +356,16 @@ class StorefrontDomainResolutionApiTest extends TestCase
     /** @test */
     public function category_tree_is_tenant_isolated_through_the_host_resolved_path(): void
     {
-        ['tenant' => $tenantA] = $this->seedDomainStore('l.example.com');
+        ['tenant' => $tenantA, 'channel' => $channelA] = $this->seedDomainStore('l.example.com');
         ['tenant' => $tenantB] = $this->seedDomainStore('m.example.com');
 
         app(TenantContext::class)->set($tenantA->id);
         $active = \App\Models\ProductCategory::create(['name' => 'فئة أ', 'is_active' => true]);
+        // COM-CATALOG-2 — بوابة نشر التصنيف: صف نشر صريح على القناة المحلولة.
+        \App\Models\CommerceCategoryListing::create([
+            'tenant_id' => $tenantA->id, 'category_id' => $active->id,
+            'sales_channel_id' => $channelA->id, 'is_published' => true,
+        ]);
         app(TenantContext::class)->forget();
 
         app(TenantContext::class)->set($tenantB->id);
