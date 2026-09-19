@@ -232,15 +232,25 @@ describe("commerce/products", () => {
     });
   });
 
-  it("returns an empty facet list (AWJ has no faceted search yet)", async () => {
+  it("returns an empty facet list (the AWJ catalog API supports no filters)", async () => {
     const filters = await fetchProductFilters();
 
     expect(filters.filters).toEqual([]);
+  });
+
+  it("offers exactly the sorts StorefrontProductController allows, both ways", async () => {
+    const filters = await fetchProductFilters();
+
+    // name / sale_price / created_at, ascending and descending — no more (a
+    // control the API cannot honour) and no fewer ("newest" was missing while
+    // `created_at` had always been supported).
     expect(filters.sort_options.map((s) => s.id)).toEqual([
       "name",
       "-name",
       "price",
       "-price",
+      "-available_on",
+      "available_on",
     ]);
   });
 });

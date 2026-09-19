@@ -52,6 +52,8 @@ function cartWithItem() {
       {
         id: "line-1",
         productId: "prod-1",
+        variantId: null,
+        variantDescriptor: null,
         name: "منتج تجريبي",
         unitKey: "base",
         unitName: "قطعة",
@@ -113,6 +115,8 @@ const sampleOrder = {
   items: [
     {
       productId: "prod-1",
+      variantId: null,
+      variantDescriptor: null,
       productName: "منتج تجريبي",
       unitName: "قطعة",
       quantity: 2,
@@ -123,6 +127,12 @@ const sampleOrder = {
   createdAt: "2026-01-01T00:00:00Z",
 };
 
+/**
+ * Walks the six-stage checkout from the contact stage to the review stage:
+ * contact -> address -> delivery -> payment -> review. Each "continue" is the
+ * stage's own save, which is what makes the PATCH assertions below meaningful —
+ * the flow never batches three endpoints behind one button.
+ */
 async function fillDetailsAndContinue(
   user: ReturnType<typeof userEvent.setup>,
 ) {
@@ -135,6 +145,11 @@ async function fillDetailsAndContinue(
     screen.getByLabelText("awjCheckout.contact.phone"),
     "0501234567",
   );
+  await user.click(
+    screen.getByRole("button", { name: "awjCheckout.continueToAddress" }),
+  );
+
+  await screen.findByLabelText("awjCheckout.address.country");
   await user.type(screen.getByLabelText("awjCheckout.address.country"), "SA");
   await user.type(screen.getByLabelText("awjCheckout.address.city"), "الدمام");
   await user.type(
@@ -142,8 +157,19 @@ async function fillDetailsAndContinue(
     "شارع الملك فهد",
   );
   await user.click(
+    screen.getByRole("button", { name: "awjCheckout.continueToDelivery" }),
+  );
+
+  await screen.findByText("awjCheckout.delivery.heading");
+  await user.click(
     screen.getByLabelText(/awjCheckout\.delivery\.methods\.pickup/),
   );
+  await user.click(
+    screen.getByRole("button", { name: "awjCheckout.continueToPayment" }),
+  );
+
+  // The payment stage is DESIGN_ONLY: it saves nothing and calls nothing.
+  await screen.findByText("awjCheckout.payment.notEnabledTitle");
   await user.click(
     screen.getByRole("button", { name: "awjCheckout.continueToReview" }),
   );
@@ -323,11 +349,7 @@ describe("AwjCheckoutFlow", () => {
 
     // Success state shows the exact CommerceOrder the backend returned.
     await screen.findByText("awjCheckout.success.heading");
-    expect(
-      screen.getByText(
-        `awjCheckout.success.orderNumber:${JSON.stringify({ number: sampleOrder.number })}`,
-      ),
-    ).toBeInTheDocument();
+    expect(screen.getByText(sampleOrder.number)).toBeInTheDocument();
     // Never implies payment happened — `confirmed` is a commercial
     // commitment only.
     expect(
@@ -671,6 +693,205 @@ describe("AwjCheckoutFlow", () => {
       expect(
         localStorage.getItem("awj-checkout-idempotency-key:identity-a"),
       ).toBeNull();
+    });
+  });
+  describe("Six-stage presentation (STORE-UI-4)", () => {
+    beforeEach(() => {
+      mockActions.startOrResumeAwjCheckout.mockResolvedValue({
+        success: true,
+        checkout: checkoutWith(),
+      });
+      mockActions.updateAwjContact.mockResolvedValue({
+        success: true,
+        checkout: checkoutWith(),
+      });
+      mockActions.updateAwjAddress.mockResolvedValue({
+        success: true,
+        checkout: checkoutWith(),
+      });
+      mockActions.updateAwjDelivery.mockResolvedValue({
+        success: true,
+        checkout: checkoutWith(),
+      });
+    });
+
+    it("starts on contact and shows only that stage's fields", async () => {
+      render(<AwjCheckoutFlow />);
+
+      await screen.findByLabelText("awjCheckout.contact.name");
+      expect(
+        screen.queryByLabelText("awjCheckout.address.street"),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByText("awjCheckout.payment.notEnabledTitle"),
+      ).not.toBeInTheDocument();
+    });
+
+    it("saves each stage to its own endpoint as the shopper advances, not all at the end", async () => {
+      const user = userEvent.setup();
+      render(<AwjCheckoutFlow />);
+
+      await screen.findByLabelText("awjCheckout.contact.name");
+      await user.type(
+        screen.getByLabelText("awjCheckout.contact.name"),
+        "سالم",
+      );
+      await user.type(
+        screen.getByLabelText("awjCheckout.contact.phone"),
+        "0501234567",
+      );
+      await user.click(
+        screen.getByRole("button", { name: "awjCheckout.continueToAddress" }),
+      );
+
+      await waitFor(() =>
+        expect(mockActions.updateAwjContact).toHaveBeenCalledTimes(1),
+      );
+      // The address endpoint has not been touched yet — the shopper has not
+      // reached that stage.
+      expect(mockActions.updateAwjAddress).not.toHaveBeenCalled();
+      expect(mockActions.updateAwjDelivery).not.toHaveBeenCalled();
+    });
+
+    it("the payment stage calls no server action at all — it is inert by design", async () => {
+      const user = userEvent.setup();
+      render(<AwjCheckoutFlow />);
+      await fillDetailsAndContinue(user);
+
+      await screen.findByText("awjCheckout.review.heading");
+
+      // Three PATCHes for three real stages. The payment stage adds none,
+      // because there is no payment endpoint to add.
+      expect(mockActions.updateAwjContact).toHaveBeenCalledTimes(1);
+      expect(mockActions.updateAwjAddress).toHaveBeenCalledTimes(1);
+      expect(mockActions.updateAwjDelivery).toHaveBeenCalledTimes(1);
+      expect(mockActions.completeAwjCheckoutAction).not.toHaveBeenCalled();
+    });
+
+    it("lets the shopper step back without re-saving the stage they left", async () => {
+      const user = userEvent.setup();
+      render(<AwjCheckoutFlow />);
+
+      await screen.findByLabelText("awjCheckout.contact.name");
+      await user.type(
+        screen.getByLabelText("awjCheckout.contact.name"),
+        "سالم",
+      );
+      await user.type(
+        screen.getByLabelText("awjCheckout.contact.phone"),
+        "0501234567",
+      );
+      await user.click(
+        screen.getByRole("button", { name: "awjCheckout.continueToAddress" }),
+      );
+      await screen.findByLabelText("awjCheckout.address.street");
+
+      await user.click(screen.getByRole("button", { name: "common.back" }));
+
+      await screen.findByLabelText("awjCheckout.contact.name");
+      expect(mockActions.updateAwjAddress).not.toHaveBeenCalled();
+    });
+
+    it("blocks the contact stage until name and phone are entered", async () => {
+      const user = userEvent.setup();
+      render(<AwjCheckoutFlow />);
+
+      await screen.findByLabelText("awjCheckout.contact.name");
+      expect(
+        screen.getByRole("button", { name: "awjCheckout.continueToAddress" }),
+      ).toBeDisabled();
+
+      await user.type(
+        screen.getByLabelText("awjCheckout.contact.name"),
+        "سالم",
+      );
+      await user.type(
+        screen.getByLabelText("awjCheckout.contact.phone"),
+        "0501234567",
+      );
+      expect(
+        screen.getByRole("button", { name: "awjCheckout.continueToAddress" }),
+      ).toBeEnabled();
+    });
+
+    it("keeps the shopper on the stage when the server refuses the save", async () => {
+      const user = userEvent.setup();
+      mockActions.updateAwjContact.mockResolvedValue({
+        success: false,
+        error: "تعذّر حفظ بيانات التواصل.",
+      });
+      render(<AwjCheckoutFlow />);
+
+      await screen.findByLabelText("awjCheckout.contact.name");
+      await user.type(
+        screen.getByLabelText("awjCheckout.contact.name"),
+        "سالم",
+      );
+      await user.type(
+        screen.getByLabelText("awjCheckout.contact.phone"),
+        "0501234567",
+      );
+      await user.click(
+        screen.getByRole("button", { name: "awjCheckout.continueToAddress" }),
+      );
+
+      expect(
+        await screen.findByText("تعذّر حفظ بيانات التواصل."),
+      ).toBeInTheDocument();
+      // Still on contact — never advanced past something the server refused.
+      expect(
+        screen.getByLabelText("awjCheckout.contact.name"),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByLabelText("awjCheckout.address.street"),
+      ).not.toBeInTheDocument();
+    });
+
+    it("shows no order total before the order exists, and the server's total after", async () => {
+      const user = userEvent.setup();
+      mockActions.completeAwjCheckoutAction.mockResolvedValue({
+        success: true,
+        order: sampleOrder,
+        replayed: false,
+      });
+      render(<AwjCheckoutFlow />);
+      await fillDetailsAndContinue(user);
+      await screen.findByText("awjCheckout.review.heading");
+
+      // The summary panel names a subtotal, never a total.
+      expect(screen.queryByText("common.total")).not.toBeInTheDocument();
+
+      await user.click(
+        screen.getByRole("button", { name: "awjCheckout.completeOrder" }),
+      );
+      await screen.findByText("awjCheckout.success.heading");
+
+      // `order.total` — the only total in the journey, and the server's.
+      expect(screen.getByText("common.total")).toBeInTheDocument();
+    });
+
+    it("sends a review_required contact gap back to the contact stage, and a cart-content gap stays on review", async () => {
+      const user = userEvent.setup();
+      mockActions.completeAwjCheckoutAction.mockResolvedValue({
+        success: false,
+        kind: "review_required",
+        items: [{ item_id: "line-1", reason: "insufficient_stock" }],
+        checkout: checkoutWith(),
+        message: "review",
+      });
+      render(<AwjCheckoutFlow />);
+      await fillDetailsAndContinue(user);
+      await screen.findByText("awjCheckout.review.heading");
+      await user.click(
+        screen.getByRole("button", { name: "awjCheckout.completeOrder" }),
+      );
+
+      await screen.findByText("awjCheckout.reviewRequired.title");
+      // A stock problem is about the cart, so the shopper stays where the
+      // refreshed lines are.
+      expect(
+        screen.getByText("awjCheckout.review.heading"),
+      ).toBeInTheDocument();
     });
   });
 });

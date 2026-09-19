@@ -5,7 +5,10 @@ namespace App\Services\Commerce;
 use App\Models\SalesChannel;
 use App\Models\Storefront;
 use App\Models\StorefrontDomain;
+use App\Services\Commerce\Edge\EdgeSnapshot;
+use App\Services\Commerce\Edge\StorefrontEdgeClient;
 use App\Support\HostnameNormalizer;
+use App\Support\IcannRegistrableDomain;
 use App\Support\InvalidHostnameException;
 use App\Support\ManagedStorefrontHostname;
 use App\Tenancy\TenantContext;
@@ -22,12 +25,14 @@ use RuntimeException;
  * الترويسات أو الـ Host. ليست هذه واجهة `GET store/v1/storefront`
  * المحسومة بالنطاق للعامة.
  *
- * `preview_url` يُبنى على الخادم من نطاق نشط ومُتحقق فقط، بمخطط https
+ * `preview_url` يُبنى على الخادم من متجر نشط ونطاق نشط ومُتحقق فقط، بمخطط https
  * ثابت — لا يُركَّب في المتصفح، ولا يُرجَع hostname خام، ولا يُكشف
- * `tenant_id`.
+ * `tenant_id`. القائمة تشمل المتاجر المتوقفة بـ`is_active` الفعلي.
  */
 final class CommerceWorkspaceStorefrontsService
 {
+    public function __construct(private readonly StorefrontEdgeClient $edge) {}
+
     /**
      * @return list<array{id: string, name: string, sales_channel_id: string, is_active: bool, preview_url: ?string, default_locale: string}>
      */
@@ -39,7 +44,6 @@ final class CommerceWorkspaceStorefrontsService
         }
 
         $storefronts = Storefront::query()
-            ->where('is_active', true)
             ->with([
                 'salesChannel',
                 'domains' => function ($query) {
@@ -68,16 +72,7 @@ final class CommerceWorkspaceStorefrontsService
                 continue;
             }
 
-            $stores[] = [
-                'id' => $storefront->id,
-                'name' => $storefront->name,
-                'sales_channel_id' => $channel->id,
-                'is_active' => true,
-                'preview_url' => $channel->is_active
-                    ? $this->authorizedPreviewUrl($storefront, $tenantId)
-                    : null,
-                'default_locale' => $storefront->default_locale,
-            ];
+            $stores[] = $this->presentStore($storefront, $channel, $tenantId);
         }
 
         return $stores;
@@ -121,28 +116,73 @@ final class CommerceWorkspaceStorefrontsService
             $storefront->forceFill($update)->save();
         }
 
-        $storefront->load(['salesChannel', 'domains' => function ($query) {
-            $query->where('is_active', true)
-                ->where('verification_status', StorefrontDomain::VERIFICATION_VERIFIED)
-                ->orderByDesc('is_primary')
-                ->orderBy('hostname');
-        }]);
+        $this->loadAuthorizedPreviewDomains($storefront);
 
         $channel = $storefront->salesChannel;
         if ($channel === null || $channel->tenant_id !== $tenantId || $channel->type !== SalesChannel::TYPE_WEB) {
             return null;
         }
 
-        return [
-            'id' => $storefront->id,
-            'name' => $storefront->name,
-            'sales_channel_id' => $channel->id,
-            'is_active' => true,
-            'preview_url' => $channel->is_active
-                ? $this->authorizedPreviewUrl($storefront, $tenantId)
-                : null,
-            'default_locale' => $storefront->default_locale,
-        ];
+        return $this->presentStore($storefront, $channel, $tenantId);
+    }
+
+    /**
+     * STORE-ADMIN-LIFECYCLE-1 — تفعيل متجر قائم يخصّ المستأجر الحالي.
+     * يكتب `Storefront.is_active = true` فقط. لا يمسّ القناة ولا النطاقات
+     * ولا الحافة. مثاليّ التكرار: متجر نشط أصلاً يُعاد كما هو.
+     *
+     * `null` = غير موجود / لا يخص هذا المستأجر → 404 غير كاشف.
+     *
+     * @return array{id: string, name: string, sales_channel_id: string, is_active: bool, preview_url: ?string, default_locale: string}|null
+     */
+    public function activateForCurrentTenant(string $storefrontId): ?array
+    {
+        return $this->setActiveForCurrentTenant($storefrontId, true);
+    }
+
+    /**
+     * STORE-ADMIN-LIFECYCLE-1 — إيقاف متجر قائم يخصّ المستأجر الحالي.
+     * يكتب `Storefront.is_active = false` فقط. الحسم العام يفشل مغلقاً لأن
+     * `ResolveStorefrontDomain` يشترط متجراً نشطاً. لا حذف ولا فصل نطاق.
+     *
+     * `null` = غير موجود / لا يخص هذا المستأجر → 404 غير كاشف.
+     *
+     * @return array{id: string, name: string, sales_channel_id: string, is_active: bool, preview_url: ?string, default_locale: string}|null
+     */
+    public function deactivateForCurrentTenant(string $storefrontId): ?array
+    {
+        return $this->setActiveForCurrentTenant($storefrontId, false);
+    }
+
+    /**
+     * @return array{id: string, name: string, sales_channel_id: string, is_active: bool, preview_url: ?string, default_locale: string}|null
+     */
+    private function setActiveForCurrentTenant(string $storefrontId, bool $active): ?array
+    {
+        $tenantId = app(TenantContext::class)->id();
+        if ($tenantId === null) {
+            throw new RuntimeException('لا سياق مستأجر نشط.');
+        }
+
+        return DB::transaction(function () use ($storefrontId, $active, $tenantId) {
+            $storefront = Storefront::query()->whereKey($storefrontId)->lockForUpdate()->first();
+            if ($storefront === null || $storefront->tenant_id !== $tenantId) {
+                return null;
+            }
+
+            $this->loadAuthorizedPreviewDomains($storefront);
+
+            $channel = $storefront->salesChannel;
+            if ($channel === null || $channel->tenant_id !== $tenantId || $channel->type !== SalesChannel::TYPE_WEB) {
+                return null;
+            }
+
+            if ((bool) $storefront->is_active !== $active) {
+                $storefront->forceFill(['is_active' => $active])->save();
+            }
+
+            return $this->presentStore($storefront, $channel, $tenantId);
+        });
     }
 
     /**
@@ -343,6 +383,491 @@ final class CommerceWorkspaceStorefrontsService
         return $this->presentDomain($domain->refresh());
     }
 
+    /**
+     * STORE-ADMIN-ADOPT-1B-3B / CUSTOM-DOMAIN-EDGE-3 — جعل نطاق مؤهل هو الأساسي.
+     *
+     * نطاق `custom`: لا يُوثَق بـ `edge_status = ready` المخزَّن. يُعاد سؤال
+     * المزوّد حيّاً خارج قفل DB، ثم تُعاد التحققات المحلية داخل المعاملة قبل
+     * `makePrimary()`. فشل النقل → 503 دون ترقية.
+     * نطاق `awj_subdomain` موثَّق ونشط يُحوَّل عبر `StorefrontDomain::makePrimary()`
+     * دون أي متطلب Railway.
+     *
+     * `null` = غير موجود / لا يخص هذا المستأجر أو هذا المتجر → 404 غير كاشف.
+     *
+     * @throws CustomDomainNotReadyForPrimaryException نطاق مخصَّص غير جاهز — 422.
+     * @throws DomainNotEligibleForPrimaryException نطاق غير مؤهل — 422.
+     * @throws StorefrontEdgeUnavailableException|StorefrontEdgeMisconfiguredException نقل المزوّد — 503.
+     *
+     * @return array{id: string, hostname: string, type: string, is_primary: bool, is_active: bool, verification_status: string, verification: array{method: string, record_name: string, record_value: string, verified_at: ?string}|null}|null
+     */
+    public function makePrimaryForCurrentTenant(string $storefrontId, string $domainId): ?array
+    {
+        $tenantId = app(TenantContext::class)->id();
+        if ($tenantId === null) {
+            throw new RuntimeException('لا سياق مستأجر نشط.');
+        }
+
+        $storefront = Storefront::query()->find($storefrontId);
+        if ($storefront === null || $storefront->tenant_id !== $tenantId) {
+            return null;
+        }
+
+        $inspection = DB::transaction(function () use ($storefront, $domainId, $tenantId) {
+            $domain = $this->lockedDomainForStorefront($storefront->id, $domainId, $tenantId);
+            if ($domain === null) {
+                return ['kind' => 'missing'];
+            }
+
+            if ($domain->type !== StorefrontDomain::TYPE_CUSTOM) {
+                if (! $domain->isVerified() || ! $domain->is_active) {
+                    throw new DomainNotEligibleForPrimaryException(
+                        'هذا النطاق غير مؤهل ليكون النطاق الأساسي.'
+                    );
+                }
+
+                if (! $domain->is_primary) {
+                    $domain->makePrimary();
+                }
+
+                return ['kind' => 'awj', 'presented' => $this->presentDomain($domain->refresh())];
+            }
+
+            if (! $domain->isVerified()) {
+                throw new CustomDomainNotReadyForPrimaryException(
+                    'لا يمكن جعل هذا النطاق أساسياً قبل اكتمال التحقّق وتفعيل HTTPS.'
+                );
+            }
+            if (! $domain->is_active) {
+                throw new DomainNotEligibleForPrimaryException(
+                    'هذا النطاق غير مؤهل ليكون النطاق الأساسي.'
+                );
+            }
+
+            $provider = is_string($domain->edge_provider) ? $domain->edge_provider : '';
+            if ($provider !== '' && $provider !== 'railway') {
+                throw new CustomDomainNotReadyForPrimaryException(
+                    'تم التحقق من ملكية النطاق، لكن تفعيل HTTPS/النطاق لم يكتمل بعد.'
+                );
+            }
+
+            $providerId = is_string($domain->edge_provider_id) && $domain->edge_provider_id !== ''
+                ? $domain->edge_provider_id
+                : null;
+
+            return [
+                'kind' => 'custom',
+                'hostname' => $domain->hostname,
+                'provider_id' => $providerId,
+            ];
+        });
+
+        if (($inspection['kind'] ?? null) === 'missing') {
+            return null;
+        }
+        if (($inspection['kind'] ?? null) === 'awj') {
+            return $inspection['presented'];
+        }
+
+        $observation = $this->observeLiveCustomEdge(
+            $inspection['hostname'],
+            $inspection['provider_id'],
+        );
+
+        DB::transaction(function () use ($storefront, $domainId, $tenantId, $observation) {
+            $domain = $this->lockedDomainForStorefront($storefront->id, $domainId, $tenantId);
+            if ($domain === null) {
+                return;
+            }
+            if ($domain->type !== StorefrontDomain::TYPE_CUSTOM) {
+                return;
+            }
+            $applyId = $observation['provider_id'] ?? '';
+            if ($applyId === '') {
+                $applyId = is_string($domain->edge_provider_id) ? $domain->edge_provider_id : '';
+            }
+            $this->applyEdgeSnapshot($domain, $observation['snapshot'], $applyId);
+        });
+
+        return DB::transaction(function () use ($storefront, $domainId, $tenantId, $observation) {
+            $domain = $this->lockedDomainForStorefront($storefront->id, $domainId, $tenantId);
+            if ($domain === null) {
+                return null;
+            }
+
+            if ($domain->type !== StorefrontDomain::TYPE_CUSTOM || ! $domain->isVerified() || ! $domain->is_active) {
+                throw new CustomDomainNotReadyForPrimaryException(
+                    'تم التحقق من ملكية النطاق، لكن تفعيل HTTPS/النطاق لم يكتمل بعد.'
+                );
+            }
+
+            if (
+                $observation['snapshot']->missing
+                || $observation['provider_id'] === null
+                || $observation['provider_id'] === ''
+                || $domain->edge_status !== StorefrontDomain::EDGE_READY
+            ) {
+                throw new CustomDomainNotReadyForPrimaryException(
+                    'تم التحقق من ملكية النطاق، لكن تفعيل HTTPS/النطاق لم يكتمل بعد.'
+                );
+            }
+
+            if (! $domain->is_primary) {
+                $domain->makePrimary();
+            }
+
+            return $this->presentDomain($domain->refresh());
+        });
+    }
+
+    /**
+     * STORE-ADMIN-ADOPT-1B-3B / CUSTOM-DOMAIN-EDGE-3 — فصل نطاق مخصَّص غير
+     * أساسي. إطلاق المزوّد أولاً (أو تأكيد الغياب السلطوي عبر hostname داخل
+     * خدمة المتجر المضبوطة)، ثم حذف الصف المحلي. فشل النقل يُبقي الصف.
+     *
+     * نطاق AWJ مُدار أو نطاق أساسي حالي → رفض فشلٍ مغلق قبل أي استدعاء مزوّد.
+     * قبل HTTP: إن لم يكن أساسياً يُعطَّل `is_active` (حاجز موجود بلا هجرة)
+     * حتى لا يمر Make Primary أثناء `release()`. فشل النقل يعيد النشاط.
+     *
+     * `null` = غير موجود / لا يخص هذا المستأجر أو هذا المتجر → 404 غير كاشف.
+     *
+     * @throws DomainNotDisconnectableException نطاق غير قابل للفصل — 422.
+     * @throws StorefrontEdgeUnavailableException|StorefrontEdgeMisconfiguredException نقل المزوّد — 503.
+     */
+    public function disconnectCustomDomainForCurrentTenant(string $storefrontId, string $domainId): ?bool
+    {
+        $tenantId = app(TenantContext::class)->id();
+        if ($tenantId === null) {
+            throw new RuntimeException('لا سياق مستأجر نشط.');
+        }
+
+        $storefront = Storefront::query()->find($storefrontId);
+        if ($storefront === null || $storefront->tenant_id !== $tenantId) {
+            return null;
+        }
+
+        $inspection = DB::transaction(function () use ($storefront, $domainId, $tenantId) {
+            $domain = $this->lockedDomainForStorefront($storefront->id, $domainId, $tenantId);
+            if ($domain === null) {
+                return ['kind' => 'missing'];
+            }
+
+            if ($domain->type !== StorefrontDomain::TYPE_CUSTOM) {
+                throw new DomainNotDisconnectableException(
+                    'لا يمكن فصل نطاق مُدار من أَوْج.'
+                );
+            }
+
+            if ($domain->is_primary) {
+                throw new DomainNotDisconnectableException(
+                    'لا يمكن فصل النطاق الأساسي الحالي — حوّل النطاق الأساسي أولاً.'
+                );
+            }
+
+            $wasActive = (bool) $domain->is_active;
+            if ($wasActive) {
+                $domain->forceFill(['is_active' => false])->save();
+            }
+
+            return [
+                'kind' => 'custom',
+                'hostname' => $domain->hostname,
+                'was_active' => $wasActive,
+            ];
+        });
+
+        if (($inspection['kind'] ?? null) === 'missing') {
+            return null;
+        }
+
+        try {
+            $this->releaseCustomEdgeBinding($inspection['hostname']);
+        } catch (StorefrontEdgeUnavailableException|StorefrontEdgeMisconfiguredException $e) {
+            if ($inspection['was_active']) {
+                $this->restoreActiveIfStillDisconnectable($storefront->id, $domainId, $tenantId);
+            }
+            throw $e;
+        }
+
+        return DB::transaction(function () use ($storefront, $domainId, $tenantId) {
+            $domain = $this->lockedDomainForStorefront($storefront->id, $domainId, $tenantId);
+            if ($domain === null) {
+                return null;
+            }
+
+            if ($domain->type !== StorefrontDomain::TYPE_CUSTOM) {
+                throw new DomainNotDisconnectableException(
+                    'لا يمكن فصل نطاق مُدار من أَوْج.'
+                );
+            }
+
+            if ($domain->is_primary) {
+                throw new DomainNotDisconnectableException(
+                    'لا يمكن فصل النطاق الأساسي الحالي — حوّل النطاق الأساسي أولاً.'
+                );
+            }
+
+            $domain->delete();
+
+            return true;
+        });
+    }
+
+    /**
+     * CUSTOM-DOMAIN-EDGE-1 — تسجيل نطاق مخصَّص موثَّق لدى Railway.
+     * Make Primary يبقى مرفوضاً للنطاق المخصَّص في هذه الشريحة.
+     *
+     * @return array{id: string, hostname: string, type: string, is_primary: bool, is_active: bool, verification_status: string, verification: array{method: string, record_name: string, record_value: string, verified_at: ?string}|null, edge: ?array}|null
+     */
+    public function activateEdgeForCurrentTenant(string $storefrontId, string $domainId): ?array
+    {
+        $tenantId = app(TenantContext::class)->id();
+        if ($tenantId === null) {
+            throw new RuntimeException('لا سياق مستأجر نشط.');
+        }
+
+        $storefront = Storefront::query()->find($storefrontId);
+        if ($storefront === null || $storefront->tenant_id !== $tenantId) {
+            return null;
+        }
+
+        return DB::transaction(function () use ($storefront, $domainId, $tenantId) {
+            $domain = $this->lockedDomainForStorefront($storefront->id, $domainId, $tenantId);
+            if ($domain === null) {
+                return null;
+            }
+
+            $this->assertEligibleForEdgeActivation($domain);
+
+            if (is_string($domain->edge_provider_id) && $domain->edge_provider_id !== '') {
+                $snapshot = $this->edge->fetch($domain->edge_provider_id);
+                if (! $snapshot->missing) {
+                    $this->applyEdgeSnapshot($domain, $snapshot, $domain->edge_provider_id);
+
+                    return $this->presentDomain($domain->refresh());
+                }
+                // المزوّد حذف الكائن خارجياً — نُعيد الاكتشاف/الإنشاء بدل تجميد failed.
+            }
+
+            $existing = $this->edge->findByHostname($domain->hostname);
+            if ($existing !== null) {
+                $this->applyEdgeSnapshot($domain, $existing->snapshot, $existing->providerId);
+
+                return $this->presentDomain($domain->refresh());
+            }
+
+            try {
+                $binding = $this->edge->provision($domain->hostname);
+            } catch (StorefrontEdgeConflictException $e) {
+                $recovered = $this->edge->findByHostname($domain->hostname);
+                if ($recovered === null) {
+                    throw $e;
+                }
+                $this->applyEdgeSnapshot($domain, $recovered->snapshot, $recovered->providerId);
+
+                return $this->presentDomain($domain->refresh());
+            } catch (StorefrontEdgeUnavailableException $e) {
+                $recovered = $this->edge->findByHostname($domain->hostname);
+                if ($recovered === null) {
+                    throw $e;
+                }
+                $this->applyEdgeSnapshot($domain, $recovered->snapshot, $recovered->providerId);
+
+                return $this->presentDomain($domain->refresh());
+            }
+
+            $this->applyEdgeSnapshot($domain, $binding->snapshot, $binding->providerId);
+
+            return $this->presentDomain($domain->refresh());
+        });
+    }
+
+    /**
+     * CUSTOM-DOMAIN-EDGE-1 — مزامنة حالة Railway إلى الصف.
+     *
+     * @return array{id: string, hostname: string, type: string, is_primary: bool, is_active: bool, verification_status: string, verification: array{method: string, record_name: string, record_value: string, verified_at: ?string}|null, edge: ?array}|null
+     */
+    public function refreshEdgeForCurrentTenant(string $storefrontId, string $domainId): ?array
+    {
+        $tenantId = app(TenantContext::class)->id();
+        if ($tenantId === null) {
+            throw new RuntimeException('لا سياق مستأجر نشط.');
+        }
+
+        $storefront = Storefront::query()->find($storefrontId);
+        if ($storefront === null || $storefront->tenant_id !== $tenantId) {
+            return null;
+        }
+
+        return DB::transaction(function () use ($storefront, $domainId, $tenantId) {
+            $domain = $this->lockedDomainForStorefront($storefront->id, $domainId, $tenantId);
+            if ($domain === null) {
+                return null;
+            }
+
+            if ($domain->type !== StorefrontDomain::TYPE_CUSTOM) {
+                throw new DomainNotEligibleForEdgeException(
+                    'نطاقات أَوْج المُدارة لا تحتاج تفعيل حافة.'
+                );
+            }
+
+            $providerId = is_string($domain->edge_provider_id) && $domain->edge_provider_id !== ''
+                ? $domain->edge_provider_id
+                : null;
+
+            if ($providerId === null) {
+                $existing = $this->edge->findByHostname($domain->hostname);
+                if ($existing === null) {
+                    throw new DomainNotActivatedForEdgeException(
+                        'هذا النطاق لم يُفعَّل لدى مزوّد الحافة بعد.'
+                    );
+                }
+                $this->applyEdgeSnapshot($domain, $existing->snapshot, $existing->providerId);
+
+                return $this->presentDomain($domain->refresh());
+            }
+
+            $snapshot = $this->edge->fetch($providerId);
+            $this->applyEdgeSnapshot($domain, $snapshot, $providerId);
+
+            return $this->presentDomain($domain->refresh());
+        });
+    }
+
+    private function assertEligibleForEdgeActivation(StorefrontDomain $domain): void
+    {
+        if ($domain->type !== StorefrontDomain::TYPE_CUSTOM) {
+            throw new DomainNotEligibleForEdgeException(
+                'نطاقات أَوْج المُدارة لا تحتاج تفعيل حافة.'
+            );
+        }
+        if (! $domain->isVerified() || ! $domain->is_active) {
+            throw new DomainNotEligibleForEdgeException(
+                'لا يمكن تفعيل الحافة قبل اكتمال تحقّق ملكية النطاق.'
+            );
+        }
+        if (! IcannRegistrableDomain::isSubdomain($domain->hostname)) {
+            throw new DomainNotEligibleForEdgeException(
+                'تفعيل النطاق الجذري غير مدعوم في هذه المرحلة — استخدم نطاقاً فرعياً مثل shop.example.com.'
+            );
+        }
+
+        $base = ManagedStorefrontHostname::configuredBaseDomain();
+        if ($domain->hostname === $base || ManagedStorefrontHostname::isUnderBaseDomain($domain->hostname, $base)) {
+            throw new DomainNotEligibleForEdgeException(
+                'لا يمكن تفعيل نطاق يقع ضمن نطاق أَوْج المُدار.'
+            );
+        }
+    }
+
+    private function applyEdgeSnapshot(StorefrontDomain $domain, EdgeSnapshot $snapshot, string $providerId): void
+    {
+        $status = $snapshot->missing ? StorefrontDomain::EDGE_FAILED : $snapshot->status;
+        $readyAt = $domain->edge_ready_at;
+        if ($status === StorefrontDomain::EDGE_READY && $readyAt === null) {
+            $readyAt = now();
+        }
+        if ($status !== StorefrontDomain::EDGE_READY) {
+            // Keep first ready_at as historical cache; EDGE-3 re-queries live cert.
+        }
+
+        $domain->forceFill([
+            'edge_status' => $status,
+            'edge_provider' => 'railway',
+            'edge_provider_id' => $snapshot->missing ? $domain->edge_provider_id : $providerId,
+            'edge_dns_instructions' => ['records' => $snapshot->instructionPayload()],
+            'edge_last_error' => $snapshot->lastError,
+            'edge_checked_at' => now(),
+            'edge_ready_at' => $readyAt,
+        ])->save();
+    }
+
+    /**
+     * TOCTOU: استعلام المزوّد خارج قفل DB. لا يُنشئ موارد. يوفّق بالمعرّف
+     * المخزَّن ثم بالـ hostname داخل خدمة المتجر المضبوطة فقط.
+     *
+     * @return array{provider_id: ?string, snapshot: EdgeSnapshot}
+     */
+    private function observeLiveCustomEdge(string $hostname, ?string $providerId): array
+    {
+        if (is_string($providerId) && $providerId !== '') {
+            $snapshot = $this->edge->fetch($providerId);
+            if (! $snapshot->missing) {
+                return ['provider_id' => $providerId, 'snapshot' => $snapshot];
+            }
+        }
+
+        $existing = $this->edge->findByHostname($hostname);
+        if ($existing !== null) {
+            return ['provider_id' => $existing->providerId, 'snapshot' => $existing->snapshot];
+        }
+
+        return [
+            'provider_id' => null,
+            'snapshot' => new EdgeSnapshot(
+                EdgeSnapshot::STATUS_FAILED,
+                [],
+                'لم يعد نطاق الحافة موجوداً لدى المزوّد.',
+                true,
+            ),
+        ];
+    }
+
+    /**
+     * إطلاق ربط الحافة قبل الحذف المحلي. المصالحة بالـ hostname داخل خدمة
+     * المتجر فقط — لا يُحذف كائن مزوّد لا يطابق hostname هذا الصف.
+     */
+    private function releaseCustomEdgeBinding(string $hostname): void
+    {
+        $existing = $this->edge->findByHostname($hostname);
+        if ($existing === null) {
+            return;
+        }
+
+        $this->edge->release($existing->providerId);
+    }
+
+    /**
+     * إن فشل إطلاق المزوّد بعد تعطيل الصف لمنع Make Primary، نعيد `is_active`
+     * فقط إن بقي النطاق مخصَّصاً غير أساسي — الربط لدى المزوّد ما زال قائماً.
+     */
+    private function restoreActiveIfStillDisconnectable(string $storefrontId, string $domainId, string $tenantId): void
+    {
+        DB::transaction(function () use ($storefrontId, $domainId, $tenantId) {
+            $domain = $this->lockedDomainForStorefront($storefrontId, $domainId, $tenantId);
+            if ($domain === null) {
+                return;
+            }
+            if ($domain->type !== StorefrontDomain::TYPE_CUSTOM || $domain->is_primary) {
+                return;
+            }
+            if ($domain->is_active) {
+                return;
+            }
+            $domain->forceFill(['is_active' => true])->save();
+        });
+    }
+
+    /**
+     * يقفل كل نطاقات المتجر (مرتَّبة بالمعرّف لتفادي deadlock) ثم يعيد الصف
+     * المطلوب إن كان مملوكاً للمستأجر الحالي. قفل المجموعة يجعل Make Primary
+     * وDisconnect متسلسلَين على نفس المتجر دون معمارية قفل جديدة.
+     */
+    private function lockedDomainForStorefront(string $storefrontId, string $domainId, string $tenantId): ?StorefrontDomain
+    {
+        $locked = StorefrontDomain::query()
+            ->where('storefront_id', $storefrontId)
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->get();
+
+        $domain = $locked->firstWhere('id', $domainId);
+        if ($domain === null || $domain->tenant_id !== $tenantId) {
+            return null;
+        }
+
+        return $domain;
+    }
+
     private function isUniqueHostnameViolation(QueryException $e): bool
     {
         $sqlState = $e->errorInfo[0] ?? null;
@@ -353,6 +878,36 @@ final class CommerceWorkspaceStorefrontsService
     }
 
     /**
+     * تمثيل موحَّد لمتجر مساحة العمل: `is_active` الفعلي، و`preview_url`
+     * فقط حين يكون المتجر والقناة نشطين ويوجد نطاق مصرَّح.
+     *
+     * @return array{id: string, name: string, sales_channel_id: string, is_active: bool, preview_url: ?string, default_locale: string}
+     */
+    private function presentStore(Storefront $storefront, SalesChannel $channel, string $tenantId): array
+    {
+        return [
+            'id' => $storefront->id,
+            'name' => $storefront->name,
+            'sales_channel_id' => $channel->id,
+            'is_active' => (bool) $storefront->is_active,
+            'preview_url' => ($storefront->is_active && $channel->is_active)
+                ? $this->authorizedPreviewUrl($storefront, $tenantId)
+                : null,
+            'default_locale' => $storefront->default_locale,
+        ];
+    }
+
+    private function loadAuthorizedPreviewDomains(Storefront $storefront): void
+    {
+        $storefront->load(['salesChannel', 'domains' => function ($query) {
+            $query->where('is_active', true)
+                ->where('verification_status', StorefrontDomain::VERIFICATION_VERIFIED)
+                ->orderByDesc('is_primary')
+                ->orderBy('hostname');
+        }]);
+    }
+
+    /**
      * التمثيل الموحَّد لصفّ `StorefrontDomain` عبر القراءة (`listDomainsForCurrentTenant`)
      * والكتابة (`addCustomDomainForCurrentTenant`/`verifyCustomDomainForCurrentTenant`)
      * — حقل `verification` إضافيّ بحت فوق حقول 1B-2 الستة القائمة (لا حذف/
@@ -360,7 +915,11 @@ final class CommerceWorkspaceStorefrontsService
      * `verification_token` فعلياً (كل نطاق `custom` أُنشئ عبر هذا المسار
      * يحمله دوماً)؛ `null` للنطاق المُدار من أَوْج أو أي صفّ تاريخي بلا token.
      *
-     * @return array{id: string, hostname: string, type: string, is_primary: bool, is_active: bool, verification_status: string, verification: array{method: string, record_name: string, record_value: string, verified_at: ?string}|null}
+     * CUSTOM-DOMAIN-EDGE-1: `edge` إضافي بحت. `null` لنطاق AWJ المُدار.
+     * للنطاق المخصَّص يُعرض الوضع/تعليمات DNS/الأزمنة/خطأ آمن فقط — بلا
+     * `edge_provider_id` ولا أسرار Railway.
+     *
+     * @return array{id: string, hostname: string, type: string, is_primary: bool, is_active: bool, verification_status: string, verification: array{method: string, record_name: string, record_value: string, verified_at: ?string}|null, edge: ?array{status: string, dns_instructions: array{records: list<array{type: string, name: string, value: string}>}, checked_at: ?string, ready_at: ?string, last_error: ?string}}
      */
     private function presentDomain(StorefrontDomain $domain): array
     {
@@ -382,6 +941,44 @@ final class CommerceWorkspaceStorefrontsService
             'is_active' => $domain->is_active,
             'verification_status' => $domain->verification_status,
             'verification' => $verification,
+            'edge' => $this->presentEdge($domain),
+        ];
+    }
+
+    /**
+     * @return array{status: string, dns_instructions: array{records: list<array{type: string, name: string, value: string}>}, checked_at: ?string, ready_at: ?string, last_error: ?string}|null
+     */
+    private function presentEdge(StorefrontDomain $domain): ?array
+    {
+        if ($domain->type !== StorefrontDomain::TYPE_CUSTOM) {
+            return null;
+        }
+
+        $instructions = $domain->edge_dns_instructions;
+        $records = [];
+        if (is_array($instructions) && isset($instructions['records']) && is_array($instructions['records'])) {
+            foreach ($instructions['records'] as $record) {
+                if (! is_array($record)) {
+                    continue;
+                }
+                $type = (string) ($record['type'] ?? '');
+                $name = (string) ($record['name'] ?? '');
+                $value = (string) ($record['value'] ?? '');
+                if ($type === '' || $name === '' || $value === '') {
+                    continue;
+                }
+                $records[] = ['type' => $type, 'name' => $name, 'value' => $value];
+            }
+        }
+
+        return [
+            'status' => is_string($domain->edge_status) && $domain->edge_status !== ''
+                ? $domain->edge_status
+                : StorefrontDomain::EDGE_NONE,
+            'dns_instructions' => ['records' => $records],
+            'checked_at' => $domain->edge_checked_at?->toIso8601String(),
+            'ready_at' => $domain->edge_ready_at?->toIso8601String(),
+            'last_error' => $domain->edge_last_error,
         ];
     }
 

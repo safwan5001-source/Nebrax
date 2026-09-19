@@ -106,7 +106,8 @@ class CommerceWorkspaceCustomDomainPostgresConcurrencyTest extends TestCase
         $storedHostname = HostnameNormalizer::normalize($raceHostname);
 
         $lockReady = $this->signalPath('domain_race_lock_');
-        $callerStarted = $this->signalPath('domain_race_caller_');
+        $lockerBackendPid = $this->signalPath('domain_race_locker_pid_');
+        $callerBackendPid = $this->signalPath('domain_race_caller_pid_');
         $resultFile = tempnam(sys_get_temp_dir(), 'domain_race_result_');
 
         // Locker: tenant A inserts the contested hostname inside an open
@@ -116,6 +117,7 @@ class CommerceWorkspaceCustomDomainPostgresConcurrencyTest extends TestCase
         if ($locker === 0) {
             DB::purge(config('database.default'));
             DB::beginTransaction();
+            file_put_contents($lockerBackendPid, (string) DB::selectOne('select pg_backend_pid()')->pg_backend_pid);
             app(TenantContext::class)->set($this->tenantA->id);
             StorefrontDomain::create([
                 'storefront_id' => $storefrontA->id,
@@ -126,8 +128,11 @@ class CommerceWorkspaceCustomDomainPostgresConcurrencyTest extends TestCase
             ]);
             app(TenantContext::class)->forget();
             touch($lockReady);
-            $this->waitForSignal($callerStarted);
-            usleep(500000);
+            $this->waitForSignal($callerBackendPid);
+            $this->waitForPostgresLock(
+                (int) file_get_contents($callerBackendPid),
+                (int) file_get_contents($lockerBackendPid),
+            );
             DB::commit();
             exit(0);
         }
@@ -142,7 +147,7 @@ class CommerceWorkspaceCustomDomainPostgresConcurrencyTest extends TestCase
         if ($caller === 0) {
             DB::purge(config('database.default'));
             app(TenantContext::class)->set($this->tenantB->id);
-            touch($callerStarted);
+            file_put_contents($callerBackendPid, (string) DB::selectOne('select pg_backend_pid()')->pg_backend_pid);
             try {
                 app(CommerceWorkspaceStorefrontsService::class)
                     ->addCustomDomainForCurrentTenant($storefrontB->id, $raceHostname);
@@ -159,7 +164,7 @@ class CommerceWorkspaceCustomDomainPostgresConcurrencyTest extends TestCase
         pcntl_waitpid($locker, $status);
         pcntl_waitpid($caller, $status);
         $result = json_decode((string) file_get_contents($resultFile), true);
-        $this->cleanupSignals([$lockReady, $callerStarted, $resultFile]);
+        $this->cleanupSignals([$lockReady, $lockerBackendPid, $callerBackendPid, $resultFile]);
 
         $this->assertFalse($result['ok'], json_encode($result));
         $this->assertTrue($result['conflict'] ?? false, 'يجب أن يتحوّل السباق إلى تعارضٍ آمن لا استثناءً خاماً: '.json_encode($result));
@@ -194,6 +199,25 @@ class CommerceWorkspaceCustomDomainPostgresConcurrencyTest extends TestCase
         if (! file_exists($path)) {
             throw new \RuntimeException("Timed out waiting for {$path}");
         }
+    }
+
+    private function waitForPostgresLock(int $callerBackendPid, int $lockerBackendPid): void
+    {
+        $deadline = microtime(true) + 5.0;
+        while (microtime(true) < $deadline) {
+            $waiting = DB::selectOne(
+                'select ? = any(pg_blocking_pids(?)) as blocked',
+                [$lockerBackendPid, $callerBackendPid],
+            );
+
+            if ((bool) $waiting->blocked) {
+                return;
+            }
+
+            usleep(1000);
+        }
+
+        throw new \RuntimeException("Timed out waiting for PostgreSQL backend {$callerBackendPid} on locker {$lockerBackendPid}");
     }
 
     /** @param list<string> $paths */

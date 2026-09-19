@@ -55,7 +55,12 @@ interface CartContextType {
    * `"base"` unless the catalog names another canonical unit) and ignored
    * on the wholesale surface.
    */
-  addItem: (id: string, quantity?: number, unitKey?: string) => Promise<void>;
+  addItem: (
+    id: string,
+    quantity?: number,
+    unitKey?: string,
+    variantId?: string | null,
+  ) => Promise<void>;
   updateItem: (lineItemId: string, quantity: number) => Promise<void>;
   removeItem: (lineItemId: string) => Promise<void>;
   refreshCart: () => Promise<void>;
@@ -126,11 +131,20 @@ export function CartProvider({
   );
 
   const addItem = useCallback(
-    async (id: string, quantity = 1, unitKey?: string) => {
+    async (
+      id: string,
+      quantity = 1,
+      unitKey?: string,
+      variantId?: string | null,
+    ) => {
       await mutateCart(
         () =>
           isAwj
-            ? addAwjItem(id, quantity, unitKey ?? "base")
+            ? // On the AWJ surface `id` is the product and `variantId` the
+              // chosen variant, because `store/v1` takes both. On the Spree
+              // surface `id` is already a variant id and there is no second
+              // identifier to pass.
+              addAwjItem(id, quantity, unitKey ?? "base", variantId)
             : addToCartAction(id, quantity, surface),
         t("failedToAddItem"),
         () => setIsOpen(true),

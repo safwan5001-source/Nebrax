@@ -356,9 +356,24 @@ describe("cart server actions", () => {
         "prod-1",
         2,
         "unit:xyz",
+        undefined,
       );
       expect(result).toEqual({ success: true, cart: awjCart });
       expect(mockClient.carts.items.create).not.toHaveBeenCalled();
+    });
+
+    it("addAwjItem forwards the chosen variant id", async () => {
+      const awjCart = { kind: "awj" as const, items: [{ id: "i1" }] };
+      mockAwjCartAdapter.addAwjCartItem.mockResolvedValue(awjCart);
+
+      await addAwjItem("prod-1", 1, "base", "variant-9");
+
+      expect(mockAwjCartAdapter.addAwjCartItem).toHaveBeenCalledWith(
+        "prod-1",
+        1,
+        "base",
+        "variant-9",
+      );
     });
 
     it("addAwjItem returns a failure result instead of throwing", async () => {

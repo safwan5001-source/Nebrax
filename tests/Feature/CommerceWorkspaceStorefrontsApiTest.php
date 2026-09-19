@@ -144,10 +144,10 @@ class CommerceWorkspaceStorefrontsApiTest extends TestCase
     }
 
     /** @test */
-    public function inactive_storefronts_are_omitted(): void
+    public function inactive_storefronts_are_listed_with_a_truthful_flag_and_no_preview_url(): void
     {
         $auth = $this->registerTenant('inactive-sf', 'inactive-sf@acme.test');
-        $this->seedWebStorefront($auth['tenant_id'], [
+        $seeded = $this->seedWebStorefront($auth['tenant_id'], [
             'name' => 'متجر متوقف',
             'storefront_active' => false,
             'hostname' => 'inactive-store.example.com',
@@ -155,7 +155,11 @@ class CommerceWorkspaceStorefrontsApiTest extends TestCase
 
         $res = $this->withToken($auth['token'])->getJson(self::PATH)->assertOk();
 
-        $this->assertSame([], $res->json('data.stores'));
+        $this->assertCount(1, $res->json('data.stores'));
+        $this->assertSame($seeded['storefront']->id, $res->json('data.stores.0.id'));
+        $this->assertSame('متجر متوقف', $res->json('data.stores.0.name'));
+        $this->assertFalse($res->json('data.stores.0.is_active'));
+        $this->assertNull($res->json('data.stores.0.preview_url'));
         $this->assertStringNotContainsString('inactive-store.example.com', $res->getContent());
     }
 

@@ -24,7 +24,8 @@
     "myAccount": "حسابي",
     "giftCard": "بطاقة هدية",
     "storeCredit": "رصيد المتجر",
-    "amountDue": "المبلغ المستحق"
+    "amountDue": "المبلغ المستحق",
+    "notAvailable": "غير متاح"
   },
   "header": {
     "categories": "التصنيفات",
@@ -81,7 +82,6 @@
     "shopNow": "تسوّق الآن",
     "forkOnGithub": "انسخ على GitHub",
     "quickstartGuide": "دليل البدء السريع",
-    "featuredProducts": "منتجات مميزة",
     "viewAll": "عرض الكل",
     "qualityProducts": "منتجات عالية الجودة",
     "qualityDescription": "تشكيلة مختارة بعناية من أفضل المنتجات.",
@@ -99,7 +99,10 @@
     "wholesaleBenefitQuickOrderTitle": "طلب سريع بالجملة",
     "wholesaleBenefitQuickOrderDescription": "أدخل رموز الأصناف والكميات لإنشاء طلب كبير خلال ثوانٍ.",
     "wholesaleBenefitOrdersTitle": "سجل الطلبات",
-    "wholesaleBenefitOrdersDescription": "راجع طلباتك السابقة وأعد طلب أصنافك المعتادة خلال نقرتين."
+    "wholesaleBenefitOrdersDescription": "راجع طلباتك السابقة وأعد طلب أصنافك المعتادة خلال نقرتين.",
+    "browseCategories": "تسوّق حسب القسم",
+    "newArrivals": "أحدث المنتجات",
+    "subcategories": "{count, plural, zero {لا أقسام فرعية} one {قسم فرعي} two {قسمان فرعيان} few {# أقسام فرعية} many {# قسماً فرعياً} other {# قسم فرعي}}"
   },
   "cart": {
     "cart": "السلة",
@@ -121,7 +124,18 @@
     "amountDue": "المبلغ المستحق",
     "failedToAddItem": "تعذّرت إضافة هذا العنصر إلى سلتك. حاول مرة أخرى.",
     "failedToUpdateItem": "تعذّر تحديث سلتك. حاول مرة أخرى.",
-    "failedToRemoveItem": "تعذّرت إزالة هذا العنصر من سلتك. حاول مرة أخرى."
+    "failedToRemoveItem": "تعذّرت إزالة هذا العنصر من سلتك. حاول مرة أخرى.",
+    "unavailableItemsNotice": "بعض العناصر في سلتك لم تعد متاحة. يمكنك إزالتها للمتابعة؛ لن تُحتسب ضمن الإجمالي.",
+    "summary": {
+      "totalConfirmedOnPlacement": "المبلغ النهائي يُؤكَّد عند إنشاء الطلب، بعد إضافة رسوم التوصيل التي يحدّدها المتجر."
+    },
+    "coupon": {
+      "label": "كود الخصم",
+      "placeholder": "أدخل الكود",
+      "apply": "تطبيق",
+      "unavailable": "أكواد الخصم غير مفعّلة في هذا المتجر بعد، فلم يُطبَّق أي خصم.",
+      "notEnabledHint": "أكواد الخصم غير مفعّلة في هذا المتجر بعد."
+    }
   },
   "products": {
     "allProducts": "جميع المنتجات",
@@ -148,7 +162,7 @@
     "productCount": "{count, plural, zero {لا منتجات} one {منتج واحد} two {منتجان} few {# منتجات} many {# منتجاً} other {# منتج}}",
     "sale": "تخفيض",
     "outOfStockVariant": "(غير متوفر)",
-    "addToCart": "أضف إلى السلة",
+    "addToCart": "أضف للسلة",
     "adding": "جارٍ الإضافة...",
     "description": "الوصف",
     "details": "التفاصيل",
@@ -195,7 +209,12 @@
     "properties": "الخصائص",
     "yes": "نعم",
     "no": "لا",
-    "optionFilterChip": "{filter}: {value}"
+    "optionFilterChip": "{filter}: {value}",
+    "pricedByOption": "السعر حسب الخيار",
+    "selectOptions": "اختر الخيارات",
+    "priceFromLabel": "ابتداءً من",
+    "addToFavorites": "إضافة إلى المفضلة",
+    "removeFromFavorites": "إزالة من المفضلة"
   },
   "navigation": {
     "home": "الرئيسية",
@@ -309,7 +328,7 @@
   },
   "account": {
     "myAccount": "حسابي",
-    "signInDescription": "سجّل الدخول للوصول إلى حسابك وسجل طلباتك.",
+    "signInDescription": "سجّل الدخول للوصول إلى حسابك.",
     "email": "البريد الإلكتروني",
     "password": "كلمة المرور",
     "signIn": "تسجيل الدخول",
@@ -319,11 +338,11 @@
     "signUp": "إنشاء حساب",
     "accountOverview": "نظرة عامة على الحساب",
     "orderHistory": "سجل الطلبات",
-    "orderHistoryDescription": "اطّلع على طلباتك السابقة وتتبّع شحناتك",
+    "orderHistoryDescription": "اطّلع على طلباتك.",
     "addresses": "العناوين",
-    "addressesDescription": "أدِر عناوين الشحن والفوترة الخاصة بك",
+    "addressesDescription": "عناوين التوصيل المحفوظة.",
     "paymentMethods": "طرق الدفع",
-    "paymentMethodsDescription": "أدِر بطاقاتك الائتمانية المحفوظة",
+    "paymentMethodsDescription": "وسائل الدفع المحفوظة.",
     "profile": "الملف الشخصي",
     "profileDescription": "حدّث معلوماتك الشخصية",
     "signOut": "تسجيل الخروج",
@@ -339,7 +358,57 @@
     "showPassword": "إظهار كلمة المرور",
     "hidePassword": "إخفاء كلمة المرور",
     "forgotPassword": "نسيت كلمة المرور؟",
-    "policyConsentRequired": "يجب الموافقة على سياسات المتجر لإنشاء حساب"
+    "policyConsentRequired": "يجب الموافقة على سياسات المتجر لإنشاء حساب",
+    "wishlist": "المفضلة",
+    "wishlistDescription": "منتجات حفظتها في هذه الصفحة.",
+    "help": "المساعدة",
+    "helpDescription": "سياسات المتجر وطرق التواصل.",
+    "signedInAs": "مسجّل الدخول باسم",
+    "backToAccount": "العودة إلى الحساب",
+    "signingOut": "جارٍ تسجيل الخروج...",
+    "signOutFailed": "تعذّر تسجيل الخروج. حاول مرة أخرى.",
+    "notEnabledBadge": "غير مفعّل",
+    "addPaymentMethod": "إضافة وسيلة",
+    "removePaymentMethod": "إزالة",
+    "noPaymentMethods": "لا توجد وسائل دفع محفوظة",
+    "noPaymentMethodsDescription": "لا يستطيع هذا المتجر حفظ وسيلة دفع بعد.",
+    "paymentNotEnabledTitle": "وسائل الدفع المحفوظة غير مفعّلة بعد",
+    "paymentNotEnabledBody": "لم يُحفظ شيء. عندما يتمكّن المتجر من حفظ وسيلة ستظهر هنا. لا تُدخل بيانات البطاقة في هذه الصفحة.",
+    "paymentActionUnavailable": "لا يستطيع هذا المتجر حفظ وسيلة دفع أو إزالتها بعد، لذلك لم يتغيّر شيء.",
+    "savedMethodShape": "شكل الوسائل المحفوظة",
+    "savedMethod": {
+      "card": "بطاقة",
+      "bank": "تحويل بنكي"
+    },
+    "addressesNotEnabledTitle": "دفتر العناوين غير مفعّل بعد",
+    "addressesNotEnabledBody": "العنوان الذي تكتبه عند إتمام الشراء يُستخدم لذلك الطلب فقط. لا يستطيع هذا المتجر حفظ دفتر عناوين بعد، لذلك لم يُحفظ شيء.",
+    "addressActionUnavailable": "لا يستطيع هذا المتجر حفظ عنوان أو تعديله أو حذفه بعد، لذلك لم يتغيّر شيء.",
+    "addressCardShape": "شكل بطاقة العنوان",
+    "addressCardTitle": "عنوان التوصيل",
+    "addressCardExample": "الشارع، الحي، المدينة",
+    "editAddress": "تعديل",
+    "removeAddress": "إزالة",
+    "addressFixture": {
+      "name": "نورة العبدالله",
+      "line1": "طريق الملك فهد",
+      "line2": "حي الشاطئ",
+      "cityPostal": "الدمام 32230",
+      "country": "المملكة العربية السعودية"
+    },
+    "addressFixtureAlt": {
+      "name": "نورة العبدالله",
+      "line1": "المستودع ٤، المدينة الصناعية الثانية",
+      "line2": "حي الفيصلية",
+      "cityPostal": "الدمام 32234",
+      "country": "المملكة العربية السعودية"
+    },
+    "methodMask": "•••• 0000",
+    "methodExpiry": "•• / ••",
+    "wishlistNotEnabledTitle": "المفضلة لا تُحفظ في الحساب بعد",
+    "wishlistNotEnabledBody": "قلب المنتج يبقى طول هذه الصفحة فقط. إعادة التحميل تمسحه. لا يُخزَّن شيء في المتصفح.",
+    "wishlistEmpty": "لا توجد مفضّلات في هذه الصفحة",
+    "wishlistEmptyDescription": "اضغط القلب على منتج ليبقى هنا إلى أن تغادر الصفحة.",
+    "wishlistBrowse": "تصفّح المنتجات"
   },
   "register": {
     "createAccount": "إنشاء حساب",
@@ -361,7 +430,7 @@
   "orders": {
     "orderHistory": "سجل الطلبات",
     "noOrders": "لا توجد طلبات بعد",
-    "noOrdersDescription": "ستظهر طلباتك هنا فور إنشائها.",
+    "noOrdersDescription": "عندما يتمكّن المتجر من استرجاع طلباتك ستظهر هنا.",
     "startShopping": "ابدأ التسوق",
     "order": "الطلب",
     "date": "التاريخ",
@@ -407,7 +476,22 @@
     "orderTitle": "الطلب رقم {number}",
     "shipmentCanceledRefund": "أُلغيت الشحنة — تم إصدار استرداد.",
     "shippingMethodUnavailable": "غير متاحة",
-    "totalColumn": "الإجمالي"
+    "totalColumn": "الإجمالي",
+    "statusConfirmed": "مؤكَّد",
+    "statusDraft": "مسودة",
+    "itemCount": "{count, plural, one {عنصر واحد} two {عنصران} few {# عناصر} many {# عنصراً} other {# عنصر}}",
+    "lookupUnavailableTitle": "لا يمكن استرجاع الطلبات السابقة بعد",
+    "lookupUnavailableBody": "إنشاء الطلب ما زال يحدث. لا يملك هذا المتجر بعد طريقة لعرض تلك الطلبات في حسابك.",
+    "timelineTitle": "حالة الطلب",
+    "timeline": {
+      "placed": "تم الطلب",
+      "preparing": "قيد التجهيز",
+      "onTheWay": "في الطريق",
+      "delivered": "تم التسليم",
+      "notTracked": "غير متتبَّع",
+      "caption": "هذا المتجر لا ينشر تتبّع الشحن بعد. الطلب المؤكَّد يُعلَّم أنه تم طلبه فقط."
+    },
+    "contact": "التواصل"
   },
   "orderPlaced": {
     "thanksForOrder": "شكراً لطلبك يا {name}!",
@@ -461,7 +545,10 @@
     "accountId": "معرّف الحساب",
     "loadingProfile": "جارٍ تحميل الملف الشخصي...",
     "failedToUpdate": "تعذّر تحديث الملف الشخصي",
-    "email": "البريد الإلكتروني"
+    "email": "البريد الإلكتروني",
+    "phone": "الهاتف",
+    "phoneUnavailable": "لا يمكن تحديث رقم الهاتف في هذا الحساب بعد.",
+    "validationEmail": "أدخل بريداً إلكترونياً صالحاً."
   },
   "creditCards": {
     "paymentMethods": "طرق الدفع",
@@ -644,13 +731,14 @@
     "unavailableDescription": "تعذّر العثور على سلتك أو جلسة الدفع، أو انتهت صلاحيتها. الرجاء البدء من جديد من السلة.",
     "returnToCart": "العودة إلى السلة",
     "continueToReview": "متابعة إلى المراجعة",
-    "editDetails": "تعديل البيانات",
     "completeOrder": "إتمام الطلب",
     "contact": {
       "heading": "معلومات التواصل",
       "name": "الاسم الكامل",
       "phone": "رقم الهاتف",
-      "email": "البريد الإلكتروني (اختياري)"
+      "email": "البريد الإلكتروني (اختياري)",
+      "description": "نستخدم هذه البيانات للتواصل معك بخصوص طلبك.",
+      "emailHint": "لإرسال تفاصيل الطلب إن رغبت."
     },
     "address": {
       "heading": "عنوان التوصيل",
@@ -660,7 +748,9 @@
       "district": "الحي",
       "street": "الشارع",
       "postalCode": "الرمز البريدي",
-      "notes": "ملاحظات (اختياري)"
+      "notes": "ملاحظات (اختياري)",
+      "description": "أين نوصّل طلبك؟",
+      "notesHint": "أي تفاصيل تساعد المندوب في الوصول."
     },
     "delivery": {
       "heading": "طريقة الاستلام",
@@ -668,11 +758,23 @@
         "pickup": "استلام من المتجر",
         "standard": "توصيل عادي"
       },
-      "amountPending": "يُحدَّد لاحقاً"
+      "amountPending": "يُحدَّد لاحقاً",
+      "description": "اختر كيف تستلم طلبك.",
+      "descriptions": {
+        "pickup": "تستلم طلبك من المتجر بنفسك.",
+        "standard": "يوصَّل طلبك إلى العنوان الذي أدخلته."
+      },
+      "pricingNotice": "لا تُحتسب رسوم التوصيل في هذه الشاشة؛ يحدّدها المتجر ويؤكّدها لك مع الطلب."
     },
     "review": {
       "heading": "مراجعة طلبك",
-      "lineDetail": "{quantity} × {unit}"
+      "description": "راجع بيانات طلبك قبل إنشائه.",
+      "edit": "تعديل",
+      "editContact": "تعديل بيانات التواصل",
+      "editAddress": "تعديل عنوان التوصيل",
+      "editDelivery": "تعديل طريقة الاستلام",
+      "notSet": "لم تُحدَّد",
+      "commitmentNotice": "بإنشاء الطلب تسجّل التزاماً تجارياً بشرائه. لا تتم أي عملية دفع الآن، ويؤكّد لك المتجر المبلغ النهائي وطريقة السداد."
     },
     "reviewRequired": {
       "title": "طلبك يحتاج إلى مراجعة",
@@ -691,8 +793,34 @@
     },
     "success": {
       "heading": "تم إنشاء الطلب",
-      "orderNumber": "رقم الطلب: {number}",
-      "notPaidNote": "هذا الطلب مؤكَّد كالتزام تجاري فقط، ولم تتم أي عملية دفع بعد."
-    }
+      "notPaidNote": "هذا الطلب مؤكَّد كالتزام تجاري فقط، ولم تتم أي عملية دفع بعد.",
+      "orderNumberLabel": "رقم الطلب",
+      "print": "طباعة"
+    },
+    "steps": {
+      "contact": "بيانات التواصل",
+      "address": "عنوان التوصيل",
+      "delivery": "طريقة الاستلام",
+      "payment": "الدفع",
+      "review": "المراجعة",
+      "confirmation": "التأكيد"
+    },
+    "stepCounter": "الخطوة {current} من {total}",
+    "payment": {
+      "heading": "الدفع",
+      "description": "طريقة سداد قيمة الطلب.",
+      "notEnabledTitle": "الدفع الإلكتروني غير مفعّل في هذا المتجر بعد",
+      "notEnabledBody": "لن تُدفع أي مبالغ الآن. بإنشاء الطلب تسجّل التزاماً تجارياً، ويتواصل معك المتجر لترتيب السداد.",
+      "notEnabledBadge": "غير مفعّل",
+      "plannedLabel": "طرق دفع مخطّط لها",
+      "methods": {
+        "card": "بطاقة",
+        "bankTransfer": "تحويل بنكي",
+        "cashOnDelivery": "الدفع عند الاستلام"
+      }
+    },
+    "continueToAddress": "متابعة إلى العنوان",
+    "continueToDelivery": "متابعة إلى التوصيل",
+    "continueToPayment": "متابعة إلى الدفع"
   }
 }

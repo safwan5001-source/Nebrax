@@ -1,0 +1,27 @@
+import { render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
+import { ACCOUNT_ORDER_STATUS_CAPABILITY } from "@/lib/commerce/capabilities";
+import { AccountOrderStatus } from "../AccountOrderStatus";
+
+vi.mock("next-intl", () => ({
+  useTranslations: () => (key: string) => key,
+}));
+
+describe("AccountOrderStatus — DESIGN_ONLY", () => {
+  it("is declared design_only", () => {
+    expect(ACCOUNT_ORDER_STATUS_CAPABILITY).toBe("design_only");
+  });
+
+  it("marks placed for a confirmed order and states tracking once, quietly", () => {
+    render(<AccountOrderStatus status="confirmed" />);
+
+    expect(screen.getByText("timeline.placed")).toBeInTheDocument();
+    expect(screen.getByText("timeline.preparing")).toBeInTheDocument();
+    expect(screen.getByText("timeline.onTheWay")).toBeInTheDocument();
+    expect(screen.getByText("timeline.delivered")).toBeInTheDocument();
+    expect(screen.getByText("timeline.caption")).toBeInTheDocument();
+    expect(screen.queryByText("timeline.notTracked")).not.toBeInTheDocument();
+    expect(screen.queryByText(/shipped/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/تم الشحن/)).not.toBeInTheDocument();
+  });
+});

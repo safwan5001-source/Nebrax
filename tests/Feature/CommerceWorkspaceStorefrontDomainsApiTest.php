@@ -83,10 +83,10 @@ class CommerceWorkspaceStorefrontDomainsApiTest extends TestCase
 
         $this->assertCount(1, $res->json('data.domains'));
         $row = $res->json('data.domains.0');
-        // STORE-ADMIN-ADOPT-1B-3A: `verification` مضافٌ إضافياً (القرار §32)
-        // بعد الحقول الستة القائمة — بلا حذف/إعادة تسمية لأيٍّ منها.
+        // STORE-ADMIN-ADOPT-1B-3A + EDGE-1: `verification` ثم `edge`
+        // إضافيان فوق الحقول الستة القائمة — بلا حذف/إعادة تسمية لأيٍّ منها.
         $this->assertSame(
-            ['id', 'hostname', 'type', 'is_primary', 'is_active', 'verification_status', 'verification'],
+            ['id', 'hostname', 'type', 'is_primary', 'is_active', 'verification_status', 'verification', 'edge'],
             array_keys($row)
         );
         $this->assertSame('domains-owner.awj-commerce.test', $row['hostname']);
@@ -96,6 +96,7 @@ class CommerceWorkspaceStorefrontDomainsApiTest extends TestCase
         $this->assertSame(StorefrontDomain::VERIFICATION_VERIFIED, $row['verification_status']);
         // نطاق مُدار من أَوْج — لا يحمل verification_token، فـ`verification` يبقى null.
         $this->assertNull($row['verification']);
+        $this->assertNull($row['edge']);
     }
 
     /** @test */
@@ -141,6 +142,10 @@ class CommerceWorkspaceStorefrontDomainsApiTest extends TestCase
         $this->assertSame(StorefrontDomain::TYPE_CUSTOM, $custom['type']);
         $this->assertSame(StorefrontDomain::VERIFICATION_PENDING, $custom['verification_status']);
         $this->assertFalse($custom['is_primary']);
+        $this->assertIsArray($custom['edge']);
+        $this->assertSame(StorefrontDomain::EDGE_NONE, $custom['edge']['status']);
+        $this->assertArrayNotHasKey('edge_provider_id', $custom);
+        $this->assertArrayNotHasKey('provider_id', $custom['edge']);
 
         app(TenantContext::class)->set($auth['tenant_id']);
         $fresh = StorefrontDomain::query()->where('hostname', 'shop.custom-domain-example.com')->first();

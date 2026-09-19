@@ -3,9 +3,11 @@
 import type { Product } from "@spree/sdk";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { memo } from "react";
+import { memo, useState } from "react";
 import { HiddenPricePrompt } from "@/components/products/HiddenPricePrompt";
+import { WishlistButton } from "@/components/products/WishlistButton";
 import { ProductImage } from "@/components/ui/product-image";
+import { useCart } from "@/contexts/CartContext";
 import { trackSelectItem } from "@/lib/analytics/gtm";
 
 interface ProductCardProps {
@@ -31,6 +33,8 @@ export const ProductCard = memo(function ProductCard({
   currency,
 }: ProductCardProps) {
   const t = useTranslations("products");
+  const { addItem, surface } = useCart();
+  const [adding, setAdding] = useState(false);
   const imageUrl = product.thumbnail_url || null;
 
   // Current display price
@@ -54,6 +58,18 @@ export const ProductCard = memo(function ProductCard({
         : product.price?.display_compare_at_amount) ?? null)
     : null;
 
+  /**
+   * The card's eyebrow. This is the product's own category as the catalogue
+   * reports it — not a merchandising label. It is already part of
+   * `PRODUCT_CARD_FIELDS`, so it costs no extra payload, and it gives the card
+   * the second line of real information it needs to read as a catalogue entry
+   * rather than a bare image with a price under it.
+   */
+  const categoryName = product.categories?.[0]?.name ?? null;
+
+  const isVariantManaged =
+    (product as { isVariantManaged?: boolean }).isVariantManaged === true;
+
   const handleClick = () => {
     if (index != null && listId && listName && currency) {
       trackSelectItem(product, listId, listName, index, currency);
@@ -61,28 +77,42 @@ export const ProductCard = memo(function ProductCard({
   };
 
   return (
-    <div className="group relative">
-      {/* Image */}
-      <div className="relative aspect-square bg-gray-100 rounded-md overflow-hidden">
+    <div className="group relative flex h-full flex-col overflow-hidden rounded-store border border-store-border bg-store-surface transition-shadow duration-150 hover:shadow-md focus-within:shadow-md motion-reduce:transition-none">
+      {/* Image. Bounded by height rather than aspect ratio: a square tile grows
+          with the column and, at desktop widths, turns an eight-product shelf
+          into a wall of photography with the catalogue text pushed out of the
+          fold. It sits flush inside the card rather than inset in a rounded
+          tile of its own — one frame per product, not a frame inside a frame. */}
+      <div className="relative h-36 shrink-0 bg-store-surface-muted sm:h-44 md:h-52">
         <ProductImage
           src={imageUrl}
           alt={product.name}
           fill
-          className="object-cover group-hover:scale-105 transition-transform duration-300"
-          sizes="(max-width: 640px) 50vw, (max-width: 1024px) 50vw, 300px"
-          iconClassName="w-16 h-16"
+          className="object-cover transition-transform duration-300 group-hover:scale-[1.03] motion-reduce:transition-none motion-reduce:group-hover:scale-100"
+          sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 260px"
+          iconClassName="w-10 h-10"
           fetchPriority={fetchPriority}
         />
         {onSale && (
-          <span className="absolute top-2 start-2 bg-red-500 text-white text-xs font-medium px-2 py-1 rounded">
+          <span className="absolute top-2 start-2 z-10 rounded-md bg-store-foreground px-2 py-0.5 text-[0.625rem] font-bold text-store-surface">
             {t("sale")}
           </span>
         )}
+        <WishlistButton
+          productId={product.id}
+          className="absolute top-2 end-2"
+        />
       </div>
 
       {/* Content */}
-      <div className="p-4">
-        <h3 className="text-sm font-medium text-gray-900 group-hover:text-primary transition-colors line-clamp-2">
+      <div className="flex grow flex-col p-3">
+        {categoryName && (
+          <span className="mb-0.5 line-clamp-1 text-[0.625rem] font-medium text-store-muted-foreground">
+            {categoryName}
+          </span>
+        )}
+
+        <h3 className="line-clamp-2 text-xs font-bold leading-snug text-store-foreground transition-colors group-hover:text-store-primary sm:text-sm">
           {/* Stretched link: the ::after overlay keeps the whole card clickable
               without wrapping the content in an <a> — HiddenPricePrompt renders
               its own link, and anchors can't nest. */}
@@ -95,10 +125,19 @@ export const ProductCard = memo(function ProductCard({
           </Link>
         </h3>
 
-        <div className="mt-2 flex items-center gap-2">
+        <div className="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-1">
           {displayPrice ? (
-            <span className="text-lg font-semibold text-gray-900">
+            <span className="text-sm font-black text-store-primary md:text-base">
               {displayPrice}
+            </span>
+          ) : isVariantManaged ? (
+            /*
+             * A variant-managed product has no price of its own — the listing
+             * endpoint sends zero for it deliberately. Saying where the price
+             * lives is honest; printing that zero said the product was free.
+             */
+            <span className="text-xs font-medium text-store-muted-foreground">
+              {t("pricedByOption")}
             </span>
           ) : (
             // Null price: a deliberate hide inside a HiddenPricingProvider
@@ -106,14 +145,79 @@ export const ProductCard = memo(function ProductCard({
             <HiddenPricePrompt />
           )}
           {onSale && strikethroughPrice && (
-            <span className="text-sm text-gray-500 line-through">
+            <span className="text-xs text-store-muted-foreground line-through">
               {strikethroughPrice}
+            </span>
+          )}
+          {/*
+            Only where the action line below is absent, which is the wholesale
+            surface. Otherwise the card said "out of stock" twice.
+          */}
+          {!product.purchasable && surface === "wholesale" && (
+            <span className="text-[0.625rem] font-medium text-store-muted-foreground">
+              {t("outOfStock")}
             </span>
           )}
         </div>
 
-        {!product.purchasable && (
-          <span className="mt-2 text-sm text-gray-500">{t("outOfStock")}</span>
+        {/*
+          One action line, kept deliberately light: a single full-width control
+          at the foot of the card, no nested footer surface and no icon, so the
+          image still leads and a two-column phone grid stays readable.
+
+          The wholesale surface is untouched — it sells real Spree variants and
+          its listing has no safe single identifier to add, so its cards stay
+          link-only exactly as before.
+        */}
+        {surface !== "wholesale" && (
+          <div className="relative z-10 mt-2.5">
+            {!product.purchasable ? (
+              <span className="block rounded-store border border-store-border px-3 py-1.5 text-center text-xs font-medium text-store-muted-foreground">
+                {t("outOfStock")}
+              </span>
+            ) : isVariantManaged ? (
+              /*
+                Never adds the parent: a variant-managed product has no sellable
+                identity of its own, so the card sends the shopper to the detail
+                page where a real variant can be resolved.
+              */
+              <Link
+                href={`${basePath}/products/${product.slug}${categoryId ? `?category_id=${categoryId}` : ""}`}
+                className="block rounded-store border border-store-primary px-3 py-1.5 text-center text-xs font-bold text-store-primary transition-colors hover:bg-store-primary-soft"
+              >
+                {t("selectOptions")}
+              </Link>
+            ) : (
+              <button
+                type="button"
+                className="block w-full rounded-store bg-store-primary px-3 py-1.5 text-xs font-bold text-store-primary-foreground transition-colors hover:bg-store-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-store-foreground disabled:opacity-60"
+                // Guards a second submit while the first is in flight; the
+                // server remains the authority on whether either succeeds.
+                disabled={adding}
+                onClick={async (event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  if (adding) return;
+                  setAdding(true);
+                  try {
+                    // Product id and quantity only. No variant (this branch is
+                    // the simple product), no price — the backend resolves it.
+                    await addItem(product.id, 1, "base", null);
+                  } catch {
+                    // `CartContext` already surfaces failures through its own
+                    // toast, and it is the single error channel. Catching here
+                    // keeps a rejection from escaping the handler unhandled;
+                    // the card reports nothing, and above all never reports a
+                    // success the server refused.
+                  } finally {
+                    setAdding(false);
+                  }
+                }}
+              >
+                {adding ? t("adding") : t("addToCart")}
+              </button>
+            )}
+          </div>
         )}
       </div>
     </div>

@@ -24,7 +24,8 @@
     "myAccount": "Mon compte",
     "giftCard": "Carte cadeau",
     "storeCredit": "Credit boutique",
-    "amountDue": "Montant du"
+    "amountDue": "Montant du",
+    "notAvailable": "Non disponible"
   },
   "header": {
     "categories": "Categories",
@@ -81,7 +82,6 @@
     "shopNow": "Tout parcourir",
     "forkOnGithub": "Forker sur GitHub",
     "quickstartGuide": "Guide de démarrage rapide",
-    "featuredProducts": "Produits en vedette",
     "viewAll": "Voir tout",
     "qualityProducts": "Produits de qualite",
     "qualityDescription": "Une selection soigneusement curee des meilleurs produits.",
@@ -99,7 +99,10 @@
     "wholesaleBenefitQuickOrderTitle": "Commande rapide en volume",
     "wholesaleBenefitQuickOrderDescription": "Saisissez des SKU et des quantités pour composer une grande commande en quelques secondes.",
     "wholesaleBenefitOrdersTitle": "Historique des commandes",
-    "wholesaleBenefitOrdersDescription": "Consultez vos commandes passées et recommandez vos références habituelles en quelques clics."
+    "wholesaleBenefitOrdersDescription": "Consultez vos commandes passées et recommandez vos références habituelles en quelques clics.",
+    "browseCategories": "Acheter par catégorie",
+    "newArrivals": "Nouveautés",
+    "subcategories": "{count, plural, one {# sous-catégorie} other {# sous-catégories}}"
   },
   "cart": {
     "cart": "Panier",
@@ -121,7 +124,18 @@
     "amountDue": "Montant du",
     "failedToAddItem": "Impossible d'ajouter cet article a votre panier. Veuillez reessayer.",
     "failedToUpdateItem": "Impossible de mettre a jour votre panier. Veuillez reessayer.",
-    "failedToRemoveItem": "Impossible de retirer cet article de votre panier. Veuillez reessayer."
+    "failedToRemoveItem": "Impossible de retirer cet article de votre panier. Veuillez reessayer.",
+    "unavailableItemsNotice": "Certains articles de votre panier ne sont plus disponibles. Vous pouvez les retirer pour continuer ; ils ne sont pas comptes dans votre total.",
+    "summary": {
+      "totalConfirmedOnPlacement": "Le montant final est confirme lors de la validation de la commande, une fois les frais de livraison ajoutes par la boutique."
+    },
+    "coupon": {
+      "label": "Code de reduction",
+      "placeholder": "Saisir le code",
+      "apply": "Appliquer",
+      "unavailable": "Les codes de reduction ne sont pas encore actives pour cette boutique, aucune reduction n'a ete appliquee.",
+      "notEnabledHint": "Les codes de reduction ne sont pas encore actives pour cette boutique."
+    }
   },
   "products": {
     "allProducts": "Tous les produits",
@@ -195,7 +209,12 @@
     "properties": "Proprietes",
     "yes": "Oui",
     "no": "Non",
-    "optionFilterChip": "{filter} : {value}"
+    "optionFilterChip": "{filter} : {value}",
+    "pricedByOption": "Prix selon l'option",
+    "selectOptions": "Choisir les options",
+    "priceFromLabel": "À partir de",
+    "addToFavorites": "Ajouter aux favoris",
+    "removeFromFavorites": "Retirer des favoris"
   },
   "navigation": {
     "home": "Accueil",
@@ -309,7 +328,7 @@
   },
   "account": {
     "myAccount": "Mon compte",
-    "signInDescription": "Connectez-vous pour acceder a votre compte et a votre historique de commandes.",
+    "signInDescription": "Connectez-vous pour accéder à votre compte.",
     "email": "E-mail",
     "password": "Mot de passe",
     "signIn": "Se connecter",
@@ -319,11 +338,11 @@
     "signUp": "S'inscrire",
     "accountOverview": "Apercu du compte",
     "orderHistory": "Historique des commandes",
-    "orderHistoryDescription": "Consultez vos commandes passees et suivez vos expeditions",
+    "orderHistoryDescription": "Consultez vos commandes.",
     "addresses": "Adresses",
-    "addressesDescription": "Gerez vos adresses de livraison et de facturation",
+    "addressesDescription": "Adresses de livraison enregistrées.",
     "paymentMethods": "Modes de paiement",
-    "paymentMethodsDescription": "Gerez vos cartes de credit enregistrees",
+    "paymentMethodsDescription": "Moyens de paiement enregistrés.",
     "profile": "Profil",
     "profileDescription": "Mettez a jour vos informations personnelles",
     "signOut": "Se deconnecter",
@@ -339,7 +358,57 @@
     "showPassword": "Afficher le mot de passe",
     "hidePassword": "Masquer le mot de passe",
     "forgotPassword": "Mot de passe oublie ?",
-    "policyConsentRequired": "Vous devez accepter les politiques du magasin pour creer un compte"
+    "policyConsentRequired": "Vous devez accepter les politiques du magasin pour creer un compte",
+    "wishlist": "Favoris",
+    "wishlistDescription": "Produits enregistrés sur cette page.",
+    "help": "Aide",
+    "helpDescription": "Politiques de la boutique et contact.",
+    "signedInAs": "Connecté en tant que",
+    "backToAccount": "Retour au compte",
+    "signingOut": "Déconnexion...",
+    "signOutFailed": "Impossible de se déconnecter. Réessayez.",
+    "notEnabledBadge": "Non activé",
+    "addPaymentMethod": "Ajouter un moyen",
+    "removePaymentMethod": "Retirer",
+    "noPaymentMethods": "Aucun moyen de paiement enregistré",
+    "noPaymentMethodsDescription": "Cette boutique ne peut pas encore enregistrer un moyen de paiement.",
+    "paymentNotEnabledTitle": "Les moyens de paiement enregistrés ne sont pas encore activés",
+    "paymentNotEnabledBody": "Rien n’a été enregistré. Les données de carte ne sont jamais saisies sur cette page.",
+    "paymentActionUnavailable": "Cette boutique ne peut pas encore enregistrer ou retirer un moyen de paiement.",
+    "savedMethodShape": "Forme prévue des moyens enregistrés",
+    "savedMethod": {
+      "card": "Carte",
+      "bank": "Virement"
+    },
+    "addressesNotEnabledTitle": "Le carnet d’adresses n’est pas encore activé",
+    "addressesNotEnabledBody": "Les adresses saisies au paiement ne servent que pour cette commande. Rien n’a été enregistré.",
+    "addressActionUnavailable": "Cette boutique ne peut pas encore enregistrer, modifier ou retirer une adresse.",
+    "addressCardShape": "Carte d’adresse prévue",
+    "addressCardTitle": "Adresse de livraison",
+    "addressCardExample": "Rue, quartier, ville",
+    "editAddress": "Modifier",
+    "removeAddress": "Retirer",
+    "addressFixture": {
+      "name": "Noura Alabdullah",
+      "line1": "Route du Roi Fahd",
+      "line2": "Al Shati",
+      "cityPostal": "Dammam 32230",
+      "country": "Arabie saoudite"
+    },
+    "addressFixtureAlt": {
+      "name": "Noura Alabdullah",
+      "line1": "Entrepôt 4, deuxième ville industrielle",
+      "line2": "Al Faisaliyah",
+      "cityPostal": "Dammam 32234",
+      "country": "Arabie saoudite"
+    },
+    "methodMask": "•••• 0000",
+    "methodExpiry": "•• / ••",
+    "wishlistNotEnabledTitle": "Les favoris ne sont pas encore enregistrés sur le compte",
+    "wishlistNotEnabledBody": "Un cœur ne dure que le temps de cette page. Recharger l’efface. Rien n’est stocké dans le navigateur.",
+    "wishlistEmpty": "Aucun favori sur cette page",
+    "wishlistEmptyDescription": "Touchez le cœur d’un produit pour le garder ici jusqu’à votre départ.",
+    "wishlistBrowse": "Parcourir les produits"
   },
   "register": {
     "createAccount": "Creer un compte",
@@ -361,7 +430,7 @@
   "orders": {
     "orderHistory": "Historique des commandes",
     "noOrders": "Aucune commande",
-    "noOrdersDescription": "Lorsque vous passerez des commandes, elles apparaitront ici.",
+    "noOrdersDescription": "Lorsque cette boutique pourra retrouver vos commandes, elles apparaîtront ici.",
     "startShopping": "Commencer les achats",
     "order": "Commande",
     "date": "Date",
@@ -407,7 +476,22 @@
     "orderTitle": "Commande #{number}",
     "shipmentCanceledRefund": "Expedition annulee — un remboursement a ete emis.",
     "shippingMethodUnavailable": "Indisponible",
-    "totalColumn": "Total"
+    "totalColumn": "Total",
+    "statusConfirmed": "Confirmée",
+    "statusDraft": "Brouillon",
+    "itemCount": "{count, plural, one {# article} other {# articles}}",
+    "lookupUnavailableTitle": "Les commandes passées ne peuvent pas encore être consultées",
+    "lookupUnavailableBody": "Passer commande les crée toujours. Cette boutique ne peut pas encore les lister sur le compte.",
+    "timelineTitle": "Statut de la commande",
+    "timeline": {
+      "placed": "Passée",
+      "preparing": "Préparation",
+      "onTheWay": "En route",
+      "delivered": "Livrée",
+      "notTracked": "Non suivi",
+      "caption": "Cette boutique ne publie pas encore de suivi d’expédition. Seule une commande confirmée est marquée comme passée."
+    },
+    "contact": "Contact"
   },
   "orderPlaced": {
     "thanksForOrder": "Merci pour votre commande, {name} !",
@@ -461,7 +545,10 @@
     "accountId": "ID du compte",
     "loadingProfile": "Chargement du profil...",
     "failedToUpdate": "Echec de la mise a jour du profil",
-    "email": "E-mail"
+    "email": "E-mail",
+    "phone": "Téléphone",
+    "phoneUnavailable": "Un numéro de téléphone ne peut pas encore être mis à jour sur ce compte.",
+    "validationEmail": "Saisissez une adresse e-mail valide."
   },
   "creditCards": {
     "paymentMethods": "Modes de paiement",
@@ -644,13 +731,14 @@
     "unavailableDescription": "Your cart or checkout session could not be found or has expired. Please start again from your cart.",
     "returnToCart": "Return to cart",
     "continueToReview": "Continue to review",
-    "editDetails": "Edit details",
     "completeOrder": "Complete order",
     "contact": {
       "heading": "Contact information",
       "name": "Full name",
       "phone": "Phone number",
-      "email": "Email (optional)"
+      "email": "Email (optional)",
+      "description": "We use these details to reach you about your order.",
+      "emailHint": "To send you the order details, if you'd like."
     },
     "address": {
       "heading": "Delivery address",
@@ -660,7 +748,9 @@
       "district": "District",
       "street": "Street",
       "postalCode": "Postal code",
-      "notes": "Notes (optional)"
+      "notes": "Notes (optional)",
+      "description": "Where should we deliver your order?",
+      "notesHint": "Anything that helps the driver find you."
     },
     "delivery": {
       "heading": "Delivery method",
@@ -668,11 +758,23 @@
         "pickup": "Pickup",
         "standard": "Standard delivery"
       },
-      "amountPending": "Calculated later"
+      "amountPending": "Calculated later",
+      "description": "Choose how you receive your order.",
+      "descriptions": {
+        "pickup": "You collect the order from the store yourself.",
+        "standard": "Delivered to the address you entered."
+      },
+      "pricingNotice": "No delivery charge is calculated on this screen. The store sets it and confirms it with your order."
     },
     "review": {
       "heading": "Review your order",
-      "lineDetail": "{quantity} × {unit}"
+      "description": "Check your order details before placing it.",
+      "edit": "Edit",
+      "editContact": "Edit contact details",
+      "editAddress": "Edit delivery address",
+      "editDelivery": "Edit delivery method",
+      "notSet": "Not set",
+      "commitmentNotice": "Placing the order records a commercial commitment to buy it. No payment is taken now; the store confirms the final amount and how to pay."
     },
     "reviewRequired": {
       "title": "Your order needs review",
@@ -691,8 +793,34 @@
     },
     "success": {
       "heading": "Order placed",
-      "orderNumber": "Order number: {number}",
-      "notPaidNote": "This order is confirmed as a commercial commitment. No payment has been processed."
-    }
+      "notPaidNote": "This order is confirmed as a commercial commitment. No payment has been processed.",
+      "orderNumberLabel": "Order number",
+      "print": "Print"
+    },
+    "steps": {
+      "contact": "Contact",
+      "address": "Address",
+      "delivery": "Delivery",
+      "payment": "Payment",
+      "review": "Review",
+      "confirmation": "Confirmation"
+    },
+    "stepCounter": "Step {current} of {total}",
+    "payment": {
+      "heading": "Payment",
+      "description": "How the order will be paid for.",
+      "notEnabledTitle": "Online payment is not enabled for this store yet",
+      "notEnabledBody": "Nothing is charged now. Placing the order records a commercial commitment, and the store contacts you to arrange payment.",
+      "notEnabledBadge": "Not enabled",
+      "plannedLabel": "Planned payment methods",
+      "methods": {
+        "card": "Card",
+        "bankTransfer": "Bank transfer",
+        "cashOnDelivery": "Cash on delivery"
+      }
+    },
+    "continueToAddress": "Continue to address",
+    "continueToDelivery": "Continue to delivery",
+    "continueToPayment": "Continue to payment"
   }
 }

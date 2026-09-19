@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Services\Commerce\Edge\RailwayStorefrontEdgeClient;
+use App\Services\Commerce\Edge\StorefrontEdgeClient;
 use App\Support\Dns\DnsTxtResolver;
 use App\Support\Dns\NativeDnsTxtResolver;
 use App\Support\RevisionBuffer;
@@ -47,6 +49,7 @@ class TenancyServiceProvider extends ServiceProvider
         // وهمي حتمي عبر الحاوية (`app()->instance(DnsTxtResolver::class, ...)`)
         // قبل حلّ أي خدمة تعتمد عليه — بلا تغيير هنا.
         $this->app->bind(DnsTxtResolver::class, NativeDnsTxtResolver::class);
+        $this->app->bind(StorefrontEdgeClient::class, RailwayStorefrontEdgeClient::class);
 
         // POS يملك مزوده التشغيلي حتى لا يعتمد على HR ولا يوسّع ملف routes/api.php
         // الكبير لأجل مسارات Domain صغيرة مستقلة.

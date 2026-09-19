@@ -25,6 +25,15 @@ export interface AwjCartMoney {
 export interface AwjCartLine {
   id: string;
   product_id: string | null;
+  product_variant_id: string | null;
+  /**
+   * The chosen variant spelled out by the backend
+   * (`DocumentLineVariantResolver::descriptor()`), e.g. "1 لتر / ستانلس ستيل".
+   * `null` for a simple product, and also for a variant line that no longer
+   * resolves — an unavailable line keeps its name snapshot but loses the
+   * descriptor along with everything else `purchasable()` would have supplied.
+   */
+  variant_descriptor: string | null;
   product_name: string;
   unit_key: string;
   unit_name: string;
@@ -56,6 +65,9 @@ export interface AwjCart {
 export interface StorefrontCartLine {
   id: string;
   productId: string | null;
+  variantId: string | null;
+  /** The variant the shopper chose, as the backend spells it. `null` for a simple product. */
+  variantDescriptor: string | null;
   name: string;
   unitKey: string;
   unitName: string;
@@ -80,6 +92,8 @@ export function mapAwjCartToViewModel(cart: AwjCart): StorefrontCart {
     (line): StorefrontCartLine => ({
       id: line.id,
       productId: line.product_id,
+      variantId: line.product_variant_id ?? null,
+      variantDescriptor: line.variant_descriptor ?? null,
       name: line.product_name,
       unitKey: line.unit_key,
       unitName: line.unit_name,

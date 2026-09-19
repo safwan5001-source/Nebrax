@@ -824,6 +824,12 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         // تحتية تجارية، لا قراءة.
         Route::put('commerce/workspace/storefronts/{id}', [CommerceWorkspaceStorefrontsController::class, 'update'])->middleware($perm('commerce.manage'));
 
+        // STORE-ADMIN-LIFECYCLE-1: تفعيل/إيقاف خدمة المتجر المستضاف —
+        // Storefront.is_active فقط. لا قناة ولا نطاق ولا حافة. نفس صلاحية
+        // الهوية (commerce.manage). أفعال صريحة وليست PATCH عاماً.
+        Route::post('commerce/workspace/storefronts/{id}/activate', [CommerceWorkspaceStorefrontsController::class, 'activate'])->middleware($perm('commerce.manage'));
+        Route::post('commerce/workspace/storefronts/{id}/deactivate', [CommerceWorkspaceStorefrontsController::class, 'deactivate'])->middleware($perm('commerce.manage'));
+
         // STORE-ADMIN-ADOPT-1B-2: رؤية نطاقات متجر قائم — قراءة فقط،
         // بلا أي فعل كتابي على StorefrontDomain. نفس صلاحية 1B-1
         // (commerce.manage): حالة النطاق/التحقّق أكثر حساسية من قائمة
@@ -835,6 +841,17 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         // 1B-1/1B-2 (commerce.manage) حصراً.
         Route::post('commerce/workspace/storefronts/{id}/domains', [CommerceWorkspaceStorefrontsController::class, 'storeDomain'])->middleware($perm('commerce.manage'));
         Route::post('commerce/workspace/storefronts/{id}/domains/{domainId}/verify', [CommerceWorkspaceStorefrontsController::class, 'verifyDomain'])->middleware($perm('commerce.manage'));
+
+        // STORE-ADMIN-ADOPT-1B-3B: جعل نطاق مؤهل أساسياً + فصل نطاق مخصَّص.
+        // Make Primary لنطاق custom فشلٌ مغلق ما دام لا دليل Edge/TLS.
+        // فصل AWJ-managed أو الأساسي الحالي مرفوض. نفس صلاحية 1B-3A.
+        Route::post('commerce/workspace/storefronts/{id}/domains/{domainId}/make-primary', [CommerceWorkspaceStorefrontsController::class, 'makePrimaryDomain'])->middleware($perm('commerce.manage'));
+        Route::delete('commerce/workspace/storefronts/{id}/domains/{domainId}', [CommerceWorkspaceStorefrontsController::class, 'destroyDomain'])->middleware($perm('commerce.manage'));
+
+        // CUSTOM-DOMAIN-EDGE-1: تفعيل/تحديث حالة Railway للنطاق المخصَّص.
+        // Make Primary للنطاق المخصَّص يبقى مرفوضاً حتى EDGE-3.
+        Route::post('commerce/workspace/storefronts/{id}/domains/{domainId}/activate-edge', [CommerceWorkspaceStorefrontsController::class, 'activateEdge'])->middleware($perm('commerce.manage'));
+        Route::post('commerce/workspace/storefronts/{id}/domains/{domainId}/refresh-edge', [CommerceWorkspaceStorefrontsController::class, 'refreshEdge'])->middleware($perm('commerce.manage'));
 
         // Cycle 0: Workspace foundation only. لا CRUD ولا مبيعات ولا اتصال أجهزة
         // قبل دوراتها، لكن هذا المسار يثبت سلسلة RBAC + entitlement + حالة التطبيق.

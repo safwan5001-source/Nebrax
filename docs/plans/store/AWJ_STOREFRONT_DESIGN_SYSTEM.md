@@ -271,22 +271,56 @@ The theme is incomplete until the following surfaces share one coherent design l
 - full cart page/mobile cart.
 - quantity update.
 - remove.
-- promotion/coupon when supported.
+- promotion/coupon, designed now and activated when a contract exists (see the
+  design-first reconciliation below).
 - server-authoritative totals.
 
 ### Checkout
 
 AWJ checkout must follow AWJ Commerce architecture rather than copying Spree's checkout state machine.
 
-Expected UX stages, activated only as backend capabilities exist:
+Expected UX stages:
 
-1. customer/address.
-2. delivery/shipping.
-3. payment.
-4. review/submit where required.
-5. order confirmation.
+1. customer/contact.
+2. address.
+3. delivery/shipping.
+4. payment.
+5. review/submit.
+6. order confirmation.
 
 No visual implementation may invent unsupported shipping, payment, discount or fulfillment behavior.
+
+### Design-first reconciliation (supersedes the "activated only as backend capabilities exist" wording)
+
+This document originally said unsupported stages and controls were to be
+*activated only as backend capabilities exist*, and §11 (STORE-UI-4) said to
+scope *only against real Commerce contracts available at implementation time*.
+Read literally, both meant "omit it until the backend lands".
+
+The owner's decision recorded in
+`AWJ_STOREFRONT_DESIGN_FIRST_POLICY.md` supersedes that reading:
+
+> Missing backend capability does not block storefront design completion.
+> It blocks production activation.
+
+So the rule is now:
+
+- **Design completeness is not gated on the backend.** A stage or control the
+  journey needs is built now, in its intended final form, and recorded in the
+  policy's register with its exact missing contract.
+- **Activation is gated on the backend, absolutely.** A designed-but-unbacked
+  control is visibly inert: it persists nothing, asserts no commercial fact,
+  claims no success, and says plainly that it is not enabled.
+- **What design-first never licenses is unchanged and non-negotiable** — see the
+  policy's §3. Inventing an API, fabricating a price/discount/stock/delivery
+  date, faking payment or order state, substituting browser storage for business
+  persistence, or weakening tenant isolation are all still forbidden, in every
+  state.
+
+Concretely for cart and checkout: the payment stage and the coupon field exist
+and are marked not enabled; no provider is named and no brand mark is shown; no
+delivery price, estimate or date is stated; and no total is computed anywhere
+before the server produces one on the order.
 
 ### Customer account
 
@@ -519,21 +553,28 @@ Scope:
 
 ### STORE-UI-4 — Cart & checkout presentation
 
-Scope only against real Commerce contracts available at implementation time:
+Scope, under the design-first reconciliation above:
 - cart desktop/mobile.
 - cart rail/drawer.
-- totals.
-- checkout steps supported by backend.
+- totals, from the server only.
+- the full six-stage checkout, with unbacked stages designed and visibly inert.
 - confirmation.
 
-No invented gateway/shipping domain.
+No invented gateway/shipping domain. Delivered — see
+`STORE-UI-4-IMPLEMENTATION-REPORT.md` for the capability matrix and the exact
+missing contract behind each `DESIGN_ONLY` surface.
 
 ### STORE-UI-5 — Customer account
 
-Scope:
-- profile.
-- order history/detail.
-- wishlist/address/payment surfaces only where corresponding backend contracts exist.
+Scope, under the design-first reconciliation above:
+- profile (session identity; update uses the existing storefront session contract).
+- order history / detail / status presentation.
+- wishlist, addresses and saved payment methods designed even where the
+  backend contract is missing; those surfaces are visibly inert.
+- login / register / logout journey, visually aligned with the store.
+
+No invented account, order-list, address-book or saved-card API. Delivered —
+see `STORE-UI-5-IMPLEMENTATION-REPORT.md`.
 
 ### STORE-UI-6 — Merchant theme configuration / Store Customizer
 

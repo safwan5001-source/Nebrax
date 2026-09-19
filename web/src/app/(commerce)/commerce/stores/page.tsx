@@ -5,6 +5,7 @@ import { useLocale } from 'next-intl';
 import { Store as StoreIcon } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Dialog } from '@/components/ui/dialog';
 import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
 import { useToast } from '@/components/ui/toast';
 import { EmptyState, ErrorState, LoadingState, PageHeader } from '@/components/nebrax';
@@ -12,7 +13,12 @@ import { currentUser } from '@/lib/auth';
 import { hasPermission } from '@/lib/permissions';
 import { commerceWorkspaceMessage } from '@/modules/commerce-workspace/messages';
 import { useCommerceStoreContext } from '@/modules/commerce-workspace/store-context';
-import { provisionCommerceStorefront, type CommerceStoreOption } from '@/modules/commerce-workspace/stores';
+import {
+  activateCommerceStorefront,
+  deactivateCommerceStorefront,
+  provisionCommerceStorefront,
+  type CommerceStoreOption,
+} from '@/modules/commerce-workspace/stores';
 import { StoreSettingsDialog } from '@/modules/commerce-workspace/store-settings-dialog';
 
 /**
@@ -20,6 +26,9 @@ import { StoreSettingsDialog } from '@/modules/commerce-workspace/store-settings
  * `CommerceStoreProvider`، وحين لا يوجد متجر بعد تعرض فعل التزويد الصريح
  * الوحيد المسموح به («إنشاء متجر إلكتروني»). لا تزويد تلقائي عند تحميل
  * الشاشة — الفعل يبدأ فقط بنقرة صريحة من مستخدم يملك `commerce.manage`.
+ *
+ * STORE-ADMIN-LIFECYCLE-1 — تفعيل/إيقاف خدمة المتجر المستضاف، مع تأكيد
+ * قبل الإيقاف. الإعدادات تبقى متاحة للمتجر المتوقف.
  */
 export default function CommerceStoresPage() {
   const locale = useLocale();
@@ -28,6 +37,8 @@ export default function CommerceStoresPage() {
   const { error: showErrorToast, success: showSuccessToast } = useToast();
   const [creating, setCreating] = useState(false);
   const [settingsStore, setSettingsStore] = useState<CommerceStoreOption | null>(null);
+  const [deactivateStore, setDeactivateStore] = useState<CommerceStoreOption | null>(null);
+  const [lifecycleBusyId, setLifecycleBusyId] = useState<string | null>(null);
 
   const user = currentUser();
   const canManage = hasPermission(user?.permissions, user?.role, 'commerce.manage');
@@ -44,6 +55,40 @@ export default function CommerceStoresPage() {
       await refresh(result.store.id);
     } finally {
       setCreating(false);
+    }
+  };
+
+  const handleActivate = async (store: CommerceStoreOption) => {
+    if (lifecycleBusyId) return;
+    setLifecycleBusyId(store.id);
+    try {
+      const result = await activateCommerceStorefront(store.id);
+      if (!result.ok) {
+        showErrorToast(t('storeActivateFailed'));
+        return;
+      }
+      await refresh(store.id);
+      showSuccessToast(t('storeActivateSuccess'));
+    } finally {
+      setLifecycleBusyId(null);
+    }
+  };
+
+  const handleDeactivateConfirm = async () => {
+    if (!deactivateStore || lifecycleBusyId) return;
+    const storeId = deactivateStore.id;
+    setLifecycleBusyId(storeId);
+    try {
+      const result = await deactivateCommerceStorefront(storeId);
+      if (!result.ok) {
+        showErrorToast(t('storeDeactivateFailed'));
+        return;
+      }
+      setDeactivateStore(null);
+      await refresh(storeId);
+      showSuccessToast(t('storeDeactivateSuccess'));
+    } finally {
+      setLifecycleBusyId(null);
     }
   };
 
@@ -107,9 +152,32 @@ export default function CommerceStoresPage() {
                 </TD>
                 {canManage ? (
                   <TD>
-                    <Button type="button" variant="outline" size="sm" onClick={() => setSettingsStore(store)}>
-                      {t('storeSettingsAction')}
-                    </Button>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Button type="button" variant="outline" size="sm" onClick={() => setSettingsStore(store)}>
+                        {t('storeSettingsAction')}
+                      </Button>
+                      {store.isActive ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setDeactivateStore(store)}
+                          disabled={lifecycleBusyId === store.id}
+                        >
+                          {t('storeDeactivateAction')}
+                        </Button>
+                      ) : (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleActivate(store)}
+                          disabled={lifecycleBusyId === store.id}
+                        >
+                          {lifecycleBusyId === store.id ? t('storeActivateActivating') : t('storeActivateAction')}
+                        </Button>
+                      )}
+                    </div>
                   </TD>
                 ) : null}
               </TR>
@@ -129,6 +197,44 @@ export default function CommerceStoresPage() {
             showSuccessToast(t('storeSettingsSuccess'));
           }}
         />
+      ) : null}
+
+      {deactivateStore ? (
+        <Dialog
+          open
+          onClose={() => {
+            if (!lifecycleBusyId) setDeactivateStore(null);
+          }}
+          title={t('storeDeactivateTitle')}
+          className="max-w-md"
+        >
+          <div className="space-y-4">
+            <p className="text-sm leading-relaxed text-text">{t('storeDeactivateConfirm')}</p>
+            <p className="rounded border border-border bg-background px-3 py-2 text-sm font-medium text-text">
+              {deactivateStore.name}
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setDeactivateStore(null)}
+                disabled={lifecycleBusyId === deactivateStore.id}
+              >
+                {t('storeSettingsCancel')}
+              </Button>
+              <Button
+                type="button"
+                variant="danger"
+                onClick={handleDeactivateConfirm}
+                disabled={lifecycleBusyId === deactivateStore.id}
+              >
+                {lifecycleBusyId === deactivateStore.id
+                  ? t('storeDeactivateDeactivating')
+                  : t('storeDeactivateConfirmAction')}
+              </Button>
+            </div>
+          </div>
+        </Dialog>
       ) : null}
     </div>
   );

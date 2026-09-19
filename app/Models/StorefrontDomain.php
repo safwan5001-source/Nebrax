@@ -37,6 +37,18 @@ class StorefrontDomain extends BaseModel implements CompanyWide
 
     public const VERIFICATION_FAILED = 'failed';
 
+    public const EDGE_NONE = 'none';
+
+    public const EDGE_PENDING = 'pending';
+
+    public const EDGE_DNS_REQUIRED = 'dns_required';
+
+    public const EDGE_TLS_PENDING = 'tls_pending';
+
+    public const EDGE_READY = 'ready';
+
+    public const EDGE_FAILED = 'failed';
+
     /**
      * STORE-ADMIN-ADOPT-1B-3A — `verification_token`/`verified_at` مُدرجان
      * هنا بنفس روح بقية الأعمدة: كلاهما يُكتب حصراً من كود خادمي موثوق
@@ -47,18 +59,24 @@ class StorefrontDomain extends BaseModel implements CompanyWide
     protected $fillable = [
         'tenant_id', 'storefront_id', 'hostname', 'type', 'is_primary', 'is_active',
         'verification_status', 'verification_token', 'verified_at',
+        'edge_status', 'edge_provider', 'edge_provider_id', 'edge_dns_instructions',
+        'edge_last_error', 'edge_checked_at', 'edge_ready_at',
     ];
 
     protected $casts = [
         'is_primary' => 'boolean',
         'is_active' => 'boolean',
         'verified_at' => 'datetime',
+        'edge_dns_instructions' => 'array',
+        'edge_checked_at' => 'datetime',
+        'edge_ready_at' => 'datetime',
     ];
 
     protected $attributes = [
         'is_primary' => false,
         'is_active' => true,
         'verification_status' => self::VERIFICATION_PENDING,
+        'edge_status' => self::EDGE_NONE,
     ];
 
     protected static function booted(): void

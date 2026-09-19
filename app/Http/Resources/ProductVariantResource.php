@@ -24,6 +24,10 @@ class ProductVariantResource extends JsonResource
                 'value_id' => $v->id,
                 'value' => $v->value,
                 'value_en' => $v->value_en,
+                // VAR-OPTION-VISUAL-1 — القيمة تبقى المالك الوحيد لصريّتها؛
+                // هذا نقلٌ للقراءة فقط، لا نسخةٌ مستقلّة تُحدَّث بمعزلٍ عنها.
+                'visual_type' => $v->visual_type,
+                'color_value' => $v->color_value,
             ])),
             'created_at' => $this->created_at,
         ];
