@@ -78,6 +78,7 @@ class CommerceModuleBoundaryTest extends TestCase
         'commerce/v1/checkout/complete',
         'commerce/v1/checkout/contact',
         'commerce/v1/checkout/delivery',
+        'commerce/v1/orders/{id}',
         'commerce/v1/products',
         'commerce/v1/products/{id}',
         'commerce/v1/storefront',

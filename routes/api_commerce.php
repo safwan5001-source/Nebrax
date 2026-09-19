@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\CommerceCartController;
 use App\Http\Controllers\Api\CommerceCategoryController;
 use App\Http\Controllers\Api\CommerceCheckoutController;
+use App\Http\Controllers\Api\CommerceOrderController;
 use App\Http\Controllers\Api\CommerceProductController;
 use App\Http\Controllers\Api\CommerceStorefrontController;
 use App\Http\Middleware\AuthenticateApiClient;
@@ -78,6 +79,11 @@ Route::middleware([
     // same X-Cart-Token identity as Cart (see CommerceCheckoutController's
     // own docblock) — Checkout has no token of its own, it shares Cart's.
     Route::get('checkout', [CommerceCheckoutController::class, 'show'])->name('checkout.show');
+
+    // PR-5 — standalone order status. Ownership is the signed X-Order-Reference
+    // header issued at checkout completion (see CommerceOrderController's own
+    // docblock) — a bare order id never establishes ownership.
+    Route::get('orders/{id}', [CommerceOrderController::class, 'show'])->whereUuid('id')->name('orders.show');
 });
 
 /*
