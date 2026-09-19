@@ -495,7 +495,9 @@ Architecture lock SHA `6898384969facbf16990feb82d741ce62217eba7` is an ancestor.
 
 ## 28. Head SHA
 
-Filled after the implementation commit on this branch (see Git table in the PR body / `git rev-parse HEAD`).
+Implementation commit: `f52c793211b9d6d44d5b1f7a93fd973714b1f00d`
+
+Branch HEAD after this docs fill-in is the tip of `feat/store-backend-1-customizer-persistence` (`git rev-parse HEAD` on the PR).
 
 ---
 
