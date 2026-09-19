@@ -46,4 +46,68 @@ describe('web presentation contract', () => {
       'https://wa.me/966551234567?text=hello',
     );
   });
+
+  it('CONTRACT-2: legacy key-shaped sections migrate with id = key and default backfill', () => {
+    const config = normalizePresentationConfig({
+      homepage: { sections: [{ key: 'hero', visible: false }] },
+    });
+    const hero = config.homepage.sections.find((s) => s.type === 'hero');
+    expect(hero).toMatchObject({ id: 'hero', visible: false });
+    expect(config.homepage.sections).toHaveLength(10);
+    expect(config.homepage.sections.every((s) => s.id === s.type)).toBe(true);
+  });
+
+  it('CONTRACT-2: v2 keeps multi-instance sections and treats absence as delete', () => {
+    const config = normalizePresentationConfig({
+      version: 2,
+      homepage: {
+        sections: [
+          { id: 'banner-a', type: 'banner', visible: true },
+          { id: 'hero', type: 'hero', visible: true },
+          { id: 'banner-b', type: 'banner', visible: false },
+        ],
+      },
+    });
+    expect(config.homepage.sections.map((s) => s.id)).toEqual([
+      'banner-a',
+      'hero',
+      'banner-b',
+    ]);
+
+    const deleted = normalizePresentationConfig({
+      version: 2,
+      homepage: { sections: [{ id: 'hero', type: 'hero', visible: true }] },
+    });
+    expect(deleted.homepage.sections.map((s) => s.type)).toEqual(['hero']);
+  });
+
+  it('CONTRACT-2: round-trip normalization is stable with no id churn', () => {
+    const once = normalizePresentationConfig({
+      version: 2,
+      homepage: {
+        sections: [
+          { id: 'b1', type: 'banner', visible: true },
+          { id: 'hero', type: 'hero', visible: true },
+        ],
+      },
+    });
+    const twice = normalizePresentationConfig(JSON.parse(JSON.stringify(once)));
+    expect(twice.homepage.sections).toEqual(once.homepage.sections);
+  });
+
+  it('CONTRACT-2: unknown types and duplicate ids are dropped deterministically', () => {
+    const config = normalizePresentationConfig({
+      version: 2,
+      homepage: {
+        sections: [
+          { id: 'x', type: 'evil-type', visible: true },
+          { id: 'hero', type: 'hero', visible: false },
+          { id: 'hero', type: 'hero', visible: true },
+        ],
+      },
+    });
+    expect(config.homepage.sections).toEqual([
+      { id: 'hero', type: 'hero', visible: false },
+    ]);
+  });
 });

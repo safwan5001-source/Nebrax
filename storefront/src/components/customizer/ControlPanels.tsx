@@ -776,7 +776,7 @@ function HomepagePanel({
         <ul className="border border-neutral-200">
           {config.homepage.sections.map((section, index) => (
             <li
-              key={section.key}
+              key={section.id}
               className="flex h-12 items-center gap-1 border-b border-neutral-200 px-1 last:border-b-0"
             >
               <div className="flex">
@@ -801,9 +801,9 @@ function HomepagePanel({
               </div>
               <div className="min-w-0 flex-1 px-1">
                 <p className="truncate text-[13px] font-medium text-neutral-900">
-                  {t(SECTION_LABEL[section.key])}
+                  {t(SECTION_LABEL[section.type])}
                 </p>
-                {isGatedHomeSection(section.key) ? (
+                {isGatedHomeSection(section.type) ? (
                   <p className="text-[10px] leading-none text-neutral-400">
                     {t("gatedBadge")}
                   </p>
@@ -1095,7 +1095,7 @@ function SocialPanel({
                   checked={item.enabled}
                   onChange={(enabled) => {
                     const social = config.social.map((row, i) =>
-                      i === index ? { ...row, enabled } : row,
+                      i === index ? { ...row, enabled } : item,
                     );
                     patch({ social });
                   }}

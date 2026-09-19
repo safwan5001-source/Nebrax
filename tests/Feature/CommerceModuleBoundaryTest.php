@@ -55,6 +55,11 @@ class CommerceModuleBoundaryTest extends TestCase
      * @var list<string>
      */
     private const ALLOWED_COMMERCE_API_ROUTES = [
+        // COM-CATALOG-2 — مساحة عمل نشر التصنيفات (قراءة + استبدال مجموعة النشر).
+        'api/commerce/workspace/categories/publication',
+        'api/commerce/workspace/categories/{id}/publication',
+        // COM-CATALOG-1 — قائمة مساحة عمل نشر المنتجات (قراءة فقط فوق COM-WS-3).
+        'api/commerce/workspace/products/publication',
         'api/commerce/workspace/products/{id}/publication',
         'api/commerce/workspace/storefronts',
         'api/commerce/workspace/storefronts/{id}',

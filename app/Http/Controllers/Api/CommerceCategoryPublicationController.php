@@ -2,24 +2,23 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Models\Product;
-use App\Services\Commerce\CommerceProductPublicationService;
+use App\Models\ProductCategory;
+use App\Services\Commerce\CommerceCategoryPublicationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
-/** COM-WS-3 — tenant-scoped ERP control for publishing an AWJ product to web stores. */
-final class CommerceProductPublicationController extends ApiController
+/** COM-CATALOG-2 — tenant-scoped ERP control for publishing an AWJ category to web stores. */
+final class CommerceCategoryPublicationController extends ApiController
 {
     /**
-     * COM-CATALOG-1 — Product Publication Workspace list.
-     *
-     * Read-only list over the same source of truth as show/update
-     * (CommerceListing.is_published). Tenant isolation stays in the service:
-     * products resolve through the tenant-scoped Product query and storefronts
-     * through the tenant-authorized web set — a cross-tenant storefront_id is
-     * rejected without revealing anything about the other tenant.
+     * Category Publication Workspace list — read-only list over the same
+     * source of truth as show/update (CommerceCategoryListing.is_published).
+     * Tenant isolation stays in the service: categories resolve through the
+     * tenant-scoped ProductCategory query and storefronts through the
+     * tenant-authorized web set — a cross-tenant storefront_id is rejected
+     * without revealing anything about the other tenant.
      */
-    public function index(Request $request, CommerceProductPublicationService $publication): JsonResponse
+    public function index(Request $request, CommerceCategoryPublicationService $publication): JsonResponse
     {
         $this->denySelfService($request);
         $validated = $request->validate([
@@ -43,26 +42,26 @@ final class CommerceProductPublicationController extends ApiController
         ]);
     }
 
-    public function show(Request $request, string $id, CommerceProductPublicationService $publication): JsonResponse
+    public function show(Request $request, string $id, CommerceCategoryPublicationService $publication): JsonResponse
     {
         $this->denySelfService($request);
-        $product = Product::query()->findOrFail($id);
+        $category = ProductCategory::query()->findOrFail($id);
 
-        return response()->json(['data' => ['stores' => $publication->state($product)]]);
+        return response()->json(['data' => ['stores' => $publication->state($category)]]);
     }
 
-    public function update(Request $request, string $id, CommerceProductPublicationService $publication): JsonResponse
+    public function update(Request $request, string $id, CommerceCategoryPublicationService $publication): JsonResponse
     {
         $this->denySelfService($request);
         $validated = $request->validate([
             'storefront_ids' => ['present', 'array'],
             'storefront_ids.*' => ['string', 'uuid', 'distinct'],
         ]);
-        $product = Product::query()->findOrFail($id);
+        $category = ProductCategory::query()->findOrFail($id);
 
         return response()->json([
             'data' => [
-                'stores' => $publication->replace($product, array_values($validated['storefront_ids'])),
+                'stores' => $publication->replace($category, array_values($validated['storefront_ids'])),
             ],
         ]);
     }
@@ -70,7 +69,7 @@ final class CommerceProductPublicationController extends ApiController
     private function denySelfService(Request $request): void
     {
         if ($request->user()?->role === 'self_service') {
-            abort(403, 'إدارة نشر المنتجات غير متاحة لحساب الخدمة الذاتية.');
+            abort(403, 'إدارة نشر التصنيفات غير متاحة لحساب الخدمة الذاتية.');
         }
     }
 }

@@ -2,10 +2,11 @@
 
 namespace App\Services\Commerce;
 
-use App\Models\CommerceListing;
-use App\Models\Product;
+use App\Models\CommerceCategoryListing;
+use App\Models\ProductCategory;
 use App\Models\SalesChannel;
 use App\Models\Storefront;
+use App\Tenancy\BranchScope;
 use App\Tenancy\TenantContext;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
@@ -14,20 +15,22 @@ use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
 /**
- * COM-WS-3 — publication overlay for AWJ products.
- * Product remains the source of truth; this service only manages CommerceListing
- * for web sales channels owned by the current tenant.
+ * COM-CATALOG-2 — Category Publication overlay for AWJ categories.
+ * ProductCategory remains the master data (name/tree/`is_active` lifecycle);
+ * this service only manages CommerceCategoryListing.is_published for web
+ * sales channels owned by the current tenant — fully independent from
+ * product publication (CommerceListing), which it never reads or writes.
  */
-final class CommerceProductPublicationService
+final class CommerceCategoryPublicationService
 {
     /** @return list<array{id:string,name:string,is_published:bool}> */
-    public function state(Product $product): array
+    public function state(ProductCategory $category): array
     {
         $tenantId = $this->tenantId();
-        $this->assertProductTenant($product, $tenantId);
+        $this->assertCategoryTenant($category, $tenantId);
 
-        $publishedChannelIds = CommerceListing::query()
-            ->where('product_id', $product->id)
+        $publishedChannelIds = CommerceCategoryListing::query()
+            ->where('category_id', $category->id)
             ->where('is_published', true)
             ->pluck('sales_channel_id')
             ->all();
@@ -43,21 +46,19 @@ final class CommerceProductPublicationService
     }
 
     /**
-     * COM-CATALOG-1 — Product Publication Workspace list.
+     * COM-CATALOG-2 — Category Publication Workspace list.
      *
-     * Lists the tenant's products (Product remains the master) with their actual
-     * publication state read solely from CommerceListing.is_published on the
-     * tenant-authorized active web storefronts. No new publication state, no
-     * parallel flag — the same rows the public storefront gate already reads.
+     * Lists the tenant's categories (ProductCategory remains the master) with
+     * their actual publication state read solely from
+     * CommerceCategoryListing.is_published on the tenant-authorized active web
+     * storefronts — the same rows the public storefront category gate reads.
      *
      * Filters (server-side):
-     *  - search: name / name_en / sku / barcode (LIKE, escaped).
+     *  - search: name (LIKE, escaped).
      *  - status: all | published | unpublished — "published" means a published
-     *    CommerceListing exists on at least one in-scope web sales channel.
+     *    CommerceCategoryListing exists on at least one in-scope web channel.
      *  - storefront_id: optional scope to a single storefront. A foreign or
-     *    unknown id is rejected (422), never silently ignored — the id arrives
-     *    only as a *choice* inside the already tenant-authorized set, mirroring
-     *    the replace() contract.
+     *    unknown id is rejected (422), never silently ignored.
      *
      * @param array{search?:?string,status?:?string,storefront_id?:?string,page?:int,per_page?:int} $filters
      */
@@ -77,27 +78,21 @@ final class CommerceProductPublicationService
         }
         $scopedChannelIds = $scopedStorefronts->pluck('sales_channel_id')->all();
 
-        $query = Product::query()
-            ->select(['id', 'tenant_id', 'sku', 'name', 'name_en', 'is_active']);
+        $query = ProductCategory::query()
+            ->select(['id', 'tenant_id', 'parent_id', 'name', 'is_active'])
+            ->with(['parent' => fn ($q) => $q->withoutGlobalScope(BranchScope::class)->select(['id', 'name'])]);
 
         if (filled($filters['search'] ?? null)) {
             $needle = addcslashes(trim((string) $filters['search']), '%_\\');
-            $like = "%{$needle}%";
-            $query->where(function (Builder $search) use ($like): void {
-                $search
-                    ->where('name', 'like', $like)
-                    ->orWhere('name_en', 'like', $like)
-                    ->orWhere('sku', 'like', $like)
-                    ->orWhere('barcode', 'like', $like);
-            });
+            $query->where('name', 'like', "%{$needle}%");
         }
 
         $status = $filters['status'] ?? 'all';
         if ($status === 'published' || $status === 'unpublished') {
-            $publishedWhere = function (Builder $products) use ($scopedChannelIds): void {
-                $products->whereExists(function ($listing) use ($scopedChannelIds): void {
-                    $listing->from((new CommerceListing())->getTable())
-                        ->whereColumn('product_id', 'products.id')
+            $publishedWhere = function (Builder $categories) use ($scopedChannelIds): void {
+                $categories->whereExists(function ($listing) use ($scopedChannelIds): void {
+                    $listing->from((new CommerceCategoryListing())->getTable())
+                        ->whereColumn('category_id', 'product_categories.id')
                         ->whereIn('sales_channel_id', $scopedChannelIds)
                         ->where('is_published', true);
                 });
@@ -123,59 +118,22 @@ final class CommerceProductPublicationService
     }
 
     /**
-     * يحوّل صفحة المنتجات إلى عناصر الـ Workspace بحالة النشر الفعلية لكل متجر —
-     * استعلام واحد مجمّع للقوائم يمنع N+1.
-     *
-     * @param Collection<int, Product> $products
-     * @param Collection<int, Storefront> $storefronts
-     */
-    private function attachPublicationState(Collection $products, Collection $storefronts): void
-    {
-        $listings = CommerceListing::query()
-            ->whereIn('product_id', $products->modelKeys())
-            ->whereIn('sales_channel_id', $storefronts->pluck('sales_channel_id')->all())
-            ->where('is_published', true)
-            ->get(['product_id', 'sales_channel_id'])
-            ->keyBy(fn (CommerceListing $listing) => $listing->product_id.':'.$listing->sales_channel_id);
-
-        $products->transform(function (Product $product) use ($storefronts, $listings): array {
-            $stores = $storefronts->map(function (Storefront $storefront) use ($product, $listings): array {
-                $published = $listings->has($product->id.':'.$storefront->sales_channel_id);
-
-                return ['id' => $storefront->id, 'name' => $storefront->name, 'is_published' => $published];
-            })->values()->all();
-
-            return [
-                'id' => $product->id,
-                'sku' => $product->sku,
-                'name' => $product->name,
-                'name_en' => $product->name_en,
-                'is_active' => (bool) $product->is_active,
-                'is_published' => collect($stores)->contains('is_published', true),
-                'stores' => $stores,
-            ];
-        });
-    }
-
-    /**
-     * Replace the product's publication set across the current tenant's active web stores.
-     * Storefront ids are accepted only as choices inside the already-authorized tenant set.
+     * Replace the category's publication set across the current tenant's active
+     * web stores. Storefront ids are accepted only as choices inside the
+     * already-authorized tenant set — never as authority.
      *
      * @param list<string> $storefrontIds
      * @return list<array{id:string,name:string,is_published:bool}>
      */
-    public function replace(Product $product, array $storefrontIds): array
+    public function replace(ProductCategory $category, array $storefrontIds): array
     {
         $tenantId = $this->tenantId();
-        $this->assertProductTenant($product, $tenantId);
+        $this->assertCategoryTenant($category, $tenantId);
 
         $storefronts = $this->webStorefronts($tenantId);
         $authorizedIds = $storefronts->pluck('id')->map(fn ($id) => (string) $id)->all();
         $requestedIds = array_values(array_unique(array_map('strval', $storefrontIds)));
 
-        // Collection::whereIn() uses loose comparison. Validate the raw requested ids
-        // strictly against the tenant-authorized set before resolving sales channels so a
-        // foreign storefront can never be silently ignored or coerced into a valid choice.
         foreach ($requestedIds as $requestedId) {
             if (! in_array($requestedId, $authorizedIds, true)) {
                 abort(422, 'أحد المتاجر المحددة غير متاح لهذا المستأجر.');
@@ -188,11 +146,11 @@ final class CommerceProductPublicationService
             ->all();
         $webChannelIds = $storefronts->pluck('sales_channel_id')->all();
 
-        DB::transaction(function () use ($product, $tenantId, $webChannelIds, $requestedChannelIds): void {
+        DB::transaction(function () use ($category, $tenantId, $webChannelIds, $requestedChannelIds): void {
             foreach ($webChannelIds as $channelId) {
-                CommerceListing::query()->updateOrCreate(
+                CommerceCategoryListing::query()->updateOrCreate(
                     [
-                        'product_id' => $product->id,
+                        'category_id' => $category->id,
                         'sales_channel_id' => $channelId,
                     ],
                     [
@@ -203,7 +161,42 @@ final class CommerceProductPublicationService
             }
         });
 
-        return $this->state($product);
+        return $this->state($category);
+    }
+
+    /**
+     * يحوّل صفحة التصنيفات إلى عناصر الـ Workspace بحالة النشر الفعلية لكل
+     * متجر — استعلام واحد مجمّع يمنع N+1.
+     *
+     * @param Collection<int, ProductCategory> $categories
+     * @param Collection<int, Storefront> $storefronts
+     */
+    private function attachPublicationState(Collection $categories, Collection $storefronts): void
+    {
+        $listings = CommerceCategoryListing::query()
+            ->whereIn('category_id', $categories->modelKeys())
+            ->whereIn('sales_channel_id', $storefronts->pluck('sales_channel_id')->all())
+            ->where('is_published', true)
+            ->get(['category_id', 'sales_channel_id'])
+            ->keyBy(fn (CommerceCategoryListing $listing) => $listing->category_id.':'.$listing->sales_channel_id);
+
+        $categories->transform(function (ProductCategory $category) use ($storefronts, $listings): array {
+            $stores = $storefronts->map(function (Storefront $storefront) use ($category, $listings): array {
+                $published = $listings->has($category->id.':'.$storefront->sales_channel_id);
+
+                return ['id' => $storefront->id, 'name' => $storefront->name, 'is_published' => $published];
+            })->values()->all();
+
+            return [
+                'id' => $category->id,
+                'name' => $category->name,
+                'parent_id' => $category->parent_id,
+                'parent_name' => $category->parent?->name,
+                'is_active' => (bool) $category->is_active,
+                'is_published' => collect($stores)->contains('is_published', true),
+                'stores' => $stores,
+            ];
+        });
     }
 
     private function tenantId(): string
@@ -216,9 +209,9 @@ final class CommerceProductPublicationService
         return $tenantId;
     }
 
-    private function assertProductTenant(Product $product, string $tenantId): void
+    private function assertCategoryTenant(ProductCategory $category, string $tenantId): void
     {
-        if ($product->tenant_id !== $tenantId) {
+        if ($category->tenant_id !== $tenantId) {
             abort(404);
         }
     }

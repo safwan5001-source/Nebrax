@@ -73,14 +73,14 @@ export default async function HomePage({ params }: HomePageProps) {
     ? resolveHomeSections(
         presentation.homepage.sections.flatMap((section) => {
           if (
-            section.key !== "hero" &&
-            section.key !== "categories" &&
-            section.key !== "newArrivals" &&
-            section.key !== "wholesale"
+            section.type !== "hero" &&
+            section.type !== "categories" &&
+            section.type !== "newArrivals" &&
+            section.type !== "wholesale"
           ) {
             return [];
           }
-          return [{ key: section.key, visible: section.visible }];
+          return [{ key: section.type, visible: section.visible }];
         }),
       )
     : resolveHomeSections();

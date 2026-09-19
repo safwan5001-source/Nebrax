@@ -112,6 +112,11 @@ class CommerceCatalogApiTest extends TestCase
 
         app(TenantContext::class)->set($a['tenant']->id);
         $categoryA = ProductCategory::create(['name' => 'تصنيف أ', 'is_active' => true]);
+        // COM-CATALOG-2 — البوابة الجديدة: ظهور التصنيف يتطلب صف نشر على قناة الجوال.
+        \App\Models\CommerceCategoryListing::create([
+            'tenant_id' => $a['tenant']->id, 'category_id' => $categoryA->id,
+            'sales_channel_id' => $a['channel']->id, 'is_published' => true,
+        ]);
         app(TenantContext::class)->forget();
 
         app(TenantContext::class)->set($b['tenant']->id);
