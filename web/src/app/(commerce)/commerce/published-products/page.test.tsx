@@ -27,6 +27,13 @@ vi.mock('@/modules/products/publication', () => ({
   replaceProductPublication: (...args: unknown[]) => replaceMock(...args),
 }));
 
+const categoryListMock = vi.fn();
+const categoryReplaceMock = vi.fn();
+vi.mock('@/modules/categories/publication', () => ({
+  loadCategoryPublicationList: (...args: unknown[]) => categoryListMock(...args),
+  replaceCategoryPublication: (...args: unknown[]) => categoryReplaceMock(...args),
+}));
+
 vi.mock('@/modules/commerce-workspace/store-context', () => ({
   useCommerceStoreContext: () => ({
     catalog: { status: 'ready', stores: [{ id: 's1', name: 'المتجر', isActive: true }] },
@@ -62,6 +69,8 @@ describe('COM-CATALOG-1 Product Publication Workspace', () => {
     cleanup();
     listMock.mockReset();
     replaceMock.mockReset();
+    categoryListMock.mockReset();
+    categoryReplaceMock.mockReset();
     toastError.mockReset();
     toastSuccess.mockReset();
     locale.current = 'ar';
@@ -110,5 +119,101 @@ describe('COM-CATALOG-1 Product Publication Workspace', () => {
     render(<CommercePublishedProductsPage />);
     await waitFor(() => expect(screen.getAllByText('قهوة عربية').length).toBeGreaterThan(0));
     expect(screen.getByRole('heading', { name: 'Published products' })).toBeTruthy();
+  });
+});
+
+const publishedCategoriesPage = {
+  items: [
+    {
+      id: 'c1',
+      name: 'مشروبات',
+      parentId: 'c0',
+      parentName: 'أساسيات',
+      isActive: true,
+      isPublished: false,
+      stores: [{ id: 's1', name: 'المتجر', isPublished: false }],
+    },
+  ],
+  meta: { currentPage: 1, lastPage: 1, perPage: 25, total: 1 },
+};
+
+describe('COM-CATALOG-2 Category Publication tab', () => {
+  afterEach(() => {
+    cleanup();
+    listMock.mockReset();
+    replaceMock.mockReset();
+    categoryListMock.mockReset();
+    categoryReplaceMock.mockReset();
+    toastError.mockReset();
+    toastSuccess.mockReset();
+    locale.current = 'ar';
+  });
+
+  it('keeps the products tab as the default without regressing COM-CATALOG-1', async () => {
+    listMock.mockResolvedValue(publishedPage);
+    categoryListMock.mockResolvedValue(publishedCategoriesPage);
+    render(<CommercePublishedProductsPage />);
+
+    expect(screen.getByRole('tab', { name: 'المنتجات', selected: true })).toBeTruthy();
+    expect(screen.getByRole('tab', { name: 'التصنيفات', selected: false })).toBeTruthy();
+    await waitFor(() => expect(screen.getAllByText('قهوة عربية').length).toBeGreaterThan(0));
+    // التبويبة الافتراضية لا تستدعي واجهة التصنيفات إطلاقاً.
+    expect(categoryListMock).not.toHaveBeenCalled();
+  });
+
+  it('renders the categories tab with hierarchy context and per-store state', async () => {
+    listMock.mockResolvedValue(publishedPage);
+    categoryListMock.mockResolvedValue(publishedCategoriesPage);
+    render(<CommercePublishedProductsPage />);
+
+    screen.getByRole('tab', { name: 'التصنيفات' }).click();
+
+    await waitFor(() => expect(screen.getAllByText('مشروبات').length).toBeGreaterThan(0));
+    expect(screen.getAllByText(/ضمن أساسيات/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/المتجر · غير منشور/).length).toBeGreaterThan(0);
+    expect(categoryListMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('publishes a category via the replace contract with success feedback', async () => {
+    listMock.mockResolvedValue(publishedPage);
+    categoryListMock.mockResolvedValue(publishedCategoriesPage);
+    categoryReplaceMock.mockResolvedValue([{ id: 's1', name: 'المتجر', isPublished: true }]);
+    render(<CommercePublishedProductsPage />);
+
+    screen.getByRole('tab', { name: 'التصنيفات' }).click();
+    await waitFor(() => expect(screen.getAllByRole('button', { name: /نشر · المتجر/ }).length).toBeGreaterThan(0));
+
+    screen.getAllByRole('button', { name: /نشر · المتجر/ })[0].click();
+    await waitFor(() => expect(categoryReplaceMock).toHaveBeenCalledWith('c1', ['s1']));
+    await waitFor(() => expect(toastSuccess).toHaveBeenCalledWith('تم نشر التصنيف في المتجر.'));
+    // المنتجات لا تُلمس — استقلالية كاملة بين التبويبتين.
+    expect(replaceMock).not.toHaveBeenCalled();
+  });
+
+  it('shows the category empty and error states', async () => {
+    listMock.mockResolvedValue(publishedPage);
+    categoryListMock.mockResolvedValue({ items: [], meta: { currentPage: 1, lastPage: 1, perPage: 25, total: 0 } });
+    render(<CommercePublishedProductsPage />);
+    screen.getByRole('tab', { name: 'التصنيفات' }).click();
+    await waitFor(() => expect(screen.getByText('لا تصنيفات بعد')).toBeTruthy());
+
+    cleanup();
+    categoryListMock.mockReset();
+    categoryListMock.mockRejectedValue(new Error('network'));
+    render(<CommercePublishedProductsPage />);
+    screen.getByRole('tab', { name: 'التصنيفات' }).click();
+    await waitFor(() => expect(screen.getByText('تعذر تحميل التصنيفات. حاول مرة أخرى.')).toBeTruthy());
+  });
+
+  it('renders the categories tab labels in English', async () => {
+    locale.current = 'en';
+    listMock.mockResolvedValue(publishedPage);
+    categoryListMock.mockResolvedValue(publishedCategoriesPage);
+    render(<CommercePublishedProductsPage />);
+
+    expect(screen.getByRole('tab', { name: 'Categories' })).toBeTruthy();
+    screen.getByRole('tab', { name: 'Categories' }).click();
+    await waitFor(() => expect(screen.getAllByText('مشروبات').length).toBeGreaterThan(0));
+    expect(screen.getAllByText(/Under أساسيات/).length).toBeGreaterThan(0);
   });
 });
