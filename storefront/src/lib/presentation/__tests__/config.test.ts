@@ -1,10 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_PRESENTATION_CONFIG,
+  MAX_HOME_SECTIONS,
   normalizePresentationConfig,
   previewStoreName,
 } from "../config";
-import { HOME_BUILDER_SECTION_KEYS } from "../tokens";
+import {
+  HOME_BUILDER_SECTION_KEYS,
+  PRESENTATION_CONFIG_VERSION,
+} from "../tokens";
 
 describe("normalizePresentationConfig", () => {
   it("resolves missing config to AWJ Modern defaults", () => {
@@ -15,11 +19,11 @@ describe("normalizePresentationConfig", () => {
     expect(normalizePresentationConfig({})).toMatchObject({
       themePreset: "awj-modern",
       primaryColor: "#12372a",
-      version: 1,
+      version: PRESENTATION_CONFIG_VERSION,
     });
   });
 
-  it("drops unknown homepage section keys and keeps implemented ones", () => {
+  it("legacy key-shaped sections: drops unknown keys and migrates ids deterministically", () => {
     const normalized = normalizePresentationConfig({
       homepage: {
         sections: [
@@ -29,15 +33,142 @@ describe("normalizePresentationConfig", () => {
       },
     });
 
-    expect(normalized.homepage.sections.some((s) => s.key === "hero")).toBe(
-      true,
-    );
+    const hero = normalized.homepage.sections.find((s) => s.type === "hero");
+    expect(hero).toMatchObject({ id: "hero", visible: false });
     expect(
-      normalized.homepage.sections.some((s) => String(s.key) === "banner-html"),
+      normalized.homepage.sections.some(
+        (s) => String(s.type) === "banner-html",
+      ),
     ).toBe(false);
-    expect(normalized.homepage.sections.map((s) => s.key).sort()).toEqual(
+    // legacy semantics: missing defaults are re-appended
+    expect(normalized.homepage.sections.map((s) => s.type).sort()).toEqual(
       [...HOME_BUILDER_SECTION_KEYS].sort(),
     );
+    // legacy migration assigns id = key
+    expect(normalized.homepage.sections.every((s) => s.id === s.type)).toBe(
+      true,
+    );
+  });
+
+  it("legacy normalization is idempotent and stable across repeated passes", () => {
+    const legacyInput = {
+      homepage: {
+        sections: [
+          { key: "hero", visible: true },
+          { key: "categories", visible: false },
+        ],
+      },
+    };
+    const once = normalizePresentationConfig(legacyInput);
+    const twice = normalizePresentationConfig(JSON.parse(JSON.stringify(once)));
+    expect(twice.homepage.sections).toEqual(once.homepage.sections);
+    expect(once.homepage.sections.map((s) => s.id)).toEqual([
+      "hero",
+      "categories",
+      ...HOME_BUILDER_SECTION_KEYS.filter(
+        (key) => key !== "hero" && key !== "categories",
+      ),
+    ]);
+  });
+
+  it("v2: keeps multiple instances of the same type with distinct ids", () => {
+    const normalized = normalizePresentationConfig({
+      version: 2,
+      homepage: {
+        sections: [
+          { id: "banner-a", type: "banner", visible: true },
+          { id: "hero", type: "hero", visible: true },
+          { id: "banner-b", type: "banner", visible: false },
+        ],
+      },
+    });
+
+    expect(
+      normalized.homepage.sections.map((s) => [s.id, s.type, s.visible]),
+    ).toEqual([
+      ["banner-a", "banner", true],
+      ["hero", "hero", true],
+      ["banner-b", "banner", false],
+    ]);
+  });
+
+  it("v2: absence of a section means deleted — no defaults resurrection", () => {
+    const normalized = normalizePresentationConfig({
+      version: 2,
+      homepage: {
+        sections: [{ id: "hero", type: "hero", visible: true }],
+      },
+    });
+
+    expect(normalized.homepage.sections.map((s) => s.type)).toEqual(["hero"]);
+  });
+
+  it("v2: an empty sections array stays empty", () => {
+    const normalized = normalizePresentationConfig({
+      version: 2,
+      homepage: { sections: [] },
+    });
+    expect(normalized.homepage.sections).toEqual([]);
+  });
+
+  it("v2: drops unknown types fail-closed and duplicate ids deterministically (first wins)", () => {
+    const normalized = normalizePresentationConfig({
+      version: 2,
+      homepage: {
+        sections: [
+          { id: "x-1", type: "evil-type", visible: true },
+          { id: "hero", type: "hero", visible: false },
+          { id: "hero", type: "hero", visible: true },
+          { id: "banner-1", type: "banner", visible: true },
+        ],
+      },
+    });
+
+    expect(normalized.homepage.sections).toEqual([
+      { id: "hero", type: "hero", visible: false },
+      { id: "banner-1", type: "banner", visible: true },
+    ]);
+  });
+
+  it("v2: rejects unsafe ids and caps the section list", () => {
+    const sections = Array.from({ length: MAX_HOME_SECTIONS + 5 }, (_, i) => ({
+      id: `banner-${i}`,
+      type: "banner",
+      visible: true,
+    }));
+    sections.unshift({
+      id: "bad id!!",
+      type: "banner",
+      visible: true,
+    } as never);
+
+    const normalized = normalizePresentationConfig({
+      version: 2,
+      homepage: { sections },
+    });
+
+    expect(normalized.homepage.sections).toHaveLength(MAX_HOME_SECTIONS);
+    expect(
+      normalized.homepage.sections.every((s) =>
+        /^[a-zA-Z0-9_-]{1,64}$/.test(s.id),
+      ),
+    ).toBe(true);
+  });
+
+  it("v2 round-trip: re-normalizing normalized output is stable", () => {
+    const input = {
+      version: 2,
+      homepage: {
+        sections: [
+          { id: "b1", type: "banner", visible: true },
+          { id: "hero", type: "hero", visible: true },
+          { id: "b2", type: "banner", visible: false },
+        ],
+      },
+    };
+    const once = normalizePresentationConfig(input);
+    const twice = normalizePresentationConfig(JSON.parse(JSON.stringify(once)));
+    expect(twice.homepage.sections).toEqual(once.homepage.sections);
   });
 
   it("rejects unsupported colours instead of applying them", () => {
