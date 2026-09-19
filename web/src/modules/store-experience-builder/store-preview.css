@@ -42,3 +42,28 @@
 .awj-store-preview .from-primary-700 { --tw-gradient-from: var(--store-primary-700, #0f2e23); }
 .awj-store-preview .via-primary-600 { --tw-gradient-via: var(--store-primary); }
 .awj-store-preview .to-primary-500 { --tw-gradient-to: var(--store-primary-500, #2a6a50); }
+
+/* STORE-CUSTOMIZER-V2-1 — section selection + scroll model.
+   Uses the store token sheet; selection is not color-only (outline offset
+   + aria-pressed on the section + composer row marker in the sidebar). */
+.awj-store-preview .awj-preview-section {
+  cursor: pointer;
+  scroll-margin-top: 5rem;
+}
+.awj-store-preview .awj-preview-section:focus-visible {
+  outline: 2px solid var(--store-primary);
+  outline-offset: 2px;
+}
+.awj-store-preview .awj-preview-section-selected {
+  outline: 2px solid var(--store-primary);
+  outline-offset: 2px;
+}
+
+/* Independent, thin-but-visible scrollbars for the customizer's own
+   scroll regions (sidebar, settings panel, preview canvas). The outer app
+   page is not the primary navigation inside the customizer. */
+[data-customizer-scroll] {
+  scrollbar-width: thin;
+  scrollbar-color: var(--store-muted-foreground, #636a78) transparent;
+  overscroll-behavior: contain;
+}
