@@ -80,16 +80,16 @@ class StorefrontPresentationPostgresConcurrencyTest extends TestCase
                 $lockerConnection->commit();
             } catch (\Throwable $e) {
                 file_put_contents($lockerError, get_class($e).': '.$e->getMessage()."\n".$e->getTraceAsString());
-                exit(1);
+                $this->replaceChildProcess(1);
             }
-            exit(0);
+            $this->replaceChildProcess(0);
         }
 
         $this->waitFor($lockReady, $lockerError);
 
         $caller = pcntl_fork();
         if ($caller === 0) {
-            DB::connection()->reconnect();
+            $this->useIsolatedPostgresConnection();
             app(TenantContext::class)->set($this->tenantId);
             file_put_contents($callerStarted, '1');
             try {
@@ -104,7 +104,7 @@ class StorefrontPresentationPostgresConcurrencyTest extends TestCase
             } catch (\Throwable $e) {
                 file_put_contents($resultFile, json_encode(['ok' => false, 'error' => $e->getMessage()]));
             }
-            exit(0);
+            $this->replaceChildProcess(0);
         }
 
         pcntl_waitpid($locker, $status);
@@ -193,6 +193,23 @@ class StorefrontPresentationPostgresConcurrencyTest extends TestCase
             $config['password'],
             [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION],
         );
+    }
+
+    private function useIsolatedPostgresConnection(): void
+    {
+        $connectionName = 'storefront_concurrency';
+        config([
+            'database.default' => $connectionName,
+            'database.connections.'.$connectionName => config('database.connections.pgsql'),
+        ]);
+        DB::setDefaultConnection($connectionName);
+        DB::connection($connectionName)->getPdo();
+    }
+
+    private function replaceChildProcess(int $exitCode): never
+    {
+        pcntl_exec(PHP_BINARY, ['-r', 'exit('.$exitCode.');']);
+        exit($exitCode);
     }
 
     private function signalPath(string $prefix): string
