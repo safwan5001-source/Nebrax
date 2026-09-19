@@ -418,7 +418,9 @@ first PR), analogous in role to `ResolveStorefrontDomain` but built for a non-ho
    `CommerceCart::STATUS_CONSUMED` closes the one-Cart-per-Order invariant a completed-but-still-
    `active` Cart left open — see `AWJ_CHECKOUT_V1_ARCHITECTURE.md` §9.
 5. **PR-5 — Standalone order status.** `GET /commerce/v1/orders/{id}` with the signed-guest-order-
-   reference scheme from §3.2.
+   reference scheme from §3.2. **Implemented** — reference = `v1.{HMAC-SHA256(tenant|channel|order)}`
+   issued at checkout completion (`order_reference` field), verified fail-closed via the
+   `X-Order-Reference` header; see `docs/plans/commerce/PR5_ORDER_STATUS_IMPLEMENTATION_REPORT.md`.
 6. **Deferred, separate prerequisite work (not part of this API's PR sequence, but blocking for
    variant support specifically):** variant-awareness in `CommercePriceResolver`,
    `CommerceListing`/publication gating, and `StorefrontProductResource`-equivalent serialization —
