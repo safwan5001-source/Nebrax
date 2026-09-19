@@ -2,14 +2,14 @@
 
 namespace Tests\Feature;
 
-use App\Models\SalesChannel;
-use App\Models\Storefront;
 use App\Models\StorefrontPresentation;
 use App\Services\Commerce\StaleDraftRevisionException;
 use App\Services\Commerce\StorefrontPresentationService;
 use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+use PDO;
 use Tests\TestCase;
 
 /**
@@ -26,6 +26,8 @@ class StorefrontPresentationPostgresConcurrencyTest extends TestCase
 
     private ?string $storefrontId = null;
 
+    private ?PDO $fixtureConnection = null;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -35,6 +37,22 @@ class StorefrontPresentationPostgresConcurrencyTest extends TestCase
         }
         if (! function_exists('pcntl_fork')) {
             $this->markTestSkipped('امتداد pcntl غير متاح في هذه البيئة.');
+        }
+    }
+
+    protected function tearDown(): void
+    {
+        $fixtureConnection = $this->fixtureConnection;
+        $this->fixtureConnection = null;
+
+        if ($fixtureConnection !== null && $fixtureConnection->inTransaction()) {
+            $fixtureConnection->rollBack();
+        }
+
+        parent::tearDown();
+
+        if ($fixtureConnection !== null && $this->tenantId !== null) {
+            $fixtureConnection->prepare('DELETE FROM tenants WHERE id = ?')->execute([$this->tenantId]);
         }
     }
 
@@ -112,37 +130,63 @@ class StorefrontPresentationPostgresConcurrencyTest extends TestCase
 
     private function seedGraph(): void
     {
-        $tenant = \App\Models\Tenant::create([
-            'name' => 'Concurrency presentation',
-            'slug' => 'pres-conc-'.substr(bin2hex(random_bytes(4)), 0, 8),
-            'vat_number' => '300000000000003',
-            'currency' => 'SAR',
-            'is_active' => true,
-        ]);
-        $this->tenantId = $tenant->id;
-        app(TenantContext::class)->set($tenant->id);
+        $this->fixtureConnection = $this->fixtureConnection();
+        $this->fixtureConnection->beginTransaction();
 
-        $channel = SalesChannel::create([
-            'slug' => 'web',
-            'name' => 'ويب',
-            'type' => SalesChannel::TYPE_WEB,
-            'is_active' => true,
-        ]);
-        $storefront = Storefront::create([
-            'slug' => 'main',
-            'name' => 'متجر',
-            'sales_channel_id' => $channel->id,
-            'is_active' => true,
-        ]);
-        StorefrontPresentation::create([
-            'storefront_id' => $storefront->id,
-            'schema_version' => 1,
-            'draft_config' => ['version' => 1, 'themePreset' => 'awj-modern'],
-            'draft_revision' => 1,
-        ]);
+        $this->tenantId = (string) Str::uuid();
+        $channelId = (string) Str::uuid();
+        $this->storefrontId = (string) Str::uuid();
+        $now = now()->toDateTimeString();
 
-        $this->storefrontId = $storefront->id;
+        $this->fixtureConnection->prepare(
+            'INSERT INTO tenants (id, name, slug, vat_number, currency, is_active, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+        )->execute([
+            $this->tenantId,
+            'Concurrency presentation',
+            'pres-conc-'.substr(bin2hex(random_bytes(4)), 0, 8),
+            '300000000000003',
+            'SAR',
+            true,
+            $now,
+            $now,
+        ]);
+        $this->fixtureConnection->prepare(
+            'INSERT INTO sales_channels (id, tenant_id, slug, name, type, is_active, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+        )->execute([$channelId, $this->tenantId, 'web', 'ويب', 'web', true, $now, $now]);
+        $this->fixtureConnection->prepare(
+            'INSERT INTO storefronts (id, tenant_id, sales_channel_id, slug, name, is_active, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+        )->execute([$this->storefrontId, $this->tenantId, $channelId, 'main', 'متجر', true, $now, $now]);
+        $this->fixtureConnection->prepare(
+            'INSERT INTO storefront_presentations (storefront_id, schema_version, draft_config, draft_revision, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?)'
+        )->execute([
+            $this->storefrontId,
+            1,
+            json_encode(['version' => 1, 'themePreset' => 'awj-modern'], JSON_THROW_ON_ERROR),
+            1,
+            $now,
+            $now,
+        ]);
+        $this->fixtureConnection->commit();
+
+        app(TenantContext::class)->set($this->tenantId);
+        StorefrontPresentation::query()->where('storefront_id', $this->storefrontId)->firstOrFail();
         app(TenantContext::class)->forget();
+    }
+
+    private function fixtureConnection(): PDO
+    {
+        $config = config('database.connections.pgsql');
+
+        return new PDO(
+            sprintf('pgsql:host=%s;port=%s;dbname=%s', $config['host'], $config['port'], $config['database']),
+            $config['username'],
+            $config['password'],
+            [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION],
+        );
     }
 
     private function signalPath(string $prefix): string
