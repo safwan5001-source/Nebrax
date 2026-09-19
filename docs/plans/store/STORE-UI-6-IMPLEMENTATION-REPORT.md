@@ -2,9 +2,10 @@
 
 ## 1. Status
 
-**Visual refinement round pending review.** Architecture and
-capabilities were accepted. **Visual approval is not granted.**
-**Not merged, not deployed.** `NO VISUAL APPROVAL = NO MERGE`.
+**Desktop 1440 and Mobile 390 visual direction approved.**
+A tablet-only responsive correction is on this branch for **final
+visual approval**. **Not merged, not deployed.**
+`NO VISUAL APPROVAL = NO MERGE`.
 
 ## 2. Git
 
@@ -129,9 +130,9 @@ Verified at 390 / 430 / 768 / 1024 / 1280 / 1440.
 
 | Width | Layout |
 |---|---|
-| 390 / 430 | Customize / Preview tabs. Header is title + locale only. Panel picker is a native select. Save / Publish sit above the tabs, not in the title row. |
-| 768 | Two-pane. Panel picker remains a select so names stay readable. Device switch appears. Preview takes the remainder. |
-| 1024 / 1280 / 1440 | Editor outline + inspector + preview. Preview is the hero (924px of 1440). |
+| 390 / 430 | Customize / Preview tabs. Header is title + locale only. Panel picker is a native select. Save / Publish sit above the tabs, not in the title row. Unchanged this pass. |
+| 768 | Tablet workspace, not a 300px phone column. Editor outline (196px) + inspector filling the rest (572px). Customize / Preview tabs; simultaneous preview is withheld so the editor can use the width. Theme presets are 3 columns. Save / Publish are a full-width action bar. Preview tab is full 768px. |
+| 1024 / 1280 / 1440 | Editor outline + inspector + live preview. 1440 is unchanged: 196 / 320 / **924**. |
 
 ## 8. RTL / LTR
 
@@ -235,7 +236,10 @@ chrome pass:
 | 1440 | AR | WhatsApp | `desktop-1440-ar-whatsapp.png` |
 | 1440 | AR | Verification | `desktop-1440-ar-verification.png` |
 | 1440 | EN | Appearance | `desktop-1440-en-theme.png` |
-| 768 | AR | Appearance | `tablet-768-ar-theme.png` |
+| 768 | AR | Customize | `tablet-768-ar-theme.png` |
+| 768 | AR | Preview | `tablet-768-ar-preview.png` |
+| 768 | EN | Customize | `tablet-768-en-theme.png` |
+| 1024 | AR | Customize + Preview | `tablet-1024-ar-theme.png` |
 | 390 | AR | Customize | `mobile-390-ar-edit.png` |
 | 390 | AR | Preview | `mobile-390-ar-preview.png` |
 | 390 | EN | Customize | `mobile-390-en-edit.png` |
@@ -255,21 +259,21 @@ Observed while capturing:
   dedicated action row above Customize / Preview.
 - Storefront preview itself was not redesigned.
 
-## 17. Visual refinement (this round)
+## 17. Visual refinement (chrome round)
 
 Chrome only. Capabilities, honesty, tenant isolation, and the
 storefront preview canvas are unchanged. No backend, API, schema,
 persistence, or browser storage was introduced.
 
-What changed:
+What changed in the chrome round (desktop / mobile, approved):
 
 - **Preview dominance.** Inspector stays ~300–320px readable; the
   outline is 196px from `lg` up; preview fills the rest.
 - **Editor outline, not a settings list.** Named surfaces in
   store-building order, icons + labels, selected row is inverted
   fill, groups separated by hairlines rather than category captions.
-- **Theme presets** are 2-column visual plates (header + product
-  tiles) with a hard selected border.
+- **Theme presets** are visual plates (header + product tiles) with
+  a hard selected border.
 - **Homepage composer** communicates show / hide / reorder as a
   layer list.
 - **Contact, WhatsApp, Verification, Apps** have section headings
@@ -277,6 +281,28 @@ What changed:
 - **Mobile action hierarchy.** Title row, panel select, controls,
   Save / Publish, then Customize / Preview. Desktop actions are not
   squeezed into the 390px title.
+
+## 17b. Tablet-only responsive correction (this pass)
+
+Desktop 1440 architecture is unchanged (196 / 320 / 924).
+Mobile 390 Customize / Preview architecture is unchanged.
+
+768 previously forced `md:w-[300px]` inspector + simultaneous
+preview, which read as a phone column beside leftover canvas
+whitespace. That breakpoint now:
+
+- Shows the editor outline (196px) beside an inspector that
+  **fills the remaining 572px**.
+- Keeps Customize / Preview as tabs so the editor can use the
+  tablet width; simultaneous preview starts at `lg` (1024).
+- Preview tab is **full 768px** (nav and inspector hide).
+- Theme preset grid becomes 3 columns at `md`, 2 columns again
+  in the desktop inspector (`lg`).
+- Save / Publish are a full-width action bar at 768; they return
+  to the header at 1024+.
+
+1024 is the compact desktop two-pane (nav 196 + inspector 300 +
+preview 528). Measured live.
 
 ## 18. Explicit non-goals (held)
 
@@ -294,5 +320,6 @@ What changed:
 
 ## 19. Stop
 
-This branch is open for **visual review only**.
+This branch is open for **final visual approval** of the tablet
+correction. Desktop and mobile direction is already approved.
 `NO VISUAL APPROVAL = NO MERGE`.

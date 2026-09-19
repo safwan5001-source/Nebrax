@@ -262,7 +262,7 @@ function ThemePanel({
   return (
     <div className="space-y-7">
       <Section title={t("preset")}>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-2">
           {THEME_PRESETS.map((preset) => {
             const selected = config.themePreset === preset.id;
             return (

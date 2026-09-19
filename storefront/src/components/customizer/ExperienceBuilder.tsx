@@ -113,7 +113,7 @@ export function ExperienceBuilder({
       data-device={device}
       className="relative flex h-full min-h-0 flex-col bg-neutral-100 text-neutral-900"
     >
-      <header className="flex h-11 shrink-0 items-center gap-2 border-b border-neutral-200 bg-white px-3 md:h-12 md:gap-3 md:pe-80">
+      <header className="flex h-11 shrink-0 items-center gap-2 border-b border-neutral-200 bg-white px-3 md:h-12 md:gap-3 lg:pe-80">
         <div className="min-w-0 flex-1">
           <p className="truncate text-[13px] font-semibold leading-none md:text-sm">
             {t("title")}
@@ -164,7 +164,9 @@ export function ExperienceBuilder({
       <div className="flex min-h-0 flex-1">
         <nav
           aria-label={t("controls")}
-          className="hidden shrink-0 overflow-y-auto border-e border-neutral-200 bg-white lg:flex lg:w-[196px] lg:flex-col"
+          className={`${
+            mobilePane === "preview" ? "hidden lg:flex" : "hidden md:flex"
+          } w-[196px] shrink-0 flex-col overflow-y-auto border-e border-neutral-200 bg-white`}
         >
           <div className="flex flex-col py-2">
             {CUSTOMIZER_NAV_GROUPS.map((group, groupIndex) => (
@@ -206,9 +208,9 @@ export function ExperienceBuilder({
           data-builder-controls=""
           className={`${
             mobilePane === "edit" ? "flex" : "hidden"
-          } w-full shrink-0 flex-col border-neutral-200 bg-white md:flex md:w-[300px] md:border-e xl:w-[320px]`}
+          } w-full min-w-0 flex-col border-neutral-200 bg-white md:flex-1 lg:flex lg:w-[300px] lg:flex-none lg:border-e xl:w-[320px]`}
         >
-          <div className="shrink-0 border-b border-neutral-200 px-3 py-2 lg:hidden">
+          <div className="shrink-0 border-b border-neutral-200 px-3 py-2 md:hidden">
             <label className="sr-only" htmlFor="customizer-panel-select">
               {t("controls")}
             </label>
@@ -227,12 +229,12 @@ export function ExperienceBuilder({
               ))}
             </select>
           </div>
-          <div className="hidden shrink-0 border-b border-neutral-200 px-4 py-3 lg:block">
+          <div className="hidden shrink-0 border-b border-neutral-200 px-4 py-3 md:block">
             <h2 className="text-[15px] font-semibold leading-tight">
               {activePanel ? t(activePanel.label) : t("theme")}
             </h2>
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 md:px-4 md:py-5">
+          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 md:px-5 md:py-5 lg:px-4 lg:py-5">
             <ControlPanels
               panel={panel}
               config={draft}
@@ -248,7 +250,7 @@ export function ExperienceBuilder({
           aria-label={t("livePreview")}
           className={`${
             mobilePane === "preview" ? "flex" : "hidden"
-          } min-w-0 flex-1 flex-col md:flex`}
+          } min-w-0 flex-1 flex-col lg:flex`}
         >
           <div className="flex h-9 shrink-0 items-center justify-between gap-3 border-b border-neutral-200 bg-white px-3 text-[11px] text-neutral-500">
             <span className="font-medium text-neutral-700">
@@ -296,13 +298,13 @@ export function ExperienceBuilder({
 
       <div
         className={`${
-          mobilePane === "preview" ? "hidden md:flex" : "flex"
-        } shrink-0 items-center gap-2 border-t border-neutral-200 bg-white px-3 py-2 md:absolute md:top-0 md:end-3 md:h-12 md:border-0 md:bg-transparent md:px-0 md:py-0`}
+          mobilePane === "preview" ? "hidden lg:flex" : "flex"
+        } shrink-0 items-center gap-2 border-t border-neutral-200 bg-white px-3 py-2 lg:absolute lg:top-0 lg:end-3 lg:h-12 lg:border-0 lg:bg-transparent lg:px-0 lg:py-0`}
       >
         <button
           type="button"
           onClick={handleRestore}
-          className="hidden h-8 px-2 text-xs text-neutral-600 hover:text-neutral-900 md:inline"
+          className="hidden h-8 px-2 text-xs text-neutral-600 hover:text-neutral-900 lg:inline"
         >
           {t("restore")}
         </button>
@@ -310,7 +312,7 @@ export function ExperienceBuilder({
           type="button"
           data-save=""
           onClick={handleSave}
-          className="h-10 flex-1 border border-neutral-300 bg-white px-3 text-sm font-medium md:h-8 md:flex-none md:px-2.5 md:text-xs"
+          className="h-10 flex-1 border border-neutral-300 bg-white px-3 text-sm font-medium lg:h-8 lg:flex-none lg:px-2.5 lg:text-xs"
         >
           {t("save")}
         </button>
@@ -318,13 +320,13 @@ export function ExperienceBuilder({
           type="button"
           data-publish=""
           onClick={handlePublish}
-          className="h-10 flex-1 bg-neutral-900 px-3 text-sm font-medium text-white md:h-8 md:flex-none md:px-2.5 md:text-xs"
+          className="h-10 flex-1 bg-neutral-900 px-3 text-sm font-medium text-white lg:h-8 lg:flex-none lg:px-2.5 lg:text-xs"
         >
           {t("publish")}
         </button>
       </div>
 
-      <div className="flex h-11 shrink-0 border-t border-neutral-200 bg-white md:hidden">
+      <div className="flex h-11 shrink-0 border-t border-neutral-200 bg-white lg:hidden">
         <button
           type="button"
           className={`relative flex-1 text-sm font-medium ${mobilePane === "edit" ? "text-neutral-900" : "text-neutral-500"}`}
