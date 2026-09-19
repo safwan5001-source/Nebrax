@@ -475,7 +475,7 @@ Rebased onto latest `origin/main` after STORE-ADMIN-LIFECYCLE-1 (#873). Fast-for
 
 ## 26. PR
 
-Title: `feat(store): customizer persistence and publish lifecycle (STORE-BACKEND-1)`
+[#875](https://github.com/safwan5001-source/Nebrax/pull/875) — `feat(store): customizer persistence and publish lifecycle (STORE-BACKEND-1)`
 
 Opened against `main`. **Not merged. Not deployed.**
 
@@ -497,7 +497,7 @@ Architecture lock SHA `6898384969facbf16990feb82d741ce62217eba7` is an ancestor.
 
 Implementation commit: `f52c793211b9d6d44d5b1f7a93fd973714b1f00d`
 
-Branch HEAD after this docs fill-in is the tip of `feat/store-backend-1-customizer-persistence` (`git rev-parse HEAD` on the PR).
+Branch HEAD: `3d72f6cde0e35f4ee8271d7868399543b49094b1` at PR open. A docs-only follow-up on the same branch may move HEAD; the implementation remains `f52c793`.
 
 ---
 
