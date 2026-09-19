@@ -13,7 +13,8 @@ capabilities were accepted. **Visual approval is not granted.**
 | **Latest main SHA** | `50e66740b5e7757edd30e3dd7ae2304d8b9f325f` — STORE-UI-5 merge (PR #868) |
 | **Base SHA** | `50e66740b5e7757edd30e3dd7ae2304d8b9f325f` (verified ancestor of this branch) |
 | **Branch** | `feat/store-ui-6-store-customizer` |
-| **Head SHA** | `PLACEHOLDER_HEAD_SHA` |
+| **Chrome SHA** | `8d84d005ca2c8e68bc425020aeebf0e00a7eab3f` |
+| **Head SHA** | `5b0b63c7bc4c7cd04efbe7e35eb512aadbc97f18` |
 | **PR** | [#871](https://github.com/safwan5001-source/Nebrax/pull/871) |
 
 `git merge-base --is-ancestor 50e66740b5e7757edd30e3dd7ae2304d8b9f325f HEAD` holds.
