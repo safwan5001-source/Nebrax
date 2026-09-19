@@ -1,9 +1,9 @@
 # STORE-CUSTOMIZER-V2-1 — Customizer Shell + Live Preview + Section Selection
 
-**Status:** Implemented. Tests green. Not merged. Not deployed.
+**Status:** Implemented. Synced with latest main (`93fd7024`) via merge commit. All CI green. Mergeable. Not merged. Not deployed.
 **Date:** 2026-09-19
 **Repository:** `safwan5001-source/Nebrax`
-**Base SHA:** `83f81fdef6fff78e6e47a1ceca82c8cb6828e8aa` (main = merge of docs PR #876, exactly the expected SHA)
+**Original Base SHA:** `83f81fdef6fff78e6e47a1ceca82c8cb6828e8aa` (main at branch creation = merge of docs PR #876)
 **Branch:** `feat/store-customizer-v2-shell-selection`
 **Source of truth:** `docs/plans/store/AWJ_STORE_CUSTOMIZER_UX_V2.md`; persistence lock `AWJ_STORE_CUSTOMIZER_PERSISTENCE_ARCHITECTURE.md` untouched.
 
@@ -86,7 +86,7 @@ The attached Prototype V0.2 HTML was read **only** to confirm the interaction mo
 
 | File | Change |
 |---|---|
-| `web/src/modules/store-experience-builder/ExperienceBuilder.tsx` | Selection state + origin-aware scroll-to-section effect, `data-selected-section`, `data-customizer-scroll` regions, prop wiring. |
+| `web/src/modules/store-experience-builder/ExperienceBuilder.tsx` | Selection state + origin-aware scroll-to-section effect, `data-selected-section`, `data-customizer-scroll` regions, prop wiring. (Also the only sync-conflict file — see §16.2.) |
 | `web/src/modules/store-experience-builder/ControlPanels.tsx` | Composer rows selectable (`data-section-option`, `aria-pressed`, selected marker), props threading. |
 | `web/src/modules/store-experience-builder/StorefrontPreviewCanvas.tsx` | Optional selection bridge; homepage sections wrapped in selectable, keyboard-accessible regions with stable `data-preview-section`. |
 | `web/src/modules/store-experience-builder/store-preview.css` | Selected-section outline + focus-visible + scroll-margin; thin contained scrollbars for customizer scroll regions. |
@@ -96,30 +96,28 @@ No backend, API, schema, migration, or public-contract change. No persistence ch
 
 ## 7. Tests run + exact results
 
-Targeted (builder + appearance page):
+Targeted (builder + appearance page), final run on merged content:
 
 ```
 vitest run 'src/app/(commerce)/commerce/appearance' 'src/modules/store-experience-builder'
-  Test Files  3 passed (3)
-  Tests       13 passed (13)
+  Test Files  4 passed (4)
+  Tests       19 passed (19)
 ```
 
 New tests cover: independent scroll regions presence; sidebar selection → composer `aria-pressed` + preview `data-section-selected` sync; scroll-to-section trigger with `block: "start"`; reduced-motion → `behavior: "auto"`; preview click selection without a scroll jump; Desktop/Tablet/Mobile device switching; composer visibility toggle + reorder preserved.
 
-Full web suite:
+Full web suite (final, on merged content):
 
 ```
 npm test
-  Test Files  281 passed (281)
-  Tests       1919 passed (1919)
+  Test Files  283 passed (283)
+  Tests       1931 passed (1931)
 ```
-
-(First full-suite run showed a single transient failure unrelated to this change; immediate re-run was fully green — no test was weakened or skipped.)
 
 ## 8. Build / typecheck / lint
 
-- `npx tsc --noEmit`: **0 errors in changed scope.** The repo has 12 pre-existing type errors in unrelated files (`pos/settings/configuration`, `gemini-card`, `document-language-selector`, `global-application-controls-card`, `product-multi-barcode-table` tests) — identical count on unmodified `main` (verified by stash A/B). Not fixed here per scope discipline.
-- `npm run build` (Next.js production build): **success**, exit 0.
+- `npx tsc --noEmit` (final, on merged content): **12 errors = exact `origin/main` baseline** (verified via detached worktree A/B); none in changed scope. Baseline errors live in unrelated files (`pos/settings/configuration`, `gemini-card`, `document-language-selector`, `global-application-controls-card`, product test files). Not fixed here per scope discipline.
+- `npm run build` (Next.js production build, final): **success**, exit 0.
 - `next lint`: not configured in `web` (interactive scaffold prompt, no ESLint config in repo) — documented as a tooling gap, not introduced by this PR.
 
 ## 9. Visual / manual verification
@@ -149,13 +147,14 @@ Screenshots captured during verification (local only, not committed): initial sh
 
 ## 11. Tenant / security impact
 
-None. UI-only slice: no tenant resolution, auth, authorization, API, or public-contract change. Selection state is page-lifetime React state; nothing is written to `localStorage`/`sessionStorage`/cookies (architecture test in the storefront mirror still passes; the web module gained no storage usage). No cross-tenant surface introduced.
+None. UI-only slice: no tenant resolution, auth, authorization, API, or public-contract change. Selection state is page-lifetime React state; nothing is written to `localStorage`/`sessionStorage`/cookies (architecture test in the storefront mirror still passes; the web module gained no storage usage). No cross-tenant surface introduced. The sync with main pulled in STORE-BACKEND-1's persistence wiring unchanged — no modification to its tenant/security behavior.
 
 ## 12. Backward compatibility assessment
 
-- `StorefrontPresentationConfig` v1: unchanged. `normalizePresentationConfig()` and fail-closed behavior: untouched. Capability states: unchanged. Public storefront: untouched (the storefront mirror and `storefront/src` were not modified).
+- `StorefrontPresentationConfig` v1: unchanged. `normalizePresentationConfig()` and fail-closed behavior: untouched. Capability states: unchanged. Public storefront: untouched (the storefront mirror and `storefront/src` were not modified by this PR).
 - Composer visibility/reorder behavior preserved (test-covered).
 - The storefront dev-harness mirror renders identically (selection props are optional).
+- Merged with STORE-BACKEND-1 (`storefrontId`-driven load/save/publish) without altering it; its tests pass (19/19 targeted includes them; full suite 1931/1931).
 
 ## 13. Risks
 
@@ -179,18 +178,34 @@ None. UI-only slice: no tenant resolution, auth, authorization, API, or public-c
 - Hero gradient dev-mode CSS ordering issue (pre-existing).
 - ESLint configuration for `web` (pre-existing tooling gap).
 
-## 16. Git
+## 16. Git (final, after sync with latest main)
 
 | | |
 |---|---|
 | **Branch** | `feat/store-customizer-v2-shell-selection` |
-| **Base SHA** | `83f81fdef6fff78e6e47a1ceca82c8cb6828e8aa` |
+| **Original merge-base** | `83f81fdef6fff78e6e47a1ceca82c8cb6828e8aa` |
+| **Latest main SHA used for sync** | `93fd702481b5db15fc88fcd42054fb21b49390b7` (PR #877 + STORE-BACKEND-1 persistence, 13 commits ahead) |
 | **PR** | [#879](https://github.com/safwan5001-source/Nebrax/pull/879) — open, not merged |
-| **Head SHA** | `3bdde11170f88065fb2e3b06bad8b98ea6b8766e` (implementation commit; this report is filed in a follow-up commit on the same branch) |
+| **Final Head SHA** | `8624d4412298efc0237e5198c7d6fb75d0bdccb6` (merge commit of main into the branch) |
+| **Mergeability** | `clean` (GitHub, 2026-09-19) |
 
-## 17. CI status
+### 16.1 Sync method
 
-GitHub Web CI runs on PR #879 (check the PR page for the authoritative status). Local gates at push time: targeted vitest green (13/13), full web suite green (1919/1919), `tsc --noEmit` no new errors vs baseline, `next build` success.
+Merge of `origin/main` into the feature branch — no force push, no history rewrite. Because this sandbox has no git push credentials, the sync was executed as: (1) local merge with conflict resolution, (2) the resolved file content pushed as a normal commit via API, (3) a **real server-side merge commit** created via GitHub's update-branch API, producing head `8624d441`. The branch now contains all of main.
+
+### 16.2 Conflicts and resolution
+
+Only one file conflicted: `web/src/modules/store-experience-builder/ExperienceBuilder.tsx`. Cause: main's `f52c7932` (STORE-BACKEND-1) rewired the same component for real draft persistence (`storefrontId`, `saved`, `draftRevision`, `busy`, `noticeKind`, load/save/publish effects), while this branch added the selection bridge to its pre-persistence version.
+
+Resolution (smallest change preserving V2-1 scope): main's persistence version kept verbatim; only the V2-1 additions re-applied on top — `type HomeBuilderSectionKey` import, `selectedSection` + `pendingSectionScroll` state, `handleSelectSection`, the scroll-to-section effect, `data-selected-section`, the three `data-customizer-scroll` regions, and the two prop wirings. The bridge internals were expressed with `useState` (instead of the earlier `useRef`) and a document-level query — functionally identical, test-verified — so the final content merges cleanly with main. No persistence behavior, API wiring, or STORE-BACKEND-1 logic was modified.
+
+Files changed **because of the sync**: only `ExperienceBuilder.tsx` (conflict resolution). All other 64 files from main merged without conflict.
+
+## 17. CI status (final)
+
+All checks on head `8624d441` **green** (2026-09-19): `web build (Next.js)` ✅, `storefront (lint + typecheck + test)` ✅, `php artisan test (L11, sqlite)` ✅ ×2 runs, `php artisan test (L11, pgsql)` ✅ ×2 runs — 7/7 success.
+
+Local gates re-run on the exact merged content before push: targeted vitest 19/19 (main's new persistence tests included), full web suite **283 files / 1931 tests green**, `tsc --noEmit` 12 errors = exact `origin/main` baseline (verified via detached worktree A/B; none in changed scope), `next build` exit 0.
 
 ## 18. Recommended next step
 
