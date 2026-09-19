@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   clonePresentationConfig,
   DEFAULT_PRESENTATION_CONFIG,
@@ -26,6 +26,11 @@ import {
   customizerMessage,
 } from "./messages";
 import { StorefrontPreviewCanvas } from "./StorefrontPreviewCanvas";
+import {
+  loadStorefrontPresentation,
+  publishStorefrontPresentation,
+  saveStorefrontPresentation,
+} from "@/modules/commerce-workspace/presentation";
 
 export const PREVIEW_WIDTHS = {
   mobile: 390,
@@ -45,29 +50,69 @@ interface ExperienceBuilderProps {
   initialConfig?: StorefrontPresentationConfig;
   liveStoreName?: string | null;
   initialLocale?: CustomizerLocale;
+  storefrontId?: string | null;
 }
 
 export function ExperienceBuilder({
   initialConfig,
   liveStoreName = null,
   initialLocale = "ar",
+  storefrontId = null,
 }: ExperienceBuilderProps) {
-  const baseline = useMemo(
-    () =>
-      normalizePresentationConfig(initialConfig ?? DEFAULT_PRESENTATION_CONFIG),
-    [initialConfig],
+  const seed = normalizePresentationConfig(
+    initialConfig ?? DEFAULT_PRESENTATION_CONFIG,
   );
-  const [draft, setDraft] = useState<StorefrontPresentationConfig>(baseline);
+  const [saved, setSaved] = useState<StorefrontPresentationConfig>(seed);
+  const [draft, setDraft] = useState<StorefrontPresentationConfig>(seed);
+  const [draftRevision, setDraftRevision] = useState(0);
   const [locale, setLocale] = useState<CustomizerLocale>(initialLocale);
   const [panel, setPanel] = useState<CustomizerPanel>("theme");
   const [device, setDevice] = useState<PreviewDevice>("desktop");
   const [mobilePane, setMobilePane] = useState<"edit" | "preview">("edit");
   const [lifecycle, setLifecycle] = useState<BuilderLifecycle>("clean");
   const [notice, setNotice] = useState<string | null>(null);
+  const [noticeKind, setNoticeKind] = useState<"capability" | "status">("status");
+  const [busy, setBusy] = useState<"loading" | "saving" | "publishing" | null>(
+    storefrontId ? "loading" : null,
+  );
   const t = (key: CustomizerMessageKey) => customizerMessage(locale, key);
 
-  const dirty = !presentationConfigsEqual(draft, baseline);
+  const dirty = !presentationConfigsEqual(draft, saved);
   const activePanel = CUSTOMIZER_PANELS.find((item) => item.id === panel);
+
+  useEffect(() => {
+    if (!storefrontId) {
+      setBusy(null);
+      return;
+    }
+
+    let cancelled = false;
+    setBusy("loading");
+    setNoticeKind("status");
+    setNotice(t("loadingDraft"));
+
+    loadStorefrontPresentation(storefrontId).then((result) => {
+      if (cancelled) return;
+      if (!result.ok) {
+        setBusy(null);
+        setNoticeKind("status");
+        setNotice(t("loadFailed"));
+        return;
+      }
+      setDraft(result.data.draft);
+      setSaved(result.data.draft);
+      setDraftRevision(result.data.draftRevision);
+      setLifecycle("clean");
+      setBusy(null);
+      setNotice(null);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+    // Intentionally reload only when the selected storefront changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storefrontId]);
 
   function updateDraft(next: StorefrontPresentationConfig) {
     const normalized = normalizePresentationConfig(next);
@@ -76,14 +121,87 @@ export function ExperienceBuilder({
     setNotice(null);
   }
 
-  function handleSave() {
-    setLifecycle("save_blocked");
-    setNotice(t("saveBlocked"));
+  async function handleSave() {
+    if (!storefrontId) {
+      setLifecycle("save_blocked");
+      setNoticeKind("capability");
+      setNotice(t("noStoreSelected"));
+      return;
+    }
+    setBusy("saving");
+    setNotice(null);
+    const result = await saveStorefrontPresentation(
+      storefrontId,
+      draft,
+      draftRevision,
+    );
+    if (result.ok) {
+      setDraft(result.data.draft);
+      setSaved(result.data.draft);
+      setDraftRevision(result.data.draftRevision);
+      setLifecycle("clean");
+      setNoticeKind("status");
+      setNotice(t("saveSuccess"));
+      setBusy(null);
+      return;
+    }
+    if (result.reason === "conflict") {
+      const reload = await loadStorefrontPresentation(storefrontId);
+      if (reload.ok) {
+        setDraft(reload.data.draft);
+        setSaved(reload.data.draft);
+        setDraftRevision(reload.data.draftRevision);
+        setLifecycle("clean");
+      }
+      setNoticeKind("status");
+      setNotice(t("staleRevision"));
+      setBusy(null);
+      return;
+    }
+    setNoticeKind("status");
+    setNotice(t("saveFailed"));
+    setBusy(null);
   }
 
-  function handlePublish() {
-    setLifecycle("publish_blocked");
-    setNotice(t("publishBlocked"));
+  async function handlePublish() {
+    if (!storefrontId) {
+      setLifecycle("publish_blocked");
+      setNoticeKind("capability");
+      setNotice(t("noStoreSelected"));
+      return;
+    }
+    setBusy("publishing");
+    setNotice(null);
+    const result = await publishStorefrontPresentation(
+      storefrontId,
+      draftRevision,
+    );
+    if (result.ok) {
+      setDraft(result.data.draft);
+      setSaved(result.data.draft);
+      setDraftRevision(result.data.draftRevision);
+      setLifecycle("clean");
+      setNoticeKind("status");
+      setNotice(t("publishSuccess"));
+      setBusy(null);
+      return;
+    }
+    if (result.reason === "conflict") {
+      const reload = await loadStorefrontPresentation(storefrontId);
+      if (reload.ok) {
+        setDraft(reload.data.draft);
+        setSaved(reload.data.draft);
+        setDraftRevision(reload.data.draftRevision);
+        setLifecycle("clean");
+      }
+      setNoticeKind("status");
+      setNotice(t("staleRevision"));
+      setBusy(null);
+      return;
+    }
+    setNoticeKind("status");
+    setNotice(t("publishFailed"));
+    setBusy(null);
   }
 
   function handleRestore() {
@@ -91,7 +209,8 @@ export function ExperienceBuilder({
     if (!confirmed) return;
     setDraft(clonePresentationConfig(DEFAULT_PRESENTATION_CONFIG));
     setLifecycle("dirty");
-    setNotice(null);
+    setNoticeKind("capability");
+    setNotice(VERSION_HISTORY_CAPABILITY === "deferred" ? t("versionDeferred") : null);
   }
 
   const width = PREVIEW_WIDTHS[device];
@@ -109,6 +228,7 @@ export function ExperienceBuilder({
       dir={locale === "ar" ? "rtl" : "ltr"}
       data-experience-builder=""
       data-lifecycle={lifecycle}
+      data-draft-revision={draftRevision}
       data-panel={panel}
       data-device={device}
       className="relative flex h-full min-h-0 flex-col bg-neutral-100 text-neutral-900"
@@ -150,14 +270,14 @@ export function ExperienceBuilder({
       {notice ? (
         <div
           role="status"
-          data-capability-notice=""
+          data-capability-notice={noticeKind === "capability" ? "" : undefined}
+          data-status-notice={noticeKind === "status" ? "" : undefined}
           className="shrink-0 border-b border-neutral-200 bg-white px-3 py-2 text-xs leading-5 text-neutral-700"
         >
-          <span className="font-medium">{t("capabilityTitle")}. </span>
+          {noticeKind === "capability" ? (
+            <span className="font-medium">{t("capabilityTitle")}. </span>
+          ) : null}
           {notice}
-          {VERSION_HISTORY_CAPABILITY === "deferred"
-            ? ` ${t("versionDeferred")}`
-            : null}
         </div>
       ) : null}
 
@@ -312,7 +432,8 @@ export function ExperienceBuilder({
           type="button"
           data-save=""
           onClick={handleSave}
-          className="h-10 flex-1 border border-neutral-300 bg-white px-3 text-sm font-medium lg:h-8 lg:flex-none lg:px-2.5 lg:text-xs"
+          disabled={busy !== null}
+          className="h-10 flex-1 border border-neutral-300 bg-white px-3 text-sm font-medium lg:h-8 lg:flex-none lg:px-2.5 lg:text-xs disabled:opacity-50"
         >
           {t("save")}
         </button>
@@ -320,7 +441,8 @@ export function ExperienceBuilder({
           type="button"
           data-publish=""
           onClick={handlePublish}
-          className="h-10 flex-1 bg-neutral-900 px-3 text-sm font-medium text-white lg:h-8 lg:flex-none lg:px-2.5 lg:text-xs"
+          disabled={busy !== null}
+          className="h-10 flex-1 bg-neutral-900 px-3 text-sm font-medium text-white lg:h-8 lg:flex-none lg:px-2.5 lg:text-xs disabled:opacity-50"
         >
           {t("publish")}
         </button>

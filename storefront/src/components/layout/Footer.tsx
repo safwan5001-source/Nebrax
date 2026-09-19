@@ -13,6 +13,21 @@ interface FooterProps {
   locale: Locale;
   categoryLinks: ReactNode;
   storeName: string | null;
+  logoUrl?: string | null;
+  showLogo?: boolean;
+  tagline?: string;
+  copyright?: string;
+  contact?: {
+    phone: string;
+    email: string;
+    address: string;
+    hours: string;
+  } | null;
+  socialLinks?: { id: string; network: string; href: string }[];
+  whatsappHref?: string | null;
+  appLinks?: { id: string; label: string; href: string }[];
+  merchantCr?: string;
+  merchantLicense?: string;
 }
 
 interface FooterCategoryLinksProps {
@@ -84,6 +99,16 @@ export async function Footer({
   locale,
   categoryLinks,
   storeName,
+  logoUrl = null,
+  showLogo = true,
+  tagline = "",
+  copyright = "",
+  contact = null,
+  socialLinks = [],
+  whatsappHref = null,
+  appLinks = [],
+  merchantCr = "",
+  merchantLicense = "",
 }: FooterProps) {
   const t = await getTranslations({ locale, namespace: "footer" });
   const tp = await getTranslations({ locale, namespace: "policies" });
@@ -91,6 +116,10 @@ export async function Footer({
   const displayName = storeName?.trim() || t("shop");
   await connection();
   const year = new Date().getFullYear();
+  const hasContact = Boolean(
+    contact?.phone || contact?.email || contact?.address || contact?.hours,
+  );
+  const hasMerchantInfo = Boolean(merchantCr.trim() || merchantLicense.trim());
 
   return (
     <footer className="bg-store-footer text-store-footer-link">
@@ -103,13 +132,25 @@ export async function Footer({
           removed. Given the full measure it reads as the band's masthead, and
           the three real link groups then divide the width evenly.
         */}
-        <StoreBrand
-          href={basePath || "/"}
-          name={displayName}
-          tone="dark"
-          size="md"
-          className="focus-visible:outline-store-footer-foreground"
-        />
+        {showLogo ? (
+          <StoreBrand
+            href={basePath || "/"}
+            name={displayName}
+            tone="dark"
+            size="md"
+            logoUrl={logoUrl}
+            className="focus-visible:outline-store-footer-foreground"
+          />
+        ) : (
+          <p className="text-lg font-extrabold text-store-footer-foreground">
+            <bdi>{displayName}</bdi>
+          </p>
+        )}
+        {tagline.trim() ? (
+          <p className="mt-3 max-w-lg text-sm text-store-footer-muted">
+            {tagline.trim()}
+          </p>
+        ) : null}
 
         <div className="mt-8 grid grid-cols-2 gap-x-6 gap-y-8 border-t border-store-footer-border pt-8 sm:grid-cols-3">
           <FooterColumn id="footer-shop" title={t("shop")}>
@@ -156,6 +197,17 @@ export async function Footer({
                 </Link>
               </li>
             )}
+            {whatsappHref ? (
+              <li>
+                <a
+                  href={whatsappHref}
+                  className={footerLinkClassName}
+                  rel="noopener noreferrer"
+                >
+                  {t("whatsapp")}
+                </a>
+              </li>
+            ) : null}
           </FooterColumn>
 
           <FooterColumn id="footer-policies" title={t("policies")}>
@@ -169,14 +221,71 @@ export async function Footer({
                 </Link>
               </li>
             ))}
+            {appLinks.map((link) => (
+              <li key={link.id}>
+                <a
+                  href={link.href}
+                  className={footerLinkClassName}
+                  rel="noopener noreferrer"
+                >
+                  {link.label}
+                </a>
+              </li>
+            ))}
           </FooterColumn>
         </div>
+
+        {(hasContact || socialLinks.length > 0 || hasMerchantInfo) && (
+          <div className="mt-8 border-t border-store-footer-border pt-6 text-sm text-store-footer-muted">
+            {contact?.phone ? <p>{contact.phone}</p> : null}
+            {contact?.email ? <p>{contact.email}</p> : null}
+            {contact?.address ? <p>{contact.address}</p> : null}
+            {contact?.hours ? <p>{contact.hours}</p> : null}
+            {socialLinks.length > 0 ? (
+              <p className="mt-2 flex flex-wrap gap-3">
+                {socialLinks.map((item) => (
+                  <a
+                    key={item.id}
+                    href={item.href}
+                    className="text-store-footer-link"
+                    rel="noopener noreferrer"
+                  >
+                    {item.network}
+                  </a>
+                ))}
+              </p>
+            ) : null}
+            {hasMerchantInfo ? (
+              <div className="mt-4 space-y-1">
+                <p className="font-medium text-store-footer-link">
+                  {t("merchantProvided")}
+                </p>
+                {merchantCr.trim() ? (
+                  <p>
+                    {t("crNumber")}: {merchantCr.trim()}
+                  </p>
+                ) : null}
+                {merchantLicense.trim() ? (
+                  <p>
+                    {t("licenseNumber")}: {merchantLicense.trim()}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+        )}
       </StoreContainer>
 
       <div className="border-t border-store-footer-border">
         <StoreContainer className="py-5">
           <p className="text-xs text-store-footer-muted">
-            © {year} <bdi>{displayName}</bdi>
+            {copyright.trim() ? (
+              copyright.trim()
+            ) : (
+              <>
+                © {year} <bdi>{displayName}</bdi>
+              </>
+            )}
           </p>
         </StoreContainer>
       </div>

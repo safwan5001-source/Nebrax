@@ -7,6 +7,7 @@ use App\Tenancy\TenantContext;
 use App\Tenancy\TenantScope;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use RuntimeException;
 
@@ -84,5 +85,10 @@ class Storefront extends BaseModel implements CompanyWide
     public function domains(): HasMany
     {
         return $this->hasMany(StorefrontDomain::class);
+    }
+
+    public function presentation(): HasOne
+    {
+        return $this->hasOne(StorefrontPresentation::class);
     }
 }

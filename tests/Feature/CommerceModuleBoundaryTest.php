@@ -66,6 +66,8 @@ class CommerceModuleBoundaryTest extends TestCase
         'api/commerce/workspace/storefronts/{id}/domains/{domainId}/make-primary',
         'api/commerce/workspace/storefronts/{id}/domains/{domainId}/refresh-edge',
         'api/commerce/workspace/storefronts/{id}/domains/{domainId}/verify',
+        'api/commerce/workspace/storefronts/{id}/presentation',
+        'api/commerce/workspace/storefronts/{id}/presentation/publish',
         'commerce/v1/cart',
         'commerce/v1/cart/items',
         'commerce/v1/cart/items/{item}',
