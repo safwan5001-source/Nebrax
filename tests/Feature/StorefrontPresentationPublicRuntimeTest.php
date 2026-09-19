@@ -6,6 +6,7 @@ use App\Models\SalesChannel;
 use App\Models\Storefront;
 use App\Models\StorefrontDomain;
 use App\Models\StorefrontPresentation;
+use App\Support\Commerce\StorefrontPresentationNormalizer;
 use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -189,5 +190,78 @@ class StorefrontPresentationPublicRuntimeTest extends TestCase
         $this->getJson($this->workspacePath($seeded['storefront']->id))->assertUnauthorized();
         $this->getJson('http://anon-ws.example.com'.$this->workspacePath($seeded['storefront']->id))
             ->assertUnauthorized();
+    }
+
+    /** @test */
+    public function contract2_a_legacy_v1_published_snapshot_still_renders_publicly(): void
+    {
+        $auth = $this->registerTenant('pres-c2-legacy-pub', 'owner@pres-c2-legacy-pub.test');
+        $seeded = $this->seedPublicStore($auth['tenant_id'], 'legacy-published.example.com');
+
+        // صف محفوظ قبل CONTRACT-2: schema_version = 1 وأقسام بشكل {key, visible}.
+        app(TenantContext::class)->set($auth['tenant_id']);
+        StorefrontPresentation::create([
+            'storefront_id' => $seeded['storefront']->id,
+            'schema_version' => 1,
+            'draft_config' => ['version' => 1],
+            'draft_revision' => 1,
+            'published_config' => [
+                'version' => 1,
+                'themePreset' => 'navy',
+                'homepage' => [
+                    'heroHeadline' => 'منشور قديم',
+                    'sections' => [
+                        ['key' => 'hero', 'visible' => true],
+                        ['key' => 'banner', 'visible' => true],
+                    ],
+                ],
+            ],
+            'published_revision' => 1,
+            'published_at' => now(),
+        ]);
+        app(TenantContext::class)->forget();
+
+        $res = $this->getJson('http://legacy-published.example.com/store/v1/storefront')->assertOk();
+
+        $this->assertSame('منشور قديم', $res->json('data.presentation.homepage.heroHeadline'));
+        $sections = $res->json('data.presentation.homepage.sections');
+        // الترحيل deterministic: id = key، ودلالات v1 تُلحق الأقسام الناقصة.
+        $this->assertSame('hero', $sections[0]['id']);
+        $this->assertSame('hero', $sections[0]['type']);
+        $this->assertSame('banner', $sections[1]['id']);
+        $this->assertCount(10, $sections);
+        foreach ($sections as $section) {
+            $this->assertSame($section['id'], $section['type']);
+            $this->assertArrayNotHasKey('key', $section);
+        }
+        $this->assertSame(StorefrontPresentationNormalizer::VERSION, $res->json('data.presentation.version'));
+    }
+
+    /** @test */
+    public function contract2_a_v2_published_snapshot_keeps_instance_order_publicly(): void
+    {
+        $auth = $this->registerTenant('pres-c2-v2-pub', 'owner@pres-c2-v2-pub.test');
+        $seeded = $this->seedPublicStore($auth['tenant_id'], 'v2-published.example.com');
+
+        $sections = [
+            ['id' => 'banner-a', 'type' => 'banner', 'visible' => true],
+            ['id' => 'hero', 'type' => 'hero', 'visible' => true],
+            ['id' => 'banner-b', 'type' => 'banner', 'visible' => false],
+        ];
+
+        $this->withToken($auth['token'])
+            ->putJson($this->workspacePath($seeded['storefront']->id), [
+                'config' => ['version' => 2, 'homepage' => ['sections' => $sections]],
+                'draft_revision' => 0,
+            ])
+            ->assertOk();
+        $this->withToken($auth['token'])
+            ->postJson($this->workspacePath($seeded['storefront']->id).'/publish', ['draft_revision' => 1])
+            ->assertOk();
+
+        $res = $this->getJson('http://v2-published.example.com/store/v1/storefront')->assertOk();
+
+        // الغياب = حذف: لا إحياء للأقسام غير الموجودة في اللقطة المنشورة.
+        $this->assertSame($sections, $res->json('data.presentation.homepage.sections'));
     }
 }
