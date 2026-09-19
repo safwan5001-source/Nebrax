@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { useMemo, useState } from "react";
 import {
   clonePresentationConfig,
@@ -15,6 +16,7 @@ import {
 } from "@/lib/presentation/capabilities";
 import {
   ControlPanels,
+  CUSTOMIZER_NAV_GROUPS,
   CUSTOMIZER_PANELS,
   type CustomizerPanel,
 } from "./ControlPanels";
@@ -65,6 +67,7 @@ export function ExperienceBuilder({
   const t = (key: CustomizerMessageKey) => customizerMessage(locale, key);
 
   const dirty = !presentationConfigsEqual(draft, baseline);
+  const activePanel = CUSTOMIZER_PANELS.find((item) => item.id === panel);
 
   function updateDraft(next: StorefrontPresentationConfig) {
     const normalized = normalizePresentationConfig(next);
@@ -108,80 +111,39 @@ export function ExperienceBuilder({
       data-lifecycle={lifecycle}
       data-panel={panel}
       data-device={device}
-      className="flex h-full min-h-0 flex-col bg-neutral-200 text-neutral-900"
+      className="relative flex h-full min-h-0 flex-col bg-neutral-100 text-neutral-900"
     >
-      <header className="flex h-12 shrink-0 items-center gap-2 border-b border-neutral-300 bg-white px-3">
-        <div className="min-w-0">
-          <p className="truncate text-sm font-semibold leading-none">
+      <header className="flex h-11 shrink-0 items-center gap-2 border-b border-neutral-200 bg-white px-3 md:h-12 md:gap-3 md:pe-80">
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[13px] font-semibold leading-none md:text-sm">
             {t("title")}
           </p>
-          <p className="mt-1 hidden truncate text-[11px] text-neutral-500 md:block">
+          <p className="mt-1 hidden truncate text-[11px] leading-none text-neutral-500 md:block">
             {t("subtitle")}
           </p>
         </div>
         <span
           data-draft-status=""
-          className="hidden rounded border border-neutral-300 px-2 py-0.5 text-[11px] text-neutral-600 sm:inline"
+          className="hidden text-[11px] text-neutral-500 xl:inline"
         >
           {statusLabel}
         </span>
-        <div className="ms-auto flex items-center gap-1">
-          <div className="hidden rounded border border-neutral-300 p-0.5 md:flex">
-            {(["desktop", "tablet", "mobile"] as const).map((item) => (
-              <button
-                key={item}
-                type="button"
-                data-device-option={item}
-                onClick={() => setDevice(item)}
-                className={`h-7 px-2 text-[11px] font-medium ${
-                  device === item
-                    ? "bg-neutral-900 text-white"
-                    : "text-neutral-700"
-                }`}
-              >
-                {t(item)}
-              </button>
-            ))}
-          </div>
-          <div className="flex rounded border border-neutral-300 p-0.5">
-            {(["ar", "en"] as const).map((item) => (
-              <button
-                key={item}
-                type="button"
-                onClick={() => setLocale(item)}
-                className={`h-7 px-2 text-[11px] font-medium ${
-                  locale === item
-                    ? "bg-neutral-900 text-white"
-                    : "text-neutral-700"
-                }`}
-              >
-                {item === "ar" ? t("arabic") : t("english")}
-              </button>
-            ))}
-          </div>
-          <button
-            type="button"
-            onClick={handleRestore}
-            className="hidden h-8 rounded border border-neutral-300 px-2 text-xs md:inline"
-          >
-            {t("restore")}
-          </button>
-          <button
-            type="button"
-            data-save=""
-            onClick={handleSave}
-            className="h-8 rounded border border-neutral-300 bg-white px-2.5 text-xs font-medium"
-          >
-            {t("save")}
-          </button>
-          <button
-            type="button"
-            data-publish=""
-            onClick={handlePublish}
-            className="h-8 rounded bg-neutral-900 px-2.5 text-xs font-medium text-white"
-          >
-            {t("publish")}
-          </button>
+        <div className="flex items-center">
+          {(["ar", "en"] as const).map((item) => (
+            <button
+              key={item}
+              type="button"
+              aria-label={item === "ar" ? t("arabic") : t("english")}
+              onClick={() => setLocale(item)}
+              className={`h-7 min-w-7 px-1.5 text-[11px] font-medium ${
+                locale === item
+                  ? "bg-neutral-900 text-white"
+                  : "text-neutral-600 hover:bg-neutral-100"
+              }`}
+            >
+              {item === "ar" ? "ع" : "EN"}
+            </button>
+          ))}
         </div>
       </header>
 
@@ -189,7 +151,7 @@ export function ExperienceBuilder({
         <div
           role="status"
           data-capability-notice=""
-          className="shrink-0 border-b border-neutral-300 bg-neutral-50 px-3 py-2 text-xs leading-5 text-neutral-700"
+          className="shrink-0 border-b border-neutral-200 bg-white px-3 py-2 text-xs leading-5 text-neutral-700"
         >
           <span className="font-medium">{t("capabilityTitle")}. </span>
           {notice}
@@ -200,33 +162,77 @@ export function ExperienceBuilder({
       ) : null}
 
       <div className="flex min-h-0 flex-1">
+        <nav
+          aria-label={t("controls")}
+          className="hidden shrink-0 overflow-y-auto border-e border-neutral-200 bg-white lg:flex lg:w-[196px] lg:flex-col"
+        >
+          <div className="flex flex-col py-2">
+            {CUSTOMIZER_NAV_GROUPS.map((group, groupIndex) => (
+              <div
+                key={group.items.map((item) => item.id).join("-")}
+                className={
+                  groupIndex > 0
+                    ? "mt-2 border-t border-neutral-200 pt-2"
+                    : undefined
+                }
+              >
+                {group.items.map((item) => {
+                  const selected = panel === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      data-panel-option={item.id}
+                      title={t(item.label)}
+                      aria-current={selected ? "page" : undefined}
+                      onClick={() => setPanel(item.id)}
+                      className={`flex h-9 w-full items-center gap-2.5 px-3 text-start text-[13px] ${
+                        selected
+                          ? "bg-neutral-900 font-medium text-white"
+                          : "text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900"
+                      }`}
+                    >
+                      <NavIcon panel={item.id} />
+                      <span className="min-w-0 truncate">{t(item.label)}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+        </nav>
+
         <aside
           data-builder-controls=""
           className={`${
             mobilePane === "edit" ? "flex" : "hidden"
-          } w-full shrink-0 flex-col border-neutral-300 bg-white md:flex md:w-[360px] md:border-e`}
+          } w-full shrink-0 flex-col border-neutral-200 bg-white md:flex md:w-[300px] md:border-e xl:w-[320px]`}
         >
-          <nav
-            aria-label={t("controls")}
-            className="flex gap-1 overflow-x-auto border-b border-neutral-200 px-2 py-2 md:flex-col md:overflow-y-auto md:overflow-x-hidden"
-          >
-            {CUSTOMIZER_PANELS.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                data-panel-option={item.id}
-                onClick={() => setPanel(item.id)}
-                className={`h-8 shrink-0 rounded px-2 text-start text-xs font-medium md:h-8 ${
-                  panel === item.id
-                    ? "bg-neutral-900 text-white"
-                    : "text-neutral-700 hover:bg-neutral-100"
-                }`}
-              >
-                {t(item.label)}
-              </button>
-            ))}
-          </nav>
-          <div className="min-h-0 flex-1 overflow-y-auto p-3">
+          <div className="shrink-0 border-b border-neutral-200 px-3 py-2 lg:hidden">
+            <label className="sr-only" htmlFor="customizer-panel-select">
+              {t("controls")}
+            </label>
+            <select
+              id="customizer-panel-select"
+              value={panel}
+              onChange={(event) =>
+                setPanel(event.target.value as CustomizerPanel)
+              }
+              className="h-11 w-full border border-neutral-300 bg-white px-3 text-sm font-medium text-neutral-900 outline-none focus:border-neutral-800"
+            >
+              {CUSTOMIZER_PANELS.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {t(item.label)}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="hidden shrink-0 border-b border-neutral-200 px-4 py-3 lg:block">
+            <h2 className="text-[15px] font-semibold leading-tight">
+              {activePanel ? t(activePanel.label) : t("theme")}
+            </h2>
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 md:px-4 md:py-5">
             <ControlPanels
               panel={panel}
               config={draft}
@@ -244,16 +250,37 @@ export function ExperienceBuilder({
             mobilePane === "preview" ? "flex" : "hidden"
           } min-w-0 flex-1 flex-col md:flex`}
         >
-          <div className="flex items-center justify-between border-b border-neutral-300 bg-neutral-100 px-3 py-1.5 text-[11px] text-neutral-600">
-            <span>{t("livePreview")}</span>
-            <span>
-              {t("deviceWidth")} · {width}
+          <div className="flex h-9 shrink-0 items-center justify-between gap-3 border-b border-neutral-200 bg-white px-3 text-[11px] text-neutral-500">
+            <span className="font-medium text-neutral-700">
+              {t("livePreview")}
             </span>
+            <div className="flex items-center gap-2">
+              <div className="hidden md:flex">
+                {(["desktop", "tablet", "mobile"] as const).map((item) => (
+                  <button
+                    key={item}
+                    type="button"
+                    data-device-option={item}
+                    onClick={() => setDevice(item)}
+                    className={`h-7 px-2 text-[11px] font-medium ${
+                      device === item
+                        ? "bg-neutral-900 text-white"
+                        : "text-neutral-600 hover:bg-neutral-100"
+                    }`}
+                  >
+                    {t(item)}
+                  </button>
+                ))}
+              </div>
+              <span className="tabular-nums">
+                {t("deviceWidth")} · {width}
+              </span>
+            </div>
           </div>
-          <div className="min-h-0 flex-1 overflow-auto p-3 md:p-5">
+          <div className="min-h-0 flex-1 overflow-auto p-3 md:p-5 xl:p-8">
             <div
               data-preview-frame=""
-              className="mx-auto overflow-hidden rounded-md border border-neutral-400 bg-white shadow-sm"
+              className="mx-auto overflow-hidden border border-neutral-300 bg-white"
               style={{ width: Math.min(width, 1440), maxWidth: "100%" }}
             >
               <StorefrontPreviewCanvas
@@ -267,19 +294,55 @@ export function ExperienceBuilder({
         </section>
       </div>
 
-      <div className="flex h-12 shrink-0 border-t border-neutral-300 bg-white md:hidden">
+      <div
+        className={`${
+          mobilePane === "preview" ? "hidden md:flex" : "flex"
+        } shrink-0 items-center gap-2 border-t border-neutral-200 bg-white px-3 py-2 md:absolute md:top-0 md:end-3 md:h-12 md:border-0 md:bg-transparent md:px-0 md:py-0`}
+      >
         <button
           type="button"
-          className={`flex-1 text-sm font-medium ${mobilePane === "edit" ? "text-neutral-900" : "text-neutral-500"}`}
+          onClick={handleRestore}
+          className="hidden h-8 px-2 text-xs text-neutral-600 hover:text-neutral-900 md:inline"
+        >
+          {t("restore")}
+        </button>
+        <button
+          type="button"
+          data-save=""
+          onClick={handleSave}
+          className="h-10 flex-1 border border-neutral-300 bg-white px-3 text-sm font-medium md:h-8 md:flex-none md:px-2.5 md:text-xs"
+        >
+          {t("save")}
+        </button>
+        <button
+          type="button"
+          data-publish=""
+          onClick={handlePublish}
+          className="h-10 flex-1 bg-neutral-900 px-3 text-sm font-medium text-white md:h-8 md:flex-none md:px-2.5 md:text-xs"
+        >
+          {t("publish")}
+        </button>
+      </div>
+
+      <div className="flex h-11 shrink-0 border-t border-neutral-200 bg-white md:hidden">
+        <button
+          type="button"
+          className={`relative flex-1 text-sm font-medium ${mobilePane === "edit" ? "text-neutral-900" : "text-neutral-500"}`}
           onClick={() => setMobilePane("edit")}
         >
+          {mobilePane === "edit" ? (
+            <span className="absolute inset-x-0 top-0 h-0.5 bg-neutral-900" />
+          ) : null}
           {t("edit")}
         </button>
         <button
           type="button"
-          className={`flex-1 text-sm font-medium ${mobilePane === "preview" ? "text-neutral-900" : "text-neutral-500"}`}
+          className={`relative flex-1 text-sm font-medium ${mobilePane === "preview" ? "text-neutral-900" : "text-neutral-500"}`}
           onClick={() => setMobilePane("preview")}
         >
+          {mobilePane === "preview" ? (
+            <span className="absolute inset-x-0 top-0 h-0.5 bg-neutral-900" />
+          ) : null}
           {t("preview")}
         </button>
       </div>
@@ -289,4 +352,86 @@ export function ExperienceBuilder({
       </span>
     </div>
   );
+}
+
+function NavIcon({ panel }: { panel: CustomizerPanel }) {
+  const common = {
+    viewBox: "0 0 16 16",
+    className: "size-4 shrink-0",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 1.5,
+    "aria-hidden": true as const,
+  };
+  const icons: Record<CustomizerPanel, ReactNode> = {
+    theme: (
+      <svg {...common}>
+        <circle cx="6" cy="6" r="2.25" />
+        <circle cx="11" cy="5.5" r="1.75" />
+        <circle cx="9.5" cy="11" r="2" />
+      </svg>
+    ),
+    branding: (
+      <svg {...common}>
+        <path d="M3 13V5.5L8 3l5 2.5V13" />
+        <path d="M8 7.5v5.5" />
+      </svg>
+    ),
+    header: (
+      <svg {...common}>
+        <rect x="2.5" y="3" width="11" height="10" />
+        <path d="M2.5 6.25h11" />
+      </svg>
+    ),
+    homepage: (
+      <svg {...common}>
+        <rect x="2.5" y="2.5" width="11" height="3" />
+        <rect x="2.5" y="7" width="5" height="6.5" />
+        <rect x="8.5" y="7" width="5" height="6.5" />
+      </svg>
+    ),
+    footer: (
+      <svg {...common}>
+        <rect x="2.5" y="3" width="11" height="10" />
+        <path d="M2.5 9.75h11" />
+      </svg>
+    ),
+    contact: (
+      <svg {...common}>
+        <path d="M3 4.5h10v7H3z" />
+        <path d="M3 4.5 8 8.25 13 4.5" />
+      </svg>
+    ),
+    whatsapp: (
+      <svg {...common}>
+        <path d="M4 12.5 3.25 14 5.5 13A5.5 5.5 0 1 0 4 12.5Z" />
+      </svg>
+    ),
+    social: (
+      <svg {...common}>
+        <circle cx="5" cy="8" r="2" />
+        <circle cx="11.5" cy="4.5" r="1.75" />
+        <circle cx="11.5" cy="11.5" r="1.75" />
+        <path d="M6.7 7.1 9.8 5.3M6.7 8.9 9.8 10.7" />
+      </svg>
+    ),
+    verification: (
+      <svg {...common}>
+        <path d="M8 2.5 13 4.5v4.2c0 3.1-2.2 4.9-5 5.8-2.8-.9-5-2.7-5-5.8V4.5L8 2.5Z" />
+      </svg>
+    ),
+    apps: (
+      <svg {...common}>
+        <rect x="4" y="2.5" width="8" height="11" />
+        <path d="M6.5 12.5h3" />
+      </svg>
+    ),
+    pages: (
+      <svg {...common}>
+        <path d="M4.5 2.5h5.2L12.5 5.3V13.5H4.5z" />
+        <path d="M9.5 2.5V5.5H12.5" />
+      </svg>
+    ),
+  };
+  return icons[panel];
 }

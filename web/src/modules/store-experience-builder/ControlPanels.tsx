@@ -1,26 +1,26 @@
 "use client";
 
+import type { ReactNode } from "react";
 import {
-  CONTENT_PAGE_SLUGS,
+  type CONTENT_PAGE_SLUGS,
+  contrastRatio,
   DENSITY_PRESETS,
+  type HomeBuilderSectionKey,
+  isGatedHomeSection,
   PRODUCT_CARD_PRESETS,
   RADIUS_PRESETS,
   SOCIAL_NETWORKS,
-  THEME_PRESETS,
-  contrastRatio,
-  isGatedHomeSection,
-  type HomeBuilderSectionKey,
   type SocialNetwork,
   type StorefrontPresentationConfig,
+  THEME_PRESETS,
   type ThemePresetId,
 } from "./presentation";
-import type { ReactNode } from "react";
+import { buildWhatsAppUrl } from "./presentation/urls";
 import {
-  customizerMessage,
   type CustomizerLocale,
   type CustomizerMessageKey,
+  customizerMessage,
 } from "./messages";
-import { buildWhatsAppUrl } from "./presentation/urls";
 
 export type CustomizerPanel =
   | "theme"
@@ -35,24 +35,46 @@ export type CustomizerPanel =
   | "apps"
   | "pages";
 
-export const CUSTOMIZER_PANELS: Array<{
-  id: CustomizerPanel;
-  label: CustomizerMessageKey;
+export const CUSTOMIZER_NAV_GROUPS: Array<{
+  items: Array<{ id: CustomizerPanel; label: CustomizerMessageKey }>;
 }> = [
-  { id: "theme", label: "theme" },
-  { id: "branding", label: "branding" },
-  { id: "header", label: "header" },
-  { id: "homepage", label: "homepage" },
-  { id: "footer", label: "footer" },
-  { id: "contact", label: "contact" },
-  { id: "whatsapp", label: "whatsapp" },
-  { id: "social", label: "social" },
-  { id: "verification", label: "verification" },
-  { id: "apps", label: "apps" },
-  { id: "pages", label: "pages" },
+  {
+    items: [
+      { id: "theme", label: "theme" },
+      { id: "branding", label: "branding" },
+    ],
+  },
+  {
+    items: [
+      { id: "header", label: "header" },
+      { id: "homepage", label: "homepage" },
+      { id: "footer", label: "footer" },
+    ],
+  },
+  {
+    items: [
+      { id: "contact", label: "contact" },
+      { id: "whatsapp", label: "whatsapp" },
+      { id: "social", label: "social" },
+    ],
+  },
+  {
+    items: [
+      { id: "verification", label: "verification" },
+      { id: "apps", label: "apps" },
+      { id: "pages", label: "pages" },
+    ],
+  },
 ];
 
-const PAGE_LABEL: Record<(typeof CONTENT_PAGE_SLUGS)[number], CustomizerMessageKey> = {
+export const CUSTOMIZER_PANELS = CUSTOMIZER_NAV_GROUPS.flatMap(
+  (group) => group.items,
+);
+
+const PAGE_LABEL: Record<
+  (typeof CONTENT_PAGE_SLUGS)[number],
+  CustomizerMessageKey
+> = {
   about: "pageAbout",
   contact: "pageContact",
   faq: "pageFaq",
@@ -140,18 +162,83 @@ function Field({
 }) {
   return (
     <label className="block space-y-1.5">
-      <span className="block text-[13px] font-medium text-neutral-800">{label}</span>
+      <span className="block text-[12px] font-medium text-neutral-600">
+        {label}
+      </span>
       {children}
-      {hint ? <span className="block text-xs leading-5 text-neutral-500">{hint}</span> : null}
+      {hint ? (
+        <span className="block text-[12px] leading-5 text-neutral-500">
+          {hint}
+        </span>
+      ) : null}
     </label>
   );
 }
 
+function Section({
+  title,
+  hint,
+  children,
+}: {
+  title?: string;
+  hint?: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="space-y-3">
+      {title || hint ? (
+        <div className="space-y-1">
+          {title ? (
+            <h3 className="text-[12px] font-semibold tracking-wide text-neutral-500">
+              {title}
+            </h3>
+          ) : null}
+          {hint ? (
+            <p className="text-[12px] leading-5 text-neutral-500">{hint}</p>
+          ) : null}
+        </div>
+      ) : null}
+      {children}
+    </section>
+  );
+}
+
+function Segmented<T extends string>({
+  value,
+  options,
+  onChange,
+}: {
+  value: T;
+  options: Array<{ id: T; label: string }>;
+  onChange: (id: T) => void;
+}) {
+  return (
+    <div className="flex border border-neutral-300 p-0.5">
+      {options.map((option) => (
+        <button
+          key={option.id}
+          type="button"
+          onClick={() => onChange(option.id)}
+          className={`h-9 flex-1 px-2 text-[12px] font-medium ${
+            value === option.id
+              ? "bg-neutral-900 text-white"
+              : "text-neutral-600 hover:text-neutral-900"
+          }`}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 const inputClass =
-  "h-9 w-full rounded border border-neutral-300 bg-white px-2.5 text-sm text-neutral-900 outline-none focus:border-neutral-800";
+  "h-10 w-full border border-neutral-300 bg-white px-3 text-sm text-neutral-900 outline-none focus:border-neutral-800";
 const selectClass = inputClass;
 const btnClass =
-  "inline-flex h-8 items-center rounded border border-neutral-300 bg-white px-2.5 text-xs font-medium text-neutral-800 hover:bg-neutral-50";
+  "inline-flex h-8 items-center border border-neutral-300 bg-white px-2.5 text-xs font-medium text-neutral-800 hover:bg-neutral-50";
+const iconBtnClass =
+  "inline-flex size-7 items-center justify-center text-xs text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 disabled:text-neutral-300 disabled:hover:bg-transparent";
 
 function moveIndex<T>(list: T[], index: number, delta: number): T[] {
   const target = index + delta;
@@ -173,52 +260,80 @@ function ThemePanel({
 }) {
   const contrast = contrastRatio(config.primaryColor, "#ffffff");
   return (
-    <div className="space-y-5">
-      <Field label={t("preset")}>
-        <div className="grid grid-cols-1 gap-1.5">
-          {THEME_PRESETS.map((preset) => (
-            <button
-              key={preset.id}
-              type="button"
-              onClick={() =>
-                patch({
-                  themePreset: preset.id,
-                  primaryColor: preset.primary,
-                })
-              }
-              className={`flex h-10 items-center gap-2 rounded border px-2.5 text-start text-sm ${
-                config.themePreset === preset.id
-                  ? "border-neutral-900 bg-neutral-50"
-                  : "border-neutral-200 hover:border-neutral-400"
-              }`}
-            >
-              <span
-                className="size-4 shrink-0 rounded-sm border border-black/10"
-                style={{ background: preset.primary }}
-              />
-              {t(preset.labelKey as CustomizerMessageKey)}
-            </button>
-          ))}
+    <div className="space-y-7">
+      <Section title={t("preset")}>
+        <div className="grid grid-cols-2 gap-2">
+          {THEME_PRESETS.map((preset) => {
+            const selected = config.themePreset === preset.id;
+            return (
+              <button
+                key={preset.id}
+                type="button"
+                onClick={() =>
+                  patch({
+                    themePreset: preset.id,
+                    primaryColor: preset.primary,
+                  })
+                }
+                className={`overflow-hidden border text-start ${
+                  selected
+                    ? "border-neutral-900"
+                    : "border-neutral-200 hover:border-neutral-400"
+                }`}
+              >
+                <span
+                  className="block p-1.5"
+                  style={{ background: preset.primary }}
+                >
+                  <span className="flex h-10 flex-col bg-white">
+                    <span
+                      className="block h-2.5"
+                      style={{ background: preset.primary, opacity: 0.18 }}
+                    />
+                    <span className="mt-auto flex gap-1 p-1">
+                      <span
+                        className="h-3.5 flex-1"
+                        style={{ background: preset.primary, opacity: 0.22 }}
+                      />
+                      <span
+                        className="h-3.5 flex-1"
+                        style={{ background: preset.primary, opacity: 0.12 }}
+                      />
+                    </span>
+                  </span>
+                </span>
+                <span className="block truncate px-2 py-1.5 text-[12px] font-medium leading-tight text-neutral-800">
+                  {t(preset.labelKey as CustomizerMessageKey)}
+                </span>
+              </button>
+            );
+          })}
         </div>
-      </Field>
+      </Section>
       <Field
         label={t("primaryColor")}
         hint={contrast >= 4.5 ? t("contrastOk") : t("contrastWarn")}
       >
-        <div className="flex items-center gap-2">
+        <div className="flex items-stretch gap-2">
+          <label className="relative size-10 shrink-0 cursor-pointer overflow-hidden border border-neutral-300">
+            <span
+              className="absolute inset-0"
+              style={{ background: config.primaryColor }}
+            />
+            <input
+              type="color"
+              value={config.primaryColor}
+              onChange={(event) =>
+                patch({
+                  primaryColor: event.target.value,
+                  themePreset: matchPreset(event.target.value),
+                })
+              }
+              className="absolute inset-0 cursor-pointer opacity-0"
+            />
+          </label>
           <input
-            type="color"
-            value={config.primaryColor}
-            onChange={(event) =>
-              patch({
-                primaryColor: event.target.value,
-                themePreset: matchPreset(event.target.value),
-              })
-            }
-            className="h-9 w-12 cursor-pointer rounded border border-neutral-300 bg-white p-0.5"
-          />
-          <input
-            className={inputClass}
+            className={`${inputClass} font-mono uppercase tracking-wide`}
             value={config.primaryColor}
             onChange={(event) =>
               patch({
@@ -229,68 +344,63 @@ function ThemePanel({
           />
         </div>
       </Field>
-      <Field label={t("font")}>
-        <select className={selectClass} value={config.fontPreset} disabled>
-          <option value="cairo-geist">{t("fontCairoGeist")}</option>
-        </select>
-      </Field>
-      <Field label={t("density")}>
-        <select
-          className={selectClass}
-          value={config.density}
-          onChange={(event) =>
-            patch({ density: event.target.value as (typeof DENSITY_PRESETS)[number] })
-          }
-        >
-          {DENSITY_PRESETS.map((id) => (
-            <option key={id} value={id}>
-              {id === "comfortable" ? t("densityComfortable") : t("densityCompact")}
-            </option>
-          ))}
-        </select>
-      </Field>
-      <Field label={t("radius")}>
-        <select
-          className={selectClass}
-          value={config.radius}
-          onChange={(event) =>
-            patch({ radius: event.target.value as (typeof RADIUS_PRESETS)[number]["id"] })
-          }
-        >
-          {RADIUS_PRESETS.map((preset) => (
-            <option key={preset.id} value={preset.id}>
-              {preset.id === "default"
-                ? t("radiusDefault")
-                : preset.id === "subtle"
-                  ? t("radiusSubtle")
-                  : t("radiusSharp")}
-            </option>
-          ))}
-        </select>
-      </Field>
-      <Field label={t("productCard")}>
-        <select
-          className={selectClass}
-          value={config.productCard}
-          onChange={(event) =>
-            patch({
-              productCard: event.target.value as (typeof PRODUCT_CARD_PRESETS)[number],
-            })
-          }
-        >
-          {PRODUCT_CARD_PRESETS.map((id) => (
-            <option key={id} value={id}>
-              {id === "standard" ? t("productCardStandard") : t("productCardCompact")}
-            </option>
-          ))}
-        </select>
-      </Field>
+      <div className="space-y-5">
+        <Field label={t("font")}>
+          <select className={selectClass} value={config.fontPreset} disabled>
+            <option value="cairo-geist">{t("fontCairoGeist")}</option>
+          </select>
+        </Field>
+        <Field label={t("density")}>
+          <Segmented
+            value={config.density}
+            onChange={(density) => patch({ density })}
+            options={DENSITY_PRESETS.map((id) => ({
+              id,
+              label:
+                id === "comfortable"
+                  ? t("densityComfortable")
+                  : t("densityCompact"),
+            }))}
+          />
+        </Field>
+        <Field label={t("radius")}>
+          <Segmented
+            value={config.radius}
+            onChange={(radius) => patch({ radius })}
+            options={RADIUS_PRESETS.map((preset) => ({
+              id: preset.id,
+              label:
+                preset.id === "default"
+                  ? t("radiusDefault")
+                  : preset.id === "subtle"
+                    ? t("radiusSubtle")
+                    : t("radiusSharp"),
+            }))}
+          />
+        </Field>
+        <Field label={t("productCard")}>
+          <Segmented
+            value={config.productCard}
+            onChange={(productCard) => patch({ productCard })}
+            options={PRODUCT_CARD_PRESETS.map((id) => ({
+              id,
+              label:
+                id === "standard"
+                  ? t("productCardStandard")
+                  : t("productCardCompact"),
+            }))}
+          />
+        </Field>
+      </div>
     </div>
   );
 }
 
 function matchPreset(hex: string): ThemePresetId {
-  return THEME_PRESETS.find((preset) => preset.primary === hex.toLowerCase())?.id ?? "awj-modern";
+  return (
+    THEME_PRESETS.find((preset) => preset.primary === hex.toLowerCase())?.id ??
+    "awj-modern"
+  );
 }
 
 function BrandingPanel({
@@ -305,7 +415,7 @@ function BrandingPanel({
   patch: (partial: Partial<StorefrontPresentationConfig>) => void;
 }) {
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <Field label={t("displayName")} hint={t("displayNameHint")}>
         <input
           className={inputClass}
@@ -319,7 +429,7 @@ function BrandingPanel({
         />
       </Field>
       {liveStoreName ? (
-        <p className="text-xs text-neutral-500">
+        <p className="text-[12px] text-neutral-500">
           {t("liveName")}: {liveStoreName}
         </p>
       ) : null}
@@ -367,7 +477,9 @@ function LogoField({
 }) {
   return (
     <div className="space-y-1.5">
-      <span className="block text-[13px] font-medium text-neutral-800">{label}</span>
+      <span className="block text-[12px] font-medium text-neutral-600">
+        {label}
+      </span>
       <div className="flex items-center gap-2">
         <label className={btnClass}>
           {t("uploadLogo")}
@@ -381,7 +493,8 @@ function LogoField({
               if (!file) return;
               const reader = new FileReader();
               reader.onload = () => {
-                const result = typeof reader.result === "string" ? reader.result : null;
+                const result =
+                  typeof reader.result === "string" ? reader.result : null;
                 onChange(result);
               };
               reader.readAsDataURL(file);
@@ -389,14 +502,20 @@ function LogoField({
           />
         </label>
         {value ? (
-          <button type="button" className={btnClass} onClick={() => onChange(null)}>
+          <button
+            type="button"
+            className={btnClass}
+            onClick={() => onChange(null)}
+          >
             {t("clearLogo")}
           </button>
         ) : (
-          <span className="text-xs text-neutral-500">{t("noLogo")}</span>
+          <span className="text-[12px] text-neutral-500">{t("noLogo")}</span>
         )}
       </div>
-      {hint ? <p className="text-xs leading-5 text-neutral-500">{hint}</p> : null}
+      {hint ? (
+        <p className="text-[12px] leading-5 text-neutral-500">{hint}</p>
+      ) : null}
     </div>
   );
 }
@@ -411,53 +530,52 @@ function HeaderPanel({
   patch: (partial: Partial<StorefrontPresentationConfig>) => void;
 }) {
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <Field label={t("headerStyle")}>
-        <select
-          className={selectClass}
+        <Segmented
           value={config.header.style}
-          onChange={(event) =>
-            patch({
-              header: {
-                ...config.header,
-                style: event.target.value as "standard" | "compact",
-              },
-            })
-          }
-        >
-          <option value="standard">{t("headerStandard")}</option>
-          <option value="compact">{t("headerCompact")}</option>
-        </select>
+          onChange={(style) => patch({ header: { ...config.header, style } })}
+          options={[
+            { id: "standard" as const, label: t("headerStandard") },
+            { id: "compact" as const, label: t("headerCompact") },
+          ]}
+        />
       </Field>
-      <Toggle
-        label={t("showSearch")}
-        checked={config.header.showSearch}
-        onChange={(showSearch) =>
-          patch({ header: { ...config.header, showSearch } })
-        }
-      />
-      <Toggle
-        label={t("showAccount")}
-        checked={config.header.showAccount}
-        onChange={(showAccount) =>
-          patch({ header: { ...config.header, showAccount } })
-        }
-      />
-      <Toggle
-        label={t("showCart")}
-        checked={config.header.showCart}
-        onChange={(showCart) => patch({ header: { ...config.header, showCart } })}
-      />
-      <Toggle
-        label={t("showCategoryNav")}
-        checked={config.header.showCategoryNav}
-        onChange={(showCategoryNav) =>
-          patch({ header: { ...config.header, showCategoryNav } })
-        }
-      />
+      <div className="divide-y divide-neutral-200 border-y border-neutral-200">
+        <Toggle
+          label={t("showSearch")}
+          checked={config.header.showSearch}
+          onChange={(showSearch) =>
+            patch({ header: { ...config.header, showSearch } })
+          }
+        />
+        <Toggle
+          label={t("showAccount")}
+          checked={config.header.showAccount}
+          onChange={(showAccount) =>
+            patch({ header: { ...config.header, showAccount } })
+          }
+        />
+        <Toggle
+          label={t("showCart")}
+          checked={config.header.showCart}
+          onChange={(showCart) =>
+            patch({ header: { ...config.header, showCart } })
+          }
+        />
+        <Toggle
+          label={t("showCategoryNav")}
+          checked={config.header.showCategoryNav}
+          onChange={(showCategoryNav) =>
+            patch({ header: { ...config.header, showCategoryNav } })
+          }
+        />
+      </div>
       <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <span className="text-[13px] font-medium text-neutral-800">{t("navLinks")}</span>
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-[12px] font-semibold tracking-wide text-neutral-500">
+            {t("navLinks")}
+          </span>
           <button
             type="button"
             className={btnClass}
@@ -482,9 +600,12 @@ function HeaderPanel({
             {t("addLink")}
           </button>
         </div>
-        <ul className="space-y-2">
+        <ul className="border border-neutral-200">
           {config.header.links.map((link, index) => (
-            <li key={link.id} className="rounded border border-neutral-200 p-2 space-y-2">
+            <li
+              key={link.id}
+              className="space-y-2 border-b border-neutral-200 p-3 last:border-b-0"
+            >
               <div className="grid grid-cols-2 gap-2">
                 <input
                   className={inputClass}
@@ -492,7 +613,9 @@ function HeaderPanel({
                   value={link.label}
                   onChange={(event) => {
                     const links = config.header.links.map((item, i) =>
-                      i === index ? { ...item, label: event.target.value } : item,
+                      i === index
+                        ? { ...item, label: event.target.value }
+                        : item,
                     );
                     patch({ header: { ...config.header, links } });
                   }}
@@ -503,7 +626,10 @@ function HeaderPanel({
                   onChange={(event) => {
                     const links = config.header.links.map((item, i) =>
                       i === index
-                        ? { ...item, kind: event.target.value as typeof link.kind }
+                        ? {
+                            ...item,
+                            kind: event.target.value as typeof link.kind,
+                          }
                         : item,
                     );
                     patch({ header: { ...config.header, links } });
@@ -516,75 +642,77 @@ function HeaderPanel({
                   <option value="external">{t("kindExternal")}</option>
                 </select>
               </div>
-              <div className="flex gap-2">
-                <input
-                  className={inputClass}
-                  placeholder={t("linkHref")}
-                  value={link.href}
-                  onChange={(event) => {
+              <input
+                className={inputClass}
+                placeholder={t("linkHref")}
+                value={link.href}
+                onChange={(event) => {
+                  const links = config.header.links.map((item, i) =>
+                    i === index ? { ...item, href: event.target.value } : item,
+                  );
+                  patch({ header: { ...config.header, links } });
+                }}
+              />
+              <div className="flex flex-wrap items-center gap-1">
+                <Toggle
+                  compact
+                  label={t("sectionVisible")}
+                  checked={link.enabled}
+                  onChange={(enabled) => {
                     const links = config.header.links.map((item, i) =>
-                      i === index ? { ...item, href: event.target.value } : item,
+                      i === index ? { ...item, enabled } : item,
                     );
                     patch({ header: { ...config.header, links } });
                   }}
                 />
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <label className="flex items-center gap-1.5 text-xs text-neutral-600">
-                  <input
-                    type="checkbox"
-                    checked={link.enabled}
-                    onChange={(event) => {
-                      const links = config.header.links.map((item, i) =>
-                        i === index ? { ...item, enabled: event.target.checked } : item,
-                      );
-                      patch({ header: { ...config.header, links } });
-                    }}
-                  />
-                  {t("sectionVisible")}
-                </label>
-                <button
-                  type="button"
-                  className={btnClass}
-                  onClick={() =>
-                    patch({
-                      header: {
-                        ...config.header,
-                        links: moveIndex(config.header.links, index, -1),
-                      },
-                    })
-                  }
-                >
-                  {t("moveUp")}
-                </button>
-                <button
-                  type="button"
-                  className={btnClass}
-                  onClick={() =>
-                    patch({
-                      header: {
-                        ...config.header,
-                        links: moveIndex(config.header.links, index, 1),
-                      },
-                    })
-                  }
-                >
-                  {t("moveDown")}
-                </button>
-                <button
-                  type="button"
-                  className={btnClass}
-                  onClick={() =>
-                    patch({
-                      header: {
-                        ...config.header,
-                        links: config.header.links.filter((_, i) => i !== index),
-                      },
-                    })
-                  }
-                >
-                  {t("removeLink")}
-                </button>
+                <span className="ms-auto flex">
+                  <button
+                    type="button"
+                    className={iconBtnClass}
+                    aria-label={t("moveUp")}
+                    onClick={() =>
+                      patch({
+                        header: {
+                          ...config.header,
+                          links: moveIndex(config.header.links, index, -1),
+                        },
+                      })
+                    }
+                  >
+                    ↑
+                  </button>
+                  <button
+                    type="button"
+                    className={iconBtnClass}
+                    aria-label={t("moveDown")}
+                    onClick={() =>
+                      patch({
+                        header: {
+                          ...config.header,
+                          links: moveIndex(config.header.links, index, 1),
+                        },
+                      })
+                    }
+                  >
+                    ↓
+                  </button>
+                  <button
+                    type="button"
+                    className={`${iconBtnClass} px-1.5`}
+                    onClick={() =>
+                      patch({
+                        header: {
+                          ...config.header,
+                          links: config.header.links.filter(
+                            (_, i) => i !== index,
+                          ),
+                        },
+                      })
+                    }
+                  >
+                    {t("removeLink")}
+                  </button>
+                </span>
               </div>
             </li>
           ))}
@@ -613,70 +741,91 @@ function HomepagePanel({
   };
 
   return (
-    <div className="space-y-5">
-      <Field label={t("heroHeadline")}>
-        <input
-          className={inputClass}
-          value={config.homepage.heroHeadline}
-          onChange={(event) =>
-            patch({
-              homepage: { ...config.homepage, heroHeadline: event.target.value },
-            })
-          }
-        />
-      </Field>
-      <Field label={t("heroSubheadline")}>
-        <input
-          className={inputClass}
-          value={config.homepage.heroSubheadline}
-          onChange={(event) =>
-            patch({
-              homepage: { ...config.homepage, heroSubheadline: event.target.value },
-            })
-          }
-        />
-      </Field>
-      <ul className="space-y-2">
-        {config.homepage.sections.map((section, index) => (
-          <li
-            key={section.key}
-            className="rounded border border-neutral-200 bg-white p-2.5"
-          >
-            <div className="flex items-center gap-2">
-              <span className="flex-1 text-sm font-medium text-neutral-900">
-                {t(SECTION_LABEL[section.key])}
-              </span>
-              {isGatedHomeSection(section.key) ? (
-                <span className="text-[11px] text-neutral-500">{t("gatedBadge")}</span>
-              ) : null}
-              <button type="button" className={btnClass} onClick={() => move(index, -1)}>
-                {t("moveUp")}
-              </button>
-              <button type="button" className={btnClass} onClick={() => move(index, 1)}>
-                {t("moveDown")}
-              </button>
-            </div>
-            <label className="mt-2 flex items-center gap-2 text-xs text-neutral-600">
-              <input
-                type="checkbox"
+    <div className="space-y-7">
+      <Section title={t("heroContent")}>
+        <Field label={t("heroHeadline")}>
+          <input
+            className={inputClass}
+            value={config.homepage.heroHeadline}
+            onChange={(event) =>
+              patch({
+                homepage: {
+                  ...config.homepage,
+                  heroHeadline: event.target.value,
+                },
+              })
+            }
+          />
+        </Field>
+        <Field label={t("heroSubheadline")}>
+          <input
+            className={inputClass}
+            value={config.homepage.heroSubheadline}
+            onChange={(event) =>
+              patch({
+                homepage: {
+                  ...config.homepage,
+                  heroSubheadline: event.target.value,
+                },
+              })
+            }
+          />
+        </Field>
+      </Section>
+      <Section title={t("composerTitle")} hint={t("composerHint")}>
+        <ul className="border border-neutral-200">
+          {config.homepage.sections.map((section, index) => (
+            <li
+              key={section.key}
+              className="flex h-12 items-center gap-1 border-b border-neutral-200 px-1 last:border-b-0"
+            >
+              <div className="flex">
+                <button
+                  type="button"
+                  aria-label={t("moveUp")}
+                  disabled={index === 0}
+                  className={iconBtnClass}
+                  onClick={() => move(index, -1)}
+                >
+                  ↑
+                </button>
+                <button
+                  type="button"
+                  aria-label={t("moveDown")}
+                  disabled={index === config.homepage.sections.length - 1}
+                  className={iconBtnClass}
+                  onClick={() => move(index, 1)}
+                >
+                  ↓
+                </button>
+              </div>
+              <div className="min-w-0 flex-1 px-1">
+                <p className="truncate text-[13px] font-medium text-neutral-900">
+                  {t(SECTION_LABEL[section.key])}
+                </p>
+                {isGatedHomeSection(section.key) ? (
+                  <p className="text-[10px] leading-none text-neutral-400">
+                    {t("gatedBadge")}
+                  </p>
+                ) : null}
+              </div>
+              <Toggle
+                compact
+                label={
+                  section.visible ? t("sectionVisible") : t("sectionHidden")
+                }
                 checked={section.visible}
-                onChange={(event) => {
+                onChange={(visible) => {
                   const sections = config.homepage.sections.map((item, i) =>
-                    i === index ? { ...item, visible: event.target.checked } : item,
+                    i === index ? { ...item, visible } : item,
                   );
                   patch({ homepage: { ...config.homepage, sections } });
                 }}
               />
-              {section.visible ? t("sectionVisible") : t("sectionHidden")}
-            </label>
-            {isGatedHomeSection(section.key) ? (
-              <p className="mt-1 text-[11px] leading-4 text-neutral-500">
-                {t("gatedSection")}
-              </p>
-            ) : null}
-          </li>
-        ))}
-      </ul>
+            </li>
+          ))}
+        </ul>
+      </Section>
     </div>
   );
 }
@@ -691,12 +840,16 @@ function FooterPanel({
   patch: (partial: Partial<StorefrontPresentationConfig>) => void;
 }) {
   return (
-    <div className="space-y-5">
-      <Toggle
-        label={t("showFooterLogo")}
-        checked={config.footer.showLogo}
-        onChange={(showLogo) => patch({ footer: { ...config.footer, showLogo } })}
-      />
+    <div className="space-y-6">
+      <div className="border-y border-neutral-200">
+        <Toggle
+          label={t("showFooterLogo")}
+          checked={config.footer.showLogo}
+          onChange={(showLogo) =>
+            patch({ footer: { ...config.footer, showLogo } })
+          }
+        />
+      </div>
       <Field label={t("footerTagline")}>
         <textarea
           className={`${inputClass} h-20 py-2`}
@@ -711,7 +864,9 @@ function FooterPanel({
           className={inputClass}
           value={config.footer.copyright}
           onChange={(event) =>
-            patch({ footer: { ...config.footer, copyright: event.target.value } })
+            patch({
+              footer: { ...config.footer, copyright: event.target.value },
+            })
           }
         />
       </Field>
@@ -728,22 +883,42 @@ function ContactPanel({
   t: (key: CustomizerMessageKey) => string;
   patch: (partial: Partial<StorefrontPresentationConfig>) => void;
 }) {
-  const set = (key: keyof StorefrontPresentationConfig["contact"], value: string) =>
-    patch({ contact: { ...config.contact, [key]: value } });
+  const set = (
+    key: keyof StorefrontPresentationConfig["contact"],
+    value: string,
+  ) => patch({ contact: { ...config.contact, [key]: value } });
   return (
-    <div className="space-y-5">
-      <Field label={t("phone")}>
-        <input className={inputClass} value={config.contact.phone} onChange={(e) => set("phone", e.target.value)} />
-      </Field>
-      <Field label={t("email")}>
-        <input className={inputClass} value={config.contact.email} onChange={(e) => set("email", e.target.value)} />
-      </Field>
-      <Field label={t("address")}>
-        <textarea className={`${inputClass} h-16 py-2`} value={config.contact.address} onChange={(e) => set("address", e.target.value)} />
-      </Field>
-      <Field label={t("hours")}>
-        <input className={inputClass} value={config.contact.hours} onChange={(e) => set("hours", e.target.value)} />
-      </Field>
+    <div className="space-y-6">
+      <Section hint={t("contactIntro")}>
+        <Field label={t("phone")}>
+          <input
+            className={inputClass}
+            value={config.contact.phone}
+            onChange={(e) => set("phone", e.target.value)}
+          />
+        </Field>
+        <Field label={t("email")}>
+          <input
+            className={inputClass}
+            value={config.contact.email}
+            onChange={(e) => set("email", e.target.value)}
+          />
+        </Field>
+        <Field label={t("address")}>
+          <textarea
+            className={`${inputClass} h-16 py-2`}
+            value={config.contact.address}
+            onChange={(e) => set("address", e.target.value)}
+          />
+        </Field>
+        <Field label={t("hours")}>
+          <input
+            className={inputClass}
+            value={config.contact.hours}
+            onChange={(e) => set("hours", e.target.value)}
+          />
+        </Field>
+      </Section>
     </div>
   );
 }
@@ -759,52 +934,67 @@ function WhatsAppPanel({
 }) {
   const href = buildWhatsAppUrl(config.whatsapp.phone, config.whatsapp.message);
   return (
-    <div className="space-y-5">
-      <Toggle
-        label={t("whatsappEnable")}
-        checked={config.whatsapp.enabled}
-        onChange={(enabled) => patch({ whatsapp: { ...config.whatsapp, enabled } })}
-      />
-      <Field label={t("whatsappPhone")} hint={href ? undefined : t("whatsappInvalid")}>
-        <input
-          className={inputClass}
-          value={config.whatsapp.phone}
-          onChange={(event) =>
-            patch({ whatsapp: { ...config.whatsapp, phone: event.target.value } })
-          }
-        />
-      </Field>
-      <Field label={t("whatsappMessage")}>
-        <textarea
-          className={`${inputClass} h-16 py-2`}
-          value={config.whatsapp.message}
-          onChange={(event) =>
-            patch({ whatsapp: { ...config.whatsapp, message: event.target.value } })
-          }
-        />
-      </Field>
-      <Field label={t("whatsappPlacement")}>
-        <select
-          className={selectClass}
-          value={config.whatsapp.placement}
-          onChange={(event) =>
-            patch({
-              whatsapp: {
-                ...config.whatsapp,
-                placement: event.target.value as StorefrontPresentationConfig["whatsapp"]["placement"],
-              },
-            })
-          }
-        >
-          <option value="floating">{t("placementFloating")}</option>
-          <option value="footer">{t("placementFooter")}</option>
-          <option value="both">{t("placementBoth")}</option>
-        </select>
-      </Field>
-      <p className="text-xs leading-5 text-neutral-500">
-        {t("whatsappPreview")}: {href ?? "—"}
+    <div className="space-y-6">
+      <p className="text-[12px] leading-5 text-neutral-500">
+        {t("whatsappIntro")}
       </p>
-      <p className="text-xs leading-5 text-neutral-500">{t("whatsappNoSend")}</p>
+      <div className="border-y border-neutral-200">
+        <Toggle
+          label={t("whatsappEnable")}
+          checked={config.whatsapp.enabled}
+          onChange={(enabled) =>
+            patch({ whatsapp: { ...config.whatsapp, enabled } })
+          }
+        />
+      </div>
+      <Section title={t("whatsappDetails")}>
+        <Field
+          label={t("whatsappPhone")}
+          hint={href ? undefined : t("whatsappInvalid")}
+        >
+          <input
+            className={inputClass}
+            value={config.whatsapp.phone}
+            onChange={(event) =>
+              patch({
+                whatsapp: { ...config.whatsapp, phone: event.target.value },
+              })
+            }
+          />
+        </Field>
+        <Field label={t("whatsappMessage")}>
+          <textarea
+            className={`${inputClass} h-16 py-2`}
+            value={config.whatsapp.message}
+            onChange={(event) =>
+              patch({
+                whatsapp: { ...config.whatsapp, message: event.target.value },
+              })
+            }
+          />
+        </Field>
+      </Section>
+      <Field label={t("whatsappPlacement")}>
+        <Segmented
+          value={config.whatsapp.placement}
+          onChange={(placement) =>
+            patch({ whatsapp: { ...config.whatsapp, placement } })
+          }
+          options={[
+            { id: "floating" as const, label: t("placementFloating") },
+            { id: "footer" as const, label: t("placementFooter") },
+            { id: "both" as const, label: t("placementBoth") },
+          ]}
+        />
+      </Field>
+      <div className="border-t border-neutral-200 pt-3">
+        <p className="font-mono text-[11px] leading-5 break-all text-neutral-500">
+          {t("whatsappPreview")}: {href ?? "—"}
+        </p>
+        <p className="mt-1 text-[12px] leading-5 text-neutral-500">
+          {t("whatsappNoSend")}
+        </p>
+      </div>
     </div>
   );
 }
@@ -820,8 +1010,10 @@ function SocialPanel({
 }) {
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <span className="text-[13px] font-medium text-neutral-800">{t("social")}</span>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[12px] font-semibold tracking-wide text-neutral-500">
+          {t("social")}
+        </span>
         <button
           type="button"
           className={btnClass}
@@ -843,83 +1035,98 @@ function SocialPanel({
         </button>
       </div>
       {config.social.length === 0 ? (
-        <p className="text-xs text-neutral-500">{t("noSocial")}</p>
-      ) : null}
-      <ul className="space-y-2">
-        {config.social.map((item, index) => (
-          <li key={item.id} className="space-y-2 rounded border border-neutral-200 p-2">
-            <div className="flex gap-2">
-              <select
-                className={selectClass}
-                value={item.network}
+        <p className="text-[12px] text-neutral-500">{t("noSocial")}</p>
+      ) : (
+        <ul className="border border-neutral-200">
+          {config.social.map((item, index) => (
+            <li
+              key={item.id}
+              className="space-y-2 border-b border-neutral-200 p-3 last:border-b-0"
+            >
+              <div className="flex gap-2">
+                <select
+                  className={selectClass}
+                  value={item.network}
+                  onChange={(event) => {
+                    const social = config.social.map((row, i) =>
+                      i === index
+                        ? {
+                            ...row,
+                            network: event.target.value as SocialNetwork,
+                          }
+                        : row,
+                    );
+                    patch({ social });
+                  }}
+                >
+                  {SOCIAL_NETWORKS.map((network) => (
+                    <option key={network} value={network}>
+                      {network}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  className={btnClass}
+                  onClick={() =>
+                    patch({
+                      social: config.social.filter((_, i) => i !== index),
+                    })
+                  }
+                >
+                  {t("removeLink")}
+                </button>
+              </div>
+              <input
+                className={inputClass}
+                placeholder="https://"
+                value={item.url}
                 onChange={(event) => {
                   const social = config.social.map((row, i) =>
-                    i === index
-                      ? { ...row, network: event.target.value as SocialNetwork }
-                      : row,
+                    i === index ? { ...row, url: event.target.value } : row,
                   );
                   patch({ social });
                 }}
-              >
-                {SOCIAL_NETWORKS.map((network) => (
-                  <option key={network} value={network}>
-                    {network}
-                  </option>
-                ))}
-              </select>
-              <button
-                type="button"
-                className={btnClass}
-                onClick={() =>
-                  patch({ social: config.social.filter((_, i) => i !== index) })
-                }
-              >
-                {t("removeLink")}
-              </button>
-            </div>
-            <input
-              className={inputClass}
-              placeholder="https://"
-              value={item.url}
-              onChange={(event) => {
-                const social = config.social.map((row, i) =>
-                  i === index ? { ...row, url: event.target.value } : row,
-                );
-                patch({ social });
-              }}
-            />
-            <div className="flex flex-wrap items-center gap-2">
-              <label className="flex items-center gap-1.5 text-xs text-neutral-600">
-                <input
-                  type="checkbox"
+              />
+              <div className="flex items-center gap-1">
+                <Toggle
+                  compact
+                  label={t("sectionVisible")}
                   checked={item.enabled}
-                  onChange={(event) => {
+                  onChange={(enabled) => {
                     const social = config.social.map((row, i) =>
-                      i === index ? { ...row, enabled: event.target.checked } : row,
+                      i === index ? { ...row, enabled } : row,
                     );
                     patch({ social });
                   }}
                 />
-                {t("sectionVisible")}
-              </label>
-              <button
-                type="button"
-                className={btnClass}
-                onClick={() => patch({ social: moveIndex(config.social, index, -1) })}
-              >
-                {t("moveUp")}
-              </button>
-              <button
-                type="button"
-                className={btnClass}
-                onClick={() => patch({ social: moveIndex(config.social, index, 1) })}
-              >
-                {t("moveDown")}
-              </button>
-            </div>
-          </li>
-        ))}
-      </ul>
+                <span className="ms-auto flex">
+                  <button
+                    type="button"
+                    className={iconBtnClass}
+                    aria-label={t("moveUp")}
+                    onClick={() =>
+                      patch({ social: moveIndex(config.social, index, -1) })
+                    }
+                  >
+                    ↑
+                  </button>
+                  <button
+                    type="button"
+                    className={iconBtnClass}
+                    aria-label={t("moveDown")}
+                    onClick={() =>
+                      patch({ social: moveIndex(config.social, index, 1) })
+                    }
+                  >
+                    ↓
+                  </button>
+                </span>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
@@ -934,58 +1141,75 @@ function VerificationPanel({
   patch: (partial: Partial<StorefrontPresentationConfig>) => void;
 }) {
   return (
-    <div className="space-y-5">
-      <div className="rounded border border-neutral-300 bg-neutral-50 px-3 py-2.5">
-        <p className="text-[13px] font-medium text-neutral-900">{t("awjVerified")}</p>
-        <p className="mt-1 text-sm text-neutral-700">{t("notVerified")}</p>
+    <div className="space-y-6">
+      <Section hint={t("verificationIntro")}>
+        <div className="border border-neutral-200 px-3 py-3">
+          <p className="text-[12px] font-medium text-neutral-500">
+            {t("awjVerified")}
+          </p>
+          <p className="mt-1 text-[15px] font-semibold text-neutral-900">
+            {t("notVerified")}
+          </p>
+          <p className="mt-2 text-[12px] leading-5 text-neutral-500">
+            {t("verificationWarning")}
+          </p>
+        </div>
+      </Section>
+      <Section title={t("merchantProvided")}>
+        <Field label={t("crNumber")}>
+          <input
+            className={inputClass}
+            value={config.verification.crNumber}
+            onChange={(event) =>
+              patch({
+                verification: {
+                  ...config.verification,
+                  crNumber: event.target.value,
+                },
+              })
+            }
+          />
+        </Field>
+        <Field label={t("licenseNumber")}>
+          <input
+            className={inputClass}
+            value={config.verification.licenseNumber}
+            onChange={(event) =>
+              patch({
+                verification: {
+                  ...config.verification,
+                  licenseNumber: event.target.value,
+                },
+              })
+            }
+          />
+        </Field>
+        <Field label={t("verificationUrl")}>
+          <input
+            className={inputClass}
+            value={config.verification.sourceUrl}
+            onChange={(event) =>
+              patch({
+                verification: {
+                  ...config.verification,
+                  sourceUrl: event.target.value,
+                },
+              })
+            }
+          />
+        </Field>
+      </Section>
+      <div className="border-y border-neutral-200">
+        <Toggle
+          label={t("requestedVerified")}
+          checked={config.verification.requestedVerifiedLabel}
+          onChange={(requestedVerifiedLabel) =>
+            patch({
+              verification: { ...config.verification, requestedVerifiedLabel },
+            })
+          }
+        />
       </div>
-      <p className="text-xs leading-5 text-neutral-600">{t("verificationWarning")}</p>
-      <p className="text-[13px] font-medium text-neutral-800">{t("merchantProvided")}</p>
-      <Field label={t("crNumber")}>
-        <input
-          className={inputClass}
-          value={config.verification.crNumber}
-          onChange={(event) =>
-            patch({
-              verification: { ...config.verification, crNumber: event.target.value },
-            })
-          }
-        />
-      </Field>
-      <Field label={t("licenseNumber")}>
-        <input
-          className={inputClass}
-          value={config.verification.licenseNumber}
-          onChange={(event) =>
-            patch({
-              verification: {
-                ...config.verification,
-                licenseNumber: event.target.value,
-              },
-            })
-          }
-        />
-      </Field>
-      <Field label={t("verificationUrl")}>
-        <input
-          className={inputClass}
-          value={config.verification.sourceUrl}
-          onChange={(event) =>
-            patch({
-              verification: { ...config.verification, sourceUrl: event.target.value },
-            })
-          }
-        />
-      </Field>
-      <Toggle
-        label={t("requestedVerified")}
-        checked={config.verification.requestedVerifiedLabel}
-        onChange={(requestedVerifiedLabel) =>
-          patch({
-            verification: { ...config.verification, requestedVerifiedLabel },
-          })
-        }
-      />
     </div>
   );
 }
@@ -1000,51 +1224,58 @@ function AppsPanel({
   patch: (partial: Partial<StorefrontPresentationConfig>) => void;
 }) {
   return (
-    <div className="space-y-5">
-      <p className="text-xs leading-5 text-neutral-500">{t("appsHint")}</p>
-      <Field label={t("appName")}>
-        <input
-          className={inputClass}
-          value={config.apps.appName}
-          onChange={(event) =>
-            patch({ apps: { ...config.apps, appName: event.target.value } })
-          }
-        />
-      </Field>
-      <Field label={t("iosUrl")}>
-        <input
-          className={inputClass}
-          value={config.apps.iosUrl}
-          placeholder="https://apps.apple.com/..."
-          onChange={(event) =>
-            patch({ apps: { ...config.apps, iosUrl: event.target.value } })
-          }
-        />
-      </Field>
-      <Field label={t("androidUrl")}>
-        <input
-          className={inputClass}
-          value={config.apps.androidUrl}
-          placeholder="https://play.google.com/..."
-          onChange={(event) =>
-            patch({ apps: { ...config.apps, androidUrl: event.target.value } })
-          }
-        />
-      </Field>
-      <Toggle
-        label={t("showAppHome")}
-        checked={config.apps.showHomepageSection}
-        onChange={(showHomepageSection) =>
-          patch({ apps: { ...config.apps, showHomepageSection } })
-        }
-      />
-      <Toggle
-        label={t("showAppFooter")}
-        checked={config.apps.showFooterLinks}
-        onChange={(showFooterLinks) =>
-          patch({ apps: { ...config.apps, showFooterLinks } })
-        }
-      />
+    <div className="space-y-6">
+      <Section hint={t("appsIntro")}>
+        <Field label={t("appName")}>
+          <input
+            className={inputClass}
+            value={config.apps.appName}
+            onChange={(event) =>
+              patch({ apps: { ...config.apps, appName: event.target.value } })
+            }
+          />
+        </Field>
+        <Field label={t("iosUrl")}>
+          <input
+            className={inputClass}
+            value={config.apps.iosUrl}
+            placeholder="https://apps.apple.com/..."
+            onChange={(event) =>
+              patch({ apps: { ...config.apps, iosUrl: event.target.value } })
+            }
+          />
+        </Field>
+        <Field label={t("androidUrl")}>
+          <input
+            className={inputClass}
+            value={config.apps.androidUrl}
+            placeholder="https://play.google.com/..."
+            onChange={(event) =>
+              patch({
+                apps: { ...config.apps, androidUrl: event.target.value },
+              })
+            }
+          />
+        </Field>
+      </Section>
+      <Section title={t("appsPlacement")}>
+        <div className="divide-y divide-neutral-200 border-y border-neutral-200">
+          <Toggle
+            label={t("showAppHome")}
+            checked={config.apps.showHomepageSection}
+            onChange={(showHomepageSection) =>
+              patch({ apps: { ...config.apps, showHomepageSection } })
+            }
+          />
+          <Toggle
+            label={t("showAppFooter")}
+            checked={config.apps.showFooterLinks}
+            onChange={(showFooterLinks) =>
+              patch({ apps: { ...config.apps, showFooterLinks } })
+            }
+          />
+        </div>
+      </Section>
     </div>
   );
 }
@@ -1060,15 +1291,20 @@ function PagesPanel({
 }) {
   return (
     <div className="space-y-4">
-      <p className="text-xs leading-5 text-neutral-500">{t("pagesHint")}</p>
-      <ul className="space-y-2">
+      <p className="text-[12px] leading-5 text-neutral-500">{t("pagesHint")}</p>
+      <ul className="border border-neutral-200">
         {config.pages.map((page, index) => (
-          <li key={page.id} className="rounded border border-neutral-200 p-2.5 space-y-2">
+          <li
+            key={page.id}
+            className="space-y-2 border-b border-neutral-200 p-3 last:border-b-0"
+          >
             <div className="flex items-center justify-between gap-2">
               <span className="text-sm font-medium text-neutral-900">
                 {t(PAGE_LABEL[page.slug])}
               </span>
-              <span className="text-[11px] text-neutral-500">{t("gatedBadge")}</span>
+              <span className="text-[11px] text-neutral-400">
+                {t("gatedBadge")}
+              </span>
             </div>
             <input
               className={inputClass}
@@ -1081,19 +1317,17 @@ function PagesPanel({
                 patch({ pages });
               }}
             />
-            <label className="flex items-center gap-2 text-xs text-neutral-600">
-              <input
-                type="checkbox"
-                checked={page.enabled}
-                onChange={(event) => {
-                  const pages = config.pages.map((item, i) =>
-                    i === index ? { ...item, enabled: event.target.checked } : item,
-                  );
-                  patch({ pages });
-                }}
-              />
-              {t("pageEnabled")}
-            </label>
+            <Toggle
+              compact
+              label={t("pageEnabled")}
+              checked={page.enabled}
+              onChange={(enabled) => {
+                const pages = config.pages.map((item, i) =>
+                  i === index ? { ...item, enabled } : item,
+                );
+                patch({ pages });
+              }}
+            />
           </li>
         ))}
       </ul>
@@ -1105,19 +1339,38 @@ function Toggle({
   label,
   checked,
   onChange,
+  compact = false,
 }: {
   label: string;
   checked: boolean;
   onChange: (value: boolean) => void;
+  compact?: boolean;
 }) {
   return (
-    <label className="flex min-h-9 items-center justify-between gap-3 text-sm text-neutral-800">
-      <span>{label}</span>
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={(event) => onChange(event.target.checked)}
-      />
+    <label
+      className={`flex items-center gap-2 ${
+        compact ? "min-h-8 shrink-0" : "min-h-11 justify-between gap-3"
+      }`}
+    >
+      <span
+        className={
+          compact
+            ? "text-[11px] text-neutral-600"
+            : "text-[13px] text-neutral-800"
+        }
+      >
+        {label}
+      </span>
+      <span className="relative inline-flex h-5 w-9 shrink-0">
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={(event) => onChange(event.target.checked)}
+          className="peer sr-only"
+        />
+        <span className="absolute inset-0 bg-neutral-300 peer-checked:bg-neutral-900 peer-focus-visible:ring-2 peer-focus-visible:ring-neutral-400" />
+        <span className="absolute top-0.5 start-0.5 size-4 bg-white transition-[inset-inline-start] peer-checked:start-[18px]" />
+      </span>
     </label>
   );
 }

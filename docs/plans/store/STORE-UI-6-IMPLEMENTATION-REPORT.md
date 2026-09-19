@@ -2,8 +2,9 @@
 
 ## 1. Status
 
-**COMPLETE pending visual review.** **Not merged, not deployed.**
-`NO VISUAL APPROVAL = NO MERGE` is respected.
+**Visual refinement round pending review.** Architecture and
+capabilities were accepted. **Visual approval is not granted.**
+**Not merged, not deployed.** `NO VISUAL APPROVAL = NO MERGE`.
 
 ## 2. Git
 
@@ -12,7 +13,7 @@
 | **Latest main SHA** | `50e66740b5e7757edd30e3dd7ae2304d8b9f325f` — STORE-UI-5 merge (PR #868) |
 | **Base SHA** | `50e66740b5e7757edd30e3dd7ae2304d8b9f325f` (verified ancestor of this branch) |
 | **Branch** | `feat/store-ui-6-store-customizer` |
-| **Head SHA** | `1369a86776b073da48a547690b34590292462a35` |
+| **Head SHA** | `PLACEHOLDER_HEAD_SHA` |
 | **PR** | [#871](https://github.com/safwan5001-source/Nebrax/pull/871) |
 
 `git merge-base --is-ancestor 50e66740b5e7757edd30e3dd7ae2304d8b9f325f HEAD` holds.
@@ -53,6 +54,8 @@ Narrow, per the brief. The full Commerce architecture was not re-audited.
 
 ## 5. Capability matrix
 
+Unchanged in this visual round.
+
 | Capability | Backend contract | State | Action taken |
 |---|---|---|---|
 | Theme persistence | none | **DESIGN_ONLY** | Preset, primary, density, radius, product-card. Tokens as `--store-*`. Save inert. |
@@ -84,10 +87,12 @@ Experience Builder. The workspace shell full-bleeds this route so the
 preview is the hero, not a padded settings card. Nav label is
 **بناء تجربة المتجر** / **Store experience**.
 
-Arabic-first RTL; English LTR. Desktop (`md+`): two-pane, controls
-360px, preview takes the rest. Mobile: **Customize / Preview** tabs.
-Device width switch (390 / 768 / 1280) lives on `md+` where a framed
-preview actually fits. Locale stays reachable on a phone.
+Arabic-first RTL; English LTR. Desktop (`lg+`): editor outline
+(196px) + inspector (300–320px) + live preview (the remainder).
+Measured at 1440: nav 196 / inspector 320 / preview **924**.
+Mobile: **Customize / Preview** tabs. Device width switch
+(390 / 768 / 1280) lives on `md+` where a framed preview actually
+fits. Locale stays reachable on a phone.
 
 ### Presentation contract
 
@@ -103,7 +108,8 @@ raster data URLs; SVG/javascript are rejected.
 as the public storefront: `StoreBrand`, `storeContainerClassName`,
 category-accent tiles, hero, new arrivals (no prices), wholesale band,
 footer. Preview catalog is labeled as fixtures. Public homepage is
-untouched and still resolves the default section list.
+untouched and still resolves the default section list. This visual
+round did not redesign the storefront preview.
 
 ### StoreBrand
 
@@ -122,9 +128,9 @@ Verified at 390 / 430 / 768 / 1024 / 1280 / 1440.
 
 | Width | Layout |
 |---|---|
-| 390 / 430 | Edit / Preview tabs. Header: title, AR/EN, Save, Publish. No squeezed two-pane. |
-| 768 | Two-pane. Device switch appears. |
-| 1024 / 1280 / 1440 | Two-pane, preview is the hero. |
+| 390 / 430 | Customize / Preview tabs. Header is title + locale only. Panel picker is a native select. Save / Publish sit above the tabs, not in the title row. |
+| 768 | Two-pane. Panel picker remains a select so names stay readable. Device switch appears. Preview takes the remainder. |
+| 1024 / 1280 / 1440 | Editor outline + inspector + preview. Preview is the hero (924px of 1440). |
 
 ## 8. RTL / LTR
 
@@ -144,7 +150,8 @@ follows independently. Logical CSS (`ms` / `me` / `ps` / `pe` / `start` /
 
 ## 10. Tenant / security assessment
 
-No stop condition was hit.
+No stop condition was hit. This visual round did not touch isolation,
+authorization, APIs, schema, or persistence.
 
 | Guardrail | Held how |
 |---|---|
@@ -172,101 +179,105 @@ Locked STORE-UI-1–5 customer surfaces were not redesigned.
 
 ## 12. Changed files
 
-**New — presentation contract (storefront)**
-- `storefront/src/lib/presentation/{capabilities,config,tokens,urls,index}.ts`
-- tests under `storefront/src/lib/presentation/__tests__/`
+**Visual round (chrome only)**
+- `storefront/src/components/customizer/{ExperienceBuilder,ControlPanels,messages}.tsx|ts`
+- `web/src/modules/store-experience-builder/{ExperienceBuilder,ControlPanels,messages}.tsx|ts`
+- `docs/plans/store/store-ui-6-visual-qa/*.png` (required recaptures)
 
-**New — Customizer (storefront)**
-- `storefront/src/components/customizer/{ExperienceBuilder,ControlPanels,StorefrontPreviewCanvas,messages,preview-fixtures}.tsx|ts`
-- `storefront/src/components/customizer/__tests__/{ExperienceBuilder,architecture}.test.ts`
-- `storefront/src/app/dev/store-ui-6/page.tsx` (dev-only harness; `notFound()` in production)
-
-**New — merchant workspace (web)**
-- `web/src/modules/store-experience-builder/**`
-- `web/src/app/(commerce)/commerce/appearance/page.test.tsx`
-
-**Changed**
-- `storefront/src/components/layout/StoreBrand.tsx` — logo slot
-- `storefront/src/app/[country]/[locale]/(storefront)/page.tsx` — comment that public homepage must not read a draft
-- `web/src/app/(commerce)/commerce/appearance/page.tsx` — mounts Experience Builder
-- `web/src/components/commerce-workspace/commerce-workspace-shell.tsx` — full-bleed for appearance
-- `web/src/modules/commerce-workspace/messages.ts` — nav labels
-- `docs/plans/store/AWJ_STOREFRONT_DESIGN_FIRST_POLICY.md` §5.16–§5.30
-
-**Visual QA**
-- `docs/plans/store/store-ui-6-visual-qa/*.png`
+**Unchanged this round:** presentation contract, capabilities, preview
+canvas, StoreBrand, public homepage, APIs, schema, persistence.
 
 ## 13. Tests and exact results
 
+Visual surfaces first, then required storefront validation:
+
 ```
-storefront pnpm test          →  78 files, 555 tests passed
-storefront biome check (STORE-UI-6 paths) →  18 files, no fixes applied
-storefront tsc --noEmit       →  clean
-web vitest appearance + presentation →  2 files, 6 tests passed
+storefront customizer + presentation + StoreBrand + Header
+  →  7 files, 29 tests passed
+web vitest appearance + presentation
+  →  2 files, 6 tests passed
+storefront pnpm test
+  →  78 files, 555 tests passed
+storefront biome check (changed customizer files)
+  →  3 files, no fixes applied
 ```
 
-This pass asserts:
+This pass still asserts:
 
 - Save / Publish do not claim success and write no `localStorage`
 - Navy preset updates `--store-primary` on the canvas
 - Additional nav labels appear in the preview
 - Requesting a verified badge does not mint `Verified` on the canvas
-- Unknown homepage keys are dropped; unsupported colours fail closed
-- javascript:/http URLs are rejected; WhatsApp `wa.me` is built only from a usable number
-- `StoreBrand` keeps the wordmark for an unsafe logo and never substitutes AWJ
 - Architecture: no presentation API client, no browser storage, no Verified badge in the preview renderer
 - `/commerce/appearance` is no longer the destination placeholder
 
-`pnpm build` was not required to prove the design; the public storefront
-is unchanged aside from the `StoreBrand` logo slot (unused until a
-published URL exists).
-
 ## 14. Build result
 
-TypeScript finished clean on the storefront. The web module typechecks
-under the same `tsc` graph for the new files.
-
-`/dev/store-ui-6` is listed; the page calls `notFound()` when
-`NODE_ENV === "production"`. The merchant surface is
+TypeScript was not re-run as a gate for chrome-only class and copy
+changes. The public storefront is unchanged. `/dev/store-ui-6` remains
+the design harness (`notFound()` in production). Merchant surface is
 `/commerce/appearance`.
 
 ## 15. CI status
 
-Not yet run at report time. No Laravel/PHP files were changed. If CI runs
-Laravel with no PHP diff, that failure is inherited and is not in this scope.
+Not yet run at report time. No Laravel/PHP files were changed.
 
 ## 16. Visual QA
 
-Harness: development-only `/dev/store-ui-6` (Playwright + Chromium
-headless-shell). The merchant workspace mounts the same builder. Preview
-fixtures are not a production catalog.
+Harness: development-only `/dev/store-ui-6`. Recaptured after this
+chrome pass:
 
-| Width | Locale | Surfaces |
-|---|---|---|
-| 1440 | AR | theme, homepage, WhatsApp, verification, apps, save-blocked lifecycle, tablet preview, mobile preview |
-| 1440 | EN | theme, homepage, WhatsApp |
-| 1280 | AR | theme |
-| 1024 | AR | theme |
-| 768 | AR | theme (two-pane) |
-| 430 | AR | edit tab, preview tab |
-| 390 | AR | edit tab, preview tab |
-| 390 | EN | edit tab, preview tab |
-
-Screenshots: `docs/plans/store/store-ui-6-visual-qa/`.
+| Width | Locale | Surface | File |
+|---|---|---|---|
+| 1440 | AR | Appearance | `desktop-1440-ar-theme.png` |
+| 1440 | AR | Homepage composer | `desktop-1440-ar-homepage.png` |
+| 1440 | AR | WhatsApp | `desktop-1440-ar-whatsapp.png` |
+| 1440 | AR | Verification | `desktop-1440-ar-verification.png` |
+| 1440 | EN | Appearance | `desktop-1440-en-theme.png` |
+| 768 | AR | Appearance | `tablet-768-ar-theme.png` |
+| 390 | AR | Customize | `mobile-390-ar-edit.png` |
+| 390 | AR | Preview | `mobile-390-ar-preview.png` |
+| 390 | EN | Customize | `mobile-390-en-edit.png` |
 
 Observed while capturing:
 
-- Two-pane RTL at 1440 is the intended workspace: preview is the hero.
-- Theme preset (Navy / Burgundy) updates the canvas primary immediately.
-- Homepage gated sections stay **hidden** in the preview until toggled;
-  they are labeled **غير مفعّل** in the controls.
-- WhatsApp shows a `wa.me` preview URL and does not send.
-- Verification panel states **غير موثّق** / **Not verified**. The canvas
-  has no Verified badge after the requested-badge toggle.
-- Mobile 390 uses Customize / Preview tabs. Device-width switch is
-  withheld below `md` so the header stays Save / Publish / locale.
+- Desktop 1440 preview is the hero (924px canvas column).
+- Editor outline is Appearance / Identity / Header & navigation /
+  Homepage / Footer / Contact / WhatsApp / Social / Verification /
+  Apps / Content, with hairline group breaks and a solid selected row.
+- Theme presets are selectable mini-store plates, not a 5-column chip row.
+- Homepage is a composer list (reorder + name + gated + visibility),
+  with hero copy as its own block.
+- WhatsApp / Verification / Apps use intro copy + grouped fields,
+  not a flat settings form.
+- Mobile 390 header is title + locale only. Save / Publish are a
+  dedicated action row above Customize / Preview.
+- Storefront preview itself was not redesigned.
 
-## 17. Explicit non-goals (held)
+## 17. Visual refinement (this round)
+
+Chrome only. Capabilities, honesty, tenant isolation, and the
+storefront preview canvas are unchanged. No backend, API, schema,
+persistence, or browser storage was introduced.
+
+What changed:
+
+- **Preview dominance.** Inspector stays ~300–320px readable; the
+  outline is 196px from `lg` up; preview fills the rest.
+- **Editor outline, not a settings list.** Named surfaces in
+  store-building order, icons + labels, selected row is inverted
+  fill, groups separated by hairlines rather than category captions.
+- **Theme presets** are 2-column visual plates (header + product
+  tiles) with a hard selected border.
+- **Homepage composer** communicates show / hide / reorder as a
+  layer list.
+- **Contact, WhatsApp, Verification, Apps** have section headings
+  and grouped controls.
+- **Mobile action hierarchy.** Title row, panel select, controls,
+  Save / Publish, then Customize / Preview. Desktop actions are not
+  squeezed into the 390px title.
+
+## 18. Explicit non-goals (held)
 
 - No merge, no deploy, no auto-merge.
 - No invented presentation API, migration or schema.
@@ -278,7 +289,9 @@ Observed while capturing:
 - No iframe of the live storefront as unpublished-theme preview.
 - STORE-UI-1–5 locked surfaces were not redesigned.
 - Version history is deferred.
+- Storefront preview was not redesigned.
 
-## 18. Stop
+## 19. Stop
 
 This branch is open for **visual review only**.
+`NO VISUAL APPROVAL = NO MERGE`.
