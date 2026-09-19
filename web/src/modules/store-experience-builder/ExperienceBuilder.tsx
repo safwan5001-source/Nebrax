@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   clonePresentationConfig,
   DEFAULT_PRESENTATION_CONFIG,
@@ -70,16 +70,16 @@ export function ExperienceBuilder({
   const [panel, setPanel] = useState<CustomizerPanel>("theme");
   const [device, setDevice] = useState<PreviewDevice>("desktop");
   const [mobilePane, setMobilePane] = useState<"edit" | "preview">("edit");
+  const [selectedSection, setSelectedSection] =
+    useState<HomeBuilderSectionKey | null>(null);
+  const [pendingSectionScroll, setPendingSectionScroll] =
+    useState<HomeBuilderSectionKey | null>(null);
   const [lifecycle, setLifecycle] = useState<BuilderLifecycle>("clean");
   const [notice, setNotice] = useState<string | null>(null);
   const [noticeKind, setNoticeKind] = useState<"capability" | "status">("status");
   const [busy, setBusy] = useState<"loading" | "saving" | "publishing" | null>(
     storefrontId ? "loading" : null,
   );
-  const [selectedSection, setSelectedSection] =
-    useState<HomeBuilderSectionKey | null>(null);
-  const rootRef = useRef<HTMLDivElement>(null);
-  const pendingSectionScroll = useRef<HomeBuilderSectionKey | null>(null);
   const t = (key: CustomizerMessageKey) => customizerMessage(locale, key);
 
   const dirty = !presentationConfigsEqual(draft, saved);
@@ -233,17 +233,16 @@ export function ExperienceBuilder({
     // since a preview click already has the section in view.
     setPanel("homepage");
     if (origin === "sidebar") {
-      pendingSectionScroll.current = key;
+      setPendingSectionScroll(key);
     }
   }
 
   useEffect(() => {
-    const key = pendingSectionScroll.current;
+    const key = pendingSectionScroll;
     if (!key) return;
-    pendingSectionScroll.current = null;
-    const root = rootRef.current;
-    if (!root) return;
-    const target = root.querySelector(`[data-preview-section="${key}"]`);
+    setPendingSectionScroll(null);
+    if (typeof document === "undefined") return;
+    const target = document.querySelector(`[data-preview-section="${key}"]`);
     if (!target || typeof target.scrollIntoView !== "function") return;
     const reduceMotion =
       typeof window.matchMedia === "function" &&
@@ -252,7 +251,7 @@ export function ExperienceBuilder({
       behavior: reduceMotion ? "auto" : "smooth",
       block: "start",
     });
-  }, [selectedSection]);
+  }, [pendingSectionScroll]);
 
   const width = PREVIEW_WIDTHS[device];
   const statusLabel =
@@ -266,7 +265,6 @@ export function ExperienceBuilder({
 
   return (
     <div
-      ref={rootRef}
       dir={locale === "ar" ? "rtl" : "ltr"}
       data-experience-builder=""
       data-lifecycle={lifecycle}
