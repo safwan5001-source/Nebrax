@@ -756,38 +756,89 @@ function HomepagePanel({
     patch({ homepage: { ...config.homepage, sections: next } });
   };
 
+  const setVisible = (index: number, visible: boolean) => {
+    const sections = config.homepage.sections.map((item, i) =>
+      i === index ? { ...item, visible } : item,
+    );
+    patch({ homepage: { ...config.homepage, sections } });
+  };
+
+  const heroFields = (
+    <>
+      <Field label={t("heroHeadline")}>
+        <input
+          className={inputClass}
+          value={config.homepage.heroHeadline}
+          onChange={(event) =>
+            patch({
+              homepage: {
+                ...config.homepage,
+                heroHeadline: event.target.value,
+              },
+            })
+          }
+        />
+      </Field>
+      <Field label={t("heroSubheadline")}>
+        <input
+          className={inputClass}
+          value={config.homepage.heroSubheadline}
+          onChange={(event) =>
+            patch({
+              homepage: {
+                ...config.homepage,
+                heroSubheadline: event.target.value,
+              },
+            })
+          }
+        />
+      </Field>
+    </>
+  );
+
+  const selectedIndex = selectedSection
+    ? config.homepage.sections.findIndex(
+        (section) => section.key === selectedSection,
+      )
+    : -1;
+  const selected =
+    selectedIndex >= 0 ? config.homepage.sections[selectedIndex] : null;
+
   return (
     <div className="space-y-7">
-      <Section title={t("heroContent")}>
-        <Field label={t("heroHeadline")}>
-          <input
-            className={inputClass}
-            value={config.homepage.heroHeadline}
-            onChange={(event) =>
-              patch({
-                homepage: {
-                  ...config.homepage,
-                  heroHeadline: event.target.value,
-                },
-              })
-            }
-          />
-        </Field>
-        <Field label={t("heroSubheadline")}>
-          <input
-            className={inputClass}
-            value={config.homepage.heroSubheadline}
-            onChange={(event) =>
-              patch({
-                homepage: {
-                  ...config.homepage,
-                  heroSubheadline: event.target.value,
-                },
-              })
-            }
-          />
-        </Field>
-      </Section>
+      {selected ? (
+        <Section
+          title={t(SECTION_LABEL[selected.key])}
+          hint={t("selectedSectionHint")}
+        >
+          <div
+            data-selected-section-settings={selected.key}
+            className="space-y-4"
+          >
+            <Toggle
+              compact
+              label={
+                selected.visible ? t("sectionVisible") : t("sectionHidden")
+              }
+              checked={selected.visible}
+              onChange={(visible) => setVisible(selectedIndex, visible)}
+            />
+            {selected.key === "hero" ? (
+              heroFields
+            ) : isGatedHomeSection(selected.key) ? (
+              <p className="text-xs leading-relaxed text-neutral-500">
+                {t("gatedSection")}
+              </p>
+            ) : (
+              <p className="text-xs leading-relaxed text-neutral-500">
+                {t("sectionManagedNote")}
+              </p>
+            )}
+          </div>
+        </Section>
+      ) : (
+        <Section title={t("heroContent")}>{heroFields}</Section>
+      )}
       <Section title={t("composerTitle")} hint={t("composerHint")}>
         <ul className="border border-neutral-200">
           {config.homepage.sections.map((section, index) => {
