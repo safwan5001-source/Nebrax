@@ -31,6 +31,10 @@ final class CommerceWorkspaceServiceProvider extends ServiceProvider
             SetBranch::class,
             EnsureActiveSubscription::class,
         ])->prefix('api/commerce/workspace/products')->group(function (): void {
+            // COM-CATALOG-1 — Product Publication Workspace list. Registered
+            // before {id} so the literal segment can never be shadowed.
+            Route::get('publication', [CommerceProductPublicationController::class, 'index'])
+                ->middleware(EnsurePermission::class.':products.view');
             Route::get('{id}/publication', [CommerceProductPublicationController::class, 'show'])
                 ->whereUuid('id')
                 ->middleware(EnsurePermission::class.':products.view');
