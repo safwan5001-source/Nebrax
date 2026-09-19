@@ -331,7 +331,7 @@ class StorefrontCatalogApiTest extends TestCase
         $product = $this->publishedProduct($tenant, $channel);
 
         $show = $this->getJson("/store/v1/{$tenant->slug}/products/{$product->id}")->assertOk();
-        $this->assertNull($show->json('data.in_stock'));
+        $this->assertNull($show->json('in_stock'));
 
         $list = $this->getJson("/store/v1/{$tenant->slug}/products")->assertOk();
         $listItem = collect($list->json('data'))->firstWhere('id', $product->id);
