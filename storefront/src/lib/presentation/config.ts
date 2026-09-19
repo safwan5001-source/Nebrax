@@ -45,10 +45,23 @@ export interface PresentationNavLink {
   enabled: boolean;
 }
 
+/**
+ * Homepage section instance (contract v2). `id` is the stable instance
+ * identity — local to this presentation document, never a global resource
+ * id. `type` is the closed, fail-closed section type. Legacy v1 documents
+ * stored `{key, visible}`; they migrate deterministically to `id = key`.
+ */
 export interface PresentationHomeSection {
-  key: HomeBuilderSectionKey;
+  id: string;
+  type: HomeBuilderSectionKey;
   visible: boolean;
 }
+
+/**
+ * Upper bound on homepage section instances. Bounds document size and keeps
+ * normalization fail-closed; well above any sane homepage.
+ */
+export const MAX_HOME_SECTIONS = 30;
 
 export interface PresentationSocialLink {
   id: string;
@@ -190,7 +203,8 @@ export const DEFAULT_PRESENTATION_CONFIG: StorefrontPresentationConfig = {
   },
   homepage: {
     sections: HOME_BUILDER_SECTION_KEYS.map((key) => ({
-      key,
+      id: key,
+      type: key,
       visible:
         key === "hero" ||
         key === "categories" ||
@@ -239,29 +253,75 @@ export const DEFAULT_PRESENTATION_CONFIG: StorefrontPresentationConfig = {
   })),
 };
 
+/**
+ * Resolves stored homepage sections to safe instances.
+ *
+ * Input accepts both shapes:
+ * - v2 instance entries `{id, type, visible}` — identity is `id`;
+ * - legacy v1 entries `{key, visible}` — migrate to `id = key` (deterministic,
+ *   stable across reloads/saves; no random ids ever).
+ *
+ * Unknown types and malformed entries are dropped (fail-closed). Duplicate
+ * ids collapse to the first occurrence, deterministically.
+ *
+ * Missing-section semantics are versioned: `legacy` input (document version
+ * < 2, or none) re-appends missing defaults exactly as v1 did, so old
+ * documents keep their current meaning. New v2 documents treat absence as a
+ * real deletion and are returned as-is.
+ */
 function resolveHomeBuilderSections(
-  configured?: readonly PresentationHomeSection[],
+  configured: unknown,
+  legacy: boolean,
 ): PresentationHomeSection[] {
-  if (!configured?.length) {
-    return DEFAULT_PRESENTATION_CONFIG.homepage.sections.map((section) => ({
-      ...section,
-    }));
+  if (!Array.isArray(configured) || configured.length === 0) {
+    return legacy
+      ? DEFAULT_PRESENTATION_CONFIG.homepage.sections.map((section) => ({
+          ...section,
+        }))
+      : [];
   }
 
-  const known = configured.filter((section) =>
-    HOME_BUILDER_SECTION_KEYS.includes(section.key),
-  );
-  const seen = new Set(known.map((section) => section.key));
+  const out: PresentationHomeSection[] = [];
+  const seenIds = new Set<string>();
+  const seenTypes = new Set<string>();
 
-  return [
-    ...known.map((section) => ({
-      key: section.key,
-      visible: Boolean(section.visible),
-    })),
-    ...DEFAULT_PRESENTATION_CONFIG.homepage.sections.filter(
-      (section) => !seen.has(section.key),
-    ),
-  ];
+  for (const raw of configured) {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) continue;
+    const entry = raw as Record<string, unknown>;
+
+    let id: string;
+    let type: string;
+    if ("id" in entry || "type" in entry) {
+      id = safeId(entry.id, "");
+      type = asString(entry.type);
+      if (!id) continue;
+    } else {
+      const key = asString(entry.key);
+      id = key;
+      type = key;
+    }
+    if (!(HOME_BUILDER_SECTION_KEYS as readonly string[]).includes(type)) {
+      continue;
+    }
+    if (seenIds.has(id)) continue;
+
+    seenIds.add(id);
+    seenTypes.add(type);
+    out.push({
+      id,
+      type: type as HomeBuilderSectionKey,
+      visible: asBoolean(entry.visible, false),
+    });
+    if (out.length >= MAX_HOME_SECTIONS) break;
+  }
+
+  if (legacy) {
+    for (const fallback of DEFAULT_PRESENTATION_CONFIG.homepage.sections) {
+      if (!seenTypes.has(fallback.type)) out.push({ ...fallback });
+    }
+  }
+
+  return out;
 }
 
 function normalizeNavLink(
@@ -415,9 +475,8 @@ export function normalizePresentationConfig(
     },
     homepage: {
       sections: resolveHomeBuilderSections(
-        Array.isArray(homepageRaw.sections)
-          ? (homepageRaw.sections as PresentationHomeSection[])
-          : undefined,
+        homepageRaw.sections,
+        !(typeof raw.version === "number" && raw.version >= 2),
       ),
       heroHeadline: asString(homepageRaw.heroHeadline).slice(0, 120),
       heroSubheadline: asString(homepageRaw.heroSubheadline).slice(0, 200),

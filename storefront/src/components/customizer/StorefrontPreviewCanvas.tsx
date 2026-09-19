@@ -238,7 +238,7 @@ export function StorefrontPreviewCanvas({
         {config.homepage.sections
           .filter((section) => section.visible)
           .map((section) => {
-            if (section.key === "hero") {
+            if (section.type === "hero") {
               const title = config.homepage.heroHeadline.trim() || storeName;
               const sub = config.homepage.heroSubheadline.trim();
               return (
@@ -264,7 +264,7 @@ export function StorefrontPreviewCanvas({
               );
             }
 
-            if (section.key === "categories") {
+            if (section.type === "categories") {
               return (
                 <section key="categories" aria-labelledby="preview-categories">
                   <SectionRule
@@ -297,7 +297,7 @@ export function StorefrontPreviewCanvas({
               );
             }
 
-            if (section.key === "newArrivals") {
+            if (section.type === "newArrivals") {
               return (
                 <section key="newArrivals" aria-labelledby="preview-arrivals">
                   <SectionRule title={t("newArrivals")} action={t("viewAll")} />
@@ -330,7 +330,7 @@ export function StorefrontPreviewCanvas({
               );
             }
 
-            if (section.key === "wholesale") {
+            if (section.type === "wholesale") {
               return (
                 <section
                   key="wholesale"
@@ -348,20 +348,20 @@ export function StorefrontPreviewCanvas({
               );
             }
 
-            if (section.key === "appPromo" && !hasApps) {
+            if (section.type === "appPromo" && !hasApps) {
               return null;
             }
 
             return (
               <section
-                key={section.key}
+                key={section.id}
                 className="rounded-store border border-dashed border-store-border-strong bg-store-surface px-4 py-5"
               >
                 <div className="flex items-center justify-between gap-3">
                   <h2 className="text-sm font-bold text-store-foreground">
-                    {t(SECTION_TITLE[section.key] ?? "sectionCustomContent")}
+                    {t(SECTION_TITLE[section.type] ?? "sectionCustomContent")}
                   </h2>
-                  {isGatedHomeSection(section.key) && (
+                  {isGatedHomeSection(section.type) && (
                     <span className="text-[11px] font-medium text-store-muted-foreground">
                       {t("gatedBadge")}
                     </span>

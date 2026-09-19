@@ -6,7 +6,8 @@ use App\Support\Commerce\StorefrontPresentationNormalizer;
 use Tests\TestCase;
 
 /**
- * STORE-BACKEND-1 — توأم PHP لـ normalizePresentationConfig v1.
+ * STORE-BACKEND-1 + STORE-CUSTOMIZER-CONTRACT-2 — توأم PHP لـ
+ * normalizePresentationConfig v2 مع دعم قراءة وثائق v1.
  *
  * تشغيل: php artisan test --filter=StorefrontPresentationNormalizerTest
  */
@@ -23,7 +24,7 @@ class StorefrontPresentationNormalizerTest extends TestCase
     /** @test */
     public function missing_or_non_object_input_fails_closed_to_awj_modern_defaults(): void
     {
-        $default = $this->fixture('v1-default.json');
+        $default = $this->fixture('default-config.json');
 
         $this->assertSame($default, $this->normalizer->defaultConfig());
         $this->assertSame($default, $this->normalizer->normalize(null));
@@ -31,7 +32,7 @@ class StorefrontPresentationNormalizerTest extends TestCase
         $this->assertSame($default, $this->normalizer->normalize(1));
         $this->assertSame('awj-modern', $this->normalizer->normalize([])['themePreset']);
         $this->assertSame('#12372a', $this->normalizer->normalize([])['primaryColor']);
-        $this->assertSame(1, $this->normalizer->normalize([])['version']);
+        $this->assertSame(StorefrontPresentationNormalizer::VERSION, $this->normalizer->normalize([])['version']);
     }
 
     /** @test */
@@ -44,18 +45,160 @@ class StorefrontPresentationNormalizerTest extends TestCase
         $this->assertSame('awj-modern', $normalized['themePreset']);
         $this->assertSame('#12372a', $normalized['primaryColor']);
         $this->assertNull($normalized['accentColor']);
-        $this->assertSame(1, $normalized['version']);
+        $this->assertSame(StorefrontPresentationNormalizer::VERSION, $normalized['version']);
         $this->assertSame('Safe Name', $normalized['branding']['displayName']);
         $this->assertNull($normalized['branding']['logoDataUrl']);
         $this->assertNull($normalized['branding']['compactLogoDataUrl']);
         $this->assertNull($normalized['branding']['faviconDataUrl']);
         $this->assertSame('', $normalized['header']['links'][0]['href']);
         $this->assertStringContainsString('https://instagram.com', $normalized['header']['links'][1]['href']);
-        $this->assertFalse(collect($normalized['homepage']['sections'])->contains(fn ($s) => $s['key'] === 'banner-html'));
-        $this->assertTrue(collect($normalized['homepage']['sections'])->contains(fn ($s) => $s['key'] === 'hero' && $s['visible'] === false));
+        $this->assertFalse(collect($normalized['homepage']['sections'])->contains(fn ($s) => $s['type'] === 'banner-html'));
+        $this->assertTrue(collect($normalized['homepage']['sections'])->contains(fn ($s) => $s['type'] === 'hero' && $s['visible'] === false));
         $this->assertSame('', $normalized['social'][0]['url']);
         $this->assertSame('', $normalized['apps']['iosUrl']);
         $this->assertStringContainsString('play.google.com', $normalized['apps']['androidUrl']);
+    }
+
+    /** @test */
+    public function legacy_v1_sections_migrate_with_deterministic_ids_and_default_backfill(): void
+    {
+        $normalized = $this->normalizer->normalize($this->fixture('v1-unsafe-input.json'));
+        $sections = $normalized['homepage']['sections'];
+
+        // legacy migration: id = key، بلا UUID عشوائي.
+        foreach ($sections as $section) {
+            $this->assertSame($section['id'], $section['type']);
+        }
+        // دلالات v1: الأقسام الناقصة تُعاد إلحاقها من الافتراضي.
+        $types = collect($sections)->pluck('type')->sort()->values()->all();
+        $this->assertSame(
+            collect(StorefrontPresentationNormalizer::HOME_BUILDER_SECTION_KEYS)->sort()->values()->all(),
+            $types,
+        );
+    }
+
+    /** @test */
+    public function legacy_normalization_is_idempotent_across_repeated_passes(): void
+    {
+        $once = $this->normalizer->normalize($this->fixture('v1-unsafe-input.json'));
+        $twice = $this->normalizer->normalize($once);
+
+        $this->assertSame($once['homepage']['sections'], $twice['homepage']['sections']);
+    }
+
+    /** @test */
+    public function v2_keeps_multiple_instances_of_the_same_type_in_order(): void
+    {
+        $normalized = $this->normalizer->normalize([
+            'version' => 2,
+            'homepage' => [
+                'sections' => [
+                    ['id' => 'banner-a', 'type' => 'banner', 'visible' => true],
+                    ['id' => 'hero', 'type' => 'hero', 'visible' => true],
+                    ['id' => 'banner-b', 'type' => 'banner', 'visible' => false],
+                ],
+            ],
+        ]);
+
+        $this->assertSame(
+            [
+                ['id' => 'banner-a', 'type' => 'banner', 'visible' => true],
+                ['id' => 'hero', 'type' => 'hero', 'visible' => true],
+                ['id' => 'banner-b', 'type' => 'banner', 'visible' => false],
+            ],
+            $normalized['homepage']['sections'],
+        );
+    }
+
+    /** @test */
+    public function v2_absence_means_delete_and_never_resurrects_defaults(): void
+    {
+        $normalized = $this->normalizer->normalize([
+            'version' => 2,
+            'homepage' => [
+                'sections' => [['id' => 'hero', 'type' => 'hero', 'visible' => true]],
+            ],
+        ]);
+
+        $this->assertSame(['hero'], collect($normalized['homepage']['sections'])->pluck('type')->all());
+    }
+
+    /** @test */
+    public function v2_empty_sections_array_stays_empty(): void
+    {
+        $normalized = $this->normalizer->normalize([
+            'version' => 2,
+            'homepage' => ['sections' => []],
+        ]);
+
+        $this->assertSame([], $normalized['homepage']['sections']);
+    }
+
+    /** @test */
+    public function v2_drops_unknown_types_and_duplicate_ids_deterministically(): void
+    {
+        $normalized = $this->normalizer->normalize([
+            'version' => 2,
+            'homepage' => [
+                'sections' => [
+                    ['id' => 'x-1', 'type' => 'evil-type', 'visible' => true],
+                    ['id' => 'hero', 'type' => 'hero', 'visible' => false],
+                    ['id' => 'hero', 'type' => 'hero', 'visible' => true],
+                    ['id' => 'banner-1', 'type' => 'banner', 'visible' => true],
+                ],
+            ],
+        ]);
+
+        $this->assertSame(
+            [
+                ['id' => 'hero', 'type' => 'hero', 'visible' => false],
+                ['id' => 'banner-1', 'type' => 'banner', 'visible' => true],
+            ],
+            $normalized['homepage']['sections'],
+        );
+    }
+
+    /** @test */
+    public function v2_rejects_unsafe_ids_and_caps_the_section_list(): void
+    {
+        $sections = [['id' => 'bad id!!', 'type' => 'banner', 'visible' => true]];
+        for ($i = 0; $i < StorefrontPresentationNormalizer::MAX_HOME_SECTIONS + 5; $i++) {
+            $sections[] = ['id' => 'banner-'.$i, 'type' => 'banner', 'visible' => true];
+        }
+
+        $normalized = $this->normalizer->normalize([
+            'version' => 2,
+            'homepage' => ['sections' => $sections],
+        ]);
+
+        $this->assertCount(StorefrontPresentationNormalizer::MAX_HOME_SECTIONS, $normalized['homepage']['sections']);
+        foreach ($normalized['homepage']['sections'] as $section) {
+            $this->assertMatchesRegularExpression('/^[a-zA-Z0-9_-]{1,64}$/', $section['id']);
+        }
+    }
+
+    /** @test */
+    public function v2_round_trip_is_stable_across_repeated_normalization(): void
+    {
+        $input = [
+            'version' => 2,
+            'homepage' => [
+                'sections' => [
+                    ['id' => 'b1', 'type' => 'banner', 'visible' => true],
+                    ['id' => 'hero', 'type' => 'hero', 'visible' => true],
+                    ['id' => 'b2', 'type' => 'banner', 'visible' => false],
+                ],
+            ],
+        ];
+
+        $once = $this->normalizer->normalize($input);
+        $twice = $this->normalizer->normalize($once);
+
+        $this->assertSame($once['homepage']['sections'], $twice['homepage']['sections']);
+        $this->assertSame(
+            ['b1', 'hero', 'b2'],
+            collect($twice['homepage']['sections'])->pluck('id')->all(),
+        );
     }
 
     /** @test */
@@ -116,7 +259,7 @@ class StorefrontPresentationNormalizerTest extends TestCase
             'themePreset' => 'navy',
         ]);
 
-        $this->assertSame(1, $normalized['version']);
+        $this->assertSame(StorefrontPresentationNormalizer::VERSION, $normalized['version']);
         $this->assertSame('navy', $normalized['themePreset']);
         $this->assertSame('#1e3a5f', $normalized['primaryColor']);
     }
