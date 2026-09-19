@@ -136,6 +136,7 @@ class StorefrontPresentationPostgresConcurrencyTest extends TestCase
         $this->tenantId = (string) Str::uuid();
         $channelId = (string) Str::uuid();
         $this->storefrontId = (string) Str::uuid();
+        $presentationId = (string) Str::uuid();
         $now = now()->toDateTimeString();
 
         $this->fixtureConnection->prepare(
@@ -160,9 +161,11 @@ class StorefrontPresentationPostgresConcurrencyTest extends TestCase
              VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
         )->execute([$this->storefrontId, $this->tenantId, $channelId, 'main', 'متجر', true, $now, $now]);
         $this->fixtureConnection->prepare(
-            'INSERT INTO storefront_presentations (storefront_id, schema_version, draft_config, draft_revision, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?)'
+            'INSERT INTO storefront_presentations (id, tenant_id, storefront_id, schema_version, draft_config, draft_revision, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
         )->execute([
+            $presentationId,
+            $this->tenantId,
             $this->storefrontId,
             1,
             json_encode(['version' => 1, 'themePreset' => 'awj-modern'], JSON_THROW_ON_ERROR),
