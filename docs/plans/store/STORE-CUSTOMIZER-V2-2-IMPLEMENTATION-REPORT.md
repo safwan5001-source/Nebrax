@@ -100,7 +100,7 @@ Unchanged by design: every mutation (visibility from composer or selected block,
 
 | File | Change |
 |---|---|
-| `web/src/modules/store-experience-builder/ControlPanels.tsx` | Selected-section settings block in `HomepagePanel`; `setVisible` helper; `heroFields` extraction; composer untouched |
+| `web/src/modules/store-experience-builder/ControlPanels.tsx` | Selected-section settings block in `HomepagePanel`; `setVisible` helper; `heroFields` extraction; composer untouched (+57/−30 approx.) |
 | `web/src/modules/store-experience-builder/messages.ts` | 2 new keys × 2 locales |
 | `web/src/app/(commerce)/commerce/appearance/section-editing.test.tsx` | **New** — 8 tests |
 
@@ -151,10 +151,10 @@ Temporary harness page (`ExperienceBuilder` rendered directly; Arabic, `dir="rtl
 ## 14. Git / CI
 
 - **Base SHA:** `7d424518fd7cf3a8ed0681a7942a42269b339801`
-- **Commits:** `4fd848a2` (tests) → `4c58b920` (messages) → `80aff80c` (ControlPanels) → report commit (this file)
-- **Final Head SHA:** recorded in PR #881 after the report commit.
-- **CI status:** see PR #881 checks (real runs on the head commit).
-- Mergeability: branch created from latest main; single-purpose commits.
+- **Commits:** `4fd848a2` (tests) → `4c58b920` (messages) → `80aff80c` (ControlPanels) → `7133c918` (this report)
+- **Final Head SHA:** `7133c9181634d99ef0cba4c2f360c85f73de5346`
+- **CI status (real runs on the head, all success):** `web build (Next.js)` ✅ · `php artisan test (L11, sqlite)` ✅ ×2 runs · `php artisan test (L11, pgsql)` ✅ ×2 runs — 5/5 green. `storefront (lint + typecheck + test)` did not run because `storefront-ci.yml` is path-scoped to `storefront/**`, which this PR does not touch.
+- **Mergeability:** `mergeable_state: clean` (branch from latest main, no conflicts).
 
 ## 15. Risks / deferred
 
