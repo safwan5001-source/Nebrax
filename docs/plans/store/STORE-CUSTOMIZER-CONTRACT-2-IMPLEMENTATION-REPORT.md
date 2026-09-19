@@ -254,7 +254,18 @@ type PresentationHomeSectionV2 = {
 
 ## 22. CI
 
-انظر القسم 26 — يُحدَّث بالنتائج النهائية للـhead الأخير.
+على الـhead النهائي `d5d3bddd22c7b41171765c5a70bf9c83c8a92943` — **4/4 خضراء**:
+
+| Check | النتيجة | المدة |
+|---|---|---|
+| storefront (lint + typecheck + test) | ✅ success | 16:14:04 → 16:15:27 |
+| web build (Next.js) | ✅ success | 16:14:04 → 16:16:52 |
+| php artisan test (L11, sqlite) | ✅ success | 16:14:04 → 16:19:01 |
+| php artisan test (L11, pgsql) | ✅ success | 16:14:40 → 16:33:43 |
+
+يشمل ذلك سويت الـPHP الكامل (sqlite + pgsql) بما فيه NormalizerTest و
+DraftApiTest وPublicRuntimeTest الجديدة/المحدّثة، وسويت storefront الكامل
+(lint + typecheck + 570 اختبارًا)، وبناء web الإنتاجي.
 
 ## 23. المخاطر
 
@@ -282,8 +293,10 @@ type PresentationHomeSectionV2 = {
 ## 26. Git / CI النهائي
 
 - Base SHA: `bbb18e0bcebb296c7a75b23a67c2d13377f49fde`
-- Head SHA: `4cdd048d2c423650f63a7e6f5ad29f9e8783ce13` (+ commit هذا التقرير — يُحدَّث أدناه)
-- CI: (يُحدَّث بعد اكتمال الـchecks على الـhead النهائي)
+- Head SHA: `d5d3bddd22c7b41171765c5a70bf9c83c8a92943` (+ commit تحديث CI في هذا التقرير)
+- Commits: 13 على الـbranch؛ التغيير: 17 ملفًا (+1281/−120)
+- CI: **4/4 خضراء على الـhead النهائي** (تفصيل القسم 22)
+- PR #884: open، غير draft، `mergeable_state: clean`، مستقل عن PR #881
 
 ## 27. الخطوة التالية الموصى بها لاستئناف PR #881
 
