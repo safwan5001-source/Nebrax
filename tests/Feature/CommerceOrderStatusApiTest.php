@@ -100,9 +100,8 @@ class CommerceOrderStatusApiTest extends TestCase
         $this->flushHeaders();
 
         $cartResponse = $this->withHeaders($this->bearer($store['token']))
-            ->postJson('/commerce/v1/cart/items', ['product_id' => $product->id, 'quantity' => 1]);
-        if ($cartResponse->status() !== 201) { var_dump($cartResponse->status(), $cartResponse->getContent()); }
-        $cartResponse->assertCreated();
+            ->postJson('/commerce/v1/cart/items', ['product_id' => $product->id, 'quantity' => 1])
+            ->assertCreated();
         $cartToken = $cartResponse->headers->get(self::TOKEN_HEADER);
 
         $headers = array_merge($this->bearer($store['token']), [self::TOKEN_HEADER => $cartToken]);
