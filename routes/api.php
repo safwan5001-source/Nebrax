@@ -446,6 +446,8 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::delete('products/{id}/options/{optionId}', [ProductVariantController::class, 'destroyOption'])->middleware($perm('products.manage'));
 
         Route::post('products/{id}/options/{optionId}/values', [ProductVariantController::class, 'storeOptionValue'])->middleware($perm('products.manage'));
+        // VAR-OPTION-VISUAL-2B: رفع صورة صريّة (swatch) لقيمة خيارٍ قائمة — نفس صلاحية إدارة الكتالوج.
+        Route::post('products/{id}/options/{optionId}/values/{valueId}/media', [ProductVariantController::class, 'storeOptionValueMedia'])->middleware($perm('products.manage'));
         Route::put('products/{id}/options/{optionId}/values/{valueId}', [ProductVariantController::class, 'updateOptionValue'])->middleware($perm('products.manage'));
         Route::delete('products/{id}/options/{optionId}/values/{valueId}', [ProductVariantController::class, 'destroyOptionValue'])->middleware($perm('products.manage'));
 
@@ -722,7 +724,7 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::get('pos/audit/carts', [PosAuditController::class, 'carts'])->middleware([$perm('pos.audit.view'), $app('sales.pos')]);
         Route::get('pos/audit/carts/{cartId}', [PosAuditController::class, 'cart'])->middleware([$perm('pos.audit.view'), $app('sales.pos')]);
         Route::get('pos/audit/users', [PosAuditController::class, 'users'])->middleware([$perm('pos.audit.view'), $app('sales.pos')]);
-        Route::get('pos/audit/approvals', [PosAuditController::class, 'approvals'])->middleware([$perm('pos.audit.review'), $app('sales.pos')]);
+        Route::get('pos/audit/approvals', [PosAuditController::class, 'approvals'])->middleware([$perm('pos.audit.view'), $app('sales.pos')]);
         Route::post('pos/audit/approvals/{id}/approve', [PosAuditController::class, 'approve'])->middleware([$perm('pos.override.approve'), $app('sales.pos')]);
         Route::get('pos/reason-codes', [PosAuditController::class, 'reasonCodes'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);
         Route::post('pos/reason-codes', [PosAuditController::class, 'storeReasonCode'])->middleware([$perm('pos.audit.settings.manage'), $app('sales.pos')]);
