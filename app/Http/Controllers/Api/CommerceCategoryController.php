@@ -3,9 +3,12 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Resources\StorefrontCategoryResource;
+use App\Models\CommerceCategoryListing;
 use App\Models\ProductCategory;
 use App\Support\PublicApiResponse;
 use App\Tenancy\BranchScope;
+use App\Tenancy\StorefrontContext;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -14,14 +17,16 @@ use Illuminate\Http\Request;
  *
  * A new, thin controller for the `/commerce/v1` trust boundary — not a reuse
  * of `StorefrontCategoryController` itself, matching PR-1's established
- * "share services, not controllers" separation (architecture doc §3.1) —
- * but the query it runs is genuinely unchanged: categories carry no
- * publication or channel gate at all (`CommerceListing.is_published`
- * governs only products; a category tree is shared browsing structure
- * across every channel by design, per `StorefrontCategoryController`'s own
- * docblock). Reuses `StorefrontCategoryResource` directly — a pure data
- * projection with zero host/channel-specific logic — rather than a second,
- * duplicate resource class.
+ * "share services, not controllers" separation (architecture doc §3.1).
+ * Reuses `StorefrontCategoryResource` directly — a pure data projection with
+ * zero host/channel-specific logic — rather than a second, duplicate resource
+ * class.
+ *
+ * COM-CATALOG-2: categories are now gated per resolved sales channel by
+ * `CommerceCategoryListing.is_published` (exactly as the web storefront is),
+ * on the mobile channel resolved by `ResolveCommerceChannel` — never from
+ * client input. Product publication (`CommerceListing`) stays a separate,
+ * independent gate in `CommerceProductController`.
  */
 class CommerceCategoryController extends PublicApiController
 {
@@ -29,13 +34,16 @@ class CommerceCategoryController extends PublicApiController
 
     public function index(Request $request): JsonResponse
     {
+        $publishedIds = $this->publishedCategoryIds();
+
         $categories = ProductCategory::query()
             ->withoutGlobalScope(BranchScope::class)
             ->whereNull('parent_id')
             ->where('is_active', true)
+            ->whereIn('id', $publishedIds)
             ->with([
-                'children' => fn ($q) => $q->where('is_active', true)->with([
-                    'children' => fn ($q2) => $q2->where('is_active', true),
+                'children' => fn ($q) => $q->where('is_active', true)->whereIn('id', $publishedIds)->with([
+                    'children' => fn ($q2) => $q2->where('is_active', true)->whereIn('id', $publishedIds),
                 ]),
             ])
             ->orderBy('name')
@@ -55,11 +63,13 @@ class CommerceCategoryController extends PublicApiController
     public function show(Request $request): JsonResponse
     {
         $id = (string) $request->route('id');
+        $publishedIds = $this->publishedCategoryIds();
 
         $category = ProductCategory::query()
             ->withoutGlobalScope(BranchScope::class)
             ->where('is_active', true)
-            ->with(['children' => fn ($q) => $q->where('is_active', true)])
+            ->whereIn('id', $publishedIds)
+            ->with(['children' => fn ($q) => $q->where('is_active', true)->whereIn('id', $publishedIds)])
             ->find($id);
 
         if ($category === null) {
@@ -70,7 +80,10 @@ class CommerceCategoryController extends PublicApiController
         $cursor = $category->parent_id;
         $depth = 0;
         while ($cursor !== null && $depth < self::MAX_ANCESTOR_DEPTH) {
-            $parent = ProductCategory::query()->withoutGlobalScope(BranchScope::class)->find($cursor);
+            $parent = ProductCategory::query()
+                ->withoutGlobalScope(BranchScope::class)
+                ->whereIn('id', $publishedIds)
+                ->find($cursor);
             if ($parent === null) {
                 break;
             }
@@ -82,5 +95,12 @@ class CommerceCategoryController extends PublicApiController
         $resource = new StorefrontCategoryResource($category, 1, array_reverse($ancestors));
 
         return PublicApiResponse::resource($request, $resource);
+    }
+
+    /** معرّفات التصنيفات المنشورة على قناة الجوال المحلولة من السياق الموثوق. */
+    private function publishedCategoryIds(): Builder
+    {
+        return CommerceCategoryListing::publishedOn(app(StorefrontContext::class)->salesChannelId())
+            ->select('category_id');
     }
 }
