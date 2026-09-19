@@ -6,6 +6,7 @@ use App\Models\SalesChannel;
 use App\Models\Storefront;
 use App\Models\StorefrontDomain;
 use App\Models\StorefrontPresentation;
+use App\Support\Commerce\StorefrontPresentationNormalizer;
 use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -76,7 +77,7 @@ class StorefrontPresentationDraftApiTest extends TestCase
             ->assertOk();
 
         $this->assertSame($seeded['storefront']->id, $res->json('data.storefront_id'));
-        $this->assertSame(1, $res->json('data.schema_version'));
+        $this->assertSame(StorefrontPresentationNormalizer::VERSION, $res->json('data.schema_version'));
         $this->assertSame(0, $res->json('data.draft_revision'));
         $this->assertNull($res->json('data.published'));
         $this->assertNull($res->json('data.published_revision'));
@@ -365,5 +366,108 @@ class StorefrontPresentationDraftApiTest extends TestCase
         $this->assertSame('اسم لا يتغيّر', $fresh->name);
         $this->assertSame('ar', $fresh->default_locale);
         app(TenantContext::class)->forget();
+    }
+
+    /** @test */
+    public function contract2_v2_sections_round_trip_through_save_reload_and_publish(): void
+    {
+        $auth = $this->registerTenant('pres-c2-roundtrip', 'owner@pres-c2-roundtrip.test');
+        $seeded = $this->seedWebStorefront($auth['tenant_id']);
+
+        $sections = [
+            ['id' => 'banner-a', 'type' => 'banner', 'visible' => true],
+            ['id' => 'hero', 'type' => 'hero', 'visible' => true],
+            ['id' => 'banner-b', 'type' => 'banner', 'visible' => false],
+        ];
+
+        $this->withToken($auth['token'])
+            ->putJson($this->path($seeded['storefront']->id), [
+                'config' => ['version' => 2, 'homepage' => ['sections' => $sections]],
+                'draft_revision' => 0,
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.schema_version', StorefrontPresentationNormalizer::VERSION);
+
+        $reloaded = $this->withToken($auth['token'])
+            ->getJson($this->path($seeded['storefront']->id))
+            ->assertOk();
+
+        $this->assertSame(
+            $sections,
+            $reloaded->json('data.draft.homepage.sections'),
+            'v2: ids/order/visibility تبقى كما هي بعد الحفظ وإعادة التحميل',
+        );
+
+        $published = $this->withToken($auth['token'])
+            ->postJson($this->path($seeded['storefront']->id).'/publish', ['draft_revision' => 1])
+            ->assertOk();
+
+        $this->assertSame($sections, $published->json('data.published.homepage.sections'));
+
+        // إعادة حفظ النتيجة المطبَّعة لا تُحدث churn ولا إحياء للمحذوف.
+        $this->withToken($auth['token'])
+            ->putJson($this->path($seeded['storefront']->id), [
+                'config' => $reloaded->json('data.draft'),
+                'draft_revision' => 1,
+            ])
+            ->assertOk();
+
+        $twice = $this->withToken($auth['token'])
+            ->getJson($this->path($seeded['storefront']->id))
+            ->assertOk();
+
+        $this->assertSame($sections, $twice->json('data.draft.homepage.sections'));
+    }
+
+    /** @test */
+    public function contract2_legacy_v1_document_gets_deterministic_ids_and_stays_stable(): void
+    {
+        $auth = $this->registerTenant('pres-c2-legacy', 'owner@pres-c2-legacy.test');
+        $seeded = $this->seedWebStorefront($auth['tenant_id']);
+
+        $this->withToken($auth['token'])
+            ->putJson($this->path($seeded['storefront']->id), [
+                'config' => [
+                    'homepage' => [
+                        'sections' => [
+                            ['key' => 'hero', 'visible' => true],
+                            ['key' => 'categories', 'visible' => false],
+                        ],
+                    ],
+                ],
+                'draft_revision' => 0,
+            ])
+            ->assertOk();
+
+        $first = $this->withToken($auth['token'])
+            ->getJson($this->path($seeded['storefront']->id))
+            ->assertOk();
+
+        $firstSections = $first->json('data.draft.homepage.sections');
+
+        // الترحيل deterministic: id = key، والأقسام الناقصة تُلحق (دلالات v1).
+        $this->assertSame('hero', $firstSections[0]['id']);
+        $this->assertSame('hero', $firstSections[0]['type']);
+        $this->assertTrue($firstSections[0]['visible']);
+        $this->assertSame('categories', $firstSections[1]['id']);
+        $this->assertFalse($firstSections[1]['visible']);
+        $this->assertCount(
+            count(StorefrontPresentationNormalizer::HOME_BUILDER_SECTION_KEYS),
+            $firstSections,
+        );
+
+        // حفظ الناتج ثم إعادة التحميل: لا churn في المعرفات أو الترتيب.
+        $this->withToken($auth['token'])
+            ->putJson($this->path($seeded['storefront']->id), [
+                'config' => $first->json('data.draft'),
+                'draft_revision' => 1,
+            ])
+            ->assertOk();
+
+        $second = $this->withToken($auth['token'])
+            ->getJson($this->path($seeded['storefront']->id))
+            ->assertOk();
+
+        $this->assertSame($firstSections, $second->json('data.draft.homepage.sections'));
     }
 }

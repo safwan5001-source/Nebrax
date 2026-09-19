@@ -1,6 +1,6 @@
 import { DEFAULT_HOME_SECTIONS } from "./home-sections";
 
-export const PRESENTATION_CONFIG_VERSION = 1 as const;
+export const PRESENTATION_CONFIG_VERSION = 2 as const;
 
 export const THEME_PRESETS = [
   { id: "awj-modern", primary: "#12372a", labelKey: "presetAwjModern" },
