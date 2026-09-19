@@ -4789,7 +4789,14 @@
     "variants_hex_label": "قيمة Hex",
     "variants_visual_title": "مظهر قيمة الخيار",
     "variants_visual_none_hint": "ستبقى القيمة نصية بلا بيانات لون.",
-    "variants_visual_saved": "تم حفظ مظهر القيمة."
+    "variants_visual_saved": "تم حفظ مظهر القيمة.",
+    "variants_visual_image": "صورة",
+    "variants_visual_image_gate": "ستُنشأ القيمة ثم يُفتح محرّرها لرفع الصورة.",
+    "variants_visual_image_hint": "ارفع عيّنة صغيرة (خامة، رخام، نقشة) تظهر بجانب اسم القيمة.",
+    "variants_visual_image_upload": "رفع صورة العيّنة",
+    "variants_visual_image_replace": "استبدال الصورة",
+    "variants_visual_image_required": "اختر صورة قبل الحفظ.",
+    "variants_visual_uploading": "جارٍ الرفع…"
   },
   "purchaseForm": {
     "title": "فاتورة مشتريات جديدة",
