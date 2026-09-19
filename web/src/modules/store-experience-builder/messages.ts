@@ -118,6 +118,9 @@ export const CUSTOMIZER_MESSAGES = {
     sectionCustomContent: "محتوى محكوم",
     gatedSection:
       "هذا القسم مصمَّم للمعاينة. لا يُنشر على المتجر الحي قبل وجود عقد بياناته.",
+    selectedSectionHint: "تظهر هنا إعدادات القسم المحدد فقط.",
+    sectionManagedNote:
+      "محتوى هذا القسم يأتي من كتالوج أَوْج ولا يُحرَّر من هنا. يمكنك إظهاره أو إخفاؤه وإعادة ترتيبه.",
     heroHeadline: "عنوان البطل",
     heroSubheadline: "سطر داعم",
     footerTagline: "نبذة قصيرة",
@@ -318,6 +321,9 @@ export const CUSTOMIZER_MESSAGES = {
     sectionCustomContent: "Controlled content",
     gatedSection:
       "This section is designed for preview. It will not appear on the live storefront until its data contract exists.",
+    selectedSectionHint: "Only the selected section's settings appear here.",
+    sectionManagedNote:
+      "This section's content comes from the AWJ catalog and cannot be edited here. You can show, hide and reorder it.",
     heroHeadline: "Hero headline",
     heroSubheadline: "Supporting line",
     footerTagline: "Short description",
