@@ -36,6 +36,18 @@ describe('commerce workspace AR/EN labels', () => {
     expect(COMMERCE_WORKSPACE_MESSAGES.en.edgeStatusReady).not.toBe(COMMERCE_WORKSPACE_MESSAGES.en.domainsOwnershipVerified);
   });
 
+  it('distinguishes store lifecycle actions from domain edge activation', () => {
+    expect(COMMERCE_WORKSPACE_MESSAGES.ar.storeActivateAction).toBe('تفعيل المتجر');
+    expect(COMMERCE_WORKSPACE_MESSAGES.en.storeActivateAction).toBe('Activate store');
+    expect(COMMERCE_WORKSPACE_MESSAGES.ar.storeDeactivateAction).toBe('إيقاف المتجر');
+    expect(COMMERCE_WORKSPACE_MESSAGES.en.storeDeactivateAction).toBe('Deactivate store');
+    expect(COMMERCE_WORKSPACE_MESSAGES.en.storeDeactivateConfirmAction).toBe('Confirm deactivation');
+    expect(COMMERCE_WORKSPACE_MESSAGES.ar.storeActivateAction).not.toBe(COMMERCE_WORKSPACE_MESSAGES.ar.activateDomainAction);
+    expect(COMMERCE_WORKSPACE_MESSAGES.en.storeActivateAction).not.toBe(COMMERCE_WORKSPACE_MESSAGES.en.activateDomainAction);
+    expect(COMMERCE_WORKSPACE_MESSAGES.en.storeDeactivateConfirm).toMatch(/public domain/i);
+    expect(COMMERCE_WORKSPACE_MESSAGES.ar.storeDeactivateConfirm).toContain('نطاقه العام');
+  });
+
   it('defaults to Arabic when the locale is not English', () => {
     expect(commerceWorkspaceMessage('ar', 'title')).toBe('التجارة الإلكترونية');
     expect(commerceWorkspaceMessage('en-US', 'title')).toBe('E-commerce');

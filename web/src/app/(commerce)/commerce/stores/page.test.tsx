@@ -250,3 +250,134 @@ describe('Commerce stores page — store identity settings', () => {
     await waitFor(() => expect(screen.queryByText('Saving…')).toBeNull());
   });
 });
+
+/**
+ * STORE-ADMIN-LIFECYCLE-1 — Activate/Deactivate on `/commerce/stores`:
+ * truthful badge, confirmation before deactivate, storefront-id POSTs (never
+ * domain edge URLs), permission gating, and settings remaining on inactive rows.
+ */
+describe('Commerce stores page — store lifecycle', () => {
+  afterEach(() => {
+    cleanup();
+    apiMock.mockReset();
+    user.current = { role: 'owner', permissions: undefined };
+  });
+
+  const activeStore = {
+    id: 's1',
+    name: 'My Store',
+    sales_channel_id: 'ch1',
+    is_active: true,
+    preview_url: 'https://my.store.test/',
+    default_locale: 'ar',
+  };
+
+  const inactiveStore = {
+    ...activeStore,
+    is_active: false,
+    preview_url: null,
+  };
+
+  it('shows an Inactive badge when the catalog says the store is inactive', async () => {
+    apiMock.mockResolvedValueOnce({ data: { stores: [inactiveStore] } });
+    renderPage();
+
+    expect(await screen.findByText('My Store')).toBeTruthy();
+    expect(screen.getByText('Inactive')).toBeTruthy();
+    expect(screen.queryByText('Active')).toBeNull();
+  });
+
+  it('keeps store settings available on an inactive row', async () => {
+    apiMock.mockResolvedValueOnce({ data: { stores: [inactiveStore] } });
+    renderPage();
+
+    expect(await screen.findByRole('button', { name: 'Store settings' })).toBeTruthy();
+  });
+
+  it('hides activate and deactivate actions for a user without commerce.manage', async () => {
+    user.current = { role: 'staff', permissions: ['products.view'] };
+    apiMock.mockResolvedValueOnce({ data: { stores: [activeStore] } });
+    renderPage();
+
+    expect(await screen.findByText('My Store')).toBeTruthy();
+    expect(screen.getByText('Active')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Deactivate store' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Activate store' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Store settings' })).toBeNull();
+  });
+
+  it('opens a confirmation dialog before deactivating and only then posts deactivate', async () => {
+    apiMock
+      .mockResolvedValueOnce({ data: { stores: [activeStore] } })
+      .mockResolvedValueOnce({ data: { store: inactiveStore } })
+      .mockResolvedValueOnce({ data: { stores: [inactiveStore] } });
+
+    renderPage();
+    await userEvent.click(await screen.findByRole('button', { name: 'Deactivate store' }));
+
+    expect(apiMock).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('dialog', { name: 'Deactivate store' })).toBeTruthy();
+    expect(screen.getByText(/Buyers will no longer be able to browse this store/i)).toBeTruthy();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Confirm deactivation' }));
+
+    expect(await screen.findByText('Inactive')).toBeTruthy();
+    expect(apiMock).toHaveBeenNthCalledWith(2, '/commerce/workspace/storefronts/s1/deactivate', {
+      method: 'POST',
+      body: {},
+    });
+    expect(String(apiMock.mock.calls[1][0])).not.toContain('domains');
+    expect(String(apiMock.mock.calls[1][0])).not.toContain('activate-edge');
+    expect(apiMock).toHaveBeenNthCalledWith(3, '/commerce/workspace/storefronts');
+  });
+
+  it('activates an inactive store with a direct POST and no domain edge URL', async () => {
+    apiMock
+      .mockResolvedValueOnce({ data: { stores: [inactiveStore] } })
+      .mockResolvedValueOnce({ data: { store: activeStore } })
+      .mockResolvedValueOnce({ data: { stores: [activeStore] } });
+
+    renderPage();
+    await userEvent.click(await screen.findByRole('button', { name: 'Activate store' }));
+
+    expect(await screen.findByText('Active')).toBeTruthy();
+    expect(apiMock).toHaveBeenNthCalledWith(2, '/commerce/workspace/storefronts/s1/activate', {
+      method: 'POST',
+      body: {},
+    });
+    expect(String(apiMock.mock.calls[1][0])).not.toContain('domains');
+    expect(String(apiMock.mock.calls[1][0])).not.toContain('activate-edge');
+    expect(screen.queryByRole('dialog', { name: 'Deactivate store' })).toBeNull();
+  });
+
+  it('keeps the deactivate dialog open and does not refresh on failure', async () => {
+    apiMock
+      .mockResolvedValueOnce({ data: { stores: [activeStore] } })
+      .mockRejectedValueOnce(new Error('forbidden'));
+
+    renderPage();
+    await userEvent.click(await screen.findByRole('button', { name: 'Deactivate store' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Confirm deactivation' }));
+
+    expect(await screen.findByText('Could not deactivate the store. Please try again.')).toBeTruthy();
+    expect(screen.getByRole('dialog', { name: 'Deactivate store' })).toBeTruthy();
+    expect(screen.getByText('Active')).toBeTruthy();
+  });
+
+  it('prevents a duplicate activate while a request is in flight', async () => {
+    let resolvePost: (value: unknown) => void = () => {};
+    apiMock
+      .mockResolvedValueOnce({ data: { stores: [inactiveStore] } })
+      .mockImplementationOnce(() => new Promise((resolve) => { resolvePost = resolve; }));
+
+    renderPage();
+    const button = await screen.findByRole('button', { name: 'Activate store' });
+    await userEvent.click(button);
+    await userEvent.click(button);
+
+    expect(apiMock).toHaveBeenCalledTimes(2);
+
+    resolvePost({ data: { store: activeStore } });
+    await waitFor(() => expect(screen.queryByText('Activating…')).toBeNull());
+  });
+});

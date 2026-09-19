@@ -34,12 +34,13 @@ use RuntimeException;
  * STORE-ADMIN-ADOPT-1B-3A — إضافة نطاق مخصَّص + تحقّق DNS TXT.
  * STORE-ADMIN-ADOPT-1B-3B — Make Primary الآمن + فصل نطاق مخصَّص.
  * CUSTOM-DOMAIN-EDGE-1 — Activate/Refresh Edge (Railway) بلا فتح Make Primary.
+ * STORE-ADMIN-LIFECYCLE-1 — تفعيل/إيقاف خدمة المتجر المستضاف (`Storefront.is_active`).
  *
  * يسرد/يزوّد/يحدّث متاجر الويب للمستأجر الحالي فقط. لا يستقبل معرّف مستأجر/متجر/نطاق
  * من العميل، ولا يستدعي الحسم العام بالنطاق. `index` لا يفرض
  * `commerce.storefront` (قراءة فقط — كانت مساحة العمل ستُغلق على الجميع
  * أيام `coming_soon`؛ سلوكها الحالي محفوظ بلا تغيير بعد ترقية النضج). `store`
- * و`update` فعلان كتابيان حقيقيان، فيُحرَسان بصلاحية RBAC مخصَّصة
+ * و`update` و`activate`/`deactivate` أفعال كتابية حقيقية، فيُحرَسان بصلاحية RBAC مخصَّصة
  * (`commerce.manage`) بدل الاكتفاء باستثناء الخدمة الذاتية وحده.
  */
 class CommerceWorkspaceStorefrontsController extends ApiController
@@ -100,6 +101,54 @@ class CommerceWorkspaceStorefrontsController extends ApiController
         }
 
         $result = $storefronts->updateIdentityForCurrentTenant($id, $request->normalizedAttributes());
+
+        if ($result === null) {
+            abort(404, 'المتجر غير موجود.');
+        }
+
+        return response()->json([
+            'data' => ['store' => $result],
+        ]);
+    }
+
+    /**
+     * STORE-ADMIN-LIFECYCLE-1 — تفعيل متجر قائم. يكتب `Storefront.is_active`
+     * فقط. `{id}` محدِّد صفّ — الملكية عبر `TenantContext`. 404 غير كاشف.
+     */
+    public function activate(
+        Request $request,
+        CommerceWorkspaceStorefrontsService $storefronts,
+        string $id,
+    ): JsonResponse {
+        if ($request->user()?->role === 'self_service') {
+            abort(403, 'مساحة عمل التجارة غير متاحة لحساب الخدمة الذاتية.');
+        }
+
+        $result = $storefronts->activateForCurrentTenant($id);
+
+        if ($result === null) {
+            abort(404, 'المتجر غير موجود.');
+        }
+
+        return response()->json([
+            'data' => ['store' => $result],
+        ]);
+    }
+
+    /**
+     * STORE-ADMIN-LIFECYCLE-1 — إيقاف متجر قائم. يكتب `Storefront.is_active`
+     * فقط. لا يمسّ القناة ولا النطاق ولا الحافة. 404 غير كاشف.
+     */
+    public function deactivate(
+        Request $request,
+        CommerceWorkspaceStorefrontsService $storefronts,
+        string $id,
+    ): JsonResponse {
+        if ($request->user()?->role === 'self_service') {
+            abort(403, 'مساحة عمل التجارة غير متاحة لحساب الخدمة الذاتية.');
+        }
+
+        $result = $storefronts->deactivateForCurrentTenant($id);
 
         if ($result === null) {
             abort(404, 'المتجر غير موجود.');

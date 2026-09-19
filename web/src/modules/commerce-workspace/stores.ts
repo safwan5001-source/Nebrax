@@ -90,6 +90,48 @@ export async function updateCommerceStorefrontIdentity(
   }
 }
 
+/**
+ * STORE-ADMIN-LIFECYCLE-1 — تفعيل متجر قائم. `{id}` محدِّد صفّ فقط؛ الخادم
+ * يحسم الملكية من `TenantContext`. لا نطاق ولا حافة ولا قناة تُرسَل هنا.
+ */
+export async function activateCommerceStorefront(
+  id: string,
+): Promise<{ ok: true; store: CommerceStoreOption } | { ok: false; message: string }> {
+  try {
+    const payload = await api<unknown>(`${COMMERCE_STORE_ADMIN_LIST_PATH}/${id}/activate`, {
+      method: 'POST',
+      body: {},
+    });
+    const store = extractProvisionedStore(payload);
+    if (!store) return { ok: false, message: 'invalid_payload' };
+    return { ok: true, store };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'activate_failed';
+    return { ok: false, message };
+  }
+}
+
+/**
+ * STORE-ADMIN-LIFECYCLE-1 — إيقاف متجر قائم. يكتب `Storefront.is_active`
+ * فقط على الخادم. ليست تفعيل نطاق ولا فصل نطاق.
+ */
+export async function deactivateCommerceStorefront(
+  id: string,
+): Promise<{ ok: true; store: CommerceStoreOption } | { ok: false; message: string }> {
+  try {
+    const payload = await api<unknown>(`${COMMERCE_STORE_ADMIN_LIST_PATH}/${id}/deactivate`, {
+      method: 'POST',
+      body: {},
+    });
+    const store = extractProvisionedStore(payload);
+    if (!store) return { ok: false, message: 'invalid_payload' };
+    return { ok: true, store };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'deactivate_failed';
+    return { ok: false, message };
+  }
+}
+
 function extractProvisionedStore(payload: unknown): CommerceStoreOption | null {
   if (!payload || typeof payload !== 'object') return null;
   const data = (payload as { data?: unknown }).data;

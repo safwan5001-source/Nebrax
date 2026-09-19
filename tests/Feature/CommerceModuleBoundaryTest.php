@@ -58,6 +58,8 @@ class CommerceModuleBoundaryTest extends TestCase
         'api/commerce/workspace/products/{id}/publication',
         'api/commerce/workspace/storefronts',
         'api/commerce/workspace/storefronts/{id}',
+        'api/commerce/workspace/storefronts/{id}/activate',
+        'api/commerce/workspace/storefronts/{id}/deactivate',
         'api/commerce/workspace/storefronts/{id}/domains',
         'api/commerce/workspace/storefronts/{id}/domains/{domainId}',
         'api/commerce/workspace/storefronts/{id}/domains/{domainId}/activate-edge',
