@@ -1,0 +1,163 @@
+{
+  "version": 2,
+  "themePreset": "awj-modern",
+  "primaryColor": "#12372a",
+  "accentColor": null,
+  "fontPreset": "cairo-geist",
+  "density": "comfortable",
+  "radius": "default",
+  "productCard": "standard",
+  "branding": {
+    "displayName": "",
+    "logoDataUrl": null,
+    "compactLogoDataUrl": null,
+    "faviconDataUrl": null
+  },
+  "header": {
+    "style": "standard",
+    "showSearch": true,
+    "showAccount": true,
+    "showCart": true,
+    "showCategoryNav": true,
+    "links": [
+      {
+        "id": "nav-home",
+        "label": "",
+        "kind": "home",
+        "href": "/",
+        "enabled": true
+      }
+    ]
+  },
+  "homepage": {
+    "sections": [
+      {
+        "id": "hero",
+        "type": "hero",
+        "visible": true
+      },
+      {
+        "id": "categories",
+        "type": "categories",
+        "visible": true
+      },
+      {
+        "id": "newArrivals",
+        "type": "newArrivals",
+        "visible": true
+      },
+      {
+        "id": "wholesale",
+        "type": "wholesale",
+        "visible": true
+      },
+      {
+        "id": "banner",
+        "type": "banner",
+        "visible": false
+      },
+      {
+        "id": "featured",
+        "type": "featured",
+        "visible": false
+      },
+      {
+        "id": "offers",
+        "type": "offers",
+        "visible": false
+      },
+      {
+        "id": "benefits",
+        "type": "benefits",
+        "visible": false
+      },
+      {
+        "id": "appPromo",
+        "type": "appPromo",
+        "visible": false
+      },
+      {
+        "id": "customContent",
+        "type": "customContent",
+        "visible": false
+      }
+    ],
+    "heroHeadline": "",
+    "heroSubheadline": ""
+  },
+  "footer": {
+    "tagline": "",
+    "showLogo": true,
+    "copyright": ""
+  },
+  "contact": {
+    "phone": "",
+    "email": "",
+    "address": "",
+    "hours": ""
+  },
+  "whatsapp": {
+    "enabled": false,
+    "phone": "",
+    "message": "",
+    "placement": "floating"
+  },
+  "social": [],
+  "verification": {
+    "crNumber": "",
+    "licenseNumber": "",
+    "sourceUrl": "",
+    "requestedVerifiedLabel": false
+  },
+  "apps": {
+    "iosUrl": "",
+    "androidUrl": "",
+    "appName": "",
+    "showHomepageSection": false,
+    "showFooterLinks": false
+  },
+  "pages": [
+    {
+      "id": "page-about",
+      "slug": "about",
+      "title": "",
+      "enabled": false
+    },
+    {
+      "id": "page-contact",
+      "slug": "contact",
+      "title": "",
+      "enabled": false
+    },
+    {
+      "id": "page-faq",
+      "slug": "faq",
+      "title": "",
+      "enabled": false
+    },
+    {
+      "id": "page-shipping-policy",
+      "slug": "shipping-policy",
+      "title": "",
+      "enabled": true
+    },
+    {
+      "id": "page-privacy-policy",
+      "slug": "privacy-policy",
+      "title": "",
+      "enabled": true
+    },
+    {
+      "id": "page-returns-policy",
+      "slug": "returns-policy",
+      "title": "",
+      "enabled": true
+    },
+    {
+      "id": "page-terms-of-service",
+      "slug": "terms-of-service",
+      "title": "",
+      "enabled": true
+    }
+  ]
+}
