@@ -6,7 +6,6 @@ use App\Models\SalesChannel;
 use App\Models\Storefront;
 use App\Models\StorefrontDomain;
 use App\Models\StorefrontPresentation;
-use App\Services\Commerce\PresentationDocumentTooLargeException;
 use App\Support\Commerce\StorefrontPresentationNormalizer;
 use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -184,19 +183,24 @@ class StorefrontPresentationPublishApiTest extends TestCase
         $before = StorefrontPresentation::query()->where('storefront_id', $seeded['storefront']->id)->first();
         $publishedJson = json_encode($before->published_config);
         $publishedAt = (string) $before->published_at;
-        app(TenantContext::class)->forget();
 
-        $this->app->instance(
-            StorefrontPresentationNormalizer::class,
-            new class extends StorefrontPresentationNormalizer
-            {
-                public function normalize(mixed $input, ?int $storedSchemaVersion = null): array
-                {
-                    throw new PresentationDocumentTooLargeException;
-                }
-            },
+        // Size failure is injected into the already-saved draft so Publish
+        // re-normalizes then hits assertStoredSize inside the locked
+        // transaction. The production normalizer stays final; this is the
+        // architecture §13.6 size-failure seam, not a subclass.
+        $prefix = 'data:image/png;base64,';
+        $logo = $prefix.str_repeat('A', StorefrontPresentationNormalizer::MAX_LOGO_BYTES - strlen($prefix));
+        $draft = $before->draft_config;
+        $draft['branding']['logoDataUrl'] = $logo;
+        $draft['branding']['compactLogoDataUrl'] = $logo;
+        $draft['branding']['faviconDataUrl'] = $logo;
+        $normalizer = new StorefrontPresentationNormalizer;
+        $this->assertGreaterThan(
+            StorefrontPresentationNormalizer::MAX_DOCUMENT_BYTES,
+            $normalizer->encodedSize($normalizer->normalize($draft)),
         );
-        $this->app->forgetInstance(\App\Services\Commerce\StorefrontPresentationService::class);
+        $before->forceFill(['draft_config' => $draft])->save();
+        app(TenantContext::class)->forget();
 
         $this->withToken($auth['token'])
             ->postJson($this->path($seeded['storefront']->id).'/publish', ['draft_revision' => 2])
