@@ -12,7 +12,18 @@ namespace App\Support\Commerce;
  */
 final class StorefrontPresentationNormalizer
 {
-    public const VERSION = 1;
+    /**
+     * STORE-CUSTOMIZER-CONTRACT-2 — الإصدار 2: أقسام الصفحة الرئيسية أصبحت
+     * instances على الشكل {id, type, visible}. المعرّف محلي داخل الوثيقة
+     * وليس global resource id. الترحيل من v1 deterministic: id = key،
+     * وأول ورود يكسب عند تكرار المعرّف. دلالات الغياب بالإصدار: وثائق v1
+     * تُعاد إلحاق الأقسام الافتراضية الناقصة لها (سلوكها الأصلي)، ووثائق
+     * v2 تعتبر الغياب حذفاً حقيقياً دون إحياء. الأنواع المجهولة تُسقط
+     * fail-closed في كل الأحوال.
+     */
+    public const VERSION = 2;
+
+    public const MAX_HOME_SECTIONS = 30;
 
     public const MAX_DOCUMENT_BYTES = 1572864; // 1.5 MiB
 
@@ -80,7 +91,8 @@ final class StorefrontPresentationNormalizer
         $sections = [];
         foreach (self::HOME_BUILDER_SECTION_KEYS as $key) {
             $sections[] = [
-                'key' => $key,
+                'id' => $key,
+                'type' => $key,
                 'visible' => in_array($key, self::IMPLEMENTED_HOME_SECTION_KEYS, true),
             ];
         }
@@ -167,8 +179,8 @@ final class StorefrontPresentationNormalizer
     }
 
     /**
-     * يطبّع مدخلاً مجهولاً إلى وثيقة v1 آمنة. نسخة مخزَّنة بإصدار أمامي
-     * تفشل إلى AWJ Modern دون تخمين v2.
+     * يطبّع مدخلاً مجهولاً إلى وثيقة v2 آمنة مع دعم قراءة وثائق v1
+     * المحفوظة. نسخة مخزَّنة بإصدار أمامي تفشل إلى AWJ Modern دون تخمين.
      *
      * @return array<string, mixed>
      */
@@ -190,6 +202,15 @@ final class StorefrontPresentationNormalizer
         ) {
             return $this->defaultConfig();
         }
+
+        // وثيقة legacy (v1): لا schema_version مخزّن ≥2 ولا version معلن ≥2.
+        // النسخة المخزّنة (من قاعدة البيانات) أسبق؛ إعلان العميل يُستخدم فقط
+        // لتمييز دلالات الغياب، وليس سلطةً على الإصدار الأمامي.
+        $declaredVersion = isset($input['version']) && is_numeric($input['version'])
+            ? (int) $input['version']
+            : null;
+        $effectiveVersion = $storedSchemaVersion ?? $declaredVersion ?? 1;
+        $legacyDocument = $effectiveVersion < 2;
 
         $defaults = $this->defaultConfig();
         $brandingRaw = $this->object($input['branding'] ?? null);
@@ -236,7 +257,11 @@ final class StorefrontPresentationNormalizer
                 'links' => $this->normalizeLinks($headerRaw['links'] ?? null, $defaults['header']['links']),
             ],
             'homepage' => [
-                'sections' => $this->resolveHomeBuilderSections($homepageRaw['sections'] ?? null, $defaults['homepage']['sections']),
+                'sections' => $this->resolveHomeBuilderSections(
+                    $homepageRaw['sections'] ?? null,
+                    $defaults['homepage']['sections'],
+                    $legacyDocument,
+                ),
                 'heroHeadline' => mb_substr($this->asString($homepageRaw['heroHeadline'] ?? null), 0, 120),
                 'heroSubheadline' => mb_substr($this->asString($homepageRaw['heroSubheadline'] ?? null), 0, 200),
             ],
@@ -372,39 +397,73 @@ final class StorefrontPresentationNormalizer
     }
 
     /**
-     * @param  list<array{key: string, visible: bool}>  $defaults
-     * @return list<array{key: string, visible: bool}>
+     * يحسم أقسام الصفحة المخزّنة إلى instances آمنة.
+     *
+     * يقبل الشكلين: instance v2 `{id, type, visible}` (الهوية = id)،
+     * وlegacy v1 `{key, visible}` الذي يُرحَّل إلى id = key بشكل
+     * deterministic (بلا معرّفات عشوائية إطلاقاً). الأنواع المجهولة
+     * والمدخلات المشوّهة تُسقط fail-closed، والـids المكررة تنهار إلى
+     * أول ورود بشكل deterministic.
+     *
+     * دلالات الغياب بالإصدار: الوثائق legacy تُعاد إلحاق الأقسام
+     * الافتراضية الناقصة لها كما كان v1 يفعل؛ وثائق v2 تعتبر الغياب حذفاً.
+     *
+     * @param  list<array{id: string, type: string, visible: bool}>  $defaults
+     * @return list<array{id: string, type: string, visible: bool}>
      */
-    private function resolveHomeBuilderSections(mixed $configured, array $defaults): array
+    private function resolveHomeBuilderSections(mixed $configured, array $defaults, bool $legacy): array
     {
         if (! is_array($configured) || $configured === []) {
-            return $defaults;
+            return $legacy ? $defaults : [];
         }
 
-        $known = [];
-        $seen = [];
+        $out = [];
+        $seenIds = [];
+        $seenTypes = [];
         foreach ($configured as $section) {
             if (! is_array($section)) {
                 continue;
             }
-            $key = $section['key'] ?? null;
-            if (! is_string($key) || ! in_array($key, self::HOME_BUILDER_SECTION_KEYS, true)) {
+
+            if (array_key_exists('id', $section) || array_key_exists('type', $section)) {
+                $id = $this->safeId($section['id'] ?? null, '');
+                $type = $this->asString($section['type'] ?? null);
+                if ($id === '') {
+                    continue;
+                }
+            } else {
+                $id = $this->asString($section['key'] ?? null);
+                $type = $id;
+            }
+
+            if (! in_array($type, self::HOME_BUILDER_SECTION_KEYS, true)) {
                 continue;
             }
-            $known[] = [
-                'key' => $key,
+            if (isset($seenIds[$id])) {
+                continue;
+            }
+
+            $seenIds[$id] = true;
+            $seenTypes[$type] = true;
+            $out[] = [
+                'id' => $id,
+                'type' => $type,
                 'visible' => (bool) ($section['visible'] ?? false),
             ];
-            $seen[$key] = true;
-        }
-
-        foreach ($defaults as $section) {
-            if (! isset($seen[$section['key']])) {
-                $known[] = $section;
+            if (count($out) >= self::MAX_HOME_SECTIONS) {
+                break;
             }
         }
 
-        return $known;
+        if ($legacy) {
+            foreach ($defaults as $fallback) {
+                if (! isset($seenTypes[$fallback['type']])) {
+                    $out[] = $fallback;
+                }
+            }
+        }
+
+        return $out;
     }
 
     /**
