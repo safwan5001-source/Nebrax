@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Resources\StorefrontProductResource;
+use App\Models\CommerceCategoryListing;
 use App\Models\CommerceListing;
 use App\Models\InventoryReservation;
 use App\Models\Product;
@@ -65,7 +66,19 @@ class StorefrontProductController extends PublicApiController
         }
 
         if (filled($filters['category_id'] ?? null)) {
-            $query->where('category_id', $filters['category_id']);
+            // COM-CATALOG-2 — مسار الترشيح بالتصنيف يحترم بوابة نشر التصنيف:
+            // تصنيفٌ غير منشور على هذه القناة ليس سطحاً عاماً، فيُرجِع الترشيح
+            // به نتيجة فارغة حتمياً. استقلالية كاملة: المنتج المنشور في تصنيف
+            // غير منشور يبقى ظاهراً في القائمة العامة (مصدره CommerceListing)،
+            // ولا يتأثر إلا الترشيح الصريح بذلك التصنيف.
+            $categoryId = (string) $filters['category_id'];
+            $query->where('category_id', $categoryId);
+            $categoryPublished = CommerceCategoryListing::publishedOn($channelId)
+                ->where('category_id', $categoryId)
+                ->exists();
+            if (! $categoryPublished) {
+                $query->whereRaw('0 = 1');
+            }
         }
 
         $this->applySort($query, $filters['sort'] ?? null, self::SORTS, 'name');
