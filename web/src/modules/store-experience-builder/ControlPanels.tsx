@@ -798,7 +798,7 @@ function HomepagePanel({
 
   const selectedIndex = selectedSection
     ? config.homepage.sections.findIndex(
-        (section) => section.key === selectedSection,
+        (section) => section.type === selectedSection,
       )
     : -1;
   const selected =
@@ -808,11 +808,11 @@ function HomepagePanel({
     <div className="space-y-7">
       {selected ? (
         <Section
-          title={t(SECTION_LABEL[selected.key])}
+          title={t(SECTION_LABEL[selected.type])}
           hint={t("selectedSectionHint")}
         >
           <div
-            data-selected-section-settings={selected.key}
+            data-selected-section-settings={selected.type}
             className="space-y-4"
           >
             <Toggle
@@ -823,9 +823,9 @@ function HomepagePanel({
               checked={selected.visible}
               onChange={(visible) => setVisible(selectedIndex, visible)}
             />
-            {selected.key === "hero" ? (
+            {selected.type === "hero" ? (
               heroFields
-            ) : isGatedHomeSection(selected.key) ? (
+            ) : isGatedHomeSection(selected.type) ? (
               <p className="text-xs leading-relaxed text-neutral-500">
                 {t("gatedSection")}
               </p>
@@ -842,11 +842,11 @@ function HomepagePanel({
       <Section title={t("composerTitle")} hint={t("composerHint")}>
         <ul className="border border-neutral-200">
           {config.homepage.sections.map((section, index) => {
-            const isSelected = selectedSection === section.key;
+            const isSelected = selectedSection === section.type;
             return (
             <li
-              key={section.key}
-              data-composer-section={section.key}
+              key={section.id}
+              data-composer-section={section.type}
               className={`flex h-12 items-center gap-1 border-b border-neutral-200 px-1 last:border-b-0 ${
                 isSelected
                   ? "border-s-2 border-s-neutral-900 bg-neutral-50 ps-0.5"
@@ -875,10 +875,10 @@ function HomepagePanel({
               </div>
               <button
                 type="button"
-                data-section-option={section.key}
+                data-section-option={section.type}
                 aria-pressed={isSelected}
-                title={t(SECTION_LABEL[section.key])}
-                onClick={() => onSelectSection?.(section.key)}
+                title={t(SECTION_LABEL[section.type])}
+                onClick={() => onSelectSection?.(section.type)}
                 className="min-w-0 flex-1 rounded-sm px-1 py-1 text-start outline-none focus-visible:ring-2 focus-visible:ring-neutral-900"
               >
                 <p
@@ -886,9 +886,9 @@ function HomepagePanel({
                     isSelected ? "font-semibold" : "font-medium"
                   }`}
                 >
-                  {t(SECTION_LABEL[section.key])}
+                  {t(SECTION_LABEL[section.type])}
                 </p>
-                {isGatedHomeSection(section.key) ? (
+                {isGatedHomeSection(section.type) ? (
                   <p className="text-[10px] leading-none text-neutral-400">
                     {t("gatedBadge")}
                   </p>
