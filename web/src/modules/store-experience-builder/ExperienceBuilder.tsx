@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import {
   clonePresentationConfig,
   DEFAULT_PRESENTATION_CONFIG,
+  type HomeBuilderSectionKey,
   normalizePresentationConfig,
   presentationConfigsEqual,
   type StorefrontPresentationConfig,
@@ -69,6 +70,10 @@ export function ExperienceBuilder({
   const [panel, setPanel] = useState<CustomizerPanel>("theme");
   const [device, setDevice] = useState<PreviewDevice>("desktop");
   const [mobilePane, setMobilePane] = useState<"edit" | "preview">("edit");
+  const [selectedSection, setSelectedSection] =
+    useState<HomeBuilderSectionKey | null>(null);
+  const [pendingSectionScroll, setPendingSectionScroll] =
+    useState<HomeBuilderSectionKey | null>(null);
   const [lifecycle, setLifecycle] = useState<BuilderLifecycle>("clean");
   const [notice, setNotice] = useState<string | null>(null);
   const [noticeKind, setNoticeKind] = useState<"capability" | "status">("status");
@@ -213,6 +218,41 @@ export function ExperienceBuilder({
     setNotice(VERSION_HISTORY_CAPABILITY === "deferred" ? t("versionDeferred") : null);
   }
 
+  // Section selection bridge (STORE-CUSTOMIZER-V2-1): a single selection
+  // state shared by the sidebar composer and the live preview. Sidebar
+  // selection opens the homepage panel and queues a scroll-to-section;
+  // preview clicks only update the selection (the section is already in
+  // view, so scrolling again would be a pointless jump).
+  function handleSelectSection(
+    key: HomeBuilderSectionKey,
+    origin: "sidebar" | "preview",
+  ) {
+    setSelectedSection(key);
+    // Both origins open the section's settings (Click-to-Edit foundation);
+    // only sidebar selection needs the preview to scroll to the section,
+    // since a preview click already has the section in view.
+    setPanel("homepage");
+    if (origin === "sidebar") {
+      setPendingSectionScroll(key);
+    }
+  }
+
+  useEffect(() => {
+    const key = pendingSectionScroll;
+    if (!key) return;
+    setPendingSectionScroll(null);
+    if (typeof document === "undefined") return;
+    const target = document.querySelector(`[data-preview-section="${key}"]`);
+    if (!target || typeof target.scrollIntoView !== "function") return;
+    const reduceMotion =
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    target.scrollIntoView({
+      behavior: reduceMotion ? "auto" : "smooth",
+      block: "start",
+    });
+  }, [pendingSectionScroll]);
+
   const width = PREVIEW_WIDTHS[device];
   const statusLabel =
     lifecycle === "save_blocked"
@@ -231,6 +271,7 @@ export function ExperienceBuilder({
       data-draft-revision={draftRevision}
       data-panel={panel}
       data-device={device}
+      data-selected-section={selectedSection ?? ""}
       className="relative flex h-full min-h-0 flex-col bg-neutral-100 text-neutral-900"
     >
       <header className="flex h-11 shrink-0 items-center gap-2 border-b border-neutral-200 bg-white px-3 md:h-12 md:gap-3 lg:pe-80">
@@ -284,6 +325,7 @@ export function ExperienceBuilder({
       <div className="flex min-h-0 flex-1">
         <nav
           aria-label={t("controls")}
+          data-customizer-scroll=""
           className={`${
             mobilePane === "preview" ? "hidden lg:flex" : "hidden md:flex"
           } w-[196px] shrink-0 flex-col overflow-y-auto border-e border-neutral-200 bg-white`}
@@ -354,13 +396,18 @@ export function ExperienceBuilder({
               {activePanel ? t(activePanel.label) : t("theme")}
             </h2>
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 md:px-5 md:py-5 lg:px-4 lg:py-5">
+          <div
+            data-customizer-scroll=""
+            className="min-h-0 flex-1 overflow-y-auto px-4 py-4 md:px-5 md:py-5 lg:px-4 lg:py-5"
+          >
             <ControlPanels
               panel={panel}
               config={draft}
               locale={locale}
               liveStoreName={liveStoreName}
               onChange={updateDraft}
+              selectedSection={selectedSection}
+              onSelectSection={(key) => handleSelectSection(key, "sidebar")}
             />
           </div>
         </aside>
@@ -399,7 +446,10 @@ export function ExperienceBuilder({
               </span>
             </div>
           </div>
-          <div className="min-h-0 flex-1 overflow-auto p-3 md:p-5 xl:p-8">
+          <div
+            data-customizer-scroll=""
+            className="min-h-0 flex-1 overflow-auto overscroll-contain p-3 md:p-5 xl:p-8"
+          >
             <div
               data-preview-frame=""
               className="mx-auto overflow-hidden border border-neutral-300 bg-white"
@@ -410,6 +460,8 @@ export function ExperienceBuilder({
                 locale={locale}
                 viewport={device}
                 liveStoreName={liveStoreName}
+                selectedSection={selectedSection}
+                onSelectSection={(key) => handleSelectSection(key, "preview")}
               />
             </div>
           </div>

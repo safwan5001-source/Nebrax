@@ -9,7 +9,10 @@ import {
   previewStoreName,
   type StorefrontPresentationConfig,
 } from "./presentation/config";
-import { presentationCssVars } from "./presentation/tokens";
+import {
+  type HomeBuilderSectionKey,
+  presentationCssVars,
+} from "./presentation/tokens";
 import { buildWhatsAppUrl, sanitizeExternalUrl } from "./presentation/urls";
 import { cn } from "@/lib/utils";
 import {
@@ -42,6 +45,13 @@ interface StorefrontPreviewCanvasProps {
   locale: CustomizerLocale;
   viewport: "desktop" | "tablet" | "mobile";
   liveStoreName?: string | null;
+  /**
+   * Click-to-Edit foundation (STORE-CUSTOMIZER-V2-1). When a selection
+   * bridge is provided, homepage sections become selectable inside the
+   * preview. Optional so the dev harness mirror stays inert.
+   */
+  selectedSection?: HomeBuilderSectionKey | null;
+  onSelectSection?: (key: HomeBuilderSectionKey) => void;
 }
 
 export function StorefrontPreviewCanvas({
@@ -49,6 +59,8 @@ export function StorefrontPreviewCanvas({
   locale,
   viewport,
   liveStoreName = null,
+  selectedSection = null,
+  onSelectSection,
 }: StorefrontPreviewCanvasProps) {
   const t = (key: CustomizerMessageKey) => customizerMessage(locale, key);
   const storeName = previewStoreName(
@@ -208,6 +220,7 @@ export function StorefrontPreviewCanvas({
         {config.homepage.sections
           .filter((section) => section.visible)
           .map((section) => {
+            const content = ((): ReactNode => {
             if (section.key === "hero") {
               const title = config.homepage.heroHeadline.trim() || storeName;
               const sub = config.homepage.heroSubheadline.trim();
@@ -332,6 +345,18 @@ export function StorefrontPreviewCanvas({
                 </div>
                 <p className="mt-1 text-xs text-store-muted-foreground">{t("gatedSection")}</p>
               </section>
+            );
+            })();
+            if (!content) return null;
+            return (
+              <SelectablePreviewSection
+                key={section.key}
+                sectionKey={section.key}
+                selected={selectedSection === section.key}
+                onSelect={onSelectSection}
+              >
+                {content}
+              </SelectablePreviewSection>
             );
           })}
       </div>
@@ -477,6 +502,42 @@ export function StorefrontPreviewCanvas({
           <MessageCircle className="size-5" aria-hidden />
         </a>
       )}
+    </div>
+  );
+}
+
+function SelectablePreviewSection({
+  sectionKey,
+  selected,
+  onSelect,
+  children,
+}: {
+  sectionKey: HomeBuilderSectionKey;
+  selected: boolean;
+  onSelect?: (key: HomeBuilderSectionKey) => void;
+  children: ReactNode;
+}) {
+  if (!onSelect) return <>{children}</>;
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      aria-pressed={selected}
+      data-preview-section={sectionKey}
+      data-section-selected={selected ? "" : undefined}
+      onClick={() => onSelect(sectionKey)}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onSelect(sectionKey);
+        }
+      }}
+      className={cn(
+        "awj-preview-section",
+        selected && "awj-preview-section-selected",
+      )}
+    >
+      {children}
     </div>
   );
 }

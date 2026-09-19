@@ -103,6 +103,8 @@ interface PanelsProps {
   locale: CustomizerLocale;
   liveStoreName: string | null;
   onChange: (next: StorefrontPresentationConfig) => void;
+  selectedSection?: HomeBuilderSectionKey | null;
+  onSelectSection?: (key: HomeBuilderSectionKey) => void;
 }
 
 export function ControlPanels({
@@ -111,6 +113,8 @@ export function ControlPanels({
   locale,
   liveStoreName,
   onChange,
+  selectedSection = null,
+  onSelectSection,
 }: PanelsProps) {
   const t = (key: CustomizerMessageKey) => customizerMessage(locale, key);
   const patch = (partial: Partial<StorefrontPresentationConfig>) =>
@@ -131,7 +135,15 @@ export function ControlPanels({
     case "header":
       return <HeaderPanel config={config} t={t} patch={patch} />;
     case "homepage":
-      return <HomepagePanel config={config} t={t} patch={patch} />;
+      return (
+        <HomepagePanel
+          config={config}
+          t={t}
+          patch={patch}
+          selectedSection={selectedSection}
+          onSelectSection={onSelectSection}
+        />
+      );
     case "footer":
       return <FooterPanel config={config} t={t} patch={patch} />;
     case "contact":
@@ -726,10 +738,14 @@ function HomepagePanel({
   config,
   t,
   patch,
+  selectedSection = null,
+  onSelectSection,
 }: {
   config: StorefrontPresentationConfig;
   t: (key: CustomizerMessageKey) => string;
   patch: (partial: Partial<StorefrontPresentationConfig>) => void;
+  selectedSection?: HomeBuilderSectionKey | null;
+  onSelectSection?: (key: HomeBuilderSectionKey) => void;
 }) {
   const move = (index: number, delta: number) => {
     const next = [...config.homepage.sections];
@@ -774,10 +790,17 @@ function HomepagePanel({
       </Section>
       <Section title={t("composerTitle")} hint={t("composerHint")}>
         <ul className="border border-neutral-200">
-          {config.homepage.sections.map((section, index) => (
+          {config.homepage.sections.map((section, index) => {
+            const isSelected = selectedSection === section.key;
+            return (
             <li
               key={section.key}
-              className="flex h-12 items-center gap-1 border-b border-neutral-200 px-1 last:border-b-0"
+              data-composer-section={section.key}
+              className={`flex h-12 items-center gap-1 border-b border-neutral-200 px-1 last:border-b-0 ${
+                isSelected
+                  ? "border-s-2 border-s-neutral-900 bg-neutral-50 ps-0.5"
+                  : ""
+              }`}
             >
               <div className="flex">
                 <button
@@ -799,8 +822,19 @@ function HomepagePanel({
                   ↓
                 </button>
               </div>
-              <div className="min-w-0 flex-1 px-1">
-                <p className="truncate text-[13px] font-medium text-neutral-900">
+              <button
+                type="button"
+                data-section-option={section.key}
+                aria-pressed={isSelected}
+                title={t(SECTION_LABEL[section.key])}
+                onClick={() => onSelectSection?.(section.key)}
+                className="min-w-0 flex-1 rounded-sm px-1 py-1 text-start outline-none focus-visible:ring-2 focus-visible:ring-neutral-900"
+              >
+                <p
+                  className={`truncate text-[13px] text-neutral-900 ${
+                    isSelected ? "font-semibold" : "font-medium"
+                  }`}
+                >
                   {t(SECTION_LABEL[section.key])}
                 </p>
                 {isGatedHomeSection(section.key) ? (
@@ -808,7 +842,7 @@ function HomepagePanel({
                     {t("gatedBadge")}
                   </p>
                 ) : null}
-              </div>
+              </button>
               <Toggle
                 compact
                 label={
@@ -823,7 +857,8 @@ function HomepagePanel({
                 }}
               />
             </li>
-          ))}
+            );
+          })}
         </ul>
       </Section>
     </div>
@@ -1095,7 +1130,7 @@ function SocialPanel({
                   checked={item.enabled}
                   onChange={(enabled) => {
                     const social = config.social.map((row, i) =>
-                      i === index ? { ...row, enabled } : row,
+                      i === index ? { ...row, enabled } : item,
                     );
                     patch({ social });
                   }}
