@@ -74,7 +74,12 @@
     "policies": "Policies",
     "poweredBy": "Powered by",
     "copyright": "© {year} {storeName}. Powered by Spree Commerce.",
-    "wholesale": "Trade & Wholesale"
+    "wholesale": "Trade & Wholesale",
+    "whatsapp": "WhatsApp",
+    "whatsappAria": "Contact on WhatsApp",
+    "merchantProvided": "Merchant-provided information",
+    "crNumber": "Commercial registration",
+    "licenseNumber": "License number"
   },
   "home": {
     "welcome": "{storeName}",

@@ -114,6 +114,13 @@ describe("commerce/config — storefront identity transport (COM-7-P2B)", () => 
     expect(mocks.headers).toHaveBeenCalled();
   });
 
+  it("does not set cache: no-store on unrelated catalog GETs", async () => {
+    await storefrontFetch("categories");
+
+    const [, init] = vi.mocked(fetch).mock.calls[0];
+    expect(init?.cache).toBeUndefined();
+  });
+
   it("builds URLs with no tenant-slug path segment", async () => {
     await storefrontFetch("products/abc-123");
 

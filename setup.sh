@@ -35,9 +35,9 @@ cp -r "$CORE_DIR/app/Models/"*.php        app/Models/
 # السمات في مجلد فرعي لا يلتقطها glob النماذج أعلاه؛ يجب أن تطابق CI والإنتاج.
 # قائمة المجلدات هنا يدوية ويجب أن تبقى مطابقة لقائمة .github/workflows/ci.yml
 # (كلاهما ينسخ من نفس النواة بمنطق مستقل) — نسيان مجلد هنا لا يظهر في CI فيمر بصمت.
-mkdir -p app/Contracts app/Models/Concerns app/Jobs/Accounting app/Jobs/DocumentCenter app/Services app/Services/Accounting app/Services/Commerce app/Services/Commerce/Edge app/Services/DocumentCenter app/Services/Pos app/Services/Pos/Hardware app/Services/Reporting app/Services/PrintTemplates app/Support app/Support/Inventory app/Support/Dns \
+mkdir -p app/Contracts app/Models/Concerns app/Jobs/Accounting app/Jobs/DocumentCenter app/Services app/Services/Accounting app/Services/Commerce app/Services/Commerce/Edge app/Services/DocumentCenter app/Services/Pos app/Services/Pos/Hardware app/Services/Reporting app/Services/PrintTemplates app/Support app/Support/Inventory app/Support/Dns app/Support/Commerce \
          app/Tenancy app/Http/Middleware app/Http/Controllers/Api config \
-         app/Http/Requests app/Http/Resources app/Console/Commands tests/Feature routes docs/openapi
+         app/Http/Requests app/Http/Resources app/Console/Commands tests/Feature tests/Fixtures/presentation routes docs/openapi
 cp -r "$CORE_DIR/app/Contracts/"*.php app/Contracts/
 cp -r "$CORE_DIR/app/Jobs/DocumentCenter/"*.php app/Jobs/DocumentCenter/
 cp -r "$CORE_DIR/app/Jobs/Accounting/"*.php app/Jobs/Accounting/
@@ -54,6 +54,7 @@ cp -r "$CORE_DIR/app/Services/PrintTemplates/"*.php app/Services/PrintTemplates/
 cp -r "$CORE_DIR/app/Support/"*.php              app/Support/
 cp -r "$CORE_DIR/app/Support/Inventory/"*.php    app/Support/Inventory/
 cp -r "$CORE_DIR/app/Support/Dns/"*.php          app/Support/Dns/
+cp -r "$CORE_DIR/app/Support/Commerce/"*.php     app/Support/Commerce/
 cp -r "$CORE_DIR/app/Tenancy/"*.php              app/Tenancy/
 cp -r "$CORE_DIR/app/Http/Middleware/"*.php      app/Http/Middleware/
 cp -r "$CORE_DIR/app/Http/Controllers/"*.php     app/Http/Controllers/ 2>/dev/null || true
@@ -70,6 +71,7 @@ cp -r "$CORE_DIR/routes/api_storefront.php"      routes/api_storefront.php
 cp -r "$CORE_DIR/routes/api_commerce.php"        routes/api_commerce.php
 cp -r "$CORE_DIR/routes/console.php"             routes/console.php
 cp -r "$CORE_DIR/tests/Feature/"*.php            tests/Feature/
+cp -r "$CORE_DIR/tests/Fixtures/presentation/"*.json tests/Fixtures/presentation/ 2>/dev/null || true
 # عقد OpenAPI (توثيق فقط) — يقرأه اختبار المطابقة عبر base_path('docs/openapi/…')
 cp -r "$CORE_DIR/docs/openapi/"*.yaml            docs/openapi/
 

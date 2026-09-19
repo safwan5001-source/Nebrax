@@ -8,9 +8,17 @@ import {
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("next/server", () => ({ connection: vi.fn() }));
+vi.mock("next-intl/server", () => ({
+  getTranslations: vi.fn(async () => (key: string) => key),
+}));
 vi.mock("@/lib/data/categories", () => ({ getCategories: vi.fn() }));
 vi.mock("@/lib/commerce/storefront", () => ({
   fetchStorefrontName: vi.fn().mockResolvedValue("متجر الاختبار"),
+  fetchStorefrontConfig: vi.fn().mockResolvedValue({
+    name: "متجر الاختبار",
+    default_locale: "ar",
+    presentation: null,
+  }),
 }));
 vi.mock("@/components/layout/Header", () => ({
   Header: () => null,
@@ -22,6 +30,9 @@ vi.mock("@/components/layout/Footer", () => ({
 }));
 vi.mock("@/components/layout/MobileBottomNav", () => ({
   MobileBottomNav: () => null,
+}));
+vi.mock("@/components/layout/StoreWhatsApp", () => ({
+  StoreWhatsApp: () => null,
 }));
 
 import { Footer } from "@/components/layout/Footer";

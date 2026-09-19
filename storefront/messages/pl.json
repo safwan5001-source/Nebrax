@@ -74,7 +74,12 @@
     "policies": "Regulaminy",
     "poweredBy": "Zasilany przez",
     "copyright": "© {year} {storeName}. Zasilany przez Spree Commerce.",
-    "wholesale": "Handel i sprzedaż hurtowa"
+    "wholesale": "Handel i sprzedaż hurtowa",
+    "whatsapp": "WhatsApp",
+    "whatsappAria": "Kontakt przez WhatsApp",
+    "merchantProvided": "Informacje podane przez sprzedawcę",
+    "crNumber": "Numer KRS",
+    "licenseNumber": "Numer licencji"
   },
   "home": {
     "welcome": "{storeName}",

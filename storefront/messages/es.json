@@ -74,7 +74,12 @@
     "policies": "Politicas",
     "poweredBy": "Impulsado por",
     "copyright": "© {year} {storeName}. Impulsado por Spree Commerce.",
-    "wholesale": "Comercio y venta al por mayor"
+    "wholesale": "Comercio y venta al por mayor",
+    "whatsapp": "WhatsApp",
+    "whatsappAria": "Contactar por WhatsApp",
+    "merchantProvided": "Información del comerciante",
+    "crNumber": "Registro mercantil",
+    "licenseNumber": "Número de licencia"
   },
   "home": {
     "welcome": "{storeName}",

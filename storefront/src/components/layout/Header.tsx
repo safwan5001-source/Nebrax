@@ -39,6 +39,12 @@ interface HeaderProps {
   mobileNavigation: ReactNode;
   categoryNavigation: ReactNode;
   storeName: string | null;
+  logoUrl?: string | null;
+  showSearch?: boolean;
+  showAccount?: boolean;
+  showCart?: boolean;
+  compact?: boolean;
+  extraLinks?: { id: string; label: string; href: string }[];
 }
 
 interface HeaderMobileMenuProps {
@@ -88,6 +94,12 @@ export async function Header({
   mobileNavigation,
   categoryNavigation,
   storeName,
+  logoUrl = null,
+  showSearch = true,
+  showAccount = true,
+  showCart = true,
+  compact = false,
+  extraLinks = [],
 }: HeaderProps) {
   const t = await getTranslations({ locale, namespace: "header" });
   const footer = await getTranslations({ locale, namespace: "footer" });
@@ -104,13 +116,15 @@ export async function Header({
         {t("skipToContent")}
       </a>
 
-      <div className="hidden border-b border-store-border bg-store-surface-muted md:block">
-        <StoreContainer>
-          <div className="flex h-store-utility items-center justify-end">
-            <LazyRegionPreferences variant="utility" />
-          </div>
-        </StoreContainer>
-      </div>
+      {!compact && (
+        <div className="hidden border-b border-store-border bg-store-surface-muted md:block">
+          <StoreContainer>
+            <div className="flex h-store-utility items-center justify-end">
+              <LazyRegionPreferences variant="utility" />
+            </div>
+          </StoreContainer>
+        </div>
+      )}
 
       <div className="border-b border-store-border">
         <StoreContainer>
@@ -129,16 +143,21 @@ export async function Header({
               href={homeHref}
               name={displayName}
               size="md"
+              logoUrl={logoUrl}
               className="justify-self-center md:justify-self-start"
             />
 
-            <div className="order-last col-span-3 min-w-0 pb-2.5 md:order-none md:col-span-1 md:flex-1 md:pb-0">
-              <StoreSearch
-                basePath={basePath}
-                className="md:max-w-2xl"
-                withSubmit
-              />
-            </div>
+            {showSearch ? (
+              <div className="order-last col-span-3 min-w-0 pb-2.5 md:order-none md:col-span-1 md:flex-1 md:pb-0">
+                <StoreSearch
+                  basePath={basePath}
+                  className="md:max-w-2xl"
+                  withSubmit
+                />
+              </div>
+            ) : (
+              <div className="order-last col-span-3 min-w-0 md:order-none md:col-span-1 md:flex-1" />
+            )}
 
             <div className="flex items-center justify-self-end gap-1 md:ms-auto md:gap-2">
               {wholesaleEnabled && (
@@ -149,15 +168,37 @@ export async function Header({
                   {t("wholesale")}
                 </Link>
               )}
-              <div className="hidden md:block">
-                <Button variant="ghost" size="icon-lg" asChild>
-                  <Link href={`${basePath}/account`} aria-label={t("account")}>
-                    <User className="size-5" />
-                  </Link>
-                </Button>
-              </div>
-              <CartButton variant="icon" className="md:hidden" />
-              <CartButton variant="action" className="hidden md:inline-flex" />
+              {extraLinks.map((link) => (
+                <Link
+                  key={link.id}
+                  href={link.href}
+                  data-extra-nav=""
+                  className="hidden whitespace-nowrap px-2 py-1.5 text-sm text-store-muted-foreground transition-colors hover:text-store-foreground lg:block"
+                >
+                  {link.label}
+                </Link>
+              ))}
+              {showAccount ? (
+                <div className="hidden md:block">
+                  <Button variant="ghost" size="icon-lg" asChild>
+                    <Link
+                      href={`${basePath}/account`}
+                      aria-label={t("account")}
+                    >
+                      <User className="size-5" />
+                    </Link>
+                  </Button>
+                </div>
+              ) : null}
+              {showCart ? (
+                <>
+                  <CartButton variant="icon" className="md:hidden" />
+                  <CartButton
+                    variant="action"
+                    className="hidden md:inline-flex"
+                  />
+                </>
+              ) : null}
             </div>
           </div>
         </StoreContainer>

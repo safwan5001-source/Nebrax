@@ -118,6 +118,14 @@ export class StorefrontApiError extends Error {
   }
 }
 
+export type StorefrontFetchInit = {
+  /**
+   * STORE-BACKEND-1: identity/presentation GET must not serve a stale
+   * Published snapshot. Catalog/product GETs keep the default fetch cache.
+   */
+  cache?: RequestCache;
+};
+
 export type StorefrontQueryParams = Record<
   string,
   string | number | boolean | undefined | null
@@ -148,6 +156,7 @@ async function raiseForErrorResponse(response: Response): Promise<never> {
 export async function storefrontFetch<T>(
   path: string,
   params?: StorefrontQueryParams,
+  init?: StorefrontFetchInit,
 ): Promise<T> {
   const url = buildStorefrontUrl(path);
 
@@ -169,7 +178,10 @@ export async function storefrontFetch<T>(
     requestHeaders[GATEWAY_SECRET_HEADER] = secret;
   }
 
-  const response = await fetch(url.toString(), { headers: requestHeaders });
+  const response = await fetch(url.toString(), {
+    headers: requestHeaders,
+    ...(init?.cache ? { cache: init.cache } : {}),
+  });
 
   if (!response.ok) {
     await raiseForErrorResponse(response);

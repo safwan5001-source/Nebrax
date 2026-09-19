@@ -9,9 +9,9 @@ import {
 import { ExperienceBuilder } from "../ExperienceBuilder";
 
 describe("ExperienceBuilder", () => {
-  it("declares persistence and publish as not live", () => {
-    expect(DRAFT_PERSISTENCE_CAPABILITY).toBe("design_only");
-    expect(PUBLISH_CAPABILITY).toBe("gated");
+  it("declares persistence and publish live, with version history still deferred", () => {
+    expect(DRAFT_PERSISTENCE_CAPABILITY).toBe("live");
+    expect(PUBLISH_CAPABILITY).toBe("live");
     expect(VERSION_HISTORY_CAPABILITY).toBe("deferred");
   });
 

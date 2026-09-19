@@ -3152,6 +3152,55 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
   }
   if (clean === '/manual-journals') return resolve({ data: mockManualJournals });
   if (clean === '/commerce/workspace/storefronts') return resolve({ data: { stores: [] } });
+  const presentationMatch = clean.match(/^\/commerce\/workspace\/storefronts\/([^/]+)\/presentation(?:\/(publish))?$/);
+  if (presentationMatch) {
+    const storefrontId = presentationMatch[1];
+    const isPublish = presentationMatch[2] === 'publish';
+    const defaultDraft = {
+      version: 1,
+      themePreset: 'awj-modern',
+      primaryColor: '#12372a',
+    };
+    const verb = String(method).toUpperCase();
+    if (isPublish) {
+      return resolve({
+        data: {
+          storefront_id: storefrontId,
+          schema_version: 1,
+          draft: defaultDraft,
+          draft_revision: 1,
+          published: defaultDraft,
+          published_revision: 1,
+          published_at: new Date().toISOString(),
+        },
+      });
+    }
+    if (verb === 'PUT') {
+      const bodyRecord = (body && typeof body === 'object' ? body : {}) as { config?: unknown; draft_revision?: unknown };
+      return resolve({
+        data: {
+          storefront_id: storefrontId,
+          schema_version: 1,
+          draft: bodyRecord.config ?? defaultDraft,
+          draft_revision: typeof bodyRecord.draft_revision === 'number' ? bodyRecord.draft_revision + 1 : 1,
+          published: null,
+          published_revision: null,
+          published_at: null,
+        },
+      });
+    }
+    return resolve({
+      data: {
+        storefront_id: storefrontId,
+        schema_version: 1,
+        draft: defaultDraft,
+        draft_revision: 0,
+        published: null,
+        published_revision: null,
+        published_at: null,
+      },
+    });
+  }
   if (/^\/commerce\/workspace\/products\/[^/]+\/publication$/.test(clean)) {
     return resolve({ data: { stores: [] } });
   }
