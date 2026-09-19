@@ -4789,7 +4789,14 @@
     "variants_hex_label": "Hex value",
     "variants_visual_title": "Option value appearance",
     "variants_visual_none_hint": "The value remains text-only with no color metadata.",
-    "variants_visual_saved": "Value appearance saved."
+    "variants_visual_saved": "Value appearance saved.",
+    "variants_visual_image": "Image",
+    "variants_visual_image_gate": "The value will be created, then its editor opens for the image upload.",
+    "variants_visual_image_hint": "Upload a small sample (fabric, marble, pattern) shown beside the value name.",
+    "variants_visual_image_upload": "Upload sample image",
+    "variants_visual_image_replace": "Replace image",
+    "variants_visual_image_required": "Choose an image before saving.",
+    "variants_visual_uploading": "Uploading…"
   },
   "purchaseForm": {
     "title": "New purchase invoice",

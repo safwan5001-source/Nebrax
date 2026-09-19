@@ -1,10 +1,10 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { useTranslations } from 'next-intl';
 import type { ColumnDef } from '@tanstack/react-table';
-import { CheckSquare, Plus, Square, Trash2, X, Pipette } from 'lucide-react';
-import { api, ApiError } from '@/lib/api';
+import { CheckSquare, Plus, Square, Trash2, X, Pipette, ImagePlus } from 'lucide-react';
+import { api, ApiError, fetchImageUrl } from '@/lib/api';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,7 +14,8 @@ import { Select } from '@/components/ui/select';
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
 import { useToast } from '@/components/ui/toast';
 
-type VisualType = 'none' | 'color';
+type VisualType = 'none' | 'color' | 'image';
+type OptionValueImage = { id: string; download_url: string };
 type OptionValue = {
   id: string;
   value: string;
@@ -22,6 +23,7 @@ type OptionValue = {
   is_active: boolean;
   visual_type?: VisualType;
   color_value?: string | null;
+  image_media?: OptionValueImage | null;
 };
 
 type VisualDraft = { visual_type: VisualType; color_value: string };
@@ -41,6 +43,7 @@ type Combination = {
 };
 type Matrix = { options: Option[]; total_possible: number; combinations: Combination[] };
 
+/** حمولة PUT للصريّة النصّية/اللونية فقط — «image» لا تمرّ من هنا أبداً: مرجعها لا يُصنع إلا خادماً عبر مسار رفع الوسيط (VAR-OPTION-VISUAL-2B). */
 function visualPayload(draft: VisualDraft) {
   return {
     visual_type: draft.visual_type,
@@ -174,9 +177,19 @@ export function ProductVariantsPanel({ productId, variantState, onProductChanged
     if (!value) return;
     const draft = visualDraft(optionId);
     try {
-      await api(`/products/${productId}/options/${optionId}/values`, { method: 'POST', body: { value, ...visualPayload(draft) } });
+      // «image» لا تُرسَل عند الإنشاء أبداً: لا هوية وسيطٍ ممكنة قبل وجود
+      // القيمة فعلياً، ولا معرّفات مزيّفة. تُنشأ القيمة نصّيةً ثم يُفتح
+      // محرّرها نفسه فوراً لرفع الصريّة عبر مسار الوسيط الحقيقي.
+      const wantsImage = draft.visual_type === 'image';
+      const created = await api<{ data: OptionValue }>(`/products/${productId}/options/${optionId}/values`, {
+        method: 'POST',
+        body: wantsImage ? { value } : { value, ...visualPayload(draft) },
+      });
       setNewValueByOption((prev) => ({ ...prev, [optionId]: '' }));
       setNewVisualByOption((prev) => ({ ...prev, [optionId]: { visual_type: 'none', color_value: '' } }));
+      if (wantsImage) {
+        setEditingValue({ optionId, value: { ...created.data, visual_type: 'none' } });
+      }
       await load();
     } catch (err) {
       showError(err instanceof ApiError ? err.message : t('action_failed'));
@@ -364,6 +377,7 @@ export function ProductVariantsPanel({ productId, variantState, onProductChanged
                 {option.values.map((value) => (
                   <span key={value.id} className="inline-flex min-h-9 items-center gap-1.5 rounded border border-border bg-surface px-2.5 py-1 text-xs text-text">
                     {value.visual_type === 'color' && value.color_value ? <Swatch color={value.color_value} /> : null}
+                    {value.visual_type === 'image' && value.image_media ? <SwatchImage media={value.image_media} label={value.value} /> : null}
                     <button type="button" aria-label={t('variants_visual_edit', { name: value.value })} className="text-start hover:underline" onClick={() => setEditingValue({ optionId: option.id, value })}>
                       <span>{value.value}</span>
                     </button>
@@ -376,8 +390,10 @@ export function ProductVariantsPanel({ productId, variantState, onProductChanged
                 <Select aria-label={t('variants_visual_type_label')} className="h-9 w-32 text-xs" value={visualDraft(option.id).visual_type} onChange={(e) => setVisualDraft(option.id, { visual_type: e.target.value as VisualType })}>
                   <option value="none">{t('variants_visual_none')}</option>
                   <option value="color">{t('variants_visual_color')}</option>
+                  <option value="image">{t('variants_visual_image')}</option>
                 </Select>
                 {visualDraft(option.id).visual_type === 'color' ? <ColorEditor draft={visualDraft(option.id)} onChange={(patch) => setVisualDraft(option.id, patch)} t={t} /> : null}
+                {visualDraft(option.id).visual_type === 'image' ? <span className="text-xs text-muted">{t('variants_visual_image_gate')}</span> : null}
                 <Button type="button" variant="outline" size="sm" onClick={() => void addValue(option.id)}>{t('add')}</Button>
               </div>
             </div>
@@ -621,6 +637,31 @@ function Swatch({ color }: { color: string }) {
   return <span aria-hidden="true" className="inline-block h-4 w-4 shrink-0 rounded-full border border-border" style={{ backgroundColor: color }} />;
 }
 
+/**
+ * صريّة صورةٍ مصغّرة بجانب التسمية — المعاينة عبر `fetchImageUrl` (رابط
+ * `blob:` محليّ بترويسة مصادقة) لا عبر مسار تخزينٍ خام، ولا يُعرَض أي
+ * مسارٍ داخلي في DOM إطلاقاً. التسمية النصّية تبقى ظاهرةً دائماً بجانبها.
+ */
+function SwatchImage({ media, label }: { media: OptionValueImage; label: string }) {
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => {
+    let active = true;
+    let objectUrl: string | null = null;
+    void fetchImageUrl(media.download_url).then((fetched) => {
+      if (active && fetched) {
+        objectUrl = fetched;
+        setUrl(fetched);
+      }
+    });
+    return () => {
+      active = false;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [media.download_url]);
+  if (!url) return null;
+  return <img src={url} alt={label} className="h-4 w-4 shrink-0 rounded-full border border-border object-cover" />;
+}
+
 function ColorEditor({ draft, onChange, t }: { draft: VisualDraft; onChange: (patch: Partial<VisualDraft>) => void; t: (key: string) => string }) {
   const pickerValue = /^#[0-9A-Fa-f]{6}$/.test(draft.color_value) ? draft.color_value : '#000000';
   return <div className="flex items-center gap-2">
@@ -636,27 +677,131 @@ function OptionValueVisualSheet({ productId, editing, onClose, onSaved }: { prod
   const { success, error: showError } = useToast();
   const [draft, setDraft] = useState<VisualDraft>({ visual_type: 'none', color_value: '' });
   const [saving, setSaving] = useState(false);
+  // VAR-OPTION-VISUAL-2B — حالة صريّة الصورة: المعاينة الحالية (رابط blob
+  // محليّ)، ملفٌّ مختارٌ لم يُرفَع بعد، وحالتا الرفع/الخطأ. لا مسار تخزينٍ
+  // خام هنا إطلاقاً — `download_url` محروسٌ ويُجلب عبر `fetchImageUrl`.
+  const [existingPreview, setExistingPreview] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedPreview, setSelectedPreview] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
   useEffect(() => {
-    if (editing) setDraft({ visual_type: editing.value.visual_type === 'color' ? 'color' : 'none', color_value: editing.value.color_value ?? '' });
+    if (!editing) return;
+    setDraft({
+      visual_type: editing.value.visual_type === 'color' ? 'color' : editing.value.visual_type === 'image' ? 'image' : 'none',
+      color_value: editing.value.color_value ?? '',
+    });
+    setSelectedFile(null);
+    setUploadError(null);
+    setExistingPreview(null);
+    let active = true;
+    let objectUrl: string | null = null;
+    if (editing.value.visual_type === 'image' && editing.value.image_media) {
+      void fetchImageUrl(editing.value.image_media.download_url).then((fetched) => {
+        if (active && fetched) {
+          objectUrl = fetched;
+          setExistingPreview(fetched);
+        }
+      });
+    }
+    return () => {
+      active = false;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
   }, [editing]);
+
+  useEffect(() => {
+    if (!selectedFile) {
+      setSelectedPreview(null);
+      return;
+    }
+    const objectUrl = URL.createObjectURL(selectedFile);
+    setSelectedPreview(objectUrl);
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [selectedFile]);
+
+  function pickFile(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0] ?? null;
+    event.target.value = '';
+    if (!file) return;
+    // تحقّقٌ مبكرٌ للتجربة فقط — الحسم (MIME/الحجم) على الخادم وحده.
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 5 * 1024 * 1024) {
+      setUploadError(t('media_invalid_file'));
+      return;
+    }
+    setUploadError(null);
+    setSelectedFile(file);
+  }
+
   async function save() {
     if (!editing) return;
     setSaving(true);
+    setUploadError(null);
     try {
-      await api(`/products/${productId}/options/${editing.optionId}/values/${editing.value.id}`, { method: 'PUT', body: visualPayload(draft) });
-      success(t('variants_visual_saved'));
-      onSaved();
-    } catch (err) { showError(err instanceof ApiError ? err.message : t('action_failed')); }
-    finally { setSaving(false); }
+      if (draft.visual_type === 'image') {
+        if (selectedFile) {
+          // الرفع والاستبدال مسارٌ واحد: الخادم يخزّن الوسيط ضمن نطاق هذه
+          // القيمة بالذات، يعتمد المرجع عبر سلطة الصريّة، وينظّف أي صريّةٍ
+          // سابقة حتمياً. لا يُرسَل `image_media_id` من العميل إطلاقاً.
+          const body = new FormData();
+          body.append('image', selectedFile);
+          await api(`/products/${productId}/options/${editing.optionId}/values/${editing.value.id}/media`, { method: 'POST', body });
+          success(t('variants_visual_saved'));
+          onSaved();
+          onClose();
+        } else if (editing.value.visual_type === 'image' && editing.value.image_media) {
+          // بلا ملفٍّ جديد: الصريّة القائمة تبقى كما هي — لا طلب شبكة زائد.
+          onClose();
+        } else {
+          setUploadError(t('variants_visual_image_required'));
+        }
+      } else {
+        // none/color — عبرها أيضاً يتم الانتقال image ← none/color: الخادم
+        // يمسح `image_media_id` وينظّف الوسيط المملوك للقيمة حتمياً.
+        await api(`/products/${productId}/options/${editing.optionId}/values/${editing.value.id}`, { method: 'PUT', body: visualPayload(draft) });
+        success(t('variants_visual_saved'));
+        onSaved();
+      }
+    } catch (err) {
+      const message = err instanceof ApiError ? err.message : t('action_failed');
+      setUploadError(message);
+      showError(message);
+    } finally {
+      setSaving(false);
+    }
   }
+
+  const preview = selectedPreview ?? existingPreview;
+
   return <Sheet open={editing !== null} onOpenChange={(open) => { if (!open) onClose(); }}>
     {editing ? <SheetContent closeLabel={t('close')}>
       <header className="shrink-0 border-b border-border px-5 pb-4 pe-14 pt-4"><p className="text-xs font-medium text-muted">{t('variants_visual_title')}</p><SheetTitle className="mt-1 text-lg font-semibold text-text">{editing.value.value}</SheetTitle></header>
       <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-5">
-        <div className="space-y-1.5"><label className="text-xs font-medium text-muted" htmlFor="edit-visual-type">{t('variants_visual_type_label')}</label><Select id="edit-visual-type" value={draft.visual_type} onChange={(e) => setDraft((prev) => ({ ...prev, visual_type: e.target.value as VisualType }))}><option value="none">{t('variants_visual_none')}</option><option value="color">{t('variants_visual_color')}</option></Select></div>
-        {draft.visual_type === 'color' ? <ColorEditor draft={draft} onChange={(patch) => setDraft((prev) => ({ ...prev, ...patch }))} t={t} /> : <p className="text-xs text-muted">{t('variants_visual_none_hint')}</p>}
+        <div className="space-y-1.5"><label className="text-xs font-medium text-muted" htmlFor="edit-visual-type">{t('variants_visual_type_label')}</label><Select id="edit-visual-type" value={draft.visual_type} onChange={(e) => setDraft((prev) => ({ ...prev, visual_type: e.target.value as VisualType }))}><option value="none">{t('variants_visual_none')}</option><option value="color">{t('variants_visual_color')}</option><option value="image">{t('variants_visual_image')}</option></Select></div>
+        {draft.visual_type === 'color' ? <ColorEditor draft={draft} onChange={(patch) => setDraft((prev) => ({ ...prev, ...patch }))} t={t} /> : null}
+        {draft.visual_type === 'none' ? <p className="text-xs text-muted">{t('variants_visual_none_hint')}</p> : null}
+        {draft.visual_type === 'image' ? (
+          <div className="space-y-3">
+            <p className="text-xs text-muted">{t('variants_visual_image_hint')}</p>
+            {preview ? (
+              <div className="flex items-center gap-3 rounded border border-border bg-surface p-3">
+                <img src={preview} alt={editing.value.value} className="h-16 w-16 rounded border border-border object-cover" />
+                <span className="text-sm text-text">{editing.value.value}</span>
+              </div>
+            ) : null}
+            <div className="flex items-center gap-2">
+              <label className="inline-flex min-h-9 cursor-pointer items-center gap-2 rounded border border-border px-3 text-xs text-text hover:bg-primary-soft">
+                <ImagePlus className="h-4 w-4" />
+                {preview ? t('variants_visual_image_replace') : t('variants_visual_image_upload')}
+                <input aria-label={t('variants_visual_image_upload')} type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={pickFile} />
+              </label>
+              {selectedFile ? <span className="text-xs text-muted" dir="ltr">{selectedFile.name}</span> : null}
+            </div>
+            {uploadError ? <p role="alert" className="text-xs text-negative">{uploadError}</p> : null}
+          </div>
+        ) : null}
       </div>
-      <footer className="flex shrink-0 justify-end gap-2 border-t border-border px-5 py-4"><Button type="button" variant="outline" size="sm" onClick={onClose}>{t('cancel')}</Button><Button type="button" size="sm" onClick={() => void save()} disabled={saving}>{t('save')}</Button></footer>
+      <footer className="flex shrink-0 justify-end gap-2 border-t border-border px-5 py-4"><Button type="button" variant="outline" size="sm" onClick={onClose}>{t('cancel')}</Button><Button type="button" size="sm" onClick={() => void save()} disabled={saving}>{saving ? t('variants_visual_uploading') : t('save')}</Button></footer>
     </SheetContent> : null}
   </Sheet>;
 }
