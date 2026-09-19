@@ -10,14 +10,19 @@ This slice is **only** `Storefront.is_active` lifecycle: storefront-id scoped Ac
 
 ## Git
 
-- Latest `main` SHA used: `50e66740b5e7757edd30e3dd7ae2304d8b9f325f`
-- Latest `main` subject: `feat(store): AWJ store customer account experience (STORE-UI-5) (#868)`
-- CUSTOM-DOMAIN-EDGE-3 / PR #870 merge SHA: `31db0857dd10a7f365e42bee41a64ca8f211b6a4`
-- EDGE-3 in ancestry of this branch: **Yes** (`git merge-base --is-ancestor 31db0857… HEAD` succeeded; EDGE-3 is the parent of STORE-UI-5)
-- Branch: `feat/store-admin-lifecycle-1`
-- Base SHA: `50e66740b5e7757edd30e3dd7ae2304d8b9f325f`
-- Head SHA: `3cdd61fdec2a14b51547255e115fa46396a244d1`
-- PR: *(filled after open)*
+| | |
+|---|---|
+| **Latest `main` at implementation** | `50e66740b5e7757edd30e3dd7ae2304d8b9f325f` — `feat(store): AWJ store customer account experience (STORE-UI-5) (#868)` |
+| **CUSTOM-DOMAIN-EDGE-3 / PR #870** | `31db0857dd10a7f365e42bee41a64ca8f211b6a4` — in ancestry (**yes**) |
+| **Branch** | `feat/store-admin-lifecycle-1` |
+| **Base SHA** | `50e66740b5e7757edd30e3dd7ae2304d8b9f325f` |
+| **Implementation SHA (CI-verified)** | `3fcb5b76bb1aec4e0fd9cc5ae9d570535d1f14b5` |
+| **Head SHA** | `3fcb5b76bb1aec4e0fd9cc5ae9d570535d1f14b5` (implementation). This file is a docs-only follow-up on the same branch; PR #873 head is that follow-up after push. |
+| **PR** | [#873](https://github.com/safwan5001-source/Nebrax/pull/873) |
+
+`git merge-base --is-ancestor 31db0857dd10a7f365e42bee41a64ca8f211b6a4 HEAD` succeeded. EDGE-3 is the parent of STORE-UI-5.
+
+`origin/main` moved after the implementation commit to `ae50844b16dc473f781e2aafa3e47888803cecf2` (`STORE-UI-6 Store Experience Builder (#871)`). Overlap is `web/src/modules/commerce-workspace/messages.ts` + `messages.test.ts` only. `git merge-tree --write-tree HEAD origin/main` exits **0** (auto-mergeable; UI-6 retitled `appearance`, this PR only **adds** store-lifecycle keys). This slice was **not** rebased so CI on `3fcb5b7…` stays the verified gate. Not an architectural conflict.
 
 ## Decision: DO NOT COUPLE
 
@@ -92,31 +97,57 @@ No migration. No resolver change. No provisioning change. No publication-semanti
 
 ### Backend (GitHub CI — PHP is not in this sandbox)
 
-- `CommerceWorkspaceStorefrontLifecycleApiTest`
-  - Guest 401; self_service 403; staff without `commerce.manage` 403; cross-tenant 404; unknown 404
-  - Deactivate writes only `Storefront.is_active = false`
-  - Unchanged: `SalesChannel.is_active`, every domain `is_active` / `is_primary` / `verification_status` / `verified_at` / `edge_status` / `edge_provider_id`
-  - Public `store/v1` products, media, storefront, cart, checkout → 404 after deactivate
-  - Activate restores public 200 when domain+channel remain healthy
-  - Activate does not call Railway/EDGE (AWJ-managed fixture, fake client call counts = 0)
-  - Idempotent activate/deactivate
-  - GET list includes inactive store with truthful flag
-  - Identity PUT still cannot flip `is_active`
-- Replaced `inactive_storefronts_are_omitted` with truthful-list assertion
+`CommerceWorkspaceStorefrontLifecycleApiTest` **PASS** on sqlite and pgsql:
+
+- Guest 401; self_service 403; staff without `commerce.manage` 403; cross-tenant 404; unknown 404
+- Deactivate writes only `Storefront.is_active = false`
+- Unchanged: `SalesChannel.is_active`, every domain `is_active` / `is_primary` / `verification_status` / `verified_at` / `edge_status` / `edge_provider_id`
+- Public `store/v1` products, media, storefront, cart, checkout → 404 after deactivate
+- Activate restores public 200 when domain+channel remain healthy
+- Activate does not call Railway/EDGE (AWJ-managed fixture, fake client call counts = 0)
+- Idempotent activate/deactivate
+- GET list includes inactive store with truthful flag
+- Identity PUT still cannot flip `is_active`
+
+Also:
+
+- Replaced `inactive_storefronts_are_omitted` with `inactive_storefronts_are_listed_with_a_truthful_flag_and_no_preview_url`
 - `CommerceModuleBoundaryTest` allowlist updated
-- Provisioning re-activate and publication-inactive tests are **not** edited and must remain green
+- Provisioning re-activate and publication-inactive tests were **not** edited and stayed green in the full suite
 
-### Frontend (local Vitest)
+Optional VERIFY-1 pgsql race (two concurrent activate/deactivate on one row) was **not** added. `lockForUpdate` is in the service; no new concurrency test file.
 
-- Stores page: deactivate confirms then POST deactivate; activate POST activate; no custom-domain edge URLs
-- Badge inactive when catalog says so
-- User without `commerce.manage` sees badge, not actions
-- Settings remains on inactive rows
-- Messages AR/EN; store activate copy ≠ domain activate copy
+PHPUnit 12 doc-comment metadata warnings fire for this test (and the rest of the Feature suite). Pre-existing pattern; **not** a failure.
+
+### Frontend (local Vitest, this continuation)
+
+Targeted files after reconnect, in `web/`:
+
+```text
+✓ src/modules/commerce-workspace/stores.test.ts (18 tests)
+✓ src/modules/commerce-workspace/messages.test.ts (6 tests)
+✓ src/app/(commerce)/commerce/stores/page.test.tsx (20 tests)
+Test Files  3 passed (3)
+     Tests  44 passed (44)
+```
+
+Covers: deactivate confirms then POST deactivate; activate POST activate; no custom-domain edge URLs; badge inactive when catalog says so; user without `commerce.manage` sees badge not actions; Settings remains on inactive rows; AR/EN copy ≠ domain activate copy.
 
 ## Build / CI
 
-*(filled after GitHub Web CI + Backend CI sqlite/pgsql)*
+Recorded from PR [#873](https://github.com/safwan5001-source/Nebrax/pull/873) implementation SHA `3fcb5b76bb1aec4e0fd9cc5ae9d570535d1f14b5`.
+
+GitHub runs **both** `push` and `pull_request` for the same SHA. Gate used below is the PR event (run [35419248094](https://github.com/safwan5001-source/Nebrax/actions/runs/35419248094), conclusion **success**) plus Web CI.
+
+| Gate | Run | Result |
+|---|---|---|
+| `web build (Next.js)` + Vitest | [35419239448](https://github.com/safwan5001-source/Nebrax/actions/runs/35419239448) (push) / [35419248098](https://github.com/safwan5001-source/Nebrax/actions/runs/35419248098) (PR) | **SUCCESS** — **1906 tests passed** (278 files); Next.js compiled successfully, 171 static pages |
+| `php artisan test (L11, sqlite)` | [35419248094](https://github.com/safwan5001-source/Nebrax/actions/runs/35419248094) | **SUCCESS** — **45 skipped, 4235 passed** (25967 assertions), 376.37s |
+| `php artisan test (L11, pgsql)` | [35419248094](https://github.com/safwan5001-source/Nebrax/actions/runs/35419248094) | **SUCCESS** — **4280 passed** (26213 assertions), 787.64s, **0 failed** |
+
+`CommerceWorkspaceStorefrontLifecycleApiTest` **PASS** on both databases.
+
+This docs-only commit does not change application code. Web CI will not re-run (paths filter). Backend CI will re-run on push; no schema files changed.
 
 ## Explicit confirmation of untouched modules
 
@@ -143,6 +174,21 @@ No migration. No resolver change. No provisioning change. No publication-semanti
 - App Builder
 - Multi-store creation
 - Order cancellation
+
+## Risks / Remaining
+
+| Item | Severity | Notes |
+|---|---|---|
+| GET list now includes inactive stores | Medium, intentional | Keys unchanged; `inactive_storefronts_are_omitted` replaced. Merchants cannot re-activate a hidden row. |
+| POST provision can still re-activate a compatible inactive first storefront | Low | Existing documented converge; out of scope. Activate remains the explicit UX. |
+| Activate while domain/channel unhealthy → 200 but public 404 | Low | Not over-gated; `preview_url` is null. |
+| Merchant may expect POS/mobile/channel to stop | Low | DO NOT COUPLE; copy says hosted storefront / public domain. |
+| `origin/main` advanced to STORE-UI-6 (`ae50844…`) | Hygiene | Auto-mergeable `messages.ts` overlap. Not rebased. Rebase only if a human merge is requested. |
+| Optional pgsql activate/deactivate race test | Informational | VERIFY-1 marked optional; not in this PR. `lockForUpdate` is present. |
+| PHPUnit 12 `@` doc-comment metadata warnings | Informational | Suite-wide; not a CI failure. |
+| VERIFY-1 PR [#872](https://github.com/safwan5001-source/Nebrax/pull/872) still open | Informational | Docs contract; independent of this PR. |
+
+No stop-condition architectural blocker.
 
 ## Next action
 
