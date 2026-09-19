@@ -114,10 +114,11 @@ class StorefrontPresentationPostgresConcurrencyTest extends TestCase
         $this->assertIsArray($result);
 
         app(TenantContext::class)->set($this->tenantId);
+        $winnerExpectedRevision = ($result['ok'] ?? false) === true ? 2 : 1;
         $winnerSave = app(StorefrontPresentationService::class)->saveDraftForCurrentTenant(
             $this->storefrontId,
             ['homepage' => ['heroHeadline' => 'بعد القفل']],
-            1,
+            $winnerExpectedRevision,
         );
 
         if (($result['ok'] ?? false) === true) {
