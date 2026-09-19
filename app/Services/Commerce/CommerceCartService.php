@@ -27,8 +27,17 @@ final class CommerceCartService
 
     public function __construct(private readonly CommercePriceResolver $prices) {}
 
-    /** @return array{cart: ?CommerceCart, invalid: bool} */
-    public function findByToken(?string $rawToken): array
+    /**
+     * @param  bool  $allowConsumed  `true` فقط لمسار إتمامٍ يحتاج الوصول إلى Checkout
+     *                                سلةٍ استُهلكت بالفعل (إعادة تشغيل Idempotency-Key
+     *                                بعد نجاح الشراء) — راجع
+     *                                `CommerceCheckoutService::resolveForCompletion()`.
+     *                                لا يُستعمَل أبداً لمسارات الإضافة/التعديل/بدء
+     *                                Checkout جديد؛ تلك تبقى ترفض `consumed` كأي حالةٍ
+     *                                غير `active`.
+     * @return array{cart: ?CommerceCart, invalid: bool}
+     */
+    public function findByToken(?string $rawToken, bool $allowConsumed = false): array
     {
         if ($rawToken === null || $rawToken === '') {
             return ['cart' => null, 'invalid' => false];
@@ -41,6 +50,21 @@ final class CommerceCartService
 
         if ($cart === null) {
             return ['cart' => null, 'invalid' => true];
+        }
+
+        if ($allowConsumed && $cart->status === CommerceCart::STATUS_CONSUMED) {
+            // `consumed` is terminal — it must never be rewritten back to
+            // `expired`/`active` by mere passage of time (unlike the `active`
+            // branch below, which actively demotes to `expired`). But the
+            // Cart's own bearer lifetime (`expires_at`) still governs how
+            // long its token stays resolvable at all: past that point, replay
+            // fails closed here — no status mutation, just a refusal to
+            // resolve — rather than remaining valid indefinitely.
+            if ($cart->expires_at->isPast()) {
+                return ['cart' => null, 'invalid' => true];
+            }
+
+            return ['cart' => $cart, 'invalid' => false];
         }
 
         if ($cart->status !== CommerceCart::STATUS_ACTIVE) {

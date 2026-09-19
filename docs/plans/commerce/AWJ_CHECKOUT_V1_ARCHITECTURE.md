@@ -141,11 +141,26 @@ The implementation must combine application-level idempotency with database-enfo
 
 Conceptual critical section:
 
-`transaction -> lock checkout/cart -> verify context -> revalidate lines/prices/stock -> recompute totals -> enforce idempotency -> create exactly one CommerceOrder -> mark checkout completed -> commit`
+`transaction -> lock checkout/cart -> verify context -> revalidate lines/prices/stock -> recompute totals -> enforce idempotency -> create exactly one CommerceOrder -> mark checkout completed -> consume the cart -> commit`
 
 Do not rely on frontend button disabling for correctness.
 
 A completed Checkout is immutable for purchase-affecting fields. Repeating completion with the same accepted idempotency identity returns the same resulting order representation rather than creating another order.
+
+**Cart One-Shot Lifecycle (PR-4 follow-up).** The Cart itself carries the other half of the
+exactly-once guarantee, not just the Checkout row: `active → checkout → successful CommerceOrder
+→ consumed` (`CommerceCart::STATUS_CONSUMED`, added by
+`2026_10_04_010000_add_consumed_status_to_commerce_carts`). Completion moves the Cart to
+`consumed` in the same transaction that creates the Order and marks the Checkout `completed` —
+Order + Checkout-completed + Cart-consumed commit together or none of them do. A consumed Cart
+can never `add`/`update`/`remove` a line, start a new Checkout, or back a second Order; a repeat
+purchase always requires a brand-new Cart and Cart Token. This closes the gap an earlier
+workaround (resuming a completed Checkout indefinitely on a still-`active` Cart) left open: that
+workaround remains in `CommerceCheckoutService::createOrResume()` only as a defensive fallback for
+data written before this fix, never reached by carts consumed through this path. Completion
+replay (`Idempotency-Key`) is unaffected — `resolveForCompletion()` explicitly allows looking up a
+Checkout via a consumed Cart precisely so replay keeps working after the cart it was purchased
+through has been consumed.
 
 ## 10. CommerceOrder
 

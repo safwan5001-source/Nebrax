@@ -260,6 +260,44 @@ class StorefrontCheckoutCompletionApiTest extends TestCase
     }
 
     /**
+     * P1 (Codex review, PR #836) — closed by the Cart One-Shot Lifecycle
+     * (owner decision: one CommerceCart backs at most one successful
+     * CommerceOrder), on the web path too — `CommerceCheckoutService` is
+     * shared between `/store/v1` and `/commerce/v1`, so the same fix
+     * protects both without any change to `/store/v1`'s own contract (no
+     * new Idempotency-Key on `POST checkout`). `complete()` now moves the
+     * Cart to `consumed` in the same transaction that completes the
+     * Checkout, so a second `POST checkout` on the same cart cookie no
+     * longer resumes anything — it 404s like any other non-active cart.
+     * `POST checkout/complete` keeps replaying/conflicting correctly via
+     * `resolveForCompletion()`'s `allowConsumed: true` lookup.
+     *
+     * @test
+     */
+    public function a_second_post_checkout_after_completion_is_rejected_on_the_web_path_too_because_the_cart_is_consumed(): void
+    {
+        ['tenant' => $tenant, 'channel' => $channel] = $this->store('checkout-complete-dup-guard.test');
+        $product = $this->product($tenant, $channel);
+        $token = $this->fullyReadyCheckout('checkout-complete-dup-guard.test', $tenant, $channel, $product);
+
+        $first = $this->complete('checkout-complete-dup-guard.test', $token, 'idem-web-guard-A')->assertCreated();
+        $this->assertDatabaseCount('commerce_checkouts', 1);
+        $this->assertDatabaseCount('commerce_orders', 1);
+        $this->assertSame(\App\Models\CommerceCart::STATUS_CONSUMED, \App\Models\CommerceCart::withoutGlobalScopes()->firstOrFail()->status);
+
+        $this->createCheckout('checkout-complete-dup-guard.test', $token)->assertStatus(404);
+        $this->assertDatabaseCount('commerce_checkouts', 1);
+
+        $this->complete('checkout-complete-dup-guard.test', $token, 'idem-web-guard-B')
+            ->assertStatus(409)->assertJsonPath('error.code', 'idempotency_conflict');
+
+        $replay = $this->complete('checkout-complete-dup-guard.test', $token, 'idem-web-guard-A')->assertOk();
+        $this->assertSame($first->json('data.order.id'), $replay->json('data.order.id'));
+        $this->assertDatabaseCount('commerce_checkouts', 1);
+        $this->assertDatabaseCount('commerce_orders', 1);
+    }
+
+    /**
      * يعيد استعمال نمط `StorefrontCartApiTest::deleting_an_alternative_unit_price_...`
      * حرفياً: سعرٌ صريح لوحدة بديلة كان محسوماً وقت الإضافة للسلة، ثم يُحذف
      * قبل الإتمام — أقرب سيناريو حقيقي قابل للاختبار لـ"تغيّر السعر" في نظامٍ

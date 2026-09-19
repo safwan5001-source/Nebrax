@@ -9,6 +9,7 @@ use App\Models\CommerceListing;
 use App\Models\CommerceOrder;
 use App\Models\Product;
 use App\Models\ProductWarehouseStock;
+use App\Models\SalesChannel;
 use App\Models\UnitTemplateUnit;
 use App\Services\Accounting\UnitConversion;
 use App\Support\DocumentLineVariantResolver;
@@ -91,10 +92,8 @@ final class CommerceCheckoutService
         $cart = $cartLookup['cart'];
         $context = $this->context();
 
-        $checkout = CommerceCheckout::query()
+        $checkout = $this->scopeToContext(CommerceCheckout::query(), $context)
             ->where('cart_id', $cart->id)
-            ->where('storefront_id', $context->storefrontId())
-            ->where('sales_channel_id', $context->salesChannelId())
             ->whereIn('status', CommerceCheckout::OPEN_STATUSES)
             ->orderByDesc('created_at')
             ->first();
@@ -105,10 +104,8 @@ final class CommerceCheckoutService
 
         if ($checkout->expires_at->isPast()) {
             return DB::transaction(function () use ($checkout, $cart, $context): array {
-                $current = CommerceCheckout::query()
+                $current = $this->scopeToContext(CommerceCheckout::query(), $context)
                     ->whereKey($checkout->id)
-                    ->where('storefront_id', $context->storefrontId())
-                    ->where('sales_channel_id', $context->salesChannelId())
                     ->lockForUpdate()
                     ->first();
 
@@ -138,11 +135,38 @@ final class CommerceCheckoutService
      * كان سيُرجع 404 دوماً لأي محاولة إتمامٍ ثانية، فيُسقط عقد Idempotency-Key
      * بالكامل بمجرد نجاح أول إتمام.
      *
+     * **`allowConsumed: true` (Cart One-Shot Lifecycle)**: أول إتمامٍ ناجح
+     * ينقل السلة إلى `consumed` في نفس معاملة `complete()` — فإعادة تشغيل
+     * نفس مفتاح Idempotency-Key بعد ذلك يجب أن تصل لهذا Checkout رغم أن
+     * سلته لم تعد `active`. هذا لا يفتح باباً لإنشاء Checkout/Order جديد:
+     * `complete()` نفسها ترى `status === STATUS_COMPLETED` فتذهب مباشرةً
+     * إلى `replayOrConflict()` بلا أي قفلٍ جديدٍ على السلة، ومسارا
+     * `current()`/`createOrResume()` أدناه يبقيان بلا `allowConsumed` عمداً
+     * فيرفضان سلةً مُستهلَكة كأي سلةٍ غير `active`.
+     *
+     * **سلةٌ `consumed`**: القرار أعلاه (أحدث Checkout ضمن حالاتٍ مقبولة)
+     * يفترض ضمناً أن السلة لا تحمل إلا Checkout واحداً ذا صلة — صحيحٌ دائماً
+     * لسلةٍ استُهلكت عبر `complete()` الحالية (تستهلك السلة وتُنشئ الطلب في
+     * نفس المعاملة، فلا Checkout آخر ذو صلة يمكن أن ينشأ بعدها). لكنه **غير
+     * مضمون لبيانات تاريخية** استُهلكت عبر migration الـbackfill: سلةٌ من
+     * قبل Cart One-Shot Lifecycle قد تحمل Checkout مكتملاً حقيقياً (ومرتبطاً
+     * بـ`CommerceOrder` فعلياً) **و** Checkout أحدث فُتح لاحقاً (من علّة
+     * `createOrResume()` الأصلية قبل إصلاحها) وبقي مفتوحاً بلا إتمام. أحدثُ-
+     * أولاً بين `{مفتوح، مكتمل}` كان يختار حينها الـCheckout المفتوح الخاطئ
+     * — لا صلة له بالطلب الفعلي — فتفشل إعادة تشغيل مفتاح Idempotency-Key
+     * الأصلي مغلقاً (404) بدل إعادة الطلب الحقيقي.
+     * لذلك: لسلةٍ `consumed`، السلطة هي وجود `CommerceOrder` مرتبط
+     * (`CommerceCheckout::order()`) — دليلٌ مباشر لا `status` وحده، ونفس
+     * الدليل الذي اعتمده backfill نفسه — لا "الأحدث من أي حالةٍ مقبولة".
+     * `whereHas('order')` يمرّ عبر نفس `TenantScope`/`scopeToContext()`
+     * أعلاه فلا تسرّب مستأجرَ آخر. لا تغيير على القرار الطبيعي (سلةٌ لا تزال
+     * `active` وقت الاستدعاء) إطلاقاً.
+     *
      * @return array{checkout: ?CommerceCheckout, invalid: bool}
      */
     public function resolveForCompletion(?string $cartToken): array
     {
-        $cartLookup = $this->carts->findByToken($cartToken);
+        $cartLookup = $this->carts->findByToken($cartToken, allowConsumed: true);
         if ($cartLookup['cart'] === null) {
             return ['checkout' => null, 'invalid' => $cartLookup['invalid']];
         }
@@ -150,10 +174,18 @@ final class CommerceCheckoutService
         $cart = $cartLookup['cart'];
         $context = $this->context();
 
-        $checkout = CommerceCheckout::query()
+        if ($cart->status === CommerceCart::STATUS_CONSUMED) {
+            $checkout = $this->scopeToContext(CommerceCheckout::query(), $context)
+                ->where('cart_id', $cart->id)
+                ->whereHas('order')
+                ->orderByDesc('created_at')
+                ->first();
+
+            return ['checkout' => $checkout, 'invalid' => false];
+        }
+
+        $checkout = $this->scopeToContext(CommerceCheckout::query(), $context)
             ->where('cart_id', $cart->id)
-            ->where('storefront_id', $context->storefrontId())
-            ->where('sales_channel_id', $context->salesChannelId())
             ->whereIn('status', [...CommerceCheckout::OPEN_STATUSES, CommerceCheckout::STATUS_COMPLETED])
             ->orderByDesc('created_at')
             ->first();
@@ -165,6 +197,23 @@ final class CommerceCheckoutService
      * ينشئ Checkout جديداً لسلة رمز الكوكي، أو يستأنف الحالي الصالح لها.
      * لا ينشئ سلةً أبداً (§ ممنوع صراحةً) — سلة غير موجودة/غير صالحة تفشل
      * مغلقاً بـ CheckoutNotFoundException.
+     *
+     * **حارس عدم التكرار (Post-Review P1، PR-4) — تراجعيٌّ الآن (Cart
+     * One-Shot Lifecycle)**: كان هذا الحارس أساسياً حين تبقى السلة
+     * `status=active` بعد `complete()`. بعد أن أصبح `complete()` ينقل السلة
+     * إلى `CommerceCart::STATUS_CONSUMED` في نفس معاملة الإتمام (راجع
+     * توثيقها)، `lockActiveCart()` أدناه — الذي يشترط `status=active` — يرفض
+     * أي `POST checkout` على سلةٍ استُهلكت **قبل** الوصول لهذا الفرع أصلاً؛
+     * فلا مسارٍ حيٍّ يبلغه بعد اليوم لسلةٍ استُهلكت عبر هذا الإصلاح نفسه.
+     * يبقى **دفاعاً احتياطياً** لبيانات تاريخية من قبل هذا الإصلاح (سلةٌ
+     * `active` قديمة تحمل Checkout `completed` بالفعل من النسخة السابقة) —
+     * إن وُجد، يُستأنَف هو نفسه ولا يُنشأ Checkout جديد أبداً، فيُعاد كل
+     * إتمامٍ لاحق إلى `complete()`/`replayOrConflict()` الموجودتين أصلاً
+     * وآمنتين تماماً (نفس المفتاح ⇐ إعادة نفس الطلب، مفتاحٌ مختلف ⇐ 409
+     * تعارض) — لا آلية idempotency موازية جديدة، ولا عمود/جدول جديد، ولا
+     * تغيير على عقد `POST checkout` (لا يزال بلا Idempotency-Key، مطابقاً
+     * لعقد `AWJ_CHECKOUT_V1_ARCHITECTURE.md` §9 حرفياً). ويب وجوال كلاهما
+     * محميان معاً لأن الإصلاح في هذه الخدمة المشتركة، لا في متحكّمٍ واحد.
      *
      * @return array{checkout: CommerceCheckout, cart: CommerceCart, created: bool}
      */
@@ -179,13 +228,16 @@ final class CommerceCheckoutService
         return DB::transaction(function () use ($cartLookup, $context): array {
             $cart = $this->lockActiveCart($cartLookup['cart']->id, $context);
 
-            $existing = CommerceCheckout::query()
+            $existing = $this->scopeToContext(CommerceCheckout::query(), $context)
                 ->where('cart_id', $cart->id)
-                ->where('storefront_id', $context->storefrontId())
-                ->where('sales_channel_id', $context->salesChannelId())
-                ->whereIn('status', CommerceCheckout::OPEN_STATUSES)
+                ->whereIn('status', [...CommerceCheckout::OPEN_STATUSES, CommerceCheckout::STATUS_COMPLETED])
+                ->orderByDesc('created_at')
                 ->lockForUpdate()
                 ->first();
+
+            if ($existing !== null && $existing->status === CommerceCheckout::STATUS_COMPLETED) {
+                return ['checkout' => $existing, 'cart' => $cart, 'created' => false];
+            }
 
             if ($existing !== null && ! $existing->expires_at->isPast()) {
                 return ['checkout' => $existing, 'cart' => $cart, 'created' => false];
@@ -196,7 +248,7 @@ final class CommerceCheckoutService
             }
 
             $checkout = CommerceCheckout::create([
-                'storefront_id' => $context->storefrontId(),
+                'storefront_id' => $context->hasStorefront() ? $context->storefrontId() : null,
                 'sales_channel_id' => $context->salesChannelId(),
                 'cart_id' => $cart->id,
                 'expires_at' => now()->addMinutes(self::LIFETIME_MINUTES),
@@ -297,11 +349,9 @@ final class CommerceCheckoutService
         $context = $this->context();
 
         return DB::transaction(function () use ($knownCheckout, $idempotencyKeyHash, $idempotencyFingerprint, $context): array {
-            $checkout = CommerceCheckout::query()
+            $checkout = $this->scopeToContext(CommerceCheckout::query(), $context)
                 ->whereKey($knownCheckout->id)
                 ->where('tenant_id', $context->tenantId())
-                ->where('storefront_id', $context->storefrontId())
-                ->where('sales_channel_id', $context->salesChannelId())
                 ->lockForUpdate()
                 ->first();
 
@@ -318,13 +368,11 @@ final class CommerceCheckoutService
             }
 
             // نفس سلة Checkout هذا حصراً — بنفس تحقّق السياق الكامل
-            // (tenant/storefront/channel) الذي تفرضه CHECKOUT-1A، لا ثقة
-            // بحالة `cart_id` المخزَّنة وحدها.
-            $cart = CommerceCart::query()
+            // (tenant/storefront أو null الجوّال/channel) الذي تفرضه
+            // CHECKOUT-1A، لا ثقة بحالة `cart_id` المخزَّنة وحدها.
+            $cart = $this->scopeToContext(CommerceCart::query(), $context)
                 ->whereKey($checkout->cart_id)
                 ->where('tenant_id', $context->tenantId())
-                ->where('storefront_id', $context->storefrontId())
-                ->where('sales_channel_id', $context->salesChannelId())
                 ->where('status', CommerceCart::STATUS_ACTIVE)
                 ->where('expires_at', '>', now())
                 ->lockForUpdate()
@@ -360,7 +408,7 @@ final class CommerceCheckoutService
 
             $order = $this->orders->createFromCheckout([
                 'sales_channel_id' => $context->salesChannelId(),
-                'storefront_id' => $context->storefrontId(),
+                'storefront_id' => $context->hasStorefront() ? $context->storefrontId() : null,
                 'commerce_checkout_id' => $checkout->id,
                 'delivery_method' => $checkout->delivery_method,
                 'contact_name' => $checkout->contact_name,
@@ -379,6 +427,12 @@ final class CommerceCheckoutService
                 'completion_idempotency_key_hash' => $idempotencyKeyHash,
                 'completion_idempotency_fingerprint' => $idempotencyFingerprint,
             ]);
+
+            // Cart One-Shot Lifecycle: نفس المعاملة، نفس الصفّ المُقفَل أعلاه —
+            // Order + Checkout مكتمل + Cart مُستهلَكة يلتزمون معاً أو لا شيء
+            // منهم. سلةٌ واحدة تدعم طلباً ناجحاً واحداً على الأكثر؛ شراءٌ
+            // تالٍ يبدأ سلةً ورمزاً جديدين دوماً (لا إعادة فتح `consumed`).
+            $cart->update(['status' => CommerceCart::STATUS_CONSUMED]);
 
             return ['order' => $order, 'replayed' => false];
         }, 3);
@@ -631,11 +685,9 @@ final class CommerceCheckoutService
      */
     private function lockActiveCart(string $cartId, StorefrontContext $context): CommerceCart
     {
-        $cart = CommerceCart::query()
+        $cart = $this->scopeToContext(CommerceCart::query(), $context)
             ->whereKey($cartId)
             ->where('tenant_id', $context->tenantId())
-            ->where('storefront_id', $context->storefrontId())
-            ->where('sales_channel_id', $context->salesChannelId())
             ->where('status', CommerceCart::STATUS_ACTIVE)
             ->where('expires_at', '>', now())
             ->lockForUpdate()
@@ -651,11 +703,9 @@ final class CommerceCheckoutService
     private function lockUsableCheckout(string $checkoutId): CommerceCheckout
     {
         $context = $this->context();
-        $checkout = CommerceCheckout::query()
+        $checkout = $this->scopeToContext(CommerceCheckout::query(), $context)
             ->whereKey($checkoutId)
             ->where('tenant_id', $context->tenantId())
-            ->where('storefront_id', $context->storefrontId())
-            ->where('sales_channel_id', $context->salesChannelId())
             ->whereIn('status', CommerceCheckout::OPEN_STATUSES)
             ->where('expires_at', '>', now())
             ->lockForUpdate()
@@ -673,14 +723,55 @@ final class CommerceCheckoutService
         return CommerceCart::find($checkout->cart_id);
     }
 
+    /**
+     * يقيّد استعلام Checkout أو Cart (كلاهما بنفس عمودي `sales_channel_id`/
+     * `storefront_id`) إلى السياق الموثوق الحالي — نفس منطق
+     * `CommerceCartService::scopeToContext()` حرفياً (مطابقة صريحة لمسار
+     * الويب، `whereNull('storefront_id')` صراحةً لمسار الجوال) مكرَّرٌ هنا
+     * عمداً بدل توسيع واجهة `CommerceCartService` العامة — نفس سبب تكرار
+     * `resolveUnit()`/`lockActiveCart()` الموثَّق في رأس هذا الصنف: Checkout
+     * لا يغيّر قواعد Cart ولا يُدخلها في التزامٍ جديد.
+     *
+     * @template TModel of CommerceCheckout|CommerceCart
+     * @param  \Illuminate\Database\Eloquent\Builder<TModel>  $query
+     * @return \Illuminate\Database\Eloquent\Builder<TModel>
+     */
+    private function scopeToContext($query, StorefrontContext $context)
+    {
+        $query->where('sales_channel_id', $context->salesChannelId());
+
+        if ($context->hasStorefront()) {
+            $query->where('storefront_id', $context->storefrontId());
+        } else {
+            $query->whereNull('storefront_id');
+        }
+
+        return $query;
+    }
+
+    /**
+     * السياق الموثوق الحالي — يقبل شكلين حصراً، مطابقٌ حرفياً لـ
+     * `CommerceCartService::context()` (راجع توثيقها الكامل):
+     *  - سياق ويب: `hasStorefront() === true` (كما كان دائماً، بلا تغيير).
+     *  - سياق جوّال: `hasStorefront() === false` **و** القناة المحلولة فعلياً
+     *    من نوع `mobile` — تحقّقٌ إيجابي صريح، لا قبولاً ضمنياً لغياب Storefront
+     *    كحالة عامة ناقصة (المسار المتوارَث `ResolveStorefrontTenant` ينتج
+     *    أيضاً `hasStorefront() === false` لكن لقناة `web`).
+     */
     private function context(): StorefrontContext
     {
         $context = app(StorefrontContext::class);
         if (! $context->isEstablished()
-            || ! $context->hasStorefront()
             || app(TenantContext::class)->id() !== $context->tenantId()
         ) {
             throw new RuntimeException('لا يوجد سياق متجر موثوق.');
+        }
+
+        if (! $context->hasStorefront()) {
+            $channel = SalesChannel::query()->find($context->salesChannelId());
+            if ($channel === null || $channel->type !== SalesChannel::TYPE_MOBILE) {
+                throw new RuntimeException('لا يوجد سياق متجر موثوق.');
+            }
         }
 
         return $context;
