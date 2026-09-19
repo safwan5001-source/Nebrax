@@ -25,9 +25,9 @@ use RuntimeException;
  * الترويسات أو الـ Host. ليست هذه واجهة `GET store/v1/storefront`
  * المحسومة بالنطاق للعامة.
  *
- * `preview_url` يُبنى على الخادم من نطاق نشط ومُتحقق فقط، بمخطط https
+ * `preview_url` يُبنى على الخادم من متجر نشط ونطاق نشط ومُتحقق فقط، بمخطط https
  * ثابت — لا يُركَّب في المتصفح، ولا يُرجَع hostname خام، ولا يُكشف
- * `tenant_id`.
+ * `tenant_id`. القائمة تشمل المتاجر المتوقفة بـ`is_active` الفعلي.
  */
 final class CommerceWorkspaceStorefrontsService
 {
@@ -44,7 +44,6 @@ final class CommerceWorkspaceStorefrontsService
         }
 
         $storefronts = Storefront::query()
-            ->where('is_active', true)
             ->with([
                 'salesChannel',
                 'domains' => function ($query) {
@@ -73,16 +72,7 @@ final class CommerceWorkspaceStorefrontsService
                 continue;
             }
 
-            $stores[] = [
-                'id' => $storefront->id,
-                'name' => $storefront->name,
-                'sales_channel_id' => $channel->id,
-                'is_active' => true,
-                'preview_url' => $channel->is_active
-                    ? $this->authorizedPreviewUrl($storefront, $tenantId)
-                    : null,
-                'default_locale' => $storefront->default_locale,
-            ];
+            $stores[] = $this->presentStore($storefront, $channel, $tenantId);
         }
 
         return $stores;
@@ -126,28 +116,73 @@ final class CommerceWorkspaceStorefrontsService
             $storefront->forceFill($update)->save();
         }
 
-        $storefront->load(['salesChannel', 'domains' => function ($query) {
-            $query->where('is_active', true)
-                ->where('verification_status', StorefrontDomain::VERIFICATION_VERIFIED)
-                ->orderByDesc('is_primary')
-                ->orderBy('hostname');
-        }]);
+        $this->loadAuthorizedPreviewDomains($storefront);
 
         $channel = $storefront->salesChannel;
         if ($channel === null || $channel->tenant_id !== $tenantId || $channel->type !== SalesChannel::TYPE_WEB) {
             return null;
         }
 
-        return [
-            'id' => $storefront->id,
-            'name' => $storefront->name,
-            'sales_channel_id' => $channel->id,
-            'is_active' => true,
-            'preview_url' => $channel->is_active
-                ? $this->authorizedPreviewUrl($storefront, $tenantId)
-                : null,
-            'default_locale' => $storefront->default_locale,
-        ];
+        return $this->presentStore($storefront, $channel, $tenantId);
+    }
+
+    /**
+     * STORE-ADMIN-LIFECYCLE-1 — تفعيل متجر قائم يخصّ المستأجر الحالي.
+     * يكتب `Storefront.is_active = true` فقط. لا يمسّ القناة ولا النطاقات
+     * ولا الحافة. مثاليّ التكرار: متجر نشط أصلاً يُعاد كما هو.
+     *
+     * `null` = غير موجود / لا يخص هذا المستأجر → 404 غير كاشف.
+     *
+     * @return array{id: string, name: string, sales_channel_id: string, is_active: bool, preview_url: ?string, default_locale: string}|null
+     */
+    public function activateForCurrentTenant(string $storefrontId): ?array
+    {
+        return $this->setActiveForCurrentTenant($storefrontId, true);
+    }
+
+    /**
+     * STORE-ADMIN-LIFECYCLE-1 — إيقاف متجر قائم يخصّ المستأجر الحالي.
+     * يكتب `Storefront.is_active = false` فقط. الحسم العام يفشل مغلقاً لأن
+     * `ResolveStorefrontDomain` يشترط متجراً نشطاً. لا حذف ولا فصل نطاق.
+     *
+     * `null` = غير موجود / لا يخص هذا المستأجر → 404 غير كاشف.
+     *
+     * @return array{id: string, name: string, sales_channel_id: string, is_active: bool, preview_url: ?string, default_locale: string}|null
+     */
+    public function deactivateForCurrentTenant(string $storefrontId): ?array
+    {
+        return $this->setActiveForCurrentTenant($storefrontId, false);
+    }
+
+    /**
+     * @return array{id: string, name: string, sales_channel_id: string, is_active: bool, preview_url: ?string, default_locale: string}|null
+     */
+    private function setActiveForCurrentTenant(string $storefrontId, bool $active): ?array
+    {
+        $tenantId = app(TenantContext::class)->id();
+        if ($tenantId === null) {
+            throw new RuntimeException('لا سياق مستأجر نشط.');
+        }
+
+        return DB::transaction(function () use ($storefrontId, $active, $tenantId) {
+            $storefront = Storefront::query()->whereKey($storefrontId)->lockForUpdate()->first();
+            if ($storefront === null || $storefront->tenant_id !== $tenantId) {
+                return null;
+            }
+
+            $this->loadAuthorizedPreviewDomains($storefront);
+
+            $channel = $storefront->salesChannel;
+            if ($channel === null || $channel->tenant_id !== $tenantId || $channel->type !== SalesChannel::TYPE_WEB) {
+                return null;
+            }
+
+            if ((bool) $storefront->is_active !== $active) {
+                $storefront->forceFill(['is_active' => $active])->save();
+            }
+
+            return $this->presentStore($storefront, $channel, $tenantId);
+        });
     }
 
     /**
@@ -840,6 +875,36 @@ final class CommerceWorkspaceStorefrontsService
 
         // PostgreSQL unique_violation = 23505 · SQLite constraint = 19
         return $sqlState === '23505' || $driverCode === 19 || str_contains(strtolower($e->getMessage()), 'unique');
+    }
+
+    /**
+     * تمثيل موحَّد لمتجر مساحة العمل: `is_active` الفعلي، و`preview_url`
+     * فقط حين يكون المتجر والقناة نشطين ويوجد نطاق مصرَّح.
+     *
+     * @return array{id: string, name: string, sales_channel_id: string, is_active: bool, preview_url: ?string, default_locale: string}
+     */
+    private function presentStore(Storefront $storefront, SalesChannel $channel, string $tenantId): array
+    {
+        return [
+            'id' => $storefront->id,
+            'name' => $storefront->name,
+            'sales_channel_id' => $channel->id,
+            'is_active' => (bool) $storefront->is_active,
+            'preview_url' => ($storefront->is_active && $channel->is_active)
+                ? $this->authorizedPreviewUrl($storefront, $tenantId)
+                : null,
+            'default_locale' => $storefront->default_locale,
+        ];
+    }
+
+    private function loadAuthorizedPreviewDomains(Storefront $storefront): void
+    {
+        $storefront->load(['salesChannel', 'domains' => function ($query) {
+            $query->where('is_active', true)
+                ->where('verification_status', StorefrontDomain::VERIFICATION_VERIFIED)
+                ->orderByDesc('is_primary')
+                ->orderBy('hostname');
+        }]);
     }
 
     /**

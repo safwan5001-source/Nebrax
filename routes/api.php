@@ -824,6 +824,12 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         // تحتية تجارية، لا قراءة.
         Route::put('commerce/workspace/storefronts/{id}', [CommerceWorkspaceStorefrontsController::class, 'update'])->middleware($perm('commerce.manage'));
 
+        // STORE-ADMIN-LIFECYCLE-1: تفعيل/إيقاف خدمة المتجر المستضاف —
+        // Storefront.is_active فقط. لا قناة ولا نطاق ولا حافة. نفس صلاحية
+        // الهوية (commerce.manage). أفعال صريحة وليست PATCH عاماً.
+        Route::post('commerce/workspace/storefronts/{id}/activate', [CommerceWorkspaceStorefrontsController::class, 'activate'])->middleware($perm('commerce.manage'));
+        Route::post('commerce/workspace/storefronts/{id}/deactivate', [CommerceWorkspaceStorefrontsController::class, 'deactivate'])->middleware($perm('commerce.manage'));
+
         // STORE-ADMIN-ADOPT-1B-2: رؤية نطاقات متجر قائم — قراءة فقط،
         // بلا أي فعل كتابي على StorefrontDomain. نفس صلاحية 1B-1
         // (commerce.manage): حالة النطاق/التحقّق أكثر حساسية من قائمة

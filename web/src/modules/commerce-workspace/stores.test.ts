@@ -11,6 +11,8 @@ import {
   resolveViewStoreUrl,
   selectStoreId,
   updateCommerceStorefrontIdentity,
+  activateCommerceStorefront,
+  deactivateCommerceStorefront,
   type CommerceStoreCatalog,
 } from './stores';
 
@@ -191,6 +193,66 @@ describe('commerce storefront identity update (STORE-ADMIN-ADOPT-1B-1)', () => {
     apiMock.mockResolvedValue({ data: {} });
 
     await expect(updateCommerceStorefrontIdentity('store-x', { name: 'X' })).resolves.toEqual({
+      ok: false,
+      message: 'invalid_payload',
+    });
+  });
+});
+
+describe('commerce storefront lifecycle (STORE-ADMIN-LIFECYCLE-1)', () => {
+  it('posts activate to the storefront id path and never to a domain edge URL', async () => {
+    apiMock.mockResolvedValue({
+      data: { store: { id: 'store-x', name: 'X', sales_channel_id: 'ch-x', is_active: true, preview_url: 'https://x.example/', default_locale: 'ar' } },
+    });
+
+    const result = await activateCommerceStorefront('store-x');
+
+    expect(apiMock).toHaveBeenCalledTimes(1);
+    expect(apiMock).toHaveBeenCalledWith('/commerce/workspace/storefronts/store-x/activate', {
+      method: 'POST',
+      body: {},
+    });
+    expect(String(apiMock.mock.calls[0][0])).not.toContain('domains');
+    expect(String(apiMock.mock.calls[0][0])).not.toContain('activate-edge');
+    expect(result).toEqual({
+      ok: true,
+      store: { id: 'store-x', name: 'X', salesChannelId: 'ch-x', isActive: true, previewUrl: 'https://x.example/', defaultLocale: 'ar' },
+    });
+  });
+
+  it('posts deactivate to the storefront id path and never to a domain edge URL', async () => {
+    apiMock.mockResolvedValue({
+      data: { store: { id: 'store-x', name: 'X', sales_channel_id: 'ch-x', is_active: false, preview_url: null, default_locale: 'ar' } },
+    });
+
+    const result = await deactivateCommerceStorefront('store-x');
+
+    expect(apiMock).toHaveBeenCalledTimes(1);
+    expect(apiMock).toHaveBeenCalledWith('/commerce/workspace/storefronts/store-x/deactivate', {
+      method: 'POST',
+      body: {},
+    });
+    expect(String(apiMock.mock.calls[0][0])).not.toContain('domains');
+    expect(String(apiMock.mock.calls[0][0])).not.toContain('activate-edge');
+    expect(result).toEqual({
+      ok: true,
+      store: { id: 'store-x', name: 'X', salesChannelId: 'ch-x', isActive: false, previewUrl: null, defaultLocale: 'ar' },
+    });
+  });
+
+  it('surfaces a failure instead of throwing when activate is rejected', async () => {
+    apiMock.mockRejectedValue(new Error('forbidden'));
+
+    await expect(activateCommerceStorefront('store-x')).resolves.toEqual({
+      ok: false,
+      message: 'forbidden',
+    });
+  });
+
+  it('fails closed on an unexpected deactivate response shape', async () => {
+    apiMock.mockResolvedValue({ data: {} });
+
+    await expect(deactivateCommerceStorefront('store-x')).resolves.toEqual({
       ok: false,
       message: 'invalid_payload',
     });
