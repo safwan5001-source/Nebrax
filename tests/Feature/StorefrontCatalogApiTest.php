@@ -331,7 +331,7 @@ class StorefrontCatalogApiTest extends TestCase
         $product = $this->publishedProduct($tenant, $channel);
 
         $show = $this->getJson("/store/v1/{$tenant->slug}/products/{$product->id}")->assertOk();
-        $this->assertNull($show->json('in_stock'));
+        $this->assertNull($show->json('data.in_stock'));
 
         $list = $this->getJson("/store/v1/{$tenant->slug}/products")->assertOk();
         $listItem = collect($list->json('data'))->firstWhere('id', $product->id);
@@ -343,12 +343,18 @@ class StorefrontCatalogApiTest extends TestCase
     /** @test */
     public function category_tree_is_tenant_isolated_and_excludes_inactive_categories(): void
     {
-        ['tenant' => $tenantA] = $this->seedStore('m');
+        ['tenant' => $tenantA, 'channel' => $channelA] = $this->seedStore('m');
         ['tenant' => $tenantB] = $this->seedStore('n');
 
         app(TenantContext::class)->set($tenantA->id);
         $active = ProductCategory::create(['name' => 'إلكترونيات', 'is_active' => true]);
         ProductCategory::create(['name' => 'مصنّف معطّل', 'is_active' => false]);
+        // COM-CATALOG-2 — ظهور التصنيف يتطلب صف نشر على القناة (البوابة الجديدة)؛
+        // الترحيل يُنشئها للبيانات القائمة قبله، أما البذور الحديثة فتزرعها صراحةً.
+        \App\Models\CommerceCategoryListing::create([
+            'tenant_id' => $tenantA->id, 'category_id' => $active->id,
+            'sales_channel_id' => $channelA->id, 'is_published' => true,
+        ]);
         app(TenantContext::class)->forget();
 
         app(TenantContext::class)->set($tenantB->id);
