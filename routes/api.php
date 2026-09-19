@@ -724,7 +724,7 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::get('pos/audit/carts', [PosAuditController::class, 'carts'])->middleware([$perm('pos.audit.view'), $app('sales.pos')]);
         Route::get('pos/audit/carts/{cartId}', [PosAuditController::class, 'cart'])->middleware([$perm('pos.audit.view'), $app('sales.pos')]);
         Route::get('pos/audit/users', [PosAuditController::class, 'users'])->middleware([$perm('pos.audit.view'), $app('sales.pos')]);
-        Route::get('pos/audit/approvals', [PosAuditController::class, 'approvals'])->middleware([$perm('pos.audit.view'), $app('sales.pos')]);
+        Route::get('pos/audit/approvals', [PosAuditController::class, 'approvals'])->middleware([$perm('pos.audit.review'), $app('sales.pos')]);
         Route::post('pos/audit/approvals/{id}/approve', [PosAuditController::class, 'approve'])->middleware([$perm('pos.override.approve'), $app('sales.pos')]);
         Route::get('pos/reason-codes', [PosAuditController::class, 'reasonCodes'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);
         Route::post('pos/reason-codes', [PosAuditController::class, 'storeReasonCode'])->middleware([$perm('pos.audit.settings.manage'), $app('sales.pos')]);
