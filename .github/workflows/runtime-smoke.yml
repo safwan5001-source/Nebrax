@@ -26,6 +26,14 @@ jobs:
       - name: Build production image
         run: docker build -t awj-api-runtime-smoke .
 
+      - name: Verify Apache configuration
+        run: |
+          set -euo pipefail
+          docker run --rm --entrypoint apache2ctl awj-api-runtime-smoke -t
+          loaded_mpm_count="$(docker run --rm --entrypoint sh awj-api-runtime-smoke -lc "apache2ctl -M 2>/dev/null | grep -Ec 'mpm_.*_module'")"
+          test "$loaded_mpm_count" -eq 1
+          docker run --rm --entrypoint sh awj-api-runtime-smoke -lc "apache2ctl -M 2>/dev/null | grep -q 'mpm_prefork_module'"
+
       - name: Start production container
         run: |
           docker run -d --name awj-api-smoke \
