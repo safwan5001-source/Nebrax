@@ -2379,6 +2379,534 @@ The actual sequence remains subject to architecture dependencies and implementat
 
 ---
 
+## 23A. V1 Scope & Delivery Plan (2026-09-20)
+
+### Delivery principle
+
+Do not attempt to ship the entire long-term App Builder vision as one feature.
+
+V1 should prove one complete merchant outcome:
+
+> **A merchant can create a branded AWJ commerce app from an approved starting point, visually customize it within controlled capabilities, preview/test it, and move an authorized native release through a safe store-release workflow — while AWJ Commerce remains the source of truth.**
+
+Every V1 item must contribute directly to that loop or to its security/reliability.
+
+### V1 success boundary
+
+V1 is complete only when the full path works:
+
+```text
+Create App
+ -> choose Store Design / Template / Safe Blank
+ -> configure identity/theme/navigation
+ -> edit supported pages/components
+ -> bind approved Commerce data/actions
+ -> validate
+ -> preview
+ -> publish compatible Experience
+ -> create native release when required
+ -> build/sign/upload safely
+ -> track store state
+ -> verify released app against AWJ Commerce
+```
+
+A beautiful editor without release capability is not complete V1.
+A build pipeline without safe visual editing is not complete V1.
+A demo app disconnected from tenant-scoped Commerce is not complete V1.
+
+### V1 — Must Have
+
+#### 1. App Manager foundation
+- Apps list;
+- create app;
+- app status;
+- platform readiness;
+- current Draft/Published experience;
+- current iOS/Android release status;
+- basic settings.
+
+#### 2. Creation wizard
+First-class paths:
+- Use My Store Design;
+- Choose a Template;
+- Start From Scratch with Minimum Safe Shell.
+
+V1 can begin with a small curated template set; marketplace/template ecosystem is later.
+
+#### 3. App identity
+- app display name;
+- logo/icon source workflow;
+- splash/brand basics where runtime/build supports them;
+- Arabic/English identity/content;
+- stable app identity record;
+- stable iOS Bundle ID / Android package ID after native identity creation.
+
+Changing branding must not casually regenerate platform identity.
+
+#### 4. Shared brand/theme foundation
+- import compatible Store/Shared Brand values;
+- app override;
+- Review Changes as preferred sync mode;
+- Detect → Diff → Preview → Apply;
+- explicit inherited vs overridden values.
+
+V1 does not require every Store Customizer structure to map automatically to mobile.
+
+#### 5. Controlled page set
+Initial page capability should focus on commerce-critical flows:
+- Home;
+- Category/Collection;
+- Search;
+- Product Detail;
+- Cart;
+- Account/Auth entry;
+- Orders/Order Detail where Commerce API readiness supports it;
+- required legal/support/settings surfaces.
+
+Checkout architecture may be native/runtime-driven or an approved secure flow depending on the Commerce API/payment readiness proved before implementation. Do not fake parity if backend/mobile contracts are not ready.
+
+#### 6. Curated Component Registry
+V1 should ship a bounded, high-quality registry rather than dozens of weak components.
+
+Candidate minimum groups:
+
+**Content**
+- heading/text;
+- image;
+- banner/hero;
+- spacer/divider where genuinely useful.
+
+**Commerce**
+- category/collection list;
+- product grid/list;
+- product card;
+- product detail primitives or approved composed product screen;
+- price;
+- variant/options selector where supported;
+- add-to-cart;
+- cart summary;
+- promotion/content callout.
+
+**Layout**
+- section/container;
+- stack/row/grid abstractions constrained for mobile.
+
+**Navigation**
+- button/link;
+- tab/bottom navigation configuration;
+- approved menu/navigation elements.
+
+Exact component list is finalized only after Commerce API/runtime proof.
+
+#### 7. Visual Builder Design mode
+- Pages / Components / Layers;
+- Live Canvas;
+- contextual Inspector;
+- Content/Layout/Style;
+- simple Data/Actions/Conditions;
+- device viewport;
+- Arabic/English + RTL/LTR;
+- undo/redo;
+- Draft save;
+- validation/issues;
+- impact-aware Publish.
+
+#### 8. Develop mode — bounded V1
+Include only what is needed to diagnose and configure the declarative runtime:
+- resource/binding inspector;
+- state inspector;
+- event/action configuration;
+- conditions;
+- navigation;
+- issues;
+- sanitized diagnostics.
+
+No arbitrary code editor.
+No arbitrary package install.
+No merchant-supplied executable runtime code in V1.
+
+#### 9. Typed Data Source Registry
+V1 resources are AWJ-owned and tenant-scoped.
+
+Priority:
+- catalog/categories/products;
+- search;
+- pricing/availability;
+- cart;
+- customer/account;
+- orders;
+- content needed by app pages.
+
+Checkout/payment/shipping mutations enter the registry only after their mobile/public contracts satisfy security/idempotency/payment requirements.
+
+#### 10. Action Registry
+V1:
+- navigation;
+- safe UI/local state;
+- approved catalog/cart/account actions;
+- approved commerce mutations;
+- authentication entry/logout;
+- deep-link resolution for supported routes.
+
+Sensitive actions remain backend-authorized.
+
+No arbitrary HTTP action to merchant-provided URL in baseline V1.
+
+#### 11. State/conditions
+- app/session UI state where needed;
+- page/component local state;
+- navigation parameters;
+- typed loading/error/empty states;
+- small allowlisted condition/predicate set.
+
+No general scripting language in V1.
+
+#### 12. Draft / Published Experience versions
+- immutable published versions;
+- compatibility metadata;
+- meaningful change summary;
+- publish actor/time;
+- Draft vs Published separation;
+- compatible Experience rollback.
+
+#### 13. Preview
+V1 target:
+- Canvas Preview;
+- Interactive Runtime Preview;
+- Real Device Preview through an authorized Preview Session;
+- release-candidate beta path before store production release.
+
+QR/session links are short-lived/revocable and do not grant tenant authority.
+
+#### 14. Flutter runtime proof then runtime V1
+Flutter remains Preferred, not Selected, until the documented proof gate passes.
+
+If proof succeeds, V1 runtime includes:
+- framework-neutral schema adapter;
+- Component Registry;
+- Action Registry;
+- Data Binding;
+- navigation;
+- theme;
+- localization/RTL;
+- compatibility/fallback;
+- secure auth/session integration;
+- diagnostics needed for preview/support.
+
+Do not start broad component production before the proof gate closes the technology choice.
+
+#### 15. Update classification
+Every publish/release diff classified as:
+- Experience only;
+- iOS native;
+- Android native;
+- both native;
+- mixed.
+
+Compatibility prevents publishing experience references unsupported by installed runtimes.
+
+#### 16. App Factory minimum safe release path
+- immutable build manifest;
+- isolated/ephemeral build worker;
+- tenant/app authorization;
+- secret-manager integration;
+- signing;
+- artifact digest;
+- validation;
+- upload;
+- external store-state tracking;
+- retry/idempotency;
+- audit.
+
+#### 17. Merchant-owned store connection
+V1 default:
+- merchant-owned Apple/Google developer accounts;
+- delegated least-privilege AWJ access;
+- readiness checks;
+- no account-password collection;
+- credential health/revoke flow.
+
+#### 18. Release Center
+V1:
+- iOS/Android readiness;
+- build status;
+- submission status;
+- review/action-required;
+- approved/released;
+- phased/staged state where integrated;
+- raw external status available to support/admin diagnostics;
+- clear distinction between store availability and device-installed version.
+
+No claim that all customer devices updated merely because release completed.
+
+#### 19. Security / Tenant Isolation
+Release-blocking requirements:
+- tenant-scoped resources;
+- server authorization for every sensitive action;
+- no schema secrets;
+- preview isolation;
+- build isolation;
+- per-app/account credential boundary;
+- redacted logs;
+- audit;
+- cross-tenant negative tests;
+- OWASP MASVS-informed mobile verification.
+
+#### 20. Observability and support
+Minimum correlation:
+- tenant/app;
+- Draft/Published experience version;
+- runtime/binary version;
+- build/release ID;
+- external store identifiers;
+- action/resource error correlation without secret/PII leakage.
+
+### V1 — Should Have if schedule allows
+
+- basic push notification sending/campaigns using already-supported native push capability;
+- deep-link campaign targets;
+- reusable merchant sections;
+- a small number of polished app templates;
+- app analytics basics;
+- version comparison UI;
+- richer preview diagnostics;
+- release notes workflow;
+- staged/phased rollout controls where official APIs and account roles allow;
+- basic minimum-supported-runtime policy;
+- simple scheduled content visibility.
+
+These must not delay the secure core loop.
+
+### Explicitly Later / Not V1
+
+- arbitrary merchant JavaScript/Dart/native code;
+- arbitrary third-party package installation;
+- public extension marketplace;
+- full no-code workflow programming;
+- complex loops/branching orchestration;
+- custom merchant backend functions;
+- arbitrary HTTP integrations from client runtime;
+- AI-generated executable code in production runtime;
+- full offline-first commerce;
+- Google-Docs-style live collaborative editing;
+- large template marketplace;
+- multi-app portfolio automation beyond the core manager;
+- fully automated unattended production release by default;
+- AWJ-owned developer accounts as default;
+- instant one-click app transfer;
+- advanced campaign automation/journeys;
+- advanced attribution/marketing analytics;
+- universal custom native plugin marketplace;
+- desktop/tablet app targets;
+- Apple/Google platform parity for features that do not naturally map.
+
+### Dependency gates before implementation phases
+
+#### Gate A — Commerce API readiness
+Confirm mobile-safe contracts for:
+- catalog/search;
+- pricing/availability;
+- cart;
+- auth/customer;
+- orders;
+- checkout;
+- payments;
+- shipping.
+
+Do not make App Builder invent parallel commerce logic to compensate for missing APIs.
+
+#### Gate B — Runtime proof
+Close Flutter proof gate before broad runtime implementation.
+
+#### Gate C — Store-account automation proof
+Using non-production/test developer setup where possible, prove:
+- delegated Apple access;
+- chosen Apple signing path;
+- Google API/service identity;
+- Play App Signing/upload flow;
+- build/upload automation;
+- secret rotation/revoke.
+
+#### Gate D — Preview security proof
+Prove:
+- session expiry/revoke;
+- tenant negatives;
+- Draft endpoint isolation;
+- sandbox mutation behavior;
+- no secret leakage.
+
+### Proposed delivery sequence
+
+#### Phase 0 — Architecture closure & contracts
+**No production feature implementation yet.**
+
+Outputs:
+- V1 component/resource/action inventory;
+- Commerce API readiness matrix;
+- Flutter proof;
+- App Schema V1 contract;
+- compatibility contract;
+- Preview Session threat model;
+- App Factory/store credential proof;
+- security test plan.
+
+Exit: no unresolved P0 architectural risk blocking implementation.
+
+#### Phase 1 — Runtime + schema foundation
+Build:
+- schema validation/versioning;
+- Component Registry foundation;
+- Data/Action registries;
+- navigation/theme/localization;
+- compatibility/fallback;
+- minimal representative components.
+
+Exit: deterministic test app renders from schema on iOS/Android and passes tenant/auth/security basics.
+
+#### Phase 2 — Builder foundation
+Build:
+- App Manager;
+- creation wizard;
+- Pages/Components/Layers;
+- Canvas;
+- metadata-driven Inspector;
+- Draft persistence;
+- validation/issues.
+
+Exit: merchant can create/customize a representative app without editing raw schema.
+
+#### Phase 3 — Commerce vertical slice
+Wire one complete customer journey:
+- Home/catalog;
+- product;
+- options where supported;
+- cart;
+- auth/account;
+- checkout/payment only when Gate A contracts are ready.
+
+Exit: representative end-to-end commerce flow against tenant-scoped AWJ backend.
+
+#### Phase 4 — Preview & publishing
+Build:
+- Interactive Preview;
+- Preview Sessions;
+- real-device Preview;
+- Draft/Published versions;
+- compatibility-aware Publish;
+- rollback of compatible experience.
+
+Exit: merchant can safely test a Draft and publish an Experience version without native rebuild when eligible.
+
+#### Phase 5 — App Factory
+Build:
+- immutable manifests;
+- isolated workers;
+- secret integration;
+- iOS/Android build/sign;
+- store connection;
+- upload;
+- Release Center state machine;
+- audit/idempotency.
+
+Exit: authorized test merchant app can move from AWJ to official pre-release/store workflow with no manual secret copying through chat/UI fields.
+
+#### Phase 6 — Production hardening
+- MASVS/platform checks;
+- cross-tenant negatives;
+- credential rotation/revoke;
+- build-worker isolation tests;
+- failure/retry/duplicate-submission tests;
+- accessibility/RTL;
+- runtime compatibility matrix;
+- observability/support runbooks;
+- Apple/Google rejection/action-required flows.
+
+Exit: production release candidate approved through AWJ's release checklist.
+
+#### Phase 7 — Engagement & expansion
+Only after core lifecycle is stable:
+- push/campaigns;
+- app promotions;
+- analytics expansion;
+- automation;
+- reusable sections/templates;
+- broader component catalog;
+- extension architecture research.
+
+### Parallelism rules
+
+Some work can run in parallel after contracts are stable:
+- Builder UI and runtime components;
+- App Factory proof and Preview architecture;
+- documentation/test fixtures.
+
+Do **not** parallelize by inventing competing contracts. App Schema, Component Definition, Action Definition and Commerce resource contracts are shared foundations and need one owner/versioned decision path.
+
+### PR strategy
+
+Implementation should use small, independently reviewable PRs rather than one “App Builder” mega-PR.
+
+Candidate streams after Phase 0:
+- APP-SCHEMA-1;
+- APP-RUNTIME-1;
+- APP-BUILDER-1;
+- APP-COMMERCE-1;
+- APP-PREVIEW-1;
+- APP-PUBLISH-1;
+- APP-FACTORY-1;
+- APP-RELEASE-1;
+- APP-SEC-1.
+
+Exact naming/order can change after dependency analysis.
+
+Each PR must preserve:
+- Tenant Isolation;
+- backward compatibility;
+- no unrelated refactor;
+- focused tests;
+- no merge/deploy without explicit approval.
+
+### Definition of Done for App Builder V1
+
+V1 is not “done” because screens exist.
+
+It requires evidence that:
+
+1. merchant can create an app through one of the supported creation paths;
+2. merchant can visually customize the supported V1 surface;
+3. app reads/mutates AWJ Commerce only through authorized tenant-scoped capabilities;
+4. Arabic RTL and English LTR work on both target platforms;
+5. Draft/Published are isolated;
+6. Preview cannot bypass tenant/auth;
+7. Experience updates respect installed-runtime compatibility;
+8. native-impacting changes are correctly classified;
+9. iOS/Android artifacts build reproducibly from immutable inputs;
+10. signing credentials remain isolated and auditable;
+11. store submission/release state is tracked truthfully;
+12. failures/retries do not duplicate dangerous external operations;
+13. cross-tenant negative tests pass;
+14. security/accessibility/platform verification passes at the agreed baseline;
+15. production verification is completed for an explicitly approved pilot app.
+
+Only then should V1 be marked complete.
+
+### Recommended immediate next artifact
+
+Before implementation, create the **AWJ App Builder V1 Contract Pack**:
+
+1. `APP_SCHEMA_V1.md`
+2. `COMPONENT_REGISTRY_V1.md`
+3. `ACTION_REGISTRY_V1.md`
+4. `DATA_RESOURCE_REGISTRY_V1.md`
+5. `RUNTIME_COMPATIBILITY_V1.md`
+6. `PREVIEW_SESSION_SECURITY_V1.md`
+7. `APP_FACTORY_SECURITY_V1.md`
+8. `COMMERCE_MOBILE_API_READINESS.md`
+
+The master architecture remains the decision record; these become implementation-facing contracts.
+
+---
+
 ## 24. Open decisions
 
 Do not silently close these:
