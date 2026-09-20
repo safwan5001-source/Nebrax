@@ -65,7 +65,7 @@ For a code task this normally means:
 - required docs/report updated;
 - merge/deploy state represented truthfully.
 
-If owner policy requires merge/deploy/production verification for true completion, keep the task at `owner_gate` until those occur.
+If the task requires merge for true completion, keep it at `merge_ready`/`merged` until the standing merge workflow and post-merge review complete. Use `owner_gate` only for actions that still require Safwan, such as deploy/production release/destructive production operation or a material escalated decision.
 
 ## Current pilot execution horizon
 
