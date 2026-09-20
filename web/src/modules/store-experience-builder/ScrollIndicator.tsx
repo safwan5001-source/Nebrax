@@ -83,12 +83,12 @@ export function ScrollIndicator({
     <div
       data-scroll-indicator=""
       aria-hidden="true"
-      className="pointer-events-none absolute inset-y-0 left-0 z-20 w-1.5"
+      className="pointer-events-none absolute inset-y-0 left-0 z-20 w-2"
     >
-      <div className="absolute inset-y-0 left-0 w-full rounded-full bg-muted/20" />
+      <div className="absolute inset-y-0 left-0 w-full rounded-full bg-border" />
       <div
         data-scroll-indicator-thumb=""
-        className="absolute left-0 w-full rounded-full bg-primary/60"
+        className="absolute left-0 w-full rounded-full bg-primary"
         style={{
           height: metrics.height,
           transform: `translateY(${metrics.top}px)`,
