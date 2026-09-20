@@ -9,7 +9,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 RUN docker-php-ext-install pdo_pgsql pdo_sqlite mbstring bcmath zip opcache dom \
-    && a2enmod rewrite
+    && a2dismod mpm_event mpm_worker || true \
+    && a2enmod mpm_prefork rewrite \
+    && apache2ctl configtest
 
 COPY --from=composer:2.7 /usr/bin/composer /usr/bin/composer
 
