@@ -75,12 +75,14 @@ Research is encouraged, but AWJ invariants and repository authority remain bindi
 
 ## Merge / deploy
 
-Current default:
+Current standing authority:
 - create/update PR: allowed inside authorized task;
-- merge: **STOP — owner approval required**;
-- deploy/release/production mutation: **STOP — owner approval required**.
+- merge: allowed without asking Safwan again **only after** applicable review/Quality Gates pass, required CI is observed green, and no unresolved Decision Gate/material scope expansion remains;
+- deploy/release/production mutation: **STOP — explicit Safwan approval required**.
 
-Do not reinterpret "autonomous" as permission to merge or deploy.
+After every merge, verify the actual merge result/SHA before unlocking dependent work.
+
+Do not reinterpret merge authority as permission to bypass review/CI or as deploy/production authority.
 
 ## End condition
 
