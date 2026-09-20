@@ -1,7 +1,8 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { ScrollIndicator } from "./ScrollIndicator";
 import {
   clonePresentationConfig,
   DEFAULT_PRESENTATION_CONFIG,
@@ -270,7 +271,13 @@ export function ExperienceBuilder({
     });
   }, [pendingSectionScroll]);
 
-  const width = PREVIEW_WIDTHS[device];
+  // Mobile viewports are canvas-first: the preview always runs in true mobile
+  // device mode (390), never the desktop 1280 canvas — the device switcher is
+  // a desktop/tablet-only control.
+  const effectiveDevice: PreviewDevice = isMobileViewport ? "mobile" : device;
+  const width = PREVIEW_WIDTHS[effectiveDevice];
+  const canvasScrollRef = useRef<HTMLDivElement | null>(null);
+  const inspectorScrollRef = useRef<HTMLDivElement | null>(null);
   const statusLabel =
     lifecycle === "save_blocked"
       ? t("save")
@@ -301,7 +308,7 @@ export function ExperienceBuilder({
       data-lifecycle={lifecycle}
       data-draft-revision={draftRevision}
       data-panel={panel}
-      data-device={device}
+      data-device={effectiveDevice}
       data-selected-section={selectedSection ?? ""}
       className="relative flex h-full min-h-0 flex-col bg-background text-text"
     >
@@ -471,19 +478,23 @@ export function ExperienceBuilder({
               {activePanel ? t(activePanel.label) : t("theme")}
             </h2>
           </div>
-          <div
-            data-customizer-scroll=""
-            className="min-h-0 flex-1 overflow-y-auto px-4 py-4 md:px-5 md:py-5 lg:px-4 lg:py-5"
-          >
-            <ControlPanels
-              panel={panel}
-              config={draft}
-              locale={locale}
-              liveStoreName={liveStoreName}
-              onChange={updateDraft}
-              selectedSection={selectedSection}
-              onSelectSection={(id) => handleSelectSection(id, "sidebar")}
-            />
+          <div className="relative min-h-0 flex-1">
+            <div
+              ref={inspectorScrollRef}
+              data-customizer-scroll=""
+              className="h-full min-h-0 overflow-y-auto px-4 py-4 md:px-5 md:py-5 lg:px-4 lg:py-5"
+            >
+              <ControlPanels
+                panel={panel}
+                config={draft}
+                locale={locale}
+                liveStoreName={liveStoreName}
+                onChange={updateDraft}
+                selectedSection={selectedSection}
+                onSelectSection={(id) => handleSelectSection(id, "sidebar")}
+              />
+            </div>
+            <ScrollIndicator targetRef={inspectorScrollRef} />
           </div>
         </aside>
 
@@ -504,24 +515,28 @@ export function ExperienceBuilder({
               </span>
             </div>
           </div>
-          <div
-            data-customizer-scroll=""
-            className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 md:overflow-y-scroll md:p-5 xl:p-8"
-          >
+          <div className="relative min-h-0 flex-1">
             <div
-              data-preview-frame=""
-              className="mx-auto overflow-hidden border border-neutral-300 bg-white"
-              style={{ width: Math.min(width, 1440), maxWidth: "100%" }}
+              ref={canvasScrollRef}
+              data-customizer-scroll=""
+              className="h-full min-h-0 overflow-y-auto overscroll-contain p-3 md:overflow-y-scroll md:p-5 xl:p-8"
             >
-              <StorefrontPreviewCanvas
-                config={draft}
-                locale={locale}
-                viewport={device}
-                liveStoreName={liveStoreName}
-                selectedSection={selectedSection}
-                onSelectSection={(key) => handleSelectSection(key, "preview")}
-              />
+              <div
+                data-preview-frame=""
+                className="mx-auto overflow-hidden border border-neutral-300 bg-white"
+                style={{ width: Math.min(width, 1440), maxWidth: "100%" }}
+              >
+                <StorefrontPreviewCanvas
+                  config={draft}
+                  locale={locale}
+                  viewport={effectiveDevice}
+                  liveStoreName={liveStoreName}
+                  selectedSection={selectedSection}
+                  onSelectSection={(key) => handleSelectSection(key, "preview")}
+                />
+              </div>
             </div>
+            <ScrollIndicator targetRef={canvasScrollRef} />
           </div>
         </section>
       </div>
