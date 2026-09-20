@@ -41,7 +41,7 @@ export function ScrollIndicator({
       cancelAnimationFrame(raf);
       raf = requestAnimationFrame(() => {
         const { scrollTop, scrollHeight, clientHeight } = el;
-        if (scrollHeight - clientHeight <= 1 || clientHeight === 0) {
+        if (scrollHeight <= clientHeight || clientHeight === 0) {
           setMetrics((m) =>
             m.visible ? { top: 0, height: 0, visible: false } : m,
           );
@@ -77,8 +77,6 @@ export function ScrollIndicator({
     };
   }, [targetRef]);
 
-  if (!metrics.visible) return null;
-
   return (
     <div
       data-scroll-indicator=""
@@ -86,14 +84,16 @@ export function ScrollIndicator({
       className="pointer-events-none absolute inset-y-0 left-0 z-20 w-2"
     >
       <div className="absolute inset-y-0 left-0 w-full rounded-full bg-border" />
-      <div
-        data-scroll-indicator-thumb=""
-        className="absolute left-0 w-full rounded-full bg-primary"
-        style={{
-          height: metrics.height,
-          transform: `translateY(${metrics.top}px)`,
-        }}
-      />
+      {metrics.visible ? (
+        <div
+          data-scroll-indicator-thumb=""
+          className="absolute left-0 w-full rounded-full bg-primary"
+          style={{
+            height: metrics.height,
+            transform: `translateY(${metrics.top}px)`,
+          }}
+        />
+      ) : null}
     </div>
   );
 }
