@@ -3,9 +3,13 @@ export type CustomizerLocale = "ar" | "en";
 export const CUSTOMIZER_MESSAGES = {
   ar: {
     title: "بناء تجربة المتجر",
+    exitCommerce: "العودة إلى التجارة",
     subtitle: "تحكم في شكل المتجر دون تغيير حقائق التجارة في أَوْج",
     preview: "المعاينة",
     edit: "التخصيص",
+    sections: "الأقسام",
+    addSection: "إضافة قسم",
+    design: "التصميم",
     desktop: "حاسوب",
     tablet: "جهاز لوحي",
     mobile: "جوال",
@@ -190,9 +194,13 @@ export const CUSTOMIZER_MESSAGES = {
   },
   en: {
     title: "Store Experience Builder",
+    exitCommerce: "Exit to Commerce",
     subtitle: "Control how the store looks without changing AWJ commerce facts",
     preview: "Preview",
     edit: "Customize",
+    sections: "Sections",
+    addSection: "Add section",
+    design: "Design",
     desktop: "Desktop",
     tablet: "Tablet",
     mobile: "Mobile",

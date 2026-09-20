@@ -1,7 +1,8 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { ScrollIndicator } from "./ScrollIndicator";
 import {
   clonePresentationConfig,
   DEFAULT_PRESENTATION_CONFIG,
@@ -52,6 +53,7 @@ interface ExperienceBuilderProps {
   liveStoreName?: string | null;
   initialLocale?: CustomizerLocale;
   storefrontId?: string | null;
+  storefrontUrl?: string | null;
 }
 
 export function ExperienceBuilder({
@@ -59,6 +61,7 @@ export function ExperienceBuilder({
   liveStoreName = null,
   initialLocale = "ar",
   storefrontId = null,
+  storefrontUrl = null,
 }: ExperienceBuilderProps) {
   const seed = normalizePresentationConfig(
     initialConfig ?? DEFAULT_PRESENTATION_CONFIG,
@@ -66,10 +69,12 @@ export function ExperienceBuilder({
   const [saved, setSaved] = useState<StorefrontPresentationConfig>(seed);
   const [draft, setDraft] = useState<StorefrontPresentationConfig>(seed);
   const [draftRevision, setDraftRevision] = useState(0);
-  const [locale, setLocale] = useState<CustomizerLocale>(initialLocale);
+  const locale: CustomizerLocale = initialLocale;
   const [panel, setPanel] = useState<CustomizerPanel>("theme");
   const [device, setDevice] = useState<PreviewDevice>("desktop");
-  const [mobilePane, setMobilePane] = useState<"edit" | "preview">("edit");
+  const [mobilePane, setMobilePane] = useState<"edit" | "preview">("preview");
+  const [mobileSheet, setMobileSheet] = useState<"sections" | "settings" | "design" | null>(null);
+  const [isMobileViewport, setIsMobileViewport] = useState(false);
   const [selectedSection, setSelectedSection] = useState<string | null>(null);
   const [pendingSectionScroll, setPendingSectionScroll] = useState<
     string | null
@@ -84,6 +89,13 @@ export function ExperienceBuilder({
 
   const dirty = !presentationConfigsEqual(draft, saved);
   const activePanel = CUSTOMIZER_PANELS.find((item) => item.id === panel);
+
+  useEffect(() => {
+    const updateViewport = () => setIsMobileViewport(window.innerWidth < 768);
+    updateViewport();
+    window.addEventListener("resize", updateViewport);
+    return () => window.removeEventListener("resize", updateViewport);
+  }, []);
 
   useEffect(() => {
     if (!storefrontId) {
@@ -235,6 +247,9 @@ export function ExperienceBuilder({
     // only sidebar selection needs the preview to scroll to the section,
     // since a preview click already has the section in view.
     setPanel("homepage");
+    if (typeof window !== "undefined" && window.innerWidth < 768) {
+      setMobileSheet("settings");
+    }
     if (origin === "sidebar") {
       setPendingSectionScroll(id);
     }
@@ -256,7 +271,13 @@ export function ExperienceBuilder({
     });
   }, [pendingSectionScroll]);
 
-  const width = PREVIEW_WIDTHS[device];
+  // Mobile viewports are canvas-first: the preview always runs in true mobile
+  // device mode (390), never the desktop 1280 canvas — the device switcher is
+  // a desktop/tablet-only control.
+  const effectiveDevice: PreviewDevice = isMobileViewport ? "mobile" : device;
+  const width = PREVIEW_WIDTHS[effectiveDevice];
+  const canvasScrollRef = useRef<HTMLDivElement | null>(null);
+  const inspectorScrollRef = useRef<HTMLDivElement | null>(null);
   const statusLabel =
     lifecycle === "save_blocked"
       ? t("save")
@@ -266,6 +287,20 @@ export function ExperienceBuilder({
           ? t("dirty")
           : t("clean");
 
+  // "Open store" renders only for a URL we can actually resolve to http(s) —
+  // never link out to a malformed or javascript: value.
+  const resolvedStorefrontUrl = (() => {
+    if (!storefrontUrl) return null;
+    try {
+      const url = new URL(storefrontUrl);
+      return url.protocol === "https:" || url.protocol === "http:"
+        ? url.toString()
+        : null;
+    } catch {
+      return null;
+    }
+  })();
+
   return (
     <div
       dir={locale === "ar" ? "rtl" : "ltr"}
@@ -273,41 +308,85 @@ export function ExperienceBuilder({
       data-lifecycle={lifecycle}
       data-draft-revision={draftRevision}
       data-panel={panel}
-      data-device={device}
+      data-device={effectiveDevice}
       data-selected-section={selectedSection ?? ""}
-      className="relative flex h-full min-h-0 flex-col bg-neutral-100 text-neutral-900"
+      className="relative flex h-full min-h-0 flex-col bg-background text-text"
     >
-      <header className="flex h-11 shrink-0 items-center gap-2 border-b border-neutral-200 bg-white px-3 md:h-12 md:gap-3 lg:pe-80">
-        <div className="min-w-0 flex-1">
+      <header className="z-20 flex min-h-14 shrink-0 items-center gap-2 border-b border-border bg-surface px-3 shadow-sm md:gap-3 md:px-5">
+        <button
+          type="button"
+          aria-label={t("exit")}
+          onClick={() => { window.location.href = "/commerce"; }}
+          className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-md border border-border px-2.5 text-xs font-medium text-text hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 md:px-3 md:text-sm"
+        >
+          <span aria-hidden="true">←</span>
+          <span className="hidden sm:inline">{t("exit")}</span>
+        </button>
+        <div className="min-w-0 border-s border-border ps-3">
           <p className="truncate text-[13px] font-semibold leading-none md:text-sm">
             {t("title")}
           </p>
-          <p className="mt-1 hidden truncate text-[11px] leading-none text-neutral-500 md:block">
-            {t("subtitle")}
+          <p className="mt-1 hidden truncate text-[11px] leading-none text-muted md:block">
+            <bdi>{liveStoreName ?? t("currentPage")}</bdi> · {t("currentPage")}
           </p>
         </div>
         <span
           data-draft-status=""
-          className="hidden text-[11px] text-neutral-500 xl:inline"
+          className={`hidden shrink-0 rounded-full px-2 py-1 text-[11px] sm:inline ${dirty ? "bg-warning-soft text-warning" : "bg-positive-soft text-positive"}`}
         >
           {statusLabel}
         </span>
-        <div className="flex items-center">
-          {(["ar", "en"] as const).map((item) => (
-            <button
-              key={item}
-              type="button"
-              aria-label={item === "ar" ? t("arabic") : t("english")}
-              onClick={() => setLocale(item)}
-              className={`h-7 min-w-7 px-1.5 text-[11px] font-medium ${
-                locale === item
-                  ? "bg-neutral-900 text-white"
-                  : "text-neutral-600 hover:bg-neutral-100"
-              }`}
+        <div className="ms-auto flex min-w-0 items-center gap-1.5 md:gap-2">
+          {resolvedStorefrontUrl ? (
+            <a
+              data-open-store=""
+              href={resolvedStorefrontUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex h-9 shrink-0 items-center gap-1 rounded-md border border-border px-2 text-xs font-medium text-primary hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 md:px-2.5"
             >
-              {item === "ar" ? "ع" : "EN"}
-            </button>
-          ))}
+              {t("openStore")}
+            </a>
+          ) : null}
+          <div className="hidden items-center gap-1 rounded-md border border-border p-1 md:flex">
+            {(["desktop", "tablet", "mobile"] as const).map((item) => (
+              <button
+                key={item}
+                type="button"
+                data-device-option={item}
+                aria-pressed={device === item}
+                onClick={() => setDevice(item)}
+                className={`h-8 rounded px-2.5 text-xs font-medium ${device === item ? "bg-primary text-primary-foreground" : "text-muted hover:bg-primary-soft hover:text-primary"}`}
+              >
+                {t(item)}
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={handleRestore}
+            className="hidden h-9 shrink-0 px-2 text-xs text-muted hover:text-text lg:inline"
+          >
+            {t("restore")}
+          </button>
+          <button
+            type="button"
+            data-save=""
+            onClick={handleSave}
+            disabled={busy !== null}
+            className="h-9 shrink-0 rounded-md border border-border bg-surface px-2.5 text-xs font-medium text-text hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-50 md:px-3 md:text-sm"
+          >
+            {t("save")}
+          </button>
+          <button
+            type="button"
+            data-publish=""
+            onClick={handlePublish}
+            disabled={busy !== null}
+            className="h-9 shrink-0 rounded-md bg-primary px-2.5 text-xs font-semibold text-primary-foreground shadow-sm hover:bg-primary-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-50 md:px-3 md:text-sm"
+          >
+            {t("publish")}
+          </button>
         </div>
       </header>
 
@@ -355,7 +434,7 @@ export function ExperienceBuilder({
                       onClick={() => setPanel(item.id)}
                       className={`flex h-9 w-full items-center gap-2.5 px-3 text-start text-[13px] ${
                         selected
-                          ? "bg-neutral-900 font-medium text-white"
+                          ? "bg-primary-soft font-medium text-primary"
                           : "text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900"
                       }`}
                     >
@@ -399,19 +478,23 @@ export function ExperienceBuilder({
               {activePanel ? t(activePanel.label) : t("theme")}
             </h2>
           </div>
-          <div
-            data-customizer-scroll=""
-            className="min-h-0 flex-1 overflow-y-auto px-4 py-4 md:px-5 md:py-5 lg:px-4 lg:py-5"
-          >
-            <ControlPanels
-              panel={panel}
-              config={draft}
-              locale={locale}
-              liveStoreName={liveStoreName}
-              onChange={updateDraft}
-              selectedSection={selectedSection}
-              onSelectSection={(id) => handleSelectSection(id, "sidebar")}
-            />
+          <div className="relative min-h-0 flex-1">
+            <div
+              ref={inspectorScrollRef}
+              data-customizer-scroll=""
+              className="h-full min-h-0 overflow-y-auto px-4 py-4 md:px-5 md:py-5 lg:px-4 lg:py-5"
+            >
+              <ControlPanels
+                panel={panel}
+                config={draft}
+                locale={locale}
+                liveStoreName={liveStoreName}
+                onChange={updateDraft}
+                selectedSection={selectedSection}
+                onSelectSection={(id) => handleSelectSection(id, "sidebar")}
+              />
+            </div>
+            <ScrollIndicator targetRef={inspectorScrollRef} />
           </div>
         </aside>
 
@@ -427,104 +510,112 @@ export function ExperienceBuilder({
               {t("livePreview")}
             </span>
             <div className="flex items-center gap-2">
-              <div className="hidden md:flex">
-                {(["desktop", "tablet", "mobile"] as const).map((item) => (
-                  <button
-                    key={item}
-                    type="button"
-                    data-device-option={item}
-                    onClick={() => setDevice(item)}
-                    className={`h-7 px-2 text-[11px] font-medium ${
-                      device === item
-                        ? "bg-neutral-900 text-white"
-                        : "text-neutral-600 hover:bg-neutral-100"
-                    }`}
-                  >
-                    {t(item)}
-                  </button>
-                ))}
-              </div>
               <span className="tabular-nums">
                 {t("deviceWidth")} · {width}
               </span>
             </div>
           </div>
-          <div
-            data-customizer-scroll=""
-            className="min-h-0 flex-1 overflow-auto overscroll-contain p-3 md:p-5 xl:p-8"
-          >
+          <div className="relative min-h-0 flex-1">
             <div
-              data-preview-frame=""
-              className="mx-auto overflow-hidden border border-neutral-300 bg-white"
-              style={{ width: Math.min(width, 1440), maxWidth: "100%" }}
+              ref={canvasScrollRef}
+              data-customizer-scroll=""
+              className="h-full min-h-0 overflow-y-auto overscroll-contain p-3 md:overflow-y-scroll md:p-5 xl:p-8"
             >
-              <StorefrontPreviewCanvas
-                config={draft}
-                locale={locale}
-                viewport={device}
-                liveStoreName={liveStoreName}
-                selectedSection={selectedSection}
-                onSelectSection={(key) => handleSelectSection(key, "preview")}
-              />
+              <div
+                data-preview-frame=""
+                className="mx-auto overflow-hidden border border-neutral-300 bg-white"
+                style={{ width: Math.min(width, 1440), maxWidth: "100%" }}
+              >
+                <StorefrontPreviewCanvas
+                  config={draft}
+                  locale={locale}
+                  viewport={effectiveDevice}
+                  liveStoreName={liveStoreName}
+                  selectedSection={selectedSection}
+                  onSelectSection={(key) => handleSelectSection(key, "preview")}
+                />
+              </div>
             </div>
+            <ScrollIndicator targetRef={canvasScrollRef} />
           </div>
         </section>
       </div>
 
-      <div
-        className={`${
-          mobilePane === "preview" ? "hidden lg:flex" : "flex"
-        } shrink-0 items-center gap-2 border-t border-neutral-200 bg-white px-3 py-2 lg:absolute lg:top-0 lg:end-3 lg:h-12 lg:border-0 lg:bg-transparent lg:px-0 lg:py-0`}
-      >
+      {isMobileViewport ? <div className="flex h-16 shrink-0 items-center gap-2 border-t border-border bg-surface px-3 lg:hidden">
         <button
           type="button"
-          onClick={handleRestore}
-          className="hidden h-8 px-2 text-xs text-neutral-600 hover:text-neutral-900 lg:inline"
+          className="flex min-h-11 flex-1 items-center justify-center rounded-md border border-border text-sm font-medium text-text hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+          onClick={() => setMobileSheet("sections")}
         >
-          {t("restore")}
+          {t("sections")}
         </button>
         <button
           type="button"
-          data-save=""
-          onClick={handleSave}
-          disabled={busy !== null}
-          className="h-10 flex-1 border border-neutral-300 bg-white px-3 text-sm font-medium lg:h-8 lg:flex-none lg:px-2.5 lg:text-xs disabled:opacity-50"
+          className="flex min-h-11 flex-1 items-center justify-center rounded-md bg-primary text-sm font-semibold text-primary-foreground shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+          onClick={() => setMobileSheet("sections")}
         >
-          {t("save")}
+          + {t("addSection")}
         </button>
         <button
           type="button"
-          data-publish=""
-          onClick={handlePublish}
-          disabled={busy !== null}
-          className="h-10 flex-1 bg-neutral-900 px-3 text-sm font-medium text-white lg:h-8 lg:flex-none lg:px-2.5 lg:text-xs disabled:opacity-50"
+          className="flex min-h-11 flex-1 items-center justify-center rounded-md border border-border text-sm font-medium text-text hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+          onClick={() => { setPanel("theme"); setMobileSheet("design"); }}
         >
-          {t("publish")}
+          {t("design")}
         </button>
-      </div>
+      </div> : null}
 
-      <div className="flex h-11 shrink-0 border-t border-neutral-200 bg-white lg:hidden">
-        <button
-          type="button"
-          className={`relative flex-1 text-sm font-medium ${mobilePane === "edit" ? "text-neutral-900" : "text-neutral-500"}`}
-          onClick={() => setMobilePane("edit")}
+      {isMobileViewport && mobileSheet ? (
+        <div
+          className="fixed inset-0 z-50 flex items-end bg-black/40 md:hidden"
+          role="presentation"
+          onClick={(event) => { if (event.target === event.currentTarget) setMobileSheet(null); }}
         >
-          {mobilePane === "edit" ? (
-            <span className="absolute inset-x-0 top-0 h-0.5 bg-neutral-900" />
-          ) : null}
-          {t("edit")}
-        </button>
-        <button
-          type="button"
-          className={`relative flex-1 text-sm font-medium ${mobilePane === "preview" ? "text-neutral-900" : "text-neutral-500"}`}
-          onClick={() => setMobilePane("preview")}
-        >
-          {mobilePane === "preview" ? (
-            <span className="absolute inset-x-0 top-0 h-0.5 bg-neutral-900" />
-          ) : null}
-          {t("preview")}
-        </button>
-      </div>
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-label={mobileSheet === "sections" ? t("sections") : mobileSheet === "design" ? t("design") : activePanel ? t(activePanel.label) : t("edit")}
+            className="flex max-h-[86dvh] w-full flex-col rounded-t-2xl border-t border-border bg-surface shadow-2xl"
+          >
+            <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-3">
+              <h2 className="text-sm font-semibold text-text">
+                {mobileSheet === "sections" ? t("sections") : mobileSheet === "design" ? t("design") : activePanel ? t(activePanel.label) : t("edit")}
+              </h2>
+              <button
+                type="button"
+                aria-label={t("close")}
+                onClick={() => setMobileSheet(null)}
+                className="flex size-10 items-center justify-center rounded-md text-muted hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+              >
+                ×
+              </button>
+            </div>
+            <div data-customizer-scroll="" className="min-h-0 flex-1 overflow-y-auto p-4">
+              {mobileSheet === "sections" ? (
+                <ControlPanels
+                  panel="homepage"
+                  config={draft}
+                  locale={locale}
+                  liveStoreName={liveStoreName}
+                  onChange={updateDraft}
+                  selectedSection={selectedSection}
+                  onSelectSection={(id) => handleSelectSection(id, "sidebar")}
+                />
+              ) : (
+                <ControlPanels
+                  panel={mobileSheet === "design" ? "theme" : panel}
+                  config={draft}
+                  locale={locale}
+                  liveStoreName={liveStoreName}
+                  onChange={updateDraft}
+                  selectedSection={selectedSection}
+                  onSelectSection={(id) => handleSelectSection(id, "sidebar")}
+                />
+              )}
+            </div>
+          </section>
+        </div>
+      ) : null}
 
       <span className="sr-only">
         {DRAFT_PERSISTENCE_CAPABILITY}:{PUBLISH_CAPABILITY}

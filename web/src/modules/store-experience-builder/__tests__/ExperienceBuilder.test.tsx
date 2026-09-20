@@ -50,6 +50,29 @@ describe('ExperienceBuilder persistence wiring', () => {
     expect(screen.queryByText('Verified')).toBeNull();
   });
 
+  it('follows the AWJ locale without a redundant language switcher', async () => {
+    loadMock.mockResolvedValue({ ok: true, data: record });
+    render(<ExperienceBuilder storefrontId="store-1" initialLocale="en" />);
+
+    await waitFor(() => expect(loadMock).toHaveBeenCalledWith('store-1'));
+
+    const builder = document.querySelector('[data-experience-builder]');
+    expect(builder?.getAttribute('dir')).toBe('ltr');
+    expect(screen.queryByText('ع', { selector: 'button' })).toBeNull();
+    expect(screen.queryByText('EN', { selector: 'button' })).toBeNull();
+  });
+
+  it('keeps the preview canvas independently scrollable', () => {
+    render(<ExperienceBuilder initialLocale="ar" />);
+
+    const preview = document.querySelector('[data-builder-preview]');
+    const scrollRegion = preview?.querySelector('[data-customizer-scroll]');
+
+    expect(scrollRegion?.className).toContain('overflow-y-auto');
+    expect(scrollRegion?.className).toContain('md:overflow-y-scroll');
+    expect(scrollRegion?.className).toContain('overscroll-contain');
+  });
+
   it('does not claim save success until PUT returns 200', async () => {
     loadMock.mockResolvedValue({ ok: true, data: record });
     saveMock.mockResolvedValue({

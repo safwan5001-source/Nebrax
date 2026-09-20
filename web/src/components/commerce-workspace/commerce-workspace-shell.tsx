@@ -47,6 +47,14 @@ export function CommerceWorkspaceShell({ children }: { children: React.ReactNode
     : null;
   const isExperienceBuilder = pathname === '/commerce/appearance' || Boolean(pathname?.startsWith('/commerce/appearance/'));
 
+  if (isExperienceBuilder) {
+    return (
+      <main id="commerce-workspace-content" className="h-screen w-full overflow-hidden bg-background [height:100dvh]">
+        <div className="flex h-full min-h-0 flex-col">{children}</div>
+      </main>
+    );
+  }
+
   return (
     <div className="flex h-screen w-full flex-col overflow-hidden bg-background [height:100dvh]">
       <header className="no-print flex h-14 shrink-0 items-center gap-2 border-b border-border bg-surface px-3 sm:px-4">

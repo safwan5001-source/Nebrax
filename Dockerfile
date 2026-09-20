@@ -1,41 +1,37 @@
 # ════════════════════════════════════════════════════════════════
-#  نبراس ERP — صورة الإنتاج (Backend Laravel 11 + PostgreSQL)
-#  تُجمّع التطبيق الكامل من النواة وقت البناء، ثم تُقلع خادماً جاهزاً.
-#  (للتشغيل/الاختبار المحلي بـ SQLite استخدم setup.sh — انظر HOW_TO_RUN.md)
+#  أَوْج AWJ — صورة الإنتاج (Backend Laravel 11 + PostgreSQL)
+#  Apache + mod_php provides a production-capable concurrent HTTP runtime.
 # ════════════════════════════════════════════════════════════════
-FROM php:8.3-cli
+FROM php:8.3-apache
 
-# اعتماديات النظام: libonig-dev(mbstring) · libpq-dev(pgsql) · libzip-dev(zip) · libsqlite3-dev(pdo_sqlite)
 RUN apt-get update && apt-get install -y --no-install-recommends \
         git unzip zip poppler-utils libpq-dev libzip-dev libonig-dev libsqlite3-dev libxml2-dev libxml2-utils \
     && rm -rf /var/lib/apt/lists/*
 
-# إضافات PHP — pdo مضمّن أصلاً. mbstring إلزامي لـ Laravel وغير مضمّن.
-# pdo_sqlite لأوامر الترحيل وقت البناء (Laravel skeleton يفترض sqlite افتراضياً).
-RUN docker-php-ext-install pdo_pgsql pdo_sqlite mbstring bcmath zip opcache dom
+RUN docker-php-ext-install pdo_pgsql pdo_sqlite mbstring bcmath zip opcache dom \
+    && a2dismod mpm_event mpm_worker || true \
+    && a2enmod mpm_prefork rewrite \
+    && apache2ctl configtest
 
-# composer 2.7: يسبق حجب Composer 2.8 للحزم المُعلَّمة بتنبيهات أمنية
-# (كل إصدارات laravel/framework 11.x مُعلَّمة حالياً، فـ 2.8 يرفض تثبيتها ويفشل البناء)
 COPY --from=composer:2.7 /usr/bin/composer /usr/bin/composer
 
-# COMPOSER_MEMORY_LIMIT=-1 يمنع نفاد ذاكرة composer أثناء البناء (أشيع فشل)
 ENV COMPOSER_ALLOW_SUPERUSER=1 \
     COMPOSER_NO_INTERACTION=1 \
     COMPOSER_MEMORY_LIMIT=-1
 
-# النواة إلى /core، ثم تجميع تطبيق Laravel كامل في /app
 COPY . /core
 RUN bash /core/deploy/assemble.sh /core /app \
     && chmod -R 775 /app/storage /app/bootstrap/cache
 
-# نقطة التشغيل (تُنسخ قبل حذف النواة)
 RUN cp /core/deploy/entrypoint.sh /usr/local/bin/entrypoint.sh \
     && chmod +x /usr/local/bin/entrypoint.sh \
-    && rm -rf /core
+    && rm -rf /core \
+    && sed -ri 's!DocumentRoot /var/www/html!DocumentRoot /app/public!g' /etc/apache2/sites-available/000-default.conf \
+    && printf '<Directory /app/public>\n    AllowOverride All\n    Require all granted\n</Directory>\n' > /etc/apache2/conf-available/awj-laravel.conf \
+    && a2enconf awj-laravel
 
 WORKDIR /app
 
-# قيم بيئة إنتاجية افتراضية (تُتجاوَز بمتغيّرات المنصة)
 ENV APP_ENV=production \
     APP_DEBUG=false \
     DB_CONNECTION=pgsql \

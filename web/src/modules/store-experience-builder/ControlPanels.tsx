@@ -242,8 +242,8 @@ function Segmented<T extends string>({
           onClick={() => onChange(option.id)}
           className={`h-9 flex-1 px-2 text-[12px] font-medium ${
             value === option.id
-              ? "bg-neutral-900 text-white"
-              : "text-neutral-600 hover:text-neutral-900"
+              ? "bg-primary text-primary-foreground"
+              : "text-neutral-600 hover:bg-primary-soft hover:text-primary"
           }`}
         >
           {option.label}
@@ -254,7 +254,7 @@ function Segmented<T extends string>({
 }
 
 const inputClass =
-  "h-10 w-full border border-neutral-300 bg-white px-3 text-sm text-neutral-900 outline-none focus:border-neutral-800";
+  "h-10 w-full border border-neutral-300 bg-white px-3 text-sm text-neutral-900 outline-none focus:border-primary focus-visible:ring-2 focus-visible:ring-primary/40";
 const selectClass = inputClass;
 const btnClass =
   "inline-flex h-8 items-center border border-neutral-300 bg-white px-2.5 text-xs font-medium text-neutral-800 hover:bg-neutral-50";
@@ -298,8 +298,8 @@ function ThemePanel({
                 }
                 className={`overflow-hidden border text-start ${
                   selected
-                    ? "border-neutral-900"
-                    : "border-neutral-200 hover:border-neutral-400"
+                    ? "border-primary ring-1 ring-primary"
+                    : "border-neutral-200 hover:border-primary/50"
                 }`}
               >
                 <span
@@ -925,7 +925,7 @@ function HomepagePanel({
                       data-picker-option={type}
                       disabled={!addable}
                       onClick={() => addSection(type)}
-                      className="flex h-9 w-full items-center justify-between gap-2 px-3 text-start text-[13px] text-neutral-800 outline-none hover:bg-neutral-50 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-neutral-900 disabled:text-neutral-400 disabled:hover:bg-transparent"
+                      className="flex h-9 w-full items-center justify-between gap-2 px-3 text-start text-[13px] text-neutral-800 outline-none hover:bg-primary-soft focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40 disabled:text-neutral-400 disabled:hover:bg-transparent"
                     >
                       <span className="truncate">{t(SECTION_LABEL[type])}</span>
                       {isGatedHomeSection(type) ? (
@@ -950,7 +950,7 @@ function HomepagePanel({
               data-section-id={section.id}
               className={`flex h-12 items-center gap-1 border-b border-neutral-200 px-1 last:border-b-0 ${
                 isSelected
-                  ? "border-s-2 border-s-neutral-900 bg-neutral-50 ps-0.5"
+                  ? "border-s-2 border-s-primary bg-primary-soft ps-0.5"
                   : ""
               }`}
             >
@@ -980,7 +980,7 @@ function HomepagePanel({
                 aria-pressed={isSelected}
                 title={t(SECTION_LABEL[section.type])}
                 onClick={() => onSelectSection?.(section.id)}
-                className="min-w-0 flex-1 rounded-sm px-1 py-1 text-start outline-none focus-visible:ring-2 focus-visible:ring-neutral-900"
+                className="min-w-0 flex-1 rounded-sm px-1 py-1 text-start outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
               >
                 <p
                   className={`truncate text-[13px] text-neutral-900 ${
@@ -1565,15 +1565,16 @@ function Toggle({
       >
         {label}
       </span>
-      <span className="relative inline-flex h-5 w-9 shrink-0">
+      <span className="relative inline-flex h-6 w-11 shrink-0">
         <input
           type="checkbox"
           checked={checked}
           onChange={(event) => onChange(event.target.checked)}
+          aria-label={label}
           className="peer sr-only"
         />
-        <span className="absolute inset-0 bg-neutral-300 peer-checked:bg-neutral-900 peer-focus-visible:ring-2 peer-focus-visible:ring-neutral-400" />
-        <span className="absolute top-0.5 start-0.5 size-4 bg-white transition-[inset-inline-start] peer-checked:start-[18px]" />
+        <span className="absolute inset-0 rounded-full bg-border transition-colors peer-checked:bg-primary peer-focus-visible:ring-2 peer-focus-visible:ring-primary/40 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-surface" />
+        <span className="absolute top-0.5 start-0.5 size-5 rounded-full bg-surface shadow-sm transition-[inset-inline-start] peer-checked:start-[22px]" />
       </span>
     </label>
   );
