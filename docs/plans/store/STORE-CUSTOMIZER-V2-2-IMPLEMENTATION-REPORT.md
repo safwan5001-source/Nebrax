@@ -1,10 +1,131 @@
 # STORE-CUSTOMIZER-V2-2 — Implementation Report
 
-**Task:** PR-STORE-CUSTOMIZER-V2-2 — Section Editing + Section Picker
+**Task:** PR-STORE-CUSTOMIZER-V2-2 — Section Editing + Section Picker (Phase 1) + Picker/Add/Duplicate/Delete continuation (Phase 2)
 **Branch:** `feat/store-customizer-v2-section-editing`
 **PR:** [#881 — feat(store): Customizer V2 section editing and picker](https://github.com/safwan5001-source/Nebrax/pull/881)
-**Base SHA:** `7d424518fd7cf3a8ed0681a7942a42269b339801` (main after PR #879 merge — V2-1)
-**Head SHA (code):** `80aff80cd1f0c5024d613c6c231a032eebd0fad2` (final head recorded in §14)
+**Phase 1 Base SHA:** `7d424518fd7cf3a8ed0681a7942a42269b339801` (main after PR #879 merge — V2-1)
+**Phase 2 (continuation) Base SHA:** `f22fe510aad6c9212295de33a7d696afe6a187b1` (main after PR #884 merge — CONTRACT-2)
+**Head SHA (code, Phase 2):** `c2772434cb56d021df5b39f21940b01f17d742f3` (final head incl. this report recorded in §14)
+
+> Sections 1–16 below describe Phase 1 (in-contract editing). Phase 2 — the continuation that consumed CONTRACT-2 (#884, merged) and added the Section Picker + Add / Duplicate / Delete + instance-id selection — is documented in §17 onward.
+
+---
+
+## 17. Phase 2 — Contract consumed (from merged PR #884)
+
+Consumed as-is, no re-design, no re-implementation of migration/normalization:
+
+- `PresentationHomeSection = { id: string; type: HomeBuilderSectionKey; visible: boolean }`, schema version `2`.
+- `MAX_HOME_SECTIONS = 30`, `safeId = /^[a-zA-Z0-9_-]{1,64}$/`, `HOME_BUILDER_SECTION_KEYS` (10 keys) — all imported from `presentation/config.ts` / `presentation/tokens.ts`.
+- v2 semantics: absence = real delete (no resurrection), unknown types fail-closed, legacy migration `id = key` (which is why default sections have `id === type`).
+
+## 18. Phase 2 — Capability model (new, UI-side only)
+
+New module `web/src/modules/store-experience-builder/presentation/section-capabilities.ts`:
+
+```ts
+export interface SectionCapability {
+  type: HomeBuilderSectionKey;
+  maxInstances: number | null; // null = no per-type cap (MAX_HOME_SECTIONS still applies)
+  canDuplicate: boolean;
+}
+```
+
+| Type | maxInstances | canDuplicate | Rationale |
+|---|---|---|---|
+| hero | 1 | no | heroHeadline/heroSubheadline remain global `homepage` fields (ownership unchanged per spec) |
+| categories / newArrivals / wholesale / appPromo | 1 | no | catalog/channel-driven singletons |
+| banner / featured / offers / benefits / customContent | null | yes | multi-instance allowed, independent ids; gated ones stay gated (badge + note unchanged — no gated section became a finished feature) |
+
+Helpers: `canAddSectionType(sections, type)` (cap → false; singleton present → false), `hasAddableSectionType(sections)`, `canDuplicateSection(sections, section)`. The normalizers do **not** depend on this model; it constrains UI-produced configs only.
+
+## 19. Phase 2 — ID generation strategy
+
+`newHomeSectionId()` → `section-${crypto.randomUUID()}` (browser-safe; length 44 ≤ 64; matches `safeId`). Fallback (test environments without `crypto.randomUUID`) follows the existing project pattern (`createPosCheckoutAttemptId` in `web/src/lib/pos-checkout-attempt.ts`) — no new helper invented. Called **only** at user creation time (Add/Duplicate click), never during normalization or reads. No timestamp-only ids.
+
+## 20. Phase 2 — Selection by instance id
+
+- `ExperienceBuilder`: `selectedSection` / `pendingSectionScroll` are now `string | null` **instance ids** (were `HomeBuilderSectionKey | null`). `handleSelectSection(id, origin)` accepts `null` (clears selection — used by Delete fallback).
+- `ControlPanels` `PanelsProps`: `selectedSection?: string | null`, `onSelectSection?: (id: string | null) => void`; the selected-section settings block looks up `sections.find((s) => s.id === selectedSection)`.
+- `StorefrontPreviewCanvas`: each rendered section carries both `data-preview-section={type}` (kept for compatibility) **and** `data-preview-section-id={section.id}`; click/keyboard selection passes the id; `selected = selectedSection === section.id`.
+- Scroll bridge targets `[data-preview-section-id="<id>"]`, so duplicate instances scroll to the exact instance.
+- **Backward compatibility:** default sections have `id === type` (CONTRACT-2 migration), so all V2-1 selection tests and V2-2 Phase-1 editing assertions (e.g. `dataset.selectedSection === 'categories'`, `[data-preview-section="hero"]`) pass unmodified.
+
+## 21. Phase 2 — Picker / Add / Duplicate / Delete behavior
+
+**Picker:** a `+ إضافة قسم` button (`data-add-section`) above the composer list toggles a lightweight inline panel (`data-section-picker`) listing all 10 registered types in registry order, with translated names and the existing gated badge for gated types. Singletons already present are **disabled**; multi-instance types stay enabled; at `MAX_HOME_SECTIONS` the button is disabled with `title = sectionLimitReached`. No unknown types can appear (list = `HOME_BUILDER_SECTION_KEYS`). No modal/focus-trap architecture added; Escape/focus behavior is that of a simple inline list, consistent with current composer density.
+
+**Add:** appends `{ id: newHomeSectionId(), type, visible: true }` at the end of the array (logical place: new sections land at the bottom, reorder is one click away), selects the new instance immediately (settings block opens for it), preserves existing order, no auto Save/Publish (draft only).
+
+**Duplicate:** only when `canDuplicateSection` (capability + under cap). Copies `type` + `visible` only — there is no per-section content payload in the contract to copy — assigns a new id, inserts immediately after the source, selects the copy. Hero/singletons never show the ⧉ button.
+
+**Delete:** removes the instance from `homepage.sections` — that **is** the delete in v2 (no `visible=false` substitute, no resurrection on save/normalize). If the deleted instance was selected, selection falls back deterministically: next sibling → previous sibling → `null` (settings block returns to the default hero-content state). No confirmation modal (no existing project pattern for row-level deletes in this composer; consistent with nav-links/social delete). No stale selected id can survive.
+
+**Hide vs Delete:** Hide = per-row toggle or settings-block toggle → `visible=false`, instance stays. Delete = removal from array. The two paths share no code.
+
+**Reorder:** unchanged arrow mechanism moves the instance object itself (identity preserved); duplicates of the same type don't interfere (rows keyed by `section.id`); selection stays on the same id after a move.
+
+**Editing (kept from Phase 1):** selected-section settings block, visibility toggle, hero fields (still global), gated note, catalog-managed note — all now resolved by `section.id`.
+
+## 22. Phase 2 — Preview bridge limitations
+
+None blocking. The preview already renders per-instance (`.map` over `sections`), so duplicate instances of the same type render independently and are independently selectable via `data-preview-section-id`. Duplicates of multi-instance types render the same placeholder content (the contract has no per-instance content yet) — they are visually identical by design, distinguished in the composer by order/selection. The **public storefront renderer** was not touched; the preview canvas only gained a data attribute and an id prop.
+
+## 23. Phase 2 — Storefront dev-mirror parity decision
+
+`storefront/src/components/customizer/*` is a dev-only, inert harness: it renders the preview canvas with **no selection bridge, no composer, no picker** (selection props are optional and unused there). Phase 1 didn't touch it; CONTRACT-2 already keeps it compiling against the v2 shape. **Decision: no parity changes** — adding instance UI there would duplicate the builder without a consumer. The production storefront renderer path is web-only for this module. Documented here per spec; if the mirror later grows a composer, it must consume `section-capabilities.ts` instead of re-implementing rules.
+
+## 24. Phase 2 — Changed / new files
+
+| File | Change |
+|---|---|
+| `web/src/modules/store-experience-builder/presentation/section-capabilities.ts` | **New** — capability registry + guards + `newHomeSectionId` |
+| `web/src/modules/store-experience-builder/presentation/index.ts` | Export the new module |
+| `web/src/modules/store-experience-builder/ControlPanels.tsx` | HomepagePanel: picker UI, add/duplicate/delete, id-based selection + settings lookup, per-row duplicate/delete buttons, `data-section-id` on rows |
+| `web/src/modules/store-experience-builder/ExperienceBuilder.tsx` | Selection state → instance id (`string | null`); scroll targets `data-preview-section-id`; nullable `onSelectSection` |
+| `web/src/modules/store-experience-builder/StorefrontPreviewCanvas.tsx` | `data-preview-section-id` per instance; selection by id; `data-preview-section={type}` kept |
+| `web/src/modules/store-experience-builder/messages.ts` | 4 new keys × 2 locales: `addSection`, `duplicateSection`, `deleteSection`, `sectionLimitReached` |
+| `web/src/modules/store-experience-builder/__tests__/section-capabilities.test.ts` | **New** — 11 unit tests |
+| `web/src/app/(commerce)/commerce/appearance/section-instances.test.tsx` | **New** — 10 UI tests |
+| `web/src/app/(commerce)/commerce/appearance/section-editing.test.tsx` | Updated: v1-era "no add/duplicate/delete controls" negative test replaced by capability-aware test (duplicate only for multi-instance; singletons disabled in picker) |
+
+## 25. Phase 2 — Tests, exact results (local, before push)
+
+- `section-capabilities.test.ts`: **11/11 passed**.
+- `section-instances.test.tsx`: **10/10 passed** — picker lists all 10 types with translated names + gated badges; existing hero/singletons disabled, multi-instance enabled; add creates safe unique `section-<uuid>` id and selects it; multi-instance add twice → distinct ids; duplicate copies type/visible, new id, sits at source+1, selected; duplicate instances independently selectable (aria-pressed + 2 preview elements with distinct ids); delete removes from array (not hide) → next-sibling fallback; last-instance delete → previous-sibling fallback; delete-all → selection cleared, no settings block; hide keeps instance and only flips `visible`; reorder preserves all ids and keeps selection; settings block targets the selected id among duplicates (visibility flip affects only that instance; preview shows only the visible one).
+- `section-editing.test.tsx`: **8/8 passed** (incl. updated capability test).
+- `section-selection.test.tsx` (V2-1 regression): **7/7 passed**, unmodified.
+- Module suite (`store-experience-builder`): 3 files / **23 tests passed** (incl. CONTRACT-2 presentation tests — stayed green).
+- Appearance suite: 4 files / **30 tests passed**.
+- **Full web suite: 288 files / 1981 tests — all passed** (no existing test reduced or weakened; one outdated negative test replaced by a stricter capability-aware one).
+- `npx tsc --noEmit`: store-experience-builder module + appearance tests **clean**; remaining errors are the pre-existing main baseline in unrelated files.
+- `npm run build` (Next.js): **success**, exit 0.
+
+## 26. Phase 2 — Persistence / scope confirmation
+
+Draft→Save→Preview→Publish flow reused unchanged (every mutation goes through the same `patch` → draft → `saveStorefrontPresentation` / `publishStorefrontPresentation` path). No new API, no DB migration, no schema version 3, no parallel persistence, no Hero content ownership change, no tenant/auth change, no public API change, no Customizer redesign, no Theme Tokens work. CONTRACT-2 normalization untouched.
+
+## 27. Phase 2 — Git / CI
+
+- **Current Base SHA:** `f22fe510aad6c9212295de33a7d696afe6a187b1` (main after #884).
+- **Commits (Phase 2):** capability model (`0c59e79d`) → message keys (`ab1427f2`) → composer picker/add/duplicate/delete + id selection (`b3343b71`) → selection bridge id upgrade (`809a8f52`) → tests (`c2772434`) → this report.
+- **Head SHA (code):** `c2772434cb56d021df5b39f21940b01f17d742f3`.
+- **Final Head SHA (incl. report):** recorded in the PR head after the report commit.
+- **CI status (real runs on the code head `c2772434`, all success):** `web build (Next.js)` ✅ (03:53:26 → 03:56:19) · `php artisan test (L11, sqlite)` ✅ (03:53:26 → 03:59:40) · `php artisan test (L11, pgsql)` ✅ (03:53:26 → 04:11:31); the previous push (`809a8f52`) also ran green: web build ✅ (03:55:04), sqlite ✅ (04:01:27), pgsql ✅ (04:07:46) — 6/6 green. `storefront (lint + typecheck + test)` did not run: `storefront-ci.yml` is path-scoped to `storefront/**`, untouched by this PR.
+- Branch synced with main before Phase 2 (`merge-base = f22fe510`, ahead 7, behind 0) — no merge/rebase needed. No force-push; normal commits only.
+
+## 28. Phase 2 — Risks / deferred
+
+- **Deferred (by contract):** per-instance content for multi-instance types (banner/featured/offers/benefits/customContent currently render identical placeholder content per type — the v2 contract has no per-instance payload field). Gated sections remain preview-only.
+- **Risk (low):** Delete has no confirmation; consistent with existing row-level deletes in the same UI (nav links, social links). Deleted instances only persist on explicit Save (draft flow).
+- **Risk (low):** id generation depends on `crypto.randomUUID` (all modern browsers; fallback covers legacy/test environments).
+- **Not in scope (unchanged):** DnD reorder, Undo/Redo, version history, per-section content contracts, storefront dev-mirror composer.
+
+## 29. Phase 2 — Recommended next step
+
+Review and merge PR #881. Natural follow-up (separate PR): per-instance content payloads for multi-instance types (starting with `banner`), which would make Duplicate materially useful beyond layout placeholders; only then consider surfacing banner/featured/offers/benefits/customContent publishing beyond the gated preview.
+
+**No Merge. No Deploy.**
 
 ---
 
