@@ -444,6 +444,225 @@ Before locking the model, perform a dedicated evidence pass on mature data-bindi
 
 ---
 
+## 13A. Data Binding + State + Actions + Events + Security — Evidence Pass (2026-09-20)
+
+### External Evidence
+
+**Digia state scopes.** Digia documents distinct state lifetimes: global App State, immutable entity/page/component parameters, mutable page/component state, and local State Container state. It also binds state variables to widget properties and updates them through explicit state actions. This is useful evidence for scoped state/lifecycle rather than one undifferentiated global store.
+
+**Digia actions/events.** Digia documents an Action Catalog grouped into state, navigation, API/data, UI, file/media and timing/events, with actions triggered by interactions or lifecycle events. This supports a typed/registered action model rather than arbitrary callback code.
+
+**Android architecture.** Android's official app-architecture guidance stresses repositories and a defined source of truth. This reinforces AWJ's existing decision that Commerce Core remains authoritative and mobile UI state must not become a competing source of business truth.
+
+**OWASP MASVS.** MASVS treats secure storage, cryptography, authentication/authorization, network communication, platform interaction, code/update safety, resilience and privacy as separate mobile security control groups. AWJ mobile architecture and testing should map to these categories rather than treating “mobile security” as one generic checklist.
+
+**React Native security guidance (architectural evidence, not runtime selection).** Official React Native guidance warns not to ship sensitive API keys/secrets in app code, recommends a server-side orchestration layer for secret-bearing calls, distinguishes non-sensitive local storage from secure platform storage, requires HTTPS for APIs, and warns that deep links must not carry sensitive information. This is relevant regardless of whether React Native is eventually selected.
+
+**Apple platform security evidence.** Apple documents Keychain Services for encrypted storage of small secrets and Universal Links with verified website/app association. Apple also explicitly warns that incoming universal-link parameters are an attack surface: parameters must be validated and available actions limited so links cannot directly perform destructive or sensitive operations.
+
+**Firebase Remote Config as remote-configuration evidence, not an AWJ dependency decision.** Firebase documents remote changes to app behavior/appearance without an app update, real-time fetching, app/build targeting and versioned templates. It also explicitly says not to store confidential data in client Remote Config and not to use it to circumvent target-platform requirements. This is strong evidence for AWJ's “configuration is readable/untrusted client input, not a secret store or policy bypass” boundary.
+
+### AWJ Decisions / Requirements from this pass
+
+#### A. Separate business truth, remote data and UI state
+
+AWJ should distinguish at least these concepts:
+
+1. **Server-authoritative commerce data** — products, prices, stock/availability, customer/order/payment state and other business records governed by AWJ backend rules.
+2. **Remote experience data/configuration** — published app schema, content references, theme/config values and safe targeting metadata.
+3. **Navigation/page parameters** — immutable inputs passed into a screen/component instance.
+4. **Ephemeral UI state** — local/page/component state such as selected tab, expanded section, form input or loading indicator.
+5. **Sensitive local session material** — only what is required on-device, stored using platform-appropriate secure storage and never exposed through the experience schema.
+
+A visual binding must never promote UI state into business authority. For example, a local `price` or `isPaid` value cannot authorize a checkout/payment/order result.
+
+#### B. Typed Data Source Registry
+
+Do not let merchant-authored schemas contain unrestricted URLs, SQL, tenant IDs or arbitrary backend queries.
+
+Bindings should resolve through an allowlisted **Data Source / Resource Registry**, conceptually:
+
+```text
+Binding
+  -> registered resource/capability
+  -> typed parameters
+  -> authenticated tenant/customer context
+  -> backend authorization
+  -> normalized response
+```
+
+Candidate resource classes may include catalog/category/product/customer/cart/order/content resources, but the final registry is not yet locked.
+
+The backend — not the schema — resolves tenant scope. Any tenant/store/app identifiers in client input are treated as resource identifiers to authorize, never as authority to switch tenant context.
+
+#### C. Scoped state model
+
+Adopt the architectural concept of explicit scope/lifecycle rather than a universal mutable global store:
+
+- app/session state;
+- page/screen state;
+- component-instance/local state;
+- immutable navigation/component parameters;
+- server/query state handled separately from mutable UI state.
+
+Persistence must be explicit. “Global” must not imply “persist to disk,” and “persisted” must not imply “safe for secrets.”
+
+#### D. Binding model must be declarative and constrained
+
+Bindings may read typed fields, safe derived values and scoped state, but the final expression language remains open.
+
+Minimum constraints:
+- deterministic where practical;
+- typed;
+- bounded in complexity;
+- no arbitrary code/eval;
+- no direct network/database/filesystem access;
+- no access to signing credentials/secrets;
+- no tenant-context override;
+- validation at authoring/publish time plus defensive runtime validation.
+
+#### E. Event → Action pipeline
+
+Use an explicit pipeline:
+
+```text
+Trusted event
+   -> validated Action Definition
+   -> capability/authorization check
+   -> execute
+   -> typed success/error result
+   -> optional allowed state/navigation effect
+```
+
+Events may originate from UI interaction, lifecycle, approved runtime/system events or trusted backend-driven events. External/deep-link/push payloads are **untrusted input** and must be parsed/validated before they can select a safe action.
+
+#### F. Action risk classes
+
+The Action Registry should distinguish risk, because “show toast” and “place order” cannot share the same trust model.
+
+Conceptual classes:
+
+- **Local UI** — visual/local state effects.
+- **Navigation** — open known screen/resource/deep link.
+- **Read capability** — tenant/customer-scoped reads.
+- **Mutation capability** — cart/customer/content mutations with backend authorization.
+- **Sensitive commerce** — checkout/payment/order/account-security actions; server-authoritative and subject to stronger validation/idempotency/audit.
+- **External integration** — allowlisted integration capability; no client-held provider secret.
+
+Exact names are open, but differentiated policy is required.
+
+#### G. Secrets never live in App Schema
+
+Published schema/configuration, client logs, preview payloads and remotely fetched parameters must be assumed inspectable by an end user.
+
+Therefore:
+- no API/provider secrets in schema;
+- no signing keys/certificates;
+- no backend service credentials;
+- no reusable privileged bearer tokens;
+- no cross-tenant credentials.
+
+Secret-bearing integrations must terminate through trusted AWJ/server-side orchestration.
+
+#### H. Secure local storage
+
+Authentication/session secrets that genuinely must be stored on-device use platform-appropriate secure storage. Non-sensitive cached UI/config data must remain separate from secret storage.
+
+The exact mobile framework abstraction is deferred until runtime selection; the security requirement is not.
+
+#### I. Deep links and push links are routing requests, not authority
+
+A deep link may identify intent/resource, but must not directly authorize sensitive effects.
+
+Required flow:
+
+```text
+incoming link/push
+ -> verify supported origin/type where applicable
+ -> parse
+ -> validate route + typed parameters
+ -> authenticate if required
+ -> backend authorize resource/action
+ -> navigate/execute safe capability
+```
+
+Never place sensitive tokens/data in ordinary deep-link parameters when a safer authenticated flow is available.
+
+#### J. Preview/Test isolation
+
+Preview is not a security bypass.
+
+Preview/Test must preserve:
+- tenant isolation;
+- authenticated resource authorization;
+- environment separation;
+- explicit test/sandbox data where available;
+- clear prevention of accidental production-sensitive mutations;
+- no privileged “builder preview token” that becomes a universal tenant bypass.
+
+Exact preview credential/session design remains open.
+
+#### K. Error and fallback model
+
+Bindings/actions need typed failure states rather than silent failure:
+- loading;
+- empty;
+- validation error;
+- unauthorized/forbidden;
+- not found;
+- network/retryable failure;
+- incompatible capability/schema;
+- safe fallback.
+
+Sensitive errors shown to merchants/users must not leak secrets, internal credentials or cross-tenant existence.
+
+#### L. Security verification baseline
+
+Use OWASP MASVS/MASTG as a mobile-security verification reference alongside platform-specific Apple/Android guidance. AWJ-specific controls remain stricter where required for multi-tenancy, finance, payments and commerce integrity.
+
+### Open Decisions after 04B
+
+Do **not** lock yet:
+- expression syntax/engine;
+- exact state serialization/persistence model;
+- query/cache library;
+- offline-first scope;
+- exact Data Source Registry contract;
+- exact Event/Action schema;
+- custom actions/public extension permissions;
+- secure-storage abstraction/library;
+- preview authentication/token architecture;
+- whether third-party API calls can ever originate directly from runtime versus always through AWJ;
+- targeting/personalization rules and privacy model.
+
+### 04B conclusion
+
+The recommended AWJ boundary is now:
+
+```text
+Visual schema/config
+       |
+       v
+Typed bindings + scoped state + registered events/actions
+       |
+       v
+Capability boundary
+       |
+       +---- local safe UI/runtime effects
+       |
+       +---- authenticated AWJ backend resources/actions
+                         |
+                         v
+              tenant-scoped authorization
+                         |
+                         v
+              server-authoritative commerce
+```
+
+The schema can describe experience intent. It cannot grant itself authority.
+
+---
+
 ## 14. Tenant isolation and security
 
 ### Non-negotiable AWJ Requirement
@@ -709,6 +928,14 @@ Each pass updates this document with evidence, AWJ decision, and remaining open 
 
 ### Existing repository evidence
 - `docs/plans/store/AWJ_MOBILE_APP_BUILDER_BENCHMARK.md` — baseline benchmark and initial architecture direction.
+
+### 04B evidence sources added 2026-09-20
+- Digia Academy — Variables; State Management; Action Catalog; Pages/lifecycle actions.
+- Android Developers — App Architecture / Data Layer / source-of-truth guidance.
+- OWASP MASVS / MASTG — mobile security verification control model.
+- React Native official Security guide — secret handling, secure storage, network and deep-link security evidence (reference only; not a runtime selection).
+- Apple Developer — Keychain Services; Universal Links and validation guidance.
+- Firebase Remote Config official docs — remote configuration, real-time updates, version/build targeting and explicit security/platform-policy limitations (reference only; not a dependency decision).
 
 ### External sources already used during the research conversation
 
