@@ -94,6 +94,32 @@ class CommerceMediaApiTest extends TestCase
         return $media;
     }
 
+    /**
+     * `disk = 'document'` هو ما يكتبه `ProductMediaService::store()` فعلياً
+     * لكل وسائط منتجٍ مرفوعة عبر المسار القياسي — الحالة الواقعية، لا
+     * `attachMedia()` أعلاه (تلك تحاكي سجلاً قديماً توافقياً فقط).
+     */
+    private function attachDocumentBackedMedia(Tenant $tenant, Product $product, string $filename = 'mango.webp'): ProductMedia
+    {
+        config()->set('document_center.storage.driver', 'local');
+        config()->set('document_center.storage.disk', 'local');
+
+        app(TenantContext::class)->set($tenant->id);
+        Storage::disk('local')->put("product-media/{$tenant->id}/{$product->id}/{$filename}", 'image-bytes');
+        $media = ProductMedia::create([
+            'product_id' => $product->id,
+            'disk' => 'document',
+            'path' => "product-media/{$tenant->id}/{$product->id}/{$filename}",
+            'original_name' => 'IMG_9001.webp',
+            'mime_type' => 'image/webp',
+            'size' => 11,
+            'sort_order' => 0,
+        ]);
+        app(TenantContext::class)->forget();
+
+        return $media;
+    }
+
     private function bearer(string $token): array
     {
         return ['Authorization' => 'Bearer '.$token];
@@ -151,6 +177,21 @@ class CommerceMediaApiTest extends TestCase
         $this->get("/commerce/v1/media/{$media->id}", $this->bearer($store['token']))
             ->assertOk()
             ->assertHeader('Content-Type', 'image/webp');
+    }
+
+    /** @test */
+    public function document_backed_media_the_real_upload_path_is_served_correctly(): void
+    {
+        Storage::fake('local');
+        $store = $this->seedMobileStore('document-disk');
+        $product = $this->publishedProduct($store['tenant'], $store['channel']);
+        $media = $this->attachDocumentBackedMedia($store['tenant'], $product);
+
+        $response = $this->get("/commerce/v1/media/{$media->id}", $this->bearer($store['token']))
+            ->assertOk()
+            ->assertHeader('Content-Type', 'image/webp');
+
+        $this->assertSame('image-bytes', $response->streamedContent());
     }
 
     /** @test */

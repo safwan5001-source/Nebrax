@@ -96,7 +96,11 @@ reusing — not duplicating — the existing `ProductMedia` storage authority an
 ## Changed files
 
 - `app/Http/Controllers/Api/CommerceMediaController.php` (new) — guarded media byte-serving
-  for `/commerce/v1`.
+  for `/commerce/v1`; branches on `disk === 'document'` (the real upload path) via
+  `DocumentStorageService`, falling back to a direct disk read for legacy records.
+- `app/Http/Controllers/Api/StorefrontMediaController.php` — same `document`-disk fix
+  applied to the pre-existing `/store/v1` sibling (see Automated review findings #4 below;
+  discovered while building `CommerceMediaController`, not part of the original plan).
 - `routes/api_commerce.php` — adds `GET media/{id}` to the existing read-only group.
 - `app/Http/Controllers/Api/CommerceProductController.php` — wires
   `ProductMediaGalleryService` into `index()`/`show()`; updates the class docblock's
@@ -104,7 +108,9 @@ reusing — not duplicating — the existing `ProductMedia` storage authority an
 - `app/Http/Resources/StorefrontProductResource.php` — adds `commerceMediaPayload()` /
   `buildCommerceMediaUrl()`; extracts the shared `buildPayload()` loop (no behavior change
   to the existing `mediaPayload()`/`buildMediaUrl()` call sites).
-- `tests/Feature/CommerceMediaApiTest.php` (new) — 11 focused tests (see below).
+- `tests/Feature/CommerceMediaApiTest.php` (new) — 13 focused tests (see below).
+- `tests/Feature/StorefrontCatalogApiTest.php` — adds one regression test for the
+  `document`-disk fix (`document_backed_media_the_real_upload_path_is_served_correctly`).
 - `tests/Feature/CommerceModuleBoundaryTest.php` — adds `commerce/v1/media/{id}` to the
   explicit route allowlist (`CommerceModuleBoundaryTest` fails closed on any
   undocumented `/commerce/v1` route; this is the deliberate, expected update for a newly
@@ -114,13 +120,15 @@ No migration. No new model. No new business/storage authority.
 
 ## Tests and exact results
 
-### New — `tests/Feature/CommerceMediaApiTest.php` (11 tests / 23 assertions)
+### New — `tests/Feature/CommerceMediaApiTest.php` (13 tests / 30 assertions)
 
 | Test | Proves |
 |---|---|
 | `published_product_media_is_returned_as_the_listing_thumbnail_and_detail_gallery` | List `thumbnail_url` and detail `media[].url` point at `/commerce/v1/media/{id}` |
 | `a_product_with_no_media_has_a_null_thumbnail_and_empty_gallery` | No false media conjured for a product with none |
 | `the_media_route_serves_the_actual_file_bytes_for_a_published_product` | Byte-serving + `Content-Type` work end-to-end |
+| `document_backed_media_the_real_upload_path_is_served_correctly` | The **real** upload path (`disk = 'document'`) is served correctly, not just the legacy-record direct-disk path |
+| `the_response_is_marked_private_not_shareable_by_a_proxy_or_cdn` | `Cache-Control: private` on the bearer-gated route |
 | `a_foreign_tenants_media_id_is_not_served` | Cross-tenant leakage blocked (`TenantScope`) |
 | `media_of_an_unpublished_product_is_not_served` | Publication gate enforced |
 | `media_published_only_on_a_web_channel_is_not_served_via_commerce_v1` | Foreign-channel (web) media not exposed via mobile boundary |
@@ -130,19 +138,23 @@ No migration. No new model. No new business/storage authority.
 | `an_inactive_mobile_channel_denies_media_access` | Channel resolution failure fails closed |
 | `no_sensitive_storage_path_or_disk_leaks_in_any_response` | No `disk`/`path` leakage in any JSON response |
 
-Run: `php artisan test --filter=CommerceMediaApiTest` → **11 passed (23 assertions)**, SQLite and PostgreSQL.
+Run: `php artisan test --filter=CommerceMediaApiTest` → **13 passed (30 assertions)**, SQLite and PostgreSQL.
 
 ### Regression — unchanged behavior confirmed
 
 - `php artisan test --filter=CommerceCatalogApiTest` → 13 passed (SQLite + PostgreSQL) —
   pricing/pagination/isolation tests untouched by the new gallery wiring.
-- `php artisan test --filter=StorefrontCatalogApiTest` → 15 passed (SQLite + PostgreSQL) —
-  `/store/v1` behaviorally identical (its own media test still asserts `/store/v1/...`
-  URLs).
+- `php artisan test --filter=StorefrontCatalogApiTest` → 16 passed (SQLite + PostgreSQL) —
+  `/store/v1` behaviorally identical for existing scenarios, plus one new regression test
+  for the `document`-disk fix (finding #4 below).
 - `php artisan test --filter=CommerceModuleBoundaryTest` → 3 passed — allowlist correctly
   updated for the one new route, no other undocumented route introduced.
+- `php artisan test --filter="ProductBarcodeAndMediaTest|ProductMediaGalleryTest"` → 30
+  passed (SQLite + PostgreSQL) — the internal authenticated media path
+  (`ProductController::downloadMedia()`, untouched) and gallery-resolution algorithm
+  unaffected.
 - `php artisan test --filter="Commerce|Storefront|ProductMedia|Variant"` on **PostgreSQL**
-  → **987 passed (4407 assertions)**, 0 failures — full commerce/storefront/variant/media
+  → **990 passed (4418 assertions)**, 0 failures — full commerce/storefront/variant/media
   module regression green on the production database engine.
 
 ### Full suite
@@ -325,6 +337,27 @@ All three were verified against repository evidence:
    means extending the shared `ProductMediaGalleryService` authority — a real but separate
    unit of work, not a small local fix. **Not fixed here — recorded as backlog below**;
    replied on the PR thread with this evidence.
+4. **P1 — `document`-backed media returns a 500 for ordinarily-uploaded product images
+   (fixed, in both controllers).** `ProductMediaService::store()` — the actual upload path
+   for all product/option-value/variant media — writes `disk = 'document'`, a sentinel, not
+   a real `config/filesystems.php` disk name: the real backend (local/S3) is resolved
+   dynamically at read time via `DocumentStorageService`, exactly as
+   `ProductController::downloadMedia()` (the existing authenticated internal download route)
+   already branches to handle. `CommerceMediaController` had copied
+   `StorefrontMediaController::show()`'s `Storage::disk($media->disk)` call verbatim, which
+   throws/misbehaves for `disk = 'document'` — i.e. for essentially all real production
+   media, not an edge case. **This is a pre-existing defect already shipped in
+   `StorefrontMediaController` for `/store/v1`**, invisible until now because that
+   controller's own test fixture always used `disk = 'local'` directly rather than the real
+   upload path. Fixed in **both** controllers in this PR (same branch-on-`document`-then-
+   `DocumentStorageService::readStream()` pattern as `ProductController::downloadMedia()`,
+   served `inline` via `response()->streamDownload()` so images still display rather than
+   force-download): the identical bug in two files performing the identical job, discovered
+   precisely because this task mirrored one into the other, with a trivial and safe fix
+   using an already-established pattern — not a policy/architecture decision, so fixed
+   directly rather than left broken in production. New regression tests:
+   `document_backed_media_the_real_upload_path_is_served_correctly` in both
+   `CommerceMediaApiTest` and `StorefrontCatalogApiTest`.
 
 ## Risks / remaining work
 
@@ -332,6 +365,9 @@ All three were verified against repository evidence:
   budget sharing, list-endpoint gallery batching) — both are pre-existing architecture
   characteristics this task inherits from the already-shipped `/store/v1` pattern, not
   regressions.
+- Finding #4 above was a genuine, previously-shipped production defect in
+  `StorefrontMediaController` (silently broken for real uploaded media, not just the new
+  mobile route) — now fixed in this PR for both controllers, with regression coverage.
 
 ## Discovered backlog
 

@@ -4,9 +4,11 @@ namespace App\Http\Controllers\Api;
 
 use App\Models\CommerceListing;
 use App\Models\ProductMedia;
+use App\Services\DocumentCenter\DocumentStorageService;
 use App\Tenancy\StorefrontContext;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use RuntimeException;
 
 /**
  * ═══════════════════════════════════════════════════════════════
@@ -34,9 +36,20 @@ use Illuminate\Support\Facades\Storage;
  *      النشطة الوحيدة لهذا المستأجر، لا قيمة من العميل). منتجٌ غير منشور أو
  *      منشورٌ على قناةٍ أخرى (مثلاً `web` فقط) لا يُخدَّم هنا.
  *  فشل أي شرطٍ → 404 غير كاشف موحَّد، لا فرق بين معرّف خاطئ ووسائط محجوبة.
+ *
+ *  **`disk = 'document'` ليس اسم قرص Laravel حقيقياً** — هو القيمة الحارسة
+ *  التي يكتبها `ProductMediaService::store()` (مسار الرفع الفعلي لكل وسائط
+ *  المنتج/قيمة الخيار/المتغيّر) لتعني «القرص الفعلي يُحسم ديناميكياً عبر
+ *  `DocumentStorageService`»، تماماً كما يحسمه `ProductController::downloadMedia()`
+ *  الداخلي فعلاً. `Storage::disk('document')` مباشرةً يفشل (لا قرص بهذا الاسم
+ *  في `config/filesystems.php`) لكل وسائط منتجٍ حقيقية مرفوعة عبر المسار
+ *  القياسي — لا فرع القرص المباشر أدناه إلا توافقاً رجعياً مع سجلاتٍ قديمة
+ *  محتملة كتبت مباشرةً على قرصٍ مسمّى.
  */
 class CommerceMediaController extends PublicApiController
 {
+    public function __construct(private readonly DocumentStorageService $documentStorage) {}
+
     public function show(Request $request)
     {
         $id = (string) $request->route('id');
@@ -58,14 +71,31 @@ class CommerceMediaController extends PublicApiController
             abort(404, 'الوسائط غير موجودة.');
         }
 
+        $headers = [
+            'Content-Type' => $media->mime_type ?? 'application/octet-stream',
+            'Cache-Control' => 'private, max-age=3600',
+        ];
+
+        if ($media->disk === 'document') {
+            try {
+                $stream = $this->documentStorage->readStream($this->documentStorage->profile(), $media->path);
+            } catch (RuntimeException) {
+                abort(404, 'الوسائط غير موجودة.');
+            }
+
+            return response()->streamDownload(function () use ($stream): void {
+                fpassthru($stream);
+                fclose($stream);
+            }, $media->original_name, $headers, 'inline');
+        }
+
+        // توافق قراءة فقط مع سجلاتٍ قديمة محتملة كتبت مباشرةً على قرصٍ مسمّى
+        // (راجع تعليق الصنف أعلاه) — يطابق `ProductController::downloadMedia()` حرفياً.
         $disk = Storage::disk($media->disk);
         if (! $disk->exists($media->path)) {
             abort(404, 'الوسائط غير موجودة.');
         }
 
-        return $disk->response($media->path, $media->original_name, [
-            'Content-Type' => $media->mime_type ?? 'application/octet-stream',
-            'Cache-Control' => 'private, max-age=3600',
-        ]);
+        return $disk->response($media->path, $media->original_name, $headers);
     }
 }
