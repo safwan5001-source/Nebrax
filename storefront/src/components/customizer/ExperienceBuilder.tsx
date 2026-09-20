@@ -14,6 +14,12 @@ import {
 import type { ReactNode } from "react";
 import { useMemo, useState } from "react";
 import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import {
   clonePresentationConfig,
   DEFAULT_PRESENTATION_CONFIG,
   normalizePresentationConfig,
@@ -72,7 +78,9 @@ export function ExperienceBuilder({
   const [locale] = useState<CustomizerLocale>(initialLocale);
   const [panel, setPanel] = useState<CustomizerPanel>("theme");
   const [device, setDevice] = useState<PreviewDevice>("desktop");
-  const [mobilePane, setMobilePane] = useState<"edit" | "preview">("edit");
+  const [mobileSheet, setMobileSheet] = useState<"sections" | "design" | null>(
+    null,
+  );
   const [lifecycle, setLifecycle] = useState<BuilderLifecycle>("clean");
   const [notice, setNotice] = useState<string | null>(null);
   const t = (key: CustomizerMessageKey) => customizerMessage(locale, key);
@@ -167,9 +175,7 @@ export function ExperienceBuilder({
       <div className="flex min-h-0 flex-1">
         <nav
           aria-label={t("controls")}
-          className={`${
-            mobilePane === "preview" ? "hidden lg:flex" : "hidden md:flex"
-          } w-[196px] shrink-0 flex-col overflow-y-auto border-e border-awj-editor-border bg-awj-editor-surface`}
+          className={`${"hidden lg:flex"} w-[196px] shrink-0 flex-col overflow-y-auto border-e border-awj-editor-border bg-awj-editor-surface`}
         >
           <div className="flex flex-col py-2">
             {CUSTOMIZER_NAV_GROUPS.map((group, groupIndex) => (
@@ -209,9 +215,7 @@ export function ExperienceBuilder({
 
         <aside
           data-builder-controls=""
-          className={`${
-            mobilePane === "edit" ? "flex" : "hidden"
-          } w-full min-w-0 flex-col border-awj-editor-border bg-awj-editor-surface md:flex-1 lg:flex lg:w-[300px] lg:flex-none lg:border-e xl:w-[320px]`}
+          className={`${"hidden lg:flex"} w-full min-w-0 flex-col border-awj-editor-border bg-awj-editor-surface md:flex-1 lg:flex lg:w-[300px] lg:flex-none lg:border-e xl:w-[320px]`}
         >
           <div className="shrink-0 border-b border-awj-editor-border px-3 py-2 md:hidden">
             <label className="sr-only" htmlFor="customizer-panel-select">
@@ -251,9 +255,7 @@ export function ExperienceBuilder({
         <section
           data-builder-preview=""
           aria-label={t("livePreview")}
-          className={`${
-            mobilePane === "preview" ? "flex" : "hidden"
-          } min-w-0 flex-1 flex-col lg:flex`}
+          className={`${"flex"} min-w-0 flex-1 flex-col lg:flex`}
         >
           <div className="flex h-10 shrink-0 items-center justify-between gap-3 border-b border-awj-editor-border bg-awj-editor-surface px-3 text-[11px] text-awj-editor-muted">
             <span className="inline-flex items-center gap-1.5 font-medium text-awj-editor-foreground">
@@ -309,9 +311,7 @@ export function ExperienceBuilder({
       </div>
 
       <div
-        className={`${
-          mobilePane === "preview" ? "hidden lg:flex" : "flex"
-        } shrink-0 items-center gap-2 border-t border-awj-editor-border bg-awj-editor-surface px-3 py-2 lg:absolute lg:top-0 lg:end-3 lg:h-12 lg:border-0 lg:bg-transparent lg:px-0 lg:py-0`}
+        className={`${"hidden lg:flex"} shrink-0 items-center gap-2 border-t border-awj-editor-border bg-awj-editor-surface px-3 py-2 lg:absolute lg:top-0 lg:end-3 lg:h-12 lg:border-0 lg:bg-transparent lg:px-0 lg:py-0`}
       >
         <button
           type="button"
@@ -341,28 +341,54 @@ export function ExperienceBuilder({
         </button>
       </div>
 
-      <div className="flex h-11 shrink-0 border-t border-awj-editor-border bg-awj-editor-surface lg:hidden">
+      <div className="flex h-16 shrink-0 items-center gap-2 border-t border-awj-editor-border bg-awj-editor-surface px-3 lg:hidden">
         <button
           type="button"
-          className={`relative flex-1 text-sm font-medium ${mobilePane === "edit" ? "text-awj-editor-foreground" : "text-awj-editor-muted"}`}
-          onClick={() => setMobilePane("edit")}
+          className="flex min-h-11 flex-1 items-center justify-center rounded-md border border-awj-editor-border px-2 text-sm font-medium text-awj-editor-foreground hover:bg-awj-editor-primary-soft focus-visible:outline-none"
+          onClick={() => setMobileSheet("sections")}
         >
-          {mobilePane === "edit" ? (
-            <span className="absolute inset-x-0 top-0 h-0.5 bg-awj-editor-primary" />
-          ) : null}
-          {t("edit")}
+          {t("sections")}
         </button>
         <button
           type="button"
-          className={`relative flex-1 text-sm font-medium ${mobilePane === "preview" ? "text-awj-editor-foreground" : "text-awj-editor-muted"}`}
-          onClick={() => setMobilePane("preview")}
+          className="flex min-h-11 flex-1 items-center justify-center rounded-md bg-awj-editor-primary px-2 text-sm font-medium text-awj-editor-primary-foreground hover:opacity-90 focus-visible:outline-none"
+          onClick={() => setMobileSheet("sections")}
         >
-          {mobilePane === "preview" ? (
-            <span className="absolute inset-x-0 top-0 h-0.5 bg-awj-editor-primary" />
-          ) : null}
-          {t("preview")}
+          + {t("addSection")}
+        </button>
+        <button
+          type="button"
+          className="flex min-h-11 flex-1 items-center justify-center rounded-md border border-awj-editor-border px-2 text-sm font-medium text-awj-editor-foreground hover:bg-awj-editor-primary-soft focus-visible:outline-none"
+          onClick={() => setMobileSheet("design")}
+        >
+          {t("design")}
         </button>
       </div>
+
+      <Sheet
+        open={mobileSheet !== null}
+        onOpenChange={(open) => !open && setMobileSheet(null)}
+      >
+        <SheetContent
+          side="bottom"
+          className="max-h-[86dvh] overflow-hidden rounded-t-xl border-awj-editor-border bg-awj-editor-surface p-0 lg:hidden"
+        >
+          <SheetHeader className="shrink-0 border-b border-awj-editor-border px-4 py-3">
+            <SheetTitle className="text-start text-sm text-awj-editor-foreground">
+              {mobileSheet === "design" ? t("design") : t("sections")}
+            </SheetTitle>
+          </SheetHeader>
+          <div className="min-h-0 overflow-y-auto px-4 py-4">
+            <ControlPanels
+              panel={mobileSheet === "design" ? "theme" : "homepage"}
+              config={draft}
+              locale={locale}
+              liveStoreName={liveStoreName}
+              onChange={updateDraft}
+            />
+          </div>
+        </SheetContent>
+      </Sheet>
 
       <span className="sr-only">
         {DRAFT_PERSISTENCE_CAPABILITY}:{PUBLISH_CAPABILITY}

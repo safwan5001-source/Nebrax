@@ -26,21 +26,22 @@
 }
 
 .awj-editor {
-  --awj-editor-background: #f5f6f8;
+  /* Scoped aliases mirror AWJ ERP roles; storefront tokens remain inside Canvas. */
+  --awj-editor-background: #f6f7f9;
   --awj-editor-surface: #ffffff;
-  --awj-editor-surface-muted: #f0f2f5;
-  --awj-editor-foreground: #17202a;
+  --awj-editor-surface-muted: #eef2ff;
+  --awj-editor-foreground: #15181d;
   --awj-editor-foreground-muted: #4b5563;
   --awj-editor-muted: #6b7280;
   --awj-editor-disabled: #9ca3af;
-  --awj-editor-border: #e2e5e9;
-  --awj-editor-border-strong: #c9ced6;
-  --awj-editor-border-hover: #aeb6c2;
-  --awj-editor-primary: #1f4b3a;
+  --awj-editor-border: #eceef1;
+  --awj-editor-border-strong: #d1d5db;
+  --awj-editor-border-hover: #9ca3af;
+  --awj-editor-primary: #1e40af;
   --awj-editor-primary-foreground: #ffffff;
-  --awj-editor-primary-soft: #e8f1ec;
-  --awj-editor-ring: #2a6a50;
-  --awj-editor-switch: #c9ced6;
+  --awj-editor-primary-soft: #eef2ff;
+  --awj-editor-ring: #1e40af;
+  --awj-editor-switch: #d1d5db;
   color: var(--awj-editor-foreground);
 }
 
