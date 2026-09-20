@@ -1349,17 +1349,22 @@ function VerificationPanel({
       <Section hint={t("verificationIntro")}>
         <div className="border border-neutral-200 px-3 py-3">
           <p className="text-[12px] font-medium text-neutral-500">
-            {t("awjVerified")}
+            {t("businessIdentity")}
           </p>
-          <p className="mt-1 text-[15px] font-semibold text-neutral-900">
-            {t("notVerified")}
-          </p>
-          <p className="mt-2 text-[12px] leading-5 text-neutral-500">
-            {t("verificationWarning")}
+          <p className="mt-1 text-[12px] leading-5 text-neutral-700">
+            {t("businessIdentitySource")}
           </p>
         </div>
       </Section>
-      <Section title={t("merchantProvided")}>
+      <Section hint={t("merchantProvidedHint")}>
+        <div className="border border-neutral-200 px-3 py-3">
+          <p className="text-[12px] font-medium text-neutral-500">
+            {t("merchantProvided")}
+          </p>
+          <p className="mt-2 text-[12px] leading-5 text-neutral-500">
+            {t("merchantProvidedWarning")}
+          </p>
+        </div>
         <Field label={t("crNumber")}>
           <input
             className={inputClass}
@@ -1403,17 +1408,16 @@ function VerificationPanel({
           />
         </Field>
       </Section>
-      <div className="border-y border-neutral-200">
-        <Toggle
-          label={t("requestedVerified")}
-          checked={config.verification.requestedVerifiedLabel}
-          onChange={(requestedVerifiedLabel) =>
-            patch({
-              verification: { ...config.verification, requestedVerifiedLabel },
-            })
-          }
-        />
-      </div>
+      <Section hint={t("officialVerificationHint")}>
+        <div className="border-y border-neutral-200 py-3">
+          <p className="text-[12px] font-medium text-neutral-500">
+            {t("officialVerification")}
+          </p>
+          <p className="mt-1 text-[12px] leading-5 text-neutral-500">
+            {t("officialVerificationStatus")}
+          </p>
+        </div>
+      </Section>
     </div>
   );
 }

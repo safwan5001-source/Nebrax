@@ -158,6 +158,17 @@ export const CUSTOMIZER_MESSAGES = {
     licenseNumber: "رقم الترخيص",
     verificationUrl: "رابط المصدر",
     requestedVerified: "طلب شارة موثّق",
+    businessIdentity: "الهوية القانونية للمنشأة",
+    businessIdentitySource:
+      "الاسم والسجل التجاري والرقم الضريبي مصدرها بيانات المنشأة في أَوْج، وليست حقولاً مستقلة في مظهر المتجر.",
+    merchantProvidedHint:
+      "هذه الحقول للعرض كمعلومات يقدّمها التاجر فقط، ولا تستبدل بيانات المنشأة ولا تثبت صحتها.",
+    merchantProvidedWarning:
+      "لن تنتج هذه البيانات شارة موثّق أو رسمي أو حكومي، ولن تغيّر السجل التجاري أو الرقم الضريبي في أَوْج.",
+    officialVerification: "التحقق الرسمي",
+    officialVerificationHint:
+      "لا توجد حالة تحقق رسمية في إعدادات العرض. لا ينتج إدخال رقم أو رابط أي اعتماد.",
+    officialVerificationStatus: "غير متاح — يتطلب عقد تحقق خارجي موثّق، وليس إعداداً بصرياً.",
     verificationWarning:
       "أَوْج لا يعرض شارة «موثّق» لأن التاجر كتب رقماً أو رابطاً. التوثيق يحتاج عقد تحقق خارجي.",
     merchantProvided: "معلومات من التاجر",
@@ -373,6 +384,17 @@ export const CUSTOMIZER_MESSAGES = {
     licenseNumber: "License number",
     verificationUrl: "Source URL",
     requestedVerified: "Request a verified badge",
+    businessIdentity: "Business legal identity",
+    businessIdentitySource:
+      "The legal name, commercial registration and VAT number come from AWJ business data, not from independent presentation fields.",
+    merchantProvidedHint:
+      "These fields are display-only merchant-provided information. They do not replace business data or prove its accuracy.",
+    merchantProvidedWarning:
+      "These values cannot produce a Verified, Official or government claim, and cannot change AWJ's CR or VAT source.",
+    officialVerification: "Official verification",
+    officialVerificationHint:
+      "The presentation has no official verification state. Typing a number or URL does not create accreditation.",
+    officialVerificationStatus: "Unavailable — it requires a documented external verification contract, not a visual setting.",
     verificationWarning:
       "AWJ will not show a Verified badge because a merchant typed a number or URL. Verification needs an external authority contract.",
     merchantProvided: "Merchant-provided information",
