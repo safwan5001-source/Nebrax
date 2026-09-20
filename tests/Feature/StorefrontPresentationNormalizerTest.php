@@ -230,6 +230,22 @@ class StorefrontPresentationNormalizerTest extends TestCase
     }
 
     /** @test */
+    public function sbc_authentication_number_is_trimmed_as_opaque_text_and_visibility_defaults_off(): void
+    {
+        $normalized = $this->normalizer->normalize([
+            'sbc' => [
+                'authentication_number' => '  000123  ',
+                'show_in_storefront' => true,
+            ],
+        ]);
+
+        $this->assertSame('000123', $normalized['sbc']['authentication_number']);
+        $this->assertTrue($normalized['sbc']['show_in_storefront']);
+        $this->assertSame('', $this->normalizer->normalize([])['sbc']['authentication_number']);
+        $this->assertFalse($this->normalizer->normalize([])['sbc']['show_in_storefront']);
+    }
+
+    /** @test */
     public function oversized_logo_data_urls_are_stored_as_null(): void
     {
         $huge = 'data:image/png;base64,'.str_repeat('A', StorefrontPresentationNormalizer::MAX_LOGO_BYTES);

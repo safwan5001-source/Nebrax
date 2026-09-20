@@ -18,6 +18,7 @@ interface FooterProps {
     cr_number: string | null;
     vat_number: string | null;
   };
+  showSbc?: boolean;
   logoUrl?: string | null;
   showLogo?: boolean;
   tagline?: string;
@@ -103,6 +104,7 @@ export async function Footer({
   categoryLinks,
   storeName,
   businessIdentity = { legal_name: null, cr_number: null, vat_number: null },
+  showSbc = false,
   logoUrl = null,
   showLogo = true,
   tagline = "",
@@ -241,7 +243,10 @@ export async function Footer({
           </FooterColumn>
         </div>
 
-        {(hasContact || socialLinks.length > 0 || hasBusinessIdentity) && (
+        {(hasContact ||
+          socialLinks.length > 0 ||
+          hasBusinessIdentity ||
+          showSbc) && (
           <div className="mt-8 border-t border-store-footer-border pt-6 text-sm text-store-footer-muted">
             {contact?.phone ? <p>{contact.phone}</p> : null}
             {contact?.email ? <p>{contact.email}</p> : null}
@@ -281,6 +286,13 @@ export async function Footer({
                     {t("vatNumber")}: {businessIdentity.vat_number}
                   </p>
                 ) : null}
+              </div>
+            ) : null}
+            {showSbc ? (
+              <div className="mt-4 border-t border-store-footer-border pt-4">
+                <p className="font-medium text-store-footer-link">
+                  {t("sbcVerified")}
+                </p>
               </div>
             ) : null}
           </div>

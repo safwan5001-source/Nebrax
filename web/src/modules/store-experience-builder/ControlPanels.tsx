@@ -1346,17 +1346,29 @@ function VerificationPanel({
 }) {
   return (
     <div className="space-y-6">
-      <Section hint={t("verificationIntro")}>
-        <div className="border border-neutral-200 px-3 py-3">
-          <p className="text-[12px] font-medium text-neutral-500">
-            {t("awjVerified")}
-          </p>
-          <p className="mt-1 text-[15px] font-semibold text-neutral-900">
-            {t("notVerified")}
-          </p>
-          <p className="mt-2 text-[12px] leading-5 text-neutral-500">
-            {t("verificationWarning")}
-          </p>
+      <Section title={t("sbcTitle")} hint={t("sbcIntro")}>
+        <Field label={t("sbcAuthenticationNumber")} hint={t("sbcAuthenticationHint")}>
+          <input
+            className={inputClass}
+            value={config.sbc.authentication_number}
+            onChange={(event) =>
+              patch({
+                sbc: {
+                  ...config.sbc,
+                  authentication_number: event.target.value,
+                },
+              })
+            }
+          />
+        </Field>
+        <div className="border-y border-neutral-200">
+          <Toggle
+            label={t("sbcShowInStorefront")}
+            checked={config.sbc.show_in_storefront}
+            onChange={(show_in_storefront) =>
+              patch({ sbc: { ...config.sbc, show_in_storefront } })
+            }
+          />
         </div>
       </Section>
       <Section title={t("merchantProvided")}>
@@ -1403,17 +1415,6 @@ function VerificationPanel({
           />
         </Field>
       </Section>
-      <div className="border-y border-neutral-200">
-        <Toggle
-          label={t("requestedVerified")}
-          checked={config.verification.requestedVerifiedLabel}
-          onChange={(requestedVerifiedLabel) =>
-            patch({
-              verification: { ...config.verification, requestedVerifiedLabel },
-            })
-          }
-        />
-      </div>
     </div>
   );
 }

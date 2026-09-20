@@ -54,6 +54,14 @@ export const CUSTOMIZER_MESSAGES = {
     whatsappDetails: "بيانات التواصل",
     verificationIntro:
       "حالة التوثيق تصدر من أَوْج. ما يكتبه التاجر لا يمنح شارة.",
+    sbcTitle: "منصة الأعمال",
+    sbcIntro:
+      "إعداد عرض منصة الأعمال داخل تذييل المتجر. لا يعرض رقم التوثيق للعميل افتراضياً.",
+    sbcAuthenticationNumber: "رقم توثيق منصة الأعمال",
+    sbcAuthenticationHint:
+      "يُحفظ كنص كما أُدخل مع الحفاظ على الأصفار في بدايته.",
+    sbcShowInStorefront: "إظهار توثيق منصة الأعمال في المتجر",
+    sbcVerified: "موثّق في منصة الأعمال",
     appsIntro: "روابط المتاجر العامة. بدون رابط صالح لا يظهر القسم.",
     appsPlacement: "موضع الظهور في المتجر",
     theme: "المظهر",
@@ -266,6 +274,14 @@ export const CUSTOMIZER_MESSAGES = {
     whatsappDetails: "Contact details",
     verificationIntro:
       "Verification is an AWJ state. Merchant-typed numbers do not grant a badge.",
+    sbcTitle: "Saudi Business Center",
+    sbcIntro:
+      "Show the Saudi Business Center item inside the store footer. The authentication number is not shown to customers by default.",
+    sbcAuthenticationNumber: "Saudi Business Center authentication number",
+    sbcAuthenticationHint:
+      "Stored as entered text, including leading zeros.",
+    sbcShowInStorefront: "Show Saudi Business Center in the storefront",
+    sbcVerified: "Verified in Saudi Business Center",
     appsIntro:
       "Public store URLs. The section stays absent without a valid link.",
     appsPlacement: "Where they appear",

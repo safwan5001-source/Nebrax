@@ -244,6 +244,7 @@ export default async function StorefrontLayout({
         locale={locale as Locale}
         storeName={displayName}
         businessIdentity={identity?.business_identity}
+        showSbc={presentation?.sbc.show_in_storefront ?? false}
         logoUrl={logoUrl}
         showLogo={presentation ? presentation.footer.showLogo : true}
         tagline={presentation?.footer.tagline ?? ""}

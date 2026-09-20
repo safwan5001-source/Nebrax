@@ -128,6 +128,10 @@ export interface StorefrontPresentationConfig {
      */
     requestedVerifiedLabel: boolean;
   };
+  sbc: {
+    authentication_number: string;
+    show_in_storefront: boolean;
+  };
   apps: {
     iosUrl: string;
     androidUrl: string;
@@ -227,6 +231,10 @@ export const DEFAULT_PRESENTATION_CONFIG: StorefrontPresentationConfig = {
     licenseNumber: "",
     sourceUrl: "",
     requestedVerifiedLabel: false,
+  },
+  sbc: {
+    authentication_number: "",
+    show_in_storefront: false,
   },
   apps: {
     iosUrl: "",
@@ -406,6 +414,10 @@ export function normalizePresentationConfig(
     raw.verification && typeof raw.verification === "object"
       ? (raw.verification as Record<string, unknown>)
       : {};
+  const sbcRaw =
+    raw.sbc && typeof raw.sbc === "object"
+      ? (raw.sbc as Record<string, unknown>)
+      : {};
   const appsRaw =
     raw.apps && typeof raw.apps === "object"
       ? (raw.apps as Record<string, unknown>)
@@ -486,6 +498,10 @@ export function normalizePresentationConfig(
       sourceUrl: sanitizeExternalUrl(asString(verificationRaw.sourceUrl)) ?? "",
       // Legacy compatibility only; merchant input cannot mint an official verification claim.
       requestedVerifiedLabel: false,
+    },
+    sbc: {
+      authentication_number: asString(sbcRaw.authentication_number).trim(),
+      show_in_storefront: asBoolean(sbcRaw.show_in_storefront, false),
     },
     apps: {
       iosUrl: isSafeAppStoreUrl(iosUrl) ? (sanitizeExternalUrl(iosUrl) ?? "") : "",
