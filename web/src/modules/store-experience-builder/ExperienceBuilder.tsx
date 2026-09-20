@@ -66,7 +66,7 @@ export function ExperienceBuilder({
   const [saved, setSaved] = useState<StorefrontPresentationConfig>(seed);
   const [draft, setDraft] = useState<StorefrontPresentationConfig>(seed);
   const [draftRevision, setDraftRevision] = useState(0);
-  const [locale, setLocale] = useState<CustomizerLocale>(initialLocale);
+  const locale: CustomizerLocale = initialLocale;
   const [panel, setPanel] = useState<CustomizerPanel>("theme");
   const [device, setDevice] = useState<PreviewDevice>("desktop");
   const [mobilePane, setMobilePane] = useState<"edit" | "preview">("preview");
@@ -327,23 +327,6 @@ export function ExperienceBuilder({
             </button>
           ))}
         </div>
-        <div className="flex items-center">
-          {(["ar", "en"] as const).map((item) => (
-            <button
-              key={item}
-              type="button"
-              aria-label={item === "ar" ? t("arabic") : t("english")}
-              onClick={() => setLocale(item)}
-              className={`h-8 min-w-8 rounded px-1.5 text-[11px] font-medium ${
-                locale === item
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted hover:bg-primary-soft"
-              }`}
-            >
-              {item === "ar" ? "ع" : "EN"}
-            </button>
-          ))}
-        </div>
       </header>
 
       {notice ? (
@@ -469,7 +452,7 @@ export function ExperienceBuilder({
           </div>
           <div
             data-customizer-scroll=""
-            className="min-h-0 flex-1 overflow-auto overscroll-contain p-3 md:p-5 xl:p-8"
+            className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 md:overflow-y-scroll md:p-5 xl:p-8"
           >
             <div
               data-preview-frame=""
