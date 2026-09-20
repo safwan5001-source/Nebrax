@@ -142,7 +142,7 @@ Record exact commands/results, changed files, risks, compatibility assessment, B
 ### M. Transition
 Classify the task truthfully:
 - `review` when implementation/evidence are ready but review gates remain;
-- `owner_gate` when technical work is ready but current policy requires Safwan action such as merge;
+- `owner_gate` only when current policy still requires Safwan action (for example deploy/release/production mutation) or a material Decision Gate requires his decision;
 - `done` only when the task-specific Definition of Done is actually satisfied.
 
 Then select the next task that is **genuinely ready**. Do not treat a dependent task as ready if its required upstream change is still unmerged.
