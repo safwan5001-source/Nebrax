@@ -43,7 +43,7 @@ tests:
   - focused
   - sqlite
   - postgres
-merge_policy: owner-approval
+merge_policy: standing-authority-after-pre-merge-review
 deploy_policy: owner-approval
 ```
 
@@ -125,7 +125,7 @@ tests:
   - tenant/channel/publication negatives
   - SQLite
   - PostgreSQL
-merge_policy: owner-approval
+merge_policy: standing-authority-after-pre-merge-review
 deploy_policy: owner-approval
 ```
 
