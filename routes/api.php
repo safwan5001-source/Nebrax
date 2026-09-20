@@ -481,6 +481,8 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
 
         // تقرير المخزون (قراءة فقط — لا أثر محاسبي)
         Route::get('inventory', [InventoryController::class, 'index'])->middleware([$perm('products.view'), $app('inventory.core')]);
+        // AWJ-PERF-4: مجمَّع خفيف لقيمة المخزون فقط (لوحة التحكم) — لا يحمّل الكتالوج الكامل.
+        Route::get('inventory/summary', [InventoryController::class, 'summary'])->middleware([$perm('products.view'), $app('inventory.core')]);
         Route::get('inventory/export', [InventoryController::class, 'export'])->middleware([$perm('products.view'), $app('inventory.core')]);
         Route::get('inventory/{productId}/movements', [InventoryController::class, 'movements'])->middleware([$perm('products.view'), $app('inventory.core')]);
 

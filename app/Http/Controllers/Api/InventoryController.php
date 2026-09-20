@@ -63,6 +63,114 @@ class InventoryController extends ApiController
         ]);
     }
 
+    /**
+     * AWJ-PERF-4 — مجمَّع خفيف لقيمة المخزون فقط، للوحة التحكم.
+     *
+     * لا يحمّل ولا يُسلسل الكتالوج الكامل — استعلام تجميعي واحد (`SUM`) بدل
+     * تحميل كل `Product` ونداء أدواته المحسوبة (`quantity_on_hand`/`avg_cost`
+     * أصبحا accessors تقرآن من `inventory_states` منذ VAR-INV-1، فكل قراءة
+     * منهما استعلامٌ مستقل — حمّل هذا `GET /inventory` القديم (الذي تستهلكه
+     * اللوحة اليوم) عشرات آلاف الاستعلامات لكتالوج كبير).
+     *
+     * **الصيغة تطابق `InventoryReportService::inventoryValue()`** حرفياً
+     * (المرجع الأحدث والمُصحَّح لمنتج `variant_managed` — لا يُصفَّر قيمته
+     * كما يفعل `Product::avg_cost` القديم، بل يُجمَع من متغيّراته النشطة
+     * الفعلية فقط، `product_variants.is_active = true`) — بلا اختراع متوسط
+     * تكلفة جديد، فقط تجميع القيم المخزَّنة فعلاً.
+     *
+     * **نطاق المخزن (AWJ-PERF-4 — إغلاق فجوة الصلاحية):** `ReportWarehouseScope`
+     * ليس فلتر عرضٍ اختيارياً — يفرض `User::allowedWarehouseIds()` كحدٍّ أمني
+     * (كما في `InventoryWorkspaceQuery`/`ProductWarehouseBalanceQuery`
+     * ونفس `InventoryReportService::inventoryValue()` أعلاه). مستخدمٌ مقيَّدٌ
+     * بمخزن (حتى لو كان دوره `admin` ويملك `products.view_cost`) يجب ألا يرى
+     * قيمة مخزونٍ خارج مخازنه المسموحة عبر هذا الملخّص. `null` = غير مقيَّد
+     * (المسار غير المقيَّد يبقى كما كان: مجمَّعٌ من `inventory_states` وحدها).
+     * المقيَّد: الكمية من `product_warehouse_stock` مُصفّاة بمخازنه المسموحة
+     * فقط (نفس `$scopedQuantities` هناك)، والتكلفة تبقى متوسط `inventory_states`
+     * العالمي بلا تغيير — لا تُخترع تكلفةٌ لكل مخزن.
+     *
+     * نطاق الفرع محفوظ عبر `Product::query()` نفسه (`BranchScoped` الشرطي
+     * القائم على المنتج) — تماماً كسلوك `/inventory` القديم الذي تستبدله
+     * اللوحة.
+     */
+    public function summary(Request $request): JsonResponse
+    {
+        $authorizedCost = SensitiveCostPolicy::authorized($request->user());
+
+        if (! $authorizedCost) {
+            return response()->json(['total_value' => null]);
+        }
+
+        $warehouseIds = ReportWarehouseScope::resolve([]);
+
+        $totalMinor = $warehouseIds === null
+            ? $this->unscopedInventoryValueMinor()
+            : $this->warehouseScopedInventoryValueMinor($warehouseIds);
+
+        return response()->json(['total_value' => Money::toRiyal($totalMinor)]);
+    }
+
+    /** مستخدمٌ غير مقيَّد بمخزن — القيمة العالمية على `inventory_states` مباشرة. */
+    private function unscopedInventoryValueMinor(): int
+    {
+        return (int) Product::query()
+            ->where('products.track_inventory', true)
+            ->join('inventory_states', function ($join) {
+                $join->on('inventory_states.product_id', '=', 'products.id')
+                    ->whereColumn('inventory_states.tenant_id', '=', 'products.tenant_id');
+            })
+            ->leftJoin('product_variants', function ($join) {
+                $join->on('product_variants.id', '=', 'inventory_states.product_variant_id')
+                    ->whereColumn('product_variants.tenant_id', '=', 'products.tenant_id');
+            })
+            ->where(function ($q) {
+                $q->whereNull('inventory_states.product_variant_id')
+                    ->orWhere('product_variants.is_active', true);
+            })
+            ->selectRaw('COALESCE(SUM(inventory_states.quantity_on_hand * inventory_states.avg_cost), 0) as total_value_minor')
+            ->value('total_value_minor');
+    }
+
+    /**
+     * مستخدمٌ مقيَّدٌ بمخازن — الكمية من `product_warehouse_stock` ضمن
+     * المخازن المسموحة، مضروبة بمتوسط `inventory_states` العالمي لنفس
+     * الهويّة (بسيطة أو متغيّر) — يطابق فرع `$warehouseIds !== null` في
+     * `InventoryReportService::inventoryValue()` حرفياً.
+     *
+     * @param  array<int, string>  $warehouseIds
+     */
+    private function warehouseScopedInventoryValueMinor(array $warehouseIds): int
+    {
+        return (int) Product::query()
+            ->where('products.track_inventory', true)
+            ->join('product_warehouse_stock', function ($join) use ($warehouseIds) {
+                $join->on('product_warehouse_stock.product_id', '=', 'products.id')
+                    ->whereColumn('product_warehouse_stock.tenant_id', '=', 'products.tenant_id')
+                    ->whereIn('product_warehouse_stock.warehouse_id', $warehouseIds);
+            })
+            ->join('inventory_states', function ($join) {
+                $join->on('inventory_states.product_id', '=', 'products.id')
+                    ->whereColumn('inventory_states.tenant_id', '=', 'products.tenant_id')
+                    ->where(function ($identity) {
+                        $identity->whereColumn('inventory_states.product_variant_id', '=', 'product_warehouse_stock.product_variant_id')
+                            ->orWhere(function ($bothSimple) {
+                                $bothSimple->whereNull('inventory_states.product_variant_id')
+                                    ->whereNull('product_warehouse_stock.product_variant_id');
+                            });
+                    });
+            })
+            ->leftJoin('product_variants', function ($join) {
+                $join->on('product_variants.id', '=', 'inventory_states.product_variant_id')
+                    ->whereColumn('product_variants.tenant_id', '=', 'products.tenant_id');
+            })
+            ->where(function ($q) {
+                $q->whereNull('inventory_states.product_variant_id')
+                    ->orWhere('product_variants.is_active', true);
+            })
+            ->selectRaw('COALESCE(SUM(product_warehouse_stock.quantity * inventory_states.avg_cost), 0) as total_value_minor')
+            ->value('total_value_minor');
+    }
+
     public function index(Request $request): JsonResponse
     {
         if ($request->query('view') === 'workspace') {
