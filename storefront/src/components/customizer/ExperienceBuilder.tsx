@@ -341,7 +341,7 @@ export function ExperienceBuilder({
         </button>
       </div>
 
-      <div className="flex h-16 shrink-0 items-center gap-2 border-t border-awj-editor-border bg-awj-editor-surface px-3 lg:hidden">
+      <div className="relative z-50 flex h-16 shrink-0 items-center gap-2 border-t border-awj-editor-border bg-awj-editor-surface px-3 lg:hidden">
         <button
           type="button"
           className="flex min-h-11 flex-1 items-center justify-center rounded-md border border-awj-editor-border px-2 text-sm font-medium text-awj-editor-foreground hover:bg-awj-editor-primary-soft focus-visible:outline-none"
