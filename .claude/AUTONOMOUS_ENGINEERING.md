@@ -80,7 +80,11 @@ Current standing authority:
 - merge: allowed without asking Safwan again **only after** applicable review/Quality Gates pass, required CI is observed green, and no unresolved Decision Gate/material scope expansion remains;
 - deploy/release/production mutation: **STOP — explicit Safwan approval required**.
 
-After every merge, verify the actual merge result/SHA before unlocking dependent work.
+Before every merge, perform the mandatory pre-merge review on the final Head SHA and record `PRE_MERGE_REVIEW: PASS`.
+
+After every merge, perform the mandatory post-merge review on the target branch and Merge SHA and record `POST_MERGE_REVIEW: PASS`.
+
+Do not unlock dependent work until the post-merge review passes.
 
 Do not reinterpret merge authority as permission to bypass review/CI or as deploy/production authority.
 
