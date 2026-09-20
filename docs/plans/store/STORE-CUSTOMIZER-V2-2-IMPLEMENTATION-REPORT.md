@@ -5,7 +5,7 @@
 **PR:** [#881 — feat(store): Customizer V2 section editing and picker](https://github.com/safwan5001-source/Nebrax/pull/881)
 **Phase 1 Base SHA:** `7d424518fd7cf3a8ed0681a7942a42269b339801` (main after PR #879 merge — V2-1)
 **Phase 2 (continuation) Base SHA:** `f22fe510aad6c9212295de33a7d696afe6a187b1` (main after PR #884 merge — CONTRACT-2)
-**Head SHA (code, Phase 2):** `c2772434cb56d021df5b39f21940b01f17d742f3` (final head incl. this report recorded in §14)
+**Head SHA (code, Phase 2):** `c2772434cb56d021df5b39f21940b01f17d742f3` (final head incl. this report recorded in §27)
 
 > Sections 1–16 below describe Phase 1 (in-contract editing). Phase 2 — the continuation that consumed CONTRACT-2 (#884, merged) and added the Section Picker + Add / Duplicate / Delete + instance-id selection — is documented in §17 onward.
 
@@ -110,8 +110,11 @@ Draft→Save→Preview→Publish flow reused unchanged (every mutation goes thro
 - **Current Base SHA:** `f22fe510aad6c9212295de33a7d696afe6a187b1` (main after #884).
 - **Commits (Phase 2):** capability model (`0c59e79d`) → message keys (`ab1427f2`) → composer picker/add/duplicate/delete + id selection (`b3343b71`) → selection bridge id upgrade (`809a8f52`) → tests (`c2772434`) → this report.
 - **Head SHA (code):** `c2772434cb56d021df5b39f21940b01f17d742f3`.
-- **Final Head SHA (incl. report):** recorded in the PR head after the report commit.
-- **CI status (real runs on the code head `c2772434`, all success):** `web build (Next.js)` ✅ (03:53:26 → 03:56:19) · `php artisan test (L11, sqlite)` ✅ (03:53:26 → 03:59:40) · `php artisan test (L11, pgsql)` ✅ (03:53:26 → 04:11:31); the previous push (`809a8f52`) also ran green: web build ✅ (03:55:04), sqlite ✅ (04:01:27), pgsql ✅ (04:07:46) — 6/6 green. `storefront (lint + typecheck + test)` did not run: `storefront-ci.yml` is path-scoped to `storefront/**`, untouched by this PR.
+- **Final Head SHA (incl. report):** `684eefa17f003d6aa5bf44878c9901c6ab84141c` (report commit; any later doc touch-up only re-records this line).
+- **CI status (real runs on the code head `c2772434`, all success):** `web build (Next.js)` ✅ (03:53:26 → 03:56:19) · `php artisan test (L11, sqlite)` ✅ (03:53:26 → 03:59:40) · `php artisan test (L11, pgsql)` ✅ (03:53:26 → 04:11:31); the previous push (`809a8f52`) also ran green: web build ✅ (03:55:04), sqlite ✅ (04:01:27), pgsql ✅ (04:07:46) — 6/6 green.
+- **CI on the report commit `684eefa1` (final head, all success):** `web build (Next.js)` ✅ (04:18:22 → 04:21:18) · `php artisan test (L11, sqlite)` ✅ (04:18:21 → 04:26:13) · `php artisan test (L11, pgsql)` ✅ (04:18:21 → 04:32:51) — 3/3 green.
+- `storefront (lint + typecheck + test)` did not run: `storefront-ci.yml` is path-scoped to `storefront/**`, untouched by this PR.
+- **Mergeability:** `mergeable_state: clean` (base = main `f22fe510`; branch synced — no conflicts).
 - Branch synced with main before Phase 2 (`merge-base = f22fe510`, ahead 7, behind 0) — no merge/rebase needed. No force-push; normal commits only.
 
 ## 28. Phase 2 — Risks / deferred
