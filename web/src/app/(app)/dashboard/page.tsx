@@ -36,7 +36,7 @@ interface Invoice {
   id: string; number: string; invoice_date: string; total: string;
   status: string; payment_status: string;
 }
-interface InventoryRow { total_value?: string; value?: string }
+interface InventorySummary { total_value: string | null }
 
 const QUICK_ACTIONS: { href: string; key: string; icon: LucideIcon }[] = [
   { href: '/invoices/new', key: 'qa_invoice', icon: FilePlus },
@@ -92,17 +92,16 @@ export default function DashboardPage() {
       api<IncomeStatement>(`/reports/income-statement${query}`),
       api<{ data: Account[] }>('/accounts'),
       api<{ data: Invoice[] }>('/invoices'),
-      api<{ data: InventoryRow[]; total_value?: string }>('/inventory').catch(() => null),
+      // AWJ-PERF-4: مجمَّع خفيف لقيمة المخزون وحدها — لا الكتالوج الكامل
+      // الذي كان يحمّله `/inventory` (المسار القديم) لهذا الرقم فقط.
+      api<InventorySummary>('/inventory/summary').catch(() => null),
     ])
       .then(([inc, acc, inv, stock]) => {
         setIncome(inc);
         setAccounts(acc.data);
         setInvoices(inv.data);
-        if (stock) {
-          // قيمة المخزون: الإجمالي إن أرسله الخادم، وإلا مجموع صفوف التقرير.
-          const total = stock.total_value
-            ?? String(stock.data?.reduce((s, r) => s + toNumber(r.total_value ?? r.value), 0) ?? 0);
-          setInventoryValue(total);
+        if (stock?.total_value != null) {
+          setInventoryValue(stock.total_value);
         }
       })
       .finally(() => setLoading(false));

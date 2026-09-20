@@ -63,6 +63,52 @@ class InventoryController extends ApiController
         ]);
     }
 
+    /**
+     * AWJ-PERF-4 — مجمَّع خفيف لقيمة المخزون فقط، للوحة التحكم.
+     *
+     * لا يحمّل ولا يُسلسل الكتالوج الكامل — استعلام تجميعي واحد (`SUM`) بدل
+     * تحميل كل `Product` ونداء أدواته المحسوبة (`quantity_on_hand`/`avg_cost`
+     * أصبحا accessors تقرآن من `inventory_states` منذ VAR-INV-1، فكل قراءة
+     * منهما استعلامٌ مستقل — حمّل هذا `GET /inventory` القديم (الذي تستهلكه
+     * اللوحة اليوم) عشرات آلاف الاستعلامات لكتالوج كبير).
+     *
+     * **الصيغة تطابق `InventoryReportService::inventoryValue()` غير المقيَّد
+     * بمخزن** (المرجع الأحدث والمُصحَّح لمنتج `variant_managed` — لا يُصفَّر
+     * قيمته كما يفعل `Product::avg_cost` القديم، بل يُجمَع من متغيّراته
+     * النشطة الفعلية): منتجٌ بسيط ← صفّ هويّته البسيطة في `inventory_states`
+     * (`product_variant_id IS NULL`)؛ منتجٌ متعدّد الخيارات ← مجموع صفوف
+     * متغيّراته **النشطة** فقط (`product_variants.is_active = true`) — بلا
+     * اختراع متوسط تكلفة جديد، فقط تجميع القيم المخزَّنة فعلاً.
+     *
+     * نطاق الفرع محفوظ عبر `Product::query()` نفسه (`BranchScoped` الشرطي
+     * القائم على المنتج) — تماماً كسلوك `/inventory` القديم الذي تستبدله
+     * اللوحة؛ لا مخزن هنا (اللوحة لا ترسل نطاق مخزن أصلاً).
+     */
+    public function summary(Request $request): JsonResponse
+    {
+        $authorizedCost = SensitiveCostPolicy::authorized($request->user());
+
+        if (! $authorizedCost) {
+            return response()->json(['total_value' => null]);
+        }
+
+        $totalMinor = (int) Product::query()
+            ->where('products.track_inventory', true)
+            ->join('inventory_states', function ($join) {
+                $join->on('inventory_states.product_id', '=', 'products.id')
+                    ->whereColumn('inventory_states.tenant_id', '=', 'products.tenant_id');
+            })
+            ->leftJoin('product_variants', 'product_variants.id', '=', 'inventory_states.product_variant_id')
+            ->where(function ($q) {
+                $q->whereNull('inventory_states.product_variant_id')
+                    ->orWhere('product_variants.is_active', true);
+            })
+            ->selectRaw('COALESCE(SUM(inventory_states.quantity_on_hand * inventory_states.avg_cost), 0) as total_value_minor')
+            ->value('total_value_minor');
+
+        return response()->json(['total_value' => Money::toRiyal($totalMinor)]);
+    }
+
     public function index(Request $request): JsonResponse
     {
         if ($request->query('view') === 'workspace') {
