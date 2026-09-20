@@ -24,25 +24,28 @@ export interface SectionCapability {
   /** null = بلا حد عددي للنوع (يبقى خاضعًا لـ MAX_HOME_SECTIONS). */
   maxInstances: number | null;
   canDuplicate: boolean;
+  /** Hero content is global today, so deleting its instance would misleadingly preserve that content. */
+  canDelete: boolean;
 }
 
 export const SECTION_CAPABILITIES: Record<
   HomeBuilderSectionKey,
   SectionCapability
 > = {
-  hero: { type: "hero", maxInstances: 1, canDuplicate: false },
-  categories: { type: "categories", maxInstances: 1, canDuplicate: false },
-  newArrivals: { type: "newArrivals", maxInstances: 1, canDuplicate: false },
-  wholesale: { type: "wholesale", maxInstances: 1, canDuplicate: false },
-  banner: { type: "banner", maxInstances: null, canDuplicate: true },
-  featured: { type: "featured", maxInstances: null, canDuplicate: true },
-  offers: { type: "offers", maxInstances: null, canDuplicate: true },
-  benefits: { type: "benefits", maxInstances: null, canDuplicate: true },
-  appPromo: { type: "appPromo", maxInstances: 1, canDuplicate: false },
+  hero: { type: "hero", maxInstances: 1, canDuplicate: false, canDelete: false },
+  categories: { type: "categories", maxInstances: 1, canDuplicate: false, canDelete: true },
+  newArrivals: { type: "newArrivals", maxInstances: 1, canDuplicate: false, canDelete: true },
+  wholesale: { type: "wholesale", maxInstances: 1, canDuplicate: false, canDelete: true },
+  banner: { type: "banner", maxInstances: null, canDuplicate: true, canDelete: true },
+  featured: { type: "featured", maxInstances: null, canDuplicate: true, canDelete: true },
+  offers: { type: "offers", maxInstances: null, canDuplicate: true, canDelete: true },
+  benefits: { type: "benefits", maxInstances: null, canDuplicate: true, canDelete: true },
+  appPromo: { type: "appPromo", maxInstances: 1, canDuplicate: false, canDelete: true },
   customContent: {
     type: "customContent",
     maxInstances: null,
     canDuplicate: true,
+    canDelete: true,
   },
 };
 
@@ -80,6 +83,11 @@ export function canDuplicateSection(
 ): boolean {
   if (sections.length >= MAX_HOME_SECTIONS) return false;
   return SECTION_CAPABILITIES[section.type].canDuplicate;
+}
+
+/** هل يمكن حذف هذا الـinstance من واجهة الـCustomizer؟ */
+export function canDeleteSection(section: PresentationHomeSection): boolean {
+  return SECTION_CAPABILITIES[section.type].canDelete;
 }
 
 /**
