@@ -49,7 +49,7 @@ A dependency that changes code is not automatically "complete" merely because it
 
 If a downstream task requires the upstream behavior on the target branch, the upstream task must be merged (and production-verified when explicitly required) before the downstream task becomes ready.
 
-Claude may continue unrelated ready tasks while an upstream PR waits at an owner gate.
+Claude may continue unrelated ready tasks while an upstream PR is not yet merged (for example while CI/review is still pending, or while a true owner gate blocks it).
 
 Do not create an implicit chain of dependent unmerged PRs unless the authorized horizon explicitly allows a stacked-branch strategy and defines how it will be reviewed/merged safely.
 
