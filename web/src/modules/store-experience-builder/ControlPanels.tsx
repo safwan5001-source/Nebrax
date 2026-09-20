@@ -1287,7 +1287,7 @@ function SocialPanel({
                 value={item.url}
                 onChange={(event) => {
                   const social = config.social.map((row, i) =>
-                    i === index ? { ...item, url: event.target.value } : row,
+                    i === index ? { ...row, url: event.target.value } : row,
                   );
                   patch({ social });
                 }}
