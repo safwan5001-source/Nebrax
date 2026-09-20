@@ -30,11 +30,11 @@ This separation is mandatory in AWJ.
 - Legal identity remains owned by Tenant data.
 - These concepts must not be silently collapsed.
 
-### Saudi Business Center verification
+### Saudi Business Center presentation
 - The merchant-facing input for SBC V1 is the **منصة الأعمال e-commerce authentication/verification number**.
 - It is not the CR number and not the VAT number.
-- Typing a number alone must never mint an authoritative `verified` claim.
-- The backend must establish trustworthy verification/association before AWJ publicly presents the store as verified.
+- Store settings provide a simple **show/hide presentation control** for the SBC item.
+- V1 does not expose pending/unverified status messaging in the public storefront.
 
 ## 3. Public Storefront information architecture
 
@@ -50,7 +50,7 @@ Display:
 These are business/legal data, not “verified badges”.
 
 ### B. Official Trust — منصة الأعمال
-Render as a visually separate trust block.
+Render as a visually distinct trust group **inside the Footer itself**. It must not become a standalone section above the Footer.
 
 Target content:
 - Arabic concept: **موثّق في منصة الأعمال**.
@@ -95,10 +95,11 @@ Do not derive a desktop layout by simply stretching the mobile benchmark.
 ### SBC V1
 Keep merchant UX intentionally small:
 1. Merchant enters the **منصة الأعمال authentication/verification number**.
-2. AWJ performs the supported trustworthy verification/association flow.
-3. Only a trustworthy successful state may enable the public verified presentation.
+2. Merchant controls whether the SBC presentation is shown in the storefront Footer.
+3. When disabled, the SBC item is omitted completely: no empty slot and no public status message.
+4. When enabled, the Footer renders the approved SBC presentation using the official asset.
 
-Do not add a merchant-controlled “I am verified” toggle.
+Do not show messages such as **لم يتم التحقق من التوثيق بعد** in the storefront or preview. The control is presentation activation, not a customer-facing verification-state workflow.
 
 ## 7. Official asset rule
 
@@ -137,7 +138,7 @@ Each of those items must be handled as a separate scoped feature/evidence pass.
 - Browser input, query strings, cookies, arbitrary Host values, or presentation JSON cannot become legal identity authority.
 - Public contracts must not expose internal Tenant/Storefront IDs unnecessarily.
 - Legacy presentation fields may remain readable for backward compatibility but cannot override canonical identity or mint official verification.
-- A presentation setting must never be the source of government verification truth.
+- Store settings control whether the SBC presentation is visible; they must not override canonical CR/VAT identity or mutate legal/accounting data.
 
 ## 10. UX acceptance principles
 
@@ -147,7 +148,8 @@ A future implementation is acceptable only when:
 - SBC trust is visually distinct from CR/VAT.
 - SBC trust is distinct from payment/communication logos.
 - The merchant setup for SBC is simple and does not expose internal complexity.
-- No false “verified”, “official”, or government affiliation can be produced by presentation configuration.
+- SBC visibility follows the explicit store setting and never produces pending/unverified customer-facing messages.
+- CR, VAT and SBC are rendered **within the Footer**, not as a separate pre-footer section.
 - Official marks are authentic assets with documented provenance and permitted usage.
 - Mobile and desktop are intentionally designed, not mechanically scaled versions of each other.
 
@@ -157,7 +159,7 @@ Before implementation of the SBC trust mark:
 1. establish the official verification/lookup mechanism for the منصة الأعمال authentication number;
 2. establish the official asset source and permitted storefront usage;
 3. freeze the minimal SBC data/verification contract;
-4. design the SBC merchant setup and public storefront states for mobile + desktop;
+4. design the SBC merchant setup and Footer presentation for mobile + desktop;
 5. only then implement.
 
 Do not expand this task into VAT, WhatsApp, app-store badges, payments, or other trust features.
