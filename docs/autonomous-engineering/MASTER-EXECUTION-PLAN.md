@@ -96,7 +96,7 @@ Candidate order from that evidence:
 id: COM-MOBILE-MEDIA-1
 title: Close the Public/Mobile Commerce product-media gap
 domain: commerce
-status: ready
+status: review
 risk: high
 depends_on:
   - accepted Commerce Mobile API readiness evidence
@@ -129,7 +129,12 @@ merge_policy: standing-authority-after-pre-merge-review
 deploy_policy: owner-approval
 ```
 
-`COM-MOBILE-MEDIA-1` is now `ready`: PR #887 is merged/post-reviewed, the readiness contract is accepted on `main`, its outcome/invariants/acceptance/tests are defined, and no material Decision Gate is required to begin the media capability. Before coding, Claude must still inspect the current relevant media/controller/routes/tests evidence and adjust stale implementation assumptions without expanding scope.
+`COM-MOBILE-MEDIA-1` is now `review`: implemented on branch
+`claude/autonomous-engineering-bootstrap-fo0mvj` (`GET /commerce/v1/media/{id}` +
+`ProductMediaGalleryService` wiring into `CommerceProductController`), focused/module tests
+green on SQLite and PostgreSQL. See
+`docs/plans/commerce/COM-MOBILE-MEDIA-1-IMPLEMENTATION-REPORT.md` for full evidence. Status
+advances to `merged`/`done` only after PR merge and mandatory post-merge review.
 
 ## Backlog discovery
 

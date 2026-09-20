@@ -11,6 +11,7 @@ use App\Services\Commerce\AvailableToSellService;
 use App\Services\Commerce\CommercePriceResolver;
 use App\Services\Commerce\FulfillmentPolicyNotConfiguredException;
 use App\Services\Commerce\FulfillmentPolicyService;
+use App\Services\ProductMediaGalleryService;
 use App\Support\PublicApiResponse;
 use App\Tenancy\BranchScope;
 use App\Tenancy\StorefrontContext;
@@ -48,11 +49,15 @@ use Illuminate\Http\Request;
  * such a product; `in_stock` stays `null` (unknown), not a fabricated
  * `false`.
  *
- * **Media deliberately out of scope** — no `/commerce/v1/media/{id}` route
- * exists yet (not in this PR's explicit scope), so `StorefrontProductResource`
- * is reused with an empty gallery and `detailed=false` even on `show()`:
- * `thumbnail_url`/`media` resolve to `null`/absent rather than a link to an
- * endpoint that doesn't exist for this trust boundary.
+ * **Media (COM-MOBILE-MEDIA-1)** — reuses `ProductMediaGalleryService` (the
+ * single gallery-resolution authority, VAR-MEDIA-1) and
+ * `StorefrontProductResource::commerceMediaPayload()` to link each item to
+ * `/commerce/v1/media/{id}` (`CommerceMediaController`), which re-applies the
+ * exact same channel-publication check this controller already performs — no
+ * parallel media storage/authority. Only the product-level shared gallery is
+ * wired here: a variant-managed product's per-variant media stays deferred
+ * with the rest of the variant contract (see the variant note above) rather
+ * than silently inventing a `/commerce/v1` variant/media shape out of scope.
  */
 class CommerceProductController extends PublicApiController
 {
@@ -63,6 +68,7 @@ class CommerceProductController extends PublicApiController
         CommercePriceResolver $prices,
         FulfillmentPolicyService $fulfillment,
         AvailableToSellService $availability,
+        ProductMediaGalleryService $gallery,
     ): JsonResponse {
         $filters = $request->validate([
             'search' => ['sometimes', 'nullable', 'string', 'max:120'],
@@ -121,7 +127,7 @@ class CommerceProductController extends PublicApiController
         }
 
         $data = $paginator->getCollection()
-            ->map(fn (Product $product) => $this->toResource($request, $product, $channelId, $currency, $warehouse, $prices, $availability, false))
+            ->map(fn (Product $product) => $this->toResource($request, $product, $channelId, $currency, $warehouse, $prices, $availability, $gallery, false))
             ->all();
 
         return new JsonResponse([
@@ -144,6 +150,7 @@ class CommerceProductController extends PublicApiController
         CommercePriceResolver $prices,
         FulfillmentPolicyService $fulfillment,
         AvailableToSellService $availability,
+        ProductMediaGalleryService $gallery,
     ): JsonResponse {
         $id = (string) $request->route('id');
 
@@ -179,7 +186,7 @@ class CommerceProductController extends PublicApiController
             $warehouse = null;
         }
 
-        $resource = $this->toResource($request, $product, $channelId, $currency, $warehouse, $prices, $availability, true);
+        $resource = $this->toResource($request, $product, $channelId, $currency, $warehouse, $prices, $availability, $gallery, true);
 
         return PublicApiResponse::success($request, $resource);
     }
@@ -192,6 +199,7 @@ class CommerceProductController extends PublicApiController
         $warehouse,
         CommercePriceResolver $prices,
         AvailableToSellService $availability,
+        ProductMediaGalleryService $gallery,
         bool $detailed,
     ): array {
         if ($product->isVariantManaged()) {
@@ -208,6 +216,10 @@ class CommerceProductController extends PublicApiController
             }
         }
 
-        return (new StorefrontProductResource($product, $price, $currency, $inStock, $detailed, null))->resolve($request);
+        // COM-MOBILE-MEDIA-1 — product-level shared gallery only (no variant
+        // passed): matches the variant-media deferral documented above.
+        $galleryMedia = StorefrontProductResource::commerceMediaPayload($gallery->resolveGallery($product));
+
+        return (new StorefrontProductResource($product, $price, $currency, $inStock, $detailed, null, $galleryMedia))->resolve($request);
     }
 }

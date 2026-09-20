@@ -83,6 +83,8 @@ class CommerceModuleBoundaryTest extends TestCase
         'commerce/v1/checkout/complete',
         'commerce/v1/checkout/contact',
         'commerce/v1/checkout/delivery',
+        // COM-MOBILE-MEDIA-1 — مسار وسائط منتج محروس لحدّ ثقة /commerce/v1.
+        'commerce/v1/media/{id}',
         'commerce/v1/orders/{id}',
         'commerce/v1/products',
         'commerce/v1/products/{id}',
