@@ -1217,6 +1217,297 @@ For AWJ's **multi-merchant, schema-driven mobile commerce runtime**, Flutter cur
 
 ---
 
+## 21B. Preview Architecture Evidence Pass (2026-09-20)
+
+### Product goal
+
+AWJ Preview must let a merchant move from a fast visual check to a high-confidence real-device test **without turning Preview into a second production environment or a tenant-isolation bypass**.
+
+Preview is a fidelity ladder, not one mode.
+
+### External Evidence
+
+**Flutter development model.** Flutter officially separates development/debug iteration (including hot reload) from profile/release builds. Hot reload is a development mechanism and is not the production merchant-preview architecture AWJ should expose.
+
+**Firebase App Distribution.** Firebase provides pre-release distribution of iOS/Android builds to trusted testers, tester invitations/groups, release notes and SDK/CLI/API-style automation. This is evidence for a controlled tester-build lane, not a decision to adopt Firebase.
+
+**Apple TestFlight.** TestFlight provides Apple’s official beta-distribution path for builds before App Store release, with internal/external testers and beta review rules where applicable. This is useful for release-candidate/beta testing, but is too heavyweight to be the normal per-edit visual preview loop.
+
+**Google Play testing tracks / internal app sharing.** Google Play provides testing/distribution mechanisms for pre-release Android builds. These are useful for build/release QA but should not be confused with instant Builder preview.
+
+**Tapcart / Shopney benchmark evidence.** Commercial mobile-commerce builders demonstrate the product value of in-editor live preview plus real-device preview/testing. AWJ should preserve this two-level mental model while implementing its own secure architecture.
+
+### AWJ Decision — four preview levels
+
+#### Level 1 — Canvas Preview
+
+Purpose: fastest authoring feedback inside AWJ Builder.
+
+Characteristics:
+- rendered from the current Draft;
+- device frame/viewport presets;
+- locale and RTL/LTR switching;
+- visual state simulation;
+- component selection synchronized with Inspector;
+- no claim of perfect native-device fidelity;
+- should work without creating a native build for every edit.
+
+This is the primary design loop.
+
+#### Level 2 — Interactive Runtime Preview
+
+Purpose: execute the real AWJ component/action/data-binding semantics using the preview runtime rather than a decorative mock.
+
+Characteristics:
+- same App Schema contract and Component Registry semantics as the mobile runtime;
+- authenticated tenant-scoped data access;
+- explicit Preview environment/session;
+- safe navigation/actions;
+- compatibility/issues surfaced;
+- may run in a dedicated preview surface/runtime implementation while preserving the same contract semantics.
+
+The exact technical implementation — web renderer, embedded runtime, streamed/device runtime or hybrid — remains open until prototype evidence.
+
+#### Level 3 — Real Device Preview
+
+Purpose: merchant scans a QR/open link and sees the Draft on a physical phone before release.
+
+Preferred architecture direction:
+
+```text
+AWJ Builder Draft
+      |
+Create short-lived Preview Session
+      |
+Signed opaque preview reference
+      |
+QR / universal-app link
+      |
+AWJ Preview App / authorized preview runtime
+      |
+Authenticate user if needed
+      |
+Server resolves tenant + app + draft + permissions
+      |
+Fetch preview-safe schema/data
+```
+
+The QR/link must **not** contain raw tenant authority, secrets, permanent bearer tokens or the full schema.
+
+Real-device Preview should use the same runtime capability model as production so it catches device/RTL/native integration issues earlier.
+
+#### Level 4 — Release Candidate / Beta Build
+
+Purpose: test the actual merchant-branded binary, native configuration and store-adjacent behavior before production release.
+
+Candidate distribution lanes:
+- Apple TestFlight;
+- Google Play testing tracks/internal distribution mechanisms;
+- optionally another controlled pre-release distribution service if later justified.
+
+Use this level for:
+- final native SDK verification;
+- permissions;
+- push;
+- deep links;
+- signing/bundle identity;
+- app icon/splash/native assets;
+- release-candidate QA.
+
+Do not rebuild a merchant binary merely to preview every banner or spacing edit.
+
+### Preview Session security model
+
+A Preview Session is a server-side resource, not a magic URL.
+
+Conceptual record:
+
+```text
+PreviewSession
+- id / opaque public reference
+- tenant_id        [server-owned]
+- app_id           [authorized server relation]
+- draft_version_id
+- environment
+- created_by
+- expires_at
+- revoked_at
+- allowed_preview_capabilities
+- optional device/tester binding
+- audit metadata
+```
+
+Exact schema/storage is not approved; this is the required security model.
+
+### Tenant isolation requirements
+
+1. Tenant context is derived/validated server-side; a QR parameter cannot switch tenants.
+2. The authenticated previewer must be authorized for the referenced app/tenant unless an explicitly designed guest-preview mode is later approved.
+3. Cross-tenant app/draft IDs return safe not-found/forbidden behavior without leaking existence.
+4. Preview data endpoints enforce the same tenant boundary as production APIs.
+5. Preview cache keys include tenant/app/version/environment dimensions.
+6. Revocation and expiry are server-enforced.
+7. Preview must never expose signing credentials, store credentials or backend secrets.
+8. A compromised preview link alone must not become durable account access.
+
+### Mutation policy
+
+Default preview posture:
+
+- read operations may use authorized tenant data where safe;
+- local UI interactions are allowed;
+- business mutations should use sandbox/test resources when available;
+- sensitive production mutations are blocked by default;
+- any explicitly allowed production-affecting preview action must be unmistakable, separately authorized and audited.
+
+Checkout/payment testing must use provider sandbox/test infrastructure where available. Preview must not silently create real charges/orders just because the screen looks like production.
+
+### Draft isolation
+
+Production runtime fetches only Published-compatible experience versions.
+
+Preview runtime may fetch Draft versions only through an authorized Preview Session.
+
+Required separation:
+
+```text
+Production App -> Published Experience endpoint
+Preview App    -> Preview Session -> Draft Experience endpoint
+Builder Canvas -> Authenticated Builder Draft
+```
+
+Do not add a generic `?preview=true` switch to the production experience endpoint.
+
+### Preview version pinning
+
+A preview session should pin to an identifiable draft/version snapshot or clearly declare “follow current draft.”
+
+For reproducible QA and bug reports, **pinned snapshot** is preferred for shareable tester sessions. Builder-local live preview may follow the working draft.
+
+The UI must show which version/snapshot the tester is seeing.
+
+### QR/link lifecycle
+
+Preview links should be:
+- opaque;
+- short-lived by default;
+- revocable;
+- scoped to one app/draft/environment;
+- auditable;
+- optionally limited by tester/device for higher-risk previews.
+
+The QR is transport/discovery only. Authorization remains server-side.
+
+### Real-device Preview App direction
+
+Preferred direction is a dedicated **AWJ Preview App/runtime** for merchant/tester preview rather than generating a new store binary for every design iteration.
+
+The Preview App:
+- contains the approved AWJ Runtime capabilities;
+- loads only authorized Preview Sessions;
+- displays clear PREVIEW / environment identity;
+- does not masquerade as the final merchant-branded production app;
+- can report runtime/schema compatibility and diagnostics;
+- should support Arabic/RTL and English/LTR exactly as production runtime does.
+
+Final Apple/Google policy feasibility of the exact Preview App distribution model must be verified before implementation.
+
+### Canvas fidelity rule
+
+The web Builder canvas is allowed to be an authoring renderer, but it must not drift into a separate product implementation.
+
+Component definitions should provide enough shared metadata/fixtures/contracts that Canvas and Mobile Runtime can be conformance-tested.
+
+For critical components, maintain contract/visual-behavior test fixtures so:
+- Builder preview says what the runtime can actually render;
+- unsupported properties are not shown as available;
+- runtime compatibility issues appear before publish.
+
+### Preview data modes
+
+Target modes:
+
+1. **Sample Data** — safe fixtures for designing empty/new apps.
+2. **Tenant Read Data** — authorized real catalog/content for realistic visual preview.
+3. **Test/Sandbox Commerce** — safe end-to-end mutations where infrastructure exists.
+
+Do not automatically use real customer PII in a shared tester preview.
+
+### Diagnostics
+
+Develop/Preview mode should be able to expose safe diagnostics such as:
+- schema version;
+- runtime version/capabilities;
+- component/binding errors;
+- API/resource request status without secrets;
+- navigation/action events;
+- compatibility fallback;
+- environment;
+- current preview snapshot.
+
+Logs must redact tokens, credentials, sensitive customer/payment data and cross-tenant identifiers where not needed.
+
+### Expiry, revoke and audit
+
+Preview sessions need:
+- automatic expiry;
+- manual revoke;
+- revoke-all for an app/user if necessary;
+- creator/time/environment audit;
+- last-use/device metadata only where privacy-appropriate.
+
+Publishing a Draft does not have to keep old preview sessions alive; exact invalidation policy remains open.
+
+### Offline behavior
+
+Offline preview is not a V1 assumption.
+
+If the production app later supports offline/cached experience behavior, Preview must deliberately test that capability. Do not let cached Draft data leak into a production session or another tenant/app.
+
+### Release Candidate testing is distinct from Preview
+
+```text
+Builder Preview
+   -> validates experience
+
+Real Device Preview
+   -> validates runtime + device interaction
+
+Release Candidate/Beta
+   -> validates actual branded binary + native/store configuration
+
+Production Release
+   -> reviewed/released artifact
+```
+
+Passing Level 1/2/3 does not prove signing/store/native configuration is correct; Level 4 exists for that reason.
+
+### Open Decisions after Preview pass
+
+- exact Canvas renderer implementation;
+- exact Preview App distribution model;
+- whether real-device Preview follows live draft or defaults to snapshots;
+- guest/client preview sharing;
+- device binding;
+- preview session TTL;
+- screenshot/video feedback capture;
+- remote device logs;
+- iOS/Android deep-link bootstrap details;
+- sandbox checkout/payment provider matrix;
+- Firebase App Distribution or another service adoption — no dependency selected;
+- TestFlight/Play testing automation details;
+- privacy rules for using real tenant/customer data in preview.
+
+### Preview architecture conclusion
+
+AWJ should use a **fast-to-high-fidelity preview ladder**:
+
+> Canvas → Interactive Runtime → Real Device Preview → Release Candidate/Beta.
+
+All levels use the same AWJ App Schema/capability contract, while authorization, tenant isolation and Draft/Published separation remain server-enforced.
+
+---
+
 ## 22. Observability, validation and testing
 
 Target platform needs:
@@ -1300,6 +1591,13 @@ Each pass updates this document with evidence, AWJ decision, and remaining open 
 
 ### Existing repository evidence
 - `docs/plans/store/AWJ_MOBILE_APP_BUILDER_BENCHMARK.md` — baseline benchmark and initial architecture direction.
+
+### Preview architecture evidence added 2026-09-20
+- Flutter official documentation — hot reload and build modes; development iteration is distinct from release binaries.
+- Apple Developer — TestFlight beta testing and tester/build workflow.
+- Google Play Console / Android Developers — testing tracks and pre-release distribution mechanisms.
+- Firebase App Distribution official documentation — controlled pre-release tester distribution (evidence only; no dependency selected).
+- Existing AWJ benchmark — Tapcart / Shopney live and real-device preview product patterns.
 
 ### Runtime technology evidence added 2026-09-20
 - Flutter official documentation — architectural overview; platform channels/platform-specific code; internationalization and direction-aware UI.
