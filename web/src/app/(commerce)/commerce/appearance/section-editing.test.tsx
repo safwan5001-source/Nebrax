@@ -166,7 +166,7 @@ describe('commerce appearance — STORE-CUSTOMIZER-V2-2 section editing', () => 
     expect(builderRoot().dataset.selectedSection).toBe('newArrivals');
   });
 
-  it('never offers add / duplicate / delete controls for homepage sections', async () => {
+  it('offers duplicate only for multi-instance types, never for singletons', async () => {
     const user = userEvent.setup();
     render(<CommerceAppearancePage />);
     await openHomepage(user);
@@ -174,16 +174,24 @@ describe('commerce appearance — STORE-CUSTOMIZER-V2-2 section editing', () => 
       document.querySelector('[data-section-option="wholesale"]') as HTMLElement,
     );
 
-    const panel = document.querySelector(
-      '[data-selected-section-settings]',
-    ) as HTMLElement;
-    const composer = document.querySelector(
-      '[data-composer-section="wholesale"]',
-    )?.parentElement?.parentElement as HTMLElement;
-    for (const region of [panel, composer, builderRoot()]) {
-      expect(region.textContent).not.toContain('تكرار');
-      expect(region.textContent).not.toContain('حذف القسم');
-      expect(region.textContent).not.toContain('إضافة قسم');
+    // Singleton rows (hero/categories/newArrivals/wholesale): no duplicate.
+    for (const type of ['hero', 'categories', 'newArrivals', 'wholesale']) {
+      const row = document.querySelector(
+        `[data-composer-section="${type}"]`,
+      ) as HTMLElement;
+      expect(
+        row.querySelector('button[aria-label="تكرار القسم"]'),
+      ).toBeNull();
+    }
+    // The picker exists, but existing singletons are not offered again.
+    await user.click(screen.getByRole('button', { name: /إضافة قسم/ }));
+    const picker = document.querySelector('[data-section-picker]') as HTMLElement;
+    expect(picker).toBeTruthy();
+    for (const type of ['hero', 'categories', 'newArrivals', 'wholesale']) {
+      const option = picker.querySelector(
+        `[data-picker-option="${type}"]`,
+      ) as HTMLButtonElement;
+      expect(option.disabled).toBe(true);
     }
   });
 });
