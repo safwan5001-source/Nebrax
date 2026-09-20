@@ -5,6 +5,7 @@ import { useState } from "react";
 import {
   canAddSectionType,
   canDuplicateSection,
+  canDeleteSection,
   type CONTENT_PAGE_SLUGS,
   contrastRatio,
   DENSITY_PRESETS,
@@ -1005,15 +1006,17 @@ function HomepagePanel({
                   ⧉
                 </button>
               ) : null}
-              <button
-                type="button"
-                aria-label={t("deleteSection")}
-                title={t("deleteSection")}
-                className={iconBtnClass}
-                onClick={() => deleteSection(index)}
-              >
-                ✕
-              </button>
+              {canDeleteSection(section) ? (
+                <button
+                  type="button"
+                  aria-label={t("deleteSection")}
+                  title={t("deleteSection")}
+                  className={iconBtnClass}
+                  onClick={() => deleteSection(index)}
+                >
+                  ✕
+                </button>
+              ) : null}
               <Toggle
                 compact
                 label={
