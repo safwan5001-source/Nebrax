@@ -37,7 +37,7 @@ describe('web presentation contract', () => {
     const config = normalizePresentationConfig({
       verification: { requestedVerifiedLabel: true, sourceUrl: 'javascript:alert(1)' },
     });
-    expect(config.verification.requestedVerifiedLabel).toBe(true);
+    expect(config.verification.requestedVerifiedLabel).toBe(false);
     expect(config.verification.sourceUrl).toBe('');
   });
 

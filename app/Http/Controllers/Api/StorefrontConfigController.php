@@ -32,28 +32,57 @@ class StorefrontConfigController extends PublicApiController
         $name = null;
         $defaultLocale = null;
         $presentation = null;
+        $businessIdentity = [
+            'legal_name' => null,
+            'cr_number' => null,
+            'vat_number' => null,
+        ];
 
         if ($context->hasStorefront()) {
             $row = Storefront::query()
                 ->whereKey($context->storefrontId())
-                ->first(['name', 'default_locale']);
+                ->where('tenant_id', $context->tenantId())
+                ->first(['name', 'default_locale', 'tenant_id']);
 
             $name = $row?->name;
             $defaultLocale = $row?->default_locale;
             $presentation = $presentations->publishedSnapshotForStorefront($context->storefrontId());
+
+            $tenant = $row
+                ? Tenant::query()->find($row->tenant_id, ['name', 'cr_number', 'vat_number'])
+                : null;
         } else {
-            $name = Tenant::query()
-                ->whereKey($context->tenantId())
-                ->value('name');
+            $tenant = Tenant::query()->find($context->tenantId(), ['name', 'cr_number', 'vat_number']);
+            $name = $tenant?->name;
+        }
+
+        if (isset($tenant)) {
+            $businessIdentity = [
+                'legal_name' => $this->nullableIdentityValue($tenant->name),
+                'cr_number' => $this->nullableIdentityValue($tenant->cr_number),
+                'vat_number' => $this->nullableIdentityValue($tenant->vat_number),
+            ];
         }
 
         return new JsonResponse([
             'data' => [
                 'name' => $name,
                 'default_locale' => $defaultLocale,
+                'business_identity' => $businessIdentity,
                 'presentation' => $presentation,
             ],
             'meta' => ['request_id' => PublicApiResponse::requestId($request)],
         ]);
+    }
+
+    private function nullableIdentityValue(mixed $value): ?string
+    {
+        if (! is_string($value)) {
+            return null;
+        }
+
+        $value = trim($value);
+
+        return $value === '' ? null : $value;
     }
 }

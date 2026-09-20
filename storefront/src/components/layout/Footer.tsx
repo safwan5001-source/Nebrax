@@ -13,6 +13,11 @@ interface FooterProps {
   locale: Locale;
   categoryLinks: ReactNode;
   storeName: string | null;
+  businessIdentity?: {
+    legal_name: string | null;
+    cr_number: string | null;
+    vat_number: string | null;
+  };
   logoUrl?: string | null;
   showLogo?: boolean;
   tagline?: string;
@@ -26,8 +31,6 @@ interface FooterProps {
   socialLinks?: { id: string; network: string; href: string }[];
   whatsappHref?: string | null;
   appLinks?: { id: string; label: string; href: string }[];
-  merchantCr?: string;
-  merchantLicense?: string;
 }
 
 interface FooterCategoryLinksProps {
@@ -99,6 +102,7 @@ export async function Footer({
   locale,
   categoryLinks,
   storeName,
+  businessIdentity = { legal_name: null, cr_number: null, vat_number: null },
   logoUrl = null,
   showLogo = true,
   tagline = "",
@@ -107,8 +111,6 @@ export async function Footer({
   socialLinks = [],
   whatsappHref = null,
   appLinks = [],
-  merchantCr = "",
-  merchantLicense = "",
 }: FooterProps) {
   const t = await getTranslations({ locale, namespace: "footer" });
   const tp = await getTranslations({ locale, namespace: "policies" });
@@ -119,7 +121,11 @@ export async function Footer({
   const hasContact = Boolean(
     contact?.phone || contact?.email || contact?.address || contact?.hours,
   );
-  const hasMerchantInfo = Boolean(merchantCr.trim() || merchantLicense.trim());
+  const hasBusinessIdentity = Boolean(
+    businessIdentity.legal_name ||
+      businessIdentity.cr_number ||
+      businessIdentity.vat_number,
+  );
 
   return (
     <footer className="bg-store-footer text-store-footer-link">
@@ -235,7 +241,7 @@ export async function Footer({
           </FooterColumn>
         </div>
 
-        {(hasContact || socialLinks.length > 0 || hasMerchantInfo) && (
+        {(hasContact || socialLinks.length > 0 || hasBusinessIdentity) && (
           <div className="mt-8 border-t border-store-footer-border pt-6 text-sm text-store-footer-muted">
             {contact?.phone ? <p>{contact.phone}</p> : null}
             {contact?.email ? <p>{contact.email}</p> : null}
@@ -255,19 +261,24 @@ export async function Footer({
                 ))}
               </p>
             ) : null}
-            {hasMerchantInfo ? (
+            {hasBusinessIdentity ? (
               <div className="mt-4 space-y-1">
                 <p className="font-medium text-store-footer-link">
-                  {t("merchantProvided")}
+                  {t("businessInformation")}
                 </p>
-                {merchantCr.trim() ? (
+                {businessIdentity.legal_name ? (
                   <p>
-                    {t("crNumber")}: {merchantCr.trim()}
+                    {t("legalName")}: {businessIdentity.legal_name}
                   </p>
                 ) : null}
-                {merchantLicense.trim() ? (
+                {businessIdentity.cr_number ? (
                   <p>
-                    {t("licenseNumber")}: {merchantLicense.trim()}
+                    {t("crNumber")}: {businessIdentity.cr_number}
+                  </p>
+                ) : null}
+                {businessIdentity.vat_number ? (
+                  <p>
+                    {t("vatNumber")}: {businessIdentity.vat_number}
                   </p>
                 ) : null}
               </div>

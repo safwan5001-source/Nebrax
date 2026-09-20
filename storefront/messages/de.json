@@ -77,8 +77,11 @@
     "wholesale": "Handel & Großhandel",
     "whatsapp": "WhatsApp",
     "whatsappAria": "Kontakt über WhatsApp",
+    "businessInformation": "Unternehmensinformationen",
+    "legalName": "Rechtlicher Name",
+    "crNumber": "Handelsregisternummer",
+    "vatNumber": "Umsatzsteuer-ID",
     "merchantProvided": "Angaben des Händlers",
-    "crNumber": "Handelsregister",
     "licenseNumber": "Lizenznummer"
   },
   "home": {

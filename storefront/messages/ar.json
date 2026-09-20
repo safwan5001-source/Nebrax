@@ -77,8 +77,11 @@
     "wholesale": "التجارة والجملة",
     "whatsapp": "واتساب",
     "whatsappAria": "التواصل عبر واتساب",
-    "merchantProvided": "معلومات من التاجر",
+    "businessInformation": "معلومات المنشأة",
+    "legalName": "الاسم القانوني",
     "crNumber": "السجل التجاري",
+    "vatNumber": "الرقم الضريبي",
+    "merchantProvided": "معلومات من التاجر",
     "licenseNumber": "رقم الترخيص"
   },
   "home": {

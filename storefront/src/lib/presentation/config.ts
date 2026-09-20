@@ -508,10 +508,8 @@ export function normalizePresentationConfig(
       crNumber: asString(verificationRaw.crNumber).slice(0, 40),
       licenseNumber: asString(verificationRaw.licenseNumber).slice(0, 40),
       sourceUrl: sanitizeExternalUrl(asString(verificationRaw.sourceUrl)) ?? "",
-      requestedVerifiedLabel: asBoolean(
-        verificationRaw.requestedVerifiedLabel,
-        false,
-      ),
+      // Legacy compatibility only; merchant input cannot mint an official verification claim.
+      requestedVerifiedLabel: false,
     },
     apps: {
       iosUrl: isSafeAppStoreUrl(iosUrl)

@@ -77,8 +77,11 @@
     "wholesale": "Trade & Wholesale",
     "whatsapp": "WhatsApp",
     "whatsappAria": "Contact on WhatsApp",
-    "merchantProvided": "Merchant-provided information",
+    "businessInformation": "Business information",
+    "legalName": "Legal name",
     "crNumber": "Commercial registration",
+    "vatNumber": "VAT number",
+    "merchantProvided": "Merchant-provided information",
     "licenseNumber": "License number"
   },
   "home": {

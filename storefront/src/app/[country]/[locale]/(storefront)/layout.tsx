@@ -243,6 +243,7 @@ export default async function StorefrontLayout({
         basePath={basePath}
         locale={locale as Locale}
         storeName={displayName}
+        businessIdentity={identity?.business_identity}
         logoUrl={logoUrl}
         showLogo={presentation ? presentation.footer.showLogo : true}
         tagline={presentation?.footer.tagline ?? ""}
@@ -251,8 +252,6 @@ export default async function StorefrontLayout({
         socialLinks={publishedSocialLinks(presentation)}
         whatsappHref={footerWhatsApp}
         appLinks={appLinks}
-        merchantCr={presentation?.verification.crNumber ?? ""}
-        merchantLicense={presentation?.verification.licenseNumber ?? ""}
         categoryLinks={
           <Suspense fallback={<FooterCategoryLinksFallback />}>
             <StorefrontFooterCategoryLinks
