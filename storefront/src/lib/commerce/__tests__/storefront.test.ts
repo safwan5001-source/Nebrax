@@ -32,7 +32,15 @@ describe("commerce/storefront identity (COM-7-P3A)", () => {
   it("returns the server-resolved store name from GET store/v1/storefront", async () => {
     vi.mocked(fetch).mockResolvedValueOnce(
       jsonResponse({
-        data: { name: "شركة دمينة للاستيراد والتصدير", default_locale: "ar" },
+        data: {
+          name: "شركة دمينة للاستيراد والتصدير",
+          default_locale: "ar",
+          business_identity: {
+            legal_name: "شركة دمينة للاستيراد والتصدير",
+            cr_number: "CR-1",
+            vat_number: "300000000000003",
+          },
+        },
         meta: { request_id: "req-1" },
       }),
     );
@@ -41,6 +49,11 @@ describe("commerce/storefront identity (COM-7-P3A)", () => {
 
     expect(config.name).toBe("شركة دمينة للاستيراد والتصدير");
     expect(config.default_locale).toBe("ar");
+    expect(config.business_identity).toEqual({
+      legal_name: "شركة دمينة للاستيراد والتصدير",
+      cr_number: "CR-1",
+      vat_number: "300000000000003",
+    });
     expect(config.presentation).toBeNull();
     const [url, init] = vi.mocked(fetch).mock.calls[0];
     expect(String(url)).toBe("http://awj-api.test/store/v1/storefront");
@@ -109,6 +122,25 @@ describe("commerce/storefront identity (COM-7-P3A)", () => {
     );
 
     await expect(fetchStorefrontName()).resolves.toBeNull();
+  });
+
+  it("normalizes missing or malformed business identity fields to null", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      jsonResponse({
+        data: {
+          name: "Store",
+          business_identity: { legal_name: "  ", cr_number: 123 },
+        },
+      }),
+    );
+
+    const config = await fetchStorefrontConfig();
+
+    expect(config.business_identity).toEqual({
+      legal_name: null,
+      cr_number: null,
+      vat_number: null,
+    });
   });
 
   it("still exposes default_locale for existing P2B callers", async () => {

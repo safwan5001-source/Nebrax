@@ -25,6 +25,7 @@ class StorefrontPublicIdentityTest extends TestCase
     {
         $tenant = Tenant::create([
             'name' => "متجر {$hostname}", 'slug' => 'id-'.Str::random(8),
+            'cr_number' => 'CR-'.$hostname,
             'vat_number' => '300000000000003', 'currency' => 'SAR', 'is_active' => true,
         ]);
         app(TenantContext::class)->set($tenant->id);
@@ -62,6 +63,9 @@ class StorefrontPublicIdentityTest extends TestCase
 
         $this->assertSame('شركة دمينة للاستيراد والتصدير', $res->json('data.name'));
         $this->assertSame('ar', $res->json('data.default_locale'));
+        $this->assertSame('متجر identity-host.example.com', $res->json('data.business_identity.legal_name'));
+        $this->assertSame('CR-identity-host.example.com', $res->json('data.business_identity.cr_number'));
+        $this->assertSame('300000000000003', $res->json('data.business_identity.vat_number'));
         $this->assertArrayNotHasKey('tenant_id', $res->json('data'));
         $this->assertArrayNotHasKey('sales_channel_id', $res->json('data'));
         $this->assertArrayNotHasKey('storefront_id', $res->json('data'));
@@ -82,6 +86,8 @@ class StorefrontPublicIdentityTest extends TestCase
         $res->assertOk();
         $this->assertSame('متجر ألف', $res->json('data.name'));
         $this->assertNotSame('متجر باء', $res->json('data.name'));
+        $this->assertSame('CR-name-a.example.com', $res->json('data.business_identity.cr_number'));
+        $this->assertNotSame('CR-name-b.example.com', $res->json('data.business_identity.cr_number'));
     }
 
     /** @test */
@@ -89,6 +95,24 @@ class StorefrontPublicIdentityTest extends TestCase
     {
         $this->getJson('http://unknown-host.example.com/store/v1/storefront')
             ->assertStatus(404);
+    }
+
+    /** @test */
+    public function missing_legal_numbers_are_returned_as_null_without_fake_values(): void
+    {
+        ['tenant' => $tenant, 'domain' => $domain] = $this->seedDomainStore('identity-null.example.com', [
+            'name' => 'متجر بلا أرقام',
+        ]);
+
+        $tenant->update([
+            'cr_number' => null,
+            'vat_number' => null,
+        ]);
+
+        $res = $this->getJson("http://{$domain->hostname}/store/v1/storefront")->assertOk();
+
+        $this->assertNull($res->json('data.business_identity.cr_number'));
+        $this->assertNull($res->json('data.business_identity.vat_number'));
     }
 
     /** @test */
@@ -106,5 +130,8 @@ class StorefrontPublicIdentityTest extends TestCase
 
         $this->assertNull($res->json('data.default_locale'));
         $this->assertSame('متجر متوارَث', $res->json('data.name'));
+        $this->assertSame('متجر متوارَث', $res->json('data.business_identity.legal_name'));
+        $this->assertNull($res->json('data.business_identity.cr_number'));
+        $this->assertSame('300000000000003', $res->json('data.business_identity.vat_number'));
     }
 }
