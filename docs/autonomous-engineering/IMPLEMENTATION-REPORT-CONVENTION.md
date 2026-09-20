@@ -28,6 +28,18 @@ DATE:
 ## Tests and exact results
 ## Build / lint / typecheck
 ## CI
+## Pre-merge review
+- PRE_MERGE_REVIEW:
+- Reviewed Head SHA:
+- Findings / resolution:
+## Merge
+- Merge status:
+- Merge SHA:
+## Post-merge review
+- POST_MERGE_REVIEW:
+- Reviewed Merge SHA:
+- Target-branch checks/smoke:
+- Findings / resolution:
 ## Self-review
 ### Implementer
 ### Reviewer
