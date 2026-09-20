@@ -89,7 +89,36 @@ Before final report:
 - confirm tests cover changed behavior;
 - confirm docs reflect material contract changes.
 
-## Gate 9 — Final evidence
+## Gate 9 — Mandatory pre-merge review
+
+For any PR that will be merged, Claude performs a fresh review of the final head after all fixes:
+- complete final diff review;
+- Reviewer + AWJ Guardian passes;
+- required CI/checks green for the exact Head SHA;
+- no unresolved Decision Gate/review finding;
+- explicit `PRE_MERGE_REVIEW: PASS` + Head SHA.
+
+Any head change invalidates this gate.
+
+## Gate 10 — Merge verification
+
+When merge authority applies:
+- merge using the reviewed head;
+- capture actual Merge SHA;
+- verify GitHub reports the PR merged.
+
+## Gate 11 — Mandatory post-merge review
+
+Before downstream work may rely on the merge:
+- verify target branch contains the intended change;
+- inspect integration result for unexpected changes;
+- inspect required post-merge checks/workflows where applicable;
+- run targeted smoke/regression verification when warranted by risk/integration;
+- record `POST_MERGE_REVIEW: PASS` + Merge SHA.
+
+Failure keeps downstream dependencies locked and must be corrected through a new reviewed PR; never rewrite shared main history.
+
+## Gate 12 — Final evidence
 
 Report:
 - what changed;
@@ -104,7 +133,7 @@ Report:
 - Branch/PR/Base SHA/Head SHA;
 - next dependency-ready task.
 
-## Gate 10 — Transition
+## Gate 13 — Transition
 
 Only mark a task complete when its Definition of Done is evidenced.
 
