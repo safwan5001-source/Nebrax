@@ -508,10 +508,9 @@ export function normalizePresentationConfig(
       crNumber: asString(verificationRaw.crNumber).slice(0, 40),
       licenseNumber: asString(verificationRaw.licenseNumber).slice(0, 40),
       sourceUrl: sanitizeExternalUrl(asString(verificationRaw.sourceUrl)) ?? "",
-      requestedVerifiedLabel: asBoolean(
-        verificationRaw.requestedVerifiedLabel,
-        false,
-      ),
+      // Legacy compatibility only. Public presentation can never mint an
+      // official, government, or verified identity claim.
+      requestedVerifiedLabel: false,
     },
     apps: {
       iosUrl: isSafeAppStoreUrl(iosUrl)
