@@ -484,10 +484,9 @@ export function normalizePresentationConfig(
       crNumber: asString(verificationRaw.crNumber).slice(0, 40),
       licenseNumber: asString(verificationRaw.licenseNumber).slice(0, 40),
       sourceUrl: sanitizeExternalUrl(asString(verificationRaw.sourceUrl)) ?? "",
-      requestedVerifiedLabel: asBoolean(
-        verificationRaw.requestedVerifiedLabel,
-        false,
-      ),
+      // Legacy compatibility only. A presentation snapshot can retain the
+      // key, but it can never enable an official or verified claim.
+      requestedVerifiedLabel: false,
     },
     apps: {
       iosUrl: isSafeAppStoreUrl(iosUrl) ? (sanitizeExternalUrl(iosUrl) ?? "") : "",

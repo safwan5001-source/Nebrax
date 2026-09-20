@@ -189,7 +189,7 @@ describe("normalizePresentationConfig", () => {
       },
     });
     expect(normalized.verification.crNumber).toBe("1234567890");
-    expect(normalized.verification.requestedVerifiedLabel).toBe(true);
+    expect(normalized.verification.requestedVerifiedLabel).toBe(false);
     expect(normalized.verification.sourceUrl).toBe("");
   });
 

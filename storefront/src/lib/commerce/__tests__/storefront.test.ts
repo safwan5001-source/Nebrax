@@ -71,7 +71,9 @@ describe("commerce/storefront identity (COM-7-P3A)", () => {
     const config = await fetchStorefrontConfig();
     expect(config.presentation?.themePreset).toBe("navy");
     expect(config.presentation?.homepage.heroHeadline).toBe("منشور");
-    expect(config.presentation?.verification.requestedVerifiedLabel).toBe(true);
+    expect(config.presentation?.verification.requestedVerifiedLabel).toBe(
+      false,
+    );
     expect(config.presentation).not.toHaveProperty("is_verified");
   });
 
