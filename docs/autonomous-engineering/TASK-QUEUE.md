@@ -13,6 +13,7 @@ This is the human-reviewable V1 queue. It is deliberately Markdown first. Do not
 - If merge/production verification is required by owner policy, represent that truthfully; do not call code-only completion `done`.
 - Claude may append discovered tasks, but may not silently promote a material new task to `ready` if it expands the authorized horizon.
 - Material decisions link an ADR/decision ID.
+- An unmerged code dependency does not satisfy a downstream dependency unless an explicit stacked-branch strategy has been authorized.
 
 ## Authorized horizon
 
@@ -27,8 +28,8 @@ There is currently **no long-running implementation horizon authorized by this P
 | 1 | COM-MOBILE-MEDIA-1 | backlog | high | accepted readiness contract | Mobile-authorized product media |
 | 2 | COM-MOBILE-VARIANTS-1 | backlog | high | media/readiness as applicable | Variant/options/UOM mobile contract |
 | 3 | COM-MOBILE-AUTH-1 | backlog | critical | identity architecture decision/readiness | Customer mobile auth + profile |
-| 4 | COM-MOBILE-CART-IDENTITY-1 | backlog | critical | AUTH-1 | Guest → authenticated cart transition |
-| 5 | COM-MOBILE-CUSTOMER-1 | backlog | high | AUTH-1 | Addresses + customer order history |
+| 4 | COM-MOBILE-CART-IDENTITY-1 | backlog | critical | COM-MOBILE-AUTH-1 | Guest → authenticated cart transition |
+| 5 | COM-MOBILE-CUSTOMER-1 | backlog | high | COM-MOBILE-AUTH-1 | Addresses + customer order history |
 | 6 | COM-MOBILE-PAYMENTS-1 | backlog | critical | checkout/auth/provider decisions | Payment methods + trusted payment lifecycle |
 | 7 | COM-MOBILE-SHIPPING-1 | backlog | high | checkout contract | Shipping method/rate refinement |
 | 8 | COM-MOBILE-PROMO-1 | backlog | high | V1 product decision | Coupon/promotion mobile contract if in scope |
@@ -41,7 +42,7 @@ Source candidate: `docs/plans/store/COMMERCE_MOBILE_API_READINESS.md` in PR #887
 
 Before changing status to `ready`:
 - source requirement/contract accepted;
-- hard dependencies complete;
+- hard dependencies complete at the required merge/verification level;
 - no unresolved material decision;
 - outcome and acceptance criteria defined;
 - risk classified;
@@ -51,10 +52,21 @@ Before changing status to `ready`:
 
 ## Agent transitions
 
-Allowed routine transitions:
-`ready → in_progress → review → owner_gate/done`
+Routine:
+`ready → in_progress → review → owner_gate → done`
+
+A task may go directly `review → done` only when its Definition of Done does not require an owner action/merge/deploy and all gates are evidenced.
 
 Exceptional:
 `in_progress → decision_required/blocked`
 
-Claude may perform routine transitions backed by evidence. It must not invent owner approval for `owner_gate → done` when owner policy requires merge/deploy/production action.
+Claude may perform routine evidence-backed transitions. It must not invent owner approval for `owner_gate → done`.
+
+## Parallel continuation rule
+
+When one task reaches `owner_gate`, Claude may continue only with other tasks that:
+- are already `ready`;
+- do not depend on the owner-gated task;
+- remain inside the authorized horizon.
+
+Otherwise it persists state and stops cleanly for Safwan.
