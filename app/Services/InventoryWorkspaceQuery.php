@@ -6,6 +6,8 @@ use App\Support\InventoryWorkspaceFilters;
 use App\Support\Money;
 use App\Support\SensitiveCostPolicy;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Pagination\LengthAwarePaginator as ConcreteLengthAwarePaginator;
+use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Collection;
 
 /**
@@ -30,6 +32,10 @@ class InventoryWorkspaceQuery
         InventoryWorkspaceFilters::apply($query, $filters);
         InventoryWorkspaceFilters::applySort($query, $filters['sort'] ?? null);
 
+        // أداء: `total`/`total_quantity`/`total_value` كانت تُحسب باستعلامٍ تجميعي
+        // منفصل، ثم `paginate()` يشغّل استعلام COUNT خاصاً به — فيمسح الانضمام
+        // الخماسي كاملاً **ثلاث مرات** لكل طلب (تجميع + عدّ + صفحة). دمج العدّ مع
+        // التجميع في استعلامٍ واحد يُسقط تكراراً كاملاً بلا تغيير أي نتيجة.
         $totals = $this->totals($query);
 
         $query->select([
@@ -51,7 +57,17 @@ class InventoryWorkspaceQuery
         ])->selectRaw(InventoryWorkspaceFilters::stockStateExpression().' as stock_state');
 
         $perPage = (int) ($filters['per_page'] ?? 25);
-        $paginator = $query->paginate($perPage);
+        $page = (int) ($filters['page'] ?? Paginator::resolveCurrentPage());
+
+        $items = (clone $query)->forPage($page, $perPage)->get();
+
+        $paginator = new ConcreteLengthAwarePaginator(
+            $items,
+            $totals['count'],
+            $perPage,
+            $page,
+            ['path' => Paginator::resolveCurrentPath()]
+        );
 
         $rows = $paginator->getCollection()->map(
             fn ($row) => $this->mapRow($row, $canViewCost)
@@ -70,7 +86,7 @@ class InventoryWorkspaceQuery
 
     /**
      * @param  \Illuminate\Database\Eloquent\Builder  $query
-     * @return array{quantity: int, value_minor: int}
+     * @return array{quantity: int, value_minor: int, count: int}
      */
     private function totals($query): array
     {
@@ -79,11 +95,13 @@ class InventoryWorkspaceQuery
             ->toBase()
             ->cloneWithout(['columns', 'orders', 'limit', 'offset'])
             ->cloneWithoutBindings(['select', 'order'])
+            ->selectRaw('COUNT(*) as cnt')
             ->selectRaw('COALESCE(SUM(product_warehouse_stock.quantity), 0) as qty')
             ->selectRaw('COALESCE(SUM(product_warehouse_stock.quantity * COALESCE(inventory_states.avg_cost, 0)), 0) as value_minor')
             ->first();
 
         return [
+            'count' => (int) ($aggregate->cnt ?? 0),
             'quantity' => (int) ($aggregate->qty ?? 0),
             'value_minor' => (int) ($aggregate->value_minor ?? 0),
         ];
