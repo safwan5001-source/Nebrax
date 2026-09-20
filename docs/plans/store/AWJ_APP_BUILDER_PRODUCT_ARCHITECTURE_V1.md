@@ -1422,6 +1422,453 @@ Component definitions should carry accessibility requirements/metadata where app
 
 ---
 
+## 20B. Visual Builder UX + Developer Workspace Architecture (2026-09-20)
+
+### Goal
+
+Turn the architecture already established — App Schema, Component/Action/Data registries, Draft/Published separation, Preview ladder, compatibility and Release Center — into one coherent merchant workflow.
+
+The Builder must serve two audiences without forcing either into the other's complexity:
+
+- **Design mode:** merchant/operator building a commerce app visually.
+- **Develop mode:** advanced operator/developer inspecting data, actions, state, conditions, events and runtime diagnostics.
+
+This is progressive disclosure, not two separate app-building products.
+
+### External benchmark evidence
+
+**Tapcart** documents a visual app studio based around screens/blocks/components, preview, editable component configuration and developer extensibility. Its developer tooling reinforces the value of keeping merchant-editable fields explicit rather than exposing implementation code.
+
+**FlutterFlow** demonstrates the broader product pattern of a visual canvas combined with widget hierarchy, properties, actions, backend/data binding, state and conditional logic. AWJ should adopt the information-architecture lesson without inheriting Flutter-specific concepts into the AWJ Experience Contract.
+
+**Webflow** provides strong evidence for the Layers/Navigator + Canvas + Style/Settings inspector mental model used by professional visual builders. AWJ should simplify this for merchants rather than reproduce a web-design IDE.
+
+**Shopify theme editor** demonstrates section/block editing, contextual settings and live storefront preview. This reinforces AWJ's progressive-disclosure direction for merchant-facing customization.
+
+### AWJ Decision — Builder shell
+
+Desktop is the primary authoring workspace.
+
+```text
+┌────────────────────────────────────────────────────────────────────┐
+│ App / Page   Draft status     Undo/Redo     Preview     Publish   │
+├──────────────┬───────────────────────────────┬─────────────────────┤
+│ Pages        │                               │ Inspector           │
+│ Components   │         Live Canvas           │                     │
+│ Layers       │                               │ Content             │
+│              │                               │ Layout              │
+│              │                               │ Style               │
+│              │                               │ Data                │
+│              │                               │ Actions             │
+│              │                               │ Conditions          │
+│              │                               │ Advanced            │
+├──────────────┴───────────────────────────────┴─────────────────────┤
+│ Components | Data | Actions | Navigation | Issues | Diagnostics   │
+└────────────────────────────────────────────────────────────────────┘
+```
+
+Do not make every panel visible simultaneously on normal merchant workflows. The diagram is the complete capability map; actual UI uses contextual tabs/drawers and progressive disclosure.
+
+### Top bar
+
+Always visible:
+- current app;
+- current page/screen;
+- Draft / saved state;
+- undo/redo;
+- device/preview entry;
+- validation/issues indicator;
+- Save where explicit save is needed;
+- Publish entry point.
+
+Native build/store release must **not** be presented as the same action as Experience Publish.
+
+If a pending change requires a native release, Publish impact analysis routes the merchant toward Release Center.
+
+### Left workspace — structure
+
+Three primary views:
+
+#### Pages
+Merchant mental model first:
+- Home;
+- Categories;
+- Product;
+- Search;
+- Cart;
+- Account;
+- custom content/landing pages where supported.
+
+System-required commerce screens may be locked/required rather than deletable.
+
+#### Components
+Searchable categorized component library:
+- Commerce;
+- Content;
+- Layout;
+- Navigation.
+
+Only components compatible with the current app/runtime target should be insertable.
+
+#### Layers
+Tree of component instances on the selected page.
+
+Supports:
+- select;
+- reorder;
+- nest where allowed;
+- hide;
+- duplicate where safe;
+- delete where allowed;
+- identify locked/system elements.
+
+Do not expose internal Flutter widget hierarchy.
+
+### Center — Live Canvas
+
+Canvas is the primary manipulation surface.
+
+Required interactions:
+- click/tap to select;
+- drag/reorder where structurally valid;
+- insert between valid drop zones;
+- resize only for properties the component contract exposes;
+- inline text editing where safe/useful;
+- empty/error/loading-state simulation;
+- device viewport presets;
+- locale + RTL/LTR;
+- zoom/fit;
+- safe navigation between app screens.
+
+Canvas operations mutate Draft App Schema through validated editor commands, not arbitrary DOM/widget mutation.
+
+### Right — metadata-driven Inspector
+
+The Inspector is generated from Component Definition metadata wherever possible.
+
+Stable conceptual groups:
+
+1. **Content** — text, media, labels and merchant content.
+2. **Layout** — spacing, alignment, sizing and allowed structure.
+3. **Style** — theme-aware visual properties.
+4. **Data** — resource/binding selection.
+5. **Actions** — allowed event → action mapping.
+6. **Conditions** — visibility/behavior predicates.
+7. **Advanced** — IDs, accessibility, diagnostics or expert options that are safe to expose.
+
+A component only shows groups it supports.
+
+Merchant-facing terminology must remain business-friendly. Do not show schema paths, Dart classes or API internals in Design mode.
+
+### Basic vs Advanced
+
+Default Inspector shows the smallest useful set of settings.
+
+Advanced expands expert controls.
+
+Theme Tokens remain an internal/design-system foundation. Merchant UI should normally say concepts such as:
+- Brand color;
+- Text style;
+- Spacing;
+- Corner style;
+- Section background;
+
+not `--token-primary-500` or runtime implementation names.
+
+### Contextual editing
+
+When the merchant selects a banner, show banner settings.
+When they select product grid, show product-source/layout/card settings.
+When they select button, show label/style/action.
+
+Avoid a giant app-wide form disconnected from the selected visual element.
+
+### Data binding UX
+
+Design mode does not expose arbitrary queries.
+
+Preferred merchant flow:
+
+```text
+Data
+  Source: Products
+  Collection: Featured products
+  Sort: Recommended
+  Limit: 8
+```
+
+Advanced/Develop mode may expose the typed resource, parameters, returned fields and binding diagnostics.
+
+Unsupported or unauthorized data sources never appear as selectable options.
+
+### Actions UX
+
+Design mode uses human-readable actions:
+
+```text
+When tapped
+  → Open product
+```
+
+or:
+
+```text
+When tapped
+  → Add selected item to cart
+```
+
+Develop mode can inspect:
+- event;
+- registered action type;
+- typed inputs;
+- source of each input;
+- success/error behavior;
+- required capability/auth;
+- diagnostics.
+
+Neither mode permits arbitrary JavaScript/Dart execution.
+
+### Conditions UX
+
+Merchant mode should support safe business predicates such as:
+- show when signed in;
+- show when collection has items;
+- show during a scheduled period;
+- show for supported market/locale where product rules permit.
+
+Complex expressions belong in Develop mode only if the future constrained expression engine supports them.
+
+Security/authorization conditions are never delegated to UI visibility. Hiding a button is not authorization.
+
+### Develop mode
+
+Develop mode extends the same selected component/page context.
+
+Target tools:
+- Data;
+- Actions;
+- State;
+- Events;
+- Conditions;
+- Navigation;
+- Issues;
+- Console/diagnostics;
+- Network/resource requests with redaction;
+- runtime/schema compatibility.
+
+Develop mode is an inspector/debugger for the **AWJ declarative runtime**, not a general-purpose code editor.
+
+### Bottom workbench
+
+Collapsed by default for merchants.
+
+Tabs:
+
+**Components** — search/details/capabilities.
+
+**Data** — current resources, bindings, loading/error state.
+
+**Actions** — event/action graph or list.
+
+**Navigation** — route graph/deep-link mapping.
+
+**Issues** — errors, warnings and compatibility blockers.
+
+**Diagnostics** — preview runtime events, sanitized resource calls and compatibility/fallback information.
+
+A future extension SDK may get a separate development workflow; do not put arbitrary package/code installation into this panel.
+
+### Validation UX
+
+Issues are classified:
+
+- **Blocker** — cannot Publish.
+- **Warning** — publish allowed with explicit awareness where policy permits.
+- **Info** — recommendation/diagnostic.
+
+Examples of blockers:
+- missing required page/navigation target;
+- unsupported component for target runtime;
+- invalid required binding;
+- forbidden action;
+- schema incompatibility;
+- missing mandatory accessibility/content property where enforced;
+- native capability required but no compatible release path.
+
+Clicking an issue should focus the relevant page/component/property.
+
+### Save / Draft semantics
+
+Editing updates a Draft working model.
+
+The UI must clearly distinguish:
+- Unsaved/local transient edit where applicable;
+- Saved Draft;
+- Published Experience version;
+- Native release version.
+
+Autosave may be used later, but it must not silently publish.
+
+### Publish flow
+
+Publish is a review flow, not an instant blind button.
+
+```text
+Publish
+ -> validate
+ -> summarize changes
+ -> classify impact
+ -> Preview recommendation / required checks
+ -> confirm
+ -> create immutable Published Experience version
+```
+
+Impact classification reuses the Update & Release Matrix:
+
+- Experience update only;
+- iOS native release required;
+- Android native release required;
+- both;
+- mixed.
+
+For native-impacting changes, Experience Publish must not create references that older installed runtimes cannot safely handle.
+
+### Version comparison
+
+Before Publish and in Versions, show meaningful diffs such as:
+- Home: Hero image changed;
+- Product Grid: columns 2 → 1 on small viewport;
+- Cart button action unchanged;
+- New component requires runtime capability X;
+- Navigation: added Offers page.
+
+Do not force merchants to read raw JSON diffs.
+
+Develop mode may expose technical diff details.
+
+### Undo/redo
+
+Undo/redo should operate on validated editor commands.
+
+Long-term desirable:
+- local short history for fast edits;
+- named/version checkpoints through Draft/Published versions.
+
+Undo does not roll back a published production version. Published rollback is a separate version operation.
+
+### Multi-user editing
+
+Do not assume Google-Docs-style simultaneous editing for V1.
+
+Minimum safe architecture:
+- revision/version identifier;
+- optimistic concurrency check;
+- conflict detection;
+- prevent silent overwrite of another editor's newer Draft.
+
+Presence/live collaboration can come later.
+
+### Mobile authoring
+
+AWJ should have a mobile-friendly management experience, but **full precision visual authoring is desktop-first**.
+
+Mobile V1 target:
+- inspect app/status;
+- edit simple content/settings;
+- reorder straightforward sections;
+- preview;
+- review issues;
+- approve/publish where authorized;
+- monitor release status.
+
+Complex layer nesting, data/action debugging and advanced Develop mode may require desktop/tablet.
+
+This avoids making the desktop Builder worse merely to fit every advanced tool onto a phone.
+
+### Accessibility authoring
+
+Component Definition should declare accessibility-relevant merchant inputs.
+
+Builder should surface applicable controls such as:
+- meaningful image description/semantics where required;
+- button/control label;
+- heading semantics where relevant;
+- contrast warnings where reliably measurable;
+- focus/interaction requirements.
+
+Runtime components themselves remain responsible for platform accessibility semantics that merchants should not manually configure.
+
+### Localization authoring
+
+Content fields should show translation status and fallback behavior.
+
+Required direction:
+- Arabic and English are first-class;
+- preview locale switch;
+- RTL/LTR preview;
+- missing translation indicator;
+- explicit fallback policy;
+- do not duplicate entire page trees merely because locale differs unless structurally required.
+
+### Theme relationship
+
+App Theme can inherit from Shared Brand/Store Theme while allowing app overrides.
+
+Inspector should be able to show, where useful:
+- inherited value;
+- app override;
+- upstream change available;
+- conflict.
+
+Theme sync uses the previously defined:
+**Detect → Diff → Preview → Apply** flow.
+
+### System components and guardrails
+
+Some commerce elements may be required/locked because removing or rewiring them could break core flows.
+
+Examples may include required checkout/account/legal/navigation elements depending on final V1 scope.
+
+The Builder should explain why an element is locked rather than merely disabling controls.
+
+### UX trust principles
+
+- no destructive action without clear consequence;
+- no fake “Published” when store binary is merely submitted;
+- no hidden production mutation from Preview;
+- no ambiguous Draft vs Live state;
+- no raw technical error as primary merchant message;
+- technical diagnostics remain available to authorized advanced users;
+- show compatibility impact before committing a change.
+
+### Open Decisions after Builder UX pass
+
+- exact visual design/layout dimensions;
+- Canvas implementation technology;
+- autosave cadence;
+- collaboration/presence scope;
+- exact component insertion/reorder gestures;
+- mobile authoring depth;
+- version-diff visualization;
+- component search/favorites/recent;
+- reusable merchant sections/components;
+- page templates;
+- extension SDK workflow;
+- approval workflow between Designer and Release Manager;
+- AI-assisted building/editing — future capability, not assumed in V1.
+
+### Builder architecture conclusion
+
+AWJ Builder should feel like a commerce design tool to a merchant and like a controlled declarative-runtime inspector to an advanced developer.
+
+The user should progress naturally:
+
+> Select page → select/add component → edit visually → bind data/action if needed → preview → resolve issues → review impact → publish.
+
+The complexity of Schema, tenant isolation, capability checks, runtime compatibility and native release classification remains enforced underneath rather than exposed as implementation jargon.
+
+---
+
 ## 21A. Mobile Runtime Technology Evidence Pass — Flutter vs React Native vs Native (2026-09-20)
 
 ### Decision criteria for AWJ
@@ -1977,6 +2424,12 @@ Each pass updates this document with evidence, AWJ decision, and remaining open 
 
 ### Existing repository evidence
 - `docs/plans/store/AWJ_MOBILE_APP_BUILDER_BENCHMARK.md` — baseline benchmark and initial architecture direction.
+
+### Visual Builder / Developer Workspace evidence added 2026-09-20
+- Tapcart developer/product documentation — screen/block/component editing, merchant-editable fields, preview and developer extensibility patterns.
+- FlutterFlow documentation — visual widget hierarchy, properties, actions, backend/data, state and conditional-logic workspace patterns (benchmark only; no framework-contract coupling).
+- Webflow documentation — Navigator/Layers, canvas and contextual style/settings editor mental model (benchmark only).
+- Shopify Help — theme editor section/block customization and live preview patterns.
 
 ### Build/signing/store ownership evidence added 2026-09-20
 - Apple Developer — Program enrollment, organization identity/D-U-N-S and contract-developer ownership guidance.
