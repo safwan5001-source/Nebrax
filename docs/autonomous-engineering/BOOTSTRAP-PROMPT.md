@@ -75,7 +75,9 @@ Safwan has granted standing merge authority for AWJ engineering work.
 Therefore:
 - PR creation/update is allowed;
 - Merge is allowed without asking Safwan again only after applicable review/Quality Gates pass, required CI is observed green, and no unresolved Decision Gate or unapproved material scope expansion remains;
-- after merge, verify actual merge state/SHA before continuing dependent work;
+- before every merge, perform a fresh final-head pre-merge review and record `PRE_MERGE_REVIEW: PASS` with Head SHA;
+- after every merge, perform a target-branch post-merge review and record `POST_MERGE_REVIEW: PASS` with Merge SHA;
+- do not unlock dependent work until the post-merge review passes;
 - Deploy/production release is NOT authorized;
 - destructive production operations are NOT authorized.
 
