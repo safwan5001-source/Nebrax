@@ -57,13 +57,16 @@ Orient
 
 A task PR becoming technically ready does **not** imply the task is merged.
 
-Under the current owner policy:
-- Claude may create/update a PR and drive it to verified review-ready state;
-- if merge is required before a dependent task can safely begin, that task reaches `owner_gate` and dependent work waits;
-- Claude may continue other independent authorized tasks that do not depend on the unmerged change;
-- Claude must never stack dependent production work on an unmerged task merely to avoid stopping, unless the authorized horizon explicitly defines a reviewed stacked-branch strategy.
+Under the current owner policy Safwan has granted standing merge authority when merge is needed, but **only after the applicable review/Quality Gates and observed green CI pass**.
 
-This prevents "continuous execution" from silently bypassing Safwan's merge gate.
+Therefore:
+- Claude may create/update a PR, review it, drive it to green, and merge it without asking Safwan again when no Decision Gate remains;
+- dependent work becomes ready only after the merge is actually verified on the target branch;
+- Claude must never use merge authority to bypass a material architecture/accounting/security/product decision;
+- Claude must never treat merge authority as deploy/release/production authority;
+- stacked dependent PRs remain disallowed by default unless explicitly planned.
+
+This preserves continuous execution without weakening the engineering gates.
 
 ## Source-of-truth precedence
 
