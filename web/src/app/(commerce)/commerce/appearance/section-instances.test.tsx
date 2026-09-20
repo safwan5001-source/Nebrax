@@ -225,6 +225,23 @@ describe('commerce appearance — STORE-CUSTOMIZER-V2-2 section instances', () =
     ).toEqual([first, second]);
   });
 
+  it('does not offer delete for hero while hero content remains global', async () => {
+    const user = userEvent.setup();
+    render(<CommerceAppearancePage />);
+    await openHomepage(user);
+
+    const heroRow = document.querySelector(
+      '[data-section-id="hero"]',
+    ) as HTMLElement;
+
+    expect(
+      heroRow.querySelector('button[aria-label="حذف القسم"]'),
+    ).toBeNull();
+    expect(
+      heroRow.querySelector('input[type="checkbox"]'),
+    ).toBeTruthy();
+  });
+
   it('delete removes the instance from the list (not a hide) and moves selection to the next sibling', async () => {
     const user = userEvent.setup();
     render(<CommerceAppearancePage />);
@@ -279,33 +296,6 @@ describe('commerce appearance — STORE-CUSTOMIZER-V2-2 section instances', () =
 
     expect(document.querySelector(`[data-section-id="${lastId}"]`)).toBeNull();
     expect(builderRoot().dataset.selectedSection).toBe(previousId);
-  });
-
-  it('delete clears the selection when nothing remains after the removed instance', async () => {
-    const user = userEvent.setup();
-    render(<CommerceAppearancePage />);
-    await openHomepage(user);
-
-    // Delete every instance (selecting the last row, then deleting it) until
-    // nothing remains; the final delete leaves no sibling at all.
-    for (;;) {
-      const rows = composerRows();
-      if (rows.length === 0) break;
-      const lastRow = rows[rows.length - 1];
-      const selectButton = lastRow.querySelector(
-        '[data-section-option]',
-      ) as HTMLElement;
-      await user.click(selectButton);
-      await user.click(
-        lastRow.querySelector('button[aria-label="حذف القسم"]') as HTMLElement,
-      );
-    }
-
-    expect(composerRows()).toHaveLength(0);
-    expect(builderRoot().dataset.selectedSection).toBe('');
-    expect(
-      document.querySelector('[data-selected-section-settings]'),
-    ).toBeNull();
   });
 
   it('hide keeps the instance in the list and only flips visible', async () => {
