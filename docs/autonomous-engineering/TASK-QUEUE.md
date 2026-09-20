@@ -10,7 +10,7 @@ This is the human-reviewable V1 queue. It is deliberately Markdown first. Do not
 - Dependencies must be explicit.
 - A task becomes `ready` only from evidence, not optimism.
 - `done` means its Definition of Done is evidenced.
-- If merge/production verification is required by owner policy, represent that truthfully; do not call code-only completion `done`.
+- Represent merge/deploy/production state truthfully; code-only completion is not `done` when the task Definition of Done requires merge or production verification.
 - Claude may append discovered tasks, but may not silently promote a material new task to `ready` if it expands the authorized horizon.
 - Material decisions link an ADR/decision ID.
 - An unmerged code dependency does not satisfy a downstream dependency unless an explicit stacked-branch strategy has been authorized.
