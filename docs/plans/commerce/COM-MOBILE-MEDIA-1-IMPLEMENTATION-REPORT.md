@@ -289,14 +289,66 @@ None — purely internal source-of-truth reuse; the required approach was alread
 specified by repository evidence (`/store/v1`'s own implementation + the readiness doc's
 explicit instruction).
 
+## Automated review findings (Codex, PR #911)
+
+Three findings were posted by the repo's automated Codex reviewer on commit `d745d7b854`.
+All three were verified against repository evidence:
+
+1. **P1 — `Cache-Control: public` on bearer-gated media (fixed).**
+   `CommerceMediaController` originally copied `StorefrontMediaController`'s
+   `Cache-Control: public, max-age=3600` verbatim. That is safe on `/store/v1` because that
+   route is fully anonymous (no `Authorization` at all — any caller of the same URL already
+   has the same right). `/commerce/v1/media/{id}` is bearer-gated
+   (`AuthenticateApiClient` + tenant/channel/publication/subscription checks); `public`
+   would let a shared proxy/CDN replay a cached response to a different caller without
+   re-running those checks, and keep bytes servable for up to an hour after unpublishing or
+   client revocation. **Fixed:** changed to `Cache-Control: private, max-age=3600` (browser
+   caching preserved, shared/proxy caching disallowed). New regression test:
+   `the_response_is_marked_private_not_shareable_by_a_proxy_or_cdn`. This was a real,
+   in-scope defect in the new code (not inherited from an equivalent trust boundary) — fixed
+   directly, not deferred.
+2. **P1 — media shares the 100/min `read` rate-limit budget with catalog reads.** Verified
+   against `app/Support/PublicApiRateLimits.php`: this is the *exact same architecture*
+   already shipped for `/store/v1` — its own `media/{id}` route shares the **same**
+   `unauth` bucket (30/min, even tighter) with `products`/`categories`/`cart`/`checkout` for
+   that IP. This PR's `read` class (100/min) is strictly more generous than the existing,
+   already-accepted precedent. Introducing a dedicated media rate-limit class means picking
+   a concrete number with real cost/abuse trade-offs — a configurable-policy decision per
+   CLAUDE.md's own governance rule, not a bug local to this PR's new code. **Not fixed here
+   — recorded as backlog below** rather than silently choosing a number; replied on the PR
+   thread with this evidence.
+3. **P2 — no batched gallery loading for the product list (`index()`).** Verified: this
+   mirrors `StorefrontProductController::index()`'s own accepted pattern exactly (one
+   `resolveGallery()` call per paginated row; no batched non-variant gallery method exists
+   yet in `ProductMediaGalleryService` to call instead). Fixing it only for the new mobile
+   path would create asymmetric behavior between the two boundaries; fixing it for both
+   means extending the shared `ProductMediaGalleryService` authority — a real but separate
+   unit of work, not a small local fix. **Not fixed here — recorded as backlog below**;
+   replied on the PR thread with this evidence.
+
 ## Risks / remaining work
 
-- None identified specific to this change. Residual risk is the same accepted
-  per-row gallery query cost already present in `/store/v1`'s list endpoint (pre-existing
-  pattern, not introduced here).
+- None newly introduced beyond the two Codex findings recorded as backlog above (rate-limit
+  budget sharing, list-endpoint gallery batching) — both are pre-existing architecture
+  characteristics this task inherits from the already-shipped `/store/v1` pattern, not
+  regressions.
 
 ## Discovered backlog
 
+- **Dedicated rate-limit budget for media downloads** (Codex finding #2 above): both
+  `/store/v1/media/{id}` and now `/commerce/v1/media/{id}` share their general read-rate
+  budget with catalog browsing, so a full page of thumbnails can consume most or all of a
+  client's per-minute allowance. Needs a deliberate policy decision (a new rate class and
+  its number, or a different accounting for media byte-requests) — out of this task's
+  reuse-only scope, and a cross-cutting change affecting both trust boundaries.
+- **Batched gallery loading for list endpoints** (Codex finding #3 above): both
+  `StorefrontProductController::index()` and (now) `CommerceProductController::index()`
+  resolve each row's gallery with a separate query. A shared, batched
+  `ProductMediaGalleryService` method (resolve base/shared media for a whole page of
+  products in one or two queries, derive each thumbnail from that collection) would remove
+  the N+1 for both boundaries at once. Left as backlog rather than fixed here to avoid
+  widening this task into a `ProductMediaGalleryService` refactor affecting every existing
+  consumer (POS, storefront, mobile).
 - **`setup.sh` (local dev bootstrap) does not copy `app/Mail/` or `resources/views/`**
   into the generated Laravel project, unlike `.github/workflows/ci.yml` which copies both.
   This causes `AuthRecoveryTest`/`DocumentCenterSecureIntakeTest`-class failures in any

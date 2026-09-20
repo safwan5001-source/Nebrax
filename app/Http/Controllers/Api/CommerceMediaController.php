@@ -17,6 +17,13 @@ use Illuminate\Support\Facades\Storage;
  *  `ProductMedia` وسلطة التخزين نفسها، لا سلطة موازية: الفرق الوحيد هو حدّ
  *  الثقة (bearer/ApiClient + قناة الجوال المحلولة بدل نطاق/شريحة متجر ويب).
  *
+ *  **`Cache-Control: private`، لا `public` كنظيرها في `/store/v1`:** ذاك مسارٌ
+ *  مجهولٌ بلا `Authorization` أصلاً، فـ`public` آمنة هناك — أي طرفٍ يطلب نفس
+ *  الرابط يحصل على نفس الحق أصلاً. هذا المسار محروسٌ بـ`bearer` (`ApiClient`)
+ *  + قناة/نشر مُحلّين؛ ذاكرة تخزين مؤقت مشتركة (وسيط/CDN) تُكرِّم `public` قد
+ *  تُعيد تقديم الاستجابة لطالبٍ آخر بلا إعادة التحقّق من العميل/القناة/الاشتراك،
+ *  وتُبقي البايتات المخزَّنة متاحةً حتى بعد إلغاء نشر المنتج أو إبطال العميل.
+ *
  *  الحراسة (مطابقة تماماً لتوثيق الفجوة في `CommerceProductController`):
  *   1. `ProductMedia::query()->find($id)` — معزول تلقائياً بـ`TenantScope`
  *      (يضبطه `AuthenticateApiClient` من عميل الـ API الموثَّق، لا من مدخل
@@ -58,7 +65,7 @@ class CommerceMediaController extends PublicApiController
 
         return $disk->response($media->path, $media->original_name, [
             'Content-Type' => $media->mime_type ?? 'application/octet-stream',
-            'Cache-Control' => 'public, max-age=3600',
+            'Cache-Control' => 'private, max-age=3600',
         ]);
     }
 }

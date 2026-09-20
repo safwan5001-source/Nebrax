@@ -153,6 +153,22 @@ class CommerceMediaApiTest extends TestCase
             ->assertHeader('Content-Type', 'image/webp');
     }
 
+    /** @test */
+    public function the_response_is_marked_private_not_shareable_by_a_proxy_or_cdn(): void
+    {
+        // بخلاف `/store/v1` المجهول، هذا المسار محروسٌ بـ`bearer` — ذاكرةٌ
+        // وسيطة مشتركة تُكرِّم `public` قد تُعيد الاستجابة لطالبٍ آخر بلا
+        // إعادة التحقّق من العميل/القناة/الاشتراك.
+        Storage::fake('local');
+        $store = $this->seedMobileStore('cache-control');
+        $product = $this->publishedProduct($store['tenant'], $store['channel']);
+        $media = $this->attachMedia($store['tenant'], $product);
+
+        $this->get("/commerce/v1/media/{$media->id}", $this->bearer($store['token']))
+            ->assertOk()
+            ->assertHeader('Cache-Control', 'max-age=3600, private');
+    }
+
     // ── 3. حدود الثقة ─────────────────────────────────────────────────────
 
     /** @test */
