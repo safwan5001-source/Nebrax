@@ -154,6 +154,99 @@ class InventorySummaryTest extends TestCase
         $this->assertSame($legacyA['total_value'], $scopedA['total_value']);
     }
 
+    /**
+     * AWJ-PERF-4 — إغلاق فجوة الصلاحية: `ReportWarehouseScope` يفرض
+     * `allowedWarehouseIds()` كحدٍّ أمني (كما في `InventoryWorkspaceQuery`
+     * و`InventoryReportService::inventoryValue()`) — مستخدمٌ `admin` يملك
+     * `products.view_cost` لكنه مقيَّدٌ بمخزنٍ واحد يجب ألا يرى قيمة مخزنٍ آخر
+     * عبر هذا الملخّص، حتى لو ملك صلاحية التكلفة كاملةً.
+     */
+    /** @test */
+    public function warehouse_scope_hides_unassigned_warehouses(): void
+    {
+        ['token' => $ownerToken, 'tenant_id' => $tid] = $this->registerTenant('nibras', 'owner@nibras.test');
+
+        $warehouseA = $this->withToken($ownerToken)->postJson('/api/warehouses', ['name' => 'مخزن ألفا'])->assertCreated()['data'];
+        $warehouseB = $this->withToken($ownerToken)->postJson('/api/warehouses', ['name' => 'مخزن بيتا'])->assertCreated()['data'];
+
+        app(TenantContext::class)->set($tid);
+        $simple = Product::create(['tenant_id' => $tid, 'name' => 'إسمنت', 'type' => 'good', 'track_inventory' => true]);
+        app(InventoryService::class)->receiveStock($simple->fresh(), 5, 30000, ['warehouse_id' => $warehouseA['id']]); // 5×300=1500.00
+        app(InventoryService::class)->receiveStock($simple->fresh(), 7, 30000, ['warehouse_id' => $warehouseB['id']]); // 7×300=2100.00
+        app(TenantContext::class)->forget();
+
+        // مستخدم admin يملك التكلفة كاملة (owner/admin عبر `*`) لكنه مقيَّد بمخزن ألفا فقط.
+        $this->withToken($ownerToken)->postJson('/api/users', [
+            'name' => 'مدير مقيَّد', 'email' => 'admin-a@nibras.test', 'password' => 'password123',
+            'role' => 'admin', 'warehouse_ids' => [$warehouseA['id']],
+        ])->assertCreated();
+        $scopedToken = $this->postJson('/api/login', ['email' => 'admin-a@nibras.test', 'password' => 'password123'])->assertOk()['token'];
+
+        $ownerRes = $this->withToken($ownerToken)->getJson('/api/inventory/summary')->assertOk();
+        $scopedRes = $this->withToken($scopedToken)->getJson('/api/inventory/summary')->assertOk();
+
+        // غير المقيَّد يرى المجموع الكامل (١٥٠٠ + ٢١٠٠ = ٣٦٠٠)؛ المقيَّد يرى مخزنه فقط (١٥٠٠).
+        $this->assertSame('3600.00', $ownerRes['total_value']);
+        $this->assertSame('1500.00', $scopedRes['total_value']);
+        $this->assertNotSame($ownerRes['total_value'], $scopedRes['total_value']);
+    }
+
+    /**
+     * نفس السيناريو أعلاه، مع منتج `variant_managed` — يثبت أن إغلاق فجوة
+     * المخزن لم يُعِد مشكلة تبسيط `variant_managed` القديمة (تصفير القيمة):
+     * المتغيّر النشط في مخزن المستخدم المقيَّد يُحتسب، والمتغيّر المُعطَّل لا
+     * يُحتسب مطلقاً — بصرف النظر عن المخزن.
+     */
+    /** @test */
+    public function warehouse_scope_correctly_values_active_variants_and_excludes_disabled_ones(): void
+    {
+        ['token' => $ownerToken, 'tenant_id' => $tid] = $this->registerTenant('nibras', 'owner@nibras.test');
+
+        $warehouseA = $this->withToken($ownerToken)->postJson('/api/warehouses', ['name' => 'مخزن ألفا'])->assertCreated()['data'];
+        $warehouseB = $this->withToken($ownerToken)->postJson('/api/warehouses', ['name' => 'مخزن بيتا'])->assertCreated()['data'];
+
+        app(TenantContext::class)->set($tid);
+        $product = Product::create(['tenant_id' => $tid, 'name' => 'قميص', 'sku' => 'SHIRT-1', 'sale_price' => 20000, 'track_inventory' => true]);
+        $color = $product->options()->create(['tenant_id' => $tid, 'name' => 'اللون', 'name_key' => 'اللون', 'sort_order' => 0]);
+        $black = $color->values()->create(['tenant_id' => $tid, 'value' => 'أسود', 'value_key' => 'أسود', 'sort_order' => 0]);
+        $white = $color->values()->create(['tenant_id' => $tid, 'value' => 'أبيض', 'value_key' => 'أبيض', 'sort_order' => 1]);
+
+        $variants = app(ProductVariantService::class);
+        $variants->enableVariantManagement($product, null);
+        $product = $product->fresh();
+        $blackVariant = $variants->createSingleVariant($product, [$black->id], null)['variant'];
+        $whiteVariant = $variants->createSingleVariant($product, [$white->id], null)['variant'];
+
+        // الأسود (نشط) في مخزن ألفا: ٦×١.٠٠ = ٦.٠٠. الأبيض (سيُعطَّل) في مخزن ألفا أيضاً: ٤×١.٥٠ = ٦.٠٠ — لا يُحتسب.
+        app(InventoryService::class)->receiveStock($product->fresh(), 6, 100, ['warehouse_id' => $warehouseA['id']], $blackVariant);
+        app(InventoryService::class)->receiveStock($product->fresh(), 4, 150, ['warehouse_id' => $warehouseA['id']], $whiteVariant);
+        // أسود إضافي في مخزن بيتا — خارج نطاق المستخدم المقيَّد، يجب ألا يُحتسب له.
+        app(InventoryService::class)->receiveStock($product->fresh(), 10, 100, ['warehouse_id' => $warehouseB['id']], $blackVariant);
+        $whiteVariant->update(['is_active' => false]);
+        app(TenantContext::class)->forget();
+
+        $this->withToken($ownerToken)->postJson('/api/users', [
+            'name' => 'مدير مقيَّد', 'email' => 'admin-a2@nibras.test', 'password' => 'password123',
+            'role' => 'admin', 'warehouse_ids' => [$warehouseA['id']],
+        ])->assertCreated();
+        $scopedToken = $this->postJson('/api/login', ['email' => 'admin-a2@nibras.test', 'password' => 'password123'])->assertOk()['token'];
+
+        $scopedRes = $this->withToken($scopedToken)->getJson('/api/inventory/summary')->assertOk();
+        $ownerRes = $this->withToken($ownerToken)->getJson('/api/inventory/summary')->assertOk();
+
+        // المقيَّد بمخزن ألفا: الأسود النشط فقط هناك (٦×١.٠٠=٦.٠٠)؛ الأبيض معطَّل فلا يُحتسب رغم وجوده في نفس المخزن.
+        $this->assertSame('6.00', $scopedRes['total_value']);
+        // غير المقيَّد: الأسود في كلا المخزنين (٦+١٠=١٦ × ١.٠٠ = ١٦.٠٠)؛ الأبيض معطَّل فلا يُحتسب رغم كميته.
+        $this->assertSame('16.00', $ownerRes['total_value']);
+
+        // Parity مع `InventoryReportService::inventoryValue()` المقيَّد بنفس المخزن.
+        app(TenantContext::class)->set($tid);
+        $authoritativeScoped = app(InventoryReportService::class)
+            ->report('value', ['warehouse_id' => [$warehouseA['id']]])['totals']['stock_value'];
+        app(TenantContext::class)->forget();
+        $this->assertSame(600, $authoritativeScoped); // ٦.٠٠ بالهللات
+    }
+
     /** @test */
     public function it_matches_the_authoritative_inventory_report_value_including_variant_managed_products(): void
     {
@@ -289,5 +382,55 @@ class InventorySummaryTest extends TestCase
             $legacyQueriesBig,
             'legacy path must show clear N+1 growth by comparison, for the same 40-product tenant'
         );
+    }
+
+    /**
+     * AWJ-PERF-4 (إغلاق الفجوة): مسار المستخدم المقيَّد بمخزن يبقى استعلاماً
+     * تجميعياً واحداً أيضاً — لا يتحوّل إلى N+1 بإضافة فرع `product_warehouse_stock`.
+     */
+    /** @test */
+    public function warehouse_scoped_query_count_also_stays_flat_with_catalog_size(): void
+    {
+        ['token' => $ownerSmall, 'tenant_id' => $tidSmall] = $this->registerTenant('nibras-wh-small', 'owner@wh-small.test');
+        $warehouseSmall = $this->withToken($ownerSmall)->postJson('/api/warehouses', ['name' => 'مخزن'])->assertCreated()['data'];
+        app(TenantContext::class)->set($tidSmall);
+        for ($i = 0; $i < 5; $i++) {
+            $p = Product::create(['tenant_id' => $tidSmall, 'name' => "صنف {$i}", 'type' => 'good', 'track_inventory' => true]);
+            app(InventoryService::class)->receiveStock($p->fresh(), 2, 1000, ['warehouse_id' => $warehouseSmall['id']]);
+        }
+        app(TenantContext::class)->forget();
+        $this->withToken($ownerSmall)->postJson('/api/users', [
+            'name' => 'مقيَّد', 'email' => 'scoped@wh-small.test', 'password' => 'password123',
+            'role' => 'admin', 'warehouse_ids' => [$warehouseSmall['id']],
+        ])->assertCreated();
+        $scopedTokenSmall = $this->postJson('/api/login', ['email' => 'scoped@wh-small.test', 'password' => 'password123'])->assertOk()['token'];
+
+        ['token' => $ownerBig, 'tenant_id' => $tidBig] = $this->registerTenant('nibras-wh-big', 'owner@wh-big.test');
+        $warehouseBig = $this->withToken($ownerBig)->postJson('/api/warehouses', ['name' => 'مخزن'])->assertCreated()['data'];
+        app(TenantContext::class)->set($tidBig);
+        for ($i = 0; $i < 30; $i++) {
+            $p = Product::create(['tenant_id' => $tidBig, 'name' => "صنف {$i}", 'type' => 'good', 'track_inventory' => true]);
+            app(InventoryService::class)->receiveStock($p->fresh(), 2, 1000, ['warehouse_id' => $warehouseBig['id']]);
+        }
+        app(TenantContext::class)->forget();
+        $this->withToken($ownerBig)->postJson('/api/users', [
+            'name' => 'مقيَّد', 'email' => 'scoped@wh-big.test', 'password' => 'password123',
+            'role' => 'admin', 'warehouse_ids' => [$warehouseBig['id']],
+        ])->assertCreated();
+        $scopedTokenBig = $this->postJson('/api/login', ['email' => 'scoped@wh-big.test', 'password' => 'password123'])->assertOk()['token'];
+
+        DB::enableQueryLog();
+
+        DB::flushQueryLog();
+        $this->withToken($scopedTokenSmall)->getJson('/api/inventory/summary')->assertOk();
+        $small = count(DB::getQueryLog());
+
+        DB::flushQueryLog();
+        $this->withToken($scopedTokenBig)->getJson('/api/inventory/summary')->assertOk();
+        $big = count(DB::getQueryLog());
+
+        DB::disableQueryLog();
+
+        $this->assertSame($small, $big, 'warehouse-scoped summary query count must stay flat between 5 and 30 tracked products');
     }
 }
