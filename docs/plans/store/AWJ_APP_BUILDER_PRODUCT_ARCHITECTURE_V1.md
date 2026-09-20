@@ -814,6 +814,197 @@ Examples requiring explicit verification:
 
 ---
 
+## 19A. Apple + Google Update & Release Matrix — Official Evidence Pass (2026-09-20)
+
+### External Evidence — Apple
+
+- Apple App Review Guideline 2.5.2 requires apps to be self-contained and prohibits downloading/installing/executing code that introduces or changes app features/functionality. This makes AWJ's declarative, allowlisted-runtime boundary important: remote experience configuration must configure capabilities already present in the reviewed app, not become a remote executable-code channel.
+- A new App Store version requires a new build to be uploaded/selected and the version submitted to App Review.
+- App Store Connect supports release after approval manually, automatically, or automatically no earlier than a selected date.
+- Apple phased release for an **update** distributes automatic updates over seven days to users with automatic updates enabled: 1%, 2%, 5%, 10%, 20%, 50%, 100%. Users may still manually download the update at any time.
+- Apple Support states App Store apps on iPhone/iPad automatically update by default, but the user can turn automatic app updates off and update manually.
+- Therefore AWJ can manage release configuration/status, but cannot truthfully promise that every installed iOS app changes binary version immediately after an App Store release.
+
+### External Evidence — Google Play
+
+- Google Play's Device and Network Abuse policy says a Play-distributed app may not modify/replace/update itself outside Google Play's update mechanism and may not download executable dex/JAR/native code from outside Google Play. Runtime-loaded interpreted code must not enable policy violations.
+- Updating an existing Play app requires an updated signed app bundle with a higher version code; after submission the update may enter review, and once published distribution to existing users begins.
+- Users can manually update. If automatic updates are enabled for the app, Google Play can download/install the update automatically; delivery can take time and device/account/network settings can affect it.
+- Google Play staged rollout exposes an update to a chosen percentage of eligible users; the percentage does **not** increase automatically and the developer must raise it. Delivery to the selected group may take time.
+- Google Play In-App Updates provides **Flexible** and **Immediate** flows. Flexible permits use while downloading; Immediate is a fullscreen flow requiring update/restart to continue after the user accepts it. This is a client UX mechanism for an update already available through Google Play, not a bypass of Play release/distribution.
+- Google Play's Publishing API/Developer API can participate in automated publishing/release workflows, but review/policy gates remain external platform controls.
+
+### AWJ Decision — four separate statuses
+
+AWJ must never use one ambiguous `Published` state for all update concepts.
+
+The product must distinguish:
+
+1. **Experience Published** — remote AWJ experience/config version is published.
+2. **Native Build Released** — a binary version has passed the AWJ build/release process and is released/available through the relevant store path.
+3. **Store Availability / Rollout** — Apple/Google is making the binary available to all or a rollout cohort.
+4. **Device Installed Version** — the customer's device has actually installed a particular binary version.
+
+These states can legitimately differ at the same time.
+
+### Update Classification Matrix
+
+The following is the AWJ target classification based on current platform evidence. “Runtime update” always means a **declarative change using capabilities already shipped in the installed reviewed binary**; it is not permission to download executable code or reveal materially hidden/unreviewed functionality.
+
+| Change | Experience/runtime publish candidate | New native build | Store submission/release | Notes |
+|---|---:|---:|---:|---|
+| Marketing text/content from approved AWJ content model | Yes | No | No | Subject to content/store policy and existing runtime support. |
+| Banner/image/content asset reference | Yes | No | No | Runtime already supports asset/content rendering; security/content policy still applies. |
+| Brand colors / supported theme tokens | Yes | No | No | Within shipped theme capabilities. |
+| Reorder existing supported sections/components | Yes | No | No | Must remain within reviewed/shipped component registry. |
+| Change properties of an existing supported component | Yes | No | No | Only properties/capabilities supported by installed runtime/schema compatibility. |
+| Navigation among existing approved screens/routes | Yes | No | No | Deep-link/resource authorization remains enforced. |
+| Visibility/scheduling of already-supported content/component | Yes | No | No | Must not activate hidden native functionality outside approved capability envelope. |
+| New server data/content returned through an existing typed AWJ resource | Usually yes | No | No | Does not authorize new native functionality; backend rules remain authoritative. |
+| New component type not present in installed runtime | No for affected installed runtime | Yes | Yes | Ship component/runtime capability first. |
+| New native capability/API integration | No | Yes | Yes | Binary capability change. |
+| Add/change native SDK/library | No | Yes | Yes | Rebuild; review/policy/data disclosures may also change. |
+| Native bug/performance fix | No | Yes | Yes | Binary code change. |
+| New OS permission/entitlement/capability | No | Yes | Yes | Also requires platform policy/configuration review as applicable. |
+| Change minimum OS / target SDK / platform compatibility | No | Yes | Yes | Binary/build configuration change. |
+| New payment/auth native implementation | No | Yes | Yes | Sensitive capability; stronger AWJ + store review controls. |
+| Push content/campaign using an already-shipped push capability | Yes | No | No | Push capability/config already present; payload cannot grant authority. |
+| Add/change push native capability, entitlement or SDK | No | Yes | Yes | Native/platform capability change. |
+| Existing supported deep-link destination/content | Yes | No | No | Incoming data remains untrusted; authorization required. |
+| Add a native deep-link/universal/app-link capability requiring binary/platform config change | No | Yes | Yes | Exact platform setup depends on chosen runtime and link model. |
+| App executable icon/bundled native assets requiring binary replacement | No | Yes | Yes | Distinguish from remotely rendered in-app branding assets. |
+| App Store / Play listing metadata only | N/A | Not necessarily | Store-side change/review rules apply | Must be tracked separately from runtime and binary versioning. |
+
+### Compatibility rule — the decisive check
+
+A remote change is eligible for an AWJ Experience Publish only when **all** of the following are true:
+
+1. the installed runtime already implements the requested component/action/data/navigation capability;
+2. the published schema version is compatible with that runtime;
+3. the change is declarative configuration/content, not downloaded executable native code;
+4. the change stays within Apple/Google policy and the app's disclosed/reviewed purpose/capability envelope;
+5. AWJ security/authorization/tenant-isolation validation passes.
+
+If any required capability is missing from an installed runtime, AWJ must classify that portion as **Native Release Required** rather than silently failing or pretending it can hot-update it.
+
+### Mixed-version installed base
+
+After AWJ releases a new binary, users may remain on older runtime versions because automatic updates are not instantaneous/guaranteed.
+
+Therefore the server must support an installed-base compatibility model:
+
+```text
+Published Experience
+   |
+   +-- runtime capability/version constraints
+   |
+   +-- compatible experience projection for older supported runtime
+   |
+   +-- latest experience for newer runtime
+   |
+   +-- minimum-supported-version policy when compatibility can no longer be preserved
+```
+
+A new builder capability should not be published globally until AWJ knows what older installed binaries will do.
+
+### Builder publish impact UX
+
+Before publishing, the Builder/Release Center should classify the pending diff:
+
+- **Experience update only** — no store binary required.
+- **iOS native release required**.
+- **Android native release required**.
+- **Both native releases required**.
+- **Mixed** — some changes can publish remotely while others wait for a native release.
+
+For mixed changes, AWJ should default to preserving a coherent user experience rather than partially publishing a configuration that references unavailable runtime capabilities.
+
+### iOS rollout model for AWJ
+
+After an approved binary is released:
+
+- Apple may release it immediately or via Apple's seven-day phased release for automatic updates.
+- Phased release affects automatic updates; users can manually fetch the update earlier.
+- Automatic updates can be disabled by the user.
+- AWJ may display **Available in App Store / Phased rollout / Released to all** based on store state, but this is not equivalent to “installed on all devices.”
+
+Do not show “100% users updated” merely because Apple's phased release reached day 7.
+
+### Android rollout/update model for AWJ
+
+After a Play binary is approved/published:
+
+- full rollout can make it available broadly;
+- staged rollout limits eligibility to a selected percentage and requires deliberate percentage increases;
+- automatic update depends on Google Play/user/device/account/network behavior and can take time;
+- AWJ may optionally integrate Google Play **In-App Updates** later to encourage/require an eligible update while the app is open.
+
+An Immediate In-App Update should be reserved for justified critical compatibility/security cases, not normal merchandising changes.
+
+### Force-update policy
+
+AWJ must not conflate “minimum supported runtime” with “the store forcibly installed a binary.”
+
+If a runtime becomes too old to operate safely:
+- backend/runtime compatibility policy may block incompatible/sensitive operations or present an update-required screen;
+- Android can additionally use Play's Immediate In-App Update UX where supported;
+- the binary still comes from the official store update mechanism.
+
+Exact iOS user-prompt UX for minimum-version enforcement remains a later design decision; do not invent an Apple equivalent to Google Play In-App Updates without official evidence.
+
+### Store automation boundary
+
+AWJ may automate supported App Store Connect / Google Play API operations where credentials/roles allow, including submission/release workflow operations exposed by official APIs.
+
+Automation does **not** mean AWJ controls:
+- App Review approval;
+- Google policy review outcome;
+- exact review duration;
+- whether a user has automatic updates enabled;
+- exact moment every device installs the update.
+
+Release Center must expose external waiting/review states rather than hide them.
+
+### Rollback semantics
+
+Experience rollback and binary rollback are different:
+
+- **Experience rollback:** AWJ can republish a prior compatible experience/config version, subject to validation.
+- **Apple binary rollback:** Apple states a previous App Store version cannot simply be reverted; a corrective new version must be created/submitted.
+- **Google binary recovery:** if a binary release is defective, release controls can halt staged rollout where applicable, but fixing the artifact requires a corrected release; do not model this as the same instant rollback operation as an experience config.
+
+### Required telemetry
+
+To operate safely with mixed runtime versions, AWJ should collect privacy-appropriate operational telemetry sufficient to understand:
+- app platform;
+- installed binary/runtime version;
+- supported schema/capability version;
+- published experience version fetched/applied;
+- compatibility/fallback failures;
+- update-required states.
+
+This telemetry must remain tenant/app scoped and must not become cross-tenant analytics leakage.
+
+### Open Decisions after this pass
+
+- exact minimum-supported-runtime policy;
+- whether/how AWJ measures installed-version adoption versus store rollout eligibility;
+- final Apple/Google API automation scope after credential/account-ownership design;
+- Android In-App Updates V1 vs later;
+- exact iOS update-required UX;
+- metadata-only store-change classification per field;
+- App Store/Play account ownership model;
+- phased/staged rollout defaults by risk class;
+- emergency security-release procedure.
+
+### Evidence-pass conclusion
+
+The core product rule is now:
+
+> **Publish experience changes remotely when they only configure capabilities already present in the installed reviewed runtime. Build/release through Apple/Google whenever the binary capability changes. Never report a store release as proof that every user's installed app has updated.**
+
+---
+
 ## 20. Build/signing/store-account model
 
 ### Open Decision
@@ -928,6 +1119,15 @@ Each pass updates this document with evidence, AWJ decision, and remaining open 
 
 ### Existing repository evidence
 - `docs/plans/store/AWJ_MOBILE_APP_BUILDER_BENCHMARK.md` — baseline benchmark and initial architecture direction.
+
+### Apple/Google Update & Release evidence added 2026-09-20
+- Apple App Review Guidelines — 2.5.2 self-contained bundle / downloaded executable-code boundary.
+- App Store Connect Help — Create a new version; Submit an app; release options; phased release for automatic updates.
+- Apple Support — App Store apps automatically update by default on iPhone/iPad, with user control/manual updates.
+- Google Play Console Help — Update or unpublish your app; Prepare and roll out a release; staged rollouts; submission activity.
+- Google Play Developer Program Policy — Device and Network Abuse / official Play update mechanism and executable-code restrictions.
+- Android Developers — Google Play In-App Updates (Flexible and Immediate flows).
+- Google Play Android Developer API — publishing/release automation surface.
 
 ### 04B evidence sources added 2026-09-20
 - Digia Academy — Variables; State Management; Action Catalog; Pages/lifecycle actions.
