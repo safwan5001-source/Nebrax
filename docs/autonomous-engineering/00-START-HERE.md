@@ -4,17 +4,19 @@
 
 This directory is the durable operating layer for long-running engineering agents working on AWJ.
 
-It does **not** replace domain architecture, `CLAUDE.md`, the design system, tests, or repository evidence. It tells an autonomous senior engineering agent how to discover the current state, choose the next safe unit of work, research when useful, implement, test, self-review, report, and continue without requiring Safwan to manually say "next" after every routine step.
+It does **not** replace domain architecture, `CLAUDE.md`, the design system, tests, or repository evidence. It tells an autonomous senior engineering agent how to discover current state, choose the next safe unit of work, research when useful, implement, test, self-review, report, and continue without requiring Safwan to manually say "next" after every routine step.
 
 ## Read order
 
 1. `/CLAUDE.md` — non-negotiable AWJ architecture/accounting/tenant rules.
-2. `docs/autonomous-engineering/AUTONOMOUS-ENGINEERING-PROTOCOL.md`
-3. `docs/autonomous-engineering/QUALITY-GATES.md`
-4. `docs/autonomous-engineering/DECISION-ESCALATION.md`
-5. `docs/autonomous-engineering/MASTER-EXECUTION-PLAN.md`
-6. The relevant domain documentation only.
-7. Current repository implementation/tests/CI evidence.
+2. `docs/autonomous-engineering/CURRENT-STATE.md`
+3. `docs/autonomous-engineering/AUTONOMOUS-ENGINEERING-PROTOCOL.md`
+4. `docs/autonomous-engineering/QUALITY-GATES.md`
+5. `docs/autonomous-engineering/DECISION-ESCALATION.md`
+6. `docs/autonomous-engineering/TASK-QUEUE.md`
+7. `docs/autonomous-engineering/MASTER-EXECUTION-PLAN.md`
+8. The relevant domain documentation and latest relevant implementation report/handoff only.
+9. Current repository implementation/tests/CI evidence.
 
 Existing orchestration material under `docs/agent-workspace/` remains historical/operational evidence and is not deleted by this layer.
 
@@ -51,7 +53,17 @@ Orient
  -> continue to next dependency-ready task
 ```
 
-The loop stops only at a defined escalation/owner gate, a real blocker, or completion of the authorized execution horizon.
+## Critical PR / merge semantics
+
+A task PR becoming technically ready does **not** imply the task is merged.
+
+Under the current owner policy:
+- Claude may create/update a PR and drive it to verified review-ready state;
+- if merge is required before a dependent task can safely begin, that task reaches `owner_gate` and dependent work waits;
+- Claude may continue other independent authorized tasks that do not depend on the unmerged change;
+- Claude must never stack dependent production work on an unmerged task merely to avoid stopping, unless the authorized horizon explicitly defines a reviewed stacked-branch strategy.
+
+This prevents "continuous execution" from silently bypassing Safwan's merge gate.
 
 ## Source-of-truth precedence
 
