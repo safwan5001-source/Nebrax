@@ -9,10 +9,7 @@ import {
   previewStoreName,
   type StorefrontPresentationConfig,
 } from "./presentation/config";
-import {
-  type HomeBuilderSectionKey,
-  presentationCssVars,
-} from "./presentation/tokens";
+import { presentationCssVars } from "./presentation/tokens";
 import { buildWhatsAppUrl, sanitizeExternalUrl } from "./presentation/urls";
 import { cn } from "@/lib/utils";
 import {
@@ -46,12 +43,14 @@ interface StorefrontPreviewCanvasProps {
   viewport: "desktop" | "tablet" | "mobile";
   liveStoreName?: string | null;
   /**
-   * Click-to-Edit foundation (STORE-CUSTOMIZER-V2-1). When a selection
-   * bridge is provided, homepage sections become selectable inside the
-   * preview. Optional so the dev harness mirror stays inert.
+   * Click-to-Edit foundation (STORE-CUSTOMIZER-V2-1), upgraded to instance
+   * identity in V2-2 (CONTRACT-2): `selectedSection` is a section instance
+   * id, and `data-preview-section-id` disambiguates duplicate instances of
+   * the same type. `data-preview-section` keeps the *type* for compatibility.
+   * Optional so the dev harness mirror stays inert.
    */
-  selectedSection?: HomeBuilderSectionKey | null;
-  onSelectSection?: (key: HomeBuilderSectionKey) => void;
+  selectedSection?: string | null;
+  onSelectSection?: (id: string) => void;
 }
 
 export function StorefrontPreviewCanvas({
@@ -352,7 +351,8 @@ export function StorefrontPreviewCanvas({
               <SelectablePreviewSection
                 key={section.id}
                 sectionKey={section.type}
-                selected={selectedSection === section.type}
+                sectionId={section.id}
+                selected={selectedSection === section.id}
                 onSelect={onSelectSection}
               >
                 {content}
@@ -508,13 +508,15 @@ export function StorefrontPreviewCanvas({
 
 function SelectablePreviewSection({
   sectionKey,
+  sectionId,
   selected,
   onSelect,
   children,
 }: {
-  sectionKey: HomeBuilderSectionKey;
+  sectionKey: string;
+  sectionId: string;
   selected: boolean;
-  onSelect?: (key: HomeBuilderSectionKey) => void;
+  onSelect?: (id: string) => void;
   children: ReactNode;
 }) {
   if (!onSelect) return <>{children}</>;
@@ -524,12 +526,13 @@ function SelectablePreviewSection({
       tabIndex={0}
       aria-pressed={selected}
       data-preview-section={sectionKey}
+      data-preview-section-id={sectionId}
       data-section-selected={selected ? "" : undefined}
-      onClick={() => onSelect(sectionKey)}
+      onClick={() => onSelect(sectionId)}
       onKeyDown={(event) => {
         if (event.key === "Enter" || event.key === " ") {
           event.preventDefault();
-          onSelect(sectionKey);
+          onSelect(sectionId);
         }
       }}
       className={cn(

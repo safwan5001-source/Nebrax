@@ -37,6 +37,10 @@ export const CUSTOMIZER_MESSAGES = {
     groupTrust: "الثقة والمحتوى",
     composerTitle: "أقسام الصفحة",
     composerHint: "إظهار وإخفاء وإعادة ترتيب. غير المفعّل يبقى للمعاينة فقط.",
+    addSection: "إضافة قسم",
+    duplicateSection: "تكرار القسم",
+    deleteSection: "حذف القسم",
+    sectionLimitReached: "بلغت الحد الأقصى للأقسام.",
     heroContent: "محتوى البطل",
     contactIntro: "تظهر في تذييل المتجر. ليست سجل الشركة في أَوْج.",
     whatsappIntro: "زر تواصل للمعاينة. المعاينة لا ترسل رسالة.",
@@ -118,6 +122,9 @@ export const CUSTOMIZER_MESSAGES = {
     sectionCustomContent: "محتوى محكوم",
     gatedSection:
       "هذا القسم مصمَّم للمعاينة. لا يُنشر على المتجر الحي قبل وجود عقد بياناته.",
+    selectedSectionHint: "تظهر هنا إعدادات القسم المحدد فقط.",
+    sectionManagedNote:
+      "محتوى هذا القسم يأتي من كتالوج أَوْج ولا يُحرَّر من هنا. يمكنك إظهاره أو إخفاؤه وإعادة ترتيبه.",
     heroHeadline: "عنوان البطل",
     heroSubheadline: "سطر داعم",
     footerTagline: "نبذة قصيرة",
@@ -233,6 +240,10 @@ export const CUSTOMIZER_MESSAGES = {
     composerTitle: "Homepage sections",
     composerHint:
       "Show, hide and reorder. Gated sections stay preview-only until their contract exists.",
+    addSection: "Add section",
+    duplicateSection: "Duplicate section",
+    deleteSection: "Delete section",
+    sectionLimitReached: "Section limit reached.",
     heroContent: "Hero content",
     contactIntro:
       "Shown in the store footer. This is not the AWJ company record.",
@@ -300,7 +311,7 @@ export const CUSTOMIZER_MESSAGES = {
     kindHome: "Home",
     kindCategory: "Category",
     kindProduct: "Product",
-    kindContent: "Page",
+    kindContent: "Content page",
     kindExternal: "External",
     sectionVisible: "Visible",
     sectionHidden: "Hidden",
@@ -318,6 +329,9 @@ export const CUSTOMIZER_MESSAGES = {
     sectionCustomContent: "Controlled content",
     gatedSection:
       "This section is designed for preview. It will not appear on the live storefront until its data contract exists.",
+    selectedSectionHint: "Only the selected section's settings appear here.",
+    sectionManagedNote:
+      "This section's content comes from the AWJ catalog and cannot be edited here. You can show, hide and reorder it.",
     heroHeadline: "Hero headline",
     heroSubheadline: "Supporting line",
     footerTagline: "Short description",

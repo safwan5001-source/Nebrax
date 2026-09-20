@@ -1,12 +1,21 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { useState } from "react";
 import {
+  canAddSectionType,
+  canDuplicateSection,
+  canDeleteSection,
   type CONTENT_PAGE_SLUGS,
   contrastRatio,
   DENSITY_PRESETS,
+  hasAddableSectionType,
+  HOME_BUILDER_SECTION_KEYS,
   type HomeBuilderSectionKey,
   isGatedHomeSection,
+  MAX_HOME_SECTIONS,
+  newHomeSectionId,
+  type PresentationHomeSection,
   PRODUCT_CARD_PRESETS,
   RADIUS_PRESETS,
   SOCIAL_NETWORKS,
@@ -103,8 +112,8 @@ interface PanelsProps {
   locale: CustomizerLocale;
   liveStoreName: string | null;
   onChange: (next: StorefrontPresentationConfig) => void;
-  selectedSection?: HomeBuilderSectionKey | null;
-  onSelectSection?: (key: HomeBuilderSectionKey) => void;
+  selectedSection?: string | null;
+  onSelectSection?: (id: string | null) => void;
 }
 
 export function ControlPanels({
@@ -744,58 +753,201 @@ function HomepagePanel({
   config: StorefrontPresentationConfig;
   t: (key: CustomizerMessageKey) => string;
   patch: (partial: Partial<StorefrontPresentationConfig>) => void;
-  selectedSection?: HomeBuilderSectionKey | null;
-  onSelectSection?: (key: HomeBuilderSectionKey) => void;
+  selectedSection?: string | null;
+  onSelectSection?: (id: string | null) => void;
 }) {
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const sections = config.homepage.sections;
+
+  const setSections = (next: PresentationHomeSection[]) =>
+    patch({ homepage: { ...config.homepage, sections: next } });
+
   const move = (index: number, delta: number) => {
-    const next = [...config.homepage.sections];
+    const next = [...sections];
     const target = index + delta;
     if (target < 0 || target >= next.length) return;
     const [item] = next.splice(index, 1);
     next.splice(target, 0, item);
-    patch({ homepage: { ...config.homepage, sections: next } });
+    setSections(next);
   };
+
+  const setVisible = (index: number, visible: boolean) => {
+    setSections(
+      sections.map((item, i) => (i === index ? { ...item, visible } : item)),
+    );
+  };
+
+  // Add (Section Picker): user-created instance — هذا هو الموضع الوحيد
+  // المسموح فيه بتوليد id جديد (بعيدًا عن normalization). النسخة الجديدة
+  // تُلحق بنهاية القائمة وتصبح selected مباشرة.
+  const addSection = (type: HomeBuilderSectionKey) => {
+    if (!canAddSectionType(sections, type)) return;
+    const id = newHomeSectionId();
+    setSections([...sections, { id, type, visible: true }]);
+    setPickerOpen(false);
+    onSelectSection?.(id);
+  };
+
+  // Duplicate: ينسخ type/visible فقط (لا content payload في العقد)، بمعرّف
+  // جديد، ويوضع مباشرة بعد الأصل ويصبح selected.
+  const duplicateSection = (index: number) => {
+    const source = sections[index];
+    if (!source || !canDuplicateSection(sections, source)) return;
+    const copy: PresentationHomeSection = {
+      id: newHomeSectionId(),
+      type: source.type,
+      visible: source.visible,
+    };
+    const next = [...sections];
+    next.splice(index + 1, 0, copy);
+    setSections(next);
+    onSelectSection?.(copy.id);
+  };
+
+  // Delete: في عقد v2 إزالة الـinstance من homepage.sections هي الحذف
+  // الحقيقي (لا resurrection). لا تُستخدم visible=false كبديل. الـselection
+  // ينتقل deterministic: next sibling، وإلا previous، وإلا null.
+  const deleteSection = (index: number) => {
+    const removed = sections[index];
+    if (!removed) return;
+    const next = sections.filter((_, i) => i !== index);
+    setSections(next);
+    if (selectedSection === removed.id) {
+      const fallback = next[index] ?? next[index - 1] ?? null;
+      onSelectSection?.(fallback ? fallback.id : null);
+    }
+  };
+
+  const heroFields = (
+    <>
+      <Field label={t("heroHeadline")}>
+        <input
+          className={inputClass}
+          value={config.homepage.heroHeadline}
+          onChange={(event) =>
+            patch({
+              homepage: {
+                ...config.homepage,
+                heroHeadline: event.target.value,
+              },
+            })
+          }
+        />
+      </Field>
+      <Field label={t("heroSubheadline")}>
+        <input
+          className={inputClass}
+          value={config.homepage.heroSubheadline}
+          onChange={(event) =>
+            patch({
+              homepage: {
+                ...config.homepage,
+                heroSubheadline: event.target.value,
+              },
+            })
+          }
+        />
+      </Field>
+    </>
+  );
+
+  const selectedIndex = selectedSection
+    ? sections.findIndex((section) => section.id === selectedSection)
+    : -1;
+  const selected = selectedIndex >= 0 ? sections[selectedIndex] : null;
 
   return (
     <div className="space-y-7">
-      <Section title={t("heroContent")}>
-        <Field label={t("heroHeadline")}>
-          <input
-            className={inputClass}
-            value={config.homepage.heroHeadline}
-            onChange={(event) =>
-              patch({
-                homepage: {
-                  ...config.homepage,
-                  heroHeadline: event.target.value,
-                },
-              })
-            }
-          />
-        </Field>
-        <Field label={t("heroSubheadline")}>
-          <input
-            className={inputClass}
-            value={config.homepage.heroSubheadline}
-            onChange={(event) =>
-              patch({
-                homepage: {
-                  ...config.homepage,
-                  heroSubheadline: event.target.value,
-                },
-              })
-            }
-          />
-        </Field>
-      </Section>
+      {selected ? (
+        <Section
+          title={t(SECTION_LABEL[selected.type])}
+          hint={t("selectedSectionHint")}
+        >
+          <div
+            data-selected-section-settings={selected.type}
+            className="space-y-4"
+          >
+            <Toggle
+              compact
+              label={
+                selected.visible ? t("sectionVisible") : t("sectionHidden")
+              }
+              checked={selected.visible}
+              onChange={(visible) => setVisible(selectedIndex, visible)}
+            />
+            {selected.type === "hero" ? (
+              heroFields
+            ) : isGatedHomeSection(selected.type) ? (
+              <p className="text-xs leading-relaxed text-neutral-500">
+                {t("gatedSection")}
+              </p>
+            ) : (
+              <p className="text-xs leading-relaxed text-neutral-500">
+                {t("sectionManagedNote")}
+              </p>
+            )}
+          </div>
+        </Section>
+      ) : (
+        <Section title={t("heroContent")}>{heroFields}</Section>
+      )}
       <Section title={t("composerTitle")} hint={t("composerHint")}>
+        <div className="mb-2">
+          <button
+            type="button"
+            data-add-section=""
+            disabled={
+              !hasAddableSectionType(sections) ||
+              sections.length >= MAX_HOME_SECTIONS
+            }
+            title={
+              sections.length >= MAX_HOME_SECTIONS
+                ? t("sectionLimitReached")
+                : undefined
+            }
+            aria-expanded={pickerOpen}
+            onClick={() => setPickerOpen((open) => !open)}
+            className={`${btnClass} w-full justify-center disabled:opacity-50`}
+          >
+            + {t("addSection")}
+          </button>
+          {pickerOpen ? (
+            <ul
+              data-section-picker=""
+              className="mt-1 border border-neutral-200 bg-white"
+            >
+              {HOME_BUILDER_SECTION_KEYS.map((type) => {
+                const addable = canAddSectionType(sections, type);
+                return (
+                  <li key={type}>
+                    <button
+                      type="button"
+                      data-picker-option={type}
+                      disabled={!addable}
+                      onClick={() => addSection(type)}
+                      className="flex h-9 w-full items-center justify-between gap-2 px-3 text-start text-[13px] text-neutral-800 outline-none hover:bg-neutral-50 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-neutral-900 disabled:text-neutral-400 disabled:hover:bg-transparent"
+                    >
+                      <span className="truncate">{t(SECTION_LABEL[type])}</span>
+                      {isGatedHomeSection(type) ? (
+                        <span className="text-[10px] leading-none text-neutral-400">
+                          {t("gatedBadge")}
+                        </span>
+                      ) : null}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : null}
+        </div>
         <ul className="border border-neutral-200">
-          {config.homepage.sections.map((section, index) => {
-            const isSelected = selectedSection === section.type;
+          {sections.map((section, index) => {
+            const isSelected = selectedSection === section.id;
             return (
             <li
               key={section.id}
               data-composer-section={section.type}
+              data-section-id={section.id}
               className={`flex h-12 items-center gap-1 border-b border-neutral-200 px-1 last:border-b-0 ${
                 isSelected
                   ? "border-s-2 border-s-neutral-900 bg-neutral-50 ps-0.5"
@@ -815,7 +967,7 @@ function HomepagePanel({
                 <button
                   type="button"
                   aria-label={t("moveDown")}
-                  disabled={index === config.homepage.sections.length - 1}
+                  disabled={index === sections.length - 1}
                   className={iconBtnClass}
                   onClick={() => move(index, 1)}
                 >
@@ -827,7 +979,7 @@ function HomepagePanel({
                 data-section-option={section.type}
                 aria-pressed={isSelected}
                 title={t(SECTION_LABEL[section.type])}
-                onClick={() => onSelectSection?.(section.type)}
+                onClick={() => onSelectSection?.(section.id)}
                 className="min-w-0 flex-1 rounded-sm px-1 py-1 text-start outline-none focus-visible:ring-2 focus-visible:ring-neutral-900"
               >
                 <p
@@ -843,18 +995,35 @@ function HomepagePanel({
                   </p>
                 ) : null}
               </button>
+              {canDuplicateSection(sections, section) ? (
+                <button
+                  type="button"
+                  aria-label={t("duplicateSection")}
+                  title={t("duplicateSection")}
+                  className={iconBtnClass}
+                  onClick={() => duplicateSection(index)}
+                >
+                  ⧉
+                </button>
+              ) : null}
+              {canDeleteSection(section) ? (
+                <button
+                  type="button"
+                  aria-label={t("deleteSection")}
+                  title={t("deleteSection")}
+                  className={iconBtnClass}
+                  onClick={() => deleteSection(index)}
+                >
+                  ✕
+                </button>
+              ) : null}
               <Toggle
                 compact
                 label={
                   section.visible ? t("sectionVisible") : t("sectionHidden")
                 }
                 checked={section.visible}
-                onChange={(visible) => {
-                  const sections = config.homepage.sections.map((item, i) =>
-                    i === index ? { ...item, visible } : item,
-                  );
-                  patch({ homepage: { ...config.homepage, sections } });
-                }}
+                onChange={(visible) => setVisible(index, visible)}
               />
             </li>
             );

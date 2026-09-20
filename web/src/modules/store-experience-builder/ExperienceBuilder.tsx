@@ -70,10 +70,10 @@ export function ExperienceBuilder({
   const [panel, setPanel] = useState<CustomizerPanel>("theme");
   const [device, setDevice] = useState<PreviewDevice>("desktop");
   const [mobilePane, setMobilePane] = useState<"edit" | "preview">("edit");
-  const [selectedSection, setSelectedSection] =
-    useState<HomeBuilderSectionKey | null>(null);
-  const [pendingSectionScroll, setPendingSectionScroll] =
-    useState<HomeBuilderSectionKey | null>(null);
+  const [selectedSection, setSelectedSection] = useState<string | null>(null);
+  const [pendingSectionScroll, setPendingSectionScroll] = useState<
+    string | null
+  >(null);
   const [lifecycle, setLifecycle] = useState<BuilderLifecycle>("clean");
   const [notice, setNotice] = useState<string | null>(null);
   const [noticeKind, setNoticeKind] = useState<"capability" | "status">("status");
@@ -218,31 +218,34 @@ export function ExperienceBuilder({
     setNotice(VERSION_HISTORY_CAPABILITY === "deferred" ? t("versionDeferred") : null);
   }
 
-  // Section selection bridge (STORE-CUSTOMIZER-V2-1): a single selection
-  // state shared by the sidebar composer and the live preview. Sidebar
-  // selection opens the homepage panel and queues a scroll-to-section;
-  // preview clicks only update the selection (the section is already in
-  // view, so scrolling again would be a pointless jump).
+  // Section selection bridge (STORE-CUSTOMIZER-V2-1), upgraded to instance
+  // identity in V2-2: selection is a homepage section *instance id* (CONTRACT-2),
+  // never a section type — two instances of the same type stay independently
+  // selectable. Sidebar selection opens the homepage panel and queues a
+  // scroll-to-section; preview clicks only update the selection (the section
+  // is already in view, so scrolling again would be a pointless jump).
+  // `null` clears the selection (e.g. after deleting the selected instance).
   function handleSelectSection(
-    key: HomeBuilderSectionKey,
+    id: string | null,
     origin: "sidebar" | "preview",
   ) {
-    setSelectedSection(key);
+    setSelectedSection(id);
+    if (id === null) return;
     // Both origins open the section's settings (Click-to-Edit foundation);
     // only sidebar selection needs the preview to scroll to the section,
     // since a preview click already has the section in view.
     setPanel("homepage");
     if (origin === "sidebar") {
-      setPendingSectionScroll(key);
+      setPendingSectionScroll(id);
     }
   }
 
   useEffect(() => {
-    const key = pendingSectionScroll;
-    if (!key) return;
+    const id = pendingSectionScroll;
+    if (!id) return;
     setPendingSectionScroll(null);
     if (typeof document === "undefined") return;
-    const target = document.querySelector(`[data-preview-section="${key}"]`);
+    const target = document.querySelector(`[data-preview-section-id="${id}"]`);
     if (!target || typeof target.scrollIntoView !== "function") return;
     const reduceMotion =
       typeof window.matchMedia === "function" &&
@@ -407,7 +410,7 @@ export function ExperienceBuilder({
               liveStoreName={liveStoreName}
               onChange={updateDraft}
               selectedSection={selectedSection}
-              onSelectSection={(key) => handleSelectSection(key, "sidebar")}
+              onSelectSection={(id) => handleSelectSection(id, "sidebar")}
             />
           </div>
         </aside>
