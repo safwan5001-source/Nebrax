@@ -4,28 +4,26 @@
 
 LAST_UPDATED: 2026-09-20
 LAYER_VERSION: V1
-STATUS: DESIGNING
+STATUS: READY_FOR_EXECUTION
 
 ## Current objective
 
-Establish a safe autonomous-engineering operating layer so a capable coding agent can execute a bounded AWJ roadmap continuously without requiring Safwan to manually trigger every routine transition.
+Execute the first bounded autonomous-engineering horizon: close the Commerce Mobile API readiness gaps sequentially, beginning with COM-MOBILE-MEDIA-1. Preserve AWJ tenant/security/business invariants and stop at material Decision Gates.
 
 ## Confirmed repository context
 
 - Existing `docs/agent-workspace/` contains the earlier ChatGPT ↔ Claude orchestration protocol and operational evidence.
 - Existing `.claude/AGENT_ORCHESTRATION.md` is the older orchestration entrypoint.
 - The new `docs/autonomous-engineering/` layer is additive. It does not erase historical orchestration evidence.
-- App Builder architecture/readiness work is maintained separately in Draft PR #887.
-- This documentation work is Draft PR #890.
+- PR #887 (App Builder architecture + Commerce Mobile API readiness) is merged and post-merge reviewed; Merge SHA: `f43a8e0db36952f3007557fc127c3a6a28de0700`.
+- PR #890 (Autonomous Engineering V1) is merged and post-merge reviewed; Merge SHA: `587ed50c152450ee8c354486648a75f31a3d24a6`.
 
-## Current PR
+## Current execution horizon
 
-- PR: #890
-- Branch: `docs/awj-autonomous-engineering-v1`
-- Base at creation: `daf86b5ac013a0802dcc64652b1051da7a722a2d`
-- Application code changes: none
-- Merge: standing authority granted by Safwan; only after applicable review/Quality Gates + observed required green CI + no unresolved Decision Gate
-- Deploy: not applicable / not authorized
+- Horizon: Commerce Mobile API readiness closure V1.
+- First executable task: `COM-MOBILE-MEDIA-1`.
+- Implementation merge: standing authority after mandatory final-head pre-merge review, required green CI, no unresolved Decision Gate, and mandatory post-merge review.
+- Deploy / production release / destructive production operation: not authorized without Safwan's explicit approval.
 
 ## Completed in this layer
 
@@ -42,11 +40,19 @@ Establish a safe autonomous-engineering operating layer so a capable coding agen
 - Legacy orchestration compatibility/mode selection.
 - Standing merge authority with review/CI/Decision Gate safeguards.
 
-## Not yet authorized
+## Authorization boundary
 
-- No Commerce Mobile implementation task is authorized merely by this documentation.
-- No deploy/release autonomy has been approved.
-- No production mutation autonomy has been approved.
+Authorized:
+- sequential implementation work required to close the documented Commerce Mobile readiness gaps;
+- only tasks promoted to `ready` after current-main dependency/evidence validation;
+- routine engineering choices inside each task's documented outcome/invariants.
+
+Not authorized:
+- deploy or production release;
+- destructive production operations;
+- silent resolution of material accounting/payment/auth/tenant/security/strategic decisions;
+- unrelated App Builder runtime implementation;
+- material scope expansion outside this horizon.
 
 ## Resume rule
 
