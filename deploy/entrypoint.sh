@@ -39,11 +39,11 @@ PORT="${PORT:-8000}"
 sed -ri "s/^Listen .*/Listen ${PORT}/" /etc/apache2/ports.conf
 sed -ri "s/<VirtualHost \*:[0-9]+>/<VirtualHost *:${PORT}>/" /etc/apache2/sites-available/000-default.conf
 
-echo "▶ تشخيص Apache runtime قبل الإقلاع"
-echo "▶ MPM modules/config links:"
-find /etc/apache2/mods-enabled -maxdepth 1 -type l -name 'mpm_*.load' -print -exec readlink -f {} \; || true
-echo "▶ Apache configtest:"
-apache2ctl configtest || true
+# Railway runtime may re-enable mpm_event after the image build. mod_php requires
+# prefork, so enforce exactly one compatible MPM at container startup.
+a2dismod mpm_event mpm_worker >/dev/null 2>&1 || true
+a2enmod mpm_prefork >/dev/null 2>&1
+apache2ctl configtest
 
 echo "▶ إقلاع أَوْج عبر Apache على المنفذ ${PORT}"
 exec apache2-foreground
