@@ -60,10 +60,39 @@
 }
 
 /* Independent, thin-but-visible scrollbars for the customizer's own
-   scroll regions (sidebar, settings panel, preview canvas). The outer app
-   page is not the primary navigation inside the customizer. */
+   scroll regions (canvas, inspector, navigation, mobile sheet), all of
+   which carry [data-customizer-scroll]. Uses the AWJ editor token sheet
+   (--border / --muted / --primary) — NOT the merchant --store-* tokens —
+   and the attribute selector keeps every rule scoped to editor chrome,
+   so nothing leaks into merchant storefront content. */
 [data-customizer-scroll] {
   scrollbar-width: thin;
-  scrollbar-color: var(--store-muted-foreground, #636a78) transparent;
+  scrollbar-color: var(--border, #e5e7eb) transparent;
   overscroll-behavior: contain;
+}
+
+[data-customizer-scroll]::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+[data-customizer-scroll]::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+[data-customizer-scroll]::-webkit-scrollbar-thumb {
+  background: var(--border, #e5e7eb);
+  border-radius: 999px;
+}
+
+[data-customizer-scroll]::-webkit-scrollbar-thumb:hover {
+  background: var(--muted, #636a78);
+}
+
+[data-customizer-scroll]::-webkit-scrollbar-thumb:active {
+  background: var(--primary, #1e40af);
+}
+
+[data-customizer-scroll]::-webkit-scrollbar-corner {
+  background: transparent;
 }
