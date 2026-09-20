@@ -1,150 +1,215 @@
-# AWJ Store — SBC Verification V1 Contract
+# AWJ Store — SBC V1 Presentation Contract
 
-Status: Proposed contract, evidence-gated
-Scope: Saudi Business Center (منصة الأعمال) e-commerce authentication only.
+**Status:** Implementation-ready product and presentation contract
+**Scope:** Saudi Business Center (منصة الأعمال) presentation inside the AWJ Storefront Footer.
 
 ## 1. Purpose
 
-Define the smallest safe contract for associating an AWJ Storefront with Saudi Business Center e-commerce authentication. This document defines product and trust boundaries; it does not implement the feature.
+This document defines the smallest safe V1 contract for presenting a Saudi Business Center (SBC / منصة الأعمال) item in an AWJ Storefront. V1 is a **merchant-configured presentation feature**. It does not introduce a customer-facing verification-status workflow and does not establish an external verification integration.
 
-## 2. Terminology
+The feature must use the existing Storefront, StorefrontPresentation, Customizer, public configuration API, and Footer paths. It must not become a Home Builder section or a block above the Footer.
 
-Merchant-facing field: **رقم توثيق منصة الأعمال**.
+## 2. Source-of-truth boundaries
 
-This is separate from Commercial Registration (CR), VAT number, licenses, ZATCA, payment brands, and other trust features.
+- `Tenant.name` is the canonical legal/business entity name.
+- `Tenant.cr_number` is the canonical Commercial Registration number.
+- `Tenant.vat_number` is the canonical VAT number.
+- `Storefront.name` is the public store/trading display name.
+- SBC settings are Storefront presentation settings only. They must never replace, override, duplicate, or mutate Tenant legal identity.
+- Legacy presentation fields such as `verification.crNumber`, `licenseNumber`, `sourceUrl`, and `requestedVerifiedLabel` remain legacy presentation data and must not be reinterpreted as SBC configuration.
 
-## 3. Ownership
+## 3. SBC V1 contract
 
-- Tenant remains the canonical legal/business identity.
-- CR remains `Tenant.cr_number`.
-- VAT remains `Tenant.vat_number`.
-- Storefront remains the public store identity and is the subject of the SBC e-commerce authentication association.
-- SBC evidence must never replace or override Tenant legal identity.
+V1 contains exactly two conceptual settings:
 
-This is an ownership contract, not yet a database schema decision.
+| Setting | Merchant-facing label | Type | Behavior |
+|---|---|---|---|
+| `authentication_number` | رقم توثيق منصة الأعمال | String | Opaque merchant-entered value. Trim surrounding whitespace and preserve leading zeros. |
+| `show_in_storefront` | إظهار توثيق منصة الأعمال في المتجر | Boolean | Explicit Footer presentation setting. Defaults to `false` for existing and new stores unless explicitly enabled. |
 
-## 4. Merchant input
+### 3.1 `authentication_number`
 
-V1 has one conceptual input: `authentication_number`.
+The value must be handled as an opaque string:
 
-Rules:
-- treat it as an opaque string until an official format specification is established;
-- trim harmless surrounding whitespace;
-- do not guess a fixed length or regex from examples;
-- do not interpret it as CR or VAT;
-- saving the number does not make the Storefront verified.
+- trim only external whitespace;
+- preserve leading zeros;
+- never coerce it to an integer or numeric value;
+- do not assume a length, format, or regular expression that is not documented by an authoritative source;
+- keep it independent from CR, VAT, licenses, and ZATCA data;
+- do not display it prominently to customers by default.
 
-## 5. Verification authority
+An entered authentication number is configuration data. It is not a second CR/VAT field and does not change Tenant identity.
 
-The merchant and Store Customizer are not verification authorities.
+### 3.2 `show_in_storefront`
 
-A public verified state may be produced only from a trustworthy Saudi Business Center mechanism that AWJ is permitted to use.
+`show_in_storefront` is a presentation setting scoped to the resolved Storefront:
 
-Until such a mechanism is documented:
-- the existence of an authentication number is not proof;
-- presentation settings cannot elevate it to verified;
-- AWJ must not claim **موثّق في منصة الأعمال**;
-- implementation must not depend on scraping the public inquiry website.
+- **OFF:** the SBC item is absent from the public Footer and Preview; no empty space, placeholder, or status message remains.
+- **ON:** the SBC item appears inside the Footer itself and uses the approved SBC presentation.
+- The item is not a standalone Home Builder section and must not render above or outside the Footer.
 
-No public machine-readable API is assumed by this contract.
+## 4. Verification authority and presentation semantics
 
-## 6. Minimal state semantics
+The merchant, Customizer, and presentation JSON are not external verification authorities. V1 does not implement lookup, polling, scraping, or an authoritative SBC verification result.
 
-Do not invent a large status enum before integration evidence exists.
+For this product decision, enabling `show_in_storefront` authorizes the approved **presentation label**:
 
-The contract needs only this trust boundary:
-- **not authoritatively verified**: no official verified claim may be rendered;
-- **authoritatively verified**: the approved trust presentation may be rendered after verification and official-asset gates are satisfied.
+> **موثّق في منصة الأعمال**
 
-Operational states may be added later only when grounded in the real integration.
+This label is a Footer presentation choice defined by the AWJ product contract. It must not be expanded into a separate verification-status workflow or used to alter legal identity, tax, accounting, checkout, or ZATCA behavior.
 
-## 7. Public Storefront
+V1 must not render any customer-facing state or copy containing:
 
-Fail closed by default.
+- Pending;
+- Unverified;
+- Not verified;
+- Waiting for verification;
+- لم يتم التحقق من التوثيق بعد;
+- equivalent status messaging.
 
-When all evidence gates are satisfied, intended presentation:
-- text equivalent to **موثّق في منصة الأعمال**;
-- authentic official SBC/منصة الأعمال asset when its source and usage permission are documented;
-- an official verification/inquiry destination if a supported public destination is established.
+The authentication number is not shown to customers by default. A future separately scoped evidence/integration contract may define an official lookup destination or authoritative result semantics.
 
-The authentication number does not need to be prominent customer-facing content in V1.
+## 5. Public Storefront behavior
 
-Do not expose internal Tenant, Storefront, evidence, or integration identifiers.
+The public Storefront must expose only the minimum presentation data needed by the existing Footer path and must not expose internal Tenant, Storefront, sales-channel, evidence, or integration identifiers.
 
-## 8. Customizer boundary
+The Footer information architecture is:
 
-Customizer may eventually control presentation of an already trustworthy state, such as visibility or ordering.
+1. **Business Information**
+   - canonical Commercial Registration from `Tenant.cr_number`;
+   - canonical VAT number from `Tenant.vat_number`.
+2. **SBC trust presentation**
+   - rendered only when `show_in_storefront` is `true`;
+   - rendered inside the Footer itself;
+   - text: **موثّق في منصة الأعمال**;
+   - official SBC asset only when the Official Asset Gate is satisfied.
+3. Existing Footer groups such as communication, applications, policies, and payment-related content.
 
-Customizer must not:
-- change verification truth;
-- provide an “I am verified” switch;
-- accept a merchant-uploaded government mark as proof;
-- create verified status from presentation JSON;
-- override the Storefront/evidence association.
+When `show_in_storefront` is `false`, the complete SBC item is omitted. No placeholder, empty row, pending state, or unverified state may be emitted.
 
-Preview must not fake an official verified state.
+The public Storefront must not display `authentication_number` by default. If a future UX explicitly displays it, that must be a separate documented decision and must not change its ownership or meaning.
 
-## 9. Official asset gate
+## 6. Customizer and Preview boundary
 
-No SBC/منصة الأعمال logo or trust mark may ship as an official verification mark until:
-1. its authentic official source is established; and
-2. applicable usage permission/guidelines for this storefront context are documented.
+The existing Store Customizer may provide exactly the V1 controls needed to:
 
-Do not use recreated SVGs, approximate icons, screenshot crops, or merchant-uploaded substitutes.
+1. enter `authentication_number`;
+2. toggle `show_in_storefront`.
 
-Use by another commerce platform is UX evidence only, not authorization for AWJ.
+The Preview must use the same Footer presentation path and semantics as the public Storefront:
 
-## 10. Tenant Isolation and security
+- OFF means the SBC item is not present;
+- ON means the item is present inside the Footer;
+- Preview must not create a Pending, Unverified, or “not verified” state;
+- the toggle controls presentation visibility only and does not claim to perform external verification;
+- the Customizer must not provide a merchant-controlled “I am verified” authority switch;
+- legacy verification fields remain readable for compatibility but cannot activate or configure SBC V1.
 
-- Resolve Tenant and Storefront server-side using existing trusted context.
-- SBC evidence must be scoped to the owned Storefront.
-- Cross-tenant reads/writes fail closed.
-- Client input and presentation configuration cannot establish verification authority.
-- Public payload exposes only minimum trustworthy presentation state.
-- SBC verification must not alter accounting, invoicing, tax, ZATCA, checkout, or canonical legal identity.
+## 7. Official Asset Gate
 
-## 11. Backward compatibility
+The official SBC / منصة الأعمال asset remains gated. AWJ may ship or render it as an official asset only after:
 
-Existing presentation verification fields remain non-authoritative.
+1. its authentic official source is documented; and
+2. applicable usage permission and guidelines for this Storefront context are documented.
 
-Do not reinterpret legacy `requestedVerifiedLabel`, merchant-provided CR/license/source URL, or similar presentation fields as SBC verification evidence.
+Until those conditions are satisfied:
 
-Do not silently change the meaning of existing public fields.
+- do not invent, redraw, recolor, or approximate the logo;
+- do not use Lucide as a substitute;
+- do not use an emoji;
+- do not use an AI-generated logo;
+- do not crop it from a screenshot;
+- do not accept a merchant-uploaded substitute as the official asset;
+- record the missing provenance as an Asset Gate in the implementation report.
 
-## 12. Out of scope
+The lack of an approved asset must not block the persistence and Show/Hide contract itself. It blocks only shipping an official SBC logo or trust mark.
 
-SBC Verification V1 excludes:
-- QR codes;
-- AWJ-generated government QR;
+## 8. Persistence and API boundary
+
+Use the smallest persistence path compatible with the existing StorefrontPresentation contract. Do not create a new table or migration if the existing presentation document can represent these two settings safely and backward-compatibly.
+
+The public API may expose only the sanitized, minimum SBC presentation fields required by the existing Footer. It must not expose internal IDs or raw server-side implementation details.
+
+The SBC settings must not modify:
+
+- `Tenant.name`;
+- `Tenant.cr_number`;
+- `Tenant.vat_number`;
+- accounting or invoices;
+- tax or ZATCA calculations;
+- checkout or payment behavior;
+- authentication, authorization, or domain/tenant resolution.
+
+## 9. Tenant Isolation and security
+
+- Tenant and Storefront are resolved server-side from the existing trusted context.
+- `authentication_number` and `show_in_storefront` are scoped to the owned Storefront.
+- Cross-tenant reads and writes must fail closed.
+- Browser-supplied tenant IDs, query parameters, cookies, arbitrary Host values, presentation JSON, or client-side environment variables cannot establish tenant or legal-identity authority.
+- Public responses must not leak Tenant, Storefront, sales-channel, evidence, or integration IDs.
+- SBC presentation configuration cannot override canonical CR/VAT or read values from another Tenant.
+
+## 10. Backward compatibility
+
+- Existing stores without SBC settings continue to work unchanged.
+- Missing SBC settings normalize to `show_in_storefront = false`.
+- Existing stores must not show SBC automatically.
+- Existing presentation documents remain readable.
+- Legacy `requestedVerifiedLabel`, `verification.crNumber`, `licenseNumber`, and `sourceUrl` retain their existing compatibility meaning and do not become SBC settings.
+- Existing public fields must not be silently renamed or changed in meaning.
+- Stored legacy keys must not be deleted merely to introduce SBC V1.
+
+## 11. Scope exclusions
+
+SBC V1 does not include:
+
+- QR codes or AWJ-generated government-style QR codes;
 - VAT verification;
 - CR editing;
 - license verification;
 - WhatsApp branding;
-- App Store / Google Play badges;
+- App Store or Google Play badges;
 - payment brands;
-- broad Trust Center work;
-- unrelated accounting, ZATCA, auth, or domain changes.
+- a broad Trust Center;
+- government lookup, scraping, polling, or external API integration;
+- unrelated accounting, invoice, ZATCA, authentication, authorization, tenant-resolution, or domain changes.
 
-Each remains a separate feature under: Evidence → Contract → UX/UI → Implementation → Tests → Production Verification.
+Each excluded item requires its own evidence, contract, UX, implementation, and verification scope.
 
-## 13. Open evidence gates
+## 12. Implementation acceptance criteria
 
-Before implementation, establish from official sources:
-1. official credential terminology and any documented format constraints;
-2. whether a supported machine-readable verification integration exists;
-3. official inquiry/deep-link behavior suitable for storefront use;
-4. authoritative result/status semantics AWJ may rely on;
-5. official SBC/منصة الأعمال asset source;
-6. permitted third-party storefront usage of that asset.
+An implementation satisfies this contract only when:
 
-If these cannot be established, AWJ remains fail-closed and does not display an official verified claim.
+1. a merchant can save `authentication_number` as a trimmed opaque String;
+2. leading zeros are preserved;
+3. a merchant can toggle `show_in_storefront`;
+4. OFF removes the SBC item completely from public Footer and Preview;
+5. ON renders the SBC item inside the Footer, not above it;
+6. ON renders **موثّق في منصة الأعمال** and no Pending/Unverified status;
+7. the authentication number is not customer-facing by default;
+8. CR/VAT remain canonical Tenant values;
+9. Preview and public Footer have equivalent SBC visibility behavior;
+10. cross-tenant reads/writes fail closed;
+11. internal IDs are absent from the public contract;
+12. existing stores and legacy presentation snapshots remain compatible;
+13. the official asset is used only when the Official Asset Gate is satisfied.
+
+## 13. Future evidence and integration work
+
+Future work may establish an official SBC asset source, usage permission, supported inquiry destination, or authoritative verification integration. Such work must be separate from this V1 presentation implementation.
+
+Until then, the approved V1 behavior is the explicit Footer Show/Hide presentation contract above. It does not introduce customer-facing Pending/Unverified states and does not alter canonical business identity.
 
 ## 14. UX handoff
 
-After the necessary evidence gates are resolved, design SBC-only Desktop + Mobile UX for:
-- merchant authentication-number entry;
-- verification feedback grounded in actual supported states;
-- verified public footer/trust block;
-- safe unverified/unavailable behavior.
+The implementation UX is intentionally small and limited to:
 
-Do not expand that UX pass into VAT, WhatsApp, app badges, payments, or other trust features.
+- merchant input: **رقم توثيق منصة الأعمال**;
+- merchant control: **إظهار توثيق منصة الأعمال في المتجر**;
+- Footer presentation: **موثّق في منصة الأعمال** when enabled;
+- no SBC Home Builder section;
+- no status workflow in Preview or Public Storefront;
+- no default customer-facing authentication number;
+- responsive Footer behavior that preserves the same semantic order on desktop and mobile.
+
+No broader Footer redesign or trust-feature expansion is authorized by this contract.
