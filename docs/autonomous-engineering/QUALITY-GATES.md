@@ -7,7 +7,7 @@ Before implementation:
 - outcome/acceptance criteria are clear enough;
 - current branch/base is known;
 - no unresolved Decision Gate blocks it;
-- merge/deploy authority is not assumed.
+- current merge/deploy authority is verified from the active protocol; standing merge authority never implies deploy/production authority.
 
 ## Gate 1 — Repository evidence
 
