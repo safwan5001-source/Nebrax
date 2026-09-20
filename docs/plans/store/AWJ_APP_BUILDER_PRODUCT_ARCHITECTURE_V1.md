@@ -1036,6 +1036,187 @@ Component definitions should carry accessibility requirements/metadata where app
 
 ---
 
+## 21A. Mobile Runtime Technology Evidence Pass — Flutter vs React Native vs Native (2026-09-20)
+
+### Decision criteria for AWJ
+
+The runtime choice is evaluated against AWJ's actual requirements, not generic framework popularity:
+
+1. one merchant app product targeting iOS + Android;
+2. high-quality Arabic/RTL + English/LTR UI;
+3. strong visual consistency for a schema-driven component runtime;
+4. ability to implement an allowlisted Component/Action Registry;
+5. real native/platform capabilities for payments, push, deep links, secure storage and accessibility;
+6. predictable performance for commerce screens and long lists;
+7. safe versioned runtime that can consume declarative experience updates;
+8. maintainable build/sign/release pipeline for many merchant-branded apps;
+9. ability to write platform-specific native code where required;
+10. long-term ownership by AWJ without coupling the Experience Contract to a framework.
+
+### External Evidence — Flutter
+
+Official Flutter documentation describes Flutter as a multiplatform framework from a single codebase. Its architecture uses a Dart framework over an engine and platform embedder, and it provides platform channels for calling Kotlin/Swift/native host code when platform integration is required.
+
+Flutter's rendering model gives the framework substantial control over UI rendering, which is attractive for a visual-builder/runtime product where the same AWJ component definition should render predictably across many branded apps.
+
+Flutter documents internationalization/localization support and direction-aware widgets/properties such as `EdgeInsetsDirectional` and `AlignmentDirectional`, relevant to AWJ's RTL-first requirement.
+
+Flutter supports add-to-app/platform integration and plugins, so choosing Flutter would not prevent AWJ from implementing native payment, push, deep-link, secure-storage or other platform-specific bridges.
+
+### External Evidence — React Native
+
+Official React Native documentation describes React Native as rendering to native platform UI and supports platform-specific code/files and Native Modules/Native Components for capabilities not covered by the common layer.
+
+React Native's current architecture includes the New Architecture/Fabric/TurboModules direction, enabling JavaScript and native interoperability without the historical bridge model for supported integrations.
+
+React Native documents RTL support through `I18nManager`, including RTL layout controls.
+
+React Native is particularly attractive where an organization wants to reuse React/TypeScript knowledge and ecosystem patterns. AWJ's management web application already uses Next.js/React/TypeScript, but this is a team/product-maintenance advantage — it does **not** imply that web components can or should be reused as mobile runtime components.
+
+### External Evidence — fully native Swift/Kotlin
+
+Apple's SwiftUI and Android's Jetpack Compose are first-party declarative UI stacks with the deepest direct access to their respective platform capabilities and UI behavior.
+
+A fully native AWJ runtime would require maintaining two primary UI/runtime implementations and keeping the AWJ schema/component/action behavior semantically synchronized across iOS and Android.
+
+This can maximize platform-specific control, but it increases duplicated runtime/component work for AWJ's multi-merchant app-factory use case.
+
+### AWJ comparative assessment
+
+| Criterion | Flutter | React Native | Separate Native |
+|---|---|---|---|
+| Shared iOS/Android runtime | Strong | Strong | Weak — two implementations |
+| Predictable cross-platform visual component rendering | **Strongest fit** | Strong | Requires dual parity work |
+| React/TypeScript alignment with AWJ web team | Lower | **Strongest** | Low |
+| Native/platform escape hatch | Strong via plugins/platform channels | Strong via native modules/components | **Direct** |
+| Schema-driven Component Registry fit | **Very strong** | Very strong | Possible but duplicated |
+| Multi-brand app factory maintainability | **Very strong** | Very strong | Higher operational cost |
+| RTL/localization capability | Strong | Strong | Strong |
+| Platform-native UI semantics by default | Framework-rendered model | **Native component model** | **Direct** |
+| Single renderer implementation controlled by AWJ | **Strong** | Strong | Two renderers |
+| Risk of framework-specific coupling | Manageable if contract stays independent | Manageable if contract stays independent | Platform duplication instead |
+| Existing AWJ React/TS skill leverage | Limited | **High** | Limited |
+
+### AWJ Decision — preferred runtime direction
+
+**Flutter is the preferred runtime direction for the AWJ App Builder/App Factory, subject to a focused technical proof before implementation lock.**
+
+This is a product-architecture preference, not authorization to begin implementation.
+
+Why Flutter currently fits AWJ better:
+
+1. **AWJ is building a runtime, not merely one mobile app.** The product needs one controlled renderer for a versioned Component Registry across many merchant-branded applications.
+2. **Visual predictability matters.** A merchant designing a component in AWJ should get a highly consistent result across iOS and Android.
+3. **The schema/runtime architecture maps naturally to a widget registry.** AWJ can own component definitions and map them to trusted compiled Flutter widgets.
+4. **Native escape hatches remain available.** Sensitive/platform capabilities can be implemented through audited plugins/platform channels and backend APIs.
+5. **It reduces dual-runtime parity work** compared with separate SwiftUI/Compose implementations.
+6. **React Native's strongest AWJ advantage is team-stack alignment**, which is valuable but less decisive than renderer consistency for this specific App Builder/App Factory product.
+
+### Why React Native is not rejected
+
+React Native remains the **fallback/second candidate**, not a bad choice.
+
+Reconsider Flutter if the proof shows a material problem in:
+- required Saudi payment/wallet SDK integration;
+- push/deep-link/native SDK support;
+- accessibility;
+- Arabic/RTL correctness;
+- performance/memory/startup for the AWJ runtime;
+- app-factory build size/time/operations;
+- store-policy compatibility;
+- maintainability compared with the available AWJ engineering skill set.
+
+Do not choose React Native merely because the AWJ web UI uses React. Web-builder technology and mobile-runtime technology are separate architecture decisions.
+
+### Why separate native is not the default
+
+Separate SwiftUI + Compose runtimes are not recommended as the initial AWJ direction because every schema capability/component/action would require parity across two implementations.
+
+Native code remains an essential **integration layer**, not the default whole-runtime strategy.
+
+### Critical decoupling rule
+
+The AWJ App Schema must remain framework-neutral.
+
+Bad:
+
+```text
+schema -> Flutter class names / Dart expressions
+```
+
+Required direction:
+
+```text
+AWJ App Schema
+   -> AWJ capability/component identifiers
+   -> runtime adapter/registry
+       -> Flutter widget today
+       -> another implementation later if ever required
+```
+
+Do not expose Dart, React Native component names, Swift types or Kotlin types in merchant-authored/persisted contracts.
+
+### Runtime layering if Flutter proof succeeds
+
+```text
+AWJ App Schema
+      |
+Schema validation + compatibility
+      |
+Component / Action / Data registries
+      |
+AWJ Runtime Domain Layer
+      |
+Flutter Presentation Runtime
+      |
+Audited Plugins / Platform Channels
+      |
+iOS native        Android native
+```
+
+Commerce authority remains on AWJ backend regardless of runtime framework.
+
+### Proof gate before final technology lock
+
+Before changing status from **Preferred** to **Selected**, build a narrow throwaway/isolated technical proof — not production App Builder implementation — that verifies:
+
+1. Arabic RTL + English LTR switching;
+2. representative Home/Product/Cart component rendering;
+3. long product list/grid scrolling;
+4. schema → registry → widget rendering;
+5. state/binding/action dispatch;
+6. secure authenticated AWJ API call;
+7. deep link;
+8. push notification;
+9. secure local token storage;
+10. at least one representative Saudi payment/native SDK integration path;
+11. accessibility semantics;
+12. iOS + Android release builds;
+13. runtime/schema compatibility fallback;
+14. approximate binary/startup/build operational characteristics.
+
+The proof should test architecture risk, not polish UI.
+
+### Open Decisions after runtime comparison
+
+- Flutter final selection — pending proof gate;
+- state-management package/library;
+- networking/cache package;
+- secure-storage implementation;
+- routing package vs AWJ-owned navigation abstraction;
+- push provider/integration;
+- payment SDK matrix;
+- app-factory build isolation strategy;
+- shared engine/artifact strategy across merchant apps;
+- minimum iOS/Android versions;
+- whether any merchant extension can include compiled custom code and, if so, how it is reviewed/built.
+
+### Runtime comparison conclusion
+
+For AWJ's **multi-merchant, schema-driven mobile commerce runtime**, Flutter currently has the strongest architectural fit. React Native remains the fallback candidate because of strong native interoperability and React/TypeScript team alignment. Separate native runtimes remain appropriate for platform-specific integration code but are not the preferred whole-product architecture.
+
+---
+
 ## 22. Observability, validation and testing
 
 Target platform needs:
@@ -1119,6 +1300,12 @@ Each pass updates this document with evidence, AWJ decision, and remaining open 
 
 ### Existing repository evidence
 - `docs/plans/store/AWJ_MOBILE_APP_BUILDER_BENCHMARK.md` — baseline benchmark and initial architecture direction.
+
+### Runtime technology evidence added 2026-09-20
+- Flutter official documentation — architectural overview; platform channels/platform-specific code; internationalization and direction-aware UI.
+- React Native official documentation — core architecture/New Architecture; native modules/components; platform-specific code; I18nManager RTL support; security guidance.
+- Apple Developer — SwiftUI first-party declarative UI documentation.
+- Android Developers — Jetpack Compose first-party declarative UI documentation.
 
 ### Apple/Google Update & Release evidence added 2026-09-20
 - Apple App Review Guidelines — 2.5.2 self-contained bundle / downloaded executable-code boundary.
