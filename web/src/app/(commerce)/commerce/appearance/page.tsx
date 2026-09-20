@@ -6,7 +6,7 @@ import { useCommerceStoreContext } from '@/modules/commerce-workspace/store-cont
 
 export default function CommerceAppearancePage() {
   const locale = useLocale();
-  const { catalog, selectedStoreId } = useCommerceStoreContext();
+  const { catalog, selectedStoreId, viewStoreUrl } = useCommerceStoreContext();
   const selectedStore =
     catalog.status === 'ready'
       ? catalog.stores.find((store) => store.id === selectedStoreId)
@@ -18,6 +18,7 @@ export default function CommerceAppearancePage() {
         storefrontId={selectedStoreId}
         liveStoreName={selectedStore?.name ?? null}
         initialLocale={locale === 'en' ? 'en' : 'ar'}
+        storefrontUrl={viewStoreUrl}
       />
     </div>
   );

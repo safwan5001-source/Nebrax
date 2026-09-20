@@ -52,6 +52,7 @@ interface ExperienceBuilderProps {
   liveStoreName?: string | null;
   initialLocale?: CustomizerLocale;
   storefrontId?: string | null;
+  storefrontUrl?: string | null;
 }
 
 export function ExperienceBuilder({
@@ -59,6 +60,7 @@ export function ExperienceBuilder({
   liveStoreName = null,
   initialLocale = "ar",
   storefrontId = null,
+  storefrontUrl = null,
 }: ExperienceBuilderProps) {
   const seed = normalizePresentationConfig(
     initialConfig ?? DEFAULT_PRESENTATION_CONFIG,
@@ -278,6 +280,20 @@ export function ExperienceBuilder({
           ? t("dirty")
           : t("clean");
 
+  // "Open store" renders only for a URL we can actually resolve to http(s) —
+  // never link out to a malformed or javascript: value.
+  const resolvedStorefrontUrl = (() => {
+    if (!storefrontUrl) return null;
+    try {
+      const url = new URL(storefrontUrl);
+      return url.protocol === "https:" || url.protocol === "http:"
+        ? url.toString()
+        : null;
+    } catch {
+      return null;
+    }
+  })();
+
   return (
     <div
       dir={locale === "ar" ? "rtl" : "ltr"}
@@ -309,23 +325,61 @@ export function ExperienceBuilder({
         </div>
         <span
           data-draft-status=""
-          className={`hidden rounded-full px-2 py-1 text-[11px] xl:inline ${dirty ? "bg-warning-soft text-warning" : "bg-positive-soft text-positive"}`}
+          className={`hidden shrink-0 rounded-full px-2 py-1 text-[11px] sm:inline ${dirty ? "bg-warning-soft text-warning" : "bg-positive-soft text-positive"}`}
         >
           {statusLabel}
         </span>
-        <div className="ms-auto hidden items-center gap-1 rounded-md border border-border p-1 md:flex">
-          {(["desktop", "tablet", "mobile"] as const).map((item) => (
-            <button
-              key={item}
-              type="button"
-              data-device-option={item}
-              aria-pressed={device === item}
-              onClick={() => setDevice(item)}
-              className={`h-8 rounded px-2.5 text-xs font-medium ${device === item ? "bg-primary text-primary-foreground" : "text-muted hover:bg-primary-soft hover:text-primary"}`}
+        <div className="ms-auto flex min-w-0 items-center gap-1.5 md:gap-2">
+          {resolvedStorefrontUrl ? (
+            <a
+              data-open-store=""
+              href={resolvedStorefrontUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex h-9 shrink-0 items-center gap-1 rounded-md border border-border px-2 text-xs font-medium text-primary hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 md:px-2.5"
             >
-              {t(item)}
-            </button>
-          ))}
+              {t("openStore")}
+            </a>
+          ) : null}
+          <div className="hidden items-center gap-1 rounded-md border border-border p-1 md:flex">
+            {(["desktop", "tablet", "mobile"] as const).map((item) => (
+              <button
+                key={item}
+                type="button"
+                data-device-option={item}
+                aria-pressed={device === item}
+                onClick={() => setDevice(item)}
+                className={`h-8 rounded px-2.5 text-xs font-medium ${device === item ? "bg-primary text-primary-foreground" : "text-muted hover:bg-primary-soft hover:text-primary"}`}
+              >
+                {t(item)}
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={handleRestore}
+            className="hidden h-9 shrink-0 px-2 text-xs text-muted hover:text-text lg:inline"
+          >
+            {t("restore")}
+          </button>
+          <button
+            type="button"
+            data-save=""
+            onClick={handleSave}
+            disabled={busy !== null}
+            className="h-9 shrink-0 rounded-md border border-border bg-surface px-2.5 text-xs font-medium text-text hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-50 md:px-3 md:text-sm"
+          >
+            {t("save")}
+          </button>
+          <button
+            type="button"
+            data-publish=""
+            onClick={handlePublish}
+            disabled={busy !== null}
+            className="h-9 shrink-0 rounded-md bg-primary px-2.5 text-xs font-semibold text-primary-foreground shadow-sm hover:bg-primary-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-50 md:px-3 md:text-sm"
+          >
+            {t("publish")}
+          </button>
         </div>
       </header>
 
@@ -373,7 +427,7 @@ export function ExperienceBuilder({
                       onClick={() => setPanel(item.id)}
                       className={`flex h-9 w-full items-center gap-2.5 px-3 text-start text-[13px] ${
                         selected
-                          ? "bg-neutral-900 font-medium text-white"
+                          ? "bg-primary-soft font-medium text-primary"
                           : "text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900"
                       }`}
                     >
@@ -470,38 +524,6 @@ export function ExperienceBuilder({
             </div>
           </div>
         </section>
-      </div>
-
-      <div
-        className={`${
-          mobilePane === "preview" ? "hidden lg:flex" : "flex"
-        } shrink-0 items-center gap-2 border-t border-neutral-200 bg-white px-3 py-2 lg:absolute lg:top-0 lg:end-3 lg:h-12 lg:border-0 lg:bg-transparent lg:px-0 lg:py-0`}
-      >
-        <button
-          type="button"
-          onClick={handleRestore}
-          className="hidden h-8 px-2 text-xs text-neutral-600 hover:text-neutral-900 lg:inline"
-        >
-          {t("restore")}
-        </button>
-        <button
-          type="button"
-          data-save=""
-          onClick={handleSave}
-          disabled={busy !== null}
-          className="h-10 flex-1 border border-neutral-300 bg-white px-3 text-sm font-medium lg:h-8 lg:flex-none lg:px-2.5 lg:text-xs disabled:opacity-50"
-        >
-          {t("save")}
-        </button>
-        <button
-          type="button"
-          data-publish=""
-          onClick={handlePublish}
-          disabled={busy !== null}
-          className="h-10 flex-1 bg-neutral-900 px-3 text-sm font-medium text-white lg:h-8 lg:flex-none lg:px-2.5 lg:text-xs disabled:opacity-50"
-        >
-          {t("publish")}
-        </button>
       </div>
 
       {isMobileViewport ? <div className="flex h-16 shrink-0 items-center gap-2 border-t border-border bg-surface px-3 lg:hidden">
