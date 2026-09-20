@@ -15,26 +15,12 @@ Find the smallest maintainable implementation that satisfies the accepted outcom
 Review the resulting diff as if authored by another senior engineer. Look for incorrect assumptions, overengineering, regressions, weak validation, poor failure behavior and insufficient tests.
 
 ### 3. AWJ Guardian
-Explicitly assess:
-- accounting correctness;
-- data integrity;
-- Tenant Isolation;
-- Branch Isolation;
-- authorization/security;
-- backward compatibility;
-- API/schema compatibility;
-- production safety.
+Explicitly assess accounting correctness, data integrity, Tenant/Branch Isolation, authorization/security, backward compatibility, API/schema compatibility and production safety.
 
 ### 4. Researcher / Architect
 When a decision depends on changing platform behavior, an unfamiliar integration, or meaningful alternatives, research before guessing.
 
-Prefer:
-1. official/current documentation;
-2. primary specifications;
-3. framework/vendor source/docs;
-4. high-quality secondary engineering evidence only when primary evidence is insufficient.
-
-Record material external evidence and why it fits AWJ.
+Prefer official/current documentation, primary specifications, framework/vendor source/docs, then high-quality secondary engineering evidence only when primary evidence is insufficient. Record material external evidence and why it fits AWJ.
 
 ## Do not start from zero
 
@@ -49,25 +35,29 @@ At the beginning of each task:
 
 Select only a task that:
 - is inside the authorized execution horizon;
-- has all hard dependencies complete;
-- is not blocked by an unresolved decision;
+- has all hard dependencies complete at the level the dependency requires;
+- is not blocked by an unresolved decision or owner gate;
 - has sufficiently clear outcome and acceptance criteria.
 
-If multiple tasks are ready, prefer:
-1. blockers for the critical path;
-2. safety/correctness gaps;
-3. small foundation tasks unlocking several later tasks;
-4. otherwise documented roadmap order.
+If multiple tasks are ready, prefer critical-path blockers, safety/correctness gaps, small foundations unlocking several later tasks, then documented roadmap order.
 
 Do not optimize for number of PRs.
+
+### Dependency and merge rule
+
+A dependency that changes code is not automatically "complete" merely because its PR is green.
+
+If a downstream task requires the upstream behavior on the target branch, the upstream task must be merged (and production-verified when explicitly required) before the downstream task becomes ready.
+
+Claude may continue unrelated ready tasks while an upstream PR waits at an owner gate.
+
+Do not create an implicit chain of dependent unmerged PRs unless the authorized horizon explicitly allows a stacked-branch strategy and defines how it will be reviewed/merged safely.
 
 ## Planning freedom
 
 The execution plan defines **outcomes, dependencies, invariants and acceptance criteria**, not mandatory code shape.
 
-Claude may choose implementation details and may improve the proposed approach when repository evidence supports it.
-
-Rule:
+Claude may choose implementation details and improve a proposed approach when repository evidence supports it.
 
 > Documentation describes current intent. Preserve requirements and invariants, but do not blindly implement stale or inferior implementation assumptions.
 
@@ -77,14 +67,9 @@ A materially different architecture or product behavior crosses the Decision Esc
 
 External research is encouraged when it materially improves correctness or avoids reinventing a solved problem.
 
-Research must not:
-- copy incompatible architecture blindly;
-- import a dependency solely because it is popular;
-- replace AWJ source-of-truth/business rules;
-- weaken security/accounting/tenant controls;
-- rely on stale platform policy when current official docs are available.
+Research must not copy incompatible architecture blindly, import dependencies merely because they are popular, replace AWJ source-of-truth/business rules, weaken security/accounting/tenant controls, or rely on stale platform policy when current official docs exist.
 
-For Apple, Google, ZATCA, payments, security, frameworks and other changing platforms, verify current official documentation before making a material platform claim.
+For Apple, Google, ZATCA, payments, security, frameworks and other changing platforms, verify current official documentation before a material platform claim.
 
 ## Scope discipline
 
@@ -95,17 +80,11 @@ Inside a task Claude may:
 - update directly affected documentation;
 - make small local cleanup necessary to keep the implementation maintainable.
 
-Claude must not opportunistically:
-- refactor unrelated areas;
-- change unrelated APIs/schema;
-- fix unrelated CI failures unless they block verification;
-- expand a feature because it would be "nice to have."
+Claude must not opportunistically refactor unrelated areas, change unrelated APIs/schema, fix unrelated CI failures unless they block verification, or expand a feature because it would be nice to have.
 
-Record discovered unrelated gaps in the backlog/report.
+Record discovered unrelated gaps in backlog/report.
 
 ## Implementation loop
-
-For each task:
 
 ### A. Evidence
 Establish current behavior and relevant tests.
@@ -120,7 +99,7 @@ Keep diff bounded and backward compatible where required.
 Run tests closest to changed behavior first.
 
 ### E. Self-review
-Perform the Implementer / Reviewer / AWJ Guardian passes.
+Perform Implementer / Reviewer / AWJ Guardian passes.
 
 ### F. Correct
 Fix issues found by self-review.
@@ -129,17 +108,20 @@ Fix issues found by self-review.
 Expand tests/builds according to risk. Financial/security/tenant changes require stronger regression coverage, never weaker coverage for speed.
 
 ### H. CI
-Inspect only relevant failing jobs/logs first. Fix failures caused by the task. Do not enter unrelated cleanup.
+Inspect relevant failing jobs/logs first. Fix failures caused by the task. Do not enter unrelated cleanup.
 
 ### I. Evidence report
-Record exact commands/results, changed files, risks, compatibility assessment, branch/PR/Base SHA/Head SHA and next task.
+Record exact commands/results, changed files, risks, compatibility assessment, Branch/PR/Base SHA/Head SHA and next task.
 
-### J. Continue
-If all gates pass and no owner/decision gate is reached, advance to the next dependency-ready task within the authorized horizon.
+### J. Transition
+Classify the task truthfully:
+- `review` when implementation/evidence are ready but review gates remain;
+- `owner_gate` when technical work is ready but current policy requires Safwan action such as merge;
+- `done` only when the task-specific Definition of Done is actually satisfied.
+
+Then select the next task that is **genuinely ready**. Do not treat a dependent task as ready if its required upstream change is still unmerged.
 
 ## Self-review checklist
-
-Before closing a task ask:
 
 ### Implementer
 - Did I satisfy the actual outcome?
@@ -167,13 +149,7 @@ Do not declare completion until findings are resolved or explicitly escalated.
 
 ## PR policy
 
-Prefer one coherent PR per independently reviewable task or tightly coupled slice.
-
-A PR should contain:
-- implementation;
-- required tests;
-- directly affected docs;
-- implementation report/evidence.
+Prefer one coherent PR per independently reviewable task or tightly coupled slice. A PR should contain implementation, required tests, directly affected docs, and implementation report/evidence.
 
 Do not create artificial PR fragmentation merely to increase throughput.
 
@@ -181,12 +157,11 @@ Do not create artificial PR fragmentation merely to increase throughput.
 
 Autonomous engineering does **not** mean universal autonomous merge.
 
-The current repository/owner policy remains authoritative.
-
 Until Safwan explicitly adopts a broader merge policy:
 - Claude may create/update PRs and drive them to verified green;
-- Claude must stop before merge;
-- no merge authorization is inferred from green CI or self-review.
+- Claude must stop that dependency path before merge;
+- no merge authorization is inferred from green CI or self-review;
+- other independent authorized tasks may continue.
 
 A future risk-tier merge policy may be adopted by explicit owner decision.
 
@@ -202,11 +177,6 @@ Any task affecting accounting entries must follow `CLAUDE.md`, including full ap
 
 A session ending must not destroy project state.
 
-After each completed task update:
-- task status/dependencies;
-- implementation report;
-- new ADR if a material decision was accepted;
-- discovered backlog gaps;
-- exact PR/SHA/CI evidence.
+After each task cycle update task status/dependencies, implementation report, new ADR if a material decision was accepted, discovered backlog gaps, and exact PR/SHA/CI evidence.
 
 A fresh capable agent should be able to resume without asking Safwan what happened last.
