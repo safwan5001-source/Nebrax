@@ -83,7 +83,7 @@ export function ScrollIndicator({
       aria-hidden="true"
       className="pointer-events-none absolute inset-y-0 left-0 z-20 w-2"
     >
-      <div className="absolute inset-y-0 left-0 w-full rounded-full bg-border" />
+      <div className="absolute inset-y-0 left-0 w-full rounded-full bg-neutral-300" />
       {metrics.visible ? (
         <div
           data-scroll-indicator-thumb=""
