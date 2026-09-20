@@ -1,0 +1,764 @@
+# AWJ App Builder — Product & Architecture V1
+
+**Status:** Active product/architecture documentation — evidence-first; not implementation authorization  
+**Recovered/updated:** 2026-09-20  
+**Scope:** AWJ merchant mobile-app platform, visual builder, developer workspace, preview/runtime, versioning, build/release lifecycle  
+**Related baseline:** `AWJ_MOBILE_APP_BUILDER_BENCHMARK.md`
+
+> This document recovers and consolidates the App Builder decisions made after the initial benchmark. It intentionally separates **External Evidence**, **AWJ Decision / Requirement**, and **Open Decision**. A proposal is not evidence, and an open item must not be guessed into an implementation contract.
+
+---
+
+## 0. Documentation rule — evidence first
+
+For every material Product / Architecture / UX / Runtime / Release decision:
+
+1. Prefer current first-party documentation, original repositories/specifications, and platform policy.
+2. Compare multiple strong references when the decision is not platform-mandated.
+3. Extract the best proven pattern, then evaluate whether it fits AWJ rather than copying it blindly.
+4. Mark statements as:
+   - **External Evidence** — directly supported by an identified source.
+   - **AWJ Decision / Requirement** — AWJ's chosen direction.
+   - **Open Decision** — not yet sufficiently evidenced or approved.
+5. For fast-changing or sensitive areas — Apple/Google policies, signing, store release/update behavior, security, SDK/API capabilities — re-verify current official documentation before implementation.
+6. Never turn an inference into a documented fact.
+
+---
+
+## 1. Vision & product foundation
+
+### AWJ Decision
+
+AWJ App Builder is a complete platform for merchants to **create, design, develop, preview, test, version, build, release, update and operate** branded iOS/Android commerce applications from AWJ.
+
+It is not merely:
+- a page/block editor;
+- a WebView wrapper;
+- a one-time app-generation service;
+- or a second commerce administration system.
+
+AWJ Commerce remains the source of truth for catalog, pricing, availability/inventory, customers, cart/checkout, orders, payments, shipping and related business data.
+
+### Product layers
+
+1. **Visual Builder** — merchant-friendly pages, sections/blocks/components, navigation, content, branding and live preview.
+2. **Developer Workspace** — advanced data sources, controlled actions, state/variables, conditions, events, APIs/integrations, diagnostics, test data and future extension tooling.
+3. **Trusted Mobile Runtime** — interprets an AWJ-owned declarative/versioned experience contract using shipped/approved capabilities.
+4. **App Factory / Release System** — build, signing, validation, store submission, release/update lifecycle.
+
+### Boundary
+
+**Store Customizer ≠ App Builder ≠ App Factory.**
+
+They may share brand/theme foundations and commerce data, but each has a distinct responsibility.
+
+---
+
+## 2. Benchmark/evidence direction
+
+### External Evidence already captured in the baseline benchmark
+
+The existing benchmark identifies useful patterns from:
+- Salla — regional merchant journey, templates, preview and launch/publishing workflow.
+- Zid — unified commerce administration rather than duplicating product/order/payment management inside the app tool.
+- Tapcart — builder architecture, reusable blocks/components, extensibility, draft/version/publish concepts and developer tooling.
+- OneMobile — merchant-friendly Screen → Blocks → Properties → Preview model.
+- Shopney — live/device preview and separation between configurable experience changes and binary app updates.
+- Vajro / Superfans — commerce widgets, navigation/content controls and scheduling.
+- Shopify ecosystem — broad mature mobile-commerce ecosystem reference.
+- Digia UI and other SDUI projects — schema/runtime/component/action/state architectural evidence, subject to license/maturity/security review.
+
+### AWJ Requirement
+
+Continue benchmarking strong regional products — including Salla, Zid, and other relevant platforms such as Wrd/ورد **only after the exact product is positively identified and its authoritative documentation is found**. Do not attribute features to an ambiguous product name.
+
+No single competitor is the product specification. AWJ combines evidence with its own safety, tenancy, commerce and UX requirements.
+
+---
+
+## 3. Information architecture
+
+### App Manager
+
+Entry from Commerce Workspace should lead to an App Manager, not directly into an editor.
+
+Target areas:
+- Overview
+- Apps
+- Templates
+- Versions / releases
+- App-level settings
+
+For an app:
+- Overview
+- Builder
+  - Design
+  - Develop
+  - Preview
+- Content
+  - Pages
+  - Navigation
+  - Components
+  - Assets
+- Engagement
+  - Push notifications
+  - Campaigns
+  - App-only promotions
+  - Automations (subject to event/policy architecture)
+- Testing / Preview
+- Versions
+- Release Center
+  - iOS
+  - Android
+- Analytics
+- Settings
+
+### UX principle
+
+Use progressive disclosure. A normal merchant should not be forced into an IDE. Advanced capabilities belong behind **Develop** while **Design** remains a clear visual workflow.
+
+The builder is the center of editing, but it is not the whole product.
+
+---
+
+## 4. Builder workspace
+
+### AWJ Requirement
+
+The target workspace must support a professional end-to-end editing experience including:
+- pages/screens tree;
+- component/block palette;
+- interactive canvas/device frame;
+- selection and property inspector;
+- drag/reorder/direct manipulation where appropriate;
+- undo/redo/history;
+- navigation;
+- content/design/layout controls;
+- data bindings;
+- actions/events/conditions;
+- visibility;
+- issues/validation;
+- logs/network/data/events diagnostics in Developer mode;
+- draft/save/publish state;
+- version awareness;
+- preview entry points.
+
+Conceptual layout only — **not locked UI**:
+
+```text
+┌───────────────────────────────────────────────────────────────┐
+│ Apps / App   Draft/Saved        Undo/Redo   Preview  Publish │
+├──────────────┬─────────────────────────────┬──────────────────┤
+│ Pages        │ Interactive device/canvas   │ Inspector        │
+│ Components   │                             │ Content          │
+│ Layers       │                             │ Layout / Style   │
+│              │                             │ Data / Actions   │
+│              │                             │ Conditions       │
+├──────────────┴─────────────────────────────┴──────────────────┤
+│ Components | Data | Actions | Navigation | Issues | Console  │
+└───────────────────────────────────────────────────────────────┘
+```
+
+### System vs custom pages
+
+**AWJ Proposal — requires contract design:** distinguish commerce-critical system screens (for example product/cart/checkout/account/order flows) from custom content/landing pages. System capabilities must remain safe even when presentation is customizable.
+
+---
+
+## 5. App creation
+
+### AWJ Decision
+
+A new app must offer three starting paths:
+
+1. **Use My Store Design**
+2. **Choose a Template**
+3. **Start From Scratch**
+
+“Start from scratch” should still create the minimum safe commerce shell required by the selected AWJ commerce capabilities; it must not silently remove authentication/checkout/navigation contracts needed for a working app.
+
+---
+
+## 6. Shared store/app theme foundation
+
+### AWJ Decision
+
+**Use My Store Design** is a first-class option.
+
+It does **not** mean “turn the website into a WebView” and does not require pixel-identical web/mobile layouts.
+
+Core principle:
+
+> Same brand can be shared; mobile UX remains mobile-appropriate.
+
+Target architecture:
+
+```text
+              Shared Brand / Theme Foundation
+                    /                 \
+             Store Theme            App Theme
+                |                       |
+         Web components          Mobile components
+                |                       |
+          Web runtime             Mobile runtime
+```
+
+### Shareable concepts
+
+Candidate shared inputs:
+- logo/brand assets;
+- brand colors;
+- typography where mobile/platform-compatible;
+- selected visual tokens;
+- selected marketing assets/content;
+- compatible section/component intent.
+
+Commerce data is not copied for theme sync; store and app consume AWJ Commerce as the source of truth.
+
+### Compatibility mapping
+
+Store layout must not be copied blindly. A compatibility layer may map store concepts to mobile equivalents, for example desktop navigation to mobile navigation.
+
+### Sync policy
+
+Three conceptual modes are retained for design:
+- **Linked** — safe supported inherited changes can follow shared brand/theme policy.
+- **Review Changes** — preferred default direction; detect → diff → preview → selectively apply.
+- **Independent** — app presentation becomes independent while commerce data remains shared.
+
+Exact labels/behavior remain UX/contract work, not final API.
+
+### Override tracking
+
+Local app customization must not be silently overwritten by later store-theme changes.
+
+The model must preserve the concept of:
+- inherited value;
+- app override;
+- upstream store/shared-brand change;
+- conflict;
+- explicit resolution.
+
+### Theme sync safety
+
+For meaningful sync:
+**Detect → Diff → Preview → Apply**
+
+Conflicts should support a merchant-readable comparison such as:
+- keep app value;
+- use store/shared value;
+- compare before applying.
+
+---
+
+## 7. Templates
+
+### AWJ Direction
+
+A template is more than colors/screenshots. It should be representable through the same app contract/runtime and may include:
+- page definitions;
+- component tree;
+- navigation;
+- theme defaults;
+- content placeholders;
+- commerce bindings;
+- compatibility metadata.
+
+Do not build a separate runtime per template.
+
+---
+
+## 8. Preview architecture
+
+### AWJ Requirement
+
+Preview is a core product capability, not a decorative phone screenshot.
+
+Target maturity:
+1. live canvas preview in Builder;
+2. interactive device preview;
+3. locale/direction/state/device controls as supported;
+4. real-device preview through a safe mechanism such as QR/link/preview app;
+5. test commerce flows where sandbox/test infrastructure exists;
+6. push/deep-link testing before release where supported.
+
+### Open Decision
+
+Exact real-device preview mechanism remains open and must be benchmarked/evidenced before implementation.
+
+---
+
+## 9. Draft, versioning, publish and rollback
+
+### AWJ Decision
+
+Never edit the customer-visible published experience directly.
+
+Conceptual lifecycle:
+
+```text
+Draft → Validate → Preview/Test → Publish → Published Experience Version
+```
+
+The platform must distinguish:
+- draft;
+- published experience;
+- native application release/build.
+
+Version records should eventually make it possible to know:
+- who published;
+- when;
+- meaningful change set;
+- runtime compatibility;
+- whether a native build/release was required.
+
+Rollback is a strong requirement but must be compatibility-safe; exact rollback semantics remain to be designed.
+
+---
+
+## 10. Experience contract / App Schema direction
+
+### External Evidence
+
+The existing benchmark documents production/reference patterns around:
+- server-driven/declarative UI;
+- versioned schemas;
+- component registries;
+- typed properties;
+- controlled action catalogs;
+- state/data binding;
+- runtime compatibility.
+
+Digia is useful architecture evidence but its current licensing must not be treated as cleared for AWJ dependency adoption.
+
+### AWJ Decision
+
+AWJ owns its Experience Contract/App Schema.
+
+Preferred security direction:
+
+```text
+Builder
+  ↓
+Versioned declarative App Schema
+  ↓
+Validate + authorize + compatibility check
+  ↓
+Publish
+  ↓
+Trusted AWJ Mobile Runtime
+  ├ Component Registry
+  ├ Action Registry
+  ├ Data Binding
+  ├ State
+  ├ Navigation
+  ├ Theme
+  └ Compatibility / fallback
+  ↓
+Native UI / shipped runtime capabilities
+```
+
+The server/configuration may describe approved experience behavior; it must not become an unrestricted remote-code execution channel for sensitive business logic.
+
+### Explicitly not finalized
+
+- JSON vs another serialized format;
+- exact field names;
+- exact expression language;
+- Flutter vs React Native vs native;
+- production SDUI dependency;
+- exact runtime update envelope.
+
+---
+
+## 11. Component Registry
+
+### AWJ Direction
+
+Separate:
+
+**Component Definition** — what a component is and what it permits.
+
+**Component Instance** — a specific configured use of that component in an app/page.
+
+A definition should conceptually be able to describe:
+- stable identity/type;
+- version/compatibility;
+- capabilities;
+- merchant-editable properties;
+- property types/validation;
+- data requirements;
+- supported actions/events;
+- child/content rules;
+- accessibility metadata;
+- runtime compatibility.
+
+This enables a metadata-driven Inspector instead of hard-coding a separate editor UI for every component.
+
+### Candidate official categories
+
+- Commerce
+- Content
+- Layout
+- Navigation
+
+The final V1 component list remains open.
+
+---
+
+## 12. Controlled Action Registry
+
+### AWJ Decision
+
+Do not let remote schema inject arbitrary executable business logic.
+
+Actions should resolve through allowlisted, validated capabilities. Candidate classes:
+- commerce actions;
+- navigation actions;
+- UI actions;
+- controlled state actions;
+- integration actions under stricter policy.
+
+Sensitive flows — payment, authentication, pricing/tax, tenant access, authorization, order mutation — remain governed by trusted AWJ backend/runtime behavior.
+
+---
+
+## 13. Data binding, state, events and conditions
+
+### Evidence status
+
+Research has begun but this section is **not closed**.
+
+### AWJ Requirements already fixed
+
+- no direct database access from merchant schemas;
+- no tenant identifier supplied by a schema may override authenticated/host-resolved tenant context;
+- data access must use tenant-scoped backend capabilities/resources;
+- state/expressions must not become an escape hatch to arbitrary code execution;
+- actions/events must be validated against authorization and runtime capability;
+- sensitive business rules stay server-authoritative.
+
+### Open Decision
+
+Before locking the model, perform a dedicated evidence pass on mature data-binding/state/action/event/security designs. Do not invent an expression engine from competitor UI alone.
+
+---
+
+## 14. Tenant isolation and security
+
+### Non-negotiable AWJ Requirement
+
+Tenant isolation, authorization, data integrity and secure commerce behavior are enforced by trusted backend/runtime boundaries, never by visual-editor conventions.
+
+A Tenant A app/schema must not gain Tenant B access by:
+- changing IDs;
+- changing URLs/query parameters;
+- crafting bindings;
+- custom actions;
+- preview/test mode;
+- cached contracts;
+- release/version endpoints.
+
+Custom/extension code, if introduced later, must not receive raw AWJ secrets or unrestricted database/network capability.
+
+Security design must cover Builder, Preview, Runtime, publishing, artifacts/builds, credentials/signing and release integrations.
+
+---
+
+## 15. WebView boundary
+
+### AWJ Decision
+
+WebView is **not** the primary AWJ App Builder runtime.
+
+A constrained WebView/safe web-content component may be useful for specific external/legacy/unsupported content, subject to explicit policy for:
+- allowed origins/domains;
+- authentication/session;
+- navigation;
+- deep links;
+- JS/native bridge;
+- permissions;
+- payment/security constraints.
+
+---
+
+## 16. Commerce feature parity
+
+### AWJ Requirement
+
+A visually configurable app is not complete if core commerce flows are missing.
+
+The app platform must map supported AWJ commerce capabilities across:
+- catalog/categories/search;
+- product options/variants where supported;
+- pricing/promotions/coupons;
+- stock/availability behavior;
+- cart;
+- checkout;
+- customer identity/account;
+- payments;
+- orders/order details;
+- shipping/delivery;
+- notifications/deep links;
+- other supported commerce capabilities.
+
+“Parity” does not mean identical web UI. It means correct, supported business capability with mobile-appropriate UX.
+
+---
+
+## 17. Engagement
+
+### AWJ Direction
+
+Push and engagement deserve a first-class workspace, not a hidden setting.
+
+Potential areas:
+- push notifications;
+- campaigns;
+- app-only promotions;
+- event-driven automations such as abandoned-cart communication.
+
+Actual automation execution must use AWJ's trusted event/policy architecture, not hidden client-side logic.
+
+---
+
+## 18. Release Center
+
+### AWJ Requirement
+
+Publishing experience configuration and releasing a native binary are different operations.
+
+Target Release Center must eventually expose per-platform state for iOS and Android, including as applicable:
+- app/version/build identifiers;
+- validation;
+- signing readiness/status;
+- submission status;
+- review/release status;
+- errors/actions requiring merchant or AWJ intervention.
+
+The UI must not collapse the entire lifecycle into a vague “Publishing…” state.
+
+---
+
+## 19. Update & Release Classification Matrix — mandatory research area
+
+This is a critical requirement and must be verified against **current official Apple and Google documentation** before implementation.
+
+### Four distinct concepts
+
+1. **Runtime / Experience Update**  
+   A declarative content/configuration/experience change that the already-installed AWJ runtime is allowed and able to consume.
+
+2. **Native Build Required**  
+   The requested change needs capabilities/code/resources/entitlements/SDK changes not present in the installed runtime.
+
+3. **Store Submission / Release Required**  
+   A new native build must go through the applicable App Store / Google Play submission and release process.
+
+4. **End-user Installation Update**  
+   Even after a store release is available, whether/when a device installs it can depend on Apple/Google mechanisms, rollout configuration, device/user update settings and other platform rules. AWJ must not promise “all users update automatically” without verified platform evidence.
+
+### Builder UX requirement
+
+Before Publish/Release, classify the pending change set and explain its impact in merchant language, for example:
+- can publish as an experience/runtime update;
+- requires new iOS build;
+- requires new Android build;
+- requires store submission/review/release;
+- mixed change set.
+
+### Research matrix to close
+
+For each capability/change type, verify from current first-party docs whether it:
+- can be delivered through AWJ's declarative runtime;
+- requires a binary build;
+- requires new permissions/entitlements;
+- requires store submission/review;
+- is eligible for phased/staged rollout;
+- can/should be forced or merely offered;
+- reaches users automatically or depends on platform/device/user behavior.
+
+Examples requiring explicit verification:
+- banners/content;
+- theme/token changes;
+- page/component reorder;
+- properties of already-shipped components;
+- introduction of a new native component/capability;
+- SDK/library changes;
+- permissions/entitlements;
+- push/deep-link capability changes;
+- payment/auth changes;
+- native assets/metadata;
+- minimum OS/runtime compatibility.
+
+**Do not fill this matrix from intuition.**
+
+---
+
+## 20. Build/signing/store-account model
+
+### Open Decision
+
+Still requires dedicated official-documentation evidence pass:
+- build infrastructure;
+- signing/certificate/key management;
+- Apple Developer / App Store Connect ownership and access;
+- Google Play developer/account/access model;
+- automated submission APIs and limitations;
+- credential custody/rotation/audit;
+- tenant/app isolation for signing artifacts;
+- failure/retry/idempotency;
+- App Store / Google Play review and release controls.
+
+No implementation should assume AWJ can silently perform every store-account action.
+
+---
+
+## 21. Localization, RTL and accessibility
+
+### AWJ Requirement
+
+The builder and produced app experiences must treat Arabic/RTL and English/LTR as first-class concerns.
+
+Preview/testing must make locale/direction differences visible before publish.
+
+Component definitions should carry accessibility requirements/metadata where appropriate. The builder must not make accessible behavior optional merely because the visual output “looks correct.”
+
+---
+
+## 22. Observability, validation and testing
+
+Target platform needs:
+- schema validation;
+- runtime compatibility validation;
+- component/action capability validation;
+- preview/test diagnostics;
+- publish validation;
+- build/release logs and actionable errors;
+- audit history;
+- safe test data/environment boundaries;
+- progressive tests from component/schema to commerce flow to release pipeline.
+
+Financial, payment, auth and tenant-isolation paths require stronger tests and must not be weakened for release speed.
+
+---
+
+## 23. Product scope vs delivery phases
+
+### AWJ Decision
+
+Document the **complete target product** first, then phase delivery. Do not define a weak MVP architecture that blocks the full product.
+
+Likely delivery decomposition will separate:
+- foundation/schema/registry;
+- visual builder;
+- preview;
+- commerce runtime;
+- versions/publishing;
+- engagement;
+- developer workspace;
+- app factory/release;
+- advanced extensibility/SDK.
+
+The actual sequence remains subject to architecture dependencies and implementation evidence.
+
+---
+
+## 24. Open decisions
+
+Do not silently close these:
+
+- Flutter vs React Native vs native runtime;
+- exact serialized schema;
+- exact expression/data-binding model;
+- final Component Registry contract;
+- final Action/Event contract;
+- production SDUI/runtime dependency vs narrow AWJ renderer;
+- exact Visual Builder UI;
+- exact real-device preview mechanism;
+- exact Store ↔ App theme sync contract and UX labels;
+- V1 component/block list;
+- release/build/signing infrastructure;
+- Apple/Google account ownership and delegated-access model;
+- exact update classification matrix;
+- public developer SDK timing;
+- custom code/extensions security model;
+- AI-assisted design;
+- pricing/entitlements;
+- segmentation/personalization scope.
+
+---
+
+## 25. Next evidence passes
+
+Proceed in this order unless new evidence changes dependencies:
+
+1. **Data Binding + State + Actions + Events + Security**
+2. **Apple/Google Update & Release Matrix** — official docs first
+3. **Runtime technology comparison** — Flutter / React Native / native against AWJ requirements
+4. **Preview architecture**
+5. **Build/signing/submission automation**
+6. **Visual Builder UX/architecture**
+7. **V1 capability/component contract**
+
+Each pass updates this document with evidence, AWJ decision, and remaining open items.
+
+---
+
+## 26. Source/evidence register
+
+### Existing repository evidence
+- `docs/plans/store/AWJ_MOBILE_APP_BUILDER_BENCHMARK.md` — baseline benchmark and initial architecture direction.
+
+### External sources already used during the research conversation
+
+These are retained as an evidence queue and must be re-checked for freshness when their claims become implementation requirements:
+
+- Salla Help Center — App Builder/design/subscription/launch documentation.
+- Zid Help Center — mobile app creation/subscription and unified commerce administration documentation.
+- Tapcart Developer Documentation — App Studio, blocks/components, developer tooling, versions/publishing/CI concepts.
+- Shopney Support — preview and post-launch design/update behavior.
+- Digia documentation/repository — SDUI, state/data, actions, custom widgets; licensing requires explicit clearance before code adoption.
+- Apple Developer — App Review / Developer Program terms and release/update documentation; official source is authoritative for iOS.
+- Google Play Console / Android developer policy documentation — dynamic code, release/update and store behavior; official source is authoritative for Android distribution.
+- Firebase Remote Config — useful evidence for app-version-aware remote configuration patterns; not an AWJ runtime decision.
+
+### Evidence hygiene
+
+A source appearing in this register does not automatically approve its implementation pattern or license. Every implementation-sensitive claim must point to a current, authoritative source during the relevant evidence pass.
+
+---
+
+## 27. Recovery completeness checklist
+
+This recovery pass explicitly captures the decisions discussed after the original benchmark:
+
+- [x] complete App Builder vision, not a simple editor;
+- [x] UI/UX + Developer Workspace + Preview as first-class product areas;
+- [x] App Manager and product information architecture;
+- [x] Store Customizer / App Builder / App Factory separation;
+- [x] Use My Store Design / Template / Scratch creation paths;
+- [x] shared brand/theme foundation;
+- [x] controlled theme sync, diff, preview, overrides/conflicts;
+- [x] mobile UX not literal web-layout copying;
+- [x] Commerce Core as source of truth;
+- [x] live/interative/real-device preview direction;
+- [x] draft/published/version/rollback direction;
+- [x] declarative versioned App Schema direction;
+- [x] Component Definition vs Component Instance;
+- [x] Component Registry and metadata-driven Inspector direction;
+- [x] controlled Action Registry;
+- [x] no arbitrary remote business-code execution;
+- [x] tenant isolation/security boundary;
+- [x] WebView is not the primary runtime;
+- [x] commerce capability parity requirement;
+- [x] Engagement as a first-class area;
+- [x] Release Center per platform;
+- [x] Instant/runtime update vs native build vs store release vs end-user installation distinction;
+- [x] explicit Apple/Google official-evidence requirement for update behavior;
+- [x] evidence-first documentation rule;
+- [x] external benchmark must extract the best **and** the best fit for AWJ;
+- [x] no final Flutter/React Native/native choice yet;
+- [x] no final schema/JSON contract yet.
+
+If a later review finds a missing decision from the conversation or prior documents, add it explicitly rather than relying on memory.
