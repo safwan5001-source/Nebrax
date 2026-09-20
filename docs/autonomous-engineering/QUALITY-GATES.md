@@ -141,6 +141,6 @@ Green tests alone are not completion if acceptance criteria, security negatives,
 
 Proceed automatically to the next authorized dependency-ready task unless:
 - Decision Escalation gate;
-- owner merge/deploy gate;
+- owner deploy/production gate;
 - blocker;
 - authorized execution horizon complete.
