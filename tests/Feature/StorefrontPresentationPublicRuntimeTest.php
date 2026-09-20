@@ -6,6 +6,7 @@ use App\Models\SalesChannel;
 use App\Models\Storefront;
 use App\Models\StorefrontDomain;
 use App\Models\StorefrontPresentation;
+use App\Models\Tenant;
 use App\Support\Commerce\StorefrontPresentationNormalizer;
 use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -104,6 +105,11 @@ class StorefrontPresentationPublicRuntimeTest extends TestCase
     {
         $auth = $this->registerTenant('pres-pub-live', 'owner@pres-pub-live.test');
         $seeded = $this->seedPublicStore($auth['tenant_id'], 'published-live.example.com');
+        Tenant::query()->whereKey($auth['tenant_id'])->update([
+            'name' => 'الاسم القانوني canonical',
+            'cr_number' => 'canonical-cr',
+            'vat_number' => 'canonical-vat',
+        ]);
 
         $this->withToken($auth['token'])
             ->putJson($this->workspacePath($seeded['storefront']->id), [
@@ -134,9 +140,20 @@ class StorefrontPresentationPublicRuntimeTest extends TestCase
 
         $this->assertSame('navy', $res->json('data.presentation.themePreset'));
         $this->assertSame('الحي بعد النشر', $res->json('data.presentation.homepage.heroHeadline'));
-        $this->assertTrue($res->json('data.presentation.verification.requestedVerifiedLabel'));
+        $this->assertFalse($res->json('data.presentation.verification.requestedVerifiedLabel'));
         $this->assertSame('1010101010', $res->json('data.presentation.verification.crNumber'));
         $this->assertArrayNotHasKey('is_verified', $res->json('data.presentation'));
+        $this->assertSame('الاسم القانوني canonical', $res->json('data.business_identity.legal_name'));
+        $this->assertSame('canonical-cr', $res->json('data.business_identity.cr_number'));
+        $this->assertSame('canonical-vat', $res->json('data.business_identity.vat_number'));
+        $this->assertNotSame(
+            $res->json('data.presentation.verification.crNumber'),
+            $res->json('data.business_identity.cr_number'),
+        );
+        $this->assertArrayNotHasKey('cr_number', $res->json('data'));
+        $this->assertArrayNotHasKey('vat_number', $res->json('data'));
+        $this->assertSame('canonical-cr', Tenant::query()->findOrFail($auth['tenant_id'])->cr_number);
+        $this->assertSame('canonical-vat', Tenant::query()->findOrFail($auth['tenant_id'])->vat_number);
         $this->assertSame('المتجر الرئيسي', $res->json('data.name'));
 
         foreach ($queries as $query) {

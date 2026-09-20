@@ -5,6 +5,7 @@ import { storefrontFetch } from "./config";
 export interface AwjStorefrontConfig {
   name: string | null;
   default_locale: string | null;
+  business_identity: AwjBusinessIdentity;
   /**
    * Published presentation only. `null` when nothing has been published —
    * callers must keep AWJ Modern / default homepage behaviour.
@@ -13,11 +14,37 @@ export interface AwjStorefrontConfig {
   presentation: StorefrontPresentationConfig | null;
 }
 
+export interface AwjBusinessIdentity {
+  legal_name: string | null;
+  cr_number: string | null;
+  vat_number: string | null;
+}
+
 interface AwjStorefrontConfigResponse {
   data: {
     name?: string | null;
     default_locale?: string | null;
+    business_identity?: unknown;
     presentation?: unknown;
+  };
+}
+
+function readBusinessIdentity(raw: unknown): AwjBusinessIdentity {
+  if (raw == null || typeof raw !== "object" || Array.isArray(raw)) {
+    return { legal_name: null, cr_number: null, vat_number: null };
+  }
+
+  const value = raw as Record<string, unknown>;
+  const nullableString = (candidate: unknown): string | null => {
+    if (typeof candidate !== "string") return null;
+    const trimmed = candidate.trim();
+    return trimmed || null;
+  };
+
+  return {
+    legal_name: nullableString(value.legal_name),
+    cr_number: nullableString(value.cr_number),
+    vat_number: nullableString(value.vat_number),
   };
 }
 
@@ -85,6 +112,7 @@ export async function fetchStorefrontConfig(): Promise<AwjStorefrontConfig> {
   return {
     name: response.data.name ?? null,
     default_locale: response.data.default_locale ?? null,
+    business_identity: readBusinessIdentity(response.data.business_identity),
     presentation: readPublishedPresentation(response.data.presentation ?? null),
   };
 }

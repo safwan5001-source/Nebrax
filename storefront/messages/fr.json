@@ -77,8 +77,11 @@
     "wholesale": "Professionnels & vente en gros",
     "whatsapp": "WhatsApp",
     "whatsappAria": "Contacter sur WhatsApp",
-    "merchantProvided": "Informations fournies par le marchand",
+    "businessInformation": "Informations sur l’entreprise",
+    "legalName": "Nom légal",
     "crNumber": "Registre du commerce",
+    "vatNumber": "Numéro de TVA",
+    "merchantProvided": "Informations fournies par le marchand",
     "licenseNumber": "Numéro de licence"
   },
   "home": {

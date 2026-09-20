@@ -287,7 +287,8 @@ final class StorefrontPresentationNormalizer
                 'crNumber' => mb_substr($this->asString($verificationRaw['crNumber'] ?? null), 0, 40),
                 'licenseNumber' => mb_substr($this->asString($verificationRaw['licenseNumber'] ?? null), 0, 40),
                 'sourceUrl' => $this->sanitizeExternalUrl($this->asString($verificationRaw['sourceUrl'] ?? null)) ?? '',
-                'requestedVerifiedLabel' => $this->asBoolean($verificationRaw['requestedVerifiedLabel'] ?? null, false),
+                // Legacy compatibility only; merchant input cannot mint an official verification claim.
+                'requestedVerifiedLabel' => false,
             ],
             'apps' => [
                 'iosUrl' => $this->isSafeAppStoreUrl($iosUrl) ? ($this->sanitizeExternalUrl($iosUrl) ?? '') : '',
