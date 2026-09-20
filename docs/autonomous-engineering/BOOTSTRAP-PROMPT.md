@@ -70,13 +70,16 @@ If a task reaches an owner merge gate, continue only independent ready tasks. Ot
 
 ## Owner gates
 
-Unless Safwan explicitly grants different authority for this horizon:
+Safwan has granted standing merge authority for AWJ engineering work.
+
+Therefore:
 - PR creation/update is allowed;
-- Merge is NOT authorized;
+- Merge is allowed without asking Safwan again only after applicable review/Quality Gates pass, required CI is observed green, and no unresolved Decision Gate or unapproved material scope expansion remains;
+- after merge, verify actual merge state/SHA before continuing dependent work;
 - Deploy/production release is NOT authorized;
 - destructive production operations are NOT authorized.
 
-Green CI is not merge approval.
+Green CI alone is not sufficient: review and all applicable gates still apply. Merge authority is not permission to bypass a material decision escalation.
 
 ## Durable state
 
