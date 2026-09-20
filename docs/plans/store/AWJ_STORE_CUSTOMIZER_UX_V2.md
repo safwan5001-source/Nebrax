@@ -1,6 +1,6 @@
 # AWJ Store Customizer UX V2
 
-**Status:** Documentation only. UX direction record. Not implemented. Not merged. Not deployed.
+**Status:** Approved UX direction record. Implementation is tracked separately. This document includes the 2026-09-20 Visual Builder workspace amendment.
 **Date:** 2026-09-19
 **Repository:** `safwan5001-source/Nebrax`
 **Base:** `main` `5dd415f7358137cac3e030b21ca7b629c15815c0` (Commerce API V1 PR-4 merge, #836)
@@ -15,7 +15,7 @@ This document records the approved **UX direction** for the next evolution of th
 - No application code is changed by this document.
 - No database, API, or persistence change is proposed here.
 - The existing Customizer (STORE-UI-6) is **not** a final UX baseline and is **not** deprecated by this document; it remains the current production surface until a V2 slice is reviewed and merged.
-- The exploratory external prototype **"AWJ Store Customizer V2 Prototype V0.2"** exists only to prove UX direction. It is **not** a visual baseline. Its colors, dimensions, and visual details must **not** be carried into production as a source of truth.
+- The exploratory prototype **"AWJ Store Customizer V2 Prototype V0.2"** is the approved **Visual + Interaction Baseline** for the Customizer workspace flow and hierarchy. It is not a literal pixel/CSS source of truth: AWJ Design System remains authoritative for editor chrome, typography, spacing, icons, borders, accessibility, and tokens; the Canvas alone represents the merchant storefront identity.
 
 ## 2. Purpose
 
@@ -112,9 +112,10 @@ The current implementation already separates these concerns into outline panels 
 
 Core layout:
 
-- **Top Toolbar**
-- **Customizer Sidebar**
-- **Live Preview Canvas** — takes the largest possible area.
+- **Standalone Full-screen Customizer Workspace** — entering **Build Store Experience / بناء تجربة المتجر** leaves the normal Commerce workspace chrome; the Commerce Sidebar is not rendered inside the editor.
+- **Top Toolbar** — AWJ Design System chrome with Exit/Back to Commerce.
+- **Customizer Sidebar / contextual inspector** — AWJ Design System controls only.
+- **Live Preview Canvas** — takes the largest possible area and is the only surface that renders the merchant storefront identity.
 
 This matches the current direction: at 1440px the current Customizer already gives the preview the dominant column (196px outline / 320px inspector / **924px preview**, measured in STORE-UI-6). V2 keeps preview dominance.
 
@@ -278,7 +279,7 @@ No conflicts were found between this specification and the locked persistence ar
 - No application code change in this task; documentation only. No merge, no deploy.
 - No rewrite of the existing Customizer or storefront.
 - No free-form page builder (no arbitrary HTML/CSS/JS, no Webflow-style canvas). `customContent` stays a gated placeholder.
-- No copying of Salla (or the external Prototype V0.2) as a literal visual/interaction source of truth.
+- No literal copying of Salla. Prototype V0.2 is the approved Visual + Interaction Baseline for layout/flow, but its raw CSS/colors/dimensions are not production authority; AWJ Design System governs editor chrome.
 - No new persistence architecture, preview token, unpublished-theme public route, or iframe of the live store (ARCH-1 already rejected these).
 - No branding media upload/CMS, no pages CMS, no Verified-business authority, no version history in V2 slices unless separately approved.
 - No changes to commerce business rules, accounting, inventory, orders, or tenant/subscription logic.
@@ -317,3 +318,71 @@ This documentation is complete only if it:
 ---
 
 *Documentation only. No code, schema, API, or deployment change is authorized by this document. Do not merge the resulting PR without owner review. Do not deploy.*
+
+
+## 19. Approved amendment — Standalone Visual Builder Workspace (2026-09-20)
+
+This section records the owner-approved UX decision for the next Customizer implementation and supersedes any earlier wording that conflicts with it.
+
+### 19.1 Entry and workspace boundary
+
+- Selecting **Build Store Experience / بناء تجربة المتجر** opens a **standalone full-screen Customizer workspace**.
+- The normal **Commerce Sidebar must not appear inside the Customizer**.
+- The editor must provide an explicit **Back / Exit to Commerce** action.
+- The route may remain backward-compatible if changing it is unnecessary; the requirement is an independent editor layout, not a URL migration.
+
+### 19.2 Visual authority boundary
+
+- All editor chrome outside the storefront preview follows the **AWJ Design System**: toolbar, buttons, sidebar, section list, inspector, sheets, dialogs, picker, status indicators, typography, spacing, borders, icons, focus states, RTL/LTR behavior, and accessibility.
+- The **Canvas alone** renders the merchant's storefront design and identity.
+- Storefront theme choices must never restyle the AWJ editor chrome.
+
+### 19.3 Prototype V0.2 authority
+
+- **AWJ Store Customizer V2 Prototype V0.2** is the approved **Visual + Interaction Baseline** for workspace hierarchy, preview-first behavior, direct editing flow, section interaction, and responsive editor behavior.
+- It is not a request to copy prototype CSS literally. Where prototype styling conflicts with the AWJ Design System, the **AWJ Design System wins for editor chrome**.
+- A future implementation is not accepted merely because CI is green; it requires **visual and interaction verification against V0.2 on Desktop and Mobile**.
+
+### 19.4 Required interaction model
+
+- The Canvas is the dominant workspace surface.
+- Clicking a customizable section in the Canvas selects the exact section **instance by id**, highlights it, and opens its contextual settings.
+- Desktop uses a compact section/navigation surface plus contextual inspector/sheet without recreating the old Commerce settings-page experience.
+- Section operations reuse the existing V2/CONTRACT-2 behavior: Add, reorder, hide/show, duplicate/delete according to section capabilities. **Hero remains non-deletable while hero content is global.**
+- Mobile is **preview-first** and uses touch-appropriate controls plus a **Bottom Sheet** (or equivalent AWJ mobile pattern) for sections/settings; it must not be a shrunken desktop editor.
+- Desktop / Tablet / Mobile are preview modes of the same responsive document.
+- Draft / Save / Preview / Publish lifecycle remains unchanged.
+
+### 19.5 Architecture and scope guardrails
+
+This UX decision does **not** authorize:
+
+- a new backend or persistence model;
+- database migrations;
+- a CONTRACT-2/schema change;
+- tenant/auth/authorization changes;
+- changes to accounting, inventory, orders, pricing, or Commerce business rules;
+- reimplementation of capabilities already delivered by STORE-CUSTOMIZER-V2-1 / V2-2 / CONTRACT-2;
+- merge, deploy, or production release without explicit owner approval.
+
+Implementation must preserve tenant isolation, backward compatibility, existing presentation normalization, and the locked Draft → Preview → Publish boundaries.
+
+### 19.6 Acceptance gate for the next UI slice
+
+The next Visual Builder UI slice is complete only when:
+
+- [ ] Commerce Sidebar is absent inside Build Store Experience.
+- [ ] Customizer runs in a standalone full-screen AWJ workspace.
+- [ ] AWJ editor chrome and storefront Canvas have a clear visual boundary.
+- [ ] Canvas is the dominant surface.
+- [ ] Direct Canvas selection resolves the exact section instance id.
+- [ ] Contextual section editing does not revert to the old global settings-page layout.
+- [ ] Existing Add / reorder / hide-show / duplicate-delete capability rules are preserved.
+- [ ] Desktop / Tablet / Mobile preview modes remain available.
+- [ ] Mobile is preview-first with bottom-sheet/equivalent contextual editing.
+- [ ] Draft / Save / Preview / Publish semantics remain unchanged.
+- [ ] No backend, DB, CONTRACT-2, tenant/auth, or Commerce business-rule change is introduced.
+- [ ] Automated tests/build are green.
+- [ ] Desktop and Mobile visual/interaction QA is performed against Prototype V0.2 before recommending merge.
+
+---
