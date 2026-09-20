@@ -133,6 +133,9 @@ export function ExperienceBuilder({
 
   function updateDraft(next: StorefrontPresentationConfig) {
     const normalized = normalizePresentationConfig(next);
+    // Keep the opaque SBC value lossless while the merchant is editing. The
+    // persistence boundary below performs the contract-required outer trim.
+    normalized.sbc.authentication_number = next.sbc.authentication_number;
     setDraft(normalized);
     setLifecycle("dirty");
     setNotice(null);
@@ -147,9 +150,10 @@ export function ExperienceBuilder({
     }
     setBusy("saving");
     setNotice(null);
+    const persistedDraft = normalizePresentationConfig(draft);
     const result = await saveStorefrontPresentation(
       storefrontId,
-      draft,
+      persistedDraft,
       draftRevision,
     );
     if (result.ok) {
