@@ -53,20 +53,23 @@ Before changing status to `ready`:
 ## Agent transitions
 
 Routine:
-`ready → in_progress → review → owner_gate → done`
+`ready → in_progress → review → merge_ready → merged → done`
 
-A task may go directly `review → done` only when its Definition of Done does not require an owner action/merge/deploy and all gates are evidenced.
+A task may go `review → done` when no merge is required and all Definition-of-Done evidence exists.
 
 Exceptional:
-`in_progress → decision_required/blocked`
+`in_progress/review → decision_required/blocked/owner_gate`
 
-Claude may perform routine evidence-backed transitions. It must not invent owner approval for `owner_gate → done`.
+`owner_gate` is now reserved for actions still requiring Safwan, such as deploy/production release/destructive production operation or a material escalated decision. It is **not** required for an ordinary merge that satisfies the standing merge policy.
 
-## Parallel continuation rule
+## Merge continuation rule
 
-When one task reaches `owner_gate`, Claude may continue only with other tasks that:
-- are already `ready`;
-- do not depend on the owner-gated task;
-- remain inside the authorized horizon.
+For an ordinary merge inside the standing authority:
+- verify applicable review/Quality Gates;
+- observe required CI green;
+- merge;
+- verify merge SHA/state;
+- update queue/report/current state;
+- then unlock merge-dependent tasks.
 
-Otherwise it persists state and stops cleanly for Safwan.
+If a task reaches a true `owner_gate`, Claude may continue only with independent ready tasks inside the authorized horizon; otherwise persist state and stop cleanly for Safwan.
