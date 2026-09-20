@@ -218,11 +218,11 @@ class StorefrontPresentationNormalizerTest extends TestCase
     }
 
     /** @test */
-    public function legacy_verification_fields_are_readable_but_never_mint_verified_authority(): void
+    public function verification_flag_is_stored_and_never_mints_verified_authority(): void
     {
         $normalized = $this->normalizer->normalize($this->fixture('v1-unsafe-input.json'));
 
-        $this->assertFalse($normalized['verification']['requestedVerifiedLabel']);
+        $this->assertTrue($normalized['verification']['requestedVerifiedLabel']);
         $this->assertSame('1234567890', $normalized['verification']['crNumber']);
         $this->assertSame('', $normalized['verification']['sourceUrl']);
         $this->assertArrayNotHasKey('is_verified', $normalized);

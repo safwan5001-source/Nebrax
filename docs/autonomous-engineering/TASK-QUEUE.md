@@ -17,15 +17,26 @@ This is the human-reviewable V1 queue. It is deliberately Markdown first. Do not
 
 ## Authorized horizon
 
-STATUS: NONE
+STATUS: ACTIVE
 
-There is currently **no long-running implementation horizon authorized by this PR**. This PR establishes the operating system first.
+**Horizon: Commerce Mobile API readiness closure V1**
+
+Source of truth:
+- `docs/plans/store/COMMERCE_MOBILE_API_READINESS.md` merged via PR #887.
+- App Builder architecture/contract pack merged via PR #887.
+
+Authorization:
+- Claude may execute this horizon sequentially and autonomously.
+- Promote later backlog items to `ready` only when their dependencies, acceptance criteria, tests and Decision Gates are satisfied from current-main evidence.
+- A blocked/material decision does not authorize guessing; use Decision Escalation and continue only independent ready work.
+- Ordinary merges use standing merge authority after mandatory pre-merge review + required green CI + mandatory post-merge review.
+- Deploy/production release/destructive production operations remain owner-gated.
 
 ## Candidate queue — Commerce Mobile prerequisites
 
 | Order | Task ID | Status | Risk | Depends on | Outcome |
 |---|---|---|---|---|---|
-| 1 | COM-MOBILE-MEDIA-1 | backlog | high | accepted readiness contract | Mobile-authorized product media |
+| 1 | COM-MOBILE-MEDIA-1 | ready | high | accepted readiness contract | Mobile-authorized product media |
 | 2 | COM-MOBILE-VARIANTS-1 | backlog | high | media/readiness as applicable | Variant/options/UOM mobile contract |
 | 3 | COM-MOBILE-AUTH-1 | backlog | critical | identity architecture decision/readiness | Customer mobile auth + profile |
 | 4 | COM-MOBILE-CART-IDENTITY-1 | backlog | critical | COM-MOBILE-AUTH-1 | Guest → authenticated cart transition |
@@ -36,7 +47,7 @@ There is currently **no long-running implementation horizon authorized by this P
 | 9 | COM-MOBILE-I18N-1 | backlog | normal | resource contracts | Explicit localization/fallback |
 | 10 | COM-MOBILE-VERTICAL-TEST-1 | backlog | high | selected vertical slice complete | Runtime/API integration fixtures and vertical proof |
 
-Source candidate: `docs/plans/store/COMMERCE_MOBILE_API_READINESS.md` in PR #887.
+Source: `docs/plans/store/COMMERCE_MOBILE_API_READINESS.md` on `main` (accepted via merged/post-reviewed PR #887).
 
 ## Promotion checklist: backlog → ready
 

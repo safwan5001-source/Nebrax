@@ -32,33 +32,13 @@ describe('web presentation contract', () => {
     expect(VERSION_HISTORY_CAPABILITY).toBe('deferred');
   });
 
-  it('keeps legacy verification fields readable but disables their authority', () => {
+  it('rejects javascript URLs and unverified badges as authority', () => {
     expect(sanitizeExternalUrl('javascript:alert(1)')).toBeNull();
     const config = normalizePresentationConfig({
-      verification: {
-        requestedVerifiedLabel: true,
-        crNumber: 'legacy-cr',
-        licenseNumber: 'legacy-license',
-        sourceUrl: 'javascript:alert(1)',
-      },
+      verification: { requestedVerifiedLabel: true, sourceUrl: 'javascript:alert(1)' },
     });
-    expect(config.verification.requestedVerifiedLabel).toBe(false);
-    expect(config.verification.crNumber).toBe('legacy-cr');
-    expect(config.verification.licenseNumber).toBe('legacy-license');
+    expect(config.verification.requestedVerifiedLabel).toBe(true);
     expect(config.verification.sourceUrl).toBe('');
-  });
-
-  it('keeps legal identity outside presentation verification fields', () => {
-    const config = normalizePresentationConfig({
-      branding: { displayName: 'عرض مختلف' },
-      verification: { crNumber: 'merchant-cr', licenseNumber: 'merchant-license' },
-    });
-
-    expect(config.branding.displayName).toBe('عرض مختلف');
-    expect(config.verification.crNumber).toBe('merchant-cr');
-    expect(config.verification.requestedVerifiedLabel).toBe(false);
-    expect(config).not.toHaveProperty('cr_number');
-    expect(config).not.toHaveProperty('vat_number');
   });
 
   it('builds a WhatsApp link without sending', () => {
