@@ -24,7 +24,7 @@ Establish a safe autonomous-engineering operating layer so a capable coding agen
 - Branch: `docs/awj-autonomous-engineering-v1`
 - Base at creation: `daf86b5ac013a0802dcc64652b1051da7a722a2d`
 - Application code changes: none
-- Merge: not authorized
+- Merge: standing authority granted by Safwan; only after applicable review/Quality Gates + observed required green CI + no unresolved Decision Gate
 - Deploy: not applicable / not authorized
 
 ## Completed in this layer
@@ -39,11 +39,12 @@ Establish a safe autonomous-engineering operating layer so a capable coding agen
 - ADR convention.
 - Implementation report convention.
 - Claude autonomous entrypoint/bootstrap.
+- Legacy orchestration compatibility/mode selection.
+- Standing merge authority with review/CI/Decision Gate safeguards.
 
 ## Not yet authorized
 
 - No Commerce Mobile implementation task is authorized merely by this documentation.
-- No automatic merge policy has been approved.
 - No deploy/release autonomy has been approved.
 - No production mutation autonomy has been approved.
 
