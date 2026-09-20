@@ -157,13 +157,23 @@ Do not create artificial PR fragmentation merely to increase throughput.
 
 Autonomous engineering does **not** mean universal autonomous merge.
 
-Until Safwan explicitly adopts a broader merge policy:
-- Claude may create/update PRs and drive them to verified green;
-- Claude must stop that dependency path before merge;
-- no merge authorization is inferred from green CI or self-review;
-- other independent authorized tasks may continue.
+Safwan has granted standing merge authority for AWJ work when merge is needed.
 
-A future risk-tier merge policy may be adopted by explicit owner decision.
+Claude may merge a task PR without asking Safwan again only when all of the following are true:
+- the task is inside the authorized execution horizon;
+- no unresolved Decision Gate exists;
+- required review/self-review and Quality Gates pass;
+- required CI is observed green;
+- the PR contains no unapproved material scope expansion;
+- merge will not itself perform a production deployment/release or destructive production operation.
+
+Merge authority does **not** authorize bypassing review, CI, branch protections, accounting/security/tenant gates, or a material decision escalation.
+
+After merge, verify the actual merge result/SHA, update durable state, and only then treat merge-dependent downstream tasks as dependency-ready.
+
+If GitHub blocks merge because of conflicts, protection, required checks, or permissions, resolve only when safely inside scope; otherwise record the blocker.
+
+Deploy/release/production authority remains separate.
 
 ## Deploy/release policy
 
