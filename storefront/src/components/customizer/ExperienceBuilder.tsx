@@ -1,5 +1,16 @@
 "use client";
 
+import {
+  ArrowLeft,
+  ArrowRight,
+  Eye,
+  Monitor,
+  RotateCcw,
+  Save,
+  Smartphone,
+  Tablet,
+  Upload,
+} from "lucide-react";
 import type { ReactNode } from "react";
 import { useMemo, useState } from "react";
 import {
@@ -58,7 +69,7 @@ export function ExperienceBuilder({
     [initialConfig],
   );
   const [draft, setDraft] = useState<StorefrontPresentationConfig>(baseline);
-  const [locale, setLocale] = useState<CustomizerLocale>(initialLocale);
+  const [locale] = useState<CustomizerLocale>(initialLocale);
   const [panel, setPanel] = useState<CustomizerPanel>("theme");
   const [device, setDevice] = useState<PreviewDevice>("desktop");
   const [mobilePane, setMobilePane] = useState<"edit" | "preview">("edit");
@@ -111,47 +122,39 @@ export function ExperienceBuilder({
       data-lifecycle={lifecycle}
       data-panel={panel}
       data-device={device}
-      className="relative flex h-full min-h-0 flex-col bg-neutral-100 text-neutral-900"
+      className="awj-editor relative flex h-full min-h-0 flex-col bg-awj-editor-background text-awj-editor-foreground"
     >
-      <header className="flex h-11 shrink-0 items-center gap-2 border-b border-neutral-200 bg-white px-3 md:h-12 md:gap-3 lg:pe-80">
-        <div className="min-w-0 flex-1">
+      <header className="flex min-h-12 shrink-0 items-center gap-2 border-b border-awj-editor-border bg-awj-editor-surface px-3 md:gap-3 lg:px-4">
+        <button
+          type="button"
+          className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-awj-editor-border bg-awj-editor-surface px-2 text-xs font-medium text-awj-editor-foreground-muted hover:bg-awj-editor-surface-muted hover:text-awj-editor-foreground"
+          onClick={() => window.history.back()}
+        >
+          {locale === "ar" ? (
+            <ArrowRight className="size-3.5" aria-hidden />
+          ) : (
+            <ArrowLeft className="size-3.5" aria-hidden />
+          )}
+          <span className="hidden sm:inline">{t("exitCommerce")}</span>
+        </button>
+        <div className="min-w-0 flex-1 border-s-2 border-awj-editor-primary ps-3">
           <p className="truncate text-[13px] font-semibold leading-none md:text-sm">
             {t("title")}
           </p>
-          <p className="mt-1 hidden truncate text-[11px] leading-none text-neutral-500 md:block">
+          <p className="mt-1 hidden truncate text-[11px] leading-none text-awj-editor-muted md:block">
             {t("subtitle")}
           </p>
         </div>
-        <span
-          data-draft-status=""
-          className="hidden text-[11px] text-neutral-500 xl:inline"
-        >
+        <span data-draft-status="" className="hidden text-[11px] xl:inline">
           {statusLabel}
         </span>
-        <div className="flex items-center">
-          {(["ar", "en"] as const).map((item) => (
-            <button
-              key={item}
-              type="button"
-              aria-label={item === "ar" ? t("arabic") : t("english")}
-              onClick={() => setLocale(item)}
-              className={`h-7 min-w-7 px-1.5 text-[11px] font-medium ${
-                locale === item
-                  ? "bg-neutral-900 text-white"
-                  : "text-neutral-600 hover:bg-neutral-100"
-              }`}
-            >
-              {item === "ar" ? "ع" : "EN"}
-            </button>
-          ))}
-        </div>
       </header>
 
       {notice ? (
         <div
           role="status"
           data-capability-notice=""
-          className="shrink-0 border-b border-neutral-200 bg-white px-3 py-2 text-xs leading-5 text-neutral-700"
+          className="shrink-0 border-b border-awj-editor-border bg-awj-editor-surface px-3 py-2 text-xs leading-5 text-awj-editor-foreground-muted"
         >
           <span className="font-medium">{t("capabilityTitle")}. </span>
           {notice}
@@ -166,7 +169,7 @@ export function ExperienceBuilder({
           aria-label={t("controls")}
           className={`${
             mobilePane === "preview" ? "hidden lg:flex" : "hidden md:flex"
-          } w-[196px] shrink-0 flex-col overflow-y-auto border-e border-neutral-200 bg-white`}
+          } w-[196px] shrink-0 flex-col overflow-y-auto border-e border-awj-editor-border bg-awj-editor-surface`}
         >
           <div className="flex flex-col py-2">
             {CUSTOMIZER_NAV_GROUPS.map((group, groupIndex) => (
@@ -174,7 +177,7 @@ export function ExperienceBuilder({
                 key={group.items.map((item) => item.id).join("-")}
                 className={
                   groupIndex > 0
-                    ? "mt-2 border-t border-neutral-200 pt-2"
+                    ? "mt-2 border-t border-awj-editor-border pt-2"
                     : undefined
                 }
               >
@@ -190,8 +193,8 @@ export function ExperienceBuilder({
                       onClick={() => setPanel(item.id)}
                       className={`flex h-9 w-full items-center gap-2.5 px-3 text-start text-[13px] ${
                         selected
-                          ? "bg-neutral-900 font-medium text-white"
-                          : "text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900"
+                          ? "bg-awj-editor-primary font-medium text-awj-editor-primary-foreground"
+                          : "text-awj-editor-foreground-muted hover:bg-awj-editor-surface-muted hover:text-awj-editor-foreground"
                       }`}
                     >
                       <NavIcon panel={item.id} />
@@ -208,9 +211,9 @@ export function ExperienceBuilder({
           data-builder-controls=""
           className={`${
             mobilePane === "edit" ? "flex" : "hidden"
-          } w-full min-w-0 flex-col border-neutral-200 bg-white md:flex-1 lg:flex lg:w-[300px] lg:flex-none lg:border-e xl:w-[320px]`}
+          } w-full min-w-0 flex-col border-awj-editor-border bg-awj-editor-surface md:flex-1 lg:flex lg:w-[300px] lg:flex-none lg:border-e xl:w-[320px]`}
         >
-          <div className="shrink-0 border-b border-neutral-200 px-3 py-2 md:hidden">
+          <div className="shrink-0 border-b border-awj-editor-border px-3 py-2 md:hidden">
             <label className="sr-only" htmlFor="customizer-panel-select">
               {t("controls")}
             </label>
@@ -220,7 +223,7 @@ export function ExperienceBuilder({
               onChange={(event) =>
                 setPanel(event.target.value as CustomizerPanel)
               }
-              className="h-11 w-full border border-neutral-300 bg-white px-3 text-sm font-medium text-neutral-900 outline-none focus:border-neutral-800"
+              className="h-11 w-full border border-awj-editor-border-strong bg-awj-editor-surface px-3 text-sm font-medium text-awj-editor-foreground outline-none focus:border-awj-editor-ring"
             >
               {CUSTOMIZER_PANELS.map((item) => (
                 <option key={item.id} value={item.id}>
@@ -229,7 +232,7 @@ export function ExperienceBuilder({
               ))}
             </select>
           </div>
-          <div className="hidden shrink-0 border-b border-neutral-200 px-4 py-3 md:block">
+          <div className="hidden shrink-0 border-b border-awj-editor-border px-4 py-3 md:block">
             <h2 className="text-[15px] font-semibold leading-tight">
               {activePanel ? t(activePanel.label) : t("theme")}
             </h2>
@@ -252,8 +255,9 @@ export function ExperienceBuilder({
             mobilePane === "preview" ? "flex" : "hidden"
           } min-w-0 flex-1 flex-col lg:flex`}
         >
-          <div className="flex h-9 shrink-0 items-center justify-between gap-3 border-b border-neutral-200 bg-white px-3 text-[11px] text-neutral-500">
-            <span className="font-medium text-neutral-700">
+          <div className="flex h-10 shrink-0 items-center justify-between gap-3 border-b border-awj-editor-border bg-awj-editor-surface px-3 text-[11px] text-awj-editor-muted">
+            <span className="inline-flex items-center gap-1.5 font-medium text-awj-editor-foreground">
+              <Eye className="size-3.5" aria-hidden />
               {t("livePreview")}
             </span>
             <div className="flex items-center gap-2">
@@ -264,12 +268,20 @@ export function ExperienceBuilder({
                     type="button"
                     data-device-option={item}
                     onClick={() => setDevice(item)}
-                    className={`h-7 px-2 text-[11px] font-medium ${
+                    aria-pressed={device === item}
+                    className={`inline-flex h-8 items-center gap-1.5 border-s border-awj-editor-border px-2 text-[11px] font-medium first:border-s-0 ${
                       device === item
-                        ? "bg-neutral-900 text-white"
-                        : "text-neutral-600 hover:bg-neutral-100"
+                        ? "bg-awj-editor-primary-soft text-awj-editor-primary"
+                        : "text-awj-editor-foreground-muted hover:bg-awj-editor-surface-muted"
                     }`}
                   >
+                    {item === "desktop" ? (
+                      <Monitor className="size-3.5" aria-hidden />
+                    ) : item === "tablet" ? (
+                      <Tablet className="size-3.5" aria-hidden />
+                    ) : (
+                      <Smartphone className="size-3.5" aria-hidden />
+                    )}
                     {t(item)}
                   </button>
                 ))}
@@ -282,7 +294,7 @@ export function ExperienceBuilder({
           <div className="min-h-0 flex-1 overflow-auto p-3 md:p-5 xl:p-8">
             <div
               data-preview-frame=""
-              className="mx-auto overflow-hidden border border-neutral-300 bg-white"
+              className="mx-auto overflow-hidden border border-awj-editor-border-strong bg-awj-editor-surface"
               style={{ width: Math.min(width, 1440), maxWidth: "100%" }}
             >
               <StorefrontPreviewCanvas
@@ -299,51 +311,54 @@ export function ExperienceBuilder({
       <div
         className={`${
           mobilePane === "preview" ? "hidden lg:flex" : "flex"
-        } shrink-0 items-center gap-2 border-t border-neutral-200 bg-white px-3 py-2 lg:absolute lg:top-0 lg:end-3 lg:h-12 lg:border-0 lg:bg-transparent lg:px-0 lg:py-0`}
+        } shrink-0 items-center gap-2 border-t border-awj-editor-border bg-awj-editor-surface px-3 py-2 lg:absolute lg:top-0 lg:end-3 lg:h-12 lg:border-0 lg:bg-transparent lg:px-0 lg:py-0`}
       >
         <button
           type="button"
           onClick={handleRestore}
-          className="hidden h-8 px-2 text-xs text-neutral-600 hover:text-neutral-900 lg:inline"
+          className="hidden h-8 items-center gap-1.5 px-2 text-xs text-awj-editor-foreground-muted hover:text-awj-editor-foreground lg:inline-flex"
         >
+          <RotateCcw className="size-3.5" aria-hidden />
           {t("restore")}
         </button>
         <button
           type="button"
           data-save=""
           onClick={handleSave}
-          className="h-10 flex-1 border border-neutral-300 bg-white px-3 text-sm font-medium lg:h-8 lg:flex-none lg:px-2.5 lg:text-xs"
+          className="inline-flex h-10 flex-1 items-center justify-center gap-1.5 rounded-md border border-awj-editor-border-strong bg-awj-editor-surface px-3 text-sm font-medium hover:bg-awj-editor-surface-muted lg:h-8 lg:flex-none lg:px-2.5 lg:text-xs"
         >
+          <Save className="size-3.5" aria-hidden />
           {t("save")}
         </button>
         <button
           type="button"
           data-publish=""
           onClick={handlePublish}
-          className="h-10 flex-1 bg-neutral-900 px-3 text-sm font-medium text-white lg:h-8 lg:flex-none lg:px-2.5 lg:text-xs"
+          className="inline-flex h-10 flex-1 items-center justify-center gap-1.5 rounded-md bg-awj-editor-primary px-3 text-sm font-medium text-awj-editor-primary-foreground hover:opacity-90 lg:h-8 lg:flex-none lg:px-2.5 lg:text-xs"
         >
+          <Upload className="size-3.5" aria-hidden />
           {t("publish")}
         </button>
       </div>
 
-      <div className="flex h-11 shrink-0 border-t border-neutral-200 bg-white lg:hidden">
+      <div className="flex h-11 shrink-0 border-t border-awj-editor-border bg-awj-editor-surface lg:hidden">
         <button
           type="button"
-          className={`relative flex-1 text-sm font-medium ${mobilePane === "edit" ? "text-neutral-900" : "text-neutral-500"}`}
+          className={`relative flex-1 text-sm font-medium ${mobilePane === "edit" ? "text-awj-editor-foreground" : "text-awj-editor-muted"}`}
           onClick={() => setMobilePane("edit")}
         >
           {mobilePane === "edit" ? (
-            <span className="absolute inset-x-0 top-0 h-0.5 bg-neutral-900" />
+            <span className="absolute inset-x-0 top-0 h-0.5 bg-awj-editor-primary" />
           ) : null}
           {t("edit")}
         </button>
         <button
           type="button"
-          className={`relative flex-1 text-sm font-medium ${mobilePane === "preview" ? "text-neutral-900" : "text-neutral-500"}`}
+          className={`relative flex-1 text-sm font-medium ${mobilePane === "preview" ? "text-awj-editor-foreground" : "text-awj-editor-muted"}`}
           onClick={() => setMobilePane("preview")}
         >
           {mobilePane === "preview" ? (
-            <span className="absolute inset-x-0 top-0 h-0.5 bg-neutral-900" />
+            <span className="absolute inset-x-0 top-0 h-0.5 bg-awj-editor-primary" />
           ) : null}
           {t("preview")}
         </button>

@@ -162,12 +162,12 @@ function Field({
 }) {
   return (
     <label className="block space-y-1.5">
-      <span className="block text-[12px] font-medium text-neutral-600">
+      <span className="block text-[12px] font-medium text-awj-editor-foreground-muted">
         {label}
       </span>
       {children}
       {hint ? (
-        <span className="block text-[12px] leading-5 text-neutral-500">
+        <span className="block text-[12px] leading-5 text-awj-editor-muted">
           {hint}
         </span>
       ) : null}
@@ -189,12 +189,14 @@ function Section({
       {title || hint ? (
         <div className="space-y-1">
           {title ? (
-            <h3 className="text-[12px] font-semibold tracking-wide text-neutral-500">
+            <h3 className="text-[12px] font-semibold tracking-wide text-awj-editor-muted">
               {title}
             </h3>
           ) : null}
           {hint ? (
-            <p className="text-[12px] leading-5 text-neutral-500">{hint}</p>
+            <p className="text-[12px] leading-5 text-awj-editor-muted">
+              {hint}
+            </p>
           ) : null}
         </div>
       ) : null}
@@ -213,7 +215,7 @@ function Segmented<T extends string>({
   onChange: (id: T) => void;
 }) {
   return (
-    <div className="flex border border-neutral-300 p-0.5">
+    <div className="flex border border-awj-editor-border-strong p-0.5">
       {options.map((option) => (
         <button
           key={option.id}
@@ -221,8 +223,8 @@ function Segmented<T extends string>({
           onClick={() => onChange(option.id)}
           className={`h-9 flex-1 px-2 text-[12px] font-medium ${
             value === option.id
-              ? "bg-neutral-900 text-white"
-              : "text-neutral-600 hover:text-neutral-900"
+              ? "bg-awj-editor-primary text-awj-editor-primary-foreground"
+              : "text-awj-editor-foreground-muted hover:text-awj-editor-foreground"
           }`}
         >
           {option.label}
@@ -233,12 +235,12 @@ function Segmented<T extends string>({
 }
 
 const inputClass =
-  "h-10 w-full border border-neutral-300 bg-white px-3 text-sm text-neutral-900 outline-none focus:border-neutral-800";
+  "h-10 w-full border border-awj-editor-border-strong bg-awj-editor-surface px-3 text-sm text-awj-editor-foreground outline-none focus:border-awj-editor-ring";
 const selectClass = inputClass;
 const btnClass =
-  "inline-flex h-8 items-center border border-neutral-300 bg-white px-2.5 text-xs font-medium text-neutral-800 hover:bg-neutral-50";
+  "inline-flex h-8 items-center border border-awj-editor-border-strong bg-awj-editor-surface px-2.5 text-xs font-medium text-awj-editor-foreground hover:bg-awj-editor-surface-muted";
 const iconBtnClass =
-  "inline-flex size-7 items-center justify-center text-xs text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 disabled:text-neutral-300 disabled:hover:bg-transparent";
+  "inline-flex size-7 items-center justify-center text-xs text-awj-editor-foreground-muted hover:bg-awj-editor-background hover:text-awj-editor-foreground disabled:text-awj-editor-disabled disabled:hover:bg-transparent";
 
 function moveIndex<T>(list: T[], index: number, delta: number): T[] {
   const target = index + delta;
@@ -277,15 +279,15 @@ function ThemePanel({
                 }
                 className={`overflow-hidden border text-start ${
                   selected
-                    ? "border-neutral-900"
-                    : "border-neutral-200 hover:border-neutral-400"
+                    ? "border-awj-editor-primary"
+                    : "border-awj-editor-border hover:border-awj-editor-border-hover"
                 }`}
               >
                 <span
                   className="block p-1.5"
                   style={{ background: preset.primary }}
                 >
-                  <span className="flex h-10 flex-col bg-white">
+                  <span className="flex h-10 flex-col bg-awj-editor-surface">
                     <span
                       className="block h-2.5"
                       style={{ background: preset.primary, opacity: 0.18 }}
@@ -302,7 +304,7 @@ function ThemePanel({
                     </span>
                   </span>
                 </span>
-                <span className="block truncate px-2 py-1.5 text-[12px] font-medium leading-tight text-neutral-800">
+                <span className="block truncate px-2 py-1.5 text-[12px] font-medium leading-tight text-awj-editor-foreground">
                   {t(preset.labelKey as CustomizerMessageKey)}
                 </span>
               </button>
@@ -315,7 +317,7 @@ function ThemePanel({
         hint={contrast >= 4.5 ? t("contrastOk") : t("contrastWarn")}
       >
         <div className="flex items-stretch gap-2">
-          <label className="relative size-10 shrink-0 cursor-pointer overflow-hidden border border-neutral-300">
+          <label className="relative size-10 shrink-0 cursor-pointer overflow-hidden border border-awj-editor-border-strong">
             <span
               className="absolute inset-0"
               style={{ background: config.primaryColor }}
@@ -429,7 +431,7 @@ function BrandingPanel({
         />
       </Field>
       {liveStoreName ? (
-        <p className="text-[12px] text-neutral-500">
+        <p className="text-[12px] text-awj-editor-muted">
           {t("liveName")}: {liveStoreName}
         </p>
       ) : null}
@@ -477,7 +479,7 @@ function LogoField({
 }) {
   return (
     <div className="space-y-1.5">
-      <span className="block text-[12px] font-medium text-neutral-600">
+      <span className="block text-[12px] font-medium text-awj-editor-foreground-muted">
         {label}
       </span>
       <div className="flex items-center gap-2">
@@ -510,11 +512,13 @@ function LogoField({
             {t("clearLogo")}
           </button>
         ) : (
-          <span className="text-[12px] text-neutral-500">{t("noLogo")}</span>
+          <span className="text-[12px] text-awj-editor-muted">
+            {t("noLogo")}
+          </span>
         )}
       </div>
       {hint ? (
-        <p className="text-[12px] leading-5 text-neutral-500">{hint}</p>
+        <p className="text-[12px] leading-5 text-awj-editor-muted">{hint}</p>
       ) : null}
     </div>
   );
@@ -541,7 +545,7 @@ function HeaderPanel({
           ]}
         />
       </Field>
-      <div className="divide-y divide-neutral-200 border-y border-neutral-200">
+      <div className="divide-y divide-awj-editor-border border-y border-awj-editor-border">
         <Toggle
           label={t("showSearch")}
           checked={config.header.showSearch}
@@ -573,7 +577,7 @@ function HeaderPanel({
       </div>
       <div className="space-y-2">
         <div className="flex items-center justify-between gap-2">
-          <span className="text-[12px] font-semibold tracking-wide text-neutral-500">
+          <span className="text-[12px] font-semibold tracking-wide text-awj-editor-muted">
             {t("navLinks")}
           </span>
           <button
@@ -600,11 +604,11 @@ function HeaderPanel({
             {t("addLink")}
           </button>
         </div>
-        <ul className="border border-neutral-200">
+        <ul className="border border-awj-editor-border">
           {config.header.links.map((link, index) => (
             <li
               key={link.id}
-              className="space-y-2 border-b border-neutral-200 p-3 last:border-b-0"
+              className="space-y-2 border-b border-awj-editor-border p-3 last:border-b-0"
             >
               <div className="grid grid-cols-2 gap-2">
                 <input
@@ -773,11 +777,11 @@ function HomepagePanel({
         </Field>
       </Section>
       <Section title={t("composerTitle")} hint={t("composerHint")}>
-        <ul className="border border-neutral-200">
+        <ul className="border border-awj-editor-border">
           {config.homepage.sections.map((section, index) => (
             <li
               key={section.id}
-              className="flex h-12 items-center gap-1 border-b border-neutral-200 px-1 last:border-b-0"
+              className="flex h-12 items-center gap-1 border-b border-awj-editor-border px-1 last:border-b-0"
             >
               <div className="flex">
                 <button
@@ -800,11 +804,11 @@ function HomepagePanel({
                 </button>
               </div>
               <div className="min-w-0 flex-1 px-1">
-                <p className="truncate text-[13px] font-medium text-neutral-900">
+                <p className="truncate text-[13px] font-medium text-awj-editor-foreground">
                   {t(SECTION_LABEL[section.type])}
                 </p>
                 {isGatedHomeSection(section.type) ? (
-                  <p className="text-[10px] leading-none text-neutral-400">
+                  <p className="text-[10px] leading-none text-awj-editor-disabled">
                     {t("gatedBadge")}
                   </p>
                 ) : null}
@@ -841,7 +845,7 @@ function FooterPanel({
 }) {
   return (
     <div className="space-y-6">
-      <div className="border-y border-neutral-200">
+      <div className="border-y border-awj-editor-border">
         <Toggle
           label={t("showFooterLogo")}
           checked={config.footer.showLogo}
@@ -935,10 +939,10 @@ function WhatsAppPanel({
   const href = buildWhatsAppUrl(config.whatsapp.phone, config.whatsapp.message);
   return (
     <div className="space-y-6">
-      <p className="text-[12px] leading-5 text-neutral-500">
+      <p className="text-[12px] leading-5 text-awj-editor-muted">
         {t("whatsappIntro")}
       </p>
-      <div className="border-y border-neutral-200">
+      <div className="border-y border-awj-editor-border">
         <Toggle
           label={t("whatsappEnable")}
           checked={config.whatsapp.enabled}
@@ -987,11 +991,11 @@ function WhatsAppPanel({
           ]}
         />
       </Field>
-      <div className="border-t border-neutral-200 pt-3">
-        <p className="font-mono text-[11px] leading-5 break-all text-neutral-500">
+      <div className="border-t border-awj-editor-border pt-3">
+        <p className="font-mono text-[11px] leading-5 break-all text-awj-editor-muted">
           {t("whatsappPreview")}: {href ?? "—"}
         </p>
-        <p className="mt-1 text-[12px] leading-5 text-neutral-500">
+        <p className="mt-1 text-[12px] leading-5 text-awj-editor-muted">
           {t("whatsappNoSend")}
         </p>
       </div>
@@ -1011,7 +1015,7 @@ function SocialPanel({
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[12px] font-semibold tracking-wide text-neutral-500">
+        <span className="text-[12px] font-semibold tracking-wide text-awj-editor-muted">
           {t("social")}
         </span>
         <button
@@ -1035,13 +1039,13 @@ function SocialPanel({
         </button>
       </div>
       {config.social.length === 0 ? (
-        <p className="text-[12px] text-neutral-500">{t("noSocial")}</p>
+        <p className="text-[12px] text-awj-editor-muted">{t("noSocial")}</p>
       ) : (
-        <ul className="border border-neutral-200">
+        <ul className="border border-awj-editor-border">
           {config.social.map((item, index) => (
             <li
               key={item.id}
-              className="space-y-2 border-b border-neutral-200 p-3 last:border-b-0"
+              className="space-y-2 border-b border-awj-editor-border p-3 last:border-b-0"
             >
               <div className="flex gap-2">
                 <select
@@ -1143,14 +1147,14 @@ function VerificationPanel({
   return (
     <div className="space-y-6">
       <Section hint={t("verificationIntro")}>
-        <div className="border border-neutral-200 px-3 py-3">
-          <p className="text-[12px] font-medium text-neutral-500">
+        <div className="border border-awj-editor-border px-3 py-3">
+          <p className="text-[12px] font-medium text-awj-editor-muted">
             {t("awjVerified")}
           </p>
-          <p className="mt-1 text-[15px] font-semibold text-neutral-900">
+          <p className="mt-1 text-[15px] font-semibold text-awj-editor-foreground">
             {t("notVerified")}
           </p>
-          <p className="mt-2 text-[12px] leading-5 text-neutral-500">
+          <p className="mt-2 text-[12px] leading-5 text-awj-editor-muted">
             {t("verificationWarning")}
           </p>
         </div>
@@ -1199,7 +1203,7 @@ function VerificationPanel({
           />
         </Field>
       </Section>
-      <div className="border-y border-neutral-200">
+      <div className="border-y border-awj-editor-border">
         <Toggle
           label={t("requestedVerified")}
           checked={config.verification.requestedVerifiedLabel}
@@ -1259,7 +1263,7 @@ function AppsPanel({
         </Field>
       </Section>
       <Section title={t("appsPlacement")}>
-        <div className="divide-y divide-neutral-200 border-y border-neutral-200">
+        <div className="divide-y divide-awj-editor-border border-y border-awj-editor-border">
           <Toggle
             label={t("showAppHome")}
             checked={config.apps.showHomepageSection}
@@ -1291,18 +1295,20 @@ function PagesPanel({
 }) {
   return (
     <div className="space-y-4">
-      <p className="text-[12px] leading-5 text-neutral-500">{t("pagesHint")}</p>
-      <ul className="border border-neutral-200">
+      <p className="text-[12px] leading-5 text-awj-editor-muted">
+        {t("pagesHint")}
+      </p>
+      <ul className="border border-awj-editor-border">
         {config.pages.map((page, index) => (
           <li
             key={page.id}
-            className="space-y-2 border-b border-neutral-200 p-3 last:border-b-0"
+            className="space-y-2 border-b border-awj-editor-border p-3 last:border-b-0"
           >
             <div className="flex items-center justify-between gap-2">
-              <span className="text-sm font-medium text-neutral-900">
+              <span className="text-sm font-medium text-awj-editor-foreground">
                 {t(PAGE_LABEL[page.slug])}
               </span>
-              <span className="text-[11px] text-neutral-400">
+              <span className="text-[11px] text-awj-editor-disabled">
                 {t("gatedBadge")}
               </span>
             </div>
@@ -1355,8 +1361,8 @@ function Toggle({
       <span
         className={
           compact
-            ? "text-[11px] text-neutral-600"
-            : "text-[13px] text-neutral-800"
+            ? "text-[11px] text-awj-editor-foreground-muted"
+            : "text-[13px] text-awj-editor-foreground"
         }
       >
         {label}
@@ -1368,8 +1374,8 @@ function Toggle({
           onChange={(event) => onChange(event.target.checked)}
           className="peer sr-only"
         />
-        <span className="absolute inset-0 bg-neutral-300 peer-checked:bg-neutral-900 peer-focus-visible:ring-2 peer-focus-visible:ring-neutral-400" />
-        <span className="absolute top-0.5 start-0.5 size-4 bg-white transition-[inset-inline-start] peer-checked:start-[18px]" />
+        <span className="absolute inset-0 bg-awj-editor-switch peer-checked:bg-awj-editor-primary peer-focus-visible:ring-2 peer-focus-visible:ring-awj-editor-ring" />
+        <span className="absolute top-0.5 start-0.5 size-4 bg-awj-editor-surface transition-[inset-inline-start] peer-checked:start-[18px]" />
       </span>
     </label>
   );

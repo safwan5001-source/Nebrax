@@ -5,6 +5,69 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* AWJ editor chrome tokens. Scoped to the standalone Customizer so merchant
+   presentation tokens can never restyle the editor controls. */
+@theme inline {
+  --color-awj-editor-background: var(--awj-editor-background);
+  --color-awj-editor-surface: var(--awj-editor-surface);
+  --color-awj-editor-surface-muted: var(--awj-editor-surface-muted);
+  --color-awj-editor-foreground: var(--awj-editor-foreground);
+  --color-awj-editor-foreground-muted: var(--awj-editor-foreground-muted);
+  --color-awj-editor-muted: var(--awj-editor-muted);
+  --color-awj-editor-disabled: var(--awj-editor-disabled);
+  --color-awj-editor-border: var(--awj-editor-border);
+  --color-awj-editor-border-strong: var(--awj-editor-border-strong);
+  --color-awj-editor-border-hover: var(--awj-editor-border-hover);
+  --color-awj-editor-primary: var(--awj-editor-primary);
+  --color-awj-editor-primary-foreground: var(--awj-editor-primary-foreground);
+  --color-awj-editor-primary-soft: var(--awj-editor-primary-soft);
+  --color-awj-editor-ring: var(--awj-editor-ring);
+  --color-awj-editor-switch: var(--awj-editor-switch);
+}
+
+.awj-editor {
+  --awj-editor-background: #f5f6f8;
+  --awj-editor-surface: #ffffff;
+  --awj-editor-surface-muted: #f0f2f5;
+  --awj-editor-foreground: #17202a;
+  --awj-editor-foreground-muted: #4b5563;
+  --awj-editor-muted: #6b7280;
+  --awj-editor-disabled: #9ca3af;
+  --awj-editor-border: #e2e5e9;
+  --awj-editor-border-strong: #c9ced6;
+  --awj-editor-border-hover: #aeb6c2;
+  --awj-editor-primary: #1f4b3a;
+  --awj-editor-primary-foreground: #ffffff;
+  --awj-editor-primary-soft: #e8f1ec;
+  --awj-editor-ring: #2a6a50;
+  --awj-editor-switch: #c9ced6;
+  color: var(--awj-editor-foreground);
+}
+
+.awj-editor :is(button, input, select, textarea, label[role="button"]) {
+  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease, box-shadow 150ms ease;
+}
+
+.awj-editor :is(button, input, select, textarea):focus-visible {
+  outline: 2px solid var(--awj-editor-ring);
+  outline-offset: 2px;
+}
+
+.awj-editor [data-draft-status] {
+  border: 1px solid var(--awj-editor-border);
+  border-radius: 999px;
+  padding: 0.25rem 0.55rem;
+  background: var(--awj-editor-surface-muted);
+  color: var(--awj-editor-foreground-muted);
+  font-weight: 600;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .awj-editor :is(button, input, select, textarea, label[role="button"]) {
+    transition: none;
+  }
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
