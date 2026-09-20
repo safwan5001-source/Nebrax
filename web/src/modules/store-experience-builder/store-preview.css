@@ -67,7 +67,7 @@
    so nothing leaks into merchant storefront content. */
 [data-customizer-scroll] {
   scrollbar-width: thin;
-  scrollbar-color: var(--border, #e5e7eb) transparent;
+  scrollbar-color: rgba(99, 106, 120, 0.4) transparent;
   overscroll-behavior: contain;
 }
 
@@ -81,7 +81,7 @@
 }
 
 [data-customizer-scroll]::-webkit-scrollbar-thumb {
-  background: var(--border, #e5e7eb);
+  background: color-mix(in srgb, var(--muted, #636a78) 40%, transparent);
   border-radius: 999px;
 }
 
