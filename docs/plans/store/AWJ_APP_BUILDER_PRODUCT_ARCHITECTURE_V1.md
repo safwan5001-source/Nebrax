@@ -1024,6 +1024,392 @@ No implementation should assume AWJ can silently perform every store-account act
 
 ---
 
+## 20A. Build, Signing, Store Ownership & Submission Automation — High-Sensitivity Evidence Pass (2026-09-20)
+
+### Why this is a security boundary
+
+The App Factory will eventually handle or orchestrate assets that can authorize software distribution under a merchant's identity. Store-account access, signing identities, API keys, upload keys and release permissions are security-sensitive credentials — not ordinary tenant configuration.
+
+A compromise here can affect distributed binaries, developer identity, release control and customer trust. Therefore the App Factory requires stronger isolation than normal Builder content.
+
+### External Evidence — Apple account ownership and roles
+
+Apple explicitly recommends that when a contract developer builds an app for an organization, **the organization enrolls in the Apple Developer Program and adds the developer to its team**. The organization's legal entity name is then the seller, and the organization remains the party submitting/distributing the app.
+
+For organization enrollment Apple requires a legal entity, D-U-N-S number (with stated exceptions such as government), legal authority to bind the organization, work email and public website. The legal entity name is used as the seller identity.
+
+Apple organization accounts have role-based access. The Account Holder controls legal agreements/membership and some uniquely sensitive functions. App Manager/Developer roles can perform scoped delivery work, while app access can be restricted for applicable roles.
+
+Apple App Store Connect API access must first be requested by the Account Holder. Apple supports team API keys and individual API keys. Apple states team API keys apply across all apps and **cannot be app-limited**, which makes a broad team key a poor default for a multi-merchant AWJ custody model. Individual API keys inherit the user's role/app access and are a potentially narrower integration path, subject to final automation design.
+
+### External Evidence — Apple signing
+
+Apple distribution certificates belong to the developer team and Apple says certificates/authentication assets are sensitive identity material and should not be shared outside the organization.
+
+Apple also supports cloud-managed distribution certificates. Xcode can use cloud signing, and Apple documents certificate rotation behavior.
+
+This evidence argues against AWJ casually exporting/importing long-lived merchant private distribution certificates into a shared credential database when a delegated/cloud-managed model can satisfy the workflow.
+
+### External Evidence — Apple upload/submission automation
+
+App Store Connect supports build upload using official tooling/API paths, including JWT-authenticated automation. Apple documents App Store Connect API automation and build upload/selection/submission workflows.
+
+Submitting an app version requires appropriate App Store Connect roles and still enters Apple App Review. API automation does not bypass review or legal/account-holder gates.
+
+### External Evidence — Apple app transfer
+
+Apple supports transferring an eligible app between developer accounts while keeping it available; reviews/ratings remain and users continue receiving updates. The Bundle ID remains with the app.
+
+However transfer is **not operationally trivial**. Apple documents special handling for capabilities such as push, Keychain sharing, Apple Pay, Sign in with Apple, iCloud, TestFlight/Xcode Cloud and others. Account Holders initiate/accept transfers.
+
+Therefore “we can transfer later” is a safety valve, not a justification for choosing the wrong ownership model initially.
+
+### External Evidence — Google account ownership and permissions
+
+Google Play organization accounts are intended for businesses/organizations and require organization verification including D-U-N-S in the documented organization flow.
+
+Play Console supports account-level and app-level user permissions. AWJ should prefer app-scoped least privilege where the required operation supports it, not global account administration.
+
+Google Play Developer API supports server automation using service accounts or OAuth. Google's documentation says service-account credentials should be kept in a secure server environment and granted the appropriate Play Console permissions.
+
+### External Evidence — Google signing
+
+With **Play App Signing**, Google holds/protects the app signing key and the developer keeps an upload key used to sign the bundle uploaded to Play. Google documents that a lost/compromised upload key can be reset.
+
+This distinction is critical for AWJ: the App Factory generally needs an authorized upload path, not custody of the final Google-held app signing private key.
+
+For apps outside Play App Signing, loss of the signing key can be catastrophic; Google documents that an app not enrolled in Play App Signing may need a new package/app if the keystore is lost.
+
+### External Evidence — Google transfer
+
+Google supports transferring apps between developer accounts subject to eligibility/process requirements. Play App Signing has specific upload/signing-key considerations during transfer.
+
+As with Apple, transfer is an exit/ownership mechanism, not a zero-cost routine operation.
+
+### AWJ Decision — default ownership model
+
+**Preferred default: merchant-owned store accounts, AWJ as delegated builder/release operator.**
+
+For a merchant-branded public app:
+
+```text
+Merchant legal organization
+   ├── owns Apple Developer / App Store Connect account
+   ├── owns Google Play developer account
+   ├── remains legal seller/developer of record where platform rules apply
+   └── delegates minimum required access to AWJ automation/operators
+```
+
+AWJ owns:
+- App Builder;
+- Experience Contract;
+- runtime/app-factory source and build templates;
+- build orchestration;
+- validation;
+- release workflow UI;
+- automation adapters.
+
+AWJ should **not** become the legal owner of every merchant's store account by default.
+
+### Why this is preferred
+
+1. merchant retains durable ownership if they leave AWJ;
+2. seller/developer identity aligns with the merchant's legal business;
+3. Apple explicitly describes organization-owned enrollment for contract-developed apps;
+4. reduces mass blast radius from one AWJ store account;
+5. app transfer is not required merely because a merchant ends the AWJ relationship;
+6. legal agreements/tax/business identity remain with the merchant;
+7. delegated access can be revoked without transferring the app.
+
+### Managed-account exception
+
+AWJ may later offer a managed publishing model for specific customer segments **only after** legal, policy, support, security and commercial review.
+
+It must be an explicit model, not the hidden default.
+
+The UI/contract must make ownership clear before first release:
+- Merchant-owned;
+- AWJ-managed (if ever supported);
+- transfer/exit consequences.
+
+### First-release onboarding
+
+Before App Factory can release, create an explicit **Store Connection & Ownership Setup** workflow.
+
+Candidate checks:
+
+#### Apple
+- organization/account status;
+- Account Holder/legal agreements readiness;
+- app record / Bundle ID;
+- delegated user/API access;
+- Certificates/Identifiers/Profiles capability where actually required;
+- signing mode;
+- push/entitlements;
+- App Store metadata/privacy/review prerequisites.
+
+#### Google
+- organization/account verification;
+- package/app record;
+- delegated user/service-account/API access;
+- Play App Signing status;
+- upload-key setup;
+- app-content/data-safety/review prerequisites.
+
+Do not ask merchants to paste account passwords into AWJ.
+
+### Credential architecture
+
+Store credentials must be handled by a dedicated secret-management boundary.
+
+Required properties:
+- encrypted at rest with managed KMS/HSM-backed key management where available;
+- never stored plaintext in tenant/business tables;
+- no secret returned to normal frontend APIs after connection;
+- scoped by platform + external account + app/tenant relationship;
+- least privilege;
+- rotation/revocation support;
+- audit of creation/use/revoke without logging secret value;
+- short-lived tokens generated from long-lived credentials where platform design allows;
+- environment separation;
+- no secrets in build logs/artifacts;
+- no cross-tenant secret lookup.
+
+Exact cloud secret manager/KMS provider remains an implementation decision.
+
+### Apple credential preference
+
+Preferred order, subject to proof/API capability:
+
+1. delegated merchant organization access with least privilege;
+2. narrowly scoped individual/integration identity where Apple permissions permit;
+3. avoid broad team API keys as default because Apple documents that team API keys cannot be limited to individual apps;
+4. avoid exported long-lived distribution private certificates when cloud-managed signing/delegated workflows can meet the requirement.
+
+Do not store the merchant's Apple Account password or 2FA recovery material.
+
+### Google credential preference
+
+Preferred:
+- merchant-owned Play account;
+- AWJ service identity/OAuth integration granted only required Play permissions;
+- Play App Signing for final distribution key custody;
+- separate upload key per app by default unless a reviewed operational reason says otherwise;
+- upload private keys stored in secret manager and injected only into isolated build jobs.
+
+Do not reuse one global AWJ upload key across unrelated merchant apps.
+
+### Build isolation
+
+Every native build is an untrusted multi-tenant job boundary.
+
+Required model:
+
+```text
+Build Request
+  -> authorize tenant/app/version
+  -> immutable build manifest
+  -> ephemeral isolated worker
+  -> fetch exact source/runtime/template revision
+  -> inject app-specific public config
+  -> lease required secret(s) just-in-time
+  -> build + sign
+  -> validate
+  -> upload artifact / submit
+  -> destroy worker + workspace + secret material
+```
+
+Requirements:
+- no shared writable workspace between merchant builds;
+- no previous tenant secrets/caches carried into another build unless cache is proven secret-free/content-addressed;
+- secrets are mounted/injected at execution time, not committed to source;
+- artifacts are tenant/app/version scoped;
+- build inputs are immutable/auditable;
+- build job cannot request another app's credentials by changing a client-supplied ID;
+- outbound network should be minimized/controlled for signing/build jobs;
+- logs must be secret-redacted.
+
+### Identity invariants
+
+Treat these as durable identities:
+- iOS Bundle ID;
+- Android application/package ID;
+- Apple/Google external app record IDs;
+- signing identity/public fingerprints;
+- merchant/store ownership relation.
+
+Do not regenerate identifiers on every build.
+
+Changing branding/name does not imply changing package/bundle identity.
+
+### Signing invariants
+
+A release record must know which signing identity was used, without exposing private material.
+
+Store at least safe metadata such as:
+- signing provider/mode;
+- certificate/key identifier/fingerprint;
+- validity/rotation status where applicable;
+- external account/app identity;
+- build artifact digest;
+- signer job/audit reference.
+
+Private key material remains in the secret/signing boundary.
+
+### Release state machine
+
+Do not model release as a single boolean.
+
+Conceptual states:
+
+```text
+Draft Release
+ -> Validating
+ -> Build Queued
+ -> Building
+ -> Build Failed / Built
+ -> Signing / Signed
+ -> Uploading / Uploaded
+ -> Store Processing
+ -> Ready for Submission
+ -> Submitted
+ -> In Review
+ -> Rejected / Action Required / Approved
+ -> Scheduled / Phased/Staged
+ -> Released
+ -> Superseded
+```
+
+Apple and Google have different exact external states; AWJ should map them into a normalized product state while retaining the raw external state for diagnostics.
+
+### Human approval / separation of duties
+
+Production submission/release is a high-impact action.
+
+AWJ should support policy such as:
+- Builder/editor can prepare;
+- authorized Release Manager can approve submission;
+- credentials are used by backend automation, not revealed to the approver;
+- high-risk changes can require explicit re-authentication/confirmation;
+- audit records actor, app, version, artifact digest and external submission IDs.
+
+For V1, **no unattended auto-release by default**.
+
+Future automated release policies may be considered only with explicit merchant opt-in and risk controls.
+
+### Idempotency and retry
+
+Build/upload/submission jobs must be idempotent around external side effects.
+
+Persist:
+- AWJ release ID;
+- immutable build/version identity;
+- artifact digest;
+- Apple/Google external operation/build/version IDs;
+- last known external state;
+- retry count/error class.
+
+A timeout must not cause AWJ to blindly create duplicate store versions/submissions.
+
+### Credential compromise / rotation
+
+#### Apple
+- revoke compromised API keys immediately and create replacement credentials with least privilege;
+- rotate signing assets according to Apple-supported processes;
+- cloud-managed certificates are preferred where they reduce private-key custody;
+- revocation effects must be understood before acting because uploaded/pending builds can be affected.
+
+#### Google
+- reset compromised upload key through Play App Signing-supported process;
+- distinguish upload key compromise from Google-held app signing key;
+- update third-party API fingerprint registrations when signing identity changes/upgrades.
+
+AWJ Release Center should surface credential health and block unsafe release operations.
+
+### Merchant offboarding / exit
+
+Because merchant ownership is preferred:
+- revoke AWJ delegated access;
+- revoke AWJ integration credentials/service accounts;
+- export merchant-owned AWJ app configuration/data as contractually supported;
+- merchant keeps Apple/Google app ownership;
+- no store transfer is normally needed.
+
+If an app is AWJ-managed under a future exception model, offboarding requires an explicit transfer runbook and capability-specific migration checklist.
+
+### App transfer runbook requirement
+
+Never implement “Transfer App” as one button without preflight.
+
+Preflight must inspect relevant capabilities, including at least:
+- subscriptions/IAP;
+- push;
+- Sign in with Apple;
+- Apple Pay;
+- Keychain/App Groups/iCloud where used;
+- TestFlight/Xcode Cloud;
+- Google Play App Signing/upload key;
+- linked API fingerprints/deep links;
+- webhooks/integrations;
+- current review/release states.
+
+Transfer should produce a signed/audited handoff checklist and post-transfer verification.
+
+### Audit requirements
+
+Security/audit log should record:
+- connection created/changed/revoked;
+- role/permission verification;
+- credential/key rotation;
+- build requested/completed;
+- artifact digest;
+- signing identity metadata;
+- upload;
+- submission;
+- release control change;
+- rejection/action-required;
+- transfer/offboarding.
+
+Do not log private keys, JWT signing material, account passwords or full access tokens.
+
+### Production protections
+
+- no Merge/Deploy from App Builder documentation automatically authorizes App Factory production access;
+- production store credentials require explicit secure onboarding;
+- preview credentials cannot submit production releases;
+- staging build workers cannot access production release secrets;
+- tenant/app ownership relation is checked server-side before every secret lease and external store action;
+- financial/legal account actions remain restricted to roles/platform processes that support them.
+
+### Open Decisions after high-sensitivity pass
+
+- exact Apple delegated integration identity: individual API key vs other supported App Store Connect API arrangement for each operation;
+- exact Apple signing automation path and whether cloud-managed signing can cover the required CI/App Factory workflow;
+- final secret manager/KMS/HSM provider;
+- build worker platform/provider;
+- whether one isolated Google Cloud service account is created per merchant account or another narrower credential model;
+- upload-key-per-app operational implementation;
+- merchant onboarding UX for D-U-N-S/account verification;
+- handling merchants who only have personal developer accounts;
+- whether AWJ ever offers managed developer-account publishing;
+- store fees/commercial responsibility;
+- tax/banking/IAP/subscription ownership;
+- exact automated metadata/review API coverage;
+- emergency signing/release procedure;
+- two-person approval policy for high-risk releases;
+- retention period for signed artifacts/build logs;
+- formal app-transfer/offboarding SLA.
+
+### High-sensitivity conclusion
+
+**Default ownership architecture: merchant owns Apple/Google developer accounts and the app; AWJ receives revocable least-privilege delegated access and operates the build/release workflow.**
+
+**Default signing architecture: minimize private-key custody; prefer platform-managed signing where available; isolate any credential AWJ must hold per external account/app and expose it only just-in-time to ephemeral build workers.**
+
+This direction materially reduces legal lock-in, tenant blast radius and credential risk while preserving AWJ's ability to automate professional releases.
+
+---
+
 ## 21. Localization, RTL and accessibility
 
 ### AWJ Requirement
@@ -1591,6 +1977,18 @@ Each pass updates this document with evidence, AWJ decision, and remaining open 
 
 ### Existing repository evidence
 - `docs/plans/store/AWJ_MOBILE_APP_BUILDER_BENCHMARK.md` — baseline benchmark and initial architecture direction.
+
+### Build/signing/store ownership evidence added 2026-09-20
+- Apple Developer — Program enrollment, organization identity/D-U-N-S and contract-developer ownership guidance.
+- Apple Developer / App Store Connect — account roles, app-scoped access, API keys and API access.
+- Apple Developer — certificates overview and cloud-managed certificates.
+- App Store Connect — upload builds, choose build, submit to App Review.
+- App Store Connect — app transfer overview and transfer criteria, including capability-specific transfer effects.
+- Google Play Console — organization developer account requirements and identity verification.
+- Google Play Console — users and permissions, including app-level vs account-level access.
+- Google Play Developer API — service account/OAuth access and secure server credential guidance.
+- Google Play Console — Play App Signing, upload key vs Google-held app signing key, upload-key reset.
+- Google Play Console — app/account transfer documentation.
 
 ### Preview architecture evidence added 2026-09-20
 - Flutter official documentation — hot reload and build modes; development iteration is distinct from release binaries.
