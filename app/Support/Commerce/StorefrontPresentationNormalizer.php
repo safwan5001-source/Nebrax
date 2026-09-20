@@ -287,8 +287,7 @@ final class StorefrontPresentationNormalizer
                 'crNumber' => mb_substr($this->asString($verificationRaw['crNumber'] ?? null), 0, 40),
                 'licenseNumber' => mb_substr($this->asString($verificationRaw['licenseNumber'] ?? null), 0, 40),
                 'sourceUrl' => $this->sanitizeExternalUrl($this->asString($verificationRaw['sourceUrl'] ?? null)) ?? '',
-                // Legacy compatibility only. Presentation can never mint an
-                // official, government, or verified identity claim.
+                // Legacy compatibility only; merchant input cannot mint an official verification claim.
                 'requestedVerifiedLabel' => false,
             ],
             'apps' => [

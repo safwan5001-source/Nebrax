@@ -67,12 +67,14 @@ For a code task this normally means:
 
 If the task requires merge for true completion, keep it at `merge_ready`/`merged` until the standing merge workflow and post-merge review complete. Use `owner_gate` only for actions that still require Safwan, such as deploy/production release/destructive production operation or a material escalated decision.
 
-## Current pilot execution horizon
+## Current autonomous execution horizon
 
-The first autonomous execution horizon should be deliberately bounded to **Commerce Mobile API readiness closure**, because it already has a documented evidence pass and dependency chain.
+**STATUS: ACTIVE — Commerce Mobile API readiness closure V1.**
+
+This horizon is deliberately bounded to the documented Commerce Mobile readiness gaps and their dependency chain.
 
 Authoritative readiness source:
-`docs/plans/store/COMMERCE_MOBILE_API_READINESS.md` once PR #887 is merged/otherwise made an accepted source.
+`docs/plans/store/COMMERCE_MOBILE_API_READINESS.md` on `main`, accepted through merged and post-merge-reviewed PR #887.
 
 Candidate order from that evidence:
 1. Mobile Product Media.
@@ -86,9 +88,7 @@ Candidate order from that evidence:
 9. Explicit localization/fallback contract.
 10. Runtime fixtures/integration tests for completed vertical slice.
 
-**Important:** This is a dependency direction, not authorization to implement all ten immediately.
-
-Before launching Claude on this horizon, normalize each candidate into a task record from current `main`, verify dependencies and mark only genuinely ready tasks as `ready`.
+**Authorization rule:** the horizon is authorized, but tasks are executable only after they are individually validated/promoted to `ready` from current `main`. Claude must not treat the full list as simultaneously ready.
 
 ## Initial seed task
 
@@ -96,7 +96,7 @@ Before launching Claude on this horizon, normalize each candidate into a task re
 id: COM-MOBILE-MEDIA-1
 title: Close the Public/Mobile Commerce product-media gap
 domain: commerce
-status: backlog
+status: ready
 risk: high
 depends_on:
   - accepted Commerce Mobile API readiness evidence
@@ -129,7 +129,7 @@ merge_policy: standing-authority-after-pre-merge-review
 deploy_policy: owner-approval
 ```
 
-It remains `backlog` here because PR #887 is currently a draft documentation source and this autonomous layer must not silently convert a draft plan into implementation authorization.
+`COM-MOBILE-MEDIA-1` is now `ready`: PR #887 is merged/post-reviewed, the readiness contract is accepted on `main`, its outcome/invariants/acceptance/tests are defined, and no material Decision Gate is required to begin the media capability. Before coding, Claude must still inspect the current relevant media/controller/routes/tests evidence and adjust stale implementation assumptions without expanding scope.
 
 ## Backlog discovery
 

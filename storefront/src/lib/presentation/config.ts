@@ -508,8 +508,7 @@ export function normalizePresentationConfig(
       crNumber: asString(verificationRaw.crNumber).slice(0, 40),
       licenseNumber: asString(verificationRaw.licenseNumber).slice(0, 40),
       sourceUrl: sanitizeExternalUrl(asString(verificationRaw.sourceUrl)) ?? "",
-      // Legacy compatibility only. Public presentation can never mint an
-      // official, government, or verified identity claim.
+      // Legacy compatibility only; merchant input cannot mint an official verification claim.
       requestedVerifiedLabel: false,
     },
     apps: {
