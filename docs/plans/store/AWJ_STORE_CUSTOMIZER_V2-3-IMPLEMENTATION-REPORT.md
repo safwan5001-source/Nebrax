@@ -55,11 +55,11 @@ Visual and interaction QA was performed against the supplied Prototype V0.2 dire
 
 | Viewport | Result | Evidence |
 |---|---|---|
-| Desktop `1440×960` | Standalone workspace, no Commerce Header/Sidebar, Canvas dominant, toolbar device controls, exact Canvas selection/highlight | `/home/ubuntu/work/Nebrax/qa-artifacts/customizer-desktop-1440.png` |
-| Mobile `390×844` | Preview-first Canvas, no permanent desktop sidebar, touch action bar | `/home/ubuntu/work/Nebrax/qa-artifacts/customizer-mobile-390.png` |
-| Mobile Bottom Sheet | Sections sheet opens and scrolls independently | `/home/ubuntu/work/Nebrax/qa-artifacts/customizer-mobile-390-sheet.png` |
+| Desktop `1440×960` | Standalone workspace, no Commerce Header/Sidebar, Canvas dominant, toolbar device controls, exact Canvas selection/highlight | `/home/ubuntu/qa-artifacts/customizer-desktop-1440.png` |
+| Mobile `390×844` | Preview-first Canvas, no permanent desktop sidebar, touch action bar | `/home/ubuntu/qa-artifacts/customizer-mobile-390.png` |
+| Mobile Bottom Sheet | Sections sheet opens and scrolls independently | `/home/ubuntu/qa-artifacts/customizer-mobile-390-sheet.png` |
 
-The automated Playwright smoke check also verified that the standalone route has no detected Commerce Sidebar, the Canvas exists, the Desktop `categories` instance selects and highlights by ID, and the Mobile Bottom Sheet is present and independently scrollable. Raw results are stored at `/home/ubuntu/work/Nebrax/qa-artifacts/qa-results.json`.
+The automated Playwright smoke check also verified that the standalone route has no detected Commerce Sidebar, the Canvas exists, the Desktop `categories` instance selects and highlights by ID, and the Mobile Bottom Sheet is present and independently scrollable. Raw results are stored at `/home/ubuntu/qa-artifacts/qa-results.json`.
 
 The local Next.js development overlay displayed unrelated existing project issues while running the app; these did not prevent rendering the Customizer and are not caused by the changed files.
 
