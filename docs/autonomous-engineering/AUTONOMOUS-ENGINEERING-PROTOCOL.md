@@ -110,10 +110,36 @@ Expand tests/builds according to risk. Financial/security/tenant changes require
 ### H. CI
 Inspect relevant failing jobs/logs first. Fix failures caused by the task. Do not enter unrelated cleanup.
 
-### I. Evidence report
+### I. Mandatory pre-merge review
+Before every merge Claude must perform a fresh review against the **final PR head**, after all implementation/fixes and required CI:
+- inspect the complete final diff;
+- re-run the Reviewer and AWJ Guardian passes;
+- verify required checks are green for that exact head;
+- verify no unresolved review finding or Decision Gate;
+- verify scope, migrations, public contracts and security/accounting/tenant implications;
+- record `PRE_MERGE_REVIEW: PASS` with reviewed Head SHA.
+
+If the head changes after this review, the pre-merge review is stale and must be repeated.
+
+### J. Merge
+When standing merge conditions pass, merge and capture the actual merge commit SHA. Never infer success from an attempted merge.
+
+### K. Mandatory post-merge review
+After every merge Claude must review the result on the target branch before unlocking dependent work:
+- verify the PR is actually merged and capture Merge SHA;
+- verify target branch contains the intended changes;
+- inspect the merge result/diff for unexpected integration changes;
+- verify required post-merge checks/workflows for the merge commit when available/applicable;
+- run a targeted post-merge smoke/regression check when risk or merge interaction warrants it;
+- confirm no new conflict with target-branch changes;
+- record `POST_MERGE_REVIEW: PASS` with Merge SHA.
+
+If post-merge verification fails, mark the task `blocked`/incident state, do not unlock dependent work, and fix forward through a new reviewed PR unless a material decision requires escalation. Never rewrite shared `main` history.
+
+### L. Evidence report
 Record exact commands/results, changed files, risks, compatibility assessment, Branch/PR/Base SHA/Head SHA and next task.
 
-### J. Transition
+### M. Transition
 Classify the task truthfully:
 - `review` when implementation/evidence are ready but review gates remain;
 - `owner_gate` when technical work is ready but current policy requires Safwan action such as merge;
@@ -169,7 +195,7 @@ Claude may merge a task PR without asking Safwan again only when all of the foll
 
 Merge authority does **not** authorize bypassing review, CI, branch protections, accounting/security/tenant gates, or a material decision escalation.
 
-After merge, verify the actual merge result/SHA, update durable state, and only then treat merge-dependent downstream tasks as dependency-ready.
+After merge, complete the mandatory post-merge review, verify the actual merge result/SHA, update durable state, and only then treat merge-dependent downstream tasks as dependency-ready.
 
 If GitHub blocks merge because of conflicts, protection, required checks, or permissions, resolve only when safely inside scope; otherwise record the blocker.
 
