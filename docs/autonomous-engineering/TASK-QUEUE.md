@@ -37,7 +37,7 @@ Authorization:
 | Order | Task ID | Status | Risk | Depends on | Outcome |
 |---|---|---|---|---|---|
 | 1 | COM-MOBILE-MEDIA-1 | done | high | accepted readiness contract | Mobile-authorized product media |
-| 2 | COM-MOBILE-VARIANTS-1 | backlog | high | media/readiness as applicable | Variant/options/UOM mobile contract |
+| 2 | COM-MOBILE-VARIANTS-1 | ready | high | COM-MOBILE-MEDIA-1 (done) | Variant/options/UOM mobile contract |
 | 3 | COM-MOBILE-AUTH-1 | backlog | critical | identity architecture decision/readiness | Customer mobile auth + profile |
 | 4 | COM-MOBILE-CART-IDENTITY-1 | backlog | critical | COM-MOBILE-AUTH-1 | Guest → authenticated cart transition |
 | 5 | COM-MOBILE-CUSTOMER-1 | backlog | high | COM-MOBILE-AUTH-1 | Addresses + customer order history |
@@ -50,6 +50,14 @@ Authorization:
 Source: `docs/plans/store/COMMERCE_MOBILE_API_READINESS.md` on `main` (accepted via merged/post-reviewed PR #887).
 
 `COM-MOBILE-MEDIA-1` is `done`: PR #911 merged (Merge SHA `8386ece721f3e6b37c9f2ff8db64f10e2b44d9c4`), post-merge CI green on `main` (SQLite + PostgreSQL), post-merge review passed. Full evidence: `docs/plans/commerce/COM-MOBILE-MEDIA-1-IMPLEMENTATION-REPORT.md`.
+
+`COM-MOBILE-VARIANTS-1` promoted to `ready` from current-`main` evidence (promotion checklist below):
+- Source requirement: `docs/plans/store/COMMERCE_MOBILE_API_READINESS.md` §5 (variant gap), required contract: option/attribute definitions, valid combinations, UOM, variant price, variant availability, media relationship, add-to-cart requirements.
+- Hard dependency (media) is `done`.
+- **Business logic is already fully variant-aware and shared, not new**: `CommerceCartController::store()` already accepts and forwards `product_variant_id` to `CommerceCartService::add()` — the same shared service `/store/v1` uses, already covered by `StorefrontVariantCommerceTest`'s cart/checkout/order variant-identity assertions. `CommercePriceResolver::resolve()` and `AvailableToSellService::forWarehouse()` are already variant-aware (`?string $variantId` parameter, VAR-COM-1). This task is a **read/DTO exposure** task on `CommerceProductController::show()`, mirroring `StorefrontProductController::show()`'s already-shipped, already-tested variant branch (options/variants payload, per-variant price/stock/media) for the mobile trust boundary — the same "reuse existing authority, no parallel logic" shape as COM-MOBILE-MEDIA-1, not a new business-logic design.
+- No unresolved material decision: no new pricing/availability/cart rule, no new contract shape (the `options`/`variants` JSON shape is already defined and shipped by `StorefrontProductResource`).
+- Acceptance criteria: `GET /commerce/v1/products/{id}` for a variant-managed product returns `options`/`variants` (id, sku, descriptor, option_value_ids, price, in_stock, media) matching `/store/v1`'s shape; list (`index()`) keeps its existing deferred behavior (`is_variant_managed` flag only) unchanged, matching `/store/v1`'s own list/detail asymmetry; tenant/channel/publication/inactive-variant negatives; cross-tenant/cross-product variant rejection (already enforced by `DocumentLineVariantResolver::resolve()`, reused unchanged).
+- Tests: focused `/commerce/v1` variant detail tests + regression on `CommerceCatalogApiTest`/`CommerceMediaApiTest`, SQLite + PostgreSQL.
 
 ## Promotion checklist: backlog → ready
 

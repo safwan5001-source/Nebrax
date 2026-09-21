@@ -145,6 +145,54 @@ both `/store/v1` and `/commerce/v1` — a configurable-policy decision, not a bu
 gallery loading for list endpoints (`ProductMediaGalleryService` currently resolves one
 row at a time on both boundaries' `index()`).
 
+## Second task
+
+```yaml
+id: COM-MOBILE-VARIANTS-1
+title: Variant/options/UOM mobile contract
+domain: commerce
+status: review
+risk: high
+depends_on:
+  - COM-MOBILE-MEDIA-1 (done)
+references:
+  - docs/plans/store/COMMERCE_MOBILE_API_READINESS.md
+outcome: >
+  A variant-managed product's GET /commerce/v1/products/{id} exposes options/
+  variants (descriptor, per-variant price/stock/media) so a mobile client can
+  select a concrete variant before calling the already-variant-aware
+  POST /commerce/v1/cart/items.
+invariants:
+  - Tenant Isolation
+  - no client-supplied variant id resolved on this read path
+  - no cross-tenant/cross-product variant leakage
+  - existing pricing/availability/cart variant authority remains source of truth
+  - backward compatibility (index() list-row behavior unchanged)
+acceptance:
+  - variant-managed product detail exposes options/variants matching /store/v1's shape
+  - inactive variant excluded
+  - list endpoint keeps its deferred is_variant_managed-only row
+  - tenant/channel/publication negatives pass
+  - no sensitive field leakage
+  - no new pricing/availability/cart-identity logic introduced
+tests:
+  - focused variant/API tests
+  - tenant/channel/publication negatives
+  - SQLite
+  - PostgreSQL
+merge_policy: standing-authority-after-pre-merge-review
+deploy_policy: owner-approval
+```
+
+`COM-MOBILE-VARIANTS-1` is `review`: implemented on branch `claude/com-mobile-variants-1`
+(`CommerceProductController::variantResource()`, mirroring
+`StorefrontProductController::show()`'s already-shipped variant branch exactly — no new
+pricing/availability/cart-identity logic, since `CommercePriceResolver`,
+`AvailableToSellService`, and `CommerceCartController`/`CommerceCartService` were already
+variant-aware before this task). Focused (7) + module regression (1001 tests) green on
+SQLite and PostgreSQL. See
+`docs/plans/commerce/COM-MOBILE-VARIANTS-1-IMPLEMENTATION-REPORT.md` for full evidence.
+
 ## Backlog discovery
 
 Claude may discover new work while implementing.
