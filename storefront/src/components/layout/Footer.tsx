@@ -120,14 +120,13 @@ export async function Footer({
   const displayName = storeName?.trim() || t("shop");
   await connection();
   const year = new Date().getFullYear();
+  const legalName = businessIdentity.legal_name?.trim() || null;
+  const crNumber = businessIdentity.cr_number?.trim() || null;
+  const vatNumber = businessIdentity.vat_number?.trim() || null;
   const hasContact = Boolean(
     contact?.phone || contact?.email || contact?.address || contact?.hours,
   );
-  const hasBusinessIdentity = Boolean(
-    businessIdentity.legal_name ||
-      businessIdentity.cr_number ||
-      businessIdentity.vat_number,
-  );
+  const hasBusinessIdentity = Boolean(legalName || crNumber || vatNumber);
 
   return (
     <footer className="bg-store-footer text-store-footer-link">
@@ -271,19 +270,19 @@ export async function Footer({
                 <p className="font-medium text-store-footer-link">
                   {t("businessInformation")}
                 </p>
-                {businessIdentity.legal_name ? (
+                {legalName ? (
                   <p>
-                    {t("legalName")}: {businessIdentity.legal_name}
+                    {t("legalName")}: {legalName}
                   </p>
                 ) : null}
-                {businessIdentity.cr_number ? (
+                {crNumber ? (
                   <p>
-                    {t("crNumber")}: {businessIdentity.cr_number}
+                    {t("crNumber")}: {crNumber}
                   </p>
                 ) : null}
-                {businessIdentity.vat_number ? (
+                {vatNumber ? (
                   <p>
-                    {t("vatNumber")}: {businessIdentity.vat_number}
+                    {t("vatNumber")}: {vatNumber}
                   </p>
                 ) : null}
               </div>

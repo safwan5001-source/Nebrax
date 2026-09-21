@@ -25,6 +25,14 @@ vi.mock('@/modules/commerce-workspace/store-context', () => ({
   }),
 }));
 
+vi.mock('@/lib/company', () => ({
+  useCompany: () => ({
+    name: 'شركة النور',
+    cr_number: '7050247977',
+    vat_number: null,
+  }),
+}));
+
 vi.mock('@/modules/commerce-workspace/presentation', () => ({
   loadStorefrontPresentation: (...args: unknown[]) => loadMock(...args),
   saveStorefrontPresentation: (...args: unknown[]) => saveMock(...args),
@@ -67,6 +75,13 @@ describe('commerce appearance — STORE-BACKEND-1', () => {
     render(<CommerceAppearancePage />);
     expect(screen.getAllByText('متجر النور').length).toBeGreaterThan(0);
     await waitFor(() => expect(loadMock).toHaveBeenCalled());
+  });
+
+  it('passes canonical company identity to the preview', async () => {
+    loadMock.mockResolvedValue({ ok: true, data: draftRecord });
+    render(<CommerceAppearancePage />);
+
+    expect(await screen.findByText('السجل التجاري: 7050247977')).toBeTruthy();
   });
 
   it('reports save success only after the server confirms', async () => {

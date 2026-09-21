@@ -42,6 +42,7 @@ interface StorefrontPreviewCanvasProps {
   locale: CustomizerLocale;
   viewport: "desktop" | "tablet" | "mobile";
   liveStoreName?: string | null;
+  businessIdentity?: StorefrontBusinessIdentity;
   /**
    * Click-to-Edit foundation (STORE-CUSTOMIZER-V2-1), upgraded to instance
    * identity in V2-2 (CONTRACT-2): `selectedSection` is a section instance
@@ -53,11 +54,18 @@ interface StorefrontPreviewCanvasProps {
   onSelectSection?: (id: string) => void;
 }
 
+export interface StorefrontBusinessIdentity {
+  legal_name: string | null;
+  cr_number: string | null;
+  vat_number: string | null;
+}
+
 export function StorefrontPreviewCanvas({
   config,
   locale,
   viewport,
   liveStoreName = null,
+  businessIdentity = { legal_name: null, cr_number: null, vat_number: null },
   selectedSection = null,
   onSelectSection,
 }: StorefrontPreviewCanvasProps) {
@@ -103,6 +111,10 @@ export function StorefrontPreviewCanvas({
   const android = sanitizeExternalUrl(config.apps.androidUrl);
   const hasApps = Boolean(ios || android);
   const visiblePages = config.pages.filter((page) => page.enabled);
+  const legalName = businessIdentity.legal_name?.trim() || null;
+  const crNumber = businessIdentity.cr_number?.trim() || null;
+  const vatNumber = businessIdentity.vat_number?.trim() || null;
+  const hasBusinessIdentity = Boolean(legalName || crNumber || vatNumber);
 
   return (
     <div
@@ -414,7 +426,7 @@ export function StorefrontPreviewCanvas({
             config.contact.address ||
             config.contact.hours ||
             enabledSocial.length > 0 ||
-            config.verification.crNumber.trim() ||
+            hasBusinessIdentity ||
             config.verification.licenseNumber.trim() ||
             config.sbc.show_in_storefront) && (
             <div className="mt-8 border-t border-store-footer-border pt-6 text-sm text-store-footer-muted">
@@ -435,24 +447,40 @@ export function StorefrontPreviewCanvas({
                   ))}
                 </p>
               )}
-              {(config.verification.crNumber.trim() ||
-                config.verification.licenseNumber.trim()) && (
+              {hasBusinessIdentity ? (
+                <div className="mt-4 space-y-1">
+                  <p className="font-medium text-store-footer-link">
+                    {t("businessInformation")}
+                  </p>
+                  {legalName ? (
+                    <p>
+                      {t("legalName")}: {legalName}
+                    </p>
+                  ) : null}
+                  {crNumber ? (
+                    <p>
+                      {t("crNumber")}: {crNumber}
+                    </p>
+                  ) : null}
+                  {vatNumber ? (
+                    <p>
+                      {t("vatNumber")}: {vatNumber}
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
+              {config.verification.licenseNumber.trim() ? (
                 <div className="mt-4 space-y-1">
                   <p className="font-medium text-store-footer-link">
                     {t("merchantProvided")}
                   </p>
-                  {config.verification.crNumber.trim() ? (
-                    <p>
-                      {t("crNumber")}: {config.verification.crNumber}
-                    </p>
-                  ) : null}
                   {config.verification.licenseNumber.trim() ? (
                     <p>
                       {t("licenseNumber")}: {config.verification.licenseNumber}
                     </p>
                   ) : null}
                 </div>
-              )}
+              ) : null}
               {config.sbc.show_in_storefront ? (
                 <div className="mt-4 border-t border-store-footer-border pt-4">
                   <p className="font-medium text-store-footer-link">
