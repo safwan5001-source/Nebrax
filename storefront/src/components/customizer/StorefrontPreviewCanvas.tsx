@@ -476,7 +476,10 @@ export function StorefrontPreviewCanvas({
               {config.sbc.show_in_storefront ? (
                 <div className="mt-4 border-t border-store-footer-border pt-4">
                   {config.sbc.seal_token.trim() ? (
-                    <SbcSeal token={config.sbc.seal_token} />
+                    <SbcSeal
+                      token={config.sbc.seal_token}
+                      fallbackLabel={t("sbcVerified")}
+                    />
                   ) : (
                     <p className="font-medium text-store-footer-link">
                       {t("sbcVerified")}

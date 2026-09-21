@@ -293,7 +293,10 @@ export async function Footer({
             {showSbc ? (
               <div className="mt-4 border-t border-store-footer-border pt-4">
                 {sbcSealToken.trim() ? (
-                  <SbcSeal token={sbcSealToken} />
+                  <SbcSeal
+                    token={sbcSealToken}
+                    fallbackLabel={t("sbcVerified")}
+                  />
                 ) : (
                   <p className="font-medium text-store-footer-link">
                     {t("sbcVerified")}

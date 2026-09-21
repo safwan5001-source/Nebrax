@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export const SBC_SEAL_SCRIPT_URL =
   "https://eauthenticate.saudibusiness.gov.sa/EAuthSealApi/seal.js";
@@ -8,20 +8,28 @@ const SBC_SEAL_SCRIPT_ID = "awj-sbc-seal-loader";
 
 interface SbcSealProps {
   token: string;
+  fallbackLabel: string;
 }
 
 /**
  * The SBC service owns the seal, status, QR and certificate presentation.
  * AWJ supplies only the opaque token from the merchant's official embed code.
  */
-export function SbcSeal({ token }: SbcSealProps) {
+export function SbcSeal({ token, fallbackLabel }: SbcSealProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const [status, setStatus] = useState<"loading" | "ready" | "error">(
+    "loading",
+  );
 
   useEffect(() => {
     const container = containerRef.current;
     const normalizedToken = token.trim();
-    if (!container || !normalizedToken) return;
+    if (!container || !normalizedToken) {
+      setStatus("error");
+      return;
+    }
 
+    setStatus("loading");
     container.replaceChildren();
     const existing = document.getElementById(SBC_SEAL_SCRIPT_ID);
     if (existing) existing.remove();
@@ -31,8 +39,10 @@ export function SbcSeal({ token }: SbcSealProps) {
     script.src = SBC_SEAL_SCRIPT_URL;
     script.async = true;
     script.dataset.awjSbcSeal = "true";
+    script.onload = () => setStatus("ready");
     script.onerror = () => {
-      // The external seal is optional page decoration; the storefront remains usable.
+      // Keep the approved text presentation when the optional external seal fails.
+      setStatus("error");
       container.replaceChildren();
     };
     document.head.appendChild(script);
@@ -44,11 +54,23 @@ export function SbcSeal({ token }: SbcSealProps) {
   }, [token]);
 
   return (
-    <div
-      ref={containerRef}
-      className="sbc-verify-seal"
-      data-token={token.trim()}
-      data-testid="sbc-official-seal"
-    />
+    <>
+      {status !== "ready" ? (
+        <p
+          className="font-medium text-store-footer-link"
+          data-testid="sbc-text-fallback"
+        >
+          {fallbackLabel}
+        </p>
+      ) : null}
+      <div
+        ref={containerRef}
+        className={
+          status === "ready" ? "sbc-verify-seal" : "sbc-verify-seal hidden"
+        }
+        data-token={token.trim()}
+        data-testid="sbc-official-seal"
+      />
+    </>
   );
 }

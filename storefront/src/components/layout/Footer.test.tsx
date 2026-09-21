@@ -41,7 +41,9 @@ describe("Footer SBC presentation", () => {
       "data-token",
       "official-token",
     );
-    expect(screen.queryByText("sbcVerified")).toBeNull();
+    expect(screen.getByTestId("sbc-text-fallback")).toHaveTextContent(
+      "sbcVerified",
+    );
   });
 
   it("renders no SBC presentation when the merchant turns it off", async () => {
