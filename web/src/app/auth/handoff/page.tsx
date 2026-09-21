@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { AuthShell } from '@/components/auth/auth-shell';
 import { ApiError, api, setToken } from '@/lib/api';
-import { persistUser, type AuthUser } from '@/lib/auth';
+import { notifyAuthSessionChanged, persistUser, type AuthUser } from '@/lib/auth';
 
 /**
  * TENANT-PROVISIONING-E2E-1 — تستهلك رمز الانتقال أحادي الاستخدام الصادر من
@@ -37,6 +37,7 @@ export default function AuthHandoffPage() {
         if (cancelled) return;
         setToken(res.token);
         persistUser(res.user);
+        notifyAuthSessionChanged();
         router.replace('/dashboard');
       })
       .catch((error) => {
