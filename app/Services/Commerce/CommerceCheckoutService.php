@@ -479,6 +479,8 @@ final class CommerceCheckoutService
                 'delivery_city' => $checkout->delivery_city,
                 'delivery_district' => $checkout->delivery_district,
                 'delivery_street' => $checkout->delivery_street,
+                'delivery_building_no' => $checkout->delivery_building_no,
+                'delivery_additional_number' => $checkout->delivery_additional_number,
                 'delivery_postal_code' => $checkout->delivery_postal_code,
                 'delivery_notes' => $checkout->delivery_notes,
             ], $lines);
@@ -730,6 +732,8 @@ final class CommerceCheckoutService
                     'city' => $checkout->delivery_city,
                     'district' => $checkout->delivery_district,
                     'street' => $checkout->delivery_street,
+                    'building_no' => $checkout->delivery_building_no,
+                    'additional_number' => $checkout->delivery_additional_number,
                     'postal_code' => $checkout->delivery_postal_code,
                     'notes' => $checkout->delivery_notes,
                 ],

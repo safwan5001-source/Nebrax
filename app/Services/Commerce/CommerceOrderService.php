@@ -224,6 +224,8 @@ class CommerceOrderService
                 'shipping_city' => $header['delivery_city'],
                 'shipping_district' => $header['delivery_district'],
                 'shipping_street' => $header['delivery_street'],
+                'shipping_building_no' => $header['delivery_building_no'],
+                'shipping_additional_number' => $header['delivery_additional_number'],
                 'shipping_postal_code' => $header['delivery_postal_code'],
                 'shipping_notes' => $header['delivery_notes'],
             ]);

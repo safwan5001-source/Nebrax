@@ -41,7 +41,8 @@ class CommerceCheckout extends BaseModel implements CompanyWide
         'status', 'expires_at',
         'contact_name', 'contact_phone', 'contact_email',
         'delivery_country', 'delivery_region', 'delivery_city', 'delivery_district',
-        'delivery_street', 'delivery_postal_code', 'delivery_notes',
+        'delivery_street', 'delivery_building_no', 'delivery_additional_number',
+        'delivery_postal_code', 'delivery_notes',
         'delivery_method', 'delivery_amount_minor',
         'completion_idempotency_key_hash', 'completion_idempotency_fingerprint',
     ];

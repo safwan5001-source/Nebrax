@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\CommerceCartController;
 use App\Http\Controllers\Api\CommerceCategoryController;
 use App\Http\Controllers\Api\CommerceCheckoutController;
+use App\Http\Controllers\Api\CommerceCustomerAddressController;
 use App\Http\Controllers\Api\CommerceCustomerAuthController;
 use App\Http\Controllers\Api\CommerceMediaController;
 use App\Http\Controllers\Api\CommerceOrderController;
@@ -213,4 +214,13 @@ Route::middleware([
 ])->group(function () {
     Route::post('auth/logout', [CommerceCustomerAuthController::class, 'logout'])->name('auth.logout');
     Route::get('me', [CommerceCustomerAuthController::class, 'me'])->name('me');
+
+    // COM-MOBILE-ADDRESSES-1 (ADR-08) — the authenticated customer's own
+    // address book. Every route resolves/mutates rows scoped by
+    // CustomerContext::customerIdentityId() alone (CommerceCustomerAddressService)
+    // — no address ever reaches or is reachable by a different customer.
+    Route::get('addresses', [CommerceCustomerAddressController::class, 'index'])->name('addresses.index');
+    Route::post('addresses', [CommerceCustomerAddressController::class, 'store'])->name('addresses.store');
+    Route::patch('addresses/{id}', [CommerceCustomerAddressController::class, 'update'])->whereUuid('id')->name('addresses.update');
+    Route::delete('addresses/{id}', [CommerceCustomerAddressController::class, 'destroy'])->whereUuid('id')->name('addresses.destroy');
 });

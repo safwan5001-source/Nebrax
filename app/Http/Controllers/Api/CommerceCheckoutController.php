@@ -153,7 +153,13 @@ final class CommerceCheckoutController extends PublicApiController
 
     public function updateAddress(Request $request, CommerceCheckoutService $checkouts): JsonResponse
     {
-        $allowed = ['country', 'region', 'city', 'district', 'street', 'postal_code', 'notes'];
+        // COM-MOBILE-ADDRESSES-1 (ADR-08) — closes the pre-existing gap where
+        // `building_no`/`additional_number` (Saudi National Address
+        // components) were never collectible at checkout at all, even though
+        // `CommerceOrderSnapshot` already had a `shipping_building_no` column
+        // no code path ever populated. Purely additive to this allow-list —
+        // guest checkout is unaffected (both remain optional free text).
+        $allowed = ['country', 'region', 'city', 'district', 'street', 'building_no', 'additional_number', 'postal_code', 'notes'];
         $this->rejectUnknown($request, $allowed);
         $data = $request->validate([
             'country' => ['sometimes', 'string', 'max:255'],
@@ -161,6 +167,8 @@ final class CommerceCheckoutController extends PublicApiController
             'city' => ['sometimes', 'string', 'max:255'],
             'district' => ['sometimes', 'nullable', 'string', 'max:255'],
             'street' => ['sometimes', 'string', 'max:255'],
+            'building_no' => ['sometimes', 'nullable', 'string', 'max:32'],
+            'additional_number' => ['sometimes', 'nullable', 'string', 'max:32'],
             'postal_code' => ['sometimes', 'nullable', 'string', 'max:32'],
             'notes' => ['sometimes', 'nullable', 'string', 'max:1000'],
         ]);
