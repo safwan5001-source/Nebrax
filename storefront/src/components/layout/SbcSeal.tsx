@@ -31,6 +31,14 @@ export function SbcSeal({ token, fallbackLabel }: SbcSealProps) {
 
     setStatus("loading");
     container.replaceChildren();
+    const observer = new MutationObserver(() => {
+      if (container.hasChildNodes()) {
+        observer.disconnect();
+        setStatus("ready");
+      }
+    });
+    observer.observe(container, { childList: true, subtree: true });
+
     const existing = document.getElementById(SBC_SEAL_SCRIPT_ID);
     if (existing) existing.remove();
 
@@ -39,15 +47,16 @@ export function SbcSeal({ token, fallbackLabel }: SbcSealProps) {
     script.src = SBC_SEAL_SCRIPT_URL;
     script.async = true;
     script.dataset.awjSbcSeal = "true";
-    script.onload = () => setStatus("ready");
     script.onerror = () => {
       // Keep the approved text presentation when the optional external seal fails.
+      observer.disconnect();
       setStatus("error");
       container.replaceChildren();
     };
     document.head.appendChild(script);
 
     return () => {
+      observer.disconnect();
       container.replaceChildren();
       script.remove();
     };
