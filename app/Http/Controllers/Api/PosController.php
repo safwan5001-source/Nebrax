@@ -135,7 +135,7 @@ class PosController extends ApiController
                 return [
                     'id' => $variant->id,
                     'sku' => $variant->sku,
-                    'descriptor' => DocumentLineVariantResolver::descriptor($variant),
+                    'descriptor' => DocumentLineVariantResolver::descriptorFromLoadedOptionValues($variant),
                     'price' => $variantPrices[$variant->id] ?? 0,
                     // VAR-FU-5/GAP-06: نفس شكل `pos_image` حرفياً — رابط تحميلٍ
                     // مصادَقٌ عليه فقط، أو null، بلا كشف مسار تخزينٍ داخلي.
