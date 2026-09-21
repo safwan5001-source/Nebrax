@@ -28,6 +28,7 @@ class CustomerIdentity extends Authenticatable implements CompanyWide
         'phone',
         'password',
         'email_verified_at',
+        'phone_verified_at',
         'is_active',
         'last_login_at',
     ];
@@ -48,6 +49,7 @@ class CustomerIdentity extends Authenticatable implements CompanyWide
         return [
             'password' => 'hashed',
             'email_verified_at' => 'datetime',
+            'phone_verified_at' => 'datetime',
             'is_active' => 'boolean',
             'last_login_at' => 'datetime',
         ];
@@ -56,8 +58,13 @@ class CustomerIdentity extends Authenticatable implements CompanyWide
     protected static function booted(): void
     {
         static::saving(function (self $identity): void {
-            $identity->email = trim($identity->email);
-            $identity->email_normalized = self::normalizeEmail($identity->email);
+            // COM-MOBILE-AUTH-1: a phone-only (OTP) identity has no email at
+            // all — email/email_normalized stay null rather than trim()ing
+            // a null and fatal-erroring.
+            $identity->email = $identity->email !== null ? trim($identity->email) : null;
+            $identity->email_normalized = $identity->email !== null
+                ? self::normalizeEmail($identity->email)
+                : null;
             $identity->phone = self::cleanPhone($identity->phone);
             $identity->phone_e164 = self::normalizePhone($identity->phone);
         });

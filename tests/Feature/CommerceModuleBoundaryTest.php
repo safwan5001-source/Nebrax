@@ -73,6 +73,12 @@ class CommerceModuleBoundaryTest extends TestCase
         'api/commerce/workspace/storefronts/{id}/domains/{domainId}/verify',
         'api/commerce/workspace/storefronts/{id}/presentation',
         'api/commerce/workspace/storefronts/{id}/presentation/publish',
+        // COM-MOBILE-AUTH-1 — مصادقة عميل /commerce/v1 (هاتف+OTP وبريد+كلمة مرور).
+        'commerce/v1/auth/login',
+        'commerce/v1/auth/logout',
+        'commerce/v1/auth/otp/request',
+        'commerce/v1/auth/otp/verify',
+        'commerce/v1/auth/register',
         'commerce/v1/cart',
         'commerce/v1/cart/items',
         'commerce/v1/cart/items/{item}',
@@ -83,6 +89,8 @@ class CommerceModuleBoundaryTest extends TestCase
         'commerce/v1/checkout/complete',
         'commerce/v1/checkout/contact',
         'commerce/v1/checkout/delivery',
+        // COM-MOBILE-AUTH-1 — ملف العميل الموثَّق (X-Customer-Token).
+        'commerce/v1/me',
         // COM-MOBILE-MEDIA-1 — مسار وسائط منتج محروس لحدّ ثقة /commerce/v1.
         'commerce/v1/media/{id}',
         'commerce/v1/orders/{id}',
