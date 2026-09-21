@@ -37,7 +37,7 @@ final class CommerceCartService
      *                                لا يُستعمَل أبداً لمسارات الإضافة/التعديل/بدء
      *                                Checkout جديد؛ تلك تبقى ترفض `consumed` كأي حالةٍ
      *                                غير `active`.
-     * @return array{cart: ?CommerceCart, invalid: bool}
+     * @return array{cart: ?CommerceCart, invalid: bool, rebound: ?string}
      */
     public function findByToken(?string $rawToken, bool $allowConsumed = false): array
     {
@@ -63,7 +63,8 @@ final class CommerceCartService
                     && (! $customerContext->isEstablished() || $customerContext->customerIdentityId() !== $cart->customer_identity_id);
 
                 if (! $ownedByOther) {
-                    return $this->resolveFoundCart($cart, $allowConsumed, $context);
+                    // The presented token already matched — nothing to rebind.
+                    return $this->resolveFoundCart($cart, $allowConsumed, $context) + ['rebound' => null];
                 }
             }
         }
@@ -95,11 +96,24 @@ final class CommerceCartService
                 ->first();
 
             if ($ownCart !== null) {
-                return $this->resolveFoundCart($ownCart, $allowConsumed, $context);
+                // (Codex, PR #924, P1, fourth round) Resolving here means the
+                // presented token (if any) did NOT match this cart's stored
+                // hash — the client is holding a stale value. Every caller of
+                // findByToken() reached this way (CommerceCheckoutService's
+                // current()/createOrResume(), both allowConsumed: false) must
+                // hand the client a token that will actually resolve next
+                // time, or it silently drifts forever and finally 404s at
+                // checkout/complete (allowConsumed: true, fallback excluded
+                // above) even on a first attempt — self-healing server-side
+                // without ever telling the client defeats the point.
+                $found = $this->resolveFoundCart($ownCart, $allowConsumed, $context);
+                $found['rebound'] = $found['cart'] !== null ? $this->rebindToken($ownCart) : null;
+
+                return $found;
             }
         }
 
-        return ['cart' => null, 'invalid' => $rawToken !== null && $rawToken !== ''];
+        return ['cart' => null, 'invalid' => $rawToken !== null && $rawToken !== '', 'rebound' => null];
     }
 
     /** @return array{cart: ?CommerceCart, invalid: bool} */

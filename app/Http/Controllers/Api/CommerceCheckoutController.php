@@ -52,7 +52,7 @@ final class CommerceCheckoutController extends PublicApiController
         $result = $checkouts->current($this->tokenFromRequest($request));
         $response = PublicApiResponse::success($request, $checkouts->serialize($result['checkout'], $result['cart']));
 
-        return $result['invalid'] ? $this->clearToken($response) : $response;
+        return $this->applyTokenOutcome($response, $result);
     }
 
     public function store(Request $request, CommerceCartService $carts, CommerceCheckoutService $checkouts): JsonResponse
@@ -75,11 +75,16 @@ final class CommerceCheckoutController extends PublicApiController
             abort(422, $e->getMessage());
         }
 
-        return PublicApiResponse::success(
+        $response = PublicApiResponse::success(
             $request,
             $checkouts->serialize($result['checkout'], $result['cart']),
             $result['created'] ? 201 : 200,
         );
+        if ($result['rebound'] !== null) {
+            $this->setToken($response, $result['rebound']);
+        }
+
+        return $response;
     }
 
     public function updateContact(Request $request, CommerceCheckoutService $checkouts): JsonResponse
@@ -269,9 +274,7 @@ final class CommerceCheckoutController extends PublicApiController
         $token = $this->tokenFromRequest($request);
         $lookup = $checkouts->current($token);
         if ($lookup['checkout'] === null) {
-            $response = $this->notFound($request);
-
-            return $lookup['invalid'] ? $this->clearToken($response) : $response;
+            return $this->applyTokenOutcome($this->notFound($request), $lookup);
         }
 
         try {
@@ -284,7 +287,7 @@ final class CommerceCheckoutController extends PublicApiController
             abort(422, $e->getMessage());
         }
 
-        return PublicApiResponse::success($request, $data);
+        return $this->applyTokenOutcome(PublicApiResponse::success($request, $data), $lookup);
     }
 
     private function tokenFromRequest(Request $request): ?string
@@ -315,5 +318,36 @@ final class CommerceCheckoutController extends PublicApiController
         $response->headers->set(self::TOKEN_HEADER, '');
 
         return $response;
+    }
+
+    private function setToken(JsonResponse $response, string $rawToken): void
+    {
+        $response->headers->set(self::TOKEN_HEADER, $rawToken);
+    }
+
+    /**
+     * (Codex, PR #924, P1, fourth round) `CommerceCartService::findByToken()`
+     * can now rebind a stale/rotated token onto the customer's own cart
+     * (self-heal, `allowConsumed: false` only) — every checkout preparation
+     * step (`show()`/`store()`/`withCurrentCheckout()`, used by
+     * updateContact/updateAddress/updateDelivery) must hand that new token
+     * back, exactly like `CommerceCartController::applyTokenOutcome()`
+     * already does for cart endpoints. Without this, the device keeps
+     * presenting the same stale token through its entire checkout flow and
+     * only discovers it at `checkout/complete` (`allowConsumed: true`,
+     * fallback deliberately excluded there) — the worst possible place to
+     * fail, and on a genuinely first attempt, not just a retry.
+     *
+     * @param  array{invalid: bool, rebound: ?string}  $lookup
+     */
+    private function applyTokenOutcome(JsonResponse $response, array $lookup): JsonResponse
+    {
+        if ($lookup['rebound'] !== null) {
+            $this->setToken($response, $lookup['rebound']);
+
+            return $response;
+        }
+
+        return $lookup['invalid'] ? $this->clearToken($response) : $response;
     }
 }

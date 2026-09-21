@@ -615,10 +615,53 @@ class CommerceCartMergeApiTest extends TestCase
 
         // Device A's checkout request still presents its now-stale token,
         // but also its still-valid X-Customer-Token — checkout must still
-        // resolve, not 404.
-        $this->getJson('/commerce/v1/checkout', $this->withCustomer($store['token'], $customerToken, $deviceAToken))
-            ->assertOk()
-            ->assertJsonPath('data.cart.items.0.quantity', 1);
+        // resolve, not 404, and must hand back a fresh, usable token so
+        // device A stops presenting the stale one going forward.
+        $response = $this->getJson('/commerce/v1/checkout', $this->withCustomer($store['token'], $customerToken, $deviceAToken))
+            ->assertOk();
+        $response->assertJsonPath('data.cart.items.0.quantity', 1);
+        $reboundToken = $response->headers->get('X-Cart-Token');
+        $this->assertNotNull($reboundToken);
+        $this->assertNotSame($deviceAToken, $reboundToken);
+    }
+
+    /**
+     * P1 (fourth round) — the full loop must close: a device whose token
+     * went stale mid-checkout (another device touched the shared cart) must
+     * still be able to complete checkout on its FIRST attempt, by picking
+     * up the fresh token every checkout preparation step now hands back —
+     * not just tolerate the stale one silently forever and finally 404 at
+     * the worst possible step.
+     *
+     * @test
+     */
+    public function a_device_that_picks_up_the_rebound_token_completes_checkout_on_the_first_attempt(): void
+    {
+        $store = $this->seedMobileStore('rebind-checkout-complete');
+        $product = $this->product($store['tenant'], $store['channel'], 'REBIND-COMPLETE-1');
+
+        $customerToken = $this->loginCustomer($store, '+966500000124');
+        $deviceAToken = $this->postJson('/commerce/v1/cart/items', ['product_id' => $product->id, 'quantity' => 1], $this->withCustomer($store['token'], $customerToken))
+            ->assertCreated()->headers->get('X-Cart-Token');
+        $this->postJson('/commerce/v1/checkout', [], $this->withCustomer($store['token'], $customerToken, $deviceAToken))->assertCreated();
+
+        // Device B touches the shared cart with no token at all, rotating it.
+        $this->getJson('/commerce/v1/cart', $this->withCustomer($store['token'], $customerToken))->assertOk();
+
+        // Device A continues its checkout with its now-stale token — every
+        // step must hand back the current token, and the client (this test)
+        // picks it up each time, exactly as a real client would.
+        $currentToken = $this->patchJson('/commerce/v1/checkout/contact', ['name' => 'ع', 'phone' => '0500000000'], $this->withCustomer($store['token'], $customerToken, $deviceAToken))
+            ->assertOk()->headers->get('X-Cart-Token') ?? $deviceAToken;
+        $currentToken = $this->patchJson('/commerce/v1/checkout/address', ['country' => 'SA', 'city' => 'x', 'street' => 'y'], $this->withCustomer($store['token'], $customerToken, $currentToken))
+            ->assertOk()->headers->get('X-Cart-Token') ?? $currentToken;
+        $currentToken = $this->patchJson('/commerce/v1/checkout/delivery', ['method' => 'pickup'], $this->withCustomer($store['token'], $customerToken, $currentToken))
+            ->assertOk()->headers->get('X-Cart-Token') ?? $currentToken;
+
+        // First (not a retry) completion attempt succeeds using the
+        // most-recently-rebound token — no 404, no lost checkout progress.
+        $this->postJson('/commerce/v1/checkout/complete', [], $this->withCustomer($store['token'], $customerToken, $currentToken) + ['Idempotency-Key' => 'rebind-checkout-complete-key'])
+            ->assertCreated();
     }
 
     // ═══════════════════════════════════════════════════════════

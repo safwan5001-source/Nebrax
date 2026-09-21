@@ -80,16 +80,17 @@ final class CommerceCheckoutService
      * الصلاحية يُنقَل حالته كسولاً ثم يُعامَل كغيابٍ تام، بنفس نمط
      * `CommerceCartService::findByToken()` حرفياً.
      *
-     * @return array{checkout: ?CommerceCheckout, cart: ?CommerceCart, invalid: bool}
+     * @return array{checkout: ?CommerceCheckout, cart: ?CommerceCart, invalid: bool, rebound: ?string}
      */
     public function current(?string $cartToken): array
     {
         $cartLookup = $this->carts->findByToken($cartToken);
         if ($cartLookup['cart'] === null) {
-            return ['checkout' => null, 'cart' => null, 'invalid' => $cartLookup['invalid']];
+            return ['checkout' => null, 'cart' => null, 'invalid' => $cartLookup['invalid'], 'rebound' => null];
         }
 
         $cart = $cartLookup['cart'];
+        $rebound = $cartLookup['rebound'];
         $context = $this->context();
 
         $checkout = $this->scopeToContext(CommerceCheckout::query(), $context)
@@ -99,31 +100,31 @@ final class CommerceCheckoutService
             ->first();
 
         if ($checkout === null) {
-            return ['checkout' => null, 'cart' => $cart, 'invalid' => false];
+            return ['checkout' => null, 'cart' => $cart, 'invalid' => false, 'rebound' => $rebound];
         }
 
         if ($checkout->expires_at->isPast()) {
-            return DB::transaction(function () use ($checkout, $cart, $context): array {
+            return DB::transaction(function () use ($checkout, $cart, $context, $rebound): array {
                 $current = $this->scopeToContext(CommerceCheckout::query(), $context)
                     ->whereKey($checkout->id)
                     ->lockForUpdate()
                     ->first();
 
                 if ($current === null || ! $current->isOpen()) {
-                    return ['checkout' => null, 'cart' => $cart, 'invalid' => false];
+                    return ['checkout' => null, 'cart' => $cart, 'invalid' => false, 'rebound' => $rebound];
                 }
 
                 if (! $current->expires_at->isPast()) {
-                    return ['checkout' => $current, 'cart' => $cart, 'invalid' => false];
+                    return ['checkout' => $current, 'cart' => $cart, 'invalid' => false, 'rebound' => $rebound];
                 }
 
                 $current->update(['status' => CommerceCheckout::STATUS_EXPIRED]);
 
-                return ['checkout' => null, 'cart' => $cart, 'invalid' => false];
+                return ['checkout' => null, 'cart' => $cart, 'invalid' => false, 'rebound' => $rebound];
             });
         }
 
-        return ['checkout' => $checkout, 'cart' => $cart, 'invalid' => false];
+        return ['checkout' => $checkout, 'cart' => $cart, 'invalid' => false, 'rebound' => $rebound];
     }
 
     /**
@@ -215,7 +216,7 @@ final class CommerceCheckoutService
      * لعقد `AWJ_CHECKOUT_V1_ARCHITECTURE.md` §9 حرفياً). ويب وجوال كلاهما
      * محميان معاً لأن الإصلاح في هذه الخدمة المشتركة، لا في متحكّمٍ واحد.
      *
-     * @return array{checkout: CommerceCheckout, cart: CommerceCart, created: bool}
+     * @return array{checkout: CommerceCheckout, cart: CommerceCart, created: bool, rebound: ?string}
      */
     public function createOrResume(?string $cartToken): array
     {
@@ -224,8 +225,9 @@ final class CommerceCheckoutService
             throw new CheckoutNotFoundException('السلة غير متاحة لبدء الدفع.');
         }
         $context = $this->context();
+        $rebound = $cartLookup['rebound'];
 
-        return DB::transaction(function () use ($cartLookup, $context): array {
+        return DB::transaction(function () use ($cartLookup, $context, $rebound): array {
             $cart = $this->lockActiveCart($cartLookup['cart']->id, $context);
 
             $existing = $this->scopeToContext(CommerceCheckout::query(), $context)
@@ -236,11 +238,11 @@ final class CommerceCheckoutService
                 ->first();
 
             if ($existing !== null && $existing->status === CommerceCheckout::STATUS_COMPLETED) {
-                return ['checkout' => $existing, 'cart' => $cart, 'created' => false];
+                return ['checkout' => $existing, 'cart' => $cart, 'created' => false, 'rebound' => $rebound];
             }
 
             if ($existing !== null && ! $existing->expires_at->isPast()) {
-                return ['checkout' => $existing, 'cart' => $cart, 'created' => false];
+                return ['checkout' => $existing, 'cart' => $cart, 'created' => false, 'rebound' => $rebound];
             }
 
             if ($existing !== null) {
@@ -254,7 +256,7 @@ final class CommerceCheckoutService
                 'expires_at' => now()->addMinutes(self::LIFETIME_MINUTES),
             ]);
 
-            return ['checkout' => $checkout, 'cart' => $cart, 'created' => true];
+            return ['checkout' => $checkout, 'cart' => $cart, 'created' => true, 'rebound' => $rebound];
         }, 3);
     }
 
