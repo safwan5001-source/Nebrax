@@ -24,6 +24,14 @@ use Illuminate\Support\Facades\Schema;
  * multi-token table, a materially larger schema change than "cart
  * ownership" calls for. Nullable, purely additive; no historical cart row
  * is reinterpreted.
+ *
+ * (Codex, PR #924, P2, eighth round) Indexed: `findByToken()`'s lookup is
+ * `WHERE token_hash = ? OR previous_token_hash = ?` — with only the first
+ * side backed by an index (the pre-existing `token_hash` unique
+ * constraint), the `OR` defeats it on both PostgreSQL and SQLite, forcing
+ * a full scan of every cart in the tenant/channel on every cart and
+ * checkout request. A plain (non-unique) index lets the query planner
+ * satisfy each side of the `OR` from its own index instead.
  */
 return new class extends Migration
 {
@@ -31,6 +39,7 @@ return new class extends Migration
     {
         Schema::table('commerce_carts', function (Blueprint $table) {
             $table->string('previous_token_hash')->nullable()->after('token_hash');
+            $table->index('previous_token_hash');
         });
     }
 

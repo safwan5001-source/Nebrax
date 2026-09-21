@@ -215,7 +215,14 @@ final class CommerceCheckoutController extends PublicApiController
                 abort(422, $eRuntime->getMessage());
             }
 
-            return PublicApiResponse::error(
+            // (Codex, PR #924, P2, eighth round) current() now calls
+            // resolveCurrent() (seventh round), which can rebind the token —
+            // e.g. another device touched the shared cart between
+            // resolveForCompletion()'s own lookup and this recovery lookup.
+            // Without surfacing it here, the client's retry keeps presenting
+            // the now-stale token, which 404s in resolveForCompletion()'s
+            // allowConsumed lookup (no identity fallback there, by design).
+            return $this->applyTokenOutcome(PublicApiResponse::error(
                 $request,
                 PublicApiErrorCode::REVIEW_REQUIRED,
                 $e->getMessage(),
@@ -224,7 +231,7 @@ final class CommerceCheckoutController extends PublicApiController
                     'items' => $e->details(),
                     'checkout' => $checkouts->serialize($current['checkout'], $current['cart']),
                 ],
-            );
+            ), $current);
         } catch (PDOException $e) {
             throw $e;
         } catch (RuntimeException $e) {
