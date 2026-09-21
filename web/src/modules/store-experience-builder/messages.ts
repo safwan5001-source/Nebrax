@@ -65,6 +65,8 @@ export const CUSTOMIZER_MESSAGES = {
       "من منصة الأعمال، افتح شهادة توثيق التجارة الإلكترونية، اختر «إضافة ختم QR»، ثم انسخ رمز الختم من الكود المقدم.",
     sbcShowInStorefront: "إظهار توثيق منصة الأعمال في المتجر",
     sbcVerified: "موثّق في منصة الأعمال",
+    sbcSealPreview:
+      "معاينة المحرر: سيظهر ختم منصة الأعمال الرسمي في المتجر المنشور.",
     appsIntro: "روابط المتاجر العامة. بدون رابط صالح لا يظهر القسم.",
     appsPlacement: "موضع الظهور في المتجر",
     theme: "المظهر",
@@ -314,6 +316,8 @@ export const CUSTOMIZER_MESSAGES = {
       "In the Business Platform, open the e-commerce authentication certificate, choose “Add QR Seal”, then copy the seal token from the provided code.",
     sbcShowInStorefront: "Show Saudi Business Center in the storefront",
     sbcVerified: "Verified in Saudi Business Center",
+    sbcSealPreview:
+      "Editor preview: the official Saudi Business Center seal will appear on the published storefront.",
     appsIntro:
       "Public store URLs. The section stays absent without a valid link.",
     appsPlacement: "Where they appear",

@@ -252,6 +252,33 @@ describe('ExperienceBuilder persistence wiring', () => {
     expect(screen.getByText('Verified in Saudi Business Center')).toBeTruthy();
   });
 
+  it('keeps the official seal out of the authenticated customizer preview', () => {
+    render(
+      <ExperienceBuilder
+        initialConfig={{
+          ...DEFAULT_PRESENTATION_CONFIG,
+          sbc: {
+            ...DEFAULT_PRESENTATION_CONFIG.sbc,
+            seal_token: 'opaque-token-must-not-reach-the-admin-dom',
+            show_in_storefront: true,
+          },
+        }}
+        initialLocale="en"
+      />,
+    );
+
+    expect(screen.getByTestId('sbc-seal-preview')).toHaveTextContent(
+      'Editor preview: the official Saudi Business Center seal will appear on the published storefront.',
+    );
+    expect(screen.queryByTestId('sbc-official-seal')).toBeNull();
+    expect(screen.queryByText('opaque-token-must-not-reach-the-admin-dom')).toBeNull();
+    expect(
+      document.querySelector(
+        'script[src="https://eauthenticate.saudibusiness.gov.sa/EAuthSealApi/seal.js"]',
+      ),
+    ).toBeNull();
+  });
+
   it('renders no CR row when canonical CR is empty', () => {
     render(
       <ExperienceBuilder
