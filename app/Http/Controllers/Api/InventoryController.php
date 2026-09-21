@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Requests\ExportInventoryBalancesRequest;
 use App\Models\Product;
+use App\Models\ProductWarehouseStock;
 use App\Models\StockMovement;
 use App\Services\InventoryBalanceExportService;
 use App\Services\InventoryWorkspaceQuery;
@@ -15,6 +16,7 @@ use App\Support\ReportWarehouseScope;
 use App\Support\SensitiveCostPolicy;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -171,6 +173,31 @@ class InventoryController extends ApiController
             ->value('total_value_minor');
     }
 
+    /**
+     * SEC-INV-1 — إغلاق فجوة صلاحية المخزن في هذا المسار القديم (نفس فجوة
+     * AWJ-PERF-4 قبل إصلاحها في `/inventory/summary`، ولم تُلمَس هنا من قبل).
+     *
+     * `ReportWarehouseScope` ليس فلتر عرضٍ اختيارياً — يفرض
+     * `User::allowedWarehouseIds()` كحدٍّ أمني (كما في `InventoryWorkspaceQuery`/
+     * `ProductWarehouseBalanceQuery`/`InventoryReportService::inventoryValue()`
+     * ونفس صيغة `summary()` أعلاه). مستخدمٌ مقيَّدٌ بمخزن — حتى بدور `admin`
+     * ومع `products.view_cost` — يجب ألا يرى **الكمية** (بصرف النظر عن صلاحية
+     * التكلفة؛ الكمية ليست بياناً حسّاساً وتبقى ظاهرة كما هي دوماً) ولا القيمة
+     * من مخازن خارج نطاقه.
+     *
+     * **العقد بلا تغيير:** نفس الحقول، نفس الشكل، نفس عدد الصفوف (صفٌّ واحدٌ
+     * لكل منتجٍ متتبَّع كما كان). الرقم الوحيد الذي يتغيّر فعلياً لمستخدمٍ
+     * مقيَّد هو **قيمة** `quantity_on_hand`/`avg_cost`/`stock_value`/`total_value`
+     * نفسها — وهذا تغييرٌ أمنيٌّ مقصود، لا تغييرٌ في سياسة التكلفة: `avg_cost`
+     * يبقى متوسط `Product` العالمي بلا تغيير (لا تكلفة تُخترع لكل مخزن)، وسلوك
+     * منتج `variant_managed` (الكمية مجموعٌ عبر كل متغيّراته، والمتوسط صفرٌ
+     * صراحةً) يبقى تماماً كما وثّقه `Product::quantityOnHand()`/`avgCost()` —
+     * لم يُغيَّر بهذا الإصلاح، فقط أُخذ نطاق المخزن بعين الاعتبار عند حساب
+     * الكمية المجمَّعة لكل هويّة.
+     *
+     * غير المقيَّد: لا تغيير إطلاقاً — نفس `$p->quantity_on_hand` مباشرة كما
+     * كان قبل هذا الإصلاح.
+     */
     public function index(Request $request): JsonResponse
     {
         if ($request->query('view') === 'workspace') {
@@ -179,23 +206,61 @@ class InventoryController extends ApiController
 
         $authorizedCost = SensitiveCostPolicy::authorized($request->user());
         $products = Product::where('track_inventory', true)->orderBy('name')->get();
+        $scopedQuantities = $this->scopedQuantitiesByProduct($products);
 
-        $items = $products->map(fn (Product $p) => [
-            'id'               => $p->id,
-            'sku'              => $p->sku,
-            'name'             => $p->name,
-            'unit'             => $p->unit,
-            'quantity_on_hand' => $p->quantity_on_hand,
-            'avg_cost'         => $authorizedCost ? Money::toRiyal($p->avg_cost) : null,
-            'stock_value'      => $authorizedCost ? Money::toRiyal($p->quantity_on_hand * $p->avg_cost) : null,
+        $rows = $products->map(function (Product $p) use ($scopedQuantities) {
+            $quantity = $scopedQuantities === null
+                ? (int) $p->quantity_on_hand
+                : (int) ($scopedQuantities[$p->id] ?? 0);
+
+            return ['product' => $p, 'quantity' => $quantity, 'value_minor' => $quantity * (int) $p->avg_cost];
+        });
+
+        $items = $rows->map(fn (array $r) => [
+            'id'               => $r['product']->id,
+            'sku'              => $r['product']->sku,
+            'name'             => $r['product']->name,
+            'unit'             => $r['product']->unit,
+            'quantity_on_hand' => $r['quantity'],
+            'avg_cost'         => $authorizedCost ? Money::toRiyal($r['product']->avg_cost) : null,
+            'stock_value'      => $authorizedCost ? Money::toRiyal($r['value_minor']) : null,
         ])->values();
 
-        $totalMinor = $products->sum(fn (Product $p) => $p->quantity_on_hand * $p->avg_cost);
+        $totalMinor = $rows->sum('value_minor');
 
         return response()->json([
             'data'        => $items,
             'total_value' => $authorizedCost ? Money::toRiyal($totalMinor) : null,
         ]);
+    }
+
+    /**
+     * الكمية الحالية لكل منتجٍ مقاطَعةً بنطاق المخزن الفعّال — استعلامٌ واحد
+     * (لا N+1)، مجموعةٌ عبر كل `product_warehouse_stock` (بسيطاً كان أم
+     * متغيّراً) لكل `product_id`، تماماً كما يفعل الفرع المقيَّد في
+     * `InventoryReportService::inventoryValue()`.
+     *
+     * @return array<string,int>|null  `null` = مستخدمٌ غير مقيَّد (بلا تصفية).
+     */
+    private function scopedQuantitiesByProduct(Collection $products): ?array
+    {
+        $warehouseIds = ReportWarehouseScope::resolve([]);
+        if ($warehouseIds === null) {
+            return null;
+        }
+
+        if ($products->isEmpty()) {
+            return [];
+        }
+
+        return ProductWarehouseStock::query()
+            ->whereIn('product_id', $products->pluck('id'))
+            ->whereIn('warehouse_id', $warehouseIds)
+            ->selectRaw('product_id, SUM(quantity) as qty')
+            ->groupBy('product_id')
+            ->pluck('qty', 'product_id')
+            ->map(fn ($v) => (int) $v)
+            ->all();
     }
 
     public function export(ExportInventoryBalancesRequest $request): Response
