@@ -38,7 +38,7 @@ Authorization:
 |---|---|---|---|---|---|
 | 1 | COM-MOBILE-MEDIA-1 | done | high | accepted readiness contract | Mobile-authorized product media |
 | 2 | COM-MOBILE-VARIANTS-1 | done | high | COM-MOBILE-MEDIA-1 (done) | Variant/options/UOM mobile contract |
-| 3 | COM-MOBILE-AUTH-1 | review | critical | identity architecture decision/readiness (resolved, ADR-06) | Customer mobile auth + profile |
+| 3 | COM-MOBILE-AUTH-1 | done | critical | identity architecture decision/readiness (resolved, ADR-06) | Customer mobile auth + profile |
 | 4 | COM-MOBILE-CART-IDENTITY-1 | backlog | critical | COM-MOBILE-AUTH-1 | Guest → authenticated cart transition |
 | 5 | COM-MOBILE-CUSTOMER-1 | backlog | high | COM-MOBILE-AUTH-1 | Addresses + customer order history |
 | 6 | COM-MOBILE-PAYMENTS-1 | backlog | critical | checkout/auth/provider decisions | Payment methods + trusted payment lifecycle |
@@ -66,10 +66,11 @@ Source: `docs/plans/store/COMMERCE_MOBILE_API_READINESS.md` on `main` (accepted 
 - This is a genuine Decision Escalation Gate per `DECISION-ESCALATION.md` (Tenant/Auth/Security architecture; a paid SMS/OTP provider is also a strategic vendor commitment) — not an evidence gap Claude can close by reading more repository state.
 - Decision Escalation packet delivered to Safwan.
 
-**Decision resolved** (`COM-MOBILE-AUTH-1-IDENTITY-MECHANISM`, recorded durably in `docs/plans/store/ADR-06-COMMERCE-MOBILE-AUTH-MECHANISM.md`): support both phone+OTP (primary) and email+password (alternative) customer authentication on `/commerce/v1`, behind a provider-neutral OTP abstraction with no real SMS/OTP vendor integrated yet (Unifonic remains a future candidate only, a separate Decision/Owner Gate). `COM-MOBILE-AUTH-1` moved to `review`:
+**Decision resolved** (`COM-MOBILE-AUTH-1-IDENTITY-MECHANISM`, recorded durably in `docs/plans/store/ADR-06-COMMERCE-MOBILE-AUTH-MECHANISM.md`): support both phone+OTP (primary) and email+password (alternative) customer authentication on `/commerce/v1`, behind a provider-neutral OTP abstraction with no real SMS/OTP vendor integrated yet (Unifonic remains a future candidate only, a separate Decision/Owner Gate).
 - Implementation reuses the existing, pre-existing-but-unwired `/customer/v1` identity stack (`CustomerIdentity`, `CustomerIdentityService`, `CustomerAuthenticationService`, `CustomerContext`, `EstablishCustomerContext` — all unmodified) extended into `/commerce/v1` via a new `X-Customer-Token` header/middleware, plus new OTP scaffolding (`CustomerOtpService`, `OtpProvider`/`FakeOtpProvider`, `CustomerPhoneAuthenticationService`).
-- Full evidence, tests (21 new + full regression, SQLite + PostgreSQL), and a security fix found during implementation (phone-squatting account-boundary leak, closed before merge): `docs/plans/commerce/COM-MOBILE-AUTH-1-IMPLEMENTATION-REPORT.md`.
-- `COM-MOBILE-CART-IDENTITY-1` and `COM-MOBILE-CUSTOMER-1` both depend on `COM-MOBILE-AUTH-1` and remain `backlog` until it reaches `done` (merged + post-merge-reviewed) — an unmerged code dependency does not satisfy a downstream dependency per this file's own queue rules.
+- Automated (Codex) review on PR #920 found and this PR fixed, before merge: (1) the customer-resolver swap silently dropped `PublicApiRequestAudit` records for authenticated customer requests; (2) phone-OTP-only identities could never be Partner-linked (`CustomerPartnerLinkService::assertEligible()` hard-required `email_verified_at`); (3) a concurrency race in OTP issuance could leave two simultaneously active codes; (4) the shared store `ApiClient` bearer meant one customer's traffic could exhaust the whole store's authentication rate-limit budget. All four fixed and regression-tested. Full evidence including a fifth, self-found security fix (phone-squatting account-boundary leak, closed before the automated review even ran): `docs/plans/commerce/COM-MOBILE-AUTH-1-IMPLEMENTATION-REPORT.md`.
+
+`COM-MOBILE-AUTH-1` is `done`: PR #920 merged (Merge SHA `a8f83b170eb2f696541e9f4d48d3db407ab02dd5`), post-merge CI green on `main` (SQLite + PostgreSQL), post-merge review passed. `COM-MOBILE-CART-IDENTITY-1` and `COM-MOBILE-CUSTOMER-1` both depend on it and are now evaluable for promotion.
 
 ## Promotion checklist: backlog → ready
 
