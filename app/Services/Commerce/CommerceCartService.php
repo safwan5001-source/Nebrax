@@ -5,6 +5,7 @@ namespace App\Services\Commerce;
 use App\Models\CommerceCart;
 use App\Models\CommerceCartItem;
 use App\Models\CommerceListing;
+use App\Models\CustomerIdentity;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\SalesChannel;
@@ -40,19 +41,57 @@ final class CommerceCartService
      */
     public function findByToken(?string $rawToken, bool $allowConsumed = false): array
     {
-        if ($rawToken === null || $rawToken === '') {
-            return ['cart' => null, 'invalid' => false];
-        }
-
         $context = $this->context();
-        $cart = $this->scopeToContext(CommerceCart::query(), $context)
-            ->where('token_hash', hash('sha256', $rawToken))
-            ->first();
+        $customerContext = app(CustomerContext::class);
 
-        if ($cart === null) {
-            return ['cart' => null, 'invalid' => true];
+        if ($rawToken !== null && $rawToken !== '') {
+            $cart = $this->scopeToContext(CommerceCart::query(), $context)
+                ->where('token_hash', hash('sha256', $rawToken))
+                ->first();
+
+            if ($cart !== null) {
+                // (Codex, PR #924, P1) An owned cart must never resolve for a
+                // bearer that isn't that same customer, even with the right
+                // token — a guest presenting a claimed/merged cart's token
+                // (after logout, or a leaked token) must see it as gone, not
+                // read or mutate it. This guards *every* caller of
+                // findByToken(), not just resolveCurrent()'s own guest
+                // branch — including CommerceCheckoutService, which shares
+                // Cart's token unmodified and would otherwise let the same
+                // bearer resolve/mutate/complete someone else's checkout.
+                $ownedByOther = $cart->customer_identity_id !== null
+                    && (! $customerContext->isEstablished() || $customerContext->customerIdentityId() !== $cart->customer_identity_id);
+
+                if (! $ownedByOther) {
+                    return $this->resolveFoundCart($cart, $allowConsumed, $context);
+                }
+            }
         }
 
+        // (Codex, PR #924, P1) No token, or it didn't resolve to a cart this
+        // bearer may use (absent, garbage, or rotated away by
+        // resolveCurrent() when another device touched the same customer's
+        // cart). An authenticated customer's own active cart stays reachable
+        // by identity, so a stale/rotated token never locks a device out of
+        // its own cart or checkout — CommerceCheckoutService needs zero
+        // changes to benefit, since it already calls this same method.
+        if ($customerContext->isEstablished()) {
+            $ownCart = $this->scopeToContext(CommerceCart::query(), $context)
+                ->where('customer_identity_id', $customerContext->customerIdentityId())
+                ->where('status', CommerceCart::STATUS_ACTIVE)
+                ->first();
+
+            if ($ownCart !== null) {
+                return $this->resolveFoundCart($ownCart, $allowConsumed, $context);
+            }
+        }
+
+        return ['cart' => null, 'invalid' => $rawToken !== null && $rawToken !== ''];
+    }
+
+    /** @return array{cart: ?CommerceCart, invalid: bool} */
+    private function resolveFoundCart(CommerceCart $cart, bool $allowConsumed, StorefrontContext $context): array
+    {
         if ($allowConsumed && $cart->status === CommerceCart::STATUS_CONSUMED) {
             // `consumed` is terminal — it must never be rewritten back to
             // `expired`/`active` by mere passage of time (unlike the `active`
@@ -160,6 +199,18 @@ final class CommerceCartService
                 ->lockForUpdate()
                 ->first();
 
+            // (Codex, PR #924, P1) This query only checked `status`, so a
+            // cart whose `expires_at` passed but which nothing has yet
+            // touched (findByToken()'s own lazy demotion never ran on it)
+            // was still treated as the customer's current cart — losing a
+            // guest cart's contents into a dead merge target, or blocking a
+            // fresh cart from ever being created. Demote it the same way
+            // findByToken() already does, then treat it as absent.
+            if ($customerCart !== null && $customerCart->expires_at->isPast()) {
+                $customerCart->update(['status' => CommerceCart::STATUS_EXPIRED]);
+                $customerCart = null;
+            }
+
             if ($guestCart !== null && $customerCart === null) {
                 $guestCart->update([
                     'customer_identity_id' => $customerId,
@@ -225,22 +276,61 @@ final class CommerceCartService
             $created = false;
 
             if ($knownCart === null) {
-                $rawToken = $this->newToken();
                 $customerContext = app(CustomerContext::class);
-                $cart = CommerceCart::create([
-                    'storefront_id' => $context->hasStorefront() ? $context->storefrontId() : null,
-                    'sales_channel_id' => $context->salesChannelId(),
-                    // COM-MOBILE-CART-IDENTITY-1: a brand-new cart created
-                    // while an authenticated customer's context is already
-                    // established is theirs from the start — null for every
-                    // guest, exactly as CommerceOrder's own column works.
-                    'customer_identity_id' => $customerContext->isEstablished()
-                        ? $customerContext->customerIdentityId()
-                        : null,
-                    'token_hash' => hash('sha256', $rawToken),
-                    'expires_at' => now()->addDays(self::LIFETIME_DAYS),
-                ]);
-                $created = true;
+                $customerId = $customerContext->isEstablished() ? $customerContext->customerIdentityId() : null;
+                $existing = null;
+
+                if ($customerId !== null) {
+                    // (Codex, PR #924, P1) Two concurrent "no current cart
+                    // yet" requests from the same authenticated customer
+                    // (e.g. a double-tap, or two devices signing in near-
+                    // simultaneously) would otherwise both see no existing
+                    // active cart and both CREATE one — splitting/losing
+                    // additions across two carts and breaking every ->first()
+                    // lookup elsewhere in this service that assumes at most
+                    // one. lockForUpdate() on an absent cart row locks
+                    // nothing, so serialize on a row that always exists
+                    // instead: the customer's own identity row. Only one
+                    // concurrent transaction can hold this lock at a time,
+                    // so the second one always sees the first's committed
+                    // cart below.
+                    CustomerIdentity::query()->whereKey($customerId)->lockForUpdate()->first();
+
+                    $existing = $this->scopeToContext(CommerceCart::query(), $context)
+                        ->where('customer_identity_id', $customerId)
+                        ->where('status', CommerceCart::STATUS_ACTIVE)
+                        ->first();
+
+                    if ($existing !== null && $existing->expires_at->isPast()) {
+                        $existing->update(['status' => CommerceCart::STATUS_EXPIRED]);
+                        $existing = null;
+                    }
+                }
+
+                if ($existing !== null) {
+                    $cart = $existing;
+                    // The caller (resolveCurrent()'s "neither exists yet"
+                    // branch) has no token to hand back for this cart — mint
+                    // one now exactly as resolveCurrent() itself does when
+                    // handing a customer's cart to a new device, so the
+                    // response can still set X-Cart-Token.
+                    $rawToken = $this->rebindToken($cart);
+                } else {
+                    $rawToken = $this->newToken();
+                    $cart = CommerceCart::create([
+                        'storefront_id' => $context->hasStorefront() ? $context->storefrontId() : null,
+                        'sales_channel_id' => $context->salesChannelId(),
+                        // COM-MOBILE-CART-IDENTITY-1: a brand-new cart created
+                        // while an authenticated customer's context is
+                        // already established is theirs from the start —
+                        // null for every guest, exactly as CommerceOrder's
+                        // own column works.
+                        'customer_identity_id' => $customerId,
+                        'token_hash' => hash('sha256', $rawToken),
+                        'expires_at' => now()->addDays(self::LIFETIME_DAYS),
+                    ]);
+                    $created = true;
+                }
             } else {
                 $cart = $this->lockUsableCart($knownCart->id);
             }

@@ -186,10 +186,17 @@ class CommerceCartMergeApiTest extends TestCase
         $this->assertNotNull($newCartToken);
         $this->assertNotSame($guestToken, $newCartToken);
 
-        // The new token resolves the merged cart even without X-Customer-Token
-        // (checkout reuses this exact mechanism unmodified).
-        $reread = $this->getJson('/commerce/v1/cart', $this->withCart($store['token'], $newCartToken))->assertOk();
+        // The new token resolves the merged cart when the SAME authenticated
+        // device presents it alongside its still-valid X-Customer-Token —
+        // checkout reuses this exact mechanism unmodified and keeps working.
+        $reread = $this->getJson('/commerce/v1/cart', $this->withCustomer($store['token'], $customerToken, $newCartToken))->assertOk();
         $reread->assertJsonPath('data.items.0.quantity', 2);
+
+        // (Codex, PR #924, P1) The same token WITHOUT X-Customer-Token must
+        // never resolve the now customer-owned cart — an owned cart is never
+        // reachable by a plain guest bearer, even with the right token.
+        $guestReread = $this->getJson('/commerce/v1/cart', $this->withCart($store['token'], $newCartToken))->assertOk();
+        $this->assertSame(0, count($guestReread->json('data.items')));
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -411,5 +418,206 @@ class CommerceCartMergeApiTest extends TestCase
         $identity = \App\Models\CustomerIdentity::query()->where('phone_e164', '+966500000110')->firstOrFail();
         $cart = CommerceCart::query()->firstOrFail();
         $this->assertSame($identity->id, $cart->customer_identity_id);
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  Post-merge review fixes (Codex, PR #924)
+    // ═══════════════════════════════════════════════════════════
+
+    /**
+     * P1 — a claimed/merged cart's token must never resolve for a plain
+     * guest bearer (no X-Customer-Token at all), e.g. after logout, or a
+     * token leaked/replayed by something other than its owner. Before this
+     * fix, `resolveCurrent()`'s guest branch delegated to `findByToken()`
+     * unmodified, which never excluded owned carts.
+     *
+     * @test
+     */
+    public function an_owned_cart_token_never_resolves_for_a_plain_guest_bearer(): void
+    {
+        $store = $this->seedMobileStore('owned-cart-guest-leak');
+        $product = $this->product($store['tenant'], $store['channel'], 'LEAK-1');
+
+        $customerToken = $this->loginCustomer($store, '+966500000113');
+        $this->postJson('/commerce/v1/cart/items', ['product_id' => $product->id, 'quantity' => 9], $this->withCustomer($store['token'], $customerToken))->assertCreated();
+        $ownedCartToken = $this->getJson('/commerce/v1/cart', $this->withCustomer($store['token'], $customerToken))
+            ->assertOk()->headers->get('X-Cart-Token');
+
+        // Same token, but now presented with NO customer token at all —
+        // e.g. the client logged out and kept the cookie/local-storage value.
+        $response = $this->getJson('/commerce/v1/cart', $this->withCart($store['token'], $ownedCartToken))->assertOk();
+
+        $this->assertSame(0, count($response->json('data.items')));
+
+        // The owned cart itself is untouched — still the customer's, still 9.
+        $identity = \App\Models\CustomerIdentity::query()->where('phone_e164', '+966500000113')->firstOrFail();
+        $cart = CommerceCart::query()->where('customer_identity_id', $identity->id)->firstOrFail();
+        $this->assertSame(9, $cart->items()->sum('quantity'));
+    }
+
+    /**
+     * P1 — the exact same leak, but through checkout, which shares Cart's
+     * token unmodified. This is the sharper consequence of the same bug:
+     * a guest bearer must not be able to view/complete someone else's
+     * checkout by presenting their (now customer-owned) cart token.
+     *
+     * @test
+     */
+    public function an_owned_carts_checkout_never_resolves_for_a_plain_guest_bearer(): void
+    {
+        $store = $this->seedMobileStore('owned-checkout-guest-leak');
+        $product = $this->product($store['tenant'], $store['channel'], 'LEAK-CHECKOUT-1');
+
+        $customerToken = $this->loginCustomer($store, '+966500000114');
+        $this->postJson('/commerce/v1/cart/items', ['product_id' => $product->id, 'quantity' => 1], $this->withCustomer($store['token'], $customerToken))->assertCreated();
+        $ownedCartToken = $this->getJson('/commerce/v1/cart', $this->withCustomer($store['token'], $customerToken))
+            ->assertOk()->headers->get('X-Cart-Token');
+        $this->postJson('/commerce/v1/checkout', [], $this->withCustomer($store['token'], $customerToken, $ownedCartToken))->assertCreated();
+
+        // GET (show()) never 404s by contract — it always answers 200 with an
+        // empty checkout and clears an unusable token (matching
+        // an_invalid_cart_token_is_treated_as_no_checkout_and_cleared in
+        // CommerceCheckoutApiTest). The security property under test is that
+        // it leaks nothing of the owned checkout, not the status code.
+        $show = $this->getJson('/commerce/v1/checkout', $this->withCart($store['token'], $ownedCartToken))
+            ->assertOk()->assertJsonPath('data.status', null);
+        $this->assertSame('', $show->headers->get('X-Cart-Token'));
+
+        // POST (store()) does explicitly 404 on an unusable token — this is
+        // the sharper, mutating-path consequence of the same bug: a guest
+        // bearer must not be able to open/resume someone else's checkout.
+        $this->postJson('/commerce/v1/checkout', [], $this->withCart($store['token'], $ownedCartToken))->assertStatus(404);
+    }
+
+    /**
+     * P1 — an expired-but-not-yet-lazily-demoted customer cart must not be
+     * selected as the merge target: it must be treated as absent, exactly
+     * like `findByToken()` already treats an expired cart found by token.
+     *
+     * @test
+     */
+    public function an_expired_customer_cart_is_not_used_as_a_merge_target(): void
+    {
+        $store = $this->seedMobileStore('expired-merge-target');
+        $stale = $this->product($store['tenant'], $store['channel'], 'EXPIRED-STALE');
+        $fresh = $this->product($store['tenant'], $store['channel'], 'EXPIRED-FRESH');
+
+        $customerToken = $this->loginCustomer($store, '+966500000115');
+        $this->postJson('/commerce/v1/cart/items', ['product_id' => $stale->id, 'quantity' => 1], $this->withCustomer($store['token'], $customerToken))->assertCreated();
+
+        app(TenantContext::class)->set($store['tenant']->id);
+        $identity = \App\Models\CustomerIdentity::query()->where('phone_e164', '+966500000115')->firstOrFail();
+        $expiredCartId = CommerceCart::query()->where('customer_identity_id', $identity->id)->firstOrFail()->id;
+        app(TenantContext::class)->forget();
+
+        // Force the customer's cart to be expired without anything having
+        // lazily demoted it yet (no request has touched it by its own token
+        // since the update).
+        CommerceCart::query()->update(['expires_at' => now()->subDay()]);
+
+        $guestAdd = $this->postJson('/commerce/v1/cart/items', ['product_id' => $fresh->id, 'quantity' => 1], $this->withCart($store['token']))->assertCreated();
+        $guestToken = $guestAdd->headers->get('X-Cart-Token');
+
+        $response = $this->getJson('/commerce/v1/cart', $this->withCustomer($store['token'], $customerToken, $guestToken))->assertOk();
+
+        // The expired customer cart was never merged into — the guest cart
+        // (now claimed, since the expired one was demoted and treated as
+        // absent) is the only surviving line.
+        $items = collect($response->json('data.items'))->pluck('product_id');
+        $this->assertTrue($items->contains($fresh->id));
+        $this->assertFalse($items->contains($stale->id));
+
+        $this->assertSame(CommerceCart::STATUS_EXPIRED, CommerceCart::withoutGlobalScopes()->whereKey($expiredCartId)->firstOrFail()->status);
+    }
+
+    /**
+     * P1 — two concurrent "no current cart yet" additions from the same
+     * authenticated customer must not create two separate active carts.
+     * `add()` now locks the customer's own identity row before checking
+     * for/creating a cart, serializing this exact race.
+     *
+     * @test
+     */
+    public function concurrent_first_additions_for_the_same_authenticated_customer_never_create_two_carts(): void
+    {
+        $store = $this->seedMobileStore('race-first-cart');
+        $productA = $this->product($store['tenant'], $store['channel'], 'RACE-A');
+        $productB = $this->product($store['tenant'], $store['channel'], 'RACE-B');
+
+        $customerToken = $this->loginCustomer($store, '+966500000116');
+
+        // Two "first add" requests for the same customer, neither presenting
+        // a cart token (both see resolveCurrent() -> cart:null and both call
+        // add(null, ...)) — simulated sequentially here (SQLite/this HTTP
+        // test client cannot truly overlap two transactions), but exercises
+        // the exact same code path the lock protects; the real concurrency
+        // guarantee is covered by the DB-level partial unique index applied
+        // in the same migration and verified directly below.
+        $this->postJson('/commerce/v1/cart/items', ['product_id' => $productA->id, 'quantity' => 1], $this->withCustomer($store['token'], $customerToken))->assertCreated();
+        $this->postJson('/commerce/v1/cart/items', ['product_id' => $productB->id, 'quantity' => 1], $this->withCustomer($store['token'], $customerToken))->assertOk();
+
+        $identity = \App\Models\CustomerIdentity::query()->where('phone_e164', '+966500000116')->firstOrFail();
+        $this->assertSame(1, CommerceCart::query()->where('customer_identity_id', $identity->id)->count());
+    }
+
+    /**
+     * P1 backstop — the database itself rejects a second active cart for
+     * the same customer even if application-level serialization were
+     * bypassed entirely (e.g. a future code path that forgets the lock).
+     *
+     * @test
+     */
+    public function the_database_enforces_at_most_one_active_cart_per_customer(): void
+    {
+        $store = $this->seedMobileStore('db-guard-one-cart');
+        app(TenantContext::class)->set($store['tenant']->id);
+        $identity = \App\Models\CustomerIdentity::create([
+            'tenant_id' => $store['tenant']->id, 'display_name' => 'ع',
+            'phone' => '+966500000117', 'phone_verified_at' => now(), 'is_active' => true,
+        ]);
+
+        CommerceCart::create([
+            'sales_channel_id' => $store['channel']->id, 'customer_identity_id' => $identity->id,
+            'token_hash' => hash('sha256', 'first-token'), 'expires_at' => now()->addDay(),
+        ]);
+
+        $this->expectException(\Illuminate\Database\QueryException::class);
+        CommerceCart::create([
+            'sales_channel_id' => $store['channel']->id, 'customer_identity_id' => $identity->id,
+            'token_hash' => hash('sha256', 'second-token'), 'expires_at' => now()->addDay(),
+        ]);
+    }
+
+    /**
+     * P1 — device A's checkout must keep resolving after device B causes a
+     * token rotation (e.g. device B signs in with no guest cart, forcing
+     * `resolveCurrent()` to rebind the shared customer cart's token). Since
+     * checkout shares Cart's token unmodified, `findByToken()` itself now
+     * falls back to identity when the presented (now-stale) token no longer
+     * matches anything, so device A is never locked out mid-checkout.
+     *
+     * @test
+     */
+    public function a_stale_rotated_cart_token_still_resolves_checkout_for_the_same_authenticated_customer(): void
+    {
+        $store = $this->seedMobileStore('rebind-checkout-self-heal');
+        $product = $this->product($store['tenant'], $store['channel'], 'REBIND-CHECKOUT-1');
+
+        $customerToken = $this->loginCustomer($store, '+966500000118');
+        $deviceAToken = $this->postJson('/commerce/v1/cart/items', ['product_id' => $product->id, 'quantity' => 1], $this->withCustomer($store['token'], $customerToken))
+            ->assertCreated()->headers->get('X-Cart-Token');
+        $this->postJson('/commerce/v1/checkout', [], $this->withCustomer($store['token'], $customerToken, $deviceAToken))->assertCreated();
+
+        // Device B: same customer, no guest cart, no cart token at all —
+        // resolveCurrent() rebinds the shared cart's token, invalidating
+        // device A's stored value.
+        $this->getJson('/commerce/v1/cart', $this->withCustomer($store['token'], $customerToken))->assertOk();
+
+        // Device A's checkout request still presents its now-stale token,
+        // but also its still-valid X-Customer-Token — checkout must still
+        // resolve, not 404.
+        $this->getJson('/commerce/v1/checkout', $this->withCustomer($store['token'], $customerToken, $deviceAToken))
+            ->assertOk()
+            ->assertJsonPath('data.cart.items.0.quantity', 1);
     }
 }
