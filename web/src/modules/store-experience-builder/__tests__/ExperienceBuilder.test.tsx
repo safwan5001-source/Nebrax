@@ -267,7 +267,7 @@ describe('ExperienceBuilder persistence wiring', () => {
       />,
     );
 
-    expect(screen.getByTestId('sbc-seal-preview')).toHaveTextContent(
+    expect(screen.getByTestId('sbc-seal-preview').textContent).toBe(
       'Editor preview: the official Saudi Business Center seal will appear on the published storefront.',
     );
     expect(screen.queryByTestId('sbc-official-seal')).toBeNull();

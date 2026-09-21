@@ -9,7 +9,7 @@ describe('SbcSeal customizer preview', () => {
   it('renders an informational state without loading government JavaScript', () => {
     render(<SbcSeal message="Official seal appears on the published storefront." />);
 
-    expect(screen.getByTestId('sbc-seal-preview')).toHaveTextContent(
+    expect(screen.getByTestId('sbc-seal-preview').textContent).toBe(
       'Official seal appears on the published storefront.',
     );
     expect(document.querySelector('script')).toBeNull();
