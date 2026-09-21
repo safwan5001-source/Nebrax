@@ -3,6 +3,7 @@
 namespace App\Http\Resources;
 
 use App\Support\Money;
+use App\Services\Pos\PosCatalogInventoryPreparer;
 use App\Support\SensitiveCostPolicy;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -121,8 +122,16 @@ class ProductResource extends JsonResource
             'purchase_price'   => $this->when(! $hidesCostProfit, fn () => Money::toRiyal($this->purchase_price)),
             'tax_rate'         => $this->tax_rate,
             'track_inventory'  => $this->track_inventory,
-            'quantity_on_hand' => $this->quantity_on_hand,
-            'avg_cost'         => $this->when(! $hidesCostProfit, fn () => Money::toRiyal($this->avg_cost)),
+            // قيم كتالوج POS المحضّرة تجمعياً فقط؛ بقية المستهلكين تبقى على
+            // accessors Product المعتادة كي لا يتغير عقدها أو دلالتها.
+            'quantity_on_hand' => array_key_exists(PosCatalogInventoryPreparer::QUANTITY_ATTRIBUTE, $this->resource->getAttributes())
+                ? (int) $this->resource->getAttribute(PosCatalogInventoryPreparer::QUANTITY_ATTRIBUTE)
+                : $this->quantity_on_hand,
+            'avg_cost'         => $this->when(! $hidesCostProfit, fn () => Money::toRiyal(
+                array_key_exists(PosCatalogInventoryPreparer::AVG_COST_ATTRIBUTE, $this->resource->getAttributes())
+                    ? (int) $this->resource->getAttribute(PosCatalogInventoryPreparer::AVG_COST_ATTRIBUTE)
+                    : $this->avg_cost,
+            )),
             'is_active'        => $this->is_active,
             // VAR-CORE-1: 'simple' | 'variant_managed'. لا يُعرض عدد المتغيّرات
             // هنا عمداً — هذا المورد يخصّ بطاقة المنتج، لا قائمة متغيّراته.
