@@ -33,6 +33,7 @@ use App\Services\Accounting\PosReturnService;
 use App\Services\Accounting\PosSessionService;
 use App\Services\Pos\PosBarcodeResolver;
 use App\Services\Pos\PosCatalogInventoryPreparer;
+use App\Services\Pos\PosCatalogPricePreparer;
 use App\Services\Pos\PosIdempotencyConflictException;
 use App\Services\ProductMediaGalleryService;
 use App\Support\DocumentLineVariantResolver;
@@ -80,9 +81,15 @@ class PosController extends ApiController
             ->latest()
             ->get();
         app(PosCatalogInventoryPreparer::class)->prepare($products);
-        $catalogUnits = $this->customerPriceLists->catalogUnitsFor($priceList, $products);
         $allVariants = $products->flatMap(fn (Product $product) => $product->variants);
-        $variantPrices = $this->customerPriceLists->catalogVariantPricesFor($priceList, $allVariants);
+        $catalogPrices = app(PosCatalogPricePreparer::class)->prepare($products);
+        $catalogUnits = $this->customerPriceLists->catalogUnitsFor($priceList, $products, $catalogPrices['explicit']);
+        $variantPrices = $this->customerPriceLists->catalogVariantPricesFor(
+            $priceList,
+            $allVariants,
+            $catalogPrices['products'],
+            $catalogPrices['explicit'],
+        );
         // VAR-FU-5/GAP-06: غلاف الوسائط المحلول لكل متغيّرٍ نشِط، مُجمَّعاً على
         // دفعتين إضافيتين فقط بصرف النظر عن عدد المتغيّرات (لا استعلامٍ لكل
         // متغيّر) — نفس سلطة `ProductMediaGalleryService` الموحّدة (VAR-MEDIA-1)،

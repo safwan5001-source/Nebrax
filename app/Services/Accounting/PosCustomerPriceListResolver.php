@@ -93,7 +93,7 @@ class PosCustomerPriceListResolver
      * @param iterable<Product> $products
      * @return array<string, array<int, array{name:string,factor:int,price:int}>>
      */
-    public function catalogUnitsFor(?PriceList $priceList, iterable $products): array
+    public function catalogUnitsFor(?PriceList $priceList, iterable $products, ?array $preparedExplicit = null): array
     {
         $byId = [];
         foreach ($products as $product) {
@@ -120,10 +120,15 @@ class PosCustomerPriceListResolver
             $items = $listed->get($id, collect())->keyBy('unit_name');
             $baseUnit = $product->unit;
             $baseItem = $items->get($baseUnit);
+            $basePrice = $baseItem
+                ? (int) $baseItem->price
+                : ($preparedExplicit !== null
+                    ? ($this->preparedExplicit($preparedExplicit, $product, null, $baseUnit) ?? 0)
+                    : (int) $product->sale_price);
             $units = [[
                 'name' => $baseUnit,
                 'factor' => 1,
-                'price' => $baseItem ? (int) $baseItem->price : (int) $product->sale_price,
+                'price' => $basePrice,
             ]];
 
             // لا تظهر الوحدة البديلة إلا حين تملك سعراً صريحاً حقيقياً —
@@ -133,7 +138,9 @@ class PosCustomerPriceListResolver
             if ($product->unitTemplate) {
                 foreach ($product->unitTemplate->units as $unit) {
                     $item = $items->get($unit->name);
-                    $price = $item ? (int) $item->price : $this->pricing->resolveExplicit($product, null, $unit->name);
+                    $price = $item
+                        ? (int) $item->price
+                        : $this->preparedExplicit($preparedExplicit, $product, null, $unit->name);
                     if ($price !== null) {
                         $units[] = [
                             'name' => $unit->name,
@@ -159,7 +166,7 @@ class PosCustomerPriceListResolver
      * @param  iterable<ProductVariant>  $variants  كل المتغيّرات النشطة للمنتجات المعروضة (منتجاتها محمَّلة سلفاً)
      * @return array<string, int> معرّف المتغيّر ⇐ سعر وحدة الأساس بالهللات
      */
-    public function catalogVariantPricesFor(?PriceList $priceList, iterable $variants): array
+    public function catalogVariantPricesFor(?PriceList $priceList, iterable $variants, array $catalogProducts = [], ?array $preparedExplicit = null): array
     {
         $byId = [];
         foreach ($variants as $variant) {
@@ -178,7 +185,7 @@ class PosCustomerPriceListResolver
 
         $resolved = [];
         foreach ($byId as $id => $variant) {
-            $product = $variant->product;
+            $product = $catalogProducts[$variant->product_id] ?? $variant->product;
             if ($product === null) {
                 continue;
             }
@@ -188,7 +195,9 @@ class PosCustomerPriceListResolver
 
                 continue;
             }
-            $resolved[$id] = (int) ($this->pricing->resolveSellable($product, $variant, null) ?? 0);
+            $resolved[$id] = (int) ($this->preparedExplicit($preparedExplicit, $product, $variant, $product->unit)
+                ?? $this->preparedExplicit($preparedExplicit, $product, null, $product->unit)
+                ?? 0);
         }
 
         return $resolved;
@@ -199,5 +208,17 @@ class PosCustomerPriceListResolver
         $unitName = is_string($unitName) ? trim($unitName) : '';
 
         return $unitName !== '' && $unitName !== $product->unit;
+    }
+
+    /** @param array<string, array<string, array<string, int>>>|null $preparedExplicit */
+    private function preparedExplicit(?array $preparedExplicit, Product $product, ?ProductVariant $variant, string $unitName): ?int
+    {
+        if ($preparedExplicit === null) {
+            return $this->pricing->resolveExplicit($product, $variant, $unitName);
+        }
+
+        $variantKey = $variant?->id ?? '__base__';
+
+        return $preparedExplicit[$product->id][$variantKey][$unitName] ?? null;
     }
 }
