@@ -133,10 +133,22 @@ class PosCatalogInventoryPreparationTest extends TestCase
             ->assertCreated()['data']['id'];
 
         $mainProduct = $this->withToken($auth['token'])->withHeaders(['X-Branch-Id' => $main])
-            ->postJson('/api/products', ['name' => 'منتج POS الرئيسي', 'sale_price' => 1000])
+            ->postJson('/api/products', [
+                'name' => 'منتج POS الرئيسي',
+                'type' => 'good',
+                'sale_price' => 1000,
+                'purchase_price' => 0,
+                'track_inventory' => false,
+            ])
             ->assertCreated()['data'];
         $otherProduct = $this->withToken($auth['token'])->withHeaders(['X-Branch-Id' => $other])
-            ->postJson('/api/products', ['name' => 'منتج POS الآخر', 'sale_price' => 1000])
+            ->postJson('/api/products', [
+                'name' => 'منتج POS الآخر',
+                'type' => 'good',
+                'sale_price' => 1000,
+                'purchase_price' => 0,
+                'track_inventory' => false,
+            ])
             ->assertCreated()['data'];
         app(TenantContext::class)->set($auth['tenant_id']);
         BranchSettings::merge(['share_products' => false]);
