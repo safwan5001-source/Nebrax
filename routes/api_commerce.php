@@ -143,6 +143,14 @@ Route::middleware([
 | mechanisms: phone+OTP (primary) and email+password (alternative), both
 | producing the same CustomerIdentity + Sanctum `customer:access` token —
 | see CommerceCustomerAuthController's own docblock.
+|
+| EnforcePublicApiRateLimit:sensitive alone is keyed per store ApiClient —
+| shared across *every* customer of that store, since one ApiClient bearer
+| is the whole mobile app's shared store token, not a per-end-customer
+| credential. Each route below also carries its own named `throttle:` limit
+| (IP + the request's own email/phone) so one busy tenant, or one caller
+| holding the store token, cannot exhaust the shared quota and lock out
+| every other customer trying to authenticate at the same time.
 */
 Route::middleware([
     AuthenticateApiClient::class,
@@ -152,10 +160,14 @@ Route::middleware([
     EnforcePublicApiRateLimit::class . ':' . PublicApiRateLimits::CLASS_SENSITIVE,
     EnsureActiveSubscription::class,
 ])->prefix('auth')->group(function () {
-    Route::post('register', [CommerceCustomerAuthController::class, 'registerWithEmail'])->name('auth.register');
-    Route::post('login', [CommerceCustomerAuthController::class, 'loginWithEmail'])->name('auth.login');
-    Route::post('otp/request', [CommerceCustomerAuthController::class, 'requestOtp'])->name('auth.otp.request');
-    Route::post('otp/verify', [CommerceCustomerAuthController::class, 'verifyOtp'])->name('auth.otp.verify');
+    Route::post('register', [CommerceCustomerAuthController::class, 'registerWithEmail'])
+        ->middleware('throttle:commerce-customer-register')->name('auth.register');
+    Route::post('login', [CommerceCustomerAuthController::class, 'loginWithEmail'])
+        ->middleware('throttle:commerce-customer-login')->name('auth.login');
+    Route::post('otp/request', [CommerceCustomerAuthController::class, 'requestOtp'])
+        ->middleware('throttle:commerce-customer-otp-request')->name('auth.otp.request');
+    Route::post('otp/verify', [CommerceCustomerAuthController::class, 'verifyOtp'])
+        ->middleware('throttle:commerce-customer-otp-verify')->name('auth.otp.verify');
 });
 
 /*
@@ -169,6 +181,11 @@ Route::middleware([
 | already does on /customer/v1, establishing CustomerContext for ownership
 | (consumed today only by CommerceOrderService; cart/checkout wiring is
 | COM-MOBILE-CART-IDENTITY-1's job, not this task's).
+|
+| EnforcePublicApiRateLimit:write above is still keyed per store ApiClient
+| (shared across every customer of the store); `commerce-customer-session`
+| runs *after* AuthenticateCommerceCustomer so it can key by the resolved
+| CustomerIdentity instead, giving each customer their own budget.
 */
 Route::middleware([
     AuthenticateApiClient::class,
@@ -179,6 +196,7 @@ Route::middleware([
     EnsureActiveSubscription::class,
     AuthenticateCommerceCustomer::class,
     EstablishCustomerContext::class,
+    'throttle:commerce-customer-session',
 ])->group(function () {
     Route::post('auth/logout', [CommerceCustomerAuthController::class, 'logout'])->name('auth.logout');
     Route::get('me', [CommerceCustomerAuthController::class, 'me'])->name('me');

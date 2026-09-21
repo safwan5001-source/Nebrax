@@ -437,6 +437,43 @@ class CommerceCustomerAuthApiTest extends TestCase
     }
 
     // ═══════════════════════════════════════════════════════════
+    //  Per-customer rate limiting — one customer cannot exhaust another's
+    //  budget by sharing the same store ApiClient (Codex finding, PR #920)
+    // ═══════════════════════════════════════════════════════════
+
+    /** @test */
+    public function repeated_failed_logins_for_one_email_do_not_block_a_different_email(): void
+    {
+        $store = $this->seedMobileStore('rl-login');
+
+        app(TenantContext::class)->set($store['tenant']->id);
+        CustomerIdentity::create([
+            'tenant_id' => $store['tenant']->id, 'display_name' => 'م',
+            'email' => 'victim@rl-login.test', 'password' => 'password123',
+            'email_verified_at' => now(), 'is_active' => true,
+        ]);
+        app(TenantContext::class)->forget();
+
+        // commerce-customer-login caps at 5/min per email — exhaust it for
+        // one attacker-controlled email.
+        for ($i = 0; $i < 5; $i++) {
+            $this->postJson('/commerce/v1/auth/login', [
+                'email' => 'attacker@rl-login.test', 'password' => 'wrong',
+            ], $this->bearer($store['token']))->assertStatus(422);
+        }
+
+        $this->postJson('/commerce/v1/auth/login', [
+            'email' => 'attacker@rl-login.test', 'password' => 'wrong',
+        ], $this->bearer($store['token']))->assertStatus(429);
+
+        // A different customer's email, same shared store ApiClient/bearer,
+        // is unaffected.
+        $this->postJson('/commerce/v1/auth/login', [
+            'email' => 'victim@rl-login.test', 'password' => 'password123',
+        ], $this->bearer($store['token']))->assertOk();
+    }
+
+    // ═══════════════════════════════════════════════════════════
     //  Audit trail survives the customer resolver swap
     // ═══════════════════════════════════════════════════════════
 
