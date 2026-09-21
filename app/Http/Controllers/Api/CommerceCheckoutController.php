@@ -55,6 +55,12 @@ final class CommerceCheckoutController extends PublicApiController
         } catch (RuntimeException $e) {
             abort(422, $e->getMessage());
         }
+        // (Codex, PR #924, P1, ninth round) Same recheck as
+        // CommerceCartController::show(): current()'s own resolution can be
+        // stale by the time this response is actually built.
+        if ($result['cart'] !== null && ! $checkouts->isCartOwnedByCurrentBearer($result['cart']->id)) {
+            return $this->clearToken($this->notFound($request));
+        }
         $response = PublicApiResponse::success($request, $checkouts->serialize($result['checkout'], $result['cart']));
 
         return $this->applyTokenOutcome($response, $result);
@@ -213,6 +219,13 @@ final class CommerceCheckoutController extends PublicApiController
                 throw $ePdo;
             } catch (RuntimeException $eRuntime) {
                 abort(422, $eRuntime->getMessage());
+            }
+
+            // (Codex, PR #924, P1, ninth round) Same recheck as show():
+            // current()'s own resolution here can also be stale by the time
+            // this response is built.
+            if ($current['cart'] !== null && ! $checkouts->isCartOwnedByCurrentBearer($current['cart']->id)) {
+                return $this->clearToken($this->notFound($request));
             }
 
             // (Codex, PR #924, P2, eighth round) current() now calls

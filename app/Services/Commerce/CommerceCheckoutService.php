@@ -90,6 +90,16 @@ final class CommerceCheckoutService
      *
      * @return array{checkout: ?CommerceCheckout, cart: ?CommerceCart, invalid: bool, rebound: ?string}
      */
+    /**
+     * (Codex, PR #924, P1, ninth round) نفس الثغرة المُصلَحة في
+     * `CommerceCartService::isOwnedByCurrentBearer()` — يستدعيها `show()`
+     * قبل تسليم استجابة Checkout المبنية على `current()`.
+     */
+    public function isCartOwnedByCurrentBearer(string $cartId): bool
+    {
+        return $this->carts->isOwnedByCurrentBearer($cartId);
+    }
+
     public function current(?string $cartToken): array
     {
         $cartLookup = $this->carts->resolveCurrent($cartToken);

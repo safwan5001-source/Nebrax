@@ -66,10 +66,7 @@ final class CommerceCartService
                 // branch — including CommerceCheckoutService, which shares
                 // Cart's token unmodified and would otherwise let the same
                 // bearer resolve/mutate/complete someone else's checkout.
-                $ownedByOther = $cart->customer_identity_id !== null
-                    && (! $customerContext->isEstablished() || $customerContext->customerIdentityId() !== $cart->customer_identity_id);
-
-                if (! $ownedByOther) {
+                if ($this->cartOwnedByCurrentBearer($cart, $customerContext)) {
                     // The presented token already matched — nothing to rebind.
                     return $this->resolveFoundCart($cart, $allowConsumed, $context) + ['rebound' => null];
                 }
@@ -708,7 +705,6 @@ final class CommerceCartService
     private function lockUsableCart(string $cartId): CommerceCart
     {
         $context = $this->context();
-        $customerContext = app(CustomerContext::class);
         $cart = $this->scopeToContext(CommerceCart::query(), $context)
             ->whereKey($cartId)
             ->where('status', CommerceCart::STATUS_ACTIVE)
@@ -720,14 +716,35 @@ final class CommerceCartService
             throw new CartNotFoundException('السلة غير متاحة.');
         }
 
-        $ownedByOther = $cart->customer_identity_id !== null
-            && (! $customerContext->isEstablished() || $customerContext->customerIdentityId() !== $cart->customer_identity_id);
-
-        if ($ownedByOther) {
+        if (! $this->cartOwnedByCurrentBearer($cart, app(CustomerContext::class))) {
             throw new CartNotFoundException('السلة غير متاحة.');
         }
 
         return $cart;
+    }
+
+    /** @return bool — سلةٌ غير مملوكة (ضيف) تُعامَل كمملوكة دائماً؛ الفحص الفعلي فقط لسلةٍ عائدة لعميل. */
+    private function cartOwnedByCurrentBearer(CommerceCart $cart, CustomerContext $customerContext): bool
+    {
+        return $cart->customer_identity_id === null
+            || ($customerContext->isEstablished() && $customerContext->customerIdentityId() === $cart->customer_identity_id);
+    }
+
+    /**
+     * (Codex, PR #924, P1, ninth round) إعادة تحقّق ملكية خفيفة **بلا قفل**
+     * قبل تسليم قراءة (`GET`) — نفس الثغرة التي أُصلحت في `lockUsableCart()`
+     * لكن للقراءة لا الكتابة: `resolveCurrent()`/`findByToken()` تحقّقتا من
+     * الملكية وقت الحلّ، لكن بين ذلك وبين `serialize()` الفعلي قد تلتزم
+     * مطالبةٌ متزامنة، فتُبنى الاستجابة على حالةٍ تجاوزها الزمن وتُسلَّم
+     * بيانات سلةٍ/Checkout صار عائداً لعميلٍ آخر لحامل توكن ضيفٍ قديم. لا
+     * قفل هنا عمداً — قراءةٌ لا تُعدِّل شيئاً فلا حاجة لتسلسلها ضد كاتبٍ
+     * آخر، يكفي ألا تُبنى الاستجابة على حالةٍ فات أوانها.
+     */
+    public function isOwnedByCurrentBearer(string $cartId): bool
+    {
+        $cart = $this->scopeToContext(CommerceCart::query(), $this->context())->find($cartId);
+
+        return $cart !== null && $this->cartOwnedByCurrentBearer($cart, app(CustomerContext::class));
     }
 
     /**

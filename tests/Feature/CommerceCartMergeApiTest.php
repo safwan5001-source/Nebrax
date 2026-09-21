@@ -1165,4 +1165,93 @@ class CommerceCartMergeApiTest extends TestCase
         $response = $this->getJson('/commerce/v1/cart', $this->withCustomer($store['token'], $customerToken, $originalToken))->assertOk();
         $this->assertNull($response->headers->get('X-Cart-Token'));
     }
+
+    // ═══════════════════════════════════════════════════════════
+    //  Ninth review round (Codex, PR #924)
+    // ═══════════════════════════════════════════════════════════
+
+    /**
+     * P1 — `CommerceCartService::isOwnedByCurrentBearer()` is the read-path
+     * counterpart to `lockUsableCart()`'s ownership recheck: `show()`
+     * actions call it right before serializing a `resolveCurrent()`/
+     * `current()` result, so a claim that commits in the gap between
+     * resolution and response-building never hands a guest bearer data that
+     * now belongs to a customer. This tests the method's own correctness
+     * directly (guest cart, own cart, a different customer's cart, then the
+     * true owner) — the gap it protects against can't be reproduced via
+     * HTTP with this test client for the same structural reason as the
+     * other unlocked-window races in this PR: `show()`'s own resolve and
+     * serialize steps run back-to-back with nothing to desync them absent
+     * an actual concurrent write landing in between.
+     *
+     * @test
+     */
+    public function is_owned_by_current_bearer_correctly_reports_ownership(): void
+    {
+        $store = $this->seedMobileStore('read-ownership-recheck');
+        $product = $this->product($store['tenant'], $store['channel'], 'READ-OWNERSHIP-1');
+
+        $this->postJson('/commerce/v1/cart/items', ['product_id' => $product->id, 'quantity' => 1], $this->withCart($store['token']))->assertCreated();
+
+        app(TenantContext::class)->set($store['tenant']->id);
+        $cart = CommerceCart::query()->firstOrFail();
+        app(\App\Tenancy\StorefrontContext::class)->set($store['tenant']->id, $store['channel']->id);
+        app(\App\Tenancy\CustomerContext::class)->forget();
+
+        $this->assertTrue(app(\App\Services\Commerce\CommerceCartService::class)->isOwnedByCurrentBearer($cart->id));
+
+        $otherIdentity = \App\Models\CustomerIdentity::create([
+            'tenant_id' => $store['tenant']->id, 'display_name' => 'ع',
+            'phone' => '+966500000192', 'phone_verified_at' => now(), 'is_active' => true,
+        ]);
+        app(TenantContext::class)->set($store['tenant']->id);
+        $cart->update(['customer_identity_id' => $otherIdentity->id]);
+
+        // The guest bearer no longer owns it.
+        $this->assertFalse(app(\App\Services\Commerce\CommerceCartService::class)->isOwnedByCurrentBearer($cart->id));
+
+        // The true owner does.
+        app(\App\Tenancy\CustomerContext::class)->set($store['tenant']->id, $otherIdentity->id, null);
+        $this->assertTrue(app(\App\Services\Commerce\CommerceCartService::class)->isOwnedByCurrentBearer($cart->id));
+    }
+
+    /**
+     * P1 — `commerce_carts_one_active_per_customer` is scoped by
+     * `sales_channel_id`: the application already treats "the customer's
+     * active cart" as per-channel (`scopeToContext()` filters by channel in
+     * every lookup), so a customer legitimately holding an active cart on
+     * one mobile `SalesChannel` must still get a first cart on a *second*
+     * one (a tenant can register more than one mobile channel — a second
+     * app, an environment, a migration) without hitting a raw
+     * constraint-violation 500.
+     *
+     * @test
+     */
+    public function the_active_cart_uniqueness_is_scoped_per_sales_channel_not_tenant_wide(): void
+    {
+        $store = $this->seedMobileStore('channel-scoped-uniqueness');
+        app(TenantContext::class)->set($store['tenant']->id);
+        $secondChannel = SalesChannel::create([
+            'slug' => 'mobile-2', 'name' => 'تطبيق جوال ثانٍ', 'type' => SalesChannel::TYPE_MOBILE, 'is_active' => true,
+        ]);
+        $identity = \App\Models\CustomerIdentity::create([
+            'tenant_id' => $store['tenant']->id, 'display_name' => 'ع',
+            'phone' => '+966500000191', 'phone_verified_at' => now(), 'is_active' => true,
+        ]);
+
+        CommerceCart::create([
+            'sales_channel_id' => $store['channel']->id, 'customer_identity_id' => $identity->id,
+            'token_hash' => hash('sha256', 'channel-a-token'), 'expires_at' => now()->addDay(),
+        ]);
+
+        // A different sales_channel_id is a different uniqueness scope —
+        // must not throw.
+        $secondCart = CommerceCart::create([
+            'sales_channel_id' => $secondChannel->id, 'customer_identity_id' => $identity->id,
+            'token_hash' => hash('sha256', 'channel-b-token'), 'expires_at' => now()->addDay(),
+        ]);
+
+        $this->assertNotNull($secondCart->id);
+        app(TenantContext::class)->forget();
+    }
 }

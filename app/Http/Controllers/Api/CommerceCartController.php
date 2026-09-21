@@ -39,6 +39,14 @@ final class CommerceCartController extends PublicApiController
     public function show(Request $request, CommerceCartService $carts): JsonResponse
     {
         $lookup = $this->resolveCurrent($request, $carts);
+        // (Codex, PR #924, P1, ninth round) resolveCurrent() checked
+        // ownership at resolution time, but a concurrent claim can commit
+        // between that check and this response being built — recheck right
+        // before serializing so a claimed cart's contents are never handed
+        // to the stale guest bearer that resolved it moments earlier.
+        if ($lookup['cart'] !== null && ! $carts->isOwnedByCurrentBearer($lookup['cart']->id)) {
+            return $this->clearToken($this->notFound($request));
+        }
         // (Codex, PR #924, P2) serialize()'s own subtotal arithmetic
         // (safeMultiply()/safeAdd()) can throw a plain RuntimeException for
         // an unrepresentable total — pre-existing, not specific to merging,
