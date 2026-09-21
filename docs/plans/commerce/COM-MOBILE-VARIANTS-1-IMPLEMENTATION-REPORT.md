@@ -223,16 +223,43 @@ No new route, no migration, no schema change, no new model.
 
 None — purely internal source-of-truth reuse.
 
+## Automated review findings (Codex, PR #916)
+
+One finding was posted by the repo's automated Codex reviewer on commit `6f99d8bf0f`,
+verified against repository evidence:
+
+- **P1 — no alternate-unit (UOM) selection exposed; base-unit-only price falls back to a
+  fabricated `0` for a variant priced only in an alternate unit.** Verified: `resolve($id,
+  $channelId, null, null, false, $variant->id)` hardcodes the base unit, and
+  `$variantPrice->amount ?? 0` is the fallback when no base-unit price resolves. Also
+  verified this is the **byte-identical characteristic already shipped** in
+  `StorefrontProductController::show()` for `/store/v1` (same call, same `?? 0` fallback) —
+  not a regression introduced by this PR, which mirrors that contract exactly. Unlike the
+  media/variant-descriptor shape (already defined and shipped by `/store/v1`, simply
+  mirrored here), **no unit-selection contract exists anywhere in the codebase to reuse** —
+  designing one (flat list per variant vs. nested, and whether `/store/v1`'s identical gap
+  should close at the same time for consistency) is new API contract design work spanning
+  both trust boundaries, not a local bug fix. **Not fixed here — recorded as backlog
+  below**; replied on the PR thread with this evidence.
+
 ## Risks / remaining work
 
-- None newly introduced. Inherits the same discovered backlog items as COM-MOBILE-MEDIA-1
+- None newly introduced beyond the Codex finding recorded as backlog above (UOM/alternate-
+  unit selection) — inherited identically from the already-shipped `/store/v1` pattern, not
+  a regression. Also inherits the same discovered backlog items as COM-MOBILE-MEDIA-1
   (rate-limit budget sharing; batched gallery loading for list endpoints) — this task does
   not touch the list endpoint's gallery resolution and adds no new rate-limit consumption
   pattern beyond what already existed.
 
 ## Discovered backlog
 
-None new.
+- **Alternate-unit (UOM) selection contract** (Codex finding above): neither `/store/v1`
+  nor (now, identically) `/commerce/v1` expose the selectable `unit_key`s / per-unit prices
+  a variant supports beyond its base unit, even though both cart endpoints already accept
+  `unit_key`. A variant priced only in an alternate unit shows a fabricated `0` base price
+  in both product-detail contracts. Needs a deliberate contract-design decision (shape of
+  the unit list, whether both boundaries change together) — out of this task's
+  mirror-only scope.
 
 ## Git state
 
