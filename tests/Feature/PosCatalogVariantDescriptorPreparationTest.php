@@ -9,6 +9,7 @@ use App\Support\DocumentLineVariantResolver;
 use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class PosCatalogVariantDescriptorPreparationTest extends TestCase
@@ -66,9 +67,25 @@ class PosCatalogVariantDescriptorPreparationTest extends TestCase
                 'is_active' => true,
             ]);
             // نربط بالعكس عمداً: descriptor يجب أن يرتب بالخيار ثم قيمة الخيار.
-            $variant->optionValues()->attach([
-                $sizeValue->id => ['product_option_id' => $size->id],
-                $colorValue->id => ['product_option_id' => $color->id],
+            DB::table('product_variant_option_values')->insert([
+                [
+                    'id' => (string) Str::uuid(),
+                    'tenant_id' => $tenantId,
+                    'product_variant_id' => $variant->id,
+                    'product_option_id' => $size->id,
+                    'product_option_value_id' => $sizeValue->id,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ],
+                [
+                    'id' => (string) Str::uuid(),
+                    'tenant_id' => $tenantId,
+                    'product_variant_id' => $variant->id,
+                    'product_option_id' => $color->id,
+                    'product_option_value_id' => $colorValue->id,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ],
             ]);
             $variants[] = $variant;
         }
