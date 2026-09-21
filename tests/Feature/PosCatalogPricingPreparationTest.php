@@ -75,13 +75,13 @@ class PosCatalogPricingPreparationTest extends TestCase
         $this->assertSame(['piece', 'carton'], array_column($items[$simple->id]['pos_units'], 'name'));
         $this->assertSame(['10.00', '120.00'], array_column($items[$simple->id]['pos_units'], 'price'));
         $this->assertSame(['piece'], array_column($items[$missing->id]['pos_units'], 'name'));
-        $this->assertSame('23.00', $items[$parent->id]['variants'][0]['price']);
+        $this->assertSame('23.00', $items[$parent->id]['pos_variants'][0]['price']);
 
         app(TenantContext::class)->set($auth['tenant_id']);
         ProductUnitPrice::where('product_variant_id', $variant->id)->where('unit_name', 'piece')->delete();
         app(TenantContext::class)->forget();
         $items = collect($this->catalog($auth['token']))->keyBy('id');
-        $this->assertSame('21.00', $items[$parent->id]['variants'][0]['price']);
+        $this->assertSame('21.00', $items[$parent->id]['pos_variants'][0]['price']);
     }
 
     /** @test */
