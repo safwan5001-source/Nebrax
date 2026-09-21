@@ -206,7 +206,7 @@ prices beyond a variant's base unit, even though both cart endpoints already acc
 id: COM-MOBILE-AUTH-1
 title: Customer mobile auth + profile
 domain: commerce
-status: review
+status: done
 risk: critical
 depends_on:
   - identity architecture decision (resolved — ADR-06-COMMERCE-MOBILE-AUTH-MECHANISM.md)
@@ -235,7 +235,7 @@ acceptance:
   - an unverified self-declared phone cannot be hijacked into an OTP login
   - SQLite/PostgreSQL verification
 tests:
-  - 21 new focused tests (CommerceCustomerAuthApiTest)
+  - 24 focused tests (CommerceCustomerAuthApiTest)
   - full Customer|Commerce regression
   - SQLite
   - PostgreSQL
@@ -243,13 +243,27 @@ merge_policy: standing-authority-after-pre-merge-review
 deploy_policy: owner-approval
 ```
 
-Decision Escalation Gate resolved by Safwan (`COM-MOBILE-AUTH-1-IDENTITY-MECHANISM`) — full
-decision and rationale recorded in `docs/plans/store/ADR-06-COMMERCE-MOBILE-AUTH-MECHANISM.md`.
-Implementation on branch `claude/com-mobile-auth-1`, status `review` pending PR/CI/merge;
-full evidence in `docs/plans/commerce/COM-MOBILE-AUTH-1-IMPLEMENTATION-REPORT.md`. A genuine
-account-boundary security issue (OTP login resolving into a stranger's identity via an
-unverified, self-declared phone entered through the separate email+password path) was found
-and closed during implementation, before merge.
+`COM-MOBILE-AUTH-1` is `done`: Decision Escalation Gate resolved by Safwan
+(`COM-MOBILE-AUTH-1-IDENTITY-MECHANISM`) — full decision and rationale recorded in
+`docs/plans/store/ADR-06-COMMERCE-MOBILE-AUTH-MECHANISM.md`. Merged via PR #920 (Merge SHA
+`a8f83b170eb2f696541e9f4d48d3db407ab02dd5`), post-merge CI green on `main` (SQLite +
+PostgreSQL), mandatory post-merge review passed. Full evidence in
+`docs/plans/commerce/COM-MOBILE-AUTH-1-IMPLEMENTATION-REPORT.md`. Two rounds of automated
+(Codex) review found and this PR fixed 4 real issues before merge (a dropped audit trail for
+authenticated customer requests, phone-OTP-only identities permanently ineligible for Partner
+linking, an OTP-issuance concurrency race, and a shared-store-token rate-limit gap allowing
+one customer to exhaust another's auth quota) on top of a fifth, self-found security issue
+(OTP login resolving into a stranger's identity via an unverified, self-declared phone entered
+through the separate email+password path) closed during implementation before the automated
+review even ran. One trivial merge conflict against `main` (import ordering, from a
+concurrently-merged unrelated PR) was resolved before merge.
+
+Discovered backlog from this task (not yet scheduled): email verification delivery mechanism
+(pre-existing gap inherited from the already-shipped `/customer/v1` stack, not introduced
+here); a claim/dispute mechanism for a phone number squatted by an unverified email+password
+registration before its real owner ever proves control via OTP (ADR-05 §16 itself defers
+this); full E.164 phone normalization (country-default inference); real SMS/OTP vendor
+selection (explicitly deferred to its own future Decision/Owner Gate).
 
 ## Backlog discovery
 

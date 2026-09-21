@@ -91,19 +91,21 @@ No `web/` changes in this PR (backend-only task).
 
 ## CI
 
-Pending — filled in once the PR's GitHub Actions run completes (SQLite + PostgreSQL jobs), per this repository's standing merge policy.
+Green on PR #920's final head (SQLite + PostgreSQL `php artisan test` jobs, plus unrelated `web build`/`storefront`/`Docker runtime smoke` jobs triggered by the merge-in of concurrent `main` changes) — all passed before merge.
 
 ## Pre-merge review
 
-Pending final-head review before merge, per the standing merge policy.
+Final-head diff reviewed against `origin/main` before merge (24 changed files, matching everything authored and already reviewed through two Codex rounds); no unresolved review threads; `mergeable_state: clean`.
 
 ## Merge
 
-Pending. PR number / Head SHA / Merge SHA to be recorded here and in `TASK-QUEUE.md`/`CURRENT-STATE.md`/`MASTER-EXECUTION-PLAN.md` via a docs-only follow-up PR once merged, matching the pattern used for `COM-MOBILE-MEDIA-1`/`COM-MOBILE-VARIANTS-1`.
+PR #920 merged via standing merge authority. Head SHA (final, post-merge-conflict-resolution): `ce37872f2e5a208e145a4bda28124c239a12657e`. Merge SHA: `a8f83b170eb2f696541e9f4d48d3db407ab02dd5`. Recorded in `TASK-QUEUE.md`/`CURRENT-STATE.md`/`MASTER-EXECUTION-PLAN.md` via this docs-only follow-up, matching the pattern used for `COM-MOBILE-MEDIA-1`/`COM-MOBILE-VARIANTS-1`.
+
+One merge conflict arose against `main` before merge: two other PRs (#918, #919) merged into `main` while this PR was in review, one of which (`AWJ-PERF-6B`) added a new `use` import to `app/Providers/TenancyServiceProvider.php` at the same line this PR's own new import landed — a trivial ordering clash, not a logic conflict. Resolved by merging `main` into the branch and keeping both imports in alphabetical order; re-verified locally (70 focused/regression tests) before pushing.
 
 ## Post-merge review
 
-Pending.
+Post-merge CI on `main` (SHA `a8f83b170eb2f696541e9f4d48d3db407ab02dd5`) green: `php artisan test` SQLite and PostgreSQL jobs both passed. Post-merge review passed.
 
 ## Self-review
 
@@ -188,8 +190,8 @@ A second review round on the fix commit (a81b908) found one more:
 
 ## Git state
 
-Branch: `claude/com-mobile-auth-1`. Commit/PR/SHA details recorded once pushed and opened.
+Branch: `claude/com-mobile-auth-1` (4 commits: implementation, 3 Codex-finding fix rounds, plus a merge commit resolving the `main` conflict). PR #920. Head SHA `ce37872f2e5a208e145a4bda28124c239a12657e`. Merge SHA `a8f83b170eb2f696541e9f4d48d3db407ab02dd5`.
 
 ## Recommended next dependency-ready task
 
-`COM-MOBILE-CART-IDENTITY-1` (Guest → authenticated cart transition) becomes evaluable now that `COM-MOBILE-AUTH-1` ships a working customer identity + `X-Customer-Token` + `CustomerContext` wiring on `/commerce/v1` — its dependency is satisfied at the code level; merge/CI/post-merge-review completion is still required before treating it as `done`-dependency-ready per the queue's own rule ("An unmerged code dependency does not satisfy a downstream dependency").
+`COM-MOBILE-CART-IDENTITY-1` (Guest → authenticated cart transition) and `COM-MOBILE-CUSTOMER-1` (Addresses + customer order history) both depend on `COM-MOBILE-AUTH-1`, now `done` (merged + post-merge-reviewed) — the queue's own rule ("An unmerged code dependency does not satisfy a downstream dependency") no longer blocks them; both are now evaluable for promotion to `ready` from current-`main` evidence.
