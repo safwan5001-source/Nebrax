@@ -17,10 +17,11 @@ class CommerceCart extends BaseModel implements CompanyWide
     public const STATUS_CONSUMED = 'consumed';
 
     protected $fillable = [
-        'tenant_id', 'storefront_id', 'sales_channel_id', 'customer_identity_id', 'token_hash', 'status', 'expires_at',
+        'tenant_id', 'storefront_id', 'sales_channel_id', 'customer_identity_id',
+        'token_hash', 'previous_token_hash', 'status', 'expires_at',
     ];
 
-    protected $hidden = ['token_hash'];
+    protected $hidden = ['token_hash', 'previous_token_hash'];
 
     protected $casts = ['expires_at' => 'datetime'];
 

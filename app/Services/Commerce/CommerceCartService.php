@@ -45,8 +45,15 @@ final class CommerceCartService
         $customerContext = app(CustomerContext::class);
 
         if ($rawToken !== null && $rawToken !== '') {
+            // (Codex, PR #924, P1, fifth round) Also match the previous
+            // generation of the token: rebindToken() keeps one prior hash
+            // valid for exactly one more rotation, so a single interleaved
+            // touch from another device (e.g. between two of this device's
+            // own checkout-preparation requests) doesn't invalidate a token
+            // in the same request/response pair it was just issued in.
+            $hash = hash('sha256', $rawToken);
             $cart = $this->scopeToContext(CommerceCart::query(), $context)
-                ->where('token_hash', hash('sha256', $rawToken))
+                ->where(fn ($query) => $query->where('token_hash', $hash)->orWhere('previous_token_hash', $hash))
                 ->first();
 
             if ($cart !== null) {
@@ -265,20 +272,20 @@ final class CommerceCartService
 
                     try {
                         $this->add($customerCart, $item->product_id, $item->unit_key, $item->quantity, $item->product_variant_id);
-                    } catch (CommerceCartQuantityOverflowException $e) {
-                        // (Codex, PR #924, P2) Never conflated with "no
-                        // longer purchasable" below — a quantity too large
-                        // to represent is data the merge must not silently
-                        // discard. Aborting the whole merge (and the
-                        // authentication attempt with it) is the only safe
-                        // choice: nothing has committed yet inside this
-                        // transaction. Rethrown as-is (already a
-                        // RuntimeException) — every caller already turns
-                        // that into a 422.
-                        throw $e;
-                    } catch (RuntimeException) {
-                        // No longer purchasable — dropped, not merged. A
-                        // stale guest line must never block sign-in.
+                    } catch (CommerceCartLineNotPurchasableException) {
+                        // (Codex, PR #924, P2, fifth round) The *only*
+                        // droppable failure: this specific line's own
+                        // eligibility (product/listing/variant/unit/price)
+                        // failed. Deliberately NOT a blanket
+                        // `catch (RuntimeException)` — add()'s own return
+                        // value calls serialize() internally, which can
+                        // throw a plain RuntimeException
+                        // (CommerceCartQuantityOverflowException included)
+                        // for a *different*, already-in-the-cart line's live
+                        // price becoming unrepresentable. That failure has
+                        // nothing to do with the line being merged and must
+                        // propagate, aborting the whole merge — nothing has
+                        // committed yet inside this transaction.
                     }
                 }
 
@@ -302,8 +309,14 @@ final class CommerceCartService
             }
 
             if ($customerCart !== null) {
-                $alreadyBound = $guestToken !== null && $guestToken !== ''
-                    && hash_equals($customerCart->token_hash, hash('sha256', $guestToken));
+                // Accept either slot as "already usable" — presenting the
+                // still-valid previous-generation token must not trigger a
+                // needless extra rotation (see rebindToken()'s own docblock).
+                $presentedHash = $guestToken !== null && $guestToken !== '' ? hash('sha256', $guestToken) : null;
+                $alreadyBound = $presentedHash !== null && (
+                    hash_equals($customerCart->token_hash, $presentedHash)
+                    || ($customerCart->previous_token_hash !== null && hash_equals($customerCart->previous_token_hash, $presentedHash))
+                );
 
                 return [
                     'cart' => $customerCart,
@@ -320,7 +333,14 @@ final class CommerceCartService
     private function rebindToken(CommerceCart $cart): string
     {
         $rawToken = $this->newToken();
-        $cart->update(['token_hash' => hash('sha256', $rawToken)]);
+        // (Codex, PR #924, P1, fifth round) The outgoing token slides into
+        // `previous_token_hash` instead of being discarded outright — see
+        // the migration's own docblock for why this bounds (without fully
+        // eliminating) the multi-device rotation race.
+        $cart->update([
+            'previous_token_hash' => $cart->token_hash,
+            'token_hash' => hash('sha256', $rawToken),
+        ]);
 
         return $rawToken;
     }
@@ -564,15 +584,27 @@ final class CommerceCartService
         $listing = $listingQuery->first(['id']);
 
         if ($product === null || $listing === null) {
-            throw new RuntimeException('المنتج غير متاح للشراء.');
+            throw new CommerceCartLineNotPurchasableException('المنتج غير متاح للشراء.');
         }
 
-        // فشلٌ مغلَق واحد لا نسخة ثانية: منتجٌ بسيط يرفض متغيّراً صريحاً،
-        // منتجٌ متعدد الخيارات يلزمه متغيّرٌ فعليٌّ نشِط تابعٌ له ولنفس المستأجر
-        // (VAR-DOC-1/VAR-POS-1 السلطة نفسها حرفياً).
-        $variant = DocumentLineVariantResolver::resolve($product, $variantId, $context->tenantId());
+        // (Codex, PR #924, P2, fifth round) DocumentLineVariantResolver and
+        // resolveUnit() below are both shared, general-purpose validators
+        // (also used by invoices/POS/purchases) that throw a plain
+        // RuntimeException — never redefined here. Converted to the
+        // dedicated type instead, so resolveCurrent()'s merge loop can tell
+        // "this line's own eligibility failed" (droppable) apart from an
+        // unrelated arithmetic failure elsewhere in the cart (never
+        // droppable) without touching that shared resolver's contract.
+        try {
+            // فشلٌ مغلَق واحد لا نسخة ثانية: منتجٌ بسيط يرفض متغيّراً صريحاً،
+            // منتجٌ متعدد الخيارات يلزمه متغيّرٌ فعليٌّ نشِط تابعٌ له ولنفس المستأجر
+            // (VAR-DOC-1/VAR-POS-1 السلطة نفسها حرفياً).
+            $variant = DocumentLineVariantResolver::resolve($product, $variantId, $context->tenantId());
+            [$canonicalKey, $unitName, $resolverUnit] = $this->resolveUnit($product, $unitKey);
+        } catch (RuntimeException $e) {
+            throw new CommerceCartLineNotPurchasableException($e->getMessage());
+        }
 
-        [$canonicalKey, $unitName, $resolverUnit] = $this->resolveUnit($product, $unitKey);
         $price = $this->prices->resolve(
             $product->id,
             $context->salesChannelId(),
@@ -582,7 +614,7 @@ final class CommerceCartService
             $variant?->id,
         );
         if (! $price->resolved || $price->amount === null) {
-            throw new RuntimeException('لا يوجد سعر معتمد لهذه الوحدة.');
+            throw new CommerceCartLineNotPurchasableException('لا يوجد سعر معتمد لهذه الوحدة.');
         }
 
         return [

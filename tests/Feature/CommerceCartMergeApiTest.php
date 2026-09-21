@@ -615,14 +615,15 @@ class CommerceCartMergeApiTest extends TestCase
 
         // Device A's checkout request still presents its now-stale token,
         // but also its still-valid X-Customer-Token — checkout must still
-        // resolve, not 404, and must hand back a fresh, usable token so
-        // device A stops presenting the stale one going forward.
+        // resolve, not 404. Exactly one interleaved rebind means device A's
+        // token is now the "previous" slot, which resolves as a direct
+        // match (fifth round) — no further rotation is needed, so no new
+        // X-Cart-Token is issued here; device A's held token keeps working
+        // as-is for its next request too, until another rebind occurs.
         $response = $this->getJson('/commerce/v1/checkout', $this->withCustomer($store['token'], $customerToken, $deviceAToken))
             ->assertOk();
         $response->assertJsonPath('data.cart.items.0.quantity', 1);
-        $reboundToken = $response->headers->get('X-Cart-Token');
-        $this->assertNotNull($reboundToken);
-        $this->assertNotSame($deviceAToken, $reboundToken);
+        $this->assertNull($response->headers->get('X-Cart-Token'));
     }
 
     /**
@@ -873,5 +874,85 @@ class CommerceCartMergeApiTest extends TestCase
         app(TenantContext::class)->forget();
 
         $this->getJson('/commerce/v1/cart', $this->withCart($store['token'], $cartToken))->assertStatus(422);
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  Fifth review round (Codex, commit c2c196c)
+    // ═══════════════════════════════════════════════════════════
+
+    /**
+     * P1 — a single interleaved touch from another device (one rebind)
+     * between two of device A's own requests must not lock device A out —
+     * the previous-generation token slot keeps resolving for exactly one
+     * more rotation, closing the gap even for checkout/complete
+     * (allowConsumed: true), which the identity fallback deliberately never
+     * covers.
+     *
+     * @test
+     */
+    public function a_single_interleaved_device_touch_does_not_break_completion_with_the_previous_token(): void
+    {
+        $store = $this->seedMobileStore('previous-token-slot');
+        $product = $this->product($store['tenant'], $store['channel'], 'PREV-SLOT-1');
+
+        $customerToken = $this->loginCustomer($store, '+966500000125');
+        $originalToken = $this->postJson('/commerce/v1/cart/items', ['product_id' => $product->id, 'quantity' => 1], $this->withCustomer($store['token'], $customerToken))
+            ->assertCreated()->headers->get('X-Cart-Token');
+        $this->postJson('/commerce/v1/checkout', [], $this->withCustomer($store['token'], $customerToken, $originalToken))->assertCreated();
+        $this->patchJson('/commerce/v1/checkout/contact', ['name' => 'ع', 'phone' => '0500000000'], $this->withCustomer($store['token'], $customerToken, $originalToken))->assertOk();
+        $this->patchJson('/commerce/v1/checkout/address', ['country' => 'SA', 'city' => 'x', 'street' => 'y'], $this->withCustomer($store['token'], $customerToken, $originalToken))->assertOk();
+        $this->patchJson('/commerce/v1/checkout/delivery', ['method' => 'pickup'], $this->withCustomer($store['token'], $customerToken, $originalToken))->assertOk();
+
+        // Device B touches the shared cart exactly once, rotating the token
+        // — device A never sees this and keeps holding $originalToken,
+        // which now lives only in the "previous" slot.
+        $this->getJson('/commerce/v1/cart', $this->withCustomer($store['token'], $customerToken))->assertOk();
+
+        // Device A completes on its FIRST attempt, presenting the now-
+        // previous-generation token — must still succeed via the two-slot
+        // match, not 404.
+        $this->postJson('/commerce/v1/checkout/complete', [], $this->withCustomer($store['token'], $customerToken, $originalToken) + ['Idempotency-Key' => 'previous-token-slot-key'])
+            ->assertCreated();
+    }
+
+    /**
+     * P2 — an arithmetic/serialization failure unrelated to the line being
+     * merged (a *different*, already-in-the-cart line's live price becoming
+     * unrepresentable) must abort the whole merge, never be silently
+     * swallowed as "the new line isn't purchasable".
+     *
+     * @test
+     */
+    public function an_unrelated_overflowing_line_aborts_the_merge_instead_of_dropping_the_new_line(): void
+    {
+        $store = $this->seedMobileStore('unrelated-overflow-merge');
+        $overflowing = $this->product($store['tenant'], $store['channel'], 'UNRELATED-OVERFLOW', price: 10000);
+        $guestProduct = $this->product($store['tenant'], $store['channel'], 'UNRELATED-GUEST');
+
+        $customerToken = $this->loginCustomer($store, '+966500000126');
+        $this->postJson('/commerce/v1/cart/items', ['product_id' => $overflowing->id, 'quantity' => 3], $this->withCustomer($store['token'], $customerToken))->assertCreated();
+
+        // The price changes after the line was safely added — live
+        // resolution means the customer's existing cart is now, silently,
+        // one serialize() call away from an arithmetic failure.
+        app(TenantContext::class)->set($store['tenant']->id);
+        $overflowing->update(['sale_price' => intdiv(PHP_INT_MAX, 2)]);
+        app(TenantContext::class)->forget();
+
+        $guestToken = $this->postJson('/commerce/v1/cart/items', ['product_id' => $guestProduct->id, 'quantity' => 1], $this->withCart($store['token']))
+            ->assertCreated()->headers->get('X-Cart-Token');
+
+        // Triggering the merge: add()'s own internal serialize() call (to
+        // build its own return value) now fails on the *unrelated*
+        // overflowing line — must abort, not drop the guest line.
+        $this->getJson('/commerce/v1/cart', $this->withCustomer($store['token'], $customerToken, $guestToken))->assertStatus(422);
+
+        // Nothing committed: the guest cart is untouched (still active, not
+        // consumed), and its line was never silently discarded.
+        app(TenantContext::class)->set($store['tenant']->id);
+        $guestCart = CommerceCart::query()->whereNull('customer_identity_id')->firstOrFail();
+        $this->assertSame(CommerceCart::STATUS_ACTIVE, $guestCart->status);
+        $this->assertSame(1, $guestCart->items()->where('product_id', $guestProduct->id)->sum('quantity'));
+        app(TenantContext::class)->forget();
     }
 }
