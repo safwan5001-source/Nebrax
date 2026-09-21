@@ -49,6 +49,7 @@ No OTP scaffolding of any kind existed anywhere in the repository (confirmed by 
 - `app/Services/Commerce/Otp/CustomerOtpService.php` (new)
 - `app/Services/CustomerPhoneAuthenticationService.php` (new)
 - `app/Http/Middleware/AuthenticateCommerceCustomer.php` (new)
+- `app/Services/CustomerPartnerLinkService.php` — eligibility accepts either verified contact method (Codex P2 fix)
 - `app/Http/Requests/CommerceCustomerOtpRequestRequest.php` (new)
 - `app/Http/Requests/CommerceCustomerOtpVerifyRequest.php` (new)
 - `app/Http/Controllers/Api/CommerceCustomerAuthController.php` (new)
@@ -61,7 +62,7 @@ No OTP scaffolding of any kind existed anywhere in the repository (confirmed by 
 
 ## Tests and exact results
 
-### New — `tests/Feature/CommerceCustomerAuthApiTest.php` (21 tests / 61 assertions)
+### New — `tests/Feature/CommerceCustomerAuthApiTest.php` (23 tests / 68 assertions)
 
 Phone+OTP: new-phone issuance creates no identity yet; correct-code verification creates a verified identity + token; same phone verified twice logs into the same identity (no duplicate); wrong code rejected without consuming the real code; attempt-limit lockout (5); expired code rejected; issuance-window flood rejected (3/10min); a new request invalidates the prior unconsumed code; tenant isolation (identical phone, different tenants, codes never cross); invalid phone shape rejected; **the self-declared-unverified-phone-squatting rejection** (new identity/regression test for the security fix above).
 
@@ -159,9 +160,15 @@ None. No journal entry, invoice, payment, or inventory movement is created, read
 - Confirmed via repository evidence (not external web research) that Laravel 11's schema builder supports `->nullable()->change()` on both SQLite and PostgreSQL without `doctrine/dbal` in this codebase already (three prior precedents: `2026_10_02_010000_make_commerce_carts_storefront_id_nullable.php`, `2026_08_29_020000_nullable_tenant_on_platform_administrator_actions.php`, `2026_10_03_010000_make_commerce_checkouts_storefront_id_nullable.php`).
 - PostgreSQL's rejection of `SELECT ... FOR UPDATE` combined with an aggregate (`count()`) is a documented PostgreSQL restriction (not SQLite-specific), discovered here via the mandatory PostgreSQL verification pass — fixed by dropping the row lock on the abuse-rate count query (not a correctness invariant; see code comment in `CustomerOtpService::requestCode()`).
 
-## Automated review findings (Codex, PR pending)
+## Automated review findings (Codex, PR #920)
 
-Recorded once the PR is opened and reviewed, per the standing merge policy — this section will be updated before merge.
+All three verified against evidence and fixed before merge:
+
+1. **P1 — audit record silently dropped for authenticated customer requests.** `AuthenticateCommerceCustomer` permanently overwrote the request's user resolver from `ApiClient` to `CustomerIdentity`. `PublicApiRequestAudit::terminate()` is terminable (runs after the full stack unwinds, after the response is sent) and only writes an audit row when `$request->user()` is still the `ApiClient` at that point — so every `me`/`logout` request was silently losing its audit trail. Fixed: the original resolver is captured and restored in a `finally` block after `$next()` returns, so the controller/`EstablishCustomerContext` still see `CustomerIdentity` during the request, but the audit middleware sees `ApiClient` again by the time it runs. Regression test added (`an_authenticated_customer_request_still_writes_an_api_client_audit_record`).
+2. **P2 — a phone-verified-only identity could never be Partner-linked.** `CustomerPartnerLinkService::assertEligible()` hard-required `email_verified_at !== null`, so every identity created by the primary (phone+OTP) mechanism — which never sets `email_verified_at` — would be permanently ineligible for linking even through the staff-verified flow, and `EstablishCustomerContext` would always report it unlinked. Fixed: eligibility now accepts either verified contact method (email or phone), consistent with `AuthenticateCommerceCustomer`'s own condition. Regression test added (`a_phone_verified_only_identity_can_be_linked_to_a_partner`).
+3. **P2 — concurrent OTP issuance could leave two simultaneously active codes.** `CustomerOtpService::requestCode()`'s invalidate-then-insert sequence wasn't atomic against a concurrent request for the same phone+purpose when no prior row existed to serialize on (the row-lock naturally resolves the case where a prior row *does* exist, but not the "both see zero existing rows" case) — two callers could each pass the checks and insert their own unconsumed code, contradicting the documented "fresh request invalidates prior" guarantee and letting either of two different codes verify successfully. Fixed with a partial unique index (`customer_otp_codes_one_active_per_phone_purpose`, `WHERE consumed_at IS NULL` — the same PostgreSQL/SQLite-portable pattern already used by `customer_partner_links_one_active_per_identity`), plus a `QueryException` catch that turns the losing insert into the same generic rate-limited-style `ValidationException` rather than a raw constraint-violation 500.
+
+Re-verified on both SQLite and PostgreSQL after all three fixes: 23 focused tests, full `Customer|Commerce` regression (651 passed/10 skipped on SQLite, 661 passed on PostgreSQL), `BranchIsolationGuardTest` green on both.
 
 ## Risks / remaining work
 

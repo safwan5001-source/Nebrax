@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 /**
@@ -13,6 +14,13 @@ use Illuminate\Support\Facades\Schema;
  * `code_hash` stores a bcrypt hash (`Hash::make()`), not a bare `sha256` —
  * a 6-digit code has only 10^6 possibilities, so a salted+slow hash resists
  * table-leak precomputation the way it would not with an unsalted digest.
+ *
+ * The partial unique index is the concurrency-safe backstop for "only one
+ * active code per phone+purpose" — the same PostgreSQL/SQLite-portable
+ * pattern already used by `customer_partner_links_one_active_per_identity`.
+ * Without it, two concurrent issuance requests could each pass the
+ * app-level checks and insert their own unconsumed code, leaving two
+ * simultaneously valid codes (`CustomerOtpService::requestCode()`).
  */
 return new class extends Migration
 {
@@ -34,6 +42,11 @@ return new class extends Migration
                 'customer_otp_codes_lookup_index'
             );
         });
+
+        DB::statement(
+            'CREATE UNIQUE INDEX customer_otp_codes_one_active_per_phone_purpose '
+            . 'ON customer_otp_codes (tenant_id, phone_e164, purpose) WHERE consumed_at IS NULL'
+        );
     }
 
     public function down(): void

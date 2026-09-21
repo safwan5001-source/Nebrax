@@ -132,7 +132,13 @@ class CustomerPartnerLinkService
         Partner $partner,
         User $actor,
     ): void {
-        if (! $identity->is_active || $identity->trashed() || $identity->email_verified_at === null) {
+        // COM-MOBILE-AUTH-1: a phone-OTP-only identity has no
+        // email_verified_at at all — "eligible" means some verified contact
+        // method (email or phone), not specifically email, consistently
+        // with AuthenticateCommerceCustomer's own eligibility condition.
+        $hasVerifiedContact = $identity->email_verified_at !== null || $identity->phone_verified_at !== null;
+
+        if (! $identity->is_active || $identity->trashed() || ! $hasVerifiedContact) {
             throw ValidationException::withMessages(['customer_identity_id' => ['هوية العميل غير مؤهلة للربط.']]);
         }
 

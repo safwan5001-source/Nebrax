@@ -4,10 +4,14 @@ namespace Tests\Feature;
 
 use App\Models\CustomerIdentity;
 use App\Models\CustomerOtpCode;
+use App\Models\Partner;
+use App\Models\PublicApiRequestLog;
 use App\Models\SalesChannel;
 use App\Models\Tenant;
+use App\Models\User;
 use App\Services\ApiClientKeyService;
 use App\Services\Commerce\Otp\FakeOtpProvider;
+use App\Services\CustomerPartnerLinkService;
 use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
@@ -430,6 +434,76 @@ class CommerceCustomerAuthApiTest extends TestCase
         CustomerIdentity::query()->where('phone_e164', $phone)->update(['is_active' => false]);
 
         $this->getJson('/commerce/v1/me', $this->withCustomerToken($store['token'], $customerToken))->assertStatus(401);
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  Audit trail survives the customer resolver swap
+    // ═══════════════════════════════════════════════════════════
+
+    /**
+     * `PublicApiRequestAudit::terminate()` is terminable — it runs after the
+     * full middleware stack unwinds and only writes a row when
+     * `$request->user()` is still the `ApiClient` at that point.
+     * `AuthenticateCommerceCustomer` must restore that resolver after
+     * `$next()` returns, or every authenticated customer request would
+     * silently lose its audit record.
+     */
+    /** @test */
+    public function an_authenticated_customer_request_still_writes_an_api_client_audit_record(): void
+    {
+        $store = $this->seedMobileStore('audit');
+        $phone = '+966500000016';
+
+        $this->postJson('/commerce/v1/auth/otp/request', ['phone' => $phone], $this->bearer($store['token']));
+        $code = FakeOtpProvider::lastCodeFor($store['tenant']->id, $phone, 'login');
+        $verify = $this->postJson('/commerce/v1/auth/otp/verify', ['phone' => $phone, 'code' => $code], $this->bearer($store['token']))->assertOk();
+        $customerToken = $verify->json('data.token');
+
+        $before = PublicApiRequestLog::query()->count();
+
+        $this->getJson('/commerce/v1/me', $this->withCustomerToken($store['token'], $customerToken))->assertOk();
+
+        $this->assertSame($before + 1, PublicApiRequestLog::query()->count());
+        $log = PublicApiRequestLog::query()->latest('created_at')->first();
+        $this->assertSame($store['tenant']->id, $log->tenant_id);
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  A phone-verified-only identity is eligible for a Partner link
+    // ═══════════════════════════════════════════════════════════
+
+    /**
+     * `CustomerPartnerLinkService::assertEligible()` must accept a
+     * phone-OTP-verified identity even though it has no `email_verified_at`
+     * at all — otherwise the primary (phone+OTP) mechanism could never be
+     * partner-linked, and `EstablishCustomerContext` would always report it
+     * as unlinked.
+     */
+    /** @test */
+    public function a_phone_verified_only_identity_can_be_linked_to_a_partner(): void
+    {
+        $store = $this->seedMobileStore('link-phone');
+        $phone = '+966500000017';
+
+        $this->postJson('/commerce/v1/auth/otp/request', ['phone' => $phone], $this->bearer($store['token']));
+        $code = FakeOtpProvider::lastCodeFor($store['tenant']->id, $phone, 'login');
+        $this->postJson('/commerce/v1/auth/otp/verify', ['phone' => $phone, 'code' => $code], $this->bearer($store['token']))->assertOk();
+        $identity = CustomerIdentity::query()->where('phone_e164', $phone)->firstOrFail();
+
+        app(TenantContext::class)->set($store['tenant']->id);
+        $partner = Partner::create([
+            'tenant_id' => $store['tenant']->id, 'name' => 'عميل مرتبط بالهاتف', 'type' => 'customer', 'is_active' => true,
+        ]);
+        $actor = User::create([
+            'tenant_id' => $store['tenant']->id, 'name' => 'Owner', 'email' => 'owner-link-phone@test.local',
+            'password' => 'password123', 'role' => 'owner', 'is_active' => true,
+        ]);
+
+        $link = app(CustomerPartnerLinkService::class)->link($identity, $partner, $actor);
+        app(TenantContext::class)->forget();
+
+        $this->assertSame('active', $link->status);
+        $this->assertSame($partner->id, $link->partner_id);
     }
 
     // ═══════════════════════════════════════════════════════════

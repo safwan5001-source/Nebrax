@@ -27,6 +27,13 @@ use Symfony\Component\HttpFoundation\Response;
  * requires `email_verified_at` specifically, but a phone-OTP-verified
  * identity may have no email at all. The condition here is "some verified
  * contact method", not "verified email".
+ *
+ * Restores the original (`ApiClient`) resolver in a `finally` after `$next`
+ * returns: `PublicApiRequestAudit::terminate()` is terminable — it runs
+ * after the full stack unwinds and only writes an audit row when
+ * `$request->user()` is still the `ApiClient` at that point. Leaving the
+ * swap in place would silently drop audit records for every authenticated
+ * customer request.
  */
 class AuthenticateCommerceCustomer
 {
@@ -71,9 +78,15 @@ class AuthenticateCommerceCustomer
         }
 
         $accessToken->forceFill(['last_used_at' => now()])->save();
+
+        $originalUser = $request->user();
         $request->setUserResolver(static fn () => $identity);
 
-        return $next($request);
+        try {
+            return $next($request);
+        } finally {
+            $request->setUserResolver(static fn () => $originalUser);
+        }
     }
 
     private function unauthenticated(Request $request): Response

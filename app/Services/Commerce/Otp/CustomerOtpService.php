@@ -4,6 +4,7 @@ namespace App\Services\Commerce\Otp;
 
 use App\Models\CustomerOtpCode;
 use App\Tenancy\TenantContext;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
@@ -75,14 +76,32 @@ class CustomerOtpService
 
             $code = str_pad((string) random_int(0, 999999), self::CODE_LENGTH, '0', STR_PAD_LEFT);
 
-            CustomerOtpCode::create([
-                'tenant_id' => $tenantId,
-                'phone_e164' => $phoneE164,
-                'purpose' => $purpose,
-                'code_hash' => Hash::make($code),
-                'attempts' => 0,
-                'expires_at' => now()->addMinutes(self::TTL_MINUTES),
-            ]);
+            // The partial unique index (`customer_otp_codes_one_active_per_
+            // phone_purpose`, WHERE consumed_at IS NULL) is the concurrency
+            // backstop: two simultaneous requests for the same phone+purpose
+            // could otherwise both pass the checks above and each insert
+            // their own unconsumed code, leaving two valid codes at once.
+            // The database rejects the second insert; treat that exactly
+            // like the issuance-rate rejection above rather than leaking a
+            // raw constraint-violation 500.
+            try {
+                CustomerOtpCode::create([
+                    'tenant_id' => $tenantId,
+                    'phone_e164' => $phoneE164,
+                    'purpose' => $purpose,
+                    'code_hash' => Hash::make($code),
+                    'attempts' => 0,
+                    'expires_at' => now()->addMinutes(self::TTL_MINUTES),
+                ]);
+            } catch (QueryException $exception) {
+                if (! in_array((string) $exception->getCode(), ['23000', '23505'], true)) {
+                    throw $exception;
+                }
+
+                throw ValidationException::withMessages([
+                    'phone' => ['يوجد طلب رمز تحقق قائم بالفعل لهذا الرقم؛ حاول لاحقاً.'],
+                ]);
+            }
 
             $this->provider->send($tenantId, $phoneE164, $code, $purpose);
         });
