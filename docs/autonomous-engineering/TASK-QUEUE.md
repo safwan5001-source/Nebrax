@@ -37,8 +37,8 @@ Authorization:
 | Order | Task ID | Status | Risk | Depends on | Outcome |
 |---|---|---|---|---|---|
 | 1 | COM-MOBILE-MEDIA-1 | done | high | accepted readiness contract | Mobile-authorized product media |
-| 2 | COM-MOBILE-VARIANTS-1 | ready | high | COM-MOBILE-MEDIA-1 (done) | Variant/options/UOM mobile contract |
-| 3 | COM-MOBILE-AUTH-1 | backlog | critical | identity architecture decision/readiness | Customer mobile auth + profile |
+| 2 | COM-MOBILE-VARIANTS-1 | done | high | COM-MOBILE-MEDIA-1 (done) | Variant/options/UOM mobile contract |
+| 3 | COM-MOBILE-AUTH-1 | decision_required | critical | identity architecture decision/readiness | Customer mobile auth + profile |
 | 4 | COM-MOBILE-CART-IDENTITY-1 | backlog | critical | COM-MOBILE-AUTH-1 | Guest → authenticated cart transition |
 | 5 | COM-MOBILE-CUSTOMER-1 | backlog | high | COM-MOBILE-AUTH-1 | Addresses + customer order history |
 | 6 | COM-MOBILE-PAYMENTS-1 | backlog | critical | checkout/auth/provider decisions | Payment methods + trusted payment lifecycle |
@@ -58,6 +58,14 @@ Source: `docs/plans/store/COMMERCE_MOBILE_API_READINESS.md` on `main` (accepted 
 - No unresolved material decision: no new pricing/availability/cart rule, no new contract shape (the `options`/`variants` JSON shape is already defined and shipped by `StorefrontProductResource`).
 - Acceptance criteria: `GET /commerce/v1/products/{id}` for a variant-managed product returns `options`/`variants` (id, sku, descriptor, option_value_ids, price, in_stock, media) matching `/store/v1`'s shape; list (`index()`) keeps its existing deferred behavior (`is_variant_managed` flag only) unchanged, matching `/store/v1`'s own list/detail asymmetry; tenant/channel/publication/inactive-variant negatives; cross-tenant/cross-product variant rejection (already enforced by `DocumentLineVariantResolver::resolve()`, reused unchanged).
 - Tests: focused `/commerce/v1` variant detail tests + regression on `CommerceCatalogApiTest`/`CommerceMediaApiTest`, SQLite + PostgreSQL.
+
+`COM-MOBILE-VARIANTS-1` is `done`: PR #916 merged (Merge SHA `40445016973d050963d25519ed15ba05e0de6b66`), post-merge CI green on `main` (SQLite + PostgreSQL), post-merge review passed. Discovered backlog: alternate-unit (UOM) selection contract, needed by both `/store/v1` and `/commerce/v1` alike, not yet designed. Full evidence: `docs/plans/commerce/COM-MOBILE-VARIANTS-1-IMPLEMENTATION-REPORT.md`.
+
+`COM-MOBILE-AUTH-1` evaluated against current-`main` evidence and found **not** promotable to `ready` — moved to `decision_required` instead:
+- `docs/plans/store/ADR-05-CUSTOMER-MOBILE-IDENTITY-BOUNDARY.md` (Accepted, 2026-09-09) fixes the conceptual boundary (Commerce Authentication Identity / Customer Account / ERP User / Partner remain distinct; tenant-scoped; ownership-based API authorization; guest checkout preserved) but its own §22 "Explicit non-decisions" lists exactly what implementation needs and does not yet have: authentication framework/provider, SMS/OTP provider, password-vs-passwordless default, and token/session format.
+- This is a genuine Decision Escalation Gate per `DECISION-ESCALATION.md` (Tenant/Auth/Security architecture; a paid SMS/OTP provider is also a strategic vendor commitment) — not an evidence gap Claude can close by reading more repository state.
+- `COM-MOBILE-CART-IDENTITY-1` and `COM-MOBILE-CUSTOMER-1` both depend on `COM-MOBILE-AUTH-1` and remain blocked (`backlog`) until it resolves. `COM-MOBILE-PAYMENTS-1` is separately gated on "checkout/auth/provider decisions" and is also not evaluated further while this Decision Gate is open.
+- Decision Escalation packet delivered to Safwan; independent horizon work continues to be sought (see current-state resume rule) while this is pending.
 
 ## Promotion checklist: backlog → ready
 
