@@ -39,13 +39,16 @@ Authorization:
 | 1 | COM-MOBILE-MEDIA-1 | done | high | accepted readiness contract | Mobile-authorized product media |
 | 2 | COM-MOBILE-VARIANTS-1 | done | high | COM-MOBILE-MEDIA-1 (done) | Variant/options/UOM mobile contract |
 | 3 | COM-MOBILE-AUTH-1 | done | critical | identity architecture decision/readiness (resolved, ADR-06) | Customer mobile auth + profile |
-| 4 | COM-MOBILE-CART-IDENTITY-1 | decision_required | critical | COM-MOBILE-AUTH-1 (done) | Guest → authenticated cart transition |
-| 5 | COM-MOBILE-CUSTOMER-1 | decision_required | high | COM-MOBILE-AUTH-1 (done) | Addresses + customer order history |
+| 4 | COM-MOBILE-CART-IDENTITY-1 | ready | critical | COM-MOBILE-AUTH-1 (done); decision resolved, ADR-07 | Guest → authenticated cart transition |
+| 5a | COM-MOBILE-ORDER-HISTORY-1 | ready | normal | COM-MOBILE-AUTH-1 (done) | Customer order history (split from COM-MOBILE-CUSTOMER-1) |
+| 5b | COM-MOBILE-ADDRESSES-1 | ready | high | COM-MOBILE-AUTH-1 (done); decision resolved, ADR-08 | Commerce customer address book (split from COM-MOBILE-CUSTOMER-1) |
 | 6 | COM-MOBILE-PAYMENTS-1 | backlog | critical | checkout/auth/provider decisions | Payment methods + trusted payment lifecycle |
 | 7 | COM-MOBILE-SHIPPING-1 | backlog | high | checkout contract | Shipping method/rate refinement |
 | 8 | COM-MOBILE-PROMO-1 | backlog | high | V1 product decision | Coupon/promotion mobile contract if in scope |
 | 9 | COM-MOBILE-I18N-1 | backlog | normal | resource contracts | Explicit localization/fallback |
 | 10 | COM-MOBILE-VERTICAL-TEST-1 | backlog | high | selected vertical slice complete | Runtime/API integration fixtures and vertical proof |
+
+`COM-MOBILE-CUSTOMER-1` (Addresses + customer order history) is retired as a bundled row — split per owner approval into `COM-MOBILE-ORDER-HISTORY-1` and `COM-MOBILE-ADDRESSES-1` above (`5a`/`5b`), each independently ready and independently dependency-tracked; neither depends on the other.
 
 Source: `docs/plans/store/COMMERCE_MOBILE_API_READINESS.md` on `main` (accepted via merged/post-reviewed PR #887).
 
@@ -78,6 +81,11 @@ Source: `docs/plans/store/COMMERCE_MOBILE_API_READINESS.md` on `main` (accepted 
 - `COM-MOBILE-CUSTOMER-1`: `docs/plans/store/ADR-05-CUSTOMER-MOBILE-IDENTITY-BOUNDARY.md` §13 ("Commerce Addresses are not forced into the current Partner address shape") explicitly defers the Commerce Address schema/design, and §22 lists "Commerce Address database schema" among its non-decisions — unaffected by ADR-06 (ADR-06 resolved only the authentication mechanism, not addresses or profile schema). The order-history half of this task is comparatively evidence-ready (`CommerceOrderService::ownedOrders()` — a reusable, already-tested, ownership-filtered query — already exists per `CommerceCustomerContextIntegrationTest`), but the task as currently scoped bundles both, and the addresses half remains blocked by an explicit ADR-05 non-decision. Splitting this task into an addresses-decision-gated half and an order-history-ready half is a queue-structure change, not a decision Claude makes unilaterally — recorded here for Safwan's consideration rather than acted on.
 - Both are genuine Decision Escalation Gates (configurable-policy-shaped product decisions per CLAUDE.md's "السياسة تُضبط ولا تُفرَض" rule — cart-merge semantics and address schema both have more than one reasonable, correct answer depending on AWJ's actual commerce policy), not evidence gaps Claude can close by reading more repository state.
 - No further candidate in the queue is independently ready: `COM-MOBILE-PAYMENTS-1` is separately gated on "checkout/auth/provider decisions" (and checkout's own guest/customer identity shape is exactly what CART-IDENTITY-1 would decide); `COM-MOBILE-SHIPPING-1` on "checkout contract"; `COM-MOBILE-PROMO-1` on "V1 product decision"; `COM-MOBILE-I18N-1` on "resource contracts"; `COM-MOBILE-VERTICAL-TEST-1` on "selected vertical slice complete". All trace back to the same two open decisions or to scope not yet confirmed.
+
+**Both decisions resolved by Safwan** (owner decision, 2026-09-21):
+
+- **`COM-MOBILE-CART-IDENTITY-1-MERGE-POLICY`**, recorded durably in `docs/plans/store/ADR-07-COMMERCE-CART-MERGE-POLICY.md`: Merge (not claim-replace) — reuses `CommerceCartService::add()`'s existing quantity-sum-on-duplicate-line semantics unchanged, no price freezing (checkout completion's existing `revalidateAndPrice()` remains sole authority), source guest cart becomes terminal (`STATUS_CONSUMED`) after a successful merge, logout never exposes the customer's cart to a subsequent guest bearer, multi-device favors preserving the customer's existing cart over a second device's guest cart. `COM-MOBILE-CART-IDENTITY-1` promoted to `ready`.
+- **`COM-MOBILE-CUSTOMER-1-ADDRESS-SCHEMA`**, recorded durably in `docs/plans/store/ADR-08-COMMERCE-CUSTOMER-ADDRESS-SCHEMA.md`: a dedicated `commerce_customer_addresses` table owned by `CustomerIdentity` (not `Partner`, no Partner refactor), with explicit Saudi National Address support (`building_no`, `additional_number`, `short_address`, all country-aware — never unconditionally mandatory), reusing `CommerceOrderSnapshot`'s existing immutability guard for order-time snapshotting, and closing the pre-existing `shipping_building_no` propagation gap found during the escalation's evidence pass. **Task split approved**: `COM-MOBILE-CUSTOMER-1` retired as a bundled row, replaced by independently-ready `COM-MOBILE-ORDER-HISTORY-1` and `COM-MOBILE-ADDRESSES-1` (table above).
 
 ## Promotion checklist: backlog → ready
 

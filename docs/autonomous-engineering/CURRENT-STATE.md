@@ -2,7 +2,7 @@
 
 > This file is a durable resume point, not a substitute for Git/GitHub evidence.
 
-LAST_UPDATED: 2026-09-21
+LAST_UPDATED: 2026-09-21 (cart-merge/address-schema decisions resolved)
 LAYER_VERSION: V1
 STATUS: EXECUTING
 
@@ -22,6 +22,10 @@ Execute the first bounded autonomous-engineering horizon: close the Commerce Mob
 - `COM-MOBILE-VARIANTS-1` (variant/options/UOM mobile contract) is **done**: PR #916 merged and post-merge reviewed; Merge SHA: `40445016973d050963d25519ed15ba05e0de6b66`. Discovered backlog: alternate-unit (UOM) selection contract, needed by both `/store/v1` and `/commerce/v1`, not yet designed. Full evidence: `docs/plans/commerce/COM-MOBILE-VARIANTS-1-IMPLEMENTATION-REPORT.md`.
 - `COM-MOBILE-AUTH-1` evaluated for promotion and found **not ready**: `docs/plans/store/ADR-05-CUSTOMER-MOBILE-IDENTITY-BOUNDARY.md` (Accepted, 2026-09-09) fixes the conceptual identity boundary (Commerce Authentication Identity / Customer Account / ERP User / Partner stay distinct; tenant-scoped; ownership-based authorization) but explicitly lists as **non-decisions**: authentication framework/provider, SMS/OTP provider, password-vs-passwordless default, and token/session format. This is a genuine Decision Escalation Gate (Tenant/Auth architecture + potential paid third-party vendor commitment), not an evidence gap Claude can resolve — see Decision Escalation packet delivered to Safwan.
 - Safwan resolved the Decision Escalation (`COM-MOBILE-AUTH-1-IDENTITY-MECHANISM`): support phone+OTP (primary) and email+password (alternative), provider-neutral OTP with no real vendor integrated yet. Recorded durably in `docs/plans/store/ADR-06-COMMERCE-MOBILE-AUTH-MECHANISM.md`. `COM-MOBILE-AUTH-1` (customer mobile auth + profile) is **done**: PR #920 merged and post-merge reviewed; Merge SHA: `a8f83b170eb2f696541e9f4d48d3db407ab02dd5`. Reuses the existing, previously-unwired `/customer/v1` identity stack unmodified, extended into `/commerce/v1` via a new `X-Customer-Token` header + `AuthenticateCommerceCustomer` middleware, plus new OTP scaffolding. 24 focused tests + full `Customer|Commerce` regression green on SQLite and PostgreSQL (post two Codex review rounds that found and fixed 4 real issues: a dropped audit trail, a partner-linking dead-end for phone-only customers, an OTP-issuance concurrency race, and a shared-quota rate-limit gap — plus a fifth, self-found security fix closing an account-boundary leak via an unverified self-declared phone). One merge conflict against `main` (trivial import-ordering clash with a concurrently-merged PR) resolved before merge. Full evidence: `docs/plans/commerce/COM-MOBILE-AUTH-1-IMPLEMENTATION-REPORT.md`.
+- Safwan resolved both remaining Decision Escalations (owner decision, 2026-09-21):
+  - **`COM-MOBILE-CART-IDENTITY-1-MERGE-POLICY`** — Merge policy (not claim-replace), recorded durably in `docs/plans/store/ADR-07-COMMERCE-CART-MERGE-POLICY.md`. `COM-MOBILE-CART-IDENTITY-1` promoted to `ready`.
+  - **`COM-MOBILE-CUSTOMER-1-ADDRESS-SCHEMA`** — a dedicated `CustomerIdentity`-owned address table (not `Partner`), with Saudi-National-Address-aware fields, recorded durably in `docs/plans/store/ADR-08-COMMERCE-CUSTOMER-ADDRESS-SCHEMA.md`. Task split approved: `COM-MOBILE-CUSTOMER-1` retired, replaced by `COM-MOBILE-ORDER-HISTORY-1` and `COM-MOBILE-ADDRESSES-1`, both promoted to `ready`.
+  - See `TASK-QUEUE.md` for full resolution detail.
 
 ## Current execution horizon
 
@@ -29,10 +33,11 @@ Execute the first bounded autonomous-engineering horizon: close the Commerce Mob
 - First executable task: `COM-MOBILE-MEDIA-1` — **done**.
 - Second executable task: `COM-MOBILE-VARIANTS-1` — **done**.
 - Third executable task: `COM-MOBILE-AUTH-1` — **done**.
-- Fourth/fifth candidates evaluated and found **not ready** — both moved to `decision_required`:
-  - `COM-MOBILE-CART-IDENTITY-1` (guest → customer cart transition): `docs/plans/store/COMMERCE_MOBILE_API_READINESS.md` §12 explicitly requires a cart-merge policy decision (claim vs. merge, conflict/quantity behavior, pricing/revalidation, abandoned-cart handling, logout/multi-device behavior) that `COM-MOBILE-AUTH-1` did not and could not resolve.
-  - `COM-MOBILE-CUSTOMER-1` (addresses + order history): blocked by ADR-05 §13/§22's explicit Commerce Address schema non-decision; its order-history half is comparatively evidence-ready but the task is currently scoped as one bundled unit.
-  - No other queue candidate is independently ready — all remaining items trace back to these same two open decisions or to unconfirmed V1 scope. This is a genuine Decision Escalation, not an evidence gap — see `TASK-QUEUE.md` for the full evaluation delivered to Safwan.
+- Both remaining Decision Escalations are now resolved (ADR-07, ADR-08 — see above). Fourth/fifth/sixth candidates are `ready`:
+  - `COM-MOBILE-CART-IDENTITY-1` (guest → customer cart transition, merge policy per ADR-07).
+  - `COM-MOBILE-ORDER-HISTORY-1` (split from the former `COM-MOBILE-CUSTOMER-1` — no schema decision needed, `CommerceOrderService::ownedOrders()` already exists).
+  - `COM-MOBILE-ADDRESSES-1` (split from the former `COM-MOBILE-CUSTOMER-1` — Commerce customer address book per ADR-08).
+  - None of the three depend on each other; execution order follows actual readiness/dependency evidence at implementation time, not a fixed stack.
 - Implementation merge: standing authority after mandatory final-head pre-merge review, required green CI, no unresolved Decision Gate, and mandatory post-merge review.
 - Deploy / production release / destructive production operation: not authorized without Safwan's explicit approval.
 
