@@ -8,7 +8,6 @@ use App\Models\Tenant;
 use App\Services\Commerce\CheckoutIdempotencyConflictException;
 use App\Services\Commerce\CheckoutNotFoundException;
 use App\Services\Commerce\CheckoutReviewRequiredException;
-use App\Services\Commerce\CommerceCartService;
 use App\Services\Commerce\CommerceCheckoutService;
 use App\Support\CommerceOrderReference;
 use App\Support\PublicApiErrorCode;
@@ -49,26 +48,34 @@ final class CommerceCheckoutController extends PublicApiController
 
     public function show(Request $request, CommerceCheckoutService $checkouts): JsonResponse
     {
-        $result = $checkouts->current($this->tokenFromRequest($request));
+        try {
+            $result = $checkouts->current($this->tokenFromRequest($request));
+        } catch (PDOException $e) {
+            throw $e;
+        } catch (RuntimeException $e) {
+            abort(422, $e->getMessage());
+        }
         $response = PublicApiResponse::success($request, $checkouts->serialize($result['checkout'], $result['cart']));
 
         return $this->applyTokenOutcome($response, $result);
     }
 
-    public function store(Request $request, CommerceCartService $carts, CommerceCheckoutService $checkouts): JsonResponse
+    public function store(Request $request, CommerceCheckoutService $checkouts): JsonResponse
     {
         $this->rejectUnknown($request, []);
         $token = $this->tokenFromRequest($request);
 
-        $lookup = $carts->findByToken($token);
-        if ($lookup['invalid']) {
-            return $this->clearToken($this->notFound($request));
-        }
-
+        // (Codex, PR #924, P1, seventh round) لا فحصٌ منفصل بـfindByToken()
+        // هنا قبل استدعاء createOrResume(): كلاهما كان يعيد ربط الرمز حين لا
+        // يطابق أيّ سلة — نداءان في طلبٍ واحد يُلغي أوّلهما الثاني، فيفقد أي
+        // جهازٍ آخر يحمل الرمز الأول صلاحيته بلا داع. createOrResume() وحدها
+        // تحلّ وتربط الرمز الآن (مرّةً واحدة)، وترمي CheckoutNotFoundException
+        // لأي سببٍ يمنع البدء — نفس معاملة "امسح الرمز وأرجع 404" التي كانت
+        // تُطبَّق فقط حين يكون الرمز المقدَّم فاسداً تحديداً.
         try {
             $result = $checkouts->createOrResume($token);
         } catch (CheckoutNotFoundException) {
-            return $this->notFound($request);
+            return $this->clearToken($this->notFound($request));
         } catch (PDOException $e) {
             throw $e;
         } catch (RuntimeException $e) {
@@ -200,7 +207,13 @@ final class CommerceCheckoutController extends PublicApiController
         } catch (CheckoutIdempotencyConflictException $e) {
             return PublicApiResponse::error($request, PublicApiErrorCode::IDEMPOTENCY_CONFLICT, $e->getMessage(), 409);
         } catch (CheckoutReviewRequiredException $e) {
-            $current = $checkouts->current($token);
+            try {
+                $current = $checkouts->current($token);
+            } catch (PDOException $ePdo) {
+                throw $ePdo;
+            } catch (RuntimeException $eRuntime) {
+                abort(422, $eRuntime->getMessage());
+            }
 
             return PublicApiResponse::error(
                 $request,
@@ -272,7 +285,13 @@ final class CommerceCheckoutController extends PublicApiController
     private function withCurrentCheckout(Request $request, CommerceCheckoutService $checkouts, callable $mutate): JsonResponse
     {
         $token = $this->tokenFromRequest($request);
-        $lookup = $checkouts->current($token);
+        try {
+            $lookup = $checkouts->current($token);
+        } catch (PDOException $e) {
+            throw $e;
+        } catch (RuntimeException $e) {
+            abort(422, $e->getMessage());
+        }
         if ($lookup['checkout'] === null) {
             return $this->applyTokenOutcome($this->notFound($request), $lookup);
         }

@@ -1043,4 +1043,126 @@ class CommerceCartMergeApiTest extends TestCase
         $this->assertSame(CommerceCart::STATUS_EXPIRED, CommerceCart::withoutGlobalScopes()->where('token_hash', hash('sha256', $cartToken))->firstOrFail()->status);
         app(TenantContext::class)->forget();
     }
+
+    // ═══════════════════════════════════════════════════════════
+    //  Seventh review round (Codex, PR #924)
+    // ═══════════════════════════════════════════════════════════
+
+    /**
+     * P1 — checkout entry points (`current()`/`createOrResume()`) now call
+     * `CommerceCartService::resolveCurrent()` instead of `findByToken()`.
+     * The latter returns a presented guest cart directly whenever it's
+     * unowned, with no claim/merge at all — an authenticated customer who
+     * goes straight to checkout with an old guest token (never touching a
+     * cart endpoint first) would start Checkout on the raw guest cart,
+     * silently ignoring their own existing cart's contents. This proves
+     * the merge now happens on the checkout entry path itself.
+     *
+     * @test
+     */
+    public function checkout_creation_merges_a_presented_guest_cart_into_the_customers_existing_cart(): void
+    {
+        $store = $this->seedMobileStore('checkout-merge-entry');
+        $existingProduct = $this->product($store['tenant'], $store['channel'], 'CHECKOUT-MERGE-EXISTING');
+        $guestProduct = $this->product($store['tenant'], $store['channel'], 'CHECKOUT-MERGE-GUEST');
+
+        $customerToken = $this->loginCustomer($store, '+966500000196');
+        $this->postJson('/commerce/v1/cart/items', ['product_id' => $existingProduct->id, 'quantity' => 1], $this->withCustomer($store['token'], $customerToken))->assertCreated();
+
+        $guestToken = $this->postJson('/commerce/v1/cart/items', ['product_id' => $guestProduct->id, 'quantity' => 1], $this->withCart($store['token']))
+            ->assertCreated()->headers->get('X-Cart-Token');
+
+        // Goes straight to checkout with the guest token — never touches a
+        // cart endpoint first.
+        $response = $this->postJson('/commerce/v1/checkout', [], $this->withCustomer($store['token'], $customerToken, $guestToken))->assertCreated();
+
+        $items = collect($response->json('data.cart.items'))->pluck('product_id');
+        $this->assertTrue($items->contains($existingProduct->id));
+        $this->assertTrue($items->contains($guestProduct->id));
+        $this->assertSame(1, CommerceCart::query()->where('status', CommerceCart::STATUS_ACTIVE)->count());
+    }
+
+    /**
+     * P1 — checkout's own cart/checkout locks (`lockActiveCart()` via
+     * `createOrResume()`, `complete()`'s inline cart lock, and
+     * `lockUsableCheckout()` via contact/address/delivery updates) must
+     * recheck cart ownership under their own lock, exactly like
+     * `CommerceCartService::lockUsableCart()` now does. Reproduces the same
+     * window: a request resolves this checkout (via its cart) while still
+     * usable by its bearer, but a concurrent request claims the cart before
+     * this mutation's own lock — `lockUsableCheckout()` only checks
+     * `cart_id` is a resolvable cart the same guest could originally see, it
+     * never re-verified who owns it. A fresh HTTP request can't reproduce
+     * the interleaving itself (a *second* request would already be rejected
+     * at resolution time), so this calls the service directly with a
+     * checkout reference exactly as the controller would already be
+     * holding it before the concurrent claim below lands.
+     *
+     * @test
+     */
+    public function a_checkout_claimed_between_resolution_and_lock_refuses_the_stale_contact_update(): void
+    {
+        $store = $this->seedMobileStore('checkout-lock-recheck');
+        $product = $this->product($store['tenant'], $store['channel'], 'CHECKOUT-LOCK-RECHECK-1');
+
+        $add = $this->postJson('/commerce/v1/cart/items', ['product_id' => $product->id, 'quantity' => 1], $this->withCart($store['token']))->assertCreated();
+        $this->postJson('/commerce/v1/checkout', [], $this->withCart($store['token'], $add->headers->get('X-Cart-Token')))->assertCreated();
+
+        app(TenantContext::class)->set($store['tenant']->id);
+        $cart = CommerceCart::query()->firstOrFail();
+        $checkout = \App\Models\CommerceCheckout::query()->where('cart_id', $cart->id)->firstOrFail();
+        $otherIdentity = \App\Models\CustomerIdentity::create([
+            'tenant_id' => $store['tenant']->id, 'display_name' => 'ع',
+            'phone' => '+966500000195', 'phone_verified_at' => now(), 'is_active' => true,
+        ]);
+
+        // Stands in for a concurrent authenticated request's claim,
+        // committed after this guest's own resolution but before this
+        // update's own lock.
+        $cart->update(['customer_identity_id' => $otherIdentity->id]);
+
+        app(\App\Tenancy\StorefrontContext::class)->set($store['tenant']->id, $store['channel']->id);
+        app(\App\Tenancy\CustomerContext::class)->forget();
+
+        $this->expectException(\App\Services\Commerce\CheckoutNotFoundException::class);
+        app(\App\Services\Commerce\CommerceCheckoutService::class)->updateContact($checkout, ['contact_name' => 'محاولة ضيف']);
+    }
+
+    /**
+     * P1 — `POST /commerce/v1/checkout` must rebind the cart's token at
+     * most once per request. It used to call `findByToken()` twice (once
+     * directly in the controller just to check `invalid`, then again inside
+     * `createOrResume()`), rebinding twice when no token matched — the
+     * second rotation discarded the token another device held immediately
+     * before this single request from *both* the current and previous
+     * slots, breaking that device's next request despite the one-generation
+     * grace mechanism. The controller no longer does its own separate
+     * lookup; `createOrResume()`'s single `resolveCurrent()` call is now
+     * the only rebind. Proven here by checking that the token which was
+     * current immediately before this request still resolves afterward
+     * (via the previous-generation slot) with no further rotation needed —
+     * which is only possible if exactly one rebind occurred.
+     *
+     * @test
+     */
+    public function post_checkout_with_no_token_rebinds_the_cart_only_once(): void
+    {
+        $store = $this->seedMobileStore('checkout-single-rebind');
+        $product = $this->product($store['tenant'], $store['channel'], 'CHECKOUT-SINGLE-REBIND-1');
+
+        $customerToken = $this->loginCustomer($store, '+966500000194');
+        $originalToken = $this->postJson('/commerce/v1/cart/items', ['product_id' => $product->id, 'quantity' => 1], $this->withCustomer($store['token'], $customerToken))
+            ->assertCreated()->headers->get('X-Cart-Token');
+
+        // A single POST checkout with no cart token at all — must rebind
+        // exactly once, not twice (which would strand $originalToken in
+        // neither slot).
+        $this->postJson('/commerce/v1/checkout', [], $this->withCustomer($store['token'], $customerToken))->assertCreated();
+
+        // $originalToken must still resolve with no further rebind needed —
+        // only possible if it landed in the previous-generation slot from a
+        // single rotation.
+        $response = $this->getJson('/commerce/v1/cart', $this->withCustomer($store['token'], $customerToken, $originalToken))->assertOk();
+        $this->assertNull($response->headers->get('X-Cart-Token'));
+    }
 }

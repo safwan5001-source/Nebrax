@@ -14,6 +14,7 @@ use App\Models\UnitTemplateUnit;
 use App\Services\Accounting\UnitConversion;
 use App\Support\DocumentLineVariantResolver;
 use App\Tenancy\BranchScope;
+use App\Tenancy\CustomerContext;
 use App\Tenancy\StorefrontContext;
 use App\Tenancy\TenantContext;
 use Illuminate\Support\Collection;
@@ -80,11 +81,18 @@ final class CommerceCheckoutService
      * الصلاحية يُنقَل حالته كسولاً ثم يُعامَل كغيابٍ تام، بنفس نمط
      * `CommerceCartService::findByToken()` حرفياً.
      *
+     * (Codex, PR #924, P1, seventh round) يستعمل `resolveCurrent()` لا
+     * `findByToken()`: الأخيرة تُرجع سلة الضيف المطابقة للرمز مباشرةً بلا أي
+     * دمج، فعميلٌ مُصادَقٌ له سلةٌ قائمة فعلاً كان يرى Checkout سلة الضيف
+     * الخام — سلته الحقيقية تُتجاهَل بصمت. لا تغيير لمسار الويب/الضيف: حين
+     * لا `CustomerContext` مؤسَّس، `resolveCurrent()` هي `findByToken()`
+     * حرفياً (راجع تعريفها).
+     *
      * @return array{checkout: ?CommerceCheckout, cart: ?CommerceCart, invalid: bool, rebound: ?string}
      */
     public function current(?string $cartToken): array
     {
-        $cartLookup = $this->carts->findByToken($cartToken);
+        $cartLookup = $this->carts->resolveCurrent($cartToken);
         if ($cartLookup['cart'] === null) {
             return ['checkout' => null, 'cart' => null, 'invalid' => $cartLookup['invalid'], 'rebound' => null];
         }
@@ -216,11 +224,16 @@ final class CommerceCheckoutService
      * لعقد `AWJ_CHECKOUT_V1_ARCHITECTURE.md` §9 حرفياً). ويب وجوال كلاهما
      * محميان معاً لأن الإصلاح في هذه الخدمة المشتركة، لا في متحكّمٍ واحد.
      *
+     * (Codex, PR #924, P1, seventh round) يستعمل `resolveCurrent()` — نفس
+     * سبب `current()` أعلاه حرفياً: بلا هذا، عميلٌ مُصادَقٌ يقدّم رمز سلة
+     * ضيفٍ مباشرةً لهذا المسار كان يبدأ Checkout على سلة الضيف الخام بلا
+     * أي دمج، متجاوزاً سلته الحالية بصمت.
+     *
      * @return array{checkout: CommerceCheckout, cart: CommerceCart, created: bool, rebound: ?string}
      */
     public function createOrResume(?string $cartToken): array
     {
-        $cartLookup = $this->carts->findByToken($cartToken);
+        $cartLookup = $this->carts->resolveCurrent($cartToken);
         if ($cartLookup['cart'] === null) {
             throw new CheckoutNotFoundException('السلة غير متاحة لبدء الدفع.');
         }
@@ -383,6 +396,8 @@ final class CommerceCheckoutService
             if ($cart === null) {
                 throw new CheckoutNotFoundException('السلة غير متاحة لإتمام الدفع.');
             }
+
+            $this->assertOwnedByCurrentBearer($cart);
 
             if ($checkout->contact_name === null || trim($checkout->contact_name) === '') {
                 throw new CheckoutReviewRequiredException(
@@ -699,6 +714,8 @@ final class CommerceCheckoutService
             throw new CheckoutNotFoundException('السلة غير متاحة لبدء الدفع.');
         }
 
+        $this->assertOwnedByCurrentBearer($cart);
+
         return $cart;
     }
 
@@ -717,7 +734,45 @@ final class CommerceCheckoutService
             throw new CheckoutNotFoundException('جلسة الدفع غير متاحة.');
         }
 
+        // (Codex, PR #924, P1, seventh round) هذا Checkout نفسه لا يحمل هوية
+        // مالكٍ مباشرة — ملكيته موروثة بالكامل من سلته عبر cart_id. قفلٌ على
+        // Checkout وحده كان يترك نفس ثغرة السباق التي أُصلحت في
+        // lockUsableCart()/lockActiveCart(): طلبٌ ضيفٌ يحلّ هذا الـCheckout
+        // قبل أن تُطالِب به مصادقةٌ متزامنة، ثم يستمر بتعديل جهة الاتصال أو
+        // العنوان بعد أن تغيّرت ملكية سلته فعلاً.
+        $cart = $this->scopeToContext(CommerceCart::query(), $context)
+            ->whereKey($checkout->cart_id)
+            ->lockForUpdate()
+            ->first();
+
+        if ($cart === null) {
+            throw new CheckoutNotFoundException('جلسة الدفع غير متاحة.');
+        }
+
+        $this->assertOwnedByCurrentBearer($cart);
+
         return $checkout;
+    }
+
+    /**
+     * (Codex, PR #924, P1, seventh round) يعيد التحقق من ملكية السلة تحت
+     * قفلها مباشرة — نفس مبدأ `CommerceCartService::lockUsableCart()`
+     * حرفياً، مكرَّرٌ عمداً هنا بدل توسيع واجهة تلك الخدمة العامة (نفس سبب
+     * تكرار `resolveUnit()`/`scopeToContext()` الموثَّق في رأس هذا الصنف).
+     * سلةٌ حُلَّت قبل هذا القفل (عبر `resolveCurrent()`/`findByToken()`) قد
+     * تكون طالبَتها مصادقةٌ متزامنة بين الحلّ وهذا القفل بالذات — المطالبة
+     * تُعدِّل `customer_identity_id` فقط، لا `status`، فلا يكفي فحصا الحالة
+     * والانتهاء وحدهما.
+     */
+    private function assertOwnedByCurrentBearer(CommerceCart $cart): void
+    {
+        $customerContext = app(CustomerContext::class);
+        $ownedByOther = $cart->customer_identity_id !== null
+            && (! $customerContext->isEstablished() || $customerContext->customerIdentityId() !== $cart->customer_identity_id);
+
+        if ($ownedByOther) {
+            throw new CheckoutNotFoundException('جلسة الدفع غير متاحة.');
+        }
     }
 
     private function cartFor(CommerceCheckout $checkout): ?CommerceCart
