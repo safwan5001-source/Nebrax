@@ -2,8 +2,9 @@
 
 **Task:** Close the Public/Mobile Commerce Product Media gap
 **Branch:** `claude/autonomous-engineering-bootstrap-fo0mvj` · **Base:** `main` @ `c333836`
-**Date:** 2026-09-20
-**STATUS:** review (pre-merge)
+**PR:** #911 · **Merge SHA:** `8386ece721f3e6b37c9f2ff8db64f10e2b44d9c4`
+**Date:** 2026-09-20 – 2026-09-21
+**STATUS:** done (merged, post-merge reviewed)
 
 ---
 
@@ -196,26 +197,37 @@ repository beyond `php artisan test` (verified via `composer.json`/CI).
 
 ## CI
 
-Not yet observed on the exact final Head SHA — pending push/PR per Gate 7/9. Will be
-inspected before Pre-Merge Review, and any task-caused failure will be fixed before merge.
+Observed green on the exact final Head SHA before merge: GitHub Actions `CI` workflow,
+both `php artisan test (L11, sqlite)` and `php artisan test (L11, pgsql)` jobs, plus
+`web build (Next.js)` (triggered incidentally by a `main`-sync merge that carried an
+unrelated `web/` change from PR #910) — all green on head `2f296fa2b729cd1f636564e74aaa400a8be4ad35`.
 
 ## Pre-merge review
 
-- PRE_MERGE_REVIEW: *(recorded below, immediately before merge, on the exact final Head SHA)*
-- Reviewed Head SHA: *(pending)*
-- Findings / resolution: *(pending)*
+- PRE_MERGE_REVIEW: PASS
+- Reviewed Head SHA: `2f296fa2b729cd1f636564e74aaa400a8be4ad35`
+- Findings / resolution: 4 automated (Codex) review findings addressed — see "Automated
+  review findings" above (1 cache-control fix, 1 critical document-disk fix in both media
+  controllers, 2 recorded as backlog with evidence); all 4 review threads resolved on the
+  PR. `mergeable_state: clean` against current `main` tip at merge time (`a0a41c9`,
+  synced twice via merge commits as `main` advanced during review). No unresolved Decision
+  Gate.
 
 ## Merge
 
-- Merge status: *(pending)*
-- Merge SHA: *(pending)*
+- Merge status: merged (standing authority, all gates satisfied)
+- Merge SHA: `8386ece721f3e6b37c9f2ff8db64f10e2b44d9c4`
 
 ## Post-merge review
 
-- POST_MERGE_REVIEW: *(pending)*
-- Reviewed Merge SHA: *(pending)*
-- Target-branch checks/smoke: *(pending)*
-- Findings / resolution: *(pending)*
+- POST_MERGE_REVIEW: PASS
+- Reviewed Merge SHA: `8386ece721f3e6b37c9f2ff8db64f10e2b44d9c4`
+- Target-branch checks/smoke: verified `main` contains the merge (`git merge-base
+  --is-ancestor`); `main`'s own post-merge CI run (workflow run `35547469387`) green on
+  both `php artisan test (L11, sqlite)` and `(L11, pgsql)` jobs for this exact commit.
+  Full diff re-inspected against the merge base — no unexpected changes, matches the
+  reviewed PR diff exactly.
+- Findings / resolution: none — clean post-merge integration.
 
 ## Self-review
 
@@ -400,9 +412,10 @@ All three were verified against repository evidence:
 ## Git state
 
 - Branch: `claude/autonomous-engineering-bootstrap-fo0mvj`
-- PR: *(pending — opened immediately after this commit)*
-- Base SHA: `c333836`
-- Head SHA: *(pending)*
+- PR: #911 (merged)
+- Base SHA: `c333836` (initial); final pre-merge base after two `main`-sync merges: `a0a41c9`
+- Final Head SHA (pre-merge): `2f296fa2b729cd1f636564e74aaa400a8be4ad35`
+- Merge SHA: `8386ece721f3e6b37c9f2ff8db64f10e2b44d9c4`
 
 ## Recommended next dependency-ready task
 

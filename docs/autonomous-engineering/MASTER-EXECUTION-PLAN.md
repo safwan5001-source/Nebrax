@@ -96,7 +96,7 @@ Candidate order from that evidence:
 id: COM-MOBILE-MEDIA-1
 title: Close the Public/Mobile Commerce product-media gap
 domain: commerce
-status: review
+status: done
 risk: high
 depends_on:
   - accepted Commerce Mobile API readiness evidence
@@ -129,12 +129,21 @@ merge_policy: standing-authority-after-pre-merge-review
 deploy_policy: owner-approval
 ```
 
-`COM-MOBILE-MEDIA-1` is now `review`: implemented on branch
-`claude/autonomous-engineering-bootstrap-fo0mvj` (`GET /commerce/v1/media/{id}` +
-`ProductMediaGalleryService` wiring into `CommerceProductController`), focused/module tests
-green on SQLite and PostgreSQL. See
-`docs/plans/commerce/COM-MOBILE-MEDIA-1-IMPLEMENTATION-REPORT.md` for full evidence. Status
-advances to `merged`/`done` only after PR merge and mandatory post-merge review.
+`COM-MOBILE-MEDIA-1` is `done`: merged via PR #911 (Merge SHA
+`8386ece721f3e6b37c9f2ff8db64f10e2b44d9c4`), post-merge CI green on `main` (SQLite +
+PostgreSQL), mandatory post-merge review passed. `GET /commerce/v1/media/{id}` +
+`ProductMediaGalleryService` wiring into `CommerceProductController`, reusing
+`/store/v1`'s existing hardened media authority with no parallel storage. Also fixed a
+pre-existing production defect discovered via automated review: `disk = 'document'` media
+(the real product-upload path) was returning a 500 in the already-shipped
+`StorefrontMediaController` for `/store/v1` — fixed in both controllers. See
+`docs/plans/commerce/COM-MOBILE-MEDIA-1-IMPLEMENTATION-REPORT.md` for full evidence.
+
+Discovered backlog from this task (not yet scheduled): a dedicated rate-limit budget for
+media downloads (currently shares the general read/unauth budget with catalog browsing on
+both `/store/v1` and `/commerce/v1` — a configurable-policy decision, not a bug); batched
+gallery loading for list endpoints (`ProductMediaGalleryService` currently resolves one
+row at a time on both boundaries' `index()`).
 
 ## Backlog discovery
 
