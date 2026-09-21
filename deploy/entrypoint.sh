@@ -32,10 +32,10 @@ runtime_paths=(
 )
 
 # Keep only the required parents accessible for traversal; this is deliberately
-# non-recursive and does not alter storage/app contents.
+# non-recursive and leaves the parents root-owned without granting runtime write
+# access. Only the runtime paths below receive write ownership/permissions.
 for parent_path in storage storage/framework bootstrap; do
-  chown www-data:www-data "$parent_path"
-  chmod ug+rwx "$parent_path"
+  chmod ug+rx "$parent_path"
 done
 
 for runtime_path in "${runtime_paths[@]}"; do
