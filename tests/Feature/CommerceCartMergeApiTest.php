@@ -774,4 +774,61 @@ class CommerceCartMergeApiTest extends TestCase
         $this->assertSame(1, $customerCart->items()->where('product_id', $guestOnly->id)->sum('quantity'));
         app(TenantContext::class)->forget();
     }
+
+    // ═══════════════════════════════════════════════════════════
+    //  Third review round (Codex, commit 1af306f)
+    // ═══════════════════════════════════════════════════════════
+
+    /**
+     * P2 — the composite FK is `restrictOnDelete()`, not `nullOnDelete()`:
+     * `ON DELETE SET NULL` on a composite key would null *every* referencing
+     * column, including the non-nullable `tenant_id`. Restricting instead
+     * keeps the cross-tenant guarantee and fails the delete cleanly rather
+     * than crashing on a not-null violation.
+     *
+     * @test
+     */
+    public function hard_deleting_a_customer_identity_with_an_active_cart_is_restricted(): void
+    {
+        $store = $this->seedMobileStore('fk-restrict');
+        $product = $this->product($store['tenant'], $store['channel'], 'FK-RESTRICT-1');
+
+        $customerToken = $this->loginCustomer($store, '+966500000123');
+        $this->postJson('/commerce/v1/cart/items', ['product_id' => $product->id, 'quantity' => 1], $this->withCustomer($store['token'], $customerToken))->assertCreated();
+
+        app(TenantContext::class)->set($store['tenant']->id);
+        $identity = \App\Models\CustomerIdentity::query()->where('phone_e164', '+966500000123')->firstOrFail();
+
+        $this->expectException(\Illuminate\Database\QueryException::class);
+        $identity->forceDelete();
+    }
+
+    /**
+     * P2 — serialize()'s own subtotal arithmetic can throw a plain
+     * RuntimeException for a monetarily-unrepresentable total. Prices are
+     * always resolved live (never frozen at add() time), so a line added
+     * safely can become unrepresentable later purely from a price change —
+     * `show()` was the one cart endpoint that called serialize() outside
+     * any try/catch (add()'s own internal serialize() call is already
+     * covered by store()'s existing wrapping).
+     *
+     * @test
+     */
+    public function a_monetary_overflow_discovered_only_at_read_time_returns_422_not_an_uncaught_crash(): void
+    {
+        $store = $this->seedMobileStore('monetary-overflow');
+        $product = $this->product($store['tenant'], $store['channel'], 'OVERFLOW-PRICE-1', price: 10000);
+
+        $cartToken = $this->postJson('/commerce/v1/cart/items', ['product_id' => $product->id, 'quantity' => 3], $this->withCart($store['token']))
+            ->assertCreated()->headers->get('X-Cart-Token');
+
+        // The price changes after the line was safely added — serialize()
+        // resolves it live, so the overflow is discovered only now, at read
+        // time, never inside add()'s own (already-protected) call.
+        app(TenantContext::class)->set($store['tenant']->id);
+        $product->update(['sale_price' => intdiv(PHP_INT_MAX, 2)]);
+        app(TenantContext::class)->forget();
+
+        $this->getJson('/commerce/v1/cart', $this->withCart($store['token'], $cartToken))->assertStatus(422);
+    }
 }

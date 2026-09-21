@@ -39,7 +39,21 @@ final class CommerceCartController extends PublicApiController
     public function show(Request $request, CommerceCartService $carts): JsonResponse
     {
         $lookup = $this->resolveCurrent($request, $carts);
-        $response = PublicApiResponse::success($request, $carts->serialize($lookup['cart']));
+        // (Codex, PR #924, P2) serialize()'s own subtotal arithmetic
+        // (safeMultiply()/safeAdd()) can throw a plain RuntimeException for
+        // an unrepresentable total — pre-existing, not specific to merging,
+        // but this is the one call site that was never behind a try/catch
+        // at all (add()/update()/remove() already return their own
+        // serialize() result from inside store()/update()/destroy()'s
+        // existing try/catch).
+        try {
+            $data = $carts->serialize($lookup['cart']);
+        } catch (PDOException $e) {
+            throw $e;
+        } catch (RuntimeException $e) {
+            abort(422, $e->getMessage());
+        }
+        $response = PublicApiResponse::success($request, $data);
 
         return $this->applyTokenOutcome($response, $lookup);
     }
