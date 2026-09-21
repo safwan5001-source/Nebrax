@@ -69,7 +69,30 @@ final class DocumentLineVariantResolver
      */
     public static function descriptor(ProductVariant $variant): ?string
     {
-        $names = $variant->optionValues()->with('option')->get()
+        return self::formatDescriptor($variant->optionValues()->with('option')->get());
+    }
+
+    /**
+     * مسار كتالوج POS المحمّل مسبقاً فقط: لا يعامل علاقة غير محمّلة أو خياراً
+     * غير محمّل كبيانات مكتملة، بل يعود حرفياً إلى المصدر الاستعلامي المعتاد.
+     */
+    public static function descriptorFromLoadedOptionValues(ProductVariant $variant): ?string
+    {
+        if (! $variant->relationLoaded('optionValues')) {
+            return self::descriptor($variant);
+        }
+
+        $values = $variant->getRelation('optionValues');
+        if (! $values->every(fn ($value) => $value->relationLoaded('option'))) {
+            return self::descriptor($variant);
+        }
+
+        return self::formatDescriptor($values);
+    }
+
+    private static function formatDescriptor($values): ?string
+    {
+        $names = $values
             ->sortBy(fn ($value) => [(int) ($value->option->sort_order ?? 0), (int) $value->sort_order])
             ->pluck('value')
             ->filter(fn ($value) => $value !== null && $value !== '')
