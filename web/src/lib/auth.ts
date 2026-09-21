@@ -3,6 +3,13 @@
 import { api, setToken, clearToken, getToken } from './api';
 import { isDemo } from './demo';
 
+/** تغيّر جلسة المصادقة: يمسح المستهلكون الذاكرة المقيدة بالهوية السابقة. */
+export const AUTH_SESSION_CHANGED_EVENT = 'nibras:auth-session-changed';
+
+export function notifyAuthSessionChanged(): void {
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event(AUTH_SESSION_CHANGED_EVENT));
+}
+
 export interface AuthUser {
   id: string;
   name: string;
@@ -40,6 +47,7 @@ export async function login(email: string, password: string): Promise<AuthUser> 
   clearSessionPreferences(); // لا يرث الحسابُ الجديد فرعَ الحساب السابق
   setToken(res.token);
   persistUser(res.user);
+  notifyAuthSessionChanged();
   return res.user;
 }
 
@@ -85,6 +93,7 @@ export async function register(payload: RegisterPayload): Promise<RegisterResult
   );
   setToken(res.token);
   persistUser(res.user);
+  notifyAuthSessionChanged();
   return { user: res.user, tenant: res.tenant, handoffCode: res.handoff?.code ?? null };
 }
 
@@ -96,6 +105,7 @@ export async function logout(): Promise<void> {
   }
   clearToken();
   clearSessionPreferences();
+  notifyAuthSessionChanged();
 }
 
 let cachedUserRaw: string | null = null;
