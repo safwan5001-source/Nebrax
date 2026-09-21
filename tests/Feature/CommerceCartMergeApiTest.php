@@ -955,4 +955,92 @@ class CommerceCartMergeApiTest extends TestCase
         $this->assertSame(1, $guestCart->items()->where('product_id', $guestProduct->id)->sum('quantity'));
         app(TenantContext::class)->forget();
     }
+
+    // ═══════════════════════════════════════════════════════════
+    //  Sixth review round (Codex, PR #924)
+    // ═══════════════════════════════════════════════════════════
+
+    /**
+     * P1 — lockUsableCart() must recheck ownership under its own lock, not
+     * just trust the CommerceCart instance the caller already resolved.
+     * Reproduces the exact window the fix closes: a request resolves this
+     * cart while it is still usable by its bearer, but by the time
+     * add()/update()/remove() actually locks the row, a concurrent request
+     * has already committed a change of ownership (resolveCurrent()'s own
+     * claim branch only ever writes `customer_identity_id`/`expires_at`,
+     * never `status` — so the pre-existing status/expiry checks alone would
+     * never catch this). A fresh HTTP request can't reproduce the
+     * interleaving itself: findByToken()'s own ownership check (an earlier
+     * round's fix) would already reject a *second* request against an
+     * already-claimed cart at the top of the lookup — the vulnerability is
+     * specifically the gap *within* one request's own execution, between
+     * its own (already-passed) resolution and its own lock. This calls the
+     * service directly with a cart reference exactly as the controller
+     * would already be holding it before the concurrent claim below lands.
+     *
+     * @test
+     */
+    public function a_cart_claimed_between_resolution_and_lock_refuses_the_stale_mutation(): void
+    {
+        $store = $this->seedMobileStore('lock-recheck-ownership');
+        $product = $this->product($store['tenant'], $store['channel'], 'LOCK-RECHECK-1');
+
+        $add = $this->postJson('/commerce/v1/cart/items', ['product_id' => $product->id, 'quantity' => 1], $this->withCart($store['token']))->assertCreated();
+        $itemId = $add->json('data.items.0.id');
+
+        app(TenantContext::class)->set($store['tenant']->id);
+        $cart = CommerceCart::query()->firstOrFail();
+        $otherIdentity = \App\Models\CustomerIdentity::create([
+            'tenant_id' => $store['tenant']->id, 'display_name' => 'ع',
+            'phone' => '+966500000198', 'phone_verified_at' => now(), 'is_active' => true,
+        ]);
+
+        // Stands in for a concurrent authenticated request's claim,
+        // committed after this guest's own resolution but before its
+        // mutation locks the row.
+        $cart->update(['customer_identity_id' => $otherIdentity->id]);
+
+        app(\App\Tenancy\StorefrontContext::class)->set($store['tenant']->id, $store['channel']->id);
+        app(\App\Tenancy\CustomerContext::class)->forget();
+
+        $this->expectException(\App\Services\Commerce\CartNotFoundException::class);
+        app(\App\Services\Commerce\CommerceCartService::class)->update($cart, $itemId, 2);
+    }
+
+    /**
+     * P1 — findByToken()'s identity-fallback branch now locks and re-reads
+     * the row before rebinding (closing a race where two concurrent
+     * no-token requests from the same customer could otherwise both rebind
+     * from the same stale hash and strand the first response's
+     * freshly-minted token in neither slot). This exercises that same
+     * locked branch against an already-expired cart, confirming the added
+     * transaction/lock doesn't change — or deadlock against —
+     * resolveFoundCart()'s own nested transaction for expiry demotion: the
+     * request must still fail closed exactly as before, not resolve a dead
+     * cart or hang.
+     *
+     * @test
+     */
+    public function the_locked_identity_fallback_still_demotes_an_expired_customers_cart(): void
+    {
+        $store = $this->seedMobileStore('locked-fallback-expiry');
+        $product = $this->product($store['tenant'], $store['channel'], 'LOCKED-FALLBACK-1');
+
+        $customerToken = $this->loginCustomer($store, '+966500000197');
+        $cartToken = $this->postJson('/commerce/v1/cart/items', ['product_id' => $product->id, 'quantity' => 1], $this->withCustomer($store['token'], $customerToken))
+            ->assertCreated()->headers->get('X-Cart-Token');
+
+        app(TenantContext::class)->set($store['tenant']->id);
+        CommerceCart::query()->update(['expires_at' => now()->subDay()]);
+        app(TenantContext::class)->forget();
+
+        // No cart token presented at all — forces findByToken() straight
+        // into the locked identity-fallback branch this round's fix wraps.
+        $this->postJson('/commerce/v1/checkout', [], $this->withCustomer($store['token'], $customerToken))
+            ->assertNotFound();
+
+        app(TenantContext::class)->set($store['tenant']->id);
+        $this->assertSame(CommerceCart::STATUS_EXPIRED, CommerceCart::withoutGlobalScopes()->where('token_hash', hash('sha256', $cartToken))->firstOrFail()->status);
+        app(TenantContext::class)->forget();
+    }
 }

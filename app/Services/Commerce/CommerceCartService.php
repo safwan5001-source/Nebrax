@@ -113,10 +113,36 @@ final class CommerceCartService
                 // checkout/complete (allowConsumed: true, fallback excluded
                 // above) even on a first attempt — self-healing server-side
                 // without ever telling the client defeats the point.
-                $found = $this->resolveFoundCart($ownCart, $allowConsumed, $context);
-                $found['rebound'] = $found['cart'] !== null ? $this->rebindToken($ownCart) : null;
+                //
+                // (Codex, PR #924, P1, sixth round) The lookup above is
+                // unlocked, so two concurrent requests from the same customer
+                // with no matching token (e.g. two devices signing in near-
+                // simultaneously) could both read the same starting
+                // token_hash and both call rebindToken() from it — the
+                // second UPDATE then overwrites the first's new hash while
+                // writing the *original* hash into previous_token_hash
+                // (since it too started from the same stale row), so the
+                // first response's freshly-minted token ends up valid in
+                // neither slot. Locking the row and re-reading inside a
+                // transaction serializes the pair: the second rebind slides
+                // the *first* rebind's already-committed new hash into
+                // previous_token_hash instead of the stale original one, so
+                // both handed-back tokens keep resolving.
+                return DB::transaction(function () use ($ownCart, $allowConsumed, $context): array {
+                    $locked = $this->scopeToContext(CommerceCart::query(), $context)
+                        ->whereKey($ownCart->id)
+                        ->lockForUpdate()
+                        ->first();
 
-                return $found;
+                    if ($locked === null) {
+                        return ['cart' => null, 'invalid' => false, 'rebound' => null];
+                    }
+
+                    $found = $this->resolveFoundCart($locked, $allowConsumed, $context);
+                    $found['rebound'] = $found['cart'] !== null ? $this->rebindToken($locked) : null;
+
+                    return $found;
+                }, 3);
             }
         }
 
@@ -665,9 +691,24 @@ final class CommerceCartService
         return ['unit:'.$unit->id, $unit->name, $unit->name];
     }
 
+    /**
+     * (Codex, PR #924, P1, sixth round) `$knownCart` was resolved by an
+     * earlier `findByToken()`/`resolveCurrent()` call — outside, and before,
+     * the row lock taken here — so a guest request that passed that
+     * ownership check while the cart was still unclaimed can race an
+     * authenticated request that claims the *same* cart (which only sets
+     * `customer_identity_id`, never `status`) in between. Without
+     * rechecking ownership after the lock, the guest's `add()`/`update()`/
+     * `remove()` would then mutate a cart that is, by the time it actually
+     * writes, someone else's. Claiming and this recheck both take
+     * `lockForUpdate()` on the exact same row, so whichever transaction
+     * commits first is fully visible to the second by the time it re-reads
+     * here — there is no window left to close.
+     */
     private function lockUsableCart(string $cartId): CommerceCart
     {
         $context = $this->context();
+        $customerContext = app(CustomerContext::class);
         $cart = $this->scopeToContext(CommerceCart::query(), $context)
             ->whereKey($cartId)
             ->where('status', CommerceCart::STATUS_ACTIVE)
@@ -676,6 +717,13 @@ final class CommerceCartService
             ->first();
 
         if ($cart === null) {
+            throw new CartNotFoundException('السلة غير متاحة.');
+        }
+
+        $ownedByOther = $cart->customer_identity_id !== null
+            && (! $customerContext->isEstablished() || $customerContext->customerIdentityId() !== $cart->customer_identity_id);
+
+        if ($ownedByOther) {
             throw new CartNotFoundException('السلة غير متاحة.');
         }
 
