@@ -7,6 +7,33 @@ set -euo pipefail
 
 cd /app
 
+# Laravel's generated FileStore, session files, and compiled Blade views all
+# write below these paths. The image prepares them, but re-create and repair
+# ownership at startup as well so a Railway-mounted/reused filesystem cannot
+# turn the first public request into a 500 after a redeploy.
+mkdir -p \
+  storage/framework/cache/data \
+  storage/framework/sessions \
+  storage/framework/testing \
+  storage/framework/views \
+  storage/logs \
+  bootstrap/cache
+chown -R www-data:www-data storage bootstrap/cache
+chmod -R ug+rwX storage bootstrap/cache
+
+for writable_path in \
+  storage/framework/cache/data \
+  storage/framework/sessions \
+  storage/framework/testing \
+  storage/framework/views \
+  storage/logs \
+  bootstrap/cache; do
+  if ! su -s /bin/sh www-data -c "test -w '$writable_path'"; then
+    echo "✗ Laravel runtime path is not writable by www-data: $writable_path"
+    exit 1
+  fi
+done
+
 if [ -z "${APP_KEY:-}" ]; then
   echo "⚠  APP_KEY غير مضبوط — أُولّد مفتاحاً مؤقتاً. للثبات اضبطه في متغيّرات البيئة."
   php artisan key:generate --force

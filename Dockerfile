@@ -21,7 +21,15 @@ ENV COMPOSER_ALLOW_SUPERUSER=1 \
 
 COPY . /core
 RUN bash /core/deploy/assemble.sh /core /app \
-    && chmod -R 775 /app/storage /app/bootstrap/cache
+    && mkdir -p \
+        /app/storage/framework/cache/data \
+        /app/storage/framework/sessions \
+        /app/storage/framework/testing \
+        /app/storage/framework/views \
+        /app/storage/logs \
+        /app/bootstrap/cache \
+    && chown -R www-data:www-data /app/storage /app/bootstrap/cache \
+    && chmod -R ug+rwX /app/storage /app/bootstrap/cache
 
 RUN cp /core/deploy/entrypoint.sh /usr/local/bin/entrypoint.sh \
     && chmod +x /usr/local/bin/entrypoint.sh \
