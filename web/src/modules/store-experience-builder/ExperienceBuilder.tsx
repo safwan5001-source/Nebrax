@@ -498,6 +498,7 @@ export function ExperienceBuilder({
                 config={draft}
                 locale={locale}
                 liveStoreName={liveStoreName}
+                businessIdentity={businessIdentity}
                 onChange={updateDraft}
                 selectedSection={selectedSection}
                 onSelectSection={(id) => handleSelectSection(id, "sidebar")}
@@ -607,6 +608,7 @@ export function ExperienceBuilder({
                   config={draft}
                   locale={locale}
                   liveStoreName={liveStoreName}
+                  businessIdentity={businessIdentity}
                   onChange={updateDraft}
                   selectedSection={selectedSection}
                   onSelectSection={(id) => handleSelectSection(id, "sidebar")}
@@ -617,6 +619,7 @@ export function ExperienceBuilder({
                   config={draft}
                   locale={locale}
                   liveStoreName={liveStoreName}
+                  businessIdentity={businessIdentity}
                   onChange={updateDraft}
                   selectedSection={selectedSection}
                   onSelectSection={(id) => handleSelectSection(id, "sidebar")}

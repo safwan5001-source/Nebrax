@@ -183,4 +183,33 @@ describe('ExperienceBuilder persistence wiring', () => {
 
     expect(screen.queryByText(/Commercial registration/)).toBeNull();
   });
+
+  it('does not expose the legacy CR value as an editable control', async () => {
+    const user = userEvent.setup();
+    render(
+      <ExperienceBuilder
+        initialLocale="en"
+        initialConfig={{
+          ...DEFAULT_PRESENTATION_CONFIG,
+          verification: {
+            ...DEFAULT_PRESENTATION_CONFIG.verification,
+            crNumber: 'legacy-cr-must-not-edit',
+          },
+        }}
+        businessIdentity={{
+          legal_name: 'Al-Noor Company',
+          cr_number: '7050247977',
+          vat_number: null,
+        }}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Verification & trust' }));
+
+    expect(screen.getByText('7050247977')).toBeTruthy();
+    expect(
+      screen.getByRole('link', { name: 'Manage company information' }).getAttribute('href'),
+    ).toBe('/settings');
+    expect(screen.queryByDisplayValue('legacy-cr-must-not-edit')).toBeNull();
+  });
 });
