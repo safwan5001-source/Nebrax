@@ -120,10 +120,15 @@ class PosCustomerPriceListResolver
             $items = $listed->get($id, collect())->keyBy('unit_name');
             $baseUnit = $product->unit;
             $baseItem = $items->get($baseUnit);
+            $basePrice = $baseItem
+                ? (int) $baseItem->price
+                : ($preparedExplicit !== null
+                    ? ($this->preparedExplicit($preparedExplicit, $product, null, $baseUnit) ?? 0)
+                    : (int) $product->sale_price);
             $units = [[
                 'name' => $baseUnit,
                 'factor' => 1,
-                'price' => $baseItem ? (int) $baseItem->price : (int) $product->sale_price,
+                'price' => $basePrice,
             ]];
 
             // لا تظهر الوحدة البديلة إلا حين تملك سعراً صريحاً حقيقياً —
