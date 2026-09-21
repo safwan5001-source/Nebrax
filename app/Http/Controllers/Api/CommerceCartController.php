@@ -38,10 +38,10 @@ final class CommerceCartController extends PublicApiController
 
     public function show(Request $request, CommerceCartService $carts): JsonResponse
     {
-        $lookup = $carts->findByToken($this->tokenFromRequest($request));
+        $lookup = $carts->resolveCurrent($this->tokenFromRequest($request));
         $response = PublicApiResponse::success($request, $carts->serialize($lookup['cart']));
 
-        return $lookup['invalid'] ? $this->clearToken($response) : $response;
+        return $this->applyTokenOutcome($response, $lookup);
     }
 
     public function store(Request $request, CommerceCartService $carts): JsonResponse
@@ -54,7 +54,7 @@ final class CommerceCartController extends PublicApiController
             'quantity' => ['required', 'integer', 'min:1', 'max:2147483647'],
         ]);
 
-        $lookup = $carts->findByToken($this->tokenFromRequest($request));
+        $lookup = $carts->resolveCurrent($this->tokenFromRequest($request));
         if ($lookup['invalid']) {
             return $this->clearToken($this->notFound($request));
         }
@@ -76,7 +76,7 @@ final class CommerceCartController extends PublicApiController
         }
 
         $response = PublicApiResponse::success($request, $result['data'], $result['created'] ? 201 : 200);
-        $this->setToken($response, $result['token'] ?? (string) $this->tokenFromRequest($request));
+        $this->setToken($response, $lookup['rebound'] ?? $result['token'] ?? (string) $this->tokenFromRequest($request));
 
         return $response;
     }
@@ -87,7 +87,7 @@ final class CommerceCartController extends PublicApiController
         $data = $request->validate([
             'quantity' => ['required', 'integer', 'min:1', 'max:2147483647'],
         ]);
-        $lookup = $carts->findByToken($this->tokenFromRequest($request));
+        $lookup = $carts->resolveCurrent($this->tokenFromRequest($request));
         if ($lookup['cart'] === null) {
             $response = $this->notFound($request);
 
@@ -105,7 +105,7 @@ final class CommerceCartController extends PublicApiController
         }
 
         $response = PublicApiResponse::success($request, $data);
-        $this->setToken($response, (string) $this->tokenFromRequest($request));
+        $this->setToken($response, $lookup['rebound'] ?? (string) $this->tokenFromRequest($request));
 
         return $response;
     }
@@ -113,7 +113,7 @@ final class CommerceCartController extends PublicApiController
     public function destroy(Request $request, CommerceCartService $carts): JsonResponse
     {
         $this->rejectUnknown($request, []);
-        $lookup = $carts->findByToken($this->tokenFromRequest($request));
+        $lookup = $carts->resolveCurrent($this->tokenFromRequest($request));
         if ($lookup['cart'] === null) {
             $response = $this->notFound($request);
 
@@ -127,7 +127,7 @@ final class CommerceCartController extends PublicApiController
         }
 
         $response = PublicApiResponse::success($request, $data);
-        $this->setToken($response, (string) $this->tokenFromRequest($request));
+        $this->setToken($response, $lookup['rebound'] ?? (string) $this->tokenFromRequest($request));
 
         return $response;
     }
@@ -158,7 +158,19 @@ final class CommerceCartController extends PublicApiController
     private function notFoundAfterMutation(Request $request, CommerceCartService $carts): JsonResponse
     {
         $response = $this->notFound($request);
-        $lookup = $carts->findByToken($this->tokenFromRequest($request));
+        $lookup = $carts->resolveCurrent($this->tokenFromRequest($request));
+
+        return $this->applyTokenOutcome($response, $lookup);
+    }
+
+    /** @param array{cart: mixed, invalid: bool, rebound: ?string} $lookup */
+    private function applyTokenOutcome(JsonResponse $response, array $lookup): JsonResponse
+    {
+        if ($lookup['rebound'] !== null) {
+            $this->setToken($response, $lookup['rebound']);
+
+            return $response;
+        }
 
         return $lookup['invalid'] ? $this->clearToken($response) : $response;
     }

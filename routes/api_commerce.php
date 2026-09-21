@@ -12,6 +12,7 @@ use App\Http\Middleware\AuthenticateApiClient;
 use App\Http\Middleware\AuthenticateCommerceCustomer;
 use App\Http\Middleware\EnsureActiveSubscription;
 use App\Http\Middleware\EnforcePublicApiRateLimit;
+use App\Http\Middleware\EstablishCommerceCustomerContextIfPresent;
 use App\Http\Middleware\EstablishCustomerContext;
 use App\Http\Middleware\PublicApiRequestAudit;
 use App\Http\Middleware\PublicApiTenantGuard;
@@ -60,6 +61,13 @@ Route::middleware([
     PublicApiRequestAudit::class,
     EnforcePublicApiRateLimit::class . ':' . PublicApiRateLimits::CLASS_READ,
     EnsureActiveSubscription::class,
+    // COM-MOBILE-CART-IDENTITY-1 — established here (group-wide, harmless
+    // no-op for catalog/media/storefront reads that never consult it) so
+    // cart/checkout in this same group resolve the authenticated
+    // customer's cart when a valid X-Customer-Token is presented, while
+    // staying fully guest-compatible when it is absent (see the
+    // middleware's own docblock).
+    EstablishCommerceCustomerContextIfPresent::class,
 ])->group(function () {
     Route::get('storefront', [CommerceStorefrontController::class, 'show'])->name('storefront.show');
 
@@ -115,6 +123,11 @@ Route::middleware([
     PublicApiRequestAudit::class,
     EnforcePublicApiRateLimit::class . ':' . PublicApiRateLimits::CLASS_WRITE,
     EnsureActiveSubscription::class,
+    // COM-MOBILE-CART-IDENTITY-1 — same optional customer context as the
+    // read group above; this is where the actual claim/merge side effect
+    // happens (CommerceCartService::resolveCurrent(), called from every
+    // CommerceCartController action).
+    EstablishCommerceCustomerContextIfPresent::class,
 ])->group(function () {
     Route::post('cart/items', [CommerceCartController::class, 'store'])->name('cart.items.store');
     Route::patch('cart/items/{item}', [CommerceCartController::class, 'update'])->whereUuid('item')->name('cart.items.update');

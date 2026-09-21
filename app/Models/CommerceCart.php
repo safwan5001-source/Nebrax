@@ -17,7 +17,7 @@ class CommerceCart extends BaseModel implements CompanyWide
     public const STATUS_CONSUMED = 'consumed';
 
     protected $fillable = [
-        'tenant_id', 'storefront_id', 'sales_channel_id', 'token_hash', 'status', 'expires_at',
+        'tenant_id', 'storefront_id', 'sales_channel_id', 'customer_identity_id', 'token_hash', 'status', 'expires_at',
     ];
 
     protected $hidden = ['token_hash'];
@@ -34,6 +34,17 @@ class CommerceCart extends BaseModel implements CompanyWide
     public function salesChannel(): BelongsTo
     {
         return $this->belongsTo(SalesChannel::class);
+    }
+
+    /**
+     * COM-MOBILE-CART-IDENTITY-1 (ADR-07) — `null` for a guest cart never
+     * claimed/merged into an authenticated customer. Source is always
+     * `App\Tenancy\CustomerContext::customerIdentityId()`, written only by
+     * `CommerceCartService::add()`/`resolveCurrent()` — never client input.
+     */
+    public function customerIdentity(): BelongsTo
+    {
+        return $this->belongsTo(CustomerIdentity::class);
     }
 
     public function items(): HasMany

@@ -12,6 +12,7 @@ use App\Models\Tenant;
 use App\Models\UnitTemplateUnit;
 use App\Support\DocumentLineVariantResolver;
 use App\Tenancy\BranchScope;
+use App\Tenancy\CustomerContext;
 use App\Tenancy\StorefrontContext;
 use App\Tenancy\TenantContext;
 use Illuminate\Support\Facades\DB;
@@ -95,6 +96,125 @@ final class CommerceCartService
         return ['cart' => $cart, 'invalid' => false];
     }
 
+    /**
+     * COM-MOBILE-CART-IDENTITY-1 (ADR-07) — the customer-aware counterpart
+     * to `findByToken()`. When no `CustomerContext` is established, this is
+     * `findByToken()` verbatim (guest behaviour is 100% unchanged). When a
+     * customer is authenticated, it resolves — and claims/merges as a
+     * side effect — the single cart that customer owns:
+     *
+     *  - a presented guest cart + no existing customer cart → **claim**:
+     *    the guest cart becomes the customer's outright, same token still
+     *    resolves it (no rotation needed);
+     *  - a presented guest cart + an existing customer cart → **merge**:
+     *    every guest line is folded into the customer's cart via `add()`'s
+     *    own existing quantity-sum-on-duplicate-line semantics (a line no
+     *    longer purchasable is dropped, not merged, so a stale line can
+     *    never block sign-in), then the guest cart becomes terminal
+     *    (`STATUS_CONSUMED`, never mergeable again — replaying the same
+     *    guest token afterward finds nothing to merge: idempotent by
+     *    construction, not by a separate replay-key mechanism);
+     *  - no presented guest cart, existing customer cart, non-matching or
+     *    absent token → the customer's cart is returned with a **freshly
+     *    minted, rebound token** (`$rebound`) so the caller can keep using
+     *    this session's cart with subsequent requests — this is what makes
+     *    multi-device login share one cart (ADR-07 §8) and what lets
+     *    `/commerce/v1` checkout keep resolving via its own unmodified
+     *    `X-Cart-Token`-based lookups without any changes to
+     *    `CommerceCheckoutService`;
+     *  - neither exists yet → `cart: null`; the next `add()` call creates
+     *    one already tagged with the customer's identity (see `add()`).
+     *
+     * No price is frozen or copied here — `serialize()`/checkout's own
+     * `revalidateAndPrice()` remain the sole pricing/availability authority
+     * for the resulting cart, exactly as for a guest cart.
+     *
+     * @return array{cart: ?CommerceCart, invalid: bool, rebound: ?string}
+     */
+    public function resolveCurrent(?string $guestToken): array
+    {
+        $customerContext = app(CustomerContext::class);
+        if (! $customerContext->isEstablished()) {
+            $lookup = $this->findByToken($guestToken);
+
+            return ['cart' => $lookup['cart'], 'invalid' => $lookup['invalid'], 'rebound' => null];
+        }
+
+        return DB::transaction(function () use ($guestToken, $customerContext): array {
+            $context = $this->context();
+            $customerId = $customerContext->customerIdentityId();
+
+            $guestCart = ($guestToken !== null && $guestToken !== '')
+                ? $this->scopeToContext(CommerceCart::query(), $context)
+                    ->where('token_hash', hash('sha256', $guestToken))
+                    ->where('status', CommerceCart::STATUS_ACTIVE)
+                    ->whereNull('customer_identity_id')
+                    ->where('expires_at', '>', now())
+                    ->lockForUpdate()
+                    ->first()
+                : null;
+
+            $customerCart = $this->scopeToContext(CommerceCart::query(), $context)
+                ->where('customer_identity_id', $customerId)
+                ->where('status', CommerceCart::STATUS_ACTIVE)
+                ->lockForUpdate()
+                ->first();
+
+            if ($guestCart !== null && $customerCart === null) {
+                $guestCart->update([
+                    'customer_identity_id' => $customerId,
+                    'expires_at' => now()->addDays(self::LIFETIME_DAYS),
+                ]);
+
+                return ['cart' => $guestCart, 'invalid' => false, 'rebound' => null];
+            }
+
+            if ($guestCart !== null && $customerCart !== null) {
+                foreach ($guestCart->items()->get() as $item) {
+                    if ($item->product_id === null) {
+                        continue;
+                    }
+
+                    try {
+                        $this->add($customerCart, $item->product_id, $item->unit_key, $item->quantity, $item->product_variant_id);
+                    } catch (RuntimeException) {
+                        // No longer purchasable — dropped, not merged. A
+                        // stale guest line must never block sign-in.
+                    }
+                }
+
+                $guestCart->update(['status' => CommerceCart::STATUS_CONSUMED]);
+
+                return [
+                    'cart' => $customerCart->fresh(),
+                    'invalid' => false,
+                    'rebound' => $this->rebindToken($customerCart),
+                ];
+            }
+
+            if ($customerCart !== null) {
+                $alreadyBound = $guestToken !== null && $guestToken !== ''
+                    && hash_equals($customerCart->token_hash, hash('sha256', $guestToken));
+
+                return [
+                    'cart' => $customerCart,
+                    'invalid' => false,
+                    'rebound' => $alreadyBound ? null : $this->rebindToken($customerCart),
+                ];
+            }
+
+            return ['cart' => null, 'invalid' => false, 'rebound' => null];
+        }, 3);
+    }
+
+    private function rebindToken(CommerceCart $cart): string
+    {
+        $rawToken = $this->newToken();
+        $cart->update(['token_hash' => hash('sha256', $rawToken)]);
+
+        return $rawToken;
+    }
+
     /** @return array{cart: CommerceCart, token: ?string, created: bool, data: array<string, mixed>} */
     public function add(?CommerceCart $knownCart, string $productId, string $unitKey, int $quantity, ?string $variantId = null): array
     {
@@ -106,9 +226,17 @@ final class CommerceCartService
 
             if ($knownCart === null) {
                 $rawToken = $this->newToken();
+                $customerContext = app(CustomerContext::class);
                 $cart = CommerceCart::create([
                     'storefront_id' => $context->hasStorefront() ? $context->storefrontId() : null,
                     'sales_channel_id' => $context->salesChannelId(),
+                    // COM-MOBILE-CART-IDENTITY-1: a brand-new cart created
+                    // while an authenticated customer's context is already
+                    // established is theirs from the start — null for every
+                    // guest, exactly as CommerceOrder's own column works.
+                    'customer_identity_id' => $customerContext->isEstablished()
+                        ? $customerContext->customerIdentityId()
+                        : null,
                     'token_hash' => hash('sha256', $rawToken),
                     'expires_at' => now()->addDays(self::LIFETIME_DAYS),
                 ]);
