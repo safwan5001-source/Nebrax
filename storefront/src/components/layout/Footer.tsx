@@ -3,6 +3,7 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { getTranslations } from "next-intl/server";
 import type { ReactNode } from "react";
+import { SbcSeal } from "@/components/layout/SbcSeal";
 import { StoreBrand } from "@/components/layout/StoreBrand";
 import { StoreContainer } from "@/components/layout/StoreContainer";
 import { POLICY_LINKS } from "@/lib/constants/policies";
@@ -19,6 +20,7 @@ interface FooterProps {
     vat_number: string | null;
   };
   showSbc?: boolean;
+  sbcSealToken?: string;
   logoUrl?: string | null;
   showLogo?: boolean;
   tagline?: string;
@@ -105,6 +107,7 @@ export async function Footer({
   storeName,
   businessIdentity = { legal_name: null, cr_number: null, vat_number: null },
   showSbc = false,
+  sbcSealToken = "",
   logoUrl = null,
   showLogo = true,
   tagline = "",
@@ -289,9 +292,13 @@ export async function Footer({
             ) : null}
             {showSbc ? (
               <div className="mt-4 border-t border-store-footer-border pt-4">
-                <p className="font-medium text-store-footer-link">
-                  {t("sbcVerified")}
-                </p>
+                {sbcSealToken.trim() ? (
+                  <SbcSeal token={sbcSealToken} />
+                ) : (
+                  <p className="font-medium text-store-footer-link">
+                    {t("sbcVerified")}
+                  </p>
+                )}
               </div>
             ) : null}
           </div>

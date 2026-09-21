@@ -175,6 +175,7 @@ final class StorefrontPresentationNormalizer
             ],
             'sbc' => [
                 'authentication_number' => '',
+                'seal_token' => '',
                 'show_in_storefront' => false,
             ],
             'apps' => [
@@ -303,6 +304,7 @@ final class StorefrontPresentationNormalizer
             ],
             'sbc' => [
                 'authentication_number' => trim($this->asString($sbcRaw['authentication_number'] ?? null)),
+                'seal_token' => trim($this->asString($sbcRaw['seal_token'] ?? null)),
                 'show_in_storefront' => $this->asBoolean($sbcRaw['show_in_storefront'] ?? null, false),
             ],
             'apps' => [

@@ -18,6 +18,7 @@ import {
 } from "./presentation/section-content";
 import { buildWhatsAppUrl, sanitizeExternalUrl } from "./presentation/urls";
 import { cn } from "@/lib/utils";
+import { SbcSeal } from "./SbcSeal";
 import {
   customizerMessage,
   type CustomizerLocale,
@@ -738,9 +739,13 @@ export function StorefrontPreviewCanvas({
               ) : null}
               {config.sbc.show_in_storefront ? (
                 <div className="mt-4 border-t border-store-footer-border pt-4">
-                  <p className="font-medium text-store-footer-link">
-                    {t("sbcVerified")}
-                  </p>
+                  {config.sbc.seal_token.trim() ? (
+                    <SbcSeal token={config.sbc.seal_token} />
+                  ) : (
+                    <p className="font-medium text-store-footer-link">
+                      {t("sbcVerified")}
+                    </p>
+                  )}
                 </div>
               ) : null}
             </div>

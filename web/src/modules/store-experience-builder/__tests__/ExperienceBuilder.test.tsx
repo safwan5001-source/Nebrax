@@ -177,9 +177,13 @@ describe('ExperienceBuilder persistence wiring', () => {
     await user.type(input, ' 00123 456 ');
 
     expect((input as HTMLInputElement).value).toBe(' 00123 456 ');
+    const sealTokenInput = screen.getAllByRole('textbox')[1];
+    await user.type(sealTokenInput, ' token=Opaque+/ ');
+    expect((sealTokenInput as HTMLInputElement).value).toBe(' token=Opaque+/ ');
     await user.click(screen.getByRole('button', { name: 'Save draft' }));
     await waitFor(() => expect(saveMock).toHaveBeenCalled());
     expect(saveMock.mock.calls[0][1].sbc.authentication_number).toBe('00123 456');
+    expect(saveMock.mock.calls[0][1].sbc.seal_token).toBe('token=Opaque+/');
   });
 
   it('reloads on 409 instead of merging or claiming success', async () => {

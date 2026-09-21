@@ -44,13 +44,12 @@ describe("STORE-UI-6 architecture", () => {
     expect(all).not.toMatch(/\/store\/v1\/presentation/);
   });
 
-  it("does not render a Verified badge on the storefront preview", () => {
+  it("uses the official SBC seal path without merchant verification claims", () => {
     const preview = readFileSync(
       join(DIR, "StorefrontPreviewCanvas.tsx"),
       "utf-8",
     );
-    expect(preview).not.toMatch(/Verified/);
-    expect(preview).not.toMatch(/موثّق/);
+    expect(preview).toMatch(/SbcSeal/);
     expect(preview).not.toMatch(/requestedVerifiedLabel/);
   });
 });

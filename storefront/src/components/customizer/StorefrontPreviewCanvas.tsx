@@ -9,6 +9,7 @@ import {
   User,
 } from "lucide-react";
 import type { CSSProperties, ReactNode } from "react";
+import { SbcSeal } from "@/components/layout/SbcSeal";
 import { StoreBrand } from "@/components/layout/StoreBrand";
 import { storeContainerClassName } from "@/components/layout/StoreContainer";
 import { categoryAccent } from "@/lib/home/category-accent";
@@ -434,7 +435,8 @@ export function StorefrontPreviewCanvas({
             config.contact.hours ||
             enabledSocial.length > 0 ||
             config.verification.crNumber.trim() ||
-            config.verification.licenseNumber.trim()) && (
+            config.verification.licenseNumber.trim() ||
+            config.sbc.show_in_storefront) && (
             <div className="mt-8 border-t border-store-footer-border pt-6 text-sm text-store-footer-muted">
               {config.contact.phone ? <p>{config.contact.phone}</p> : null}
               {config.contact.email ? <p>{config.contact.email}</p> : null}
@@ -471,6 +473,17 @@ export function StorefrontPreviewCanvas({
                   ) : null}
                 </div>
               )}
+              {config.sbc.show_in_storefront ? (
+                <div className="mt-4 border-t border-store-footer-border pt-4">
+                  {config.sbc.seal_token.trim() ? (
+                    <SbcSeal token={config.sbc.seal_token} />
+                  ) : (
+                    <p className="font-medium text-store-footer-link">
+                      {t("sbcVerified")}
+                    </p>
+                  )}
+                </div>
+              ) : null}
             </div>
           )}
         </div>

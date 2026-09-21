@@ -60,6 +60,9 @@ export const CUSTOMIZER_MESSAGES = {
     sbcAuthenticationNumber: "رقم توثيق منصة الأعمال",
     sbcAuthenticationHint:
       "يُحفظ كنص كما أُدخل مع الحفاظ على الأصفار في بدايته.",
+    sbcSealToken: "رمز ختم منصة الأعمال",
+    sbcSealTokenHint:
+      "من منصة الأعمال، افتح شهادة توثيق التجارة الإلكترونية، اختر «إضافة ختم QR»، ثم انسخ رمز الختم من الكود المقدم.",
     sbcShowInStorefront: "إظهار توثيق منصة الأعمال في المتجر",
     sbcVerified: "موثّق في منصة الأعمال",
     appsIntro: "روابط المتاجر العامة. بدون رابط صالح لا يظهر القسم.",
@@ -306,6 +309,9 @@ export const CUSTOMIZER_MESSAGES = {
     sbcAuthenticationNumber: "Saudi Business Center authentication number",
     sbcAuthenticationHint:
       "Stored as entered text, including leading zeros.",
+    sbcSealToken: "Saudi Business Center seal token",
+    sbcSealTokenHint:
+      "In the Business Platform, open the e-commerce authentication certificate, choose “Add QR Seal”, then copy the seal token from the provided code.",
     sbcShowInStorefront: "Show Saudi Business Center in the storefront",
     sbcVerified: "Verified in Saudi Business Center",
     appsIntro:

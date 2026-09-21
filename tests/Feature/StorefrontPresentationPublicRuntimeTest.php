@@ -162,6 +162,45 @@ class StorefrontPresentationPublicRuntimeTest extends TestCase
     }
 
     /** @test */
+    public function public_runtime_exposes_only_the_resolved_store_seal_token_and_never_authentication_number(): void
+    {
+        $a = $this->registerTenant('pres-seal-a', 'owner@pres-seal-a.test');
+        $b = $this->registerTenant('pres-seal-b', 'owner@pres-seal-b.test');
+        $storeA = $this->seedPublicStore($a['tenant_id'], 'seal-a.example.com');
+        $storeB = $this->seedPublicStore($b['tenant_id'], 'seal-b.example.com');
+
+        foreach ([[$a, $storeA, 'seal-a.example.com', 'token-a'], [$b, $storeB, 'seal-b.example.com', 'token-b']] as [$auth, $store, $host, $token]) {
+            $this->withToken($auth['token'])
+                ->putJson($this->workspacePath($store['storefront']->id), [
+                    'config' => [
+                        'sbc' => [
+                            'authentication_number' => 'private-'.$token,
+                            'seal_token' => ' '.$token.' ',
+                            'show_in_storefront' => true,
+                        ],
+                    ],
+                    'draft_revision' => 0,
+                ])
+                ->assertOk();
+            $this->withToken($auth['token'])
+                ->postJson($this->workspacePath($store['storefront']->id).'/publish')
+                ->assertOk();
+        }
+
+        $publicA = $this->getJson('http://seal-a.example.com/store/v1/storefront')->assertOk();
+        $publicB = $this->getJson('http://seal-b.example.com/store/v1/storefront')->assertOk();
+
+        $this->assertSame('token-a', $publicA->json('data.presentation.sbc.seal_token'));
+        $this->assertSame('token-b', $publicB->json('data.presentation.sbc.seal_token'));
+        $this->assertSame('', $publicA->json('data.presentation.sbc.authentication_number'));
+        $this->assertSame('', $publicB->json('data.presentation.sbc.authentication_number'));
+        $this->assertStringNotContainsString('private-token-a', $publicA->getContent());
+        $this->assertStringNotContainsString('private-token-b', $publicB->getContent());
+        $this->assertStringNotContainsString('token-b', $publicA->getContent());
+        $this->assertStringNotContainsString('token-a', $publicB->getContent());
+    }
+
+    /** @test */
     public function host_isolation_never_returns_another_tenants_published_presentation(): void
     {
         $a = $this->registerTenant('pres-host-a', 'owner@pres-host-a.test');

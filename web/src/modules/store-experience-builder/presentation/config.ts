@@ -136,6 +136,7 @@ export interface StorefrontPresentationConfig {
   };
   sbc: {
     authentication_number: string;
+    seal_token: string;
     show_in_storefront: boolean;
   };
   apps: {
@@ -240,6 +241,7 @@ export const DEFAULT_PRESENTATION_CONFIG: StorefrontPresentationConfig = {
   },
   sbc: {
     authentication_number: "",
+    seal_token: "",
     show_in_storefront: false,
   },
   apps: {
@@ -510,6 +512,7 @@ export function normalizePresentationConfig(
     },
     sbc: {
       authentication_number: asString(sbcRaw.authentication_number).trim(),
+      seal_token: asString(sbcRaw.seal_token).trim(),
       show_in_storefront: asBoolean(sbcRaw.show_in_storefront, false),
     },
     apps: {

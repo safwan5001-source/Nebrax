@@ -90,6 +90,8 @@ export function ExperienceBuilder({
 
   function updateDraft(next: StorefrontPresentationConfig) {
     const normalized = normalizePresentationConfig(next);
+    normalized.sbc.authentication_number = next.sbc.authentication_number;
+    normalized.sbc.seal_token = next.sbc.seal_token;
     setDraft(normalized);
     setLifecycle("dirty");
     setNotice(null);
