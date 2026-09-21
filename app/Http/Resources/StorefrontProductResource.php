@@ -91,17 +91,7 @@ class StorefrontProductResource extends JsonResource
      */
     public static function mediaPayload(iterable $items, ?string $tenantSlug): array
     {
-        $out = [];
-        foreach ($items as $item) {
-            $out[] = [
-                'id' => $item->id,
-                'url' => self::buildMediaUrl($item->id, $tenantSlug),
-                'alt' => $item->original_name,
-                'position' => $item->sort_order,
-            ];
-        }
-
-        return $out;
+        return self::buildPayload($items, fn (string $id) => self::buildMediaUrl($id, $tenantSlug));
     }
 
     public static function buildMediaUrl(string $mediaId, ?string $tenantSlug): string
@@ -115,5 +105,45 @@ class StorefrontProductResource extends JsonResource
         return RouteFacade::has('storefront.v1.media.show')
             ? route('storefront.v1.media.show', ['id' => $mediaId])
             : "/store/v1/media/{$mediaId}";
+    }
+
+    /**
+     * COM-MOBILE-MEDIA-1 — نظير `mediaPayload()` لحدّ ثقة `/commerce/v1`
+     * الموثوق (bearer + قناة جوال محلولة، لا شريحة/نطاق متجر) — يبنيه
+     * `CommerceProductController`. لا `tenantSlug` هنا أصلاً: المسار الموثوق
+     * يحسم المستأجر من عميل الـ API، لا من الرابط.
+     *
+     * @param  iterable<\App\Models\ProductMedia>  $items
+     * @return array<int, array{id:string,url:string,alt:?string,position:?int}>
+     */
+    public static function commerceMediaPayload(iterable $items): array
+    {
+        return self::buildPayload($items, fn (string $id) => self::buildCommerceMediaUrl($id));
+    }
+
+    public static function buildCommerceMediaUrl(string $mediaId): string
+    {
+        return RouteFacade::has('commerce.v1.media.show')
+            ? route('commerce.v1.media.show', ['id' => $mediaId])
+            : "/commerce/v1/media/{$mediaId}";
+    }
+
+    /**
+     * @param  iterable<\App\Models\ProductMedia>  $items
+     * @return array<int, array{id:string,url:string,alt:?string,position:?int}>
+     */
+    private static function buildPayload(iterable $items, callable $urlBuilder): array
+    {
+        $out = [];
+        foreach ($items as $item) {
+            $out[] = [
+                'id' => $item->id,
+                'url' => $urlBuilder($item->id),
+                'alt' => $item->original_name,
+                'position' => $item->sort_order,
+            ];
+        }
+
+        return $out;
     }
 }

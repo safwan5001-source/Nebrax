@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\CommerceCartController;
 use App\Http\Controllers\Api\CommerceCategoryController;
 use App\Http\Controllers\Api\CommerceCheckoutController;
+use App\Http\Controllers\Api\CommerceMediaController;
 use App\Http\Controllers\Api\CommerceOrderController;
 use App\Http\Controllers\Api\CommerceProductController;
 use App\Http\Controllers\Api\CommerceStorefrontController;
@@ -68,6 +69,13 @@ Route::middleware([
 
     Route::get('products', [CommerceProductController::class, 'index'])->name('products.index');
     Route::get('products/{id}', [CommerceProductController::class, 'show'])->whereUuid('id')->name('products.show');
+
+    // COM-MOBILE-MEDIA-1 — mobile-authorized product media, reusing the exact
+    // ProductMedia storage/tenant authority `/store/v1/media/{id}` already
+    // hardens (see CommerceMediaController's own docblock). Gated by
+    // CommerceListing publication on the resolved *mobile* channel, never a
+    // client-supplied channel id.
+    Route::get('media/{id}', [CommerceMediaController::class, 'show'])->whereUuid('id')->name('media.show');
 
     // PR-3 — guest cart read. Reuses CommerceCartService in full; identity is
     // the X-Cart-Token header (see CommerceCartController's own docblock),

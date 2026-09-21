@@ -36,7 +36,7 @@ Authorization:
 
 | Order | Task ID | Status | Risk | Depends on | Outcome |
 |---|---|---|---|---|---|
-| 1 | COM-MOBILE-MEDIA-1 | ready | high | accepted readiness contract | Mobile-authorized product media |
+| 1 | COM-MOBILE-MEDIA-1 | review | high | accepted readiness contract | Mobile-authorized product media |
 | 2 | COM-MOBILE-VARIANTS-1 | backlog | high | media/readiness as applicable | Variant/options/UOM mobile contract |
 | 3 | COM-MOBILE-AUTH-1 | backlog | critical | identity architecture decision/readiness | Customer mobile auth + profile |
 | 4 | COM-MOBILE-CART-IDENTITY-1 | backlog | critical | COM-MOBILE-AUTH-1 | Guest → authenticated cart transition |

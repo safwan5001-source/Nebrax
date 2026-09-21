@@ -163,6 +163,41 @@ class StorefrontCatalogApiTest extends TestCase
         );
     }
 
+    /** @test */
+    public function document_backed_media_the_real_upload_path_is_served_correctly(): void
+    {
+        // `disk = 'document'` هو ما يكتبه `ProductMediaService::store()` فعلياً
+        // لكل وسائط منتجٍ مرفوعة عبر المسار القياسي — `'local'` أعلاه يحاكي
+        // سجلاً قديماً توافقياً فقط. اكتُشف أثناء بناء نظير `/commerce/v1`
+        // (COM-MOBILE-MEDIA-1): `Storage::disk('document')` المباشر يفشل، لأن
+        // القرص الفعلي يُحسم ديناميكياً عبر `DocumentStorageService` فقط.
+        config()->set('document_center.storage.driver', 'local');
+        config()->set('document_center.storage.disk', 'local');
+        Storage::fake('local');
+        ['tenant' => $tenant, 'channel' => $channel] = $this->seedStore('document-disk');
+        $product = $this->publishedProduct($tenant, $channel);
+
+        app(TenantContext::class)->set($tenant->id);
+        $path = "product-media/{$tenant->id}/{$product->id}/mango.webp";
+        Storage::disk('local')->put($path, 'image-bytes');
+        $media = ProductMedia::create([
+            'product_id' => $product->id,
+            'disk' => 'document',
+            'path' => $path,
+            'original_name' => 'IMG_9001.webp',
+            'mime_type' => 'image/webp',
+            'size' => 11,
+            'sort_order' => 0,
+        ]);
+        app(TenantContext::class)->forget();
+
+        $response = $this->get("/store/v1/{$tenant->slug}/media/{$media->id}")
+            ->assertOk()
+            ->assertHeader('Content-Type', 'image/webp');
+
+        $this->assertSame('image-bytes', $response->streamedContent());
+    }
+
     // ── 3. Unknown/invalid store context ────────────────────────────────
 
     /** @test */

@@ -4,7 +4,7 @@
 
 LAST_UPDATED: 2026-09-20
 LAYER_VERSION: V1
-STATUS: READY_FOR_EXECUTION
+STATUS: EXECUTING
 
 ## Current objective
 
@@ -17,6 +17,7 @@ Execute the first bounded autonomous-engineering horizon: close the Commerce Mob
 - The new `docs/autonomous-engineering/` layer is additive. It does not erase historical orchestration evidence.
 - PR #887 (App Builder architecture + Commerce Mobile API readiness) is merged and post-merge reviewed; Merge SHA: `f43a8e0db36952f3007557fc127c3a6a28de0700`.
 - PR #890 (Autonomous Engineering V1) is merged and post-merge reviewed; Merge SHA: `587ed50c152450ee8c354486648a75f31a3d24a6`.
+- `COM-MOBILE-MEDIA-1` (mobile-authorized product media, `/commerce/v1/media/{id}`) is implemented on branch `claude/autonomous-engineering-bootstrap-fo0mvj`, tests green on SQLite and PostgreSQL; PR pending. See `docs/plans/commerce/COM-MOBILE-MEDIA-1-IMPLEMENTATION-REPORT.md`.
 
 ## Current execution horizon
 
