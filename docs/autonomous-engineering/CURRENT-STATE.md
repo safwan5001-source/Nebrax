@@ -29,7 +29,10 @@ Execute the first bounded autonomous-engineering horizon: close the Commerce Mob
 - First executable task: `COM-MOBILE-MEDIA-1` — **done**.
 - Second executable task: `COM-MOBILE-VARIANTS-1` — **done**.
 - Third executable task: `COM-MOBILE-AUTH-1` — **done**.
-- Fourth/fifth candidates: `COM-MOBILE-CART-IDENTITY-1` and `COM-MOBILE-CUSTOMER-1`, both depending on `COM-MOBILE-AUTH-1` (now `done`) — evaluable for promotion to `ready` from current-`main` evidence.
+- Fourth/fifth candidates evaluated and found **not ready** — both moved to `decision_required`:
+  - `COM-MOBILE-CART-IDENTITY-1` (guest → customer cart transition): `docs/plans/store/COMMERCE_MOBILE_API_READINESS.md` §12 explicitly requires a cart-merge policy decision (claim vs. merge, conflict/quantity behavior, pricing/revalidation, abandoned-cart handling, logout/multi-device behavior) that `COM-MOBILE-AUTH-1` did not and could not resolve.
+  - `COM-MOBILE-CUSTOMER-1` (addresses + order history): blocked by ADR-05 §13/§22's explicit Commerce Address schema non-decision; its order-history half is comparatively evidence-ready but the task is currently scoped as one bundled unit.
+  - No other queue candidate is independently ready — all remaining items trace back to these same two open decisions or to unconfirmed V1 scope. This is a genuine Decision Escalation, not an evidence gap — see `TASK-QUEUE.md` for the full evaluation delivered to Safwan.
 - Implementation merge: standing authority after mandatory final-head pre-merge review, required green CI, no unresolved Decision Gate, and mandatory post-merge review.
 - Deploy / production release / destructive production operation: not authorized without Safwan's explicit approval.
 
