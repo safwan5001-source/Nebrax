@@ -12,6 +12,7 @@ use App\Services\Commerce\CommercePriceResolver;
 use App\Services\Commerce\FulfillmentPolicyNotConfiguredException;
 use App\Services\Commerce\FulfillmentPolicyService;
 use App\Services\ProductMediaGalleryService;
+use App\Support\DocumentLineVariantResolver;
 use App\Support\PublicApiResponse;
 use App\Tenancy\BranchScope;
 use App\Tenancy\StorefrontContext;
@@ -36,28 +37,34 @@ use Illuminate\Http\Request;
  * already respects whatever channel is resolved — it was never hardcoded to
  * `SalesChannel::TYPE_WEB` in the first place.
  *
- * **Variants deliberately deferred** — mirrors `/store/v1`'s own existing
- * list-row convention for a variant-managed product (`is_variant_managed:
- * true`, no price, no variant/option payload) for both list and detail here.
- * `CommercePriceResolver`/`AvailableToSellService` gained variant-awareness
- * since this doc section was written (VAR-COM-1), but building the actual
- * variant contract for `/commerce/v1` (attributes, per-variant price/stock)
- * is real, non-trivial new surface — out of PR-2's explicit scope, not
- * silently invented here. `AvailableToSellService::forWarehouse()` reading
- * `product_variant_id IS NULL` on a variant-managed parent would silently
- * return zero stock (a *wrong* signal, not "no stock") — never called for
- * such a product; `in_stock` stays `null` (unknown), not a fabricated
- * `false`.
+ * **Variants (COM-MOBILE-VARIANTS-1)** — `index()` keeps `/store/v1`'s own
+ * list-row convention for a variant-managed product unchanged
+ * (`is_variant_managed: true`, no ambiguous parent price/stock, no
+ * variant/option payload — resolving every variant's price/stock for a full
+ * paginated page would be real N+1 for no listing benefit, exactly why
+ * `/store/v1`'s own list never does it either). `show()` now mirrors
+ * `StorefrontProductController::show()`'s already-shipped variant branch:
+ * `options` (attribute/value definitions) and `variants` (id, sku,
+ * descriptor, option_value_ids, price, in_stock, media) — no new pricing,
+ * availability, or variant-identity logic; `CommercePriceResolver::resolve()`
+ * and `AvailableToSellService::forWarehouse()` already accept `$variantId`
+ * (VAR-COM-1), and `CommerceCartController::store()` already forwards
+ * `product_variant_id` to the shared `CommerceCartService` — this only
+ * closes the read-side gap of exposing what a client needs to select a
+ * variant before adding it to cart. `AvailableToSellService::forWarehouse()`
+ * is still never called with `variantId=null` on a variant-managed parent
+ * (would silently return a *wrong* zero-stock signal, not "no stock").
  *
  * **Media (COM-MOBILE-MEDIA-1)** — reuses `ProductMediaGalleryService` (the
  * single gallery-resolution authority, VAR-MEDIA-1) and
  * `StorefrontProductResource::commerceMediaPayload()` to link each item to
  * `/commerce/v1/media/{id}` (`CommerceMediaController`), which re-applies the
  * exact same channel-publication check this controller already performs — no
- * parallel media storage/authority. Only the product-level shared gallery is
- * wired here: a variant-managed product's per-variant media stays deferred
- * with the rest of the variant contract (see the variant note above) rather
- * than silently inventing a `/commerce/v1` variant/media shape out of scope.
+ * parallel media storage/authority. The product-level shared gallery is wired
+ * into every product; a variant-managed product's `show()` additionally
+ * resolves each variant's own media via `resolveGallery($product, $variant)`
+ * (COM-MOBILE-VARIANTS-1) — the same three-layer algorithm
+ * `ProductMediaGalleryService` already applies for `/store/v1` and POS.
  */
 class CommerceProductController extends PublicApiController
 {
@@ -203,7 +210,11 @@ class CommerceProductController extends PublicApiController
         bool $detailed,
     ): array {
         if ($product->isVariantManaged()) {
-            // Deferred (see class docblock): no ambiguous parent price/stock.
+            if ($detailed) {
+                return $this->variantResource($request, $product, $channelId, $currency, $warehouse, $prices, $availability, $gallery);
+            }
+
+            // List row deferred (see class docblock): no ambiguous parent price/stock.
             $price = 0;
             $inStock = null;
         } else {
@@ -221,5 +232,84 @@ class CommerceProductController extends PublicApiController
         $galleryMedia = StorefrontProductResource::commerceMediaPayload($gallery->resolveGallery($product));
 
         return (new StorefrontProductResource($product, $price, $currency, $inStock, $detailed, null, $galleryMedia))->resolve($request);
+    }
+
+    /**
+     * COM-MOBILE-VARIANTS-1 — mirrors `StorefrontProductController::show()`'s
+     * variant-managed branch exactly (same authorities, same shape), adapted
+     * for the mobile trust boundary (`commerceMediaPayload()`, no
+     * `tenantSlug`). No ambiguous parent price/stock: price/availability are
+     * resolved per active variant only.
+     */
+    private function variantResource(
+        Request $request,
+        Product $product,
+        string $channelId,
+        string $currency,
+        $warehouse,
+        CommercePriceResolver $prices,
+        AvailableToSellService $availability,
+        ProductMediaGalleryService $gallery,
+    ): array {
+        $activeVariants = $product->variants()
+            ->where('is_active', true)
+            ->with('optionValues.option')
+            ->get();
+
+        $variantPayload = [];
+        $cheapest = null;
+        $anyInStock = null;
+        foreach ($activeVariants as $variant) {
+            $variantPrice = $prices->resolve($product->id, $channelId, null, null, false, $variant->id);
+            if ($variantPrice->amount !== null && ($cheapest === null || $variantPrice->amount < $cheapest)) {
+                $cheapest = $variantPrice->amount;
+            }
+
+            $variantInStock = null;
+            if ($warehouse !== null) {
+                $variantInStock = $availability->forWarehouse($product->id, $warehouse->id, $variant->id)->availableToSell > 0;
+                $anyInStock = $anyInStock === true || $variantInStock === true;
+            }
+
+            $optionValueIds = $variant->optionValues()->with('option')->get()
+                ->sortBy(fn ($value) => [(int) ($value->option->sort_order ?? 0), (int) $value->sort_order])
+                ->pluck('id')->values()->all();
+
+            $variantPayload[] = [
+                'id' => $variant->id,
+                'sku' => $variant->sku,
+                'descriptor' => DocumentLineVariantResolver::descriptor($variant),
+                'option_value_ids' => $optionValueIds,
+                'price' => ['amount_minor' => $variantPrice->amount ?? 0, 'currency' => $currency],
+                'in_stock' => $variantInStock,
+                'media' => StorefrontProductResource::commerceMediaPayload($gallery->resolveGallery($product, $variant)),
+            ];
+        }
+
+        $optionsPayload = $product->options()->where('is_active', true)->with('values')->get()
+            ->map(fn ($option) => [
+                'id' => $option->id,
+                'name' => $option->name,
+                'name_en' => $option->name_en,
+                'values' => $option->values->where('is_active', true)->values()->map(fn ($value) => [
+                    'id' => $value->id,
+                    'value' => $value->value,
+                    'value_en' => $value->value_en,
+                ])->all(),
+            ])->all();
+
+        $galleryMedia = StorefrontProductResource::commerceMediaPayload($gallery->resolveGallery($product));
+
+        return (new StorefrontProductResource(
+            $product,
+            $cheapest ?? 0,
+            $currency,
+            $anyInStock,
+            true,
+            null,
+            $galleryMedia,
+            $optionsPayload,
+            $variantPayload,
+        ))->resolve($request);
     }
 }
