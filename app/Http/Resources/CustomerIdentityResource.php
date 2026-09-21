@@ -17,6 +17,7 @@ class CustomerIdentityResource extends JsonResource
             'email' => $this->email,
             'phone' => $this->phone,
             'email_verified' => $this->email_verified_at !== null,
+            'phone_verified' => $this->phone_verified_at !== null,
             'is_active' => $this->is_active,
             'last_login_at' => $this->last_login_at?->toIso8601String(),
         ];

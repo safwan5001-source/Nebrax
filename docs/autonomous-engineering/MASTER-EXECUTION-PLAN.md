@@ -200,6 +200,57 @@ contract — neither `/store/v1` nor `/commerce/v1` expose selectable `unit_key`
 prices beyond a variant's base unit, even though both cart endpoints already accept
 `unit_key`. Needs a deliberate cross-boundary contract-design decision.
 
+## Third task
+
+```yaml
+id: COM-MOBILE-AUTH-1
+title: Customer mobile auth + profile
+domain: commerce
+status: review
+risk: critical
+depends_on:
+  - identity architecture decision (resolved — ADR-06-COMMERCE-MOBILE-AUTH-MECHANISM.md)
+references:
+  - docs/plans/store/ADR-05-CUSTOMER-MOBILE-IDENTITY-BOUNDARY.md
+  - docs/plans/store/ADR-06-COMMERCE-MOBILE-AUTH-MECHANISM.md
+  - docs/plans/store/COMMERCE_MOBILE_API_READINESS.md
+outcome: >
+  A mobile Commerce client can authenticate a customer via phone+OTP
+  (primary) or email+password (alternative) and retrieve its own profile,
+  reusing the existing /customer/v1 identity authority unmodified rather
+  than duplicating it, with no coupling to any real SMS/OTP vendor.
+invariants:
+  - Tenant Isolation
+  - Commerce Authentication Identity / Customer Account / ERP User / Partner
+    stay four distinct concepts (ADR-05)
+  - guest checkout unchanged
+  - /customer/v1 and /store/v1 behavior unchanged
+  - no real SMS/OTP vendor coupling
+  - OTP codes hashed at rest, never logged in plaintext
+acceptance:
+  - phone+OTP unified register-or-login issues a customer:access token
+  - email+password reuses /customer/v1's own services byte-for-byte
+  - X-Customer-Token (not Authorization) gates authenticated routes
+  - cross-tenant/foreign-token/inactive-identity negatives pass
+  - an unverified self-declared phone cannot be hijacked into an OTP login
+  - SQLite/PostgreSQL verification
+tests:
+  - 21 new focused tests (CommerceCustomerAuthApiTest)
+  - full Customer|Commerce regression
+  - SQLite
+  - PostgreSQL
+merge_policy: standing-authority-after-pre-merge-review
+deploy_policy: owner-approval
+```
+
+Decision Escalation Gate resolved by Safwan (`COM-MOBILE-AUTH-1-IDENTITY-MECHANISM`) — full
+decision and rationale recorded in `docs/plans/store/ADR-06-COMMERCE-MOBILE-AUTH-MECHANISM.md`.
+Implementation on branch `claude/com-mobile-auth-1`, status `review` pending PR/CI/merge;
+full evidence in `docs/plans/commerce/COM-MOBILE-AUTH-1-IMPLEMENTATION-REPORT.md`. A genuine
+account-boundary security issue (OTP login resolving into a stranger's identity via an
+unverified, self-declared phone entered through the separate email+password path) was found
+and closed during implementation, before merge.
+
 ## Backlog discovery
 
 Claude may discover new work while implementing.

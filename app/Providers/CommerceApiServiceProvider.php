@@ -4,6 +4,8 @@ namespace App\Providers;
 
 use App\Http\Middleware\ForceJsonResponse;
 use App\Http\Middleware\PublicApiRequestContext;
+use App\Services\Commerce\Otp\FakeOtpProvider;
+use App\Services\Commerce\Otp\OtpProvider;
 use App\Support\PublicApiExceptionRenderer;
 use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Http\Request;
@@ -36,6 +38,16 @@ use Throwable;
  */
 class CommerceApiServiceProvider extends ServiceProvider
 {
+    public function register(): void
+    {
+        // COM-MOBILE-AUTH-1 — no real SMS/OTP vendor is integrated yet
+        // (explicit product decision: Unifonic is only a future preferred
+        // candidate, not committed). `FakeOtpProvider` is the sole binding
+        // until a vendor-selection Decision/Owner Gate is resolved; swapping
+        // it later touches only this one line.
+        $this->app->bind(OtpProvider::class, FakeOtpProvider::class);
+    }
+
     public function boot(): void
     {
         $this->registerCommerceApiRoutes();

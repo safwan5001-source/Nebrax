@@ -37,6 +37,8 @@ cp -r "$CORE_DIR/app/Services/Accounting/"*.php  app/Services/Accounting/
 cp -r "$CORE_DIR/app/Services/Commerce/"*.php    app/Services/Commerce/
 mkdir -p app/Services/Commerce/Edge
 cp -r "$CORE_DIR/app/Services/Commerce/Edge/"*.php app/Services/Commerce/Edge/
+mkdir -p app/Services/Commerce/Otp
+cp -r "$CORE_DIR/app/Services/Commerce/Otp/"*.php app/Services/Commerce/Otp/
 mkdir -p app/Services/DocumentCenter
 cp -r "$CORE_DIR/app/Services/DocumentCenter/"*.php app/Services/DocumentCenter/
 cp -r "$CORE_DIR/app/Services/Pos/"*.php         app/Services/Pos/

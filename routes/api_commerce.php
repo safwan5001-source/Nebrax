@@ -3,13 +3,16 @@
 use App\Http\Controllers\Api\CommerceCartController;
 use App\Http\Controllers\Api\CommerceCategoryController;
 use App\Http\Controllers\Api\CommerceCheckoutController;
+use App\Http\Controllers\Api\CommerceCustomerAuthController;
 use App\Http\Controllers\Api\CommerceMediaController;
 use App\Http\Controllers\Api\CommerceOrderController;
 use App\Http\Controllers\Api\CommerceProductController;
 use App\Http\Controllers\Api\CommerceStorefrontController;
 use App\Http\Middleware\AuthenticateApiClient;
+use App\Http\Middleware\AuthenticateCommerceCustomer;
 use App\Http\Middleware\EnsureActiveSubscription;
 use App\Http\Middleware\EnforcePublicApiRateLimit;
+use App\Http\Middleware\EstablishCustomerContext;
 use App\Http\Middleware\PublicApiRequestAudit;
 use App\Http\Middleware\PublicApiTenantGuard;
 use App\Http\Middleware\ResolveCommerceChannel;
@@ -127,4 +130,56 @@ Route::middleware([
     Route::patch('checkout/address', [CommerceCheckoutController::class, 'updateAddress'])->name('checkout.address.update');
     Route::patch('checkout/delivery', [CommerceCheckoutController::class, 'updateDelivery'])->name('checkout.delivery.update');
     Route::post('checkout/complete', [CommerceCheckoutController::class, 'complete'])->name('checkout.complete');
+});
+
+/*
+|--------------------------------------------------------------------------
+| COM-MOBILE-AUTH-1 — customer authentication (no customer token yet)
+|--------------------------------------------------------------------------
+| Same chain as the groups above (an ApiClient/store bearer + resolved
+| mobile channel are still required to reach any /commerce/v1 route), with
+| EnforcePublicApiRateLimit:sensitive — the first real consumer of that
+| rate class (previously seeded, unused). Two independent, provider-neutral
+| mechanisms: phone+OTP (primary) and email+password (alternative), both
+| producing the same CustomerIdentity + Sanctum `customer:access` token —
+| see CommerceCustomerAuthController's own docblock.
+*/
+Route::middleware([
+    AuthenticateApiClient::class,
+    PublicApiTenantGuard::class,
+    ResolveCommerceChannel::class,
+    PublicApiRequestAudit::class,
+    EnforcePublicApiRateLimit::class . ':' . PublicApiRateLimits::CLASS_SENSITIVE,
+    EnsureActiveSubscription::class,
+])->prefix('auth')->group(function () {
+    Route::post('register', [CommerceCustomerAuthController::class, 'registerWithEmail'])->name('auth.register');
+    Route::post('login', [CommerceCustomerAuthController::class, 'loginWithEmail'])->name('auth.login');
+    Route::post('otp/request', [CommerceCustomerAuthController::class, 'requestOtp'])->name('auth.otp.request');
+    Route::post('otp/verify', [CommerceCustomerAuthController::class, 'verifyOtp'])->name('auth.otp.verify');
+});
+
+/*
+|--------------------------------------------------------------------------
+| COM-MOBILE-AUTH-1 — authenticated customer (X-Customer-Token required)
+|--------------------------------------------------------------------------
+| AuthenticateCommerceCustomer resolves the customer's own Sanctum token
+| from X-Customer-Token (never Authorization, already the ApiClient/store
+| bearer resolved above) and swaps the request's user resolver; the
+| existing, unmodified EstablishCustomerContext then runs exactly as it
+| already does on /customer/v1, establishing CustomerContext for ownership
+| (consumed today only by CommerceOrderService; cart/checkout wiring is
+| COM-MOBILE-CART-IDENTITY-1's job, not this task's).
+*/
+Route::middleware([
+    AuthenticateApiClient::class,
+    PublicApiTenantGuard::class,
+    ResolveCommerceChannel::class,
+    PublicApiRequestAudit::class,
+    EnforcePublicApiRateLimit::class . ':' . PublicApiRateLimits::CLASS_WRITE,
+    EnsureActiveSubscription::class,
+    AuthenticateCommerceCustomer::class,
+    EstablishCustomerContext::class,
+])->group(function () {
+    Route::post('auth/logout', [CommerceCustomerAuthController::class, 'logout'])->name('auth.logout');
+    Route::get('me', [CommerceCustomerAuthController::class, 'me'])->name('me');
 });

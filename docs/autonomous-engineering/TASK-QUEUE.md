@@ -38,7 +38,7 @@ Authorization:
 |---|---|---|---|---|---|
 | 1 | COM-MOBILE-MEDIA-1 | done | high | accepted readiness contract | Mobile-authorized product media |
 | 2 | COM-MOBILE-VARIANTS-1 | done | high | COM-MOBILE-MEDIA-1 (done) | Variant/options/UOM mobile contract |
-| 3 | COM-MOBILE-AUTH-1 | decision_required | critical | identity architecture decision/readiness | Customer mobile auth + profile |
+| 3 | COM-MOBILE-AUTH-1 | review | critical | identity architecture decision/readiness (resolved, ADR-06) | Customer mobile auth + profile |
 | 4 | COM-MOBILE-CART-IDENTITY-1 | backlog | critical | COM-MOBILE-AUTH-1 | Guest → authenticated cart transition |
 | 5 | COM-MOBILE-CUSTOMER-1 | backlog | high | COM-MOBILE-AUTH-1 | Addresses + customer order history |
 | 6 | COM-MOBILE-PAYMENTS-1 | backlog | critical | checkout/auth/provider decisions | Payment methods + trusted payment lifecycle |
@@ -61,11 +61,15 @@ Source: `docs/plans/store/COMMERCE_MOBILE_API_READINESS.md` on `main` (accepted 
 
 `COM-MOBILE-VARIANTS-1` is `done`: PR #916 merged (Merge SHA `40445016973d050963d25519ed15ba05e0de6b66`), post-merge CI green on `main` (SQLite + PostgreSQL), post-merge review passed. Discovered backlog: alternate-unit (UOM) selection contract, needed by both `/store/v1` and `/commerce/v1` alike, not yet designed. Full evidence: `docs/plans/commerce/COM-MOBILE-VARIANTS-1-IMPLEMENTATION-REPORT.md`.
 
-`COM-MOBILE-AUTH-1` evaluated against current-`main` evidence and found **not** promotable to `ready` — moved to `decision_required` instead:
+`COM-MOBILE-AUTH-1` evaluated against current-`main` evidence and found **not** promotable to `ready` — moved to `decision_required`:
 - `docs/plans/store/ADR-05-CUSTOMER-MOBILE-IDENTITY-BOUNDARY.md` (Accepted, 2026-09-09) fixes the conceptual boundary (Commerce Authentication Identity / Customer Account / ERP User / Partner remain distinct; tenant-scoped; ownership-based API authorization; guest checkout preserved) but its own §22 "Explicit non-decisions" lists exactly what implementation needs and does not yet have: authentication framework/provider, SMS/OTP provider, password-vs-passwordless default, and token/session format.
 - This is a genuine Decision Escalation Gate per `DECISION-ESCALATION.md` (Tenant/Auth/Security architecture; a paid SMS/OTP provider is also a strategic vendor commitment) — not an evidence gap Claude can close by reading more repository state.
-- `COM-MOBILE-CART-IDENTITY-1` and `COM-MOBILE-CUSTOMER-1` both depend on `COM-MOBILE-AUTH-1` and remain blocked (`backlog`) until it resolves. `COM-MOBILE-PAYMENTS-1` is separately gated on "checkout/auth/provider decisions" and is also not evaluated further while this Decision Gate is open.
-- Decision Escalation packet delivered to Safwan; independent horizon work continues to be sought (see current-state resume rule) while this is pending.
+- Decision Escalation packet delivered to Safwan.
+
+**Decision resolved** (`COM-MOBILE-AUTH-1-IDENTITY-MECHANISM`, recorded durably in `docs/plans/store/ADR-06-COMMERCE-MOBILE-AUTH-MECHANISM.md`): support both phone+OTP (primary) and email+password (alternative) customer authentication on `/commerce/v1`, behind a provider-neutral OTP abstraction with no real SMS/OTP vendor integrated yet (Unifonic remains a future candidate only, a separate Decision/Owner Gate). `COM-MOBILE-AUTH-1` moved to `review`:
+- Implementation reuses the existing, pre-existing-but-unwired `/customer/v1` identity stack (`CustomerIdentity`, `CustomerIdentityService`, `CustomerAuthenticationService`, `CustomerContext`, `EstablishCustomerContext` — all unmodified) extended into `/commerce/v1` via a new `X-Customer-Token` header/middleware, plus new OTP scaffolding (`CustomerOtpService`, `OtpProvider`/`FakeOtpProvider`, `CustomerPhoneAuthenticationService`).
+- Full evidence, tests (21 new + full regression, SQLite + PostgreSQL), and a security fix found during implementation (phone-squatting account-boundary leak, closed before merge): `docs/plans/commerce/COM-MOBILE-AUTH-1-IMPLEMENTATION-REPORT.md`.
+- `COM-MOBILE-CART-IDENTITY-1` and `COM-MOBILE-CUSTOMER-1` both depend on `COM-MOBILE-AUTH-1` and remain `backlog` until it reaches `done` (merged + post-merge-reviewed) — an unmerged code dependency does not satisfy a downstream dependency per this file's own queue rules.
 
 ## Promotion checklist: backlog → ready
 
