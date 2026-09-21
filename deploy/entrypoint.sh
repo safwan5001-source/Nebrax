@@ -18,8 +18,30 @@ mkdir -p \
   storage/framework/views \
   storage/logs \
   bootstrap/cache
-chown -R www-data:www-data storage bootstrap/cache
-chmod -R ug+rwX storage bootstrap/cache
+
+# Only runtime-owned paths are repaired recursively. Do not traverse
+# storage/app: it may contain a large persistent set of tenant media,
+# attachments, imports, and other user files.
+runtime_paths=(
+  storage/framework/cache/data
+  storage/framework/sessions
+  storage/framework/testing
+  storage/framework/views
+  storage/logs
+  bootstrap/cache
+)
+
+# Keep only the required parents accessible for traversal; this is deliberately
+# non-recursive and does not alter storage/app contents.
+for parent_path in storage storage/framework bootstrap; do
+  chown www-data:www-data "$parent_path"
+  chmod ug+rwx "$parent_path"
+done
+
+for runtime_path in "${runtime_paths[@]}"; do
+  chown -R www-data:www-data "$runtime_path"
+  chmod -R ug+rwX "$runtime_path"
+done
 
 for writable_path in \
   storage/framework/cache/data \
