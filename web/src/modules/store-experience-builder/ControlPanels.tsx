@@ -111,6 +111,7 @@ interface PanelsProps {
   config: StorefrontPresentationConfig;
   locale: CustomizerLocale;
   liveStoreName: string | null;
+  businessIdentity?: { cr_number: string | null };
   onChange: (next: StorefrontPresentationConfig) => void;
   selectedSection?: string | null;
   onSelectSection?: (id: string | null) => void;
@@ -121,6 +122,7 @@ export function ControlPanels({
   config,
   locale,
   liveStoreName,
+  businessIdentity,
   onChange,
   selectedSection = null,
   onSelectSection,
@@ -162,7 +164,14 @@ export function ControlPanels({
     case "social":
       return <SocialPanel config={config} t={t} patch={patch} />;
     case "verification":
-      return <VerificationPanel config={config} t={t} patch={patch} />;
+      return (
+        <VerificationPanel
+          config={config}
+          t={t}
+          patch={patch}
+          businessIdentity={businessIdentity}
+        />
+      );
     case "apps":
       return <AppsPanel config={config} t={t} patch={patch} />;
     case "pages":
@@ -1339,11 +1348,15 @@ function VerificationPanel({
   config,
   t,
   patch,
+  businessIdentity,
 }: {
   config: StorefrontPresentationConfig;
   t: (key: CustomizerMessageKey) => string;
   patch: (partial: Partial<StorefrontPresentationConfig>) => void;
+  businessIdentity?: { cr_number: string | null };
 }) {
+  const canonicalCrNumber = businessIdentity?.cr_number?.trim() || null;
+
   return (
     <div className="space-y-6">
       <Section title={t("sbcTitle")} hint={t("sbcIntro")}>
@@ -1371,21 +1384,24 @@ function VerificationPanel({
           />
         </div>
       </Section>
-      <Section title={t("merchantProvided")}>
+      <Section title={t("businessInformation")} hint={t("canonicalIdentityHint")}>
         <Field label={t("crNumber")}>
-          <input
-            className={inputClass}
-            value={config.verification.crNumber}
-            onChange={(event) =>
-              patch({
-                verification: {
-                  ...config.verification,
-                  crNumber: event.target.value,
-                },
-              })
-            }
-          />
+          <output
+            className={`${inputClass} block bg-neutral-50 text-neutral-700`}
+            aria-readonly="true"
+            dir="ltr"
+          >
+            {canonicalCrNumber || "—"}
+          </output>
         </Field>
+        <a
+          href="/settings"
+          className="inline-flex text-[12px] font-medium text-primary underline-offset-4 hover:underline"
+        >
+          {t("businessInformationSettings")}
+        </a>
+      </Section>
+      <Section title={t("merchantProvided")}>
         <Field label={t("licenseNumber")}>
           <input
             className={inputClass}

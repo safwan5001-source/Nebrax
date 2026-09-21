@@ -17,6 +17,11 @@ vi.mock("@/lib/commerce/storefront", () => ({
   fetchStorefrontConfig: vi.fn().mockResolvedValue({
     name: "متجر الاختبار",
     default_locale: "ar",
+    business_identity: {
+      legal_name: "شركة الاختبار",
+      cr_number: "7050247977",
+      vat_number: null,
+    },
     presentation: null,
   }),
 }));
@@ -47,6 +52,7 @@ interface LayoutElementProps {
   categoryLinks?: ReactElement<{ fallback: ReactNode }>;
   fallback?: ReactNode;
   id?: string;
+  businessIdentity?: unknown;
 }
 
 async function renderLayout(content: ReactNode) {
@@ -90,5 +96,16 @@ describe("StorefrontLayout", () => {
 
     expect(main?.props.id).toBe("main-content");
     expect(elements.at(-1)?.type).toBe(MobileBottomNav);
+  });
+
+  it("passes canonical Tenant identity to the public Footer", async () => {
+    const elements = await renderLayout(<section>Storefront content</section>);
+    const footer = elements.find((element) => element.type === Footer);
+
+    expect(footer?.props.businessIdentity).toEqual({
+      legal_name: "شركة الاختبار",
+      cr_number: "7050247977",
+      vat_number: null,
+    });
   });
 });

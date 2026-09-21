@@ -142,4 +142,74 @@ describe('ExperienceBuilder persistence wiring', () => {
     expect(setItem).not.toHaveBeenCalled();
     setItem.mockRestore();
   });
+
+  it('renders canonical CR and SBC presentation without legacy CR', () => {
+    const config = {
+      ...DEFAULT_PRESENTATION_CONFIG,
+      verification: {
+        ...DEFAULT_PRESENTATION_CONFIG.verification,
+        crNumber: 'legacy-cr-must-not-render',
+      },
+      sbc: {
+        ...DEFAULT_PRESENTATION_CONFIG.sbc,
+        show_in_storefront: true,
+      },
+    };
+
+    render(
+      <ExperienceBuilder
+        initialConfig={config}
+        initialLocale="en"
+        businessIdentity={{
+          legal_name: 'Al-Noor Company',
+          cr_number: '7050247977',
+          vat_number: null,
+        }}
+      />,
+    );
+
+    expect(screen.getByText('Commercial registration: 7050247977')).toBeTruthy();
+    expect(screen.queryByText(/legacy-cr-must-not-render/)).toBeNull();
+    expect(screen.getByText('Verified in Saudi Business Center')).toBeTruthy();
+  });
+
+  it('renders no CR row when canonical CR is empty', () => {
+    render(
+      <ExperienceBuilder
+        initialLocale="en"
+        businessIdentity={{ legal_name: null, cr_number: '   ', vat_number: null }}
+      />,
+    );
+
+    expect(screen.queryByText(/Commercial registration/)).toBeNull();
+  });
+
+  it('does not expose the legacy CR value as an editable control', async () => {
+    const user = userEvent.setup();
+    render(
+      <ExperienceBuilder
+        initialLocale="en"
+        initialConfig={{
+          ...DEFAULT_PRESENTATION_CONFIG,
+          verification: {
+            ...DEFAULT_PRESENTATION_CONFIG.verification,
+            crNumber: 'legacy-cr-must-not-edit',
+          },
+        }}
+        businessIdentity={{
+          legal_name: 'Al-Noor Company',
+          cr_number: '7050247977',
+          vat_number: null,
+        }}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Verification & trust' }));
+
+    expect(screen.getByText('7050247977')).toBeTruthy();
+    expect(
+      screen.getByRole('link', { name: 'Manage company information' }).getAttribute('href'),
+    ).toBe('/settings');
+    expect(screen.queryByDisplayValue('legacy-cr-must-not-edit')).toBeNull();
+  });
 });

@@ -27,7 +27,10 @@ import {
   type CustomizerMessageKey,
   customizerMessage,
 } from "./messages";
-import { StorefrontPreviewCanvas } from "./StorefrontPreviewCanvas";
+import {
+  StorefrontPreviewCanvas,
+  type StorefrontBusinessIdentity,
+} from "./StorefrontPreviewCanvas";
 import {
   loadStorefrontPresentation,
   publishStorefrontPresentation,
@@ -51,6 +54,7 @@ export type BuilderLifecycle =
 interface ExperienceBuilderProps {
   initialConfig?: StorefrontPresentationConfig;
   liveStoreName?: string | null;
+  businessIdentity?: StorefrontBusinessIdentity;
   initialLocale?: CustomizerLocale;
   storefrontId?: string | null;
   storefrontUrl?: string | null;
@@ -59,6 +63,7 @@ interface ExperienceBuilderProps {
 export function ExperienceBuilder({
   initialConfig,
   liveStoreName = null,
+  businessIdentity = { legal_name: null, cr_number: null, vat_number: null },
   initialLocale = "ar",
   storefrontId = null,
   storefrontUrl = null,
@@ -493,6 +498,7 @@ export function ExperienceBuilder({
                 config={draft}
                 locale={locale}
                 liveStoreName={liveStoreName}
+                businessIdentity={businessIdentity}
                 onChange={updateDraft}
                 selectedSection={selectedSection}
                 onSelectSection={(id) => handleSelectSection(id, "sidebar")}
@@ -535,6 +541,7 @@ export function ExperienceBuilder({
                   locale={locale}
                   viewport={effectiveDevice}
                   liveStoreName={liveStoreName}
+                  businessIdentity={businessIdentity}
                   selectedSection={selectedSection}
                   onSelectSection={(key) => handleSelectSection(key, "preview")}
                 />
@@ -601,6 +608,7 @@ export function ExperienceBuilder({
                   config={draft}
                   locale={locale}
                   liveStoreName={liveStoreName}
+                  businessIdentity={businessIdentity}
                   onChange={updateDraft}
                   selectedSection={selectedSection}
                   onSelectSection={(id) => handleSelectSection(id, "sidebar")}
@@ -611,6 +619,7 @@ export function ExperienceBuilder({
                   config={draft}
                   locale={locale}
                   liveStoreName={liveStoreName}
+                  businessIdentity={businessIdentity}
                   onChange={updateDraft}
                   selectedSection={selectedSection}
                   onSelectSection={(id) => handleSelectSection(id, "sidebar")}
