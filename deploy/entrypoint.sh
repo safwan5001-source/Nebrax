@@ -7,6 +7,55 @@ set -euo pipefail
 
 cd /app
 
+# Laravel's generated FileStore, session files, and compiled Blade views all
+# write below these paths. The image prepares them, but re-create and repair
+# ownership at startup as well so a Railway-mounted/reused filesystem cannot
+# turn the first public request into a 500 after a redeploy.
+mkdir -p \
+  storage/framework/cache/data \
+  storage/framework/sessions \
+  storage/framework/testing \
+  storage/framework/views \
+  storage/logs \
+  bootstrap/cache
+
+# Only runtime-owned paths are repaired recursively. Do not traverse
+# storage/app: it may contain a large persistent set of tenant media,
+# attachments, imports, and other user files.
+runtime_paths=(
+  storage/framework/cache/data
+  storage/framework/sessions
+  storage/framework/testing
+  storage/framework/views
+  storage/logs
+  bootstrap/cache
+)
+
+# Keep only the required parents accessible for traversal; this is deliberately
+# non-recursive and leaves the parents root-owned without granting runtime write
+# access. Only the runtime paths below receive write ownership/permissions.
+for parent_path in storage storage/framework bootstrap; do
+  chmod ug+rx "$parent_path"
+done
+
+for runtime_path in "${runtime_paths[@]}"; do
+  chown -R www-data:www-data "$runtime_path"
+  chmod -R ug+rwX "$runtime_path"
+done
+
+for writable_path in \
+  storage/framework/cache/data \
+  storage/framework/sessions \
+  storage/framework/testing \
+  storage/framework/views \
+  storage/logs \
+  bootstrap/cache; do
+  if ! su -s /bin/sh www-data -c "test -w '$writable_path'"; then
+    echo "✗ Laravel runtime path is not writable by www-data: $writable_path"
+    exit 1
+  fi
+done
+
 if [ -z "${APP_KEY:-}" ]; then
   echo "⚠  APP_KEY غير مضبوط — أُولّد مفتاحاً مؤقتاً. للثبات اضبطه في متغيّرات البيئة."
   php artisan key:generate --force
