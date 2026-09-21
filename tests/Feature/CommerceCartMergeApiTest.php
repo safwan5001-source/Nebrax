@@ -620,4 +620,158 @@ class CommerceCartMergeApiTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.cart.items.0.quantity', 1);
     }
+
+    // ═══════════════════════════════════════════════════════════
+    //  Second review round (Codex, commit 6d322e5)
+    // ═══════════════════════════════════════════════════════════
+
+    /**
+     * P2 — two guest carts claiming under the same customer (no existing
+     * customer cart yet) must never race into a raw 500 from the new
+     * partial unique index. Sequential here (this test client cannot
+     * truly overlap two transactions), but exercises the exact path the
+     * CustomerIdentity row lock now serializes: the second claim correctly
+     * falls into MERGE (not a second CLAIM) once the first has committed.
+     *
+     * @test
+     */
+    public function two_guest_carts_claiming_under_the_same_new_customer_never_race_into_an_error(): void
+    {
+        $store = $this->seedMobileStore('serialize-claims');
+        $productA = $this->product($store['tenant'], $store['channel'], 'SERIALIZE-A');
+        $productB = $this->product($store['tenant'], $store['channel'], 'SERIALIZE-B');
+
+        $addA = $this->postJson('/commerce/v1/cart/items', ['product_id' => $productA->id, 'quantity' => 1], $this->withCart($store['token']))->assertCreated();
+        $guestTokenA = $addA->headers->get('X-Cart-Token');
+        $addB = $this->postJson('/commerce/v1/cart/items', ['product_id' => $productB->id, 'quantity' => 1], $this->withCart($store['token']))->assertCreated();
+        $guestTokenB = $addB->headers->get('X-Cart-Token');
+
+        $customerToken = $this->loginCustomer($store, '+966500000119');
+
+        // First guest cart claims outright (no customer cart yet).
+        $this->getJson('/commerce/v1/cart', $this->withCustomer($store['token'], $customerToken, $guestTokenA))->assertOk();
+        // Second guest cart now finds an existing (just-claimed) customer
+        // cart — it must merge gracefully, never 500.
+        $response = $this->getJson('/commerce/v1/cart', $this->withCustomer($store['token'], $customerToken, $guestTokenB))->assertOk();
+
+        $items = collect($response->json('data.items'))->pluck('product_id');
+        $this->assertTrue($items->contains($productA->id));
+        $this->assertTrue($items->contains($productB->id));
+        $this->assertSame(1, CommerceCart::query()->where('status', CommerceCart::STATUS_ACTIVE)->count());
+    }
+
+    /**
+     * P1 — a stale-token retry of an idempotency key belonging to an
+     * already-*completed* checkout must never resolve a *different*,
+     * newer active cart/checkout for the same customer. The identity
+     * fallback in findByToken() is deliberately excluded for
+     * `allowConsumed: true` (resolveForCompletion()'s own lookup) for
+     * exactly this reason.
+     *
+     * @test
+     */
+    public function a_stale_token_replay_never_resolves_a_different_newer_checkout(): void
+    {
+        $store = $this->seedMobileStore('replay-wrong-cart');
+        $productA = $this->product($store['tenant'], $store['channel'], 'REPLAY-WRONG-A');
+        $productB = $this->product($store['tenant'], $store['channel'], 'REPLAY-WRONG-B');
+        $customerToken = $this->loginCustomer($store, '+966500000120');
+
+        // Device A: full checkout A, completed successfully.
+        $addA = $this->postJson('/commerce/v1/cart/items', ['product_id' => $productA->id, 'quantity' => 1], $this->withCustomer($store['token'], $customerToken))->assertCreated();
+        $tokenA = $addA->headers->get('X-Cart-Token');
+        $this->postJson('/commerce/v1/checkout', [], $this->withCustomer($store['token'], $customerToken, $tokenA))->assertCreated();
+        $this->patchJson('/commerce/v1/checkout/contact', ['name' => 'ع', 'phone' => '0500000000'], $this->withCustomer($store['token'], $customerToken, $tokenA))->assertOk();
+        $this->patchJson('/commerce/v1/checkout/address', ['country' => 'SA', 'city' => 'x', 'street' => 'y'], $this->withCustomer($store['token'], $customerToken, $tokenA))->assertOk();
+        $this->patchJson('/commerce/v1/checkout/delivery', ['method' => 'pickup'], $this->withCustomer($store['token'], $customerToken, $tokenA))->assertOk();
+        $this->postJson('/commerce/v1/checkout/complete', [], $this->withCustomer($store['token'], $customerToken, $tokenA) + ['Idempotency-Key' => 'replay-wrong-cart-key-A'])
+            ->assertCreated();
+        $this->assertSame(1, \App\Models\CommerceOrder::query()->count());
+
+        // A brand-new active cart + checkout for the same customer, later.
+        $addB = $this->postJson('/commerce/v1/cart/items', ['product_id' => $productB->id, 'quantity' => 1], $this->withCustomer($store['token'], $customerToken))->assertCreated();
+        $tokenB = $addB->headers->get('X-Cart-Token');
+        $this->postJson('/commerce/v1/checkout', [], $this->withCustomer($store['token'], $customerToken, $tokenB))->assertCreated();
+        $this->patchJson('/commerce/v1/checkout/contact', ['name' => 'ع', 'phone' => '0500000000'], $this->withCustomer($store['token'], $customerToken, $tokenB))->assertOk();
+        $this->patchJson('/commerce/v1/checkout/address', ['country' => 'SA', 'city' => 'x', 'street' => 'y'], $this->withCustomer($store['token'], $customerToken, $tokenB))->assertOk();
+        $this->patchJson('/commerce/v1/checkout/delivery', ['method' => 'pickup'], $this->withCustomer($store['token'], $customerToken, $tokenB))->assertOk();
+
+        // A "retry" of the ORIGINAL request presenting a token that matches
+        // NEITHER cart (device A's own token was never rotated in storage —
+        // this simulates the same effective condition: a token that no
+        // longer resolves by hash) with the ORIGINAL idempotency key.
+        $bogusToken = 'stale-'.\Illuminate\Support\Str::random(32);
+        $retry = $this->postJson('/commerce/v1/checkout/complete', [], $this->withCustomer($store['token'], $customerToken, $bogusToken) + ['Idempotency-Key' => 'replay-wrong-cart-key-A'])
+            ->assertStatus(404);
+
+        // Cart B's own checkout was never touched/completed by the stale replay.
+        $this->assertSame(1, \App\Models\CommerceOrder::query()->count());
+    }
+
+    /**
+     * P2 — a quantity-overflow failure inside the merge loop must abort
+     * the merge (and the whole authentication attempt), never be silently
+     * treated the same as "no longer purchasable" and dropped.
+     *
+     * @test
+     */
+    public function a_quantity_overflow_during_merge_aborts_instead_of_silently_dropping_the_line(): void
+    {
+        $store = $this->seedMobileStore('overflow-merge');
+        $product = $this->product($store['tenant'], $store['channel'], 'OVERFLOW-1');
+
+        $customerToken = $this->loginCustomer($store, '+966500000121');
+        $this->postJson('/commerce/v1/cart/items', ['product_id' => $product->id, 'quantity' => 2147483647], $this->withCustomer($store['token'], $customerToken))->assertCreated();
+
+        $guestAdd = $this->postJson('/commerce/v1/cart/items', ['product_id' => $product->id, 'quantity' => 1], $this->withCart($store['token']))->assertCreated();
+        $guestToken = $guestAdd->headers->get('X-Cart-Token');
+
+        $this->getJson('/commerce/v1/cart', $this->withCustomer($store['token'], $customerToken, $guestToken))->assertStatus(422);
+
+        // Nothing committed — the guest cart was never consumed, the
+        // customer's line was never silently dropped or truncated.
+        app(TenantContext::class)->set($store['tenant']->id);
+        $identity = \App\Models\CustomerIdentity::query()->where('phone_e164', '+966500000121')->firstOrFail();
+        $customerCart = CommerceCart::query()->where('customer_identity_id', $identity->id)->firstOrFail();
+        $this->assertSame(2147483647, $customerCart->items()->sum('quantity'));
+        app(TenantContext::class)->forget();
+        $this->assertSame(CommerceCart::STATUS_ACTIVE, CommerceCart::query()->whereNull('customer_identity_id')->firstOrFail()->status);
+    }
+
+    /**
+     * P2 — a PATCH/DELETE targeting an item id that only existed in the
+     * guest cart, when the same request also triggers a merge as a side
+     * effect, must surface a clear "cart changed, refetch" signal — not a
+     * misleading 404, and not a silent no-op.
+     *
+     * @test
+     */
+    public function mutating_a_now_merged_guest_item_id_returns_cart_merged_not_a_bare_404(): void
+    {
+        $store = $this->seedMobileStore('merged-item-id');
+        $customerOwn = $this->product($store['tenant'], $store['channel'], 'MERGED-ID-CUSTOMER');
+        $guestOnly = $this->product($store['tenant'], $store['channel'], 'MERGED-ID-GUEST');
+
+        $customerToken = $this->loginCustomer($store, '+966500000122');
+        $this->postJson('/commerce/v1/cart/items', ['product_id' => $customerOwn->id, 'quantity' => 1], $this->withCustomer($store['token'], $customerToken))->assertCreated();
+
+        $guestAdd = $this->postJson('/commerce/v1/cart/items', ['product_id' => $guestOnly->id, 'quantity' => 1], $this->withCart($store['token']))->assertCreated();
+        $guestToken = $guestAdd->headers->get('X-Cart-Token');
+        $guestItemId = $guestAdd->json('data.items.0.id');
+
+        // Same request carries both tokens and mutates by the (about to be
+        // stale) guest item id — resolveCurrent() merges first, as a side
+        // effect of resolving the cart for this very request.
+        $response = $this->patchJson("/commerce/v1/cart/items/{$guestItemId}", ['quantity' => 5], $this->withCustomer($store['token'], $customerToken, $guestToken))
+            ->assertStatus(409);
+        $response->assertJsonPath('error.code', 'cart_merged');
+
+        // The merge itself still succeeded — the guest line is present in
+        // the customer's cart, just under a different item id.
+        app(TenantContext::class)->set($store['tenant']->id);
+        $identity = \App\Models\CustomerIdentity::query()->where('phone_e164', '+966500000122')->firstOrFail();
+        $customerCart = CommerceCart::query()->where('customer_identity_id', $identity->id)->firstOrFail();
+        $this->assertSame(1, $customerCart->items()->where('product_id', $guestOnly->id)->sum('quantity'));
+        app(TenantContext::class)->forget();
+    }
 }

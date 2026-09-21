@@ -75,7 +75,20 @@ final class CommerceCartService
         // by identity, so a stale/rotated token never locks a device out of
         // its own cart or checkout — CommerceCheckoutService needs zero
         // changes to benefit, since it already calls this same method.
-        if ($customerContext->isEstablished()) {
+        //
+        // **Deliberately excluded when `$allowConsumed` is true** (Codex,
+        // PR #924, P1, second round): that flag exists only for
+        // `resolveForCompletion()`'s idempotency-key replay, which must
+        // stay anchored to the *exact* cart/checkout a specific completion
+        // request already committed to — never "whichever cart is
+        // currently active for this customer". Falling back here would let
+        // a stale-token retry of an already-completed request resolve a
+        // *different*, newer active cart/checkout and complete it under the
+        // original request's idempotency key. A first-time `checkout/complete`
+        // presenting a stale token still 404s (pre-existing behavior,
+        // unchanged by this task) — the self-heal above already covers
+        // every read/update step that normally precedes it.
+        if ($customerContext->isEstablished() && ! $allowConsumed) {
             $ownCart = $this->scopeToContext(CommerceCart::query(), $context)
                 ->where('customer_identity_id', $customerContext->customerIdentityId())
                 ->where('status', CommerceCart::STATUS_ACTIVE)
@@ -168,7 +181,7 @@ final class CommerceCartService
      * `revalidateAndPrice()` remain the sole pricing/availability authority
      * for the resulting cart, exactly as for a guest cart.
      *
-     * @return array{cart: ?CommerceCart, invalid: bool, rebound: ?string}
+     * @return array{cart: ?CommerceCart, invalid: bool, rebound: ?string, merged: bool}
      */
     public function resolveCurrent(?string $guestToken): array
     {
@@ -176,12 +189,22 @@ final class CommerceCartService
         if (! $customerContext->isEstablished()) {
             $lookup = $this->findByToken($guestToken);
 
-            return ['cart' => $lookup['cart'], 'invalid' => $lookup['invalid'], 'rebound' => null];
+            return ['cart' => $lookup['cart'], 'invalid' => $lookup['invalid'], 'rebound' => null, 'merged' => false];
         }
 
         return DB::transaction(function () use ($guestToken, $customerContext): array {
             $context = $this->context();
             $customerId = $customerContext->customerIdentityId();
+
+            // (Codex, PR #924, P2) Locked first, before any cart query: two
+            // devices authenticating concurrently with different guest carts
+            // (or one claiming here while another calls add(null, ...), which
+            // takes the same lock) must never both observe "no customer cart
+            // yet" and both write one — the partial unique index would turn
+            // the loser's write into a raw 500 instead of a graceful merge.
+            // Serializing on this always-existing row is the same technique
+            // add() already uses for the exact same race.
+            CustomerIdentity::query()->whereKey($customerId)->lockForUpdate()->first();
 
             $guestCart = ($guestToken !== null && $guestToken !== '')
                 ? $this->scopeToContext(CommerceCart::query(), $context)
@@ -217,7 +240,7 @@ final class CommerceCartService
                     'expires_at' => now()->addDays(self::LIFETIME_DAYS),
                 ]);
 
-                return ['cart' => $guestCart, 'invalid' => false, 'rebound' => null];
+                return ['cart' => $guestCart, 'invalid' => false, 'rebound' => null, 'merged' => false];
             }
 
             if ($guestCart !== null && $customerCart !== null) {
@@ -228,6 +251,17 @@ final class CommerceCartService
 
                     try {
                         $this->add($customerCart, $item->product_id, $item->unit_key, $item->quantity, $item->product_variant_id);
+                    } catch (CommerceCartQuantityOverflowException $e) {
+                        // (Codex, PR #924, P2) Never conflated with "no
+                        // longer purchasable" below — a quantity too large
+                        // to represent is data the merge must not silently
+                        // discard. Aborting the whole merge (and the
+                        // authentication attempt with it) is the only safe
+                        // choice: nothing has committed yet inside this
+                        // transaction. Rethrown as-is (already a
+                        // RuntimeException) — every caller already turns
+                        // that into a 422.
+                        throw $e;
                     } catch (RuntimeException) {
                         // No longer purchasable — dropped, not merged. A
                         // stale guest line must never block sign-in.
@@ -240,6 +274,16 @@ final class CommerceCartService
                     'cart' => $customerCart->fresh(),
                     'invalid' => false,
                     'rebound' => $this->rebindToken($customerCart),
+                    // (Codex, PR #924, P2) A URL item id from the guest cart
+                    // (e.g. a PATCH/DELETE the client built before this
+                    // request) is never valid against the post-merge
+                    // customer cart — merging created new line rows (or
+                    // summed into a pre-existing one) with no 1:1 mapping
+                    // back to the guest cart's own item ids. Callers that
+                    // target a specific item must check this and refuse the
+                    // mutation rather than 404 after already committing the
+                    // merge.
+                    'merged' => true,
                 ];
             }
 
@@ -251,10 +295,11 @@ final class CommerceCartService
                     'cart' => $customerCart,
                     'invalid' => false,
                     'rebound' => $alreadyBound ? null : $this->rebindToken($customerCart),
+                    'merged' => false,
                 ];
             }
 
-            return ['cart' => null, 'invalid' => false, 'rebound' => null];
+            return ['cart' => null, 'invalid' => false, 'rebound' => null, 'merged' => false];
         }, 3);
     }
 
@@ -661,9 +706,14 @@ final class CommerceCartService
 
     private function safeQuantityAdd(int $left, int $right): int
     {
-        $quantity = $this->safeAdd($left, $right);
+        try {
+            $quantity = $this->safeAdd($left, $right);
+        } catch (RuntimeException $e) {
+            throw new CommerceCartQuantityOverflowException($e->getMessage());
+        }
+
         if ($quantity > 2147483647) {
-            throw new RuntimeException('الكمية أكبر من الحد المسموح.');
+            throw new CommerceCartQuantityOverflowException('الكمية أكبر من الحد المسموح.');
         }
 
         return $quantity;

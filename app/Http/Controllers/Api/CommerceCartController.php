@@ -38,7 +38,7 @@ final class CommerceCartController extends PublicApiController
 
     public function show(Request $request, CommerceCartService $carts): JsonResponse
     {
-        $lookup = $carts->resolveCurrent($this->tokenFromRequest($request));
+        $lookup = $this->resolveCurrent($request, $carts);
         $response = PublicApiResponse::success($request, $carts->serialize($lookup['cart']));
 
         return $this->applyTokenOutcome($response, $lookup);
@@ -54,7 +54,7 @@ final class CommerceCartController extends PublicApiController
             'quantity' => ['required', 'integer', 'min:1', 'max:2147483647'],
         ]);
 
-        $lookup = $carts->resolveCurrent($this->tokenFromRequest($request));
+        $lookup = $this->resolveCurrent($request, $carts);
         if ($lookup['invalid']) {
             return $this->clearToken($this->notFound($request));
         }
@@ -87,11 +87,14 @@ final class CommerceCartController extends PublicApiController
         $data = $request->validate([
             'quantity' => ['required', 'integer', 'min:1', 'max:2147483647'],
         ]);
-        $lookup = $carts->resolveCurrent($this->tokenFromRequest($request));
+        $lookup = $this->resolveCurrent($request, $carts);
         if ($lookup['cart'] === null) {
             $response = $this->notFound($request);
 
             return $lookup['invalid'] ? $this->clearToken($response) : $response;
+        }
+        if ($lookup['merged']) {
+            return $this->applyTokenOutcome($this->cartMerged($request), $lookup);
         }
 
         try {
@@ -113,11 +116,14 @@ final class CommerceCartController extends PublicApiController
     public function destroy(Request $request, CommerceCartService $carts): JsonResponse
     {
         $this->rejectUnknown($request, []);
-        $lookup = $carts->resolveCurrent($this->tokenFromRequest($request));
+        $lookup = $this->resolveCurrent($request, $carts);
         if ($lookup['cart'] === null) {
             $response = $this->notFound($request);
 
             return $lookup['invalid'] ? $this->clearToken($response) : $response;
+        }
+        if ($lookup['merged']) {
+            return $this->applyTokenOutcome($this->cartMerged($request), $lookup);
         }
 
         try {
@@ -155,15 +161,51 @@ final class CommerceCartController extends PublicApiController
         return PublicApiResponse::error($request, PublicApiErrorCode::NOT_FOUND, 'السلة غير متاحة.');
     }
 
+    /**
+     * (Codex, PR #924, P2) The item id in this request's URL was resolved
+     * against a guest cart that `resolveCurrent()` just merged into the
+     * customer's own cart as a side effect of this very request — it no
+     * longer identifies any row (summed into an existing line, or replaced
+     * by a newly created one with no 1:1 mapping back). Never guess; the
+     * merge already committed, so the client must re-fetch the cart and
+     * retry against its current item ids.
+     */
+    private function cartMerged(Request $request): JsonResponse
+    {
+        return PublicApiResponse::error(
+            $request, PublicApiErrorCode::CART_MERGED,
+            'تغيّرت السلة بعد تسجيل الدخول — يرجى إعادة جلبها والمحاولة مجدداً.',
+        );
+    }
+
     private function notFoundAfterMutation(Request $request, CommerceCartService $carts): JsonResponse
     {
         $response = $this->notFound($request);
-        $lookup = $carts->resolveCurrent($this->tokenFromRequest($request));
+        $lookup = $this->resolveCurrent($request, $carts);
 
         return $this->applyTokenOutcome($response, $lookup);
     }
 
-    /** @param array{cart: mixed, invalid: bool, rebound: ?string} $lookup */
+    /**
+     * (Codex, PR #924, P2) `resolveCurrent()` can now throw mid-merge
+     * (`CommerceCartQuantityOverflowException`, a `RuntimeException`) —
+     * every caller must translate that into the same 422 the mutation
+     * endpoints already give a domain failure, never an uncaught 500.
+     *
+     * @return array{cart: mixed, invalid: bool, rebound: ?string, merged: bool}
+     */
+    private function resolveCurrent(Request $request, CommerceCartService $carts): array
+    {
+        try {
+            return $carts->resolveCurrent($this->tokenFromRequest($request));
+        } catch (PDOException $e) {
+            throw $e;
+        } catch (RuntimeException $e) {
+            abort(422, $e->getMessage());
+        }
+    }
+
+    /** @param array{cart: mixed, invalid: bool, rebound: ?string, merged?: bool} $lookup */
     private function applyTokenOutcome(JsonResponse $response, array $lookup): JsonResponse
     {
         if ($lookup['rebound'] !== null) {
