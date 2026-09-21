@@ -151,7 +151,7 @@ row at a time on both boundaries' `index()`).
 id: COM-MOBILE-VARIANTS-1
 title: Variant/options/UOM mobile contract
 domain: commerce
-status: review
+status: done
 risk: high
 depends_on:
   - COM-MOBILE-MEDIA-1 (done)
@@ -184,14 +184,21 @@ merge_policy: standing-authority-after-pre-merge-review
 deploy_policy: owner-approval
 ```
 
-`COM-MOBILE-VARIANTS-1` is `review`: implemented on branch `claude/com-mobile-variants-1`
-(`CommerceProductController::variantResource()`, mirroring
+`COM-MOBILE-VARIANTS-1` is `done`: merged via PR #916 (Merge SHA
+`40445016973d050963d25519ed15ba05e0de6b66`), post-merge CI green on `main` (SQLite +
+PostgreSQL), mandatory post-merge review passed.
+`CommerceProductController::variantResource()` mirrors
 `StorefrontProductController::show()`'s already-shipped variant branch exactly — no new
 pricing/availability/cart-identity logic, since `CommercePriceResolver`,
 `AvailableToSellService`, and `CommerceCartController`/`CommerceCartService` were already
-variant-aware before this task). Focused (7) + module regression (1001 tests) green on
+variant-aware before this task. Focused (7) + module regression (1001 tests) green on
 SQLite and PostgreSQL. See
 `docs/plans/commerce/COM-MOBILE-VARIANTS-1-IMPLEMENTATION-REPORT.md` for full evidence.
+
+Discovered backlog from this task (not yet scheduled): an alternate-unit (UOM) selection
+contract — neither `/store/v1` nor `/commerce/v1` expose selectable `unit_key`s/per-unit
+prices beyond a variant's base unit, even though both cart endpoints already accept
+`unit_key`. Needs a deliberate cross-boundary contract-design decision.
 
 ## Backlog discovery
 

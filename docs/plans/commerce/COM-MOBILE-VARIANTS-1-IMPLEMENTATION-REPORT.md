@@ -2,8 +2,9 @@
 
 **Task:** Variant/options/UOM mobile contract for `/commerce/v1`
 **Branch:** `claude/com-mobile-variants-1` · **Base:** `main` @ `c91f873`
+**PR:** #916 · **Merge SHA:** `40445016973d050963d25519ed15ba05e0de6b66`
 **Date:** 2026-09-21
-**STATUS:** review (pre-merge)
+**STATUS:** done (merged, post-merge reviewed)
 
 ---
 
@@ -134,26 +135,35 @@ No `web/` changes — Web CI not applicable.
 
 ## CI
 
-Not yet observed on the exact final Head SHA — pending push/PR. Will be inspected before
-Pre-Merge Review.
+Observed green on the exact final Head SHA before merge: GitHub Actions `CI` workflow,
+both `php artisan test (L11, sqlite)` and `php artisan test (L11, pgsql)` jobs, on head
+`8d9e369ba1d538ded0e958efc077971b49075d92`.
 
 ## Pre-merge review
 
-- PRE_MERGE_REVIEW: *(recorded immediately before merge, on the exact final Head SHA)*
-- Reviewed Head SHA: *(pending)*
-- Findings / resolution: *(pending)*
+- PRE_MERGE_REVIEW: PASS
+- Reviewed Head SHA: `8d9e369ba1d538ded0e958efc077971b49075d92`
+- Findings / resolution: 1 automated (Codex) review finding — see "Automated review
+  findings" above (UOM/alternate-unit selection, verified as an already-shipped `/store/v1`
+  characteristic, recorded as backlog). Thread resolved on the PR. `mergeable_state: clean`
+  against current `main` tip (`c91f873`, unchanged since branch creation). No unresolved
+  Decision Gate.
 
 ## Merge
 
-- Merge status: *(pending)*
-- Merge SHA: *(pending)*
+- Merge status: merged (standing authority, all gates satisfied)
+- Merge SHA: `40445016973d050963d25519ed15ba05e0de6b66`
 
 ## Post-merge review
 
-- POST_MERGE_REVIEW: *(pending)*
-- Reviewed Merge SHA: *(pending)*
-- Target-branch checks/smoke: *(pending)*
-- Findings / resolution: *(pending)*
+- POST_MERGE_REVIEW: PASS
+- Reviewed Merge SHA: `40445016973d050963d25519ed15ba05e0de6b66`
+- Target-branch checks/smoke: verified `main` contains the merge (`git merge-base
+  --is-ancestor`); `main`'s own post-merge CI run (workflow run `35556502494`) green on
+  both `php artisan test (L11, sqlite)` and `(L11, pgsql)` jobs for this exact commit. Full
+  diff re-inspected against the merge base — no unexpected changes, matches the reviewed PR
+  diff exactly.
+- Findings / resolution: none — clean post-merge integration.
 
 ## Self-review
 
@@ -264,9 +274,10 @@ verified against repository evidence:
 ## Git state
 
 - Branch: `claude/com-mobile-variants-1`
-- PR: *(pending — opened immediately after this commit)*
+- PR: #916 (merged)
 - Base SHA: `c91f873`
-- Head SHA: *(pending)*
+- Final Head SHA (pre-merge): `8d9e369ba1d538ded0e958efc077971b49075d92`
+- Merge SHA: `40445016973d050963d25519ed15ba05e0de6b66`
 
 ## Recommended next dependency-ready task
 
