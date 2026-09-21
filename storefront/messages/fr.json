@@ -81,6 +81,7 @@
     "legalName": "Nom légal",
     "crNumber": "Registre du commerce",
     "vatNumber": "Numéro de TVA",
+    "sbcVerified": "Vérifié dans le Saudi Business Center",
     "merchantProvided": "Informations fournies par le marchand",
     "licenseNumber": "Numéro de licence"
   },

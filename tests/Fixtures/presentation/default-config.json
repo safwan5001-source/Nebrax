@@ -109,6 +109,10 @@
     "sourceUrl": "",
     "requestedVerifiedLabel": false
   },
+  "sbc": {
+    "authentication_number": "",
+    "show_in_storefront": false
+  },
   "apps": {
     "iosUrl": "",
     "androidUrl": "",

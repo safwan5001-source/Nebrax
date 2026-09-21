@@ -89,6 +89,26 @@ describe('ExperienceBuilder persistence wiring', () => {
     expect(screen.queryByText(/nothing was stored/i)).toBeNull();
   });
 
+  it('preserves SBC internal whitespace while editing and outer-trims at save', async () => {
+    loadMock.mockResolvedValue({ ok: true, data: record });
+    saveMock.mockResolvedValue({
+      ok: true,
+      data: { ...record, draftRevision: 1 },
+    });
+    const user = userEvent.setup();
+    render(<ExperienceBuilder storefrontId="store-1" initialLocale="en" />);
+    await waitFor(() => expect(loadMock).toHaveBeenCalled());
+
+    await user.click(screen.getByRole('button', { name: 'Verification & trust' }));
+    const input = screen.getAllByRole('textbox')[0];
+    await user.type(input, ' 00123 456 ');
+
+    expect((input as HTMLInputElement).value).toBe(' 00123 456 ');
+    await user.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() => expect(saveMock).toHaveBeenCalled());
+    expect(saveMock.mock.calls[0][1].sbc.authentication_number).toBe('00123 456');
+  });
+
   it('reloads on 409 instead of merging or claiming success', async () => {
     loadMock
       .mockResolvedValueOnce({ ok: true, data: record })

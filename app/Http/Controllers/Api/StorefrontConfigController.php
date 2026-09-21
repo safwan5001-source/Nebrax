@@ -47,6 +47,9 @@ class StorefrontConfigController extends PublicApiController
             $name = $row?->name;
             $defaultLocale = $row?->default_locale;
             $presentation = $presentations->publishedSnapshotForStorefront($context->storefrontId());
+            if (is_array($presentation) && isset($presentation['sbc']) && is_array($presentation['sbc'])) {
+                $presentation['sbc']['authentication_number'] = '';
+            }
 
             $tenant = $row
                 ? Tenant::query()->find($row->tenant_id, ['name', 'cr_number', 'vat_number'])

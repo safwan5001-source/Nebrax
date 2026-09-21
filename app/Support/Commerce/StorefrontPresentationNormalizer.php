@@ -167,6 +167,10 @@ final class StorefrontPresentationNormalizer
                 'sourceUrl' => '',
                 'requestedVerifiedLabel' => false,
             ],
+            'sbc' => [
+                'authentication_number' => '',
+                'show_in_storefront' => false,
+            ],
             'apps' => [
                 'iosUrl' => '',
                 'androidUrl' => '',
@@ -220,6 +224,7 @@ final class StorefrontPresentationNormalizer
         $contactRaw = $this->object($input['contact'] ?? null);
         $whatsappRaw = $this->object($input['whatsapp'] ?? null);
         $verificationRaw = $this->object($input['verification'] ?? null);
+        $sbcRaw = $this->object($input['sbc'] ?? null);
         $appsRaw = $this->object($input['apps'] ?? null);
 
         $themePreset = $this->inList($input['themePreset'] ?? null, array_keys(self::THEME_PRESETS), 'awj-modern');
@@ -289,6 +294,10 @@ final class StorefrontPresentationNormalizer
                 'sourceUrl' => $this->sanitizeExternalUrl($this->asString($verificationRaw['sourceUrl'] ?? null)) ?? '',
                 // Legacy compatibility only; merchant input cannot mint an official verification claim.
                 'requestedVerifiedLabel' => false,
+            ],
+            'sbc' => [
+                'authentication_number' => trim($this->asString($sbcRaw['authentication_number'] ?? null)),
+                'show_in_storefront' => $this->asBoolean($sbcRaw['show_in_storefront'] ?? null, false),
             ],
             'apps' => [
                 'iosUrl' => $this->isSafeAppStoreUrl($iosUrl) ? ($this->sanitizeExternalUrl($iosUrl) ?? '') : '',

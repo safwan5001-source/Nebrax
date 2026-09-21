@@ -41,6 +41,18 @@ describe('web presentation contract', () => {
     expect(config.verification.sourceUrl).toBe('');
   });
 
+  it('normalizes SBC authentication as opaque text and defaults visibility off', () => {
+    expect(
+      normalizePresentationConfig({
+        sbc: { authentication_number: '  000123  ', show_in_storefront: true },
+      }).sbc,
+    ).toEqual({ authentication_number: '000123', show_in_storefront: true });
+    expect(normalizePresentationConfig({}).sbc).toEqual({
+      authentication_number: '',
+      show_in_storefront: false,
+    });
+  });
+
   it('builds a WhatsApp link without sending', () => {
     expect(buildWhatsAppUrl('966551234567', 'hello')).toBe(
       'https://wa.me/966551234567?text=hello',

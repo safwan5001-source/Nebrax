@@ -415,7 +415,8 @@ export function StorefrontPreviewCanvas({
             config.contact.hours ||
             enabledSocial.length > 0 ||
             config.verification.crNumber.trim() ||
-            config.verification.licenseNumber.trim()) && (
+            config.verification.licenseNumber.trim() ||
+            config.sbc.show_in_storefront) && (
             <div className="mt-8 border-t border-store-footer-border pt-6 text-sm text-store-footer-muted">
               {config.contact.phone ? <p>{config.contact.phone}</p> : null}
               {config.contact.email ? <p>{config.contact.email}</p> : null}
@@ -452,6 +453,13 @@ export function StorefrontPreviewCanvas({
                   ) : null}
                 </div>
               )}
+              {config.sbc.show_in_storefront ? (
+                <div className="mt-4 border-t border-store-footer-border pt-4">
+                  <p className="font-medium text-store-footer-link">
+                    {t("sbcVerified")}
+                  </p>
+                </div>
+              ) : null}
             </div>
           )}
         </div>

@@ -81,6 +81,7 @@
     "legalName": "الاسم القانوني",
     "crNumber": "السجل التجاري",
     "vatNumber": "الرقم الضريبي",
+    "sbcVerified": "موثّق في منصة الأعمال",
     "merchantProvided": "معلومات من التاجر",
     "licenseNumber": "رقم الترخيص"
   },
