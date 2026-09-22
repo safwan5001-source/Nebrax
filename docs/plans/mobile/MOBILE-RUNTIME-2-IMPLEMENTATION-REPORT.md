@@ -316,7 +316,7 @@ tasks.
 - Branch: `claude/awj-mobile-runtime-horizon-v1-g0n8mm`
 - PR: (recorded once opened)
 - Base SHA: `12109a204abf7950d3818243ef31380b194505d3` (`origin/main`, PR #949)
-- Head SHA: (recorded once pushed)
+- Head SHA: `dcec5eecea5a99c1735b7cf33d58456b4b61c2d0` (pushed)
 
 ## Recommended next dependency-ready task
 
