@@ -672,4 +672,36 @@ class CommerceCheckoutApiTest extends TestCase
         $this->assertNull($snapshot->shipping_additional_number);
         app(TenantContext::class)->forget();
     }
+
+    // ── COM-MOBILE-ADDRESSES-1 (ADR-08), round 3 (Codex) — region gap closure:
+    // `delivery_region` reached `commerce_checkouts` but never the order
+    // snapshot, silently dropping it from the immutable order record.
+
+    /** @test */
+    public function completion_propagates_region_into_the_order_snapshot(): void
+    {
+        $store = $this->seedMobileStore('snapshot-region');
+        $product = $this->publishedProduct($store['tenant'], $store['channel']);
+        $cartToken = $this->cartTokenWithItem($store, $product);
+        $this->createCheckout($store, $cartToken)->assertCreated();
+
+        $this->patchContact($store, $cartToken, [
+            'name' => 'سالم الأحمدي', 'phone' => '0501234567', 'email' => 'salem@example.com',
+        ])->assertOk();
+        $this->patchAddress($store, $cartToken, [
+            'country' => 'SA', 'region' => 'المنطقة الشرقية', 'city' => 'الدمام', 'district' => 'الشاطئ',
+            'street' => 'شارع الملك فهد', 'building_no' => '1234', 'additional_number' => '5678',
+            'postal_code' => '31411',
+        ])->assertOk();
+        $this->patchDelivery($store, $cartToken, ['method' => 'pickup'])->assertOk();
+
+        $response = $this->complete($store, $cartToken, 'idem-snapshot-region')->assertCreated();
+        $orderId = $response->json('data.order.id');
+
+        app(TenantContext::class)->set($store['tenant']->id);
+        $snapshot = \App\Models\CommerceOrderSnapshot::withoutGlobalScopes()
+            ->where('commerce_order_id', $orderId)->firstOrFail();
+        $this->assertSame('المنطقة الشرقية', $snapshot->shipping_region);
+        app(TenantContext::class)->forget();
+    }
 }

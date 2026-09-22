@@ -36,6 +36,8 @@ final class CommerceCustomerAddressService
 {
     private const SAUDI_REQUIRED_FIELDS = ['district', 'building_no', 'postal_code', 'additional_number'];
 
+    private const SAUDI_DIGIT_FIELDS = ['building_no' => 4, 'additional_number' => 4, 'postal_code' => 5];
+
     /** @return Collection<int, CommerceCustomerAddress> */
     public function list(CustomerContext $context): Collection
     {
@@ -53,7 +55,7 @@ final class CommerceCustomerAddressService
         return DB::transaction(function () use ($context, $data): CommerceCustomerAddress {
             $this->lockCustomer($context);
 
-            $this->assertSaudiFieldsPresent($data);
+            $this->assertSaudiFieldsValid($data);
 
             if ($this->isTruthyBoolean($data['is_default_shipping'] ?? false)) {
                 $this->clearDefault($context, 'is_default_shipping');
@@ -80,7 +82,7 @@ final class CommerceCustomerAddressService
                 throw new RuntimeException('العنوان غير موجود.');
             }
 
-            $this->assertSaudiFieldsPresent([
+            $this->assertSaudiFieldsValid([
                 'country' => $data['country'] ?? $address->country,
                 'district' => array_key_exists('district', $data) ? $data['district'] : $address->district,
                 'building_no' => array_key_exists('building_no', $data) ? $data['building_no'] : $address->building_no,
@@ -111,8 +113,20 @@ final class CommerceCustomerAddressService
         });
     }
 
-    /** @param  array<string, mixed>  $data */
-    public function assertSaudiFieldsPresent(array $data): void
+    /**
+     * (Codex, PR #929, round 3, P1) Presence alone let `building_no => "x"`,
+     * `additional_number => "abc"`, or `postal_code => "?"` through as a
+     * valid Saudi address. ADR-08 §4 calls for Saudi-specific shape/digit
+     * checks on top of presence — applied only when `country` is `SA`, same
+     * as the presence check, so a non-Saudi address is never affected. Digit
+     * counts (building number 4, additional number 4, postal code 5) are the
+     * SPL National Address format corroborated by ADR-08's own sourcing
+     * (see its §1 caveat on re-verifying exact digit counts against the
+     * official SPL/TGA pages before treating them as contractually final).
+     *
+     * @param  array<string, mixed>  $data
+     */
+    public function assertSaudiFieldsValid(array $data): void
     {
         if (($data['country'] ?? null) !== 'SA') {
             return;
@@ -128,6 +142,19 @@ final class CommerceCustomerAddressService
         if ($missing !== []) {
             throw ValidationException::withMessages([
                 'saudi_national_address' => 'العنوان الوطني السعودي يتطلب: '.implode(', ', $missing).'.',
+            ]);
+        }
+
+        $invalid = [];
+        foreach (self::SAUDI_DIGIT_FIELDS as $field => $digits) {
+            if (! preg_match('/^\d{'.$digits.'}$/', (string) $data[$field])) {
+                $invalid[] = $field;
+            }
+        }
+
+        if ($invalid !== []) {
+            throw ValidationException::withMessages([
+                'saudi_national_address' => 'صيغة الحقول التالية غير صحيحة (أرقام فقط بالطول المطلوب): '.implode(', ', $invalid).'.',
             ]);
         }
     }

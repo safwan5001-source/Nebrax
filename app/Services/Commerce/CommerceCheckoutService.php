@@ -476,6 +476,7 @@ final class CommerceCheckoutService
                 'contact_phone' => $checkout->contact_phone,
                 'contact_email' => $checkout->contact_email,
                 'delivery_country' => $checkout->delivery_country,
+                'delivery_region' => $checkout->delivery_region,
                 'delivery_city' => $checkout->delivery_city,
                 'delivery_district' => $checkout->delivery_district,
                 'delivery_street' => $checkout->delivery_street,

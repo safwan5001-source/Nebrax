@@ -27,9 +27,9 @@ class CommerceOrderSnapshot extends BaseModel implements CompanyWide
     protected $fillable = [
         'tenant_id', 'commerce_order_id',
         'customer_name', 'contact_name', 'company_name', 'email', 'phone', 'vat_number', 'cr_number',
-        'shipping_recipient_name', 'shipping_phone', 'shipping_country', 'shipping_city', 'shipping_district',
+        'shipping_recipient_name', 'shipping_phone', 'shipping_country', 'shipping_region', 'shipping_city', 'shipping_district',
         'shipping_street', 'shipping_building_no', 'shipping_additional_number', 'shipping_postal_code', 'shipping_notes',
-        'billing_recipient_name', 'billing_phone', 'billing_country', 'billing_city', 'billing_district',
+        'billing_recipient_name', 'billing_phone', 'billing_country', 'billing_region', 'billing_city', 'billing_district',
         'billing_street', 'billing_building_no', 'billing_additional_number', 'billing_postal_code',
     ];
 

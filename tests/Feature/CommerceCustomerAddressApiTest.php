@@ -280,6 +280,25 @@ class CommerceCustomerAddressApiTest extends TestCase
     }
 
     /** @test */
+    public function a_saudi_address_rejects_malformed_building_no_additional_number_or_postal_code(): void
+    {
+        $store = $this->seedMobileStore('addr-sa-shape');
+        $token = $this->customerToken($store, '+966500000112');
+        $headers = $this->withCustomerToken($store['token'], $token);
+
+        $this->withHeaders($headers)->postJson('/commerce/v1/addresses', $this->saudiAddressPayload([
+            'building_no' => 'x', 'additional_number' => 'abc', 'postal_code' => '?',
+        ]))->assertStatus(422);
+
+        $this->withHeaders($headers)->postJson('/commerce/v1/addresses', $this->saudiAddressPayload([
+            'building_no' => '123', // one digit short of the required 4
+        ]))->assertStatus(422);
+
+        $this->withHeaders($headers)->postJson('/commerce/v1/addresses', $this->saudiAddressPayload())
+            ->assertCreated();
+    }
+
+    /** @test */
     public function a_non_saudi_address_never_requires_saudi_national_address_fields(): void
     {
         $store = $this->seedMobileStore('addr-non-sa');
