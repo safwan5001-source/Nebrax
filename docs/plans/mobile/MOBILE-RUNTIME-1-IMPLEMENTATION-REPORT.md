@@ -196,13 +196,43 @@ being re-observed on the corrected exact head (recorded below once pushed).
 
 ## Pre-merge review
 
-- PRE_MERGE_REVIEW: **pending** — no review has been recorded as PASS
-  against any head of this PR yet (the first head's CI was still running
-  when the identity correction superseded it, so nothing was invalidated
-  that had actually passed). Recorded once CI is observed green on the
-  corrected exact head (see Gate 9). This report is updated in place when
-  that happens; do not treat this section as final until it says PASS with
-  a Head SHA.
+- PRE_MERGE_REVIEW: **PASS**
+- Reviewed Head SHA: `4e5fae304396cce3be70c3de015159967e6950f3`
+- Findings / resolution: fresh Reviewer + AWJ Guardian pass performed
+  against the complete final diff (`git diff 51a8068 4e5fae3`, 44
+  non-binary files, 2422 insertions) on this exact head:
+  - Confirmed all 6 required checks green on this exact head: `mobile
+    (analyze + test)` ×2 (push+PR event), `php artisan test (L11,
+    sqlite)` ×2, `php artisan test (L11, pgsql)` ×2 — all
+    `conclusion: success`. `mergeable_state: clean`, no conflict with
+    `main` (still at base SHA `51a8068`, unchanged since branch creation).
+  - Re-grepped the full diff for `nebrax`/`Nebrax`/`نبراس` — every
+    remaining match is documentation prose describing the correction
+    itself or the repository's own name; zero matches in any Dart/
+    Kotlin/Swift/Gradle/plist/pbxproj source. Confirmed live identifiers
+    directly: `mobile/android/app/build.gradle.kts` (namespace +
+    applicationId), `mobile/ios/Runner.xcodeproj/project.pbxproj` (both
+    unique `PRODUCT_BUNDLE_IDENTIFIER` values, including the
+    `.RunnerTests` variant), and `mobile/lib/app.dart`'s visible AppBar
+    text all show the corrected `com.example.awjmobileruntimeproof` /
+    `com.example.awjMobileRuntimeProof` / `'أَوْج — AWJ Mobile Runtime'`
+    values consistently.
+  - Confirmed no scope expansion occurred beyond MOBILE-RUNTIME-1's own
+    outcome plus the requested identity correction — no App Schema,
+    Commerce client, or screen code was added.
+  - Confirmed no unapproved namespace was substituted for the
+    disapproved one: `com.example.*` is Apple's/Google's own documented
+    placeholder-identity convention, not a second invented AWJ namespace,
+    and the open Decision Gate is recorded in `mobile/README.md` rather
+    than silently resolved.
+  - No unresolved review finding or Decision Gate remains against this
+    task's own scope (the production Bundle/Application ID Decision Gate
+    is intentionally *not* resolved by this task — it is correctly
+    recorded as open, not treated as blocking a non-production proof
+    workspace).
+  - No accounting/tenant/RBAC/API/DB code touched (confirmed via the file
+    list above — every changed path is under `mobile/`,
+    `.github/workflows/mobile-ci.yml`, or `docs/`).
 
 ## Merge
 
