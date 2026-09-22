@@ -345,7 +345,7 @@ None. No API, database, or migration touched.
 - PR: [#948](https://github.com/safwan5001-source/Nebrax/pull/948)
 - Base SHA: `51a80685289aecdc7354ebcd8d1a32a2c92ac449` (`origin/main`, PR #947)
 - First head (superseded, CI never observed complete): `07c1f6e73ec304ef1ad05493f2c75c4edcae9b73`
-- Head SHA: (recorded once the identity-correction commit is pushed)
+- Head SHA: `edcde98bb2b44dcf2559ae5333832724eb16f834` (identity-correction commit, pushed)
 
 ## Recommended next dependency-ready task
 
