@@ -72,6 +72,8 @@ Current direct browser viewport: **1363 × 936 CSS px**, Arabic RTL.
 | Blog index — desktop | Direct live inspection | **Observed** |
 | About page — desktop | Direct live inspection of hero, story copy and image-led content bands | **Observed** |
 | Header/footer global shells | Seen across all inspected pages | **Observed** |
+| Header sticky/scrolled state | Direct scroll test at 1100px with computed geometry and styles | **Observed** |
+| Home hero carousel controls | Two-slide arrow/dot transition directly exercised; swipe/autoplay/pause pending | **Observed partial** |
 | Search overlay | Full-screen open/close and query entry observed | **Observed** |
 | Product search results / no results | Direct live inspection of populated and zero-result URLs | **Observed** |
 | Policy pages | Returns, terms and privacy/use pages directly inspected | **Observed** |
@@ -170,12 +172,22 @@ The header is a two-row composition with a combined measured height of 154px:
    - RTL ordering;
    - sticky-capable header classes and sticky-shadow capability.
 
+Direct scrolling to 1100px exposed the sticky state:
+
+- the main header becomes fixed at viewport top with `z-index: 390` and an observed 1px/3px soft shadow;
+- total visible height contracts from 154px to 110px;
+- the utility/brand row contracts from 104px to 60px;
+- the primary navigation row remains 50px;
+- the header receives prepared/stuck state classes while its original document-flow box scrolls out of view.
+
+These measurements are **Observed** reference behavior. AWJ should reproduce the perceptual transition through its own component state, not copy the reference classes.
+
 ### 7.2 Header variants required in AWJ
 
 | Variant | Use |
 |---|---|
 | `floral-centered` | Theme default: logo-led, spacious desktop identity. |
-| `floral-compact` | Sticky/scrolled state with reduced height. |
+| `floral-compact` | Sticky/scrolled state: fixed at the viewport top, 110px observed total desktop height, compact 60px brand row, unchanged 50px navigation row and soft elevation. |
 | `floral-mobile` | Mobile top bar with menu, logo and cart; exact reference behavior pending direct observation. |
 
 ### 7.3 Customizer controls
@@ -277,6 +289,11 @@ This is a theme preset. The merchant may reorder, duplicate, hide or delete elig
 #### Hero editorial
 
 - desktop media ratio observed near 1363:585 (~2.33:1) for a main campaign image;
+- the inspected desktop hero is a two-slide RTL carousel;
+- visible previous/next arrow controls are keyboard-focusable and expose accessible slide-direction labels;
+- two pagination dots expose `Go to slide 1/2`; the selected dot alone carries `aria-current="true"` and is in the tab order;
+- directly activating the visible `Next slide` control moved the active state from slide 2 to slide 1 and moved `aria-current` with it, without changing the page URL;
+- swipe, autoplay timing, pause-on-hover/focus and reduced-motion behavior were not directly verified;
 - alternate/mobile media slot required;
 - fields: eyebrow, title, body, CTA label/link, desktop image, mobile image, focal point, overlay strength;
 - variants: full-bleed / contained / split;
@@ -691,7 +708,7 @@ This table is an **AWJ provisional decision**, not a claim of reference-site exa
 ### Global
 
 - [x] Desktop header default.
-- [ ] Header sticky/scrolled visual state.
+- [x] Header sticky/scrolled geometry, compaction, fixed position and elevation.
 - [ ] Mobile header closed/open/submenu.
 - [x] Search closed/open/query-entry/close behavior.
 - [x] Search results and no-results rendering.
@@ -716,7 +733,8 @@ This table is an **AWJ provisional decision**, not a claim of reference-site exa
 - [ ] Full-page screenshot review for pixel-level composition and hidden visual details.
 - [ ] Tablet layout.
 - [ ] Mobile layout.
-- [ ] Carousel arrows/dots/swipe/autoplay/pause behavior.
+- [x] Hero carousel arrows, dots, accessible selected state and URL preservation.
+- [ ] Hero carousel swipe/autoplay/pause/reduced-motion behavior.
 - [ ] Countdown expiry.
 - [ ] Empty collection and partial-media behavior.
 
