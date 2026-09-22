@@ -115,6 +115,44 @@ With the Commerce Mobile Customer track fully closed, a Decision/Evidence Packet
 
 `COM-MOBILE-VERTICAL-TEST-1` is `done`: three stacked PRs merged in sequence — PR #942 (1/3, `/commerce/v1` OpenAPI 3.1 contract, Merge SHA `b7d16ecb75808c3622d3c5782c451c21b71e0f0f`), PR #943 (2/3, guest journey, Merge SHA `c05c62e392f7f33fe57fcb1f8ff1fe97a1a66740`), PR #944 (3/3, authenticated journey, Merge SHA `b8e1a121f202eb9cb967bcb056092f8a2305a5c9`) — each confirmed a genuine squash merge with a single parent via `git log --parents`. Per the owner's explicit split decision (asked via `AskUserQuestion` mid-task once the true scope, 31 routes across ~10 resource types, proved disproportionately large): full field-level contract rigor, matching `PublicApiOpenApiContractTest`'s own convention exactly, split into 3 reviewed-and-merged-in-sequence PRs rather than one large one. Implements ADR-13's partial-scope deliverable in full: `docs/openapi/commerce-api-v1.yaml` (all 31 routes, four `x-auth-tier` groups) + `CommerceApiOpenApiContractTest` (29 tests, four-part rigor) + a guest journey test (catalog→cart→checkout→order→signed lookup, 4 tests) + an authenticated journey test (auth→cart-identity-claim→saved-address→checkout→order→order-history, 2 tests) — both journeys now incorporating Shipping (ADR-10) and Payments (ADR-09) per ADR-13 §5's own incremental-extension instruction, since both landed after the ADR was written. Discovered and closed two real pre-existing bugs along the way: `CommerceCustomerAddressController` had no `rejectUnknown()` allow-list guard unlike every sibling mutation controller (an undocumented field was silently accepted, not rejected); `CommerceCheckoutService::emptyResponse()`'s address block was missing `building_no`/`additional_number`, violating the endpoint's own documented empty/populated key-set-parity invariant. Went through 3 rounds of automated (Codex) review across the stack (round 1 on #942 clean; round 2 on #943's accumulated diff found 5 findings — the `allOf`/`additionalProperties:false` incompatibility on `ProductDetail`/`ProductVariantDetail`, `Order.payment` referencing the wrong schema, an undocumented optional `X-Customer-Token` on cart/checkout, the contract test's own schema-drift check only validating top-level keys, and the `emptyResponse()` bug above — plus a sixth, `Cart.status` non-nullable despite `emptyResponse()` returning `null`, found independently on #944's accumulated diff; round 3 on the fix commit itself found 2 more — the new recursive validator's null-handling and `$ref`-type-checking both had real gaps, which on being fixed properly surfaced two more genuine schema-accuracy bugs, `CartItem.unit_name`/`Order.items[].unit_name` wrongly typed non-nullable). All findings across all three rounds verified as real and fixed; Codex then reported its review-usage limit exhausted for this account. Full `Commerce|Customer|Storefront|BranchIsolationGuard` regression stayed green throughout, final state: 1036 passed on SQLite, 1046 passed on PostgreSQL, 0 failed. `POST_MERGE_REVIEW: PASS` for the final merge (Gate 11): `main` verified to contain `b8e1a12` as its own tip; single-parent squash merge confirmed via `git log --parents` at each of the three merge points; post-merge CI on the exact final `head_sha` re-ran and passed on both required jobs — verified via the GitHub Actions API, run [35763886208](https://github.com/safwan5001-source/Nebrax/actions/runs/35763886208), `conclusion: success`. This closes the entire currently-authorized Commerce Mobile API readiness horizon (rows 1–10): Payments, Shipping, I18N, and the Vertical Slice are now all `done`; `COM-MOBILE-PROMO-1` remains explicitly `deferred` (ADR-11), not pending. No further row in this table is `ready`. Full evidence: `docs/plans/commerce/COM-MOBILE-VERTICAL-TEST-1-IMPLEMENTATION-REPORT.md`.
 
+## Authorized horizon — AWJ Mobile Runtime Proof Horizon V1
+
+STATUS: ACTIVE
+
+Source of truth:
+- `docs/plans/mobile/AWJ_MOBILE_RUNTIME_PROOF_HORIZON_V1.md` (full task
+  outcomes, dependencies, invariants, Quality Gates A–H, Definition of Done,
+  Decision Gates — not duplicated here per the 00-START-HERE documentation
+  rule).
+- `docs/plans/mobile/AWJ_MOBILE_RUNTIME_PROOF_BOOTSTRAP.md` (launch
+  entrypoint).
+
+Authorization: the previous Commerce Mobile API readiness closure V1
+horizon (table above) is fully closed — see `CURRENT-STATE.md`. This
+horizon starts from that closed state and executes sequentially and
+autonomously per نظام الأفق, `MOBILE-RUNTIME-1` first.
+
+| Order | Task ID | Status | Risk | Depends on | Outcome |
+|---|---|---|---|---|---|
+| 1 | MOBILE-RUNTIME-1 | in_progress | normal | horizon authorization | Flutter workspace + toolchain proof |
+| 2 | MOBILE-RUNTIME-2 | backlog | normal | MOBILE-RUNTIME-1 | App Schema + compatibility kernel |
+| 3 | MOBILE-RUNTIME-3 | backlog | normal | MOBILE-RUNTIME-2 | Component + Action Registry |
+| 4 | MOBILE-RUNTIME-4 | backlog | high | MOBILE-RUNTIME-1 | Commerce OpenAPI client + secure session boundary |
+| 5 | MOBILE-RUNTIME-5 | backlog | high | MOBILE-RUNTIME-3, MOBILE-RUNTIME-4 | Home/Product/Cart vertical UI |
+| 6 | MOBILE-RUNTIME-6 | backlog | normal | MOBILE-RUNTIME-5 | ar/en + RTL/LTR + theme/accessibility |
+| 7 | MOBILE-RUNTIME-7 | backlog | high | MOBILE-RUNTIME-3, MOBILE-RUNTIME-5 | Universal/App Links |
+| 8 | MOBILE-RUNTIME-8 | backlog | high | MOBILE-RUNTIME-3, MOBILE-RUNTIME-7 | Push adapter + notification routing proof |
+| 9 | MOBILE-RUNTIME-9 | backlog | normal | MOBILE-RUNTIME-6, 7, 8 | Android/iOS release-build proof |
+| 10 | MOBILE-RUNTIME-10 | backlog | high | MOBILE-RUNTIME-9 | Final compatibility/security/performance/runtime evidence + horizon closure |
+
+`MOBILE-RUNTIME-1` promoted directly to `ready`/`in_progress` from horizon
+authorization (no further evidence gap): the horizon document itself is the
+accepted source requirement, this is the first task, and its outcome
+(workspace scaffold + toolchain baseline) has no unresolved product/
+architecture decision — MR-01/MR-02 already fix Flutter-first and the
+`mobile/` workspace location. Full task-by-task evidence recorded in
+`CURRENT-STATE.md` as each completes.
+
 ## Promotion checklist: backlog → ready
 
 Before changing status to `ready`:
