@@ -20,6 +20,12 @@ It does **not** replace domain architecture, `CLAUDE.md`, the design system, tes
 
 Existing orchestration material under `docs/agent-workspace/` remains historical/operational evidence and is not deleted by this layer.
 
+## نظام الأفق — invocation reference
+
+The canonical name and invocation contract for **نظام الأفق / AWJ Autonomous Engineering Horizon** is documented in `docs/autonomous-engineering/AWJ-HORIZON-SYSTEM.md`.
+
+When Safwan asks to **«نفّذ هذه المهمة بنظام الأفق»** or an unambiguous equivalent, treat that phrase as a durable request to apply the complete documented Horizon process. Do not rely on chat memory to reconstruct its meaning; read the canonical repository reference and current durable state.
+
 ## Core operating principle
 
 **Autonomous by default. Escalate by significance.**
