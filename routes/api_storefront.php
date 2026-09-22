@@ -57,11 +57,15 @@ Route::middleware([
     // COM-CHECKOUT-1A أساسٌ؛ COM-CHECKOUT-1B يضيف /checkout/complete —
     // idempotency إلزامية + التزامٌ صريح، راجع AWJ_CHECKOUT_V1_ARCHITECTURE.md §9.
     Route::get('checkout', [StorefrontCheckoutController::class, 'show'])->name('checkout.show');
+    // COM-MOBILE-PAYMENTS-1 — طرق الدفع المتاحة فعلياً للقناة الحالية
+    // (ADR-09 §3)، عبر PaymentMethodChannelAvailabilityService. قراءة فقط.
+    Route::get('checkout/payment-methods', [StorefrontCheckoutController::class, 'paymentMethods'])->name('checkout.payment_methods.index');
     Route::middleware(RequireStorefrontMutationGateway::class)->group(function () {
         Route::post('checkout', [StorefrontCheckoutController::class, 'store'])->name('checkout.store');
         Route::patch('checkout/contact', [StorefrontCheckoutController::class, 'updateContact'])->name('checkout.contact.update');
         Route::patch('checkout/address', [StorefrontCheckoutController::class, 'updateAddress'])->name('checkout.address.update');
         Route::patch('checkout/delivery', [StorefrontCheckoutController::class, 'updateDelivery'])->name('checkout.delivery.update');
+        Route::patch('checkout/payment', [StorefrontCheckoutController::class, 'updatePayment'])->name('checkout.payment.update');
         Route::post('checkout/complete', [StorefrontCheckoutController::class, 'complete'])->name('checkout.complete');
     });
 });

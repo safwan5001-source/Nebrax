@@ -3,17 +3,20 @@
 namespace App\Http\Controllers\Api;
 
 use App\Models\CommerceCheckout;
+use App\Models\SalesChannel;
 use App\Services\Commerce\CheckoutIdempotencyConflictException;
 use App\Services\Commerce\CheckoutNotFoundException;
 use App\Services\Commerce\CheckoutReviewRequiredException;
 use App\Services\Commerce\CommerceCheckoutService;
 use App\Services\Commerce\CommerceCustomerAddressService;
+use App\Services\PaymentMethodChannelAvailabilityService;
 use App\Support\CommerceOrderReference;
 use App\Support\CommerceOrderSerializer;
 use App\Support\PublicApiErrorCode;
 use App\Support\PublicApiIdempotency;
 use App\Support\PublicApiResponse;
 use App\Tenancy\CustomerContext;
+use App\Tenancy\StorefrontContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -270,6 +273,46 @@ final class CommerceCheckoutController extends PublicApiController
             $request,
             $checkouts,
             fn (CommerceCheckout $checkout) => $checkouts->updateDelivery($checkout, $data['method']),
+        );
+    }
+
+    /**
+     * COM-MOBILE-PAYMENTS-1 (ADR-09 §3) — طرق الدفع المتاحة فعلياً لهذه
+     * القناة، عبر `PaymentMethodChannelAvailabilityService::availableFor()`
+     * حرفياً — لا منطق إتاحة موازٍ. حقول عامة آمنة فقط: لا `cash_bank_
+     * account_id`، لا شيء محاسبي.
+     */
+    public function paymentMethods(Request $request, PaymentMethodChannelAvailabilityService $availability): JsonResponse
+    {
+        $channel = SalesChannel::query()->find(app(StorefrontContext::class)->salesChannelId());
+        $methods = $channel === null ? collect() : $availability->availableFor($channel);
+
+        return PublicApiResponse::success($request, [
+            'payment_methods' => $methods->map(fn ($method) => [
+                'id' => $method->id,
+                'name' => $method->name,
+                'name_en' => $method->name_en,
+                'settlement_type' => $method->settlement_type,
+            ])->all(),
+        ]);
+    }
+
+    /**
+     * COM-MOBILE-PAYMENTS-1 (ADR-09) — يختار `payment_method_id` من طرق
+     * الدفع المتاحة فعلياً لهذه القناة (`GET commerce/v1/payment-methods`).
+     * لا حقل مبلغ ولا مزوّد في هذا الطلب مطلقاً — سلطة خادم صرفة.
+     */
+    public function updatePayment(Request $request, CommerceCheckoutService $checkouts): JsonResponse
+    {
+        $this->rejectUnknown($request, ['payment_method_id']);
+        $data = $request->validate([
+            'payment_method_id' => ['required', 'uuid'],
+        ]);
+
+        return $this->withCurrentCheckout(
+            $request,
+            $checkouts,
+            fn (CommerceCheckout $checkout) => $checkouts->updatePayment($checkout, $data['payment_method_id']),
         );
     }
 

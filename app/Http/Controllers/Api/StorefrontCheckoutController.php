@@ -4,15 +4,18 @@ namespace App\Http\Controllers\Api;
 
 use App\Models\CommerceCheckout;
 use App\Models\CommerceOrder;
+use App\Models\SalesChannel;
 use App\Models\Tenant;
 use App\Services\Commerce\CheckoutIdempotencyConflictException;
 use App\Services\Commerce\CheckoutNotFoundException;
 use App\Services\Commerce\CheckoutReviewRequiredException;
 use App\Services\Commerce\CommerceCartService;
 use App\Services\Commerce\CommerceCheckoutService;
+use App\Services\PaymentMethodChannelAvailabilityService;
 use App\Support\PublicApiErrorCode;
 use App\Support\PublicApiIdempotency;
 use App\Support\PublicApiResponse;
+use App\Tenancy\StorefrontContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -149,6 +152,45 @@ final class StorefrontCheckoutController extends PublicApiController
     }
 
     /**
+     * COM-MOBILE-PAYMENTS-1 (ADR-09 §3) — طرق الدفع المتاحة فعلياً لهذه
+     * القناة، عبر `PaymentMethodChannelAvailabilityService::availableFor()`
+     * حرفياً — لا منطق إتاحة موازٍ. حقول عامة آمنة فقط.
+     */
+    public function paymentMethods(Request $request, PaymentMethodChannelAvailabilityService $availability): JsonResponse
+    {
+        $channel = SalesChannel::query()->find(app(StorefrontContext::class)->salesChannelId());
+        $methods = $channel === null ? collect() : $availability->availableFor($channel);
+
+        return PublicApiResponse::success($request, [
+            'payment_methods' => $methods->map(fn ($method) => [
+                'id' => $method->id,
+                'name' => $method->name,
+                'name_en' => $method->name_en,
+                'settlement_type' => $method->settlement_type,
+            ])->all(),
+        ]);
+    }
+
+    /**
+     * COM-MOBILE-PAYMENTS-1 (ADR-09) — يختار `payment_method_id` من طرق
+     * الدفع المتاحة فعلياً لهذه القناة (`GET store/v1/checkout/payment-methods`).
+     * لا حقل مبلغ ولا مزوّد في هذا الطلب مطلقاً — سلطة خادم صرفة.
+     */
+    public function updatePayment(Request $request, CommerceCheckoutService $checkouts): JsonResponse
+    {
+        $this->rejectUnknown($request, ['payment_method_id']);
+        $data = $request->validate([
+            'payment_method_id' => ['required', 'uuid'],
+        ]);
+
+        return $this->withCurrentCheckout(
+            $request,
+            $checkouts,
+            fn (CommerceCheckout $checkout) => $checkouts->updatePayment($checkout, $data['payment_method_id']),
+        );
+    }
+
+    /**
      * COM-CHECKOUT-1B — `POST /store/v1/checkout/complete`. `Idempotency-Key`
      * إلزامية (نفس عقد `PublicApiIdempotency` — تحقّق/تجزئة/بصمة). لا Order
      * يُنشأ إن فشلت إعادة التحقّق النهائية (`review_required`، 409) أو تعارض
@@ -242,6 +284,11 @@ final class StorefrontCheckoutController extends PublicApiController
                 // COM-MOBILE-SHIPPING-1: مسبقاً محسوباً ضمن `total` أعلاه —
                 // هذا الحقل تفصيلٌ للعرض فقط، لا مصدر حقيقة إضافياً.
                 'amount' => ['amount_minor' => $order->delivery_amount_minor, 'currency' => $currency],
+            ],
+            'payment' => [
+                'method' => $order->paymentIntent?->method,
+                'status' => $order->paymentIntent?->status,
+                'payment_method_name' => $order->paymentIntent?->payment_method_name,
             ],
             'items' => $order->lines->map(fn ($line) => [
                 'product_id' => $line->product_id,

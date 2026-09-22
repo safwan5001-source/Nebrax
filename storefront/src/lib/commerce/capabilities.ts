@@ -77,55 +77,55 @@ export const WISHLIST_CAPABILITY = "design_only" as CapabilityState;
 export const COUPON_CAPABILITY = "design_only" as CapabilityState;
 
 /**
- * Online payment.
+ * Online/card payment.
  *
- * `design_only`: there is no payment route in `routes/api_storefront.php`, no
- * `PaymentIntent` model in `app/Models`, and `CommerceCheckoutService::complete()`
- * creates a `CommerceOrder` with `status = confirmed` and no payment of any kind.
- * ADR-04 ("Payment Intent / Authorization / Capture / Refund") is recorded as
- * **Accepted — Architecture Direction ... no implementation approval**, so the
- * boundary is agreed and the implementation does not exist.
+ * `design_only` for online/card payment specifically — still true: no PSP is
+ * integrated, no `client secret`/redirect flow exists, and `POST checkout/
+ * complete` still confirms the order on its own rather than requiring a
+ * settled/authorised provider intent first. ADR-04 ("Payment Intent /
+ * Authorization / Capture / Refund") remains **Accepted — Architecture
+ * Direction**, provider selection unmade.
  *
- * The checkout therefore carries a payment stage that is designed and visibly
- * inert. It names no provider, shows no brand mark, and offers no method the
- * store has not enabled — per the design-first policy §5.6, a payment mark is a
- * commercial claim the platform has not made. Placing the order states plainly
- * that it is a commercial commitment and that no payment has been taken.
+ * **COM-MOBILE-PAYMENTS-1 (ADR-09) made a narrower thing real underneath**:
+ * `CommerceCheckoutService::complete()` now creates a real `CommercePaymentIntent`
+ * (`cod`/`pay_on_pickup`, derived from the delivery method — never marked
+ * paid at order creation, ADR-04 §5) and `GET/PATCH checkout/payment-methods`
+ * / `checkout/payment` are real, live routes for the store's own enabled
+ * cash-settlement methods (`PaymentMethodChannelAvailabilityService`) — see
+ * `PaymentStage.tsx`'s own doc. This constant still governs only the
+ * card/online piece: no provider is named, no brand mark is shown, no card
+ * field exists anywhere in this storefront.
  *
- * Missing backend contract, for later gap closure:
- *   GET  store/v1/checkout/payment-methods → the methods THIS storefront enabled
- *   POST store/v1/checkout/payment-intent  → { method } → a provider-side intent
- *                                            (client secret / redirect URL),
- *                                            never card data through AWJ
- *   POST store/v1/checkout/complete        → must then require a settled or
- *                                            authorised intent rather than
- *                                            confirming on its own
+ * Missing backend contract, for later gap closure (online/card only):
+ *   POST store/v1/checkout/payment-intent → { method } → a provider-side
+ *                                           intent (client secret/redirect
+ *                                           URL), never card data through AWJ
+ *   POST store/v1/checkout/complete       → must then require a settled or
+ *                                           authorised intent rather than
+ *                                           confirming on its own
  * plus a server-verified provider webhook receiver, processed idempotently
- * inside a trusted tenant context (ADR-04 §1).
+ * inside a trusted tenant context (ADR-04 §1), and the provider/vendor
+ * selection itself (ADR-09's own open decision).
  */
 export const PAYMENT_CAPABILITY = "design_only" as CapabilityState;
 
 /**
  * Shipping/delivery pricing.
  *
- * `design_only` for presentation, with a live method choice underneath.
- * `CommerceCheckoutService::DELIVERY_METHODS` is the fixed list `['pickup',
- * 'standard']` and `updateDelivery()` writes `'delivery_amount_minor' => 0`
- * unconditionally — the method a shopper picks is real and is stored; the amount
- * is a server-forced zero because no shipping pricing authority exists. The
- * controller does not accept an amount from the client at all.
+ * `live` — COM-MOBILE-SHIPPING-1 (ADR-10) gave `updateDelivery()` a real
+ * shipping-rate authority (`ShippingRateService`: a merchant-configured
+ * zone match, city then region, or `0` for `pickup`/an unconfigured
+ * tenant). `delivery.amount` is now a genuine server-computed figure —
+ * never a placeholder — and it is safe to show, including as "free," since
+ * a resolved `0` is now an authoritative fact (no zone configured, or
+ * `pickup`), not a gap-filler. The controller still accepts no amount from
+ * the client at all.
  *
- * So the storefront shows the two real methods and shows no price, no estimate
- * and no delivery date for either. It never presents the zero as "free
- * delivery": that would be a commercial claim, and the amount is a placeholder,
- * not a quote.
- *
- * Missing backend contract, for later gap closure: a shipping pricing authority
- * (rate source, zone/region model, per-method quote) that `updateDelivery()` can
- * consult, so `delivery.amount` becomes a real server-computed figure and the
- * checkout total becomes subtotal + delivery rather than subtotal alone.
+ * `CartSummary`'s own doc explains why there is still no client-computed
+ * "Total" row even so: the server-sent figures are shown as given, never
+ * summed client-side.
  */
-export const DELIVERY_PRICING_CAPABILITY = "design_only" as CapabilityState;
+export const DELIVERY_PRICING_CAPABILITY = "live" as CapabilityState;
 
 /**
  * Tax presentation in cart and checkout.

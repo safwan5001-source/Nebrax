@@ -8,11 +8,14 @@ import {
   completeAwjCheckout,
   createOrResumeAwjCheckout,
   fetchAwjCheckout,
+  fetchAwjPaymentMethods,
   updateAwjCheckoutAddress,
   updateAwjCheckoutContact,
   updateAwjCheckoutDelivery,
+  updateAwjCheckoutPayment,
 } from "@/lib/commerce/checkout";
 import {
+  type AwjPaymentMethod,
   type AwjReviewIssue,
   type AwjReviewRequiredDetails,
   mapAwjCheckoutToViewModel,
@@ -102,6 +105,22 @@ export async function updateAwjDelivery(method: string) {
     const checkout = await updateAwjCheckoutDelivery(method);
     return { checkout };
   }, "Could not save your delivery method. Please try again.");
+}
+
+/** The payment methods this channel has enabled. Empty array on any failure — never throws to the caller. */
+export async function getAwjPaymentMethods(): Promise<AwjPaymentMethod[]> {
+  try {
+    return await fetchAwjPaymentMethods();
+  } catch {
+    return [];
+  }
+}
+
+export async function updateAwjPayment(paymentMethodId: string) {
+  return actionResult(async () => {
+    const checkout = await updateAwjCheckoutPayment(paymentMethodId);
+    return { checkout };
+  }, "Could not save your payment method. Please try again.");
 }
 
 export type CompleteAwjCheckoutResult =

@@ -59,6 +59,7 @@ import {
 import {
   AWJ_DELIVERY_METHODS,
   type AwjDeliveryMethod,
+  type AwjPaymentMethod,
   type AwjReviewIssue,
   type StorefrontCheckout,
   type StorefrontOrder,
@@ -66,10 +67,12 @@ import {
 import {
   completeAwjCheckoutAction,
   getAwjCheckoutIdentity,
+  getAwjPaymentMethods,
   startOrResumeAwjCheckout,
   updateAwjAddress,
   updateAwjContact,
   updateAwjDelivery,
+  updateAwjPayment,
 } from "@/lib/data/awj-checkout";
 import { extractBasePath } from "@/lib/utils/path";
 
@@ -111,6 +114,8 @@ export function AwjCheckoutFlow() {
   const [address, setAddress] = useState<AddressForm>(EMPTY_ADDRESS);
   const [deliveryMethod, setDeliveryMethod] =
     useState<AwjDeliveryMethod | null>(null);
+  const [paymentMethods, setPaymentMethods] = useState<AwjPaymentMethod[]>([]);
+  const [paymentMethodId, setPaymentMethodId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [completing, setCompleting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -149,6 +154,16 @@ export function AwjCheckoutFlow() {
       )
         ? (nextCheckout.delivery.method as AwjDeliveryMethod)
         : null,
+    );
+    const methods = await getAwjPaymentMethods();
+    setPaymentMethods(methods);
+    // A sole enabled method has no real choice to make — pre-select it as a
+    // draft so the shopper doesn't tap through an option list of one. Still
+    // only saved when `saveAndAdvance` actually PATCHes it, same as any
+    // other draft field here.
+    setPaymentMethodId(
+      nextCheckout.payment.payment_method_id ??
+        (methods.length === 1 ? methods[0].id : null),
     );
     setStage("contact");
     setFlowState("stage");
@@ -218,13 +233,31 @@ export function AwjCheckoutFlow() {
             return;
           }
           setCheckout(result.checkout);
+        } else if (from === "payment") {
+          // Optional: the backend creates the Payment Intent either way
+          // (`payment_method_name` stays null if none was ever chosen — see
+          // `CommercePaymentIntentService`'s own doc). Only PATCH when there
+          // is something to save and it differs from what is already saved,
+          // so re-visiting this stage without changing anything never fires
+          // a redundant write.
+          if (
+            paymentMethodId &&
+            paymentMethodId !== checkout?.payment.payment_method_id
+          ) {
+            const result = await updateAwjPayment(paymentMethodId);
+            if (!result.success) {
+              setFormError(result.error);
+              return;
+            }
+            setCheckout(result.checkout);
+          }
         }
         goTo(to);
       } finally {
         setSaving(false);
       }
     },
-    [contact, address, deliveryMethod, goTo],
+    [contact, address, deliveryMethod, paymentMethodId, checkout, goTo],
   );
 
   const handleComplete = useCallback(async () => {
@@ -398,7 +431,15 @@ export function AwjCheckoutFlow() {
               t={t}
             />
           )}
-          {stage === "payment" && <PaymentStage t={t} />}
+          {stage === "payment" && (
+            <PaymentStage
+              paymentMethods={paymentMethods}
+              selectedPaymentMethodId={paymentMethodId}
+              onChange={setPaymentMethodId}
+              deliveryMethod={deliveryMethod}
+              t={t}
+            />
+          )}
           {stage === "review" && (
             <ReviewStage checkout={checkout} onEdit={goTo} t={t} />
           )}
@@ -520,7 +561,10 @@ function StageActions({
           onClick: () => onAdvance("delivery", "payment"),
         };
       case "payment":
-        // Nothing to save: the stage is inert by design.
+        // Optional, never blocking: completing with no method ever chosen
+        // still succeeds (see `saveAndAdvance`'s own `payment` branch and
+        // `CommercePaymentIntentService`'s doc) — there is nothing here a
+        // shopper could get "wrong" by skipping.
         return {
           label: t("continueToReview"),
           disabled: false,

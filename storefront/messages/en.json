@@ -783,7 +783,8 @@
       "editAddress": "Edit delivery address",
       "editDelivery": "Edit delivery method",
       "notSet": "Not set",
-      "commitmentNotice": "Placing the order records a commercial commitment to buy it. No payment is taken now; the store confirms the final amount and how to pay."
+      "commitmentNotice": "Placing the order records a commercial commitment to buy it. No payment is taken now; the store confirms the final amount and how to pay.",
+      "editPayment": "Edit payment method"
     },
     "reviewRequired": {
       "title": "Your order needs review",
@@ -826,7 +827,11 @@
         "card": "Card",
         "bankTransfer": "Bank transfer",
         "cashOnDelivery": "Cash on delivery"
-      }
+      },
+      "selectMethod": "Select how you'll pay",
+      "noMethodsEnabled": "This store hasn't enabled a specific payment method yet.",
+      "settledOnDelivery": "Settled in cash when your order is delivered.",
+      "settledOnPickup": "Settled in cash when you pick up your order."
     },
     "continueToAddress": "Continue to address",
     "continueToDelivery": "Continue to delivery",

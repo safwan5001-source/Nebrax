@@ -55,6 +55,10 @@ class CommerceModuleBoundaryTest extends TestCase
      * @var list<string>
      */
     private const ALLOWED_COMMERCE_API_ROUTES = [
+        // COM-MOBILE-PAYMENTS-1 — إدارة داخلية لالتزامات دفع Commerce (ADR-09).
+        'api/commerce/payment-intents',
+        'api/commerce/payment-intents/{id}/cancel',
+        'api/commerce/payment-intents/{id}/collect',
         // COM-CATALOG-2 — مساحة عمل نشر التصنيفات (قراءة + استبدال مجموعة النشر).
         'api/commerce/workspace/categories/publication',
         'api/commerce/workspace/categories/{id}/publication',
@@ -95,6 +99,8 @@ class CommerceModuleBoundaryTest extends TestCase
         'commerce/v1/checkout/complete',
         'commerce/v1/checkout/contact',
         'commerce/v1/checkout/delivery',
+        // COM-MOBILE-PAYMENTS-1 — اختيار طريقة الدفع.
+        'commerce/v1/checkout/payment',
         // COM-MOBILE-AUTH-1 — ملف العميل الموثَّق (X-Customer-Token).
         'commerce/v1/me',
         // COM-MOBILE-ORDER-HISTORY-1 — سجلّ طلبات العميل الموثَّق الخاص به.
@@ -103,6 +109,8 @@ class CommerceModuleBoundaryTest extends TestCase
         // COM-MOBILE-MEDIA-1 — مسار وسائط منتج محروس لحدّ ثقة /commerce/v1.
         'commerce/v1/media/{id}',
         'commerce/v1/orders/{id}',
+        // COM-MOBILE-PAYMENTS-1 — طرق الدفع المتاحة فعلياً للقناة (ADR-09 §3).
+        'commerce/v1/payment-methods',
         'commerce/v1/products',
         'commerce/v1/products/{id}',
         'commerce/v1/storefront',

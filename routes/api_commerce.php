@@ -101,6 +101,10 @@ Route::middleware([
     // own docblock) — Checkout has no token of its own, it shares Cart's.
     Route::get('checkout', [CommerceCheckoutController::class, 'show'])->name('checkout.show');
 
+    // COM-MOBILE-PAYMENTS-1 — طرق الدفع المتاحة فعلياً للقناة الجوّالة
+    // الحالية (ADR-09 §3)، عبر PaymentMethodChannelAvailabilityService.
+    Route::get('payment-methods', [CommerceCheckoutController::class, 'paymentMethods'])->name('payment_methods.index');
+
     // PR-5 — standalone order status. Ownership is the signed X-Order-Reference
     // header issued at checkout completion (see CommerceOrderController's own
     // docblock) — a bare order id never establishes ownership.
@@ -144,6 +148,7 @@ Route::middleware([
     Route::patch('checkout/contact', [CommerceCheckoutController::class, 'updateContact'])->name('checkout.contact.update');
     Route::patch('checkout/address', [CommerceCheckoutController::class, 'updateAddress'])->name('checkout.address.update');
     Route::patch('checkout/delivery', [CommerceCheckoutController::class, 'updateDelivery'])->name('checkout.delivery.update');
+    Route::patch('checkout/payment', [CommerceCheckoutController::class, 'updatePayment'])->name('checkout.payment.update');
     Route::post('checkout/complete', [CommerceCheckoutController::class, 'complete'])->name('checkout.complete');
 });
 

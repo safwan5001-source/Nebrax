@@ -141,6 +141,12 @@ class CommerceOrder extends BaseModel implements CompanyWide
         return $this->hasOne(CommerceOrderSnapshot::class);
     }
 
+    /** COM-MOBILE-PAYMENTS-1 — التزام الدفع (ADR-04) — واحدٌ لكل طلب في V1. */
+    public function paymentIntent(): HasOne
+    {
+        return $this->hasOne(CommercePaymentIntent::class, 'commerce_order_id');
+    }
+
     public function isDraft(): bool
     {
         return $this->status === self::STATUS_DRAFT;

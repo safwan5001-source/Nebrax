@@ -27,7 +27,10 @@ use App\Models\Tenant;
  *  parity between the two products' shapes.
  *
  *  Public-safe fields only: no tenant internals beyond the existing
- *  contract, no cost/ledger/inventory/payment data, no API client identity.
+ *  contract, no cost/ledger/inventory data, no API client identity.
+ *  `payment` (COM-MOBILE-PAYMENTS-1) exposes only method/status/method
+ *  name — never a card/PSP field, since none exist in this V1 (COD/Pay on
+ *  Pickup only, ADR-09).
  *
  *  COM-MOBILE-ORDER-HISTORY-1: also the detail shape for the authenticated
  *  customer's own order history (`GET /commerce/v1/me/orders/{id}`) — one
@@ -68,6 +71,11 @@ final class CommerceOrderSerializer
                 // COM-MOBILE-SHIPPING-1: مسبقاً محسوباً ضمن `total` أعلاه —
                 // هذا الحقل تفصيلٌ للعرض فقط، لا مصدر حقيقة إضافياً.
                 'amount' => ['amount_minor' => $order->delivery_amount_minor, 'currency' => $currency],
+            ],
+            'payment' => [
+                'method' => $order->paymentIntent?->method,
+                'status' => $order->paymentIntent?->status,
+                'payment_method_name' => $order->paymentIntent?->payment_method_name,
             ],
             'items' => $order->lines->map(fn ($line) => [
                 'product_id' => $line->product_id,

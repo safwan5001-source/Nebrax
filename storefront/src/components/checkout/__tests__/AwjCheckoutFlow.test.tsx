@@ -24,6 +24,11 @@ const mockActions = vi.hoisted(() => ({
   updateAwjContact: vi.fn(),
   updateAwjAddress: vi.fn(),
   updateAwjDelivery: vi.fn(),
+  // COM-MOBILE-PAYMENTS-1 — empty by default, matching the real backend's
+  // own out-of-the-box state (every default-seeded PaymentMethod starts
+  // disabled for any online channel; see `fetchAwjPaymentMethods`'s doc).
+  getAwjPaymentMethods: vi.fn().mockResolvedValue([]),
+  updateAwjPayment: vi.fn(),
   completeAwjCheckoutAction: vi.fn(),
   // Fixed by default — real localStorage-backed persistence
   // (`@/lib/commerce/checkout-idempotency`) is exercised for real via
@@ -93,6 +98,11 @@ function baseCheckout(): StorefrontCheckout {
         notes: null,
       },
     },
+    payment: {
+      payment_method_id: null,
+      payment_method_name: null,
+      method: null,
+    },
     cart: cartWithItem(),
   };
 }
@@ -111,6 +121,11 @@ const sampleOrder = {
     street: "شارع الملك فهد",
     postal_code: null,
     notes: null,
+  },
+  payment: {
+    method: "pay_on_pickup",
+    status: "awaiting_collection",
+    payment_method_name: null,
   },
   items: [
     {
@@ -168,8 +183,9 @@ async function fillDetailsAndContinue(
     screen.getByRole("button", { name: "awjCheckout.continueToPayment" }),
   );
 
-  // The payment stage is DESIGN_ONLY: it saves nothing and calls nothing.
-  await screen.findByText("awjCheckout.payment.notEnabledTitle");
+  // Default mock has no enabled payment methods — the stage shows the
+  // honest empty state and saves nothing (no method to select).
+  await screen.findByText("awjCheckout.payment.noMethodsEnabled");
   await user.click(
     screen.getByRole("button", { name: "awjCheckout.continueToReview" }),
   );
@@ -181,6 +197,7 @@ describe("AwjCheckoutFlow", () => {
       mock.mockReset();
     }
     mockActions.getAwjCheckoutIdentity.mockResolvedValue("identity-a");
+    mockActions.getAwjPaymentMethods.mockResolvedValue([]);
     localStorage.clear();
   });
 
@@ -723,7 +740,7 @@ describe("AwjCheckoutFlow", () => {
         screen.queryByLabelText("awjCheckout.address.street"),
       ).not.toBeInTheDocument();
       expect(
-        screen.queryByText("awjCheckout.payment.notEnabledTitle"),
+        screen.queryByText("awjCheckout.payment.noMethodsEnabled"),
       ).not.toBeInTheDocument();
     });
 
@@ -753,18 +770,20 @@ describe("AwjCheckoutFlow", () => {
       expect(mockActions.updateAwjDelivery).not.toHaveBeenCalled();
     });
 
-    it("the payment stage calls no server action at all — it is inert by design", async () => {
+    it("the payment stage saves nothing when no method is enabled to select", async () => {
       const user = userEvent.setup();
       render(<AwjCheckoutFlow />);
       await fillDetailsAndContinue(user);
 
       await screen.findByText("awjCheckout.review.heading");
 
-      // Three PATCHes for three real stages. The payment stage adds none,
-      // because there is no payment endpoint to add.
+      // Three PATCHes for three real stages. The payment stage adds none
+      // here because the default mock has no enabled method to select —
+      // there is nothing to save.
       expect(mockActions.updateAwjContact).toHaveBeenCalledTimes(1);
       expect(mockActions.updateAwjAddress).toHaveBeenCalledTimes(1);
       expect(mockActions.updateAwjDelivery).toHaveBeenCalledTimes(1);
+      expect(mockActions.updateAwjPayment).not.toHaveBeenCalled();
       expect(mockActions.completeAwjCheckoutAction).not.toHaveBeenCalled();
     });
 
