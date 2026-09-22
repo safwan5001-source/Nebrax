@@ -212,6 +212,99 @@ A successful local/simulator debug run alone is insufficient.
 
 Store signing, merchant certificates, App Store/Play submission and production release are **outside this horizon** and remain owner-gated.
 
+### MR-13 — Capability manifest + runtime handshake
+
+The proof must model compatibility as capabilities, not only version numbers.
+
+At startup/experience resolution, the runtime must be able to present or derive a capability manifest that identifies at least:
+- platform;
+- runtime version/build identity;
+- supported schema range;
+- supported Component Registry capabilities/versions;
+- supported Action Registry capabilities/versions;
+- relevant native capabilities.
+
+The server/schema must not assume that the same capability is simultaneously available on iOS and Android. Exact transport/handshake fields remain implementation work, but the proof must demonstrate deterministic compatibility decisions from explicit capability evidence.
+
+### MR-14 — Last-known-good startup and offline safety
+
+This horizon does **not** introduce offline-first commerce. It must nevertheless prove safe startup degradation when experience/configuration or Commerce data cannot be fetched.
+
+A previously validated Published Experience may be cached as **last-known-good** only when:
+- its integrity and compatibility metadata are preserved;
+- it remains compatible with the installed runtime;
+- it contains no customer secrets;
+- sensitive/business data is not treated as current merely because presentation can render;
+- stale commerce operations fail safely and revalidate server-side when connectivity returns.
+
+If no compatible last-known-good experience exists, show a controlled unavailable/update-required state rather than executing unknown or partially validated schema.
+
+### MR-15 — Native capability rollout ordering
+
+A remote Experience must never require a native capability before a supporting binary is safely available under the compatibility policy.
+
+Required ordering:
+
+```text
+ship native capability
+ -> establish supported runtime/capability evidence
+ -> only then allow Published Experience to require it
+```
+
+Store release/rollout is not equivalent to device installation. The proof must preserve the distinction between native build released, store availability, installed runtime and published Experience.
+
+Rollback must select only an Experience compatible with the installed runtime/capability profile.
+
+### MR-16 — Lifecycle and network resilience
+
+The proof must exercise:
+- cold start;
+- resume after background;
+- interrupted/slow network;
+- request timeout/cancellation;
+- safe retry behavior;
+- token/session recovery or explicit re-authentication where appropriate;
+- no duplicate side effects caused by blind retries.
+
+Retry behavior must respect existing Commerce idempotency semantics and must not invent new financial/order guarantees client-side.
+
+### MR-17 — Observability and privacy
+
+Runtime diagnostics must be useful without leaking sensitive data.
+
+At minimum, define structured diagnostic context for:
+- runtime/build version;
+- schema/Experience version;
+- capability/compatibility failure class;
+- platform;
+- non-sensitive correlation/request identifiers when available.
+
+Never log raw customer tokens, cart/order secret references, credentials, PII payloads or secure-storage contents. Crash/telemetry vendor adoption is not authorized by this horizon.
+
+### MR-18 — Performance evidence
+
+“Runs successfully” is not sufficient proof. Capture reproducible measurements for at least:
+- cold/warm startup;
+- first meaningful runtime render;
+- schema parse/validation/render path;
+- product-list scrolling/image loading behavior;
+- representative memory/jank observations;
+- release artifact/binary size.
+
+MOBILE-RUNTIME-1 must establish measurement method and provisional budgets/baseline before optimization. MOBILE-RUNTIME-10 must report measured results and regressions. Do not optimize by weakening correctness, accessibility, security or image fidelity without an explicit tradeoff.
+
+### MR-19 — Dependency/license/supply-chain gate
+
+Before adding a non-trivial Flutter/native dependency, record:
+- why it is needed;
+- license compatibility for commercial SaaS/mobile distribution;
+- maintenance/release health;
+- platform support;
+- security implications and native permissions;
+- whether a narrower first-party/framework implementation is reasonable.
+
+Pin dependencies through the normal lockfile/toolchain mechanism. Do not adopt broad SDUI/low-code runtimes merely to accelerate the proof. Strategic dependency lock-in is a Decision Gate.
+
 ## 5. Runtime proof vertical slice
 
 The minimum runtime flow:
@@ -252,7 +345,14 @@ Proof fixtures must include:
 - unknown optional component;
 - unknown required component/action;
 - too-new schema/runtime requirement;
-- malformed schema.
+- malformed schema;
+- old runtime + newer compatible Experience;
+- old runtime + unsupported required capability;
+- new runtime + older Experience;
+- iOS/Android capability divergence;
+- rollback to a compatible Experience only;
+- no-network startup with compatible last-known-good;
+- no-network startup without a compatible last-known-good.
 
 ## 7. Quality Gates
 
@@ -260,13 +360,17 @@ Proof fixtures must include:
 - Flutter project/workspace isolated and documented.
 - pinned SDK/dependency strategy.
 - lint/analyze/test commands documented.
-- no unrelated repo refactor.
+- no unrelated repo refactor;
+- dependency/license/supply-chain review for added non-trivial packages;
+- performance measurement method + provisional budgets/baseline recorded.
 
 ### Gate B — Schema + Registry
 - versioned schema parser/validator;
 - typed Component Registry;
 - typed Action Registry;
+- capability manifest/runtime compatibility model;
 - compatibility/fallback tests;
+- version-skew and rollback compatibility tests;
 - malicious/unknown input negatives.
 
 ### Gate C — Commerce integration
@@ -282,7 +386,9 @@ Proof fixtures must include:
 - deep-link input validation;
 - no arbitrary URL/action execution;
 - cross-tenant authority cannot be supplied by schema/runtime;
-- negative tests.
+- negative tests;
+- last-known-good cache cannot become a secret/business-authority cache;
+- diagnostics/redaction tests or equivalent evidence.
 
 ### Gate E — i18n/accessibility
 - ar/en;
@@ -294,7 +400,9 @@ Proof fixtures must include:
 ### Gate F — Native capability proof
 - verified-link configuration/validation path documented;
 - push adapter proof;
-- lifecycle handling for foreground/background/open-from-notification where applicable.
+- lifecycle handling for foreground/background/open-from-notification where applicable;
+- iOS/Android capability divergence is represented rather than assumed equal;
+- native capability rollout ordering is documented and tested.
 
 ### Gate G — Build
 - Android release build;
@@ -307,7 +415,13 @@ Proof fixtures must include:
 - startup/runtime errors captured;
 - binary/build observations recorded;
 - known limitations explicit;
-- Flutter viability conclusion based on evidence.
+- Flutter viability conclusion based on evidence;
+- cold/warm startup and first-render measurements;
+- schema parse/render, list/image, memory/jank observations;
+- release artifact/binary size recorded;
+- cold start/resume/network interruption/retry evidence;
+- compatible last-known-good and controlled unavailable/update-required startup paths proven;
+- version-skew/rollback matrix proven.
 
 ## 8. Task queue — dependency safe
 
@@ -322,7 +436,7 @@ Proof fixtures must include:
 | 7 | MOBILE-RUNTIME-7 | Universal/App Links | 3,5 | validated product/navigation deep links |
 | 8 | MOBILE-RUNTIME-8 | Push adapter + notification routing proof | 3,7 | provider-bounded push/navigation |
 | 9 | MOBILE-RUNTIME-9 | Android/iOS release-build proof | 6,7,8 | reproducible native build evidence |
-| 10 | MOBILE-RUNTIME-10 | Final compatibility/security/runtime evidence | 9 | closure report + Flutter viability verdict |
+| 10 | MOBILE-RUNTIME-10 | Final compatibility/security/performance/runtime evidence | 9 | version-skew, rollback, offline-startup, lifecycle, performance + Flutter viability closure |
 
 Tasks may be split into smaller PRs when evidence warrants it. Dependent work does not unlock until predecessor Post-Merge Review passes.
 
@@ -341,6 +455,14 @@ The horizon is complete only when all of the following are evidenced:
 - accessibility evidence exists.
 - Android and iOS release-mode build proof exists within available non-production credentials.
 - compatibility/fallback negatives pass.
+- explicit capability manifest/compatibility decisions pass.
+- old/new runtime↔Experience version-skew and rollback matrix passes.
+- native capability rollout ordering prevents premature Experience activation.
+- compatible last-known-good startup and no-compatible-cache safe failure are proven.
+- cold start/resume/network interruption/retry behavior is evidenced.
+- diagnostics are useful and redact secrets/PII.
+- performance measurements and release artifact sizes are recorded against documented provisional budgets/baselines.
+- non-trivial dependencies have license/maintenance/security review evidence.
 - final security/Guardian review passes.
 - exact-Head CI passes before every merge.
 - Post-Merge Review passes after every merge.
