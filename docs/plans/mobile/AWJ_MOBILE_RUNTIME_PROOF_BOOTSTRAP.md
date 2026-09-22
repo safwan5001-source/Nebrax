@@ -32,6 +32,7 @@ Start with `MOBILE-RUNTIME-1`.
 For every task:
 - inspect only relevant code/docs/tests;
 - use current official platform docs when behavior may have changed;
+- before adding non-trivial Flutter/native dependencies, record license, maintenance, security/native-permission and lock-in evidence;
 - implement the smallest correct slice;
 - run focused tests first, then risk-appropriate broader tests/builds;
 - self-review as Implementer;
@@ -62,6 +63,12 @@ Any Head change after pre-merge review invalidates that review.
 - Unknown security-significant schema/action input fails closed.
 - Preserve Arabic default + English + RTL/LTR.
 - Preserve backward compatibility.
+- Treat runtime compatibility as explicit capabilities, not version numbers alone.
+- Never remotely require a native capability before a compatible installed-runtime policy permits it.
+- Store release/rollout must never be treated as proof that devices installed the binary.
+- Last-known-good Experience caching is presentation recovery only; it must not become stale business authority or a secret cache.
+- Offline-first commerce is out of scope, but safe no-network startup is required.
+- Diagnostics must redact tokens, secret order/cart references, credentials and PII.
 - No production deploy/release.
 - No App Store/Google Play submission.
 - No merchant signing/account ownership change.
@@ -98,7 +105,11 @@ At horizon closure, commit an MD report containing:
 - RTL/LTR/accessibility evidence;
 - deep-link/push evidence;
 - security/Guardian findings;
-- runtime compatibility results;
+- runtime compatibility results, including capability manifest, version-skew and rollback matrix;
+- last-known-good/no-network startup evidence;
+- cold-start/resume/network interruption/retry evidence;
+- performance measurements: cold/warm startup, first meaningful render, schema path, list/image behavior, memory/jank observations and release artifact sizes;
+- dependency/license/security review summary;
 - Flutter viability conclusion;
 - known limitations/deferred items;
 - remaining Decision Gates;
