@@ -404,6 +404,79 @@ Discovered backlog from this task (not yet scheduled): none beyond what
 `createFromCheckout()` → `CustomerContext` wiring gap, `COM-MOBILE-ORDER-HISTORY-1`'s job,
 not this task's).
 
+## Sixth task
+
+```yaml
+id: COM-MOBILE-ORDER-HISTORY-1
+title: Authenticated customer order history (split from COM-MOBILE-CUSTOMER-1)
+domain: commerce
+status: done
+risk: normal
+depends_on:
+  - COM-MOBILE-AUTH-1 (done)
+  - CommerceOrderService::createFromCheckout() CustomerContext-sourcing gap (closed by this task)
+references:
+  - docs/plans/store/COMMERCE_MOBILE_API_READINESS.md
+outcome: >
+  GET /commerce/v1/me/orders (paginated list, lightweight summary rows) and
+  GET /commerce/v1/me/orders/{id} (full detail via CommerceOrderSerializer),
+  both under the existing X-Customer-Token required-auth group. Ownership is
+  CustomerContext::customerIdentityId() alone, via the pre-existing
+  CommerceOrderService::ownedOrders()/findOwnedOrder(). Also fixes
+  createFromCheckout()'s customer_identity_id wiring gap: sourced from
+  CustomerContext at order-creation time, exactly matching how the same
+  method already sources TenantContext, rather than the hardcoded null it
+  had unconditionally written since PR-COM-6B.
+invariants:
+  - Tenant Isolation
+  - customer_identity_id never client-suppliable, sourced only from CustomerContext
+  - an order belonging to one customer is never listable or readable by another, even in the same tenant
+  - a guest-completed order is permanently unreachable via this endpoint for any customer
+  - no write to any existing CommerceOrder/CommerceOrderSnapshot row (read-only plus one create-time field)
+acceptance:
+  - list/detail happy path with the correct summary/full shapes respectively
+  - per-customer isolation; guest orders never appear in any customer's history
+  - newest-first default sort order
+  - foreign-order/nonexistent-order/no-token rejections, non-revealing where applicable
+  - no sensitive internal field leakage
+  - SQLite/PostgreSQL verification
+tests:
+  - 10 tests (CommerceCustomerOrderApiTest, new)
+  - full Commerce|Customer|Storefront regression
+  - CommerceOrderStatusApiTest / CommerceCheckoutApiTest / CommerceModuleBoundaryTest / BranchIsolationGuardTest (regression, unaffected)
+  - SQLite
+  - PostgreSQL
+merge_policy: standing-authority-after-pre-merge-review
+deploy_policy: owner-approval
+```
+
+`COM-MOBILE-ORDER-HISTORY-1` is `done`: no Decision Escalation Gate — the task's
+sole dependency was a wiring-gap fix (`createFromCheckout()`'s `CustomerContext`
+sourcing), not a product/policy decision, per both `COM-MOBILE-CART-IDENTITY-1`'s
+and `COM-MOBILE-ADDRESSES-1`'s own discovered backlog. Merged via PR #932 (Merge SHA
+`1813c63721eaa1859566b5533c86a18df7a31679`), post-merge CI green on `main` (SQLite +
+PostgreSQL), mandatory post-merge review passed. Full evidence in
+`docs/plans/commerce/COM-MOBILE-ORDER-HISTORY-1-IMPLEMENTATION-REPORT.md`. Along the
+way, found and fixed a real shape-drift bug: `CommerceCheckoutController::complete()`
+kept its own independent literal copy of `CommerceOrderSerializer`'s exact shape,
+despite that class's own docblock already claiming it was "mirrored" by it — the two
+had already silently drifted, caught immediately by `CommerceOrderStatusApiTest`'s own
+shape-parity assertion when this task extended the serializer's `delivery` block.
+Replaced the duplicate with a direct call to the shared serializer instead of patching
+it a second time.
+
+Discovered backlog from this task (not yet scheduled): `StorefrontCheckoutController::
+serializeOrder()` (`/store/v1`) still keeps its own independent copy of the same order
+shape — out of scope for this `/commerce/v1`-only task, no test asserts parity between
+the two products' shapes, and no immediate driver exists to unify them.
+
+This closes the full three-way split from the former `COM-MOBILE-CUSTOMER-1`
+(`COM-MOBILE-CART-IDENTITY-1`, `COM-MOBILE-ADDRESSES-1`, `COM-MOBILE-ORDER-HISTORY-1`) —
+all three are now `done`. No further Commerce Mobile API readiness task is currently
+`ready`; each remaining row (`COM-MOBILE-PAYMENTS-1`, `COM-MOBILE-SHIPPING-1`,
+`COM-MOBILE-PROMO-1`, `COM-MOBILE-I18N-1`, `COM-MOBILE-VERTICAL-TEST-1`) is gated on its
+own undecided product/vendor/scope question, not an evidence gap.
+
 ## Backlog discovery
 
 Claude may discover new work while implementing.

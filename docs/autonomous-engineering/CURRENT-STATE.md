@@ -2,7 +2,7 @@
 
 > This file is a durable resume point, not a substitute for Git/GitHub evidence.
 
-LAST_UPDATED: 2026-09-22 (COM-MOBILE-ADDRESSES-1 merged)
+LAST_UPDATED: 2026-09-22 (COM-MOBILE-ORDER-HISTORY-1 merged)
 LAYER_VERSION: V1
 STATUS: EXECUTING
 
@@ -28,6 +28,7 @@ Execute the first bounded autonomous-engineering horizon: close the Commerce Mob
   - See `TASK-QUEUE.md` for full resolution detail.
 - `COM-MOBILE-CART-IDENTITY-1` (guest → authenticated customer cart transition) is **done**: PR #924 merged and post-merge reviewed; Merge SHA: `dffe6c86017e88019a82fceb2b0214d8a895b332`. Implements ADR-07's Merge policy across both cart and checkout entry points. Went through 11 rounds of automated (Codex) review — every non-optional finding verified and fixed, except one ("merge carts before authenticated checkout completion") verified and explicitly declined with reasoning posted on its PR thread, since the literal fix would have orphaned the checkout being completed or violated the one-active-cart-per-customer invariant. 35 focused tests + full `Commerce|Customer|Storefront` regression: 931 passed/25 skipped on SQLite, 956 passed on PostgreSQL, 0 failed. Full evidence: `docs/plans/commerce/COM-MOBILE-CART-IDENTITY-1-IMPLEMENTATION-REPORT.md`.
 - `COM-MOBILE-ADDRESSES-1` (Commerce customer address book) is **done**: PR #929 merged and post-merge reviewed; Merge SHA: `482c33053a07cad8bdcf79790e6125e31d4db895`. Implements ADR-08: a dedicated `CommerceCustomerAddress` book owned by `CustomerIdentity` (not `Partner`), country-aware Saudi National Address validation, DB-enforced default-shipping/default-billing exclusivity, plus the deferred "select a saved address at checkout" feature (unblocked by CART-IDENTITY-1's `EstablishCommerceCustomerContextIfPresent`), copying field values in rather than storing a reference (Order Snapshot Rule). Went through 3 rounds of automated (Codex) review — all 8 findings across the 3 rounds verified and fixed (validation gaps, two concurrency races the earlier fixes themselves exposed, Saudi format/shape validation, and an order-snapshot region/additional_number propagation gap) — before Codex exhausted its review usage limit for this account, closing the review cycle. 17 + 4 focused tests + full `Commerce|Customer|Storefront` regression: 936 passed/25 skipped on SQLite, 961 passed on PostgreSQL, 0 failed. Full evidence: `docs/plans/commerce/COM-MOBILE-ADDRESSES-1-IMPLEMENTATION-REPORT.md`.
+- `COM-MOBILE-ORDER-HISTORY-1` (authenticated customer order history) is **done**: PR #932 merged and post-merge reviewed; Merge SHA: `1813c63721eaa1859566b5533c86a18df7a31679`. Closes `CommerceOrderService::createFromCheckout()`'s `CustomerContext`-sourcing gap (a confirmed order always had `customer_identity_id = null` before this, regardless of the completing bearer — both prior tasks' reports had flagged it). Adds `GET /commerce/v1/me/orders` (list) and `GET /commerce/v1/me/orders/{id}` (detail), both under the existing `X-Customer-Token` required-auth group, deliberately separate from the guest signed-reference order-status endpoint. Along the way, found and fixed a real shape-drift bug: `CommerceCheckoutController::complete()` kept its own independent copy of `CommerceOrderSerializer`'s shape that had already silently diverged — replaced with a direct call to the shared serializer. 10 new tests + full `Commerce|Customer|Storefront` regression: 946 passed on SQLite, 971 passed on PostgreSQL, 0 failed. This closes the full three-way split from the former `COM-MOBILE-CUSTOMER-1` — all three (`COM-MOBILE-CART-IDENTITY-1`, `COM-MOBILE-ADDRESSES-1`, `COM-MOBILE-ORDER-HISTORY-1`) are now `done`. Full evidence: `docs/plans/commerce/COM-MOBILE-ORDER-HISTORY-1-IMPLEMENTATION-REPORT.md`.
 
 ## Current execution horizon
 
@@ -37,8 +38,8 @@ Execute the first bounded autonomous-engineering horizon: close the Commerce Mob
 - Third executable task: `COM-MOBILE-AUTH-1` — **done**.
 - Fourth executable task: `COM-MOBILE-CART-IDENTITY-1` — **done**.
 - Fifth executable task: `COM-MOBILE-ADDRESSES-1` — **done**.
-- Sixth candidate remains `ready`:
-  - `COM-MOBILE-ORDER-HISTORY-1` (split from the former `COM-MOBILE-CUSTOMER-1` — no schema decision needed, `CommerceOrderService::ownedOrders()` already exists; needs `CommerceOrderService::createFromCheckout()`'s `CustomerContext`-sourcing gap closed first, per CART-IDENTITY-1's and ADDRESSES-1's own discovered backlog).
+- Sixth executable task: `COM-MOBILE-ORDER-HISTORY-1` — **done**.
+- No further candidate is currently `ready`: `COM-MOBILE-PAYMENTS-1` (checkout/auth/provider decisions), `COM-MOBILE-SHIPPING-1` (checkout contract refinement), `COM-MOBILE-PROMO-1` (V1 product-scope decision), `COM-MOBILE-I18N-1` (resource-contract decision), `COM-MOBILE-VERTICAL-TEST-1` (needs a completed vertical slice) all remain gated on undecided product/vendor/scope questions per `TASK-QUEUE.md` — none are evidence gaps closable by reading more repository state. This horizon's originally-scoped Commerce Mobile Customer track (media → variants → auth → cart identity → addresses → order history) is now fully closed.
 - Implementation merge: standing authority after mandatory final-head pre-merge review, required green CI, no unresolved Decision Gate, and mandatory post-merge review.
 - Deploy / production release / destructive production operation: not authorized without Safwan's explicit approval.
 
