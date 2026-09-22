@@ -8,14 +8,14 @@ void main() {
     await tester.pumpWidget(const AwjMobileRuntimeApp());
     await tester.pumpAndSettle();
 
-    expect(find.text('نبراس — AWJ Mobile Runtime'), findsOneWidget);
+    expect(find.text('أَوْج — AWJ Mobile Runtime'), findsOneWidget);
   });
 
   testWidgets('AwjMobileRuntimeApp defaults to RTL text direction', (tester) async {
     await tester.pumpWidget(const AwjMobileRuntimeApp());
     await tester.pumpAndSettle();
 
-    final shellElement = tester.element(find.text('نبراس — AWJ Mobile Runtime'));
+    final shellElement = tester.element(find.text('أَوْج — AWJ Mobile Runtime'));
     expect(Directionality.of(shellElement), TextDirection.rtl);
   });
 }

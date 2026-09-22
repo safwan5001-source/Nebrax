@@ -33,7 +33,7 @@ class _RuntimeShellScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('نبراس — AWJ Mobile Runtime')),
+      appBar: AppBar(title: const Text('أَوْج — AWJ Mobile Runtime')),
       body: const Center(
         child: Padding(
           padding: EdgeInsets.all(24),

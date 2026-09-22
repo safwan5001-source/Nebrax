@@ -49,6 +49,39 @@ CI runs `pub get` + `analyze` + `test` on every push/PR touching `mobile/**`
 (`.github/workflows/mobile-ci.yml`). Release-mode build jobs are added in
 MOBILE-RUNTIME-9 once there is a runtime worth building.
 
+## Application identity (Android/iOS) — temporary, not a production decision
+
+Android `applicationId`/`namespace` and iOS `PRODUCT_BUNDLE_IDENTIFIER` are
+currently `com.example.awjmobileruntimeproof` /
+`com.example.awjMobileRuntimeProof`.
+
+This is a **deliberately temporary proof identifier**, not a canonical AWJ
+namespace. Before choosing it, the repository was checked for an
+already-approved reverse-domain/bundle-id convention and none exists: the
+only documented AWJ-owned domain is the web tenant-subdomain contract
+`awj.app` (`docs/plans/tenancy/AWJ_TENANT_SUBDOMAIN_V1_IMPLEMENTATION_REPORT.md`),
+which was approved specifically for ERP web tenant hosts, not for a mobile
+package/bundle namespace — reusing it here would misrepresent an
+unapproved decision as settled. The identifier also deliberately does not
+contain the legacy `Nebrax`/`نبراس` product name; `AWJ`/`أَوْج` is the current
+product identity per this horizon's own documentation, even though the
+GitHub repository is still named `Nebrax`.
+
+`com.example.*` mirrors Apple's and Google's own documentation convention
+for a placeholder identifier that must not be mistaken for a real one.
+
+**The production Android Application ID / iOS Bundle ID is an open Decision
+Gate** (`docs/autonomous-engineering/DECISION-ESCALATION.md` — "strategic
+platform/provider commitment" / durable identity, per
+`AWJ_APP_BUILDER_PRODUCT_ARCHITECTURE_V1.md` §20A: "do not regenerate
+identifiers on every build"). It must be resolved by Safwan before any
+signing, App Store Connect / Google Play Console registration, or store
+submission — never inferred from the repository name or invented silently
+by a later task. Whichever later task first needs a real identity (at the
+earliest, `MOBILE-RUNTIME-9`'s signing-adjacent work, though that task
+itself only needs unsigned builds) must re-raise this Decision Gate rather
+than assume `com.example.awjmobileruntimeproof` can simply ship.
+
 ## Current state (MOBILE-RUNTIME-1)
 
 This task only proves the workspace itself: a reproducible shell that

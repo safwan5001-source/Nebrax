@@ -1,6 +1,8 @@
 # MOBILE-RUNTIME-1 — Implementation Report
 
-STATUS: review (implementation complete, pre-merge review pending final CI observation)
+STATUS: review (implementation complete including a pre-merge owner-directed
+application-identity correction; pre-merge review pending CI observation on
+the corrected exact head)
 DATE: 2026-09-22
 
 ## Outcome
@@ -38,16 +40,9 @@ before starting:
    without depending on this session's local install surviving.
 2. `flutter create --project-name awj_mobile_runtime --org sa.nebrax
    --platforms=android,ios mobile` — Android + iOS only (no desktop/web
-   platform folders), matching the horizon's mobile-only scope. Chose
-   `sa.nebrax` as the reverse-domain org because no existing bundle-id/
-   package-id convention exists anywhere in the repository (checked via
-   grep for `com.nebrax`/`sa.nebrax`/bundle-id patterns — none found); it
-   matches the GitHub org/repo (`safwan5001-source/Nebrax`) and product
-   branding. Resulting identity: Android `sa.nebrax.awj_mobile_runtime`,
-   iOS `sa.nebrax.awjMobileRuntime`. This is a durable identity per
-   `AWJ_APP_BUILDER_PRODUCT_ARCHITECTURE_V1.md` §20A ("do not regenerate
-   identifiers on every build") — recorded here so no later task
-   accidentally changes it.
+   platform folders), matching the horizon's mobile-only scope.
+   **Superseded by step 8 below before merge** — see there for the
+   corrected identity and why the initial `sa.nebrax` choice was wrong.
 3. Replaced the generated counter-demo app (`lib/main.dart`) with a
    minimal placeholder shell (`lib/app.dart`: `AwjMobileRuntimeApp` +
    `_RuntimeShellScreen`) — a single bilingual static screen, no state, no
@@ -84,6 +79,45 @@ before starting:
    pointer and open this horizon, linking to
    `docs/plans/mobile/AWJ_MOBILE_RUNTIME_PROOF_HORIZON_V1.md` rather than
    duplicating its task table, per 00-START-HERE's documentation rule.
+8. **Post-PR correction (before merge, owner-directed, invalidates the
+   PRE_MERGE_REVIEW recorded against the first head):** the initial
+   `sa.nebrax` choice in step 2 was wrong on two independent grounds —
+   (a) it carries the legacy `Nebrax` product name into a durable
+   Android/iOS identity when `AWJ`/`أَوْج` is the current product identity
+   (the GitHub repository merely still being named `Nebrax` does not make
+   `Nebrax` the product), and (b) it was invented rather than sourced from
+   an actually-approved canonical namespace. Re-checked the repository for
+   any already-approved reverse-domain/bundle-id convention before
+   choosing a replacement: the only AWJ-owned domain documented anywhere
+   is the web tenant-subdomain contract `awj.app`
+   (`docs/plans/tenancy/AWJ_TENANT_SUBDOMAIN_V1_IMPLEMENTATION_REPORT.md`
+   — explicitly approved for ERP tenant web hosts, replacing an earlier
+   `.nebrax.app` suffix), which was never approved as a mobile
+   package/bundle namespace decision; reusing it here would have
+   misrepresented an unapproved decision as settled, which is exactly
+   what was asked to be avoided. No mobile-specific namespace is
+   documented anywhere (checked `AWJ_APP_BUILDER_PRODUCT_ARCHITECTURE_V1.md`,
+   `RUNTIME_COMPATIBILITY_V1.md`, and a repository-wide grep for
+   `com.awj`/`sa.awj`/`io.awj`/bundle-id patterns — none found beyond this
+   task's own first-draft files). Corrected to
+   `com.example.awjmobileruntimeproof` (Android `namespace`/
+   `applicationId`) / `com.example.awjMobileRuntimeProof` (iOS
+   `PRODUCT_BUNDLE_IDENTIFIER`, plus its `.RunnerTests` variant) —
+   `com.example.*` is Apple's and Google's own documented convention for a
+   placeholder identifier that must not be mistaken for a real one, so it
+   cannot be misread as a settled product decision. `MainActivity.kt`
+   moved to the matching Kotlin package path
+   (`android/app/src/main/kotlin/com/example/awjmobileruntimeproof/`).
+   Documented the still-open Decision Gate explicitly in
+   `mobile/README.md` (new "Application identity" section) so a later
+   task cannot silently treat this as final before signing/store
+   registration. Also replaced the placeholder shell's visible
+   `'نبراس — AWJ Mobile Runtime'` AppBar text (and the matching test
+   assertions) with `'أَوْج — AWJ Mobile Runtime'` — same correction applied
+   to the one piece of user-visible UI text this task shipped.
+   Re-ran `flutter analyze` (0 issues) and `flutter test` (2/2 passing)
+   against the corrected tree before pushing; see "Tests and exact
+   results" below for the exact post-correction run.
 
 ## Why this approach fits AWJ
 
@@ -103,10 +137,14 @@ before starting:
 ```
 mobile/                                  (new Flutter workspace — generated + edited files below)
 mobile/lib/main.dart                     (edited — entry point calls AwjMobileRuntimeApp)
-mobile/lib/app.dart                      (new — placeholder shell widget)
-mobile/test/widget_test.dart             (edited — 2 tests: renders shell, defaults to RTL)
-mobile/README.md                         (edited — workspace/toolchain/command documentation)
-mobile/pubspec.yaml, pubspec.lock, analysis_options.yaml, android/**, ios/**  (generated by `flutter create`, unedited except pubspec description)
+mobile/lib/app.dart                      (new, then corrected — placeholder shell widget, أَوْج branding)
+mobile/test/widget_test.dart             (edited — 2 tests: renders shell, defaults to RTL; text corrected)
+mobile/README.md                         (edited — workspace/toolchain/command docs + Application identity section)
+mobile/android/app/build.gradle.kts      (edited — namespace/applicationId corrected to com.example.awjmobileruntimeproof)
+mobile/android/app/src/main/kotlin/com/example/awjmobileruntimeproof/MainActivity.kt
+                                          (moved from sa/nebrax/awj_mobile_runtime/, package declaration corrected)
+mobile/ios/Runner.xcodeproj/project.pbxproj  (edited — PRODUCT_BUNDLE_IDENTIFIER corrected, 6 occurrences)
+mobile/pubspec.yaml, pubspec.lock, analysis_options.yaml, android/** (remaining), ios/** (remaining)  (generated by `flutter create`, unedited except pubspec description)
 .github/workflows/mobile-ci.yml          (new)
 docs/plans/mobile/AWJ_MOBILE_RUNTIME_PERFORMANCE_BASELINE.md   (new)
 docs/plans/mobile/MOBILE-RUNTIME-1-IMPLEMENTATION-REPORT.md    (new, this file)
@@ -117,10 +155,12 @@ docs/autonomous-engineering/CURRENT-STATE.md          (edited — horizon switch
 
 ## Tests and exact results
 
+Post-identity-correction run (final, matches the pushed head):
+
 ```
 $ flutter analyze
 Analyzing mobile...
-No issues found! (ran in 8.5s)
+No issues found! (ran in 12.7s)
 
 $ flutter test
 00:00 +0: loading /home/user/Nebrax/mobile/test/widget_test.dart
@@ -128,6 +168,10 @@ $ flutter test
 00:00 +1: AwjMobileRuntimeApp defaults to RTL text direction
 00:00 +2: All tests passed!
 ```
+
+(First run, before the identity correction, showed the same result —
+`analyze`: 0 issues, `test`: 2/2 passing — against the `sa.nebrax`/`نبراس`
+tree; not reproduced here since that tree was superseded before merge.)
 
 Run locally in this session's environment (Flutter 3.47.5 installed to
 `/opt/flutter-sdk`, not part of the repository).
@@ -143,15 +187,20 @@ internally (dependency resolution via `flutter pub get`).
 
 ## CI
 
-Not yet observed on GitHub Actions at the time of writing this report —
-`.github/workflows/mobile-ci.yml` is new in this same change set. Per Gate
-9/Gate 7, this task's `PRE_MERGE_REVIEW: PASS` will not be recorded until
-this workflow is observed green on the PR's exact final Head SHA.
+PR #948 opened on the first head (`07c1f6e73ec304ef1ad05493f2c75c4edcae9b73`);
+CI (`mobile-ci.yml` + the existing `ci.yml` regression) started running on
+that head. Before it was observed green, the application-identity
+correction (step 8 above) landed as a new commit, which per Gate 9
+invalidates that in-flight review/CI observation for merge purposes — CI is
+being re-observed on the corrected exact head (recorded below once pushed).
 
 ## Pre-merge review
 
-- PRE_MERGE_REVIEW: **pending** — recorded after CI is observed green on
-  the exact PR head (see Gate 9). This report is updated in place once
+- PRE_MERGE_REVIEW: **pending** — no review has been recorded as PASS
+  against any head of this PR yet (the first head's CI was still running
+  when the identity correction superseded it, so nothing was invalidated
+  that had actually passed). Recorded once CI is observed green on the
+  corrected exact head (see Gate 9). This report is updated in place when
   that happens; do not treat this section as final until it says PASS with
   a Head SHA.
 
@@ -206,6 +255,19 @@ currently-unshipped, unreferenced workspace; nothing in the existing
 Laravel/Next.js applications imports or depends on `mobile/`. Are secrets/
 PII exposed in logs/errors/artifacts? No secret material exists in this
 task; the CI workflow contains no credentials.
+
+**Identity-correction pass (added after owner review, before merge):**
+was the corrected `com.example.awjmobileruntimeproof` identifier itself
+sourced from an actually-approved decision, or invented and dressed up to
+look approved? Checked directly: no AWJ document anywhere approves any
+mobile bundle/package namespace, so `com.example.*` — a convention owned
+by Apple/Google themselves for exactly this "not a real identity" case —
+was chosen precisely because it cannot be mistaken for a settled decision,
+and the still-open Decision Gate is recorded in `mobile/README.md` where a
+later task will actually read it before touching signing. Does the
+corrected identity still leak the legacy `Nebrax` name anywhere? Re-grepped
+the full `mobile/` tree for `nebrax`/`Nebrax`/`نبراس` after the fix — zero
+matches in tracked files.
 
 ## Accounting impact
 
@@ -269,15 +331,21 @@ None. No API, database, or migration touched.
 
 ## Discovered backlog
 
-None discovered beyond what the horizon document already scopes into
-later tasks.
+- The production Android Application ID / iOS Bundle ID remains an open
+  Decision Gate (recorded in `mobile/README.md`'s "Application identity"
+  section) — not scheduled to any specific later task; whichever task
+  first needs a real store-facing identity (earliest plausibly around
+  MOBILE-RUNTIME-9's signing-adjacent work, though that task itself only
+  needs unsigned builds) must re-raise it rather than silently keep
+  `com.example.awjmobileruntimeproof`.
 
 ## Git state
 
 - Branch: `claude/awj-mobile-runtime-horizon-v1-g0n8mm`
-- PR: (recorded once opened)
+- PR: [#948](https://github.com/safwan5001-source/Nebrax/pull/948)
 - Base SHA: `51a80685289aecdc7354ebcd8d1a32a2c92ac449` (`origin/main`, PR #947)
-- Head SHA: (recorded once pushed)
+- First head (superseded, CI never observed complete): `07c1f6e73ec304ef1ad05493f2c75c4edcae9b73`
+- Head SHA: (recorded once the identity-correction commit is pushed)
 
 ## Recommended next dependency-ready task
 

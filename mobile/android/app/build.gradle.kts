@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "sa.nebrax.awj_mobile_runtime"
+    namespace = "com.example.awjmobileruntimeproof"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -15,8 +15,13 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "sa.nebrax.awj_mobile_runtime"
+        // MOBILE-RUNTIME-1: explicitly temporary proof identifier — no canonical AWJ
+        // mobile Bundle ID/Application ID namespace is documented anywhere in this
+        // repository (only a web tenant-subdomain domain, awj.app, which was never
+        // approved as a mobile package namespace). Production Application ID remains
+        // an owner Decision Gate before signing/store registration — see
+        // docs/plans/mobile/MOBILE-RUNTIME-1-IMPLEMENTATION-REPORT.md.
+        applicationId = "com.example.awjmobileruntimeproof"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion

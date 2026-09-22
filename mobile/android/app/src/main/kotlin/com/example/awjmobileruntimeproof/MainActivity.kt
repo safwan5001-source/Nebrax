@@ -1,4 +1,4 @@
-package sa.nebrax.awj_mobile_runtime
+package com.example.awjmobileruntimeproof
 
 import io.flutter.embedding.android.FlutterActivity
 
