@@ -312,7 +312,7 @@ final class CommerceCheckoutService
     public function updateContact(CommerceCheckout $knownCheckout, array $fields): array
     {
         return DB::transaction(function () use ($knownCheckout, $fields): array {
-            $checkout = $this->lockUsableCheckout($knownCheckout->id);
+            $checkout = $this->lockUsableCheckout($knownCheckout);
             $checkout->update($fields + ['expires_at' => now()->addMinutes(self::LIFETIME_MINUTES)]);
 
             return $this->serialize($checkout, $this->cartFor($checkout));
@@ -323,7 +323,7 @@ final class CommerceCheckoutService
     public function updateAddress(CommerceCheckout $knownCheckout, array $fields): array
     {
         return DB::transaction(function () use ($knownCheckout, $fields): array {
-            $checkout = $this->lockUsableCheckout($knownCheckout->id);
+            $checkout = $this->lockUsableCheckout($knownCheckout);
             $checkout->update($fields + ['expires_at' => now()->addMinutes(self::LIFETIME_MINUTES)]);
 
             return $this->serialize($checkout, $this->cartFor($checkout));
@@ -342,7 +342,7 @@ final class CommerceCheckoutService
         }
 
         return DB::transaction(function () use ($knownCheckout, $method): array {
-            $checkout = $this->lockUsableCheckout($knownCheckout->id);
+            $checkout = $this->lockUsableCheckout($knownCheckout);
             $checkout->update([
                 'delivery_method' => $method,
                 'delivery_amount_minor' => 0,
@@ -399,6 +399,21 @@ final class CommerceCheckoutService
         $context = $this->context();
 
         return DB::transaction(function () use ($knownCheckout, $idempotencyKeyHash, $idempotencyFingerprint, $context): array {
+            // (Codex, PR #924, P2, eleventh round) Cart locked before
+            // checkout — `cart_id` is already known from `$knownCheckout`,
+            // so no lookup is needed to discover it first. Matches
+            // `createOrResume()`/`lockActiveCart()` and the read path's
+            // `serializeForOwnedRead()`, both of which must lock the cart
+            // first (their own cart id is the only one known in advance);
+            // `lockUsableCheckout()` below now follows the same order,
+            // closing a deadlock risk this method and it used to disagree on
+            // under concurrent access.
+            $cart = $this->scopeToContext(CommerceCart::query(), $context)
+                ->whereKey($knownCheckout->cart_id)
+                ->where('tenant_id', $context->tenantId())
+                ->lockForUpdate()
+                ->first();
+
             $checkout = $this->scopeToContext(CommerceCheckout::query(), $context)
                 ->whereKey($knownCheckout->id)
                 ->where('tenant_id', $context->tenantId())
@@ -419,16 +434,10 @@ final class CommerceCheckoutService
 
             // نفس سلة Checkout هذا حصراً — بنفس تحقّق السياق الكامل
             // (tenant/storefront أو null الجوّال/channel) الذي تفرضه
-            // CHECKOUT-1A، لا ثقة بحالة `cart_id` المخزَّنة وحدها.
-            $cart = $this->scopeToContext(CommerceCart::query(), $context)
-                ->whereKey($checkout->cart_id)
-                ->where('tenant_id', $context->tenantId())
-                ->where('status', CommerceCart::STATUS_ACTIVE)
-                ->where('expires_at', '>', now())
-                ->lockForUpdate()
-                ->first();
-
-            if ($cart === null) {
+            // CHECKOUT-1A، لا ثقة بحالة `cart_id` المخزَّنة وحدها. القفل تمّ
+            // أعلاه قبل معرفة إن كانت هذه إعادة تشغيل أصلاً (لا Checkout
+            // معروفاً بعد) — الفحص هنا بعد التحميل، لا ضمن استعلام القفل.
+            if ($cart === null || $cart->status !== CommerceCart::STATUS_ACTIVE || $cart->expires_at->isPast()) {
                 throw new CheckoutNotFoundException('السلة غير متاحة لإتمام الدفع.');
             }
 
@@ -754,11 +763,32 @@ final class CommerceCheckoutService
         return $cart;
     }
 
-    private function lockUsableCheckout(string $checkoutId): CommerceCheckout
+    /**
+     * (Codex, PR #924, P1, seventh round) هذا Checkout نفسه لا يحمل هوية
+     * مالكٍ مباشرة — ملكيته موروثة بالكامل من سلته عبر `cart_id`. قفلٌ على
+     * Checkout وحده كان يترك نفس ثغرة السباق التي أُصلحت في
+     * `lockUsableCart()`/`lockActiveCart()`: طلبٌ ضيفٌ يحلّ هذا الـCheckout
+     * قبل أن تُطالِب به مصادقةٌ متزامنة، ثم يستمر بتعديل جهة الاتصال أو
+     * العنوان بعد أن تغيّرت ملكية سلته فعلاً.
+     *
+     * (Codex, PR #924, P2, eleventh round) يأخذ نموذج Checkout الكامل لا
+     * مجرّد معرّفه — `cart_id` معروفٌ منه مسبقاً فلا حاجة لاستعلامٍ يكتشفه
+     * أولاً — كي يُقفَل السلة قبل الـCheckout، مطابقاً `complete()`/
+     * `createOrResume()`/`serializeForOwnedRead()`: كانت هذه الدالة تقفل
+     * بالترتيب المعاكس (Checkout ثم سلة)، وهو تعارضٌ حقيقي يفتح باب توقّفٍ
+     * متبادل (deadlock) مع أي من تلك الثلاث تحت تزامنٍ حقيقي.
+     */
+    private function lockUsableCheckout(CommerceCheckout $knownCheckout): CommerceCheckout
     {
         $context = $this->context();
+
+        $cart = $this->scopeToContext(CommerceCart::query(), $context)
+            ->whereKey($knownCheckout->cart_id)
+            ->lockForUpdate()
+            ->first();
+
         $checkout = $this->scopeToContext(CommerceCheckout::query(), $context)
-            ->whereKey($checkoutId)
+            ->whereKey($knownCheckout->id)
             ->where('tenant_id', $context->tenantId())
             ->whereIn('status', CommerceCheckout::OPEN_STATUSES)
             ->where('expires_at', '>', now())
@@ -768,17 +798,6 @@ final class CommerceCheckoutService
         if ($checkout === null) {
             throw new CheckoutNotFoundException('جلسة الدفع غير متاحة.');
         }
-
-        // (Codex, PR #924, P1, seventh round) هذا Checkout نفسه لا يحمل هوية
-        // مالكٍ مباشرة — ملكيته موروثة بالكامل من سلته عبر cart_id. قفلٌ على
-        // Checkout وحده كان يترك نفس ثغرة السباق التي أُصلحت في
-        // lockUsableCart()/lockActiveCart(): طلبٌ ضيفٌ يحلّ هذا الـCheckout
-        // قبل أن تُطالِب به مصادقةٌ متزامنة، ثم يستمر بتعديل جهة الاتصال أو
-        // العنوان بعد أن تغيّرت ملكية سلته فعلاً.
-        $cart = $this->scopeToContext(CommerceCart::query(), $context)
-            ->whereKey($checkout->cart_id)
-            ->lockForUpdate()
-            ->first();
 
         if ($cart === null) {
             throw new CheckoutNotFoundException('جلسة الدفع غير متاحة.');

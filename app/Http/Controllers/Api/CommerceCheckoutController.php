@@ -95,9 +95,26 @@ final class CommerceCheckoutController extends PublicApiController
             abort(422, $e->getMessage());
         }
 
+        // (Codex, PR #924, P1, eleventh round) createOrResume()'s own cart
+        // lock is released once its transaction commits, before this
+        // response is built — a claim committing in that gap could leak the
+        // new owner's data into this stale response. Same locked
+        // recheck-and-serialize as show()/complete()'s review-required
+        // branch, not the plain serialize() this call used before.
+        try {
+            $serialized = $checkouts->serializeForOwnedRead($result['checkout'], $result['cart']);
+        } catch (PDOException $e) {
+            throw $e;
+        } catch (RuntimeException $e) {
+            abort(422, $e->getMessage());
+        }
+        if (! $serialized['owned']) {
+            return $this->clearToken($this->notFound($request));
+        }
+
         $response = PublicApiResponse::success(
             $request,
-            $checkouts->serialize($result['checkout'], $result['cart']),
+            $serialized['data'],
             $result['created'] ? 201 : 200,
         );
         if ($result['rebound'] !== null) {
