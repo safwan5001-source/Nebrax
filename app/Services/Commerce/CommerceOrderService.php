@@ -175,7 +175,12 @@ class CommerceOrderService
      * بحالة `draft` إطلاقاً؛ لا تغيير في enum `status` ولا في معنى `confirmed`
      * القديم (AWJ_COMMERCE_ORDER_IDENTITY_DECISION_REPORT.md، القرار C).
      *
-     * @param  array{sales_channel_id: string, storefront_id: string, commerce_checkout_id: string, delivery_method: ?string, contact_name: ?string, contact_phone: ?string, contact_email: ?string, delivery_country: ?string, delivery_city: ?string, delivery_district: ?string, delivery_street: ?string, delivery_postal_code: ?string, delivery_notes: ?string}  $header
+     * **`delivery_amount_minor` (COM-MOBILE-SHIPPING-1)**: لقطة رسم الشحن
+     * المحسوم فعلاً على Checkout (`ShippingRateService`، لا إعادة حسمٍ هنا) —
+     * يُضاف إلى `total` كما هو، إلى جانب مجموع سطور المنتج؛ غيابه من الحمولة
+     * (مسارٌ مستقبليٌّ آخر) يُعامَل كصفر، مطابقاً لسلوك ما قبل هذه المهمة.
+     *
+     * @param  array{sales_channel_id: string, storefront_id: string, commerce_checkout_id: string, delivery_method: ?string, delivery_amount_minor?: int, contact_name: ?string, contact_phone: ?string, contact_email: ?string, delivery_country: ?string, delivery_city: ?string, delivery_district: ?string, delivery_street: ?string, delivery_postal_code: ?string, delivery_notes: ?string}  $header
      * @param  array<int, array{product_id: string, product_variant_id?: ?string, variant_descriptor_snapshot?: ?string, product_name_snapshot: string, quantity: int, unit_name: ?string, unit_factor: int, unit_price: int, line_total: int}>  $lines  نتيجة إعادة تحقّق موثوقة بالفعل — لا يُعاد حسم سعرٍ أو وحدةٍ هنا.
      *
      * @throws RuntimeException `$lines` فارغة، أو `sales_channel_id` غير موجود.
@@ -215,9 +220,10 @@ class CommerceOrderService
                 'customer_identity_id' => $customerIdentityId,
                 'number' => $this->nextNumber(),
                 'delivery_method' => $header['delivery_method'],
+                'delivery_amount_minor' => $header['delivery_amount_minor'] ?? 0,
             ]);
 
-            $total = 0;
+            $total = $order->delivery_amount_minor;
             foreach ($lines as $line) {
                 $created = $order->lines()->create($line);
                 $total += $created->line_total;

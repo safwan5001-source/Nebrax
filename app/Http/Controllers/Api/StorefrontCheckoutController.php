@@ -239,6 +239,9 @@ final class StorefrontCheckoutController extends PublicApiController
                 'street' => $order->snapshot?->shipping_street,
                 'postal_code' => $order->snapshot?->shipping_postal_code,
                 'notes' => $order->snapshot?->shipping_notes,
+                // COM-MOBILE-SHIPPING-1: مسبقاً محسوباً ضمن `total` أعلاه —
+                // هذا الحقل تفصيلٌ للعرض فقط، لا مصدر حقيقة إضافياً.
+                'amount' => ['amount_minor' => $order->delivery_amount_minor, 'currency' => $currency],
             ],
             'items' => $order->lines->map(fn ($line) => [
                 'product_id' => $line->product_id,
