@@ -43,11 +43,11 @@ One additional piece of evidence surfaced only during implementation: `CommerceC
 - `app/Http/Controllers/Api/CommerceCheckoutController.php` (round 7+) — `store()`/`show()`/`withCurrentCheckout()`/`complete()`'s review-required branch all updated for token-outcome propagation and locked ownership rechecks.
 - `routes/api_commerce.php` — `EstablishCommerceCustomerContextIfPresent` added to the read/write cart and checkout groups.
 - `app/Support/PublicApiErrorCode.php` + `docs/openapi/public-api-v1.yaml` — `cart_merged` (409) additive error code.
-- `tests/Feature/CommerceCartMergeApiTest.php` (new, grew from 12 to 37 tests across all rounds).
+- `tests/Feature/CommerceCartMergeApiTest.php` (new, grew from 12 to 35 tests across all rounds).
 
 ## Tests and exact results
 
-### Final — `tests/Feature/CommerceCartMergeApiTest.php` (37 tests, grown across 11 review rounds)
+### Final — `tests/Feature/CommerceCartMergeApiTest.php` (35 tests, grown across 11 review rounds)
 
 Claim (no existing customer cart); merge with quantity-sum on an identical line and distinct lines kept separate; token rebinding (including the round-5 two-slot previous-token-hash grace window) so subsequent (including checkout) requests keep resolving correctly; idempotent replay of the same guest token after a merge (no duplicate quantities); idempotent repeated claim; a guest line no longer purchasable is dropped during merge without blocking sign-in (via a dedicated `CommerceCartLineNotPurchasableException`, never swallowing an unrelated arithmetic overflow); multi-device (a second device with no guest cart receives the customer's existing cart unchanged, never discarded); price is resolved live post-merge, never frozen from either source cart; cross-tenant isolation; a cart token already claimed by a *different* customer never leaks to a second customer presenting it; full guest backward compatibility; a brand-new cart created while authenticated is tagged with that identity from creation; concurrent-claim ownership rechecks under lock on both write (`lockUsableCart()`/`lockUsableCheckout()`) and read (`serializeForOwnedRead()`) paths, for both cart and checkout; checkout creation itself now merges a presented guest cart into the customer's existing cart instead of silently completing the raw guest cart; a single POST checkout rebinds the cart token at most once; channel-scoped active-cart uniqueness (a tenant with two mobile `SalesChannel`s doesn't collide).
 

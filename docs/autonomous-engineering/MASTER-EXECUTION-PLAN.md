@@ -299,7 +299,7 @@ acceptance:
   - an unrelated arithmetic/serialization failure aborts the whole merge, never silently drops a line
   - SQLite/PostgreSQL verification
 tests:
-  - 37 tests (CommerceCartMergeApiTest, grown across 11 review rounds)
+  - 35 tests (CommerceCartMergeApiTest, grown across 11 review rounds)
   - full Commerce|Customer|Storefront|PublicApiOpenApiContractTest regression
   - SQLite
   - PostgreSQL
