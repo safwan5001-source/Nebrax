@@ -263,27 +263,44 @@ None beyond what ADR-10 already recorded as open decisions.
 ## Git state
 
 Branch `claude/com-mobile-shipping-1`, based on `main` at `5c6ecdf` (post
-PR #934 merge). Pushed, reviewed (`PRE_MERGE_REVIEW: PASS` at Head SHA
-`037cbb6`'s final commit — see PR #937's own review history for the
-per-round detail), and merged into `main` as a real (non-squash) merge
-commit, **Merge SHA `5980ee4559632df134a268546e688d56e99e9217`**.
+PR #934 merge). Pushed, reviewed across 3 rounds (`PRE_MERGE_REVIEW: PASS`
+at the PR's actual final pre-merge head, commit
+`42156f65d83ebe79099eea1f093d16d6b4f15d31` — "fix: guard order total
+against bigint overflow", the fourth and last commit on the branch; see
+PR #937's own review history for the per-round detail), and **squash**-
+merged into `main` as a single commit, **Merge SHA
+`5980ee4559632df134a268546e688d56e99e9217`**. (An earlier version of this
+section incorrectly named `037cbb6` as this pre-merge head and called the
+merge a non-squash merge with four parents — `037cbb6` is actually PR
+#938's own later commit, built *on top of* `5980ee4`, and `5980ee4` has a
+single parent, `6be5d7d`, per `git log --parents` — a real squash merge,
+consistent with every other merge in this session. Caught by Codex review
+on PR #938; corrected here.)
 
 ## POST_MERGE_REVIEW: PASS
 
 Merge SHA: `5980ee4559632df134a268546e688d56e99e9217`.
 
-- **Target branch contains the change**: confirmed — `main`'s history
-  includes this commit as a real merge (its four authored commits are
-  `main`'s own history, not rewritten), verified via both `git log`
-  ancestry and the GitHub commit API.
-- **No unexpected integration change**: the merge commit's diff matches
-  PR #937's own reviewed diff exactly; no manual conflict resolution was
-  needed.
+- **Target branch contains the change**: confirmed — `main`'s history has
+  this commit as its own (a `git branch --contains` from a branch built
+  directly on `main` post-merge shows it as an ancestor), and its tree
+  matches PR #937's final reviewed diff exactly (squash merge — one new
+  commit on `main`, not a merge with the PR branch's own commits as
+  separate parents).
+- **No unexpected integration change**: no manual conflict resolution was
+  needed at merge time; the diff GitHub squashed onto `main` is exactly
+  the PR's own reviewed diff.
 - **Required post-merge checks/workflows**: the push-to-`main` CI trigger
-  (`ci.yml`/`storefront-ci.yml`, `on: push: branches: ['**']`) re-ran on
-  this exact SHA and passed on all three required jobs (`php artisan test`
-  L11 sqlite, L11 pgsql, storefront lint+typecheck+test) — a second,
-  independent green beyond the PR's own pre-merge head check.
+  (`on: push: branches: ['**']`, both `ci.yml` and `storefront-ci.yml`)
+  re-ran on this exact SHA as its own independent workflow runs — not the
+  PR's pre-merge check, a second, later trigger — and passed on all three
+  required jobs: `php artisan test (L11, sqlite)` and `(L11, pgsql)` in
+  run [35724653563](https://github.com/safwan5001-source/Nebrax/actions/runs/35724653563),
+  and `Storefront CI` in run
+  [35724653544](https://github.com/safwan5001-source/Nebrax/actions/runs/35724653544)
+  — all three `conclusion: success`, `head_branch: main`,
+  `head_sha: 5980ee4559632df134a268546e688d56e99e9217`, verified directly
+  via the GitHub Actions API (not inferred from the PR's own check list).
 - **Targeted regression**: a further focused `Commerce|Customer|
   Storefront|BranchIsolationGuard` run, from `claude/com-mobile-payments-1`
   (branched directly off this merge commit while starting
