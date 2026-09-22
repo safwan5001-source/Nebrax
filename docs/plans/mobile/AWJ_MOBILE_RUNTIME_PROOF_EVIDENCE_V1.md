@@ -44,3 +44,21 @@
 ## Evidence discipline
 
 Before implementation decisions that depend on changing platform behavior, re-open the relevant first-party source and record the date/effect in the implementation report. Repository evidence wins over stale assumptions about current AWJ code; owner-approved product invariants remain binding.
+
+## Hardening Pass — Runtime Compatibility and Operations
+
+Cross-check against the repository's existing `RUNTIME_COMPATIBILITY_V1.md` identified proof obligations that must not be lost in a narrower Flutter prototype. The horizon therefore explicitly carries forward:
+
+- capability manifest/runtime handshake rather than version-only compatibility;
+- old/new Runtime ↔ Experience version-skew tests;
+- per-platform capability divergence;
+- compatibility-safe rollback;
+- native-capability-before-Experience rollout ordering;
+- store availability ≠ installed runtime;
+- safe last-known-good startup without turning presentation cache into commerce authority;
+- cold-start/resume/network interruption/retry behavior;
+- privacy-safe diagnostics;
+- reproducible performance/binary observations;
+- dependency license/maintenance/security/supply-chain review.
+
+These are AWJ proof requirements derived from the existing repository compatibility architecture. Exact implementation fields, budgets and transport remain evidence-driven implementation details unless a material Decision Gate is reached.
