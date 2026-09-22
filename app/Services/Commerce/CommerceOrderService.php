@@ -226,7 +226,7 @@ class CommerceOrderService
             $total = $order->delivery_amount_minor;
             foreach ($lines as $line) {
                 $created = $order->lines()->create($line);
-                $total += $created->line_total;
+                $total = $this->addMinorAmountOrFail($total, $created->line_total);
             }
             $order->update(['total' => $total]);
 
@@ -256,6 +256,28 @@ class CommerceOrderService
 
             return $order->fresh(['lines', 'snapshot']);
         });
+    }
+
+    /**
+     * COM-MOBILE-SHIPPING-1 — جمعُ مبلغَين بالهللات مع فحصٍ صريح ضد فيضان
+     * `PHP_INT_MAX` **قبل** الوثوق بالنتيجة: PHP لا يرمي استثناءً عند فيضان
+     * `int + int` — يحوّل الناتج بصمتٍ إلى `float` (بالضبط ما تمنعه القاعدة
+     * المحاسبية الصارمة: لا `float`/`double` في أي حساب مالي إطلاقاً).
+     * `is_int()` بعد الجمع هي الفحص القياسي في PHP لاكتشاف هذا التحوّل. حدّا
+     * `unit_price`/`quantity` المسموحان اليوم (`PublicStoreProductRequest`،
+     * `CommerceCartController`) يسمحان نظرياً بمجموعٍ يقترب من هذا السقف
+     * حتى قبل إضافة الشحن؛ فشلٌ صريح هنا أفضل من إجماليّ خاطئ صامت.
+     *
+     * @throws RuntimeException الجمع يتجاوز الحد الأقصى الآمن لعددٍ صحيح.
+     */
+    private function addMinorAmountOrFail(int $a, int $b): int
+    {
+        $sum = $a + $b;
+        if (! is_int($sum)) {
+            throw new RuntimeException('إجمالي الطلب يتجاوز الحد الأقصى المسموح للمبالغ المالية.');
+        }
+
+        return $sum;
     }
 
     /**
