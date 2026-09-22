@@ -6,6 +6,8 @@ use App\Models\CommerceOrder;
 use App\Models\CommercePaymentIntent;
 use App\Models\PaymentMethod;
 use App\Models\Tenant;
+use App\Services\PaymentMethodChannelAvailabilityService;
+use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
 /**
@@ -27,6 +29,10 @@ use RuntimeException;
  */
 final class CommercePaymentIntentService
 {
+    public function __construct(
+        private readonly PaymentMethodChannelAvailabilityService $paymentAvailability,
+    ) {}
+
     /**
      * يُستدعى داخل نفس معاملة `CommerceOrderService::createFromCheckout()`
      * — فشلٌ هنا يُلغي إنشاء الطلب كله (لا طلبٌ بلا Payment Intent مطابق).
@@ -52,7 +58,7 @@ final class CommercePaymentIntentService
             default => throw new RuntimeException('طريقة توصيل غير مدعومة لتحصيل الدفع.'),
         };
 
-        $paymentMethod = $paymentMethodId === null ? null : $this->resolvePaymentMethod($order->tenant_id, $paymentMethodId);
+        $paymentMethod = $paymentMethodId === null ? null : $this->resolvePaymentMethod($order, $paymentMethodId);
         $currency = Tenant::findOrFail($order->tenant_id)->currency;
 
         return CommercePaymentIntent::create([
@@ -70,21 +76,30 @@ final class CommercePaymentIntentService
      * تحصيلٌ فعلي (نقدي عند التوصيل أو الاستلام) — انتقالٌ صريح واحد، لا
      * قابل للتراجع. لا أثر محاسبي في هذا الإصدار (راجع توثيق رأس الصنف).
      *
+     * `lockForUpdate()` + إعادة فحص الحالة داخل المعاملة — `collect`/
+     * `cancel` متزامنان على نفس الالتزام كانا سيتسابقان بلا هذا (آخر كاتبٍ
+     * يفوز صامتاً، فيترك `cancelled` بـ`collected_at` معبّأ أو يقبل تحصيلاً
+     * مزدوجاً)، فحصُ `$intent` المُمرَّر وحده كان يقرأ نسخةً قديمة سابقة للقفل.
+     *
      * @throws RuntimeException الحالة الحالية ليست قابلة للتحصيل.
      */
     public function markCollected(CommercePaymentIntent $intent, ?string $note = null): CommercePaymentIntent
     {
-        if ($intent->status !== CommercePaymentIntent::STATUS_AWAITING_COLLECTION) {
-            throw new RuntimeException('لا يمكن تحصيل التزام دفع ليس بانتظار التحصيل.');
-        }
+        return DB::transaction(function () use ($intent, $note): CommercePaymentIntent {
+            $locked = CommercePaymentIntent::query()->whereKey($intent->id)->lockForUpdate()->firstOrFail();
 
-        $intent->update([
-            'status' => CommercePaymentIntent::STATUS_COLLECTED,
-            'collected_at' => now(),
-            'collection_note' => $note,
-        ]);
+            if ($locked->status !== CommercePaymentIntent::STATUS_AWAITING_COLLECTION) {
+                throw new RuntimeException('لا يمكن تحصيل التزام دفع ليس بانتظار التحصيل.');
+            }
 
-        return $intent->fresh();
+            $locked->update([
+                'status' => CommercePaymentIntent::STATUS_COLLECTED,
+                'collected_at' => now(),
+                'collection_note' => $note,
+            ]);
+
+            return $locked->fresh();
+        });
     }
 
     /**
@@ -95,31 +110,46 @@ final class CommercePaymentIntentService
      */
     public function cancel(CommercePaymentIntent $intent): CommercePaymentIntent
     {
-        if ($intent->isCollected()) {
-            throw new RuntimeException('لا يمكن إلغاء التزام دفع مُحصَّل بالفعل.');
-        }
-        if ($intent->isCancelled()) {
-            throw new RuntimeException('التزام الدفع مُلغىً بالفعل.');
-        }
+        return DB::transaction(function () use ($intent): CommercePaymentIntent {
+            $locked = CommercePaymentIntent::query()->whereKey($intent->id)->lockForUpdate()->firstOrFail();
 
-        $intent->update([
-            'status' => CommercePaymentIntent::STATUS_CANCELLED,
-            'cancelled_at' => now(),
-        ]);
+            if ($locked->isCollected()) {
+                throw new RuntimeException('لا يمكن إلغاء التزام دفع مُحصَّل بالفعل.');
+            }
+            if ($locked->isCancelled()) {
+                throw new RuntimeException('التزام الدفع مُلغىً بالفعل.');
+            }
 
-        return $intent->fresh();
+            $locked->update([
+                'status' => CommercePaymentIntent::STATUS_CANCELLED,
+                'cancelled_at' => now(),
+            ]);
+
+            return $locked->fresh();
+        });
     }
 
-    /** يُستدعى فقط حين اختار العميل/القناة طريقة دفعٍ صراحةً — راجع توثيق `createForOrder()`. */
-    private function resolvePaymentMethod(string $tenantId, string $paymentMethodId): PaymentMethod
+    /**
+     * يُستدعى فقط حين اختار العميل/القناة طريقة دفعٍ صراحةً — راجع توثيق
+     * `createForOrder()`. يُعيد التحقّق من إتاحة القناة هنا أيضاً، لا فقط
+     * `is_active` — الاختيار قد يسبق الإتمام بوقتٍ كافٍ لتعطيل المؤسسة
+     * تلك الطريقة عن القناة تحديداً (`setAvailability()`) في هذه الأثناء؛
+     * قبول اختيارٍ لم يعد سارياً كان سيتجاوز السياسة صامتاً.
+     */
+    private function resolvePaymentMethod(CommerceOrder $order, string $paymentMethodId): PaymentMethod
     {
         $paymentMethod = PaymentMethod::query()
-            ->where('tenant_id', $tenantId)
+            ->where('tenant_id', $order->tenant_id)
             ->where('is_active', true)
             ->find($paymentMethodId);
 
         if ($paymentMethod === null) {
             throw new RuntimeException('طريقة الدفع غير موجودة أو معطّلة.');
+        }
+
+        $channel = $order->salesChannel;
+        if ($channel === null || ! $this->paymentAvailability->isAvailable($paymentMethod, $channel)) {
+            throw new RuntimeException('طريقة الدفع لم تعد متاحة لهذه القناة.');
         }
 
         return $paymentMethod;

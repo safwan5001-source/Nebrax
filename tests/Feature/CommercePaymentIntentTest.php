@@ -145,6 +145,45 @@ class CommercePaymentIntentTest extends TestCase
         app(TenantContext::class)->forget();
     }
 
+    /**
+     * Codex review (PR #940, P1): collect/cancel must lock and re-check the
+     * row, not trust the caller's own in-memory status — `update()` mutates
+     * the freshly-queried row the service locks, never the `$intent`
+     * instance the caller passed in, so that instance's own `status`
+     * attribute is *still* `awaiting_collection` after a first successful
+     * collect. Passing that same stale instance to `markCollected()` again
+     * proves the service checks the locked DB row, not the caller's copy.
+     */
+    /** @test */
+    public function collecting_the_same_stale_intent_instance_twice_is_rejected_on_the_second_call(): void
+    {
+        $tenant = $this->makeTenant('intent-collect-stale');
+        app(TenantContext::class)->set($tenant->id);
+        $intent = $this->makeIntent($tenant);
+
+        app(CommercePaymentIntentService::class)->markCollected($intent);
+        $this->assertSame(CommercePaymentIntent::STATUS_AWAITING_COLLECTION, $intent->status);
+
+        $this->expectException(RuntimeException::class);
+        app(CommercePaymentIntentService::class)->markCollected($intent);
+        app(TenantContext::class)->forget();
+    }
+
+    /** @test */
+    public function cancelling_the_same_stale_intent_instance_after_it_was_collected_is_rejected(): void
+    {
+        $tenant = $this->makeTenant('intent-cancel-stale');
+        app(TenantContext::class)->set($tenant->id);
+        $intent = $this->makeIntent($tenant);
+
+        app(CommercePaymentIntentService::class)->markCollected($intent);
+        $this->assertSame(CommercePaymentIntent::STATUS_AWAITING_COLLECTION, $intent->status);
+
+        $this->expectException(RuntimeException::class);
+        app(CommercePaymentIntentService::class)->cancel($intent);
+        app(TenantContext::class)->forget();
+    }
+
     private function makeTenant(string $slug): Tenant
     {
         return Tenant::create([
@@ -379,5 +418,52 @@ class CommercePaymentIntentTest extends TestCase
 
         $this->assertNull($response->json('data.order.payment.payment_method_name'));
         $this->assertSame('awaiting_collection', $response->json('data.order.payment.status'));
+    }
+
+    /**
+     * Codex review (PR #940, P2): a method valid at selection time can be
+     * disabled for the channel before completion (`setAvailability()`).
+     * Completion must re-check availability, not just `is_active` — a
+     * selection that is no longer valid must fail closed, never silently
+     * attach to the order.
+     */
+    /** @test */
+    public function completion_rejects_a_selected_method_disabled_for_the_channel_after_selection(): void
+    {
+        $store = $this->seedMobileStore('methods-disabled-after-select');
+        app(TenantContext::class)->set($store['tenant']->id);
+        $method = PaymentMethod::create(['name' => 'نقدي', 'settlement_type' => 'cash', 'available_online' => true, 'is_active' => true]);
+        app(TenantContext::class)->forget();
+
+        $product = $this->publishedProduct($store['tenant'], $store['channel']);
+        $cartToken = $this->fullyReadyCheckout($store, $product);
+        $this->patchPayment($store, $cartToken, $method->id)->assertOk();
+
+        app(TenantContext::class)->set($store['tenant']->id);
+        $method->update(['available_online' => false]);
+        app(TenantContext::class)->forget();
+
+        $this->complete($store, $cartToken, 'idem-methods-disabled-after-select')->assertStatus(422);
+    }
+
+    /**
+     * Codex review (PR #940, P2): `StorefrontCheckout`/`StorefrontOrder`
+     * treat `payment` as always present; `emptyResponse()` (no checkout
+     * created yet) must include it too, or the frontend mapper reads
+     * `payment.payment_method_id` off `undefined` and throws.
+     */
+    /** @test */
+    public function a_checkout_response_before_any_checkout_exists_still_has_a_present_but_null_payment_shape(): void
+    {
+        $store = $this->seedMobileStore('payment-shape-empty');
+        $product = $this->publishedProduct($store['tenant'], $store['channel']);
+        $cartToken = $this->cartTokenWithItem($store, $product);
+
+        $this->withHeaders($this->cartHeaders($store['token'], $cartToken))
+            ->getJson('/commerce/v1/checkout')
+            ->assertOk()
+            ->assertJsonPath('data.payment.payment_method_id', null)
+            ->assertJsonPath('data.payment.payment_method_name', null)
+            ->assertJsonPath('data.payment.method', null);
     }
 }

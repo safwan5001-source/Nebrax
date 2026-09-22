@@ -999,6 +999,14 @@ final class CommerceCheckoutService
                     'street' => null, 'postal_code' => null, 'notes' => null,
                 ],
             ],
+            // COM-MOBILE-PAYMENTS-1 — no checkout row exists yet, so no
+            // method could ever have been selected; keeps this shape's
+            // `payment` key present just like the real response's.
+            'payment' => [
+                'payment_method_id' => null,
+                'payment_method_name' => null,
+                'method' => null,
+            ],
             'cart' => $cartData,
         ];
     }
