@@ -8,7 +8,6 @@ use App\Models\Tenant;
 use App\Services\Commerce\CheckoutIdempotencyConflictException;
 use App\Services\Commerce\CheckoutNotFoundException;
 use App\Services\Commerce\CheckoutReviewRequiredException;
-use App\Services\Commerce\CommerceCartService;
 use App\Services\Commerce\CommerceCheckoutService;
 use App\Support\CommerceOrderReference;
 use App\Support\PublicApiErrorCode;
@@ -49,37 +48,80 @@ final class CommerceCheckoutController extends PublicApiController
 
     public function show(Request $request, CommerceCheckoutService $checkouts): JsonResponse
     {
-        $result = $checkouts->current($this->tokenFromRequest($request));
-        $response = PublicApiResponse::success($request, $checkouts->serialize($result['checkout'], $result['cart']));
+        try {
+            $result = $checkouts->current($this->tokenFromRequest($request));
+        } catch (PDOException $e) {
+            throw $e;
+        } catch (RuntimeException $e) {
+            abort(422, $e->getMessage());
+        }
+        // (Codex, PR #924, P1, tenth round) Same locked recheck-and-serialize
+        // as CommerceCartController::show(): current()'s own resolution can
+        // be stale by the time this response is actually built.
+        try {
+            $serialized = $checkouts->serializeForOwnedRead($result['checkout'], $result['cart']);
+        } catch (PDOException $e) {
+            throw $e;
+        } catch (RuntimeException $e) {
+            abort(422, $e->getMessage());
+        }
+        if (! $serialized['owned']) {
+            return $this->clearToken($this->notFound($request));
+        }
+        $response = PublicApiResponse::success($request, $serialized['data']);
 
-        return $result['invalid'] ? $this->clearToken($response) : $response;
+        return $this->applyTokenOutcome($response, $result);
     }
 
-    public function store(Request $request, CommerceCartService $carts, CommerceCheckoutService $checkouts): JsonResponse
+    public function store(Request $request, CommerceCheckoutService $checkouts): JsonResponse
     {
         $this->rejectUnknown($request, []);
         $token = $this->tokenFromRequest($request);
 
-        $lookup = $carts->findByToken($token);
-        if ($lookup['invalid']) {
-            return $this->clearToken($this->notFound($request));
-        }
-
+        // (Codex, PR #924, P1, seventh round) لا فحصٌ منفصل بـfindByToken()
+        // هنا قبل استدعاء createOrResume(): كلاهما كان يعيد ربط الرمز حين لا
+        // يطابق أيّ سلة — نداءان في طلبٍ واحد يُلغي أوّلهما الثاني، فيفقد أي
+        // جهازٍ آخر يحمل الرمز الأول صلاحيته بلا داع. createOrResume() وحدها
+        // تحلّ وتربط الرمز الآن (مرّةً واحدة)، وترمي CheckoutNotFoundException
+        // لأي سببٍ يمنع البدء — نفس معاملة "امسح الرمز وأرجع 404" التي كانت
+        // تُطبَّق فقط حين يكون الرمز المقدَّم فاسداً تحديداً.
         try {
             $result = $checkouts->createOrResume($token);
         } catch (CheckoutNotFoundException) {
-            return $this->notFound($request);
+            return $this->clearToken($this->notFound($request));
         } catch (PDOException $e) {
             throw $e;
         } catch (RuntimeException $e) {
             abort(422, $e->getMessage());
         }
 
-        return PublicApiResponse::success(
+        // (Codex, PR #924, P1, eleventh round) createOrResume()'s own cart
+        // lock is released once its transaction commits, before this
+        // response is built — a claim committing in that gap could leak the
+        // new owner's data into this stale response. Same locked
+        // recheck-and-serialize as show()/complete()'s review-required
+        // branch, not the plain serialize() this call used before.
+        try {
+            $serialized = $checkouts->serializeForOwnedRead($result['checkout'], $result['cart']);
+        } catch (PDOException $e) {
+            throw $e;
+        } catch (RuntimeException $e) {
+            abort(422, $e->getMessage());
+        }
+        if (! $serialized['owned']) {
+            return $this->clearToken($this->notFound($request));
+        }
+
+        $response = PublicApiResponse::success(
             $request,
-            $checkouts->serialize($result['checkout'], $result['cart']),
+            $serialized['data'],
             $result['created'] ? 201 : 200,
         );
+        if ($result['rebound'] !== null) {
+            $this->setToken($response, $result['rebound']);
+        }
+
+        return $response;
     }
 
     public function updateContact(Request $request, CommerceCheckoutService $checkouts): JsonResponse
@@ -195,18 +237,45 @@ final class CommerceCheckoutController extends PublicApiController
         } catch (CheckoutIdempotencyConflictException $e) {
             return PublicApiResponse::error($request, PublicApiErrorCode::IDEMPOTENCY_CONFLICT, $e->getMessage(), 409);
         } catch (CheckoutReviewRequiredException $e) {
-            $current = $checkouts->current($token);
+            try {
+                $current = $checkouts->current($token);
+            } catch (PDOException $ePdo) {
+                throw $ePdo;
+            } catch (RuntimeException $eRuntime) {
+                abort(422, $eRuntime->getMessage());
+            }
 
-            return PublicApiResponse::error(
+            // (Codex, PR #924, P1, tenth round) Same locked recheck-and-
+            // serialize as show(): current()'s own resolution here can also
+            // be stale by the time this response is built.
+            try {
+                $serialized = $checkouts->serializeForOwnedRead($current['checkout'], $current['cart']);
+            } catch (PDOException $ePdo) {
+                throw $ePdo;
+            } catch (RuntimeException $eRuntime) {
+                abort(422, $eRuntime->getMessage());
+            }
+            if (! $serialized['owned']) {
+                return $this->clearToken($this->notFound($request));
+            }
+
+            // (Codex, PR #924, P2, eighth round) current() now calls
+            // resolveCurrent() (seventh round), which can rebind the token —
+            // e.g. another device touched the shared cart between
+            // resolveForCompletion()'s own lookup and this recovery lookup.
+            // Without surfacing it here, the client's retry keeps presenting
+            // the now-stale token, which 404s in resolveForCompletion()'s
+            // allowConsumed lookup (no identity fallback there, by design).
+            return $this->applyTokenOutcome(PublicApiResponse::error(
                 $request,
                 PublicApiErrorCode::REVIEW_REQUIRED,
                 $e->getMessage(),
                 409,
                 [
                     'items' => $e->details(),
-                    'checkout' => $checkouts->serialize($current['checkout'], $current['cart']),
+                    'checkout' => $serialized['data'],
                 ],
-            );
+            ), $current);
         } catch (PDOException $e) {
             throw $e;
         } catch (RuntimeException $e) {
@@ -267,11 +336,15 @@ final class CommerceCheckoutController extends PublicApiController
     private function withCurrentCheckout(Request $request, CommerceCheckoutService $checkouts, callable $mutate): JsonResponse
     {
         $token = $this->tokenFromRequest($request);
-        $lookup = $checkouts->current($token);
+        try {
+            $lookup = $checkouts->current($token);
+        } catch (PDOException $e) {
+            throw $e;
+        } catch (RuntimeException $e) {
+            abort(422, $e->getMessage());
+        }
         if ($lookup['checkout'] === null) {
-            $response = $this->notFound($request);
-
-            return $lookup['invalid'] ? $this->clearToken($response) : $response;
+            return $this->applyTokenOutcome($this->notFound($request), $lookup);
         }
 
         try {
@@ -284,7 +357,7 @@ final class CommerceCheckoutController extends PublicApiController
             abort(422, $e->getMessage());
         }
 
-        return PublicApiResponse::success($request, $data);
+        return $this->applyTokenOutcome(PublicApiResponse::success($request, $data), $lookup);
     }
 
     private function tokenFromRequest(Request $request): ?string
@@ -315,5 +388,36 @@ final class CommerceCheckoutController extends PublicApiController
         $response->headers->set(self::TOKEN_HEADER, '');
 
         return $response;
+    }
+
+    private function setToken(JsonResponse $response, string $rawToken): void
+    {
+        $response->headers->set(self::TOKEN_HEADER, $rawToken);
+    }
+
+    /**
+     * (Codex, PR #924, P1, fourth round) `CommerceCartService::findByToken()`
+     * can now rebind a stale/rotated token onto the customer's own cart
+     * (self-heal, `allowConsumed: false` only) — every checkout preparation
+     * step (`show()`/`store()`/`withCurrentCheckout()`, used by
+     * updateContact/updateAddress/updateDelivery) must hand that new token
+     * back, exactly like `CommerceCartController::applyTokenOutcome()`
+     * already does for cart endpoints. Without this, the device keeps
+     * presenting the same stale token through its entire checkout flow and
+     * only discovers it at `checkout/complete` (`allowConsumed: true`,
+     * fallback deliberately excluded there) — the worst possible place to
+     * fail, and on a genuinely first attempt, not just a retry.
+     *
+     * @param  array{invalid: bool, rebound: ?string}  $lookup
+     */
+    private function applyTokenOutcome(JsonResponse $response, array $lookup): JsonResponse
+    {
+        if ($lookup['rebound'] !== null) {
+            $this->setToken($response, $lookup['rebound']);
+
+            return $response;
+        }
+
+        return $lookup['invalid'] ? $this->clearToken($response) : $response;
     }
 }

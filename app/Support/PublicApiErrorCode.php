@@ -38,6 +38,12 @@ enum PublicApiErrorCode: string
     // يغيّر أو يستبدل أيّاً من الرموز المستقرة أعلاه.
     case REVIEW_REQUIRED = 'review_required';
 
+    // ── COM-MOBILE-CART-IDENTITY-1 (Codex, PR #924, P2) — طلب PATCH/DELETE
+    // على عنصر سلة استهدف رقم سطرٍ من سلة ضيفٍ دُمجت للتو في سلة العميل
+    // ضمن نفس هذا الطلب؛ رقم السطر القديم لم يعد له معنىً بعد الدمج
+    // (سطرٌ جديد أو كميةٌ مجموعة في سطرٍ آخر) — لا 404 مضلِّل، ولا تخمين.
+    case CART_MERGED = 'cart_merged';
+
     /** رمز HTTP الافتراضي لكل رمز خطأ — مرجع واحد يمنع التضارب بين المسارات. */
     public function defaultHttpStatus(): int
     {
@@ -54,7 +60,8 @@ enum PublicApiErrorCode: string
             self::METHOD_NOT_ALLOWED => 405,
             self::IDEMPOTENCY_CONFLICT,
             self::IDEMPOTENCY_IN_PROGRESS,
-            self::REVIEW_REQUIRED => 409,
+            self::REVIEW_REQUIRED,
+            self::CART_MERGED => 409,
             self::VALIDATION_FAILED => 422,
             self::RATE_LIMITED => 429,
             self::INTERNAL_ERROR => 500,

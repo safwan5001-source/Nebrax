@@ -924,6 +924,7 @@ components:
             - idempotency_conflict
             - idempotency_in_progress
             - review_required
+            - cart_merged
         message: { type: string }
         details:
           type: object

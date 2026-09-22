@@ -14,6 +14,7 @@ use App\Models\UnitTemplateUnit;
 use App\Services\Accounting\UnitConversion;
 use App\Support\DocumentLineVariantResolver;
 use App\Tenancy\BranchScope;
+use App\Tenancy\CustomerContext;
 use App\Tenancy\StorefrontContext;
 use App\Tenancy\TenantContext;
 use Illuminate\Support\Collection;
@@ -80,16 +81,59 @@ final class CommerceCheckoutService
      * الصلاحية يُنقَل حالته كسولاً ثم يُعامَل كغيابٍ تام، بنفس نمط
      * `CommerceCartService::findByToken()` حرفياً.
      *
-     * @return array{checkout: ?CommerceCheckout, cart: ?CommerceCart, invalid: bool}
+     * (Codex, PR #924, P1, seventh round) يستعمل `resolveCurrent()` لا
+     * `findByToken()`: الأخيرة تُرجع سلة الضيف المطابقة للرمز مباشرةً بلا أي
+     * دمج، فعميلٌ مُصادَقٌ له سلةٌ قائمة فعلاً كان يرى Checkout سلة الضيف
+     * الخام — سلته الحقيقية تُتجاهَل بصمت. لا تغيير لمسار الويب/الضيف: حين
+     * لا `CustomerContext` مؤسَّس، `resolveCurrent()` هي `findByToken()`
+     * حرفياً (راجع تعريفها).
+     *
+     * @return array{checkout: ?CommerceCheckout, cart: ?CommerceCart, invalid: bool, rebound: ?string}
      */
+    /**
+     * (Codex, PR #924, P1, tenth round) النسخة المُقفَلة من إعادة تحقّق
+     * الملكية قبل التسليم — نفس `CommerceCartService::serializeForOwnedRead()`
+     * حرفياً، لكن تُسلسِل أيضاً `serialize()` الخاص بـCheckout (يقرأ حقول
+     * Checkout نفسها: جهة الاتصال والعنوان، لا سلته فقط) داخل نفس المعاملة
+     * والقفل. `show()` و`complete()`'s الفرع المتعلّق بـreview-required
+     * يستدعيانها بدل `serialize()` العام مباشرة.
+     *
+     * @return array{data: array<string, mixed>, owned: bool}
+     */
+    public function serializeForOwnedRead(?CommerceCheckout $checkout, ?CommerceCart $cart): array
+    {
+        if ($cart === null) {
+            return ['data' => $this->serialize($checkout, null), 'owned' => true];
+        }
+
+        return DB::transaction(function () use ($checkout, $cart): array {
+            $context = $this->context();
+            $lockedCart = $this->scopeToContext(CommerceCart::query(), $context)
+                ->whereKey($cart->id)
+                ->lockForUpdate()
+                ->first();
+
+            if ($lockedCart === null || ! $this->carts->cartModelOwnedByCurrentBearer($lockedCart)) {
+                return ['data' => [], 'owned' => false];
+            }
+
+            $lockedCheckout = $checkout !== null
+                ? $this->scopeToContext(CommerceCheckout::query(), $context)->whereKey($checkout->id)->lockForUpdate()->first()
+                : null;
+
+            return ['data' => $this->serialize($lockedCheckout, $lockedCart), 'owned' => true];
+        }, 3);
+    }
+
     public function current(?string $cartToken): array
     {
-        $cartLookup = $this->carts->findByToken($cartToken);
+        $cartLookup = $this->carts->resolveCurrent($cartToken);
         if ($cartLookup['cart'] === null) {
-            return ['checkout' => null, 'cart' => null, 'invalid' => $cartLookup['invalid']];
+            return ['checkout' => null, 'cart' => null, 'invalid' => $cartLookup['invalid'], 'rebound' => null];
         }
 
         $cart = $cartLookup['cart'];
+        $rebound = $cartLookup['rebound'];
         $context = $this->context();
 
         $checkout = $this->scopeToContext(CommerceCheckout::query(), $context)
@@ -99,31 +143,31 @@ final class CommerceCheckoutService
             ->first();
 
         if ($checkout === null) {
-            return ['checkout' => null, 'cart' => $cart, 'invalid' => false];
+            return ['checkout' => null, 'cart' => $cart, 'invalid' => false, 'rebound' => $rebound];
         }
 
         if ($checkout->expires_at->isPast()) {
-            return DB::transaction(function () use ($checkout, $cart, $context): array {
+            return DB::transaction(function () use ($checkout, $cart, $context, $rebound): array {
                 $current = $this->scopeToContext(CommerceCheckout::query(), $context)
                     ->whereKey($checkout->id)
                     ->lockForUpdate()
                     ->first();
 
                 if ($current === null || ! $current->isOpen()) {
-                    return ['checkout' => null, 'cart' => $cart, 'invalid' => false];
+                    return ['checkout' => null, 'cart' => $cart, 'invalid' => false, 'rebound' => $rebound];
                 }
 
                 if (! $current->expires_at->isPast()) {
-                    return ['checkout' => $current, 'cart' => $cart, 'invalid' => false];
+                    return ['checkout' => $current, 'cart' => $cart, 'invalid' => false, 'rebound' => $rebound];
                 }
 
                 $current->update(['status' => CommerceCheckout::STATUS_EXPIRED]);
 
-                return ['checkout' => null, 'cart' => $cart, 'invalid' => false];
+                return ['checkout' => null, 'cart' => $cart, 'invalid' => false, 'rebound' => $rebound];
             });
         }
 
-        return ['checkout' => $checkout, 'cart' => $cart, 'invalid' => false];
+        return ['checkout' => $checkout, 'cart' => $cart, 'invalid' => false, 'rebound' => $rebound];
     }
 
     /**
@@ -215,17 +259,23 @@ final class CommerceCheckoutService
      * لعقد `AWJ_CHECKOUT_V1_ARCHITECTURE.md` §9 حرفياً). ويب وجوال كلاهما
      * محميان معاً لأن الإصلاح في هذه الخدمة المشتركة، لا في متحكّمٍ واحد.
      *
-     * @return array{checkout: CommerceCheckout, cart: CommerceCart, created: bool}
+     * (Codex, PR #924, P1, seventh round) يستعمل `resolveCurrent()` — نفس
+     * سبب `current()` أعلاه حرفياً: بلا هذا، عميلٌ مُصادَقٌ يقدّم رمز سلة
+     * ضيفٍ مباشرةً لهذا المسار كان يبدأ Checkout على سلة الضيف الخام بلا
+     * أي دمج، متجاوزاً سلته الحالية بصمت.
+     *
+     * @return array{checkout: CommerceCheckout, cart: CommerceCart, created: bool, rebound: ?string}
      */
     public function createOrResume(?string $cartToken): array
     {
-        $cartLookup = $this->carts->findByToken($cartToken);
+        $cartLookup = $this->carts->resolveCurrent($cartToken);
         if ($cartLookup['cart'] === null) {
             throw new CheckoutNotFoundException('السلة غير متاحة لبدء الدفع.');
         }
         $context = $this->context();
+        $rebound = $cartLookup['rebound'];
 
-        return DB::transaction(function () use ($cartLookup, $context): array {
+        return DB::transaction(function () use ($cartLookup, $context, $rebound): array {
             $cart = $this->lockActiveCart($cartLookup['cart']->id, $context);
 
             $existing = $this->scopeToContext(CommerceCheckout::query(), $context)
@@ -236,11 +286,11 @@ final class CommerceCheckoutService
                 ->first();
 
             if ($existing !== null && $existing->status === CommerceCheckout::STATUS_COMPLETED) {
-                return ['checkout' => $existing, 'cart' => $cart, 'created' => false];
+                return ['checkout' => $existing, 'cart' => $cart, 'created' => false, 'rebound' => $rebound];
             }
 
             if ($existing !== null && ! $existing->expires_at->isPast()) {
-                return ['checkout' => $existing, 'cart' => $cart, 'created' => false];
+                return ['checkout' => $existing, 'cart' => $cart, 'created' => false, 'rebound' => $rebound];
             }
 
             if ($existing !== null) {
@@ -254,7 +304,7 @@ final class CommerceCheckoutService
                 'expires_at' => now()->addMinutes(self::LIFETIME_MINUTES),
             ]);
 
-            return ['checkout' => $checkout, 'cart' => $cart, 'created' => true];
+            return ['checkout' => $checkout, 'cart' => $cart, 'created' => true, 'rebound' => $rebound];
         }, 3);
     }
 
@@ -262,7 +312,7 @@ final class CommerceCheckoutService
     public function updateContact(CommerceCheckout $knownCheckout, array $fields): array
     {
         return DB::transaction(function () use ($knownCheckout, $fields): array {
-            $checkout = $this->lockUsableCheckout($knownCheckout->id);
+            $checkout = $this->lockUsableCheckout($knownCheckout);
             $checkout->update($fields + ['expires_at' => now()->addMinutes(self::LIFETIME_MINUTES)]);
 
             return $this->serialize($checkout, $this->cartFor($checkout));
@@ -273,7 +323,7 @@ final class CommerceCheckoutService
     public function updateAddress(CommerceCheckout $knownCheckout, array $fields): array
     {
         return DB::transaction(function () use ($knownCheckout, $fields): array {
-            $checkout = $this->lockUsableCheckout($knownCheckout->id);
+            $checkout = $this->lockUsableCheckout($knownCheckout);
             $checkout->update($fields + ['expires_at' => now()->addMinutes(self::LIFETIME_MINUTES)]);
 
             return $this->serialize($checkout, $this->cartFor($checkout));
@@ -292,7 +342,7 @@ final class CommerceCheckoutService
         }
 
         return DB::transaction(function () use ($knownCheckout, $method): array {
-            $checkout = $this->lockUsableCheckout($knownCheckout->id);
+            $checkout = $this->lockUsableCheckout($knownCheckout);
             $checkout->update([
                 'delivery_method' => $method,
                 'delivery_amount_minor' => 0,
@@ -349,6 +399,21 @@ final class CommerceCheckoutService
         $context = $this->context();
 
         return DB::transaction(function () use ($knownCheckout, $idempotencyKeyHash, $idempotencyFingerprint, $context): array {
+            // (Codex, PR #924, P2, eleventh round) Cart locked before
+            // checkout — `cart_id` is already known from `$knownCheckout`,
+            // so no lookup is needed to discover it first. Matches
+            // `createOrResume()`/`lockActiveCart()` and the read path's
+            // `serializeForOwnedRead()`, both of which must lock the cart
+            // first (their own cart id is the only one known in advance);
+            // `lockUsableCheckout()` below now follows the same order,
+            // closing a deadlock risk this method and it used to disagree on
+            // under concurrent access.
+            $cart = $this->scopeToContext(CommerceCart::query(), $context)
+                ->whereKey($knownCheckout->cart_id)
+                ->where('tenant_id', $context->tenantId())
+                ->lockForUpdate()
+                ->first();
+
             $checkout = $this->scopeToContext(CommerceCheckout::query(), $context)
                 ->whereKey($knownCheckout->id)
                 ->where('tenant_id', $context->tenantId())
@@ -369,18 +434,14 @@ final class CommerceCheckoutService
 
             // نفس سلة Checkout هذا حصراً — بنفس تحقّق السياق الكامل
             // (tenant/storefront أو null الجوّال/channel) الذي تفرضه
-            // CHECKOUT-1A، لا ثقة بحالة `cart_id` المخزَّنة وحدها.
-            $cart = $this->scopeToContext(CommerceCart::query(), $context)
-                ->whereKey($checkout->cart_id)
-                ->where('tenant_id', $context->tenantId())
-                ->where('status', CommerceCart::STATUS_ACTIVE)
-                ->where('expires_at', '>', now())
-                ->lockForUpdate()
-                ->first();
-
-            if ($cart === null) {
+            // CHECKOUT-1A، لا ثقة بحالة `cart_id` المخزَّنة وحدها. القفل تمّ
+            // أعلاه قبل معرفة إن كانت هذه إعادة تشغيل أصلاً (لا Checkout
+            // معروفاً بعد) — الفحص هنا بعد التحميل، لا ضمن استعلام القفل.
+            if ($cart === null || $cart->status !== CommerceCart::STATUS_ACTIVE || $cart->expires_at->isPast()) {
                 throw new CheckoutNotFoundException('السلة غير متاحة لإتمام الدفع.');
             }
+
+            $this->assertOwnedByCurrentBearer($cart);
 
             if ($checkout->contact_name === null || trim($checkout->contact_name) === '') {
                 throw new CheckoutReviewRequiredException(
@@ -697,14 +758,37 @@ final class CommerceCheckoutService
             throw new CheckoutNotFoundException('السلة غير متاحة لبدء الدفع.');
         }
 
+        $this->assertOwnedByCurrentBearer($cart);
+
         return $cart;
     }
 
-    private function lockUsableCheckout(string $checkoutId): CommerceCheckout
+    /**
+     * (Codex, PR #924, P1, seventh round) هذا Checkout نفسه لا يحمل هوية
+     * مالكٍ مباشرة — ملكيته موروثة بالكامل من سلته عبر `cart_id`. قفلٌ على
+     * Checkout وحده كان يترك نفس ثغرة السباق التي أُصلحت في
+     * `lockUsableCart()`/`lockActiveCart()`: طلبٌ ضيفٌ يحلّ هذا الـCheckout
+     * قبل أن تُطالِب به مصادقةٌ متزامنة، ثم يستمر بتعديل جهة الاتصال أو
+     * العنوان بعد أن تغيّرت ملكية سلته فعلاً.
+     *
+     * (Codex, PR #924, P2, eleventh round) يأخذ نموذج Checkout الكامل لا
+     * مجرّد معرّفه — `cart_id` معروفٌ منه مسبقاً فلا حاجة لاستعلامٍ يكتشفه
+     * أولاً — كي يُقفَل السلة قبل الـCheckout، مطابقاً `complete()`/
+     * `createOrResume()`/`serializeForOwnedRead()`: كانت هذه الدالة تقفل
+     * بالترتيب المعاكس (Checkout ثم سلة)، وهو تعارضٌ حقيقي يفتح باب توقّفٍ
+     * متبادل (deadlock) مع أي من تلك الثلاث تحت تزامنٍ حقيقي.
+     */
+    private function lockUsableCheckout(CommerceCheckout $knownCheckout): CommerceCheckout
     {
         $context = $this->context();
+
+        $cart = $this->scopeToContext(CommerceCart::query(), $context)
+            ->whereKey($knownCheckout->cart_id)
+            ->lockForUpdate()
+            ->first();
+
         $checkout = $this->scopeToContext(CommerceCheckout::query(), $context)
-            ->whereKey($checkoutId)
+            ->whereKey($knownCheckout->id)
             ->where('tenant_id', $context->tenantId())
             ->whereIn('status', CommerceCheckout::OPEN_STATUSES)
             ->where('expires_at', '>', now())
@@ -715,7 +799,34 @@ final class CommerceCheckoutService
             throw new CheckoutNotFoundException('جلسة الدفع غير متاحة.');
         }
 
+        if ($cart === null) {
+            throw new CheckoutNotFoundException('جلسة الدفع غير متاحة.');
+        }
+
+        $this->assertOwnedByCurrentBearer($cart);
+
         return $checkout;
+    }
+
+    /**
+     * (Codex, PR #924, P1, seventh round) يعيد التحقق من ملكية السلة تحت
+     * قفلها مباشرة — نفس مبدأ `CommerceCartService::lockUsableCart()`
+     * حرفياً، مكرَّرٌ عمداً هنا بدل توسيع واجهة تلك الخدمة العامة (نفس سبب
+     * تكرار `resolveUnit()`/`scopeToContext()` الموثَّق في رأس هذا الصنف).
+     * سلةٌ حُلَّت قبل هذا القفل (عبر `resolveCurrent()`/`findByToken()`) قد
+     * تكون طالبَتها مصادقةٌ متزامنة بين الحلّ وهذا القفل بالذات — المطالبة
+     * تُعدِّل `customer_identity_id` فقط، لا `status`، فلا يكفي فحصا الحالة
+     * والانتهاء وحدهما.
+     */
+    private function assertOwnedByCurrentBearer(CommerceCart $cart): void
+    {
+        $customerContext = app(CustomerContext::class);
+        $ownedByOther = $cart->customer_identity_id !== null
+            && (! $customerContext->isEstablished() || $customerContext->customerIdentityId() !== $cart->customer_identity_id);
+
+        if ($ownedByOther) {
+            throw new CheckoutNotFoundException('جلسة الدفع غير متاحة.');
+        }
     }
 
     private function cartFor(CommerceCheckout $checkout): ?CommerceCart
