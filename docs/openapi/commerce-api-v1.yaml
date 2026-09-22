@@ -1,0 +1,1803 @@
+openapi: 3.1.0
+
+info:
+  title: AWJ Commerce Mobile API
+  version: v1
+  summary: Mobile/native-client commerce surface for AWJ tenants (`/commerce/v1`).
+  description: >
+    `/commerce/v1` is an additive, versioned surface for native mobile
+    clients — a separate trust boundary from `/store/v1` (the web storefront)
+    and `/api/v1` (the tenant-facing machine-to-machine Public API). It shares
+    services with `/store/v1` (cart, checkout, catalog, orders) but never its
+    controllers, and shares nothing with `/api/v1` beyond the error-code enum
+    and general envelope conventions. See
+    `docs/plans/commerce/PUBLIC_MOBILE_COMMERCE_API_V1_ARCHITECTURE.md`.
+
+
+    ## Authentication tiers
+
+    Every route requires a **store bearer token** (`Authorization: Bearer
+    <key>`) — the same `ApiClient`/Sanctum credential `/api/v1` already uses,
+    reused unmodified. It resolves the tenant and the tenant's single active
+    `mobile` `SalesChannel`; it is never an end-customer's own session. Four
+    route groups layer on top of that shared requirement:
+
+
+    - **Read (optional customer context)** — store bearer only. An optional
+      `X-Customer-Token` may additionally be presented (see below) to
+      personalize cart/checkout resolution, but its absence never blocks a
+      read.
+
+    - **Write (optional customer context)** — same as Read, plus a stricter
+      rate-limit class. Cart/checkout mutations live here.
+
+    - **Sensitive (customer auth entry points)** — store bearer only; these
+      routes (`auth/register`, `auth/login`, `auth/otp/*`) are how a customer
+      *obtains* their own token, so none can already require one. Each also
+      carries its own named per-identifier throttle (IP + email/phone) on top
+      of the shared per-store rate limit, so one busy tenant cannot exhaust
+      every other tenant's shared quota.
+
+    - **Customer-required** — store bearer **and** a valid `X-Customer-Token`
+      (a Sanctum `customer:access` token, obtained from a Sensitive-tier
+      route). `me`, the address book, and order history live here.
+
+
+    `X-Customer-Token` is never the `Authorization` header — that header
+    always carries the store's own bearer token, resolved first, regardless
+    of tier.
+
+
+    ## Cart/Checkout identity
+
+    Guest cart and checkout identity travels in a dedicated `X-Cart-Token`
+    request/response header — never a cookie (unreliable on native clients)
+    and never `Authorization` (already the store bearer). A client that
+    presents a valid `X-Customer-Token` alongside an `X-Cart-Token` gets its
+    guest cart claimed/merged into its authenticated cart automatically; see
+    the architecture doc for the merge policy.
+
+
+    ## Envelopes
+
+    Success: `{ "data": …, "meta": { "request_id" } }`, with an additional
+    `meta.pagination` on paginated list endpoints. Error: `{ "error": {
+    "code", "message", "details?" }, "meta": { "request_id" } }`. Every
+    response carries `X-Request-Id`.
+
+
+    ## Money
+
+    Monetary amounts are integer **minor units** (e.g. halalas: 100.50 SAR =
+    10050), never floating point, paired with a `currency` (ISO-4217) field.
+
+
+    ## Idempotency
+
+    Only `POST checkout/complete` requires an `Idempotency-Key` header — the
+    one truly non-idempotent write on this surface (every other mutation is
+    naturally safe to retry: cart/checkout resolve-or-create by token, and
+    resource updates are plain overwrites). This mirrors `/store/v1`'s own
+    checkout contract exactly, not a new guarantee invented here.
+
+
+    ## Versioning
+
+    The base path `/commerce/v1` is the first major version. A breaking
+    change would be introduced under a new major version rather than
+    mutating `v1`, matching `/api/v1`'s own principle.
+  contact:
+    name: AWJ ERP
+
+servers:
+  - url: '{baseUrl}/commerce/v1'
+    description: >
+      Commerce Mobile API base. `baseUrl` is the deployment origin; no
+      production host is hard-coded here because it is environment-specific.
+    variables:
+      baseUrl:
+        default: https://api.example.com
+        description: Deployment origin (scheme + host), configured per environment.
+
+tags:
+  - name: Storefront
+    description: Store identity/config for the resolved mobile channel.
+  - name: Catalog
+    description: Read-only categories and products, gated by mobile-channel publication.
+  - name: Media
+    description: Product media bytes, gated by the same publication check as Catalog.
+  - name: Cart
+    description: Guest/customer cart, identified by X-Cart-Token.
+  - name: Checkout
+    description: Checkout preparation and completion, sharing Cart's identity.
+  - name: Payments
+    description: Payment method selection (COD/Pay on Pickup settlement, ADR-09).
+  - name: Orders
+    description: Standalone guest order status via a signed order reference.
+  - name: Auth
+    description: Customer authentication (phone+OTP or email+password).
+  - name: Addresses
+    description: The authenticated customer's own saved address book.
+  - name: OrderHistory
+    description: The authenticated customer's own order history.
+
+security:
+  - storeBearer: []
+
+paths:
+  /storefront:
+    parameters:
+      - $ref: '#/components/parameters/RequestId'
+    get:
+      operationId: getStorefront
+      tags: [Storefront]
+      summary: Resolved store identity for the mobile channel
+      x-auth-tier: read
+      responses:
+        '200':
+          description: The tenant's store identity.
+          headers:
+            X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StorefrontResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /categories:
+    parameters:
+      - $ref: '#/components/parameters/RequestId'
+    get:
+      operationId: listCategories
+      tags: [Catalog]
+      summary: List root categories (published on the mobile channel)
+      x-auth-tier: read
+      responses:
+        '200':
+          description: Root categories, up to two levels of children nested.
+          headers:
+            X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CategoryListResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /categories/{id}:
+    parameters:
+      - $ref: '#/components/parameters/RequestId'
+      - $ref: '#/components/parameters/IdPath'
+    get:
+      operationId: getCategory
+      tags: [Catalog]
+      summary: Get a category, with one level of children and its ancestor chain
+      x-auth-tier: read
+      responses:
+        '200':
+          description: The category.
+          headers:
+            X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CategoryResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /products:
+    parameters:
+      - $ref: '#/components/parameters/RequestId'
+    get:
+      operationId: listProducts
+      tags: [Catalog]
+      summary: List products published on the mobile channel
+      x-auth-tier: read
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/ProductsSearch'
+        - $ref: '#/components/parameters/ProductsCategoryId'
+        - $ref: '#/components/parameters/ProductsSort'
+      responses:
+        '200':
+          description: A page of products (list rows never carry media/options/variants).
+          headers:
+            X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProductListResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /products/{id}:
+    parameters:
+      - $ref: '#/components/parameters/RequestId'
+      - $ref: '#/components/parameters/IdPath'
+    get:
+      operationId: getProduct
+      tags: [Catalog]
+      summary: Get a product
+      description: >
+        A simple product's `is_variant_managed` is `false` and it carries no
+        `options`/`variants`. A variant-managed product's `is_variant_managed`
+        is `true` and it carries both — `price`/`in_stock` at the top level
+        then reflect the cheapest variant / any-variant-in-stock, never an
+        ambiguous parent figure.
+      x-auth-tier: read
+      responses:
+        '200':
+          description: The product (detail always includes `media`, unlike the list row).
+          headers:
+            X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/ProductDetail'
+                  - $ref: '#/components/schemas/ProductVariantDetail'
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /media/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+    get:
+      operationId: getMedia
+      tags: [Media]
+      summary: Product media bytes
+      description: >
+        Streams the media file's own bytes (not a JSON envelope) once the
+        owning product's publication on the resolved mobile channel is
+        confirmed — the identical non-revealing 404 for a wrong id, an
+        unpublished product, or a product published on a different channel.
+        `Cache-Control: private` (never `public`): this route is bearer-gated,
+        so a shared cache serving a stale hit would bypass re-authorization.
+      x-auth-tier: read
+      responses:
+        '200':
+          description: The media bytes.
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /cart:
+    parameters:
+      - $ref: '#/components/parameters/RequestId'
+      - $ref: '#/components/parameters/CartToken'
+    get:
+      operationId: getCart
+      tags: [Cart]
+      summary: Get the current cart
+      description: >
+        Resolves by `X-Cart-Token` (guest) merged with the authenticated
+        customer's own cart when `X-Customer-Token` is also present. A
+        missing/invalid/foreign token is indistinguishable from "no cart yet"
+        — a fresh empty cart shape, never a 404 that would leak whether a
+        token was merely stale versus genuinely unowned.
+      x-auth-tier: read
+      responses:
+        '200':
+          description: The cart (empty shape if no cart exists yet for this token).
+          headers:
+            X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+            X-Cart-Token: { $ref: '#/components/headers/XCartToken' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CartResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /cart/items:
+    parameters:
+      - $ref: '#/components/parameters/RequestId'
+      - $ref: '#/components/parameters/CartToken'
+    post:
+      operationId: addCartItem
+      tags: [Cart]
+      summary: Add a product (or unit/variant) to the cart
+      description: >
+        Creates a cart on first call if `X-Cart-Token` is absent/unknown — the
+        response's `X-Cart-Token` header then carries the new token, which
+        the client must persist and resend. No `Idempotency-Key`: Cart V1 has
+        no request-level idempotency contract by design (matches `/store/v1`).
+      x-auth-tier: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CartItemCreate' }
+      responses:
+        '200':
+          description: Quantity merged into an existing line for the same product/unit/variant.
+          headers:
+            X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+            X-Cart-Token: { $ref: '#/components/headers/XCartToken' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CartResponse' }
+        '201':
+          description: A new cart line created.
+          headers:
+            X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+            X-Cart-Token: { $ref: '#/components/headers/XCartToken' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CartResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /cart/items/{item}:
+    parameters:
+      - $ref: '#/components/parameters/RequestId'
+      - $ref: '#/components/parameters/CartToken'
+      - name: item
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+        description: Cart line id.
+    patch:
+      operationId: updateCartItem
+      tags: [Cart]
+      summary: Update a cart line's quantity
+      x-auth-tier: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CartItemUpdate' }
+      responses:
+        '200':
+          description: The updated cart.
+          headers:
+            X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+            X-Cart-Token: { $ref: '#/components/headers/XCartToken' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CartResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/CartMerged' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+    delete:
+      operationId: removeCartItem
+      tags: [Cart]
+      summary: Remove a cart line
+      x-auth-tier: write
+      responses:
+        '200':
+          description: The updated cart.
+          headers:
+            X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+            X-Cart-Token: { $ref: '#/components/headers/XCartToken' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CartResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/CartMerged' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /checkout:
+    parameters:
+      - $ref: '#/components/parameters/RequestId'
+      - $ref: '#/components/parameters/CartToken'
+    get:
+      operationId: getCheckout
+      tags: [Checkout]
+      summary: Get the current checkout (shares Cart's X-Cart-Token identity)
+      description: >
+        Before `POST checkout` is ever called, this returns the checkout
+        fields as `null`/zeroed alongside the real cart — never a 404 —
+        exactly the same key set as a populated checkout.
+      x-auth-tier: read
+      responses:
+        '200':
+          description: The checkout (empty shape if none exists yet).
+          headers:
+            X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+            X-Cart-Token: { $ref: '#/components/headers/XCartToken' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CheckoutResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+    post:
+      operationId: startCheckout
+      tags: [Checkout]
+      summary: Start (or resume) checkout for the current cart
+      x-auth-tier: write
+      responses:
+        '200':
+          description: An already-open checkout resumed.
+          headers:
+            X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+            X-Cart-Token: { $ref: '#/components/headers/XCartToken' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CheckoutResponse' }
+        '201':
+          description: A new checkout created.
+          headers:
+            X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+            X-Cart-Token: { $ref: '#/components/headers/XCartToken' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CheckoutResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /checkout/contact:
+    parameters:
+      - $ref: '#/components/parameters/RequestId'
+      - $ref: '#/components/parameters/CartToken'
+    patch:
+      operationId: updateCheckoutContact
+      tags: [Checkout]
+      summary: Set contact fields on the current checkout
+      x-auth-tier: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CheckoutContactUpdate' }
+      responses:
+        '200':
+          description: The updated checkout.
+          headers:
+            X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+            X-Cart-Token: { $ref: '#/components/headers/XCartToken' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CheckoutResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /checkout/address:
+    parameters:
+      - $ref: '#/components/parameters/RequestId'
+      - $ref: '#/components/parameters/CartToken'
+    patch:
+      operationId: updateCheckoutAddress
+      tags: [Checkout]
+      summary: Set the delivery address, manually or by a saved address id
+      description: >
+        Either the manual address fields, **or** `address_id` alone — never
+        both in the same request (422 if mixed). `address_id` requires an
+        established customer context (`X-Customer-Token`); its fields are
+        copied in at this moment, not referenced, so a later edit/delete of
+        the saved address never retroactively changes this checkout.
+      x-auth-tier: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CheckoutAddressUpdate' }
+      responses:
+        '200':
+          description: The updated checkout.
+          headers:
+            X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+            X-Cart-Token: { $ref: '#/components/headers/XCartToken' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CheckoutResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /checkout/delivery:
+    parameters:
+      - $ref: '#/components/parameters/RequestId'
+      - $ref: '#/components/parameters/CartToken'
+    patch:
+      operationId: updateCheckoutDelivery
+      tags: [Checkout]
+      summary: Set the delivery method
+      description: >
+        `delivery.amount` is then server-resolved (COM-MOBILE-SHIPPING-1,
+        ADR-10): a merchant-configured zone rate for `standard`, matched by
+        city then region, or `0` for `pickup`/no configured zone — never a
+        client-supplied amount.
+      x-auth-tier: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CheckoutDeliveryUpdate' }
+      responses:
+        '200':
+          description: The updated checkout.
+          headers:
+            X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+            X-Cart-Token: { $ref: '#/components/headers/XCartToken' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CheckoutResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /checkout/payment:
+    parameters:
+      - $ref: '#/components/parameters/RequestId'
+      - $ref: '#/components/parameters/CartToken'
+    patch:
+      operationId: updateCheckoutPayment
+      tags: [Payments]
+      summary: Select a settlement method from the channel's enabled methods
+      description: >
+        Optional (COM-MOBILE-PAYMENTS-1, ADR-09): completing checkout with no
+        method ever selected still succeeds. `payment_method_id` must be one
+        of `GET payment-methods`' own results — active **and** enabled for
+        this channel (`PaymentMethodChannelAvailabilityService`), re-checked
+        again at completion in case it was disabled in between.
+      x-auth-tier: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CheckoutPaymentUpdate' }
+      responses:
+        '200':
+          description: The updated checkout.
+          headers:
+            X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+            X-Cart-Token: { $ref: '#/components/headers/XCartToken' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CheckoutResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /checkout/complete:
+    parameters:
+      - $ref: '#/components/parameters/RequestId'
+      - $ref: '#/components/parameters/CartToken'
+    post:
+      operationId: completeCheckout
+      tags: [Checkout]
+      summary: Complete checkout, creating a CommerceOrder
+      description: >
+        The **only** write on this surface that requires `Idempotency-Key`.
+        A final server-side revalidation (price/availability/unit) runs
+        before any order is created; a change since the client's last read
+        returns `409 review_required` with the current checkout and the
+        specific items that changed, never a silently-adjusted order.
+      x-auth-tier: write
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: A prior completion with this exact idempotency key replayed.
+          headers:
+            X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+            X-Cart-Token: { $ref: '#/components/headers/XCartToken' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CheckoutCompleteResponse' }
+        '201':
+          description: A new order created.
+          headers:
+            X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+            X-Cart-Token: { $ref: '#/components/headers/XCartToken' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CheckoutCompleteResponse' }
+        '400': { $ref: '#/components/responses/IdempotencyKeyError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: Idempotency key conflict, or final revalidation found a review-required gap.
+          headers:
+            X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /payment-methods:
+    parameters:
+      - $ref: '#/components/parameters/RequestId'
+    get:
+      operationId: listPaymentMethods
+      tags: [Payments]
+      summary: The channel's own enabled settlement methods
+      description: >
+        Empty by default: every default-seeded `PaymentMethod` starts
+        disabled for any online channel until a merchant explicitly enables
+        one (`PaymentMethodChannelAvailabilityService`) — an empty list is
+        the honest out-of-the-box state, not an error.
+      x-auth-tier: read
+      responses:
+        '200':
+          description: The channel's enabled methods (possibly empty).
+          headers:
+            X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PaymentMethodListResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /orders/{id}:
+    parameters:
+      - $ref: '#/components/parameters/RequestId'
+      - $ref: '#/components/parameters/IdPath'
+      - $ref: '#/components/parameters/OrderReference'
+    get:
+      operationId: getGuestOrder
+      tags: [Orders]
+      summary: Standalone order status, proven by a signed order reference
+      description: >
+        Ownership is **never** the bearer token alone (that proves only
+        store/client identity) — it is a valid `X-Order-Reference` signature
+        bound to exactly this order's tenant/channel/id, issued once at
+        checkout completion. Every ownership failure (missing, malformed,
+        tampered, wrong-order reference, foreign/nonexistent id) returns the
+        identical non-revealing 404.
+      x-auth-tier: read
+      responses:
+        '200':
+          description: The order.
+          headers:
+            X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GuestOrderResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /auth/register:
+    parameters:
+      - $ref: '#/components/parameters/RequestId'
+    post:
+      operationId: registerCustomer
+      tags: [Auth]
+      summary: Register a customer with email + password
+      description: >
+        Always `202 { verification_required: true }`, identically for a new
+        or an already-registered email — no account-existence enumeration,
+        and no token until email-verification delivery exists (shared,
+        pre-existing gap with `/customer/v1`, not new here).
+      x-auth-tier: sensitive
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CustomerRegisterRequest' }
+      responses:
+        '202':
+          description: Registration accepted.
+          headers:
+            X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RegisterResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /auth/login:
+    parameters:
+      - $ref: '#/components/parameters/RequestId'
+    post:
+      operationId: loginCustomer
+      tags: [Auth]
+      summary: Log in with email + password
+      x-auth-tier: sensitive
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CustomerLoginRequest' }
+      responses:
+        '200':
+          description: Authenticated — a customer:access token and identity.
+          headers:
+            X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TokenAuthResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /auth/otp/request:
+    parameters:
+      - $ref: '#/components/parameters/RequestId'
+    post:
+      operationId: requestOtp
+      tags: [Auth]
+      summary: Request a phone OTP code (unified register-or-login)
+      x-auth-tier: sensitive
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OtpRequestRequest' }
+      responses:
+        '202':
+          description: Code dispatch accepted.
+          headers:
+            X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OtpRequestResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /auth/otp/verify:
+    parameters:
+      - $ref: '#/components/parameters/RequestId'
+    post:
+      operationId: verifyOtp
+      tags: [Auth]
+      summary: Verify a phone OTP code and authenticate
+      x-auth-tier: sensitive
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OtpVerifyRequest' }
+      responses:
+        '200':
+          description: Authenticated — a customer:access token and identity.
+          headers:
+            X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TokenAuthResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /auth/logout:
+    parameters:
+      - $ref: '#/components/parameters/RequestId'
+      - $ref: '#/components/parameters/CustomerToken'
+    post:
+      operationId: logoutCustomer
+      tags: [Auth]
+      summary: Revoke the current customer:access token
+      x-auth-tier: customer
+      responses:
+        '200':
+          description: Logged out.
+          headers:
+            X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LogoutResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /me:
+    parameters:
+      - $ref: '#/components/parameters/RequestId'
+      - $ref: '#/components/parameters/CustomerToken'
+    get:
+      operationId: getMe
+      tags: [Auth]
+      summary: The authenticated customer's own profile
+      x-auth-tier: customer
+      responses:
+        '200':
+          description: The customer's identity and partner-link status.
+          headers:
+            X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MeResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /addresses:
+    parameters:
+      - $ref: '#/components/parameters/RequestId'
+      - $ref: '#/components/parameters/CustomerToken'
+    get:
+      operationId: listAddresses
+      tags: [Addresses]
+      summary: List the authenticated customer's own saved addresses
+      x-auth-tier: customer
+      responses:
+        '200':
+          description: The customer's addresses.
+          headers:
+            X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AddressListResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+    post:
+      operationId: createAddress
+      tags: [Addresses]
+      summary: Save a new address
+      description: >
+        Saudi National Address fields (`district`/`building_no`/
+        `postal_code`/`additional_number`) are required only when `country`
+        is `SA`. Setting `is_default_shipping`/`is_default_billing` clears
+        any existing default of that kind for this customer (DB-enforced
+        exclusivity).
+      x-auth-tier: customer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AddressCreate' }
+      responses:
+        '201':
+          description: The saved address.
+          headers:
+            X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AddressResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /addresses/{id}:
+    parameters:
+      - $ref: '#/components/parameters/RequestId'
+      - $ref: '#/components/parameters/CustomerToken'
+      - $ref: '#/components/parameters/IdPath'
+    patch:
+      operationId: updateAddress
+      tags: [Addresses]
+      summary: Update a saved address
+      description: >
+        Validates the **merged** (existing + patched) state, not the raw
+        partial payload — a patch that flips `country` to `SA` or clears a
+        required field cannot slip through.
+      x-auth-tier: customer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AddressUpdate' }
+      responses:
+        '200':
+          description: The updated address.
+          headers:
+            X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AddressResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+    delete:
+      operationId: deleteAddress
+      tags: [Addresses]
+      summary: Delete a saved address
+      x-auth-tier: customer
+      responses:
+        '200':
+          description: Deleted.
+          headers:
+            X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DeletedResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /me/orders:
+    parameters:
+      - $ref: '#/components/parameters/RequestId'
+      - $ref: '#/components/parameters/CustomerToken'
+    get:
+      operationId: listMyOrders
+      tags: [OrderHistory]
+      summary: The authenticated customer's own order list
+      description: >
+        Lightweight summary rows only — full line items and the delivery/
+        contact snapshot are reserved for the detail endpoint. Guest orders
+        (no linked customer identity) never appear here, whoever is asking.
+      x-auth-tier: customer
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/OrdersSort'
+      responses:
+        '200':
+          description: A page of the customer's own orders.
+          headers:
+            X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OrderSummaryListResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /me/orders/{id}:
+    parameters:
+      - $ref: '#/components/parameters/RequestId'
+      - $ref: '#/components/parameters/CustomerToken'
+      - $ref: '#/components/parameters/IdPath'
+    get:
+      operationId: getMyOrder
+      tags: [OrderHistory]
+      summary: One of the authenticated customer's own orders, in full
+      description: >
+        A foreign customer's order, a nonexistent id, and a guest order
+        (`customer_identity_id` null) all return the identical non-revealing
+        404 — ownership, never a bare id, is what is checked.
+      x-auth-tier: customer
+      responses:
+        '200':
+          description: The order.
+          headers:
+            X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GuestOrderResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+components:
+  securitySchemes:
+    storeBearer:
+      type: http
+      scheme: bearer
+      description: >
+        The tenant-owned ApiClient/Sanctum key for this store's mobile
+        client, identical to `/api/v1`'s own bearer mechanism.
+
+  parameters:
+    RequestId:
+      name: X-Request-Id
+      in: header
+      required: false
+      description: Optional client-supplied correlation id, echoed back if valid; otherwise server-generated.
+      schema: { type: string }
+    CartToken:
+      name: X-Cart-Token
+      in: header
+      required: false
+      description: Opaque guest cart/checkout identity, issued in the response of the first cart mutation.
+      schema: { type: string }
+    CustomerToken:
+      name: X-Customer-Token
+      in: header
+      required: true
+      description: The customer's own `customer:access` Sanctum token (never the `Authorization` header).
+      schema: { type: string }
+    OrderReference:
+      name: X-Order-Reference
+      in: header
+      required: true
+      description: Signed guest-order-ownership reference issued at checkout completion.
+      schema: { type: string }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: { type: string, minLength: 8, maxLength: 255 }
+    IdPath:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    Page:
+      name: page
+      in: query
+      required: false
+      schema: { type: integer, minimum: 1 }
+    PerPage:
+      name: per_page
+      in: query
+      required: false
+      schema: { type: integer, minimum: 1, maximum: 100 }
+    ProductsSearch:
+      name: search
+      in: query
+      required: false
+      schema: { type: string, maxLength: 120 }
+    ProductsCategoryId:
+      name: category_id
+      in: query
+      required: false
+      schema: { type: string, format: uuid }
+    ProductsSort:
+      name: sort
+      in: query
+      required: false
+      schema: { type: string, enum: [name, '-name', sale_price, '-sale_price', created_at, '-created_at'] }
+    OrdersSort:
+      name: sort
+      in: query
+      required: false
+      schema: { type: string, enum: [created_at, '-created_at', number, '-number', total, '-total'] }
+
+  headers:
+    XRequestId:
+      description: Correlation id for this response.
+      schema: { type: string }
+    XCartToken:
+      description: Present when a new or rebound cart/checkout token must be persisted by the client.
+      schema: { type: string }
+
+  responses:
+    Unauthenticated:
+      description: Missing or invalid store bearer token (or, on customer-tier routes, X-Customer-Token).
+      headers:
+        X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotFound:
+      description: >
+        Resource not found, or a non-revealing 404 standing in for an
+        ownership/publication failure (never distinguished from a genuinely
+        missing id).
+      headers:
+        X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    ValidationError:
+      description: Request failed validation.
+      headers:
+        X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    TooManyRequests:
+      description: Rate limit exceeded.
+      headers:
+        X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    IdempotencyKeyError:
+      description: Idempotency-Key missing or malformed.
+      headers:
+        X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    CartMerged:
+      description: The target cart line no longer exists because a guest cart was just merged into the customer's own cart within this same request.
+      headers:
+        X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
+  schemas:
+    Money:
+      type: object
+      additionalProperties: false
+      required: [amount_minor, currency]
+      properties:
+        amount_minor: { type: integer, description: Minor units (e.g. halalas). Never a float. }
+        currency: { type: string, description: 'ISO-4217 currency code.' }
+
+    Error:
+      type: object
+      additionalProperties: false
+      required: [error, meta]
+      properties:
+        error:
+          type: object
+          additionalProperties: false
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              enum: [internal_error, bad_request, not_found, method_not_allowed, validation_failed, unauthenticated, forbidden, tenant_context_required, client_inactive, insufficient_scope, rate_limited, idempotency_key_required, invalid_idempotency_key, idempotency_conflict, idempotency_in_progress, review_required, cart_merged]
+            message: { type: string }
+            details: {}
+        meta:
+          type: object
+          required: [request_id]
+          properties:
+            request_id: { type: string }
+
+    StorefrontResponse:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data:
+          type: object
+          additionalProperties: false
+          required: [name]
+          properties:
+            name: { type: [string, 'null'] }
+        meta: { $ref: '#/components/schemas/SuccessMeta' }
+
+    SuccessMeta:
+      type: object
+      required: [request_id]
+      properties:
+        request_id: { type: string }
+
+    PaginationMeta:
+      type: object
+      additionalProperties: false
+      required: [request_id, pagination]
+      properties:
+        request_id: { type: string }
+        pagination:
+          type: object
+          additionalProperties: false
+          required: [page, per_page, total, last_page, has_more]
+          properties:
+            page: { type: integer }
+            per_page: { type: integer }
+            total: { type: integer }
+            last_page: { type: integer }
+            has_more: { type: boolean }
+
+    Category:
+      type: object
+      additionalProperties: false
+      required: [id, name, description, color, parent_id]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        description: { type: [string, 'null'] }
+        color: { type: [string, 'null'] }
+        parent_id: { type: [string, 'null'], format: uuid }
+        children:
+          type: array
+          items: { $ref: '#/components/schemas/Category' }
+        ancestors:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [id, name]
+            properties:
+              id: { type: string, format: uuid }
+              name: { type: string }
+
+    CategoryListResponse:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data: { type: array, items: { $ref: '#/components/schemas/Category' } }
+        meta: { $ref: '#/components/schemas/SuccessMeta' }
+
+    CategoryResponse:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data: { $ref: '#/components/schemas/Category' }
+        meta: { $ref: '#/components/schemas/SuccessMeta' }
+
+    ProductMediaItem:
+      type: object
+      additionalProperties: false
+      required: [id, url, alt, position]
+      properties:
+        id: { type: string, format: uuid }
+        url: { type: string }
+        alt: { type: [string, 'null'] }
+        position: { type: [integer, 'null'] }
+
+    ProductListItem:
+      type: object
+      additionalProperties: false
+      required: [id, name, name_en, description, sku, category, price, in_stock, thumbnail_url, is_variant_managed, created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        name_en: { type: [string, 'null'] }
+        description: { type: [string, 'null'] }
+        sku: { type: [string, 'null'] }
+        category:
+          type: [object, 'null']
+          additionalProperties: false
+          properties:
+            id: { type: string, format: uuid }
+            name: { type: string }
+        price: { $ref: '#/components/schemas/Money' }
+        in_stock: { type: [boolean, 'null'] }
+        thumbnail_url: { type: [string, 'null'] }
+        is_variant_managed: { type: boolean }
+        created_at: { type: [string, 'null'], format: date-time }
+        updated_at: { type: [string, 'null'], format: date-time }
+
+    ProductDetail:
+      allOf:
+        - $ref: '#/components/schemas/ProductListItem'
+        - type: object
+          required: [media]
+          properties:
+            media: { type: array, items: { $ref: '#/components/schemas/ProductMediaItem' } }
+
+    ProductOption:
+      type: object
+      additionalProperties: false
+      required: [id, name, name_en, values]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        name_en: { type: [string, 'null'] }
+        values:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [id, value, value_en]
+            properties:
+              id: { type: string, format: uuid }
+              value: { type: string }
+              value_en: { type: [string, 'null'] }
+
+    ProductVariant:
+      type: object
+      additionalProperties: false
+      required: [id, sku, descriptor, option_value_ids, price, in_stock, media]
+      properties:
+        id: { type: string, format: uuid }
+        sku: { type: [string, 'null'] }
+        descriptor: { type: [string, 'null'] }
+        option_value_ids: { type: array, items: { type: string, format: uuid } }
+        price: { $ref: '#/components/schemas/Money' }
+        in_stock: { type: [boolean, 'null'] }
+        media: { type: array, items: { $ref: '#/components/schemas/ProductMediaItem' } }
+
+    ProductVariantDetail:
+      allOf:
+        - $ref: '#/components/schemas/ProductDetail'
+        - type: object
+          required: [options, variants]
+          properties:
+            options: { type: array, items: { $ref: '#/components/schemas/ProductOption' } }
+            variants: { type: array, items: { $ref: '#/components/schemas/ProductVariant' } }
+
+    ProductListResponse:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data: { type: array, items: { $ref: '#/components/schemas/ProductListItem' } }
+        meta: { $ref: '#/components/schemas/PaginationMeta' }
+
+    CartItem:
+      type: object
+      additionalProperties: false
+      required: [id, product_id, product_variant_id, variant_descriptor, product_name, unit_key, unit_name, quantity, unit_price, line_total, available]
+      properties:
+        id: { type: string, format: uuid }
+        product_id: { type: [string, 'null'], format: uuid }
+        product_variant_id: { type: [string, 'null'], format: uuid }
+        variant_descriptor: { type: [string, 'null'] }
+        product_name: { type: string }
+        unit_key: { type: string }
+        unit_name: { type: string }
+        quantity: { type: integer }
+        unit_price: { $ref: '#/components/schemas/Money' }
+        line_total: { $ref: '#/components/schemas/Money' }
+        available: { type: boolean }
+
+    Cart:
+      type: object
+      additionalProperties: false
+      required: [status, items, subtotal, currency, has_unavailable_items]
+      properties:
+        status: { type: string }
+        items: { type: array, items: { $ref: '#/components/schemas/CartItem' } }
+        subtotal: { $ref: '#/components/schemas/Money' }
+        currency: { type: string }
+        has_unavailable_items: { type: boolean }
+
+    CartResponse:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data: { $ref: '#/components/schemas/Cart' }
+        meta: { $ref: '#/components/schemas/SuccessMeta' }
+
+    CartItemCreate:
+      type: object
+      additionalProperties: false
+      required: [product_id, quantity]
+      properties:
+        product_id: { type: string, format: uuid }
+        product_variant_id: { type: [string, 'null'], format: uuid }
+        unit_key: { type: string, maxLength: 80 }
+        quantity: { type: integer, minimum: 1 }
+
+    CartItemUpdate:
+      type: object
+      additionalProperties: false
+      required: [quantity]
+      properties:
+        quantity: { type: integer, minimum: 1 }
+
+    CheckoutAddress:
+      type: object
+      additionalProperties: false
+      required: [country, region, city, district, street, building_no, additional_number, postal_code, notes]
+      properties:
+        country: { type: [string, 'null'] }
+        region: { type: [string, 'null'] }
+        city: { type: [string, 'null'] }
+        district: { type: [string, 'null'] }
+        street: { type: [string, 'null'] }
+        building_no: { type: [string, 'null'] }
+        additional_number: { type: [string, 'null'] }
+        postal_code: { type: [string, 'null'] }
+        notes: { type: [string, 'null'] }
+
+    CheckoutPayment:
+      type: object
+      additionalProperties: false
+      required: [payment_method_id, payment_method_name, method]
+      properties:
+        payment_method_id: { type: [string, 'null'], format: uuid }
+        payment_method_name: { type: [string, 'null'] }
+        method: { type: [string, 'null'], enum: [cod, pay_on_pickup, null] }
+
+    Checkout:
+      type: object
+      additionalProperties: false
+      required: [status, contact, delivery, payment, cart]
+      properties:
+        status: { type: [string, 'null'], enum: [active, ready, completed, expired, null] }
+        contact:
+          type: object
+          additionalProperties: false
+          required: [name, phone, email]
+          properties:
+            name: { type: [string, 'null'] }
+            phone: { type: [string, 'null'] }
+            email: { type: [string, 'null'] }
+        delivery:
+          type: object
+          additionalProperties: false
+          required: [method, amount, address]
+          properties:
+            method: { type: [string, 'null'], enum: [pickup, standard, null] }
+            amount: { $ref: '#/components/schemas/Money' }
+            address: { $ref: '#/components/schemas/CheckoutAddress' }
+        payment: { $ref: '#/components/schemas/CheckoutPayment' }
+        cart: { $ref: '#/components/schemas/Cart' }
+
+    CheckoutResponse:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data: { $ref: '#/components/schemas/Checkout' }
+        meta: { $ref: '#/components/schemas/SuccessMeta' }
+
+    CheckoutContactUpdate:
+      type: object
+      additionalProperties: false
+      properties:
+        name: { type: string, maxLength: 255 }
+        phone: { type: string, maxLength: 32 }
+        email: { type: [string, 'null'], format: email, maxLength: 255 }
+
+    CheckoutAddressUpdate:
+      type: object
+      additionalProperties: false
+      description: >
+        Either the manual fields below, or `address_id` alone — mixing both
+        in the same request is rejected (422).
+      properties:
+        country: { type: string, maxLength: 255 }
+        region: { type: [string, 'null'], maxLength: 255 }
+        city: { type: string, maxLength: 255 }
+        district: { type: [string, 'null'], maxLength: 255 }
+        street: { type: string, maxLength: 255 }
+        building_no: { type: [string, 'null'], maxLength: 32 }
+        additional_number: { type: [string, 'null'], maxLength: 32 }
+        postal_code: { type: [string, 'null'], maxLength: 32 }
+        notes: { type: [string, 'null'], maxLength: 1000 }
+        address_id: { type: string, format: uuid }
+
+    CheckoutDeliveryUpdate:
+      type: object
+      additionalProperties: false
+      required: [method]
+      properties:
+        method: { type: string, enum: [pickup, standard] }
+
+    CheckoutPaymentUpdate:
+      type: object
+      additionalProperties: false
+      required: [payment_method_id]
+      properties:
+        payment_method_id: { type: string, format: uuid }
+
+    CheckoutCompleteResponse:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data:
+          type: object
+          additionalProperties: false
+          required: [order, order_reference, replayed]
+          properties:
+            order: { $ref: '#/components/schemas/Order' }
+            order_reference: { type: string }
+            replayed: { type: boolean }
+        meta: { $ref: '#/components/schemas/SuccessMeta' }
+
+    PaymentMethod:
+      type: object
+      additionalProperties: false
+      required: [id, name, name_en, settlement_type]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        name_en: { type: [string, 'null'] }
+        settlement_type: { type: string }
+
+    PaymentMethodListResponse:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data:
+          type: object
+          additionalProperties: false
+          required: [payment_methods]
+          properties:
+            payment_methods: { type: array, items: { $ref: '#/components/schemas/PaymentMethod' } }
+        meta: { $ref: '#/components/schemas/SuccessMeta' }
+
+    OrderMoney:
+      allOf:
+        - $ref: '#/components/schemas/Money'
+
+    Order:
+      type: object
+      additionalProperties: false
+      required: [id, number, status, delivery_method, total, contact, delivery, payment, items, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        number: { type: string }
+        status: { type: string }
+        delivery_method: { type: [string, 'null'] }
+        total: { $ref: '#/components/schemas/Money' }
+        contact:
+          type: object
+          additionalProperties: false
+          required: [name, phone, email]
+          properties:
+            name: { type: [string, 'null'] }
+            phone: { type: [string, 'null'] }
+            email: { type: [string, 'null'] }
+        delivery:
+          type: object
+          additionalProperties: false
+          required: [country, region, city, district, street, building_no, additional_number, postal_code, notes, amount]
+          properties:
+            country: { type: [string, 'null'] }
+            region: { type: [string, 'null'] }
+            city: { type: [string, 'null'] }
+            district: { type: [string, 'null'] }
+            street: { type: [string, 'null'] }
+            building_no: { type: [string, 'null'] }
+            additional_number: { type: [string, 'null'] }
+            postal_code: { type: [string, 'null'] }
+            notes: { type: [string, 'null'] }
+            amount: { $ref: '#/components/schemas/Money' }
+        payment: { $ref: '#/components/schemas/CheckoutPayment' }
+        items:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [product_id, product_name, unit_name, quantity, unit_price, line_total]
+            properties:
+              product_id: { type: [string, 'null'], format: uuid }
+              product_name: { type: string }
+              unit_name: { type: string }
+              quantity: { type: integer }
+              unit_price: { $ref: '#/components/schemas/Money' }
+              line_total: { $ref: '#/components/schemas/Money' }
+        created_at: { type: [string, 'null'], format: date-time }
+
+    GuestOrderResponse:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data:
+          type: object
+          additionalProperties: false
+          required: [order]
+          properties:
+            order: { $ref: '#/components/schemas/Order' }
+        meta: { $ref: '#/components/schemas/SuccessMeta' }
+
+    OrderSummary:
+      type: object
+      additionalProperties: false
+      required: [id, number, status, delivery_method, total, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        number: { type: string }
+        status: { type: string }
+        delivery_method: { type: [string, 'null'] }
+        total: { $ref: '#/components/schemas/Money' }
+        created_at: { type: [string, 'null'], format: date-time }
+
+    OrderSummaryListResponse:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data: { type: array, items: { $ref: '#/components/schemas/OrderSummary' } }
+        meta: { $ref: '#/components/schemas/PaginationMeta' }
+
+    CustomerIdentity:
+      type: object
+      additionalProperties: false
+      required: [id, display_name, email, phone, email_verified, phone_verified, is_active, last_login_at]
+      properties:
+        id: { type: string, format: uuid }
+        display_name: { type: [string, 'null'] }
+        email: { type: [string, 'null'] }
+        phone: { type: [string, 'null'] }
+        email_verified: { type: boolean }
+        phone_verified: { type: boolean }
+        is_active: { type: boolean }
+        last_login_at: { type: [string, 'null'], format: date-time }
+
+    CustomerRegisterRequest:
+      type: object
+      additionalProperties: false
+      required: [display_name, email, password]
+      properties:
+        display_name: { type: string, maxLength: 255 }
+        email: { type: string, format: email, maxLength: 255 }
+        phone: { type: [string, 'null'], pattern: '^\+[1-9][0-9]{7,14}$' }
+        password: { type: string, minLength: 8, maxLength: 255 }
+
+    CustomerLoginRequest:
+      type: object
+      additionalProperties: false
+      required: [email, password]
+      properties:
+        email: { type: string, format: email, maxLength: 255 }
+        password: { type: string, maxLength: 255 }
+
+    OtpRequestRequest:
+      type: object
+      additionalProperties: false
+      required: [phone]
+      properties:
+        phone: { type: string, pattern: '^\+[1-9][0-9]{7,14}$' }
+
+    OtpVerifyRequest:
+      type: object
+      additionalProperties: false
+      required: [phone, code]
+      properties:
+        phone: { type: string, pattern: '^\+[1-9][0-9]{7,14}$' }
+        code: { type: string, pattern: '^[0-9]{6}$' }
+
+    RegisterResponse:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data:
+          type: object
+          additionalProperties: false
+          required: [verification_required]
+          properties:
+            verification_required: { type: boolean }
+        meta: { $ref: '#/components/schemas/SuccessMeta' }
+
+    OtpRequestResponse:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data:
+          type: object
+          additionalProperties: false
+          required: [sent]
+          properties:
+            sent: { type: boolean }
+        meta: { $ref: '#/components/schemas/SuccessMeta' }
+
+    TokenAuthResponse:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data:
+          type: object
+          additionalProperties: false
+          required: [token, customer]
+          properties:
+            token: { type: string }
+            customer: { $ref: '#/components/schemas/CustomerIdentity' }
+        meta: { $ref: '#/components/schemas/SuccessMeta' }
+
+    LogoutResponse:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data:
+          type: object
+          additionalProperties: false
+          required: [logged_out]
+          properties:
+            logged_out: { type: boolean }
+        meta: { $ref: '#/components/schemas/SuccessMeta' }
+
+    MeResponse:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data:
+          type: object
+          additionalProperties: false
+          required: [customer, partner_link]
+          properties:
+            customer: { $ref: '#/components/schemas/CustomerIdentity' }
+            partner_link:
+              type: object
+              additionalProperties: false
+              required: [linked, partner_id]
+              properties:
+                linked: { type: boolean }
+                partner_id: { type: [string, 'null'], format: uuid }
+        meta: { $ref: '#/components/schemas/SuccessMeta' }
+
+    Address:
+      type: object
+      additionalProperties: false
+      required: [id, label, recipient_name, phone, country, region, city, district, street, building_no, additional_number, postal_code, short_address, latitude, longitude, delivery_notes, is_default_shipping, is_default_billing, created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        label: { type: [string, 'null'] }
+        recipient_name: { type: string }
+        phone: { type: string }
+        country: { type: string }
+        region: { type: [string, 'null'] }
+        city: { type: string }
+        district: { type: [string, 'null'] }
+        street: { type: string }
+        building_no: { type: [string, 'null'] }
+        additional_number: { type: [string, 'null'] }
+        postal_code: { type: [string, 'null'] }
+        short_address: { type: [string, 'null'] }
+        latitude: { type: [number, 'null'] }
+        longitude: { type: [number, 'null'] }
+        delivery_notes: { type: [string, 'null'] }
+        is_default_shipping: { type: boolean }
+        is_default_billing: { type: boolean }
+        created_at: { type: [string, 'null'], format: date-time }
+        updated_at: { type: [string, 'null'], format: date-time }
+
+    AddressResponse:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data: { $ref: '#/components/schemas/Address' }
+        meta: { $ref: '#/components/schemas/SuccessMeta' }
+
+    AddressListResponse:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data:
+          type: object
+          additionalProperties: false
+          required: [data]
+          properties:
+            data: { type: array, items: { $ref: '#/components/schemas/Address' } }
+        meta: { $ref: '#/components/schemas/SuccessMeta' }
+
+    AddressCreate:
+      type: object
+      additionalProperties: false
+      required: [recipient_name, phone, country, city, street]
+      properties:
+        label: { type: [string, 'null'], maxLength: 255 }
+        recipient_name: { type: string, maxLength: 255 }
+        phone: { type: string, maxLength: 32 }
+        country: { type: string, minLength: 2, maxLength: 2 }
+        region: { type: [string, 'null'], maxLength: 255 }
+        city: { type: string, maxLength: 255 }
+        district: { type: [string, 'null'], maxLength: 255 }
+        street: { type: string, maxLength: 255 }
+        building_no: { type: [string, 'null'], maxLength: 32 }
+        additional_number: { type: [string, 'null'], maxLength: 32 }
+        postal_code: { type: [string, 'null'], maxLength: 32 }
+        short_address: { type: [string, 'null'], maxLength: 8 }
+        latitude: { type: [number, 'null'], minimum: -90, maximum: 90 }
+        longitude: { type: [number, 'null'], minimum: -180, maximum: 180 }
+        delivery_notes: { type: [string, 'null'], maxLength: 1000 }
+        is_default_shipping: { type: boolean }
+        is_default_billing: { type: boolean }
+
+    AddressUpdate:
+      type: object
+      additionalProperties: false
+      description: All fields optional — a partial patch, validated against the merged (existing + patched) state.
+      properties:
+        label: { type: [string, 'null'], maxLength: 255 }
+        recipient_name: { type: string, maxLength: 255 }
+        phone: { type: string, maxLength: 32 }
+        country: { type: string, minLength: 2, maxLength: 2 }
+        region: { type: [string, 'null'], maxLength: 255 }
+        city: { type: string, maxLength: 255 }
+        district: { type: [string, 'null'], maxLength: 255 }
+        street: { type: string, maxLength: 255 }
+        building_no: { type: [string, 'null'], maxLength: 32 }
+        additional_number: { type: [string, 'null'], maxLength: 32 }
+        postal_code: { type: [string, 'null'], maxLength: 32 }
+        short_address: { type: [string, 'null'], maxLength: 8 }
+        latitude: { type: [number, 'null'], minimum: -90, maximum: 90 }
+        longitude: { type: [number, 'null'], minimum: -180, maximum: 180 }
+        delivery_notes: { type: [string, 'null'], maxLength: 1000 }
+        is_default_shipping: { type: boolean }
+        is_default_billing: { type: boolean }
+
+    DeletedResponse:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data:
+          type: object
+          additionalProperties: false
+          required: [deleted]
+          properties:
+            deleted: { type: boolean }
+        meta: { $ref: '#/components/schemas/SuccessMeta' }

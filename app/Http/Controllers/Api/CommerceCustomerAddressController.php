@@ -8,6 +8,7 @@ use App\Support\PublicApiResponse;
 use App\Tenancy\CustomerContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 /**
  * COM-MOBILE-ADDRESSES-1 (ADR-08) — CRUD over the authenticated customer's own
@@ -72,6 +73,11 @@ final class CommerceCustomerAddressController extends PublicApiController
     /** @return array<string, mixed> */
     private function validateStore(Request $request): array
     {
+        $this->rejectUnknown($request, [
+            'label', 'recipient_name', 'phone', 'country', 'region', 'city', 'district',
+            'street', 'building_no', 'additional_number', 'postal_code', 'short_address',
+            'latitude', 'longitude', 'delivery_notes', 'is_default_shipping', 'is_default_billing',
+        ]);
         $data = $request->validate([
             'label' => ['nullable', 'string', 'max:255'],
             'recipient_name' => ['required', 'string', 'max:255'],
@@ -100,6 +106,11 @@ final class CommerceCustomerAddressController extends PublicApiController
     /** @return array<string, mixed> */
     private function validateUpdate(Request $request): array
     {
+        $this->rejectUnknown($request, [
+            'label', 'recipient_name', 'phone', 'country', 'region', 'city', 'district',
+            'street', 'building_no', 'additional_number', 'postal_code', 'short_address',
+            'latitude', 'longitude', 'delivery_notes', 'is_default_shipping', 'is_default_billing',
+        ]);
         $data = $request->validate([
             'label' => ['sometimes', 'nullable', 'string', 'max:255'],
             'recipient_name' => ['sometimes', 'string', 'max:255'],
@@ -125,5 +136,16 @@ final class CommerceCustomerAddressController extends PublicApiController
         }
 
         return $data;
+    }
+
+    /** @param array<int, string> $allowed */
+    private function rejectUnknown(Request $request, array $allowed): void
+    {
+        $unknown = array_values(array_diff(array_keys($request->all()), $allowed));
+        if ($unknown !== []) {
+            throw ValidationException::withMessages([
+                'request' => 'حقول غير مسموحة: '.implode(', ', $unknown),
+            ]);
+        }
     }
 }
