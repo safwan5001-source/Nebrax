@@ -133,6 +133,18 @@ PR #929, round 2 (Codex, reviewed commit `66c0fb8`) — 2 findings, both concurr
 
 Both re-verified with the full `CommerceCustomerAddressApiTest` (16 tests) and the broader `Commerce\|Customer\|Storefront` regression on both SQLite (934 passed) and PostgreSQL (959 passed) after the fix, with no regressions. Both threads replied to and resolved.
 
+PR #929, round 3 (Codex, reviewed commit `1146b15`) — 3 findings, all verified as genuine and fixed in commit `87beb17`:
+
+| # | Severity | File | Finding | Fix |
+|---|----------|------|---------|-----|
+| 1 | P1 | `CommerceCustomerAddressController::store()`/`assertSaudiFieldsPresent()` | Presence-only validation let `building_no="x"`, `additional_number="abc"`, `postal_code="?"` through as a valid Saudi address, letting unusable addresses flow into checkout/order snapshots. | Renamed to `assertSaudiFieldsValid()` and added ADR-08 §4 digit/shape checks: `building_no`/`additional_number` exactly 4 digits, `postal_code` exactly 5, applied only when `country=SA`, after the existing presence check. New test: `a_saudi_address_rejects_malformed_building_no_additional_number_or_postal_code`. |
+| 2 | P2 | `CommerceCheckoutController::addressFieldsFromSavedAddress()` / `CommerceOrderSnapshot` | A selected address's `region` reached `commerce_checkouts.delivery_region`, but `CommerceCheckoutService::complete()`'s header omitted it and `commerce_order_snapshots` had no `shipping_region`/`billing_region` column — completion silently dropped the region from the immutable order record. | New migration adds `shipping_region`/`billing_region`; `complete()`'s header now includes `delivery_region`; `createFromCheckout()` writes `shipping_region` into the snapshot. New test: `completion_propagates_region_into_the_order_snapshot`. |
+| 3 | P2 | `CommerceOrderSnapshot::normalizeSnapshotInput()` | The generic snapshot-write path's (`CommerceOrderService::create()`/`updateSnapshot()`) field whitelist only had `building_no`/`postal_code`, silently dropping `additional_number` (and now `region`) for both shipping and billing on any write through that path — only the checkout-completion path could set them. | Added `region` and `additional_number` to the whitelist for both `shipping_snapshot` and `billing_snapshot`. |
+
+All three re-verified with the full `CommerceCustomerAddressApiTest` (17 tests) + `CommerceCheckoutApiTest` (23 tests) and the broader `Commerce\|Customer\|Storefront` regression on both SQLite (936 passed) and PostgreSQL (961 passed) after the fix, with no regressions; `BranchIsolationGuardTest`/`CommerceModuleBoundaryTest` also re-verified green. All three threads replied to and resolved.
+
+**Review cycle closed at round 3**: immediately after this round posted, Codex announced it had reached its code-review usage limit for this account and will not review further pushes to this PR (see the PR's issue comment from `chatgpt-codex-connector[bot]`). All 8 findings across all 3 rounds are fixed, tested on both engines, and their threads resolved — the PR proceeds to merge on that basis, with no round-4 automated review pending.
+
 ## Risks / remaining work
 
 - None identified beyond what ADR-08 itself already scoped out (this task does not touch `Partner` addresses or attempt to unify the two address concepts — an explicit non-goal).
