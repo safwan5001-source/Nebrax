@@ -76,8 +76,8 @@ Current direct browser viewport: **1363 × 936 CSS px**, Arabic RTL.
 | Product search results / no results | Direct live inspection of populated and zero-result URLs | **Observed** |
 | Policy pages | Returns, terms and privacy/use pages directly inspected | **Observed** |
 | Blog article detail | Article, metadata, comments/reply form and sidebar directly inspected | **Observed** |
-| Wishlist | Header and product actions found; destination/state not yet verified | **Partial** |
-| Compare | Related-product compare actions found; compare page not yet verified | **Partial** |
+| Wishlist | Add/remove toggle directly exercised; header/destination link remained empty | **Observed partial / reference defect** |
+| Compare | Add/remove toggle directly exercised; no comparison destination or table exposed | **Observed partial / reference defect** |
 | Quick view | Earlier public crawl suggested it; current direct live state not yet verified | **Not yet confirmed** |
 | Mini-cart | Empty and populated side-drawer states directly inspected | **Observed** |
 | Filled cart | Direct live inspection after adding a simple product | **Observed** |
@@ -335,7 +335,7 @@ This is a theme preset. The merchant may reorder, duplicate, hide or delete elig
 - original price plus current price;
 - in-stock simple products;
 - product image and full-card/product-title navigation;
-- wishlist and compare affordances exist in the storefront ecosystem, but card placement/visibility needs direct interaction verification.
+- wishlist and compare affordances exist on product and related-product surfaces; their toggle behavior was exercised, but their destination surfaces are incomplete in the reference.
 
 ### 9.2 Required AWJ states
 
@@ -360,6 +360,26 @@ This is a theme preset. The merchant may reorder, duplicate, hide or delete elig
 - sale badge shape and position;
 - card alignment and spacing;
 - hover image/quick actions only when keyboard and touch equivalents exist.
+
+### 9.4 Wishlist and compare — observed partial; AWJ replacement required
+
+Wishlist observation:
+
+- the product-detail action changed from `Add to wishlist` to `Browse Wishlist` after addition;
+- activating it again removed the state and restored `Add to wishlist`;
+- the global wishlist header action and the post-add action retained an empty destination URL;
+- no wishlist page, drawer, count or product list became available in the exercised public state.
+
+Compare observation:
+
+- a related-product action changed from `Add to compare` to `Compare products` after addition;
+- activating it again removed the comparison state;
+- the action retained an empty destination URL;
+- no comparison page, modal, table or global compare entry point became available.
+
+These are reference-site incomplete behaviors, not theme features to reproduce.
+
+**AWJ decision:** expose either capability only when its runtime contract exists. Wishlist must have an addressable empty/populated surface, remove/undo, stable identity behavior for guests and signed-in customers, and an explicit guest-account merge policy. Compare must have an addressable selected-products surface, remove/clear, attribute rows, safe maximum item count and sensible behavior when compared products have non-aligned attributes. Both need loading/error states and touch/keyboard equivalents. Otherwise the actions must be hidden, not simulated.
 
 ## 10. Catalog/category templates
 
@@ -661,7 +681,10 @@ This table is an **AWJ provisional decision**, not a claim of reference-site exa
 - [x] Search results and no-results rendering.
 - [ ] Search loading/error rendering.
 - [ ] Account hover/dropdown versus click behavior.
-- [ ] Wishlist empty/populated/remove.
+- [x] Reference wishlist add/remove toggle and broken destination documented.
+- [x] Reference compare add/remove toggle and missing comparison surface documented.
+- [ ] AWJ wishlist empty/populated/remove/merge-state contract.
+- [ ] AWJ comparison table, maximum-items and non-aligned-attribute contract.
 - [x] Mini-cart empty/open/close behavior.
 - [x] Mini-cart populated anatomy.
 - [ ] Mini-cart loading/error and stock-conflict behavior.
@@ -804,6 +827,6 @@ The extraction is complete only when:
 
 The reference is suitable as the first AWJ ready-made boutique/floral theme because it combines editorial gifting content with dense commerce coverage: campaign hero, custom-gift story, multiple catalog collections, promotion/countdown, testimonials, product discovery and a full product-detail path.
 
-The current pass is sufficient to lock the desktop information architecture, both catalog compositions, search result states and the core content templates. It is **not yet sufficient to claim a complete extraction**: direct mobile/tablet rendering, populated commerce states, search loading/error behavior, wishlist/compare destinations and several error/interactive states remain explicitly open in §16.
+The current pass is sufficient to lock the desktop information architecture, both catalog compositions, search result states, populated cart/checkout anatomy, core content templates, and the decision not to reproduce the reference's incomplete wishlist/compare destinations. It is **not yet sufficient to claim a complete extraction**: direct mobile/tablet rendering, variable/out-of-stock products, search loading/error behavior, completed payment/order states and several validation/error interactions remain explicitly open in §16.
 
 No application code, database schema, API contract, merge or deployment is authorized by this document.
