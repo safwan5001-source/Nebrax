@@ -127,13 +127,16 @@ completes at zero, completion adds the resolved amount into both the
 `CommerceCheckout` and `CommerceOrder` records and the shared serializer).
 
 - SQLite (`/home/user/nibras-app`): `CommerceShippingZoneTest` — **15
-  passed** (59 assertions). Broader `Commerce|Customer|Storefront|
-  BranchIsolationGuard` regression: **965 passed, 25 skipped** (PostgreSQL-only
-  concurrency tests), 0 failed. Full suite: pending (running in background at
-  time of writing; will be confirmed green before requesting merge).
-- PostgreSQL (`/tmp/nibras-app-addresses1-pg`): same regression filter
-  running at time of writing; will be confirmed green before requesting
-  merge.
+  passed** (59 assertions), later **16** after the DB-level uniqueness fix.
+  Final broader `Commerce|Customer|Storefront|BranchIsolationGuard`
+  regression: **967 passed**, 25 skipped (PostgreSQL-only concurrency
+  tests), 0 failed.
+- PostgreSQL (`/tmp/nibras-app-addresses1-pg`): same regression filter —
+  **992 passed**, 0 failed.
+- Both confirmed green before merge (PR #937), and re-confirmed after merge
+  as part of `COM-MOBILE-PAYMENTS-1`'s own pre-work regression on a branch
+  built directly on the merge commit: 997 passed (SQLite) / 1007 passed
+  (PostgreSQL) — see `POST_MERGE_REVIEW` below.
 
 One pre-existing allow-list guard needed an update:
 `CommerceModuleBoundaryTest::ALLOWED_COMMERCE_API_ROUTES` enumerates every
@@ -214,7 +217,33 @@ is in scope for this task.
 
 ## Automated review findings
 
-Not yet opened for review.
+Three rounds of automated (Codex) review on PR #937, all four findings
+verified and fixed before merge:
+1. Case-insensitive shipping-zone uniqueness race — the controller's
+   precheck was TOCTOU-prone; closed at the database level with a
+   model-managed `match_value_normalized` column plus a unique index, and
+   `ShippingRateService` now matches against that normalized column
+   directly. Proven by a new test asserting the DB constraint itself (not
+   just the controller precheck) rejects a case-variant duplicate.
+2. Missing `rate_amount_minor` cap, and — found only after that first fix
+   — a genuine `bigint` overflow in the combined order total (existing
+   `unit_price`/`quantity` bounds already permit a line total near
+   `PHP_INT_MAX`, so adding `delivery_amount_minor` could cross it; PHP
+   silently promotes `int + int` overflow to `float` rather than throwing).
+   Closed with a `100000000000` validation cap plus a checked-arithmetic
+   `addMinorAmountOrFail()` helper in `CommerceOrderService` that fails
+   closed (`RuntimeException`, no order row committed) rather than ever
+   accept a float-promoted total.
+3. A malformed-UUID 500 on the merchant `shipping-zones` PUT/DELETE
+   routes — closed with `whereUuid('id')`.
+4. A real billing-transparency gap in the already-live `/store/v1`
+   AWJ-native storefront checkout: the review stage and order-summary
+   panel still rendered a static "pending" placeholder for a shipping
+   charge the server had already resolved and committed — fixed to render
+   the real `checkout.delivery.amount`.
+
+All four fixes are included in PR #937's merged history and covered by the
+final test counts above.
 
 ## Risks / remaining work
 
@@ -233,9 +262,50 @@ None beyond what ADR-10 already recorded as open decisions.
 
 ## Git state
 
-Branch `claude/com-mobile-shipping-1`, based on `main` at `5c6ecdf`
-(post PR #934 merge). Not yet pushed/PR'd at time of writing this report
-(final CI confirmation on both engines pending).
+Branch `claude/com-mobile-shipping-1`, based on `main` at `5c6ecdf` (post
+PR #934 merge). Pushed, reviewed across 3 rounds (`PRE_MERGE_REVIEW: PASS`
+at the PR's actual final pre-merge head, commit
+`42156f65d83ebe79099eea1f093d16d6b4f15d31` — "fix: guard order total
+against bigint overflow", the fourth and last commit on the branch; see
+PR #937's own review history for the per-round detail), and **squash**-
+merged into `main` as a single commit, **Merge SHA
+`5980ee4559632df134a268546e688d56e99e9217`**. (An earlier version of this
+section incorrectly named `037cbb6` as this pre-merge head and called the
+merge a non-squash merge with four parents — `037cbb6` is actually PR
+#938's own later commit, built *on top of* `5980ee4`, and `5980ee4` has a
+single parent, `6be5d7d`, per `git log --parents` — a real squash merge,
+consistent with every other merge in this session. Caught by Codex review
+on PR #938; corrected here.)
+
+## POST_MERGE_REVIEW: PASS
+
+Merge SHA: `5980ee4559632df134a268546e688d56e99e9217`.
+
+- **Target branch contains the change**: confirmed — `main`'s history has
+  this commit as its own (a `git branch --contains` from a branch built
+  directly on `main` post-merge shows it as an ancestor), and its tree
+  matches PR #937's final reviewed diff exactly (squash merge — one new
+  commit on `main`, not a merge with the PR branch's own commits as
+  separate parents).
+- **No unexpected integration change**: no manual conflict resolution was
+  needed at merge time; the diff GitHub squashed onto `main` is exactly
+  the PR's own reviewed diff.
+- **Required post-merge checks/workflows**: the push-to-`main` CI trigger
+  (`on: push: branches: ['**']`, both `ci.yml` and `storefront-ci.yml`)
+  re-ran on this exact SHA as its own independent workflow runs — not the
+  PR's pre-merge check, a second, later trigger — and passed on all three
+  required jobs: `php artisan test (L11, sqlite)` and `(L11, pgsql)` in
+  run [35724653563](https://github.com/safwan5001-source/Nebrax/actions/runs/35724653563),
+  and `Storefront CI` in run
+  [35724653544](https://github.com/safwan5001-source/Nebrax/actions/runs/35724653544)
+  — all three `conclusion: success`, `head_branch: main`,
+  `head_sha: 5980ee4559632df134a268546e688d56e99e9217`, verified directly
+  via the GitHub Actions API (not inferred from the PR's own check list).
+- **Targeted regression**: a further focused `Commerce|Customer|
+  Storefront|BranchIsolationGuard` run, from `claude/com-mobile-payments-1`
+  (branched directly off this merge commit while starting
+  `COM-MOBILE-PAYMENTS-1`, 2026-09-22), stayed fully green: **997 passed**
+  on SQLite, **1007 passed** on PostgreSQL, 0 failed.
 
 ## Recommended next task
 
