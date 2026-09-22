@@ -79,11 +79,11 @@ Current direct browser viewport: **1363 × 936 CSS px**, Arabic RTL.
 | Wishlist | Header and product actions found; destination/state not yet verified | **Partial** |
 | Compare | Related-product compare actions found; compare page not yet verified | **Partial** |
 | Quick view | Earlier public crawl suggested it; current direct live state not yet verified | **Not yet confirmed** |
-| Mini-cart | Empty side drawer observed; populated state not exercised | **Observed with gap** |
-| Filled cart | Populated state not exercised | **Not observed** |
+| Mini-cart | Empty and populated side-drawer states directly inspected | **Observed** |
+| Filled cart | Direct live inspection after adding a simple product | **Observed** |
 | Checkout with empty cart | Direct visit redirected to the empty-cart surface | **Observed boundary** |
-| Checkout with populated cart | Not exercised | **Not observed** |
-| Product variations/options | Only a simple product was directly inspected | **Not observed** |
+| Checkout with populated cart | Guest contact, shipping, delivery slot, payment and summary directly inspected; order not submitted | **Observed boundary** |
+| Product variations/options | First 48 catalog cards were marked simple products; no variable product found | **Not observed** |
 | Out-of-stock/backorder | Stock filter exists; card/detail states not yet captured | **Not observed** |
 | Mobile 390/430 | Responsive stylesheet rules observed; no direct viewport visual inspection yet | **Inferred from stylesheet; visual pending** |
 | Tablet 768/1024 | Responsive stylesheet rules observed; no direct viewport visual inspection yet | **Inferred from stylesheet; visual pending** |
@@ -449,6 +449,8 @@ The inspected simple product used one tall portrait image inside a zoom-enabled 
 
 Multi-image thumbnail, previous/next, swipe and image-counter behavior remains unobserved.
 
+The first 48 catalog cards across the first two 24-item shop pages were marked as in-stock simple products. This strengthens the evidence that the current public sample does not expose variable or out-of-stock states; it does **not** justify treating those states as unsupported in AWJ.
+
 ## 12. Cart and checkout surfaces
 
 ### 12.1 Empty cart — observed
@@ -458,7 +460,7 @@ Multi-image thumbnail, previous/next, swipe and image-counter behavior remains u
 - four recommended products with image, name, price, rating when available and Add to Cart;
 - global footer and navigation remain present.
 
-### 12.2 Mini-cart — empty observed; filled pending
+### 12.2 Mini-cart — empty and populated observed
 
 The header cart opens a side drawer without leaving the page. In the inspected empty state it exposed:
 
@@ -469,7 +471,12 @@ The header cart opens a side drawer without leaving the page. In the inspected e
 - `Return To Shop` action;
 - dimmed/overlay-style page relationship implied by the drawer shell.
 
-The populated state was not exercised in this pass.
+After adding one simple product, the same 340px drawer opened automatically and exposed:
+
+- product thumbnail/view action, product name, quantity × unit price and remove action;
+- subtotal;
+- View cart and Checkout actions;
+- cart count updated from zero to one.
 
 AWJ must eventually specify and verify:
 
@@ -482,9 +489,39 @@ AWJ must eventually specify and verify:
 - guest → authenticated identity transition using AWJ's canonical merge policy;
 - mobile bottom/sticky checkout action where appropriate.
 
-### 12.3 Checkout boundary
+### 12.3 Filled cart — observed
 
-A direct visit to `/checkout/` with an empty cart redirected to `/cart/` and reused the empty-cart recommendations surface. Populated checkout was **not observed** and is not approved for visual imitation yet. AWJ checkout must prioritize transaction clarity, address/delivery/payment correctness, validation and accessible error recovery over decorative parity with the reference.
+The cart initially rendered loading placeholders, then resolved to:
+
+- product media/link, name, unit price and short description;
+- quantity stepper with decrement disabled at quantity one;
+- remove action and line total;
+- expandable coupon entry;
+- shipping line (`Flat rate`, free in the observed session);
+- estimated total;
+- installment-information block supplied by the configured payment integration;
+- proceed-to-checkout action.
+
+**AWJ decision:** the theme may style these surfaces but prices, discounts, shipping, installments and totals must come from canonical checkout calculations. Loading must retain table/card geometry and announce progress.
+
+### 12.4 Checkout — populated boundary observed
+
+A direct visit to `/checkout/` with an empty cart redirected to `/cart/` and reused the empty-cart recommendations surface.
+
+With one product present, guest checkout exposed:
+
+- contact email, guest-status copy and gift-message field;
+- shipping address: country/region, first/last name, optional company, street/district, optional apartment/unit, city, region, optional phone and postal code;
+- same-address-for-billing checkbox;
+- shipping option;
+- delivery date and delivery-time slot controls;
+- payment choices (the observed store exposed a buy-now-pay-later integration and credit card);
+- optional order note;
+- terms/privacy acknowledgement copy;
+- persistent order summary with line item, subtotal, shipping and total;
+- provider-specific final CTA.
+
+No customer data was entered and no order/payment action was submitted. Validation, payment failure, order success and authenticated checkout remain unobserved. AWJ checkout must prioritize transaction clarity, address/delivery/payment correctness, validation and accessible error recovery over decorative parity with the reference. Enabled countries, fields, delivery slots and payment methods must come from store configuration, never from theme defaults.
 
 ## 13. Account, blog and content templates
 
@@ -626,7 +663,8 @@ This table is an **AWJ provisional decision**, not a claim of reference-site exa
 - [ ] Account hover/dropdown versus click behavior.
 - [ ] Wishlist empty/populated/remove.
 - [x] Mini-cart empty/open/close behavior.
-- [ ] Mini-cart populated/loading/error.
+- [x] Mini-cart populated anatomy.
+- [ ] Mini-cart loading/error and stock-conflict behavior.
 - [ ] Cookie/announcement dismissal if part of the intended theme.
 - [ ] Focus-visible and reduced-motion audit.
 
@@ -673,9 +711,10 @@ This table is an **AWJ provisional decision**, not a claim of reference-site exa
 - [x] Guest login form.
 - [x] Lost-password form.
 - [x] Empty-cart checkout redirect boundary.
-- [ ] Filled cart.
-- [ ] Coupon/discount behavior.
-- [ ] Checkout steps and validation.
+- [x] Filled-cart line, quantity, remove, totals and checkout CTA anatomy.
+- [x] Coupon-entry control anatomy; valid/invalid application not exercised.
+- [x] Populated guest-checkout fields, delivery scheduling, payment choices and order-summary anatomy.
+- [ ] Checkout validation and payment-provider failure behavior.
 - [ ] Order success/failure.
 - [ ] Registration availability/form and authenticated account/orders.
 
