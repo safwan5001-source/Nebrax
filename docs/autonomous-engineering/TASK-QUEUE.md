@@ -134,8 +134,8 @@ autonomously per نظام الأفق, `MOBILE-RUNTIME-1` first.
 
 | Order | Task ID | Status | Risk | Depends on | Outcome |
 |---|---|---|---|---|---|
-| 1 | MOBILE-RUNTIME-1 | in_progress | normal | horizon authorization | Flutter workspace + toolchain proof |
-| 2 | MOBILE-RUNTIME-2 | backlog | normal | MOBILE-RUNTIME-1 | App Schema + compatibility kernel |
+| 1 | MOBILE-RUNTIME-1 | done | normal | horizon authorization | Flutter workspace + toolchain proof |
+| 2 | MOBILE-RUNTIME-2 | in_progress | normal | MOBILE-RUNTIME-1 (done) | App Schema + compatibility kernel |
 | 3 | MOBILE-RUNTIME-3 | backlog | normal | MOBILE-RUNTIME-2 | Component + Action Registry |
 | 4 | MOBILE-RUNTIME-4 | backlog | high | MOBILE-RUNTIME-1 | Commerce OpenAPI client + secure session boundary |
 | 5 | MOBILE-RUNTIME-5 | backlog | high | MOBILE-RUNTIME-3, MOBILE-RUNTIME-4 | Home/Product/Cart vertical UI |
@@ -152,6 +152,30 @@ accepted source requirement, this is the first task, and its outcome
 architecture decision — MR-01/MR-02 already fix Flutter-first and the
 `mobile/` workspace location. Full task-by-task evidence recorded in
 `CURRENT-STATE.md` as each completes.
+
+`MOBILE-RUNTIME-1` is `done`: PR #948 merged (Merge SHA
+`761d546c82b868850ed71889f49c8909dec0063b`, confirmed single-parent squash
+onto `main`, zero content drift from the reviewed head), post-merge CI green
+on both required workflows (`ci.yml`, `mobile-ci.yml`), post-merge review
+passed. Includes an owner-directed pre-merge correction: the initial
+`sa.nebrax` Android/iOS identity and `'نبراس'` placeholder UI text were
+corrected to a temporary `com.example.awjmobileruntimeproof` proof
+identifier and `'أَوْج — AWJ Mobile Runtime'` text — no canonical AWJ mobile
+namespace is documented anywhere, so none was invented; the production
+Bundle/Application ID remains an explicit open Decision Gate recorded in
+`mobile/README.md`. Full evidence:
+`docs/plans/mobile/MOBILE-RUNTIME-1-IMPLEMENTATION-REPORT.md`.
+
+`MOBILE-RUNTIME-2` promoted to `ready`/`in_progress` now that its hard
+dependency (`MOBILE-RUNTIME-1`) is merged and post-merge reviewed. Source
+requirement: `docs/plans/mobile/AWJ_MOBILE_RUNTIME_PROOF_HORIZON_V1.md` §4
+MR-04 (App Schema shape) and Quality Gate B. No unresolved product decision:
+MR-04's schema shape (schemaVersion/minRuntimeVersion, page definitions,
+approved component instances, typed props/bindings, allowlisted actions,
+navigation, theme tokens, compatibility/fallback) and RUNTIME_COMPATIBILITY_V1.md's
+capability-manifest/fail-closed rules are already fixed; this task
+implements a parser/validator/compatibility kernel against those already-
+accepted contracts, not a new architecture decision.
 
 ## Promotion checklist: backlog → ready
 
