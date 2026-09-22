@@ -195,13 +195,24 @@ class CommerceOrderService
             throw new RuntimeException('قناة البيع غير موجودة.');
         }
 
-        return DB::transaction(function () use ($header, $lines) {
+        // (COM-MOBILE-ORDER-HISTORY-1) Sourced from CustomerContext, exactly
+        // as this model's own docblock always documented — null for a guest
+        // completion, the authenticated customer's id otherwise. This was a
+        // pre-existing wiring gap (hardcoded null regardless of context,
+        // discovered during COM-MOBILE-CART-IDENTITY-1 and COM-MOBILE-
+        // ADDRESSES-1) rather than a new policy decision: CommerceCheckoutService
+        // ::complete() already establishes CustomerContext via
+        // EstablishCommerceCustomerContextIfPresent before this is called.
+        $customerContext = app(CustomerContext::class);
+        $customerIdentityId = $customerContext->isEstablished() ? $customerContext->customerIdentityId() : null;
+
+        return DB::transaction(function () use ($header, $lines, $customerIdentityId) {
             $order = CommerceOrder::create([
                 'sales_channel_id' => $header['sales_channel_id'],
                 'storefront_id' => $header['storefront_id'],
                 'commerce_checkout_id' => $header['commerce_checkout_id'],
                 'partner_id' => null,
-                'customer_identity_id' => null,
+                'customer_identity_id' => $customerIdentityId,
                 'number' => $this->nextNumber(),
                 'delivery_method' => $header['delivery_method'],
             ]);

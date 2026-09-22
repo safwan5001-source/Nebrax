@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\CommerceCategoryController;
 use App\Http\Controllers\Api\CommerceCheckoutController;
 use App\Http\Controllers\Api\CommerceCustomerAddressController;
 use App\Http\Controllers\Api\CommerceCustomerAuthController;
+use App\Http\Controllers\Api\CommerceCustomerOrderController;
 use App\Http\Controllers\Api\CommerceMediaController;
 use App\Http\Controllers\Api\CommerceOrderController;
 use App\Http\Controllers\Api\CommerceProductController;
@@ -223,4 +224,12 @@ Route::middleware([
     Route::post('addresses', [CommerceCustomerAddressController::class, 'store'])->name('addresses.store');
     Route::patch('addresses/{id}', [CommerceCustomerAddressController::class, 'update'])->whereUuid('id')->name('addresses.update');
     Route::delete('addresses/{id}', [CommerceCustomerAddressController::class, 'destroy'])->whereUuid('id')->name('addresses.destroy');
+
+    // COM-MOBILE-ORDER-HISTORY-1 — the authenticated customer's own order
+    // history. Deliberately `me/orders`, not `orders/{id}`: that path is
+    // already the guest signed-reference order-status route in the
+    // optional-auth group above, an entirely different ownership proof —
+    // see CommerceCustomerOrderController's own docblock.
+    Route::get('me/orders', [CommerceCustomerOrderController::class, 'index'])->name('me.orders.index');
+    Route::get('me/orders/{id}', [CommerceCustomerOrderController::class, 'show'])->whereUuid('id')->name('me.orders.show');
 });

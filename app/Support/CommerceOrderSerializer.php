@@ -11,18 +11,31 @@ use App\Models\Tenant;
  * ═══════════════════════════════════════════════════════════════
  *
  *  Extracts the exact response shape `StorefrontCheckoutController::
- *  serializeOrder()` established (and `CommerceCheckoutController` mirrored
- *  in PR-4) into one reusable static, so the standalone
- *  `GET /commerce/v1/orders/{id}` endpoint reuses the approved public
- *  contract byte-for-byte instead of growing a third private copy.
+ *  serializeOrder()` established into one reusable static, so the
+ *  standalone `GET /commerce/v1/orders/{id}` endpoint reuses the approved
+ *  public contract byte-for-byte instead of growing a third private copy.
  *
- *  The two existing controllers are deliberately left untouched (no
- *  refactor of working PR-4 code); this class is the single reuse point
- *  for the new endpoint only. Shape parity with the checkout-complete
- *  response is asserted by `CommerceOrderStatusApiTest`.
+ *  `CommerceCheckoutController::complete()` originally kept its own
+ *  literal copy of this same shape (a "mirror" in name only — it had
+ *  already silently drifted from this class, caught by
+ *  `CommerceOrderStatusApiTest`'s shape-parity assertion when
+ *  COM-MOBILE-ORDER-HISTORY-1 added new `delivery` fields here but not to
+ *  that copy) and now calls `CommerceOrderSerializer::serialize()`
+ *  directly instead. `StorefrontCheckoutController` (`/store/v1`, a
+ *  separate trust boundary/consumer) keeps its own independent copy —
+ *  out of scope for a `/commerce/v1`-only task, and no test asserts
+ *  parity between the two products' shapes.
  *
  *  Public-safe fields only: no tenant internals beyond the existing
  *  contract, no cost/ledger/inventory/payment data, no API client identity.
+ *
+ *  COM-MOBILE-ORDER-HISTORY-1: also the detail shape for the authenticated
+ *  customer's own order history (`GET /commerce/v1/me/orders/{id}`) — one
+ *  serializer, one contract, for the guest-reference, checkout-completion,
+ *  and customer-owned read paths alike. `region`/`building_no`/
+ *  `additional_number` added to `delivery` here (COM-MOBILE-ADDRESSES-1
+ *  had already added the columns to `CommerceOrderSnapshot`, but no
+ *  serializer exposed them yet).
  */
 final class CommerceOrderSerializer
 {
@@ -44,9 +57,12 @@ final class CommerceOrderSerializer
             ],
             'delivery' => [
                 'country' => $order->snapshot?->shipping_country,
+                'region' => $order->snapshot?->shipping_region,
                 'city' => $order->snapshot?->shipping_city,
                 'district' => $order->snapshot?->shipping_district,
                 'street' => $order->snapshot?->shipping_street,
+                'building_no' => $order->snapshot?->shipping_building_no,
+                'additional_number' => $order->snapshot?->shipping_additional_number,
                 'postal_code' => $order->snapshot?->shipping_postal_code,
                 'notes' => $order->snapshot?->shipping_notes,
             ],
