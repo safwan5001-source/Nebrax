@@ -91,13 +91,38 @@ final class CommerceCheckoutService
      * @return array{checkout: ?CommerceCheckout, cart: ?CommerceCart, invalid: bool, rebound: ?string}
      */
     /**
-     * (Codex, PR #924, P1, ninth round) نفس الثغرة المُصلَحة في
-     * `CommerceCartService::isOwnedByCurrentBearer()` — يستدعيها `show()`
-     * قبل تسليم استجابة Checkout المبنية على `current()`.
+     * (Codex, PR #924, P1, tenth round) النسخة المُقفَلة من إعادة تحقّق
+     * الملكية قبل التسليم — نفس `CommerceCartService::serializeForOwnedRead()`
+     * حرفياً، لكن تُسلسِل أيضاً `serialize()` الخاص بـCheckout (يقرأ حقول
+     * Checkout نفسها: جهة الاتصال والعنوان، لا سلته فقط) داخل نفس المعاملة
+     * والقفل. `show()` و`complete()`'s الفرع المتعلّق بـreview-required
+     * يستدعيانها بدل `serialize()` العام مباشرة.
+     *
+     * @return array{data: array<string, mixed>, owned: bool}
      */
-    public function isCartOwnedByCurrentBearer(string $cartId): bool
+    public function serializeForOwnedRead(?CommerceCheckout $checkout, ?CommerceCart $cart): array
     {
-        return $this->carts->isOwnedByCurrentBearer($cartId);
+        if ($cart === null) {
+            return ['data' => $this->serialize($checkout, null), 'owned' => true];
+        }
+
+        return DB::transaction(function () use ($checkout, $cart): array {
+            $context = $this->context();
+            $lockedCart = $this->scopeToContext(CommerceCart::query(), $context)
+                ->whereKey($cart->id)
+                ->lockForUpdate()
+                ->first();
+
+            if ($lockedCart === null || ! $this->carts->cartModelOwnedByCurrentBearer($lockedCart)) {
+                return ['data' => [], 'owned' => false];
+            }
+
+            $lockedCheckout = $checkout !== null
+                ? $this->scopeToContext(CommerceCheckout::query(), $context)->whereKey($checkout->id)->lockForUpdate()->first()
+                : null;
+
+            return ['data' => $this->serialize($lockedCheckout, $lockedCart), 'owned' => true];
+        }, 3);
     }
 
     public function current(?string $cartToken): array

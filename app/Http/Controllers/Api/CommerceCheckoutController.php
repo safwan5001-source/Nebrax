@@ -55,13 +55,20 @@ final class CommerceCheckoutController extends PublicApiController
         } catch (RuntimeException $e) {
             abort(422, $e->getMessage());
         }
-        // (Codex, PR #924, P1, ninth round) Same recheck as
-        // CommerceCartController::show(): current()'s own resolution can be
-        // stale by the time this response is actually built.
-        if ($result['cart'] !== null && ! $checkouts->isCartOwnedByCurrentBearer($result['cart']->id)) {
+        // (Codex, PR #924, P1, tenth round) Same locked recheck-and-serialize
+        // as CommerceCartController::show(): current()'s own resolution can
+        // be stale by the time this response is actually built.
+        try {
+            $serialized = $checkouts->serializeForOwnedRead($result['checkout'], $result['cart']);
+        } catch (PDOException $e) {
+            throw $e;
+        } catch (RuntimeException $e) {
+            abort(422, $e->getMessage());
+        }
+        if (! $serialized['owned']) {
             return $this->clearToken($this->notFound($request));
         }
-        $response = PublicApiResponse::success($request, $checkouts->serialize($result['checkout'], $result['cart']));
+        $response = PublicApiResponse::success($request, $serialized['data']);
 
         return $this->applyTokenOutcome($response, $result);
     }
@@ -221,10 +228,17 @@ final class CommerceCheckoutController extends PublicApiController
                 abort(422, $eRuntime->getMessage());
             }
 
-            // (Codex, PR #924, P1, ninth round) Same recheck as show():
-            // current()'s own resolution here can also be stale by the time
-            // this response is built.
-            if ($current['cart'] !== null && ! $checkouts->isCartOwnedByCurrentBearer($current['cart']->id)) {
+            // (Codex, PR #924, P1, tenth round) Same locked recheck-and-
+            // serialize as show(): current()'s own resolution here can also
+            // be stale by the time this response is built.
+            try {
+                $serialized = $checkouts->serializeForOwnedRead($current['checkout'], $current['cart']);
+            } catch (PDOException $ePdo) {
+                throw $ePdo;
+            } catch (RuntimeException $eRuntime) {
+                abort(422, $eRuntime->getMessage());
+            }
+            if (! $serialized['owned']) {
                 return $this->clearToken($this->notFound($request));
             }
 
@@ -242,7 +256,7 @@ final class CommerceCheckoutController extends PublicApiController
                 409,
                 [
                     'items' => $e->details(),
-                    'checkout' => $checkouts->serialize($current['checkout'], $current['cart']),
+                    'checkout' => $serialized['data'],
                 ],
             ), $current);
         } catch (PDOException $e) {

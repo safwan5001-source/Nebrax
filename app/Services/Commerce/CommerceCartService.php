@@ -731,20 +731,46 @@ final class CommerceCartService
     }
 
     /**
-     * (Codex, PR #924, P1, ninth round) إعادة تحقّق ملكية خفيفة **بلا قفل**
-     * قبل تسليم قراءة (`GET`) — نفس الثغرة التي أُصلحت في `lockUsableCart()`
-     * لكن للقراءة لا الكتابة: `resolveCurrent()`/`findByToken()` تحقّقتا من
-     * الملكية وقت الحلّ، لكن بين ذلك وبين `serialize()` الفعلي قد تلتزم
-     * مطالبةٌ متزامنة، فتُبنى الاستجابة على حالةٍ تجاوزها الزمن وتُسلَّم
-     * بيانات سلةٍ/Checkout صار عائداً لعميلٍ آخر لحامل توكن ضيفٍ قديم. لا
-     * قفل هنا عمداً — قراءةٌ لا تُعدِّل شيئاً فلا حاجة لتسلسلها ضد كاتبٍ
-     * آخر، يكفي ألا تُبنى الاستجابة على حالةٍ فات أوانها.
+     * (Codex, PR #924, P1, tenth round) الجولة التاسعة أضافت إعادة تحقّق
+     * ملكية قبل `serialize()` مباشرة، لكن بلا قفل — فبقيت نافذةٌ أصغر
+     * مفتوحة بين إعادة التحقّق تلك و`serialize()` الفعلي: مطالبةٌ متزامنة قد
+     * تلتزم في تلك اللحظة بالذات فتُبنى الاستجابة جزئياً على حالةٍ عائدة
+     * لعميلٍ آخر. هذه النسخة تُنفّذ إعادة التحقّق و`serialize()` معاً داخل
+     * معاملةٍ واحدة تحت `lockForUpdate()` على صفّ السلة — نفس القفل الذي
+     * تأخذه `resolveCurrent()`'s المطالبة/الدمج على الصفّ نفسه، فتتسلسلان
+     * فعلياً: إمّا تكتمل القراءة قبل أي مطالبة، أو تنتظر حتى تلتزم المطالبة
+     * ثم تُعيد التحقّق فتراه غير مملوكٍ لحاملها فترفض — لا نافذة متبقية.
+     *
+     * @return array{data: array<string, mixed>, owned: bool}
      */
-    public function isOwnedByCurrentBearer(string $cartId): bool
+    public function serializeForOwnedRead(?CommerceCart $cart): array
     {
-        $cart = $this->scopeToContext(CommerceCart::query(), $this->context())->find($cartId);
+        if ($cart === null) {
+            return ['data' => $this->serialize(null), 'owned' => true];
+        }
 
-        return $cart !== null && $this->cartOwnedByCurrentBearer($cart, app(CustomerContext::class));
+        return DB::transaction(function () use ($cart): array {
+            $locked = $this->scopeToContext(CommerceCart::query(), $this->context())
+                ->whereKey($cart->id)
+                ->lockForUpdate()
+                ->first();
+
+            if ($locked === null || ! $this->cartOwnedByCurrentBearer($locked, app(CustomerContext::class))) {
+                return ['data' => [], 'owned' => false];
+            }
+
+            return ['data' => $this->serialize($locked), 'owned' => true];
+        }, 3);
+    }
+
+    /**
+     * يتحقق من ملكية كائن Cart محمَّلٍ (وربما مقفلٍ) بالفعل من مستدعٍ آخر —
+     * بلا استعلامٍ إضافي. تستعمله `CommerceCheckoutService::serializeForOwnedRead()`
+     * بعد أن تقفل السلة بنفسها ضمن معاملتها الخاصة.
+     */
+    public function cartModelOwnedByCurrentBearer(CommerceCart $cart): bool
+    {
+        return $this->cartOwnedByCurrentBearer($cart, app(CustomerContext::class));
     }
 
     /**

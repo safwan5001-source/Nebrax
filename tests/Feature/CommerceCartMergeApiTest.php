@@ -1171,22 +1171,22 @@ class CommerceCartMergeApiTest extends TestCase
     // ═══════════════════════════════════════════════════════════
 
     /**
-     * P1 — `CommerceCartService::isOwnedByCurrentBearer()` is the read-path
+     * P1 — `CommerceCartService::serializeForOwnedRead()` (locked in the
+     * tenth round; unlocked originally in this round) is the read-path
      * counterpart to `lockUsableCart()`'s ownership recheck: `show()`
-     * actions call it right before serializing a `resolveCurrent()`/
-     * `current()` result, so a claim that commits in the gap between
-     * resolution and response-building never hands a guest bearer data that
-     * now belongs to a customer. This tests the method's own correctness
-     * directly (guest cart, own cart, a different customer's cart, then the
-     * true owner) — the gap it protects against can't be reproduced via
-     * HTTP with this test client for the same structural reason as the
-     * other unlocked-window races in this PR: `show()`'s own resolve and
-     * serialize steps run back-to-back with nothing to desync them absent
-     * an actual concurrent write landing in between.
+     * actions call it instead of `serialize()` directly, so a claim that
+     * commits around resolution/response-building never hands a guest
+     * bearer data that now belongs to a customer. This tests the method's
+     * own correctness directly (guest cart, own cart, a different
+     * customer's cart, then the true owner) — the underlying race can't be
+     * reproduced via HTTP with this test client for the same structural
+     * reason as the other unlocked-window races in this PR: `show()`'s own
+     * resolve and serialize steps run back-to-back with nothing to desync
+     * them absent an actual concurrent write landing in between.
      *
      * @test
      */
-    public function is_owned_by_current_bearer_correctly_reports_ownership(): void
+    public function serialize_for_owned_read_correctly_reports_ownership(): void
     {
         $store = $this->seedMobileStore('read-ownership-recheck');
         $product = $this->product($store['tenant'], $store['channel'], 'READ-OWNERSHIP-1');
@@ -1198,7 +1198,8 @@ class CommerceCartMergeApiTest extends TestCase
         app(\App\Tenancy\StorefrontContext::class)->set($store['tenant']->id, $store['channel']->id);
         app(\App\Tenancy\CustomerContext::class)->forget();
 
-        $this->assertTrue(app(\App\Services\Commerce\CommerceCartService::class)->isOwnedByCurrentBearer($cart->id));
+        $carts = app(\App\Services\Commerce\CommerceCartService::class);
+        $this->assertTrue($carts->serializeForOwnedRead($cart)['owned']);
 
         $otherIdentity = \App\Models\CustomerIdentity::create([
             'tenant_id' => $store['tenant']->id, 'display_name' => 'ع',
@@ -1208,11 +1209,11 @@ class CommerceCartMergeApiTest extends TestCase
         $cart->update(['customer_identity_id' => $otherIdentity->id]);
 
         // The guest bearer no longer owns it.
-        $this->assertFalse(app(\App\Services\Commerce\CommerceCartService::class)->isOwnedByCurrentBearer($cart->id));
+        $this->assertFalse($carts->serializeForOwnedRead($cart)['owned']);
 
         // The true owner does.
         app(\App\Tenancy\CustomerContext::class)->set($store['tenant']->id, $otherIdentity->id, null);
-        $this->assertTrue(app(\App\Services\Commerce\CommerceCartService::class)->isOwnedByCurrentBearer($cart->id));
+        $this->assertTrue($carts->serializeForOwnedRead($cart)['owned']);
     }
 
     /**
@@ -1253,5 +1254,41 @@ class CommerceCartMergeApiTest extends TestCase
 
         $this->assertNotNull($secondCart->id);
         app(TenantContext::class)->forget();
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  Tenth review round (Codex, PR #924)
+    // ═══════════════════════════════════════════════════════════
+
+    /**
+     * P1 — `serializeForOwnedRead()` now locks the cart (and, in
+     * `CommerceCheckoutService`'s own version, the checkout too) for the
+     * duration of the recheck-and-serialize, closing the smaller window the
+     * ninth round's unlocked recheck still left open between its own check
+     * and the actual `serialize()` call. This is a plain regression check
+     * that wrapping the normal (non-racing) GET path in a transaction with
+     * `lockForUpdate()` doesn't change its own observable behavior or
+     * deadlock against anything — `GET /commerce/v1/cart` and
+     * `GET /commerce/v1/checkout` must both still succeed normally for an
+     * authenticated customer reading their own cart/checkout.
+     *
+     * @test
+     */
+    public function the_locked_owned_read_still_serializes_normally_for_the_true_owner(): void
+    {
+        $store = $this->seedMobileStore('locked-read-regression');
+        $product = $this->product($store['tenant'], $store['channel'], 'LOCKED-READ-1');
+
+        $customerToken = $this->loginCustomer($store, '+966500000190');
+        $cartToken = $this->postJson('/commerce/v1/cart/items', ['product_id' => $product->id, 'quantity' => 2], $this->withCustomer($store['token'], $customerToken))
+            ->assertCreated()->headers->get('X-Cart-Token');
+        $this->postJson('/commerce/v1/checkout', [], $this->withCustomer($store['token'], $customerToken, $cartToken))->assertCreated();
+
+        $cartResponse = $this->getJson('/commerce/v1/cart', $this->withCustomer($store['token'], $customerToken, $cartToken))->assertOk();
+        $this->assertSame($product->id, $cartResponse->json('data.items.0.product_id'));
+        $this->assertSame(2, $cartResponse->json('data.items.0.quantity'));
+
+        $checkoutResponse = $this->getJson('/commerce/v1/checkout', $this->withCustomer($store['token'], $customerToken, $cartToken))->assertOk();
+        $this->assertSame($product->id, $checkoutResponse->json('data.cart.items.0.product_id'));
     }
 }
