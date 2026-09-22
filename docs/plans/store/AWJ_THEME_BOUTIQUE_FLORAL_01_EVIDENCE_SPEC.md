@@ -71,11 +71,12 @@ Current direct browser viewport: **1363 × 936 CSS px**, Arabic RTL.
 | Blog index — desktop | Direct live inspection | **Observed** |
 | About page shell — desktop | Direct live inspection; page body appeared visually/content-light | **Observed with gap** |
 | Header/footer global shells | Seen across all inspected pages | **Observed** |
-| Search overlay/results | Search forms and full-screen search capability found; open/result states not yet exercised | **Partial** |
+| Search overlay/results | Full-screen open/close and query entry observed; successful/no-result rendering still unresolved | **Observed with gap** |
 | Wishlist | Header and product actions found; destination/state not yet verified | **Partial** |
 | Compare | Related-product compare actions found; compare page not yet verified | **Partial** |
 | Quick view | Earlier public crawl suggested it; current direct live state not yet verified | **Not yet confirmed** |
-| Filled cart / mini-cart | Empty shell observed; populated state not exercised | **Not observed** |
+| Mini-cart | Empty side drawer observed; populated state not exercised | **Observed with gap** |
+| Filled cart | Populated state not exercised | **Not observed** |
 | Checkout | Not exercised | **Not observed** |
 | Product variations/options | Only a simple product was directly inspected | **Not observed** |
 | Out-of-stock/backorder | Stock filter exists; card/detail states not yet captured | **Not observed** |
@@ -183,28 +184,45 @@ The header is a two-row composition with a combined measured height of 154px:
 - cart display: icon only / count / count + subtotal where supported;
 - transparent-over-hero is **not** part of the default until observed or selected as an AWJ extension.
 
+### 7.4 Full-screen search — observed with gap
+
+- opens as a full-width layer directly below the 154px header;
+- measured approximately 1363 × 782px in the inspected viewport;
+- search form occupies an approximately 111px-high top row;
+- explicit close control;
+- inspected placeholder is `Search for posts`, not product-specific Arabic copy;
+- entering an Arabic flower query left the instructional message visible and exposed no result cards during the observation window.
+
+**AWJ decision:** the ready theme must use storefront-product search by default, with localized copy and explicit loading, results, no-results and error states. The reference's apparent post-search mismatch/empty AJAX behavior is a defect to avoid, not a behavior to copy.
+
 ## 8. Home page template
 
 ### 8.1 Observed section sequence
 
-The live page established these section families, though repeated carousels and responsive duplicate markup require a later screenshot-by-screenshot ordering lock:
+The live page established this desktop flow. Approximate vertical positions are included to distinguish actual sequence from duplicated responsive/carousel markup:
 
-1. Header.
-2. Repeating announcement/marquee strip — current campaign copy repeated across the width; 48px measured height, blush background.
-3. Large full-width hero/editorial region.
-4. A custom-gift editorial section containing:
+1. Header — 0–154px.
+2. Main content top padding — to ~194px.
+3. Repeating announcement/marquee strip — ~194px, 48px measured height, blush background.
+4. A large custom-gift hero/editorial section — ~242–999px — containing:
    - headline;
    - supporting headline/copy;
    - imagery;
    - green CTA;
    - large editorial rounded region (40px measured on one container).
-5. Multiple independent product collections/sliders.
-6. Category-led product groupings, including bouquets, vases and balloons.
-7. Sale state with percentage badge, original price and current price.
-8. Promotional/countdown section with days/hours/minutes/seconds.
-9. Testimonials/reviews carousel with avatar, name, five-star visual and long review copy.
-10. Payment-method/logo carousel.
-11. Multi-column footer.
+5. Intermediate visual/editorial bands — ~1058–2277px — including a large multi-image block and a white benefits/trust band.
+6. First product collection — ~2423–2860px — 20 product nodes in carousel markup.
+7. Image-led promotional band — ~2920–3489px.
+8. Full-width visual/editorial campaign — ~3548–4297px.
+9. Second product collection — ~4443–4860px — includes the observed sale state with percentage badge, original and current prices.
+10. Two further image-led promotional/editorial bands — ~4896–5886px.
+11. Third product collection — ~6031–6468px — vase/arrangement-led products.
+12. Promotional countdown — ~6469–7218px — days/hours/minutes/seconds.
+13. Testimonials/reviews carousel — ~7466–7801px — avatar, name, five-star visual and long review copy.
+14. Payment-method/logo carousel — ~7861–8106px.
+15. Multi-column footer — ~8205–8673px.
+
+The blank/duplicate nodes inside these ranges are implementation artifacts and must not become duplicate AWJ sections.
 
 ### 8.2 AWJ default home composition
 
@@ -391,9 +409,18 @@ This is a theme preset. The merchant may reorder, duplicate, hide or delete elig
 - four recommended products with image, name, price, rating when available and Add to Cart;
 - global footer and navigation remain present.
 
-### 12.2 Mini-cart and filled cart — pending
+### 12.2 Mini-cart — empty observed; filled pending
 
-The global shell exposes a side-cart/Shopping Cart surface and a close action. The populated state was not exercised in this pass.
+The header cart opens a side drawer without leaving the page. In the inspected empty state it exposed:
+
+- approximately 340px drawer width across the full 936px viewport height;
+- title `Shopping cart`;
+- explicit Close action;
+- Arabic empty message: no products in the cart;
+- `Return To Shop` action;
+- dimmed/overlay-style page relationship implied by the drawer shell.
+
+The populated state was not exercised in this pass.
 
 AWJ must eventually specify and verify:
 
@@ -504,17 +531,20 @@ This table is an **AWJ provisional decision**, not a claim of reference-site exa
 - [x] Desktop header default.
 - [ ] Header sticky/scrolled visual state.
 - [ ] Mobile header closed/open/submenu.
-- [ ] Search closed/open/results/no-results/error.
+- [x] Search closed/open/query-entry/close behavior.
+- [ ] Search loading/results/no-results/error.
 - [ ] Account hover/dropdown versus click behavior.
 - [ ] Wishlist empty/populated/remove.
-- [ ] Mini-cart empty/populated/loading/error.
+- [x] Mini-cart empty/open/close behavior.
+- [ ] Mini-cart populated/loading/error.
 - [ ] Cookie/announcement dismissal if part of the intended theme.
 - [ ] Focus-visible and reduced-motion audit.
 
 ### Home
 
 - [x] Desktop section-family inventory.
-- [ ] Exact desktop ordering and section boundaries from full-page visual capture.
+- [x] Desktop ordering and section boundaries from live layout geometry.
+- [ ] Full-page screenshot review for pixel-level composition and hidden visual details.
 - [ ] Tablet layout.
 - [ ] Mobile layout.
 - [ ] Carousel arrows/dots/swipe/autoplay/pause behavior.
