@@ -2,13 +2,17 @@
 
 > This file is a durable resume point, not a substitute for Git/GitHub evidence.
 
-LAST_UPDATED: 2026-09-22 (Payments/Shipping/Promo/I18n/Vertical-Slice decisions resolved, ADR-09..13; COM-MOBILE-I18N-1 done, PR #935; COM-MOBILE-SHIPPING-1 done, PR #937; COM-MOBILE-PAYMENTS-1 done, PR #940; COM-MOBILE-VERTICAL-TEST-1 done, PRs #942/#943/#944 — Commerce Mobile API readiness horizon closed, no `ready` row remains)
+LAST_UPDATED: 2026-09-22 (AWJ Mobile Runtime Proof Horizon V1 launched; MOBILE-RUNTIME-1 (Flutter workspace + toolchain proof) in progress — `mobile/` Flutter 3.47.5 workspace scaffolded, analyze/test green, CI added)
 LAYER_VERSION: V1
 STATUS: EXECUTING
 
 ## Current objective
 
-Execute the first bounded autonomous-engineering horizon: close the Commerce Mobile API readiness gaps sequentially, beginning with COM-MOBILE-MEDIA-1. Preserve AWJ tenant/security/business invariants and stop at material Decision Gates.
+Execute **AWJ Mobile Runtime Proof Horizon V1** sequentially under نظام الأفق, beginning with `MOBILE-RUNTIME-1`. Preserve AWJ tenant/security/business/accounting invariants and the horizon's non-negotiable boundaries (no parallel commerce logic in Flutter, no production deploy/release). Stop only at a genuine Decision Gate or Horizon End. The prior Commerce Mobile API readiness closure V1 horizon (below) is closed and is this horizon's accepted input.
+
+## AWJ Mobile Runtime Proof Horizon V1 — execution log
+
+- `MOBILE-RUNTIME-1` (Flutter workspace + toolchain proof) is **in_progress**: `mobile/` created via `flutter create --platforms=android,ios` on Flutter `3.47.5` stable (Dart `3.13.4`) — the current stable release as of 2026-09-22, verified against `storage.googleapis.com/flutter_infra_release/releases/releases_linux.json`. Flutter SDK installed locally in this session's environment (`/opt/flutter-sdk`, not committed) since none was preinstalled — `flutter analyze` reports 0 issues, `flutter test` 2/2 passing on a minimal placeholder shell (`lib/app.dart`/`lib/main.dart`) that defaults to Arabic + RTL via a plain `Directionality` override (full `flutter_localizations` deferred to `MOBILE-RUNTIME-6` per plan). No App Schema, Commerce API call, or screens yet — deliberately out of this task's scope. CI added (`.github/workflows/mobile-ci.yml`, `subosito/flutter-action@v2` pinned to the same exact version, `analyze` + `test` on `mobile/**` changes). No non-trivial dependency added (only `flutter create`'s stock `cupertino_icons`/`flutter_lints` defaults — reviewed in `mobile/README.md` per MR-19, first-party/trivial, no dedicated review needed). Performance measurement method + provisional budgets recorded per MR-18: `docs/plans/mobile/AWJ_MOBILE_RUNTIME_PERFORMANCE_BASELINE.md`. PR [#948](https://github.com/safwan5001-source/Nebrax/pull/948) opened; CI started on first head `07c1f6e`. **Owner-directed correction before merge:** the first draft's `sa.nebrax` Android/iOS identity and the shell's `'نبراس — AWJ Mobile Runtime'` UI text both carried the legacy `Nebrax` name into a durable product identity — corrected to `com.example.awjmobileruntimeproof` (Apple/Google's own placeholder-identity convention, since no canonical AWJ mobile namespace is documented anywhere — only the unrelated web tenant-subdomain domain `awj.app`) and `'أَوْج — AWJ Mobile Runtime'` respectively; the production Bundle/Application ID is recorded as an explicit open Decision Gate in `mobile/README.md`. This invalidates the first head's in-flight CI/review for merge purposes per Gate 9 — re-observing CI on the corrected head. See `docs/plans/mobile/MOBILE-RUNTIME-1-IMPLEMENTATION-REPORT.md` for full detail as work continues.
 
 ## Confirmed repository context
 
@@ -44,6 +48,19 @@ Execute the first bounded autonomous-engineering horizon: close the Commerce Mob
 - `COM-MOBILE-VERTICAL-TEST-1` (ADR-13 partial-scope vertical slice: `/commerce/v1` OpenAPI contract + guest/authenticated journey tests) is **done**: three stacked PRs merged in sequence — #942 (1/3, contract, Merge SHA `b7d16ecb75808c3622d3c5782c451c21b71e0f0f`), #943 (2/3, guest journey, Merge SHA `c05c62e392f7f33fe57fcb1f8ff1fe97a1a66740`), #944 (3/3, authenticated journey, Merge SHA `b8e1a121f202eb9cb967bcb056092f8a2305a5c9`), each a confirmed single-parent squash merge (`git log --parents`). The task's real scope (31 routes, ~10 resource types with genuinely conditional shapes) proved disproportionately large mid-task; two explicit questions were put to Safwan via `AskUserQuestion` rather than silently grinding or cutting corners — **"full field-level rigor"** (match `PublicApiOpenApiContractTest`'s own convention exactly) and **"split into 3 PRs"** (contract → guest journey → authenticated journey, each reviewed/merged before the next). Both journeys incorporate Shipping (ADR-10) and Payments (ADR-09) per ADR-13 §5's own incremental-extension instruction. Discovered and closed two real pre-existing bugs: `CommerceCustomerAddressController` had no `rejectUnknown()` guard (an undocumented field was silently accepted, not rejected); `CommerceCheckoutService::emptyResponse()`'s address block was missing `building_no`/`additional_number`, violating the endpoint's own documented invariant. Three rounds of automated (Codex) review across the stack found and fixed 7 real findings total (an `allOf`/`additionalProperties:false` schema incompatibility, a wrong-schema `Order.payment` reference, an undocumented optional `X-Customer-Token` parameter, a non-nullable `Cart.status` contradicting its own `emptyResponse()`, the two bugs above, plus — on a second review pass of the contract test's own newly-written recursive schema validator — a null-handling gap and a `$ref` type-checking gap, whose proper fix then surfaced two further genuine schema-accuracy bugs, `unit_name` wrongly typed non-nullable). Codex then reported its review-usage limit exhausted for this account. Final `Commerce|Customer|Storefront|BranchIsolationGuard` regression: 1036 passed on SQLite, 1046 passed on PostgreSQL, 0 failed. `POST_MERGE_REVIEW: PASS` on the final merge (Gate 11): `main` confirmed to contain `b8e1a12` as its tip; post-merge CI on that exact SHA passed — verified via the GitHub Actions API, run [35763886208](https://github.com/safwan5001-source/Nebrax/actions/runs/35763886208), `conclusion: success`. **This closes the entire currently-authorized Commerce Mobile API readiness horizon** — Payments, Shipping, I18N, and the Vertical Slice are all `done`; `COM-MOBILE-PROMO-1` remains explicitly `deferred` (ADR-11). No row in the Commerce Mobile prerequisites table remains `ready`. Full evidence: `docs/plans/commerce/COM-MOBILE-VERTICAL-TEST-1-IMPLEMENTATION-REPORT.md`.
 
 ## Current execution horizon
+
+- Horizon: **AWJ Mobile Runtime Proof Horizon V1** (active, started 2026-09-22).
+  Source: `docs/plans/mobile/AWJ_MOBILE_RUNTIME_PROOF_HORIZON_V1.md`,
+  launched via `docs/plans/mobile/AWJ_MOBILE_RUNTIME_PROOF_BOOTSTRAP.md`.
+  Starts from `main@51a80685289aecdc7354ebcd8d1a32a2c92ac449` (merged PR
+  #947, "docs: authorize AWJ Mobile Runtime Proof Horizon V1"). The prior
+  Commerce Mobile API readiness closure V1 horizon (below) is fully closed
+  and is this horizon's accepted input, not something it reopens.
+- First executable task: `MOBILE-RUNTIME-1` (Flutter workspace + toolchain
+  proof) — **in_progress**. See "AWJ Mobile Runtime Proof Horizon V1" log
+  below for evidence as it lands.
+
+### Previous (closed) horizon — Commerce Mobile API readiness closure V1
 
 - Horizon: Commerce Mobile API readiness closure V1.
 - First executable task: `COM-MOBILE-MEDIA-1` — **done**.

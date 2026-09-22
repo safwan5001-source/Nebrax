@@ -69,7 +69,37 @@ If the task requires merge for true completion, keep it at `merge_ready`/`merged
 
 ## Current autonomous execution horizon
 
-**STATUS: ACTIVE — Commerce Mobile API readiness closure V1.**
+**STATUS: CLOSED — Commerce Mobile API readiness closure V1.**
+
+This horizon closed with `COM-MOBILE-VERTICAL-TEST-1` (PRs #942/#943/#944).
+No row in its candidate table remains `ready`; `COM-MOBILE-PROMO-1` is
+`deferred` (ADR-11), not pending. See `CURRENT-STATE.md` for the closure
+evidence trail. The task records below (Initial seed task ... Sixth task)
+remain as historical execution evidence and are not deleted.
+
+**STATUS: ACTIVE — AWJ Mobile Runtime Proof Horizon V1.**
+
+Per the "documentation rule" in `00-START-HERE.md` (this directory owns
+execution ordering/dependencies/current state, not domain specifications),
+this horizon's full task table, outcomes, dependencies, Quality Gates and
+Decision Gates are **not duplicated here** — they live in the accepted
+domain document:
+
+`docs/plans/mobile/AWJ_MOBILE_RUNTIME_PROOF_HORIZON_V1.md` §8 (task queue)
+and §9 (Definition of Done), authorized 2026-09-22
+(`docs/plans/mobile/AWJ_MOBILE_RUNTIME_PROOF_BOOTSTRAP.md` is the launch
+entrypoint).
+
+Execution order: `MOBILE-RUNTIME-1` → `MOBILE-RUNTIME-10`, strictly
+dependency-ordered per that document's §8 table. Current state and
+per-task evidence are recorded in `CURRENT-STATE.md` and
+`TASK-QUEUE.md`, and per-task implementation reports live in
+`docs/plans/mobile/<TASK-ID>-IMPLEMENTATION-REPORT.md`.
+
+---
+
+The following historical Commerce Mobile task records (below this line)
+predate the Mobile Runtime horizon and remain for evidence/resumability.
 
 This horizon is deliberately bounded to the documented Commerce Mobile readiness gaps and their dependency chain.
 

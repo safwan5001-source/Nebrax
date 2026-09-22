@@ -1,0 +1,40 @@
+name: Mobile CI
+
+# AWJ Mobile Runtime Proof (mobile/) — analyze + test on every push/PR that
+# touches the workspace. Release-build jobs (Android/iOS) are added in
+# MOBILE-RUNTIME-9 once there is a runtime worth building.
+
+on:
+  push:
+    branches: ['**']
+    paths: ['mobile/**', '.github/workflows/mobile-ci.yml']
+  pull_request:
+    branches: ['**']
+    paths: ['mobile/**', '.github/workflows/mobile-ci.yml']
+
+jobs:
+  check:
+    name: mobile (analyze + test)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter 3.47.5 (stable)
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.5'
+          channel: 'stable'
+          cache: true
+
+      - name: flutter pub get
+        run: flutter pub get
+
+      - name: flutter analyze
+        run: flutter analyze
+
+      - name: flutter test
+        run: flutter test
