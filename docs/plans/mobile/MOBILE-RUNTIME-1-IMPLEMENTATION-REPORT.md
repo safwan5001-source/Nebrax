@@ -197,7 +197,12 @@ being re-observed on the corrected exact head (recorded below once pushed).
 ## Pre-merge review
 
 - PRE_MERGE_REVIEW: **PASS**
-- Reviewed Head SHA: `4e5fae304396cce3be70c3de015159967e6950f3`
+- Reviewed Head SHA: `4e5fae304396cce3be70c3de015159967e6950f3` (code
+  content reviewed); the actual merge head,
+  `1d204f66d1399691aa505fbcc004728233aca195`, adds only this report
+  section on top — `git diff 4e5fae3 1d204f6` touches exactly one file
+  (this report), confirmed documentation-only, so the review below
+  applies unchanged to the merge head.
 - Findings / resolution: fresh Reviewer + AWJ Guardian pass performed
   against the complete final diff (`git diff 51a8068 4e5fae3`, 44
   non-binary files, 2422 insertions) on this exact head:
