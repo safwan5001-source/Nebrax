@@ -187,8 +187,30 @@ writing this section. Updated once CI is observed on the exact PR head.
 
 ## Pre-merge review
 
-- PRE_MERGE_REVIEW: **pending** — recorded once CI is green on the exact
-  PR head (Gate 9).
+- PRE_MERGE_REVIEW: **PASS**
+- Reviewed Head SHA: `2611aa4b77103e5dd6c526381c8791ac7e56eedf`
+- Findings / resolution: fresh Reviewer + AWJ Guardian pass against the
+  complete final diff (`git diff 12109a2 2611aa4`, 10 files, 1611
+  insertions, 0 deletions):
+  - All 6 required checks green on this exact head: `mobile (analyze +
+    test)` ×2 (push+PR event), `php artisan test (L11, sqlite)` ×2,
+    `php artisan test (L11, pgsql)` ×2 — all `conclusion: success`.
+    `mergeable_state: clean`, no conflict with `main`.
+  - Diff contains exactly the files this task's own change list names —
+    no unrelated file touched, no widget/Commerce-client code introduced
+    ahead of MOBILE-RUNTIME-3/4/5's scope.
+  - Confirmed by direct inspection (not just test-passing) that
+    `optional` defaults to `false` in `SchemaComponent._fromJson`
+    (`app_schema.dart`) — the fail-closed-by-default posture is a real
+    property of the parser, not merely an assumption the tests happen to
+    exercise.
+  - Confirmed the unknown-field/tenant-smuggling/malicious-input
+    rejections are enforced by `_rejectUnknownKeys`/`_validateJsonSafeMap`
+    at every object level (schema root, component, action, theme,
+    navigation) — not just at the top level.
+  - No accounting/tenant/RBAC/API/DB code touched (every changed path is
+    under `mobile/lib/schema/`, `mobile/test/schema/`, or `docs/`).
+  - No unresolved review finding or Decision Gate.
 
 ## Merge
 
