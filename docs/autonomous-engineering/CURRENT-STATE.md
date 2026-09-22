@@ -2,7 +2,7 @@
 
 > This file is a durable resume point, not a substitute for Git/GitHub evidence.
 
-LAST_UPDATED: 2026-09-22 (COM-MOBILE-CART-IDENTITY-1 merged)
+LAST_UPDATED: 2026-09-22 (COM-MOBILE-ADDRESSES-1 merged)
 LAYER_VERSION: V1
 STATUS: EXECUTING
 
@@ -27,6 +27,7 @@ Execute the first bounded autonomous-engineering horizon: close the Commerce Mob
   - **`COM-MOBILE-CUSTOMER-1-ADDRESS-SCHEMA`** — a dedicated `CustomerIdentity`-owned address table (not `Partner`), with Saudi-National-Address-aware fields, recorded durably in `docs/plans/store/ADR-08-COMMERCE-CUSTOMER-ADDRESS-SCHEMA.md`. Task split approved: `COM-MOBILE-CUSTOMER-1` retired, replaced by `COM-MOBILE-ORDER-HISTORY-1` and `COM-MOBILE-ADDRESSES-1`, both promoted to `ready`.
   - See `TASK-QUEUE.md` for full resolution detail.
 - `COM-MOBILE-CART-IDENTITY-1` (guest → authenticated customer cart transition) is **done**: PR #924 merged and post-merge reviewed; Merge SHA: `dffe6c86017e88019a82fceb2b0214d8a895b332`. Implements ADR-07's Merge policy across both cart and checkout entry points. Went through 11 rounds of automated (Codex) review — every non-optional finding verified and fixed, except one ("merge carts before authenticated checkout completion") verified and explicitly declined with reasoning posted on its PR thread, since the literal fix would have orphaned the checkout being completed or violated the one-active-cart-per-customer invariant. 35 focused tests + full `Commerce|Customer|Storefront` regression: 931 passed/25 skipped on SQLite, 956 passed on PostgreSQL, 0 failed. Full evidence: `docs/plans/commerce/COM-MOBILE-CART-IDENTITY-1-IMPLEMENTATION-REPORT.md`.
+- `COM-MOBILE-ADDRESSES-1` (Commerce customer address book) is **done**: PR #929 merged and post-merge reviewed; Merge SHA: `482c33053a07cad8bdcf79790e6125e31d4db895`. Implements ADR-08: a dedicated `CommerceCustomerAddress` book owned by `CustomerIdentity` (not `Partner`), country-aware Saudi National Address validation, DB-enforced default-shipping/default-billing exclusivity, plus the deferred "select a saved address at checkout" feature (unblocked by CART-IDENTITY-1's `EstablishCommerceCustomerContextIfPresent`), copying field values in rather than storing a reference (Order Snapshot Rule). Went through 3 rounds of automated (Codex) review — all 8 findings across the 3 rounds verified and fixed (validation gaps, two concurrency races the earlier fixes themselves exposed, Saudi format/shape validation, and an order-snapshot region/additional_number propagation gap) — before Codex exhausted its review usage limit for this account, closing the review cycle. 17 + 4 focused tests + full `Commerce|Customer|Storefront` regression: 936 passed/25 skipped on SQLite, 961 passed on PostgreSQL, 0 failed. Full evidence: `docs/plans/commerce/COM-MOBILE-ADDRESSES-1-IMPLEMENTATION-REPORT.md`.
 
 ## Current execution horizon
 
@@ -35,9 +36,9 @@ Execute the first bounded autonomous-engineering horizon: close the Commerce Mob
 - Second executable task: `COM-MOBILE-VARIANTS-1` — **done**.
 - Third executable task: `COM-MOBILE-AUTH-1` — **done**.
 - Fourth executable task: `COM-MOBILE-CART-IDENTITY-1` — **done**.
-- Fifth/sixth candidates remain `ready` (both promoted alongside CART-IDENTITY-1, neither depends on it or on each other):
-  - `COM-MOBILE-ORDER-HISTORY-1` (split from the former `COM-MOBILE-CUSTOMER-1` — no schema decision needed, `CommerceOrderService::ownedOrders()` already exists; now also needs `CommerceOrderService::createFromCheckout()`'s `CustomerContext`-sourcing gap closed first, per CART-IDENTITY-1's discovered backlog).
-  - `COM-MOBILE-ADDRESSES-1` (split from the former `COM-MOBILE-CUSTOMER-1` — Commerce customer address book per ADR-08; WIP on `claude/com-mobile-addresses-1`, was deliberately sequenced to wait for CART-IDENTITY-1's merge to pick up `EstablishCommerceCustomerContextIfPresent` for its "select saved address at checkout" feature).
+- Fifth executable task: `COM-MOBILE-ADDRESSES-1` — **done**.
+- Sixth candidate remains `ready`:
+  - `COM-MOBILE-ORDER-HISTORY-1` (split from the former `COM-MOBILE-CUSTOMER-1` — no schema decision needed, `CommerceOrderService::ownedOrders()` already exists; needs `CommerceOrderService::createFromCheckout()`'s `CustomerContext`-sourcing gap closed first, per CART-IDENTITY-1's and ADDRESSES-1's own discovered backlog).
 - Implementation merge: standing authority after mandatory final-head pre-merge review, required green CI, no unresolved Decision Gate, and mandatory post-merge review.
 - Deploy / production release / destructive production operation: not authorized without Safwan's explicit approval.
 

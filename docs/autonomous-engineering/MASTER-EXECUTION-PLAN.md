@@ -330,6 +330,80 @@ still has `customer_identity_id = null` regardless of cart ownership; this is
 two-slot token-rotation grace window ever proves insufficient for more than one interleaved
 device touch in practice.
 
+## Fifth task
+
+```yaml
+id: COM-MOBILE-ADDRESSES-1
+title: Commerce customer address book (split from COM-MOBILE-CUSTOMER-1)
+domain: commerce
+status: done
+risk: high
+depends_on:
+  - COM-MOBILE-AUTH-1 (done)
+  - COM-MOBILE-CART-IDENTITY-1 (done — supplies EstablishCommerceCustomerContextIfPresent for checkout address selection)
+  - address schema decision (resolved — ADR-08-COMMERCE-CUSTOMER-ADDRESS-SCHEMA.md)
+references:
+  - docs/plans/store/ADR-08-COMMERCE-CUSTOMER-ADDRESS-SCHEMA.md
+  - docs/plans/store/COMMERCE_MOBILE_API_READINESS.md
+outcome: >
+  A dedicated CommerceCustomerAddress book owned by CustomerIdentity (independent
+  of Partner, no Partner refactor): full CRUD under the existing X-Customer-Token
+  required-auth group, country-aware Saudi National Address validation (district/
+  building_no/postal_code/additional_number required and digit/shape-checked only
+  when country=SA), DB-enforced default-shipping/default-billing exclusivity, and
+  address_id selection at checkout that copies field values in (Order Snapshot
+  Rule) rather than storing a reference.
+invariants:
+  - Tenant Isolation
+  - an address never resolves for anyone but its own customer_identity_id owner
+  - a Saudi address's required fields are validated on every write, including partial PATCH merged against existing state
+  - at most one default-shipping and one default-billing address per customer (DB-enforced under a per-customer row lock)
+  - a selected address's fields are copied into checkout/order at selection/completion time, never live-referenced
+  - full backward compatibility for checkout's existing manual-address-entry path
+acceptance:
+  - full CRUD, auth-required, per-customer/per-tenant isolation
+  - country-aware Saudi validation (presence and shape) on create and on merged-PATCH state
+  - default-shipping/default-billing exclusivity holds under concurrent requests
+  - address_id checkout selection rejects a guest, a nonexistent address, a different customer's address, or combining with manual fields
+  - a selected address's fields survive a later edit/delete of the saved address unchanged (copy, not reference)
+  - region/building_no/additional_number all propagate into the immutable order snapshot
+  - SQLite/PostgreSQL verification
+tests:
+  - 17 tests (CommerceCustomerAddressApiTest) + 4 tests (CommerceCheckoutApiTest), grown across 3 review rounds
+  - full Commerce|Customer|Storefront regression
+  - BranchIsolationGuardTest / CommerceModuleBoundaryTest
+  - SQLite
+  - PostgreSQL
+merge_policy: standing-authority-after-pre-merge-review
+deploy_policy: owner-approval
+```
+
+`COM-MOBILE-ADDRESSES-1` is `done`: Decision Escalation Gate resolved by Safwan
+(`COM-MOBILE-CUSTOMER-1-ADDRESS-SCHEMA`) — full decision and rationale recorded in
+`docs/plans/store/ADR-08-COMMERCE-CUSTOMER-ADDRESS-SCHEMA.md`. Merged via PR #929 (Merge SHA
+`482c33053a07cad8bdcf79790e6125e31d4db895`), post-merge CI green on `main` (SQLite +
+PostgreSQL), mandatory post-merge review passed. Full evidence in
+`docs/plans/commerce/COM-MOBILE-ADDRESSES-1-IMPLEMENTATION-REPORT.md`. 3 rounds of automated
+(Codex) review found and this PR fixed all 8 real issues raised, progressively hardening:
+round 1 closed an address-id UUID validation gap (malformed id 500ing on PostgreSQL only), a
+missing merged-PATCH-state Saudi validation, and an unnormalized boolean-flag comparison bug
+that let `1`/`"1"` skip clearing a previous default; round 2 closed two concurrency races
+round 1's own fixes exposed — the merged-state Saudi validation and default-address
+assignment could each race under concurrent requests — both closed by locking the owning
+`CustomerIdentity` row before any read or write; round 3 added the actual Saudi National
+Address digit/shape validation (presence alone wasn't enough), closed a gap where a selected
+address's `region` was silently dropped from the immutable order snapshot at checkout
+completion, and widened the generic snapshot-write path's field whitelist to also accept
+`additional_number`/`region`. Immediately after round 3, Codex announced it had reached its
+code-review usage limit for this account and would not review further pushes — the review
+cycle closed there, with every raised finding fixed, tested on both engines, and its thread
+resolved.
+
+Discovered backlog from this task (not yet scheduled): none beyond what
+`COM-MOBILE-CART-IDENTITY-1`'s own report already recorded (the
+`createFromCheckout()` → `CustomerContext` wiring gap, `COM-MOBILE-ORDER-HISTORY-1`'s job,
+not this task's).
+
 ## Backlog discovery
 
 Claude may discover new work while implementing.
