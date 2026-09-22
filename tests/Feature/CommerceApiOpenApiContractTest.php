@@ -723,23 +723,30 @@ class CommerceApiOpenApiContractTest extends TestCase
         }
     }
 
-    /** @param array<string, mixed> $schema */
+    /**
+     * (Codex review, PR #943, round 2, P2×2) الإصلاح الأول: `$ref` كان يُحَل
+     * فرعاً مستقلاً ثم يعود فوراً — فقيمةٌ سكالر حيث يُتوقَّع كائنٌ مرجعي
+     * (كمثال `Order.payment` نصّاً) كانت تمرّ بصمت لأن `is_array($value)` تفشل
+     * فيتخطّى الشرط الفحص كله بلا أي `assert`. الإصلاح: `$ref` يُستبدَل بمخطّطه
+     * المحلول ويُكمل نفس الجسم أدناه (لا فرعٌ منفصل)، فتتكفّل فحوص
+     * `properties`/`type` العادية بإلزام الشكل الصحيح.
+     * الإصلاح الثاني: `null` كان يُقبَل غير مشروط بلا أي نظرٍ للمخطّط — فحقلٌ
+     * إلزاميٌّ غير قابلٍ لـnull (كمثال `Order.status`) كان يمرّ رغم قيمة `null`
+     * فعلية. الإصلاح: `null` يُقبَل فقط إن صرّح المخطّط (بعد حلّ `$ref`) بذلك
+     * عبر `schemaAllowsNull()`.
+     *
+     * @param array<string, mixed> $schema
+     */
     private function assertValueMatchesPropertySchema(array $schema, mixed $value, string $label): void
     {
-        if ($value === null) {
-            // القيمة null صالحة إن كان `null` أحد الأنواع المسموحة أو النوع
-            // غير محدَّد أصلاً — العكس (قيمة موجودة رغم عدم توثيق null) يُفحص
-            // أدناه عبر فحص النوع العادي.
-            return;
-        }
-
         if (isset($schema['$ref'])) {
             $resolved = $this->resolvePointer($this->spec(), $schema['$ref']);
             $this->assertIsArray($resolved, "{$label}: مرجع لا يُحَل.");
-            [$nestedProps, $nestedRequired] = $this->resolveSchemaNode($resolved);
-            if ($nestedProps !== [] && is_array($value)) {
-                $this->assertMatchesResolvedSchema($nestedProps, $nestedRequired, $value, $label);
-            }
+            $schema = $resolved;
+        }
+
+        if ($value === null) {
+            $this->assertTrue($this->schemaAllowsNull($schema), "{$label}: القيمة null لكنّ المخطّط الموثَّق لا يسمح بذلك.");
 
             return;
         }
@@ -765,6 +772,21 @@ class CommerceApiOpenApiContractTest extends TestCase
         }
 
         $this->assertValueMatchesDeclaredType($schema['type'] ?? null, $value, $label);
+    }
+
+    /** @param array<string, mixed> $schema */
+    private function schemaAllowsNull(array $schema): bool
+    {
+        if (isset($schema['enum']) && in_array(null, $schema['enum'], true)) {
+            return true;
+        }
+
+        $type = $schema['type'] ?? null;
+        if ($type === null) {
+            return false;
+        }
+
+        return in_array('null', is_array($type) ? $type : [$type], true);
     }
 
     private function assertValueMatchesDeclaredType(mixed $declaredType, mixed $value, string $label): void

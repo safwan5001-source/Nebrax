@@ -1381,7 +1381,7 @@ components:
         variant_descriptor: { type: [string, 'null'] }
         product_name: { type: string }
         unit_key: { type: string }
-        unit_name: { type: string }
+        unit_name: { type: [string, 'null'] }
         quantity: { type: integer }
         unit_price: { $ref: '#/components/schemas/Money' }
         line_total: { $ref: '#/components/schemas/Money' }
@@ -1617,7 +1617,7 @@ components:
             properties:
               product_id: { type: [string, 'null'], format: uuid }
               product_name: { type: string }
-              unit_name: { type: string }
+              unit_name: { type: [string, 'null'] }
               quantity: { type: integer }
               unit_price: { $ref: '#/components/schemas/Money' }
               line_total: { $ref: '#/components/schemas/Money' }
