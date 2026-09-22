@@ -162,21 +162,24 @@ class StorefrontPresentationPublicRuntimeTest extends TestCase
     }
 
     /** @test */
-    public function public_runtime_exposes_only_the_resolved_store_seal_token_and_never_authentication_number(): void
+    public function public_runtime_exposes_seal_token_only_when_enabled_for_the_resolved_storefront(): void
     {
         $a = $this->registerTenant('pres-seal-a', 'owner@pres-seal-a.test');
         $b = $this->registerTenant('pres-seal-b', 'owner@pres-seal-b.test');
         $storeA = $this->seedPublicStore($a['tenant_id'], 'seal-a.example.com');
         $storeB = $this->seedPublicStore($b['tenant_id'], 'seal-b.example.com');
 
-        foreach ([[$a, $storeA, 'seal-a.example.com', 'token-a'], [$b, $storeB, 'seal-b.example.com', 'token-b']] as [$auth, $store, $host, $token]) {
+        foreach ([
+            [$a, $storeA, 'token-a', false],
+            [$b, $storeB, 'token-b', true],
+        ] as [$auth, $store, $token, $showSbc]) {
             $this->withToken($auth['token'])
                 ->putJson($this->workspacePath($store['storefront']->id), [
                     'config' => [
                         'sbc' => [
                             'authentication_number' => 'private-'.$token,
                             'seal_token' => ' '.$token.' ',
-                            'show_in_storefront' => true,
+                            'show_in_storefront' => $showSbc,
                         ],
                     ],
                     'draft_revision' => 0,
@@ -190,7 +193,9 @@ class StorefrontPresentationPublicRuntimeTest extends TestCase
         $publicA = $this->getJson('http://seal-a.example.com/store/v1/storefront')->assertOk();
         $publicB = $this->getJson('http://seal-b.example.com/store/v1/storefront')->assertOk();
 
-        $this->assertSame('token-a', $publicA->json('data.presentation.sbc.seal_token'));
+        $this->assertFalse($publicA->json('data.presentation.sbc.show_in_storefront'));
+        $this->assertSame('', $publicA->json('data.presentation.sbc.seal_token'));
+        $this->assertTrue($publicB->json('data.presentation.sbc.show_in_storefront'));
         $this->assertSame('token-b', $publicB->json('data.presentation.sbc.seal_token'));
         $this->assertSame('', $publicA->json('data.presentation.sbc.authentication_number'));
         $this->assertSame('', $publicB->json('data.presentation.sbc.authentication_number'));
