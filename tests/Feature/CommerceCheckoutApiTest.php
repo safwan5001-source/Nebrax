@@ -593,4 +593,115 @@ class CommerceCheckoutApiTest extends TestCase
 
         $this->withHeaders($this->bearer($token))->getJson('/commerce/v1/checkout')->assertStatus(404);
     }
+
+    // ── COM-MOBILE-ADDRESSES-1 (ADR-08) — building_no/additional_number ────
+    // gap closure: these were never collectible at checkout at all, even
+    // though CommerceOrderSnapshot already had a shipping_building_no column
+    // no code path populated. Both are purely additive/optional — guest
+    // checkout without them stays exactly as it already worked (see the
+    // untouched `readyCheckout()`/`no_accounting_or_inventory_side_effects...`
+    // tests above, which never send either field).
+
+    /** @test */
+    public function checkout_address_accepts_building_no_and_additional_number(): void
+    {
+        $store = $this->seedMobileStore('address-building-no');
+        $product = $this->publishedProduct($store['tenant'], $store['channel']);
+        $cartToken = $this->cartTokenWithItem($store, $product);
+        $this->createCheckout($store, $cartToken)->assertCreated();
+
+        $response = $this->patchAddress($store, $cartToken, [
+            'country' => 'SA', 'city' => 'الدمام', 'district' => 'الشاطئ',
+            'street' => 'شارع الملك فهد', 'building_no' => '1234', 'additional_number' => '5678',
+            'postal_code' => '31411',
+        ])->assertOk();
+
+        $this->assertSame('1234', $response->json('data.delivery.address.building_no'));
+        $this->assertSame('5678', $response->json('data.delivery.address.additional_number'));
+
+        app(TenantContext::class)->set($store['tenant']->id);
+        $checkout = CommerceCheckout::withoutGlobalScopes()->firstOrFail();
+        $this->assertSame('1234', $checkout->delivery_building_no);
+        $this->assertSame('5678', $checkout->delivery_additional_number);
+        app(TenantContext::class)->forget();
+    }
+
+    /** @test */
+    public function completion_propagates_building_no_and_additional_number_into_the_order_snapshot(): void
+    {
+        $store = $this->seedMobileStore('snapshot-building-no');
+        $product = $this->publishedProduct($store['tenant'], $store['channel']);
+        $cartToken = $this->cartTokenWithItem($store, $product);
+        $this->createCheckout($store, $cartToken)->assertCreated();
+
+        $this->patchContact($store, $cartToken, [
+            'name' => 'سالم الأحمدي', 'phone' => '0501234567', 'email' => 'salem@example.com',
+        ])->assertOk();
+        $this->patchAddress($store, $cartToken, [
+            'country' => 'SA', 'city' => 'الدمام', 'district' => 'الشاطئ',
+            'street' => 'شارع الملك فهد', 'building_no' => '1234', 'additional_number' => '5678',
+            'postal_code' => '31411',
+        ])->assertOk();
+        $this->patchDelivery($store, $cartToken, ['method' => 'pickup'])->assertOk();
+
+        $response = $this->complete($store, $cartToken, 'idem-snapshot-building-no')->assertCreated();
+        $orderId = $response->json('data.order.id');
+
+        app(TenantContext::class)->set($store['tenant']->id);
+        $snapshot = \App\Models\CommerceOrderSnapshot::withoutGlobalScopes()
+            ->where('commerce_order_id', $orderId)->firstOrFail();
+        $this->assertSame('1234', $snapshot->shipping_building_no);
+        $this->assertSame('5678', $snapshot->shipping_additional_number);
+        app(TenantContext::class)->forget();
+    }
+
+    /** @test */
+    public function completion_without_building_no_or_additional_number_leaves_them_null_in_the_snapshot(): void
+    {
+        $store = $this->seedMobileStore('snapshot-no-building-no');
+        $product = $this->publishedProduct($store['tenant'], $store['channel']);
+        $cartToken = $this->fullyReadyCheckout($store, $product);
+
+        $response = $this->complete($store, $cartToken, 'idem-snapshot-no-building-no')->assertCreated();
+        $orderId = $response->json('data.order.id');
+
+        app(TenantContext::class)->set($store['tenant']->id);
+        $snapshot = \App\Models\CommerceOrderSnapshot::withoutGlobalScopes()
+            ->where('commerce_order_id', $orderId)->firstOrFail();
+        $this->assertNull($snapshot->shipping_building_no);
+        $this->assertNull($snapshot->shipping_additional_number);
+        app(TenantContext::class)->forget();
+    }
+
+    // ── COM-MOBILE-ADDRESSES-1 (ADR-08), round 3 (Codex) — region gap closure:
+    // `delivery_region` reached `commerce_checkouts` but never the order
+    // snapshot, silently dropping it from the immutable order record.
+
+    /** @test */
+    public function completion_propagates_region_into_the_order_snapshot(): void
+    {
+        $store = $this->seedMobileStore('snapshot-region');
+        $product = $this->publishedProduct($store['tenant'], $store['channel']);
+        $cartToken = $this->cartTokenWithItem($store, $product);
+        $this->createCheckout($store, $cartToken)->assertCreated();
+
+        $this->patchContact($store, $cartToken, [
+            'name' => 'سالم الأحمدي', 'phone' => '0501234567', 'email' => 'salem@example.com',
+        ])->assertOk();
+        $this->patchAddress($store, $cartToken, [
+            'country' => 'SA', 'region' => 'المنطقة الشرقية', 'city' => 'الدمام', 'district' => 'الشاطئ',
+            'street' => 'شارع الملك فهد', 'building_no' => '1234', 'additional_number' => '5678',
+            'postal_code' => '31411',
+        ])->assertOk();
+        $this->patchDelivery($store, $cartToken, ['method' => 'pickup'])->assertOk();
+
+        $response = $this->complete($store, $cartToken, 'idem-snapshot-region')->assertCreated();
+        $orderId = $response->json('data.order.id');
+
+        app(TenantContext::class)->set($store['tenant']->id);
+        $snapshot = \App\Models\CommerceOrderSnapshot::withoutGlobalScopes()
+            ->where('commerce_order_id', $orderId)->firstOrFail();
+        $this->assertSame('المنطقة الشرقية', $snapshot->shipping_region);
+        app(TenantContext::class)->forget();
+    }
 }

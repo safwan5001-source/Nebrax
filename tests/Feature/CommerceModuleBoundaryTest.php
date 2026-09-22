@@ -73,6 +73,9 @@ class CommerceModuleBoundaryTest extends TestCase
         'api/commerce/workspace/storefronts/{id}/domains/{domainId}/verify',
         'api/commerce/workspace/storefronts/{id}/presentation',
         'api/commerce/workspace/storefronts/{id}/presentation/publish',
+        // COM-MOBILE-ADDRESSES-1 — دفتر عناوين العميل الموثَّق (X-Customer-Token).
+        'commerce/v1/addresses',
+        'commerce/v1/addresses/{id}',
         // COM-MOBILE-AUTH-1 — مصادقة عميل /commerce/v1 (هاتف+OTP وبريد+كلمة مرور).
         'commerce/v1/auth/login',
         'commerce/v1/auth/logout',

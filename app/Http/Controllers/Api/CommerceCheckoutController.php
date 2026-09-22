@@ -9,10 +9,12 @@ use App\Services\Commerce\CheckoutIdempotencyConflictException;
 use App\Services\Commerce\CheckoutNotFoundException;
 use App\Services\Commerce\CheckoutReviewRequiredException;
 use App\Services\Commerce\CommerceCheckoutService;
+use App\Services\Commerce\CommerceCustomerAddressService;
 use App\Support\CommerceOrderReference;
 use App\Support\PublicApiErrorCode;
 use App\Support\PublicApiIdempotency;
 use App\Support\PublicApiResponse;
+use App\Tenancy\CustomerContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -151,22 +153,47 @@ final class CommerceCheckoutController extends PublicApiController
         );
     }
 
-    public function updateAddress(Request $request, CommerceCheckoutService $checkouts): JsonResponse
+    public function updateAddress(Request $request, CommerceCheckoutService $checkouts, CommerceCustomerAddressService $addresses): JsonResponse
     {
-        $allowed = ['country', 'region', 'city', 'district', 'street', 'postal_code', 'notes'];
-        $this->rejectUnknown($request, $allowed);
+        // COM-MOBILE-ADDRESSES-1 (ADR-08) — closes the pre-existing gap where
+        // `building_no`/`additional_number` (Saudi National Address
+        // components) were never collectible at checkout at all, even though
+        // `CommerceOrderSnapshot` already had a `shipping_building_no` column
+        // no code path ever populated. Purely additive to this allow-list —
+        // guest checkout is unaffected (both remain optional free text).
+        $manualFields = ['country', 'region', 'city', 'district', 'street', 'building_no', 'additional_number', 'postal_code', 'notes'];
+        $this->rejectUnknown($request, [...$manualFields, 'address_id']);
+
+        if ($request->has('address_id')) {
+            if (array_intersect($manualFields, array_keys($request->all())) !== []) {
+                throw ValidationException::withMessages([
+                    'address_id' => 'لا يمكن الجمع بين address_id وحقول العنوان اليدوية في نفس الطلب.',
+                ]);
+            }
+
+            $fields = $this->addressFieldsFromSavedAddress($request, $addresses);
+
+            return $this->withCurrentCheckout(
+                $request,
+                $checkouts,
+                fn (CommerceCheckout $checkout) => $checkouts->updateAddress($checkout, $fields),
+            );
+        }
+
         $data = $request->validate([
             'country' => ['sometimes', 'string', 'max:255'],
             'region' => ['sometimes', 'nullable', 'string', 'max:255'],
             'city' => ['sometimes', 'string', 'max:255'],
             'district' => ['sometimes', 'nullable', 'string', 'max:255'],
             'street' => ['sometimes', 'string', 'max:255'],
+            'building_no' => ['sometimes', 'nullable', 'string', 'max:32'],
+            'additional_number' => ['sometimes', 'nullable', 'string', 'max:32'],
             'postal_code' => ['sometimes', 'nullable', 'string', 'max:32'],
             'notes' => ['sometimes', 'nullable', 'string', 'max:1000'],
         ]);
 
         $fields = [];
-        foreach ($allowed as $key) {
+        foreach ($manualFields as $key) {
             if (array_key_exists($key, $data)) {
                 $fields['delivery_'.$key] = $data[$key];
             }
@@ -177,6 +204,60 @@ final class CommerceCheckoutController extends PublicApiController
             $checkouts,
             fn (CommerceCheckout $checkout) => $checkouts->updateAddress($checkout, $fields),
         );
+    }
+
+    /**
+     * COM-MOBILE-ADDRESSES-1 (ADR-08) — selects a saved address book entry as
+     * this checkout's delivery address. **Copies its field values in now**
+     * (the Order Snapshot Rule already applied to `CommerceOrderSnapshot`,
+     * extended here to checkout's own `delivery_*` columns) rather than
+     * storing a reference to the address row: if the customer later edits or
+     * deletes that saved address, an in-progress checkout must not silently
+     * change underneath them. Only the address fields are copied — contact
+     * (`recipient_name`/`phone` on the address) stays a separate concern via
+     * the existing `updateContact()` step, matching checkout's own field
+     * separation. Requires an established `CustomerContext` (guests have no
+     * address book) and that the address belongs to that same customer —
+     * `CommerceCustomerAddressService::find()` already scopes by
+     * `customer_identity_id`, so a foreign or nonexistent id is
+     * indistinguishable from "not found".
+     *
+     * @return array<string, mixed>
+     */
+    private function addressFieldsFromSavedAddress(Request $request, CommerceCustomerAddressService $addresses): array
+    {
+        // (Codex, PR #929, P2) A malformed (non-UUID) id reaching find()'s
+        // query against a UUID column fails closed as a DB error on
+        // PostgreSQL (rejects the literal outright) rather than simply
+        // returning no row — validate the shape here so a bad id is a plain
+        // 422, not a 500.
+        $data = $request->validate(['address_id' => ['required', 'uuid']]);
+
+        $customerContext = app(CustomerContext::class);
+        if (! $customerContext->isEstablished()) {
+            throw ValidationException::withMessages([
+                'address_id' => 'اختيار عنوان محفوظ يتطلب تسجيل الدخول.',
+            ]);
+        }
+
+        $address = $addresses->find($customerContext, $data['address_id']);
+        if ($address === null) {
+            throw ValidationException::withMessages([
+                'address_id' => 'العنوان غير موجود.',
+            ]);
+        }
+
+        return [
+            'delivery_country' => $address->country,
+            'delivery_region' => $address->region,
+            'delivery_city' => $address->city,
+            'delivery_district' => $address->district,
+            'delivery_street' => $address->street,
+            'delivery_building_no' => $address->building_no,
+            'delivery_additional_number' => $address->additional_number,
+            'delivery_postal_code' => $address->postal_code,
+            'delivery_notes' => $address->delivery_notes,
+        ];
     }
 
     public function updateDelivery(Request $request, CommerceCheckoutService $checkouts): JsonResponse

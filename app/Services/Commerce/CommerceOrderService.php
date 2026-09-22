@@ -221,9 +221,12 @@ class CommerceOrderService
                 'shipping_recipient_name' => $header['contact_name'],
                 'shipping_phone' => $header['contact_phone'],
                 'shipping_country' => $header['delivery_country'],
+                'shipping_region' => $header['delivery_region'],
                 'shipping_city' => $header['delivery_city'],
                 'shipping_district' => $header['delivery_district'],
                 'shipping_street' => $header['delivery_street'],
+                'shipping_building_no' => $header['delivery_building_no'],
+                'shipping_additional_number' => $header['delivery_additional_number'],
                 'shipping_postal_code' => $header['delivery_postal_code'],
                 'shipping_notes' => $header['delivery_notes'],
             ]);
@@ -400,7 +403,7 @@ class CommerceOrderService
             }
 
             $block = $this->snapshotBlock($data[$key], $key);
-            $fields = ['recipient_name', 'phone', 'country', 'city', 'district', 'street', 'building_no', 'postal_code'];
+            $fields = ['recipient_name', 'phone', 'country', 'region', 'city', 'district', 'street', 'building_no', 'additional_number', 'postal_code'];
             if ($prefix === 'shipping') {
                 $fields[] = 'notes';
             }
