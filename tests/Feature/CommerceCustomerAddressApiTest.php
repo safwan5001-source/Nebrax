@@ -3,7 +3,9 @@
 namespace Tests\Feature;
 
 use App\Models\CommerceCustomerAddress;
+use App\Models\CommerceListing;
 use App\Models\CustomerIdentity;
+use App\Models\Product;
 use App\Models\SalesChannel;
 use App\Models\Tenant;
 use App\Services\ApiClientKeyService;
@@ -65,6 +67,28 @@ class CommerceCustomerAddressApiTest extends TestCase
     private function withCustomerToken(string $apiToken, string $customerToken): array
     {
         return $this->bearer($apiToken) + ['X-Customer-Token' => $customerToken];
+    }
+
+    private function withCartAndCustomerToken(string $apiToken, string $customerToken, ?string $cartToken = null): array
+    {
+        $headers = $this->withCustomerToken($apiToken, $customerToken);
+        if ($cartToken !== null) {
+            $headers['X-Cart-Token'] = $cartToken;
+        }
+
+        return $headers;
+    }
+
+    private function product(Tenant $tenant, SalesChannel $channel, string $sku, int $price = 10000): Product
+    {
+        app(TenantContext::class)->set($tenant->id);
+        $product = Product::create([
+            'name' => "منتج {$sku}", 'sku' => $sku, 'sale_price' => $price, 'unit' => 'piece', 'is_active' => true,
+        ]);
+        CommerceListing::create(['product_id' => $product->id, 'sales_channel_id' => $channel->id, 'is_published' => true]);
+        app(TenantContext::class)->forget();
+
+        return $product->fresh();
     }
 
     /** يسجّل عميلاً جديداً عبر OTP ويعيد توكنه الخاص جاهزاً لترويسة X-Customer-Token. */
@@ -290,5 +314,129 @@ class CommerceCustomerAddressApiTest extends TestCase
         $this->withHeaders($headers)->postJson('/commerce/v1/addresses', $this->saudiAddressPayload())
             ->assertCreated()
             ->assertJsonPath('data.short_address', null);
+    }
+
+    // ── Select a saved address at checkout (COM-MOBILE-ADDRESSES-1, deferred feature) ──
+
+    /** @test */
+    public function selecting_a_saved_address_copies_its_fields_into_the_checkout_delivery_address(): void
+    {
+        $store = $this->seedMobileStore('addr-checkout-select');
+        $product = $this->product($store['tenant'], $store['channel'], 'ADDR-CHECKOUT-1');
+        $customerToken = $this->customerToken($store, '+966500000112');
+
+        $address = $this->withHeaders($this->withCustomerToken($store['token'], $customerToken))
+            ->postJson('/commerce/v1/addresses', $this->saudiAddressPayload())
+            ->assertCreated();
+        $addressId = $address->json('data.id');
+
+        $cartToken = $this->withHeaders($this->withCartAndCustomerToken($store['token'], $customerToken))
+            ->postJson('/commerce/v1/cart/items', ['product_id' => $product->id, 'quantity' => 1])
+            ->assertCreated()->headers->get('X-Cart-Token');
+        $this->withHeaders($this->withCartAndCustomerToken($store['token'], $customerToken, $cartToken))
+            ->postJson('/commerce/v1/checkout', [])->assertCreated();
+
+        $response = $this->withHeaders($this->withCartAndCustomerToken($store['token'], $customerToken, $cartToken))
+            ->patchJson('/commerce/v1/checkout/address', ['address_id' => $addressId])
+            ->assertOk();
+
+        $response->assertJsonPath('data.delivery.address.city', 'الدمام');
+        $response->assertJsonPath('data.delivery.address.district', 'الشاطئ');
+        $response->assertJsonPath('data.delivery.address.street', 'شارع الملك فهد');
+        $response->assertJsonPath('data.delivery.address.postal_code', '31411');
+    }
+
+    /** @test */
+    public function selecting_a_saved_address_alongside_manual_fields_is_rejected(): void
+    {
+        $store = $this->seedMobileStore('addr-checkout-mixed');
+        $product = $this->product($store['tenant'], $store['channel'], 'ADDR-CHECKOUT-2');
+        $customerToken = $this->customerToken($store, '+966500000113');
+
+        $address = $this->withHeaders($this->withCustomerToken($store['token'], $customerToken))
+            ->postJson('/commerce/v1/addresses', $this->saudiAddressPayload())
+            ->assertCreated();
+
+        $cartToken = $this->withHeaders($this->withCartAndCustomerToken($store['token'], $customerToken))
+            ->postJson('/commerce/v1/cart/items', ['product_id' => $product->id, 'quantity' => 1])
+            ->assertCreated()->headers->get('X-Cart-Token');
+        $this->withHeaders($this->withCartAndCustomerToken($store['token'], $customerToken, $cartToken))
+            ->postJson('/commerce/v1/checkout', [])->assertCreated();
+
+        $this->withHeaders($this->withCartAndCustomerToken($store['token'], $customerToken, $cartToken))
+            ->patchJson('/commerce/v1/checkout/address', ['address_id' => $address->json('data.id'), 'city' => 'الرياض'])
+            ->assertStatus(422);
+    }
+
+    /** @test */
+    public function selecting_a_foreign_customers_address_at_checkout_is_rejected(): void
+    {
+        $store = $this->seedMobileStore('addr-checkout-foreign');
+        $product = $this->product($store['tenant'], $store['channel'], 'ADDR-CHECKOUT-3');
+        $ownerToken = $this->customerToken($store, '+966500000114');
+        $attackerToken = $this->customerToken($store, '+966500000115');
+
+        $address = $this->withHeaders($this->withCustomerToken($store['token'], $ownerToken))
+            ->postJson('/commerce/v1/addresses', $this->saudiAddressPayload())
+            ->assertCreated();
+
+        $cartToken = $this->withHeaders($this->withCartAndCustomerToken($store['token'], $attackerToken))
+            ->postJson('/commerce/v1/cart/items', ['product_id' => $product->id, 'quantity' => 1])
+            ->assertCreated()->headers->get('X-Cart-Token');
+        $this->withHeaders($this->withCartAndCustomerToken($store['token'], $attackerToken, $cartToken))
+            ->postJson('/commerce/v1/checkout', [])->assertCreated();
+
+        $this->withHeaders($this->withCartAndCustomerToken($store['token'], $attackerToken, $cartToken))
+            ->patchJson('/commerce/v1/checkout/address', ['address_id' => $address->json('data.id')])
+            ->assertStatus(422);
+    }
+
+    /** @test */
+    public function selecting_a_saved_address_as_a_guest_checkout_is_rejected(): void
+    {
+        $store = $this->seedMobileStore('addr-checkout-guest');
+        $product = $this->product($store['tenant'], $store['channel'], 'ADDR-CHECKOUT-4');
+
+        $cartToken = $this->withHeaders($this->bearer($store['token']))
+            ->postJson('/commerce/v1/cart/items', ['product_id' => $product->id, 'quantity' => 1])
+            ->assertCreated()->headers->get('X-Cart-Token');
+        $this->withHeaders($this->bearer($store['token']) + ['X-Cart-Token' => $cartToken])
+            ->postJson('/commerce/v1/checkout', [])->assertCreated();
+
+        $this->withHeaders($this->bearer($store['token']) + ['X-Cart-Token' => $cartToken])
+            ->patchJson('/commerce/v1/checkout/address', ['address_id' => (string) Str::uuid()])
+            ->assertStatus(422);
+    }
+
+    /** @test */
+    public function a_selected_address_is_copied_not_referenced_surviving_a_later_edit(): void
+    {
+        $store = $this->seedMobileStore('addr-checkout-snapshot');
+        $product = $this->product($store['tenant'], $store['channel'], 'ADDR-CHECKOUT-5');
+        $customerToken = $this->customerToken($store, '+966500000116');
+
+        $address = $this->withHeaders($this->withCustomerToken($store['token'], $customerToken))
+            ->postJson('/commerce/v1/addresses', $this->saudiAddressPayload())
+            ->assertCreated();
+        $addressId = $address->json('data.id');
+
+        $cartToken = $this->withHeaders($this->withCartAndCustomerToken($store['token'], $customerToken))
+            ->postJson('/commerce/v1/cart/items', ['product_id' => $product->id, 'quantity' => 1])
+            ->assertCreated()->headers->get('X-Cart-Token');
+        $this->withHeaders($this->withCartAndCustomerToken($store['token'], $customerToken, $cartToken))
+            ->postJson('/commerce/v1/checkout', [])->assertCreated();
+        $this->withHeaders($this->withCartAndCustomerToken($store['token'], $customerToken, $cartToken))
+            ->patchJson('/commerce/v1/checkout/address', ['address_id' => $addressId])
+            ->assertOk();
+
+        // Edit the saved address after selecting it — the checkout must not
+        // silently change underneath the customer (copy, not reference).
+        $this->withHeaders($this->withCustomerToken($store['token'], $customerToken))
+            ->patchJson("/commerce/v1/addresses/{$addressId}", ['city' => 'الجبيل'])
+            ->assertOk();
+
+        $checkout = $this->withHeaders($this->withCartAndCustomerToken($store['token'], $customerToken, $cartToken))
+            ->getJson('/commerce/v1/checkout')->assertOk();
+        $checkout->assertJsonPath('data.delivery.address.city', 'الدمام');
     }
 }
