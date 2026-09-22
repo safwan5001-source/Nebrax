@@ -996,7 +996,8 @@ final class CommerceCheckoutService
                 'amount' => ['amount_minor' => 0, 'currency' => $cartData['currency']],
                 'address' => [
                     'country' => null, 'region' => null, 'city' => null, 'district' => null,
-                    'street' => null, 'postal_code' => null, 'notes' => null,
+                    'street' => null, 'building_no' => null, 'additional_number' => null,
+                    'postal_code' => null, 'notes' => null,
                 ],
             ],
             // COM-MOBILE-PAYMENTS-1 — no checkout row exists yet, so no
