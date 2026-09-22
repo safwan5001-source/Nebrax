@@ -8,7 +8,6 @@ use App\Support\PublicApiResponse;
 use App\Tenancy\CustomerContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Validation\ValidationException;
 
 /**
  * COM-MOBILE-ADDRESSES-1 (ADR-08) — CRUD over the authenticated customer's own
@@ -21,17 +20,19 @@ use Illuminate\Validation\ValidationException;
  * Country-aware validation: Saudi National Address components (district,
  * building number, postal code, secondary/additional number) are required
  * only when `country` is `SA`, never unconditionally — a non-Saudi address
- * only ever needs the universal fields. This conditional requiredness is
- * enforced on `store()` only (a brand-new address always has a definite
- * country); `update()` stays a plain partial merge — same shape as
- * `CommerceCheckoutController::updateAddress()` — so changing an address's
- * country to add/drop Saudi-specific requirements means creating a new
- * saved address, not a moving-target PATCH contract.
+ * only ever needs the universal fields. `update()` validates the *merged*
+ * (existing + patched) state, not the raw partial payload, so a PATCH that
+ * flips `country` to `SA` or clears a required field can't slip through.
+ *
+ * (Codex, PR #929, round 2, P2) That merged-state check itself moved into
+ * `CommerceCustomerAddressService::create()`/`update()`, running under the
+ * per-customer row lock those methods already take before touching any
+ * address — reading the existing row here in the controller, outside any
+ * lock, let two concurrent PATCHes each validate against a stale snapshot
+ * and land a state neither individually would have allowed.
  */
 final class CommerceCustomerAddressController extends PublicApiController
 {
-    private const SAUDI_REQUIRED_FIELDS = ['district', 'building_no', 'postal_code', 'additional_number'];
-
     public function index(Request $request, CustomerContext $customerContext, CommerceCustomerAddressService $addresses): JsonResponse
     {
         $list = $addresses->list($customerContext);
@@ -53,27 +54,6 @@ final class CommerceCustomerAddressController extends PublicApiController
     public function update(Request $request, string $id, CustomerContext $customerContext, CommerceCustomerAddressService $addresses): JsonResponse
     {
         $data = $this->validateUpdate($request);
-
-        // (Codex, PR #929, P1) validateUpdate() only sees this request's own
-        // partial payload, so a PATCH that changes country to SA, or clears
-        // a required field on an already-Saudi address, previously reached
-        // the service unchecked — the write happened regardless, letting an
-        // address that violates the advertised Saudi National Address
-        // requirement flow into checkout/order snapshots. Validate the
-        // *merged* (existing + patched) state instead of the raw patch.
-        // Skipped entirely when the address can't be found here — the
-        // service's own update() call still surfaces that as "not found"
-        // via domainWrite(), unchanged.
-        $existing = $addresses->find($customerContext, $id);
-        if ($existing !== null) {
-            $this->assertSaudiFieldsPresent([
-                'country' => $data['country'] ?? $existing->country,
-                'district' => array_key_exists('district', $data) ? $data['district'] : $existing->district,
-                'building_no' => array_key_exists('building_no', $data) ? $data['building_no'] : $existing->building_no,
-                'postal_code' => array_key_exists('postal_code', $data) ? $data['postal_code'] : $existing->postal_code,
-                'additional_number' => array_key_exists('additional_number', $data) ? $data['additional_number'] : $existing->additional_number,
-            ]);
-        }
 
         $address = $this->domainWrite(fn () => $addresses->update($customerContext, $id, $data));
 
@@ -113,7 +93,6 @@ final class CommerceCustomerAddressController extends PublicApiController
         ]);
 
         $data['country'] = strtoupper($data['country']);
-        $this->assertSaudiFieldsPresent($data);
 
         return $data;
     }
@@ -146,26 +125,5 @@ final class CommerceCustomerAddressController extends PublicApiController
         }
 
         return $data;
-    }
-
-    /** @param  array<string, mixed>  $data */
-    private function assertSaudiFieldsPresent(array $data): void
-    {
-        if ($data['country'] !== 'SA') {
-            return;
-        }
-
-        $missing = [];
-        foreach (self::SAUDI_REQUIRED_FIELDS as $field) {
-            if (! isset($data[$field]) || trim((string) $data[$field]) === '') {
-                $missing[] = $field;
-            }
-        }
-
-        if ($missing !== []) {
-            throw ValidationException::withMessages([
-                'saudi_national_address' => 'العنوان الوطني السعودي يتطلب: '.implode(', ', $missing).'.',
-            ]);
-        }
     }
 }

@@ -3,9 +3,11 @@
 namespace App\Services\Commerce;
 
 use App\Models\CommerceCustomerAddress;
+use App\Models\CustomerIdentity;
 use App\Tenancy\CustomerContext;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use RuntimeException;
 
 /**
@@ -18,9 +20,22 @@ use RuntimeException;
  * previous default under a row lock, then set the new one) and again at the
  * database level by the two partial unique indexes the migration creates —
  * this service is the ergonomic path, the index is the guarantee under races.
+ *
+ * (Codex, PR #929, round 2, P2) `create()`/`update()` each lock the owning
+ * `CustomerIdentity` row first, before reading or writing any address of
+ * that customer. This is a stable row that exists before the very first
+ * address is ever created, so it serializes concurrent default-address
+ * writes even when no address row yet exists to lock — without it, two
+ * concurrent "set as default" requests could each see no existing default,
+ * both insert one, and hit the partial unique index as a raw 500. The same
+ * lock also fixes a second race: it makes `update()`'s merged-state Saudi
+ * validation read the address's current committed state, not a snapshot
+ * from before a concurrent PATCH landed.
  */
 final class CommerceCustomerAddressService
 {
+    private const SAUDI_REQUIRED_FIELDS = ['district', 'building_no', 'postal_code', 'additional_number'];
+
     /** @return Collection<int, CommerceCustomerAddress> */
     public function list(CustomerContext $context): Collection
     {
@@ -36,6 +51,10 @@ final class CommerceCustomerAddressService
     public function create(CustomerContext $context, array $data): CommerceCustomerAddress
     {
         return DB::transaction(function () use ($context, $data): CommerceCustomerAddress {
+            $this->lockCustomer($context);
+
+            $this->assertSaudiFieldsPresent($data);
+
             if ($this->isTruthyBoolean($data['is_default_shipping'] ?? false)) {
                 $this->clearDefault($context, 'is_default_shipping');
             }
@@ -54,10 +73,20 @@ final class CommerceCustomerAddressService
     public function update(CustomerContext $context, string $id, array $data): CommerceCustomerAddress
     {
         return DB::transaction(function () use ($context, $id, $data): CommerceCustomerAddress {
+            $this->lockCustomer($context);
+
             $address = $this->scoped($context)->lockForUpdate()->find($id);
             if ($address === null) {
                 throw new RuntimeException('العنوان غير موجود.');
             }
+
+            $this->assertSaudiFieldsPresent([
+                'country' => $data['country'] ?? $address->country,
+                'district' => array_key_exists('district', $data) ? $data['district'] : $address->district,
+                'building_no' => array_key_exists('building_no', $data) ? $data['building_no'] : $address->building_no,
+                'postal_code' => array_key_exists('postal_code', $data) ? $data['postal_code'] : $address->postal_code,
+                'additional_number' => array_key_exists('additional_number', $data) ? $data['additional_number'] : $address->additional_number,
+            ]);
 
             if ($this->isTruthyBoolean($data['is_default_shipping'] ?? false)) {
                 $this->clearDefault($context, 'is_default_shipping', $address->id);
@@ -70,6 +99,37 @@ final class CommerceCustomerAddressService
 
             return $address;
         });
+    }
+
+    public function delete(CustomerContext $context, string $id): void
+    {
+        DB::transaction(function () use ($context, $id): void {
+            $deleted = $this->scoped($context)->whereKey($id)->delete();
+            if ($deleted === 0) {
+                throw new RuntimeException('العنوان غير موجود.');
+            }
+        });
+    }
+
+    /** @param  array<string, mixed>  $data */
+    public function assertSaudiFieldsPresent(array $data): void
+    {
+        if (($data['country'] ?? null) !== 'SA') {
+            return;
+        }
+
+        $missing = [];
+        foreach (self::SAUDI_REQUIRED_FIELDS as $field) {
+            if (! isset($data[$field]) || trim((string) $data[$field]) === '') {
+                $missing[] = $field;
+            }
+        }
+
+        if ($missing !== []) {
+            throw ValidationException::withMessages([
+                'saudi_national_address' => 'العنوان الوطني السعودي يتطلب: '.implode(', ', $missing).'.',
+            ]);
+        }
     }
 
     /**
@@ -86,14 +146,16 @@ final class CommerceCustomerAddressService
         return (bool) $value;
     }
 
-    public function delete(CustomerContext $context, string $id): void
+    /**
+     * Locks the customer's own row for the rest of this transaction. A
+     * `CustomerIdentity` row always exists before its first address does,
+     * so this is the one stable anchor available to serialize concurrent
+     * create()/update() calls for the same customer — the address rows
+     * themselves can't be locked when there aren't any yet.
+     */
+    private function lockCustomer(CustomerContext $context): void
     {
-        DB::transaction(function () use ($context, $id): void {
-            $deleted = $this->scoped($context)->whereKey($id)->delete();
-            if ($deleted === 0) {
-                throw new RuntimeException('العنوان غير موجود.');
-            }
-        });
+        CustomerIdentity::query()->whereKey($context->customerIdentityId())->lockForUpdate()->first();
     }
 
     private function clearDefault(CustomerContext $context, string $column, ?string $exceptId = null): void
