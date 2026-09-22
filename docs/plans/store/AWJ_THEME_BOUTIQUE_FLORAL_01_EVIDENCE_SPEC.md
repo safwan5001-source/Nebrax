@@ -77,7 +77,8 @@ Current direct browser viewport: **1363 × 936 CSS px**, Arabic RTL.
 | Quick view | Earlier public crawl suggested it; current direct live state not yet verified | **Not yet confirmed** |
 | Mini-cart | Empty side drawer observed; populated state not exercised | **Observed with gap** |
 | Filled cart | Populated state not exercised | **Not observed** |
-| Checkout | Not exercised | **Not observed** |
+| Checkout with empty cart | Direct visit redirected to the empty-cart surface | **Observed boundary** |
+| Checkout with populated cart | Not exercised | **Not observed** |
 | Product variations/options | Only a simple product was directly inspected | **Not observed** |
 | Out-of-stock/backorder | Stock filter exists; card/detail states not yet captured | **Not observed** |
 | Product search results / no results | Not exercised | **Not observed** |
@@ -400,6 +401,17 @@ This is a theme preset. The merchant may reorder, duplicate, hide or delete elig
 - share URLs use the resolved storefront domain and current locale;
 - related products are tenant/storefront scoped and publication-safe.
 
+### 11.3 Single-image gallery interaction — observed
+
+The inspected simple product used one tall portrait image inside a zoom-enabled gallery. Activating `Click to enlarge` opened a modal/lightbox layer with:
+
+- explicit Arabic Close control with `Esc` hint;
+- Share control;
+- Full-screen control;
+- no previous/next controls in the single-image case.
+
+Multi-image thumbnail, previous/next, swipe and image-counter behavior remains unobserved.
+
 ## 12. Cart and checkout surfaces
 
 ### 12.1 Empty cart — observed
@@ -435,7 +447,7 @@ AWJ must eventually specify and verify:
 
 ### 12.3 Checkout boundary
 
-Checkout was **not observed** and is not approved for visual imitation yet. AWJ checkout must prioritize transaction clarity, address/delivery/payment correctness, validation and accessible error recovery over decorative parity with the reference.
+A direct visit to `/checkout/` with an empty cart redirected to `/cart/` and reused the empty-cart recommendations surface. Populated checkout was **not observed** and is not approved for visual imitation yet. AWJ checkout must prioritize transaction clarity, address/delivery/payment correctness, validation and accessible error recovery over decorative parity with the reference.
 
 ## 13. Account, blog and content templates
 
@@ -449,7 +461,7 @@ Checkout was **not observed** and is not approved for visual imitation yet. AWJ 
 - Lost password;
 - global footer.
 
-Registration, authenticated dashboard, orders, addresses and profile states were not observed.
+The lost-password route was also observed: explanatory copy, username/email field and a Reset Password action inside the same global shell. The visible registration action/link did not expose a registration form in the inspected public state; `?action=register` returned the login form. Authenticated dashboard, orders, addresses and profile states were not observed.
 
 ### 13.2 Blog index — observed
 
@@ -566,7 +578,8 @@ This table is an **AWJ provisional decision**, not a claim of reference-site exa
 - [x] Simple product desktop anatomy.
 - [x] Reviews-zero form anatomy.
 - [x] One-review display confirmed by public search evidence.
-- [ ] Multi-image lightbox interactions.
+- [x] Single-image lightbox open/close/share/full-screen controls.
+- [ ] Multi-image thumbnails/previous/next/counter/swipe interactions.
 - [ ] Variable product/options.
 - [ ] Out-of-stock and invalid quantity.
 - [ ] Add-to-cart success/error.
@@ -576,11 +589,13 @@ This table is an **AWJ provisional decision**, not a claim of reference-site exa
 
 - [x] Empty cart and recommendations.
 - [x] Guest login form.
+- [x] Lost-password form.
+- [x] Empty-cart checkout redirect boundary.
 - [ ] Filled cart.
 - [ ] Coupon/discount behavior.
 - [ ] Checkout steps and validation.
 - [ ] Order success/failure.
-- [ ] Registration/lost password/authenticated account/orders.
+- [ ] Registration availability/form and authenticated account/orders.
 
 ### Content/footer
 
