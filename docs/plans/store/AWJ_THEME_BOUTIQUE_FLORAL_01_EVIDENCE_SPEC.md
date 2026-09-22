@@ -78,7 +78,7 @@ Current direct browser viewport: **1363 × 936 CSS px**, Arabic RTL.
 | Blog article detail | Article, metadata, comments/reply form and sidebar directly inspected | **Observed** |
 | Wishlist | Add/remove toggle directly exercised; header/destination link remained empty | **Observed partial / reference defect** |
 | Compare | Add/remove toggle directly exercised; no comparison destination or table exposed | **Observed partial / reference defect** |
-| Quick view | Earlier public crawl suggested it; current direct live state not yet verified | **Not yet confirmed** |
+| Quick view | Related-product modal opened and closed directly | **Observed** |
 | Mini-cart | Empty and populated side-drawer states directly inspected | **Observed** |
 | Filled cart | Direct live inspection after adding a simple product | **Observed** |
 | Checkout with empty cart | Direct visit redirected to the empty-cart surface | **Observed boundary** |
@@ -380,6 +380,22 @@ Compare observation:
 These are reference-site incomplete behaviors, not theme features to reproduce.
 
 **AWJ decision:** expose either capability only when its runtime contract exists. Wishlist must have an addressable empty/populated surface, remove/undo, stable identity behavior for guests and signed-in customers, and an explicit guest-account merge policy. Compare must have an addressable selected-products surface, remove/clear, attribute rows, safe maximum item count and sensible behavior when compared products have non-aligned attributes. Both need loading/error states and touch/keyboard equivalents. Otherwise the actions must be hidden, not simulated.
+
+### 9.5 Quick view — observed
+
+Activating Quick view on a related-product card opened an in-place modal without changing the current product URL. The observed desktop modal measured approximately 920 × 613px within a full-viewport overlay and contained:
+
+- explicit Close control with an `Esc` title/hint;
+- product image/gallery region; one image was present, so previous/next controls were disabled;
+- View details link to the canonical product page;
+- product title and price;
+- quantity decrement/input/increment and Add to Cart;
+- SKU and linked categories;
+- social-share actions.
+
+Closing removed the modal and preserved the underlying page URL. Description, reviews, wishlist and compare were not included in the quick-view content observed.
+
+**AWJ decision:** Quick view is optional. When enabled it must preserve focus, trap keyboard navigation, close via visible control and `Esc`, return focus to the originating card, use canonical product/price/inventory data, and expose loading/error/unavailable-product states. Touch layouts may use a bottom sheet or navigate directly when a modal would reduce usability.
 
 ## 10. Catalog/category templates
 
@@ -683,6 +699,8 @@ This table is an **AWJ provisional decision**, not a claim of reference-site exa
 - [ ] Account hover/dropdown versus click behavior.
 - [x] Reference wishlist add/remove toggle and broken destination documented.
 - [x] Reference compare add/remove toggle and missing comparison surface documented.
+- [x] Quick-view open/content/close and URL-preservation behavior.
+- [ ] Quick-view loading/error/focus-return and mobile presentation.
 - [ ] AWJ wishlist empty/populated/remove/merge-state contract.
 - [ ] AWJ comparison table, maximum-items and non-aligned-attribute contract.
 - [x] Mini-cart empty/open/close behavior.
