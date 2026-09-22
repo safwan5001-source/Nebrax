@@ -226,7 +226,12 @@ final class CommerceCheckoutController extends PublicApiController
      */
     private function addressFieldsFromSavedAddress(Request $request, CommerceCustomerAddressService $addresses): array
     {
-        $data = $request->validate(['address_id' => ['required', 'string']]);
+        // (Codex, PR #929, P2) A malformed (non-UUID) id reaching find()'s
+        // query against a UUID column fails closed as a DB error on
+        // PostgreSQL (rejects the literal outright) rather than simply
+        // returning no row — validate the shape here so a bad id is a plain
+        // 422, not a 500.
+        $data = $request->validate(['address_id' => ['required', 'uuid']]);
 
         $customerContext = app(CustomerContext::class);
         if (! $customerContext->isEstablished()) {

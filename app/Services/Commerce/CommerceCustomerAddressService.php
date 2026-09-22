@@ -36,10 +36,10 @@ final class CommerceCustomerAddressService
     public function create(CustomerContext $context, array $data): CommerceCustomerAddress
     {
         return DB::transaction(function () use ($context, $data): CommerceCustomerAddress {
-            if (($data['is_default_shipping'] ?? false) === true) {
+            if ($this->isTruthyBoolean($data['is_default_shipping'] ?? false)) {
                 $this->clearDefault($context, 'is_default_shipping');
             }
-            if (($data['is_default_billing'] ?? false) === true) {
+            if ($this->isTruthyBoolean($data['is_default_billing'] ?? false)) {
                 $this->clearDefault($context, 'is_default_billing');
             }
 
@@ -59,10 +59,10 @@ final class CommerceCustomerAddressService
                 throw new RuntimeException('العنوان غير موجود.');
             }
 
-            if (($data['is_default_shipping'] ?? false) === true) {
+            if ($this->isTruthyBoolean($data['is_default_shipping'] ?? false)) {
                 $this->clearDefault($context, 'is_default_shipping', $address->id);
             }
-            if (($data['is_default_billing'] ?? false) === true) {
+            if ($this->isTruthyBoolean($data['is_default_billing'] ?? false)) {
                 $this->clearDefault($context, 'is_default_billing', $address->id);
             }
 
@@ -70,6 +70,20 @@ final class CommerceCustomerAddressService
 
             return $address;
         });
+    }
+
+    /**
+     * (Codex, PR #929, P2) Laravel's `boolean` validation rule accepts
+     * `true`/`false`/`1`/`0`/`"1"`/`"0"` but never normalizes the validated
+     * value — it stays exactly as submitted. A strict `=== true` check
+     * against `1`/`"1"` silently skipped clearing the previous default,
+     * while the model's own `boolean` cast still saved the new row as the
+     * default — two rows the partial unique index then rejected with a raw
+     * constraint-violation 500 instead of the intended clear-then-set flow.
+     */
+    private function isTruthyBoolean(mixed $value): bool
+    {
+        return (bool) $value;
     }
 
     public function delete(CustomerContext $context, string $id): void

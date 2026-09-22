@@ -54,6 +54,27 @@ final class CommerceCustomerAddressController extends PublicApiController
     {
         $data = $this->validateUpdate($request);
 
+        // (Codex, PR #929, P1) validateUpdate() only sees this request's own
+        // partial payload, so a PATCH that changes country to SA, or clears
+        // a required field on an already-Saudi address, previously reached
+        // the service unchecked — the write happened regardless, letting an
+        // address that violates the advertised Saudi National Address
+        // requirement flow into checkout/order snapshots. Validate the
+        // *merged* (existing + patched) state instead of the raw patch.
+        // Skipped entirely when the address can't be found here — the
+        // service's own update() call still surfaces that as "not found"
+        // via domainWrite(), unchanged.
+        $existing = $addresses->find($customerContext, $id);
+        if ($existing !== null) {
+            $this->assertSaudiFieldsPresent([
+                'country' => $data['country'] ?? $existing->country,
+                'district' => array_key_exists('district', $data) ? $data['district'] : $existing->district,
+                'building_no' => array_key_exists('building_no', $data) ? $data['building_no'] : $existing->building_no,
+                'postal_code' => array_key_exists('postal_code', $data) ? $data['postal_code'] : $existing->postal_code,
+                'additional_number' => array_key_exists('additional_number', $data) ? $data['additional_number'] : $existing->additional_number,
+            ]);
+        }
+
         $address = $this->domainWrite(fn () => $addresses->update($customerContext, $id, $data));
 
         return PublicApiResponse::resource($request, new CommerceCustomerAddressResource($address));
