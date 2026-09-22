@@ -44,6 +44,7 @@ class CommerceCheckout extends BaseModel implements CompanyWide
         'delivery_street', 'delivery_building_no', 'delivery_additional_number',
         'delivery_postal_code', 'delivery_notes',
         'delivery_method', 'delivery_amount_minor',
+        'payment_method_id',
         'completion_idempotency_key_hash', 'completion_idempotency_fingerprint',
     ];
 
@@ -70,6 +71,12 @@ class CommerceCheckout extends BaseModel implements CompanyWide
     public function cart(): BelongsTo
     {
         return $this->belongsTo(CommerceCart::class, 'cart_id');
+    }
+
+    /** COM-MOBILE-PAYMENTS-1 — طريقة الدفع المختارة، إن وُجدت. مرجعٌ خام لا لقطة (راجع توثيق الهجرة). */
+    public function paymentMethod(): BelongsTo
+    {
+        return $this->belongsTo(PaymentMethod::class);
     }
 
     public function isOpen(): bool

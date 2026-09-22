@@ -7,6 +7,7 @@ use App\Models\PaymentMethodChannelAvailability;
 use App\Models\SalesChannel;
 use App\Tenancy\TenantContext;
 use DomainException;
+use Illuminate\Support\Collection;
 
 /**
  * أصغر طبقة سياسة مشتركة لقنوات Commerce.
@@ -46,6 +47,23 @@ final class PaymentMethodChannelAvailabilityService
         // the only online/channel signal. Existing tenants therefore keep the
         // same result until they configure an explicit channel override.
         return (bool) $method->available_online;
+    }
+
+    /**
+     * COM-MOBILE-PAYMENTS-1 — كل طرق الدفع النشطة لقناةٍ، مصفّاة بنفس
+     * `isAvailable()` حرفياً (استدعاءٌ لكل صفّ، لا منطق تصفية موازٍ). قائمة
+     * التحقّق الوحيدة التي يبنيها Commerce Checkout عليها اختيار طريقة الدفع.
+     *
+     * @return Collection<int, PaymentMethod>
+     */
+    public function availableFor(SalesChannel $channel): Collection
+    {
+        return PaymentMethod::query()
+            ->where('tenant_id', $channel->tenant_id)
+            ->where('is_active', true)
+            ->get()
+            ->filter(fn (PaymentMethod $method) => $this->isAvailable($method, $channel))
+            ->values();
     }
 
     public function setAvailability(PaymentMethod $method, SalesChannel $channel, bool $enabled): PaymentMethodChannelAvailability

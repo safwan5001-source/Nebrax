@@ -135,6 +135,14 @@ export function AwjOrderConfirmation({
               {t(`delivery.methods.${order.deliveryMethod}`)}
             </p>
           )}
+          {/* COM-MOBILE-PAYMENTS-1: the real, already-committed method — set
+              only when the shopper chose one; `success.notPaidNote` above
+              still covers the case where none was ever selected. */}
+          {order.payment.payment_method_name && (
+            <p className="mt-1 text-store-muted-foreground">
+              {order.payment.payment_method_name}
+            </p>
+          )}
         </DetailCard>
       </div>
 

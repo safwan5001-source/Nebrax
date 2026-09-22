@@ -28,6 +28,7 @@ use App\Http\Controllers\Api\CashBankAccountController;
 use App\Http\Controllers\Api\ClassificationAnalyticsReportController;
 use App\Http\Controllers\Api\ClassificationController;
 use App\Http\Controllers\Api\CompanyController;
+use App\Http\Controllers\Api\CommercePaymentIntentController;
 use App\Http\Controllers\Api\CommerceShippingZoneController;
 use App\Http\Controllers\Api\CommerceWorkspaceStorefrontsController;
 use App\Http\Controllers\Api\CommerceWorkspaceStorefrontPresentationController;
@@ -805,6 +806,15 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::put('payment-methods/{id}', [PaymentMethodController::class, 'update'])->middleware($perm('payments.manage'));
         Route::post('payment-methods/{id}/make-default', [PaymentMethodController::class, 'makeDefault'])->middleware($perm('payments.manage'));
         Route::delete('payment-methods/{id}', [PaymentMethodController::class, 'destroy'])->middleware($perm('payments.manage'));
+
+        // COM-MOBILE-PAYMENTS-1 (ADR-04/ADR-09): إدارة داخلية لالتزامات دفع
+        // Commerce (COD/الاستلام) — تحصيل/إلغاء صريحان، نفس صلاحية عمليات
+        // الدفع الأخرى (payments.manage/view)، لا نطاق جديد.
+        Route::get('commerce/payment-intents', [CommercePaymentIntentController::class, 'index'])->middleware($perm('payments.view'));
+        Route::post('commerce/payment-intents/{id}/collect', [CommercePaymentIntentController::class, 'collect'])
+            ->whereUuid('id')->middleware($perm('payments.manage'));
+        Route::post('commerce/payment-intents/{id}/cancel', [CommercePaymentIntentController::class, 'cancel'])
+            ->whereUuid('id')->middleware($perm('payments.manage'));
 
         // كتالوج التطبيقات مدموجاً بحالة تفعيل المؤسسة — لا إنفاذ على مسارات أخرى بعد.
         Route::get('applications', [TenantApplicationController::class, 'index'])->middleware($perm('apps.view'));

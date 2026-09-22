@@ -24,7 +24,25 @@ export interface AwjMoney {
 export const AWJ_DELIVERY_METHODS = ["pickup", "standard"] as const;
 export type AwjDeliveryMethod = (typeof AWJ_DELIVERY_METHODS)[number];
 
-/** Raw `GET/POST /checkout`, `PATCH /checkout/{contact,address,delivery}` response shape. */
+/**
+ * The two Payment Intent methods this backend can create (COM-MOBILE-
+ * PAYMENTS-1, ADR-09) — derived server-side from the delivery method
+ * (`standard` -> `cod`, `pickup` -> `pay_on_pickup`), never chosen directly
+ * by the shopper. No online/card method exists yet.
+ */
+export const AWJ_PAYMENT_INTENT_METHODS = ["cod", "pay_on_pickup"] as const;
+export type AwjPaymentIntentMethod =
+  (typeof AWJ_PAYMENT_INTENT_METHODS)[number];
+
+/** One row from `GET checkout/payment-methods` — the channel's own enabled settlement destinations. */
+export interface AwjPaymentMethod {
+  id: string;
+  name: string;
+  name_en: string | null;
+  settlement_type: string;
+}
+
+/** Raw `GET/POST /checkout`, `PATCH /checkout/{contact,address,delivery,payment}` response shape. */
 export interface AwjCheckout {
   status: "active" | "ready" | "completed" | "expired" | null;
   contact: {
@@ -44,6 +62,11 @@ export interface AwjCheckout {
       postal_code: string | null;
       notes: string | null;
     };
+  };
+  payment: {
+    payment_method_id: string | null;
+    payment_method_name: string | null;
+    method: string | null;
   };
   cart: AwjCart;
 }
@@ -67,6 +90,11 @@ export interface AwjOrder {
     street: string | null;
     postal_code: string | null;
     notes: string | null;
+  };
+  payment: {
+    method: string | null;
+    status: string | null;
+    payment_method_name: string | null;
   };
   items: Array<{
     product_id: string | null;
@@ -109,6 +137,7 @@ export interface StorefrontCheckout {
     amount: AwjMoney;
     address: AwjCheckout["delivery"]["address"];
   };
+  payment: AwjCheckout["payment"];
   cart: StorefrontCart;
 }
 
@@ -120,6 +149,7 @@ export interface StorefrontOrder {
   total: AwjMoney;
   contact: AwjOrder["contact"];
   delivery: AwjOrder["delivery"];
+  payment: AwjOrder["payment"];
   items: Array<{
     productId: string | null;
     productName: string;
@@ -142,6 +172,7 @@ export function mapAwjCheckoutToViewModel(
       amount: checkout.delivery.amount,
       address: checkout.delivery.address,
     },
+    payment: checkout.payment,
     cart: mapAwjCartToViewModel(checkout.cart),
   };
 }
@@ -155,6 +186,7 @@ export function mapAwjOrderToViewModel(order: AwjOrder): StorefrontOrder {
     total: order.total,
     contact: order.contact,
     delivery: order.delivery,
+    payment: order.payment,
     items: order.items.map((item) => ({
       productId: item.product_id,
       productName: item.product_name,

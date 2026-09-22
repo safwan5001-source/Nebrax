@@ -28,6 +28,11 @@ export const ACCOUNT_ORDER_PREVIEW: StorefrontOrder = {
     postal_code: "32230",
     notes: null,
   },
+  payment: {
+    method: "cod",
+    status: "awaiting_collection",
+    payment_method_name: "نقدي",
+  },
   items: [
     {
       productId: "p-cups",

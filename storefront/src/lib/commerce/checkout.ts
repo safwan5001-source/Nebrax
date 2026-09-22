@@ -10,6 +10,7 @@
 import {
   type AwjCheckout,
   type AwjOrder,
+  type AwjPaymentMethod,
   mapAwjCheckoutToViewModel,
   mapAwjOrderToViewModel,
   type StorefrontCheckout,
@@ -82,9 +83,10 @@ export async function updateAwjCheckoutAddress(
  * `method` must be one of `AWJ_DELIVERY_METHODS` (`checkout-types.ts`) —
  * the backend's own fixed list (`CommerceCheckoutService::DELIVERY_METHODS`).
  * There is no amount parameter: the backend never accepts a client-supplied
- * delivery amount (it is always server-set to `0` until a real shipping
- * pricing authority exists) — this function's signature makes sending one
- * structurally impossible, mirroring the backend contract.
+ * delivery amount — it is always resolved server-side (`ShippingRateService`,
+ * COM-MOBILE-SHIPPING-1: a real configured zone rate, or `0` for `pickup` or
+ * a tenant with no configured zone) — this function's signature makes
+ * sending one structurally impossible, mirroring the backend contract.
  */
 export async function updateAwjCheckoutDelivery(
   method: string,
@@ -92,6 +94,37 @@ export async function updateAwjCheckoutDelivery(
   const response = await storefrontCartRequest<
     AwjResourceResponse<AwjCheckout>
   >("PATCH", "checkout/delivery", { method });
+  return mapAwjCheckoutToViewModel(response.data);
+}
+
+/**
+ * The payment methods THIS channel has enabled
+ * (`PaymentMethodChannelAvailabilityService`, COM-MOBILE-PAYMENTS-1) — never
+ * a hardcoded shape. Empty until the merchant explicitly enables at least
+ * one; every default-seeded method starts disabled for any online channel,
+ * so an empty list is the honest out-of-the-box state, not a bug.
+ */
+export async function fetchAwjPaymentMethods(): Promise<AwjPaymentMethod[]> {
+  const response = await storefrontCartRequest<
+    AwjResourceResponse<{ payment_methods: AwjPaymentMethod[] }>
+  >("GET", "checkout/payment-methods");
+  return response.data.payment_methods;
+}
+
+/**
+ * Selects one of the methods `fetchAwjPaymentMethods()` returned. Optional —
+ * completing without ever calling this still succeeds (the backend creates
+ * the Payment Intent with no method_name attached); this only lets the
+ * shopper express a preference when the channel has more than one enabled.
+ * No amount, no provider, no card field — none of those exist in this
+ * request shape (ADR-09: COD / Pay on Pickup only, no vendor).
+ */
+export async function updateAwjCheckoutPayment(
+  paymentMethodId: string,
+): Promise<StorefrontCheckout> {
+  const response = await storefrontCartRequest<
+    AwjResourceResponse<AwjCheckout>
+  >("PATCH", "checkout/payment", { payment_method_id: paymentMethodId });
   return mapAwjCheckoutToViewModel(response.data);
 }
 

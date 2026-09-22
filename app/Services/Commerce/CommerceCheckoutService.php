@@ -7,11 +7,14 @@ use App\Models\CommerceCartItem;
 use App\Models\CommerceCheckout;
 use App\Models\CommerceListing;
 use App\Models\CommerceOrder;
+use App\Models\CommercePaymentIntent;
+use App\Models\PaymentMethod;
 use App\Models\Product;
 use App\Models\ProductWarehouseStock;
 use App\Models\SalesChannel;
 use App\Models\UnitTemplateUnit;
 use App\Services\Accounting\UnitConversion;
+use App\Services\PaymentMethodChannelAvailabilityService;
 use App\Support\DocumentLineVariantResolver;
 use App\Tenancy\BranchScope;
 use App\Tenancy\CustomerContext;
@@ -74,6 +77,8 @@ final class CommerceCheckoutService
         private readonly InventoryReservationService $reservations,
         private readonly CommerceOrderService $orders,
         private readonly ShippingRateService $shipping,
+        private readonly PaymentMethodChannelAvailabilityService $paymentAvailability,
+        private readonly CommercePaymentIntentService $paymentIntents,
     ) {}
 
     /**
@@ -366,6 +371,45 @@ final class CommerceCheckoutService
     }
 
     /**
+     * COM-MOBILE-PAYMENTS-1 (ADR-09 §3) — تختار طريقة دفعٍ من `PaymentMethod`
+     * القائمة فعلياً للمؤسسة، مصفّاةً بـ`PaymentMethodChannelAvailabilityService
+     * ::isAvailable()` **حرفياً بلا تعديل** — لا منطق إتاحة موازٍ لأي قناة.
+     * `cod`/`pay_on_pickup` (ADR-09 §1) ليسا اختياراً مستقلاً هنا؛ يُشتقّان
+     * من طريقة التوصيل عند الإتمام فقط (`CommercePaymentIntentService::
+     * createForOrder()`) — هذا التوقيع يختار **وجهة** التحصيل (خزينة/حساب
+     * بنكي) لا **توقيته**.
+     *
+     * @throws RuntimeException طريقة الدفع غير موجودة، أو معطّلة، أو غير
+     *                          متاحة لقناة هذا الـCheckout.
+     */
+    public function updatePayment(CommerceCheckout $knownCheckout, string $paymentMethodId): array
+    {
+        return DB::transaction(function () use ($knownCheckout, $paymentMethodId): array {
+            $checkout = $this->lockUsableCheckout($knownCheckout);
+            $context = $this->context();
+
+            $paymentMethod = PaymentMethod::query()
+                ->where('tenant_id', $context->tenantId())
+                ->where('is_active', true)
+                ->find($paymentMethodId);
+            if ($paymentMethod === null) {
+                throw new RuntimeException('طريقة الدفع غير موجودة أو معطّلة.');
+            }
+
+            $channel = SalesChannel::query()->find($context->salesChannelId());
+            if ($channel === null || ! $this->paymentAvailability->isAvailable($paymentMethod, $channel)) {
+                throw new RuntimeException('طريقة الدفع غير متاحة لهذه القناة.');
+            }
+
+            $checkout->payment_method_id = $paymentMethod->id;
+            $checkout->expires_at = now()->addMinutes(self::LIFETIME_MINUTES);
+            $checkout->save();
+
+            return $this->serialize($checkout, $this->cartFor($checkout));
+        }, 3);
+    }
+
+    /**
      * `pickup` (أو لا طريقة مختارة بعد) صفرٌ دائماً — لا اعتماد على مطابقة
      * منطقة شحن حتى لو كانت مُهيَّأة؛ الاستلام من الفرع بلا شحنٍ بطبيعته.
      */
@@ -511,6 +555,11 @@ final class CommerceCheckoutService
                 'delivery_postal_code' => $checkout->delivery_postal_code,
                 'delivery_notes' => $checkout->delivery_notes,
             ], $lines);
+
+            // COM-MOBILE-PAYMENTS-1 (ADR-04/ADR-09) — نفس معاملة إنشاء
+            // الطلب: لا طلبٌ بلا Payment Intent مطابق. فشلٌ هنا يُلغي إنشاء
+            // الطلب كله (savepoint متداخلة ضمن معاملة complete() الخارجية).
+            $this->paymentIntents->createForOrder($order, $checkout->payment_method_id, $checkout->delivery_method);
 
             $checkout->update([
                 'status' => CommerceCheckout::STATUS_COMPLETED,
@@ -765,8 +814,25 @@ final class CommerceCheckoutService
                     'notes' => $checkout->delivery_notes,
                 ],
             ],
+            // COM-MOBILE-PAYMENTS-1 — `method` معاينةٌ فقط (ما سيُشتقّ من
+            // طريقة التوصيل الحالية وقت الإتمام)، لا التزامٌ مخزَّن — لا
+            // CommercePaymentIntent قبل نجاح `complete()`.
+            'payment' => [
+                'payment_method_id' => $checkout->payment_method_id,
+                'payment_method_name' => $checkout->paymentMethod?->name,
+                'method' => $this->previewPaymentMethod($checkout->delivery_method),
+            ],
             'cart' => $cartData,
         ];
+    }
+
+    private function previewPaymentMethod(?string $deliveryMethod): ?string
+    {
+        return match ($deliveryMethod) {
+            'standard' => CommercePaymentIntent::METHOD_COD,
+            'pickup' => CommercePaymentIntent::METHOD_PAY_ON_PICKUP,
+            default => null,
+        };
     }
 
     /**
@@ -932,6 +998,14 @@ final class CommerceCheckoutService
                     'country' => null, 'region' => null, 'city' => null, 'district' => null,
                     'street' => null, 'postal_code' => null, 'notes' => null,
                 ],
+            ],
+            // COM-MOBILE-PAYMENTS-1 — no checkout row exists yet, so no
+            // method could ever have been selected; keeps this shape's
+            // `payment` key present just like the real response's.
+            'payment' => [
+                'payment_method_id' => null,
+                'payment_method_name' => null,
+                'method' => null,
             ],
             'cart' => $cartData,
         ];

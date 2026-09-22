@@ -19,8 +19,10 @@ import type { StorefrontCheckout } from "@/lib/commerce/checkout-types";
  * owns that, and it does not compute a total (see `CartSummary`'s doc).
  *
  * The note above the button says exactly what pressing it does: it records a
- * commercial commitment, and no payment is taken, because none can be. That
- * sentence is the reason the payment stage is allowed to be inert.
+ * commercial commitment, and no online/card payment is taken, because none
+ * can be (`PAYMENT_CAPABILITY`). COD/Pay on Pickup (COM-MOBILE-PAYMENTS-1)
+ * are a different thing entirely: real, and settled later in cash — this
+ * row shows the real method chosen, if any.
  */
 export function ReviewStage({
   checkout,
@@ -28,7 +30,7 @@ export function ReviewStage({
   t,
 }: {
   checkout: StorefrontCheckout;
-  onEdit: (stage: "contact" | "address" | "delivery") => void;
+  onEdit: (stage: "contact" | "address" | "delivery" | "payment") => void;
   t: ReturnType<typeof useTranslations>;
 }) {
   const address = checkout.delivery.address;
@@ -104,11 +106,14 @@ export function ReviewStage({
 
         <ReviewRow
           label={t("payment.heading")}
-          onEdit={() => onEdit("delivery")}
-          editLabel={null}
+          onEdit={() => onEdit("payment")}
+          editLabel={t("review.editPayment")}
           t={t}
         >
-          <span className="block">{t("payment.notEnabledTitle")}</span>
+          <span className="block">
+            {checkout.payment.payment_method_name ??
+              t("payment.noMethodsEnabled")}
+          </span>
         </ReviewRow>
       </dl>
 
