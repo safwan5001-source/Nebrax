@@ -45,7 +45,7 @@ final class ShippingRateService
         $zone = CommerceShippingZone::query()
             ->where('is_active', true)
             ->where('match_type', $matchType)
-            ->whereRaw('LOWER(match_value) = LOWER(?)', [$value])
+            ->where('match_value_normalized', mb_strtolower($value))
             ->first();
 
         return $zone?->rate_amount_minor;

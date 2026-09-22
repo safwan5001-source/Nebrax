@@ -14,9 +14,15 @@ use App\Tenancy\CompanyWide;
  * `FulfillmentPolicy` أنفسهما — قناة البيع (لا الفرع) هي حدود Commerce
  * (ADR-03 §1)، فلا `branch_id` هنا.
  *
- * لا منطق حسمٍ هنا — القراءة حصراً عبر `App\Services\Commerce\
- * ShippingRateService::resolveRateMinor()`، الذي يطبّق مطابقةً غير حسّاسة
- * لحالة الأحرف ويفضّل مطابقة المدينة على المنطقة.
+ * **`match_value_normalized`**: مُشتقٌّ دائماً من `match_value` هنا (وحيداً
+ * — لا في المتحكّم)، فلا يقبل الإدخال المباشر ولا يمكن أن ينحرف عنه. القيد
+ * الفريد على القاعدة (`match_type`, `match_value_normalized`) هو ما يمنع
+ * التكرار غير الحسّاس لحالة الأحرف فعلياً تحت التزامن — فحص التطبيق وحده
+ * عرضة لسباقٍ بين قراءتين متزامنتين (TOCTOU).
+ *
+ * لا منطق حسمٍ آخر هنا — القراءة حصراً عبر `App\Services\Commerce\
+ * ShippingRateService::resolveRateMinor()`، الذي يفضّل مطابقة المدينة على
+ * المنطقة.
  */
 class CommerceShippingZone extends BaseModel implements CompanyWide
 {
@@ -38,4 +44,11 @@ class CommerceShippingZone extends BaseModel implements CompanyWide
     protected $attributes = [
         'is_active' => true,
     ];
+
+    protected static function booted(): void
+    {
+        static::saving(function (self $zone): void {
+            $zone->match_value_normalized = mb_strtolower(trim((string) $zone->match_value));
+        });
+    }
 }

@@ -19,11 +19,14 @@ use Illuminate\Support\Facades\Schema;
  * معنى لأيّهما يُقدَّم)، ويفتح الباب لمستوى مطابقة إضافي لاحقاً (حيّ، مثلاً)
  * بقيمة enum جديدة فقط — لا عمود جديد ولا هجرة بيانات.
  *
- * `unique(tenant_id, match_type, match_value)`: صفّان بنفس النوع والقيمة
- * تناقضٌ في التسعير («ما السعر الصحيح؟») يُمنع بنيوياً، لا بفحص تطبيق وحده.
- * المطابقة عند القراءة غير حسّاسة لحالة الأحرف (`ShippingRateService`)؛ هذا
- * القيد حسّاس لحالتها كقاعدة بيانات — تكرار بفارق حالة أحرف فقط (نادر عملياً
- * لعناوين عربية) يُترَك لفحص الخدمة وقت الإنشاء/التحديث، لا هذه الهجرة.
+ * `unique(tenant_id, match_type, match_value_normalized)`: صفّان بنفس النوع
+ * والقيمة (بصرف النظر عن حالة الأحرف) تناقضٌ في التسعير («ما السعر
+ * الصحيح؟») يُمنع بنيوياً على مستوى القاعدة، لا بفحص تطبيق وحده — إنشاءان
+ * متزامنان لنفس المدينة بحالتَي أحرف مختلفتين («Riyadh»/«RIYADH») كانا
+ * سيمرّان معاً من فحص التطبيق وحده (TOCTOU)، فيصبح `first()` في
+ * `ShippingRateService` غير حتمي بين صفّين متطابقين فعلياً. `match_value`
+ * يبقى للعرض بحالة أحرفه الأصلية؛ `match_value_normalized` (مُدارٌ من
+ * النموذج، لا يُدخله المستخدم) هو عمود المطابقة والقيد الفريد معاً.
  */
 return new class extends Migration
 {
@@ -35,11 +38,12 @@ return new class extends Migration
             $table->string('name');
             $table->string('match_type', 16); // city | region
             $table->string('match_value');
+            $table->string('match_value_normalized');
             $table->unsignedBigInteger('rate_amount_minor')->default(0);
             $table->boolean('is_active')->default(true);
             $table->timestamps();
 
-            $table->unique(['tenant_id', 'match_type', 'match_value']);
+            $table->unique(['tenant_id', 'match_type', 'match_value_normalized']);
             $table->index(['tenant_id', 'is_active']);
         });
     }

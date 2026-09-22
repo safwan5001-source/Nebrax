@@ -60,11 +60,18 @@ class CommerceShippingZoneController extends ApiController
         return response()->json(['message' => 'deleted']);
     }
 
+    /**
+     * فحصٌ ودّي مسبق فقط — رسالة 422 واضحة للحالة الشائعة غير المتزامنة.
+     * منع التكرار الفعلي تحت التزامن مضمونٌ بنيوياً بالقيد الفريد على
+     * `(tenant_id, match_type, match_value_normalized)` في القاعدة؛ سباقٌ
+     * نادر يتجاوز هذا الفحص ينتهي بخطأ قاعدة بيانات 500 قياسي (سياسة
+     * `ApiController::domain()` — لا يُترجَم نص SQL للعميل).
+     */
     private function assertMatchValueFree(string $matchType, string $matchValue, ?string $exceptId = null): void
     {
         $query = CommerceShippingZone::query()
             ->where('match_type', $matchType)
-            ->whereRaw('LOWER(match_value) = LOWER(?)', [trim($matchValue)]);
+            ->where('match_value_normalized', mb_strtolower(trim($matchValue)));
         if ($exceptId !== null) {
             $query->whereKeyNot($exceptId);
         }

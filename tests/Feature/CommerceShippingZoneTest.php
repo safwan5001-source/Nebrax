@@ -203,6 +203,28 @@ class CommerceShippingZoneTest extends TestCase
         ])->assertStatus(422);
     }
 
+    /**
+     * Bypasses the controller's app-level precheck entirely (direct model
+     * writes, as two concurrent requests racing past it would) to prove the
+     * database-level unique constraint on `match_value_normalized` — not
+     * just the controller's TOCTOU-prone read-then-write check — is what
+     * actually prevents two case-variant duplicates from coexisting.
+     */
+    /** @test */
+    public function the_database_rejects_a_case_variant_duplicate_even_without_the_controller_precheck(): void
+    {
+        $tenant = $this->makeTenant('rate-db-unique');
+        app(TenantContext::class)->set($tenant->id);
+        CommerceShippingZone::create([
+            'name' => 'الرياض', 'match_type' => 'city', 'match_value' => 'Riyadh', 'rate_amount_minor' => 1800,
+        ]);
+
+        $this->expectException(\Illuminate\Database\QueryException::class);
+        CommerceShippingZone::create([
+            'name' => 'الرياض ٢', 'match_type' => 'city', 'match_value' => 'RIYADH', 'rate_amount_minor' => 2000,
+        ]);
+    }
+
     // ── Checkout wiring: order-independence + order total ───────────────
 
     /** @return array{tenant: Tenant, channel: SalesChannel, token: string} */

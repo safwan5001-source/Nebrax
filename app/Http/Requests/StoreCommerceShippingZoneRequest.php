@@ -19,7 +19,10 @@ class StoreCommerceShippingZoneRequest extends FormRequest
             'name' => ['required', 'string', 'max:255'],
             'match_type' => ['required', Rule::in(CommerceShippingZone::MATCH_TYPES)],
             'match_value' => ['required', 'string', 'max:255'],
-            'rate_amount_minor' => ['required', 'integer', 'min:0'],
+            // نفس السقف المستعمل لأي مبلغ بالهللات في طلبات مماثلة
+            // (PublicStoreInvoiceRequest/PublicStoreProductRequest) — يمنع
+            // فيضان bigint عند جمعه لاحقاً مع إجمالي الطلب.
+            'rate_amount_minor' => ['required', 'integer', 'min:0', 'max:100000000000'],
             'is_active' => ['sometimes', 'boolean'],
         ];
     }

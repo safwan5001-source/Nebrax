@@ -876,8 +876,12 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         // جديد. القراءة العامة (الحسم وقت Checkout) لا تمرّ بهذا المتحكّم.
         Route::get('commerce/workspace/shipping-zones', [CommerceShippingZoneController::class, 'index'])->middleware($perm('commerce.manage'));
         Route::post('commerce/workspace/shipping-zones', [CommerceShippingZoneController::class, 'store'])->middleware($perm('commerce.manage'));
-        Route::put('commerce/workspace/shipping-zones/{id}', [CommerceShippingZoneController::class, 'update'])->middleware($perm('commerce.manage'));
-        Route::delete('commerce/workspace/shipping-zones/{id}', [CommerceShippingZoneController::class, 'destroy'])->middleware($perm('commerce.manage'));
+        Route::put('commerce/workspace/shipping-zones/{id}', [CommerceShippingZoneController::class, 'update'])
+            ->whereUuid('id')
+            ->middleware($perm('commerce.manage'));
+        Route::delete('commerce/workspace/shipping-zones/{id}', [CommerceShippingZoneController::class, 'destroy'])
+            ->whereUuid('id')
+            ->middleware($perm('commerce.manage'));
 
         // Cycle 0: Workspace foundation only. لا CRUD ولا مبيعات ولا اتصال أجهزة
         // قبل دوراتها، لكن هذا المسار يثبت سلسلة RBAC + entitlement + حالة التطبيق.
