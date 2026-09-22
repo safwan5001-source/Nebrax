@@ -94,6 +94,9 @@ class CommerceModuleBoundaryTest extends TestCase
         'commerce/v1/checkout/delivery',
         // COM-MOBILE-AUTH-1 — ملف العميل الموثَّق (X-Customer-Token).
         'commerce/v1/me',
+        // COM-MOBILE-ORDER-HISTORY-1 — سجلّ طلبات العميل الموثَّق الخاص به.
+        'commerce/v1/me/orders',
+        'commerce/v1/me/orders/{id}',
         // COM-MOBILE-MEDIA-1 — مسار وسائط منتج محروس لحدّ ثقة /commerce/v1.
         'commerce/v1/media/{id}',
         'commerce/v1/orders/{id}',

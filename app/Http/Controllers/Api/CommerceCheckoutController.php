@@ -3,14 +3,13 @@
 namespace App\Http\Controllers\Api;
 
 use App\Models\CommerceCheckout;
-use App\Models\CommerceOrder;
-use App\Models\Tenant;
 use App\Services\Commerce\CheckoutIdempotencyConflictException;
 use App\Services\Commerce\CheckoutNotFoundException;
 use App\Services\Commerce\CheckoutReviewRequiredException;
 use App\Services\Commerce\CommerceCheckoutService;
 use App\Services\Commerce\CommerceCustomerAddressService;
 use App\Support\CommerceOrderReference;
+use App\Support\CommerceOrderSerializer;
 use App\Support\PublicApiErrorCode;
 use App\Support\PublicApiIdempotency;
 use App\Support\PublicApiResponse;
@@ -366,7 +365,7 @@ final class CommerceCheckoutController extends PublicApiController
         return PublicApiResponse::success(
             $request,
             [
-                'order' => $this->serializeOrder($result['order']),
+                'order' => CommerceOrderSerializer::serialize($result['order']),
                 // PR-5: مرجع ضيف موقَّع لقراءة الطلب لاحقاً عبر
                 // GET /commerce/v1/orders/{id} — حقل إضافي بحت، deterministic
                 // (إعادة التشغيل Idempotent تعيد المرجع نفسه حرفياً).
@@ -375,42 +374,6 @@ final class CommerceCheckoutController extends PublicApiController
             ],
             $result['replayed'] ? 200 : 201,
         );
-    }
-
-    /** @return array<string, mixed> */
-    private function serializeOrder(CommerceOrder $order): array
-    {
-        $currency = Tenant::findOrFail($order->tenant_id)->currency;
-
-        return [
-            'id' => $order->id,
-            'number' => $order->number,
-            'status' => $order->status,
-            'delivery_method' => $order->delivery_method,
-            'total' => ['amount_minor' => $order->total, 'currency' => $currency],
-            'contact' => [
-                'name' => $order->snapshot?->contact_name,
-                'phone' => $order->snapshot?->phone,
-                'email' => $order->snapshot?->email,
-            ],
-            'delivery' => [
-                'country' => $order->snapshot?->shipping_country,
-                'city' => $order->snapshot?->shipping_city,
-                'district' => $order->snapshot?->shipping_district,
-                'street' => $order->snapshot?->shipping_street,
-                'postal_code' => $order->snapshot?->shipping_postal_code,
-                'notes' => $order->snapshot?->shipping_notes,
-            ],
-            'items' => $order->lines->map(fn ($line) => [
-                'product_id' => $line->product_id,
-                'product_name' => $line->product_name_snapshot,
-                'unit_name' => $line->unit_name,
-                'quantity' => $line->quantity,
-                'unit_price' => ['amount_minor' => $line->unit_price, 'currency' => $currency],
-                'line_total' => ['amount_minor' => $line->line_total, 'currency' => $currency],
-            ])->all(),
-            'created_at' => $order->created_at?->toIso8601String(),
-        ];
     }
 
     /** يحلّ Checkout الحالي من X-Cart-Token، وإلا 404 (مع مسح التوكن إن كان فاسداً)، ثم ينفّذ التحوير. */
