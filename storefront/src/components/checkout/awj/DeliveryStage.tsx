@@ -16,13 +16,17 @@ import {
  * They are a real, stored choice: `PATCH store/v1/checkout/delivery` writes the
  * method to the checkout and carries it onto the order.
  *
- * **No price, no estimate, no date.** `updateDelivery()` sets
- * `delivery_amount_minor` to `0` unconditionally because no shipping pricing
- * authority exists, and the controller accepts no amount from the client at
- * all. Rendering that zero as "free delivery" would turn a placeholder into a
- * commercial offer; rendering an arrival window would invent a promise nothing
- * in this system makes. Each option says what it is and the stage says once,
- * plainly, that the delivery charge is confirmed by the store.
+ * **No price shown per option, no date.** `updateDelivery()` now resolves a
+ * real, server-computed amount once a method is saved
+ * (`ShippingRateService`, COM-MOBILE-SHIPPING-1) — but that amount depends on
+ * which option is chosen and isn't known to the client until the choice is
+ * saved, so this stage still can't show a number for either radio option
+ * ahead of selection without a preview endpoint this backend doesn't have
+ * (deliberately out of ADR-10's bounded V1 scope). The controller still
+ * accepts no amount from the client at all; rendering an arrival window would
+ * invent a promise nothing in this system makes. The confirmed amount is
+ * shown as soon as it exists — on the review stage and order summary, right
+ * after this stage saves a choice.
  */
 
 const METHOD_ICON: Record<AwjDeliveryMethod, typeof Truck> = {

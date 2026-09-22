@@ -51,6 +51,7 @@ import {
 import { CheckoutProgress } from "@/components/checkout/CheckoutProgress";
 import { Button } from "@/components/ui/button";
 import { useCartLineImages } from "@/hooks/useCartLineImages";
+import { formatMinorAmount } from "@/lib/commerce/cart-types";
 import {
   clearPersistedIdempotencyKey,
   resolveIdempotencyKey,
@@ -432,9 +433,17 @@ export function AwjCheckoutFlow() {
           showCoupon={false}
           sticky
           deliveryLabel={
-            deliveryMethod
-              ? `${t(`delivery.methods.${deliveryMethod}`)} · ${t("delivery.amountPending")}`
-              : null
+            // COM-MOBILE-SHIPPING-1: `checkout.delivery.amount` is now a
+            // real, server-committed figure once a method is saved
+            // (`ShippingRateService`, no longer a hardcoded 0). Only shown
+            // once the saved method matches the current draft selection —
+            // an unsaved draft change has no confirmed amount yet.
+            checkout.delivery.method &&
+            checkout.delivery.method === deliveryMethod
+              ? `${t(`delivery.methods.${checkout.delivery.method}`)} · ${formatMinorAmount(checkout.delivery.amount)}`
+              : deliveryMethod
+                ? `${t(`delivery.methods.${deliveryMethod}`)} · ${t("delivery.amountPending")}`
+                : null
           }
         >
           <ul className="divide-y divide-store-border">

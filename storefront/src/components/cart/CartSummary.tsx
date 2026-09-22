@@ -15,9 +15,10 @@ import { cn } from "@/lib/utils";
  *
  * The AWJ cart payload carries exactly one figure: `subtotal`. There is no
  * total, no tax and no discount in `CommerceCartService::serialize()`, and
- * `CommerceCheckoutService::serialize()` adds only `delivery.amount`, which
- * `updateDelivery()` writes as a hard `0` because no shipping pricing authority
- * exists yet.
+ * `CommerceCheckoutService::serialize()` adds only `delivery.amount` — a real,
+ * server-committed figure once a delivery method is saved
+ * (`ShippingRateService`, COM-MOBILE-SHIPPING-1/ADR-10; `0` for `pickup` or a
+ * tenant with no configured zone, never a placeholder).
  *
  * Adding those two numbers in the browser and labelling the result "Total"
  * would be a client-authoritative total: it would read as a promise the server
@@ -73,8 +74,8 @@ export function CartSummary({
   const rows: SummaryRow[] = [
     {
       label: tc("shipping"),
-      // Never "Free". The server's zero is a placeholder for an amount no
-      // pricing authority has produced, not a price of nothing.
+      // `deliveryLabel` already carries the real formatted amount once the
+      // caller (`AwjCheckoutFlow`) has a server-confirmed one to show.
       value: deliveryLabel ?? t("shippingCalculatedAtCheckout"),
       muted: true,
     },
