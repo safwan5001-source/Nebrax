@@ -61,6 +61,9 @@ class CommerceModuleBoundaryTest extends TestCase
         // COM-CATALOG-1 — قائمة مساحة عمل نشر المنتجات (قراءة فقط فوق COM-WS-3).
         'api/commerce/workspace/products/publication',
         'api/commerce/workspace/products/{id}/publication',
+        // COM-MOBILE-SHIPPING-1 — مناطق شحن مُهيَّأة من التاجر (ADR-10).
+        'api/commerce/workspace/shipping-zones',
+        'api/commerce/workspace/shipping-zones/{id}',
         'api/commerce/workspace/storefronts',
         'api/commerce/workspace/storefronts/{id}',
         'api/commerce/workspace/storefronts/{id}/activate',

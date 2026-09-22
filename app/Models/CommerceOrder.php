@@ -62,17 +62,20 @@ class CommerceOrder extends BaseModel implements CompanyWide
 
     protected $fillable = [
         'tenant_id', 'sales_channel_id', 'storefront_id', 'commerce_checkout_id',
-        'partner_id', 'customer_identity_id', 'number', 'status', 'total', 'delivery_method', 'confirmed_at',
+        'partner_id', 'customer_identity_id', 'number', 'status', 'total', 'delivery_method',
+        'delivery_amount_minor', 'confirmed_at',
     ];
 
     protected $casts = [
         'total' => 'integer',
+        'delivery_amount_minor' => 'integer',
         'confirmed_at' => 'datetime',
     ];
 
     protected $attributes = [
         'status' => self::STATUS_DRAFT,
         'total' => 0,
+        'delivery_amount_minor' => 0,
     ];
 
     /**

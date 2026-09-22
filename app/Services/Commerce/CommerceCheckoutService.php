@@ -57,12 +57,12 @@ final class CommerceCheckoutService
     public const LIFETIME_MINUTES = 60;
 
     /**
-     * §5: لا محرك تسعير شحن حقيقي بعد في هذا المستودع (لا جدول تهيئة، لا
-     * FulfillmentPolicy سعرياً). قائمة ثابتة في الكود — لا جدول جديد يُنشأ
-     * هنا (تفادي بناء Shipping Engine) — يمثّل "الاختيارات المهيّأة من
-     * الخادم صراحةً" التي تسمح بها §5 كحدّ أدنى. المبلغ صفر دائماً بصرف
-     * النظر عن الطريقة المختارة إلى أن يوجد محرك تسعير شحن حقيقي (مهمّة
-     * Shipping منفصلة) — لا يُخترَع سعر، ولا يُقبل من العميل مطلقاً.
+     * قائمة ثابتة في الكود — لا جدول أنواع توصيل. `pickup` مبلغه صفرٌ دائماً
+     * (COM-MOBILE-SHIPPING-1، ADR-10 §3: لا تغيير على سلوكه القائم). `standard`
+     * يُسعَّر الآن عبر `ShippingRateService` من مناطق الشحن المُهيَّأة —
+     * أوّل مبلغ توصيل حقيقي غير صفري في هذا المستودع (كان صفراً بنيوياً قبل
+     * ADR-10، إلى أن يوجد محرك تسعير حقيقي). لا يزال المبلغ سلطة خادم
+     * حصراً: لا بارامتر مبلغ في أي توقيع هنا، ولا يُقبل من العميل مطلقاً.
      */
     public const DELIVERY_METHODS = ['pickup', 'standard'];
 
@@ -73,6 +73,7 @@ final class CommerceCheckoutService
         private readonly FulfillmentPolicyService $fulfillment,
         private readonly InventoryReservationService $reservations,
         private readonly CommerceOrderService $orders,
+        private readonly ShippingRateService $shipping,
     ) {}
 
     /**
@@ -319,12 +320,23 @@ final class CommerceCheckoutService
         }, 3);
     }
 
-    /** @param array<string, string|null> $fields مفاتيحها أعمدة delivery_* (عنوان) جاهزة من المتحكّم. */
+    /**
+     * @param  array<string, string|null>  $fields مفاتيحها أعمدة delivery_* (عنوان) جاهزة من المتحكّم.
+     *
+     * (COM-MOBILE-SHIPPING-1) العنوان وطريقة التوصيل يُضبطان عبر نداءين
+     * مستقلّين بلا ترتيبٍ مفروض بينهما (`updateAddress`/`updateDelivery` كلاهما
+     * قابلٌ للاستدعاء أولاً) — إعادة حسم `delivery_amount_minor` هنا أيضاً،
+     * لا في `updateDelivery()` وحدها، ضروريةٌ لتبقى صحيحة أياً كان ترتيب
+     * العميل: تغييرُ المدينة بعد اختيار `standard` يجب أن يُحدِّث الرسم.
+     */
     public function updateAddress(CommerceCheckout $knownCheckout, array $fields): array
     {
         return DB::transaction(function () use ($knownCheckout, $fields): array {
             $checkout = $this->lockUsableCheckout($knownCheckout);
-            $checkout->update($fields + ['expires_at' => now()->addMinutes(self::LIFETIME_MINUTES)]);
+            $checkout->fill($fields);
+            $checkout->delivery_amount_minor = $this->resolveDeliveryAmount($checkout);
+            $checkout->expires_at = now()->addMinutes(self::LIFETIME_MINUTES);
+            $checkout->save();
 
             return $this->serialize($checkout, $this->cartFor($checkout));
         }, 3);
@@ -333,7 +345,8 @@ final class CommerceCheckoutService
     /**
      * يختار طريقة توصيل من `DELIVERY_METHODS` الثابتة فقط. لا بارامتر مبلغ
      * إطلاقاً في هذا التوقيع — بنيوياً يستحيل تمرير مبلغٍ من العميل عبره؛
-     * `delivery_amount_minor` يبقى صفراً دائماً (سلطة خادم، §5).
+     * `delivery_amount_minor` يُحسَم دوماً من `ShippingRateService` وحده
+     * (COM-MOBILE-SHIPPING-1، ADR-10) — سلطة خادم صرفة، لا مُدخَل عميل.
      */
     public function updateDelivery(CommerceCheckout $knownCheckout, string $method): array
     {
@@ -343,14 +356,26 @@ final class CommerceCheckoutService
 
         return DB::transaction(function () use ($knownCheckout, $method): array {
             $checkout = $this->lockUsableCheckout($knownCheckout);
-            $checkout->update([
-                'delivery_method' => $method,
-                'delivery_amount_minor' => 0,
-                'expires_at' => now()->addMinutes(self::LIFETIME_MINUTES),
-            ]);
+            $checkout->delivery_method = $method;
+            $checkout->delivery_amount_minor = $this->resolveDeliveryAmount($checkout);
+            $checkout->expires_at = now()->addMinutes(self::LIFETIME_MINUTES);
+            $checkout->save();
 
             return $this->serialize($checkout, $this->cartFor($checkout));
         }, 3);
+    }
+
+    /**
+     * `pickup` (أو لا طريقة مختارة بعد) صفرٌ دائماً — لا اعتماد على مطابقة
+     * منطقة شحن حتى لو كانت مُهيَّأة؛ الاستلام من الفرع بلا شحنٍ بطبيعته.
+     */
+    private function resolveDeliveryAmount(CommerceCheckout $checkout): int
+    {
+        if ($checkout->delivery_method !== 'standard') {
+            return 0;
+        }
+
+        return $this->shipping->resolveRateMinor($checkout->delivery_city, $checkout->delivery_region);
     }
 
     /**
@@ -472,6 +497,7 @@ final class CommerceCheckoutService
                 'storefront_id' => $context->hasStorefront() ? $context->storefrontId() : null,
                 'commerce_checkout_id' => $checkout->id,
                 'delivery_method' => $checkout->delivery_method,
+                'delivery_amount_minor' => $checkout->delivery_amount_minor,
                 'contact_name' => $checkout->contact_name,
                 'contact_phone' => $checkout->contact_phone,
                 'contact_email' => $checkout->contact_email,

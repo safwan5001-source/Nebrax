@@ -4,6 +4,7 @@ import { Pencil, ShieldAlert } from "lucide-react";
 import type { useTranslations } from "next-intl";
 import { StageShell } from "@/components/checkout/awj/StageShell";
 import { Button } from "@/components/ui/button";
+import { formatMinorAmount } from "@/lib/commerce/cart-types";
 import type { StorefrontCheckout } from "@/lib/commerce/checkout-types";
 
 /**
@@ -91,8 +92,13 @@ export function ReviewStage({
           <span className="block">
             {method ? t(`delivery.methods.${method}`) : t("review.notSet")}
           </span>
+          {/* COM-MOBILE-SHIPPING-1: real and server-committed the moment a
+              method is saved (`ShippingRateService`), never a placeholder —
+              this is what the order summary panel's total already includes. */}
           <span className="mt-1 block text-xs text-store-muted-foreground">
-            {t("delivery.amountPending")}
+            {method
+              ? formatMinorAmount(checkout.delivery.amount)
+              : t("delivery.amountPending")}
           </span>
         </ReviewRow>
 

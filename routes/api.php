@@ -28,6 +28,7 @@ use App\Http\Controllers\Api\CashBankAccountController;
 use App\Http\Controllers\Api\ClassificationAnalyticsReportController;
 use App\Http\Controllers\Api\ClassificationController;
 use App\Http\Controllers\Api\CompanyController;
+use App\Http\Controllers\Api\CommerceShippingZoneController;
 use App\Http\Controllers\Api\CommerceWorkspaceStorefrontsController;
 use App\Http\Controllers\Api\CommerceWorkspaceStorefrontPresentationController;
 use App\Http\Controllers\Api\CorporateFuelContractController;
@@ -866,6 +867,19 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
             ->whereUuid('id')
             ->middleware($perm('commerce.manage'));
         Route::post('commerce/workspace/storefronts/{id}/presentation/publish', [CommerceWorkspaceStorefrontPresentationController::class, 'publish'])
+            ->whereUuid('id')
+            ->middleware($perm('commerce.manage'));
+
+        // COM-MOBILE-SHIPPING-1 (ADR-10): مناطق شحن مُهيَّأة من التاجر —
+        // مطابقة مدينة/منطقة ⇐ رسم ثابت. نفس صلاحية بنية Commerce التحتية
+        // الأخرى (commerce.manage) لقراءةً وكتابةً معاً، بلا نطاق `shipping.*`
+        // جديد. القراءة العامة (الحسم وقت Checkout) لا تمرّ بهذا المتحكّم.
+        Route::get('commerce/workspace/shipping-zones', [CommerceShippingZoneController::class, 'index'])->middleware($perm('commerce.manage'));
+        Route::post('commerce/workspace/shipping-zones', [CommerceShippingZoneController::class, 'store'])->middleware($perm('commerce.manage'));
+        Route::put('commerce/workspace/shipping-zones/{id}', [CommerceShippingZoneController::class, 'update'])
+            ->whereUuid('id')
+            ->middleware($perm('commerce.manage'));
+        Route::delete('commerce/workspace/shipping-zones/{id}', [CommerceShippingZoneController::class, 'destroy'])
             ->whereUuid('id')
             ->middleware($perm('commerce.manage'));
 

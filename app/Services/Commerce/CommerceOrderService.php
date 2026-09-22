@@ -175,7 +175,12 @@ class CommerceOrderService
      * بحالة `draft` إطلاقاً؛ لا تغيير في enum `status` ولا في معنى `confirmed`
      * القديم (AWJ_COMMERCE_ORDER_IDENTITY_DECISION_REPORT.md، القرار C).
      *
-     * @param  array{sales_channel_id: string, storefront_id: string, commerce_checkout_id: string, delivery_method: ?string, contact_name: ?string, contact_phone: ?string, contact_email: ?string, delivery_country: ?string, delivery_city: ?string, delivery_district: ?string, delivery_street: ?string, delivery_postal_code: ?string, delivery_notes: ?string}  $header
+     * **`delivery_amount_minor` (COM-MOBILE-SHIPPING-1)**: لقطة رسم الشحن
+     * المحسوم فعلاً على Checkout (`ShippingRateService`، لا إعادة حسمٍ هنا) —
+     * يُضاف إلى `total` كما هو، إلى جانب مجموع سطور المنتج؛ غيابه من الحمولة
+     * (مسارٌ مستقبليٌّ آخر) يُعامَل كصفر، مطابقاً لسلوك ما قبل هذه المهمة.
+     *
+     * @param  array{sales_channel_id: string, storefront_id: string, commerce_checkout_id: string, delivery_method: ?string, delivery_amount_minor?: int, contact_name: ?string, contact_phone: ?string, contact_email: ?string, delivery_country: ?string, delivery_city: ?string, delivery_district: ?string, delivery_street: ?string, delivery_postal_code: ?string, delivery_notes: ?string}  $header
      * @param  array<int, array{product_id: string, product_variant_id?: ?string, variant_descriptor_snapshot?: ?string, product_name_snapshot: string, quantity: int, unit_name: ?string, unit_factor: int, unit_price: int, line_total: int}>  $lines  نتيجة إعادة تحقّق موثوقة بالفعل — لا يُعاد حسم سعرٍ أو وحدةٍ هنا.
      *
      * @throws RuntimeException `$lines` فارغة، أو `sales_channel_id` غير موجود.
@@ -215,12 +220,13 @@ class CommerceOrderService
                 'customer_identity_id' => $customerIdentityId,
                 'number' => $this->nextNumber(),
                 'delivery_method' => $header['delivery_method'],
+                'delivery_amount_minor' => $header['delivery_amount_minor'] ?? 0,
             ]);
 
-            $total = 0;
+            $total = $order->delivery_amount_minor;
             foreach ($lines as $line) {
                 $created = $order->lines()->create($line);
-                $total += $created->line_total;
+                $total = $this->addMinorAmountOrFail($total, $created->line_total);
             }
             $order->update(['total' => $total]);
 
@@ -250,6 +256,28 @@ class CommerceOrderService
 
             return $order->fresh(['lines', 'snapshot']);
         });
+    }
+
+    /**
+     * COM-MOBILE-SHIPPING-1 — جمعُ مبلغَين بالهللات مع فحصٍ صريح ضد فيضان
+     * `PHP_INT_MAX` **قبل** الوثوق بالنتيجة: PHP لا يرمي استثناءً عند فيضان
+     * `int + int` — يحوّل الناتج بصمتٍ إلى `float` (بالضبط ما تمنعه القاعدة
+     * المحاسبية الصارمة: لا `float`/`double` في أي حساب مالي إطلاقاً).
+     * `is_int()` بعد الجمع هي الفحص القياسي في PHP لاكتشاف هذا التحوّل. حدّا
+     * `unit_price`/`quantity` المسموحان اليوم (`PublicStoreProductRequest`،
+     * `CommerceCartController`) يسمحان نظرياً بمجموعٍ يقترب من هذا السقف
+     * حتى قبل إضافة الشحن؛ فشلٌ صريح هنا أفضل من إجماليّ خاطئ صامت.
+     *
+     * @throws RuntimeException الجمع يتجاوز الحد الأقصى الآمن لعددٍ صحيح.
+     */
+    private function addMinorAmountOrFail(int $a, int $b): int
+    {
+        $sum = $a + $b;
+        if (! is_int($sum)) {
+            throw new RuntimeException('إجمالي الطلب يتجاوز الحد الأقصى المسموح للمبالغ المالية.');
+        }
+
+        return $sum;
     }
 
     /**

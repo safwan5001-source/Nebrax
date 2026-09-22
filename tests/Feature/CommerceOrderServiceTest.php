@@ -483,4 +483,56 @@ class CommerceOrderServiceTest extends TestCase
         $this->assertSame(0, \App\Models\CommerceListing::query()->count());
         $this->assertSame(0, \App\Models\FulfillmentPolicy::query()->count());
     }
+
+    /**
+     * COM-MOBILE-SHIPPING-1 — `unit_price`/`quantity`'s own currently-allowed
+     * bounds (`PublicStoreProductRequest`, `CommerceCartController`) already
+     * permit a line total that approaches `PHP_INT_MAX`; folding
+     * `delivery_amount_minor` into `total` must fail closed rather than let
+     * PHP silently promote the sum to a `float` (forbidden in any financial
+     * calculation) or hand PostgreSQL an out-of-range `bigint`.
+     */
+    /** @test */
+    public function creating_an_order_from_checkout_fails_closed_when_the_total_would_overflow_a_bigint(): void
+    {
+        $header = [
+            'sales_channel_id' => $this->channel->id,
+            'storefront_id' => null,
+            'commerce_checkout_id' => null,
+            'delivery_method' => 'standard',
+            'delivery_amount_minor' => 10,
+            'contact_name' => 'عميل',
+            'contact_phone' => '0500000000',
+            'contact_email' => null,
+            'delivery_country' => 'SA',
+            'delivery_region' => null,
+            'delivery_city' => null,
+            'delivery_district' => null,
+            'delivery_street' => null,
+            'delivery_building_no' => null,
+            'delivery_additional_number' => null,
+            'delivery_postal_code' => null,
+            'delivery_notes' => null,
+        ];
+
+        $lines = [[
+            'product_id' => $this->product->id,
+            'product_name_snapshot' => $this->product->name,
+            'quantity' => 1,
+            'unit_name' => null,
+            'unit_factor' => 1,
+            'unit_price' => PHP_INT_MAX - 5,
+            'line_total' => PHP_INT_MAX - 5,
+        ]];
+
+        $threw = false;
+        try {
+            $this->orders->createFromCheckout($header, $lines);
+        } catch (RuntimeException) {
+            $threw = true;
+        }
+
+        $this->assertTrue($threw, 'كان يجب رفض الإجمالي الفائض بـ RuntimeException.');
+        $this->assertSame(0, CommerceOrder::query()->count(), 'لا طلب يُلتزَم (rollback) عند فشل حسم الإجمالي.');
+    }
 }
