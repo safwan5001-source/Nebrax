@@ -64,14 +64,18 @@ Current direct browser viewport: **1363 × 936 CSS px**, Arabic RTL.
 | Surface / state | Current evidence | Status |
 |---|---|---|
 | Home — desktop | Direct live inspection, DOM and computed styles | **Observed** |
-| Catalog/products page — desktop | Direct live inspection | **Observed** |
+| Canonical shop `/shop/` — desktop | Direct live inspection of controls, grid, cards and pagination | **Observed** |
+| Curated Products page — desktop | Direct live inspection of hero, filters, dynamic category tabs and six-column grid | **Observed** |
 | Product detail — desktop | Direct live inspection of simple product | **Observed** |
 | Empty cart — desktop | Direct live inspection | **Observed** |
 | Account login — desktop | Direct live inspection | **Observed** |
 | Blog index — desktop | Direct live inspection | **Observed** |
-| About page shell — desktop | Direct live inspection; page body appeared visually/content-light | **Observed with gap** |
+| About page — desktop | Direct live inspection of hero, story copy and image-led content bands | **Observed** |
 | Header/footer global shells | Seen across all inspected pages | **Observed** |
-| Search overlay/results | Full-screen open/close and query entry observed; successful/no-result rendering still unresolved | **Observed with gap** |
+| Search overlay | Full-screen open/close and query entry observed | **Observed** |
+| Product search results / no results | Direct live inspection of populated and zero-result URLs | **Observed** |
+| Policy pages | Returns, terms and privacy/use pages directly inspected | **Observed** |
+| Blog article detail | Article, metadata, comments/reply form and sidebar directly inspected | **Observed** |
 | Wishlist | Header and product actions found; destination/state not yet verified | **Partial** |
 | Compare | Related-product compare actions found; compare page not yet verified | **Partial** |
 | Quick view | Earlier public crawl suggested it; current direct live state not yet verified | **Not yet confirmed** |
@@ -81,9 +85,8 @@ Current direct browser viewport: **1363 × 936 CSS px**, Arabic RTL.
 | Checkout with populated cart | Not exercised | **Not observed** |
 | Product variations/options | Only a simple product was directly inspected | **Not observed** |
 | Out-of-stock/backorder | Stock filter exists; card/detail states not yet captured | **Not observed** |
-| Product search results / no results | Not exercised | **Not observed** |
-| Mobile 390/430 | Mobile navigation and sticky-toolbar assets detected, but no direct viewport observation yet | **Not observed** |
-| Tablet 768/1024 | Not directly observed | **Not observed** |
+| Mobile 390/430 | Responsive stylesheet rules observed; no direct viewport visual inspection yet | **Inferred from stylesheet; visual pending** |
+| Tablet 768/1024 | Responsive stylesheet rules observed; no direct viewport visual inspection yet | **Inferred from stylesheet; visual pending** |
 | Hover/focus/keyboard states | Static styles inspected; state matrix still pending | **Partial** |
 | Loading/skeleton/error | Not exposed during public-page pass | **Not observed** |
 
@@ -185,16 +188,34 @@ The header is a two-row composition with a combined measured height of 154px:
 - cart display: icon only / count / count + subtotal where supported;
 - transparent-over-hero is **not** part of the default until observed or selected as an AWJ extension.
 
-### 7.4 Full-screen search — observed with gap
+### 7.4 Full-screen search — observed
 
 - opens as a full-width layer directly below the 154px header;
 - measured approximately 1363 × 782px in the inspected viewport;
 - search form occupies an approximately 111px-high top row;
 - explicit close control;
 - inspected placeholder is `Search for posts`, not product-specific Arabic copy;
-- entering an Arabic flower query left the instructional message visible and exposed no result cards during the observation window.
+- the overlay interaction itself did not expose live result cards during the observation window;
+- submitting a product query routes to a dedicated product-search results template.
 
 **AWJ decision:** the ready theme must use storefront-product search by default, with localized copy and explicit loading, results, no-results and error states. The reference's apparent post-search mismatch/empty AJAX behavior is a defect to avoid, not a behavior to copy.
+
+### 7.5 Product-search results — observed
+
+The submitted product-search URL used the query and `post_type=product`. The populated state exposed:
+
+- a heading containing the entered term;
+- twelve product cards on the observed page;
+- the same catalog card language and compare action;
+- pagination covering five numbered pages plus a next action.
+
+The zero-result state exposed:
+
+- an explicit message that no products matched the selection;
+- the search form as the recovery path;
+- zero product cards and no pagination.
+
+**AWJ decision:** query, filters and page must be URL-addressable. Loading and error states remain required even though they were not directly exposed by the reference.
 
 ## 8. Home page template
 
@@ -340,21 +361,37 @@ This is a theme preset. The merchant may reorder, duplicate, hide or delete elig
 - card alignment and spacing;
 - hover image/quick actions only when keyboard and touch equivalents exist.
 
-## 10. Catalog/category template
+## 10. Catalog/category templates
 
-### 10.1 Observed desktop anatomy
+The reference has **two materially different product-discovery templates**. AWJ must model them as reusable page/section compositions, not merge their controls into one overloaded screen.
 
-- global header/footer;
-- filter surface with:
-  - Categories;
-  - Stock status;
-  - Price range;
-  - Filter action;
-- category navigation list including balloons, natural flowers, party setup, bouquets, flower baskets and vases;
-- ten product cards were rendered in the inspected state;
-- AJAX-shop capability is present in the reference implementation.
+### 10.1 Canonical shop `/shop/` — observed
 
-### 10.2 AWJ contract
+- global header/footer and breadcrumb `Home → Store`;
+- twelve products rendered on the observed page;
+- item-count selector: 9, 12, 18 or 24; 12 was active;
+- grid-density selector: 2, 3 or 4 columns; 3 was active;
+- observed three-column cards measured approximately 384px wide with square 384 × 384px media;
+- regular and sale cards;
+- compare action per card;
+- pagination numbered 1–7 plus a next action;
+- approximately 1222px main content width;
+- no conventional sort select was visible in this state.
+
+### 10.2 Curated Products page — observed
+
+- an editorial hero with heading, supporting copy and CTA;
+- horizontal filter bar containing Categories, Stock status, Price range and Filter action;
+- the opened category menu listed uncategorized, balloons, natural flowers, cake/flower category, bouquets, baskets and vases;
+- stock options present in the reference markup were On sale, In stock and On backorder; their untranslated English copy is a reference defect, not an AWJ baseline;
+- price filter exposed a SAR 35–5,300 range and two keyboard-focusable slider handles;
+- a second category-tab navigation covered balloons, natural flowers, party setup, bouquets, baskets and vases;
+- activating the natural-flowers tab replaced the product set asynchronously without changing the URL and moved the active state to that tab;
+- the observed desktop collection used six columns with cards approximately 179px wide.
+
+The filter bar and the category tabs are separate interaction layers. AWJ should not duplicate category selection by default unless the merchant intentionally composes both sections.
+
+### 10.3 AWJ contract
 
 - title/breadcrumb area;
 - result count;
@@ -367,7 +404,7 @@ This is a theme preset. The merchant may reorder, duplicate, hide or delete elig
 - loading/error states;
 - no hidden inventory or unpublished listings may leak through filters.
 
-**Gap:** the current custom “Products” page routed its filter form toward `/shop/` and showed an unusual leading `6` in one product title. AWJ should reproduce the visual capability, not reference-site content/routing defects.
+**AWJ decision:** count and grid-density controls are optional presentation controls. Sort remains a required commerce control even though it was not observed. Dynamic category tabs must update the active state, announce loading/result changes and preserve a shareable/back-navigation state; the reference's URL-less AJAX change is insufficient. The custom page's unusual leading `6` in one product title is a content defect and must not be reproduced.
 
 ## 11. Product-detail template
 
@@ -471,11 +508,39 @@ The lost-password route was also observed: explanatory copy, username/email fiel
 - contact/inquiry form area;
 - reference content currently includes placeholder WordPress copy. AWJ must use merchant content and never copy it.
 
-### 13.3 About — observed with gap
+### 13.3 Blog article detail — observed
 
-The page loaded with the global shell and imagery but exposed little meaningful text in the inspected state. A visual screenshot pass is still required before locking its page template.
+- category, title, author, date and comment count;
+- article body;
+- Back to list navigation;
+- comments list and reply action;
+- comment form with comment, name, email, website and remember-me fields;
+- sidebar search, recent posts, recent comments, archives and categories;
+- global header/footer.
 
-### 13.4 Required generic pages
+The inspected article is WordPress placeholder content. Only the template anatomy is evidence; its copy must not be carried into AWJ.
+
+### 13.4 About — observed
+
+- image-led hero measured approximately 1333 × 374px beneath the global header;
+- story section with `من نحن` and `لأن كل هدية تستحق لمسة مميزة` headings;
+- rich store-description copy;
+- multiple large visual/background bands continuing below the introductory content;
+- global header/footer and theme typography.
+
+AWJ should provide hero, rich text and image/editorial sections using merchant media and copy. Exact reference images and prose are excluded by §2.
+
+### 13.5 Policy content template — observed
+
+Three footer-linked long-form pages were directly inspected:
+
+- returns/exchange: natural flowers, damage/defect, recipient refusal and natural-product variation;
+- terms: site use, orders/preparation, prices/payment, delivery, cancellation/modification, intellectual property and updates;
+- privacy/use: use rules, account, orders/content, intellectual property, data collection/use/protection/sharing and updates.
+
+They reuse the global shell and a simple long-form content layout; no special commerce component was observed. These topics are evidence of information architecture only. AWJ merchants remain responsible for legally appropriate policy text.
+
+### 13.6 Required generic pages
 
 - About;
 - Contact;
@@ -524,7 +589,19 @@ All page types must inherit theme header/footer, content typography, RTL/LTR han
 - mobile navigation, mobile cart and sticky bottom-toolbar capabilities are present in the reference assets/markup;
 - the reference includes responsive carousel and dropdown modules.
 
-### 15.2 AWJ target matrix — pending visual validation
+### 15.2 Reference stylesheet evidence — visually unverified
+
+The live page's loaded responsive stylesheet exposed these rules. This is **stylesheet observation/inference**, not direct mobile/tablet visual confirmation:
+
+- primary breakpoints at `max-width: 1024px` and `max-width: 767px`, plus `min-width: 768px` and a `768–1024px` tablet range;
+- at ≤1024px, one hero uses `min-height: 41vh`, sampled headings reduce to approximately 25px/23px, a sampled CTA to 15px, and one carousel is configured for two slides;
+- at ≤767px, a dedicated mobile hero background asset is used, the hero moves to `min-height: 90vh`, radius 22px and 5px padding, sampled content uses a negative top offset, one carousel reduces to one slide and relevant heading alignment becomes centered;
+- at ≥768px, several inner containers use 90% width and editorial split columns use 50%;
+- at 768–1024px, observed split-content widths include 70%, 100% and 65% depending on region.
+
+These rules prove responsive intent and breakpoint families but do not prove the final rendered navigation, footer, filter drawer or overflow behavior. Direct viewport inspection remains mandatory.
+
+### 15.3 AWJ target matrix — pending visual validation
 
 | Width | Target behavior |
 |---|---|
@@ -544,7 +621,8 @@ This table is an **AWJ provisional decision**, not a claim of reference-site exa
 - [ ] Header sticky/scrolled visual state.
 - [ ] Mobile header closed/open/submenu.
 - [x] Search closed/open/query-entry/close behavior.
-- [ ] Search loading/results/no-results/error.
+- [x] Search results and no-results rendering.
+- [ ] Search loading/error rendering.
 - [ ] Account hover/dropdown versus click behavior.
 - [ ] Wishlist empty/populated/remove.
 - [x] Mini-cart empty/open/close behavior.
@@ -565,11 +643,15 @@ This table is an **AWJ provisional decision**, not a claim of reference-site exa
 
 ### Catalog
 
-- [x] Default desktop catalog/filter anatomy.
+- [x] Canonical shop count/grid controls, three-column grid and card anatomy.
+- [x] Canonical shop numbered pagination and next action.
+- [x] Curated Products hero/filter/category-tab/six-column anatomy.
+- [x] Category dropdown, stock-option and price-range control anatomy.
+- [x] Dynamic category-tab result replacement and active state.
 - [ ] Sort options and selected state.
 - [ ] Active filter chips/clear.
-- [ ] Pagination/load-more behavior.
-- [ ] No results/loading/error.
+- [x] Product-search no-results recovery state.
+- [ ] Catalog loading/error and load-more variant, if supported.
 - [ ] Mobile filter drawer.
 - [ ] Sale/out-of-stock/variant card states.
 
@@ -601,9 +683,10 @@ This table is an **AWJ provisional decision**, not a claim of reference-site exa
 
 - [x] Blog index anatomy.
 - [x] Footer information architecture.
-- [ ] Article detail.
-- [ ] About visual/content anatomy.
-- [ ] Contact and policy pages.
+- [x] Article detail, comments/reply form and sidebar anatomy.
+- [x] About hero/story/visual-band anatomy.
+- [x] Returns, terms and privacy/use policy page anatomy.
+- [ ] Contact page and form validation states.
 - [ ] Mobile footer accordions.
 
 ## 17. Theme-engine capability mapping
@@ -682,6 +765,6 @@ The extraction is complete only when:
 
 The reference is suitable as the first AWJ ready-made boutique/floral theme because it combines editorial gifting content with dense commerce coverage: campaign hero, custom-gift story, multiple catalog collections, promotion/countdown, testimonials, product discovery and a full product-detail path.
 
-The current pass is sufficient to open the documentation track and lock the theme anatomy. It is **not yet sufficient to claim a complete extraction**: mobile/tablet behavior, populated commerce states, search/wishlist/compare overlays and several error/empty/interactive states remain explicitly open in §16.
+The current pass is sufficient to lock the desktop information architecture, both catalog compositions, search result states and the core content templates. It is **not yet sufficient to claim a complete extraction**: direct mobile/tablet rendering, populated commerce states, search loading/error behavior, wishlist/compare destinations and several error/interactive states remain explicitly open in §16.
 
 No application code, database schema, API contract, merge or deployment is authorized by this document.
