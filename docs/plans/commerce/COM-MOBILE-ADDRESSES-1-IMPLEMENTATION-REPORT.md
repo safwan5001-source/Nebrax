@@ -114,7 +114,15 @@ None beyond what ADR-08 already recorded — Saudi National Address field requir
 
 ## Automated review findings
 
-Not yet opened for review — will be recorded here once PR review completes, per the standing merge policy.
+PR #929, round 1 (Codex, reviewed commit `b230071`) — 3 findings, all verified as genuine bugs and fixed in commit `9d1f4e6`:
+
+| # | Severity | File | Finding | Fix |
+|---|----------|------|---------|-----|
+| 1 | P1 | `CommerceCustomerAddressController::update()` | A PATCH could flip `country` to `SA`, or clear a required Saudi field on an already-Saudi address, without re-validating — writing an address that violates the advertised Saudi National Address requirement into checkout/order snapshots. | Validate the merged (existing + patched) state via `assertSaudiFieldsPresent()` before the write, not just the raw partial payload. |
+| 2 | P2 | `CommerceCheckoutController::addressFieldsFromSavedAddress()` | `address_id` was validated as `string`, not `uuid`; a malformed id reaching `find()` against a UUID column silently returns no row on SQLite but errors out as a raw 500 on PostgreSQL. | Validate `address_id` with the `uuid` rule so a bad id is a plain 422 on both engines. |
+| 3 | P2 | `CommerceCustomerAddressService::create()`/`update()` | Laravel's `boolean` validation rule accepts `1`/`"1"` without normalizing it; the service's strict `=== true` check silently skipped clearing the previous default, while the model's own `boolean` cast still saved the new row as default — two defaults hit the partial unique index as a raw constraint-violation 500. | Added a private `isTruthyBoolean()` helper using a plain `(bool)` cast, applied to all four default-shipping/default-billing checks. |
+
+All three re-verified with the full `CommerceCustomerAddressApiTest` (16 tests) and the broader `Commerce\|Customer\|Storefront` regression on both SQLite (934 passed) and PostgreSQL (959 passed) after the fix, with no regressions. All three threads replied to and resolved.
 
 ## Risks / remaining work
 
