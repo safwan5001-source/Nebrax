@@ -29,9 +29,12 @@ export function SbcSeal({ token, fallbackLabel }: SbcSealProps) {
       return;
     }
 
+    let active = true;
     setStatus("loading");
     container.replaceChildren();
     const observer = new MutationObserver(() => {
+      if (!active) return;
+
       if (container.hasChildNodes()) {
         observer.disconnect();
         setStatus("ready");
@@ -48,6 +51,8 @@ export function SbcSeal({ token, fallbackLabel }: SbcSealProps) {
     script.async = true;
     script.dataset.awjSbcSeal = "true";
     script.onerror = () => {
+      if (!active) return;
+
       // Keep the approved text presentation when the optional external seal fails.
       observer.disconnect();
       setStatus("error");
@@ -56,6 +61,7 @@ export function SbcSeal({ token, fallbackLabel }: SbcSealProps) {
     document.head.appendChild(script);
 
     return () => {
+      active = false;
       observer.disconnect();
       container.replaceChildren();
       script.remove();

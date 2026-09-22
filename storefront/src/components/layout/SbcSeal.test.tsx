@@ -66,6 +66,38 @@ describe("SbcSeal", () => {
     expect(document.getElementById("awj-sbc-seal-loader")).toBeNull();
   });
 
+  it("ignores a stale error from token A after token B takes ownership", async () => {
+    const { getByTestId, rerender } = render(
+      <SbcSeal token="token-a" fallbackLabel="sbcVerified" />,
+    );
+    const scriptA = document.getElementById(
+      "awj-sbc-seal-loader",
+    ) as HTMLScriptElement;
+
+    rerender(<SbcSeal token="token-b" fallbackLabel="sbcVerified" />);
+    const containerB = getByTestId("sbc-official-seal");
+    expect(containerB).toHaveAttribute("data-token", "token-b");
+
+    scriptA.dispatchEvent(new Event("error"));
+    expect(getByTestId("sbc-text-fallback")).toHaveTextContent("sbcVerified");
+    expect(containerB).toHaveClass("hidden");
+
+    containerB.appendChild(document.createElement("iframe"));
+    await waitFor(() => {
+      expect(containerB).not.toHaveClass("hidden");
+      expect(
+        document.querySelector('[data-testid="sbc-text-fallback"]'),
+      ).toBeNull();
+    });
+
+    scriptA.dispatchEvent(new Event("error"));
+    expect(containerB).not.toHaveClass("hidden");
+    expect(containerB.querySelector("iframe")).not.toBeNull();
+    expect(
+      document.querySelector('[data-testid="sbc-text-fallback"]'),
+    ).toBeNull();
+  });
+
   it("disconnects the content observer on token change and unmount", () => {
     const disconnect = vi.spyOn(MutationObserver.prototype, "disconnect");
     const { rerender, unmount } = render(
