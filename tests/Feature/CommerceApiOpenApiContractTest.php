@@ -690,10 +690,23 @@ class CommerceApiOpenApiContractTest extends TestCase
      * يؤكّد أن مفاتيح `$actual` مجموعةٌ جزئية من خصائص المخطّط الموثَّقة، وأن
      * كل مفتاحٍ إلزامي (`required`) حاضرٌ فعلياً — لا مطابقةً حرفية، لأن حقولاً
      * مثل `Category.children`/`Product.options` اختياريةٌ حقاً بحسب العمق/النوع.
+     *
+     * (Codex review, PR #943, P2) **يتعمّق فعلياً**، لا يفحص المستوى الأعلى
+     * فقط: لكل خاصية فيها `$ref`/كائنٌ ضمنيّ (`properties`)، يتحقّق بنية القيمة
+     * المتداخلة فعلياً بنفس المنطق (تكراراً)؛ لكل خاصية مصفوفة، يتحقّق كل عنصر
+     * بمخطّط `items`؛ ولكل قيمة `enum` موثَّقة، يتحقّق أن القيمة الفعلية منه.
+     * هذا بالضبط ما كان غائباً حين مرّر `Order.payment` بمخطّط `CheckoutPayment`
+     * الخاطئ سابقاً بلا فشل — لم يكن يُفحَص إلا مفتاح `payment` نفسه، لا محتواه.
      */
     private function assertMatchesSchema(string $schemaName, array $actual, string $label): void
     {
         [$properties, $required] = $this->resolveSchema($schemaName);
+        $this->assertMatchesResolvedSchema($properties, $required, $actual, $label);
+    }
+
+    /** @param array<string, mixed> $properties */
+    private function assertMatchesResolvedSchema(array $properties, array $required, array $actual, string $label): void
+    {
         $allowed = array_keys($properties);
 
         $extra = array_values(array_diff(array_keys($actual), $allowed));
@@ -701,6 +714,103 @@ class CommerceApiOpenApiContractTest extends TestCase
 
         $missing = array_values(array_diff($required, array_keys($actual)));
         $this->assertSame([], $missing, "{$label}: مفاتيح إلزامية غائبة: " . implode(', ', $missing));
+
+        foreach ($actual as $key => $value) {
+            if (! isset($properties[$key])) {
+                continue;
+            }
+            $this->assertValueMatchesPropertySchema($properties[$key], $value, "{$label}.{$key}");
+        }
+    }
+
+    /**
+     * (Codex review, PR #943, round 2, P2×2) الإصلاح الأول: `$ref` كان يُحَل
+     * فرعاً مستقلاً ثم يعود فوراً — فقيمةٌ سكالر حيث يُتوقَّع كائنٌ مرجعي
+     * (كمثال `Order.payment` نصّاً) كانت تمرّ بصمت لأن `is_array($value)` تفشل
+     * فيتخطّى الشرط الفحص كله بلا أي `assert`. الإصلاح: `$ref` يُستبدَل بمخطّطه
+     * المحلول ويُكمل نفس الجسم أدناه (لا فرعٌ منفصل)، فتتكفّل فحوص
+     * `properties`/`type` العادية بإلزام الشكل الصحيح.
+     * الإصلاح الثاني: `null` كان يُقبَل غير مشروط بلا أي نظرٍ للمخطّط — فحقلٌ
+     * إلزاميٌّ غير قابلٍ لـnull (كمثال `Order.status`) كان يمرّ رغم قيمة `null`
+     * فعلية. الإصلاح: `null` يُقبَل فقط إن صرّح المخطّط (بعد حلّ `$ref`) بذلك
+     * عبر `schemaAllowsNull()`.
+     *
+     * @param array<string, mixed> $schema
+     */
+    private function assertValueMatchesPropertySchema(array $schema, mixed $value, string $label): void
+    {
+        if (isset($schema['$ref'])) {
+            $resolved = $this->resolvePointer($this->spec(), $schema['$ref']);
+            $this->assertIsArray($resolved, "{$label}: مرجع لا يُحَل.");
+            $schema = $resolved;
+        }
+
+        if ($value === null) {
+            $this->assertTrue($this->schemaAllowsNull($schema), "{$label}: القيمة null لكنّ المخطّط الموثَّق لا يسمح بذلك.");
+
+            return;
+        }
+
+        if (($schema['type'] ?? null) === 'array' && isset($schema['items'])) {
+            $this->assertIsArray($value, "{$label}: يجب أن تكون مصفوفة.");
+            foreach ($value as $index => $item) {
+                $this->assertValueMatchesPropertySchema($schema['items'], $item, "{$label}[{$index}]");
+            }
+
+            return;
+        }
+
+        if (isset($schema['properties'])) {
+            $this->assertIsArray($value, "{$label}: يجب أن تكون كائناً.");
+            $this->assertMatchesResolvedSchema($schema['properties'], $schema['required'] ?? [], $value, $label);
+
+            return;
+        }
+
+        if (isset($schema['enum'])) {
+            $this->assertContains($value, $schema['enum'], "{$label}: قيمة خارج enum الموثَّق.");
+        }
+
+        $this->assertValueMatchesDeclaredType($schema['type'] ?? null, $value, $label);
+    }
+
+    /** @param array<string, mixed> $schema */
+    private function schemaAllowsNull(array $schema): bool
+    {
+        if (isset($schema['enum']) && in_array(null, $schema['enum'], true)) {
+            return true;
+        }
+
+        $type = $schema['type'] ?? null;
+        if ($type === null) {
+            return false;
+        }
+
+        return in_array('null', is_array($type) ? $type : [$type], true);
+    }
+
+    private function assertValueMatchesDeclaredType(mixed $declaredType, mixed $value, string $label): void
+    {
+        if ($declaredType === null) {
+            return;
+        }
+        $types = is_array($declaredType) ? $declaredType : [$declaredType];
+        $types = array_values(array_diff($types, ['null']));
+        if ($types === []) {
+            return;
+        }
+
+        $matches = array_filter($types, fn (string $type) => match ($type) {
+            'string' => is_string($value),
+            'integer' => is_int($value),
+            'number' => is_int($value) || is_float($value),
+            'boolean' => is_bool($value),
+            'array' => is_array($value) && array_is_list($value),
+            'object' => is_array($value) && ! array_is_list($value),
+            default => true,
+        });
+
+        $this->assertNotEmpty($matches, "{$label}: النوع الفعلي (" . get_debug_type($value) . ") لا يطابق الموثَّق (" . implode('|', $types) . ").");
     }
 
     private function assertSameSet(array $expected, array $actual, string $label = ''): void

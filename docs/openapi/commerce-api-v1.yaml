@@ -272,6 +272,7 @@ paths:
     parameters:
       - $ref: '#/components/parameters/RequestId'
       - $ref: '#/components/parameters/CartToken'
+      - $ref: '#/components/parameters/OptionalCustomerToken'
     get:
       operationId: getCart
       tags: [Cart]
@@ -301,6 +302,7 @@ paths:
     parameters:
       - $ref: '#/components/parameters/RequestId'
       - $ref: '#/components/parameters/CartToken'
+      - $ref: '#/components/parameters/OptionalCustomerToken'
     post:
       operationId: addCartItem
       tags: [Cart]
@@ -342,6 +344,7 @@ paths:
     parameters:
       - $ref: '#/components/parameters/RequestId'
       - $ref: '#/components/parameters/CartToken'
+      - $ref: '#/components/parameters/OptionalCustomerToken'
       - name: item
         in: path
         required: true
@@ -394,6 +397,7 @@ paths:
     parameters:
       - $ref: '#/components/parameters/RequestId'
       - $ref: '#/components/parameters/CartToken'
+      - $ref: '#/components/parameters/OptionalCustomerToken'
     get:
       operationId: getCheckout
       tags: [Checkout]
@@ -447,6 +451,7 @@ paths:
     parameters:
       - $ref: '#/components/parameters/RequestId'
       - $ref: '#/components/parameters/CartToken'
+      - $ref: '#/components/parameters/OptionalCustomerToken'
     patch:
       operationId: updateCheckoutContact
       tags: [Checkout]
@@ -475,6 +480,7 @@ paths:
     parameters:
       - $ref: '#/components/parameters/RequestId'
       - $ref: '#/components/parameters/CartToken'
+      - $ref: '#/components/parameters/OptionalCustomerToken'
     patch:
       operationId: updateCheckoutAddress
       tags: [Checkout]
@@ -509,6 +515,7 @@ paths:
     parameters:
       - $ref: '#/components/parameters/RequestId'
       - $ref: '#/components/parameters/CartToken'
+      - $ref: '#/components/parameters/OptionalCustomerToken'
     patch:
       operationId: updateCheckoutDelivery
       tags: [Checkout]
@@ -542,6 +549,7 @@ paths:
     parameters:
       - $ref: '#/components/parameters/RequestId'
       - $ref: '#/components/parameters/CartToken'
+      - $ref: '#/components/parameters/OptionalCustomerToken'
     patch:
       operationId: updateCheckoutPayment
       tags: [Payments]
@@ -576,6 +584,7 @@ paths:
     parameters:
       - $ref: '#/components/parameters/RequestId'
       - $ref: '#/components/parameters/CartToken'
+      - $ref: '#/components/parameters/OptionalCustomerToken'
     post:
       operationId: completeCheckout
       tags: [Checkout]
@@ -1005,6 +1014,18 @@ components:
       required: true
       description: The customer's own `customer:access` Sanctum token (never the `Authorization` header).
       schema: { type: string }
+    OptionalCustomerToken:
+      name: X-Customer-Token
+      in: header
+      required: false
+      description: >
+        Optional on cart/checkout operations only (`EstablishCommerceCustomerContextIfPresent`):
+        when presented alongside `X-Cart-Token`, the guest cart is claimed or
+        merged into this customer's own identity (ADR-07), and this checkout
+        completes as this customer's order rather than a guest one. Its
+        absence never blocks the request — the same operation remains fully
+        guest-usable.
+      schema: { type: string }
     OrderReference:
       name: X-Order-Reference
       in: header
@@ -1246,12 +1267,37 @@ components:
         updated_at: { type: [string, 'null'], format: date-time }
 
     ProductDetail:
-      allOf:
-        - $ref: '#/components/schemas/ProductListItem'
-        - type: object
-          required: [media]
+      type: object
+      additionalProperties: false
+      description: >
+        `ProductListItem`'s own fields plus `media` — the detail response
+        (`GET /products/{id}`) never omits `media` the way the list row
+        (`GET /products`) does. Not `allOf`-composed over `ProductListItem`:
+        a schema with `additionalProperties: false` cannot be extended that
+        way under standard JSON Schema/OpenAPI 3.1 validators (the base's
+        own closed check runs before the extension's added properties are
+        considered, so every real detail response would fail validation) —
+        each product schema here is instead fully, independently closed.
+      required: [id, name, name_en, description, sku, category, price, in_stock, thumbnail_url, is_variant_managed, created_at, updated_at, media]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        name_en: { type: [string, 'null'] }
+        description: { type: [string, 'null'] }
+        sku: { type: [string, 'null'] }
+        category:
+          type: [object, 'null']
+          additionalProperties: false
           properties:
-            media: { type: array, items: { $ref: '#/components/schemas/ProductMediaItem' } }
+            id: { type: string, format: uuid }
+            name: { type: string }
+        price: { $ref: '#/components/schemas/Money' }
+        in_stock: { type: [boolean, 'null'] }
+        thumbnail_url: { type: [string, 'null'] }
+        is_variant_managed: { type: boolean }
+        created_at: { type: [string, 'null'], format: date-time }
+        updated_at: { type: [string, 'null'], format: date-time }
+        media: { type: array, items: { $ref: '#/components/schemas/ProductMediaItem' } }
 
     ProductOption:
       type: object
@@ -1286,13 +1332,35 @@ components:
         media: { type: array, items: { $ref: '#/components/schemas/ProductMediaItem' } }
 
     ProductVariantDetail:
-      allOf:
-        - $ref: '#/components/schemas/ProductDetail'
-        - type: object
-          required: [options, variants]
+      type: object
+      additionalProperties: false
+      description: >
+        `ProductDetail`'s own fields plus `options`/`variants`, for a
+        variant-managed product's detail response. Independently closed for
+        the same reason `ProductDetail` is not `allOf`-composed over
+        `ProductListItem` — see that schema's own doc.
+      required: [id, name, name_en, description, sku, category, price, in_stock, thumbnail_url, is_variant_managed, created_at, updated_at, media, options, variants]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        name_en: { type: [string, 'null'] }
+        description: { type: [string, 'null'] }
+        sku: { type: [string, 'null'] }
+        category:
+          type: [object, 'null']
+          additionalProperties: false
           properties:
-            options: { type: array, items: { $ref: '#/components/schemas/ProductOption' } }
-            variants: { type: array, items: { $ref: '#/components/schemas/ProductVariant' } }
+            id: { type: string, format: uuid }
+            name: { type: string }
+        price: { $ref: '#/components/schemas/Money' }
+        in_stock: { type: [boolean, 'null'] }
+        thumbnail_url: { type: [string, 'null'] }
+        is_variant_managed: { type: boolean }
+        created_at: { type: [string, 'null'], format: date-time }
+        updated_at: { type: [string, 'null'], format: date-time }
+        media: { type: array, items: { $ref: '#/components/schemas/ProductMediaItem' } }
+        options: { type: array, items: { $ref: '#/components/schemas/ProductOption' } }
+        variants: { type: array, items: { $ref: '#/components/schemas/ProductVariant' } }
 
     ProductListResponse:
       type: object
@@ -1313,7 +1381,7 @@ components:
         variant_descriptor: { type: [string, 'null'] }
         product_name: { type: string }
         unit_key: { type: string }
-        unit_name: { type: string }
+        unit_name: { type: [string, 'null'] }
         quantity: { type: integer }
         unit_price: { $ref: '#/components/schemas/Money' }
         line_total: { $ref: '#/components/schemas/Money' }
@@ -1324,7 +1392,7 @@ components:
       additionalProperties: false
       required: [status, items, subtotal, currency, has_unavailable_items]
       properties:
-        status: { type: string }
+        status: { type: [string, 'null'] }
         items: { type: array, items: { $ref: '#/components/schemas/CartItem' } }
         subtotal: { $ref: '#/components/schemas/Money' }
         currency: { type: string }
@@ -1378,6 +1446,22 @@ components:
         payment_method_id: { type: [string, 'null'], format: uuid }
         payment_method_name: { type: [string, 'null'] }
         method: { type: [string, 'null'], enum: [cod, pay_on_pickup, null] }
+
+    OrderPayment:
+      type: object
+      additionalProperties: false
+      description: >
+        The committed `CommercePaymentIntent` snapshot on a completed order
+        (`CommerceOrderSerializer::serialize()`) — a distinct shape from
+        `CheckoutPayment` (the pre-completion preview): no `payment_method_id`
+        here (the intent references the method internally; only its
+        snapshotted name is public), and a real `status` in its place,
+        since a commitment now exists to have a status at all.
+      required: [method, status, payment_method_name]
+      properties:
+        method: { type: [string, 'null'], enum: [cod, pay_on_pickup, null] }
+        status: { type: [string, 'null'], enum: [pending, awaiting_collection, collected, cancelled, null] }
+        payment_method_name: { type: [string, 'null'] }
 
     Checkout:
       type: object
@@ -1490,10 +1574,6 @@ components:
             payment_methods: { type: array, items: { $ref: '#/components/schemas/PaymentMethod' } }
         meta: { $ref: '#/components/schemas/SuccessMeta' }
 
-    OrderMoney:
-      allOf:
-        - $ref: '#/components/schemas/Money'
-
     Order:
       type: object
       additionalProperties: false
@@ -1527,7 +1607,7 @@ components:
             postal_code: { type: [string, 'null'] }
             notes: { type: [string, 'null'] }
             amount: { $ref: '#/components/schemas/Money' }
-        payment: { $ref: '#/components/schemas/CheckoutPayment' }
+        payment: { $ref: '#/components/schemas/OrderPayment' }
         items:
           type: array
           items:
@@ -1537,7 +1617,7 @@ components:
             properties:
               product_id: { type: [string, 'null'], format: uuid }
               product_name: { type: string }
-              unit_name: { type: string }
+              unit_name: { type: [string, 'null'] }
               quantity: { type: integer }
               unit_price: { $ref: '#/components/schemas/Money' }
               line_total: { $ref: '#/components/schemas/Money' }
