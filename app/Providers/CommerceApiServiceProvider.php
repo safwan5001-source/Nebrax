@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Http\Middleware\ForceJsonResponse;
 use App\Http\Middleware\PublicApiRequestContext;
+use App\Http\Middleware\ResolveCommerceLocale;
 use App\Services\Commerce\Otp\FakeOtpProvider;
 use App\Services\Commerce\Otp\OtpProvider;
 use App\Support\PublicApiExceptionRenderer;
@@ -29,7 +30,10 @@ use Throwable;
  *   - Same base middleware group as `/api/v1`
  *     (`ForceJsonResponse` + `PublicApiRequestContext`) — reused as-is, not
  *     reimplemented: both layers need the identical JSON-forcing +
- *     request-id foundation.
+ *     request-id foundation. `ResolveCommerceLocale` (COM-MOBILE-I18N-1,
+ *     ADR-12) is added here too, shared identically with `/store/v1` via
+ *     `StorefrontApiServiceProvider` — the one place both surfaces agree on
+ *     `Accept-Language` resolution, never a per-route or per-channel copy.
  *   - Own renderable-exception scope, strictly `commerce/v1/*`, reusing
  *     `PublicApiExceptionRenderer` (already engine-agnostic — no `/api/v1`
  *     assumption in its code) so `/commerce/v1` gets the exact same
@@ -60,7 +64,7 @@ class CommerceApiServiceProvider extends ServiceProvider
             return;
         }
 
-        Route::middleware([ForceJsonResponse::class, PublicApiRequestContext::class])
+        Route::middleware([ForceJsonResponse::class, PublicApiRequestContext::class, ResolveCommerceLocale::class])
             ->prefix('commerce/v1')
             ->as('commerce.v1.')
             ->group(base_path('routes/api_commerce.php'));

@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Http\Middleware\ForceJsonResponse;
 use App\Http\Middleware\PublicApiRequestContext;
+use App\Http\Middleware\ResolveCommerceLocale;
 use App\Support\PublicApiExceptionRenderer;
 use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Http\Request;
@@ -19,6 +20,9 @@ use Throwable;
  *    (M2M) ولا `/customer/v1` (عميل مصادَق).
  *  - مجموعة وسائط مشتركة عامّة فقط (ForceJsonResponse + PublicApiRequestContext)
  *    — كلاهما عامّان بلا أي افتراض M2M، يُعاد استخدامهما بأمان.
+ *  - ResolveCommerceLocale (COM-MOBILE-I18N-1, ADR-12) مضافٌ هنا أيضاً — نفس
+ *    سلطة حسم اللغة (Accept-Language) المطبَّقة حرفياً على /commerce/v1 عبر
+ *    CommerceApiServiceProvider، لا نسخة مستقلة لكل سطح.
  *  - ملف مسارات منفصل `routes/api_storefront.php` لا يُحمَّل ضمن `withRouting`
  *    الداخلي ولا ضمن مزوّد الـ Public API الحالي — لا تعديل على ذاك المزوّد
  *    أو ملفه إطلاقاً.
@@ -41,7 +45,7 @@ class StorefrontApiServiceProvider extends ServiceProvider
             return;
         }
 
-        Route::middleware([ForceJsonResponse::class, PublicApiRequestContext::class])
+        Route::middleware([ForceJsonResponse::class, PublicApiRequestContext::class, ResolveCommerceLocale::class])
             ->prefix('store/v1')
             ->as('storefront.v1.')
             ->group(base_path('routes/api_storefront.php'));
