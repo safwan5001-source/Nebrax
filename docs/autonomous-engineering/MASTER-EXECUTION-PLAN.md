@@ -265,6 +265,71 @@ registration before its real owner ever proves control via OTP (ADR-05 §16 itse
 this); full E.164 phone normalization (country-default inference); real SMS/OTP vendor
 selection (explicitly deferred to its own future Decision/Owner Gate).
 
+## Fourth task
+
+```yaml
+id: COM-MOBILE-CART-IDENTITY-1
+title: Guest → authenticated customer cart transition
+domain: commerce
+status: done
+risk: critical
+depends_on:
+  - COM-MOBILE-AUTH-1 (done)
+  - merge-policy decision (resolved — ADR-07-COMMERCE-CART-MERGE-POLICY.md)
+references:
+  - docs/plans/store/ADR-07-COMMERCE-CART-MERGE-POLICY.md
+  - docs/plans/store/COMMERCE_MOBILE_API_READINESS.md
+outcome: >
+  Presenting a valid X-Customer-Token alongside a guest X-Cart-Token claims
+  the guest cart outright when the customer has no existing cart, or merges
+  its lines into the customer's existing cart (CommerceCartService::add()'s
+  own unmodified quantity-sum semantics) when they do — across both cart and
+  checkout entry points.
+invariants:
+  - Tenant Isolation
+  - no price/availability frozen anywhere in the merge path (revalidateAndPrice() stays sole authority)
+  - a claimed/merged cart is never resolvable by a plain guest bearer, even with the right token
+  - customer_identity_id is never client-suppliable
+  - full guest-flow backward compatibility when no X-Customer-Token is presented
+  - one active cart per customer per sales channel (DB-enforced)
+acceptance:
+  - claim (no existing customer cart) and merge (existing cart) both work end to end, from cart and checkout entry points alike
+  - concurrent-claim races are closed under lock on both write and read paths
+  - a guest line no longer purchasable is dropped, never blocking sign-in or aborting the merge
+  - an unrelated arithmetic/serialization failure aborts the whole merge, never silently drops a line
+  - SQLite/PostgreSQL verification
+tests:
+  - 35 tests (CommerceCartMergeApiTest, grown across 11 review rounds)
+  - full Commerce|Customer|Storefront|PublicApiOpenApiContractTest regression
+  - SQLite
+  - PostgreSQL
+merge_policy: standing-authority-after-pre-merge-review
+deploy_policy: owner-approval
+```
+
+`COM-MOBILE-CART-IDENTITY-1` is `done`: Decision Escalation Gate resolved by Safwan
+(`COM-MOBILE-CART-IDENTITY-1-MERGE-POLICY`) — full decision and rationale recorded in
+`docs/plans/store/ADR-07-COMMERCE-CART-MERGE-POLICY.md`. Merged via PR #924 (Merge SHA
+`dffe6c86017e88019a82fceb2b0214d8a895b332`), post-merge CI green on `main` (SQLite +
+PostgreSQL), mandatory post-merge review passed. Full evidence in
+`docs/plans/commerce/COM-MOBILE-CART-IDENTITY-1-IMPLEMENTATION-REPORT.md`. 11 rounds of
+automated (Codex) review found and this PR fixed real issues progressively hardening: guest/
+owned-cart isolation, concurrent-claim races on both write and read paths for cart and
+checkout, a bounded two-slot token-rotation grace window, quantity/monetary overflow handling
+during merges, a channel-scoped active-cart uniqueness index, and consistent cart/checkout
+lock ordering removing a latent deadlock risk that pre-dated this task. One finding (round 8,
+"merge carts before authenticated checkout completion") was verified and explicitly declined
+with reasoning posted on its PR thread rather than fixed: the literal remedy would have
+orphaned the very checkout being completed (its cart_id never moves) or violated the
+one-active-cart-per-customer invariant.
+
+Discovered backlog from this task (not yet scheduled): `CommerceOrderService::createFromCheckout()`
+still never reads `CustomerContext` (pre-existing, documented design) — a confirmed order
+still has `customer_identity_id = null` regardless of cart ownership; this is
+`COM-MOBILE-ORDER-HISTORY-1`'s job. A genuine multi-token-per-cart schema, if the bounded
+two-slot token-rotation grace window ever proves insufficient for more than one interleaved
+device touch in practice.
+
 ## Backlog discovery
 
 Claude may discover new work while implementing.
