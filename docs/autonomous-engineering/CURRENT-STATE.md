@@ -2,7 +2,7 @@
 
 > This file is a durable resume point, not a substitute for Git/GitHub evidence.
 
-LAST_UPDATED: 2026-09-22 (Payments/Shipping/Promo/I18n/Vertical-Slice decisions resolved, ADR-09..13)
+LAST_UPDATED: 2026-09-22 (Payments/Shipping/Promo/I18n/Vertical-Slice decisions resolved, ADR-09..13; COM-MOBILE-I18N-1 done, PR #935)
 LAYER_VERSION: V1
 STATUS: EXECUTING
 
@@ -38,6 +38,7 @@ Execute the first bounded autonomous-engineering horizon: close the Commerce Mob
   - Cross-cutting rule (no dedicated ADR): Payments/Shipping/locale/future-promotions are shared AWJ Commerce/platform authorities, reusable by Commerce Core, Web Storefront, Mobile, and future App Builder — never mobile-only business logic.
   - Messaging Foundation flag (no ADR, recorded as backlog): any customer-facing SMS/email/push need discovered while building Payments/Shipping must not become a feature-specific integration — record it for the future shared AWJ Messaging/Communications Foundation instead. A real SMS provider remains a separate, unscheduled decision.
   - No production vendor, credential, or external activation is authorized by any of these five decisions. See `TASK-QUEUE.md` for full resolution detail.
+- `COM-MOBILE-I18N-1` (shared Accept-Language locale resolution) is **done**: PR #935 merged; Merge SHA: `220fffb2fb4bcdc9ce0819ae089b42d9e145af1f`. Implements `ADR-12`: `App\Support\CommerceLocale` (pure RFC 9110 §12.5.4 resolver, `ar`/`en`, `ar` default) + `App\Http\Middleware\ResolveCommerceLocale`, wired into the one shared route-registration middleware array both `CommerceApiServiceProvider` and `StorefrontApiServiceProvider` already use — one insertion point for `/commerce/v1` and `/store/v1` alike. Adds `Content-Language` response header only; fully backward compatible. 15 new tests; full `Commerce|Customer|Storefront` regression: 961 passed on SQLite, 986 passed on PostgreSQL, 0 failed. Full evidence: `docs/plans/commerce/COM-MOBILE-I18N-1-IMPLEMENTATION-REPORT.md`.
 
 ## Current execution horizon
 
@@ -48,7 +49,8 @@ Execute the first bounded autonomous-engineering horizon: close the Commerce Mob
 - Fourth executable task: `COM-MOBILE-CART-IDENTITY-1` — **done**.
 - Fifth executable task: `COM-MOBILE-ADDRESSES-1` — **done**.
 - Sixth executable task: `COM-MOBILE-ORDER-HISTORY-1` — **done**.
-- Four candidates now `ready` (owner-resolved, 2026-09-22): `COM-MOBILE-PAYMENTS-1` (ADR-09, COD/Pay-on-Pickup scope only), `COM-MOBILE-SHIPPING-1` (ADR-10, configurable zones only), `COM-MOBILE-I18N-1` (ADR-12), `COM-MOBILE-VERTICAL-TEST-1` (ADR-13, partial scope only).
+- Seventh executable task: `COM-MOBILE-I18N-1` — **done**.
+- Three candidates remain `ready` (owner-resolved, 2026-09-22): `COM-MOBILE-PAYMENTS-1` (ADR-09, COD/Pay-on-Pickup scope only), `COM-MOBILE-SHIPPING-1` (ADR-10, configurable zones only, in progress on `claude/com-mobile-shipping-1`), `COM-MOBILE-VERTICAL-TEST-1` (ADR-13, partial scope only).
 - `COM-MOBILE-PROMO-1` is `deferred` (ADR-11) — explicitly out of scope, not pending.
 - Implementation merge: standing authority after mandatory final-head pre-merge review, required green CI, no unresolved Decision Gate, and mandatory post-merge review.
 - Deploy / production release / destructive production operation: not authorized without Safwan's explicit approval.
