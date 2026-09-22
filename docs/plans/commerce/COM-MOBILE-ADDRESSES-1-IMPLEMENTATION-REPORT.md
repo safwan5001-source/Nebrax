@@ -124,6 +124,15 @@ PR #929, round 1 (Codex, reviewed commit `b230071`) — 3 findings, all verified
 
 All three re-verified with the full `CommerceCustomerAddressApiTest` (16 tests) and the broader `Commerce\|Customer\|Storefront` regression on both SQLite (934 passed) and PostgreSQL (959 passed) after the fix, with no regressions. All three threads replied to and resolved.
 
+PR #929, round 2 (Codex, reviewed commit `66c0fb8`) — 2 findings, both concurrency races exposed by round 1's own fixes, verified as genuine and fixed in commit `a3319da`:
+
+| # | Severity | File | Finding | Fix |
+|---|----------|------|---------|-----|
+| 1 | P2 | `CommerceCustomerAddressController::update()` | Round 1's merged-state Saudi validation still read the existing address *before* `CommerceCustomerAddressService::update()` acquired its row lock — two concurrent PATCHes to the same address could each validate against the same stale pre-lock snapshot and jointly commit a Saudi address missing a required field. | Moved the merged-state read + `assertSaudiFieldsPresent()` call into the service itself, after `lockCustomer()`/`lockForUpdate()`, inside the same transaction as the write — the controller no longer pre-reads at all. |
+| 2 | P2 | `CommerceCustomerAddressService::create()`/`update()` | Two concurrent requests creating a customer's first default address could each see no existing default (nothing to lock yet), both pass, and race to insert — the partial unique index rejects the second as a raw 500. | Added `lockCustomer()`: locks the owning `CustomerIdentity` row (always exists before any address does) at the start of `create()`/`update()`, before any default-clearing or write, fully serializing concurrent default-address operations for the same customer. |
+
+Both re-verified with the full `CommerceCustomerAddressApiTest` (16 tests) and the broader `Commerce\|Customer\|Storefront` regression on both SQLite (934 passed) and PostgreSQL (959 passed) after the fix, with no regressions. Both threads replied to and resolved.
+
 ## Risks / remaining work
 
 - None identified beyond what ADR-08 itself already scoped out (this task does not touch `Partner` addresses or attempt to unify the two address concepts — an explicit non-goal).
