@@ -1,7 +1,6 @@
 # MOBILE-RUNTIME-9 — Implementation Report
 
-STATUS: in progress (CI pending — this task's own CI run is the first real
-build-proof evidence; see "CI" below)
+STATUS: done
 DATE: 2026-09-23
 
 ## Outcome
@@ -200,7 +199,7 @@ evidence, not a local re-run.
 
 ## CI
 
-_In progress._ PR #964 opened on head `5f3e3c25a90b7b18f4725c279cc9fc5e1a72475e`.
+PR #964 opened on head `5f3e3c25a90b7b18f4725c279cc9fc5e1a72475e`.
 As anticipated in "Repository evidence" above, this PR's own CI run
 against `ios-release-build` was the first real compile-time verification
 `AppDelegate.swift`'s MOBILE-RUNTIME-8 push-channel code had ever had —
@@ -222,7 +221,8 @@ MOBILE-RUNTIME-7's and MOBILE-RUNTIME-8's own reports flagged explicitly
 environment... a compile-time mistake would not be caught until
 MOBILE-RUNTIME-9 actually builds the app") — now caught, for real, by
 this task's own new CI job doing exactly that. Fixed with a `guard let`
-unwrap (`mobile/ios/Runner/AppDelegate.swift`):
+unwrap (`mobile/ios/Runner/AppDelegate.swift`), pushed as a second commit
+(head became `35bf9295ca1cdc6dee06365e5d423e4849b472f8`):
 
 ```swift
 guard let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "AwjPushChannel") else {
@@ -237,22 +237,88 @@ uses a structurally different, non-optional pattern — already the same
 shape as the pre-existing, already-proven deep-link channel — and was
 checked directly; no analogous defect exists there.
 
-Fix pushed; re-run pending. `android-release-build`'s result (was still
-`in_progress` when the iOS failure was investigated) and the corrected
-`ios-release-build`'s result will both be recorded here once this PR's
-CI completes on the exact reviewed head._
+After the fix, both `android-release-build` and `ios-release-build`
+succeeded on both push and PR events — the first confirmed, real Gate G
+evidence for either platform. One `ci.yml` `pgsql` job then failed with
+a single test failure:
+`Tests\Feature\ZatcaQrCertificateMaterialExtractorTest > it extracts the
+uncompressed ec key and verifiable ca signature` — "Failed asserting
+that two strings are identical" on raw EC key bytes. This diff touches
+zero PHP/Laravel code (CI-workflow + README + `AppDelegate.swift` fix +
+docs report only), and the failure signature is the exact same
+non-deterministic EC-keypair-generation flake already root-caused in
+MOBILE-RUNTIME-6's implementation report (`openssl_pkey_new` with no
+fixed seed occasionally produces a leading-zero-byte x/y coordinate
+mismatch). Per the CI-red protocol, `rerun_failed_jobs` was triggered
+once on that run; the re-run passed cleanly with no code change,
+confirming the flake diagnosis rather than dismissing it on wording
+alone.
+
+All 10 required checks (`mobile-ci.yml`'s `check`/`android-release-build`/
+`ios-release-build` ×2 for push+PR, `ci.yml` sqlite+pgsql ×2) reported
+`conclusion: success` on head `35bf9295ca1cdc6dee06365e5d423e4849b472f8`.
 
 ## Pre-merge review
 
-_Pending._
+- PRE_MERGE_REVIEW: **PASS**
+- Reviewed Head SHA: `35bf9295ca1cdc6dee06365e5d423e4849b472f8`
+- Findings / resolution:
+  - All 10 required checks green on this exact head (see "CI" above).
+    `mergeable_state: clean`.
+  - Confirmed the diff (`git diff 3a3650b 35bf929 --stat`, 4 files, 516
+    insertions, 5 deletions) touches only
+    `.github/workflows/mobile-ci.yml`, `mobile/README.md`,
+    `mobile/ios/Runner/AppDelegate.swift`, and this task's own report —
+    no `app/`, `database/`, `routes/`, or other PHP/Laravel file, and no
+    other mobile Dart/Kotlin source anywhere in the diff.
+  - Grepped the full diff for any signing-material indicator
+    (keystore/certificate/provisioning/private-key/password/secret/`.p12`/
+    `.mobileprovision`): every match found is prose in a doc comment or
+    the implementation report explicitly stating no such material was
+    added — no actual credential, key file, or secret exists anywhere in
+    this diff.
+  - Re-ran `flutter analyze && flutter test` directly against this exact
+    head in this session: 0 analyze issues, 190/190 tests passing
+    (unchanged from MOBILE-RUNTIME-8, since no Dart source was touched).
+  - Confirmed via GitHub's own build artifacts
+    (`android-release-build` zip 70,202,189 bytes containing the real
+    APK+AAB; `ios-release-build` zip 7,032,678 bytes containing the real
+    unsigned `Runner.app`) that both release builds genuinely produced
+    real output, not just an exit-code-0 no-op.
+  - The one PR comment (`chatgpt-codex-connector[bot]` reporting it hit
+    its own Codex usage limit) carries no review finding — the same
+    non-finding already seen on PRs #960/#962. Zero human/bot reviews
+    posted.
+  - No accounting/tenant/RBAC/API/DB code touched.
+  - No unresolved review finding or Decision Gate blocking merge.
 
 ## Merge
 
-_Pending._
+- Merge status: **merged** (squash), PR #964.
+- Merge SHA: `4b8bc4fda04ff960da691f43d625dccda2c54eea`
 
 ## Post-merge review
 
-_Pending._
+- POST_MERGE_REVIEW: **PASS**
+- Reviewed Merge SHA: `4b8bc4fda04ff960da691f43d625dccda2c54eea`
+- Target-branch checks/smoke:
+  - `git fetch origin main` confirms `origin/main` tip is exactly this
+    SHA, single parent `3a3650bbf786fd1475a5e9731f037fa6f7d8087a` — a
+    genuine squash merge.
+  - `git diff 35bf929 origin/main -- .github/workflows/mobile-ci.yml
+    mobile/README.md mobile/ios/Runner/AppDelegate.swift
+    docs/plans/mobile/MOBILE-RUNTIME-9-IMPLEMENTATION-REPORT.md` is
+    empty — the squash preserved the reviewed content exactly.
+  - Post-merge CI on this exact `head_sha`: `mobile-ci.yml` run
+    [35881295286](https://github.com/safwan5001-source/Nebrax/actions/runs/35881295286)
+    and `ci.yml` run
+    [35881295172](https://github.com/safwan5001-source/Nebrax/actions/runs/35881295172),
+    both `conclusion: success` — including both release-build jobs
+    green on the merge commit itself, not just the PR head.
+  - Targeted post-merge smoke: `flutter analyze` (0 issues) and `flutter
+    test` (190/190 passing) re-run directly against the merged content,
+    after resetting the local branch onto `origin/main` first.
+- Findings / resolution: none — no unexpected integration change.
 
 ## Self-review
 
@@ -349,13 +415,13 @@ locally.
 
 ## Risks / remaining work
 
-- **This task's actual pass/fail evidence is entirely CI-dependent** —
-  unlike every prior MOBILE-RUNTIME task, there is no local fallback
-  verification. If either new job fails, it must be genuinely debugged
-  (not merely "acknowledged" the way MOBILE-RUNTIME-7/8's un-compiled
-  native code was) before this PR can honestly claim Gate G is
-  satisfied — a red build-proof job blocks merge exactly like a red
-  `ci.yml`/`check` job would.
+- **This task's actual pass/fail evidence was entirely CI-dependent** —
+  unlike every prior MOBILE-RUNTIME task, there was no local fallback
+  verification. This played out for real: the first CI run caught a
+  genuine, pre-existing Swift compile bug in `AppDelegate.swift`
+  (MOBILE-RUNTIME-8's registrar-unwrap defect, see "CI" above), which was
+  debugged and fixed rather than merely acknowledged, exactly as this
+  risk anticipated.
 - **Neither built artifact has been installed on a real or simulated
   device.** Gate G asks for buildability, not installability/runtime
   proof on a device — that bar (MR-16 lifecycle, Gate H final runtime
@@ -376,7 +442,13 @@ locally.
 - MOBILE-RUNTIME-10 can now download this task's uploaded
   `android-release-build`/`ios-release-build` CI artifacts directly to
   measure real release artifact sizes against MR-18's provisional
-  budgets, rather than needing its own build step.
+  budgets, rather than needing its own build step. Zipped artifact sizes
+  from the actual merge-commit CI run (`mobile-ci.yml` run 35881295286):
+  `android-release-build` 70,202,189 bytes (APK + AAB together, zip
+  container — GitHub always zips uploaded artifacts, so this is not the
+  raw APK/AAB size), `ios-release-build` 7,032,678 bytes (`Runner.app`,
+  same zip caveat). MOBILE-RUNTIME-10 should download and unzip both to
+  get exact individual file sizes for MR-18's baseline.
 - The production Android Application ID / iOS Bundle ID Decision Gate
   (`mobile/README.md`'s own section, open since MOBILE-RUNTIME-1) remains
   unresolved — this task's builds still use
@@ -397,9 +469,10 @@ added to the same PR.
 ## Git state
 
 - Branch: `claude/awj-mobile-runtime-horizon-v1-g0n8mm`
+- PR: #964 (merged)
 - Base SHA: `3a3650bbf786fd1475a5e9731f037fa6f7d8087a` (`origin/main`, PR #963)
-- Head SHA: _pending push_
-- PR: _pending_
+- Head SHA: `35bf9295ca1cdc6dee06365e5d423e4849b472f8` (pushed, merged)
+- Merge SHA: `4b8bc4fda04ff960da691f43d625dccda2c54eea`
 
 ## Recommended next dependency-ready task
 

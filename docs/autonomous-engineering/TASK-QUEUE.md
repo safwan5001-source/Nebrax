@@ -142,8 +142,8 @@ autonomously per نظام الأفق, `MOBILE-RUNTIME-1` first.
 | 6 | MOBILE-RUNTIME-6 | done | normal | MOBILE-RUNTIME-5 | ar/en + RTL/LTR + theme/accessibility |
 | 7 | MOBILE-RUNTIME-7 | done | high | MOBILE-RUNTIME-3, MOBILE-RUNTIME-5 | Universal/App Links |
 | 8 | MOBILE-RUNTIME-8 | done | high | MOBILE-RUNTIME-3, MOBILE-RUNTIME-7 | Push adapter + notification routing proof |
-| 9 | MOBILE-RUNTIME-9 | in_progress | normal | MOBILE-RUNTIME-6, 7, 8 | Android/iOS release-build proof |
-| 10 | MOBILE-RUNTIME-10 | backlog | high | MOBILE-RUNTIME-9 | Final compatibility/security/performance/runtime evidence + horizon closure |
+| 9 | MOBILE-RUNTIME-9 | done | normal | MOBILE-RUNTIME-6, 7, 8 | Android/iOS release-build proof |
+| 10 | MOBILE-RUNTIME-10 | in_progress | high | MOBILE-RUNTIME-9 | Final compatibility/security/performance/runtime evidence + horizon closure |
 
 `MOBILE-RUNTIME-1` promoted directly to `ready`/`in_progress` from horizon
 authorization (no further evidence gap): the horizon document itself is the
@@ -366,6 +366,42 @@ exact wording, and `.github/workflows/mobile-ci.yml`'s own header comment
 signing, merchant certificates, and App Store/Google Play submission are
 explicitly outside this horizon and remain owner-gated — never attempted
 by this task.
+
+`MOBILE-RUNTIME-9` is `done`: PR #964 merged (Merge SHA
+`4b8bc4fda04ff960da691f43d625dccda2c54eea`, confirmed single-parent
+squash onto `main`, zero content drift from the reviewed head),
+post-merge CI green on both required workflows, post-merge review
+passed. 190/190 tests unchanged, 0 analyze issues, no new dependency.
+Two new `mobile-ci.yml` jobs (`android-release-build` on `ubuntu-latest`,
+`ios-release-build` on `macos-latest`) prove Gate G — this session's own
+Linux environment has neither an Android SDK nor Xcode, so this PR's own
+CI run was the first real compile-time verification either release build
+ever had, and it caught a genuine pre-existing Swift compile bug in
+`AppDelegate.swift` (MOBILE-RUNTIME-8's unhandled optional plugin
+registrar), fixed with a `guard let` unwrap. After the fix both
+release-build jobs passed; a separately-hit `ci.yml` `pgsql` job failure
+was confirmed as the same known EC-keypair-generation flake from
+MOBILE-RUNTIME-6's report via one `rerun_failed_jobs`, unrelated to this
+PR's diff. Both jobs upload their build artifacts for MOBILE-RUNTIME-10's
+use. Full evidence: `docs/plans/mobile/MOBILE-RUNTIME-9-IMPLEMENTATION-REPORT.md`.
+
+`MOBILE-RUNTIME-10` promoted to `ready`/`in_progress` now that its only
+dependency (`MOBILE-RUNTIME-9`) is merged and post-merge reviewed — this
+is the horizon's **final task** (§8 row 10). Source requirement: the
+complete §9 Definition of Done, Gate H (final runtime evidence), and
+MR-13 (capability manifest + runtime handshake), MR-14 (last-known-good
+startup and offline safety), MR-15 (native capability rollout ordering),
+MR-16 (lifecycle and network resilience), MR-17 (observability and
+privacy), MR-18 (performance evidence) — all to be read in full before
+designing anything, since this task closes the entire horizon rather than
+proving one more incremental capability. Expected evidence: version-skew/
+rollback matrix, compatible last-known-good and controlled-unavailable
+startup paths, cold start/resume/network interruption/retry behavior,
+diagnostics redaction proof, performance measurements against
+`docs/plans/mobile/AWJ_MOBILE_RUNTIME_PERFORMANCE_BASELINE.md` (MR-18's
+provisional baseline from MOBILE-RUNTIME-1), release artifact sizes (from
+MOBILE-RUNTIME-9's uploaded CI artifacts), and a Flutter-viability
+conclusion based on evidence — plus a horizon closure report.
 
 ## Promotion checklist: backlog → ready
 
