@@ -258,9 +258,12 @@ push+PR events) passed — `conclusion: success` on every run.
 ## Pre-merge review
 
 - PRE_MERGE_REVIEW: **PASS**
-- Reviewed Head SHA: `59e6baef38e6f73b9735a20d236756805978272b`
+- Reviewed Head SHA: `d715e7e` (code reviewed at `59e6baef38e6f73b9735a20d236756805978272b`;
+  the one commit on top of that, `d715e7e`, is this section's own docs-only
+  addition to this report — `git diff 59e6bae d715e7e --stat` touches only
+  this file, zero code drift)
 - Findings / resolution: fresh Reviewer + AWJ Guardian pass against the
-  complete final diff (`git diff 2276fc6 59e6bae`, 14 files, 2925
+  complete final code diff (`git diff 2276fc6 59e6bae`, 14 files, 2925
   insertions, 1 deletion):
   - All 5 required checks green on this exact head: `mobile (analyze +
     test)`, `php artisan test (L11, sqlite)` ×2, `php artisan test (L11,
