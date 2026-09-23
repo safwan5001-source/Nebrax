@@ -173,6 +173,16 @@ class Rbac
             // قراءة مساحة عمل. owner/admin يملكانها عبر `*`؛ لا تُضاف لـ
             // accountant/staff تلقائياً — نفس نمط الصلاحيات الحديثة أعلاه.
             'commerce.manage',
+            // APP-BUILDER-1: إدارة تطبيقات AWJ App Builder (الهوية والمسودة)
+            // سلطة مستقلة عن نشر نسخة تجربة — `apps_builder.publish` أدناه.
+            // لا علاقة بـ`apps.view`/`apps.manage` (تفعيل/إيقاف قدرات
+            // ApplicationCatalog) رغم تشابه الاسم — نطاقان مختلفان تماماً.
+            // owner/admin عبر `*`؛ لا تُضاف لـ accountant/staff تلقائياً.
+            'apps_builder.view', 'apps_builder.manage',
+            // نشر نسخة تجربة غير قابل للتراجع عنه وأثره يصل للعميل النهائي
+            // مباشرة — صلاحية أضيق عمداً من `apps_builder.manage` (تحرير
+            // المسودة اليومي). owner/admin عبر `*`؛ لا تُضاف تلقائياً.
+            'apps_builder.publish',
     ];
 
     /**

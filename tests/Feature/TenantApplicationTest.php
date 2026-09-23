@@ -34,7 +34,8 @@ class TenantApplicationTest extends TestCase
 
         $res = $this->withToken($auth['token'])->getJson('/api/applications')->assertOk();
 
-        $this->assertCount(44, $res['data']);
+        // APP-BUILDER-1: كتالوج التطبيقات نما بمفتاح `commerce.app_builder` جديد.
+        $this->assertCount(45, $res['data']);
         $this->assertTrue($res['data']['sales.invoicing']['enabled']);
         $this->assertTrue($res['data']['accounting.ledger']['enabled']);
         $this->assertFalse($res['data']['hr.employees']['enabled']);
@@ -313,6 +314,6 @@ class TenantApplicationTest extends TestCase
     /** @test */
     public function the_catalogue_and_service_agree_on_key_count(): void
     {
-        $this->assertCount(44, ApplicationCatalog::all());
+        $this->assertCount(45, ApplicationCatalog::all());
     }
 }

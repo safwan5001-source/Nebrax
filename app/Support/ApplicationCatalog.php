@@ -354,6 +354,23 @@ final class ApplicationCatalog
             'dependencies' => ['sales.invoicing'],
         ],
 
+        // APP-BUILDER-1: تأسيس هوية/مسودة/نشر تطبيق جوال AWJ App Builder —
+        // قناة بيع موازية لـ`commerce.storefront` (تطبيق جوال لا متجر ويب)،
+        // بنفس المجموعة لذلك. `built` لأن سطحاً خلفياً حقيقياً وظيفياً
+        // (API مُختبَر بالكامل خلف RBAC/EnsureApplicationActive) موجود من
+        // هذه المهمة — لا واجهة بناء مرئية بعد (App Manager وworkspace
+        // البناء الفعلي في APP-BUILDER-4/5+)، تماماً كما بدأت قدرات Commerce
+        // Mobile الأخرى `built` بسطح API فقط قبل أي واجهة مرافقة. لا اعتمادية
+        // على `commerce.storefront` — بناء تطبيق جوال لا يتطلب متجراً ويبياً
+        // مفعَّلاً أولاً في V1 (مسار "استخدام تصميم المتجر" اختياري وقت
+        // الإنشاء، لا اعتماديةً بنيوية على الكتالوج).
+        'commerce.app_builder' => [
+            'group' => 'sales',
+            'maturity' => self::MATURITY_BUILT,
+            'mandatory' => false,
+            'dependencies' => [],
+        ],
+
         // ─────────────────────── التكاملات الخارجية ───────────────────────
         'integration.mudad' => [
             'group' => 'integrations',
