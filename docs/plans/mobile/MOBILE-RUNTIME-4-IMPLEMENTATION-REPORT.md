@@ -251,9 +251,42 @@ code). No native build attempted — out of this task's scope
 
 ## CI
 
-PR to be opened on this task's head commit; `mobile-ci.yml` (analyze+test)
-and `ci.yml` (sqlite+pgsql, unaffected by this Dart-only change) are the
-required checks, per the same pattern as MOBILE-RUNTIME-1/2/3.
+PR #954 opened on head `59e6baef38e6f73b9735a20d236756805978272b`; all 5
+required checks (`mobile-ci.yml` analyze+test, `ci.yml` sqlite+pgsql ×2 for
+push+PR events) passed — `conclusion: success` on every run.
+
+## Pre-merge review
+
+- PRE_MERGE_REVIEW: **PASS**
+- Reviewed Head SHA: `59e6baef38e6f73b9735a20d236756805978272b`
+- Findings / resolution: fresh Reviewer + AWJ Guardian pass against the
+  complete final diff (`git diff 2276fc6 59e6bae`, 14 files, 2925
+  insertions, 1 deletion):
+  - All 5 required checks green on this exact head: `mobile (analyze +
+    test)`, `php artisan test (L11, sqlite)` ×2, `php artisan test (L11,
+    pgsql)` ×2 — all `conclusion: success`. `mergeable_state: clean`.
+  - Diff contains exactly the files this task's own change list names —
+    no checkout/payment/order/address code, no UI wiring, ahead of
+    MOBILE-RUNTIME-5's scope.
+  - Re-ran `flutter pub get && flutter analyze && flutter test` directly
+    against this exact head in a fresh container (session resumed mid-CI-
+    wait): 0 analyze issues, 101/101 tests passing — not just trusting the
+    CI badge.
+  - Confirmed by direct inspection that `CommerceClient` never returns a
+    raw token from any public method (grepped every method's return type),
+    that `logoutCustomer`'s success/failure token-clearing split and the
+    401-clears-stale-token behavior are each backed by a dedicated test,
+    and that path-segment building in `_send` never double-encodes (raw
+    segments passed to `Uri.replace(pathSegments: ...)`, never pre-encoded
+    then split).
+  - Confirmed the `flutter_secure_storage` MR-19 dependency review in this
+    report is complete (license, maintenance, platform, permissions,
+    narrower-alternative consideration) and that Android's default
+    `minSdkVersion` (24) already satisfies the package's minimum (23).
+  - The one PR comment (`chatgpt-codex-connector[bot]` reporting it hit its
+    own Codex usage limit) carries no review finding — no action needed.
+  - No accounting/tenant/RBAC/API/DB code touched.
+  - No unresolved review finding or Decision Gate.
 
 ## Self-review
 
