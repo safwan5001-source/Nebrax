@@ -135,8 +135,8 @@ autonomously per نظام الأفق, `MOBILE-RUNTIME-1` first.
 | Order | Task ID | Status | Risk | Depends on | Outcome |
 |---|---|---|---|---|---|
 | 1 | MOBILE-RUNTIME-1 | done | normal | horizon authorization | Flutter workspace + toolchain proof |
-| 2 | MOBILE-RUNTIME-2 | in_progress | normal | MOBILE-RUNTIME-1 (done) | App Schema + compatibility kernel |
-| 3 | MOBILE-RUNTIME-3 | backlog | normal | MOBILE-RUNTIME-2 | Component + Action Registry |
+| 2 | MOBILE-RUNTIME-2 | done | normal | MOBILE-RUNTIME-1 (done) | App Schema + compatibility kernel |
+| 3 | MOBILE-RUNTIME-3 | in_progress | normal | MOBILE-RUNTIME-2 (done) | Component + Action Registry |
 | 4 | MOBILE-RUNTIME-4 | backlog | high | MOBILE-RUNTIME-1 | Commerce OpenAPI client + secure session boundary |
 | 5 | MOBILE-RUNTIME-5 | backlog | high | MOBILE-RUNTIME-3, MOBILE-RUNTIME-4 | Home/Product/Cart vertical UI |
 | 6 | MOBILE-RUNTIME-6 | backlog | normal | MOBILE-RUNTIME-5 | ar/en + RTL/LTR + theme/accessibility |
@@ -176,6 +176,31 @@ navigation, theme tokens, compatibility/fallback) and RUNTIME_COMPATIBILITY_V1.m
 capability-manifest/fail-closed rules are already fixed; this task
 implements a parser/validator/compatibility kernel against those already-
 accepted contracts, not a new architecture decision.
+
+`MOBILE-RUNTIME-2` is `done`: PR #950 merged (Merge SHA
+`12ae268ff0f60b6f7d1044d58bd87b4dcb01eb10`, confirmed single-parent squash,
+zero content drift), post-merge CI green on both required workflows,
+post-merge review passed. 35/35 tests, 0 analyze issues, no new dependency.
+Full evidence: `docs/plans/mobile/MOBILE-RUNTIME-2-IMPLEMENTATION-REPORT.md`.
+
+`MOBILE-RUNTIME-3` promoted to `ready`/`in_progress` now that its hard
+dependency (`MOBILE-RUNTIME-2`) is merged and post-merge reviewed. Source
+requirement: horizon doc §4 MR-04 (component candidate list: Page, Section,
+Text, Image, ProductList, ProductCard, ProductDetail, Price,
+VariantSelector, Quantity, AddToCart, CartList, CartSummary, Button,
+Navigation target) and MR-05 (action allowlist: navigate, openProduct,
+addToCart, updateCartQuantity, removeCartItem, refresh), Quality Gate B
+("typed Component Registry", "typed Action Registry"). No unresolved
+product decision: the identifier lists are already fixed (and already
+mirrored in `mobile/lib/schema/registry_identifiers.dart`); this task gives
+each identifier an actual typed Flutter widget/prop-schema and a typed
+action-dispatch handler consuming `CompatibilityResolver`'s
+`RenderableExperience` output — an implementation task against an
+already-accepted contract, not a new architecture decision. Sensitive
+actions (`addToCart`, `updateCartQuantity`, `removeCartItem`) will not yet
+call a real Commerce API (that is `MOBILE-RUNTIME-4`/`5`) — this task's
+dispatch layer is proved with an injectable/fake action handler, matching
+the horizon's own task-4-comes-after-task-3 dependency ordering.
 
 ## Promotion checklist: backlog → ready
 
