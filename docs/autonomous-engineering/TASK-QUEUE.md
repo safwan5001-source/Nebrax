@@ -498,8 +498,8 @@ Source of truth:
 | Order | Task ID | Status | Risk | Depends on | Outcome |
 |---|---|---|---|---|---|
 | 1 | APP-BUILDER-1 | done | normal | horizon authorization | Domain/persistence foundation (App/Draft/Published Experience Version, tenant/RBAC) |
-| 2 | APP-BUILDER-2 | ready | normal | APP-BUILDER-1 (done) | Schema validation + runtime capability contract |
-| 3 | APP-BUILDER-3 | pending | normal | APP-BUILDER-2 | Component/Action/Data Resource registries |
+| 2 | APP-BUILDER-2 | done | normal | APP-BUILDER-1 (done) | Schema validation + runtime capability contract |
+| 3 | APP-BUILDER-3 | ready | normal | APP-BUILDER-2 (done) | Component/Action/Data Resource registries |
 | 4 | APP-BUILDER-4 | pending | high | APP-BUILDER-3 | App Manager + creation wizard (UI/UX Evidence Pass required) |
 | 5 | APP-BUILDER-5 | pending | high | APP-BUILDER-4 | Builder workspace shell (UI/UX Evidence Pass required) |
 | 6 | APP-BUILDER-6 | pending | normal | APP-BUILDER-5 | Visual editing + history |
@@ -534,3 +534,23 @@ fail-closed compatibility rules are already fixed by the accepted contract pack 
 Mobile Runtime Proof horizon's own `CompatibilityResolver`; this task implements a PHP-side
 validator against those already-accepted contracts (deepening `AppSchemaStructuralValidator`
 introduced in APP-BUILDER-1), not a new architecture decision.
+
+`APP-BUILDER-2` is `done`: PR #971 merged (Merge SHA `8844881de5171055342b397294d8d8fd7ae1e33f`,
+confirmed single-parent squash onto `main`, zero content drift from the reviewed head `30abaa3`).
+Realigned the backend App Schema validator/`BuilderDraftExperience` schema shape to the real,
+already-tested Mobile Runtime contract (`mobile/lib/schema/`) instead of the illustrative
+architecture-doc shape used in APP-BUILDER-1 — the horizon's own anti-duplication rule required
+this correction. Added `SchemaVersion`/`RuntimeCapabilities`/`AppSchemaParser`/`CapabilityManifest`/
+`CompatibilityResult`/`CompatibilityResolver`, all faithful PHP ports of the corresponding Dart
+files. 44 new/updated tests (16 + 10 mirror the Dart test suite's own taxonomy 1:1) + full
+guard-test regression (55/55, no tenant/RBAC/ApplicationCatalog impact). Full evidence:
+`docs/plans/app-builder/APP-BUILDER-2-IMPLEMENTATION-REPORT.md`.
+
+`APP-BUILDER-3` promoted to `ready` now that its hard dependency (`APP-BUILDER-2`) is merged and
+post-merge reviewed. Source requirement: horizon doc task 3 ("metadata contracts powering Inspector
+and safe bindings/actions") and `COMPONENT_REGISTRY_V1.md`/`ACTION_REGISTRY_V1.md`/
+`DATA_RESOURCE_REGISTRY_V1.md`. No unresolved product decision for the identifier set itself
+(`RuntimeCapabilities` from APP-BUILDER-2 already fixes the 15 component / 6 action / 1 native
+capability identifiers); this task adds the richer per-identifier metadata (props, bindings,
+events, editor hints) those contract docs describe, against the same already-fixed identifiers —
+an implementation task, not a new architecture decision.
