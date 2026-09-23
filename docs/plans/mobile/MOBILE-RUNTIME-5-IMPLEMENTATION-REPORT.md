@@ -214,9 +214,87 @@ this task's scope (MOBILE-RUNTIME-9).
 
 ## CI
 
-PR to be opened on this task's head commit; `mobile-ci.yml` (analyze+test)
-and `ci.yml` (sqlite+pgsql, unaffected by this Dart-only change) are the
-required checks, per the same pattern as MOBILE-RUNTIME-1–4.
+PR #956 opened on head `7d22b1e9e66d88bbe2f5d0376cb14bb72ee93c16`; all 6
+required checks (`mobile-ci.yml` analyze+test, `ci.yml` sqlite+pgsql, each
+×2 for push+PR events) passed — `conclusion: success` on every run.
+
+## Pre-merge review
+
+- PRE_MERGE_REVIEW: **PASS**
+- Reviewed Head SHA: `7d22b1e9e66d88bbe2f5d0376cb14bb72ee93c16`
+- Findings / resolution: fresh Reviewer + AWJ Guardian pass against the
+  complete final diff (`git diff 226fde8 7d22b1e`, 18 files, 2001
+  insertions, 35 deletions):
+  - All 6 required checks green on this exact head: `mobile (analyze +
+    test)` ×2, `php artisan test (L11, sqlite)` ×2, `php artisan test
+    (L11, pgsql)` ×2 — all `conclusion: success`. `mergeable_state: clean`.
+  - Re-ran `flutter pub get && flutter analyze && flutter test` directly
+    against this exact head in this session: 0 analyze issues, 116/116
+    tests passing — not just trusting the CI badge.
+  - Confirmed by direct inspection that `RuntimeState.markCartChanged()`
+    is only called after a successful `CommerceClient` response in all
+    three cart-mutating handler methods (`onAddToCart`,
+    `onUpdateCartQuantity`, `onRemoveCartItem`), each with a corresponding
+    failure-path test proving `cartVersion` stays unchanged and `onError`
+    fires instead.
+  - Confirmed `hydrateNode` only ever replaces the exact node matching its
+    `targetId`, leaving siblings/ancestors untouched, and is fail-safe
+    (returns the tree unchanged) when the target id is absent — proven by
+    dedicated tests, not just asserted in prose.
+  - Confirmed the Product-screen architecture decision (bypassing schema
+    parsing, building the tree directly in Dart) is documented in the
+    file's own doc comment, not a silent inconsistency with Home/Cart's
+    schema-driven approach.
+  - Diff contains exactly the files this task's own change list names —
+    no checkout/payment/order/address UI, no deep links, no push, ahead of
+    MOBILE-RUNTIME-6/7/8's scope.
+  - The one PR comment (`chatgpt-codex-connector[bot]` reporting it hit
+    its own Codex usage limit) carries no review finding — no action
+    needed.
+  - No accounting/tenant/RBAC/API/DB code touched.
+  - No unresolved review finding or Decision Gate.
+
+## Merge
+
+- Merge status: **merged** (squash), PR #956.
+- Merge SHA: `5b2815a353bebc6a136ba682ef0b874f22c0e9ff`
+
+## Post-merge review
+
+- POST_MERGE_REVIEW: **PASS**
+- Reviewed Merge SHA: `5b2815a353bebc6a136ba682ef0b874f22c0e9ff`
+- Target-branch checks/smoke:
+  - `git fetch origin main` confirms `origin/main` tip is exactly this SHA,
+    single parent `226fde865a7067b8b1d7391b7a5e214ff4f58859` — a genuine
+    squash merge.
+  - `git diff 7d22b1e9e66d88bbe2f5d0376cb14bb72ee93c16 origin/main --
+    mobile/lib/app mobile/test/app mobile/lib/app.dart
+    mobile/test/widget_test.dart docs/plans/mobile/MOBILE-RUNTIME-5-IMPLEMENTATION-REPORT.md`
+    is empty — the squash preserved the reviewed content exactly.
+  - Post-merge CI on this exact `head_sha`: `ci.yml` run
+    [35831150418](https://github.com/safwan5001-source/Nebrax/actions/runs/35831150418)
+    and `mobile-ci.yml` run
+    [35831150445](https://github.com/safwan5001-source/Nebrax/actions/runs/35831150445),
+    both `conclusion: success`.
+  - Targeted post-merge smoke: `flutter analyze` (0 issues) and `flutter
+    test` (116/116 passing) re-run directly against the merged content.
+- Findings / resolution: none — no unexpected integration change.
+
+## Continuation-mechanism follow-up
+
+The `subscribe_pr_activity` (event-driven) + `send_later` (fallback, per
+the standing owner instruction recorded in MOBILE-RUNTIME-4's report)
+combination worked reliably across this task's full PR lifecycle — both
+mechanisms fired as expected, with the event-driven subscription
+generally arriving first. One operational note for future tasks in this
+horizon: after a squash merge, the source branch's remote ref is *not*
+automatically updated to descend from the new squash commit (squash
+merges are never fast-forwards relative to the source branch's own prior
+tip) — resetting the local branch to `origin/main` for the next task's
+work therefore always needs `--force-with-lease` on the next push, not a
+plain `git push`. This was already implicitly true for MOBILE-RUNTIME-3/4
+as well; recorded explicitly here after a plain `push` was rejected
+mid-task and required an immediate `--force-with-lease` retry.
 
 ## Self-review
 
@@ -355,9 +433,9 @@ long-standing framework APIs.
 ## Git state
 
 - Branch: `claude/awj-mobile-runtime-horizon-v1-g0n8mm`
-- PR: (recorded once opened)
+- PR: #956
 - Base SHA: `226fde865a7067b8b1d7391b7a5e214ff4f58859` (`origin/main`, PR #955)
-- Head SHA: (recorded once pushed)
+- Head SHA: `7d22b1e9e66d88bbe2f5d0376cb14bb72ee93c16` (pushed)
 
 ## Recommended next dependency-ready task
 
