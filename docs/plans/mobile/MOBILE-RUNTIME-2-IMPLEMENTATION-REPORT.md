@@ -1,6 +1,6 @@
 # MOBILE-RUNTIME-2 — Implementation Report
 
-STATUS: review (implementation complete, pre-merge review pending CI observation)
+STATUS: done
 DATE: 2026-09-22
 
 ## Outcome
@@ -214,11 +214,30 @@ writing this section. Updated once CI is observed on the exact PR head.
 
 ## Merge
 
-- Merge status: not yet opened/merged.
+- Merge status: **merged** (squash), PR #950.
+- Merge SHA: `12ae268ff0f60b6f7d1044d58bd87b4dcb01eb10`
 
 ## Post-merge review
 
-- POST_MERGE_REVIEW: not yet applicable.
+- POST_MERGE_REVIEW: **PASS**
+- Reviewed Merge SHA: `12ae268ff0f60b6f7d1044d58bd87b4dcb01eb10`
+- Target-branch checks/smoke:
+  - `git fetch origin main` confirms `origin/main` tip is exactly this SHA,
+    single parent `12109a204abf7950d3818243ef31380b194505d3` — a genuine
+    squash merge.
+  - `git diff 5edc70fb254e992ed0d350e13f35f74d175dd48a origin/main --
+    mobile/lib/schema mobile/test/schema docs/plans/mobile` is empty — the
+    squash preserved the reviewed content exactly.
+  - Post-merge CI on this exact `head_sha` (push-to-`main` trigger, separate
+    from the PR's own pre-merge head check): `mobile-ci.yml` run
+    [35798761468](https://github.com/safwan5001-source/Nebrax/actions/runs/35798761468)
+    and `ci.yml` run
+    [35798761453](https://github.com/safwan5001-source/Nebrax/actions/runs/35798761453),
+    both `conclusion: success`.
+  - Targeted post-merge smoke: `flutter analyze` (0 issues) and `flutter
+    test` (35/35 passing) re-run directly against the merged content.
+- Findings / resolution: none — no unexpected integration change, no
+  conflict with concurrent `main` activity.
 
 ## Self-review
 
