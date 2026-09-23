@@ -2,13 +2,19 @@
 
 > This file is a durable resume point, not a substitute for Git/GitHub evidence.
 
-LAST_UPDATED: 2026-09-23 (MOBILE-RUNTIME-1 through 9 done; MOBILE-RUNTIME-10 done, PR #966 merged (Merge SHA 95198157f1b64e0e437675d9c0e01f45479d776d), post-merge review passed — this closes AWJ Mobile Runtime Proof Horizon V1. See closure report: docs/plans/mobile/AWJ_MOBILE_RUNTIME_PROOF_HORIZON_V1_CLOSURE_REPORT.md. Horizon does not auto-continue to App Builder or any other next horizon — awaiting owner/ChatGPT review.)
+LAST_UPDATED: 2026-09-23 (AWJ App Builder Horizon V1 authorized and launched; APP-BUILDER-1 done, PR #969 merged (Merge SHA 0560429d5987d89549e9e436dc86d2504634eb38), post-merge review passed. Prior AWJ Mobile Runtime Proof Horizon V1 (below) is fully closed and is this horizon's accepted input.)
 LAYER_VERSION: V1
-STATUS: HORIZON_CLOSED (awaiting next-horizon authorization)
+STATUS: ACTIVE — AWJ App Builder Horizon V1
 
 ## Current objective
 
-Execute **AWJ Mobile Runtime Proof Horizon V1** sequentially under نظام الأفق, beginning with `MOBILE-RUNTIME-1`. Preserve AWJ tenant/security/business/accounting invariants and the horizon's non-negotiable boundaries (no parallel commerce logic in Flutter, no production deploy/release). Stop only at a genuine Decision Gate or Horizon End. The prior Commerce Mobile API readiness closure V1 horizon (below) is closed and is this horizon's accepted input.
+Execute **AWJ App Builder Horizon V1** sequentially under نظام الأفق, per `docs/plans/app-builder/AWJ_APP_BUILDER_HORIZON_V1.md`, beginning with `APP-BUILDER-1`. Preserve AWJ tenant/RBAC/accounting invariants and the horizon's non-negotiable boundaries (App Schema is declarative untrusted configuration only, Commerce remains sole business-truth authority, no production deploy/release, no App Factory/signing/store submission). Stop only at a genuine Decision Gate or Horizon End. The prior AWJ Mobile Runtime Proof Horizon V1 (logged below) is fully closed and is this horizon's accepted input/execution layer.
+
+## AWJ App Builder Horizon V1 — execution log
+
+- `APP-BUILDER-1` (Domain/persistence foundation) is **done**: tenant-scoped `BuilderApp` (identity), `BuilderDraftExperience` (mutable working copy, one per app, seeded atomically at creation with a minimal safe App Schema V1 shell per `APP_SCHEMA_V1.md` §4), and `BuilderPublishedExperienceVersion` (immutable, sequentially versioned per app under a row-locked transaction, no update/delete possible after creation) — all `CompanyWide` (mirrors `commerce.storefront`'s classification). `AppSchemaStructuralValidator` checks only the top-level App Schema shape (known keys, `defaultLocale` ∈ `locales`, basic types, a 1 MiB defensive size bound); deep component/action/resource validation is explicitly deferred to `APP-BUILDER-2`/`3`. New RBAC permissions `apps_builder.view`/`apps_builder.manage`/`apps_builder.publish` (publish kept separate — irreversible, customer-facing; not related to the pre-existing `apps.view`/`apps.manage`, which gate `TenantApplicationService`'s unrelated catalog enable/disable concept). New `ApplicationCatalog` key `commerce.app_builder` (group `sales`, `built`, optional, no dependencies), gated via `EnsureApplicationActive`. REST API under `/api/app-builder/apps/*`. Registered the new `app/Services/AppBuilder` directory in the three copy-list scripts this repo's CI guard requires (`ci.yml`, `setup.sh`, `deploy/assemble.sh`). 12 new focused tests (tenant isolation, RBAC negatives, capability gating, structural-validation negatives including an attempted `tenantId`-smuggling test, immutability, race-safe concurrent-publish version numbering) + `ApplicationCatalogTest`/`TenantApplicationTest`'s exhaustive-key fixtures updated for the new catalog entry (44→45). No accounting impact — purely additive, no existing route/model/migration/permission changed. PR #969 merged: Merge SHA `0560429d5987d89549e9e436dc86d2504634eb38`, a confirmed single-parent squash onto `main` (parent `4010305`, this horizon's own base SHA), zero content drift from the reviewed head `869cde3`. Post-merge CI green on the merge commit itself (`ci.yml` run [35916107117](https://github.com/safwan5001-source/Nebrax/actions/runs/35916107117), both `sqlite`/`pgsql` jobs `conclusion: success`). `POST_MERGE_REVIEW: PASS`. A local full-suite run surfaced 35 unrelated pre-existing local-environment-only failures (missing `bcmath` PHP extension; `setup.sh` never copying `app/Mail/*.php`, unlike `ci.yml`/`deploy/assemble.sh`) — both root-caused with direct evidence, confirmed not to reproduce on real CI, and recorded as discovered backlog (the `setup.sh` gap) rather than fixed in this task (out of scope). Full evidence: `docs/plans/app-builder/APP-BUILDER-1-IMPLEMENTATION-REPORT.md`.
+
+## AWJ Mobile Runtime Proof Horizon V1 (closed) — execution log
 
 ## AWJ Mobile Runtime Proof Horizon V1 — execution log
 
@@ -57,6 +63,31 @@ Execute **AWJ Mobile Runtime Proof Horizon V1** sequentially under نظام ال
 - `COM-MOBILE-VERTICAL-TEST-1` (ADR-13 partial-scope vertical slice: `/commerce/v1` OpenAPI contract + guest/authenticated journey tests) is **done**: three stacked PRs merged in sequence — #942 (1/3, contract, Merge SHA `b7d16ecb75808c3622d3c5782c451c21b71e0f0f`), #943 (2/3, guest journey, Merge SHA `c05c62e392f7f33fe57fcb1f8ff1fe97a1a66740`), #944 (3/3, authenticated journey, Merge SHA `b8e1a121f202eb9cb967bcb056092f8a2305a5c9`), each a confirmed single-parent squash merge (`git log --parents`). The task's real scope (31 routes, ~10 resource types with genuinely conditional shapes) proved disproportionately large mid-task; two explicit questions were put to Safwan via `AskUserQuestion` rather than silently grinding or cutting corners — **"full field-level rigor"** (match `PublicApiOpenApiContractTest`'s own convention exactly) and **"split into 3 PRs"** (contract → guest journey → authenticated journey, each reviewed/merged before the next). Both journeys incorporate Shipping (ADR-10) and Payments (ADR-09) per ADR-13 §5's own incremental-extension instruction. Discovered and closed two real pre-existing bugs: `CommerceCustomerAddressController` had no `rejectUnknown()` guard (an undocumented field was silently accepted, not rejected); `CommerceCheckoutService::emptyResponse()`'s address block was missing `building_no`/`additional_number`, violating the endpoint's own documented invariant. Three rounds of automated (Codex) review across the stack found and fixed 7 real findings total (an `allOf`/`additionalProperties:false` schema incompatibility, a wrong-schema `Order.payment` reference, an undocumented optional `X-Customer-Token` parameter, a non-nullable `Cart.status` contradicting its own `emptyResponse()`, the two bugs above, plus — on a second review pass of the contract test's own newly-written recursive schema validator — a null-handling gap and a `$ref` type-checking gap, whose proper fix then surfaced two further genuine schema-accuracy bugs, `unit_name` wrongly typed non-nullable). Codex then reported its review-usage limit exhausted for this account. Final `Commerce|Customer|Storefront|BranchIsolationGuard` regression: 1036 passed on SQLite, 1046 passed on PostgreSQL, 0 failed. `POST_MERGE_REVIEW: PASS` on the final merge (Gate 11): `main` confirmed to contain `b8e1a12` as its tip; post-merge CI on that exact SHA passed — verified via the GitHub Actions API, run [35763886208](https://github.com/safwan5001-source/Nebrax/actions/runs/35763886208), `conclusion: success`. **This closes the entire currently-authorized Commerce Mobile API readiness horizon** — Payments, Shipping, I18N, and the Vertical Slice are all `done`; `COM-MOBILE-PROMO-1` remains explicitly `deferred` (ADR-11). No row in the Commerce Mobile prerequisites table remains `ready`. Full evidence: `docs/plans/commerce/COM-MOBILE-VERTICAL-TEST-1-IMPLEMENTATION-REPORT.md`.
 
 ## Current execution horizon
+
+- Horizon: **AWJ App Builder Horizon V1** — **ACTIVE** (authorized 2026-09-23).
+  Source: `docs/plans/app-builder/AWJ_APP_BUILDER_HORIZON_V1.md`, launched via
+  `docs/plans/app-builder/AWJ_APP_BUILDER_HORIZON_V1_BOOTSTRAP.md`. Starts from
+  `main@4010305be21d63f7249fa7c1fd287f60e2fa720a` (merged PR #968, "docs:
+  authorize AWJ App Builder Horizon V1"). The prior AWJ Mobile Runtime Proof
+  Horizon V1 (below) is fully closed and is this horizon's accepted input/
+  execution layer, not something it reopens.
+- First executable task: `APP-BUILDER-1` (Domain/persistence foundation) —
+  **done** (PR #969, Merge SHA `0560429`). Full evidence: "AWJ App Builder
+  Horizon V1" log above, `docs/plans/app-builder/APP-BUILDER-1-IMPLEMENTATION-REPORT.md`.
+- Second executable task: `APP-BUILDER-2` (Schema validation + runtime
+  capability contract) — next up.
+- Remaining tasks `APP-BUILDER-3` through `APP-BUILDER-12`: see
+  `docs/autonomous-engineering/TASK-QUEUE.md` for the full dependency-ordered
+  table and promotion evidence.
+- Implementation merge: standing authority after mandatory final-head
+  pre-merge review, required green CI, no unresolved Decision Gate, and
+  mandatory post-merge review.
+- Deploy / production release / destructive production operation / App
+  Factory / signing / store submission: not authorized without Safwan's
+  explicit approval — explicitly out of this horizon's scope per its own
+  document.
+
+### Previous (closed) horizon — AWJ Mobile Runtime Proof Horizon V1
 
 - Horizon: **AWJ Mobile Runtime Proof Horizon V1** — **CLOSED** (2026-09-23).
   Source: `docs/plans/mobile/AWJ_MOBILE_RUNTIME_PROOF_HORIZON_V1.md`,
@@ -130,17 +161,23 @@ Execute **AWJ Mobile Runtime Proof Horizon V1** sequentially under نظام ال
 
 ## Authorization boundary
 
-Authorized:
-- sequential implementation work required to close the documented Commerce Mobile readiness gaps;
+Authorized (current horizon: AWJ App Builder Horizon V1):
+- sequential implementation work required to satisfy the documented App Builder V1 task queue
+  (`APP-BUILDER-1` through `APP-BUILDER-12`) and its Definition of Done;
 - only tasks promoted to `ready` after current-main dependency/evidence validation;
-- routine engineering choices inside each task's documented outcome/invariants.
+- routine engineering choices inside each task's documented outcome/invariants;
+- focused UI/UX Evidence Pass + AWJ Design System conformance for each major Builder UI slice, per
+  the horizon document's mandatory workflow.
 
 Not authorized:
+- App Factory / build farm, Apple/Google signing/account ownership, App Store/Google Play
+  submission/release, production rollout — explicitly out of this horizon's scope;
 - deploy or production release;
 - destructive production operations;
 - silent resolution of material accounting/payment/auth/tenant/security/strategic decisions;
-- unrelated App Builder runtime implementation;
-- material scope expansion outside this horizon.
+- arbitrary-code/plugin/runtime execution in the App Schema;
+- material scope expansion outside this horizon (e.g. Preview & Testing infrastructure, broad
+  Store Customizer redesign — both explicitly out of scope per the horizon document).
 
 ## Resume rule
 

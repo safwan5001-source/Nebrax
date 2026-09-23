@@ -1,6 +1,6 @@
 # APP-BUILDER-1 — Implementation Report
 
-STATUS: pre-merge review
+STATUS: done
 DATE: 2026-09-23
 
 ## Outcome
@@ -159,17 +159,25 @@ fixtures — see Tests section above; both are superseded by this head.)
 
 ## Post-merge review
 
-- POST_MERGE_REVIEW: _in progress — `main@0560429` confirmed as `origin/main`'s tip, a
-  single-parent squash (parent `4010305`, this task's own base SHA), zero content drift from the
-  reviewed head `869cde3` (`git diff 869cde3 origin/main` on every touched path is empty). Post-merge
-  CI (`ci.yml` run 35916107117 on the merge commit) was still running at time of this commit — not
-  claiming PASS before it is observed, per the truthfulness rule. Will be updated to PASS once
-  observed._
+- POST_MERGE_REVIEW: **PASS**
 - Reviewed Merge SHA: `0560429d5987d89549e9e436dc86d2504634eb38`
-- Target-branch checks/smoke: post-merge `ci.yml` run
-  [35916107117](https://github.com/safwan5001-source/Nebrax/actions/runs/35916107117) — pending at
-  time of this commit.
-- Findings / resolution: none so far.
+- Target-branch verification:
+  - `main@0560429` confirmed as `origin/main`'s tip via `git fetch origin main` + `git log
+    origin/main -1 --format="%H %P"` — a single-parent squash (parent `4010305`, this task's own
+    base SHA); no history rewrite.
+  - Zero content drift: `git diff 869cde3 origin/main` on every touched path (`app database routes
+    tests docs/autonomous-engineering docs/plans/app-builder .github setup.sh deploy`) is empty —
+    the merged tree matches the reviewed pre-merge head exactly.
+  - Post-merge CI on the merge commit itself (`ci.yml` run
+    [35916107117](https://github.com/safwan5001-source/Nebrax/actions/runs/35916107117),
+    `main@0560429`): both required jobs green — `php artisan test (L11, sqlite)` success,
+    `php artisan test (L11, pgsql)` success.
+  - This report's own docs-only follow-up (PR #970, head `a99670c`) also went fully green:
+    `php artisan test (L11, sqlite)` and `(L11, pgsql)` success on both its push- and
+    pull_request-triggered runs (4/4 checks).
+  - No new conflict with target-branch changes; no unexpected integration change in the merge
+    result.
+- Findings / resolution: none.
 
 ## Self-review
 
@@ -263,9 +271,12 @@ repository conventions; no platform/vendor claim needed verification.
 ## Git state
 
 - Branch: `claude/awj-app-builder-horizon-v1-e4iy21`
-- PR: _pending_
+- PR: [#969](https://github.com/safwan5001-source/Nebrax/pull/969) (code, merged), docs-only
+  follow-up [#970](https://github.com/safwan5001-source/Nebrax/pull/970) (this report's
+  pre/post-merge sections)
 - Base SHA: `4010305be21d63f7249fa7c1fd287f60e2fa720a`
-- Head SHA: _pending_
+- Head SHA (reviewed pre-merge): `869cde3cbb5cb494a0653cec27c84614d5ec151f`
+- Merge SHA: `0560429d5987d89549e9e436dc86d2504634eb38`
 
 ## Recommended next dependency-ready task
 
