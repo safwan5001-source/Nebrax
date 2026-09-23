@@ -3,19 +3,31 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:awj_mobile_runtime/app.dart';
 
+import 'app/fake_commerce.dart';
+
 void main() {
-  testWidgets('AwjMobileRuntimeApp boots to the runtime shell screen', (tester) async {
-    await tester.pumpWidget(const AwjMobileRuntimeApp());
+  testWidgets('AwjMobileRuntimeApp boots to the runtime shell screen', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      AwjMobileRuntimeApp(client: buildFakeCommerceClient()),
+    );
     await tester.pumpAndSettle();
 
     expect(find.text('أَوْج — AWJ Mobile Runtime'), findsOneWidget);
   });
 
-  testWidgets('AwjMobileRuntimeApp defaults to RTL text direction', (tester) async {
-    await tester.pumpWidget(const AwjMobileRuntimeApp());
+  testWidgets('AwjMobileRuntimeApp defaults to RTL text direction', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      AwjMobileRuntimeApp(client: buildFakeCommerceClient()),
+    );
     await tester.pumpAndSettle();
 
-    final shellElement = tester.element(find.text('أَوْج — AWJ Mobile Runtime'));
+    final shellElement = tester.element(
+      find.text('أَوْج — AWJ Mobile Runtime'),
+    );
     expect(Directionality.of(shellElement), TextDirection.rtl);
   });
 }
