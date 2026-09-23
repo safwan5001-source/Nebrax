@@ -41,6 +41,8 @@ mkdir -p app/Services/Commerce/Otp
 cp -r "$CORE_DIR/app/Services/Commerce/Otp/"*.php app/Services/Commerce/Otp/
 mkdir -p app/Services/DocumentCenter
 cp -r "$CORE_DIR/app/Services/DocumentCenter/"*.php app/Services/DocumentCenter/
+mkdir -p app/Services/AppBuilder
+cp -r "$CORE_DIR/app/Services/AppBuilder/"*.php app/Services/AppBuilder/
 cp -r "$CORE_DIR/app/Services/Pos/"*.php         app/Services/Pos/
 cp -r "$CORE_DIR/app/Services/Pos/Hardware/"*.php app/Services/Pos/Hardware/
 cp -r "$CORE_DIR/app/Services/Reporting/"*.php   app/Services/Reporting/

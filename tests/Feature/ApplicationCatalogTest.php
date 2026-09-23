@@ -65,6 +65,8 @@ class ApplicationCatalogTest extends TestCase
             'company.branches',
             'communications.sms',
             'commerce.storefront',
+            // APP-BUILDER-1: تأسيس هوية/مسودة/نشر تطبيق جوال AWJ App Builder.
+            'commerce.app_builder',
             'integration.mudad',
         ];
 
@@ -73,7 +75,7 @@ class ApplicationCatalogTest extends TestCase
         sort($expectedKeys);
 
         $this->assertSame($expectedKeys, $actualKeys);
-        $this->assertCount(44, ApplicationCatalog::all());
+        $this->assertCount(45, ApplicationCatalog::all());
         $this->assertSame([], ApplicationCatalog::validationErrors());
     }
 

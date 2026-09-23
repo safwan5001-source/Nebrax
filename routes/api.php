@@ -28,6 +28,9 @@ use App\Http\Controllers\Api\CashBankAccountController;
 use App\Http\Controllers\Api\ClassificationAnalyticsReportController;
 use App\Http\Controllers\Api\ClassificationController;
 use App\Http\Controllers\Api\CompanyController;
+use App\Http\Controllers\Api\BuilderAppController;
+use App\Http\Controllers\Api\BuilderDraftExperienceController;
+use App\Http\Controllers\Api\BuilderPublishedExperienceVersionController;
 use App\Http\Controllers\Api\CommercePaymentIntentController;
 use App\Http\Controllers\Api\CommerceShippingZoneController;
 use App\Http\Controllers\Api\CommerceWorkspaceStorefrontsController;
@@ -892,6 +895,33 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::delete('commerce/workspace/shipping-zones/{id}', [CommerceShippingZoneController::class, 'destroy'])
             ->whereUuid('id')
             ->middleware($perm('commerce.manage'));
+
+        // APP-BUILDER-1 (AB-01/AB-02/AB-03): تأسيس هوية/مسودة/نشر تطبيق
+        // جوال AWJ App Builder. `apps_builder.publish` أضيق عمداً من
+        // `apps_builder.manage` — نشر نسخة تجربة فعلٌ غير قابل للتراجع، لا
+        // تعديل مسودة يومي. `commerce.app_builder` قدرة عملياتية (لا تجارية)
+        // في ApplicationCatalog، فتُستعمل $app لا $commercialApp.
+        Route::get('app-builder/apps', [BuilderAppController::class, 'index'])
+            ->middleware([$perm('apps_builder.view'), $app('commerce.app_builder')]);
+        Route::post('app-builder/apps', [BuilderAppController::class, 'store'])
+            ->middleware([$perm('apps_builder.manage'), $app('commerce.app_builder')]);
+        Route::get('app-builder/apps/{id}', [BuilderAppController::class, 'show'])
+            ->whereUuid('id')->middleware([$perm('apps_builder.view'), $app('commerce.app_builder')]);
+        Route::patch('app-builder/apps/{id}', [BuilderAppController::class, 'update'])
+            ->whereUuid('id')->middleware([$perm('apps_builder.manage'), $app('commerce.app_builder')]);
+
+        Route::get('app-builder/apps/{id}/draft', [BuilderDraftExperienceController::class, 'show'])
+            ->whereUuid('id')->middleware([$perm('apps_builder.view'), $app('commerce.app_builder')]);
+        Route::put('app-builder/apps/{id}/draft', [BuilderDraftExperienceController::class, 'update'])
+            ->whereUuid('id')->middleware([$perm('apps_builder.manage'), $app('commerce.app_builder')]);
+
+        Route::get('app-builder/apps/{id}/versions', [BuilderPublishedExperienceVersionController::class, 'index'])
+            ->whereUuid('id')->middleware([$perm('apps_builder.view'), $app('commerce.app_builder')]);
+        Route::post('app-builder/apps/{id}/versions', [BuilderPublishedExperienceVersionController::class, 'store'])
+            ->whereUuid('id')->middleware([$perm('apps_builder.publish'), $app('commerce.app_builder')]);
+        Route::get('app-builder/apps/{id}/versions/{version}', [BuilderPublishedExperienceVersionController::class, 'show'])
+            ->whereUuid('id')->whereNumber('version')
+            ->middleware([$perm('apps_builder.view'), $app('commerce.app_builder')]);
 
         // Cycle 0: Workspace foundation only. لا CRUD ولا مبيعات ولا اتصال أجهزة
         // قبل دوراتها، لكن هذا المسار يثبت سلسلة RBAC + entitlement + حالة التطبيق.

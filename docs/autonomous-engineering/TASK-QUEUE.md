@@ -479,3 +479,42 @@ For an ordinary merge inside the standing authority:
 - then unlock merge-dependent tasks.
 
 If a task reaches a true `owner_gate`, Claude may continue only with independent ready tasks inside the authorized horizon; otherwise persist state and stop cleanly for Safwan.
+
+## Authorized horizon — AWJ App Builder Horizon V1
+
+STATUS: ACTIVE (2026-09-23) — authorized by `docs/plans/app-builder/AWJ_APP_BUILDER_HORIZON_V1.md`
+and its bootstrap `docs/plans/app-builder/AWJ_APP_BUILDER_HORIZON_V1_BOOTSTRAP.md`, launched
+after AWJ Mobile Runtime Proof Horizon V1 closed (`main@95198157f1b64e0e437675d9c0e01f45479d776d`).
+
+Source of truth:
+- `docs/plans/app-builder/AWJ_APP_BUILDER_HORIZON_V1.md` (V1 product slice, AB-01..AB-12
+  architecture decisions, dependency-safe task queue, Quality Gates A-F, Definition of Done,
+  Decision Escalation Gates — not duplicated here per the 00-START-HERE documentation rule).
+- `docs/plans/app-builder/AWJ_APP_BUILDER_HORIZON_V1_EVIDENCE.md` (evidence pass).
+- `docs/plans/store/AWJ_APP_BUILDER_PRODUCT_ARCHITECTURE_V1.md`, `APP_SCHEMA_V1.md`,
+  `COMPONENT_REGISTRY_V1.md`, `ACTION_REGISTRY_V1.md`, `DATA_RESOURCE_REGISTRY_V1.md`,
+  `RUNTIME_COMPATIBILITY_V1.md` (accepted contract pack this horizon builds on).
+
+| Order | Task ID | Status | Risk | Depends on | Outcome |
+|---|---|---|---|---|---|
+| 1 | APP-BUILDER-1 | in_progress | normal | horizon authorization | Domain/persistence foundation (App/Draft/Published Experience Version, tenant/RBAC) |
+| 2 | APP-BUILDER-2 | pending | normal | APP-BUILDER-1 | Schema validation + runtime capability contract |
+| 3 | APP-BUILDER-3 | pending | normal | APP-BUILDER-2 | Component/Action/Data Resource registries |
+| 4 | APP-BUILDER-4 | pending | high | APP-BUILDER-3 | App Manager + creation wizard (UI/UX Evidence Pass required) |
+| 5 | APP-BUILDER-5 | pending | high | APP-BUILDER-4 | Builder workspace shell (UI/UX Evidence Pass required) |
+| 6 | APP-BUILDER-6 | pending | normal | APP-BUILDER-5 | Visual editing + history |
+| 7 | APP-BUILDER-7 | pending | normal | APP-BUILDER-6 | Data/Actions/Conditions/Visibility (Develop mode) |
+| 8 | APP-BUILDER-8 | pending | high | APP-BUILDER-7 | Theme + Use My Store Design |
+| 9 | APP-BUILDER-9 | pending | normal | APP-BUILDER-8 | Templates + navigation/pages |
+| 10 | APP-BUILDER-10 | pending | high | APP-BUILDER-9 | Validate/Publish/Version/Rollback foundation |
+| 11 | APP-BUILDER-11 | pending | high | APP-BUILDER-10 | Integrated vertical proof + UX/security closure |
+| 12 | APP-BUILDER-12 | pending | normal | APP-BUILDER-11 | Horizon closure — STOP for owner/ChatGPT review |
+
+`APP-BUILDER-1` promoted directly to `ready`/`in_progress` from horizon authorization: the horizon
+document itself is the accepted source requirement, this is the first task, and its outcome
+(App/Draft Experience/Published Experience Version lifecycle, tenant/RBAC boundary) has no
+unresolved product/architecture decision — AB-01/AB-02/AB-03 already fix the shape
+(server-authoritative persistence, immutable versioned publish, reuse of the accepted App Schema
+identity fields). Repository convention research (`BaseModel`/`CompanyWide` classification,
+`Rbac::PERMISSIONS`, `ApplicationCatalog`, migration/service/controller/test house style) completed
+before implementation per Gate 1/Gate 2.
