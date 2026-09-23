@@ -20,7 +20,7 @@ use RuntimeException;
 final class BuilderAppService
 {
     public function __construct(
-        private readonly AppSchemaStructuralValidator $validator,
+        private readonly AppSchemaParser $parser,
     ) {}
 
     /**
@@ -36,7 +36,7 @@ final class BuilderAppService
         // التمايز الحقيقي (تصميم المتجر/القالب) مؤجَّلٌ إلى APP-BUILDER-8/9
         // (انظر توثيق `BuilderDraftExperience::minimalSafeSchema()`).
         $schema = BuilderDraftExperience::minimalSafeSchema();
-        $this->validator->validate($schema);
+        $this->parser->validate($schema);
 
         return DB::transaction(function () use ($name, $nameEn, $creationSource, $userId, $schema): BuilderApp {
             $app = BuilderApp::create([
