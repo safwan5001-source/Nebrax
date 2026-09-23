@@ -1,6 +1,6 @@
 # MOBILE-RUNTIME-3 — Implementation Report
 
-STATUS: review (implementation complete, pre-merge review pending CI observation)
+STATUS: done
 DATE: 2026-09-23
 
 ## Outcome
@@ -166,20 +166,58 @@ exactly covers `RuntimeCapabilities.components`, and one that
 
 ## CI
 
-Not yet observed — PR not yet opened at the time of writing this section.
+PR #952 opened on head `4847b31cbd760bc6e4374b795f566c2f4ecd10ec`; all 6
+required checks (`mobile-ci.yml` analyze+test, `ci.yml` sqlite+pgsql, each
+×2 for push+PR events) passed — `conclusion: success` on every run.
 
 ## Pre-merge review
 
-- PRE_MERGE_REVIEW: **pending** — recorded once CI is green on the exact PR
-  head (Gate 9).
+- PRE_MERGE_REVIEW: **PASS**
+- Reviewed Head SHA: `4847b31cbd760bc6e4374b795f566c2f4ecd10ec`
+- Findings / resolution: fresh Reviewer + AWJ Guardian pass against the
+  complete final diff (`git diff 9d21705 4847b31`, 11 files, 1493
+  insertions, 0 deletions):
+  - All 6 required checks green on this exact head: `mobile (analyze +
+    test)` ×2, `php artisan test (L11, sqlite)` ×2, `php artisan test
+    (L11, pgsql)` ×2 — all `conclusion: success`. `mergeable_state: clean`.
+  - Diff contains exactly the files this task's own change list names —
+    no Commerce API code, no real navigation, no localization introduced
+    ahead of MOBILE-RUNTIME-4/5/6/7's scope.
+  - Confirmed by direct inspection that `ComponentRegistry.builders`
+    covers exactly `RuntimeCapabilities.components` and `decodeAction`'s
+    switch covers exactly `RuntimeCapabilities.actions`, each backed by a
+    dedicated test that would fail on any future drift.
+  - Confirmed `Image`'s `https://`-only guard and every prop accessor's
+    defensive fallback are real properties of the code, not just
+    assumptions the tests happen to exercise.
+  - No accounting/tenant/RBAC/API/DB code touched.
+  - No unresolved review finding or Decision Gate.
 
 ## Merge
 
-- Merge status: not yet opened/merged.
+- Merge status: **merged** (squash), PR #952.
+- Merge SHA: `b7637f3990702a2cd6277422493dae3eda3b3ced`
 
 ## Post-merge review
 
-- POST_MERGE_REVIEW: not yet applicable.
+- POST_MERGE_REVIEW: **PASS**
+- Reviewed Merge SHA: `b7637f3990702a2cd6277422493dae3eda3b3ced`
+- Target-branch checks/smoke:
+  - `git fetch origin main` confirms `origin/main` tip is exactly this SHA,
+    single parent `9d2170575494f0bc224de181b31873d55d70b58d` — a genuine
+    squash merge.
+  - `git diff 4847b31cbd760bc6e4374b795f566c2f4ecd10ec origin/main --
+    mobile/lib/actions mobile/lib/registry mobile/test/actions
+    mobile/test/registry docs/plans/mobile` is empty — the squash preserved
+    the reviewed content exactly.
+  - Post-merge CI on this exact `head_sha`: `ci.yml` run
+    [35814402337](https://github.com/safwan5001-source/Nebrax/actions/runs/35814402337)
+    and `mobile-ci.yml` run
+    [35814402408](https://github.com/safwan5001-source/Nebrax/actions/runs/35814402408),
+    both `conclusion: success`.
+  - Targeted post-merge smoke: `flutter analyze` (0 issues) and `flutter
+    test` (72/72 passing) re-run directly against the merged content.
+- Findings / resolution: none — no unexpected integration change.
 
 ## Self-review
 
