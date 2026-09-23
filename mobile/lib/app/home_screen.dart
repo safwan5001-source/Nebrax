@@ -8,6 +8,7 @@ import 'experience_hydration.dart';
 import 'runtime_schema.dart';
 import 'runtime_state.dart';
 import 'runtime_status_views.dart';
+import 'runtime_strings.dart';
 
 /// Home — the vertical slice's "Home from App Schema" + "product list from
 /// /commerce/v1" (`AWJ_MOBILE_RUNTIME_PROOF_HORIZON_V1.md` §5).
@@ -24,12 +25,14 @@ class HomeScreen extends StatefulWidget {
   final CommerceClient client;
   final RuntimeState state;
   final AppActionDispatcher dispatcher;
+  final Locale locale;
 
   const HomeScreen({
     super.key,
     required this.client,
     required this.state,
     required this.dispatcher,
+    required this.locale,
   });
 
   @override
@@ -102,7 +105,7 @@ class _HomeScreenState extends State<HomeScreen> {
       // placeholder Commerce host — see `runtime_config.dart`) — this proof
       // has no real deployed tenant to point at by default.
       setState(() {
-        _errorMessage = 'تعذّر الاتصال بالخدمة';
+        _errorMessage = RuntimeStrings.of(widget.locale).connectionError;
         _loading = false;
       });
     }
@@ -110,12 +113,13 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final strings = RuntimeStrings.of(widget.locale);
     if (_incompatibleMessage != null) {
       return IncompatibleView(message: _incompatibleMessage!);
     }
     final basePage = _basePage;
     if (basePage == null) {
-      return const Center(child: Text('تعذّر تحميل الصفحة الرئيسية'));
+      return Center(child: Text(strings.homeLoadError));
     }
     if (_loading && _products == null) {
       return const Center(child: CircularProgressIndicator());
@@ -131,7 +135,11 @@ class _HomeScreenState extends State<HomeScreen> {
           id: 'product-${product.id}',
           optional: true,
           props: {
-            'title': product.name,
+            'title': localizedProductName(
+              product.name,
+              product.nameEn,
+              widget.locale,
+            ),
             'amountMinor': product.price.amountMinor,
             if (product.thumbnailUrl != null) 'imageUrl': product.thumbnailUrl!,
           },
@@ -142,8 +150,18 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
     ];
-    final hydrated = hydrateNode(
+    var hydrated = hydrateNode(
       basePage,
+      'home-tagline',
+      (node) => withProp(node, 'text', strings.tagline),
+    );
+    hydrated = hydrateNode(
+      hydrated,
+      'home-go-cart',
+      (node) => withProp(node, 'label', strings.goToCart),
+    );
+    hydrated = hydrateNode(
+      hydrated,
       'slot.home.products',
       (node) => node.withChildren(cards),
     );

@@ -29,7 +29,10 @@ int _intProp(SchemaComponent node, String key, {int fallback = 0}) {
 List<String> _stringListProp(SchemaComponent node, String key) {
   final value = node.props[key];
   if (value is! List) return const [];
-  return [for (final item in value) if (item is String) item];
+  return [
+    for (final item in value)
+      if (item is String) item,
+  ];
 }
 
 /// Formats integer minor units (halalas) as a human-readable amount —
@@ -66,10 +69,7 @@ class _ActionTappable extends StatelessWidget {
     if (action == null) {
       return Opacity(opacity: 0.5, child: IgnorePointer(child: child));
     }
-    return InkWell(
-      onTap: () => onAction(action),
-      child: child,
-    );
+    return InkWell(onTap: () => onAction(action), child: child);
   }
 }
 
@@ -77,14 +77,22 @@ class _ActionTappable extends StatelessWidget {
 // Layout/content components
 // ---------------------------------------------------------------------------
 
-Widget buildPage(BuildContext context, SchemaComponent node, ActionDispatch onAction) {
+Widget buildPage(
+  BuildContext context,
+  SchemaComponent node,
+  ActionDispatch onAction,
+) {
   return ListView(
     padding: const EdgeInsets.all(16),
     children: buildChildren(node, onAction),
   );
 }
 
-Widget buildSection(BuildContext context, SchemaComponent node, ActionDispatch onAction) {
+Widget buildSection(
+  BuildContext context,
+  SchemaComponent node,
+  ActionDispatch onAction,
+) {
   final title = _optionalStringProp(node, 'title');
   return Padding(
     padding: const EdgeInsets.symmetric(vertical: 8),
@@ -101,7 +109,11 @@ Widget buildSection(BuildContext context, SchemaComponent node, ActionDispatch o
   );
 }
 
-Widget buildText(BuildContext context, SchemaComponent node, ActionDispatch onAction) {
+Widget buildText(
+  BuildContext context,
+  SchemaComponent node,
+  ActionDispatch onAction,
+) {
   final text = _stringProp(node, 'text');
   final style = _stringProp(node, 'style', fallback: 'body');
   final textTheme = Theme.of(context).textTheme;
@@ -113,12 +125,19 @@ Widget buildText(BuildContext context, SchemaComponent node, ActionDispatch onAc
   return Text(text, style: resolvedStyle);
 }
 
-Widget buildImage(BuildContext context, SchemaComponent node, ActionDispatch onAction) {
+Widget buildImage(
+  BuildContext context,
+  SchemaComponent node,
+  ActionDispatch onAction,
+) {
   final url = _stringProp(node, 'url');
   final placeholder = Container(
     color: Theme.of(context).colorScheme.surfaceContainerHighest,
     alignment: Alignment.center,
-    child: Icon(Icons.image_not_supported_outlined, color: Theme.of(context).colorScheme.outline),
+    child: Icon(
+      Icons.image_not_supported_outlined,
+      color: Theme.of(context).colorScheme.outline,
+    ),
   );
   // Only https is accepted — a schema is untrusted published content, and
   // restricting the scheme is a cheap, structural guard against anything
@@ -137,15 +156,23 @@ Widget buildImage(BuildContext context, SchemaComponent node, ActionDispatch onA
       errorBuilder: (context, error, stackTrace) => placeholder,
       loadingBuilder: (context, child, progress) {
         if (progress == null) return child;
-        return Center(child: CircularProgressIndicator(value: progress.expectedTotalBytes != null
-            ? progress.cumulativeBytesLoaded / progress.expectedTotalBytes!
-            : null));
+        return Center(
+          child: CircularProgressIndicator(
+            value: progress.expectedTotalBytes != null
+                ? progress.cumulativeBytesLoaded / progress.expectedTotalBytes!
+                : null,
+          ),
+        );
       },
     ),
   );
 }
 
-Widget buildButton(BuildContext context, SchemaComponent node, ActionDispatch onAction) {
+Widget buildButton(
+  BuildContext context,
+  SchemaComponent node,
+  ActionDispatch onAction,
+) {
   final label = _stringProp(node, 'label', fallback: 'زر');
   final style = _stringProp(node, 'style', fallback: 'primary');
   final action = node.action;
@@ -155,14 +182,24 @@ Widget buildButton(BuildContext context, SchemaComponent node, ActionDispatch on
       : ElevatedButton(onPressed: onPressed, child: Text(label));
 }
 
-Widget buildNavigationTarget(BuildContext context, SchemaComponent node, ActionDispatch onAction) {
+Widget buildNavigationTarget(
+  BuildContext context,
+  SchemaComponent node,
+  ActionDispatch onAction,
+) {
   final label = _stringProp(node, 'label', fallback: '');
+  // "Forward" is a direction-dependent glyph (MR-11: "no direction-only
+  // meaning") — `chevron_left` reads as forward in RTL but backward in
+  // LTR, so it is never used unconditionally; it is picked from the
+  // ambient `Directionality`, the same signal `Icon.textDirection` and
+  // every other direction-aware widget in this tree already relies on.
+  final isRtl = Directionality.of(context) == TextDirection.rtl;
   return _ActionTappable(
     node: node,
     onAction: onAction,
     child: ListTile(
       title: Text(label),
-      trailing: const Icon(Icons.chevron_left),
+      trailing: Icon(isRtl ? Icons.chevron_left : Icons.chevron_right),
     ),
   );
 }
@@ -177,16 +214,25 @@ Widget buildNavigationTarget(BuildContext context, SchemaComponent node, ActionD
 // *can render*, typed and safely, from whatever data eventually feeds it.
 // ---------------------------------------------------------------------------
 
-Widget buildPrice(BuildContext context, SchemaComponent node, ActionDispatch onAction) {
+Widget buildPrice(
+  BuildContext context,
+  SchemaComponent node,
+  ActionDispatch onAction,
+) {
   final amountMinor = _intProp(node, 'amountMinor');
   final currencySymbol = _stringProp(node, 'currencySymbol', fallback: 'ر.س');
   return Text(
     formatMinorAmount(amountMinor, currencySymbol: currencySymbol),
-    style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+    style: Theme.of(context).textTheme.titleMedium
+        ?.copyWith(fontWeight: FontWeight.bold),
   );
 }
 
-Widget buildProductCard(BuildContext context, SchemaComponent node, ActionDispatch onAction) {
+Widget buildProductCard(
+  BuildContext context,
+  SchemaComponent node,
+  ActionDispatch onAction,
+) {
   final title = _stringProp(node, 'title');
   final imageUrl = _optionalStringProp(node, 'imageUrl');
   final amountMinor = _intProp(node, 'amountMinor');
@@ -221,7 +267,8 @@ Widget buildProductCard(BuildContext context, SchemaComponent node, ActionDispat
                   const SizedBox(height: 4),
                   Text(
                     formatMinorAmount(amountMinor),
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
+                    style: Theme.of(context).textTheme.bodyMedium
+                        ?.copyWith(fontWeight: FontWeight.bold),
                   ),
                 ],
               ),
@@ -233,11 +280,25 @@ Widget buildProductCard(BuildContext context, SchemaComponent node, ActionDispat
   );
 }
 
-Widget buildProductList(BuildContext context, SchemaComponent node, ActionDispatch onAction) {
-  return SizedBox(
-    height: 220,
-    child: ListView(
-      scrollDirection: Axis.horizontal,
+/// A fixed-height cross axis (the previous `SizedBox(height: 220)` +
+/// `ListView`) assumed a text scale where two title lines plus a price line
+/// fit under 220px; at an accessibility text scale (MR-11 large-text
+/// resilience, Gate E) that assumption breaks and each [buildProductCard]
+/// overflows its box. A `Row` in a horizontal `SingleChildScrollView`
+/// instead sizes to whatever height the tallest card's content actually
+/// needs at the active [MediaQuery] text scale — no magic constant to keep
+/// in sync with font metrics, and still a single unbounded-width scroller
+/// (this proof's product pages are never large enough to need the
+/// virtualization a `ListView` would add over a `Row`).
+Widget buildProductList(
+  BuildContext context,
+  SchemaComponent node,
+  ActionDispatch onAction,
+) {
+  return SingleChildScrollView(
+    scrollDirection: Axis.horizontal,
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         for (final child in node.children)
           Padding(
@@ -249,7 +310,11 @@ Widget buildProductList(BuildContext context, SchemaComponent node, ActionDispat
   );
 }
 
-Widget buildProductDetail(BuildContext context, SchemaComponent node, ActionDispatch onAction) {
+Widget buildProductDetail(
+  BuildContext context,
+  SchemaComponent node,
+  ActionDispatch onAction,
+) {
   final title = _stringProp(node, 'title');
   final description = _optionalStringProp(node, 'description');
   final imageUrl = _optionalStringProp(node, 'imageUrl');
@@ -274,7 +339,8 @@ Widget buildProductDetail(BuildContext context, SchemaComponent node, ActionDisp
       const SizedBox(height: 4),
       Text(
         formatMinorAmount(amountMinor),
-        style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+        style: Theme.of(context).textTheme.titleMedium
+            ?.copyWith(fontWeight: FontWeight.bold),
       ),
       if (description != null) ...[
         const SizedBox(height: 8),
@@ -286,7 +352,11 @@ Widget buildProductDetail(BuildContext context, SchemaComponent node, ActionDisp
   );
 }
 
-Widget buildAddToCart(BuildContext context, SchemaComponent node, ActionDispatch onAction) {
+Widget buildAddToCart(
+  BuildContext context,
+  SchemaComponent node,
+  ActionDispatch onAction,
+) {
   final label = _stringProp(node, 'label', fallback: 'إضافة للسلة');
   final action = node.action;
   return ElevatedButton.icon(
@@ -296,23 +366,39 @@ Widget buildAddToCart(BuildContext context, SchemaComponent node, ActionDispatch
   );
 }
 
-Widget buildCartList(BuildContext context, SchemaComponent node, ActionDispatch onAction) {
+Widget buildCartList(
+  BuildContext context,
+  SchemaComponent node,
+  ActionDispatch onAction,
+) {
   return Column(children: buildChildren(node, onAction));
 }
 
-Widget buildCartSummary(BuildContext context, SchemaComponent node, ActionDispatch onAction) {
+Widget buildCartSummary(
+  BuildContext context,
+  SchemaComponent node,
+  ActionDispatch onAction,
+) {
   final itemCount = _intProp(node, 'itemCount');
   final subtotalAmountMinor = _intProp(node, 'subtotalAmountMinor');
+  // `summaryLabel` lets a locale-aware caller (`cart_screen.dart`) supply
+  // its own already-pluralized/-translated text (MOBILE-RUNTIME-6,
+  // `RuntimeStrings.itemsCount`) — this registry widget has no locale of
+  // its own to format with (a `ComponentBuilder` has no such parameter),
+  // so it only ever falls back to a bare count for a caller that omits it.
+  final summaryLabel =
+      _optionalStringProp(node, 'summaryLabel') ?? '$itemCount عنصر';
   return Card(
     child: Padding(
       padding: const EdgeInsets.all(12),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text('$itemCount عنصر'),
+          Text(summaryLabel),
           Text(
             formatMinorAmount(subtotalAmountMinor),
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+            style: Theme.of(context).textTheme.titleMedium
+                ?.copyWith(fontWeight: FontWeight.bold),
           ),
         ],
       ),
@@ -331,7 +417,11 @@ Widget buildCartSummary(BuildContext context, SchemaComponent node, ActionDispat
 // through server-authoritative validation).
 // ---------------------------------------------------------------------------
 
-Widget buildVariantSelector(BuildContext context, SchemaComponent node, ActionDispatch onAction) {
+Widget buildVariantSelector(
+  BuildContext context,
+  SchemaComponent node,
+  ActionDispatch onAction,
+) {
   final options = _stringListProp(node, 'options');
   return _VariantSelectorWidget(options: options);
 }
@@ -364,16 +454,30 @@ class _VariantSelectorWidgetState extends State<_VariantSelectorWidget> {
   }
 }
 
-Widget buildQuantity(BuildContext context, SchemaComponent node, ActionDispatch onAction) {
+Widget buildQuantity(
+  BuildContext context,
+  SchemaComponent node,
+  ActionDispatch onAction,
+) {
   final initial = _intProp(node, 'value', fallback: 1);
   final min = _intProp(node, 'min', fallback: 1);
   final max = _intProp(node, 'max', fallback: 99);
+  // Same locale-source limitation `buildCartSummary` documents: this
+  // registry widget has no `Locale` of its own, so a locale-aware caller
+  // (`cart_screen.dart`) supplies these (MR-11: icon-only controls need a
+  // semantic label, not just a visible icon a screen reader cannot name).
+  final decreaseLabel =
+      _optionalStringProp(node, 'decreaseLabel') ?? 'إنقاص الكمية';
+  final increaseLabel =
+      _optionalStringProp(node, 'increaseLabel') ?? 'زيادة الكمية';
   return _QuantityWidget(
     initial: initial.clamp(min, max),
     min: min,
     max: max,
     action: node.action,
     onAction: onAction,
+    decreaseLabel: decreaseLabel,
+    increaseLabel: increaseLabel,
   );
 }
 
@@ -383,6 +487,8 @@ class _QuantityWidget extends StatefulWidget {
   final int max;
   final ActionRef? action;
   final ActionDispatch onAction;
+  final String decreaseLabel;
+  final String increaseLabel;
 
   const _QuantityWidget({
     required this.initial,
@@ -390,6 +496,8 @@ class _QuantityWidget extends StatefulWidget {
     required this.max,
     required this.action,
     required this.onAction,
+    required this.decreaseLabel,
+    required this.increaseLabel,
   });
 
   @override
@@ -405,7 +513,12 @@ class _QuantityWidgetState extends State<_QuantityWidget> {
     setState(() => _value = next);
     final action = widget.action;
     if (action != null) {
-      widget.onAction(ActionRef(type: action.type, params: {...action.params, 'quantity': next}));
+      widget.onAction(
+        ActionRef(
+          type: action.type,
+          params: {...action.params, 'quantity': next},
+        ),
+      );
     }
   }
 
@@ -417,12 +530,14 @@ class _QuantityWidgetState extends State<_QuantityWidget> {
         IconButton(
           key: const ValueKey('quantity-decrement'),
           icon: const Icon(Icons.remove_circle_outline),
+          tooltip: widget.decreaseLabel,
           onPressed: _value > widget.min ? () => _change(-1) : null,
         ),
         Text('$_value', style: Theme.of(context).textTheme.titleMedium),
         IconButton(
           key: const ValueKey('quantity-increment'),
           icon: const Icon(Icons.add_circle_outline),
+          tooltip: widget.increaseLabel,
           onPressed: _value < widget.max ? () => _change(1) : null,
         ),
       ],

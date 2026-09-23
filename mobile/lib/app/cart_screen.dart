@@ -8,6 +8,7 @@ import 'experience_hydration.dart';
 import 'runtime_schema.dart';
 import 'runtime_state.dart';
 import 'runtime_status_views.dart';
+import 'runtime_strings.dart';
 
 /// Cart — the vertical slice's "Cart read/update/remove"
 /// (`AWJ_MOBILE_RUNTIME_PROOF_HORIZON_V1.md` §5).
@@ -28,12 +29,14 @@ class CartScreen extends StatefulWidget {
   final CommerceClient client;
   final RuntimeState state;
   final AppActionDispatcher dispatcher;
+  final Locale locale;
 
   const CartScreen({
     super.key,
     required this.client,
     required this.state,
     required this.dispatcher,
+    required this.locale,
   });
 
   @override
@@ -103,7 +106,7 @@ class _CartScreenState extends State<CartScreen> {
       });
     } catch (_) {
       setState(() {
-        _errorMessage = 'تعذّر الاتصال بالخدمة';
+        _errorMessage = RuntimeStrings.of(widget.locale).connectionError;
         _loading = false;
       });
     }
@@ -111,12 +114,13 @@ class _CartScreenState extends State<CartScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final strings = RuntimeStrings.of(widget.locale);
     if (_incompatibleMessage != null) {
       return IncompatibleView(message: _incompatibleMessage!);
     }
     final basePage = _basePage;
     if (basePage == null) {
-      return const Center(child: Text('تعذّر تحميل السلة'));
+      return Center(child: Text(strings.cartLoadError));
     }
     if (_loading && _cart == null) {
       return const Center(child: CircularProgressIndicator());
@@ -153,7 +157,13 @@ class _CartScreenState extends State<CartScreen> {
               type: 'Quantity',
               id: 'cart-line-${item.id}-qty',
               optional: true,
-              props: {'value': item.quantity, 'min': 1, 'max': 99},
+              props: {
+                'value': item.quantity,
+                'min': 1,
+                'max': 99,
+                'decreaseLabel': strings.quantityDecrease,
+                'increaseLabel': strings.quantityIncrease,
+              },
               children: const [],
               action: ActionRef(
                 type: 'updateCartQuantity',
@@ -164,7 +174,7 @@ class _CartScreenState extends State<CartScreen> {
               type: 'Button',
               id: 'cart-line-${item.id}-remove',
               optional: true,
-              props: {'label': 'إزالة', 'style': 'secondary'},
+              props: {'label': strings.removeItem, 'style': 'secondary'},
               children: const [],
               action: ActionRef(
                 type: 'removeCartItem',
@@ -177,6 +187,11 @@ class _CartScreenState extends State<CartScreen> {
 
     var hydrated = hydrateNode(
       basePage,
+      'cart-go-home',
+      (node) => withProp(node, 'label', strings.continueShopping),
+    );
+    hydrated = hydrateNode(
+      hydrated,
       'slot.cart.items',
       (node) => node.withChildren(lineNodes),
     );
@@ -192,6 +207,7 @@ class _CartScreenState extends State<CartScreen> {
         props: {
           'itemCount': cart?.items.length ?? 0,
           'subtotalAmountMinor': cart?.subtotal.amountMinor ?? 0,
+          'summaryLabel': strings.itemsCount(cart?.items.length ?? 0),
         },
       ),
     );

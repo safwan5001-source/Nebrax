@@ -39,6 +39,28 @@ void main() {
       },
     );
 
+    test('Accept-Language defaults to ar and follows setLocale (ADR-12/COM-MOBILE-I18N-1)', () async {
+      final transport = FakeCommerceTransport.always(
+        jsonResponse(200, {'data': [], 'meta': paginationMeta(total: 0)}),
+      );
+      final client = CommerceClient(
+        config: _config(),
+        sessionStore: InMemorySecureSessionStore(),
+        transport: transport,
+      );
+
+      await client.listProducts();
+      expect(transport.requests.single.headers['Accept-Language'], 'ar');
+
+      client.setLocale('en');
+      await client.listProducts();
+      expect(transport.requests.last.headers['Accept-Language'], 'en');
+
+      client.setLocale('ar');
+      await client.listProducts();
+      expect(transport.requests.last.headers['Accept-Language'], 'ar');
+    });
+
     test('listProducts encodes optional filters as query parameters, omitting absent ones', () async {
       final transport = FakeCommerceTransport.always(
         jsonResponse(200, {'data': [], 'meta': paginationMeta(total: 0)}),
