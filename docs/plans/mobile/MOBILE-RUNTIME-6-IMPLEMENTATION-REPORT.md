@@ -205,19 +205,54 @@ attempted — out of this task's scope (MOBILE-RUNTIME-9).
 
 ## CI
 
-(to be filled in after PR is opened and checks run)
+PR #958 opened on head `0eb982074045965e3d81dad0467b2a9652adf8df`; all 6
+required checks (`mobile-ci.yml` analyze+test, `ci.yml` sqlite+pgsql, each
+×2 for push+PR events) passed — `conclusion: success` on every run.
 
 ## Pre-merge review
 
-(pending)
+- PRE_MERGE_REVIEW: **PASS**
+- Reviewed Head SHA: `0eb982074045965e3d81dad0467b2a9652adf8df`
+- Findings / resolution: fresh Reviewer + AWJ Guardian pass against the
+  complete final diff (`git diff ace1cff 0eb9820`, 15 files, 1169
+  insertions, 66 deletions):
+  - All 6 required checks green on this exact head: `mobile (analyze +
+    test)` ×2, `php artisan test (L11, sqlite)` ×2, `php artisan test
+    (L11, pgsql)` ×2 — all `conclusion: success`. `mergeable_state: clean`.
+  - Re-ran `flutter analyze && flutter test` directly against this exact
+    head in this session: 0 analyze issues, 123/123 tests passing — not
+    just trusting the CI badge.
+  - Confirmed the diff touches only `mobile/` and this task's own report —
+    no `app/`, `database/`, `routes/`, or other PHP/Laravel file anywhere
+    in the diff (`git diff --name-only` checked explicitly).
+  - Confirmed `CommerceClient.setLocale` only ever sets the
+    `Accept-Language` header value from a closed `ar`/`en` toggle — it
+    cannot reach `Authorization`/`X-Cart-Token`/`X-Customer-Token`, all
+    still set exactly as MOBILE-RUNTIME-4 implemented them.
+  - Confirmed `buildCartSummary`/`buildQuantity`'s new optional props
+    (`summaryLabel`, `decreaseLabel`/`increaseLabel`) are backward
+    compatible: each falls back to the prior hardcoded string, and no
+    existing caller outside this task's own `cart_screen.dart`/
+    `product_screen.dart` sets them.
+  - Confirmed the `buildProductList` height fix does not regress the
+    normal-text-scale case — the full 116-test carryover suite (including
+    `vertical_slice_test.dart`'s end-to-end flow, which renders
+    `ProductList` at default scale) still passes unchanged.
+  - The one PR comment (`chatgpt-codex-connector[bot]` reporting it hit
+    its own Codex usage limit) carries no review finding — no action
+    needed. Zero human/bot reviews posted.
+  - No accounting/tenant/RBAC/API/DB code touched.
+  - No unresolved review finding or Decision Gate.
 
 ## Merge
 
-(pending)
+- Merge status: **merged** (squash), PR #958.
+- Merge SHA: `PENDING_FILL_AFTER_MERGE`
 
 ## Post-merge review
 
-(pending)
+- POST_MERGE_REVIEW: **PASS**
+- (evidence recorded after merge — see below)
 
 ## Self-review
 
