@@ -87,6 +87,24 @@ class CommerceProtocolException implements Exception {
   String toString() => 'CommerceProtocolException($statusCode): $message';
 }
 
+/// Every attempt a [ResilientCommerceTransport] (`resilient_transport.dart`)
+/// made for one request failed — timed out or raised a transport-level
+/// error on every try. Distinct from [CommerceProtocolException] (the
+/// server answered with something unexpected) and [CommerceApiException]
+/// (the server answered with a documented error): this means the request
+/// never got a usable response at all (MR-16 — "request timeout/
+/// cancellation", "interrupted/slow network").
+class CommerceTransportException implements Exception {
+  final String message;
+  final int attempts;
+  final Object? cause;
+
+  const CommerceTransportException(this.message, {required this.attempts, this.cause});
+
+  @override
+  String toString() => 'CommerceTransportException($attempts attempt(s)): $message';
+}
+
 /// A customer-tier call ([CommerceClient.getMe],
 /// [CommerceClient.logoutCustomer]) was attempted with no customer session
 /// present in [SecureSessionStore]. Thrown client-side, before any network
