@@ -138,8 +138,8 @@ autonomously per نظام الأفق, `MOBILE-RUNTIME-1` first.
 | 2 | MOBILE-RUNTIME-2 | done | normal | MOBILE-RUNTIME-1 (done) | App Schema + compatibility kernel |
 | 3 | MOBILE-RUNTIME-3 | done | normal | MOBILE-RUNTIME-2 (done) | Component + Action Registry |
 | 4 | MOBILE-RUNTIME-4 | done | high | MOBILE-RUNTIME-1 (done) | Commerce OpenAPI client + secure session boundary |
-| 5 | MOBILE-RUNTIME-5 | in_progress | high | MOBILE-RUNTIME-3, MOBILE-RUNTIME-4 | Home/Product/Cart vertical UI |
-| 6 | MOBILE-RUNTIME-6 | backlog | normal | MOBILE-RUNTIME-5 | ar/en + RTL/LTR + theme/accessibility |
+| 5 | MOBILE-RUNTIME-5 | done | high | MOBILE-RUNTIME-3, MOBILE-RUNTIME-4 | Home/Product/Cart vertical UI |
+| 6 | MOBILE-RUNTIME-6 | in_progress | normal | MOBILE-RUNTIME-5 | ar/en + RTL/LTR + theme/accessibility |
 | 7 | MOBILE-RUNTIME-7 | backlog | high | MOBILE-RUNTIME-3, MOBILE-RUNTIME-5 | Universal/App Links |
 | 8 | MOBILE-RUNTIME-8 | backlog | high | MOBILE-RUNTIME-3, MOBILE-RUNTIME-7 | Push adapter + notification routing proof |
 | 9 | MOBILE-RUNTIME-9 | backlog | normal | MOBILE-RUNTIME-6, 7, 8 | Android/iOS release-build proof |
@@ -254,6 +254,28 @@ navigation/ephemeral UI state, never business authority). Deep links
 own dependency table — this task's "deep-link into a supported screen"
 line in the vertical slice is realized later via that same navigation
 boundary, not built ahead of schedule here.
+
+`MOBILE-RUNTIME-5` is `done`: PR #956 merged (Merge SHA
+`5b2815a353bebc6a136ba682ef0b874f22c0e9ff`, confirmed single-parent squash
+onto `main`, zero content drift from the reviewed head), post-merge CI
+green on both required workflows, post-merge review passed. 116/116 tests
+(15 new), 0 analyze issues, no new dependency. `NoopActionHandler` is
+retired; `RuntimeActionHandler` now wires every allowlisted action to
+`CommerceClient`. Full evidence:
+`docs/plans/mobile/MOBILE-RUNTIME-5-IMPLEMENTATION-REPORT.md`.
+
+`MOBILE-RUNTIME-6` promoted to `ready`/`in_progress` now that its hard
+dependency (`MOBILE-RUNTIME-5`) is merged and post-merge reviewed. Source
+requirement: horizon doc §4 MR-10 (Localization) and MR-11
+(Accessibility), Quality Gate E ("ar/en", "RTL/LTR", "large text",
+"semantics", "VoiceOver/TalkBack smoke evidence where executable"). No
+unresolved product decision: AWJ's project-wide rule already fixes
+Arabic-first/RTL-first (CLAUDE.md), and full `flutter_localizations` was
+already flagged as deferred-to-this-task since MOBILE-RUNTIME-1's own
+report. This task adds the ar/en locale delegate stack, LTR support for
+English, and accessibility semantics/large-text support to the existing
+Home/Product/Cart screens — not a new screen or a new Commerce
+interaction.
 
 ## Promotion checklist: backlog → ready
 

@@ -254,6 +254,48 @@ required checks (`mobile-ci.yml` analyze+test, `ci.yml` sqlite+pgsql, each
   - No accounting/tenant/RBAC/API/DB code touched.
   - No unresolved review finding or Decision Gate.
 
+## Merge
+
+- Merge status: **merged** (squash), PR #956.
+- Merge SHA: `5b2815a353bebc6a136ba682ef0b874f22c0e9ff`
+
+## Post-merge review
+
+- POST_MERGE_REVIEW: **PASS**
+- Reviewed Merge SHA: `5b2815a353bebc6a136ba682ef0b874f22c0e9ff`
+- Target-branch checks/smoke:
+  - `git fetch origin main` confirms `origin/main` tip is exactly this SHA,
+    single parent `226fde865a7067b8b1d7391b7a5e214ff4f58859` — a genuine
+    squash merge.
+  - `git diff 7d22b1e9e66d88bbe2f5d0376cb14bb72ee93c16 origin/main --
+    mobile/lib/app mobile/test/app mobile/lib/app.dart
+    mobile/test/widget_test.dart docs/plans/mobile/MOBILE-RUNTIME-5-IMPLEMENTATION-REPORT.md`
+    is empty — the squash preserved the reviewed content exactly.
+  - Post-merge CI on this exact `head_sha`: `ci.yml` run
+    [35831150418](https://github.com/safwan5001-source/Nebrax/actions/runs/35831150418)
+    and `mobile-ci.yml` run
+    [35831150445](https://github.com/safwan5001-source/Nebrax/actions/runs/35831150445),
+    both `conclusion: success`.
+  - Targeted post-merge smoke: `flutter analyze` (0 issues) and `flutter
+    test` (116/116 passing) re-run directly against the merged content.
+- Findings / resolution: none — no unexpected integration change.
+
+## Continuation-mechanism follow-up
+
+The `subscribe_pr_activity` (event-driven) + `send_later` (fallback, per
+the standing owner instruction recorded in MOBILE-RUNTIME-4's report)
+combination worked reliably across this task's full PR lifecycle — both
+mechanisms fired as expected, with the event-driven subscription
+generally arriving first. One operational note for future tasks in this
+horizon: after a squash merge, the source branch's remote ref is *not*
+automatically updated to descend from the new squash commit (squash
+merges are never fast-forwards relative to the source branch's own prior
+tip) — resetting the local branch to `origin/main` for the next task's
+work therefore always needs `--force-with-lease` on the next push, not a
+plain `git push`. This was already implicitly true for MOBILE-RUNTIME-3/4
+as well; recorded explicitly here after a plain `push` was rejected
+mid-task and required an immediate `--force-with-lease` retry.
+
 ## Self-review
 
 ### Implementer
