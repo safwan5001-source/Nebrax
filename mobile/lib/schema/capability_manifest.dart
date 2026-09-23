@@ -20,6 +20,7 @@ class CapabilityManifest {
   final SchemaVersion maxSupportedSchemaVersion;
   final Map<String, int> components;
   final Map<String, int> actions;
+  final Map<String, int> nativeCapabilities;
 
   const CapabilityManifest({
     required this.platform,
@@ -28,6 +29,7 @@ class CapabilityManifest {
     required this.maxSupportedSchemaVersion,
     required this.components,
     required this.actions,
+    this.nativeCapabilities = const {},
   });
 
   /// This exact runtime build's manifest — the only constructor production
@@ -42,6 +44,7 @@ class CapabilityManifest {
       maxSupportedSchemaVersion: const SchemaVersion(1, 0, 0),
       components: RuntimeCapabilities.components,
       actions: RuntimeCapabilities.actions,
+      nativeCapabilities: RuntimeCapabilities.nativeCapabilities,
     );
   }
 
@@ -66,6 +69,10 @@ class CapabilityManifest {
   /// is required just because the horizon's illustrative example used
   /// dotted names.
   /// (`commerce.productGrid`, `commerce.cart.add`) does not distinguish the
-  /// two namespaces syntactically, so this checks both.
-  int? namedCapabilityVersion(String key) => actions[key] ?? components[key];
+  /// two namespaces syntactically, so this checks both. MOBILE-RUNTIME-8
+  /// added the third namespace this doc comment anticipated
+  /// ([nativeCapabilities]) once a real need — push routing — appeared;
+  /// this also checks that map, in the same undistinguished style.
+  int? namedCapabilityVersion(String key) =>
+      actions[key] ?? components[key] ?? nativeCapabilities[key];
 }

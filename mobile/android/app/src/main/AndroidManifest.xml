@@ -1,4 +1,11 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Required starting API 33 (Tiramisu) to show any notification at
+         all; requested at runtime via the `awj/push` channel
+         (MOBILE-RUNTIME-8, horizon MR-09) — see `MainActivity.kt`'s own
+         doc comment. Declaring this permission is not itself a push
+         transport commitment: it only gates whether this app may display a
+         notification, independent of what eventually delivers one. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <application
         android:label="awj_mobile_runtime"
         android:name="${applicationName}"

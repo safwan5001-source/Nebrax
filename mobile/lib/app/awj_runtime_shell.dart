@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../actions/actions.dart';
 import '../commerce/commerce.dart';
 import '../deeplink/deep_link_channel.dart';
+import '../push/push_channel_adapter.dart';
+import '../push/push_controller.dart';
 import 'cart_screen.dart';
 import 'home_screen.dart';
 import 'product_screen.dart';
@@ -51,6 +53,8 @@ class _AwjRuntimeShellState extends State<AwjRuntimeShell> {
   late final RuntimeState _state;
   late final AppActionDispatcher _dispatcher;
   late final DeepLinkController _deepLinks;
+  late final ChannelPushAdapter _pushAdapter;
+  late final PushController _push;
 
   @override
   void initState() {
@@ -73,6 +77,13 @@ class _AwjRuntimeShellState extends State<AwjRuntimeShell> {
     // explains why its output can only ever be `navigate`/`openProduct`).
     _deepLinks = DeepLinkController(onAction: _dispatcher.dispatch);
     _deepLinks.start();
+    // A notification tap resolves through the exact same allowlisted
+    // navigate/openProduct-only pipeline as a deep link — see
+    // `push_payload_resolver.dart`'s own doc comment for why it can never
+    // smuggle a destructive action.
+    _pushAdapter = ChannelPushAdapter();
+    _push = PushController(adapter: _pushAdapter, onAction: _dispatcher.dispatch);
+    _push.start();
   }
 
   @override
@@ -87,6 +98,7 @@ class _AwjRuntimeShellState extends State<AwjRuntimeShell> {
   void dispose() {
     _state.removeListener(_onStateChanged);
     _state.dispose();
+    _pushAdapter.dispose();
     super.dispose();
   }
 
