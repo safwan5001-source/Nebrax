@@ -117,7 +117,11 @@ With the Commerce Mobile Customer track fully closed, a Decision/Evidence Packet
 
 ## Authorized horizon — AWJ Mobile Runtime Proof Horizon V1
 
-STATUS: ACTIVE
+STATUS: CLOSED (2026-09-23) — all 10 tasks `done`; see
+`docs/plans/mobile/AWJ_MOBILE_RUNTIME_PROOF_HORIZON_V1_CLOSURE_REPORT.md`.
+No task in this horizon is `ready`; continuation to a next horizon
+requires new owner authorization per `AWJ-HORIZON-SYSTEM.md`'s closure
+rule.
 
 Source of truth:
 - `docs/plans/mobile/AWJ_MOBILE_RUNTIME_PROOF_HORIZON_V1.md` (full task
@@ -143,7 +147,7 @@ autonomously per نظام الأفق, `MOBILE-RUNTIME-1` first.
 | 7 | MOBILE-RUNTIME-7 | done | high | MOBILE-RUNTIME-3, MOBILE-RUNTIME-5 | Universal/App Links |
 | 8 | MOBILE-RUNTIME-8 | done | high | MOBILE-RUNTIME-3, MOBILE-RUNTIME-7 | Push adapter + notification routing proof |
 | 9 | MOBILE-RUNTIME-9 | done | normal | MOBILE-RUNTIME-6, 7, 8 | Android/iOS release-build proof |
-| 10 | MOBILE-RUNTIME-10 | in_progress | high | MOBILE-RUNTIME-9 | Final compatibility/security/performance/runtime evidence + horizon closure |
+| 10 | MOBILE-RUNTIME-10 | done | high | MOBILE-RUNTIME-9 | Final compatibility/security/performance/runtime evidence + horizon closure |
 
 `MOBILE-RUNTIME-1` promoted directly to `ready`/`in_progress` from horizon
 authorization (no further evidence gap): the horizon document itself is the
@@ -402,6 +406,43 @@ diagnostics redaction proof, performance measurements against
 provisional baseline from MOBILE-RUNTIME-1), release artifact sizes (from
 MOBILE-RUNTIME-9's uploaded CI artifacts), and a Flutter-viability
 conclusion based on evidence — plus a horizon closure report.
+
+`MOBILE-RUNTIME-10` is `done`: PR #966 merged (Merge SHA
+`95198157f1b64e0e437675d9c0e01f45479d776d`, confirmed single-parent squash
+onto `main`, zero content drift from the reviewed head), post-merge CI
+green on both required workflows (including both release-build jobs on
+the merge commit itself), post-merge review passed. This session was a
+handoff from a prior session that hit its weekly usage limit mid-task; the
+handoff checkpoint (base SHA, PR #965's merge SHA, "no MOBILE-RUNTIME-10
+PR yet") was independently verified against live repo/GitHub state before
+any work began, and both owner decisions recorded in the handoff were
+preserved exactly: MR-14 (`mobile/lib/startup/`, last-known-good startup
+decision mechanism) and MR-17 (`mobile/lib/diagnostics/`, diagnostic
+context + redaction) are real, tested, standalone primitives with zero
+production call site — no remote Published Experience fetch flow was
+invented, and the real Home/Cart startup path (still rendering bundled
+fixture schemas, unchanged since MOBILE-RUNTIME-5) was left undisturbed.
+MR-16 (network resilience) added `ResilientCommerceTransport` (timeout +
+bounded retry, `GET`-only — a mutating request always gets exactly one
+attempt) as `CommerceClient`'s new default transport, plus an
+`AwjRuntimeShell` lifecycle observer that re-triggers the existing
+`refresh` action on background resume. A Gate H audit found horizon §6's
+13-fixture compatibility matrix already 11/13 proven by MOBILE-RUNTIME-2/
+8's existing tests; `startup/` closes the remaining two. Per the preserved
+performance-evidence decision, real measurements were produced for
+schema parse/resolve wall-clock and release artifact sizes (70,209,077
+bytes zipped Android APK+AAB; 7,036,117 bytes zipped iOS `Runner.app`,
+both from this task's own fresh CI build); every device-backed metric is
+recorded as explicitly NOT MEASURED with the exact reason (no emulator/
+Simulator/device in this environment; none provisioned, per explicit
+owner instruction) rather than fabricated. 252/252 tests passing (62 new,
+up from 190), 0 analyze issues, no native code touched. **This closes the
+entire authorized `AWJ Mobile Runtime Proof Horizon V1`** — no task in
+this horizon remains `ready`. Full evidence:
+`docs/plans/mobile/MOBILE-RUNTIME-10-IMPLEMENTATION-REPORT.md`. Full
+horizon closure report (Flutter viability conclusion, all 10 Merge SHAs,
+remaining Decision Gates, next recommended horizon):
+`docs/plans/mobile/AWJ_MOBILE_RUNTIME_PROOF_HORIZON_V1_CLOSURE_REPORT.md`.
 
 ## Promotion checklist: backlog → ready
 

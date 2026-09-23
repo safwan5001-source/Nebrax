@@ -297,14 +297,61 @@ No journal entry table applies.
 
 ## CI / merge evidence
 
-PR #966, Head SHA `d45e32f38de33af9021949b94dc5092b35f5f580`. Both required
-workflows green on this exact head (verified via the GitHub Actions API,
-not assumed from a webhook alone):
+PR #966. Two heads, both fully green:
 
-- `mobile-ci.yml` run [35894857490](https://github.com/safwan5001-source/Nebrax/actions/runs/35894857490) — `conclusion: success`, all three jobs (`mobile (analyze + test)`, `mobile (Android release build proof)`, `mobile (iOS release build proof)`) individually `success`.
-- `ci.yml` run [35894857231](https://github.com/safwan5001-source/Nebrax/actions/runs/35894857231) — `conclusion: success` (backend suite, unrelated to this diff but required).
+- `d45e32f38de33af9021949b94dc5092b35f5f580` (initial push): `mobile-ci.yml`
+  run [35894857490](https://github.com/safwan5001-source/Nebrax/actions/runs/35894857490)
+  — `conclusion: success`, all three jobs (`mobile (analyze + test)`,
+  `mobile (Android release build proof)`, `mobile (iOS release build
+  proof)`) individually `success`; `ci.yml` run
+  [35894857231](https://github.com/safwan5001-source/Nebrax/actions/runs/35894857231)
+  — `conclusion: success`.
+- `d16e23d7221a2c388968166a6ef6d5da505c6ac0` (docs-only backfill of the real
+  artifact sizes above — `git diff d45e32f d16e23d --stat` confirmed
+  exactly 2 files changed, both under `docs/plans/mobile/`, zero code
+  drift): `mobile-ci.yml` did not re-run (path-filtered to `mobile/**`,
+  untouched by this commit) — its prior green result on `d45e32f` still
+  applied since no file it covers changed; `ci.yml` re-ran fresh (no path
+  filter) and passed again on this exact head, run
+  [35896935589](https://github.com/safwan5001-source/Nebrax/actions/runs/35896935589)
+  — `conclusion: success`, both `pgsql` and `sqlite` jobs individually
+  `success`.
+
+PR mergeable state: `clean` (no conflict, required checks satisfied). No
+open review threads (`get_review_comments` returned 0). The one PR comment
+(`chatgpt-codex-connector[bot]`) reported Codex's own review-usage limit
+was reached for this account — informational only, no finding to act on
+(consistent with several prior tasks in this horizon hitting the same
+limit).
 
 `PRE_MERGE_REVIEW: PASS`
-`Reviewed Head SHA: d45e32f38de33af9021949b94dc5092b35f5f580`
+`Reviewed Head SHA: d16e23d7221a2c388968166a6ef6d5da505c6ac0`
 
-<!-- POST_MERGE_REVIEW and actual Merge SHA recorded here after merge. -->
+PR #966 merged via squash (`mcp__github__merge_pull_request`,
+`expectedHeadSha` set to the reviewed head, so a silent race with a later
+push was structurally impossible): **Merge SHA
+`95198157f1b64e0e437675d9c0e01f45479d776d`**, confirmed a single-parent
+squash onto `main` (`git log origin/main -1 --format='%H %P'` →
+`9519815... beea79f...`, `beea79f` being this session's own verified base
+SHA). `git diff d16e23d origin/main -- mobile/ docs/plans/mobile/` is empty
+— zero content drift between the reviewed head and what actually landed on
+`main`.
+
+Post-merge CI on this exact Merge SHA — both required workflows re-ran
+fresh from the push-to-`main` event and passed:
+
+- `mobile-ci.yml` run [35899315030](https://github.com/safwan5001-source/Nebrax/actions/runs/35899315030) — `conclusion: success`, all three jobs individually `success` (including both release-build jobs on the merge commit itself, the same convention MOBILE-RUNTIME-9's report established).
+- `ci.yml` run [35899315224](https://github.com/safwan5001-source/Nebrax/actions/runs/35899315224) — `conclusion: success`, both `pgsql`/`sqlite` jobs individually `success`.
+
+Plus a targeted post-merge `flutter analyze`/`flutter test` smoke re-run
+against the merged content in this session's own local checkout (identical
+to `origin/main`'s tree for every path this task touched): `flutter
+analyze` 0 issues, `flutter test` 252/252 passing.
+
+`POST_MERGE_REVIEW: PASS`
+`Reviewed Merge SHA: 95198157f1b64e0e437675d9c0e01f45479d776d`
+
+**This closes `AWJ Mobile Runtime Proof Horizon V1`** — MOBILE-RUNTIME-10
+was the horizon's final task (§8 row 10). See
+`docs/plans/mobile/AWJ_MOBILE_RUNTIME_PROOF_HORIZON_V1_CLOSURE_REPORT.md`
+for the full horizon closure report.
