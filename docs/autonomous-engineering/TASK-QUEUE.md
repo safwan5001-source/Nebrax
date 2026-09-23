@@ -500,8 +500,8 @@ Source of truth:
 | 1 | APP-BUILDER-1 | done | normal | horizon authorization | Domain/persistence foundation (App/Draft/Published Experience Version, tenant/RBAC) |
 | 2 | APP-BUILDER-2 | done | normal | APP-BUILDER-1 (done) | Schema validation + runtime capability contract |
 | 3 | APP-BUILDER-3 | done | normal | APP-BUILDER-2 (done) | Component/Action/Data Resource registries |
-| 4 | APP-BUILDER-4 | ready | high | APP-BUILDER-3 (done) | App Manager + creation wizard (UI/UX Evidence Pass required) |
-| 5 | APP-BUILDER-5 | pending | high | APP-BUILDER-4 | Builder workspace shell (UI/UX Evidence Pass required) |
+| 4 | APP-BUILDER-4 | done | high | APP-BUILDER-3 (done) | App Manager + creation wizard (UI/UX Evidence Pass required) |
+| 5 | APP-BUILDER-5 | ready | high | APP-BUILDER-4 (done) | Builder workspace shell (UI/UX Evidence Pass required) |
 | 6 | APP-BUILDER-6 | pending | normal | APP-BUILDER-5 | Visual editing + history |
 | 7 | APP-BUILDER-7 | pending | normal | APP-BUILDER-6 | Data/Actions/Conditions/Visibility (Develop mode) |
 | 8 | APP-BUILDER-8 | pending | high | APP-BUILDER-7 | Theme + Use My Store Design |
@@ -555,7 +555,10 @@ capability identifiers); this task adds the richer per-identifier metadata (prop
 events, editor hints) those contract docs describe, against the same already-fixed identifiers —
 an implementation task, not a new architecture decision.
 
-`APP-BUILDER-3` is `done`: PR pending merge (see implementation report for live status). Added
+`APP-BUILDER-3` is `done`: PR #973 merged (Merge SHA `4256d0aadb1a53f5288d054d5d937cd85ddf4d97`,
+confirmed single-parent squash onto `main`, zero content drift from the reviewed head `82cbc1a`),
+post-merge CI green on the merge commit (`ci.yml` run 35931041709, sqlite+pgsql both success),
+post-merge review passed. Added
 `ComponentRegistry`/`ActionRegistry` (full per-identifier metadata: props, children rules,
 actionability, typed action params) plus a deliberately empty `DataResourceRegistry`. Two scoping
 findings, both repository-evidence-grounded (not product decisions): (1) the real, tested schema
@@ -570,3 +573,22 @@ APP-BUILDER-1/2's documented `bcmath`/`app/Mail` local-environment gaps). Full e
 `APP-BUILDER-4` promoted to `ready` now that its hard dependency (`APP-BUILDER-3`) is done.
 **Requires a UI/UX Evidence Pass and AWJ Design System conformance check before implementation**
 per the horizon's own gate for the first major Builder UI slice — not to be skipped.
+
+`APP-BUILDER-4` is `done`: PR pending merge (see implementation report for live status). Completed
+a focused UI/UX Evidence Pass (`APP-BUILDER-4-UX-EVIDENCE-PASS.md`) before any implementation, per
+the horizon's mandatory gate for the first major Builder UI slice — external interaction evidence
+(WordPress.com site creation, Shopify theme library, empty-state UX literature), retained/rejected
+patterns, and an explicit AWJ UX Decision, all reusing the AWJ Design System's existing components
+exclusively (no new visual primitive). Built `/app-builder` (list), `/app-builder/new` (path-first
+creation: Use My Store Design / Choose Template / Start From Scratch), `/app-builder/[id]`
+(overview) — pure frontend, zero backend files touched, consuming APP-BUILDER-1's existing REST
+API unchanged. Sidebar entry added to the `sales` group, gated by the same
+`commerce.app_builder`/`apps_builder.view` mechanism every other catalog-backed nav item uses.
+11 new focused tests, all passing; found and fixed one real test-mock bug (unstable `next-intl`
+mock reference causing an infinite re-render loop in the test only, not production code) before
+any external review. Full evidence: `docs/plans/app-builder/APP-BUILDER-4-IMPLEMENTATION-REPORT.md`.
+
+`APP-BUILDER-5` promoted to `ready` now that its hard dependency (`APP-BUILDER-4`) is done.
+**Requires its own focused UI/UX Evidence Pass and AWJ Design System conformance check before
+implementation** — the bootstrap explicitly requires repeating this workflow per major Builder UI
+slice, not reusing APP-BUILDER-4's pass.

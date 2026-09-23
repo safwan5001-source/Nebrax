@@ -51,7 +51,8 @@ export const OPENAPI_MODEL: OpenApiModel = {
     "invalid_idempotency_key",
     "idempotency_conflict",
     "idempotency_in_progress",
-    "review_required"
+    "review_required",
+    "cart_merged"
   ],
   "notableHeaders": [
     {
