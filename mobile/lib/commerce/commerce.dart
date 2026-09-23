@@ -14,4 +14,5 @@ export 'commerce_config.dart';
 export 'commerce_error.dart';
 export 'commerce_models.dart';
 export 'commerce_transport.dart';
+export 'resilient_transport.dart';
 export 'secure_session_store.dart';

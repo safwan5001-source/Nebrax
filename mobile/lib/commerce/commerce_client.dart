@@ -4,6 +4,7 @@ import 'commerce_config.dart';
 import 'commerce_error.dart';
 import 'commerce_models.dart';
 import 'commerce_transport.dart';
+import 'resilient_transport.dart';
 import 'secure_session_store.dart';
 
 /// Whether a call sends `X-Customer-Token`, per
@@ -44,11 +45,17 @@ class CommerceClient {
   final CommerceTransport _transport;
   String _acceptLanguage = 'ar';
 
+  /// Production code never passes [transport] — the default wraps the real
+  /// [IoCommerceTransport] in a [ResilientCommerceTransport] (MR-16), so
+  /// timeout/retry protection applies to every real request without any
+  /// call site opting in. Tests always inject a fake transport directly
+  /// (bypassing timeout/retry entirely, which is correct — they exercise
+  /// [ResilientCommerceTransport] itself in `resilient_transport_test.dart`).
   CommerceClient({
     required this.config,
     required this.sessionStore,
     CommerceTransport? transport,
-  }) : _transport = transport ?? IoCommerceTransport();
+  }) : _transport = transport ?? ResilientCommerceTransport(IoCommerceTransport());
 
   /// Sets the `Accept-Language` value every subsequent request sends,
   /// aligning this client with the server's own locale resolution

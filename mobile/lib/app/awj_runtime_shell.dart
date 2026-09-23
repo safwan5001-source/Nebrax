@@ -48,7 +48,7 @@ class AwjRuntimeShell extends StatefulWidget {
   State<AwjRuntimeShell> createState() => _AwjRuntimeShellState();
 }
 
-class _AwjRuntimeShellState extends State<AwjRuntimeShell> {
+class _AwjRuntimeShellState extends State<AwjRuntimeShell> with WidgetsBindingObserver {
   late final CommerceClient _client;
   late final RuntimeState _state;
   late final AppActionDispatcher _dispatcher;
@@ -56,9 +56,19 @@ class _AwjRuntimeShellState extends State<AwjRuntimeShell> {
   late final ChannelPushAdapter _pushAdapter;
   late final PushController _push;
 
+  /// Tracks whether the app has actually been backgrounded since the last
+  /// refresh, so the `resumed -> inactive -> paused -> inactive -> resumed`
+  /// sequence real devices send (Flutter's own documented lifecycle order —
+  /// `inactive` is a transient state on the way in and out of `paused`, not
+  /// a background state itself) still triggers exactly one refresh, rather
+  /// than requiring an exact `paused` immediately followed by `resumed`
+  /// with nothing in between.
+  bool _wasPaused = false;
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _client =
         widget.client ??
         CommerceClient(
@@ -96,10 +106,29 @@ class _AwjRuntimeShellState extends State<AwjRuntimeShell> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _state.removeListener(_onStateChanged);
     _state.dispose();
     _pushAdapter.dispose();
     super.dispose();
+  }
+
+  /// MR-16 ("resume after background"): re-validates on-screen data through
+  /// the exact same allowlisted `refresh` action every screen already
+  /// listens for (MR-05's action registry, wired since MOBILE-RUNTIME-3) —
+  /// never a new navigation or business-authority path of its own. Only
+  /// fires on a genuine paused -> resumed transition, never on the initial
+  /// lifecycle callback a fresh cold start also receives (that path is
+  /// already "Boot -> ... -> Home from App Schema" — refreshing again on
+  /// top of it would just duplicate the first fetch for no reason).
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused) {
+      _wasPaused = true;
+    } else if (state == AppLifecycleState.resumed && _wasPaused) {
+      _wasPaused = false;
+      _state.markRefreshRequested();
+    }
   }
 
   void _onStateChanged() => setState(() {});

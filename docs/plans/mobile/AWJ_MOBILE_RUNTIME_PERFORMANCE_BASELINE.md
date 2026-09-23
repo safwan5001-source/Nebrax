@@ -1,6 +1,9 @@
 # AWJ Mobile Runtime — Performance Measurement Method + Provisional Baseline (MR-18)
 
-**Status:** Provisional — established at MOBILE-RUNTIME-1, measured against at MOBILE-RUNTIME-10.
+**Status:** Method/budgets established at MOBILE-RUNTIME-1 (§1-6, unchanged,
+still provisional). Device-independent metrics measured at MOBILE-RUNTIME-10
+(§7.1); device-backed metrics explicitly not measurable in this environment
+(§7.2) — see §7 for the full result.
 **Parent:** `docs/plans/mobile/AWJ_MOBILE_RUNTIME_PROOF_HORIZON_V1.md` §4 MR-18.
 
 ## 1. Why this exists now
@@ -92,3 +95,61 @@ a specific device matrix, and does not authorize skipping correctness,
 accessibility or security work to hit a budget (per the horizon's own
 MR-18: "Do not optimize by weakening correctness, accessibility, security or
 image fidelity without an explicit tradeoff").
+
+## 7. MOBILE-RUNTIME-10 measured results
+
+**Owner decision recorded for this section** (2026-09-23, preserved from
+this task's handoff): "Document the limitation, measure what's
+device-independent." Every number below is real and reproducible from the
+commands cited — nothing is estimated, interpolated, or "converted" from a
+different metric. Every metric this environment cannot genuinely measure is
+recorded as **NOT MEASURED** with the exact reason, never a guess.
+
+### 7.1 Measured — device-independent
+
+| Metric | Method | Result |
+|---|---|---|
+| Schema parse+resolve (Home) | `Stopwatch` around `AppSchema.parse` + `CompatibilityResolver.resolve`, 500 iterations after 20-run warmup, `flutter test test/performance/schema_performance_test.dart` | n=500, median 94µs, p90 215µs, max 2228µs, mean 135.6µs |
+| Schema parse+resolve (Cart) | same method | n=500, median 28µs, p90 67µs, max 678µs, mean 40.5µs |
+| Schema parse only (Home, isolates parse from resolve) | same method | n=500, median 13µs, p90 19µs, max 531µs |
+| Headless widget-tree render, cold (first pump in a fresh `flutter test` isolate — includes this process's one-time engine/binding init, not repeated per real app launch) | `Stopwatch` around `tester.pumpWidget`/`pumpAndSettle` of `ExperienceView` for the resolved Home page, `flutter test` | 511,978µs (single sample) |
+| Headless widget-tree render, warm (second pump of the identical tree in the same isolate — isolates steady-state rebuild/layout/paint from one-time init) | same method | 1,628µs (single sample) |
+| `flutter analyze` | `flutter analyze` | 0 issues |
+| `flutter test` (full suite, harness speed sanity only, not a performance metric) | `flutter test` | 251/251 passing, ~11–12s wall time in this environment |
+| Android release artifact size | `flutter build apk --release` + `flutter build appbundle --release` (`mobile-ci.yml`'s `android-release-build` job, `ubuntu-latest`) | see this task's implementation report for the exact byte sizes from this PR's own CI run |
+| iOS release artifact size (unsigned) | `flutter build ios --release --no-codesign` (`mobile-ci.yml`'s `ios-release-build` job, `macos-latest`) | see this task's implementation report for the exact byte size from this PR's own CI run |
+
+The widget-tree render numbers are an explicit **proxy**, not a
+first-meaningful-render measurement: `flutter test` runs against
+`AutomatedTestWidgetsFlutterBinding` on the Dart VM host, not a real device
+GPU/raster pipeline, and there is no network fetch or real image decode in
+this scenario (`ExperienceView` renders an already-resolved in-memory tree
+with no product images). It is genuinely useful as a headless, reproducible,
+device-independent signal for "did this change make rendering the schema
+tree dramatically slower" — it is not comparable to §4's
+first-meaningful-render budget and this section does not claim it satisfies
+that budget.
+
+### 7.2 NOT MEASURED — requires a real device/emulator/simulator
+
+| Metric | Why NOT MEASURED |
+|---|---|
+| Cold startup `timeToFirstFrameMicros` (`flutter run --profile --trace-startup`) | Requires a running app on an attached Android emulator, iOS Simulator, or physical device. This task's authoring environment is a headless Linux container with no display server, no Android SDK/AVD, and no Xcode/iOS Simulator. |
+| Warm/resume startup wall-clock | Same reason — requires a running, backgroundable app instance on a device/emulator to actually measure a lifecycle-driven resume, not just unit-test a lifecycle *callback* (which MR-16's `lifecycle_resume_test.dart` does prove, as a decision-mechanism test — see this task's implementation report). |
+| First meaningful runtime render (device-measured, with real network/image decode) | Same reason; §7.1's headless widget-test number is a proxy, not this metric. |
+| Product-list scroll / image loading frame timing | Same reason — DevTools' Performance timeline requires a running device/emulator session. |
+| Memory/jank observations (DevTools Memory view, janky-frame count) | Same reason. |
+
+`mobile-ci.yml`'s two release-build jobs (`android-release-build` on
+`ubuntu-latest`, `ios-release-build` on `macos-latest`) build the app but do
+not boot an emulator/Simulator or launch it — they prove Gate G
+(buildability), not runtime performance. Per explicit owner instruction,
+this task does **not** add emulator/Simulator CI infrastructure (e.g.
+`reactivecircus/android-emulator-runner`, an Xcode Simulator boot step) to
+obtain these numbers — that is deferred to whichever future task actually
+needs device-backed measurement, with its own cost/maintenance review, not
+bundled into this horizon's final proof task.
+
+None of the budgets in §4 that require a device are marked "met" or
+"missed" — they are marked **not measurable in this environment**, per this
+document's own §2 instruction not to fabricate a number.
