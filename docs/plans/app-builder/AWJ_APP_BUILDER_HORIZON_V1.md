@@ -170,6 +170,11 @@ A downstream task is not ready until predecessor post-merge review passes unless
 - no new financial semantics without Decision Gate
 
 ### D — Builder UX
+- focused, slice-specific UI/UX Evidence Pass completed and documented before implementation
+- External Evidence / AWJ UX Decision / Open Decision are separated truthfully
+- final implementation conforms to AWJ Design System; no copied external visual identity and no parallel ad-hoc design language
+- current Store Customizer interaction patterns are not inherited automatically
+- evidence includes Desktop + responsive/mobile, ar/en, RTL/LTR, accessibility and key states/interactions
 - dense, professional AWJ workspace
 - keyboard/mouse desktop path
 - responsive/mobile management path
@@ -204,10 +209,12 @@ The horizon is complete only when repository evidence proves:
 8. validation catches unsafe/incompatible schema;
 9. publish creates immutable compatible Published Experience;
 10. proven Flutter Runtime can consume the resulting compatible experience contract without a parallel runtime;
-11. ar/en, RTL/LTR and accessibility evidence exists;
-12. tenant/RBAC/security/backcompat negatives pass;
-13. final closure report distinguishes measured/proven items from deferred Preview/App Factory/release work;
-14. no production deploy/release/signing occurred without owner approval.
+11. each major Builder UI slice has a documented focused UI/UX Evidence Pass and AWJ UX Decision before implementation;
+12. final Builder UI demonstrably follows the AWJ Design System rather than competitor identity or automatic Store Customizer inheritance;
+13. ar/en, RTL/LTR and accessibility evidence exists;
+14. tenant/RBAC/security/backcompat negatives pass;
+15. final closure report distinguishes measured/proven items from deferred Preview/App Factory/release work;
+16. no production deploy/release/signing occurred without owner approval.
 
 ## Decision Escalation Gates
 
