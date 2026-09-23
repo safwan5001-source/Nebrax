@@ -42,12 +42,25 @@ class CommerceClient {
   final CommerceConfig config;
   final SecureSessionStore sessionStore;
   final CommerceTransport _transport;
+  String _acceptLanguage = 'ar';
 
   CommerceClient({
     required this.config,
     required this.sessionStore,
     CommerceTransport? transport,
   }) : _transport = transport ?? IoCommerceTransport();
+
+  /// Sets the `Accept-Language` value every subsequent request sends,
+  /// aligning this client with the server's own locale resolution
+  /// (`ADR-12`/`COM-MOBILE-I18N-1`: `ar`/`en` supported, `ar` default) —
+  /// MR-10's "`Accept-Language` aligned with the existing Commerce API
+  /// locale contract". Called by `AwjRuntimeShell` whenever the runtime's
+  /// own UI locale changes (MOBILE-RUNTIME-6); never inferred from device
+  /// locale on its own, since the app's displayed language and the
+  /// language the server replies in must never silently diverge.
+  void setLocale(String languageCode) {
+    _acceptLanguage = languageCode;
+  }
 
   // -- Storefront / Catalog / Media (read tier, no cart/customer identity) --
 
@@ -256,6 +269,7 @@ class CommerceClient {
     final headers = <String, String>{
       'Authorization': 'Bearer ${config.storeBearerToken}',
       'Accept': 'application/json',
+      'Accept-Language': _acceptLanguage,
     };
 
     final cartToken = await sessionStore.readCartToken();

@@ -169,12 +169,12 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('تمر'), findsOneWidget);
-    expect(find.text('1 عنصر'), findsOneWidget);
+    expect(find.text('عنصر واحد'), findsOneWidget);
 
     // Remove the line -> cart empties.
     await tester.tap(find.text('إزالة'));
     await tester.pumpAndSettle();
 
-    expect(find.text('0 عنصر'), findsOneWidget);
+    expect(find.text('لا عناصر'), findsOneWidget);
   });
 }

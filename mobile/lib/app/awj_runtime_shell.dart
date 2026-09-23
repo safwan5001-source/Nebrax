@@ -8,6 +8,7 @@ import 'product_screen.dart';
 import 'runtime_action_handler.dart';
 import 'runtime_config.dart';
 import 'runtime_state.dart';
+import 'runtime_strings.dart';
 
 /// The runtime's real shell (replacing MOBILE-RUNTIME-1's placeholder):
 /// owns the one [CommerceClient] and [RuntimeState] for the app's lifetime,
@@ -20,12 +21,25 @@ import 'runtime_state.dart';
 /// client per screen would each read/write session tokens independently,
 /// risking races on the same underlying secure storage keys for no benefit
 /// (MR-07's boundary is per-runtime, not per-screen).
+///
+/// Locale itself is owned one level up, by [AwjMobileRuntimeApp] (it must
+/// live above `MaterialApp` to drive `MaterialApp.locale`) — this shell only
+/// receives the current [locale] and forwards it to every screen, and calls
+/// [onLocaleChanged] (which also re-points [CommerceClient.setLocale], see
+/// `commerce_client.dart`) when the toggle in its app bar is tapped.
 class AwjRuntimeShell extends StatefulWidget {
   final CommerceClient? client;
+  final Locale locale;
+  final ValueChanged<Locale> onLocaleChanged;
 
   /// Test-only override — production code always uses the default (`null`),
   /// which builds a real [CommerceClient] from [buildRuntimeCommerceConfig].
-  const AwjRuntimeShell({super.key, this.client});
+  const AwjRuntimeShell({
+    super.key,
+    this.client,
+    required this.locale,
+    required this.onLocaleChanged,
+  });
 
   @override
   State<AwjRuntimeShell> createState() => _AwjRuntimeShellState();
@@ -45,11 +59,20 @@ class _AwjRuntimeShellState extends State<AwjRuntimeShell> {
           config: buildRuntimeCommerceConfig(),
           sessionStore: FlutterSecureSessionStore(),
         );
+    _client.setLocale(widget.locale.languageCode);
     _state = RuntimeState();
     _dispatcher = AppActionDispatcher(
       RuntimeActionHandler(client: _client, state: _state, onError: _showError),
     );
     _state.addListener(_onStateChanged);
+  }
+
+  @override
+  void didUpdateWidget(covariant AwjRuntimeShell oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.locale != widget.locale) {
+      _client.setLocale(widget.locale.languageCode);
+    }
   }
 
   @override
@@ -67,25 +90,47 @@ class _AwjRuntimeShellState extends State<AwjRuntimeShell> {
         .showSnackBar(SnackBar(content: Text(message)));
   }
 
+  void _toggleLocale() {
+    widget.onLocaleChanged(
+      Locale(widget.locale.languageCode == 'en' ? 'ar' : 'en'),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final strings = RuntimeStrings.of(widget.locale);
     return Scaffold(
-      appBar: AppBar(title: const Text('أَوْج — AWJ Mobile Runtime')),
+      appBar: AppBar(
+        title: const Text('أَوْج — AWJ Mobile Runtime'),
+        actions: [
+          TextButton(
+            key: const ValueKey('locale-toggle'),
+            onPressed: _toggleLocale,
+            child: Text(
+              strings.languageToggleLabel,
+              style: const TextStyle(color: Colors.white),
+            ),
+          ),
+        ],
+      ),
       body: switch (_state.page) {
         RuntimePage.home => HomeScreen(
           client: _client,
           state: _state,
           dispatcher: _dispatcher,
+          locale: widget.locale,
         ),
         RuntimePage.product => ProductScreen(
           productId: _state.selectedProductId!,
           client: _client,
           dispatcher: _dispatcher,
+          locale: widget.locale,
         ),
         RuntimePage.cart => CartScreen(
           client: _client,
           state: _state,
           dispatcher: _dispatcher,
+          locale: widget.locale,
         ),
       },
     );

@@ -5,6 +5,7 @@ import '../commerce/commerce.dart';
 import '../registry/registry.dart';
 import '../schema/schema.dart';
 import 'runtime_status_views.dart';
+import 'runtime_strings.dart';
 
 /// Product — the vertical slice's "Product screen", "media + variant/UOM
 /// where applicable", "authoritative price/availability", and "Add to
@@ -38,12 +39,14 @@ class ProductScreen extends StatefulWidget {
   final String productId;
   final CommerceClient client;
   final AppActionDispatcher dispatcher;
+  final Locale locale;
 
   const ProductScreen({
     super.key,
     required this.productId,
     required this.client,
     required this.dispatcher,
+    required this.locale,
   });
 
   @override
@@ -90,7 +93,7 @@ class _ProductScreenState extends State<ProductScreen> {
       });
     } catch (_) {
       setState(() {
-        _errorMessage = 'تعذّر الاتصال بالخدمة';
+        _errorMessage = RuntimeStrings.of(widget.locale).connectionError;
         _loading = false;
       });
     }
@@ -98,13 +101,14 @@ class _ProductScreenState extends State<ProductScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final strings = RuntimeStrings.of(widget.locale);
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
     }
     final product = _product;
     if (product == null) {
       return ErrorRetryView(
-        message: _errorMessage ?? 'تعذّر تحميل المنتج',
+        message: _errorMessage ?? strings.productLoadError,
         onRetry: _load,
       );
     }
@@ -114,20 +118,24 @@ class _ProductScreenState extends State<ProductScreen> {
       id: 'product-detail-${product.id}',
       optional: false,
       props: {
-        'title': product.name,
+        'title': localizedProductName(
+          product.name,
+          product.nameEn,
+          widget.locale,
+        ),
         if (product.description != null) 'description': product.description!,
         if (product.media.isNotEmpty) 'imageUrl': product.media.first.url,
         'amountMinor': product.price.amountMinor,
       },
       children: const [],
     );
-    const goHomeNode = SchemaComponent(
+    final goHomeNode = SchemaComponent(
       type: 'NavigationTarget',
       id: 'product-go-home',
       optional: false,
-      props: {'label': 'الرئيسية'},
-      children: [],
-      action: ActionRef(type: 'navigate', params: {'pageId': 'home'}),
+      props: {'label': strings.goHome},
+      children: const [],
+      action: const ActionRef(type: 'navigate', params: {'pageId': 'home'}),
     );
 
     return ListView(
@@ -135,7 +143,11 @@ class _ProductScreenState extends State<ProductScreen> {
       children: [
         ComponentView(node: detailNode, onAction: widget.dispatcher.dispatch),
         const SizedBox(height: 16),
-        _PurchasePanel(product: product, dispatcher: widget.dispatcher),
+        _PurchasePanel(
+          product: product,
+          dispatcher: widget.dispatcher,
+          locale: widget.locale,
+        ),
         const SizedBox(height: 16),
         ComponentView(node: goHomeNode, onAction: widget.dispatcher.dispatch),
       ],
@@ -146,8 +158,13 @@ class _ProductScreenState extends State<ProductScreen> {
 class _PurchasePanel extends StatefulWidget {
   final CommerceProductDetail product;
   final AppActionDispatcher dispatcher;
+  final Locale locale;
 
-  const _PurchasePanel({required this.product, required this.dispatcher});
+  const _PurchasePanel({
+    required this.product,
+    required this.dispatcher,
+    required this.locale,
+  });
 
   @override
   State<_PurchasePanel> createState() => _PurchasePanelState();
@@ -159,6 +176,7 @@ class _PurchasePanelState extends State<_PurchasePanel> {
 
   @override
   Widget build(BuildContext context) {
+    final strings = RuntimeStrings.of(widget.locale);
     final product = widget.product;
     final variants = product is CommerceVariantManagedProduct
         ? product.variants
@@ -177,7 +195,7 @@ class _PurchasePanelState extends State<_PurchasePanel> {
                   label: Text(
                     variants[i].descriptor ??
                         variants[i].sku ??
-                        'خيار ${i + 1}',
+                        '${strings.optionPrefix} ${i + 1}',
                   ),
                   selected: _selectedVariantIndex == i,
                   onSelected: (_) => setState(() => _selectedVariantIndex = i),
@@ -191,6 +209,7 @@ class _PurchasePanelState extends State<_PurchasePanel> {
             IconButton(
               key: const ValueKey('purchase-quantity-decrement'),
               icon: const Icon(Icons.remove_circle_outline),
+              tooltip: strings.quantityDecrease,
               onPressed: _quantity > 1
                   ? () => setState(() => _quantity--)
                   : null,
@@ -199,13 +218,14 @@ class _PurchasePanelState extends State<_PurchasePanel> {
             IconButton(
               key: const ValueKey('purchase-quantity-increment'),
               icon: const Icon(Icons.add_circle_outline),
+              tooltip: strings.quantityIncrease,
               onPressed: () => setState(() => _quantity++),
             ),
             const SizedBox(width: 12),
             ElevatedButton.icon(
               onPressed: inStock ? _addToCart : null,
               icon: const Icon(Icons.add_shopping_cart),
-              label: Text(inStock ? 'إضافة للسلة' : 'غير متوفر'),
+              label: Text(inStock ? strings.addToCart : strings.outOfStock),
             ),
           ],
         ),

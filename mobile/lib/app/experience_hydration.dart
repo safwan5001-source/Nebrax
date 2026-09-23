@@ -26,3 +26,20 @@ SchemaComponent hydrateNode(
     for (final child in root.children) hydrateNode(child, targetId, transform),
   ]);
 }
+
+/// Returns a copy of [node] with `props[key]` set to [value] — the small
+/// reconstruction every [hydrateNode] `transform` callback that only needs
+/// to change one prop would otherwise repeat inline. Used by
+/// `home_screen.dart`/`cart_screen.dart` to swap a schema-declared static
+/// label's text for the current locale's `RuntimeStrings` value
+/// (MOBILE-RUNTIME-6, MR-10), the same way data slots are hydrated.
+SchemaComponent withProp(SchemaComponent node, String key, Object? value) {
+  return SchemaComponent(
+    type: node.type,
+    id: node.id,
+    optional: node.optional,
+    props: {...node.props, key: value},
+    children: node.children,
+    action: node.action,
+  );
+}
