@@ -1,6 +1,6 @@
 # MOBILE-RUNTIME-8 — Implementation Report
 
-STATUS: in progress (CI pending)
+STATUS: done
 DATE: 2026-09-23
 
 ## Outcome
@@ -270,21 +270,71 @@ work" below.
 
 ## CI
 
-_Pending — filled in once PR CI completes, per this horizon's established
-two-PR pattern (implementation PR, then a docs-only follow-up recording
-final CI/merge/post-merge evidence)._
+PR #962 opened on head `a38a70dba2857f0749ee3f636eba56f548caef56`; all 6
+required checks (`mobile-ci.yml` analyze+test, `ci.yml` sqlite+pgsql, each
+×2 for push+PR events) passed — `conclusion: success` on every run.
 
 ## Pre-merge review
 
-_Pending._
+- PRE_MERGE_REVIEW: **PASS**
+- Reviewed Head SHA: `a38a70dba2857f0749ee3f636eba56f548caef56`
+- Findings / resolution:
+  - All 6 required checks green on this exact head. `mergeable_state:
+    clean`.
+  - Re-ran `flutter analyze && flutter test` directly against this exact
+    head in this session: 0 analyze issues, 190/190 tests passing — not
+    just trusting the CI badge.
+  - Confirmed the diff (`git diff b20c9a1 a38a70d --stat`, 18 files, 1620
+    insertions, 2 deletions) touches only `mobile/` and this task's own
+    report — no `app/`, `database/`, `routes/`, or other PHP/Laravel file
+    anywhere in the diff.
+  - Confirmed no push SDK dependency was added anywhere: `git diff b20c9a1
+    a38a70d -- mobile/pubspec.yaml` is empty, and a diff scoped to every
+    Android `build.gradle*`/iOS `Podfile*` is also empty.
+  - Re-confirmed by direct reading that `resolvePushPayload` has no code
+    path that can construct any `ActionRef` other than `navigate`/
+    `openProduct`, and that `PushController` never wires
+    `onForegroundMessage` to `onAction` — both structural guarantees, not
+    just asserted in prose.
+  - Confirmed native Kotlin/Swift changes carry only standard-library
+    permission handling (`ActivityCompat`/`ContextCompat`,
+    `UNUserNotificationCenter`) — no Firebase or other vendor SDK type
+    referenced anywhere.
+  - The one PR comment (`chatgpt-codex-connector[bot]` reporting it hit
+    its own Codex usage limit) carries no review finding — no action
+    needed. Zero human/bot reviews posted.
+  - No accounting/tenant/RBAC/API/DB code touched.
+  - No unresolved review finding or Decision Gate blocking merge (the
+    no-real-transport-wired state is acknowledged/documented as the
+    deliberate, correct outcome of not making a permanent-provider choice,
+    not a blocking gap).
 
 ## Merge
 
-_Pending._
+- Merge status: **merged** (squash), PR #962.
+- Merge SHA: `9a1e45b90643bc81f4dbf5085cbaaeda2daf3213`
 
 ## Post-merge review
 
-_Pending._
+- POST_MERGE_REVIEW: **PASS**
+- Reviewed Merge SHA: `9a1e45b90643bc81f4dbf5085cbaaeda2daf3213`
+- Target-branch checks/smoke:
+  - `git fetch origin main` confirms `origin/main` tip is exactly this
+    SHA, single parent `b20c9a1c473aec81f88c85f280943d458d427110` — a
+    genuine squash merge.
+  - `git diff a38a70d origin/main -- mobile/
+    docs/plans/mobile/MOBILE-RUNTIME-8-IMPLEMENTATION-REPORT.md` is
+    empty — the squash preserved the reviewed content exactly.
+  - Post-merge CI on this exact `head_sha`: `mobile-ci.yml` run
+    [35866715666](https://github.com/safwan5001-source/Nebrax/actions/runs/35866715666)
+    and `ci.yml` run
+    [35866715709](https://github.com/safwan5001-source/Nebrax/actions/runs/35866715709),
+    both `conclusion: success`.
+  - Targeted post-merge smoke: `flutter analyze` (0 issues) and `flutter
+    test` (190/190 passing) re-run directly against the merged content,
+    after resetting the local branch onto `origin/main` first (per the
+    established branch-reset discipline).
+- Findings / resolution: none — no unexpected integration change.
 
 ## Self-review
 
@@ -461,9 +511,10 @@ horizon instruction (no `ScheduleWakeup`).
 ## Git state
 
 - Branch: `claude/awj-mobile-runtime-horizon-v1-g0n8mm`
+- PR: #962 (merged)
 - Base SHA: `b20c9a1c473aec81f88c85f280943d458d427110` (`origin/main`, PR #961)
-- Head SHA: _pending push_
-- PR: _pending_
+- Head SHA: `a38a70dba2857f0749ee3f636eba56f548caef56` (pushed, merged)
+- Merge SHA: `9a1e45b90643bc81f4dbf5085cbaaeda2daf3213`
 
 ## Recommended next dependency-ready task
 
