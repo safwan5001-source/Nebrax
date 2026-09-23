@@ -200,11 +200,47 @@ evidence, not a local re-run.
 
 ## CI
 
-_Pending — this PR's CI run against the two new jobs is the first real
-compile-time verification either has ever had. Recorded here once
-`android-release-build` and `ios-release-build` (plus the existing
-`check` and `ci.yml` sqlite/pgsql jobs) all report `conclusion:success`
-on the exact reviewed head._
+_In progress._ PR #964 opened on head `5f3e3c25a90b7b18f4725c279cc9fc5e1a72475e`.
+As anticipated in "Repository evidence" above, this PR's own CI run
+against `ios-release-build` was the first real compile-time verification
+`AppDelegate.swift`'s MOBILE-RUNTIME-8 push-channel code had ever had —
+and it surfaced a genuine, pre-existing Swift compile error:
+
+```
+Swift Compiler Error (Xcode): Value of optional type
+'(any FlutterPluginRegistrar)?' must be unwrapped to refer to member
+'messenger' of wrapped base type 'any FlutterPluginRegistrar'
+mobile/ios/Runner/AppDelegate.swift:33:79
+```
+
+Root cause: `FlutterPluginRegistry.registrar(forPlugin:)` returns
+`FlutterPluginRegistrar?` (nil if a registrar was already vended for that
+plugin name) — MOBILE-RUNTIME-8's code called `.messenger()` on it
+directly without unwrapping. This is exactly the class of risk both
+MOBILE-RUNTIME-7's and MOBILE-RUNTIME-8's own reports flagged explicitly
+("native Kotlin/Swift changes are not compiled/verified by this
+environment... a compile-time mistake would not be caught until
+MOBILE-RUNTIME-9 actually builds the app") — now caught, for real, by
+this task's own new CI job doing exactly that. Fixed with a `guard let`
+unwrap (`mobile/ios/Runner/AppDelegate.swift`):
+
+```swift
+guard let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "AwjPushChannel") else {
+  return
+}
+let channel = FlutterMethodChannel(name: pushChannelName, binaryMessenger: registrar.messenger())
+```
+
+The parallel Android push-channel code
+(`MainActivity.kt`, `MethodChannel(flutterEngine.dartExecutor.binaryMessenger, ...)`)
+uses a structurally different, non-optional pattern — already the same
+shape as the pre-existing, already-proven deep-link channel — and was
+checked directly; no analogous defect exists there.
+
+Fix pushed; re-run pending. `android-release-build`'s result (was still
+`in_progress` when the iOS failure was investigated) and the corrected
+`ios-release-build`'s result will both be recorded here once this PR's
+CI completes on the exact reviewed head._
 
 ## Pre-merge review
 
