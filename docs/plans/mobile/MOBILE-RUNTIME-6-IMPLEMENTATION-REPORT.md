@@ -205,19 +205,88 @@ attempted — out of this task's scope (MOBILE-RUNTIME-9).
 
 ## CI
 
-(to be filled in after PR is opened and checks run)
+PR #958 opened on head `0eb982074045965e3d81dad0467b2a9652adf8df`; all 6
+required checks (`mobile-ci.yml` analyze+test, `ci.yml` sqlite+pgsql, each
+×2 for push+PR events) passed — `conclusion: success` on every run.
 
 ## Pre-merge review
 
-(pending)
+- PRE_MERGE_REVIEW: **PASS**
+- Reviewed Head SHA: `0eb982074045965e3d81dad0467b2a9652adf8df`
+- Findings / resolution: fresh Reviewer + AWJ Guardian pass against the
+  complete final diff (`git diff ace1cff 0eb9820`, 15 files, 1169
+  insertions, 66 deletions):
+  - All 6 required checks green on this exact head: `mobile (analyze +
+    test)` ×2, `php artisan test (L11, sqlite)` ×2, `php artisan test
+    (L11, pgsql)` ×2 — all `conclusion: success`. `mergeable_state: clean`.
+  - Re-ran `flutter analyze && flutter test` directly against this exact
+    head in this session: 0 analyze issues, 123/123 tests passing — not
+    just trusting the CI badge.
+  - Confirmed the diff touches only `mobile/` and this task's own report —
+    no `app/`, `database/`, `routes/`, or other PHP/Laravel file anywhere
+    in the diff (`git diff --name-only` checked explicitly).
+  - Confirmed `CommerceClient.setLocale` only ever sets the
+    `Accept-Language` header value from a closed `ar`/`en` toggle — it
+    cannot reach `Authorization`/`X-Cart-Token`/`X-Customer-Token`, all
+    still set exactly as MOBILE-RUNTIME-4 implemented them.
+  - Confirmed `buildCartSummary`/`buildQuantity`'s new optional props
+    (`summaryLabel`, `decreaseLabel`/`increaseLabel`) are backward
+    compatible: each falls back to the prior hardcoded string, and no
+    existing caller outside this task's own `cart_screen.dart`/
+    `product_screen.dart` sets them.
+  - Confirmed the `buildProductList` height fix does not regress the
+    normal-text-scale case — the full 116-test carryover suite (including
+    `vertical_slice_test.dart`'s end-to-end flow, which renders
+    `ProductList` at default scale) still passes unchanged.
+  - The one PR comment (`chatgpt-codex-connector[bot]` reporting it hit
+    its own Codex usage limit) carries no review finding — no action
+    needed. Zero human/bot reviews posted.
+  - No accounting/tenant/RBAC/API/DB code touched.
+  - No unresolved review finding or Decision Gate.
 
 ## Merge
 
-(pending)
+- Merge status: **merged** (squash), PR #958.
+- Merge SHA: `1dfce398a9efc1afccdb91b250015e2cf5c462d5`
 
 ## Post-merge review
 
-(pending)
+- POST_MERGE_REVIEW: **PASS**
+- Reviewed Merge SHA: `1dfce398a9efc1afccdb91b250015e2cf5c462d5`
+- Target-branch checks/smoke:
+  - `git fetch origin main` confirms `origin/main` tip is exactly this
+    SHA, single parent `ace1cffb37b996bdbbba2c4b1b48f7d5e14bba26` — a
+    genuine squash merge.
+  - `git diff 0eb982074045965e3d81dad0467b2a9652adf8df origin/main --
+    mobile/ docs/plans/mobile/MOBILE-RUNTIME-6-IMPLEMENTATION-REPORT.md`
+    is empty — the squash preserved the reviewed content exactly.
+  - Post-merge CI on this exact `head_sha`: `mobile-ci.yml` run
+    [35839084209](https://github.com/safwan5001-source/Nebrax/actions/runs/35839084209)
+    and `ci.yml` run
+    [35839084178](https://github.com/safwan5001-source/Nebrax/actions/runs/35839084178),
+    both `conclusion: success`.
+  - Targeted post-merge smoke: `flutter analyze` (0 issues) and `flutter
+    test` (123/123 passing) re-run directly against the merged content.
+- Findings / resolution: none — no unexpected integration change.
+
+**Flake observed and resolved during this task's own post-merge docs
+follow-up (unrelated to the merged code):** the docs-only follow-up
+commit recording this evidence (touching only this report file)
+triggered a fresh `ci.yml` run whose `php artisan test (L11, sqlite)`
+job failed once, on a single assertion in
+`Tests\Feature\ZatcaQrCertificateMaterialExtractorTest` — a byte-string
+mismatch on extracted EC public key material. Root-caused before
+dismissing it: that test (pre-existing, untouched by this horizon)
+generates a fresh random EC keypair via `openssl_pkey_new` with no fixed
+seed in every run, so a leading-zero-byte edge case in the randomly
+generated key's x/y coordinate can produce this exact mismatch on rare
+runs. The identical PHP code had already passed this same test on the
+merge SHA's own `ci.yml` run minutes earlier, and a one-time
+`rerun_failed_jobs` on the docs commit's run reproduced clean (both jobs
+`conclusion: success`) — confirming a genuine flake, not a regression
+from this task's diff (which touches no PHP file). No code change was
+made in response; recorded here per the horizon's CI-red protocol rather
+than silently re-running without comment.
 
 ## Self-review
 
@@ -354,12 +423,24 @@ long-standing framework APIs.
   layout; a golden-image RTL regression suite is a reasonable follow-up
   but is not what MR-11's stated proof bullets require.
 
+## Continuation-mechanism follow-up
+
+`subscribe_pr_activity` (event-driven) + `send_later` (fallback) again
+worked reliably across this task's full PR lifecycle, including through
+the CI-flake investigation on the post-merge docs follow-up (multiple
+consecutive `send_later` check-ins correctly tracked two separate
+`ci.yml` runs — the merge SHA's own and the docs-evidence commit's —
+across a genuine ~15-19 minute `pgsql` job duration each time, with no
+manual "continue" needed). No `ScheduleWakeup` use this task, per the
+standing instruction.
+
 ## Git state
 
 - Branch: `claude/awj-mobile-runtime-horizon-v1-g0n8mm`
-- PR: (to be opened)
-- Base SHA: (current `origin/main` tip at time of push)
-- Head SHA: (to be recorded after push)
+- PR: #958 (merged)
+- Base SHA: `ace1cffb37b996bdbbba2c4b1b48f7d5e14bba26` (`origin/main`, PR #957)
+- Head SHA: `0eb982074045965e3d81dad0467b2a9652adf8df` (pushed, merged)
+- Merge SHA: `1dfce398a9efc1afccdb91b250015e2cf5c462d5`
 
 ## Recommended next dependency-ready task
 
