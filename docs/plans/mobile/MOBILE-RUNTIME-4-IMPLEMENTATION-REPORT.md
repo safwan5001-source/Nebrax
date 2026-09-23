@@ -422,12 +422,58 @@ unmodified OpenAPI contract; no server-side file was touched.
   calls, since `Image.network` alone has no header-injection hook without
   a custom `HttpClient`-backed image provider.
 
+## Merge
+
+- Merge status: **merged** (squash), PR #954.
+- Merge SHA: `b645d33b84cfaa85266122f1ea0272c28ee79158`
+
+## Post-merge review
+
+- POST_MERGE_REVIEW: **PASS**
+- Reviewed Merge SHA: `b645d33b84cfaa85266122f1ea0272c28ee79158`
+- Target-branch checks/smoke:
+  - `git fetch origin main` confirms `origin/main` tip is exactly this SHA,
+    single parent `2276fc66aa190e696e2fff39ef5bdbc8faf0cea5` — a genuine
+    squash merge.
+  - `git diff 20c8d9397199b3e030842e0afd7ef43e261f211e origin/main --
+    mobile/lib/commerce mobile/test/commerce mobile/pubspec.yaml
+    mobile/pubspec.lock docs/plans/mobile/MOBILE-RUNTIME-4-IMPLEMENTATION-REPORT.md`
+    is empty — the squash preserved the reviewed content exactly.
+  - Post-merge CI on this exact `head_sha`: `ci.yml` run
+    [35823026097](https://github.com/safwan5001-source/Nebrax/actions/runs/35823026097)
+    and `mobile-ci.yml` run
+    [35823026148](https://github.com/safwan5001-source/Nebrax/actions/runs/35823026148),
+    both `conclusion: success`.
+  - Targeted post-merge smoke: `flutter analyze` (0 issues) and `flutter
+    test` (101/101 passing) re-run directly against the merged content.
+- Findings / resolution: none — no unexpected integration change.
+
+## Continuation-mechanism note (horizon-wide, not specific to this task)
+
+This task's CI wait exposed that `ScheduleWakeup` fallback wake-ups do not
+reliably fire in this environment — the session went idle past at least
+one scheduled wake time without resuming, and durable-state updates for
+this task were still pending when the session was later resumed by an
+unrelated `SessionStart:resume` hook rather than by the schedule itself.
+Per explicit owner instruction, the continuation strategy for the rest of
+this horizon is: `subscribe_pr_activity` (event-driven, GitHub-pushed) as
+the primary trigger, with `send_later`/`create_trigger`
+(`claude-code-remote` MCP server) as the fallback instead of
+`ScheduleWakeup` — `send_later`'s own documentation states delivery
+"survives container restarts", which `ScheduleWakeup` does not claim. No
+application architecture or infrastructure was changed to work around
+this; it is purely a change in which of this session's own existing tools
+schedules the fallback check-in. If neither mechanism fires, the session
+remains blocked until the owner manually resumes it — that residual risk
+is inherent to this platform's session-resumption model and is not fully
+eliminated by this change, only reduced.
+
 ## Git state
 
 - Branch: `claude/awj-mobile-runtime-horizon-v1-g0n8mm`
-- PR: (recorded once opened)
+- PR: #954 (merged)
 - Base SHA: `2276fc66aa190e696e2fff39ef5bdbc8faf0cea5` (`origin/main`, PR #953)
-- Head SHA: `31a2180fd54fb60b642f58338c4afebeedf76194` (pushed)
+- Head SHA: `20c8d9397199b3e030842e0afd7ef43e261f211e` (reviewed; merged as `b645d33b84cfaa85266122f1ea0272c28ee79158`)
 
 ## Recommended next dependency-ready task
 
