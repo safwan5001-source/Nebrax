@@ -5,13 +5,14 @@ namespace App\Services\AppBuilder;
 use App\Models\BuilderDraftExperience;
 
 /**
- * سلطة حفظ `BuilderDraftExperience` الوحيدة — APP-BUILDER-1. يتحقق بنيوياً
- * قبل الحفظ (`AppSchemaStructuralValidator`) ويزيد `revision` تفاؤلياً.
+ * سلطة حفظ `BuilderDraftExperience` الوحيدة — APP-BUILDER-1/2. يتحقق بنيوياً
+ * قبل الحفظ (`AppSchemaParser`، Authoring validation فقط — لا
+ * `CompatibilityResolver` هنا، ذاك حصراً عند النشر) ويزيد `revision` تفاؤلياً.
  */
 final class BuilderDraftExperienceService
 {
     public function __construct(
-        private readonly AppSchemaStructuralValidator $validator,
+        private readonly AppSchemaParser $parser,
     ) {}
 
     /**
@@ -19,7 +20,7 @@ final class BuilderDraftExperienceService
      */
     public function save(BuilderDraftExperience $draft, array $schema, ?string $userId): BuilderDraftExperience
     {
-        $this->validator->validate($schema);
+        $this->parser->validate($schema);
 
         $draft->update([
             'schema' => $schema,

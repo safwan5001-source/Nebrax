@@ -39,8 +39,9 @@ class BuilderAppTest extends TestCase
         $this->assertNotNull($appId);
 
         $draft = $this->withToken($auth['token'])->getJson("/api/app-builder/apps/{$appId}/draft")->assertOk();
-        $draft->assertJsonPath('data.schema.schemaVersion', '1.0');
-        $draft->assertJsonPath('data.schema.defaultLocale', 'ar');
+        $draft->assertJsonPath('data.schema.schemaVersion', '1.0.0');
+        $draft->assertJsonPath('data.schema.navigation.initialPageId', 'home');
+        $draft->assertJsonPath('data.schema.pages.home.type', 'Page');
         $draft->assertJsonPath('data.revision', 0);
     }
 
@@ -120,14 +121,19 @@ class BuilderAppTest extends TestCase
         ])->json('data.id');
 
         $schema = [
-            'schemaVersion' => '1.0',
-            'locales' => ['ar', 'en'],
-            'defaultLocale' => 'en',
-            'theme' => [],
-            'navigation' => [],
-            'pages' => [],
-            'assets' => [],
-            'metadata' => [],
+            'schemaVersion' => '1.0.0',
+            'minRuntimeVersion' => '1.0.0',
+            'navigation' => ['initialPageId' => 'home'],
+            'theme' => ['tokens' => ['colorPrimary' => '#0F6A5A']],
+            'pages' => [
+                'home' => [
+                    'type' => 'Page',
+                    'id' => 'home-root',
+                    'children' => [
+                        ['type' => 'Text', 'id' => 'home-tagline', 'props' => ['text' => 'مرحباً']],
+                    ],
+                ],
+            ],
         ];
 
         $response = $this->withToken($auth['token'])
@@ -135,7 +141,7 @@ class BuilderAppTest extends TestCase
             ->assertOk();
 
         $response->assertJsonPath('data.revision', 1);
-        $response->assertJsonPath('data.schema.defaultLocale', 'en');
+        $response->assertJsonPath('data.schema.theme.tokens.colorPrimary', '#0F6A5A');
     }
 
     /** @test */
@@ -156,19 +162,129 @@ class BuilderAppTest extends TestCase
     }
 
     /** @test */
-    public function draft_schema_with_default_locale_outside_locales_is_rejected(): void
+    public function draft_schema_with_initial_page_id_referencing_an_undeclared_page_is_rejected(): void
     {
-        $auth = $this->registerTenant('appb-draft-locale', 'owner@appb-draft-locale.test');
+        $auth = $this->registerTenant('appb-draft-nav', 'owner@appb-draft-nav.test');
         $appId = $this->withToken($auth['token'])->postJson('/api/app-builder/apps', [
             'name' => 'تطبيق', 'creation_source' => 'scratch',
         ])->json('data.id');
 
-        $schema = array_merge(\App\Models\BuilderDraftExperience::minimalSafeSchema(), [
-            'defaultLocale' => 'fr',
-        ]);
+        $schema = \App\Models\BuilderDraftExperience::minimalSafeSchema();
+        $schema['navigation']['initialPageId'] = 'does-not-exist';
 
         $this->withToken($auth['token'])
             ->putJson("/api/app-builder/apps/{$appId}/draft", ['schema' => $schema])
+            ->assertStatus(422);
+    }
+
+    /** @test */
+    public function draft_schema_with_non_page_root_component_is_rejected(): void
+    {
+        $auth = $this->registerTenant('appb-draft-root', 'owner@appb-draft-root.test');
+        $appId = $this->withToken($auth['token'])->postJson('/api/app-builder/apps', [
+            'name' => 'تطبيق', 'creation_source' => 'scratch',
+        ])->json('data.id');
+
+        $schema = \App\Models\BuilderDraftExperience::minimalSafeSchema();
+        $schema['pages']['home']['type'] = 'Section';
+
+        $this->withToken($auth['token'])
+            ->putJson("/api/app-builder/apps/{$appId}/draft", ['schema' => $schema])
+            ->assertStatus(422);
+    }
+
+    /** @test */
+    public function draft_schema_with_invalid_schema_version_format_is_rejected(): void
+    {
+        $auth = $this->registerTenant('appb-draft-version', 'owner@appb-draft-version.test');
+        $appId = $this->withToken($auth['token'])->postJson('/api/app-builder/apps', [
+            'name' => 'تطبيق', 'creation_source' => 'scratch',
+        ])->json('data.id');
+
+        $schema = \App\Models\BuilderDraftExperience::minimalSafeSchema();
+        $schema['schemaVersion'] = '1.0';
+
+        $this->withToken($auth['token'])
+            ->putJson("/api/app-builder/apps/{$appId}/draft", ['schema' => $schema])
+            ->assertStatus(422);
+    }
+
+    // ── التوافق وقت النشر (APP-BUILDER-2) ────────────────────────────
+
+    /** @test */
+    public function publish_rejects_a_schema_referencing_an_unsupported_required_component(): void
+    {
+        $auth = $this->registerTenant('appb-compat-required', 'owner@appb-compat-required.test');
+        $appId = $this->withToken($auth['token'])->postJson('/api/app-builder/apps', [
+            'name' => 'تطبيق', 'creation_source' => 'scratch',
+        ])->json('data.id');
+
+        $schema = \App\Models\BuilderDraftExperience::minimalSafeSchema();
+        $schema['pages']['home']['children'] = [
+            ['type' => 'NotARealComponent', 'id' => 'x1'],
+        ];
+        $this->withToken($auth['token'])
+            ->putJson("/api/app-builder/apps/{$appId}/draft", ['schema' => $schema])
+            ->assertOk();
+
+        $this->withToken($auth['token'])->postJson("/api/app-builder/apps/{$appId}/versions", [])
+            ->assertStatus(422);
+    }
+
+    /** @test */
+    public function publish_succeeds_when_an_unsupported_component_is_marked_optional(): void
+    {
+        $auth = $this->registerTenant('appb-compat-optional', 'owner@appb-compat-optional.test');
+        $appId = $this->withToken($auth['token'])->postJson('/api/app-builder/apps', [
+            'name' => 'تطبيق', 'creation_source' => 'scratch',
+        ])->json('data.id');
+
+        $schema = \App\Models\BuilderDraftExperience::minimalSafeSchema();
+        $schema['pages']['home']['children'] = [
+            ['type' => 'NotARealComponent', 'id' => 'x1', 'optional' => true],
+        ];
+        $this->withToken($auth['token'])
+            ->putJson("/api/app-builder/apps/{$appId}/draft", ['schema' => $schema])
+            ->assertOk();
+
+        $this->withToken($auth['token'])->postJson("/api/app-builder/apps/{$appId}/versions", [])
+            ->assertCreated();
+    }
+
+    /** @test */
+    public function publish_rejects_a_schema_newer_than_the_current_runtime_supports(): void
+    {
+        $auth = $this->registerTenant('appb-compat-toonew', 'owner@appb-compat-toonew.test');
+        $appId = $this->withToken($auth['token'])->postJson('/api/app-builder/apps', [
+            'name' => 'تطبيق', 'creation_source' => 'scratch',
+        ])->json('data.id');
+
+        $schema = \App\Models\BuilderDraftExperience::minimalSafeSchema();
+        $schema['schemaVersion'] = '9.0.0';
+        $schema['minRuntimeVersion'] = '9.0.0';
+        $this->withToken($auth['token'])
+            ->putJson("/api/app-builder/apps/{$appId}/draft", ['schema' => $schema])
+            ->assertOk();
+
+        $this->withToken($auth['token'])->postJson("/api/app-builder/apps/{$appId}/versions", [])
+            ->assertStatus(422);
+    }
+
+    /** @test */
+    public function publish_rejects_a_schema_requiring_an_unavailable_named_capability(): void
+    {
+        $auth = $this->registerTenant('appb-compat-cap', 'owner@appb-compat-cap.test');
+        $appId = $this->withToken($auth['token'])->postJson('/api/app-builder/apps', [
+            'name' => 'تطبيق', 'creation_source' => 'scratch',
+        ])->json('data.id');
+
+        $schema = \App\Models\BuilderDraftExperience::minimalSafeSchema();
+        $schema['requiredCapabilities'] = ['addToCart' => 99];
+        $this->withToken($auth['token'])
+            ->putJson("/api/app-builder/apps/{$appId}/draft", ['schema' => $schema])
+            ->assertOk();
+
+        $this->withToken($auth['token'])->postJson("/api/app-builder/apps/{$appId}/versions", [])
             ->assertStatus(422);
     }
 
@@ -207,7 +323,7 @@ class BuilderAppTest extends TestCase
             'builder_app_id' => $app->id,
             'version' => 1,
             'schema' => \App\Models\BuilderDraftExperience::minimalSafeSchema(),
-            'schema_version' => '1.0',
+            'schema_version' => '1.0.0',
             'published_at' => now(),
         ]);
 

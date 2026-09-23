@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * ═══════════════════════════════════════════════════════════════
- *  مسودة تجربة تطبيق — AWJ App Builder (APP-BUILDER-1)
+ *  مسودة تجربة تطبيق — AWJ App Builder (APP-BUILDER-1/2)
  * ═══════════════════════════════════════════════════════════════
  *
  * النسخة العاملة القابلة للتعديل لتجربة `BuilderApp`. صفٌّ واحد فقط لكل
@@ -15,19 +15,25 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * مكانه، لا ينشئ تاريخاً. النشر (`BuilderPublishedExperienceVersion`)
  * ينسخ لقطة من `schema` دون أن يمسّ هذا الصفّ أو يصفّره.
  *
- * **مفاتيح `schema` العليا المسموحة** مطابقة لـ`APP_SCHEMA_V1.md` §4
- * حرفياً. التحقق هنا سطحي فقط (مفاتيح معروفة + أنواع أساسية) — لا تحقق
- * عميق من محتوى `pages`/الإجراءات/الروابط (ذاك APP-BUILDER-2/3، بعد وجود
- * سجلّات المكوّنات/الإجراءات/الموارد فعلياً).
+ * **مفاتيح `schema` العليا المسموحة** مطابقة حرفياً لعقد App Schema
+ * **الحقيقي المُختبَر فعلياً** في `mobile/lib/schema/app_schema.dart`
+ * (`AppSchema`)، لا الشكل التوضيحي في `APP_SCHEMA_V1.md` §4 (ذاك يصرّح
+ * صراحةً أنه "contract candidates... not locked"). APP-BUILDER-2 صحّح هذا
+ * — الشكل الأول في APP-BUILDER-1 (`locales`/`defaultLocale`/`assets`/
+ * `metadata`) كان اجتهاداً من الوثيقة المعمارية التوضيحية قبل قراءة العقد
+ * القائم فعلياً؛ الأفق نفسه يمنع اختراع عقد مخطط/تشغيل ثانٍ («Do not invent
+ * a second schema/runtime contract when the Mobile Runtime Proof already
+ * established compatible primitives»). التحقق العميق (`AppSchemaParser`)
+ * يطابق محلّل Flutter عقدة عقدة.
  */
 class BuilderDraftExperience extends BaseModel implements CompanyWide
 {
-    /** مطابقة حرفية لـ APP_SCHEMA_V1.md §4 — لا هوية/إصدار هنا (أعمدة خادمية). */
+    /** مطابقة حرفية لمفاتيح `AppSchema` في `mobile/lib/schema/app_schema.dart`. */
     public const SCHEMA_KEYS = [
-        'schemaVersion', 'locales', 'defaultLocale', 'theme', 'navigation', 'pages', 'assets', 'metadata',
+        'schemaVersion', 'minRuntimeVersion', 'requiredCapabilities', 'theme', 'navigation', 'pages',
     ];
 
-    public const CURRENT_SCHEMA_VERSION = '1.0';
+    public const CURRENT_SCHEMA_VERSION = '1.0.0';
 
     protected $fillable = [
         'tenant_id', 'builder_app_id', 'schema', 'revision', 'updated_by',
@@ -50,12 +56,15 @@ class BuilderDraftExperience extends BaseModel implements CompanyWide
 
     /**
      * الحدّ الأدنى الآمن الذي يوصّف به معمارية App Builder §5 مسار "البدء
-     * من الصفر" — بلا صفحات/مكوّنات فعلية بعد (تلك APP-BUILDER-3/5+)، لكنه
-     * مخطّط صالح بنيوياً يمرّ من أي محقّق سطحي منذ اللحظة الأولى.
+     * من الصفر" — صفحة رئيسية فارغة بلا مكوّنات فعلية بعد (تلك APP-BUILDER-5+)،
+     * لكنها مخطّط صالح كاملاً يمرّ من `AppSchemaParser` **و**
+     * `CompatibilityResolver` معاً منذ اللحظة الأولى (يطابق شكل
+     * `kHomeSchemaJson`/`kCartSchemaJson` الحقيقي في `mobile/lib/app/runtime_schema.dart`
+     * حرفياً — مكوّن جذرٍ واحد من نوع `Page` معروف في سجلّ AWJ Mobile Runtime).
      *
-     * V1 (APP-BUILDER-1) يستعمل نفس اللقطة لكل مسارات الإنشاء الثلاثة —
-     * التمايز الحقيقي (استيراد تصميم المتجر، محتوى القالب) مؤجَّلٌ صراحةً
-     * إلى APP-BUILDER-8/9 (انظر توثيق ترحيل `builder_apps`).
+     * V1 يستعمل نفس اللقطة لكل مسارات الإنشاء الثلاثة — التمايز الحقيقي
+     * (استيراد تصميم المتجر، محتوى القالب) مؤجَّلٌ صراحةً إلى APP-BUILDER-8/9
+     * (انظر توثيق ترحيل `builder_apps`).
      *
      * @return array<string, mixed>
      */
@@ -63,13 +72,16 @@ class BuilderDraftExperience extends BaseModel implements CompanyWide
     {
         return [
             'schemaVersion' => self::CURRENT_SCHEMA_VERSION,
-            'locales' => ['ar', 'en'],
-            'defaultLocale' => 'ar',
-            'theme' => [],
-            'navigation' => [],
-            'pages' => [],
-            'assets' => [],
-            'metadata' => [],
+            'minRuntimeVersion' => self::CURRENT_SCHEMA_VERSION,
+            'navigation' => ['initialPageId' => 'home'],
+            'theme' => ['tokens' => []],
+            'pages' => [
+                'home' => [
+                    'type' => 'Page',
+                    'id' => 'home-root',
+                    'children' => [],
+                ],
+            ],
         ];
     }
 }

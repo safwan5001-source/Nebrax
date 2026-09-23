@@ -9,7 +9,7 @@ use RuntimeException;
 
 /**
  * ═══════════════════════════════════════════════════════════════
- *  سلطة نشر نسخة تجربة جديدة الوحيدة — APP-BUILDER-1 (AB-03)
+ *  سلطة نشر نسخة تجربة جديدة الوحيدة — APP-BUILDER-1/2 (AB-03)
  * ═══════════════════════════════════════════════════════════════
  *
  * `publish()` تقفل صفّ `builder_apps` نفسه (مِرساة تزامن) ثم تعيد حساب
@@ -22,17 +22,25 @@ use RuntimeException;
  * إعادة التحقق البنيوي هنا (لا الاكتفاء بتحقق وقت الحفظ) مطابقة لتمييز
  * `APP_SCHEMA_V1.md` §21 بين "Authoring validation" و"Publish validation" —
  * الأخيرة أشدّ صراحةً ولا تثق بأن حالة المسودة لم تتغيّر بين الحفظ والنشر.
+ *
+ * **APP-BUILDER-2**: إضافةً للتحقق البنيوي، النشر يستدعي
+ * `CompatibilityResolver` مقابل بناء AWJ Mobile Runtime **الحالي**
+ * (`CapabilityManifest::current()`) — قدرة مطلوبة غير مدعومة تمنع النشر
+ * كاملاً («compatibility failure cannot silently publish»، Quality Gate E)؛
+ * تجاوزات اختيارية آمنة (`fallbacks`) لا تمنعه.
  */
 final class BuilderPublishedExperienceVersionService
 {
     public function __construct(
-        private readonly AppSchemaStructuralValidator $validator,
+        private readonly AppSchemaParser $parser,
+        private readonly CompatibilityResolver $compatibilityResolver,
     ) {}
 
     /**
      * @throws RuntimeException لا توجد مسودة لهذا التطبيق (لا يحدث عملياً
      *                          — `BuilderAppService::create()` يضمن وجودها
-     *                          ذرّياً)، أو المسودة غير صالحة بنيوياً.
+     *                          ذرّياً)، أو المسودة غير صالحة بنيوياً، أو غير
+     *                          متوافقة مع بناء AWJ Mobile Runtime الحالي.
      */
     public function publish(BuilderApp $app, ?string $note, ?string $userId): BuilderPublishedExperienceVersion
     {
@@ -45,7 +53,12 @@ final class BuilderPublishedExperienceVersionService
             }
 
             $schema = $draft->schema;
-            $this->validator->validate($schema);
+            $this->parser->validate($schema);
+
+            $compatibility = $this->compatibilityResolver->resolve($schema, CapabilityManifest::current());
+            if (! $compatibility->compatible) {
+                throw new RuntimeException("التجربة غير متوافقة مع تطبيق الجوال الحالي: {$compatibility->message}");
+            }
 
             $nextVersion = (int) (BuilderPublishedExperienceVersion::query()
                 ->where('builder_app_id', $lockedApp->id)
