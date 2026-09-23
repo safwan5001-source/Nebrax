@@ -2618,6 +2618,7 @@
     "customerPayments": "مدفوعات العملاء",
     "customerRefunds": "استردادات العملاء",
     "salesSettings": "إعدادات المبيعات",
+    "appBuilder": "تطبيقات AWJ",
     "customersManage": "إدارة العملاء",
     "customerCreate": "إضافة عميل جديد",
     "appointments": "المواعيد",
@@ -6777,6 +6778,57 @@
       "fuel_stations_avi": "التموين الذكي AVI/RFID",
       "fuel_stations_maintenance": "الصيانة والسلامة",
       "fuel_stations_integrations": "تكاملات أجهزة المحطة"
+    }
+  },
+  "appBuilder": {
+    "title": "تطبيقات AWJ",
+    "subtitle": "أنشئ وأدر تجارب تطبيق الجوال المتصلة بمتجرك — كل تطبيق مسودة قابلة للتعديل حتى نشرها.",
+    "noAccess": "هذه الصفحة تتطلب صلاحية إدارة تطبيقات AWJ.",
+    "loadFailed": "تعذر تحميل التطبيقات.",
+    "createAction": "إنشاء تطبيق",
+    "emptyTitle": "لا توجد تطبيقات بعد",
+    "emptyDescription": "أنشئ أول تطبيق جوال لمتجرك — ابدأ بتصميم متجرك، أو قالب جاهز، أو من الصفر.",
+    "createdAt": "أُنشئ في {date}",
+    "unpublished": "لم يُنشر بعد",
+    "latestVersion": "أحدث نسخة منشورة: {version}",
+    "creationSource": {
+      "store_design": "من تصميم المتجر",
+      "template": "من قالب",
+      "scratch": "من الصفر"
+    },
+    "new": {
+      "title": "إنشاء تطبيق",
+      "subtitle": "اختر نقطة البداية أولاً، ثم اسمِّ التطبيق.",
+      "back": "رجوع",
+      "pathSectionTitle": "نقطة البداية",
+      "nameSectionTitle": "اسم التطبيق",
+      "storeDesignTitle": "استخدام تصميم متجري",
+      "storeDesignDescription": "يبدأ التطبيق بحدٍّ أدنى آمن اليوم؛ مزامنة هوية متجرك الفعلية (الألوان والشعار) تُضاف في مهمة لاحقة.",
+      "templateTitle": "اختيار قالب",
+      "templateDescription": "يبدأ التطبيق بحدٍّ أدنى آمن اليوم؛ معرض القوالب الفعلي يُضاف في مهمة لاحقة.",
+      "scratchTitle": "البدء من الصفر",
+      "scratchDescription": "تطبيق فارغ بحدٍّ أدنى آمن — صفحة رئيسية واحدة جاهزة للتعديل.",
+      "nameLabel": "الاسم (عربي)",
+      "namePlaceholder": "اسم التطبيق",
+      "nameEnLabel": "الاسم (إنجليزي، اختياري)",
+      "nameEnPlaceholder": "App name",
+      "create": "إنشاء",
+      "creating": "جارٍ الإنشاء...",
+      "cancel": "إلغاء",
+      "nameRequired": "الاسم مطلوب.",
+      "pathRequired": "اختر نقطة بداية أولاً."
+    },
+    "detail": {
+      "back": "رجوع إلى التطبيقات",
+      "loadFailed": "تعذر تحميل التطبيق.",
+      "overviewTitle": "نظرة عامة",
+      "createdLabel": "تاريخ الإنشاء",
+      "sourceLabel": "نقطة البداية",
+      "versionsTitle": "النسخ المنشورة",
+      "versionsEmpty": "لم يُنشر أي إصدار بعد.",
+      "versionRow": "الإصدار {version} — {date}",
+      "builderComingSoonTitle": "مساحة التحرير المرئي",
+      "builderComingSoon": "شاشة بناء التجربة المرئية قادمة في مهمة لاحقة من هذا الأفق."
     }
   },
   "nebrax": {

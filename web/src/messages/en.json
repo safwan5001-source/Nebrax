@@ -2618,6 +2618,7 @@
     "customerPayments": "Customer payments",
     "customerRefunds": "Customer refunds",
     "salesSettings": "Sales settings",
+    "appBuilder": "AWJ Apps",
     "customersManage": "Manage customers",
     "customerCreate": "Add new customer",
     "appointments": "Appointments",
@@ -6777,6 +6778,57 @@
       "fuel_stations_avi": "AVI/RFID Smart Refueling",
       "fuel_stations_maintenance": "Maintenance & Safety",
       "fuel_stations_integrations": "Station Device Integrations"
+    }
+  },
+  "appBuilder": {
+    "title": "AWJ Apps",
+    "subtitle": "Create and manage your store's mobile app experiences — every app is an editable draft until you publish it.",
+    "noAccess": "This page requires the App Builder management permission.",
+    "loadFailed": "Could not load apps.",
+    "createAction": "Create app",
+    "emptyTitle": "No apps yet",
+    "emptyDescription": "Create your first mobile app for your store — start from your store design, a ready template, or from scratch.",
+    "createdAt": "Created {date}",
+    "unpublished": "Not published yet",
+    "latestVersion": "Latest published version: {version}",
+    "creationSource": {
+      "store_design": "From store design",
+      "template": "From template",
+      "scratch": "From scratch"
+    },
+    "new": {
+      "title": "Create app",
+      "subtitle": "Choose a starting point first, then name the app.",
+      "back": "Back",
+      "pathSectionTitle": "Starting point",
+      "nameSectionTitle": "App name",
+      "storeDesignTitle": "Use my store design",
+      "storeDesignDescription": "The app starts from a safe minimum shell today; syncing your actual store branding (colors, logo) is added in a later task.",
+      "templateTitle": "Choose a template",
+      "templateDescription": "The app starts from a safe minimum shell today; the real template gallery is added in a later task.",
+      "scratchTitle": "Start from scratch",
+      "scratchDescription": "A blank, safe minimum app — one home page ready to edit.",
+      "nameLabel": "Name (Arabic)",
+      "namePlaceholder": "App name",
+      "nameEnLabel": "Name (English, optional)",
+      "nameEnPlaceholder": "App name",
+      "create": "Create",
+      "creating": "Creating...",
+      "cancel": "Cancel",
+      "nameRequired": "Name is required.",
+      "pathRequired": "Choose a starting point first."
+    },
+    "detail": {
+      "back": "Back to apps",
+      "loadFailed": "Could not load app.",
+      "overviewTitle": "Overview",
+      "createdLabel": "Created",
+      "sourceLabel": "Starting point",
+      "versionsTitle": "Published versions",
+      "versionsEmpty": "No version published yet.",
+      "versionRow": "Version {version} — {date}",
+      "builderComingSoonTitle": "Visual editing workspace",
+      "builderComingSoon": "The visual experience builder screen is coming in a later task of this horizon."
     }
   },
   "nebrax": {
