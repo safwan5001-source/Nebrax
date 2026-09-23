@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { DetailPage, ErrorState, LoadingState } from '@/components/nebrax';
 import { api, ApiError } from '@/lib/api';
 import { appDisplayName, type BuilderApp, type BuilderPublishedVersion } from '@/lib/app-builder';
+import { formatDate } from '@/lib/formatting';
 
 /**
  * APP-BUILDER-4 — نظرة عامة على التطبيق. مساحة التحرير المرئي نفسها
@@ -57,7 +58,7 @@ export default function AppBuilderDetailPage() {
           <span className="text-sm text-text">
             {t('versionRow', {
               version: version.version,
-              date: version.published_at ? new Date(version.published_at).toLocaleDateString(locale) : '—',
+              date: version.published_at ? formatDate(version.published_at, locale) : '—',
             })}
           </span>
         </div>
@@ -78,7 +79,7 @@ export default function AppBuilderDetailPage() {
       backLabel={t('back')}
       title={appDisplayName(app, locale)}
       badges={<Badge tone="muted">{tRoot(`creationSource.${app.creation_source}`)}</Badge>}
-      meta={`${t('createdLabel')}: ${new Date(app.created_at).toLocaleDateString(locale)}`}
+      meta={`${t('createdLabel')}: ${formatDate(app.created_at, locale)}`}
       sections={[
         { id: 'versions', title: t('versionsTitle'), count: versions.length, content: versionsContent },
         { id: 'builder', title: t('builderComingSoonTitle'), content: builderComingSoon },

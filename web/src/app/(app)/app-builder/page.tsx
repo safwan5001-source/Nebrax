@@ -12,6 +12,7 @@ import { EmptyState, ErrorState, LoadingState, PageHeader, type PageAction } fro
 import { api, ApiError } from '@/lib/api';
 import { currentUser } from '@/lib/auth';
 import { appDisplayName, hasAppBuilderPermission, type BuilderApp } from '@/lib/app-builder';
+import { formatDate } from '@/lib/formatting';
 
 /**
  * APP-BUILDER-4 — قائمة تطبيقات AWJ App Builder (App Manager). صلاحية
@@ -99,7 +100,7 @@ export default function AppBuilderPage() {
                     )}
                   </div>
                   <p className="text-xs text-muted">
-                    {t('createdAt', { date: new Date(app.created_at).toLocaleDateString(locale) })}
+                    {t('createdAt', { date: formatDate(app.created_at, locale) })}
                   </p>
                 </CardContent>
               </Card>
