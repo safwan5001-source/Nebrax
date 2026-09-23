@@ -141,8 +141,8 @@ autonomously per نظام الأفق, `MOBILE-RUNTIME-1` first.
 | 5 | MOBILE-RUNTIME-5 | done | high | MOBILE-RUNTIME-3, MOBILE-RUNTIME-4 | Home/Product/Cart vertical UI |
 | 6 | MOBILE-RUNTIME-6 | done | normal | MOBILE-RUNTIME-5 | ar/en + RTL/LTR + theme/accessibility |
 | 7 | MOBILE-RUNTIME-7 | done | high | MOBILE-RUNTIME-3, MOBILE-RUNTIME-5 | Universal/App Links |
-| 8 | MOBILE-RUNTIME-8 | in_progress | high | MOBILE-RUNTIME-3, MOBILE-RUNTIME-7 | Push adapter + notification routing proof |
-| 9 | MOBILE-RUNTIME-9 | backlog | normal | MOBILE-RUNTIME-6, 7, 8 | Android/iOS release-build proof |
+| 8 | MOBILE-RUNTIME-8 | done | high | MOBILE-RUNTIME-3, MOBILE-RUNTIME-7 | Push adapter + notification routing proof |
+| 9 | MOBILE-RUNTIME-9 | in_progress | normal | MOBILE-RUNTIME-6, 7, 8 | Android/iOS release-build proof |
 | 10 | MOBILE-RUNTIME-10 | backlog | high | MOBILE-RUNTIME-9 | Final compatibility/security/performance/runtime evidence + horizon closure |
 
 `MOBILE-RUNTIME-1` promoted directly to `ready`/`in_progress` from horizon
@@ -331,6 +331,41 @@ exact wording and MOBILE-RUNTIME-7's own `DeepLinkController`/
 very likely reuse the identical `ActionRef`-through-`AppActionDispatcher`
 pipeline rather than invent a third one, matching how MOBILE-RUNTIME-7
 reused it for deep links instead of MOBILE-RUNTIME-5's own navigation.
+
+`MOBILE-RUNTIME-8` is `done`: PR #962 merged (Merge SHA
+`9a1e45b90643bc81f4dbf5085cbaaeda2daf3213`, confirmed single-parent squash
+onto `main`, zero content drift from the reviewed head), post-merge CI
+green on both required workflows, post-merge review passed. 190/190 tests
+(39 new), 0 analyze issues, no new dependency. `resolvePushPayload` maps a
+notification's `data` payload to the exact same `navigate`/`openProduct`
+`ActionRef` shape `resolveDeepLinkUri` already produces — structurally
+incapable of a destructive action. `PushController` dispatches only on a
+tap, never on mere foreground arrival. `ChannelPushAdapter` (a first-party
+`MethodChannel`) is the only concrete adapter shipped — no vendor push SDK
+(Firebase or otherwise) was added to `pubspec.yaml` or any native build
+file; that remains an explicit, undecided Decision Gate per MR-09/MR-19,
+deliberately not resolved on this task's own initiative. `CapabilityManifest`
+gained a `nativeCapabilities` namespace (`push.notifications`) proving
+MR-15's native capability rollout ordering and Gate F's iOS/Android
+divergence requirement. Native Android/iOS permission-handling code is
+acknowledged as not build-verified by this environment (no native build
+step exists until `MOBILE-RUNTIME-9`). Full evidence:
+`docs/plans/mobile/MOBILE-RUNTIME-8-IMPLEMENTATION-REPORT.md`.
+
+`MOBILE-RUNTIME-9` promoted to `ready`/`in_progress` now that all three
+hard dependencies (`MOBILE-RUNTIME-6`, `MOBILE-RUNTIME-7`,
+`MOBILE-RUNTIME-8`) are merged and post-merge reviewed. Source requirement:
+horizon doc's MR-12 (Build proof — release-mode buildability proof for
+both Android and iOS as far as available CI/tooling permits; a successful
+local/simulator debug run alone is insufficient) and Gate G (Android
+release build, iOS release/archive build to the maximum non-signing level
+available, no production signing/release required, build instructions
+reproducible). To be read in full before implementation: MR-12/Gate G's
+exact wording, and `.github/workflows/mobile-ci.yml`'s own header comment
+(already states release-build jobs are added in this task). Store
+signing, merchant certificates, and App Store/Google Play submission are
+explicitly outside this horizon and remain owner-gated — never attempted
+by this task.
 
 ## Promotion checklist: backlog → ready
 
