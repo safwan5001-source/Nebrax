@@ -137,8 +137,8 @@ autonomously per نظام الأفق, `MOBILE-RUNTIME-1` first.
 | 1 | MOBILE-RUNTIME-1 | done | normal | horizon authorization | Flutter workspace + toolchain proof |
 | 2 | MOBILE-RUNTIME-2 | done | normal | MOBILE-RUNTIME-1 (done) | App Schema + compatibility kernel |
 | 3 | MOBILE-RUNTIME-3 | done | normal | MOBILE-RUNTIME-2 (done) | Component + Action Registry |
-| 4 | MOBILE-RUNTIME-4 | in_progress | high | MOBILE-RUNTIME-1 (done) | Commerce OpenAPI client + secure session boundary |
-| 5 | MOBILE-RUNTIME-5 | backlog | high | MOBILE-RUNTIME-3, MOBILE-RUNTIME-4 | Home/Product/Cart vertical UI |
+| 4 | MOBILE-RUNTIME-4 | done | high | MOBILE-RUNTIME-1 (done) | Commerce OpenAPI client + secure session boundary |
+| 5 | MOBILE-RUNTIME-5 | in_progress | high | MOBILE-RUNTIME-3, MOBILE-RUNTIME-4 | Home/Product/Cart vertical UI |
 | 6 | MOBILE-RUNTIME-6 | backlog | normal | MOBILE-RUNTIME-5 | ar/en + RTL/LTR + theme/accessibility |
 | 7 | MOBILE-RUNTIME-7 | backlog | high | MOBILE-RUNTIME-3, MOBILE-RUNTIME-5 | Universal/App Links |
 | 8 | MOBILE-RUNTIME-8 | backlog | high | MOBILE-RUNTIME-3, MOBILE-RUNTIME-7 | Push adapter + notification routing proof |
@@ -224,6 +224,36 @@ abstraction, not a new API design. Adding a secure-storage package (this
 horizon's likely first non-trivial Flutter dependency) requires the MR-19
 license/maintenance/security/native-permission review recorded in the
 task's implementation report before it lands in `pubspec.yaml`.
+
+`MOBILE-RUNTIME-4` is `done`: PR #954 merged (Merge SHA
+`b645d33b84cfaa85266122f1ea0272c28ee79158`, confirmed single-parent squash
+onto `main`, zero content drift from the reviewed head), post-merge CI
+green on both required workflows, post-merge review passed. 101/101 tests
+(29 new), 0 analyze issues, one new dependency (`flutter_secure_storage`,
+MR-19 review recorded in the report). Checkout/payments/orders/addresses
+explicitly out of scope — not on Gate C's bar or MR-05's action allowlist.
+Full evidence: `docs/plans/mobile/MOBILE-RUNTIME-4-IMPLEMENTATION-REPORT.md`.
+
+`MOBILE-RUNTIME-5` promoted to `ready`/`in_progress` now that both hard
+dependencies (`MOBILE-RUNTIME-3`, `MOBILE-RUNTIME-4`) are merged and
+post-merge reviewed. Source requirement: horizon doc §5 (Runtime proof
+vertical slice: Boot → compatibility → Arabic/English shell → Home from
+App Schema → product list from `/commerce/v1` → Product screen → Add to
+Cart → Cart read/update/remove → persist/recover session material →
+deep-link → push interaction) and §8 row 5. No unresolved product
+decision: this task wires MOBILE-RUNTIME-2's schema/compatibility kernel,
+MOBILE-RUNTIME-3's Component/Action Registry, and MOBILE-RUNTIME-4's
+Commerce client together into real Home/Product/Cart screens — an
+integration task against three already-accepted contracts, not a new
+architecture decision. MOBILE-RUNTIME-3's report explicitly flagged one
+open design point this task must resolve: `AddToCart` does not read a
+sibling `Quantity`'s live value, so a page-level state coordinator is
+needed (MR-06 state separation still applies — the coordinator holds
+navigation/ephemeral UI state, never business authority). Deep links
+(MR-08) and push (MR-09) remain `MOBILE-RUNTIME-7`/`8`'s scope, per §8's
+own dependency table — this task's "deep-link into a supported screen"
+line in the vertical slice is realized later via that same navigation
+boundary, not built ahead of schedule here.
 
 ## Promotion checklist: backlog → ready
 
