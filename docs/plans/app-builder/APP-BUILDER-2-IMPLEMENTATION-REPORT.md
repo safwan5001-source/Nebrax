@@ -98,25 +98,38 @@ migration needed — `schema` remains an opaque JSON column; only its accepted s
 
 ## CI
 
-_To be completed once observed on the exact PR head._
+GitHub Actions on PR head `30abaa3e43ed7c816cb24d9f06857b61011d90dc` (PR #971), both the
+push-triggered and pull_request-triggered workflow runs, all 4 checks green:
+`php artisan test (L11, sqlite)` and `(L11, pgsql)` success on both runs.
 
 ## Pre-merge review
 
-- PRE_MERGE_REVIEW: _pending_
-- Reviewed Head SHA: _pending_
-- Findings / resolution: _pending_
+- PRE_MERGE_REVIEW: **PASS**
+- Reviewed Head SHA: `30abaa3e43ed7c816cb24d9f06857b61011d90dc`
+- Findings / resolution: No open findings. `chatgpt-codex-connector[bot]` posted only a
+  usage-limit notice (did not perform a review). No human review posted.
 
 ## Merge
 
-- Merge status: _pending_
-- Merge SHA: _pending_
+- Merge status: **merged** via standing authority (squash, no unresolved Decision Gate, required
+  CI green on exact head, no unapproved scope expansion, no production deploy/release).
+- Merge SHA: `8844881de5171055342b397294d8d8fd7ae1e33f`
 
 ## Post-merge review
 
-- POST_MERGE_REVIEW: _pending_
-- Reviewed Merge SHA: _pending_
-- Target-branch checks/smoke: _pending_
-- Findings / resolution: _pending_
+- POST_MERGE_REVIEW: **PASS**
+- `main@8844881` confirmed as `origin/main`'s tip, a single-parent squash (parent `9c5a5b9`), zero
+  content drift from the reviewed head `30abaa3`
+  (`git diff 30abaa3 origin/main -- app database routes tests docs/plans/app-builder` is empty).
+  Post-merge CI (`ci.yml` run
+  [35924167021](https://github.com/safwan5001-source/Nebrax/actions/runs/35924167021) on the merge
+  commit) completed with both jobs green: `php artisan test (L11, sqlite)` (completed 21:48:56 UTC)
+  and `php artisan test (L11, pgsql)` (completed 21:55:42 UTC).
+- Reviewed Merge SHA: `8844881de5171055342b397294d8d8fd7ae1e33f`
+- Target-branch checks/smoke: post-merge `ci.yml` run
+  [35924167021](https://github.com/safwan5001-source/Nebrax/actions/runs/35924167021) — both jobs
+  `success`.
+- Findings / resolution: none.
 
 ## Self-review
 
@@ -207,9 +220,10 @@ None new beyond APP-BUILDER-1's carried-forward `setup.sh` `app/Mail` gap (unaff
 ## Git state
 
 - Branch: `claude/awj-app-builder-horizon-v1-e4iy21`
-- PR: _pending_
+- PR: [#971](https://github.com/safwan5001-source/Nebrax/pull/971) (merged)
 - Base SHA: `9c5a5b9263993da9708050bce826d06d7d252e5f`
-- Head SHA: _pending_
+- Head SHA (reviewed pre-merge): `30abaa3e43ed7c816cb24d9f06857b61011d90dc`
+- Merge SHA: `8844881de5171055342b397294d8d8fd7ae1e33f`
 
 ## Recommended next dependency-ready task
 
