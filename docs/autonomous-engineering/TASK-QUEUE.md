@@ -139,8 +139,8 @@ autonomously per نظام الأفق, `MOBILE-RUNTIME-1` first.
 | 3 | MOBILE-RUNTIME-3 | done | normal | MOBILE-RUNTIME-2 (done) | Component + Action Registry |
 | 4 | MOBILE-RUNTIME-4 | done | high | MOBILE-RUNTIME-1 (done) | Commerce OpenAPI client + secure session boundary |
 | 5 | MOBILE-RUNTIME-5 | done | high | MOBILE-RUNTIME-3, MOBILE-RUNTIME-4 | Home/Product/Cart vertical UI |
-| 6 | MOBILE-RUNTIME-6 | in_progress | normal | MOBILE-RUNTIME-5 | ar/en + RTL/LTR + theme/accessibility |
-| 7 | MOBILE-RUNTIME-7 | backlog | high | MOBILE-RUNTIME-3, MOBILE-RUNTIME-5 | Universal/App Links |
+| 6 | MOBILE-RUNTIME-6 | done | normal | MOBILE-RUNTIME-5 | ar/en + RTL/LTR + theme/accessibility |
+| 7 | MOBILE-RUNTIME-7 | in_progress | high | MOBILE-RUNTIME-3, MOBILE-RUNTIME-5 | Universal/App Links |
 | 8 | MOBILE-RUNTIME-8 | backlog | high | MOBILE-RUNTIME-3, MOBILE-RUNTIME-7 | Push adapter + notification routing proof |
 | 9 | MOBILE-RUNTIME-9 | backlog | normal | MOBILE-RUNTIME-6, 7, 8 | Android/iOS release-build proof |
 | 10 | MOBILE-RUNTIME-10 | backlog | high | MOBILE-RUNTIME-9 | Final compatibility/security/performance/runtime evidence + horizon closure |
@@ -276,6 +276,32 @@ report. This task adds the ar/en locale delegate stack, LTR support for
 English, and accessibility semantics/large-text support to the existing
 Home/Product/Cart screens — not a new screen or a new Commerce
 interaction.
+
+`MOBILE-RUNTIME-6` is `done`: PR #958 merged (Merge SHA
+`1dfce398a9efc1afccdb91b250015e2cf5c462d5`, confirmed single-parent squash
+onto `main`, zero content drift from the reviewed head), post-merge CI
+green on both required workflows, post-merge review passed. 123/123 tests
+(7 new), 0 analyze issues, one new dependency (`flutter_localizations`,
+Flutter SDK package — no MR-19 review needed). Building the required
+large-text-resilience test surfaced and fixed two genuine pre-existing
+MR-11 gaps (`NavigationTarget`'s direction-only chevron,
+`ProductList`'s fixed-height overflow at accessibility text scale) —
+neither introduced by this task. A CI flake in an unrelated pre-existing
+test (`ZatcaQrCertificateMaterialExtractorTest`, non-deterministic EC
+keypair generation) surfaced on this task's own post-merge docs commit;
+root-caused and confirmed via a single re-run, no code change needed.
+Full evidence: `docs/plans/mobile/MOBILE-RUNTIME-6-IMPLEMENTATION-REPORT.md`.
+
+`MOBILE-RUNTIME-7` promoted to `ready`/`in_progress` now that its hard
+dependencies (`MOBILE-RUNTIME-3`, `MOBILE-RUNTIME-5`) are merged and
+post-merge reviewed — `MOBILE-RUNTIME-6` was not itself a dependency, but
+this session continues sequentially. Source requirement: horizon doc's
+Universal/App Links task (Android App Links + iOS Universal Links routing
+into the existing schema-driven navigation, per the horizon's own task
+table). To be read in full before implementation: the horizon doc's
+deep-link section and MR-06 state-separation rule (a deep link is a
+navigation parameter, never business/session authority — MR-06 already
+established this boundary for `RuntimeState.selectedProductId`).
 
 ## Promotion checklist: backlog → ready
 
