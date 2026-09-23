@@ -95,9 +95,36 @@ domain models.
 - `php artisan test --filter="BranchIsolationGuardTest|ApplicationCatalogTest|ApplicationAccessGateGuardTest|RbacTest|RoleTest"`
   → **37/37 passed** (302 assertions) — confirms the three new models are correctly classified
   `CompanyWide` and the new `ApplicationCatalog`/RBAC entries don't break existing guards.
-- Full `php artisan test` (all engines/suites, SQLite): see CI section below — will be filled with
-  the exact observed result once complete (was still running at time of writing this report; not
-  claiming a result not yet observed, per `IMPLEMENTATION-REPORT-CONVENTION.md`'s truthfulness rule).
+- Full `php artisan test` (SQLite, local `/home/user/nibras-app`), first run (pre-fix): 149 failed,
+  49 skipped, 4466 passed. Second run (post-fix, this PR's `a5d0f1d`): **37 failed**, 49 skipped,
+  4578 passed (28993 assertions), 522s. Every one of the 37 is root-caused below with direct
+  evidence — none is a regression this PR introduced beyond the two already-fixed fixtures:
+  - **2** — `TenantApplicationTest`'s two catalog-count-44 assertions: caused by this PR (new
+    `commerce.app_builder` catalog key), already fixed in commit `a5d0f1d` (same pattern as
+    `ApplicationCatalogTest`). The second local run still showed this failure because the PHP test
+    process had already loaded the pre-fix bytecode for that file before my mid-run edit landed on
+    disk (Collision's error renderer re-reads the file from disk for the printed source-context
+    lines only, which is why the failure output paradoxically *shows* the fixed `assertCount(45,
+    ...)` line while reporting "expected 44" — confirms the executed code was stale, not that the
+    fix is wrong). Not re-verified a third time locally since the fix is identical in shape/cause
+    to the already-passing `ApplicationCatalogTest` fixture update; will be confirmed by CI on the
+    actual PR head instead of a third ~9-minute local run.
+  - **26** — every `Fuel*Test` failure: `Call to undefined function App\Services\bcmul()` (and
+    `bcadd`/`bcsub`/etc.) in `FuelCostBasisService` — the `bcmath` PHP extension is not loaded in
+    this local container (`php -m | grep bcmath` → empty). Pre-existing, environment-only, zero
+    relation to this task's diff. `ci.yml` explicitly installs `bcmath` for the real CI run
+    (`extensions: mbstring, pdo_sqlite, sqlite3, pgsql, pdo_pgsql, bcmath, intl, fileinfo, zip,
+    dom`), so this does not reproduce on GitHub Actions.
+  - **9** — `AuthRecoveryTest` (8) + `DocumentCenterSecureIntakeTest` (1): `Class
+    "App\Mail\AuthActionMail" not found`. Root cause: `setup.sh` (the script that built this
+    session's local `/home/user/nibras-app`) never copies `app/Mail/*.php` at all — confirmed by
+    `grep -n "app/Mail" setup.sh` returning nothing, while `.github/workflows/ci.yml` and
+    `deploy/assemble.sh` both already do. A **pre-existing gap in `setup.sh`**, unrelated to this
+    task's diff (this PR only adds one line to `setup.sh`, registering `app/Services/AppBuilder`).
+    Does not reproduce on real CI for the same reason as above. Recorded as discovered backlog
+    below rather than fixed in this PR (out of this task's scope; not required for this task's own
+    verification since it doesn't affect the routes/models this task touches).
+- Full CI result (GitHub Actions, exact PR head): see CI section below.
 
 ## Build / lint / typecheck
 
@@ -208,6 +235,11 @@ repository conventions; no platform/vendor claim needed verification.
 - App deletion/archival policy for `BuilderApp` (see above).
 - `BuilderApp` currently has no `status`/lifecycle field beyond implicit "has a draft, may have
   published versions" — may need one once App Manager (APP-BUILDER-4) defines list/filter UX.
+- `setup.sh` never copies `app/Mail/*.php` into the locally-built test project (unlike `ci.yml`
+  and `deploy/assemble.sh`, which both already do) — causes `AuthRecoveryTest`/
+  `DocumentCenterSecureIntakeTest` to fail locally with `Class "App\Mail\AuthActionMail" not
+  found`. Does not affect real CI. Discovered while running the full suite locally for this task;
+  unrelated to App Builder, left unfixed here per scope discipline.
 
 ## Git state
 
