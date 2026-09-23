@@ -1,0 +1,103 @@
+<?php
+
+namespace App\Services\AppBuilder;
+
+/**
+ * ═══════════════════════════════════════════════════════════════
+ *  سجلّ بيانات الإجراءات الوصفية — APP-BUILDER-3
+ * ═══════════════════════════════════════════════════════════════
+ *
+ * يوسّع `RuntimeCapabilities::ACTIONS` (هوية + إصدار فقط) ببيان مُدخلات كل
+ * إجراء. **كل قيد هنا مطابقٌ حرفياً لـ `decodeAction()` في
+ * `mobile/lib/actions/app_action.dart`** — لا قيد أوسع أو أضيق ممّا يفحصه
+ * ذلك المفكِّك فعلياً، ومُختبَر بمرآة في `mobile/test/actions/app_action_test.dart`.
+ *
+ * لا واحد من الستّة له أثرٌ تجاري فعلي اليوم: `ActionHandler` الوحيد المُثبَت
+ * هو `NoopActionHandler` (`mobile/lib/actions/action_dispatcher.dart`) —
+ * MOBILE-RUNTIME-4/5 (ربط Commerce API فعلي) لم يُبنَيا. `dispatchStatus`
+ * يوثّق هذه الفجوة صراحةً لكل إجراء بدل الإيحاء بقدرة غير موجودة.
+ *
+ * مفتاح المصفوفة المُعادة من `definitions()` يُطابق حرفياً
+ * `RuntimeCapabilities::ACTIONS` — يحرسه `ActionRegistryTest`.
+ */
+final class ActionRegistry
+{
+    private function __construct() {}
+
+    /**
+     * @return array<string, ActionDefinition>
+     */
+    public static function definitions(): array
+    {
+        $definitions = [
+            new ActionDefinition(
+                type: 'navigate',
+                version: 1,
+                riskClass: ActionRiskClass::NAVIGATION,
+                params: [
+                    new ActionParamDefinition('pageId', PropType::STRING, required: true),
+                ],
+                dispatchStatus: ActionDefinition::DISPATCH_PROVEN_NOOP,
+                notes: 'يُفكَّك فقط حين تكون `pageId` سلسلة غير فارغة.',
+            ),
+            new ActionDefinition(
+                type: 'openProduct',
+                version: 1,
+                riskClass: ActionRiskClass::NAVIGATION,
+                params: [
+                    new ActionParamDefinition('productId', PropType::STRING, required: true),
+                ],
+                dispatchStatus: ActionDefinition::DISPATCH_PROVEN_NOOP,
+                notes: 'يُفكَّك فقط حين تكون `productId` سلسلة غير فارغة.',
+            ),
+            new ActionDefinition(
+                type: 'addToCart',
+                version: 1,
+                riskClass: ActionRiskClass::COMMERCE_MUTATION,
+                params: [
+                    new ActionParamDefinition('productId', PropType::STRING, required: true),
+                    new ActionParamDefinition('variantId', PropType::STRING, required: false, nullable: true),
+                    new ActionParamDefinition('quantity', PropType::INTEGER, required: false, default: 1, minValue: 1),
+                ],
+                dispatchStatus: ActionDefinition::DISPATCH_PROVEN_NOOP,
+                notes: '`quantity` غائبة تفترض 1؛ موجودة يجب أن تكون عدداً صحيحاً موجباً (`> 0`) وإلا يُرفض الفكّ كاملاً.',
+            ),
+            new ActionDefinition(
+                type: 'updateCartQuantity',
+                version: 1,
+                riskClass: ActionRiskClass::COMMERCE_MUTATION,
+                params: [
+                    new ActionParamDefinition('cartItemId', PropType::STRING, required: true),
+                    new ActionParamDefinition('quantity', PropType::INTEGER, required: true, minValue: 0),
+                ],
+                dispatchStatus: ActionDefinition::DISPATCH_PROVEN_NOOP,
+                notes: 'صفر مسموح صراحة (قرار "إزالة بالصفر" يخص المستدعي، لا هذا الفكّ) — السالب مرفوض.',
+            ),
+            new ActionDefinition(
+                type: 'removeCartItem',
+                version: 1,
+                riskClass: ActionRiskClass::COMMERCE_MUTATION,
+                params: [
+                    new ActionParamDefinition('cartItemId', PropType::STRING, required: true),
+                ],
+                dispatchStatus: ActionDefinition::DISPATCH_PROVEN_NOOP,
+                notes: 'يُفكَّك فقط حين تكون `cartItemId` سلسلة غير فارغة.',
+            ),
+            new ActionDefinition(
+                type: 'refresh',
+                version: 1,
+                riskClass: ActionRiskClass::READ_CAPABILITY,
+                params: [],
+                dispatchStatus: ActionDefinition::DISPATCH_PROVEN_NOOP,
+                notes: 'يتجاهل أي معاملات مُعطاة — يُفكَّك دوماً بنجاح بلا مُدخلات.',
+            ),
+        ];
+
+        $byType = [];
+        foreach ($definitions as $definition) {
+            $byType[$definition->type] = $definition;
+        }
+
+        return $byType;
+    }
+}
