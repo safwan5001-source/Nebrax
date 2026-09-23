@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../actions/actions.dart';
 import '../commerce/commerce.dart';
+import '../deeplink/deep_link_channel.dart';
 import 'cart_screen.dart';
 import 'home_screen.dart';
 import 'product_screen.dart';
@@ -49,6 +50,7 @@ class _AwjRuntimeShellState extends State<AwjRuntimeShell> {
   late final CommerceClient _client;
   late final RuntimeState _state;
   late final AppActionDispatcher _dispatcher;
+  late final DeepLinkController _deepLinks;
 
   @override
   void initState() {
@@ -65,6 +67,12 @@ class _AwjRuntimeShellState extends State<AwjRuntimeShell> {
       RuntimeActionHandler(client: _client, state: _state, onError: _showError),
     );
     _state.addListener(_onStateChanged);
+    // A validated deep link is dispatched through the exact same
+    // `AppActionDispatcher` every schema-driven tap already uses — never a
+    // parallel navigation path (`deep_link_resolver.dart`'s own doc comment
+    // explains why its output can only ever be `navigate`/`openProduct`).
+    _deepLinks = DeepLinkController(onAction: _dispatcher.dispatch);
+    _deepLinks.start();
   }
 
   @override

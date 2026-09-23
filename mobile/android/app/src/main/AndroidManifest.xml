@@ -24,6 +24,23 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <!-- Android App Link (MOBILE-RUNTIME-7, horizon MR-08). The host
+                 is a placeholder under the IANA-reserved `.example` TLD (see
+                 `mobile/lib/deeplink/deep_link_resolver.dart`'s own doc
+                 comment) — no canonical AWJ mobile deep-link domain is
+                 documented anywhere yet, so `autoVerify` cannot actually
+                 succeed until a real domain hosts the matching
+                 `.well-known/assetlinks.json`. That is an explicit open
+                 Decision Gate, not silently assumed resolved; the
+                 Dart-side validation this filter feeds into
+                 (`DeepLinkController`/`resolveDeepLinkUri`) is what this
+                 task actually proves. -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="https" android:host="awj-runtime-proof.example"/>
+            </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
