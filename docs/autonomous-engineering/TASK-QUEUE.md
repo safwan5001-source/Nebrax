@@ -499,8 +499,8 @@ Source of truth:
 |---|---|---|---|---|---|
 | 1 | APP-BUILDER-1 | done | normal | horizon authorization | Domain/persistence foundation (App/Draft/Published Experience Version, tenant/RBAC) |
 | 2 | APP-BUILDER-2 | done | normal | APP-BUILDER-1 (done) | Schema validation + runtime capability contract |
-| 3 | APP-BUILDER-3 | ready | normal | APP-BUILDER-2 (done) | Component/Action/Data Resource registries |
-| 4 | APP-BUILDER-4 | pending | high | APP-BUILDER-3 | App Manager + creation wizard (UI/UX Evidence Pass required) |
+| 3 | APP-BUILDER-3 | done | normal | APP-BUILDER-2 (done) | Component/Action/Data Resource registries |
+| 4 | APP-BUILDER-4 | ready | high | APP-BUILDER-3 (done) | App Manager + creation wizard (UI/UX Evidence Pass required) |
 | 5 | APP-BUILDER-5 | pending | high | APP-BUILDER-4 | Builder workspace shell (UI/UX Evidence Pass required) |
 | 6 | APP-BUILDER-6 | pending | normal | APP-BUILDER-5 | Visual editing + history |
 | 7 | APP-BUILDER-7 | pending | normal | APP-BUILDER-6 | Data/Actions/Conditions/Visibility (Develop mode) |
@@ -554,3 +554,19 @@ and safe bindings/actions") and `COMPONENT_REGISTRY_V1.md`/`ACTION_REGISTRY_V1.m
 capability identifiers); this task adds the richer per-identifier metadata (props, bindings,
 events, editor hints) those contract docs describe, against the same already-fixed identifiers —
 an implementation task, not a new architecture decision.
+
+`APP-BUILDER-3` is `done`: PR pending merge (see implementation report for live status). Added
+`ComponentRegistry`/`ActionRegistry` (full per-identifier metadata: props, children rules,
+actionability, typed action params) plus a deliberately empty `DataResourceRegistry`. Two scoping
+findings, both repository-evidence-grounded (not product decisions): (1) the real, tested schema
+contract (`SchemaComponent._allowedKeys`) has no `bindings` field at all, so no Component "Bindings"
+metadata was invented; (2) no `COMMERCE_MOBILE_API_READINESS.md` exists and the Mobile Runtime
+horizon never built live data binding, so `DataResourceRegistry` ships empty (guarded by a test)
+rather than populated with speculative resources. 14 new focused tests, zero modified files (fully
+additive), full local suite shows zero regressions (35 pre-existing unrelated failures, same as
+APP-BUILDER-1/2's documented `bcmath`/`app/Mail` local-environment gaps). Full evidence:
+`docs/plans/app-builder/APP-BUILDER-3-IMPLEMENTATION-REPORT.md`.
+
+`APP-BUILDER-4` promoted to `ready` now that its hard dependency (`APP-BUILDER-3`) is done.
+**Requires a UI/UX Evidence Pass and AWJ Design System conformance check before implementation**
+per the horizon's own gate for the first major Builder UI slice — not to be skipped.
