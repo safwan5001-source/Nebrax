@@ -117,18 +117,19 @@ push-triggered and pull_request-triggered workflow runs, all 4 checks green:
 
 ## Post-merge review
 
-- POST_MERGE_REVIEW: _in progress — `main@8844881` confirmed as `origin/main`'s tip, a
-  single-parent squash (parent `9c5a5b9`), zero content drift from the reviewed head `30abaa3`
+- POST_MERGE_REVIEW: **PASS**
+- `main@8844881` confirmed as `origin/main`'s tip, a single-parent squash (parent `9c5a5b9`), zero
+  content drift from the reviewed head `30abaa3`
   (`git diff 30abaa3 origin/main -- app database routes tests docs/plans/app-builder` is empty).
   Post-merge CI (`ci.yml` run
   [35924167021](https://github.com/safwan5001-source/Nebrax/actions/runs/35924167021) on the merge
-  commit) was still running at time of this commit — not claiming PASS before it is observed, per
-  the truthfulness rule. Will be updated to PASS once observed._
+  commit) completed with both jobs green: `php artisan test (L11, sqlite)` (completed 21:48:56 UTC)
+  and `php artisan test (L11, pgsql)` (completed 21:55:42 UTC).
 - Reviewed Merge SHA: `8844881de5171055342b397294d8d8fd7ae1e33f`
 - Target-branch checks/smoke: post-merge `ci.yml` run
-  [35924167021](https://github.com/safwan5001-source/Nebrax/actions/runs/35924167021) — pending at
-  time of this commit.
-- Findings / resolution: none so far.
+  [35924167021](https://github.com/safwan5001-source/Nebrax/actions/runs/35924167021) — both jobs
+  `success`.
+- Findings / resolution: none.
 
 ## Self-review
 
