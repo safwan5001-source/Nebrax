@@ -391,7 +391,7 @@ unmodified OpenAPI contract; no server-side file was touched.
 - Branch: `claude/awj-mobile-runtime-horizon-v1-g0n8mm`
 - PR: (recorded once opened)
 - Base SHA: `2276fc66aa190e696e2fff39ef5bdbc8faf0cea5` (`origin/main`, PR #953)
-- Head SHA: (recorded once pushed)
+- Head SHA: `31a2180fd54fb60b642f58338c4afebeedf76194` (pushed)
 
 ## Recommended next dependency-ready task
 
