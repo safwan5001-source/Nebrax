@@ -1,8 +1,18 @@
 name: Mobile CI
 
 # AWJ Mobile Runtime Proof (mobile/) — analyze + test on every push/PR that
-# touches the workspace. Release-build jobs (Android/iOS) are added in
-# MOBILE-RUNTIME-9 once there is a runtime worth building.
+# touches the workspace, plus (MOBILE-RUNTIME-9, horizon MR-12/Gate G)
+# release-mode build proof for both platforms: Android release APK/AAB
+# (debug-signed per the stock `flutter create` template — see
+# android/app/build.gradle.kts's own comment — never a production/store
+# signing key) on this same ubuntu-latest runner, and an iOS release build
+# to the maximum non-signing level available (`--no-codesign`, no Apple
+# Developer account/certificate/provisioning profile required or used) on
+# a macos-latest runner, since no macOS/Xcode toolchain exists in the
+# session that authored this workflow to verify it any other way. Store
+# signing, App Store/Google Play submission, and production release remain
+# entirely out of this horizon's scope — see MOBILE-RUNTIME-9's
+# implementation report.
 
 on:
   push:
@@ -38,3 +48,89 @@ jobs:
 
       - name: flutter test
         run: flutter test
+
+  android-release-build:
+    name: mobile (Android release build proof)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter 3.47.5 (stable)
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.5'
+          channel: 'stable'
+          cache: true
+
+      - name: flutter pub get
+        run: flutter pub get
+
+      # Debug-signed per the stock `flutter create` template
+      # (android/app/build.gradle.kts's release buildType reuses the
+      # debug signingConfig, matching MR-09/DoD's "release-mode build
+      # proof... within available non-production credentials") — an APK
+      # (sideload-installable proof artifact) and an AAB (the real Play
+      # publishing format) are both built, since a release-build proof
+      # ought to cover the format that would actually ship, not just the
+      # easier-to-test one.
+      - name: flutter build apk --release (debug-signed proof)
+        run: flutter build apk --release
+
+      - name: flutter build appbundle --release (debug-signed proof)
+        run: flutter build appbundle --release
+
+      # Preserved so MOBILE-RUNTIME-10 (MR-18 performance evidence,
+      # "release artifact/binary size recorded") can measure real sizes
+      # without re-running a build — this job's only job is buildability
+      # proof, not the measurement itself.
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-release-build
+          path: |
+            mobile/build/app/outputs/flutter-apk/app-release.apk
+            mobile/build/app/outputs/bundle/release/app-release.aab
+          retention-days: 14
+
+  ios-release-build:
+    name: mobile (iOS release build proof)
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter 3.47.5 (stable)
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.5'
+          channel: 'stable'
+          cache: true
+
+      - name: flutter pub get
+        run: flutter pub get
+
+      # `--no-codesign` is Gate G's "maximum non-signing level available":
+      # a real Release-configuration build of Runner.app for a device
+      # architecture, with the entire code-signing step skipped — no
+      # Apple Developer account, certificate, or provisioning profile is
+      # required or used. This is not an .ipa (that requires signing to
+      # export) and is never submitted anywhere.
+      - name: flutter build ios --release --no-codesign
+        run: flutter build ios --release --no-codesign
+
+      # Preserved so MOBILE-RUNTIME-10 (MR-18 performance evidence,
+      # "release artifact/binary size recorded") can measure the real
+      # unsigned build's size without re-running it.
+      - name: Upload release build
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-release-build
+          path: mobile/build/ios/iphoneos/Runner.app
+          retention-days: 14

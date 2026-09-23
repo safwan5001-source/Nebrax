@@ -46,8 +46,12 @@ flutter build ios --release --no-codesign   # iOS release build, unsigned (Gate 
 ```
 
 CI runs `pub get` + `analyze` + `test` on every push/PR touching `mobile/**`
-(`.github/workflows/mobile-ci.yml`). Release-mode build jobs are added in
-MOBILE-RUNTIME-9 once there is a runtime worth building.
+(`.github/workflows/mobile-ci.yml`), plus (MOBILE-RUNTIME-9) release-mode
+build proof jobs: Android release APK + AAB on the same `ubuntu-latest`
+runner (debug-signed per the stock template, never a production key), and
+an unsigned iOS release build (`--no-codesign`) on a `macos-latest`
+runner — the only toolchain this proof needed that the authoring session
+itself did not have.
 
 ## Application identity (Android/iOS) — temporary, not a production decision
 
