@@ -32,6 +32,11 @@ Any Head change invalidates the prior pre-merge review.
 
 During async CI waits, prefer event-driven PR/GitHub activity continuation and arm the proven delayed-trigger fallback; do not require the owner to manually say “continue”.
 
+## Mandatory UI/UX workflow
+For every major user-facing Builder slice, do not design from memory and do not mechanically reuse Store Customizer UX. Before implementation, perform a focused current UI/UX Evidence Pass for the exact interaction problem, document references and retained/rejected patterns, make an explicit AWJ UX Decision, then implement using the AWJ Design System as the authoritative visual/component language. Repeat this per major slice; one horizon-wide benchmark is insufficient. Validate Desktop + responsive/mobile, ar/en + RTL/LTR, accessibility, key states, keyboard/focus where relevant, and progressive disclosure. External products are interaction evidence only; never copy their visual identity/assets/design system.
+
+If a Builder-specific primitive is genuinely missing from AWJ Design System, extend it deliberately and consistently rather than creating an ad-hoc parallel UI language.
+
 ## Non-negotiables
 - Tenant/RBAC/security/backcompat first.
 - Commerce remains business source of truth.
