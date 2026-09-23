@@ -1,6 +1,6 @@
 # APP-BUILDER-3 — Implementation Report
 
-STATUS: pre-merge review
+STATUS: merged, post-merge review in progress
 DATE: 2026-09-23
 
 ## Outcome
@@ -112,12 +112,37 @@ once for data resources (no invented endpoint/resource without readiness evidenc
 
 ## CI
 
-Pending — will be recorded once the GitHub Actions run on this PR's head is observed, per the
-truthfulness rule (not claiming PASS before observed).
+GitHub Actions on PR head `82cbc1aade73c0d6b69f99289b1abc312df3a4b0` (PR #973), both the
+push-triggered and pull_request-triggered workflow runs, all 4 checks green:
+`php artisan test (L11, sqlite)` and `(L11, pgsql)` success on both runs.
 
 ## Pre-merge review
 
-Pending — to be completed after CI is confirmed green on the exact reviewed head.
+- PRE_MERGE_REVIEW: **PASS**
+- Reviewed Head SHA: `82cbc1aade73c0d6b69f99289b1abc312df3a4b0`
+- Findings / resolution: No open findings. `chatgpt-codex-connector[bot]` posted only a
+  usage-limit notice (did not perform a review). No human review posted.
+
+## Merge
+
+- Merge status: **merged** via standing authority (squash, no unresolved Decision Gate, required
+  CI green on exact head, no unapproved scope expansion, no production deploy/release).
+- Merge SHA: `4256d0aadb1a53f5288d054d5d937cd85ddf4d97`
+
+## Post-merge review
+
+- POST_MERGE_REVIEW: _in progress — `main@4256d0a` confirmed as `origin/main`'s tip, a
+  single-parent squash (parent `6e15810`), zero content drift from the reviewed head `82cbc1a`
+  (`git diff 82cbc1aade73c0d6b69f99289b1abc312df3a4b0 origin/main -- app database routes tests docs/plans/app-builder`
+  is empty). Post-merge CI (`ci.yml` run
+  [35931041709](https://github.com/safwan5001-source/Nebrax/actions/runs/35931041709) on the merge
+  commit) was still in progress at time of this commit — not claiming PASS before it is observed,
+  per the truthfulness rule. Will be updated to PASS once observed._
+- Reviewed Merge SHA: `4256d0aadb1a53f5288d054d5d937cd85ddf4d97`
+- Target-branch checks/smoke: post-merge `ci.yml` run
+  [35931041709](https://github.com/safwan5001-source/Nebrax/actions/runs/35931041709) — pending at
+  time of this commit.
+- Findings / resolution: none so far.
 
 ## Self-review
 
@@ -205,8 +230,10 @@ None new beyond APP-BUILDER-1's carried-forward `setup.sh` `app/Mail` gap (unaff
 ## Git state
 
 - Branch: `claude/awj-app-builder-horizon-v1-e4iy21`
-- PR: pending (to be opened after this report is committed)
+- PR: [#973](https://github.com/safwan5001-source/Nebrax/pull/973) (merged)
 - Base SHA: `6e158104f306d6d287cda7bf1628221c635e4975`
+- Head SHA (reviewed pre-merge): `82cbc1aade73c0d6b69f99289b1abc312df3a4b0`
+- Merge SHA: `4256d0aadb1a53f5288d054d5d937cd85ddf4d97`
 
 ## Recommended next dependency-ready task
 
