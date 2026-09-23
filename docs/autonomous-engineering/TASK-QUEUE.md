@@ -140,8 +140,8 @@ autonomously per نظام الأفق, `MOBILE-RUNTIME-1` first.
 | 4 | MOBILE-RUNTIME-4 | done | high | MOBILE-RUNTIME-1 (done) | Commerce OpenAPI client + secure session boundary |
 | 5 | MOBILE-RUNTIME-5 | done | high | MOBILE-RUNTIME-3, MOBILE-RUNTIME-4 | Home/Product/Cart vertical UI |
 | 6 | MOBILE-RUNTIME-6 | done | normal | MOBILE-RUNTIME-5 | ar/en + RTL/LTR + theme/accessibility |
-| 7 | MOBILE-RUNTIME-7 | in_progress | high | MOBILE-RUNTIME-3, MOBILE-RUNTIME-5 | Universal/App Links |
-| 8 | MOBILE-RUNTIME-8 | backlog | high | MOBILE-RUNTIME-3, MOBILE-RUNTIME-7 | Push adapter + notification routing proof |
+| 7 | MOBILE-RUNTIME-7 | done | high | MOBILE-RUNTIME-3, MOBILE-RUNTIME-5 | Universal/App Links |
+| 8 | MOBILE-RUNTIME-8 | in_progress | high | MOBILE-RUNTIME-3, MOBILE-RUNTIME-7 | Push adapter + notification routing proof |
 | 9 | MOBILE-RUNTIME-9 | backlog | normal | MOBILE-RUNTIME-6, 7, 8 | Android/iOS release-build proof |
 | 10 | MOBILE-RUNTIME-10 | backlog | high | MOBILE-RUNTIME-9 | Final compatibility/security/performance/runtime evidence + horizon closure |
 
@@ -302,6 +302,35 @@ table). To be read in full before implementation: the horizon doc's
 deep-link section and MR-06 state-separation rule (a deep link is a
 navigation parameter, never business/session authority — MR-06 already
 established this boundary for `RuntimeState.selectedProductId`).
+
+`MOBILE-RUNTIME-7` is `done`: PR #960 merged (Merge SHA
+`4929e9106e07c743a1c3814ae019064b2d625812`, confirmed single-parent squash
+onto `main`, zero content drift from the reviewed head), post-merge CI
+green on both required workflows, post-merge review passed. 151/151 tests
+(28 new), 0 analyze issues, no new dependency. `resolveDeepLinkUri`
+validates scheme/host/path and maps to the exact same `navigate`/
+`openProduct` `ActionRef` shape every schema-driven tap already
+dispatches — structurally incapable of a destructive action and never
+reads query parameters. Uses a placeholder `.example` domain, same
+Decision Gate convention as MOBILE-RUNTIME-1's Bundle ID. Native
+Kotlin/Swift changes are acknowledged as not build-verified by this
+environment (no native build step exists until `MOBILE-RUNTIME-9`). Full
+evidence: `docs/plans/mobile/MOBILE-RUNTIME-7-IMPLEMENTATION-REPORT.md`.
+
+`MOBILE-RUNTIME-8` promoted to `ready`/`in_progress` now that its hard
+dependencies (`MOBILE-RUNTIME-3`, `MOBILE-RUNTIME-7`) are merged and
+post-merge reviewed. Source requirement: horizon doc's MR-09 (Push
+boundary — "Prove a provider adapter boundary and one safe
+notification-to-navigation path"; FCM may be used as proof transport but
+this is not a permanent AWJ Messaging architecture decision, which is a
+Decision Gate if it comes up) and Gate F ("push adapter proof",
+"lifecycle handling for foreground/background/open-from-notification
+where applicable"). To be read in full before implementation: MR-09's
+exact wording and MOBILE-RUNTIME-7's own `DeepLinkController`/
+`resolveDeepLinkUri` pattern — a notification-to-navigation path should
+very likely reuse the identical `ActionRef`-through-`AppActionDispatcher`
+pipeline rather than invent a third one, matching how MOBILE-RUNTIME-7
+reused it for deep links instead of MOBILE-RUNTIME-5's own navigation.
 
 ## Promotion checklist: backlog → ready
 
