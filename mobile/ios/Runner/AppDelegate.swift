@@ -30,7 +30,9 @@ import UserNotifications
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
 
-    let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "AwjPushChannel")
+    guard let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "AwjPushChannel") else {
+      return
+    }
     let channel = FlutterMethodChannel(name: pushChannelName, binaryMessenger: registrar.messenger())
     channel.setMethodCallHandler { call, result in
       switch call.method {
