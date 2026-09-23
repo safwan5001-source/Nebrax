@@ -188,10 +188,35 @@ infrastructure was added to obtain them):**
 
 ### Release artifact sizes
 
-<!-- FILLED IN after this PR's own mobile-ci.yml android-release-build /
-ios-release-build jobs complete, from the real CI run — see the CI-run
-evidence section below. Not backfilled from MOBILE-RUNTIME-9's older PR
-#964 numbers; this task measures its own PR's fresh build. -->
+Measured from this PR's own `mobile-ci.yml` run on this exact head
+(`d45e32f...`), not backfilled from MOBILE-RUNTIME-9's older PR #964 build —
+this task's own build is the fresh, current source of truth:
+
+| Artifact | CI job | Size (zipped, as `actions/upload-artifact` reports via the GitHub API) |
+|---|---|---|
+| `android-release-build` (APK + AAB together) | `android-release-build`, run [35894857490](https://github.com/safwan5001-source/Nebrax/actions/runs/35894857490), job `107296134748` | 70,209,077 bytes (≈67.0 MiB) |
+| `ios-release-build` (unsigned `Runner.app`) | `ios-release-build`, same run, job `107296134513` | 7,036,117 bytes (≈6.7 MiB) |
+
+Both numbers are the artifact bundle's zipped size (`GET
+/repos/{owner}/{repo}/actions/artifacts/{id}` — `size_in_bytes`), the same
+convention MOBILE-RUNTIME-9's report used, and comparable in kind, not just
+coincidentally similar in magnitude, to the MOBILE-RUNTIME-9 baseline
+(70,202,189 / 7,032,678 bytes) — a ~7KB/~3.4KB delta between the two PRs'
+builds, consistent with no meaningful size regression from this task's
+Dart-only changes (no image/asset/native dependency was added).
+
+**Individual APK/AAB/`Runner.app` byte sizes (unzipped) could not be
+measured in this session**: downloading the artifact's zip content redirects
+to `productionresultssa12.blob.core.windows.net` (GitHub Actions' artifact
+storage backend), which this environment's egress network policy denies
+(`CONNECT` rejected with HTTP 403 — confirmed via the proxy's own status
+endpoint, not assumed). The zipped bundle size above is real, sourced
+directly from the GitHub Actions API (not estimated), and is a fair
+proxy for judging "did this change bloat the app" even without the
+unzipped breakdown — MR-18's provisional §4 budgets (≤40MB Android app
+size, ≤50MB iOS IPA) were written against unzipped app size, so this
+section reports the zipped bundle number honestly as what it is rather
+than silently treating it as equivalent to those budgets.
 
 ## Tests
 
@@ -272,4 +297,14 @@ No journal entry table applies.
 
 ## CI / merge evidence
 
-<!-- FILLED IN once PR is opened and CI completes on the exact final head. -->
+PR #966, Head SHA `d45e32f38de33af9021949b94dc5092b35f5f580`. Both required
+workflows green on this exact head (verified via the GitHub Actions API,
+not assumed from a webhook alone):
+
+- `mobile-ci.yml` run [35894857490](https://github.com/safwan5001-source/Nebrax/actions/runs/35894857490) — `conclusion: success`, all three jobs (`mobile (analyze + test)`, `mobile (Android release build proof)`, `mobile (iOS release build proof)`) individually `success`.
+- `ci.yml` run [35894857231](https://github.com/safwan5001-source/Nebrax/actions/runs/35894857231) — `conclusion: success` (backend suite, unrelated to this diff but required).
+
+`PRE_MERGE_REVIEW: PASS`
+`Reviewed Head SHA: d45e32f38de33af9021949b94dc5092b35f5f580`
+
+<!-- POST_MERGE_REVIEW and actual Merge SHA recorded here after merge. -->

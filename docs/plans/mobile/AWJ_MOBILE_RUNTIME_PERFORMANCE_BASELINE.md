@@ -116,8 +116,8 @@ recorded as **NOT MEASURED** with the exact reason, never a guess.
 | Headless widget-tree render, warm (second pump of the identical tree in the same isolate — isolates steady-state rebuild/layout/paint from one-time init) | same method | 1,628µs (single sample) |
 | `flutter analyze` | `flutter analyze` | 0 issues |
 | `flutter test` (full suite, harness speed sanity only, not a performance metric) | `flutter test` | 251/251 passing, ~11–12s wall time in this environment |
-| Android release artifact size | `flutter build apk --release` + `flutter build appbundle --release` (`mobile-ci.yml`'s `android-release-build` job, `ubuntu-latest`) | see this task's implementation report for the exact byte sizes from this PR's own CI run |
-| iOS release artifact size (unsigned) | `flutter build ios --release --no-codesign` (`mobile-ci.yml`'s `ios-release-build` job, `macos-latest`) | see this task's implementation report for the exact byte size from this PR's own CI run |
+| Android release artifact size | `flutter build apk --release` + `flutter build appbundle --release` (`mobile-ci.yml`'s `android-release-build` job, `ubuntu-latest`) | 70,209,077 bytes zipped (APK+AAB bundle), this PR's own CI run — see implementation report §"Release artifact sizes" for the unzipped-size limitation |
+| iOS release artifact size (unsigned) | `flutter build ios --release --no-codesign` (`mobile-ci.yml`'s `ios-release-build` job, `macos-latest`) | 7,036,117 bytes zipped (`Runner.app`), this PR's own CI run — same limitation noted |
 
 The widget-tree render numbers are an explicit **proxy**, not a
 first-meaningful-render measurement: `flutter test` runs against
