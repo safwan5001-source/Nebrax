@@ -136,8 +136,8 @@ autonomously per نظام الأفق, `MOBILE-RUNTIME-1` first.
 |---|---|---|---|---|---|
 | 1 | MOBILE-RUNTIME-1 | done | normal | horizon authorization | Flutter workspace + toolchain proof |
 | 2 | MOBILE-RUNTIME-2 | done | normal | MOBILE-RUNTIME-1 (done) | App Schema + compatibility kernel |
-| 3 | MOBILE-RUNTIME-3 | in_progress | normal | MOBILE-RUNTIME-2 (done) | Component + Action Registry |
-| 4 | MOBILE-RUNTIME-4 | backlog | high | MOBILE-RUNTIME-1 | Commerce OpenAPI client + secure session boundary |
+| 3 | MOBILE-RUNTIME-3 | done | normal | MOBILE-RUNTIME-2 (done) | Component + Action Registry |
+| 4 | MOBILE-RUNTIME-4 | in_progress | high | MOBILE-RUNTIME-1 (done) | Commerce OpenAPI client + secure session boundary |
 | 5 | MOBILE-RUNTIME-5 | backlog | high | MOBILE-RUNTIME-3, MOBILE-RUNTIME-4 | Home/Product/Cart vertical UI |
 | 6 | MOBILE-RUNTIME-6 | backlog | normal | MOBILE-RUNTIME-5 | ar/en + RTL/LTR + theme/accessibility |
 | 7 | MOBILE-RUNTIME-7 | backlog | high | MOBILE-RUNTIME-3, MOBILE-RUNTIME-5 | Universal/App Links |
@@ -201,6 +201,29 @@ actions (`addToCart`, `updateCartQuantity`, `removeCartItem`) will not yet
 call a real Commerce API (that is `MOBILE-RUNTIME-4`/`5`) — this task's
 dispatch layer is proved with an injectable/fake action handler, matching
 the horizon's own task-4-comes-after-task-3 dependency ordering.
+
+`MOBILE-RUNTIME-3` is `done`: PR #952 merged (Merge SHA
+`b7637f3990702a2cd6277422493dae3eda3b3ced`, confirmed single-parent squash
+onto `main`, zero content drift from the reviewed head), post-merge CI
+green on both required workflows, post-merge review passed. 72/72 tests
+(37 new), 0 analyze issues, no new dependency. Full evidence:
+`docs/plans/mobile/MOBILE-RUNTIME-3-IMPLEMENTATION-REPORT.md`.
+
+`MOBILE-RUNTIME-4` promoted to `ready`/`in_progress` now that its hard
+dependency (`MOBILE-RUNTIME-1`, done) is satisfied — it does not depend on
+`MOBILE-RUNTIME-2`/`3` per the horizon's own dependency table (§8), though
+this session continues sequentially. Source requirement: horizon doc §8
+row 4, Quality Gate C ("generated or strongly typed client based on the
+committed OpenAPI contract", "tenant/channel remain server-resolved",
+"error envelope handled explicitly") and Gate D ("secure token/session
+abstraction", "no token logging"). No unresolved product decision: the
+`/commerce/v1` contract (`docs/openapi/commerce-api-v1.yaml`) is already
+committed and accepted (COM-MOBILE-VERTICAL-TEST-1, done); this task
+implements a typed client against it plus a secure-storage session
+abstraction, not a new API design. Adding a secure-storage package (this
+horizon's likely first non-trivial Flutter dependency) requires the MR-19
+license/maintenance/security/native-permission review recorded in the
+task's implementation report before it lands in `pubspec.yaml`.
 
 ## Promotion checklist: backlog → ready
 
