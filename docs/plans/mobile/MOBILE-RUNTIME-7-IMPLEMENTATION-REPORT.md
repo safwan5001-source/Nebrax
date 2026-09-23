@@ -207,19 +207,69 @@ to run one manually either. See "Risks / remaining work" below.
 
 ## CI
 
-(to be filled in after PR is opened and checks run)
+PR #960 opened on head `311b1f49720b51669b3da19162d343316dee03a4`; all 6
+required checks (`mobile-ci.yml` analyze+test, `ci.yml` sqlite+pgsql, each
+×2 for push+PR events) passed — `conclusion: success` on every run.
 
 ## Pre-merge review
 
-(pending)
+- PRE_MERGE_REVIEW: **PASS**
+- Reviewed Head SHA: `311b1f49720b51669b3da19162d343316dee03a4`
+- Findings / resolution: fresh Reviewer + AWJ Guardian pass against the
+  complete final diff (`git diff efa7a18 311b1f4`, 12 files, 1113
+  insertions, 1 deletion):
+  - All 6 required checks green on this exact head: `mobile (analyze +
+    test)` ×2, `php artisan test (L11, sqlite)` ×2, `php artisan test
+    (L11, pgsql)` ×2 — all `conclusion: success`. `mergeable_state: clean`.
+  - Re-ran `flutter analyze && flutter test` directly against this exact
+    head in this session: 0 analyze issues, 151/151 tests passing — not
+    just trusting the CI badge.
+  - Confirmed the diff touches only `mobile/` and this task's own report —
+    no `app/`, `database/`, `routes/`, or other PHP/Laravel file anywhere
+    in the diff.
+  - Re-confirmed by direct reading that `resolveDeepLinkUri` has no code
+    path that can construct any `ActionRef` other than `navigate`/
+    `openProduct`, and no code path that reads `uri.queryParameters` —
+    both structural guarantees, not just asserted in prose.
+  - Confirmed the host check is exact-match (`==`), not `contains`/
+    `startsWith`, per the dedicated "host containing the real host as a
+    substring" test.
+  - Confirmed native Kotlin/Swift changes carry zero allowlisting logic
+    of their own — each only ever forwards a raw string across the
+    `awj/deep_links` channel.
+  - The one PR comment (`chatgpt-codex-connector[bot]` reporting it hit
+    its own Codex usage limit) carries no review finding — no action
+    needed. Zero human/bot reviews posted.
+  - No accounting/tenant/RBAC/API/DB code touched.
+  - No unresolved review finding or Decision Gate blocking merge (the
+    placeholder-domain and native-build-unverified risks are
+    acknowledged/documented, not blocking, exactly like MOBILE-RUNTIME-1's
+    Bundle ID precedent).
 
 ## Merge
 
-(pending)
+- Merge status: **merged** (squash), PR #960.
+- Merge SHA: `4929e9106e07c743a1c3814ae019064b2d625812`
 
 ## Post-merge review
 
-(pending)
+- POST_MERGE_REVIEW: **PASS**
+- Reviewed Merge SHA: `4929e9106e07c743a1c3814ae019064b2d625812`
+- Target-branch checks/smoke:
+  - `git fetch origin main` confirms `origin/main` tip is exactly this
+    SHA, single parent `efa7a1893ebe3a776275eb5f144741cb3017ca93` — a
+    genuine squash merge.
+  - `git diff 311b1f4 origin/main -- mobile/
+    docs/plans/mobile/MOBILE-RUNTIME-7-IMPLEMENTATION-REPORT.md` is
+    empty — the squash preserved the reviewed content exactly.
+  - Post-merge CI on this exact `head_sha`: `mobile-ci.yml` run
+    [35848544132](https://github.com/safwan5001-source/Nebrax/actions/runs/35848544132)
+    and `ci.yml` run
+    [35848543962](https://github.com/safwan5001-source/Nebrax/actions/runs/35848543962),
+    both `conclusion: success`.
+  - Targeted post-merge smoke: `flutter analyze` (0 issues) and `flutter
+    test` (151/151 passing) re-run directly against the merged content.
+- Findings / resolution: none — no unexpected integration change.
 
 ## Self-review
 
@@ -370,12 +420,23 @@ evaluated or adopted.
   decision as the production Bundle/Application ID from
   MOBILE-RUNTIME-1's own report, not resolved by this task.
 
+## Continuation-mechanism follow-up
+
+`subscribe_pr_activity` + `send_later` again worked reliably across this
+task's full PR lifecycle, including through an unusually long
+`pgsql` job (~20 minutes vs. this horizon's typical ~15-19) on the
+post-merge run — a mid-wait `get_job_logs` check confirmed it was
+actively progressing through the test suite, not hung, before continuing
+to wait rather than treating length alone as a failure signal. No
+`ScheduleWakeup` use this task, per the standing instruction.
+
 ## Git state
 
 - Branch: `claude/awj-mobile-runtime-horizon-v1-g0n8mm`
-- PR: (to be opened)
-- Base SHA: (current `origin/main` tip at time of push)
-- Head SHA: (to be recorded after push)
+- PR: #960 (merged)
+- Base SHA: `efa7a1893ebe3a776275eb5f144741cb3017ca93` (`origin/main`, PR #959)
+- Head SHA: `311b1f49720b51669b3da19162d343316dee03a4` (pushed, merged)
+- Merge SHA: `4929e9106e07c743a1c3814ae019064b2d625812`
 
 ## Recommended next dependency-ready task
 
