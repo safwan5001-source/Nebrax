@@ -44,4 +44,23 @@ class RuntimeCapabilities {
     'removeCartItem': 1,
     'refresh': 1,
   };
+
+  /// Native (non-renderable, non-dispatchable) capabilities this runtime
+  /// build can prove — distinct from [components]/[actions] because a
+  /// capability like push routing is never a schema component nor an
+  /// action type, yet a schema may still need to assert it as a
+  /// prerequisite (MR-15: "a remote Experience must never require a native
+  /// capability before a supporting binary is safely available under the
+  /// compatibility policy"). [CapabilityManifest.namedCapabilityVersion]
+  /// checks this map exactly like the other two, so `requiredCapabilities`
+  /// works identically whether it names a component, an action, or one of
+  /// these.
+  ///
+  /// `push.notifications` (MOBILE-RUNTIME-8, horizon MR-09) is this
+  /// runtime's notification-tap-to-navigation boundary (`lib/push/`) — it
+  /// says nothing about which transport delivers a push, only that this
+  /// build can safely route one that arrives.
+  static const Map<String, int> nativeCapabilities = {
+    'push.notifications': 1,
+  };
 }

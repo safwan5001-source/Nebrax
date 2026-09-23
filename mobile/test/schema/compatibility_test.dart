@@ -10,6 +10,7 @@ CapabilityManifest manifestOf({
   String maxSchema = '1.0.0',
   Map<String, int>? components,
   Map<String, int>? actions,
+  Map<String, int>? nativeCapabilities,
 }) {
   return CapabilityManifest(
     platform: platform,
@@ -18,6 +19,7 @@ CapabilityManifest manifestOf({
     maxSupportedSchemaVersion: SchemaVersion.parse(maxSchema),
     components: components ?? RuntimeCapabilities.components,
     actions: actions ?? RuntimeCapabilities.actions,
+    nativeCapabilities: nativeCapabilities ?? RuntimeCapabilities.nativeCapabilities,
   );
 }
 
@@ -221,6 +223,67 @@ void main() {
         isA<IncompatibleExperience>(),
       );
     });
+  });
+
+  group('CompatibilityResolver — native capability rollout ordering (MR-15)', () {
+    test(
+      'the current runtime satisfies a schema requiring push.notifications v1',
+      () {
+        final schema = AppSchema.parse(
+          encodeSchema(baseSchemaJson(requiredCapabilities: {'push.notifications': 1})),
+        );
+        final result = resolver.resolve(schema, CapabilityManifest.current(RuntimePlatform.ios));
+
+        expect(result, isA<RenderableExperience>());
+      },
+    );
+
+    test(
+      'a schema requiring a not-yet-shipped push.notifications version is rejected — '
+      'MR-15: a Published Experience must never require a native capability '
+      'before a supporting binary is safely available',
+      () {
+        final schema = AppSchema.parse(
+          encodeSchema(baseSchemaJson(requiredCapabilities: {'push.notifications': 2})),
+        );
+        final result = resolver.resolve(schema, CapabilityManifest.current(RuntimePlatform.ios));
+
+        expect(result, isA<IncompatibleExperience>());
+        expect(
+          (result as IncompatibleExperience).reason,
+          IncompatibilityReason.missingRequiredCapability,
+        );
+      },
+    );
+
+    test(
+      'an older runtime that has not yet shipped push routing at all is rejected closed',
+      () {
+        final schema = AppSchema.parse(
+          encodeSchema(baseSchemaJson(requiredCapabilities: {'push.notifications': 1})),
+        );
+        final preRolloutManifest = manifestOf(nativeCapabilities: const {});
+
+        expect(resolver.resolve(schema, preRolloutManifest), isA<IncompatibleExperience>());
+      },
+    );
+
+    test(
+      'iOS/Android push rollout can diverge: one platform ships it, the other has not yet',
+      () {
+        final schema = AppSchema.parse(
+          encodeSchema(baseSchemaJson(requiredCapabilities: {'push.notifications': 1})),
+        );
+        final androidWithPush = CapabilityManifest.current(RuntimePlatform.android);
+        final iosBeforeRollout = manifestOf(
+          platform: RuntimePlatform.ios,
+          nativeCapabilities: const {},
+        );
+
+        expect(resolver.resolve(schema, androidWithPush), isA<RenderableExperience>());
+        expect(resolver.resolve(schema, iosBeforeRollout), isA<IncompatibleExperience>());
+      },
+    );
   });
 
   group('selectRollbackTarget', () {
