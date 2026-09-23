@@ -1,6 +1,6 @@
 # APP-BUILDER-1 — Implementation Report
 
-STATUS: pre-merge review
+STATUS: done
 DATE: 2026-09-23
 
 ## Outcome
@@ -132,25 +132,52 @@ Not applicable — backend-only PHP change, no `web/`/`storefront/` files touche
 
 ## CI
 
-_To be completed once observed on the exact PR head — not claimed in advance._
+GitHub Actions on PR head `869cde3cbb5cb494a0653cec27c84614d5ec151f` (PR #969), both the
+push-triggered and pull_request-triggered workflow runs, all 5 required checks green:
+- `php artisan test (L11, sqlite)` — success (both runs)
+- `php artisan test (L11, pgsql)` — success (both runs)
+- `Docker runtime smoke` — success
+
+No failure on this exact head. (Two earlier heads, `3a201e5` and its immediate predecessor, did
+fail on the known-and-already-fixed `ApplicationCatalogTest`/`TenantApplicationTest` count-44
+fixtures — see Tests section above; both are superseded by this head.)
 
 ## Pre-merge review
 
-- PRE_MERGE_REVIEW: _pending_
-- Reviewed Head SHA: _pending_
-- Findings / resolution: _pending_
+- PRE_MERGE_REVIEW: **PASS**
+- Reviewed Head SHA: `869cde3cbb5cb494a0653cec27c84614d5ec151f`
+- Findings / resolution: No open findings. `chatgpt-codex-connector[bot]` posted only a
+  usage-limit notice (did not perform a review) — not an actionable finding. No human review
+  posted. Diff inspected file-by-file against intent (31 files changed, all expected — no
+  unrelated files). Self-review (Implementer/Reviewer/AWJ Guardian) recorded below.
 
 ## Merge
 
-- Merge status: _pending_
-- Merge SHA: _pending_
+- Merge status: **merged** via standing authority (squash, no unresolved Decision Gate, required
+  CI green on exact head, no unapproved scope expansion, no production deploy/release).
+- Merge SHA: `0560429d5987d89549e9e436dc86d2504634eb38`
 
 ## Post-merge review
 
-- POST_MERGE_REVIEW: _pending_
-- Reviewed Merge SHA: _pending_
-- Target-branch checks/smoke: _pending_
-- Findings / resolution: _pending_
+- POST_MERGE_REVIEW: **PASS**
+- Reviewed Merge SHA: `0560429d5987d89549e9e436dc86d2504634eb38`
+- Target-branch verification:
+  - `main@0560429` confirmed as `origin/main`'s tip via `git fetch origin main` + `git log
+    origin/main -1 --format="%H %P"` — a single-parent squash (parent `4010305`, this task's own
+    base SHA); no history rewrite.
+  - Zero content drift: `git diff 869cde3 origin/main` on every touched path (`app database routes
+    tests docs/autonomous-engineering docs/plans/app-builder .github setup.sh deploy`) is empty —
+    the merged tree matches the reviewed pre-merge head exactly.
+  - Post-merge CI on the merge commit itself (`ci.yml` run
+    [35916107117](https://github.com/safwan5001-source/Nebrax/actions/runs/35916107117),
+    `main@0560429`): both required jobs green — `php artisan test (L11, sqlite)` success,
+    `php artisan test (L11, pgsql)` success.
+  - This report's own docs-only follow-up (PR #970, head `a99670c`) also went fully green:
+    `php artisan test (L11, sqlite)` and `(L11, pgsql)` success on both its push- and
+    pull_request-triggered runs (4/4 checks).
+  - No new conflict with target-branch changes; no unexpected integration change in the merge
+    result.
+- Findings / resolution: none.
 
 ## Self-review
 
@@ -244,9 +271,12 @@ repository conventions; no platform/vendor claim needed verification.
 ## Git state
 
 - Branch: `claude/awj-app-builder-horizon-v1-e4iy21`
-- PR: _pending_
+- PR: [#969](https://github.com/safwan5001-source/Nebrax/pull/969) (code, merged), docs-only
+  follow-up [#970](https://github.com/safwan5001-source/Nebrax/pull/970) (this report's
+  pre/post-merge sections)
 - Base SHA: `4010305be21d63f7249fa7c1fd287f60e2fa720a`
-- Head SHA: _pending_
+- Head SHA (reviewed pre-merge): `869cde3cbb5cb494a0653cec27c84614d5ec151f`
+- Merge SHA: `0560429d5987d89549e9e436dc86d2504634eb38`
 
 ## Recommended next dependency-ready task
 

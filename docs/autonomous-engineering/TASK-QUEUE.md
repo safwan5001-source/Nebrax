@@ -497,8 +497,8 @@ Source of truth:
 
 | Order | Task ID | Status | Risk | Depends on | Outcome |
 |---|---|---|---|---|---|
-| 1 | APP-BUILDER-1 | in_progress | normal | horizon authorization | Domain/persistence foundation (App/Draft/Published Experience Version, tenant/RBAC) |
-| 2 | APP-BUILDER-2 | pending | normal | APP-BUILDER-1 | Schema validation + runtime capability contract |
+| 1 | APP-BUILDER-1 | done | normal | horizon authorization | Domain/persistence foundation (App/Draft/Published Experience Version, tenant/RBAC) |
+| 2 | APP-BUILDER-2 | ready | normal | APP-BUILDER-1 (done) | Schema validation + runtime capability contract |
 | 3 | APP-BUILDER-3 | pending | normal | APP-BUILDER-2 | Component/Action/Data Resource registries |
 | 4 | APP-BUILDER-4 | pending | high | APP-BUILDER-3 | App Manager + creation wizard (UI/UX Evidence Pass required) |
 | 5 | APP-BUILDER-5 | pending | high | APP-BUILDER-4 | Builder workspace shell (UI/UX Evidence Pass required) |
@@ -518,3 +518,19 @@ unresolved product/architecture decision — AB-01/AB-02/AB-03 already fix the s
 identity fields). Repository convention research (`BaseModel`/`CompanyWide` classification,
 `Rbac::PERMISSIONS`, `ApplicationCatalog`, migration/service/controller/test house style) completed
 before implementation per Gate 1/Gate 2.
+
+`APP-BUILDER-1` is `done`: PR #969 merged (Merge SHA `0560429d5987d89549e9e436dc86d2504634eb38`,
+confirmed single-parent squash onto `main`, zero content drift from the reviewed head `869cde3`),
+post-merge CI green on the merge commit (`ci.yml` run 35916107117, sqlite+pgsql both success),
+post-merge review passed. 12 new focused tests + `ApplicationCatalogTest`/`TenantApplicationTest`
+fixture updates for the new `commerce.app_builder` catalog key (44→45). Full evidence:
+`docs/plans/app-builder/APP-BUILDER-1-IMPLEMENTATION-REPORT.md`.
+
+`APP-BUILDER-2` promoted to `ready` now that its hard dependency (`APP-BUILDER-1`) is merged and
+post-merge reviewed. Source requirement: horizon doc task 2 ("align backend validator with
+accepted App Schema and Mobile Runtime capability manifest; compatibility negatives") and
+`RUNTIME_COMPATIBILITY_V1.md`. No unresolved product decision: the capability-manifest concept and
+fail-closed compatibility rules are already fixed by the accepted contract pack and proven by the
+Mobile Runtime Proof horizon's own `CompatibilityResolver`; this task implements a PHP-side
+validator against those already-accepted contracts (deepening `AppSchemaStructuralValidator`
+introduced in APP-BUILDER-1), not a new architecture decision.
