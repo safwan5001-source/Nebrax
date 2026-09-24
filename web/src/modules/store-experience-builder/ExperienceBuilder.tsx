@@ -43,6 +43,9 @@ export const PREVIEW_WIDTHS = {
   desktop: 1280,
 } as const;
 
+export const STORE_BUILDER_SIDEBAR_STORAGE_KEY =
+  "awj-store-builder-sidebar-collapsed";
+
 export type PreviewDevice = keyof typeof PREVIEW_WIDTHS;
 
 export type BuilderLifecycle =
@@ -80,6 +83,8 @@ export function ExperienceBuilder({
   const [mobilePane, setMobilePane] = useState<"edit" | "preview">("preview");
   const [mobileSheet, setMobileSheet] = useState<"sections" | "settings" | "design" | null>(null);
   const [isMobileViewport, setIsMobileViewport] = useState(false);
+  const [builderSidebarCollapsed, setBuilderSidebarCollapsed] = useState(false);
+  const [sidebarPreferenceLoaded, setSidebarPreferenceLoaded] = useState(false);
   const [selectedSection, setSelectedSection] = useState<string | null>(null);
   const [pendingSectionScroll, setPendingSectionScroll] = useState<
     string | null
@@ -101,6 +106,33 @@ export function ExperienceBuilder({
     window.addEventListener("resize", updateViewport);
     return () => window.removeEventListener("resize", updateViewport);
   }, []);
+
+  useEffect(() => {
+    try {
+      const persisted = window.localStorage.getItem(
+        STORE_BUILDER_SIDEBAR_STORAGE_KEY,
+      );
+      if (persisted === "true" || persisted === "false") {
+        setBuilderSidebarCollapsed(persisted === "true");
+      }
+    } catch {
+      // Browser storage can be unavailable; expanded is the safe default.
+    } finally {
+      setSidebarPreferenceLoaded(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!sidebarPreferenceLoaded) return;
+    try {
+      window.localStorage.setItem(
+        STORE_BUILDER_SIDEBAR_STORAGE_KEY,
+        String(builderSidebarCollapsed),
+      );
+    } catch {
+      // The preference is best-effort and must never block the builder.
+    }
+  }, [builderSidebarCollapsed, sidebarPreferenceLoaded]);
 
   useEffect(() => {
     if (!storefrontId) {
@@ -319,6 +351,7 @@ export function ExperienceBuilder({
       data-panel={panel}
       data-device={effectiveDevice}
       data-selected-section={selectedSection ?? ""}
+      data-builder-navigation-collapsed={builderSidebarCollapsed ? "true" : "false"}
       className="relative flex h-full min-h-0 flex-col bg-background text-text"
     >
       <header className="z-20 flex min-h-14 shrink-0 items-center gap-2 border-b border-border bg-surface px-3 shadow-sm md:gap-3 md:px-5">
@@ -419,8 +452,28 @@ export function ExperienceBuilder({
           data-customizer-scroll=""
           className={`${
             mobilePane === "preview" ? "hidden lg:flex" : "hidden md:flex"
-          } w-[196px] shrink-0 flex-col overflow-y-auto border-e border-neutral-200 bg-white`}
+          } ${builderSidebarCollapsed ? "lg:w-16" : "w-[196px]"} shrink-0 flex-col overflow-y-auto border-e border-neutral-200 bg-white`}
         >
+          <div className={`flex h-12 shrink-0 items-center border-b border-neutral-200 px-2 ${builderSidebarCollapsed ? "justify-center" : "justify-end"}`}>
+            <button
+              type="button"
+              aria-label={t(
+                builderSidebarCollapsed
+                  ? "expandBuilderNavigation"
+                  : "collapseBuilderNavigation",
+              )}
+              aria-expanded={!builderSidebarCollapsed}
+              title={t(
+                builderSidebarCollapsed
+                  ? "expandBuilderNavigation"
+                  : "collapseBuilderNavigation",
+              )}
+              onClick={() => setBuilderSidebarCollapsed((collapsed) => !collapsed)}
+              className="inline-flex size-9 items-center justify-center rounded-md text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+            >
+              <SidebarToggleIcon locale={locale} collapsed={builderSidebarCollapsed} />
+            </button>
+          </div>
           <div className="flex flex-col py-2">
             {CUSTOMIZER_NAV_GROUPS.map((group, groupIndex) => (
               <div
@@ -441,14 +494,20 @@ export function ExperienceBuilder({
                       title={t(item.label)}
                       aria-current={selected ? "page" : undefined}
                       onClick={() => setPanel(item.id)}
-                      className={`flex h-9 w-full items-center gap-2.5 px-3 text-start text-[13px] ${
+                      className={`flex h-9 w-full items-center text-start text-[13px] ${
+                        builderSidebarCollapsed
+                          ? "justify-center px-0"
+                          : "gap-2.5 px-3"
+                      } ${
                         selected
                           ? "bg-primary-soft font-medium text-primary"
                           : "text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900"
                       }`}
                     >
                       <NavIcon panel={item.id} />
-                      <span className="min-w-0 truncate">{t(item.label)}</span>
+                      <span className={builderSidebarCollapsed ? "sr-only" : "min-w-0 truncate"}>
+                        {t(item.label)}
+                      </span>
                     </button>
                   );
                 })}
@@ -717,4 +776,35 @@ function NavIcon({ panel }: { panel: CustomizerPanel }) {
     ),
   };
   return icons[panel];
+}
+
+function SidebarToggleIcon({
+  locale,
+  collapsed,
+}: {
+  locale: CustomizerLocale;
+  collapsed: boolean;
+}) {
+  const points =
+    locale === "ar"
+      ? collapsed
+        ? "10 3 15 8 10 13"
+        : "6 3 1 8 6 13"
+      : collapsed
+        ? "6 3 1 8 6 13"
+        : "10 3 15 8 10 13";
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      className="size-4"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d={points} />
+    </svg>
+  );
 }

@@ -31,6 +31,7 @@ const record = {
 describe('ExperienceBuilder persistence wiring', () => {
   afterEach(() => {
     cleanup();
+    window.localStorage.clear();
     loadMock.mockReset();
     saveMock.mockReset();
     publishMock.mockReset();
@@ -71,6 +72,78 @@ describe('ExperienceBuilder persistence wiring', () => {
     expect(scrollRegion?.className).toContain('overflow-y-auto');
     expect(scrollRegion?.className).toContain('md:overflow-y-scroll');
     expect(scrollRegion?.className).toContain('overscroll-contain');
+  });
+
+  it('defaults to an expanded builder navigation and reclaims its width when collapsed', async () => {
+    const user = userEvent.setup();
+    render(<ExperienceBuilder initialLocale="en" />);
+
+    const builder = document.querySelector('[data-experience-builder]');
+    const navigation = screen.getByRole('navigation', { name: 'Customization controls' });
+    expect(builder?.getAttribute('data-builder-navigation-collapsed')).toBe('false');
+    expect(navigation.className).toContain('w-[196px]');
+    expect(
+      screen
+        .getByRole('button', { name: 'Collapse Store Builder navigation' })
+        .getAttribute('aria-expanded'),
+    ).toBe('true');
+
+    await user.click(screen.getByRole('button', { name: 'Collapse Store Builder navigation' }));
+
+    expect(builder?.getAttribute('data-builder-navigation-collapsed')).toBe('true');
+    expect(navigation.className).toContain('lg:w-16');
+    expect(navigation.className).not.toContain('w-[196px]');
+    expect(
+      screen
+        .getByRole('button', { name: 'Expand Store Builder navigation' })
+        .getAttribute('aria-expanded'),
+    ).toBe('false');
+  });
+
+  it('restores only valid persisted collapsed state and can expand again', async () => {
+    window.localStorage.setItem('awj-store-builder-sidebar-collapsed', 'true');
+    const user = userEvent.setup();
+    const { unmount } = render(<ExperienceBuilder initialLocale="en" />);
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Expand Store Builder navigation' })).toBeTruthy(),
+    );
+    const homepage = screen.getByRole('button', { name: 'Homepage' });
+    expect(homepage.getAttribute('title')).toBe('Homepage');
+    expect(screen.getByRole('button', { name: 'Appearance' }).getAttribute('aria-current')).toBe(
+      'page',
+    );
+    expect(screen.getByRole('button', { name: 'Appearance' }).getAttribute('title')).toBe(
+      'Appearance',
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Expand Store Builder navigation' }));
+    expect(
+      screen
+        .getByRole('button', { name: 'Collapse Store Builder navigation' })
+        .getAttribute('aria-expanded'),
+    ).toBe('true');
+    expect(window.localStorage.getItem('awj-store-builder-sidebar-collapsed')).toBe('false');
+    unmount();
+
+    window.localStorage.setItem('awj-store-builder-sidebar-collapsed', 'unexpected');
+    render(<ExperienceBuilder initialLocale="en" />);
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Collapse Store Builder navigation' })).toBeTruthy(),
+    );
+  });
+
+  it('keeps mobile navigation independent from the desktop collapsed preference', async () => {
+    window.localStorage.setItem('awj-store-builder-sidebar-collapsed', 'true');
+    render(<ExperienceBuilder initialLocale="en" />);
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Expand Store Builder navigation' })).toBeTruthy(),
+    );
+    const navigation = screen.getByRole('navigation', { name: 'Customization controls' });
+    expect(navigation.className).toContain('hidden lg:flex');
+    expect(document.querySelector('[data-builder-controls]')?.className).toContain('md:flex');
+    expect(document.querySelector('[data-builder-preview]')).toBeTruthy();
   });
 
   it('does not claim save success until PUT returns 200', async () => {
@@ -130,7 +203,7 @@ describe('ExperienceBuilder persistence wiring', () => {
     expect(screen.queryByText(/Draft saved/)).toBeNull();
   });
 
-  it('never writes the draft to browser storage', async () => {
+  it('does not write the draft to browser storage', async () => {
     loadMock.mockResolvedValue({ ok: true, data: record });
     saveMock.mockResolvedValue({ ok: true, data: { ...record, draftRevision: 1 } });
     const setItem = vi.spyOn(Storage.prototype, 'setItem');
@@ -139,7 +212,9 @@ describe('ExperienceBuilder persistence wiring', () => {
     await waitFor(() => expect(loadMock).toHaveBeenCalled());
     await user.click(screen.getByRole('button', { name: 'Save draft' }));
     await waitFor(() => expect(saveMock).toHaveBeenCalled());
-    expect(setItem).not.toHaveBeenCalled();
+    expect(
+      setItem.mock.calls.some(([key]) => key === 'awj-store-builder-draft'),
+    ).toBe(false);
     setItem.mockRestore();
   });
 
