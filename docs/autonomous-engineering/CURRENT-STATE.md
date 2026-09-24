@@ -2,7 +2,7 @@
 
 > This file is a durable resume point, not a substitute for Git/GitHub evidence.
 
-LAST_UPDATED: 2026-09-24 (AWJ App Builder Horizon V1 authorized and launched; APP-BUILDER-1/2/3/4/5 done, APP-BUILDER-6 ready. APP-BUILDER-4 (App Manager + creation wizard): PR #975 merged (Merge SHA 163bcc1c27ad87e874626710910a28e381029cd0), post-merge review passed; docs follow-up PR #976 merged (Merge SHA ca20ae4023b8548c59e3003d89816dde95f8f5d0). APP-BUILDER-5 (Builder workspace shell): PR pending — implementation report has live status. Prior AWJ Mobile Runtime Proof Horizon V1 (below) is fully closed and is this horizon's accepted input.)
+LAST_UPDATED: 2026-09-24 (AWJ App Builder Horizon V1 authorized and launched; APP-BUILDER-1/2/3/4/5 done, APP-BUILDER-6 ready. APP-BUILDER-4 (App Manager + creation wizard): PR #975 merged (Merge SHA 163bcc1c27ad87e874626710910a28e381029cd0), post-merge review passed; docs follow-up PR #976 merged (Merge SHA ca20ae4023b8548c59e3003d89816dde95f8f5d0). APP-BUILDER-5 (Builder workspace shell): PR #977 merged (Merge SHA f48d583f0041caf909a61c4658aa7d1b89c0a604), post-merge review passed. Prior AWJ Mobile Runtime Proof Horizon V1 (below) is fully closed and is this horizon's accepted input.)
 LAYER_VERSION: V1
 STATUS: ACTIVE — AWJ App Builder Horizon V1
 
@@ -92,8 +92,8 @@ Execute **AWJ App Builder Horizon V1** sequentially under نظام الأفق, p
   completed before implementation. Full evidence: "AWJ App Builder Horizon
   V1" log above, `docs/plans/app-builder/APP-BUILDER-4-IMPLEMENTATION-REPORT.md`.
 - Fifth executable task: `APP-BUILDER-5` (Builder workspace shell) —
-  **done** (PR pending merge; see implementation report for live status).
-  Read-only workspace shell (Pages/Layers, canvas, Inspector, locale/device
+  **done** (PR #977, Merge SHA `f48d583`). Read-only workspace shell
+  (Pages/Layers, canvas, Inspector, locale/device
   controls) — its own focused UI/UX Evidence Pass completed before
   implementation; all editing interactivity deferred to `APP-BUILDER-6` per
   the task-queue split. Full evidence: "AWJ App Builder Horizon V1" log
