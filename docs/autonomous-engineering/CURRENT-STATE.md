@@ -523,5 +523,18 @@ their own, so only their resource-field validation applies. 37 new/updated tests
 regression green. No accounting impact. `APP-BUILDER-16` (Conditions/Visibility) is `in_progress`,
 independent of `APP-BUILDER-15`/`17`.
 
+`APP-BUILDER-16` (backend schema/compatibility contract) is **done**: PR #996 merged (squash Merge
+SHA `22156e493ef830a34a372b5c74643ab20e37632f`, confirmed single-parent squash onto `main`, parent
+`57d474e`). Adds the optional `visibility` component-node key (`ADR-01` §3.3): a closed, typed
+condition tree (`all`/`any` combinators or a `{signal, operator, value?}` leaf), bounded depth/
+branch count, no expression engine. New `VisibilitySignal`/`VisibilityOperator` closed vocabularies.
+`CompatibilityResolver` resolves it through the same optional-prune/required-fail-closed mechanism
+as `type`/`action.type`/`binding`; `RuntimeCapabilities::SCHEMA_FEATURES` stays deliberately empty
+until `APP-BUILDER-17` (same reasoning as `DATA_RESOURCES`). Visibility is presentation-only by
+construction — no authorization touched. 46 new tests, full regression green. Inspector UX for
+authoring conditions deferred to land with `APP-BUILDER-15`'s binding editor (not silently dropped
+— both are the same Inspector surface with no backend dependency blocking either). No accounting
+impact. `APP-BUILDER-21` (UX/localization) is `in_progress` — independent, mandatory.
+
 TASK-QUEUE.md records the finalized task decomposition (`APP-BUILDER-13`..`APP-BUILDER-23`) under
 the horizon header, promoted to `ready` in dependency order per ADR-01.

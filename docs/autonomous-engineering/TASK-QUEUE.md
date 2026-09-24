@@ -924,7 +924,7 @@ Source of truth for this horizon:
 | 1 | APP-BUILDER-13 | done | ADR-01 | Data Resource Registry V1 foundation (populate `commerce.categories`/`commerce.products`/`commerce.cart`) |
 | 2 | APP-BUILDER-14 | done | APP-BUILDER-13 | App Schema `binding` contract (parser + compatibility resolver) |
 | 3 | APP-BUILDER-15 | ready (after 14) | APP-BUILDER-14 | Builder Data UX (Inspector binding editor) |
-| 4 | APP-BUILDER-16 | in_progress | ADR-01 | Conditions/Visibility contract (closed/typed/allowlisted) + Inspector UX |
+| 4 | APP-BUILDER-16 | done (schema contract) | ADR-01 | Conditions/Visibility contract (closed/typed/allowlisted) + Inspector UX |
 | 5 | APP-BUILDER-17 | ready (after 14) | APP-BUILDER-14 | Mobile runtime binding/visibility resolver (replaces 3 hand-written screen implementations) |
 | 6 | APP-BUILDER-18 | ready (after 17) | APP-BUILDER-17 | Real action dispatch wired through schema bindings |
 | 7 | APP-BUILDER-19 | ready | ADR-01 (Decision Point 1 = YES) | Live publish → fetch → on-device-cache loop (Last Known Good) |
@@ -935,6 +935,12 @@ Source of truth for this horizon:
 
 `APP-BUILDER-21`/`APP-BUILDER-22` have no dependency on the data/runtime track and may execute in
 parallel with it.
+
+**Scope note on row 4**: `APP-BUILDER-16`'s backend schema/compatibility contract (the closed/
+typed/allowlisted `visibility` condition tree) is `done` — see below. Its Inspector UX (a
+merchant-facing condition-builder editor) is deferred to land alongside `APP-BUILDER-15`'s binding
+editor, since both are the same Inspector surface and neither has a backend dependency blocking the
+other; tracked as `APP-BUILDER-15`'s scope now includes both editors, not a silently dropped item.
 
 `APP-BUILDER-13` is `done`: PR #993 merged (squash Merge SHA
 `ed6c485b317a15a67a742db1ae2c05b1f4e44ea0`, confirmed single-parent squash onto `main`, parent
@@ -995,3 +1001,24 @@ placeholder key) remains structurally rejected. 37 new/updated focused tests acr
 regression green, full local suite 4664 passed/35 failed (same pre-existing `bcmath` baseline)/49
 skipped. No accounting impact. `APP-BUILDER-16` promoted to `in_progress` (independent of
 `APP-BUILDER-15`/`17`, per the queue's own dependency table).
+
+`APP-BUILDER-16` (backend schema/compatibility contract) is `done`: PR #996 merged (squash Merge
+SHA `22156e493ef830a34a372b5c74643ab20e37632f`, confirmed single-parent squash onto `main`, parent
+`57d474e`). Adds the optional `visibility` component-node key from `ADR-01` §3.3: a closed, typed
+condition tree (`{all:[...]}`/`{any:[...]}` combinators or a leaf `{signal, operator, value?}`),
+bounded nesting depth (4) and branch count (16), leaf values restricted to scalars or flat scalar
+lists — no expression engine. New `VisibilitySignal` (`cart.itemCount`, `customer.isAuthenticated`,
+`product.inStock`) and `VisibilityOperator` (`equals`/`notEquals`/`gt`/`lt`/`gte`/`lte`/`in`/
+`isTrue`/`isFalse`, each with its own value-arity rule) — closed, enumerated vocabularies.
+`CompatibilityResolver` resolves `visibility` through the same optional-prune/required-fail-closed
+mechanism already used for `type`/`action.type`/`binding`: unknown signal/operator, an arity
+mismatch, or a runtime not yet declaring the `visibility` schema feature
+(`CapabilityManifest::schemaFeatureVersion()`) are all "unsupported." `RuntimeCapabilities::
+SCHEMA_FEATURES` stays deliberately empty for the same reason `DATA_RESOURCES` does — no Flutter
+Runtime resolves a real visibility tree yet, so `APP-BUILDER-17` updates this constant and the Dart
+mirror together. Visibility is presentation-only by construction — no authorization is touched; a
+dispatched action's own independent `commerce/v1` server-side check is unaffected by what a hidden/
+shown control implies. 46 new focused tests, full `AppBuilder*` regression green, full local suite
+4680 passed/35 failed (same pre-existing `bcmath` baseline)/49 skipped. No accounting impact.
+Inspector UX for authoring conditions deferred to land with `APP-BUILDER-15`'s binding editor (see
+scope note above). `APP-BUILDER-21` promoted to `in_progress` (independent, mandatory).
