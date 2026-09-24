@@ -43,6 +43,36 @@ const { api, translate } = vi.hoisted(() => {
     retry: 'Try again',
     save: 'Save',
     cancel: 'Cancel',
+    'theme.tabLabel': 'Theme',
+    'theme.tabDescription': 'Edit theme tokens.',
+    'theme.presetTitle': 'Presets',
+    'theme.preset.awj-modern': 'AWJ Modern',
+    'theme.preset.navy': 'Navy',
+    'theme.preset.burgundy': 'Burgundy',
+    'theme.preset.sand': 'Sand',
+    'theme.preset.slate': 'Slate',
+    'theme.primaryColor': 'Primary color',
+    'theme.radius': 'Corner radius',
+    'theme.radiusOption.default': 'Default',
+    'theme.radiusOption.subtle': 'Subtle',
+    'theme.radiusOption.sharp': 'Sharp',
+    'theme.density': 'Density',
+    'theme.densityOption.comfortable': 'Comfortable',
+    'theme.densityOption.compact': 'Compact',
+    'theme.productCardStyle': 'Product card style',
+    'theme.productCardOption.standard': 'Standard',
+    'theme.productCardOption.compact': 'Compact',
+    'theme.sync.title': 'Store design sync',
+    'theme.sync.description': 'Fetch and review your store design.',
+    'theme.sync.action': 'Use my store design',
+    'theme.sync.chooseStore': 'Choose a store',
+    'theme.sync.detecting': 'Fetching from the store…',
+    'theme.sync.noStoreFound': 'No store found.',
+    'theme.sync.forbidden': 'Not permitted.',
+    'theme.sync.detectFailed': 'Could not fetch.',
+    'theme.sync.noChanges': 'No changes.',
+    'theme.sync.apply': 'Apply',
+    'theme.sync.cancel': 'Cancel',
   };
   const cache = new Map<string, ReturnType<typeof buildTranslator>>();
   function buildTranslator(namespace: string) {
@@ -140,7 +170,18 @@ const registriesData = {
   },
 };
 
-function mockApi() {
+const storeCatalogData = {
+  stores: [{ id: 'store-1', name: 'My Store', sales_channel_id: null, is_active: true, preview_url: null, default_locale: 'ar' }],
+};
+
+const storePresentationData = {
+  storefront_id: 'store-1', schema_version: 2, draft_revision: 3,
+  draft: { themePreset: 'navy', primaryColor: '#1e3a5f', accentColor: null, fontPreset: 'cairo-geist', density: 'compact', radius: 'sharp', productCard: 'compact', branding: { displayName: 'My Store', logoDataUrl: null, compactLogoDataUrl: null, faviconDataUrl: null } },
+  published: { themePreset: 'burgundy', primaryColor: '#7f1d1d', accentColor: null, fontPreset: 'cairo-geist', density: 'comfortable', radius: 'default', productCard: 'standard', branding: { displayName: 'My Store', logoDataUrl: null, compactLogoDataUrl: null, faviconDataUrl: null } },
+  published_revision: 2, published_at: '2026-09-01T00:00:00Z',
+};
+
+function mockApi(options?: { storeCatalog?: unknown; storePresentation?: unknown; presentationError?: Error }) {
   api.mockImplementation((path?: string) => {
     // A stray no-argument invocation can occur during Vitest/RTL's own async
     // teardown after a test's assertions already ran (observed empirically,
@@ -150,6 +191,11 @@ function mockApi() {
     if (!path) return Promise.resolve({ data: null });
     if (path.endsWith('/draft')) return Promise.resolve({ data: draftData });
     if (path.endsWith('/registries')) return Promise.resolve({ data: registriesData });
+    if (path.endsWith('/commerce/workspace/storefronts')) return Promise.resolve({ data: options?.storeCatalog ?? storeCatalogData });
+    if (path.endsWith('/presentation')) {
+      if (options?.presentationError) return Promise.reject(options.presentationError);
+      return Promise.resolve({ data: options?.storePresentation ?? storePresentationData });
+    }
     if (path.includes('/app-builder/apps/')) return Promise.resolve({ data: appData });
     return Promise.reject(new Error(`unexpected path: ${path}`));
   });
@@ -304,6 +350,98 @@ describe('AppBuilderWorkspacePage', () => {
 
     await waitFor(() => expect(screen.getAllByText('Saved').length).toBeGreaterThan(0));
     expect(toastFns.success).toHaveBeenCalled();
+  });
+
+  it('the Theme tab lets the merchant pick a preset and marks the draft unsaved', async () => {
+    mockApi();
+    render(<AppBuilderWorkspacePage />);
+    await screen.findByText('Featured');
+
+    const [themeTab] = screen.getAllByText('Theme');
+    await userEvent.setup().click(themeTab);
+
+    const [navyPreset] = await screen.findAllByText('Navy');
+    await userEvent.setup().click(navyPreset);
+
+    expect(screen.getByText('Unsaved changes')).toBeTruthy();
+    // Selecting a preset also seeds the primary-color hex field with that preset's color.
+    await waitFor(() => expect(screen.getAllByDisplayValue('#1e3a5f').length).toBeGreaterThan(0));
+  });
+
+  it('switching back to Pages after selecting a component shows the component Inspector, not the Theme panel', async () => {
+    mockApi();
+    render(<AppBuilderWorkspacePage />);
+    await screen.findByText('Featured');
+
+    const [themeTab] = screen.getAllByText('Theme');
+    await userEvent.setup().click(themeTab);
+    expect(screen.getAllByText('Presets').length).toBeGreaterThan(0);
+
+    // The Pages tree is hidden while on the Theme tab; selecting a node from the canvas
+    // (its type tag) is the only way back to the Inspector.
+    const [sectionTag] = screen.getAllByText('Section');
+    await userEvent.setup().click(sectionTag);
+
+    // Selecting a component from the canvas returns the Inspector automatically.
+    await waitFor(() => expect(screen.getAllByText('title').length).toBeGreaterThan(0));
+    expect(screen.queryAllByText('Presets').length).toBe(0);
+  });
+
+  it('Use My Store Design: detecting from a single store shows a diff and Apply merges the proposed tokens', async () => {
+    mockApi();
+    render(<AppBuilderWorkspacePage />);
+    await screen.findByText('Featured');
+
+    const [themeTab] = screen.getAllByText('Theme');
+    await userEvent.setup().click(themeTab);
+
+    const [detectButton] = await screen.findAllByText('Use my store design');
+    await userEvent.setup().click(detectButton);
+
+    // The published presentation (burgundy, #7f1d1d) is used over the unpublished draft.
+    await waitFor(() => expect(screen.getAllByText('#7f1d1d').length).toBeGreaterThan(0));
+    expect(screen.getAllByText('primaryColor').length).toBeGreaterThan(0);
+
+    const [applyButton] = screen.getAllByText('Apply');
+    await userEvent.setup().click(applyButton);
+
+    expect(screen.getByText('Unsaved changes')).toBeTruthy();
+    await waitFor(() => expect(screen.getAllByDisplayValue('#7f1d1d').length).toBeGreaterThan(0));
+    // Review state clears after Apply — the diff table is gone.
+    expect(screen.queryAllByText('primaryColor').length).toBe(0);
+  });
+
+  it('Use My Store Design: shows a store picker when more than one store exists', async () => {
+    mockApi({ storeCatalog: { stores: [
+      { id: 'store-1', name: 'Store One', sales_channel_id: null, is_active: true, preview_url: null, default_locale: 'ar' },
+      { id: 'store-2', name: 'Store Two', sales_channel_id: null, is_active: true, preview_url: null, default_locale: 'ar' },
+    ] } });
+    render(<AppBuilderWorkspacePage />);
+    await screen.findByText('Featured');
+
+    const [themeTab] = screen.getAllByText('Theme');
+    await userEvent.setup().click(themeTab);
+    const [detectButton] = await screen.findAllByText('Use my store design');
+    await userEvent.setup().click(detectButton);
+
+    const [chooseStore] = await screen.findAllByText('Choose a store');
+    expect(chooseStore).toBeTruthy();
+    expect(screen.getAllByText('Store One').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Store Two').length).toBeGreaterThan(0);
+  });
+
+  it('Use My Store Design: shows a clear message when the presentation read is forbidden', async () => {
+    const { ApiError } = await import('@/lib/api');
+    mockApi({ presentationError: new ApiError(403, 'forbidden', null) });
+    render(<AppBuilderWorkspacePage />);
+    await screen.findByText('Featured');
+
+    const [themeTab] = screen.getAllByText('Theme');
+    await userEvent.setup().click(themeTab);
+    const [detectButton] = await screen.findAllByText('Use my store design');
+    await userEvent.setup().click(detectButton);
+
+    expect(await screen.findByText('Not permitted.')).toBeTruthy();
   });
 
   it('shows an error state when loading fails', async () => {

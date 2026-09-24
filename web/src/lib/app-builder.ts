@@ -61,7 +61,7 @@ export interface AppSchema {
   schemaVersion: string;
   minRuntimeVersion: string;
   requiredCapabilities?: Record<string, number>;
-  theme?: { tokens?: Record<string, unknown> };
+  theme?: { tokens?: Record<string, string> };
   navigation: { initialPageId: string };
   pages: Record<string, AppSchemaComponent>;
 }
@@ -221,4 +221,19 @@ export function createComponentFromDefinition(type: string, definition: Registry
     id: generateComponentId(type),
     ...(Object.keys(props).length > 0 ? { props } : {}),
   };
+}
+
+// ── Theme edit helpers (APP-BUILDER-8) ───────────────────────────────────────
+// `schema.theme.tokens` وحده الحقل الحقيقي — خريطة سلاسل حرّة يتحقّقها الخادم
+// بنيوياً فقط (`AppSchemaParser::validateTheme`)، بلا قائمة مفاتيح مغلقة، بلا
+// بوابة قدرة/توافق (`CompatibilityResolver`/`CapabilityManifest` لا يذكرانها).
+
+/** رموز المظهر الحالية — كائن فارغ إن لم توجد بعد. */
+export function themeTokens(schema: AppSchema): Record<string, string> {
+  return schema.theme?.tokens ?? {};
+}
+
+/** يدمج رموزاً جديدة/محدَّثة في `theme.tokens` — لا يحذف مفاتيح غائبة عن `patch`. */
+export function mergeThemeTokens(schema: AppSchema, patch: Record<string, string>): AppSchema {
+  return { ...schema, theme: { ...schema.theme, tokens: { ...themeTokens(schema), ...patch } } };
 }

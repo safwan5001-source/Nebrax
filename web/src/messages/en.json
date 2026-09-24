@@ -6863,6 +6863,48 @@
         "mobile": "Mobile",
         "tablet": "Tablet",
         "desktop": "Desktop"
+      },
+      "theme": {
+        "tabLabel": "Theme",
+        "tabDescription": "Edit the app's color, corner radius, density, and product card style. Stored as free-form tokens in the schema — not yet gated by any runtime capability/compatibility check.",
+        "presetTitle": "Presets",
+        "preset": {
+          "awj-modern": "AWJ Modern",
+          "navy": "Navy",
+          "burgundy": "Burgundy",
+          "sand": "Sand",
+          "slate": "Slate"
+        },
+        "primaryColor": "Primary color",
+        "radius": "Corner radius",
+        "radiusOption": {
+          "default": "Default",
+          "subtle": "Subtle",
+          "sharp": "Sharp"
+        },
+        "density": "Density",
+        "densityOption": {
+          "comfortable": "Comfortable",
+          "compact": "Compact"
+        },
+        "productCardStyle": "Product card style",
+        "productCardOption": {
+          "standard": "Standard",
+          "compact": "Compact"
+        },
+        "sync": {
+          "title": "Store design sync",
+          "description": "Fetches your storefront's current color, radius, and density and shows them for review before applying — no logos or images.",
+          "action": "Use my store design",
+          "chooseStore": "Choose a store",
+          "detecting": "Fetching from the store…",
+          "noStoreFound": "This tenant has no online store yet.",
+          "forbidden": "You don't have permission to view the store design.",
+          "detectFailed": "Could not fetch the store design.",
+          "noChanges": "No differences between the current theme and the store design.",
+          "apply": "Apply",
+          "cancel": "Cancel"
+        }
       }
     }
   },

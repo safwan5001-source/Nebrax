@@ -4,10 +4,13 @@ import {
   createComponentFromDefinition,
   findParentId,
   generateComponentId,
+  mergeThemeTokens,
   moveSibling,
   removeComponentById,
   reorderChildren,
+  themeTokens,
   updateComponentById,
+  type AppSchema,
   type AppSchemaComponent,
   type RegistryComponentDefinition,
 } from './app-builder';
@@ -134,5 +137,36 @@ describe('createComponentFromDefinition', () => {
     };
     const node = createComponentFromDefinition('Page', definition);
     expect(node.props).toBeUndefined();
+  });
+});
+
+function minimalSchema(theme?: AppSchema['theme']): AppSchema {
+  return {
+    schemaVersion: '1.0.0', minRuntimeVersion: '1.0.0',
+    navigation: { initialPageId: 'home' },
+    theme,
+    pages: { home: { type: 'Page', id: 'home-root' } },
+  };
+}
+
+describe('themeTokens', () => {
+  it('returns an empty object when no theme is set', () => {
+    expect(themeTokens(minimalSchema())).toEqual({});
+  });
+  it('returns the existing tokens map', () => {
+    expect(themeTokens(minimalSchema({ tokens: { primaryColor: '#12372a' } }))).toEqual({ primaryColor: '#12372a' });
+  });
+});
+
+describe('mergeThemeTokens', () => {
+  it('adds tokens to a schema with no theme yet', () => {
+    const updated = mergeThemeTokens(minimalSchema(), { primaryColor: '#12372a' });
+    expect(updated.theme?.tokens).toEqual({ primaryColor: '#12372a' });
+  });
+  it('merges into existing tokens without dropping untouched keys', () => {
+    const original = minimalSchema({ tokens: { primaryColor: '#12372a', radius: 'default' } });
+    const updated = mergeThemeTokens(original, { radius: 'sharp' });
+    expect(updated.theme?.tokens).toEqual({ primaryColor: '#12372a', radius: 'sharp' });
+    expect(original.theme?.tokens).toEqual({ primaryColor: '#12372a', radius: 'default' });
   });
 });
