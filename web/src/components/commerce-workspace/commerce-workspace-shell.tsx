@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { useLocale } from 'next-intl';
 import { usePathname } from 'next/navigation';
-import { ArrowRight, Check, ChevronDown, ExternalLink, Menu, Store, X } from 'lucide-react';
+import { ArrowRight, Check, ChevronDown, ChevronLeft, ChevronRight, ExternalLink, Menu, Store, X } from 'lucide-react';
 import { CompanyLogoMark } from '@/components/layout/company-logo-mark';
 import { LangToggle } from '@/components/layout/lang-toggle';
 import { ThemeToggle } from '@/components/layout/theme-toggle';
@@ -15,14 +15,37 @@ import { useCommerceStoreContext } from '@/modules/commerce-workspace/store-cont
 import { CommerceWorkspaceNav } from './commerce-workspace-nav';
 
 export function CommerceWorkspaceShell({ children }: { children: React.ReactNode }) {
+  const COMMERCE_SIDEBAR_STORAGE_KEY = 'awj-commerce-sidebar-collapsed';
   const locale = useLocale();
   const pathname = usePathname();
   const t = (key: Parameters<typeof commerceWorkspaceMessage>[1]) => commerceWorkspaceMessage(locale, key);
   const company = useCompany();
   const { catalog, selectedStoreId, setSelectedStoreId, viewStoreUrl } = useCommerceStoreContext();
   const [navigationOpen, setNavigationOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarPreferenceLoaded, setSidebarPreferenceLoaded] = useState(false);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    try {
+      const persisted = window.localStorage.getItem(COMMERCE_SIDEBAR_STORAGE_KEY);
+      if (persisted === 'true' || persisted === 'false') setSidebarCollapsed(persisted === 'true');
+    } catch {
+      // Browser storage is optional; the expanded default remains usable.
+    } finally {
+      setSidebarPreferenceLoaded(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!sidebarPreferenceLoaded) return;
+    try {
+      window.localStorage.setItem(COMMERCE_SIDEBAR_STORAGE_KEY, String(sidebarCollapsed));
+    } catch {
+      // Preference persistence is best-effort and must not block navigation.
+    }
+  }, [sidebarCollapsed, sidebarPreferenceLoaded]);
 
   useEffect(() => {
     if (!navigationOpen) return;
@@ -159,8 +182,24 @@ export function CommerceWorkspaceShell({ children }: { children: React.ReactNode
       </header>
 
       <div className="flex min-h-0 flex-1">
-        <aside className="no-print hidden w-64 shrink-0 overflow-y-auto border-e border-border bg-surface p-3 lg:block">
-          <CommerceWorkspaceNav />
+        <aside className={`no-print hidden shrink-0 overflow-y-auto border-e border-border bg-surface p-3 transition-[width] duration-150 ease-out lg:block ${sidebarCollapsed ? 'w-16' : 'w-64'}`}>
+          <div className={sidebarCollapsed ? 'flex justify-center pb-3' : 'flex justify-end pb-3'}>
+            <button
+              type="button"
+              onClick={() => setSidebarCollapsed((collapsed) => !collapsed)}
+              aria-expanded={!sidebarCollapsed}
+              aria-label={sidebarCollapsed ? t('expandNavigation') : t('collapseNavigation')}
+              title={sidebarCollapsed ? t('expandNavigation') : t('collapseNavigation')}
+              className="flex h-9 w-9 items-center justify-center rounded text-muted hover:bg-primary-soft hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+            >
+              {sidebarCollapsed ? (
+                <ChevronRight className="h-4 w-4 rtl:rotate-180" aria-hidden="true" strokeWidth={1.7} />
+              ) : (
+                <ChevronLeft className="h-4 w-4 rtl:rotate-180" aria-hidden="true" strokeWidth={1.7} />
+              )}
+            </button>
+          </div>
+          <CommerceWorkspaceNav collapsed={sidebarCollapsed} />
         </aside>
 
         {navigationOpen && <div className="fixed inset-0 z-40 bg-black/50 lg:hidden" onClick={dismissNavigation} aria-hidden />}
