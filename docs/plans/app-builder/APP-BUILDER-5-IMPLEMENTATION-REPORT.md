@@ -142,12 +142,18 @@ than half-built here.
 
 ## CI
 
-Pending — will be recorded once GitHub Actions (`ci.yml` + `web-ci.yml`, this PR touches both
-`app/`/`routes/`/`tests/` and `web/`) run on this PR's head is observed, per the truthfulness rule.
+**PASS.** PR #977, head `9335215eda189040667958b6e280d8222e5feed4`. Both required workflows green:
+`ci.yml` run [35940885893](https://github.com/safwan5001-source/Nebrax/actions/runs/35940885893)
+(`php artisan test (L11, sqlite)` and `(L11, pgsql)`, both `success`) and `web-ci.yml` run
+[35940885971](https://github.com/safwan5001-source/Nebrax/actions/runs/35940885971) (`web build
+(Next.js)`, `success`). `mergeable_state: clean`, no open review threads (one bot comment from
+`chatgpt-codex-connector[bot]` reporting it had hit its own usage limit and performed no review —
+not actionable).
 
 ## Pre-merge review
 
-Pending — to be completed after CI is confirmed green on the exact reviewed head.
+**PASS.** `PRE_MERGE_REVIEW: PASS` — CI green on the exact reviewed head (`9335215`), no merge
+conflict, no open review comments/threads requiring action, self-review (below) complete.
 
 ## Self-review
 
