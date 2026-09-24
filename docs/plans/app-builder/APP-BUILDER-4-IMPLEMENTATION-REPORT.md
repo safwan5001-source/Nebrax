@@ -130,22 +130,22 @@ documented in a PR comment before the fixes were pushed.
 
 ## Post-merge review
 
-- POST_MERGE_REVIEW: _in progress — `main@163bcc1` confirmed as `origin/main`'s tip, a
-  single-parent squash (parent `7bf04d7`), zero content drift from the reviewed head `0a14ffa`
+- POST_MERGE_REVIEW: **PASS**
+- `main@163bcc1` confirmed as `origin/main`'s tip at merge time, a single-parent squash (parent
+  `7bf04d7`), zero content drift from the reviewed head `0a14ffa`
   (`git diff 0a14ffa72f4cb104629ce3fcf112a03a2a7ee667 origin/main -- app database routes tests docs/plans/app-builder web`
-  is empty). Post-merge CI (`ci.yml` run
-  [35935456801](https://github.com/safwan5001-source/Nebrax/actions/runs/35935456801) and
-  `web-ci.yml` run
-  [35935456789](https://github.com/safwan5001-source/Nebrax/actions/runs/35935456789) on the merge
-  commit) was still running at time of this commit — not claiming PASS before it is observed, per
-  the truthfulness rule. Will be updated to PASS once observed._
+  was empty). Post-merge CI completed with both workflows green: `ci.yml` run
+  [35935456801](https://github.com/safwan5001-source/Nebrax/actions/runs/35935456801)
+  (sqlite/pgsql `success`) and `web-ci.yml` run
+  [35935456789](https://github.com/safwan5001-source/Nebrax/actions/runs/35935456789)
+  (`web build (Next.js)` `success`).
 - Reviewed Merge SHA: `163bcc1c27ad87e874626710910a28e381029cd0`
 - Target-branch checks/smoke: post-merge `ci.yml` run
   [35935456801](https://github.com/safwan5001-source/Nebrax/actions/runs/35935456801) and
   `web-ci.yml` run
-  [35935456789](https://github.com/safwan5001-source/Nebrax/actions/runs/35935456789) — pending at
-  time of this commit.
-- Findings / resolution: none so far.
+  [35935456789](https://github.com/safwan5001-source/Nebrax/actions/runs/35935456789) — both
+  `success`.
+- Findings / resolution: none.
 
 ## Self-review
 

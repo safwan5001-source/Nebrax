@@ -6827,8 +6827,29 @@
       "versionsTitle": "Published versions",
       "versionsEmpty": "No version published yet.",
       "versionRow": "Version {version} — {date}",
-      "builderComingSoonTitle": "Visual editing workspace",
-      "builderComingSoon": "The visual experience builder screen is coming in a later task of this horizon."
+      "openBuilder": "Open the builder"
+    },
+    "builder": {
+      "back": "Back",
+      "loadFailed": "Could not load the workspace.",
+      "savedBadge": "Saved",
+      "pagesTitle": "Pages",
+      "layersTitle": "Layers",
+      "initialPageBadge": "Home",
+      "emptyPage": "Empty page",
+      "inspectorEmpty": "Select a component to see its properties.",
+      "inspectorUnknownType": "Type \"{type}\" is not recognized by the registry.",
+      "propsTitle": "Properties",
+      "noProps": "This component has no properties.",
+      "actionTitle": "Action",
+      "noAction": "No action attached.",
+      "mobileStructureTab": "Structure",
+      "mobileInspectorTab": "Properties",
+      "device": {
+        "mobile": "Mobile",
+        "tablet": "Tablet",
+        "desktop": "Desktop"
+      }
     }
   },
   "nebrax": {
