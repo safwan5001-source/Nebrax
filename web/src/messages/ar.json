@@ -6827,8 +6827,29 @@
       "versionsTitle": "النسخ المنشورة",
       "versionsEmpty": "لم يُنشر أي إصدار بعد.",
       "versionRow": "الإصدار {version} — {date}",
-      "builderComingSoonTitle": "مساحة التحرير المرئي",
-      "builderComingSoon": "شاشة بناء التجربة المرئية قادمة في مهمة لاحقة من هذا الأفق."
+      "openBuilder": "فتح مساحة التحرير"
+    },
+    "builder": {
+      "back": "رجوع",
+      "loadFailed": "تعذر تحميل مساحة العمل.",
+      "savedBadge": "محفوظ",
+      "pagesTitle": "الصفحات",
+      "layersTitle": "الطبقات",
+      "initialPageBadge": "رئيسية",
+      "emptyPage": "صفحة فارغة",
+      "inspectorEmpty": "اختر مكوّناً لعرض خصائصه.",
+      "inspectorUnknownType": "النوع «{type}» غير معروف في السجلّ.",
+      "propsTitle": "الخصائص",
+      "noProps": "لا خصائص لهذا المكوّن.",
+      "actionTitle": "الإجراء",
+      "noAction": "لا يوجد إجراء مرفق.",
+      "mobileStructureTab": "البنية",
+      "mobileInspectorTab": "الخصائص",
+      "device": {
+        "mobile": "جوال",
+        "tablet": "لوحي",
+        "desktop": "سطح المكتب"
+      }
     }
   },
   "nebrax": {

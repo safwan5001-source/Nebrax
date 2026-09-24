@@ -28,6 +28,7 @@ use App\Http\Controllers\Api\CashBankAccountController;
 use App\Http\Controllers\Api\ClassificationAnalyticsReportController;
 use App\Http\Controllers\Api\ClassificationController;
 use App\Http\Controllers\Api\CompanyController;
+use App\Http\Controllers\Api\AppBuilderRegistryController;
 use App\Http\Controllers\Api\BuilderAppController;
 use App\Http\Controllers\Api\BuilderDraftExperienceController;
 use App\Http\Controllers\Api\BuilderPublishedExperienceVersionController;
@@ -921,6 +922,11 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
             ->whereUuid('id')->middleware([$perm('apps_builder.publish'), $app('commerce.app_builder')]);
         Route::get('app-builder/apps/{id}/versions/{version}', [BuilderPublishedExperienceVersionController::class, 'show'])
             ->whereUuid('id')->whereNumber('version')
+            ->middleware([$perm('apps_builder.view'), $app('commerce.app_builder')]);
+
+        // APP-BUILDER-5: تسلسل ComponentRegistry/ActionRegistry (APP-BUILDER-3) — مصدر
+        // Inspector الوصفي. بيانات منصّة ثابتة لا مسار {id}، ونفس بوابتَي الصلاحية/القدرة.
+        Route::get('app-builder/registries', [AppBuilderRegistryController::class, 'index'])
             ->middleware([$perm('apps_builder.view'), $app('commerce.app_builder')]);
 
         // Cycle 0: Workspace foundation only. لا CRUD ولا مبيعات ولا اتصال أجهزة

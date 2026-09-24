@@ -14,8 +14,7 @@ const { api, translate } = vi.hoisted(() => {
     'detail.versionsTitle': 'Published versions',
     'detail.versionsEmpty': 'No version published yet.',
     'detail.versionRow': 'Version {version} — {date}',
-    'detail.builderComingSoonTitle': 'Visual editing workspace',
-    'detail.builderComingSoon': 'The visual experience builder screen is coming in a later task.',
+    openBuilder: 'Open the builder',
     'creationSource.store_design': 'From store design',
     'creationSource.template': 'From template',
     'creationSource.scratch': 'From scratch',
@@ -96,7 +95,8 @@ describe('AppBuilderDetailPage', () => {
     // DetailPage renders section content twice (mobile accordion + desktop grid, toggled by CSS
     // classes jsdom doesn't apply) — assert presence via getAllByText, not a single-match query.
     expect(screen.getAllByText('No version published yet.').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('The visual experience builder screen is coming in a later task.').length).toBeGreaterThan(0);
+    const openBuilderLink = screen.getByRole('link', { name: 'Open the builder' });
+    expect(openBuilderLink.getAttribute('href')).toBe('/app-builder/app-1/builder');
   });
 
   it('renders published versions when present', async () => {

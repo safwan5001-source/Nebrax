@@ -4,17 +4,17 @@ import * as React from 'react';
 import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
-import { Layers, Wrench } from 'lucide-react';
+import { Layers, PenSquare } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { DetailPage, ErrorState, LoadingState } from '@/components/nebrax';
+import { DetailPage, ErrorState, LoadingState, type PageAction } from '@/components/nebrax';
 import { api, ApiError } from '@/lib/api';
 import { appDisplayName, type BuilderApp, type BuilderPublishedVersion } from '@/lib/app-builder';
 import { formatDate } from '@/lib/formatting';
 
 /**
- * APP-BUILDER-4 — نظرة عامة على التطبيق. مساحة التحرير المرئي نفسها
- * (Builder workspace) هي APP-BUILDER-5 — لا رابط ميت هنا لشاشة غير موجودة
- * بعد، فقط ملاحظة صريحة (انظر `APP-BUILDER-4-UX-EVIDENCE-PASS.md`).
+ * APP-BUILDER-4/5 — نظرة عامة على التطبيق. «فتح مساحة التحرير» يقود إلى
+ * `/app-builder/[id]/builder` (هيكل مساحة العمل — APP-BUILDER-5؛ التحرير
+ * الفعلي APP-BUILDER-6).
  */
 export default function AppBuilderDetailPage() {
   const t = useTranslations('appBuilder.detail');
@@ -66,12 +66,9 @@ export default function AppBuilderDetailPage() {
     </div>
   );
 
-  const builderComingSoon = (
-    <div className="flex items-start gap-3 py-2 text-sm text-muted">
-      <Wrench className="mt-0.5 h-5 w-5 shrink-0 text-primary" strokeWidth={1.7} aria-hidden="true" />
-      <p>{t('builderComingSoon')}</p>
-    </div>
-  );
+  const actions: PageAction[] = [
+    { key: 'open-builder', label: t('openBuilder'), icon: PenSquare, href: `/app-builder/${app.id}/builder`, variant: 'primary' },
+  ];
 
   return (
     <DetailPage
@@ -80,9 +77,9 @@ export default function AppBuilderDetailPage() {
       title={appDisplayName(app, locale)}
       badges={<Badge tone="muted">{tRoot(`creationSource.${app.creation_source}`)}</Badge>}
       meta={`${t('createdLabel')}: ${formatDate(app.created_at, locale)}`}
+      actions={actions}
       sections={[
         { id: 'versions', title: t('versionsTitle'), count: versions.length, content: versionsContent },
-        { id: 'builder', title: t('builderComingSoonTitle'), content: builderComingSoon },
       ]}
     >
       <div className="flex items-center gap-2 text-xs text-muted">

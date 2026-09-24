@@ -501,8 +501,8 @@ Source of truth:
 | 2 | APP-BUILDER-2 | done | normal | APP-BUILDER-1 (done) | Schema validation + runtime capability contract |
 | 3 | APP-BUILDER-3 | done | normal | APP-BUILDER-2 (done) | Component/Action/Data Resource registries |
 | 4 | APP-BUILDER-4 | done | high | APP-BUILDER-3 (done) | App Manager + creation wizard (UI/UX Evidence Pass required) |
-| 5 | APP-BUILDER-5 | ready | high | APP-BUILDER-4 (done) | Builder workspace shell (UI/UX Evidence Pass required) |
-| 6 | APP-BUILDER-6 | pending | normal | APP-BUILDER-5 | Visual editing + history |
+| 5 | APP-BUILDER-5 | done | high | APP-BUILDER-4 (done) | Builder workspace shell (UI/UX Evidence Pass required) |
+| 6 | APP-BUILDER-6 | ready | normal | APP-BUILDER-5 (done) | Visual editing + history |
 | 7 | APP-BUILDER-7 | pending | normal | APP-BUILDER-6 | Data/Actions/Conditions/Visibility (Develop mode) |
 | 8 | APP-BUILDER-8 | pending | high | APP-BUILDER-7 | Theme + Use My Store Design |
 | 9 | APP-BUILDER-9 | pending | normal | APP-BUILDER-8 | Templates + navigation/pages |
@@ -574,7 +574,10 @@ APP-BUILDER-1/2's documented `bcmath`/`app/Mail` local-environment gaps). Full e
 **Requires a UI/UX Evidence Pass and AWJ Design System conformance check before implementation**
 per the horizon's own gate for the first major Builder UI slice — not to be skipped.
 
-`APP-BUILDER-4` is `done`: PR pending merge (see implementation report for live status). Completed
+`APP-BUILDER-4` is `done`: PR #975 merged (Merge SHA `163bcc1c27ad87e874626710910a28e381029cd0`,
+confirmed single-parent squash onto `main`, zero content drift from the reviewed head `0a14ffa`),
+post-merge CI green on the merge commit (both `ci.yml` run 35935456801 and `web-ci.yml` run
+35935456789, sqlite+pgsql/web build all success), post-merge review passed. Completed
 a focused UI/UX Evidence Pass (`APP-BUILDER-4-UX-EVIDENCE-PASS.md`) before any implementation, per
 the horizon's mandatory gate for the first major Builder UI slice — external interaction evidence
 (WordPress.com site creation, Shopify theme library, empty-state UX literature), retained/rejected
@@ -592,3 +595,25 @@ any external review. Full evidence: `docs/plans/app-builder/APP-BUILDER-4-IMPLEM
 **Requires its own focused UI/UX Evidence Pass and AWJ Design System conformance check before
 implementation** — the bootstrap explicitly requires repeating this workflow per major Builder UI
 slice, not reusing APP-BUILDER-4's pass.
+
+`APP-BUILDER-5` is `done`: PR pending merge (see implementation report for live status). Completed
+its own focused UI/UX Evidence Pass (`APP-BUILDER-5-UX-EVIDENCE-PASS.md`) — external evidence
+(Oracle Visual Builder/Page Designer, Sitecore Page Builder docs) plus internal precedent
+(`ExperienceBuilder.tsx`, the Store Customizer's already-shipped workspace chrome — a different
+product/data model, only the interaction shape reused). Built the Builder workspace shell:
+read-only Pages/Layers panel, framework-neutral canvas (15 component types, defensive prop
+fallbacks matching `component_widgets.dart`), read-only Inspector driven by APP-BUILDER-3's
+registries (first real consumer, as flagged in that task's own report), locale/device preview
+toggles, Draft/Saved badge, responsive mobile baseline. New backend route
+`GET /app-builder/registries` (serializes `ComponentRegistry`/`ActionRegistry`), same
+`apps_builder.view`/`commerce.app_builder` gate as every other app-builder route. Editing itself
+(add/remove/reorder/property edits/undo-redo) is explicitly APP-BUILDER-6 — no editable field
+exists yet, by design. 4 new backend tests + 3 new frontend tests, full guard-test regression
+(93/93). Full evidence: `docs/plans/app-builder/APP-BUILDER-5-IMPLEMENTATION-REPORT.md`.
+
+`APP-BUILDER-6` promoted to `ready` now that its hard dependency (`APP-BUILDER-5`) is done.
+Source requirement: horizon doc task 6 ("select/add/remove/reorder, property edits, bounded
+drag/direct manipulation, undo/redo, dirty/save semantics") — builds directly on APP-BUILDER-5's
+canvas/layers/Inspector shell. Whether this slice needs its own UI/UX Evidence Pass is a scope
+question for that task itself (APP-BUILDER-5's own pass explicitly left this open), not
+pre-decided here.
