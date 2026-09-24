@@ -13,14 +13,17 @@ import { ErrorState, LoadingState } from '@/components/nebrax';
 import { api, ApiError } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import {
-  addChildComponent, appDisplayName, findComponentById, findParentId, moveSibling, removeComponentById, reorderChildren, updateComponentById,
+  addChildComponent, appDisplayName, findComponentById, findParentId, mergeThemeTokens, moveSibling, removeComponentById,
+  reorderChildren, themeTokens as schemaThemeTokens, updateComponentById,
   type AppBuilderRegistries, type AppSchema, type AppSchemaComponent, type BuilderApp, type BuilderDraftExperience,
 } from '@/lib/app-builder';
 import { AppBuilderCanvas, PREVIEW_WIDTHS, type PreviewDevice } from '@/modules/app-builder/canvas';
 import { LayersTree } from '@/modules/app-builder/layers-tree';
 import { Inspector } from '@/modules/app-builder/inspector';
+import { ThemePanel } from '@/modules/app-builder/theme-panel';
 
 type MobilePanel = 'structure' | 'inspector';
+type StructureMode = 'pages' | 'theme';
 const HISTORY_LIMIT = 50;
 
 /**
@@ -51,6 +54,8 @@ export default function AppBuilderWorkspacePage() {
   const [previewLocale, setPreviewLocale] = useState<'ar' | 'en'>('ar');
   const [device, setDevice] = useState<PreviewDevice>('desktop');
   const [mobilePanel, setMobilePanel] = useState<MobilePanel>('structure');
+  const [structureMode, setStructureMode] = useState<StructureMode>('pages');
+  const [previewThemeTokens, setPreviewThemeTokens] = useState<Record<string, string> | null>(null);
 
   const load = useCallback(() => {
     if (!params.id) return;
@@ -67,6 +72,8 @@ export default function AppBuilderWorkspacePage() {
         pastRef.current = [];
         futureRef.current = [];
         setDirty(false);
+        setStructureMode('pages');
+        setPreviewThemeTokens(null);
         setRegistries(registriesRes.data);
         const initialPageId = draftRes.data.schema.navigation?.initialPageId ?? null;
         const pageId = initialPageId && draftRes.data.schema.pages[initialPageId] ? initialPageId : Object.keys(draftRes.data.schema.pages)[0] ?? null;
@@ -96,6 +103,17 @@ export default function AppBuilderWorkspacePage() {
       futureRef.current = [];
       setDirty(true);
       setSchema({ ...schema, pages: { ...schema.pages, [pageId]: updater(schema.pages[pageId]) } });
+    },
+    [schema]
+  );
+
+  const applyThemeEdit = useCallback(
+    (patch: Record<string, string>) => {
+      if (!schema) return;
+      pastRef.current = [...pastRef.current, schema].slice(-HISTORY_LIMIT);
+      futureRef.current = [];
+      setDirty(true);
+      setSchema(mergeThemeTokens(schema, patch));
     },
     [schema]
   );
@@ -156,10 +174,23 @@ export default function AppBuilderWorkspacePage() {
   const canUndo = pastRef.current.length > 0;
   const canRedo = futureRef.current.length > 0;
 
+  /** يبدّل وضع لوحة البنية — يلغي أي معاينة مزامنة مظهر معلّقة عند مغادرة تبويب المظهر، فلا تبقى معلَّقة على كانفاس لم يعد يُظهر أدواتها. */
+  function switchStructureMode(mode: StructureMode) {
+    setStructureMode(mode);
+    if (mode !== 'theme') setPreviewThemeTokens(null);
+  }
+
   function selectPage(pageId: string) {
     if (!schema) return;
+    switchStructureMode('pages');
     setSelectedPageId(pageId);
     setSelectedComponentId(schema.pages[pageId]?.id ?? null);
+  }
+
+  /** التحديد من الشجرة/الكانفاس يعيد لوحة الفحص دوماً لوضع «الصفحات» — لا يبقى التحديد يتغيّر خلف تبويب المظهر بصمت. */
+  function selectComponent(id: string) {
+    switchStructureMode('pages');
+    setSelectedComponentId(id);
   }
 
   function updateSelectedNode(nextNode: AppSchemaComponent) {
@@ -202,54 +233,77 @@ export default function AppBuilderWorkspacePage() {
 
   const structurePanel = (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="shrink-0 border-b border-border px-3 py-2">
-        <p className="text-xs font-semibold text-muted">{t('pagesTitle')}</p>
-      </div>
-      <div className="shrink-0 space-y-0.5 border-b border-border p-2">
-        {pageIds.map((pageId) => (
+      <div className="flex shrink-0 items-center gap-1 border-b border-border p-2">
+        {(['pages', 'theme'] as const).map((mode) => (
           <button
-            key={pageId}
+            key={mode}
             type="button"
-            onClick={() => selectPage(pageId)}
-            aria-current={pageId === selectedPageId ? 'page' : undefined}
+            aria-pressed={structureMode === mode}
+            onClick={() => switchStructureMode(mode)}
             className={cn(
-              'flex h-8 w-full items-center rounded px-2 text-start text-sm',
-              pageId === selectedPageId ? 'bg-primary-soft font-medium text-primary' : 'text-text hover:bg-background'
+              'h-7 flex-1 rounded px-2 text-xs font-medium',
+              structureMode === mode ? 'bg-primary text-primary-foreground' : 'text-muted hover:bg-primary-soft hover:text-primary'
             )}
           >
-            {pageId}
-            {pageId === schema.navigation?.initialPageId ? (
-              <Badge tone="muted" className="ms-auto">{t('initialPageBadge')}</Badge>
-            ) : null}
+            {mode === 'pages' ? t('pagesTitle') : t('theme.tabLabel')}
           </button>
         ))}
       </div>
-      <div className="shrink-0 px-3 py-2">
-        <p className="text-xs font-semibold text-muted">{t('layersTitle')}</p>
-      </div>
-      <div className="min-h-0 flex-1 overflow-y-auto px-1 pb-2">
-        <LayersTree
-          root={currentPageRoot}
-          selectedId={selectedComponentId}
-          onSelect={setSelectedComponentId}
-          onReorder={(parentId, orderedIds) => selectedPageId && reorderSiblings(selectedPageId, parentId, orderedIds)}
-          onMove={(id, direction) => selectedPageId && moveNode(selectedPageId, id, direction)}
-          emptyLabel={t('emptyPage')}
-        />
-      </div>
+      {structureMode === 'pages' ? (
+        <>
+          <div className="shrink-0 space-y-0.5 border-b border-border p-2">
+            {pageIds.map((pageId) => (
+              <button
+                key={pageId}
+                type="button"
+                onClick={() => selectPage(pageId)}
+                aria-current={pageId === selectedPageId ? 'page' : undefined}
+                className={cn(
+                  'flex h-8 w-full items-center rounded px-2 text-start text-sm',
+                  pageId === selectedPageId ? 'bg-primary-soft font-medium text-primary' : 'text-text hover:bg-background'
+                )}
+              >
+                {pageId}
+                {pageId === schema.navigation?.initialPageId ? (
+                  <Badge tone="muted" className="ms-auto">{t('initialPageBadge')}</Badge>
+                ) : null}
+              </button>
+            ))}
+          </div>
+          <div className="shrink-0 px-3 py-2">
+            <p className="text-xs font-semibold text-muted">{t('layersTitle')}</p>
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto px-1 pb-2">
+            <LayersTree
+              root={currentPageRoot}
+              selectedId={selectedComponentId}
+              onSelect={selectComponent}
+              onReorder={(parentId, orderedIds) => selectedPageId && reorderSiblings(selectedPageId, parentId, orderedIds)}
+              onMove={(id, direction) => selectedPageId && moveNode(selectedPageId, id, direction)}
+              emptyLabel={t('emptyPage')}
+            />
+          </div>
+        </>
+      ) : (
+        <p className="px-3 py-4 text-xs leading-relaxed text-muted">{t('theme.tabDescription')}</p>
+      )}
     </div>
   );
 
   const inspectorPanel = (
     <div className="h-full min-h-0 overflow-y-auto">
-      <Inspector
-        node={selectedNode}
-        registries={registries}
-        onChange={updateSelectedNode}
-        onAddChild={addChildToSelected}
-        onRemove={removeSelected}
-        canRemove={Boolean(selectedNode && currentPageRoot && selectedNode.id !== currentPageRoot.id)}
-      />
+      {structureMode === 'theme' ? (
+        <ThemePanel tokens={schemaThemeTokens(schema)} onChange={applyThemeEdit} onPreview={setPreviewThemeTokens} />
+      ) : (
+        <Inspector
+          node={selectedNode}
+          registries={registries}
+          onChange={updateSelectedNode}
+          onAddChild={addChildToSelected}
+          onRemove={removeSelected}
+          canRemove={Boolean(selectedNode && currentPageRoot && selectedNode.id !== currentPageRoot.id)}
+        />
+      )}
     </div>
   );
 
@@ -328,7 +382,8 @@ export default function AppBuilderWorkspacePage() {
           device={device}
           locale={previewLocale}
           selectedId={selectedComponentId}
-          onSelect={setSelectedComponentId}
+          onSelect={selectComponent}
+          themeTokens={previewThemeTokens ?? schemaThemeTokens(schema)}
         />
 
         <aside className="hidden w-72 shrink-0 overflow-hidden border-s border-border bg-surface lg:block">

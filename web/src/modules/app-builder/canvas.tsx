@@ -6,6 +6,7 @@ import { ImageOff, ShoppingCart } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatRiyal } from '@/lib/money';
 import { type AppSchemaComponent } from '@/lib/app-builder';
+import { presentationCssVars } from '@/modules/store-experience-builder/presentation/tokens';
 
 /**
  * APP-BUILDER-5 — عرض تقريبي إطاري-محايد (React/Tailwind) لعقدة مخطط، لا رسم Flutter
@@ -299,18 +300,34 @@ function CanvasComponentNode({
   }
 }
 
+/**
+ * تحويل رموز مظهر محدودة (لون فقط اليوم) إلى متغيّرات CSS تلتقطها فئات
+ * `bg-primary`/`text-primary-foreground` الموجودة أصلاً (`tailwind.config.ts`:
+ * `var(--primary)`/`var(--primary-foreground)`) — بلا إعادة كتابة أي مكوّن.
+ * نصف القطر محفوظ في `theme.tokens` ويُقارَن/يُطبَّق، لكن لا يُعاين هنا بعد:
+ * `borderRadius.DEFAULT` في Tailwind قيمة ثابتة لا متغيّر (انظر وثيقة الأدلّة).
+ */
+function themeCssVars(tokens: Record<string, string> | undefined): React.CSSProperties {
+  const primary = tokens?.primaryColor;
+  if (!primary || !/^#([0-9a-fA-F]{6})$/.test(primary)) return {};
+  const vars = presentationCssVars(primary, 'default');
+  return { '--primary': vars['--primary'], '--primary-foreground': vars['--primary-foreground'] } as React.CSSProperties;
+}
+
 export function AppBuilderCanvas({
   root,
   device,
   locale,
   selectedId,
   onSelect,
+  themeTokens,
 }: {
   root: AppSchemaComponent | null;
   device: PreviewDevice;
   locale: string;
   selectedId: string | null;
   onSelect: (id: string) => void;
+  themeTokens?: Record<string, string>;
 }) {
   const t = useTranslations('appBuilder.builder');
 
@@ -318,7 +335,7 @@ export function AppBuilderCanvas({
     <div className="flex h-full min-h-0 flex-1 justify-center overflow-auto bg-background p-6">
       <div
         dir={locale.toLowerCase().startsWith('ar') ? 'rtl' : 'ltr'}
-        style={{ width: PREVIEW_WIDTHS[device], maxWidth: '100%' }}
+        style={{ width: PREVIEW_WIDTHS[device], maxWidth: '100%', ...themeCssVars(themeTokens) }}
         className="h-fit min-h-[480px] shrink-0 rounded-lg border border-border bg-surface shadow-sm"
         onClick={() => root && onSelect(root.id)}
       >
