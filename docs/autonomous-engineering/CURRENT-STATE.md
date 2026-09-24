@@ -2,7 +2,7 @@
 
 > This file is a durable resume point, not a substitute for Git/GitHub evidence.
 
-LAST_UPDATED: 2026-09-24 (AWJ App Builder Horizon V1 authorized and launched; APP-BUILDER-1/2/3/4/5/6/8/9 done. APP-BUILDER-7 (Data/Actions/Conditions/Visibility) evaluated for implementation and found NOT READY — a genuine Decision Escalation Gate, not an evidence gap: three of its four named concepts (Data, Conditions, Visibility) have no backing in the accepted, tested App Schema contract, and building them requires inventing an expression/condition engine or a Data Source Registry contract, both explicitly "not yet locked" in the accepted architecture doc. Owner decision (2026-09-24): keep APP-BUILDER-7 explicitly deferred (decision_required, not completed, not permanently skipped), proceed to APP-BUILDER-8 after a narrow dependency check found no real runtime/schema dependency on APP-BUILDER-7 — table updated, APP-BUILDER-8 promoted to ready then completed (PR #983, Theme + Use My Store Design), APP-BUILDER-9 likewise completed (PR #985, Templates + navigation/pages). APP-BUILDER-10 now in progress. Prior AWJ Mobile Runtime Proof Horizon V1 (below) is fully closed and is this horizon's accepted input.)
+LAST_UPDATED: 2026-09-24 (AWJ App Builder Horizon V1 authorized and launched; APP-BUILDER-1/2/3/4/5/6/8/9/10 done. APP-BUILDER-7 (Data/Actions/Conditions/Visibility) evaluated for implementation and found NOT READY — a genuine Decision Escalation Gate, not an evidence gap: three of its four named concepts (Data, Conditions, Visibility) have no backing in the accepted, tested App Schema contract, and building them requires inventing an expression/condition engine or a Data Source Registry contract, both explicitly "not yet locked" in the accepted architecture doc. Owner decision (2026-09-24): keep APP-BUILDER-7 explicitly deferred (decision_required, not completed, not permanently skipped), proceed to APP-BUILDER-8 after a narrow dependency check found no real runtime/schema dependency on APP-BUILDER-7 — table updated, APP-BUILDER-8 promoted to ready then completed (PR #983, Theme + Use My Store Design), APP-BUILDER-9 likewise completed (PR #985, Templates + navigation/pages), APP-BUILDER-10 likewise completed (PR #988, Validate/Publish/Version/Rollback foundation). APP-BUILDER-11 now ready. Prior AWJ Mobile Runtime Proof Horizon V1 (below) is fully closed and is this horizon's accepted input.)
 LAYER_VERSION: V1
 STATUS: ACTIVE — AWJ App Builder Horizon V1
 
@@ -82,6 +82,39 @@ Execute **AWJ App Builder Horizon V1** sequentially under نظام الأفق, p
   confirmed zero content drift via a path-restricted diff despite two unrelated commits landing on
   `main` between implementation and merge. `POST_MERGE_REVIEW: PASS`. Full evidence:
   `docs/plans/app-builder/APP-BUILDER-9-IMPLEMENTATION-REPORT.md`.
+- `APP-BUILDER-10` (Validate/Publish/Version/Rollback foundation) is **done**: a dependency check
+  confirmed no real runtime/schema dependency on the deferred `APP-BUILDER-7` — validate/publish/
+  rollback all operate on the whole schema as an already-validated opaque document, never touching
+  `SchemaComponent`-level Actions/Conditions/Visibility/Data. The first task this horizon touches
+  backend files since `APP-BUILDER-2`: a new `POST .../validate` endpoint (refactored out of
+  `publish()`'s existing two checks — `AppSchemaParser::validate()` then
+  `CompatibilityResolver::resolve()` — creates no version row, gated by `apps_builder.manage` since
+  it mutates nothing). A focused UI/UX Evidence Pass (`APP-BUILDER-10-UX-EVIDENCE-PASS.md`) written
+  before implementation. Added a "Publish" dialog to the Builder workspace header (beside Save) that
+  auto-runs Validate, shows its result, takes an optional note, and only enables confirm once
+  validation passes — disabled, with a visible reason, while the draft has unsaved changes (a real
+  correctness guardrail: `publish()` reads the *saved* draft, not in-memory edits) or without
+  `apps_builder.publish`. Added `/app-builder/[id]/versions`: every published version with its note
+  and publisher (`published_by_name`, already stored but never exposed) and a "Restore to draft"
+  action that writes the historical schema back via the existing `PUT .../draft` and redirects into
+  the Builder workspace — never auto-publishing; the existing publish pipeline's compatibility check
+  applies automatically on the merchant's next explicit publish, satisfying "compatibility-safe
+  rollback within contract" with zero new validation logic. Caught and fixed one real bug via
+  self-review before any external review: the Resource's first draft used `whenLoaded('publisher',
+  ...)` for `published_by_name`, correct for `index()`/`show()` (both eager-load the relation) but
+  silently `null` for `store()`'s freshly-created response — fixed by resolving `$this->publisher?->name`
+  directly. 4 new `BuilderAppTest` cases (22/22 total) + 97/97 across the full App
+  Builder/RBAC/tenancy test slice, 4 new Builder-page tests (22/22 total) + 4 new versions-page
+  tests (new file) + 3/3 detail-page tests, full frontend suite 2076/2076 passing, `npm run build`
+  succeeds, `ar.json`/`en.json` key parity verified, full backend suite 4634 passed / 35
+  pre-existing-failure baseline unchanged (zero backend source drift, +4 matching this task's new
+  tests exactly). PR #988 merged (also carrying `APP-BUILDER-9`'s post-merge documentation and this
+  task's own dependency check, pushed to the same still-open branch before that earlier docs-only
+  content had merged): squash SHA `b69f98125d0b9010986cd7df16247dea68d4e0e4`, confirmed
+  single-parent squash and zero content drift from the reviewed pre-merge head `10babae` via a
+  path-restricted diff, post-merge CI green on the merge commit itself (`ci.yml` run `35989443086`
+  sqlite+pgsql both success, `web-ci.yml` run `35989443048` success). `POST_MERGE_REVIEW: PASS`.
+  Full evidence: `docs/plans/app-builder/APP-BUILDER-10-IMPLEMENTATION-REPORT.md`.
 
 ## AWJ Mobile Runtime Proof Horizon V1 (closed) — execution log
 
@@ -203,7 +236,17 @@ Execute **AWJ App Builder Horizon V1** sequentially under نظام الأفق, p
   creation wizard, its own focused UI/UX Evidence Pass completed before
   implementation. Full evidence: "AWJ App Builder Horizon V1" log above,
   `docs/plans/app-builder/APP-BUILDER-9-IMPLEMENTATION-REPORT.md`.
-- Remaining tasks `APP-BUILDER-10` through `APP-BUILDER-12`: see
+- Tenth executable task: `APP-BUILDER-10` (Validate/Publish/Version/Rollback
+  foundation) — **done** (PR #988, squash SHA `b69f9812`). Dependency check
+  confirmed no real runtime/schema dependency on `APP-BUILDER-7` — the first
+  task this horizon touches backend files since `APP-BUILDER-2`: a
+  validate-only endpoint refactored out of `publish()`'s existing checks, a
+  Publish dialog in the Builder workspace header, and a
+  `/app-builder/[id]/versions` page with a "Restore to draft" action that
+  never auto-publishes, its own focused UI/UX Evidence Pass completed before
+  implementation. Full evidence: "AWJ App Builder Horizon V1" log above,
+  `docs/plans/app-builder/APP-BUILDER-10-IMPLEMENTATION-REPORT.md`.
+- Remaining tasks `APP-BUILDER-11` through `APP-BUILDER-12`: see
   `docs/autonomous-engineering/TASK-QUEUE.md` for the full dependency-ordered
   table and promotion evidence.
 - Implementation merge: standing authority after mandatory final-head
