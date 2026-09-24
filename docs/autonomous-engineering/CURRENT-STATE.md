@@ -427,9 +427,21 @@ A future agent should:
 ## AWJ App Builder — Commerce Data & Dynamic Runtime V1 (new horizon, Phase 1)
 
 LAST_UPDATED: 2026-09-24
-STATUS: Phase 1 (Evidence & Architecture) **complete** — at a mandatory Decision Gate, awaiting
-Safwan/ChatGPT review. **No implementation has started.** Do not promote any task below to `ready`
-until `docs/plans/app-builder/AWJ_APP_BUILDER_COMMERCE_RUNTIME_V1_EVIDENCE.md` §8 is resolved.
+STATUS: **Decision Gate approved (Option A, with amendments) — ADR-01 recorded, horizon ACTIVE.**
+See `docs/plans/app-builder/ADR-01-APP-BUILDER-COMMERCE-DATA-RUNTIME-V1.md` for the full decision
+record. Implementation is now authorized and in progress; see `TASK-QUEUE.md` for live task status.
+
+Owner decision (2026-09-24): Option A adopted. Decision Point 1 = **YES** — the live Published
+Schema → fetch → verified on-device cache / Last Known Good loop is in scope and required for this
+horizon. Decision Point 2 = **EXCLUDE** `commerce.customer.profile`/`commerce.orders` from V1.
+Conditions/Visibility stays closed, typed, and allowlisted — no expression language, eval, or
+arbitrary JS/HTTP/GraphQL/SQL. `commerce/v1` is confirmed as the mobile App Builder commerce API
+contract; Storefront Web and Mobile App remain presentation channels over the same authoritative
+AWJ Commerce Core. Amendment: the current build-time `COMMERCE_STORE_BEARER_TOKEN` mechanism is
+current-state evidence, not a locked architecture assumption — credential provisioning/rotation/
+revocation is an explicit future App Factory/security-lifecycle boundary, not in scope here.
+`APP-BUILDER-21` (UX/localization) and `APP-BUILDER-22` (theme rendering gap) are mandatory horizon
+deliverables, not optional follow-ons.
 
 Owner-issued mission continues Horizon V1's connected deferred track (`APP-BUILDER-7` +
 `APP-BUILDER-11`'s real-Commerce-binding clause): lock a Data Resource Registry contract, connect
@@ -466,5 +478,5 @@ Key evidence findings (see the evidence doc for full citations):
   with zero real I/O wired) — flagged as the evidence doc's Decision Point 1, since without it any
   new binding/visibility mechanism only ever runs against a schema baked into a native build.
 
-No task in this horizon is `ready`. TASK-QUEUE.md records the proposed (not authorized) task
-decomposition under a new horizon header, explicitly blocked on the Decision Gate above.
+TASK-QUEUE.md records the finalized task decomposition (`APP-BUILDER-13`..`APP-BUILDER-23`) under
+the horizon header, promoted to `ready` in dependency order per ADR-01.
