@@ -900,3 +900,38 @@ explicit out-of-scope boundary, and a next-horizon recommendation.
 
 **AWJ App Builder Horizon V1 is CLOSED.** Per the horizon bootstrap's own "Horizon End" rule, this
 session STOPS here — no automatic continuation to Preview & Testing or any new horizon.
+
+---
+
+## Horizon: AWJ App Builder — Commerce Data & Dynamic Runtime V1
+
+STATUS: **ACTIVE — Decision Gate approved (ADR-01), Option A with amendments.** See
+`docs/plans/app-builder/ADR-01-APP-BUILDER-COMMERCE-DATA-RUNTIME-V1.md` for the full decision
+record: Decision Point 1 = YES (live fetch/cache loop in scope), Decision Point 2 = EXCLUDE
+(customer profile/orders out of V1), Conditions/Visibility closed/typed/allowlisted only,
+`commerce/v1` confirmed as the binding target, store-bearer credential lifecycle explicitly out of
+scope (future App Factory boundary). `APP-BUILDER-21`/`APP-BUILDER-22` are mandatory.
+
+Source of truth for this horizon:
+- `docs/plans/app-builder/AWJ_APP_BUILDER_COMMERCE_RUNTIME_V1_BOOTSTRAP.md`
+- `docs/plans/app-builder/AWJ_APP_BUILDER_COMMERCE_RUNTIME_V1_EVIDENCE.md`
+- `docs/plans/app-builder/ADR-01-APP-BUILDER-COMMERCE-DATA-RUNTIME-V1.md`
+
+### Candidate queue (finalized, promoted to `ready` in dependency order)
+
+| Order | Task ID | Status | Depends on | Outcome |
+|---|---|---|---|---|
+| 1 | APP-BUILDER-13 | ready | ADR-01 | Data Resource Registry V1 foundation (populate `commerce.categories`/`commerce.products`/`commerce.cart`) |
+| 2 | APP-BUILDER-14 | ready (after 13) | APP-BUILDER-13 | App Schema `binding` contract (parser + compatibility resolver) |
+| 3 | APP-BUILDER-15 | ready (after 14) | APP-BUILDER-14 | Builder Data UX (Inspector binding editor) |
+| 4 | APP-BUILDER-16 | ready | ADR-01 | Conditions/Visibility contract (closed/typed/allowlisted) + Inspector UX |
+| 5 | APP-BUILDER-17 | ready (after 14) | APP-BUILDER-14 | Mobile runtime binding/visibility resolver (replaces 3 hand-written screen implementations) |
+| 6 | APP-BUILDER-18 | ready (after 17) | APP-BUILDER-17 | Real action dispatch wired through schema bindings |
+| 7 | APP-BUILDER-19 | ready | ADR-01 (Decision Point 1 = YES) | Live publish → fetch → on-device-cache loop (Last Known Good) |
+| 8 | APP-BUILDER-20 | ready (after 18+19) | APP-BUILDER-18, APP-BUILDER-19 | Same-Store integrated proof |
+| 9 | APP-BUILDER-21 | ready | none (independent, mandatory) | App Builder UX/localization pass |
+| 10 | APP-BUILDER-22 | ready | none (independent, mandatory) | Canvas + Flutter theme-token rendering fix |
+| 11 | APP-BUILDER-23 | blocked | all above | Horizon closure report |
+
+`APP-BUILDER-21`/`APP-BUILDER-22` have no dependency on the data/runtime track and may execute in
+parallel with it.

@@ -421,3 +421,62 @@ A future agent should:
 2. correct stale factual metadata rather than trusting it blindly;
 3. read the active queue item;
 4. continue only within its authorized horizon.
+
+---
+
+## AWJ App Builder — Commerce Data & Dynamic Runtime V1 (new horizon, Phase 1)
+
+LAST_UPDATED: 2026-09-24
+STATUS: **Decision Gate approved (Option A, with amendments) — ADR-01 recorded, horizon ACTIVE.**
+See `docs/plans/app-builder/ADR-01-APP-BUILDER-COMMERCE-DATA-RUNTIME-V1.md` for the full decision
+record. Implementation is now authorized and in progress; see `TASK-QUEUE.md` for live task status.
+
+Owner decision (2026-09-24): Option A adopted. Decision Point 1 = **YES** — the live Published
+Schema → fetch → verified on-device cache / Last Known Good loop is in scope and required for this
+horizon. Decision Point 2 = **EXCLUDE** `commerce.customer.profile`/`commerce.orders` from V1.
+Conditions/Visibility stays closed, typed, and allowlisted — no expression language, eval, or
+arbitrary JS/HTTP/GraphQL/SQL. `commerce/v1` is confirmed as the mobile App Builder commerce API
+contract; Storefront Web and Mobile App remain presentation channels over the same authoritative
+AWJ Commerce Core. Amendment: the current build-time `COMMERCE_STORE_BEARER_TOKEN` mechanism is
+current-state evidence, not a locked architecture assumption — credential provisioning/rotation/
+revocation is an explicit future App Factory/security-lifecycle boundary, not in scope here.
+`APP-BUILDER-21` (UX/localization) and `APP-BUILDER-22` (theme rendering gap) are mandatory horizon
+deliverables, not optional follow-ons.
+
+Owner-issued mission continues Horizon V1's connected deferred track (`APP-BUILDER-7` +
+`APP-BUILDER-11`'s real-Commerce-binding clause): lock a Data Resource Registry contract, connect
+App Builder components to real AWJ Commerce data, implement constrained Conditions/Visibility,
+implement real Commerce runtime dispatch, prove the mobile experience shares one Commerce Core with
+the AWJ Store, complete an App Builder UX/localization pass, and close the theme-token canvas
+rendering gap.
+
+Durable records for this phase:
+- `docs/plans/app-builder/AWJ_APP_BUILDER_COMMERCE_RUNTIME_V1_BOOTSTRAP.md` — mission record.
+- `docs/plans/app-builder/AWJ_APP_BUILDER_COMMERCE_RUNTIME_V1_EVIDENCE.md` — full evidence pass
+  (backend App Builder contract, Flutter mobile runtime, real `commerce/v1` API surface, Builder UX
+  localization gap, theme-token rendering gap), external evidence (Shopify, Builder.io,
+  server-driven-UI "Blueprint" pattern, Apple/Google downloaded-code policy), proposed architecture
+  for the Data Resource Registry / App Schema binding / Conditions-Visibility / real dispatch /
+  mobile resolution pipeline / versioning, an Update/Release Matrix, Same-Store Proof plan,
+  Security/Tenant-Isolation and backward-compatibility analysis, and the open Decision Escalation
+  Packet (`ADR-APP-BUILDER-COMMERCE-RUNTIME-V1-01`).
+
+Key evidence findings (see the evidence doc for full citations):
+- `DataResourceRegistry::RESOURCES` is a deliberate empty stub today; the schema contract's closed
+  key-list structurally forbids `binding`/`condition`/`visibility` keys — confirms `APP-BUILDER-7`'s
+  original deferral was correct, not overcautious.
+- The already-closed Mobile Runtime horizon independently built **real** `commerce/v1` data
+  fetching and **real** cart-action dispatch (`RuntimeActionHandler`) — but entirely through
+  hand-written per-screen Dart code (`home_screen.dart`/`product_screen.dart`/`cart_screen.dart`),
+  never through the schema. The backend App Builder contract's `DISPATCH_PROVEN_NOOP` label
+  describes the schema/canvas contract only, not the shipped runtime, which already dispatches real
+  commerce actions outside that contract.
+- `commerce/v1` (contract at `docs/openapi/commerce-api-v1.yaml`) is the one real API surface to
+  bind to — not `store/v1`, and not the still-Spree-transitional `storefront/` app.
+- No live publish → fetch → on-device-cache loop exists for the mobile runtime
+  (`mobile/lib/startup/last_known_good.dart` is a fully designed, unit-tested decision mechanism
+  with zero real I/O wired) — flagged as the evidence doc's Decision Point 1, since without it any
+  new binding/visibility mechanism only ever runs against a schema baked into a native build.
+
+TASK-QUEUE.md records the finalized task decomposition (`APP-BUILDER-13`..`APP-BUILDER-23`) under
+the horizon header, promoted to `ready` in dependency order per ADR-01.
