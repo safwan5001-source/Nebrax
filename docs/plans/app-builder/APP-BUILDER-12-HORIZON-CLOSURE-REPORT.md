@@ -1,6 +1,6 @@
 # AWJ App Builder Horizon V1 — Closure Report (APP-BUILDER-12)
 
-STATUS: pre-merge review
+STATUS: merged — post-merge review PASS
 DATE: 2026-09-24
 
 ## Horizon outcome
@@ -178,6 +178,23 @@ Customizer redesign.
    picking up whenever a task next touches the canvas rendering pipeline.
 4. **Preview & Testing horizon** remains explicitly not started, per this horizon's own boundary
    and the bootstrap's closure instruction — a separate authorization decision for the owner.
+
+## Merge and post-merge review
+
+This closure report merged as part of PR #991 (which also carried `APP-BUILDER-11`'s own
+post-merge documentation, pushed to the same still-open branch before that earlier docs-only
+content had merged) via squash as `ac6c375f669adfbcb9dc301c8296c42d8506c4b3`, pre-merge head
+`9d0828d8a121bf29ffea44762b6b5b15fb0c79a7`.
+
+- **Single-parent squash confirmed:** `git log -1 --format=%P origin/main` on the merge commit
+  returns exactly one parent (`a7a2e0c...`, the prior merge base) — a real squash.
+- **Zero content drift confirmed:** `git diff <pre-merge-head> origin/main -- docs/plans/app-builder/
+  docs/autonomous-engineering/` returns empty.
+- **Post-merge CI confirmed green on the merge commit itself:** `CI` (`.github/workflows/ci.yml`,
+  sqlite+pgsql) — run `36009975210` — **completed / success**. No `Web CI` run was expected or
+  triggered, since the diff touches only `docs/`.
+
+**POST_MERGE_REVIEW: PASS.**
 
 ## Self-review
 
