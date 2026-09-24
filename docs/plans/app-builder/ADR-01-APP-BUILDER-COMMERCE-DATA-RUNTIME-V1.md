@@ -140,3 +140,38 @@ App Builder — Commerce Data & Dynamic Runtime V1" (`APP-BUILDER-13` through `A
 promoted to `ready` in dependency order). Any further material decision discovered during
 implementation (e.g. an ambiguous field mapping, a genuinely new security trade-off) must be raised
 as its own Decision Escalation per `DECISION-ESCALATION.md`, not silently resolved.
+
+## Amendment (2026-09-24) — Storefront completeness is not a Mobile App Builder prerequisite
+
+Owner clarification, recorded verbatim as guidance binding on every remaining task in this horizon
+(`APP-BUILDER-15` through `APP-BUILDER-23`), not a new decision superseding anything above:
+
+- **Storefront Web feature/UI completeness is never a prerequisite for App Builder work.**
+  Storefront Web and the Mobile App are independent presentation channels over the same
+  authoritative AWJ Commerce Core — this was already true of `commerce/v1` vs `store/v1` (§1.3 of
+  the evidence doc), but is now stated as an explicit horizon-wide rule: the still-mid-migration
+  Spree-based `storefront/` app's own incompleteness (cart/checkout/customer-auth still Spree-shaped,
+  per the evidence pass) must never be treated as blocking, gating, or a pacing dependency for any
+  App Builder or Mobile Runtime task. The two channels share Commerce truth; they do not share a
+  release schedule.
+- **The Mobile App must share real Commerce truth, never invent a substitute.** Products, variants/
+  options, pricing, inventory, and any other Commerce capability the Mobile App surfaces must come
+  from the authoritative `commerce/v1` contract (the same models/services `store/v1` and the
+  merchant-facing `api/*` surface already use) — never an app-specific duplicate, a hardcoded
+  fixture standing in for a real capability, or a parallel data path invented to route around a gap.
+- **A missing Commerce capability is a recorded gap, not an invitation to invent one.** If an
+  approved App Builder capability needs something `commerce/v1` does not yet expose (the evidence
+  doc already named two: no `commerce.promotions` resource at all, and `commerce.categories` lacking
+  `name_en`), the correct action is to record it explicitly as a Commerce Core dependency/gap in the
+  relevant task's implementation report and in `TASK-QUEUE.md` — continuing the rest of the
+  authorized horizon around it. Escalate to the owner only if the specific gap actually blocks a
+  task inside this horizon's approved scope; do not escalate speculatively for gaps that don't block
+  anything currently authorized.
+- **Consequence for `APP-BUILDER-20` (Same-Store Proof) specifically**: the proof must demonstrate
+  that Storefront Web and Mobile App consume the *same Commerce Core data/business rules* (shared
+  models, shared price/availability resolvers, shared tenant/channel boundary) — it does **not**
+  require the Storefront Web *application* itself to be feature-complete, and must not be blocked
+  waiting for `storefront/`'s Spree-to-AWJ migration to finish.
+
+This reaffirms, rather than changes, the horizon's non-negotiable principle: **one Commerce Core,
+multiple presentation channels.**
