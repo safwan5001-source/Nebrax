@@ -73,6 +73,10 @@ const { api, translate } = vi.hoisted(() => {
     'theme.sync.noChanges': 'No changes.',
     'theme.sync.apply': 'Apply',
     'theme.sync.cancel': 'Cancel',
+    'pages.addAction': 'Add page',
+    'pages.setHomeLabel': 'Set as home page',
+    'pages.removeLabel': 'Remove page',
+    'pages.pickerPlaceholder': 'Choose a page',
   };
   const cache = new Map<string, ReturnType<typeof buildTranslator>>();
   function buildTranslator(namespace: string) {
@@ -143,6 +147,7 @@ const draftData = {
           },
         ],
       },
+      about: { type: 'Page', id: 'about-root', children: [] },
     },
   },
 };
@@ -166,6 +171,11 @@ const registriesData = {
       type: 'openProduct', version: 1, risk_class: 'navigation',
       params: [{ key: 'productId', type: 'string', required: true, nullable: false, default: null, min_value: null }],
       dispatch_status: 'provenNoop', notes: 'Opens a product.',
+    },
+    navigate: {
+      type: 'navigate', version: 1, risk_class: 'navigation',
+      params: [{ key: 'pageId', type: 'string', required: true, nullable: false, default: null, min_value: null }],
+      dispatch_status: 'provenNoop', notes: 'Navigates to a page.',
     },
   },
 };
@@ -442,6 +452,73 @@ describe('AppBuilderWorkspacePage', () => {
     await userEvent.setup().click(detectButton);
 
     expect(await screen.findByText('Not permitted.')).toBeTruthy();
+  });
+
+  it('adding a page creates and selects a new empty page', async () => {
+    mockApi();
+    render(<AppBuilderWorkspacePage />);
+    await screen.findByText('Featured');
+
+    const removeButtonsBefore = screen.getAllByLabelText('Remove page');
+    const [addPageButton] = screen.getAllByText('Add page');
+    await userEvent.setup().click(addPageButton);
+
+    // A third page row now exists (home, about, and the new one), and it is immediately
+    // selected — the new empty Page root has no props, so the Inspector falls back to the
+    // "no properties" message.
+    const removeButtonsAfter = screen.getAllByLabelText('Remove page');
+    expect(removeButtonsAfter.length).toBe(removeButtonsBefore.length + 2); // +1 page, desktop+mobile copies
+    expect(screen.getAllByText('This component has no properties.').length).toBeGreaterThan(0);
+    expect(screen.getByText('Unsaved changes')).toBeTruthy();
+  });
+
+  it('the home page cannot be removed, and removing another page falls back selection to home', async () => {
+    mockApi();
+    render(<AppBuilderWorkspacePage />);
+    await screen.findByText('Featured');
+
+    // Row order follows schema.pages key order (home, about); desktop panel's buttons come
+    // first in DOM order, mobile panel's copy second.
+    const [homeRemoveButton, aboutRemoveButton] = screen.getAllByLabelText('Remove page');
+    expect((homeRemoveButton as HTMLButtonElement).disabled).toBe(true);
+    expect((aboutRemoveButton as HTMLButtonElement).disabled).toBe(false);
+
+    await userEvent.setup().click(aboutRemoveButton);
+
+    expect(screen.queryAllByText('about').length).toBe(0);
+    expect(screen.getByText('Unsaved changes')).toBeTruthy();
+  });
+
+  it('setting a different page as home moves the removability guardrail with it', async () => {
+    mockApi();
+    render(<AppBuilderWorkspacePage />);
+    await screen.findByText('Featured');
+
+    // Only the non-home page ("about") offers "Set as home" initially.
+    const [setAboutHomeButton] = screen.getAllByLabelText('Set as home page');
+    await userEvent.setup().click(setAboutHomeButton);
+
+    expect(screen.getByText('Unsaved changes')).toBeTruthy();
+    // Home is now removable (it is no longer the home page), about is not.
+    const [homeRemoveButton, aboutRemoveButton] = screen.getAllByLabelText('Remove page');
+    expect((homeRemoveButton as HTMLButtonElement).disabled).toBe(false);
+    expect((aboutRemoveButton as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("the navigate action's pageId param renders as a picker of real declared pages", async () => {
+    mockApi();
+    render(<AppBuilderWorkspacePage />);
+    await screen.findByText('Featured');
+
+    const productCardRows = screen.getAllByText('ProductCard');
+    await userEvent.setup().click(productCardRows[0]);
+
+    const [actionTypeSelect] = await screen.findAllByDisplayValue('openProduct');
+    fireEvent.change(actionTypeSelect, { target: { value: 'navigate' } });
+
+    const [pageIdSelect] = await screen.findAllByDisplayValue('Choose a page');
+    fireEvent.change(pageIdSelect, { target: { value: 'about' } });
+    expect(await screen.findAllByDisplayValue('about')).toBeTruthy();
   });
 
   it('shows an error state when loading fails', async () => {

@@ -1,13 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import {
   addChildComponent,
+  addPage,
   createComponentFromDefinition,
   findParentId,
   generateComponentId,
+  generatePageId,
   mergeThemeTokens,
   moveSibling,
   removeComponentById,
+  removePage,
   reorderChildren,
+  setInitialPage,
   themeTokens,
   updateComponentById,
   type AppSchema,
@@ -168,5 +172,61 @@ describe('mergeThemeTokens', () => {
     const updated = mergeThemeTokens(original, { radius: 'sharp' });
     expect(updated.theme?.tokens).toEqual({ primaryColor: '#12372a', radius: 'sharp' });
     expect(original.theme?.tokens).toEqual({ primaryColor: '#12372a', radius: 'default' });
+  });
+});
+
+function twoPageSchema(): AppSchema {
+  return {
+    schemaVersion: '1.0.0', minRuntimeVersion: '1.0.0',
+    navigation: { initialPageId: 'home' },
+    pages: {
+      home: { type: 'Page', id: 'home-root' },
+      about: { type: 'Page', id: 'about-root' },
+    },
+  };
+}
+
+describe('generatePageId', () => {
+  it('produces a page-prefixed id, unique across calls', () => {
+    const first = generatePageId();
+    const second = generatePageId();
+    expect(first.startsWith('page-')).toBe(true);
+    expect(first).not.toBe(second);
+  });
+});
+
+describe('addPage', () => {
+  it('adds a new empty Page root keyed by the given id, without mutating the original', () => {
+    const original = minimalSchema();
+    const updated = addPage(original, 'page-new');
+    expect(updated.pages['page-new']).toEqual({ type: 'Page', id: 'page-new-root', children: [] });
+    expect(original.pages['page-new']).toBeUndefined();
+  });
+});
+
+describe('removePage', () => {
+  it('removes a non-home page', () => {
+    const updated = removePage(twoPageSchema(), 'about');
+    expect(updated.pages.about).toBeUndefined();
+    expect(Object.keys(updated.pages)).toEqual(['home']);
+  });
+  it('is a no-op when removing the current home page', () => {
+    const original = twoPageSchema();
+    expect(removePage(original, 'home')).toEqual(original);
+  });
+  it('is a no-op when it is the only page', () => {
+    const original = minimalSchema();
+    expect(removePage(original, 'home')).toEqual(original);
+  });
+});
+
+describe('setInitialPage', () => {
+  it('sets a declared page as the initial page', () => {
+    const updated = setInitialPage(twoPageSchema(), 'about');
+    expect(updated.navigation.initialPageId).toBe('about');
+  });
+  it('is a no-op for an id that does not reference a declared page', () => {
+    const original = twoPageSchema();
+    expect(setInitialPage(original, 'missing')).toEqual(original);
   });
 });

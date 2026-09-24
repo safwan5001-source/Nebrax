@@ -147,11 +147,30 @@ function ActionParamField({
   definition,
   value,
   onChange,
+  pageIds,
+  t,
 }: {
   definition: RegistryActionParamDefinition;
   value: unknown;
   onChange: (next: unknown) => void;
+  pageIds?: string[];
+  t: ReturnType<typeof useTranslations>;
 }) {
+  // APP-BUILDER-9 — `navigate.pageId` وحده يُعرض منتقياً من صفحات المخطط الحقيقية
+  // (`pageIds` مُمرَّرة فقط لهذا المعامل تحديداً، انظر مكان الاستدعاء) بدل حقل نصّ
+  // حرّ: لا طبقة تتحقّق مرجعية `pageId` بغياب صفحة مطابقة اليوم — مرجع ميت كان
+  // يُكتشف وقت تشغيل التطبيق الأصلي فقط.
+  if (pageIds) {
+    const current = typeof value === 'string' ? value : '';
+    return (
+      <Select value={current} onChange={(event) => onChange(event.target.value)} className="h-8 text-xs">
+        <option value="">{t('pages.pickerPlaceholder')}</option>
+        {pageIds.map((pageId) => (
+          <option key={pageId} value={pageId}>{pageId}</option>
+        ))}
+      </Select>
+    );
+  }
   if (definition.type === 'integer') {
     const current = typeof value === 'number' ? value : '';
     return (
@@ -172,10 +191,14 @@ function ActionParamRow({
   definition,
   value,
   onChange,
+  pageIds,
+  t,
 }: {
   definition: RegistryActionParamDefinition;
   value: unknown;
   onChange: (next: unknown) => void;
+  pageIds?: string[];
+  t: ReturnType<typeof useTranslations>;
 }) {
   return (
     <div className="space-y-1 border-b border-border py-2 last:border-0">
@@ -183,7 +206,7 @@ function ActionParamRow({
         {definition.key}
         {definition.required ? <span className="text-negative"> *</span> : null}
       </label>
-      <ActionParamField definition={definition} value={value} onChange={onChange} />
+      <ActionParamField definition={definition} value={value} onChange={onChange} pageIds={pageIds} t={t} />
     </div>
   );
 }
@@ -191,6 +214,7 @@ function ActionParamRow({
 export function Inspector({
   node,
   registries,
+  pageIds,
   onChange,
   onAddChild,
   onRemove,
@@ -198,6 +222,7 @@ export function Inspector({
 }: {
   node: AppSchemaComponent | null;
   registries: AppBuilderRegistries | null;
+  pageIds: string[];
   onChange: (next: AppSchemaComponent) => void;
   onAddChild: (newNode: AppSchemaComponent) => void;
   onRemove: () => void;
@@ -297,6 +322,8 @@ export function Inspector({
                     definition={param}
                     value={node.action?.params?.[param.key]}
                     onChange={(v) => setActionParam(param.key, v)}
+                    pageIds={node.action?.type === 'navigate' && param.key === 'pageId' ? pageIds : undefined}
+                    t={t}
                   />
                 ))}
               {actionDefinition.params.some((param) => injectedParams.has(param.key)) ? (

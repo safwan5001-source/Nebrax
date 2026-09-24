@@ -237,3 +237,38 @@ export function themeTokens(schema: AppSchema): Record<string, string> {
 export function mergeThemeTokens(schema: AppSchema, patch: Record<string, string>): AppSchema {
   return { ...schema, theme: { ...schema.theme, tokens: { ...themeTokens(schema), ...patch } } };
 }
+
+// ── Page-map edit helpers (APP-BUILDER-9) ────────────────────────────────────
+// `schema.pages`/`navigation.initialPageId` حقلان حقيقيان بالفعل — لا مفهوم
+// جديد. الضمانات هنا تعكس فقط ما يتحقّقه `AppSchemaParser::validate()` خادمياً
+// أصلاً (pages غير فارغة، initialPageId يشير لصفحة معرَّفة): كلا الدالتين
+// المؤثّرتين تصمتان (لا تغيير) إن كانت النتيجة ستنتج حالة يرفضها الخادم، لا
+// تخمين إعادة إسناد.
+
+/** معرّف صفحة جديد فريد بما يكفي لمخطط تحرير واحد — لا يفترض تفرداً عالمياً. */
+export function generatePageId(): string {
+  const random = typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? crypto.randomUUID().slice(0, 8)
+    : Math.random().toString(36).slice(2, 10);
+  return `page-${random}`;
+}
+
+/** يضيف صفحة فارغة جديدة بمعرّف `pageId` المعطى (استدعِ `generatePageId` أولاً). */
+export function addPage(schema: AppSchema, pageId: string): AppSchema {
+  return { ...schema, pages: { ...schema.pages, [pageId]: { type: 'Page', id: `${pageId}-root`, children: [] } } };
+}
+
+/** يحذف صفحة بمعرّفها — صامتة (بلا تغيير) إن كانت الصفحة الأخيرة أو الصفحة الرئيسية الحالية. */
+export function removePage(schema: AppSchema, pageId: string): AppSchema {
+  if (Object.keys(schema.pages).length <= 1) return schema;
+  if (schema.navigation.initialPageId === pageId) return schema;
+  const nextPages = { ...schema.pages };
+  delete nextPages[pageId];
+  return { ...schema, pages: nextPages };
+}
+
+/** يجعل صفحة بمعرّفها هي الصفحة الرئيسية — صامتة إن لم تكن الصفحة معرَّفة أصلاً. */
+export function setInitialPage(schema: AppSchema, pageId: string): AppSchema {
+  if (!(pageId in schema.pages)) return schema;
+  return { ...schema, navigation: { ...schema.navigation, initialPageId: pageId } };
+}

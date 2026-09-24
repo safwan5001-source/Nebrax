@@ -504,8 +504,8 @@ Source of truth:
 | 5 | APP-BUILDER-5 | done | high | APP-BUILDER-4 (done) | Builder workspace shell (UI/UX Evidence Pass required) |
 | 6 | APP-BUILDER-6 | done | normal | APP-BUILDER-5 (done) | Visual editing + history |
 | 7 | APP-BUILDER-7 | decision_required | normal | APP-BUILDER-6 (done) | Data/Actions/Conditions/Visibility (Develop mode) |
-| 8 | APP-BUILDER-8 | ready | high | APP-BUILDER-6 (done); no real dependency on APP-BUILDER-7 (verified, see below) | Theme + Use My Store Design |
-| 9 | APP-BUILDER-9 | pending | normal | APP-BUILDER-8 | Templates + navigation/pages |
+| 8 | APP-BUILDER-8 | done | high | APP-BUILDER-6 (done); no real dependency on APP-BUILDER-7 (verified, see below) | Theme + Use My Store Design |
+| 9 | APP-BUILDER-9 | ready | normal | APP-BUILDER-8 (done) | Templates + navigation/pages |
 | 10 | APP-BUILDER-10 | pending | high | APP-BUILDER-9 | Validate/Publish/Version/Rollback foundation |
 | 11 | APP-BUILDER-11 | pending | high | APP-BUILDER-10 | Integrated vertical proof + UX/security closure |
 | 12 | APP-BUILDER-12 | pending | normal | APP-BUILDER-11 | Horizon closure — STOP for owner/ChatGPT review |
@@ -686,3 +686,49 @@ Conditions, Visibility, or Data bindings — a structurally separate part of the
 separate workspace surface (a Theme editor, not the per-component Inspector). Confirmed: **no real
 runtime/schema dependency on `APP-BUILDER-7`**. Table updated: `APP-BUILDER-8`'s dependency is now
 `APP-BUILDER-6 (done)`, promoted to `ready`.
+
+`APP-BUILDER-8` is `done`: PR #983 merged (Merge SHA `1248223dd1668ad840f2b39f21e3de5a6d86755b`,
+confirmed single-parent squash onto `main`, zero content drift from the reviewed head `4c28197`),
+post-merge CI green on the merge commit (`ci.yml` run 35968746817 sqlite+pgsql both success,
+`web-ci.yml` run 35968746879 success). A focused UI/UX Evidence Pass
+(`APP-BUILDER-8-UX-EVIDENCE-PASS.md`) was completed before implementation. Added a **Theme** tab to
+the Builder workspace's structure panel editing `schema.theme.tokens` (manual preset/color/radius/
+density/product-card-style editing, plus **"Use My Store Design"** — a one-time Detect → Diff →
+Preview → Apply sync against the Store Customizer's real, already-shipped presentation data, the
+architecture doc's own "Review Changes" preferred-default mode). Canvas preview reflects the
+theme's primary color live via CSS custom properties; radius/density/product-card tokens are
+persisted/diffed/synced but not yet visually reflected in the canvas (`tailwind.config.ts`'s
+`borderRadius.DEFAULT` is a fixed value, not CSS-variable-driven) — an explicitly documented, scoped
+gap. Pure frontend — zero backend files touched. Honored every explicit constraint from the owner's
+APP-BUILDER-7 resolution: no Data Source Registry, expression/condition language, or
+merchant-authored visibility semantics invented; no duplication of APP-BUILDER-6's Actions editing;
+`APP-BUILDER-7` left untouched, still `decision_required`. 4 new `app-builder.ts` unit tests (21/21
+total) + 5 new workspace tests (14/14 total), full frontend suite 2046/2046 passing, `npm run build`
+succeeds, `ar.json`/`en.json` key parity verified, full backend suite unaffected (4630 passed / 35
+pre-existing-failure baseline unchanged, zero backend source drift). Full evidence:
+`docs/plans/app-builder/APP-BUILDER-8-IMPLEMENTATION-REPORT.md`.
+
+`APP-BUILDER-9` (Templates + navigation/pages) — dependency check performed before implementation,
+mirroring `APP-BUILDER-8`'s: source requirement is "same schema/runtime; safe system page
+constraints and minimum shell" (horizon doc task 9). Read the real, accepted, tested contract
+before scoping: `mobile/lib/schema/app_schema.dart`'s `SchemaNavigation` is "**deliberately
+minimal** — `initialPageId` is the only concept needed" (its own doc comment), and
+`app/Services/AppBuilder/AppSchemaParser.php::validate()` already enforces the **entire** "system
+page constraint" surface server-side today: `pages` must be a non-empty object, every page root's
+`type` must be `'Page'`, and `navigation.initialPageId` must reference a declared page — no
+"required page type" (cart/checkout/account) concept exists anywhere in the schema, parser, or
+`CompatibilityResolver`. Unlike `APP-BUILDER-7`'s Data/Conditions/Visibility (which needed
+inventing wholly new JSON fields and validation semantics), this task's entire scope is
+representable in the already-accepted `pages: Map<String, SchemaComponent>` /
+`navigation.initialPageId` shape: page add/remove/rename/set-initial as new client-side tree
+operations (the `pages`-map analogue of `APP-BUILDER-6`'s component-tree helpers), with UI
+guardrails that only mirror validation the server already performs (never removing the last page,
+never leaving `initialPageId` dangling) — not a new contract. "Templates" (architecture doc §7:
+"more than colors/screenshots... representable through the same app contract/runtime") is a small
+curated set of complete, valid `AppSchema` starter payloads (multi-page, may reference theme
+tokens/components/actions — all already-accepted concepts) selected in the `/app-builder/new`
+wizard's existing `template` creation path (today honestly indistinguishable from `scratch`, per
+that page's own comment: "محتوى التصميم/القالب الفعلي مؤجَّل صراحةً إلى APP-BUILDER-8/9"), written
+through the same `POST /app-builder/apps` + `PUT .../draft` endpoints `APP-BUILDER-8` already used
+unchanged. **Confirmed: no real runtime/schema dependency on `APP-BUILDER-7`, and no new App
+Schema contract required** — table dependency is `APP-BUILDER-8 (done)` alone, `ready`.

@@ -1,6 +1,6 @@
 # APP-BUILDER-8 — Implementation Report
 
-STATUS: pre-merge review
+STATUS: merged — post-merge review PASS
 DATE: 2026-09-24
 
 ## Outcome
@@ -132,6 +132,32 @@ makes the heading a real English/Arabic distinct label, not a workaround limited
   `app/` confirmed the only differences are that same known gap plus Laravel's own unmodified
   scaffolding files (`Http/Controllers/Controller.php`, `Providers/AppServiceProvider.php`) — zero
   source drift from this task, which never touched a backend file.
+
+## CI
+
+**PASS.** PR #983, final head `4c28197c2ee77e0192544dcf6406b1cfa252b9a1`. All 5 required checks
+green: `ci.yml` (`php artisan test (L11, sqlite)` and `(L11, pgsql)`, both `success`) and
+`web-ci.yml` (`web build (Next.js)`, `success`). `mergeable_state: clean`, no open review threads
+(one bot comment from `chatgpt-codex-connector[bot]` reporting it had hit its own usage limit and
+performed no review — not actionable, same pattern as every prior App Builder PR).
+
+## Pre-merge review
+
+**PASS.** `PRE_MERGE_REVIEW: PASS` — CI green on the exact reviewed head (`4c28197`), no merge
+conflict, no open review comments/threads requiring action, self-review (below) complete.
+
+## Post-merge review
+
+**PASS.** PR #983 merged via squash: Merge SHA `1248223dd1668ad840f2b39f21e3de5a6d86755b`.
+Confirmed `main@1248223` was `origin/main`'s tip at merge time, a single-parent squash (parent
+`a322d1c21c663c804dd258eddde96cf523a4a268`, the pre-merge tip), zero content drift from the
+reviewed head (`diff` of `git diff a322d1c 4c28197 -- app database routes tests
+docs/plans/app-builder web` against the equivalent diff onto the merge commit — identical).
+Post-merge CI on the merge commit itself: `ci.yml` run
+[35968746817](https://github.com/safwan5001-source/Nebrax/actions/runs/35968746817) (sqlite/pgsql
+both `success`) and `web-ci.yml` run
+[35968746879](https://github.com/safwan5001-source/Nebrax/actions/runs/35968746879) (`web build
+(Next.js)`, `success`) — both confirmed green. `POST_MERGE_REVIEW: PASS`.
 
 ## Accounting impact
 
