@@ -6835,7 +6835,22 @@
       "versionsTitle": "Published versions",
       "versionsEmpty": "No version published yet.",
       "versionRow": "Version {version} — {date}",
+      "viewAllVersions": "View all versions",
       "openBuilder": "Open the builder"
+    },
+    "versions": {
+      "title": "Published versions",
+      "loadFailed": "Could not load versions.",
+      "empty": "No version published yet.",
+      "versionLabel": "Version {version}",
+      "publishedByLabel": "Published by {name}",
+      "noNote": "No note",
+      "restoreAction": "Restore to draft",
+      "restoreConfirmTitle": "Restore this version to the draft?",
+      "restoreConfirmBody": "This replaces your current draft with version {version}. Any unsaved draft changes will be lost. You'll review it in the builder and must publish again explicitly.",
+      "restoring": "Restoring…",
+      "restoreSuccessTitle": "Draft restored",
+      "restoreErrorTitle": "Could not restore this version"
     },
     "builder": {
       "back": "Back",
@@ -6859,6 +6874,21 @@
         "setHomeLabel": "Set as home page",
         "removeLabel": "Remove page",
         "pickerPlaceholder": "Choose a page"
+      },
+      "publish": {
+        "action": "Publish",
+        "forbidden": "You don't have permission to publish.",
+        "saveFirst": "Save your changes before publishing.",
+        "dialogTitle": "Publish a new version",
+        "validating": "Checking compatibility…",
+        "validationPassed": "Ready to publish.",
+        "validateErrorGeneric": "Could not check compatibility.",
+        "noteLabel": "Note (optional)",
+        "notePlaceholder": "What changed in this version?",
+        "confirmAction": "Publish",
+        "publishing": "Publishing…",
+        "successTitle": "Version published",
+        "errorTitle": "Could not publish"
       },
       "inspectorEmpty": "Select a component to see its properties.",
       "inspectorUnknownType": "Type \"{type}\" is not recognized by the registry.",

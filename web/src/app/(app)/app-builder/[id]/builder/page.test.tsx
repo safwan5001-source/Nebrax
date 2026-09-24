@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import AppBuilderWorkspacePage from './page';
 
-const { api, translate } = vi.hoisted(() => {
+const { api, currentUser, translate } = vi.hoisted(() => {
   const strings: Record<string, string> = {
     back: 'Back',
     loadFailed: 'Could not load the workspace.',
@@ -77,6 +77,19 @@ const { api, translate } = vi.hoisted(() => {
     'pages.setHomeLabel': 'Set as home page',
     'pages.removeLabel': 'Remove page',
     'pages.pickerPlaceholder': 'Choose a page',
+    'publish.action': 'Publish',
+    'publish.forbidden': "You don't have permission to publish.",
+    'publish.saveFirst': 'Save your changes before publishing.',
+    'publish.dialogTitle': 'Publish a new version',
+    'publish.validating': 'Checking compatibility…',
+    'publish.validationPassed': 'Ready to publish.',
+    'publish.validateErrorGeneric': 'Could not check compatibility.',
+    'publish.noteLabel': 'Note (optional)',
+    'publish.notePlaceholder': 'What changed in this version?',
+    'publish.confirmAction': 'Publish',
+    'publish.publishing': 'Publishing…',
+    'publish.successTitle': 'Version published',
+    'publish.errorTitle': 'Could not publish',
   };
   const cache = new Map<string, ReturnType<typeof buildTranslator>>();
   function buildTranslator(namespace: string) {
@@ -93,7 +106,7 @@ const { api, translate } = vi.hoisted(() => {
     if (!cache.has(namespace)) cache.set(namespace, buildTranslator(namespace));
     return cache.get(namespace)!;
   };
-  return { api: vi.fn(), translate: translator };
+  return { api: vi.fn(), currentUser: vi.fn(), translate: translator };
 });
 
 vi.mock('next-intl', () => ({ useTranslations: (ns: string) => translate(ns), useLocale: () => 'en' }));
@@ -107,6 +120,7 @@ vi.mock('@/lib/api', async () => {
   const actual = await vi.importActual<typeof import('@/lib/api')>('@/lib/api');
   return { ...actual, api };
 });
+vi.mock('@/lib/auth', () => ({ currentUser }));
 const { toastFns } = vi.hoisted(() => ({ toastFns: { success: vi.fn(), error: vi.fn() } }));
 vi.mock('@/components/ui/toast', () => ({ useToast: () => toastFns }));
 vi.mock('lucide-react', () => {
@@ -191,7 +205,13 @@ const storePresentationData = {
   published_revision: 2, published_at: '2026-09-01T00:00:00Z',
 };
 
-function mockApi(options?: { storeCatalog?: unknown; storePresentation?: unknown; presentationError?: Error }) {
+function mockApi(options?: {
+  storeCatalog?: unknown;
+  storePresentation?: unknown;
+  presentationError?: Error;
+  validateError?: Error;
+  publishError?: Error;
+}) {
   api.mockImplementation((path?: string) => {
     // A stray no-argument invocation can occur during Vitest/RTL's own async
     // teardown after a test's assertions already ran (observed empirically,
@@ -199,6 +219,14 @@ function mockApi(options?: { storeCatalog?: unknown; storePresentation?: unknown
     // pass a concrete path) — resolve harmlessly rather than let it throw and
     // mask the test's real result.
     if (!path) return Promise.resolve({ data: null });
+    if (path.endsWith('/validate')) {
+      if (options?.validateError) return Promise.reject(options.validateError);
+      return Promise.resolve({ data: { valid: true } });
+    }
+    if (path.endsWith('/versions')) {
+      if (options?.publishError) return Promise.reject(options.publishError);
+      return Promise.resolve({ data: { id: 'v1', builder_app_id: 'app-1', version: 1 } });
+    }
     if (path.endsWith('/draft')) return Promise.resolve({ data: draftData });
     if (path.endsWith('/registries')) return Promise.resolve({ data: registriesData });
     if (path.endsWith('/commerce/workspace/storefronts')) return Promise.resolve({ data: options?.storeCatalog ?? storeCatalogData });
@@ -217,6 +245,7 @@ describe('AppBuilderWorkspacePage', () => {
     api.mockReset();
     toastFns.success.mockReset();
     toastFns.error.mockReset();
+    currentUser.mockReturnValue({ role: 'owner' });
   });
 
   it('loads the draft and renders the page tree, canvas content, and default selection', async () => {
@@ -519,6 +548,68 @@ describe('AppBuilderWorkspacePage', () => {
     const [pageIdSelect] = await screen.findAllByDisplayValue('Choose a page');
     fireEvent.change(pageIdSelect, { target: { value: 'about' } });
     expect(await screen.findAllByDisplayValue('about')).toBeTruthy();
+  });
+
+  it('the Publish button is disabled while the draft has unsaved changes', async () => {
+    mockApi();
+    render(<AppBuilderWorkspacePage />);
+    await screen.findByText('Featured');
+
+    const desktopTree = screen.getAllByRole('tree')[0];
+    await userEvent.setup().click(within(desktopTree).getByText('Text'));
+    const textareas = await screen.findAllByDisplayValue('Welcome');
+    fireEvent.change(textareas[0], { target: { value: 'Bye' } });
+
+    const [publishButton] = screen.getAllByText('Publish');
+    expect((publishButton.closest('button') as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it('the Publish button is disabled for a user without the publish permission', async () => {
+    currentUser.mockReturnValue({ role: 'staff', permissions: [] });
+    mockApi();
+    render(<AppBuilderWorkspacePage />);
+    await screen.findByText('Featured');
+
+    const [publishButton] = screen.getAllByText('Publish');
+    expect((publishButton.closest('button') as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it('Publish: validation passes automatically, then confirming calls the versions endpoint', async () => {
+    mockApi();
+    render(<AppBuilderWorkspacePage />);
+    await screen.findByText('Featured');
+
+    const [publishButton] = screen.getAllByText('Publish');
+    await userEvent.setup().click(publishButton);
+
+    const dialog = await screen.findByRole('dialog');
+    await within(dialog).findByText('Ready to publish.');
+    expect(within(dialog).queryByText('Checking compatibility…')).toBeNull();
+
+    fireEvent.change(within(dialog).getByPlaceholderText('What changed in this version?'), { target: { value: 'First release' } });
+
+    const confirmButton = within(dialog).getByRole('button', { name: 'Publish' });
+    expect((confirmButton as HTMLButtonElement).disabled).toBe(false);
+    await userEvent.setup().click(confirmButton);
+
+    await waitFor(() => expect(toastFns.success).toHaveBeenCalledWith('Version published'));
+  });
+
+  it('Publish: a failed validation blocks the confirm button and shows the error', async () => {
+    const { ApiError } = await import('@/lib/api');
+    mockApi({ validateError: new ApiError(422, 'Schema is incompatible.', null) });
+    render(<AppBuilderWorkspacePage />);
+    await screen.findByText('Featured');
+
+    const [publishButton] = screen.getAllByText('Publish');
+    await userEvent.setup().click(publishButton);
+
+    const dialog = await screen.findByRole('dialog');
+    await within(dialog).findByText('Schema is incompatible.');
+    expect(within(dialog).queryByText('Ready to publish.')).toBeNull();
+
+    const confirmButton = within(dialog).getByRole('button', { name: 'Publish' });
+    expect((confirmButton as HTMLButtonElement).disabled).toBe(true);
   });
 
   it('shows an error state when loading fails', async () => {

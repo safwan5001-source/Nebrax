@@ -25,6 +25,9 @@ export interface BuilderPublishedVersion {
   version: number;
   schema_version: string;
   note: string | null;
+  schema?: AppSchema;
+  published_by: string | null;
+  published_by_name: string | null;
   published_at: string | null;
 }
 

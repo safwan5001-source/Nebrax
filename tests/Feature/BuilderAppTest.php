@@ -288,6 +288,58 @@ class BuilderAppTest extends TestCase
             ->assertStatus(422);
     }
 
+    // ── فحص صريح بلا نشر (APP-BUILDER-10) ────────────────────────────
+
+    /** @test */
+    public function validate_succeeds_for_a_compatible_draft_without_creating_a_version(): void
+    {
+        $auth = $this->registerTenant('appb-validate-ok', 'owner@appb-validate-ok.test');
+        $appId = $this->withToken($auth['token'])->postJson('/api/app-builder/apps', [
+            'name' => 'تطبيق', 'creation_source' => 'scratch',
+        ])->json('data.id');
+
+        $this->withToken($auth['token'])->postJson("/api/app-builder/apps/{$appId}/validate")
+            ->assertOk()
+            ->assertJsonPath('data.valid', true);
+
+        $this->assertDatabaseCount('builder_published_experience_versions', 0);
+    }
+
+    /** @test */
+    public function validate_rejects_the_same_incompatible_draft_publish_would_reject(): void
+    {
+        $auth = $this->registerTenant('appb-validate-bad', 'owner@appb-validate-bad.test');
+        $appId = $this->withToken($auth['token'])->postJson('/api/app-builder/apps', [
+            'name' => 'تطبيق', 'creation_source' => 'scratch',
+        ])->json('data.id');
+
+        $schema = \App\Models\BuilderDraftExperience::minimalSafeSchema();
+        $schema['pages']['home']['children'] = [
+            ['type' => 'NotARealComponent', 'id' => 'x1'],
+        ];
+        $this->withToken($auth['token'])
+            ->putJson("/api/app-builder/apps/{$appId}/draft", ['schema' => $schema])
+            ->assertOk();
+
+        $this->withToken($auth['token'])->postJson("/api/app-builder/apps/{$appId}/validate")
+            ->assertStatus(422);
+
+        $this->assertDatabaseCount('builder_published_experience_versions', 0);
+    }
+
+    /** @test */
+    public function validate_requires_the_manage_permission(): void
+    {
+        $auth = $this->registerTenant('appb-validate-rbac', 'owner@appb-validate-rbac.test');
+        $appId = $this->withToken($auth['token'])->postJson('/api/app-builder/apps', [
+            'name' => 'تطبيق', 'creation_source' => 'scratch',
+        ])->json('data.id');
+
+        $staffToken = $this->tokenForRole($auth['tenant_id'], 'staff', 'staff3@appb-validate-rbac.test');
+        $this->withToken($staffToken)->postJson("/api/app-builder/apps/{$appId}/validate")
+            ->assertForbidden();
+    }
+
     // ── النشر والترقيم والتزامن ──────────────────────────────────────
 
     /** @test */
@@ -308,6 +360,22 @@ class BuilderAppTest extends TestCase
 
         $list = $this->withToken($auth['token'])->getJson("/api/app-builder/apps/{$appId}/versions")->assertOk();
         $list->assertJsonCount(2, 'data');
+    }
+
+    /** @test */
+    public function published_version_exposes_the_publisher_name(): void
+    {
+        $auth = $this->registerTenant('appb-publisher-name', 'owner@appb-publisher-name.test');
+        $appId = $this->withToken($auth['token'])->postJson('/api/app-builder/apps', [
+            'name' => 'تطبيق', 'creation_source' => 'scratch',
+        ])->json('data.id');
+
+        $response = $this->withToken($auth['token'])->postJson("/api/app-builder/apps/{$appId}/versions", [])
+            ->assertCreated();
+        $response->assertJsonPath('data.published_by_name', 'المالك');
+
+        $list = $this->withToken($auth['token'])->getJson("/api/app-builder/apps/{$appId}/versions")->assertOk();
+        $list->assertJsonPath('data.0.published_by_name', 'المالك');
     }
 
     /** @test */
