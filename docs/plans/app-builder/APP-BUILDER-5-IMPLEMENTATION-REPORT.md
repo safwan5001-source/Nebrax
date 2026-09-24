@@ -1,6 +1,6 @@
 # APP-BUILDER-5 — Implementation Report
 
-STATUS: pre-merge review
+STATUS: merged — post-merge review PASS
 DATE: 2026-09-24
 
 ## Outcome
@@ -142,18 +142,32 @@ than half-built here.
 
 ## CI
 
-**PASS.** PR #977, head `9335215eda189040667958b6e280d8222e5feed4`. Both required workflows green:
-`ci.yml` run [35940885893](https://github.com/safwan5001-source/Nebrax/actions/runs/35940885893)
-(`php artisan test (L11, sqlite)` and `(L11, pgsql)`, both `success`) and `web-ci.yml` run
-[35940885971](https://github.com/safwan5001-source/Nebrax/actions/runs/35940885971) (`web build
+**PASS.** PR #977, final head `caf548c7d15a09b8390934f652e6f3133950e385`. An intermediate docs-only
+commit (`9335215` → `caf548c`, recording this section's own first CI pass) reset the PR's checks
+after they had already gone green once — CI was re-run and re-confirmed green on the actual merged
+head before merge. Both required workflows green on `caf548c`: `ci.yml` run
+[35942539619](https://github.com/safwan5001-source/Nebrax/actions/runs/35942539619) (`php artisan
+test (L11, sqlite)` and `(L11, pgsql)`, both `success`) and `web-ci.yml` run
+[35942542598](https://github.com/safwan5001-source/Nebrax/actions/runs/35942542598) (`web build
 (Next.js)`, `success`). `mergeable_state: clean`, no open review threads (one bot comment from
 `chatgpt-codex-connector[bot]` reporting it had hit its own usage limit and performed no review —
 not actionable).
 
 ## Pre-merge review
 
-**PASS.** `PRE_MERGE_REVIEW: PASS` — CI green on the exact reviewed head (`9335215`), no merge
+**PASS.** `PRE_MERGE_REVIEW: PASS` — CI green on the exact reviewed head (`caf548c`), no merge
 conflict, no open review comments/threads requiring action, self-review (below) complete.
+
+## Post-merge review
+
+**PASS.** PR #977 merged via squash: Merge SHA `f48d583f0041caf909a61c4658aa7d1b89c0a604`. Confirmed
+`main@f48d583` was `origin/main`'s tip at merge time, a single-parent squash (parent `ca20ae4`,
+the pre-merge tip), zero content drift from the reviewed head (`git diff caf548c origin/main --
+app database routes tests docs/plans/app-builder web` empty). Post-merge CI on the merge commit
+itself: `ci.yml` run [35944173602](https://github.com/safwan5001-source/Nebrax/actions/runs/35944173602)
+(sqlite/pgsql both `success`) and `web-ci.yml` run
+[35944173604](https://github.com/safwan5001-source/Nebrax/actions/runs/35944173604) (`web build
+(Next.js)`, `success`) — both green. `POST_MERGE_REVIEW: PASS`.
 
 ## Self-review
 
