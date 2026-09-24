@@ -101,12 +101,51 @@ horizon's mobile runtime — applied here to not implying template/theme content
 
 ## CI
 
-Pending — will be recorded once GitHub Actions (`web-ci.yml`, plus `ci.yml` since `docs/` files
-are also touched) run on this PR's head is observed, per the truthfulness rule.
+GitHub Actions on PR head `0a14ffa72f4cb104629ce3fcf112a03a2a7ee667` (PR #975), all 6 checks
+green: `php artisan test (L11, sqlite)`/`(L11, pgsql)` (both push- and pull_request-triggered
+runs) and `web build (Next.js)` (both runs).
+
+The first push (head `ee1166b`) failed `web build` with two issues: (1) a real bug in this task's
+own code — `new Date(...).toLocaleDateString(locale)` tripped the repo's central-date-formatting
+guardrail, fixed by routing through `formatDate()` from `@/lib/formatting` (commit `b791fc7`);
+(2) a pre-existing, unrelated drift in `openapi-model.generated.ts` vs. `docs/openapi/public-api-v1.yaml`
+(introduced by an already-merged Commerce Mobile task, commit `dffe6c8`, never caught because no
+`web/`-touching PR had run since) — fixed by regenerating the model via `npm run openapi:generate`,
+a pure mechanical transform of the already-committed YAML contract (commit `0a14ffa`). Both
+documented in a PR comment before the fixes were pushed.
 
 ## Pre-merge review
 
-Pending — to be completed after CI is confirmed green on the exact reviewed head.
+- PRE_MERGE_REVIEW: **PASS**
+- Reviewed Head SHA: `0a14ffa72f4cb104629ce3fcf112a03a2a7ee667`
+- Findings / resolution: No open findings. `chatgpt-codex-connector[bot]` posted only a
+  usage-limit notice (did not perform a review). No human review posted. Two CI failures on the
+  first push were investigated and fixed (see CI section above) before this review.
+
+## Merge
+
+- Merge status: **merged** via standing authority (squash, no unresolved Decision Gate, required
+  CI green on exact head, no unapproved scope expansion, no production deploy/release).
+- Merge SHA: `163bcc1c27ad87e874626710910a28e381029cd0`
+
+## Post-merge review
+
+- POST_MERGE_REVIEW: _in progress — `main@163bcc1` confirmed as `origin/main`'s tip, a
+  single-parent squash (parent `7bf04d7`), zero content drift from the reviewed head `0a14ffa`
+  (`git diff 0a14ffa72f4cb104629ce3fcf112a03a2a7ee667 origin/main -- app database routes tests docs/plans/app-builder web`
+  is empty). Post-merge CI (`ci.yml` run
+  [35935456801](https://github.com/safwan5001-source/Nebrax/actions/runs/35935456801) and
+  `web-ci.yml` run
+  [35935456789](https://github.com/safwan5001-source/Nebrax/actions/runs/35935456789) on the merge
+  commit) was still running at time of this commit — not claiming PASS before it is observed, per
+  the truthfulness rule. Will be updated to PASS once observed._
+- Reviewed Merge SHA: `163bcc1c27ad87e874626710910a28e381029cd0`
+- Target-branch checks/smoke: post-merge `ci.yml` run
+  [35935456801](https://github.com/safwan5001-source/Nebrax/actions/runs/35935456801) and
+  `web-ci.yml` run
+  [35935456789](https://github.com/safwan5001-source/Nebrax/actions/runs/35935456789) — pending at
+  time of this commit.
+- Findings / resolution: none so far.
 
 ## Self-review
 
@@ -197,8 +236,10 @@ None new.
 ## Git state
 
 - Branch: `claude/awj-app-builder-horizon-v1-e4iy21`
-- PR: pending (to be opened after this report is committed)
+- PR: [#975](https://github.com/safwan5001-source/Nebrax/pull/975) (merged)
 - Base SHA: `7bf04d79db941e089001e6234c478c227c8c6c73`
+- Head SHA (reviewed pre-merge): `0a14ffa72f4cb104629ce3fcf112a03a2a7ee667`
+- Merge SHA: `163bcc1c27ad87e874626710910a28e381029cd0`
 
 ## Recommended next dependency-ready task
 
