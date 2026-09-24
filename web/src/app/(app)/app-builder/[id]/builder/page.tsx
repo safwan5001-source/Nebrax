@@ -1,40 +1,50 @@
 'use client';
 
 import * as React from 'react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { ArrowRight, LayoutPanelLeft, SlidersHorizontal } from 'lucide-react';
+import { ArrowRight, LayoutPanelLeft, Redo2, SlidersHorizontal, Undo2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { useToast } from '@/components/ui/toast';
 import { ErrorState, LoadingState } from '@/components/nebrax';
 import { api, ApiError } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import {
-  appDisplayName, findComponentById, type AppBuilderRegistries, type BuilderApp, type BuilderDraftExperience,
+  addChildComponent, appDisplayName, findComponentById, findParentId, moveSibling, removeComponentById, reorderChildren, updateComponentById,
+  type AppBuilderRegistries, type AppSchema, type AppSchemaComponent, type BuilderApp, type BuilderDraftExperience,
 } from '@/lib/app-builder';
 import { AppBuilderCanvas, PREVIEW_WIDTHS, type PreviewDevice } from '@/modules/app-builder/canvas';
 import { LayersTree } from '@/modules/app-builder/layers-tree';
 import { Inspector } from '@/modules/app-builder/inspector';
 
 type MobilePanel = 'structure' | 'inspector';
+const HISTORY_LIMIT = 50;
 
 /**
- * APP-BUILDER-5 — هيكل مساحة عمل الـ Builder: صفحات/طبقات/كانفاس/Inspector للقراءة
- * فقط، مع تبديل الجهاز واللغة وحالة الحفظ. التحرير الفعلي APP-BUILDER-6 — انظر
- * `APP-BUILDER-5-UX-EVIDENCE-PASS.md` لتفصيل القرار وما استُبعِد عمداً.
+ * APP-BUILDER-6 — يبني على هيكل APP-BUILDER-5 (لا تغيير في الشكل/الاستجابة) ويضيف
+ * تحرير المخطط فعلياً: تحديد/إضافة/حذف/إعادة ترتيب، خصائص وإجراءات قابلة للتحرير في
+ * الـ Inspector، تراجع/إعادة محدودان، وحفظ صريح عبر `PUT /app-builder/apps/{id}/draft`
+ * الموجود أصلاً منذ APP-BUILDER-1. انظر `APP-BUILDER-6-UX-EVIDENCE-PASS.md`.
  */
 export default function AppBuilderWorkspacePage() {
   const t = useTranslations('appBuilder.builder');
   const tc = useTranslations('common');
   const params = useParams<{ id: string }>();
+  const toast = useToast();
 
   const [app, setApp] = useState<BuilderApp | null>(null);
-  const [draft, setDraft] = useState<BuilderDraftExperience | null>(null);
   const [registries, setRegistries] = useState<AppBuilderRegistries | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+
+  const [schema, setSchema] = useState<AppSchema | null>(null);
+  const pastRef = useRef<AppSchema[]>([]);
+  const futureRef = useRef<AppSchema[]>([]);
+  const [dirty, setDirty] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   const [selectedPageId, setSelectedPageId] = useState<string | null>(null);
   const [selectedComponentId, setSelectedComponentId] = useState<string | null>(null);
@@ -53,7 +63,10 @@ export default function AppBuilderWorkspacePage() {
     ])
       .then(([appRes, draftRes, registriesRes]) => {
         setApp(appRes.data);
-        setDraft(draftRes.data);
+        setSchema(draftRes.data.schema);
+        pastRef.current = [];
+        futureRef.current = [];
+        setDirty(false);
         setRegistries(registriesRes.data);
         const initialPageId = draftRes.data.schema.navigation?.initialPageId ?? null;
         const pageId = initialPageId && draftRes.data.schema.pages[initialPageId] ? initialPageId : Object.keys(draftRes.data.schema.pages)[0] ?? null;
@@ -66,18 +79,126 @@ export default function AppBuilderWorkspacePage() {
 
   useEffect(() => load(), [load]);
 
-  const pageIds = useMemo(() => (draft ? Object.keys(draft.schema.pages) : []), [draft]);
-  const currentPageRoot = draft && selectedPageId ? draft.schema.pages[selectedPageId] ?? null : null;
+  useEffect(() => {
+    function onBeforeUnload(event: BeforeUnloadEvent) {
+      if (!dirty) return;
+      event.preventDefault();
+      event.returnValue = '';
+    }
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, [dirty]);
+
+  const applyPageEdit = useCallback(
+    (pageId: string, updater: (pageRoot: AppSchemaComponent) => AppSchemaComponent) => {
+      if (!schema) return;
+      pastRef.current = [...pastRef.current, schema].slice(-HISTORY_LIMIT);
+      futureRef.current = [];
+      setDirty(true);
+      setSchema({ ...schema, pages: { ...schema.pages, [pageId]: updater(schema.pages[pageId]) } });
+    },
+    [schema]
+  );
+
+  const undo = useCallback(() => {
+    if (!schema || pastRef.current.length === 0) return;
+    const previous = pastRef.current[pastRef.current.length - 1];
+    pastRef.current = pastRef.current.slice(0, -1);
+    futureRef.current = [schema, ...futureRef.current];
+    setDirty(true);
+    setSchema(previous);
+  }, [schema]);
+
+  const redo = useCallback(() => {
+    if (!schema || futureRef.current.length === 0) return;
+    const next = futureRef.current[0];
+    futureRef.current = futureRef.current.slice(1);
+    pastRef.current = [...pastRef.current, schema].slice(-HISTORY_LIMIT);
+    setDirty(true);
+    setSchema(next);
+  }, [schema]);
+
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      const target = event.target as HTMLElement | null;
+      const editingText = target && ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName);
+      if (editingText) return;
+      const meta = event.ctrlKey || event.metaKey;
+      if (!meta || event.key.toLowerCase() !== 'z') return;
+      event.preventDefault();
+      if (event.shiftKey) redo();
+      else undo();
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [undo, redo]);
+
+  async function handleSave() {
+    if (!schema || !params.id) return;
+    setSaving(true);
+    try {
+      await api<{ data: BuilderDraftExperience }>(`/app-builder/apps/${params.id}/draft`, {
+        method: 'PUT',
+        body: { schema },
+      });
+      setDirty(false);
+      toast.success(t('saveSuccessTitle'));
+    } catch (err) {
+      toast.error(t('saveErrorTitle'), err instanceof ApiError ? err.message : undefined);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const pageIds = useMemo(() => (schema ? Object.keys(schema.pages) : []), [schema]);
+  const currentPageRoot = schema && selectedPageId ? schema.pages[selectedPageId] ?? null : null;
   const selectedNode = currentPageRoot && selectedComponentId ? findComponentById(currentPageRoot, selectedComponentId) : null;
+  const canUndo = pastRef.current.length > 0;
+  const canRedo = futureRef.current.length > 0;
 
   function selectPage(pageId: string) {
-    if (!draft) return;
+    if (!schema) return;
     setSelectedPageId(pageId);
-    setSelectedComponentId(draft.schema.pages[pageId]?.id ?? null);
+    setSelectedComponentId(schema.pages[pageId]?.id ?? null);
+  }
+
+  function updateSelectedNode(nextNode: AppSchemaComponent) {
+    if (!selectedPageId || !selectedComponentId) return;
+    applyPageEdit(selectedPageId, (root) => updateComponentById(root, selectedComponentId, () => nextNode));
+  }
+
+  function addChildToSelected(newNode: AppSchemaComponent) {
+    if (!selectedPageId || !selectedComponentId) return;
+    applyPageEdit(selectedPageId, (root) => addChildComponent(root, selectedComponentId, newNode));
+    setSelectedComponentId(newNode.id);
+  }
+
+  function removeSelected() {
+    if (!selectedPageId || !selectedComponentId || !currentPageRoot || selectedComponentId === currentPageRoot.id) return;
+    const targetId = selectedComponentId;
+    const parentId = findParentId(currentPageRoot, targetId) ?? currentPageRoot.id;
+    applyPageEdit(selectedPageId, (root) => removeComponentById(root, targetId));
+    setSelectedComponentId(parentId);
+  }
+
+  function reorderSiblings(pageId: string, parentId: string, orderedIds: string[]) {
+    applyPageEdit(pageId, (root) => reorderChildren(root, parentId, orderedIds));
+  }
+
+  function moveNode(pageId: string, id: string, direction: 'up' | 'down') {
+    applyPageEdit(pageId, (root) => moveSibling(root, id, direction));
   }
 
   if (loading) return <LoadingState rows={8} label={tc('loading')} />;
-  if (!app || !draft || !registries) return <ErrorState message={loadError ?? t('loadFailed')} onRetry={load} retryLabel={tc('retry')} />;
+  if (!app || !schema || !registries) return <ErrorState message={loadError ?? t('loadFailed')} onRetry={load} retryLabel={tc('retry')} />;
+
+  const statusBadge = saving ? (
+    <Badge tone="muted" className="shrink-0">{t('savingBadge')}</Badge>
+  ) : dirty ? (
+    <Badge tone="warning" className="shrink-0">{t('unsavedBadge')}</Badge>
+  ) : (
+    <Badge tone="positive" className="shrink-0">{t('savedBadge')}</Badge>
+  );
 
   const structurePanel = (
     <div className="flex h-full min-h-0 flex-col">
@@ -97,7 +218,7 @@ export default function AppBuilderWorkspacePage() {
             )}
           >
             {pageId}
-            {pageId === draft.schema.navigation?.initialPageId ? (
+            {pageId === schema.navigation?.initialPageId ? (
               <Badge tone="muted" className="ms-auto">{t('initialPageBadge')}</Badge>
             ) : null}
           </button>
@@ -111,6 +232,8 @@ export default function AppBuilderWorkspacePage() {
           root={currentPageRoot}
           selectedId={selectedComponentId}
           onSelect={setSelectedComponentId}
+          onReorder={(parentId, orderedIds) => selectedPageId && reorderSiblings(selectedPageId, parentId, orderedIds)}
+          onMove={(id, direction) => selectedPageId && moveNode(selectedPageId, id, direction)}
           emptyLabel={t('emptyPage')}
         />
       </div>
@@ -119,7 +242,14 @@ export default function AppBuilderWorkspacePage() {
 
   const inspectorPanel = (
     <div className="h-full min-h-0 overflow-y-auto">
-      <Inspector node={selectedNode} registries={registries} />
+      <Inspector
+        node={selectedNode}
+        registries={registries}
+        onChange={updateSelectedNode}
+        onAddChild={addChildToSelected}
+        onRemove={removeSelected}
+        canRemove={Boolean(selectedNode && currentPageRoot && selectedNode.id !== currentPageRoot.id)}
+      />
     </div>
   );
 
@@ -137,7 +267,19 @@ export default function AppBuilderWorkspacePage() {
           </Link>
         </Button>
         <p className="min-w-0 truncate text-sm font-semibold text-text">{appDisplayName(app, previewLocale)}</p>
-        <Badge tone="positive" className="shrink-0">{t('savedBadge')}</Badge>
+        {statusBadge}
+
+        <div className="flex shrink-0 items-center gap-0.5">
+          <Button variant="ghost" size="icon" aria-label={t('undoLabel')} disabled={!canUndo} onClick={undo}>
+            <Undo2 className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />
+          </Button>
+          <Button variant="ghost" size="icon" aria-label={t('redoLabel')} disabled={!canRedo} onClick={redo}>
+            <Redo2 className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />
+          </Button>
+        </div>
+        <Button size="sm" disabled={!dirty || saving} onClick={handleSave}>
+          {saving ? t('savingBadge') : tc('save')}
+        </Button>
 
         <div className="ms-auto flex flex-wrap items-center gap-2">
           <div className="hidden items-center gap-1 rounded-md border border-border p-1 sm:flex">
