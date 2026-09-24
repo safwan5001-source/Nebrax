@@ -450,6 +450,25 @@ implement real Commerce runtime dispatch, prove the mobile experience shares one
 the AWJ Store, complete an App Builder UX/localization pass, and close the theme-token canvas
 rendering gap.
 
+## Execution log
+
+`APP-BUILDER-13` (Data Resource Registry V1 foundation) is **done**: PR #993 merged (squash Merge
+SHA `ed6c485b317a15a67a742db1ae2c05b1f4e44ea0`, confirmed single-parent squash onto `main`, parent
+`7e41f97`), post-merge CI green (`ci.yml` sqlite+pgsql both `success`). This PR also carried the
+horizon's Phase 1 evidence pack and `ADR-01` as earlier commits on the same branch. Populated
+`DataResourceRegistry::RESOURCES` with the ADR-01-locked V1 scope (`commerce.categories`,
+`commerce.products`, `commerce.cart`), each field/filter/sort/pagination/auth requirement read
+directly off the real `commerce/v1` controllers, not invented; new `ResourceDefinition`/
+`ResourceFieldDefinition`/`ResourceFieldType`/`ResourceQueryParamDefinition` classes mirror the
+existing `ComponentDefinition`/`PropDefinition`/`PropType` pattern. Purely descriptive metadata —
+`AppSchemaParser`/`CompatibilityResolver` untouched (`APP-BUILDER-14`'s job). CI caught one real
+pre-merge regression: `AppBuilderIntegratedProofTest`'s `APP-BUILDER-11` boundary assertion (that
+`DataResourceRegistry::RESOURCES` stays empty) needed updating for the now-intentionally-populated
+registry — fixed in the same PR; the still-valid "`bindings` key structurally rejected" assertion in
+that same test was left unchanged. 10 new focused tests (`DataResourceRegistryTest`) + full
+`AppBuilder*` regression green. No accounting impact. `APP-BUILDER-14` promoted to `ready`. Full
+evidence in `TASK-QUEUE.md`'s horizon section.
+
 Durable records for this phase:
 - `docs/plans/app-builder/AWJ_APP_BUILDER_COMMERCE_RUNTIME_V1_BOOTSTRAP.md` — mission record.
 - `docs/plans/app-builder/AWJ_APP_BUILDER_COMMERCE_RUNTIME_V1_EVIDENCE.md` — full evidence pass

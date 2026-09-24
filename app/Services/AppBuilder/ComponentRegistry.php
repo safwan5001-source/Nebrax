@@ -97,6 +97,7 @@ final class ComponentRegistry
                 actionable: false,
                 injectedRuntimeActionParams: [],
                 notes: 'مُموِّج أفقي محدود يرسم أيّ نوع أبناء دون تحقّق فعلي — `ProductCard` تلميحٌ تحريري لا قيد تشغيلي.',
+                bindableResources: ['commerce.products'],
             ),
             new ComponentDefinition(
                 type: 'ProductCard',
@@ -126,6 +127,7 @@ final class ComponentRegistry
                 actionable: false,
                 injectedRuntimeActionParams: [],
                 notes: 'يعرض الحقول الثابتة أولاً ثم أبناءه (عادة `VariantSelector`/`Quantity`/`AddToCart`) بالترتيب المُعطى.',
+                bindableResources: ['commerce.products'],
             ),
             new ComponentDefinition(
                 type: 'Price',
@@ -189,6 +191,7 @@ final class ComponentRegistry
                 actionable: false,
                 injectedRuntimeActionParams: [],
                 notes: 'عمود يرسم أبناءه فقط، بلا خصائص خاصة به.',
+                bindableResources: ['commerce.cart'],
             ),
             new ComponentDefinition(
                 type: 'CartSummary',
@@ -203,6 +206,7 @@ final class ComponentRegistry
                 actionable: false,
                 injectedRuntimeActionParams: [],
                 notes: 'بلا `summaryLabel` تُبنى تسمية غير مترجمة (`"$itemCount عنصر"`) — لا لغة للودجة نفسها.',
+                bindableResources: ['commerce.cart'],
             ),
             new ComponentDefinition(
                 type: 'Button',

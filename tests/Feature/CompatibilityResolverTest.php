@@ -197,4 +197,191 @@ class CompatibilityResolverTest extends TestCase
         );
         $this->assertFalse($withoutPush->compatible);
     }
+
+    /** manifest يفترض بناءً افتراضياً يستهلك موارد البيانات — لا يوجد بعد (`APP-BUILDER-17`)، يُستعمَل هنا فقط لإثبات آلية `resourceVersion()` نفسها. */
+    private function manifestWithResources(array $dataResources): CapabilityManifest
+    {
+        return new CapabilityManifest(
+            runtimeVersion: SchemaVersion::tryParse('1.0.0'),
+            minSupportedSchemaVersion: SchemaVersion::tryParse('1.0.0'),
+            maxSupportedSchemaVersion: SchemaVersion::tryParse('1.0.0'),
+            components: RuntimeCapabilities::COMPONENTS,
+            actions: RuntimeCapabilities::ACTIONS,
+            nativeCapabilities: RuntimeCapabilities::NATIVE_CAPABILITIES,
+            dataResources: $dataResources,
+        );
+    }
+
+    /** @test */
+    public function a_binding_on_the_current_runtime_is_unsupported_since_no_data_resource_is_consumed_yet(): void
+    {
+        $schema = $this->baseSchema();
+        $schema['pages']['home']['children'][] = [
+            'type' => 'ProductList', 'id' => 'p1',
+            'binding' => ['resource' => 'commerce.products'],
+        ];
+
+        $result = $this->resolver()->resolve($schema, CapabilityManifest::current());
+
+        $this->assertFalse($result->compatible);
+        $this->assertSame(CompatibilityResult::REASON_MISSING_REQUIRED_CAPABILITY, $result->reason);
+    }
+
+    /** @test */
+    public function an_optional_binding_unsupported_on_current_runtime_is_pruned_not_fatal(): void
+    {
+        $schema = $this->baseSchema();
+        $schema['pages']['home']['children'][] = [
+            'type' => 'ProductList', 'id' => 'p1', 'optional' => true,
+            'binding' => ['resource' => 'commerce.products'],
+        ];
+
+        $result = $this->resolver()->resolve($schema, CapabilityManifest::current());
+
+        $this->assertTrue($result->compatible);
+        $this->assertCount(1, $result->fallbacks);
+    }
+
+    /** @test */
+    public function a_binding_is_compatible_once_the_manifest_declares_the_resource_supported(): void
+    {
+        $schema = $this->baseSchema();
+        $schema['pages']['home']['children'][] = [
+            'type' => 'ProductList', 'id' => 'p1',
+            'binding' => [
+                'resource' => 'commerce.products',
+                'query' => ['category_id' => '$route.categoryId', 'sort' => '-created_at'],
+                'itemProps' => ['title' => 'name', 'amountMinor' => 'price.amount_minor'],
+            ],
+        ];
+
+        $result = $this->resolver()->resolve($schema, $this->manifestWithResources(['commerce.products' => 1]));
+
+        $this->assertTrue($result->compatible);
+        $this->assertSame([], $result->fallbacks);
+    }
+
+    /** @test */
+    public function a_binding_to_an_unknown_resource_id_is_unsupported(): void
+    {
+        $schema = $this->baseSchema();
+        $schema['pages']['home']['children'][] = [
+            'type' => 'ProductList', 'id' => 'p1',
+            'binding' => ['resource' => 'commerce.not_real'],
+        ];
+
+        $result = $this->resolver()->resolve(
+            $schema,
+            $this->manifestWithResources(['commerce.not_real' => 1, 'commerce.products' => 1]),
+        );
+
+        // even a manifest that (implausibly) claims to support an id the
+        // registry itself doesn't know cannot make it resolvable.
+        $this->assertFalse($result->compatible);
+    }
+
+    /** @test */
+    public function a_binding_to_a_resource_the_component_is_not_registered_to_bind_is_unsupported(): void
+    {
+        $schema = $this->baseSchema();
+        // Text is not in ComponentRegistry's bindableResources for any resource.
+        $schema['pages']['home']['children'][] = [
+            'type' => 'Text', 'id' => 't-bound',
+            'binding' => ['resource' => 'commerce.products'],
+        ];
+
+        $result = $this->resolver()->resolve($schema, $this->manifestWithResources(['commerce.products' => 1]));
+
+        $this->assertFalse($result->compatible);
+    }
+
+    /** @test */
+    public function a_binding_item_prop_on_a_single_shape_component_not_declared_on_it_is_unsupported(): void
+    {
+        // ProductDetail declares its own props (single-shape) — unlike
+        // ProductList/CartList, which are pure containers with no props of
+        // their own, so this check only bites here.
+        $schema = $this->baseSchema();
+        $schema['pages']['home']['children'][] = [
+            'type' => 'ProductDetail', 'id' => 'pd1',
+            'binding' => ['resource' => 'commerce.products', 'itemProps' => ['notAProp' => 'name']],
+        ];
+
+        $result = $this->resolver()->resolve($schema, $this->manifestWithResources(['commerce.products' => 1]));
+
+        $this->assertFalse($result->compatible);
+    }
+
+    /** @test */
+    public function a_binding_item_prop_on_a_list_shape_container_is_not_checked_against_its_own_empty_props(): void
+    {
+        // ProductList has no props of its own — itemProps there targets a
+        // not-yet-designed per-item template (APP-BUILDER-15/17), so only the
+        // resource-field side of itemProps is validated for it.
+        $schema = $this->baseSchema();
+        $schema['pages']['home']['children'][] = [
+            'type' => 'ProductList', 'id' => 'p1',
+            'binding' => ['resource' => 'commerce.products', 'itemProps' => ['anyLabel' => 'name']],
+        ];
+
+        $result = $this->resolver()->resolve($schema, $this->manifestWithResources(['commerce.products' => 1]));
+
+        $this->assertTrue($result->compatible);
+    }
+
+    /** @test */
+    public function a_binding_item_prop_mapped_to_a_field_the_resource_does_not_expose_is_unsupported(): void
+    {
+        $schema = $this->baseSchema();
+        $schema['pages']['home']['children'][] = [
+            'type' => 'ProductList', 'id' => 'p1',
+            'binding' => ['resource' => 'commerce.products', 'itemProps' => ['title' => 'not_a_real_field']],
+        ];
+
+        $result = $this->resolver()->resolve($schema, $this->manifestWithResources(['commerce.products' => 1]));
+
+        $this->assertFalse($result->compatible);
+    }
+
+    /** @test */
+    public function a_binding_query_key_not_allow_listed_for_the_resource_is_unsupported(): void
+    {
+        $schema = $this->baseSchema();
+        $schema['pages']['home']['children'][] = [
+            'type' => 'ProductList', 'id' => 'p1',
+            'binding' => ['resource' => 'commerce.products', 'query' => ['arbitrary_sql' => "1=1"]],
+        ];
+
+        $result = $this->resolver()->resolve($schema, $this->manifestWithResources(['commerce.products' => 1]));
+
+        $this->assertFalse($result->compatible);
+    }
+
+    /** @test */
+    public function a_binding_sort_value_not_among_the_resources_sortable_fields_is_unsupported(): void
+    {
+        $schema = $this->baseSchema();
+        $schema['pages']['home']['children'][] = [
+            'type' => 'ProductList', 'id' => 'p1',
+            'binding' => ['resource' => 'commerce.products', 'query' => ['sort' => 'not_a_sort_field']],
+        ];
+
+        $result = $this->resolver()->resolve($schema, $this->manifestWithResources(['commerce.products' => 1]));
+
+        $this->assertFalse($result->compatible);
+    }
+
+    /** @test */
+    public function a_binding_id_query_key_is_allowed_only_when_the_resource_has_a_detail_endpoint(): void
+    {
+        $schema = $this->baseSchema();
+        $schema['pages']['home']['children'][] = [
+            'type' => 'ProductDetail', 'id' => 'pd1',
+            'binding' => ['resource' => 'commerce.products', 'query' => ['id' => '$route.productId']],
+        ];
+
+        $result = $this->resolver()->resolve($schema, $this->manifestWithResources(['commerce.products' => 1]));
+
+        $this->assertTrue($result->compatible);
+    }
 }

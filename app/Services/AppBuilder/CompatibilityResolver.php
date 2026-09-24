@@ -14,11 +14,16 @@ namespace App\Services\AppBuilder;
  * التأليف وتحقق النشر (الأخير أشدّ صراحةً). يفترض أن `$schema` مرّ فعلاً عبر
  * `AppSchemaParser::validate()` (بلا استثناء) — لا يعيد التحقق البنيوي.
  *
- * **قاعدة الإغلاق الآمن**: قدرة مطلوبة (component/action غير `optional`)
+ * **قاعدة الإغلاق الآمن**: قدرة مطلوبة (component/action/binding غير `optional`)
  * غير مدعومة تُفشل **الوثيقة كاملة**، لا الصفحة فقط — يطابق تعليق Dart
  * الحرفي: «reaching null here means a required descendant failed closed,
  * which must fail the whole document closed». عقدة اختيارية غير مدعومة
  * تُسقَط هي وشجرتها الفرعية كاملة (`fallbacks`)، والنشر يستمر.
+ *
+ * **`binding` (`APP-BUILDER-14`, `ADR-01`)**: يُعامَل بنفس آلية component/action
+ * تماماً — هوية مورد غير معروفة، مكوّن لا يسمح بالربط بهذا المورد، حقول/
+ * معاملات لا يعرضها المورد، أو قدرة تشغيل غير متوفرة بعد (`resourceVersion()`)
+ * كلها تُسقِط العقدة بنفس مسار الإسقاط/الإغلاق أعلاه — لا مسار فشل منفصل.
  */
 final class CompatibilityResolver
 {
@@ -74,9 +79,10 @@ final class CompatibilityResolver
 
     /**
      * يعيد `true` عند إمكان عرض العقدة (بغضّ النظر عن تقليم فرعي اختياري)،
-     * أو `false` حين يكون نوع العقدة نفسها أو إجراؤها غير مدعوم. القرار
-     * سقوط/تجاوز يُتّخذ عند الأب باستعمال علم `optional` **للطفل نفسه** —
-     * وسم مكوّن اختيارياً يجعل شجرته الفرعية كلها وحدة إسقاط آمنة واحدة.
+     * أو `false` حين يكون نوع العقدة نفسها أو إجراؤها أو ربطها غير مدعوم.
+     * القرار سقوط/تجاوز يُتّخذ عند الأب باستعمال علم `optional` **للطفل
+     * نفسه** — وسم مكوّن اختيارياً يجعل شجرته الفرعية كلها وحدة إسقاط آمنة
+     * واحدة.
      *
      * @param  array<int, array{componentId: string, componentType: string, reason: string}>  &$fallbacks
      */
@@ -84,7 +90,8 @@ final class CompatibilityResolver
     {
         $action = $node['action'] ?? null;
         $unsupportedHere = $manifest->componentVersion($node['type']) === null
-            || ($action !== null && $manifest->actionVersion($action['type']) === null);
+            || ($action !== null && $manifest->actionVersion($action['type']) === null)
+            || (($node['binding'] ?? null) !== null && ! $this->bindingSupported($node['type'], $node['binding'], $manifest));
         if ($unsupportedHere) {
             return false;
         }
@@ -107,5 +114,72 @@ final class CompatibilityResolver
         }
 
         return true;
+    }
+
+    /**
+     * `APP-BUILDER-14` (`ADR-01`): يفشل الربط في أيٍّ من أربع حالات — مورد
+     * غير معروف في `DataResourceRegistry`، مكوّن لا يسمح سجلّه (`ComponentRegistry`)
+     * بالربط بهذا المورد تحديداً، `itemProps`/`query` تُشير إلى حقول/معاملات
+     * لا يعرضها المورد فعلياً، أو القدرة نفسها غير متوفرة في بناء التشغيل
+     * الحالي (`manifest->resourceVersion()` — فارغة دوماً حتى `APP-BUILDER-17`).
+     * التحقّق الثلاثة الأولى شكلي/دلالي بحت (لا علاقة له بإصدار البناء)، مطلوبٌ
+     * حتى قبل أن يستهلك أيّ تشغيل رابطاً فعلياً — فيمنع محرِّر الربط
+     * (`APP-BUILDER-15`) من حفظ ربط مكسور بنيوياً من اليوم الأول.
+     */
+    private function bindingSupported(string $componentType, array $binding, CapabilityManifest $manifest): bool
+    {
+        $resourceId = $binding['resource'] ?? null;
+        if (! is_string($resourceId) || $resourceId === '') {
+            return false;
+        }
+
+        $resource = DataResourceRegistry::definitions()[$resourceId] ?? null;
+        if ($resource === null) {
+            return false;
+        }
+
+        $component = ComponentRegistry::definitions()[$componentType] ?? null;
+        if ($component === null || ! in_array($resourceId, $component->bindableResources, true)) {
+            return false;
+        }
+
+        // `ProductList`/`CartList` (شكل قائمة) لا يعلنان أيّ `props` خاصة بهما —
+        // `itemProps` هناك يستهدف قالب عنصر لم يُحسم شكله بعد (`APP-BUILDER-15`/
+        // `17`)، فالتحقّق من مطابقة `propKey` لخصائص المكوّن نفسه يُطبَّق فقط
+        // حين يُعلن المكوّن (شكل مفرد، مثل `ProductDetail`/`CartSummary`) خصائصه
+        // فعلياً — تحقّق صحة حقل المورد المقروء يبقى إلزامياً في الحالتين.
+        $componentPropKeys = array_map(fn (PropDefinition $prop) => $prop->key, $component->props);
+        $readableFields = $resource->readableFieldKeys();
+        foreach (($binding['itemProps'] ?? []) as $propKey => $fieldPath) {
+            if ($componentPropKeys !== [] && ! in_array($propKey, $componentPropKeys, true)) {
+                return false;
+            }
+            $topSegment = explode('.', (string) $fieldPath, 2)[0];
+            if (! in_array($topSegment, $readableFields, true)) {
+                return false;
+            }
+        }
+
+        // مفاتيح الاستعلام المسموحة: مفاتيح الترشيح حرفياً + مفتاح `sort` الحرفي
+        // الواحد إن كان للمورد حقول فرز أصلاً (قيمته تُتحقَّق بمعزل أدناه، لا
+        // كمفتاح) + `id` فقط حين يملك المورد endpoint تفاصيل.
+        $allowedQueryKeys = array_merge(
+            $resource->filterKeys(),
+            $resource->sortKeys() !== [] ? ['sort'] : [],
+            $resource->detailEndpoint !== null ? ['id'] : [],
+        );
+        foreach (($binding['query'] ?? []) as $queryKey => $queryValue) {
+            if (! in_array($queryKey, $allowedQueryKeys, true)) {
+                return false;
+            }
+            if ($queryKey === 'sort') {
+                $sortField = ltrim((string) $queryValue, '-');
+                if (! in_array($sortField, $resource->sortKeys(), true)) {
+                    return false;
+                }
+            }
+        }
+
+        return $manifest->resourceVersion($resourceId) !== null;
     }
 }

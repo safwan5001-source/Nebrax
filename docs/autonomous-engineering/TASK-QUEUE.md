@@ -921,7 +921,7 @@ Source of truth for this horizon:
 
 | Order | Task ID | Status | Depends on | Outcome |
 |---|---|---|---|---|
-| 1 | APP-BUILDER-13 | ready | ADR-01 | Data Resource Registry V1 foundation (populate `commerce.categories`/`commerce.products`/`commerce.cart`) |
+| 1 | APP-BUILDER-13 | done | ADR-01 | Data Resource Registry V1 foundation (populate `commerce.categories`/`commerce.products`/`commerce.cart`) |
 | 2 | APP-BUILDER-14 | ready (after 13) | APP-BUILDER-13 | App Schema `binding` contract (parser + compatibility resolver) |
 | 3 | APP-BUILDER-15 | ready (after 14) | APP-BUILDER-14 | Builder Data UX (Inspector binding editor) |
 | 4 | APP-BUILDER-16 | ready | ADR-01 | Conditions/Visibility contract (closed/typed/allowlisted) + Inspector UX |
@@ -935,3 +935,25 @@ Source of truth for this horizon:
 
 `APP-BUILDER-21`/`APP-BUILDER-22` have no dependency on the data/runtime track and may execute in
 parallel with it.
+
+`APP-BUILDER-13` is `done`: PR #993 merged (squash Merge SHA
+`ed6c485b317a15a67a742db1ae2c05b1f4e44ea0`, confirmed single-parent squash onto `main`, parent
+`7e41f97`), post-merge CI green on the merge commit itself (`ci.yml` runs `36031721373`/`36031727596`,
+sqlite+pgsql both `success`). This PR also carried the horizon's Phase 1 evidence pack and `ADR-01`
+(landed as earlier commits on the same branch, since the Decision Gate was approved mid-CI). Delivered
+exactly the scope in `ADR-01`: `DataResourceRegistry::RESOURCES` populated with the V1-locked
+`commerce.categories`/`commerce.products`/`commerce.cart`, each field/filter/sort/pagination/auth
+requirement read directly off the real `commerce/v1` controllers (`CommerceCategoryController`,
+`CommerceProductController`, `CommerceCartController`/`CommerceCartService`) — new
+`ResourceDefinition`/`ResourceFieldDefinition`/`ResourceFieldType`/`ResourceQueryParamDefinition`
+classes mirror the existing `ComponentDefinition`/`PropDefinition`/`PropType` pattern. Purely
+descriptive metadata; `AppSchemaParser`/`CompatibilityResolver` untouched (that's `APP-BUILDER-14`).
+CI (sqlite job) caught one real regression before merge: `AppBuilderIntegratedProofTest`'s
+`APP-BUILDER-11` boundary test asserted `DataResourceRegistry::RESOURCES` stayed empty — root-caused
+and fixed in a follow-up commit on the same PR (updated the assertion to the new locked V1 scope; the
+still-valid "`bindings` key structurally rejected" assertion in the same test was left unchanged,
+since `AppSchemaParser` itself was not touched by this task). 10 new focused tests
+(`DataResourceRegistryTest`, 37 assertions) + full `AppBuilder*` regression (12/12) green. Full local
+suite: 4646 passed/36 failed(pre-existing local-only `bcmath`-missing failures, unrelated)/49 skipped
+— not the real gate; CI (which has `bcmath`) is, and CI was green on the final head. No accounting
+impact. `APP-BUILDER-14` promoted to `ready`.

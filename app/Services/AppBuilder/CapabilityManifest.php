@@ -20,6 +20,7 @@ final class CapabilityManifest
      * @param  array<string, int>  $components
      * @param  array<string, int>  $actions
      * @param  array<string, int>  $nativeCapabilities
+     * @param  array<string, int>  $dataResources  `APP-BUILDER-14` (`ADR-01`) — ما يستهلكه Flutter Runtime المُثبَت فعلياً من `DataResourceRegistry`؛ فارغ حتى `APP-BUILDER-17`، انظر `RuntimeCapabilities::DATA_RESOURCES`.
      */
     public function __construct(
         public readonly SchemaVersion $runtimeVersion,
@@ -28,6 +29,7 @@ final class CapabilityManifest
         public readonly array $components,
         public readonly array $actions,
         public readonly array $nativeCapabilities = [],
+        public readonly array $dataResources = [],
     ) {}
 
     /** بناء التشغيل الحالي المُثبَت فعلياً — المرجع الوحيد لكود الإنتاج. */
@@ -40,6 +42,7 @@ final class CapabilityManifest
             components: RuntimeCapabilities::COMPONENTS,
             actions: RuntimeCapabilities::ACTIONS,
             nativeCapabilities: RuntimeCapabilities::NATIVE_CAPABILITIES,
+            dataResources: RuntimeCapabilities::DATA_RESOURCES,
         );
     }
 
@@ -53,13 +56,19 @@ final class CapabilityManifest
         return $this->actions[$type] ?? null;
     }
 
+    /** `APP-BUILDER-14` — يوازي `componentVersion()`/`actionVersion()` لفضاء موارد البيانات. */
+    public function resourceVersion(string $id): ?int
+    {
+        return $this->dataResources[$id] ?? null;
+    }
+
     /**
-     * مفتاح `requiredCapabilities` قد يسمّي مكوّناً أو إجراءً أو قدرة أصلية —
-     * يطابق `CapabilityManifest.namedCapabilityVersion` في Dart حرفياً (نفس
-     * عدم التمييز المتعمَّد بين الفضاءات الثلاثة).
+     * مفتاح `requiredCapabilities` قد يسمّي مكوّناً أو إجراءً أو قدرة أصلية أو
+     * مورد بيانات — يطابق `CapabilityManifest.namedCapabilityVersion` في Dart
+     * حرفياً (نفس عدم التمييز المتعمَّد بين الفضاءات).
      */
     public function namedCapabilityVersion(string $key): ?int
     {
-        return $this->actions[$key] ?? $this->components[$key] ?? $this->nativeCapabilities[$key] ?? null;
+        return $this->actions[$key] ?? $this->components[$key] ?? $this->nativeCapabilities[$key] ?? $this->dataResources[$key] ?? null;
     }
 }

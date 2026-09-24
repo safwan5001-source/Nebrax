@@ -54,4 +54,22 @@ final class RuntimeCapabilities
     public const NATIVE_CAPABILITIES = [
         'push.notifications' => 1,
     ];
+
+    /**
+     * فضاء هويات موارد البيانات — **فارغٌ عمداً اليوم**، على عكس
+     * `DataResourceRegistry::RESOURCES` (`APP-BUILDER-13`، مُقفَل على نطاق V1
+     * الثلاثي). هذا الثابت يمثّل ما **يستهلكه فعلياً** بناء Flutter المُثبَت —
+     * لا Flutter Runtime يحلّ `binding` إلى استدعاء `commerce/v1` حقيقي بعد
+     * (ذلك `APP-BUILDER-17`، الذي يحدّث هذا الثابت **و**نظيره Dart معاً في
+     * نفس المهمة). حتى ذلك الحين، أي عقدة تحمل `binding` تُعامَل كقدرة غير
+     * متوفرة عبر `CompatibilityResolver::resolveComponent()` — تماماً كمكوّن/
+     * إجراء غير مدعوم: تُقلَّم إن كانت اختيارية، أو تُفشل الوثيقة كاملة إن
+     * كانت إلزامية. الفصل بين هذا الثابت و`DataResourceRegistry::RESOURCES`
+     * مقصود: الأول «ماذا يعرف أَوْج عن `commerce/v1`» (يغذّي محرِّر الربط)،
+     * والثاني «ماذا يستهلك التشغيل المُثبَت فعلياً اليوم» — لا يتطابقان حتى
+     * يُنجَز APP-BUILDER-17.
+     *
+     * @var array<string, int>
+     */
+    public const DATA_RESOURCES = [];
 }

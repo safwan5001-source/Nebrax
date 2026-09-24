@@ -88,4 +88,23 @@ class ComponentRegistryTest extends TestCase
             );
         }
     }
+
+    /** ADR-01 (APP-BUILDER-14) — نطاق V1 المُقفَل لمكوّنات الربط فقط. */
+    public function test_only_the_four_adr_01_components_declare_bindable_resources(): void
+    {
+        $expected = [
+            'ProductList' => ['commerce.products'],
+            'ProductDetail' => ['commerce.products'],
+            'CartList' => ['commerce.cart'],
+            'CartSummary' => ['commerce.cart'],
+        ];
+
+        foreach (ComponentRegistry::definitions() as $type => $definition) {
+            $this->assertSame(
+                $expected[$type] ?? [],
+                $definition->bindableResources,
+                "bindableResources لـ{$type} خارج نطاق ADR-01 V1."
+            );
+        }
+    }
 }
