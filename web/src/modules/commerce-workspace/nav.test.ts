@@ -5,6 +5,7 @@ import {
   isCommerceNavItemActive,
   isCommerceWorkspacePath,
 } from './nav';
+import { isNavEntryVisible } from '@/components/layout/nav-visibility';
 
 describe('commerce workspace navigation', () => {
   it('exposes the approved commerce destinations only', () => {
@@ -13,10 +14,32 @@ describe('commerce workspace navigation', () => {
       '/commerce/stores',
       '/commerce/published-products',
       '/commerce/appearance',
+      '/app-builder',
       '/commerce/domains',
       '/commerce/delivery',
       '/commerce/integrations',
     ]);
+  });
+
+  it('places App Builder after Store Experience and preserves its guards', () => {
+    const storeItems = COMMERCE_WORKSPACE_NAV_GROUPS.find((group) => group.labelKey === 'groupStore')?.items;
+    expect(storeItems?.map((item) => item.href)).toEqual([
+      '/commerce/stores',
+      '/commerce/published-products',
+      '/commerce/appearance',
+      '/app-builder',
+    ]);
+    expect(storeItems?.[3]).toMatchObject({
+      appKey: 'commerce.app_builder',
+      permission: 'apps_builder.view',
+    });
+  });
+
+  it('hides App Builder from viewers without the existing permission or entitlement', () => {
+    const appBuilder = COMMERCE_WORKSPACE_NAV_GROUPS.find((group) => group.labelKey === 'groupStore')?.items[3];
+    expect(appBuilder).toBeDefined();
+    expect(isNavEntryVisible(appBuilder!, new Set(), { role: 'staff', permissions: [] })).toBe(false);
+    expect(isNavEntryVisible(appBuilder!, new Set(['commerce.app_builder']), { role: 'admin' })).toBe(false);
   });
 
   it('does not add copies of AWJ core modules', () => {
