@@ -55,7 +55,6 @@ import {
   ShieldCheck,
   ShoppingCart,
   SlidersHorizontal,
-  Smartphone,
   Store,
   Terminal,
   Timer,
@@ -161,7 +160,6 @@ const GROUPS: NavGroup[] = [
     icon: ShoppingCart,
     items: [
       { href: '/commerce', icon: ShoppingCart, key: 'ecommerce', built: true },
-      { href: '/app-builder', icon: Smartphone, key: 'appBuilder', built: true, appKey: 'commerce.app_builder', permission: 'apps_builder.view' },
     ],
   },
   {

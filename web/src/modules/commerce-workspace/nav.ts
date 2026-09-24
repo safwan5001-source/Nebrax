@@ -1,6 +1,8 @@
 export type CommerceWorkspaceNavItem = {
   href: string;
   labelKey: string;
+  appKey?: string;
+  permission?: string;
 };
 
 export type CommerceWorkspaceNavGroup = {
@@ -24,6 +26,7 @@ export const COMMERCE_WORKSPACE_NAV_GROUPS: CommerceWorkspaceNavGroup[] = [
       { href: '/commerce/stores', labelKey: 'stores' },
       { href: '/commerce/published-products', labelKey: 'publishedProducts' },
       { href: '/commerce/appearance', labelKey: 'appearance' },
+      { href: '/app-builder', labelKey: 'appBuilder', appKey: 'commerce.app_builder', permission: 'apps_builder.view' },
     ],
   },
   {

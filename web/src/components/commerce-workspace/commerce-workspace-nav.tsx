@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
 import {
   Globe,
@@ -13,6 +14,9 @@ import {
   Store,
   Truck,
 } from 'lucide-react';
+import { currentUser } from '@/lib/auth';
+import { api } from '@/lib/api';
+import { hiddenApplicationKeys, isNavEntryVisible } from '@/components/layout/nav-visibility';
 import { cn } from '@/lib/utils';
 import {
   COMMERCE_WORKSPACE_NAV_GROUPS,
@@ -46,6 +50,21 @@ export function CommerceWorkspaceNav({
   const locale = useLocale();
   const pathname = usePathname();
   const t = (key: CommerceWorkspaceMessageKey) => commerceWorkspaceMessage(locale, key);
+  const viewer = currentUser();
+  const [hiddenAppKeys, setHiddenAppKeys] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    let cancelled = false;
+    api<{ data: Record<string, boolean> }>('/applications/nav-state')
+      .then((res) => {
+        if (cancelled || Array.isArray(res.data)) return;
+        setHiddenAppKeys(hiddenApplicationKeys(res.data));
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
     <nav aria-label={t('navAriaLabel')} className={cn('space-y-4', className)}>
@@ -53,7 +72,7 @@ export function CommerceWorkspaceNav({
         <section key={group.labelKey} aria-label={t(group.labelKey as CommerceWorkspaceMessageKey)}>
           {!collapsed && <p className="px-3 pb-1.5 text-[11px] font-semibold tracking-wide text-muted">{t(group.labelKey as CommerceWorkspaceMessageKey)}</p>}
           <div className="space-y-1">
-            {group.items.map((item) => (
+            {group.items.filter((item) => isNavEntryVisible(item, hiddenAppKeys, viewer)).map((item) => (
               <WorkspaceLink
                 key={item.href}
                 item={item}

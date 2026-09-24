@@ -32,32 +32,16 @@ function findSidebarEntriesByHref(href: string): ts.ObjectLiteralExpression[] {
   return matches;
 }
 
-function findGroupByTitle(title: string): ts.ObjectLiteralExpression | undefined {
-  let match: ts.ObjectLiteralExpression | undefined;
-  const visit = (node: ts.Node) => {
-    if (ts.isObjectLiteralExpression(node) && readStringProperty(node, 'title') === title) match = node;
-    ts.forEachChild(node, visit);
-  };
-  visit(sidebarAst);
-  return match;
-}
-
-function readArrayProperty(node: ts.ObjectLiteralExpression, propertyName: string): ts.ArrayLiteralExpression | undefined {
-  for (const property of node.properties) {
-    if (!ts.isPropertyAssignment(property)) continue;
-    if (!ts.isIdentifier(property.name) || property.name.text !== propertyName) continue;
-    if (!ts.isArrayLiteralExpression(property.initializer)) continue;
-    return property.initializer;
-  }
-  return undefined;
-}
-
 describe('commerce workspace main navigation entry', () => {
   it('adds exactly one /commerce entry with the approved key', () => {
     const entries = findSidebarEntriesByHref('/commerce');
     expect(entries).toHaveLength(1);
     expect(readStringProperty(entries[0], 'key')).toBe('ecommerce');
     expect(readStringProperty(entries[0], 'appKey')).toBeUndefined();
+  });
+
+  it('does not expose App Builder in the global sidebar', () => {
+    expect(findSidebarEntriesByHref('/app-builder')).toHaveLength(0);
   });
 
   it('uses the approved AR/EN main navigation labels', () => {
@@ -70,20 +54,6 @@ describe('commerce workspace main navigation entry', () => {
   it('keeps the entry visible without inventing a new permission gate', () => {
     expect(isNavEntryVisible({}, new Set(), { role: 'staff' })).toBe(true);
     expect(isNavEntryVisible({}, new Set(['commerce.storefront']), { role: 'staff' })).toBe(true);
-  });
-
-  it('places App Builder inside Commerce and preserves its existing guards', () => {
-    const entries = findSidebarEntriesByHref('/app-builder');
-    expect(entries).toHaveLength(1);
-    expect(readStringProperty(entries[0], 'key')).toBe('appBuilder');
-    expect(readStringProperty(entries[0], 'appKey')).toBe('commerce.app_builder');
-    expect(readStringProperty(entries[0], 'permission')).toBe('apps_builder.view');
-
-    const commerceGroup = findGroupByTitle('ecommerce');
-    const commerceItems = commerceGroup && readArrayProperty(commerceGroup, 'items');
-    expect(commerceItems?.elements.some((item) =>
-      ts.isObjectLiteralExpression(item) && readStringProperty(item, 'href') === '/app-builder',
-    )).toBe(true);
   });
 
   it('does not regress the inventory workspace leaf', () => {
