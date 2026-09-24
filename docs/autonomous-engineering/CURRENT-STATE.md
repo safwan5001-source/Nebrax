@@ -2,7 +2,7 @@
 
 > This file is a durable resume point, not a substitute for Git/GitHub evidence.
 
-LAST_UPDATED: 2026-09-24 (AWJ App Builder Horizon V1 authorized and launched; APP-BUILDER-1/2/3/4/5/6 done. APP-BUILDER-6 (Visual editing + history): PR #979 merged (Merge SHA 08c143b614be7f2b303528a17a13e862c08b6261), post-merge review passed. APP-BUILDER-7 (Data/Actions/Conditions/Visibility) evaluated for implementation and found NOT READY — a genuine Decision Escalation Gate, not an evidence gap: three of its four named concepts (Data, Conditions, Visibility) have no backing in the accepted, tested App Schema contract, and building them requires inventing an expression/condition engine or a Data Source Registry contract, both explicitly listed as "not yet locked" in the accepted architecture doc, which itself warns against inventing them "from competitor UI alone." Decision Escalation packet delivered to Safwan/ChatGPT; execution paused pending that decision. Prior AWJ Mobile Runtime Proof Horizon V1 (below) is fully closed and is this horizon's accepted input.)
+LAST_UPDATED: 2026-09-24 (AWJ App Builder Horizon V1 authorized and launched; APP-BUILDER-1/2/3/4/5/6 done. APP-BUILDER-7 (Data/Actions/Conditions/Visibility) evaluated for implementation and found NOT READY — a genuine Decision Escalation Gate, not an evidence gap: three of its four named concepts (Data, Conditions, Visibility) have no backing in the accepted, tested App Schema contract, and building them requires inventing an expression/condition engine or a Data Source Registry contract, both explicitly "not yet locked" in the accepted architecture doc. Owner decision (2026-09-24): keep APP-BUILDER-7 explicitly deferred (decision_required, not completed, not permanently skipped), proceed to APP-BUILDER-8 after a narrow dependency check found no real runtime/schema dependency on APP-BUILDER-7 — table updated, APP-BUILDER-8 promoted to ready. APP-BUILDER-8 now in progress. Prior AWJ Mobile Runtime Proof Horizon V1 (below) is fully closed and is this horizon's accepted input.)
 LAYER_VERSION: V1
 STATUS: ACTIVE — AWJ App Builder Horizon V1
 
@@ -108,14 +108,23 @@ Execute **AWJ App Builder Horizon V1** sequentially under نظام الأفق, p
   actions and first form inputs. Full evidence: "AWJ App Builder Horizon
   V1" log above, `docs/plans/app-builder/APP-BUILDER-6-IMPLEMENTATION-REPORT.md`.
 - Seventh executable task: `APP-BUILDER-7` (Data/Actions/Conditions/
-  Visibility, Develop mode) — **decision_required**. Evaluated for
-  implementation and found not ready: three of its four named concepts have
-  no backing in the accepted App Schema contract, and building them would
-  mean inventing an expression/condition engine or a Data Source Registry
-  contract — both explicitly "not yet locked" per the architecture doc.
-  Decision Escalation packet delivered; not pre-decided here. Full
-  evidence: `docs/autonomous-engineering/TASK-QUEUE.md`.
-- Remaining tasks `APP-BUILDER-8` through `APP-BUILDER-12`: see
+  Visibility, Develop mode) — **decision_required**, explicitly deferred
+  (not completed, not permanently skipped). Evaluated for implementation
+  and found not ready: three of its four named concepts have no backing in
+  the accepted App Schema contract, and building them would mean inventing
+  an expression/condition engine or a Data Source Registry contract — both
+  explicitly "not yet locked" per the architecture doc. Owner decision
+  (2026-09-24, option 2): defer and continue the horizon; return to
+  APP-BUILDER-7 through its own dedicated architecture/evidence decision
+  before implementation. Full evidence:
+  `docs/autonomous-engineering/TASK-QUEUE.md`.
+- Eighth executable task: `APP-BUILDER-8` (Theme + Use My Store Design) —
+  **in progress**. Dependency check confirmed no real runtime/schema
+  dependency on `APP-BUILDER-7` (its content operates entirely on the
+  App Schema's `theme.tokens` field and Store Customizer's existing theme
+  data, never on `SchemaComponent`-level Actions/Conditions/Visibility/Data);
+  promoted to `ready` on `APP-BUILDER-6` alone.
+- Remaining tasks `APP-BUILDER-9` through `APP-BUILDER-12`: see
   `docs/autonomous-engineering/TASK-QUEUE.md` for the full dependency-ordered
   table and promotion evidence.
 - Implementation merge: standing authority after mandatory final-head

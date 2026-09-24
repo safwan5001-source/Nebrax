@@ -504,7 +504,7 @@ Source of truth:
 | 5 | APP-BUILDER-5 | done | high | APP-BUILDER-4 (done) | Builder workspace shell (UI/UX Evidence Pass required) |
 | 6 | APP-BUILDER-6 | done | normal | APP-BUILDER-5 (done) | Visual editing + history |
 | 7 | APP-BUILDER-7 | decision_required | normal | APP-BUILDER-6 (done) | Data/Actions/Conditions/Visibility (Develop mode) |
-| 8 | APP-BUILDER-8 | pending | high | APP-BUILDER-7 | Theme + Use My Store Design |
+| 8 | APP-BUILDER-8 | ready | high | APP-BUILDER-6 (done); no real dependency on APP-BUILDER-7 (verified, see below) | Theme + Use My Store Design |
 | 9 | APP-BUILDER-9 | pending | normal | APP-BUILDER-8 | Templates + navigation/pages |
 | 10 | APP-BUILDER-10 | pending | high | APP-BUILDER-9 | Validate/Publish/Version/Rollback foundation |
 | 11 | APP-BUILDER-11 | pending | high | APP-BUILDER-10 | Integrated vertical proof + UX/security closure |
@@ -665,8 +665,24 @@ Schema security/authority changes," a Decision Escalation Gate per the horizon b
 are explicitly listed as **not yet locked** in the accepted architecture doc, which itself warns
 against inventing them "from competitor UI alone." This is not an evidence gap Claude can resolve
 by building a narrower version — a Decision Escalation packet was delivered to Safwan/ChatGPT.
-Execution of `APP-BUILDER-7` is paused pending that decision. Whether to proceed to `APP-BUILDER-8`
-in the meantime (its own content — theme token mapping/Detect/Diff/Preview/Apply — does not appear
-to actually need Conditions/Visibility/Data binding, only the table's prescribed sequencing lists
-`APP-BUILDER-7` as its dependency) or to hold the whole horizon until this decision returns is
-itself left to the owner's response, not decided unilaterally here.
+Execution of `APP-BUILDER-7` is paused pending that decision.
+
+**Owner decision (2026-09-24):** proceed to `APP-BUILDER-8` after a narrow dependency check;
+`APP-BUILDER-7` stays explicitly deferred (`decision_required`) — not completed, not permanently
+skipped — to be returned to through its own dedicated architecture/evidence decision before any
+implementation. Do not invent a Data Source Registry, expression/condition language, or
+merchant-authored visibility semantics merely to unblock sequencing. Escalate again only if a
+later task turns out to have a genuine architectural dependency on `APP-BUILDER-7`'s output, or
+another Decision Escalation Gate is reached.
+
+**Dependency check performed:** `APP-BUILDER-8`'s content (`AWJ_APP_BUILDER_PRODUCT_ARCHITECTURE_V1.md`
+§6, "Shared store/app theme foundation" — shared brand/theme mapping, Linked/Review-Changes/
+Independent sync policy, override tracking, Detect → Diff → Preview → Apply) operates entirely on
+the App Schema's `theme.tokens` field (`ThemeTokens` in `mobile/lib/schema/app_schema.dart` —
+already accepted, already parsed, a plain `Map<String, String>` of token→value pairs with no
+condition/expression/data-binding involved) and on Store Customizer's existing theme data
+(`commerce.storefront`, already shipped). It never touches `SchemaComponent`-level Actions,
+Conditions, Visibility, or Data bindings — a structurally separate part of the schema and a
+separate workspace surface (a Theme editor, not the per-component Inspector). Confirmed: **no real
+runtime/schema dependency on `APP-BUILDER-7`**. Table updated: `APP-BUILDER-8`'s dependency is now
+`APP-BUILDER-6 (done)`, promoted to `ready`.
