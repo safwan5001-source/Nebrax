@@ -2,7 +2,7 @@
 
 > This file is a durable resume point, not a substitute for Git/GitHub evidence.
 
-LAST_UPDATED: 2026-09-24 (AWJ App Builder Horizon V1 authorized and launched; APP-BUILDER-1/2/3/4/5/6 done. APP-BUILDER-7 (Data/Actions/Conditions/Visibility) evaluated for implementation and found NOT READY — a genuine Decision Escalation Gate, not an evidence gap: three of its four named concepts (Data, Conditions, Visibility) have no backing in the accepted, tested App Schema contract, and building them requires inventing an expression/condition engine or a Data Source Registry contract, both explicitly "not yet locked" in the accepted architecture doc. Owner decision (2026-09-24): keep APP-BUILDER-7 explicitly deferred (decision_required, not completed, not permanently skipped), proceed to APP-BUILDER-8 after a narrow dependency check found no real runtime/schema dependency on APP-BUILDER-7 — table updated, APP-BUILDER-8 promoted to ready. APP-BUILDER-8 now in progress. Prior AWJ Mobile Runtime Proof Horizon V1 (below) is fully closed and is this horizon's accepted input.)
+LAST_UPDATED: 2026-09-24 (AWJ App Builder Horizon V1 authorized and launched; APP-BUILDER-1/2/3/4/5/6/8 done. APP-BUILDER-7 (Data/Actions/Conditions/Visibility) evaluated for implementation and found NOT READY — a genuine Decision Escalation Gate, not an evidence gap: three of its four named concepts (Data, Conditions, Visibility) have no backing in the accepted, tested App Schema contract, and building them requires inventing an expression/condition engine or a Data Source Registry contract, both explicitly "not yet locked" in the accepted architecture doc. Owner decision (2026-09-24): keep APP-BUILDER-7 explicitly deferred (decision_required, not completed, not permanently skipped), proceed to APP-BUILDER-8 after a narrow dependency check found no real runtime/schema dependency on APP-BUILDER-7 — table updated, APP-BUILDER-8 promoted to ready then completed (PR #983, Theme + Use My Store Design). APP-BUILDER-9 now in progress. Prior AWJ Mobile Runtime Proof Horizon V1 (below) is fully closed and is this horizon's accepted input.)
 LAYER_VERSION: V1
 STATUS: ACTIVE — AWJ App Builder Horizon V1
 
@@ -18,6 +18,44 @@ Execute **AWJ App Builder Horizon V1** sequentially under نظام الأفق, p
 - `APP-BUILDER-4` (App Manager + creation wizard) is **done**: the first user-facing App Builder UI slice, gated behind a focused UI/UX Evidence Pass (`APP-BUILDER-4-UX-EVIDENCE-PASS.md`) completed **before** implementation per the horizon bootstrap's mandatory workflow — external interaction evidence (WordPress.com site creation, Shopify theme library, empty-state UX literature), retained/rejected patterns, and an explicit AWJ UX Decision, all built from the AWJ Design System's existing components exclusively (no new visual primitive invented). Built `/app-builder` (list), `/app-builder/new` (path-first creation: Use My Store Design / Choose Template / Start From Scratch, all producing the same safe-minimum shell today via APP-BUILDER-1's existing `POST /app-builder/apps`, honestly labeled), `/app-builder/[id]` (overview, with a plain "coming in a later task" note instead of a dead link to the not-yet-built Builder workspace). Pure frontend — zero backend files touched, zero API change. Sidebar entry added to the `sales` group via the existing `commerce.app_builder`/`apps_builder.view` gating mechanism. 11 new focused tests, all passing; found and fixed one real test-mock bug (an unstable `next-intl` mock reference causing an infinite re-render loop in the test harness only — confirmed not a production-code issue, since the same `useCallback` dependency shape already exists safely in `receipt-vouchers/[id]/page.tsx` against the real, stable `next-intl`). `npm run build` succeeds. CI red on the PR surfaced two failures: one real (own) bug — `new Date(...).toLocaleDateString()` used directly instead of the required `formatDate` helper, tripping the repo's date-formatting guardrail test — fixed directly; and one pre-existing, unrelated drift — `openapi-model.generated.ts` never regenerated after an earlier already-merged Commerce Mobile task added `cart_merged` to the source YAML — fixed mechanically via `npm run openapi:generate` with a transparent PR comment explaining both fixes before pushing. PR #975 merged: Merge SHA `163bcc1c27ad87e874626710910a28e381029cd0`. Docs follow-up PR #976 merged: Merge SHA `ca20ae4023b8548c59e3003d89816dde95f8f5d0`. `POST_MERGE_REVIEW: PASS`. Full evidence: `docs/plans/app-builder/APP-BUILDER-4-IMPLEMENTATION-REPORT.md`.
 - `APP-BUILDER-5` (Builder workspace shell) is **done**: a focused UI/UX Evidence Pass (`APP-BUILDER-5-UX-EVIDENCE-PASS.md`) written before implementation, explicitly scoping this task to a read-only workspace shell — Pages/Layers tree, canvas preview, Inspector, locale (ar/en) and device (mobile/tablet/desktop) preview controls, responsive admin baseline — with all editing interactivity (add/remove/reorder, property edits, drag, undo/redo, save) explicitly deferred to `APP-BUILDER-6` per the horizon's own task-queue split, preventing scope creep into a full editor. Backend: new `AppBuilderRegistryController`/`GET /app-builder/registries` route (gated by `apps_builder.view` + `commerce.app_builder`) exposing APP-BUILDER-3's `ComponentRegistry`/`ActionRegistry` over HTTP for the first time — a pure read/serialize layer, zero registry/schema/domain logic changed. Frontend: `AppBuilderCanvas` (15-case component-type switch rendering the draft's real App Schema tree, money shown via `formatRiyal(amountMinor / 100)` per the runtime's minor-units convention), `LayersTree` (click-to-select), `Inspector` (props/action detail keyed off the live registry response, including an explicit "not recognized by the registry" state for a schema referencing an unknown type), assembled into `/app-builder/[id]/builder`, a full-height workspace page inside the standard sidebar/topbar shell (`-m-4 sm:-m-6` canceling ambient padding, `h-[80vh] min-h-[560px]`, not a chrome-less route group). `/app-builder/[id]`'s placeholder "coming in a later task" note replaced with a real "Open the builder" link. 4 new backend tests + 3 new frontend workspace tests + 2 updated detail-page tests, all passing; one genuine test-environment artifact diagnosed via `console.trace()` (a stray zero-argument mock invocation from Vitest/RTL's own async teardown machinery, confirmed via debug logging not to originate from the page's real `Promise.all` call sites) and handled with a defensive test-side guard rather than a production-code change. `npm run build` succeeds. PR #977 merged: Merge SHA `f48d583f0041caf909a61c4658aa7d1b89c0a604`. Docs follow-up PR #978 merged: Merge SHA `84d528a1a04568274762129786e1eb7c4bf14302`. `POST_MERGE_REVIEW: PASS`. Full evidence: `docs/plans/app-builder/APP-BUILDER-5-IMPLEMENTATION-REPORT.md`.
 - `APP-BUILDER-6` (Visual editing + history) is **done**: a focused UI/UX Evidence Pass (`APP-BUILDER-6-UX-EVIDENCE-PASS.md`) written before implementation — judged necessary since APP-BUILDER-5's own pass left this as an open scope question, and this task's interaction problem (the workspace's first destructive/undoable actions and its first form inputs) is materially different from a read-only shell. Turned the APP-BUILDER-5 shell into a real editor: select/add/remove/reorder (bounded to same-parent siblings only, via `@dnd-kit` reused verbatim from `web/src/components/settings/section-designer.tsx`'s existing internal pattern — no new dependency), inline typed property/action-param editing in the Inspector (one control per registry `PropType`: text/URL-hinted/number/Riyal-denominated-number/add-remove-row-list, `enum_values` always as a `<Select>`, a component's `injected_runtime_action_params` never shown editable), a bounded 50-entry undo/redo history (`Ctrl/Cmd+Z`/`Ctrl/Cmd+Shift+Z` plus toolbar buttons), and explicit Draft/Unsaved/Saving/Saved header state with a Save button calling APP-BUILDER-1's existing `PUT /app-builder/apps/{id}/draft` completely unchanged. Pure frontend — zero backend files touched. New pure/immutable tree-edit helpers in `web/src/lib/app-builder.ts` (`updateComponentById`/`addChildComponent`/`removeComponentById`/`reorderChildren`/`moveSibling`/`findParentId`/`createComponentFromDefinition`). Caught and fixed two real issues via self-review before any external review: a dropped "action type not recognized by the registry" fallback message (a real regression against APP-BUILDER-5's already-shipped defensiveness), and a React Strict-Mode hazard — the undo/redo refs were originally mutated inside a `setState` updater function, which Strict Mode double-invokes in development and would have silently corrupted the history stack; fixed by design (refs mutated once, synchronously, alongside plain-value state setters) before any test was written. 17 new tree-helper unit tests + 9/9 workspace tests (up from 3/3), full frontend suite 2037/2037 passing, `npm run build` succeeds, full backend suite unaffected (4630 passed, same pre-existing unrelated local-environment failure set — confirmed via `diff -rq` against the built project that zero backend source was touched). PR #979 merged: Merge SHA `08c143b614be7f2b303528a17a13e862c08b6261`. `POST_MERGE_REVIEW: PASS`. Full evidence: `docs/plans/app-builder/APP-BUILDER-6-IMPLEMENTATION-REPORT.md`.
+- `APP-BUILDER-7` (Data/Actions/Conditions/Visibility — Develop mode) is **deferred**
+  (`decision_required`, not completed, not permanently skipped): evaluated for implementation and
+  found not ready — a genuine Decision Escalation Gate, since three of its four named concepts
+  (Data, Conditions, Visibility) have no backing in the accepted, tested App Schema contract, and
+  building them requires inventing an expression/condition engine or a Data Source Registry
+  contract, both explicitly "not yet locked" in the accepted architecture doc. Owner decision
+  (2026-09-24, option 2): keep it explicitly deferred, return to it through its own dedicated
+  architecture/evidence decision before implementation. See `TASK-QUEUE.md` for the full finding.
+- `APP-BUILDER-8` (Theme + Use My Store Design) is **done**: a focused UI/UX Evidence Pass
+  (`APP-BUILDER-8-UX-EVIDENCE-PASS.md`) written before implementation, judged necessary as this
+  task's first cross-module integration (reading Store Customizer's live data) and first
+  non-component-tree editing surface. Performed a narrow dependency check confirming zero real
+  runtime/schema dependency on the deferred `APP-BUILDER-7`, per the owner's explicit resolution.
+  Added a **Theme** tab to the Builder workspace's structure panel, editing `schema.theme.tokens`
+  (a flat, unconstrained `Map<string, string>`, already validated server-side — no new
+  schema/contract): manual preset/color/radius/density/product-card-style editing through the same
+  undo/redo/dirty/save pipeline `APP-BUILDER-6` built, plus **"Use My Store Design"** — a one-time
+  Detect → Diff → Preview → Apply sync against the Store Customizer's real, already-shipped
+  presentation data (`GET /commerce/workspace/storefronts`, `GET .../presentation`, both existing,
+  `commerce.manage`-gated routes, no new backend), reading the **published** config over the draft.
+  Canvas preview reflects the theme's primary color live via CSS custom properties (existing
+  Tailwind `var(--primary)` mapping); radius/density/product-card tokens are persisted/diffed/
+  synced but not yet visually reflected in the canvas (`borderRadius.DEFAULT` is a fixed Tailwind
+  value, not var-driven) — an explicit, scoped gap, not silently dropped. Pure frontend — zero
+  backend files touched. Caught and fixed one real bug via self-review before any external review:
+  `theme.sync.title` and `theme.sync.action` were translated to the identical string in both
+  `ar.json`/`en.json`, causing a test to bind its "detect" click to the wrong (non-interactive)
+  element; fixed by giving the static heading its own distinct copy. Reuses the Store Customizer's
+  own `presentationCssVars`/`THEME_PRESETS` color-derivation utilities directly (a deliberate,
+  evidence-justified exception to "no Customizer code inherited automatically" — that boundary is
+  about not mechanically copying Customizer's UI/UX, not about refusing a correct, tested
+  color-math utility for a feature whose entire purpose is reading Customizer's real data
+  honestly). 4 new `app-builder.ts` unit tests (21/21 total) + 5 new workspace tests (14/14 total),
+  full frontend suite 2046/2046 passing, `npm run build` succeeds, `ar.json`/`en.json` key parity
+  verified, full backend suite unaffected (4630 passed / 35 pre-existing-failure baseline
+  unchanged, zero backend source drift — confirmed via `diff -rq` against the built project). PR
+  #983 merged: Merge SHA `1248223dd1668ad840f2b39f21e3de5a6d86755b`. `POST_MERGE_REVIEW: PASS`.
+  Full evidence: `docs/plans/app-builder/APP-BUILDER-8-IMPLEMENTATION-REPORT.md`.
 
 ## AWJ Mobile Runtime Proof Horizon V1 (closed) — execution log
 
@@ -119,11 +157,15 @@ Execute **AWJ App Builder Horizon V1** sequentially under نظام الأفق, p
   before implementation. Full evidence:
   `docs/autonomous-engineering/TASK-QUEUE.md`.
 - Eighth executable task: `APP-BUILDER-8` (Theme + Use My Store Design) —
-  **in progress**. Dependency check confirmed no real runtime/schema
-  dependency on `APP-BUILDER-7` (its content operates entirely on the
-  App Schema's `theme.tokens` field and Store Customizer's existing theme
-  data, never on `SchemaComponent`-level Actions/Conditions/Visibility/Data);
-  promoted to `ready` on `APP-BUILDER-6` alone.
+  **done** (PR #983, Merge SHA `1248223`). Dependency check confirmed no
+  real runtime/schema dependency on `APP-BUILDER-7` (its content operates
+  entirely on the App Schema's `theme.tokens` field and Store Customizer's
+  existing theme data, never on `SchemaComponent`-level Actions/Conditions/
+  Visibility/Data); promoted to `ready` on `APP-BUILDER-6` alone, then
+  implemented: a Theme tab (manual editing + "Use My Store Design"
+  Detect/Diff/Preview/Apply sync), its own focused UI/UX Evidence Pass
+  completed before implementation. Full evidence: "AWJ App Builder Horizon
+  V1" log above, `docs/plans/app-builder/APP-BUILDER-8-IMPLEMENTATION-REPORT.md`.
 - Remaining tasks `APP-BUILDER-9` through `APP-BUILDER-12`: see
   `docs/autonomous-engineering/TASK-QUEUE.md` for the full dependency-ordered
   table and promotion evidence.

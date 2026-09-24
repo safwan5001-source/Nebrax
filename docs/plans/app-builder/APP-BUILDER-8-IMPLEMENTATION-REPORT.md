@@ -1,6 +1,6 @@
 # APP-BUILDER-8 — Implementation Report
 
-STATUS: merged — post-merge CI verification pending
+STATUS: merged — post-merge review PASS
 DATE: 2026-09-24
 
 ## Outcome
@@ -148,17 +148,16 @@ conflict, no open review comments/threads requiring action, self-review (below) 
 
 ## Post-merge review
 
-PR #983 merged via squash: Merge SHA `1248223dd1668ad840f2b39f21e3de5a6d86755b`. Confirmed
-`main@1248223` was `origin/main`'s tip at merge time, a single-parent squash (parent
+**PASS.** PR #983 merged via squash: Merge SHA `1248223dd1668ad840f2b39f21e3de5a6d86755b`.
+Confirmed `main@1248223` was `origin/main`'s tip at merge time, a single-parent squash (parent
 `a322d1c21c663c804dd258eddde96cf523a4a268`, the pre-merge tip), zero content drift from the
 reviewed head (`diff` of `git diff a322d1c 4c28197 -- app database routes tests
 docs/plans/app-builder web` against the equivalent diff onto the merge commit — identical).
-Post-merge CI on the merge commit itself was still running as of this write: `ci.yml` run
-[35968746817](https://github.com/safwan5001-source/Nebrax/actions/runs/35968746817) and `web-ci.yml`
-run [35968746879](https://github.com/safwan5001-source/Nebrax/actions/runs/35968746879) — both
-in progress, neither red. **`POST_MERGE_REVIEW` to be confirmed and recorded in a follow-up
-docs-only commit once both runs complete**, per this horizon's established pattern of not pushing
-further to an already-merged PR's now-closed branch.
+Post-merge CI on the merge commit itself: `ci.yml` run
+[35968746817](https://github.com/safwan5001-source/Nebrax/actions/runs/35968746817) (sqlite/pgsql
+both `success`) and `web-ci.yml` run
+[35968746879](https://github.com/safwan5001-source/Nebrax/actions/runs/35968746879) (`web build
+(Next.js)`, `success`) — both confirmed green. `POST_MERGE_REVIEW: PASS`.
 
 ## Accounting impact
 
