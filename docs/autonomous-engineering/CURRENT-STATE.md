@@ -2,9 +2,9 @@
 
 > This file is a durable resume point, not a substitute for Git/GitHub evidence.
 
-LAST_UPDATED: 2026-09-24 (AWJ App Builder Horizon V1 authorized and launched; APP-BUILDER-1/2/3/4/5/6/8/9/10/11 done. APP-BUILDER-7 (Data/Actions/Conditions/Visibility) evaluated for implementation and found NOT READY — a genuine Decision Escalation Gate, not an evidence gap: three of its four named concepts (Data, Conditions, Visibility) have no backing in the accepted, tested App Schema contract, and building them requires inventing an expression/condition engine or a Data Source Registry contract, both explicitly "not yet locked" in the accepted architecture doc. Owner decision (2026-09-24): keep APP-BUILDER-7 explicitly deferred (decision_required, not completed, not permanently skipped), proceed to APP-BUILDER-8 after a narrow dependency check found no real runtime/schema dependency on APP-BUILDER-7 — table updated, APP-BUILDER-8 promoted to ready then completed (PR #983, Theme + Use My Store Design), APP-BUILDER-9 likewise completed (PR #985, Templates + navigation/pages), APP-BUILDER-10 likewise completed (PR #988, Validate/Publish/Version/Rollback foundation). APP-BUILDER-11's original "bind real Commerce resource / proven Flutter runtime consumes" line was found genuinely unsatisfiable inside the accepted contract (same undecided Data Source Registry boundary as APP-BUILDER-7) and escalated; owner decision (2026-09-24, option 2): redefined as an Integrated Proof of the currently accepted and actually implemented App Builder contract, completed (PR #990) with the real-Commerce-binding/live-runtime portion carried forward as a deferred/decision_required follow-up track alongside APP-BUILDER-7. APP-BUILDER-12 (Horizon closure) now ready — its closure report must explicitly distinguish completed capabilities from this deferred architecture track and then STOP for owner/ChatGPT review. Prior AWJ Mobile Runtime Proof Horizon V1 (below) is fully closed and is this horizon's accepted input.)
+LAST_UPDATED: 2026-09-24 (**AWJ App Builder Horizon V1 is CLOSED.** All 12 tasks resolved: APP-BUILDER-1/2/3/4/5/6/8/9/10/11/12 done, APP-BUILDER-7 explicitly deferred as a genuine Decision Escalation Gate. APP-BUILDER-7 (Data/Actions/Conditions/Visibility) evaluated for implementation and found NOT READY: three of its four named concepts (Data, Conditions, Visibility) have no backing in the accepted, tested App Schema contract, and building them requires inventing an expression/condition engine or a Data Source Registry contract, both explicitly "not yet locked" in the accepted architecture doc. Owner decision (2026-09-24): keep APP-BUILDER-7 explicitly deferred (decision_required, not completed, not permanently skipped) — table updated, APP-BUILDER-8/9/10 completed in sequence after narrow dependency checks each found no real runtime/schema dependency on APP-BUILDER-7 (PR #983, #985, #988). APP-BUILDER-11's original "bind real Commerce resource / proven Flutter runtime consumes" line was found genuinely unsatisfiable inside the accepted contract (the identical undecided Data Source Registry boundary as APP-BUILDER-7) and escalated; owner decision (2026-09-24, option 2): redefined as an Integrated Proof of the currently accepted and actually implemented App Builder contract, completed (PR #990) with the real-Commerce-binding/live-runtime portion carried forward as a deferred/decision_required follow-up track alongside APP-BUILDER-7. APP-BUILDER-12 (Horizon closure, PR #991) produced the horizon's final closure report distinguishing completed capabilities from this one connected deferred architecture track, plus known limitations, out-of-scope boundary, and next-horizon recommendation. Per the horizon bootstrap's own "Horizon End" rule, this session now STOPS — no automatic continuation to Preview & Testing or any new horizon without explicit owner/ChatGPT-reviewed authorization. Prior AWJ Mobile Runtime Proof Horizon V1 (below) is fully closed and was this horizon's accepted input.)
 LAYER_VERSION: V1
-STATUS: ACTIVE — AWJ App Builder Horizon V1
+STATUS: CLOSED — AWJ App Builder Horizon V1 (see `docs/plans/app-builder/APP-BUILDER-12-HORIZON-CLOSURE-REPORT.md`); awaiting owner/ChatGPT review before any new horizon is authorized
 
 ## Current objective
 
@@ -143,6 +143,28 @@ Execute **AWJ App Builder Horizon V1** sequentially under نظام الأفق, p
   `36003417429` sqlite+pgsql both success; no `web-ci.yml` run expected or triggered since the
   diff touches only `tests/Feature/` and `docs/`). `POST_MERGE_REVIEW: PASS`. Full evidence:
   `docs/plans/app-builder/APP-BUILDER-11-IMPLEMENTATION-REPORT.md`.
+- `APP-BUILDER-12` (Horizon closure) is **done** — the horizon's mandatory final task. Produced
+  `docs/plans/app-builder/APP-BUILDER-12-HORIZON-CLOSURE-REPORT.md`: a full closure report covering
+  all 11 completed tasks with their PR/merge-SHA evidence, cumulative tenant/RBAC/App-Schema
+  security evidence, accessibility/bidi evidence, runtime compatibility evidence, cumulative
+  regression evidence, one connected deferred architecture track (`APP-BUILDER-7`'s Data/Actions/
+  Conditions/Visibility plus `APP-BUILDER-11`'s original real-Commerce-binding/live-runtime clause
+  — both tied to the same unlocked Data Source Registry boundary, never independently reinterpreted
+  or silently dropped), known limitations carried forward (`APP-BUILDER-8`'s canvas token-rendering
+  gap; the pre-existing local `bcmath`/`setup.sh` environment gap — neither an App Builder defect),
+  the horizon's explicit out-of-scope boundary (App Factory, signing, submission, production
+  release, etc. — none touched), and a next-horizon recommendation (a dedicated Data Source
+  Registry decision track, a corresponding Mobile Runtime dispatch follow-on, the small canvas
+  token-rendering follow-up, and the still-not-started Preview & Testing horizon). PR #991 merged
+  (also carrying `APP-BUILDER-11`'s own post-merge documentation, pushed to the same still-open
+  branch before that earlier docs-only content had merged): squash SHA
+  `ac6c375f669adfbcb9dc301c8296c42d8506c4b3`, confirmed single-parent squash and zero content drift
+  from the reviewed pre-merge head `9d0828d` via a path-restricted diff, post-merge CI green on the
+  merge commit itself (`ci.yml` run `36009975210` sqlite+pgsql both success). `POST_MERGE_REVIEW:
+  PASS`.
+
+**AWJ App Builder Horizon V1 is CLOSED.** Per the horizon bootstrap's own "Horizon End" rule, this
+session STOPS here — no automatic continuation to Preview & Testing or any new horizon.
 
 ## AWJ Mobile Runtime Proof Horizon V1 (closed) — execution log
 

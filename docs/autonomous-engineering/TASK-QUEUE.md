@@ -508,7 +508,7 @@ Source of truth:
 | 9 | APP-BUILDER-9 | done | normal | APP-BUILDER-8 (done) | Templates + navigation/pages |
 | 10 | APP-BUILDER-10 | done | high | APP-BUILDER-9 (done); no real dependency on APP-BUILDER-7 (verified, see below) | Validate/Publish/Version/Rollback foundation |
 | 11 | APP-BUILDER-11 | done | high | APP-BUILDER-10 (done) | Integrated vertical proof + UX/security closure |
-| 12 | APP-BUILDER-12 | ready | normal | APP-BUILDER-11 (done) | Horizon closure — STOP for owner/ChatGPT review |
+| 12 | APP-BUILDER-12 | done | normal | APP-BUILDER-11 (done) | Horizon closure — STOP for owner/ChatGPT review |
 
 `APP-BUILDER-1` promoted directly to `ready`/`in_progress` from horizon authorization: the horizon
 document itself is the accepted source requirement, this is the first task, and its outcome
@@ -885,3 +885,18 @@ this task's new tests exactly). The original task-11 intent's real-Commerce-bind
 portion is recorded as a connected deferred/`decision_required` follow-up track with
 `APP-BUILDER-7`, carried into `APP-BUILDER-12`'s closure report — not silently dropped, not marked
 done. Full evidence: `docs/plans/app-builder/APP-BUILDER-11-IMPLEMENTATION-REPORT.md`.
+
+`APP-BUILDER-12` (Horizon closure) is `done`: PR #991 merged (squash SHA `ac6c375f669adfbcb9dc301c8296c42d8506c4b3`,
+confirmed single-parent squash onto `main`, zero content drift from the reviewed pre-merge head
+`9d0828d` verified via a path-restricted diff), post-merge CI green on the merge commit itself
+(`ci.yml` run `36009975210` sqlite+pgsql both success). Produced the horizon's mandatory final
+closure report — `docs/plans/app-builder/APP-BUILDER-12-HORIZON-CLOSURE-REPORT.md` — covering all
+11 completed tasks with their PR/merge-SHA evidence, tenant/RBAC/App-Schema-declarative-only
+security evidence, accessibility/bidi evidence, runtime compatibility evidence, cumulative
+regression evidence, the one connected deferred architecture track (`APP-BUILDER-7` +
+`APP-BUILDER-11`'s original real-Commerce-binding clause, both tied to the same unlocked Data
+Source Registry boundary), known limitations carried forward (not blockers), the horizon's
+explicit out-of-scope boundary, and a next-horizon recommendation.
+
+**AWJ App Builder Horizon V1 is CLOSED.** Per the horizon bootstrap's own "Horizon End" rule, this
+session STOPS here — no automatic continuation to Preview & Testing or any new horizon.
