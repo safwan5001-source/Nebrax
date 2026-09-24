@@ -503,8 +503,8 @@ Source of truth:
 | 4 | APP-BUILDER-4 | done | high | APP-BUILDER-3 (done) | App Manager + creation wizard (UI/UX Evidence Pass required) |
 | 5 | APP-BUILDER-5 | done | high | APP-BUILDER-4 (done) | Builder workspace shell (UI/UX Evidence Pass required) |
 | 6 | APP-BUILDER-6 | done | normal | APP-BUILDER-5 (done) | Visual editing + history |
-| 7 | APP-BUILDER-7 | ready | normal | APP-BUILDER-6 (done) | Data/Actions/Conditions/Visibility (Develop mode) |
-| 8 | APP-BUILDER-8 | pending | high | APP-BUILDER-7 | Theme + Use My Store Design |
+| 7 | APP-BUILDER-7 | decision_required | normal | APP-BUILDER-6 (done) | Data/Actions/Conditions/Visibility (Develop mode) |
+| 8 | APP-BUILDER-8 | ready | high | APP-BUILDER-6 (done); no real dependency on APP-BUILDER-7 (verified, see below) | Theme + Use My Store Design |
 | 9 | APP-BUILDER-9 | pending | normal | APP-BUILDER-8 | Templates + navigation/pages |
 | 10 | APP-BUILDER-10 | pending | high | APP-BUILDER-9 | Validate/Publish/Version/Rollback foundation |
 | 11 | APP-BUILDER-11 | pending | high | APP-BUILDER-10 | Integrated vertical proof + UX/security closure |
@@ -631,7 +631,58 @@ tests (9/9 total, up from 3/3), full frontend suite 2037/2037, full backend suit
 (4630 passed, same pre-existing unrelated failure set). Full evidence:
 `docs/plans/app-builder/APP-BUILDER-6-IMPLEMENTATION-REPORT.md`.
 
-`APP-BUILDER-7` promoted to `ready` now that its hard dependency (`APP-BUILDER-6`) is done.
-Source requirement: horizon doc task 7 (Data/Actions/Conditions/Visibility, Develop mode) — builds
-on the now-editable Inspector this task shipped. Whether this slice needs its own UI/UX Evidence
-Pass is a scope question for that task itself, not pre-decided here.
+`APP-BUILDER-7` initially promoted to `ready` now that its hard dependency (`APP-BUILDER-6`) is
+done, then **evaluated for implementation and found not ready** — moved to `decision_required`:
+
+Source requirement: horizon doc task 7 ("Data/Actions/Conditions/Visibility — bounded Develop
+controls using registries; no arbitrary code/HTTP"). Before implementing, read the real, tested
+App Schema contract (`mobile/lib/schema/app_schema.dart`) and the architecture doc's own section
+on this exact surface (`AWJ_APP_BUILDER_PRODUCT_ARCHITECTURE_V1.md` §13/§13A, "Data binding,
+state, events and conditions"), per the horizon's own anti-duplication rule ("do not invent a
+second schema/runtime contract" — the same check that corrected APP-BUILDER-1→2 and kept
+APP-BUILDER-3's `DataResourceRegistry` honestly empty).
+
+Finding: three of this task's four named concepts have **no backing in the accepted, tested
+Mobile Runtime contract today**, and building them requires inventing exactly what the
+architecture doc explicitly says is not yet decided:
+- **Data** — `DataResourceRegistry::RESOURCES` ships empty by APP-BUILDER-3's own explicit
+  decision; §13B: "the final registry is not yet locked." A "Data" tab has nothing real to bind.
+- **Conditions** — `SchemaComponent._allowedKeys` (`type`/`id`/`optional`/`props`/`children`/
+  `action`) has no condition/expression field. §13's own "Open Decision" reads verbatim: "Do not
+  invent an expression engine from competitor UI alone" and lists "expression syntax/engine" among
+  the items explicitly **not** to lock yet.
+- **Visibility** — same gap. The existing `optional` boolean is `CompatibilityResolver`'s own
+  fallback-pruning flag (decided by runtime capability, not merchant intent) — a different concept
+  that happens to share vocabulary, not a usable substitute for a merchant-authored show/hide rule.
+- **Actions** — the one concept with real backing (`ActionRegistry`, `RuntimeCapabilities`) — is
+  already fully built, in APP-BUILDER-6 (attach/detach/edit action + typed params).
+
+The architecture doc's own Builder-workspace diagram (§4) is explicitly labeled "Conceptual layout
+only — not locked UI," so this is not a UI-shape question APP-BUILDER-7 can resolve by picking a
+different layout. Implementing real Conditions/Visibility editing requires either a new App Schema
+expression/condition contract or a new Data Source Registry contract — both are "material App
+Schema security/authority changes," a Decision Escalation Gate per the horizon bootstrap, and both
+are explicitly listed as **not yet locked** in the accepted architecture doc, which itself warns
+against inventing them "from competitor UI alone." This is not an evidence gap Claude can resolve
+by building a narrower version — a Decision Escalation packet was delivered to Safwan/ChatGPT.
+Execution of `APP-BUILDER-7` is paused pending that decision.
+
+**Owner decision (2026-09-24):** proceed to `APP-BUILDER-8` after a narrow dependency check;
+`APP-BUILDER-7` stays explicitly deferred (`decision_required`) — not completed, not permanently
+skipped — to be returned to through its own dedicated architecture/evidence decision before any
+implementation. Do not invent a Data Source Registry, expression/condition language, or
+merchant-authored visibility semantics merely to unblock sequencing. Escalate again only if a
+later task turns out to have a genuine architectural dependency on `APP-BUILDER-7`'s output, or
+another Decision Escalation Gate is reached.
+
+**Dependency check performed:** `APP-BUILDER-8`'s content (`AWJ_APP_BUILDER_PRODUCT_ARCHITECTURE_V1.md`
+§6, "Shared store/app theme foundation" — shared brand/theme mapping, Linked/Review-Changes/
+Independent sync policy, override tracking, Detect → Diff → Preview → Apply) operates entirely on
+the App Schema's `theme.tokens` field (`ThemeTokens` in `mobile/lib/schema/app_schema.dart` —
+already accepted, already parsed, a plain `Map<String, String>` of token→value pairs with no
+condition/expression/data-binding involved) and on Store Customizer's existing theme data
+(`commerce.storefront`, already shipped). It never touches `SchemaComponent`-level Actions,
+Conditions, Visibility, or Data bindings — a structurally separate part of the schema and a
+separate workspace surface (a Theme editor, not the per-component Inspector). Confirmed: **no real
+runtime/schema dependency on `APP-BUILDER-7`**. Table updated: `APP-BUILDER-8`'s dependency is now
+`APP-BUILDER-6 (done)`, promoted to `ready`.
