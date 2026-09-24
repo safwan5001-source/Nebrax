@@ -537,7 +537,7 @@ authoring conditions deferred to land with `APP-BUILDER-15`'s binding editor (no
 impact.
 
 `APP-BUILDER-21` (UX/localization) is **done** locally (commit `8ab18df` on
-`claude/app-builder-21-ux-localization`, PR pending): adds a `Label(ar, en)` value object to every
+`claude/app-builder-21-ux-localization`, PR #997 open): adds a `Label(ar, en)` value object to every
 `ComponentRegistry`/`ActionRegistry` definition and every prop/action-param (15 components, 6
 actions), serialized by `AppBuilderRegistryController` alongside the existing `bindable_resources`.
 No schema identifier renamed anywhere — `type`/prop keys/action-param keys are unchanged, so
@@ -555,6 +555,38 @@ Verified locally: targeted backend filter (`ComponentRegistryTest|ActionRegistry
 AppBuilderRegistryTest`, 94 tests/476 assertions) green; full frontend suite (2076 tests), `tsc
 --noEmit`, and `npm run build` all green. No accounting impact — UI/localization only, no new
 financial postings.
+
+`APP-BUILDER-22` (theme-token canvas/runtime rendering fix, `AWJ_APP_BUILDER_COMMERCE_RUNTIME_V1_
+EVIDENCE.md` §11) is **done** locally on `claude/app-builder-21-ux-localization`, PR pending — both
+independent halves of the documented gap closed:
+
+- **Web canvas**: `tailwind.config.ts`'s `borderRadius.DEFAULT` stays a fixed `0.5rem` on purpose
+  (it backs the bare `rounded` class used across ~286 files app-wide; making it var-driven would
+  break every screen outside the Builder wherever `--canvas-radius` is unset). Instead, an
+  additive `canvas` radius scale value (`rounded-canvas` → `var(--canvas-radius, 0.5rem)`) was
+  added — zero blast radius anywhere it isn't explicitly used, verified by the full frontend suite
+  staying green (2076/2076) after the change. `canvas.tsx`'s `themeCssVars()` now sets
+  `--canvas-radius` from `theme.tokens.radius` (via the same `RADIUS_PRESETS`/`radiusToken` already
+  used by `theme-panel.tsx`), and the merchant-content elements that previously used bare `rounded`
+  (`Quantity`'s +/- controls, `AddToCart`, the generic `Button` component) now use `rounded-canvas`.
+  Builder chrome (`NodeFrame`'s selection ring, `TypeTag`'s badge) is deliberately left on the
+  editor's own fixed `rounded` — it isn't merchant content.
+- **Flutter runtime**: `theme.tokens` was already parsed and validated (`MOBILE-RUNTIME-2`) but
+  nothing ever read it — `ThemeData` used an unrelated hardcoded literal. `app.dart` gains a pure,
+  defensive `themeSeedColorFromSchema(String)` (same "malformed input never crashes boot, falls
+  back to the safe default" posture as `component_widgets.dart`'s prop reads) that reads
+  `theme.tokens.colorPrimary` from the bundled `kHomeSchemaJson` and seeds `ThemeData.colorSchemeSeed`
+  with it — replacing the previous disconnected literal. Deliberately scoped to what the runtime's
+  *current* architecture actually supports today: the mobile runtime still boots from a
+  compile-time-bundled schema constant (the live publish → fetch → cache loop is `APP-BUILDER-19`,
+  not yet built), so there is no live-fetched schema to thread through `MaterialApp`'s root state
+  yet — that lifting is `APP-BUILDER-19`'s concern, not invented here ahead of it. No new theme
+  token key was introduced (`colorPrimary` is the only one the bundled schema already carries) —
+  "no token redesign," per the evidence. 5 new focused tests (`theme_seed_test.dart`) plus one
+  widget-level assertion in `widget_test.dart` that `Theme.of(context).colorScheme.primary` matches
+  the same seed computation. **Not verified locally — this session has no Flutter SDK**; relies on
+  `mobile-ci.yml` as the verification gate, consistent with every other Dart change deferred in this
+  horizon for the same reason. No accounting impact.
 
 TASK-QUEUE.md records the finalized task decomposition (`APP-BUILDER-13`..`APP-BUILDER-23`) under
 the horizon header, promoted to `ready` in dependency order per ADR-01.

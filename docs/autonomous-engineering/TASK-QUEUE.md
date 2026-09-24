@@ -930,7 +930,7 @@ Source of truth for this horizon:
 | 7 | APP-BUILDER-19 | ready | ADR-01 (Decision Point 1 = YES) | Live publish → fetch → on-device-cache loop (Last Known Good) |
 | 8 | APP-BUILDER-20 | ready (after 18+19) | APP-BUILDER-18, APP-BUILDER-19 | Same-Store integrated proof |
 | 9 | APP-BUILDER-21 | done (PR pending) | none (independent, mandatory) | App Builder UX/localization pass |
-| 10 | APP-BUILDER-22 | ready | none (independent, mandatory) | Canvas + Flutter theme-token rendering fix |
+| 10 | APP-BUILDER-22 | done (PR pending) | none (independent, mandatory) | Canvas + Flutter theme-token rendering fix |
 | 11 | APP-BUILDER-23 | blocked | all above | Horizon closure report |
 
 `APP-BUILDER-21`/`APP-BUILDER-22` have no dependency on the data/runtime track and may execute in
@@ -1024,7 +1024,7 @@ Inspector UX for authoring conditions deferred to land with `APP-BUILDER-15`'s b
 scope note above). `APP-BUILDER-21` promoted to `in_progress` (independent, mandatory).
 
 `APP-BUILDER-21` (App Builder UX/localization) is `done` locally (commit `8ab18df` on
-`claude/app-builder-21-ux-localization`, PR pending): a `Label(ar, en)` value object added to every
+`claude/app-builder-21-ux-localization`, PR #997 open): a `Label(ar, en)` value object added to every
 `ComponentRegistry`/`ActionRegistry` definition and every prop/action-param, serialized by
 `AppBuilderRegistryController`. No schema identifier renamed — `type`/prop keys/action-param keys
 untouched, so published experiences and `commerce/v1`/binding contracts are unaffected. Frontend
@@ -1036,3 +1036,29 @@ than simulated storefront content — a distinction surfaced during implementati
 before landing. 94 backend tests/476 assertions (targeted `ComponentRegistryTest`/
 `ActionRegistryTest`/`AppBuilderRegistryTest`) green; full frontend suite (2076 tests), `tsc
 --noEmit`, and `npm run build` all green. No accounting impact.
+
+`APP-BUILDER-22` (Canvas + Flutter theme-token rendering fix) is `done` locally on
+`claude/app-builder-21-ux-localization`, PR pending — the gap from evidence §11 closed on both
+sides:
+
+- **Web**: `tailwind.config.ts` gains an additive `canvas` radius scale value (`rounded-canvas` →
+  `var(--canvas-radius, 0.5rem)`) instead of touching `borderRadius.DEFAULT` (which backs the bare
+  `rounded` class app-wide — ~286 files outside the Builder — so making it var-driven would have
+  broken every one of them wherever `--canvas-radius` is unset). `canvas.tsx`'s `themeCssVars()`
+  sets `--canvas-radius` from `theme.tokens.radius`; `Quantity`/`AddToCart`/`Button` (merchant
+  content) switched from bare `rounded` to `rounded-canvas`; `NodeFrame`/`TypeTag` (Builder chrome)
+  intentionally left alone. Verified: full frontend suite stays green (2076/2076) after the change
+  — proof the fix is genuinely scoped to the canvas and nothing else, `tsc --noEmit` clean, `npm
+  run build` succeeds.
+- **Flutter**: `app.dart` gains `themeSeedColorFromSchema(String)` — a pure, defensive function
+  (same posture as `component_widgets.dart`'s prop reads: malformed input never crashes boot,
+  always falls back to the safe default) that reads `theme.tokens.colorPrimary` from the bundled
+  `kHomeSchemaJson` and seeds `ThemeData.colorSchemeSeed`, replacing a previously disconnected
+  hardcoded literal. Scoped to today's actual architecture: the runtime still boots from a
+  compile-time-bundled schema (the live fetch loop is `APP-BUILDER-19`, not yet built), so no
+  MaterialApp-root state-lifting was invented ahead of that task; no new theme token key was added
+  (`colorPrimary` is the only one the bundled schema carries) — no token redesign, per the
+  evidence. 5 new tests in `theme_seed_test.dart` plus a `widget_test.dart` assertion that
+  `Theme.of(context).colorScheme.primary` matches the same seed computation. **Not verified
+  locally — no Flutter SDK in this session**; relies on `mobile-ci.yml`, same as every other Dart
+  change deferred in this horizon for the same reason. No accounting impact.

@@ -6,7 +6,7 @@ import { ImageOff, ShoppingCart } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatRiyal } from '@/lib/money';
 import { registryLabel, type AppBuilderRegistries, type AppSchemaComponent } from '@/lib/app-builder';
-import { presentationCssVars } from '@/modules/store-experience-builder/presentation/tokens';
+import { presentationCssVars, radiusToken, RADIUS_PRESETS, type RadiusId } from '@/modules/store-experience-builder/presentation/tokens';
 
 /**
  * APP-BUILDER-5 — عرض تقريبي إطاري-محايد (React/Tailwind) لعقدة مخطط، لا رسم Flutter
@@ -245,9 +245,9 @@ function CanvasComponentNode({
       const value = intProp(node, 'value', 1);
       return frame(
         <div className="flex w-fit items-center gap-2 p-1.5 text-sm text-text">
-          <span className="rounded border border-border px-1.5">−</span>
+          <span className="rounded-canvas border border-border px-1.5">−</span>
           <span className="num">{value}</span>
-          <span className="rounded border border-border px-1.5">+</span>
+          <span className="rounded-canvas border border-border px-1.5">+</span>
         </div>
       );
     }
@@ -255,7 +255,7 @@ function CanvasComponentNode({
     case 'AddToCart': {
       const label = stringProp(node, 'label', 'إضافة للسلة');
       return frame(
-        <span className="inline-flex items-center gap-1.5 rounded bg-primary px-2.5 py-1.5 text-xs font-medium text-primary-foreground">
+        <span className="inline-flex items-center gap-1.5 rounded-canvas bg-primary px-2.5 py-1.5 text-xs font-medium text-primary-foreground">
           <ShoppingCart className="h-3.5 w-3.5" strokeWidth={1.8} aria-hidden="true" />
           {label}
         </span>
@@ -290,7 +290,7 @@ function CanvasComponentNode({
       return frame(
         <span
           className={cn(
-            'inline-block rounded px-2.5 py-1.5 text-xs font-medium',
+            'inline-block rounded-canvas px-2.5 py-1.5 text-xs font-medium',
             style === 'secondary' ? 'border border-border text-text' : 'bg-primary text-primary-foreground'
           )}
         >
@@ -315,17 +315,24 @@ function CanvasComponentNode({
 }
 
 /**
- * تحويل رموز مظهر محدودة (لون فقط اليوم) إلى متغيّرات CSS تلتقطها فئات
+ * تحويل رموز مظهر محدودة (لون + نصف قطر) إلى متغيّرات CSS تلتقطها فئات
  * `bg-primary`/`text-primary-foreground` الموجودة أصلاً (`tailwind.config.ts`:
- * `var(--primary)`/`var(--primary-foreground)`) — بلا إعادة كتابة أي مكوّن.
- * نصف القطر محفوظ في `theme.tokens` ويُقارَن/يُطبَّق، لكن لا يُعاين هنا بعد:
- * `borderRadius.DEFAULT` في Tailwind قيمة ثابتة لا متغيّر (انظر وثيقة الأدلّة).
+ * `var(--primary)`/`var(--primary-foreground)`) وفئة `rounded-canvas` الجديدة
+ * (`var(--canvas-radius)`) — بلا إعادة كتابة أي مكوّن. **مغلَق الآن** (كان
+ * فجوة موثَّقة في وثيقة الأدلّة §11 — APP-BUILDER-22): `borderRadius.DEFAULT`
+ * في Tailwind يبقى قيمة ثابتة عمداً (تستعملها فئة `rounded` المجرّدة في كل
+ * الواجهة خارج الـBuilder)، فأُضيف نطاقٌ منفصل `canvas` بدل تعديله.
  */
 function themeCssVars(tokens: Record<string, string> | undefined): React.CSSProperties {
   const primary = tokens?.primaryColor;
-  if (!primary || !/^#([0-9a-fA-F]{6})$/.test(primary)) return {};
-  const vars = presentationCssVars(primary, 'default');
-  return { '--primary': vars['--primary'], '--primary-foreground': vars['--primary-foreground'] } as React.CSSProperties;
+  const radiusId = (RADIUS_PRESETS.some((preset) => preset.id === tokens?.radius) ? tokens!.radius : 'default') as RadiusId;
+  const vars: Record<string, string> = { '--canvas-radius': radiusToken(radiusId) };
+  if (primary && /^#([0-9a-fA-F]{6})$/.test(primary)) {
+    const presentationVars = presentationCssVars(primary, radiusId);
+    vars['--primary'] = presentationVars['--primary'];
+    vars['--primary-foreground'] = presentationVars['--primary-foreground'];
+  }
+  return vars as React.CSSProperties;
 }
 
 export function AppBuilderCanvas({
