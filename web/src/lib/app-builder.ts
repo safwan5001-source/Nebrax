@@ -60,6 +60,40 @@ export interface AppSchemaActionRef {
   params?: Record<string, unknown>;
 }
 
+// ── Binding + Visibility (APP-BUILDER-14/16, edited by APP-BUILDER-15's Inspector) ──
+// شكلا `binding`/`visibility` هنا يطابقان حرفياً ما يتحقّقه `AppSchemaParser`
+// بنيوياً (لا محرّك تعابير — قيَم سكالر/قوائم فقط). صحّة هوية المورد/الإشارة/
+// المُشغّل وتوافق النوع تُتحقَّق خادمياً وقت النشر (`CompatibilityResolver`)،
+// لا هنا — هذه الأنواع تصف الشكل المسموح تركيبياً فقط.
+
+export interface AppSchemaBinding {
+  resource: string;
+  query?: Record<string, unknown>;
+  itemProps?: Record<string, string>;
+}
+
+export type VisibilityScalar = string | number | boolean | null;
+
+export interface VisibilityLeaf {
+  signal: string;
+  operator: string;
+  value?: VisibilityScalar | VisibilityScalar[];
+}
+
+export interface VisibilityAll {
+  all: VisibilityNode[];
+}
+
+export interface VisibilityAny {
+  any: VisibilityNode[];
+}
+
+export type VisibilityNode = VisibilityAll | VisibilityAny | VisibilityLeaf;
+
+export function isVisibilityLeaf(node: VisibilityNode): node is VisibilityLeaf {
+  return 'signal' in node;
+}
+
 export interface AppSchemaComponent {
   type: string;
   id: string;
@@ -67,6 +101,8 @@ export interface AppSchemaComponent {
   props?: Record<string, unknown>;
   children?: AppSchemaComponent[];
   action?: AppSchemaActionRef;
+  binding?: AppSchemaBinding;
+  visibility?: VisibilityNode;
 }
 
 export interface AppSchema {
@@ -121,8 +157,8 @@ export interface RegistryComponentDefinition {
   children_rule: RegistryChildrenRule;
   actionable: boolean;
   injected_runtime_action_params: string[];
-  bindable_resources: string[];
   notes: string;
+  bindable_resources: string[];
 }
 
 export interface RegistryActionParamDefinition {
@@ -145,9 +181,37 @@ export interface RegistryActionDefinition {
   notes: string;
 }
 
+export interface RegistryResourceField {
+  key: string;
+  type: string;
+  localized: boolean;
+}
+
+export interface RegistryResourceQueryParam {
+  key: string;
+  kind: 'filter' | 'sort';
+}
+
+export interface RegistryResourceDefinition {
+  id: string;
+  version: number;
+  shape: 'list' | 'single';
+  paginated: boolean;
+  fields: RegistryResourceField[];
+  query_params: RegistryResourceQueryParam[];
+}
+
+export interface RegistryVisibilityOperator {
+  type: string;
+  value_arity: 'none' | 'single' | 'list';
+}
+
 export interface AppBuilderRegistries {
   components: Record<string, RegistryComponentDefinition>;
   actions: Record<string, RegistryActionDefinition>;
+  resources: Record<string, RegistryResourceDefinition>;
+  visibility_signals: string[];
+  visibility_operators: RegistryVisibilityOperator[];
 }
 
 /** يبحث عن عقدة بمعرّفها ضمن شجرة صفحة — أول تطابق بعمقٍ أول. */

@@ -923,14 +923,14 @@ Source of truth for this horizon:
 |---|---|---|---|---|
 | 1 | APP-BUILDER-13 | done | ADR-01 | Data Resource Registry V1 foundation (populate `commerce.categories`/`commerce.products`/`commerce.cart`) |
 | 2 | APP-BUILDER-14 | done | APP-BUILDER-13 | App Schema `binding` contract (parser + compatibility resolver) |
-| 3 | APP-BUILDER-15 | ready (after 14) | APP-BUILDER-14 | Builder Data UX (Inspector binding editor) |
+| 3 | APP-BUILDER-15 | done (PR #998) | APP-BUILDER-14 | Builder Data UX (Inspector binding editor) |
 | 4 | APP-BUILDER-16 | done (schema contract) | ADR-01 | Conditions/Visibility contract (closed/typed/allowlisted) + Inspector UX |
-| 5 | APP-BUILDER-17 | ready (after 14) | APP-BUILDER-14 | Mobile runtime binding/visibility resolver (replaces 3 hand-written screen implementations) |
+| 5 | APP-BUILDER-17 | in_progress (slice 1/3 done, PR #999) | APP-BUILDER-14 | Mobile runtime binding/visibility resolver (replaces 3 hand-written screen implementations) |
 | 6 | APP-BUILDER-18 | ready (after 17) | APP-BUILDER-17 | Real action dispatch wired through schema bindings |
 | 7 | APP-BUILDER-19 | ready | ADR-01 (Decision Point 1 = YES) | Live publish → fetch → on-device-cache loop (Last Known Good) |
 | 8 | APP-BUILDER-20 | ready (after 18+19) | APP-BUILDER-18, APP-BUILDER-19 | Same-Store integrated proof |
-| 9 | APP-BUILDER-21 | done (PR pending) | none (independent, mandatory) | App Builder UX/localization pass |
-| 10 | APP-BUILDER-22 | done (PR pending) | none (independent, mandatory) | Canvas + Flutter theme-token rendering fix |
+| 9 | APP-BUILDER-21 | done (PR #997 merged) | none (independent, mandatory) | App Builder UX/localization pass |
+| 10 | APP-BUILDER-22 | done (PR #997 merged) | none (independent, mandatory) | Canvas + Flutter theme-token rendering fix |
 | 11 | APP-BUILDER-23 | blocked | all above | Horizon closure report |
 
 `APP-BUILDER-21`/`APP-BUILDER-22` have no dependency on the data/runtime track and may execute in
@@ -1023,23 +1023,22 @@ shown control implies. 46 new focused tests, full `AppBuilder*` regression green
 Inspector UX for authoring conditions deferred to land with `APP-BUILDER-15`'s binding editor (see
 scope note above). `APP-BUILDER-21` promoted to `in_progress` (independent, mandatory).
 
-`APP-BUILDER-21` (App Builder UX/localization) is `done` locally (commit `8ab18df` on
-`claude/app-builder-21-ux-localization`, PR #997 open): a `Label(ar, en)` value object added to every
-`ComponentRegistry`/`ActionRegistry` definition and every prop/action-param, serialized by
-`AppBuilderRegistryController`. No schema identifier renamed — `type`/prop keys/action-param keys
-untouched, so published experiences and `commerce/v1`/binding contracts are unaffected. Frontend
-`registryLabel(label, locale)` helper renders localized labels in the Inspector (prop rows,
-action-param rows, action-type select, add-child select) and LayersTree node badges; raw
-identifiers preserved as `title` tooltips throughout. Canvas type-tag badge uses the actual UI
-locale (`useLocale()`), not the content-preview locale toggle, since it is Builder chrome rather
-than simulated storefront content — a distinction surfaced during implementation and corrected
-before landing. 94 backend tests/476 assertions (targeted `ComponentRegistryTest`/
-`ActionRegistryTest`/`AppBuilderRegistryTest`) green; full frontend suite (2076 tests), `tsc
---noEmit`, and `npm run build` all green. No accounting impact.
+`APP-BUILDER-21` (App Builder UX/localization) is `done`: PR #997 merged (squash Merge SHA
+`8dbff6fbd197f5a5b1ba47ce398a6792ecd90db5`, confirmed single-parent squash onto `main`, parent
+`22156e4`). A `Label(ar, en)` value object added to every `ComponentRegistry`/`ActionRegistry`
+definition and every prop/action-param, serialized by `AppBuilderRegistryController`. No schema
+identifier renamed — `type`/prop keys/action-param keys untouched, so published experiences and
+`commerce/v1`/binding contracts are unaffected. Frontend `registryLabel(label, locale)` helper
+renders localized labels in the Inspector (prop rows, action-param rows, action-type select,
+add-child select) and LayersTree node badges; raw identifiers preserved as `title` tooltips
+throughout. Canvas type-tag badge uses the actual UI locale (`useLocale()`), not the content-preview
+locale toggle, since it is Builder chrome rather than simulated storefront content — a distinction
+surfaced during implementation and corrected before landing. 94 backend tests/476 assertions
+(targeted `ComponentRegistryTest`/`ActionRegistryTest`/`AppBuilderRegistryTest`) green; full frontend
+suite (2076 tests), `tsc --noEmit`, and `npm run build` all green. No accounting impact.
 
-`APP-BUILDER-22` (Canvas + Flutter theme-token rendering fix) is `done` locally on
-`claude/app-builder-21-ux-localization`, PR pending — the gap from evidence §11 closed on both
-sides:
+`APP-BUILDER-22` (Canvas + Flutter theme-token rendering fix) is `done`, same PR #997 merge — the gap
+from evidence §11 closed on both sides:
 
 - **Web**: `tailwind.config.ts` gains an additive `canvas` radius scale value (`rounded-canvas` →
   `var(--canvas-radius, 0.5rem)`) instead of touching `borderRadius.DEFAULT` (which backs the bare
@@ -1059,6 +1058,24 @@ sides:
   MaterialApp-root state-lifting was invented ahead of that task; no new theme token key was added
   (`colorPrimary` is the only one the bundled schema carries) — no token redesign, per the
   evidence. 5 new tests in `theme_seed_test.dart` plus a `widget_test.dart` assertion that
-  `Theme.of(context).colorScheme.primary` matches the same seed computation. **Not verified
-  locally — no Flutter SDK in this session**; relies on `mobile-ci.yml`, same as every other Dart
+  `Theme.of(context).colorScheme.primary` matches the same seed computation. **Verified via
+  `mobile-ci.yml` post-merge (green)** — this session has no Flutter SDK, same as every other Dart
   change deferred in this horizon for the same reason. No accounting impact.
+
+`APP-BUILDER-15` (Builder Data UX — Inspector binding/visibility editor) is `done`, PR #998.
+`AppBuilderRegistryController` now
+exposes `resources`/`visibility_signals`/`visibility_operators` and each component's
+`bindable_resources` (the field existed since `APP-BUILDER-14` but was never serialized). Frontend
+gains a `BindingEditor` (resource → filter/sort → per-prop field mapping, shown only for components
+whose registry entry lists `bindable_resources`) and a `VisibilityEditor` that edits a **flat**
+condition only (one leaf, or one combinator over N leaves — no nested tree editor, matching `ADR-01`'s
+closed/typed vocabulary, not an expression builder); a deeper shape arriving via direct API edits
+renders read-only with a reset action rather than being silently reinterpreted. Deliberate scope
+decision: `commerce.products`'s `category_id` filter is excluded from the buildable query UI because
+its only documented value (`$route.categoryId`) is a navigation-context reference with no runtime
+mechanism anywhere in the codebase yet — recorded as a Commerce/runtime dependency rather than
+invented ahead of the task that would actually build context-passing. 7 new backend tests
+(`AppBuilderRegistryTest`) + 5 new frontend tests (builder `page.test.tsx`). Verified: 93 targeted
+backend tests green, full frontend suite (2081 tests) green, `tsc --noEmit` clean, `npm run build`
+succeeds, `en.json`/`ar.json` key parity confirmed for the new translation subtrees. No accounting
+impact — authoring-only; no runtime effect until `APP-BUILDER-17`.

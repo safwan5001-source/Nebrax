@@ -127,7 +127,7 @@ describe('createComponentFromDefinition', () => {
         { key: 'noDefault', type: 'string', required: false, label: { ar: 'بلا افتراضي', en: 'No Default' }, default: null, enum_values: null },
       ],
       children_rule: { kind: 'none', suggested_child_type: null },
-      actionable: false, injected_runtime_action_params: [], bindable_resources: [], notes: '',
+      actionable: false, injected_runtime_action_params: [], notes: '', bindable_resources: [],
     };
     const node = createComponentFromDefinition('Text', definition);
     expect(node.type).toBe('Text');
@@ -137,7 +137,7 @@ describe('createComponentFromDefinition', () => {
     const definition: RegistryComponentDefinition = {
       type: 'Page', version: 1, category: 'layout', label: { ar: 'الصفحة', en: 'Page' }, props: [],
       children_rule: { kind: 'unboundedAny', suggested_child_type: null },
-      actionable: false, injected_runtime_action_params: [], bindable_resources: [], notes: '',
+      actionable: false, injected_runtime_action_params: [], notes: '', bindable_resources: [],
     };
     const node = createComponentFromDefinition('Page', definition);
     expect(node.props).toBeUndefined();
