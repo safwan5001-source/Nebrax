@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select } from '@/components/ui/select';
 import {
-  createComponentFromDefinition, isVisibilityLeaf,
+  createComponentFromDefinition, isVisibilityLeaf, registryLabel,
   type AppSchemaActionRef, type AppSchemaBinding, type AppSchemaComponent, type AppBuilderRegistries,
   type RegistryActionParamDefinition, type RegistryPropDefinition, type RegistryResourceDefinition,
   type RegistryVisibilityOperator, type VisibilityLeaf, type VisibilityNode, type VisibilityScalar,
@@ -128,15 +128,17 @@ function PropRow({
   definition,
   value,
   onChange,
+  locale,
 }: {
   definition: RegistryPropDefinition;
   value: unknown;
   onChange: (next: unknown) => void;
+  locale: string;
 }) {
   return (
     <div className="space-y-1 border-b border-border py-2 last:border-0">
-      <label className="block text-xs font-medium text-text">
-        {definition.key}
+      <label className="block text-xs font-medium text-text" title={definition.key}>
+        {registryLabel(definition.label, locale)}
         {definition.required ? <span className="text-negative"> *</span> : null}
       </label>
       <PropField definition={definition} value={value} onChange={onChange} />
@@ -194,17 +196,19 @@ function ActionParamRow({
   onChange,
   pageIds,
   t,
+  locale,
 }: {
   definition: RegistryActionParamDefinition;
   value: unknown;
   onChange: (next: unknown) => void;
   pageIds?: string[];
   t: ReturnType<typeof useTranslations>;
+  locale: string;
 }) {
   return (
     <div className="space-y-1 border-b border-border py-2 last:border-0">
-      <label className="block text-xs font-medium text-text">
-        {definition.key}
+      <label className="block text-xs font-medium text-text" title={definition.key}>
+        {registryLabel(definition.label, locale)}
         {definition.required ? <span className="text-negative"> *</span> : null}
       </label>
       <ActionParamField definition={definition} value={value} onChange={onChange} pageIds={pageIds} t={t} />
@@ -549,6 +553,7 @@ export function Inspector({
   canRemove: boolean;
 }) {
   const t = useTranslations('appBuilder.builder');
+  const locale = useLocale();
   const [addType, setAddType] = React.useState<string>('');
 
   if (!node) {
@@ -621,7 +626,7 @@ export function Inspector({
     <div className="space-y-4 p-3">
       <div>
         <div className="flex items-center gap-2">
-          <h3 className="font-semibold text-text">{definition.type}</h3>
+          <h3 className="font-semibold text-text" title={definition.type}>{registryLabel(definition.label, locale)}</h3>
           <Badge tone="muted">{definition.category}</Badge>
         </div>
         <p className="mt-1 text-[11px] leading-relaxed text-muted">{definition.notes}</p>
@@ -633,7 +638,7 @@ export function Inspector({
           <p className="text-xs text-muted">{t('noProps')}</p>
         ) : (
           definition.props.map((prop) => (
-            <PropRow key={prop.key} definition={prop} value={node.props?.[prop.key]} onChange={(v) => setProp(prop.key, v)} />
+            <PropRow key={prop.key} definition={prop} value={node.props?.[prop.key]} onChange={(v) => setProp(prop.key, v)} locale={locale} />
           ))
         )}
       </div>
@@ -644,7 +649,7 @@ export function Inspector({
           <Select value={node.action?.type ?? ''} onChange={(event) => attachAction(event.target.value)} className="mb-2 h-8 text-xs">
             <option value="">{t('noAction')}</option>
             {actionTypeOptions.map((type) => (
-              <option key={type} value={type}>{type}</option>
+              <option key={type} value={type} title={type}>{registries ? registryLabel(registries.actions[type].label, locale) : type}</option>
             ))}
           </Select>
           {node.action && !actionDefinition ? (
@@ -662,6 +667,7 @@ export function Inspector({
                     onChange={(v) => setActionParam(param.key, v)}
                     pageIds={node.action?.type === 'navigate' && param.key === 'pageId' ? pageIds : undefined}
                     t={t}
+                    locale={locale}
                   />
                 ))}
               {actionDefinition.params.some((param) => injectedParams.has(param.key)) ? (
@@ -698,7 +704,7 @@ export function Inspector({
             <Select value={addType} onChange={(event) => setAddType(event.target.value)} className="h-8 text-xs">
               <option value="">{t('addChildPlaceholder')}</option>
               {componentTypeOptions.map((type) => (
-                <option key={type} value={type}>{type}</option>
+                <option key={type} value={type} title={type}>{registries ? registryLabel(registries.components[type].label, locale) : type}</option>
               ))}
             </Select>
             <Button type="button" size="sm" className="h-8 shrink-0 text-xs" disabled={!addType} onClick={handleAddChild}>

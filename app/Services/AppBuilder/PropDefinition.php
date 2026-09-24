@@ -20,6 +20,7 @@ final class PropDefinition
         public readonly string $key,
         public readonly string $type,
         public readonly bool $required,
+        public readonly Label $label,
         public readonly mixed $default = null,
         public readonly ?array $enumValues = null,
     ) {}

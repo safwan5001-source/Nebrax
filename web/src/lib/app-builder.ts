@@ -35,6 +35,15 @@ export function appDisplayName(app: Pick<BuilderApp, 'name' | 'name_en'>, locale
   return locale.toLowerCase().startsWith('en') && app.name_en ? app.name_en : app.name;
 }
 
+/**
+ * APP-BUILDER-21 — يختار تسمية بشرية من `RegistryLabel` حسب اللغة الحالية،
+ * مطابقاً لنمط `appDisplayName` تماماً. لا يُستهلَك لتغيير أي معرّف داخلي —
+ * عرضي بحت في Inspector/Layers/Canvas.
+ */
+export function registryLabel(label: RegistryLabel, locale: string): string {
+  return locale.toLowerCase().startsWith('en') ? label.en : label.ar;
+}
+
 export function hasAppBuilderPermission(
   user: { role: string; permissions?: string[] } | null,
   permission: string
@@ -115,10 +124,21 @@ export interface BuilderDraftExperience {
 
 // ── Component/Action registries (APP-BUILDER-3, serialized by AppBuilderRegistryController) ──
 
+/**
+ * APP-BUILDER-21 — تسمية بشرية ثنائية اللغة لمعرّف مخطط داخلي. لا تُستهلَك
+ * كبديل عن المعرّف الداخلي (`type`/`key`) في أي مكان يُرسَل فيه المخطط —
+ * عرضية بحتة في Inspector/Layers/Canvas فقط.
+ */
+export interface RegistryLabel {
+  ar: string;
+  en: string;
+}
+
 export interface RegistryPropDefinition {
   key: string;
   type: string;
   required: boolean;
+  label: RegistryLabel;
   default: unknown;
   enum_values: string[] | null;
 }
@@ -132,6 +152,7 @@ export interface RegistryComponentDefinition {
   type: string;
   version: number;
   category: string;
+  label: RegistryLabel;
   props: RegistryPropDefinition[];
   children_rule: RegistryChildrenRule;
   actionable: boolean;
@@ -144,6 +165,7 @@ export interface RegistryActionParamDefinition {
   key: string;
   type: string;
   required: boolean;
+  label: RegistryLabel;
   nullable: boolean;
   default: unknown;
   min_value: number | null;
@@ -153,6 +175,7 @@ export interface RegistryActionDefinition {
   type: string;
   version: number;
   risk_class: string;
+  label: RegistryLabel;
   params: RegistryActionParamDefinition[];
   dispatch_status: string;
   notes: string;

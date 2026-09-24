@@ -120,11 +120,11 @@ describe('generateComponentId', () => {
 describe('createComponentFromDefinition', () => {
   it('seeds props from the registry defaults, skipping null defaults', () => {
     const definition: RegistryComponentDefinition = {
-      type: 'Text', version: 1, category: 'content',
+      type: 'Text', version: 1, category: 'content', label: { ar: 'نص', en: 'Text' },
       props: [
-        { key: 'text', type: 'string', required: false, default: '', enum_values: null },
-        { key: 'style', type: 'string', required: false, default: 'body', enum_values: ['title', 'body', 'caption'] },
-        { key: 'noDefault', type: 'string', required: false, default: null, enum_values: null },
+        { key: 'text', type: 'string', required: false, label: { ar: 'النص', en: 'Text' }, default: '', enum_values: null },
+        { key: 'style', type: 'string', required: false, label: { ar: 'الأسلوب', en: 'Style' }, default: 'body', enum_values: ['title', 'body', 'caption'] },
+        { key: 'noDefault', type: 'string', required: false, label: { ar: 'بلا افتراضي', en: 'No Default' }, default: null, enum_values: null },
       ],
       children_rule: { kind: 'none', suggested_child_type: null },
       actionable: false, injected_runtime_action_params: [], notes: '', bindable_resources: [],
@@ -135,7 +135,7 @@ describe('createComponentFromDefinition', () => {
   });
   it('omits props entirely when the component has none with a default', () => {
     const definition: RegistryComponentDefinition = {
-      type: 'Page', version: 1, category: 'layout', props: [],
+      type: 'Page', version: 1, category: 'layout', label: { ar: 'الصفحة', en: 'Page' }, props: [],
       children_rule: { kind: 'unboundedAny', suggested_child_type: null },
       actionable: false, injected_runtime_action_params: [], notes: '', bindable_resources: [],
     };

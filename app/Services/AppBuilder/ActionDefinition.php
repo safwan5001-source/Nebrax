@@ -24,5 +24,6 @@ final class ActionDefinition
         public readonly array $params,
         public readonly string $dispatchStatus,
         public readonly string $notes,
+        public readonly Label $label,
     ) {}
 }

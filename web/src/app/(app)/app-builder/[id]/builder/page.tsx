@@ -392,6 +392,7 @@ export default function AppBuilderWorkspacePage() {
               onReorder={(parentId, orderedIds) => selectedPageId && reorderSiblings(selectedPageId, parentId, orderedIds)}
               onMove={(id, direction) => selectedPageId && moveNode(selectedPageId, id, direction)}
               emptyLabel={t('emptyPage')}
+              registries={registries}
             />
           </div>
         </>
@@ -506,6 +507,7 @@ export default function AppBuilderWorkspacePage() {
           selectedId={selectedComponentId}
           onSelect={selectComponent}
           themeTokens={previewThemeTokens ?? schemaThemeTokens(schema)}
+          registries={registries}
         />
 
         <aside className="hidden w-72 shrink-0 overflow-hidden border-s border-border bg-surface lg:block">

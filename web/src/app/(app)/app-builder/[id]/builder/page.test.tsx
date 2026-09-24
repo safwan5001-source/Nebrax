@@ -206,33 +206,33 @@ const draftData = {
 
 const registriesData = {
   components: {
-    Page: { type: 'Page', version: 1, category: 'layout', props: [], children_rule: { kind: 'unboundedAny', suggested_child_type: null }, actionable: false, injected_runtime_action_params: [], notes: 'Page root.', bindable_resources: [] },
-    Section: { type: 'Section', version: 1, category: 'layout', props: [{ key: 'title', type: 'string', required: false, default: null, enum_values: null }], children_rule: { kind: 'unboundedAny', suggested_child_type: null }, actionable: false, injected_runtime_action_params: [], notes: 'Section.', bindable_resources: [] },
-    Text: { type: 'Text', version: 1, category: 'content', props: [{ key: 'text', type: 'string', required: false, default: '', enum_values: null }], children_rule: { kind: 'none', suggested_child_type: null }, actionable: false, injected_runtime_action_params: [], notes: 'Text.', bindable_resources: [] },
+    Page: { type: 'Page', version: 1, category: 'layout', label: { ar: 'الصفحة', en: 'Page' }, props: [], children_rule: { kind: 'unboundedAny', suggested_child_type: null }, actionable: false, injected_runtime_action_params: [], notes: 'Page root.', bindable_resources: [] },
+    Section: { type: 'Section', version: 1, category: 'layout', label: { ar: 'قسم', en: 'Section' }, props: [{ key: 'title', type: 'string', required: false, label: { ar: 'العنوان', en: 'Title' }, default: null, enum_values: null }], children_rule: { kind: 'unboundedAny', suggested_child_type: null }, actionable: false, injected_runtime_action_params: [], notes: 'Section.', bindable_resources: [] },
+    Text: { type: 'Text', version: 1, category: 'content', label: { ar: 'نص', en: 'Text' }, props: [{ key: 'text', type: 'string', required: false, label: { ar: 'النص', en: 'Text' }, default: '', enum_values: null }], children_rule: { kind: 'none', suggested_child_type: null }, actionable: false, injected_runtime_action_params: [], notes: 'Text.', bindable_resources: [] },
     ProductCard: {
-      type: 'ProductCard', version: 1, category: 'commerce',
+      type: 'ProductCard', version: 1, category: 'commerce', label: { ar: 'بطاقة المنتج', en: 'Product Card' },
       props: [
-        { key: 'title', type: 'string', required: true, default: '', enum_values: null },
-        { key: 'amountMinor', type: 'amountMinor', required: true, default: 0, enum_values: null },
+        { key: 'title', type: 'string', required: true, label: { ar: 'العنوان', en: 'Title' }, default: '', enum_values: null },
+        { key: 'amountMinor', type: 'amountMinor', required: true, label: { ar: 'السعر', en: 'Price' }, default: 0, enum_values: null },
       ],
       children_rule: { kind: 'none', suggested_child_type: null }, actionable: true, injected_runtime_action_params: [], notes: 'Product card.',
       bindable_resources: [],
     },
     ProductList: {
-      type: 'ProductList', version: 1, category: 'commerce', props: [],
+      type: 'ProductList', version: 1, category: 'commerce', label: { ar: 'قائمة المنتجات', en: 'Product List' }, props: [],
       children_rule: { kind: 'unboundedAny', suggested_child_type: 'ProductCard' }, actionable: false, injected_runtime_action_params: [], notes: 'Product list.',
       bindable_resources: ['commerce.products'],
     },
   },
   actions: {
     openProduct: {
-      type: 'openProduct', version: 1, risk_class: 'navigation',
-      params: [{ key: 'productId', type: 'string', required: true, nullable: false, default: null, min_value: null }],
+      type: 'openProduct', version: 1, risk_class: 'navigation', label: { ar: 'فتح المنتج', en: 'Open Product' },
+      params: [{ key: 'productId', type: 'string', required: true, label: { ar: 'معرّف المنتج', en: 'Product ID' }, nullable: false, default: null, min_value: null }],
       dispatch_status: 'provenNoop', notes: 'Opens a product.',
     },
     navigate: {
-      type: 'navigate', version: 1, risk_class: 'navigation',
-      params: [{ key: 'pageId', type: 'string', required: true, nullable: false, default: null, min_value: null }],
+      type: 'navigate', version: 1, risk_class: 'navigation', label: { ar: 'الانتقال', en: 'Navigate' },
+      params: [{ key: 'pageId', type: 'string', required: true, label: { ar: 'معرّف الصفحة', en: 'Page ID' }, nullable: false, default: null, min_value: null }],
       dispatch_status: 'provenNoop', notes: 'Navigates to a page.',
     },
   },
@@ -327,7 +327,7 @@ describe('AppBuilderWorkspacePage', () => {
     expect(await screen.findByText('Featured')).toBeTruthy();
     // Layers tree shows every node's type (rendered twice: desktop pane + mobile pane).
     expect(screen.getAllByText('Section').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('ProductCard').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Product Card').length).toBeGreaterThan(0);
     // Canvas renders the Text node's content and the formatted price.
     expect(screen.getAllByText('Welcome').length).toBeGreaterThan(0);
     expect(screen.getAllByText(/123\.45/).length).toBeGreaterThan(0);
@@ -341,12 +341,12 @@ describe('AppBuilderWorkspacePage', () => {
     render(<AppBuilderWorkspacePage />);
     await screen.findByText('Featured');
 
-    const productCardRows = screen.getAllByText('ProductCard');
+    const productCardRows = screen.getAllByText('Product Card');
     await user.click(productCardRows[0]);
 
-    await waitFor(() => expect(screen.getAllByText('amountMinor').length).toBeGreaterThan(0));
-    expect(screen.getAllByText('openProduct').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('productId').length).toBeGreaterThan(0);
+    await waitFor(() => expect(screen.getAllByText('Price').length).toBeGreaterThan(0));
+    expect(screen.getAllByText('Open Product').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Product ID').length).toBeGreaterThan(0);
   });
 
   it('editing a text prop updates the canvas and marks the draft unsaved', async () => {
@@ -379,7 +379,7 @@ describe('AppBuilderWorkspacePage', () => {
     expect(screen.queryAllByText('Bye').length).toBe(0);
     expect(screen.queryAllByText('Welcome').length).toBe(0);
     // Selection moves to the removed node's parent (the Section), which has a `title` prop.
-    await waitFor(() => expect(screen.getAllByText('title').length).toBeGreaterThan(0));
+    await waitFor(() => expect(screen.getAllByText('Title').length).toBeGreaterThan(0));
   });
 
   it('the move-down button on a layers-tree row reorders siblings, bounded to the same parent', async () => {
@@ -390,9 +390,9 @@ describe('AppBuilderWorkspacePage', () => {
     const desktopTree = screen.getAllByRole('tree')[0];
     const rowsBefore = within(desktopTree).getAllByRole('treeitem').map((row) => row.textContent);
     expect(rowsBefore.some((text) => text?.includes('Text'))).toBe(true);
-    expect(rowsBefore.some((text) => text?.includes('ProductCard'))).toBe(true);
+    expect(rowsBefore.some((text) => text?.includes('Product Card'))).toBe(true);
     const textIndexBefore = rowsBefore.findIndex((text) => text?.includes('Text'));
-    const productCardIndexBefore = rowsBefore.findIndex((text) => text?.includes('ProductCard'));
+    const productCardIndexBefore = rowsBefore.findIndex((text) => text?.includes('Product Card'));
     expect(textIndexBefore).toBeLessThan(productCardIndexBefore);
 
     const [moveDownButton] = within(desktopTree).getAllByLabelText('Move down');
@@ -400,7 +400,7 @@ describe('AppBuilderWorkspacePage', () => {
 
     const rowsAfter = within(desktopTree).getAllByRole('treeitem').map((row) => row.textContent);
     const textIndexAfter = rowsAfter.findIndex((text) => text?.includes('Text'));
-    const productCardIndexAfter = rowsAfter.findIndex((text) => text?.includes('ProductCard'));
+    const productCardIndexAfter = rowsAfter.findIndex((text) => text?.includes('Product Card'));
     expect(textIndexAfter).toBeGreaterThan(productCardIndexAfter);
     expect(screen.getByText('Unsaved changes')).toBeTruthy();
   });
@@ -492,7 +492,7 @@ describe('AppBuilderWorkspacePage', () => {
     await userEvent.setup().click(sectionTag);
 
     // Selecting a component from the canvas returns the Inspector automatically.
-    await waitFor(() => expect(screen.getAllByText('title').length).toBeGreaterThan(0));
+    await waitFor(() => expect(screen.getAllByText('Title').length).toBeGreaterThan(0));
     expect(screen.queryAllByText('Presets').length).toBe(0);
   });
 
@@ -609,10 +609,10 @@ describe('AppBuilderWorkspacePage', () => {
     render(<AppBuilderWorkspacePage />);
     await screen.findByText('Featured');
 
-    const productCardRows = screen.getAllByText('ProductCard');
+    const productCardRows = screen.getAllByText('Product Card');
     await userEvent.setup().click(productCardRows[0]);
 
-    const [actionTypeSelect] = await screen.findAllByDisplayValue('openProduct');
+    const [actionTypeSelect] = await screen.findAllByDisplayValue('Open Product');
     fireEvent.change(actionTypeSelect, { target: { value: 'navigate' } });
 
     const [pageIdSelect] = await screen.findAllByDisplayValue('Choose a page');
@@ -626,7 +626,7 @@ describe('AppBuilderWorkspacePage', () => {
     await screen.findByText('Featured');
 
     const desktopTree = screen.getAllByRole('tree')[0];
-    await userEvent.setup().click(within(desktopTree).getByText('ProductList'));
+    await userEvent.setup().click(within(desktopTree).getByText('Product List'));
     expect(await screen.findAllByText('Data source')).toBeTruthy();
 
     await userEvent.setup().click(within(desktopTree).getByText('Text'));
@@ -639,7 +639,7 @@ describe('AppBuilderWorkspacePage', () => {
     await screen.findByText('Featured');
 
     const desktopTree = screen.getAllByRole('tree')[0];
-    await userEvent.setup().click(within(desktopTree).getByText('ProductList'));
+    await userEvent.setup().click(within(desktopTree).getByText('Product List'));
 
     const [resourceSelect] = await screen.findAllByDisplayValue('No data source (static content)');
     fireEvent.change(resourceSelect, { target: { value: 'commerce.products' } });
@@ -659,7 +659,7 @@ describe('AppBuilderWorkspacePage', () => {
     await screen.findByText('Featured');
 
     const desktopTree = screen.getAllByRole('tree')[0];
-    await userEvent.setup().click(within(desktopTree).getByText('ProductList'));
+    await userEvent.setup().click(within(desktopTree).getByText('Product List'));
     // ProductList has no props of its own — mapping section only makes sense
     // for a component that renders fields, so it should not appear here.
     expect(screen.queryAllByText('Map fields').length).toBe(0);
