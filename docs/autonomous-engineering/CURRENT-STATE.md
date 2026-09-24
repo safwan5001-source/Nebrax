@@ -2,7 +2,7 @@
 
 > This file is a durable resume point, not a substitute for Git/GitHub evidence.
 
-LAST_UPDATED: 2026-09-24 (AWJ App Builder Horizon V1 authorized and launched; APP-BUILDER-1/2/3/4/5/6/8/9/10 done. APP-BUILDER-7 (Data/Actions/Conditions/Visibility) evaluated for implementation and found NOT READY — a genuine Decision Escalation Gate, not an evidence gap: three of its four named concepts (Data, Conditions, Visibility) have no backing in the accepted, tested App Schema contract, and building them requires inventing an expression/condition engine or a Data Source Registry contract, both explicitly "not yet locked" in the accepted architecture doc. Owner decision (2026-09-24): keep APP-BUILDER-7 explicitly deferred (decision_required, not completed, not permanently skipped), proceed to APP-BUILDER-8 after a narrow dependency check found no real runtime/schema dependency on APP-BUILDER-7 — table updated, APP-BUILDER-8 promoted to ready then completed (PR #983, Theme + Use My Store Design), APP-BUILDER-9 likewise completed (PR #985, Templates + navigation/pages), APP-BUILDER-10 likewise completed (PR #988, Validate/Publish/Version/Rollback foundation). APP-BUILDER-11 now ready. Prior AWJ Mobile Runtime Proof Horizon V1 (below) is fully closed and is this horizon's accepted input.)
+LAST_UPDATED: 2026-09-24 (AWJ App Builder Horizon V1 authorized and launched; APP-BUILDER-1/2/3/4/5/6/8/9/10/11 done. APP-BUILDER-7 (Data/Actions/Conditions/Visibility) evaluated for implementation and found NOT READY — a genuine Decision Escalation Gate, not an evidence gap: three of its four named concepts (Data, Conditions, Visibility) have no backing in the accepted, tested App Schema contract, and building them requires inventing an expression/condition engine or a Data Source Registry contract, both explicitly "not yet locked" in the accepted architecture doc. Owner decision (2026-09-24): keep APP-BUILDER-7 explicitly deferred (decision_required, not completed, not permanently skipped), proceed to APP-BUILDER-8 after a narrow dependency check found no real runtime/schema dependency on APP-BUILDER-7 — table updated, APP-BUILDER-8 promoted to ready then completed (PR #983, Theme + Use My Store Design), APP-BUILDER-9 likewise completed (PR #985, Templates + navigation/pages), APP-BUILDER-10 likewise completed (PR #988, Validate/Publish/Version/Rollback foundation). APP-BUILDER-11's original "bind real Commerce resource / proven Flutter runtime consumes" line was found genuinely unsatisfiable inside the accepted contract (same undecided Data Source Registry boundary as APP-BUILDER-7) and escalated; owner decision (2026-09-24, option 2): redefined as an Integrated Proof of the currently accepted and actually implemented App Builder contract, completed (PR #990) with the real-Commerce-binding/live-runtime portion carried forward as a deferred/decision_required follow-up track alongside APP-BUILDER-7. APP-BUILDER-12 (Horizon closure) now ready — its closure report must explicitly distinguish completed capabilities from this deferred architecture track and then STOP for owner/ChatGPT review. Prior AWJ Mobile Runtime Proof Horizon V1 (below) is fully closed and is this horizon's accepted input.)
 LAYER_VERSION: V1
 STATUS: ACTIVE — AWJ App Builder Horizon V1
 
@@ -115,6 +115,34 @@ Execute **AWJ App Builder Horizon V1** sequentially under نظام الأفق, p
   path-restricted diff, post-merge CI green on the merge commit itself (`ci.yml` run `35989443086`
   sqlite+pgsql both success, `web-ci.yml` run `35989443048` success). `POST_MERGE_REVIEW: PASS`.
   Full evidence: `docs/plans/app-builder/APP-BUILDER-10-IMPLEMENTATION-REPORT.md`.
+- `APP-BUILDER-11` (Integrated vertical proof + UX/security closure) is **done** under an
+  owner-redefined scope (2026-09-24, option 2): a dependency check found the horizon doc's
+  original task-11 line ("bind real Commerce resource... proven Flutter runtime consumes") is not
+  satisfiable inside the accepted, tested contract — a schema `bindings` key is structurally
+  rejected, `DataResourceRegistry::RESOURCES` is deliberately empty, every registered `Action` is
+  `DISPATCH_PROVEN_NOOP`, and the architecture doc lists "exact Data Source Registry contract" as
+  explicitly not locked, the same undecided item that made `APP-BUILDER-7` a Decision Escalation
+  Gate. Escalated to the owner; redefined as an **Integrated Proof of the currently accepted and
+  actually implemented App Builder contract**. Delivered exactly that: one new test file,
+  `tests/Feature/AppBuilderIntegratedProofTest.php`, driving the real, already-shipped HTTP
+  contract through one connected merchant journey (create → edit → theme sync from a real seeded
+  `Storefront`/presentation → pages/navigation → Validate → Publish → immutable version → restore
+  to draft → revalidate → Publish again, proving an exact round trip) plus tenant-isolation and
+  RBAC coverage across every surface the proof touches, plus an explicit boundary test proving
+  `bindings` is still rejected and `DataResourceRegistry` stays empty after the full lifecycle
+  runs. Zero production code changed. Full redefinition record:
+  `docs/plans/app-builder/APP-BUILDER-11-UX-EVIDENCE-PASS.md`. The original task-11 intent's
+  real-Commerce-binding/live-runtime portion is recorded as a connected deferred/`decision_required`
+  follow-up track with `APP-BUILDER-7`, carried into `APP-BUILDER-12`'s closure report — not
+  silently dropped, not marked done. 4/4 new tests passed (61 assertions), 126/126 across the full
+  App Builder/Commerce-workspace regression slice, full frontend suite 2076/2076 passing
+  (unaffected), full backend suite 4638 passed / 35 pre-existing-failure baseline unchanged (zero
+  backend source drift). PR #990 merged: squash SHA `a7a2e0c35ee5a0a2ddebe7aaf23e281f861ce744`,
+  confirmed single-parent squash and zero content drift from the reviewed pre-merge head `9ce280c`
+  via a path-restricted diff, post-merge CI green on the merge commit itself (`ci.yml` run
+  `36003417429` sqlite+pgsql both success; no `web-ci.yml` run expected or triggered since the
+  diff touches only `tests/Feature/` and `docs/`). `POST_MERGE_REVIEW: PASS`. Full evidence:
+  `docs/plans/app-builder/APP-BUILDER-11-IMPLEMENTATION-REPORT.md`.
 
 ## AWJ Mobile Runtime Proof Horizon V1 (closed) — execution log
 
@@ -246,7 +274,22 @@ Execute **AWJ App Builder Horizon V1** sequentially under نظام الأفق, p
   never auto-publishes, its own focused UI/UX Evidence Pass completed before
   implementation. Full evidence: "AWJ App Builder Horizon V1" log above,
   `docs/plans/app-builder/APP-BUILDER-10-IMPLEMENTATION-REPORT.md`.
-- Remaining tasks `APP-BUILDER-11` through `APP-BUILDER-12`: see
+- Eleventh executable task: `APP-BUILDER-11` (Integrated vertical proof +
+  UX/security closure) — **done** under an owner-redefined scope (PR #990,
+  squash SHA `a7a2e0c3`). The original task-11 line ("bind real Commerce
+  resource... proven Flutter runtime consumes") was found not satisfiable
+  inside the accepted, tested contract and escalated; redefined as an
+  Integrated Proof of the currently accepted and actually implemented App
+  Builder contract, delivered as one new test file proving the full real
+  lifecycle (create → edit → theme sync from a real store → pages/navigation
+  → Validate → Publish → immutable version → restore → revalidate → publish
+  again) plus tenant/RBAC/deferred-boundary evidence, with zero production
+  code changed. The real-Commerce-binding/live-runtime portion of the
+  original intent is carried forward as a deferred/`decision_required`
+  follow-up track alongside `APP-BUILDER-7`, into `APP-BUILDER-12`'s closure
+  report. Full evidence: "AWJ App Builder Horizon V1" log above,
+  `docs/plans/app-builder/APP-BUILDER-11-IMPLEMENTATION-REPORT.md`.
+- Remaining task `APP-BUILDER-12`: see
   `docs/autonomous-engineering/TASK-QUEUE.md` for the full dependency-ordered
   table and promotion evidence.
 - Implementation merge: standing authority after mandatory final-head

@@ -507,8 +507,8 @@ Source of truth:
 | 8 | APP-BUILDER-8 | done | high | APP-BUILDER-6 (done); no real dependency on APP-BUILDER-7 (verified, see below) | Theme + Use My Store Design |
 | 9 | APP-BUILDER-9 | done | normal | APP-BUILDER-8 (done) | Templates + navigation/pages |
 | 10 | APP-BUILDER-10 | done | high | APP-BUILDER-9 (done); no real dependency on APP-BUILDER-7 (verified, see below) | Validate/Publish/Version/Rollback foundation |
-| 11 | APP-BUILDER-11 | ready | high | APP-BUILDER-10 (done) | Integrated vertical proof + UX/security closure |
-| 12 | APP-BUILDER-12 | pending | normal | APP-BUILDER-11 | Horizon closure — STOP for owner/ChatGPT review |
+| 11 | APP-BUILDER-11 | done | high | APP-BUILDER-10 (done) | Integrated vertical proof + UX/security closure |
+| 12 | APP-BUILDER-12 | ready | normal | APP-BUILDER-11 (done) | Horizon closure — STOP for owner/ChatGPT review |
 
 `APP-BUILDER-1` promoted directly to `ready`/`in_progress` from horizon authorization: the horizon
 document itself is the accepted source requirement, this is the first task, and its outcome
@@ -864,3 +864,24 @@ silently dropped, not marked done. Full redefinition record:
 `docs/plans/app-builder/APP-BUILDER-11-UX-EVIDENCE-PASS.md`. **`APP-BUILDER-7` itself remains
 untouched, still `decision_required`.** Table dependency is `APP-BUILDER-10 (done)` alone,
 promoted to `ready`.
+
+`APP-BUILDER-11` is `done`: PR #990 merged (squash SHA
+`a7a2e0c35ee5a0a2ddebe7aaf23e281f861ce744`, confirmed single-parent squash onto `main`, zero
+content drift from the reviewed pre-merge head `9ce280c` verified via a path-restricted diff),
+post-merge CI green on the merge commit itself (`ci.yml` run `36003417429` sqlite+pgsql both
+success; no `web-ci.yml` run was expected or triggered since the diff touches only
+`tests/Feature/` and `docs/`). Delivered exactly the redefined scope above: one new test file,
+`tests/Feature/AppBuilderIntegratedProofTest.php`, driving the real, already-shipped HTTP contract
+through one connected merchant journey (create → edit → theme sync from a real seeded
+`Storefront`/presentation → pages/navigation → Validate → Publish → immutable version → restore to
+draft → revalidate → Publish again, proving an exact round trip) plus tenant-isolation and RBAC
+coverage across every surface the proof touches, plus an explicit boundary test proving `bindings`
+is still rejected and `DataResourceRegistry` stays empty after the full lifecycle runs. Zero
+production code changed. 4/4 new tests passed (61 assertions), 126/126 across the full App
+Builder/Commerce-workspace regression slice (741 assertions), full frontend suite 2076/2076
+passing (unaffected), `npm run build` succeeds, `npx tsc --noEmit` zero errors, full backend suite
+4638 passed / 35 pre-existing-failure baseline unchanged (zero backend source drift, +4 matching
+this task's new tests exactly). The original task-11 intent's real-Commerce-binding/live-runtime
+portion is recorded as a connected deferred/`decision_required` follow-up track with
+`APP-BUILDER-7`, carried into `APP-BUILDER-12`'s closure report — not silently dropped, not marked
+done. Full evidence: `docs/plans/app-builder/APP-BUILDER-11-IMPLEMENTATION-REPORT.md`.
