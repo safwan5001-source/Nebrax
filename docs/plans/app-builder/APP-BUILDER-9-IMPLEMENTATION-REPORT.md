@@ -1,6 +1,6 @@
 # APP-BUILDER-9 — Implementation Report
 
-STATUS: pre-merge review
+STATUS: merged — post-merge review PASS
 DATE: 2026-09-24
 
 ## Outcome
@@ -118,6 +118,24 @@ no review — not actionable, same pattern as every prior App Builder PR).
 
 **PASS.** `PRE_MERGE_REVIEW: PASS` — CI green on the exact reviewed head (`0312ad0`), no merge
 conflict, no open review comments/threads requiring action, self-review (below) complete.
+
+## Post-merge review
+
+**PASS.** PR #985 merged via squash: Merge SHA `c054c9c2425e0f1f6172cee437d9fc2415073b66`.
+`main` advanced with two unrelated commits (#986 "fix(web): place app builder in commerce
+workspace nav", #987 "feat(web): add collapsible store builder navigation") between this task's
+implementation and the actual merge; GitHub's squash merge rebased cleanly against the new tip
+(`mergeable_state: clean` throughout). Confirmed a single-parent squash (parent `1ac16d631274701
+7568107b9ea7d1a7c1ede12bf`, the pre-merge tip at merge time) and, since the base moved, verified
+zero content drift the precise way that requires — diffing the reviewed head's own introduced
+changes (`git diff 1248223 0312ad0`, restricted to every path this task or its bundled
+`APP-BUILDER-8` docs commit touched) against the equivalent diff on the merge commit
+(`git diff 1ac16d6 c054c9c`, same path restriction) — byte-identical. Post-merge CI on the merge
+commit itself: `ci.yml` run
+[35981924200](https://github.com/safwan5001-source/Nebrax/actions/runs/35981924200) (sqlite/pgsql
+both `success`) and `web-ci.yml` run
+[35981924104](https://github.com/safwan5001-source/Nebrax/actions/runs/35981924104) (`web build
+(Next.js)`, `success`) — both confirmed green. `POST_MERGE_REVIEW: PASS`.
 
 ## Accounting impact
 

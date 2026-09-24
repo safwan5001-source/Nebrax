@@ -505,7 +505,7 @@ Source of truth:
 | 6 | APP-BUILDER-6 | done | normal | APP-BUILDER-5 (done) | Visual editing + history |
 | 7 | APP-BUILDER-7 | decision_required | normal | APP-BUILDER-6 (done) | Data/Actions/Conditions/Visibility (Develop mode) |
 | 8 | APP-BUILDER-8 | done | high | APP-BUILDER-6 (done); no real dependency on APP-BUILDER-7 (verified, see below) | Theme + Use My Store Design |
-| 9 | APP-BUILDER-9 | ready | normal | APP-BUILDER-8 (done) | Templates + navigation/pages |
+| 9 | APP-BUILDER-9 | done | normal | APP-BUILDER-8 (done) | Templates + navigation/pages |
 | 10 | APP-BUILDER-10 | pending | high | APP-BUILDER-9 | Validate/Publish/Version/Rollback foundation |
 | 11 | APP-BUILDER-11 | pending | high | APP-BUILDER-10 | Integrated vertical proof + UX/security closure |
 | 12 | APP-BUILDER-12 | pending | normal | APP-BUILDER-11 | Horizon closure — STOP for owner/ChatGPT review |
@@ -732,3 +732,25 @@ that page's own comment: "محتوى التصميم/القالب الفعلي م
 through the same `POST /app-builder/apps` + `PUT .../draft` endpoints `APP-BUILDER-8` already used
 unchanged. **Confirmed: no real runtime/schema dependency on `APP-BUILDER-7`, and no new App
 Schema contract required** — table dependency is `APP-BUILDER-8 (done)` alone, `ready`.
+
+`APP-BUILDER-9` is `done`: PR #985 merged (Merge SHA `c054c9c2425e0f1f6172cee437d9fc2415073b66`,
+confirmed single-parent squash onto `main`, zero content drift from the reviewed head `0312ad0`
+despite two unrelated commits landing on `main` in between — verified with a path-restricted diff
+comparison), post-merge CI green on the merge commit (`ci.yml` run 35981924200 sqlite+pgsql both
+success, `web-ci.yml` run 35981924104 success). This PR grew to also carry `APP-BUILDER-8`'s
+post-merge documentation (recording its own `POST_MERGE_REVIEW: PASS`, PR #983) since it was
+pushed to the same still-open branch before that earlier docs-only PR had merged — both pieces are
+independently complete and tested. A focused UI/UX Evidence Pass
+(`APP-BUILDER-9-UX-EVIDENCE-PASS.md`) was completed before implementation. Delivered: page
+add/remove/set-home in the Builder workspace's Pages tab (new `pages`-map helpers in
+`app-builder.ts`, guardrails mirroring `AppSchemaParser::validate()`'s own checks exactly — never a
+new rule); a real page picker for the `navigate` action's `pageId` param in the Inspector,
+replacing a free-text field that had no validation against real pages anywhere; a small curated
+template set (Blank, Catalog) in `/app-builder/new`'s `template` creation path, each a complete,
+valid `AppSchema` applied via a second `PUT .../draft` call right after app creation — Catalog's
+`Button`→`navigate` action doubles as a live demonstration of the new page navigation. Pure
+frontend — zero backend files touched. 7 new `app-builder.ts` unit tests (28/28 total) + 4 new
+Builder-workspace tests (18/18 total) + 2 new creation-wizard tests (5/5 total), full frontend
+suite 2060/2060 passing, `npm run build` succeeds, `ar.json`/`en.json` key parity verified, full
+backend suite unaffected (4630 passed / 35 pre-existing-failure baseline unchanged, zero backend
+source drift). Full evidence: `docs/plans/app-builder/APP-BUILDER-9-IMPLEMENTATION-REPORT.md`.
