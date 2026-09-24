@@ -523,5 +523,57 @@ their own, so only their resource-field validation applies. 37 new/updated tests
 regression green. No accounting impact. `APP-BUILDER-16` (Conditions/Visibility) is `in_progress`,
 independent of `APP-BUILDER-15`/`17`.
 
+`APP-BUILDER-15` (Builder Data UX — Inspector binding/visibility editor) is **done** on
+`claude/app-builder-15-inspector-binding-editor` (PR #998, pending review); see that branch's own
+`CURRENT-STATE.md` for the full entry — not duplicated here to avoid two branches diverging on the
+same paragraph.
+
+**`APP-BUILDER-17` is investigated and re-scoped into three slices** (this session has no Flutter
+SDK to verify Dart changes locally, so each slice is kept independently small and CI-verified —
+`mobile-ci.yml`'s `mobile (analyze + test)` job has proven reliable across two prior Dart pushes on
+this horizon). Investigation found the task's one-line description ("mobile runtime binding/
+visibility resolver") undersells its real scope: the Dart-side schema parser
+(`mobile/lib/schema/app_schema.dart`) had **no knowledge of `binding`/`visibility` at all** —
+`SchemaComponent._allowedKeys` only listed `{type, id, optional, props, children, action}` — so the
+full task spans (a) parser support, (b) `CompatibilityResolver`/`RuntimeCapabilities` gating, and
+(c) an actual resource-fetch + visibility-evaluation layer replacing `HomeScreen`/`CartScreen`'s
+hand-written slot hydration, **plus flipping `RuntimeCapabilities::DATA_RESOURCES`/`SCHEMA_FEATURES`
+server-side (PHP)** — a production-wide gate on what every tenant can publish, which should not move
+ahead of a verified, shipped mobile release. Slicing:
+
+- **Slice 1 (this entry) — parser support, done locally** on
+  `claude/app-builder-17-mobile-schema-binding-visibility`, PR pending. Adds `SchemaBinding` and
+  `VisibilityNode` (mirroring
+  `AppSchemaParser::validateBinding`/`validateVisibility` exactly, including the `MAX_CONDITION_DEPTH`
+  (4)/`MAX_CONDITION_BRANCHES` (16) limits) to `mobile/lib/schema/app_schema.dart`; `SchemaComponent`
+  gains optional `binding`/`visibility` fields, both preserved through `withChildren()`. **Dormant by
+  construction**: `CompatibilityResolver` (Dart) is untouched and does not read either field, so this
+  slice changes nothing about what the resolver considers compatible; the two bundled schemas
+  (`kHomeSchemaJson`/`kCartSchemaJson`) declare neither key, so no existing behavior changes either.
+  The only real effect: a schema that *would* declare `binding`/`visibility` now parses structurally
+  instead of being rejected with `unknown_field` — safe today only because the device never parses
+  anything but those two bundled constants (no live-fetch mechanism exists — that is
+  `APP-BUILDER-19`). 15 new Dart tests in `mobile/test/schema/schema_binding_visibility_test.dart`,
+  mirroring `AppSchemaParserTest.php`'s binding/visibility coverage case-for-case. **Not verified
+  locally** (no Flutter SDK); relies on CI.
+- **Slice 2 (not started)** — Dart `RuntimeCapabilities`/`CapabilityManifest` gain `dataResources`/
+  `schemaFeatures` maps and `CompatibilityResolver` gains `bindingSupported()`/`visibilitySupported()`
+  checks mirroring the PHP resolver, **kept empty/unsupported** (matching PHP's own still-empty
+  `DATA_RESOURCES`/`SCHEMA_FEATURES`) so a schema with binding/visibility is correctly pruned
+  (optional) or rejected (required) by this runtime build — closing slice 1's "parses but isn't
+  gated" dormancy before slice 3 makes it do anything. Important ordering note for whoever picks this
+  up: **slice 2 must land before slice 3's server-side capability flip**, not after — flipping
+  `RuntimeCapabilities::DATA_RESOURCES`/`SCHEMA_FEATURES` server-side while an already-installed
+  mobile build only has slice 1 (parses but never gates or resolves) would let that old build accept
+  a binding/visibility node as "compatible" while silently doing nothing with it.
+- **Slice 3 (not started)** — the actual resource-fetch + visibility-evaluation layer (mapping
+  `binding.resource` to the right `CommerceClient` call, `itemProps` to node props, evaluating
+  `VisibilitySignal`/`VisibilityOperator` against live cart/auth/stock state), rewiring
+  `HomeScreen`/`CartScreen`/`ProductScreen` off their hand-written hydration, updating the bundled
+  `kHomeSchemaJson`/`kCartSchemaJson` to declare real bindings, and — only once 1+2 are shipped and
+  verified in a real mobile release — flipping `RuntimeCapabilities::DATA_RESOURCES`/`SCHEMA_FEATURES`
+  server-side (PHP) to non-empty. This is the task queue's real "APP-BUILDER-18 depends on 17"
+  dependency edge.
+
 TASK-QUEUE.md records the finalized task decomposition (`APP-BUILDER-13`..`APP-BUILDER-23`) under
 the horizon header, promoted to `ready` in dependency order per ADR-01.

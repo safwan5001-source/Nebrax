@@ -11,6 +11,8 @@ Map<String, Object?> componentNode({
   Map<String, Object?>? props,
   List<Map<String, Object?>>? children,
   Map<String, Object?>? action,
+  Map<String, Object?>? binding,
+  Map<String, Object?>? visibility,
 }) {
   return {
     'type': type,
@@ -19,6 +21,8 @@ Map<String, Object?> componentNode({
     'props': props,
     'children': children,
     'action': action,
+    if (binding != null) 'binding': binding,
+    if (visibility != null) 'visibility': visibility,
   };
 }
 

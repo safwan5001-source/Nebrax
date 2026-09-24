@@ -925,7 +925,7 @@ Source of truth for this horizon:
 | 2 | APP-BUILDER-14 | done | APP-BUILDER-13 | App Schema `binding` contract (parser + compatibility resolver) |
 | 3 | APP-BUILDER-15 | ready (after 14) | APP-BUILDER-14 | Builder Data UX (Inspector binding editor) |
 | 4 | APP-BUILDER-16 | in_progress | ADR-01 | Conditions/Visibility contract (closed/typed/allowlisted) + Inspector UX |
-| 5 | APP-BUILDER-17 | ready (after 14) | APP-BUILDER-14 | Mobile runtime binding/visibility resolver (replaces 3 hand-written screen implementations) |
+| 5 | APP-BUILDER-17 | in_progress (slice 1/3 done) | APP-BUILDER-14 | Mobile runtime binding/visibility resolver (replaces 3 hand-written screen implementations) — split into parser support / compatibility gating / resolver+screens+capability flip, see entry below |
 | 6 | APP-BUILDER-18 | ready (after 17) | APP-BUILDER-17 | Real action dispatch wired through schema bindings |
 | 7 | APP-BUILDER-19 | ready | ADR-01 (Decision Point 1 = YES) | Live publish → fetch → on-device-cache loop (Last Known Good) |
 | 8 | APP-BUILDER-20 | ready (after 18+19) | APP-BUILDER-18, APP-BUILDER-19 | Same-Store integrated proof |
@@ -995,3 +995,37 @@ placeholder key) remains structurally rejected. 37 new/updated focused tests acr
 regression green, full local suite 4664 passed/35 failed (same pre-existing `bcmath` baseline)/49
 skipped. No accounting impact. `APP-BUILDER-16` promoted to `in_progress` (independent of
 `APP-BUILDER-15`/`17`, per the queue's own dependency table).
+
+`APP-BUILDER-15` (Builder Data UX — Inspector binding/visibility editor) is `done` on
+`claude/app-builder-15-inspector-binding-editor` (PR #998, pending review) — full entry on that
+branch's own `TASK-QUEUE.md`, not duplicated here.
+
+`APP-BUILDER-17` was investigated and found substantially larger than its one-line description: the
+Dart schema parser had no `binding`/`visibility` support at all (`SchemaComponent._allowedKeys` was
+`{type, id, optional, props, children, action}`), so the full task is really parser support +
+compatibility-resolver gating + a resource-fetch/visibility-evaluation layer replacing 3 hand-written
+screens + flipping `RuntimeCapabilities::DATA_RESOURCES`/`SCHEMA_FEATURES` server-side (a
+production-wide publish gate that should not move ahead of a shipped, verified mobile release). Split
+into three independently-shippable slices (see the detailed slice breakdown in `CURRENT-STATE.md`):
+
+- **Slice 1 — Dart parser support** is `done` locally on
+  `claude/app-builder-17-mobile-schema-binding-visibility`, PR pending.
+  `SchemaBinding`/`VisibilityNode` added to `mobile/lib/schema/app_schema.dart`, mirroring
+  `AppSchemaParser::validateBinding`/`validateVisibility` exactly (same `MAX_CONDITION_DEPTH`(4)/
+  `MAX_CONDITION_BRANCHES`(16) limits). Dormant by construction — `CompatibilityResolver` (Dart) does
+  not read either field, and neither bundled schema (`kHomeSchemaJson`/`kCartSchemaJson`) declares
+  them, so nothing about current runtime behavior changes; only effect is that a schema declaring
+  `binding`/`visibility` now parses instead of failing `unknown_field` — safe today since the device
+  never parses anything but those two bundled constants (no live fetch yet — `APP-BUILDER-19`). 15
+  new Dart tests in `schema_binding_visibility_test.dart`, one-for-one against
+  `AppSchemaParserTest.php`'s binding/visibility cases. **Unverified locally (no Flutter SDK)** —
+  relies on `mobile-ci.yml`.
+- **Slice 2 — compatibility gating** (not started): Dart `RuntimeCapabilities`/`CapabilityManifest`
+  gain `dataResources`/`schemaFeatures`, kept empty (matching PHP), and `CompatibilityResolver` gains
+  the prune/reject checks — must land before slice 3's server-side flip, not after, or an
+  already-installed build with only slice 1 would treat a live binding/visibility node as
+  "compatible" while doing nothing with it.
+- **Slice 3 — resolver + screens + capability flip** (not started): the real fetch/hydrate/evaluate
+  layer, `HomeScreen`/`CartScreen`/`ProductScreen` rewired off hand-written hydration, bundled schemas
+  updated to declare real bindings, and only then flipping `RuntimeCapabilities::DATA_RESOURCES`/
+  `SCHEMA_FEATURES` server-side. This is the queue's actual "APP-BUILDER-18 depends on 17" edge.

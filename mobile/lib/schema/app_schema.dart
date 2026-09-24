@@ -12,6 +12,14 @@ const int kMaxComponentNodeCount = 500;
 const int kMaxPropsNestingDepth = 8;
 const int kMaxPropsCollectionLength = 64;
 
+/// `visibility` condition-tree limits (`ADR-01` §3.3, `APP-BUILDER-16`) —
+/// mirrors `AppSchemaParser::MAX_CONDITION_DEPTH`/`MAX_CONDITION_BRANCHES`
+/// exactly. Kept separate from the component-tree limits above: a condition
+/// tree is a different shape (combinator/leaf, not renderable nodes) with
+/// its own, much smaller bound.
+const int kMaxConditionDepth = 4;
+const int kMaxConditionBranches = 16;
+
 /// A single structural/type/unknown-field problem found while parsing or
 /// validating an App Schema document. [code] is a stable machine-readable
 /// identifier (never a translated string) so callers/tests can assert on
@@ -57,6 +65,194 @@ class ActionRef {
   }
 }
 
+/// A data-source binding on a component node (`ADR-01` §3.2,
+/// `APP-BUILDER-14`). Mirrors `AppSchemaParser::validateBinding` exactly —
+/// purely structural here (a JSON-safe object with a non-empty `resource`
+/// string, an optional JSON-safe `query`, and an optional string:string
+/// `itemProps`). Resource identity, field/query-key validity against the
+/// real Data Resource Registry, and capability gating are the compatibility
+/// resolver's job (`APP-BUILDER-17`), never this parser's — same split as
+/// [ActionRef]'s type/params here versus the Action Registry elsewhere.
+class SchemaBinding {
+  final String resource;
+  final Map<String, Object?> query;
+  final Map<String, String> itemProps;
+
+  const SchemaBinding({
+    required this.resource,
+    required this.query,
+    required this.itemProps,
+  });
+
+  static const _allowedKeys = {'resource', 'query', 'itemProps'};
+
+  factory SchemaBinding._fromJson(Map<String, Object?> json) {
+    _rejectUnknownKeys(json, _allowedKeys, context: 'binding');
+
+    final resource = json['resource'];
+    if (resource is! String || resource.isEmpty) {
+      throw const SchemaFormatException('missing_field', 'binding.resource must be a non-empty string');
+    }
+
+    final queryRaw = json['query'];
+    var query = const <String, Object?>{};
+    if (queryRaw != null) {
+      if (queryRaw is! Map) {
+        throw const SchemaFormatException('invalid_type', 'binding.query must be an object');
+      }
+      query = _validateJsonSafeMap(queryRaw.cast<String, Object?>(), context: 'binding.query');
+    }
+
+    final itemPropsRaw = json['itemProps'];
+    final itemProps = <String, String>{};
+    if (itemPropsRaw != null) {
+      if (itemPropsRaw is! Map) {
+        throw const SchemaFormatException('invalid_type', 'binding.itemProps must be an object');
+      }
+      itemPropsRaw.forEach((key, value) {
+        if (key is! String || key.isEmpty || value is! String || value.isEmpty) {
+          throw const SchemaFormatException(
+            'invalid_type',
+            'binding.itemProps entries must be non-empty string:string',
+          );
+        }
+        itemProps[key] = value;
+      });
+    }
+
+    return SchemaBinding(
+      resource: resource,
+      query: query,
+      itemProps: Map.unmodifiable(itemProps),
+    );
+  }
+}
+
+/// Which of `visibility`'s two group shapes a non-leaf [VisibilityNode]
+/// carries — `{all:[...]}` or `{any:[...]}`.
+enum VisibilityCombinator { all, any }
+
+/// A single node of a `visibility` condition tree (`ADR-01` §3.3,
+/// `APP-BUILDER-16`). Mirrors `AppSchemaParser::validateVisibility` exactly:
+/// a closed, typed three-shape union — a combinator group (`{all:[...]}`/
+/// `{any:[...]}`) or a leaf (`{signal, operator, value?}`) — never an
+/// expression, never arbitrary code. Represented as one flat class (matching
+/// this file's existing style, e.g. [ActionRef]) rather than a class
+/// hierarchy: [isLeaf] tells callers which fields are meaningful, and the
+/// two private named constructors below (not subtyping) are what actually
+/// keeps "exactly one of group-shape or leaf-shape" true.
+class VisibilityNode {
+  final VisibilityCombinator? combinator;
+  final List<VisibilityNode> branches;
+  final String? signal;
+  final String? operatorName;
+  final Object? value;
+
+  /// Whether a `value` key was present at all — distinct from `value` being
+  /// `null`, since `null` is itself a valid JSON-safe scalar value.
+  final bool hasValue;
+
+  const VisibilityNode._group({required this.combinator, required this.branches})
+      : signal = null,
+        operatorName = null,
+        value = null,
+        hasValue = false;
+
+  const VisibilityNode._leaf({
+    required this.signal,
+    required this.operatorName,
+    this.value,
+    required this.hasValue,
+  }) : combinator = null,
+       branches = const [];
+
+  bool get isLeaf => signal != null;
+
+  static const _leafKeys = {'signal', 'operator', 'value'};
+
+  factory VisibilityNode._fromJson(Map<String, Object?> json, int depth) {
+    if (depth > kMaxConditionDepth) {
+      throw const SchemaFormatException('too_deep', 'visibility nesting too deep');
+    }
+
+    final hasAll = json.containsKey('all');
+    final hasAny = json.containsKey('any');
+    if (hasAll || hasAny) {
+      final key = hasAll ? 'all' : 'any';
+      _rejectUnknownKeys(json, {key}, context: 'visibility');
+      final branchesRaw = json[key];
+      if (branchesRaw is! List || branchesRaw.isEmpty) {
+        throw SchemaFormatException('invalid_type', 'visibility.$key must be a non-empty list');
+      }
+      if (branchesRaw.length > kMaxConditionBranches) {
+        throw SchemaFormatException('too_many_nodes', 'visibility.$key has too many entries');
+      }
+      final branches = <VisibilityNode>[];
+      for (final branch in branchesRaw) {
+        if (branch is! Map) {
+          throw SchemaFormatException('invalid_type', 'visibility.$key entries must be objects');
+        }
+        branches.add(VisibilityNode._fromJson(branch.cast<String, Object?>(), depth + 1));
+      }
+      return VisibilityNode._group(
+        combinator: hasAll ? VisibilityCombinator.all : VisibilityCombinator.any,
+        branches: List.unmodifiable(branches),
+      );
+    }
+
+    if (json.containsKey('signal')) {
+      _rejectUnknownKeys(json, _leafKeys, context: 'visibility');
+      final signal = json['signal'];
+      if (signal is! String || signal.isEmpty) {
+        throw const SchemaFormatException('missing_field', 'visibility.signal must be a non-empty string');
+      }
+      final operatorValue = json['operator'];
+      if (operatorValue is! String || operatorValue.isEmpty) {
+        throw const SchemaFormatException('missing_field', 'visibility.operator must be a non-empty string');
+      }
+      final hasValue = json.containsKey('value');
+      if (hasValue) {
+        _validateVisibilityValue(json['value']);
+      }
+      return VisibilityNode._leaf(
+        signal: signal,
+        operatorName: operatorValue,
+        value: hasValue ? json['value'] : null,
+        hasValue: hasValue,
+      );
+    }
+
+    throw const SchemaFormatException(
+      'missing_field',
+      'visibility must declare exactly one of: all, any, signal',
+    );
+  }
+}
+
+/// `value` must be a JSON-safe scalar, or a flat list of scalars (for
+/// `in`) — never a nested object. Mirrors
+/// `AppSchemaParser::validateVisibilityValue` exactly.
+void _validateVisibilityValue(Object? value) {
+  if (value == null || value is String || value is num || value is bool) {
+    return;
+  }
+  if (value is List) {
+    if (value.length > kMaxPropsCollectionLength) {
+      throw const SchemaFormatException('too_many_nodes', 'visibility.value list too long');
+    }
+    for (final item in value) {
+      if (!(item is String || item is num || item is bool)) {
+        throw const SchemaFormatException('invalid_type', 'visibility.value list entries must be scalars');
+      }
+    }
+    return;
+  }
+  throw const SchemaFormatException(
+    'invalid_type',
+    'visibility.value must be a scalar or a flat list of scalars',
+  );
+}
+
 /// One node in an App Schema page's component tree (horizon MR-04's
 /// "approved component instances" + "typed props/bindings", pending full
 /// per-type prop schemas from MOBILE-RUNTIME-3).
@@ -71,6 +267,8 @@ class SchemaComponent {
   final Map<String, Object?> props;
   final List<SchemaComponent> children;
   final ActionRef? action;
+  final SchemaBinding? binding;
+  final VisibilityNode? visibility;
 
   const SchemaComponent({
     required this.type,
@@ -79,9 +277,13 @@ class SchemaComponent {
     required this.props,
     required this.children,
     this.action,
+    this.binding,
+    this.visibility,
   });
 
-  static const _allowedKeys = {'type', 'id', 'optional', 'props', 'children', 'action'};
+  static const _allowedKeys = {
+    'type', 'id', 'optional', 'props', 'children', 'action', 'binding', 'visibility',
+  };
 
   factory SchemaComponent._fromJson(
     Map<String, Object?> json,
@@ -144,6 +346,24 @@ class SchemaComponent {
       action = ActionRef._fromJson(actionRaw.cast<String, Object?>());
     }
 
+    final bindingRaw = json['binding'];
+    SchemaBinding? binding;
+    if (bindingRaw != null) {
+      if (bindingRaw is! Map) {
+        throw const SchemaFormatException('invalid_type', 'component.binding must be an object');
+      }
+      binding = SchemaBinding._fromJson(bindingRaw.cast<String, Object?>());
+    }
+
+    final visibilityRaw = json['visibility'];
+    VisibilityNode? visibility;
+    if (visibilityRaw != null) {
+      if (visibilityRaw is! Map) {
+        throw const SchemaFormatException('invalid_type', 'component.visibility must be an object');
+      }
+      visibility = VisibilityNode._fromJson(visibilityRaw.cast<String, Object?>(), 0);
+    }
+
     return SchemaComponent(
       type: type,
       id: id,
@@ -151,6 +371,8 @@ class SchemaComponent {
       props: props,
       children: List.unmodifiable(children),
       action: action,
+      binding: binding,
+      visibility: visibility,
     );
   }
 
@@ -165,6 +387,8 @@ class SchemaComponent {
       props: props,
       children: List.unmodifiable(newChildren),
       action: action,
+      binding: binding,
+      visibility: visibility,
     );
   }
 }
