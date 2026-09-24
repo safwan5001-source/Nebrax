@@ -1,11 +1,11 @@
 'use client';
 
 import * as React from 'react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { ImageOff, ShoppingCart } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatRiyal } from '@/lib/money';
-import { type AppSchemaComponent } from '@/lib/app-builder';
+import { registryLabel, type AppBuilderRegistries, type AppSchemaComponent } from '@/lib/app-builder';
 import { presentationCssVars } from '@/modules/store-experience-builder/presentation/tokens';
 
 /**
@@ -33,33 +33,45 @@ function stringListProp(node: AppSchemaComponent, key: string): string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
 }
 
-function TypeTag({ type, selected }: { type: string; selected: boolean }) {
+function TypeTag({ type, label, selected }: { type: string; label: string; selected: boolean }) {
   return (
     <span
+      title={type}
       className={cn(
         'pointer-events-none absolute -top-2.5 start-1.5 rounded px-1.5 py-0.5 text-[10px] font-medium leading-none',
         selected ? 'bg-primary text-primary-foreground' : 'bg-surface text-muted opacity-0 group-hover:opacity-100'
       )}
     >
-      {type}
+      {label}
     </span>
   );
 }
 
-/** كل مكوّن يُغلَّف بهذا حتى يحمل شارة النوع والتحديد بلا تكرار المنطق 15 مرة. */
+/**
+ * كل مكوّن يُغلَّف بهذا حتى يحمل شارة النوع والتحديد بلا تكرار المنطق 15 مرة.
+ * شارة النوع أداة بناء (Builder chrome) لا محتوى تجربة معاينة — تتبع لغة
+ * واجهة أَوْج الفعلية (`useLocale()`)، لا مفتاح `locale`/`previewLocale`
+ * المُمرَّر لعرض المحتوى نفسه (اتجاه RTL/LTR)، تماماً كشجرة الطبقات.
+ */
 function NodeFrame({
   node,
   selected,
   onSelect,
   className,
   children,
+  registries,
 }: {
   node: AppSchemaComponent;
   selected: boolean;
   onSelect: (id: string) => void;
   className?: string;
   children: React.ReactNode;
+  registries: AppBuilderRegistries | null;
 }) {
+  const uiLocale = useLocale();
+  const definition = registries?.components[node.type];
+  const typeLabel = definition ? registryLabel(definition.label, uiLocale) : node.type;
+
   return (
     <div
       role="button"
@@ -80,7 +92,7 @@ function NodeFrame({
         className
       )}
     >
-      <TypeTag type={node.type} selected={selected} />
+      <TypeTag type={node.type} label={typeLabel} selected={selected} />
       {children}
     </div>
   );
@@ -90,15 +102,17 @@ function CanvasComponentNode({
   node,
   selectedId,
   onSelect,
+  registries,
 }: {
   node: AppSchemaComponent;
   selectedId: string | null;
   onSelect: (id: string) => void;
+  registries: AppBuilderRegistries | null;
 }) {
   const selected = node.id === selectedId;
   const children = node.children ?? [];
   const frame = (body: React.ReactNode, className?: string) => (
-    <NodeFrame node={node} selected={selected} onSelect={onSelect} className={className}>
+    <NodeFrame node={node} selected={selected} onSelect={onSelect} className={className} registries={registries}>
       {body}
     </NodeFrame>
   );
@@ -108,7 +122,7 @@ function CanvasComponentNode({
       return (
         <div className="space-y-3 p-3">
           {children.map((child) => (
-            <CanvasComponentNode key={child.id} node={child} selectedId={selectedId} onSelect={onSelect} />
+            <CanvasComponentNode key={child.id} node={child} selectedId={selectedId} onSelect={onSelect} registries={registries} />
           ))}
         </div>
       );
@@ -120,7 +134,7 @@ function CanvasComponentNode({
           {title ? <p className="text-sm font-semibold text-text">{title}</p> : null}
           <div className="space-y-2">
             {children.map((child) => (
-              <CanvasComponentNode key={child.id} node={child} selectedId={selectedId} onSelect={onSelect} />
+              <CanvasComponentNode key={child.id} node={child} selectedId={selectedId} onSelect={onSelect} registries={registries} />
             ))}
           </div>
         </div>
@@ -163,7 +177,7 @@ function CanvasComponentNode({
           ) : (
             children.map((child) => (
               <div key={child.id} className="w-32 shrink-0">
-                <CanvasComponentNode node={child} selectedId={selectedId} onSelect={onSelect} />
+                <CanvasComponentNode node={child} selectedId={selectedId} onSelect={onSelect} registries={registries} />
               </div>
             ))
           )}
@@ -198,7 +212,7 @@ function CanvasComponentNode({
           {description ? <p className="text-sm text-muted">{description}</p> : null}
           <div className="space-y-2 border-t border-border pt-2">
             {children.map((child) => (
-              <CanvasComponentNode key={child.id} node={child} selectedId={selectedId} onSelect={onSelect} />
+              <CanvasComponentNode key={child.id} node={child} selectedId={selectedId} onSelect={onSelect} registries={registries} />
             ))}
           </div>
         </div>
@@ -254,7 +268,7 @@ function CanvasComponentNode({
           {children.length === 0 ? (
             <span className="text-xs text-muted">—</span>
           ) : (
-            children.map((child) => <CanvasComponentNode key={child.id} node={child} selectedId={selectedId} onSelect={onSelect} />)
+            children.map((child) => <CanvasComponentNode key={child.id} node={child} selectedId={selectedId} onSelect={onSelect} registries={registries} />)
           )}
         </div>
       );
@@ -321,6 +335,7 @@ export function AppBuilderCanvas({
   selectedId,
   onSelect,
   themeTokens,
+  registries = null,
 }: {
   root: AppSchemaComponent | null;
   device: PreviewDevice;
@@ -328,6 +343,7 @@ export function AppBuilderCanvas({
   selectedId: string | null;
   onSelect: (id: string) => void;
   themeTokens?: Record<string, string>;
+  registries?: AppBuilderRegistries | null;
 }) {
   const t = useTranslations('appBuilder.builder');
 
@@ -340,7 +356,7 @@ export function AppBuilderCanvas({
         onClick={() => root && onSelect(root.id)}
       >
         {root ? (
-          <CanvasComponentNode node={root} selectedId={selectedId} onSelect={onSelect} />
+          <CanvasComponentNode node={root} selectedId={selectedId} onSelect={onSelect} registries={registries} />
         ) : (
           <p className="p-6 text-center text-sm text-muted">{t('emptyPage')}</p>
         )}

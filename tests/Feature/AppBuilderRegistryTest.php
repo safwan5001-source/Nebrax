@@ -70,6 +70,45 @@ class AppBuilderRegistryTest extends TestCase
     }
 
     /** @test */
+    public function a_component_and_its_props_expose_bilingual_labels_without_changing_internal_keys(): void
+    {
+        $auth = $this->registerTenant('appb-registries-labels', 'owner@appb-registries-labels.test');
+
+        $response = $this->withToken($auth['token'])->getJson('/api/app-builder/registries')->assertOk();
+
+        // المعرّف الداخلي يبقى كما هو (`type`) — التسمية إضافية لا بديلة.
+        $response->assertJsonPath('data.components.ProductList.type', 'ProductList');
+        $response->assertJsonPath('data.components.ProductList.label.ar', 'قائمة المنتجات');
+        $response->assertJsonPath('data.components.ProductList.label.en', 'Product List');
+
+        $amountProp = collect($response->json('data.components.ProductCard.props'))
+            ->firstWhere('key', 'amountMinor');
+        $this->assertNotNull($amountProp);
+        $this->assertSame('amountMinor', $amountProp['key']);
+        $this->assertSame('السعر', $amountProp['label']['ar']);
+        $this->assertSame('Price', $amountProp['label']['en']);
+    }
+
+    /** @test */
+    public function an_action_and_its_params_expose_bilingual_labels_without_changing_internal_keys(): void
+    {
+        $auth = $this->registerTenant('appb-registries-action-labels', 'owner@appb-registries-action-labels.test');
+
+        $response = $this->withToken($auth['token'])->getJson('/api/app-builder/registries')->assertOk();
+
+        $response->assertJsonPath('data.actions.addToCart.type', 'addToCart');
+        $response->assertJsonPath('data.actions.addToCart.label.ar', 'إضافة إلى السلة');
+        $response->assertJsonPath('data.actions.addToCart.label.en', 'Add to Cart');
+
+        $quantityParam = collect($response->json('data.actions.addToCart.params'))
+            ->firstWhere('key', 'quantity');
+        $this->assertNotNull($quantityParam);
+        $this->assertSame('quantity', $quantityParam['key']);
+        $this->assertSame('الكمية', $quantityParam['label']['ar']);
+        $this->assertSame('Quantity', $quantityParam['label']['en']);
+    }
+
+    /** @test */
     public function staff_role_without_the_permission_is_denied(): void
     {
         $auth = $this->registerTenant('appb-registries-rbac', 'owner@appb-registries-rbac.test');

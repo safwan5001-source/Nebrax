@@ -6,6 +6,7 @@ use App\Services\AppBuilder\ActionDefinition;
 use App\Services\AppBuilder\ActionRegistry;
 use App\Services\AppBuilder\ComponentDefinition;
 use App\Services\AppBuilder\ComponentRegistry;
+use App\Services\AppBuilder\Label;
 use Illuminate\Http\JsonResponse;
 
 /**
@@ -39,10 +40,12 @@ class AppBuilderRegistryController extends ApiController
             'type' => $definition->type,
             'version' => $definition->version,
             'category' => $definition->category,
+            'label' => $this->labelToArray($definition->label),
             'props' => array_map(fn ($prop) => [
                 'key' => $prop->key,
                 'type' => $prop->type,
                 'required' => $prop->required,
+                'label' => $this->labelToArray($prop->label),
                 'default' => $prop->default,
                 'enum_values' => $prop->enumValues,
             ], $definition->props),
@@ -52,6 +55,7 @@ class AppBuilderRegistryController extends ApiController
             ],
             'actionable' => $definition->actionable,
             'injected_runtime_action_params' => $definition->injectedRuntimeActionParams,
+            'bindable_resources' => $definition->bindableResources,
             'notes' => $definition->notes,
         ];
     }
@@ -62,10 +66,12 @@ class AppBuilderRegistryController extends ApiController
             'type' => $definition->type,
             'version' => $definition->version,
             'risk_class' => $definition->riskClass,
+            'label' => $this->labelToArray($definition->label),
             'params' => array_map(fn ($param) => [
                 'key' => $param->key,
                 'type' => $param->type,
                 'required' => $param->required,
+                'label' => $this->labelToArray($param->label),
                 'nullable' => $param->nullable,
                 'default' => $param->default,
                 'min_value' => $param->minValue,
@@ -73,5 +79,10 @@ class AppBuilderRegistryController extends ApiController
             'dispatch_status' => $definition->dispatchStatus,
             'notes' => $definition->notes,
         ];
+    }
+
+    private function labelToArray(Label $label): array
+    {
+        return ['ar' => $label->ar, 'en' => $label->en];
     }
 }

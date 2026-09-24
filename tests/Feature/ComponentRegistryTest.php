@@ -89,6 +89,21 @@ class ComponentRegistryTest extends TestCase
         }
     }
 
+    /** APP-BUILDER-21 — كل مكوّن وكل خاصية يحملان تسمية بشرية ثنائية اللغة، ولا تُغيَّر أي هوية داخلية. */
+    public function test_every_component_and_prop_declares_a_non_empty_bilingual_label(): void
+    {
+        foreach (ComponentRegistry::definitions() as $type => $definition) {
+            $this->assertNotSame('', trim($definition->label->ar), "{$type}: تسمية عربية فارغة.");
+            $this->assertNotSame('', trim($definition->label->en), "{$type}: English label is empty.");
+            $this->assertNotSame($type, $definition->label->ar, "{$type}: التسمية يجب أن تكون بشرية لا مطابقة للمعرّف الداخلي.");
+
+            foreach ($definition->props as $prop) {
+                $this->assertNotSame('', trim($prop->label->ar), "{$type}.{$prop->key}: تسمية عربية فارغة.");
+                $this->assertNotSame('', trim($prop->label->en), "{$type}.{$prop->key}: English label is empty.");
+            }
+        }
+    }
+
     /** ADR-01 (APP-BUILDER-14) — نطاق V1 المُقفَل لمكوّنات الربط فقط. */
     public function test_only_the_four_adr_01_components_declare_bindable_resources(): void
     {
