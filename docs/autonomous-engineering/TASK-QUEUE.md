@@ -929,7 +929,7 @@ Source of truth for this horizon:
 | 6 | APP-BUILDER-18 | ready (after 17) | APP-BUILDER-17 | Real action dispatch wired through schema bindings |
 | 7 | APP-BUILDER-19 | ready | ADR-01 (Decision Point 1 = YES) | Live publish → fetch → on-device-cache loop (Last Known Good) |
 | 8 | APP-BUILDER-20 | ready (after 18+19) | APP-BUILDER-18, APP-BUILDER-19 | Same-Store integrated proof |
-| 9 | APP-BUILDER-21 | ready | none (independent, mandatory) | App Builder UX/localization pass |
+| 9 | APP-BUILDER-21 | done (PR pending) | none (independent, mandatory) | App Builder UX/localization pass |
 | 10 | APP-BUILDER-22 | ready | none (independent, mandatory) | Canvas + Flutter theme-token rendering fix |
 | 11 | APP-BUILDER-23 | blocked | all above | Horizon closure report |
 
@@ -1022,3 +1022,17 @@ shown control implies. 46 new focused tests, full `AppBuilder*` regression green
 4680 passed/35 failed (same pre-existing `bcmath` baseline)/49 skipped. No accounting impact.
 Inspector UX for authoring conditions deferred to land with `APP-BUILDER-15`'s binding editor (see
 scope note above). `APP-BUILDER-21` promoted to `in_progress` (independent, mandatory).
+
+`APP-BUILDER-21` (App Builder UX/localization) is `done` locally (commit `8ab18df` on
+`claude/app-builder-21-ux-localization`, PR pending): a `Label(ar, en)` value object added to every
+`ComponentRegistry`/`ActionRegistry` definition and every prop/action-param, serialized by
+`AppBuilderRegistryController`. No schema identifier renamed — `type`/prop keys/action-param keys
+untouched, so published experiences and `commerce/v1`/binding contracts are unaffected. Frontend
+`registryLabel(label, locale)` helper renders localized labels in the Inspector (prop rows,
+action-param rows, action-type select, add-child select) and LayersTree node badges; raw
+identifiers preserved as `title` tooltips throughout. Canvas type-tag badge uses the actual UI
+locale (`useLocale()`), not the content-preview locale toggle, since it is Builder chrome rather
+than simulated storefront content — a distinction surfaced during implementation and corrected
+before landing. 94 backend tests/476 assertions (targeted `ComponentRegistryTest`/
+`ActionRegistryTest`/`AppBuilderRegistryTest`) green; full frontend suite (2076 tests), `tsc
+--noEmit`, and `npm run build` all green. No accounting impact.

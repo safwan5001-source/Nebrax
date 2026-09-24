@@ -534,7 +534,27 @@ until `APP-BUILDER-17` (same reasoning as `DATA_RESOURCES`). Visibility is prese
 construction — no authorization touched. 46 new tests, full regression green. Inspector UX for
 authoring conditions deferred to land with `APP-BUILDER-15`'s binding editor (not silently dropped
 — both are the same Inspector surface with no backend dependency blocking either). No accounting
-impact. `APP-BUILDER-21` (UX/localization) is `in_progress` — independent, mandatory.
+impact.
+
+`APP-BUILDER-21` (UX/localization) is **done** locally (commit `8ab18df` on
+`claude/app-builder-21-ux-localization`, PR pending): adds a `Label(ar, en)` value object to every
+`ComponentRegistry`/`ActionRegistry` definition and every prop/action-param (15 components, 6
+actions), serialized by `AppBuilderRegistryController` alongside the existing `bindable_resources`.
+No schema identifier renamed anywhere — `type`/prop keys/action-param keys are unchanged, so
+published experiences and the `commerce/v1`/binding contracts are untouched. Frontend: a shared
+`registryLabel(label, locale)` helper (`web/src/lib/app-builder.ts`) renders the localized label in
+the Inspector (prop rows, action-param rows, action-type select, add-child select) and the
+LayersTree node badges; raw identifiers are preserved everywhere as `title` tooltips for
+merchants/developers who need the underlying key. The Canvas type-tag badge uses the actual UI
+locale (`useLocale()`) rather than the content-preview locale toggle — a real distinction found
+during implementation: the badge is Builder chrome, not simulated storefront content. Backend:
+`ComponentRegistryTest`/`ActionRegistryTest` assert label completeness (non-empty `ar`+`en`) on
+every definition/prop/param; `AppBuilderRegistryTest` asserts HTTP exposure. Frontend: full
+`app-builder.test.ts` + builder `page.test.tsx` suites updated to assert localized rendering.
+Verified locally: targeted backend filter (`ComponentRegistryTest|ActionRegistryTest|
+AppBuilderRegistryTest`, 94 tests/476 assertions) green; full frontend suite (2076 tests), `tsc
+--noEmit`, and `npm run build` all green. No accounting impact — UI/localization only, no new
+financial postings.
 
 TASK-QUEUE.md records the finalized task decomposition (`APP-BUILDER-13`..`APP-BUILDER-23`) under
 the horizon header, promoted to `ready` in dependency order per ADR-01.
