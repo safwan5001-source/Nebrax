@@ -263,21 +263,25 @@ class AppBuilderIntegratedProofTest extends TestCase
     }
 
     /**
-     * الحدّ المعماري الصريح: هذا الإثبات الرأسي المتكامل — رغم شموله كل خطوة
-     * حقيقية من الإنشاء حتى الاسترجاع وإعادة النشر — **لا يعبر** إلى ربط بيانات
-     * Commerce حيّ ولا تنفيذ إجراء تجاري فعلي. كلاهما مؤجَّل صراحةً مع
-     * APP-BUILDER-7 (قرار المالك 2026-09-24) ولم يُخترَع هنا.
+     * الحدّ المعماري الصريح، مُحدَّثٌ بعد `ADR-01` (Commerce Data & Dynamic
+     * Runtime V1): هذا الإثبات الرأسي المتكامل — رغم شموله كل خطوة حقيقية من
+     * الإنشاء حتى الاسترجاع وإعادة النشر — **لا يعبر بعد** إلى مخطط يقبل
+     * `binding` فعلياً. `ADR-01` أقفل نطاق `DataResourceRegistry` V1
+     * (`commerce.categories`/`commerce.products`/`commerce.cart`،
+     * `APP-BUILDER-13`) كخطوة تأسيسية وصفية بحتة، لكن `AppSchemaParser` نفسه
+     * لم يتغيّر بعد — مفتاح `bindings`/`binding` يبقى مرفوضاً بنيوياً حتى
+     * `APP-BUILDER-14` يضيف المفتاح الاختياري المحروس بقدرة (`CompatibilityResolver`).
      *
      * @test
      */
-    public function integrated_proof_never_crosses_into_the_deferred_data_binding_boundary(): void
+    public function integrated_proof_still_rejects_a_bindings_key_pending_app_builder_14(): void
     {
         $auth = $this->registerTenant('appb11-boundary', 'owner@appb11-boundary.test');
         $appId = $this->withToken($auth['token'])->postJson('/api/app-builder/apps', [
             'name' => 'تطبيق', 'creation_source' => 'scratch',
         ])->json('data.id');
 
-        // مفتاح `bindings` لا يزال مرفوضاً بنيوياً — العقد الحقيقي لم يتغيّر بهذه المهمة.
+        // مفتاح `bindings` لا يزال مرفوضاً بنيوياً — `APP-BUILDER-14` لم يُنفَّذ بعد.
         $schema = \App\Models\BuilderDraftExperience::minimalSafeSchema();
         $schema['pages']['home']['children'] = [
             ['type' => 'Text', 'id' => 'bound-text', 'bindings' => ['text' => 'commerce.products.0.title']],
@@ -286,7 +290,11 @@ class AppBuilderIntegratedProofTest extends TestCase
             ->putJson("/api/app-builder/apps/{$appId}/draft", ['schema' => $schema])
             ->assertStatus(422);
 
-        // سجلّ موارد البيانات لا يزال فارغاً عمداً — لم تُضَف أي هوية مورد هنا.
-        $this->assertSame([], DataResourceRegistry::RESOURCES);
+        // ADR-01 (APP-BUILDER-13): السجلّ يحمل الآن نطاق V1 المُقفَل صراحةً —
+        // لم يعد فارغاً عمداً، بل مُعبَّأً عمداً بثلاثة موارد فقط.
+        $this->assertSame(
+            ['commerce.categories', 'commerce.products', 'commerce.cart'],
+            array_keys(DataResourceRegistry::RESOURCES),
+        );
     }
 }
