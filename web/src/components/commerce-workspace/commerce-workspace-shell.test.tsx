@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import * as React from 'react';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const apiMock = vi.fn();
@@ -46,6 +46,7 @@ describe('Commerce workspace shell header', () => {
     cleanup();
     locale.current = 'en';
     apiMock.mockReset();
+    window.localStorage.clear();
   });
 
   it('keeps View Store disabled and navigation working when the tenant has no stores', async () => {
@@ -120,5 +121,42 @@ describe('Commerce workspace shell header', () => {
     await waitFor(() => expect(screen.getByText('Store list is not available yet')).toBeTruthy());
     expect(screen.queryByRole('link', { name: 'View store' })).toBeNull();
     expect(screen.getByRole('link', { name: 'Stores' })).toHaveProperty('href', expect.stringContaining('/commerce/stores'));
+  });
+
+  it('collapses and expands the desktop navigation without removing destinations', async () => {
+    apiMock.mockResolvedValue({ data: { stores: [] } });
+    renderShell();
+
+    await waitFor(() => expect(screen.getByRole('link', { name: 'Overview' })).toBeTruthy());
+    const toggle = screen.getByRole('button', { name: 'Collapse E-commerce navigation' });
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    fireEvent.click(toggle);
+
+    expect(screen.getByRole('button', { name: 'Expand E-commerce navigation' }).getAttribute('aria-expanded')).toBe('false');
+    expect(screen.getAllByRole('link', { name: 'Overview' }).some((link) => link.getAttribute('title') === 'Overview')).toBe(true);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Expand E-commerce navigation' }));
+    expect(screen.getByRole('button', { name: 'Collapse E-commerce navigation' }).getAttribute('aria-expanded')).toBe('true');
+    expect(screen.getAllByRole('link', { name: 'Overview' }).some((link) => link.textContent?.includes('Overview'))).toBe(true);
+  });
+
+  it('restores a valid preference and ignores an invalid one safely', async () => {
+    apiMock.mockResolvedValue({ data: { stores: [] } });
+    window.localStorage.setItem('awj-commerce-sidebar-collapsed', 'true');
+    const { unmount } = renderShell();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Expand E-commerce navigation' })).toBeTruthy());
+    unmount();
+
+    window.localStorage.setItem('awj-commerce-sidebar-collapsed', 'unexpected');
+    renderShell();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Collapse E-commerce navigation' })).toBeTruthy());
+  });
+
+  it('keeps the mobile drawer navigation separate from desktop collapse state', async () => {
+    apiMock.mockResolvedValue({ data: { stores: [] } });
+    renderShell();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Open E-commerce navigation' })).toBeTruthy());
+    expect(screen.getByRole('button', { name: 'Collapse E-commerce navigation' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Open E-commerce navigation' })).toBeTruthy();
   });
 });

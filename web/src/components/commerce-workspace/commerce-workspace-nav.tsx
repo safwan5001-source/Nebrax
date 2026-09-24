@@ -37,9 +37,11 @@ const ICONS: Record<string, typeof Store> = {
 export function CommerceWorkspaceNav({
   onNavigate,
   className,
+  collapsed = false,
 }: {
   onNavigate?: () => void;
   className?: string;
+  collapsed?: boolean;
 }) {
   const locale = useLocale();
   const pathname = usePathname();
@@ -49,9 +51,7 @@ export function CommerceWorkspaceNav({
     <nav aria-label={t('navAriaLabel')} className={cn('space-y-4', className)}>
       {COMMERCE_WORKSPACE_NAV_GROUPS.map((group) => (
         <section key={group.labelKey} aria-label={t(group.labelKey as CommerceWorkspaceMessageKey)}>
-          <p className="px-3 pb-1.5 text-[11px] font-semibold tracking-wide text-muted">
-            {t(group.labelKey as CommerceWorkspaceMessageKey)}
-          </p>
+          {!collapsed && <p className="px-3 pb-1.5 text-[11px] font-semibold tracking-wide text-muted">{t(group.labelKey as CommerceWorkspaceMessageKey)}</p>}
           <div className="space-y-1">
             {group.items.map((item) => (
               <WorkspaceLink
@@ -60,6 +60,7 @@ export function CommerceWorkspaceNav({
                 pathname={pathname}
                 label={t(item.labelKey as CommerceWorkspaceMessageKey)}
                 onNavigate={onNavigate}
+                collapsed={collapsed}
               />
             ))}
           </div>
@@ -74,11 +75,13 @@ function WorkspaceLink({
   pathname,
   label,
   onNavigate,
+  collapsed,
 }: {
   item: CommerceWorkspaceNavItem;
   pathname: string;
   label: string;
   onNavigate?: () => void;
+  collapsed: boolean;
 }) {
   const Icon = ICONS[item.href] ?? Layers3;
   const active = isCommerceNavItemActive(item.href, pathname);
@@ -87,16 +90,27 @@ function WorkspaceLink({
     <Link
       href={item.href}
       aria-current={active ? 'page' : undefined}
+      aria-label={collapsed ? label : undefined}
+      title={collapsed ? label : undefined}
       onClick={onNavigate}
       className={cn(
-        'relative flex min-h-11 items-center gap-3 rounded px-3 py-2 text-sm transition-colors',
+        'group relative flex min-h-11 items-center gap-3 rounded py-2 text-sm transition-colors',
+        collapsed ? 'justify-center px-2' : 'px-3',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
         active ? 'bg-primary-soft font-medium text-primary' : 'text-text hover:bg-primary-soft hover:text-primary',
       )}
     >
       {active && <span aria-hidden className="absolute inset-y-2 start-0 w-0.5 rounded bg-primary" />}
       <Icon aria-hidden="true" className="h-[18px] w-[18px] shrink-0" strokeWidth={1.7} />
-      <span className="truncate">{label}</span>
+      <span className={collapsed ? 'sr-only' : 'truncate'}>{label}</span>
+      {collapsed && (
+        <span
+          role="tooltip"
+          className="pointer-events-none absolute start-full z-20 ms-2 whitespace-nowrap rounded border border-border bg-surface px-2 py-1 text-xs text-text opacity-0 shadow-sm transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
+        >
+          {label}
+        </span>
+      )}
     </Link>
   );
 }
