@@ -35,9 +35,11 @@ final class AppSchemaParser
         'schemaVersion', 'minRuntimeVersion', 'requiredCapabilities', 'theme', 'navigation', 'pages',
     ];
 
-    private const COMPONENT_KEYS = ['type', 'id', 'optional', 'props', 'children', 'action'];
+    private const COMPONENT_KEYS = ['type', 'id', 'optional', 'props', 'children', 'action', 'binding'];
 
     private const ACTION_KEYS = ['type', 'params'];
+
+    private const BINDING_KEYS = ['resource', 'query', 'itemProps'];
 
     private const THEME_KEYS = ['tokens'];
 
@@ -203,6 +205,50 @@ final class AppSchemaParser
                 throw new SchemaFormatException('invalid_type', 'component.action must be an object');
             }
             $this->validateActionRef($action);
+        }
+
+        $binding = $json['binding'] ?? null;
+        if ($binding !== null) {
+            if (! $this->isObjectLike($binding)) {
+                throw new SchemaFormatException('invalid_type', 'component.binding must be an object');
+            }
+            $this->validateBinding($binding);
+        }
+    }
+
+    /**
+     * تحقّق بنيوي بحت من شكل `binding` — لا يتحقق من هوية المورد نفسها ولا من
+     * صحة أسماء حقوله (ذلك عمل `CompatibilityResolver` وقت النشر، تماماً
+     * كتمييز هوية المكوّن/الإجراء أعلاه). القيمة المسموحة الوحيدة: كائن JSON
+     * آمن — لا تعبير، لا استعلام SQL، لا رابط HTTP حرّ (`ADR-01`).
+     */
+    private function validateBinding(array $json): void
+    {
+        $this->rejectUnknownKeys($json, self::BINDING_KEYS, 'binding');
+
+        $resource = $json['resource'] ?? null;
+        if (! is_string($resource) || $resource === '') {
+            throw new SchemaFormatException('missing_field', 'binding.resource must be a non-empty string');
+        }
+
+        $query = $json['query'] ?? null;
+        if ($query !== null) {
+            if (! $this->isObjectLike($query)) {
+                throw new SchemaFormatException('invalid_type', 'binding.query must be an object');
+            }
+            $this->validateJsonSafeMap($query, 'binding.query');
+        }
+
+        $itemProps = $json['itemProps'] ?? null;
+        if ($itemProps !== null) {
+            if (! $this->isObjectLike($itemProps)) {
+                throw new SchemaFormatException('invalid_type', 'binding.itemProps must be an object');
+            }
+            foreach ($itemProps as $propKey => $fieldPath) {
+                if (! is_string($propKey) || $propKey === '' || ! is_string($fieldPath) || $fieldPath === '') {
+                    throw new SchemaFormatException('invalid_type', 'binding.itemProps entries must be non-empty string:string');
+                }
+            }
         }
     }
 

@@ -240,4 +240,85 @@ class AppSchemaParserTest extends TestCase
         $this->parser()->validate($schema);
         $this->assertTrue(true);
     }
+
+    /** @test */
+    public function parses_a_component_with_a_well_formed_binding(): void
+    {
+        $schema = $this->minimalSchema();
+        $schema['pages']['home']['children'] = [
+            ['type' => 'ProductList', 'id' => 'p1', 'binding' => [
+                'resource' => 'commerce.products',
+                'query' => ['category_id' => '$route.categoryId', 'sort' => 'name'],
+                'itemProps' => ['title' => 'name', 'amountMinor' => 'price.amount_minor'],
+            ]],
+        ];
+
+        $this->parser()->validate($schema);
+        $this->assertTrue(true);
+    }
+
+    /** @test */
+    public function rejects_a_binding_with_an_unknown_field(): void
+    {
+        $schema = $this->minimalSchema();
+        $schema['pages']['home']['children'] = [
+            ['type' => 'ProductList', 'id' => 'p1', 'binding' => [
+                'resource' => 'commerce.products', 'endpoint' => '/anything',
+            ]],
+        ];
+
+        try {
+            $this->parser()->validate($schema);
+            $this->fail('expected SchemaFormatException');
+        } catch (SchemaFormatException $e) {
+            $this->assertSame('unknown_field', $e->errorCode);
+        }
+    }
+
+    /** @test */
+    public function rejects_a_binding_missing_resource(): void
+    {
+        $schema = $this->minimalSchema();
+        $schema['pages']['home']['children'] = [
+            ['type' => 'ProductList', 'id' => 'p1', 'binding' => ['query' => []]],
+        ];
+
+        try {
+            $this->parser()->validate($schema);
+            $this->fail('expected SchemaFormatException');
+        } catch (SchemaFormatException $e) {
+            $this->assertSame('missing_field', $e->errorCode);
+        }
+    }
+
+    /** @test */
+    public function rejects_a_binding_with_a_non_string_item_props_value(): void
+    {
+        $schema = $this->minimalSchema();
+        $schema['pages']['home']['children'] = [
+            ['type' => 'ProductList', 'id' => 'p1', 'binding' => [
+                'resource' => 'commerce.products',
+                'itemProps' => ['title' => 5],
+            ]],
+        ];
+
+        $this->expectException(SchemaFormatException::class);
+        $this->parser()->validate($schema);
+    }
+
+    /** @test */
+    public function rejects_the_old_plural_bindings_key_since_only_binding_singular_is_accepted(): void
+    {
+        $schema = $this->minimalSchema();
+        $schema['pages']['home']['children'] = [
+            ['type' => 'Text', 'id' => 'bound-text', 'bindings' => ['text' => 'commerce.products.0.title']],
+        ];
+
+        try {
+            $this->parser()->validate($schema);
+            $this->fail('expected SchemaFormatException');
+        } catch (SchemaFormatException $e) {
+            $this->assertSame('unknown_field', $e->errorCode);
+        }
+    }
 }
