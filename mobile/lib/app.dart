@@ -2,7 +2,37 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'app/awj_runtime_shell.dart';
+import 'app/runtime_schema.dart';
 import 'commerce/commerce.dart';
+import 'schema/schema.dart';
+
+/// This runtime's default brand seed color — used whenever the bundled
+/// schema carries no `theme.tokens.colorPrimary`, or an invalid one.
+const Color _kDefaultSeedColor = Color(0xFF0F6A5A);
+
+/// APP-BUILDER-22 — closes the "theme tokens parsed but never read" gap
+/// (`AWJ_APP_BUILDER_COMMERCE_RUNTIME_V1_EVIDENCE.md` §11): [AppSchema.theme]
+/// was already validated at parse time (MOBILE-RUNTIME-2) but nothing ever
+/// consumed it — [ThemeData] used an unrelated hardcoded literal instead.
+///
+/// Reads `theme.tokens.colorPrimary` from [schemaJson] as the app's Material
+/// 3 seed color. Same defensive posture `component_widgets.dart` already
+/// uses for schema props: a missing token, a malformed schema, or a value
+/// that is not a `#RRGGBB` hex string all fall back to [_kDefaultSeedColor]
+/// rather than throwing — a bundled schema's theme is presentation-only and
+/// must never be able to crash app boot.
+Color themeSeedColorFromSchema(String schemaJson) {
+  try {
+    final tokens = AppSchema.parse(schemaJson).theme.tokens;
+    final hex = tokens['colorPrimary'];
+    if (hex == null) return _kDefaultSeedColor;
+    final hexDigits = RegExp(r'^#([0-9a-fA-F]{6})$').firstMatch(hex.trim())?.group(1);
+    if (hexDigits == null) return _kDefaultSeedColor;
+    return Color(int.parse('FF$hexDigits', radix: 16));
+  } on SchemaFormatException {
+    return _kDefaultSeedColor;
+  }
+}
 
 /// AWJ Mobile Runtime — root application widget.
 ///
@@ -34,6 +64,11 @@ class AwjMobileRuntimeApp extends StatefulWidget {
 class _AwjMobileRuntimeAppState extends State<AwjMobileRuntimeApp> {
   Locale _locale = const Locale('ar');
 
+  /// Computed once — [kHomeSchemaJson] is a compile-time bundled constant,
+  /// not a per-build value, so re-parsing it on every rebuild (e.g. the
+  /// locale toggle) would be pure waste.
+  late final Color _seedColor = themeSeedColorFromSchema(kHomeSchemaJson);
+
   void _onLocaleChanged(Locale locale) {
     setState(() => _locale = locale);
   }
@@ -44,7 +79,7 @@ class _AwjMobileRuntimeAppState extends State<AwjMobileRuntimeApp> {
       title: 'AWJ Mobile Runtime',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        colorSchemeSeed: const Color(0xFF0F6A5A),
+        colorSchemeSeed: _seedColor,
         useMaterial3: true,
       ),
       locale: _locale,

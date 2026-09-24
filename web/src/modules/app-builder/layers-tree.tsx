@@ -7,9 +7,9 @@ import {
 import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, arrayMove, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { ArrowDown, ArrowUp, GripVertical } from 'lucide-react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils';
-import { type AppSchemaComponent } from '@/lib/app-builder';
+import { registryLabel, type AppBuilderRegistries, type AppSchemaComponent } from '@/lib/app-builder';
 
 /**
  * APP-BUILDER-6 — شجرة الطبقات: التحديد كما بُني في APP-BUILDER-5، زائداً إعادة
@@ -37,6 +37,7 @@ function TreeRow({
   count,
   onMove,
   reorderable,
+  registries,
 }: {
   node: AppSchemaComponent;
   depth: number;
@@ -46,10 +47,14 @@ function TreeRow({
   count: number;
   onMove: (id: string, direction: 'up' | 'down') => void;
   reorderable: boolean;
+  registries: AppBuilderRegistries | null;
 }) {
   const t = useTranslations('appBuilder.builder');
+  const locale = useLocale();
   const selected = node.id === selectedId;
   const label = nodeLabel(node);
+  const componentDefinition = registries?.components[node.type];
+  const typeLabel = componentDefinition ? registryLabel(componentDefinition.label, locale) : node.type;
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: node.id, disabled: !reorderable });
 
   return (
@@ -107,7 +112,7 @@ function TreeRow({
           selected ? 'bg-primary-soft font-medium text-primary' : 'text-text hover:bg-background'
         )}
       >
-        <span className="shrink-0 text-xs text-muted">{node.type}</span>
+        <span className="shrink-0 text-xs text-muted" title={node.type}>{typeLabel}</span>
         {label ? <span className="truncate text-xs text-muted">· {label}</span> : null}
       </div>
     </div>
@@ -121,6 +126,7 @@ function ChildrenGroup({
   onSelect,
   onReorder,
   onMove,
+  registries,
 }: {
   parent: AppSchemaComponent;
   depth: number;
@@ -128,6 +134,7 @@ function ChildrenGroup({
   onSelect: (id: string) => void;
   onReorder: (parentId: string, orderedIds: string[]) => void;
   onMove: (id: string, direction: 'up' | 'down') => void;
+  registries: AppBuilderRegistries | null;
 }) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
@@ -160,9 +167,10 @@ function ChildrenGroup({
               count={children.length}
               onMove={onMove}
               reorderable={reorderable}
+              registries={registries}
             />
             {child.children && child.children.length > 0 ? (
-              <ChildrenGroup parent={child} depth={depth + 1} selectedId={selectedId} onSelect={onSelect} onReorder={onReorder} onMove={onMove} />
+              <ChildrenGroup parent={child} depth={depth + 1} selectedId={selectedId} onSelect={onSelect} onReorder={onReorder} onMove={onMove} registries={registries} />
             ) : null}
           </React.Fragment>
         ))}
@@ -178,6 +186,7 @@ export function LayersTree({
   onReorder,
   onMove,
   emptyLabel,
+  registries = null,
 }: {
   root: AppSchemaComponent | null;
   selectedId: string | null;
@@ -185,13 +194,14 @@ export function LayersTree({
   onReorder: (parentId: string, orderedIds: string[]) => void;
   onMove: (id: string, direction: 'up' | 'down') => void;
   emptyLabel: string;
+  registries?: AppBuilderRegistries | null;
 }) {
   if (!root) return <p className="px-3 py-2 text-xs text-muted">{emptyLabel}</p>;
 
   return (
     <div role="tree" className="space-y-0.5 py-1">
-      <TreeRow node={root} depth={0} selectedId={selectedId} onSelect={onSelect} index={0} count={1} onMove={onMove} reorderable={false} />
-      <ChildrenGroup parent={root} depth={1} selectedId={selectedId} onSelect={onSelect} onReorder={onReorder} onMove={onMove} />
+      <TreeRow node={root} depth={0} selectedId={selectedId} onSelect={onSelect} index={0} count={1} onMove={onMove} reorderable={false} registries={registries} />
+      <ChildrenGroup parent={root} depth={1} selectedId={selectedId} onSelect={onSelect} onReorder={onReorder} onMove={onMove} registries={registries} />
     </div>
   );
 }

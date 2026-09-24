@@ -82,4 +82,19 @@ class ActionRegistryTest extends TestCase
         $this->assertTrue($quantity->required);
         $this->assertSame(0, $quantity->minValue, 'decodeAction يقبل quantity == 0 صراحة لـupdateCartQuantity.');
     }
+
+    /** APP-BUILDER-21 — كل إجراء وكل معامل يحملان تسمية بشرية ثنائية اللغة. */
+    public function test_every_action_and_param_declares_a_non_empty_bilingual_label(): void
+    {
+        foreach (ActionRegistry::definitions() as $type => $definition) {
+            $this->assertNotSame('', trim($definition->label->ar), "{$type}: تسمية عربية فارغة.");
+            $this->assertNotSame('', trim($definition->label->en), "{$type}: English label is empty.");
+            $this->assertNotSame($type, $definition->label->ar, "{$type}: التسمية يجب أن تكون بشرية لا مطابقة للمعرّف الداخلي.");
+
+            foreach ($definition->params as $param) {
+                $this->assertNotSame('', trim($param->label->ar), "{$type}.{$param->key}: تسمية عربية فارغة.");
+                $this->assertNotSame('', trim($param->label->en), "{$type}.{$param->key}: English label is empty.");
+            }
+        }
+    }
 }

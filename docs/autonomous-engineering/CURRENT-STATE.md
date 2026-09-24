@@ -523,5 +523,70 @@ their own, so only their resource-field validation applies. 37 new/updated tests
 regression green. No accounting impact. `APP-BUILDER-16` (Conditions/Visibility) is `in_progress`,
 independent of `APP-BUILDER-15`/`17`.
 
+`APP-BUILDER-16` (backend schema/compatibility contract) is **done**: PR #996 merged (squash Merge
+SHA `22156e493ef830a34a372b5c74643ab20e37632f`, confirmed single-parent squash onto `main`, parent
+`57d474e`). Adds the optional `visibility` component-node key (`ADR-01` §3.3): a closed, typed
+condition tree (`all`/`any` combinators or a `{signal, operator, value?}` leaf), bounded depth/
+branch count, no expression engine. New `VisibilitySignal`/`VisibilityOperator` closed vocabularies.
+`CompatibilityResolver` resolves it through the same optional-prune/required-fail-closed mechanism
+as `type`/`action.type`/`binding`; `RuntimeCapabilities::SCHEMA_FEATURES` stays deliberately empty
+until `APP-BUILDER-17` (same reasoning as `DATA_RESOURCES`). Visibility is presentation-only by
+construction — no authorization touched. 46 new tests, full regression green. Inspector UX for
+authoring conditions deferred to land with `APP-BUILDER-15`'s binding editor (not silently dropped
+— both are the same Inspector surface with no backend dependency blocking either). No accounting
+impact.
+
+`APP-BUILDER-21` (UX/localization) is **done** locally (commit `8ab18df` on
+`claude/app-builder-21-ux-localization`, PR #997 open): adds a `Label(ar, en)` value object to every
+`ComponentRegistry`/`ActionRegistry` definition and every prop/action-param (15 components, 6
+actions), serialized by `AppBuilderRegistryController` alongside the existing `bindable_resources`.
+No schema identifier renamed anywhere — `type`/prop keys/action-param keys are unchanged, so
+published experiences and the `commerce/v1`/binding contracts are untouched. Frontend: a shared
+`registryLabel(label, locale)` helper (`web/src/lib/app-builder.ts`) renders the localized label in
+the Inspector (prop rows, action-param rows, action-type select, add-child select) and the
+LayersTree node badges; raw identifiers are preserved everywhere as `title` tooltips for
+merchants/developers who need the underlying key. The Canvas type-tag badge uses the actual UI
+locale (`useLocale()`) rather than the content-preview locale toggle — a real distinction found
+during implementation: the badge is Builder chrome, not simulated storefront content. Backend:
+`ComponentRegistryTest`/`ActionRegistryTest` assert label completeness (non-empty `ar`+`en`) on
+every definition/prop/param; `AppBuilderRegistryTest` asserts HTTP exposure. Frontend: full
+`app-builder.test.ts` + builder `page.test.tsx` suites updated to assert localized rendering.
+Verified locally: targeted backend filter (`ComponentRegistryTest|ActionRegistryTest|
+AppBuilderRegistryTest`, 94 tests/476 assertions) green; full frontend suite (2076 tests), `tsc
+--noEmit`, and `npm run build` all green. No accounting impact — UI/localization only, no new
+financial postings.
+
+`APP-BUILDER-22` (theme-token canvas/runtime rendering fix, `AWJ_APP_BUILDER_COMMERCE_RUNTIME_V1_
+EVIDENCE.md` §11) is **done** locally on `claude/app-builder-21-ux-localization`, PR pending — both
+independent halves of the documented gap closed:
+
+- **Web canvas**: `tailwind.config.ts`'s `borderRadius.DEFAULT` stays a fixed `0.5rem` on purpose
+  (it backs the bare `rounded` class used across ~286 files app-wide; making it var-driven would
+  break every screen outside the Builder wherever `--canvas-radius` is unset). Instead, an
+  additive `canvas` radius scale value (`rounded-canvas` → `var(--canvas-radius, 0.5rem)`) was
+  added — zero blast radius anywhere it isn't explicitly used, verified by the full frontend suite
+  staying green (2076/2076) after the change. `canvas.tsx`'s `themeCssVars()` now sets
+  `--canvas-radius` from `theme.tokens.radius` (via the same `RADIUS_PRESETS`/`radiusToken` already
+  used by `theme-panel.tsx`), and the merchant-content elements that previously used bare `rounded`
+  (`Quantity`'s +/- controls, `AddToCart`, the generic `Button` component) now use `rounded-canvas`.
+  Builder chrome (`NodeFrame`'s selection ring, `TypeTag`'s badge) is deliberately left on the
+  editor's own fixed `rounded` — it isn't merchant content.
+- **Flutter runtime**: `theme.tokens` was already parsed and validated (`MOBILE-RUNTIME-2`) but
+  nothing ever read it — `ThemeData` used an unrelated hardcoded literal. `app.dart` gains a pure,
+  defensive `themeSeedColorFromSchema(String)` (same "malformed input never crashes boot, falls
+  back to the safe default" posture as `component_widgets.dart`'s prop reads) that reads
+  `theme.tokens.colorPrimary` from the bundled `kHomeSchemaJson` and seeds `ThemeData.colorSchemeSeed`
+  with it — replacing the previous disconnected literal. Deliberately scoped to what the runtime's
+  *current* architecture actually supports today: the mobile runtime still boots from a
+  compile-time-bundled schema constant (the live publish → fetch → cache loop is `APP-BUILDER-19`,
+  not yet built), so there is no live-fetched schema to thread through `MaterialApp`'s root state
+  yet — that lifting is `APP-BUILDER-19`'s concern, not invented here ahead of it. No new theme
+  token key was introduced (`colorPrimary` is the only one the bundled schema already carries) —
+  "no token redesign," per the evidence. 5 new focused tests (`theme_seed_test.dart`) plus one
+  widget-level assertion in `widget_test.dart` that `Theme.of(context).colorScheme.primary` matches
+  the same seed computation. **Not verified locally — this session has no Flutter SDK**; relies on
+  `mobile-ci.yml` as the verification gate, consistent with every other Dart change deferred in this
+  horizon for the same reason. No accounting impact.
+
 TASK-QUEUE.md records the finalized task decomposition (`APP-BUILDER-13`..`APP-BUILDER-23`) under
 the horizon header, promoted to `ready` in dependency order per ADR-01.

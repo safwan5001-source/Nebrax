@@ -14,6 +14,7 @@ final class ActionParamDefinition
         public readonly string $key,
         public readonly string $type,
         public readonly bool $required,
+        public readonly Label $label,
         public readonly bool $nullable = false,
         public readonly mixed $default = null,
         public readonly ?int $minValue = null,
