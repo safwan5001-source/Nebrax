@@ -497,5 +497,31 @@ Key evidence findings (see the evidence doc for full citations):
   with zero real I/O wired) — flagged as the evidence doc's Decision Point 1, since without it any
   new binding/visibility mechanism only ever runs against a schema baked into a native build.
 
+**Owner clarification (2026-09-24, `ADR-01` amendment, PR #995 merged, squash Merge SHA
+`fbccc252d0d75109279ce03fad65ed3bd2677226`)**: Storefront Web feature/UI completeness is never a
+prerequisite for App Builder/Mobile Runtime work — the two channels share Commerce truth (`commerce/v1`),
+not a release schedule. A missing Commerce capability is recorded as an explicit gap, never
+substituted with an app-specific invention; escalate only if it blocks this horizon's approved
+scope. Binding on `APP-BUILDER-15`..`23`.
+
+`APP-BUILDER-14` (App Schema binding contract) is **done**: PR #994 merged (squash Merge SHA
+`57d474e8042466afa52e0f76773f5b57eee7f3bd`, confirmed single-parent squash onto `main`, parent
+`fbccc25`). Adds the optional `binding` component-node key to `AppSchemaParser` (closed sub-shape:
+`resource`/`query`/`itemProps`, JSON-safe only) and resolves it in `CompatibilityResolver` via the
+same optional-prune/required-fail-closed mechanism already used for `type`/`action.type` — unknown
+resource, a component not registered to bind it (`ComponentRegistry::bindableResources`), an
+`itemProps`/`query` key the resource doesn't expose, or a runtime not yet declaring the resource
+(`CapabilityManifest::resourceVersion()`) are all "unsupported". `RuntimeCapabilities::DATA_RESOURCES`
+stays deliberately empty — no Flutter Runtime consumes a real binding yet — so every binding today
+correctly fails at publish time until `APP-BUILDER-17` updates this constant **and**
+`mobile/lib/schema/registry_identifiers.dart` together, with real CI-verified Dart changes (this
+session has no Flutter SDK to verify Dart locally, so that mirroring is correctly deferred rather
+than pushed unverified). Fixed one real design gap found during implementation: `itemProps`
+prop-key validation only applies when the bound component declares its own props
+(`ProductDetail`/`CartSummary`) — `ProductList`/`CartList` are pure containers with no props of
+their own, so only their resource-field validation applies. 37 new/updated tests, full `AppBuilder*`
+regression green. No accounting impact. `APP-BUILDER-16` (Conditions/Visibility) is `in_progress`,
+independent of `APP-BUILDER-15`/`17`.
+
 TASK-QUEUE.md records the finalized task decomposition (`APP-BUILDER-13`..`APP-BUILDER-23`) under
 the horizon header, promoted to `ready` in dependency order per ADR-01.

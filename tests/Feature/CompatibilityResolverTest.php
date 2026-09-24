@@ -384,4 +384,153 @@ class CompatibilityResolverTest extends TestCase
 
         $this->assertTrue($result->compatible);
     }
+
+    /** manifest يفترض بناءً يستهلك ميزة `visibility` فعلياً — لا يوجد بعد (`APP-BUILDER-17`)، يُستعمَل هنا فقط لإثبات آلية `schemaFeatureVersion()` نفسها. */
+    private function manifestWithSchemaFeatures(array $schemaFeatures): CapabilityManifest
+    {
+        return new CapabilityManifest(
+            runtimeVersion: SchemaVersion::tryParse('1.0.0'),
+            minSupportedSchemaVersion: SchemaVersion::tryParse('1.0.0'),
+            maxSupportedSchemaVersion: SchemaVersion::tryParse('1.0.0'),
+            components: RuntimeCapabilities::COMPONENTS,
+            actions: RuntimeCapabilities::ACTIONS,
+            nativeCapabilities: RuntimeCapabilities::NATIVE_CAPABILITIES,
+            schemaFeatures: $schemaFeatures,
+        );
+    }
+
+    /** @test */
+    public function a_visibility_leaf_on_the_current_runtime_is_unsupported_since_no_schema_feature_is_consumed_yet(): void
+    {
+        $schema = $this->baseSchema();
+        $schema['pages']['home']['children'][] = [
+            'type' => 'Button', 'id' => 'x1',
+            'visibility' => ['signal' => 'customer.isAuthenticated', 'operator' => 'isTrue'],
+        ];
+
+        $result = $this->resolver()->resolve($schema, CapabilityManifest::current());
+
+        $this->assertFalse($result->compatible);
+        $this->assertSame(CompatibilityResult::REASON_MISSING_REQUIRED_CAPABILITY, $result->reason);
+    }
+
+    /** @test */
+    public function an_optional_visibility_unsupported_on_current_runtime_is_pruned_not_fatal(): void
+    {
+        $schema = $this->baseSchema();
+        $schema['pages']['home']['children'][] = [
+            'type' => 'Button', 'id' => 'x1', 'optional' => true,
+            'visibility' => ['signal' => 'customer.isAuthenticated', 'operator' => 'isTrue'],
+        ];
+
+        $result = $this->resolver()->resolve($schema, CapabilityManifest::current());
+
+        $this->assertTrue($result->compatible);
+        $this->assertCount(1, $result->fallbacks);
+    }
+
+    /** @test */
+    public function a_visibility_leaf_is_compatible_once_the_manifest_declares_the_feature_supported(): void
+    {
+        $schema = $this->baseSchema();
+        $schema['pages']['home']['children'][] = [
+            'type' => 'Button', 'id' => 'x1',
+            'visibility' => ['signal' => 'cart.itemCount', 'operator' => 'gt', 'value' => 0],
+        ];
+
+        $result = $this->resolver()->resolve($schema, $this->manifestWithSchemaFeatures(['visibility' => 1]));
+
+        $this->assertTrue($result->compatible);
+        $this->assertSame([], $result->fallbacks);
+    }
+
+    /** @test */
+    public function a_nested_any_all_visibility_tree_is_compatible_when_every_leaf_is_valid(): void
+    {
+        $schema = $this->baseSchema();
+        $schema['pages']['home']['children'][] = [
+            'type' => 'Button', 'id' => 'x1',
+            'visibility' => ['any' => [
+                ['signal' => 'cart.itemCount', 'operator' => 'gt', 'value' => 0],
+                ['all' => [
+                    ['signal' => 'product.inStock', 'operator' => 'isTrue'],
+                    ['signal' => 'customer.isAuthenticated', 'operator' => 'in', 'value' => [true]],
+                ]],
+            ]],
+        ];
+
+        $result = $this->resolver()->resolve($schema, $this->manifestWithSchemaFeatures(['visibility' => 1]));
+
+        $this->assertTrue($result->compatible);
+    }
+
+    /** @test */
+    public function a_visibility_leaf_with_an_unknown_signal_is_unsupported_even_when_the_feature_is_declared(): void
+    {
+        $schema = $this->baseSchema();
+        $schema['pages']['home']['children'][] = [
+            'type' => 'Button', 'id' => 'x1',
+            'visibility' => ['signal' => 'not.a.real.signal', 'operator' => 'isTrue'],
+        ];
+
+        $result = $this->resolver()->resolve($schema, $this->manifestWithSchemaFeatures(['visibility' => 1]));
+
+        $this->assertFalse($result->compatible);
+    }
+
+    /** @test */
+    public function a_visibility_leaf_with_an_unknown_operator_is_unsupported(): void
+    {
+        $schema = $this->baseSchema();
+        $schema['pages']['home']['children'][] = [
+            'type' => 'Button', 'id' => 'x1',
+            'visibility' => ['signal' => 'cart.itemCount', 'operator' => 'startsWith', 'value' => 'x'],
+        ];
+
+        $result = $this->resolver()->resolve($schema, $this->manifestWithSchemaFeatures(['visibility' => 1]));
+
+        $this->assertFalse($result->compatible);
+    }
+
+    /** @test */
+    public function a_visibility_is_true_or_false_operator_carrying_a_value_is_unsupported(): void
+    {
+        $schema = $this->baseSchema();
+        $schema['pages']['home']['children'][] = [
+            'type' => 'Button', 'id' => 'x1',
+            'visibility' => ['signal' => 'customer.isAuthenticated', 'operator' => 'isTrue', 'value' => true],
+        ];
+
+        $result = $this->resolver()->resolve($schema, $this->manifestWithSchemaFeatures(['visibility' => 1]));
+
+        $this->assertFalse($result->compatible);
+    }
+
+    /** @test */
+    public function a_visibility_in_operator_requires_a_non_empty_list_value(): void
+    {
+        $schema = $this->baseSchema();
+        $schema['pages']['home']['children'][] = [
+            'type' => 'Button', 'id' => 'x1',
+            'visibility' => ['signal' => 'cart.itemCount', 'operator' => 'in', 'value' => 5],
+        ];
+
+        $result = $this->resolver()->resolve($schema, $this->manifestWithSchemaFeatures(['visibility' => 1]));
+
+        $this->assertFalse($result->compatible);
+    }
+
+    /** @test */
+    public function a_visibility_comparison_operator_missing_its_required_value_is_unsupported(): void
+    {
+        $schema = $this->baseSchema();
+        $schema['pages']['home']['children'][] = [
+            'type' => 'Button', 'id' => 'x1',
+            'visibility' => ['signal' => 'cart.itemCount', 'operator' => 'gt'],
+        ];
+
+        $result = $this->resolver()->resolve($schema, $this->manifestWithSchemaFeatures(['visibility' => 1]));
+
+        $this->assertFalse($result->compatible);
+    }
 }

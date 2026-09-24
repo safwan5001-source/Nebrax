@@ -307,6 +307,119 @@ class AppSchemaParserTest extends TestCase
     }
 
     /** @test */
+    public function parses_a_component_with_a_simple_visibility_leaf(): void
+    {
+        $schema = $this->minimalSchema();
+        $schema['pages']['home']['children'] = [
+            ['type' => 'Button', 'id' => 'b1', 'visibility' => [
+                'signal' => 'customer.isAuthenticated', 'operator' => 'isTrue',
+            ]],
+        ];
+
+        $this->parser()->validate($schema);
+        $this->assertTrue(true);
+    }
+
+    /** @test */
+    public function parses_a_component_with_a_nested_any_all_visibility_tree(): void
+    {
+        $schema = $this->minimalSchema();
+        $schema['pages']['home']['children'] = [
+            ['type' => 'Button', 'id' => 'b1', 'visibility' => [
+                'any' => [
+                    ['signal' => 'cart.itemCount', 'operator' => 'gt', 'value' => 0],
+                    ['all' => [
+                        ['signal' => 'product.inStock', 'operator' => 'isTrue'],
+                        ['signal' => 'customer.isAuthenticated', 'operator' => 'equals', 'value' => true],
+                    ]],
+                ],
+            ]],
+        ];
+
+        $this->parser()->validate($schema);
+        $this->assertTrue(true);
+    }
+
+    /** @test */
+    public function rejects_a_visibility_with_an_unknown_field(): void
+    {
+        $schema = $this->minimalSchema();
+        $schema['pages']['home']['children'] = [
+            ['type' => 'Button', 'id' => 'b1', 'visibility' => [
+                'signal' => 'cart.itemCount', 'operator' => 'gt', 'value' => 0, 'extra' => true,
+            ]],
+        ];
+
+        try {
+            $this->parser()->validate($schema);
+            $this->fail('expected SchemaFormatException');
+        } catch (SchemaFormatException $e) {
+            $this->assertSame('unknown_field', $e->errorCode);
+        }
+    }
+
+    /** @test */
+    public function rejects_a_visibility_declaring_neither_all_any_nor_signal(): void
+    {
+        $schema = $this->minimalSchema();
+        $schema['pages']['home']['children'] = [
+            ['type' => 'Button', 'id' => 'b1', 'visibility' => ['whatever' => true]],
+        ];
+
+        $this->expectException(SchemaFormatException::class);
+        $this->parser()->validate($schema);
+    }
+
+    /** @test */
+    public function rejects_a_visibility_all_that_is_an_empty_list(): void
+    {
+        $schema = $this->minimalSchema();
+        $schema['pages']['home']['children'] = [
+            ['type' => 'Button', 'id' => 'b1', 'visibility' => ['all' => []]],
+        ];
+
+        $this->expectException(SchemaFormatException::class);
+        $this->parser()->validate($schema);
+    }
+
+    /** @test */
+    public function rejects_a_visibility_with_a_nested_object_as_value(): void
+    {
+        $schema = $this->minimalSchema();
+        $schema['pages']['home']['children'] = [
+            ['type' => 'Button', 'id' => 'b1', 'visibility' => [
+                'signal' => 'cart.itemCount', 'operator' => 'equals', 'value' => ['nested' => true],
+            ]],
+        ];
+
+        $this->expectException(SchemaFormatException::class);
+        $this->parser()->validate($schema);
+    }
+
+    /** @test */
+    public function rejects_a_visibility_tree_deeper_than_the_max_condition_depth(): void
+    {
+        // بناء تعشيش أعمق من الحدّ (4) عبر `all` متتالية أحادية الفرع.
+        $leaf = ['signal' => 'customer.isAuthenticated', 'operator' => 'isTrue'];
+        $nested = $leaf;
+        for ($i = 0; $i < 6; $i++) {
+            $nested = ['all' => [$nested]];
+        }
+
+        $schema = $this->minimalSchema();
+        $schema['pages']['home']['children'] = [
+            ['type' => 'Button', 'id' => 'b1', 'visibility' => $nested],
+        ];
+
+        try {
+            $this->parser()->validate($schema);
+            $this->fail('expected SchemaFormatException');
+        } catch (SchemaFormatException $e) {
+            $this->assertSame('too_deep', $e->errorCode);
+        }
+    }
+
+    /** @test */
     public function rejects_the_old_plural_bindings_key_since_only_binding_singular_is_accepted(): void
     {
         $schema = $this->minimalSchema();
