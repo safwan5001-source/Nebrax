@@ -21,8 +21,8 @@ Map<String, Object?> componentNode({
     'props': props,
     'children': children,
     'action': action,
-    if (binding != null) 'binding': binding,
-    if (visibility != null) 'visibility': visibility,
+    ?'binding': binding,
+    ?'visibility': visibility,
   };
 }
 
