@@ -923,9 +923,9 @@ Source of truth for this horizon:
 |---|---|---|---|---|
 | 1 | APP-BUILDER-13 | done | ADR-01 | Data Resource Registry V1 foundation (populate `commerce.categories`/`commerce.products`/`commerce.cart`) |
 | 2 | APP-BUILDER-14 | done | APP-BUILDER-13 | App Schema `binding` contract (parser + compatibility resolver) |
-| 3 | APP-BUILDER-15 | done (PR #998) | APP-BUILDER-14 | Builder Data UX (Inspector binding editor) |
+| 3 | APP-BUILDER-15 | done (PR #998 merged) | APP-BUILDER-14 | Builder Data UX (Inspector binding editor) |
 | 4 | APP-BUILDER-16 | done (schema contract) | ADR-01 | Conditions/Visibility contract (closed/typed/allowlisted) + Inspector UX |
-| 5 | APP-BUILDER-17 | in_progress (slice 1/3 done, PR #999) | APP-BUILDER-14 | Mobile runtime binding/visibility resolver (replaces 3 hand-written screen implementations) |
+| 5 | APP-BUILDER-17 | in_progress (slice 1/3 done, PR #999) | APP-BUILDER-14 | Mobile runtime binding/visibility resolver (replaces 3 hand-written screen implementations) — split into parser support / compatibility gating / resolver+screens+capability flip, see entry below |
 | 6 | APP-BUILDER-18 | ready (after 17) | APP-BUILDER-17 | Real action dispatch wired through schema bindings |
 | 7 | APP-BUILDER-19 | ready | ADR-01 (Decision Point 1 = YES) | Live publish → fetch → on-device-cache loop (Last Known Good) |
 | 8 | APP-BUILDER-20 | ready (after 18+19) | APP-BUILDER-18, APP-BUILDER-19 | Same-Store integrated proof |
@@ -1062,20 +1062,51 @@ from evidence §11 closed on both sides:
   `mobile-ci.yml` post-merge (green)** — this session has no Flutter SDK, same as every other Dart
   change deferred in this horizon for the same reason. No accounting impact.
 
-`APP-BUILDER-15` (Builder Data UX — Inspector binding/visibility editor) is `done`, PR #998.
-`AppBuilderRegistryController` now
-exposes `resources`/`visibility_signals`/`visibility_operators` and each component's
-`bindable_resources` (the field existed since `APP-BUILDER-14` but was never serialized). Frontend
-gains a `BindingEditor` (resource → filter/sort → per-prop field mapping, shown only for components
-whose registry entry lists `bindable_resources`) and a `VisibilityEditor` that edits a **flat**
-condition only (one leaf, or one combinator over N leaves — no nested tree editor, matching `ADR-01`'s
-closed/typed vocabulary, not an expression builder); a deeper shape arriving via direct API edits
-renders read-only with a reset action rather than being silently reinterpreted. Deliberate scope
-decision: `commerce.products`'s `category_id` filter is excluded from the buildable query UI because
-its only documented value (`$route.categoryId`) is a navigation-context reference with no runtime
-mechanism anywhere in the codebase yet — recorded as a Commerce/runtime dependency rather than
-invented ahead of the task that would actually build context-passing. 7 new backend tests
-(`AppBuilderRegistryTest`) + 5 new frontend tests (builder `page.test.tsx`). Verified: 93 targeted
-backend tests green, full frontend suite (2081 tests) green, `tsc --noEmit` clean, `npm run build`
-succeeds, `en.json`/`ar.json` key parity confirmed for the new translation subtrees. No accounting
-impact — authoring-only; no runtime effect until `APP-BUILDER-17`.
+`APP-BUILDER-15` (Builder Data UX — Inspector binding/visibility editor) is `done`: PR #998 merged
+(squash Merge SHA `ef757bd79f39c199047893bea735b90ef8284005`, confirmed single-parent squash onto
+`main`, parent `8dbff6f`). `AppBuilderRegistryController` now exposes
+`resources`/`visibility_signals`/`visibility_operators` and each component's `bindable_resources`
+(the field existed since `APP-BUILDER-14` but was never serialized). Frontend gains a `BindingEditor`
+(resource → filter/sort → per-prop field mapping, shown only for components whose registry entry
+lists `bindable_resources`) and a `VisibilityEditor` that edits a **flat** condition only (one leaf,
+or one combinator over N leaves — no nested tree editor, matching `ADR-01`'s closed/typed vocabulary,
+not an expression builder); a deeper shape arriving via direct API edits renders read-only with a
+reset action rather than being silently reinterpreted. Deliberate scope decision:
+`commerce.products`'s `category_id` filter is excluded from the buildable query UI because its only
+documented value (`$route.categoryId`) is a navigation-context reference with no runtime mechanism
+anywhere in the codebase yet — recorded as a Commerce/runtime dependency rather than invented ahead
+of the task that would actually build context-passing. 7 new backend tests (`AppBuilderRegistryTest`)
++ 5 new frontend tests (builder `page.test.tsx`). Verified: 93 targeted backend tests green, full
+frontend suite (2081 tests) green, `tsc --noEmit` clean, `npm run build` succeeds, `en.json`/`ar.json`
+key parity confirmed for the new translation subtrees. No accounting impact — authoring-only; no
+runtime effect until `APP-BUILDER-17`.
+
+`APP-BUILDER-17` was investigated and found substantially larger than its one-line description: the
+Dart schema parser had no `binding`/`visibility` support at all (`SchemaComponent._allowedKeys` was
+`{type, id, optional, props, children, action}`), so the full task is really parser support +
+compatibility-resolver gating + a resource-fetch/visibility-evaluation layer replacing 3 hand-written
+screens + flipping `RuntimeCapabilities::DATA_RESOURCES`/`SCHEMA_FEATURES` server-side (a
+production-wide publish gate that should not move ahead of a shipped, verified mobile release). Split
+into three independently-shippable slices (see the detailed slice breakdown in `CURRENT-STATE.md`):
+
+- **Slice 1 — Dart parser support** is `done` locally on
+  `claude/app-builder-17-mobile-schema-binding-visibility`, PR #999.
+  `SchemaBinding`/`VisibilityNode` added to `mobile/lib/schema/app_schema.dart`, mirroring
+  `AppSchemaParser::validateBinding`/`validateVisibility` exactly (same `MAX_CONDITION_DEPTH`(4)/
+  `MAX_CONDITION_BRANCHES`(16) limits). Dormant by construction — `CompatibilityResolver` (Dart) does
+  not read either field, and neither bundled schema (`kHomeSchemaJson`/`kCartSchemaJson`) declares
+  them, so nothing about current runtime behavior changes; only effect is that a schema declaring
+  `binding`/`visibility` now parses instead of failing `unknown_field` — safe today since the device
+  never parses anything but those two bundled constants (no live fetch yet — `APP-BUILDER-19`). 15
+  new Dart tests in `schema_binding_visibility_test.dart`, one-for-one against
+  `AppSchemaParserTest.php`'s binding/visibility cases. **Unverified locally (no Flutter SDK)** —
+  relies on `mobile-ci.yml`.
+- **Slice 2 — compatibility gating** (not started): Dart `RuntimeCapabilities`/`CapabilityManifest`
+  gain `dataResources`/`schemaFeatures`, kept empty (matching PHP), and `CompatibilityResolver` gains
+  the prune/reject checks — must land before slice 3's server-side flip, not after, or an
+  already-installed build with only slice 1 would treat a live binding/visibility node as
+  "compatible" while doing nothing with it.
+- **Slice 3 — resolver + screens + capability flip** (not started): the real fetch/hydrate/evaluate
+  layer, `HomeScreen`/`CartScreen`/`ProductScreen` rewired off hand-written hydration, bundled schemas
+  updated to declare real bindings, and only then flipping `RuntimeCapabilities::DATA_RESOURCES`/
+  `SCHEMA_FEATURES` server-side. This is the queue's actual "APP-BUILDER-18 depends on 17" edge.

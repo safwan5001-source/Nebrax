@@ -11,8 +11,10 @@ Map<String, Object?> componentNode({
   Map<String, Object?>? props,
   List<Map<String, Object?>>? children,
   Map<String, Object?>? action,
+  Map<String, Object?>? binding,
+  Map<String, Object?>? visibility,
 }) {
-  return {
+  final node = <String, Object?>{
     'type': type,
     'id': id,
     'optional': optional,
@@ -20,6 +22,9 @@ Map<String, Object?> componentNode({
     'children': children,
     'action': action,
   };
+  if (binding != null) node['binding'] = binding;
+  if (visibility != null) node['visibility'] = visibility;
+  return node;
 }
 
 Map<String, Object?> baseSchemaJson({

@@ -583,37 +583,84 @@ tests (`theme_seed_test.dart`) plus one widget-level assertion in `widget_test.d
 `mobile-ci.yml` post-merge (green)** since this session has no Flutter SDK to verify locally. No
 accounting impact.
 
-`APP-BUILDER-15` (Builder Data UX — Inspector binding/visibility editor) is **done**, PR #998. Backend: `AppBuilderRegistryController`
-now also serializes `resources` (`DataResourceRegistry::definitions()` — id/version/shape/paginated/
-fields/query_params), `visibility_signals` (`VisibilitySignal::ALL`), and `visibility_operators`
-(`VisibilityOperator::ALL` with a derived `value_arity: none|single|list`), plus `bindable_resources`
-on each component (the field already existed on `ComponentDefinition` since `APP-BUILDER-14` but was
-never exposed over HTTP until now). 7 new focused tests in `AppBuilderRegistryTest`. Frontend
-(`web/src/lib/app-builder.ts`, `inspector.tsx`): `AppSchemaBinding`/`VisibilityNode` (a closed
-`{all}`/`{any}`/`{signal,operator,value?}` union, matching `AppSchemaParser` exactly) added to the
-schema types; a new `BindingEditor` (resource picker → filter/sort fields → per-prop field mapping)
-renders under any component whose registry entry declares `bindable_resources`; a new
-`VisibilityEditor` edits a **flat** condition shape only — one leaf, or one combinator wrapping N
-leaves, no nesting — which covers every realistic case without building a full tree editor; a
-condition that arrived via the API in a shape deeper than that (only possible today by editing the
-draft directly through the API, since this editor never produces one) renders as a read-only
-"too advanced for this editor" state with a reset button, never a silent misread. One real,
-deliberate scope decision made during implementation: `commerce.products`'s `category_id` filter is
-structurally valid per `DataResourceRegistry` but its only documented intended value
-(`$route.categoryId`) is a navigation-context reference that doesn't exist as a runtime concept
-anywhere yet (no schema/runtime mechanism resolves it) — the editor excludes it from the buildable
-query UI rather than inventing a context-passing mechanism ahead of a task that would actually design
-one; recorded here as a Commerce/runtime dependency, not silently worked around. 5 new frontend
-tests in the builder `page.test.tsx` covering: bindable-vs-non-bindable Inspector state, choosing a
-resource revealing filter/sort fields, field-mapping rows keyed to the component's own props,
-visibility "always" → "all of these" transitions, and value-field visibility keyed to each
-operator's arity. Verified: 93 targeted backend tests green (`AppBuilderRegistryTest`,
-`ComponentRegistryTest`, `ActionRegistryTest`, `DataResourceRegistryTest`, `AppSchemaParserTest`,
-`CompatibilityResolverTest`); full frontend suite (2081 tests), `tsc --noEmit`, and `npm run build`
-all green; `en.json`/`ar.json` key parity verified for the new `binding`/`visibility` translation
-subtrees. No accounting impact — Builder authoring UI only; the binding/visibility data itself has
-no runtime effect yet (`RuntimeCapabilities::DATA_RESOURCES`/`SCHEMA_FEATURES` stay empty until
-`APP-BUILDER-17`), consistent with the note already in `APP-BUILDER-14`'s entry above.
+`APP-BUILDER-15` (Builder Data UX — Inspector binding/visibility editor) is **done**: PR #998 merged
+(squash Merge SHA `ef757bd79f39c199047893bea735b90ef8284005`, confirmed single-parent squash onto
+`main`, parent `8dbff6f`). Backend: `AppBuilderRegistryController` now also serializes `resources`
+(`DataResourceRegistry::definitions()` — id/version/shape/paginated/fields/query_params),
+`visibility_signals` (`VisibilitySignal::ALL`), and `visibility_operators` (`VisibilityOperator::ALL`
+with a derived `value_arity: none|single|list`), plus `bindable_resources` on each component (the
+field already existed on `ComponentDefinition` since `APP-BUILDER-14` but was never exposed over HTTP
+until now). 7 new focused tests in `AppBuilderRegistryTest`. Frontend (`web/src/lib/app-builder.ts`,
+`inspector.tsx`): `AppSchemaBinding`/`VisibilityNode` (a closed `{all}`/`{any}`/
+`{signal,operator,value?}` union, matching `AppSchemaParser` exactly) added to the schema types; a
+new `BindingEditor` (resource picker → filter/sort fields → per-prop field mapping) renders under any
+component whose registry entry declares `bindable_resources`; a new `VisibilityEditor` edits a
+**flat** condition shape only — one leaf, or one combinator wrapping N leaves, no nesting — which
+covers every realistic case without building a full tree editor; a condition that arrived via the API
+in a shape deeper than that (only possible today by editing the draft directly through the API, since
+this editor never produces one) renders as a read-only "too advanced for this editor" state with a
+reset button, never a silent misread. One real, deliberate scope decision made during implementation:
+`commerce.products`'s `category_id` filter is structurally valid per `DataResourceRegistry` but its
+only documented intended value (`$route.categoryId`) is a navigation-context reference that doesn't
+exist as a runtime concept anywhere yet (no schema/runtime mechanism resolves it) — the editor
+excludes it from the buildable query UI rather than inventing a context-passing mechanism ahead of a
+task that would actually design one; recorded here as a Commerce/runtime dependency, not silently
+worked around. 5 new frontend tests in the builder `page.test.tsx` covering: bindable-vs-non-bindable
+Inspector state, choosing a resource revealing filter/sort fields, field-mapping rows keyed to the
+component's own props, visibility "always" → "all of these" transitions, and value-field visibility
+keyed to each operator's arity. Verified: 93 targeted backend tests green, full frontend suite (2081
+tests), `tsc --noEmit`, and `npm run build` all green; `en.json`/`ar.json` key parity verified for the
+new `binding`/`visibility` translation subtrees. No accounting impact — Builder authoring UI only;
+the binding/visibility data itself has no runtime effect yet (`RuntimeCapabilities::DATA_RESOURCES`/
+`SCHEMA_FEATURES` stay empty until `APP-BUILDER-17`), consistent with the note already in
+`APP-BUILDER-14`'s entry above.
+
+**`APP-BUILDER-17` is investigated and re-scoped into three slices** (this session has no Flutter
+SDK to verify Dart changes locally, so each slice is kept independently small and CI-verified —
+`mobile-ci.yml`'s `mobile (analyze + test)` job has proven reliable across two prior Dart pushes on
+this horizon). Investigation found the task's one-line description ("mobile runtime binding/
+visibility resolver") undersells its real scope: the Dart-side schema parser
+(`mobile/lib/schema/app_schema.dart`) had **no knowledge of `binding`/`visibility` at all** —
+`SchemaComponent._allowedKeys` only listed `{type, id, optional, props, children, action}` — so the
+full task spans (a) parser support, (b) `CompatibilityResolver`/`RuntimeCapabilities` gating, and
+(c) an actual resource-fetch + visibility-evaluation layer replacing `HomeScreen`/`CartScreen`'s
+hand-written slot hydration, **plus flipping `RuntimeCapabilities::DATA_RESOURCES`/`SCHEMA_FEATURES`
+server-side (PHP)** — a production-wide gate on what every tenant can publish, which should not move
+ahead of a verified, shipped mobile release. Slicing:
+
+- **Slice 1 (this entry) — parser support, done locally** on
+  `claude/app-builder-17-mobile-schema-binding-visibility`, PR #999. Adds `SchemaBinding` and
+  `VisibilityNode` (mirroring
+  `AppSchemaParser::validateBinding`/`validateVisibility` exactly, including the `MAX_CONDITION_DEPTH`
+  (4)/`MAX_CONDITION_BRANCHES` (16) limits) to `mobile/lib/schema/app_schema.dart`; `SchemaComponent`
+  gains optional `binding`/`visibility` fields, both preserved through `withChildren()`. **Dormant by
+  construction**: `CompatibilityResolver` (Dart) is untouched and does not read either field, so this
+  slice changes nothing about what the resolver considers compatible; the two bundled schemas
+  (`kHomeSchemaJson`/`kCartSchemaJson`) declare neither key, so no existing behavior changes either.
+  The only real effect: a schema that *would* declare `binding`/`visibility` now parses structurally
+  instead of being rejected with `unknown_field` — safe today only because the device never parses
+  anything but those two bundled constants (no live-fetch mechanism exists — that is
+  `APP-BUILDER-19`). 15 new Dart tests in `mobile/test/schema/schema_binding_visibility_test.dart`,
+  mirroring `AppSchemaParserTest.php`'s binding/visibility coverage case-for-case. **Not verified
+  locally** (no Flutter SDK); relies on CI.
+- **Slice 2 (not started)** — Dart `RuntimeCapabilities`/`CapabilityManifest` gain `dataResources`/
+  `schemaFeatures` maps and `CompatibilityResolver` gains `bindingSupported()`/`visibilitySupported()`
+  checks mirroring the PHP resolver, **kept empty/unsupported** (matching PHP's own still-empty
+  `DATA_RESOURCES`/`SCHEMA_FEATURES`) so a schema with binding/visibility is correctly pruned
+  (optional) or rejected (required) by this runtime build — closing slice 1's "parses but isn't
+  gated" dormancy before slice 3 makes it do anything. Important ordering note for whoever picks this
+  up: **slice 2 must land before slice 3's server-side capability flip**, not after — flipping
+  `RuntimeCapabilities::DATA_RESOURCES`/`SCHEMA_FEATURES` server-side while an already-installed
+  mobile build only has slice 1 (parses but never gates or resolves) would let that old build accept
+  a binding/visibility node as "compatible" while silently doing nothing with it.
+- **Slice 3 (not started)** — the actual resource-fetch + visibility-evaluation layer (mapping
+  `binding.resource` to the right `CommerceClient` call, `itemProps` to node props, evaluating
+  `VisibilitySignal`/`VisibilityOperator` against live cart/auth/stock state), rewiring
+  `HomeScreen`/`CartScreen`/`ProductScreen` off their hand-written hydration, updating the bundled
+  `kHomeSchemaJson`/`kCartSchemaJson` to declare real bindings, and — only once 1+2 are shipped and
+  verified in a real mobile release — flipping `RuntimeCapabilities::DATA_RESOURCES`/`SCHEMA_FEATURES`
+  server-side (PHP) to non-empty. This is the task queue's real "APP-BUILDER-18 depends on 17"
+  dependency edge.
 
 TASK-QUEUE.md records the finalized task decomposition (`APP-BUILDER-13`..`APP-BUILDER-23`) under
 the horizon header, promoted to `ready` in dependency order per ADR-01.
