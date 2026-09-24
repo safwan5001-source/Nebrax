@@ -506,7 +506,7 @@ Source of truth:
 | 7 | APP-BUILDER-7 | decision_required | normal | APP-BUILDER-6 (done) | Data/Actions/Conditions/Visibility (Develop mode) |
 | 8 | APP-BUILDER-8 | done | high | APP-BUILDER-6 (done); no real dependency on APP-BUILDER-7 (verified, see below) | Theme + Use My Store Design |
 | 9 | APP-BUILDER-9 | done | normal | APP-BUILDER-8 (done) | Templates + navigation/pages |
-| 10 | APP-BUILDER-10 | pending | high | APP-BUILDER-9 | Validate/Publish/Version/Rollback foundation |
+| 10 | APP-BUILDER-10 | ready | high | APP-BUILDER-9 (done); no real dependency on APP-BUILDER-7 (verified, see below) | Validate/Publish/Version/Rollback foundation |
 | 11 | APP-BUILDER-11 | pending | high | APP-BUILDER-10 | Integrated vertical proof + UX/security closure |
 | 12 | APP-BUILDER-12 | pending | normal | APP-BUILDER-11 | Horizon closure — STOP for owner/ChatGPT review |
 
@@ -754,3 +754,53 @@ Builder-workspace tests (18/18 total) + 2 new creation-wizard tests (5/5 total),
 suite 2060/2060 passing, `npm run build` succeeds, `ar.json`/`en.json` key parity verified, full
 backend suite unaffected (4630 passed / 35 pre-existing-failure baseline unchanged, zero backend
 source drift). Full evidence: `docs/plans/app-builder/APP-BUILDER-9-IMPLEMENTATION-REPORT.md`.
+
+`APP-BUILDER-10` (Validate/Publish/Version/Rollback foundation) — dependency check performed
+before implementation, mirroring `APP-BUILDER-8`/`APP-BUILDER-9`'s. Source requirement: "Draft →
+Validate → Published Experience; immutable versions; compatibility-safe rollback within contract"
+(horizon doc task 10). Read the real backend contract before scoping (models, services, routes,
+RBAC, prior implementation reports — not the architecture doc's richer aspiration alone):
+
+- **Already built (APP-BUILDER-1/2):** `BuilderPublishedExperienceVersion` is a fully immutable row
+  (model-level `booted()` guard rejects any `update`/`delete` outright), race-safe sequential
+  `version` numbering per app, a full independent `schema` snapshot at publish time.
+  `BuilderPublishedExperienceVersionService::publish()` already runs the exact two checks task 10
+  asks for — `AppSchemaParser::validate()` (structural) then `CompatibilityResolver::resolve()`
+  against the live `CapabilityManifest` (fail-closed: an incompatible schema is rejected outright,
+  no partial/staged publish) — before creating the version row. `apps_builder.publish` is already a
+  distinct, narrower RBAC permission from `.manage`, gating `POST .../versions`. `GET .../versions`
+  and `GET .../versions/{version}` (returning the full historical `schema`) already exist.
+- **Genuinely missing (confirmed by direct grep, zero implementation found):**
+  - No standalone validate-only/dry-run endpoint — draft save only runs structural validation, not
+    the compatibility check; a merchant cannot know a draft would fail `CompatibilityResolver`
+    without attempting a real (gated, irreversible-feeling) publish.
+  - No rollback of any kind. The model's own docblock and `RUNTIME_COMPATIBILITY_V1.md` §15 already
+    settle the *mechanism* — "modeled as publishing a new version on top, never mutating an old
+    row" — so this is not an open design question requiring escalation, only unbuilt.
+  - Frontend: `/app-builder/[id]` shows only a bare read-only version+date list (no note, no
+    publisher, no Publish button, no Validate button, no rollback affordance anywhere).
+- **Explicitly scoped out of this task** (architecture doc §"Validation UX"/"Publish flow"/"Version
+  comparison" richer aspirations, the same class of not-yet-decided items that made `APP-BUILDER-7`
+  a Decision Escalation Gate when treated as a hard requirement): a structured, itemized,
+  Blocker/Warning/Info Issues panel (today's single thrown-exception error message is kept — the
+  same "fail closed with one clear message" posture `APP-BUILDER-8`'s Store Design sync already
+  established); human-readable version-to-version diffs; native-build/release impact classification
+  (§"Impact classification" — no backing data model exists, mobile store submission is a wholly
+  separate, unbuilt concern); optimistic-concurrency conflict detection on draft save (a real,
+  already-flagged `APP-BUILDER-1` backlog item, adjacent but not this task's stated line). None of
+  these are required by the horizon doc's own task-10 outcome line, and none block a real, honest
+  Validate/Publish/Rollback.
+- **Rollback's real mechanism needs zero new backend business logic**: `GET .../versions/{version}`
+  already returns the full historical `schema`; restoring it is exactly one `PUT .../draft` call
+  (already accepts any structurally-valid schema) followed by an ordinary `POST .../versions`
+  publish — which re-runs the *exact same* compatibility check automatically, satisfying
+  "compatibility-safe rollback within contract" for free, no new validation rule invented. Only
+  genuinely new backend surface: a thin validate-only endpoint that runs the same two existing
+  validators without creating a row (exposing existing logic as a standalone check, not new rules) —
+  the first backend files this horizon touches since `APP-BUILDER-2`, unlike `APP-BUILDER-6/8/9`'s
+  zero-backend precedent, and narrowly justified by task 10's own explicit "Validate" step.
+
+**Confirmed: no real runtime/schema dependency on `APP-BUILDER-7`** — rollback/publish/validate all
+operate on the whole schema as an already-validated opaque document via the already-accepted
+`AppSchemaParser`/`CompatibilityResolver`, never touching `SchemaComponent`-level Actions/
+Conditions/Visibility/Data. Table dependency is `APP-BUILDER-9 (done)` alone, promoted to `ready`.
