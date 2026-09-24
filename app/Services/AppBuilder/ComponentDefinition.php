@@ -30,6 +30,7 @@ final class ComponentDefinition
         public readonly bool $actionable,
         public readonly array $injectedRuntimeActionParams,
         public readonly string $notes,
+        public readonly Label $label,
         public readonly array $bindableResources = [],
     ) {}
 }

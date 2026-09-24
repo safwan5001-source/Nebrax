@@ -523,10 +523,97 @@ their own, so only their resource-field validation applies. 37 new/updated tests
 regression green. No accounting impact. `APP-BUILDER-16` (Conditions/Visibility) is `in_progress`,
 independent of `APP-BUILDER-15`/`17`.
 
-`APP-BUILDER-15` (Builder Data UX — Inspector binding/visibility editor) is **done** on
-`claude/app-builder-15-inspector-binding-editor` (PR #998, pending review); see that branch's own
-`CURRENT-STATE.md` for the full entry — not duplicated here to avoid two branches diverging on the
-same paragraph.
+`APP-BUILDER-16` (backend schema/compatibility contract) is **done**: PR #996 merged (squash Merge
+SHA `22156e493ef830a34a372b5c74643ab20e37632f`, confirmed single-parent squash onto `main`, parent
+`57d474e`). Adds the optional `visibility` component-node key (`ADR-01` §3.3): a closed, typed
+condition tree (`all`/`any` combinators or a `{signal, operator, value?}` leaf), bounded depth/
+branch count, no expression engine. New `VisibilitySignal`/`VisibilityOperator` closed vocabularies.
+`CompatibilityResolver` resolves it through the same optional-prune/required-fail-closed mechanism
+as `type`/`action.type`/`binding`; `RuntimeCapabilities::SCHEMA_FEATURES` stays deliberately empty
+until `APP-BUILDER-17` (same reasoning as `DATA_RESOURCES`). Visibility is presentation-only by
+construction — no authorization touched. 46 new tests, full regression green. Inspector UX for
+authoring conditions deferred to land with `APP-BUILDER-15`'s binding editor (not silently dropped
+— both are the same Inspector surface with no backend dependency blocking either). No accounting
+impact.
+
+`APP-BUILDER-21` (UX/localization) and `APP-BUILDER-22` (theme-token canvas/runtime rendering fix,
+`AWJ_APP_BUILDER_COMMERCE_RUNTIME_V1_EVIDENCE.md` §11) are **done**: PR #997 merged (squash Merge SHA
+`8dbff6fbd197f5a5b1ba47ce398a6792ecd90db5`, confirmed single-parent squash onto `main`, parent
+`22156e4`).
+
+`APP-BUILDER-21`: adds a `Label(ar, en)` value object to every `ComponentRegistry`/`ActionRegistry`
+definition and every prop/action-param (15 components, 6 actions), serialized by
+`AppBuilderRegistryController` alongside the existing `bindable_resources`. No schema identifier
+renamed anywhere — `type`/prop keys/action-param keys are unchanged, so published experiences and
+the `commerce/v1`/binding contracts are untouched. Frontend: a shared `registryLabel(label, locale)`
+helper (`web/src/lib/app-builder.ts`) renders the localized label in the Inspector (prop rows,
+action-param rows, action-type select, add-child select) and the LayersTree node badges; raw
+identifiers are preserved everywhere as `title` tooltips for merchants/developers who need the
+underlying key. The Canvas type-tag badge uses the actual UI locale (`useLocale()`) rather than the
+content-preview locale toggle — a real distinction found during implementation: the badge is Builder
+chrome, not simulated storefront content. Backend: `ComponentRegistryTest`/`ActionRegistryTest`
+assert label completeness (non-empty `ar`+`en`) on every definition/prop/param;
+`AppBuilderRegistryTest` asserts HTTP exposure. Frontend: full `app-builder.test.ts` + builder
+`page.test.tsx` suites updated to assert localized rendering. No accounting impact — UI/localization
+only, no new financial postings.
+
+`APP-BUILDER-22`: `tailwind.config.ts`'s `borderRadius.DEFAULT` stays a fixed `0.5rem` on purpose (it
+backs the bare `rounded` class used across ~286 files app-wide; making it var-driven would break
+every screen outside the Builder wherever `--canvas-radius` is unset). Instead, an additive `canvas`
+radius scale value (`rounded-canvas` → `var(--canvas-radius, 0.5rem)`) was added — zero blast radius
+anywhere it isn't explicitly used, verified by the full frontend suite staying green (2076/2076)
+after the change. `canvas.tsx`'s `themeCssVars()` now sets `--canvas-radius` from
+`theme.tokens.radius` (via the same `RADIUS_PRESETS`/`radiusToken` already used by
+`theme-panel.tsx`), and the merchant-content elements that previously used bare `rounded`
+(`Quantity`'s +/- controls, `AddToCart`, the generic `Button` component) now use `rounded-canvas`.
+Builder chrome (`NodeFrame`'s selection ring, `TypeTag`'s badge) is deliberately left on the editor's
+own fixed `rounded` — it isn't merchant content. On the Flutter side: `theme.tokens` was already
+parsed and validated (`MOBILE-RUNTIME-2`) but nothing ever read it — `ThemeData` used an unrelated
+hardcoded literal. `app.dart` gains a pure, defensive `themeSeedColorFromSchema(String)` (same
+"malformed input never crashes boot, falls back to the safe default" posture as
+`component_widgets.dart`'s prop reads) that reads `theme.tokens.colorPrimary` from the bundled
+`kHomeSchemaJson` and seeds `ThemeData.colorSchemeSeed` with it — replacing the previous disconnected
+literal. Deliberately scoped to what the runtime's *current* architecture actually supports today:
+the mobile runtime still boots from a compile-time-bundled schema constant (the live publish → fetch
+→ cache loop is `APP-BUILDER-19`, not yet built), so there is no live-fetched schema to thread
+through `MaterialApp`'s root state yet. No new theme token key was introduced (`colorPrimary` is the
+only one the bundled schema already carries) — "no token redesign," per the evidence. 5 new focused
+tests (`theme_seed_test.dart`) plus one widget-level assertion in `widget_test.dart` that
+`Theme.of(context).colorScheme.primary` matches the same seed computation; both were **verified via
+`mobile-ci.yml` post-merge (green)** since this session has no Flutter SDK to verify locally. No
+accounting impact.
+
+`APP-BUILDER-15` (Builder Data UX — Inspector binding/visibility editor) is **done**: PR #998 merged
+(squash Merge SHA `ef757bd79f39c199047893bea735b90ef8284005`, confirmed single-parent squash onto
+`main`, parent `8dbff6f`). Backend: `AppBuilderRegistryController` now also serializes `resources`
+(`DataResourceRegistry::definitions()` — id/version/shape/paginated/fields/query_params),
+`visibility_signals` (`VisibilitySignal::ALL`), and `visibility_operators` (`VisibilityOperator::ALL`
+with a derived `value_arity: none|single|list`), plus `bindable_resources` on each component (the
+field already existed on `ComponentDefinition` since `APP-BUILDER-14` but was never exposed over HTTP
+until now). 7 new focused tests in `AppBuilderRegistryTest`. Frontend (`web/src/lib/app-builder.ts`,
+`inspector.tsx`): `AppSchemaBinding`/`VisibilityNode` (a closed `{all}`/`{any}`/
+`{signal,operator,value?}` union, matching `AppSchemaParser` exactly) added to the schema types; a
+new `BindingEditor` (resource picker → filter/sort fields → per-prop field mapping) renders under any
+component whose registry entry declares `bindable_resources`; a new `VisibilityEditor` edits a
+**flat** condition shape only — one leaf, or one combinator wrapping N leaves, no nesting — which
+covers every realistic case without building a full tree editor; a condition that arrived via the API
+in a shape deeper than that (only possible today by editing the draft directly through the API, since
+this editor never produces one) renders as a read-only "too advanced for this editor" state with a
+reset button, never a silent misread. One real, deliberate scope decision made during implementation:
+`commerce.products`'s `category_id` filter is structurally valid per `DataResourceRegistry` but its
+only documented intended value (`$route.categoryId`) is a navigation-context reference that doesn't
+exist as a runtime concept anywhere yet (no schema/runtime mechanism resolves it) — the editor
+excludes it from the buildable query UI rather than inventing a context-passing mechanism ahead of a
+task that would actually design one; recorded here as a Commerce/runtime dependency, not silently
+worked around. 5 new frontend tests in the builder `page.test.tsx` covering: bindable-vs-non-bindable
+Inspector state, choosing a resource revealing filter/sort fields, field-mapping rows keyed to the
+component's own props, visibility "always" → "all of these" transitions, and value-field visibility
+keyed to each operator's arity. Verified: 93 targeted backend tests green, full frontend suite (2081
+tests), `tsc --noEmit`, and `npm run build` all green; `en.json`/`ar.json` key parity verified for the
+new `binding`/`visibility` translation subtrees. No accounting impact — Builder authoring UI only;
+the binding/visibility data itself has no runtime effect yet (`RuntimeCapabilities::DATA_RESOURCES`/
+`SCHEMA_FEATURES` stay empty until `APP-BUILDER-17`), consistent with the note already in
+`APP-BUILDER-14`'s entry above.
 
 **`APP-BUILDER-17` is investigated and re-scoped into three slices** (this session has no Flutter
 SDK to verify Dart changes locally, so each slice is kept independently small and CI-verified —
@@ -542,7 +629,7 @@ server-side (PHP)** — a production-wide gate on what every tenant can publish,
 ahead of a verified, shipped mobile release. Slicing:
 
 - **Slice 1 (this entry) — parser support, done locally** on
-  `claude/app-builder-17-mobile-schema-binding-visibility`, PR pending. Adds `SchemaBinding` and
+  `claude/app-builder-17-mobile-schema-binding-visibility`, PR #999. Adds `SchemaBinding` and
   `VisibilityNode` (mirroring
   `AppSchemaParser::validateBinding`/`validateVisibility` exactly, including the `MAX_CONDITION_DEPTH`
   (4)/`MAX_CONDITION_BRANCHES` (16) limits) to `mobile/lib/schema/app_schema.dart`; `SchemaComponent`
