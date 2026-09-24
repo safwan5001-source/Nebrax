@@ -922,9 +922,9 @@ Source of truth for this horizon:
 | Order | Task ID | Status | Depends on | Outcome |
 |---|---|---|---|---|
 | 1 | APP-BUILDER-13 | done | ADR-01 | Data Resource Registry V1 foundation (populate `commerce.categories`/`commerce.products`/`commerce.cart`) |
-| 2 | APP-BUILDER-14 | ready (after 13) | APP-BUILDER-13 | App Schema `binding` contract (parser + compatibility resolver) |
+| 2 | APP-BUILDER-14 | done | APP-BUILDER-13 | App Schema `binding` contract (parser + compatibility resolver) |
 | 3 | APP-BUILDER-15 | ready (after 14) | APP-BUILDER-14 | Builder Data UX (Inspector binding editor) |
-| 4 | APP-BUILDER-16 | ready | ADR-01 | Conditions/Visibility contract (closed/typed/allowlisted) + Inspector UX |
+| 4 | APP-BUILDER-16 | in_progress | ADR-01 | Conditions/Visibility contract (closed/typed/allowlisted) + Inspector UX |
 | 5 | APP-BUILDER-17 | ready (after 14) | APP-BUILDER-14 | Mobile runtime binding/visibility resolver (replaces 3 hand-written screen implementations) |
 | 6 | APP-BUILDER-18 | ready (after 17) | APP-BUILDER-17 | Real action dispatch wired through schema bindings |
 | 7 | APP-BUILDER-19 | ready | ADR-01 (Decision Point 1 = YES) | Live publish → fetch → on-device-cache loop (Last Known Good) |
@@ -957,3 +957,41 @@ since `AppSchemaParser` itself was not touched by this task). 10 new focused tes
 suite: 4646 passed/36 failed(pre-existing local-only `bcmath`-missing failures, unrelated)/49 skipped
 — not the real gate; CI (which has `bcmath`) is, and CI was green on the final head. No accounting
 impact. `APP-BUILDER-14` promoted to `ready`.
+
+**Owner clarification recorded** (2026-09-24, `ADR-01` amendment, PR #995 merged, squash Merge SHA
+`fbccc252d0d75109279ce03fad65ed3bd2677226`): Storefront Web feature/UI completeness is never a
+prerequisite for App Builder work — the two channels share Commerce truth, not a release schedule.
+A missing Commerce capability (`commerce.promotions`, `commerce.categories.name_en`) is a recorded
+gap, not an invitation to invent an app-specific substitute; escalate only if it actually blocks
+this horizon's approved scope. Binding on `APP-BUILDER-15`..`23`, especially `APP-BUILDER-20`'s
+Same-Store Proof scope (proves shared Commerce Core data/rules, not Storefront Web completeness).
+
+`APP-BUILDER-14` is `done`: PR #994 merged (squash Merge SHA
+`57d474e8042466afa52e0f76773f5b57eee7f3bd`, confirmed single-parent squash onto `main`, parent
+`fbccc25`), post-merge CI triggered on the merge commit itself (`ci.yml` run `36036162058`).
+Delivered exactly the scope in `ADR-01` §3.2: `AppSchemaParser` gains an optional `binding`
+component-node key (closed sub-shape `resource`/`query`/`itemProps`, JSON-safe values only);
+`CompatibilityResolver` resolves a node's `binding` using the exact same optional-prune/
+required-fail-closed mechanism already used for `type`/`action.type` — unknown resource id, a
+component not registered to bind that resource (`ComponentRegistry::bindableResources`, populated
+for `ProductList`/`ProductDetail` → `commerce.products`, `CartList`/`CartSummary` →
+`commerce.cart`), an `itemProps`/`query` key the resource doesn't expose, or a runtime not yet
+declaring the resource (`CapabilityManifest::resourceVersion()`) are all "unsupported capability".
+`RuntimeCapabilities::DATA_RESOURCES` is deliberately left empty — no Flutter Runtime consumes a
+real binding yet, so every binding today is correctly treated as unsupported at publish time; that
+capability only turns on once `APP-BUILDER-17` updates this constant **and**
+`mobile/lib/schema/registry_identifiers.dart` together. **No Dart/`mobile/` file was touched by this
+task** — this session has no Flutter SDK to verify `flutter analyze`/`flutter test`, so schema/
+registry mirroring requiring simultaneous Dart verification is correctly deferred to
+`APP-BUILDER-17`, which is scoped to land with real CI-verified Dart changes. A real design gap was
+found and fixed during implementation: `itemProps` prop-key validation was originally checked
+against the binding component's own `props` list, but `ProductList`/`CartList` (list-shaped
+containers) declare no props of their own — the check now only applies when the component declares
+props itself (`ProductDetail`/`CartSummary`), while resource-field validation always applies.
+Updated `APP-BUILDER-11`'s boundary test: `binding` (singular) now saves successfully as a draft on
+a bindable component but is still rejected at `/validate` (422); `bindings` (plural, the old
+placeholder key) remains structurally rejected. 37 new/updated focused tests across
+`AppSchemaParserTest`/`CompatibilityResolverTest`/`ComponentRegistryTest`, full `AppBuilder*`
+regression green, full local suite 4664 passed/35 failed (same pre-existing `bcmath` baseline)/49
+skipped. No accounting impact. `APP-BUILDER-16` promoted to `in_progress` (independent of
+`APP-BUILDER-15`/`17`, per the queue's own dependency table).
