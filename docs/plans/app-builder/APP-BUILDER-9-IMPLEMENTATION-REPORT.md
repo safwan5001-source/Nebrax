@@ -96,11 +96,28 @@ already existed unchanged since `APP-BUILDER-1` (`PUT /app-builder/apps/{id}/dra
   own `i18n-keys.test.ts` guard test is included in the full suite run above and passed.
 - `npm run build` → succeeds, exit code 0, zero errors.
 - `php artisan test` (full backend suite, no filter) — run despite zero backend files touched, per
-  the mandatory pre-commit protocol: results recorded below once the background run completes;
-  `diff -rq` against the built Laravel project's `app/` confirmed the only differences are the same
-  pre-existing local-environment gap already documented in every prior App Builder task's report
-  (missing `bcmath` extension, `setup.sh`'s `app/Mail` copy gap, unmodified Laravel scaffolding
-  files) — zero source drift possible from a task that never touched a backend file.
+  the mandatory pre-commit protocol: **4630 passed / 35 failed / 49 skipped** (29,187 assertions).
+  All 35 failures are the same pre-existing local-environment-only set documented in every prior
+  App Builder task's report (missing `bcmath` PHP extension breaking `Fuel*` services' fixed-point
+  arithmetic; `setup.sh`'s `app/Mail` copy gap). `diff -rq` against the built Laravel project's
+  `app/` confirmed the only differences are that same known gap plus Laravel's own unmodified
+  scaffolding files (`Http/Controllers/Controller.php`, `Providers/AppServiceProvider.php`) — zero
+  source drift from this task, which never touched a backend file.
+
+## CI
+
+**PASS.** PR #985 (this PR grew to carry both `APP-BUILDER-8`'s post-merge docs and the full
+`APP-BUILDER-9` implementation — see its description for why), final head
+`0312ad065b8854115d3352fe7b91747cf0d24c1e`. All 6 check runs green across both pushed commits:
+`ci.yml` (`php artisan test (L11, sqlite)` and `(L11, pgsql)`, both `success`) and `web-ci.yml`
+(`web build (Next.js)`, `success`). `mergeable_state: clean`, no open review threads (one bot
+comment from `chatgpt-codex-connector[bot]` reporting it had hit its own usage limit and performed
+no review — not actionable, same pattern as every prior App Builder PR).
+
+## Pre-merge review
+
+**PASS.** `PRE_MERGE_REVIEW: PASS` — CI green on the exact reviewed head (`0312ad0`), no merge
+conflict, no open review comments/threads requiring action, self-review (below) complete.
 
 ## Accounting impact
 
