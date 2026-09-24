@@ -21,6 +21,43 @@ const { api, currentUser, translate } = vi.hoisted(() => {
     actionTitle: 'Action',
     noAction: 'No action',
     injectedParamNote: "Some parameters are injected by the runtime automatically and aren't editable here.",
+    'binding.title': 'Data source',
+    'binding.runtimeNote': 'Not yet active in the mobile app.',
+    'binding.noneOption': 'No data source (static content)',
+    'binding.queryTitle': 'Filter & sort',
+    'binding.searchLabel': 'Search text',
+    'binding.searchPlaceholder': 'Leave empty to show all',
+    'binding.sortLabel': 'Sort by',
+    'binding.sortNoneOption': 'Default order',
+    'binding.sortDirectionAscending': 'Ascending',
+    'binding.sortDirectionDescending': 'Descending',
+    'binding.mappingTitle': 'Map fields',
+    'binding.mappingHint': 'Choose which data field fills each property.',
+    'binding.mappingFieldPlaceholder': 'Choose a field',
+    'visibility.title': 'Visibility condition',
+    'visibility.runtimeNote': 'Not yet active in the mobile app.',
+    'visibility.alwaysOption': 'Always visible',
+    'visibility.allOption': 'All of these are true',
+    'visibility.anyOption': 'Any of these is true',
+    'visibility.signalPlaceholder': 'Choose a signal',
+    'visibility.operatorPlaceholder': 'Choose a comparison',
+    'visibility.valuePlaceholder': 'Value',
+    'visibility.valueListPlaceholder': 'Comma-separated values',
+    'visibility.addCondition': 'Add condition',
+    'visibility.unsupportedShape': 'This condition is too advanced for this editor.',
+    'visibility.reset': 'Reset to "Always visible"',
+    'visibility.signalOption.cart.itemCount': 'Cart item count',
+    'visibility.signalOption.customer.isAuthenticated': 'Customer is signed in',
+    'visibility.signalOption.product.inStock': 'Product is in stock',
+    'visibility.operatorOption.equals': 'equals',
+    'visibility.operatorOption.notEquals': 'does not equal',
+    'visibility.operatorOption.gt': 'is greater than',
+    'visibility.operatorOption.lt': 'is less than',
+    'visibility.operatorOption.gte': 'is at least',
+    'visibility.operatorOption.lte': 'is at most',
+    'visibility.operatorOption.in': 'is one of',
+    'visibility.operatorOption.isTrue': 'is true',
+    'visibility.operatorOption.isFalse': 'is false',
     addChildTitle: 'Add item',
     addChildPlaceholder: 'Choose an item type',
     addChildAction: 'Add',
@@ -157,6 +194,7 @@ const draftData = {
                 type: 'ProductCard', id: 'pc-1', props: { title: 'Shoe', amountMinor: 12345 },
                 action: { type: 'openProduct', params: { productId: 'p-1' } },
               },
+              { type: 'ProductList', id: 'pl-1', children: [] },
             ],
           },
         ],
@@ -168,9 +206,9 @@ const draftData = {
 
 const registriesData = {
   components: {
-    Page: { type: 'Page', version: 1, category: 'layout', props: [], children_rule: { kind: 'unboundedAny', suggested_child_type: null }, actionable: false, injected_runtime_action_params: [], notes: 'Page root.' },
-    Section: { type: 'Section', version: 1, category: 'layout', props: [{ key: 'title', type: 'string', required: false, default: null, enum_values: null }], children_rule: { kind: 'unboundedAny', suggested_child_type: null }, actionable: false, injected_runtime_action_params: [], notes: 'Section.' },
-    Text: { type: 'Text', version: 1, category: 'content', props: [{ key: 'text', type: 'string', required: false, default: '', enum_values: null }], children_rule: { kind: 'none', suggested_child_type: null }, actionable: false, injected_runtime_action_params: [], notes: 'Text.' },
+    Page: { type: 'Page', version: 1, category: 'layout', props: [], children_rule: { kind: 'unboundedAny', suggested_child_type: null }, actionable: false, injected_runtime_action_params: [], notes: 'Page root.', bindable_resources: [] },
+    Section: { type: 'Section', version: 1, category: 'layout', props: [{ key: 'title', type: 'string', required: false, default: null, enum_values: null }], children_rule: { kind: 'unboundedAny', suggested_child_type: null }, actionable: false, injected_runtime_action_params: [], notes: 'Section.', bindable_resources: [] },
+    Text: { type: 'Text', version: 1, category: 'content', props: [{ key: 'text', type: 'string', required: false, default: '', enum_values: null }], children_rule: { kind: 'none', suggested_child_type: null }, actionable: false, injected_runtime_action_params: [], notes: 'Text.', bindable_resources: [] },
     ProductCard: {
       type: 'ProductCard', version: 1, category: 'commerce',
       props: [
@@ -178,6 +216,12 @@ const registriesData = {
         { key: 'amountMinor', type: 'amountMinor', required: true, default: 0, enum_values: null },
       ],
       children_rule: { kind: 'none', suggested_child_type: null }, actionable: true, injected_runtime_action_params: [], notes: 'Product card.',
+      bindable_resources: [],
+    },
+    ProductList: {
+      type: 'ProductList', version: 1, category: 'commerce', props: [],
+      children_rule: { kind: 'unboundedAny', suggested_child_type: 'ProductCard' }, actionable: false, injected_runtime_action_params: [], notes: 'Product list.',
+      bindable_resources: ['commerce.products'],
     },
   },
   actions: {
@@ -192,6 +236,32 @@ const registriesData = {
       dispatch_status: 'provenNoop', notes: 'Navigates to a page.',
     },
   },
+  resources: {
+    'commerce.products': {
+      id: 'commerce.products', version: 1, shape: 'list', paginated: true,
+      fields: [
+        { key: 'id', type: 'id', localized: false },
+        { key: 'name', type: 'string', localized: true },
+      ],
+      query_params: [
+        { key: 'search', kind: 'filter' },
+        { key: 'category_id', kind: 'filter' },
+        { key: 'name', kind: 'sort' },
+      ],
+    },
+  },
+  visibility_signals: ['cart.itemCount', 'customer.isAuthenticated', 'product.inStock'],
+  visibility_operators: [
+    { type: 'equals', value_arity: 'single' },
+    { type: 'notEquals', value_arity: 'single' },
+    { type: 'gt', value_arity: 'single' },
+    { type: 'lt', value_arity: 'single' },
+    { type: 'gte', value_arity: 'single' },
+    { type: 'lte', value_arity: 'single' },
+    { type: 'in', value_arity: 'list' },
+    { type: 'isTrue', value_arity: 'none' },
+    { type: 'isFalse', value_arity: 'none' },
+  ],
 };
 
 const storeCatalogData = {
@@ -548,6 +618,85 @@ describe('AppBuilderWorkspacePage', () => {
     const [pageIdSelect] = await screen.findAllByDisplayValue('Choose a page');
     fireEvent.change(pageIdSelect, { target: { value: 'about' } });
     expect(await screen.findAllByDisplayValue('about')).toBeTruthy();
+  });
+
+  it('a bindable component shows the data source picker; a non-bindable one does not', async () => {
+    mockApi();
+    render(<AppBuilderWorkspacePage />);
+    await screen.findByText('Featured');
+
+    const desktopTree = screen.getAllByRole('tree')[0];
+    await userEvent.setup().click(within(desktopTree).getByText('ProductList'));
+    expect(await screen.findAllByText('Data source')).toBeTruthy();
+
+    await userEvent.setup().click(within(desktopTree).getByText('Text'));
+    await waitFor(() => expect(screen.queryAllByText('Data source').length).toBe(0));
+  });
+
+  it('choosing a data source for a bindable component reveals its filter/sort fields and marks the draft unsaved', async () => {
+    mockApi();
+    render(<AppBuilderWorkspacePage />);
+    await screen.findByText('Featured');
+
+    const desktopTree = screen.getAllByRole('tree')[0];
+    await userEvent.setup().click(within(desktopTree).getByText('ProductList'));
+
+    const [resourceSelect] = await screen.findAllByDisplayValue('No data source (static content)');
+    fireEvent.change(resourceSelect, { target: { value: 'commerce.products' } });
+
+    expect(await screen.findAllByText('Search text')).toBeTruthy();
+    expect(screen.getAllByText('Sort by').length).toBeGreaterThan(0);
+    expect(screen.getByText('Unsaved changes')).toBeTruthy();
+
+    const [searchInput] = screen.getAllByPlaceholderText('Leave empty to show all');
+    fireEvent.change(searchInput, { target: { value: 'shoes' } });
+    expect(await screen.findAllByDisplayValue('shoes')).toBeTruthy();
+  });
+
+  it('a mapped component shows field-mapping rows for each of its own properties', async () => {
+    mockApi();
+    render(<AppBuilderWorkspacePage />);
+    await screen.findByText('Featured');
+
+    const desktopTree = screen.getAllByRole('tree')[0];
+    await userEvent.setup().click(within(desktopTree).getByText('ProductList'));
+    // ProductList has no props of its own — mapping section only makes sense
+    // for a component that renders fields, so it should not appear here.
+    expect(screen.queryAllByText('Map fields').length).toBe(0);
+  });
+
+  it('the visibility condition editor starts as "always visible" and adding a condition reveals signal/operator fields', async () => {
+    mockApi();
+    render(<AppBuilderWorkspacePage />);
+    await screen.findByText('Featured');
+
+    const desktopTree = screen.getAllByRole('tree')[0];
+    await userEvent.setup().click(within(desktopTree).getByText('Text'));
+
+    const [visibilitySelect] = await screen.findAllByDisplayValue('Always visible');
+    fireEvent.change(visibilitySelect, { target: { value: 'all' } });
+
+    expect(await screen.findAllByText('Choose a signal')).toBeTruthy();
+    expect(screen.getAllByText('Choose a comparison').length).toBeGreaterThan(0);
+    expect(screen.getByText('Unsaved changes')).toBeTruthy();
+  });
+
+  it('the visibility editor hides the value field for isTrue/isFalse and shows it for equals', async () => {
+    mockApi();
+    render(<AppBuilderWorkspacePage />);
+    await screen.findByText('Featured');
+
+    const desktopTree = screen.getAllByRole('tree')[0];
+    await userEvent.setup().click(within(desktopTree).getByText('Text'));
+
+    const [visibilitySelect] = await screen.findAllByDisplayValue('Always visible');
+    fireEvent.change(visibilitySelect, { target: { value: 'all' } });
+
+    const [operatorSelect] = await screen.findAllByDisplayValue('equals');
+    expect(screen.getAllByPlaceholderText('Value').length).toBeGreaterThan(0);
+
+    fireEvent.change(operatorSelect, { target: { value: 'isTrue' } });
+    await waitFor(() => expect(screen.queryAllByPlaceholderText('Value').length).toBe(0));
   });
 
   it('the Publish button is disabled while the draft has unsaved changes', async () => {

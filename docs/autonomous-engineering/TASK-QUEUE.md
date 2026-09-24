@@ -923,7 +923,7 @@ Source of truth for this horizon:
 |---|---|---|---|---|
 | 1 | APP-BUILDER-13 | done | ADR-01 | Data Resource Registry V1 foundation (populate `commerce.categories`/`commerce.products`/`commerce.cart`) |
 | 2 | APP-BUILDER-14 | done | APP-BUILDER-13 | App Schema `binding` contract (parser + compatibility resolver) |
-| 3 | APP-BUILDER-15 | ready (after 14) | APP-BUILDER-14 | Builder Data UX (Inspector binding editor) |
+| 3 | APP-BUILDER-15 | done (PR pending) | APP-BUILDER-14 | Builder Data UX (Inspector binding editor) |
 | 4 | APP-BUILDER-16 | in_progress | ADR-01 | Conditions/Visibility contract (closed/typed/allowlisted) + Inspector UX |
 | 5 | APP-BUILDER-17 | ready (after 14) | APP-BUILDER-14 | Mobile runtime binding/visibility resolver (replaces 3 hand-written screen implementations) |
 | 6 | APP-BUILDER-18 | ready (after 17) | APP-BUILDER-17 | Real action dispatch wired through schema bindings |
@@ -995,3 +995,21 @@ placeholder key) remains structurally rejected. 37 new/updated focused tests acr
 regression green, full local suite 4664 passed/35 failed (same pre-existing `bcmath` baseline)/49
 skipped. No accounting impact. `APP-BUILDER-16` promoted to `in_progress` (independent of
 `APP-BUILDER-15`/`17`, per the queue's own dependency table).
+
+`APP-BUILDER-15` (Builder Data UX — Inspector binding/visibility editor) is `done` locally on
+`claude/app-builder-15-inspector-binding-editor`, PR pending. `AppBuilderRegistryController` now
+exposes `resources`/`visibility_signals`/`visibility_operators` and each component's
+`bindable_resources` (the field existed since `APP-BUILDER-14` but was never serialized). Frontend
+gains a `BindingEditor` (resource → filter/sort → per-prop field mapping, shown only for components
+whose registry entry lists `bindable_resources`) and a `VisibilityEditor` that edits a **flat**
+condition only (one leaf, or one combinator over N leaves — no nested tree editor, matching `ADR-01`'s
+closed/typed vocabulary, not an expression builder); a deeper shape arriving via direct API edits
+renders read-only with a reset action rather than being silently reinterpreted. Deliberate scope
+decision: `commerce.products`'s `category_id` filter is excluded from the buildable query UI because
+its only documented value (`$route.categoryId`) is a navigation-context reference with no runtime
+mechanism anywhere in the codebase yet — recorded as a Commerce/runtime dependency rather than
+invented ahead of the task that would actually build context-passing. 7 new backend tests
+(`AppBuilderRegistryTest`) + 5 new frontend tests (builder `page.test.tsx`). Verified: 93 targeted
+backend tests green, full frontend suite (2081 tests) green, `tsc --noEmit` clean, `npm run build`
+succeeds, `en.json`/`ar.json` key parity confirmed for the new translation subtrees. No accounting
+impact — authoring-only; no runtime effect until `APP-BUILDER-17`.

@@ -523,5 +523,38 @@ their own, so only their resource-field validation applies. 37 new/updated tests
 regression green. No accounting impact. `APP-BUILDER-16` (Conditions/Visibility) is `in_progress`,
 independent of `APP-BUILDER-15`/`17`.
 
+`APP-BUILDER-15` (Builder Data UX — Inspector binding/visibility editor) is **done** locally on
+`claude/app-builder-15-inspector-binding-editor`, PR pending. Backend: `AppBuilderRegistryController`
+now also serializes `resources` (`DataResourceRegistry::definitions()` — id/version/shape/paginated/
+fields/query_params), `visibility_signals` (`VisibilitySignal::ALL`), and `visibility_operators`
+(`VisibilityOperator::ALL` with a derived `value_arity: none|single|list`), plus `bindable_resources`
+on each component (the field already existed on `ComponentDefinition` since `APP-BUILDER-14` but was
+never exposed over HTTP until now). 7 new focused tests in `AppBuilderRegistryTest`. Frontend
+(`web/src/lib/app-builder.ts`, `inspector.tsx`): `AppSchemaBinding`/`VisibilityNode` (a closed
+`{all}`/`{any}`/`{signal,operator,value?}` union, matching `AppSchemaParser` exactly) added to the
+schema types; a new `BindingEditor` (resource picker → filter/sort fields → per-prop field mapping)
+renders under any component whose registry entry declares `bindable_resources`; a new
+`VisibilityEditor` edits a **flat** condition shape only — one leaf, or one combinator wrapping N
+leaves, no nesting — which covers every realistic case without building a full tree editor; a
+condition that arrived via the API in a shape deeper than that (only possible today by editing the
+draft directly through the API, since this editor never produces one) renders as a read-only
+"too advanced for this editor" state with a reset button, never a silent misread. One real,
+deliberate scope decision made during implementation: `commerce.products`'s `category_id` filter is
+structurally valid per `DataResourceRegistry` but its only documented intended value
+(`$route.categoryId`) is a navigation-context reference that doesn't exist as a runtime concept
+anywhere yet (no schema/runtime mechanism resolves it) — the editor excludes it from the buildable
+query UI rather than inventing a context-passing mechanism ahead of a task that would actually design
+one; recorded here as a Commerce/runtime dependency, not silently worked around. 5 new frontend
+tests in the builder `page.test.tsx` covering: bindable-vs-non-bindable Inspector state, choosing a
+resource revealing filter/sort fields, field-mapping rows keyed to the component's own props,
+visibility "always" → "all of these" transitions, and value-field visibility keyed to each
+operator's arity. Verified: 93 targeted backend tests green (`AppBuilderRegistryTest`,
+`ComponentRegistryTest`, `ActionRegistryTest`, `DataResourceRegistryTest`, `AppSchemaParserTest`,
+`CompatibilityResolverTest`); full frontend suite (2081 tests), `tsc --noEmit`, and `npm run build`
+all green; `en.json`/`ar.json` key parity verified for the new `binding`/`visibility` translation
+subtrees. No accounting impact — Builder authoring UI only; the binding/visibility data itself has
+no runtime effect yet (`RuntimeCapabilities::DATA_RESOURCES`/`SCHEMA_FEATURES` stay empty until
+`APP-BUILDER-17`), consistent with the note already in `APP-BUILDER-14`'s entry above.
+
 TASK-QUEUE.md records the finalized task decomposition (`APP-BUILDER-13`..`APP-BUILDER-23`) under
 the horizon header, promoted to `ready` in dependency order per ADR-01.
