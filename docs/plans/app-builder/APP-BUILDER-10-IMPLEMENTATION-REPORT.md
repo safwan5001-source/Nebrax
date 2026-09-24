@@ -1,6 +1,6 @@
 # APP-BUILDER-10 — Implementation Report
 
-STATUS: pre-merge review
+STATUS: CI/PRE_MERGE_REVIEW: PASS — awaiting merge
 DATE: 2026-09-24
 
 ## Outcome
@@ -137,10 +137,14 @@ freshly-created row (no N+1 risk there, unlike the list endpoints, which already
 - `npm run build` → succeeds, exit code 0; `/app-builder/[id]/versions` present in the route
   manifest (3.36 kB).
 - `php artisan test` (full backend suite, no filter) — run per the mandatory pre-commit protocol
-  despite this task genuinely touching backend files (the first since `APP-BUILDER-2`): results
-  recorded below once the background run completes; `diff -rq` against the built Laravel project's
-  `app/` confirmed the only differences are the same pre-existing local-environment gap already
-  documented in every prior App Builder task's report.
+  despite this task genuinely touching backend files (the first since `APP-BUILDER-2`): **4634
+  passed, 35 failed, 49 skipped (29202 assertions), 574.00s.** The 35 failures are exactly the
+  known pre-existing baseline, all in `Tests\Feature\FuelSupplyReceivingTest` →
+  `App\Services\FuelCostBasisService` calling `bcmul()`/`bcadd()`/`bcsub()`/`bcdiv()`/`bccomp()` —
+  the local test environment's PHP build is missing the `bcmath` extension entirely, unrelated to
+  App Builder in any way and already documented as this exact baseline in every prior App Builder
+  task's report. Passed count is up from the prior baseline of 4630 by exactly +4, matching the 4
+  new `BuilderAppTest` cases added by this task. **Zero new regressions.**
 
 ## Accounting impact
 
