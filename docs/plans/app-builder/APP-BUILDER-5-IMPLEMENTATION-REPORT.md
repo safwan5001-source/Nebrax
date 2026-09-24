@@ -123,6 +123,22 @@ than half-built here.
   and appear in the route manifest.
 - `npx vitest run src/lib/__tests__/date-formatting-guardrail.test.ts` → still passes (this task's
   new files use no raw `Date#toLocale*String`, learned from APP-BUILDER-4's own CI-red fix).
+- `npx vitest run src/lib/__tests__/i18n-keys.test.ts` → caught one **real** bug (not test-only):
+  `/app-builder/[id]/page.tsx`'s new "Open the builder" action called `tRoot('openBuilder')`
+  (namespace `appBuilder`), but the key was only ever added at `appBuilder.detail.openBuilder`.
+  Fixed by calling `t('openBuilder')` (the already-scoped `appBuilder.detail` translator) instead —
+  the same fix used for every other key on that page. Re-ran the full guard test plus all App
+  Builder frontend tests after the fix: still 19/19 (was 14/14; the guard test itself is now
+  included and passing). Full frontend regression: `npx vitest run` → **2014/2014 passed** (294
+  test files), zero unrelated failures.
+- `php artisan test` (full local suite, no `--filter`) → **4629 passed / 36 failed / 49 skipped**.
+  All 36 failures are the same pre-existing local-environment-only set already root-caused in
+  APP-BUILDER-1/2/3's reports (missing `bcmath` PHP extension breaking `Fuel*` services'
+  fixed-point arithmetic; `setup.sh` never copying `app/Mail/*.php` breaking `AuthRecoveryTest`/
+  `DocumentCenterSecureIntakeTest`; one known unseeded EC-keypair-generation flake in
+  `ZatcaQrCertificateMaterialExtractorTest`, first documented in MOBILE-RUNTIME-6/9's reports) —
+  zero App Builder regressions, confirmed not to reproduce on real CI (which has `bcmath` and the
+  full `app/Mail` copy list).
 
 ## CI
 
@@ -153,7 +169,9 @@ Inspector field, no drag handle, no add/remove control).
   Quality Gate D's "External Evidence / AWJ UX Decision / Open Decision are separated truthfully."
 - Found and fixed two real test-authoring bugs via this task's own test runs before any external
   review, both confirmed test-only through direct evidence (not guessed) before being written off
-  as non-production issues.
+  as non-production issues. Also found and fixed one real **production** bug the same way: the new
+  "Open the builder" action read a translation key from the wrong namespace (`appBuilder.openBuilder`
+  instead of `appBuilder.detail.openBuilder`), caught by the repo's own `i18n-keys` guard test.
 
 ### AWJ Guardian
 
