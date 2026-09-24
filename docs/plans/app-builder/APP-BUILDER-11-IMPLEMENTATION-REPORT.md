@@ -1,6 +1,6 @@
 # APP-BUILDER-11 — Implementation Report
 
-STATUS: pre-merge review
+STATUS: CI/PRE_MERGE_REVIEW: PASS — awaiting merge
 DATE: 2026-09-24
 
 ## Outcome
@@ -87,9 +87,12 @@ services, not just that each side's own tests pass in isolation — which is pre
 - `npx vitest run` (full frontend suite) → **2076/2076 passed** (296 files) — unaffected, since
   zero frontend files were touched by this task.
 - `npm run build` → succeeds.
-- `php artisan test` (full backend suite, no filter) — results below once the background run
-  completes; `diff -rq` against the built Laravel project confirmed the only source difference
-  from the reviewed head is the one new test file this task adds.
+- `php artisan test` (full backend suite, no filter) → **4638 passed, 35 failed, 49 skipped
+  (29263 assertions), 579.31s.** The 35 failures are exactly the known pre-existing baseline
+  (`FuelSupplyReceivingTest` → `FuelCostBasisService` calling `bcmul`/`bcadd`/etc. — the local
+  environment's PHP build lacks the `bcmath` extension, unrelated to App Builder). Passed count is
+  +4 over the prior baseline of 4634, exactly matching this task's 4 new
+  `AppBuilderIntegratedProofTest` cases. **Zero new regressions.**
 
 ## Accounting impact
 

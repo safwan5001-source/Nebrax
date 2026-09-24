@@ -117,8 +117,9 @@ What is proven by direct code reading of the actual shipped screens (not re-asse
 - `php artisan test --filter="AppBuilderIntegratedProofTest|BuilderAppTest|AppSchemaParserTest|CompatibilityResolverTest|ComponentRegistryTest|ActionRegistryTest|DataResourceRegistryTest|AppBuilderRegistryTest|BranchIsolationGuardTest|ApplicationCatalogTest|TenantApplicationTest|StorefrontPresentationDraftApiTest|CommerceWorkspaceStorefrontsApiTest"` → **126/126 passed** (741 assertions) — zero interference between the new integrated proof and any App Builder/Commerce-workspace suite it touches.
 - `npx vitest run` (full frontend suite, unchanged since zero frontend files touched) → **2076/2076 passed** (296 files).
 - `npm run build` → succeeds.
-- `php artisan test` (full backend suite, no filter) → recorded in the implementation report once
-  the background run completes.
+- `php artisan test` (full backend suite, no filter) → **4638 passed, 35 pre-existing failures, 49
+  skipped** (+4 over the prior baseline, exactly matching this task's new tests). Zero new
+  regressions. Full detail in the implementation report.
 
 ## Explicitly out of scope (deferred, not silently dropped)
 
