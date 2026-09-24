@@ -132,3 +132,93 @@ export function findComponentById(root: AppSchemaComponent, id: string): AppSche
   }
   return null;
 }
+
+// ── Tree edit helpers (APP-BUILDER-6) ────────────────────────────────────────
+// كلها نقية/غير قابلة للتحوّر: تُعيد جذراً جديداً بدل تعديل الجذر المُعطى في
+// مكانه، فيبقى مصدر تاريخ التراجع/الإعادة في الصفحة مجرد مصفوفة من المراجع
+// القديمة دون نسخ عميق يدوي في كل خطوة.
+
+/** يبحث عن معرّف الأب المباشر لعقدة — `null` إن كانت هي الجذر أو غير موجودة. */
+export function findParentId(root: AppSchemaComponent, childId: string): string | null {
+  for (const child of root.children ?? []) {
+    if (child.id === childId) return root.id;
+    const found = findParentId(child, childId);
+    if (found) return found;
+  }
+  return null;
+}
+
+/** يستبدل عقدة بمعرّفها بنتيجة `updater` — لا تأثير إن لم يُعثر عليها. */
+export function updateComponentById(
+  root: AppSchemaComponent,
+  id: string,
+  updater: (node: AppSchemaComponent) => AppSchemaComponent
+): AppSchemaComponent {
+  if (root.id === id) return updater(root);
+  const children = root.children;
+  if (!children || children.length === 0) return root;
+  return { ...root, children: children.map((child) => updateComponentById(child, id, updater)) };
+}
+
+/** يُلحِق عقدة جديدة بنهاية أبناء عقدة الحاوية `parentId`. */
+export function addChildComponent(
+  root: AppSchemaComponent,
+  parentId: string,
+  newNode: AppSchemaComponent
+): AppSchemaComponent {
+  return updateComponentById(root, parentId, (node) => ({ ...node, children: [...(node.children ?? []), newNode] }));
+}
+
+/** يحذف عقدة بمعرّفها من أبناء أبيها — لا تأثير على الجذر نفسه. */
+export function removeComponentById(root: AppSchemaComponent, id: string): AppSchemaComponent {
+  if (!root.children || root.children.length === 0) return root;
+  return {
+    ...root,
+    children: root.children.filter((child) => child.id !== id).map((child) => removeComponentById(child, id)),
+  };
+}
+
+/** يُعيد ترتيب أبناء عقدة أبٍ واحدة بمصفوفة مُرتّبة جديدة من نفس المعرّفات — لا نقل بين آباء مختلفين. */
+export function reorderChildren(root: AppSchemaComponent, parentId: string, orderedChildIds: string[]): AppSchemaComponent {
+  return updateComponentById(root, parentId, (node) => {
+    const byId = new Map((node.children ?? []).map((child) => [child.id, child]));
+    const reordered = orderedChildIds.map((id) => byId.get(id)).filter((child): child is AppSchemaComponent => Boolean(child));
+    return { ...node, children: reordered };
+  });
+}
+
+/** يبدّل عقدة بجارتها المباشرة (سابقة/تالية) ضمن قائمة إخوتها. */
+export function moveSibling(root: AppSchemaComponent, id: string, direction: 'up' | 'down'): AppSchemaComponent {
+  const parentId = findParentId(root, id);
+  if (!parentId) return root;
+  return updateComponentById(root, parentId, (node) => {
+    const children = node.children ?? [];
+    const index = children.findIndex((child) => child.id === id);
+    const targetIndex = index + (direction === 'up' ? -1 : 1);
+    if (index < 0 || targetIndex < 0 || targetIndex >= children.length) return node;
+    const next = [...children];
+    [next[index], next[targetIndex]] = [next[targetIndex], next[index]];
+    return { ...node, children: next };
+  });
+}
+
+/** معرّف عقدة جديد فريد بما يكفي لمخطط تحرير واحد — لا يفترض تفرداً عالمياً. */
+export function generateComponentId(type: string): string {
+  const random = typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? crypto.randomUUID().slice(0, 8)
+    : Math.random().toString(36).slice(2, 10);
+  return `${type.toLowerCase()}-${random}`;
+}
+
+/** ينشئ عقدة جديدة بقيَم `props` الافتراضية من تعريف السجلّ (يترك ما لا افتراضي له لعرض المكوّن الدفاعي). */
+export function createComponentFromDefinition(type: string, definition: RegistryComponentDefinition): AppSchemaComponent {
+  const props: Record<string, unknown> = {};
+  for (const prop of definition.props) {
+    if (prop.default !== null && prop.default !== undefined) props[prop.key] = prop.default;
+  }
+  return {
+    type,
+    id: generateComponentId(type),
+    ...(Object.keys(props).length > 0 ? { props } : {}),
+  };
+}

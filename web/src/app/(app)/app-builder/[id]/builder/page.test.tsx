@@ -1,6 +1,6 @@
 /* @vitest-environment jsdom */
 import * as React from 'react';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import AppBuilderWorkspacePage from './page';
@@ -19,7 +19,21 @@ const { api, translate } = vi.hoisted(() => {
     propsTitle: 'Properties',
     noProps: 'This component has no properties.',
     actionTitle: 'Action',
-    noAction: 'No action attached.',
+    noAction: 'No action',
+    injectedParamNote: "Some parameters are injected by the runtime automatically and aren't editable here.",
+    addChildTitle: 'Add item',
+    addChildPlaceholder: 'Choose an item type',
+    addChildAction: 'Add',
+    removeComponent: 'Remove this component',
+    unsavedBadge: 'Unsaved changes',
+    savingBadge: 'Saving…',
+    saveSuccessTitle: 'Draft saved',
+    saveErrorTitle: 'Could not save the draft',
+    undoLabel: 'Undo',
+    redoLabel: 'Redo',
+    moveUpLabel: 'Move up',
+    moveDownLabel: 'Move down',
+    dragLabel: 'Drag to reorder',
     mobileStructureTab: 'Structure',
     mobileInspectorTab: 'Properties',
     'device.mobile': 'Mobile',
@@ -27,6 +41,8 @@ const { api, translate } = vi.hoisted(() => {
     'device.desktop': 'Desktop',
     loading: 'Loading…',
     retry: 'Try again',
+    save: 'Save',
+    cancel: 'Cancel',
   };
   const cache = new Map<string, ReturnType<typeof buildTranslator>>();
   function buildTranslator(namespace: string) {
@@ -57,6 +73,8 @@ vi.mock('@/lib/api', async () => {
   const actual = await vi.importActual<typeof import('@/lib/api')>('@/lib/api');
   return { ...actual, api };
 });
+const { toastFns } = vi.hoisted(() => ({ toastFns: { success: vi.fn(), error: vi.fn() } }));
+vi.mock('@/components/ui/toast', () => ({ useToast: () => toastFns }));
 vi.mock('lucide-react', () => {
   const iconStub = () => <span />;
   return new Proxy({ __esModule: true } as Record<string | symbol, unknown>, {
@@ -139,7 +157,11 @@ function mockApi() {
 
 describe('AppBuilderWorkspacePage', () => {
   afterEach(cleanup);
-  beforeEach(() => api.mockReset());
+  beforeEach(() => {
+    api.mockReset();
+    toastFns.success.mockReset();
+    toastFns.error.mockReset();
+  });
 
   it('loads the draft and renders the page tree, canvas content, and default selection', async () => {
     mockApi();
@@ -170,6 +192,118 @@ describe('AppBuilderWorkspacePage', () => {
     await waitFor(() => expect(screen.getAllByText('amountMinor').length).toBeGreaterThan(0));
     expect(screen.getAllByText('openProduct').length).toBeGreaterThan(0);
     expect(screen.getAllByText('productId').length).toBeGreaterThan(0);
+  });
+
+  it('editing a text prop updates the canvas and marks the draft unsaved', async () => {
+    mockApi();
+    render(<AppBuilderWorkspacePage />);
+    await screen.findByText('Featured');
+
+    const desktopTree = screen.getAllByRole('tree')[0];
+    await userEvent.setup().click(within(desktopTree).getByText('Text'));
+
+    const textareas = await screen.findAllByDisplayValue('Welcome');
+    fireEvent.change(textareas[0], { target: { value: 'Bye' } });
+
+    expect(screen.getAllByText('Bye').length).toBeGreaterThan(0);
+    expect(screen.queryAllByText('Welcome').length).toBe(0);
+    expect(screen.getByText('Unsaved changes')).toBeTruthy();
+  });
+
+  it('removing the selected component drops it from the canvas and selects its parent', async () => {
+    mockApi();
+    render(<AppBuilderWorkspacePage />);
+    await screen.findByText('Featured');
+
+    const desktopTree = screen.getAllByRole('tree')[0];
+    await userEvent.setup().click(within(desktopTree).getByText('Text'));
+
+    const removeButtons = await screen.findAllByText('Remove this component');
+    await userEvent.setup().click(removeButtons[0]);
+
+    expect(screen.queryAllByText('Bye').length).toBe(0);
+    expect(screen.queryAllByText('Welcome').length).toBe(0);
+    // Selection moves to the removed node's parent (the Section), which has a `title` prop.
+    await waitFor(() => expect(screen.getAllByText('title').length).toBeGreaterThan(0));
+  });
+
+  it('the move-down button on a layers-tree row reorders siblings, bounded to the same parent', async () => {
+    mockApi();
+    render(<AppBuilderWorkspacePage />);
+    await screen.findByText('Featured');
+
+    const desktopTree = screen.getAllByRole('tree')[0];
+    const rowsBefore = within(desktopTree).getAllByRole('treeitem').map((row) => row.textContent);
+    expect(rowsBefore.some((text) => text?.includes('Text'))).toBe(true);
+    expect(rowsBefore.some((text) => text?.includes('ProductCard'))).toBe(true);
+    const textIndexBefore = rowsBefore.findIndex((text) => text?.includes('Text'));
+    const productCardIndexBefore = rowsBefore.findIndex((text) => text?.includes('ProductCard'));
+    expect(textIndexBefore).toBeLessThan(productCardIndexBefore);
+
+    const [moveDownButton] = within(desktopTree).getAllByLabelText('Move down');
+    await userEvent.setup().click(moveDownButton);
+
+    const rowsAfter = within(desktopTree).getAllByRole('treeitem').map((row) => row.textContent);
+    const textIndexAfter = rowsAfter.findIndex((text) => text?.includes('Text'));
+    const productCardIndexAfter = rowsAfter.findIndex((text) => text?.includes('ProductCard'));
+    expect(textIndexAfter).toBeGreaterThan(productCardIndexAfter);
+    expect(screen.getByText('Unsaved changes')).toBeTruthy();
+  });
+
+  it('adding a child to a container selects the new node and marks the draft unsaved', async () => {
+    mockApi();
+    render(<AppBuilderWorkspacePage />);
+    await screen.findByText('Featured');
+
+    const desktopTree = screen.getAllByRole('tree')[0];
+    await userEvent.setup().click(within(desktopTree).getByText('Section'));
+
+    const [addTypeSelect] = await screen.findAllByDisplayValue('Choose an item type');
+    fireEvent.change(addTypeSelect, { target: { value: 'Text' } });
+    const [addButton] = screen.getAllByText('Add');
+    await userEvent.setup().click(addButton);
+
+    expect(screen.getByText('Unsaved changes')).toBeTruthy();
+    // The new Text node is selected — its (empty-string default) `text` prop field is now visible.
+    await waitFor(() => expect(screen.getAllByDisplayValue('').length).toBeGreaterThan(0));
+  });
+
+  it('undo reverts the last edit and redo reapplies it', async () => {
+    mockApi();
+    render(<AppBuilderWorkspacePage />);
+    await screen.findByText('Featured');
+
+    const desktopTree = screen.getAllByRole('tree')[0];
+    await userEvent.setup().click(within(desktopTree).getByText('Text'));
+    const textareas = await screen.findAllByDisplayValue('Welcome');
+    fireEvent.change(textareas[0], { target: { value: 'Bye' } });
+    expect(screen.getAllByText('Bye').length).toBeGreaterThan(0);
+
+    const [undoButton] = screen.getAllByLabelText('Undo');
+    await userEvent.setup().click(undoButton);
+    await waitFor(() => expect(screen.getAllByText('Welcome').length).toBeGreaterThan(0));
+
+    const [redoButton] = screen.getAllByLabelText('Redo');
+    await userEvent.setup().click(redoButton);
+    await waitFor(() => expect(screen.getAllByText('Bye').length).toBeGreaterThan(0));
+  });
+
+  it('saving calls the draft PUT endpoint and clears the unsaved state', async () => {
+    mockApi();
+    render(<AppBuilderWorkspacePage />);
+    await screen.findByText('Featured');
+
+    const desktopTree = screen.getAllByRole('tree')[0];
+    await userEvent.setup().click(within(desktopTree).getByText('Text'));
+    const textareas = await screen.findAllByDisplayValue('Welcome');
+    fireEvent.change(textareas[0], { target: { value: 'Bye' } });
+    expect(screen.getByText('Unsaved changes')).toBeTruthy();
+
+    const [saveButton] = screen.getAllByText('Save');
+    await userEvent.setup().click(saveButton);
+
+    await waitFor(() => expect(screen.getAllByText('Saved').length).toBeGreaterThan(0));
+    expect(toastFns.success).toHaveBeenCalled();
   });
 
   it('shows an error state when loading fails', async () => {

@@ -502,8 +502,8 @@ Source of truth:
 | 3 | APP-BUILDER-3 | done | normal | APP-BUILDER-2 (done) | Component/Action/Data Resource registries |
 | 4 | APP-BUILDER-4 | done | high | APP-BUILDER-3 (done) | App Manager + creation wizard (UI/UX Evidence Pass required) |
 | 5 | APP-BUILDER-5 | done | high | APP-BUILDER-4 (done) | Builder workspace shell (UI/UX Evidence Pass required) |
-| 6 | APP-BUILDER-6 | ready | normal | APP-BUILDER-5 (done) | Visual editing + history |
-| 7 | APP-BUILDER-7 | pending | normal | APP-BUILDER-6 | Data/Actions/Conditions/Visibility (Develop mode) |
+| 6 | APP-BUILDER-6 | done | normal | APP-BUILDER-5 (done) | Visual editing + history |
+| 7 | APP-BUILDER-7 | ready | normal | APP-BUILDER-6 (done) | Data/Actions/Conditions/Visibility (Develop mode) |
 | 8 | APP-BUILDER-8 | pending | high | APP-BUILDER-7 | Theme + Use My Store Design |
 | 9 | APP-BUILDER-9 | pending | normal | APP-BUILDER-8 | Templates + navigation/pages |
 | 10 | APP-BUILDER-10 | pending | high | APP-BUILDER-9 | Validate/Publish/Version/Rollback foundation |
@@ -596,24 +596,41 @@ any external review. Full evidence: `docs/plans/app-builder/APP-BUILDER-4-IMPLEM
 implementation** — the bootstrap explicitly requires repeating this workflow per major Builder UI
 slice, not reusing APP-BUILDER-4's pass.
 
-`APP-BUILDER-5` is `done`: PR pending merge (see implementation report for live status). Completed
-its own focused UI/UX Evidence Pass (`APP-BUILDER-5-UX-EVIDENCE-PASS.md`) — external evidence
-(Oracle Visual Builder/Page Designer, Sitecore Page Builder docs) plus internal precedent
-(`ExperienceBuilder.tsx`, the Store Customizer's already-shipped workspace chrome — a different
-product/data model, only the interaction shape reused). Built the Builder workspace shell:
-read-only Pages/Layers panel, framework-neutral canvas (15 component types, defensive prop
-fallbacks matching `component_widgets.dart`), read-only Inspector driven by APP-BUILDER-3's
-registries (first real consumer, as flagged in that task's own report), locale/device preview
-toggles, Draft/Saved badge, responsive mobile baseline. New backend route
-`GET /app-builder/registries` (serializes `ComponentRegistry`/`ActionRegistry`), same
-`apps_builder.view`/`commerce.app_builder` gate as every other app-builder route. Editing itself
-(add/remove/reorder/property edits/undo-redo) is explicitly APP-BUILDER-6 — no editable field
-exists yet, by design. 4 new backend tests + 3 new frontend tests, full guard-test regression
-(93/93). Full evidence: `docs/plans/app-builder/APP-BUILDER-5-IMPLEMENTATION-REPORT.md`.
+`APP-BUILDER-5` is `done`: PR #977 merged (Merge SHA `f48d583`), docs follow-up PR #978 merged
+(Merge SHA `84d528a`), post-merge review passed. Completed its own focused UI/UX Evidence Pass
+(`APP-BUILDER-5-UX-EVIDENCE-PASS.md`) — external evidence (Oracle Visual Builder/Page Designer,
+Sitecore Page Builder docs) plus internal precedent (`ExperienceBuilder.tsx`, the Store
+Customizer's already-shipped workspace chrome — a different product/data model, only the
+interaction shape reused). Built the Builder workspace shell: read-only Pages/Layers panel,
+framework-neutral canvas (15 component types, defensive prop fallbacks matching
+`component_widgets.dart`), read-only Inspector driven by APP-BUILDER-3's registries (first real
+consumer, as flagged in that task's own report), locale/device preview toggles, Draft/Saved badge,
+responsive mobile baseline. New backend route `GET /app-builder/registries` (serializes
+`ComponentRegistry`/`ActionRegistry`), same `apps_builder.view`/`commerce.app_builder` gate as
+every other app-builder route. Editing itself (add/remove/reorder/property edits/undo-redo) was
+explicitly deferred to APP-BUILDER-6 — no editable field existed yet, by design. 4 new backend
+tests + 3 new frontend tests, full guard-test regression (93/93). Full evidence:
+`docs/plans/app-builder/APP-BUILDER-5-IMPLEMENTATION-REPORT.md`.
 
-`APP-BUILDER-6` promoted to `ready` now that its hard dependency (`APP-BUILDER-5`) is done.
-Source requirement: horizon doc task 6 ("select/add/remove/reorder, property edits, bounded
-drag/direct manipulation, undo/redo, dirty/save semantics") — builds directly on APP-BUILDER-5's
-canvas/layers/Inspector shell. Whether this slice needs its own UI/UX Evidence Pass is a scope
-question for that task itself (APP-BUILDER-5's own pass explicitly left this open), not
-pre-decided here.
+`APP-BUILDER-6` is `done`: PR pending merge (see implementation report for live status). Judged to
+need its own focused UI/UX Evidence Pass (`APP-BUILDER-6-UX-EVIDENCE-PASS.md`, completed before
+implementation) — APP-BUILDER-5's own pass left this as an open question, and this task's
+interaction problem (the workspace's first destructive/undoable actions and its first form inputs)
+is materially different from a read-only shell. Turned APP-BUILDER-5's shell into a real editor:
+select/add/remove/reorder (bounded to same-parent siblings, via `@dnd-kit` reused verbatim from
+`section-designer.tsx`'s existing pattern — no new dependency), inline typed property/action-param
+editing (one control per registry `PropType`, `enum_values` as a `<Select>`, `amountMinor` as a
+Riyal-denominated input converted at the edit boundary), a bounded (50-entry) undo/redo history,
+and explicit Draft/Unsaved/Saving/Saved state with a Save action calling APP-BUILDER-1's existing
+`PUT /app-builder/apps/{id}/draft` unchanged. Zero backend files touched. Caught and fixed two real
+issues via self-review before any external review: a dropped "unknown action type" fallback
+message, and a React Strict-Mode hazard (ref mutation inside a `setState` updater function) fixed
+by design before any test was written. 17 new tree-helper unit tests + 6 new/expanded workspace
+tests (9/9 total, up from 3/3), full frontend suite 2037/2037, full backend suite unaffected
+(4630 passed, same pre-existing unrelated failure set). Full evidence:
+`docs/plans/app-builder/APP-BUILDER-6-IMPLEMENTATION-REPORT.md`.
+
+`APP-BUILDER-7` promoted to `ready` now that its hard dependency (`APP-BUILDER-6`) is done.
+Source requirement: horizon doc task 7 (Data/Actions/Conditions/Visibility, Develop mode) — builds
+on the now-editable Inspector this task shipped. Whether this slice needs its own UI/UX Evidence
+Pass is a scope question for that task itself, not pre-decided here.
