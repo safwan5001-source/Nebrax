@@ -142,7 +142,6 @@ const GROUPS: NavGroup[] = [
       { href: '/recurring-invoices', icon: CalendarClock, key: 'recurringInvoices', built: true },
       { href: '/payments', icon: CreditCard, key: 'customerPayments', built: true },
       { href: '/customer-refunds', icon: Banknote, key: 'customerRefunds', built: true, permission: 'customer_refunds.view' },
-      { href: '/app-builder', icon: Smartphone, key: 'appBuilder', built: true, appKey: 'commerce.app_builder', permission: 'apps_builder.view' },
       { href: '/sales-settings', icon: SlidersHorizontal, key: 'salesSettings', built: true },
     ],
   },
@@ -162,6 +161,7 @@ const GROUPS: NavGroup[] = [
     icon: ShoppingCart,
     items: [
       { href: '/commerce', icon: ShoppingCart, key: 'ecommerce', built: true },
+      { href: '/app-builder', icon: Smartphone, key: 'appBuilder', built: true, appKey: 'commerce.app_builder', permission: 'apps_builder.view' },
     ],
   },
   {
