@@ -612,7 +612,8 @@ explicitly deferred to APP-BUILDER-6 — no editable field existed yet, by desig
 tests + 3 new frontend tests, full guard-test regression (93/93). Full evidence:
 `docs/plans/app-builder/APP-BUILDER-5-IMPLEMENTATION-REPORT.md`.
 
-`APP-BUILDER-6` is `done`: PR pending merge (see implementation report for live status). Judged to
+`APP-BUILDER-6` is `done`: PR #979 merged (Merge SHA `08c143b614be7f2b303528a17a13e862c08b6261`),
+post-merge review passed. Judged to
 need its own focused UI/UX Evidence Pass (`APP-BUILDER-6-UX-EVIDENCE-PASS.md`, completed before
 implementation) — APP-BUILDER-5's own pass left this as an open question, and this task's
 interaction problem (the workspace's first destructive/undoable actions and its first form inputs)

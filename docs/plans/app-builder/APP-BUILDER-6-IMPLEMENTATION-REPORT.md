@@ -1,6 +1,6 @@
 # APP-BUILDER-6 — Implementation Report
 
-STATUS: pre-merge review
+STATUS: merged — post-merge review PASS
 DATE: 2026-09-24
 
 ## Outcome
@@ -118,12 +118,28 @@ pure frontend editor against an already-existing, already-validated persistence 
 
 ## CI
 
-Pending — will be recorded once GitHub Actions (`ci.yml` + `web-ci.yml`) run on this PR's head is
-observed, per the truthfulness rule.
+**PASS.** PR #979, head `15af3b1382b68f2a1d151a6439652bda1efd8a34`. All 6 required checks green:
+`ci.yml` (`php artisan test (L11, sqlite)` and `(L11, pgsql)`, both `success`) and `web-ci.yml`
+(`web build (Next.js)`, `success`). `mergeable_state: clean`, no open review threads (one bot
+comment from `chatgpt-codex-connector[bot]` reporting it had hit its own usage limit and performed
+no review — not actionable).
 
 ## Pre-merge review
 
-Pending — to be completed after CI is confirmed green on the exact reviewed head.
+**PASS.** `PRE_MERGE_REVIEW: PASS` — CI green on the exact reviewed head (`15af3b1`), no merge
+conflict, no open review comments/threads requiring action, self-review (below) complete.
+
+## Post-merge review
+
+**PASS.** PR #979 merged via squash: Merge SHA `08c143b614be7f2b303528a17a13e862c08b6261`.
+Confirmed `main@08c143b` was `origin/main`'s tip at merge time, a single-parent squash (parent
+`84d528a`, the pre-merge tip), zero content drift from the reviewed head (`git diff 15af3b1
+origin/main -- app database routes tests docs/plans/app-builder web` empty). Post-merge CI on the
+merge commit itself: `ci.yml` run
+[35959372930](https://github.com/safwan5001-source/Nebrax/actions/runs/35959372930) (sqlite/pgsql
+both `success`) and `web-ci.yml` run
+[35959372931](https://github.com/safwan5001-source/Nebrax/actions/runs/35959372931) (`web build
+(Next.js)`, `success`) — both green. `POST_MERGE_REVIEW: PASS`.
 
 ## Self-review
 
