@@ -826,3 +826,41 @@ suite 2076/2076 passing, `npm run build` succeeds, `ar.json`/`en.json` key parit
 backend suite 4634 passed / 35 pre-existing-failure baseline unchanged (zero backend source drift,
 +4 matching this task's new tests exactly). Full evidence:
 `docs/plans/app-builder/APP-BUILDER-10-IMPLEMENTATION-REPORT.md`.
+
+`APP-BUILDER-11` (Integrated vertical proof + UX/security closure) — dependency check performed
+before implementation, mirroring every prior task's. Source requirement (horizon doc task 11):
+*"create app → edit → bind real Commerce resource → validate → publish → proven Flutter runtime
+consumes compatible experience fixture/contract; tenant/RBAC/security/accessibility/bidi/
+regression evidence."* Unlike every prior task in this horizon, this one's literal requirement is
+**not** satisfiable inside the accepted, tested contract — confirmed by direct reading, not
+inference:
+
+- `SchemaComponent._allowedKeys` in the tested `mobile/lib/schema/app_schema.dart` accepts only
+  `type/id/optional/props/children/action` — a `bindings` key is structurally rejected
+  (`unknown_key`), not merely unsupported today.
+- `DataResourceRegistry::RESOURCES` is deliberately empty (`APP-BUILDER-3`'s own finding, guarded
+  by its own test) — zero Commerce data resources exist in the compatible runtime contract.
+- Every registered `Action` is `DISPATCH_PROVEN_NOOP` — real Commerce API dispatch
+  (`MOBILE-RUNTIME-4/5`) was never built; that work belongs to the **already-closed** Mobile
+  Runtime Proof V1 horizon, not this one.
+- `AWJ_APP_BUILDER_PRODUCT_ARCHITECTURE_V1.md` §"Open Decisions after 04B" lists "exact Data
+  Source Registry contract" as explicitly **not locked** — the identical undecided item that made
+  `APP-BUILDER-7` a Decision Escalation Gate.
+
+Escalated to the owner (the same posture `APP-BUILDER-7` itself used). Owner decision (2026-09-24,
+option 2): redefine APP-BUILDER-11 as an **Integrated Proof of the currently accepted and actually
+implemented App Builder contract** — prove the full real journey (create → edit →
+components/actions already supported → theme / Use My Store Design → pages/navigation/templates →
+Validate → Publish → immutable published version → restore/rollback to draft → revalidate) end to
+end, using only real existing behavior, with tenant/RBAC/security/accessibility/bidi/regression
+evidence drawn from what is actually built. Explicitly never invent `bindings` in App Schema, a
+Data Resource Registry contract, a condition/expression contract, merchant-authored visibility
+semantics, arbitrary JS/expression evaluation, real Commerce API action dispatch, or a new
+Flutter/runtime contract merely to satisfy the original aspirational wording — and never claim
+real Commerce resource binding or live Commerce runtime dispatch is proven. That portion of the
+original task-11 intent is recorded as a connected deferred/`decision_required` follow-up track
+with `APP-BUILDER-7`, for owner/ChatGPT review after Horizon closure (`APP-BUILDER-12`) — not
+silently dropped, not marked done. Full redefinition record:
+`docs/plans/app-builder/APP-BUILDER-11-UX-EVIDENCE-PASS.md`. **`APP-BUILDER-7` itself remains
+untouched, still `decision_required`.** Table dependency is `APP-BUILDER-10 (done)` alone,
+promoted to `ready`.
