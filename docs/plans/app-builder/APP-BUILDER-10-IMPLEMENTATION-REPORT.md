@@ -1,6 +1,6 @@
 # APP-BUILDER-10 — Implementation Report
 
-STATUS: CI/PRE_MERGE_REVIEW: PASS — awaiting merge
+STATUS: merged — post-merge review PASS
 DATE: 2026-09-24
 
 ## Outcome
@@ -145,6 +145,24 @@ freshly-created row (no N+1 risk there, unlike the list endpoints, which already
   App Builder in any way and already documented as this exact baseline in every prior App Builder
   task's report. Passed count is up from the prior baseline of 4630 by exactly +4, matching the 4
   new `BuilderAppTest` cases added by this task. **Zero new regressions.**
+
+## Merge and post-merge review
+
+PR #988 (which grew to bundle APP-BUILDER-9 post-merge docs, the APP-BUILDER-10 dependency check,
+and this task's implementation — see the PR body for the full breakdown) merged via squash as
+`b69f98125d0b9010986cd7df16247dea68d4e0e4`, final pre-merge head `10babae8af2ee8c9d858e04cf87c9daf768f0a9a`.
+
+- **Single-parent squash confirmed:** `git log -1 --format=%P origin/main` on the merge commit
+  returns exactly one parent (`c054c9c...`, the prior merge base) — a real squash, not an
+  accidental merge commit.
+- **Zero content drift confirmed:** `git diff <pre-merge-head> origin/main -- app/ routes/ tests/
+  web/src/ docs/plans/app-builder/ docs/autonomous-engineering/` returns empty — the squash carries
+  exactly the PR's content, nothing more or less.
+- **Post-merge CI confirmed green on the merge commit itself** (not just the pre-merge head):
+  - `CI` (`.github/workflows/ci.yml`, sqlite+pgsql) — run `35989443086` — **completed / success**.
+  - `Web CI` (`.github/workflows/web-ci.yml`) — run `35989443048` — **completed / success**.
+
+**POST_MERGE_REVIEW: PASS.**
 
 ## Accounting impact
 

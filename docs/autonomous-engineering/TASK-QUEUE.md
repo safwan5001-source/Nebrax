@@ -506,8 +506,8 @@ Source of truth:
 | 7 | APP-BUILDER-7 | decision_required | normal | APP-BUILDER-6 (done) | Data/Actions/Conditions/Visibility (Develop mode) |
 | 8 | APP-BUILDER-8 | done | high | APP-BUILDER-6 (done); no real dependency on APP-BUILDER-7 (verified, see below) | Theme + Use My Store Design |
 | 9 | APP-BUILDER-9 | done | normal | APP-BUILDER-8 (done) | Templates + navigation/pages |
-| 10 | APP-BUILDER-10 | ready | high | APP-BUILDER-9 (done); no real dependency on APP-BUILDER-7 (verified, see below) | Validate/Publish/Version/Rollback foundation |
-| 11 | APP-BUILDER-11 | pending | high | APP-BUILDER-10 | Integrated vertical proof + UX/security closure |
+| 10 | APP-BUILDER-10 | done | high | APP-BUILDER-9 (done); no real dependency on APP-BUILDER-7 (verified, see below) | Validate/Publish/Version/Rollback foundation |
+| 11 | APP-BUILDER-11 | ready | high | APP-BUILDER-10 (done) | Integrated vertical proof + UX/security closure |
 | 12 | APP-BUILDER-12 | pending | normal | APP-BUILDER-11 | Horizon closure — STOP for owner/ChatGPT review |
 
 `APP-BUILDER-1` promoted directly to `ready`/`in_progress` from horizon authorization: the horizon
@@ -804,3 +804,25 @@ RBAC, prior implementation reports — not the architecture doc's richer aspirat
 operate on the whole schema as an already-validated opaque document via the already-accepted
 `AppSchemaParser`/`CompatibilityResolver`, never touching `SchemaComponent`-level Actions/
 Conditions/Visibility/Data. Table dependency is `APP-BUILDER-9 (done)` alone, promoted to `ready`.
+
+`APP-BUILDER-10` is `done`: PR #988 merged (squash SHA `b69f98125d0b9010986cd7df16247dea68d4e0e4`,
+confirmed single-parent squash onto `main`, zero content drift from the reviewed pre-merge head
+`10babae` verified via a path-restricted diff), post-merge CI green on the merge commit itself
+(`ci.yml` run `35989443086` sqlite+pgsql both success, `web-ci.yml` run `35989443048` success).
+This PR grew to also carry `APP-BUILDER-9`'s post-merge documentation and the `APP-BUILDER-10`
+dependency check above, since implementation began on the same still-open branch before that
+earlier docs-only content had merged — all pieces independently complete and tested. Delivered
+exactly the three pieces scoped above: a `POST .../validate` endpoint (refactored out of
+`publish()`'s existing two checks, creates no row); a "Publish" dialog in the Builder workspace
+header that auto-runs Validate, shows its result, and is disabled — with a visible reason — while
+the draft is unsaved or the user lacks `apps_builder.publish`; a `/app-builder/[id]/versions` page
+listing every published version with its note/publisher and a "Restore to draft" action that writes
+the historical schema back via the existing `PUT .../draft` and redirects into the Builder
+workspace — never auto-publishing. Zero new App Schema contract, zero duplication of `APP-BUILDER-6`
+Actions editing, `APP-BUILDER-7` left untouched, still `decision_required`. 4 new `BuilderAppTest`
+cases (22/22 total) + 97/97 across the full App Builder/RBAC/tenancy test slice, 4 new Builder-page
+tests (22/22 total) + 4 new versions-page tests (new file) + 3/3 detail-page tests, full frontend
+suite 2076/2076 passing, `npm run build` succeeds, `ar.json`/`en.json` key parity verified, full
+backend suite 4634 passed / 35 pre-existing-failure baseline unchanged (zero backend source drift,
++4 matching this task's new tests exactly). Full evidence:
+`docs/plans/app-builder/APP-BUILDER-10-IMPLEMENTATION-REPORT.md`.
