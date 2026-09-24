@@ -2,7 +2,7 @@
 
 > This file is a durable resume point, not a substitute for Git/GitHub evidence.
 
-LAST_UPDATED: 2026-09-24 (AWJ App Builder Horizon V1 authorized and launched; APP-BUILDER-1/2/3/4/5/6/8 done. APP-BUILDER-7 (Data/Actions/Conditions/Visibility) evaluated for implementation and found NOT READY — a genuine Decision Escalation Gate, not an evidence gap: three of its four named concepts (Data, Conditions, Visibility) have no backing in the accepted, tested App Schema contract, and building them requires inventing an expression/condition engine or a Data Source Registry contract, both explicitly "not yet locked" in the accepted architecture doc. Owner decision (2026-09-24): keep APP-BUILDER-7 explicitly deferred (decision_required, not completed, not permanently skipped), proceed to APP-BUILDER-8 after a narrow dependency check found no real runtime/schema dependency on APP-BUILDER-7 — table updated, APP-BUILDER-8 promoted to ready then completed (PR #983, Theme + Use My Store Design). APP-BUILDER-9 now in progress. Prior AWJ Mobile Runtime Proof Horizon V1 (below) is fully closed and is this horizon's accepted input.)
+LAST_UPDATED: 2026-09-24 (AWJ App Builder Horizon V1 authorized and launched; APP-BUILDER-1/2/3/4/5/6/8/9 done. APP-BUILDER-7 (Data/Actions/Conditions/Visibility) evaluated for implementation and found NOT READY — a genuine Decision Escalation Gate, not an evidence gap: three of its four named concepts (Data, Conditions, Visibility) have no backing in the accepted, tested App Schema contract, and building them requires inventing an expression/condition engine or a Data Source Registry contract, both explicitly "not yet locked" in the accepted architecture doc. Owner decision (2026-09-24): keep APP-BUILDER-7 explicitly deferred (decision_required, not completed, not permanently skipped), proceed to APP-BUILDER-8 after a narrow dependency check found no real runtime/schema dependency on APP-BUILDER-7 — table updated, APP-BUILDER-8 promoted to ready then completed (PR #983, Theme + Use My Store Design), APP-BUILDER-9 likewise completed (PR #985, Templates + navigation/pages). APP-BUILDER-10 now in progress. Prior AWJ Mobile Runtime Proof Horizon V1 (below) is fully closed and is this horizon's accepted input.)
 LAYER_VERSION: V1
 STATUS: ACTIVE — AWJ App Builder Horizon V1
 
@@ -56,6 +56,32 @@ Execute **AWJ App Builder Horizon V1** sequentially under نظام الأفق, p
   unchanged, zero backend source drift — confirmed via `diff -rq` against the built project). PR
   #983 merged: Merge SHA `1248223dd1668ad840f2b39f21e3de5a6d86755b`. `POST_MERGE_REVIEW: PASS`.
   Full evidence: `docs/plans/app-builder/APP-BUILDER-8-IMPLEMENTATION-REPORT.md`.
+- `APP-BUILDER-9` (Templates + navigation/pages) is **done**: a focused UI/UX Evidence Pass
+  (`APP-BUILDER-9-UX-EVIDENCE-PASS.md`) written before implementation. A dependency check
+  confirmed no real runtime/schema dependency on the deferred `APP-BUILDER-7` and, unlike it, no
+  new App Schema contract required at all — `SchemaNavigation` is documented as "deliberately
+  minimal" in its own Dart source, and `AppSchemaParser::validate()` already enforces the entire
+  "system page constraint" surface server-side (non-empty `pages`, every root `type: 'Page'`,
+  `navigation.initialPageId` referencing a declared page). Added page add/remove/set-home to the
+  Builder workspace's Pages tab (new `pages`-map helpers in `app-builder.ts`, the `pages`-map
+  analogue of `APP-BUILDER-6`'s component-tree helpers; guardrails only mirror the server's own
+  checks — never a new rule). Gave the Inspector's `navigate` action `pageId` param a real picker
+  of the schema's declared pages, replacing a free-text field that had no validation against real
+  pages anywhere (`ActionRegistry`'s `navigate` action was already real and editable since
+  `APP-BUILDER-6`). Added a small curated template set (Blank, Catalog) to `/app-builder/new`'s
+  `template` creation path, replacing its honest "added in a later task" placeholder — each a
+  complete, valid `AppSchema` from already-shipped component/action types, applied via a second
+  `PUT .../draft` call right after app creation; Catalog's `Button`→`navigate` action doubles as a
+  live demonstration of the new page navigation. Pure frontend — zero backend files touched. 7 new
+  `app-builder.ts` unit tests (28/28 total) + 4 new Builder-workspace tests (18/18 total) + 2 new
+  creation-wizard tests (5/5 total), full frontend suite 2060/2060 passing, `npm run build`
+  succeeds, `ar.json`/`en.json` key parity verified, full backend suite unaffected (4630 passed /
+  35 pre-existing-failure baseline unchanged, zero backend source drift). PR #985 merged (also
+  carrying `APP-BUILDER-8`'s post-merge documentation, pushed to the same still-open branch before
+  that earlier docs-only PR had merged): Merge SHA `c054c9c2425e0f1f6172cee437d9fc2415073b66`,
+  confirmed zero content drift via a path-restricted diff despite two unrelated commits landing on
+  `main` between implementation and merge. `POST_MERGE_REVIEW: PASS`. Full evidence:
+  `docs/plans/app-builder/APP-BUILDER-9-IMPLEMENTATION-REPORT.md`.
 
 ## AWJ Mobile Runtime Proof Horizon V1 (closed) — execution log
 
@@ -166,7 +192,18 @@ Execute **AWJ App Builder Horizon V1** sequentially under نظام الأفق, p
   Detect/Diff/Preview/Apply sync), its own focused UI/UX Evidence Pass
   completed before implementation. Full evidence: "AWJ App Builder Horizon
   V1" log above, `docs/plans/app-builder/APP-BUILDER-8-IMPLEMENTATION-REPORT.md`.
-- Remaining tasks `APP-BUILDER-9` through `APP-BUILDER-12`: see
+- Ninth executable task: `APP-BUILDER-9` (Templates + navigation/pages) —
+  **done** (PR #985, Merge SHA `c054c9c`). Dependency check confirmed no
+  real runtime/schema dependency on `APP-BUILDER-7`, and — unlike it — no
+  new App Schema contract required at all (`AppSchemaParser::validate()`
+  already enforces the full "system page constraint" surface); promoted
+  to `ready` on `APP-BUILDER-8` alone, then implemented: Pages-tab
+  add/remove/set-home, a real page picker for the `navigate` action's
+  `pageId` param, and a small curated template set (Blank, Catalog) in the
+  creation wizard, its own focused UI/UX Evidence Pass completed before
+  implementation. Full evidence: "AWJ App Builder Horizon V1" log above,
+  `docs/plans/app-builder/APP-BUILDER-9-IMPLEMENTATION-REPORT.md`.
+- Remaining tasks `APP-BUILDER-10` through `APP-BUILDER-12`: see
   `docs/autonomous-engineering/TASK-QUEUE.md` for the full dependency-ordered
   table and promotion evidence.
 - Implementation merge: standing authority after mandatory final-head

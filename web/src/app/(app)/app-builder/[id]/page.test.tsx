@@ -14,6 +14,7 @@ const { api, translate } = vi.hoisted(() => {
     'detail.versionsTitle': 'Published versions',
     'detail.versionsEmpty': 'No version published yet.',
     'detail.versionRow': 'Version {version} — {date}',
+    'detail.viewAllVersions': 'View all versions',
     openBuilder: 'Open the builder',
     'creationSource.store_design': 'From store design',
     'creationSource.template': 'From template',
@@ -97,6 +98,9 @@ describe('AppBuilderDetailPage', () => {
     expect(screen.getAllByText('No version published yet.').length).toBeGreaterThan(0);
     const openBuilderLink = screen.getByRole('link', { name: 'Open the builder' });
     expect(openBuilderLink.getAttribute('href')).toBe('/app-builder/app-1/builder');
+
+    const [viewAllLink] = screen.getAllByRole('link', { name: 'View all versions' });
+    expect(viewAllLink.getAttribute('href')).toBe('/app-builder/app-1/versions');
   });
 
   it('renders published versions when present', async () => {

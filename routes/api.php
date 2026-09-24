@@ -916,6 +916,12 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::put('app-builder/apps/{id}/draft', [BuilderDraftExperienceController::class, 'update'])
             ->whereUuid('id')->middleware([$perm('apps_builder.manage'), $app('commerce.app_builder')]);
 
+        // APP-BUILDER-10: فحصٌ صريح لا فعل — يشغّل تحقّقَي `publish()` نفسيهما
+        // (بنيوي فالتوافق) بلا نشر. صلاحية `.manage` لا `.publish`: لا يُنشئ
+        // نسخة ولا أثر له، فهو جزء من دورة التحرير اليومية لا فعل النشر.
+        Route::post('app-builder/apps/{id}/validate', [BuilderPublishedExperienceVersionController::class, 'validateDraft'])
+            ->whereUuid('id')->middleware([$perm('apps_builder.manage'), $app('commerce.app_builder')]);
+
         Route::get('app-builder/apps/{id}/versions', [BuilderPublishedExperienceVersionController::class, 'index'])
             ->whereUuid('id')->middleware([$perm('apps_builder.view'), $app('commerce.app_builder')]);
         Route::post('app-builder/apps/{id}/versions', [BuilderPublishedExperienceVersionController::class, 'store'])

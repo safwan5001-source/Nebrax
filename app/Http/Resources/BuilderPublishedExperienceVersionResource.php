@@ -18,6 +18,8 @@ class BuilderPublishedExperienceVersionResource extends JsonResource
             'schema_version' => $this->schema_version,
             'note' => $this->note,
             'schema' => $this->schema,
+            'published_by' => $this->published_by,
+            'published_by_name' => $this->publisher?->name,
             'published_at' => $this->published_at?->toIso8601String(),
         ];
     }

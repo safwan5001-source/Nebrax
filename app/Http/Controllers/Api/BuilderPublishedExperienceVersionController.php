@@ -23,7 +23,7 @@ class BuilderPublishedExperienceVersionController extends ApiController
         $app = BuilderApp::findOrFail($appId);
 
         return response()->json([
-            'data' => BuilderPublishedExperienceVersionResource::collection($app->publishedVersions()->get()),
+            'data' => BuilderPublishedExperienceVersionResource::collection($app->publishedVersions()->with('publisher')->get()),
         ]);
     }
 
@@ -46,8 +46,18 @@ class BuilderPublishedExperienceVersionController extends ApiController
         // بث صريح لعدد صحيح: مقارنة نصّ الرابط مباشرة بعمود `unsignedInteger`
         // على PostgreSQL قد ترفض الالتقاط الضمني، بخلاف SQLite المتساهل —
         // التحويل هنا يطابق السلوك على المحركين معاً.
-        $row = $app->publishedVersions()->where('version', (int) $version)->firstOrFail();
+        $row = $app->publishedVersions()->with('publisher')->where('version', (int) $version)->firstOrFail();
 
         return response()->json(['data' => new BuilderPublishedExperienceVersionResource($row)]);
+    }
+
+    /** فحصٌ صريح لا فعل — انظر توثيق `BuilderPublishedExperienceVersionService::validate()`. */
+    public function validateDraft(string $appId): JsonResponse
+    {
+        $app = BuilderApp::findOrFail($appId);
+
+        $this->domain(fn () => $this->service->validate($app));
+
+        return response()->json(['data' => ['valid' => true]]);
     }
 }

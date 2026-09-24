@@ -6835,7 +6835,22 @@
       "versionsTitle": "النسخ المنشورة",
       "versionsEmpty": "لم يُنشر أي إصدار بعد.",
       "versionRow": "الإصدار {version} — {date}",
+      "viewAllVersions": "عرض كل النسخ",
       "openBuilder": "فتح مساحة التحرير"
+    },
+    "versions": {
+      "title": "النسخ المنشورة",
+      "loadFailed": "تعذّر تحميل النسخ.",
+      "empty": "لم يُنشر أي إصدار بعد.",
+      "versionLabel": "الإصدار {version}",
+      "publishedByLabel": "نشرها {name}",
+      "noNote": "بلا ملاحظة",
+      "restoreAction": "استعادة كمسودة",
+      "restoreConfirmTitle": "استعادة هذه النسخة إلى المسودة؟",
+      "restoreConfirmBody": "سيستبدل هذا مسودتك الحالية بالإصدار {version}. أي تعديلات غير محفوظة في المسودة ستُفقد. ستراجعها في الباني ويجب أن تنشر مجدداً صراحةً.",
+      "restoring": "جارٍ الاستعادة…",
+      "restoreSuccessTitle": "تمت استعادة المسودة",
+      "restoreErrorTitle": "تعذّرت استعادة هذه النسخة"
     },
     "builder": {
       "back": "رجوع",
@@ -6859,6 +6874,21 @@
         "setHomeLabel": "تعيين كصفحة رئيسية",
         "removeLabel": "حذف الصفحة",
         "pickerPlaceholder": "اختر صفحة"
+      },
+      "publish": {
+        "action": "نشر",
+        "forbidden": "لا تملك صلاحية النشر.",
+        "saveFirst": "احفظ تغييراتك قبل النشر.",
+        "dialogTitle": "نشر نسخة جديدة",
+        "validating": "جارٍ فحص التوافق…",
+        "validationPassed": "جاهز للنشر.",
+        "validateErrorGeneric": "تعذّر فحص التوافق.",
+        "noteLabel": "ملاحظة (اختياري)",
+        "notePlaceholder": "ما الذي تغيّر في هذه النسخة؟",
+        "confirmAction": "نشر",
+        "publishing": "جارٍ النشر…",
+        "successTitle": "تم نشر النسخة",
+        "errorTitle": "تعذّر النشر"
       },
       "inspectorEmpty": "اختر مكوّناً لعرض خصائصه.",
       "inspectorUnknownType": "النوع «{type}» غير معروف في السجلّ.",

@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import { Layers, PenSquare } from 'lucide-react';
@@ -49,20 +50,27 @@ export default function AppBuilderDetailPage() {
   if (loading) return <LoadingState rows={6} label={tc('loading')} />;
   if (!app) return <ErrorState message={loadError ?? t('loadFailed')} onRetry={load} retryLabel={tc('retry')} />;
 
-  const versionsContent = versions.length === 0 ? (
-    <p className="py-5 text-center text-sm text-muted">{t('versionsEmpty')}</p>
-  ) : (
-    <div className="divide-y divide-border rounded-md border border-border">
-      {versions.map((version) => (
-        <div key={version.id} className="flex items-center justify-between gap-3 px-3 py-3">
-          <span className="text-sm text-text">
-            {t('versionRow', {
-              version: version.version,
-              date: version.published_at ? formatDate(version.published_at, locale) : '—',
-            })}
-          </span>
+  const versionsContent = (
+    <div className="space-y-3">
+      {versions.length === 0 ? (
+        <p className="py-5 text-center text-sm text-muted">{t('versionsEmpty')}</p>
+      ) : (
+        <div className="divide-y divide-border rounded-md border border-border">
+          {versions.slice(0, 3).map((version) => (
+            <div key={version.id} className="flex items-center justify-between gap-3 px-3 py-3">
+              <span className="text-sm text-text">
+                {t('versionRow', {
+                  version: version.version,
+                  date: version.published_at ? formatDate(version.published_at, locale) : '—',
+                })}
+              </span>
+            </div>
+          ))}
         </div>
-      ))}
+      )}
+      <Link href={`/app-builder/${app.id}/versions`} className="block text-sm font-medium text-primary hover:underline">
+        {t('viewAllVersions')}
+      </Link>
     </div>
   );
 

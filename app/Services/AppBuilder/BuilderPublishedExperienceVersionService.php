@@ -47,18 +47,7 @@ final class BuilderPublishedExperienceVersionService
         return DB::transaction(function () use ($app, $note, $userId): BuilderPublishedExperienceVersion {
             $lockedApp = BuilderApp::query()->whereKey($app->id)->lockForUpdate()->firstOrFail();
 
-            $draft = $lockedApp->draft()->first();
-            if ($draft === null) {
-                throw new RuntimeException('لا توجد مسودة تجربة لهذا التطبيق.');
-            }
-
-            $schema = $draft->schema;
-            $this->parser->validate($schema);
-
-            $compatibility = $this->compatibilityResolver->resolve($schema, CapabilityManifest::current());
-            if (! $compatibility->compatible) {
-                throw new RuntimeException("التجربة غير متوافقة مع تطبيق الجوال الحالي: {$compatibility->message}");
-            }
+            $schema = $this->validatedDraftSchema($lockedApp);
 
             $nextVersion = (int) (BuilderPublishedExperienceVersion::query()
                 ->where('builder_app_id', $lockedApp->id)
@@ -74,5 +63,45 @@ final class BuilderPublishedExperienceVersionService
                 'note' => $note,
             ]);
         });
+    }
+
+    /**
+     * ═══════════════════════════════════════════════════════════════
+     *  فحص مسودة دون نشر — APP-BUILDER-10
+     * ═══════════════════════════════════════════════════════════════
+     * يُشغِّل تحقّقَي `publish()` نفسيهما (بنيوي ثم توافق) بلا قفل وبلا إنشاء
+     * صفّ — فحصٌ صريح لا فعل. لا قاعدة تحقّق جديدة: يعيد استخدام
+     * `validatedDraftSchema()` حرفياً، فنجاح الفحص يعني نجاح نشرٍ فعلي لاحق
+     * بنفس المسودة (ما لم تتغيّر المسودة أو بناء التشغيل الحالي بين الفحص
+     * والنشر — سباقٌ نادر، ونشرٌ فاشل بعده يُبلّغ برسالته الحقيقية كأي فشل آخر).
+     *
+     * @throws RuntimeException لا توجد مسودة، أو غير صالحة بنيوياً، أو غير متوافقة.
+     */
+    public function validate(BuilderApp $app): void
+    {
+        $this->validatedDraftSchema($app);
+    }
+
+    /**
+     * @return array<string, mixed> مخطط المسودة بعد تحقّقٍ بنيوي وتوافقي كاملين.
+     *
+     * @throws RuntimeException لا توجد مسودة، أو غير صالحة بنيوياً، أو غير متوافقة.
+     */
+    private function validatedDraftSchema(BuilderApp $app): array
+    {
+        $draft = $app->draft()->first();
+        if ($draft === null) {
+            throw new RuntimeException('لا توجد مسودة تجربة لهذا التطبيق.');
+        }
+
+        $schema = $draft->schema;
+        $this->parser->validate($schema);
+
+        $compatibility = $this->compatibilityResolver->resolve($schema, CapabilityManifest::current());
+        if (! $compatibility->compatible) {
+            throw new RuntimeException("التجربة غير متوافقة مع تطبيق الجوال الحالي: {$compatibility->message}");
+        }
+
+        return $schema;
     }
 }

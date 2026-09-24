@@ -5,16 +5,20 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { ArrowRight, Home, LayoutPanelLeft, Plus, Redo2, SlidersHorizontal, Trash2, Undo2 } from 'lucide-react';
+import { ArrowRight, Home, LayoutPanelLeft, Plus, Redo2, SlidersHorizontal, Trash2, Undo2, UploadCloud } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Dialog } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/toast';
 import { ErrorState, LoadingState } from '@/components/nebrax';
 import { api, ApiError } from '@/lib/api';
+import { currentUser } from '@/lib/auth';
 import { cn } from '@/lib/utils';
 import {
-  addChildComponent, addPage, appDisplayName, findComponentById, findParentId, generatePageId, mergeThemeTokens, moveSibling,
-  removeComponentById, removePage, reorderChildren, setInitialPage, themeTokens as schemaThemeTokens, updateComponentById,
+  addChildComponent, addPage, appDisplayName, findComponentById, findParentId, generatePageId, hasAppBuilderPermission,
+  mergeThemeTokens, moveSibling, removeComponentById, removePage, reorderChildren, setInitialPage,
+  themeTokens as schemaThemeTokens, updateComponentById,
   type AppBuilderRegistries, type AppSchema, type AppSchemaComponent, type BuilderApp, type BuilderDraftExperience,
 } from '@/lib/app-builder';
 import { AppBuilderCanvas, PREVIEW_WIDTHS, type PreviewDevice } from '@/modules/app-builder/canvas';
@@ -55,6 +59,11 @@ export default function AppBuilderWorkspacePage() {
   const [device, setDevice] = useState<PreviewDevice>('desktop');
   const [mobilePanel, setMobilePanel] = useState<MobilePanel>('structure');
   const [structureMode, setStructureMode] = useState<StructureMode>('pages');
+  const [publishOpen, setPublishOpen] = useState(false);
+  const [publishNote, setPublishNote] = useState('');
+  const [validation, setValidation] = useState<{ status: 'checking' | 'passed' | 'failed'; message?: string }>({ status: 'checking' });
+  const [publishing, setPublishing] = useState(false);
+  const canPublish = hasAppBuilderPermission(currentUser(), 'apps_builder.publish');
   const [previewThemeTokens, setPreviewThemeTokens] = useState<Record<string, string> | null>(null);
 
   const load = useCallback(() => {
@@ -177,6 +186,41 @@ export default function AppBuilderWorkspacePage() {
       toast.error(t('saveErrorTitle'), err instanceof ApiError ? err.message : undefined);
     } finally {
       setSaving(false);
+    }
+  }
+
+  /** يفتح حوار النشر ويشغّل الفحص الصريح فوراً — لا زرّ تأكيد مفعّلاً قبل نجاحه. */
+  function openPublishDialog() {
+    setPublishNote('');
+    setPublishOpen(true);
+    runValidate();
+  }
+
+  async function runValidate() {
+    if (!params.id) return;
+    setValidation({ status: 'checking' });
+    try {
+      await api(`/app-builder/apps/${params.id}/validate`, { method: 'POST' });
+      setValidation({ status: 'passed' });
+    } catch (err) {
+      setValidation({ status: 'failed', message: err instanceof ApiError ? err.message : t('publish.validateErrorGeneric') });
+    }
+  }
+
+  async function confirmPublish() {
+    if (!params.id || validation.status !== 'passed') return;
+    setPublishing(true);
+    try {
+      await api(`/app-builder/apps/${params.id}/versions`, {
+        method: 'POST',
+        body: { note: publishNote.trim() || undefined },
+      });
+      setPublishOpen(false);
+      toast.success(t('publish.successTitle'));
+    } catch (err) {
+      toast.error(t('publish.errorTitle'), err instanceof ApiError ? err.message : undefined);
+    } finally {
+      setPublishing(false);
     }
   }
 
@@ -402,6 +446,16 @@ export default function AppBuilderWorkspacePage() {
         <Button size="sm" disabled={!dirty || saving} onClick={handleSave}>
           {saving ? t('savingBadge') : tc('save')}
         </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={dirty || saving || !canPublish}
+          title={!canPublish ? t('publish.forbidden') : dirty ? t('publish.saveFirst') : undefined}
+          onClick={openPublishDialog}
+        >
+          <UploadCloud className="h-3.5 w-3.5" strokeWidth={1.7} aria-hidden="true" />
+          {t('publish.action')}
+        </Button>
 
         <div className="ms-auto flex flex-wrap items-center gap-2">
           <div className="hidden items-center gap-1 rounded-md border border-border p-1 sm:flex">
@@ -490,6 +544,36 @@ export default function AppBuilderWorkspacePage() {
           </div>
         </div>
       </div>
+
+      <Dialog open={publishOpen} onClose={() => (publishing ? null : setPublishOpen(false))} title={t('publish.dialogTitle')}>
+        <div className="space-y-3">
+          {validation.status === 'checking' ? (
+            <p className="text-sm text-muted">{t('publish.validating')}</p>
+          ) : validation.status === 'passed' ? (
+            <p className="text-sm text-positive">{t('publish.validationPassed')}</p>
+          ) : (
+            <p className="text-sm text-negative">{validation.message}</p>
+          )}
+          <div className="space-y-1">
+            <label className="block text-xs font-medium text-text">{t('publish.noteLabel')}</label>
+            <Textarea
+              className="min-h-20 text-sm"
+              value={publishNote}
+              onChange={(event) => setPublishNote(event.target.value)}
+              placeholder={t('publish.notePlaceholder')}
+              disabled={publishing}
+            />
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" disabled={publishing} onClick={() => setPublishOpen(false)}>
+              {tc('cancel')}
+            </Button>
+            <Button type="button" disabled={publishing || validation.status !== 'passed'} onClick={confirmPublish}>
+              {publishing ? t('publish.publishing') : t('publish.confirmAction')}
+            </Button>
+          </div>
+        </div>
+      </Dialog>
     </div>
   );
 }
