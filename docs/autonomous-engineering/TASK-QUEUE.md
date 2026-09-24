@@ -707,3 +707,28 @@ total) + 5 new workspace tests (14/14 total), full frontend suite 2046/2046 pass
 succeeds, `ar.json`/`en.json` key parity verified, full backend suite unaffected (4630 passed / 35
 pre-existing-failure baseline unchanged, zero backend source drift). Full evidence:
 `docs/plans/app-builder/APP-BUILDER-8-IMPLEMENTATION-REPORT.md`.
+
+`APP-BUILDER-9` (Templates + navigation/pages) — dependency check performed before implementation,
+mirroring `APP-BUILDER-8`'s: source requirement is "same schema/runtime; safe system page
+constraints and minimum shell" (horizon doc task 9). Read the real, accepted, tested contract
+before scoping: `mobile/lib/schema/app_schema.dart`'s `SchemaNavigation` is "**deliberately
+minimal** — `initialPageId` is the only concept needed" (its own doc comment), and
+`app/Services/AppBuilder/AppSchemaParser.php::validate()` already enforces the **entire** "system
+page constraint" surface server-side today: `pages` must be a non-empty object, every page root's
+`type` must be `'Page'`, and `navigation.initialPageId` must reference a declared page — no
+"required page type" (cart/checkout/account) concept exists anywhere in the schema, parser, or
+`CompatibilityResolver`. Unlike `APP-BUILDER-7`'s Data/Conditions/Visibility (which needed
+inventing wholly new JSON fields and validation semantics), this task's entire scope is
+representable in the already-accepted `pages: Map<String, SchemaComponent>` /
+`navigation.initialPageId` shape: page add/remove/rename/set-initial as new client-side tree
+operations (the `pages`-map analogue of `APP-BUILDER-6`'s component-tree helpers), with UI
+guardrails that only mirror validation the server already performs (never removing the last page,
+never leaving `initialPageId` dangling) — not a new contract. "Templates" (architecture doc §7:
+"more than colors/screenshots... representable through the same app contract/runtime") is a small
+curated set of complete, valid `AppSchema` starter payloads (multi-page, may reference theme
+tokens/components/actions — all already-accepted concepts) selected in the `/app-builder/new`
+wizard's existing `template` creation path (today honestly indistinguishable from `scratch`, per
+that page's own comment: "محتوى التصميم/القالب الفعلي مؤجَّل صراحةً إلى APP-BUILDER-8/9"), written
+through the same `POST /app-builder/apps` + `PUT .../draft` endpoints `APP-BUILDER-8` already used
+unchanged. **Confirmed: no real runtime/schema dependency on `APP-BUILDER-7`, and no new App
+Schema contract required** — table dependency is `APP-BUILDER-8 (done)` alone, `ready`.

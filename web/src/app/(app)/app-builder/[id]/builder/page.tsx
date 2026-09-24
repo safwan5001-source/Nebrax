@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { ArrowRight, LayoutPanelLeft, Redo2, SlidersHorizontal, Undo2 } from 'lucide-react';
+import { ArrowRight, Home, LayoutPanelLeft, Plus, Redo2, SlidersHorizontal, Trash2, Undo2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/toast';
@@ -13,8 +13,8 @@ import { ErrorState, LoadingState } from '@/components/nebrax';
 import { api, ApiError } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import {
-  addChildComponent, appDisplayName, findComponentById, findParentId, mergeThemeTokens, moveSibling, removeComponentById,
-  reorderChildren, themeTokens as schemaThemeTokens, updateComponentById,
+  addChildComponent, addPage, appDisplayName, findComponentById, findParentId, generatePageId, mergeThemeTokens, moveSibling,
+  removeComponentById, removePage, reorderChildren, setInitialPage, themeTokens as schemaThemeTokens, updateComponentById,
   type AppBuilderRegistries, type AppSchema, type AppSchemaComponent, type BuilderApp, type BuilderDraftExperience,
 } from '@/lib/app-builder';
 import { AppBuilderCanvas, PREVIEW_WIDTHS, type PreviewDevice } from '@/modules/app-builder/canvas';
@@ -118,6 +118,18 @@ export default function AppBuilderWorkspacePage() {
     [schema]
   );
 
+  /** أساس عمليات صفحات المخطط (إضافة/حذف/تعيين رئيسية) — نفس مسار السجلّ/التعديل. */
+  const applyPagesEdit = useCallback(
+    (updater: (current: AppSchema) => AppSchema) => {
+      if (!schema) return;
+      pastRef.current = [...pastRef.current, schema].slice(-HISTORY_LIMIT);
+      futureRef.current = [];
+      setDirty(true);
+      setSchema(updater(schema));
+    },
+    [schema]
+  );
+
   const undo = useCallback(() => {
     if (!schema || pastRef.current.length === 0) return;
     const previous = pastRef.current[pastRef.current.length - 1];
@@ -193,6 +205,30 @@ export default function AppBuilderWorkspacePage() {
     setSelectedComponentId(id);
   }
 
+  /** يضيف صفحة فارغة جديدة ويحدّدها مباشرة. */
+  function addNewPage() {
+    if (!schema) return;
+    const pageId = generatePageId();
+    applyPagesEdit((current) => addPage(current, pageId));
+    setSelectedPageId(pageId);
+    setSelectedComponentId(`${pageId}-root`);
+  }
+
+  /** يحذف صفحة — لا تأثير على الصفحة الرئيسية أو آخر صفحة متبقية (`removePage` نفسه صامت، والزر معطّل أصلاً في هذه الحالات). إن كانت الصفحة المحذوفة هي المحدَّدة، يعاد التحديد إلى الصفحة الرئيسية الباقية دوماً. */
+  function deletePage(pageId: string) {
+    if (!schema) return;
+    applyPagesEdit((current) => removePage(current, pageId));
+    if (selectedPageId === pageId) {
+      const fallbackId = schema.navigation.initialPageId;
+      setSelectedPageId(fallbackId);
+      setSelectedComponentId(schema.pages[fallbackId]?.id ?? null);
+    }
+  }
+
+  function makeInitialPage(pageId: string) {
+    applyPagesEdit((current) => setInitialPage(current, pageId));
+  }
+
   function updateSelectedNode(nextNode: AppSchemaComponent) {
     if (!selectedPageId || !selectedComponentId) return;
     applyPageEdit(selectedPageId, (root) => updateComponentById(root, selectedComponentId, () => nextNode));
@@ -252,23 +288,54 @@ export default function AppBuilderWorkspacePage() {
       {structureMode === 'pages' ? (
         <>
           <div className="shrink-0 space-y-0.5 border-b border-border p-2">
-            {pageIds.map((pageId) => (
-              <button
-                key={pageId}
-                type="button"
-                onClick={() => selectPage(pageId)}
-                aria-current={pageId === selectedPageId ? 'page' : undefined}
-                className={cn(
-                  'flex h-8 w-full items-center rounded px-2 text-start text-sm',
-                  pageId === selectedPageId ? 'bg-primary-soft font-medium text-primary' : 'text-text hover:bg-background'
-                )}
-              >
-                {pageId}
-                {pageId === schema.navigation?.initialPageId ? (
-                  <Badge tone="muted" className="ms-auto">{t('initialPageBadge')}</Badge>
-                ) : null}
-              </button>
-            ))}
+            {pageIds.map((pageId) => {
+              const isInitial = pageId === schema.navigation?.initialPageId;
+              const canRemove = pageIds.length > 1 && !isInitial;
+              return (
+                <div key={pageId} className="group flex items-center gap-0.5">
+                  <button
+                    type="button"
+                    onClick={() => selectPage(pageId)}
+                    aria-current={pageId === selectedPageId ? 'page' : undefined}
+                    className={cn(
+                      'flex h-8 min-w-0 flex-1 items-center rounded px-2 text-start text-sm',
+                      pageId === selectedPageId ? 'bg-primary-soft font-medium text-primary' : 'text-text hover:bg-background'
+                    )}
+                  >
+                    <span className="truncate">{pageId}</span>
+                    {isInitial ? <Badge tone="muted" className="ms-auto shrink-0">{t('initialPageBadge')}</Badge> : null}
+                  </button>
+                  {!isInitial ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      aria-label={t('pages.setHomeLabel')}
+                      title={t('pages.setHomeLabel')}
+                      onClick={() => makeInitialPage(pageId)}
+                      className="h-7 w-7 shrink-0 opacity-0 group-hover:opacity-100"
+                    >
+                      <Home className="h-3.5 w-3.5" strokeWidth={1.7} aria-hidden="true" />
+                    </Button>
+                  ) : null}
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    aria-label={t('pages.removeLabel')}
+                    disabled={!canRemove}
+                    onClick={() => deletePage(pageId)}
+                    className="h-7 w-7 shrink-0 opacity-0 group-hover:opacity-100"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" strokeWidth={1.7} aria-hidden="true" />
+                  </Button>
+                </div>
+              );
+            })}
+            <Button type="button" variant="outline" size="sm" className="mt-1 h-8 w-full text-xs" onClick={addNewPage}>
+              <Plus className="h-3.5 w-3.5" strokeWidth={1.7} aria-hidden="true" />
+              {t('pages.addAction')}
+            </Button>
           </div>
           <div className="shrink-0 px-3 py-2">
             <p className="text-xs font-semibold text-muted">{t('layersTitle')}</p>
@@ -298,6 +365,7 @@ export default function AppBuilderWorkspacePage() {
         <Inspector
           node={selectedNode}
           registries={registries}
+          pageIds={pageIds}
           onChange={updateSelectedNode}
           onAddChild={addChildToSelected}
           onRemove={removeSelected}

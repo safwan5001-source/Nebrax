@@ -28,6 +28,12 @@ const { api, push, translate } = vi.hoisted(() => {
     nameRequired: 'Name is required.',
     pathRequired: 'Choose a starting point first.',
     saveFailed: 'Could not save.',
+    templateSectionTitle: 'Template',
+    templateRequired: 'Choose a template first.',
+    'templates.blankName': 'Blank',
+    'templates.blankDescription': 'One home page.',
+    'templates.catalogName': 'Catalog',
+    'templates.catalogDescription': 'Featured products + cart.',
   };
   const translator = Object.assign((key: string) => strings[key] ?? key, { raw: () => ({}) });
   return { api: vi.fn(), push: vi.fn(), translate: translator };
@@ -89,6 +95,46 @@ describe('NewAppBuilderPage', () => {
       body: { name: 'تطبيقي', name_en: undefined, creation_source: 'scratch' },
     }));
     await waitFor(() => expect(push).toHaveBeenCalledWith('/app-builder/app-42'));
+  });
+
+  it('choosing the template path requires picking a template before Create is enabled', async () => {
+    const user = userEvent.setup();
+    render(<NewAppBuilderPage />);
+
+    await user.click(screen.getByRole('radio', { name: /Choose a template/ }));
+    await user.type(screen.getByLabelText('Name (Arabic)'), 'تطبيقي');
+    // Name is filled but no template chosen yet — Create stays disabled.
+    expect((screen.getByRole('button', { name: 'Create' }) as HTMLButtonElement).disabled).toBe(true);
+
+    await user.click(screen.getByRole('radio', { name: /Blank/ }));
+    expect((screen.getByRole('button', { name: 'Create' }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it('creating an app from a template seeds the draft with the chosen template schema, then redirects', async () => {
+    const user = userEvent.setup();
+    const calls: { path: string; options?: { method?: string; body?: unknown } }[] = [];
+    api.mockImplementation((path: string, options?: { method?: string; body?: unknown }) => {
+      calls.push({ path, options });
+      if (path === '/app-builder/apps') return Promise.resolve({ data: { id: 'app-42' } });
+      return Promise.resolve({ data: {} });
+    });
+    render(<NewAppBuilderPage />);
+
+    await user.click(screen.getByRole('radio', { name: /Choose a template/ }));
+    await user.click(screen.getByRole('radio', { name: /Catalog/ }));
+    await user.type(screen.getByLabelText('Name (Arabic)'), 'تطبيقي');
+    await user.click(screen.getByRole('button', { name: 'Create' }));
+
+    await waitFor(() => expect(push).toHaveBeenCalledWith('/app-builder/app-42'));
+
+    const createCall = calls.find((c) => c.path === '/app-builder/apps');
+    expect(createCall?.options?.body).toEqual({ name: 'تطبيقي', name_en: undefined, creation_source: 'template' });
+
+    const seedCall = calls.find((c) => c.path === '/app-builder/apps/app-42/draft');
+    expect(seedCall).toBeTruthy();
+    expect(seedCall?.options?.method).toBe('PUT');
+    const seededSchema = seedCall?.options?.body as { schema?: { pages?: Record<string, unknown> } };
+    expect(Object.keys(seededSchema.schema?.pages ?? {})).toEqual(['home', 'cart']);
   });
 
   it('shows a save-failed message when the API rejects the request', async () => {
