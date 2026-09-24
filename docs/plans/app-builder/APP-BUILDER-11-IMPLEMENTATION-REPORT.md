@@ -1,6 +1,6 @@
 # APP-BUILDER-11 — Implementation Report
 
-STATUS: CI/PRE_MERGE_REVIEW: PASS — awaiting merge
+STATUS: merged — post-merge review PASS
 DATE: 2026-09-24
 
 ## Outcome
@@ -93,6 +93,23 @@ services, not just that each side's own tests pass in isolation — which is pre
   environment's PHP build lacks the `bcmath` extension, unrelated to App Builder). Passed count is
   +4 over the prior baseline of 4634, exactly matching this task's 4 new
   `AppBuilderIntegratedProofTest` cases. **Zero new regressions.**
+
+## Merge and post-merge review
+
+PR #990 merged via squash as `a7a2e0c35ee5a0a2ddebe7aaf23e281f861ce744`, final pre-merge head
+`9ce280ce1b2b3a7368cdbdf07ce056e96c34c292`.
+
+- **Single-parent squash confirmed:** `git log -1 --format=%P origin/main` on the merge commit
+  returns exactly one parent (`cee1ffb...`, the prior merge base) — a real squash, not an
+  accidental merge commit.
+- **Zero content drift confirmed:** `git diff <pre-merge-head> origin/main -- tests/Feature/
+  docs/plans/app-builder/ docs/autonomous-engineering/` returns empty.
+- **Post-merge CI confirmed green on the merge commit itself:** `CI` (`.github/workflows/ci.yml`,
+  sqlite+pgsql) — run `36003417429` — **completed / success**. No `Web CI` run was triggered for
+  this commit, which is expected and not a gap: the diff touches only `tests/Feature/` and
+  `docs/`, and `web-ci.yml` is path-scoped to `web/`.
+
+**POST_MERGE_REVIEW: PASS.**
 
 ## Accounting impact
 
