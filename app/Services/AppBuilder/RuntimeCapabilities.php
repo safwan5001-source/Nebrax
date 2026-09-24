@@ -72,4 +72,17 @@ final class RuntimeCapabilities
      * @var array<string, int>
      */
     public const DATA_RESOURCES = [];
+
+    /**
+     * فضاء ميزات المخطط (لا هويّة مورد بيانات ولا قدرة منصّة أصلية) — **فارغٌ
+     * عمداً اليوم** لنفس سبب `DATA_RESOURCES` بالضبط: لا Flutter Runtime
+     * يحلّ شجرة `visibility` إلى إخفاء/إظهار فعلي بعد (`APP-BUILDER-16` يضيف
+     * العقد فقط؛ الاستهلاك الحقيقي `APP-BUILDER-17`، الذي يحدّث هذا الثابت
+     * ونظيره Dart معاً). حتى ذلك الحين تُعامَل `visibility` كقدرة غير متوفرة
+     * — تُقلَّم إن كانت اختيارية، أو تُفشل الوثيقة كاملة إن كانت إلزامية،
+     * تماماً كمكوّن/إجراء/مورد بيانات غير مدعوم.
+     *
+     * @var array<string, int>
+     */
+    public const SCHEMA_FEATURES = [];
 }

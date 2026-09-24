@@ -21,6 +21,7 @@ final class CapabilityManifest
      * @param  array<string, int>  $actions
      * @param  array<string, int>  $nativeCapabilities
      * @param  array<string, int>  $dataResources  `APP-BUILDER-14` (`ADR-01`) — ما يستهلكه Flutter Runtime المُثبَت فعلياً من `DataResourceRegistry`؛ فارغ حتى `APP-BUILDER-17`، انظر `RuntimeCapabilities::DATA_RESOURCES`.
+     * @param  array<string, int>  $schemaFeatures  `APP-BUILDER-16` (`ADR-01`) — ميزات مخطط مستهلَكة فعلياً (مثال: `visibility`)؛ فارغ حتى `APP-BUILDER-17`، انظر `RuntimeCapabilities::SCHEMA_FEATURES`.
      */
     public function __construct(
         public readonly SchemaVersion $runtimeVersion,
@@ -30,6 +31,7 @@ final class CapabilityManifest
         public readonly array $actions,
         public readonly array $nativeCapabilities = [],
         public readonly array $dataResources = [],
+        public readonly array $schemaFeatures = [],
     ) {}
 
     /** بناء التشغيل الحالي المُثبَت فعلياً — المرجع الوحيد لكود الإنتاج. */
@@ -43,6 +45,7 @@ final class CapabilityManifest
             actions: RuntimeCapabilities::ACTIONS,
             nativeCapabilities: RuntimeCapabilities::NATIVE_CAPABILITIES,
             dataResources: RuntimeCapabilities::DATA_RESOURCES,
+            schemaFeatures: RuntimeCapabilities::SCHEMA_FEATURES,
         );
     }
 
@@ -62,13 +65,20 @@ final class CapabilityManifest
         return $this->dataResources[$id] ?? null;
     }
 
+    /** `APP-BUILDER-16` — يوازي `resourceVersion()` لفضاء ميزات المخطط (مثال: `visibility`). */
+    public function schemaFeatureVersion(string $key): ?int
+    {
+        return $this->schemaFeatures[$key] ?? null;
+    }
+
     /**
      * مفتاح `requiredCapabilities` قد يسمّي مكوّناً أو إجراءً أو قدرة أصلية أو
-     * مورد بيانات — يطابق `CapabilityManifest.namedCapabilityVersion` في Dart
-     * حرفياً (نفس عدم التمييز المتعمَّد بين الفضاءات).
+     * مورد بيانات أو ميزة مخطط — يطابق `CapabilityManifest.namedCapabilityVersion`
+     * في Dart حرفياً (نفس عدم التمييز المتعمَّد بين الفضاءات).
      */
     public function namedCapabilityVersion(string $key): ?int
     {
-        return $this->actions[$key] ?? $this->components[$key] ?? $this->nativeCapabilities[$key] ?? $this->dataResources[$key] ?? null;
+        return $this->actions[$key] ?? $this->components[$key] ?? $this->nativeCapabilities[$key]
+            ?? $this->dataResources[$key] ?? $this->schemaFeatures[$key] ?? null;
     }
 }

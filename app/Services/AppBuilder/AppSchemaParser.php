@@ -35,11 +35,17 @@ final class AppSchemaParser
         'schemaVersion', 'minRuntimeVersion', 'requiredCapabilities', 'theme', 'navigation', 'pages',
     ];
 
-    private const COMPONENT_KEYS = ['type', 'id', 'optional', 'props', 'children', 'action', 'binding'];
+    private const COMPONENT_KEYS = ['type', 'id', 'optional', 'props', 'children', 'action', 'binding', 'visibility'];
 
     private const ACTION_KEYS = ['type', 'params'];
 
     private const BINDING_KEYS = ['resource', 'query', 'itemProps'];
+
+    private const CONDITION_LEAF_KEYS = ['signal', 'operator', 'value'];
+
+    private const MAX_CONDITION_DEPTH = 4;
+
+    private const MAX_CONDITION_BRANCHES = 16;
 
     private const THEME_KEYS = ['tokens'];
 
@@ -214,6 +220,89 @@ final class AppSchemaParser
             }
             $this->validateBinding($binding);
         }
+
+        $visibility = $json['visibility'] ?? null;
+        if ($visibility !== null) {
+            if (! $this->isObjectLike($visibility)) {
+                throw new SchemaFormatException('invalid_type', 'component.visibility must be an object');
+            }
+            $this->validateVisibility($visibility, 0);
+        }
+    }
+
+    /**
+     * تحقّق بنيوي بحت من شجرة `visibility` — شكل ثلاثي مغلق: `{all:[...]}`،
+     * `{any:[...]}`، أو ورقة `{signal, operator, value?}`. لا يتحقق من صحة
+     * `signal`/`operator` نفسيهما ولا من توافق نوع `value` مع المُشغّل (ذلك
+     * `CompatibilityResolver` وقت النشر، تماماً كتمييز هوية المكوّن/الإجراء/
+     * المورد) — فقط الشكل والحدود (عمق، عدد فروع) بلا أي تعبير قابل للتنفيذ.
+     */
+    private function validateVisibility(array $json, int $depth): void
+    {
+        if ($depth > self::MAX_CONDITION_DEPTH) {
+            throw new SchemaFormatException('too_deep', 'visibility nesting too deep');
+        }
+
+        if (array_key_exists('all', $json) || array_key_exists('any', $json)) {
+            $combinator = array_key_exists('all', $json) ? 'all' : 'any';
+            $this->rejectUnknownKeys($json, [$combinator], 'visibility');
+            $branches = $json[$combinator];
+            if (! is_array($branches) || ! array_is_list($branches) || $branches === []) {
+                throw new SchemaFormatException('invalid_type', "visibility.{$combinator} must be a non-empty list");
+            }
+            if (count($branches) > self::MAX_CONDITION_BRANCHES) {
+                throw new SchemaFormatException('too_many_nodes', "visibility.{$combinator} has too many entries");
+            }
+            foreach ($branches as $branch) {
+                if (! $this->isObjectLike($branch)) {
+                    throw new SchemaFormatException('invalid_type', "visibility.{$combinator} entries must be objects");
+                }
+                $this->validateVisibility($branch, $depth + 1);
+            }
+
+            return;
+        }
+
+        if (array_key_exists('signal', $json)) {
+            $this->rejectUnknownKeys($json, self::CONDITION_LEAF_KEYS, 'visibility');
+
+            $signal = $json['signal'] ?? null;
+            if (! is_string($signal) || $signal === '') {
+                throw new SchemaFormatException('missing_field', 'visibility.signal must be a non-empty string');
+            }
+            $operator = $json['operator'] ?? null;
+            if (! is_string($operator) || $operator === '') {
+                throw new SchemaFormatException('missing_field', 'visibility.operator must be a non-empty string');
+            }
+            if (array_key_exists('value', $json)) {
+                $this->validateVisibilityValue($json['value']);
+            }
+
+            return;
+        }
+
+        throw new SchemaFormatException('missing_field', 'visibility must declare exactly one of: all, any, signal');
+    }
+
+    /** `value` سكالر JSON آمن، أو قائمة مسطّحة من سكالرات (لِـ`in`) — أبداً كائن متداخل. */
+    private function validateVisibilityValue(mixed $value): void
+    {
+        if ($value === null || is_string($value) || is_int($value) || is_float($value) || is_bool($value)) {
+            return;
+        }
+        if (is_array($value) && array_is_list($value)) {
+            if (count($value) > self::MAX_PROPS_COLLECTION_LENGTH) {
+                throw new SchemaFormatException('too_many_nodes', 'visibility.value list too long');
+            }
+            foreach ($value as $item) {
+                if (! (is_string($item) || is_int($item) || is_float($item) || is_bool($item))) {
+                    throw new SchemaFormatException('invalid_type', 'visibility.value list entries must be scalars');
+                }
+            }
+
+            return;
+        }
+        throw new SchemaFormatException('invalid_type', 'visibility.value must be a scalar or a flat list of scalars');
     }
 
     /**

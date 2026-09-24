@@ -24,6 +24,13 @@ namespace App\Services\AppBuilder;
  * تماماً — هوية مورد غير معروفة، مكوّن لا يسمح بالربط بهذا المورد، حقول/
  * معاملات لا يعرضها المورد، أو قدرة تشغيل غير متوفرة بعد (`resourceVersion()`)
  * كلها تُسقِط العقدة بنفس مسار الإسقاط/الإغلاق أعلاه — لا مسار فشل منفصل.
+ *
+ * **`visibility` (`APP-BUILDER-16`, `ADR-01`)**: نفس المعاملة أيضاً — إشارة/
+ * مُشغّل غير معروفين، `value` بشكل لا يوافق المُشغّل، أو قدرة تشغيل غير
+ * متوفرة بعد (`schemaFeatureVersion('visibility')`) تُسقِط العقدة بنفس
+ * المسار. لا محرّك تعابير هنا — مجموعة إشارات/مُشغّلات مغلقة فقط
+ * (`VisibilitySignal`/`VisibilityOperator`)، والعرض/الإخفاء دوماً سلوك واجهة
+ * بحت لا يُغيّر أي تفويض خادم حقيقي.
  */
 final class CompatibilityResolver
 {
@@ -91,7 +98,8 @@ final class CompatibilityResolver
         $action = $node['action'] ?? null;
         $unsupportedHere = $manifest->componentVersion($node['type']) === null
             || ($action !== null && $manifest->actionVersion($action['type']) === null)
-            || (($node['binding'] ?? null) !== null && ! $this->bindingSupported($node['type'], $node['binding'], $manifest));
+            || (($node['binding'] ?? null) !== null && ! $this->bindingSupported($node['type'], $node['binding'], $manifest))
+            || (($node['visibility'] ?? null) !== null && ! $this->visibilitySupported($node['visibility'], $manifest));
         if ($unsupportedHere) {
             return false;
         }
@@ -181,5 +189,48 @@ final class CompatibilityResolver
         }
 
         return $manifest->resourceVersion($resourceId) !== null;
+    }
+
+    /**
+     * `APP-BUILDER-16` (`ADR-01`): القدرة أولاً (`manifest->schemaFeatureVersion('visibility')`
+     * — فارغة دوماً حتى `APP-BUILDER-17`)، ثم صحة الشجرة دلالياً بمعزل عن
+     * إصدار البناء (إشارة/مُشغّل معروفان، وتوافق شكل `value` مع المُشغّل) —
+     * كلاهما يجب أن يمرّا.
+     */
+    private function visibilitySupported(array $visibility, CapabilityManifest $manifest): bool
+    {
+        return $manifest->schemaFeatureVersion('visibility') !== null
+            && $this->visibilityConditionValid($visibility);
+    }
+
+    private function visibilityConditionValid(array $condition): bool
+    {
+        foreach (['all', 'any'] as $combinator) {
+            if (array_key_exists($combinator, $condition)) {
+                foreach ($condition[$combinator] as $branch) {
+                    if (! $this->visibilityConditionValid($branch)) {
+                        return false;
+                    }
+                }
+
+                return true;
+            }
+        }
+
+        $signal = $condition['signal'] ?? null;
+        $operator = $condition['operator'] ?? null;
+        if (! in_array($signal, VisibilitySignal::ALL, true) || ! in_array($operator, VisibilityOperator::ALL, true)) {
+            return false;
+        }
+
+        $hasValue = array_key_exists('value', $condition);
+        if (in_array($operator, VisibilityOperator::NO_VALUE, true)) {
+            return ! $hasValue;
+        }
+        if (in_array($operator, VisibilityOperator::LIST_VALUE, true)) {
+            return $hasValue && is_array($condition['value']) && $condition['value'] !== [];
+        }
+
+        return $hasValue && ! is_array($condition['value']);
     }
 }
