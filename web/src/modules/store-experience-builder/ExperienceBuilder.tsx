@@ -28,6 +28,7 @@ import {
   customizerMessage,
 } from "./messages";
 import {
+  type PreviewChromeTarget,
   StorefrontPreviewCanvas,
   type StorefrontBusinessIdentity,
 } from "./StorefrontPreviewCanvas";
@@ -86,6 +87,8 @@ export function ExperienceBuilder({
   const [builderSidebarCollapsed, setBuilderSidebarCollapsed] = useState(false);
   const [sidebarPreferenceLoaded, setSidebarPreferenceLoaded] = useState(false);
   const [selectedSection, setSelectedSection] = useState<string | null>(null);
+  const [selectedChrome, setSelectedChrome] =
+    useState<PreviewChromeTarget | null>(null);
   const [pendingSectionScroll, setPendingSectionScroll] = useState<
     string | null
   >(null);
@@ -278,11 +281,21 @@ export function ExperienceBuilder({
   // scroll-to-section; preview clicks only update the selection (the section
   // is already in view, so scrolling again would be a pointless jump).
   // `null` clears the selection (e.g. after deleting the selected instance).
+  function handleSelectChrome(target: PreviewChromeTarget) {
+    setSelectedChrome(target);
+    setSelectedSection(null);
+    setPanel(target);
+    if (typeof window !== "undefined" && window.innerWidth < 768) {
+      setMobileSheet("settings");
+    }
+  }
+
   function handleSelectSection(
     id: string | null,
     origin: "sidebar" | "preview",
   ) {
     setSelectedSection(id);
+    setSelectedChrome(null);
     if (id === null) return;
     // Both origins open the section's settings (Click-to-Edit foundation);
     // only sidebar selection needs the preview to scroll to the section,
@@ -351,6 +364,7 @@ export function ExperienceBuilder({
       data-panel={panel}
       data-device={effectiveDevice}
       data-selected-section={selectedSection ?? ""}
+      data-selected-chrome={selectedChrome ?? ""}
       data-builder-navigation-collapsed={builderSidebarCollapsed ? "true" : "false"}
       className="relative flex h-full min-h-0 flex-col bg-background text-text"
     >
@@ -603,6 +617,8 @@ export function ExperienceBuilder({
                   businessIdentity={businessIdentity}
                   selectedSection={selectedSection}
                   onSelectSection={(key) => handleSelectSection(key, "preview")}
+                  selectedChrome={selectedChrome}
+                  onSelectChrome={handleSelectChrome}
                 />
               </div>
             </div>

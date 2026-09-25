@@ -52,6 +52,12 @@ interface StorefrontPreviewCanvasProps {
    */
   selectedSection?: string | null;
   onSelectSection?: (id: string) => void;
+  /**
+   * Click-to-edit for fixed chrome (UX V2 §3.2). Not presentation data.
+   * Header, logo, footer, WhatsApp and social links route to existing panels.
+   */
+  selectedChrome?: PreviewChromeTarget | null;
+  onSelectChrome?: (target: PreviewChromeTarget) => void;
 }
 
 export interface StorefrontBusinessIdentity {
@@ -59,6 +65,13 @@ export interface StorefrontBusinessIdentity {
   cr_number: string | null;
   vat_number: string | null;
 }
+
+export type PreviewChromeTarget =
+  | "header"
+  | "branding"
+  | "footer"
+  | "whatsapp"
+  | "social";
 
 export function StorefrontPreviewCanvas({
   config,
@@ -68,6 +81,8 @@ export function StorefrontPreviewCanvas({
   businessIdentity = { legal_name: null, cr_number: null, vat_number: null },
   selectedSection = null,
   onSelectSection,
+  selectedChrome = null,
+  onSelectChrome,
 }: StorefrontPreviewCanvasProps) {
   const t = (key: CustomizerMessageKey) => customizerMessage(locale, key);
   const storeName = previewStoreName(
@@ -129,7 +144,39 @@ export function StorefrontPreviewCanvas({
     >
       <p className="sr-only">{t("fixtureCatalogHint")}</p>
 
-      <header className="sticky top-0 z-20 bg-store-surface">
+      <header
+        className={cn(
+          "sticky top-0 z-20 bg-store-surface",
+          onSelectChrome && "awj-preview-section",
+          selectedChrome === "header" && "awj-preview-section-selected",
+        )}
+        data-preview-chrome={onSelectChrome ? "header" : undefined}
+        role={onSelectChrome ? "button" : undefined}
+        tabIndex={onSelectChrome ? 0 : undefined}
+        aria-pressed={onSelectChrome ? selectedChrome === "header" : undefined}
+        aria-label={onSelectChrome ? t("header") : undefined}
+        onClick={
+          onSelectChrome
+            ? (event) => {
+                const inner = (event.target as HTMLElement).closest(
+                  "[data-preview-chrome]",
+                );
+                if (inner && inner !== event.currentTarget) return;
+                onSelectChrome("header");
+              }
+            : undefined
+        }
+        onKeyDown={
+          onSelectChrome
+            ? (event) => {
+                if (event.target !== event.currentTarget) return;
+                if (event.key !== "Enter" && event.key !== " ") return;
+                event.preventDefault();
+                onSelectChrome("header");
+              }
+            : undefined
+        }
+      >
         {!compact && (
           <div className="hidden border-b border-store-border bg-store-surface-muted md:block">
             <div className={cn(storeContainerClassName, "flex h-7 items-center justify-end")}>
@@ -154,13 +201,46 @@ export function StorefrontPreviewCanvas({
                 {t("home")}
               </span>
             )}
-            <StoreBrand
-              href="#preview"
-              name={storeName}
-              size="md"
-              logoUrl={logo}
-              className={compact ? "justify-self-center" : undefined}
-            />
+            <span
+              data-preview-chrome={onSelectChrome ? "branding" : undefined}
+              role={onSelectChrome ? "button" : undefined}
+              tabIndex={onSelectChrome ? 0 : undefined}
+              aria-pressed={
+                onSelectChrome ? selectedChrome === "branding" : undefined
+              }
+              aria-label={onSelectChrome ? t("branding") : undefined}
+              onClick={
+                onSelectChrome
+                  ? (event) => {
+                      event.stopPropagation();
+                      onSelectChrome("branding");
+                    }
+                  : undefined
+              }
+              onKeyDown={
+                onSelectChrome
+                  ? (event) => {
+                      if (event.key !== "Enter" && event.key !== " ") return;
+                      event.preventDefault();
+                      event.stopPropagation();
+                      onSelectChrome("branding");
+                    }
+                  : undefined
+              }
+              className={cn(
+                "inline-flex",
+                onSelectChrome && "awj-preview-section",
+                selectedChrome === "branding" && "awj-preview-section-selected",
+                compact && "justify-self-center",
+              )}
+            >
+              <StoreBrand
+                href="#preview"
+                name={storeName}
+                size="md"
+                logoUrl={logo}
+              />
+            </span>
             {config.header.showSearch && !compact && (
               <div className="flex min-h-10 flex-1 items-center gap-2 rounded-store border border-store-border bg-store-surface px-3 text-sm text-store-muted-foreground">
                 <Search className="size-4" aria-hidden />
@@ -373,16 +453,74 @@ export function StorefrontPreviewCanvas({
           })}
       </div>
 
-      <footer className="bg-store-footer text-store-footer-link">
+      <footer
+        className={cn(
+          "bg-store-footer text-store-footer-link",
+          onSelectChrome && "awj-preview-section",
+          selectedChrome === "footer" && "awj-preview-section-selected",
+        )}
+        data-preview-chrome={onSelectChrome ? "footer" : undefined}
+        role={onSelectChrome ? "button" : undefined}
+        tabIndex={onSelectChrome ? 0 : undefined}
+        aria-pressed={onSelectChrome ? selectedChrome === "footer" : undefined}
+        aria-label={onSelectChrome ? t("footer") : undefined}
+        onClick={
+          onSelectChrome
+            ? (event) => {
+                const inner = (event.target as HTMLElement).closest(
+                  "[data-preview-chrome]",
+                );
+                if (inner && inner !== event.currentTarget) return;
+                onSelectChrome("footer");
+              }
+            : undefined
+        }
+        onKeyDown={
+          onSelectChrome
+            ? (event) => {
+                if (event.target !== event.currentTarget) return;
+                if (event.key !== "Enter" && event.key !== " ") return;
+                event.preventDefault();
+                onSelectChrome("footer");
+              }
+            : undefined
+        }
+      >
         <div className={cn(storeContainerClassName, "py-10 md:py-12")}>
           {config.footer.showLogo && (
-            <StoreBrand
-              href="#preview"
-              name={storeName}
-              tone="dark"
-              size="md"
-              logoUrl={logo}
-            />
+            <span
+              data-preview-chrome={onSelectChrome ? "branding" : undefined}
+              role={onSelectChrome ? "button" : undefined}
+              tabIndex={onSelectChrome ? 0 : undefined}
+              aria-label={onSelectChrome ? t("branding") : undefined}
+              onClick={
+                onSelectChrome
+                  ? (event) => {
+                      event.stopPropagation();
+                      onSelectChrome("branding");
+                    }
+                  : undefined
+              }
+              onKeyDown={
+                onSelectChrome
+                  ? (event) => {
+                      if (event.key !== "Enter" && event.key !== " ") return;
+                      event.preventDefault();
+                      event.stopPropagation();
+                      onSelectChrome("branding");
+                    }
+                  : undefined
+              }
+              className="inline-flex"
+            >
+              <StoreBrand
+                href="#preview"
+                name={storeName}
+                tone="dark"
+                size="md"
+                logoUrl={logo}
+              />
+            </span>
           )}
           {config.footer.tagline.trim() ? (
             <p className="mt-3 max-w-lg text-sm text-store-footer-muted">
@@ -400,7 +538,16 @@ export function StorefrontPreviewCanvas({
               <span>{t("account")}</span>
               <span>{t("cart")}</span>
               {footerWhatsapp ? (
-                <a href={footerWhatsapp} className="text-store-footer-link underline-offset-2 hover:underline">
+                <a
+                  href={footerWhatsapp}
+                  data-preview-chrome="whatsapp"
+                  className="text-store-footer-link underline-offset-2 hover:underline"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    onSelectChrome?.("whatsapp");
+                  }}
+                >
                   {t("whatsapp")}
                 </a>
               ) : null}
@@ -440,7 +587,13 @@ export function StorefrontPreviewCanvas({
                     <a
                       key={item.id}
                       href={item.href}
+                      data-preview-chrome="social"
                       className="text-store-footer-link"
+                      onClick={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        onSelectChrome?.("social");
+                      }}
                     >
                       {item.network}
                     </a>
@@ -529,9 +682,18 @@ export function StorefrontPreviewCanvas({
       {whatsappHref && (
         <a
           href={whatsappHref}
+          data-preview-chrome="whatsapp"
           aria-label={t("whatsappAria")}
+          aria-pressed={selectedChrome === "whatsapp" ? true : undefined}
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            onSelectChrome?.("whatsapp");
+          }}
           className={cn(
             "absolute z-30 inline-flex size-12 items-center justify-center rounded-full bg-[#128c7e] text-white",
+            onSelectChrome && "awj-preview-section",
+            selectedChrome === "whatsapp" && "awj-preview-section-selected",
             compact ? "end-3 bottom-16" : "end-4 bottom-4",
           )}
         >
