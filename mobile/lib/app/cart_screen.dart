@@ -4,6 +4,7 @@ import '../actions/actions.dart';
 import '../commerce/commerce.dart';
 import '../registry/registry.dart';
 import '../schema/schema.dart';
+import 'binding_resolution.dart';
 import 'experience_hydration.dart';
 import 'runtime_schema.dart';
 import 'runtime_state.dart';
@@ -11,20 +12,25 @@ import 'runtime_status_views.dart';
 import 'runtime_strings.dart';
 
 /// Cart — the vertical slice's "Cart read/update/remove"
-/// (`AWJ_MOBILE_RUNTIME_PROOF_HORIZON_V1.md` §5).
+/// (`AWJ_MOBILE_RUNTIME_PROOF_HORIZON_V1.md` §5), now resolved through the
+/// real `binding.collect` mechanism (`APP-BUILDER-17` slice 3b).
 ///
-/// Like Home, the static shell comes from `kCartSchemaJson`; the two
-/// dynamic slots (`slot.cart.items`, `slot.cart.summary`) are hydrated from
-/// a live `CommerceClient.getCart()` call. Each cart line is composed from
-/// already-allowlisted MOBILE-RUNTIME-3 component types (`Text`, `Price`,
-/// `Quantity`, `Button`) — there is no dedicated "CartItem" type in the
-/// horizon's MR-04 component list, so a line is a small `Section`
-/// containing them, exactly the composition MR-04's own component set was
-/// designed to support. `Quantity`'s dispatched `updateCartQuantity` here
-/// carries the *real* `cartItemId` a cart line has (unlike the Product
-/// screen's pre-add quantity, which has none yet — see `product_screen.dart`),
-/// so it correctly uses MOBILE-RUNTIME-3's schema-driven `Quantity`
-/// component rather than a screen-owned one.
+/// Like Home, the static shell comes from `kCartSchemaJson`. `CartList`
+/// declares `binding: {resource: "commerce.cart", collect: "items"}` with
+/// one authored composite line template (`Text`/`Price`/`Quantity`/
+/// `Button` — there is no dedicated "CartItem" type in the horizon's MR-04
+/// component list, so a line is a small `Section` containing them, exactly
+/// the composition MR-04's own component set was designed to support);
+/// `resolveNodeBindings` repeats that template once per cart item, resolving
+/// every `$item.*` reference (including `Quantity`/`Button`'s action
+/// params — `cartItemId`/`quantity` — *before* dispatch, so
+/// `updateCartQuantity`/`removeCartItem` always carry the real item's id,
+/// never a hand-typed one). `CartSummary` stays outside the binding
+/// mechanism deliberately: `itemCount`/`summaryLabel` are a locale-formatted
+/// aggregate, not a per-item field, so it is computed here from the same
+/// raw fetch `CartList`'s binding consumes (a single
+/// `CommerceClient.fetchBindingResource('commerce.cart')` call serves both;
+/// no second, typed `getCart()` fetch is needed).
 class CartScreen extends StatefulWidget {
   final CommerceClient client;
   final RuntimeState state;
@@ -46,7 +52,7 @@ class CartScreen extends StatefulWidget {
 class _CartScreenState extends State<CartScreen> {
   SchemaComponent? _basePage;
   String? _incompatibleMessage;
-  CommerceCart? _cart;
+  Map<String, Object?>? _cart;
   String? _errorMessage;
   bool _loading = true;
   int _lastHandledCartVersion = -1;
@@ -88,9 +94,9 @@ class _CartScreenState extends State<CartScreen> {
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
-      final cart = await widget.client.getCart();
+      final raw = await widget.client.fetchBindingResource('commerce.cart');
       setState(() {
-        _cart = cart;
+        _cart = raw is Map ? raw.cast<String, Object?>() : const {};
         _errorMessage = null;
         _loading = false;
       });
@@ -129,71 +135,35 @@ class _CartScreenState extends State<CartScreen> {
       return ErrorRetryView(message: _errorMessage!, onRetry: _load);
     }
 
-    final cart = _cart;
-    final lineNodes = <SchemaComponent>[
-      for (final item in cart?.items ?? const <CommerceCartItem>[])
-        SchemaComponent(
-          type: 'Section',
-          id: 'cart-line-${item.id}',
-          optional: true,
-          props: {'title': item.productName},
-          children: [
-            if (item.variantDescriptor != null)
-              SchemaComponent(
-                type: 'Text',
-                id: 'cart-line-${item.id}-variant',
-                optional: true,
-                props: {'text': item.variantDescriptor!, 'style': 'caption'},
-                children: const [],
-              ),
-            SchemaComponent(
-              type: 'Price',
-              id: 'cart-line-${item.id}-price',
-              optional: true,
-              props: {'amountMinor': item.lineTotal.amountMinor},
-              children: const [],
-            ),
-            SchemaComponent(
-              type: 'Quantity',
-              id: 'cart-line-${item.id}-qty',
-              optional: true,
-              props: {
-                'value': item.quantity,
-                'min': 1,
-                'max': 99,
-                'decreaseLabel': strings.quantityDecrease,
-                'increaseLabel': strings.quantityIncrease,
-              },
-              children: const [],
-              action: ActionRef(
-                type: 'updateCartQuantity',
-                params: {'cartItemId': item.id, 'quantity': item.quantity},
-              ),
-            ),
-            SchemaComponent(
-              type: 'Button',
-              id: 'cart-line-${item.id}-remove',
-              optional: true,
-              props: {'label': strings.removeItem, 'style': 'secondary'},
-              children: const [],
-              action: ActionRef(
-                type: 'removeCartItem',
-                params: {'cartItemId': item.id},
-              ),
-            ),
-          ],
-        ),
-    ];
+    final cart = _cart ?? const <String, Object?>{};
+    final itemCount = (readFieldPath(cart, 'items') as List?)?.length ?? 0;
+    final subtotalAmountMinor = readFieldPath(cart, 'subtotal.amount_minor');
 
     var hydrated = hydrateNode(
       basePage,
       'cart-go-home',
       (node) => withProp(node, 'label', strings.continueShopping),
     );
+    hydrated = resolveNodeBindings(hydrated, {'commerce.cart': cart});
+    // The line template's Quantity/Button controls carry locale-invariant
+    // literal defaults in the bundled schema (never actually shown); every
+    // repeated line shares the same descendant id (see
+    // `binding_resolution.dart`'s own note on why that never collides as a
+    // Flutter key), so one `hydrateNode` pass localizes all of them at once
+    // — the same pattern already used for `home-tagline`/`cart-go-home`.
     hydrated = hydrateNode(
       hydrated,
-      'slot.cart.items',
-      (node) => node.withChildren(lineNodes),
+      'cart-line-template-qty',
+      (node) => withProp(
+        withProp(node, 'decreaseLabel', strings.quantityDecrease),
+        'increaseLabel',
+        strings.quantityIncrease,
+      ),
+    );
+    hydrated = hydrateNode(
+      hydrated,
+      'cart-line-template-remove',
+      (node) => withProp(node, 'label', strings.removeItem),
     );
     hydrated = hydrateNode(
       hydrated,
@@ -205,9 +175,9 @@ class _CartScreenState extends State<CartScreen> {
         action: node.action,
         children: node.children,
         props: {
-          'itemCount': cart?.items.length ?? 0,
-          'subtotalAmountMinor': cart?.subtotal.amountMinor ?? 0,
-          'summaryLabel': strings.itemsCount(cart?.items.length ?? 0),
+          'itemCount': itemCount,
+          'subtotalAmountMinor': subtotalAmountMinor is int ? subtotalAmountMinor : 0,
+          'summaryLabel': strings.itemsCount(itemCount),
         },
       ),
     );

@@ -99,6 +99,23 @@ class _FakeCommerceServer {
       return jsonResponse(201, {'data': _cartJson(), 'meta': successMeta()});
     }
 
+    if (request.method == CommerceHttpMethod.patch &&
+        segments.contains('items')) {
+      final itemId = segments.last;
+      final body = jsonDecode(request.body!) as Map<String, Object?>;
+      final index = _cartItems.indexWhere((item) => item['id'] == itemId);
+      if (index == -1) {
+        return jsonResponse(404, errorEnvelope('not_found', 'no such cart item'));
+      }
+      final quantity = body['quantity'] as int;
+      _cartItems[index] = {
+        ..._cartItems[index],
+        'quantity': quantity,
+        'line_total': money(amountMinor: 5000 * quantity),
+      };
+      return jsonResponse(200, {'data': _cartJson(), 'meta': successMeta()});
+    }
+
     if (request.method == CommerceHttpMethod.delete &&
         segments.contains('items')) {
       final itemId = segments.last;
@@ -170,6 +187,18 @@ void main() {
 
     expect(find.text('تمر'), findsOneWidget);
     expect(find.text('عنصر واحد'), findsOneWidget);
+    expect(find.textContaining('50.00'), findsNWidgets(2)); // line price + summary subtotal
+
+    // Increase the line's quantity -> proves `$item.id` resolves into the
+    // real `updateCartQuantity` dispatch (schema binding action-param
+    // resolution, APP-BUILDER-17 slice 3b) end-to-end: real widget tap ->
+    // real action dispatch -> real PATCH request -> fake server update ->
+    // real re-fetch -> re-render, both the line's own price and the
+    // summary's subtotal reflecting the server's new total.
+    await tester.tap(find.byKey(const ValueKey('quantity-increment')));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('100.00'), findsNWidgets(2));
 
     // Remove the line -> cart empties.
     await tester.tap(find.text('إزالة'));

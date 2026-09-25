@@ -291,7 +291,7 @@ void main() {
   });
 
   group('CompatibilityResolver — binding capability gating (APP-BUILDER-17 slice 2)', () {
-    test('a binding on the current runtime is unsupported since no data resource is consumed yet', () {
+    test('a binding on a runtime that has not shipped this data resource is unsupported', () {
       final json = baseSchemaJson(
         pageOverride: componentNode(
           type: 'Page',
@@ -306,8 +306,12 @@ void main() {
         ),
       );
       final schema = AppSchema.parse(encodeSchema(json));
+      // `.current()` now ships `commerce.products` (APP-BUILDER-17 slice 3b)
+      // — an explicit older-runtime manifest is what actually represents
+      // "no data resource consumed yet" today.
+      final olderManifest = manifestOf(dataResources: const {});
 
-      final result = resolver.resolve(schema, CapabilityManifest.current(RuntimePlatform.ios));
+      final result = resolver.resolve(schema, olderManifest);
 
       expect(result, isA<IncompatibleExperience>());
       expect(
@@ -316,7 +320,7 @@ void main() {
       );
     });
 
-    test('an optional binding unsupported on the current runtime is pruned, not fatal', () {
+    test('an optional binding unsupported on an older runtime is pruned, not fatal', () {
       final json = baseSchemaJson(
         pageOverride: componentNode(
           type: 'Page',
@@ -332,11 +336,34 @@ void main() {
         ),
       );
       final schema = AppSchema.parse(encodeSchema(json));
+      final olderManifest = manifestOf(dataResources: const {});
+
+      final result = resolver.resolve(schema, olderManifest);
+
+      expect(result, isA<RenderableExperience>());
+      expect((result as RenderableExperience).fallbacks, hasLength(1));
+    });
+
+    test('a binding on the current shipped runtime is compatible (APP-BUILDER-17 slice 3b)', () {
+      final json = baseSchemaJson(
+        pageOverride: componentNode(
+          type: 'Page',
+          id: 'home-root',
+          children: [
+            componentNode(
+              type: 'ProductList',
+              id: 'p1',
+              binding: {'resource': 'commerce.products'},
+            ),
+          ],
+        ),
+      );
+      final schema = AppSchema.parse(encodeSchema(json));
 
       final result = resolver.resolve(schema, CapabilityManifest.current(RuntimePlatform.ios));
 
       expect(result, isA<RenderableExperience>());
-      expect((result as RenderableExperience).fallbacks, hasLength(1));
+      expect((result as RenderableExperience).fallbacks, isEmpty);
     });
 
     test('a binding is compatible once the manifest declares the resource supported', () {
@@ -713,15 +740,33 @@ void main() {
     });
   });
 
-  group('CapabilityManifest.current — dataResources/schemaFeatures stay empty (slice 2 guard rail)', () {
-    test('the shipped runtime declares no data resources or schema features yet', () {
-      final manifest = CapabilityManifest.current(RuntimePlatform.ios);
+  group(
+    'CapabilityManifest.current — dataResources/schemaFeatures staged rollout '
+    '(APP-BUILDER-17 slice 3b guard rail)',
+    () {
+      test(
+        'the shipped runtime declares exactly the resources/features its own bundled '
+        'Home/Cart schemas actually use, and nothing more',
+        () {
+          final manifest = CapabilityManifest.current(RuntimePlatform.ios);
 
-      expect(manifest.dataResources, isEmpty);
-      expect(manifest.schemaFeatures, isEmpty);
-    });
-  });
+          // `commerce.products`/`commerce.cart` (Home/Cart bindings) and
+          // `binding.collect` (Cart's collection template) are proven and
+          // declared this slice — see `registry_identifiers.dart`'s own doc
+          // comment for the staged-rollout safety reasoning (PHP's mirror
+          // constant deliberately stays empty; nothing here reaches a
+          // remotely-fetched schema or an older installed client).
+          expect(manifest.dataResources, {'commerce.products': 1, 'commerce.cart': 1});
+          expect(manifest.schemaFeatures, {'binding.collect': 1});
 
+          // `visibility` stays undeclared: no bundled schema uses it yet,
+          // and declaring it without a real use would be capability theatre,
+          // not proof.
+          expect(manifest.schemaFeatures.containsKey('visibility'), isFalse);
+        },
+      );
+    },
+  );
   group('selectRollbackTarget', () {
     test('selects the newest compatible candidate, skipping an incompatible newer one', () {
       final compatibleOld = AppSchema.parse(encodeSchema(baseSchemaJson(schemaVersion: '1.0.0')));
