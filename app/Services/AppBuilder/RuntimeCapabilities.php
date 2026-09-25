@@ -82,6 +82,14 @@ final class RuntimeCapabilities
      * — تُقلَّم إن كانت اختيارية، أو تُفشل الوثيقة كاملة إن كانت إلزامية،
      * تماماً كمكوّن/إجراء/مورد بيانات غير مدعوم.
      *
+     * **`binding.collect`** (`APP-BUILDER-17` slice 3، Decision Gate معتمَد):
+     * مفتاح مستقلّ يفصل «يدعم الربط الأساسي» عن «يدعم تكرار قالب التجميع»
+     * — بناءٌ يُبلِّغ عن `resourceVersion()` بلا هذا المفتاح لا يُعامَل كداعمٍ
+     * لِـ`binding.collect` إطلاقاً (`CompatibilityResolver::bindingSupported()`).
+     * **فارغٌ عمداً حتى الآن أيضاً**: قلب هذا المفتاح والتشغيل الفعلي في
+     * `mobile/` كلاهما يجب أن يشحنا معاً في بناء جوال مُثبَت ومُتحقَّق منه أولاً
+     * — لا قبل ذلك.
+     *
      * @var array<string, int>
      */
     public const SCHEMA_FEATURES = [];

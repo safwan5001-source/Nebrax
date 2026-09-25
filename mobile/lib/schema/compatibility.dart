@@ -1,5 +1,6 @@
 import 'app_schema.dart';
 import 'capability_manifest.dart';
+import 'data_resource_registry.dart';
 import 'visibility_vocabulary.dart';
 
 /// Why a schema was found incompatible with a runtime's capability manifest.
@@ -161,26 +162,39 @@ class CompatibilityResolver {
     return node.withChildren(resolvedChildren);
   }
 
-  /// `APP-BUILDER-17` slice 2 — capability gating only, mirroring
-  /// `CompatibilityResolver::bindingSupported`'s (PHP) *capability* check.
+  /// `APP-BUILDER-17` slice 3 — mirrors `CompatibilityResolver::bindingSupported`
+  /// (PHP) exactly, including the `binding.collect` fail-closed gate
+  /// (Decision Gate, Amendment 1): a `collect` target must resolve to an
+  /// explicitly declared, `list`-typed, readable field on the bound
+  /// resource, AND the manifest must separately declare
+  /// `schemaFeatureVersion('binding.collect')` — a manifest that only
+  /// declares the resource (basic binding) never satisfies a `collect`
+  /// binding, proving old/basic-binding runtimes reject collect-dependent
+  /// schemas.
   ///
-  /// The fuller structural checks that PHP method also does — the resource
-  /// exists in `DataResourceRegistry`, the component's own registry entry
-  /// allows binding to it, `itemProps`/`query` name fields/params the
-  /// resource actually exposes — depend on a real Data Resource Registry +
-  /// Component Registry existing on this runtime. Neither exists in Dart
-  /// yet, and since [CapabilityManifest.dataResources] stays empty until
-  /// slice 3 (see its own doc comment), every one of those structural
-  /// checks would be moot today regardless of their answer: this capability
-  /// gate alone already makes every `binding` node "unsupported," exactly
-  /// matching PHP's net effect while `RuntimeCapabilities.dataResources` is
-  /// empty on both sides. Building the fuller check now would duplicate
-  /// work slice 3 needs to do anyway when it adds those registries to wire
-  /// the real `commerce/v1` consumption they exist to serve — port the
-  /// fuller check here at that point, never flip
-  /// `RuntimeCapabilities.dataResources` non-empty without it.
+  /// The fuller structural checks PHP's method also does — a component's
+  /// own registry entry allowing binding to a given resource, `itemProps`/
+  /// `query` naming fields/params the resource actually exposes — depend on
+  /// a Component Registry existing on this runtime, which does not exist in
+  /// Dart yet. That remains the documented deferral: nothing about it is
+  /// moot anymore now that [DataResourceRegistry] exists, but it is not
+  /// required to satisfy this slice's `collect` fail-closed requirement,
+  /// and inventing it now would duplicate work a future slice needs to do
+  /// anyway when it adds the Component Registry port.
   bool _bindingSupported(SchemaBinding binding, CapabilityManifest manifest) {
-    return manifest.resourceVersion(binding.resource) != null;
+    if (manifest.resourceVersion(binding.resource) == null) return false;
+
+    final collect = binding.collect;
+    if (collect != null) {
+      final collectTopSegment = collect.split('.').first;
+      final resource = DataResourceRegistry.definitions[binding.resource];
+      if (resource == null) return false;
+      if (!resource.readableFieldKeys().contains(collectTopSegment)) return false;
+      if (resource.fieldType(collectTopSegment) != ResourceFieldType.list) return false;
+      if (manifest.schemaFeatureVersion('binding.collect') == null) return false;
+    }
+
+    return true;
   }
 
   /// `APP-BUILDER-17` slice 2 — mirrors `CompatibilityResolver::visibilitySupported`

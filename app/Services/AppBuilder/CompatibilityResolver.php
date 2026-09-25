@@ -188,6 +188,26 @@ final class CompatibilityResolver
             }
         }
 
+        // `APP-BUILDER-17` slice 3 — `collect` فشلٌ مُغلَق مستقلّ عن `resourceVersion()`:
+        // مورد يدعم الربط الأساسي لا يعني ضمناً أنه يدعم تكرار قالب التجميع.
+        // بناءٌ يعلن `resourceVersion($resourceId)` بلا `schemaFeatureVersion('binding.collect')`
+        // (أو العكس) يُعامَل كغير داعمٍ لهذا الربط تحديداً — أضيق آلية إصدار
+        // متوفرة أصلاً (`schemaFeatures`، النمط نفسه المستعمل لـ`visibility`)،
+        // لا نظام قدرات مُوازٍ جديد.
+        $collect = $binding['collect'] ?? null;
+        if ($collect !== null) {
+            $collectTopSegment = explode('.', (string) $collect, 2)[0];
+            if (! in_array($collectTopSegment, $readableFields, true)) {
+                return false;
+            }
+            if ($resource->fieldType($collectTopSegment) !== ResourceFieldType::LIST) {
+                return false;
+            }
+            if ($manifest->schemaFeatureVersion('binding.collect') === null) {
+                return false;
+            }
+        }
+
         return $manifest->resourceVersion($resourceId) !== null;
     }
 

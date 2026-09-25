@@ -533,4 +533,115 @@ class CompatibilityResolverTest extends TestCase
 
         $this->assertFalse($result->compatible);
     }
+
+    /** manifest يعلن كلا الموردين وميزات المخطط معاً — لاختبارات `binding.collect` (`APP-BUILDER-17` slice 3). */
+    private function manifestWithResourcesAndFeatures(array $dataResources, array $schemaFeatures): CapabilityManifest
+    {
+        return new CapabilityManifest(
+            runtimeVersion: SchemaVersion::tryParse('1.0.0'),
+            minSupportedSchemaVersion: SchemaVersion::tryParse('1.0.0'),
+            maxSupportedSchemaVersion: SchemaVersion::tryParse('1.0.0'),
+            components: RuntimeCapabilities::COMPONENTS,
+            actions: RuntimeCapabilities::ACTIONS,
+            nativeCapabilities: RuntimeCapabilities::NATIVE_CAPABILITIES,
+            dataResources: $dataResources,
+            schemaFeatures: $schemaFeatures,
+        );
+    }
+
+    /** @test */
+    public function a_collect_binding_is_unsupported_on_a_manifest_that_only_supports_basic_binding(): void
+    {
+        $schema = $this->baseSchema();
+        $schema['pages']['home']['children'][] = [
+            'type' => 'CartList', 'id' => 'c1',
+            'binding' => ['resource' => 'commerce.cart', 'collect' => 'items'],
+        ];
+
+        // Manifest declares the resource itself supported (basic binding)
+        // but not the separate `binding.collect` schema feature -- the
+        // mandatory fail-closed rule: basic-binding support must never be
+        // assumed to imply collect/template-repeat support.
+        $result = $this->resolver()->resolve(
+            $schema,
+            $this->manifestWithResourcesAndFeatures(['commerce.cart' => 1], []),
+        );
+
+        $this->assertFalse($result->compatible);
+    }
+
+    /** @test */
+    public function a_collect_binding_is_compatible_once_both_the_resource_and_the_collect_feature_are_declared(): void
+    {
+        $schema = $this->baseSchema();
+        $schema['pages']['home']['children'][] = [
+            'type' => 'CartList', 'id' => 'c1',
+            'binding' => ['resource' => 'commerce.cart', 'collect' => 'items'],
+        ];
+
+        $result = $this->resolver()->resolve(
+            $schema,
+            $this->manifestWithResourcesAndFeatures(['commerce.cart' => 1], ['binding.collect' => 1]),
+        );
+
+        $this->assertTrue($result->compatible);
+    }
+
+    /** @test */
+    public function a_collect_target_that_is_not_a_declared_readable_field_is_unsupported(): void
+    {
+        $schema = $this->baseSchema();
+        $schema['pages']['home']['children'][] = [
+            'type' => 'CartList', 'id' => 'c1',
+            'binding' => ['resource' => 'commerce.cart', 'collect' => 'not_a_real_field'],
+        ];
+
+        $result = $this->resolver()->resolve(
+            $schema,
+            $this->manifestWithResourcesAndFeatures(['commerce.cart' => 1], ['binding.collect' => 1]),
+        );
+
+        $this->assertFalse($result->compatible);
+    }
+
+    /** @test */
+    public function a_collect_target_whose_field_is_not_list_typed_is_unsupported(): void
+    {
+        $schema = $this->baseSchema();
+        $schema['pages']['home']['children'][] = [
+            // `subtotal` is a real, readable commerce.cart field -- but it
+            // is MONEY-typed, not LIST-typed, so it can never be a valid
+            // repeat target.
+            'type' => 'CartList', 'id' => 'c1',
+            'binding' => ['resource' => 'commerce.cart', 'collect' => 'subtotal'],
+        ];
+
+        $result = $this->resolver()->resolve(
+            $schema,
+            $this->manifestWithResourcesAndFeatures(['commerce.cart' => 1], ['binding.collect' => 1]),
+        );
+
+        $this->assertFalse($result->compatible);
+    }
+
+    /** @test */
+    public function a_binding_without_collect_is_unaffected_by_the_missing_collect_feature(): void
+    {
+        // Backward compatibility: an ordinary (non-collect) binding must
+        // keep working on a manifest that never declares `binding.collect`
+        // at all -- collect support is additive, never a prerequisite for
+        // the existing binding contract.
+        $schema = $this->baseSchema();
+        $schema['pages']['home']['children'][] = [
+            'type' => 'CartSummary', 'id' => 'c2',
+            'binding' => ['resource' => 'commerce.cart', 'itemProps' => ['subtotalAmountMinor' => 'subtotal.amount_minor']],
+        ];
+
+        $result = $this->resolver()->resolve(
+            $schema,
+            $this->manifestWithResourcesAndFeatures(['commerce.cart' => 1], []),
+        );
+
+        $this->assertTrue($result->compatible);
+    }
 }

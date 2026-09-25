@@ -342,6 +342,99 @@ void main() {
     });
   });
 
+  group('fetchBindingResource (APP-BUILDER-17 slice 3)', () {
+    test('commerce.products maps to GET products and returns the raw data list', () async {
+      final transport = FakeCommerceTransport.always(
+        jsonResponse(200, {
+          'data': [
+            {'id': 'p1', 'name': 'قهوة'},
+          ],
+          'meta': successMeta(),
+        }),
+      );
+      final client = CommerceClient(
+        config: _config(),
+        sessionStore: InMemorySecureSessionStore(),
+        transport: transport,
+      );
+
+      final data = await client.fetchBindingResource('commerce.products');
+
+      expect(data, [
+        {'id': 'p1', 'name': 'قهوة'},
+      ]);
+      final sent = transport.requests.single;
+      expect(sent.uri.toString(), 'https://api.example.com/commerce/v1/products');
+      expect(sent.headers.containsKey('X-Customer-Token'), isFalse);
+    });
+
+    test('commerce.categories maps to GET categories and returns the raw data list', () async {
+      final transport = FakeCommerceTransport.always(
+        jsonResponse(200, {
+          'data': [
+            {'id': 'c1', 'name': 'مشروبات'},
+          ],
+          'meta': successMeta(),
+        }),
+      );
+      final client = CommerceClient(
+        config: _config(),
+        sessionStore: InMemorySecureSessionStore(),
+        transport: transport,
+      );
+
+      await client.fetchBindingResource('commerce.categories');
+
+      expect(
+        transport.requests.single.uri.toString(),
+        'https://api.example.com/commerce/v1/categories',
+      );
+    });
+
+    test('commerce.cart maps to GET cart, sends an optional customer token, and returns the raw data map', () async {
+      final transport = FakeCommerceTransport.always(
+        jsonResponse(200, {
+          'data': {
+            'status': 'active',
+            'items': [
+              {'id': 'i1', 'product_id': 'p1', 'quantity': 2},
+            ],
+          },
+          'meta': successMeta(),
+        }),
+      );
+      final client = CommerceClient(
+        config: _config(),
+        sessionStore: InMemorySecureSessionStore(),
+        transport: transport,
+      );
+
+      final data = await client.fetchBindingResource('commerce.cart');
+
+      expect(data, {
+        'status': 'active',
+        'items': [
+          {'id': 'i1', 'product_id': 'p1', 'quantity': 2},
+        ],
+      });
+      final sent = transport.requests.single;
+      expect(sent.uri.toString(), 'https://api.example.com/commerce/v1/cart');
+    });
+
+    test('an unknown binding resource id throws ArgumentError rather than guessing a route', () async {
+      final client = CommerceClient(
+        config: _config(),
+        sessionStore: InMemorySecureSessionStore(),
+        transport: FakeCommerceTransport.always(jsonResponse(200, {'data': [], 'meta': successMeta()})),
+      );
+
+      expect(
+        () => client.fetchBindingResource('commerce.unknown'),
+        throwsA(isA<ArgumentError>()),
+      );
+    });
+  });
+
   group('cart (write tier, optional customer identity)', () {
     test('a stored cart token is attached to a cart request', () async {
       final sessionStore = InMemorySecureSessionStore();

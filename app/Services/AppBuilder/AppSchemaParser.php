@@ -39,7 +39,7 @@ final class AppSchemaParser
 
     private const ACTION_KEYS = ['type', 'params'];
 
-    private const BINDING_KEYS = ['resource', 'query', 'itemProps'];
+    private const BINDING_KEYS = ['resource', 'query', 'itemProps', 'collect'];
 
     private const CONDITION_LEAF_KEYS = ['signal', 'operator', 'value'];
 
@@ -310,6 +310,13 @@ final class AppSchemaParser
      * صحة أسماء حقوله (ذلك عمل `CompatibilityResolver` وقت النشر، تماماً
      * كتمييز هوية المكوّن/الإجراء أعلاه). القيمة المسموحة الوحيدة: كائن JSON
      * آمن — لا تعبير، لا استعلام SQL، لا رابط HTTP حرّ (`ADR-01`).
+     *
+     * **`collect`** (`APP-BUILDER-17` slice 3): مفتاح اختياري إضافي — مسار
+     * منقوط (نفس اصطلاح `itemProps`) إلى حقل **من نوع `LIST`** على المورد
+     * المحلول تُكرَّر عليه شجرة ابن العقدة الوحيد قالباً واحداً لكل عنصر. تحقّق
+     * بنيوي فقط هنا (نص غير فارغ) — صحة الحقل واسمه ونوعه ضد
+     * `DataResourceRegistry`، ووجود ابن واحد بالضبط، من عمل `CompatibilityResolver`
+     * وقت النشر، تماماً كبقية مفاتيح `binding`.
      */
     private function validateBinding(array $json): void
     {
@@ -338,6 +345,11 @@ final class AppSchemaParser
                     throw new SchemaFormatException('invalid_type', 'binding.itemProps entries must be non-empty string:string');
                 }
             }
+        }
+
+        $collect = $json['collect'] ?? null;
+        if ($collect !== null && (! is_string($collect) || $collect === '')) {
+            throw new SchemaFormatException('invalid_type', 'binding.collect must be a non-empty string');
         }
     }
 

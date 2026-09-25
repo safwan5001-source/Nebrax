@@ -363,6 +363,145 @@ void main() {
     });
   });
 
+  group('CompatibilityResolver — binding.collect capability gating (APP-BUILDER-17 slice 3)', () {
+    test(
+      'a collect binding is unsupported on a manifest that only supports basic binding',
+      () {
+        final json = baseSchemaJson(
+          pageOverride: componentNode(
+            type: 'Page',
+            id: 'home-root',
+            children: [
+              componentNode(
+                type: 'CartList',
+                id: 'lines',
+                binding: {'resource': 'commerce.cart', 'collect': 'items'},
+                children: [componentNode(type: 'Section', id: 'line-template')],
+              ),
+            ],
+          ),
+        );
+        final schema = AppSchema.parse(encodeSchema(json));
+        final manifest = manifestOf(dataResources: {'commerce.cart': 1});
+
+        final result = resolver.resolve(schema, manifest);
+
+        expect(result, isA<IncompatibleExperience>());
+        expect(
+          (result as IncompatibleExperience).reason,
+          IncompatibilityReason.missingRequiredCapability,
+        );
+      },
+    );
+
+    test(
+      'a collect binding is compatible once both the resource and the collect feature are declared',
+      () {
+        final json = baseSchemaJson(
+          pageOverride: componentNode(
+            type: 'Page',
+            id: 'home-root',
+            children: [
+              componentNode(
+                type: 'CartList',
+                id: 'lines',
+                binding: {'resource': 'commerce.cart', 'collect': 'items'},
+                children: [componentNode(type: 'Section', id: 'line-template')],
+              ),
+            ],
+          ),
+        );
+        final schema = AppSchema.parse(encodeSchema(json));
+        final manifest = manifestOf(
+          dataResources: {'commerce.cart': 1},
+          schemaFeatures: {'binding.collect': 1},
+        );
+
+        final result = resolver.resolve(schema, manifest);
+
+        expect(result, isA<RenderableExperience>());
+        expect((result as RenderableExperience).fallbacks, isEmpty);
+      },
+    );
+
+    test('a collect target that is not a declared readable field is unsupported', () {
+      final json = baseSchemaJson(
+        pageOverride: componentNode(
+          type: 'Page',
+          id: 'home-root',
+          children: [
+            componentNode(
+              type: 'CartList',
+              id: 'lines',
+              binding: {'resource': 'commerce.cart', 'collect': 'not_a_real_field'},
+              children: [componentNode(type: 'Section', id: 'line-template')],
+            ),
+          ],
+        ),
+      );
+      final schema = AppSchema.parse(encodeSchema(json));
+      final manifest = manifestOf(
+        dataResources: {'commerce.cart': 1},
+        schemaFeatures: {'binding.collect': 1},
+      );
+
+      expect(resolver.resolve(schema, manifest), isA<IncompatibleExperience>());
+    });
+
+    test('a collect target whose field is not list-typed is unsupported', () {
+      final json = baseSchemaJson(
+        pageOverride: componentNode(
+          type: 'Page',
+          id: 'home-root',
+          children: [
+            componentNode(
+              type: 'CartList',
+              id: 'lines',
+              binding: {'resource': 'commerce.cart', 'collect': 'subtotal'},
+              children: [componentNode(type: 'Section', id: 'line-template')],
+            ),
+          ],
+        ),
+      );
+      final schema = AppSchema.parse(encodeSchema(json));
+      final manifest = manifestOf(
+        dataResources: {'commerce.cart': 1},
+        schemaFeatures: {'binding.collect': 1},
+      );
+
+      expect(resolver.resolve(schema, manifest), isA<IncompatibleExperience>());
+    });
+
+    test(
+      'a binding without collect is unaffected by the missing collect feature (backward compatibility)',
+      () {
+        final json = baseSchemaJson(
+          pageOverride: componentNode(
+            type: 'Page',
+            id: 'home-root',
+            children: [
+              componentNode(
+                type: 'ProductList',
+                id: 'featured',
+                binding: {
+                  'resource': 'commerce.products',
+                  'itemProps': {'title': 'name'},
+                },
+              ),
+            ],
+          ),
+        );
+        final schema = AppSchema.parse(encodeSchema(json));
+        final manifest = manifestOf(dataResources: {'commerce.products': 1});
+
+        final result = resolver.resolve(schema, manifest);
+
+        expect(result, isA<RenderableExperience>());
+        expect((result as RenderableExperience).fallbacks, isEmpty);
+      },
+    );
+  });
+
   group('CompatibilityResolver — visibility capability gating (APP-BUILDER-17 slice 2)', () {
     test('a visibility leaf on the current runtime is unsupported since no schema feature is consumed yet', () {
       final json = baseSchemaJson(

@@ -51,6 +51,23 @@ final class ResourceDefinition
         return array_map(fn (ResourceFieldDefinition $field) => $field->key, $this->fields);
     }
 
+    /**
+     * نوع حقل معلَن بمفتاحه المباشر (`ResourceFieldType::*`)، أو `null` إن لم
+     * يكن هذا الحقل معلَناً إطلاقاً — يستعمله `CompatibilityResolver::bindingSupported()`
+     * للتحقّق من أن هدف `binding.collect` هو تحديداً حقل `LIST` (`APP-BUILDER-17`
+     * slice 3)، لا أي حقل قابل للقراءة عشوائياً.
+     */
+    public function fieldType(string $key): ?string
+    {
+        foreach ($this->fields as $field) {
+            if ($field->key === $key) {
+                return $field->type;
+            }
+        }
+
+        return null;
+    }
+
     /** @return array<int, string> مفاتيح الترشيح المسموحة في `binding.query`. */
     public function filterKeys(): array
     {
