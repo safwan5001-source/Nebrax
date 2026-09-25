@@ -76,9 +76,13 @@ describe("StorefrontLayout", () => {
 
     expect(header.type).toBe(Header);
     expect(main.type).toBe("main");
-    expect(main.props.children.type).toBe(PublishedCardStyleProvider);
-    expect(main.props.children.props.productCard).toBe("standard");
-    expect(main.props.children.props.children).toBe(content);
+    const cardStyle = main.props.children as ReactElement<{
+      productCard: string;
+      children: ReactNode;
+    }>;
+    expect(cardStyle.type).toBe(PublishedCardStyleProvider);
+    expect(cardStyle.props.productCard).toBe("standard");
+    expect(cardStyle.props.children).toBe(content);
     expect(footer.type).toBe(Footer);
 
     const mobileNavigation = header.props.mobileNavigation;
