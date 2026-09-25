@@ -2,15 +2,26 @@
 
 > This file is a durable resume point, not a substitute for Git/GitHub evidence.
 
-LAST_UPDATED: 2026-09-25 (**AWJ Storefront Visual Completion Horizon implementation-ready queue is done.** #1015 `ec2aad3cacc988417971489d46c9125da838c8d8`, #1016 `2e1225f39e553103ef628e25438461d4cd7d2abe`, #1017 `6b8869e8694c3b897eed4f75bbf1af07b708f1e4`, #1020 `395b163c0bc2f22e6086e3e4f5422fa612c7a2a3`, #1021 `58567bb0ce3b8ccb62dae2668aafa56cf4ccf64d`. PRE_MERGE_REVIEW and POST_MERGE_REVIEW passed on each exact SHA. No deploy. Remaining items are BACKEND_GATED, PRODUCT_DECISION_REQUIRED, or DEFERRED. Do not start them without a Decision Packet.)
+LAST_UPDATED: 2026-09-26 (**AWJ Store Customizer Capability Completion Horizon is closed for implementation-ready work.** #1029 merge `ebd799c0dd449935be97c7cfbf7d2db3baca8c9b`, reviewed head `dbe88f4775f6bde49f85907e589d9aa8c1316afb`. PRE_MERGE_REVIEW and POST_MERGE_REVIEW passed. No deploy. Offers stay PRODUCT_DECISION_REQUIRED. Browser visual QA was not captured. Do not start another horizon.)
 
 ## Previous snapshot
 
 LAST_UPDATED: 2026-09-24 (**AWJ App Builder Horizon V1 is CLOSED.** All 12 tasks resolved: APP-BUILDER-1/2/3/4/5/6/8/9/10/11/12 done, APP-BUILDER-7 explicitly deferred as a genuine Decision Escalation Gate. APP-BUILDER-7 (Data/Actions/Conditions/Visibility) evaluated for implementation and found NOT READY: three of its four named concepts (Data, Conditions, Visibility) have no backing in the accepted, tested App Schema contract, and building them requires inventing an expression/condition engine or a Data Source Registry contract, both explicitly "not yet locked" in the accepted architecture doc. Owner decision (2026-09-24): keep APP-BUILDER-7 explicitly deferred (decision_required, not completed, not permanently skipped) — table updated, APP-BUILDER-8/9/10 completed in sequence after narrow dependency checks each found no real runtime/schema dependency on APP-BUILDER-7 (PR #983, #985, #988). APP-BUILDER-11's original "bind real Commerce resource / proven Flutter runtime consumes" line was found genuinely unsatisfiable inside the accepted contract (the identical undecided Data Source Registry boundary as APP-BUILDER-7) and escalated; owner decision (2026-09-24, option 2): redefined as an Integrated Proof of the currently accepted and actually implemented App Builder contract, completed (PR #990) with the real-Commerce-binding/live-runtime portion carried forward as a deferred/decision_required follow-up track alongside APP-BUILDER-7. APP-BUILDER-12 (Horizon closure, PR #991) produced the horizon's final closure report distinguishing completed capabilities from this one connected deferred architecture track, plus known limitations, out-of-scope boundary, and next-horizon recommendation. Per the horizon bootstrap's own "Horizon End" rule, this session now STOPS — no automatic continuation to Preview & Testing or any new horizon without explicit owner/ChatGPT-reviewed authorization. Prior AWJ Mobile Runtime Proof Horizon V1 (below) is fully closed and was this horizon's accepted input.)
 LAYER_VERSION: V1
-STATUS: OPEN — AWJ Storefront Visual Completion Horizon (`docs/plans/store/AWJ_STOREFRONT_VISUAL_COMPLETION_HORIZON.md`). App Builder Horizon V1 below remains CLOSED.
+STATUS: CLOSED — AWJ Store Customizer Capability Completion (`docs/plans/store/AWJ_STORE_CUSTOMIZER_CAPABILITY_COMPLETION_CLOSURE_REPORT.md`). Offers remain an open Decision Packet. Do not start another horizon. The storefront visual horizon below is prior history.
 
 ## Current objective
+
+Store Customizer capability completion is merged. Banner, benefits, structured custom content, featured product ids, and app promo (from real app URLs) edit, save, preview, and publish. Offers stay gated on the promotions decision packet. Branding object storage, undo/version history, Market, and Floral were not started. No deploy. Stop.
+
+## AWJ Store Customizer Capability Completion — execution log
+
+- Evidence pass and offers decision packet are in `docs/plans/store/`.
+- PR [#1029](https://github.com/safwan5001-source/Nebrax/pull/1029) squash-merged as `ebd799c0dd449935be97c7cfbf7d2db3baca8c9b` (parent `222fb9bfc77af79ea14b66b54ab680b2eaecabc1`). Reviewed head `dbe88f4775f6bde49f85907e589d9aa8c1316afb`. Path diff of the customizer files against that head was empty.
+- `PRE_MERGE_REVIEW: PASS` and `POST_MERGE_REVIEW: PASS` are on the PR. Post-merge CI on the merge SHA was green: PHP sqlite + pgsql ([36197971569](https://github.com/safwan5001-source/Nebrax/actions/runs/36197971569)), storefront ([36197972243](https://github.com/safwan5001-source/Nebrax/actions/runs/36197972243)), web build ([36197971673](https://github.com/safwan5001-source/Nebrax/actions/runs/36197971673)).
+- Closure: `docs/plans/store/AWJ_STORE_CUSTOMIZER_CAPABILITY_COMPLETION_CLOSURE_REPORT.md`.
+
+## Previous objective
 
 AWJ Storefront Visual Completion Horizon implementation-ready work is merged: evidence, homepage deletion fidelity, customizer chrome, designed `not-found`, and published `density`/`productCard` padding. No further dependency-ready task remains inside this horizon. Per-instance section content, branding object storage, undo/version history, Market, and Floral stay behind a Decision Gate or explicit deferral. No deploy. The App Builder horizon below is closed history.
 
