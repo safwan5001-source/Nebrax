@@ -54,14 +54,16 @@ class InMemoryExperienceCache implements ExperienceCache {
 class FileExperienceCache implements ExperienceCache {
   static const _fileName = 'awj_last_known_good_experience.json';
 
-  final Future<Directory> Function() _directory;
+  /// Resolves the writable directory this cache's file lives in — a plain
+  /// public field (not a private one behind a differently-named parameter)
+  /// so a test can inject a temp directory, mirroring
+  /// `FlutterSecureSessionStore.storage`'s exact same pattern.
+  final Future<Directory> Function() directory;
 
-  const FileExperienceCache({
-    Future<Directory> Function() directory = getApplicationSupportDirectory,
-  }) : _directory = directory;
+  const FileExperienceCache({this.directory = getApplicationSupportDirectory});
 
   Future<File> _file() async {
-    final dir = await _directory();
+    final dir = await directory();
     return File('${dir.path}/$_fileName');
   }
 
