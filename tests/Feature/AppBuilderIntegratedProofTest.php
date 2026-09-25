@@ -264,21 +264,17 @@ class AppBuilderIntegratedProofTest extends TestCase
     }
 
     /**
-     * الحدّ المعماري، مُحدَّثٌ مرتين بعد `ADR-01` (Commerce Data & Dynamic
-     * Runtime V1): هذا الإثبات الرأسي المتكامل — رغم شموله كل خطوة حقيقية من
-     * الإنشاء حتى الاسترجاع وإعادة النشر — **لا يعبر بعد** إلى ربط بيانات
-     * حيّ فعلياً على أي تشغيل مُثبَت. `APP-BUILDER-13` أقفل نطاق
-     * `DataResourceRegistry` V1؛ `APP-BUILDER-14` أضاف مفتاح `binding`
-     * الاختياري الحقيقي إلى `AppSchemaParser`/`CompatibilityResolver` —
-     * يُقبَل بنيوياً الآن على مكوّن قابل للربط (`ProductList` وغيره)، لكن
-     * النشر يبقى مرفوضاً لأن `RuntimeCapabilities::DATA_RESOURCES` فارغٌ
-     * عمداً حتى `APP-BUILDER-17` يُنجز استهلاكاً حقيقياً في Flutter Runtime.
-     * مفتاح `bindings` (بالجمع، خطأ إملائي) يبقى مرفوضاً بنيوياً دوماً —
-     * فقط `binding` (بالإفراد) هو المفتاح الحقيقي.
+     * الحدّ المعماري، مُحدَّثٌ بعد `ADR-01` (Commerce Data & Dynamic Runtime V1)
+     * وتفعيل الخادم الفعلي (`APP-BUILDER-17` slice 3c، بعد إثبات تشغيل الجوال
+     * الحقيقي وشحنه — PR #1006): هذا الإثبات الرأسي المتكامل **يعبر الآن**
+     * فعلياً إلى نشرٍ حقيقي لربط بيانات حيّ — `commerce.products`، تماماً كما
+     * يستهلكه بناء الجوال المُثبَت فعلياً. مفتاح `bindings` (بالجمع، خطأ
+     * إملائي) يبقى مرفوضاً بنيوياً دوماً — فقط `binding` (بالإفراد) هو
+     * المفتاح الحقيقي.
      *
      * @test
      */
-    public function integrated_proof_accepts_binding_structurally_but_still_rejects_it_at_publish(): void
+    public function integrated_proof_accepts_binding_structurally_and_now_publishes_a_shipped_resource_binding(): void
     {
         $auth = $this->registerTenant('appb11-boundary', 'owner@appb11-boundary.test');
         $appId = $this->withToken($auth['token'])->postJson('/api/app-builder/apps', [
@@ -295,7 +291,8 @@ class AppBuilderIntegratedProofTest extends TestCase
             ->assertStatus(422);
 
         // مفتاح `binding` (بالإفراد) الصحيح على مكوّن قابل للربط (`ProductList`)
-        // يُقبَل بنيوياً الآن (`APP-BUILDER-14`) — الحفظ (Draft) ينجح.
+        // بمورد يستهلكه بناء الجوال المُثبَت فعلياً (`commerce.products`) —
+        // الحفظ (Draft)، الفحص (Validate)، والنشر الفعلي كلها تنجح الآن.
         $boundSchema = \App\Models\BuilderDraftExperience::minimalSafeSchema();
         $boundSchema['pages']['home']['children'] = [
             ['type' => 'ProductList', 'id' => 'bound-list', 'binding' => [
@@ -306,23 +303,27 @@ class AppBuilderIntegratedProofTest extends TestCase
         $this->withToken($auth['token'])
             ->putJson("/api/app-builder/apps/{$appId}/draft", ['schema' => $boundSchema])
             ->assertOk();
-
-        // لكن الفحص (Validate) يرفض النشر — لا Flutter Runtime مُثبَت يستهلك
-        // أي مورد بيانات بعد (`BuilderPublishedExperienceVersionService::validate()`
-        // يُحوِّل `RuntimeException` إلى 422 عبر `ApiController::domain()`).
         $this->withToken($auth['token'])
             ->postJson("/api/app-builder/apps/{$appId}/validate")
-            ->assertStatus(422);
+            ->assertOk()->assertJsonPath('data.valid', true);
+        $this->withToken($auth['token'])
+            ->postJson("/api/app-builder/apps/{$appId}/versions", [])
+            ->assertCreated()
+            ->assertJsonPath('data.schema.pages.home.children.0.binding.resource', 'commerce.products');
 
-        // ADR-01 (APP-BUILDER-13): السجلّ يحمل الآن نطاق V1 المُقفَل صراحةً —
-        // لم يعد فارغاً عمداً، بل مُعبَّأً عمداً بثلاثة موارد فقط.
+        // ADR-01 (APP-BUILDER-13): السجلّ يحمل نطاق V1 المُقفَل صراحةً —
+        // ثلاثة موارد معروفة بنيوياً للخادم.
         $this->assertSame(
             ['commerce.categories', 'commerce.products', 'commerce.cart'],
             array_keys(DataResourceRegistry::RESOURCES),
         );
 
-        // ADR-01 (APP-BUILDER-14): لا مورد بيانات واحد يستهلكه التشغيل
-        // المُثبَت فعلياً بعد — ذلك حصراً APP-BUILDER-17.
-        $this->assertSame([], RuntimeCapabilities::DATA_RESOURCES);
+        // ADR-01 (APP-BUILDER-17 slice 3c): التشغيل المُثبَت فعلياً يستهلك
+        // فقط ما أثبته — `commerce.products`/`commerce.cart` — لا
+        // `commerce.categories`، رغم معرفة السجلّ به بنيوياً.
+        $this->assertSame(
+            ['commerce.products' => 1, 'commerce.cart' => 1],
+            RuntimeCapabilities::DATA_RESOURCES,
+        );
     }
 }

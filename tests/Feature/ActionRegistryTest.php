@@ -33,13 +33,31 @@ class ActionRegistryTest extends TestCase
         }
     }
 
-    public function test_no_action_has_a_proven_business_effect_yet(): void
+    /**
+     * `APP-BUILDER-18`: بعد PR #1006 (الربط الحقيقي على `commerce.products`/
+     * `commerce.cart` في `mobile/`)، ثلاثة إجراءات فقط أصبحت مُثبَتة الوصول
+     * عبر مسارٍ مخطط **مربوط** (`$item.*` من بيانات حيّة) — الثلاثة الأخرى
+     * تبقى `DISPATCH_PROVEN_NOOP` لأسباب مختلفة موثَّقة عند كل واحد في
+     * `ActionRegistry` (غير قابلة للربط أصلاً، أو مُستهلَكة من شجرة Dart
+     * مملوكة للشاشة لا من مخطط مُحلَّل).
+     */
+    public function test_dispatch_status_matches_which_actions_are_reachable_through_a_bound_schema_path(): void
     {
-        foreach (ActionRegistry::definitions() as $type => $definition) {
+        $definitions = ActionRegistry::definitions();
+
+        foreach (['openProduct', 'updateCartQuantity', 'removeCartItem'] as $type) {
+            $this->assertSame(
+                ActionDefinition::DISPATCH_LIVE,
+                $definitions[$type]->dispatchStatus,
+                "{$type}: مُثبَتٌ الآن عبر مسار مخطط مربوط حقيقي (APP-BUILDER-18)."
+            );
+        }
+
+        foreach (['navigate', 'addToCart', 'refresh'] as $type) {
             $this->assertSame(
                 ActionDefinition::DISPATCH_PROVEN_NOOP,
-                $definition->dispatchStatus,
-                "{$type}: NoopActionHandler هو المُنفِّذ الوحيد المُثبَت اليوم — لا إجراء له أثر تجاري فعلي."
+                $definitions[$type]->dispatchStatus,
+                "{$type}: غير قابل للربط، أو غير مُستهلَك من مخطط مُحلَّل، بعد."
             );
         }
     }
