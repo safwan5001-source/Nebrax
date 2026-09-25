@@ -66,32 +66,65 @@ class RuntimeCapabilities {
 
   /// Data-resource identity space this runtime build actually consumes via a
   /// real `binding` resolution (`APP-BUILDER-13`/`17`, `ADR-01`) — mirrors
-  /// `RuntimeCapabilities::DATA_RESOURCES` (PHP) literally.
+  /// `RuntimeCapabilities::DATA_RESOURCES` (PHP) in *identifier space* (same
+  /// resource ids), not necessarily in *value* — see the staged-rollout note
+  /// below, which this deliberately departs from the "flip both sides in the
+  /// same task" default.
   ///
-  /// **Empty by design, still.** No component here maps `binding.resource`
-  /// to a real `commerce/v1` fetch yet — that is `APP-BUILDER-17` slice 3.
-  /// Until then, `CompatibilityResolver` treats every `binding` node as an
-  /// unsupported capability, exactly like an unknown component/action: an
-  /// optional one is pruned, a required one fails the whole document
-  /// closed. Flipping this non-empty here without the PHP-side
-  /// `RuntimeCapabilities::DATA_RESOURCES` flip landing in the *same*
-  /// server-side release (slice 3's own gate) would let an
-  /// already-published binding "work" on a build that never proved it can
-  /// actually resolve one.
-  static const Map<String, int> dataResources = {};
+  /// **APP-BUILDER-17 slice 3b**: this build's own bundled Home/Cart
+  /// schemas (`kHomeSchemaJson`/`kCartSchemaJson`) now declare real
+  /// `binding`/`binding.collect` nodes, and `HomeScreen`/`CartScreen` now
+  /// resolve them through the real `resolveNodeBindings` pipeline against a
+  /// real `CommerceClient.fetchBindingResource()` call — this is what these
+  /// two identifiers being non-empty proves *this build* can do.
+  ///
+  /// **`RuntimeCapabilities::DATA_RESOURCES` (PHP) deliberately stays empty**
+  /// — this is a staged, owner-directed proof sequence
+  /// (`docs/autonomous-engineering/CURRENT-STATE.md`'s slice 3b entry), not
+  /// the flip described in the older comment this replaces. Safety
+  /// reasoning, evidence-checked before this change:
+  /// - PHP's constant governs what the *server* will let a tenant's
+  ///   App-Builder-published Experience require. It staying empty means the
+  ///   server still refuses to publish anything requiring `binding`/
+  ///   `binding.collect` — no tenant, on any client version, can be served a
+  ///   schema this capability space would need to render, regardless of
+  ///   what any single mobile build declares.
+  /// - No live fetch of a published Experience is wired into this build's
+  ///   boot path yet (`resolveRealStartup()` — `APP-BUILDER-19` — is built
+  ///   and tested but not called from `AwjRuntimeShell`/`HomeScreen`/
+  ///   `CartScreen`). The only schema this build ever resolves is its own
+  ///   bundled `kHomeSchemaJson`/`kCartSchemaJson` — the same artifact, same
+  ///   commit, same release as this very manifest. There is no cross-version
+  ///   remote-schema risk to this specific flip.
+  /// - An older, already-installed build's own compiled-in `dataResources`
+  ///   is fixed at *its* build time — a newer build declaring more here
+  ///   cannot retroactively change what an older install accepts. This is
+  ///   the same per-build capability divergence already established and
+  ///   tested for `nativeCapabilities['push.notifications']` (MR-15:
+  ///   "iOS/Android push rollout can diverge").
+  /// - The full, original "flip both sides together" condition — a shipped,
+  ///   verified mobile release *and* the live publish/fetch loop actually
+  ///   wired in — remains the gate for the PHP-side flip and for
+  ///   `APP-BUILDER-18`/`20`'s own promotion. This Dart-only step exists
+  ///   specifically to *produce* that evidence, not to bypass it.
+  static const Map<String, int> dataResources = {'commerce.products': 1, 'commerce.cart': 1};
 
   /// Schema-feature identity space (not a component, action, or native
   /// capability) this runtime build actually evaluates —
   /// `APP-BUILDER-16`/`17`, `ADR-01`. Mirrors
-  /// `RuntimeCapabilities::SCHEMA_FEATURES` (PHP) literally.
+  /// `RuntimeCapabilities::SCHEMA_FEATURES` (PHP) in identifier space only —
+  /// see [dataResources]'s doc comment for the full staged-rollout reasoning
+  /// this shares exactly.
   ///
-  /// **Empty by design, still**, for the exact same reason as
-  /// [dataResources]: no component here evaluates a `visibility` condition
-  /// tree into an actual show/hide decision yet (`APP-BUILDER-16` only
-  /// added the schema contract). Until `APP-BUILDER-17` slice 3 wires real
-  /// evaluation and this map gains `'visibility': 1` on both sides at once,
-  /// every `visibility` node is treated as an unsupported capability by
-  /// `CompatibilityResolver` — pruned if optional, fails the document
-  /// closed if required.
-  static const Map<String, int> schemaFeatures = {};
+  /// **`'binding.collect'` is now proven and declared** — `CartList`'s
+  /// bundled binding uses it and `CompatibilityResolver`/
+  /// `resolveNodeBindings` resolve it for real (`APP-BUILDER-17` slice 3b).
+  /// **`'visibility'` stays absent, deliberately**: neither bundled schema
+  /// declares a `visibility` node (nothing to prove yet), and adding one
+  /// merely to exercise the capability would be inventing a use case ahead
+  /// of a real one — the same restraint already recorded when
+  /// `evaluateVisibility`/`pruneInvisible` were built in slice 3. PHP's
+  /// `RuntimeCapabilities::SCHEMA_FEATURES` stays empty for both keys, for
+  /// the identical reasons documented on [dataResources].
+  static const Map<String, int> schemaFeatures = {'binding.collect': 1};
 }
