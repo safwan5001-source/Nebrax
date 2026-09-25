@@ -27,6 +27,11 @@
     "amountDue": "Fälliger Betrag",
     "notAvailable": "Nicht verfügbar"
   },
+  "notFound": {
+    "title": "Seite nicht gefunden",
+    "description": "Diese Seite gehört nicht zum Shop. Katalog und Warenkorb bleiben unverändert.",
+    "home": "Zurück zum Shop"
+  },
   "header": {
     "categories": "Kategorien",
     "openCart": "Warenkorb öffnen",

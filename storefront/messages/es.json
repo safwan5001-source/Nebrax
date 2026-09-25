@@ -27,6 +27,11 @@
     "amountDue": "Importe pendiente",
     "notAvailable": "No disponible"
   },
+  "notFound": {
+    "title": "Página no encontrada",
+    "description": "Esta página no forma parte de la tienda. El catálogo y el carrito no han cambiado.",
+    "home": "Volver a la tienda"
+  },
   "header": {
     "categories": "Categorias",
     "openCart": "Abrir carrito",

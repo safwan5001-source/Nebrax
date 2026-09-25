@@ -1,7 +1,8 @@
 # AWJ Storefront Visual Completion Horizon
 
-**Status:** Evidence recorded. Two implementation PRs opened from `main` and left unmerged. Horizon is not closed.  
-**Base SHA:** `fdfa0b34f5197c17f2da45b3bfad7a30bd124ed4`  
+**Status:** Open. Evidence and the two fidelity fixes are merged. Designed 404 is in progress. Public density/product-card parity is not started.  
+**Base SHA at evidence:** `fdfa0b34f5197c17f2da45b3bfad7a30bd124ed4`  
+**Main after the fidelity merges:** `ec2aad3cacc988417971489d46c9125da838c8d8`  
 **Evidence:** `docs/plans/store/AWJ_STOREFRONT_VISUAL_COMPLETION_EVIDENCE_PASS.md`
 
 ## Objective
@@ -19,7 +20,7 @@ The question this horizon answers:
 - Payment, tax, coupon, wishlist, address-book, order-history, review, or shipping-authority changes.
 - Branding object storage, undo/redo, version history, drag-and-drop, or per-instance content fields.
 - Production deploy or release.
-- Merge. This invocation requires Safwan’s explicit approval before every merge. Standing merge authority in the protocol does not override that.
+- Production deploy or release.
 
 ## Invariants
 
@@ -37,22 +38,22 @@ The question this horizon answers:
 1. Evidence matrix exists. **Done** (this horizon’s evidence pass).
 2. Every core buyer route has a classification. **Done in the matrix.** Populated PDP/checkout were not browser-rendered; that limit is written down, not treated as a pass.
 3. Desktop/mobile and RTL/LTR verified at 390, 430, 768, 1024, 1280, 1440 where the environment could render. **Partial.** See the evidence pass. English customizer harness was not available.
-4. Customizer preview vs public runtime checked. **Gap found and patched, not merged.**
-5. Every IMPLEMENTATION_READY defect closed or explicitly left. **Two patched in PRs. Designed 404 and public density/product-card remain open.**
+4. Customizer preview vs public runtime checked. **Gap patched and merged in #1016 and #1017.**
+5. Every IMPLEMENTATION_READY defect closed or explicitly left. **Homepage deletion and chrome click-to-edit are merged. Designed 404 is the current task. Public density/product-card remains open.**
 6. No unsupported backend feature activated. **Held.**
 7. Remaining gaps classified. **Done.**
-8. Tests and CI green on each final PR head. **Local tests recorded per PR. GitHub CI must be observed on the final head before any merge review.**
-9. No open P1/P2 inside the patches. **Self-review recorded on the PRs. Not a merge.**
-10. Closure report. **Written when the PRs exist. The horizon stays open because 5 and 8 are not finished and merge is forbidden.**
+8. Tests and CI green on each final PR head. **Green on #1015, #1016, and #1017, including post-merge CI on the merge SHAs. Repeat for each later head.**
+9. No open P1/P2 inside the patches. **None left open on the merged heads.**
+10. Closure report. **Updated. The horizon stays open until the 404 and density/product-card tasks are finished.**
 
 ## Task queue
 
 | Order | ID | Depends on merge? | Outcome | State |
 |---|---|---|---|---|
-| 0 | Evidence + this horizon | No | Durable matrix and queue | This docs change |
-| 1 | STORE-VISUAL-CLOSE-1 | No | Public v2 homepage deletion is not resurrected | PR from `main`. Do not merge |
-| 2 | STORE-CUSTOMIZER-CLOSE-1 | No | Header/logo/footer/WhatsApp/social click-to-edit. Honest logo and display-name hints. Preview links do not leave the editor | PR from `main`. Do not merge |
-| 3 | STORE-STATES-CLOSE-1 | No | Designed `not-found` inside the store shell, ar/en, no new data | Not started |
+| 0 | Evidence + this horizon | No | Durable matrix and queue | Merged [#1015](https://github.com/safwan5001-source/Nebrax/pull/1015) `ec2aad3cacc988417971489d46c9125da838c8d8` |
+| 1 | STORE-VISUAL-CLOSE-1 | No | Public v2 homepage deletion is not resurrected | Merged [#1016](https://github.com/safwan5001-source/Nebrax/pull/1016) `2e1225f39e553103ef628e25438461d4cd7d2abe` |
+| 2 | STORE-CUSTOMIZER-CLOSE-1 | No | Header/logo/footer/WhatsApp/social click-to-edit. Honest logo and display-name hints. Preview links do not leave the editor | Merged [#1017](https://github.com/safwan5001-source/Nebrax/pull/1017) `6b8869e8694c3b897eed4f75bbf1af07b708f1e4` |
+| 3 | STORE-STATES-CLOSE-1 | No | Designed `not-found` inside the store shell, ar/en, no new data | In progress |
 | 4 | STORE-THEME-PARITY-1 | No | Public page honors published `density` and `productCard` only | Not started |
 | — | Per-instance content, branding media object, undo, version history, Market, Floral | Decision or explicit deferral | Do not start | Blocked |
 
@@ -90,4 +91,4 @@ None opened. A gate would be required before:
 
 ## Release boundary
 
-No merge, deploy, or production migration in this horizon without a new explicit approval.
+No deploy or production migration in this horizon without a new explicit approval. Merge of in-scope PRs follows the horizon cycle after exact-head CI and pre-merge review.

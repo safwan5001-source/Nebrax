@@ -27,6 +27,11 @@
     "amountDue": "Do zapłaty",
     "notAvailable": "Niedostępne"
   },
+  "notFound": {
+    "title": "Nie znaleziono strony",
+    "description": "Ta strona nie należy do sklepu. Katalog i koszyk pozostają bez zmian.",
+    "home": "Wróć do sklepu"
+  },
   "header": {
     "categories": "Kategorie",
     "openCart": "Otwórz koszyk",
