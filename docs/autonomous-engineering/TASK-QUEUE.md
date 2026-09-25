@@ -925,7 +925,7 @@ Source of truth for this horizon:
 | 2 | APP-BUILDER-14 | done | APP-BUILDER-13 | App Schema `binding` contract (parser + compatibility resolver) |
 | 3 | APP-BUILDER-15 | done (PR #998 merged) | APP-BUILDER-14 | Builder Data UX (Inspector binding editor) |
 | 4 | APP-BUILDER-16 | done (schema contract) | ADR-01 | Conditions/Visibility contract (closed/typed/allowlisted) + Inspector UX |
-| 5 | APP-BUILDER-17 | in_progress (slice 1/3 merged, PR #999) | APP-BUILDER-14 | Mobile runtime binding/visibility resolver (replaces 3 hand-written screen implementations) — split into parser support / compatibility gating / resolver+screens+capability flip, see entry below |
+| 5 | APP-BUILDER-17 | in_progress (slices 1-2/3 merged) | APP-BUILDER-14 | Mobile runtime binding/visibility resolver (replaces 3 hand-written screen implementations) — split into parser support / compatibility gating / resolver+screens+capability flip, see entry below |
 | 6 | APP-BUILDER-18 | ready (after 17) | APP-BUILDER-17 | Real action dispatch wired through schema bindings |
 | 7 | APP-BUILDER-19 | done | ADR-01 (Decision Point 1 = YES) | Live publish → fetch → on-device-cache loop (Last Known Good) |
 | 8 | APP-BUILDER-20 | ready (after 18+19) | APP-BUILDER-18, APP-BUILDER-19 | Same-Store integrated proof |
@@ -1103,11 +1103,20 @@ into three independently-shippable slices (see the detailed slice breakdown in `
   new Dart tests in `schema_binding_visibility_test.dart`, one-for-one against
   `AppSchemaParserTest.php`'s binding/visibility cases. **Unverified locally (no Flutter SDK)** —
   relies on `mobile-ci.yml`.
-- **Slice 2 — compatibility gating** (not started): Dart `RuntimeCapabilities`/`CapabilityManifest`
-  gain `dataResources`/`schemaFeatures`, kept empty (matching PHP), and `CompatibilityResolver` gains
-  the prune/reject checks — must land before slice 3's server-side flip, not after, or an
-  already-installed build with only slice 1 would treat a live binding/visibility node as
-  "compatible" while doing nothing with it.
+- **Slice 2 — compatibility gating, done.** Dart `RuntimeCapabilities`/`CapabilityManifest` gain
+  `dataResources`/`schemaFeatures` (kept empty, matching PHP), plus `resourceVersion()`/
+  `schemaFeatureVersion()` and an extended `namedCapabilityVersion()` fallback — mirrors
+  `CapabilityManifest` (PHP) literally. New `visibility_vocabulary.dart` ports `VisibilitySignal`/
+  `VisibilityOperator`'s closed vocabularies. `CompatibilityResolver._resolveComponent` now prunes/
+  rejects an unsupported `binding`/`visibility` exactly like an unsupported component/action.
+  **Deliberate scope reduction** (full reasoning in `CURRENT-STATE.md`): the binding check is
+  capability-gate-only, not the fuller `DataResourceRegistry`/`ComponentRegistry`-backed structural
+  validation PHP's resolver also does — those registries don't exist in Dart yet, building them now
+  would duplicate slice 3's own job, and the capability gate alone already produces PHP's identical
+  net effect while `dataResources` stays empty. The visibility check *is* fully ported (semantic
+  validity has no registry dependency). 24 new/updated Dart tests, mirroring the scope-appropriate
+  subset of `CompatibilityResolverTest.php`'s binding/visibility coverage. **Unverified locally (no
+  Flutter SDK)** — relies on `mobile-ci.yml`.
 - **Slice 3 — resolver + screens + capability flip** (not started): the real fetch/hydrate/evaluate
   layer, `HomeScreen`/`CartScreen`/`ProductScreen` rewired off hand-written hydration, bundled schemas
   updated to declare real bindings, and only then flipping `RuntimeCapabilities::DATA_RESOURCES`/

@@ -63,4 +63,35 @@ class RuntimeCapabilities {
   static const Map<String, int> nativeCapabilities = {
     'push.notifications': 1,
   };
+
+  /// Data-resource identity space this runtime build actually consumes via a
+  /// real `binding` resolution (`APP-BUILDER-13`/`17`, `ADR-01`) — mirrors
+  /// `RuntimeCapabilities::DATA_RESOURCES` (PHP) literally.
+  ///
+  /// **Empty by design, still.** No component here maps `binding.resource`
+  /// to a real `commerce/v1` fetch yet — that is `APP-BUILDER-17` slice 3.
+  /// Until then, `CompatibilityResolver` treats every `binding` node as an
+  /// unsupported capability, exactly like an unknown component/action: an
+  /// optional one is pruned, a required one fails the whole document
+  /// closed. Flipping this non-empty here without the PHP-side
+  /// `RuntimeCapabilities::DATA_RESOURCES` flip landing in the *same*
+  /// server-side release (slice 3's own gate) would let an
+  /// already-published binding "work" on a build that never proved it can
+  /// actually resolve one.
+  static const Map<String, int> dataResources = {};
+
+  /// Schema-feature identity space (not a component, action, or native
+  /// capability) this runtime build actually evaluates —
+  /// `APP-BUILDER-16`/`17`, `ADR-01`. Mirrors
+  /// `RuntimeCapabilities::SCHEMA_FEATURES` (PHP) literally.
+  ///
+  /// **Empty by design, still**, for the exact same reason as
+  /// [dataResources]: no component here evaluates a `visibility` condition
+  /// tree into an actual show/hide decision yet (`APP-BUILDER-16` only
+  /// added the schema contract). Until `APP-BUILDER-17` slice 3 wires real
+  /// evaluation and this map gains `'visibility': 1` on both sides at once,
+  /// every `visibility` node is treated as an unsupported capability by
+  /// `CompatibilityResolver` — pruned if optional, fails the document
+  /// closed if required.
+  static const Map<String, int> schemaFeatures = {};
 }

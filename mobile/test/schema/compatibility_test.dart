@@ -11,6 +11,8 @@ CapabilityManifest manifestOf({
   Map<String, int>? components,
   Map<String, int>? actions,
   Map<String, int>? nativeCapabilities,
+  Map<String, int>? dataResources,
+  Map<String, int>? schemaFeatures,
 }) {
   return CapabilityManifest(
     platform: platform,
@@ -20,6 +22,8 @@ CapabilityManifest manifestOf({
     components: components ?? RuntimeCapabilities.components,
     actions: actions ?? RuntimeCapabilities.actions,
     nativeCapabilities: nativeCapabilities ?? RuntimeCapabilities.nativeCapabilities,
+    dataResources: dataResources ?? RuntimeCapabilities.dataResources,
+    schemaFeatures: schemaFeatures ?? RuntimeCapabilities.schemaFeatures,
   );
 }
 
@@ -284,6 +288,299 @@ void main() {
         expect(resolver.resolve(schema, iosBeforeRollout), isA<IncompatibleExperience>());
       },
     );
+  });
+
+  group('CompatibilityResolver — binding capability gating (APP-BUILDER-17 slice 2)', () {
+    test('a binding on the current runtime is unsupported since no data resource is consumed yet', () {
+      final json = baseSchemaJson(
+        pageOverride: componentNode(
+          type: 'Page',
+          id: 'home-root',
+          children: [
+            componentNode(
+              type: 'ProductList',
+              id: 'p1',
+              binding: {'resource': 'commerce.products'},
+            ),
+          ],
+        ),
+      );
+      final schema = AppSchema.parse(encodeSchema(json));
+
+      final result = resolver.resolve(schema, CapabilityManifest.current(RuntimePlatform.ios));
+
+      expect(result, isA<IncompatibleExperience>());
+      expect(
+        (result as IncompatibleExperience).reason,
+        IncompatibilityReason.missingRequiredCapability,
+      );
+    });
+
+    test('an optional binding unsupported on the current runtime is pruned, not fatal', () {
+      final json = baseSchemaJson(
+        pageOverride: componentNode(
+          type: 'Page',
+          id: 'home-root',
+          children: [
+            componentNode(
+              type: 'ProductList',
+              id: 'p1',
+              optional: true,
+              binding: {'resource': 'commerce.products'},
+            ),
+          ],
+        ),
+      );
+      final schema = AppSchema.parse(encodeSchema(json));
+
+      final result = resolver.resolve(schema, CapabilityManifest.current(RuntimePlatform.ios));
+
+      expect(result, isA<RenderableExperience>());
+      expect((result as RenderableExperience).fallbacks, hasLength(1));
+    });
+
+    test('a binding is compatible once the manifest declares the resource supported', () {
+      final json = baseSchemaJson(
+        pageOverride: componentNode(
+          type: 'Page',
+          id: 'home-root',
+          children: [
+            componentNode(
+              type: 'ProductList',
+              id: 'p1',
+              binding: {'resource': 'commerce.products'},
+            ),
+          ],
+        ),
+      );
+      final schema = AppSchema.parse(encodeSchema(json));
+      final manifest = manifestOf(dataResources: {'commerce.products': 1});
+
+      final result = resolver.resolve(schema, manifest);
+
+      expect(result, isA<RenderableExperience>());
+      expect((result as RenderableExperience).fallbacks, isEmpty);
+    });
+  });
+
+  group('CompatibilityResolver — visibility capability gating (APP-BUILDER-17 slice 2)', () {
+    test('a visibility leaf on the current runtime is unsupported since no schema feature is consumed yet', () {
+      final json = baseSchemaJson(
+        pageOverride: componentNode(
+          type: 'Page',
+          id: 'home-root',
+          children: [
+            componentNode(
+              type: 'Button',
+              id: 'x1',
+              visibility: {'signal': 'customer.isAuthenticated', 'operator': 'isTrue'},
+            ),
+          ],
+        ),
+      );
+      final schema = AppSchema.parse(encodeSchema(json));
+
+      final result = resolver.resolve(schema, CapabilityManifest.current(RuntimePlatform.ios));
+
+      expect(result, isA<IncompatibleExperience>());
+      expect(
+        (result as IncompatibleExperience).reason,
+        IncompatibilityReason.missingRequiredCapability,
+      );
+    });
+
+    test('an optional visibility unsupported on the current runtime is pruned, not fatal', () {
+      final json = baseSchemaJson(
+        pageOverride: componentNode(
+          type: 'Page',
+          id: 'home-root',
+          children: [
+            componentNode(
+              type: 'Button',
+              id: 'x1',
+              optional: true,
+              visibility: {'signal': 'customer.isAuthenticated', 'operator': 'isTrue'},
+            ),
+          ],
+        ),
+      );
+      final schema = AppSchema.parse(encodeSchema(json));
+
+      final result = resolver.resolve(schema, CapabilityManifest.current(RuntimePlatform.ios));
+
+      expect(result, isA<RenderableExperience>());
+      expect((result as RenderableExperience).fallbacks, hasLength(1));
+    });
+
+    test('a visibility leaf is compatible once the manifest declares the feature supported', () {
+      final json = baseSchemaJson(
+        pageOverride: componentNode(
+          type: 'Page',
+          id: 'home-root',
+          children: [
+            componentNode(
+              type: 'Button',
+              id: 'x1',
+              visibility: {'signal': 'cart.itemCount', 'operator': 'gt', 'value': 0},
+            ),
+          ],
+        ),
+      );
+      final schema = AppSchema.parse(encodeSchema(json));
+      final manifest = manifestOf(schemaFeatures: {'visibility': 1});
+
+      final result = resolver.resolve(schema, manifest);
+
+      expect(result, isA<RenderableExperience>());
+      expect((result as RenderableExperience).fallbacks, isEmpty);
+    });
+
+    test('a nested any/all visibility tree is compatible when every leaf is valid', () {
+      final json = baseSchemaJson(
+        pageOverride: componentNode(
+          type: 'Page',
+          id: 'home-root',
+          children: [
+            componentNode(
+              type: 'Button',
+              id: 'x1',
+              visibility: {
+                'any': [
+                  {'signal': 'cart.itemCount', 'operator': 'gt', 'value': 0},
+                  {
+                    'all': [
+                      {'signal': 'product.inStock', 'operator': 'isTrue'},
+                      {
+                        'signal': 'customer.isAuthenticated',
+                        'operator': 'in',
+                        'value': [true],
+                      },
+                    ],
+                  },
+                ],
+              },
+            ),
+          ],
+        ),
+      );
+      final schema = AppSchema.parse(encodeSchema(json));
+      final manifest = manifestOf(schemaFeatures: {'visibility': 1});
+
+      expect(resolver.resolve(schema, manifest), isA<RenderableExperience>());
+    });
+
+    test('a visibility leaf with an unknown signal is unsupported even when the feature is declared', () {
+      final json = baseSchemaJson(
+        pageOverride: componentNode(
+          type: 'Page',
+          id: 'home-root',
+          children: [
+            componentNode(
+              type: 'Button',
+              id: 'x1',
+              visibility: {'signal': 'not.a.real.signal', 'operator': 'isTrue'},
+            ),
+          ],
+        ),
+      );
+      final schema = AppSchema.parse(encodeSchema(json));
+      final manifest = manifestOf(schemaFeatures: {'visibility': 1});
+
+      expect(resolver.resolve(schema, manifest), isA<IncompatibleExperience>());
+    });
+
+    test('a visibility leaf with an unknown operator is unsupported', () {
+      final json = baseSchemaJson(
+        pageOverride: componentNode(
+          type: 'Page',
+          id: 'home-root',
+          children: [
+            componentNode(
+              type: 'Button',
+              id: 'x1',
+              visibility: {'signal': 'cart.itemCount', 'operator': 'startsWith', 'value': 'x'},
+            ),
+          ],
+        ),
+      );
+      final schema = AppSchema.parse(encodeSchema(json));
+      final manifest = manifestOf(schemaFeatures: {'visibility': 1});
+
+      expect(resolver.resolve(schema, manifest), isA<IncompatibleExperience>());
+    });
+
+    test('an isTrue/isFalse operator carrying a value is unsupported', () {
+      final json = baseSchemaJson(
+        pageOverride: componentNode(
+          type: 'Page',
+          id: 'home-root',
+          children: [
+            componentNode(
+              type: 'Button',
+              id: 'x1',
+              visibility: {
+                'signal': 'customer.isAuthenticated',
+                'operator': 'isTrue',
+                'value': true,
+              },
+            ),
+          ],
+        ),
+      );
+      final schema = AppSchema.parse(encodeSchema(json));
+      final manifest = manifestOf(schemaFeatures: {'visibility': 1});
+
+      expect(resolver.resolve(schema, manifest), isA<IncompatibleExperience>());
+    });
+
+    test('an in operator requires a non-empty list value', () {
+      final json = baseSchemaJson(
+        pageOverride: componentNode(
+          type: 'Page',
+          id: 'home-root',
+          children: [
+            componentNode(
+              type: 'Button',
+              id: 'x1',
+              visibility: {'signal': 'cart.itemCount', 'operator': 'in', 'value': 5},
+            ),
+          ],
+        ),
+      );
+      final schema = AppSchema.parse(encodeSchema(json));
+      final manifest = manifestOf(schemaFeatures: {'visibility': 1});
+
+      expect(resolver.resolve(schema, manifest), isA<IncompatibleExperience>());
+    });
+
+    test('a comparison operator missing its required value is unsupported', () {
+      final json = baseSchemaJson(
+        pageOverride: componentNode(
+          type: 'Page',
+          id: 'home-root',
+          children: [
+            componentNode(
+              type: 'Button',
+              id: 'x1',
+              visibility: {'signal': 'cart.itemCount', 'operator': 'gt'},
+            ),
+          ],
+        ),
+      );
+      final schema = AppSchema.parse(encodeSchema(json));
+      final manifest = manifestOf(schemaFeatures: {'visibility': 1});
+
+      expect(resolver.resolve(schema, manifest), isA<IncompatibleExperience>());
+    });
+  });
+
+  group('CapabilityManifest.current — dataResources/schemaFeatures stay empty (slice 2 guard rail)', () {
+    test('the shipped runtime declares no data resources or schema features yet', () {
+      final manifest = CapabilityManifest.current(RuntimePlatform.ios);
+
+      expect(manifest.dataResources, isEmpty);
+      expect(manifest.schemaFeatures, isEmpty);
+    });
   });
 
   group('selectRollbackTarget', () {
