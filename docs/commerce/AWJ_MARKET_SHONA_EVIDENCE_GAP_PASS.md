@@ -935,3 +935,209 @@ Remaining closure before the final Horizon handoff is narrow:
 - lock the final visual acceptance checklist against the Shona evidence without copying its identity/assets;
 - confirm documentation PR CI and merge it when clean;
 - then emit the single Horizon execution task.
+
+
+## 29. AWJ Market preset application semantics — locked for Horizon
+
+The preset must behave as an **explicit starting composition**, not a permanent override layer.
+
+When the merchant actively selects **AWJ Market** in the production Customizer, the UI may offer/apply a coordinated Market starting bundle:
+
+- `themePreset = awj-market`;
+- density = `compact`;
+- productCard = `compact`;
+- header.style = `compact`;
+- keep merchant branding fields, business/contact data, links, app links, policy metadata and other unrelated content intact;
+- use only implemented homepage section types in the initial visible composition;
+- never auto-enable gated sections.
+
+After application, the resulting fields remain ordinary merchant-editable presentation values. Re-opening or normalizing an AWJ Market document must **not** continually force compact density/card/header or reset merchant choices.
+
+Switching presets must not silently erase branding/content. If a future UX offers “reset to theme defaults”, that must be a separate explicit merchant action.
+
+This preserves the current contract model where theme preset, density, card style and header style are independently persisted fields while still giving AWJ Market a useful one-click baseline.
+
+## 30. Concrete shared visual import graph — Horizon styling scope
+
+Verified shared component graph for the Market visual pass:
+
+### Store shell
+
+- `storefront/src/app/[country]/[locale]/(storefront)/layout.tsx`
+  - `components/layout/Header.tsx`
+  - `components/layout/CategoryNav.tsx`
+  - `components/layout/MobileBottomNav.tsx`
+  - `components/layout/Footer.tsx`
+  - `components/layout/StoreWhatsApp.tsx`
+  - `components/layout/StoreContainer.tsx`
+
+Market should flow through this shared shell; no Market route-tree fork.
+
+### Homepage
+
+- `storefront/src/app/[country]/[locale]/(storefront)/page.tsx`
+  - `components/home/HeroSection.tsx`
+  - `components/home/CategoriesSection.tsx`
+  - `components/home/NewArrivalsSection.tsx`
+  - `components/home/WholesaleSection.tsx`
+  - shared section heading/container primitives used by those sections.
+
+Only currently implemented section types are in V1 runtime scope.
+
+### Product browsing
+
+Verified shared product chain:
+
+- `components/products/ProductListing.tsx`
+- `components/products/InfiniteProductList.tsx`
+- `components/products/ProductGrid.tsx`
+- `components/products/NewArrivals.tsx`
+- `components/products/ProductCarousel.tsx`
+- `components/products/ProductCard.tsx`
+- `components/products/ProductCardSkeleton.tsx`
+- `components/products/ProductGridSkeleton.tsx`
+
+`ProductCard` is reused by multiple surfaces, including account wishlist scaffolding. Theme-aware changes here must therefore be generic and keyed from the shared presentation/theme seam; do not hard-code Market styling globally.
+
+### Cart
+
+- `storefront/src/components/cart/CartDrawer.tsx`
+- shared cart line/summary components already used by cart/checkout.
+
+The drawer is also reused by wholesale behavior. Any Market presentation change must preserve its existing commerce branches and server-sent monetary authority.
+
+### Checkout
+
+- `storefront/src/app/[country]/[locale]/(store-checkout)/checkout/page.tsx`
+- `storefront/src/components/checkout/AwjCheckoutFlow.tsx`
+- existing checkout stage components and CartSummary.
+
+Checkout architecture tests already guard important boundaries. Market must not fork this flow.
+
+### Customizer
+
+Production editor:
+
+- `web/src/modules/store-experience-builder/ExperienceBuilder.tsx`
+- `web/src/modules/store-experience-builder/ControlPanels.tsx`
+- `web/src/modules/store-experience-builder/StorefrontPreviewCanvas.tsx`
+- `web/src/modules/store-experience-builder/presentation/{tokens,config}.ts`
+
+Contract/runtime mirror:
+
+- `storefront/src/lib/presentation/{tokens,config}.ts`
+- storefront customizer mirror only where existing contract compilation/tests require parity.
+
+Server authority:
+
+- `app/Support/Commerce/StorefrontPresentationNormalizer.php`.
+
+## 31. Locked visual acceptance checklist — AWJ Market V1
+
+The implementation is accepted only when all applicable items below are demonstrated with real AWJ data/contracts, not benchmark assets.
+
+### Global identity and shell
+
+- AWJ Market is selectable as a ready theme/preset in the production Customizer.
+- Existing merchant logo/name/colors remain customizable.
+- Search is visually prominent without changing its server contract.
+- Category discovery remains fast and dense.
+- Header remains usable with long Arabic names and equivalent English LTR.
+- Mobile bottom navigation respects safe-area inset and never overlaps actionable content.
+- Footer/contact/WhatsApp/social/app/policy data renders only when valid/configured.
+
+### Home
+
+- Compact high-SKU composition; product discovery dominates decoration.
+- Hero and categories establish hierarchy without oversized empty space.
+- New arrivals/products remain real catalog results.
+- Wholesale section keeps its existing semantics when present.
+- Gated banner/offers/featured/benefits/appPromo/customContent are not falsely activated.
+- Missing optional content does not leave broken spacing or empty shells.
+
+### Product cards and grids
+
+- Two columns remain usable at 390/430 where the shared responsive contract requires them.
+- Tablet/desktop progressively increase density without unreadable cards.
+- Long grocery/FMCG names wrap predictably.
+- Price remains authoritative and visually dominant.
+- Missing media, loading skeleton and unavailable state remain stable.
+- No fake compare-at price, discount badge, rating, purchase count or wishlist persistence.
+- Product cards do not issue per-card detail/inventory requests.
+
+### Catalog/search/category
+
+- Existing server search, category filtering and supported sort controls remain authoritative.
+- Empty/no-result state is deliberate.
+- No client-only fake faceted filter over a partial page.
+- Pagination/infinite loading does not duplicate cards or lose query state.
+
+### PDP
+
+- Simple products and variant-managed products both fit the Market visual language.
+- Generic option semantics remain generic; no hard-coded color/size assumptions.
+- Variant-specific media/price/availability continue to follow the authoritative variant.
+- Unknown/out-of-stock states remain honest.
+- SKU may be shown only according to existing public contract; do not relabel it as barcode/GTIN/model number.
+- No multi-branch selector until the separately defined platform capability exists.
+
+### Cart and checkout
+
+- Cart drawer/page become visually coherent with Market without changing mutation/price authority.
+- Empty cart and rejected mutations remain clear.
+- Checkout keeps its dedicated shell and existing stage architecture.
+- No marketing navigation is reintroduced into checkout.
+- Server-confirmed amounts remain the only authoritative monetary display.
+- Unsupported payment/shipping/coupon capabilities remain gated/honest.
+
+### Customizer lifecycle
+
+- selecting AWJ Market applies the explicit starting bundle once;
+- merchant can subsequently adjust supported density/card/header/color settings;
+- Save affects Draft only;
+- Publish atomically promotes the normalized Draft;
+- public storefront does not observe unpublished Market changes;
+- switching/reloading does not erase unrelated merchant content;
+- unknown/stale preset values fail closed to AWJ Modern.
+
+### Responsive and directionality
+
+Required review widths: 390, 430, 768, 1024, 1280, 1440.
+
+At each relevant surface:
+
+- Arabic RTL;
+- English LTR;
+- no horizontal overflow;
+- logical direction utilities/icons remain correct;
+- touch targets remain usable;
+- fixed/sticky UI does not obscure content;
+- mixed Arabic/Latin/SKU/English numerals remain visually stable.
+
+### Accessibility and performance
+
+- keyboard/focus/semantic behavior does not regress;
+- icon-only controls retain accessible names;
+- reduced-motion behavior remains valid;
+- no new browser N+1 pattern;
+- no duplicated storefront config/catalog fetch solely for theme detection;
+- image/card geometry avoids avoidable layout shift;
+- performance claims in the Horizon report must be measured or explicitly marked unmeasured.
+
+## 32. Pre-Horizon status
+
+The specification now has:
+
+- external benchmark evidence;
+- AWJ capability/gap classification;
+- authority/security boundaries;
+- exact preset persistence/normalization seams;
+- locked preset application semantics;
+- concrete shared visual component graph;
+- regression requirements;
+- responsive/state/accessibility/performance matrices;
+- final visual acceptance checklist.
+
+The remaining operational gate is documentation integration: confirm PR #1001 is clean/mergeable and merge the durable spec. After that, generate the single Horizon execution prompt against the merged `main` Base SHA.
+
+Status: **SPEC COMPLETE — PENDING DOCS INTEGRATION BEFORE HORIZON HANDOFF**.
