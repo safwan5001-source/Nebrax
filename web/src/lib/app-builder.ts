@@ -70,6 +70,17 @@ export interface AppSchemaBinding {
   resource: string;
   query?: Record<string, unknown>;
   itemProps?: Record<string, string>;
+  /**
+   * LIVE-PREVIEW-2 — closes a structural gap this type left open since
+   * `APP-BUILDER-17` slice 3 added `SchemaBinding.collect`
+   * (`mobile/lib/schema/app_schema.dart`): a dotted field path to a
+   * `LIST`-typed field on the resolved resource whose entries the node's
+   * single declared child (its item template) repeats once per, exactly
+   * like `itemProps`'s own field-path convention. `undefined` means "no
+   * repetition" — same meaning as the Dart side's `null`. Additive only;
+   * does not change how any existing field is read or validated.
+   */
+  collect?: string;
 }
 
 export type VisibilityScalar = string | number | boolean | null;

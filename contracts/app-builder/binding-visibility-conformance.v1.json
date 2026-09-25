@@ -1,0 +1,328 @@
+{
+  "_meta": {
+    "purpose": "LIVE-PREVIEW-2 (AWJ_APP_BUILDER_LIVE_RUNTIME_PREVIEW_V1.md) — canonical, single-source conformance fixture for the App Builder binding-resolution and visibility-evaluation contract. Both the Flutter runtime's implementation (source of truth) and the Builder web Preview's derived TypeScript port MUST resolve every case below to the exact 'expected' value. This file is the one place the contract's expected behavior is written down; do not duplicate case data inline in either test suite.",
+    "sourceOfTruth": "mobile/lib/app/binding_resolution.dart",
+    "portedTo": "web/src/modules/app-builder/runtime-contract.ts",
+    "consumers": [
+      "mobile/test/app/binding_visibility_conformance_test.dart",
+      "web/src/modules/app-builder/runtime-contract.test.ts"
+    ],
+    "note": "A 'node' below is a single SchemaComponent-shaped JSON object, valid as the sole child of a bare Page root. Dart tests parse it through AppSchema.parse (the only public constructor path for SchemaComponent/VisibilityNode); TypeScript tests read it directly as JSON since AppSchemaComponent is a plain structural type. 'expected' always lists props/children explicitly (never omitted-as-empty) so a byte-for-byte deep-equal catches any drift in either port."
+  },
+  "bindingCases": [
+    {
+      "id": "collect-list-repeats-with-item-substitution",
+      "description": "binding.collect targets a nested list field; repeats the single item template once per entry, substitutes $item.<field> in nested props and action params, disambiguates ids by item.id, leaves a non-prefixed string untouched, and resolves a missing field to null.",
+      "node": {
+        "type": "CartList",
+        "id": "cart-list",
+        "binding": { "resource": "commerce.cart", "collect": "items" },
+        "children": [
+          {
+            "type": "ProductCard",
+            "id": "cart-line",
+            "props": {
+              "title": "$item.name",
+              "amountMinor": "$item.priceMinor",
+              "nested": { "label": "$item.name" },
+              "note": "غير مرتبط $item.name",
+              "missingRef": "$item.notThere"
+            },
+            "action": { "type": "updateCartQuantity", "params": { "itemId": "$item.id", "quantity": 1 } }
+          }
+        ]
+      },
+      "resourceData": {
+        "commerce.cart": {
+          "items": [
+            { "id": "i1", "name": "قهوة", "priceMinor": 1200 },
+            { "id": "i2", "name": "شاي", "priceMinor": 800 }
+          ]
+        }
+      },
+      "expected": {
+        "type": "CartList",
+        "id": "cart-list",
+        "optional": false,
+        "props": {},
+        "children": [
+          {
+            "type": "ProductCard",
+            "id": "cart-line-i1",
+            "optional": false,
+            "props": {
+              "title": "قهوة",
+              "amountMinor": 1200,
+              "nested": { "label": "قهوة" },
+              "note": "غير مرتبط $item.name",
+              "missingRef": null
+            },
+            "children": [],
+            "action": { "type": "updateCartQuantity", "params": { "itemId": "i1", "quantity": 1 } }
+          },
+          {
+            "type": "ProductCard",
+            "id": "cart-line-i2",
+            "optional": false,
+            "props": {
+              "title": "شاي",
+              "amountMinor": 800,
+              "nested": { "label": "شاي" },
+              "note": "غير مرتبط $item.name",
+              "missingRef": null
+            },
+            "children": [],
+            "action": { "type": "updateCartQuantity", "params": { "itemId": "i2", "quantity": 1 } }
+          }
+        ]
+      }
+    },
+    {
+      "id": "collect-target-not-a-list-fails-closed",
+      "description": "binding.collect points at a field whose runtime value is not a List — fails closed to zero children rather than falling through to single-item semantics.",
+      "node": {
+        "type": "CartList",
+        "id": "cl2",
+        "binding": { "resource": "commerce.cart", "collect": "items" },
+        "children": [{ "type": "ProductCard", "id": "tmpl", "props": { "title": "$item.name" } }]
+      },
+      "resourceData": { "commerce.cart": { "items": "not-a-list" } },
+      "expected": { "type": "CartList", "id": "cl2", "optional": false, "props": {}, "children": [] }
+    },
+    {
+      "id": "collect-with-no-template-child-fails-closed",
+      "description": "binding.collect with zero authored children has nothing well-defined to repeat — fails closed to zero children.",
+      "node": {
+        "type": "CartList",
+        "id": "cl3",
+        "binding": { "resource": "commerce.cart", "collect": "items" },
+        "children": []
+      },
+      "resourceData": { "commerce.cart": { "items": [{ "id": "x" }] } },
+      "expected": { "type": "CartList", "id": "cl3", "optional": false, "props": {}, "children": [] }
+    },
+    {
+      "id": "collect-with-ambiguous-multiple-template-children-fails-closed",
+      "description": "binding.collect with more than one authored child has no single well-defined template — fails closed to zero children.",
+      "node": {
+        "type": "CartList",
+        "id": "cl4",
+        "binding": { "resource": "commerce.cart", "collect": "items" },
+        "children": [
+          { "type": "Text", "id": "a" },
+          { "type": "Text", "id": "b" }
+        ]
+      },
+      "resourceData": { "commerce.cart": { "items": [{ "id": "x" }] } },
+      "expected": { "type": "CartList", "id": "cl4", "optional": false, "props": {}, "children": [] }
+    },
+    {
+      "id": "no-collect-resource-itself-is-the-list",
+      "description": "No binding.collect: the resource's own wire shape is already a list (commerce.products' real shape) — repeated directly; an item with no 'id' field falls back to an index-based id.",
+      "node": {
+        "type": "ProductList",
+        "id": "pl",
+        "binding": { "resource": "commerce.products" },
+        "children": [{ "type": "ProductCard", "id": "card", "props": { "title": "$item.name" } }]
+      },
+      "resourceData": { "commerce.products": [{ "name": "a" }, { "name": "b" }] },
+      "expected": {
+        "type": "ProductList",
+        "id": "pl",
+        "optional": false,
+        "props": {},
+        "children": [
+          { "type": "ProductCard", "id": "card-0", "optional": false, "props": { "title": "a" }, "children": [] },
+          { "type": "ProductCard", "id": "card-1", "optional": false, "props": { "title": "b" }, "children": [] }
+        ]
+      }
+    },
+    {
+      "id": "single-item-itemProps-preserves-static-props-and-recurses",
+      "description": "No collect and the resolved resource is not a list: single-item binding via itemProps merges resolved fields into the node's own props (static props not named in itemProps survive untouched), and children are still walked for their own (here, absent) bindings.",
+      "node": {
+        "type": "ProductDetail",
+        "id": "pd",
+        "props": { "staticLabel": "ثابت" },
+        "binding": { "resource": "commerce.products", "itemProps": { "title": "name", "amountMinor": "priceMinor" } },
+        "children": [{ "type": "Text", "id": "desc", "props": { "text": "وصف" } }]
+      },
+      "resourceData": { "commerce.products": { "name": "منتج", "priceMinor": 5000 } },
+      "expected": {
+        "type": "ProductDetail",
+        "id": "pd",
+        "optional": false,
+        "props": { "staticLabel": "ثابت", "title": "منتج", "amountMinor": 5000 },
+        "children": [{ "type": "Text", "id": "desc", "optional": false, "props": { "text": "وصف" }, "children": [] }]
+      }
+    },
+    {
+      "id": "single-item-itemProps-missing-resource-fails-closed-to-null",
+      "description": "The bound resource id has no entry at all in resourceData — never throws; each itemProps field resolves to null.",
+      "node": {
+        "type": "ProductDetail",
+        "id": "pd2",
+        "binding": { "resource": "commerce.products", "itemProps": { "title": "name" } },
+        "children": []
+      },
+      "resourceData": {},
+      "expected": { "type": "ProductDetail", "id": "pd2", "optional": false, "props": { "title": null }, "children": [] }
+    },
+    {
+      "id": "pass-through-recursion-finds-nested-binding",
+      "description": "A node with no binding of its own is not itself touched — it recurses into children, one of which does carry a binding several levels down.",
+      "node": {
+        "type": "Section",
+        "id": "sec",
+        "props": { "title": "قسم" },
+        "children": [
+          {
+            "type": "ProductList",
+            "id": "inner-list",
+            "binding": { "resource": "commerce.products" },
+            "children": [{ "type": "Text", "id": "t", "props": { "text": "$item.label" } }]
+          }
+        ]
+      },
+      "resourceData": { "commerce.products": [{ "label": "x" }] },
+      "expected": {
+        "type": "Section",
+        "id": "sec",
+        "optional": false,
+        "props": { "title": "قسم" },
+        "children": [
+          {
+            "type": "ProductList",
+            "id": "inner-list",
+            "optional": false,
+            "props": {},
+            "children": [{ "type": "Text", "id": "t-0", "optional": false, "props": { "text": "x" }, "children": [] }]
+          }
+        ]
+      }
+    }
+  ],
+  "visibilityCases": [
+    {
+      "id": "isTrue-signal-true",
+      "condition": { "signal": "customer.isAuthenticated", "operator": "isTrue" },
+      "signals": { "customer.isAuthenticated": true },
+      "expected": true
+    },
+    {
+      "id": "isTrue-signal-missing",
+      "condition": { "signal": "customer.isAuthenticated", "operator": "isTrue" },
+      "signals": {},
+      "expected": false
+    },
+    {
+      "id": "isFalse-signal-false",
+      "condition": { "signal": "product.inStock", "operator": "isFalse" },
+      "signals": { "product.inStock": false },
+      "expected": true
+    },
+    {
+      "id": "equals-match",
+      "condition": { "signal": "cart.itemCount", "operator": "equals", "value": 3 },
+      "signals": { "cart.itemCount": 3 },
+      "expected": true
+    },
+    {
+      "id": "notEquals-match",
+      "condition": { "signal": "cart.itemCount", "operator": "notEquals", "value": 5 },
+      "signals": { "cart.itemCount": 3 },
+      "expected": true
+    },
+    {
+      "id": "gt-true",
+      "condition": { "signal": "cart.itemCount", "operator": "gt", "value": 0 },
+      "signals": { "cart.itemCount": 3 },
+      "expected": true
+    },
+    {
+      "id": "gt-false",
+      "condition": { "signal": "cart.itemCount", "operator": "gt", "value": 0 },
+      "signals": { "cart.itemCount": 0 },
+      "expected": false
+    },
+    {
+      "id": "in-match",
+      "condition": { "signal": "cart.itemCount", "operator": "in", "value": [1, 2, 3] },
+      "signals": { "cart.itemCount": 2 },
+      "expected": true
+    },
+    {
+      "id": "in-no-match",
+      "condition": { "signal": "cart.itemCount", "operator": "in", "value": [1, 2, 3] },
+      "signals": { "cart.itemCount": 5 },
+      "expected": false
+    },
+    {
+      "id": "all-mixed-is-false",
+      "condition": {
+        "all": [
+          { "signal": "cart.itemCount", "operator": "gt", "value": 0 },
+          { "signal": "customer.isAuthenticated", "operator": "isTrue" }
+        ]
+      },
+      "signals": { "cart.itemCount": 2, "customer.isAuthenticated": false },
+      "expected": false
+    },
+    {
+      "id": "all-true-is-true",
+      "condition": {
+        "all": [
+          { "signal": "cart.itemCount", "operator": "gt", "value": 0 },
+          { "signal": "customer.isAuthenticated", "operator": "isTrue" }
+        ]
+      },
+      "signals": { "cart.itemCount": 2, "customer.isAuthenticated": true },
+      "expected": true
+    },
+    {
+      "id": "any-one-true-is-true",
+      "condition": {
+        "any": [
+          { "signal": "cart.itemCount", "operator": "gt", "value": 10 },
+          { "signal": "customer.isAuthenticated", "operator": "isTrue" }
+        ]
+      },
+      "signals": { "cart.itemCount": 2, "customer.isAuthenticated": true },
+      "expected": true
+    },
+    {
+      "id": "any-all-false-is-false",
+      "condition": {
+        "any": [
+          { "signal": "cart.itemCount", "operator": "gt", "value": 10 },
+          { "signal": "customer.isAuthenticated", "operator": "isTrue" }
+        ]
+      },
+      "signals": { "cart.itemCount": 2, "customer.isAuthenticated": false },
+      "expected": false
+    },
+    {
+      "id": "nested-any-of-all",
+      "condition": {
+        "any": [
+          {
+            "all": [
+              { "signal": "cart.itemCount", "operator": "gt", "value": 0 },
+              { "signal": "customer.isAuthenticated", "operator": "isTrue" }
+            ]
+          },
+          { "signal": "product.inStock", "operator": "isTrue" }
+        ]
+      },
+      "signals": { "cart.itemCount": 0, "customer.isAuthenticated": true, "product.inStock": true },
+      "expected": true
+    },
+    {
+      "id": "unknown-operator-fails-closed-to-hidden",
+      "description": "Defensive layer only — CompatibilityResolver already rejects an unknown operator at publish time, so this path is unreachable in production, but evaluateVisibility itself must still fail closed (hidden) rather than throw or default to visible.",
+      "condition": { "signal": "cart.itemCount", "operator": "definitelyNotARealOperator" },
+      "signals": { "cart.itemCount": 3 },
+      "expected": false
+    }
+  ]
+}

@@ -47,8 +47,8 @@ Standing authority covers implementation, tests, commits, PRs, merging green dep
 | Task | Purpose | State |
 |---|---|---|
 | LIVE-PREVIEW-1 | Preview Contract Evidence Pass | **DONE / PASS** — see `LIVE-PREVIEW-1-EVIDENCE-PASS.md` |
-| LIVE-PREVIEW-2 | Preview / Runtime Semantic Parity Foundation | READY (no Decision Gate triggered) |
-| LIVE-PREVIEW-3 | Binding + Collection Preview Parity | BLOCKED |
+| LIVE-PREVIEW-2 | Preview / Runtime Semantic Parity Foundation | **IN REVIEW** — implemented, PR pending CI; see `LIVE-PREVIEW-2-PARITY-FOUNDATION.md` |
+| LIVE-PREVIEW-3 | Binding + Collection Preview Parity | BLOCKED on LP-2 merge |
 | LIVE-PREVIEW-4 | Action + Theme + Supported Visibility Parity | BLOCKED |
 | LIVE-PREVIEW-5 | Runtime-Aware Pre-Publish Validation | BLOCKED |
 | LIVE-PREVIEW-6 | Draft / Default / Published Preview States | BLOCKED |
@@ -187,5 +187,19 @@ The horizon is CLOSED / PASS only when evidence proves:
   the Theme panel's tokens have ~zero live effect on the shipped runtime today (key mismatch:
   Builder writes `primaryColor`, runtime reads `colorPrimary` from the bundled Default schema
   only, never from a tenant's published experience). No Decision Gate triggered (all 8 checked).
-- Next task: **LIVE-PREVIEW-2 — Preview / Runtime Semantic Parity Foundation** (READY; do not
-  start implementation until the evidence report above has been reviewed, per instruction).
+- **LIVE-PREVIEW-2: implemented, PR pending CI** — full report:
+  `docs/plans/app-builder/LIVE-PREVIEW-2-PARITY-FOUNDATION.md`. Base SHA:
+  `fdfa0b34f5197c17f2da45b3bfad7a30bd124ed4`. Adds `web/src/modules/app-builder/runtime-contract.ts`
+  (a documented, narrow TypeScript port of `mobile/lib/app/binding_resolution.dart`'s binding
+  resolution + visibility evaluation — not yet wired into `canvas.tsx`, per the horizon's own
+  LP-2/LP-3 split), a single canonical conformance fixture
+  (`contracts/app-builder/binding-visibility-conformance.v1.json`, 23 cases) asserted from both
+  `web/src/modules/app-builder/runtime-contract.test.ts` and
+  `mobile/test/app/binding_visibility_conformance_test.dart`, both CI workflows' path triggers
+  extended to cover the shared fixture, and an additive `AppSchemaBinding.collect` field on the
+  web schema type (was missing entirely). Web evidence green locally (297 files / 2105 tests,
+  `npm run build` clean); Dart/mobile side not runnable in this session (no local Flutter
+  toolchain) — **PR/CI is the authoritative verification**; merge SHA and CI result to be
+  recorded here once merged. No Decision Gate triggered; no capability broadened; fail-closed
+  semantics preserved (see the report's dedicated fixture cases).
+- Next task once LP-2 merges: **LIVE-PREVIEW-3 — Binding + Collection Preview Parity**.
