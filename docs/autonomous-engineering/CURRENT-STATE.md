@@ -941,3 +941,28 @@ published yet" fallback-UX decision before `resolveRealStartup()` is wired into 
 shipped boot path (`AppBuilderSameStoreProofTest`'s own doc comment, above). Per
 `AWJ-HORIZON-SYSTEM.md`'s own "Horizon End" instruction, this session stops here rather than starting
 a new horizon on its own initiative.
+
+## Horizon: AWJ App Builder — Live Runtime Boot / Default Experience (AWJ-RUNTIME-BOOT-1)
+
+**`AWJ-RUNTIME-BOOT-1` — done.** Resolves deferred item (2) above: the "no Experience published yet"
+fallback-UX decision is now explicit and shipped as the **AWJ Runtime Boot contract**. Full detail:
+`docs/plans/mobile/AWJ-RUNTIME-BOOT-1-IMPLEMENTATION-REPORT.md`.
+
+Summary: `ExperienceFetchOutcome` gained `ExperienceFetchNotPublished` (mobile's `experience_fetcher.dart`
+maps `GET commerce/v1/experience`'s 404 to it, distinct from any other fetch failure);
+`resolveStartup()` gained `UseDefaultExperience`, returned immediately for that outcome, never
+routed through last-known-good. `AwjRuntimeShell` now calls `resolveRealStartup()` once per app
+session and renders Published/Default AWJ Experience/LastKnownGood/`ControlledUnavailable`
+accordingly, through the existing `HomeScreen`/`CartScreen` rendering pipeline (each screen gained
+one optional injected-experience parameter, no UI redesign). `ProductScreen`/`$route.productId`,
+deep link/push navigation, and tenant isolation/RBAC are unchanged.
+
+Tests: `test/startup/` 33 passed; new `test/app/awj_runtime_shell_startup_test.dart` proves all four
+contract branches against the real shell (4 passed); full local `flutter test` 356 passed, 0 failed;
+`flutter analyze` clean. Six existing app-level widget tests updated to pass an explicit
+`InMemoryExperienceCache` (the production `FileExperienceCache` default depends on `path_provider`'s
+platform channel, which hangs rather than erroring under plain `flutter_test` with no mock) and, for
+fake servers with no `experience` route, an explicit 404 matching real backend behavior.
+
+Real-device verification before any actual mobile distribution remains owed and unresolved by this
+task, as previously recorded — this task is web/API-boundary logic plus widget tests only.

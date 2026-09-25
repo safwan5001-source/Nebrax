@@ -29,9 +29,31 @@ class ExperienceFetchSucceeded extends ExperienceFetchOutcome {
 /// non-sensitive machine-readable code (never a raw exception message or
 /// URL, so this can never leak a token embedded in a query string or a
 /// server error body into a diagnostic).
+///
+/// Deliberately **not** what a 404/"nothing published for this tenant"
+/// response produces — see [ExperienceFetchNotPublished]. A transient
+/// failure is retried against last-known-good; "nothing published" is a
+/// definitive, well-formed answer from the server and is not.
 class ExperienceFetchFailed extends ExperienceFetchOutcome {
   final String reason;
   const ExperienceFetchFailed(this.reason);
+}
+
+/// A fetch that reached the server and received its documented, definitive
+/// "no Published Experience exists for this tenant" answer (`GET
+/// commerce/v1/experience`'s 404 — `CommerceExperienceController::show`)
+/// — never produced by a network/timeout/transport/server error or
+/// malformed bytes, which stay [ExperienceFetchFailed].
+///
+/// AWJ Runtime Boot contract: this is not a fetch failure and must never be
+/// treated like one. [resolveStartup] routes it straight to the bundled
+/// Default AWJ Experience ([UseDefaultExperience]), never through
+/// last-known-good — a tenant that has genuinely never published (or has
+/// deliberately unpublished) is not "temporarily unreachable", so there is
+/// nothing to recover from and no reason to prefer a stale cache over the
+/// current, correct answer.
+class ExperienceFetchNotPublished extends ExperienceFetchOutcome {
+  const ExperienceFetchNotPublished();
 }
 
 /// A previously validated Published Experience cached as MR-14's
@@ -110,6 +132,27 @@ class UseFreshExperience extends StartupDecision {
   const UseFreshExperience(this.experience);
 }
 
+/// Render the bundled **Default AWJ Experience** — this runtime's own
+/// `kHomeSchemaJson`/`kCartSchemaJson` (`app/runtime_schema.dart`) — because
+/// this boot's tenant has no Published Experience at all
+/// ([ExperienceFetchNotPublished]).
+///
+/// This is the AWJ Runtime Boot contract's explicit second branch, not an
+/// accidental fallback: a tenant that has never published (or has
+/// deliberately unpublished) an App Builder Experience is not in a failure
+/// state, so it is never routed through [UseLastKnownGood] or
+/// [ControlledUnavailable] — it gets this runtime's own always-available,
+/// always-compatible bundled demo, by design.
+///
+/// Carries no payload: unlike [UseFreshExperience]/[UseLastKnownGood], the
+/// Default AWJ Experience is not fetched, cached, or resolved through
+/// [CompatibilityResolver] at all — it is compiled into this runtime build
+/// itself, and the screen layer already knows how to render it (exactly as
+/// it always has) whenever no live experience overrides it.
+class UseDefaultExperience extends StartupDecision {
+  const UseDefaultExperience();
+}
+
 /// Render a previously validated, still-compatible, integrity-intact cache
 /// entry because this boot's fetch did not succeed. MR-14: this is
 /// presentation recovery only — the caller must still treat any commerce
@@ -141,8 +184,18 @@ class ControlledUnavailable extends StartupDecision {
 
 /// Decides what a boot should render, given this attempt's fetch outcome, an
 /// optional previously cached Experience, and the installed runtime's
-/// [CapabilityManifest] — MR-14's "last-known-good startup and offline
-/// safety" decision mechanism.
+/// [CapabilityManifest] — the **AWJ Runtime Boot contract** (MR-14's
+/// "last-known-good startup and offline safety" decision mechanism, extended
+/// to name the Default AWJ Experience explicitly):
+///
+/// 1. Published Experience exists and is compatible -> [UseFreshExperience].
+/// 2. No Published Experience ([ExperienceFetchNotPublished]) ->
+///    [UseDefaultExperience] — never treated as a fetch failure, never
+///    routed through last-known-good.
+/// 3. Fetch fails transiently ([ExperienceFetchFailed]) and a compatible,
+///    intact last-known-good cache exists -> [UseLastKnownGood].
+/// 4. Fetch fails transiently and no usable cache exists ->
+///    [ControlledUnavailable].
 ///
 /// Pure function, exactly like [CompatibilityResolver.resolve] (which it
 /// delegates every compatibility question to, never re-implementing the
@@ -155,6 +208,9 @@ StartupDecision resolveStartup({
   required CapabilityManifest manifest,
   CompatibilityResolver resolver = const CompatibilityResolver(),
 }) {
+  if (fetch is ExperienceFetchNotPublished) {
+    return const UseDefaultExperience();
+  }
   if (fetch is ExperienceFetchSucceeded) {
     final AppSchema schema;
     try {

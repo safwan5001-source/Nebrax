@@ -5,6 +5,7 @@ import 'app/awj_runtime_shell.dart';
 import 'app/runtime_schema.dart';
 import 'commerce/commerce.dart';
 import 'schema/schema.dart';
+import 'startup/startup.dart';
 
 /// This runtime's default brand seed color — used whenever the bundled
 /// schema carries no `theme.tokens.colorPrimary`, or an invalid one.
@@ -55,7 +56,11 @@ class AwjMobileRuntimeApp extends StatefulWidget {
   /// Test-only override, forwarded to [AwjRuntimeShell].
   final CommerceClient? client;
 
-  const AwjMobileRuntimeApp({super.key, this.client});
+  /// Test-only override, forwarded to [AwjRuntimeShell] — the AWJ Runtime
+  /// Boot resolver's on-device last-known-good cache.
+  final ExperienceCache? experienceCache;
+
+  const AwjMobileRuntimeApp({super.key, this.client, this.experienceCache});
 
   @override
   State<AwjMobileRuntimeApp> createState() => _AwjMobileRuntimeAppState();
@@ -99,6 +104,7 @@ class _AwjMobileRuntimeAppState extends State<AwjMobileRuntimeApp> {
       },
       home: AwjRuntimeShell(
         client: widget.client,
+        experienceCache: widget.experienceCache,
         locale: _locale,
         onLocaleChanged: _onLocaleChanged,
       ),

@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:awj_mobile_runtime/app.dart';
 import 'package:awj_mobile_runtime/app/runtime_schema.dart';
+import 'package:awj_mobile_runtime/startup/startup.dart';
 
 import 'app/fake_commerce.dart';
 
@@ -11,7 +12,7 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(
-      AwjMobileRuntimeApp(client: buildFakeCommerceClient()),
+      AwjMobileRuntimeApp(client: buildFakeCommerceClient(), experienceCache: InMemoryExperienceCache()),
     );
     await tester.pumpAndSettle();
 
@@ -22,7 +23,7 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(
-      AwjMobileRuntimeApp(client: buildFakeCommerceClient()),
+      AwjMobileRuntimeApp(client: buildFakeCommerceClient(), experienceCache: InMemoryExperienceCache()),
     );
     await tester.pumpAndSettle();
 
@@ -37,7 +38,7 @@ void main() {
     '(APP-BUILDER-22 — the token used to be parsed but never read)',
     (tester) async {
       await tester.pumpWidget(
-        AwjMobileRuntimeApp(client: buildFakeCommerceClient()),
+        AwjMobileRuntimeApp(client: buildFakeCommerceClient(), experienceCache: InMemoryExperienceCache()),
       );
       await tester.pumpAndSettle();
 

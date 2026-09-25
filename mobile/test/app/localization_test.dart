@@ -3,6 +3,7 @@ import 'package:awj_mobile_runtime/app/runtime_strings.dart';
 import 'package:awj_mobile_runtime/commerce/commerce.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:awj_mobile_runtime/startup/startup.dart';
 
 import '../commerce/fake_transport.dart';
 import 'fake_commerce.dart';
@@ -18,6 +19,12 @@ void main() {
     CommerceHttpRequest request,
   ) async {
     final segments = request.uri.pathSegments;
+    // The AWJ Runtime Boot contract's `GET commerce/v1/experience` — see
+    // `deep_link_navigation_test.dart`'s identical branch for why this is a
+    // 404, not the generic `{data: []}` fallback below.
+    if (segments.last == 'experience') {
+      return jsonResponse(404, errorEnvelope('not_found', 'no published experience'));
+    }
     if (segments.last == 'products') {
       return jsonResponse(200, {
         'data': [
@@ -105,7 +112,7 @@ void main() {
     'names between ar (default) and en',
     (tester) async {
       final client = buildFakeCommerceClient(handler: productHandler);
-      await tester.pumpWidget(AwjMobileRuntimeApp(client: client));
+      await tester.pumpWidget(AwjMobileRuntimeApp(client: client, experienceCache: InMemoryExperienceCache()));
       await tester.pumpAndSettle();
 
       // Arabic is the default (project-wide RTL-first rule).
@@ -148,7 +155,7 @@ void main() {
       sessionStore: InMemorySecureSessionStore(),
       transport: transport,
     );
-    await tester.pumpWidget(AwjMobileRuntimeApp(client: client));
+    await tester.pumpWidget(AwjMobileRuntimeApp(client: client, experienceCache: InMemoryExperienceCache()));
     await tester.pumpAndSettle();
     expect(transport.requests.last.headers['Accept-Language'], 'ar');
 
@@ -168,7 +175,7 @@ void main() {
       final handle = tester.ensureSemantics();
 
       final client = buildFakeCommerceClient(handler: productHandler);
-      await tester.pumpWidget(AwjMobileRuntimeApp(client: client));
+      await tester.pumpWidget(AwjMobileRuntimeApp(client: client, experienceCache: InMemoryExperienceCache()));
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('تمر'));
@@ -196,7 +203,7 @@ void main() {
       await tester.pumpWidget(
         MediaQuery(
           data: const MediaQueryData(textScaler: TextScaler.linear(2.5)),
-          child: AwjMobileRuntimeApp(client: client),
+          child: AwjMobileRuntimeApp(client: client, experienceCache: InMemoryExperienceCache()),
         ),
       );
       await tester.pumpAndSettle();
@@ -223,7 +230,7 @@ void main() {
     'accept keyboard focus (focus/navigation sanity)',
     (tester) async {
       final client = buildFakeCommerceClient(handler: productHandler);
-      await tester.pumpWidget(AwjMobileRuntimeApp(client: client));
+      await tester.pumpWidget(AwjMobileRuntimeApp(client: client, experienceCache: InMemoryExperienceCache()));
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('تمر'));
@@ -255,7 +262,7 @@ void main() {
     '(MR-11: no direction-only meaning)',
     (tester) async {
       final client = buildFakeCommerceClient(handler: productHandler);
-      await tester.pumpWidget(AwjMobileRuntimeApp(client: client));
+      await tester.pumpWidget(AwjMobileRuntimeApp(client: client, experienceCache: InMemoryExperienceCache()));
       await tester.pumpAndSettle();
 
       // Arabic/RTL: "forward" (toward the cart) reads as pointing left.

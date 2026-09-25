@@ -53,13 +53,21 @@ Future<StartupDecision> resolveRealStartup({
 }
 
 /// Maps every way [CommerceClient.getExperienceSchemaJson] can fail to
+/// either [ExperienceFetchNotPublished] (the endpoint's documented,
+/// definitive "nothing published for this tenant" 404 —
+/// `CommerceExperienceController::show`'s only 404 case) or
 /// [ExperienceFetchFailed]'s stable, non-sensitive `reason` code — never a
-/// raw exception message or URL (its own doc comment's requirement).
+/// raw exception message or URL (its own doc comment's requirement). This is
+/// the one place that draws that line: everywhere else in the runtime, a
+/// 404 on this specific, single-purpose endpoint means exactly one thing.
 Future<ExperienceFetchOutcome> _fetch(CommerceClient client) async {
   try {
     final rawJson = await client.getExperienceSchemaJson();
     return ExperienceFetchSucceeded(rawJson);
   } on CommerceApiException catch (e) {
+    if (e.statusCode == 404) {
+      return const ExperienceFetchNotPublished();
+    }
     return ExperienceFetchFailed(e.code.name);
   } on CommerceProtocolException {
     return const ExperienceFetchFailed('protocol_error');

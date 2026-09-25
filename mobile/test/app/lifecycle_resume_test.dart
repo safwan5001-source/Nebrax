@@ -2,6 +2,7 @@ import 'package:awj_mobile_runtime/app.dart';
 import 'package:awj_mobile_runtime/commerce/commerce.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:awj_mobile_runtime/startup/startup.dart';
 
 import '../commerce/fake_transport.dart';
 import 'fake_commerce.dart';
@@ -17,11 +18,17 @@ void main() {
               request.uri.pathSegments.last == 'products') {
             productListCalls++;
           }
+          // The AWJ Runtime Boot contract's `GET commerce/v1/experience` —
+          // see `deep_link_navigation_test.dart`'s identical branch for why
+          // this is a 404, not the generic `{data: []}` fallback below.
+          if (request.uri.pathSegments.last == 'experience') {
+            return jsonResponse(404, errorEnvelope('not_found', 'no published experience'));
+          }
           return jsonResponse(200, {'data': [], 'meta': paginationMeta()});
         },
       );
 
-      await tester.pumpWidget(AwjMobileRuntimeApp(client: client));
+      await tester.pumpWidget(AwjMobileRuntimeApp(client: client, experienceCache: InMemoryExperienceCache()));
       await tester.pumpAndSettle();
       expect(productListCalls, 1, reason: 'cold start loads Home once');
 
@@ -57,11 +64,14 @@ void main() {
               request.uri.pathSegments.last == 'products') {
             productListCalls++;
           }
+          if (request.uri.pathSegments.last == 'experience') {
+            return jsonResponse(404, errorEnvelope('not_found', 'no published experience'));
+          }
           return jsonResponse(200, {'data': [], 'meta': paginationMeta()});
         },
       );
 
-      await tester.pumpWidget(AwjMobileRuntimeApp(client: client));
+      await tester.pumpWidget(AwjMobileRuntimeApp(client: client, experienceCache: InMemoryExperienceCache()));
       await tester.pumpAndSettle();
       expect(productListCalls, 1);
 

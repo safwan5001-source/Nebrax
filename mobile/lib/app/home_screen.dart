@@ -36,12 +36,21 @@ class HomeScreen extends StatefulWidget {
   final AppActionDispatcher dispatcher;
   final Locale locale;
 
+  /// The AWJ Runtime Boot contract's live Experience for this boot
+  /// (`AwjRuntimeShell`'s `resolveRealStartup` result), when this boot
+  /// resolved to a Published or last-known-good Experience that declares a
+  /// `home` page. `null` for the Default AWJ Experience decision (this
+  /// screen then renders exactly as it always has, from the bundled
+  /// `kHomeSchemaJson`) and while boot resolution is still in flight.
+  final RenderableExperience? experience;
+
   const HomeScreen({
     super.key,
     required this.client,
     required this.state,
     required this.dispatcher,
     required this.locale,
+    this.experience,
   });
 
   @override
@@ -65,6 +74,20 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   @override
+  void didUpdateWidget(covariant HomeScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Boot resolution (`AwjRuntimeShell._resolveStartupExperience`) is
+    // async and may still be in flight when this screen first mounts —
+    // `experience` can go from `null` (still resolving, or Default AWJ
+    // Experience) to a real [RenderableExperience] (or back, on retry)
+    // without this screen ever being recreated, so the base page must be
+    // recomputed then too, not only in `initState`.
+    if (!identical(oldWidget.experience, widget.experience)) {
+      _resolveSchema();
+    }
+  }
+
+  @override
   void dispose() {
     widget.state.removeListener(_onStateChanged);
     super.dispose();
@@ -77,7 +100,18 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  /// The `home` page node this screen renders. A live [widget.experience]
+  /// (already resolved/validated by `resolveRealStartup` before this screen
+  /// ever saw it) wins when it declares a `home` page; otherwise this falls
+  /// back to the bundled Default AWJ Experience — both this screen's own
+  /// prior-to-this-task-only behavior, and the safe degrade when a live
+  /// Experience happens not to declare a `home` page of its own.
   void _resolveSchema() {
+    final liveHomePage = widget.experience?.pages['home'];
+    if (liveHomePage != null) {
+      _basePage = liveHomePage;
+      return;
+    }
     final result = resolveRuntimeSchema(
       kHomeSchemaJson,
       CapabilityManifest.current(currentRuntimePlatform()),
