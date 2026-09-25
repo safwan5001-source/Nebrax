@@ -27,6 +27,11 @@
     "amountDue": "Amount due",
     "notAvailable": "Not available"
   },
+  "notFound": {
+    "title": "Page not found",
+    "description": "This page is not part of the store. The catalog and your cart are unchanged.",
+    "home": "Back to the store"
+  },
   "header": {
     "categories": "Categories",
     "openCart": "Open cart",

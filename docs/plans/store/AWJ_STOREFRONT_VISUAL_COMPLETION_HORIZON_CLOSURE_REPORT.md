@@ -1,24 +1,24 @@
 # AWJ Storefront Visual Completion — Horizon status
 
-**Status:** PAUSED. Not closed.  
-**Reason:** Two IMPLEMENTATION_READY fixes are in unmerged PRs. Designed 404 and public density/product-card parity are still open. GitHub CI was not observed on the final heads. This invocation forbids merge and deploy.
+**Status:** OPEN. Not closed.  
+**Reason:** Designed 404 and public density/product-card parity are still open. The earlier pause (unmerged #1015/#1016/#1017, CI not observed) is resolved.
 
 ## Identity
 
 | | |
 |---|---|
 | Verified base / latest `main` at start | `fdfa0b34f5197c17f2da45b3bfad7a30bd124ed4` |
-| Main moved during the pass? | No |
+| Main after #1014, then these merges | `ec2aad3cacc988417971489d46c9125da838c8d8` |
 
-## Pull requests (not merged)
+## Pull requests
 
-| PR | Branch | Base | Head | What |
+| PR | Branch | Reviewed head | Merge SHA | What |
 |---|---|---|---|---|
-| [#1015](https://github.com/safwan5001-source/Nebrax/pull/1015) | `docs/storefront-visual-completion-evidence` | `fdfa0b34f5197c17f2da45b3bfad7a30bd124ed4` | `bafd59385e5126b51b18fc36bef8d62c04ee58f7` | Evidence matrix, horizon, screenshots |
-| [#1016](https://github.com/safwan5001-source/Nebrax/pull/1016) | `fix/storefront-published-home-sections` | same | `99349f4fc93fa610242101e1a7fccd68161d6d59` | Public v2 section deletion |
-| [#1017](https://github.com/safwan5001-source/Nebrax/pull/1017) | `fix/customizer-chrome-click-to-edit` | same | `b6498e9b706a95d467d3844a445e1e6521a59b09` | Chrome click-to-edit + honest hints |
+| [#1015](https://github.com/safwan5001-source/Nebrax/pull/1015) | `docs/storefront-visual-completion-evidence` | `0b6b146ae19e8219011404ad0c2006f13c80a214` | `ec2aad3cacc988417971489d46c9125da838c8d8` | Evidence matrix, horizon, screenshots |
+| [#1016](https://github.com/safwan5001-source/Nebrax/pull/1016) | `fix/storefront-published-home-sections` | `99349f4fc93fa610242101e1a7fccd68161d6d59` | `2e1225f39e553103ef628e25438461d4cd7d2abe` | Public v2 section deletion |
+| [#1017](https://github.com/safwan5001-source/Nebrax/pull/1017) | `fix/customizer-chrome-click-to-edit` | `b6498e9b706a95d467d3844a445e1e6521a59b09` | `6b8869e8694c3b897eed4f75bbf1af07b708f1e4` | Chrome click-to-edit + honest hints |
 
-This closure note is a follow-up commit on #1015. It does not change the code heads of #1016 or #1017.
+Each squash is a single parent. Path diffs against the reviewed heads were empty. `PRE_MERGE_REVIEW: PASS` and `POST_MERGE_REVIEW: PASS` are on the PR threads with those SHAs. Post-merge CI was green on each merge commit (PHP sqlite + pgsql; storefront CI on #1016 and #1017; web CI on #1017). No deploy.
 
 ## Evidence completed
 
@@ -93,11 +93,10 @@ None. No packet. The content-schema and media-storage choices were not forced.
 
 ## PRE_MERGE_REVIEW
 
-`PRE_MERGE_REVIEW: NOT RECORDED`  
-CI on the exact heads was not observed. Merge was not performed. A later review must be redone if any head moves.
+Recorded on each PR before merge, against the exact head SHA above. A later head move invalidates that review.
 
 ## Next dependency-safe action
 
-1. Safwan reviews #1015, #1016, and #1017. They do not depend on each other.
-2. After his merge approval, observe CI on the exact head, then record `PRE_MERGE_REVIEW: PASS` with that SHA. This session did not merge.
-3. In parallel, without waiting for merge: STORE-STATES-CLOSE-1 (designed 404) and STORE-THEME-PARITY-1 (`density` / `productCard` on the public page only).
+1. STORE-STATES-CLOSE-1 — designed `not-found` inside the store shell.
+2. STORE-THEME-PARITY-1 — public `density` and `productCard` only.
+3. Do not deploy.

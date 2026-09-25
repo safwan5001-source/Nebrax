@@ -92,12 +92,10 @@ UX V2 §3.2. Panels `header`, `branding`, `footer`, `whatsapp`, `social` already
 
 `logoHint` / `displayNameHint` claimed the logo and name were session-only. `branding.displayName` and capped raster data URLs already round-trip through draft/publish. The hint now says that, including the 512 KB cap and the SVG rejection. It does not claim a file-storage upload exists.
 
-### 5.3 Not started, still IMPLEMENTATION_READY
+### 5.3 Follow-up after the evidence pass
 
-- Designed storefront `not-found` (shell + bilingual empty state, no new data).
-- Public application of published `density` and `productCard` (padding/rhythm only).
-
-These do not depend on merging the two fixes above. They were left so the open PRs stay reviewable. They are not closed.
+- Designed storefront `not-found` is the current task: `not-found.tsx` inside the storefront segment, so `notFound()` from a store page renders inside the existing shell. Arabic and English copy. No new commerce data. An unmatched URL that never enters this segment still uses the framework page.
+- Public application of published `density` and `productCard` (padding/rhythm only) is still open.
 
 ### 5.4 Explicitly not implementation
 

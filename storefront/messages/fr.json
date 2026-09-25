@@ -27,6 +27,11 @@
     "amountDue": "Montant du",
     "notAvailable": "Non disponible"
   },
+  "notFound": {
+    "title": "Page introuvable",
+    "description": "Cette page ne fait pas partie de la boutique. Le catalogue et le panier sont inchangés.",
+    "home": "Retour à la boutique"
+  },
   "header": {
     "categories": "Categories",
     "openCart": "Ouvrir le panier",

@@ -13,6 +13,7 @@ vi.mock("next/navigation", () => ({
   }),
   usePathname: () => "/us/en",
   useSearchParams: () => new URLSearchParams(),
+  useParams: () => ({ country: "sa", locale: "ar" }),
 }));
 
 // Mock next/headers
