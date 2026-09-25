@@ -1,6 +1,6 @@
 # AWJ App Builder — Live Runtime & Preview V1
 
-**Status:** APPROVED / READY  
+**Status:** CLOSED / PASS (2026-09-25) — see `AWJ_APP_BUILDER_LIVE_RUNTIME_PREVIEW_V1_CLOSURE_REPORT.md`  
 **Starting main SHA:** `21c012ef343c755feab012c5d41bd8649e6d549c`  
 **Predecessor:** Commerce Data & Dynamic Runtime V1 — CLOSED / PASS  
 **Runtime Boot prerequisite:** APP RUNTIME BOOT-1 / PR #1011 — CLOSED / PASS
@@ -53,7 +53,10 @@ Standing authority covers implementation, tests, commits, PRs, merging green dep
 | LIVE-PREVIEW-5 | Runtime-Aware Pre-Publish Validation | **DONE / PASS** — see `LIVE-PREVIEW-5-PREPUBLISH-VALIDATION.md` |
 | LIVE-PREVIEW-6 | Draft / Default / Published Preview States | **DONE / PASS** — see `LIVE-PREVIEW-6-PREVIEW-STATES.md` |
 | LIVE-PREVIEW-7 | Integrated Builder → Publish → Runtime Proof | **DONE / PASS** — see `LIVE-PREVIEW-7-INTEGRATED-PROOF.md` |
-| LIVE-PREVIEW-8 | Horizon Closure / Durable Documentation | READY |
+| LIVE-PREVIEW-8 | Horizon Closure / Durable Documentation | **DONE / PASS** — see `AWJ_APP_BUILDER_LIVE_RUNTIME_PREVIEW_V1_CLOSURE_REPORT.md` |
+
+**Horizon status: CLOSED / PASS.** All 8 tasks complete. See
+`AWJ_APP_BUILDER_LIVE_RUNTIME_PREVIEW_V1_CLOSURE_REPORT.md` for the full closure report.
 
 ### LIVE-PREVIEW-1 — Preview Contract Evidence Pass
 
@@ -343,9 +346,12 @@ The horizon is CLOSED / PASS only when evidence proves:
   this PR, matching how Dart/Flutter's absence was handled in LP-2/LP-3. No Decision Gate
   triggered; no schema/API/RBAC/Tenant Isolation/Commerce authorization change; no financial/
   accounting rule changed (this file has no ledger-affecting code path).
-- **LIVE-PREVIEW-6 — Draft / Default / Published Preview States: DONE / PASS** (implementation
-  complete; PR pending). Full report: `docs/plans/app-builder/LIVE-PREVIEW-6-PREVIEW-STATES.md`.
-  Base SHA: `d565161dff81b65174fbb2fab443871176eb3940` (LP-5's merge commit). Closed the gap
+- **LIVE-PREVIEW-6 — Draft / Default / Published Preview States: DONE / PASS.** PR #1026
+  (squash-merged). Full report: `docs/plans/app-builder/LIVE-PREVIEW-6-PREVIEW-STATES.md`.
+  Base SHA: `d565161dff81b65174fbb2fab443871176eb3940` (LP-5's merge commit).
+  **Merge SHA: `d3dcf8f803034a9296aada58fcb89fbb437f52a8`** (verified via `get_commit`). CI: 6/6
+  checks green (`php artisan test (L11, sqlite/pgsql)` ×2, `web build (Next.js)` ×2 across two
+  workflow triggers). Closed the gap
   LIVE-PREVIEW-1 §7 identified: Preview had no way to show either the Default AWJ Experience
   (the mobile app's own bundled `kHomeSchemaJson`/`kCartSchemaJson`) or a merchant's last
   Published version — only the live draft, unlabeled as such. Built (1)
@@ -368,13 +374,13 @@ The horizon is CLOSED / PASS only when evidence proves:
   new route, no schema/API contract change (existing endpoints, existing shapes), no capability
   broadened (strictly read-only presentation of already-returned data), no Tenant
   Isolation/RBAC/Commerce authorization/auth-token surface touched.
-- **LIVE-PREVIEW-6 — Draft / Default / Published Preview States: DONE / PASS.** PR #1026
-  (squash-merged). **Merge SHA: `d3dcf8f803034a9296aada58fcb89fbb437f52a8`** (verified via
-  `get_commit`). CI: 6/6 checks green (`php artisan test (L11, sqlite/pgsql)` ×2, `web build
-  (Next.js)` ×2 across two workflow triggers). Full report in the LIVE-PREVIEW-6 entry above.
-- **LIVE-PREVIEW-7 — Integrated Builder → Publish → Runtime Proof: DONE / PASS** (implementation
-  complete; PR pending). Full report: `docs/plans/app-builder/LIVE-PREVIEW-7-INTEGRATED-PROOF.md`.
-  Base SHA: `d3dcf8f803034a9296aada58fcb89fbb437f52a8` (LP-6's merge commit). Closed the gap
+- **LIVE-PREVIEW-7 — Integrated Builder → Publish → Runtime Proof: DONE / PASS.** PR #1028
+  (squash-merged, after one CI-red fix cycle — see below). Full report: `docs/plans/app-builder/
+  LIVE-PREVIEW-7-INTEGRATED-PROOF.md`. Base SHA: `d3dcf8f803034a9296aada58fcb89fbb437f52a8`
+  (LP-6's merge commit). **Merge SHA: `222fb9bfc77af79ea14b66b54ab680b2eaecabc1`** (verified via
+  `get_commit`). CI: 8/8 checks green on the fixed head (`php artisan test (L11, sqlite/pgsql)`
+  ×2, `web build (Next.js)`, `mobile (analyze + test)`, `mobile (Android/iOS release build
+  proof)`). Closed the gap
   LIVE-PREVIEW-1 §7 named: no test previously used the *same* schema document across the backend
   chain, Preview, and the real Dart runtime chain — each existing proof test
   (`AppBuilderIntegratedProofTest`, `AppBuilderSameStoreProofTest`, `awj_runtime_shell_startup_
@@ -415,4 +421,18 @@ The horizon is CLOSED / PASS only when evidence proves:
   Decision Gate triggered: no new route, no schema/API/auth change, no capability broadened, no
   Tenant Isolation/RBAC/Commerce authorization touched, no production rendering code changed —
   both findings above are recorded, not implemented.
-- Next task once LP-7's PR merges: **LIVE-PREVIEW-8 — Horizon Closure / Durable Documentation**.
+  **CI-red fix cycle**: the first real CI run (`php artisan test (L11, sqlite/pgsql)`) failed —
+  `AppBuilderPreviewToRuntimeIntegratedProofTest` is the first PHP test to read a
+  `contracts/app-builder/**` fixture via `base_path()`; every prior consumer of that directory
+  was TypeScript/Dart only, so this test environment's existing core-to-generated-app copy
+  allowlist (`ci.yml`/`setup.sh`) never included `contracts/`, and the fixture wasn't found in
+  the generated app. Fixed by following the identical existing precedent for `docs/openapi/
+  *.yaml` (copied for the exact same `base_path()` reason): added `contracts/app-builder` to
+  both files' copy lists. Verified locally, pushed, all 8 checks (including the `mobile` Dart job
+  exercising the new `group('E — ...')` cases — the first real Flutter-toolchain verification of
+  this task's Dart code, since this sandbox has none) passed on the corrected head. Documented in
+  full in the evidence doc's own "CI infrastructure fix" section.
+- **LIVE-PREVIEW-8 — Horizon Closure / Durable Documentation: DONE / PASS.** Full closure report:
+  `docs/plans/app-builder/AWJ_APP_BUILDER_LIVE_RUNTIME_PREVIEW_V1_CLOSURE_REPORT.md` — task-by-task
+  PR/SHA/CI ledger, all 10 exit criteria evidenced, integrated-proof summary, complete list of
+  intentional deferrals, security/Tenant Isolation status, and recommended next workstream.
