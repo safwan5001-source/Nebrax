@@ -6869,6 +6869,7 @@
       "layersTitle": "الطبقات",
       "initialPageBadge": "رئيسية",
       "emptyPage": "صفحة فارغة",
+      "sampleDataBanner": "بيانات تجريبية — لإظهار شكل الربط بالبيانات فقط، وليست بيانات متجرك الفعلية",
       "pages": {
         "addAction": "إضافة صفحة",
         "setHomeLabel": "تعيين كصفحة رئيسية",
