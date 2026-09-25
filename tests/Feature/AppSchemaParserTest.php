@@ -307,6 +307,59 @@ class AppSchemaParserTest extends TestCase
     }
 
     /** @test */
+    public function parses_a_component_with_a_well_formed_collect_binding(): void
+    {
+        $schema = $this->minimalSchema();
+        $schema['pages']['home']['children'] = [
+            ['type' => 'CartList', 'id' => 'c1', 'binding' => [
+                'resource' => 'commerce.cart',
+                'collect' => 'items',
+            ], 'children' => [
+                ['type' => 'Section', 'id' => 'c1-item', 'props' => ['title' => '$item.product_name']],
+            ]],
+        ];
+
+        $this->parser()->validate($schema);
+        $this->assertTrue(true);
+    }
+
+    /** @test */
+    public function rejects_a_non_string_collect(): void
+    {
+        $schema = $this->minimalSchema();
+        $schema['pages']['home']['children'] = [
+            ['type' => 'CartList', 'id' => 'c1', 'binding' => [
+                'resource' => 'commerce.cart', 'collect' => 5,
+            ]],
+        ];
+
+        try {
+            $this->parser()->validate($schema);
+            $this->fail('expected SchemaFormatException');
+        } catch (SchemaFormatException $e) {
+            $this->assertSame('invalid_type', $e->errorCode);
+        }
+    }
+
+    /** @test */
+    public function rejects_an_empty_collect(): void
+    {
+        $schema = $this->minimalSchema();
+        $schema['pages']['home']['children'] = [
+            ['type' => 'CartList', 'id' => 'c1', 'binding' => [
+                'resource' => 'commerce.cart', 'collect' => '',
+            ]],
+        ];
+
+        try {
+            $this->parser()->validate($schema);
+            $this->fail('expected SchemaFormatException');
+        } catch (SchemaFormatException $e) {
+            $this->assertSame('invalid_type', $e->errorCode);
+        }
+    }
+
+    /** @test */
     public function parses_a_component_with_a_simple_visibility_leaf(): void
     {
         $schema = $this->minimalSchema();

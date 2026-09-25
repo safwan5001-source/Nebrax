@@ -145,6 +145,46 @@ class CommerceClient {
     pathSegments: [...config.baseUrl.pathSegments, 'media', id],
   );
 
+  /// `APP-BUILDER-17` slice 3 — fetches the raw `data` payload for a
+  /// `binding.resource` identifier (`commerce.categories`/`commerce.products`/
+  /// `commerce.cart`, `DataResourceRegistry`'s locked V1 scope), bypassing
+  /// every typed model above on purpose: the binding-resolution pipeline
+  /// (`app/binding_resolution.dart`) resolves `itemProps`/`$item.<field>`
+  /// paths against the *wire* field names (`docs/openapi/commerce-api-v1.yaml`,
+  /// snake_case — `product_id`, `unit_price`, ...), which is exactly what the
+  /// PHP `DataResourceRegistry` and this file's own [DataResourceRegistry]
+  /// (`mobile/lib/schema/data_resource_registry.dart`) both declare. Going
+  /// through a typed model first (camelCase Dart fields) would silently
+  /// desync from that contract the moment a model's field naming diverges
+  /// from the wire, which the registries have no way to catch.
+  ///
+  /// Returns whatever shape `data` is on the wire for that resource — a
+  /// `List` for a `SHAPE_LIST` resource (`commerce.products`/
+  /// `commerce.categories`), a `Map` for a `SHAPE_SINGLE` one
+  /// (`commerce.cart`). The caller (the binding-resolution pipeline) already
+  /// knows which shape to expect from the same [DataResourceRegistry] it
+  /// validated the binding against at compatibility-resolution time.
+  Future<Object?> fetchBindingResource(
+    String resourceId, {
+    Map<String, String>? query,
+  }) async {
+    final pathSegments = switch (resourceId) {
+      'commerce.categories' => const ['categories'],
+      'commerce.products' => const ['products'],
+      'commerce.cart' => const ['cart'],
+      _ => throw ArgumentError.value(resourceId, 'resourceId', 'unknown binding resource'),
+    };
+    final envelope = await _send(
+      CommerceHttpMethod.get,
+      pathSegments,
+      query: query,
+      customerTokenPolicy: resourceId == 'commerce.cart'
+          ? _CustomerTokenPolicy.optional
+          : _CustomerTokenPolicy.none,
+    );
+    return envelope['data'];
+  }
+
   // -- Cart (write tier; optional customer identity, cart-token session) ---
 
   Future<CommerceCart> getCart() async {

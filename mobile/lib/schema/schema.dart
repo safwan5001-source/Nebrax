@@ -10,6 +10,7 @@ library;
 export 'app_schema.dart';
 export 'capability_manifest.dart';
 export 'compatibility.dart';
+export 'data_resource_registry.dart';
 export 'registry_identifiers.dart';
 export 'schema_version.dart';
 export 'visibility_vocabulary.dart';

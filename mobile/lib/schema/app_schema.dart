@@ -78,13 +78,26 @@ class SchemaBinding {
   final Map<String, Object?> query;
   final Map<String, String> itemProps;
 
+  /// `APP-BUILDER-17` slice 3 (Decision Gate approved) — a dotted field path
+  /// (same convention as [itemProps]'s field paths) to a `LIST`-typed field
+  /// on the resolved resource whose entries the node's single declared
+  /// child (its item template) is repeated once per, substituting
+  /// `$item.<field>` throughout. `null` means "no repetition" — the
+  /// resolved resource (or, for a `SHAPE_LIST` resource, its own result
+  /// set) is the binding's only target, exactly like today. Purely
+  /// structural here (non-empty string); resource/field identity and
+  /// `LIST`-type validity are `CompatibilityResolver`'s job, mirroring
+  /// [resource]/[itemProps]'s own split exactly.
+  final String? collect;
+
   const SchemaBinding({
     required this.resource,
     required this.query,
     required this.itemProps,
+    this.collect,
   });
 
-  static const _allowedKeys = {'resource', 'query', 'itemProps'};
+  static const _allowedKeys = {'resource', 'query', 'itemProps', 'collect'};
 
   factory SchemaBinding._fromJson(Map<String, Object?> json) {
     _rejectUnknownKeys(json, _allowedKeys, context: 'binding');
@@ -120,10 +133,20 @@ class SchemaBinding {
       });
     }
 
+    final collectRaw = json['collect'];
+    String? collect;
+    if (collectRaw != null) {
+      if (collectRaw is! String || collectRaw.isEmpty) {
+        throw const SchemaFormatException('invalid_type', 'binding.collect must be a non-empty string');
+      }
+      collect = collectRaw;
+    }
+
     return SchemaBinding(
       resource: resource,
       query: query,
       itemProps: Map.unmodifiable(itemProps),
+      collect: collect,
     );
   }
 }
