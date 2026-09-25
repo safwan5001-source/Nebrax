@@ -409,7 +409,12 @@ void main() {
           ),
         );
         final schema = AppSchema.parse(encodeSchema(json));
-        final manifest = manifestOf(dataResources: {'commerce.cart': 1});
+        // `schemaFeatures` explicit and empty: `manifestOf`'s own default
+        // now falls back to `RuntimeCapabilities.schemaFeatures`, which
+        // declares `binding.collect` for real (APP-BUILDER-17 slice 3b) —
+        // this manifest must simulate a runtime that supports the resource
+        // but genuinely predates the collect feature, not today's shipped one.
+        final manifest = manifestOf(dataResources: {'commerce.cart': 1}, schemaFeatures: const {});
 
         final result = resolver.resolve(schema, manifest);
 

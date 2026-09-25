@@ -95,7 +95,7 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       final raw = await widget.client.fetchBindingResource('commerce.products');
       setState(() {
-        _products = _localizeProducts(raw is List ? raw : const []);
+        _products = raw is List ? raw : const [];
         _errorMessage = null;
         _loading = false;
       });
@@ -128,6 +128,13 @@ class _HomeScreenState extends State<HomeScreen> {
   /// expressions"), so a locale pick must happen here, screen-side, on the
   /// raw data *before* `resolveNodeBindings` ever sees it — never by
   /// inventing a schema-level conditional.
+  ///
+  /// Called from [build], not [_loadProducts]: `_products` itself must stay
+  /// the raw, both-locales fetch (never pre-baked to one locale), so that
+  /// toggling the app's locale — which rebuilds this widget with a new
+  /// [widget.locale] but does **not** refetch — recomputes `display_name`
+  /// fresh on every build, exactly like `localizedProductName` was already
+  /// called fresh on every build before this screen used bindings.
   List<Object?> _localizeProducts(List<Object?> rawProducts) {
     return [
       for (final entry in rawProducts)
@@ -174,7 +181,7 @@ class _HomeScreenState extends State<HomeScreen> {
       (node) => withProp(node, 'label', strings.goToCart),
     );
     hydrated = resolveNodeBindings(hydrated, {
-      'commerce.products': _products ?? const <Object?>[],
+      'commerce.products': _localizeProducts(_products ?? const <Object?>[]),
     });
     return ComponentView(node: hydrated, onAction: widget.dispatcher.dispatch);
   }
