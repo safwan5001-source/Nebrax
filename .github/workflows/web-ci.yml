@@ -4,10 +4,14 @@ name: Web CI
 on:
   push:
     branches: ['**']
-    paths: ['web/**', '.github/workflows/web-ci.yml']
+    # `contracts/app-builder/**` (LIVE-PREVIEW-2) is the shared conformance
+    # fixture `web/src/modules/app-builder/runtime-contract.test.ts` asserts
+    # against — see that workflow's own note in `mobile-ci.yml` for why a
+    # fixture-only change must re-run both suites, not just one.
+    paths: ['web/**', 'contracts/app-builder/**', '.github/workflows/web-ci.yml']
   pull_request:
     branches: ['**']
-    paths: ['web/**', '.github/workflows/web-ci.yml']
+    paths: ['web/**', 'contracts/app-builder/**', '.github/workflows/web-ci.yml']
 
 jobs:
   build:

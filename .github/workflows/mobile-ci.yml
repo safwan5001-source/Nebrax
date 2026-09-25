@@ -17,10 +17,15 @@ name: Mobile CI
 on:
   push:
     branches: ['**']
-    paths: ['mobile/**', '.github/workflows/mobile-ci.yml']
+    # `contracts/app-builder/**` (LIVE-PREVIEW-2) is the shared conformance
+    # fixture `mobile/test/app/binding_visibility_conformance_test.dart`
+    # asserts against — it must re-run whenever that fixture changes, not
+    # only when `mobile/**` itself changes, or a Dart-side behavior change
+    # made *only* to keep pace with an updated fixture could go unverified.
+    paths: ['mobile/**', 'contracts/app-builder/**', '.github/workflows/mobile-ci.yml']
   pull_request:
     branches: ['**']
-    paths: ['mobile/**', '.github/workflows/mobile-ci.yml']
+    paths: ['mobile/**', 'contracts/app-builder/**', '.github/workflows/mobile-ci.yml']
 
 jobs:
   check:
