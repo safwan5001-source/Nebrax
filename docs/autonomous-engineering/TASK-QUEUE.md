@@ -925,7 +925,7 @@ Source of truth for this horizon:
 | 2 | APP-BUILDER-14 | done | APP-BUILDER-13 | App Schema `binding` contract (parser + compatibility resolver) |
 | 3 | APP-BUILDER-15 | done (PR #998 merged) | APP-BUILDER-14 | Builder Data UX (Inspector binding editor) |
 | 4 | APP-BUILDER-16 | done (schema contract) | ADR-01 | Conditions/Visibility contract (closed/typed/allowlisted) + Inspector UX |
-| 5 | APP-BUILDER-17 | in_progress (slice 1/3 done, PR #999) | APP-BUILDER-14 | Mobile runtime binding/visibility resolver (replaces 3 hand-written screen implementations) — split into parser support / compatibility gating / resolver+screens+capability flip, see entry below |
+| 5 | APP-BUILDER-17 | in_progress (slice 1/3 merged, PR #999) | APP-BUILDER-14 | Mobile runtime binding/visibility resolver (replaces 3 hand-written screen implementations) — split into parser support / compatibility gating / resolver+screens+capability flip, see entry below |
 | 6 | APP-BUILDER-18 | ready (after 17) | APP-BUILDER-17 | Real action dispatch wired through schema bindings |
 | 7 | APP-BUILDER-19 | ready | ADR-01 (Decision Point 1 = YES) | Live publish → fetch → on-device-cache loop (Last Known Good) |
 | 8 | APP-BUILDER-20 | ready (after 18+19) | APP-BUILDER-18, APP-BUILDER-19 | Same-Store integrated proof |
@@ -1089,8 +1089,10 @@ screens + flipping `RuntimeCapabilities::DATA_RESOURCES`/`SCHEMA_FEATURES` serve
 production-wide publish gate that should not move ahead of a shipped, verified mobile release). Split
 into three independently-shippable slices (see the detailed slice breakdown in `CURRENT-STATE.md`):
 
-- **Slice 1 — Dart parser support** is `done` locally on
-  `claude/app-builder-17-mobile-schema-binding-visibility`, PR #999.
+- **Slice 1 — Dart parser support** is `done`, merged as PR #999 (squash SHA
+  `30af97e0b19b5b94274545b4240a56b82e3e779d`, parent `ef757bd79f39c199047893bea735b90ef8284005`,
+  confirmed single-parent squash onto `main`; post-merge `ci.yml` and `mobile-ci.yml` both green on
+  the merge commit — `web-ci.yml` did not run, expected since this diff is `mobile/*` + docs only).
   `SchemaBinding`/`VisibilityNode` added to `mobile/lib/schema/app_schema.dart`, mirroring
   `AppSchemaParser::validateBinding`/`validateVisibility` exactly (same `MAX_CONDITION_DEPTH`(4)/
   `MAX_CONDITION_BRANCHES`(16) limits). Dormant by construction — `CompatibilityResolver` (Dart) does

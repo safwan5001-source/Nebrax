@@ -628,8 +628,12 @@ hand-written slot hydration, **plus flipping `RuntimeCapabilities::DATA_RESOURCE
 server-side (PHP)** — a production-wide gate on what every tenant can publish, which should not move
 ahead of a verified, shipped mobile release. Slicing:
 
-- **Slice 1 (this entry) — parser support, done locally** on
-  `claude/app-builder-17-mobile-schema-binding-visibility`, PR #999. Adds `SchemaBinding` and
+- **Slice 1 (this entry) — parser support, merged.** PR #999 merged (squash SHA
+  `30af97e0b19b5b94274545b4240a56b82e3e779d`, parent `ef757bd79f39c199047893bea735b90ef8284005` —
+  confirmed single-parent squash onto `main`); post-merge CI (`ci.yml` pgsql+sqlite, `mobile-ci.yml`)
+  both green on the merge commit. `web-ci.yml` did not run for this push — expected, since the diff
+  touches only `mobile/*` and docs, and that workflow is path-filtered to `web/` changes (same as
+  `APP-BUILDER-16`'s Dart/backend-only merge). Adds `SchemaBinding` and
   `VisibilityNode` (mirroring
   `AppSchemaParser::validateBinding`/`validateVisibility` exactly, including the `MAX_CONDITION_DEPTH`
   (4)/`MAX_CONDITION_BRANCHES` (16) limits) to `mobile/lib/schema/app_schema.dart`; `SchemaComponent`
