@@ -431,3 +431,187 @@ These gaps must remain separate scoped capabilities. None should be silently imp
 ## 20. Next pass
 
 Next evidence work should complete the theme-side parity matrix: homepage section types, category/product-card density, search/filter/sort behavior, mobile bottom navigation, cart/checkout presentation, and responsive states. Then the document can be converted into the first complete AWJ Market Theme Spec candidate and reviewed for merge.
+
+
+## 21. AWJ Repository/UI Evidence Pass 03 — theme-side parity
+
+Evidence verified against current `main` storefront contracts, responsive baseline, and presentation tokens.
+
+### Homepage composition
+
+The presentation contract already recognizes these home section types: `hero`, `categories`, `newArrivals`, `wholesale`, `banner`, `featured`, `offers`, `benefits`, `appPromo`, and `customContent`.
+
+However, the contract explicitly separates implemented sections from gated sections. `banner`, `featured`, `offers`, `benefits`, `appPromo`, and `customContent` are currently gated. Their presence in Theme Tokens is a design seam, not proof of a production data contract.
+
+**AWJ Market decision:** use the existing section-instance architecture and ordering/visibility contract. Do not create a parallel Market-only page-builder schema. Market defines a preset/default composition; capabilities remain gated by the platform.
+
+### Density and product cards
+
+The current presentation system already supports `comfortable|compact` density, `standard|compact` product-card treatment, `standard|compact` header styles, and a bounded radius system.
+
+The locked responsive baseline also establishes two-column mobile browsing, three-column tablet behavior, and denser desktop product grids; the catalog implementation validated two columns on mobile, three on tablet, and four on desktop.
+
+Classification: **EXISTING presentation foundation.**
+
+**AWJ Market decision:** default toward compact commerce density and compact product cards, while keeping merchant customization through the shared tokens. The theme must not fork ProductCard or catalog truth merely to achieve density.
+
+### Search
+
+Storefront search is already server-authoritative and searches `name`, `name_en`, and `sku`, with pagination. The existing responsive baseline requires prominent search access.
+
+There is no authoritative contract for suggestions, trending queries, recent searches, typo tolerance, barcode search on the public storefront, or predictive autocomplete.
+
+Classification:
+
+- basic catalog search: **EXISTING**;
+- prominent Market search composition: **THEME/PRESENTATION**;
+- suggestions/autocomplete/trending/recent searches: **MISSING / DEFERRED** unless separately specified.
+
+### Filters and sorting
+
+Current public catalog supports category filtering plus server-side sorting by `name`, `sale_price`, and `created_at`, ascending/descending. It has no price, availability, option, brand, or other facet filters.
+
+Classification:
+
+- category filter: **EXISTING**;
+- name/price/date sorting: **EXISTING**;
+- faceted filtering: **MISSING**.
+
+**AWJ Market decision:** do not draw fake supermarket facets. A future faceting capability should be server-authoritative and operate over the full eligible catalog, not a client-side partial page.
+
+### Mobile bottom navigation
+
+The locked AWJ Store Responsive Visual Baseline already requires persistent bottom navigation on primary mobile shopping surfaces and explicitly removes it from desktop.
+
+Classification: **EXISTING/LOCKED storefront presentation requirement.**
+
+AWJ Market should inherit the shared mobile navigation rather than create a theme-specific navigation system.
+
+### Product detail and variants
+
+The storefront already has authoritative product detail, media gallery, generic product options, concrete variant selection, variant price, variant availability, and variant-specific media. The generic model deliberately avoids inferring color/size semantics when the backend supplies no renderer metadata.
+
+Classification: **EXISTING.**
+
+AWJ Market can change PDP composition/density, but must reuse the generic variant contract and must not introduce grocery-specific assumptions into the product domain.
+
+### Cart and checkout
+
+Cart mutation and checkout remain server-authoritative. The client sends sellable identity/variant, unit and quantity, never authoritative price. Checkout revalidates commercial facts. Unsupported monetary claims remain gated.
+
+Classification: **EXISTING commerce foundation; theme presentation may vary.**
+
+AWJ Market must not create separate cart/checkout business logic. Dense cart rows, sticky actions, mobile composition, and visual hierarchy are theme/presentation concerns only.
+
+### Responsive contract
+
+The locked baseline covers approximately 390–430, 768, 1024, 1280 and 1440 widths; Arabic RTL and English LTR; mobile two-column product browsing where readable; progressively denser tablet/desktop layouts; and no horizontal overflow.
+
+Classification: **EXISTING/LOCKED shared contract.**
+
+AWJ Market is one responsive theme document, not separate desktop and mobile themes.
+
+## 22. AWJ Market Theme Spec Candidate V1
+
+### Identity
+
+- Display name: **AWJ Market**
+- Proposed internal key: `awj-market`
+- Purpose: high-density commerce preset for grocery, supermarket, FMCG, household and other high-SKU retail, while remaining compatible with general catalog products.
+- Reference role: Shona supplies evidence for useful commerce composition/patterns only; no Shona branding, proprietary assets, copy, or merchant identity is copied.
+
+### Architecture
+
+AWJ Market is a **theme/presentation preset over shared AWJ commerce contracts**, not a storefront fork.
+
+It should reuse:
+
+- StorefrontPresentationConfig and its safe normalization;
+- shared ProductCard/ProductGrid/category/search components;
+- existing product/variant/media/price/availability contracts;
+- shared cart and checkout flows;
+- shared mobile bottom navigation;
+- content/contact/WhatsApp/social/app-link presentation contracts;
+- tenant-resolved publication and commerce boundaries.
+
+### Default visual/composition direction
+
+- compact header with highly prominent search;
+- dense category discovery near the top of the home page;
+- compact, scan-friendly product cards;
+- strong price and add-to-cart hierarchy;
+- multiple catalog rails/collections only when backed by authoritative queries/contracts;
+- restrained decoration so product discovery remains dominant;
+- responsive two-column mobile browsing, progressive tablet density, and denser desktop grid;
+- persistent shared mobile bottom navigation on primary shopping surfaces;
+- RTL-first quality with equivalent LTR behavior;
+- merchant colors, branding, radius and supported presentation settings remain customizable through shared Theme Tokens/Customizer.
+
+### Candidate default home order
+
+Subject to capability gates:
+
+1. promotional/announcement area where configured,
+2. hero/banner,
+3. categories,
+4. offers when authoritative offers exist,
+5. featured products when authoritative selection exists,
+6. new arrivals,
+7. additional merchant-selected product/category sections when supported,
+8. benefits/trust section when merchant-configured claims are supported,
+9. app promotion when configured,
+10. FAQ/content where enabled,
+11. contact/location area,
+12. shared footer/policies/business information.
+
+A missing capability removes/gates its section; the theme must not fill the gap with fabricated commerce data.
+
+### Product-card direction
+
+AWJ Market should start from the shared compact ProductCard preset and optimize for rapid scanning:
+
+- image remains clear but not oversized;
+- product name receives enough lines for grocery/FMCG naming;
+- authoritative price is visually dominant;
+- availability is derived only from AWJ truth;
+- add-to-cart is fast and obvious;
+- variant-managed products retain generic selection rules;
+- sale badge/original price remains absent until authoritative promotion pricing exists;
+- wishlist remains gated until persistent identity/backend exists;
+- ratings/purchase counts remain absent until their contracts exist.
+
+### Catalog direction
+
+- prominent search;
+- category navigation;
+- real server-side sort controls;
+- no fake faceted filters;
+- pagination/infinite-loading behavior continues to use authoritative API pages;
+- future Market facets should be a shared platform capability, not theme-local filtering.
+
+### Capability gaps discovered by the theme
+
+Separate product workstreams are required for:
+
+1. customer-selectable multi-location availability / pickup location;
+2. authoritative promotions, compare-at pricing and dedicated offers collection;
+3. persistent wishlist/customer identity;
+4. ratings and reviews;
+5. explicit public barcode/GTIN semantics if desired;
+6. safe structured map/location rendering;
+7. server-side catalog faceting;
+8. optional search suggestions/autocomplete if later justified.
+
+None of these belongs silently inside the first AWJ Market theme implementation PR.
+
+### Initial implementation boundary
+
+The first implementation slice should be presentation-only wherever possible: register the `awj-market` preset, establish its default shared token choices/composition, and apply Market-specific responsive presentation using existing components/contracts. Any required shared component extension must remain generic and backward-compatible with AWJ Modern and other themes.
+
+No database, accounting, inventory-posting, tenant-resolution, price authority, cart authority, or checkout authority change is justified by this Theme Spec alone.
+
+## 23. Evidence-pass conclusion
+
+The benchmark is now sufficiently classified to proceed from discovery to a scoped implementation plan. The core Market experience can be built on the existing AWJ storefront architecture. The main missing items are platform capabilities, not reasons to fork the theme or duplicate commerce truth.
+
+Before implementation, create a small Theme Implementation Plan that identifies exact shared files/components, compatibility tests, visual acceptance widths, and which gated sections remain intentionally inactive. Implementation should then proceed as small reviewable PRs.
