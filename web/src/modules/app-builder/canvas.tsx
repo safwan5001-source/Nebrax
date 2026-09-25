@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useLocale, useTranslations } from 'next-intl';
-import { FlaskConical, ImageOff, ShoppingCart } from 'lucide-react';
+import { EyeOff, FlaskConical, ImageOff, ShoppingCart } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatRiyal } from '@/lib/money';
 import { registryLabel, type AppBuilderRegistries, type AppSchemaComponent } from '@/lib/app-builder';
@@ -24,6 +24,17 @@ import { SAMPLE_RESOURCE_DATA } from './sample-resource-data';
  * القالب المُستهلَك نفسه، إذ تستبدله N نسخة. التحديد للنقر عليها يُسنَد لأقرب سلفٍ
  * معروف فعلاً في المخطط الأصلي (`knownIds`/`selectFallbackId`) بدل معرّفها الاصطناعي
  * — عملياً عقدة الربط الحاوية (`ProductList`/`CartList`) نفسها، لا القالب المختفي.
+ *
+ * **LIVE-PREVIEW-4** — محاذاة قدرات مدعومة فعلاً فقط، لا محاكاة قدرة غير مدعومة:
+ * - **الإجراء**: مكوّن قابل للفعل (`Button`/`AddToCart`/`ProductCard`/`NavigationTarget`)
+ *   بلا `action` مرفق يُعرَض معتماً (50%) — يطابق `_ActionTappable`/`onPressed: null`
+ *   الحقيقيين في `component_widgets.dart`، لا افتراض أنه سيستجيب للنقر حين لا يوجد فعل.
+ * - **الظهور**: `visibility` **لا تُقيَّم شرطياً هنا إطلاقاً** — عمداً. البناء الحالي
+ *   لا يملك `schemaFeatures['visibility']` (مطابقاً `RuntimeCapabilities`)، فتقييمها هنا
+ *   (حتى بدوال `evaluateVisibility`/`pruneInvisible` المطابقة تماماً في `./runtime-contract`)
+ *   كان سيحاكي قدرةً غير موجودة فعلياً على أي جهاز حقيقي اليوم. بدلاً من ذلك: عقدة تحمل
+ *   شرط ظهور تُعرَض دوماً + شارة صريحة («لم يُطبَّق بعد») — تماماً كما يبقى النشر
+ *   ينجح/يفشل به فعلياً (`CompatibilityResolver`)، لا كما لو كان الشرط يعمل.
  */
 
 export const PREVIEW_WIDTHS = { mobile: 390, tablet: 768, desktop: 1280 } as const;
@@ -72,6 +83,24 @@ function TypeTag({ type, label, selected }: { type: string; label: string; selec
 }
 
 /**
+ * LIVE-PREVIEW-4 — شارة **صريحة ودائمة الظهور** (لا تعتمد على hover كـ`TypeTag`) على
+ * أي عقدة تحمل `visibility`: البناء الحالي لا يقيّم شروط الظهور إطلاقاً
+ * (`RuntimeCapabilities.schemaFeatures` بلا `'visibility'`)، فالعقدة تُعرَض دوماً بصرف
+ * النظر عن شرطها — هذه الشارة وحدها ما يمنع تلك الحقيقة من الاختفاء خلف عرضٍ يبدو عادياً.
+ */
+function UnsupportedVisibilityBadge({ label }: { label: string }) {
+  return (
+    <span
+      title={label}
+      className="pointer-events-none absolute -top-2.5 end-1.5 flex items-center gap-1 rounded bg-warning/10 px-1.5 py-0.5 text-[10px] font-medium leading-none text-warning"
+    >
+      <EyeOff className="h-2.5 w-2.5" strokeWidth={2} aria-hidden="true" />
+      {label}
+    </span>
+  );
+}
+
+/**
  * كل مكوّن يُغلَّف بهذا حتى يحمل شارة النوع والتحديد بلا تكرار المنطق 15 مرة.
  * شارة النوع أداة بناء (Builder chrome) لا محتوى تجربة معاينة — تتبع لغة
  * واجهة أَوْج الفعلية (`useLocale()`)، لا مفتاح `locale`/`previewLocale`
@@ -97,6 +126,7 @@ function NodeFrame({
   registries: AppBuilderRegistries | null;
 }) {
   const uiLocale = useLocale();
+  const t = useTranslations('appBuilder.builder');
   const definition = registries?.components[node.type];
   const typeLabel = definition ? registryLabel(definition.label, uiLocale) : node.type;
 
@@ -121,6 +151,7 @@ function NodeFrame({
       )}
     >
       <TypeTag type={node.type} label={typeLabel} selected={selected} />
+      {node.visibility ? <UnsupportedVisibilityBadge label={t('visibilityUnsupportedBadge')} /> : null}
       {children}
     </div>
   );
@@ -231,7 +262,8 @@ function CanvasComponentNode({
           </div>
           <p className="truncate text-xs text-text">{title || '—'}</p>
           <p className="num text-xs font-semibold text-text">{formatRiyal(amountMinor / 100)}</p>
-        </div>
+        </div>,
+        node.action ? undefined : 'opacity-50'
       );
     }
 
@@ -295,7 +327,8 @@ function CanvasComponentNode({
         <span className="inline-flex items-center gap-1.5 rounded-canvas bg-primary px-2.5 py-1.5 text-xs font-medium text-primary-foreground">
           <ShoppingCart className="h-3.5 w-3.5" strokeWidth={1.8} aria-hidden="true" />
           {label}
-        </span>
+        </span>,
+        node.action ? undefined : 'opacity-50'
       );
     }
 
@@ -332,7 +365,8 @@ function CanvasComponentNode({
           )}
         >
           {label}
-        </span>
+        </span>,
+        node.action ? undefined : 'opacity-50'
       );
     }
 
@@ -342,7 +376,8 @@ function CanvasComponentNode({
         <div className="flex items-center justify-between gap-2 p-1.5 text-sm text-text">
           <span>{label || '—'}</span>
           <span aria-hidden="true" className="text-muted">‹</span>
-        </div>
+        </div>,
+        node.action ? undefined : 'opacity-50'
       );
     }
 

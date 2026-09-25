@@ -82,6 +82,7 @@ const { api, currentUser, translate } = vi.hoisted(() => {
     cancel: 'Cancel',
     'theme.tabLabel': 'Theme',
     'theme.tabDescription': 'Edit theme tokens.',
+    'theme.runtimeNote': 'Not yet active in the mobile app.',
     'theme.presetTitle': 'Presets',
     'theme.preset.awj-modern': 'AWJ Modern',
     'theme.preset.navy': 'Navy',

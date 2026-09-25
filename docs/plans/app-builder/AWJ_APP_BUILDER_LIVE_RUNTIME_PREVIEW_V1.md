@@ -49,8 +49,8 @@ Standing authority covers implementation, tests, commits, PRs, merging green dep
 | LIVE-PREVIEW-1 | Preview Contract Evidence Pass | **DONE / PASS** — see `LIVE-PREVIEW-1-EVIDENCE-PASS.md` |
 | LIVE-PREVIEW-2 | Preview / Runtime Semantic Parity Foundation | **DONE / PASS** — see `LIVE-PREVIEW-2-PARITY-FOUNDATION.md` |
 | LIVE-PREVIEW-3 | Binding + Collection Preview Parity | **DONE / PASS** — see `LIVE-PREVIEW-3-BINDING-COLLECTION-PARITY.md` |
-| LIVE-PREVIEW-4 | Action + Theme + Supported Visibility Parity | READY |
-| LIVE-PREVIEW-5 | Runtime-Aware Pre-Publish Validation | BLOCKED |
+| LIVE-PREVIEW-4 | Action + Theme + Supported Visibility Parity | **DONE / PASS** — see `LIVE-PREVIEW-4-ACTION-THEME-VISIBILITY-PARITY.md` |
+| LIVE-PREVIEW-5 | Runtime-Aware Pre-Publish Validation | READY |
 | LIVE-PREVIEW-6 | Draft / Default / Published Preview States | BLOCKED |
 | LIVE-PREVIEW-7 | Integrated Builder → Publish → Runtime Proof | BLOCKED |
 | LIVE-PREVIEW-8 | Horizon Closure / Durable Documentation | BLOCKED |
@@ -263,8 +263,12 @@ The horizon is CLOSED / PASS only when evidence proves:
     contracts" bar.
 
   **Implementation — DONE / PASS.** Full report: `docs/plans/app-builder/
-  LIVE-PREVIEW-3-BINDING-COLLECTION-PARITY.md`. PR pending (opening next). Base SHA:
-  `41b53fdb96a828276c6e1a1b532126302325f403`. Adds `web/src/modules/app-builder/
+  LIVE-PREVIEW-3-BINDING-COLLECTION-PARITY.md`. PR #1019 (squash-merged). Base SHA:
+  `41b53fdb96a828276c6e1a1b532126302325f403`. **Merge SHA:
+  `e906d48c022fbfd8f3671833b7db78caebd87dd5`** (verified via `get_commit` against `main`).
+  CI: 6/6 checks green (`web build (Next.js)` ×2, `php artisan test (L11, sqlite/pgsql)` ×2 —
+  unaffected, `ci.yml` has no path filter; `mobile-ci.yml` correctly did not trigger — web-only
+  diff). Adds `web/src/modules/app-builder/
   sample-resource-data.ts` (static, hardcoded, field-for-field matching
   `DataResourceRegistry`'s real contracts — no fetch, no network, no store-bearer token) and
   wires it through LP-2's `resolveNodeBindings` into `canvas.tsx`'s render path, plus a
@@ -280,4 +284,27 @@ The horizon is CLOSED / PASS only when evidence proves:
   the implementation itself (the gate was already resolved above); no capability broadened; all
   six owner-mandated guardrails verified against the actual diff (see the report's own
   "Owner-mandated guardrails — verified, not just asserted" section).
-- Next task once LP-3 merges: **LIVE-PREVIEW-4 — Action + Theme + Supported Visibility Parity**.
+- **LIVE-PREVIEW-4 — Action + Theme + Supported Visibility Parity: DONE / PASS.** Full report:
+  `docs/plans/app-builder/LIVE-PREVIEW-4-ACTION-THEME-VISIBILITY-PARITY.md`. PR pending
+  (opening next). Base SHA: `e906d48c022fbfd8f3671833b7db78caebd87dd5`. **Deliberately does
+  not** wire `evaluateVisibility`/`pruneInvisible` into rendering — `RuntimeCapabilities.
+  schemaFeatures` has no `'visibility'` entry on either Dart or PHP side, so the real runtime
+  does not evaluate visibility at all today; doing so in Preview would simulate an unsupported
+  capability, which this task's own governing instruction forbids. Instead: (1) actionable
+  components (`Button`/`AddToCart`/`ProductCard`/`NavigationTarget`) now dim to 50% opacity when
+  `!node.action`, matching `component_widgets.dart`'s real inert-vs-wired visual distinction —
+  `Quantity` deliberately excluded (its real widget never dims on action absence); (2) any node
+  carrying `visibility` gets an always-visible "not yet active" badge while still always
+  rendering unconditionally — explicit-and-unevaluated, never simulated; (3) `ThemePanel` gains
+  a `runtimeNote` (matching binding/visibility's existing pattern) stating plainly that a
+  published experience's colors do not reach the shipped app yet — the `primaryColor`/
+  `colorPrimary` key mismatch is deliberately **not** "fixed" by renaming, since
+  `mobile/lib/app.dart` seeds its color only once from the bundled compile-time Default schema
+  (`kHomeSchemaJson`), never from any tenant's own published/fetched experience — a key rename
+  would falsely imply a capability that doesn't exist end-to-end; the real gap is a mobile-side
+  architecture question, recorded as an out-of-scope deferral, not silently dropped. Web-only
+  change — no backend, no mobile file touched. Evidence: focused `canvas.test.tsx` 9/9 (4 new),
+  broader app-builder suite 8 files / 80 tests green, full web suite 299 files / 2118 tests
+  green, `npm run build` clean. No Decision Gate triggered; no capability broadened (this task
+  narrows an implicit overclaim, if anything).
+- Next task once LP-4 merges: **LIVE-PREVIEW-5 — Runtime-Aware Pre-Publish Validation**.
