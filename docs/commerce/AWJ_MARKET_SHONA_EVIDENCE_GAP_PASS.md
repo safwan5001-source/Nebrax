@@ -812,3 +812,126 @@ Before marking the package `READY FOR HORIZON IMPLEMENTATION`, complete only the
 - issue a final single Horizon task prompt referencing the merged durable spec.
 
 Until those items are closed, status remains **PRE-HORIZON — NOT READY FOR IMPLEMENTATION**.
+
+
+## 26. Exact Change Map Pass — verified repository seams
+
+This pass maps the exact existing seams Horizon should use. It is intentionally conservative: files listed as likely change targets are not blanket authorization to edit unrelated behavior.
+
+### A. Theme preset contract — MUST stay in parity
+
+Verified mirrored allow-lists currently define the same preset ids and defaults:
+
+- `storefront/src/lib/presentation/tokens.ts` — TypeScript public/runtime preset registry.
+- `web/src/modules/store-experience-builder/presentation/tokens.ts` — production Customizer mirror.
+- `app/Support/Commerce/StorefrontPresentationNormalizer.php` — server-authoritative allow-list and normalization.
+
+All currently recognize `awj-modern`, `navy`, `burgundy`, `sand`, and `slate`. The server re-normalizes saved documents, so adding `awj-market` to only a frontend registry would silently fail back to AWJ Modern on persistence.
+
+**Required Horizon rule:** if `awj-market` becomes a persisted `themePreset`, update all authoritative/mirrored allow-lists together and add parity regression tests. Do not change the fallback: unknown preset → `awj-modern`.
+
+### B. Configuration defaults versus preset defaults
+
+Verified current global default remains:
+
+- `themePreset: awj-modern`;
+- comfortable density;
+- standard product card;
+- standard header;
+- default radius.
+
+**Decision:** registering AWJ Market must not mutate `DEFAULT_PRESENTATION_CONFIG` / server `defaultConfig()` into Market defaults. Existing/no-presentation stores must remain AWJ Modern.
+
+If selecting AWJ Market is intended to apply a coordinated bundle (compact density/card/header plus Market composition), implement that as an explicit preset-application operation in the Customizer/shared helper, not by changing global defaults or making normalization secretly rewrite independent merchant choices on every load.
+
+### C. Normalization and persistence
+
+Verified files:
+
+- `storefront/src/lib/presentation/config.ts` — public/runtime TypeScript normalizer.
+- `web/src/modules/store-experience-builder/presentation/config.ts` — Customizer mirror.
+- `app/Support/Commerce/StorefrontPresentationNormalizer.php` — authoritative PHP normalizer.
+- `app/Services/Commerce/StorefrontPresentationService.php` — tenant-owned Draft save, revision control, atomic Publish and Published snapshot.
+- `app/Http/Requests/SaveStorefrontPresentationRequest.php` — request envelope allow-list; rejects authority-field injection.
+
+The persistence service already preserves the required authority model: tenant context, foreign/missing 404 behavior through the service/controller path, Draft/Published separation, revision conflicts, normalized storage, and Published-only public snapshot.
+
+**Expected change:** the service/request envelope should normally require no semantic change for AWJ Market. Any Horizon change here must be justified by a concrete contract requirement and tested for tenant isolation and Draft/Published behavior.
+
+### D. Public runtime theme application
+
+Verified runtime seam:
+
+- `storefront/src/app/[country]/[locale]/(storefront)/layout.tsx`
+- `storefront/src/lib/presentation/public.ts` and shared token helpers used by the layout.
+
+The layout reads the published presentation, derives safe CSS vars, header behavior, branding, contact/social/app links and WhatsApp, and otherwise renders the existing storefront shell. No presentation means existing AWJ Modern chrome.
+
+**Decision:** AWJ Market styling should enter through a bounded theme marker/token seam at this shared layout/runtime layer and shared components. Do not fork the storefront route tree or duplicate the layout.
+
+### E. Homepage renderer
+
+Verified public homepage:
+
+- `storefront/src/app/[country]/[locale]/(storefront)/page.tsx`
+- shared home section resolver under `storefront/src/lib/home/sections`.
+
+Only four section types are production-rendered today: `hero`, `categories`, `newArrivals`, `wholesale`. The public page explicitly drops all other builder types even if they exist in the presentation document.
+
+Gated registry types are `banner`, `featured`, `offers`, `benefits`, `appPromo`, and `customContent`.
+
+**Decision:** Horizon must not activate these merely because AWJ Market's benchmark contains similar sections. Market V1 public composition must use the implemented set unless the Master package separately promotes a gated capability with authoritative data and tests.
+
+### F. Customizer production path versus storefront-side harness
+
+Verified distinction:
+
+- production merchant editor: `web/src/modules/store-experience-builder/*`;
+- storefront-side `storefront/src/components/customizer/*` is an inert/dev mirror and is not the production composer.
+
+The production editor already owns Draft Save/Publish integration and the live in-workspace preview contract. Existing documentation explicitly warns against duplicating the builder into the storefront-side harness.
+
+**Decision:** Market preset selection and merchant-facing controls belong in the production `web` ExperienceBuilder/ControlPanels path. Keep TypeScript contract/token mirrors synchronized where compilation/runtime requires it, but do not build a second composer.
+
+### G. Shared commerce components — styling only, no authority fork
+
+The current storefront route tree already owns Header/CategoryNav/MobileBottomNav, home sections, listing/search/category views, PDP/variant flow, cart, and checkout. AWJ Market should add theme-aware styling/composition at these shared seams.
+
+Exact component files may be selected by Horizon only after tracing imports from the verified routes; this spec does **not** authorize replacing shared commerce components with `Market*` duplicates. A new Market-only wrapper is acceptable only when it is purely presentational and cannot reasonably be expressed by a shared theme marker/token without contaminating other themes.
+
+### H. Checkout boundary
+
+Verified checkout has a dedicated `(store-checkout)` layout and intentionally omits the normal storefront marketing/category/search/cart/mobile-bottom-nav chrome. Checkout stages remain shared commerce UI.
+
+**Decision:** AWJ Market may harmonize typography/tokens/radius/density where the existing presentation architecture reaches checkout, but must preserve the dedicated checkout shell and may not reintroduce marketing chrome or create Market-specific checkout business logic.
+
+## 27. Required focused regression suite for Horizon
+
+At minimum, add or retain focused coverage proving:
+
+1. `awj-market` is accepted identically by PHP, storefront TypeScript and web Customizer normalization.
+2. unknown preset still fails closed to `awj-modern`.
+3. no-presentation storefront still renders AWJ Modern defaults.
+4. choosing Market does not mutate unrelated persisted merchant fields unexpectedly.
+5. Draft Market changes are not visible publicly before Publish.
+6. Publish exposes the normalized Market config and stale-revision behavior remains intact.
+7. foreign-tenant storefront presentation remains inaccessible / no IDOR regression.
+8. existing AWJ Modern normalization snapshots/tests remain green.
+9. gated homepage section types remain absent from public runtime unless separately activated by an approved capability contract.
+10. public theme rendering does not expose raw inventory/cost/accounting data.
+11. RTL/LTR and required viewport acceptance remains clean.
+12. cart/checkout authority tests remain green if their shared presentation surfaces are touched.
+
+## 28. Exact-change-map conclusion
+
+The main implementation risk is now explicit: **`themePreset` is a persisted, server-normalized closed enum mirrored across PHP + storefront + web.** AWJ Market cannot be introduced safely as a CSS-only frontend name.
+
+At the same time, the existing architecture is sufficient: no new database model, no new storefront route tree, and no new commerce authority is required for the core Market theme.
+
+Remaining closure before the final Horizon handoff is narrow:
+
+- define the exact AWJ Market preset application bundle without overwriting merchant customization semantics;
+- map the concrete shared visual component import graph that needs theme-aware styles;
+- lock the final visual acceptance checklist against the Shona evidence without copying its identity/assets;
+- confirm documentation PR CI and merge it when clean;
+- then emit the single Horizon execution task.
