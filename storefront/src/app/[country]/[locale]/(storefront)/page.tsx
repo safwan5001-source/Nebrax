@@ -13,6 +13,7 @@ import {
 } from "@/lib/home/sections";
 import { generateHomeMetadata } from "@/lib/metadata/home";
 import { publishedStoreName } from "@/lib/presentation/public";
+import { publishedHomeStackClass } from "@/lib/presentation/public-rhythm";
 
 interface HomePageProps {
   params: Promise<{
@@ -83,7 +84,7 @@ export default async function HomePage({ params }: HomePageProps) {
      * bands each needed their own container and their own separator, which is
      * how a page ends up with four different ideas of where its content starts.
      */
-    <StoreContainer className="space-y-8 py-4 md:space-y-10 md:py-6">
+    <StoreContainer className={publishedHomeStackClass(presentation?.density)}>
       {homeSections
         .filter((section) => section.visible)
         .map((section, index) => (

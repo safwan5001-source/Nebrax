@@ -2,6 +2,7 @@ import type { Product } from "@spree/sdk";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { PublishedCardStyleProvider } from "@/components/layout/PublishedCardStyle";
 import { ProductCard } from "@/components/products/ProductCard";
 
 vi.mock("next-intl", () => ({
@@ -97,6 +98,20 @@ describe("ProductCard", () => {
 
     expect(screen.getByText("Classic T-Shirt")).toBeInTheDocument();
     expect(screen.getByText("$25.00")).toBeInTheDocument();
+  });
+
+  it("keeps standard padding unless the published card style is compact", () => {
+    const { container, rerender } = render(
+      <ProductCard product={baseProduct} basePath="/us/en" />,
+    );
+    expect(container.querySelector("[data-card-body]")).toHaveClass("p-3");
+
+    rerender(
+      <PublishedCardStyleProvider productCard="compact">
+        <ProductCard product={baseProduct} basePath="/us/en" />
+      </PublishedCardStyleProvider>,
+    );
+    expect(container.querySelector("[data-card-body]")).toHaveClass("p-2.5");
   });
 
   it("links to the product page", () => {

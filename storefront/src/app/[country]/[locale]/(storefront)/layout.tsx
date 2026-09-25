@@ -7,6 +7,7 @@ import { CategoryNav } from "@/components/layout/CategoryNav";
 import { Footer, FooterCategoryLinks } from "@/components/layout/Footer";
 import { Header, HeaderMobileMenu } from "@/components/layout/Header";
 import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
+import { PublishedCardStyleProvider } from "@/components/layout/PublishedCardStyle";
 import { StoreWhatsApp } from "@/components/layout/StoreWhatsApp";
 import { fetchStorefrontConfig } from "@/lib/commerce/storefront";
 import { getCategories } from "@/lib/data/categories";
@@ -237,7 +238,13 @@ export default async function StorefrontLayout({
         id="main-content"
         className="flex-1 scroll-mt-(--store-header-offset)"
       >
-        {children}
+        <PublishedCardStyleProvider
+          productCard={
+            presentation?.productCard === "compact" ? "compact" : "standard"
+          }
+        >
+          {children}
+        </PublishedCardStyleProvider>
       </main>
       <Footer
         basePath={basePath}
