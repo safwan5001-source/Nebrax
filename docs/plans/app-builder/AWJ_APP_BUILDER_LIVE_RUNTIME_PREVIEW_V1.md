@@ -44,10 +44,10 @@ Standing authority covers implementation, tests, commits, PRs, merging green dep
 
 ## Task queue
 
-| Task | Purpose | Initial state |
+| Task | Purpose | State |
 |---|---|---|
-| LIVE-PREVIEW-1 | Preview Contract Evidence Pass | READY |
-| LIVE-PREVIEW-2 | Preview / Runtime Semantic Parity Foundation | BLOCKED on LP-1 evidence |
+| LIVE-PREVIEW-1 | Preview Contract Evidence Pass | **DONE / PASS** — see `LIVE-PREVIEW-1-EVIDENCE-PASS.md` |
+| LIVE-PREVIEW-2 | Preview / Runtime Semantic Parity Foundation | READY (no Decision Gate triggered) |
 | LIVE-PREVIEW-3 | Binding + Collection Preview Parity | BLOCKED |
 | LIVE-PREVIEW-4 | Action + Theme + Supported Visibility Parity | BLOCKED |
 | LIVE-PREVIEW-5 | Runtime-Aware Pre-Publish Validation | BLOCKED |
@@ -176,4 +176,16 @@ The horizon is CLOSED / PASS only when evidence proves:
 - Backend CI: green
 - Mobile CI: green
 - Android/iOS release-build proof: green
-- Next task: **LIVE-PREVIEW-1 — Preview Contract Evidence Pass**
+- **LIVE-PREVIEW-1: DONE / PASS** (evidence-only, no code changed) — full report:
+  `docs/plans/app-builder/LIVE-PREVIEW-1-EVIDENCE-PASS.md`. Headline findings: Preview
+  (`web/src/modules/app-builder/canvas.tsx`) renders the live draft's component/theme structure
+  correctly (registry parity confirmed), but never evaluates `binding`/`collect`/`itemProps`/
+  `$item.*` (already live for `commerce.products`/`commerce.cart`), never evaluates
+  `visibility`, never dispatches/distinguishes wired-vs-inert `action`s, never runs
+  `CompatibilityResolver` during editing (only at explicit Validate/Publish, where it already IS
+  the real, shared check), cannot preview a Published version or the Default AWJ Experience, and
+  the Theme panel's tokens have ~zero live effect on the shipped runtime today (key mismatch:
+  Builder writes `primaryColor`, runtime reads `colorPrimary` from the bundled Default schema
+  only, never from a tenant's published experience). No Decision Gate triggered (all 8 checked).
+- Next task: **LIVE-PREVIEW-2 — Preview / Runtime Semantic Parity Foundation** (READY; do not
+  start implementation until the evidence report above has been reviewed, per instruction).
