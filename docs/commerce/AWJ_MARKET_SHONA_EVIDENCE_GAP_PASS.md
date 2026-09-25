@@ -330,3 +330,104 @@ Next repository evidence pass:
 4. reviews/ratings,
 5. content/pages/policies,
 6. public business profile, map/location, and app links.
+
+
+## 18. AWJ Repository/API Evidence Pass 02 — identifiers, offers, wishlist, reviews, content
+
+Evidence verified against current `main` source.
+
+### Product identifiers
+
+`StorefrontProductResource` already exposes the product-level `sku` publicly. Variant detail payloads also expose each variant's `sku`. The Product domain also has a legacy/primary `Product.barcode` and separate multiple-barcode capability, but the public storefront resource does **not** expose barcode/GTIN fields.
+
+Classification:
+
+| Capability | State | Notes |
+|---|---|---|
+| Public product SKU | **EXISTING** | Explicit allow-listed field in StorefrontProductResource |
+| Public variant SKU | **EXISTING** | Variant payload contains SKU |
+| Public barcode/GTIN | **WIRING_GAP / CONTRACT DECISION REQUIRED** | Barcode exists internally, but is deliberately absent from the public allow-list; multiple-barcode semantics make a blind mapping unsafe |
+
+AWJ Market must not label SKU as barcode/model number. If a public barcode/GTIN is justified, define which identifier is merchant/customer-facing and expose it explicitly through the safe public resource.
+
+### Offers, discounts, and compare-at pricing
+
+The storefront design already contains dormant sale/compare-at presentation branches, but current evidence states `original_price` is hard-null and `compare_at` is never populated. The sale badge/strikethrough therefore cannot become authoritative today. Coupon UX is also DESIGN_ONLY/GATED and has no server-authoritative cart discount contract yet.
+
+Classification:
+
+| Capability | State | Notes |
+|---|---|---|
+| Sale/compare-at presentation shape | **DESIGN_ONLY / GATED** | UI branches exist but no authoritative API value activates them |
+| Authoritative compare-at/original price | **MISSING** | Current storefront contract does not provide it |
+| Coupon/promotion-code UI | **DESIGN_ONLY / GATED** | Intended UX exists |
+| Coupon monetary authority | **MISSING** | Cart lacks authoritative discount/total contract required by documented activation plan |
+| Dedicated public Offers collection | **MISSING** | No verified storefront offers contract/query; cannot derive it client-side from fabricated discounts |
+
+The Shona-style Offers page is therefore a real platform/catalog-merchandising gap, not merely a route to add to AWJ Market.
+
+### Wishlist / favourites
+
+AWJ already designed a reusable WishlistButton and WishlistContext across home, catalog/search/category results and PDP. However, the documented capability state is DESIGN_ONLY/GATED. Favourites live only in React page-lifetime state and intentionally do not use localStorage/cookies as fake persistence.
+
+The missing substantive dependency is shopper identity plus real wishlist persistence/API.
+
+Classification: **DESIGN_ONLY / GATED; backend/identity capability MISSING.**
+
+AWJ Market may reuse the designed surface, but it must remain gated until a real customer identity and wishlist contract are active.
+
+### Ratings and reviews
+
+Current storefront policy explicitly classifies ratings/reviews as DEFERRED: no authoritative contract and nothing production-active.
+
+Classification: **MISSING / DEFERRED.**
+
+Shona evidence therefore identifies reviews as a genuine AWJ product capability candidate. It requires persistence, customer/verified-purchase identity rules, moderation, aggregation, tenant isolation, merchant controls, and abuse handling before activation.
+
+### Content, contact, WhatsApp, policies and app links
+
+The Storefront Presentation contract already contains merchant-configurable presentation data for:
+
+- contact phone, email, address and hours;
+- WhatsApp enabled state, phone, message and placement;
+- social links;
+- app name plus validated App Store and Google Play URLs, with homepage/footer visibility controls;
+- content-page metadata for a closed set of page slugs;
+- footer tagline/copyright;
+- business verification-related metadata with explicit safeguards against self-minting a verified badge.
+
+The Customizer architecture also already persists these presentation settings and the Footer consumes configured policy pages.
+
+Classification:
+
+| Capability | State | Notes |
+|---|---|---|
+| Contact details | **EXISTING** | Presentation contract |
+| WhatsApp | **EXISTING** | Safe configurable presentation contract |
+| Social links | **EXISTING** | Bounded presentation contract |
+| App Store / Google Play links | **EXISTING** | URL validation + visibility controls |
+| Policy-page navigation/metadata | **EXISTING / PARTIAL CONTENT MODEL** | Configured page metadata/navigation exists; do not infer arbitrary CMS/page-builder capability |
+| Footer business information | **EXISTING / PARTIAL** | Several safe fields exist; exact Market footer requirements still need mapping |
+| Store address text | **EXISTING** | Contact address |
+| Interactive map/embed | **MISSING / NOT VERIFIED** | No safe map/embed contract verified in this pass; arbitrary HTML/JS is intentionally forbidden |
+
+### Security note for map/location
+
+Do not implement a merchant-pasted arbitrary iframe/HTML field. Current presentation persistence intentionally forbids arbitrary HTML/CSS/JS. If AWJ Market needs a map, prefer a structured location contract (for example coordinates or a validated map URL) rendered by an AWJ-owned component.
+
+## 19. Consolidated high-value gap snapshot
+
+After the first two repository passes, the benchmark has surfaced these material gaps:
+
+1. **Customer-selectable multi-location availability / pickup location** — missing platform capability; existing single-warehouse ATS remains authoritative.
+2. **Dedicated offers + authoritative compare-at/promotional pricing** — missing public monetary/catalog contract.
+3. **Persistent wishlist** — designed but gated; needs shopper identity and backend persistence.
+4. **Ratings/reviews** — missing/deferred product capability.
+5. **Public barcode/GTIN** — internal data exists but public semantics/allow-list decision is missing.
+6. **Structured map/location section** — address exists; safe interactive-map contract not verified.
+
+These gaps must remain separate scoped capabilities. None should be silently implemented inside the AWJ Market theme PR.
+
+## 20. Next pass
+
+Next evidence work should complete the theme-side parity matrix: homepage section types, category/product-card density, search/filter/sort behavior, mobile bottom navigation, cart/checkout presentation, and responsive states. Then the document can be converted into the first complete AWJ Market Theme Spec candidate and reviewed for merge.
