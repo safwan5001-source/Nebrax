@@ -47,8 +47,8 @@ Standing authority covers implementation, tests, commits, PRs, merging green dep
 | Task | Purpose | State |
 |---|---|---|
 | LIVE-PREVIEW-1 | Preview Contract Evidence Pass | **DONE / PASS** — see `LIVE-PREVIEW-1-EVIDENCE-PASS.md` |
-| LIVE-PREVIEW-2 | Preview / Runtime Semantic Parity Foundation | **IN REVIEW** — implemented, PR pending CI; see `LIVE-PREVIEW-2-PARITY-FOUNDATION.md` |
-| LIVE-PREVIEW-3 | Binding + Collection Preview Parity | BLOCKED on LP-2 merge |
+| LIVE-PREVIEW-2 | Preview / Runtime Semantic Parity Foundation | **DONE / PASS** — see `LIVE-PREVIEW-2-PARITY-FOUNDATION.md` |
+| LIVE-PREVIEW-3 | Binding + Collection Preview Parity | READY — owner-approved scope: sample/representative data only (see durable state below) |
 | LIVE-PREVIEW-4 | Action + Theme + Supported Visibility Parity | BLOCKED |
 | LIVE-PREVIEW-5 | Runtime-Aware Pre-Publish Validation | BLOCKED |
 | LIVE-PREVIEW-6 | Draft / Default / Published Preview States | BLOCKED |
@@ -109,6 +109,12 @@ Builder Draft
 ```
 
 Isolated unit tests alone are insufficient for the horizon's end-to-end claim.
+
+> **Note (owner decision resolving LIVE-PREVIEW-3's Decision Gate, 2026-09-25):** LIVE-PREVIEW-3
+> proves binding/collection resolution semantics using clearly labeled representative/sample
+> data (not live merchant data) — see "Current durable state" below. That sample-data proof does
+> **not** satisfy this task. LIVE-PREVIEW-7 still requires real contracts wherever feasible, and
+> must not claim LP-3's sample-data evidence as proof of live merchant-data Preview parity.
 
 ### LIVE-PREVIEW-8 — Closure
 
@@ -187,19 +193,71 @@ The horizon is CLOSED / PASS only when evidence proves:
   the Theme panel's tokens have ~zero live effect on the shipped runtime today (key mismatch:
   Builder writes `primaryColor`, runtime reads `colorPrimary` from the bundled Default schema
   only, never from a tenant's published experience). No Decision Gate triggered (all 8 checked).
-- **LIVE-PREVIEW-2: implemented, PR pending CI** — full report:
-  `docs/plans/app-builder/LIVE-PREVIEW-2-PARITY-FOUNDATION.md`. Base SHA:
-  `fdfa0b34f5197c17f2da45b3bfad7a30bd124ed4`. Adds `web/src/modules/app-builder/runtime-contract.ts`
-  (a documented, narrow TypeScript port of `mobile/lib/app/binding_resolution.dart`'s binding
-  resolution + visibility evaluation — not yet wired into `canvas.tsx`, per the horizon's own
-  LP-2/LP-3 split), a single canonical conformance fixture
-  (`contracts/app-builder/binding-visibility-conformance.v1.json`, 23 cases) asserted from both
-  `web/src/modules/app-builder/runtime-contract.test.ts` and
+- **LIVE-PREVIEW-2: DONE / PASS** — full report:
+  `docs/plans/app-builder/LIVE-PREVIEW-2-PARITY-FOUNDATION.md`. PR #1014. Base SHA:
+  `fdfa0b34f5197c17f2da45b3bfad7a30bd124ed4`. **Merge SHA: `53bfc74dd7b6bc77fa4ff6fdf08bf0625ca136c9`**
+  (squash-merged; verified via `get_commit` against `main`). Adds
+  `web/src/modules/app-builder/runtime-contract.ts` (a documented, narrow TypeScript port of
+  `mobile/lib/app/binding_resolution.dart`'s binding resolution + visibility evaluation — not yet
+  wired into `canvas.tsx`, per the horizon's own LP-2/LP-3 split), a single canonical conformance
+  fixture (`contracts/app-builder/binding-visibility-conformance.v1.json`, 23 cases) asserted from
+  both `web/src/modules/app-builder/runtime-contract.test.ts` and
   `mobile/test/app/binding_visibility_conformance_test.dart`, both CI workflows' path triggers
   extended to cover the shared fixture, and an additive `AppSchemaBinding.collect` field on the
-  web schema type (was missing entirely). Web evidence green locally (297 files / 2105 tests,
-  `npm run build` clean); Dart/mobile side not runnable in this session (no local Flutter
-  toolchain) — **PR/CI is the authoritative verification**; merge SHA and CI result to be
-  recorded here once merged. No Decision Gate triggered; no capability broadened; fail-closed
-  semantics preserved (see the report's dedicated fixture cases).
-- Next task once LP-2 merges: **LIVE-PREVIEW-3 — Binding + Collection Preview Parity**.
+  web schema type (was missing entirely). **CI evidence (all green on PR head
+  `644ad7bffe53836b3b3b19c332bec64cbfb91dc9`, 12/12 check runs)**: `mobile (analyze + test)` ✅
+  (the authoritative confirmation that `binding_visibility_conformance_test.dart` passes —
+  unverifiable locally, no Flutter toolchain in-session), `mobile (Android/iOS release build
+  proof)` ✅, `web build (Next.js)` ✅, `php artisan test (L11, sqlite/pgsql)` ✅ (unaffected,
+  triggered because `ci.yml` has no path filter). No Decision Gate triggered; no capability
+  broadened; fail-closed semantics preserved (see the report's dedicated fixture cases).
+- **LIVE-PREVIEW-3 — Binding + Collection Preview Parity: DECISION GATE RESOLVED (owner decision,
+  2026-09-25) — Option 3 approved. READY to implement.**
+  While scoping which data LP-3 should feed `resolveNodeBindings` for a live Preview render,
+  reading `app/Services/AppBuilder/DataResourceRegistry.php` found that `commerce.products`
+  resolves to `GET commerce/v1/products` (`CommerceProductController`) — the **public
+  `commerce/v1` storefront surface**, authenticated by `ResourceDefinition::AUTH_STORE_BEARER`
+  (a per-channel store-bearer token; the same surface the real Flutter runtime itself calls),
+  **not** the merchant's own Sanctum session the Builder UI is authenticated with. This is a
+  materially different situation from the one LIVE-PREVIEW-1 §11 anticipated and recommended
+  ("reuse the tenant-scoped, already-authorized commerce endpoints... exactly as `ThemePanel`'s
+  'Use my store design' flow already does") — that flow calls `commerce/workspace/*`
+  (`commerce.manage`-gated, same Sanctum auth as the rest of the app); there is no equivalent
+  Sanctum-authenticated internal endpoint already in use by the web app for reading
+  `commerce/v1/products`-shaped product data. Three options were put to the owner:
+  (a) mint/forward a store-bearer token from a merchant's Builder session (a new,
+  security-sensitive auth path); (b) a new Sanctum-authenticated internal endpoint proxying
+  `commerce/v1/products`-equivalent data (new API surface); (c) representative/sample data only,
+  shaped to the real resource contracts, for both `commerce.products` and `commerce.cart`.
+
+  **Owner approved option (c).** LIVE-PREVIEW-3's scope is therefore fixed as follows:
+  - Preview feeds `resolveNodeBindings` **clearly labeled representative/sample data**, shaped to
+    exactly match `DataResourceRegistry`'s real field contracts for `commerce.products` (list
+    shape: `id/name/description/sku/category/price/in_stock/thumbnail_url/...`) and
+    `commerce.cart` (single shape: `status/items/subtotal/currency/...`) — sufficient to prove
+    `binding.collect`, `itemProps`, and `$item.*` resolve identically to the real runtime for any
+    schema that declares them, without claiming the *values* shown are a real tenant's data.
+  - **Sample/representative data is not live merchant data**, and **Preview must visibly
+    communicate this** (a persistent, unambiguous label/badge in the bound-preview UI — never a
+    silent assumption merchants could mistake for their real catalog/cart).
+  - **No store-bearer token minting or forwarding**, from the Builder session or anywhere else in
+    this task.
+  - **No new Sanctum-authenticated internal proxy endpoint**, or any other new backend route, for
+    fetching real commerce data into Preview.
+  - **No RBAC, Tenant Isolation, Commerce authorization, public API, or schema-surface expansion**
+    of any kind in this task — `resolveNodeBindings`'s pure function signature already accepts
+    caller-supplied `resourceData`; LP-3 only needs to supply that argument, never a new fetch
+    path, new route, new permission, or new schema field beyond LP-2's already-landed
+    `AppSchemaBinding.collect`.
+  - **Real live product/cart data in Builder Preview is intentionally deferred** to a separately
+    scoped follow-up task, not silently dropped — to be scoped only after a deliberate decision
+    on which of options (a)/(b) above (or another mechanism) is acceptable, outside this horizon
+    task unless the owner later folds it back in explicitly.
+  - **This does not touch LIVE-PREVIEW-7 or the horizon's exit criteria.** LIVE-PREVIEW-7 must
+    still prove the integrated Builder → Preview → Validate → Publish → `commerce/v1/experience`
+    → real startup resolver → runtime compatibility → runtime rendering flow using real contracts
+    wherever feasible (its own text, unchanged, below). LP-3's sample data proves Preview's
+    *binding/collection resolution semantics* match the runtime's, in isolation from live data —
+    it must never be cited, here or in LP-7/LP-8, as evidence that Preview shows live merchant
+    data, and does not relax exit-criteria item 7's own "integrated evidence... using real
+    contracts" bar.
