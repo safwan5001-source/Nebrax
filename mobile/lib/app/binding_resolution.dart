@@ -1,5 +1,3 @@
-import '../schema/schema.dart';
-
 /// `APP-BUILDER-17` slice 3 — the "collection/template hydration" +
 /// "visibility handling" stages of the mandated resolution pipeline
 /// (Decision Gate approved, `docs/plans/app-builder/
@@ -56,6 +54,8 @@ import '../schema/schema.dart';
 /// contract," so this file never widens `VisibilitySignal` to reach into an
 /// item on its own.
 library;
+
+import '../schema/schema.dart';
 
 const _itemRefPrefix = r'$item.';
 
