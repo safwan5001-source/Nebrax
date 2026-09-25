@@ -16,8 +16,8 @@ This queue is a dependency map, not permission to skip the Evidence Pass. The ex
 | 6 | STORE-CAP-APP-1 | App promo from real configured app metadata/links | STORE-CAP-0 | implemented from existing `apps` URLs |
 | 7 | STORE-CAP-FEATURED-1 | Tenant-safe featured product references + ordering + public resolution | STORE-CAP-0 | implemented: ids only, public `fetchProduct` |
 | 8 | STORE-CAP-OFFERS-1 | Offers section backed by authoritative AWJ promotion/offer data | STORE-CAP-0 | PRODUCT_DECISION_REQUIRED — see OFFERS decision packet. Not implemented |
-| 9 | STORE-CAP-VISUAL-QA-1 | Cross-capability RTL/LTR + mobile/desktop visual QA | relevant merged capabilities | not browser-captured in the implementation sandbox |
-| 10 | STORE-CAP-CLOSE-1 | Closure report + Current State + final classification | all ready work complete / gates named | after merge and post-merge review |
+| 9 | STORE-CAP-VISUAL-QA-1 | Cross-capability RTL/LTR + mobile/desktop visual QA | relevant merged capabilities | not browser-captured. New public bands use document direction and sm/md/lg grids; no physical left/right utilities. Not a screenshot pass |
+| 10 | STORE-CAP-CLOSE-1 | Closure report + Current State + final classification | all ready work complete / gates named | done in the closure report after #1029 |
 
 ## Task rules
 

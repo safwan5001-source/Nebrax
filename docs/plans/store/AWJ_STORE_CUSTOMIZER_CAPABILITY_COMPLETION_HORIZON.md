@@ -1,6 +1,6 @@
 # AWJ Store Customizer Capability Completion Horizon
 
-**Status:** Proposed / ready for owner launch  
+**Status:** Closed for implementation-ready work. Closure: `docs/plans/store/AWJ_STORE_CUSTOMIZER_CAPABILITY_COMPLETION_CLOSURE_REPORT.md`. Offers remain a Decision Packet. No deploy.  
 **Invocation:** نفّذ هذه المهمة بنظام الأفق  
 **Repository:** `safwan5001-source/Nebrax`  
 **Verified base main SHA:** `1a0cac9863e48eb4eb2e4870e1f0aa70878382af`  
