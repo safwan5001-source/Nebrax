@@ -1,0 +1,583 @@
+[
+  {
+    "id": "customizer-harness",
+    "width": 390,
+    "status": 200,
+    "title": "",
+    "errors": [
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=I2S9IQzveXrnmJIHl-iqa' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE",
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=I2S9IQzveXrnmJIHl-iqa' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE"
+    ],
+    "text": "بناء تجربة المتجر معاينة المتجر عرض المعاينة · 1280 المنتجات والتصنيفات هنا عيّنات للمعاينة فقط، وليست حقيقة تجارية للمتجر الحي. متجر النور ابحث في المتجر الحساب السلة كل المنتجات الإلكترونيات المنزل العناية الأزياء المكتب الرياضة متجر ا",
+    "file": "/workspace/Nebrax/docs/plans/store/storefront-visual-completion-qa/customizer-harness-390.png"
+  },
+  {
+    "id": "customizer-harness",
+    "width": 430,
+    "status": 200,
+    "title": "",
+    "errors": [
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=tfLliFpN3biky9lscJWYE' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE",
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=tfLliFpN3biky9lscJWYE' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE"
+    ],
+    "text": "بناء تجربة المتجر معاينة المتجر عرض المعاينة · 1280 المنتجات والتصنيفات هنا عيّنات للمعاينة فقط، وليست حقيقة تجارية للمتجر الحي. متجر النور ابحث في المتجر الحساب السلة كل المنتجات الإلكترونيات المنزل العناية الأزياء المكتب الرياضة متجر ا",
+    "file": "/workspace/Nebrax/docs/plans/store/storefront-visual-completion-qa/customizer-harness-430.png"
+  },
+  {
+    "id": "customizer-harness",
+    "width": 768,
+    "status": 200,
+    "title": "",
+    "errors": [
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=XTMGfAK565gcgdWpHMpLD' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE",
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=XTMGfAK565gcgdWpHMpLD' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE"
+    ],
+    "text": "العودة إلى التجارة بناء تجربة المتجر تحكم في شكل المتجر دون تغيير حقائق التجارة في أَوْج معاينة المتجر حاسوب جهاز لوحي جوال عرض المعاينة · 1280 المنتجات والتصنيفات هنا عيّنات للمعاينة فقط، وليست حقيقة تجارية للمتجر الحي. السعودية · ر.س",
+    "file": "/workspace/Nebrax/docs/plans/store/storefront-visual-completion-qa/customizer-harness-768.png"
+  },
+  {
+    "id": "customizer-harness",
+    "width": 1024,
+    "status": 200,
+    "title": "",
+    "errors": [
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=YlN0vqe8U6mYKfSMK4Ode' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE",
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=YlN0vqe8U6mYKfSMK4Ode' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE"
+    ],
+    "text": "العودة إلى التجارة بناء تجربة المتجر تحكم في شكل المتجر دون تغيير حقائق التجارة في أَوْج المظهر الهوية الرأس والتنقل الصفحة الرئيسية التذييل التواصل واتساب اجتماعي التوثيق والثقة التطبيقات المحتوى المظهر قالب المظهر أَوْج الحديث كحلي عنا",
+    "file": "/workspace/Nebrax/docs/plans/store/storefront-visual-completion-qa/customizer-harness-1024.png"
+  },
+  {
+    "id": "customizer-harness",
+    "width": 1280,
+    "status": 200,
+    "title": "",
+    "errors": [
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=2mRzJU4TJPGxMDjByFLPm' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE",
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=2mRzJU4TJPGxMDjByFLPm' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE"
+    ],
+    "text": "العودة إلى التجارة بناء تجربة المتجر تحكم في شكل المتجر دون تغيير حقائق التجارة في أَوْج لا تغييرات المظهر الهوية الرأس والتنقل الصفحة الرئيسية التذييل التواصل واتساب اجتماعي التوثيق والثقة التطبيقات المحتوى المظهر قالب المظهر أَوْج الحد",
+    "file": "/workspace/Nebrax/docs/plans/store/storefront-visual-completion-qa/customizer-harness-1280.png"
+  },
+  {
+    "id": "customizer-harness",
+    "width": 1440,
+    "status": 200,
+    "title": "",
+    "errors": [
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=YVdmHMt073VBZgjBRk6HC' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE",
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=YVdmHMt073VBZgjBRk6HC' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE"
+    ],
+    "text": "العودة إلى التجارة بناء تجربة المتجر تحكم في شكل المتجر دون تغيير حقائق التجارة في أَوْج لا تغييرات المظهر الهوية الرأس والتنقل الصفحة الرئيسية التذييل التواصل واتساب اجتماعي التوثيق والثقة التطبيقات المحتوى المظهر قالب المظهر أَوْج الحد",
+    "file": "/workspace/Nebrax/docs/plans/store/storefront-visual-completion-qa/customizer-harness-1440.png"
+  },
+  {
+    "id": "account-overview-ar",
+    "width": 390,
+    "status": 200,
+    "title": "",
+    "errors": [
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=XKoKuMS0wMnGejvqQeEr_' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE",
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=XKoKuMS0wMnGejvqQeEr_' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE"
+    ],
+    "text": "STORE-UI-5 preview العربية English signin overview orders orders-empty order-detail addresses wishlist profile payment مسجّل الدخول باسم نورة العبدالله noura@example.com الطلبات سجل الطلبات لا يمكن استرجاع الطلبات السابقة بعد إنشاء ال",
+    "file": "/workspace/Nebrax/docs/plans/store/storefront-visual-completion-qa/account-overview-ar-390.png"
+  },
+  {
+    "id": "account-overview-ar",
+    "width": 430,
+    "status": 200,
+    "title": "",
+    "errors": [
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=EVXvh5MEHZ7xfowqesd02' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE",
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=EVXvh5MEHZ7xfowqesd02' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE"
+    ],
+    "text": "STORE-UI-5 preview العربية English signin overview orders orders-empty order-detail addresses wishlist profile payment مسجّل الدخول باسم نورة العبدالله noura@example.com الطلبات سجل الطلبات لا يمكن استرجاع الطلبات السابقة بعد إنشاء ال",
+    "file": "/workspace/Nebrax/docs/plans/store/storefront-visual-completion-qa/account-overview-ar-430.png"
+  },
+  {
+    "id": "account-overview-ar",
+    "width": 768,
+    "status": 200,
+    "title": "",
+    "errors": [
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=5h3wkC-w7ryxavZ3H7iPM' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE",
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=5h3wkC-w7ryxavZ3H7iPM' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE"
+    ],
+    "text": "STORE-UI-5 preview العربية English signin overview orders orders-empty order-detail addresses wishlist profile payment مسجّل الدخول باسم نورة العبدالله noura@example.com الطلبات سجل الطلبات لا يمكن استرجاع الطلبات السابقة بعد إنشاء ال",
+    "file": "/workspace/Nebrax/docs/plans/store/storefront-visual-completion-qa/account-overview-ar-768.png"
+  },
+  {
+    "id": "account-overview-ar",
+    "width": 1024,
+    "status": 200,
+    "title": "",
+    "errors": [
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=ly9b4QKhI3sat1LLVFq2D' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE",
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=ly9b4QKhI3sat1LLVFq2D' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE"
+    ],
+    "text": "STORE-UI-5 preview العربية English signin overview orders orders-empty order-detail addresses wishlist profile payment نورة العبدالله noura@example.com نظرة عامة الطلبات الملف الشخصي العناوين المفضلة طرق الدفع المساعدة تسجيل الخروج مسج",
+    "file": "/workspace/Nebrax/docs/plans/store/storefront-visual-completion-qa/account-overview-ar-1024.png"
+  },
+  {
+    "id": "account-overview-ar",
+    "width": 1280,
+    "status": 200,
+    "title": "",
+    "errors": [
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=bmUrD0V8KvVul2j2sS5DQ' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE",
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=bmUrD0V8KvVul2j2sS5DQ' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE"
+    ],
+    "text": "STORE-UI-5 preview العربية English signin overview orders orders-empty order-detail addresses wishlist profile payment نورة العبدالله noura@example.com نظرة عامة الطلبات الملف الشخصي العناوين المفضلة طرق الدفع المساعدة تسجيل الخروج مسج",
+    "file": "/workspace/Nebrax/docs/plans/store/storefront-visual-completion-qa/account-overview-ar-1280.png"
+  },
+  {
+    "id": "account-overview-ar",
+    "width": 1440,
+    "status": 200,
+    "title": "",
+    "errors": [
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=cv0VQcOz3xZ4x81Ei2HIU' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE",
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=cv0VQcOz3xZ4x81Ei2HIU' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE"
+    ],
+    "text": "STORE-UI-5 preview العربية English signin overview orders orders-empty order-detail addresses wishlist profile payment نورة العبدالله noura@example.com نظرة عامة الطلبات الملف الشخصي العناوين المفضلة طرق الدفع المساعدة تسجيل الخروج مسج",
+    "file": "/workspace/Nebrax/docs/plans/store/storefront-visual-completion-qa/account-overview-ar-1440.png"
+  },
+  {
+    "id": "account-overview-en",
+    "width": 390,
+    "status": 200,
+    "title": "",
+    "errors": [
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=GmbqlrN1jE96fv-wyhRdX' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE",
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=GmbqlrN1jE96fv-wyhRdX' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE"
+    ],
+    "text": "STORE-UI-5 preview العربية English signin overview orders orders-empty order-detail addresses wishlist profile payment Signed in as نورة العبدالله noura@example.com Orders Order History Past orders cannot be looked up yet Placing an o",
+    "file": "/workspace/Nebrax/docs/plans/store/storefront-visual-completion-qa/account-overview-en-390.png"
+  },
+  {
+    "id": "account-overview-en",
+    "width": 430,
+    "status": 200,
+    "title": "",
+    "errors": [
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=LFZ5gKzl0Z0bBgbb5_ioe' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE",
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=LFZ5gKzl0Z0bBgbb5_ioe' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE"
+    ],
+    "text": "STORE-UI-5 preview العربية English signin overview orders orders-empty order-detail addresses wishlist profile payment Signed in as نورة العبدالله noura@example.com Orders Order History Past orders cannot be looked up yet Placing an o",
+    "file": "/workspace/Nebrax/docs/plans/store/storefront-visual-completion-qa/account-overview-en-430.png"
+  },
+  {
+    "id": "account-overview-en",
+    "width": 768,
+    "status": 200,
+    "title": "",
+    "errors": [
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=j9myIsIjS3RkbKMm8LSQk' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE",
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=j9myIsIjS3RkbKMm8LSQk' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE"
+    ],
+    "text": "STORE-UI-5 preview العربية English signin overview orders orders-empty order-detail addresses wishlist profile payment Signed in as نورة العبدالله noura@example.com Orders Order History Past orders cannot be looked up yet Placing an o",
+    "file": "/workspace/Nebrax/docs/plans/store/storefront-visual-completion-qa/account-overview-en-768.png"
+  },
+  {
+    "id": "account-overview-en",
+    "width": 1024,
+    "status": 200,
+    "title": "",
+    "errors": [
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=cDZqf7CHRi8GoYTTpVuiM' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE",
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=cDZqf7CHRi8GoYTTpVuiM' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE"
+    ],
+    "text": "STORE-UI-5 preview العربية English signin overview orders orders-empty order-detail addresses wishlist profile payment نورة العبدالله noura@example.com Overview Orders Profile Addresses Favorites Payment Methods Help Sign Out Signed in",
+    "file": "/workspace/Nebrax/docs/plans/store/storefront-visual-completion-qa/account-overview-en-1024.png"
+  },
+  {
+    "id": "account-overview-en",
+    "width": 1280,
+    "status": 200,
+    "title": "",
+    "errors": [
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=jxH_UEnc_cuhJbvlo58HM' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE",
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=jxH_UEnc_cuhJbvlo58HM' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE"
+    ],
+    "text": "STORE-UI-5 preview العربية English signin overview orders orders-empty order-detail addresses wishlist profile payment نورة العبدالله noura@example.com Overview Orders Profile Addresses Favorites Payment Methods Help Sign Out Signed in",
+    "file": "/workspace/Nebrax/docs/plans/store/storefront-visual-completion-qa/account-overview-en-1280.png"
+  },
+  {
+    "id": "account-overview-en",
+    "width": 1440,
+    "status": 200,
+    "title": "",
+    "errors": [
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=_AWEtR7PDsBgXRLED0omQ' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE",
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=_AWEtR7PDsBgXRLED0omQ' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE"
+    ],
+    "text": "STORE-UI-5 preview العربية English signin overview orders orders-empty order-detail addresses wishlist profile payment نورة العبدالله noura@example.com Overview Orders Profile Addresses Favorites Payment Methods Help Sign Out Signed in",
+    "file": "/workspace/Nebrax/docs/plans/store/storefront-visual-completion-qa/account-overview-en-1440.png"
+  },
+  {
+    "id": "account-orders-empty-ar",
+    "width": 390,
+    "status": 200,
+    "title": "",
+    "errors": [
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=pqR4lcEQ3Ed310OqzKwX3' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE",
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=pqR4lcEQ3Ed310OqzKwX3' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE"
+    ],
+    "text": "STORE-UI-5 preview العربية English signin overview orders orders-empty order-detail addresses wishlist profile payment العودة إلى الحساب سجل الطلبات لا يمكن استرجاع الطلبات السابقة بعد إنشاء الطلب ما زال يحدث. لا يملك هذا المتجر بعد طريقة",
+    "file": "/workspace/Nebrax/docs/plans/store/storefront-visual-completion-qa/account-orders-empty-ar-390.png"
+  },
+  {
+    "id": "account-orders-empty-ar",
+    "width": 430,
+    "status": 200,
+    "title": "",
+    "errors": [
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=ouXX3oj7i_aGvzcjNsLwF' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE",
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=ouXX3oj7i_aGvzcjNsLwF' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE"
+    ],
+    "text": "STORE-UI-5 preview العربية English signin overview orders orders-empty order-detail addresses wishlist profile payment العودة إلى الحساب سجل الطلبات لا يمكن استرجاع الطلبات السابقة بعد إنشاء الطلب ما زال يحدث. لا يملك هذا المتجر بعد طريقة",
+    "file": "/workspace/Nebrax/docs/plans/store/storefront-visual-completion-qa/account-orders-empty-ar-430.png"
+  },
+  {
+    "id": "account-orders-empty-ar",
+    "width": 768,
+    "status": 200,
+    "title": "",
+    "errors": [
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=-Yc0ZOr1c1YOuJTBhSfbJ' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE",
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=-Yc0ZOr1c1YOuJTBhSfbJ' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE"
+    ],
+    "text": "STORE-UI-5 preview العربية English signin overview orders orders-empty order-detail addresses wishlist profile payment العودة إلى الحساب سجل الطلبات لا يمكن استرجاع الطلبات السابقة بعد إنشاء الطلب ما زال يحدث. لا يملك هذا المتجر بعد طريقة",
+    "file": "/workspace/Nebrax/docs/plans/store/storefront-visual-completion-qa/account-orders-empty-ar-768.png"
+  },
+  {
+    "id": "account-orders-empty-ar",
+    "width": 1024,
+    "status": 200,
+    "title": "",
+    "errors": [
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=Jgc3AQCLJKQgEYNblZpVw' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE",
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=Jgc3AQCLJKQgEYNblZpVw' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE"
+    ],
+    "text": "STORE-UI-5 preview العربية English signin overview orders orders-empty order-detail addresses wishlist profile payment نورة العبدالله noura@example.com نظرة عامة الطلبات الملف الشخصي العناوين المفضلة طرق الدفع المساعدة تسجيل الخروج سجل ",
+    "file": "/workspace/Nebrax/docs/plans/store/storefront-visual-completion-qa/account-orders-empty-ar-1024.png"
+  },
+  {
+    "id": "account-orders-empty-ar",
+    "width": 1280,
+    "status": 200,
+    "title": "",
+    "errors": [
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=4uQ_P7JYJlBxA21fgCmpd' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE",
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=4uQ_P7JYJlBxA21fgCmpd' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE"
+    ],
+    "text": "STORE-UI-5 preview العربية English signin overview orders orders-empty order-detail addresses wishlist profile payment نورة العبدالله noura@example.com نظرة عامة الطلبات الملف الشخصي العناوين المفضلة طرق الدفع المساعدة تسجيل الخروج سجل ",
+    "file": "/workspace/Nebrax/docs/plans/store/storefront-visual-completion-qa/account-orders-empty-ar-1280.png"
+  },
+  {
+    "id": "account-orders-empty-ar",
+    "width": 1440,
+    "status": 200,
+    "title": "",
+    "errors": [
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=MAOTtVesMFaNCpZKX47AP' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE",
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=MAOTtVesMFaNCpZKX47AP' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE"
+    ],
+    "text": "STORE-UI-5 preview العربية English signin overview orders orders-empty order-detail addresses wishlist profile payment نورة العبدالله noura@example.com نظرة عامة الطلبات الملف الشخصي العناوين المفضلة طرق الدفع المساعدة تسجيل الخروج سجل ",
+    "file": "/workspace/Nebrax/docs/plans/store/storefront-visual-completion-qa/account-orders-empty-ar-1440.png"
+  },
+  {
+    "id": "account-signin-en",
+    "width": 390,
+    "status": 200,
+    "title": "",
+    "errors": [
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=-RO0DA4OnPLNhFBSLu68B' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE",
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=-RO0DA4OnPLNhFBSLu68B' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE"
+    ],
+    "text": "STORE-UI-5 preview العربية English signin overview orders orders-empty order-detail addresses wishlist profile payment My Account Sign in to access your account. Email Password Forgot password? Sign In Don't have an account? Sign up",
+    "file": "/workspace/Nebrax/docs/plans/store/storefront-visual-completion-qa/account-signin-en-390.png"
+  },
+  {
+    "id": "account-signin-en",
+    "width": 430,
+    "status": 200,
+    "title": "",
+    "errors": [
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=-sRg9dIYafGVYWsqFs3p3' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE",
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=-sRg9dIYafGVYWsqFs3p3' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE"
+    ],
+    "text": "STORE-UI-5 preview العربية English signin overview orders orders-empty order-detail addresses wishlist profile payment My Account Sign in to access your account. Email Password Forgot password? Sign In Don't have an account? Sign up",
+    "file": "/workspace/Nebrax/docs/plans/store/storefront-visual-completion-qa/account-signin-en-430.png"
+  },
+  {
+    "id": "account-signin-en",
+    "width": 768,
+    "status": 200,
+    "title": "",
+    "errors": [
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=H9vwEwY5ho5iBHGW-ecnV' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE",
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=H9vwEwY5ho5iBHGW-ecnV' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE"
+    ],
+    "text": "STORE-UI-5 preview العربية English signin overview orders orders-empty order-detail addresses wishlist profile payment My Account Sign in to access your account. Email Password Forgot password? Sign In Don't have an account? Sign up",
+    "file": "/workspace/Nebrax/docs/plans/store/storefront-visual-completion-qa/account-signin-en-768.png"
+  },
+  {
+    "id": "account-signin-en",
+    "width": 1024,
+    "status": 200,
+    "title": "",
+    "errors": [
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=ecMWDHWrZh88GavRtPYWg' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE",
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=ecMWDHWrZh88GavRtPYWg' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE"
+    ],
+    "text": "STORE-UI-5 preview العربية English signin overview orders orders-empty order-detail addresses wishlist profile payment My Account Sign in to access your account. Email Password Forgot password? Sign In Don't have an account? Sign up",
+    "file": "/workspace/Nebrax/docs/plans/store/storefront-visual-completion-qa/account-signin-en-1024.png"
+  },
+  {
+    "id": "account-signin-en",
+    "width": 1280,
+    "status": 200,
+    "title": "",
+    "errors": [
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=tklfe6sYdLf3gd970M37M' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE",
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=tklfe6sYdLf3gd970M37M' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE"
+    ],
+    "text": "STORE-UI-5 preview العربية English signin overview orders orders-empty order-detail addresses wishlist profile payment My Account Sign in to access your account. Email Password Forgot password? Sign In Don't have an account? Sign up",
+    "file": "/workspace/Nebrax/docs/plans/store/storefront-visual-completion-qa/account-signin-en-1280.png"
+  },
+  {
+    "id": "account-signin-en",
+    "width": 1440,
+    "status": 200,
+    "title": "",
+    "errors": [
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=t57LS_J27t5mP3R96aU4h' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE",
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=t57LS_J27t5mP3R96aU4h' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE"
+    ],
+    "text": "STORE-UI-5 preview العربية English signin overview orders orders-empty order-detail addresses wishlist profile payment My Account Sign in to access your account. Email Password Forgot password? Sign In Don't have an account? Sign up",
+    "file": "/workspace/Nebrax/docs/plans/store/storefront-visual-completion-qa/account-signin-en-1440.png"
+  },
+  {
+    "id": "public-home-ar",
+    "width": 390,
+    "status": 200,
+    "title": "Spree Store",
+    "errors": [
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=G6fsjZ13FgUxo9fWizFO5' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE",
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=G6fsjZ13FgUxo9fWizFO5' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE",
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=W_ZOKKIerTxc1eni7gE4Z' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE"
+    ],
+    "text": "تخطي إلى المحتوى المتجر المتجر تسوّق الآن أحدث المنتجات عرض الكل لا توجد منتجات تصفّح مجموعتنا الكاملة المتجر المتجر جميع المنتجات الحساب حسابي سجل الطلبات السلة السياسات سياسة الشحن سياسة الخصوصية سياسة الإرجاع شروط الخدمة © 2026 المتج",
+    "file": "/workspace/Nebrax/docs/plans/store/storefront-visual-completion-qa/public-home-ar-390.png"
+  },
+  {
+    "id": "public-home-ar",
+    "width": 430,
+    "status": 200,
+    "title": "Spree Store",
+    "errors": [
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=qEn6T0sWy_Po9ipLyvWUl' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE",
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=qEn6T0sWy_Po9ipLyvWUl' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE"
+    ],
+    "text": "",
+    "file": "/workspace/Nebrax/docs/plans/store/storefront-visual-completion-qa/public-home-ar-430.png"
+  },
+  {
+    "id": "public-home-ar",
+    "width": 768,
+    "status": 200,
+    "title": "",
+    "errors": [
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=k8DGpNHXWF9SgQkxpW5KW' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE",
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=k8DGpNHXWF9SgQkxpW5KW' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE",
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=V1i29sPHsRqKiY8rP4S3d' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE"
+    ],
+    "text": "",
+    "file": "/workspace/Nebrax/docs/plans/store/storefront-visual-completion-qa/public-home-ar-768.png"
+  },
+  {
+    "id": "public-home-ar",
+    "width": 1024,
+    "status": 200,
+    "title": "Spree Store",
+    "errors": [
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=z5QTUtNz317dvzkndNuu8' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE",
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=z5QTUtNz317dvzkndNuu8' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE"
+    ],
+    "text": "",
+    "file": "/workspace/Nebrax/docs/plans/store/storefront-visual-completion-qa/public-home-ar-1024.png"
+  },
+  {
+    "id": "public-home-ar",
+    "width": 1280,
+    "status": 200,
+    "title": "Spree Store",
+    "errors": [
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=bDt3BAGuy6mTvAyhTn3xR' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE",
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=bDt3BAGuy6mTvAyhTn3xR' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE",
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=PBXxSDXYz0htKqM9zQYQO' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE"
+    ],
+    "text": "تخطي إلى المحتوى AR SAR المتجر بحث السلة جميع المنتجات المتجر تسوّق الآن أحدث المنتجات عرض الكل لا توجد منتجات تصفّح مجموعتنا الكاملة المتجر المتجر جميع المنتجات الحساب حسابي سجل الطلبات السلة السياسات سياسة الشحن سياسة الخصوصية سياسة ال",
+    "file": "/workspace/Nebrax/docs/plans/store/storefront-visual-completion-qa/public-home-ar-1280.png"
+  },
+  {
+    "id": "public-home-ar",
+    "width": 1440,
+    "status": 200,
+    "title": "Spree Store",
+    "errors": [
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=icn421QPTC3LK35QiDjoi' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE",
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=icn421QPTC3LK35QiDjoi' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE",
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=XEI_5xVtN35Q5hQOoXg1z' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE"
+    ],
+    "text": "تخطي إلى المحتوى AR SAR المتجر بحث السلة جميع المنتجات المتجر تسوّق الآن أحدث المنتجات عرض الكل لا توجد منتجات تصفّح مجموعتنا الكاملة المتجر المتجر جميع المنتجات الحساب حسابي سجل الطلبات السلة السياسات سياسة الشحن سياسة الخصوصية سياسة ال",
+    "file": "/workspace/Nebrax/docs/plans/store/storefront-visual-completion-qa/public-home-ar-1440.png"
+  },
+  {
+    "id": "public-products-en",
+    "width": 390,
+    "status": 200,
+    "title": "Products | Spree Store",
+    "errors": [
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=txEcoWXPSn6-S_7PK1rfb' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE",
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=txEcoWXPSn6-S_7PK1rfb' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE"
+    ],
+    "text": "",
+    "file": "/workspace/Nebrax/docs/plans/store/storefront-visual-completion-qa/public-products-en-390.png"
+  },
+  {
+    "id": "public-products-en",
+    "width": 430,
+    "status": 200,
+    "title": "",
+    "errors": [
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=kLpatsGX_1AEoVq_nVHxy' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE",
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=kLpatsGX_1AEoVq_nVHxy' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE"
+    ],
+    "text": "",
+    "file": "/workspace/Nebrax/docs/plans/store/storefront-visual-completion-qa/public-products-en-430.png"
+  },
+  {
+    "id": "public-products-en",
+    "width": 768,
+    "status": 200,
+    "title": "Products | Spree Store",
+    "errors": [
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=Te9Wj3rL1yfF-kBW60ZSD' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE",
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=Te9Wj3rL1yfF-kBW60ZSD' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE"
+    ],
+    "text": "",
+    "file": "/workspace/Nebrax/docs/plans/store/storefront-visual-completion-qa/public-products-en-768.png"
+  },
+  {
+    "id": "public-products-en",
+    "width": 1024,
+    "status": 200,
+    "title": "Products | Spree Store",
+    "errors": [
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=QDxajqU_8avg-oebG2Dht' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE",
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=QDxajqU_8avg-oebG2Dht' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE"
+    ],
+    "text": "",
+    "file": "/workspace/Nebrax/docs/plans/store/storefront-visual-completion-qa/public-products-en-1024.png"
+  },
+  {
+    "id": "public-products-en",
+    "width": 1280,
+    "status": 200,
+    "title": "Products | Spree Store",
+    "errors": [
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=rdm6gSPFh5h4b7i62iJF8' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE",
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=rdm6gSPFh5h4b7i62iJF8' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE"
+    ],
+    "text": "",
+    "file": "/workspace/Nebrax/docs/plans/store/storefront-visual-completion-qa/public-products-en-1280.png"
+  },
+  {
+    "id": "public-products-en",
+    "width": 1440,
+    "status": 200,
+    "title": "Products | Spree Store",
+    "errors": [
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=HVVVqkurwb3pVOAU6KKu8' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE",
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=HVVVqkurwb3pVOAU6KKu8' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE"
+    ],
+    "text": "تخطي إلى المحتوى AR SAR المتجر بحث السلة جميع المنتجات جميع المنتجات تصفّح مجموعتنا الكاملة المتجر المتجر جميع المنتجات الحساب حسابي سجل الطلبات السلة السياسات سياسة الشحن سياسة الخصوصية سياسة الإرجاع شروط الخدمة © 2026 المتجر",
+    "file": "/workspace/Nebrax/docs/plans/store/storefront-visual-completion-qa/public-products-en-1440.png"
+  },
+  {
+    "id": "public-cart-ar",
+    "width": 390,
+    "status": 200,
+    "title": "Spree Store",
+    "errors": [
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=4XflXFcXlruhblZtFfjaM' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE",
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=4XflXFcXlruhblZtFfjaM' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE"
+    ],
+    "text": "",
+    "file": "/workspace/Nebrax/docs/plans/store/storefront-visual-completion-qa/public-cart-ar-390.png"
+  },
+  {
+    "id": "public-cart-ar",
+    "width": 430,
+    "status": 200,
+    "title": "Spree Store",
+    "errors": [
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=-C32Ckz5ZjS0ytmUzQw-E' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE",
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=-C32Ckz5ZjS0ytmUzQw-E' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE"
+    ],
+    "text": "",
+    "file": "/workspace/Nebrax/docs/plans/store/storefront-visual-completion-qa/public-cart-ar-430.png"
+  },
+  {
+    "id": "public-cart-ar",
+    "width": 768,
+    "status": 200,
+    "title": "",
+    "errors": [
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=TnG0FJDnPY31TqX4C4Ozj' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE",
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=TnG0FJDnPY31TqX4C4Ozj' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE"
+    ],
+    "text": "تخطي إلى المحتوى AR SAR المتجر بحث جميع المنتجات المتجر المتجر جميع المنتجات الحساب حسابي سجل الطلبات السلة السياسات سياسة الشحن سياسة الخصوصية سياسة الإرجاع شروط الخدمة © 2026 المتجر",
+    "file": "/workspace/Nebrax/docs/plans/store/storefront-visual-completion-qa/public-cart-ar-768.png"
+  },
+  {
+    "id": "public-cart-ar",
+    "width": 1024,
+    "status": 200,
+    "title": "Spree Store",
+    "errors": [
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=Pd94x89zLdlsow5Bz1GJ0' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE",
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=Pd94x89zLdlsow5Bz1GJ0' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE",
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=XqAp9idLe-92Fg-r623QD' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE"
+    ],
+    "text": "تخطي إلى المحتوى AR SAR المتجر بحث السلة جميع المنتجات المتجر المتجر جميع المنتجات الحساب حسابي سجل الطلبات السلة السياسات سياسة الشحن سياسة الخصوصية سياسة الإرجاع شروط الخدمة © 2026 المتجر",
+    "file": "/workspace/Nebrax/docs/plans/store/storefront-visual-completion-qa/public-cart-ar-1024.png"
+  },
+  {
+    "id": "public-cart-ar",
+    "width": 1280,
+    "status": 200,
+    "title": "Spree Store",
+    "errors": [
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=NwAG-JA2zgXXIHLJ82mSl' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE",
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=NwAG-JA2zgXXIHLJ82mSl' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE"
+    ],
+    "text": "",
+    "file": "/workspace/Nebrax/docs/plans/store/storefront-visual-completion-qa/public-cart-ar-1280.png"
+  },
+  {
+    "id": "public-cart-ar",
+    "width": 1440,
+    "status": 200,
+    "title": "Spree Store",
+    "errors": [
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=FObQ-I4esd7Xi3e561P73' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE",
+      "WebSocket connection to 'ws://127.0.0.1:3001/_next/webpack-hmr?id=FObQ-I4esd7Xi3e561P73' failed: Error during WebSocket handshake: net::ERR_INVALID_HTTP_RESPONSE"
+    ],
+    "text": "",
+    "file": "/workspace/Nebrax/docs/plans/store/storefront-visual-completion-qa/public-cart-ar-1440.png"
+  }
+]
