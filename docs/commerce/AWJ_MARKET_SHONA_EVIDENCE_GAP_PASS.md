@@ -201,3 +201,65 @@ This document is intentionally not final. Next evidence passes must add:
 - reviews,
 - content/pages,
 - final gap priorities and dependencies.
+
+
+## 14. External Evidence Pass 02 — additional confirmed patterns
+
+Evidence captured from the public reference storefront on 2026-09-25. These are reference observations, not AWJ implementation decisions.
+
+### Home and content surfaces
+
+The public storefront confirms a commerce-oriented home composition that includes promotional messaging, category discovery, FAQ, customer testimonials/reviews, store location/map, merchant story/about content, trust/service features, app promotion, and policy/business-information links.
+
+### Dedicated offers discovery
+
+A dedicated public offers surface exists. AWJ Market should therefore verify whether current AWJ promotions can deterministically power an offers collection, including variant pricing, validity windows, sales-channel eligibility, and tenant isolation. This is not assumed to be theme-only.
+
+### Product-detail evidence
+
+Multiple unrelated product pages consistently expose price, add-to-cart, purchase-count/social-proof information, a model/barcode-like identifier, branch availability, and branch selection. Because the availability pattern appears across multiple products, it is treated as an intentional reference capability rather than a one-product anomaly.
+
+Important: AWJ must not assume the reference model number maps directly to AWJ SKU, barcode, GTIN, or variant ID. The public identifier contract must be verified first. Likewise, purchase counts require defined aggregation, return/cancellation semantics, and privacy-safe exposure before AWJ can reproduce them.
+
+### Evidence matrix additions
+
+| Capability | External evidence | AWJ state | Required verification |
+|---|---|---|---|
+| Dedicated offers page | Confirmed | Unknown | Promotions to storefront collection |
+| Purchase count | Confirmed on multiple PDPs | Unknown | Domain source and privacy semantics |
+| Model/barcode-like identifier | Confirmed | Unknown public mapping | SKU/barcode/GTIN contract |
+| Branch availability | Confirmed on multiple PDPs | High-priority verification | Inventory to storefront to cart |
+| Branch selector | Confirmed | High-priority verification | Persistence and checkout validation |
+| FAQ | Confirmed | Candidate THEME_ONLY/content | Customizer content blocks |
+| Store location/map | Confirmed | Candidate THEME_ONLY/content | Store settings/location contract |
+| Trust/service section | Confirmed | Candidate THEME_ONLY/content | Reusable section |
+| App promotion | Confirmed | Verification required | Storefront app-link settings |
+| Policies/business info | Confirmed | Verification required | Pages/public business profile |
+
+### Updated branch-availability investigation
+
+Reference evidence is now strong enough to make branch availability a formal capability investigation. AWJ must verify the complete truth path:
+
+Product/Variant -> inventory source (branch/warehouse) -> sellable availability -> Storefront API -> customer branch selection -> Cart -> Checkout.
+
+The public storefront contract should expose only commerce-safe availability. Internal stock-ledger quantities, costing, or accounting details must not become public merely because they exist in ERP.
+
+### Candidate AWJ Market section inventory
+
+Current evidence supports evaluating these reusable sections: announcement/promo strip, prominent-search header, hero banners, category shortcuts, product rails/grids, offers discovery, merchant story, trust/service features, reviews/testimonials, FAQ, store location/map, app promotion, and policy/business-information footer.
+
+This remains an evidence-derived candidate inventory, not the final Theme Spec.
+
+## 15. Next evidence pass — AWJ repository/API
+
+The next pass must verify current AWJ implementation evidence for, in order:
+
+1. branch/warehouse inventory and sellable availability,
+2. public product identifiers/barcodes,
+3. promotions/offers,
+4. favorites,
+5. reviews,
+6. content/pages and policy links,
+7. storefront business profile, location, and app links.
+
+Only repository/API evidence can move a matrix item to EXISTING, WIRING_GAP, PARTIAL, or MISSING.
