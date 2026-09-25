@@ -1141,3 +1141,99 @@ The specification now has:
 The remaining operational gate is documentation integration: confirm PR #1001 is clean/mergeable and merge the durable spec. After that, generate the single Horizon execution prompt against the merged `main` Base SHA.
 
 Status: **SPEC COMPLETE — PENDING DOCS INTEGRATION BEFORE HORIZON HANDOFF**.
+
+
+## 33. Shona UI/UX Extraction Contract — mandatory Horizon benchmark pass
+
+### Intent
+
+Shona is not merely a loose inspiration reference for AWJ Market. Horizon must perform a **systematic UI/UX extraction pass** against the live Shona storefront benchmark before finalizing implementation decisions, then translate the useful patterns into AWJ's shared design system and commerce contracts.
+
+Benchmark: `https://store.shonaksa.com/`
+
+The goal is **experience parity where appropriate, not asset/identity cloning**.
+
+### Mandatory extraction scope
+
+Horizon must inspect the benchmark across desktop and mobile and record, at minimum:
+
+1. **Global shell** — announcement/promo treatment, header height and hierarchy, logo zone, search prominence, account/favorites/cart affordances, category navigation, sticky behavior, footer hierarchy, mobile bottom navigation and help/WhatsApp affordances.
+2. **Homepage composition** — section order, vertical rhythm, hero/banner proportions, category presentation, product rails/grids, offer discovery, trust/service content, merchant story, app promotion, reviews/testimonials, FAQ, location/map and footer transition.
+3. **Product cards** — image ratio, information hierarchy, title line behavior, price hierarchy, promotional treatment, add-to-cart affordance, spacing, density, borders/radius/shadow, unavailable state and interaction feedback.
+4. **Catalog/search/category UX** — search entry, results hierarchy, category navigation, filter/sort placement, mobile drawer/sheet behavior, result density, pagination/loading pattern, empty/no-result handling and preservation of query state.
+5. **PDP** — gallery/media proportions, title/category/identifier hierarchy, price/add-to-cart hierarchy, quantity/variant behavior, availability messaging, branch/location affordance, social proof, supporting content and mobile sticky/action behavior.
+6. **Cart** — drawer/page composition, line-item density, quantity controls, subtotal/total hierarchy, checkout CTA, empty cart and rejected/unavailable states.
+7. **Checkout entry/continuity** — only visual/interaction patterns observable publicly; do not infer hidden monetary, payment, shipping or tax contracts from appearance.
+8. **Content/trust surfaces** — FAQ, policies, about/story, contact, map/location, app links, business/VAT information and service/trust blocks.
+9. **Responsive behavior** — what changes, collapses, becomes sticky, becomes horizontally scrollable, moves into drawers, changes column count, or disappears between phone/tablet/desktop.
+10. **Interaction details** — hover/focus/pressed/selected/disabled/loading feedback, drawers/modals, carousel controls, sticky controls, navigation transitions and touch behavior that materially affect usability.
+11. **Visual system** — spacing rhythm, content widths, typography scale/weight hierarchy, radii, borders, shadows, surfaces, icon sizing, image treatment and density. Extract relationships/patterns rather than copying proprietary values blindly.
+12. **States** — loading, empty, no results, missing image, unavailable/out-of-stock, invalid selection, long content, error/retry, and any observable edge state.
+
+### Required evidence format
+
+For every material Shona pattern used in AWJ Market, Horizon must classify it as:
+
+- **Observed Shona behavior** — what is actually visible/verified;
+- **AWJ existing capability** — existing contract/component that can implement it;
+- **AWJ adaptation** — how the pattern is translated into AWJ design language;
+- **Gap/Gate** — anything that cannot be truthfully implemented with current contracts;
+- **Decision** — implement, adapt, gate, defer or reject.
+
+Do not turn visual inference into backend fact. For example, a visible discount, branch selector, purchase count or rating on Shona does not prove AWJ has the required authority contract.
+
+### Fidelity target
+
+The implementation should capture the benchmark's useful **UX structure and retail density** closely enough that the relationship is deliberate and reviewable:
+
+- information hierarchy;
+- browsing speed;
+- search prominence;
+- category/product density;
+- section rhythm;
+- card proportions;
+- mobile shopping ergonomics;
+- responsive transformations;
+- interaction hierarchy.
+
+Where Shona conflicts with AWJ's stronger accessibility, RTL/LTR, security, performance, truthful-commerce, responsive or Customizer requirements, **AWJ requirements win** and the final report must record the adaptation.
+
+### Explicit non-copy boundary
+
+Horizon must **not** copy or redistribute:
+
+- Shona logo or brand marks;
+- merchant name/identity;
+- proprietary product/banner photography or illustrations;
+- marketing copy, testimonials, policy text or business information;
+- downloadable theme/source assets obtained without authorization;
+- tracking identifiers, private endpoints, credentials or implementation secrets;
+- proprietary code/CSS/JS copied from the benchmark.
+
+Horizon may reproduce general layout/interaction patterns through original AWJ implementation using AWJ components, tokens and merchant-provided content.
+
+### Benchmark completeness requirement
+
+Do not stop after the homepage. Before declaring visual parity complete, Horizon must cover every benchmark surface that is publicly reachable and materially relevant to the AWJ Market shopping journey, including representative simple/variant products and mobile/desktop behavior.
+
+If a benchmark surface cannot be reached or a state cannot be observed, mark it **NOT OBSERVED** rather than inventing its behavior.
+
+### Deliverable inside the Horizon report
+
+Add a dedicated **Shona → AWJ Market UI/UX Parity Matrix** containing:
+
+| Surface/pattern | Shona evidence | AWJ implementation/adaptation | Status | Reason for divergence |
+|---|---|---|---|---|
+
+Status must use: `MATCHED`, `ADAPTED`, `GATED`, `DEFERRED`, `REJECTED`, or `NOT OBSERVED`.
+
+The final implementation report must also identify any visible Shona behavior intentionally absent from AWJ Market and explain whether the reason is missing platform authority, accessibility, security, performance, tenant isolation, truthful commerce, or deliberate AWJ product/design choice.
+
+### Final rule
+
+**No Horizon completion claim based only on implementing this written specification.** Horizon must use the live Shona benchmark as a visual/interaction verification source and reconcile the finished AWJ Market implementation against both:
+
+1. this AWJ Master Spec; and
+2. the observed Shona UI/UX benchmark.
+
+The Master Spec controls architecture, security and commerce truth. Shona controls benchmark evidence for the intended retail UI/UX direction.
