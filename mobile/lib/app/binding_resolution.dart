@@ -178,14 +178,28 @@ SchemaComponent _resolveBoundNode(
 /// zero children (never throws) when [node] does not declare exactly one
 /// template child — a `collect` binding with no authored template, or more
 /// than one, has nothing well-defined to repeat.
+///
+/// Returns a plain [SchemaComponent] rather than `node.withChildren(...)`
+/// deliberately: `withChildren` copies [SchemaComponent.binding] verbatim,
+/// which would leave the resolved node still carrying its now-consumed
+/// `binding` — breaking this pipeline's own "fully-literal, no node carries
+/// a binding" contract.
 SchemaComponent _repeatTemplate(SchemaComponent node, List<Object?> items) {
-  if (node.children.length != 1) {
-    return node.withChildren(const []);
-  }
-  final template = node.children.single;
-  return node.withChildren([
-    for (var i = 0; i < items.length; i++) _instantiateTemplate(template, items[i], i),
-  ]);
+  final children = node.children.length == 1
+      ? [
+          for (var i = 0; i < items.length; i++) _instantiateTemplate(node.children.single, items[i], i),
+        ]
+      : const <SchemaComponent>[];
+  return SchemaComponent(
+    type: node.type,
+    id: node.id,
+    optional: node.optional,
+    props: node.props,
+    children: children,
+    action: node.action,
+    binding: null,
+    visibility: node.visibility,
+  );
 }
 
 SchemaComponent _instantiateTemplate(SchemaComponent template, Object? item, int index) {
