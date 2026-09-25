@@ -7,12 +7,14 @@ export async function FeaturedShelf({
   locale,
   currency,
   title,
+  headingId,
 }: {
   productIds: readonly string[];
   basePath: string;
   locale: string;
   currency?: string;
   title: string;
+  headingId: string;
 }) {
   const settled = await Promise.allSettled(
     productIds.map((id) => fetchProduct(id)),
@@ -23,9 +25,9 @@ export async function FeaturedShelf({
   if (products.length === 0) return null;
 
   return (
-    <section aria-labelledby="home-featured">
+    <section aria-labelledby={headingId}>
       <h2
-        id="home-featured"
+        id={headingId}
         className="text-base font-extrabold text-store-foreground md:text-lg"
       >
         {title}

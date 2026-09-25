@@ -179,7 +179,13 @@ async function publishedNodes(
     if (section.type === "customContent") {
       const content = customContentOf(section);
       if (!content.blocks.some((block) => block.text.trim())) continue;
-      nodes.push(<CustomContentBand key={section.id} content={content} />);
+      nodes.push(
+        <CustomContentBand
+          key={section.id}
+          sectionId={section.id}
+          content={content}
+        />,
+      );
       continue;
     }
     if (section.type === "featured") {
@@ -196,6 +202,7 @@ async function publishedNodes(
           locale={ctx.locale}
           currency={ctx.currency}
           title={ctx.featuredTitle}
+          headingId={`featured-${section.id}`}
         />,
       );
       continue;
