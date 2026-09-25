@@ -2,7 +2,7 @@
 
 > This file is a durable resume point, not a substitute for Git/GitHub evidence.
 
-LAST_UPDATED: 2026-09-25 (**AWJ Storefront Visual Completion Horizon is OPEN.** #1015 merge `ec2aad3cacc988417971489d46c9125da838c8d8`, #1016 merge `2e1225f39e553103ef628e25438461d4cd7d2abe`, #1017 merge `6b8869e8694c3b897eed4f75bbf1af07b708f1e4`, #1020 merge `395b163c0bc2f22e6086e3e4f5422fa612c7a2a3` (designed not-found). PRE_MERGE_REVIEW passed on those heads. POST_MERGE_REVIEW passed on #1015/#1016/#1017. #1020 post-merge CI is the remaining check before that review is closed. No deploy. Next: STORE-THEME-PARITY-1, public `density` and `productCard` only.)
+LAST_UPDATED: 2026-09-25 (**AWJ Storefront Visual Completion Horizon implementation-ready queue is done.** #1015 `ec2aad3cacc988417971489d46c9125da838c8d8`, #1016 `2e1225f39e553103ef628e25438461d4cd7d2abe`, #1017 `6b8869e8694c3b897eed4f75bbf1af07b708f1e4`, #1020 `395b163c0bc2f22e6086e3e4f5422fa612c7a2a3`, #1021 `58567bb0ce3b8ccb62dae2668aafa56cf4ccf64d`. PRE_MERGE_REVIEW and POST_MERGE_REVIEW passed on each exact SHA. No deploy. Remaining items are BACKEND_GATED, PRODUCT_DECISION_REQUIRED, or DEFERRED. Do not start them without a Decision Packet.)
 
 ## Previous snapshot
 
@@ -12,7 +12,7 @@ STATUS: OPEN — AWJ Storefront Visual Completion Horizon (`docs/plans/store/AWJ
 
 ## Current objective
 
-Execute **AWJ Storefront Visual Completion Horizon** under نظام الأفق, per `docs/plans/store/AWJ_STOREFRONT_VISUAL_COMPLETION_HORIZON.md`. Evidence, homepage deletion fidelity, customizer chrome, and the designed storefront `not-found` are merged. Continue with STORE-THEME-PARITY-1 (published `density` and `productCard` on the public page only: homepage rhythm and card padding, fail closed to the current comfortable/standard look). No deploy, production migration, or store release. Stop only at a genuine Decision Gate. The App Builder horizon below is closed history.
+AWJ Storefront Visual Completion Horizon implementation-ready work is merged: evidence, homepage deletion fidelity, customizer chrome, designed `not-found`, and published `density`/`productCard` padding. No further dependency-ready task remains inside this horizon. Per-instance section content, branding object storage, undo/version history, Market, and Floral stay behind a Decision Gate or explicit deferral. No deploy. The App Builder horizon below is closed history.
 
 ## AWJ App Builder Horizon V1 — execution log
 
