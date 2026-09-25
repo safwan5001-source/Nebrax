@@ -1,0 +1,80 @@
+{
+  "schemaVersion": "1.0.0",
+  "minRuntimeVersion": "1.0.0",
+  "navigation": { "initialPageId": "home" },
+  "theme": { "tokens": {} },
+  "pages": {
+    "home": {
+      "type": "Page",
+      "id": "home-root",
+      "children": [
+        {
+          "type": "Text",
+          "id": "marker-text",
+          "props": { "text": "LIVE_PREVIEW_7_INTEGRATED_PROOF_MARKER" }
+        },
+        {
+          "type": "ProductList",
+          "id": "products",
+          "binding": { "resource": "commerce.products" },
+          "children": [
+            {
+              "type": "ProductCard",
+              "id": "product-card-template",
+              "optional": true,
+              "props": {
+                "title": "$item.name",
+                "amountMinor": "$item.price.amount_minor"
+              },
+              "action": { "type": "openProduct", "params": { "productId": "$item.id" } }
+            }
+          ]
+        },
+        {
+          "type": "NavigationTarget",
+          "id": "go-cart",
+          "props": { "label": "View cart" },
+          "action": { "type": "navigate", "params": { "pageId": "cart" } }
+        }
+      ]
+    },
+    "cart": {
+      "type": "Page",
+      "id": "cart-root",
+      "children": [
+        {
+          "type": "NavigationTarget",
+          "id": "go-home",
+          "props": { "label": "Continue shopping" },
+          "action": { "type": "navigate", "params": { "pageId": "home" } }
+        },
+        {
+          "type": "CartList",
+          "id": "cart-items",
+          "binding": { "resource": "commerce.cart", "collect": "items" },
+          "children": [
+            {
+              "type": "Section",
+              "id": "cart-line-template",
+              "optional": true,
+              "props": { "title": "$item.product_name" },
+              "children": [
+                {
+                  "type": "Price",
+                  "id": "cart-line-template-price",
+                  "optional": true,
+                  "props": { "amountMinor": "$item.line_total.amount_minor" }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "CartSummary",
+          "id": "cart-summary",
+          "props": { "itemCount": 0, "subtotalAmountMinor": 0 }
+        }
+      ]
+    }
+  }
+}

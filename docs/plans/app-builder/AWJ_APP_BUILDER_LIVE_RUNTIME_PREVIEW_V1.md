@@ -52,8 +52,8 @@ Standing authority covers implementation, tests, commits, PRs, merging green dep
 | LIVE-PREVIEW-4 | Action + Theme + Supported Visibility Parity | **DONE / PASS** — see `LIVE-PREVIEW-4-ACTION-THEME-VISIBILITY-PARITY.md` |
 | LIVE-PREVIEW-5 | Runtime-Aware Pre-Publish Validation | **DONE / PASS** — see `LIVE-PREVIEW-5-PREPUBLISH-VALIDATION.md` |
 | LIVE-PREVIEW-6 | Draft / Default / Published Preview States | **DONE / PASS** — see `LIVE-PREVIEW-6-PREVIEW-STATES.md` |
-| LIVE-PREVIEW-7 | Integrated Builder → Publish → Runtime Proof | READY |
-| LIVE-PREVIEW-8 | Horizon Closure / Durable Documentation | BLOCKED |
+| LIVE-PREVIEW-7 | Integrated Builder → Publish → Runtime Proof | **DONE / PASS** — see `LIVE-PREVIEW-7-INTEGRATED-PROOF.md` |
+| LIVE-PREVIEW-8 | Horizon Closure / Durable Documentation | READY |
 
 ### LIVE-PREVIEW-1 — Preview Contract Evidence Pass
 
@@ -368,5 +368,51 @@ The horizon is CLOSED / PASS only when evidence proves:
   new route, no schema/API contract change (existing endpoints, existing shapes), no capability
   broadened (strictly read-only presentation of already-returned data), no Tenant
   Isolation/RBAC/Commerce authorization/auth-token surface touched.
-- Next task once LP-6's PR merges: **LIVE-PREVIEW-7 — Integrated Builder → Publish → Runtime
-  Proof**.
+- **LIVE-PREVIEW-6 — Draft / Default / Published Preview States: DONE / PASS.** PR #1026
+  (squash-merged). **Merge SHA: `d3dcf8f803034a9296aada58fcb89fbb437f52a8`** (verified via
+  `get_commit`). CI: 6/6 checks green (`php artisan test (L11, sqlite/pgsql)` ×2, `web build
+  (Next.js)` ×2 across two workflow triggers). Full report in the LIVE-PREVIEW-6 entry above.
+- **LIVE-PREVIEW-7 — Integrated Builder → Publish → Runtime Proof: DONE / PASS** (implementation
+  complete; PR pending). Full report: `docs/plans/app-builder/LIVE-PREVIEW-7-INTEGRATED-PROOF.md`.
+  Base SHA: `d3dcf8f803034a9296aada58fcb89fbb437f52a8` (LP-6's merge commit). Closed the gap
+  LIVE-PREVIEW-1 §7 named: no test previously used the *same* schema document across the backend
+  chain, Preview, and the real Dart runtime chain — each existing proof test
+  (`AppBuilderIntegratedProofTest`, `AppBuilderSameStoreProofTest`, `awj_runtime_shell_startup_
+  test.dart`) used its own bespoke fixture. Built one canonical shared fixture,
+  `contracts/app-builder/integrated-proof-schema.v1.json`, asserted byte-identically by three new
+  test suites: (1) `AppBuilderPreviewToRuntimeIntegratedProofTest.php` — real HTTP round trip,
+  Draft → Validate → Publish → real `GET commerce/v1/experience` fetch → `CompatibilityResolver`,
+  asserting byte-identical schema at every stage and `compatible === true` with zero fallbacks;
+  (2) `web/.../integrated-proof-schema.test.tsx` — renders the fixture through the real
+  `AppBuilderCanvas` Preview component, asserting the marker text and real hydrated
+  product/cart-line content; (3) a new `group('E — ...')` in
+  `awj_runtime_shell_startup_test.dart` — a fake `commerce/v1` transport serving the fixture plus
+  real-shaped product/cart data, pumping the real `AwjRuntimeShell`, asserting the marker text and
+  hydrated bindings render via the real startup resolver/compatibility/rendering pipeline, then
+  tapping through to Cart to prove `binding.collect` there too. Same-fixture discipline mirrors
+  LIVE-PREVIEW-2's shared-conformance-fixture pattern, applied to one whole document instead of
+  individual cases — no single test can span PHP/TypeScript/Dart in one process. Deliberately uses
+  only the binding grammar proven to actually hydrate on-device (`binding.resource` + child
+  template, no bare `collect`-free `itemProps` on a list-shaped resource) — the evidence pass
+  reading `binding_resolution.dart` line-by-line found that the OTHER two existing PHP proof
+  tests' own `itemProps`-on-`ProductList`-with-no-children grammar does **not** actually hydrate
+  any items on the real runtime (structurally valid, publishes successfully, renders empty on
+  device) — recorded as an out-of-scope finding (those tests' own doc comments overclaim; no
+  behavior change needed since they never assert rendering). A second finding: `HomeScreen`/
+  `CartScreen`'s `hydrateNode(..., 'slot.cart.summary', ...)`-style calls target hardcoded ids
+  from the bundled default schema only, so a generically-authored Published Experience's
+  `CartSummary` never gets its `itemCount`/`subtotal` live-recomputed unless it happens to reuse
+  that exact id — recorded as a deferred architectural question (fixing it generically is a real
+  runtime-rendering behavior change, reserved for owner review), not attempted. No PHP file in
+  the existing pipeline was modified — only new fixtures/tests added. Evidence: PHP
+  `--filter=AppBuilderPreviewToRuntimeIntegratedProofTest` 2/2 (29 assertions); web
+  `integrated-proof-schema.test.tsx` 3/3; full web suite 301 files / 2127 tests green; `npm run
+  build` clean; full `php artisan test`: 4705 passed / 35 failed / 49 skipped (29605 assertions)
+  — 2 more passing than LP-6's 4703 baseline, matching this task's 2 new PHP tests, identical
+  pre-existing bcmath failures, zero regressions; Dart suite reviewed
+  line-by-line against real rendering code (no Flutter toolchain in this sandbox, same
+  environment limitation as every prior task's mobile-side work — real CI is authoritative). No
+  Decision Gate triggered: no new route, no schema/API/auth change, no capability broadened, no
+  Tenant Isolation/RBAC/Commerce authorization touched, no production rendering code changed —
+  both findings above are recorded, not implemented.
+- Next task once LP-7's PR merges: **LIVE-PREVIEW-8 — Horizon Closure / Durable Documentation**.
