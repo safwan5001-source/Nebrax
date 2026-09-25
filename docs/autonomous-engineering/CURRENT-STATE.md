@@ -733,21 +733,78 @@ ahead of a verified, shipped mobile release. Slicing:
     (`mobile/test/app/binding_resolution_test.dart`, `binding_resolution_widget_test.dart`).
     `ProductScreen`/route context (`$route.productId`) and item-scoped `visibility` remain explicitly
     out of scope, per the same Decision Gate.
-  - **What remains open** (call it slice 3b, not yet started): rewiring `HomeScreen`/`CartScreen`
-    to actually call `resolveNodeBindings`/`CommerceClient.fetchBindingResource`, updating the
-    bundled schemas to declare real `binding`/`collect`, and — only once that ships in a real,
-    verified mobile release — flipping `RuntimeCapabilities.dataResources`/`schemaFeatures` non-empty
-    on both PHP and Dart. **This is an operational/business milestone ("shipped and proven"), not
-    something a coding session can attest to or manufacture** — see `RuntimeCapabilities.dataResources`'s
-    own doc comment on both sides. Until it is met, `APP-BUILDER-18`'s own definition of done (§3.4:
-    "once an action is reachable end-to-end through a bound, schema-declared path,"
-    `ActionRegistry.dispatchStatus` updates to `DISPATCH_LIVE`) is **not yet satisfiable** — the action
-    is proven reachable in tests, not "reachable" through the shipped app, since no shipped screen
-    uses `binding` yet. `APP-BUILDER-18`/`APP-BUILDER-20` are therefore **not promoted to `ready`** by
-    this task, despite the table's pre-recorded "ready (after 17)"/"ready (after 18+19)" — that
-    pre-recorded readiness assumed slice 3 would include the screen rewiring + capability flip, which
-    this owner-directed narrowing deferred. See `TASK-QUEUE.md`'s matching entry for the queue-level
-    status update.
+  - **Slice 3b — screen rewiring, done.** PR #1006 merged (squash SHA
+    `88612093de458d0b3b7a2d365c9fafc9a1451c9c`, confirmed single-parent squash onto `main`, parent
+    `647af264...`; post-merge `Mobile CI` run `36131595231` green — `mobile (analyze + test)`,
+    `mobile (Android release build proof)`, and `mobile (iOS release build proof)` all succeeded on
+    the merge commit itself). Owner-directed staged proof sequence (see the user's exact instruction
+    quoted in the session record): prove the real mobile runtime end-to-end using only the app's own
+    bundled schemas, before any server-side capability flip. `HomeScreen`/`CartScreen` now call
+    `CommerceClient.fetchBindingResource()` + `resolveNodeBindings()` for real; `kHomeSchemaJson`'s
+    `ProductList` declares `binding: {resource: "commerce.products"}` with a `ProductCard` item
+    template, `kCartSchemaJson`'s `CartList` declares `binding: {resource: "commerce.cart", collect:
+    "items"}` with a composite `Section` item template — both using real `$item.*` substitution,
+    including action params (`openProduct.productId`, `updateCartQuantity.cartItemId/quantity`,
+    `removeCartItem.cartItemId`). **`RuntimeCapabilities.dataResources`/`schemaFeatures` (Dart only)**
+    flipped to `{'commerce.products': 1, 'commerce.cart': 1}`/`{'binding.collect': 1}` — exactly what
+    these two bundled schemas use; **PHP's constants stayed empty in this PR**, so the server still
+    refused to publish anything requiring these capabilities to any tenant on any client version. Two
+    real bugs caught by CI and fixed in the same PR: `HomeScreen` baked the locale-picked
+    `display_name` into fetched data instead of recomputing it in `build()` (broke locale-toggle
+    reactivity); a `CompatibilityResolverTest`-mirroring Dart test relied on `manifestOf()`'s
+    `schemaFeatures` default meaning "empty," which broke once that default became genuinely
+    non-empty. `vertical_slice_test.dart` extended with a quantity-increment step proving `$item.id`
+    resolves into a real `updateCartQuantity` dispatch → PATCH → re-fetch → re-render end-to-end.
+  - **Slice 3c — server-side capability flip + `APP-BUILDER-18`, done.** PR #1007 merged (squash SHA
+    `afaab2256c282bcf8928c4fc2a9eb93b413dfa5e`, confirmed single-parent squash onto `main`, parent
+    `8861209...`; post-merge `ci.yml` run `36137485842` green on both `pgsql`/`sqlite`). **Owner
+    decision (2026-09-25)**, following a requested narrow evidence pass: the "shipped, verified
+    mobile release" milestone that gated this flip is satisfied by this repository's own established
+    Gate G/H precedent (`AWJ_MOBILE_RUNTIME_PROOF_HORIZON_V1_CLOSURE_REPORT.md` — the entire Mobile
+    Runtime Proof V1 horizon was already closed on CI-only release-build/test evidence, explicitly
+    without any real-device/emulator/simulator installation, per an earlier explicit owner decision),
+    now independently re-met on PR #1006's own merge commit. No real-device or store distribution was
+    required for this specific flip. A **separate, explicitly recorded operational requirement**
+    (`RuntimeCapabilities::DATA_RESOURCES`'s own doc comment) obligates real-device verification
+    against a real, safely controlled `commerce/v1` tenant — covering Home, Cart, network behavior,
+    binding hydration, rendering, and mutation/action flows — before the *first actual mobile
+    distribution* (internal, store, or otherwise); this is not silently dropped, but is not a blocker
+    for this horizon.
+    - `RuntimeCapabilities::DATA_RESOURCES`/`SCHEMA_FEATURES` (PHP) now mirror Dart's
+      `registry_identifiers.dart` exactly: `{'commerce.products': 1, 'commerce.cart': 1}`/
+      `{'binding.collect': 1}` — not the full three-resource `DataResourceRegistry` catalog
+      (`commerce.categories` stays out: no component is registered to bind it, and no shipped mobile
+      build consumes it) and not `visibility` (no bundled schema uses it). `CompatibilityResolver`'s
+      existing fail-closed collect-vs-basic-binding gate needed zero code changes — verified by two
+      fixed tests (switched from `CapabilityManifest::current()`, now genuinely compatible, to an
+      explicit "no data resources" manifest simulating an older runtime) plus three new tests proving
+      a `commerce.products` binding and a `commerce.cart`/`collect: "items"` binding are compatible
+      on the actual shipped runtime.
+    - `AppBuilderIntegratedProofTest`'s architectural-boundary test updated: a `ProductList` bound to
+      `commerce.products` now saves, validates, **and publishes** successfully end-to-end through the
+      real HTTP API — the boundary this test polices genuinely moved from "accepted structurally,
+      rejected at publish" to "accepted and published."
+    - **`APP-BUILDER-18`** (evidence doc §3.4 DoD: "once an action is reachable end-to-end through a
+      bound, schema-declared path, `ActionRegistry.dispatchStatus` updates to `DISPATCH_LIVE`"): new
+      `ActionDefinition::DISPATCH_LIVE` constant; `openProduct`/`updateCartQuantity`/`removeCartItem`
+      flipped to it — the three actions PR #1006's bundled schemas actually resolve via `$item.*`
+      binding substitution, proven end-to-end by `vertical_slice_test.dart`. `navigate`/`refresh`
+      stay `DISPATCH_PROVEN_NOOP` (never binding-dependent — no item data involved in either);
+      `addToCart` stays `DISPATCH_PROVEN_NOOP` (dispatched only from `ProductScreen`'s screen-owned
+      Dart tree, which deliberately does not parse an `AppSchema`/consume `binding` at all — see its
+      own doc comment). This label describes the App Builder schema/canvas contract specifically; it
+      is independent of the mobile runtime's hand-written screens already dispatching real Commerce
+      actions via `RuntimeActionHandler`, true since the separately-closed Mobile Runtime Proof V1
+      horizon — stale doc comments claiming otherwise (`MOBILE-RUNTIME-4/5 لم يُبنَيا`,
+      `NoopActionHandler` as the only handler) were removed from `ActionRegistry.php`/
+      `ActionDefinition.php` as part of this task.
+    - Tests: full local suite green (4710 passed, 29572 assertions; the same pre-existing local-only
+      `bcmath`-extension failures as every prior entry, absent in CI). No `mobile/`/`web/` files
+      touched — `mobile-ci.yml`/`web-ci.yml` correctly did not run.
+  - `APP-BUILDER-17` is now **fully `done`** across all slices (1, 2, 3, 3b, 3c) — no further slice
+    remains. `APP-BUILDER-18` is **`done`**. `APP-BUILDER-20` (Same-Store integrated proof) is now
+    **`ready`** — its dependencies (`APP-BUILDER-18`, `APP-BUILDER-19`) are both `done`. See
+    `TASK-QUEUE.md`'s matching entry for the queue-level status update.
   - Tests: PHP (`AppSchemaParserTest`, `CompatibilityResolverTest`) + Dart (`compatibility_test.dart`,
     `commerce_client_test.dart`, `binding_resolution_test.dart`, `binding_resolution_widget_test.dart`)
     — parser validation, unknown/non-LIST/unknown-feature `collect` rejection, old/basic-binding-
