@@ -263,3 +263,70 @@ The next pass must verify current AWJ implementation evidence for, in order:
 7. storefront business profile, location, and app links.
 
 Only repository/API evidence can move a matrix item to EXISTING, WIRING_GAP, PARTIAL, or MISSING.
+
+
+## 16. AWJ Repository/API Evidence Pass 01 — inventory and branch availability
+
+Evidence verified against current `main` source.
+
+### Verified existing capability
+
+AWJ already has a real server-authoritative sellable-availability path. `AvailableToSellService::forWarehouse()` reads physical on-hand from `product_warehouse_stock` and subtracts active inventory reservations. The physical location key is explicitly `warehouse_id`; Commerce does not create a parallel stock balance.
+
+`StorefrontProductController` resolves the Sales Channel fulfillment warehouse through `FulfillmentPolicyService::resolveWarehouseFor()`. Public catalog responses expose only derived `in_stock` state, not raw stock quantity, cost, valuation, or internal ledger detail. When no fulfillment policy is configured, availability is represented as unknown (`null`) rather than falsely unavailable.
+
+Variant-managed PDPs are already variant-aware: each active variant receives its own resolved price, `in_stock`, descriptor, option values, and media. `AvailableToSellService::forWarehouse(..., variantId)` is the shared availability authority.
+
+Cart and checkout are also variant-aware. Checkout revalidates sellable identity, publication, UOM, authoritative price, and warehouse stock; invalid or insufficient lines fail closed before order creation. Tenant isolation is enforced through tenant-scoped inventory models and fail-closed variant resolution.
+
+### Important limitation for the Shona benchmark
+
+Current storefront availability is resolved against the **single fulfillment warehouse configured for the Sales Channel**. This is materially different from a customer-facing list of multiple branches/locations where the shopper chooses a branch and sees availability per branch.
+
+The existing architecture deliberately keeps Sales Channel, Branch, Warehouse, and future Pickup Location as distinct concepts. A Branch is not implicitly a Warehouse, and a Warehouse is not automatically a customer-selectable pickup/store location.
+
+Therefore the Shona-style capability is classified as:
+
+| Capability | Classification | Evidence-based reason |
+|---|---|---|
+| Server-authoritative sellable availability | **EXISTING** | Warehouse-scoped ATS + active reservations |
+| Product-level public `in_stock` | **EXISTING** | Storefront list/detail derive availability server-side |
+| Variant-level public `in_stock` | **EXISTING** | PDP resolves ATS per concrete variant |
+| Checkout stock revalidation | **EXISTING** | Checkout fails closed on insufficient/unavailable sellable identity |
+| Single channel fulfillment warehouse | **EXISTING** | Fulfillment policy resolves warehouse for Sales Channel |
+| Public multi-branch/location availability list | **MISSING** | No verified public contract enumerates customer-visible locations with per-location availability |
+| Customer branch/location selector | **MISSING** | Current warehouse authority is trusted server configuration, not browser-selected fulfillment authority |
+| Persist selected pickup/store location through cart/checkout | **MISSING** | No verified current contract for customer-selected location persistence |
+| Click & Collect / pickup-location domain | **DEFERRED / SEPARATE CAPABILITY** | Existing ADR explicitly keeps Pickup Location distinct and leaves its persistence/model for follow-up design |
+
+### AWJ Market decision
+
+Do **not** implement Shona's branch selector as a theme-only control and do not allow the browser to choose an arbitrary `warehouse_id`.
+
+AWJ Market V1 can safely consume the existing `in_stock` contract. A future “availability by location / choose pickup location” feature requires a separately scoped Commerce capability that defines a public pickup/location identity, eligible warehouse mapping, tenant-safe exposure, cart persistence, checkout revalidation, and stock-change behavior.
+
+This is a platform gap discovered by the theme benchmark, not a defect in the current storefront.
+
+### Security and accounting boundary
+
+The future public location feature must preserve these existing invariants:
+
+- physical inventory truth remains in the inventory/warehouse domain;
+- the client cannot override trusted warehouse authority directly;
+- no internal stock ledger, cost, valuation, or accounting data is exposed publicly;
+- all location/warehouse mappings are tenant-bound;
+- variant-level availability remains concrete and fail-closed;
+- no accounting, inventory-posting, or legacy ERP behavior changes as a side effect of theme work.
+
+## 17. Matrix update after Repository/API Pass 01
+
+The first major Shona gap is now resolved at architecture level: **AWJ has robust availability, but not customer-selectable multi-location availability.**
+
+Next repository evidence pass:
+
+1. public SKU/barcode/GTIN exposure,
+2. promotions and dedicated offers collection,
+3. favorites,
+4. reviews/ratings,
+5. content/pages/policies,
+6. public business profile, map/location, and app links.
