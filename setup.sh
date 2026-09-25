@@ -37,7 +37,7 @@ cp -r "$CORE_DIR/app/Models/"*.php        app/Models/
 # (كلاهما ينسخ من نفس النواة بمنطق مستقل) — نسيان مجلد هنا لا يظهر في CI فيمر بصمت.
 mkdir -p app/Contracts app/Models/Concerns app/Jobs/Accounting app/Jobs/DocumentCenter app/Services app/Services/Accounting app/Services/Commerce app/Services/Commerce/Edge app/Services/Commerce/Otp app/Services/DocumentCenter app/Services/AppBuilder app/Services/Pos app/Services/Pos/Hardware app/Services/Reporting app/Services/PrintTemplates app/Support app/Support/Inventory app/Support/Dns app/Support/Commerce \
          app/Tenancy app/Http/Middleware app/Http/Controllers/Api config \
-         app/Http/Requests app/Http/Resources app/Console/Commands tests/Feature tests/Fixtures/presentation routes docs/openapi
+         app/Http/Requests app/Http/Resources app/Console/Commands tests/Feature tests/Fixtures/presentation routes docs/openapi contracts/app-builder
 cp -r "$CORE_DIR/app/Contracts/"*.php app/Contracts/
 cp -r "$CORE_DIR/app/Jobs/DocumentCenter/"*.php app/Jobs/DocumentCenter/
 cp -r "$CORE_DIR/app/Jobs/Accounting/"*.php app/Jobs/Accounting/
@@ -76,6 +76,9 @@ cp -r "$CORE_DIR/tests/Feature/"*.php            tests/Feature/
 cp -r "$CORE_DIR/tests/Fixtures/presentation/"*.json tests/Fixtures/presentation/ 2>/dev/null || true
 # عقد OpenAPI (توثيق فقط) — يقرأه اختبار المطابقة عبر base_path('docs/openapi/…')
 cp -r "$CORE_DIR/docs/openapi/"*.yaml            docs/openapi/
+# عقد LIVE-PREVIEW مشترك (LIVE-PREVIEW-2/7) — يقرأه اختبار الإثبات المتكامل عبر
+# base_path('contracts/app-builder/…')؛ نفس الملفات التي تقرأها اختبارات TypeScript/Dart مباشرة.
+cp -r "$CORE_DIR/contracts/app-builder/"*.json   contracts/app-builder/
 
 # تسجيل TenancyServiceProvider (حاسم للعزل) إن لم يكن مسجلاً
 if ! grep -q "TenancyServiceProvider" bootstrap/providers.php; then

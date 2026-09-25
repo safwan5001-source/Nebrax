@@ -143,6 +143,32 @@ documented:
 Neither finding is a Decision Gate for *this* task — both are pre-existing, out-of-scope gaps
 this task's evidence pass surfaced while building a fixture that avoids stepping on either one.
 
+## CI infrastructure fix (required for this task's own PHP test to run at all)
+
+`AppBuilderPreviewToRuntimeIntegratedProofTest.php` is the **first** PHP test in this repository
+to read a `contracts/app-builder/**` shared fixture — every prior consumer of that directory
+(LIVE-PREVIEW-2's conformance fixture) was TypeScript/Dart only. The repo's test environment is
+core-only: `ci.yml`/`setup.sh` build a full Laravel app at a separate path (`$APP_DIR`) and copy
+in only an explicit allowlist of files/directories from the core checkout (`$CORE`/`$CORE_DIR`)
+— `contracts/` was not on that allowlist, so `base_path('contracts/app-builder/...')` (which
+resolves against `$APP_DIR`, not the original checkout) could never find the fixture in CI, even
+though it worked in this sandbox (where the fixture had already been manually copied into the
+local `nibras-app` build directory while iterating). First real-CI run on this PR failed exactly
+this way (`php artisan test (L11, sqlite)`: `Failed asserting that file
+"/tmp/nibras-app/contracts/app-builder/integrated-proof-schema.v1.json" exists`).
+
+Fixed by following the **exact existing precedent** for this situation — `docs/openapi/*.yaml`
+is copied the same way for the same reason (its own comment: "يقرأه اختبار المطابقة عبر
+`base_path('docs/openapi/…')`"): added `contracts/app-builder` to both `ci.yml`'s and
+`setup.sh`'s `mkdir -p` directory list, and one `cp -r "$CORE.../contracts/app-builder/"*.json
+contracts/app-builder/` line to each, placed right after the `docs/openapi` copy. Both files
+carry their own comment cross-referencing each other's list (`setup.sh`'s own comment already
+warned: "قائمة المجلدات هنا يدوية ويجب أن تبقى مطابقة لقائمة .github/workflows/ci.yml" — forgetting
+one here doesn't fail loudly, it just silently diverges), so this task updated both together, not
+one. Verified locally by deleting the sandbox's manually-placed copy and re-creating it via the
+exact new `cp` command, then re-running the affected test — passed. This is CI/dev-environment
+plumbing, not a schema/API/behavior change — no Decision Gate.
+
 ## Evidence
 
 - **PHP**: `php artisan test --filter=AppBuilderPreviewToRuntimeIntegratedProofTest` — 2/2
