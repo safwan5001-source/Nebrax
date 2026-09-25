@@ -6871,6 +6871,18 @@
       "emptyPage": "صفحة فارغة",
       "sampleDataBanner": "بيانات تجريبية — لإظهار شكل الربط بالبيانات فقط، وليست بيانات متجرك الفعلية",
       "visibilityUnsupportedBadge": "شرط ظهور غير مُفعَّل بعد",
+      "previewState": {
+        "draft": "مسودة",
+        "published": "منشورة",
+        "default": "افتراضية",
+        "draftBanner": "مسودة — قيد التحرير، ليست نسخة مباشرة في تطبيق الجوال",
+        "publishedBanner": "منشورة — نسخة {version} كما نشرتها آخر مرة من هذا التطبيق",
+        "defaultBanner": "التجربة الافتراضية — ما يراه العميل قبل أي نشر لهذا المستأجر",
+        "noPublishedVersion": "لا توجد نسخة منشورة بعد لهذا التطبيق",
+        "loadFailed": "تعذّر تحميل النسخة المنشورة",
+        "readOnlyNotice": "قراءة فقط — للتحرير، ارجع إلى تبويب «مسودة»",
+        "switchToDraftToPublish": "بدّل إلى «مسودة» للنشر"
+      },
       "pages": {
         "addAction": "إضافة صفحة",
         "setHomeLabel": "تعيين كصفحة رئيسية",
