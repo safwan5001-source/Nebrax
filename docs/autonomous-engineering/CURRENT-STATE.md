@@ -675,14 +675,18 @@ function that was fully designed/unit-tested with **zero** I/O of its own since 
 - **Backend**: `GET commerce/v1/experience` (`CommerceExperienceController`, same read-tier
   middleware chain as `storefront`/`categories`/`products` — no cart identity needed). Returns the
   tenant's `BuilderPublishedExperienceVersion` schema document as-is (it already embeds its own
-  `schemaVersion`, exactly what `AppSchema.parse` expects with no extra wrapping). **Explicit scope
-  decision**: `builder_apps.tenant_id` carries no unique constraint (a merchant may create more than
-  one `BuilderApp` — free-form authoring tool, `BuilderAppController::store()` has no "one app only"
-  guard) and no `is_live`/"active app" column exists. "The live experience" is defined here as **the
-  most recently published version across all of the tenant's `BuilderApp`s combined**
-  (`ORDER BY published_at DESC`) — matching the merchant's expected mental model (publish a version,
-  it's what's live) with zero schema change; reversible later behind the same response shape (only
-  the selection query would change) if a real `is_live` flag is ever needed. 404 (`not_found`) when a
+  `schemaVersion`, exactly what `AppSchema.parse` expects with no extra wrapping). **Interim V1
+  selection policy, not a permanent product invariant**: `builder_apps.tenant_id` carries no unique
+  constraint (a merchant may create more than one `BuilderApp` — free-form authoring tool,
+  `BuilderAppController::store()` has no "one app only" guard) and no `is_live`/"active app" column
+  exists. "The live experience" is defined here, for V1 only, as **the most recently published
+  version across all of the tenant's `BuilderApp`s combined** (`ORDER BY published_at DESC`) —
+  matching the merchant's expected mental model (publish a version, it's what's live) with zero
+  schema change. The moment a real tenant needs more than one concurrently-live app, this policy is
+  meant to be replaced by an explicit `is_live` column on `BuilderApp` — the response shape
+  (`data.version`/`schema_version`/`published_at`/`schema`) does not change, only the selection query
+  does. Do not treat "most recently published = live" as a fixed architectural fact anywhere else in
+  the codebase. 404 (`not_found`) when a
   tenant has never published anything — mapped by `PublicApiExceptionRenderer` automatically via
   `abort(404, ...)`, no new `PublicApiErrorCode`. New `ExperienceResponse` schema + `/experience` path
   added to `docs/openapi/commerce-api-v1.yaml` (`AppBuilder` tag) — `CommerceApiOpenApiContractTest`'s

@@ -1119,9 +1119,11 @@ around `last_known_good.dart`'s `resolveStartup`, a pure decision function fully
 since MOBILE-RUNTIME-10 with zero I/O of its own; `resolveStartup` itself is unchanged. Backend:
 `GET commerce/v1/experience` returns the tenant's most recently published
 `BuilderPublishedExperienceVersion` schema **across all of the tenant's `BuilderApp`s combined**
-(explicit scope decision, recorded in full in `CURRENT-STATE.md` — `builder_apps` has no unique
-tenant constraint and no `is_live` column; "most recently published, tenant-wide" is the zero-schema-
-change default, reversible behind the same response shape later). Mobile: `CommerceClient.
+(**interim V1 selection policy, not a permanent product invariant** — recorded in full in
+`CURRENT-STATE.md`/the controller's own docblock: `builder_apps` has no unique tenant constraint and
+no `is_live` column; "most recently published, tenant-wide" is the zero-schema-change default for V1,
+meant to be replaced by an explicit `is_live` column on `BuilderApp` the moment a tenant needs more
+than one concurrently-live app, without changing the response shape). Mobile: `CommerceClient.
 getExperienceSchemaJson()` (a plain read-tier method) + new `startup/experience_fetcher.dart`
 (exception → `ExperienceFetchOutcome` mapping) + new `startup/experience_cache.dart`
 (`ExperienceCache` interface, `InMemoryExperienceCache` for tests, `FileExperienceCache` for real
