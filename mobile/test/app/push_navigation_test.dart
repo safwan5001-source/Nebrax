@@ -2,6 +2,7 @@ import 'package:awj_mobile_runtime/app.dart';
 import 'package:awj_mobile_runtime/commerce/commerce.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:awj_mobile_runtime/startup/startup.dart';
 
 import '../commerce/fake_transport.dart';
 
@@ -25,6 +26,12 @@ void main() {
 
   Future<CommerceHttpResponse> handler(CommerceHttpRequest request) async {
     final segments = request.uri.pathSegments;
+    // The AWJ Runtime Boot contract's `GET commerce/v1/experience` — see
+    // `deep_link_navigation_test.dart`'s identical branch for why this is a
+    // 404, not the generic `{data: []}` fallback below.
+    if (segments.last == 'experience') {
+      return jsonResponse(404, errorEnvelope('not_found', 'no published experience'));
+    }
     if (segments.contains('products') && segments.last == 'p1') {
       return jsonResponse(200, {
         'data': {
@@ -82,7 +89,7 @@ void main() {
             return null;
           });
 
-      await tester.pumpWidget(AwjMobileRuntimeApp(client: buildClient()));
+      await tester.pumpWidget(AwjMobileRuntimeApp(client: buildClient(), experienceCache: InMemoryExperienceCache()));
       await tester.pumpAndSettle();
 
       expect(find.text('تمر سكري'), findsOneWidget);
@@ -99,7 +106,7 @@ void main() {
             return null;
           });
 
-      await tester.pumpWidget(AwjMobileRuntimeApp(client: buildClient()));
+      await tester.pumpWidget(AwjMobileRuntimeApp(client: buildClient(), experienceCache: InMemoryExperienceCache()));
       await tester.pumpAndSettle();
 
       // Home is showing (its own schema-declared "go to cart" link).
@@ -127,7 +134,7 @@ void main() {
             return null;
           });
 
-      await tester.pumpWidget(AwjMobileRuntimeApp(client: buildClient()));
+      await tester.pumpWidget(AwjMobileRuntimeApp(client: buildClient(), experienceCache: InMemoryExperienceCache()));
       await tester.pumpAndSettle();
       expect(find.text('عرض السلة'), findsOneWidget);
 
@@ -156,7 +163,7 @@ void main() {
             return null;
           });
 
-      await tester.pumpWidget(AwjMobileRuntimeApp(client: buildClient()));
+      await tester.pumpWidget(AwjMobileRuntimeApp(client: buildClient(), experienceCache: InMemoryExperienceCache()));
       await tester.pumpAndSettle();
 
       expect(find.text('عرض السلة'), findsOneWidget);

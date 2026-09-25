@@ -4,6 +4,7 @@ import 'package:awj_mobile_runtime/app.dart';
 import 'package:awj_mobile_runtime/commerce/commerce.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:awj_mobile_runtime/startup/startup.dart';
 
 import '../commerce/fake_transport.dart';
 
@@ -162,7 +163,7 @@ void main() {
       transport: FakeCommerceTransport(server.handle),
     );
 
-    await tester.pumpWidget(AwjMobileRuntimeApp(client: client));
+    await tester.pumpWidget(AwjMobileRuntimeApp(client: client, experienceCache: InMemoryExperienceCache()));
     await tester.pumpAndSettle();
 
     // Home: static shell from the bundled schema + live product list.

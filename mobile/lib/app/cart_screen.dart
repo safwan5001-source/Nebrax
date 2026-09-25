@@ -37,12 +37,20 @@ class CartScreen extends StatefulWidget {
   final AppActionDispatcher dispatcher;
   final Locale locale;
 
+  /// The AWJ Runtime Boot contract's live Experience for this boot — see
+  /// `HomeScreen.experience`'s own doc comment for the full contract. `null`
+  /// for the Default AWJ Experience decision (this screen then renders
+  /// exactly as it always has, from the bundled `kCartSchemaJson`) and
+  /// while boot resolution is still in flight.
+  final RenderableExperience? experience;
+
   const CartScreen({
     super.key,
     required this.client,
     required this.state,
     required this.dispatcher,
     required this.locale,
+    this.experience,
   });
 
   @override
@@ -66,6 +74,16 @@ class _CartScreenState extends State<CartScreen> {
   }
 
   @override
+  void didUpdateWidget(covariant CartScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // See `HomeScreen.didUpdateWidget`'s own doc comment — boot resolution
+    // can complete after this screen has already mounted.
+    if (!identical(oldWidget.experience, widget.experience)) {
+      _resolveSchema();
+    }
+  }
+
+  @override
   void dispose() {
     widget.state.removeListener(_onStateChanged);
     super.dispose();
@@ -78,7 +96,14 @@ class _CartScreenState extends State<CartScreen> {
     }
   }
 
+  /// The `cart` page node this screen renders — see `HomeScreen._resolveSchema`'s
+  /// own doc comment for the identical live-experience-vs-bundled-default rule.
   void _resolveSchema() {
+    final liveCartPage = widget.experience?.pages['cart'];
+    if (liveCartPage != null) {
+      _basePage = liveCartPage;
+      return;
+    }
     final result = resolveRuntimeSchema(
       kCartSchemaJson,
       CapabilityManifest.current(currentRuntimePlatform()),

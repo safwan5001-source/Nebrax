@@ -24,6 +24,34 @@ void main() {
   final incompatibleJson = encodeSchema(baseSchemaJson(schemaVersion: '9.0.0'));
   final now = DateTime.utc(2026, 9, 23, 12, 0, 0);
 
+  group('resolveStartup — AWJ Runtime Boot contract: no Published Experience', () {
+    test('ExperienceFetchNotPublished -> UseDefaultExperience, with no cache', () {
+      final decision = resolveStartup(
+        fetch: const ExperienceFetchNotPublished(),
+        cached: null,
+        manifest: _manifestOf(),
+      );
+
+      expect(decision, isA<UseDefaultExperience>());
+    });
+
+    test(
+      'ExperienceFetchNotPublished -> UseDefaultExperience even when a compatible last-known-good '
+      'cache exists — never a fetch failure, never routed through last-known-good',
+      () {
+        final cached = CachedExperience.capture(compatibleJson, cachedAt: now);
+
+        final decision = resolveStartup(
+          fetch: const ExperienceFetchNotPublished(),
+          cached: cached,
+          manifest: _manifestOf(),
+        );
+
+        expect(decision, isA<UseDefaultExperience>());
+      },
+    );
+  });
+
   group('resolveStartup — fresh fetch', () {
     test('fetch succeeded + compatible -> UseFreshExperience, no cache needed', () {
       final decision = resolveStartup(

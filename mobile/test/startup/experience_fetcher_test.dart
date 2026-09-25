@@ -70,8 +70,8 @@ void main() {
     });
   });
 
-  group('resolveRealStartup — fresh fetch fails, cache present', () {
-    test('a 404 (never published) falls back to a compatible cache as UseLastKnownGood, and the cache is left untouched', () async {
+  group('resolveRealStartup — no Published Experience (AWJ Runtime Boot contract)', () {
+    test('a 404 (never published) renders the Default AWJ Experience even when a last-known-good cache exists, and the cache is left untouched', () async {
       final cachedEntry = CachedExperience.capture(compatibleJson, cachedAt: now);
       final cache = InMemoryExperienceCache();
       await cache.write(cachedEntry);
@@ -79,11 +79,39 @@ void main() {
 
       final decision = await resolveRealStartup(client: client, cache: cache, manifest: _manifest());
 
-      expect(decision, isA<UseLastKnownGood>());
-      expect((decision as UseLastKnownGood).cachedAt, now);
-      // Reusing last-known-good must never re-stamp cachedAt with "now".
+      // No Published Experience is never a fetch failure and is never routed
+      // through last-known-good — see this task's AWJ Runtime Boot contract.
+      expect(decision, isA<UseDefaultExperience>());
       final stillCached = await cache.read();
       expect(stillCached!.cachedAt, now);
+      expect(stillCached.rawJson, compatibleJson);
+    });
+
+    test('a 404 (never published) with no cache at all also renders the Default AWJ Experience, not ControlledUnavailable', () async {
+      final cache = InMemoryExperienceCache();
+      final client = _failingClient(404, 'not_found');
+
+      final decision = await resolveRealStartup(client: client, cache: cache, manifest: _manifest());
+
+      expect(decision, isA<UseDefaultExperience>());
+      expect(await cache.read(), isNull);
+    });
+  });
+
+  group('resolveRealStartup — fresh fetch fails, cache present', () {
+    test('a 500 (genuine server error, not a 404) falls back to a compatible cache as UseLastKnownGood', () async {
+      final cachedEntry = CachedExperience.capture(compatibleJson, cachedAt: now);
+      final cache = InMemoryExperienceCache();
+      await cache.write(cachedEntry);
+      final client = _failingClient(500, 'internal_error');
+
+      final decision = await resolveRealStartup(client: client, cache: cache, manifest: _manifest());
+
+      // Unlike a 404, this is a genuine transient failure — the 404/
+      // no-published case must never be conflated with any other fetch
+      // failure, and vice versa.
+      expect(decision, isA<UseLastKnownGood>());
+      expect((decision as UseLastKnownGood).cachedAt, now);
     });
 
     test('a transport failure (no network) with no cache -> ControlledUnavailable(fetchFailedNoCache)', () async {

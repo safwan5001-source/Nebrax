@@ -3,6 +3,7 @@ import 'package:awj_mobile_runtime/commerce/commerce.dart';
 import 'package:awj_mobile_runtime/deeplink/deep_link_resolver.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:awj_mobile_runtime/startup/startup.dart';
 
 import '../commerce/fake_transport.dart';
 
@@ -25,6 +26,15 @@ void main() {
 
   Future<CommerceHttpResponse> handler(CommerceHttpRequest request) async {
     final segments = request.uri.pathSegments;
+    // The AWJ Runtime Boot contract's `GET commerce/v1/experience` — this
+    // fake server has never published an App Builder Experience, so it
+    // answers with the real endpoint's documented 404, exactly like
+    // `CommerceExperienceController::show` does for a tenant with no
+    // `BuilderPublishedExperienceVersion` row. Home/Cart below still render
+    // their bundled Default AWJ Experience either way.
+    if (segments.last == 'experience') {
+      return jsonResponse(404, errorEnvelope('not_found', 'no published experience'));
+    }
     if (segments.contains('products') && segments.last == 'p1') {
       return jsonResponse(200, {
         'data': {
@@ -81,7 +91,7 @@ void main() {
         transport: FakeCommerceTransport(handler),
       );
 
-      await tester.pumpWidget(AwjMobileRuntimeApp(client: client));
+      await tester.pumpWidget(AwjMobileRuntimeApp(client: client, experienceCache: InMemoryExperienceCache()));
       await tester.pumpAndSettle();
 
       expect(find.text('تمر سكري'), findsOneWidget);
@@ -103,7 +113,7 @@ void main() {
         transport: FakeCommerceTransport(handler),
       );
 
-      await tester.pumpWidget(AwjMobileRuntimeApp(client: client));
+      await tester.pumpWidget(AwjMobileRuntimeApp(client: client, experienceCache: InMemoryExperienceCache()));
       await tester.pumpAndSettle();
 
       // Home is showing (its own schema-declared "go to cart" link).
@@ -142,7 +152,7 @@ void main() {
         transport: FakeCommerceTransport(handler),
       );
 
-      await tester.pumpWidget(AwjMobileRuntimeApp(client: client));
+      await tester.pumpWidget(AwjMobileRuntimeApp(client: client, experienceCache: InMemoryExperienceCache()));
       await tester.pumpAndSettle();
 
       expect(find.text('عرض السلة'), findsOneWidget);

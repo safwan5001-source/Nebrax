@@ -1223,3 +1223,16 @@ controlled `commerce/v1` tenant before any actual mobile distribution; (2) the "
 yet" fallback-UX decision before `resolveRealStartup()` is wired into `AwjRuntimeShell`'s shipped boot
 path. Neither blocks this horizon's own closure. Per `AWJ-HORIZON-SYSTEM.md`'s own "Horizon End"
 instruction, this session stops here rather than starting a new horizon on its own initiative.
+
+## Horizon: AWJ App Builder — Live Runtime Boot / Default Experience
+
+**`AWJ-RUNTIME-BOOT-1` — done.** The AWJ Runtime Boot contract: Published Experience -> run it; no
+Published Experience (404) -> the bundled Default AWJ Experience (`UseDefaultExperience`, a new
+named branch, never a fetch failure, never routed through last-known-good); transient fetch failure
++ compatible cache -> last-known-good; transient fetch failure + no cache -> `ControlledUnavailable`.
+Wired into `AwjRuntimeShell`'s real boot path (`resolveRealStartup()` called once per app session;
+Home/Cart accept the resolved live Experience or keep the bundled default). Full report:
+`docs/plans/mobile/AWJ-RUNTIME-BOOT-1-IMPLEMENTATION-REPORT.md`. `test/startup/` 33 passed; new
+shell-integration test proves all four branches (4 passed); full `flutter test` 356 passed, 0
+failed; `flutter analyze` clean. Real-device verification before any actual mobile distribution
+remains owed and unresolved, as previously recorded.

@@ -50,20 +50,19 @@ use Tests\TestCase;
  * with **no republish** is reflected on both channels immediately (the
  * Update/Release Matrix's Category A, evidence doc §4).
  *
- * **Deliberately out of scope, recorded explicitly, not silently
- * dropped**: this proof does not wire `resolveRealStartup()` into
- * `AwjRuntimeShell`'s actual shipped boot sequence — `HomeScreen`/
- * `CartScreen` still render the bundled `kHomeSchemaJson`/`kCartSchemaJson`
- * fixtures by default. Doing so today would mean every tenant that has
- * never published an App Builder Experience (currently: all of them, since
- * `GET commerce/v1/experience` 404s with no `BuilderPublishedExperienceVersion`
- * row) sees a `ControlledUnavailable` screen instead of the working bundled
- * demo — `ExperienceFetchOutcome`/`resolveStartup` has no "nothing published
- * yet" outcome distinct from a genuine fetch failure. Resolving that
- * fallback-UX product decision (render the bundled demo as an implicit
- * default vs. a distinct "not configured" state vs. something else) is a
- * real product decision this proof does not invent an answer for — it is
- * recorded here as the named prerequisite for that specific future wiring.
+ * **Formerly deferred, now resolved (AWJ Runtime Boot contract,
+ * `AWJ-RUNTIME-BOOT-1`)**: this proof itself still only exercises the fetch
+ * → compatibility pipeline directly, not `AwjRuntimeShell`'s widget tree —
+ * but the "no Experience published yet" fallback-UX decision this doc
+ * comment used to name as an open product decision is now resolved and
+ * shipped. `ExperienceFetchOutcome` gained `ExperienceFetchNotPublished`
+ * (mobile/lib/startup/last_known_good.dart), `resolveStartup` gained
+ * `UseDefaultExperience`, and `AwjRuntimeShell` now calls
+ * `resolveRealStartup()` on every real boot and renders Published/Default/
+ * LastKnownGood/ControlledUnavailable accordingly — see
+ * `docs/plans/mobile/AWJ-RUNTIME-BOOT-1-IMPLEMENTATION-REPORT.md` for the
+ * full contract and `mobile/test/app/awj_runtime_shell_startup_test.dart`
+ * for the real-shell integration proof.
  *
  * تشغيل: php artisan test --filter=AppBuilderSameStoreProofTest
  */
