@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:awj_mobile_runtime/app.dart';
 import 'package:awj_mobile_runtime/commerce/commerce.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../commerce/fake_transport.dart';
