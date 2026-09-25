@@ -50,8 +50,8 @@ Standing authority covers implementation, tests, commits, PRs, merging green dep
 | LIVE-PREVIEW-2 | Preview / Runtime Semantic Parity Foundation | **DONE / PASS** — see `LIVE-PREVIEW-2-PARITY-FOUNDATION.md` |
 | LIVE-PREVIEW-3 | Binding + Collection Preview Parity | **DONE / PASS** — see `LIVE-PREVIEW-3-BINDING-COLLECTION-PARITY.md` |
 | LIVE-PREVIEW-4 | Action + Theme + Supported Visibility Parity | **DONE / PASS** — see `LIVE-PREVIEW-4-ACTION-THEME-VISIBILITY-PARITY.md` |
-| LIVE-PREVIEW-5 | Runtime-Aware Pre-Publish Validation | READY |
-| LIVE-PREVIEW-6 | Draft / Default / Published Preview States | BLOCKED |
+| LIVE-PREVIEW-5 | Runtime-Aware Pre-Publish Validation | **DONE / PASS** — see `LIVE-PREVIEW-5-PREPUBLISH-VALIDATION.md` |
+| LIVE-PREVIEW-6 | Draft / Default / Published Preview States | READY |
 | LIVE-PREVIEW-7 | Integrated Builder → Publish → Runtime Proof | BLOCKED |
 | LIVE-PREVIEW-8 | Horizon Closure / Durable Documentation | BLOCKED |
 
@@ -285,8 +285,11 @@ The horizon is CLOSED / PASS only when evidence proves:
   six owner-mandated guardrails verified against the actual diff (see the report's own
   "Owner-mandated guardrails — verified, not just asserted" section).
 - **LIVE-PREVIEW-4 — Action + Theme + Supported Visibility Parity: DONE / PASS.** Full report:
-  `docs/plans/app-builder/LIVE-PREVIEW-4-ACTION-THEME-VISIBILITY-PARITY.md`. PR pending
-  (opening next). Base SHA: `e906d48c022fbfd8f3671833b7db78caebd87dd5`. **Deliberately does
+  `docs/plans/app-builder/LIVE-PREVIEW-4-ACTION-THEME-VISIBILITY-PARITY.md`. PR #1022
+  (squash-merged). Base SHA: `e906d48c022fbfd8f3671833b7db78caebd87dd5`. **Merge SHA:
+  `fcb0e20b2b5c4cad8df9469e18d6d0d23002e2c9`** (verified via `get_commit` against `main`; two
+  unrelated storefront PRs, #1020/#1021, landed on `main` between LP-3 and LP-4 — merged cleanly,
+  no conflict). CI: 6/6 checks green. **Deliberately does
   not** wire `evaluateVisibility`/`pruneInvisible` into rendering — `RuntimeCapabilities.
   schemaFeatures` has no `'visibility'` entry on either Dart or PHP side, so the real runtime
   does not evaluate visibility at all today; doing so in Preview would simulate an unsupported
@@ -307,4 +310,36 @@ The horizon is CLOSED / PASS only when evidence proves:
   broader app-builder suite 8 files / 80 tests green, full web suite 299 files / 2118 tests
   green, `npm run build` clean. No Decision Gate triggered; no capability broadened (this task
   narrows an implicit overclaim, if anything).
-- Next task once LP-4 merges: **LIVE-PREVIEW-5 — Runtime-Aware Pre-Publish Validation**.
+- **LIVE-PREVIEW-5 — Runtime-Aware Pre-Publish Validation: DONE / PASS** (implementation
+  complete; PR pending). Full report: `docs/plans/app-builder/
+  LIVE-PREVIEW-5-PREPUBLISH-VALIDATION.md`. Base SHA: `fcb0e20b2b5c4cad8df9469e18d6d0d23002e2c9`.
+  Inspected first, per the task's own instruction — the Validate/Publish gate itself
+  (`BuilderPublishedExperienceVersionService` → real, shared `CompatibilityResolver`) was
+  already correct (LP-1 §6); the actual gap found was diagnostic, not behavioral: a *required*
+  (non-optional) unsupported node's publish failure named only the page, never the offending
+  node, unlike the already-detailed optional/fallback path. `CompatibilityResolver.php`'s
+  `resolveComponent()` gained one by-reference output parameter recording the exact
+  `componentId`/`componentType` at the point of failure (cleared when absorbed as a safe
+  optional fallback instead), and `resolve()`'s message now names it. `reason` constants and
+  every compatible/incompatible/fallback code path are otherwise byte-for-byte unchanged — one
+  string got more specific, nothing else. PHP-only change; `mobile/lib/schema/compatibility.dart`
+  deliberately left as-is (that message is never merchant-facing — mobile only shows a generic
+  `ControlledUnavailable` state, proven under the separate, already-closed APP RUNTIME BOOT-1
+  horizon). Evidence: `php artisan test --filter=CompatibilityResolverTest` 38/38 (59
+  assertions); `--filter="AppSchemaParserTest|AppBuilderIntegratedProofTest|
+  AppBuilderSameStoreProofTest|BuilderAppTest|AppBuilderRegistryTest"` 67/67 (251 assertions).
+  Full local `php artisan test`: 4703 passed / 35 failed / 49 skipped — **all 35 failures
+  confirmed unrelated**: `Call to undefined function App\Services\bcmul()` — this session's
+  sandbox PHP build has no `ext-bcmath` (`php -m` confirms), and `bcmul`/`bcadd`/`bcdiv`/`bcsub`/
+  `bccomp` are used **only** in `app/Services/FuelCostBasisService.php` (Fuel/Petroleum
+  logistics costing — `grep -rl bcmul app/Services` returns exactly that one file), consumed
+  only by `FuelAviRfidServiceTest`/`FuelReconciliationTest`/`FuelSupplyReceivingTest`/
+  `FuelSupplyReceivingApiTest`/`FuelSaleServiceTest`/`FuelSaleApiTest` — none of which this
+  task's one-file diff (`CompatibilityResolver.php`) could plausibly touch, and all of which
+  already passed on every prior PR's real `ci.yml` run this session (which does have
+  `ext-bcmath`). Real CI (`php artisan test (L11, sqlite/pgsql)`) is the authoritative check for
+  this PR, matching how Dart/Flutter's absence was handled in LP-2/LP-3. No Decision Gate
+  triggered; no schema/API/RBAC/Tenant Isolation/Commerce authorization change; no financial/
+  accounting rule changed (this file has no ledger-affecting code path).
+- Next task once LP-5's PR merges: **LIVE-PREVIEW-6 — Draft / Default / Published Preview
+  States**.

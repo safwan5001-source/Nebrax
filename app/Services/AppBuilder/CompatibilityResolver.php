@@ -72,11 +72,21 @@ final class CompatibilityResolver
 
         $fallbacks = [];
         foreach (($schema['pages'] ?? []) as $pageId => $root) {
-            $resolvedRoot = $this->resolveComponent($root, $manifest, $fallbacks);
+            $requiredFailure = null;
+            $resolvedRoot = $this->resolveComponent($root, $manifest, $fallbacks, $requiredFailure);
             if ($resolvedRoot === false) {
+                // LIVE-PREVIEW-5: names the actual unsupported node, not just the page,
+                // whenever `resolveComponent` identified one — see that method's own
+                // doc comment for why this is always available except in the one case
+                // that cannot happen here (empty `pages`, already rejected by
+                // `AppSchemaParser::validate()` before this resolver ever runs).
+                $detail = $requiredFailure !== null
+                    ? " (component \"{$requiredFailure['componentId']}\" of type \"{$requiredFailure['componentType']}\")"
+                    : '';
+
                 return CompatibilityResult::incompatible(
                     CompatibilityResult::REASON_MISSING_REQUIRED_CAPABILITY,
-                    "page \"{$pageId}\" contains a required, unsupported component or action",
+                    "page \"{$pageId}\" contains a required, unsupported component or action{$detail}",
                 );
             }
         }
@@ -91,9 +101,16 @@ final class CompatibilityResolver
      * نفسه** — وسم مكوّن اختيارياً يجعل شجرته الفرعية كلها وحدة إسقاط آمنة
      * واحدة.
      *
+     * **LIVE-PREVIEW-5**: `$requiredFailure` يُسجَّل بمعرّف/نوع العقدة **نفسها**
+     * التي رسبت (لا أول عقدة استُدعيت عليها الدالة) — يُضبَط فقط عند
+     * `$unsupportedHere` الحقيقية، ويُمسَح صراحةً حين يُمتَص الرسوب كتجاوزٍ
+     * آمن لعقدة اختيارية (`$fallbacks`)، فلا يظهر خطأ فرعٍ آمنٍ مُسقَط في
+     * رسالة فشلٍ فعلية غير ذات صلة لاحقاً.
+     *
      * @param  array<int, array{componentId: string, componentType: string, reason: string}>  &$fallbacks
+     * @param  array{componentId: string, componentType: string}|null  &$requiredFailure
      */
-    private function resolveComponent(array $node, CapabilityManifest $manifest, array &$fallbacks): bool
+    private function resolveComponent(array $node, CapabilityManifest $manifest, array &$fallbacks, ?array &$requiredFailure): bool
     {
         $action = $node['action'] ?? null;
         $unsupportedHere = $manifest->componentVersion($node['type']) === null
@@ -101,11 +118,13 @@ final class CompatibilityResolver
             || (($node['binding'] ?? null) !== null && ! $this->bindingSupported($node['type'], $node['binding'], $manifest))
             || (($node['visibility'] ?? null) !== null && ! $this->visibilitySupported($node['visibility'], $manifest));
         if ($unsupportedHere) {
+            $requiredFailure = ['componentId' => $node['id'], 'componentType' => $node['type']];
+
             return false;
         }
 
         foreach (($node['children'] ?? []) as $child) {
-            $childOk = $this->resolveComponent($child, $manifest, $fallbacks);
+            $childOk = $this->resolveComponent($child, $manifest, $fallbacks, $requiredFailure);
             if (! $childOk) {
                 if ($child['optional'] ?? false) {
                     $fallbacks[] = [
@@ -113,6 +132,7 @@ final class CompatibilityResolver
                         'componentType' => $child['type'],
                         'reason' => 'unsupported component/action, or an unsupported required descendant within this optional subtree',
                     ];
+                    $requiredFailure = null;
 
                     continue;
                 }
