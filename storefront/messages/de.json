@@ -116,6 +116,11 @@
     "wholesaleBenefitOrdersDescription": "Sehen Sie vergangene Bestellungen ein und bestellen Sie Ihre Standardartikel mit wenigen Klicks nach.",
     "browseCategories": "Nach Kategorie einkaufen",
     "newArrivals": "Neu eingetroffen",
+    "benefits": "Vorteile",
+    "featured": "Auswahl",
+    "appPromo": "Shop-App",
+    "appStore": "App Store",
+    "playStore": "Google Play",
     "subcategories": "{count, plural, one {# Unterkategorie} other {# Unterkategorien}}"
   },
   "cart": {

@@ -116,6 +116,11 @@
     "wholesaleBenefitOrdersDescription": "راجع طلباتك السابقة وأعد طلب أصنافك المعتادة خلال نقرتين.",
     "browseCategories": "تسوّق حسب القسم",
     "newArrivals": "أحدث المنتجات",
+    "benefits": "مزايا المتجر",
+    "featured": "مختارات المتجر",
+    "appPromo": "تطبيق المتجر",
+    "appStore": "App Store",
+    "playStore": "Google Play",
     "subcategories": "{count, plural, zero {لا أقسام فرعية} one {قسم فرعي} two {قسمان فرعيان} few {# أقسام فرعية} many {# قسماً فرعياً} other {# قسم فرعي}}"
   },
   "cart": {

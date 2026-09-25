@@ -10,6 +10,12 @@ import {
   type StorefrontPresentationConfig,
 } from "./presentation/config";
 import { presentationCssVars } from "./presentation/tokens";
+import {
+  bannerContentOf,
+  benefitsContentOf,
+  customContentOf,
+  featuredContentOf,
+} from "./presentation/section-content";
 import { buildWhatsAppUrl, sanitizeExternalUrl } from "./presentation/urls";
 import { cn } from "@/lib/utils";
 import {
@@ -151,10 +157,9 @@ export function StorefrontPreviewCanvas({
           selectedChrome === "header" && "awj-preview-section-selected",
         )}
         data-preview-chrome={onSelectChrome ? "header" : undefined}
-        role={onSelectChrome ? "button" : undefined}
-        tabIndex={onSelectChrome ? 0 : undefined}
-        aria-pressed={onSelectChrome ? selectedChrome === "header" : undefined}
-        aria-label={onSelectChrome ? t("header") : undefined}
+        data-chrome-selected={
+          onSelectChrome && selectedChrome === "header" ? "" : undefined
+        }
         onClick={
           onSelectChrome
             ? (event) => {
@@ -166,17 +171,20 @@ export function StorefrontPreviewCanvas({
               }
             : undefined
         }
-        onKeyDown={
-          onSelectChrome
-            ? (event) => {
-                if (event.target !== event.currentTarget) return;
-                if (event.key !== "Enter" && event.key !== " ") return;
-                event.preventDefault();
-                onSelectChrome("header");
-              }
-            : undefined
-        }
       >
+        {onSelectChrome ? (
+          <button
+            type="button"
+            className="sr-only"
+            aria-pressed={selectedChrome === "header"}
+            onClick={(event) => {
+              event.stopPropagation();
+              onSelectChrome("header");
+            }}
+          >
+            {t("header")}
+          </button>
+        ) : null}
         {!compact && (
           <div className="hidden border-b border-store-border bg-store-surface-muted md:block">
             <div className={cn(storeContainerClassName, "flex h-7 items-center justify-end")}>
@@ -201,10 +209,9 @@ export function StorefrontPreviewCanvas({
                 {t("home")}
               </span>
             )}
-            <span
+            <button
+              type="button"
               data-preview-chrome={onSelectChrome ? "branding" : undefined}
-              role={onSelectChrome ? "button" : undefined}
-              tabIndex={onSelectChrome ? 0 : undefined}
               aria-pressed={
                 onSelectChrome ? selectedChrome === "branding" : undefined
               }
@@ -212,16 +219,6 @@ export function StorefrontPreviewCanvas({
               onClick={
                 onSelectChrome
                   ? (event) => {
-                      event.stopPropagation();
-                      onSelectChrome("branding");
-                    }
-                  : undefined
-              }
-              onKeyDown={
-                onSelectChrome
-                  ? (event) => {
-                      if (event.key !== "Enter" && event.key !== " ") return;
-                      event.preventDefault();
                       event.stopPropagation();
                       onSelectChrome("branding");
                     }
@@ -239,8 +236,9 @@ export function StorefrontPreviewCanvas({
                 name={storeName}
                 size="md"
                 logoUrl={logo}
+                linked={!onSelectChrome}
               />
-            </span>
+            </button>
             {config.header.showSearch && !compact && (
               <div className="flex min-h-10 flex-1 items-center gap-2 rounded-store border border-store-border bg-store-surface px-3 text-sm text-store-muted-foreground">
                 <Search className="size-4" aria-hidden />
@@ -415,8 +413,116 @@ export function StorefrontPreviewCanvas({
               );
             }
 
-            if (section.type === "appPromo" && !hasApps) {
-              return null;
+            if (section.type === "banner") {
+              const banner = bannerContentOf(section);
+              const empty =
+                !banner.title &&
+                !banner.subtitle &&
+                !banner.ctaLabel &&
+                !banner.imageUrl;
+              return (
+                <section key={section.id} className="rounded-store bg-store-surface px-5 py-6">
+                  {empty ? (
+                    <p className="text-sm text-store-muted-foreground">{t("sectionBanner")}</p>
+                  ) : (
+                    <>
+                      {banner.imageUrl ? (
+                        <img src={banner.imageUrl} alt="" className="mb-3 h-28 w-full rounded-store object-cover" />
+                      ) : null}
+                      {banner.title ? (
+                        <h2 className="text-lg font-extrabold text-store-foreground">{banner.title}</h2>
+                      ) : null}
+                      {banner.subtitle ? (
+                        <p className="mt-1 text-sm text-store-muted-foreground">{banner.subtitle}</p>
+                      ) : null}
+                      {banner.ctaLabel ? (
+                        <span className="mt-3 inline-flex h-9 items-center rounded-store bg-store-primary px-3 text-xs font-bold text-store-primary-foreground">
+                          {banner.ctaLabel}
+                        </span>
+                      ) : null}
+                    </>
+                  )}
+                </section>
+              );
+            }
+
+            if (section.type === "benefits") {
+              const items = benefitsContentOf(section).items.filter((item) => item.title || item.body);
+              return (
+                <section key={section.id}>
+                  <h2 className="text-base font-extrabold">{t("sectionBenefits")}</h2>
+                  {items.length === 0 ? (
+                    <p className="mt-2 text-sm text-store-muted-foreground">{t("sectionBenefits")}</p>
+                  ) : (
+                    <ul className="mt-3 grid gap-2 sm:grid-cols-2">
+                      {items.map((item) => (
+                        <li key={item.id} className="rounded-store border border-store-border px-3 py-3">
+                          {item.title ? <p className="text-sm font-bold">{item.title}</p> : null}
+                          {item.body ? <p className="text-sm text-store-muted-foreground">{item.body}</p> : null}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </section>
+              );
+            }
+
+            if (section.type === "customContent") {
+              const blocks = customContentOf(section).blocks.filter((block) => block.text.trim());
+              return (
+                <section key={section.id} className="space-y-2">
+                  {blocks.length === 0 ? (
+                    <p className="text-sm text-store-muted-foreground">{t("sectionCustomContent")}</p>
+                  ) : (
+                    blocks.map((block) =>
+                      block.kind === "heading" ? (
+                        <h2 key={block.id} className="text-lg font-extrabold">{block.text}</h2>
+                      ) : (
+                        <p key={block.id} className="text-sm text-store-muted-foreground">{block.text}</p>
+                      ),
+                    )
+                  )}
+                </section>
+              );
+            }
+
+            if (section.type === "featured") {
+              const ids = featuredContentOf(section).productIds.filter((id) => id);
+              return (
+                <section key={section.id}>
+                  <h2 className="text-base font-extrabold">{t("sectionFeatured")}</h2>
+                  <p className="mt-1 text-xs text-store-muted-foreground">{t("featuredHint")}</p>
+                  {ids.length > 0 ? (
+                    <ul className="mt-3 flex flex-wrap gap-2">
+                      {ids.map((id) => (
+                        <li key={id} className="rounded-store border border-store-border px-2 py-1 text-xs">
+                          {id}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </section>
+              );
+            }
+
+            if (section.type === "appPromo") {
+              if (!hasApps) {
+                return (
+                  <section key={section.id} className="rounded-store border border-dashed border-store-border px-4 py-5">
+                    <h2 className="text-sm font-bold">{t("sectionAppPromo")}</h2>
+                    <p className="mt-1 text-xs text-store-muted-foreground">{t("appPromoNote")}</p>
+                  </section>
+                );
+              }
+              return (
+                <section key={section.id} className="rounded-store bg-store-footer px-5 py-6 text-store-footer-foreground">
+                  <h2 className="text-base font-extrabold">{config.apps.appName.trim() || t("sectionAppPromo")}</h2>
+                  <div className="mt-3 flex flex-wrap gap-2 text-xs font-bold">
+                    {ios ? <span className="rounded-store bg-white px-3 py-2 text-store-foreground">App Store</span> : null}
+                    {android ? <span className="rounded-store bg-white px-3 py-2 text-store-foreground">Google Play</span> : null}
+                  </div>
+                </section>
+              );
             }
 
             return (
@@ -460,10 +566,9 @@ export function StorefrontPreviewCanvas({
           selectedChrome === "footer" && "awj-preview-section-selected",
         )}
         data-preview-chrome={onSelectChrome ? "footer" : undefined}
-        role={onSelectChrome ? "button" : undefined}
-        tabIndex={onSelectChrome ? 0 : undefined}
-        aria-pressed={onSelectChrome ? selectedChrome === "footer" : undefined}
-        aria-label={onSelectChrome ? t("footer") : undefined}
+        data-chrome-selected={
+          onSelectChrome && selectedChrome === "footer" ? "" : undefined
+        }
         onClick={
           onSelectChrome
             ? (event) => {
@@ -475,37 +580,29 @@ export function StorefrontPreviewCanvas({
               }
             : undefined
         }
-        onKeyDown={
-          onSelectChrome
-            ? (event) => {
-                if (event.target !== event.currentTarget) return;
-                if (event.key !== "Enter" && event.key !== " ") return;
-                event.preventDefault();
-                onSelectChrome("footer");
-              }
-            : undefined
-        }
       >
+        {onSelectChrome ? (
+          <button
+            type="button"
+            className="sr-only"
+            aria-pressed={selectedChrome === "footer"}
+            onClick={(event) => {
+              event.stopPropagation();
+              onSelectChrome("footer");
+            }}
+          >
+            {t("footer")}
+          </button>
+        ) : null}
         <div className={cn(storeContainerClassName, "py-10 md:py-12")}>
           {config.footer.showLogo && (
-            <span
+            <button
+              type="button"
               data-preview-chrome={onSelectChrome ? "branding" : undefined}
-              role={onSelectChrome ? "button" : undefined}
-              tabIndex={onSelectChrome ? 0 : undefined}
               aria-label={onSelectChrome ? t("branding") : undefined}
               onClick={
                 onSelectChrome
                   ? (event) => {
-                      event.stopPropagation();
-                      onSelectChrome("branding");
-                    }
-                  : undefined
-              }
-              onKeyDown={
-                onSelectChrome
-                  ? (event) => {
-                      if (event.key !== "Enter" && event.key !== " ") return;
-                      event.preventDefault();
                       event.stopPropagation();
                       onSelectChrome("branding");
                     }
@@ -519,8 +616,9 @@ export function StorefrontPreviewCanvas({
                 tone="dark"
                 size="md"
                 logoUrl={logo}
+                linked={!onSelectChrome}
               />
-            </span>
+            </button>
           )}
           {config.footer.tagline.trim() ? (
             <p className="mt-3 max-w-lg text-sm text-store-footer-muted">

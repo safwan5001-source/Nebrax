@@ -268,6 +268,67 @@ class StorefrontPresentationNormalizerTest extends TestCase
     }
 
     /** @test */
+    public function section_content_is_optional_structured_and_fail_closed(): void
+    {
+        $normalized = $this->normalizer->normalize([
+            'version' => 2,
+            'homepage' => [
+                'sections' => [
+                    [
+                        'id' => 'banner-a',
+                        'type' => 'banner',
+                        'visible' => true,
+                        'content' => [
+                            'title' => 'عرض',
+                            'subtitle' => '<b>not html</b>',
+                            'ctaLabel' => 'تسوّق',
+                            'ctaHref' => 'javascript:alert(1)',
+                            'imageUrl' => 'https://cdn.example.com/banner.jpg',
+                            'html' => '<script>alert(1)</script>',
+                        ],
+                    ],
+                    [
+                        'id' => 'offers-a',
+                        'type' => 'offers',
+                        'visible' => true,
+                        'content' => ['discountPercent' => 50],
+                    ],
+                    [
+                        'id' => 'feat-a',
+                        'type' => 'featured',
+                        'visible' => true,
+                        'content' => [
+                            'productIds' => ['prod-1', 'prod-1', 'bad id', 'prod-2'],
+                            'price' => 100,
+                        ],
+                    ],
+                ],
+            ],
+        ]);
+
+        $sections = collect($normalized['homepage']['sections'])->keyBy('id');
+        $banner = $sections['banner-a'];
+        $this->assertSame('عرض', $banner['content']['title']);
+        $this->assertSame('<b>not html</b>', $banner['content']['subtitle']);
+        $this->assertSame('', $banner['content']['ctaHref']);
+        $this->assertSame('https://cdn.example.com/banner.jpg', $banner['content']['imageUrl']);
+        $this->assertArrayNotHasKey('html', $banner['content']);
+        $this->assertArrayNotHasKey('content', $sections['offers-a']);
+        $this->assertSame(['prod-1', 'prod-2'], $sections['feat-a']['content']['productIds']);
+        $this->assertArrayNotHasKey('price', $sections['feat-a']['content']);
+
+        $plain = $this->normalizer->normalize([
+            'version' => 2,
+            'homepage' => [
+                'sections' => [
+                    ['id' => 'banner-a', 'type' => 'banner', 'visible' => true],
+                ],
+            ],
+        ]);
+        $this->assertArrayNotHasKey('content', $plain['homepage']['sections'][0]);
+    }
+
+    /** @test */
     public function client_supplied_version_is_overwritten_and_is_not_authority(): void
     {
         $normalized = $this->normalizer->normalize([

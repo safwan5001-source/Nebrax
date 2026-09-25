@@ -26,6 +26,19 @@ import {
 } from "./presentation";
 import { buildWhatsAppUrl } from "./presentation/urls";
 import {
+  bannerContentOf,
+  benefitsContentOf,
+  customContentOf,
+  emptyBannerContent,
+  featuredContentOf,
+  MAX_BENEFIT_ITEMS,
+  MAX_CUSTOM_BLOCKS,
+  MAX_FEATURED_PRODUCTS,
+  type BannerContent,
+  type BenefitItem,
+  type CustomBlock,
+} from "./presentation/section-content";
+import {
   type CustomizerLocale,
   type CustomizerMessageKey,
   customizerMessage,
@@ -781,9 +794,22 @@ function HomepagePanel({
   };
 
   const setVisible = (index: number, visible: boolean) => {
-    setSections(
-      sections.map((item, i) => (i === index ? { ...item, visible } : item)),
+    const current = sections[index];
+    const nextSections = sections.map((item, i) =>
+      i === index ? { ...item, visible } : item,
     );
+    if (current?.type === "appPromo") {
+      patch({
+        homepage: { ...config.homepage, sections: nextSections },
+        apps: { ...config.apps, showHomepageSection: visible },
+      });
+      return;
+    }
+    setSections(nextSections);
+  };
+
+  const updateSection = (index: number, next: PresentationHomeSection) => {
+    setSections(sections.map((item, i) => (i === index ? next : item)));
   };
 
   // Add (Section Picker): user-created instance — هذا هو الموضع الوحيد
@@ -806,6 +832,7 @@ function HomepagePanel({
       id: newHomeSectionId(),
       type: source.type,
       visible: source.visible,
+      ...(source.content ? { content: structuredClone(source.content) } : {}),
     };
     const next = [...sections];
     next.splice(index + 1, 0, copy);
@@ -886,6 +913,54 @@ function HomepagePanel({
             />
             {selected.type === "hero" ? (
               heroFields
+            ) : selected.type === "banner" ? (
+              <BannerFields
+                content={bannerContentOf(selected)}
+                t={t}
+                onChange={(content) =>
+                  updateSection(selectedIndex, {
+                    ...selected,
+                    content: isBannerEmpty(content) ? undefined : content,
+                  })
+                }
+              />
+            ) : selected.type === "benefits" ? (
+              <BenefitsFields
+                items={benefitsContentOf(selected).items}
+                t={t}
+                onChange={(items) =>
+                  updateSection(selectedIndex, {
+                    ...selected,
+                    content: items.length ? { items } : undefined,
+                  })
+                }
+              />
+            ) : selected.type === "customContent" ? (
+              <CustomFields
+                blocks={customContentOf(selected).blocks}
+                t={t}
+                onChange={(blocks) =>
+                  updateSection(selectedIndex, {
+                    ...selected,
+                    content: blocks.length ? { blocks } : undefined,
+                  })
+                }
+              />
+            ) : selected.type === "featured" ? (
+              <FeaturedFields
+                productIds={featuredContentOf(selected).productIds}
+                t={t}
+                onChange={(productIds) =>
+                  updateSection(selectedIndex, {
+                    ...selected,
+                    content: productIds.length ? { productIds } : undefined,
+                  })
+                }
+              />
+            ) : selected.type === "appPromo" ? (
+              <p className="text-xs leading-relaxed text-neutral-500">
+                {t("appPromoNote")}
+              </p>
             ) : isGatedHomeSection(selected.type) ? (
               <p className="text-xs leading-relaxed text-neutral-500">
                 {t("gatedSection")}
@@ -1484,9 +1559,28 @@ function AppsPanel({
           <Toggle
             label={t("showAppHome")}
             checked={config.apps.showHomepageSection}
-            onChange={(showHomepageSection) =>
-              patch({ apps: { ...config.apps, showHomepageSection } })
-            }
+            onChange={(showHomepageSection) => {
+              const sections = config.homepage.sections;
+              const has = sections.some((section) => section.type === "appPromo");
+              const nextSections = showHomepageSection && !has
+                ? [
+                    ...sections,
+                    {
+                      id: newHomeSectionId(),
+                      type: "appPromo" as const,
+                      visible: true,
+                    },
+                  ]
+                : sections.map((section) =>
+                    section.type === "appPromo"
+                      ? { ...section, visible: showHomepageSection }
+                      : section,
+                  );
+              patch({
+                apps: { ...config.apps, showHomepageSection },
+                homepage: { ...config.homepage, sections: nextSections },
+              });
+            }}
           />
           <Toggle
             label={t("showAppFooter")}
@@ -1497,6 +1591,190 @@ function AppsPanel({
           />
         </div>
       </Section>
+    </div>
+  );
+}
+
+function isBannerEmpty(content: BannerContent): boolean {
+  return (
+    !content.title &&
+    !content.subtitle &&
+    !content.ctaLabel &&
+    !content.ctaHref &&
+    !content.imageUrl
+  );
+}
+
+function BannerFields({
+  content,
+  t,
+  onChange,
+}: {
+  content: BannerContent;
+  t: (key: CustomizerMessageKey) => string;
+  onChange: (content: BannerContent) => void;
+}) {
+  const value = content ?? emptyBannerContent();
+  const set = (partial: Partial<BannerContent>) => onChange({ ...value, ...partial });
+  return (
+    <div className="space-y-3">
+      <Field label={t("bannerTitle")}>
+        <input className={inputClass} value={value.title} onChange={(event) => set({ title: event.target.value })} />
+      </Field>
+      <Field label={t("bannerSubtitle")}>
+        <textarea className={`${inputClass} h-20 py-2`} value={value.subtitle} onChange={(event) => set({ subtitle: event.target.value })} />
+      </Field>
+      <Field label={t("bannerCtaLabel")}>
+        <input className={inputClass} value={value.ctaLabel} onChange={(event) => set({ ctaLabel: event.target.value })} />
+      </Field>
+      <Field label={t("bannerCtaHref")}>
+        <input className={inputClass} value={value.ctaHref} onChange={(event) => set({ ctaHref: event.target.value })} />
+      </Field>
+      <Field label={t("bannerImageUrl")}>
+        <input className={inputClass} value={value.imageUrl ?? ""} onChange={(event) => set({ imageUrl: event.target.value || null })} />
+      </Field>
+    </div>
+  );
+}
+
+function BenefitsFields({
+  items,
+  t,
+  onChange,
+}: {
+  items: BenefitItem[];
+  t: (key: CustomizerMessageKey) => string;
+  onChange: (items: BenefitItem[]) => void;
+}) {
+  return (
+    <div className="space-y-3">
+      {items.map((item, index) => (
+        <div key={item.id} className="space-y-2 border border-neutral-200 p-2">
+          <Field label={t("benefitTitle")}>
+            <input
+              className={inputClass}
+              value={item.title}
+              onChange={(event) =>
+                onChange(items.map((row, i) => (i === index ? { ...row, title: event.target.value } : row)))
+              }
+            />
+          </Field>
+          <Field label={t("benefitBody")}>
+            <textarea
+              className={`${inputClass} h-16 py-2`}
+              value={item.body}
+              onChange={(event) =>
+                onChange(items.map((row, i) => (i === index ? { ...row, body: event.target.value } : row)))
+              }
+            />
+          </Field>
+          <button type="button" className="text-xs text-neutral-500" onClick={() => onChange(items.filter((_, i) => i !== index))}>
+            {t("removeItem")}
+          </button>
+        </div>
+      ))}
+      <button
+        type="button"
+        disabled={items.length >= MAX_BENEFIT_ITEMS}
+        className="text-xs font-medium text-neutral-800 disabled:opacity-40"
+        onClick={() =>
+          onChange([...items, { id: `benefit-${items.length + 1}`, title: "", body: "" }])
+        }
+      >
+        + {t("addBenefit")}
+      </button>
+    </div>
+  );
+}
+
+function CustomFields({
+  blocks,
+  t,
+  onChange,
+}: {
+  blocks: CustomBlock[];
+  t: (key: CustomizerMessageKey) => string;
+  onChange: (blocks: CustomBlock[]) => void;
+}) {
+  const add = (kind: CustomBlock["kind"]) => {
+    if (blocks.length >= MAX_CUSTOM_BLOCKS) return;
+    onChange([...blocks, { id: `block-${blocks.length + 1}`, kind, text: "" }]);
+  };
+  return (
+    <div className="space-y-3">
+      {blocks.map((block, index) => (
+        <div key={block.id} className="space-y-2 border border-neutral-200 p-2">
+          <Field label={t("blockText")}>
+            {block.kind === "heading" ? (
+              <input
+                className={inputClass}
+                value={block.text}
+                onChange={(event) =>
+                  onChange(blocks.map((row, i) => (i === index ? { ...row, text: event.target.value } : row)))
+                }
+              />
+            ) : (
+              <textarea
+                className={`${inputClass} h-20 py-2`}
+                value={block.text}
+                onChange={(event) =>
+                  onChange(blocks.map((row, i) => (i === index ? { ...row, text: event.target.value } : row)))
+                }
+              />
+            )}
+          </Field>
+          <button type="button" className="text-xs text-neutral-500" onClick={() => onChange(blocks.filter((_, i) => i !== index))}>
+            {t("removeItem")}
+          </button>
+        </div>
+      ))}
+      <div className="flex gap-3">
+        <button type="button" disabled={blocks.length >= MAX_CUSTOM_BLOCKS} className="text-xs font-medium disabled:opacity-40" onClick={() => add("heading")}>
+          + {t("addHeading")}
+        </button>
+        <button type="button" disabled={blocks.length >= MAX_CUSTOM_BLOCKS} className="text-xs font-medium disabled:opacity-40" onClick={() => add("paragraph")}>
+          + {t("addParagraph")}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function FeaturedFields({
+  productIds,
+  t,
+  onChange,
+}: {
+  productIds: string[];
+  t: (key: CustomizerMessageKey) => string;
+  onChange: (productIds: string[]) => void;
+}) {
+  return (
+    <div className="space-y-3">
+      <p className="text-xs leading-relaxed text-neutral-500">{t("featuredHint")}</p>
+      {productIds.map((id, index) => (
+        <div key={`${id}-${index}`} className="flex items-center gap-2">
+          <input
+            className={inputClass}
+            aria-label={t("featuredProductId")}
+            value={id}
+            onChange={(event) =>
+              onChange(productIds.map((row, i) => (i === index ? event.target.value.trim() : row)))
+            }
+          />
+          <button type="button" className="text-xs text-neutral-500" onClick={() => onChange(productIds.filter((_, i) => i !== index))}>
+            {t("removeItem")}
+          </button>
+        </div>
+      ))}
+      <button
+        type="button"
+        disabled={productIds.length >= MAX_FEATURED_PRODUCTS}
+        className="text-xs font-medium disabled:opacity-40"
+        onClick={() => onChange([...productIds, ""])}
+      >
+        + {t("addProduct")}
+      </button>
     </div>
   );
 }

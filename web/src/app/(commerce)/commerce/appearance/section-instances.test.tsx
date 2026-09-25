@@ -95,11 +95,14 @@ describe('commerce appearance — STORE-CUSTOMIZER-V2-2 section instances', () =
       'customContent',
     ]);
     expect(picker.textContent).toContain('شريط ترويجي');
-    // Gated types carry the existing gated badge.
-    const bannerOption = picker.querySelector(
-      '[data-picker-option="banner"]',
+    const offersOption = picker.querySelector(
+      '[data-picker-option="offers"]',
     ) as HTMLElement;
-    expect(bannerOption.textContent).toContain('غير مفعّل');
+    expect(offersOption.textContent).toContain('غير مفعّل');
+    expect(
+      (picker.querySelector('[data-picker-option="banner"]') as HTMLElement)
+        .textContent,
+    ).not.toContain('غير مفعّل');
     // Existing singletons are disabled; multi-instance types are not.
     expect(
       (picker.querySelector('[data-picker-option="hero"]') as HTMLButtonElement)

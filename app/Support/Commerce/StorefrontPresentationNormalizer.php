@@ -47,6 +47,12 @@ final class StorefrontPresentationNormalizer
 
     public const HEADER_STYLES = ['standard', 'compact'];
 
+    public const MAX_BENEFIT_ITEMS = 6;
+
+    public const MAX_CUSTOM_BLOCKS = 8;
+
+    public const MAX_FEATURED_PRODUCTS = 8;
+
     public const HOME_BUILDER_SECTION_KEYS = [
         'hero',
         'categories',
@@ -455,11 +461,16 @@ final class StorefrontPresentationNormalizer
 
             $seenIds[$id] = true;
             $seenTypes[$type] = true;
-            $out[] = [
+            $instance = [
                 'id' => $id,
                 'type' => $type,
                 'visible' => (bool) ($section['visible'] ?? false),
             ];
+            $content = $this->normalizeOptionalSectionContent($type, $section['content'] ?? null);
+            if ($content !== null) {
+                $instance['content'] = $content;
+            }
+            $out[] = $instance;
             if (count($out) >= self::MAX_HOME_SECTIONS) {
                 break;
             }
@@ -474,6 +485,128 @@ final class StorefrontPresentationNormalizer
         }
 
         return $out;
+    }
+
+    /**
+     * محتوى اختياري لكل instance. الغياب يعني فارغاً، والمحتوى الفارغ
+     * لا يُكتب حتى تبقى وثائق {id,type,visible} كما هي. الأنواع التي
+     * لا تحمل محتوى (ومنها offers) تُسقِط أي content يُهرَّب.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function normalizeOptionalSectionContent(string $type, mixed $raw): ?array
+    {
+        $source = $this->object($raw);
+
+        if ($type === 'banner') {
+            $content = [
+                'title' => mb_substr(trim($this->asString($source['title'] ?? null)), 0, 120),
+                'subtitle' => mb_substr(trim($this->asString($source['subtitle'] ?? null)), 0, 200),
+                'ctaLabel' => mb_substr(trim($this->asString($source['ctaLabel'] ?? null)), 0, 80),
+                'ctaHref' => $this->sanitizeContentHref($this->asString($source['ctaHref'] ?? null)),
+                'imageUrl' => $this->sanitizeExternalUrl($this->asString($source['imageUrl'] ?? null)),
+            ];
+            $empty = $content['title'] === ''
+                && $content['subtitle'] === ''
+                && $content['ctaLabel'] === ''
+                && $content['ctaHref'] === ''
+                && $content['imageUrl'] === null;
+
+            return $empty ? null : $content;
+        }
+
+        if ($type === 'benefits') {
+            $items = [];
+            $seen = [];
+            foreach (array_values(is_array($source['items'] ?? null) ? $source['items'] : []) as $index => $item) {
+                if (! is_array($item) || array_is_list($item)) {
+                    continue;
+                }
+                $title = mb_substr(trim($this->asString($item['title'] ?? null)), 0, 80);
+                $body = mb_substr(trim($this->asString($item['body'] ?? null)), 0, 200);
+                $id = $this->safeId($item['id'] ?? null, 'benefit-'.$index);
+                if ($id === '' || isset($seen[$id])) {
+                    continue;
+                }
+                $seen[$id] = true;
+                $items[] = ['id' => $id, 'title' => $title, 'body' => $body];
+                if (count($items) >= self::MAX_BENEFIT_ITEMS) {
+                    break;
+                }
+            }
+
+            return $items === [] ? null : ['items' => $items];
+        }
+
+        if ($type === 'customContent') {
+            $blocks = [];
+            $seen = [];
+            foreach (array_values(is_array($source['blocks'] ?? null) ? $source['blocks'] : []) as $index => $block) {
+                if (! is_array($block) || array_is_list($block)) {
+                    continue;
+                }
+                $kind = $block['kind'] ?? null;
+                if ($kind !== 'heading' && $kind !== 'paragraph') {
+                    continue;
+                }
+                $limit = $kind === 'heading' ? 120 : 600;
+                $text = mb_substr(trim($this->asString($block['text'] ?? null)), 0, $limit);
+                $id = $this->safeId($block['id'] ?? null, 'block-'.$index);
+                if ($id === '' || isset($seen[$id])) {
+                    continue;
+                }
+                $seen[$id] = true;
+                $blocks[] = ['id' => $id, 'kind' => $kind, 'text' => $text];
+                if (count($blocks) >= self::MAX_CUSTOM_BLOCKS) {
+                    break;
+                }
+            }
+
+            return $blocks === [] ? null : ['blocks' => $blocks];
+        }
+
+        if ($type === 'featured') {
+            $ids = [];
+            $seen = [];
+            foreach (is_array($source['productIds'] ?? null) ? $source['productIds'] : [] as $value) {
+                if (! is_string($value)) {
+                    continue;
+                }
+                $token = trim($value);
+                if ($token !== '' && preg_match('/^[a-zA-Z0-9_-]{1,64}$/', $token) !== 1) {
+                    continue;
+                }
+                if (isset($seen[$token])) {
+                    continue;
+                }
+                $seen[$token] = true;
+                $ids[] = $token;
+                if (count($ids) >= self::MAX_FEATURED_PRODUCTS) {
+                    break;
+                }
+            }
+
+            return $ids === [] ? null : ['productIds' => $ids];
+        }
+
+        return null;
+    }
+
+    private function sanitizeContentHref(string $value): string
+    {
+        $trimmed = trim($value);
+        if ($trimmed === '') {
+            return '';
+        }
+        if (str_starts_with($trimmed, '/')) {
+            if (str_starts_with($trimmed, '//') || preg_match('/[\s<>"\']/', $trimmed) === 1) {
+                return '';
+            }
+
+            return mb_substr($trimmed, 0, 240);
+        }
+
+        return $this->sanitizeExternalUrl($trimmed) ?? '';
     }
 
     /**

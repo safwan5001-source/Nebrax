@@ -116,6 +116,11 @@
     "wholesaleBenefitOrdersDescription": "Przeglądaj poprzednie zamówienia i zamawiaj ponownie swoje stałe pozycje w kilka kliknięć.",
     "browseCategories": "Kupuj według kategorii",
     "newArrivals": "Nowości",
+    "benefits": "Korzyści",
+    "featured": "Wybór sklepu",
+    "appPromo": "Aplikacja",
+    "appStore": "App Store",
+    "playStore": "Google Play",
     "subcategories": "{count, plural, one {# podkategoria} few {# podkategorie} many {# podkategorii} other {# podkategorii}}"
   },
   "cart": {

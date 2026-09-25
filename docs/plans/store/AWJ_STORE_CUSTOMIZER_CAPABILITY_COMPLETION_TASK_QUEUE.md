@@ -7,17 +7,17 @@ This queue is a dependency map, not permission to skip the Evidence Pass. The ex
 
 | Order | ID | Outcome | Initial dependency | State |
 |---|---|---|---|---|
-| 0 | STORE-CAP-0 | Focused evidence matrix + exact current contracts | none | ready |
-| 1 | STORE-CUSTOMIZER-CLEANUP-1 | Correct fixed-chrome click-to-edit interaction semantics without redesign | STORE-CAP-0 | ready after evidence |
-| 2 | STORE-CAP-CONTRACT-1 | Smallest safe per-instance content contract + backward-compatible normalizers | STORE-CAP-0 | evidence-dependent |
-| 3 | STORE-CAP-BANNER-1 | Banner edit/save/preview/publish/public runtime | STORE-CAP-CONTRACT-1 if shared content envelope required | blocked by dependency |
-| 4 | STORE-CAP-BENEFITS-1 | Benefits items edit/save/preview/publish/public runtime | STORE-CAP-CONTRACT-1 if shared content envelope required | blocked by dependency |
-| 5 | STORE-CAP-CUSTOM-1 | Safe structured custom-content blocks end-to-end | STORE-CAP-CONTRACT-1 | blocked by dependency |
-| 6 | STORE-CAP-APP-1 | App promo from real configured app metadata/links | STORE-CAP-0 | evidence-dependent |
-| 7 | STORE-CAP-FEATURED-1 | Tenant-safe featured product references + ordering + public resolution | STORE-CAP-0 / product reference evidence | evidence-dependent |
-| 8 | STORE-CAP-OFFERS-1 | Offers section backed by authoritative AWJ promotion/offer data | STORE-CAP-0 / pricing authority evidence | likely Decision Gate unless authority already exists |
-| 9 | STORE-CAP-VISUAL-QA-1 | Cross-capability RTL/LTR + mobile/desktop visual QA | relevant merged capabilities | blocked by dependencies |
-| 10 | STORE-CAP-CLOSE-1 | Closure report + Current State + final classification | all ready work complete / gates named | blocked by dependencies |
+| 0 | STORE-CAP-0 | Focused evidence matrix + exact current contracts | none | done in this horizon (evidence pass) |
+| 1 | STORE-CUSTOMIZER-CLEANUP-1 | Correct fixed-chrome click-to-edit interaction semantics without redesign | STORE-CAP-0 | implemented: header/footer are not buttons; logo is a sibling button and is not a link |
+| 2 | STORE-CAP-CONTRACT-1 | Smallest safe per-instance content contract + backward-compatible normalizers | STORE-CAP-0 | implemented: optional content, version stays 2, empty content omitted |
+| 3 | STORE-CAP-BANNER-1 | Banner edit/save/preview/publish/public runtime | STORE-CAP-CONTRACT-1 | implemented |
+| 4 | STORE-CAP-BENEFITS-1 | Benefits items edit/save/preview/publish/public runtime | STORE-CAP-CONTRACT-1 | implemented |
+| 5 | STORE-CAP-CUSTOM-1 | Safe structured custom-content blocks end-to-end | STORE-CAP-CONTRACT-1 | implemented |
+| 6 | STORE-CAP-APP-1 | App promo from real configured app metadata/links | STORE-CAP-0 | implemented from existing `apps` URLs |
+| 7 | STORE-CAP-FEATURED-1 | Tenant-safe featured product references + ordering + public resolution | STORE-CAP-0 | implemented: ids only, public `fetchProduct` |
+| 8 | STORE-CAP-OFFERS-1 | Offers section backed by authoritative AWJ promotion/offer data | STORE-CAP-0 | PRODUCT_DECISION_REQUIRED — see OFFERS decision packet. Not implemented |
+| 9 | STORE-CAP-VISUAL-QA-1 | Cross-capability RTL/LTR + mobile/desktop visual QA | relevant merged capabilities | not browser-captured in the implementation sandbox |
+| 10 | STORE-CAP-CLOSE-1 | Closure report + Current State + final classification | all ready work complete / gates named | after merge and post-merge review |
 
 ## Task rules
 

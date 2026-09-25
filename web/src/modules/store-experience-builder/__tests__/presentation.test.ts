@@ -122,4 +122,36 @@ describe('web presentation contract', () => {
       { id: 'hero', type: 'hero', visible: false },
     ]);
   });
+
+  it('keeps per-instance content without accepting offer or price fields', () => {
+    const config = normalizePresentationConfig({
+      version: 2,
+      homepage: {
+        sections: [
+          {
+            id: 'banner-a',
+            type: 'banner',
+            visible: true,
+            content: {
+              title: 'عرض',
+              ctaHref: '/products',
+              imageUrl: 'javascript:alert(1)',
+            },
+          },
+          {
+            id: 'offers-a',
+            type: 'offers',
+            visible: true,
+            content: { discountPercent: 20 },
+          },
+        ],
+      },
+    });
+    expect(config.homepage.sections[0].content).toMatchObject({
+      title: 'عرض',
+      ctaHref: '/products',
+      imageUrl: null,
+    });
+    expect(config.homepage.sections[1].content).toBeUndefined();
+  });
 });

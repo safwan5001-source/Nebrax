@@ -117,7 +117,8 @@ describe('commerce appearance — STORE-CUSTOMIZER-V2-2 section editing', () => 
 
     const block = selectedSettings() as HTMLElement;
     expect(block.getAttribute('data-selected-section-settings')).toBe('offers');
-    expect(block.textContent).toContain('لا يُنشر على المتجر الحي');
+    expect(block.textContent).toContain('محرك العروض');
+    expect(block.textContent).not.toContain('عنوان');
   });
 
   it('toggles visibility from the selected block and keeps preview in sync', async () => {
