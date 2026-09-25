@@ -76,6 +76,29 @@ class CommerceClient {
     return parseStorefrontResponse(envelope);
   }
 
+  /// APP-BUILDER-19 — raw JSON text of `data.schema` from `GET
+  /// commerce/v1/experience` (the tenant's most recently published App
+  /// Builder experience). Returns the schema document's own bytes, not a
+  /// parsed [Map] and not this client's usual typed model: App Schema
+  /// parsing is `mobile/lib/schema/app_schema.dart`'s job, not this
+  /// transport layer's — `startup/experience_fetcher.dart` is the adapter
+  /// that turns this into an [ExperienceFetchOutcome] for `resolveStartup`.
+  /// Throws exactly like every other method here ([CommerceApiException] on
+  /// a documented error, [CommerceProtocolException] on a malformed body) —
+  /// the fetcher, not this client, is where those become a fail-safe outcome.
+  Future<String> getExperienceSchemaJson() async {
+    final envelope = await _send(CommerceHttpMethod.get, const ['experience']);
+    final data = envelope['data'];
+    if (data is! Map) {
+      throw const CommerceProtocolException('experience response missing "data" object');
+    }
+    final schema = data['schema'];
+    if (schema is! Map) {
+      throw const CommerceProtocolException('experience response missing "data.schema" object');
+    }
+    return jsonEncode(schema);
+  }
+
   Future<List<CommerceCategory>> listCategories() async {
     final envelope = await _send(CommerceHttpMethod.get, const ['categories']);
     return parseCategoryListResponse(envelope);

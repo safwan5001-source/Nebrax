@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:awj_mobile_runtime/commerce/commerce.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -263,6 +265,78 @@ void main() {
 
       await expectLater(
         client.getStorefront(),
+        throwsA(isA<CommerceProtocolException>()),
+      );
+    });
+  });
+
+  group('experience (APP-BUILDER-19 — read tier, no cart/customer identity)', () {
+    test('getExperienceSchemaJson returns data.schema re-encoded as raw JSON text', () async {
+      final transport = FakeCommerceTransport.always(
+        jsonResponse(200, {
+          'data': {
+            'version': 3,
+            'schema_version': '1',
+            'published_at': '2026-09-25T00:00:00Z',
+            'schema': {
+              'schemaVersion': '1.0.0',
+              'pages': {
+                'home': {'type': 'Page'},
+              },
+            },
+          },
+          'meta': successMeta(),
+        }),
+      );
+      final client = CommerceClient(
+        config: _config(),
+        sessionStore: InMemorySecureSessionStore(),
+        transport: transport,
+      );
+
+      final rawJson = await client.getExperienceSchemaJson();
+
+      expect(jsonDecode(rawJson), {
+        'schemaVersion': '1.0.0',
+        'pages': {
+          'home': {'type': 'Page'},
+        },
+      });
+      final sent = transport.requests.single;
+      expect(sent.uri.toString(), 'https://api.example.com/commerce/v1/experience');
+      expect(sent.headers['Authorization'], 'Bearer store-secret-key');
+      expect(sent.headers.containsKey('X-Cart-Token'), isFalse);
+      expect(sent.headers.containsKey('X-Customer-Token'), isFalse);
+    });
+
+    test('getExperienceSchemaJson throws CommerceApiException on a documented 404', () async {
+      final transport = FakeCommerceTransport.always(
+        jsonResponse(404, errorEnvelope('not_found', 'لا توجد تجربة منشورة لهذا المستأجر.')),
+      );
+      final client = CommerceClient(
+        config: _config(),
+        sessionStore: InMemorySecureSessionStore(),
+        transport: transport,
+      );
+
+      await expectLater(
+        client.getExperienceSchemaJson(),
+        throwsA(isA<CommerceApiException>().having((e) => e.code, 'code', CommerceErrorCode.notFound)),
+      );
+    });
+
+    test('getExperienceSchemaJson throws CommerceProtocolException when data.schema is missing', () async {
+      final transport = FakeCommerceTransport.always(
+        jsonResponse(200, {'data': {'version': 1}, 'meta': successMeta()}),
+      );
+      final client = CommerceClient(
+        config: _config(),
+        sessionStore: InMemorySecureSessionStore(),
+        transport: transport,
+      );
+
+      await expectLater(
+        client.getExperienceSchemaJson(),
         throwsA(isA<CommerceProtocolException>()),
       );
     });

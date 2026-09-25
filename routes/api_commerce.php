@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\CommerceCheckoutController;
 use App\Http\Controllers\Api\CommerceCustomerAddressController;
 use App\Http\Controllers\Api\CommerceCustomerAuthController;
 use App\Http\Controllers\Api\CommerceCustomerOrderController;
+use App\Http\Controllers\Api\CommerceExperienceController;
 use App\Http\Controllers\Api\CommerceMediaController;
 use App\Http\Controllers\Api\CommerceOrderController;
 use App\Http\Controllers\Api\CommerceProductController;
@@ -72,6 +73,13 @@ Route::middleware([
     EstablishCommerceCustomerContextIfPresent::class,
 ])->group(function () {
     Route::get('storefront', [CommerceStorefrontController::class, 'show'])->name('storefront.show');
+
+    // APP-BUILDER-19 — the App Builder's published-experience fetch endpoint
+    // (see CommerceExperienceController's own docblock for the "which
+    // BuilderApp is live" scope decision). Read-only, same auth/channel/
+    // subscription chain as every other route in this group; no cart
+    // identity needed.
+    Route::get('experience', [CommerceExperienceController::class, 'show'])->name('experience.show');
 
     // PR-2 — read-only catalog. Categories carry no publication/channel gate
     // (shared browsing structure); products are gated by CommerceListing on

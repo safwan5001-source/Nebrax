@@ -102,6 +102,8 @@ servers:
 tags:
   - name: Storefront
     description: Store identity/config for the resolved mobile channel.
+  - name: AppBuilder
+    description: The tenant's live published App Builder experience (APP-BUILDER-19).
   - name: Catalog
     description: Read-only categories and products, gated by mobile-channel publication.
   - name: Media
@@ -141,6 +143,32 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/StorefrontResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /experience:
+    parameters:
+      - $ref: '#/components/parameters/RequestId'
+    get:
+      operationId: getExperience
+      tags: [AppBuilder]
+      summary: The tenant's most recently published App Builder experience
+      description: >-
+        APP-BUILDER-19 — backs the mobile runtime's live publish → fetch →
+        on-device-cache loop. Returns the latest `BuilderPublishedExperienceVersion`
+        across all of the tenant's BuilderApp records (there is no separate
+        "active app" flag today — publishing is what makes a version live).
+        404 when the tenant has never published any App Builder experience.
+      x-auth-tier: read
+      responses:
+        '200':
+          description: The published experience.
+          headers:
+            X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ExperienceResponse' }
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '404': { $ref: '#/components/responses/NotFound' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
@@ -1169,6 +1197,24 @@ components:
           required: [name]
           properties:
             name: { type: [string, 'null'] }
+        meta: { $ref: '#/components/schemas/SuccessMeta' }
+
+    ExperienceResponse:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data:
+          type: object
+          additionalProperties: false
+          required: [version, schema_version, published_at, schema]
+          properties:
+            version: { type: integer }
+            schema_version: { type: string }
+            published_at: { type: string, format: date-time }
+            # The full APP_SCHEMA_V1 document as published — its own contract
+            # lives in APP_SCHEMA_V1.md, not duplicated here.
+            schema: { type: object }
         meta: { $ref: '#/components/schemas/SuccessMeta' }
 
     SuccessMeta:
