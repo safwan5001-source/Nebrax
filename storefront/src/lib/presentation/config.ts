@@ -1,4 +1,8 @@
 import {
+  normalizeOptionalSectionContent,
+  type SectionContent,
+} from "./section-content";
+import {
   CONTENT_PAGE_SLUGS,
   type ContentPageSlug,
   DENSITY_PRESETS,
@@ -55,6 +59,8 @@ export interface PresentationHomeSection {
   id: string;
   type: HomeBuilderSectionKey;
   visible: boolean;
+  /** Present only when this instance has non-empty authored content. */
+  content?: SectionContent;
 }
 
 /**
@@ -315,11 +321,14 @@ function resolveHomeBuilderSections(
 
     seenIds.add(id);
     seenTypes.add(type);
-    out.push({
+    const section: PresentationHomeSection = {
       id,
       type: type as HomeBuilderSectionKey,
       visible: asBoolean(entry.visible, false),
-    });
+    };
+    const content = normalizeOptionalSectionContent(type, entry.content);
+    if (content) section.content = content;
+    out.push(section);
     if (out.length >= MAX_HOME_SECTIONS) break;
   }
 

@@ -180,7 +180,9 @@ describe('commerce appearance — STORE-CUSTOMIZER-V2-1 shell and section select
     await user.click(screen.getByText('السعودية · ر.س'));
     expect(builderRoot().dataset.panel).toBe('header');
     expect(builderRoot().dataset.selectedChrome).toBe('header');
-    expect(header.getAttribute('aria-pressed')).toBe('true');
+    expect(header.getAttribute('role')).toBeNull();
+    expect(header.getAttribute('data-chrome-selected')).toBe('');
+    expect(header.querySelector('button [data-preview-chrome], button button, [role="button"] [role="button"]')).toBeNull();
 
     const logo = document.querySelector(
       '[data-preview-chrome="branding"]',
@@ -195,7 +197,8 @@ describe('commerce appearance — STORE-CUSTOMIZER-V2-1 shell and section select
     ) as HTMLElement;
     await user.click(footer);
     expect(builderRoot().dataset.panel).toBe('footer');
-    expect(footer.getAttribute('aria-pressed')).toBe('true');
+    expect(footer.getAttribute('role')).toBeNull();
+    expect(footer.getAttribute('data-chrome-selected')).toBe('');
   });
 });
 

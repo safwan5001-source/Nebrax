@@ -116,6 +116,11 @@
     "wholesaleBenefitOrdersDescription": "Review past orders and reorder your regular lines in a couple of clicks.",
     "browseCategories": "Shop by category",
     "newArrivals": "New arrivals",
+    "benefits": "Store benefits",
+    "featured": "Store picks",
+    "appPromo": "Store app",
+    "appStore": "App Store",
+    "playStore": "Google Play",
     "subcategories": "{count, plural, one {# subcategory} other {# subcategories}}"
   },
   "cart": {

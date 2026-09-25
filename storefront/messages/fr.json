@@ -116,6 +116,11 @@
     "wholesaleBenefitOrdersDescription": "Consultez vos commandes passées et recommandez vos références habituelles en quelques clics.",
     "browseCategories": "Acheter par catégorie",
     "newArrivals": "Nouveautés",
+    "benefits": "Avantages",
+    "featured": "Sélection",
+    "appPromo": "Application",
+    "appStore": "App Store",
+    "playStore": "Google Play",
     "subcategories": "{count, plural, one {# sous-catégorie} other {# sous-catégories}}"
   },
   "cart": {

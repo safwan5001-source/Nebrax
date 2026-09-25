@@ -55,12 +55,7 @@ export const IMPLEMENTED_HOME_SECTION_KEYS = DEFAULT_HOME_SECTIONS.map(
 );
 
 export const GATED_HOME_SECTION_KEYS = [
-  "banner",
-  "featured",
   "offers",
-  "benefits",
-  "appPromo",
-  "customContent",
 ] as const satisfies readonly HomeBuilderSectionKey[];
 
 export const SOCIAL_NETWORKS = [
