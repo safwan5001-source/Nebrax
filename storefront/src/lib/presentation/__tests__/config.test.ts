@@ -225,18 +225,26 @@ describe("normalizePresentationConfig", () => {
         ],
       },
     });
-    const banner = normalized.homepage.sections.find((section) => section.id === "banner-a");
+    const banner = normalized.homepage.sections.find(
+      (section) => section.id === "banner-a",
+    );
     expect(banner?.content).toMatchObject({
       title: "عرض",
       ctaHref: "",
       imageUrl: "https://cdn.example.com/banner.jpg",
     });
     expect(banner?.content && "html" in banner.content).toBe(false);
-    const offers = normalized.homepage.sections.find((section) => section.id === "offers-a");
+    const offers = normalized.homepage.sections.find(
+      (section) => section.id === "offers-a",
+    );
     expect(offers?.content).toBeUndefined();
-    const featured = normalized.homepage.sections.find((section) => section.id === "feat-a");
+    const featured = normalized.homepage.sections.find(
+      (section) => section.id === "feat-a",
+    );
     expect(featured?.content).toEqual({ productIds: ["prod-1"] });
-    const empty = normalized.homepage.sections.find((section) => section.id === "banner-empty");
+    const empty = normalized.homepage.sections.find(
+      (section) => section.id === "banner-empty",
+    );
     expect(empty?.content).toBeUndefined();
   });
 

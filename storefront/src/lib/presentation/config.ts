@@ -1,4 +1,8 @@
 import {
+  normalizeOptionalSectionContent,
+  type SectionContent,
+} from "./section-content";
+import {
   CONTENT_PAGE_SLUGS,
   type ContentPageSlug,
   DENSITY_PRESETS,
@@ -28,10 +32,6 @@ import {
   sanitizeExternalUrl,
   sanitizeLogoUrl,
 } from "./urls";
-import {
-  normalizeOptionalSectionContent,
-  type SectionContent,
-} from "./section-content";
 
 export type NavLinkKind =
   | "home"

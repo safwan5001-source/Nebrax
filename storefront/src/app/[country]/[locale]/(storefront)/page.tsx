@@ -12,11 +12,9 @@ import { WholesaleSection } from "@/components/home/WholesaleSection";
 import { StoreContainer } from "@/components/layout/StoreContainer";
 import { fetchStorefrontConfig } from "@/lib/commerce/storefront";
 import { resolveCurrency } from "@/lib/data/markets";
-import {
-  type HomeSectionKey,
-  resolveHomeSections,
-} from "@/lib/home/sections";
+import { type HomeSectionKey, resolveHomeSections } from "@/lib/home/sections";
 import { generateHomeMetadata } from "@/lib/metadata/home";
+import type { PresentationHomeSection } from "@/lib/presentation/config";
 import { publishedStoreName } from "@/lib/presentation/public";
 import { publishedHomeStackClass } from "@/lib/presentation/public-rhythm";
 import {
@@ -25,7 +23,6 @@ import {
   customContentOf,
   featuredContentOf,
 } from "@/lib/presentation/section-content";
-import type { PresentationHomeSection } from "@/lib/presentation/config";
 
 interface HomePageProps {
   params: Promise<{
@@ -143,9 +140,7 @@ async function publishedNodes(
       section.type === "newArrivals" ||
       section.type === "wholesale"
     ) {
-      nodes.push(
-        <div key={section.id}>{ctx.implemented[section.type]}</div>,
-      );
+      nodes.push(<div key={section.id}>{ctx.implemented[section.type]}</div>);
       continue;
     }
     if (section.type === "banner") {

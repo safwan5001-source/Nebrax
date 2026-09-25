@@ -5,10 +5,7 @@ export function CustomContentBand({ content }: { content: CustomContent }) {
   const labelledBy = blocks.find((block) => block.kind === "heading")?.id;
   if (blocks.length === 0) return null;
   return (
-    <section
-      aria-labelledby={labelledBy}
-      className="max-w-3xl space-y-3"
-    >
+    <section aria-labelledby={labelledBy} className="max-w-3xl space-y-3">
       {blocks.map((block) =>
         block.kind === "heading" ? (
           <h2
@@ -19,7 +16,10 @@ export function CustomContentBand({ content }: { content: CustomContent }) {
             {block.text}
           </h2>
         ) : (
-          <p key={block.id} className="text-sm leading-relaxed text-store-muted-foreground">
+          <p
+            key={block.id}
+            className="text-sm leading-relaxed text-store-muted-foreground"
+          >
             {block.text}
           </p>
         ),

@@ -27,6 +27,7 @@ export function BannerBand({
     >
       <div className="flex flex-col gap-4 p-5 md:flex-row md:items-center md:p-8">
         {content.imageUrl ? (
+          // biome-ignore lint/performance/noImgElement: merchant banner is a runtime https URL, not a static import
           <img
             src={content.imageUrl}
             alt=""

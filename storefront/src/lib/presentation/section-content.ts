@@ -69,7 +69,9 @@ export function bannerContentOf(section: {
   type: string;
   content?: SectionContent;
 }): BannerContent {
-  return section.type === "banner" && section.content && "title" in section.content
+  return section.type === "banner" &&
+    section.content &&
+    "title" in section.content
     ? section.content
     : emptyBannerContent();
 }
@@ -187,7 +189,8 @@ function normalizeCustom(source: Record<string, unknown>): CustomContent {
   source.blocks.forEach((block, index) => {
     if (!block || typeof block !== "object" || Array.isArray(block)) return;
     const row = block as Record<string, unknown>;
-    const kind = row.kind === "heading" || row.kind === "paragraph" ? row.kind : null;
+    const kind =
+      row.kind === "heading" || row.kind === "paragraph" ? row.kind : null;
     if (!kind) return;
     const text = asString(row.text)
       .trim()

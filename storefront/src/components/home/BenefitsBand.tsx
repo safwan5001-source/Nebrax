@@ -21,22 +21,22 @@ export function BenefitsBand({
         {content.items
           .filter((item) => item.title || item.body)
           .map((item) => (
-          <li
-            key={item.id}
-            className="rounded-store border border-store-border bg-store-surface px-4 py-4"
-          >
-            {item.title ? (
-              <p className="text-sm font-bold text-store-foreground">
-                {item.title}
-              </p>
-            ) : null}
-            {item.body ? (
-              <p className="mt-1 text-sm text-store-muted-foreground">
-                {item.body}
-              </p>
-            ) : null}
-          </li>
-        ))}
+            <li
+              key={item.id}
+              className="rounded-store border border-store-border bg-store-surface px-4 py-4"
+            >
+              {item.title ? (
+                <p className="text-sm font-bold text-store-foreground">
+                  {item.title}
+                </p>
+              ) : null}
+              {item.body ? (
+                <p className="mt-1 text-sm text-store-muted-foreground">
+                  {item.body}
+                </p>
+              ) : null}
+            </li>
+          ))}
       </ul>
     </section>
   );
