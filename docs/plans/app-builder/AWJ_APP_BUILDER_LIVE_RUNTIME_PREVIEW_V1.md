@@ -51,8 +51,8 @@ Standing authority covers implementation, tests, commits, PRs, merging green dep
 | LIVE-PREVIEW-3 | Binding + Collection Preview Parity | **DONE / PASS** — see `LIVE-PREVIEW-3-BINDING-COLLECTION-PARITY.md` |
 | LIVE-PREVIEW-4 | Action + Theme + Supported Visibility Parity | **DONE / PASS** — see `LIVE-PREVIEW-4-ACTION-THEME-VISIBILITY-PARITY.md` |
 | LIVE-PREVIEW-5 | Runtime-Aware Pre-Publish Validation | **DONE / PASS** — see `LIVE-PREVIEW-5-PREPUBLISH-VALIDATION.md` |
-| LIVE-PREVIEW-6 | Draft / Default / Published Preview States | READY |
-| LIVE-PREVIEW-7 | Integrated Builder → Publish → Runtime Proof | BLOCKED |
+| LIVE-PREVIEW-6 | Draft / Default / Published Preview States | **DONE / PASS** — see `LIVE-PREVIEW-6-PREVIEW-STATES.md` |
+| LIVE-PREVIEW-7 | Integrated Builder → Publish → Runtime Proof | READY |
 | LIVE-PREVIEW-8 | Horizon Closure / Durable Documentation | BLOCKED |
 
 ### LIVE-PREVIEW-1 — Preview Contract Evidence Pass
@@ -310,10 +310,12 @@ The horizon is CLOSED / PASS only when evidence proves:
   broader app-builder suite 8 files / 80 tests green, full web suite 299 files / 2118 tests
   green, `npm run build` clean. No Decision Gate triggered; no capability broadened (this task
   narrows an implicit overclaim, if anything).
-- **LIVE-PREVIEW-5 — Runtime-Aware Pre-Publish Validation: DONE / PASS** (implementation
-  complete; PR pending). Full report: `docs/plans/app-builder/
+- **LIVE-PREVIEW-5 — Runtime-Aware Pre-Publish Validation: DONE / PASS.** PR #1024
+  (squash-merged). Full report: `docs/plans/app-builder/
   LIVE-PREVIEW-5-PREPUBLISH-VALIDATION.md`. Base SHA: `fcb0e20b2b5c4cad8df9469e18d6d0d23002e2c9`.
-  Inspected first, per the task's own instruction — the Validate/Publish gate itself
+  **Merge SHA: `d565161dff81b65174fbb2fab443871176eb3940`** (verified via `get_commit`). CI: 4/4
+  checks green (`php artisan test (L11, sqlite/pgsql)` ×2). Inspected first, per the task's own
+  instruction — the Validate/Publish gate itself
   (`BuilderPublishedExperienceVersionService` → real, shared `CompatibilityResolver`) was
   already correct (LP-1 §6); the actual gap found was diagnostic, not behavioral: a *required*
   (non-optional) unsupported node's publish failure named only the page, never the offending
@@ -341,5 +343,30 @@ The horizon is CLOSED / PASS only when evidence proves:
   this PR, matching how Dart/Flutter's absence was handled in LP-2/LP-3. No Decision Gate
   triggered; no schema/API/RBAC/Tenant Isolation/Commerce authorization change; no financial/
   accounting rule changed (this file has no ledger-affecting code path).
-- Next task once LP-5's PR merges: **LIVE-PREVIEW-6 — Draft / Default / Published Preview
-  States**.
+- **LIVE-PREVIEW-6 — Draft / Default / Published Preview States: DONE / PASS** (implementation
+  complete; PR pending). Full report: `docs/plans/app-builder/LIVE-PREVIEW-6-PREVIEW-STATES.md`.
+  Base SHA: `d565161dff81b65174fbb2fab443871176eb3940` (LP-5's merge commit). Closed the gap
+  LIVE-PREVIEW-1 §7 identified: Preview had no way to show either the Default AWJ Experience
+  (the mobile app's own bundled `kHomeSchemaJson`/`kCartSchemaJson`) or a merchant's last
+  Published version — only the live draft, unlabeled as such. Built (1)
+  `web/src/modules/app-builder/default-experience.ts`: a static, client-side-only, byte-identical
+  mirror of the bundled mobile schema, verified against `mobile/lib/app/runtime_schema.dart`'s
+  plain-text source via a new conformance test (same discipline as LP-2's fixture — no Flutter
+  toolchain needed since it's a compile-time string literal); (2) a 3-way Draft/Published/Default
+  switcher in `builder/page.tsx`, reusing the **existing** `GET .../versions` +
+  `GET .../versions/{version}` endpoints (no new backend route) to fetch/cache the latest
+  published version; (3) every edit affordance (Save/Undo/Redo/Publish/page add-remove/Inspector)
+  disabled and swapped for read-only panels whenever a non-draft state is viewed — no code path
+  can reach an `apply*` mutator against a non-draft schema; (4) a persistent `stateBanner` on
+  `AppBuilderCanvas` (new optional prop) naming which version is shown, with the draft banner
+  explicitly stating it is "not a live version in the mobile app." Web-only change — no backend,
+  no mobile file touched. Evidence: `default-experience.test.ts` 3/3 new; `page.test.tsx` 3 new
+  cases (Default renders with zero extra API calls; Published fetches list-then-detail and
+  disables all edit controls; Published tab disabled with no published version) alongside all 27
+  pre-existing cases unmodified — 30/30; broader app-builder suite 9 files / 86 tests green; full
+  web suite 300 files / 2124 tests green; `npm run build` clean. No Decision Gate triggered: no
+  new route, no schema/API contract change (existing endpoints, existing shapes), no capability
+  broadened (strictly read-only presentation of already-returned data), no Tenant
+  Isolation/RBAC/Commerce authorization/auth-token surface touched.
+- Next task once LP-6's PR merges: **LIVE-PREVIEW-7 — Integrated Builder → Publish → Runtime
+  Proof**.

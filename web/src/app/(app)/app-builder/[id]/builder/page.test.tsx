@@ -128,6 +128,16 @@ const { api, currentUser, translate } = vi.hoisted(() => {
     'publish.publishing': 'Publishing…',
     'publish.successTitle': 'Version published',
     'publish.errorTitle': 'Could not publish',
+    'previewState.draft': 'Draft',
+    'previewState.published': 'Published',
+    'previewState.default': 'Default',
+    'previewState.draftBanner': 'Draft — being edited, not a live version in the mobile app',
+    'previewState.publishedBanner': 'Published — version {version}, as you last published this app',
+    'previewState.defaultBanner': 'Default experience — what a customer sees before this tenant has published anything',
+    'previewState.noPublishedVersion': 'This app has no published version yet',
+    'previewState.loadFailed': 'Could not load the published version',
+    'previewState.readOnlyNotice': 'Read-only — switch to the Draft tab to edit',
+    'previewState.switchToDraftToPublish': 'Switch to Draft to publish',
   };
   const cache = new Map<string, ReturnType<typeof buildTranslator>>();
   function buildTranslator(namespace: string) {
@@ -775,5 +785,94 @@ describe('AppBuilderWorkspacePage', () => {
     render(<AppBuilderWorkspacePage />);
 
     expect(await screen.findByText('Could not load the workspace.')).toBeTruthy();
+  });
+
+  // LIVE-PREVIEW-6 — Draft / Published / Default preview-state switcher. These three tests
+  // use their own local `api.mockImplementation` rather than the shared `mockApi()` helper
+  // above: that helper treats ANY path ending in `/versions` as the single-object PUBLISH
+  // response, which would answer the switcher's `GET .../versions` LIST call with the wrong
+  // shape.
+  describe('preview state switcher', () => {
+    const publishedSchema = {
+      schemaVersion: '1.0.0',
+      minRuntimeVersion: '1.0.0',
+      navigation: { initialPageId: 'home' },
+      theme: { tokens: {} },
+      pages: {
+        home: {
+          type: 'Page', id: 'home-root',
+          children: [{ type: 'Section', id: 'pub-sec-1', props: { title: 'Published Content' }, children: [] }],
+        },
+      },
+    };
+
+    function mockApiWithPublishedVersion() {
+      api.mockImplementation((path?: string) => {
+        if (!path) return Promise.resolve({ data: null });
+        if (path.endsWith('/draft')) return Promise.resolve({ data: draftData });
+        if (path.endsWith('/registries')) return Promise.resolve({ data: registriesData });
+        if (path.endsWith('/versions')) {
+          return Promise.resolve({
+            data: [
+              { id: 'ver-1', builder_app_id: 'app-1', version: 1, schema_version: '1.0.0', note: null, published_by: null, published_by_name: null, published_at: '2026-09-01T00:00:00Z' },
+              { id: 'ver-2', builder_app_id: 'app-1', version: 2, schema_version: '1.0.0', note: null, published_by: null, published_by_name: null, published_at: '2026-09-10T00:00:00Z' },
+            ],
+          });
+        }
+        if (path.endsWith('/versions/2')) {
+          return Promise.resolve({
+            data: { id: 'ver-2', builder_app_id: 'app-1', version: 2, schema_version: '1.0.0', note: null, schema: publishedSchema, published_by: null, published_by_name: null, published_at: '2026-09-10T00:00:00Z' },
+          });
+        }
+        if (path.endsWith('/apps/app-1')) return Promise.resolve({ data: { ...appData, latest_published_version: 2 } });
+        return Promise.reject(new Error(`unexpected path: ${path}`));
+      });
+    }
+
+    it('switching to Default renders the bundled default experience with no extra API call and shows the default banner', async () => {
+      mockApi();
+      render(<AppBuilderWorkspacePage />);
+      await screen.findByText('Featured');
+
+      const callsBeforeSwitch = api.mock.calls.length;
+      await userEvent.setup().click(screen.getByRole('button', { name: 'Default' }));
+
+      expect(await screen.findByText('أَوْج')).toBeTruthy();
+      expect(screen.getByText('Default experience — what a customer sees before this tenant has published anything')).toBeTruthy();
+      // No new network call — the default experience is a static, bundled constant.
+      expect(api.mock.calls.length).toBe(callsBeforeSwitch);
+      // Read-only: no editable panels are exposed against this non-draft schema.
+      expect(screen.queryByText('Add page')).toBeNull();
+      expect(screen.getByText('Read-only — switch to the Draft tab to edit')).toBeTruthy();
+    });
+
+    it('switching to Published fetches the version list then the full version and renders it read-only', async () => {
+      mockApiWithPublishedVersion();
+      render(<AppBuilderWorkspacePage />);
+      await screen.findByText('Featured');
+
+      await userEvent.setup().click(screen.getByRole('button', { name: 'Published' }));
+
+      expect(await screen.findByText('Published Content')).toBeTruthy();
+      expect(screen.getByText('Published — version 2, as you last published this app')).toBeTruthy();
+      await waitFor(() => expect(api).toHaveBeenCalledWith('/app-builder/apps/app-1/versions'));
+      await waitFor(() => expect(api).toHaveBeenCalledWith('/app-builder/apps/app-1/versions/2'));
+
+      // Editing controls are disabled — nothing here can mutate the draft.
+      const [saveButton] = screen.getAllByText('Save');
+      expect((saveButton.closest('button') as HTMLButtonElement).disabled).toBe(true);
+      const [undoButton] = screen.getAllByLabelText('Undo');
+      expect((undoButton as HTMLButtonElement).disabled).toBe(true);
+      expect(screen.queryByText('Add page')).toBeNull();
+    });
+
+    it('the Published tab is disabled when the app has no published version', async () => {
+      mockApi();
+      render(<AppBuilderWorkspacePage />);
+      await screen.findByText('Featured');
+
+      const publishedTab = screen.getByRole('button', { name: 'Published' });
+      expect((publishedTab as HTMLButtonElement).disabled).toBe(true);
+    });
   });
 });

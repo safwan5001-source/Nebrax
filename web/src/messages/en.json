@@ -6871,6 +6871,18 @@
       "emptyPage": "Empty page",
       "sampleDataBanner": "Sample data — shows how data binding renders, not your real store data",
       "visibilityUnsupportedBadge": "Visibility condition not yet active",
+      "previewState": {
+        "draft": "Draft",
+        "published": "Published",
+        "default": "Default",
+        "draftBanner": "Draft — being edited, not a live version in the mobile app",
+        "publishedBanner": "Published — version {version}, as you last published this app",
+        "defaultBanner": "Default experience — what a customer sees before this tenant has published anything",
+        "noPublishedVersion": "This app has no published version yet",
+        "loadFailed": "Could not load the published version",
+        "readOnlyNotice": "Read-only — switch to the Draft tab to edit",
+        "switchToDraftToPublish": "Switch to Draft to publish"
+      },
       "pages": {
         "addAction": "Add page",
         "setHomeLabel": "Set as home page",

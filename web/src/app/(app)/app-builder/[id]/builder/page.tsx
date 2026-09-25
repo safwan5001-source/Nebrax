@@ -20,14 +20,23 @@ import {
   mergeThemeTokens, moveSibling, removeComponentById, removePage, reorderChildren, setInitialPage,
   themeTokens as schemaThemeTokens, updateComponentById,
   type AppBuilderRegistries, type AppSchema, type AppSchemaComponent, type BuilderApp, type BuilderDraftExperience,
+  type BuilderPublishedVersion,
 } from '@/lib/app-builder';
 import { AppBuilderCanvas, PREVIEW_WIDTHS, type PreviewDevice } from '@/modules/app-builder/canvas';
+import { DEFAULT_APP_EXPERIENCE } from '@/modules/app-builder/default-experience';
 import { LayersTree } from '@/modules/app-builder/layers-tree';
 import { Inspector } from '@/modules/app-builder/inspector';
 import { ThemePanel } from '@/modules/app-builder/theme-panel';
 
 type MobilePanel = 'structure' | 'inspector';
 type StructureMode = 'pages' | 'theme';
+/**
+ * LIVE-PREVIEW-6 — أيّ نسخة يعرضها الكانفاس حالياً. `draft` هو الوضع الوحيد القابل
+ * للتحرير (المسار الموجود أصلاً، بلا تغيير). `published`/`default` قراءة فقط بالكامل —
+ * لا تُستدعى أيٌّ من دوال `apply*`/`handleSave`/`confirmPublish` وهما معروضان، فلا خطر
+ * تحرير خفي يستهدف مخططاً غير المسودة الفعلية.
+ */
+type PreviewState = 'draft' | 'published' | 'default';
 const HISTORY_LIMIT = 50;
 
 /**
@@ -65,6 +74,12 @@ export default function AppBuilderWorkspacePage() {
   const [publishing, setPublishing] = useState(false);
   const canPublish = hasAppBuilderPermission(currentUser(), 'apps_builder.publish');
   const [previewThemeTokens, setPreviewThemeTokens] = useState<Record<string, string> | null>(null);
+
+  const [previewState, setPreviewState] = useState<PreviewState>('draft');
+  const [publishedVersion, setPublishedVersion] = useState<BuilderPublishedVersion | null>(null);
+  const [publishedLoading, setPublishedLoading] = useState(false);
+  const [publishedError, setPublishedError] = useState<string | null>(null);
+  const [viewedPageId, setViewedPageId] = useState<string | null>(null);
 
   const load = useCallback(() => {
     if (!params.id) return;
@@ -217,6 +232,10 @@ export default function AppBuilderWorkspacePage() {
       });
       setPublishOpen(false);
       toast.success(t('publish.successTitle'));
+      // LIVE-PREVIEW-6: يُبطِل ذاكرة النسخة المنشورة المخبّأة — نشرٌ ناجح جديد يعني أن
+      // "أحدث نسخة" تغيّرت؛ إعادة الجلب تُطلَب في المرة التالية التي يُفتَح فيها تبويب
+      // «منشورة» بدل الاستمرار بعرض النسخة القديمة المخبّأة.
+      setPublishedVersion(null);
     } catch (err) {
       toast.error(t('publish.errorTitle'), err instanceof ApiError ? err.message : undefined);
     } finally {
@@ -224,7 +243,47 @@ export default function AppBuilderWorkspacePage() {
     }
   }
 
+  /**
+   * LIVE-PREVIEW-6 — يبدّل حالة المعاينة. `published` تجلب أحدث نسخة منشورة مرّة واحدة
+   * فقط وتخبّئها (تُبطَل عند نشر ناجح جديد، أعلاه) — نفس مساري `GET .../versions` +
+   * `GET .../versions/{version}` الموجودَين أصلاً لصفحة سجلّ النسخ، لا مسار جديد.
+   */
+  async function switchPreviewState(next: PreviewState) {
+    setPreviewState(next);
+    if (next === 'default') {
+      setViewedPageId(DEFAULT_APP_EXPERIENCE.navigation.initialPageId);
+      return;
+    }
+    if (next !== 'published' || publishedVersion || !params.id) return;
+    setPublishedLoading(true);
+    setPublishedError(null);
+    try {
+      const list = await api<{ data: BuilderPublishedVersion[] }>(`/app-builder/apps/${params.id}/versions`);
+      const latest = list.data.reduce<BuilderPublishedVersion | null>(
+        (best, version) => (!best || version.version > best.version ? version : best),
+        null
+      );
+      if (!latest) {
+        setPublishedError(t('previewState.noPublishedVersion'));
+        return;
+      }
+      const full = await api<{ data: BuilderPublishedVersion }>(`/app-builder/apps/${params.id}/versions/${latest.version}`);
+      setPublishedVersion(full.data);
+      setViewedPageId(full.data.schema?.navigation.initialPageId ?? null);
+    } catch (err) {
+      setPublishedError(err instanceof ApiError ? err.message : t('previewState.loadFailed'));
+    } finally {
+      setPublishedLoading(false);
+    }
+  }
+
   const pageIds = useMemo(() => (schema ? Object.keys(schema.pages) : []), [schema]);
+  const viewedSchema: AppSchema | null =
+    previewState === 'published' ? publishedVersion?.schema ?? null : previewState === 'default' ? DEFAULT_APP_EXPERIENCE : null;
+  const viewedPageIds = useMemo(() => (viewedSchema ? Object.keys(viewedSchema.pages) : []), [viewedSchema]);
+  const effectiveViewedPageId =
+    viewedPageId && viewedSchema?.pages[viewedPageId] ? viewedPageId : viewedSchema?.navigation.initialPageId ?? null;
+  const viewedPageRoot = viewedSchema && effectiveViewedPageId ? viewedSchema.pages[effectiveViewedPageId] ?? null : null;
   const currentPageRoot = schema && selectedPageId ? schema.pages[selectedPageId] ?? null : null;
   const selectedNode = currentPageRoot && selectedComponentId ? findComponentById(currentPageRoot, selectedComponentId) : null;
   const canUndo = pastRef.current.length > 0;
@@ -420,6 +479,43 @@ export default function AppBuilderWorkspacePage() {
     </div>
   );
 
+  /**
+   * LIVE-PREVIEW-6 — لوحتا القراءة فقط لحالتَي «منشورة»/«افتراضية»: لا زرّ إضافة/حذف/تعيين
+   * رئيسية، ولا Inspector — مجرّد تنقّل بين صفحات المخطط المعروض (`viewedPageId` محلّي، لا
+   * يمسّ `selectedPageId`/`selectedComponentId` الخاصّين بتحرير المسودة إطلاقاً).
+   */
+  const readOnlyPagePanel = (
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="shrink-0 px-3 py-2">
+        <p className="text-xs font-semibold text-muted">{t('pagesTitle')}</p>
+      </div>
+      <div className="min-h-0 flex-1 space-y-0.5 overflow-y-auto px-2 pb-2">
+        {viewedPageIds.map((pageId) => (
+          <button
+            key={pageId}
+            type="button"
+            onClick={() => setViewedPageId(pageId)}
+            aria-current={pageId === effectiveViewedPageId ? 'page' : undefined}
+            className={cn(
+              'flex h-8 w-full items-center rounded px-2 text-start text-sm',
+              pageId === effectiveViewedPageId ? 'bg-primary-soft font-medium text-primary' : 'text-text hover:bg-background'
+            )}
+          >
+            <span className="truncate">{pageId}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+
+  const readOnlyNotice = (
+    <div className="flex h-full min-h-0 items-center justify-center p-4 text-center text-xs leading-relaxed text-muted">
+      {t('previewState.readOnlyNotice')}
+    </div>
+  );
+
+  const isDraftView = previewState === 'draft';
+
   return (
     // `-m-4 sm:-m-6` cancels `<main>`'s own padding (`(app)/layout.tsx`) so the workspace
     // reaches the page edges like every other full-bleed panel in this shell — a fixed
@@ -437,21 +533,21 @@ export default function AppBuilderWorkspacePage() {
         {statusBadge}
 
         <div className="flex shrink-0 items-center gap-0.5">
-          <Button variant="ghost" size="icon" aria-label={t('undoLabel')} disabled={!canUndo} onClick={undo}>
+          <Button variant="ghost" size="icon" aria-label={t('undoLabel')} disabled={!isDraftView || !canUndo} onClick={undo}>
             <Undo2 className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />
           </Button>
-          <Button variant="ghost" size="icon" aria-label={t('redoLabel')} disabled={!canRedo} onClick={redo}>
+          <Button variant="ghost" size="icon" aria-label={t('redoLabel')} disabled={!isDraftView || !canRedo} onClick={redo}>
             <Redo2 className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />
           </Button>
         </div>
-        <Button size="sm" disabled={!dirty || saving} onClick={handleSave}>
+        <Button size="sm" disabled={!isDraftView || !dirty || saving} onClick={handleSave}>
           {saving ? t('savingBadge') : tc('save')}
         </Button>
         <Button
           size="sm"
           variant="outline"
-          disabled={dirty || saving || !canPublish}
-          title={!canPublish ? t('publish.forbidden') : dirty ? t('publish.saveFirst') : undefined}
+          disabled={!isDraftView || dirty || saving || !canPublish}
+          title={!isDraftView ? t('previewState.switchToDraftToPublish') : !canPublish ? t('publish.forbidden') : dirty ? t('publish.saveFirst') : undefined}
           onClick={openPublishDialog}
         >
           <UploadCloud className="h-3.5 w-3.5" strokeWidth={1.7} aria-hidden="true" />
@@ -459,6 +555,27 @@ export default function AppBuilderWorkspacePage() {
         </Button>
 
         <div className="ms-auto flex flex-wrap items-center gap-2">
+          <div className="hidden items-center gap-1 rounded-md border border-border p-1 sm:flex">
+            {(['draft', 'published', 'default'] as const).map((state) => {
+              const disabled = state === 'published' && !app.latest_published_version;
+              return (
+                <button
+                  key={state}
+                  type="button"
+                  aria-pressed={previewState === state}
+                  disabled={disabled}
+                  title={disabled ? t('previewState.noPublishedVersion') : undefined}
+                  onClick={() => switchPreviewState(state)}
+                  className={cn(
+                    'h-7 rounded px-2 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-40',
+                    previewState === state ? 'bg-primary text-primary-foreground' : 'text-muted hover:bg-primary-soft hover:text-primary'
+                  )}
+                >
+                  {t(`previewState.${state}`)}
+                </button>
+              );
+            })}
+          </div>
           <div className="hidden items-center gap-1 rounded-md border border-border p-1 sm:flex">
             {(['ar', 'en'] as const).map((item) => (
               <button
@@ -497,53 +614,83 @@ export default function AppBuilderWorkspacePage() {
       {/* Desktop/tablet: three fixed panes. Below `lg`: canvas + a switchable structure/inspector pane, per the responsive admin baseline in APP-BUILDER-5-UX-EVIDENCE-PASS.md. */}
       <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
         <aside className="hidden w-60 shrink-0 overflow-hidden border-e border-border bg-surface lg:block">
-          {structurePanel}
+          {isDraftView ? structurePanel : readOnlyPagePanel}
         </aside>
 
-        <AppBuilderCanvas
-          root={currentPageRoot}
-          device={device}
-          locale={previewLocale}
-          selectedId={selectedComponentId}
-          onSelect={selectComponent}
-          themeTokens={previewThemeTokens ?? schemaThemeTokens(schema)}
-          registries={registries}
-        />
+        {isDraftView ? (
+          <AppBuilderCanvas
+            root={currentPageRoot}
+            device={device}
+            locale={previewLocale}
+            selectedId={selectedComponentId}
+            onSelect={selectComponent}
+            themeTokens={previewThemeTokens ?? schemaThemeTokens(schema)}
+            registries={registries}
+            stateBanner={t('previewState.draftBanner')}
+          />
+        ) : previewState === 'published' && publishedLoading ? (
+          <div className="flex h-full min-h-0 flex-1 items-center justify-center bg-background text-sm text-muted">{tc('loading')}</div>
+        ) : previewState === 'published' && publishedError ? (
+          <div className="flex h-full min-h-0 flex-1 items-center justify-center bg-background p-6 text-center text-sm text-negative">
+            {publishedError}
+          </div>
+        ) : (
+          <AppBuilderCanvas
+            root={viewedPageRoot}
+            device={device}
+            locale={previewLocale}
+            selectedId={null}
+            onSelect={() => {}}
+            themeTokens={viewedSchema ? schemaThemeTokens(viewedSchema) : undefined}
+            registries={registries}
+            stateBanner={
+              previewState === 'published'
+                ? t('previewState.publishedBanner', { version: publishedVersion?.version ?? 0 })
+                : t('previewState.defaultBanner')
+            }
+          />
+        )}
 
         <aside className="hidden w-72 shrink-0 overflow-hidden border-s border-border bg-surface lg:block">
-          {inspectorPanel}
+          {isDraftView ? inspectorPanel : readOnlyNotice}
         </aside>
 
         <div className="flex min-h-0 shrink-0 flex-col border-t border-border bg-surface lg:hidden" style={{ height: '38vh' }}>
-          <div className="flex shrink-0 border-b border-border">
-            <button
-              type="button"
-              onClick={() => setMobilePanel('structure')}
-              aria-current={mobilePanel === 'structure' ? 'page' : undefined}
-              className={cn(
-                'flex h-10 flex-1 items-center justify-center gap-1.5 text-xs font-medium',
-                mobilePanel === 'structure' ? 'border-b-2 border-primary text-primary' : 'text-muted'
-              )}
-            >
-              <LayoutPanelLeft className="h-3.5 w-3.5" strokeWidth={1.7} aria-hidden="true" />
-              {t('mobileStructureTab')}
-            </button>
-            <button
-              type="button"
-              onClick={() => setMobilePanel('inspector')}
-              aria-current={mobilePanel === 'inspector' ? 'page' : undefined}
-              className={cn(
-                'flex h-10 flex-1 items-center justify-center gap-1.5 text-xs font-medium',
-                mobilePanel === 'inspector' ? 'border-b-2 border-primary text-primary' : 'text-muted'
-              )}
-            >
-              <SlidersHorizontal className="h-3.5 w-3.5" strokeWidth={1.7} aria-hidden="true" />
-              {t('mobileInspectorTab')}
-            </button>
-          </div>
-          <div className="min-h-0 flex-1 overflow-y-auto">
-            {mobilePanel === 'structure' ? structurePanel : inspectorPanel}
-          </div>
+          {isDraftView ? (
+            <>
+              <div className="flex shrink-0 border-b border-border">
+                <button
+                  type="button"
+                  onClick={() => setMobilePanel('structure')}
+                  aria-current={mobilePanel === 'structure' ? 'page' : undefined}
+                  className={cn(
+                    'flex h-10 flex-1 items-center justify-center gap-1.5 text-xs font-medium',
+                    mobilePanel === 'structure' ? 'border-b-2 border-primary text-primary' : 'text-muted'
+                  )}
+                >
+                  <LayoutPanelLeft className="h-3.5 w-3.5" strokeWidth={1.7} aria-hidden="true" />
+                  {t('mobileStructureTab')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMobilePanel('inspector')}
+                  aria-current={mobilePanel === 'inspector' ? 'page' : undefined}
+                  className={cn(
+                    'flex h-10 flex-1 items-center justify-center gap-1.5 text-xs font-medium',
+                    mobilePanel === 'inspector' ? 'border-b-2 border-primary text-primary' : 'text-muted'
+                  )}
+                >
+                  <SlidersHorizontal className="h-3.5 w-3.5" strokeWidth={1.7} aria-hidden="true" />
+                  {t('mobileInspectorTab')}
+                </button>
+              </div>
+              <div className="min-h-0 flex-1 overflow-y-auto">
+                {mobilePanel === 'structure' ? structurePanel : inspectorPanel}
+              </div>
+            </>
+          ) : (
+            <div className="min-h-0 flex-1 overflow-y-auto">{readOnlyPagePanel}</div>
+          )}
         </div>
       </div>
 

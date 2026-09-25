@@ -415,6 +415,7 @@ export function AppBuilderCanvas({
   onSelect,
   themeTokens,
   registries = null,
+  stateBanner,
 }: {
   root: AppSchemaComponent | null;
   device: PreviewDevice;
@@ -423,6 +424,13 @@ export function AppBuilderCanvas({
   onSelect: (id: string) => void;
   themeTokens?: Record<string, string>;
   registries?: AppBuilderRegistries | null;
+  /**
+   * LIVE-PREVIEW-6 — نصّ حالة دائم الظهور (مسودة/منشورة/افتراضية) يعلو المحتوى، لا يعتمد
+   * على أي شرط داخلي كشارة البيانات التجريبية. الغرض هنا مختلف تماماً عن تلك الشارة: هذه
+   * تجيب «أيّ نسخة أرى الآن؟» بصرف النظر عن وجود ربط بيانات من عدمه — يُمرَّر من المستدعي
+   * (`builder/page.tsx`) لا يُحسَب هنا، لأن هذا الملف لا يعرف شيئاً عن حالات المسودة/النشر.
+   */
+  stateBanner?: string;
 }) {
   const t = useTranslations('appBuilder.builder');
 
@@ -441,6 +449,11 @@ export function AppBuilderCanvas({
         className="h-fit min-h-[480px] shrink-0 overflow-hidden rounded-lg border border-border bg-surface shadow-sm"
         onClick={() => root && onSelect(root.id)}
       >
+        {stateBanner ? (
+          <div className="border-b border-border bg-background px-3 py-1.5 text-center text-[11px] font-semibold text-text">
+            {stateBanner}
+          </div>
+        ) : null}
         {showSampleDataBanner ? (
           <div className="flex items-center gap-1.5 border-b border-border bg-primary-soft px-3 py-1.5 text-[11px] font-medium text-primary">
             <FlaskConical className="h-3.5 w-3.5 shrink-0" strokeWidth={1.8} aria-hidden="true" />
