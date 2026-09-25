@@ -47,8 +47,8 @@ Standing authority covers implementation, tests, commits, PRs, merging green dep
 | Task | Purpose | State |
 |---|---|---|
 | LIVE-PREVIEW-1 | Preview Contract Evidence Pass | **DONE / PASS** — see `LIVE-PREVIEW-1-EVIDENCE-PASS.md` |
-| LIVE-PREVIEW-2 | Preview / Runtime Semantic Parity Foundation | **IN REVIEW** — implemented, PR pending CI; see `LIVE-PREVIEW-2-PARITY-FOUNDATION.md` |
-| LIVE-PREVIEW-3 | Binding + Collection Preview Parity | BLOCKED on LP-2 merge |
+| LIVE-PREVIEW-2 | Preview / Runtime Semantic Parity Foundation | **DONE / PASS** — see `LIVE-PREVIEW-2-PARITY-FOUNDATION.md` |
+| LIVE-PREVIEW-3 | Binding + Collection Preview Parity | **DECISION GATE RAISED** — see durable state below |
 | LIVE-PREVIEW-4 | Action + Theme + Supported Visibility Parity | BLOCKED |
 | LIVE-PREVIEW-5 | Runtime-Aware Pre-Publish Validation | BLOCKED |
 | LIVE-PREVIEW-6 | Draft / Default / Published Preview States | BLOCKED |
@@ -187,19 +187,44 @@ The horizon is CLOSED / PASS only when evidence proves:
   the Theme panel's tokens have ~zero live effect on the shipped runtime today (key mismatch:
   Builder writes `primaryColor`, runtime reads `colorPrimary` from the bundled Default schema
   only, never from a tenant's published experience). No Decision Gate triggered (all 8 checked).
-- **LIVE-PREVIEW-2: implemented, PR pending CI** — full report:
-  `docs/plans/app-builder/LIVE-PREVIEW-2-PARITY-FOUNDATION.md`. Base SHA:
-  `fdfa0b34f5197c17f2da45b3bfad7a30bd124ed4`. Adds `web/src/modules/app-builder/runtime-contract.ts`
-  (a documented, narrow TypeScript port of `mobile/lib/app/binding_resolution.dart`'s binding
-  resolution + visibility evaluation — not yet wired into `canvas.tsx`, per the horizon's own
-  LP-2/LP-3 split), a single canonical conformance fixture
-  (`contracts/app-builder/binding-visibility-conformance.v1.json`, 23 cases) asserted from both
-  `web/src/modules/app-builder/runtime-contract.test.ts` and
+- **LIVE-PREVIEW-2: DONE / PASS** — full report:
+  `docs/plans/app-builder/LIVE-PREVIEW-2-PARITY-FOUNDATION.md`. PR #1014. Base SHA:
+  `fdfa0b34f5197c17f2da45b3bfad7a30bd124ed4`. **Merge SHA: `53bfc74dd7b6bc77fa4ff6fdf08bf0625ca136c9`**
+  (squash-merged; verified via `get_commit` against `main`). Adds
+  `web/src/modules/app-builder/runtime-contract.ts` (a documented, narrow TypeScript port of
+  `mobile/lib/app/binding_resolution.dart`'s binding resolution + visibility evaluation — not yet
+  wired into `canvas.tsx`, per the horizon's own LP-2/LP-3 split), a single canonical conformance
+  fixture (`contracts/app-builder/binding-visibility-conformance.v1.json`, 23 cases) asserted from
+  both `web/src/modules/app-builder/runtime-contract.test.ts` and
   `mobile/test/app/binding_visibility_conformance_test.dart`, both CI workflows' path triggers
   extended to cover the shared fixture, and an additive `AppSchemaBinding.collect` field on the
-  web schema type (was missing entirely). Web evidence green locally (297 files / 2105 tests,
-  `npm run build` clean); Dart/mobile side not runnable in this session (no local Flutter
-  toolchain) — **PR/CI is the authoritative verification**; merge SHA and CI result to be
-  recorded here once merged. No Decision Gate triggered; no capability broadened; fail-closed
-  semantics preserved (see the report's dedicated fixture cases).
-- Next task once LP-2 merges: **LIVE-PREVIEW-3 — Binding + Collection Preview Parity**.
+  web schema type (was missing entirely). **CI evidence (all green on PR head
+  `644ad7bffe53836b3b3b19c332bec64cbfb91dc9`, 12/12 check runs)**: `mobile (analyze + test)` ✅
+  (the authoritative confirmation that `binding_visibility_conformance_test.dart` passes —
+  unverifiable locally, no Flutter toolchain in-session), `mobile (Android/iOS release build
+  proof)` ✅, `web build (Next.js)` ✅, `php artisan test (L11, sqlite/pgsql)` ✅ (unaffected,
+  triggered because `ci.yml` has no path filter). No Decision Gate triggered; no capability
+  broadened; fail-closed semantics preserved (see the report's dedicated fixture cases).
+- **LIVE-PREVIEW-3 — Binding + Collection Preview Parity: DECISION GATE RAISED, not started.**
+  While scoping which data LP-3 should feed `resolveNodeBindings` for a live Preview render,
+  reading `app/Services/AppBuilder/DataResourceRegistry.php` found that `commerce.products`
+  resolves to `GET commerce/v1/products` (`CommerceProductController`) — the **public
+  `commerce/v1` storefront surface**, authenticated by `ResourceDefinition::AUTH_STORE_BEARER`
+  (a per-channel store-bearer token; the same surface the real Flutter runtime itself calls),
+  **not** the merchant's own Sanctum session the Builder UI is authenticated with. This is a
+  materially different situation from the one LIVE-PREVIEW-1 §11 anticipated and recommended
+  ("reuse the tenant-scoped, already-authorized commerce endpoints... exactly as `ThemePanel`'s
+  'Use my store design' flow already does") — that flow calls `commerce/workspace/*`
+  (`commerce.manage`-gated, same Sanctum auth as the rest of the app); there is no equivalent
+  Sanctum-authenticated internal endpoint already in use by the web app for reading
+  `commerce/v1/products`-shaped product data. Fetching genuinely live `commerce.products` data
+  into Preview would therefore require either (a) minting/forwarding a store-bearer token from
+  a merchant's Builder session (a new, security-sensitive auth path), or (b) a new
+  Sanctum-authenticated internal endpoint proxying `commerce/v1/products`-equivalent data (new
+  API surface). Both are exactly the shape of change the horizon's Decision Gates 5/6 exist to
+  catch ("material public schema/API contract change" / "Tenant Isolation, RBAC, or Commerce
+  authorization would need to change") — raised here rather than built silently. `commerce.cart`
+  has no merchant-session equivalent at all regardless of auth (there is no "current cart"
+  concept for a Builder editing session, and customer identity/cart is out of this horizon's
+  scope on its own terms). Recommendation and options are in the report handed back to the
+  owner alongside this update; LP-3 does not proceed until one is chosen.
