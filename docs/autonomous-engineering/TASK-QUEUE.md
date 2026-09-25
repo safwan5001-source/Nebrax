@@ -925,10 +925,10 @@ Source of truth for this horizon:
 | 2 | APP-BUILDER-14 | done | APP-BUILDER-13 | App Schema `binding` contract (parser + compatibility resolver) |
 | 3 | APP-BUILDER-15 | done (PR #998 merged) | APP-BUILDER-14 | Builder Data UX (Inspector binding editor) |
 | 4 | APP-BUILDER-16 | done (schema contract) | ADR-01 | Conditions/Visibility contract (closed/typed/allowlisted) + Inspector UX |
-| 5 | APP-BUILDER-17 | done (slices 1-3 merged; slice 3 owner-narrowed scope — see entry below) | APP-BUILDER-14 | Mobile runtime binding/visibility resolver (replaces 3 hand-written screen implementations) — split into parser support / compatibility gating / resolver mechanism, see entry below |
-| 6 | APP-BUILDER-18 | blocked (not promotable — see entry below) | APP-BUILDER-17 | Real action dispatch wired through schema bindings |
+| 5 | APP-BUILDER-17 | done (all slices 1-3c merged — see entry below) | APP-BUILDER-14 | Mobile runtime binding/visibility resolver (replaces 3 hand-written screen implementations) — split into parser support / compatibility gating / resolver mechanism / screen rewiring / server-side flip, see entry below |
+| 6 | APP-BUILDER-18 | done (PR #1007 merged — see entry below) | APP-BUILDER-17 | Real action dispatch wired through schema bindings |
 | 7 | APP-BUILDER-19 | done | ADR-01 (Decision Point 1 = YES) | Live publish → fetch → on-device-cache loop (Last Known Good) |
-| 8 | APP-BUILDER-20 | blocked (depends on 18) | APP-BUILDER-18, APP-BUILDER-19 | Same-Store integrated proof |
+| 8 | APP-BUILDER-20 | ready (18+19 both done) | APP-BUILDER-18, APP-BUILDER-19 | Same-Store integrated proof |
 | 9 | APP-BUILDER-21 | done (PR #997 merged) | none (independent, mandatory) | App Builder UX/localization pass |
 | 10 | APP-BUILDER-22 | done (PR #997 merged) | none (independent, mandatory) | Canvas + Flutter theme-token rendering fix |
 | 11 | APP-BUILDER-23 | blocked | all above | Horizon closure report |
@@ -1130,30 +1130,32 @@ into three independently-shippable slices (see the detailed slice breakdown in `
   condition ... is satisfied" — so `HomeScreen`/`CartScreen`/`ProductScreen` and the bundled schemas
   were **not** rewired; the mechanism is proven via constructed-manifest tests instead. Full detail in
   `CURRENT-STATE.md`'s matching entry.
-- **Slice 3b — screen rewiring + capability flip (not started, blocked on an operational milestone,
-  not evidence or a decision Claude can resolve)**: rewiring `HomeScreen`/`CartScreen` to call
-  `resolveNodeBindings`/`fetchBindingResource`, declaring real `binding`/`collect` on the bundled
-  schemas, and only once that ships in a verified mobile release, flipping
-  `RuntimeCapabilities.dataResources`/`schemaFeatures` non-empty on both PHP and Dart. This is the
-  queue's actual "APP-BUILDER-18 depends on 17" edge — and it is **not yet closed**: see the
-  `APP-BUILDER-18`/`APP-BUILDER-20` status update immediately below.
+- **Slice 3b — screen rewiring, done.** PR #1006 merged (squash SHA
+  `88612093de458d0b3b7a2d365c9fafc9a1451c9c`, confirmed single-parent squash onto `main`; post-merge
+  `Mobile CI` run `36131595231` green on all three jobs, including both Android/iOS release-build
+  proof jobs). Owner-directed staged proof sequence: `HomeScreen`/`CartScreen` rewired to call
+  `resolveNodeBindings`/`fetchBindingResource` for real; `kHomeSchemaJson`/`kCartSchemaJson` declare
+  real `binding`/`collect`; Dart-only `RuntimeCapabilities.dataResources`/`schemaFeatures` flipped to
+  exactly what those two bundled schemas use, with PHP's constants deliberately left untouched in
+  this PR. Full detail in `CURRENT-STATE.md`'s matching entry.
+- **Slice 3c — server-side capability flip + `APP-BUILDER-18`, done.** PR #1007 merged (squash SHA
+  `afaab2256c282bcf8928c4fc2a9eb93b413dfa5e`, confirmed single-parent squash onto `main`; post-merge
+  `ci.yml` run `36137485842` green on both `pgsql`/`sqlite`). Owner decision (2026-09-25), after a
+  requested narrow evidence pass: the "shipped, verified mobile release" milestone is satisfied by
+  this repository's own established Gate G/H precedent (the entire Mobile Runtime Proof V1 horizon
+  was already closed on CI-only evidence, no real device required), now independently re-met on PR
+  #1006's own merge commit. `RuntimeCapabilities::DATA_RESOURCES`/`SCHEMA_FEATURES` (PHP) flipped to
+  mirror Dart exactly; `ActionRegistry`'s `openProduct`/`updateCartQuantity`/`removeCartItem` flipped
+  to a new `DISPATCH_LIVE` status. A separate, explicitly recorded operational requirement obligates
+  real-device verification before the first actual mobile distribution — not a blocker for this
+  horizon. Full detail, including the four-part evidence-pass reasoning, in `CURRENT-STATE.md`'s
+  matching entry.
 
-**`APP-BUILDER-18`/`APP-BUILDER-20` re-evaluated against this new evidence and found not promotable —
-moved to `blocked`, not `ready`.** The table above pre-recorded both as "ready (after 17)"/"ready
-(after 18+19)" under the assumption that finishing `APP-BUILDER-17` would include screen rewiring +
-the capability flip (slice 3b above). `APP-BUILDER-18`'s own Definition of Done (evidence doc §3.4):
-"once an action is reachable end-to-end through a bound, schema-declared path,"
-`ActionRegistry.dispatchStatus` updates to a new `DISPATCH_LIVE` status. The action *is* now provably
-reachable through a bound path — in tests, against a manifest simulating a shipped runtime — but not
-through the actually-shipped app, since no shipped screen declares `binding` yet (slice 3b, above,
-undone). Marking `dispatchStatus` `DISPATCH_LIVE` today would misrepresent the Inspector's own status
-signal to App Builder authors. This is not a new product/architecture decision to escalate — it is the
-same "shipped/proven mobile-runtime" operational precondition slice 3 already named, which this coding
-session cannot manufacture or attest to (no owner has declared a mobile release live). `APP-BUILDER-20`
-inherits the same block through its `APP-BUILDER-18` dependency. No further row in this table is
-`ready`: `APP-BUILDER-21`/`22` are already `done`; `APP-BUILDER-23`'s own row already reads `blocked`
-("all above"). Per `AWJ-HORIZON-SYSTEM.md`'s continue-only-independent-ready-work rule, this session
-stops here rather than force either row forward.
+**`APP-BUILDER-18`/`APP-BUILDER-20` re-evaluated against this new evidence.** `APP-BUILDER-17` is now
+fully `done` across all slices. `APP-BUILDER-18` is `done` (PR #1007). `APP-BUILDER-20` (Same-Store
+integrated proof) is now `ready`: both its dependencies (`APP-BUILDER-18`, `APP-BUILDER-19`) are
+`done`. `APP-BUILDER-21`/`22` are already `done`. `APP-BUILDER-23`'s own row remains `blocked` on
+`APP-BUILDER-20`.
 
 `APP-BUILDER-19` (live publish → fetch → on-device-cache loop) is `done` — independent of
 `APP-BUILDER-17`/`18` (only ADR-01 itself), so correctly buildable ahead of either. Wires real I/O
