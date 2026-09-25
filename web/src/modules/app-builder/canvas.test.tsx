@@ -5,8 +5,13 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { AppSchemaComponent } from '@/lib/app-builder';
 import { AppBuilderCanvas } from './canvas';
 
+const TRANSLATIONS: Record<string, string> = {
+  sampleDataBanner: 'Sample data — not your real store data',
+  visibilityUnsupportedBadge: 'Visibility condition not yet active',
+};
+
 vi.mock('next-intl', () => ({
-  useTranslations: () => (key: string) => (key === 'sampleDataBanner' ? 'Sample data — not your real store data' : key),
+  useTranslations: () => (key: string) => TRANSLATIONS[key] ?? key,
   useLocale: () => 'en',
 }));
 
@@ -134,5 +139,72 @@ describe('AppBuilderCanvas — LIVE-PREVIEW-3 binding resolution', () => {
 
     expect(screen.getByText('يدوي')).toBeTruthy();
     expect(screen.queryByText('Sample data — not your real store data')).toBeNull();
+  });
+});
+
+describe('AppBuilderCanvas — LIVE-PREVIEW-4 action inert/wired parity', () => {
+  it('dims an actionable component with no attached action, matching the real runtime\'s inert state', () => {
+    const root: AppSchemaComponent = {
+      type: 'Page',
+      id: 'home-root',
+      children: [{ type: 'Button', id: 'btn-1', props: { label: 'بلا فعل' } }],
+    };
+
+    render(<AppBuilderCanvas root={root} device="mobile" locale="en" selectedId={null} onSelect={vi.fn()} />);
+
+    const wrapper = screen.getByText('بلا فعل').closest('[role="button"]');
+    expect(wrapper?.className).toContain('opacity-50');
+  });
+
+  it('does not dim an actionable component that has an attached action', () => {
+    const root: AppSchemaComponent = {
+      type: 'Page',
+      id: 'home-root',
+      children: [
+        { type: 'Button', id: 'btn-2', props: { label: 'مع فعل' }, action: { type: 'navigate', params: { pageId: 'home' } } },
+      ],
+    };
+
+    render(<AppBuilderCanvas root={root} device="mobile" locale="en" selectedId={null} onSelect={vi.fn()} />);
+
+    const wrapper = screen.getByText('مع فعل').closest('[role="button"]');
+    expect(wrapper?.className).not.toContain('opacity-50');
+  });
+});
+
+describe('AppBuilderCanvas — LIVE-PREVIEW-4 visibility stays explicit, never simulated', () => {
+  it('shows an unsupported-visibility badge and still always renders the node — never conditionally hides it', () => {
+    const root: AppSchemaComponent = {
+      type: 'Page',
+      id: 'home-root',
+      children: [
+        {
+          type: 'Text',
+          id: 'txt-conditional',
+          props: { text: 'نص مشروط' },
+          visibility: { signal: 'cart.itemCount', operator: 'gt', value: 0 },
+        },
+      ],
+    };
+
+    // No cart/customer/product signal is ever supplied to AppBuilderCanvas at all — proving
+    // the condition is never evaluated, only flagged, regardless of what it says.
+    render(<AppBuilderCanvas root={root} device="mobile" locale="en" selectedId={null} onSelect={vi.fn()} />);
+
+    expect(screen.getByText('نص مشروط')).toBeTruthy();
+    expect(screen.getByText('Visibility condition not yet active')).toBeTruthy();
+  });
+
+  it('shows no badge for a node without a visibility condition', () => {
+    const root: AppSchemaComponent = {
+      type: 'Page',
+      id: 'home-root',
+      children: [{ type: 'Text', id: 'txt-plain', props: { text: 'نص عادي' } }],
+    };
+
+    render(<AppBuilderCanvas root={root} device="mobile" locale="en" selectedId={null} onSelect={vi.fn()} />);
+
+    expect(screen.getByText('نص عادي')).toBeTruthy();
+    expect(screen.queryByText('Visibility condition not yet active')).toBeNull();
   });
 });

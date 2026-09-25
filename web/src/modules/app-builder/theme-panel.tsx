@@ -151,6 +151,12 @@ export function ThemePanel({
 
   return (
     <div className="space-y-5 p-3">
+      {/* LIVE-PREVIEW-4 — نفس نمط `binding.runtimeNote`/`visibility.runtimeNote`: قدرة
+          محرَّرة الآن بأمان بنيوياً، لكن لا أثر لها بعد على التطبيق الحقيقي — يظهر هنا
+          دوماً (لا يحتاج شرطاً كالربط/الظهور) لأن قسم المظهر متاح دون اختيارٍ مسبق. */}
+      <p className="rounded border border-border bg-background px-2.5 py-2 text-[11px] leading-relaxed text-muted">
+        {t('runtimeNote')}
+      </p>
       <div>
         <p className="mb-2 text-xs font-medium text-muted">{t('presetTitle')}</p>
         <div className="grid grid-cols-3 gap-2">

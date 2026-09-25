@@ -6870,6 +6870,7 @@
       "initialPageBadge": "Home",
       "emptyPage": "Empty page",
       "sampleDataBanner": "Sample data — shows how data binding renders, not your real store data",
+      "visibilityUnsupportedBadge": "Visibility condition not yet active",
       "pages": {
         "addAction": "Add page",
         "setHomeLabel": "Set as home page",
@@ -6958,6 +6959,7 @@
       "theme": {
         "tabLabel": "Theme",
         "tabDescription": "Edit the app's color, corner radius, density, and product card style. Stored as free-form tokens in the schema — not yet gated by any runtime capability/compatibility check.",
+        "runtimeNote": "Not yet active in the mobile app — a published experience's colors are not applied to the real app's appearance yet. Safe to set up now; it will take effect once published-experience theming is wired into the mobile app.",
         "presetTitle": "Presets",
         "preset": {
           "awj-modern": "AWJ Modern",
