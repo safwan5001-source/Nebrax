@@ -29,12 +29,12 @@ namespace App\Services\AppBuilder;
  * اليوم كان سيكون افتراضياً بلا سياق تشغيلي حقيقي. `commerce.promotions` غير
  * موجود إطلاقاً كمورد خلفي — لا endpoint له على `commerce/v1` اليوم.
  *
- * `RESOURCES` (هوية + إصدار) يوازي نمط `RuntimeCapabilities::COMPONENTS`/`ACTIONS`
- * تمهيداً لِـ`APP-BUILDER-14` حين يُضاف فضاء `dataResources` فعلي إلى
- * `RuntimeCapabilities`/`CapabilityManifest` للتحقّق البنيوي وقت النشر. هذا
- * الصنف نفسه **لا يغيّر بعد** أي سلوك في `AppSchemaParser`/`CompatibilityResolver`
- * — تماماً كما كانت حال `ComponentRegistry`/`ActionRegistry` بعد APP-BUILDER-3
- * قبل أن يُربَطا لاحقاً بالتحقّق الفعلي.
+ * `RESOURCES` (هوية + إصدار) يوازي نمط `RuntimeCapabilities::COMPONENTS`/`ACTIONS`.
+ * **هذا الصنف نفسه لا يمثّل ما يستهلكه التشغيل المُثبَت فعلياً** — ذلك حصراً
+ * `RuntimeCapabilities::DATA_RESOURCES` (`APP-BUILDER-17`)، الذي يقتصر اليوم
+ * على `commerce.products`/`commerce.cart` فقط رغم أن هذا السجلّ يعرف
+ * `commerce.categories` أيضاً بنيوياً — فجوةٌ مقصودة لا سهو: معرفة الخادم
+ * بمورد لا تعني تلقائياً أن أي بناء جوال مُثبَت يعرضه.
  */
 final class DataResourceRegistry
 {

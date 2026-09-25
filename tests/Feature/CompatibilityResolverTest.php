@@ -213,22 +213,26 @@ class CompatibilityResolverTest extends TestCase
     }
 
     /** @test */
-    public function a_binding_on_the_current_runtime_is_unsupported_since_no_data_resource_is_consumed_yet(): void
+    public function a_binding_on_a_runtime_that_declares_no_data_resources_is_unsupported(): void
     {
+        // `CapabilityManifest::current()` now declares `commerce.products`
+        // (APP-BUILDER-17 slice 3c) -- an explicit "no resources" manifest
+        // simulates an older, pre-flip runtime instead, so this fail-closed
+        // path stays exercised.
         $schema = $this->baseSchema();
         $schema['pages']['home']['children'][] = [
             'type' => 'ProductList', 'id' => 'p1',
             'binding' => ['resource' => 'commerce.products'],
         ];
 
-        $result = $this->resolver()->resolve($schema, CapabilityManifest::current());
+        $result = $this->resolver()->resolve($schema, $this->manifestWithResources([]));
 
         $this->assertFalse($result->compatible);
         $this->assertSame(CompatibilityResult::REASON_MISSING_REQUIRED_CAPABILITY, $result->reason);
     }
 
     /** @test */
-    public function an_optional_binding_unsupported_on_current_runtime_is_pruned_not_fatal(): void
+    public function an_optional_binding_unsupported_on_a_runtime_with_no_data_resources_is_pruned_not_fatal(): void
     {
         $schema = $this->baseSchema();
         $schema['pages']['home']['children'][] = [
@@ -236,10 +240,75 @@ class CompatibilityResolverTest extends TestCase
             'binding' => ['resource' => 'commerce.products'],
         ];
 
-        $result = $this->resolver()->resolve($schema, CapabilityManifest::current());
+        $result = $this->resolver()->resolve($schema, $this->manifestWithResources([]));
 
         $this->assertTrue($result->compatible);
         $this->assertCount(1, $result->fallbacks);
+    }
+
+    /**
+     * `APP-BUILDER-17` slice 3c guard rail: the constants this whole test
+     * class exercises through `CapabilityManifest::current()` must stay
+     * exactly what the shipped mobile build (`registry_identifiers.dart`,
+     * PR #1006) actually proved it consumes -- no more (`commerce.categories`
+     * stays out even though `DataResourceRegistry` knows it structurally)
+     * and no less.
+     *
+     * @test
+     */
+    public function the_current_runtime_declares_exactly_the_data_resources_and_schema_features_the_shipped_mobile_build_proved(): void
+    {
+        $this->assertSame(
+            ['commerce.products' => 1, 'commerce.cart' => 1],
+            RuntimeCapabilities::DATA_RESOURCES,
+        );
+        $this->assertSame(['binding.collect' => 1], RuntimeCapabilities::SCHEMA_FEATURES);
+        $this->assertArrayNotHasKey('visibility', RuntimeCapabilities::SCHEMA_FEATURES);
+    }
+
+    /**
+     * `APP-BUILDER-17` slice 3c: the exact binding the mobile app now really
+     * resolves end-to-end (PR #1006's `ProductList`/`commerce.products`
+     * wiring in `kHomeSchemaJson`) is compatible on the runtime this server
+     * actually publishes against today -- proving the flip is live, not
+     * just declared.
+     *
+     * @test
+     */
+    public function a_binding_to_commerce_products_is_compatible_on_the_current_shipped_runtime(): void
+    {
+        $schema = $this->baseSchema();
+        $schema['pages']['home']['children'][] = [
+            'type' => 'ProductList', 'id' => 'p1',
+            'binding' => ['resource' => 'commerce.products', 'itemProps' => ['title' => 'name']],
+        ];
+
+        $result = $this->resolver()->resolve($schema, CapabilityManifest::current());
+
+        $this->assertTrue($result->compatible);
+        $this->assertSame([], $result->fallbacks);
+    }
+
+    /**
+     * Mirrors the mobile build's own proven `CartList`/`commerce.cart`
+     * `collect: "items"` wiring (`kCartSchemaJson`, PR #1006) -- the collect
+     * gate is now open on the runtime this server actually publishes
+     * against, not only on a manifest simulating a future one.
+     *
+     * @test
+     */
+    public function a_collect_binding_to_commerce_cart_items_is_compatible_on_the_current_shipped_runtime(): void
+    {
+        $schema = $this->baseSchema();
+        $schema['pages']['home']['children'][] = [
+            'type' => 'CartList', 'id' => 'c1',
+            'binding' => ['resource' => 'commerce.cart', 'collect' => 'items'],
+        ];
+
+        $result = $this->resolver()->resolve($schema, CapabilityManifest::current());
+
+        $this->assertTrue($result->compatible);
+        $this->assertSame([], $result->fallbacks);
     }
 
     /** @test */

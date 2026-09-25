@@ -20,8 +20,8 @@ final class CapabilityManifest
      * @param  array<string, int>  $components
      * @param  array<string, int>  $actions
      * @param  array<string, int>  $nativeCapabilities
-     * @param  array<string, int>  $dataResources  `APP-BUILDER-14` (`ADR-01`) — ما يستهلكه Flutter Runtime المُثبَت فعلياً من `DataResourceRegistry`؛ فارغ حتى `APP-BUILDER-17`، انظر `RuntimeCapabilities::DATA_RESOURCES`.
-     * @param  array<string, int>  $schemaFeatures  `APP-BUILDER-16` (`ADR-01`) — ميزات مخطط مستهلَكة فعلياً (مثال: `visibility`)؛ فارغ حتى `APP-BUILDER-17`، انظر `RuntimeCapabilities::SCHEMA_FEATURES`.
+     * @param  array<string, int>  $dataResources  `APP-BUILDER-14`/`17` (`ADR-01`) — ما يستهلكه Flutter Runtime المُثبَت فعلياً من `DataResourceRegistry`؛ انظر `RuntimeCapabilities::DATA_RESOURCES`.
+     * @param  array<string, int>  $schemaFeatures  `APP-BUILDER-16`/`17` (`ADR-01`) — ميزات مخطط مستهلَكة فعلياً (مثال: `binding.collect`)؛ انظر `RuntimeCapabilities::SCHEMA_FEATURES`.
      */
     public function __construct(
         public readonly SchemaVersion $runtimeVersion,
