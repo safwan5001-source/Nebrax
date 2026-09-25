@@ -1,5 +1,6 @@
 import 'app_schema.dart';
 import 'capability_manifest.dart';
+import 'visibility_vocabulary.dart';
 
 /// Why a schema was found incompatible with a runtime's capability manifest.
 enum IncompatibilityReason {
@@ -134,7 +135,9 @@ class CompatibilityResolver {
     List<FallbackNote> fallbacks,
   ) {
     final unsupportedHere = manifest.componentVersion(node.type) == null ||
-        (node.action != null && manifest.actionVersion(node.action!.type) == null);
+        (node.action != null && manifest.actionVersion(node.action!.type) == null) ||
+        (node.binding != null && !_bindingSupported(node.binding!, manifest)) ||
+        (node.visibility != null && !_visibilitySupported(node.visibility!, manifest));
     if (unsupportedHere) return null;
 
     final resolvedChildren = <SchemaComponent>[];
@@ -156,6 +159,63 @@ class CompatibilityResolver {
     }
 
     return node.withChildren(resolvedChildren);
+  }
+
+  /// `APP-BUILDER-17` slice 2 — capability gating only, mirroring
+  /// `CompatibilityResolver::bindingSupported`'s (PHP) *capability* check.
+  ///
+  /// The fuller structural checks that PHP method also does — the resource
+  /// exists in `DataResourceRegistry`, the component's own registry entry
+  /// allows binding to it, `itemProps`/`query` name fields/params the
+  /// resource actually exposes — depend on a real Data Resource Registry +
+  /// Component Registry existing on this runtime. Neither exists in Dart
+  /// yet, and since [CapabilityManifest.dataResources] stays empty until
+  /// slice 3 (see its own doc comment), every one of those structural
+  /// checks would be moot today regardless of their answer: this capability
+  /// gate alone already makes every `binding` node "unsupported," exactly
+  /// matching PHP's net effect while `RuntimeCapabilities.dataResources` is
+  /// empty on both sides. Building the fuller check now would duplicate
+  /// work slice 3 needs to do anyway when it adds those registries to wire
+  /// the real `commerce/v1` consumption they exist to serve — port the
+  /// fuller check here at that point, never flip
+  /// `RuntimeCapabilities.dataResources` non-empty without it.
+  bool _bindingSupported(SchemaBinding binding, CapabilityManifest manifest) {
+    return manifest.resourceVersion(binding.resource) != null;
+  }
+
+  /// `APP-BUILDER-17` slice 2 — mirrors `CompatibilityResolver::visibilitySupported`
+  /// (PHP) exactly: the capability gate first (`schemaFeatureVersion`,
+  /// empty until slice 3), then full semantic validity of the condition
+  /// tree regardless of the capability gate's answer — unlike
+  /// [_bindingSupported], this one has no undone-registry dependency, so
+  /// there is nothing to defer.
+  bool _visibilitySupported(VisibilityNode visibility, CapabilityManifest manifest) {
+    return manifest.schemaFeatureVersion('visibility') != null && _visibilityConditionValid(visibility);
+  }
+
+  /// Mirrors `CompatibilityResolver::visibilityConditionValid` (PHP)
+  /// exactly: a group node is valid iff every branch is; a leaf node is
+  /// valid iff its signal/operator are both in the closed vocabularies and
+  /// its `value` presence/shape matches that operator's arity.
+  bool _visibilityConditionValid(VisibilityNode condition) {
+    if (condition.combinator != null) {
+      return condition.branches.every(_visibilityConditionValid);
+    }
+
+    final signal = condition.signal;
+    final operatorName = condition.operatorName;
+    if (!VisibilitySignal.all.contains(signal) || !VisibilityOperator.all.contains(operatorName)) {
+      return false;
+    }
+
+    if (VisibilityOperator.noValue.contains(operatorName)) {
+      return !condition.hasValue;
+    }
+    if (VisibilityOperator.listValue.contains(operatorName)) {
+      final value = condition.value;
+      return condition.hasValue && value is List && value.isNotEmpty;
+    }
+    return condition.hasValue && condition.value is! List;
   }
 }
 

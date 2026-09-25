@@ -22,6 +22,18 @@ class CapabilityManifest {
   final Map<String, int> actions;
   final Map<String, int> nativeCapabilities;
 
+  /// `APP-BUILDER-13`/`17` (`ADR-01`) — what this runtime build actually
+  /// consumes from `DataResourceRegistry` via a real `binding` resolution.
+  /// See `RuntimeCapabilities.dataResources`'s own doc comment for why this
+  /// stays empty until slice 3.
+  final Map<String, int> dataResources;
+
+  /// `APP-BUILDER-16`/`17` (`ADR-01`) — schema features (e.g. `visibility`)
+  /// this runtime build actually evaluates. See
+  /// `RuntimeCapabilities.schemaFeatures`'s own doc comment for why this
+  /// stays empty until slice 3.
+  final Map<String, int> schemaFeatures;
+
   const CapabilityManifest({
     required this.platform,
     required this.runtimeVersion,
@@ -30,6 +42,8 @@ class CapabilityManifest {
     required this.components,
     required this.actions,
     this.nativeCapabilities = const {},
+    this.dataResources = const {},
+    this.schemaFeatures = const {},
   });
 
   /// This exact runtime build's manifest — the only constructor production
@@ -45,12 +59,22 @@ class CapabilityManifest {
       components: RuntimeCapabilities.components,
       actions: RuntimeCapabilities.actions,
       nativeCapabilities: RuntimeCapabilities.nativeCapabilities,
+      dataResources: RuntimeCapabilities.dataResources,
+      schemaFeatures: RuntimeCapabilities.schemaFeatures,
     );
   }
 
   int? componentVersion(String type) => components[type];
 
   int? actionVersion(String type) => actions[type];
+
+  /// `APP-BUILDER-13`/`17` — mirrors [componentVersion]/[actionVersion] for
+  /// the data-resource identity space.
+  int? resourceVersion(String id) => dataResources[id];
+
+  /// `APP-BUILDER-16`/`17` — mirrors [resourceVersion] for the schema-feature
+  /// identity space (e.g. `'visibility'`).
+  int? schemaFeatureVersion(String key) => schemaFeatures[key];
 
   /// A required-capability key (`AppSchema.requiredCapabilities`) may name
   /// either a component or an action identifier — the horizon's own example
@@ -73,6 +97,10 @@ class CapabilityManifest {
   /// added the third namespace this doc comment anticipated
   /// ([nativeCapabilities]) once a real need — push routing — appeared;
   /// this also checks that map, in the same undistinguished style.
+  /// `APP-BUILDER-17` slice 2 adds the fourth and fifth namespaces
+  /// ([dataResources]/[schemaFeatures]) for the exact same reason — matches
+  /// `CapabilityManifest::namedCapabilityVersion` (PHP) fallback order
+  /// literally.
   int? namedCapabilityVersion(String key) =>
-      actions[key] ?? components[key] ?? nativeCapabilities[key];
+      actions[key] ?? components[key] ?? nativeCapabilities[key] ?? dataResources[key] ?? schemaFeatures[key];
 }

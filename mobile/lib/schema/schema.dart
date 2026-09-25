@@ -12,3 +12,4 @@ export 'capability_manifest.dart';
 export 'compatibility.dart';
 export 'registry_identifiers.dart';
 export 'schema_version.dart';
+export 'visibility_vocabulary.dart';

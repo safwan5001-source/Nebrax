@@ -647,16 +647,40 @@ ahead of a verified, shipped mobile release. Slicing:
   `APP-BUILDER-19`). 15 new Dart tests in `mobile/test/schema/schema_binding_visibility_test.dart`,
   mirroring `AppSchemaParserTest.php`'s binding/visibility coverage case-for-case. **Not verified
   locally** (no Flutter SDK); relies on CI.
-- **Slice 2 (not started)** — Dart `RuntimeCapabilities`/`CapabilityManifest` gain `dataResources`/
-  `schemaFeatures` maps and `CompatibilityResolver` gains `bindingSupported()`/`visibilitySupported()`
-  checks mirroring the PHP resolver, **kept empty/unsupported** (matching PHP's own still-empty
-  `DATA_RESOURCES`/`SCHEMA_FEATURES`) so a schema with binding/visibility is correctly pruned
-  (optional) or rejected (required) by this runtime build — closing slice 1's "parses but isn't
-  gated" dormancy before slice 3 makes it do anything. Important ordering note for whoever picks this
-  up: **slice 2 must land before slice 3's server-side capability flip**, not after — flipping
+- **Slice 2 — compatibility gating, done.** `mobile/lib/schema/registry_identifiers.dart`'s
+  `RuntimeCapabilities` gains `dataResources`/`schemaFeatures` maps (**both empty by design, still**
+  — mirrors `RuntimeCapabilities::DATA_RESOURCES`/`SCHEMA_FEATURES` (PHP) literally, same reasoning:
+  no component here resolves a real `binding` or evaluates a real `visibility` tree yet). `mobile/lib/
+  schema/capability_manifest.dart`'s `CapabilityManifest` gains matching `dataResources`/
+  `schemaFeatures` fields, `resourceVersion()`/`schemaFeatureVersion()` accessors, and
+  `namedCapabilityVersion()`'s fallback order extended to both — mirrors `CapabilityManifest` (PHP)
+  literally. New `mobile/lib/schema/visibility_vocabulary.dart` ports `VisibilitySignal`/
+  `VisibilityOperator`'s closed vocabularies (PHP) into Dart — needed only by the *semantic* half of
+  visibility validity, which has no registry dependency, unlike binding.
+  `mobile/lib/schema/compatibility.dart`'s `CompatibilityResolver._resolveComponent` now also treats
+  an unsupported `binding`/`visibility` exactly like an unsupported component/action: pruned if
+  optional, fails the whole document closed if required — closing slice 1's "parses but isn't gated"
+  dormancy. **Deliberate scope reduction, recorded explicitly**: `_bindingSupported()` is a
+  capability-gate-only check (`manifest.resourceVersion(binding.resource) != null`) — it does **not**
+  port `CompatibilityResolver::bindingSupported()`'s (PHP) fuller structural checks (resource exists
+  in `DataResourceRegistry`, the component's registry entry allows binding to it, `itemProps`/`query`
+  name real fields/params), because those depend on a Data Resource Registry + Component Registry
+  that don't exist in Dart yet, and since `dataResources` stays empty, every one of those checks would
+  be moot today regardless of their answer — the capability gate alone already produces PHP's identical
+  net effect. Building those registries now would duplicate slice 3's own job (it needs them anyway to
+  wire the real `commerce/v1` consumption they exist to serve); port the fuller check there instead.
+  `_visibilitySupported()`/`_visibilityConditionValid()` **are** fully ported (capability gate +
+  complete semantic validity — signal/operator vocabulary, value arity per operator), since neither
+  needs an undone registry. 24 new/updated Dart tests in `mobile/test/schema/compatibility_test.dart`
+  mirroring `CompatibilityResolverTest.php`'s binding/visibility-gating coverage case-for-case (the
+  scope-appropriate subset — the PHP tests that depend on `DataResourceRegistry`/`ComponentRegistry`
+  structural checks have no Dart equivalent yet, by the same deliberate deferral above), plus a guard-
+  rail test asserting `CapabilityManifest.current()` still reports both maps empty. **Not verified
+  locally** (no Flutter SDK); relies on CI. Important ordering note for whoever picks up slice 3:
+  **slice 2 must land before slice 3's server-side capability flip**, not after — flipping
   `RuntimeCapabilities::DATA_RESOURCES`/`SCHEMA_FEATURES` server-side while an already-installed
-  mobile build only has slice 1 (parses but never gates or resolves) would let that old build accept
-  a binding/visibility node as "compatible" while silently doing nothing with it.
+  mobile build only had slice 1 (parses but never gated or resolved) would have let that old build
+  accept a binding/visibility node as "compatible" while silently doing nothing with it.
 - **Slice 3 (not started)** — the actual resource-fetch + visibility-evaluation layer (mapping
   `binding.resource` to the right `CommerceClient` call, `itemProps` to node props, evaluating
   `VisibilitySignal`/`VisibilityOperator` against live cart/auth/stock state), rewiring
