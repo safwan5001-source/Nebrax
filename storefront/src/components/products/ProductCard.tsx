@@ -4,11 +4,13 @@ import type { Product } from "@spree/sdk";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { memo, useState } from "react";
+import { usePublishedProductCard } from "@/components/layout/PublishedCardStyle";
 import { HiddenPricePrompt } from "@/components/products/HiddenPricePrompt";
 import { WishlistButton } from "@/components/products/WishlistButton";
 import { ProductImage } from "@/components/ui/product-image";
 import { useCart } from "@/contexts/CartContext";
 import { trackSelectItem } from "@/lib/analytics/gtm";
+import { publishedProductCardBodyClass } from "@/lib/presentation/public-rhythm";
 
 interface ProductCardProps {
   product: Product;
@@ -33,6 +35,7 @@ export const ProductCard = memo(function ProductCard({
   currency,
 }: ProductCardProps) {
   const t = useTranslations("products");
+  const cardStyle = usePublishedProductCard();
   const { addItem, surface } = useCart();
   const [adding, setAdding] = useState(false);
   const imageUrl = product.thumbnail_url || null;
@@ -105,7 +108,10 @@ export const ProductCard = memo(function ProductCard({
       </div>
 
       {/* Content */}
-      <div className="flex grow flex-col p-3">
+      <div
+        data-card-body=""
+        className={publishedProductCardBodyClass(cardStyle)}
+      >
         {categoryName && (
           <span className="mb-0.5 line-clamp-1 text-[0.625rem] font-medium text-store-muted-foreground">
             {categoryName}

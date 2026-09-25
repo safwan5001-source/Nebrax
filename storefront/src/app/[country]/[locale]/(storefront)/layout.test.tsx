@@ -43,6 +43,7 @@ vi.mock("@/components/layout/StoreWhatsApp", () => ({
 import { Footer } from "@/components/layout/Footer";
 import { Header } from "@/components/layout/Header";
 import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
+import { PublishedCardStyleProvider } from "@/components/layout/PublishedCardStyle";
 import StorefrontLayout from "./layout";
 
 interface LayoutElementProps {
@@ -75,7 +76,9 @@ describe("StorefrontLayout", () => {
 
     expect(header.type).toBe(Header);
     expect(main.type).toBe("main");
-    expect(main.props.children).toBe(content);
+    expect(main.props.children.type).toBe(PublishedCardStyleProvider);
+    expect(main.props.children.props.productCard).toBe("standard");
+    expect(main.props.children.props.children).toBe(content);
     expect(footer.type).toBe(Footer);
 
     const mobileNavigation = header.props.mobileNavigation;
