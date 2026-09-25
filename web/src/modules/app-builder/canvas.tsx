@@ -2,17 +2,28 @@
 
 import * as React from 'react';
 import { useLocale, useTranslations } from 'next-intl';
-import { ImageOff, ShoppingCart } from 'lucide-react';
+import { FlaskConical, ImageOff, ShoppingCart } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatRiyal } from '@/lib/money';
 import { registryLabel, type AppBuilderRegistries, type AppSchemaComponent } from '@/lib/app-builder';
 import { presentationCssVars, radiusToken, RADIUS_PRESETS, type RadiusId } from '@/modules/store-experience-builder/presentation/tokens';
+import { resolveNodeBindings } from './runtime-contract';
+import { SAMPLE_RESOURCE_DATA } from './sample-resource-data';
 
 /**
  * APP-BUILDER-5 — عرض تقريبي إطاري-محايد (React/Tailwind) لعقدة مخطط، لا رسم Flutter
  * حرفي (AB-11: «Builder إطاريّ فقط عند حدّ قدرة التشغيل»). قراءة فقط — لا تحرير هنا
  * (APP-BUILDER-6). كل قراءة خاصية دفاعية بنفس منطق `component_widgets.dart` الحقيقي:
  * خاصية غائبة أو بنوع خطأ تسقط لقيمة افتراضية آمنة، لا استثناء.
+ *
+ * **LIVE-PREVIEW-3** — الشجرة المعروضة فعلياً هي ناتج `resolveNodeBindings` (مطابقة
+ * `binding_resolution.dart`، `./runtime-contract`) مطبَّقاً على المخطط الأصلي ببيانات
+ * تجريبية (`./sample-resource-data`) — لا جلب حيّ، ولا رمز حامل متجر (قرار المالك
+ * الموثَّق في `AWJ_APP_BUILDER_LIVE_RUNTIME_PREVIEW_V1.md`). العقد المولَّدة من تكرار
+ * `binding.collect` تحمل معرّفات مركّبة غير موجودة في المخطط الأصلي — ولا حتى معرّف
+ * القالب المُستهلَك نفسه، إذ تستبدله N نسخة. التحديد للنقر عليها يُسنَد لأقرب سلفٍ
+ * معروف فعلاً في المخطط الأصلي (`knownIds`/`selectFallbackId`) بدل معرّفها الاصطناعي
+ * — عملياً عقدة الربط الحاوية (`ProductList`/`CartList`) نفسها، لا القالب المختفي.
  */
 
 export const PREVIEW_WIDTHS = { mobile: 390, tablet: 768, desktop: 1280 } as const;
@@ -31,6 +42,19 @@ function intProp(node: AppSchemaComponent, key: string, fallback = 0): number {
 function stringListProp(node: AppSchemaComponent, key: string): string[] {
   const value = node.props?.[key];
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
+}
+
+/** يجمع كل معرّفات عقد المخطط **الأصلي** (قبل حلّ الربط) — مرجع «ما هو حقيقي وقابل للتحرير». */
+function collectIds(node: AppSchemaComponent, into: Set<string>): Set<string> {
+  into.add(node.id);
+  for (const child of node.children ?? []) collectIds(child, into);
+  return into;
+}
+
+/** هل تحمل الشجرة عقدة ربط واحدة على الأقل — يقرّر ظهور شارة «بيانات تجريبية». */
+function hasAnyBinding(node: AppSchemaComponent): boolean {
+  if (node.binding) return true;
+  return (node.children ?? []).some(hasAnyBinding);
 }
 
 function TypeTag({ type, label, selected }: { type: string; label: string; selected: boolean }) {
@@ -55,6 +79,7 @@ function TypeTag({ type, label, selected }: { type: string; label: string; selec
  */
 function NodeFrame({
   node,
+  selectId,
   selected,
   onSelect,
   className,
@@ -62,6 +87,9 @@ function NodeFrame({
   registries,
 }: {
   node: AppSchemaComponent;
+  /** المعرّف الذي يُرسَل فعلياً إلى `onSelect` — معرّف العقدة نفسها إن كانت حقيقية (موجودة
+   * في المخطط الأصلي)، أو أقرب سلفٍ حقيقي إن كانت نسخة مولَّدة من تكرار `binding.collect`. */
+  selectId: string;
   selected: boolean;
   onSelect: (id: string) => void;
   className?: string;
@@ -78,12 +106,12 @@ function NodeFrame({
       tabIndex={0}
       onClick={(event) => {
         event.stopPropagation();
-        onSelect(node.id);
+        onSelect(selectId);
       }}
       onKeyDown={(event) => {
         if (event.key === 'Enter' || event.key === ' ') {
           event.preventDefault();
-          onSelect(node.id);
+          onSelect(selectId);
         }
       }}
       className={cn(
@@ -103,16 +131,25 @@ function CanvasComponentNode({
   selectedId,
   onSelect,
   registries,
+  knownIds,
+  selectFallbackId,
 }: {
   node: AppSchemaComponent;
   selectedId: string | null;
   onSelect: (id: string) => void;
   registries: AppBuilderRegistries | null;
+  /** معرّفات المخطط الأصلي — عقدة معرّفها خارج هذه المجموعة نسخةٌ مولَّدة من تكرار `binding.collect`. */
+  knownIds: Set<string>;
+  /** أقرب سلفٍ معروف لهذه العقدة، تُسنَد إليه التحديدات الصادرة من نسخ مولَّدة. */
+  selectFallbackId: string;
 }) {
-  const selected = node.id === selectedId;
+  const isKnown = knownIds.has(node.id);
+  const effectiveSelectId = isKnown ? node.id : selectFallbackId;
+  const childFallbackId = isKnown ? node.id : selectFallbackId;
+  const selected = isKnown && node.id === selectedId;
   const children = node.children ?? [];
   const frame = (body: React.ReactNode, className?: string) => (
-    <NodeFrame node={node} selected={selected} onSelect={onSelect} className={className} registries={registries}>
+    <NodeFrame node={node} selectId={effectiveSelectId} selected={selected} onSelect={onSelect} className={className} registries={registries}>
       {body}
     </NodeFrame>
   );
@@ -122,7 +159,7 @@ function CanvasComponentNode({
       return (
         <div className="space-y-3 p-3">
           {children.map((child) => (
-            <CanvasComponentNode key={child.id} node={child} selectedId={selectedId} onSelect={onSelect} registries={registries} />
+            <CanvasComponentNode key={child.id} node={child} selectedId={selectedId} onSelect={onSelect} registries={registries} knownIds={knownIds} selectFallbackId={childFallbackId} />
           ))}
         </div>
       );
@@ -134,7 +171,7 @@ function CanvasComponentNode({
           {title ? <p className="text-sm font-semibold text-text">{title}</p> : null}
           <div className="space-y-2">
             {children.map((child) => (
-              <CanvasComponentNode key={child.id} node={child} selectedId={selectedId} onSelect={onSelect} registries={registries} />
+              <CanvasComponentNode key={child.id} node={child} selectedId={selectedId} onSelect={onSelect} registries={registries} knownIds={knownIds} selectFallbackId={childFallbackId} />
             ))}
           </div>
         </div>
@@ -177,7 +214,7 @@ function CanvasComponentNode({
           ) : (
             children.map((child) => (
               <div key={child.id} className="w-32 shrink-0">
-                <CanvasComponentNode node={child} selectedId={selectedId} onSelect={onSelect} registries={registries} />
+                <CanvasComponentNode node={child} selectedId={selectedId} onSelect={onSelect} registries={registries} knownIds={knownIds} selectFallbackId={childFallbackId} />
               </div>
             ))
           )}
@@ -212,7 +249,7 @@ function CanvasComponentNode({
           {description ? <p className="text-sm text-muted">{description}</p> : null}
           <div className="space-y-2 border-t border-border pt-2">
             {children.map((child) => (
-              <CanvasComponentNode key={child.id} node={child} selectedId={selectedId} onSelect={onSelect} registries={registries} />
+              <CanvasComponentNode key={child.id} node={child} selectedId={selectedId} onSelect={onSelect} registries={registries} knownIds={knownIds} selectFallbackId={childFallbackId} />
             ))}
           </div>
         </div>
@@ -268,7 +305,7 @@ function CanvasComponentNode({
           {children.length === 0 ? (
             <span className="text-xs text-muted">—</span>
           ) : (
-            children.map((child) => <CanvasComponentNode key={child.id} node={child} selectedId={selectedId} onSelect={onSelect} registries={registries} />)
+            children.map((child) => <CanvasComponentNode key={child.id} node={child} selectedId={selectedId} onSelect={onSelect} registries={registries} knownIds={knownIds} selectFallbackId={childFallbackId} />)
           )}
         </div>
       );
@@ -354,16 +391,36 @@ export function AppBuilderCanvas({
 }) {
   const t = useTranslations('appBuilder.builder');
 
+  // LIVE-PREVIEW-3: الشجرة المعروضة فعلياً هي ناتج حلّ الربط، لا المخطط الخام —
+  // `knownIds` يبقى مرجع المخطط الأصلي لأن التحديد للتحرير يستهدف القالب دوماً لا
+  // نسخة مولَّدة (انظر تعليق الملف الرأسي).
+  const knownIds = React.useMemo(() => (root ? collectIds(root, new Set()) : new Set<string>()), [root]);
+  const resolvedRoot = React.useMemo(() => (root ? resolveNodeBindings(root, SAMPLE_RESOURCE_DATA) : null), [root]);
+  const showSampleDataBanner = React.useMemo(() => (root ? hasAnyBinding(root) : false), [root]);
+
   return (
     <div className="flex h-full min-h-0 flex-1 justify-center overflow-auto bg-background p-6">
       <div
         dir={locale.toLowerCase().startsWith('ar') ? 'rtl' : 'ltr'}
         style={{ width: PREVIEW_WIDTHS[device], maxWidth: '100%', ...themeCssVars(themeTokens) }}
-        className="h-fit min-h-[480px] shrink-0 rounded-lg border border-border bg-surface shadow-sm"
+        className="h-fit min-h-[480px] shrink-0 overflow-hidden rounded-lg border border-border bg-surface shadow-sm"
         onClick={() => root && onSelect(root.id)}
       >
-        {root ? (
-          <CanvasComponentNode node={root} selectedId={selectedId} onSelect={onSelect} registries={registries} />
+        {showSampleDataBanner ? (
+          <div className="flex items-center gap-1.5 border-b border-border bg-primary-soft px-3 py-1.5 text-[11px] font-medium text-primary">
+            <FlaskConical className="h-3.5 w-3.5 shrink-0" strokeWidth={1.8} aria-hidden="true" />
+            <span>{t('sampleDataBanner')}</span>
+          </div>
+        ) : null}
+        {resolvedRoot ? (
+          <CanvasComponentNode
+            node={resolvedRoot}
+            selectedId={selectedId}
+            onSelect={onSelect}
+            registries={registries}
+            knownIds={knownIds}
+            selectFallbackId={resolvedRoot.id}
+          />
         ) : (
           <p className="p-6 text-center text-sm text-muted">{t('emptyPage')}</p>
         )}

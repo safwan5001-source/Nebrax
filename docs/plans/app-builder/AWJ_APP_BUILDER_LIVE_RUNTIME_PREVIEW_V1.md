@@ -48,8 +48,8 @@ Standing authority covers implementation, tests, commits, PRs, merging green dep
 |---|---|---|
 | LIVE-PREVIEW-1 | Preview Contract Evidence Pass | **DONE / PASS** — see `LIVE-PREVIEW-1-EVIDENCE-PASS.md` |
 | LIVE-PREVIEW-2 | Preview / Runtime Semantic Parity Foundation | **DONE / PASS** — see `LIVE-PREVIEW-2-PARITY-FOUNDATION.md` |
-| LIVE-PREVIEW-3 | Binding + Collection Preview Parity | READY — owner-approved scope: sample/representative data only (see durable state below) |
-| LIVE-PREVIEW-4 | Action + Theme + Supported Visibility Parity | BLOCKED |
+| LIVE-PREVIEW-3 | Binding + Collection Preview Parity | **DONE / PASS** — see `LIVE-PREVIEW-3-BINDING-COLLECTION-PARITY.md` |
+| LIVE-PREVIEW-4 | Action + Theme + Supported Visibility Parity | READY |
 | LIVE-PREVIEW-5 | Runtime-Aware Pre-Publish Validation | BLOCKED |
 | LIVE-PREVIEW-6 | Draft / Default / Published Preview States | BLOCKED |
 | LIVE-PREVIEW-7 | Integrated Builder → Publish → Runtime Proof | BLOCKED |
@@ -212,7 +212,7 @@ The horizon is CLOSED / PASS only when evidence proves:
   triggered because `ci.yml` has no path filter). No Decision Gate triggered; no capability
   broadened; fail-closed semantics preserved (see the report's dedicated fixture cases).
 - **LIVE-PREVIEW-3 — Binding + Collection Preview Parity: DECISION GATE RESOLVED (owner decision,
-  2026-09-25) — Option 3 approved. READY to implement.**
+  2026-09-25) — Option 3 approved, then implemented. DONE / PASS — see below for PR/evidence.**
   While scoping which data LP-3 should feed `resolveNodeBindings` for a live Preview render,
   reading `app/Services/AppBuilder/DataResourceRegistry.php` found that `commerce.products`
   resolves to `GET commerce/v1/products` (`CommerceProductController`) — the **public
@@ -261,3 +261,23 @@ The horizon is CLOSED / PASS only when evidence proves:
     it must never be cited, here or in LP-7/LP-8, as evidence that Preview shows live merchant
     data, and does not relax exit-criteria item 7's own "integrated evidence... using real
     contracts" bar.
+
+  **Implementation — DONE / PASS.** Full report: `docs/plans/app-builder/
+  LIVE-PREVIEW-3-BINDING-COLLECTION-PARITY.md`. PR pending (opening next). Base SHA:
+  `41b53fdb96a828276c6e1a1b532126302325f403`. Adds `web/src/modules/app-builder/
+  sample-resource-data.ts` (static, hardcoded, field-for-field matching
+  `DataResourceRegistry`'s real contracts — no fetch, no network, no store-bearer token) and
+  wires it through LP-2's `resolveNodeBindings` into `canvas.tsx`'s render path, plus a
+  persistent "sample data, not live" banner (new `sampleDataBanner` i18n key, both locales)
+  whenever the current page has any `binding` node, plus a `knownIds`/`selectFallbackId` fix so
+  clicking a repeated (`binding.collect`) instance in Preview maps back to the bound container's
+  real schema id instead of a synthetic, non-existent one. Web-only change — no backend, no
+  mobile file touched; `web-ci.yml` is the only relevant CI. Evidence: focused
+  `src/modules/app-builder` suite 3 files / 32 tests green (24 pre-existing + 3 new
+  `sample-resource-data.test.ts` + 5 new `canvas.test.tsx`), broader app-builder suite 7 files /
+  73 tests green (including the pre-existing 27-test `builder/page.test.tsx`, unaffected), full
+  web suite 298 files / 2111 tests green, `npm run build` clean. No Decision Gate triggered by
+  the implementation itself (the gate was already resolved above); no capability broadened; all
+  six owner-mandated guardrails verified against the actual diff (see the report's own
+  "Owner-mandated guardrails — verified, not just asserted" section).
+- Next task once LP-3 merges: **LIVE-PREVIEW-4 — Action + Theme + Supported Visibility Parity**.

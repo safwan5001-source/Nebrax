@@ -6869,6 +6869,7 @@
       "layersTitle": "Layers",
       "initialPageBadge": "Home",
       "emptyPage": "Empty page",
+      "sampleDataBanner": "Sample data — shows how data binding renders, not your real store data",
       "pages": {
         "addAction": "Add page",
         "setHomeLabel": "Set as home page",
