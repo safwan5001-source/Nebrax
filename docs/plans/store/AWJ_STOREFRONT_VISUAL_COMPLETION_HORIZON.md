@@ -1,6 +1,6 @@
 # AWJ Storefront Visual Completion Horizon
 
-**Status:** Open. Evidence and the two fidelity fixes are merged. Designed 404 is in progress. Public density/product-card parity is not started.  
+**Status:** Implementation-ready queue done. Horizon stays open only for classified gated/deferred gaps. No deploy.  
 **Base SHA at evidence:** `fdfa0b34f5197c17f2da45b3bfad7a30bd124ed4`  
 **Main after the fidelity merges:** `ec2aad3cacc988417971489d46c9125da838c8d8`  
 **Evidence:** `docs/plans/store/AWJ_STOREFRONT_VISUAL_COMPLETION_EVIDENCE_PASS.md`
@@ -54,7 +54,7 @@ The question this horizon answers:
 | 1 | STORE-VISUAL-CLOSE-1 | No | Public v2 homepage deletion is not resurrected | Merged [#1016](https://github.com/safwan5001-source/Nebrax/pull/1016) `2e1225f39e553103ef628e25438461d4cd7d2abe` |
 | 2 | STORE-CUSTOMIZER-CLOSE-1 | No | Header/logo/footer/WhatsApp/social click-to-edit. Honest logo and display-name hints. Preview links do not leave the editor | Merged [#1017](https://github.com/safwan5001-source/Nebrax/pull/1017) `6b8869e8694c3b897eed4f75bbf1af07b708f1e4` |
 | 3 | STORE-STATES-CLOSE-1 | No | Designed `not-found` inside the store shell, ar/en, no new data | Merged [#1020](https://github.com/safwan5001-source/Nebrax/pull/1020) `395b163c0bc2f22e6086e3e4f5422fa612c7a2a3` |
-| 4 | STORE-THEME-PARITY-1 | No | Public page honors published `density` and `productCard` only | This change |
+| 4 | STORE-THEME-PARITY-1 | No | Public page honors published `density` and `productCard` only | Merged [#1021](https://github.com/safwan5001-source/Nebrax/pull/1021) `58567bb0ce3b8ccb62dae2668aafa56cf4ccf64d` |
 | — | Per-instance content, branding media object, undo, version history, Market, Floral | Decision or explicit deferral | Do not start | Blocked |
 
 Tasks 1 and 2 do not stack. Either can merge first. Tasks 3 and 4 do not need them merged.
