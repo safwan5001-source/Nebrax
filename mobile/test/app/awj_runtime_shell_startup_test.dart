@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:awj_mobile_runtime/app/awj_runtime_shell.dart';
 import 'package:awj_mobile_runtime/commerce/commerce.dart';
@@ -153,5 +154,132 @@ void main() {
     expect(find.text('إعادة المحاولة'), findsOneWidget);
     expect(find.text(bundledTagline), findsNothing);
     expect(find.text('عرض السلة'), findsNothing);
+  });
+
+  group('E — LIVE-PREVIEW-7 integrated-proof fixture', () {
+    // Relative to this package's root — `mobile-ci.yml` runs `flutter test` with
+    // `working-directory: mobile`, matching `binding_visibility_conformance_test.dart`'s own
+    // established convention for reading a file shared with the PHP/TypeScript suites.
+    const fixturePath = '../contracts/app-builder/integrated-proof-schema.v1.json';
+
+    Map<String, Object?> loadIntegratedProofFixture() {
+      final file = File(fixturePath);
+      if (!file.existsSync()) {
+        throw StateError(
+          'Shared LIVE-PREVIEW-7 fixture not found at "$fixturePath" (resolved from '
+          '${Directory.current.path}). `flutter test` must be run from the `mobile/` directory.',
+        );
+      }
+      return jsonDecode(file.readAsStringSync()) as Map<String, Object?>;
+    }
+
+    /// A real fake `commerce/v1` server: `/experience` answers with the exact document
+    /// `tests/Feature/AppBuilderPreviewToRuntimeIntegratedProofTest.php` proves Draft ->
+    /// Validate -> Publish -> `GET commerce/v1/experience` round-trips byte-identically;
+    /// `/products`/`/cart` answer with real-shaped data (the same field names
+    /// `DataResourceRegistry.php`/`web/.../sample-resource-data.ts` document) so the fixture's
+    /// `$item.name`/`$item.price.amount_minor`/`$item.product_name`/
+    /// `$item.line_total.amount_minor` references actually resolve to real values, not just
+    /// structurally parse.
+    // Built directly (not via this file's own `_client` helper): `_client` only forwards
+    // `/experience` requests to its callback and hardcodes empty `/products`/`/cart`
+    // responses internally — this fixture needs real-shaped data on all three routes for its
+    // bindings to actually hydrate, not just parse structurally.
+    CommerceClient integratedProofClient() {
+      final fixture = loadIntegratedProofFixture();
+      Future<CommerceHttpResponse> handler(CommerceHttpRequest request) async {
+        final segments = request.uri.pathSegments;
+        if (segments.last == 'experience') {
+          return jsonResponse(200, {
+            'data': {
+              'version': 1,
+              'schema_version': '1.0.0',
+              'published_at': '2026-09-25T00:00:00Z',
+              'schema': fixture,
+            },
+            'meta': successMeta(),
+          });
+        }
+        if (segments.last == 'products') {
+          return jsonResponse(200, {
+            'data': [
+              {'id': 'p-1', 'name': 'LIVE_PREVIEW_7_PRODUCT_NAME', 'price': money(amountMinor: 12345)},
+            ],
+            'meta': paginationMeta(),
+          });
+        }
+        if (segments.last == 'cart') {
+          return jsonResponse(200, {
+            'data': {
+              'status': 'active',
+              'items': [
+                {
+                  'id': 'ci-1',
+                  'product_id': 'p-1',
+                  'product_variant_id': null,
+                  'variant_descriptor': null,
+                  'product_name': 'LIVE_PREVIEW_7_CART_LINE_PRODUCT_NAME',
+                  'unit_key': 'unit',
+                  'unit_name': 'piece',
+                  'quantity': 1,
+                  'unit_price': money(amountMinor: 12345),
+                  'line_total': money(amountMinor: 12345),
+                  'available': true,
+                },
+              ],
+              'subtotal': money(amountMinor: 12345),
+              'currency': 'SAR',
+              'has_unavailable_items': false,
+            },
+            'meta': successMeta(),
+          });
+        }
+        return jsonResponse(404, errorEnvelope('not_found', 'no fake route for ${request.uri.path}'));
+      }
+
+      return CommerceClient(
+        config: CommerceConfig(baseUrl: Uri.parse('https://api.example.com/commerce/v1'), storeBearerToken: 't'),
+        sessionStore: InMemorySecureSessionStore(),
+        transport: FakeCommerceTransport(handler),
+      );
+    }
+
+    testWidgets(
+      'the fixture is fetched, resolved compatible, and actually rendered — Home binds real products',
+      (tester) async {
+        await tester.pumpWidget(_shell(integratedProofClient(), experienceCache: InMemoryExperienceCache()));
+        await tester.pumpAndSettle();
+
+        // Proves fetch (real HTTP-shaped JSON) -> resolveRealStartup -> UseFreshExperience ->
+        // CompatibilityResolver (Dart) accepted this exact document, and AwjRuntimeShell
+        // actually rendered it — never silently kept showing the bundled Default AWJ
+        // Experience while a Published one was available.
+        expect(find.text('LIVE_PREVIEW_7_INTEGRATED_PROOF_MARKER'), findsOneWidget);
+        expect(find.text(bundledTagline), findsNothing);
+
+        // Proves the ProductList's `binding: {resource: "commerce.products"}` (no `collect` —
+        // the real, working grammar: commerce.products' own wire shape is already a list, so
+        // binding_resolution.dart's List-resource branch repeats the ProductCard template)
+        // actually hydrated `$item.name`/`$item.price.amount_minor` against the real fetched
+        // product, not just parsed structurally.
+        expect(find.text('LIVE_PREVIEW_7_PRODUCT_NAME'), findsOneWidget);
+        expect(find.textContaining('123.45'), findsOneWidget);
+      },
+    );
+
+    testWidgets('navigating to Cart hydrates the real binding.collect line template', (tester) async {
+      await tester.pumpWidget(_shell(integratedProofClient(), experienceCache: InMemoryExperienceCache()));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('View cart'));
+      await tester.pumpAndSettle();
+
+      // Proves CartList's `binding: {resource: "commerce.cart", collect: "items"}` actually
+      // repeated the authored Section/Price line template once per real fetched cart item,
+      // resolving `$item.product_name`/`$item.line_total.amount_minor` — the same
+      // `binding.collect` + `$item.*` grammar LIVE-PREVIEW-2/3 proved in Preview, now proven
+      // against the real runtime's own resolver on this exact fixture.
+      expect(find.text('LIVE_PREVIEW_7_CART_LINE_PRODUCT_NAME'), findsOneWidget);
+    });
   });
 }
