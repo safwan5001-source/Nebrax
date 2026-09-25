@@ -74,9 +74,10 @@ export const CUSTOMIZER_MESSAGES = {
     productCardCompact: "مضغوط",
     displayName: "اسم المتجر الظاهر",
     displayNameHint:
-      "الاسم الحي من أَوْج يبقى مصدر الهوية ما لم تُحفظ قيمة هنا لاحقاً.",
+      "يُحفظ مع مسودة العرض ويظهر للزوار بعد النشر. اتركه فارغًا ليبقى اسم المتجر الحي.",
     logo: "شعار المتجر",
-    logoHint: "يُعرض في المعاينة فقط لهذه الجلسة. لا يُرفع ولا يُحفظ.",
+    logoHint:
+      "يُحفظ داخل إعدادات العرض كصورة حتى ٥١٢ ك.ب (PNG أو JPEG أو WebP). لا يوجد تخزين ملفات منفصل، وصور SVG لا تُقبل.",
     compactLogo: "شعار مصغّر للجوال",
     favicon: "أيقونة التبويب",
     noLogo: "بدون شعار — يُستخدم الاسم كنص",
@@ -269,10 +270,10 @@ export const CUSTOMIZER_MESSAGES = {
     productCardCompact: "Compact",
     displayName: "Store display name",
     displayNameHint:
-      "The live AWJ store name remains identity until a presentation contract can store an override.",
+      "Saved with the presentation draft and shown to shoppers after publish. Leave it empty to keep the live store name.",
     logo: "Store logo",
     logoHint:
-      "Shown in this preview session only. It is not uploaded or saved.",
+      "Saved inside the presentation as an image up to 512 KB (PNG, JPEG, or WebP). There is no separate file store, and SVG is rejected.",
     compactLogo: "Compact mobile logo",
     favicon: "Favicon",
     noLogo: "No logo — typographic name is used",

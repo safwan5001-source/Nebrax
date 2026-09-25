@@ -168,4 +168,34 @@ describe('commerce appearance — STORE-CUSTOMIZER-V2-1 shell and section select
     ).map((el) => el.getAttribute('data-composer-section'));
     expect(after.indexOf('categories')).toBe(categoriesIndex - 1);
   });
+
+  it('routes header, logo and footer clicks to their existing panels', async () => {
+    const user = userEvent.setup();
+    render(<CommerceAppearancePage />);
+
+    const header = document.querySelector(
+      'header[data-preview-chrome="header"]',
+    ) as HTMLElement;
+    expect(header).toBeTruthy();
+    await user.click(screen.getByText('السعودية · ر.س'));
+    expect(builderRoot().dataset.panel).toBe('header');
+    expect(builderRoot().dataset.selectedChrome).toBe('header');
+    expect(header.getAttribute('aria-pressed')).toBe('true');
+
+    const logo = document.querySelector(
+      '[data-preview-chrome="branding"]',
+    ) as HTMLElement;
+    await user.click(logo);
+    expect(builderRoot().dataset.panel).toBe('branding');
+    expect(builderRoot().dataset.selectedChrome).toBe('branding');
+    expect(builderRoot().dataset.selectedSection).toBe('');
+
+    const footer = document.querySelector(
+      'footer[data-preview-chrome="footer"]',
+    ) as HTMLElement;
+    await user.click(footer);
+    expect(builderRoot().dataset.panel).toBe('footer');
+    expect(footer.getAttribute('aria-pressed')).toBe('true');
+  });
 });
+
