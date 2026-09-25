@@ -615,3 +615,200 @@ No database, accounting, inventory-posting, tenant-resolution, price authority, 
 The benchmark is now sufficiently classified to proceed from discovery to a scoped implementation plan. The core Market experience can be built on the existing AWJ storefront architecture. The main missing items are platform capabilities, not reasons to fork the theme or duplicate commerce truth.
 
 Before implementation, create a small Theme Implementation Plan that identifies exact shared files/components, compatibility tests, visual acceptance widths, and which gated sections remain intentionally inactive. Implementation should then proceed as small reviewable PRs.
+
+
+## 24. Master Pre-Implementation Pass — Horizon execution preparation
+
+### Execution strategy
+
+AWJ Market will not move into implementation piecemeal. The repository evidence, visual/theme contract, capability gates, compatibility rules, acceptance matrix, and test plan must be closed first. Only then should the complete implementation package be handed to Horizon for one coordinated execution horizon.
+
+This does **not** authorize Horizon to invent missing contracts. The implementation horizon is bounded by this specification and by the existing AWJ authority boundaries.
+
+### Current verified implementation foundation
+
+The following are already available and should be reused rather than rebuilt:
+
+- host/tenant-resolved storefront and publication eligibility;
+- safe public product resource with allow-listed fields;
+- product/category catalog, server search and server sorting;
+- generic product options and concrete variant identity;
+- authoritative price and derived availability;
+- product/variant media;
+- server-authoritative cart and checkout flows;
+- responsive storefront shell and mobile bottom navigation;
+- dedicated checkout shell that intentionally removes storefront marketing/navigation chrome;
+- StorefrontPresentationConfig with safe normalization;
+- Draft persistence, workspace preview, atomic Publish and public Published-only runtime;
+- semantic presentation tokens including density, card, header, radius and theme preset seams;
+- contact, WhatsApp, social, app-link and policy-page presentation metadata;
+- locked responsive acceptance widths and RTL/LTR baseline.
+
+### Horizon non-negotiable authority boundaries
+
+Horizon must not:
+
+- create a second product/category/price/inventory source of truth;
+- make browser-selected `warehouse_id` authoritative;
+- calculate commercial discounts, totals, tax, delivery prices or stock facts client-side;
+- expose raw stock quantity, inventory ledger, cost, margin, valuation or accounting data publicly;
+- add arbitrary merchant HTML/CSS/JS or unsafe iframe injection to the presentation contract;
+- weaken tenant resolution, publication guards, cart mutation gateway, IDOR protection, or Draft/Published isolation;
+- alter accounting, inventory posting, financial rules, database contracts or public APIs merely to make the theme resemble the benchmark;
+- activate gated capability UI as though it were live;
+- fork cart/checkout/product business logic for AWJ Market;
+- regress AWJ Modern or other existing theme/presentation behavior.
+
+### Capability gate manifest for the implementation horizon
+
+The first AWJ Market implementation may consume only authoritative/live capabilities. The following remain gated unless a separately approved platform implementation is included in the Horizon package with its own contracts/tests:
+
+- customer-selectable multi-location availability / pickup location;
+- authoritative offers/compare-at pricing and dedicated Offers collection;
+- persistent wishlist/customer identity;
+- ratings/reviews;
+- purchase-count social proof;
+- public barcode/GTIN beyond the already-public SKU;
+- safe structured interactive map;
+- faceted catalog filtering;
+- search suggestions/autocomplete/trending/recent searches;
+- arbitrary related/recommended products;
+- coupons/promotion codes without server-computed discount/total;
+- unsupported payment/shipping/tax claims.
+
+### Surface inventory for visual implementation
+
+Horizon must treat AWJ Market as a coherent responsive system across these surfaces, not just a homepage skin:
+
+1. storefront shell/header/search/category navigation;
+2. mobile bottom navigation on normal storefront surfaces;
+3. home composition and all enabled section states;
+4. catalog/product listing;
+5. category results;
+6. search results and no-results state;
+7. product detail for simple and variant-managed products;
+8. media states: multiple, single and missing media;
+9. availability states: in stock, out of stock, unknown;
+10. cart drawer and cart page;
+11. empty cart;
+12. checkout shell and contact/address/delivery/payment/review/confirmation stages, respecting capability gates;
+13. content/contact/policy/footer surfaces supported by the shared presentation contract;
+14. Customizer preview and published runtime parity for Market presentation tokens.
+
+### Responsive acceptance matrix
+
+At minimum verify approximately:
+
+| Width | Required review |
+|---:|---|
+| 390px | compact phone / two-column catalog where readable / bottom-nav safe area |
+| 430px | large phone / long Arabic product names and actions |
+| 768px | tablet composition / three-column catalog baseline |
+| 1024px | wide tablet / compact desktop transition |
+| 1280px | desktop commerce density |
+| 1440px | wide desktop hierarchy and bounded canvas |
+
+Every critical surface must be checked in Arabic RTL and English LTR. No horizontal overflow. Mixed Arabic/Latin/SKU/price content must remain stable.
+
+### State acceptance matrix
+
+The Horizon implementation must explicitly cover:
+
+- loading where the current architecture exposes a loading boundary;
+- empty catalog/search/cart states;
+- API/business rejection without false success;
+- missing media;
+- simple product;
+- variant-managed product before selection and after valid selection;
+- unavailable variant/combinations;
+- product in stock / out of stock / availability unknown;
+- long names/descriptions;
+- configured and absent merchant branding;
+- configured and absent optional content/presentation sections;
+- Draft preview versus Published public runtime;
+- unsupported/gated capabilities remaining absent or honestly gated.
+
+### Accessibility acceptance
+
+Preserve or improve the shared storefront baseline:
+
+- semantic heading hierarchy and landmarks;
+- keyboard reachable search, navigation, product controls, variant controls, cart and checkout;
+- visible focus states;
+- meaningful accessible names for icon-only controls;
+- correct disabled/pending/error semantics;
+- no color-only state communication;
+- logical RTL/LTR layout rather than fragile physical offsets;
+- reduced-motion behavior where motion exists;
+- touch targets appropriate for mobile commerce.
+
+### Performance acceptance
+
+AWJ Market must not add per-card detail fetches, per-card inventory queries, or client-side N+1 behavior. Catalog pages continue to use paginated server results and narrowed card data. Images must preserve stable aspect-ratio/layout behavior. Theme composition must avoid unnecessary client components and duplicated data fetches. Any performance claim in the final report must be measured; unmeasured metrics must be reported as such, never inferred.
+
+### Customizer and theme compatibility acceptance
+
+- `awj-market` must be represented through the shared presentation/theme architecture, not a separate persistence model.
+- Draft Save must not publish.
+- Public runtime reads Published only.
+- unknown/stale tokens fail closed through normalization.
+- merchant branding and colors remain merchant-controlled where supported.
+- Market defaults may choose compact density/card/header composition, but merchant-supported overrides remain valid.
+- AWJ Modern remains the safe fallback.
+- other existing themes/presets must not inherit Market-only styling accidentally.
+- Customizer preview and public runtime must use the same semantic token meaning.
+
+### Suggested one-horizon internal execution order
+
+Horizon may execute the work as one coordinated task, but internally it should proceed in dependency order:
+
+1. verify exact `main` Base SHA and read this Master Spec plus current presentation contracts;
+2. register the Market preset/key in shared closed token sets and both backend/frontend normalizers where required by the existing architecture;
+3. add Market defaults without changing existing preset defaults;
+4. implement shared, theme-aware composition/style seams needed by Market;
+5. complete shell/home/catalog/PDP/cart presentation;
+6. verify checkout compatibility without forking its business flow;
+7. wire Customizer selection/preview using existing Draft/Publish contracts;
+8. add/update focused unit/component tests;
+9. run storefront lint/typecheck/tests/build;
+10. run backend/presentation contract tests if shared normalization/persistence code changes;
+11. perform visual matrix review across required widths and RTL/LTR;
+12. run broader regression only where blast radius justifies it;
+13. produce the final Horizon implementation report;
+14. STOP before merge/deploy unless the current owner authorization explicitly covers that action.
+
+### Final Horizon report contract
+
+The final MD report must include:
+
+- exact task scope and what was intentionally excluded;
+- Base SHA / Branch / PR / Head SHA;
+- implementation summary by surface;
+- changed files grouped by responsibility;
+- contracts reused and any contract changes;
+- capability gates that remain inactive;
+- focused tests and exact results;
+- full storefront test/lint/typecheck/build results;
+- backend tests if applicable;
+- visual verification matrix with widths and RTL/LTR;
+- accessibility findings;
+- performance findings, explicitly marking anything not measured;
+- tenant/security/backward-compatibility assessment;
+- risks and remaining work;
+- CI state;
+- merge/deploy state;
+- recommended next action.
+
+## 25. Remaining pre-Horizon closure checklist
+
+Before marking the package `READY FOR HORIZON IMPLEMENTATION`, complete only these evidence/spec closure items:
+
+- map the exact shared files/components likely to change for preset registration, runtime styling and Customizer selection;
+- verify backend and frontend presentation token/normalizer parity for adding a new preset key;
+- verify current home section renderer behavior and which gated section placeholders are preview-only versus public-hidden;
+- verify Market styling can remain theme-aware without duplicating ProductCard/cart/checkout logic;
+- define focused regression tests for AWJ Modern fallback and Draft/Published isolation;
+- confirm PR #1001 CI/merge state and merge the documentation when clean;
+- issue a final single Horizon task prompt referencing the merged durable spec.
+
+Until those items are closed, status remains **PRE-HORIZON — NOT READY FOR IMPLEMENTATION**.
