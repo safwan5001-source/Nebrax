@@ -628,8 +628,12 @@ hand-written slot hydration, **plus flipping `RuntimeCapabilities::DATA_RESOURCE
 server-side (PHP)** — a production-wide gate on what every tenant can publish, which should not move
 ahead of a verified, shipped mobile release. Slicing:
 
-- **Slice 1 (this entry) — parser support, done locally** on
-  `claude/app-builder-17-mobile-schema-binding-visibility`, PR #999. Adds `SchemaBinding` and
+- **Slice 1 (this entry) — parser support, merged.** PR #999 merged (squash SHA
+  `30af97e0b19b5b94274545b4240a56b82e3e779d`, parent `ef757bd79f39c199047893bea735b90ef8284005` —
+  confirmed single-parent squash onto `main`); post-merge CI (`ci.yml` pgsql+sqlite, `mobile-ci.yml`)
+  both green on the merge commit. `web-ci.yml` did not run for this push — expected, since the diff
+  touches only `mobile/*` and docs, and that workflow is path-filtered to `web/` changes (same as
+  `APP-BUILDER-16`'s Dart/backend-only merge). Adds `SchemaBinding` and
   `VisibilityNode` (mirroring
   `AppSchemaParser::validateBinding`/`validateVisibility` exactly, including the `MAX_CONDITION_DEPTH`
   (4)/`MAX_CONDITION_BRANCHES` (16) limits) to `mobile/lib/schema/app_schema.dart`; `SchemaComponent`
@@ -661,6 +665,66 @@ ahead of a verified, shipped mobile release. Slicing:
   verified in a real mobile release — flipping `RuntimeCapabilities::DATA_RESOURCES`/`SCHEMA_FEATURES`
   server-side (PHP) to non-empty. This is the task queue's real "APP-BUILDER-18 depends on 17"
   dependency edge.
+
+**`APP-BUILDER-19` — live publish → fetch → on-device-cache loop, done** (ADR-01 §8 Decision Point 1
+= yes). Independent of `APP-BUILDER-17`/`18` (depends only on ADR-01 itself) — correctly buildable
+before either lands. Wires real I/O around `last_known_good.dart`'s `resolveStartup`, a pure decision
+function that was fully designed/unit-tested with **zero** I/O of its own since MOBILE-RUNTIME-10;
+`resolveStartup` itself is untouched by this task.
+
+- **Backend**: `GET commerce/v1/experience` (`CommerceExperienceController`, same read-tier
+  middleware chain as `storefront`/`categories`/`products` — no cart identity needed). Returns the
+  tenant's `BuilderPublishedExperienceVersion` schema document as-is (it already embeds its own
+  `schemaVersion`, exactly what `AppSchema.parse` expects with no extra wrapping). **Interim V1
+  selection policy, not a permanent product invariant**: `builder_apps.tenant_id` carries no unique
+  constraint (a merchant may create more than one `BuilderApp` — free-form authoring tool,
+  `BuilderAppController::store()` has no "one app only" guard) and no `is_live`/"active app" column
+  exists. "The live experience" is defined here, for V1 only, as **the most recently published
+  version across all of the tenant's `BuilderApp`s combined** (`ORDER BY published_at DESC`) —
+  matching the merchant's expected mental model (publish a version, it's what's live) with zero
+  schema change. The moment a real tenant needs more than one concurrently-live app, this policy is
+  meant to be replaced by an explicit `is_live` column on `BuilderApp` — the response shape
+  (`data.version`/`schema_version`/`published_at`/`schema`) does not change, only the selection query
+  does. Do not treat "most recently published = live" as a fixed architectural fact anywhere else in
+  the codebase. 404 (`not_found`) when a
+  tenant has never published anything — mapped by `PublicApiExceptionRenderer` automatically via
+  `abort(404, ...)`, no new `PublicApiErrorCode`. New `ExperienceResponse` schema + `/experience` path
+  added to `docs/openapi/commerce-api-v1.yaml` (`AppBuilder` tag) — `CommerceApiOpenApiContractTest`'s
+  path/tier-matching assertions cover it like every other commerce/v1 route. 4 new focused tests in
+  `CommerceExperienceApiTest` (latest-across-apps selection, tenant isolation, 404 on never-published,
+  401 unauthenticated).
+- **Mobile**: `CommerceClient.getExperienceSchemaJson()` — a plain read-tier method alongside
+  `getStorefront()`, returning `data.schema` re-encoded as raw JSON text (not a parsed `Map`, not a
+  typed model — App Schema parsing stays `mobile/lib/schema/`'s job, not this transport layer's).
+  Throws exactly like every other `CommerceClient` method; a new `startup/experience_fetcher.dart` is
+  the *only* place that catches those exceptions and maps them to `ExperienceFetchOutcome` (a stable
+  `reason` code per `ExperienceFetchFailed`'s own contract — never a raw message/URL). A new
+  `startup/experience_cache.dart` (`ExperienceCache` interface + `InMemoryExperienceCache` for tests +
+  `FileExperienceCache` for real devices) is the real on-device persistence `last_known_good.dart`
+  never had. **Deliberately not `flutter_secure_storage`-backed**: a cached Experience carries no
+  customer secret (MR-14's own framing), and a full App Schema document is a poor fit for a platform
+  Keychain/EncryptedSharedPreferences entry's reliable per-item size limits — `path_provider` (new
+  dependency, `^2.1.5`) is the narrowest first-party addition for "the app's own sandboxed writable
+  directory," the same "narrower first-party" reasoning (MR-19) that already justified adding
+  `flutter_secure_storage` itself for MR-07. `resolveRealStartup()` orchestrates: read cache (a
+  storage failure degrades to "no cache," never an uncaught exception) → fetch → `resolveStartup()`
+  (unchanged) → on `UseFreshExperience` only, best-effort write the fresh bytes back to cache (a write
+  failure never discards an otherwise-good decision this boot must still render). 3 new tests in
+  `CommerceClient`'s own suite (success/404/malformed-body), a new `experience_cache_test.dart`
+  (round-trip, overwrite, clear, corrupt-file-reads-as-null), and a new `experience_fetcher_test.dart`
+  (fresh success caches; last-known-good reuse never re-stamps `cachedAt`; incompatible-fresh-with-
+  cache falls back without overwriting; a throwing cache never crashes startup) — **not verified
+  locally** (no Flutter SDK in this session, same constraint as every other Dart change this horizon);
+  relies on `mobile-ci.yml`.
+- **Deliberately out of scope for this task** (left to `APP-BUILDER-17` slice 3 /
+  `APP-BUILDER-20`, per those tasks' own entries above): `HomeScreen`/`CartScreen`/`ProductScreen`
+  still render their bundled `kHomeSchemaJson`/`kCartSchemaJson` fixtures, not whatever this fetch
+  loop retrieves — `resolveRealStartup()` is wired and independently tested/proven, but nothing in the
+  shipped app boot sequence calls it yet. Wiring it into `AwjRuntimeShell`'s actual startup path and
+  rendering its `StartupDecision` is explicitly the same "prove the generated mobile experience
+  consumes the same Commerce Core via true no-code publish" integration `APP-BUILDER-20`'s Same-Store
+  proof already exists to do, once `APP-BUILDER-17`/`18` also land — bolting a partial UI integration
+  onto this task would duplicate that work ahead of the pieces it depends on.
 
 TASK-QUEUE.md records the finalized task decomposition (`APP-BUILDER-13`..`APP-BUILDER-23`) under
 the horizon header, promoted to `ready` in dependency order per ADR-01.

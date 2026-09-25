@@ -101,6 +101,8 @@ class CommerceModuleBoundaryTest extends TestCase
         'commerce/v1/checkout/delivery',
         // COM-MOBILE-PAYMENTS-1 — اختيار طريقة الدفع.
         'commerce/v1/checkout/payment',
+        // APP-BUILDER-19 — أحدث تجربة App Builder منشورة (حلقة الجلب/التخزين المؤقت).
+        'commerce/v1/experience',
         // COM-MOBILE-AUTH-1 — ملف العميل الموثَّق (X-Customer-Token).
         'commerce/v1/me',
         // COM-MOBILE-ORDER-HISTORY-1 — سجلّ طلبات العميل الموثَّق الخاص به.

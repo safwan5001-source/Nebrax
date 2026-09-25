@@ -925,9 +925,9 @@ Source of truth for this horizon:
 | 2 | APP-BUILDER-14 | done | APP-BUILDER-13 | App Schema `binding` contract (parser + compatibility resolver) |
 | 3 | APP-BUILDER-15 | done (PR #998 merged) | APP-BUILDER-14 | Builder Data UX (Inspector binding editor) |
 | 4 | APP-BUILDER-16 | done (schema contract) | ADR-01 | Conditions/Visibility contract (closed/typed/allowlisted) + Inspector UX |
-| 5 | APP-BUILDER-17 | in_progress (slice 1/3 done, PR #999) | APP-BUILDER-14 | Mobile runtime binding/visibility resolver (replaces 3 hand-written screen implementations) — split into parser support / compatibility gating / resolver+screens+capability flip, see entry below |
+| 5 | APP-BUILDER-17 | in_progress (slice 1/3 merged, PR #999) | APP-BUILDER-14 | Mobile runtime binding/visibility resolver (replaces 3 hand-written screen implementations) — split into parser support / compatibility gating / resolver+screens+capability flip, see entry below |
 | 6 | APP-BUILDER-18 | ready (after 17) | APP-BUILDER-17 | Real action dispatch wired through schema bindings |
-| 7 | APP-BUILDER-19 | ready | ADR-01 (Decision Point 1 = YES) | Live publish → fetch → on-device-cache loop (Last Known Good) |
+| 7 | APP-BUILDER-19 | done | ADR-01 (Decision Point 1 = YES) | Live publish → fetch → on-device-cache loop (Last Known Good) |
 | 8 | APP-BUILDER-20 | ready (after 18+19) | APP-BUILDER-18, APP-BUILDER-19 | Same-Store integrated proof |
 | 9 | APP-BUILDER-21 | done (PR #997 merged) | none (independent, mandatory) | App Builder UX/localization pass |
 | 10 | APP-BUILDER-22 | done (PR #997 merged) | none (independent, mandatory) | Canvas + Flutter theme-token rendering fix |
@@ -1089,8 +1089,10 @@ screens + flipping `RuntimeCapabilities::DATA_RESOURCES`/`SCHEMA_FEATURES` serve
 production-wide publish gate that should not move ahead of a shipped, verified mobile release). Split
 into three independently-shippable slices (see the detailed slice breakdown in `CURRENT-STATE.md`):
 
-- **Slice 1 — Dart parser support** is `done` locally on
-  `claude/app-builder-17-mobile-schema-binding-visibility`, PR #999.
+- **Slice 1 — Dart parser support** is `done`, merged as PR #999 (squash SHA
+  `30af97e0b19b5b94274545b4240a56b82e3e779d`, parent `ef757bd79f39c199047893bea735b90ef8284005`,
+  confirmed single-parent squash onto `main`; post-merge `ci.yml` and `mobile-ci.yml` both green on
+  the merge commit — `web-ci.yml` did not run, expected since this diff is `mobile/*` + docs only).
   `SchemaBinding`/`VisibilityNode` added to `mobile/lib/schema/app_schema.dart`, mirroring
   `AppSchemaParser::validateBinding`/`validateVisibility` exactly (same `MAX_CONDITION_DEPTH`(4)/
   `MAX_CONDITION_BRANCHES`(16) limits). Dormant by construction — `CompatibilityResolver` (Dart) does
@@ -1110,3 +1112,31 @@ into three independently-shippable slices (see the detailed slice breakdown in `
   layer, `HomeScreen`/`CartScreen`/`ProductScreen` rewired off hand-written hydration, bundled schemas
   updated to declare real bindings, and only then flipping `RuntimeCapabilities::DATA_RESOURCES`/
   `SCHEMA_FEATURES` server-side. This is the queue's actual "APP-BUILDER-18 depends on 17" edge.
+
+`APP-BUILDER-19` (live publish → fetch → on-device-cache loop) is `done` — independent of
+`APP-BUILDER-17`/`18` (only ADR-01 itself), so correctly buildable ahead of either. Wires real I/O
+around `last_known_good.dart`'s `resolveStartup`, a pure decision function fully designed/unit-tested
+since MOBILE-RUNTIME-10 with zero I/O of its own; `resolveStartup` itself is unchanged. Backend:
+`GET commerce/v1/experience` returns the tenant's most recently published
+`BuilderPublishedExperienceVersion` schema **across all of the tenant's `BuilderApp`s combined**
+(**interim V1 selection policy, not a permanent product invariant** — recorded in full in
+`CURRENT-STATE.md`/the controller's own docblock: `builder_apps` has no unique tenant constraint and
+no `is_live` column; "most recently published, tenant-wide" is the zero-schema-change default for V1,
+meant to be replaced by an explicit `is_live` column on `BuilderApp` the moment a tenant needs more
+than one concurrently-live app, without changing the response shape). Mobile: `CommerceClient.
+getExperienceSchemaJson()` (a plain read-tier method) + new `startup/experience_fetcher.dart`
+(exception → `ExperienceFetchOutcome` mapping) + new `startup/experience_cache.dart`
+(`ExperienceCache` interface, `InMemoryExperienceCache` for tests, `FileExperienceCache` for real
+devices — deliberately not `flutter_secure_storage`-backed, since a cached Experience is not a secret
+and a full schema document is a poor fit for Keychain/EncryptedSharedPreferences size limits;
+`path_provider` added as the narrowest first-party fit, MR-19's own "narrower first-party" test).
+`resolveRealStartup()` orchestrates read-cache → fetch → `resolveStartup()` → best-effort write-back
+on `UseFreshExperience` only, with every cache failure degrading gracefully rather than crashing
+startup. 4 new backend tests (`CommerceExperienceApiTest`) + updated `docs/openapi/commerce-api-v1.yaml`
+(`CommerceApiOpenApiContractTest` covers the new route); 3 new `CommerceClient` tests plus two new
+Dart test files (`experience_cache_test.dart`, `experience_fetcher_test.dart`) — **unverified locally
+(no Flutter SDK)**, relies on `mobile-ci.yml`. **Deliberately out of scope**: nothing in the shipped
+app's boot sequence calls `resolveRealStartup()` yet — `HomeScreen`/`CartScreen`/`ProductScreen` still
+render their bundled fixtures. Wiring this loop into `AwjRuntimeShell`'s actual startup and rendering
+its `StartupDecision` is `APP-BUILDER-20`'s Same-Store integrated-proof job, once `APP-BUILDER-17`/`18`
+also land — building a partial UI integration here would duplicate work ahead of its own dependencies.
