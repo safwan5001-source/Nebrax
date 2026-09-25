@@ -886,3 +886,58 @@ function that was fully designed/unit-tested with **zero** I/O of its own since 
 
 TASK-QUEUE.md records the finalized task decomposition (`APP-BUILDER-13`..`APP-BUILDER-23`) under
 the horizon header, promoted to `ready` in dependency order per ADR-01.
+
+**`APP-BUILDER-20` — Same-Store integrated proof, done.** PR #1009 merged (squash SHA
+`e909d6385ecdf5226ea37fdb609ec7b85d61a05b`, confirmed single-parent squash onto `main`, parent
+`223ad83b`; post-merge `ci.yml` sqlite+pgsql green on the merge commit itself). `ADR-01`'s own
+amendment scopes this precisely: prove Storefront Web (`store/v1`) and the Mobile App (`commerce/v1`)
+consume the same Commerce Core data/business rules — shared models, shared price/availability
+resolvers, shared tenant/channel boundary — not that Storefront Web is feature-complete.
+
+New `AppBuilderSameStoreProofTest` proves it end-to-end with real HTTP round trips, no mocking: one
+product created and published to both a `web` and a `mobile` `SalesChannel` under the same tenant; an
+App Builder Experience authored with a real `ProductList` → `commerce.products` binding (`itemProps`
+mapping `title`/`amountMinor`), published through the real draft → validate → publish HTTP pipeline;
+fetched back through the exact `GET commerce/v1/experience` endpoint `experience_fetcher.dart`'s
+`resolveRealStartup()` calls in production, then re-resolved through the same
+`CompatibilityResolver`/`CapabilityManifest::current()` the shipped mobile runtime uses — proving, for
+the first time, that the full publish → fetch → compatibility pipeline works over a real HTTP round
+trip, not only against a fake transport in a Dart widget test
+(`mobile/test/app/vertical_slice_test.dart`). `GET commerce/v1/products` and `GET store/v1/products`
+are then compared directly for the identical product: same `id`/`name`/`price` — and, since
+`CommerceProductController` and `StorefrontProductController` both format their response through the
+same `StorefrontProductResource` and resolve through the same `CommercePriceResolver`/
+`AvailableToSellService`, a live price change on the product with **zero republish** is reflected on
+both channels immediately on the very next read (the Update/Release Matrix's Category A, evidence doc
+§4 — "resolved live by `BindingResolver` at render time").
+
+**Deliberately out of scope, recorded explicitly in the test's own doc comment, not silently
+dropped**: this does **not** wire `resolveRealStartup()` into `AwjRuntimeShell`'s actual shipped boot
+sequence — `HomeScreen`/`CartScreen` still render the bundled `kHomeSchemaJson`/`kCartSchemaJson`
+fixtures by default. Doing so today would mean every tenant that has never published an App Builder
+Experience (currently: all of them, since `GET commerce/v1/experience` 404s with no
+`BuilderPublishedExperienceVersion` row at all) would see a `ControlledUnavailable` screen instead of
+the working bundled demo — `ExperienceFetchOutcome`/`resolveStartup` has no "nothing published yet"
+outcome distinct from a genuine fetch failure, and `resolveStartup`'s only fallback for "fetch failed,
+no cache" is `ControlledUnavailable`. Resolving that fallback-UX product decision (render the bundled
+demo as an implicit default vs. a distinct "not configured" state vs. something else) is a real,
+unresolved product decision this task does not invent an answer for — it is recorded here as the named
+prerequisite for that specific future wiring, exactly the discipline `APP-BUILDER-13`'s excluded
+`commerce.promotions`/`commerce.categories.name_en` gaps already established for this horizon.
+
+1 new focused test (21 assertions). Full local suite: 4711 passed (one more than the prior 4710
+baseline — exactly this test), 29593 assertions (21 more than baseline — exactly this test's own
+assertions), same 27 pre-existing local-only `bcmath`-extension failures, 49 skipped. No `mobile/`/
+`web/` files touched — `mobile-ci.yml`/`web-ci.yml` correctly did not run. No accounting impact.
+
+## Horizon closed — AWJ App Builder — Commerce Data & Dynamic Runtime V1
+
+All 11 tasks (`APP-BUILDER-13` through `APP-BUILDER-23`) are `done`. Full closure report:
+`docs/plans/app-builder/AWJ_APP_BUILDER_COMMERCE_RUNTIME_V1_CLOSURE_REPORT.md`. Two product decisions
+remain named and owner-gated, neither blocking this horizon's own closure: (1) real-device
+verification against a real, safely controlled `commerce/v1` tenant before any actual mobile
+distribution (`RuntimeCapabilities::DATA_RESOURCES`'s own doc comment); (2) the "no Experience
+published yet" fallback-UX decision before `resolveRealStartup()` is wired into `AwjRuntimeShell`'s
+shipped boot path (`AppBuilderSameStoreProofTest`'s own doc comment, above). Per
+`AWJ-HORIZON-SYSTEM.md`'s own "Horizon End" instruction, this session stops here rather than starting
+a new horizon on its own initiative.
