@@ -3,6 +3,7 @@ import {
   DEFAULT_HOME_SECTIONS,
   type HomeSection,
   resolveHomeSections,
+  resolvePublishedImplementedSections,
 } from "../sections";
 
 describe("resolveHomeSections", () => {
@@ -37,5 +38,42 @@ describe("resolveHomeSections", () => {
     expect(resolved.map((s) => s.key).sort()).toEqual(
       [...DEFAULT_HOME_SECTIONS].map((s) => s.key).sort(),
     );
+  });
+});
+
+describe("resolvePublishedImplementedSections", () => {
+  it("does not resurrect a section a published v2 document deleted", () => {
+    const resolved = resolvePublishedImplementedSections([
+      { type: "hero", visible: true },
+      { type: "newArrivals", visible: false },
+    ]);
+    expect(resolved).toEqual([
+      { key: "hero", visible: true },
+      { key: "newArrivals", visible: false },
+    ]);
+  });
+
+  it("drops gated types and keeps an empty published stack empty", () => {
+    expect(
+      resolvePublishedImplementedSections([
+        { type: "banner", visible: true },
+        { type: "customContent", visible: true },
+      ]),
+    ).toEqual([]);
+    expect(resolvePublishedImplementedSections([])).toEqual([]);
+  });
+
+  it("preserves order, including a repeated implemented type", () => {
+    const resolved = resolvePublishedImplementedSections([
+      { type: "wholesale", visible: true },
+      { type: "hero", visible: true },
+      { type: "offers", visible: true },
+      { type: "wholesale", visible: true },
+    ]);
+    expect(resolved.map((section) => section.key)).toEqual([
+      "wholesale",
+      "hero",
+      "wholesale",
+    ]);
   });
 });

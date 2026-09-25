@@ -6,7 +6,11 @@ import { WholesaleSection } from "@/components/home/WholesaleSection";
 import { StoreContainer } from "@/components/layout/StoreContainer";
 import { fetchStorefrontConfig } from "@/lib/commerce/storefront";
 import { resolveCurrency } from "@/lib/data/markets";
-import { type HomeSectionKey, resolveHomeSections } from "@/lib/home/sections";
+import {
+  type HomeSectionKey,
+  resolveHomeSections,
+  resolvePublishedImplementedSections,
+} from "@/lib/home/sections";
 import { generateHomeMetadata } from "@/lib/metadata/home";
 import { publishedStoreName } from "@/lib/presentation/public";
 
@@ -37,10 +41,6 @@ export default async function HomePage({ params }: HomePageProps) {
   const heroHeadline = presentation?.homepage.heroHeadline.trim() || null;
   const heroSubheadline = presentation?.homepage.heroSubheadline.trim() || null;
 
-  // Rendered from the section list rather than in fixed JSX order, so a
-  // published presentation config changes what appears here without the page
-  // being rewritten around it. `resolveHomeSections` is called with published
-  // sections only when `presentation` is non-null; gated keys remain dropped.
   const sections: Record<HomeSectionKey, React.ReactNode> = {
     hero: (
       <HeroSection
@@ -69,20 +69,11 @@ export default async function HomePage({ params }: HomePageProps) {
     wholesale: <WholesaleSection basePath={basePath} locale={locale} />,
   };
 
+  // Published v2 sections are already normalized. Gated types stay dropped.
+  // Absence is a real deletion — do not resurrect omitted sections. No
+  // presentation at all keeps the default stack.
   const homeSections = presentation
-    ? resolveHomeSections(
-        presentation.homepage.sections.flatMap((section) => {
-          if (
-            section.type !== "hero" &&
-            section.type !== "categories" &&
-            section.type !== "newArrivals" &&
-            section.type !== "wholesale"
-          ) {
-            return [];
-          }
-          return [{ key: section.type, visible: section.visible }];
-        }),
-      )
+    ? resolvePublishedImplementedSections(presentation.homepage.sections)
     : resolveHomeSections();
 
   return (
@@ -95,8 +86,8 @@ export default async function HomePage({ params }: HomePageProps) {
     <StoreContainer className="space-y-8 py-4 md:space-y-10 md:py-6">
       {homeSections
         .filter((section) => section.visible)
-        .map((section) => (
-          <div key={section.key}>{sections[section.key]}</div>
+        .map((section, index) => (
+          <div key={`${section.key}-${index}`}>{sections[section.key]}</div>
         ))}
     </StoreContainer>
   );

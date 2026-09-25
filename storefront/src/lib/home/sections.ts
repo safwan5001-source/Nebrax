@@ -31,6 +31,10 @@ export const DEFAULT_HOME_SECTIONS: readonly HomeSection[] =
  * Unknown keys are dropped rather than rendered, and implemented sections the
  * configuration omits keep their default position at the end, so a stale or
  * partial configuration can never blank the homepage.
+ *
+ * This resurrection is for a missing or legacy partial list only. A published
+ * v2 document must use `resolvePublishedImplementedSections`: absence there
+ * is a real deletion.
  */
 export function resolveHomeSections(
   configured?: readonly HomeSection[],
@@ -46,4 +50,27 @@ export function resolveHomeSections(
     ...known,
     ...DEFAULT_HOME_SECTIONS.filter((section) => !seen.has(section.key)),
   ];
+}
+
+/**
+ * Public runtime for an already-normalized published presentation.
+ *
+ * Gated types are dropped. Implemented sections keep published order and
+ * visibility, including duplicates. Omitted sections are not put back.
+ * An empty list stays empty — the merchant deleted the implemented stack.
+ */
+export function resolvePublishedImplementedSections(
+  sections: readonly { type: string; visible: boolean }[],
+): HomeSection[] {
+  const out: HomeSection[] = [];
+  for (const section of sections) {
+    if (!(HOME_SECTION_KEYS as readonly string[]).includes(section.type)) {
+      continue;
+    }
+    out.push({
+      key: section.type as HomeSectionKey,
+      visible: section.visible,
+    });
+  }
+  return out;
 }
