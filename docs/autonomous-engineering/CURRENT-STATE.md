@@ -681,14 +681,91 @@ ahead of a verified, shipped mobile release. Slicing:
   `RuntimeCapabilities::DATA_RESOURCES`/`SCHEMA_FEATURES` server-side while an already-installed
   mobile build only had slice 1 (parses but never gated or resolved) would have let that old build
   accept a binding/visibility node as "compatible" while silently doing nothing with it.
-- **Slice 3 (not started)** — the actual resource-fetch + visibility-evaluation layer (mapping
-  `binding.resource` to the right `CommerceClient` call, `itemProps` to node props, evaluating
-  `VisibilitySignal`/`VisibilityOperator` against live cart/auth/stock state), rewiring
-  `HomeScreen`/`CartScreen`/`ProductScreen` off their hand-written hydration, updating the bundled
-  `kHomeSchemaJson`/`kCartSchemaJson` to declare real bindings, and — only once 1+2 are shipped and
-  verified in a real mobile release — flipping `RuntimeCapabilities::DATA_RESOURCES`/`SCHEMA_FEATURES`
-  server-side (PHP) to non-empty. This is the task queue's real "APP-BUILDER-18 depends on 17"
-  dependency edge.
+- **Slice 3 — generic `binding.collect` mechanism + resolution pipeline, done (partial slice-3
+  scope, by explicit owner Decision Gate).** PR #1004 merged (squash SHA
+  `c273550d76c35b78be6b3dfc797db34f8e521178`, parent `f8749a86945824faa235d3fb25f19721bb6c8b3b`,
+  confirmed single-parent squash onto `main`; post-merge CI green on `ci.yml` pgsql+sqlite and
+  `mobile-ci.yml`). Before implementing, a readiness/evidence check surfaced a genuine architecture
+  gap: Cart's per-line UI is a multi-component composite (`Text`/`Price`/`Quantity`/`Button`), not a
+  1:1 item→component mapping like Home's `ProductList`→`ProductCard`, which the existing flat
+  `binding.itemProps` contract cannot express. A Decision Gate report (evidence, viable mechanisms,
+  security/versioning/Tenant-Isolation implications) was delivered and the owner approved, with
+  amendments, a generic `binding.collect` field: a dotted path naming a `LIST`-typed field on the
+  bound resource, whose node's single authored child (an item template, possibly a composite
+  subtree) is repeated once per collected entry, substituting `$item.<field>` throughout that
+  template's props and action params — **not** a `commerce.cart.items` pseudo-resource, and
+  `itemProps` is preserved unchanged (proven by a dedicated backward-compatibility test on both
+  sides).
+  - **PHP**: `AppSchemaParser` validates `binding.collect` structurally (non-empty string or
+    absent); `ResourceDefinition::fieldType()` added; `CompatibilityResolver::bindingSupported()`
+    fails `collect` closed unless its target is a declared readable `LIST`-typed field **and** the
+    manifest separately declares `schemaFeatureVersion('binding.collect')` — mirrors the exact
+    "old/basic-binding runtime rejects collect-dependent schemas" fail-closed shape MR-15 already
+    established for `push.notifications`.
+  - **Dart**: `SchemaBinding` gains the same structural `collect` field; new
+    `mobile/lib/schema/data_resource_registry.dart` (a lean mirror of PHP's `DataResourceRegistry`,
+    scoped to exactly what `collect`'s LIST-type validation needs — the fuller `itemProps`/`query`
+    structural port against a Component Registry remains the same slice-2-documented deferral, not
+    resolved by this task); `CompatibilityResolver._bindingSupported()` mirrors the same fail-closed
+    gate. New `mobile/lib/app/binding_resolution.dart` — the actual runtime hydration pipeline
+    (`readFieldPath`, `substituteItemRefsInProps`/`InAction`, `resolveNodeBindings`,
+    `evaluateVisibility`, `pruneInvisible`) that turns a compatibility-approved binding tree into an
+    ordinary, fully-literal `SchemaComponent` tree — `decodeAction`/`AppActionDispatcher` need zero
+    changes, since `$item.*` substitution happens upstream of dispatch, exactly as §3.4 of the
+    evidence doc anticipated ("an extension of existing code, not new dispatch logic").
+    `CommerceClient.fetchBindingResource()` added — a raw (untyped) JSON fetch for
+    `commerce.categories`/`commerce.products`/`commerce.cart`, deliberately bypassing typed models so
+    `$item.*` resolves against actual wire field names (snake_case) rather than risking drift against
+    Dart's camelCase models.
+  - **Deliberate, owner-directed scope narrowing — this is *not* the full slice 3 the earlier entry
+    above described.** The Decision Gate approval was explicit: "Keep the server-side capability flip
+    DISABLED. This slice may implement and prove the mobile runtime, but publishing these
+    capabilities server-side remains gated until the required shipped/proven mobile-runtime condition
+    from the approved architecture is satisfied." Consequently `RuntimeCapabilities.dataResources`/
+    `schemaFeatures` stay **empty on both PHP and Dart sides** — unchanged by this task — and
+    `kHomeSchemaJson`/`kCartSchemaJson`/`home_screen.dart`/`cart_screen.dart` were **deliberately left
+    untouched**: `CapabilityManifest.current()` still declares no data resources/schema features, so
+    wiring the bundled schema to `binding.collect` today would prune/fail it, not light it up. The
+    mechanism is instead proven end-to-end — including real `ComponentView` rendering and real action
+    dispatch (`openProduct`/`updateCartQuantity`/`removeCartItem` all firing with `$item.*`-resolved
+    params) for Home's `ProductList` and Cart's `CartList` shapes — via new tests that construct a
+    manifest simulating a future runtime with the capability shipped
+    (`mobile/test/app/binding_resolution_test.dart`, `binding_resolution_widget_test.dart`).
+    `ProductScreen`/route context (`$route.productId`) and item-scoped `visibility` remain explicitly
+    out of scope, per the same Decision Gate.
+  - **What remains open** (call it slice 3b, not yet started): rewiring `HomeScreen`/`CartScreen`
+    to actually call `resolveNodeBindings`/`CommerceClient.fetchBindingResource`, updating the
+    bundled schemas to declare real `binding`/`collect`, and — only once that ships in a real,
+    verified mobile release — flipping `RuntimeCapabilities.dataResources`/`schemaFeatures` non-empty
+    on both PHP and Dart. **This is an operational/business milestone ("shipped and proven"), not
+    something a coding session can attest to or manufacture** — see `RuntimeCapabilities.dataResources`'s
+    own doc comment on both sides. Until it is met, `APP-BUILDER-18`'s own definition of done (§3.4:
+    "once an action is reachable end-to-end through a bound, schema-declared path,"
+    `ActionRegistry.dispatchStatus` updates to `DISPATCH_LIVE`) is **not yet satisfiable** — the action
+    is proven reachable in tests, not "reachable" through the shipped app, since no shipped screen
+    uses `binding` yet. `APP-BUILDER-18`/`APP-BUILDER-20` are therefore **not promoted to `ready`** by
+    this task, despite the table's pre-recorded "ready (after 17)"/"ready (after 18+19)" — that
+    pre-recorded readiness assumed slice 3 would include the screen rewiring + capability flip, which
+    this owner-directed narrowing deferred. See `TASK-QUEUE.md`'s matching entry for the queue-level
+    status update.
+  - Tests: PHP (`AppSchemaParserTest`, `CompatibilityResolverTest`) + Dart (`compatibility_test.dart`,
+    `commerce_client_test.dart`, `binding_resolution_test.dart`, `binding_resolution_widget_test.dart`)
+    — parser validation, unknown/non-LIST/unknown-feature `collect` rejection, old/basic-binding-
+    runtime rejection, `itemProps` backward compatibility, `ProductList`/`CartList` collection
+    hydration, composite child-template repetition, recursive `$item.*` prop/action-param
+    substitution (including out-of-contract references failing closed to `null`, never throwing),
+    and real widget rendering/dispatch for both Home and Cart shapes. One real bug found and fixed
+    during CI (not caught by local review, since no Flutter SDK exists in this session): the
+    collect/list-repeat container was rebuilt via `node.withChildren(...)`, which copies
+    `SchemaComponent.binding` verbatim, so the resolved node still carried its now-consumed binding —
+    fixed to rebuild the container explicitly with `binding: null`. Full `php artisan test` run
+    locally: 4707 passed; remaining 27 failures are pre-existing and unrelated (`Fuel*`/
+    `FuelCostBasisService` — the `bcmath` PHP extension is absent from this sandbox; one
+    `DocumentCenterSecureIntakeTest` PDF-fixture case) — confirmed via CI's own fresh build passing
+    cleanly on both engines. Two pre-existing local-build sync gaps unrelated to this diff
+    (`app/Mail/AuthActionMail.php`, `resources/views/emails/auth-action.blade.php`, both present in
+    the core repo but missing from this session's locally-built copy) were synced to get an accurate
+    local signal; not part of this PR's diff.
 
 **`APP-BUILDER-19` — live publish → fetch → on-device-cache loop, done** (ADR-01 §8 Decision Point 1
 = yes). Independent of `APP-BUILDER-17`/`18` (depends only on ADR-01 itself) — correctly buildable

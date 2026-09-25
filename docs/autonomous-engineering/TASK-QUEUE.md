@@ -925,10 +925,10 @@ Source of truth for this horizon:
 | 2 | APP-BUILDER-14 | done | APP-BUILDER-13 | App Schema `binding` contract (parser + compatibility resolver) |
 | 3 | APP-BUILDER-15 | done (PR #998 merged) | APP-BUILDER-14 | Builder Data UX (Inspector binding editor) |
 | 4 | APP-BUILDER-16 | done (schema contract) | ADR-01 | Conditions/Visibility contract (closed/typed/allowlisted) + Inspector UX |
-| 5 | APP-BUILDER-17 | in_progress (slices 1-2/3 merged) | APP-BUILDER-14 | Mobile runtime binding/visibility resolver (replaces 3 hand-written screen implementations) — split into parser support / compatibility gating / resolver+screens+capability flip, see entry below |
-| 6 | APP-BUILDER-18 | ready (after 17) | APP-BUILDER-17 | Real action dispatch wired through schema bindings |
+| 5 | APP-BUILDER-17 | done (slices 1-3 merged; slice 3 owner-narrowed scope — see entry below) | APP-BUILDER-14 | Mobile runtime binding/visibility resolver (replaces 3 hand-written screen implementations) — split into parser support / compatibility gating / resolver mechanism, see entry below |
+| 6 | APP-BUILDER-18 | blocked (not promotable — see entry below) | APP-BUILDER-17 | Real action dispatch wired through schema bindings |
 | 7 | APP-BUILDER-19 | done | ADR-01 (Decision Point 1 = YES) | Live publish → fetch → on-device-cache loop (Last Known Good) |
-| 8 | APP-BUILDER-20 | ready (after 18+19) | APP-BUILDER-18, APP-BUILDER-19 | Same-Store integrated proof |
+| 8 | APP-BUILDER-20 | blocked (depends on 18) | APP-BUILDER-18, APP-BUILDER-19 | Same-Store integrated proof |
 | 9 | APP-BUILDER-21 | done (PR #997 merged) | none (independent, mandatory) | App Builder UX/localization pass |
 | 10 | APP-BUILDER-22 | done (PR #997 merged) | none (independent, mandatory) | Canvas + Flutter theme-token rendering fix |
 | 11 | APP-BUILDER-23 | blocked | all above | Horizon closure report |
@@ -1117,10 +1117,43 @@ into three independently-shippable slices (see the detailed slice breakdown in `
   validity has no registry dependency). 24 new/updated Dart tests, mirroring the scope-appropriate
   subset of `CompatibilityResolverTest.php`'s binding/visibility coverage. **Unverified locally (no
   Flutter SDK)** — relies on `mobile-ci.yml`.
-- **Slice 3 — resolver + screens + capability flip** (not started): the real fetch/hydrate/evaluate
-  layer, `HomeScreen`/`CartScreen`/`ProductScreen` rewired off hand-written hydration, bundled schemas
-  updated to declare real bindings, and only then flipping `RuntimeCapabilities::DATA_RESOURCES`/
-  `SCHEMA_FEATURES` server-side. This is the queue's actual "APP-BUILDER-18 depends on 17" edge.
+- **Slice 3 — generic `binding.collect` mechanism + resolution pipeline, done (owner-narrowed scope).**
+  PR #1004 merged (squash SHA `c273550d76c35b78be6b3dfc797db34f8e521178`). A pre-implementation
+  readiness check found Cart's per-line UI needs a composite (multi-component) item template, which
+  the flat `itemProps` contract can't express — resolved via an owner-approved Decision Gate into a
+  generic `binding.collect` field (dotted path to a `LIST`-typed field; single item template repeated
+  per entry; `$item.<field>` substitution), implemented and fail-closed-gated identically in PHP and
+  Dart, with a real Dart hydration pipeline (`mobile/lib/app/binding_resolution.dart`) proven via unit
+  and widget tests. **Owner-directed scope narrowing, explicit**: the server-side (and mirrored Dart)
+  capability flip (`RuntimeCapabilities.dataResources`/`schemaFeatures`) stays disabled — "publishing
+  these capabilities server-side remains gated until the required shipped/proven mobile-runtime
+  condition ... is satisfied" — so `HomeScreen`/`CartScreen`/`ProductScreen` and the bundled schemas
+  were **not** rewired; the mechanism is proven via constructed-manifest tests instead. Full detail in
+  `CURRENT-STATE.md`'s matching entry.
+- **Slice 3b — screen rewiring + capability flip (not started, blocked on an operational milestone,
+  not evidence or a decision Claude can resolve)**: rewiring `HomeScreen`/`CartScreen` to call
+  `resolveNodeBindings`/`fetchBindingResource`, declaring real `binding`/`collect` on the bundled
+  schemas, and only once that ships in a verified mobile release, flipping
+  `RuntimeCapabilities.dataResources`/`schemaFeatures` non-empty on both PHP and Dart. This is the
+  queue's actual "APP-BUILDER-18 depends on 17" edge — and it is **not yet closed**: see the
+  `APP-BUILDER-18`/`APP-BUILDER-20` status update immediately below.
+
+**`APP-BUILDER-18`/`APP-BUILDER-20` re-evaluated against this new evidence and found not promotable —
+moved to `blocked`, not `ready`.** The table above pre-recorded both as "ready (after 17)"/"ready
+(after 18+19)" under the assumption that finishing `APP-BUILDER-17` would include screen rewiring +
+the capability flip (slice 3b above). `APP-BUILDER-18`'s own Definition of Done (evidence doc §3.4):
+"once an action is reachable end-to-end through a bound, schema-declared path,"
+`ActionRegistry.dispatchStatus` updates to a new `DISPATCH_LIVE` status. The action *is* now provably
+reachable through a bound path — in tests, against a manifest simulating a shipped runtime — but not
+through the actually-shipped app, since no shipped screen declares `binding` yet (slice 3b, above,
+undone). Marking `dispatchStatus` `DISPATCH_LIVE` today would misrepresent the Inspector's own status
+signal to App Builder authors. This is not a new product/architecture decision to escalate — it is the
+same "shipped/proven mobile-runtime" operational precondition slice 3 already named, which this coding
+session cannot manufacture or attest to (no owner has declared a mobile release live). `APP-BUILDER-20`
+inherits the same block through its `APP-BUILDER-18` dependency. No further row in this table is
+`ready`: `APP-BUILDER-21`/`22` are already `done`; `APP-BUILDER-23`'s own row already reads `blocked`
+("all above"). Per `AWJ-HORIZON-SYSTEM.md`'s continue-only-independent-ready-work rule, this session
+stops here rather than force either row forward.
 
 `APP-BUILDER-19` (live publish → fetch → on-device-cache loop) is `done` — independent of
 `APP-BUILDER-17`/`18` (only ADR-01 itself), so correctly buildable ahead of either. Wires real I/O
