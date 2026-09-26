@@ -225,9 +225,7 @@ export default async function TrustVisualPage({
     verification: {
       crNumber: DECOY_CR,
       licenseNumber:
-        scenario === "empty" || scenario === "missing-identity"
-          ? ""
-          : "LIC-42",
+        scenario === "empty" || scenario === "missing-identity" ? "" : "LIC-42",
     },
     sbc: {
       show_in_storefront:
@@ -271,7 +269,12 @@ export default async function TrustVisualPage({
     : null;
   const appLinks = [
     ios && isSafeAppStoreUrl(ios)
-      ? { id: "app-ios", store: "apple" as const, label: "App Store", href: ios }
+      ? {
+          id: "app-ios",
+          store: "apple" as const,
+          label: "App Store",
+          href: ios,
+        }
       : null,
     android && isSafePlayStoreUrl(android)
       ? {
