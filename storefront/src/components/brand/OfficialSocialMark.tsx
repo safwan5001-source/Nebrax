@@ -2,14 +2,14 @@
  * Compact official marks. The bytes under `/brand/social` are unmodified
  * first-party files. Do not redraw, recolor, or substitute an icon pack.
  *
- * whatsapp  — static.whatsapp.net glyph served as the whatsapp.com icon
- * instagram — static.cdninstagram.com apple-touch glyph
+ * whatsapp  — WhatsApp Brand Resource Center `Digital_Glyph_Green_RGB_2026.svg`
+ * instagram — Instagram brand pack `Instagram_Glyph_White.svg` (dark-footer variant)
  * x         — X Brand Toolkit `x-logo.zip` `logo.svg` (official white)
  * tiktok    — TikTok developer `logo-pack.zip` `TikTok_Icon_Black_Circle.png`
- * snapchat  — static.snapchat.com official Ghost apple-touch icon
+ * snapchat  — Snapchat Support official Ghost `Ghost Logo - Primary.svg` (white)
  * youtube   — YouTube Brand Resource Center `youtube-icon.zip` red digital icon
  * linkedin  — LinkedIn brand downloads `in-logo.zip` `LI-In-Bug.png`
- * facebook  — facebook.com `fb_icon_325x325.png`
+ * facebook  — Facebook Brand Asset Pack `Facebook_Logo_Primary.png`
  *
  * Storefront and web each keep a byte-identical copy because they are
  * separate Next.js apps with no shared static root.
@@ -17,16 +17,16 @@
 
 export const OFFICIAL_SOCIAL_MARKS = {
   instagram: {
-    src: "/brand/social/instagram.webp",
-    width: 180,
-    height: 180,
+    src: "/brand/social/instagram.svg",
+    width: 1000,
+    height: 1000,
   },
   x: { src: "/brand/social/x.svg", width: 1200, height: 1227 },
   tiktok: { src: "/brand/social/tiktok.png", width: 1200, height: 1200 },
-  snapchat: { src: "/brand/social/snapchat.png", width: 180, height: 180 },
+  snapchat: { src: "/brand/social/snapchat.svg", width: 500, height: 500 },
   youtube: { src: "/brand/social/youtube.png", width: 1255, height: 1075 },
   linkedin: { src: "/brand/social/linkedin.png", width: 635, height: 540 },
-  facebook: { src: "/brand/social/facebook.png", width: 325, height: 325 },
+  facebook: { src: "/brand/social/facebook.png", width: 2084, height: 2084 },
   whatsapp: { src: "/brand/social/whatsapp.svg", width: 720, height: 720 },
 } as const;
 
