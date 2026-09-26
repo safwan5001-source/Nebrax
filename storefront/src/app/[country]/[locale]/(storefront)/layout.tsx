@@ -261,6 +261,7 @@ export default async function StorefrontLayout({
         socialLinks={publishedSocialLinks(presentation)}
         whatsappHref={footerWhatsApp}
         appLinks={appLinks}
+        licenseNumber={presentation?.verification.licenseNumber ?? ""}
         categoryLinks={
           <Suspense fallback={<FooterCategoryLinksFallback />}>
             <StorefrontFooterCategoryLinks

@@ -102,6 +102,11 @@ interface PanelsProps {
   config: StorefrontPresentationConfig;
   locale: CustomizerLocale;
   liveStoreName: string | null;
+  businessIdentity?: {
+    legal_name: string | null;
+    cr_number: string | null;
+    vat_number: string | null;
+  };
   onChange: (next: StorefrontPresentationConfig) => void;
 }
 
@@ -110,6 +115,7 @@ export function ControlPanels({
   config,
   locale,
   liveStoreName,
+  businessIdentity,
   onChange,
 }: PanelsProps) {
   const t = (key: CustomizerMessageKey) => customizerMessage(locale, key);
@@ -141,7 +147,14 @@ export function ControlPanels({
     case "social":
       return <SocialPanel config={config} t={t} patch={patch} />;
     case "verification":
-      return <VerificationPanel config={config} t={t} patch={patch} />;
+      return (
+        <VerificationPanel
+          config={config}
+          t={t}
+          patch={patch}
+          businessIdentity={businessIdentity}
+        />
+      );
     case "apps":
       return <AppsPanel config={config} t={t} patch={patch} />;
     case "pages":
@@ -1139,11 +1152,21 @@ function VerificationPanel({
   config,
   t,
   patch,
+  businessIdentity,
 }: {
   config: StorefrontPresentationConfig;
   t: (key: CustomizerMessageKey) => string;
   patch: (partial: Partial<StorefrontPresentationConfig>) => void;
+  businessIdentity?: {
+    legal_name: string | null;
+    cr_number: string | null;
+    vat_number: string | null;
+  };
 }) {
+  const legalName = businessIdentity?.legal_name?.trim() || null;
+  const crNumber = businessIdentity?.cr_number?.trim() || null;
+  const vatNumber = businessIdentity?.vat_number?.trim() || null;
+
   return (
     <div className="space-y-6">
       <Section title={t("sbcTitle")}>
@@ -1188,34 +1211,33 @@ function VerificationPanel({
           />
         </div>
       </Section>
-      <Section hint={t("verificationIntro")}>
-        <div className="border border-awj-editor-border px-3 py-3">
-          <p className="text-[12px] font-medium text-awj-editor-muted">
-            {t("awjVerified")}
-          </p>
-          <p className="mt-1 text-[15px] font-semibold text-awj-editor-foreground">
-            {t("notVerified")}
-          </p>
-          <p className="mt-2 text-[12px] leading-5 text-awj-editor-muted">
-            {t("verificationWarning")}
-          </p>
-        </div>
+      <Section
+        title={t("businessInformation")}
+        hint={t("canonicalIdentityHint")}
+      >
+        <Field label={t("legalName")}>
+          <output className={`${inputClass} block bg-neutral-50`}>
+            {legalName || "—"}
+          </output>
+        </Field>
+        <Field label={t("crNumber")}>
+          <output className={`${inputClass} block bg-neutral-50`} dir="ltr">
+            {crNumber || "—"}
+          </output>
+        </Field>
+        <Field label={t("vatNumber")}>
+          <output className={`${inputClass} block bg-neutral-50`} dir="ltr">
+            {vatNumber || "—"}
+          </output>
+        </Field>
+        <a
+          href="/settings"
+          className="inline-flex text-[12px] font-medium text-primary underline-offset-4 hover:underline"
+        >
+          {t("businessInformationSettings")}
+        </a>
       </Section>
       <Section title={t("merchantProvided")}>
-        <Field label={t("crNumber")}>
-          <input
-            className={inputClass}
-            value={config.verification.crNumber}
-            onChange={(event) =>
-              patch({
-                verification: {
-                  ...config.verification,
-                  crNumber: event.target.value,
-                },
-              })
-            }
-          />
-        </Field>
         <Field label={t("licenseNumber")}>
           <input
             className={inputClass}
@@ -1245,17 +1267,6 @@ function VerificationPanel({
           />
         </Field>
       </Section>
-      <div className="border-y border-awj-editor-border">
-        <Toggle
-          label={t("requestedVerified")}
-          checked={config.verification.requestedVerifiedLabel}
-          onChange={(requestedVerifiedLabel) =>
-            patch({
-              verification: { ...config.verification, requestedVerifiedLabel },
-            })
-          }
-        />
-      </div>
     </div>
   );
 }

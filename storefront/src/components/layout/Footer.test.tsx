@@ -71,6 +71,36 @@ describe("Footer SBC presentation", () => {
     expect(screen.queryByTestId("sbc-seal-preview")).toBeNull();
   });
 
+  it("renders canonical identity and a separate merchant license", async () => {
+    const view = await Footer({
+      ...baseProps,
+      businessIdentity: {
+        legal_name: "شركة النور",
+        cr_number: "7050247977",
+        vat_number: null,
+      },
+      licenseNumber: "LIC-42",
+    });
+    const screen = render(view);
+
+    expect(screen.getByText("legalName: شركة النور")).toBeTruthy();
+    expect(screen.getByText("crNumber: 7050247977")).toBeTruthy();
+    expect(screen.queryByText(/vatNumber/)).toBeNull();
+    expect(screen.getByText("merchantProvided")).toBeTruthy();
+    expect(screen.getByText("licenseNumber: LIC-42")).toBeTruthy();
+  });
+
+  it("omits the merchant-provided group when the license is blank", async () => {
+    const view = await Footer({
+      ...baseProps,
+      licenseNumber: "   ",
+    });
+    const screen = render(view);
+
+    expect(screen.queryByText("merchantProvided")).toBeNull();
+    expect(screen.queryByText("businessInformation")).toBeNull();
+  });
+
   it("renders no SBC presentation when the merchant turns it off", async () => {
     const view = await Footer({
       ...baseProps,

@@ -704,7 +704,7 @@ export function StorefrontPreviewCanvas({
                 </p>
               )}
               {hasBusinessIdentity ? (
-                <div className="mt-4 space-y-1">
+                <div className="mt-4 space-y-1 break-words">
                   <p className="font-medium text-store-footer-link">
                     {t("businessInformation")}
                   </p>
@@ -726,7 +726,7 @@ export function StorefrontPreviewCanvas({
                 </div>
               ) : null}
               {config.verification.licenseNumber.trim() ? (
-                <div className="mt-4 space-y-1">
+                <div className="mt-4 space-y-1 break-words">
                   <p className="font-medium text-store-footer-link">
                     {t("merchantProvided")}
                   </p>

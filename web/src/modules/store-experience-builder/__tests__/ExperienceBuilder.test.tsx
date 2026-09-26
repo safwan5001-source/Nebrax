@@ -313,6 +313,8 @@ describe('ExperienceBuilder persistence wiring', () => {
     await user.click(screen.getByRole('button', { name: 'Verification & trust' }));
 
     expect(screen.getByText('7050247977')).toBeTruthy();
+    expect(screen.getByText('Al-Noor Company')).toBeTruthy();
+    expect(screen.getAllByText('—').length).toBeGreaterThan(0);
     expect(
       screen.getByRole('link', { name: 'Manage company information' }).getAttribute('href'),
     ).toBe('/settings');

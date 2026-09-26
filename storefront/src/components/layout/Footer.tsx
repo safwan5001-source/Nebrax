@@ -34,6 +34,7 @@ interface FooterProps {
   socialLinks?: { id: string; network: string; href: string }[];
   whatsappHref?: string | null;
   appLinks?: { id: string; label: string; href: string }[];
+  licenseNumber?: string;
 }
 
 interface FooterCategoryLinksProps {
@@ -116,6 +117,7 @@ export async function Footer({
   socialLinks = [],
   whatsappHref = null,
   appLinks = [],
+  licenseNumber = "",
 }: FooterProps) {
   const t = await getTranslations({ locale, namespace: "footer" });
   const tp = await getTranslations({ locale, namespace: "policies" });
@@ -126,6 +128,7 @@ export async function Footer({
   const legalName = businessIdentity.legal_name?.trim() || null;
   const crNumber = businessIdentity.cr_number?.trim() || null;
   const vatNumber = businessIdentity.vat_number?.trim() || null;
+  const license = licenseNumber.trim();
   const hasContact = Boolean(
     contact?.phone || contact?.email || contact?.address || contact?.hours,
   );
@@ -248,6 +251,7 @@ export async function Footer({
         {(hasContact ||
           socialLinks.length > 0 ||
           hasBusinessIdentity ||
+          license ||
           showSbc) && (
           <div className="mt-8 border-t border-store-footer-border pt-6 text-sm text-store-footer-muted">
             {contact?.phone ? <p>{contact.phone}</p> : null}
@@ -269,7 +273,7 @@ export async function Footer({
               </p>
             ) : null}
             {hasBusinessIdentity ? (
-              <div className="mt-4 space-y-1">
+              <div className="mt-4 space-y-1 break-words">
                 <p className="font-medium text-store-footer-link">
                   {t("businessInformation")}
                 </p>
@@ -288,6 +292,16 @@ export async function Footer({
                     {t("vatNumber")}: {vatNumber}
                   </p>
                 ) : null}
+              </div>
+            ) : null}
+            {license ? (
+              <div className="mt-4 space-y-1 break-words">
+                <p className="font-medium text-store-footer-link">
+                  {t("merchantProvided")}
+                </p>
+                <p>
+                  {t("licenseNumber")}: {license}
+                </p>
               </div>
             ) : null}
             {showSbc ? (
