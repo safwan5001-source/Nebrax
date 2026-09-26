@@ -32,7 +32,7 @@ Dependency-ready next tasks:
 - `STORE-BRAND-SOCIAL-ASSET-EVIDENCE-1`
 - `STORE-BRAND-PAY-EVIDENCE-1`
 
-`STORE-BRAND-WA-SOCIAL-1` remains blocked until the official asset registry is complete.
+`STORE-BRAND-WA-SOCIAL-1` remains blocked only until the official asset registry is complete. Safwan has explicitly authorized use of the authentic official marks, including TikTok; brand-use restrictions are documented risk, not an extra decision gate.
 
 ## Key payment gate
 
