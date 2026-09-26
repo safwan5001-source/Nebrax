@@ -17,10 +17,9 @@ async function assertPublishedFooter(
   width: number,
   locale: "ar" | "en",
 ) {
-  await expect(page.locator('[data-trust-surface="published"]')).toHaveAttribute(
-    "dir",
-    locale === "ar" ? "rtl" : "ltr",
-  );
+  await expect(
+    page.locator('[data-trust-surface="published"]'),
+  ).toHaveAttribute("dir", locale === "ar" ? "rtl" : "ltr");
 
   const overflow = await page.evaluate(() => ({
     scrollWidth: document.documentElement.scrollWidth,
