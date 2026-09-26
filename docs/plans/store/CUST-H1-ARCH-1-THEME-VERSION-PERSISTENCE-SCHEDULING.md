@@ -283,7 +283,7 @@ On the **first Version creation** (or, as a defensive fallback, first Version pu
 Creation requirements:
 
 - lock the owned Storefront;
-- attempt a lazy insert with normalized default `draft_config`, `draft_revision = 0`, current `schema_version`, and null Published pointers;
+- attempt a lazy insert with normalized default `draft_config`, `draft_revision = 0`, current legacy `schema_version`, matching non-null `draft_schema_version`, `published_schema_version = null`, and null Published/version pointers;
 - rely on `unique(storefront_id)` as the final race authority;
 - catch unique violation outside the aborted PostgreSQL transaction and retry-read the winning head, following the existing STORE-BACKEND-1 first-insert pattern;
 - only then create/publish Version state.
@@ -795,10 +795,13 @@ Cancel first, then delete.
 
 1. lock Storefront/head/Version;
 2. require target is current scheduled pointer;
-3. validate future timestamp;
-4. increment generation;
-5. update scheduled_for;
-6. commit.
+3. compare the request's expected Version `revision` with the locked Version; mismatch → **409** before any schedule change;
+4. validate future timestamp;
+5. increment generation;
+6. update scheduled_for;
+7. commit.
+
+A stale reschedule request must never silently schedule a Version whose content changed after the scheduling dialog was opened.
 
 Old execution token becomes stale.
 
@@ -903,7 +906,16 @@ Compatibility behavior is explicit:
 
 Map only to `compatibility_working_version_id`.
 
-If the compatibility Version is also the current active Published Version, legacy editing must first fork/create a Draft compatibility Version; it must not mutate the active row in place. Persist the new compatibility pointer atomically.
+If the compatibility Version is also the current active Published Version, legacy editing must first fork/create a Draft compatibility Version; it must not mutate the active row in place.
+
+Runtime fork revision rule:
+
+- the fork starts with `revision = current legacy draft_revision` (minimum 1);
+- the legacy PUT validates the caller's expected `draft_revision` against that preserved value;
+- the same transaction then applies the requested save and increments both the compatibility Version revision and legacy head `draft_revision` consistently;
+- the new `compatibility_working_version_id` is persisted atomically.
+
+This prevents an unchanged legacy client from seeing a revision reset or spurious 409 during the Active→Draft compatibility fork.
 
 New Customizer UI moves to Version APIs.
 
@@ -1076,6 +1088,7 @@ True concurrency tests should run on PostgreSQL where repository convention alre
 - publish vs save;
 - publish vs publish;
 - schedule vs reschedule;
+- stale reschedule revision → 409 with no schedule mutation;
 - schedule vs cancel;
 - stale job generation no-op.
 
