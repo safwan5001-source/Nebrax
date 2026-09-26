@@ -350,34 +350,34 @@ export async function Footer({
                   {hours ? <ContactDetail kind="hours" value={hours} /> : null}
                   {whatsappHref ? (
                     <p>
-                    <a
-                      href={whatsappHref}
-                      className={`${footerLinkClassName} inline-flex min-h-11 items-center gap-2`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      <OfficialSocialMark network="whatsapp" />
-                      {t("whatsapp")}
-                    </a>
+                      <a
+                        href={whatsappHref}
+                        className={`${footerLinkClassName} inline-flex min-h-11 items-center gap-2`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        <OfficialSocialMark network="whatsapp" />
+                        {t("whatsapp")}
+                      </a>
                     </p>
                   ) : null}
                   {visibleSocial.length > 0 ? (
                     <div className="flex flex-wrap items-center gap-1">
-                    {visibleSocial.map((item) => {
-                      const label = socialLabel(item.network);
-                      return (
-                        <a
-                          key={item.id}
-                          href={item.href}
-                          className={officialSocialLinkClassName}
-                          aria-label={label}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          <OfficialSocialMark network={item.network} />
-                        </a>
-                      );
-                    })}
+                      {visibleSocial.map((item) => {
+                        const label = socialLabel(item.network);
+                        return (
+                          <a
+                            key={item.id}
+                            href={item.href}
+                            className={officialSocialLinkClassName}
+                            aria-label={label}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            <OfficialSocialMark network={item.network} />
+                          </a>
+                        );
+                      })}
                     </div>
                   ) : null}
                 </div>
