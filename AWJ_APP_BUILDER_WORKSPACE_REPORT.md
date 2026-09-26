@@ -64,6 +64,16 @@ They remain independent tools. App Builder was not merged with `ExperienceBuilde
 - **Deep links:** route URLs remain identical (`/app-builder`, `/app-builder/new`, `/app-builder/:id`, `/app-builder/:id/versions`, `/app-builder/:id/builder`). Only the Next route-group composition changed.
 - **RTL/LTR:** the editor now uses the active locale (`ar` → `rtl`, otherwise `ltr`) instead of hard-coding RTL. Root HTML direction remains supplied by the existing root layout.
 
+## BranchScope verification
+
+The route-group move intentionally does **not** add `BranchScope` to `CommerceLayout` or App Builder.
+
+- Before the change, `AppLayout` mounted `BranchScope` around `(app)` children and also used `useBranchVersion` for ERP-shell state.
+- After the change, no App Builder file under `web/src/app/(commerce)/app-builder` or `web/src/modules/app-builder` imports or references `BranchScope`, `useBranchVersion`, or `BRANCH_CHANGED_EVENT`.
+- Every App Builder data request uses the shared `api()` helper (`/app-builder/apps`, drafts, registries, validation, and versions). `api()` reads `localStorage.getItem('nibras_active_branch')` at request time and adds `X-Branch-Id` when present.
+- Therefore App Builder does not rely on the old wrapper to select or update branch context. Branch selection remains a shared request concern, and no wrapper or branch behavior was changed.
+- Existing branch resolution tests passed: **8/8** (`branch.test.ts`, `branch-view.test.ts`).
+
 ## Tests / results
 
 - Focused App Builder editor tests: **passed — 30 tests**.
@@ -71,24 +81,25 @@ They remain independent tools. App Builder was not merged with `ExperienceBuilde
 - Commerce navigation tests: **passed — 10 tests** (`nav.test.ts` and `commerce-workspace-nav.test.ts`).
 - JSON validation for `en.json` and `ar.json`: **passed**.
 - `git diff --check`: passed before commit.
+- Branch context tests: **passed — 8 tests**.
 
 ## Build / CI
 
 - `pnpm run build`: **passed** (`next build`; compiled, lint/type validity for production build, generated 175 static pages).
 - The generated route table includes `/app-builder`, `/app-builder/[id]`, `/app-builder/[id]/builder`, `/app-builder/[id]/versions`, and `/app-builder/new`.
 - Standalone `pnpm exec tsc --noEmit` reports **12 pre-existing errors in 9 unrelated test files** (POS configuration, platform integrations, document/product tests, and import jobs). None reference the changed files; the production Next build passed its own validity step.
-- No CI workflow was dispatched by this task; PR checks are expected to run normally after opening the PR.
+- GitHub PR CI: **passed — all checks green on PR #1059**. This includes the Web CI Next.js build and the PHP test matrix (SQLite and PostgreSQL jobs).
 
 ## Risks / remaining work
 
 - The App Manager and creation/version routes remain inside the Commerce workspace shell rather than the full-bleed editor surface. This is intentional: only the actual builder editor needs maximum canvas/panel space, while list/detail/form pages retain normal Commerce navigation and clear escape routes.
 - The new route predicate intentionally targets `/app-builder/:id/builder` (with an optional trailing slash), avoiding accidental chrome removal from App Manager, detail, version, and creation routes.
-- Browser-level authenticated visual QA was not run in this sandbox; focused component tests and production build cover the route composition and rendered shell contract.
+- Browser QA: **manual QA pending**. The local server was reachable and the unauthenticated Commerce → App Builder navigation redirected to the login screen as expected. A demo-session attempt could not be completed because the Browser tool session reset/unavailable; no authenticated Arabic/English builder interaction was claimed as passed.
 - The existing unrelated TypeScript test errors should be addressed separately; they were not expanded in this PR.
 
 ## Head SHA
 
-`efcd900cb7010c8b3b889a223b2576a4275f7d4c`
+`931dda237f8ee063c8208587e5a8845360532712`
 
 ## Suggested next step
 
