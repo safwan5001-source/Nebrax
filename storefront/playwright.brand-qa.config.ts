@@ -5,7 +5,10 @@ export default defineConfig({
   timeout: 90_000,
   fullyParallel: false,
   workers: 1,
-  reporter: [["list"], ["html", { open: "never", outputFolder: "playwright-brand-qa-report" }]],
+  reporter: [
+    ["list"],
+    ["html", { open: "never", outputFolder: "playwright-brand-qa-report" }],
+  ],
   use: {
     baseURL: "http://127.0.0.1:3001",
     headless: true,
