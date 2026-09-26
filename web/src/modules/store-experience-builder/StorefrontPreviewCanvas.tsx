@@ -3,6 +3,7 @@
 import { Home, LayoutGrid, Search, ShoppingBag, User } from "lucide-react";
 import type { CSSProperties, ReactNode } from "react";
 import { OfficialStoreBadge } from "./OfficialStoreBadge";
+import { ContactDetail, contactDetailText } from "./ContactDetail";
 import {
   isOfficialSocialNetwork,
   OfficialSocialMark,
@@ -151,6 +152,10 @@ export function StorefrontPreviewCanvas({
   const legalName = businessIdentity.legal_name?.trim() || null;
   const crNumber = businessIdentity.cr_number?.trim() || null;
   const vatNumber = businessIdentity.vat_number?.trim() || null;
+  const phone = contactDetailText(config.contact.phone);
+  const email = contactDetailText(config.contact.email);
+  const address = contactDetailText(config.contact.address);
+  const hours = contactDetailText(config.contact.hours);
   const hasBusinessIdentity = Boolean(legalName || crNumber || vatNumber);
 
   return (
@@ -682,10 +687,10 @@ export function StorefrontPreviewCanvas({
                 : <span>{t("pagesHint")}</span>}
             </FooterCol>
           </div>
-          {(config.contact.phone ||
-            config.contact.email ||
-            config.contact.address ||
-            config.contact.hours ||
+          {(phone ||
+            email ||
+            address ||
+            hours ||
             footerWhatsapp ||
             enabledSocial.length > 0 ||
             hasBusinessIdentity ||
@@ -743,10 +748,10 @@ export function StorefrontPreviewCanvas({
                   </div>
                 </section>
               ) : null}
-              {config.contact.phone ||
-              config.contact.email ||
-              config.contact.address ||
-              config.contact.hours ||
+              {phone ||
+              email ||
+              address ||
+              hours ||
               footerWhatsapp ||
               enabledSocial.length > 0 ? (
                 <section className="min-w-0">
@@ -754,12 +759,12 @@ export function StorefrontPreviewCanvas({
                     {t("communication")}
                   </h3>
                   <div className="mt-3 break-words">
-                    {config.contact.phone ? <p>{config.contact.phone}</p> : null}
-                    {config.contact.email ? <p>{config.contact.email}</p> : null}
-                    {config.contact.address ? (
-                      <p>{config.contact.address}</p>
+                    {phone ? <ContactDetail kind="phone" value={phone} /> : null}
+                    {email ? <ContactDetail kind="email" value={email} /> : null}
+                    {address ? (
+                      <ContactDetail kind="address" value={address} />
                     ) : null}
-                    {config.contact.hours ? <p>{config.contact.hours}</p> : null}
+                    {hours ? <ContactDetail kind="hours" value={hours} /> : null}
                     {footerWhatsapp ? (
                       <p>
                         <a

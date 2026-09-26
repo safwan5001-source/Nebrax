@@ -11,6 +11,10 @@ import {
 import { SbcSeal } from "@/components/layout/SbcSeal";
 import { StoreBrand } from "@/components/layout/StoreBrand";
 import { StoreContainer } from "@/components/layout/StoreContainer";
+import {
+  ContactDetail,
+  contactDetailText,
+} from "@/components/store/ContactDetail";
 import { OfficialStoreBadge } from "@/components/store/OfficialStoreBadge";
 import { POLICY_LINKS } from "@/lib/constants/policies";
 import { isSafeAppStoreUrl, isSafePlayStoreUrl } from "@/lib/presentation/urls";
@@ -188,9 +192,11 @@ export async function Footer({
         return network;
     }
   };
-  const hasContact = Boolean(
-    contact?.phone || contact?.email || contact?.address || contact?.hours,
-  );
+  const phone = contactDetailText(contact?.phone);
+  const email = contactDetailText(contact?.email);
+  const address = contactDetailText(contact?.address);
+  const hours = contactDetailText(contact?.hours);
+  const hasContact = Boolean(phone || email || address || hours);
   const hasBusinessIdentity = Boolean(legalName || crNumber || vatNumber);
 
   return (
@@ -335,10 +341,12 @@ export async function Footer({
             ) : null}
             {hasContact || whatsappHref || visibleSocial.length > 0 ? (
               <TrustGroup id="footer-communication" title={t("communication")}>
-                {contact?.phone ? <p>{contact.phone}</p> : null}
-                {contact?.email ? <p>{contact.email}</p> : null}
-                {contact?.address ? <p>{contact.address}</p> : null}
-                {contact?.hours ? <p>{contact.hours}</p> : null}
+                {phone ? <ContactDetail kind="phone" value={phone} /> : null}
+                {email ? <ContactDetail kind="email" value={email} /> : null}
+                {address ? (
+                  <ContactDetail kind="address" value={address} />
+                ) : null}
+                {hours ? <ContactDetail kind="hours" value={hours} /> : null}
                 {whatsappHref ? (
                   <p>
                     <a
