@@ -6,8 +6,8 @@
 | Order | Task ID | Status | Risk | Depends on | Outcome |
 |---|---|---|---|---|---|
 | 0 | STORE-BRAND-0 | done | normal | horizon definition | Evidence matrix for marks/utility icons + current payment architecture inventory |
-| 1 | STORE-BRAND-SOCIAL-ASSET-EVIDENCE-1 | ready | normal | STORE-BRAND-0 | Close first-party asset/usage evidence for WhatsApp + seven social networks |
-| 2 | STORE-BRAND-WA-SOCIAL-1 | blocked_on_asset_evidence | normal | STORE-BRAND-SOCIAL-ASSET-EVIDENCE-1 | Official WhatsApp + seven supported social marks with Preview/Public parity |
+| 1 | STORE-BRAND-SOCIAL-ASSET-EVIDENCE-1 | done | normal | STORE-BRAND-0 | First-party asset/usage registry closed for WhatsApp + seven social networks |
+| 2 | STORE-BRAND-WA-SOCIAL-1 | ready | normal | STORE-BRAND-SOCIAL-ASSET-EVIDENCE-1 | Official WhatsApp + seven supported social marks with Preview/Public parity |
 | 3 | STORE-BRAND-APPS-1 | ready | normal | STORE-BRAND-0 | Verify/fix official App Store / Google Play badges in AppPromo + Footer |
 | 4 | STORE-BRAND-CONTACT-1 | ready | normal | STORE-BRAND-0 | AWJ utility icons for phone/email/address/hours on Preview + Published |
 | 5 | STORE-BRAND-PAY-EVIDENCE-1 | ready | high | STORE-BRAND-0 | Prove payment-method source-of-truth and classify implementation readiness |
@@ -188,5 +188,7 @@ Definition of Done:
 - no runtime code;
 - owner decision is already recorded to proceed with authentic official marks, including TikTok;
 - WA-SOCIAL-1 promoted when every mark it will render has a confirmed first-party asset/variant.
+
+Registry: `docs/plans/store/AWJ_STORE_BRAND_SOCIAL_ASSET_REGISTRY.md`.
 
 Do not substitute an unofficial icon pack. Brand-use restrictions remain documented risk, not an implementation blocker unless they expose a technical/security issue.

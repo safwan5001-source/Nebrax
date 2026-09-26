@@ -25,14 +25,18 @@ Complete the storefront's visible mark/icon layer with:
 
 `STORE-BRAND-0` — PASS.
 
+`STORE-BRAND-SOCIAL-ASSET-EVIDENCE-1` — PASS.
+
+Official registry: `docs/plans/store/AWJ_STORE_BRAND_SOCIAL_ASSET_REGISTRY.md`.
+
 Dependency-ready next tasks:
 
+- `STORE-BRAND-WA-SOCIAL-1`
 - `STORE-BRAND-CONTACT-1`
 - `STORE-BRAND-APPS-1`
-- `STORE-BRAND-SOCIAL-ASSET-EVIDENCE-1`
 - `STORE-BRAND-PAY-EVIDENCE-1`
 
-`STORE-BRAND-WA-SOCIAL-1` remains blocked only until the official asset registry is complete. Safwan has explicitly authorized use of the authentic official marks, including TikTok; brand-use restrictions are documented risk, not an extra decision gate.
+Safwan has explicitly authorized authentic official marks, including TikTok. The social asset evidence gate is closed.
 
 ## Key payment gate
 
