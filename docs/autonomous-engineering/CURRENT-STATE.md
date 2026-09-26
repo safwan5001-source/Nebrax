@@ -2,7 +2,7 @@
 
 > This file is a durable resume point, not a substitute for Git/GitHub evidence.
 
-LAST_UPDATED: 2026-09-26 (**AWJ Store Trust horizon, STATE-1 recorded.** STORE-TRUST-0 squash-merged as PR #1048, merge SHA `fa237e392bd4a5bfd1ffc19e3800aaa81e6e53bc`, reviewed head `917bc658f93df86f838c5662c40407680aec1c3b`. Owner branding decision is now on main: `KEEP_EMBEDDED_MEDIA_UNTIL_PERSISTENT_STORAGE_IS_AUTHORIZED` in `docs/plans/store/AWJ_STORE_BRANDING_MEDIA_OWNER_DECISION.md`. PR #1044 stays unmerged. No runtime change. No deploy. Next ready: BIZ-1, SBC-1, WA-1, SOCIAL-1, APPS-1.)
+LAST_UPDATED: 2026-09-26 (**AWJ Store Trust horizon.** STORE-TRUST-0 merged `fa237e392bd4a5bfd1ffc19e3800aaa81e6e53bc`, POST_MERGE_REVIEW PASS. STORE-TRUST-STATE-1 squash-merged as PR #1049, merge SHA `f7db2b5bf1cd86e6dfc79c962e862bc7136e78b7`, reviewed head `05f47cc295dc171c69bb1bab17ff07595ed44598`. Post-merge CI for STATE-1 is run 36240798438 and is not yet recorded PASS. STORE-TRUST-SBC-1 re-verified #926 with no code change and no P1/P2. PR #1044 stays unmerged. No storage activation. No deploy. Next ready: BIZ-1, WA-1, SOCIAL-1, APPS-1.)
 
 ## Previous snapshot
 

@@ -10,7 +10,7 @@
 | 0 | STORE-TRUST-0 | done | normal | horizon definition | Evidence matrix + official-source registry + exact current-state classification |
 | 1 | STORE-TRUST-STATE-1 | done | normal | STORE-TRUST-0 | Reconcile owner branding/storage deferral from open PR #1044 into durable main history without runtime change |
 | 2 | STORE-TRUST-BIZ-1 | ready | high | STORE-TRUST-0 | Canonical legal name / CR / VAT / store-name presentation parity |
-| 3 | STORE-TRUST-SBC-1 | ready | high | STORE-TRUST-0; PR #926 merged | Post-merge SBC contract/security/visual parity verification; fix only proven gaps |
+| 3 | STORE-TRUST-SBC-1 | done | high | STORE-TRUST-0; PR #926 merged | Post-merge SBC contract/security/visual parity verification; fix only proven gaps |
 | 4 | STORE-TRUST-WA-1 | ready | normal | STORE-TRUST-0 | WhatsApp link + official icon evidence + Preview/Public parity |
 | 5 | STORE-TRUST-SOCIAL-1 | ready | normal | STORE-TRUST-0 | Supported social links/icons, accessibility, URL safety, parity |
 | 6 | STORE-TRUST-APPS-1 | ready | normal | STORE-TRUST-0 | App Store / Google Play links + official badge evidence + Footer/AppPromo parity |

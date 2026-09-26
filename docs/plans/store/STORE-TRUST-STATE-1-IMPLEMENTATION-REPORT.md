@@ -41,20 +41,20 @@ Recorded on the PR for the exact head.
 
 ## Pre-merge review
 
-- PRE_MERGE_REVIEW: pending the PR comment for the exact head
-- Reviewed Head SHA:
-- Findings / resolution:
+- PRE_MERGE_REVIEW: PASS
+- Reviewed Head SHA: `05f47cc295dc171c69bb1bab17ff07595ed44598`
+- Findings / resolution: none. Comment: https://github.com/safwan5001-source/Nebrax/pull/1049#issuecomment-5846114871
 
 ## Merge
 
-- Merge status: not merged
-- Merge SHA:
+- Merge status: squash-merged as PR #1049
+- Merge SHA: `f7db2b5bf1cd86e6dfc79c962e862bc7136e78b7`
 
 ## Post-merge review
 
-- POST_MERGE_REVIEW: pending
+- POST_MERGE_REVIEW: pending CI on the merge SHA
 - Reviewed Merge SHA:
-- Target-branch checks/smoke:
+- Target-branch checks/smoke: run 36240798438 started on `f7db2b5bf1cd86e6dfc79c962e862bc7136e78b7`
 - Findings / resolution:
 
 ## Self-review
