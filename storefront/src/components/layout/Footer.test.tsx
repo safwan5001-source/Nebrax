@@ -199,4 +199,29 @@ describe("Footer SBC presentation", () => {
       screen.getByRole("navigation", { name: "policies" }).querySelector("img"),
     ).toBeNull();
   });
+
+  it("wraps an unbroken tagline and copyright instead of widening the footer", async () => {
+    const view = await Footer({
+      ...baseProps,
+      tagline: "AwjUnbrokenToken".repeat(12),
+      copyright: "AwjUnbrokenToken".repeat(8),
+    });
+    const screen = render(view);
+    const nodes = screen.getAllByText(/AwjUnbrokenToken/);
+
+    expect(
+      nodes.some(
+        (node) =>
+          node.className.includes("break-words") &&
+          node.className.includes("max-w-lg"),
+      ),
+    ).toBe(true);
+    expect(
+      nodes.some(
+        (node) =>
+          node.className.includes("break-words") &&
+          node.className.includes("text-xs"),
+      ),
+    ).toBe(true);
+  });
 });

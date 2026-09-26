@@ -211,7 +211,7 @@ export async function Footer({
           </p>
         )}
         {tagline.trim() ? (
-          <p className="mt-3 max-w-lg text-sm text-store-footer-muted">
+          <p className="mt-3 max-w-lg break-words text-sm text-store-footer-muted">
             {tagline.trim()}
           </p>
         ) : null}
@@ -385,7 +385,7 @@ export async function Footer({
 
       <div className="border-t border-store-footer-border">
         <StoreContainer className="py-5">
-          <p className="text-xs text-store-footer-muted">
+          <p className="break-words text-xs text-store-footer-muted">
             {copyright.trim() ? (
               copyright.trim()
             ) : (

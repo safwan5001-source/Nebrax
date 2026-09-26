@@ -159,7 +159,7 @@ export function StorefrontPreviewCanvas({
             className={cn(
               storeContainerClassName,
               compact
-                ? "grid grid-cols-[1fr_auto_1fr] items-center gap-2 py-2"
+                ? "grid grid-cols-[1fr_minmax(0,1fr)_1fr] items-center gap-2 py-2"
                 : "flex items-center gap-6 py-3",
             )}
           >
@@ -441,7 +441,7 @@ export function StorefrontPreviewCanvas({
             />
           )}
           {config.footer.tagline.trim() ? (
-            <p className="mt-3 max-w-lg text-sm text-store-footer-muted">
+            <p className="mt-3 max-w-lg break-words text-sm text-store-footer-muted">
               {config.footer.tagline}
             </p>
           ) : null}
@@ -618,7 +618,7 @@ export function StorefrontPreviewCanvas({
         </div>
         <div className="border-t border-store-footer-border">
           <div className={cn(storeContainerClassName, "py-5")}>
-            <p className="text-xs text-store-footer-muted">
+            <p className="break-words text-xs text-store-footer-muted">
               {config.footer.copyright.trim() || `© ${storeName}`}
             </p>
           </div>

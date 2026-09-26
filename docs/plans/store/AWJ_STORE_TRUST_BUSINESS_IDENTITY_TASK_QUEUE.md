@@ -9,13 +9,13 @@
 |---|---|---|---|---|---|
 | 0 | STORE-TRUST-0 | done | normal | horizon definition | Evidence matrix + official-source registry + exact current-state classification |
 | 1 | STORE-TRUST-STATE-1 | done | normal | STORE-TRUST-0 | Reconcile owner branding/storage deferral from open PR #1044 into durable main history without runtime change |
-| 2 | STORE-TRUST-BIZ-1 | ready | high | STORE-TRUST-0 | Canonical legal name / CR / VAT / store-name presentation parity |
+| 2 | STORE-TRUST-BIZ-1 | done | high | STORE-TRUST-0 | Canonical legal name / CR / VAT / store-name presentation parity |
 | 3 | STORE-TRUST-SBC-1 | done | high | STORE-TRUST-0; PR #926 merged | Post-merge SBC contract/security/visual parity verification; fix only proven gaps |
-| 4 | STORE-TRUST-WA-1 | ready | normal | STORE-TRUST-0 | WhatsApp link + official icon evidence + Preview/Public parity |
-| 5 | STORE-TRUST-SOCIAL-1 | ready | normal | STORE-TRUST-0 | Supported social links/icons, accessibility, URL safety, parity |
-| 6 | STORE-TRUST-APPS-1 | ready | normal | STORE-TRUST-0 | App Store / Google Play links + official badge evidence + Footer/AppPromo parity |
-| 7 | STORE-TRUST-COMPOSE-1 | pending | normal | BIZ/SBC/WA/SOCIAL/APPS merged and post-merge reviewed | Shared Footer grouping, density, responsive composition |
-| 8 | STORE-TRUST-QA-1 | pending | high | implemented slices | RTL/LTR responsive + accessibility + security regression pass |
+| 4 | STORE-TRUST-WA-1 | done | normal | STORE-TRUST-0 | WhatsApp link + official icon evidence + Preview/Public parity |
+| 5 | STORE-TRUST-SOCIAL-1 | done | normal | STORE-TRUST-0 | Supported social links/icons, accessibility, URL safety, parity |
+| 6 | STORE-TRUST-APPS-1 | done | normal | STORE-TRUST-0 | App Store / Google Play links + official badge evidence + Footer/AppPromo parity |
+| 7 | STORE-TRUST-COMPOSE-1 | done | normal | BIZ/SBC/WA/SOCIAL/APPS merged and post-merge reviewed | Shared Footer grouping, density, responsive composition |
+| 8 | STORE-TRUST-QA-1 | done | high | implemented slices | RTL/LTR responsive + accessibility + security regression pass |
 | 9 | STORE-TRUST-CLOSE-1 | pending | normal | all ready work closed | Closure report + durable CURRENT-STATE |
 
 ## STORE-TRUST-0 — Evidence Pass
