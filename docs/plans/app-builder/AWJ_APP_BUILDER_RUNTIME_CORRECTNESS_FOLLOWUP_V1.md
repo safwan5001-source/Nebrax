@@ -93,7 +93,7 @@ Stop only for a genuine Decision Gate, a real blocker, or scope crossing as defi
 |---|---|---|
 | RUNTIME-CORRECTNESS-1 | Evidence lock for the two LIVE-PREVIEW-7 findings | **DONE** |
 | RUNTIME-CORRECTNESS-2 | Correct proof/test overclaims without weakening assertions | **DONE** |
-| RUNTIME-CORRECTNESS-3 | Generic CartSummary live hydration | **READY** |
+| RUNTIME-CORRECTNESS-3 | Generic CartSummary live hydration | **READY** (implementation pushed, PR pending CI) |
 | RUNTIME-CORRECTNESS-4 | Integrated runtime proof for arbitrary CartSummary ids | BLOCKED on RC-3 |
 | RUNTIME-CORRECTNESS-5 | Horizon closure / durable documentation | BLOCKED on RC-4 |
 
@@ -364,7 +364,9 @@ release-mode CI/build proof is green and the task does not require device-only b
 
 - PR: #1036
 - Base SHA: `110dc0d944ee821160c4cb2290d6471be8cabab0`
-- Head SHA: (this task's own commit `45ca3a0` on the restarted `claude/awj-runtime-correctness-followup-x7anrt`)
+- Head SHA: `b0e54567bb6b9a305f16e7f52012cfe19ae0468a`
+- Merge SHA: `4dba0cd00d08e0775906d6e93a61686982b9cd17` (squash merge)
+- CI: green (4/4 pull_request-triggered `php artisan test` L11 sqlite/pgsql checks on the final head)
 - Scope: doc-comment wording corrections only in
   `tests/Feature/AppBuilderIntegratedProofTest.php` and `tests/Feature/AppBuilderSameStoreProofTest.php`
   — no assertion removed, weakened, or added; no runtime/behavior change (RC-1 found no tiny
@@ -378,13 +380,54 @@ release-mode CI/build proof is green and the task does not require device-only b
   `--filter=AppBuilderSameStoreProofTest` (1 passed, 21 assertions) — both assertion counts
   unchanged from pre-change baseline, confirming no assertion was added/removed. Broader
   `--filter=AppBuilder` (16 passed, 177 assertions) all green. Full local suite attempted
-  (4706 passed / 35 failed / 49 skipped) — all 35 failures are pre-existing
-  `FuelSupplyReceivingTest`/`FuelCostBasisService` `bcmul()` errors caused by this sandbox's PHP
-  build having no `bcmath` extension loaded (confirmed via `php -m`), unrelated to this change and
-  unrelated to App Builder; GitHub CI is the authoritative full-suite signal.
+  (4706 passed / 35 failed / 49 skipped) — all 35 failures are pre-existing local-sandbox-only
+  issues unrelated to this change and unrelated to App Builder: most (Fuel* tests) are
+  `Call to undefined function App\Services\bcmul()` because this sandbox's PHP build has no
+  `bcmath` extension loaded (confirmed via `php -m`); the remainder (`AuthRecoveryTest`,
+  `DocumentCenterSecureIntakeTest`) are mail-fake/other local config gaps. GitHub CI (full PHP
+  extension set) is the authoritative full-suite signal, and this PR's own CI was green (above).
 - Decision Gate check: not applicable (docs/comments only).
 - Risks: none introduced.
-- Next task: **RUNTIME-CORRECTNESS-3 — Generic CartSummary live hydration**.
+
+### RUNTIME-CORRECTNESS-3 — READY (implementation pushed, PR pending CI)
+
+- Base SHA: `4dba0cd00d08e0775906d6e93a61686982b9cd17`
+- Scope: `mobile/lib/app/experience_hydration.dart` (new `hydrateNodesByType` function, the
+  type-keyed counterpart to the existing id-keyed `hydrateNode`), `mobile/lib/app/cart_screen.dart`
+  (one call site: `hydrateNode(..., 'slot.cart.summary', ...)` → `hydrateNodesByType(...,
+  'CartSummary', ...)`), and `mobile/test/app/experience_hydration_test.dart` (5 new focused unit
+  tests). No schema/API change; no other file touched.
+- Result: `CartSummary`'s live `itemCount`/`subtotalAmountMinor`/`summaryLabel` now reach any
+  `CartSummary` node regardless of its authored `id` — keyed off `SchemaComponent.type` (already a
+  required, capability-gated field), not a hardcoded slot id. `hydrateNodesByType` reuses
+  `hydrateNode`'s exact recursive shape (same fail-safe-on-no-match contract, same "apply to every
+  matching node across sibling subtrees" behavior — already true of the original id-keyed walk, so
+  a schema with more than one `CartSummary` node gets deterministic, non-special-cased behavior for
+  free, per RC-1's evidence that no repository schema does this today anyway).
+- Tests added (all mirror the existing id-keyed `hydrateNode` test shapes 1:1): a `CartSummary`
+  under a merchant-authored, non-default id is hydrated; a deeply nested `CartSummary` is found by
+  type; two `CartSummary` nodes both receive the transform; no match leaves the tree unchanged
+  (fail-safe); the root node itself can be the match.
+- Tests run: **could not run `flutter test`/`flutter analyze` locally — no Flutter/Dart SDK is
+  installed in this sandbox** (consistent with the predecessor horizon's own recorded constraint:
+  "this sandbox had no Flutter toolchain throughout the horizon"). Verified by manual review only:
+  brace/paren balance, type-checked field usage against `SchemaComponent`'s real constructor
+  signature, and cross-referencing every other `slot.cart.summary`/`CartSummary` reference in
+  `mobile/` to confirm no other file depends on the old id-keyed call. **GitHub CI's `mobile
+  (analyze + test)` job is the authoritative verification for this task** — the same precedent
+  LIVE-PREVIEW-7 established for its own new Dart test code.
+- Decision Gate check: no schema/API field added; no multi-`CartSummary` product-semantics decision
+  needed (RC-1 confirmed none exists today, and the walk's existing "apply to every match" behavior
+  handles it without a new rule); no auth/RBAC/Tenant Isolation/Commerce authorization touched; no
+  compatibility/fail-closed behavior weakened (`hydrateNodesByType`'s no-match case is unchanged
+  from `hydrateNode`'s); no runtime architecture redesign (one new ~10-line pure function, one call
+  site changed); no executable merchant code; no scope creep into Preview/theme/visibility/App
+  Factory/distribution. **No gate triggered.**
+- Risks: this task's own Dart changes are unverified by this session pending real CI (see above) —
+  flagged explicitly rather than claimed as tested; low risk given the mechanical nature of the
+  change and the exact-precedent reuse of `hydrateNode`'s already-proven shape.
+- Next task: **RUNTIME-CORRECTNESS-4 — Integrated proof** (blocked until this PR's CI, especially
+  the `mobile (analyze + test)` job, is confirmed green and merged).
 
 ## Autonomous execution instruction
 

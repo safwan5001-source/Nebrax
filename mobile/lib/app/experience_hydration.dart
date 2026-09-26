@@ -27,6 +27,39 @@ SchemaComponent hydrateNode(
   ]);
 }
 
+/// The type-keyed counterpart to [hydrateNode]: rebuilds [root] with every
+/// descendant node whose `type` is [targetType] replaced by
+/// `transform(thatNode)`, instead of matching one hardcoded `id`.
+///
+/// Used where a live value (RUNTIME-CORRECTNESS-3: `CartSummary`'s live
+/// `itemCount`/`subtotalAmountMinor`) must reach a node of a given kind
+/// regardless of the `id` a schema author gave it — `id`-keyed [hydrateNode]
+/// only works for the bundled Default Experience's own fixed slot ids, never
+/// for a generically-authored Published Experience that reuses the same
+/// component type under a different id. `SchemaComponent.type` is already a
+/// required, non-empty, capability-gated field (`RuntimeCapabilities.
+/// components`), so this introduces no new schema/API surface.
+///
+/// This walk already applies [transform] independently to *every* matching
+/// node it finds across sibling subtrees (the same is already true of
+/// [hydrateNode]'s id-keyed walk — ids simply happen to be unique in
+/// practice) — deterministic and additive if a schema ever authors more than
+/// one node of [targetType]. It never recurses into a matched node's own
+/// children (matching [hydrateNode]'s own contract). Returns [root]
+/// unchanged if no node has that type anywhere (fail-safe, same contract as
+/// [hydrateNode]).
+SchemaComponent hydrateNodesByType(
+  SchemaComponent root,
+  String targetType,
+  SchemaComponent Function(SchemaComponent node) transform,
+) {
+  if (root.type == targetType) return transform(root);
+  if (root.children.isEmpty) return root;
+  return root.withChildren([
+    for (final child in root.children) hydrateNodesByType(child, targetType, transform),
+  ]);
+}
+
 /// Returns a copy of [node] with `props[key]` set to [value] — the small
 /// reconstruction every [hydrateNode] `transform` callback that only needs
 /// to change one prop would otherwise repeat inline. Used by
