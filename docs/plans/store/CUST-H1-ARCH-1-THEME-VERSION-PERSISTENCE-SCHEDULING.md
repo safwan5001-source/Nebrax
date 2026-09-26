@@ -583,23 +583,39 @@ Immediate Publish must:
 4. lock target Version;
 5. re-check tenant/storefront/version relationship;
 6. validate expected Version revision;
-7. normalize target Version config server-side;
-8. enforce document-size limits;
-9. if normalization upgrades/transforms the Version document or schema, atomically persist the normalized `config` and resulting `schema_version` back to the target Version before/with publication; define this normalization-only rewrite as **not a merchant edit**, so it does not create a stale-edit surprise or increment the merchant-facing Version revision unless implementation evidence proves revision increment is necessary;
-10. copy that exact persisted normalized config to existing head `published_config`;
-11. atomically set head `published_schema_version = target.schema_version` using the persisted target schema version;
-12. do **not** retag the unrelated compatibility Draft; `draft_schema_version` remains the schema version of `draft_config`;
-13. update legacy shared `schema_version` only according to the compatibility strategy chosen in implementation, and never use it as authority for new reads;
-14. update `published_revision` with a compatibility monotonic value;
-15. update `published_at = now()`;
-16. set `active_version_id = target.id`;
-17. set target `last_published_at = now()`;
-18. if target was scheduled, clear its schedule and head `scheduled_version_id`;
-19. commit.
+7. **before normalization**, require `target.schema_version <= StorefrontPresentationNormalizer::VERSION`; if the Version uses a forward schema unsupported by the running code, abort with a lifecycle/compatibility conflict and leave both the Version and current Published snapshot unchanged;
+8. normalize target Version config server-side;
+9. enforce document-size limits;
+10. if normalization upgrades/transforms the Version document or schema, atomically persist the normalized `config` and resulting `schema_version` back to the target Version before/with publication; define this normalization-only rewrite as **not a merchant edit**, so it does not create a stale-edit surprise or increment the merchant-facing Version revision unless implementation evidence proves revision increment is necessary;
+11. copy that exact persisted normalized config to existing head `published_config`;
+12. atomically set head `published_schema_version = target.schema_version` using the persisted target schema version;
+13. do **not** retag the unrelated compatibility Draft; `draft_schema_version` remains the schema version of `draft_config`;
+14. update legacy shared `schema_version` only according to the compatibility strategy chosen in implementation, and never use it as authority for new reads;
+15. update `published_revision` with a compatibility monotonic value;
+16. update `published_at = now()`;
+17. set `active_version_id = target.id`;
+18. set target `last_published_at = now()`;
+19. if target was scheduled, clear its schedule and head `scheduled_version_id`;
+20. commit.
 
 The Published document and `published_schema_version` are one atomic pair. The Draft document and `draft_schema_version` are a separate atomic pair. A v2 Published document must never be interpreted through a v1 tag, and publishing v2 must never silently retag a still-v1 legacy Draft.
 
 The active Version row must also remain the exact source of the live snapshot after normalization. Reading or duplicating the active Version later must produce the same document semantics as the public head.
+
+### Forward-schema fail-closed rule
+
+A Version written by a newer deployment must **never** be normalized by an older runtime if `version.schema_version > StorefrontPresentationNormalizer::VERSION`.
+
+This protects rolling deploys and rollbacks from the existing forward-schema fallback behavior that can resolve unsupported documents to the AWJ Modern default.
+
+Immediate Publish and Scheduled Publish must share this exact guard. On failure:
+
+- no Version config/schema mutation;
+- no `published_config` mutation;
+- no active pointer change;
+- no schedule-success mark;
+- current live storefront remains unchanged;
+- response/job outcome is explicit and observable.
 
 No partial public state is observable.
 
@@ -1152,6 +1168,8 @@ True concurrency tests should run on PostgreSQL where repository convention alre
 - draft_schema_version remains paired with draft_config;
 - publishing v2 after migrated v1 head preserves v2 semantics in public normalization without reinterpreting a v1 compatibility draft;
 - failed publish leaves old snapshot;
+- forward-schema Version is rejected before normalization and leaves Version + Published snapshot unchanged;
+- scheduled forward-schema Version also fails closed without replacing live;
 - idempotent republish;
 - public runtime sees only current Published.
 
