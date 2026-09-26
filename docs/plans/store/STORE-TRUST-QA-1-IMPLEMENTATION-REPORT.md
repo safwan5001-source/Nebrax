@@ -111,6 +111,8 @@ None.
 
 English production-route shots exist at 390 only. Configured production-route shots do not exist here because there is no seeded tenant. The fixture uses the published components and helpers.
 
+`measurements.json` originally kept the failed-attempt log for two Arabic long preview cells and for the production-route cells, even after those JPEGs were recaptured. Those superseded connection and timeout strings were removed. Cells with no JPEG (English production route above 390) stay marked not captured. Pixel measures that were never rewritten into the JSON remain in this report.
+
 ## Git state
 
 - Branch: `feat/store-trust-qa-1`

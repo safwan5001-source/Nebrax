@@ -2122,9 +2122,8 @@
       "width": 390,
       "file": "preview-long-ar-390.jpg",
       "url": "http://127.0.0.1:3100/dev/trust-visual?locale=ar&scenario=long&viewport=mobile",
-      "findings": [
-        "TimeoutError: page.goto: Timeout 30000ms exceeded.\nCall log:\n  - navigating to \"http://127.0.0.1:3100/dev/trust-visual?locale=ar&scenario=long&viewport=mobile\", waiting until \"domcontentloaded\"\n"
-      ]
+      "findings": [],
+      "captureNote": "Superseded capture error. The JPEG is the successful recapture. Numeric scrollWidth for this cell is in STORE-TRUST-QA-1-IMPLEMENTATION-REPORT.md, not this object."
     },
     {
       "surface": "published",
@@ -2188,9 +2187,8 @@
       "width": 768,
       "file": "preview-long-ar-768.jpg",
       "url": "http://127.0.0.1:3100/dev/trust-visual?locale=ar&scenario=long&viewport=tablet",
-      "findings": [
-        "TimeoutError: locator.screenshot: Timeout 29706.883ms exceeded.\nCall log:\n  - taking element screenshot\n  - waiting for fonts to load...\n"
-      ]
+      "findings": [],
+      "captureNote": "Superseded capture error. The JPEG is the successful recapture. Numeric scrollWidth for this cell is in STORE-TRUST-QA-1-IMPLEMENTATION-REPORT.md, not this object."
     },
     {
       "surface": "published",
@@ -3391,97 +3389,95 @@
       "file": "route-empty-ar-390.jpg",
       "locale": "ar",
       "width": 390,
-      "findings": [
-        "Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:3101/us/ar\nCall log:\n  - navigating to \"http://127.0.0.1:3101/us/ar\", waiting until \"domcontentloaded\"\n"
-      ]
+      "findings": [],
+      "captureNote": "Superseded connection error. The JPEG is the successful empty-route capture. Arabic widths 390–1440 and English 390 were retaken after the dev server was restarted."
     },
     {
       "file": "route-empty-ar-430.jpg",
       "locale": "ar",
       "width": 430,
-      "findings": [
-        "Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:3101/us/ar\nCall log:\n  - navigating to \"http://127.0.0.1:3101/us/ar\", waiting until \"domcontentloaded\"\n"
-      ]
+      "findings": [],
+      "captureNote": "Superseded connection error. The JPEG is the successful empty-route capture. Arabic widths 390–1440 and English 390 were retaken after the dev server was restarted."
     },
     {
       "file": "route-empty-ar-768.jpg",
       "locale": "ar",
       "width": 768,
-      "findings": [
-        "Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:3101/us/ar\nCall log:\n  - navigating to \"http://127.0.0.1:3101/us/ar\", waiting until \"domcontentloaded\"\n"
-      ]
+      "findings": [],
+      "captureNote": "Superseded connection error. The JPEG is the successful empty-route capture. Arabic widths 390–1440 and English 390 were retaken after the dev server was restarted."
     },
     {
       "file": "route-empty-ar-1024.jpg",
       "locale": "ar",
       "width": 1024,
-      "findings": [
-        "Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:3101/us/ar\nCall log:\n  - navigating to \"http://127.0.0.1:3101/us/ar\", waiting until \"domcontentloaded\"\n"
-      ]
+      "findings": [],
+      "captureNote": "Superseded connection error. The JPEG is the successful empty-route capture. Arabic widths 390–1440 and English 390 were retaken after the dev server was restarted."
     },
     {
       "file": "route-empty-ar-1280.jpg",
       "locale": "ar",
       "width": 1280,
-      "findings": [
-        "Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:3101/us/ar\nCall log:\n  - navigating to \"http://127.0.0.1:3101/us/ar\", waiting until \"domcontentloaded\"\n"
-      ]
+      "findings": [],
+      "captureNote": "Superseded connection error. The JPEG is the successful empty-route capture. Arabic widths 390–1440 and English 390 were retaken after the dev server was restarted."
     },
     {
       "file": "route-empty-ar-1440.jpg",
       "locale": "ar",
       "width": 1440,
-      "findings": [
-        "Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:3101/us/ar\nCall log:\n  - navigating to \"http://127.0.0.1:3101/us/ar\", waiting until \"domcontentloaded\"\n"
-      ]
+      "findings": [],
+      "captureNote": "Superseded connection error. The JPEG is the successful empty-route capture. Arabic widths 390–1440 and English 390 were retaken after the dev server was restarted."
     },
     {
       "file": "route-empty-en-390.jpg",
       "locale": "en",
       "width": 390,
-      "findings": [
-        "Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:3101/us/en\nCall log:\n  - navigating to \"http://127.0.0.1:3101/us/en\", waiting until \"domcontentloaded\"\n"
-      ]
+      "findings": [],
+      "captureNote": "Superseded connection error. The JPEG is the successful empty-route capture. Arabic widths 390–1440 and English 390 were retaken after the dev server was restarted."
     },
     {
       "file": "route-empty-en-430.jpg",
       "locale": "en",
       "width": 430,
       "findings": [
-        "Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:3101/us/en\nCall log:\n  - navigating to \"http://127.0.0.1:3101/us/en\", waiting until \"domcontentloaded\"\n"
-      ]
+        "not captured: the local storefront dev server exited before this English width"
+      ],
+      "captureNote": "English production-route evidence exists at 390 only. Other English widths are covered by the published fixture, which mounts the same Footer."
     },
     {
       "file": "route-empty-en-768.jpg",
       "locale": "en",
       "width": 768,
       "findings": [
-        "Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:3101/us/en\nCall log:\n  - navigating to \"http://127.0.0.1:3101/us/en\", waiting until \"domcontentloaded\"\n"
-      ]
+        "not captured: the local storefront dev server exited before this English width"
+      ],
+      "captureNote": "English production-route evidence exists at 390 only. Other English widths are covered by the published fixture, which mounts the same Footer."
     },
     {
       "file": "route-empty-en-1024.jpg",
       "locale": "en",
       "width": 1024,
       "findings": [
-        "Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:3101/us/en\nCall log:\n  - navigating to \"http://127.0.0.1:3101/us/en\", waiting until \"domcontentloaded\"\n"
-      ]
+        "not captured: the local storefront dev server exited before this English width"
+      ],
+      "captureNote": "English production-route evidence exists at 390 only. Other English widths are covered by the published fixture, which mounts the same Footer."
     },
     {
       "file": "route-empty-en-1280.jpg",
       "locale": "en",
       "width": 1280,
       "findings": [
-        "Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:3101/us/en\nCall log:\n  - navigating to \"http://127.0.0.1:3101/us/en\", waiting until \"domcontentloaded\"\n"
-      ]
+        "not captured: the local storefront dev server exited before this English width"
+      ],
+      "captureNote": "English production-route evidence exists at 390 only. Other English widths are covered by the published fixture, which mounts the same Footer."
     },
     {
       "file": "route-empty-en-1440.jpg",
       "locale": "en",
       "width": 1440,
       "findings": [
-        "Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:3101/us/en\nCall log:\n  - navigating to \"http://127.0.0.1:3101/us/en\", waiting until \"domcontentloaded\"\n"
-      ]
+        "not captured: the local storefront dev server exited before this English width"
+      ],
+      "captureNote": "English production-route evidence exists at 390 only. Other English widths are covered by the published fixture, which mounts the same Footer."
     }
   ]
 }
