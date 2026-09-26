@@ -1,0 +1,1167 @@
+# CUST-H1-ARCH-1 — Theme Version Persistence & Scheduling Architecture
+
+**Status:** Architecture lock candidate — documentation only  
+**Date:** 2026-09-26  
+**Repository:** `safwan5001-source/Nebrax`  
+**Base:** `main@145dac8a6b46b4b8c7ccfe3d225d950701ddfcea`  
+**Parent Horizon:** `CUST-H1-THEME-VERSIONS-EVIDENCE-UX.md`  
+**Authority after approval:** CUST-H1 implementation slices  
+**No runtime code / migration / API is authorized by this document alone.**
+
+---
+
+## 0. Executive decision
+
+CUST-H1 adopts a **Compatibility Head + Version Rows** architecture.
+
+```
+Tenant
+  └─ Storefront
+       ├─ StorefrontPresentation              (existing 1:1 compatibility/public head)
+       │    ├─ draft_config / draft_revision  (legacy-compatible working head)
+       │    ├─ published_config               (public compatibility snapshot)
+       │    ├─ published_revision
+       │    ├─ published_at
+       │    ├─ active_version_id              (new nullable pointer)
+       │    └─ scheduled_version_id           (new nullable pointer)
+       │
+       └─ StorefrontPresentationVersion[]     (new named independently editable versions)
+            ├─ id
+            ├─ name
+            ├─ config
+            ├─ revision
+            ├─ schema_version
+            ├─ scheduled_for
+            ├─ schedule_generation
+            ├─ last_published_at
+            └─ timestamps
+```
+
+### Why this model
+
+It is the smallest design that simultaneously preserves:
+
+- the existing public runtime contract;
+- current `storefront_presentations` ownership and tenant boundary;
+- backward compatibility for existing merchants;
+- current Published fallback semantics;
+- current normalization rules;
+- current transactional publication guarantees;
+
+while adding:
+
+- multiple named editable copies;
+- independent per-version revisions;
+- one live version;
+- one scheduled next version in CUST-H1 V1;
+- duplication;
+- rename;
+- exact-version preview;
+- safe scheduled publication;
+- retention of the former live design.
+
+The existing head row remains the stable compatibility boundary. Version rows are the new merchant lifecycle model.
+
+---
+
+## 1. Evidence that constrains the design
+
+Current repository evidence:
+
+- `storefront_presentations` is unique 1:1 by `storefront_id`.
+- It stores one `draft_config` and one `published_config`.
+- `StorefrontPresentationService` locks the owned Storefront and presentation row for Save/Publish.
+- Draft save uses an integer optimistic-concurrency revision.
+- Publish is atomic and server-normalized.
+- Public runtime reads only `published_config` and never Draft.
+- A failed Publish leaves Published unchanged.
+- Foreign Storefronts fail through the established tenant-scoped non-leaking path.
+- Current repository search found no generic existing delayed-publication scheduler infrastructure suitable to reuse.
+
+Therefore:
+
+1. replacing the head row would create unnecessary public-runtime and migration risk;
+2. multiple copies cannot be represented honestly inside the current row;
+3. scheduling requires a real server-side execution path and deploy/runtime support, not a browser timer.
+
+---
+
+## 2. Ownership
+
+### Decision
+
+```
+Tenant
+  └─ Storefront
+       ├─ StorefrontPresentation (1:1)
+       └─ StorefrontPresentationVersion (1:N)
+```
+
+Both models are CompanyWide, like Storefront.
+
+Tenant authority remains:
+
+`auth User → SetTenant → TenantContext`
+
+Never:
+
+- request body;
+- version id;
+- storefront id;
+- Host for workspace writes;
+- query string;
+- cookie.
+
+A Version is valid only when:
+
+`version.tenant_id == storefront.tenant_id == TenantContext::id()`
+
+Missing or foreign Storefront/Version returns the same non-leaking **404** semantics used by current Commerce workspace resources.
+
+---
+
+## 3. Existing table evolution
+
+### 3.1 Keep existing columns
+
+Do **not** remove or repurpose:
+
+- `draft_config`
+- `draft_revision`
+- `published_config`
+- `published_revision`
+- `published_at`
+- `schema_version`
+
+They remain compatibility fields during and after CUST-H1.
+
+### 3.2 Add nullable pointers
+
+Add to `storefront_presentations`:
+
+```
+active_version_id       uuid nullable
+scheduled_version_id    uuid nullable
+```
+
+FK strategy:
+
+- both reference `storefront_presentation_versions.id`;
+- `nullOnDelete` is acceptable only through controlled service deletion rules;
+- deleting the active version through normal product APIs is forbidden;
+- deleting a scheduled version requires schedule cancellation in the same transaction first.
+
+Indexes:
+
+- index(active_version_id)
+- index(scheduled_version_id)
+
+### Why pointers live on the head
+
+They establish one authoritative live version and one authoritative scheduled-next version without partial unique indexes or status races across SQLite/PostgreSQL.
+
+Version state is **derived**, not trusted from a merchant-writable status column.
+
+---
+
+## 4. New table — storefront_presentation_versions
+
+### Required columns
+
+```
+id                    uuid PK
+tenant_id             foreignUuid → tenants cascadeOnDelete
+storefront_id         foreignUuid → storefronts cascadeOnDelete
+name                  string(120)
+schema_version        unsignedSmallInteger
+config                json NOT NULL
+revision              unsignedInteger default 1
+scheduled_for         timestamp nullable
+schedule_generation   unsignedInteger default 0
+last_published_at     timestamp nullable
+created_at
+updated_at
+```
+
+### Constraints/indexes
+
+- primary `id`
+- index(`tenant_id`)
+- index(`storefront_id`)
+- index(`tenant_id, storefront_id`)
+- index(`scheduled_for`)
+- index(`storefront_id, scheduled_for`)
+
+Do not require globally unique version names.
+
+A merchant may have two versions with the same display name, although UX should warn/clarify to reduce confusion.
+
+### No SoftDeletes in CUST-H1 V1
+
+Deletion is product deletion, not audit history.
+
+Published/live versions are not deletable by product API.
+
+If future compliance/audit requires tombstones, that is a separate decision.
+
+---
+
+## 5. Version state machine
+
+Version state is calculated server-side.
+
+### Published
+
+`version.id === presentation.active_version_id`
+
+Exactly one or zero active version pointer per Storefront.
+
+### Scheduled
+
+`version.id === presentation.scheduled_version_id`
+AND
+`version.scheduled_for != null`
+
+### Draft
+
+Any existing version that is neither active nor scheduled.
+
+### Important
+
+Do **not** persist a merchant-writable `status` enum.
+
+This prevents contradictory rows such as two `published` versions.
+
+The API may return a derived `state: draft|scheduled|published`.
+
+---
+
+## 6. One-live / one-scheduled V1 rule
+
+CUST-H1 V1 supports:
+
+- many Draft versions;
+- one Published version;
+- at most one Scheduled-next version per Storefront.
+
+Why only one Scheduled-next version:
+
+- matches the first merchant need;
+- keeps scheduling UX understandable;
+- avoids a future-publication queue/state-machine before it is needed;
+- lets the head row be the serialized source of truth.
+
+A future Horizon may support a schedule queue/calendar.
+
+---
+
+## 7. Backfill / migration strategy
+
+Migration must be deterministic and preserve current public bytes/meaning.
+
+### Case A — no presentation row
+
+Create nothing.
+
+The merchant still receives current virtual/default behavior.
+
+First use of Versions can lazily create the first version.
+
+### Case B — presentation row, Published exists, Draft equals Published
+
+Create one Version:
+
+- name: localized/default migration name such as `التصميم الحالي` / server-neutral internal fallback;
+- config = normalized Published;
+- revision = max(1, current draft_revision);
+- last_published_at = existing `published_at`.
+
+Set `active_version_id` to it.
+
+Keep existing head config fields unchanged.
+
+### Case C — Published exists, Draft differs from Published
+
+Create two versions:
+
+1. Published version from `published_config`.
+2. Draft version from `draft_config`.
+
+Set active pointer to Published version.
+
+The legacy/current workspace compatibility draft remains `draft_config` until the CUST-H1 UI switches to explicit version editing.
+
+No user work is discarded.
+
+### Case D — Draft exists, never Published
+
+Create one Draft version from `draft_config`.
+
+`active_version_id = null`.
+
+Public runtime remains AWJ Modern/default exactly as before.
+
+### Idempotency
+
+Backfill must be safely re-runnable or guarded by pointer/version existence so a retry cannot duplicate migrated versions.
+
+Migration code must normalize documents before writing version rows but must not rewrite the existing public head snapshot during migration.
+
+---
+
+## 8. Source-of-truth rules after rollout
+
+### Public runtime
+
+**Still reads `storefront_presentations.published_config`.**
+
+This is intentional.
+
+CUST-H1 does not require the public storefront route to join Versions.
+
+### Version editing
+
+The selected `StorefrontPresentationVersion.config` is the authoritative editable document.
+
+### Active pointer
+
+`active_version_id` identifies which version produced the current Published snapshot.
+
+### Legacy compatibility draft
+
+`draft_config` remains synchronized with the **currently selected compatibility working version only where old API compatibility requires it**.
+
+New CUST-H1 endpoints must not rely on `draft_config` as the source of truth for arbitrary versions.
+
+### Long-term note
+
+A later architecture may retire compatibility draft fields after all clients move to version APIs. CUST-H1 does not remove them.
+
+---
+
+## 9. Version concurrency
+
+Each version has independent:
+
+`revision: uint`
+
+Save contract:
+
+- client sends expected `revision`;
+- server locks owned Storefront + head + selected Version;
+- mismatch → 409;
+- server normalizes config;
+- successful save increments Version revision by 1.
+
+No JSON auto-merge.
+
+Two tabs editing different versions do not conflict.
+
+Two tabs editing the same version use independent-version 409 protection.
+
+---
+
+## 10. Workspace API contract
+
+Existing endpoints remain backward compatible during rollout:
+
+```
+GET  /api/commerce/workspace/storefronts/{storefront}/presentation
+PUT  /api/commerce/workspace/storefronts/{storefront}/presentation
+POST /api/commerce/workspace/storefronts/{storefront}/presentation/publish
+```
+
+New version endpoints:
+
+### List
+
+```
+GET /api/commerce/workspace/storefronts/{storefront}/presentation/versions
+```
+
+Returns merchant-safe fields only:
+
+- id
+- name
+- state (derived)
+- revision
+- scheduled_for
+- last_published_at
+- created_at
+- updated_at
+
+No tenant_id.
+
+### Create new
+
+```
+POST /api/commerce/workspace/storefronts/{storefront}/presentation/versions
+```
+
+Body:
+
+```json
+{
+  "name": "رمضان 1448",
+  "source_version_id": "<optional uuid>"
+}
+```
+
+If source omitted:
+
+- architecture implementation decision: use current active version config if available; otherwise current normalized compatibility Draft/default.
+
+No client config injection in the create-copy endpoint.
+
+### Read exact version
+
+```
+GET /api/commerce/workspace/storefronts/{storefront}/presentation/versions/{version}
+```
+
+Returns:
+
+- metadata;
+- normalized config;
+- revision.
+
+### Save exact version
+
+```
+PUT /api/commerce/workspace/storefronts/{storefront}/presentation/versions/{version}
+```
+
+Body:
+
+```json
+{
+  "config": {},
+  "revision": 7
+}
+```
+
+### Rename
+
+Use focused metadata endpoint or PATCH:
+
+```
+PATCH /api/commerce/workspace/storefronts/{storefront}/presentation/versions/{version}
+```
+
+Allowed envelope:
+
+- name
+- revision if the implementation uses one revision for metadata+config
+
+Recommendation: one revision token for the row to avoid split concurrency semantics.
+
+### Duplicate
+
+Creation with `source_version_id` is sufficient; no separate duplicate route is required.
+
+### Delete
+
+```
+DELETE /api/commerce/workspace/storefronts/{storefront}/presentation/versions/{version}
+```
+
+Reject:
+
+- active version;
+- scheduled version unless schedule is canceled first;
+- foreign version.
+
+### Publish now
+
+```
+POST /api/commerce/workspace/storefronts/{storefront}/presentation/versions/{version}/publish
+```
+
+Body:
+
+```json
+{
+  "revision": 7
+}
+```
+
+### Schedule
+
+```
+PUT /api/commerce/workspace/storefronts/{storefront}/presentation/versions/{version}/schedule
+```
+
+Body:
+
+```json
+{
+  "revision": 7,
+  "scheduled_for": "2026-10-01T21:00:00+03:00"
+}
+```
+
+Server stores a canonical UTC timestamp.
+
+### Cancel schedule
+
+```
+DELETE /api/commerce/workspace/storefronts/{storefront}/presentation/versions/{version}/schedule
+```
+
+All version write endpoints require existing `commerce.manage` and current workspace middleware. No new permission is introduced in CUST-H1.
+
+---
+
+## 11. Publish transaction
+
+Immediate Publish must:
+
+1. begin DB transaction;
+2. lock owned Storefront;
+3. lock `storefront_presentations` head;
+4. lock target Version;
+5. re-check tenant/storefront/version relationship;
+6. validate expected Version revision;
+7. normalize target Version config server-side;
+8. enforce document-size limits;
+9. copy normalized config to existing head `published_config`;
+10. update `published_revision` with a compatibility monotonic value;
+11. update `published_at = now()`;
+12. set `active_version_id = target.id`;
+13. set target `last_published_at = now()`;
+14. if target was scheduled, clear its schedule and head `scheduled_version_id`;
+15. commit.
+
+No partial public state is observable.
+
+### Former live version
+
+The former version row remains intact and becomes Draft by derivation when the active pointer moves away.
+
+This gives safe recovery without inventing another status transition.
+
+### Publishing the already-active unchanged version
+
+May be idempotent 200 when the expected revision/config are unchanged.
+
+Do not rewrite `published_at` on a true no-op.
+
+---
+
+## 12. Compatibility published_revision
+
+Existing public/workspace clients may rely on `published_revision`.
+
+Do not redefine it to equal Version revision, because different Versions may have overlapping revision numbers.
+
+CUST-H1 implementation must make `storefront_presentations.published_revision` a **head-level monotonic publication revision**:
+
+- preserve current value on migration;
+- each non-no-op publish increments by 1;
+- never decrement;
+- version revision remains independent.
+
+This is a deliberate evolution from the old equality `published_revision = draft_revision`.
+
+Any old test asserting equality must be replaced only after proving no external contract depends on equality; API compatibility depends on the field remaining numeric/monotonic, not on internal equality.
+
+This contract change must be called out explicitly in the implementation PR.
+
+---
+
+## 13. Scheduling model
+
+### Decision
+
+Schedule state is persisted in DB; execution is server-side.
+
+No browser timers.
+
+The authoritative schedule consists of:
+
+- head `scheduled_version_id`;
+- target version `scheduled_for`;
+- target version `schedule_generation`.
+
+### schedule_generation
+
+Every schedule/reschedule/cancel increments `schedule_generation`.
+
+A queued/delayed execution carries:
+
+- storefront_id;
+- version_id;
+- expected schedule_generation.
+
+At execution:
+
+- lock Storefront + head + Version;
+- require head scheduled pointer still equals target;
+- require Version generation still equals expected;
+- require `scheduled_for <= now()`;
+- otherwise exit safely/no-op.
+
+This makes stale delayed jobs harmless.
+
+---
+
+## 14. Scheduler runtime contract
+
+Repository evidence did not reveal a reusable delayed-publication worker contract.
+
+Therefore implementation must add a real runtime path and document deployment requirements.
+
+### Preferred execution model
+
+**DB-owned due schedule + idempotent queued job**, with a small recurring dispatcher.
+
+A Laravel scheduled command runs every minute:
+
+```
+storefront-presentations:dispatch-due
+```
+
+It selects due scheduled heads/versions in bounded batches and dispatches idempotent publish jobs.
+
+Why not only delayed queue jobs:
+
+- delayed jobs can be lost/reconfigured during deploy/provider changes;
+- DB remains authoritative;
+- dispatcher can recover due work after downtime.
+
+Why not only direct scheduler publish:
+
+- bounded jobs isolate failures/retries;
+- easier observability.
+
+### Deployment gate
+
+CUST-H1 Scheduled publishing is **GATED** until Production has an always-running scheduler path:
+
+- Laravel scheduler worker/process; or
+- equivalent platform cron invoking `schedule:run`.
+
+Implementation may land code before activation, but UX must not expose LIVE scheduling in Production until runtime scheduling is verified.
+
+---
+
+## 15. Scheduled publish job
+
+Job identity inputs:
+
+- storefront_id;
+- version_id;
+- schedule_generation.
+
+Job behavior:
+
+1. establish safe tenant context from persisted authoritative Storefront/Version relation — never from client input;
+2. transaction + locks;
+3. verify pointer/generation/due time;
+4. normalize target config;
+5. publish through the same internal transaction path as immediate Publish;
+6. clear schedule atomically;
+7. mark result through normal logs/observability.
+
+Retry must be idempotent.
+
+If Publish fails:
+
+- current `published_config` is unchanged;
+- schedule remains diagnosable;
+- implementation must define retry/error observability;
+- do not silently mark success.
+
+---
+
+## 16. Schedule / edit semantics
+
+### Editing a scheduled version
+
+Allowed.
+
+But a saved edit increments Version revision while the schedule still points to that Version.
+
+At execution, **the latest saved config of that same scheduled Version** is published.
+
+This is the simplest merchant mental model:
+
+> “I scheduled this design version.”
+
+not:
+
+> “I scheduled a hidden immutable snapshot.”
+
+UX must clearly show “last modified” after scheduling.
+
+If product later requires immutable scheduled snapshots, that is a future change.
+
+### Rename scheduled version
+
+Allowed; no effect on scheduled content.
+
+### Duplicate scheduled version
+
+Allowed; duplicate is Draft with no schedule.
+
+### Delete scheduled version
+
+Not allowed directly.
+
+Cancel first, then delete.
+
+---
+
+## 17. Reschedule and cancel transaction
+
+### Reschedule
+
+1. lock Storefront/head/Version;
+2. require target is current scheduled pointer;
+3. validate future timestamp;
+4. increment generation;
+5. update scheduled_for;
+6. commit.
+
+Old execution token becomes stale.
+
+### Cancel
+
+1. lock Storefront/head/Version;
+2. increment generation;
+3. clear target scheduled_for;
+4. clear head scheduled_version_id;
+5. commit.
+
+Any old queued job becomes a safe no-op.
+
+---
+
+## 18. Scheduling timezone
+
+API accepts ISO-8601 with explicit offset.
+
+Store UTC in DB.
+
+API returns:
+
+- UTC canonical timestamp;
+- UI formats in the authoritative merchant/store timezone.
+
+### Architecture constraint
+
+Do not assume browser timezone is authoritative.
+
+If AWJ lacks a locked Storefront timezone field at implementation time:
+
+- use the existing authoritative tenant/business timezone if one exists and is proven;
+- otherwise make timezone a required architecture dependency before enabling Schedule UX.
+
+For Saudi-first default behavior, `Asia/Riyadh` must not be hard-coded as a universal tenant rule.
+
+---
+
+## 19. Create / duplicate transaction
+
+Creation:
+
+- lock owned Storefront/head;
+- resolve optional source Version within same Storefront/Tenant;
+- choose source config;
+- normalize;
+- create new Version revision 1;
+- scheduled_for null;
+- schedule_generation 0;
+- last_published_at null.
+
+If copying the active version, the copy is still Draft.
+
+No public head field changes.
+
+---
+
+## 20. Delete rules
+
+Delete is allowed only if Version is:
+
+- same Tenant/Storefront;
+- not active;
+- not scheduled.
+
+Deleting a Draft has no public effect.
+
+If an implementation bug or admin operation removes a pointed Version, FK pointer behavior must fail safe; product service still prevents this path.
+
+---
+
+## 21. Legacy API behavior
+
+During CUST-H1 rollout:
+
+### GET legacy presentation
+
+Continue returning:
+
+- draft
+- draft_revision
+- published
+- published_revision
+- published_at
+
+### PUT legacy presentation
+
+Compatibility behavior must be scoped.
+
+Recommended:
+
+- map the legacy Draft API to one compatibility working Version selected/created by the service;
+- synchronize head `draft_config` / `draft_revision`;
+- do not allow legacy calls to mutate arbitrary versions.
+
+### Legacy publish
+
+Map to the compatibility working Version.
+
+New Customizer UI moves to Version APIs.
+
+After migration and adoption, legacy endpoints may be deprecated only through a separate compatibility decision.
+
+---
+
+## 22. Public runtime
+
+No public API shape change is required.
+
+`GET /store/v1/storefront` continues to expose only Published presentation.
+
+Public rendering remains based on the head's `published_config`.
+
+Benefits:
+
+- no extra join;
+- no cache semantic change;
+- no leak of version metadata;
+- no leak of scheduled designs;
+- no leak of private version names.
+
+---
+
+## 23. Cache behavior
+
+Keep current presentation runtime `no-store` semantics unless a separate performance decision changes them.
+
+Publish transaction updates the compatibility Published snapshot, so public runtime sees the new design through the same path as today.
+
+Version-list/editor APIs are authenticated workspace data and should not be treated as public cacheable documents.
+
+---
+
+## 24. Authorization
+
+Reuse:
+
+- auth:sanctum
+- EnsureUserPrincipal
+- SetTenant
+- SetBranch where current Commerce workspace requires it
+- EnsureActiveSubscription
+- EnsurePermission:commerce.manage
+- existing self_service deny behavior
+
+No `commerce.appearance` permission in CUST-H1.
+
+Version IDs are row selectors, never authorization sources.
+
+---
+
+## 25. Normalization and document size
+
+Reuse `StorefrontPresentationNormalizer` as server authority.
+
+Every Version Save and Publish:
+
+- normalizes;
+- drops unknown fields;
+- applies URL/logo/token safety;
+- applies schema version;
+- enforces existing document size limits.
+
+Versions do not weaken current presentation security.
+
+---
+
+## 26. API response model
+
+Suggested exact Version resource:
+
+```json
+{
+  "id": "uuid",
+  "storefront_id": "uuid",
+  "name": "رمضان 1448",
+  "state": "draft",
+  "schema_version": 2,
+  "config": {},
+  "revision": 7,
+  "scheduled_for": null,
+  "last_published_at": null,
+  "created_at": "...",
+  "updated_at": "..."
+}
+```
+
+List endpoint may omit `config` for payload efficiency.
+
+Do not expose:
+
+- tenant_id;
+- schedule_generation;
+- internal job ids;
+- internal compatibility pointers.
+
+---
+
+## 27. Error semantics
+
+- 401 unauthenticated
+- 403 missing permission / invalid principal / subscription
+- 404 missing or foreign Storefront
+- 404 missing or foreign Version
+- 409 stale Version revision
+- 409 schedule/publish state conflict
+- 422 invalid envelope
+- 422 invalid/past scheduled_for
+- 422 active/scheduled Version deletion attempt may instead use 409 if treated as state conflict; choose one consistently in implementation contract
+- 422 oversize normalized document
+
+Recommendation: use **409** for valid resource + invalid lifecycle state; 422 for malformed semantic input.
+
+---
+
+## 28. Dual-DB constraints
+
+Architecture must work on SQLite and PostgreSQL.
+
+Do not depend on:
+
+- PostgreSQL-only partial unique indexes;
+- exclusion constraints;
+- advisory locks.
+
+One-active/one-scheduled rules are enforced through the locked head row pointers.
+
+True concurrency tests should run on PostgreSQL where repository convention already allows SQLite skips for race-specific tests.
+
+---
+
+## 29. Required implementation tests
+
+### Migration/backfill
+
+- no row;
+- draft only;
+- published == draft;
+- published != draft;
+- rerun/idempotency;
+- schema normalization;
+- no public snapshot mutation.
+
+### Version CRUD
+
+- create blank/from current;
+- duplicate;
+- rename;
+- exact read;
+- save;
+- delete eligible;
+- active delete blocked;
+- scheduled delete blocked.
+
+### Isolation
+
+- tenant A cannot list/read/save/publish/schedule/delete tenant B version;
+- same-tenant Storefront A version cannot be used under Storefront B URL;
+- no body authority override.
+
+### Concurrency
+
+- same-version stale save;
+- different-version independent save;
+- publish vs save;
+- publish vs publish;
+- schedule vs reschedule;
+- schedule vs cancel;
+- stale job generation no-op.
+
+### Publication
+
+- active pointer changes atomically;
+- old live Version retained;
+- Published compatibility snapshot updated;
+- failed publish leaves old snapshot;
+- idempotent republish;
+- public runtime sees only current Published.
+
+### Scheduling
+
+- future validation;
+- UTC persistence;
+- due dispatcher;
+- duplicate dispatch;
+- stale job;
+- canceled job;
+- rescheduled job;
+- execution failure;
+- scheduler recovery after late run.
+
+### Legacy compatibility
+
+- old GET/PUT/publish tests remain or are deliberately adapted;
+- current frontend can survive transition until it moves to version endpoints.
+
+---
+
+## 30. Implementation slicing
+
+After this architecture is approved, implementation should be split by risk:
+
+### CUST-H1-1 — Version persistence foundation
+
+- migration;
+- model;
+- backfill;
+- version CRUD/read APIs;
+- revision/isolation tests;
+- no scheduling activation.
+
+### CUST-H1-2 — Version-aware Customizer UX
+
+- version manager;
+- create/duplicate/rename/switch/delete;
+- exact-version editing/preview;
+- mobile/desktop UX;
+- no Schedule button LIVE yet unless backend scheduler is ready.
+
+### CUST-H1-3 — Immediate version publishing
+
+- publish endpoint;
+- active pointer;
+- compatibility head update;
+- retain former live version;
+- public parity tests.
+
+### CUST-H1-4 — Scheduling backend/runtime
+
+- schedule/cancel/reschedule APIs;
+- dispatcher;
+- idempotent publish job;
+- runtime scheduler deployment contract;
+- concurrency/failure tests.
+
+### CUST-H1-5 — Scheduling UX + Integrated QA
+
+- schedule UI;
+- timezone copy;
+- state badges;
+- responsive QA;
+- failure UX;
+- end-to-end immediate/scheduled lifecycle.
+
+Then PRE_MERGE_REVIEW and Horizon Closure.
+
+Do not combine all five into one large PR.
+
+---
+
+## 31. Rejected alternatives
+
+### Replace head with Versions immediately
+
+Rejected for CUST-H1.
+
+Reason: unnecessary migration/public-runtime/API risk.
+
+### Store all Versions in one JSON array on head
+
+Rejected.
+
+Reason: poor concurrency, large writes, no row-level isolation, difficult scheduling/deletion/listing.
+
+### Add version1_config/version2_config columns
+
+Rejected.
+
+Reason: fixed-capacity non-model.
+
+### Status enum as source of truth
+
+Rejected.
+
+Reason: multiple Published/Scheduled rows can drift; cross-DB uniqueness awkward.
+
+### Immutable version on every keystroke/save
+
+Rejected.
+
+Reason: that is revision history, not named merchant copies; storage churn.
+
+### Client/browser scheduling
+
+Rejected.
+
+Reason: unsafe and non-authoritative.
+
+### Queue delay as only source of schedule truth
+
+Rejected.
+
+Reason: recovery after queue/deploy disruption is weaker than DB-authoritative schedule + dispatcher.
+
+---
+
+## 32. Security stop gates
+
+Stop implementation if it would require:
+
+- exposing unpublished config through anonymous public routes;
+- deriving tenant from Version id;
+- accepting authority fields from request body;
+- weakening current URL/logo/HTML safety;
+- changing Commerce pricing/catalog truth;
+- making browser timer authoritative;
+- hard-coding one timezone for all tenants;
+- breaking old Published rendering during migration.
+
+---
+
+## 33. Definition of architecture complete
+
+This architecture is ready for implementation only after review confirms:
+
+- [x] ownership graph defined;
+- [x] table/column/index/FK strategy defined;
+- [x] one-live/one-scheduled model defined;
+- [x] state derivation defined;
+- [x] migration/backfill defined;
+- [x] public compatibility strategy defined;
+- [x] version concurrency defined;
+- [x] immediate publish transaction defined;
+- [x] schedule generation/idempotency defined;
+- [x] scheduler runtime dependency defined;
+- [x] API shapes defined;
+- [x] auth/404 semantics defined;
+- [x] dual-DB constraints defined;
+- [x] failure semantics defined;
+- [x] test matrix defined;
+- [x] implementation slices defined;
+- [x] rejected alternatives recorded.
+
+Remaining before runtime code:
+
+- owner/architecture review;
+- CI on documentation PR;
+- explicit decision to proceed with implementation slices.
+
+---
+
+*Documentation only. No DB/API/runtime/merge/deploy is authorized by this file.*
