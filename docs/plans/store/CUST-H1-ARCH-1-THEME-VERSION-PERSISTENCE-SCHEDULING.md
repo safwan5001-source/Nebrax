@@ -140,25 +140,30 @@ They remain compatibility fields during and after CUST-H1.
 Add to `storefront_presentations`:
 
 ```
-active_version_id       uuid nullable
-scheduled_version_id    uuid nullable
+active_version_id                uuid nullable
+scheduled_version_id             uuid nullable
+compatibility_working_version_id uuid nullable
 ```
 
 FK strategy:
 
-- both reference `storefront_presentation_versions.id`;
+- all three reference `storefront_presentation_versions.id`;
 - `nullOnDelete` is acceptable only through controlled service deletion rules;
 - deleting the active version through normal product APIs is forbidden;
-- deleting a scheduled version requires schedule cancellation in the same transaction first.
+- deleting the scheduled version requires schedule cancellation in the same transaction first;
+- deleting the compatibility-working version is forbidden while the legacy API compatibility window remains active.
 
 Indexes:
 
 - index(active_version_id)
 - index(scheduled_version_id)
+- index(compatibility_working_version_id)
 
 ### Why pointers live on the head
 
-They establish one authoritative live version and one authoritative scheduled-next version without partial unique indexes or status races across SQLite/PostgreSQL.
+They establish one authoritative live version, one authoritative scheduled-next version, and one durable legacy compatibility working version without partial unique indexes or status races across SQLite/PostgreSQL.
+
+`compatibility_working_version_id` exists only for the mixed-client compatibility window. It is not merchant-facing state. It gives the legacy GET/PUT/publish endpoints one unambiguous Version target after multiple Draft Versions exist.
 
 Version state is **derived**, not trusted from a merchant-writable status column.
 
@@ -278,6 +283,8 @@ Create one Version:
 
 Set `active_version_id` to it.
 
+Set `compatibility_working_version_id` to that same Version unless implementation evidence requires a separately created Draft working copy for the legacy editor.
+
 Keep existing head config fields unchanged.
 
 ### Case C — Published exists, Draft differs from Published
@@ -289,7 +296,9 @@ Create two versions:
 
 Set active pointer to Published version.
 
-The legacy/current workspace compatibility draft remains `draft_config` until the CUST-H1 UI switches to explicit version editing.
+Set `compatibility_working_version_id` to the migrated Draft version.
+
+The legacy/current workspace compatibility draft remains `draft_config`, and legacy GET/PUT/publish maps deterministically to `compatibility_working_version_id` until the compatibility window is retired.
 
 No user work is discarded.
 
@@ -298,6 +307,8 @@ No user work is discarded.
 Create one Draft version from `draft_config`.
 
 `active_version_id = null`.
+
+Set `compatibility_working_version_id` to the migrated Draft version.
 
 Public runtime remains AWJ Modern/default exactly as before.
 
@@ -440,6 +451,10 @@ Body:
 }
 ```
 
+**Active Published Versions are read-only.** If `version.id === active_version_id`, this endpoint returns a lifecycle conflict (recommended **409**). The merchant must create/duplicate a Draft Version and edit that Draft.
+
+This preserves the invariant that a Version reported as `Published` is byte-for-byte the source of the current public head snapshot. It also ensures duplicating the Published Version copies the live design, never unpublished edits.
+
 ### Rename
 
 Use focused metadata endpoint or PATCH:
@@ -525,12 +540,15 @@ Immediate Publish must:
 7. normalize target Version config server-side;
 8. enforce document-size limits;
 9. copy normalized config to existing head `published_config`;
-10. update `published_revision` with a compatibility monotonic value;
-11. update `published_at = now()`;
-12. set `active_version_id = target.id`;
-13. set target `last_published_at = now()`;
-14. if target was scheduled, clear its schedule and head `scheduled_version_id`;
-15. commit.
+10. atomically set head `schema_version = target.schema_version` (or the server-normalized current schema version used for the copied document);
+11. update `published_revision` with a compatibility monotonic value;
+12. update `published_at = now()`;
+13. set `active_version_id = target.id`;
+14. set target `last_published_at = now()`;
+15. if target was scheduled, clear its schedule and head `scheduled_version_id`;
+16. commit.
+
+The head schema version and Published document are one atomic pair. A v2 document must never be stored under a stale v1 head `schema_version`, because public normalization semantics depend on that version.
 
 No partial public state is observable.
 
@@ -808,19 +826,23 @@ Continue returning:
 - published_revision
 - published_at
 
+The Draft side is backed by the durable head pointer `compatibility_working_version_id`. If the pointer is null during transition, the service deterministically creates/selects the compatibility working Version under the same transaction/locking rules and persists the pointer before returning mutable legacy state.
+
 ### PUT legacy presentation
 
-Compatibility behavior must be scoped.
+Compatibility behavior is explicit:
 
-Recommended:
-
-- map the legacy Draft API to one compatibility working Version selected/created by the service;
-- synchronize head `draft_config` / `draft_revision`;
-- do not allow legacy calls to mutate arbitrary versions.
+- lock Storefront + head + `compatibility_working_version_id` Version;
+- map the legacy Draft API only to that persisted Version;
+- synchronize head `draft_config` / `draft_revision` for old response semantics;
+- never select “an arbitrary Draft” by recency/name/query order;
+- legacy calls cannot mutate another named Version.
 
 ### Legacy publish
 
-Map to the compatibility working Version.
+Map only to `compatibility_working_version_id`.
+
+If the compatibility Version is also the current active Published Version, legacy editing must first fork/create a Draft compatibility Version; it must not mutate the active row in place. Persist the new compatibility pointer atomically.
 
 New Customizer UI moves to Version APIs.
 
@@ -975,7 +997,9 @@ True concurrency tests should run on PostgreSQL where repository convention alre
 - save;
 - delete eligible;
 - active delete blocked;
-- scheduled delete blocked.
+- scheduled delete blocked;
+- compatibility-working delete blocked during legacy compatibility window;
+- save to active Published Version blocked;
 
 ### Isolation
 
@@ -998,6 +1022,8 @@ True concurrency tests should run on PostgreSQL where repository convention alre
 - active pointer changes atomically;
 - old live Version retained;
 - Published compatibility snapshot updated;
+- head schema_version changes atomically with published_config;
+- publishing v2 after migrated v1 head preserves v2 semantics in public normalization;
 - failed publish leaves old snapshot;
 - idempotent republish;
 - public runtime sees only current Published.
