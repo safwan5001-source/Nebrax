@@ -134,7 +134,7 @@ export async function Header({
             RTL. Search sits on a second grid line there and moves into the row
             itself from `md`, where the same children lay out as a flex line.
           */}
-          <div className="grid grid-cols-[1fr_auto_1fr] grid-rows-[var(--store-header-height)_auto] items-center gap-x-2 gap-y-1 md:flex md:h-store-header-lg md:grid-rows-none md:gap-6">
+          <div className="grid grid-cols-[1fr_minmax(0,1fr)_1fr] grid-rows-[var(--store-header-height)_auto] items-center gap-x-2 gap-y-1 md:flex md:h-store-header-lg md:grid-rows-none md:gap-6">
             <div className="-ms-2 justify-self-start lg:hidden">
               {mobileNavigation}
             </div>

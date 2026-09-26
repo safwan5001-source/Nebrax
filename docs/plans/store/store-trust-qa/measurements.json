@@ -1,0 +1,3487 @@
+{
+  "production": {
+    "/sa/ar": {
+      "status": 200,
+      "title": "Spree Store",
+      "snippet": "<meta id=\"__next-page-redirect\" http-equiv=\"refresh\" content=\"1;url=/us/ar\"/><script src=\"/_next/static/chunks/polyfills.js\" noModule=\"\"></script><meta charSet=\"utf-8\"/><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"/><l"
+    },
+    "/sa/en": {
+      "status": 200,
+      "title": "Spree Store",
+      "snippet": "<meta id=\"__next-page-redirect\" http-equiv=\"refresh\" content=\"1;url=/us/ar\"/><script src=\"/_next/static/chunks/polyfills.js\" noModule=\"\"></script><meta charSet=\"utf-8\"/><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"/><l"
+    }
+  },
+  "results": [
+    {
+      "surface": "published",
+      "scenario": "empty",
+      "locale": "ar",
+      "width": 390,
+      "file": "published-empty-ar-390.jpg",
+      "url": "http://127.0.0.1:3101/dev/trust-visual?locale=ar&scenario=empty&surface=published&viewport=mobile",
+      "findings": [],
+      "measured": {
+        "dir": "rtl",
+        "lang": "ar",
+        "scrollWidth": 390,
+        "clientWidth": 390,
+        "overflow": false,
+        "sealScript": false,
+        "officialSeal": false,
+        "sealPreview": false,
+        "textFallback": false,
+        "groups": [
+          "المتجر",
+          "الحساب",
+          "السياسات"
+        ],
+        "badges": [],
+        "linkCount": 10,
+        "unnamed": []
+      }
+    },
+    {
+      "surface": "preview",
+      "scenario": "empty",
+      "locale": "ar",
+      "width": 390,
+      "file": "preview-empty-ar-390.jpg",
+      "url": "http://127.0.0.1:3100/dev/trust-visual?locale=ar&scenario=empty&viewport=mobile",
+      "findings": [],
+      "measured": {
+        "dir": "rtl",
+        "lang": "ar",
+        "canvasDir": "rtl",
+        "scrollWidth": 390,
+        "clientWidth": 390,
+        "overflow": false,
+        "sealScript": false,
+        "officialSeal": false,
+        "sealPreview": false,
+        "textFallback": false,
+        "groups": [
+          "المتجر",
+          "الحساب",
+          "السياسات"
+        ],
+        "badges": [],
+        "linkCount": 0,
+        "unnamed": []
+      }
+    },
+    {
+      "surface": "published",
+      "scenario": "empty",
+      "locale": "ar",
+      "width": 1440,
+      "file": "published-empty-ar-1440.jpg",
+      "url": "http://127.0.0.1:3101/dev/trust-visual?locale=ar&scenario=empty&surface=published&viewport=desktop",
+      "findings": [],
+      "measured": {
+        "dir": "rtl",
+        "lang": "ar",
+        "scrollWidth": 1440,
+        "clientWidth": 1440,
+        "overflow": false,
+        "sealScript": false,
+        "officialSeal": false,
+        "sealPreview": false,
+        "textFallback": false,
+        "groups": [
+          "المتجر",
+          "الحساب",
+          "السياسات"
+        ],
+        "badges": [],
+        "linkCount": 10,
+        "unnamed": []
+      }
+    },
+    {
+      "surface": "preview",
+      "scenario": "empty",
+      "locale": "ar",
+      "width": 1440,
+      "file": "preview-empty-ar-1440.jpg",
+      "url": "http://127.0.0.1:3100/dev/trust-visual?locale=ar&scenario=empty&viewport=desktop",
+      "findings": [],
+      "measured": {
+        "dir": "rtl",
+        "lang": "ar",
+        "canvasDir": "rtl",
+        "scrollWidth": 1440,
+        "clientWidth": 1440,
+        "overflow": false,
+        "sealScript": false,
+        "officialSeal": false,
+        "sealPreview": false,
+        "textFallback": false,
+        "groups": [
+          "المتجر",
+          "الحساب",
+          "السياسات"
+        ],
+        "badges": [],
+        "linkCount": 0,
+        "unnamed": []
+      }
+    },
+    {
+      "surface": "published",
+      "scenario": "empty",
+      "locale": "en",
+      "width": 390,
+      "file": "published-empty-en-390.jpg",
+      "url": "http://127.0.0.1:3101/dev/trust-visual?locale=en&scenario=empty&surface=published&viewport=mobile",
+      "findings": [],
+      "measured": {
+        "dir": "rtl",
+        "lang": "ar",
+        "scrollWidth": 390,
+        "clientWidth": 390,
+        "overflow": false,
+        "sealScript": false,
+        "officialSeal": false,
+        "sealPreview": false,
+        "textFallback": false,
+        "groups": [
+          "Shop",
+          "Account",
+          "Policies"
+        ],
+        "badges": [],
+        "linkCount": 10,
+        "unnamed": []
+      }
+    },
+    {
+      "surface": "preview",
+      "scenario": "empty",
+      "locale": "en",
+      "width": 390,
+      "file": "preview-empty-en-390.jpg",
+      "url": "http://127.0.0.1:3100/dev/trust-visual?locale=en&scenario=empty&viewport=mobile",
+      "findings": [],
+      "measured": {
+        "dir": "rtl",
+        "lang": "ar",
+        "canvasDir": "ltr",
+        "scrollWidth": 391,
+        "clientWidth": 390,
+        "overflow": false,
+        "sealScript": false,
+        "officialSeal": false,
+        "sealPreview": false,
+        "textFallback": false,
+        "groups": [
+          "Shop",
+          "Account",
+          "Policies"
+        ],
+        "badges": [],
+        "linkCount": 0,
+        "unnamed": []
+      }
+    },
+    {
+      "surface": "published",
+      "scenario": "empty",
+      "locale": "en",
+      "width": 1440,
+      "file": "published-empty-en-1440.jpg",
+      "url": "http://127.0.0.1:3101/dev/trust-visual?locale=en&scenario=empty&surface=published&viewport=desktop",
+      "findings": [],
+      "measured": {
+        "dir": "rtl",
+        "lang": "ar",
+        "scrollWidth": 1440,
+        "clientWidth": 1440,
+        "overflow": false,
+        "sealScript": false,
+        "officialSeal": false,
+        "sealPreview": false,
+        "textFallback": false,
+        "groups": [
+          "Shop",
+          "Account",
+          "Policies"
+        ],
+        "badges": [],
+        "linkCount": 10,
+        "unnamed": []
+      }
+    },
+    {
+      "surface": "preview",
+      "scenario": "empty",
+      "locale": "en",
+      "width": 1440,
+      "file": "preview-empty-en-1440.jpg",
+      "url": "http://127.0.0.1:3100/dev/trust-visual?locale=en&scenario=empty&viewport=desktop",
+      "findings": [],
+      "measured": {
+        "dir": "rtl",
+        "lang": "ar",
+        "canvasDir": "ltr",
+        "scrollWidth": 1441,
+        "clientWidth": 1440,
+        "overflow": false,
+        "sealScript": false,
+        "officialSeal": false,
+        "sealPreview": false,
+        "textFallback": false,
+        "groups": [
+          "Shop",
+          "Account",
+          "Policies"
+        ],
+        "badges": [],
+        "linkCount": 0,
+        "unnamed": []
+      }
+    },
+    {
+      "surface": "published",
+      "scenario": "partial",
+      "locale": "ar",
+      "width": 390,
+      "file": "published-partial-ar-390.jpg",
+      "url": "http://127.0.0.1:3101/dev/trust-visual?locale=ar&scenario=partial&surface=published&viewport=mobile",
+      "findings": [],
+      "measured": {
+        "dir": "rtl",
+        "lang": "ar",
+        "scrollWidth": 390,
+        "clientWidth": 390,
+        "overflow": false,
+        "sealScript": false,
+        "officialSeal": false,
+        "sealPreview": false,
+        "textFallback": false,
+        "groups": [
+          "المتجر",
+          "الحساب",
+          "السياسات",
+          "معلومات المنشأة",
+          "معلومات من التاجر",
+          "التواصل"
+        ],
+        "badges": [],
+        "linkCount": 12,
+        "unnamed": []
+      }
+    },
+    {
+      "surface": "preview",
+      "scenario": "partial",
+      "locale": "ar",
+      "width": 390,
+      "file": "preview-partial-ar-390.jpg",
+      "url": "http://127.0.0.1:3100/dev/trust-visual?locale=ar&scenario=partial&viewport=mobile",
+      "findings": [],
+      "measured": {
+        "dir": "rtl",
+        "lang": "ar",
+        "canvasDir": "rtl",
+        "scrollWidth": 390,
+        "clientWidth": 390,
+        "overflow": false,
+        "sealScript": false,
+        "officialSeal": false,
+        "sealPreview": false,
+        "textFallback": false,
+        "groups": [
+          "المتجر",
+          "الحساب",
+          "السياسات",
+          "معلومات المنشأة",
+          "معلومات من التاجر",
+          "التواصل"
+        ],
+        "badges": [],
+        "linkCount": 2,
+        "unnamed": []
+      }
+    },
+    {
+      "surface": "published",
+      "scenario": "partial",
+      "locale": "ar",
+      "width": 1440,
+      "file": "published-partial-ar-1440.jpg",
+      "url": "http://127.0.0.1:3101/dev/trust-visual?locale=ar&scenario=partial&surface=published&viewport=desktop",
+      "findings": [],
+      "measured": {
+        "dir": "rtl",
+        "lang": "ar",
+        "scrollWidth": 1440,
+        "clientWidth": 1440,
+        "overflow": false,
+        "sealScript": false,
+        "officialSeal": false,
+        "sealPreview": false,
+        "textFallback": false,
+        "groups": [
+          "المتجر",
+          "الحساب",
+          "السياسات",
+          "معلومات المنشأة",
+          "معلومات من التاجر",
+          "التواصل"
+        ],
+        "badges": [],
+        "linkCount": 12,
+        "unnamed": []
+      }
+    },
+    {
+      "surface": "preview",
+      "scenario": "partial",
+      "locale": "ar",
+      "width": 1440,
+      "file": "preview-partial-ar-1440.jpg",
+      "url": "http://127.0.0.1:3100/dev/trust-visual?locale=ar&scenario=partial&viewport=desktop",
+      "findings": [],
+      "measured": {
+        "dir": "rtl",
+        "lang": "ar",
+        "canvasDir": "rtl",
+        "scrollWidth": 1440,
+        "clientWidth": 1440,
+        "overflow": false,
+        "sealScript": false,
+        "officialSeal": false,
+        "sealPreview": false,
+        "textFallback": false,
+        "groups": [
+          "المتجر",
+          "الحساب",
+          "السياسات",
+          "معلومات المنشأة",
+          "معلومات من التاجر",
+          "التواصل"
+        ],
+        "badges": [],
+        "linkCount": 2,
+        "unnamed": []
+      }
+    },
+    {
+      "surface": "published",
+      "scenario": "partial",
+      "locale": "en",
+      "width": 390,
+      "file": "published-partial-en-390.jpg",
+      "url": "http://127.0.0.1:3101/dev/trust-visual?locale=en&scenario=partial&surface=published&viewport=mobile",
+      "findings": [],
+      "measured": {
+        "dir": "rtl",
+        "lang": "ar",
+        "scrollWidth": 390,
+        "clientWidth": 390,
+        "overflow": false,
+        "sealScript": false,
+        "officialSeal": false,
+        "sealPreview": false,
+        "textFallback": false,
+        "groups": [
+          "Shop",
+          "Account",
+          "Policies",
+          "Business information",
+          "Merchant-provided information",
+          "Contact"
+        ],
+        "badges": [],
+        "linkCount": 12,
+        "unnamed": []
+      }
+    },
+    {
+      "surface": "preview",
+      "scenario": "partial",
+      "locale": "en",
+      "width": 390,
+      "file": "preview-partial-en-390.jpg",
+      "url": "http://127.0.0.1:3100/dev/trust-visual?locale=en&scenario=partial&viewport=mobile",
+      "findings": [],
+      "measured": {
+        "dir": "rtl",
+        "lang": "ar",
+        "canvasDir": "ltr",
+        "scrollWidth": 391,
+        "clientWidth": 390,
+        "overflow": false,
+        "sealScript": false,
+        "officialSeal": false,
+        "sealPreview": false,
+        "textFallback": false,
+        "groups": [
+          "Shop",
+          "Account",
+          "Policies",
+          "Business information",
+          "Merchant-provided information",
+          "Contact"
+        ],
+        "badges": [],
+        "linkCount": 2,
+        "unnamed": []
+      }
+    },
+    {
+      "surface": "published",
+      "scenario": "partial",
+      "locale": "en",
+      "width": 1440,
+      "file": "published-partial-en-1440.jpg",
+      "url": "http://127.0.0.1:3101/dev/trust-visual?locale=en&scenario=partial&surface=published&viewport=desktop",
+      "findings": [],
+      "measured": {
+        "dir": "rtl",
+        "lang": "ar",
+        "scrollWidth": 1440,
+        "clientWidth": 1440,
+        "overflow": false,
+        "sealScript": false,
+        "officialSeal": false,
+        "sealPreview": false,
+        "textFallback": false,
+        "groups": [
+          "Shop",
+          "Account",
+          "Policies",
+          "Business information",
+          "Merchant-provided information",
+          "Contact"
+        ],
+        "badges": [],
+        "linkCount": 12,
+        "unnamed": []
+      }
+    },
+    {
+      "surface": "preview",
+      "scenario": "partial",
+      "locale": "en",
+      "width": 1440,
+      "file": "preview-partial-en-1440.jpg",
+      "url": "http://127.0.0.1:3100/dev/trust-visual?locale=en&scenario=partial&viewport=desktop",
+      "findings": [],
+      "measured": {
+        "dir": "rtl",
+        "lang": "ar",
+        "canvasDir": "ltr",
+        "scrollWidth": 1441,
+        "clientWidth": 1440,
+        "overflow": false,
+        "sealScript": false,
+        "officialSeal": false,
+        "sealPreview": false,
+        "textFallback": false,
+        "groups": [
+          "Shop",
+          "Account",
+          "Policies",
+          "Business information",
+          "Merchant-provided information",
+          "Contact"
+        ],
+        "badges": [],
+        "linkCount": 2,
+        "unnamed": []
+      }
+    },
+    {
+      "surface": "published",
+      "scenario": "full",
+      "locale": "ar",
+      "width": 390,
+      "file": "published-full-ar-390.jpg",
+      "url": "http://127.0.0.1:3101/dev/trust-visual?locale=ar&scenario=full&surface=published&viewport=mobile",
+      "findings": [],
+      "measured": {
+        "dir": "rtl",
+        "lang": "ar",
+        "scrollWidth": 390,
+        "clientWidth": 390,
+        "overflow": false,
+        "sealScript": false,
+        "officialSeal": true,
+        "sealPreview": false,
+        "textFallback": true,
+        "groups": [
+          "تطبيق النور",
+          "المتجر",
+          "الحساب",
+          "السياسات",
+          "معلومات المنشأة",
+          "معلومات من التاجر",
+          "منصة الأعمال",
+          "التواصل",
+          "التطبيقات"
+        ],
+        "badges": [
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          },
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          },
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          },
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          }
+        ],
+        "linkCount": 23,
+        "unnamed": []
+      }
+    },
+    {
+      "surface": "preview",
+      "scenario": "full",
+      "locale": "ar",
+      "width": 390,
+      "file": "preview-full-ar-390.jpg",
+      "url": "http://127.0.0.1:3100/dev/trust-visual?locale=ar&scenario=full&viewport=mobile",
+      "findings": [],
+      "measured": {
+        "dir": "rtl",
+        "lang": "ar",
+        "canvasDir": "rtl",
+        "scrollWidth": 390,
+        "clientWidth": 390,
+        "overflow": false,
+        "sealScript": false,
+        "officialSeal": false,
+        "sealPreview": true,
+        "textFallback": false,
+        "groups": [
+          "تطبيق النور",
+          "المتجر",
+          "الحساب",
+          "السياسات",
+          "معلومات المنشأة",
+          "معلومات من التاجر",
+          "منصة الأعمال",
+          "التواصل",
+          "التطبيقات"
+        ],
+        "badges": [
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          },
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          },
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          },
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          }
+        ],
+        "linkCount": 13,
+        "unnamed": []
+      }
+    },
+    {
+      "surface": "published",
+      "scenario": "full",
+      "locale": "ar",
+      "width": 430,
+      "file": "published-full-ar-430.jpg",
+      "url": "http://127.0.0.1:3101/dev/trust-visual?locale=ar&scenario=full&surface=published&viewport=mobile",
+      "findings": [],
+      "measured": {
+        "dir": "rtl",
+        "lang": "ar",
+        "scrollWidth": 430,
+        "clientWidth": 430,
+        "overflow": false,
+        "sealScript": false,
+        "officialSeal": true,
+        "sealPreview": false,
+        "textFallback": true,
+        "groups": [
+          "تطبيق النور",
+          "المتجر",
+          "الحساب",
+          "السياسات",
+          "معلومات المنشأة",
+          "معلومات من التاجر",
+          "منصة الأعمال",
+          "التواصل",
+          "التطبيقات"
+        ],
+        "badges": [
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          },
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          },
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          },
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          }
+        ],
+        "linkCount": 23,
+        "unnamed": []
+      }
+    },
+    {
+      "surface": "preview",
+      "scenario": "full",
+      "locale": "ar",
+      "width": 430,
+      "file": "preview-full-ar-430.jpg",
+      "url": "http://127.0.0.1:3100/dev/trust-visual?locale=ar&scenario=full&viewport=mobile",
+      "findings": [],
+      "measured": {
+        "dir": "rtl",
+        "lang": "ar",
+        "canvasDir": "rtl",
+        "scrollWidth": 430,
+        "clientWidth": 430,
+        "overflow": false,
+        "sealScript": false,
+        "officialSeal": false,
+        "sealPreview": true,
+        "textFallback": false,
+        "groups": [
+          "تطبيق النور",
+          "المتجر",
+          "الحساب",
+          "السياسات",
+          "معلومات المنشأة",
+          "معلومات من التاجر",
+          "منصة الأعمال",
+          "التواصل",
+          "التطبيقات"
+        ],
+        "badges": [
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          },
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          },
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          },
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          }
+        ],
+        "linkCount": 13,
+        "unnamed": []
+      }
+    },
+    {
+      "surface": "published",
+      "scenario": "full",
+      "locale": "ar",
+      "width": 768,
+      "file": "published-full-ar-768.jpg",
+      "url": "http://127.0.0.1:3101/dev/trust-visual?locale=ar&scenario=full&surface=published&viewport=tablet",
+      "findings": [],
+      "measured": {
+        "dir": "rtl",
+        "lang": "ar",
+        "scrollWidth": 768,
+        "clientWidth": 768,
+        "overflow": false,
+        "sealScript": false,
+        "officialSeal": true,
+        "sealPreview": false,
+        "textFallback": true,
+        "groups": [
+          "تطبيق النور",
+          "المتجر",
+          "الحساب",
+          "السياسات",
+          "معلومات المنشأة",
+          "معلومات من التاجر",
+          "منصة الأعمال",
+          "التواصل",
+          "التطبيقات"
+        ],
+        "badges": [
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          },
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          },
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          },
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          }
+        ],
+        "linkCount": 23,
+        "unnamed": []
+      }
+    },
+    {
+      "surface": "preview",
+      "scenario": "full",
+      "locale": "ar",
+      "width": 768,
+      "file": "preview-full-ar-768.jpg",
+      "url": "http://127.0.0.1:3100/dev/trust-visual?locale=ar&scenario=full&viewport=tablet",
+      "findings": [],
+      "measured": {
+        "dir": "rtl",
+        "lang": "ar",
+        "canvasDir": "rtl",
+        "scrollWidth": 768,
+        "clientWidth": 768,
+        "overflow": false,
+        "sealScript": false,
+        "officialSeal": false,
+        "sealPreview": true,
+        "textFallback": false,
+        "groups": [
+          "تطبيق النور",
+          "المتجر",
+          "الحساب",
+          "السياسات",
+          "معلومات المنشأة",
+          "معلومات من التاجر",
+          "منصة الأعمال",
+          "التواصل",
+          "التطبيقات"
+        ],
+        "badges": [
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          },
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          },
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          },
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          }
+        ],
+        "linkCount": 13,
+        "unnamed": []
+      }
+    },
+    {
+      "surface": "published",
+      "scenario": "full",
+      "locale": "ar",
+      "width": 1024,
+      "file": "published-full-ar-1024.jpg",
+      "url": "http://127.0.0.1:3101/dev/trust-visual?locale=ar&scenario=full&surface=published&viewport=desktop",
+      "findings": [],
+      "measured": {
+        "dir": "rtl",
+        "lang": "ar",
+        "scrollWidth": 1024,
+        "clientWidth": 1024,
+        "overflow": false,
+        "sealScript": false,
+        "officialSeal": true,
+        "sealPreview": false,
+        "textFallback": true,
+        "groups": [
+          "تطبيق النور",
+          "المتجر",
+          "الحساب",
+          "السياسات",
+          "معلومات المنشأة",
+          "معلومات من التاجر",
+          "منصة الأعمال",
+          "التواصل",
+          "التطبيقات"
+        ],
+        "badges": [
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          },
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          },
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          },
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          }
+        ],
+        "linkCount": 23,
+        "unnamed": []
+      }
+    },
+    {
+      "surface": "preview",
+      "scenario": "full",
+      "locale": "ar",
+      "width": 1024,
+      "file": "preview-full-ar-1024.jpg",
+      "url": "http://127.0.0.1:3100/dev/trust-visual?locale=ar&scenario=full&viewport=desktop",
+      "findings": [],
+      "measured": {
+        "dir": "rtl",
+        "lang": "ar",
+        "canvasDir": "rtl",
+        "scrollWidth": 1024,
+        "clientWidth": 1024,
+        "overflow": false,
+        "sealScript": false,
+        "officialSeal": false,
+        "sealPreview": true,
+        "textFallback": false,
+        "groups": [
+          "تطبيق النور",
+          "المتجر",
+          "الحساب",
+          "السياسات",
+          "معلومات المنشأة",
+          "معلومات من التاجر",
+          "منصة الأعمال",
+          "التواصل",
+          "التطبيقات"
+        ],
+        "badges": [
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          },
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          },
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          },
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          }
+        ],
+        "linkCount": 13,
+        "unnamed": []
+      }
+    },
+    {
+      "surface": "published",
+      "scenario": "full",
+      "locale": "ar",
+      "width": 1280,
+      "file": "published-full-ar-1280.jpg",
+      "url": "http://127.0.0.1:3101/dev/trust-visual?locale=ar&scenario=full&surface=published&viewport=desktop",
+      "findings": [],
+      "measured": {
+        "dir": "rtl",
+        "lang": "ar",
+        "scrollWidth": 1280,
+        "clientWidth": 1280,
+        "overflow": false,
+        "sealScript": false,
+        "officialSeal": true,
+        "sealPreview": false,
+        "textFallback": true,
+        "groups": [
+          "تطبيق النور",
+          "المتجر",
+          "الحساب",
+          "السياسات",
+          "معلومات المنشأة",
+          "معلومات من التاجر",
+          "منصة الأعمال",
+          "التواصل",
+          "التطبيقات"
+        ],
+        "badges": [
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          },
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          },
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          },
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          }
+        ],
+        "linkCount": 23,
+        "unnamed": []
+      }
+    },
+    {
+      "surface": "preview",
+      "scenario": "full",
+      "locale": "ar",
+      "width": 1280,
+      "file": "preview-full-ar-1280.jpg",
+      "url": "http://127.0.0.1:3100/dev/trust-visual?locale=ar&scenario=full&viewport=desktop",
+      "findings": [],
+      "measured": {
+        "dir": "rtl",
+        "lang": "ar",
+        "canvasDir": "rtl",
+        "scrollWidth": 1280,
+        "clientWidth": 1280,
+        "overflow": false,
+        "sealScript": false,
+        "officialSeal": false,
+        "sealPreview": true,
+        "textFallback": false,
+        "groups": [
+          "تطبيق النور",
+          "المتجر",
+          "الحساب",
+          "السياسات",
+          "معلومات المنشأة",
+          "معلومات من التاجر",
+          "منصة الأعمال",
+          "التواصل",
+          "التطبيقات"
+        ],
+        "badges": [
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          },
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          },
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          },
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          }
+        ],
+        "linkCount": 13,
+        "unnamed": []
+      }
+    },
+    {
+      "surface": "published",
+      "scenario": "full",
+      "locale": "ar",
+      "width": 1440,
+      "file": "published-full-ar-1440.jpg",
+      "url": "http://127.0.0.1:3101/dev/trust-visual?locale=ar&scenario=full&surface=published&viewport=desktop",
+      "findings": [],
+      "measured": {
+        "dir": "rtl",
+        "lang": "ar",
+        "scrollWidth": 1440,
+        "clientWidth": 1440,
+        "overflow": false,
+        "sealScript": false,
+        "officialSeal": true,
+        "sealPreview": false,
+        "textFallback": true,
+        "groups": [
+          "تطبيق النور",
+          "المتجر",
+          "الحساب",
+          "السياسات",
+          "معلومات المنشأة",
+          "معلومات من التاجر",
+          "منصة الأعمال",
+          "التواصل",
+          "التطبيقات"
+        ],
+        "badges": [
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          },
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          },
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          },
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          }
+        ],
+        "linkCount": 23,
+        "unnamed": []
+      }
+    },
+    {
+      "surface": "preview",
+      "scenario": "full",
+      "locale": "ar",
+      "width": 1440,
+      "file": "preview-full-ar-1440.jpg",
+      "url": "http://127.0.0.1:3100/dev/trust-visual?locale=ar&scenario=full&viewport=desktop",
+      "findings": [],
+      "measured": {
+        "dir": "rtl",
+        "lang": "ar",
+        "canvasDir": "rtl",
+        "scrollWidth": 1440,
+        "clientWidth": 1440,
+        "overflow": false,
+        "sealScript": false,
+        "officialSeal": false,
+        "sealPreview": true,
+        "textFallback": false,
+        "groups": [
+          "تطبيق النور",
+          "المتجر",
+          "الحساب",
+          "السياسات",
+          "معلومات المنشأة",
+          "معلومات من التاجر",
+          "منصة الأعمال",
+          "التواصل",
+          "التطبيقات"
+        ],
+        "badges": [
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          },
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          },
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          },
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          }
+        ],
+        "linkCount": 13,
+        "unnamed": []
+      }
+    },
+    {
+      "surface": "published",
+      "scenario": "full",
+      "locale": "en",
+      "width": 390,
+      "file": "published-full-en-390.jpg",
+      "url": "http://127.0.0.1:3101/dev/trust-visual?locale=en&scenario=full&surface=published&viewport=mobile",
+      "findings": [],
+      "measured": {
+        "dir": "rtl",
+        "lang": "ar",
+        "scrollWidth": 390,
+        "clientWidth": 390,
+        "overflow": false,
+        "sealScript": false,
+        "officialSeal": true,
+        "sealPreview": false,
+        "textFallback": true,
+        "groups": [
+          "Al Noor",
+          "Shop",
+          "Account",
+          "Policies",
+          "Business information",
+          "Merchant-provided information",
+          "Saudi Business Center",
+          "Contact",
+          "Applications"
+        ],
+        "badges": [
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          },
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          },
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          },
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          }
+        ],
+        "linkCount": 23,
+        "unnamed": []
+      }
+    },
+    {
+      "surface": "preview",
+      "scenario": "full",
+      "locale": "en",
+      "width": 390,
+      "file": "preview-full-en-390.jpg",
+      "url": "http://127.0.0.1:3100/dev/trust-visual?locale=en&scenario=full&viewport=mobile",
+      "findings": [],
+      "measured": {
+        "dir": "rtl",
+        "lang": "ar",
+        "canvasDir": "ltr",
+        "scrollWidth": 391,
+        "clientWidth": 390,
+        "overflow": false,
+        "sealScript": false,
+        "officialSeal": false,
+        "sealPreview": true,
+        "textFallback": false,
+        "groups": [
+          "Al Noor",
+          "Shop",
+          "Account",
+          "Policies",
+          "Business information",
+          "Merchant-provided information",
+          "Saudi Business Center",
+          "Contact",
+          "Applications"
+        ],
+        "badges": [
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          },
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          },
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          },
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          }
+        ],
+        "linkCount": 13,
+        "unnamed": []
+      }
+    },
+    {
+      "surface": "published",
+      "scenario": "full",
+      "locale": "en",
+      "width": 430,
+      "file": "published-full-en-430.jpg",
+      "url": "http://127.0.0.1:3101/dev/trust-visual?locale=en&scenario=full&surface=published&viewport=mobile",
+      "findings": [],
+      "measured": {
+        "dir": "rtl",
+        "lang": "ar",
+        "scrollWidth": 430,
+        "clientWidth": 430,
+        "overflow": false,
+        "sealScript": false,
+        "officialSeal": true,
+        "sealPreview": false,
+        "textFallback": true,
+        "groups": [
+          "Al Noor",
+          "Shop",
+          "Account",
+          "Policies",
+          "Business information",
+          "Merchant-provided information",
+          "Saudi Business Center",
+          "Contact",
+          "Applications"
+        ],
+        "badges": [
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          },
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          },
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          },
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          }
+        ],
+        "linkCount": 23,
+        "unnamed": []
+      }
+    },
+    {
+      "surface": "preview",
+      "scenario": "full",
+      "locale": "en",
+      "width": 430,
+      "file": "preview-full-en-430.jpg",
+      "url": "http://127.0.0.1:3100/dev/trust-visual?locale=en&scenario=full&viewport=mobile",
+      "findings": [],
+      "measured": {
+        "dir": "rtl",
+        "lang": "ar",
+        "canvasDir": "ltr",
+        "scrollWidth": 431,
+        "clientWidth": 430,
+        "overflow": false,
+        "sealScript": false,
+        "officialSeal": false,
+        "sealPreview": true,
+        "textFallback": false,
+        "groups": [
+          "Al Noor",
+          "Shop",
+          "Account",
+          "Policies",
+          "Business information",
+          "Merchant-provided information",
+          "Saudi Business Center",
+          "Contact",
+          "Applications"
+        ],
+        "badges": [
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          },
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          },
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          },
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          }
+        ],
+        "linkCount": 13,
+        "unnamed": []
+      }
+    },
+    {
+      "surface": "published",
+      "scenario": "full",
+      "locale": "en",
+      "width": 768,
+      "file": "published-full-en-768.jpg",
+      "url": "http://127.0.0.1:3101/dev/trust-visual?locale=en&scenario=full&surface=published&viewport=tablet",
+      "findings": [],
+      "measured": {
+        "dir": "rtl",
+        "lang": "ar",
+        "scrollWidth": 768,
+        "clientWidth": 768,
+        "overflow": false,
+        "sealScript": false,
+        "officialSeal": true,
+        "sealPreview": false,
+        "textFallback": true,
+        "groups": [
+          "Al Noor",
+          "Shop",
+          "Account",
+          "Policies",
+          "Business information",
+          "Merchant-provided information",
+          "Saudi Business Center",
+          "Contact",
+          "Applications"
+        ],
+        "badges": [
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          },
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          },
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          },
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          }
+        ],
+        "linkCount": 23,
+        "unnamed": []
+      }
+    },
+    {
+      "surface": "preview",
+      "scenario": "full",
+      "locale": "en",
+      "width": 768,
+      "file": "preview-full-en-768.jpg",
+      "url": "http://127.0.0.1:3100/dev/trust-visual?locale=en&scenario=full&viewport=tablet",
+      "findings": [],
+      "measured": {
+        "dir": "rtl",
+        "lang": "ar",
+        "canvasDir": "ltr",
+        "scrollWidth": 769,
+        "clientWidth": 768,
+        "overflow": false,
+        "sealScript": false,
+        "officialSeal": false,
+        "sealPreview": true,
+        "textFallback": false,
+        "groups": [
+          "Al Noor",
+          "Shop",
+          "Account",
+          "Policies",
+          "Business information",
+          "Merchant-provided information",
+          "Saudi Business Center",
+          "Contact",
+          "Applications"
+        ],
+        "badges": [
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          },
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          },
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          },
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          }
+        ],
+        "linkCount": 13,
+        "unnamed": []
+      }
+    },
+    {
+      "surface": "published",
+      "scenario": "full",
+      "locale": "en",
+      "width": 1024,
+      "file": "published-full-en-1024.jpg",
+      "url": "http://127.0.0.1:3101/dev/trust-visual?locale=en&scenario=full&surface=published&viewport=desktop",
+      "findings": [],
+      "measured": {
+        "dir": "rtl",
+        "lang": "ar",
+        "scrollWidth": 1024,
+        "clientWidth": 1024,
+        "overflow": false,
+        "sealScript": false,
+        "officialSeal": true,
+        "sealPreview": false,
+        "textFallback": true,
+        "groups": [
+          "Al Noor",
+          "Shop",
+          "Account",
+          "Policies",
+          "Business information",
+          "Merchant-provided information",
+          "Saudi Business Center",
+          "Contact",
+          "Applications"
+        ],
+        "badges": [
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          },
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          },
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          },
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          }
+        ],
+        "linkCount": 23,
+        "unnamed": []
+      }
+    },
+    {
+      "surface": "preview",
+      "scenario": "full",
+      "locale": "en",
+      "width": 1024,
+      "file": "preview-full-en-1024.jpg",
+      "url": "http://127.0.0.1:3100/dev/trust-visual?locale=en&scenario=full&viewport=desktop",
+      "findings": [],
+      "measured": {
+        "dir": "rtl",
+        "lang": "ar",
+        "canvasDir": "ltr",
+        "scrollWidth": 1025,
+        "clientWidth": 1024,
+        "overflow": false,
+        "sealScript": false,
+        "officialSeal": false,
+        "sealPreview": true,
+        "textFallback": false,
+        "groups": [
+          "Al Noor",
+          "Shop",
+          "Account",
+          "Policies",
+          "Business information",
+          "Merchant-provided information",
+          "Saudi Business Center",
+          "Contact",
+          "Applications"
+        ],
+        "badges": [
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          },
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          },
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          },
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          }
+        ],
+        "linkCount": 13,
+        "unnamed": []
+      }
+    },
+    {
+      "surface": "published",
+      "scenario": "full",
+      "locale": "en",
+      "width": 1280,
+      "file": "published-full-en-1280.jpg",
+      "url": "http://127.0.0.1:3101/dev/trust-visual?locale=en&scenario=full&surface=published&viewport=desktop",
+      "findings": [],
+      "measured": {
+        "dir": "rtl",
+        "lang": "ar",
+        "scrollWidth": 1280,
+        "clientWidth": 1280,
+        "overflow": false,
+        "sealScript": false,
+        "officialSeal": true,
+        "sealPreview": false,
+        "textFallback": true,
+        "groups": [
+          "Al Noor",
+          "Shop",
+          "Account",
+          "Policies",
+          "Business information",
+          "Merchant-provided information",
+          "Saudi Business Center",
+          "Contact",
+          "Applications"
+        ],
+        "badges": [
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          },
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          },
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          },
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          }
+        ],
+        "linkCount": 23,
+        "unnamed": []
+      }
+    },
+    {
+      "surface": "preview",
+      "scenario": "full",
+      "locale": "en",
+      "width": 1280,
+      "file": "preview-full-en-1280.jpg",
+      "url": "http://127.0.0.1:3100/dev/trust-visual?locale=en&scenario=full&viewport=desktop",
+      "findings": [],
+      "measured": {
+        "dir": "rtl",
+        "lang": "ar",
+        "canvasDir": "ltr",
+        "scrollWidth": 1281,
+        "clientWidth": 1280,
+        "overflow": false,
+        "sealScript": false,
+        "officialSeal": false,
+        "sealPreview": true,
+        "textFallback": false,
+        "groups": [
+          "Al Noor",
+          "Shop",
+          "Account",
+          "Policies",
+          "Business information",
+          "Merchant-provided information",
+          "Saudi Business Center",
+          "Contact",
+          "Applications"
+        ],
+        "badges": [
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          },
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          },
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          },
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          }
+        ],
+        "linkCount": 13,
+        "unnamed": []
+      }
+    },
+    {
+      "surface": "published",
+      "scenario": "full",
+      "locale": "en",
+      "width": 1440,
+      "file": "published-full-en-1440.jpg",
+      "url": "http://127.0.0.1:3101/dev/trust-visual?locale=en&scenario=full&surface=published&viewport=desktop",
+      "findings": [],
+      "measured": {
+        "dir": "rtl",
+        "lang": "ar",
+        "scrollWidth": 1440,
+        "clientWidth": 1440,
+        "overflow": false,
+        "sealScript": false,
+        "officialSeal": true,
+        "sealPreview": false,
+        "textFallback": true,
+        "groups": [
+          "Al Noor",
+          "Shop",
+          "Account",
+          "Policies",
+          "Business information",
+          "Merchant-provided information",
+          "Saudi Business Center",
+          "Contact",
+          "Applications"
+        ],
+        "badges": [
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          },
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          },
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          },
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          }
+        ],
+        "linkCount": 23,
+        "unnamed": []
+      }
+    },
+    {
+      "surface": "preview",
+      "scenario": "full",
+      "locale": "en",
+      "width": 1440,
+      "file": "preview-full-en-1440.jpg",
+      "url": "http://127.0.0.1:3100/dev/trust-visual?locale=en&scenario=full&viewport=desktop",
+      "findings": [],
+      "measured": {
+        "dir": "rtl",
+        "lang": "ar",
+        "canvasDir": "ltr",
+        "scrollWidth": 1441,
+        "clientWidth": 1440,
+        "overflow": false,
+        "sealScript": false,
+        "officialSeal": false,
+        "sealPreview": true,
+        "textFallback": false,
+        "groups": [
+          "Al Noor",
+          "Shop",
+          "Account",
+          "Policies",
+          "Business information",
+          "Merchant-provided information",
+          "Saudi Business Center",
+          "Contact",
+          "Applications"
+        ],
+        "badges": [
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          },
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          },
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          },
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          }
+        ],
+        "linkCount": 13,
+        "unnamed": []
+      }
+    },
+    {
+      "surface": "published",
+      "scenario": "unsafe",
+      "locale": "ar",
+      "width": 390,
+      "file": "published-unsafe-ar-390.jpg",
+      "url": "http://127.0.0.1:3101/dev/trust-visual?locale=ar&scenario=unsafe&surface=published&viewport=mobile",
+      "findings": [],
+      "measured": {
+        "dir": "rtl",
+        "lang": "ar",
+        "scrollWidth": 390,
+        "clientWidth": 390,
+        "overflow": false,
+        "sealScript": false,
+        "officialSeal": false,
+        "sealPreview": false,
+        "textFallback": false,
+        "groups": [
+          "تطبيق النور",
+          "المتجر",
+          "الحساب",
+          "السياسات",
+          "معلومات المنشأة",
+          "معلومات من التاجر",
+          "التواصل",
+          "التطبيقات"
+        ],
+        "badges": [
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          },
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          }
+        ],
+        "linkCount": 13,
+        "unnamed": []
+      }
+    },
+    {
+      "surface": "preview",
+      "scenario": "unsafe",
+      "locale": "ar",
+      "width": 390,
+      "file": "preview-unsafe-ar-390.jpg",
+      "url": "http://127.0.0.1:3100/dev/trust-visual?locale=ar&scenario=unsafe&viewport=mobile",
+      "findings": [],
+      "measured": {
+        "scrollWidth": 390,
+        "clientWidth": 390,
+        "surfaceDir": "rtl",
+        "text": "المنتجات والتصنيفات هنا عيّنات للمعاينة فقط، وليست حقيقة تجارية للمتجر الحي.\n\nالرأس والتنقل\nالرئيسية\nمتجر النور\nابحث في المتجر\nتطبيق النور\nالتذييل\nمتجر النور\n\nEastern Province\n\nالمتجر\nكل المنتجاتالإلكترونياتالمنزلالعنايةالأزياء\nالحساب\nالحسابالسلة\nالسياسات\nسياسة الشحنالخصوصيةالإرجاعالشروط\nمعلومات المنشأة\n\nالاسم القانوني: شركة النور للتجارة\n\nمعلومات من التاجر\n\nرقم الترخيص: LIC-42\n\nالتواصل\n\n+96650000"
+      }
+    },
+    {
+      "surface": "published",
+      "scenario": "unsafe",
+      "locale": "ar",
+      "width": 1440,
+      "file": "published-unsafe-ar-1440.jpg",
+      "url": "http://127.0.0.1:3101/dev/trust-visual?locale=ar&scenario=unsafe&surface=published&viewport=desktop",
+      "findings": [],
+      "measured": {
+        "dir": "rtl",
+        "lang": "ar",
+        "scrollWidth": 1440,
+        "clientWidth": 1440,
+        "overflow": false,
+        "sealScript": false,
+        "officialSeal": false,
+        "sealPreview": false,
+        "textFallback": false,
+        "groups": [
+          "تطبيق النور",
+          "المتجر",
+          "الحساب",
+          "السياسات",
+          "معلومات المنشأة",
+          "معلومات من التاجر",
+          "التواصل",
+          "التطبيقات"
+        ],
+        "badges": [
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          },
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          }
+        ],
+        "linkCount": 13,
+        "unnamed": []
+      }
+    },
+    {
+      "surface": "preview",
+      "scenario": "unsafe",
+      "locale": "ar",
+      "width": 1440,
+      "file": "preview-unsafe-ar-1440.jpg",
+      "url": "http://127.0.0.1:3100/dev/trust-visual?locale=ar&scenario=unsafe&viewport=desktop",
+      "findings": [],
+      "measured": {
+        "scrollWidth": 1440,
+        "clientWidth": 1440,
+        "surfaceDir": "rtl",
+        "text": "المنتجات والتصنيفات هنا عيّنات للمعاينة فقط، وليست حقيقة تجارية للمتجر الحي.\n\nالرأس والتنقل\nالسعودية · ر.س\nمتجر النور\nابحث في المتجر\nالحساب\nالسلة\nكل المنتجات\nالإلكترونيات\nالمنزل\nالعناية\nالأزياء\nالمكتب\nالرياضة\nتطبيق النور\nالتذييل\nمتجر النور\n\nEastern Province\n\nالمتجر\nكل المنتجاتالإلكترونياتالمنزلالعنايةالأزياء\nالحساب\nالحسابالسلة\nالسياسات\nسياسة الشحنالخصوصيةالإرجاعالشروط\nمعلومات المنشأة\n\nالاسم القانو"
+      }
+    },
+    {
+      "surface": "published",
+      "scenario": "unsafe",
+      "locale": "en",
+      "width": 390,
+      "file": "published-unsafe-en-390.jpg",
+      "url": "http://127.0.0.1:3101/dev/trust-visual?locale=en&scenario=unsafe&surface=published&viewport=mobile",
+      "findings": [],
+      "measured": {
+        "dir": "rtl",
+        "lang": "ar",
+        "scrollWidth": 390,
+        "clientWidth": 390,
+        "overflow": false,
+        "sealScript": false,
+        "officialSeal": false,
+        "sealPreview": false,
+        "textFallback": false,
+        "groups": [
+          "Al Noor",
+          "Shop",
+          "Account",
+          "Policies",
+          "Business information",
+          "Merchant-provided information",
+          "Contact",
+          "Applications"
+        ],
+        "badges": [
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          },
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          }
+        ],
+        "linkCount": 13,
+        "unnamed": []
+      }
+    },
+    {
+      "surface": "preview",
+      "scenario": "unsafe",
+      "locale": "en",
+      "width": 390,
+      "file": "preview-unsafe-en-390.jpg",
+      "url": "http://127.0.0.1:3100/dev/trust-visual?locale=en&scenario=unsafe&viewport=mobile",
+      "findings": [],
+      "measured": {
+        "scrollWidth": 391,
+        "clientWidth": 390,
+        "surfaceDir": "ltr",
+        "text": "Products and categories here are preview fixtures, not live commerce truth.\n\nHeader & navigation\nHome\nAl Noor\nSearch the store\nAl Noor\nFooter\nAl Noor\n\nEastern Province\n\nShop\nAll productsElectronicsHomeCareFashion\nAccount\nAccountCart\nPolicies\nShipping policyPrivacyReturnsTerms\nBusiness information\n\nLegal name: Al Noor Trading Company\n\nMerchant-provided information\n\nLicense number: LIC-42\n\nContact\n\n"
+      }
+    },
+    {
+      "surface": "published",
+      "scenario": "unsafe",
+      "locale": "en",
+      "width": 1440,
+      "file": "published-unsafe-en-1440.jpg",
+      "url": "http://127.0.0.1:3101/dev/trust-visual?locale=en&scenario=unsafe&surface=published&viewport=desktop",
+      "findings": [],
+      "measured": {
+        "dir": "rtl",
+        "lang": "ar",
+        "scrollWidth": 1440,
+        "clientWidth": 1440,
+        "overflow": false,
+        "sealScript": false,
+        "officialSeal": false,
+        "sealPreview": false,
+        "textFallback": false,
+        "groups": [
+          "Al Noor",
+          "Shop",
+          "Account",
+          "Policies",
+          "Business information",
+          "Merchant-provided information",
+          "Contact",
+          "Applications"
+        ],
+        "badges": [
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          },
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          }
+        ],
+        "linkCount": 13,
+        "unnamed": []
+      }
+    },
+    {
+      "surface": "preview",
+      "scenario": "unsafe",
+      "locale": "en",
+      "width": 1440,
+      "file": "preview-unsafe-en-1440.jpg",
+      "url": "http://127.0.0.1:3100/dev/trust-visual?locale=en&scenario=unsafe&viewport=desktop",
+      "findings": [],
+      "measured": {
+        "scrollWidth": 1441,
+        "clientWidth": 1440,
+        "surfaceDir": "ltr",
+        "text": "Products and categories here are preview fixtures, not live commerce truth.\n\nHeader & navigation\nSaudi Arabia · SAR\nAl Noor\nSearch the store\nAccount\nCart\nAll products\nElectronics\nHome\nCare\nFashion\nOffice\nSport\nAl Noor\nFooter\nAl Noor\n\nEastern Province\n\nShop\nAll productsElectronicsHomeCareFashion\nAccount\nAccountCart\nPolicies\nShipping policyPrivacyReturnsTerms\nBusiness information\n\nLegal name: Al Noo"
+      }
+    },
+    {
+      "surface": "published",
+      "scenario": "long",
+      "locale": "ar",
+      "width": 390,
+      "file": "published-long-ar-390.jpg",
+      "url": "http://127.0.0.1:3101/dev/trust-visual?locale=ar&scenario=long&surface=published&viewport=mobile",
+      "findings": [],
+      "measured": {
+        "dir": "rtl",
+        "lang": "ar",
+        "scrollWidth": 390,
+        "clientWidth": 390,
+        "overflow": false,
+        "sealScript": false,
+        "officialSeal": true,
+        "sealPreview": false,
+        "textFallback": true,
+        "groups": [
+          "تطبيق النور",
+          "المتجر",
+          "الحساب",
+          "السياسات",
+          "معلومات المنشأة",
+          "معلومات من التاجر",
+          "منصة الأعمال",
+          "التواصل",
+          "التطبيقات"
+        ],
+        "badges": [
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          },
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          },
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          },
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          }
+        ],
+        "linkCount": 23,
+        "unnamed": []
+      }
+    },
+    {
+      "surface": "preview",
+      "scenario": "long",
+      "locale": "ar",
+      "width": 390,
+      "file": "preview-long-ar-390.jpg",
+      "url": "http://127.0.0.1:3100/dev/trust-visual?locale=ar&scenario=long&viewport=mobile",
+      "findings": [
+        "TimeoutError: page.goto: Timeout 30000ms exceeded.\nCall log:\n  - navigating to \"http://127.0.0.1:3100/dev/trust-visual?locale=ar&scenario=long&viewport=mobile\", waiting until \"domcontentloaded\"\n"
+      ]
+    },
+    {
+      "surface": "published",
+      "scenario": "long",
+      "locale": "ar",
+      "width": 768,
+      "file": "published-long-ar-768.jpg",
+      "url": "http://127.0.0.1:3101/dev/trust-visual?locale=ar&scenario=long&surface=published&viewport=tablet",
+      "findings": [],
+      "measured": {
+        "dir": "rtl",
+        "lang": "ar",
+        "scrollWidth": 768,
+        "clientWidth": 768,
+        "overflow": false,
+        "sealScript": false,
+        "officialSeal": true,
+        "sealPreview": false,
+        "textFallback": true,
+        "groups": [
+          "تطبيق النور",
+          "المتجر",
+          "الحساب",
+          "السياسات",
+          "معلومات المنشأة",
+          "معلومات من التاجر",
+          "منصة الأعمال",
+          "التواصل",
+          "التطبيقات"
+        ],
+        "badges": [
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          },
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          },
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          },
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          }
+        ],
+        "linkCount": 23,
+        "unnamed": []
+      }
+    },
+    {
+      "surface": "preview",
+      "scenario": "long",
+      "locale": "ar",
+      "width": 768,
+      "file": "preview-long-ar-768.jpg",
+      "url": "http://127.0.0.1:3100/dev/trust-visual?locale=ar&scenario=long&viewport=tablet",
+      "findings": [
+        "TimeoutError: locator.screenshot: Timeout 29706.883ms exceeded.\nCall log:\n  - taking element screenshot\n  - waiting for fonts to load...\n"
+      ]
+    },
+    {
+      "surface": "published",
+      "scenario": "long",
+      "locale": "ar",
+      "width": 1440,
+      "file": "published-long-ar-1440.jpg",
+      "url": "http://127.0.0.1:3101/dev/trust-visual?locale=ar&scenario=long&surface=published&viewport=desktop",
+      "findings": [],
+      "measured": {
+        "dir": "rtl",
+        "lang": "ar",
+        "scrollWidth": 1440,
+        "clientWidth": 1440,
+        "overflow": false,
+        "sealScript": false,
+        "officialSeal": true,
+        "sealPreview": false,
+        "textFallback": true,
+        "groups": [
+          "تطبيق النور",
+          "المتجر",
+          "الحساب",
+          "السياسات",
+          "معلومات المنشأة",
+          "معلومات من التاجر",
+          "منصة الأعمال",
+          "التواصل",
+          "التطبيقات"
+        ],
+        "badges": [
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          },
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          },
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          },
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          }
+        ],
+        "linkCount": 23,
+        "unnamed": []
+      }
+    },
+    {
+      "surface": "preview",
+      "scenario": "long",
+      "locale": "ar",
+      "width": 1440,
+      "file": "preview-long-ar-1440.jpg",
+      "url": "http://127.0.0.1:3100/dev/trust-visual?locale=ar&scenario=long&viewport=desktop",
+      "findings": [],
+      "measured": {
+        "scrollWidth": 1440,
+        "clientWidth": 1440,
+        "surfaceDir": "rtl",
+        "text": "المنتجات والتصنيفات هنا عيّنات للمعاينة فقط، وليست حقيقة تجارية للمتجر الحي.\n\nالرأس والتنقل\nالسعودية · ر.س\nAwjUnbrokenTokenAwjUnbrokenTokenAwjUnbrokenTokenAwjUnbrokenTokenAwjUnbrokenToken\nابحث في المتجر\nالحساب\nالسلة\nكل المنتجات\nالإلكترونيات\nالمنزل\nالعناية\nالأزياء\nالمكتب\nالرياضة\nتطبيق النور\nالتذييل\nAwjUnbrokenTokenAwjUnbrokenTokenAwjUnbrokenTokenAwjUnbrokenTokenAwjUnbrokenToken\n\nAwjUnbrokenTokenAwj"
+      }
+    },
+    {
+      "surface": "published",
+      "scenario": "long",
+      "locale": "en",
+      "width": 390,
+      "file": "published-long-en-390.jpg",
+      "url": "http://127.0.0.1:3101/dev/trust-visual?locale=en&scenario=long&surface=published&viewport=mobile",
+      "findings": [],
+      "measured": {
+        "dir": "rtl",
+        "lang": "ar",
+        "scrollWidth": 390,
+        "clientWidth": 390,
+        "overflow": false,
+        "sealScript": false,
+        "officialSeal": true,
+        "sealPreview": false,
+        "textFallback": true,
+        "groups": [
+          "Al Noor",
+          "Shop",
+          "Account",
+          "Policies",
+          "Business information",
+          "Merchant-provided information",
+          "Saudi Business Center",
+          "Contact",
+          "Applications"
+        ],
+        "badges": [
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          },
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          },
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          },
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          }
+        ],
+        "linkCount": 23,
+        "unnamed": []
+      }
+    },
+    {
+      "surface": "preview",
+      "scenario": "long",
+      "locale": "en",
+      "width": 390,
+      "file": "preview-long-en-390.jpg",
+      "url": "http://127.0.0.1:3100/dev/trust-visual?locale=en&scenario=long&viewport=mobile",
+      "findings": [],
+      "measured": {
+        "scrollWidth": 391,
+        "clientWidth": 390,
+        "surfaceDir": "ltr",
+        "text": "Products and categories here are preview fixtures, not live commerce truth.\n\nHeader & navigation\nHome\nAwjUnbrokenTokenAwjUnbrokenTokenAwjUnbrokenTokenAwjUnbrokenTokenAwjUnbrokenToken\nSearch the store\nAl Noor\nFooter\nAwjUnbrokenTokenAwjUnbrokenTokenAwjUnbrokenTokenAwjUnbrokenTokenAwjUnbrokenToken\n\nAwjUnbrokenTokenAwjUnbrokenTokenAwjUnbrokenTokenAwjUnbrokenTokenAwjUnbrokenTokenAwjUnbrokenTokenAwjUnbr"
+      }
+    },
+    {
+      "surface": "published",
+      "scenario": "long",
+      "locale": "en",
+      "width": 768,
+      "file": "published-long-en-768.jpg",
+      "url": "http://127.0.0.1:3101/dev/trust-visual?locale=en&scenario=long&surface=published&viewport=tablet",
+      "findings": [],
+      "measured": {
+        "dir": "rtl",
+        "lang": "ar",
+        "scrollWidth": 768,
+        "clientWidth": 768,
+        "overflow": false,
+        "sealScript": false,
+        "officialSeal": true,
+        "sealPreview": false,
+        "textFallback": true,
+        "groups": [
+          "Al Noor",
+          "Shop",
+          "Account",
+          "Policies",
+          "Business information",
+          "Merchant-provided information",
+          "Saudi Business Center",
+          "Contact",
+          "Applications"
+        ],
+        "badges": [
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          },
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          },
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          },
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          }
+        ],
+        "linkCount": 23,
+        "unnamed": []
+      }
+    },
+    {
+      "surface": "preview",
+      "scenario": "long",
+      "locale": "en",
+      "width": 768,
+      "file": "preview-long-en-768.jpg",
+      "url": "http://127.0.0.1:3100/dev/trust-visual?locale=en&scenario=long&viewport=tablet",
+      "findings": [],
+      "measured": {
+        "scrollWidth": 769,
+        "clientWidth": 768,
+        "surfaceDir": "ltr",
+        "text": "Products and categories here are preview fixtures, not live commerce truth.\n\nHeader & navigation\nSaudi Arabia · SAR\nAwjUnbrokenTokenAwjUnbrokenTokenAwjUnbrokenTokenAwjUnbrokenTokenAwjUnbrokenToken\nSearch the store\nAccount\nCart\nAll products\nElectronics\nHome\nCare\nFashion\nOffice\nSport\nAl Noor\nFooter\nAwjUnbrokenTokenAwjUnbrokenTokenAwjUnbrokenTokenAwjUnbrokenTokenAwjUnbrokenToken\n\nAwjUnbrokenTokenAwjU"
+      }
+    },
+    {
+      "surface": "published",
+      "scenario": "long",
+      "locale": "en",
+      "width": 1440,
+      "file": "published-long-en-1440.jpg",
+      "url": "http://127.0.0.1:3101/dev/trust-visual?locale=en&scenario=long&surface=published&viewport=desktop",
+      "findings": [],
+      "measured": {
+        "dir": "rtl",
+        "lang": "ar",
+        "scrollWidth": 1440,
+        "clientWidth": 1440,
+        "overflow": false,
+        "sealScript": false,
+        "officialSeal": true,
+        "sealPreview": false,
+        "textFallback": true,
+        "groups": [
+          "Al Noor",
+          "Shop",
+          "Account",
+          "Policies",
+          "Business information",
+          "Merchant-provided information",
+          "Saudi Business Center",
+          "Contact",
+          "Applications"
+        ],
+        "badges": [
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          },
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          },
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          },
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          }
+        ],
+        "linkCount": 23,
+        "unnamed": []
+      }
+    },
+    {
+      "surface": "preview",
+      "scenario": "long",
+      "locale": "en",
+      "width": 1440,
+      "file": "preview-long-en-1440.jpg",
+      "url": "http://127.0.0.1:3100/dev/trust-visual?locale=en&scenario=long&viewport=desktop",
+      "findings": [],
+      "measured": {
+        "scrollWidth": 1441,
+        "clientWidth": 1440,
+        "surfaceDir": "ltr",
+        "text": "Products and categories here are preview fixtures, not live commerce truth.\n\nHeader & navigation\nSaudi Arabia · SAR\nAwjUnbrokenTokenAwjUnbrokenTokenAwjUnbrokenTokenAwjUnbrokenTokenAwjUnbrokenToken\nSearch the store\nAccount\nCart\nAll products\nElectronics\nHome\nCare\nFashion\nOffice\nSport\nAl Noor\nFooter\nAwjUnbrokenTokenAwjUnbrokenTokenAwjUnbrokenTokenAwjUnbrokenTokenAwjUnbrokenToken\n\nAwjUnbrokenTokenAwjU"
+      }
+    },
+    {
+      "surface": "published",
+      "scenario": "missing-identity",
+      "locale": "ar",
+      "width": 390,
+      "file": "published-missing-identity-ar-390.jpg",
+      "url": "http://127.0.0.1:3101/dev/trust-visual?locale=ar&scenario=missing-identity&surface=published&viewport=mobile",
+      "findings": [],
+      "measured": {
+        "dir": "rtl",
+        "lang": "ar",
+        "scrollWidth": 390,
+        "clientWidth": 390,
+        "overflow": false,
+        "sealScript": false,
+        "officialSeal": false,
+        "sealPreview": false,
+        "textFallback": false,
+        "groups": [
+          "تطبيق النور",
+          "المتجر",
+          "الحساب",
+          "السياسات",
+          "التواصل",
+          "التطبيقات"
+        ],
+        "badges": [
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          },
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          },
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          },
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          }
+        ],
+        "linkCount": 17,
+        "unnamed": []
+      }
+    },
+    {
+      "surface": "preview",
+      "scenario": "missing-identity",
+      "locale": "ar",
+      "width": 390,
+      "file": "preview-missing-identity-ar-390.jpg",
+      "url": "http://127.0.0.1:3100/dev/trust-visual?locale=ar&scenario=missing-identity&viewport=mobile",
+      "findings": [],
+      "measured": {
+        "scrollWidth": 390,
+        "clientWidth": 390,
+        "surfaceDir": "rtl",
+        "text": "المنتجات والتصنيفات هنا عيّنات للمعاينة فقط، وليست حقيقة تجارية للمتجر الحي.\n\nالرأس والتنقل\nالرئيسية\nمتجر النور\nابحث في المتجر\nتطبيق النور\nالتذييل\nمتجر النور\n\nEastern Province\n\nالمتجر\nكل المنتجاتالإلكترونياتالمنزلالعنايةالأزياء\nالحساب\nالحسابالسلة\nالسياسات\nسياسة الشحنالخصوصيةالإرجاعالشروط\nالتواصل\n\n+966500000001\n\nshop@example.com\n\nالدمام، المنطقة الشرقية\n\n٩ ص – ٩ م\n\nواتساب\n\nإنستغرام\n\nالتطبيقات\n\n© مت"
+      }
+    },
+    {
+      "surface": "published",
+      "scenario": "missing-identity",
+      "locale": "ar",
+      "width": 1440,
+      "file": "published-missing-identity-ar-1440.jpg",
+      "url": "http://127.0.0.1:3101/dev/trust-visual?locale=ar&scenario=missing-identity&surface=published&viewport=desktop",
+      "findings": [],
+      "measured": {
+        "dir": "rtl",
+        "lang": "ar",
+        "scrollWidth": 1440,
+        "clientWidth": 1440,
+        "overflow": false,
+        "sealScript": false,
+        "officialSeal": false,
+        "sealPreview": false,
+        "textFallback": false,
+        "groups": [
+          "تطبيق النور",
+          "المتجر",
+          "الحساب",
+          "السياسات",
+          "التواصل",
+          "التطبيقات"
+        ],
+        "badges": [
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          },
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          },
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          },
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          }
+        ],
+        "linkCount": 17,
+        "unnamed": []
+      }
+    },
+    {
+      "surface": "preview",
+      "scenario": "missing-identity",
+      "locale": "ar",
+      "width": 1440,
+      "file": "preview-missing-identity-ar-1440.jpg",
+      "url": "http://127.0.0.1:3100/dev/trust-visual?locale=ar&scenario=missing-identity&viewport=desktop",
+      "findings": [],
+      "measured": {
+        "scrollWidth": 1440,
+        "clientWidth": 1440,
+        "surfaceDir": "rtl",
+        "text": "المنتجات والتصنيفات هنا عيّنات للمعاينة فقط، وليست حقيقة تجارية للمتجر الحي.\n\nالرأس والتنقل\nالسعودية · ر.س\nمتجر النور\nابحث في المتجر\nالحساب\nالسلة\nكل المنتجات\nالإلكترونيات\nالمنزل\nالعناية\nالأزياء\nالمكتب\nالرياضة\nتطبيق النور\nالتذييل\nمتجر النور\n\nEastern Province\n\nالمتجر\nكل المنتجاتالإلكترونياتالمنزلالعنايةالأزياء\nالحساب\nالحسابالسلة\nالسياسات\nسياسة الشحنالخصوصيةالإرجاعالشروط\nالتواصل\n\n+966500000001\n\nshop@"
+      }
+    },
+    {
+      "surface": "published",
+      "scenario": "missing-identity",
+      "locale": "en",
+      "width": 390,
+      "file": "published-missing-identity-en-390.jpg",
+      "url": "http://127.0.0.1:3101/dev/trust-visual?locale=en&scenario=missing-identity&surface=published&viewport=mobile",
+      "findings": [],
+      "measured": {
+        "dir": "rtl",
+        "lang": "ar",
+        "scrollWidth": 390,
+        "clientWidth": 390,
+        "overflow": false,
+        "sealScript": false,
+        "officialSeal": false,
+        "sealPreview": false,
+        "textFallback": false,
+        "groups": [
+          "Al Noor",
+          "Shop",
+          "Account",
+          "Policies",
+          "Contact",
+          "Applications"
+        ],
+        "badges": [
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          },
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          },
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          },
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          }
+        ],
+        "linkCount": 17,
+        "unnamed": []
+      }
+    },
+    {
+      "surface": "preview",
+      "scenario": "missing-identity",
+      "locale": "en",
+      "width": 390,
+      "file": "preview-missing-identity-en-390.jpg",
+      "url": "http://127.0.0.1:3100/dev/trust-visual?locale=en&scenario=missing-identity&viewport=mobile",
+      "findings": [],
+      "measured": {
+        "scrollWidth": 391,
+        "clientWidth": 390,
+        "surfaceDir": "ltr",
+        "text": "Products and categories here are preview fixtures, not live commerce truth.\n\nHeader & navigation\nHome\nAl Noor\nSearch the store\nAl Noor\nFooter\nAl Noor\n\nEastern Province\n\nShop\nAll productsElectronicsHomeCareFashion\nAccount\nAccountCart\nPolicies\nShipping policyPrivacyReturnsTerms\nContact\n\n+966500000001\n\nshop@example.com\n\nDammam, Eastern Province\n\n9:00–21:00\n\nWhatsApp\n\nInstagram\n\nApplications\n\n© Al Noo"
+      }
+    },
+    {
+      "surface": "published",
+      "scenario": "missing-identity",
+      "locale": "en",
+      "width": 1440,
+      "file": "published-missing-identity-en-1440.jpg",
+      "url": "http://127.0.0.1:3101/dev/trust-visual?locale=en&scenario=missing-identity&surface=published&viewport=desktop",
+      "findings": [],
+      "measured": {
+        "dir": "rtl",
+        "lang": "ar",
+        "scrollWidth": 1440,
+        "clientWidth": 1440,
+        "overflow": false,
+        "sealScript": false,
+        "officialSeal": false,
+        "sealPreview": false,
+        "textFallback": false,
+        "groups": [
+          "Al Noor",
+          "Shop",
+          "Account",
+          "Policies",
+          "Contact",
+          "Applications"
+        ],
+        "badges": [
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          },
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          },
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          },
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          }
+        ],
+        "linkCount": 17,
+        "unnamed": []
+      }
+    },
+    {
+      "surface": "preview",
+      "scenario": "missing-identity",
+      "locale": "en",
+      "width": 1440,
+      "file": "preview-missing-identity-en-1440.jpg",
+      "url": "http://127.0.0.1:3100/dev/trust-visual?locale=en&scenario=missing-identity&viewport=desktop",
+      "findings": [],
+      "measured": {
+        "scrollWidth": 1441,
+        "clientWidth": 1440,
+        "surfaceDir": "ltr",
+        "text": "Products and categories here are preview fixtures, not live commerce truth.\n\nHeader & navigation\nSaudi Arabia · SAR\nAl Noor\nSearch the store\nAccount\nCart\nAll products\nElectronics\nHome\nCare\nFashion\nOffice\nSport\nAl Noor\nFooter\nAl Noor\n\nEastern Province\n\nShop\nAll productsElectronicsHomeCareFashion\nAccount\nAccountCart\nPolicies\nShipping policyPrivacyReturnsTerms\nContact\n\n+966500000001\n\nshop@example.com"
+      }
+    },
+    {
+      "surface": "published",
+      "scenario": "sbc-plain",
+      "locale": "ar",
+      "width": 390,
+      "file": "published-sbc-plain-ar-390.jpg",
+      "url": "http://127.0.0.1:3101/dev/trust-visual?locale=ar&scenario=sbc-plain&surface=published&viewport=mobile",
+      "findings": [],
+      "measured": {
+        "dir": "rtl",
+        "lang": "ar",
+        "scrollWidth": 390,
+        "clientWidth": 390,
+        "overflow": false,
+        "sealScript": false,
+        "officialSeal": false,
+        "sealPreview": false,
+        "textFallback": false,
+        "groups": [
+          "المتجر",
+          "الحساب",
+          "السياسات",
+          "معلومات المنشأة",
+          "معلومات من التاجر",
+          "منصة الأعمال"
+        ],
+        "badges": [],
+        "linkCount": 10,
+        "unnamed": []
+      }
+    },
+    {
+      "surface": "preview",
+      "scenario": "sbc-plain",
+      "locale": "ar",
+      "width": 390,
+      "file": "preview-sbc-plain-ar-390.jpg",
+      "url": "http://127.0.0.1:3100/dev/trust-visual?locale=ar&scenario=sbc-plain&viewport=mobile",
+      "findings": [],
+      "measured": {
+        "scrollWidth": 390,
+        "clientWidth": 390,
+        "surfaceDir": "rtl",
+        "text": "المنتجات والتصنيفات هنا عيّنات للمعاينة فقط، وليست حقيقة تجارية للمتجر الحي.\n\nالرأس والتنقل\nالرئيسية\nمتجر النور\nابحث في المتجر\nالتذييل\nمتجر النور\n\nEastern Province\n\nالمتجر\nكل المنتجاتالإلكترونياتالمنزلالعنايةالأزياء\nالحساب\nالحسابالسلة\nالسياسات\nسياسة الشحنالخصوصيةالإرجاعالشروط\nمعلومات المنشأة\n\nالاسم القانوني: شركة النور للتجارة\n\nمعلومات من التاجر\n\nرقم الترخيص: LIC-42\n\nمنصة الأعمال\n\nموثّق في منصة ال"
+      }
+    },
+    {
+      "surface": "published",
+      "scenario": "sbc-plain",
+      "locale": "ar",
+      "width": 1440,
+      "file": "published-sbc-plain-ar-1440.jpg",
+      "url": "http://127.0.0.1:3101/dev/trust-visual?locale=ar&scenario=sbc-plain&surface=published&viewport=desktop",
+      "findings": [],
+      "measured": {
+        "dir": "rtl",
+        "lang": "ar",
+        "scrollWidth": 1440,
+        "clientWidth": 1440,
+        "overflow": false,
+        "sealScript": false,
+        "officialSeal": false,
+        "sealPreview": false,
+        "textFallback": false,
+        "groups": [
+          "المتجر",
+          "الحساب",
+          "السياسات",
+          "معلومات المنشأة",
+          "معلومات من التاجر",
+          "منصة الأعمال"
+        ],
+        "badges": [],
+        "linkCount": 10,
+        "unnamed": []
+      }
+    },
+    {
+      "surface": "preview",
+      "scenario": "sbc-plain",
+      "locale": "ar",
+      "width": 1440,
+      "file": "preview-sbc-plain-ar-1440.jpg",
+      "url": "http://127.0.0.1:3100/dev/trust-visual?locale=ar&scenario=sbc-plain&viewport=desktop",
+      "findings": [],
+      "measured": {
+        "scrollWidth": 1440,
+        "clientWidth": 1440,
+        "surfaceDir": "rtl",
+        "text": "المنتجات والتصنيفات هنا عيّنات للمعاينة فقط، وليست حقيقة تجارية للمتجر الحي.\n\nالرأس والتنقل\nالسعودية · ر.س\nمتجر النور\nابحث في المتجر\nالحساب\nالسلة\nكل المنتجات\nالإلكترونيات\nالمنزل\nالعناية\nالأزياء\nالمكتب\nالرياضة\nالتذييل\nمتجر النور\n\nEastern Province\n\nالمتجر\nكل المنتجاتالإلكترونياتالمنزلالعنايةالأزياء\nالحساب\nالحسابالسلة\nالسياسات\nسياسة الشحنالخصوصيةالإرجاعالشروط\nمعلومات المنشأة\n\nالاسم القانوني: شركة الن"
+      }
+    },
+    {
+      "surface": "published",
+      "scenario": "sbc-plain",
+      "locale": "en",
+      "width": 390,
+      "file": "published-sbc-plain-en-390.jpg",
+      "url": "http://127.0.0.1:3101/dev/trust-visual?locale=en&scenario=sbc-plain&surface=published&viewport=mobile",
+      "findings": [],
+      "measured": {
+        "dir": "rtl",
+        "lang": "ar",
+        "scrollWidth": 390,
+        "clientWidth": 390,
+        "overflow": false,
+        "sealScript": false,
+        "officialSeal": false,
+        "sealPreview": false,
+        "textFallback": false,
+        "groups": [
+          "Shop",
+          "Account",
+          "Policies",
+          "Business information",
+          "Merchant-provided information",
+          "Saudi Business Center"
+        ],
+        "badges": [],
+        "linkCount": 10,
+        "unnamed": []
+      }
+    },
+    {
+      "surface": "preview",
+      "scenario": "sbc-plain",
+      "locale": "en",
+      "width": 390,
+      "file": "preview-sbc-plain-en-390.jpg",
+      "url": "http://127.0.0.1:3100/dev/trust-visual?locale=en&scenario=sbc-plain&viewport=mobile",
+      "findings": [],
+      "measured": {
+        "scrollWidth": 391,
+        "clientWidth": 390,
+        "surfaceDir": "ltr",
+        "text": "Products and categories here are preview fixtures, not live commerce truth.\n\nHeader & navigation\nHome\nAl Noor\nSearch the store\nFooter\nAl Noor\n\nEastern Province\n\nShop\nAll productsElectronicsHomeCareFashion\nAccount\nAccountCart\nPolicies\nShipping policyPrivacyReturnsTerms\nBusiness information\n\nLegal name: Al Noor Trading Company\n\nMerchant-provided information\n\nLicense number: LIC-42\n\nSaudi Business Ce"
+      }
+    },
+    {
+      "surface": "published",
+      "scenario": "sbc-plain",
+      "locale": "en",
+      "width": 1440,
+      "file": "published-sbc-plain-en-1440.jpg",
+      "url": "http://127.0.0.1:3101/dev/trust-visual?locale=en&scenario=sbc-plain&surface=published&viewport=desktop",
+      "findings": [],
+      "measured": {
+        "dir": "rtl",
+        "lang": "ar",
+        "scrollWidth": 1440,
+        "clientWidth": 1440,
+        "overflow": false,
+        "sealScript": false,
+        "officialSeal": false,
+        "sealPreview": false,
+        "textFallback": false,
+        "groups": [
+          "Shop",
+          "Account",
+          "Policies",
+          "Business information",
+          "Merchant-provided information",
+          "Saudi Business Center"
+        ],
+        "badges": [],
+        "linkCount": 10,
+        "unnamed": []
+      }
+    },
+    {
+      "surface": "preview",
+      "scenario": "sbc-plain",
+      "locale": "en",
+      "width": 1440,
+      "file": "preview-sbc-plain-en-1440.jpg",
+      "url": "http://127.0.0.1:3100/dev/trust-visual?locale=en&scenario=sbc-plain&viewport=desktop",
+      "findings": [],
+      "measured": {
+        "scrollWidth": 1441,
+        "clientWidth": 1440,
+        "surfaceDir": "ltr",
+        "text": "Products and categories here are preview fixtures, not live commerce truth.\n\nHeader & navigation\nSaudi Arabia · SAR\nAl Noor\nSearch the store\nAccount\nCart\nAll products\nElectronics\nHome\nCare\nFashion\nOffice\nSport\nFooter\nAl Noor\n\nEastern Province\n\nShop\nAll productsElectronicsHomeCareFashion\nAccount\nAccountCart\nPolicies\nShipping policyPrivacyReturnsTerms\nBusiness information\n\nLegal name: Al Noor Tradin"
+      }
+    },
+    {
+      "surface": "published",
+      "scenario": "apps-one",
+      "locale": "ar",
+      "width": 390,
+      "file": "published-apps-one-ar-390.jpg",
+      "url": "http://127.0.0.1:3101/dev/trust-visual?locale=ar&scenario=apps-one&surface=published&viewport=mobile",
+      "findings": [],
+      "measured": {
+        "dir": "rtl",
+        "lang": "ar",
+        "scrollWidth": 390,
+        "clientWidth": 390,
+        "overflow": false,
+        "sealScript": false,
+        "officialSeal": false,
+        "sealPreview": false,
+        "textFallback": false,
+        "groups": [
+          "تطبيق النور",
+          "المتجر",
+          "الحساب",
+          "السياسات",
+          "معلومات المنشأة",
+          "معلومات من التاجر",
+          "التواصل",
+          "التطبيقات"
+        ],
+        "badges": [
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          },
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          }
+        ],
+        "linkCount": 12,
+        "unnamed": []
+      }
+    },
+    {
+      "surface": "preview",
+      "scenario": "apps-one",
+      "locale": "ar",
+      "width": 390,
+      "file": "preview-apps-one-ar-390.jpg",
+      "url": "http://127.0.0.1:3100/dev/trust-visual?locale=ar&scenario=apps-one&viewport=mobile",
+      "findings": [],
+      "measured": {
+        "scrollWidth": 390,
+        "clientWidth": 390,
+        "surfaceDir": "rtl",
+        "text": "المنتجات والتصنيفات هنا عيّنات للمعاينة فقط، وليست حقيقة تجارية للمتجر الحي.\n\nالرأس والتنقل\nالرئيسية\nمتجر النور\nابحث في المتجر\nتطبيق النور\nالتذييل\nمتجر النور\n\nEastern Province\n\nالمتجر\nكل المنتجاتالإلكترونياتالمنزلالعنايةالأزياء\nالحساب\nالحسابالسلة\nالسياسات\nسياسة الشحنالخصوصيةالإرجاعالشروط\nمعلومات المنشأة\n\nالاسم القانوني: شركة النور للتجارة\n\nمعلومات من التاجر\n\nرقم الترخيص: LIC-42\n\nالتواصل\n\n+96650000"
+      }
+    },
+    {
+      "surface": "published",
+      "scenario": "apps-one",
+      "locale": "ar",
+      "width": 1440,
+      "file": "published-apps-one-ar-1440.jpg",
+      "url": "http://127.0.0.1:3101/dev/trust-visual?locale=ar&scenario=apps-one&surface=published&viewport=desktop",
+      "findings": [],
+      "measured": {
+        "dir": "rtl",
+        "lang": "ar",
+        "scrollWidth": 1440,
+        "clientWidth": 1440,
+        "overflow": false,
+        "sealScript": false,
+        "officialSeal": false,
+        "sealPreview": false,
+        "textFallback": false,
+        "groups": [
+          "تطبيق النور",
+          "المتجر",
+          "الحساب",
+          "السياسات",
+          "معلومات المنشأة",
+          "معلومات من التاجر",
+          "التواصل",
+          "التطبيقات"
+        ],
+        "badges": [
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          },
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          }
+        ],
+        "linkCount": 12,
+        "unnamed": []
+      }
+    },
+    {
+      "surface": "preview",
+      "scenario": "apps-one",
+      "locale": "ar",
+      "width": 1440,
+      "file": "preview-apps-one-ar-1440.jpg",
+      "url": "http://127.0.0.1:3100/dev/trust-visual?locale=ar&scenario=apps-one&viewport=desktop",
+      "findings": [],
+      "measured": {
+        "scrollWidth": 1440,
+        "clientWidth": 1440,
+        "surfaceDir": "rtl",
+        "text": "المنتجات والتصنيفات هنا عيّنات للمعاينة فقط، وليست حقيقة تجارية للمتجر الحي.\n\nالرأس والتنقل\nالسعودية · ر.س\nمتجر النور\nابحث في المتجر\nالحساب\nالسلة\nكل المنتجات\nالإلكترونيات\nالمنزل\nالعناية\nالأزياء\nالمكتب\nالرياضة\nتطبيق النور\nالتذييل\nمتجر النور\n\nEastern Province\n\nالمتجر\nكل المنتجاتالإلكترونياتالمنزلالعنايةالأزياء\nالحساب\nالحسابالسلة\nالسياسات\nسياسة الشحنالخصوصيةالإرجاعالشروط\nمعلومات المنشأة\n\nالاسم القانو"
+      }
+    },
+    {
+      "surface": "published",
+      "scenario": "apps-one",
+      "locale": "en",
+      "width": 390,
+      "file": "published-apps-one-en-390.jpg",
+      "url": "http://127.0.0.1:3101/dev/trust-visual?locale=en&scenario=apps-one&surface=published&viewport=mobile",
+      "findings": [],
+      "measured": {
+        "dir": "rtl",
+        "lang": "ar",
+        "scrollWidth": 390,
+        "clientWidth": 390,
+        "overflow": false,
+        "sealScript": false,
+        "officialSeal": false,
+        "sealPreview": false,
+        "textFallback": false,
+        "groups": [
+          "Al Noor",
+          "Shop",
+          "Account",
+          "Policies",
+          "Business information",
+          "Merchant-provided information",
+          "Contact",
+          "Applications"
+        ],
+        "badges": [
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          },
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          }
+        ],
+        "linkCount": 12,
+        "unnamed": []
+      }
+    },
+    {
+      "surface": "preview",
+      "scenario": "apps-one",
+      "locale": "en",
+      "width": 390,
+      "file": "preview-apps-one-en-390.jpg",
+      "url": "http://127.0.0.1:3100/dev/trust-visual?locale=en&scenario=apps-one&viewport=mobile",
+      "findings": [],
+      "measured": {
+        "scrollWidth": 391,
+        "clientWidth": 390,
+        "surfaceDir": "ltr",
+        "text": "Products and categories here are preview fixtures, not live commerce truth.\n\nHeader & navigation\nHome\nAl Noor\nSearch the store\nAl Noor\nFooter\nAl Noor\n\nEastern Province\n\nShop\nAll productsElectronicsHomeCareFashion\nAccount\nAccountCart\nPolicies\nShipping policyPrivacyReturnsTerms\nBusiness information\n\nLegal name: Al Noor Trading Company\n\nMerchant-provided information\n\nLicense number: LIC-42\n\nContact\n\n"
+      }
+    },
+    {
+      "surface": "published",
+      "scenario": "apps-one",
+      "locale": "en",
+      "width": 1440,
+      "file": "published-apps-one-en-1440.jpg",
+      "url": "http://127.0.0.1:3101/dev/trust-visual?locale=en&scenario=apps-one&surface=published&viewport=desktop",
+      "findings": [],
+      "measured": {
+        "dir": "rtl",
+        "lang": "ar",
+        "scrollWidth": 1440,
+        "clientWidth": 1440,
+        "overflow": false,
+        "sealScript": false,
+        "officialSeal": false,
+        "sealPreview": false,
+        "textFallback": false,
+        "groups": [
+          "Al Noor",
+          "Shop",
+          "Account",
+          "Policies",
+          "Business information",
+          "Merchant-provided information",
+          "Contact",
+          "Applications"
+        ],
+        "badges": [
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          },
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          }
+        ],
+        "linkCount": 12,
+        "unnamed": []
+      }
+    },
+    {
+      "surface": "preview",
+      "scenario": "apps-one",
+      "locale": "en",
+      "width": 1440,
+      "file": "preview-apps-one-en-1440.jpg",
+      "url": "http://127.0.0.1:3100/dev/trust-visual?locale=en&scenario=apps-one&viewport=desktop",
+      "findings": [],
+      "measured": {
+        "scrollWidth": 1441,
+        "clientWidth": 1440,
+        "surfaceDir": "ltr",
+        "text": "Products and categories here are preview fixtures, not live commerce truth.\n\nHeader & navigation\nSaudi Arabia · SAR\nAl Noor\nSearch the store\nAccount\nCart\nAll products\nElectronics\nHome\nCare\nFashion\nOffice\nSport\nAl Noor\nFooter\nAl Noor\n\nEastern Province\n\nShop\nAll productsElectronicsHomeCareFashion\nAccount\nAccountCart\nPolicies\nShipping policyPrivacyReturnsTerms\nBusiness information\n\nLegal name: Al Noo"
+      }
+    },
+    {
+      "surface": "mirror",
+      "scenario": "full",
+      "locale": "ar",
+      "width": 390,
+      "file": "mirror-full-ar-390.jpg",
+      "url": "http://127.0.0.1:3101/dev/trust-visual?locale=ar&scenario=full&surface=mirror&viewport=mobile",
+      "findings": [],
+      "measured": {
+        "dir": "rtl",
+        "lang": "ar",
+        "canvasDir": "rtl",
+        "scrollWidth": 390,
+        "clientWidth": 390,
+        "overflow": false,
+        "sealScript": false,
+        "officialSeal": false,
+        "sealPreview": true,
+        "textFallback": false,
+        "groups": [
+          "تطبيق النور",
+          "المتجر",
+          "الحساب",
+          "السياسات",
+          "معلومات المنشأة",
+          "معلومات من التاجر",
+          "منصة الأعمال",
+          "التواصل",
+          "التطبيقات"
+        ],
+        "badges": [
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          },
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          },
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          },
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          }
+        ],
+        "linkCount": 15,
+        "unnamed": []
+      }
+    },
+    {
+      "surface": "mirror",
+      "scenario": "full",
+      "locale": "ar",
+      "width": 1440,
+      "file": "mirror-full-ar-1440.jpg",
+      "url": "http://127.0.0.1:3101/dev/trust-visual?locale=ar&scenario=full&surface=mirror&viewport=desktop",
+      "findings": [],
+      "measured": {
+        "dir": "rtl",
+        "lang": "ar",
+        "canvasDir": "rtl",
+        "scrollWidth": 1440,
+        "clientWidth": 1440,
+        "overflow": false,
+        "sealScript": false,
+        "officialSeal": false,
+        "sealPreview": true,
+        "textFallback": false,
+        "groups": [
+          "تطبيق النور",
+          "المتجر",
+          "الحساب",
+          "السياسات",
+          "معلومات المنشأة",
+          "معلومات من التاجر",
+          "منصة الأعمال",
+          "التواصل",
+          "التطبيقات"
+        ],
+        "badges": [
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          },
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          },
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          },
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          }
+        ],
+        "linkCount": 15,
+        "unnamed": []
+      }
+    },
+    {
+      "surface": "mirror",
+      "scenario": "full",
+      "locale": "en",
+      "width": 390,
+      "file": "mirror-full-en-390.jpg",
+      "url": "http://127.0.0.1:3101/dev/trust-visual?locale=en&scenario=full&surface=mirror&viewport=mobile",
+      "findings": [],
+      "measured": {
+        "dir": "rtl",
+        "lang": "ar",
+        "canvasDir": "ltr",
+        "scrollWidth": 391,
+        "clientWidth": 390,
+        "overflow": false,
+        "sealScript": false,
+        "officialSeal": false,
+        "sealPreview": true,
+        "textFallback": false,
+        "groups": [
+          "Al Noor",
+          "Shop",
+          "Account",
+          "Policies",
+          "Business information",
+          "Merchant-provided information",
+          "Saudi Business Center",
+          "Contact",
+          "Applications"
+        ],
+        "badges": [
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          },
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          },
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          },
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          }
+        ],
+        "linkCount": 15,
+        "unnamed": []
+      }
+    },
+    {
+      "surface": "mirror",
+      "scenario": "full",
+      "locale": "en",
+      "width": 1440,
+      "file": "mirror-full-en-1440.jpg",
+      "url": "http://127.0.0.1:3101/dev/trust-visual?locale=en&scenario=full&surface=mirror&viewport=desktop",
+      "findings": [],
+      "measured": {
+        "dir": "rtl",
+        "lang": "ar",
+        "canvasDir": "ltr",
+        "scrollWidth": 1441,
+        "clientWidth": 1440,
+        "overflow": false,
+        "sealScript": false,
+        "officialSeal": false,
+        "sealPreview": true,
+        "textFallback": false,
+        "groups": [
+          "Al Noor",
+          "Shop",
+          "Account",
+          "Policies",
+          "Business information",
+          "Merchant-provided information",
+          "Saudi Business Center",
+          "Contact",
+          "Applications"
+        ],
+        "badges": [
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          },
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          },
+          {
+            "alt": "App Store",
+            "h": 40,
+            "nw": 120
+          },
+          {
+            "alt": "Google Play",
+            "h": 40,
+            "nw": 646
+          }
+        ],
+        "linkCount": 15,
+        "unnamed": []
+      }
+    }
+  ],
+  "partial": false,
+  "productionRoutes": [
+    {
+      "file": "route-empty-ar-390.jpg",
+      "locale": "ar",
+      "width": 390,
+      "findings": [
+        "Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:3101/us/ar\nCall log:\n  - navigating to \"http://127.0.0.1:3101/us/ar\", waiting until \"domcontentloaded\"\n"
+      ]
+    },
+    {
+      "file": "route-empty-ar-430.jpg",
+      "locale": "ar",
+      "width": 430,
+      "findings": [
+        "Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:3101/us/ar\nCall log:\n  - navigating to \"http://127.0.0.1:3101/us/ar\", waiting until \"domcontentloaded\"\n"
+      ]
+    },
+    {
+      "file": "route-empty-ar-768.jpg",
+      "locale": "ar",
+      "width": 768,
+      "findings": [
+        "Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:3101/us/ar\nCall log:\n  - navigating to \"http://127.0.0.1:3101/us/ar\", waiting until \"domcontentloaded\"\n"
+      ]
+    },
+    {
+      "file": "route-empty-ar-1024.jpg",
+      "locale": "ar",
+      "width": 1024,
+      "findings": [
+        "Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:3101/us/ar\nCall log:\n  - navigating to \"http://127.0.0.1:3101/us/ar\", waiting until \"domcontentloaded\"\n"
+      ]
+    },
+    {
+      "file": "route-empty-ar-1280.jpg",
+      "locale": "ar",
+      "width": 1280,
+      "findings": [
+        "Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:3101/us/ar\nCall log:\n  - navigating to \"http://127.0.0.1:3101/us/ar\", waiting until \"domcontentloaded\"\n"
+      ]
+    },
+    {
+      "file": "route-empty-ar-1440.jpg",
+      "locale": "ar",
+      "width": 1440,
+      "findings": [
+        "Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:3101/us/ar\nCall log:\n  - navigating to \"http://127.0.0.1:3101/us/ar\", waiting until \"domcontentloaded\"\n"
+      ]
+    },
+    {
+      "file": "route-empty-en-390.jpg",
+      "locale": "en",
+      "width": 390,
+      "findings": [
+        "Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:3101/us/en\nCall log:\n  - navigating to \"http://127.0.0.1:3101/us/en\", waiting until \"domcontentloaded\"\n"
+      ]
+    },
+    {
+      "file": "route-empty-en-430.jpg",
+      "locale": "en",
+      "width": 430,
+      "findings": [
+        "Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:3101/us/en\nCall log:\n  - navigating to \"http://127.0.0.1:3101/us/en\", waiting until \"domcontentloaded\"\n"
+      ]
+    },
+    {
+      "file": "route-empty-en-768.jpg",
+      "locale": "en",
+      "width": 768,
+      "findings": [
+        "Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:3101/us/en\nCall log:\n  - navigating to \"http://127.0.0.1:3101/us/en\", waiting until \"domcontentloaded\"\n"
+      ]
+    },
+    {
+      "file": "route-empty-en-1024.jpg",
+      "locale": "en",
+      "width": 1024,
+      "findings": [
+        "Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:3101/us/en\nCall log:\n  - navigating to \"http://127.0.0.1:3101/us/en\", waiting until \"domcontentloaded\"\n"
+      ]
+    },
+    {
+      "file": "route-empty-en-1280.jpg",
+      "locale": "en",
+      "width": 1280,
+      "findings": [
+        "Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:3101/us/en\nCall log:\n  - navigating to \"http://127.0.0.1:3101/us/en\", waiting until \"domcontentloaded\"\n"
+      ]
+    },
+    {
+      "file": "route-empty-en-1440.jpg",
+      "locale": "en",
+      "width": 1440,
+      "findings": [
+        "Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:3101/us/en\nCall log:\n  - navigating to \"http://127.0.0.1:3101/us/en\", waiting until \"domcontentloaded\"\n"
+      ]
+    }
+  ]
+}

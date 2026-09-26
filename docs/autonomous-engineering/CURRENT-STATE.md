@@ -2,7 +2,7 @@
 
 > This file is a durable resume point, not a substitute for Git/GitHub evidence.
 
-LAST_UPDATED: 2026-09-26 (**AWJ Store Trust horizon.** STORE-TRUST-0 merged `fa237e392bd4a5bfd1ffc19e3800aaa81e6e53bc`, POST_MERGE_REVIEW PASS. STORE-TRUST-STATE-1 squash-merged as PR #1049, merge SHA `f7db2b5bf1cd86e6dfc79c962e862bc7136e78b7`, reviewed head `05f47cc295dc171c69bb1bab17ff07595ed44598`. Post-merge CI for STATE-1 is run 36240798438 and is not yet recorded PASS. STORE-TRUST-SBC-1 re-verified #926 with no code change and no P1/P2. PR #1044 stays unmerged. No storage activation. No deploy. Next ready: BIZ-1, WA-1, SOCIAL-1, APPS-1.)
+LAST_UPDATED: 2026-09-26 (**AWJ Store Trust horizon.** STORE-TRUST-0 through STORE-TRUST-COMPOSE-1 are merged. COMPOSE-1 squash is `cb16f671e58f75598655f7e6b47884c794abd6fd`. POST_MERGE_REVIEW: PASS on runs [36245636636](https://github.com/safwan5001-source/Nebrax/actions/runs/36245636636), [36245636641](https://github.com/safwan5001-source/Nebrax/actions/runs/36245636641), and [36245636632](https://github.com/safwan5001-source/Nebrax/actions/runs/36245636632). STORE-TRUST-QA-1 found one P2 (unbroken tagline/copyright and the compact header column widened the page) and fixed it. Visual evidence is in `docs/plans/store/store-trust-qa/`. QA merge is the open gate. PR #1044 stays unmerged. No storage activation. No deploy. Next: STORE-TRUST-CLOSE-1 after QA post-merge review.)
 
 ## Previous snapshot
 
