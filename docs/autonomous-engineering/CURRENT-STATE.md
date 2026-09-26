@@ -2,6 +2,10 @@
 
 > This file is a durable resume point, not a substitute for Git/GitHub evidence.
 
+LAST_UPDATED: 2026-09-26 (**AWJ Store Trust, Business Identity & External Brands V1 is in progress.** STORE-TRUST-0 evidence is written against `e69a8e115f4dc2ef420a24b429be5b79fefd1e8d`. No runtime change. PR #926 stays the SBC implementation. PR #1044 stays open and must not be merged automatically. Owner storage decision remains `KEEP_EMBEDDED_MEDIA_UNTIL_PERSISTENT_STORAGE_IS_AUTHORIZED`. Next ready tasks after this evidence merges: STATE-1, BIZ-1, SBC-1, WA-1, SOCIAL-1, APPS-1. No deploy.)
+
+## Previous snapshot
+
 LAST_UPDATED: 2026-09-26 (**Store Customizer Offers decision is resolved.** Owner selected Option 1: Offers remains visible-but-gated in the merchant customizer and unpublished until AWJ has an authoritative shared Promotions Engine. No free-text discount claims, no shadow pricing, and no promotions implementation is authorized here. Store Customizer capability completion + visual verification remain closed. No deploy.)
 
 ## Previous snapshot

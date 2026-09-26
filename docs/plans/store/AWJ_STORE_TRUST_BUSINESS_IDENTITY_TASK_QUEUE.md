@@ -1,18 +1,20 @@
 # AWJ Store Trust, Business Identity & External Brands — Task Queue V1
 
 **Horizon:** AWJ Store Trust, Business Identity & External Brands V1  
-**Base:** `7c1dd55c7e7cd2e8e9d80f3cf52f65b260947d48`
+**Base at horizon definition:** `7c1dd55c7e7cd2e8e9d80f3cf52f65b260947d48`  
+**Evidence base:** `e69a8e115f4dc2ef420a24b429be5b79fefd1e8d`  
+**Promotion source:** `docs/plans/store/AWJ_STORE_TRUST_BUSINESS_IDENTITY_EVIDENCE.md`
 
-| Order | Task ID | Initial status | Risk | Depends on | Outcome |
+| Order | Task ID | Status | Risk | Depends on | Outcome |
 |---|---|---|---|---|---|
-| 0 | STORE-TRUST-0 | ready | normal | horizon definition | Evidence matrix + official-source registry + exact current-state classification |
-| 1 | STORE-TRUST-STATE-1 | decision_required | normal | STORE-TRUST-0 | Reconcile owner branding/storage deferral from open PR #1044 into durable main history without runtime change |
-| 2 | STORE-TRUST-BIZ-1 | pending | high | STORE-TRUST-0 | Canonical legal name / CR / VAT / store-name presentation parity |
-| 3 | STORE-TRUST-SBC-1 | pending | high | STORE-TRUST-0; PR #926 merged | Post-merge SBC contract/security/visual parity verification; fix only proven gaps |
-| 4 | STORE-TRUST-WA-1 | pending | normal | STORE-TRUST-0 | WhatsApp link + official icon evidence + Preview/Public parity |
-| 5 | STORE-TRUST-SOCIAL-1 | pending | normal | STORE-TRUST-0 | Supported social links/icons, accessibility, URL safety, parity |
-| 6 | STORE-TRUST-APPS-1 | pending | normal | STORE-TRUST-0 | App Store / Google Play links + official badge evidence + Footer/AppPromo parity |
-| 7 | STORE-TRUST-COMPOSE-1 | pending | normal | BIZ/SBC/WA/SOCIAL/APPS ready slices | Shared Footer grouping, density, responsive composition |
+| 0 | STORE-TRUST-0 | done | normal | horizon definition | Evidence matrix + official-source registry + exact current-state classification |
+| 1 | STORE-TRUST-STATE-1 | ready | normal | STORE-TRUST-0 | Reconcile owner branding/storage deferral from open PR #1044 into durable main history without runtime change |
+| 2 | STORE-TRUST-BIZ-1 | ready | high | STORE-TRUST-0 | Canonical legal name / CR / VAT / store-name presentation parity |
+| 3 | STORE-TRUST-SBC-1 | ready | high | STORE-TRUST-0; PR #926 merged | Post-merge SBC contract/security/visual parity verification; fix only proven gaps |
+| 4 | STORE-TRUST-WA-1 | ready | normal | STORE-TRUST-0 | WhatsApp link + official icon evidence + Preview/Public parity |
+| 5 | STORE-TRUST-SOCIAL-1 | ready | normal | STORE-TRUST-0 | Supported social links/icons, accessibility, URL safety, parity |
+| 6 | STORE-TRUST-APPS-1 | ready | normal | STORE-TRUST-0 | App Store / Google Play links + official badge evidence + Footer/AppPromo parity |
+| 7 | STORE-TRUST-COMPOSE-1 | pending | normal | BIZ/SBC/WA/SOCIAL/APPS merged and post-merge reviewed | Shared Footer grouping, density, responsive composition |
 | 8 | STORE-TRUST-QA-1 | pending | high | implemented slices | RTL/LTR responsive + accessibility + security regression pass |
 | 9 | STORE-TRUST-CLOSE-1 | pending | normal | all ready work closed | Closure report + durable CURRENT-STATE |
 
