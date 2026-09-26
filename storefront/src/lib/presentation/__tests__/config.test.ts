@@ -287,6 +287,16 @@ describe("normalizePresentationConfig", () => {
     expect(normalized.social[0].url).toBe("");
     expect(normalized.apps.iosUrl).toBe("");
     expect(normalized.apps.androidUrl).toContain("play.google.com");
+    expect(
+      normalizePresentationConfig({
+        apps: { iosUrl: "https://www.apple.com/iphone" },
+      }).apps.iosUrl,
+    ).toBe("");
+    expect(
+      normalizePresentationConfig({
+        apps: { iosUrl: "https://apps.apple.com/app/id1" },
+      }).apps.iosUrl,
+    ).toContain("apps.apple.com");
   });
 
   it("does not invent a store name when branding is empty", () => {

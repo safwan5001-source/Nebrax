@@ -2,6 +2,7 @@
 
 import { Home, LayoutGrid, MessageCircle, Search, ShoppingBag, User } from "lucide-react";
 import type { CSSProperties, ReactNode } from "react";
+import { OfficialStoreBadge } from "./OfficialStoreBadge";
 import { StoreBrand, storeContainerClassName } from "./StoreBrand";
 import { categoryAccent } from "./category-accent";
 import {
@@ -16,7 +17,12 @@ import {
   customContentOf,
   featuredContentOf,
 } from "./presentation/section-content";
-import { buildWhatsAppUrl, sanitizeExternalUrl } from "./presentation/urls";
+import {
+  buildWhatsAppUrl,
+  isSafeAppStoreUrl,
+  isSafePlayStoreUrl,
+  sanitizeExternalUrl,
+} from "./presentation/urls";
 import { cn } from "@/lib/utils";
 import { SbcSeal } from "./SbcSeal";
 import {
@@ -129,8 +135,12 @@ export function StorefrontPreviewCanvas({
     }
     return true;
   });
-  const ios = sanitizeExternalUrl(config.apps.iosUrl);
-  const android = sanitizeExternalUrl(config.apps.androidUrl);
+  const ios = isSafeAppStoreUrl(config.apps.iosUrl)
+    ? sanitizeExternalUrl(config.apps.iosUrl)
+    : null;
+  const android = isSafePlayStoreUrl(config.apps.androidUrl)
+    ? sanitizeExternalUrl(config.apps.androidUrl)
+    : null;
   const hasApps = Boolean(ios || android);
   const visiblePages = config.pages.filter((page) => page.enabled);
   const legalName = businessIdentity.legal_name?.trim() || null;
@@ -522,9 +532,25 @@ export function StorefrontPreviewCanvas({
               return (
                 <section key={section.id} className="rounded-store bg-store-footer px-5 py-6 text-store-footer-foreground">
                   <h2 className="text-base font-extrabold">{config.apps.appName.trim() || t("sectionAppPromo")}</h2>
-                  <div className="mt-3 flex flex-wrap gap-2 text-xs font-bold">
-                    {ios ? <span className="rounded-store bg-white px-3 py-2 text-store-foreground">App Store</span> : null}
-                    {android ? <span className="rounded-store bg-white px-3 py-2 text-store-foreground">Google Play</span> : null}
+                  <div className="mt-4 flex flex-wrap gap-3">
+                    {ios ? (
+                      <OfficialStoreBadge
+                        store="apple"
+                        href={ios}
+                        locale={locale}
+                        label="App Store"
+                        onClick={(event) => event.preventDefault()}
+                      />
+                    ) : null}
+                    {android ? (
+                      <OfficialStoreBadge
+                        store="google"
+                        href={android}
+                        locale={locale}
+                        label="Google Play"
+                        onClick={(event) => event.preventDefault()}
+                      />
+                    ) : null}
                   </div>
                 </section>
               );
@@ -665,8 +691,24 @@ export function StorefrontPreviewCanvas({
                 : <span>{t("pagesHint")}</span>}
               {hasApps && config.apps.showFooterLinks ? (
                 <>
-                  {ios ? <span>App Store</span> : null}
-                  {android ? <span>Google Play</span> : null}
+                  {ios ? (
+                    <OfficialStoreBadge
+                      store="apple"
+                      href={ios}
+                      locale={locale}
+                      label="App Store"
+                      onClick={(event) => event.preventDefault()}
+                    />
+                  ) : null}
+                  {android ? (
+                    <OfficialStoreBadge
+                      store="google"
+                      href={android}
+                      locale={locale}
+                      label="Google Play"
+                      onClick={(event) => event.preventDefault()}
+                    />
+                  ) : null}
                 </>
               ) : null}
             </FooterCol>

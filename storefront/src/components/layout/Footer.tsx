@@ -6,7 +6,9 @@ import type { ReactNode } from "react";
 import { SbcSeal } from "@/components/layout/SbcSeal";
 import { StoreBrand } from "@/components/layout/StoreBrand";
 import { StoreContainer } from "@/components/layout/StoreContainer";
+import { OfficialStoreBadge } from "@/components/store/OfficialStoreBadge";
 import { POLICY_LINKS } from "@/lib/constants/policies";
+import { isSafeAppStoreUrl, isSafePlayStoreUrl } from "@/lib/presentation/urls";
 import { isWholesaleEnabled } from "@/lib/spree";
 
 interface FooterProps {
@@ -33,7 +35,12 @@ interface FooterProps {
   } | null;
   socialLinks?: { id: string; network: string; href: string }[];
   whatsappHref?: string | null;
-  appLinks?: { id: string; label: string; href: string }[];
+  appLinks?: {
+    id: string;
+    store: "apple" | "google";
+    label: string;
+    href: string;
+  }[];
   licenseNumber?: string;
 }
 
@@ -129,6 +136,11 @@ export async function Footer({
   const crNumber = businessIdentity.cr_number?.trim() || null;
   const vatNumber = businessIdentity.vat_number?.trim() || null;
   const license = licenseNumber.trim();
+  const visibleAppLinks = appLinks.filter((link) =>
+    link.store === "apple"
+      ? isSafeAppStoreUrl(link.href)
+      : isSafePlayStoreUrl(link.href),
+  );
   const socialLabel = (network: string) => {
     switch (network) {
       case "instagram":
@@ -255,15 +267,14 @@ export async function Footer({
                 </Link>
               </li>
             ))}
-            {appLinks.map((link) => (
+            {visibleAppLinks.map((link) => (
               <li key={link.id}>
-                <a
+                <OfficialStoreBadge
+                  store={link.store}
                   href={link.href}
-                  className={footerLinkClassName}
-                  rel="noopener noreferrer"
-                >
-                  {link.label}
-                </a>
+                  locale={locale}
+                  label={link.label}
+                />
               </li>
             ))}
           </FooterColumn>
