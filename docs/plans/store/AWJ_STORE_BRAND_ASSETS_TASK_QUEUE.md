@@ -184,8 +184,9 @@ Definition of Done:
 - permitted storefront/social-link usage recorded;
 - local-host vs first-party-remote consumption rule recorded;
 - recolor/modify/clear-space/minimum-size rules recorded where applicable;
-- any permission/license gate identified explicitly;
+- any permission/license restriction identified explicitly;
 - no runtime code;
-- WA-SOCIAL-1 promoted only when every mark it will render has sufficient evidence.
+- owner decision is already recorded to proceed with authentic official marks, including TikTok;
+- WA-SOCIAL-1 promoted when every mark it will render has a confirmed first-party asset/variant.
 
-If one brand cannot be cleared, record a per-brand Decision Gate; do not substitute an unofficial icon pack.
+Do not substitute an unofficial icon pack. Brand-use restrictions remain documented risk, not an implementation blocker unless they expose a technical/security issue.
