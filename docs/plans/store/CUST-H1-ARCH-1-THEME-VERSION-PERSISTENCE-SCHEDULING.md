@@ -17,7 +17,7 @@ CUST-H1 adopts a **Compatibility Head + Version Rows** architecture.
 ```
 Tenant
   └─ Storefront
-       ├─ StorefrontPresentation              (existing 1:1 compatibility/public head)
+       ├─ StorefrontPresentation              (existing optional 0..1 compatibility/public head)
        │    ├─ draft_config / draft_revision  (legacy-compatible working head)
        │    ├─ published_config               (public compatibility snapshot)
        │    ├─ published_revision
@@ -68,7 +68,7 @@ The existing head row remains the stable compatibility boundary. Version rows ar
 
 Current repository evidence:
 
-- `storefront_presentations` is unique 1:1 by `storefront_id`.
+- `storefront_presentations` is **zero-or-one per Storefront**; `unique(storefront_id)` enforces at most one row, while untouched storefronts may have no row.
 - It stores one `draft_config` and one `published_config`.
 - `StorefrontPresentationService` locks the owned Storefront and presentation row for Save/Publish.
 - Draft save uses an integer optimistic-concurrency revision.
@@ -93,7 +93,7 @@ Therefore:
 ```
 Tenant
   └─ Storefront
-       ├─ StorefrontPresentation (1:1)
+       ├─ StorefrontPresentation (0..1)
        └─ StorefrontPresentationVersion (1:N)
 ```
 
@@ -540,17 +540,19 @@ Initial schedule body:
 }
 ```
 
-If this Version is **already the current scheduled Version**, the request is a reschedule and must include the current schedule token/generation:
+If this Version is **already the current scheduled Version**, the request is a reschedule and must include the current opaque merchant-safe schedule token:
 
 ```json
 {
   "revision": 7,
   "scheduled_for": "2026-10-02T21:00:00+03:00",
-  "schedule_generation": 4
+  "schedule_token": "<opaque token>"
 }
 ```
 
-A tokenless or stale same-target schedule request is rejected with **409** and must not change `scheduled_for` or increment generation.
+A tokenless or stale same-target schedule request is rejected with **409** and must not change `scheduled_for` or increment the internal schedule generation.
+
+`schedule_generation` remains an internal persistence/job concurrency value and is never part of the merchant API contract.
 
 Server stores a canonical UTC timestamp.
 
@@ -1387,3 +1389,29 @@ Remaining before runtime code:
 ---
 
 *Documentation only. No DB/API/runtime/merge/deploy is authorized by this file.*
+
+
+---
+
+## 34. Final architecture consistency checklist
+
+Before CUST-H1 implementation starts, the following invariants are treated as one contract:
+
+- [x] StorefrontPresentation cardinality is **0..1**, never assumed mandatory before first persisted customization.
+- [x] One Storefront has many Version rows, but at most one active and one scheduled-next pointer.
+- [x] Version state is derived from head pointers; no merchant-writable status authority exists.
+- [x] Active Published Version is immutable through normal Save; editing requires a Draft.
+- [x] Active Published Version cannot also be Scheduled.
+- [x] Compatibility working Version is durable and cannot be deleted during the mixed-client window.
+- [x] Legacy Draft config/revision/schema tag move atomically.
+- [x] Published config/revision/schema tag move atomically.
+- [x] Active Version config/schema remains semantically identical to the public Published snapshot after normalization.
+- [x] Forward-schema documents fail closed before normalization across read/save/duplicate/legacy/immediate/scheduled paths.
+- [x] Raw `schedule_generation` is internal only; merchant API uses opaque `schedule_token`.
+- [x] Initial schedule, replacement, reschedule, cancel, and delayed jobs all invalidate stale executions deterministically.
+- [x] Delete uses the common Storefront → head → Version lock order and rechecks pointers under lock.
+- [x] Public runtime remains Published-head-only and never exposes Draft/Scheduled data.
+- [x] Tenant authority comes only from authenticated TenantContext; IDs are selectors, never authority.
+- [x] SQLite/PostgreSQL compatibility does not depend on PostgreSQL-only partial unique indexes.
+- [x] Scheduling UX remains gated until scheduler + execution isolation are verified in Production.
+- [x] No Merge/Deploy/Production activation is authorized by this architecture document.
