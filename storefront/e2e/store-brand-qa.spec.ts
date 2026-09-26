@@ -1,6 +1,6 @@
-import { expect, test, type Page } from "@playwright/test";
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
+import { expect, type Page, test } from "@playwright/test";
 
 const widths = [390, 430, 768, 1024, 1280, 1440] as const;
 const locales = ["ar", "en"] as const;
@@ -65,7 +65,9 @@ async function assertPublishedFooter(
     await expect(icon).toHaveAttribute("aria-hidden", "true");
   }
 
-  expect(await page.locator('[data-official-social="whatsapp"]').count()).toBeGreaterThanOrEqual(2);
+  expect(
+    await page.locator('[data-official-social="whatsapp"]').count(),
+  ).toBeGreaterThanOrEqual(2);
   await expect(page.getByRole("img", { name: "App Store" })).toHaveCount(2);
   await expect(page.getByRole("img", { name: "Google Play" })).toHaveCount(2);
 }
@@ -84,10 +86,7 @@ for (const locale of locales) {
       await page.waitForLoadState("networkidle");
       await assertPublishedFooter(page, width, locale);
       await page.screenshot({
-        path: path.join(
-          evidenceDir,
-          `published-full-${locale}-${width}.png`,
-        ),
+        path: path.join(evidenceDir, `published-full-${locale}-${width}.png`),
         fullPage: true,
       });
     });
@@ -101,9 +100,11 @@ test("published unsafe values fail closed", async ({ page }) => {
   );
   await page.waitForLoadState("networkidle");
 
-  const hrefs = await page.locator("footer a").evaluateAll((nodes) =>
-    nodes.map((node) => (node as HTMLAnchorElement).href),
-  );
+  const hrefs = await page
+    .locator("footer a")
+    .evaluateAll((nodes) =>
+      nodes.map((node) => (node as HTMLAnchorElement).href),
+    );
   expect(hrefs.some((href) => href.startsWith("javascript:"))).toBe(false);
   expect(hrefs.some((href) => href.startsWith("http://"))).toBe(false);
   await expect(page.locator('[data-official-social="x"]')).toHaveCount(0);
