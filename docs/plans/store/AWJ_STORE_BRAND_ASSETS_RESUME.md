@@ -29,13 +29,13 @@ Complete the storefront's visible mark/icon layer with:
 
 Before any mada / Visa / Mastercard / Apple Pay / Google Pay mark is shown, prove that the method is actually supported and enabled for the relevant storefront.
 
-If no authoritative enabled-method source exists, stop at a Decision Gate.
+If no authoritative enabled-method source exists, stop the payment slice at a Decision Gate. This is a valid resolved state and does not block the remaining non-payment horizon work.
 
 ## Deployment
 
 No manual Deploy / Production Release is authorized by this horizon definition.
 
-Existing Railway auto-deploy behavior must be reported truthfully if merges later cause production deployment; do not change deployment configuration in this horizon.
+Existing Railway auto-deploy behavior must be reported truthfully. Because a runtime merge to `main` may itself deploy Production, runtime-changing PRs stop before merge unless Safwan explicitly authorizes that Production impact (or a separately authorized deployment gate removes the automatic effect). Do not change deployment configuration in this horizon.
 
 ## End behavior
 
