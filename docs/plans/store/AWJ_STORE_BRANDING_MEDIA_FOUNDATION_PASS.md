@@ -1,6 +1,6 @@
 # AWJ Store Branding & Media Foundation — Evidence / Decision Pass
 
-**Status:** Proposed  
+**Status:** Evidence complete — `INFRA_DECISION_REQUIRED`  
 **Repository:** `safwan5001-source/Nebrax`  
 **Base main SHA:** `8881a8f3f4f86b4b62b7faca1f52cef91a21e4a2`  
 **Scope:** Store Customizer branding/media persistence only  
