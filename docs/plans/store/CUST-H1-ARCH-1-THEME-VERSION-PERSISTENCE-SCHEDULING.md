@@ -629,7 +629,29 @@ Immediate Publish must:
 18. set target `last_published_at = now()`;
 19. commit.
 
-Precondition: the target must not be the current Scheduled Version. Publish Now never clears a schedule implicitly.
+Precondition for **Publish Now**: the target must not be the current Scheduled Version. Publish Now never clears a schedule implicitly.
+
+### Scheduled publication entry
+
+Scheduled execution uses a separate schedule-aware entry into the same core publish transaction.
+
+It is allowed to publish a target that is currently Scheduled **only after** the job has already verified under lock:
+
+- head `scheduled_version_id === target.id`;
+- expected schedule generation/token still matches;
+- `scheduled_for <= now()`;
+- target/storefront/tenant relationship is valid;
+- target schema is supported.
+
+For this schedule-aware path, the transaction performs the same normalization/publication invariants and then atomically:
+
+- clears target `scheduled_for`;
+- increments/invalidates the internal schedule generation as required;
+- clears head `scheduled_version_id`;
+- sets `active_version_id = target.id`;
+- commits the Published snapshot.
+
+This exception is **only** for the verified scheduler entry. Merchant-triggered Publish Now remains rejected while a schedule exists.
 
 The Published document and `published_schema_version` are one atomic pair. The Draft document and `draft_schema_version` are a separate atomic pair. A v2 Published document must never be interpreted through a v1 tag, and publishing v2 must never silently retag a still-v1 legacy Draft.
 
@@ -1012,13 +1034,19 @@ During CUST-H1 rollout:
 
 ### GET legacy presentation
 
-Continue returning:
+Continue returning the existing response shape, including:
 
-- draft
-- draft_revision
-- published
-- published_revision
-- published_at
+- `storefront_id`
+- `schema_version`
+- `draft`
+- `draft_revision`
+- `published`
+- `published_revision`
+- `published_at`
+
+Backward compatibility requires retaining all existing top-level fields consumed by current clients/tests.
+
+During the mixed-schema transition, top-level `schema_version` remains a **legacy compatibility field**. It must continue to represent the legacy Draft-side interpretation expected by existing clients until those clients migrate; new CUST-H1 code must instead use `draft_schema_version` for Draft and `published_schema_version` for Published internally.
 
 The Draft side is backed by the durable head pointer `compatibility_working_version_id`. If the pointer is null during transition, the service deterministically creates/selects the compatibility working Version under the same transaction/locking rules and persists the pointer before returning mutable legacy state.
 
@@ -1249,6 +1277,8 @@ True concurrency tests should run on PostgreSQL where repository convention alre
 - forward-schema exact read/save/duplicate/legacy paths fail closed without fabricating defaults;
 - incoming save payload with forward `config.version` fails closed before normalization;
 - scheduled forward-schema Version also fails closed without replacing live;
+- verified scheduled job can enter the schedule-aware publish path and clears schedule atomically;
+- merchant Publish Now remains blocked while target is Scheduled;
 - idempotent republish;
 - public runtime sees only current Published.
 
@@ -1438,6 +1468,8 @@ Before CUST-H1 implementation starts, the following invariants are treated as on
 - [x] Raw `schedule_generation` is internal only; merchant API uses opaque schedule tokens.
 - [x] Any existing storefront schedule must be matched by `expected_current_schedule_token` before same-target reschedule or different-target replacement.
 - [x] Publish Now cannot implicitly cancel a scheduled lifecycle state; Scheduled must be explicitly canceled first.
+- [x] Scheduled jobs use a distinct verified scheduler entry into the shared publish transaction and clear schedule atomically on success.
+- [x] Legacy GET preserves `storefront_id` and legacy `schema_version`; new code uses separate Draft/Published schema tags internally.
 - [x] Initial schedule, replacement, reschedule, cancel, and delayed jobs all invalidate stale executions deterministically.
 - [x] Delete uses the common Storefront → head → Version lock order and rechecks pointers under lock.
 - [x] Public runtime remains Published-head-only and never exposes Draft/Scheduled data.
