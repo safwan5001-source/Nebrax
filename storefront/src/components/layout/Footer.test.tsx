@@ -1,5 +1,6 @@
 import { render, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import { OFFICIAL_SOCIAL_MARKS } from "@/components/brand/OfficialSocialMark";
 import { SBC_SEAL_SCRIPT_URL } from "./SbcSeal";
 
 vi.mock("next/server", () => ({ connection: vi.fn() }));
@@ -223,5 +224,77 @@ describe("Footer SBC presentation", () => {
           node.className.includes("text-xs"),
       ),
     ).toBe(true);
+  });
+
+  it("renders an official mark for every supported network and keeps the link safe", async () => {
+    const view = await Footer({
+      ...baseProps,
+      whatsappHref: "https://wa.me/966500000000",
+      socialLinks: [
+        { id: "ig", network: "instagram", href: "https://instagram.com/awj" },
+        { id: "x", network: "x", href: "https://x.com/awj" },
+        { id: "tt", network: "tiktok", href: "https://www.tiktok.com/@awj" },
+        {
+          id: "sc",
+          network: "snapchat",
+          href: "https://www.snapchat.com/add/awj",
+        },
+        { id: "yt", network: "youtube", href: "https://www.youtube.com/@awj" },
+        {
+          id: "li",
+          network: "linkedin",
+          href: "https://www.linkedin.com/company/awj",
+        },
+        { id: "fb", network: "facebook", href: "https://www.facebook.com/awj" },
+        { id: "empty", network: "instagram", href: "" },
+        { id: "unknown", network: "myspace", href: "https://example.com/awj" },
+      ],
+    });
+    const screen = render(view);
+    const expected = [
+      ["socialInstagram", "https://instagram.com/awj", "instagram"],
+      ["socialX", "https://x.com/awj", "x"],
+      ["socialTiktok", "https://www.tiktok.com/@awj", "tiktok"],
+      ["socialSnapchat", "https://www.snapchat.com/add/awj", "snapchat"],
+      ["socialYoutube", "https://www.youtube.com/@awj", "youtube"],
+      ["socialLinkedin", "https://www.linkedin.com/company/awj", "linkedin"],
+      ["socialFacebook", "https://www.facebook.com/awj", "facebook"],
+    ] as const;
+
+    for (const [name, href, network] of expected) {
+      const link = screen.getByRole("link", { name });
+      const mark = link.querySelector("img");
+      expect(link.getAttribute("href")).toBe(href);
+      expect(link.getAttribute("target")).toBe("_blank");
+      expect(link.getAttribute("rel")).toBe("noopener noreferrer");
+      expect(link.className).toContain("size-11");
+      expect(mark?.getAttribute("data-official-social")).toBe(network);
+      expect(mark?.getAttribute("src")).toBe(
+        OFFICIAL_SOCIAL_MARKS[network].src,
+      );
+      expect(mark?.getAttribute("alt")).toBe("");
+    }
+
+    const whatsapp = screen.getByRole("link", { name: "whatsapp" });
+    expect(whatsapp.getAttribute("href")).toBe("https://wa.me/966500000000");
+    expect(
+      whatsapp.querySelector("img")?.getAttribute("data-official-social"),
+    ).toBe("whatsapp");
+    expect(screen.queryByRole("link", { name: "myspace" })).toBeNull();
+    expect(
+      document.querySelector('[data-official-social="myspace"]'),
+    ).toBeNull();
+    expect(
+      screen.getAllByRole("link", { name: "socialInstagram" }),
+    ).toHaveLength(1);
+  });
+
+  it("does not render a WhatsApp mark when whatsappHref is absent", async () => {
+    const view = await Footer({ ...baseProps, whatsappHref: null });
+    const screen = render(view);
+    expect(screen.queryByRole("link", { name: "whatsapp" })).toBeNull();
+    expect(
+      document.querySelector('[data-official-social="whatsapp"]'),
+    ).toBeNull();
   });
 });

@@ -3,6 +3,11 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { getTranslations } from "next-intl/server";
 import type { ReactNode } from "react";
+import {
+  isOfficialSocialNetwork,
+  OfficialSocialMark,
+  officialSocialLinkClassName,
+} from "@/components/brand/OfficialSocialMark";
 import { SbcSeal } from "@/components/layout/SbcSeal";
 import { StoreBrand } from "@/components/layout/StoreBrand";
 import { StoreContainer } from "@/components/layout/StoreContainer";
@@ -160,6 +165,9 @@ export async function Footer({
       ? isSafeAppStoreUrl(link.href)
       : isSafePlayStoreUrl(link.href),
   );
+  const visibleSocial = socialLinks.filter(
+    (item) => Boolean(item.href) && isOfficialSocialNetwork(item.network),
+  );
   const socialLabel = (network: string) => {
     switch (network) {
       case "instagram":
@@ -279,7 +287,7 @@ export async function Footer({
 
         {(hasContact ||
           Boolean(whatsappHref) ||
-          socialLinks.length > 0 ||
+          visibleSocial.length > 0 ||
           hasBusinessIdentity ||
           license ||
           showSbc ||
@@ -325,7 +333,7 @@ export async function Footer({
                 )}
               </TrustGroup>
             ) : null}
-            {hasContact || whatsappHref || socialLinks.length > 0 ? (
+            {hasContact || whatsappHref || visibleSocial.length > 0 ? (
               <TrustGroup id="footer-communication" title={t("communication")}>
                 {contact?.phone ? <p>{contact.phone}</p> : null}
                 {contact?.email ? <p>{contact.email}</p> : null}
@@ -335,32 +343,33 @@ export async function Footer({
                   <p>
                     <a
                       href={whatsappHref}
-                      className={footerLinkClassName}
+                      className={`${footerLinkClassName} inline-flex min-h-11 items-center gap-2`}
                       target="_blank"
                       rel="noopener noreferrer"
                     >
+                      <OfficialSocialMark network="whatsapp" />
                       {t("whatsapp")}
                     </a>
                   </p>
                 ) : null}
-                {socialLinks.length > 0 ? (
-                  <p className="mt-2 flex flex-wrap gap-3">
-                    {socialLinks.map((item) => {
+                {visibleSocial.length > 0 ? (
+                  <div className="mt-2 flex flex-wrap items-center gap-1">
+                    {visibleSocial.map((item) => {
                       const label = socialLabel(item.network);
                       return (
                         <a
                           key={item.id}
                           href={item.href}
-                          className="text-store-footer-link"
+                          className={officialSocialLinkClassName}
                           aria-label={label}
                           target="_blank"
                           rel="noopener noreferrer"
                         >
-                          {label}
+                          <OfficialSocialMark network={item.network} />
                         </a>
                       );
                     })}
-                  </p>
+                  </div>
                 ) : null}
               </TrustGroup>
             ) : null}
