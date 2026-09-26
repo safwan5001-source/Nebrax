@@ -531,7 +531,7 @@ Body:
 PUT /api/commerce/workspace/storefronts/{storefront}/presentation/versions/{version}/schedule
 ```
 
-Body:
+Initial schedule body:
 
 ```json
 {
@@ -539,6 +539,18 @@ Body:
   "scheduled_for": "2026-10-01T21:00:00+03:00"
 }
 ```
+
+If this Version is **already the current scheduled Version**, the request is a reschedule and must include the current schedule token/generation:
+
+```json
+{
+  "revision": 7,
+  "scheduled_for": "2026-10-02T21:00:00+03:00",
+  "schedule_generation": 4
+}
+```
+
+A tokenless or stale same-target schedule request is rejected with **409** and must not change `scheduled_for` or increment generation.
 
 Server stores a canonical UTC timestamp.
 
@@ -608,7 +620,24 @@ A Version written by a newer deployment must **never** be normalized by an older
 
 This protects rolling deploys and rollbacks from the existing forward-schema fallback behavior that can resolve unsupported documents to the AWJ Modern default.
 
-Immediate Publish and Scheduled Publish must share this exact guard. On failure:
+The guard applies **before any normalization** on every Version path that reads or transforms stored config:
+
+- exact Version read;
+- exact Version save;
+- legacy GET/PUT mapping;
+- duplicate/create-from-Version;
+- immediate Publish;
+- scheduled Publish.
+
+Unsupported forward-schema Version behavior:
+
+- exact read returns an explicit compatibility error rather than fabricated/default config;
+- save is rejected before normalization/persistence;
+- duplicate is rejected rather than creating a default-derived copy;
+- legacy compatibility calls fail closed if their mapped Version is forward-schema;
+- immediate/scheduled publication fails closed.
+
+On failure:
 
 - no Version config/schema mutation;
 - no `published_config` mutation;
@@ -926,11 +955,26 @@ Delete is allowed only if Version is:
 
 - same Tenant/Storefront;
 - not active;
-- not scheduled.
+- not scheduled;
+- not the compatibility working Version during the legacy compatibility window.
 
-Deleting a Draft has no public effect.
+Delete is a serialized lifecycle transaction:
 
-If an implementation bug or admin operation removes a pointed Version, FK pointer behavior must fail safe; product service still prevents this path.
+1. begin transaction;
+2. lock owned Storefront;
+3. lock presentation head;
+4. lock target Version;
+5. re-check tenant/storefront relationship;
+6. re-check `active_version_id`, `scheduled_version_id`, and `compatibility_working_version_id` **after all locks are held**;
+7. reject with lifecycle conflict if any pointer now references the target;
+8. delete the Version;
+9. commit.
+
+This uses the same lock order as Publish/Schedule to prevent Delete racing with a lifecycle pointer change.
+
+Deleting an eligible Draft has no public effect.
+
+FK `nullOnDelete` is only a defensive last resort, not product lifecycle logic. Normal product APIs must never rely on it to clear a pointer that became active/scheduled concurrently.
 
 ---
 
@@ -955,10 +999,14 @@ The Draft side is backed by the durable head pointer `compatibility_working_vers
 Compatibility behavior is explicit:
 
 - lock Storefront + head + `compatibility_working_version_id` Version;
+- fail closed if the mapped Version schema is newer than the running normalizer;
 - map the legacy Draft API only to that persisted Version;
-- synchronize head `draft_config` / `draft_revision` for old response semantics;
+- normalize through the supported server schema;
+- synchronize head `draft_config`, `draft_schema_version`, and `draft_revision` **atomically** for old response semantics;
 - never select “an arbitrary Draft” by recency/name/query order;
 - legacy calls cannot mutate another named Version.
+
+The Draft document and `draft_schema_version` must always be written as one atomic pair.
 
 ### Legacy publish
 
@@ -1169,6 +1217,7 @@ True concurrency tests should run on PostgreSQL where repository convention alre
 - publishing v2 after migrated v1 head preserves v2 semantics in public normalization without reinterpreting a v1 compatibility draft;
 - failed publish leaves old snapshot;
 - forward-schema Version is rejected before normalization and leaves Version + Published snapshot unchanged;
+- forward-schema exact read/save/duplicate/legacy paths fail closed without fabricating defaults;
 - scheduled forward-schema Version also fails closed without replacing live;
 - idempotent republish;
 - public runtime sees only current Published.
