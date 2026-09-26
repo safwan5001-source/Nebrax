@@ -1,6 +1,6 @@
 # STORE-TRUST-0 — Implementation Report
 
-STATUS: Evidence complete in this change. Merge not claimed here.
+STATUS: Merged. Post-merge CI is observed separately on the merge commit.
 DATE: 2026-09-26
 
 ## Outcome
@@ -36,25 +36,30 @@ Not run. No source change.
 
 ## CI
 
-Recorded on the PR after the exact head is observed. Not claimed in this file before that observation.
+Green on reviewed head `917bc658f93df86f838c5662c40407680aec1c3b`:
+
+- run [36238574799](https://github.com/safwan5001-source/Nebrax/actions/runs/36238574799) sqlite + pgsql success
+- run [36238588290](https://github.com/safwan5001-source/Nebrax/actions/runs/36238588290) sqlite + pgsql success
 
 ## Pre-merge review
 
-- PRE_MERGE_REVIEW: pending until the PR records it for the exact head
-- Reviewed Head SHA:
-- Findings / resolution:
+- PRE_MERGE_REVIEW: PASS
+- Reviewed Head SHA: `917bc658f93df86f838c5662c40407680aec1c3b`
+- Findings / resolution: none
 
 ## Merge
 
-- Merge status: not merged
-- Merge SHA:
+- Merge status: squash-merged as PR #1048
+- Merge SHA: `fa237e392bd4a5bfd1ffc19e3800aaa81e6e53bc`
+- Parent: `e69a8e115f4dc2ef420a24b429be5b79fefd1e8d`
+- Content drift of the four documentation files against the reviewed head: none
 
 ## Post-merge review
 
-- POST_MERGE_REVIEW: pending
-- Reviewed Merge SHA:
-- Target-branch checks/smoke:
-- Findings / resolution:
+- POST_MERGE_REVIEW: not yet PASS. Merge-commit CI on `fa237e392bd4a5bfd1ffc19e3800aaa81e6e53bc` was still running when this note was written. PASS is recorded on PR #1048 only after that run is green.
+- Reviewed Merge SHA: `fa237e392bd4a5bfd1ffc19e3800aaa81e6e53bc`
+- Target-branch checks/smoke: `main` is the squash commit. Docs only. No runtime smoke.
+- Findings / resolution: none in the squash diff
 
 ## Self-review
 
@@ -104,10 +109,11 @@ None beyond the queue.
 
 ## Git state
 
-- Branch:
-- PR:
+- Branch: `docs/store-trust-0-evidence`
+- PR: https://github.com/safwan5001-source/Nebrax/pull/1048
 - Base SHA: `e69a8e115f4dc2ef420a24b429be5b79fefd1e8d`
-- Head SHA:
+- Head SHA: `917bc658f93df86f838c5662c40407680aec1c3b`
+- Merge SHA: `fa237e392bd4a5bfd1ffc19e3800aaa81e6e53bc`
 
 ## Recommended next dependency-ready task
 

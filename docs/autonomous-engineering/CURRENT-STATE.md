@@ -2,7 +2,7 @@
 
 > This file is a durable resume point, not a substitute for Git/GitHub evidence.
 
-LAST_UPDATED: 2026-09-26 (**AWJ Store Trust, Business Identity & External Brands V1 is in progress.** STORE-TRUST-0 evidence is written against `e69a8e115f4dc2ef420a24b429be5b79fefd1e8d`. No runtime change. PR #926 stays the SBC implementation. PR #1044 stays open and must not be merged automatically. Owner storage decision remains `KEEP_EMBEDDED_MEDIA_UNTIL_PERSISTENT_STORAGE_IS_AUTHORIZED`. Next ready tasks after this evidence merges: STATE-1, BIZ-1, SBC-1, WA-1, SOCIAL-1, APPS-1. No deploy.)
+LAST_UPDATED: 2026-09-26 (**AWJ Store Trust horizon, STATE-1 recorded.** STORE-TRUST-0 squash-merged as PR #1048, merge SHA `fa237e392bd4a5bfd1ffc19e3800aaa81e6e53bc`, reviewed head `917bc658f93df86f838c5662c40407680aec1c3b`. Owner branding decision is now on main: `KEEP_EMBEDDED_MEDIA_UNTIL_PERSISTENT_STORAGE_IS_AUTHORIZED` in `docs/plans/store/AWJ_STORE_BRANDING_MEDIA_OWNER_DECISION.md`. PR #1044 stays unmerged. No runtime change. No deploy. Next ready: BIZ-1, SBC-1, WA-1, SOCIAL-1, APPS-1.)
 
 ## Previous snapshot
 
