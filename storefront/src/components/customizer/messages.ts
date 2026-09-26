@@ -162,6 +162,9 @@ export const CUSTOMIZER_MESSAGES = {
     vatNumber: "الرقم الضريبي",
     businessInformationSettings: "إدارة بيانات الشركة",
     licenseNumber: "رقم الترخيص",
+    communication: "التواصل",
+    applications: "التطبيقات",
+    sbcGroup: "منصة الأعمال",
     verificationUrl: "رابط المصدر",
     requestedVerified: "طلب شارة موثّق",
     verificationWarning:
@@ -382,6 +385,9 @@ export const CUSTOMIZER_MESSAGES = {
     vatNumber: "VAT number",
     businessInformationSettings: "Manage company information",
     licenseNumber: "License number",
+    communication: "Contact",
+    applications: "Applications",
+    sbcGroup: "Saudi Business Center",
     verificationUrl: "Source URL",
     requestedVerified: "Request a verified badge",
     verificationWarning:

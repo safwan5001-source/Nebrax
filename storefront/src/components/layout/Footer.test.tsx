@@ -86,8 +86,15 @@ describe("Footer SBC presentation", () => {
     expect(screen.getByText("legalName: شركة النور")).toBeTruthy();
     expect(screen.getByText("crNumber: 7050247977")).toBeTruthy();
     expect(screen.queryByText(/vatNumber/)).toBeNull();
-    expect(screen.getByText("merchantProvided")).toBeTruthy();
-    expect(screen.getByText("licenseNumber: LIC-42")).toBeTruthy();
+    const identity = screen.getByRole("region", {
+      name: "businessInformation",
+    });
+    const licenseRegion = screen.getByRole("region", {
+      name: "merchantProvided",
+    });
+    expect(identity.textContent).toContain("7050247977");
+    expect(identity.textContent).not.toContain("LIC-42");
+    expect(licenseRegion.textContent).toContain("LIC-42");
   });
 
   it("opens the published WhatsApp link in a new tab without sending a message", async () => {
@@ -101,6 +108,12 @@ describe("Footer SBC presentation", () => {
     expect(link.getAttribute("href")).toBe("https://wa.me/966500000000");
     expect(link.getAttribute("target")).toBe("_blank");
     expect(link.getAttribute("rel")).toBe("noopener noreferrer");
+    expect(
+      screen.getByRole("region", { name: "communication" }).contains(link),
+    ).toBe(true);
+    expect(
+      screen.getByRole("navigation", { name: "account" }).contains(link),
+    ).toBe(false);
   });
 
   it("names a published social link and opens it in a new tab", async () => {
@@ -179,5 +192,11 @@ describe("Footer SBC presentation", () => {
       expect.stringContaining("/ar_badge_web_generic.png"),
     );
     expect(screen.getAllByRole("img")).toHaveLength(2);
+    expect(
+      screen.getByRole("region", { name: "applications" }).contains(apple),
+    ).toBe(true);
+    expect(
+      screen.getByRole("navigation", { name: "policies" }).querySelector("img"),
+    ).toBeNull();
   });
 });

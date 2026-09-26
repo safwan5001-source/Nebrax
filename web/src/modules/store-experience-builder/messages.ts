@@ -200,6 +200,9 @@ export const CUSTOMIZER_MESSAGES = {
     legalName: "الاسم القانوني",
     vatNumber: "الرقم الضريبي",
     licenseNumber: "رقم الترخيص",
+    communication: "التواصل",
+    applications: "التطبيقات",
+    sbcGroup: "منصة الأعمال",
     verificationUrl: "رابط المصدر",
     requestedVerified: "طلب شارة موثّق",
     verificationWarning:
@@ -460,6 +463,9 @@ export const CUSTOMIZER_MESSAGES = {
     legalName: "Legal name",
     vatNumber: "VAT number",
     licenseNumber: "License number",
+    communication: "Contact",
+    applications: "Applications",
+    sbcGroup: "Saudi Business Center",
     verificationUrl: "Source URL",
     requestedVerified: "Request a verified badge",
     verificationWarning:

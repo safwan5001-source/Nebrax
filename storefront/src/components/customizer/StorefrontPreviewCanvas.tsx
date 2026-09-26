@@ -455,15 +455,6 @@ export function StorefrontPreviewCanvas({
             <FooterCol title={t("account")}>
               <span>{t("account")}</span>
               <span>{t("cart")}</span>
-              {footerWhatsapp ? (
-                <a
-                  href={footerWhatsapp}
-                  className="text-store-footer-link underline-offset-2 hover:underline"
-                  onClick={(event) => event.preventDefault()}
-                >
-                  {t("whatsapp")}
-                </a>
-              ) : null}
             </FooterCol>
             <FooterCol title={t("policies")}>
               {visiblePages.length ? (
@@ -475,105 +466,152 @@ export function StorefrontPreviewCanvas({
               ) : (
                 <span>{t("pagesHint")}</span>
               )}
-              {hasApps && config.apps.showFooterLinks ? (
-                <>
-                  {ios ? (
-                    <OfficialStoreBadge
-                      store="apple"
-                      href={ios}
-                      locale={locale}
-                      label="App Store"
-                      newTab={false}
-                      onClick={(event) => event.preventDefault()}
-                    />
-                  ) : null}
-                  {android ? (
-                    <OfficialStoreBadge
-                      store="google"
-                      href={android}
-                      locale={locale}
-                      label="Google Play"
-                      newTab={false}
-                      onClick={(event) => event.preventDefault()}
-                    />
-                  ) : null}
-                </>
-              ) : null}
             </FooterCol>
           </div>
           {(config.contact.phone ||
             config.contact.email ||
             config.contact.address ||
             config.contact.hours ||
+            footerWhatsapp ||
             enabledSocial.length > 0 ||
             hasBusinessIdentity ||
             license ||
-            config.sbc.show_in_storefront) && (
-            <div className="mt-8 border-t border-store-footer-border pt-6 text-sm text-store-footer-muted">
-              {config.contact.phone ? <p>{config.contact.phone}</p> : null}
-              {config.contact.email ? <p>{config.contact.email}</p> : null}
-              {config.contact.address ? <p>{config.contact.address}</p> : null}
-              {config.contact.hours ? <p>{config.contact.hours}</p> : null}
-              {enabledSocial.length > 0 && (
-                <p className="mt-2 flex flex-wrap gap-3">
-                  {enabledSocial.map((item) => {
-                    const label = socialLabel(t, item.network);
-                    return (
-                      <a
-                        key={item.id}
-                        href={item.href}
-                        aria-label={label}
-                        className="text-store-footer-link"
-                        onClick={(event) => event.preventDefault()}
-                      >
-                        {label}
-                      </a>
-                    );
-                  })}
-                </p>
-              )}
+            config.sbc.show_in_storefront ||
+            (hasApps && config.apps.showFooterLinks)) && (
+            <div className="mt-8 grid grid-cols-1 gap-6 border-t border-store-footer-border pt-6 text-sm text-store-footer-muted sm:grid-cols-2">
               {hasBusinessIdentity ? (
-                <div className="mt-4 space-y-1 break-words">
-                  <p className="font-medium text-store-footer-link">
+                <section className="min-w-0">
+                  <h3 className="text-sm font-bold text-store-footer-foreground">
                     {t("businessInformation")}
-                  </p>
-                  {legalName ? (
-                    <p>
-                      {t("legalName")}: {legalName}
-                    </p>
-                  ) : null}
-                  {crNumber ? (
-                    <p>
-                      {t("crNumber")}: {crNumber}
-                    </p>
-                  ) : null}
-                  {vatNumber ? (
-                    <p>
-                      {t("vatNumber")}: {vatNumber}
-                    </p>
-                  ) : null}
-                </div>
+                  </h3>
+                  <div className="mt-3 break-words">
+                    {legalName ? (
+                      <p>
+                        {t("legalName")}: {legalName}
+                      </p>
+                    ) : null}
+                    {crNumber ? (
+                      <p>
+                        {t("crNumber")}: {crNumber}
+                      </p>
+                    ) : null}
+                    {vatNumber ? (
+                      <p>
+                        {t("vatNumber")}: {vatNumber}
+                      </p>
+                    ) : null}
+                  </div>
+                </section>
               ) : null}
               {license ? (
-                <div className="mt-4 space-y-1 break-words">
-                  <p className="font-medium text-store-footer-link">
+                <section className="min-w-0">
+                  <h3 className="text-sm font-bold text-store-footer-foreground">
                     {t("merchantProvided")}
-                  </p>
-                  <p>
+                  </h3>
+                  <p className="mt-3 break-words">
                     {t("licenseNumber")}: {license}
                   </p>
-                </div>
+                </section>
               ) : null}
               {config.sbc.show_in_storefront ? (
-                <div className="mt-4 border-t border-store-footer-border pt-4">
-                  {config.sbc.seal_token.trim() ? (
-                    <SbcSeal message={t("sbcSealPreview")} />
-                  ) : (
-                    <p className="font-medium text-store-footer-link">
-                      {t("sbcVerified")}
-                    </p>
-                  )}
-                </div>
+                <section className="min-w-0">
+                  <h3 className="text-sm font-bold text-store-footer-foreground">
+                    {t("sbcGroup")}
+                  </h3>
+                  <div className="mt-3">
+                    {config.sbc.seal_token.trim() ? (
+                      <SbcSeal message={t("sbcSealPreview")} />
+                    ) : (
+                      <p className="font-medium text-store-footer-link">
+                        {t("sbcVerified")}
+                      </p>
+                    )}
+                  </div>
+                </section>
+              ) : null}
+              {config.contact.phone ||
+              config.contact.email ||
+              config.contact.address ||
+              config.contact.hours ||
+              footerWhatsapp ||
+              enabledSocial.length > 0 ? (
+                <section className="min-w-0">
+                  <h3 className="text-sm font-bold text-store-footer-foreground">
+                    {t("communication")}
+                  </h3>
+                  <div className="mt-3 break-words">
+                    {config.contact.phone ? (
+                      <p>{config.contact.phone}</p>
+                    ) : null}
+                    {config.contact.email ? (
+                      <p>{config.contact.email}</p>
+                    ) : null}
+                    {config.contact.address ? (
+                      <p>{config.contact.address}</p>
+                    ) : null}
+                    {config.contact.hours ? (
+                      <p>{config.contact.hours}</p>
+                    ) : null}
+                    {footerWhatsapp ? (
+                      <p>
+                        <a
+                          href={footerWhatsapp}
+                          className="text-store-footer-link underline-offset-2 hover:underline"
+                          onClick={(event) => event.preventDefault()}
+                        >
+                          {t("whatsapp")}
+                        </a>
+                      </p>
+                    ) : null}
+                    {enabledSocial.length > 0 ? (
+                      <p className="mt-2 flex flex-wrap gap-3">
+                        {enabledSocial.map((item) => {
+                          const label = socialLabel(t, item.network);
+                          return (
+                            <a
+                              key={item.id}
+                              href={item.href}
+                              aria-label={label}
+                              className="text-store-footer-link"
+                              onClick={(event) => event.preventDefault()}
+                            >
+                              {label}
+                            </a>
+                          );
+                        })}
+                      </p>
+                    ) : null}
+                  </div>
+                </section>
+              ) : null}
+              {hasApps && config.apps.showFooterLinks ? (
+                <section className="min-w-0">
+                  <h3 className="text-sm font-bold text-store-footer-foreground">
+                    {t("applications")}
+                  </h3>
+                  <div className="mt-3 flex flex-wrap gap-3">
+                    {ios ? (
+                      <OfficialStoreBadge
+                        store="apple"
+                        href={ios}
+                        locale={locale}
+                        label="App Store"
+                        newTab={false}
+                        onClick={(event) => event.preventDefault()}
+                      />
+                    ) : null}
+                    {android ? (
+                      <OfficialStoreBadge
+                        store="google"
+                        href={android}
+                        locale={locale}
+                        label="Google Play"
+                        newTab={false}
+                        onClick={(event) => event.preventDefault()}
+                      />
+                    ) : null}
+                  </div>
+                </section>
               ) : null}
             </div>
           )}
