@@ -338,8 +338,11 @@ release-mode CI/build proof is green and the task does not require device-only b
 
 ### RUNTIME-CORRECTNESS-1 — DONE
 
-- PR: (this task's own docs-only PR, opened against `claude/awj-runtime-correctness-followup-x7anrt`)
+- PR: #1034 (docs-only)
 - Base SHA: `52d1ede313196c4042fe47c44b2c6fcd57af8c84`
+- Head SHA: `87febccee7e6ac39300ebeae1cd36e78fd929227`
+- Merge SHA: `110dc0d944ee821160c4cb2290d6471be8cabab0` (squash merge)
+- CI: 4/4 checks green (`php artisan test` L11 sqlite/pgsql, run twice — both pushes to the PR)
 - Evidence report: `docs/plans/app-builder/RUNTIME-CORRECTNESS-1-EVIDENCE-PASS.md`
 - Scope: evidence only, no runtime/test code changed.
 - Result: both LIVE-PREVIEW-7 findings re-confirmed against current `main`. Finding A pinpointed to
@@ -354,7 +357,34 @@ release-mode CI/build proof is green and the task does not require device-only b
 - Decision Gate check: all 8 gates checked, none triggered.
 - No tests run (docs-only change); no runtime/behavior change.
 - Risks: none introduced. No new deferrals beyond what LIVE-PREVIEW-8 already recorded.
-- Next task: **RUNTIME-CORRECTNESS-2 — Proof truthfulness**.
+- Review: one automated comment (`chatgpt-codex-connector[bot]`) reporting its own usage-limit
+  exhaustion, not a review finding — no action needed.
+
+### RUNTIME-CORRECTNESS-2 — DONE
+
+- PR: #1036
+- Base SHA: `110dc0d944ee821160c4cb2290d6471be8cabab0`
+- Head SHA: (this task's own commit `45ca3a0` on the restarted `claude/awj-runtime-correctness-followup-x7anrt`)
+- Scope: doc-comment wording corrections only in
+  `tests/Feature/AppBuilderIntegratedProofTest.php` and `tests/Feature/AppBuilderSameStoreProofTest.php`
+  — no assertion removed, weakened, or added; no runtime/behavior change (RC-1 found no tiny
+  inseparable fix was needed, so none was made here).
+- Result: both overclaiming comments corrected to distinguish structural validity, successful
+  Validate/Publish/fetch, `CompatibilityResolver`'s structural/capability verdict, and actual
+  on-device rendering — pointing to the real integrated-runtime proof
+  (`mobile/test/app/awj_runtime_shell_startup_test.dart` group E) for the claim they no longer make
+  themselves.
+- Tests: focused `--filter=AppBuilderIntegratedProofTest` (4 passed, 67 assertions) and
+  `--filter=AppBuilderSameStoreProofTest` (1 passed, 21 assertions) — both assertion counts
+  unchanged from pre-change baseline, confirming no assertion was added/removed. Broader
+  `--filter=AppBuilder` (16 passed, 177 assertions) all green. Full local suite attempted
+  (4706 passed / 35 failed / 49 skipped) — all 35 failures are pre-existing
+  `FuelSupplyReceivingTest`/`FuelCostBasisService` `bcmul()` errors caused by this sandbox's PHP
+  build having no `bcmath` extension loaded (confirmed via `php -m`), unrelated to this change and
+  unrelated to App Builder; GitHub CI is the authoritative full-suite signal.
+- Decision Gate check: not applicable (docs/comments only).
+- Risks: none introduced.
+- Next task: **RUNTIME-CORRECTNESS-3 — Generic CartSummary live hydration**.
 
 ## Autonomous execution instruction
 
