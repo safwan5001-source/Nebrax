@@ -28,7 +28,8 @@ The preceding Store Trust horizon is closed. Treat its implementation as current
 - official social/WhatsApp marks were intentionally not shipped without evidence;
 - App Store / Google Play link/badge behavior already has existing implementation that must be verified rather than blindly replaced;
 - Footer grouping exists;
-- Railway may auto-deploy merged `main`, so reports must distinguish “no manual deploy triggered” from actual production deployment state.
+- Railway may auto-deploy merged `main`, so reports must distinguish “no manual deploy triggered” from actual production deployment state;
+- because of that behavior, runtime-changing PRs must stop before merge unless Safwan has explicitly authorized the Production impact of that merge (or a separately authorized deployment gate has first removed that automatic Production effect).
 
 ## Evidence work
 
@@ -58,7 +59,7 @@ Do not render payment marks from a static design list.
 
 First prove the authoritative supported+enabled payment-method source for the specific storefront/channel.
 
-If no such source exists, create a Decision Packet and stop that slice.
+If no such source exists, create a Decision Packet and stop that payment slice. That resolved decision-gated/deferred payment state must not block the non-payment composition, QA, or horizon closure.
 
 No payment gateway integration or financial behavior may be introduced.
 
