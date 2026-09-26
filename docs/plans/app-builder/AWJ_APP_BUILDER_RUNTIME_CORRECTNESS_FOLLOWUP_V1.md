@@ -92,8 +92,8 @@ Stop only for a genuine Decision Gate, a real blocker, or scope crossing as defi
 | Task | Purpose | State |
 |---|---|---|
 | RUNTIME-CORRECTNESS-1 | Evidence lock for the two LIVE-PREVIEW-7 findings | **DONE** |
-| RUNTIME-CORRECTNESS-2 | Correct proof/test overclaims without weakening assertions | **READY** |
-| RUNTIME-CORRECTNESS-3 | Generic CartSummary live hydration | BLOCKED on RC-2 |
+| RUNTIME-CORRECTNESS-2 | Correct proof/test overclaims without weakening assertions | **DONE** |
+| RUNTIME-CORRECTNESS-3 | Generic CartSummary live hydration | **READY** |
 | RUNTIME-CORRECTNESS-4 | Integrated runtime proof for arbitrary CartSummary ids | BLOCKED on RC-3 |
 | RUNTIME-CORRECTNESS-5 | Horizon closure / durable documentation | BLOCKED on RC-4 |
 

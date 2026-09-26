@@ -148,9 +148,25 @@ class AppBuilderSameStoreProofTest extends TestCase
 
         // The fetched document, run through the exact same CompatibilityResolver
         // the mobile runtime uses (mirrored Dart-side by CompatibilityResolverTest's
-        // own "compatible on the current shipped runtime" tests), is genuinely
-        // renderable on this shipped runtime — not just structurally accepted at
-        // draft time.
+        // own "compatible on the current shipped runtime" tests), passes the real
+        // structural/version/capability compatibility gate the shipped runtime's
+        // Dart mirror also enforces — not just accepted at draft-save time.
+        //
+        // Correction (RUNTIME-CORRECTNESS-1/2, 2026-09-26): "compatible" here is a
+        // structural/capability verdict only, never a rendering proof —
+        // CompatibilityResolver never inspects a `binding` target's runtime shape
+        // and never renders anything. This schema's own `ProductList.binding.
+        // itemProps` would in fact never be read by the real runtime for this
+        // shape: a list-shaped `commerce.products` resource takes
+        // `binding_resolution.dart`'s list-repeat branch (`_repeatTemplate`),
+        // which ignores `itemProps` and needs an authored item-template child this
+        // schema does not declare — see `AppBuilderIntegratedProofTest`'s
+        // equivalent note. The actual on-device rendering proof for
+        // `ProductList`/`CartList` binding lives in
+        // `mobile/test/app/awj_runtime_shell_startup_test.dart` (group E), against
+        // the shared `contracts/app-builder/integrated-proof-schema.v1.json`
+        // fixture — a real `binding.resource` + authored template, never
+        // `itemProps` on a list-shaped resource.
         $result = (new CompatibilityResolver)->resolve($fetched->json('data.schema'), CapabilityManifest::current());
         $this->assertTrue($result->compatible, $result->message ?? '');
 
