@@ -298,4 +298,49 @@ describe("Footer SBC presentation", () => {
       document.querySelector('[data-official-social="whatsapp"]'),
     ).toBeNull();
   });
+
+  it("shows a utility icon beside each present contact value and no link", async () => {
+    const view = await Footer({
+      ...baseProps,
+      contact: {
+        phone: "+966500000000",
+        email: "  ",
+        address: "الدمام، شارع طويل جداً بلا انقطاع في السطر الواحد",
+        hours: "",
+      },
+    });
+    const screen = render(view);
+    const region = screen.getByRole("region", { name: "communication" });
+
+    expect(screen.getByText("+966500000000").closest("p")).toContainElement(
+      region.querySelector("[data-contact-icon='phone']"),
+    );
+    expect(screen.getByText(/الدمام/).className).toContain("break-words");
+    expect(
+      region.querySelector("[data-contact-icon='address']"),
+    ).not.toBeNull();
+    expect(region.querySelector("[data-contact-icon='email']")).toBeNull();
+    expect(region.querySelector("[data-contact-icon='hours']")).toBeNull();
+    expect(region.querySelector("a")).toBeNull();
+  });
+
+  it("renders every contact field when the set is complete", async () => {
+    const view = await Footer({
+      ...baseProps,
+      contact: {
+        phone: "050",
+        email: "a@awj.dev",
+        address: "Dammam",
+        hours: "9–5",
+      },
+    });
+    const screen = render(view);
+    for (const kind of ["phone", "email", "address", "hours"]) {
+      expect(
+        document.querySelector(`[data-contact-icon='${kind}']`),
+      ).not.toBeNull();
+    }
+    expect(screen.getByText("a@awj.dev")).toBeTruthy();
+    expect(screen.queryByRole("link", { name: "a@awj.dev" })).toBeNull();
+  });
 });

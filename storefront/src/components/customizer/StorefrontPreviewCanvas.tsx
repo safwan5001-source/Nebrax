@@ -9,6 +9,10 @@ import {
 } from "@/components/brand/OfficialSocialMark";
 import { StoreBrand } from "@/components/layout/StoreBrand";
 import { storeContainerClassName } from "@/components/layout/StoreContainer";
+import {
+  ContactDetail,
+  contactDetailText,
+} from "@/components/store/ContactDetail";
 import { OfficialStoreBadge } from "@/components/store/OfficialStoreBadge";
 import { categoryAccent } from "@/lib/home/category-accent";
 import {
@@ -87,6 +91,10 @@ export function StorefrontPreviewCanvas({
   const crNumber = businessIdentity.cr_number?.trim() || null;
   const vatNumber = businessIdentity.vat_number?.trim() || null;
   const license = config.verification.licenseNumber.trim();
+  const phone = contactDetailText(config.contact.phone);
+  const email = contactDetailText(config.contact.email);
+  const address = contactDetailText(config.contact.address);
+  const hours = contactDetailText(config.contact.hours);
   const hasBusinessIdentity = Boolean(legalName || crNumber || vatNumber);
   const whatsappHref =
     config.whatsapp.enabled &&
@@ -466,10 +474,10 @@ export function StorefrontPreviewCanvas({
               )}
             </FooterCol>
           </div>
-          {(config.contact.phone ||
-            config.contact.email ||
-            config.contact.address ||
-            config.contact.hours ||
+          {(phone ||
+            email ||
+            address ||
+            hours ||
             footerWhatsapp ||
             enabledSocial.length > 0 ||
             hasBusinessIdentity ||
@@ -527,10 +535,10 @@ export function StorefrontPreviewCanvas({
                   </div>
                 </section>
               ) : null}
-              {config.contact.phone ||
-              config.contact.email ||
-              config.contact.address ||
-              config.contact.hours ||
+              {phone ||
+              email ||
+              address ||
+              hours ||
               footerWhatsapp ||
               enabledSocial.length > 0 ? (
                 <section className="min-w-0">
@@ -538,17 +546,17 @@ export function StorefrontPreviewCanvas({
                     {t("communication")}
                   </h3>
                   <div className="mt-3 break-words">
-                    {config.contact.phone ? (
-                      <p>{config.contact.phone}</p>
+                    {phone ? (
+                      <ContactDetail kind="phone" value={phone} />
                     ) : null}
-                    {config.contact.email ? (
-                      <p>{config.contact.email}</p>
+                    {email ? (
+                      <ContactDetail kind="email" value={email} />
                     ) : null}
-                    {config.contact.address ? (
-                      <p>{config.contact.address}</p>
+                    {address ? (
+                      <ContactDetail kind="address" value={address} />
                     ) : null}
-                    {config.contact.hours ? (
-                      <p>{config.contact.hours}</p>
+                    {hours ? (
+                      <ContactDetail kind="hours" value={hours} />
                     ) : null}
                     {footerWhatsapp ? (
                       <p>
