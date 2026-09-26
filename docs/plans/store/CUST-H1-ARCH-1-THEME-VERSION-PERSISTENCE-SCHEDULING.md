@@ -147,11 +147,16 @@ scheduled_version_id             uuid nullable
 compatibility_working_version_id uuid nullable
 ```
 
-Backfill:
+Backfill / migration sequence:
 
-- `draft_schema_version = existing schema_version`
-- if `published_config != null`, `published_schema_version = existing schema_version`; otherwise null.
-- keep legacy `schema_version` populated for backward compatibility during the transition.
+1. add `draft_schema_version` as nullable (or with a compatibility-safe temporary default) and `published_schema_version` as nullable;
+2. backfill `draft_schema_version = existing schema_version`;
+3. if `published_config != null`, backfill `published_schema_version = existing schema_version`; otherwise leave null;
+4. verify no existing presentation row has null `draft_schema_version`;
+5. enforce `draft_schema_version NOT NULL` using the repository's SQLite/PostgreSQL-compatible migration pattern;
+6. keep legacy `schema_version` populated for backward compatibility during the transition.
+
+Do not add a non-null/no-default column to a populated table before backfill; PostgreSQL would reject the change and the backfill could never run.
 
 FK strategy:
 
@@ -536,6 +541,17 @@ Body:
 
 Server stores a canonical UTC timestamp.
 
+Initial schedule transaction must:
+
+1. lock Storefront/head/Version;
+2. reject active Published target;
+3. compare request `revision` to locked Version revision; mismatch → **409** before any schedule/pointer mutation;
+4. validate future timestamp;
+5. increment schedule generation;
+6. set Version `scheduled_for`;
+7. atomically replace head `scheduled_version_id` with this target;
+8. commit.
+
 **Active Published Versions cannot be scheduled.** If `version.id === active_version_id`, return a lifecycle conflict (recommended **409**). A merchant who wants a future change must create/duplicate a Draft Version first.
 
 This keeps the derived state exclusive: a Version cannot be both Published and Scheduled.
@@ -808,12 +824,13 @@ Old execution token becomes stale.
 ### Cancel
 
 1. lock Storefront/head/Version;
-2. increment generation;
-3. clear target scheduled_for;
-4. clear head scheduled_version_id;
-5. commit.
+2. require `head.scheduled_version_id === target.id`; if not, return a lifecycle conflict (**409**) or an explicitly documented stale-cancel no-op — never clear another Version's pointer;
+3. increment generation;
+4. clear target `scheduled_for`;
+5. clear head `scheduled_version_id`;
+6. commit.
 
-Any old queued job becomes a safe no-op.
+Any old queued job becomes a safe no-op. A delayed cancellation for superseded Version A cannot cancel newer scheduled Version B.
 
 ---
 
@@ -1087,8 +1104,10 @@ True concurrency tests should run on PostgreSQL where repository convention alre
 - different-version independent save;
 - publish vs save;
 - publish vs publish;
+- initial schedule stale revision → 409 with no schedule mutation;
 - schedule vs reschedule;
 - stale reschedule revision → 409 with no schedule mutation;
+- stale cancel for superseded Version cannot clear newer scheduled pointer;
 - schedule vs cancel;
 - stale job generation no-op.
 
