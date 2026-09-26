@@ -207,7 +207,7 @@ TikTok's current first-party developer Design Guidelines state that TikTok logos
 First-party source:
 https://developers.tiktok.com/doc/getting-started-design-guidelines
 
-**Evidence conclusion:** this is a permission gate, not merely an asset-discovery gap. AWJ must not render a TikTok mark in the storefront unless the applicable permission/authorization basis is established. Text-label fallback remains the safe current behavior.
+**Evidence conclusion:** first-party TikTok guidance records trademark/permission restrictions. **Owner Decision (Safwan, 2026-09-26):** AWJ will proceed with the authentic first-party TikTok mark for the storefront social link. This legal/brand-use note is retained as documented risk, not an implementation blocker. AWJ must still use the official asset unmodified and must not substitute an unofficial redraw or icon pack.
 
 ## 4. Evidence matrix
 
@@ -220,7 +220,7 @@ https://developers.tiktok.com/doc/getting-started-design-guidelines
 | WhatsApp destination | phone/message/placement | Present | Present | wa.me | Current URL construction is fail-closed | Existing commerce authoring boundary | Brand mark missing | ASSET_EVIDENCE_REQUIRED | SOCIAL-ASSET-EVIDENCE-1 |
 | Instagram | social[] HTTPS URL | Text label | Text label | Meta brand resources | URL safety exists | Existing commerce authoring boundary | Exact approved mark evidence incomplete | ASSET_EVIDENCE_REQUIRED | SOCIAL-ASSET-EVIDENCE-1 |
 | X | social[] HTTPS URL | Text label | Text label | X Brand Toolkit | Official source found | Existing commerce authoring boundary | Mark not implemented | ASSET_EVIDENCE_REQUIRED | SOCIAL-ASSET-EVIDENCE-1 → WA-SOCIAL-1 |
-| TikTok | social[] HTTPS URL | Text label | Text label | TikTok first-party developer guidelines / asset packs | Prior written permission required by current developer guidance | Existing commerce authoring boundary | Permission basis not established | PRODUCT_DECISION_REQUIRED | SOCIAL-ASSET-EVIDENCE-1 decision packet |
+| TikTok | social[] HTTPS URL | Text label | Text label | TikTok first-party developer guidelines / asset packs | Owner authorized use of authentic first-party mark; restriction retained as documented risk | Existing commerce authoring boundary | Official mark not implemented | ASSET_EVIDENCE_REQUIRED | SOCIAL-ASSET-EVIDENCE-1 → WA-SOCIAL-1 |
 | Snapchat | social[] HTTPS URL | Text label | Text label | Snap Brand Guidelines | Official Ghost source found | Existing commerce authoring boundary | Mark not implemented | ASSET_EVIDENCE_REQUIRED | SOCIAL-ASSET-EVIDENCE-1 → WA-SOCIAL-1 |
 | YouTube | social[] HTTPS URL | Text label | Text label | brand.youtube | Official center found; exact usage text incomplete | Existing commerce authoring boundary | Exact approved production asset evidence incomplete | ASSET_EVIDENCE_REQUIRED | SOCIAL-ASSET-EVIDENCE-1 |
 | LinkedIn | social[] HTTPS URL | Text label | Text label | LinkedIn [in] Logo | Social-icon lineup use explicitly supported | Existing commerce authoring boundary | Mark not implemented | ASSET_EVIDENCE_REQUIRED | SOCIAL-ASSET-EVIDENCE-1 → WA-SOCIAL-1 |
@@ -261,7 +261,7 @@ Create:
 Purpose:
 
 - obtain/capture exact first-party downloadable asset and permitted-use evidence for WhatsApp, Instagram, YouTube, Facebook;
-- for TikTok, document the prior-written-permission gate and determine whether AWJ has an applicable authorization basis;
+- for TikTok, capture the exact first-party asset/variant and record the owner-authorized implementation decision together with the known brand-use restriction;
 - re-confirm X, Snapchat, and LinkedIn asset variants;
 - decide local committed asset vs first-party remote asset only where the official terms allow it;
 - produce a closed asset registry for WA-SOCIAL-1.
@@ -305,4 +305,17 @@ Next dependency-ready tasks:
 - STORE-BRAND-SOCIAL-ASSET-EVIDENCE-1
 - STORE-BRAND-PAY-EVIDENCE-1
 
-WA-SOCIAL-1 remains blocked until its first-party asset registry is complete.
+WA-SOCIAL-1 remains blocked only until its first-party asset registry is complete. No additional owner/legal decision gate remains for TikTok.
+
+
+## 9. Owner decision — official social marks
+
+Safwan explicitly decided on 2026-09-26 that AWJ should use the authentic official social-network icons/marks, including TikTok.
+
+Execution rule:
+
+- use first-party official assets only;
+- do not redraw, imitate, or substitute unofficial icon-pack versions;
+- preserve official proportions/variants;
+- record known brand-use restrictions in evidence;
+- those restrictions do not block implementation unless a technical or security issue is discovered.
