@@ -1,6 +1,6 @@
 # AWJ Store Official Brand, Contact & Payment Marks Horizon — Resume Note
 
-**Status:** STORE-BRAND-WA-SOCIAL-1 done and in Production. CONTACT-1, APPS-1, and PAY-EVIDENCE-1 remain ready.  
+**Status:** WA/SOCIAL, APPS-1, and CONTACT-1 are done. PAY-EVIDENCE-1 resolved at Decision Gate; PAY-1 deferred. COMPOSE-1 is next.  
 **Definition base:** `c1bdac3b3f1f7f5be7cfde6b918671d0cb7814e1`
 
 ## Objective
@@ -36,13 +36,15 @@ Official registry: `docs/plans/store/AWJ_STORE_BRAND_SOCIAL_ASSET_REGISTRY.md`.
 - POST_MERGE_REVIEW: PASS for that Merge SHA
 - Production auto-deploy SUCCESS on that SHA for storefront, Nebrax/web, nibras-api, and awj-scheduler (Vercel storefront and Vercel nebrax also SUCCESS). No manual deploy.
 
-Dependency-ready next tasks:
+Closed slices:
 
-- `STORE-BRAND-CONTACT-1`
-- `STORE-BRAND-APPS-1`
-- `STORE-BRAND-PAY-EVIDENCE-1`
+- `STORE-BRAND-APPS-1` — PR #1066, Merge SHA `316005750560add32b26dc5adad024efd5541ad9`.
+- `STORE-BRAND-CONTACT-1` — PR #1068, Merge SHA `5802fc30b673e1be8b7fff8943d733d55b5df7a0`.
+- `STORE-BRAND-PAY-EVIDENCE-1` — resolved at Decision Gate; see `AWJ_STORE_BRAND_PAY_EVIDENCE_DECISION.md`.
 
-`STORE-BRAND-COMPOSE-1` stays blocked until APPS-1 and CONTACT-1 are done. PAY-1 stays decision-gated.
+Next task: `STORE-BRAND-COMPOSE-1`.
+
+`STORE-BRAND-PAY-1` is deferred until a server-authoritative card/wallet supported+enabled capability model exists.
 
 Safwan has explicitly authorized authentic official marks, including TikTok. The social asset evidence gate is closed. WA-SOCIAL-1 is merged; do not reopen it unless a regression appears.
 
@@ -50,7 +52,9 @@ Safwan has explicitly authorized authentic official marks, including TikTok. The
 
 Before any mada / Visa / Mastercard / Apple Pay / Google Pay mark is shown, prove that the method is actually supported and enabled for the relevant storefront.
 
-If no authoritative enabled-method source exists, stop the payment slice at a Decision Gate. This is a valid resolved state and does not block the remaining non-payment horizon work.
+PAY-EVIDENCE-1 confirmed that the existing channel-enabled `PaymentMethod` source does not model card-network/wallet acceptance. Current Commerce Payment Intent supports only `cod` / `pay_on_pickup`; mada, Visa, Mastercard, Apple Pay, and Google Pay are not proven storefront capabilities.
+
+Result: Decision Gate resolved, `STORE-BRAND-PAY-1` deferred. This does not block the remaining non-payment horizon work.
 
 ## Deployment
 
@@ -65,6 +69,6 @@ No automatic next horizon after closure.
 
 ## STORE-BRAND-0 key finding
 
-Published Footer renders official WhatsApp and social marks (STORE-BRAND-WA-SOCIAL-1, PR #1064, Merge SHA `4739ecd6928c0ad506824e9a57939b3f35b08439`). Contact rows are still text-only. App Store / Google Play already use first-party badge URLs in Preview and Published; APPS-1 remains the verify/fix slice.
+Published Footer now has official WhatsApp/social marks, verified official App Store / Google Play badges, and AWJ utility icons for phone/email/address/hours with Preview/Public parity.
 
-The storefront payment contract currently exposes channel-enabled PaymentMethod rows, but its Payment Intent methods are COD / Pay on Pickup and it explicitly has no online/card method yet. Do not infer Visa/Mastercard/mada/Apple Pay/Google Pay support from PaymentGateway provider configuration.
+The storefront payment contract exposes channel-enabled `PaymentMethod` rows, but its Payment Intent methods are only COD / Pay on Pickup and it explicitly has no online/card method yet. Do not infer Visa/Mastercard/mada/Apple Pay/Google Pay support from `PaymentGateway` provider configuration.
