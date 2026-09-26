@@ -72,18 +72,20 @@ Current direct browser viewport: **1363 × 936 CSS px**, Arabic RTL.
 | Blog index — desktop | Direct live inspection | **Observed** |
 | About page — desktop | Direct live inspection of hero, story copy and image-led content bands | **Observed** |
 | Header/footer global shells | Seen across all inspected pages | **Observed** |
+| Header sticky/scrolled state | Direct scroll test at 1100px with computed geometry and styles | **Observed** |
+| Home hero carousel controls | Two-slide arrow/dot transition directly exercised; swipe/autoplay/pause pending | **Observed partial** |
 | Search overlay | Full-screen open/close and query entry observed | **Observed** |
 | Product search results / no results | Direct live inspection of populated and zero-result URLs | **Observed** |
 | Policy pages | Returns, terms and privacy/use pages directly inspected | **Observed** |
 | Blog article detail | Article, metadata, comments/reply form and sidebar directly inspected | **Observed** |
-| Wishlist | Header and product actions found; destination/state not yet verified | **Partial** |
-| Compare | Related-product compare actions found; compare page not yet verified | **Partial** |
-| Quick view | Earlier public crawl suggested it; current direct live state not yet verified | **Not yet confirmed** |
-| Mini-cart | Empty side drawer observed; populated state not exercised | **Observed with gap** |
-| Filled cart | Populated state not exercised | **Not observed** |
+| Wishlist | Add/remove toggle directly exercised; header/destination link remained empty | **Observed partial / reference defect** |
+| Compare | Add/remove toggle directly exercised; no comparison destination or table exposed | **Observed partial / reference defect** |
+| Quick view | Related-product modal opened and closed directly | **Observed** |
+| Mini-cart | Empty and populated side-drawer states directly inspected | **Observed** |
+| Filled cart | Direct live inspection after adding a simple product | **Observed** |
 | Checkout with empty cart | Direct visit redirected to the empty-cart surface | **Observed boundary** |
-| Checkout with populated cart | Not exercised | **Not observed** |
-| Product variations/options | Only a simple product was directly inspected | **Not observed** |
+| Checkout with populated cart | Guest contact, shipping, delivery slot, payment and summary directly inspected; order not submitted | **Observed boundary** |
+| Product variations/options | First 48 catalog cards were marked simple products; no variable product found | **Not observed** |
 | Out-of-stock/backorder | Stock filter exists; card/detail states not yet captured | **Not observed** |
 | Mobile 390/430 | Responsive stylesheet rules observed; no direct viewport visual inspection yet | **Inferred from stylesheet; visual pending** |
 | Tablet 768/1024 | Responsive stylesheet rules observed; no direct viewport visual inspection yet | **Inferred from stylesheet; visual pending** |
@@ -170,12 +172,22 @@ The header is a two-row composition with a combined measured height of 154px:
    - RTL ordering;
    - sticky-capable header classes and sticky-shadow capability.
 
+Direct scrolling to 1100px exposed the sticky state:
+
+- the main header becomes fixed at viewport top with `z-index: 390` and an observed 1px/3px soft shadow;
+- total visible height contracts from 154px to 110px;
+- the utility/brand row contracts from 104px to 60px;
+- the primary navigation row remains 50px;
+- the header receives prepared/stuck state classes while its original document-flow box scrolls out of view.
+
+These measurements are **Observed** reference behavior. AWJ should reproduce the perceptual transition through its own component state, not copy the reference classes.
+
 ### 7.2 Header variants required in AWJ
 
 | Variant | Use |
 |---|---|
 | `floral-centered` | Theme default: logo-led, spacious desktop identity. |
-| `floral-compact` | Sticky/scrolled state with reduced height. |
+| `floral-compact` | Sticky/scrolled state: fixed at the viewport top, 110px observed total desktop height, compact 60px brand row, unchanged 50px navigation row and soft elevation. |
 | `floral-mobile` | Mobile top bar with menu, logo and cart; exact reference behavior pending direct observation. |
 
 ### 7.3 Customizer controls
@@ -277,6 +289,11 @@ This is a theme preset. The merchant may reorder, duplicate, hide or delete elig
 #### Hero editorial
 
 - desktop media ratio observed near 1363:585 (~2.33:1) for a main campaign image;
+- the inspected desktop hero is a two-slide RTL carousel;
+- visible previous/next arrow controls are keyboard-focusable and expose accessible slide-direction labels;
+- two pagination dots expose `Go to slide 1/2`; the selected dot alone carries `aria-current="true"` and is in the tab order;
+- directly activating the visible `Next slide` control moved the active state from slide 2 to slide 1 and moved `aria-current` with it, without changing the page URL;
+- swipe, autoplay timing, pause-on-hover/focus and reduced-motion behavior were not directly verified;
 - alternate/mobile media slot required;
 - fields: eyebrow, title, body, CTA label/link, desktop image, mobile image, focal point, overlay strength;
 - variants: full-bleed / contained / split;
@@ -335,7 +352,7 @@ This is a theme preset. The merchant may reorder, duplicate, hide or delete elig
 - original price plus current price;
 - in-stock simple products;
 - product image and full-card/product-title navigation;
-- wishlist and compare affordances exist in the storefront ecosystem, but card placement/visibility needs direct interaction verification.
+- wishlist and compare affordances exist on product and related-product surfaces; their toggle behavior was exercised, but their destination surfaces are incomplete in the reference.
 
 ### 9.2 Required AWJ states
 
@@ -360,6 +377,42 @@ This is a theme preset. The merchant may reorder, duplicate, hide or delete elig
 - sale badge shape and position;
 - card alignment and spacing;
 - hover image/quick actions only when keyboard and touch equivalents exist.
+
+### 9.4 Wishlist and compare — observed partial; AWJ replacement required
+
+Wishlist observation:
+
+- the product-detail action changed from `Add to wishlist` to `Browse Wishlist` after addition;
+- activating it again removed the state and restored `Add to wishlist`;
+- the global wishlist header action and the post-add action retained an empty destination URL;
+- no wishlist page, drawer, count or product list became available in the exercised public state.
+
+Compare observation:
+
+- a related-product action changed from `Add to compare` to `Compare products` after addition;
+- activating it again removed the comparison state;
+- the action retained an empty destination URL;
+- no comparison page, modal, table or global compare entry point became available.
+
+These are reference-site incomplete behaviors, not theme features to reproduce.
+
+**AWJ decision:** expose either capability only when its runtime contract exists. Wishlist must have an addressable empty/populated surface, remove/undo, stable identity behavior for guests and signed-in customers, and an explicit guest-account merge policy. Compare must have an addressable selected-products surface, remove/clear, attribute rows, safe maximum item count and sensible behavior when compared products have non-aligned attributes. Both need loading/error states and touch/keyboard equivalents. Otherwise the actions must be hidden, not simulated.
+
+### 9.5 Quick view — observed
+
+Activating Quick view on a related-product card opened an in-place modal without changing the current product URL. The observed desktop modal measured approximately 920 × 613px within a full-viewport overlay and contained:
+
+- explicit Close control with an `Esc` title/hint;
+- product image/gallery region; one image was present, so previous/next controls were disabled;
+- View details link to the canonical product page;
+- product title and price;
+- quantity decrement/input/increment and Add to Cart;
+- SKU and linked categories;
+- social-share actions.
+
+Closing removed the modal and preserved the underlying page URL. Description, reviews, wishlist and compare were not included in the quick-view content observed.
+
+**AWJ decision:** Quick view is optional. When enabled it must preserve focus, trap keyboard navigation, close via visible control and `Esc`, return focus to the originating card, use canonical product/price/inventory data, and expose loading/error/unavailable-product states. Touch layouts may use a bottom sheet or navigate directly when a modal would reduce usability.
 
 ## 10. Catalog/category templates
 
@@ -449,6 +502,8 @@ The inspected simple product used one tall portrait image inside a zoom-enabled 
 
 Multi-image thumbnail, previous/next, swipe and image-counter behavior remains unobserved.
 
+The first 48 catalog cards across the first two 24-item shop pages were marked as in-stock simple products. This strengthens the evidence that the current public sample does not expose variable or out-of-stock states; it does **not** justify treating those states as unsupported in AWJ.
+
 ## 12. Cart and checkout surfaces
 
 ### 12.1 Empty cart — observed
@@ -458,7 +513,7 @@ Multi-image thumbnail, previous/next, swipe and image-counter behavior remains u
 - four recommended products with image, name, price, rating when available and Add to Cart;
 - global footer and navigation remain present.
 
-### 12.2 Mini-cart — empty observed; filled pending
+### 12.2 Mini-cart — empty and populated observed
 
 The header cart opens a side drawer without leaving the page. In the inspected empty state it exposed:
 
@@ -469,7 +524,12 @@ The header cart opens a side drawer without leaving the page. In the inspected e
 - `Return To Shop` action;
 - dimmed/overlay-style page relationship implied by the drawer shell.
 
-The populated state was not exercised in this pass.
+After adding one simple product, the same 340px drawer opened automatically and exposed:
+
+- product thumbnail/view action, product name, quantity × unit price and remove action;
+- subtotal;
+- View cart and Checkout actions;
+- cart count updated from zero to one.
 
 AWJ must eventually specify and verify:
 
@@ -482,9 +542,39 @@ AWJ must eventually specify and verify:
 - guest → authenticated identity transition using AWJ's canonical merge policy;
 - mobile bottom/sticky checkout action where appropriate.
 
-### 12.3 Checkout boundary
+### 12.3 Filled cart — observed
 
-A direct visit to `/checkout/` with an empty cart redirected to `/cart/` and reused the empty-cart recommendations surface. Populated checkout was **not observed** and is not approved for visual imitation yet. AWJ checkout must prioritize transaction clarity, address/delivery/payment correctness, validation and accessible error recovery over decorative parity with the reference.
+The cart initially rendered loading placeholders, then resolved to:
+
+- product media/link, name, unit price and short description;
+- quantity stepper with decrement disabled at quantity one;
+- remove action and line total;
+- expandable coupon entry;
+- shipping line (`Flat rate`, free in the observed session);
+- estimated total;
+- installment-information block supplied by the configured payment integration;
+- proceed-to-checkout action.
+
+**AWJ decision:** the theme may style these surfaces but prices, discounts, shipping, installments and totals must come from canonical checkout calculations. Loading must retain table/card geometry and announce progress.
+
+### 12.4 Checkout — populated boundary observed
+
+A direct visit to `/checkout/` with an empty cart redirected to `/cart/` and reused the empty-cart recommendations surface.
+
+With one product present, guest checkout exposed:
+
+- contact email, guest-status copy and gift-message field;
+- shipping address: country/region, first/last name, optional company, street/district, optional apartment/unit, city, region, optional phone and postal code;
+- same-address-for-billing checkbox;
+- shipping option;
+- delivery date and delivery-time slot controls;
+- payment choices (the observed store exposed a buy-now-pay-later integration and credit card);
+- optional order note;
+- terms/privacy acknowledgement copy;
+- persistent order summary with line item, subtotal, shipping and total;
+- provider-specific final CTA.
+
+No customer data was entered and no order/payment action was submitted. Validation, payment failure, order success and authenticated checkout remain unobserved. AWJ checkout must prioritize transaction clarity, address/delivery/payment correctness, validation and accessible error recovery over decorative parity with the reference. Enabled countries, fields, delivery slots and payment methods must come from store configuration, never from theme defaults.
 
 ## 13. Account, blog and content templates
 
@@ -618,15 +708,21 @@ This table is an **AWJ provisional decision**, not a claim of reference-site exa
 ### Global
 
 - [x] Desktop header default.
-- [ ] Header sticky/scrolled visual state.
+- [x] Header sticky/scrolled geometry, compaction, fixed position and elevation.
 - [ ] Mobile header closed/open/submenu.
 - [x] Search closed/open/query-entry/close behavior.
 - [x] Search results and no-results rendering.
 - [ ] Search loading/error rendering.
 - [ ] Account hover/dropdown versus click behavior.
-- [ ] Wishlist empty/populated/remove.
+- [x] Reference wishlist add/remove toggle and broken destination documented.
+- [x] Reference compare add/remove toggle and missing comparison surface documented.
+- [x] Quick-view open/content/close and URL-preservation behavior.
+- [ ] Quick-view loading/error/focus-return and mobile presentation.
+- [ ] AWJ wishlist empty/populated/remove/merge-state contract.
+- [ ] AWJ comparison table, maximum-items and non-aligned-attribute contract.
 - [x] Mini-cart empty/open/close behavior.
-- [ ] Mini-cart populated/loading/error.
+- [x] Mini-cart populated anatomy.
+- [ ] Mini-cart loading/error and stock-conflict behavior.
 - [ ] Cookie/announcement dismissal if part of the intended theme.
 - [ ] Focus-visible and reduced-motion audit.
 
@@ -637,7 +733,8 @@ This table is an **AWJ provisional decision**, not a claim of reference-site exa
 - [ ] Full-page screenshot review for pixel-level composition and hidden visual details.
 - [ ] Tablet layout.
 - [ ] Mobile layout.
-- [ ] Carousel arrows/dots/swipe/autoplay/pause behavior.
+- [x] Hero carousel arrows, dots, accessible selected state and URL preservation.
+- [ ] Hero carousel swipe/autoplay/pause/reduced-motion behavior.
 - [ ] Countdown expiry.
 - [ ] Empty collection and partial-media behavior.
 
@@ -673,9 +770,10 @@ This table is an **AWJ provisional decision**, not a claim of reference-site exa
 - [x] Guest login form.
 - [x] Lost-password form.
 - [x] Empty-cart checkout redirect boundary.
-- [ ] Filled cart.
-- [ ] Coupon/discount behavior.
-- [ ] Checkout steps and validation.
+- [x] Filled-cart line, quantity, remove, totals and checkout CTA anatomy.
+- [x] Coupon-entry control anatomy; valid/invalid application not exercised.
+- [x] Populated guest-checkout fields, delivery scheduling, payment choices and order-summary anatomy.
+- [ ] Checkout validation and payment-provider failure behavior.
 - [ ] Order success/failure.
 - [ ] Registration availability/form and authenticated account/orders.
 
@@ -765,6 +863,6 @@ The extraction is complete only when:
 
 The reference is suitable as the first AWJ ready-made boutique/floral theme because it combines editorial gifting content with dense commerce coverage: campaign hero, custom-gift story, multiple catalog collections, promotion/countdown, testimonials, product discovery and a full product-detail path.
 
-The current pass is sufficient to lock the desktop information architecture, both catalog compositions, search result states and the core content templates. It is **not yet sufficient to claim a complete extraction**: direct mobile/tablet rendering, populated commerce states, search loading/error behavior, wishlist/compare destinations and several error/interactive states remain explicitly open in §16.
+The current pass is sufficient to lock the desktop information architecture, both catalog compositions, search result states, populated cart/checkout anatomy, core content templates, and the decision not to reproduce the reference's incomplete wishlist/compare destinations. It is **not yet sufficient to claim a complete extraction**: direct mobile/tablet rendering, variable/out-of-stock products, search loading/error behavior, completed payment/order states and several validation/error interactions remain explicitly open in §16.
 
 No application code, database schema, API contract, merge or deployment is authorized by this document.
