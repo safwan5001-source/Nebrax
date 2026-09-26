@@ -342,14 +342,14 @@ export async function Footer({
             {hasContact || whatsappHref || visibleSocial.length > 0 ? (
               <TrustGroup id="footer-communication" title={t("communication")}>
                 <div className="space-y-2">
-                {phone ? <ContactDetail kind="phone" value={phone} /> : null}
-                {email ? <ContactDetail kind="email" value={email} /> : null}
-                {address ? (
-                  <ContactDetail kind="address" value={address} />
-                ) : null}
-                {hours ? <ContactDetail kind="hours" value={hours} /> : null}
-                {whatsappHref ? (
-                  <p>
+                  {phone ? <ContactDetail kind="phone" value={phone} /> : null}
+                  {email ? <ContactDetail kind="email" value={email} /> : null}
+                  {address ? (
+                    <ContactDetail kind="address" value={address} />
+                  ) : null}
+                  {hours ? <ContactDetail kind="hours" value={hours} /> : null}
+                  {whatsappHref ? (
+                    <p>
                     <a
                       href={whatsappHref}
                       className={`${footerLinkClassName} inline-flex min-h-11 items-center gap-2`}
@@ -359,10 +359,10 @@ export async function Footer({
                       <OfficialSocialMark network="whatsapp" />
                       {t("whatsapp")}
                     </a>
-                  </p>
-                ) : null}
-                {visibleSocial.length > 0 ? (
-                  <div className="flex flex-wrap items-center gap-1">
+                    </p>
+                  ) : null}
+                  {visibleSocial.length > 0 ? (
+                    <div className="flex flex-wrap items-center gap-1">
                     {visibleSocial.map((item) => {
                       const label = socialLabel(item.network);
                       return (
@@ -378,8 +378,8 @@ export async function Footer({
                         </a>
                       );
                     })}
-                  </div>
-                ) : null}
+                    </div>
+                  ) : null}
                 </div>
               </TrustGroup>
             ) : null}
