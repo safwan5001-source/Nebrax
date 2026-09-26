@@ -30,7 +30,11 @@ import 'runtime_strings.dart';
 /// aggregate, not a per-item field, so it is computed here from the same
 /// raw fetch `CartList`'s binding consumes (a single
 /// `CommerceClient.fetchBindingResource('commerce.cart')` call serves both;
-/// no second, typed `getCart()` fetch is needed).
+/// no second, typed `getCart()` fetch is needed). It reaches the schema via
+/// `hydrateNodesByType(..., 'CartSummary', ...)` (RUNTIME-CORRECTNESS-3) —
+/// keyed by component type, not a hardcoded id — so a generically-authored
+/// Published Experience's `CartSummary` gets live values under any id, not
+/// only the bundled Default schema's own `slot.cart.summary`.
 class CartScreen extends StatefulWidget {
   final CommerceClient client;
   final RuntimeState state;
@@ -190,9 +194,9 @@ class _CartScreenState extends State<CartScreen> {
       'cart-line-template-remove',
       (node) => withProp(node, 'label', strings.removeItem),
     );
-    hydrated = hydrateNode(
+    hydrated = hydrateNodesByType(
       hydrated,
-      'slot.cart.summary',
+      'CartSummary',
       (node) => SchemaComponent(
         type: node.type,
         id: node.id,
