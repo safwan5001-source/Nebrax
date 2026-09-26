@@ -8,7 +8,7 @@
 | 0 | STORE-BRAND-0 | done | normal | horizon definition | Evidence matrix for marks/utility icons + current payment architecture inventory |
 | 1 | STORE-BRAND-SOCIAL-ASSET-EVIDENCE-1 | done | normal | STORE-BRAND-0 | First-party asset/usage registry closed for WhatsApp + seven social networks |
 | 2 | STORE-BRAND-WA-SOCIAL-1 | done | normal | STORE-BRAND-SOCIAL-ASSET-EVIDENCE-1 | Official WhatsApp + seven supported social marks with Preview/Public parity |
-| 3 | STORE-BRAND-APPS-1 | ready | normal | STORE-BRAND-0 | Verify/fix official App Store / Google Play badges in AppPromo + Footer |
+| 3 | STORE-BRAND-APPS-1 | done | normal | STORE-BRAND-0 | Verify/fix official App Store / Google Play badges in AppPromo + Footer |
 | 4 | STORE-BRAND-CONTACT-1 | ready | normal | STORE-BRAND-0 | AWJ utility icons for phone/email/address/hours on Preview + Published |
 | 5 | STORE-BRAND-PAY-EVIDENCE-1 | ready | high | STORE-BRAND-0 | Prove payment-method source-of-truth and classify implementation readiness |
 | 6 | STORE-BRAND-PAY-1 | decision_gated | high | STORE-BRAND-PAY-EVIDENCE-1 | Render only truly supported/enabled official payment marks |
@@ -89,6 +89,14 @@ Definition of Done:
 - AppPromo and Footer use aligned semantics;
 - Preview/Public parity;
 - correct aspect ratio / minimum-size handling from evidence.
+
+Closed 2026-09-26.
+
+- PR [#1066](https://github.com/safwan5001-source/Nebrax/pull/1066) merged to `main`.
+- Merge SHA: `316005750560add32b26dc5adad024efd5541ad9`.
+- POST_MERGE_REVIEW: PASS.
+- Production auto-deploy SUCCESS on that SHA: storefront, Nebrax/web, nibras-api, awj-scheduler.
+- Live first-party badges kept. Arabic App Store code is `ar-AR` (not `ar-sa`). Play badge frame is 60px. No social, contact, payment, checkout, or Railway change.
 
 ## STORE-BRAND-CONTACT-1
 

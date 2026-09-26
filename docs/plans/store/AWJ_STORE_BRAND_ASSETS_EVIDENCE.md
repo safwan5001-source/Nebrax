@@ -225,8 +225,8 @@ https://developers.tiktok.com/doc/getting-started-design-guidelines
 | YouTube | social[] HTTPS URL | Official red icon | Official red icon | YouTube Brand Resource Center `yt_icon_red_digital.png` | Unmodified | Existing commerce authoring boundary | None | COMPLETE | done — #1064 / `4739ecd` |
 | LinkedIn | social[] HTTPS URL | Official [in] bug | Official [in] bug | LinkedIn `LI-In-Bug.png` | Social-icon lineup use; unmodified | Existing commerce authoring boundary | None | COMPLETE | done — #1064 / `4739ecd` |
 | Facebook | social[] HTTPS URL | Official primary logo | Official primary logo | Facebook Brand Asset Pack `Facebook_Logo_Primary.png` | Unmodified | Existing commerce authoring boundary | None | COMPLETE | done — #1064 / `4739ecd` |
-| App Store | apps.iosUrl | Official badge | Official badge | Apple Marketing Tools | Strong first-party alignment; safe host gate | Existing commerce authoring boundary | Final verification / visual QA | IMPLEMENTATION_READY | APPS-1 |
-| Google Play | apps.androidUrl | Official badge | Official badge | play.google.com asset | First-party asset; current guideline verification still needed | Existing commerce authoring boundary | Final guideline / visual QA | IMPLEMENTATION_READY | APPS-1 |
+| App Store | apps.iosUrl | Official black badge, 40px, Arabic `ar-AR` | Official black badge, 40px, Arabic `ar-AR` | Apple Marketing Tools live SVG | Unmodified; host allow-list; on-screen minimum 40px | Existing commerce authoring boundary | None | COMPLETE | done — #1066 / `316005750560add32b26dc5adad024efd5541ad9` |
+| Google Play | apps.androidUrl | Official badge, 60px frame | Official badge, 60px frame | `play.google.com` generic PNG | Unmodified; visible artwork about 40px so it is not smaller than the App Store badge | Existing commerce authoring boundary | None | COMPLETE | done — #1066 / `316005750560add32b26dc5adad024efd5541ad9` |
 | Payment method source | channel payment-method endpoint | Checkout only | Checkout only | AWJ backend | Channel-scoped enabled list exists | Tenant/channel scoped | Footer has no bridge | IMPLEMENTATION_READY for evidence task only | PAY-EVIDENCE-1 |
 | mada | no proven storefront capability | None | None | not evaluated in this shallow pass | No proof of supported+enabled online method | n/a | Capability not proven | DEFERRED pending PAY-EVIDENCE-1 | PAY-EVIDENCE-1 |
 | Visa | no proven storefront capability | None | None | not evaluated in this shallow pass | No card method exists in current storefront contract | n/a | Capability not proven | DEFERRED pending PAY-EVIDENCE-1 | PAY-EVIDENCE-1 |
@@ -272,7 +272,7 @@ No runtime implementation in this evidence slice.
 
 **STORE-BRAND-WA-SOCIAL-1** is no longer blocked. SOCIAL-ASSET-EVIDENCE-1 passed, and the implementation merged as PR #1064 at `4739ecd6928c0ad506824e9a57939b3f35b08439`. Production auto-deploy of that SHA succeeded for storefront, Nebrax/web, nibras-api, and awj-scheduler. POST_MERGE_REVIEW: PASS.
 
-The social rows in the matrix above were refreshed after that merge. App Store / Google Play stay IMPLEMENTATION_READY for APPS-1. Contact and payment rows are unchanged.
+The social rows in the matrix above were refreshed after that merge. App Store / Google Play are COMPLETE via PR #1066 at `316005750560add32b26dc5adad024efd5541ad9` (POST_MERGE_REVIEW: PASS; Production auto-deploy SUCCESS). Contact and payment rows are unchanged.
 
 ## 6. Payment architecture finding
 
@@ -298,14 +298,12 @@ Future runtime-changing PRs in this horizon must respect the documented Railway 
 
 No P1/P2 runtime finding was introduced by this evidence pass.
 
-Next dependency-ready tasks:
+Next dependency-ready tasks after WA-SOCIAL-1 and APPS-1:
 
 - STORE-BRAND-CONTACT-1
-- STORE-BRAND-APPS-1
-- STORE-BRAND-SOCIAL-ASSET-EVIDENCE-1
 - STORE-BRAND-PAY-EVIDENCE-1
 
-WA-SOCIAL-1 remains blocked only until its first-party asset registry is complete. No additional owner/legal decision gate remains for TikTok.
+WA-SOCIAL-1 and APPS-1 are done. COMPOSE-1 stays blocked on CONTACT-1.
 
 
 ## 9. Owner decision — official social marks
