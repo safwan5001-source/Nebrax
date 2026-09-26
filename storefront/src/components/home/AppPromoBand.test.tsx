@@ -32,7 +32,7 @@ describe("AppPromoBand", () => {
     );
     const image = screen.getByRole("img", { name: "Google Play" });
     expect(image).toHaveAttribute("src", expect.stringContaining("en_badge"));
-    expect(image).toHaveClass("h-10");
+    expect(image).toHaveClass("h-[60px]");
     expect(image.closest("a")).toHaveAttribute("target", "_blank");
     expect(screen.queryByRole("img", { name: "App Store" })).toBeNull();
   });
@@ -48,7 +48,7 @@ describe("AppPromoBand", () => {
     );
     expect(screen.getByRole("img", { name: "App Store" })).toHaveAttribute(
       "src",
-      expect.stringContaining("/ar-sa?"),
+      expect.stringContaining("/ar-AR?"),
     );
     expect(screen.getByRole("img", { name: "Google Play" })).toHaveAttribute(
       "src",

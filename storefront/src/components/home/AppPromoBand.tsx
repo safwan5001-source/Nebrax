@@ -25,7 +25,7 @@ export function AppPromoBand({
   return (
     <section className="rounded-store bg-store-footer px-5 py-6 text-store-footer-foreground md:px-8">
       <h2 className="text-base font-extrabold md:text-lg">{heading}</h2>
-      <div className="mt-4 flex flex-wrap gap-3">
+      <div className="mt-4 flex flex-wrap items-center gap-3">
         {ios ? (
           <OfficialStoreBadge
             store="apple"

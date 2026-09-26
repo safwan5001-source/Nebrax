@@ -26,7 +26,7 @@ describe("OfficialStoreBadge", () => {
       />,
     );
     const apple = screen.getByRole("img", { name: "App Store" });
-    expect(apple.getAttribute("src")).toContain("/ar-sa?");
+    expect(apple.getAttribute("src")).toContain("/ar-AR?");
     expect(apple.className).toContain("h-10");
     expect(apple.closest("a")?.getAttribute("target")).toBeNull();
 
@@ -41,5 +41,8 @@ describe("OfficialStoreBadge", () => {
     expect(
       screen.getByRole("img", { name: "Google Play" }).getAttribute("src"),
     ).toContain("/en_badge_web_generic.png");
+    expect(screen.getByRole("img", { name: "Google Play" }).className).toContain(
+      "h-[60px]",
+    );
   });
 });
