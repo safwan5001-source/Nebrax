@@ -420,6 +420,7 @@ Returns merchant-safe fields only:
 - state (derived)
 - revision
 - scheduled_for
+- schedule_token (opaque, changes on every schedule/reschedule/cancel/replace)
 - last_published_at
 - created_at
 - updated_at
@@ -540,6 +541,8 @@ Body:
 ```
 
 Server stores a canonical UTC timestamp.
+
+The API returns an opaque merchant-safe `schedule_token` derived from the current schedule generation (or an equivalent unguessable concurrency token). Do not expose raw internal job ids.
 
 Initial schedule transaction must:
 
@@ -813,13 +816,24 @@ Cancel first, then delete.
 
 ### Reschedule
 
+Request must include both:
+
+- expected Version `revision`;
+- current opaque `schedule_token`.
+
+Transaction:
+
 1. lock Storefront/head/Version;
 2. require target is current scheduled pointer;
-3. compare the request's expected Version `revision` with the locked Version; mismatch → **409** before any schedule change;
-4. validate future timestamp;
-5. increment generation;
-6. update scheduled_for;
-7. commit.
+3. validate `schedule_token` against the locked current schedule generation; mismatch → **409**;
+4. compare expected Version `revision` with the locked Version; mismatch → **409** before any schedule change;
+5. validate future timestamp;
+6. increment generation;
+7. update `scheduled_for`;
+8. return a new `schedule_token`;
+9. commit.
+
+A stale reschedule request cannot overwrite a newer reschedule even when Version content did not change.
 
 A stale reschedule request must never silently schedule a Version whose content changed after the scheduling dialog was opened.
 
@@ -827,12 +841,19 @@ Old execution token becomes stale.
 
 ### Cancel
 
+Request must include the current opaque `schedule_token`.
+
+Transaction:
+
 1. lock Storefront/head/Version;
-2. require `head.scheduled_version_id === target.id`; if not, return a lifecycle conflict (**409**) or an explicitly documented stale-cancel no-op — never clear another Version's pointer;
-3. increment generation;
-4. clear target `scheduled_for`;
-5. clear head `scheduled_version_id`;
-6. commit.
+2. require `head.scheduled_version_id === target.id`; if not, return **409** or an explicitly documented stale-cancel no-op — never clear another Version's pointer;
+3. validate `schedule_token` against the locked current schedule generation; mismatch → **409**;
+4. increment generation;
+5. clear target `scheduled_for`;
+6. clear head `scheduled_version_id`;
+7. commit.
+
+A delayed cancel from an older schedule generation cannot clear a newer schedule for the same Version.
 
 Any old queued job becomes a safe no-op. A delayed cancellation for superseded Version A cannot cancel newer scheduled Version B.
 
@@ -1081,7 +1102,9 @@ True concurrency tests should run on PostgreSQL where repository convention alre
 - rerun/idempotency;
 - schema normalization;
 - no public snapshot mutation;
-- compatibility Draft Version preserves existing draft_revision in Cases C and D.
+- compatibility Draft Version preserves existing draft_revision in Cases C and D;
+- dual-write/cutover test proving a legacy Draft save committed immediately before backfill is present in the resulting compatibility Version;
+- deployment guard prevents head-only legacy writers during backfill.
 
 ### Version CRUD
 
@@ -1112,6 +1135,9 @@ True concurrency tests should run on PostgreSQL where repository convention alre
 - replacing scheduled Version A with B clears A.scheduled_for and invalidates A.schedule_generation atomically;
 - schedule vs reschedule;
 - stale reschedule revision → 409 with no schedule mutation;
+- stale schedule_token on reschedule → 409;
+- stale schedule_token on cancel → 409;
+- reordered reschedule/cancel requests cannot overwrite or clear newer scheduling state;
 - stale cancel for superseded Version cannot clear newer scheduled pointer;
 - schedule vs cancel;
 - stale job generation no-op.
@@ -1156,6 +1182,8 @@ After this architecture is approved, implementation should be split by risk:
 
 - migration;
 - model;
+- version-aware compatibility dual-write/read path;
+- rollout/cutover guard proving no head-only legacy writer remains before backfill;
 - backfill;
 - version CRUD/read APIs;
 - revision/isolation tests;
