@@ -1,8 +1,10 @@
 # STORE-TRUST-QA-1 — Verification
 
-STATUS: Implemented. Awaiting exact-head CI and PRE_MERGE_REVIEW.
+STATUS: Merged. POST_MERGE_REVIEW: PASS.
 DATE: 2026-09-26
 BASE: `cb16f671e58f75598655f7e6b47884c794abd6fd` (STORE-TRUST-COMPOSE-1 merge)
+MERGE: `37b7f88b9bb08b19e4f1d0aca5b7ab4e4fe3496f` ([#1056](https://github.com/safwan5001-source/Nebrax/pull/1056))
+POST_MERGE CI: PHP [36251570726](https://github.com/safwan5001-source/Nebrax/actions/runs/36251570726), storefront [36251570822](https://github.com/safwan5001-source/Nebrax/actions/runs/36251570822), web [36251570723](https://github.com/safwan5001-source/Nebrax/actions/runs/36251570723)
 
 ## Outcome
 

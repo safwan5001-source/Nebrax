@@ -16,7 +16,7 @@
 | 6 | STORE-TRUST-APPS-1 | done | normal | STORE-TRUST-0 | App Store / Google Play links + official badge evidence + Footer/AppPromo parity |
 | 7 | STORE-TRUST-COMPOSE-1 | done | normal | BIZ/SBC/WA/SOCIAL/APPS merged and post-merge reviewed | Shared Footer grouping, density, responsive composition |
 | 8 | STORE-TRUST-QA-1 | done | high | implemented slices | RTL/LTR responsive + accessibility + security regression pass |
-| 9 | STORE-TRUST-CLOSE-1 | pending | normal | all ready work closed | Closure report + durable CURRENT-STATE |
+| 9 | STORE-TRUST-CLOSE-1 | done | normal | all ready work closed | Closure report + durable CURRENT-STATE |
 
 ## STORE-TRUST-0 — Evidence Pass
 
