@@ -1,6 +1,6 @@
 # AWJ App Builder — Real Mobile Preview Horizon
 
-**Status:** PROPOSED / DOCUMENTED — NOT STARTED  
+**Status:** APPROVED / READY AFTER MERGE  
 **Repository:** `safwan5001-source/Nebrax`  
 **Starting main SHA:** `07f9769463134b6c388ef31845289474bcf6d396`  
 **Owner:** Safwan / AWJ  
@@ -493,16 +493,19 @@ Those require their own approved scope.
 
 ## 17. Relationship to Runtime Correctness Follow-up
 
-Do not start this Horizon before the current:
+The predecessor Horizon:
 
 `AWJ_APP_BUILDER_RUNTIME_CORRECTNESS_FOLLOWUP_V1`
 
-is CLOSED/PASS, unless Safwan explicitly changes priority.
+is now **CLOSED / PASS**.
 
-Reason:
-Real Mobile Preview should be built on a runtime whose current correctness findings are already closed.
+Closure task:
+- RC-5 — PR #1039
+- Merge SHA: `e3060eb5`
 
-As of this document's starting SHA, RUNTIME-CORRECTNESS-4 has landed on `main`; closure of that Horizon should still be confirmed before Mobile Preview implementation begins.
+All five Runtime Correctness tasks are merged, with the two LIVE-PREVIEW-7 findings fixed and proven through the real Flutter runtime path. No schema/API/auth/RBAC/Tenant Isolation Decision Gate was triggered.
+
+Therefore the sequencing prerequisite for Real Mobile Preview is satisfied. After this Horizon document is merged, **MOBILE-PREVIEW-1 — Evidence & UX benchmark** is the next READY task.
 
 ---
 
