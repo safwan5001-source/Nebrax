@@ -93,8 +93,8 @@ Stop only for a genuine Decision Gate, a real blocker, or scope crossing as defi
 |---|---|---|
 | RUNTIME-CORRECTNESS-1 | Evidence lock for the two LIVE-PREVIEW-7 findings | **DONE** |
 | RUNTIME-CORRECTNESS-2 | Correct proof/test overclaims without weakening assertions | **DONE** |
-| RUNTIME-CORRECTNESS-3 | Generic CartSummary live hydration | **READY** (implementation pushed, PR pending CI) |
-| RUNTIME-CORRECTNESS-4 | Integrated runtime proof for arbitrary CartSummary ids | BLOCKED on RC-3 |
+| RUNTIME-CORRECTNESS-3 | Generic CartSummary live hydration | **DONE** |
+| RUNTIME-CORRECTNESS-4 | Integrated runtime proof for arbitrary CartSummary ids | **READY** (implementation pushed, PR pending CI) |
 | RUNTIME-CORRECTNESS-5 | Horizon closure / durable documentation | BLOCKED on RC-4 |
 
 ## RUNTIME-CORRECTNESS-1 — Evidence lock
@@ -389,9 +389,16 @@ release-mode CI/build proof is green and the task does not require device-only b
 - Decision Gate check: not applicable (docs/comments only).
 - Risks: none introduced.
 
-### RUNTIME-CORRECTNESS-3 — READY (implementation pushed, PR pending CI)
+### RUNTIME-CORRECTNESS-3 — DONE
 
+- PR: #1037
 - Base SHA: `4dba0cd00d08e0775906d6e93a61686982b9cd17`
+- Head SHA: `f286f67637c7d34a5d5590066a53f1343b6cdc9e`
+- Merge SHA: `4ad00ada9bcb484541fe56f2b8ac93987364e4b8` (squash merge)
+- CI: 12/12 checks green, including both `mobile (analyze + test)` runs — the first real Flutter
+  toolchain verification of this Horizon's new Dart code (this sandbox has no local Flutter/Dart
+  SDK), plus Android/iOS release-build proofs, php artisan test (sqlite/pgsql), web build,
+  storefront lint/typecheck/test.
 - Scope: `mobile/lib/app/experience_hydration.dart` (new `hydrateNodesByType` function, the
   type-keyed counterpart to the existing id-keyed `hydrateNode`), `mobile/lib/app/cart_screen.dart`
   (one call site: `hydrateNode(..., 'slot.cart.summary', ...)` → `hydrateNodesByType(...,
@@ -408,14 +415,11 @@ release-mode CI/build proof is green and the task does not require device-only b
   under a merchant-authored, non-default id is hydrated; a deeply nested `CartSummary` is found by
   type; two `CartSummary` nodes both receive the transform; no match leaves the tree unchanged
   (fail-safe); the root node itself can be the match.
-- Tests run: **could not run `flutter test`/`flutter analyze` locally — no Flutter/Dart SDK is
-  installed in this sandbox** (consistent with the predecessor horizon's own recorded constraint:
-  "this sandbox had no Flutter toolchain throughout the horizon"). Verified by manual review only:
-  brace/paren balance, type-checked field usage against `SchemaComponent`'s real constructor
-  signature, and cross-referencing every other `slot.cart.summary`/`CartSummary` reference in
-  `mobile/` to confirm no other file depends on the old id-keyed call. **GitHub CI's `mobile
-  (analyze + test)` job is the authoritative verification for this task** — the same precedent
-  LIVE-PREVIEW-7 established for its own new Dart test code.
+- Tests run: could not run `flutter test`/`flutter analyze` locally — no Flutter/Dart SDK is
+  installed in this sandbox (consistent with the predecessor horizon's own recorded constraint).
+  All 5 new unit tests, plus the full existing `mobile/` suite, passed on GitHub CI's `mobile
+  (analyze + test)` job (both the `pull_request`- and `push`-triggered runs) — confirmed green
+  before merge.
 - Decision Gate check: no schema/API field added; no multi-`CartSummary` product-semantics decision
   needed (RC-1 confirmed none exists today, and the walk's existing "apply to every match" behavior
   handles it without a new rule); no auth/RBAC/Tenant Isolation/Commerce authorization touched; no
@@ -423,11 +427,56 @@ release-mode CI/build proof is green and the task does not require device-only b
   from `hydrateNode`'s); no runtime architecture redesign (one new ~10-line pure function, one call
   site changed); no executable merchant code; no scope creep into Preview/theme/visibility/App
   Factory/distribution. **No gate triggered.**
-- Risks: this task's own Dart changes are unverified by this session pending real CI (see above) —
-  flagged explicitly rather than claimed as tested; low risk given the mechanical nature of the
-  change and the exact-precedent reuse of `hydrateNode`'s already-proven shape.
-- Next task: **RUNTIME-CORRECTNESS-4 — Integrated proof** (blocked until this PR's CI, especially
-  the `mobile (analyze + test)` job, is confirmed green and merged).
+- Risks: none — CI-verified before merge.
+
+### RUNTIME-CORRECTNESS-4 — READY (implementation pushed, PR pending CI)
+
+- Base SHA: `4ad00ada9bcb484541fe56f2b8ac93987364e4b8`
+- Scope: `mobile/test/app/awj_runtime_shell_startup_test.dart` only — no runtime/lib code touched.
+  Reuses the exact existing LIVE-PREVIEW-7 integrated-proof infrastructure (`_shell`,
+  `integratedProofClient()`, the shared `contracts/app-builder/integrated-proof-schema.v1.json`
+  fixture) per the Horizon's explicit instruction not to build a second parallel harness.
+- Result — the required minimum proof:
+  1. **Non-default `CartSummary` id fixture**: the existing shared fixture already authors its
+     `cart` page's `CartSummary` node under id `cart-summary` (confirmed in RC-1's evidence) —
+     deliberately different from the bundled Default schema's `slot.cart.summary`. No fixture
+     change was needed.
+  2. **Existing compatibility path**: unchanged — the fixture still flows through
+     `resolveRealStartup` → `CompatibilityResolver` exactly as LIVE-PREVIEW-7 proved.
+  3. **Real startup/runtime flow**: the existing group-E `testWidgets` boots the real
+     `AwjRuntimeShell` via `_shell()`, unchanged.
+  4. **Deterministic cart data**: the existing fake `commerce/v1` server in `integratedProofClient()`
+     already returns a deterministic 1-item cart with a 12345-minor-unit subtotal.
+  5. **Rendered/runtime-visible assertion from live cart data**: three new assertions added to the
+     existing "navigating to Cart hydrates..." test — `find.text('عنصر واحد')` (the live-computed
+     `RuntimeStrings.itemsCount(1)`, proving `itemCount` reached the render from the real fetched
+     cart, not the fixture's static authored `0`), `find.text('0 عنصر')` returns `findsNothing`
+     (the literal stale-fallback text that would render if the id-keyed lookup were still in
+     place and never matched this non-default id), and `find.textContaining('123.45')` (the live
+     `subtotalAmountMinor`, proving it too reached the render, not the fixture's static `0`).
+  6. **Bundled Default Experience still green**: extended test B (404 → Default AWJ Experience) to
+     navigate to Cart and assert `find.text('لا عناصر')` (`RuntimeStrings.itemsCount(0)`, live-
+     computed from the empty fake cart) — proving the historical hardcoded id `slot.cart.summary`
+     is *still* found and hydrated by the new type-keyed lookup, not only the generic case.
+  7. **Incompatible schemas still fail closed**: verified existing coverage
+     (`compatibility_test.dart`, `last_known_good_test.dart`, `experience_fetcher_test.dart`)
+     remains untouched and unaffected — this change never touches `CompatibilityResolver` or the
+     fail-closed path, only post-compatibility hydration. Not duplicated, per the Horizon's own
+     instruction.
+  8. **Relevant mobile analyze/tests/release-build CI**: pending this PR's CI (see below).
+- Tests run locally: none — no Flutter/Dart SDK in this sandbox (same constraint as RC-3).
+  Verified by manual review: exact `formatMinorAmount`/`itemsCount`/`buildCartSummary` fallback
+  string values traced against their real implementations and the fixture's real JSON (`itemCount:
+  0, subtotalAmountMinor: 0`, no `summaryLabel`) to confirm the expected rendered strings precisely;
+  brace/paren balance checked. **GitHub CI's `mobile (analyze + test)` job is the authoritative
+  verification.**
+- Decision Gate check: test-only change, no schema/API/auth/RBAC/Tenant Isolation/compatibility
+  behavior touched. **No gate triggered.**
+- Risks: this task's new assertions are unverified by this session pending real CI — flagged
+  explicitly; low risk given the string values were traced against their exact source
+  implementations rather than guessed.
+- Next task: **RUNTIME-CORRECTNESS-5 — Horizon closure** (blocked until this PR's CI is confirmed
+  green and merged).
 
 ## Autonomous execution instruction
 

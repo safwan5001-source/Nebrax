@@ -121,6 +121,15 @@ void main() {
 
     expect(find.text(bundledTagline), findsOneWidget);
     expect(find.text('إعادة المحاولة'), findsNothing);
+
+    // RUNTIME-CORRECTNESS-4 backward-compatibility check: the bundled Default AWJ
+    // Experience's own CartSummary node still uses its historical hardcoded id
+    // ('slot.cart.summary', `runtime_schema.dart`) — RUNTIME-CORRECTNESS-3's type-keyed
+    // `hydrateNodesByType(..., 'CartSummary', ...)` must still find and live-hydrate it exactly
+    // as the old id-keyed `hydrateNode` did, never only the generically-authored case.
+    await tester.tap(find.text('عرض السلة')); // RuntimeStrings.goToCart (ar)
+    await tester.pumpAndSettle();
+    expect(find.text('لا عناصر'), findsOneWidget); // RuntimeStrings.itemsCount(0) (ar) — live, not stale
   });
 
   testWidgets('C — a transient fetch failure with an intact last-known-good cache renders the cached Experience', (
@@ -267,19 +276,42 @@ void main() {
       },
     );
 
-    testWidgets('navigating to Cart hydrates the real binding.collect line template', (tester) async {
-      await tester.pumpWidget(_shell(integratedProofClient(), experienceCache: InMemoryExperienceCache()));
-      await tester.pumpAndSettle();
+    testWidgets(
+      'navigating to Cart hydrates the real binding.collect line template and the '
+      'CartSummary node under its own non-default fixture id (RUNTIME-CORRECTNESS-4)',
+      (tester) async {
+        await tester.pumpWidget(_shell(integratedProofClient(), experienceCache: InMemoryExperienceCache()));
+        await tester.pumpAndSettle();
 
-      await tester.tap(find.text('View cart'));
-      await tester.pumpAndSettle();
+        await tester.tap(find.text('View cart'));
+        await tester.pumpAndSettle();
 
-      // Proves CartList's `binding: {resource: "commerce.cart", collect: "items"}` actually
-      // repeated the authored Section/Price line template once per real fetched cart item,
-      // resolving `$item.product_name`/`$item.line_total.amount_minor` — the same
-      // `binding.collect` + `$item.*` grammar LIVE-PREVIEW-2/3 proved in Preview, now proven
-      // against the real runtime's own resolver on this exact fixture.
-      expect(find.text('LIVE_PREVIEW_7_CART_LINE_PRODUCT_NAME'), findsOneWidget);
-    });
+        // Proves CartList's `binding: {resource: "commerce.cart", collect: "items"}` actually
+        // repeated the authored Section/Price line template once per real fetched cart item,
+        // resolving `$item.product_name`/`$item.line_total.amount_minor` — the same
+        // `binding.collect` + `$item.*` grammar LIVE-PREVIEW-2/3 proved in Preview, now proven
+        // against the real runtime's own resolver on this exact fixture.
+        expect(find.text('LIVE_PREVIEW_7_CART_LINE_PRODUCT_NAME'), findsOneWidget);
+
+        // RUNTIME-CORRECTNESS-4: this fixture's `cart` page authors its `CartSummary` node
+        // under id `cart-summary` — deliberately NOT the bundled Default AWJ Experience's own
+        // hardcoded `slot.cart.summary` (see `contracts/app-builder/
+        // integrated-proof-schema.v1.json`) — with static authored props
+        // `{itemCount: 0, subtotalAmountMinor: 0}` and no `summaryLabel`. Before
+        // RUNTIME-CORRECTNESS-3, `cart_screen.dart`'s id-keyed `hydrateNode(...,
+        // 'slot.cart.summary', ...)` would never match this node, so `buildCartSummary`'s own
+        // no-`summaryLabel` fallback (`component_widgets.dart`: `'$itemCount عنصر'`) would render
+        // the stale authored count forever — `'0 عنصر'` — never the real fetched cart's 1 item /
+        // 12345-minor subtotal this same fixture's fake `commerce/v1` server answers with (see
+        // `integratedProofClient()` above). `hydrateNodesByType(..., 'CartSummary', ...)` matches
+        // by component type instead, so it finds this arbitrarily-id'd node and replaces its
+        // props with the real live values (including a proper `summaryLabel` via
+        // `RuntimeStrings.itemsCount`) — proven here through the real widget tree, not a
+        // helper/unit test.
+        expect(find.text('عنصر واحد'), findsOneWidget); // RuntimeStrings.itemsCount(1) (ar)
+        expect(find.text('0 عنصر'), findsNothing); // the stale/unhydrated fallback text
+        expect(find.textContaining('123.45'), findsWidgets); // live subtotal (12345 minor)
+      },
+    );
   });
 }
