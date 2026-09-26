@@ -15,6 +15,12 @@ describe("StoreWhatsApp", () => {
     expect(link.getAttribute("href")).toBe("https://wa.me/966500000000");
     expect(link.getAttribute("target")).toBe("_blank");
     expect(link.getAttribute("rel")).toBe("noopener noreferrer");
-    expect(link.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
+    expect(link.className).toContain("size-12");
+    const mark = link.querySelector("img");
+    expect(mark).toHaveAttribute("data-official-social", "whatsapp");
+    expect(mark).toHaveAttribute("src", "/brand/social/whatsapp.svg");
+    expect(mark).toHaveAttribute("aria-hidden", "true");
+    expect(mark?.className).toContain("w-auto");
+    expect(link.querySelector("svg")).toBeNull();
   });
 });

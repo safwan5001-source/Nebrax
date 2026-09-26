@@ -1,14 +1,12 @@
 "use client";
 
-import {
-  Home,
-  LayoutGrid,
-  MessageCircle,
-  Search,
-  ShoppingBag,
-  User,
-} from "lucide-react";
+import { Home, LayoutGrid, Search, ShoppingBag, User } from "lucide-react";
 import type { CSSProperties, ReactNode } from "react";
+import {
+  isOfficialSocialNetwork,
+  OfficialSocialMark,
+  officialSocialLinkClassName,
+} from "@/components/brand/OfficialSocialMark";
 import { StoreBrand } from "@/components/layout/StoreBrand";
 import { storeContainerClassName } from "@/components/layout/StoreContainer";
 import { OfficialStoreBadge } from "@/components/store/OfficialStoreBadge";
@@ -105,7 +103,7 @@ export function StorefrontPreviewCanvas({
   const density = config.density === "compact" ? "compact" : "comfortable";
   const cardPad = config.productCard === "compact" ? "p-2.5" : "p-3";
   const enabledSocial = config.social.flatMap((item) => {
-    if (!item.enabled) return [];
+    if (!item.enabled || !isOfficialSocialNetwork(item.network)) return [];
     const href = sanitizeExternalUrl(item.url);
     return href ? [{ ...item, href }] : [];
   });
@@ -556,15 +554,16 @@ export function StorefrontPreviewCanvas({
                       <p>
                         <a
                           href={footerWhatsapp}
-                          className="text-store-footer-link underline-offset-2 hover:underline"
+                          className="inline-flex min-h-11 items-center gap-2 text-store-footer-link underline-offset-2 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
                           onClick={(event) => event.preventDefault()}
                         >
+                          <OfficialSocialMark network="whatsapp" />
                           {t("whatsapp")}
                         </a>
                       </p>
                     ) : null}
                     {enabledSocial.length > 0 ? (
-                      <p className="mt-2 flex flex-wrap gap-3">
+                      <div className="mt-2 flex flex-wrap items-center gap-1">
                         {enabledSocial.map((item) => {
                           const label = socialLabel(t, item.network);
                           return (
@@ -572,14 +571,14 @@ export function StorefrontPreviewCanvas({
                               key={item.id}
                               href={item.href}
                               aria-label={label}
-                              className="text-store-footer-link"
+                              className={officialSocialLinkClassName}
                               onClick={(event) => event.preventDefault()}
                             >
-                              {label}
+                              <OfficialSocialMark network={item.network} />
                             </a>
                           );
                         })}
-                      </p>
+                      </div>
                     ) : null}
                   </div>
                 </section>
@@ -657,11 +656,11 @@ export function StorefrontPreviewCanvas({
           aria-label={t("whatsappAria")}
           onClick={(event) => event.preventDefault()}
           className={cn(
-            "absolute z-30 inline-flex size-12 items-center justify-center rounded-full bg-[#128c7e] text-white",
+            "absolute z-30 inline-flex size-12 items-center justify-center rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#111827]",
             compact ? "end-3 bottom-16" : "end-4 bottom-4",
           )}
         >
-          <MessageCircle className="size-5" aria-hidden />
+          <OfficialSocialMark network="whatsapp" size="floating" />
         </a>
       )}
     </div>
