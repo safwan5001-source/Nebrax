@@ -5,13 +5,13 @@
 
 | Order | Task ID | Status | Risk | Depends on | Outcome |
 |---|---|---|---|---|---|
-| 0 | STORE-BRAND-0 | ready | normal | horizon definition | Evidence matrix for all marks, utility icons, and payment-capability truth |
+| 0 | STORE-BRAND-0 | ready | normal | horizon definition | Evidence matrix for marks/utility icons + current payment architecture inventory |
 | 1 | STORE-BRAND-WA-SOCIAL-1 | blocked_on_0 | normal | STORE-BRAND-0 | Official WhatsApp + seven supported social marks with Preview/Public parity |
 | 2 | STORE-BRAND-APPS-1 | blocked_on_0 | normal | STORE-BRAND-0 | Official App Store / Google Play badges in AppPromo + Footer |
 | 3 | STORE-BRAND-CONTACT-1 | blocked_on_0 | normal | STORE-BRAND-0 | AWJ utility icons for phone/email/address/hours on Preview + Published |
 | 4 | STORE-BRAND-PAY-EVIDENCE-1 | blocked_on_0 | high | STORE-BRAND-0 | Prove payment-method source-of-truth and classify implementation readiness |
 | 5 | STORE-BRAND-PAY-1 | decision_gated | high | STORE-BRAND-PAY-EVIDENCE-1 | Render only truly supported/enabled official payment marks |
-| 6 | STORE-BRAND-COMPOSE-1 | blocked | normal | WA/SOCIAL + APPS + CONTACT + any ready PAY slice | Final Footer composition and shared mark component behavior |
+| 6 | STORE-BRAND-COMPOSE-1 | blocked | normal | WA/SOCIAL + APPS + CONTACT; PAY only if implementation-ready | Final Footer composition and shared mark component behavior |
 | 7 | STORE-BRAND-QA-1 | blocked | high | implemented slices | Responsive RTL/LTR, accessibility, security, actual published-route parity |
 | 8 | STORE-BRAND-CLOSE-1 | blocked | normal | all ready work closed | Closure report + durable state |
 
@@ -37,9 +37,11 @@ Inspect at minimum:
 - Web Customizer controls + preview;
 - maintained storefront mirror;
 - presentation normalizers / URL helpers;
-- existing payment capability/configuration/runtime;
+- current payment capability/configuration/runtime inventory only, enough to locate candidate sources and boundaries;
 - checkout/payment-method source if one exists;
 - tests.
+
+Do not duplicate the deep payment proof here. STORE-BRAND-PAY-EVIDENCE-1 owns the authoritative supported+enabled-method investigation and its decision classification.
 
 For third-party marks, use authoritative first-party sources.
 
@@ -106,7 +108,9 @@ Must answer:
 - What official brand assets and usage requirements apply?
 - Can Footer marks be rendered without misrepresenting checkout capability?
 
-If there is no authoritative enabled-method source, stop and create a Decision Packet. Do not hard-code a decorative list.
+If there is no authoritative enabled-method source, stop this payment slice and create a Decision Packet. Do not hard-code a decorative list.
+
+A PRODUCT_DECISION_REQUIRED / ARCHITECTURE_DECISION_REQUIRED / DEFERRED result here is a valid resolved state for this horizon and **does not block** STORE-BRAND-COMPOSE-1, QA-1, or CLOSE-1 for the non-payment scope.
 
 ## STORE-BRAND-PAY-1
 
