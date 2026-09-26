@@ -110,6 +110,34 @@ describe("ExperienceBuilder", () => {
     expect(canvas?.textContent).not.toMatch(/Verified/);
   });
 
+  it("does not navigate away when the preview WhatsApp control is used", async () => {
+    const user = userEvent.setup();
+    render(
+      <ExperienceBuilder
+        initialLocale="en"
+        initialConfig={{
+          ...DEFAULT_PRESENTATION_CONFIG,
+          whatsapp: {
+            enabled: true,
+            phone: "+966500000000",
+            message: "",
+            placement: "both",
+          },
+        }}
+      />,
+    );
+
+    const footerLink = screen.getByRole("link", { name: "WhatsApp" });
+    const floating = screen.getByRole("link", { name: "Contact on WhatsApp" });
+    expect(footerLink.getAttribute("href")).toMatch(
+      /^https:\/\/wa\.me\/966500000000/,
+    );
+    expect(floating.getAttribute("target")).toBeNull();
+    await user.click(footerLink);
+    await user.click(floating);
+    expect(screen.getByLabelText("Live store preview")).toBeTruthy();
+  });
+
   it("keeps the official seal out of the storefront customizer preview", () => {
     const token = "opaque-token-must-not-reach-the-preview-loader";
     render(

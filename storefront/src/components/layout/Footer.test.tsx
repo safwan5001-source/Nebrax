@@ -90,6 +90,19 @@ describe("Footer SBC presentation", () => {
     expect(screen.getByText("licenseNumber: LIC-42")).toBeTruthy();
   });
 
+  it("opens the published WhatsApp link in a new tab without sending a message", async () => {
+    const view = await Footer({
+      ...baseProps,
+      whatsappHref: "https://wa.me/966500000000",
+    });
+    const screen = render(view);
+    const link = screen.getByRole("link", { name: "whatsapp" });
+
+    expect(link.getAttribute("href")).toBe("https://wa.me/966500000000");
+    expect(link.getAttribute("target")).toBe("_blank");
+    expect(link.getAttribute("rel")).toBe("noopener noreferrer");
+  });
+
   it("omits the merchant-provided group when the license is blank", async () => {
     const view = await Footer({
       ...baseProps,

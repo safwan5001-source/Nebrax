@@ -15,6 +15,7 @@ export function StoreWhatsApp({ href, label }: StoreWhatsAppProps) {
       href={href}
       aria-label={label}
       data-store-whatsapp=""
+      target="_blank"
       rel="noopener noreferrer"
       className="fixed z-30 inline-flex size-12 items-center justify-center rounded-full bg-[#128c7e] text-white end-4 bottom-[calc(var(--store-bottom-nav-height)+1rem)] md:bottom-4"
     >
