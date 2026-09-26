@@ -25,7 +25,7 @@ export function BannerBand({
       aria-labelledby={headingId}
       className="overflow-hidden rounded-store border border-store-border bg-store-surface"
     >
-      <div className="flex flex-col gap-4 p-5 md:flex-row md:items-center md:p-8">
+      <div className="flex min-w-0 flex-col gap-4 p-5 md:flex-row md:items-center md:p-8">
         {content.imageUrl ? (
           // biome-ignore lint/performance/noImgElement: merchant banner is a runtime https URL, not a static import
           <img
@@ -38,7 +38,7 @@ export function BannerBand({
           {content.title ? (
             <h2
               id={headingId}
-              className="text-lg font-extrabold leading-tight text-store-foreground md:text-2xl"
+              className="break-words text-lg font-extrabold leading-tight text-store-foreground md:text-2xl"
             >
               {content.title}
             </h2>
@@ -48,7 +48,7 @@ export function BannerBand({
             </h2>
           )}
           {content.subtitle ? (
-            <p className="mt-2 max-w-2xl text-sm text-store-muted-foreground">
+            <p className="mt-2 max-w-2xl break-words text-sm text-store-muted-foreground">
               {content.subtitle}
             </p>
           ) : null}

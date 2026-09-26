@@ -420,27 +420,31 @@ export function StorefrontPreviewCanvas({
                 !banner.subtitle &&
                 !banner.ctaLabel &&
                 !banner.imageUrl;
+              const ctaHrefOk =
+                banner.ctaHref.startsWith("https://") || banner.ctaHref.startsWith("/");
               return (
-                <section key={section.id} className="rounded-store bg-store-surface px-5 py-6">
+                <section key={section.id} className="overflow-hidden rounded-store border border-store-border bg-store-surface">
                   {empty ? (
-                    <p className="text-sm text-store-muted-foreground">{t("sectionBanner")}</p>
+                    <p className="px-5 py-6 text-sm text-store-muted-foreground">{t("sectionBanner")}</p>
                   ) : (
-                    <>
+                    <div className="flex min-w-0 flex-col gap-4 p-5 md:flex-row md:items-center md:p-8">
                       {banner.imageUrl ? (
-                        <img src={banner.imageUrl} alt="" className="mb-3 h-28 w-full rounded-store object-cover" />
+                        <img src={banner.imageUrl} alt="" className="h-36 w-full rounded-store object-cover md:h-40 md:w-56 md:shrink-0" />
                       ) : null}
-                      {banner.title ? (
-                        <h2 className="text-lg font-extrabold text-store-foreground">{banner.title}</h2>
-                      ) : null}
-                      {banner.subtitle ? (
-                        <p className="mt-1 text-sm text-store-muted-foreground">{banner.subtitle}</p>
-                      ) : null}
-                      {banner.ctaLabel ? (
-                        <span className="mt-3 inline-flex h-9 items-center rounded-store bg-store-primary px-3 text-xs font-bold text-store-primary-foreground">
-                          {banner.ctaLabel}
-                        </span>
-                      ) : null}
-                    </>
+                      <div className="min-w-0">
+                        {banner.title ? (
+                          <h2 className="break-words text-lg font-extrabold text-store-foreground md:text-2xl">{banner.title}</h2>
+                        ) : null}
+                        {banner.subtitle ? (
+                          <p className="mt-2 max-w-2xl break-words text-sm text-store-muted-foreground">{banner.subtitle}</p>
+                        ) : null}
+                        {banner.ctaLabel && ctaHrefOk ? (
+                          <span className="mt-4 inline-flex h-10 items-center rounded-store bg-store-primary px-4 text-sm font-bold text-store-primary-foreground">
+                            {banner.ctaLabel}
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
                   )}
                 </section>
               );
@@ -454,11 +458,11 @@ export function StorefrontPreviewCanvas({
                   {items.length === 0 ? (
                     <p className="mt-2 text-sm text-store-muted-foreground">{t("sectionBenefits")}</p>
                   ) : (
-                    <ul className="mt-3 grid gap-2 sm:grid-cols-2">
+                    <ul className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                       {items.map((item) => (
-                        <li key={item.id} className="rounded-store border border-store-border px-3 py-3">
-                          {item.title ? <p className="text-sm font-bold">{item.title}</p> : null}
-                          {item.body ? <p className="text-sm text-store-muted-foreground">{item.body}</p> : null}
+                        <li key={item.id} className="min-w-0 break-words rounded-store border border-store-border px-3 py-3">
+                          {item.title ? <p className="break-words text-sm font-bold">{item.title}</p> : null}
+                          {item.body ? <p className="break-words text-sm text-store-muted-foreground">{item.body}</p> : null}
                         </li>
                       ))}
                     </ul>
@@ -470,15 +474,15 @@ export function StorefrontPreviewCanvas({
             if (section.type === "customContent") {
               const blocks = customContentOf(section).blocks.filter((block) => block.text.trim());
               return (
-                <section key={section.id} className="space-y-2">
+                <section key={section.id} className="min-w-0 max-w-3xl space-y-2 break-words">
                   {blocks.length === 0 ? (
                     <p className="text-sm text-store-muted-foreground">{t("sectionCustomContent")}</p>
                   ) : (
                     blocks.map((block) =>
                       block.kind === "heading" ? (
-                        <h2 key={block.id} className="text-lg font-extrabold">{block.text}</h2>
+                        <h2 key={block.id} className="break-words text-lg font-extrabold">{block.text}</h2>
                       ) : (
-                        <p key={block.id} className="text-sm text-store-muted-foreground">{block.text}</p>
+                        <p key={block.id} className="break-words text-sm text-store-muted-foreground">{block.text}</p>
                       ),
                     )
                   )}
@@ -495,7 +499,7 @@ export function StorefrontPreviewCanvas({
                   {ids.length > 0 ? (
                     <ul className="mt-3 flex flex-wrap gap-2">
                       {ids.map((id) => (
-                        <li key={id} className="rounded-store border border-store-border px-2 py-1 text-xs">
+                        <li key={id} className="max-w-full break-all rounded-store border border-store-border px-2 py-1 text-xs">
                           {id}
                         </li>
                       ))}

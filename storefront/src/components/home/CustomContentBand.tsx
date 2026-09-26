@@ -14,21 +14,21 @@ export function CustomContentBand({
   return (
     <section
       aria-labelledby={labelledBy ? domId(labelledBy) : undefined}
-      className="max-w-3xl space-y-3"
+      className="max-w-3xl min-w-0 space-y-3 break-words"
     >
       {blocks.map((block) =>
         block.kind === "heading" ? (
           <h2
             key={block.id}
             id={domId(block.id)}
-            className="text-lg font-extrabold text-store-foreground md:text-xl"
+            className="break-words text-lg font-extrabold text-store-foreground md:text-xl"
           >
             {block.text}
           </h2>
         ) : (
           <p
             key={block.id}
-            className="text-sm leading-relaxed text-store-muted-foreground"
+            className="break-words text-sm leading-relaxed text-store-muted-foreground"
           >
             {block.text}
           </p>
