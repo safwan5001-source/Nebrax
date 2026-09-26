@@ -8,11 +8,11 @@
 | 0 | STORE-BRAND-0 | done | normal | horizon definition | Evidence matrix for marks/utility icons + current payment architecture inventory |
 | 1 | STORE-BRAND-SOCIAL-ASSET-EVIDENCE-1 | done | normal | STORE-BRAND-0 | First-party asset/usage registry closed for WhatsApp + seven social networks |
 | 2 | STORE-BRAND-WA-SOCIAL-1 | done | normal | STORE-BRAND-SOCIAL-ASSET-EVIDENCE-1 | Official WhatsApp + seven supported social marks with Preview/Public parity |
-| 3 | STORE-BRAND-APPS-1 | ready | normal | STORE-BRAND-0 | Verify/fix official App Store / Google Play badges in AppPromo + Footer |
-| 4 | STORE-BRAND-CONTACT-1 | ready | normal | STORE-BRAND-0 | AWJ utility icons for phone/email/address/hours on Preview + Published |
-| 5 | STORE-BRAND-PAY-EVIDENCE-1 | ready | high | STORE-BRAND-0 | Prove payment-method source-of-truth and classify implementation readiness |
-| 6 | STORE-BRAND-PAY-1 | decision_gated | high | STORE-BRAND-PAY-EVIDENCE-1 | Render only truly supported/enabled official payment marks |
-| 7 | STORE-BRAND-COMPOSE-1 | blocked | normal | WA/SOCIAL + APPS + CONTACT; PAY only if implementation-ready | Final Footer composition and shared mark component behavior |
+| 3 | STORE-BRAND-APPS-1 | done | normal | STORE-BRAND-0 | Official App Store / Google Play badge verification/fix merged in #1066 |
+| 4 | STORE-BRAND-CONTACT-1 | done | normal | STORE-BRAND-0 | Contact utility icons merged in #1068 with Preview/Public parity |
+| 5 | STORE-BRAND-PAY-EVIDENCE-1 | done_decision_gate | high | STORE-BRAND-0 | Evidence proves COD/Pay on Pickup only; card/wallet acceptance model absent |
+| 6 | STORE-BRAND-PAY-1 | deferred | high | STORE-BRAND-PAY-EVIDENCE-1 | Deferred until authoritative card/wallet supported+enabled capability exists |
+| 7 | STORE-BRAND-COMPOSE-1 | ready | normal | WA/SOCIAL + APPS + CONTACT; PAY deferred by evidence gate | Final Footer composition and shared mark component behavior |
 | 8 | STORE-BRAND-QA-1 | blocked | high | implemented slices | Responsive RTL/LTR, accessibility, security, actual published-route parity |
 | 9 | STORE-BRAND-CLOSE-1 | blocked | normal | all ready work closed | Closure report + durable state |
 
@@ -80,6 +80,12 @@ Closed 2026-09-26.
 
 ## STORE-BRAND-APPS-1
 
+Closed 2026-09-27.
+
+- PR #1066 merged to `main`.
+- Merge SHA: `316005750560add32b26dc5adad024efd5541ad9`.
+- POST_MERGE_REVIEW: PASS; production auto-deploy succeeded.
+
 Definition of Done:
 
 - first-party approved App Store badge;
@@ -91,6 +97,12 @@ Definition of Done:
 - correct aspect ratio / minimum-size handling from evidence.
 
 ## STORE-BRAND-CONTACT-1
+
+Closed 2026-09-27.
+
+- PR #1068 merged to `main`.
+- Merge SHA: `5802fc30b673e1be8b7fff8943d733d55b5df7a0`.
+- PRE_MERGE_REVIEW: PASS; no manual deploy.
 
 Definition of Done:
 
@@ -118,6 +130,8 @@ Must answer:
 - Can Footer marks be rendered without misrepresenting checkout capability?
 
 If there is no authoritative enabled-method source, stop this payment slice and create a Decision Packet. Do not hard-code a decorative list.
+
+Resolved at Decision Gate. See `AWJ_STORE_BRAND_PAY_EVIDENCE_DECISION.md`. Current Payment Intent capability is `cod` / `pay_on_pickup`; mada/Visa/Mastercard/Apple Pay/Google Pay are not proven storefront capabilities. `STORE-BRAND-PAY-1` is deferred.
 
 A PRODUCT_DECISION_REQUIRED / ARCHITECTURE_DECISION_REQUIRED / DEFERRED result here is a valid resolved state for this horizon and **does not block** STORE-BRAND-COMPOSE-1, QA-1, or CLOSE-1 for the non-payment scope.
 
