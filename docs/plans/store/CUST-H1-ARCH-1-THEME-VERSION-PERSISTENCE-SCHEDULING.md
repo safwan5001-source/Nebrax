@@ -140,10 +140,18 @@ They remain compatibility fields during and after CUST-H1.
 Add to `storefront_presentations`:
 
 ```
+draft_schema_version             unsignedSmallInteger
+published_schema_version         unsignedSmallInteger nullable
 active_version_id                uuid nullable
 scheduled_version_id             uuid nullable
 compatibility_working_version_id uuid nullable
 ```
+
+Backfill:
+
+- `draft_schema_version = existing schema_version`
+- if `published_config != null`, `published_schema_version = existing schema_version`; otherwise null.
+- keep legacy `schema_version` populated for backward compatibility during the transition.
 
 FK strategy:
 
@@ -555,15 +563,17 @@ Immediate Publish must:
 7. normalize target Version config server-side;
 8. enforce document-size limits;
 9. copy normalized config to existing head `published_config`;
-10. atomically set head `schema_version = target.schema_version` (or the server-normalized current schema version used for the copied document);
-11. update `published_revision` with a compatibility monotonic value;
-12. update `published_at = now()`;
-13. set `active_version_id = target.id`;
-14. set target `last_published_at = now()`;
-15. if target was scheduled, clear its schedule and head `scheduled_version_id`;
-16. commit.
+10. atomically set head `published_schema_version = target.schema_version` (or the server-normalized current schema version used for the copied document);
+11. do **not** retag the unrelated compatibility Draft; `draft_schema_version` remains the schema version of `draft_config`;
+12. update legacy shared `schema_version` only according to the compatibility strategy chosen in implementation, and never use it as authority for new reads;
+13. update `published_revision` with a compatibility monotonic value;
+14. update `published_at = now()`;
+15. set `active_version_id = target.id`;
+16. set target `last_published_at = now()`;
+17. if target was scheduled, clear its schedule and head `scheduled_version_id`;
+18. commit.
 
-The head schema version and Published document are one atomic pair. A v2 document must never be stored under a stale v1 head `schema_version`, because public normalization semantics depend on that version.
+The Published document and `published_schema_version` are one atomic pair. The Draft document and `draft_schema_version` are a separate atomic pair. A v2 Published document must never be interpreted through a v1 tag, and publishing v2 must never silently retag a still-v1 legacy Draft.
 
 No partial public state is observable.
 
@@ -646,7 +656,9 @@ Therefore implementation must add a real runtime path and document deployment re
 
 ### Preferred execution model
 
-**DB-owned due schedule + idempotent queued job**, with a small recurring dispatcher.
+**DB-owned due schedule + isolated execution unit**, with a small recurring dispatcher.
+
+Preferred Production mode is a real asynchronous queue worker/connection.
 
 A Laravel scheduled command runs every minute:
 
@@ -662,19 +674,48 @@ Why not only delayed queue jobs:
 - DB remains authoritative;
 - dispatcher can recover due work after downtime.
 
-Why not only direct scheduler publish:
+Why not one monolithic direct scheduler loop:
 
-- bounded jobs isolate failures/retries;
-- easier observability.
+- one failed publication must not abort/starve later due publications;
+- each due item requires independent exception isolation and retry/observability.
+
+### Queue/runtime evidence
+
+Current Production container configuration pins `QUEUE_CONNECTION=sync`.
+
+Therefore **scheduler availability alone is not enough to mark Scheduled Publishing LIVE**.
+
+Production activation requires one of these locked paths:
+
+**Path A — preferred**
+- non-sync queue connection;
+- always-running queue worker;
+- retry/backoff policy;
+- failed-job observability;
+- scheduler/cron dispatching due work.
+
+**Path B — explicit sync fallback**
+- dispatcher processes each due schedule in an isolated try/catch unit;
+- one failure cannot abort the batch;
+- failed items remain DB-authoritative and retryable on the next pass;
+- bounded per-run batch;
+- per-item failure logging/metrics;
+- starvation test proving a failing first item does not block later due items.
+
+Until one path is verified in Production runtime, Schedule UX remains **GATED**.
 
 ### Deployment gate
 
-CUST-H1 Scheduled publishing is **GATED** until Production has an always-running scheduler path:
+CUST-H1 Scheduled publishing is **GATED** until Production has:
 
-- Laravel scheduler worker/process; or
-- equivalent platform cron invoking `schedule:run`.
+1. an always-running scheduler path:
+   - Laravel scheduler worker/process; or
+   - equivalent platform cron invoking `schedule:run`;
+2. **and** either:
+   - a real non-sync queue worker/connection, or
+   - the explicitly verified per-item sync isolation/retry contract above.
 
-Implementation may land code before activation, but UX must not expose LIVE scheduling in Production until runtime scheduling is verified.
+Implementation may land code before activation, but UX must not expose LIVE scheduling in Production until both scheduling and execution isolation are verified.
 
 ---
 
@@ -1039,8 +1080,9 @@ True concurrency tests should run on PostgreSQL where repository convention alre
 - active pointer changes atomically;
 - old live Version retained;
 - Published compatibility snapshot updated;
-- head schema_version changes atomically with published_config;
-- publishing v2 after migrated v1 head preserves v2 semantics in public normalization;
+- published_schema_version changes atomically with published_config;
+- draft_schema_version remains paired with draft_config;
+- publishing v2 after migrated v1 head preserves v2 semantics in public normalization without reinterpreting a v1 compatibility draft;
 - failed publish leaves old snapshot;
 - idempotent republish;
 - public runtime sees only current Published.
