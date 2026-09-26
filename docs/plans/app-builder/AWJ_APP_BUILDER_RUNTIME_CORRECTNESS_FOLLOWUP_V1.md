@@ -1,6 +1,8 @@
 # AWJ App Builder — Runtime Correctness Follow-up V1
 
-**Status:** APPROVED / READY  
+**Status:** CLOSED / PASS
+**Closure report:** `AWJ_APP_BUILDER_RUNTIME_CORRECTNESS_FOLLOWUP_V1_CLOSURE_REPORT.md`
+**Closure merge:** (this document's own closure commit, RUNTIME-CORRECTNESS-5)
 **Starting main SHA:** `298908cb3d5c8809f6bce34e1abacc6c2f1a0695`  
 **Predecessor:** AWJ App Builder — Live Runtime & Preview V1 — CLOSED / PASS  
 **Predecessor closure merge:** `52c6a19fffb736a6c72ea88393006ab338ff1339` (PR #1030)  
@@ -94,8 +96,8 @@ Stop only for a genuine Decision Gate, a real blocker, or scope crossing as defi
 | RUNTIME-CORRECTNESS-1 | Evidence lock for the two LIVE-PREVIEW-7 findings | **DONE** |
 | RUNTIME-CORRECTNESS-2 | Correct proof/test overclaims without weakening assertions | **DONE** |
 | RUNTIME-CORRECTNESS-3 | Generic CartSummary live hydration | **DONE** |
-| RUNTIME-CORRECTNESS-4 | Integrated runtime proof for arbitrary CartSummary ids | **READY** (implementation pushed, PR pending CI) |
-| RUNTIME-CORRECTNESS-5 | Horizon closure / durable documentation | BLOCKED on RC-4 |
+| RUNTIME-CORRECTNESS-4 | Integrated runtime proof for arbitrary CartSummary ids | **DONE** |
+| RUNTIME-CORRECTNESS-5 | Horizon closure / durable documentation | **READY** |
 
 ## RUNTIME-CORRECTNESS-1 — Evidence lock
 
@@ -429,9 +431,15 @@ release-mode CI/build proof is green and the task does not require device-only b
   Factory/distribution. **No gate triggered.**
 - Risks: none — CI-verified before merge.
 
-### RUNTIME-CORRECTNESS-4 — READY (implementation pushed, PR pending CI)
+### RUNTIME-CORRECTNESS-4 — DONE
 
+- PR: #1038
 - Base SHA: `4ad00ada9bcb484541fe56f2b8ac93987364e4b8`
+- Head SHA: `b74f1c4870ae3e80682320be6350cc032a80be01`
+- Merge SHA: `07f9769463134b6c388ef31845289474bcf6d396` (squash merge)
+- CI: 10/10 checks green, including both `mobile (analyze + test)` runs — every traced string
+  assertion (`'عنصر واحد'`, `'0 عنصر'` absent, `'123.45'`, `'لا عناصر'`) confirmed matching real
+  rendered output on first push; no fix cycle needed.
 - Scope: `mobile/test/app/awj_runtime_shell_startup_test.dart` only — no runtime/lib code touched.
   Reuses the exact existing LIVE-PREVIEW-7 integrated-proof infrastructure (`_shell`,
   `integratedProofClient()`, the shared `contracts/app-builder/integrated-proof-schema.v1.json`
@@ -463,20 +471,27 @@ release-mode CI/build proof is green and the task does not require device-only b
      remains untouched and unaffected — this change never touches `CompatibilityResolver` or the
      fail-closed path, only post-compatibility hydration. Not duplicated, per the Horizon's own
      instruction.
-  8. **Relevant mobile analyze/tests/release-build CI**: pending this PR's CI (see below).
-- Tests run locally: none — no Flutter/Dart SDK in this sandbox (same constraint as RC-3).
-  Verified by manual review: exact `formatMinorAmount`/`itemsCount`/`buildCartSummary` fallback
-  string values traced against their real implementations and the fixture's real JSON (`itemCount:
-  0, subtotalAmountMinor: 0`, no `summaryLabel`) to confirm the expected rendered strings precisely;
-  brace/paren balance checked. **GitHub CI's `mobile (analyze + test)` job is the authoritative
-  verification.**
+  8. **Relevant mobile analyze/tests/release-build CI**: 10/10 checks green (see below).
+- Tests run: could not run locally — no Flutter/Dart SDK in this sandbox (same constraint as
+  RC-3). All assertions (traced by hand against `formatMinorAmount`/`itemsCount`/
+  `buildCartSummary`'s real source implementations and the fixture's real JSON before push) passed
+  on GitHub CI's `mobile (analyze + test)` job on first push — no fix cycle needed.
 - Decision Gate check: test-only change, no schema/API/auth/RBAC/Tenant Isolation/compatibility
   behavior touched. **No gate triggered.**
-- Risks: this task's new assertions are unverified by this session pending real CI — flagged
-  explicitly; low risk given the string values were traced against their exact source
-  implementations rather than guessed.
-- Next task: **RUNTIME-CORRECTNESS-5 — Horizon closure** (blocked until this PR's CI is confirmed
-  green and merged).
+- Risks: none — CI-verified before merge.
+
+### RUNTIME-CORRECTNESS-5 — DONE — HORIZON CLOSED / PASS
+
+- Scope: closure report + durable-state update only, no code.
+- Closure report: `AWJ_APP_BUILDER_RUNTIME_CORRECTNESS_FOLLOWUP_V1_CLOSURE_REPORT.md` — full
+  task-by-task PR ledger with Base/Head/Merge SHAs, all 10 exit criteria evidenced individually,
+  exact runtime behavior before/after, backward-compatibility evidence, complete Tenant
+  Isolation/security/RBAC/Commerce authorization statement, complete intentional-deferrals list,
+  real-device verification status (still pending, unchanged), and recommended next workstream.
+- All 10 Horizon exit criteria evidenced (see closure report §2). All 8 Decision Gates checked
+  across all 4 implementation tasks — none ever triggered. No CI-red fix cycle occurred on any of
+  the 4 PRs.
+- **Horizon status: CLOSED / PASS.**
 
 ## Autonomous execution instruction
 
