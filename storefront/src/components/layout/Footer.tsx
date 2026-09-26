@@ -298,7 +298,7 @@ export async function Footer({
           license ||
           showSbc ||
           visibleAppLinks.length > 0) && (
-          <div className="mt-8 grid grid-cols-1 gap-6 border-t border-store-footer-border pt-6 text-sm text-store-footer-muted sm:grid-cols-2">
+          <div className="mt-8 grid grid-cols-1 gap-x-8 gap-y-8 border-t border-store-footer-border pt-6 text-sm text-store-footer-muted sm:grid-cols-2 lg:grid-cols-3">
             {hasBusinessIdentity ? (
               <TrustGroup id="footer-identity" title={t("businessInformation")}>
                 {legalName ? (
@@ -341,44 +341,46 @@ export async function Footer({
             ) : null}
             {hasContact || whatsappHref || visibleSocial.length > 0 ? (
               <TrustGroup id="footer-communication" title={t("communication")}>
-                {phone ? <ContactDetail kind="phone" value={phone} /> : null}
-                {email ? <ContactDetail kind="email" value={email} /> : null}
-                {address ? (
-                  <ContactDetail kind="address" value={address} />
-                ) : null}
-                {hours ? <ContactDetail kind="hours" value={hours} /> : null}
-                {whatsappHref ? (
-                  <p>
-                    <a
-                      href={whatsappHref}
-                      className={`${footerLinkClassName} inline-flex min-h-11 items-center gap-2`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      <OfficialSocialMark network="whatsapp" />
-                      {t("whatsapp")}
-                    </a>
-                  </p>
-                ) : null}
-                {visibleSocial.length > 0 ? (
-                  <div className="mt-2 flex flex-wrap items-center gap-1">
-                    {visibleSocial.map((item) => {
-                      const label = socialLabel(item.network);
-                      return (
-                        <a
-                          key={item.id}
-                          href={item.href}
-                          className={officialSocialLinkClassName}
-                          aria-label={label}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          <OfficialSocialMark network={item.network} />
-                        </a>
-                      );
-                    })}
-                  </div>
-                ) : null}
+                <div className="space-y-2">
+                  {phone ? <ContactDetail kind="phone" value={phone} /> : null}
+                  {email ? <ContactDetail kind="email" value={email} /> : null}
+                  {address ? (
+                    <ContactDetail kind="address" value={address} />
+                  ) : null}
+                  {hours ? <ContactDetail kind="hours" value={hours} /> : null}
+                  {whatsappHref ? (
+                    <p>
+                      <a
+                        href={whatsappHref}
+                        className={`${footerLinkClassName} inline-flex min-h-11 items-center gap-2`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        <OfficialSocialMark network="whatsapp" />
+                        {t("whatsapp")}
+                      </a>
+                    </p>
+                  ) : null}
+                  {visibleSocial.length > 0 ? (
+                    <div className="flex flex-wrap items-center gap-1">
+                      {visibleSocial.map((item) => {
+                        const label = socialLabel(item.network);
+                        return (
+                          <a
+                            key={item.id}
+                            href={item.href}
+                            className={officialSocialLinkClassName}
+                            aria-label={label}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            <OfficialSocialMark network={item.network} />
+                          </a>
+                        );
+                      })}
+                    </div>
+                  ) : null}
+                </div>
               </TrustGroup>
             ) : null}
             {visibleAppLinks.length > 0 ? (

@@ -697,7 +697,7 @@ export function StorefrontPreviewCanvas({
             config.verification.licenseNumber.trim() ||
             config.sbc.show_in_storefront ||
             (hasApps && config.apps.showFooterLinks)) && (
-            <div className="mt-8 grid grid-cols-1 gap-6 border-t border-store-footer-border pt-6 text-sm text-store-footer-muted sm:grid-cols-2">
+            <div className="mt-8 grid grid-cols-1 gap-x-8 gap-y-8 border-t border-store-footer-border pt-6 text-sm text-store-footer-muted sm:grid-cols-2 lg:grid-cols-3">
               {hasBusinessIdentity ? (
                 <section className="min-w-0">
                   <h3 className="text-sm font-bold text-store-footer-foreground">
@@ -758,7 +758,7 @@ export function StorefrontPreviewCanvas({
                   <h3 className="text-sm font-bold text-store-footer-foreground">
                     {t("communication")}
                   </h3>
-                  <div className="mt-3 break-words">
+                  <div className="mt-3 space-y-2 break-words">
                     {phone ? <ContactDetail kind="phone" value={phone} /> : null}
                     {email ? <ContactDetail kind="email" value={email} /> : null}
                     {address ? (
@@ -783,7 +783,7 @@ export function StorefrontPreviewCanvas({
                       </p>
                     ) : null}
                     {enabledSocial.length > 0 ? (
-                      <div className="mt-2 flex flex-wrap items-center gap-1">
+                      <div className="flex flex-wrap items-center gap-1">
                         {enabledSocial.map((item) => {
                           const label = socialLabel(t, item.network);
                           return (
