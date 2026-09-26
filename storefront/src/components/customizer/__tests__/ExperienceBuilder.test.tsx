@@ -6,6 +6,7 @@ import {
   PUBLISH_CAPABILITY,
   VERSION_HISTORY_CAPABILITY,
 } from "@/lib/presentation/capabilities";
+import { DEFAULT_PRESENTATION_CONFIG } from "@/lib/presentation/config";
 import { ExperienceBuilder } from "../ExperienceBuilder";
 
 describe("ExperienceBuilder", () => {
@@ -82,5 +83,67 @@ describe("ExperienceBuilder", () => {
     const canvas = document.querySelector("[data-preview-canvas]");
     expect(canvas?.textContent).not.toMatch(/Verified/);
     expect(canvas?.textContent).not.toMatch(/موثّق/);
+  });
+
+  it("keeps the official seal out of the storefront customizer preview", () => {
+    const token = "opaque-token-must-not-reach-the-preview-loader";
+    render(
+      <ExperienceBuilder
+        initialLocale="en"
+        initialConfig={{
+          ...DEFAULT_PRESENTATION_CONFIG,
+          sbc: {
+            ...DEFAULT_PRESENTATION_CONFIG.sbc,
+            seal_token: token,
+            show_in_storefront: true,
+          },
+        }}
+      />,
+    );
+
+    const canvas = document.querySelector("[data-preview-canvas]");
+    expect(screen.getByTestId("sbc-seal-preview").textContent).toBe(
+      "Editor preview: the official Saudi Business Center seal will appear on the published storefront.",
+    );
+    expect(canvas?.textContent).toContain(
+      "Editor preview: the official Saudi Business Center seal will appear on the published storefront.",
+    );
+    expect(screen.queryByTestId("sbc-official-seal")).toBeNull();
+    expect(canvas?.querySelector("[data-token]")).toBeNull();
+    expect(canvas?.innerHTML ?? "").not.toContain(token);
+    expect(document.querySelector("script")).toBeNull();
+    expect(
+      document.querySelector(
+        'script[src="https://eauthenticate.saudibusiness.gov.sa/EAuthSealApi/seal.js"]',
+      ),
+    ).toBeNull();
+    expect(document.getElementById("awj-sbc-seal-loader")).toBeNull();
+  });
+
+  it("keeps the approved SBC text when the preview has no seal token", () => {
+    render(
+      <ExperienceBuilder
+        initialLocale="en"
+        initialConfig={{
+          ...DEFAULT_PRESENTATION_CONFIG,
+          sbc: {
+            ...DEFAULT_PRESENTATION_CONFIG.sbc,
+            seal_token: "   ",
+            show_in_storefront: true,
+          },
+        }}
+      />,
+    );
+
+    const canvas = document.querySelector("[data-preview-canvas]");
+    expect(canvas?.textContent).toContain("Verified in Saudi Business Center");
+    expect(screen.queryByTestId("sbc-seal-preview")).toBeNull();
+    expect(screen.queryByTestId("sbc-official-seal")).toBeNull();
+    expect(canvas?.querySelector("[data-token]")).toBeNull();
+    expect(
+      document.querySelector(
+        'script[src="https://eauthenticate.saudibusiness.gov.sa/EAuthSealApi/seal.js"]',
+      ),
+    ).toBeNull();
   });
 });

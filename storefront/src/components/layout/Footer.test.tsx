@@ -1,5 +1,6 @@
-import { render } from "@testing-library/react";
+import { render, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import { SBC_SEAL_SCRIPT_URL } from "./SbcSeal";
 
 vi.mock("next/server", () => ({ connection: vi.fn() }));
 vi.mock("next-intl/server", () => ({
@@ -44,6 +45,30 @@ describe("Footer SBC presentation", () => {
     expect(screen.getByTestId("sbc-text-fallback")).toHaveTextContent(
       "sbcVerified",
     );
+  });
+
+  it("loads the official seal script on the public storefront when enabled and a token exists", async () => {
+    const view = await Footer({
+      ...baseProps,
+      showSbc: true,
+      sbcSealToken: "official-token",
+    });
+    const screen = render(view);
+
+    expect(screen.getByTestId("sbc-official-seal")).toHaveAttribute(
+      "data-token",
+      "official-token",
+    );
+    await waitFor(() =>
+      expect(
+        document.querySelector(`script[src="${SBC_SEAL_SCRIPT_URL}"]`),
+      ).not.toBeNull(),
+    );
+    expect(document.getElementById("awj-sbc-seal-loader")).toHaveAttribute(
+      "src",
+      SBC_SEAL_SCRIPT_URL,
+    );
+    expect(screen.queryByTestId("sbc-seal-preview")).toBeNull();
   });
 
   it("renders no SBC presentation when the merchant turns it off", async () => {

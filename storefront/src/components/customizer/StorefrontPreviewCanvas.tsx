@@ -9,7 +9,6 @@ import {
   User,
 } from "lucide-react";
 import type { CSSProperties, ReactNode } from "react";
-import { SbcSeal } from "@/components/layout/SbcSeal";
 import { StoreBrand } from "@/components/layout/StoreBrand";
 import { storeContainerClassName } from "@/components/layout/StoreContainer";
 import { categoryAccent } from "@/lib/home/category-accent";
@@ -31,6 +30,7 @@ import {
   PREVIEW_PRODUCTS,
   PREVIEW_STORE_NAME,
 } from "./preview-fixtures";
+import { SbcSeal } from "./SbcSeal";
 
 const SECTION_TITLE: Record<string, CustomizerMessageKey> = {
   hero: "sectionHero",
@@ -476,10 +476,7 @@ export function StorefrontPreviewCanvas({
               {config.sbc.show_in_storefront ? (
                 <div className="mt-4 border-t border-store-footer-border pt-4">
                   {config.sbc.seal_token.trim() ? (
-                    <SbcSeal
-                      token={config.sbc.seal_token}
-                      fallbackLabel={t("sbcVerified")}
-                    />
+                    <SbcSeal message={t("sbcSealPreview")} />
                   ) : (
                     <p className="font-medium text-store-footer-link">
                       {t("sbcVerified")}

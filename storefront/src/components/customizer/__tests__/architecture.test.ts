@@ -44,12 +44,16 @@ describe("STORE-UI-6 architecture", () => {
     expect(all).not.toMatch(/\/store\/v1\/presentation/);
   });
 
-  it("uses the official SBC seal path without merchant verification claims", () => {
+  it("keeps the storefront customizer preview off the official seal loader", () => {
     const preview = readFileSync(
       join(DIR, "StorefrontPreviewCanvas.tsx"),
       "utf-8",
     );
-    expect(preview).toMatch(/SbcSeal/);
+    const seal = readFileSync(join(DIR, "SbcSeal.tsx"), "utf-8");
+    expect(preview).toMatch(/from "\.\/SbcSeal"/);
+    expect(preview).not.toMatch(/@\/components\/layout\/SbcSeal/);
+    expect(preview).not.toMatch(/seal\.js|data-token|fallbackLabel/);
+    expect(seal).not.toMatch(/seal\.js|data-token|createElement\("script"\)/);
     expect(preview).not.toMatch(/requestedVerifiedLabel/);
   });
 });
