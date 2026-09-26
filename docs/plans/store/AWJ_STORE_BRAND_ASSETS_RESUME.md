@@ -1,6 +1,6 @@
 # AWJ Store Official Brand, Contact & Payment Marks Horizon — Resume Note
 
-**Status:** Definition proposed. No implementation started.  
+**Status:** STORE-BRAND-0 evidence complete. No runtime implementation started.  
 **Definition base:** `c1bdac3b3f1f7f5be7cfde6b918671d0cb7814e1`
 
 ## Objective
@@ -21,9 +21,18 @@ Complete the storefront's visible mark/icon layer with:
 - Payment logos are never decorative claims.
 - No new payment integration, contact field, social network, or finance behavior is authorized.
 
-## First task
+## Current state
 
-`STORE-BRAND-0` — evidence only.
+`STORE-BRAND-0` — PASS.
+
+Dependency-ready next tasks:
+
+- `STORE-BRAND-CONTACT-1`
+- `STORE-BRAND-APPS-1`
+- `STORE-BRAND-SOCIAL-ASSET-EVIDENCE-1`
+- `STORE-BRAND-PAY-EVIDENCE-1`
+
+`STORE-BRAND-WA-SOCIAL-1` remains blocked until the official asset registry is complete.
 
 ## Key payment gate
 
@@ -40,3 +49,10 @@ Existing Railway auto-deploy behavior must be reported truthfully. Because a run
 ## End behavior
 
 No automatic next horizon after closure.
+
+
+## STORE-BRAND-0 key finding
+
+Published Footer currently renders contact, WhatsApp, and social values without the requested icons/official marks. App Store / Google Play already use first-party badge URLs in Preview and Published.
+
+The storefront payment contract currently exposes channel-enabled PaymentMethod rows, but its Payment Intent methods are COD / Pay on Pickup and it explicitly has no online/card method yet. Do not infer Visa/Mastercard/mada/Apple Pay/Google Pay support from PaymentGateway provider configuration.
