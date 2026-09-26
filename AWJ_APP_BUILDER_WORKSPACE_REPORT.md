@@ -16,7 +16,7 @@ Build Store Experience follows a different composition: `web/src/app/(commerce)/
 
 ## PR
 
-To be created from this branch after the verification below. No merge or deploy will be performed.
+[PR #1059](https://github.com/safwan5001-source/Nebrax/pull/1059). No merge or deploy was performed.
 
 ## Route/layout before and after
 
@@ -70,7 +70,7 @@ They remain independent tools. App Builder was not merged with `ExperienceBuilde
 - Commerce workspace shell tests: **passed — 9 tests**, including the new no-chrome App Builder regression.
 - Commerce navigation tests: **passed — 10 tests** (`nav.test.ts` and `commerce-workspace-nav.test.ts`).
 - JSON validation for `en.json` and `ar.json`: **passed**.
-- `git diff --check`: to be run before commit/PR.
+- `git diff --check`: passed before commit.
 
 ## Build / CI
 
@@ -88,7 +88,7 @@ They remain independent tools. App Builder was not merged with `ExperienceBuilde
 
 ## Head SHA
 
-To be filled after the implementation commit and push.
+`efcd900cb7010c8b3b889a223b2576a4275f7d4c`
 
 ## Suggested next step
 
