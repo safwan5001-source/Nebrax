@@ -543,14 +543,18 @@ Server stores a canonical UTC timestamp.
 
 Initial schedule transaction must:
 
-1. lock Storefront/head/Version;
+1. lock Storefront/head/target Version;
 2. reject active Published target;
-3. compare request `revision` to locked Version revision; mismatch → **409** before any schedule/pointer mutation;
+3. compare request `revision` to locked target Version revision; mismatch → **409** before any schedule/pointer mutation;
 4. validate future timestamp;
-5. increment schedule generation;
-6. set Version `scheduled_for`;
-7. atomically replace head `scheduled_version_id` with this target;
-8. commit.
+5. if `head.scheduled_version_id` points to a different previous Version, lock that previous Version in the same transaction;
+6. invalidate the previous schedule by incrementing its `schedule_generation` and clearing its `scheduled_for`;
+7. increment the target Version `schedule_generation`;
+8. set target Version `scheduled_for`;
+9. atomically replace head `scheduled_version_id` with the target;
+10. commit.
+
+The previously scheduled Version must not retain obsolete schedule metadata after replacement. Its derived state becomes Draft and its `scheduled_for` must be null. Any delayed job for it becomes stale by generation/pointer checks.
 
 **Active Published Versions cannot be scheduled.** If `version.id === active_version_id`, return a lifecycle conflict (recommended **409**). A merchant who wants a future change must create/duplicate a Draft Version first.
 
@@ -1105,6 +1109,7 @@ True concurrency tests should run on PostgreSQL where repository convention alre
 - publish vs save;
 - publish vs publish;
 - initial schedule stale revision → 409 with no schedule mutation;
+- replacing scheduled Version A with B clears A.scheduled_for and invalidates A.schedule_generation atomically;
 - schedule vs reschedule;
 - stale reschedule revision → 409 with no schedule mutation;
 - stale cancel for superseded Version cannot clear newer scheduled pointer;
