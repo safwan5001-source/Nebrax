@@ -1,6 +1,6 @@
 # AWJ Store Official Brand, Contact & Payment Marks Horizon — Resume Note
 
-**Status:** STORE-BRAND-0 evidence complete. No runtime implementation started.  
+**Status:** STORE-BRAND-WA-SOCIAL-1 done and in Production. CONTACT-1, APPS-1, and PAY-EVIDENCE-1 remain ready.  
 **Definition base:** `c1bdac3b3f1f7f5be7cfde6b918671d0cb7814e1`
 
 ## Objective
@@ -29,14 +29,22 @@ Complete the storefront's visible mark/icon layer with:
 
 Official registry: `docs/plans/store/AWJ_STORE_BRAND_SOCIAL_ASSET_REGISTRY.md`.
 
+`STORE-BRAND-WA-SOCIAL-1` — done.
+
+- PR: [#1064](https://github.com/safwan5001-source/Nebrax/pull/1064)
+- Merge SHA: `4739ecd6928c0ad506824e9a57939b3f35b08439` (on `main`)
+- POST_MERGE_REVIEW: PASS for that Merge SHA
+- Production auto-deploy SUCCESS on that SHA for storefront, Nebrax/web, nibras-api, and awj-scheduler (Vercel storefront and Vercel nebrax also SUCCESS). No manual deploy.
+
 Dependency-ready next tasks:
 
-- `STORE-BRAND-WA-SOCIAL-1`
 - `STORE-BRAND-CONTACT-1`
 - `STORE-BRAND-APPS-1`
 - `STORE-BRAND-PAY-EVIDENCE-1`
 
-Safwan has explicitly authorized authentic official marks, including TikTok. The social asset evidence gate is closed.
+`STORE-BRAND-COMPOSE-1` stays blocked until APPS-1 and CONTACT-1 are done. PAY-1 stays decision-gated.
+
+Safwan has explicitly authorized authentic official marks, including TikTok. The social asset evidence gate is closed. WA-SOCIAL-1 is merged; do not reopen it unless a regression appears.
 
 ## Key payment gate
 
@@ -57,6 +65,6 @@ No automatic next horizon after closure.
 
 ## STORE-BRAND-0 key finding
 
-Published Footer currently renders contact, WhatsApp, and social values without the requested icons/official marks. App Store / Google Play already use first-party badge URLs in Preview and Published.
+Published Footer renders official WhatsApp and social marks (STORE-BRAND-WA-SOCIAL-1, PR #1064, Merge SHA `4739ecd6928c0ad506824e9a57939b3f35b08439`). Contact rows are still text-only. App Store / Google Play already use first-party badge URLs in Preview and Published; APPS-1 remains the verify/fix slice.
 
 The storefront payment contract currently exposes channel-enabled PaymentMethod rows, but its Payment Intent methods are COD / Pay on Pickup and it explicitly has no online/card method yet. Do not infer Visa/Mastercard/mada/Apple Pay/Google Pay support from PaymentGateway provider configuration.

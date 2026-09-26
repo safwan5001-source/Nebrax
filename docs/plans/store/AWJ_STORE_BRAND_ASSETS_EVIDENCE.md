@@ -217,14 +217,14 @@ https://developers.tiktok.com/doc/getting-started-design-guidelines
 | Contact: email | presentation.contact.email | Text | Text | AWJ utility icon system | No external trademark | Existing commerce authoring boundary | Missing icon | IMPLEMENTATION_READY | CONTACT-1 |
 | Contact: address | presentation.contact.address | Text | Text | AWJ utility icon system | No external trademark | Existing commerce authoring boundary | Missing icon | IMPLEMENTATION_READY | CONTACT-1 |
 | Contact: hours | presentation.contact.hours | Text | Text | AWJ utility icon system | No external trademark | Existing commerce authoring boundary | Missing icon | IMPLEMENTATION_READY | CONTACT-1 |
-| WhatsApp destination | phone/message/placement | Present | Present | wa.me | Current URL construction is fail-closed | Existing commerce authoring boundary | Brand mark missing | ASSET_EVIDENCE_REQUIRED | SOCIAL-ASSET-EVIDENCE-1 |
-| Instagram | social[] HTTPS URL | Text label | Text label | Meta brand resources | URL safety exists | Existing commerce authoring boundary | Exact approved mark evidence incomplete | ASSET_EVIDENCE_REQUIRED | SOCIAL-ASSET-EVIDENCE-1 |
-| X | social[] HTTPS URL | Text label | Text label | X Brand Toolkit | Official source found | Existing commerce authoring boundary | Mark not implemented | ASSET_EVIDENCE_REQUIRED | SOCIAL-ASSET-EVIDENCE-1 → WA-SOCIAL-1 |
-| TikTok | social[] HTTPS URL | Text label | Text label | TikTok first-party developer guidelines / asset packs | Owner authorized use of authentic first-party mark; restriction retained as documented risk | Existing commerce authoring boundary | Official mark not implemented | ASSET_EVIDENCE_REQUIRED | SOCIAL-ASSET-EVIDENCE-1 → WA-SOCIAL-1 |
-| Snapchat | social[] HTTPS URL | Text label | Text label | Snap Brand Guidelines | Official Ghost source found | Existing commerce authoring boundary | Mark not implemented | ASSET_EVIDENCE_REQUIRED | SOCIAL-ASSET-EVIDENCE-1 → WA-SOCIAL-1 |
-| YouTube | social[] HTTPS URL | Text label | Text label | brand.youtube | Official center found; exact usage text incomplete | Existing commerce authoring boundary | Exact approved production asset evidence incomplete | ASSET_EVIDENCE_REQUIRED | SOCIAL-ASSET-EVIDENCE-1 |
-| LinkedIn | social[] HTTPS URL | Text label | Text label | LinkedIn [in] Logo | Social-icon lineup use explicitly supported | Existing commerce authoring boundary | Mark not implemented | ASSET_EVIDENCE_REQUIRED | SOCIAL-ASSET-EVIDENCE-1 → WA-SOCIAL-1 |
-| Facebook | social[] HTTPS URL | Text label | Text label | Meta brand resources | Official source location known | Existing commerce authoring boundary | Exact approved mark evidence incomplete | ASSET_EVIDENCE_REQUIRED | SOCIAL-ASSET-EVIDENCE-1 |
+| WhatsApp destination | phone/message/placement | Official green glyph | Official green glyph | WhatsApp Brand Resource Center `Digital_Glyph_Green_RGB_2026.svg` | Fail-closed wa.me; preview does not navigate | Existing commerce authoring boundary | None | COMPLETE | done — #1064 / `4739ecd` |
+| Instagram | social[] HTTPS URL | Official white glyph | Official white glyph | Instagram brand pack `Instagram_Glyph_White.svg` | URL safety exists; glyph unmodified | Existing commerce authoring boundary | None | COMPLETE | done — #1064 / `4739ecd` |
+| X | social[] HTTPS URL | Official white mark | Official white mark | X Brand Toolkit `logo.svg` | Official source; unmodified | Existing commerce authoring boundary | None | COMPLETE | done — #1064 / `4739ecd` |
+| TikTok | social[] HTTPS URL | Official black-circle mark | Official black-circle mark | TikTok first-party `TikTok_Icon_Black_Circle.png` | Owner authorized authentic mark; written-permission restriction remains documented risk | Existing commerce authoring boundary | None | COMPLETE | done — #1064 / `4739ecd` |
+| Snapchat | social[] HTTPS URL | Official Ghost | Official Ghost | Snapchat Ghost Logo Primary SVG | Black/white only; unmodified | Existing commerce authoring boundary | None | COMPLETE | done — #1064 / `4739ecd` |
+| YouTube | social[] HTTPS URL | Official red icon | Official red icon | YouTube Brand Resource Center `yt_icon_red_digital.png` | Unmodified | Existing commerce authoring boundary | None | COMPLETE | done — #1064 / `4739ecd` |
+| LinkedIn | social[] HTTPS URL | Official [in] bug | Official [in] bug | LinkedIn `LI-In-Bug.png` | Social-icon lineup use; unmodified | Existing commerce authoring boundary | None | COMPLETE | done — #1064 / `4739ecd` |
+| Facebook | social[] HTTPS URL | Official primary logo | Official primary logo | Facebook Brand Asset Pack `Facebook_Logo_Primary.png` | Unmodified | Existing commerce authoring boundary | None | COMPLETE | done — #1064 / `4739ecd` |
 | App Store | apps.iosUrl | Official badge | Official badge | Apple Marketing Tools | Strong first-party alignment; safe host gate | Existing commerce authoring boundary | Final verification / visual QA | IMPLEMENTATION_READY | APPS-1 |
 | Google Play | apps.androidUrl | Official badge | Official badge | play.google.com asset | First-party asset; current guideline verification still needed | Existing commerce authoring boundary | Final guideline / visual QA | IMPLEMENTATION_READY | APPS-1 |
 | Payment method source | channel payment-method endpoint | Checkout only | Checkout only | AWJ backend | Channel-scoped enabled list exists | Tenant/channel scoped | Footer has no bridge | IMPLEMENTATION_READY for evidence task only | PAY-EVIDENCE-1 |
@@ -268,11 +268,11 @@ Purpose:
 
 No runtime implementation in this evidence slice.
 
-### Not ready yet
+### Closed
 
-**STORE-BRAND-WA-SOCIAL-1** remains blocked on SOCIAL-ASSET-EVIDENCE-1.
+**STORE-BRAND-WA-SOCIAL-1** is no longer blocked. SOCIAL-ASSET-EVIDENCE-1 passed, and the implementation merged as PR #1064 at `4739ecd6928c0ad506824e9a57939b3f35b08439`. Production auto-deploy of that SHA succeeded for storefront, Nebrax/web, nibras-api, and awj-scheduler. POST_MERGE_REVIEW: PASS.
 
-This prevents AWJ from substituting an unofficial icon pack just to make the Footer look complete.
+The social rows in the matrix above were refreshed after that merge. App Store / Google Play stay IMPLEMENTATION_READY for APPS-1. Contact and payment rows are unchanged.
 
 ## 6. Payment architecture finding
 
