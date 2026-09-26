@@ -41,8 +41,7 @@ export const CUSTOMIZER_MESSAGES = {
       "حالة التوثيق تصدر من أَوْج. ما يكتبه التاجر لا يمنح شارة.",
     sbcTitle: "منصة الأعمال",
     sbcAuthenticationNumber: "رقم توثيق منصة الأعمال",
-    sbcAuthenticationHint:
-      "يُحفظ كنص كما أُدخل مع الحفاظ على الأصفار في بدايته.",
+    sbcAuthenticationHint: "يُحفظ كنص كما أُدخل مع الحفاظ على الأصفار في بدايته.",
     sbcSealToken: "رمز ختم منصة الأعمال",
     sbcSealTokenHint:
       "من منصة الأعمال، افتح شهادة توثيق التجارة الإلكترونية، اختر «إضافة ختم QR»، ثم انسخ رمز الختم من الكود المقدم.",
@@ -245,8 +244,7 @@ export const CUSTOMIZER_MESSAGES = {
       "Verification is an AWJ state. Merchant-typed numbers do not grant a badge.",
     sbcTitle: "Saudi Business Center",
     sbcAuthenticationNumber: "Saudi Business Center authentication number",
-    sbcAuthenticationHint:
-      "Stored as entered text, including leading zeros.",
+    sbcAuthenticationHint: "Stored as entered text, including leading zeros.",
     sbcSealToken: "Saudi Business Center seal token",
     sbcSealTokenHint:
       "In the Business Platform, open the e-commerce authentication certificate, choose “Add QR Seal”, then copy the seal token from the provided code.",
