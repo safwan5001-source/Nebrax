@@ -5,15 +5,16 @@
 
 | Order | Task ID | Status | Risk | Depends on | Outcome |
 |---|---|---|---|---|---|
-| 0 | STORE-BRAND-0 | ready | normal | horizon definition | Evidence matrix for marks/utility icons + current payment architecture inventory |
-| 1 | STORE-BRAND-WA-SOCIAL-1 | blocked_on_0 | normal | STORE-BRAND-0 | Official WhatsApp + seven supported social marks with Preview/Public parity |
-| 2 | STORE-BRAND-APPS-1 | blocked_on_0 | normal | STORE-BRAND-0 | Official App Store / Google Play badges in AppPromo + Footer |
-| 3 | STORE-BRAND-CONTACT-1 | blocked_on_0 | normal | STORE-BRAND-0 | AWJ utility icons for phone/email/address/hours on Preview + Published |
-| 4 | STORE-BRAND-PAY-EVIDENCE-1 | blocked_on_0 | high | STORE-BRAND-0 | Prove payment-method source-of-truth and classify implementation readiness |
-| 5 | STORE-BRAND-PAY-1 | decision_gated | high | STORE-BRAND-PAY-EVIDENCE-1 | Render only truly supported/enabled official payment marks |
-| 6 | STORE-BRAND-COMPOSE-1 | blocked | normal | WA/SOCIAL + APPS + CONTACT; PAY only if implementation-ready | Final Footer composition and shared mark component behavior |
-| 7 | STORE-BRAND-QA-1 | blocked | high | implemented slices | Responsive RTL/LTR, accessibility, security, actual published-route parity |
-| 8 | STORE-BRAND-CLOSE-1 | blocked | normal | all ready work closed | Closure report + durable state |
+| 0 | STORE-BRAND-0 | done | normal | horizon definition | Evidence matrix for marks/utility icons + current payment architecture inventory |
+| 1 | STORE-BRAND-SOCIAL-ASSET-EVIDENCE-1 | ready | normal | STORE-BRAND-0 | Close first-party asset/usage evidence for WhatsApp + seven social networks |
+| 2 | STORE-BRAND-WA-SOCIAL-1 | blocked_on_asset_evidence | normal | STORE-BRAND-SOCIAL-ASSET-EVIDENCE-1 | Official WhatsApp + seven supported social marks with Preview/Public parity |
+| 3 | STORE-BRAND-APPS-1 | ready | normal | STORE-BRAND-0 | Verify/fix official App Store / Google Play badges in AppPromo + Footer |
+| 4 | STORE-BRAND-CONTACT-1 | ready | normal | STORE-BRAND-0 | AWJ utility icons for phone/email/address/hours on Preview + Published |
+| 5 | STORE-BRAND-PAY-EVIDENCE-1 | ready | high | STORE-BRAND-0 | Prove payment-method source-of-truth and classify implementation readiness |
+| 6 | STORE-BRAND-PAY-1 | decision_gated | high | STORE-BRAND-PAY-EVIDENCE-1 | Render only truly supported/enabled official payment marks |
+| 7 | STORE-BRAND-COMPOSE-1 | blocked | normal | WA/SOCIAL + APPS + CONTACT; PAY only if implementation-ready | Final Footer composition and shared mark component behavior |
+| 8 | STORE-BRAND-QA-1 | blocked | high | implemented slices | Responsive RTL/LTR, accessibility, security, actual published-route parity |
+| 9 | STORE-BRAND-CLOSE-1 | blocked | normal | all ready work closed | Closure report + durable state |
 
 ## STORE-BRAND-0 — Evidence Pass
 
@@ -170,3 +171,22 @@ Close only after:
 - `docs/autonomous-engineering/CURRENT-STATE.md` is updated.
 
 No automatic next horizon.
+
+
+## STORE-BRAND-SOCIAL-ASSET-EVIDENCE-1 — Official asset registry
+
+Documentation/evidence only.
+
+Definition of Done:
+
+- exact first-party source recorded for WhatsApp, Instagram, X, TikTok, Snapchat, YouTube, LinkedIn, Facebook;
+- exact asset/variant intended for AWJ recorded;
+- permitted storefront/social-link usage recorded;
+- local-host vs first-party-remote consumption rule recorded;
+- recolor/modify/clear-space/minimum-size rules recorded where applicable;
+- any permission/license restriction identified explicitly;
+- no runtime code;
+- owner decision is already recorded to proceed with authentic official marks, including TikTok;
+- WA-SOCIAL-1 promoted when every mark it will render has a confirmed first-party asset/variant.
+
+Do not substitute an unofficial icon pack. Brand-use restrictions remain documented risk, not an implementation blocker unless they expose a technical/security issue.
