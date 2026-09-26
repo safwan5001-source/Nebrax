@@ -177,9 +177,13 @@ describe('ExperienceBuilder persistence wiring', () => {
     await user.type(input, ' 00123 456 ');
 
     expect((input as HTMLInputElement).value).toBe(' 00123 456 ');
+    const sealTokenInput = screen.getAllByRole('textbox')[1];
+    await user.type(sealTokenInput, ' token=Opaque+/ ');
+    expect((sealTokenInput as HTMLInputElement).value).toBe(' token=Opaque+/ ');
     await user.click(screen.getByRole('button', { name: 'Save draft' }));
     await waitFor(() => expect(saveMock).toHaveBeenCalled());
     expect(saveMock.mock.calls[0][1].sbc.authentication_number).toBe('00123 456');
+    expect(saveMock.mock.calls[0][1].sbc.seal_token).toBe('token=Opaque+/');
   });
 
   it('reloads on 409 instead of merging or claiming success', async () => {
@@ -246,6 +250,33 @@ describe('ExperienceBuilder persistence wiring', () => {
     expect(screen.getByText('Commercial registration: 7050247977')).toBeTruthy();
     expect(screen.queryByText(/legacy-cr-must-not-render/)).toBeNull();
     expect(screen.getByText('Verified in Saudi Business Center')).toBeTruthy();
+  });
+
+  it('keeps the official seal out of the authenticated customizer preview', () => {
+    render(
+      <ExperienceBuilder
+        initialConfig={{
+          ...DEFAULT_PRESENTATION_CONFIG,
+          sbc: {
+            ...DEFAULT_PRESENTATION_CONFIG.sbc,
+            seal_token: 'opaque-token-must-not-reach-the-admin-dom',
+            show_in_storefront: true,
+          },
+        }}
+        initialLocale="en"
+      />,
+    );
+
+    expect(screen.getByTestId('sbc-seal-preview').textContent).toBe(
+      'Editor preview: the official Saudi Business Center seal will appear on the published storefront.',
+    );
+    expect(screen.queryByTestId('sbc-official-seal')).toBeNull();
+    expect(screen.queryByText('opaque-token-must-not-reach-the-admin-dom')).toBeNull();
+    expect(
+      document.querySelector(
+        'script[src="https://eauthenticate.saudibusiness.gov.sa/EAuthSealApi/seal.js"]',
+      ),
+    ).toBeNull();
   });
 
   it('renders no CR row when canonical CR is empty', () => {

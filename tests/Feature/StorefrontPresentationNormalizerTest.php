@@ -230,18 +230,21 @@ class StorefrontPresentationNormalizerTest extends TestCase
     }
 
     /** @test */
-    public function sbc_authentication_number_is_trimmed_as_opaque_text_and_visibility_defaults_off(): void
+    public function sbc_values_are_opaque_and_trimmed_only_at_normalization_boundary(): void
     {
         $normalized = $this->normalizer->normalize([
             'sbc' => [
                 'authentication_number' => '  000123  ',
+                'seal_token' => "  token=AbC +/  ",
                 'show_in_storefront' => true,
             ],
         ]);
 
         $this->assertSame('000123', $normalized['sbc']['authentication_number']);
+        $this->assertSame('token=AbC +/', $normalized['sbc']['seal_token']);
         $this->assertTrue($normalized['sbc']['show_in_storefront']);
         $this->assertSame('', $this->normalizer->normalize([])['sbc']['authentication_number']);
+        $this->assertSame('', $this->normalizer->normalize([])['sbc']['seal_token']);
         $this->assertFalse($this->normalizer->normalize([])['sbc']['show_in_storefront']);
     }
 

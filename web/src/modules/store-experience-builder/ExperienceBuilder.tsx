@@ -176,6 +176,7 @@ export function ExperienceBuilder({
     // Keep the opaque SBC value lossless while the merchant is editing. The
     // persistence boundary below performs the contract-required outer trim.
     normalized.sbc.authentication_number = next.sbc.authentication_number;
+    normalized.sbc.seal_token = next.sbc.seal_token;
     setDraft(normalized);
     setLifecycle("dirty");
     setNotice(null);

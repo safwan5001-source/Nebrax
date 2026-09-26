@@ -44,11 +44,12 @@ describe('web presentation contract', () => {
   it('normalizes SBC authentication as opaque text and defaults visibility off', () => {
     expect(
       normalizePresentationConfig({
-        sbc: { authentication_number: '  000123  ', show_in_storefront: true },
+        sbc: { authentication_number: '  000123  ', seal_token: '  token=AbC +/  ', show_in_storefront: true },
       }).sbc,
-    ).toEqual({ authentication_number: '000123', show_in_storefront: true });
+    ).toEqual({ authentication_number: '000123', seal_token: 'token=AbC +/', show_in_storefront: true });
     expect(normalizePresentationConfig({}).sbc).toEqual({
       authentication_number: '',
+      seal_token: '',
       show_in_storefront: false,
     });
   });

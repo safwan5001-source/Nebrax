@@ -1146,6 +1146,48 @@ function VerificationPanel({
 }) {
   return (
     <div className="space-y-6">
+      <Section title={t("sbcTitle")}>
+        <Field
+          label={t("sbcAuthenticationNumber")}
+          hint={t("sbcAuthenticationHint")}
+        >
+          <input
+            className={inputClass}
+            value={config.sbc.authentication_number}
+            onChange={(event) =>
+              patch({
+                sbc: {
+                  ...config.sbc,
+                  authentication_number: event.target.value,
+                },
+              })
+            }
+          />
+        </Field>
+        <Field label={t("sbcSealToken")} hint={t("sbcSealTokenHint")}>
+          <input
+            className={inputClass}
+            value={config.sbc.seal_token}
+            onChange={(event) =>
+              patch({
+                sbc: {
+                  ...config.sbc,
+                  seal_token: event.target.value,
+                },
+              })
+            }
+          />
+        </Field>
+        <div className="border-y border-neutral-200">
+          <Toggle
+            label={t("sbcShowInStorefront")}
+            checked={config.sbc.show_in_storefront}
+            onChange={(show_in_storefront) =>
+              patch({ sbc: { ...config.sbc, show_in_storefront } })
+            }
+          />
+        </div>
+      </Section>
       <Section hint={t("verificationIntro")}>
         <div className="border border-awj-editor-border px-3 py-3">
           <p className="text-[12px] font-medium text-awj-editor-muted">

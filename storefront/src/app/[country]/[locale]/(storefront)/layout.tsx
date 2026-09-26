@@ -252,6 +252,7 @@ export default async function StorefrontLayout({
         storeName={displayName}
         businessIdentity={identity?.business_identity}
         showSbc={presentation?.sbc.show_in_storefront ?? false}
+        sbcSealToken={presentation?.sbc.seal_token ?? ""}
         logoUrl={logoUrl}
         showLogo={presentation ? presentation.footer.showLogo : true}
         tagline={presentation?.footer.tagline ?? ""}

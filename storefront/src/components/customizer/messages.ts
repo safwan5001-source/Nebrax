@@ -39,6 +39,16 @@ export const CUSTOMIZER_MESSAGES = {
     whatsappDetails: "بيانات التواصل",
     verificationIntro:
       "حالة التوثيق تصدر من أَوْج. ما يكتبه التاجر لا يمنح شارة.",
+    sbcTitle: "منصة الأعمال",
+    sbcAuthenticationNumber: "رقم توثيق منصة الأعمال",
+    sbcAuthenticationHint: "يُحفظ كنص كما أُدخل مع الحفاظ على الأصفار في بدايته.",
+    sbcSealToken: "رمز ختم منصة الأعمال",
+    sbcSealTokenHint:
+      "من منصة الأعمال، افتح شهادة توثيق التجارة الإلكترونية، اختر «إضافة ختم QR»، ثم انسخ رمز الختم من الكود المقدم.",
+    sbcShowInStorefront: "إظهار توثيق منصة الأعمال في المتجر",
+    sbcVerified: "موثّق في منصة الأعمال",
+    sbcSealPreview:
+      "معاينة المحرر: سيظهر ختم منصة الأعمال الرسمي في المتجر المنشور.",
     appsIntro: "روابط المتاجر العامة. بدون رابط صالح لا يظهر القسم.",
     appsPlacement: "موضع الظهور في المتجر",
     theme: "المظهر",
@@ -234,6 +244,16 @@ export const CUSTOMIZER_MESSAGES = {
     whatsappDetails: "Contact details",
     verificationIntro:
       "Verification is an AWJ state. Merchant-typed numbers do not grant a badge.",
+    sbcTitle: "Saudi Business Center",
+    sbcAuthenticationNumber: "Saudi Business Center authentication number",
+    sbcAuthenticationHint: "Stored as entered text, including leading zeros.",
+    sbcSealToken: "Saudi Business Center seal token",
+    sbcSealTokenHint:
+      "In the Business Platform, open the e-commerce authentication certificate, choose “Add QR Seal”, then copy the seal token from the provided code.",
+    sbcShowInStorefront: "Show Saudi Business Center in the storefront",
+    sbcVerified: "Verified in Saudi Business Center",
+    sbcSealPreview:
+      "Editor preview: the official Saudi Business Center seal will appear on the published storefront.",
     appsIntro:
       "Public store URLs. The section stays absent without a valid link.",
     appsPlacement: "Where they appear",

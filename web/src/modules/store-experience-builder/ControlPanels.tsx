@@ -1449,6 +1449,20 @@ function VerificationPanel({
             }
           />
         </Field>
+        <Field label={t("sbcSealToken")} hint={t("sbcSealTokenHint")}>
+          <input
+            className={inputClass}
+            value={config.sbc.seal_token}
+            onChange={(event) =>
+              patch({
+                sbc: {
+                  ...config.sbc,
+                  seal_token: event.target.value,
+                },
+              })
+            }
+          />
+        </Field>
         <div className="border-y border-neutral-200">
           <Toggle
             label={t("sbcShowInStorefront")}
