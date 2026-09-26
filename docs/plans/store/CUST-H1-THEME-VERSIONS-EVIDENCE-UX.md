@@ -45,7 +45,7 @@ This Horizon does **not** own:
 
 ### 2.1 Current persistence model
 
-Current production architecture is intentionally a **single current-head row per storefront**:
+Current production architecture supports **zero or one current-head row per storefront**. The row is created lazily on the first successful Draft save; untouched storefronts may have no row at all:
 
 `storefront_presentations`
 
@@ -58,7 +58,7 @@ Current production architecture is intentionally a **single current-head row per
 - `published_revision`
 - `published_at`
 
-The table has `unique(storefront_id)`.
+The table has `unique(storefront_id)`, which enforces **at most one** row per Storefront; it does not require every Storefront to have a row.
 
 This was explicitly designed as **current state, not an audit log**. The original architecture rejected revision/history tables because Version History was DEFERRED at that time.
 
@@ -505,9 +505,20 @@ Required guarantees:
 - canceled schedule cannot later execute;
 - rescheduling invalidates the prior execution token/job safely;
 - duplicate jobs are idempotent;
+- **storefront-level supersession is authoritative:** a delayed/retried job from an older schedule must not be allowed to publish after a newer schedule has replaced it or already published;
+- execution must verify the Storefront's current scheduled-version pointer (or equivalent authoritative ordering token) **and** the expected schedule generation before publishing;
+- when a newer schedule is created, rescheduled, canceled, or published, older execution tokens become stale no-ops;
 - exact version payload published is deterministic;
 - failed scheduled publish preserves prior live design;
 - execution result is auditable enough to diagnose failure.
+
+Required race test:
+
+1. schedule Version A;
+2. replace it with a later schedule for Version B;
+3. allow B to publish;
+4. deliver/retry A's old job afterward;
+5. A must no-op and **must not overwrite B**.
 
 Do not implement client timers.
 
