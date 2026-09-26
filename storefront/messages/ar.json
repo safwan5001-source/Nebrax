@@ -88,7 +88,14 @@
     "vatNumber": "الرقم الضريبي",
     "sbcVerified": "موثّق في منصة الأعمال",
     "merchantProvided": "معلومات من التاجر",
-    "licenseNumber": "رقم الترخيص"
+    "licenseNumber": "رقم الترخيص",
+    "socialInstagram": "إنستغرام",
+    "socialX": "إكس",
+    "socialTiktok": "تيك توك",
+    "socialSnapchat": "سناب شات",
+    "socialYoutube": "يوتيوب",
+    "socialLinkedin": "لينكدإن",
+    "socialFacebook": "فيسبوك"
   },
   "home": {
     "welcome": "{storeName}",

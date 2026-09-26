@@ -129,6 +129,26 @@ export async function Footer({
   const crNumber = businessIdentity.cr_number?.trim() || null;
   const vatNumber = businessIdentity.vat_number?.trim() || null;
   const license = licenseNumber.trim();
+  const socialLabel = (network: string) => {
+    switch (network) {
+      case "instagram":
+        return t("socialInstagram");
+      case "x":
+        return t("socialX");
+      case "tiktok":
+        return t("socialTiktok");
+      case "snapchat":
+        return t("socialSnapchat");
+      case "youtube":
+        return t("socialYoutube");
+      case "linkedin":
+        return t("socialLinkedin");
+      case "facebook":
+        return t("socialFacebook");
+      default:
+        return network;
+    }
+  };
   const hasContact = Boolean(
     contact?.phone || contact?.email || contact?.address || contact?.hours,
   );
@@ -261,16 +281,21 @@ export async function Footer({
             {contact?.hours ? <p>{contact.hours}</p> : null}
             {socialLinks.length > 0 ? (
               <p className="mt-2 flex flex-wrap gap-3">
-                {socialLinks.map((item) => (
-                  <a
-                    key={item.id}
-                    href={item.href}
-                    className="text-store-footer-link"
-                    rel="noopener noreferrer"
-                  >
-                    {item.network}
-                  </a>
-                ))}
+                {socialLinks.map((item) => {
+                  const label = socialLabel(item.network);
+                  return (
+                    <a
+                      key={item.id}
+                      href={item.href}
+                      className="text-store-footer-link"
+                      aria-label={label}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      {label}
+                    </a>
+                  );
+                })}
               </p>
             ) : null}
             {hasBusinessIdentity ? (

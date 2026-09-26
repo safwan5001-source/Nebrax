@@ -88,7 +88,14 @@
     "vatNumber": "Numéro de TVA",
     "sbcVerified": "Vérifié dans le Saudi Business Center",
     "merchantProvided": "Informations fournies par le marchand",
-    "licenseNumber": "Numéro de licence"
+    "licenseNumber": "Numéro de licence",
+    "socialInstagram": "Instagram",
+    "socialX": "X",
+    "socialTiktok": "TikTok",
+    "socialSnapchat": "Snapchat",
+    "socialYoutube": "YouTube",
+    "socialLinkedin": "LinkedIn",
+    "socialFacebook": "Facebook"
   },
   "home": {
     "welcome": "{storeName}",

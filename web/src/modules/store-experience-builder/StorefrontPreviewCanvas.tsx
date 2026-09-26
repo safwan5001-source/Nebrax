@@ -686,21 +686,25 @@ export function StorefrontPreviewCanvas({
               {config.contact.hours ? <p>{config.contact.hours}</p> : null}
               {enabledSocial.length > 0 && (
                 <p className="mt-2 flex flex-wrap gap-3">
-                  {enabledSocial.map((item) => (
-                    <a
-                      key={item.id}
-                      href={item.href}
-                      data-preview-chrome="social"
-                      className="text-store-footer-link"
-                      onClick={(event) => {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        onSelectChrome?.("social");
-                      }}
-                    >
-                      {item.network}
-                    </a>
-                  ))}
+                  {enabledSocial.map((item) => {
+                    const label = socialLabel(t, item.network);
+                    return (
+                      <a
+                        key={item.id}
+                        href={item.href}
+                        aria-label={label}
+                        data-preview-chrome="social"
+                        className="text-store-footer-link"
+                        onClick={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          onSelectChrome?.("social");
+                        }}
+                      >
+                        {label}
+                      </a>
+                    );
+                  })}
                 </p>
               )}
               {hasBusinessIdentity ? (
@@ -894,5 +898,29 @@ function pageTitleKey(
       return "pageReturns";
     default:
       return "pageTerms";
+  }
+}
+
+function socialLabel(
+  t: (key: CustomizerMessageKey) => string,
+  network: string,
+): string {
+  switch (network) {
+    case "instagram":
+      return t("socialInstagram");
+    case "x":
+      return t("socialX");
+    case "tiktok":
+      return t("socialTiktok");
+    case "snapchat":
+      return t("socialSnapchat");
+    case "youtube":
+      return t("socialYoutube");
+    case "linkedin":
+      return t("socialLinkedin");
+    case "facebook":
+      return t("socialFacebook");
+    default:
+      return network;
   }
 }
