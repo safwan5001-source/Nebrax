@@ -56,7 +56,7 @@ Green on reviewed head `917bc658f93df86f838c5662c40407680aec1c3b`:
 
 ## Post-merge review
 
-- POST_MERGE_REVIEW: not yet PASS. Merge-commit CI on `fa237e392bd4a5bfd1ffc19e3800aaa81e6e53bc` was still running when this note was written. PASS is recorded on PR #1048 only after that run is green.
+- POST_MERGE_REVIEW: PASS. Reviewed Merge SHA `fa237e392bd4a5bfd1ffc19e3800aaa81e6e53bc`. Run [36239684948](https://github.com/safwan5001-source/Nebrax/actions/runs/36239684948) sqlite and pgsql both succeeded. Comment: https://github.com/safwan5001-source/Nebrax/pull/1048#issuecomment-5846109798
 - Reviewed Merge SHA: `fa237e392bd4a5bfd1ffc19e3800aaa81e6e53bc`
 - Target-branch checks/smoke: `main` is the squash commit. Docs only. No runtime smoke.
 - Findings / resolution: none in the squash diff
