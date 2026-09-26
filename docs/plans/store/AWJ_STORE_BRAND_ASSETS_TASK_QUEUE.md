@@ -7,7 +7,7 @@
 |---|---|---|---|---|---|
 | 0 | STORE-BRAND-0 | done | normal | horizon definition | Evidence matrix for marks/utility icons + current payment architecture inventory |
 | 1 | STORE-BRAND-SOCIAL-ASSET-EVIDENCE-1 | done | normal | STORE-BRAND-0 | First-party asset/usage registry closed for WhatsApp + seven social networks |
-| 2 | STORE-BRAND-WA-SOCIAL-1 | ready | normal | STORE-BRAND-SOCIAL-ASSET-EVIDENCE-1 | Official WhatsApp + seven supported social marks with Preview/Public parity |
+| 2 | STORE-BRAND-WA-SOCIAL-1 | done | normal | STORE-BRAND-SOCIAL-ASSET-EVIDENCE-1 | Official WhatsApp + seven supported social marks with Preview/Public parity |
 | 3 | STORE-BRAND-APPS-1 | ready | normal | STORE-BRAND-0 | Verify/fix official App Store / Google Play badges in AppPromo + Footer |
 | 4 | STORE-BRAND-CONTACT-1 | ready | normal | STORE-BRAND-0 | AWJ utility icons for phone/email/address/hours on Preview + Published |
 | 5 | STORE-BRAND-PAY-EVIDENCE-1 | ready | high | STORE-BRAND-0 | Prove payment-method source-of-truth and classify implementation readiness |
@@ -69,6 +69,14 @@ Definition of Done:
 - accessible name for every mark;
 - Preview/Public parity;
 - no new networks.
+
+Closed 2026-09-26.
+
+- PR [#1064](https://github.com/safwan5001-source/Nebrax/pull/1064) merged to `main`.
+- Merge SHA: `4739ecd6928c0ad506824e9a57939b3f35b08439`.
+- POST_MERGE_REVIEW: PASS.
+- Production auto-deploy SUCCESS on that SHA: storefront, Nebrax/web, nibras-api, awj-scheduler.
+- No schema, API, payment, contact-icon, or Railway change.
 
 ## STORE-BRAND-APPS-1
 
