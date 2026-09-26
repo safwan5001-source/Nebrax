@@ -187,13 +187,30 @@ export default async function StorefrontLayout({
     : null;
   const appLinks = [
     ios && isSafeAppStoreUrl(ios)
-      ? { id: "app-ios", label: "App Store", href: ios }
+      ? {
+          id: "app-ios",
+          store: "apple" as const,
+          label: "App Store",
+          href: ios,
+        }
       : null,
     android && isSafePlayStoreUrl(android)
-      ? { id: "app-android", label: "Google Play", href: android }
+      ? {
+          id: "app-android",
+          store: "google" as const,
+          label: "Google Play",
+          href: android,
+        }
       : null,
-  ].filter((item): item is { id: string; label: string; href: string } =>
-    Boolean(item),
+  ].filter(
+    (
+      item,
+    ): item is {
+      id: string;
+      store: "apple" | "google";
+      label: string;
+      href: string;
+    } => Boolean(item),
   );
 
   const chrome = (

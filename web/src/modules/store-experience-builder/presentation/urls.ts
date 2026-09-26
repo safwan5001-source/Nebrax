@@ -62,7 +62,7 @@ export function isSafeAppStoreUrl(value: string | null | undefined): boolean {
   if (!url) return false;
   try {
     const host = new URL(url).hostname.toLowerCase();
-    return host === "apps.apple.com" || host.endsWith(".apple.com");
+    return host === "apps.apple.com";
   } catch {
     return false;
   }
@@ -77,4 +77,16 @@ export function isSafePlayStoreUrl(value: string | null | undefined): boolean {
   } catch {
     return false;
   }
+}
+
+/** Live first-party Apple badge. Arabic uses ar-sa; every other locale uses en-us. */
+export function appStoreBadgeUrl(locale: string): string {
+  const code = locale === "ar" ? "ar-sa" : "en-us";
+  return `https://toolbox.marketingtools.apple.com/api/badges/download-on-the-app-store/black/${code}?size=250x83`;
+}
+
+/** Live first-party Play badge. Arabic uses ar; every other locale uses en. */
+export function playStoreBadgeUrl(locale: string): string {
+  const code = locale === "ar" ? "ar" : "en";
+  return `https://play.google.com/intl/en_us/badges/static/images/badges/${code}_badge_web_generic.png`;
 }

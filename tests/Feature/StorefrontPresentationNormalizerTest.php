@@ -57,6 +57,12 @@ class StorefrontPresentationNormalizerTest extends TestCase
         $this->assertSame('', $normalized['social'][0]['url']);
         $this->assertSame('', $normalized['apps']['iosUrl']);
         $this->assertStringContainsString('play.google.com', $normalized['apps']['androidUrl']);
+        $this->assertSame('', $this->normalizer->normalize([
+            'apps' => ['iosUrl' => 'https://www.apple.com/iphone'],
+        ])['apps']['iosUrl']);
+        $this->assertStringContainsString('apps.apple.com', $this->normalizer->normalize([
+            'apps' => ['iosUrl' => 'https://apps.apple.com/app/id1'],
+        ])['apps']['iosUrl']);
     }
 
     /** @test */

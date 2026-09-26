@@ -11,6 +11,7 @@ import {
 import type { CSSProperties, ReactNode } from "react";
 import { StoreBrand } from "@/components/layout/StoreBrand";
 import { storeContainerClassName } from "@/components/layout/StoreContainer";
+import { OfficialStoreBadge } from "@/components/store/OfficialStoreBadge";
 import { categoryAccent } from "@/lib/home/category-accent";
 import {
   isGatedHomeSection,
@@ -18,7 +19,12 @@ import {
   type StorefrontPresentationConfig,
 } from "@/lib/presentation/config";
 import { presentationCssVars } from "@/lib/presentation/tokens";
-import { buildWhatsAppUrl, sanitizeExternalUrl } from "@/lib/presentation/urls";
+import {
+  buildWhatsAppUrl,
+  isSafeAppStoreUrl,
+  isSafePlayStoreUrl,
+  sanitizeExternalUrl,
+} from "@/lib/presentation/urls";
 import { cn } from "@/lib/utils";
 import {
   type CustomizerLocale,
@@ -110,8 +116,12 @@ export function StorefrontPreviewCanvas({
     }
     return true;
   });
-  const ios = sanitizeExternalUrl(config.apps.iosUrl);
-  const android = sanitizeExternalUrl(config.apps.androidUrl);
+  const ios = isSafeAppStoreUrl(config.apps.iosUrl)
+    ? sanitizeExternalUrl(config.apps.iosUrl)
+    : null;
+  const android = isSafePlayStoreUrl(config.apps.androidUrl)
+    ? sanitizeExternalUrl(config.apps.androidUrl)
+    : null;
   const hasApps = Boolean(ios || android);
   const visiblePages = config.pages.filter((page) => page.enabled);
 
@@ -360,8 +370,40 @@ export function StorefrontPreviewCanvas({
               );
             }
 
-            if (section.type === "appPromo" && !hasApps) {
-              return null;
+            if (section.type === "appPromo") {
+              if (!hasApps) return null;
+              return (
+                <section
+                  key={section.id}
+                  className="rounded-store bg-store-footer px-5 py-6 text-store-footer-foreground md:px-8"
+                >
+                  <h2 className="text-base font-extrabold md:text-lg">
+                    {config.apps.appName.trim() || t("sectionAppPromo")}
+                  </h2>
+                  <div className="mt-4 flex flex-wrap gap-3">
+                    {ios ? (
+                      <OfficialStoreBadge
+                        store="apple"
+                        href={ios}
+                        locale={locale}
+                        label="App Store"
+                        newTab={false}
+                        onClick={(event) => event.preventDefault()}
+                      />
+                    ) : null}
+                    {android ? (
+                      <OfficialStoreBadge
+                        store="google"
+                        href={android}
+                        locale={locale}
+                        label="Google Play"
+                        newTab={false}
+                        onClick={(event) => event.preventDefault()}
+                      />
+                    ) : null}
+                  </div>
+                </section>
+              );
             }
 
             return (
@@ -435,8 +477,26 @@ export function StorefrontPreviewCanvas({
               )}
               {hasApps && config.apps.showFooterLinks ? (
                 <>
-                  {ios ? <span>App Store</span> : null}
-                  {android ? <span>Google Play</span> : null}
+                  {ios ? (
+                    <OfficialStoreBadge
+                      store="apple"
+                      href={ios}
+                      locale={locale}
+                      label="App Store"
+                      newTab={false}
+                      onClick={(event) => event.preventDefault()}
+                    />
+                  ) : null}
+                  {android ? (
+                    <OfficialStoreBadge
+                      store="google"
+                      href={android}
+                      locale={locale}
+                      label="Google Play"
+                      newTab={false}
+                      onClick={(event) => event.preventDefault()}
+                    />
+                  ) : null}
                 </>
               ) : null}
             </FooterCol>

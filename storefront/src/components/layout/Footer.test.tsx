@@ -141,4 +141,43 @@ describe("Footer SBC presentation", () => {
     expect(screen.queryByTestId("sbc-official-seal")).toBeNull();
     expect(screen.queryByText("sbcVerified")).toBeNull();
   });
+
+  it("renders official store badges and drops a host that is not allow-listed", async () => {
+    const view = await Footer({
+      ...baseProps,
+      appLinks: [
+        {
+          id: "ios",
+          store: "apple",
+          label: "App Store",
+          href: "https://apps.apple.com/app/id1",
+        },
+        {
+          id: "wide",
+          store: "apple",
+          label: "App Store",
+          href: "https://www.apple.com/iphone",
+        },
+        {
+          id: "play",
+          store: "google",
+          label: "Google Play",
+          href: "https://play.google.com/store/apps/details?id=sa.awj",
+        },
+      ],
+    });
+    const screen = render(view);
+    const apple = screen.getByRole("img", { name: "App Store" });
+    const play = screen.getByRole("img", { name: "Google Play" });
+
+    expect(apple).toHaveAttribute("src", expect.stringContaining("/ar-sa?"));
+    expect(apple).toHaveClass("h-10");
+    expect(apple.closest("a")).toHaveAttribute("target", "_blank");
+    expect(apple.closest("a")).toHaveAttribute("rel", "noopener noreferrer");
+    expect(play).toHaveAttribute(
+      "src",
+      expect.stringContaining("/ar_badge_web_generic.png"),
+    );
+    expect(screen.getAllByRole("img")).toHaveLength(2);
+  });
 });

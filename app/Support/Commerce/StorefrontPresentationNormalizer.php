@@ -400,7 +400,7 @@ final class StorefrontPresentationNormalizer
         }
         $host = strtolower((string) parse_url($url, PHP_URL_HOST));
 
-        return $host === 'apps.apple.com' || str_ends_with($host, '.apple.com');
+        return $host === 'apps.apple.com';
     }
 
     private function isSafePlayStoreUrl(string $value): bool
