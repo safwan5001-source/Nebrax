@@ -34,7 +34,7 @@ export async function FeaturedShelf({
       </h2>
       <ul className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 md:gap-5">
         {products.map((product, index) => (
-          <li key={product.id}>
+          <li key={product.id} className="min-w-0">
             <ProductCard
               product={product}
               basePath={basePath}
