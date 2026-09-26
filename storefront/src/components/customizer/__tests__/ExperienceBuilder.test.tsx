@@ -73,16 +73,41 @@ describe("ExperienceBuilder", () => {
     );
   });
 
-  it("does not mint a Verified badge from a merchant request", async () => {
+  it("shows canonical identity and does not edit a second CR", async () => {
     const user = userEvent.setup();
-    render(<ExperienceBuilder initialLocale="en" />);
+    render(
+      <ExperienceBuilder
+        initialLocale="en"
+        businessIdentity={{
+          legal_name: "Al-Noor Company",
+          cr_number: "7050247977",
+          vat_number: null,
+        }}
+        initialConfig={{
+          ...DEFAULT_PRESENTATION_CONFIG,
+          verification: {
+            ...DEFAULT_PRESENTATION_CONFIG.verification,
+            crNumber: "legacy-cr-must-not-render",
+            licenseNumber: "LIC-9",
+          },
+        }}
+      />,
+    );
     await user.click(
       screen.getByRole("button", { name: "Verification & trust" }),
     );
-    await user.click(screen.getByLabelText("Request a verified badge"));
+
+    expect(screen.queryByLabelText("Request a verified badge")).toBeNull();
+    expect(screen.queryByDisplayValue("legacy-cr-must-not-render")).toBeNull();
+    expect(screen.getByText("7050247977")).toBeTruthy();
+    expect(screen.getByText("Al-Noor Company")).toBeTruthy();
     const canvas = document.querySelector("[data-preview-canvas]");
+    expect(canvas?.textContent).toContain(
+      "Commercial registration: 7050247977",
+    );
+    expect(canvas?.textContent).toContain("License number: LIC-9");
+    expect(canvas?.textContent).not.toContain("legacy-cr-must-not-render");
     expect(canvas?.textContent).not.toMatch(/Verified/);
-    expect(canvas?.textContent).not.toMatch(/موثّق/);
   });
 
   it("keeps the official seal out of the storefront customizer preview", () => {

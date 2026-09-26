@@ -50,6 +50,11 @@ interface StorefrontPreviewCanvasProps {
   locale: CustomizerLocale;
   viewport: "desktop" | "tablet" | "mobile";
   liveStoreName?: string | null;
+  businessIdentity?: {
+    legal_name: string | null;
+    cr_number: string | null;
+    vat_number: string | null;
+  };
 }
 
 export function StorefrontPreviewCanvas({
@@ -57,6 +62,7 @@ export function StorefrontPreviewCanvas({
   locale,
   viewport,
   liveStoreName = null,
+  businessIdentity = { legal_name: null, cr_number: null, vat_number: null },
 }: StorefrontPreviewCanvasProps) {
   const t = (key: CustomizerMessageKey) => customizerMessage(locale, key);
   const storeName = previewStoreName(
@@ -73,6 +79,11 @@ export function StorefrontPreviewCanvas({
     compact && config.branding.compactLogoDataUrl
       ? config.branding.compactLogoDataUrl
       : config.branding.logoDataUrl;
+  const legalName = businessIdentity.legal_name?.trim() || null;
+  const crNumber = businessIdentity.cr_number?.trim() || null;
+  const vatNumber = businessIdentity.vat_number?.trim() || null;
+  const license = config.verification.licenseNumber.trim();
+  const hasBusinessIdentity = Boolean(legalName || crNumber || vatNumber);
   const whatsappHref =
     config.whatsapp.enabled &&
     (config.whatsapp.placement === "floating" ||
@@ -434,8 +445,8 @@ export function StorefrontPreviewCanvas({
             config.contact.address ||
             config.contact.hours ||
             enabledSocial.length > 0 ||
-            config.verification.crNumber.trim() ||
-            config.verification.licenseNumber.trim() ||
+            hasBusinessIdentity ||
+            license ||
             config.sbc.show_in_storefront) && (
             <div className="mt-8 border-t border-store-footer-border pt-6 text-sm text-store-footer-muted">
               {config.contact.phone ? <p>{config.contact.phone}</p> : null}
@@ -455,24 +466,38 @@ export function StorefrontPreviewCanvas({
                   ))}
                 </p>
               )}
-              {(config.verification.crNumber.trim() ||
-                config.verification.licenseNumber.trim()) && (
-                <div className="mt-4 space-y-1">
+              {hasBusinessIdentity ? (
+                <div className="mt-4 space-y-1 break-words">
                   <p className="font-medium text-store-footer-link">
-                    {t("merchantProvided")}
+                    {t("businessInformation")}
                   </p>
-                  {config.verification.crNumber.trim() ? (
+                  {legalName ? (
                     <p>
-                      {t("crNumber")}: {config.verification.crNumber}
+                      {t("legalName")}: {legalName}
                     </p>
                   ) : null}
-                  {config.verification.licenseNumber.trim() ? (
+                  {crNumber ? (
                     <p>
-                      {t("licenseNumber")}: {config.verification.licenseNumber}
+                      {t("crNumber")}: {crNumber}
+                    </p>
+                  ) : null}
+                  {vatNumber ? (
+                    <p>
+                      {t("vatNumber")}: {vatNumber}
                     </p>
                   ) : null}
                 </div>
-              )}
+              ) : null}
+              {license ? (
+                <div className="mt-4 space-y-1 break-words">
+                  <p className="font-medium text-store-footer-link">
+                    {t("merchantProvided")}
+                  </p>
+                  <p>
+                    {t("licenseNumber")}: {license}
+                  </p>
+                </div>
+              ) : null}
               {config.sbc.show_in_storefront ? (
                 <div className="mt-4 border-t border-store-footer-border pt-4">
                   {config.sbc.seal_token.trim() ? (

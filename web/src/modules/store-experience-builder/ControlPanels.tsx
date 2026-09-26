@@ -124,7 +124,11 @@ interface PanelsProps {
   config: StorefrontPresentationConfig;
   locale: CustomizerLocale;
   liveStoreName: string | null;
-  businessIdentity?: { cr_number: string | null };
+  businessIdentity?: {
+    legal_name: string | null;
+    cr_number: string | null;
+    vat_number: string | null;
+  };
   onChange: (next: StorefrontPresentationConfig) => void;
   selectedSection?: string | null;
   onSelectSection?: (id: string | null) => void;
@@ -1428,9 +1432,15 @@ function VerificationPanel({
   config: StorefrontPresentationConfig;
   t: (key: CustomizerMessageKey) => string;
   patch: (partial: Partial<StorefrontPresentationConfig>) => void;
-  businessIdentity?: { cr_number: string | null };
+  businessIdentity?: {
+    legal_name: string | null;
+    cr_number: string | null;
+    vat_number: string | null;
+  };
 }) {
+  const canonicalLegalName = businessIdentity?.legal_name?.trim() || null;
   const canonicalCrNumber = businessIdentity?.cr_number?.trim() || null;
+  const canonicalVatNumber = businessIdentity?.vat_number?.trim() || null;
 
   return (
     <div className="space-y-6">
@@ -1474,6 +1484,14 @@ function VerificationPanel({
         </div>
       </Section>
       <Section title={t("businessInformation")} hint={t("canonicalIdentityHint")}>
+        <Field label={t("legalName")}>
+          <output
+            className={`${inputClass} block bg-neutral-50 text-neutral-700`}
+            aria-readonly="true"
+          >
+            {canonicalLegalName || "—"}
+          </output>
+        </Field>
         <Field label={t("crNumber")}>
           <output
             className={`${inputClass} block bg-neutral-50 text-neutral-700`}
@@ -1481,6 +1499,15 @@ function VerificationPanel({
             dir="ltr"
           >
             {canonicalCrNumber || "—"}
+          </output>
+        </Field>
+        <Field label={t("vatNumber")}>
+          <output
+            className={`${inputClass} block bg-neutral-50 text-neutral-700`}
+            aria-readonly="true"
+            dir="ltr"
+          >
+            {canonicalVatNumber || "—"}
           </output>
         </Field>
         <a
