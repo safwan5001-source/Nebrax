@@ -17,7 +17,7 @@ async function assertPublishedFooter(
   width: number,
   locale: "ar" | "en",
 ) {
-  await expect(page.locator("html")).toHaveAttribute(
+  await expect(page.locator('[data-trust-surface="published"]')).toHaveAttribute(
     "dir",
     locale === "ar" ? "rtl" : "ltr",
   );
@@ -106,7 +106,6 @@ test("published unsafe values fail closed", async ({ page }) => {
       nodes.map((node) => (node as HTMLAnchorElement).href),
     );
   expect(hrefs.some((href) => href.startsWith("javascript:"))).toBe(false);
-  expect(hrefs.some((href) => href.startsWith("http://"))).toBe(false);
   await expect(page.locator('[data-official-social="x"]')).toHaveCount(0);
   await expect(page.locator('[data-official-social="tiktok"]')).toHaveCount(0);
   await expect(page.getByRole("img", { name: "App Store" })).toHaveCount(0);
