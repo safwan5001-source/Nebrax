@@ -1,12 +1,13 @@
 // @vitest-environment jsdom
 import * as React from 'react';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ProductVariantsPanel } from './product-variants-panel';
 
-const { apiMock, toastSuccess, toastError, translate } = vi.hoisted(() => ({
+const { apiMock, fetchImageUrlMock, toastSuccess, toastError, translate } = vi.hoisted(() => ({
   apiMock: vi.fn(),
+  fetchImageUrlMock: vi.fn(async () => null),
   toastSuccess: vi.fn(),
   toastError: vi.fn(),
   // مرجعٌ ثابتٌ واحد عبر كل الاستدعاءات — لا دالّةٌ جديدة في كل عرض. `t` غير
@@ -24,6 +25,7 @@ vi.mock('next-intl', () => ({ useTranslations: () => translate }));
 
 vi.mock('@/lib/api', () => ({
   api: apiMock,
+  fetchImageUrl: fetchImageUrlMock,
   ApiError: class ApiError extends Error {
     constructor(public status: number, message: string) {
       super(message);
@@ -84,7 +86,7 @@ vi.mock('lucide-react', () => {
 const PRODUCT_ID = 'product-1';
 
 type Fixture = {
-  options: Array<{ id: string; name: string; name_en: string | null; is_active: boolean; values: Array<{ id: string; value: string; value_en: string | null; is_active: boolean; visual_type?: 'none' | 'color'; color_value?: string | null }> }>;
+  options: Array<{ id: string; name: string; name_en: string | null; is_active: boolean; values: Array<{ id: string; value: string; value_en: string | null; is_active: boolean; visual_type?: 'none' | 'color' | 'image'; color_value?: string | null; image_media?: { id: string; download_url: string } | null }> }>;
   variants: Array<{ id: string; sku: string; is_active: boolean; display_name: string; option_values: Array<{ option_id: string; option_name: string | null; value_id: string; value: string }> }>;
 };
 
@@ -125,6 +127,26 @@ function matrixFrom(fixture: Fixture) {
     options: fixture.options,
     total_possible: combinations.length,
     combinations,
+  };
+}
+
+
+/** السلوك الافتراضي للمزيَّف — يُستعاد جزئياً في اختبار فشل الرفع. */
+function defaultApi(fixture: Fixture) {
+  return async (path: string, options: { method?: string; body?: unknown } = {}) => {
+    const method = options.method ?? 'GET';
+    if (path === `/products/${PRODUCT_ID}/options` && method === 'GET') return { data: fixture.options };
+    if (path === `/products/${PRODUCT_ID}/variants` && method === 'GET') return { data: fixture.variants };
+    if (path === `/products/${PRODUCT_ID}/variants/combinations` && method === 'GET') return matrixFrom(fixture);
+    const valueMatch = path.match(new RegExp(`^/products/${PRODUCT_ID}/options/([^/]+)/values$`));
+    if (valueMatch && method === 'POST') {
+      const option = fixture.options.find((o) => o.id === valueMatch[1]);
+      const body = options.body as { value: string };
+      const value = { id: `val-new`, value: body.value, value_en: null, is_active: true, visual_type: 'none' as const, color_value: null };
+      option?.values.push(value);
+      return { data: value };
+    }
+    throw new Error(`unmocked api call: ${method} ${path}`);
   };
 }
 
@@ -182,6 +204,18 @@ function installApiMock(fixture: Fixture) {
       }
       return { data: variant };
     }
+    const mediaMatch = path.match(new RegExp(`^/products/${PRODUCT_ID}/options/([^/]+)/values/([^/]+)/media$`));
+    if (mediaMatch && method === 'POST') {
+      const option = fixture.options.find((o) => o.id === mediaMatch[1]);
+      const value = option?.values.find((v) => v.id === mediaMatch[2]);
+      if (!value) throw new Error('value not found for media upload');
+      const body = options.body as FormData;
+      if (!(body instanceof FormData) || !(body.get('image') instanceof File)) throw new Error('missing image file');
+      value.visual_type = 'image';
+      value.color_value = null;
+      value.image_media = { id: `media-${Math.random().toString(36).slice(2, 8)}`, download_url: `/api/products/${PRODUCT_ID}/media/x/download` };
+      return { data: value };
+    }
     const valueUpdateMatch = path.match(new RegExp(`^/products/${PRODUCT_ID}/options/([^/]+)/values/([^/]+)$`));
     if (valueUpdateMatch && method === 'PUT') {
       const option = fixture.options.find((o) => o.id === valueUpdateMatch[1]);
@@ -190,6 +224,7 @@ function installApiMock(fixture: Fixture) {
       if (value) {
         value.visual_type = body.visual_type;
         value.color_value = body.visual_type === 'color' ? body.color_value : null;
+        if (body.visual_type !== 'image') value.image_media = null;
       }
       return { data: value };
     }
@@ -205,8 +240,18 @@ function installApiMock(fixture: Fixture) {
   });
 }
 
+// jsdom لا يوفّر واجهة Object URL — تُختَبر مسارات المعاينة (`blob:`) هنا.
+if (typeof URL.createObjectURL !== 'function') {
+  URL.createObjectURL = () => 'blob:mock-preview';
+}
+if (typeof URL.revokeObjectURL !== 'function') {
+  URL.revokeObjectURL = () => {};
+}
+
 beforeEach(() => {
   apiMock.mockReset();
+  fetchImageUrlMock.mockReset();
+  fetchImageUrlMock.mockResolvedValue(null);
   toastSuccess.mockReset();
   toastError.mockReset();
 });
@@ -422,6 +467,164 @@ describe('لوحة خيارات ومتغيّرات المنتج', () => {
     });
     expect(fixture.variants[0]!.id).toBe('var-black');
     expect(fixture.variants[0]!.sku).toBe('SHIRT-BLACK');
+  });
+
+
+  // ───────────────────────── VAR-OPTION-VISUAL-2B — صريّة الصورة ─────────────────────────
+
+  it('يقدّم خيارات المظهر الثلاثة (بدون/لون/صورة) في محرّر القيمة نفسه', async () => {
+    const fixture = makeFixture();
+    installApiMock(fixture);
+    const user = userEvent.setup();
+    render(<ProductVariantsPanel productId={PRODUCT_ID} variantState="variant_managed" onProductChanged={vi.fn()} />);
+    await waitFor(() => expect(screen.getAllByText('أسود').length).toBeGreaterThan(0));
+    await user.click(screen.getByRole('button', { name: 'variants_visual_edit:أسود' }));
+    const select = screen.getByRole('combobox', { name: 'variants_visual_type_label' });
+    expect(within(select).getByRole('option', { name: 'variants_visual_none' })).toBeTruthy();
+    expect(within(select).getByRole('option', { name: 'variants_visual_color' })).toBeTruthy();
+    expect(within(select).getByRole('option', { name: 'variants_visual_image' })).toBeTruthy();
+  });
+
+  it('اختيار «صورة» يعرض تحكّم الرفع ولا يُرسل أي طلب وسيط قبل اختيار ملف', async () => {
+    const fixture = makeFixture();
+    installApiMock(fixture);
+    const user = userEvent.setup();
+    render(<ProductVariantsPanel productId={PRODUCT_ID} variantState="variant_managed" onProductChanged={vi.fn()} />);
+    await waitFor(() => expect(screen.getAllByText('أسود').length).toBeGreaterThan(0));
+    await user.click(screen.getByRole('button', { name: 'variants_visual_edit:أسود' }));
+    await user.selectOptions(screen.getByRole('combobox', { name: 'variants_visual_type_label' }), 'image');
+    expect(screen.getByText('variants_visual_image_hint')).toBeTruthy();
+    expect(apiMock.mock.calls.some((c) => String(c[0]).endsWith('/media'))).toBe(false);
+    await user.click(screen.getByRole('button', { name: 'save' }));
+    await waitFor(() => expect(screen.getByRole('alert').textContent).toBe('variants_visual_image_required'));
+    expect(apiMock.mock.calls.some((c) => String(c[0]).endsWith('/media'))).toBe(false);
+  });
+
+  it('رفع صورة ناجح يُرسل FormData لمسار وسيط القيمة ويعرض المعاينة', async () => {
+    const fixture = makeFixture();
+    installApiMock(fixture);
+    const user = userEvent.setup();
+    render(<ProductVariantsPanel productId={PRODUCT_ID} variantState="variant_managed" onProductChanged={vi.fn()} />);
+    await waitFor(() => expect(screen.getAllByText('أسود').length).toBeGreaterThan(0));
+    await user.click(screen.getByRole('button', { name: 'variants_visual_edit:أسود' }));
+    await user.selectOptions(screen.getByRole('combobox', { name: 'variants_visual_type_label' }), 'image');
+    const file = new File(['fake-image'], 'velvet.jpg', { type: 'image/jpeg' });
+    await user.upload(screen.getByLabelText('variants_visual_image_upload'), file);
+    expect(screen.getByText('velvet.jpg')).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: 'save' }));
+    await waitFor(() => {
+      const call = apiMock.mock.calls.find((c) => c[0] === `/products/${PRODUCT_ID}/options/opt-color/values/val-black/media` && (c[1] as { method?: string }).method === 'POST');
+      expect(call).toBeTruthy();
+      expect((call![1] as { body: FormData }).body).toBeInstanceOf(FormData);
+    });
+    expect(toastSuccess).toHaveBeenCalledWith('variants_visual_saved');
+  });
+
+  it('فشل الرفع يعرض حالة خطأٍ صريحة', async () => {
+    const fixture = makeFixture();
+    installApiMock(fixture);
+    apiMock.mockImplementation(async (path: string, options: { method?: string; body?: unknown } = {}) => {
+      if (String(path).endsWith('/media')) {
+        throw Object.assign(new Error('upload rejected'), { status: 422 });
+      }
+      return defaultApi(fixture)(path, options);
+    });
+    const user = userEvent.setup();
+    render(<ProductVariantsPanel productId={PRODUCT_ID} variantState="variant_managed" onProductChanged={vi.fn()} />);
+    await waitFor(() => expect(screen.getAllByText('أسود').length).toBeGreaterThan(0));
+    await user.click(screen.getByRole('button', { name: 'variants_visual_edit:أسود' }));
+    await user.selectOptions(screen.getByRole('combobox', { name: 'variants_visual_type_label' }), 'image');
+    await user.upload(screen.getByLabelText('variants_visual_image_upload'), new File(['x'], 'velvet.jpg', { type: 'image/jpeg' }));
+    await user.click(screen.getByRole('button', { name: 'save' }));
+    await waitFor(() => expect(screen.getByRole('alert')).toBeTruthy());
+  });
+
+  it('استبدال صورةٍ قائمة يمرّ عبر مسار الرفع نفسه بلا معرّف وسيطٍ من العميل', async () => {
+    const fixture = makeFixture();
+    fixture.options[0]!.values[0] = {
+      ...fixture.options[0]!.values[0]!,
+      visual_type: 'image',
+      image_media: { id: 'media-1', download_url: `/api/products/${PRODUCT_ID}/media/media-1/download` },
+    };
+    installApiMock(fixture);
+    fetchImageUrlMock.mockResolvedValue('blob:existing-preview');
+    const user = userEvent.setup();
+    render(<ProductVariantsPanel productId={PRODUCT_ID} variantState="variant_managed" onProductChanged={vi.fn()} />);
+    await waitFor(() => expect(screen.getAllByText('أسود').length).toBeGreaterThan(0));
+    await user.click(screen.getByRole('button', { name: 'variants_visual_edit:أسود' }));
+    await waitFor(() => expect(screen.getByText('variants_visual_image_replace')).toBeTruthy());
+    await user.upload(screen.getByLabelText('variants_visual_image_upload'), new File(['x'], 'new.jpg', { type: 'image/jpeg' }));
+    await user.click(screen.getByRole('button', { name: 'save' }));
+    await waitFor(() => {
+      const call = apiMock.mock.calls.find((c) => String(c[0]).endsWith('/values/val-black/media'));
+      expect(call).toBeTruthy();
+    });
+    // لا PUT بمرجع صورةٍ من العميل إطلاقاً.
+    const puts = apiMock.mock.calls.filter((c) => ((c[1] ?? {}) as { method?: string }).method === 'PUT');
+    expect(puts).toHaveLength(0);
+  });
+
+  it('الانتقال صورة ← بدون يُرسل PUT نصّياً فقط (الخادم يمسح المرجع)', async () => {
+    const fixture = makeFixture();
+    fixture.options[0]!.values[0] = {
+      ...fixture.options[0]!.values[0]!,
+      visual_type: 'image',
+      image_media: { id: 'media-1', download_url: `/api/products/${PRODUCT_ID}/media/media-1/download` },
+    };
+    installApiMock(fixture);
+    const user = userEvent.setup();
+    render(<ProductVariantsPanel productId={PRODUCT_ID} variantState="variant_managed" onProductChanged={vi.fn()} />);
+    await waitFor(() => expect(screen.getAllByText('أسود').length).toBeGreaterThan(0));
+    await user.click(screen.getByRole('button', { name: 'variants_visual_edit:أسود' }));
+    await user.selectOptions(screen.getByRole('combobox', { name: 'variants_visual_type_label' }), 'none');
+    await user.click(screen.getByRole('button', { name: 'save' }));
+    await waitFor(() => {
+      const call = apiMock.mock.calls.find((c) => c[0] === `/products/${PRODUCT_ID}/options/opt-color/values/val-black` && (c[1] as { method?: string }).method === 'PUT');
+      expect((call![1] as { body: Record<string, unknown> }).body).toEqual({ visual_type: 'none', color_value: null });
+    });
+    expect(fixture.variants[0]!.id).toBe('var-black');
+    expect(fixture.variants[0]!.sku).toBe('SHIRT-BLACK');
+  });
+
+  it('الانتقال صورة ← لون يُرسل اللون فقط بلا مرجع صورة', async () => {
+    const fixture = makeFixture();
+    fixture.options[0]!.values[0] = {
+      ...fixture.options[0]!.values[0]!,
+      visual_type: 'image',
+      image_media: { id: 'media-1', download_url: `/api/products/${PRODUCT_ID}/media/media-1/download` },
+    };
+    installApiMock(fixture);
+    const user = userEvent.setup();
+    render(<ProductVariantsPanel productId={PRODUCT_ID} variantState="variant_managed" onProductChanged={vi.fn()} />);
+    await waitFor(() => expect(screen.getAllByText('أسود').length).toBeGreaterThan(0));
+    await user.click(screen.getByRole('button', { name: 'variants_visual_edit:أسود' }));
+    await user.selectOptions(screen.getByRole('combobox', { name: 'variants_visual_type_label' }), 'color');
+    await user.type(screen.getByRole('textbox', { name: 'variants_hex_label' }), '#1E3A8A');
+    await user.click(screen.getByRole('button', { name: 'save' }));
+    await waitFor(() => {
+      const call = apiMock.mock.calls.find((c) => c[0] === `/products/${PRODUCT_ID}/options/opt-color/values/val-black` && (c[1] as { method?: string }).method === 'PUT');
+      expect((call![1] as { body: Record<string, unknown> }).body).toEqual({ visual_type: 'color', color_value: '#1E3A8A' });
+    });
+  });
+
+  it('إنشاء قيمةٍ بمظهر «صورة» ينشئها نصّيةً أولاً ثم يفتح محرّرها — بلا طلب وسيط قبل الهوية', async () => {
+    const fixture = makeFixture();
+    fixture.options[0]!.values = [];
+    installApiMock(fixture);
+    const user = userEvent.setup();
+    render(<ProductVariantsPanel productId={PRODUCT_ID} variantState="variant_managed" onProductChanged={vi.fn()} />);
+    await waitFor(() => expect(screen.getByPlaceholderText('variants_add_value_placeholder')).toBeTruthy());
+    await user.type(screen.getByPlaceholderText('variants_add_value_placeholder'), 'مخمل أزرق');
+    await user.selectOptions(screen.getByRole('combobox', { name: 'variants_visual_type_label' }), 'image');
+    expect(screen.getByText('variants_visual_image_gate')).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: 'add' }));
+    await waitFor(() => {
+      const call = apiMock.mock.calls.find((c) => c[0] === `/products/${PRODUCT_ID}/options/opt-color/values` && (c[1] as { method?: string }).method === 'POST');
+      // لا visual_type=image ولا معرّف وسيطٍ مزيّف عند الإنشاء.
+      expect((call![1] as { body: Record<string, unknown> }).body).toEqual({ value: 'مخمل أزرق' });
+    });
+    expect(apiMock.mock.calls.some((c) => String(c[0]).endsWith('/media'))).toBe(false);
+    await waitFor(() => expect(screen.getByText('variants_visual_title')).toBeTruthy());
   });
 
 });

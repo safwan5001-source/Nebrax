@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Requests\CreateProductVariantsRequest;
 use App\Http\Requests\StoreProductOptionRequest;
+use App\Http\Requests\StoreOptionValueSwatchRequest;
 use App\Http\Requests\StoreProductOptionValueRequest;
 use App\Http\Requests\UpdateProductOptionRequest;
 use App\Http\Requests\UpdateProductOptionValueRequest;
@@ -16,6 +17,7 @@ use App\Models\Product;
 use App\Models\ProductOption;
 use App\Models\ProductOptionValue;
 use App\Models\ProductVariant;
+use App\Services\ProductMediaService;
 use App\Services\ProductVariantService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -31,8 +33,10 @@ use Illuminate\Http\Request;
  */
 class ProductVariantController extends ApiController
 {
-    public function __construct(private readonly ProductVariantService $variants)
-    {
+    public function __construct(
+        private readonly ProductVariantService $variants,
+        private readonly ProductMediaService $media,
+    ) {
     }
 
     // ───────────────────────── حالة المنتج ─────────────────────────
@@ -112,6 +116,43 @@ class ProductVariantController extends ApiController
         $this->domain(fn () => $this->variants->deleteOptionValue($value, $request->user()?->id));
 
         return response()->json(['message' => 'تم الحذف.']);
+    }
+
+    /**
+     * VAR-OPTION-VISUAL-2B — رفع صورة صريّة (swatch) لقيمة خيارٍ قائمة.
+     *
+     * أصغر مسار تأليفٍ ممكن فوق سلطة VAR-MEDIA-1 القائمة: التخزين عبر
+     * `ProductMediaService::attachToOptionValue()` (نفس `DocumentStorageService`
+     * ونفس مسار `product-media/{tenant}/{product}/` المولَّد خادماً — لا مسار
+     * من العميل إطلاقاً)، ثم اعتماد المرجع عبر سلطة الصريّة نفسها
+     * (`updateOptionValue` → `applyVisualMetadata`) لا بكتابة العمود مباشرةً.
+     *
+     * الملكية الهرمية (المنتج ← الخيار ← القيمة) تُحلّ في `resolveOptionValue`
+     * قبل أي كتابة؛ عزل المستأجر عبر `TenantScope` وصلاحية `products.manage`
+     * على المسار. إن فشل اعتماد الصريّة بعد نجاح التخزين يُحذف الوسيط الجديد
+     * فوراً — لا صفّ يتيم بلا مرجع.
+     */
+    public function storeOptionValueMedia(StoreOptionValueSwatchRequest $request, string $id, string $optionId, string $valueId): JsonResponse
+    {
+        $value = $this->resolveOptionValue($id, $optionId, $valueId);
+        $product = $value->option->product;
+
+        $media = $this->domain(fn () => $this->media->attachToOptionValue(
+            $product, $value, [$request->file('image')], $request->user()?->id
+        ))[0];
+
+        try {
+            $value = $this->domain(fn () => $this->variants->updateOptionValue($value->fresh(), [
+                'visual_type' => \App\Models\ProductOptionValue::VISUAL_TYPE_IMAGE,
+                'image_media_id' => $media->id,
+            ], $request->user()?->id));
+        } catch (\Throwable $exception) {
+            $this->media->delete($media);
+
+            throw $exception;
+        }
+
+        return (new ProductOptionValueResource($value->fresh('imageMedia')))->response()->setStatusCode(201);
     }
 
     // ───────────────────────── التركيبات والمتغيّرات ─────────────────────────

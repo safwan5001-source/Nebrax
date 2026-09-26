@@ -216,10 +216,22 @@ class ProductVariantService
         });
     }
 
-    /** @param array<string, mixed> $data */
+    /**
+     * @param array<string, mixed> $data
+     *
+     * VAR-OPTION-VISUAL-2B — تنظيفٌ حتميّ لوسيط الصريّة المستبدَل: أي انتقالٍ
+     * يُبعد `image_media_id` عن مرجعه السابق (استبدال صورةٍ بأخرى، أو image ←
+     * color/none) يحذف صفّ الوسيط السابق **داخل المعاملة نفسها** وملفّه
+     * الفعلي بعد الالتزام (نفس نمط `deleteOptionValue` حرفياً). الحذف آمنٌ
+     * بالبنية: وسيطُ الصريّة مملوكٌ حصرياً لهذه القيمة بالذات
+     * (`product_option_value_id` — يفرضه حارس `ProductMedia::booted()` وشرط
+     * `applyVisualMetadata`)، ولا مرجع `image_media_id` آخر يمكن أن يشير
+     * إليه لأن المرجع لا يُقبل إلا من قيمته المالكة نفسها.
+     */
     public function updateOptionValue(ProductOptionValue $value, array $data, ?string $userId): ProductOptionValue
     {
-        return DB::transaction(function () use ($value, $data, $userId) {
+        $staleSwatchFiles = [];
+        $result = DB::transaction(function () use ($value, $data, $userId, &$staleSwatchFiles) {
             $value = ProductOptionValue::lockForUpdate()->findOrFail($value->id);
             $option = $value->option;
             $diff = [];
@@ -267,12 +279,31 @@ class ProductVariantService
             if ($value->isDirty()) {
                 $value->save();
             }
+
+            // الوسيط السابق لم يعد مرجع الصريّة — يُنظَّف حتمياً (صفٌّ داخل
+            // المعاملة، ملفٌّ بعد الالتزام) إن كان مملوكاً لهذه القيمة فعلاً.
+            // مرجعٌ لا يخصّها لا يُمسّ (لا يحدث عبر المسارات المعتمَدة، لكن
+            // الشرط صريحٌ دفاعاً عن أي صفٍّ موروث).
+            $previousImageId = $visualBefore['image_media_id'];
+            if ($previousImageId !== null && $previousImageId !== $value->image_media_id) {
+                $stale = ProductMedia::where('id', $previousImageId)
+                    ->where('product_option_value_id', $value->id)
+                    ->first();
+                if ($stale !== null) {
+                    $staleSwatchFiles = [['disk' => $stale->disk, 'path' => $stale->path]];
+                    $stale->delete();
+                }
+            }
+
             if ($diff !== []) {
                 $this->recordActivity($option->product, 'variant_option_value_updated', $diff, $userId);
             }
 
             return $value;
         });
+        $this->media->deleteFiles($staleSwatchFiles);
+
+        return $result;
     }
 
     /**

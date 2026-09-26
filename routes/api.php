@@ -453,6 +453,8 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::delete('products/{id}/options/{optionId}', [ProductVariantController::class, 'destroyOption'])->middleware($perm('products.manage'));
 
         Route::post('products/{id}/options/{optionId}/values', [ProductVariantController::class, 'storeOptionValue'])->middleware($perm('products.manage'));
+        // VAR-OPTION-VISUAL-2B: رفع صورة صريّة (swatch) لقيمة خيارٍ قائمة — نفس صلاحية إدارة الكتالوج.
+        Route::post('products/{id}/options/{optionId}/values/{valueId}/media', [ProductVariantController::class, 'storeOptionValueMedia'])->middleware($perm('products.manage'));
         Route::put('products/{id}/options/{optionId}/values/{valueId}', [ProductVariantController::class, 'updateOptionValue'])->middleware($perm('products.manage'));
         Route::delete('products/{id}/options/{optionId}/values/{valueId}', [ProductVariantController::class, 'destroyOptionValue'])->middleware($perm('products.manage'));
 
