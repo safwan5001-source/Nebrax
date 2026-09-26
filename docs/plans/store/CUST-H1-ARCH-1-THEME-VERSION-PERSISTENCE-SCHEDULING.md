@@ -310,7 +310,7 @@ Keep existing head config fields unchanged.
 Create two versions:
 
 1. Published version from `published_config`, with `last_published_at = existing published_at`.
-2. Draft version from `draft_config`.
+2. Draft version from `draft_config`, with `revision = max(1, existing draft_revision)`.
 
 Set active pointer to Published version.
 
@@ -322,7 +322,7 @@ No user work is discarded.
 
 ### Case D — Draft exists, never Published
 
-Create one Draft version from `draft_config`.
+Create one Draft version from `draft_config`, with `revision = max(1, existing draft_revision)`.
 
 `active_version_id = null`.
 
@@ -562,18 +562,21 @@ Immediate Publish must:
 6. validate expected Version revision;
 7. normalize target Version config server-side;
 8. enforce document-size limits;
-9. copy normalized config to existing head `published_config`;
-10. atomically set head `published_schema_version = target.schema_version` (or the server-normalized current schema version used for the copied document);
-11. do **not** retag the unrelated compatibility Draft; `draft_schema_version` remains the schema version of `draft_config`;
-12. update legacy shared `schema_version` only according to the compatibility strategy chosen in implementation, and never use it as authority for new reads;
-13. update `published_revision` with a compatibility monotonic value;
-14. update `published_at = now()`;
-15. set `active_version_id = target.id`;
-16. set target `last_published_at = now()`;
-17. if target was scheduled, clear its schedule and head `scheduled_version_id`;
-18. commit.
+9. if normalization upgrades/transforms the Version document or schema, atomically persist the normalized `config` and resulting `schema_version` back to the target Version before/with publication; define this normalization-only rewrite as **not a merchant edit**, so it does not create a stale-edit surprise or increment the merchant-facing Version revision unless implementation evidence proves revision increment is necessary;
+10. copy that exact persisted normalized config to existing head `published_config`;
+11. atomically set head `published_schema_version = target.schema_version` using the persisted target schema version;
+12. do **not** retag the unrelated compatibility Draft; `draft_schema_version` remains the schema version of `draft_config`;
+13. update legacy shared `schema_version` only according to the compatibility strategy chosen in implementation, and never use it as authority for new reads;
+14. update `published_revision` with a compatibility monotonic value;
+15. update `published_at = now()`;
+16. set `active_version_id = target.id`;
+17. set target `last_published_at = now()`;
+18. if target was scheduled, clear its schedule and head `scheduled_version_id`;
+19. commit.
 
 The Published document and `published_schema_version` are one atomic pair. The Draft document and `draft_schema_version` are a separate atomic pair. A v2 Published document must never be interpreted through a v1 tag, and publishing v2 must never silently retag a still-v1 legacy Draft.
+
+The active Version row must also remain the exact source of the live snapshot after normalization. Reading or duplicating the active Version later must produce the same document semantics as the public head.
 
 No partial public state is observable.
 
@@ -1044,7 +1047,8 @@ True concurrency tests should run on PostgreSQL where repository convention alre
 - published != draft;
 - rerun/idempotency;
 - schema normalization;
-- no public snapshot mutation.
+- no public snapshot mutation;
+- compatibility Draft Version preserves existing draft_revision in Cases C and D.
 
 ### Version CRUD
 
@@ -1080,6 +1084,7 @@ True concurrency tests should run on PostgreSQL where repository convention alre
 - active pointer changes atomically;
 - old live Version retained;
 - Published compatibility snapshot updated;
+- normalization-on-publish persists back to the target Version so active Version == live snapshot;
 - published_schema_version changes atomically with published_config;
 - draft_schema_version remains paired with draft_config;
 - publishing v2 after migrated v1 head preserves v2 semantics in public normalization without reinterpreting a v1 compatibility draft;
