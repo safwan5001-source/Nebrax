@@ -142,6 +142,7 @@ Add to `storefront_presentations`:
 ```
 draft_schema_version             unsignedSmallInteger
 published_schema_version         unsignedSmallInteger nullable
+schedule_epoch                   unsignedInteger default 0
 active_version_id                uuid nullable
 scheduled_version_id             uuid nullable
 compatibility_working_version_id uuid nullable
@@ -171,6 +172,8 @@ Indexes:
 - index(active_version_id)
 - index(scheduled_version_id)
 - index(compatibility_working_version_id)
+
+`schedule_epoch` is a Storefront-level lifecycle counter. It increments on every schedule create/replace/reschedule/cancel/successful scheduled publish and remains persisted even when no schedule exists. It prevents ABA races where the Storefront returns to an apparently "unscheduled" state after a newer schedule lifecycle decision.
 
 ### Why pointers live on the head
 
@@ -385,8 +388,12 @@ Save contract:
 - server locks owned Storefront + head + selected Version;
 - mismatch → 409;
 - **before normalization**, reject if either the stored Version schema or the incoming document's declared `config.version` is greater than `StorefrontPresentationNormalizer::VERSION`;
-- server normalizes only supported-schema config;
+- server interprets accepted incoming config as the **current supported schema contract** once the payload's declared version is validated;
+- normalize using current-schema semantics, not the row's stale legacy schema tag;
+- atomically persist both normalized `config` and resulting current `schema_version`;
 - successful save increments Version revision by 1.
+
+For a migrated v1 Version, the first successful exact save is therefore an explicit atomic upgrade of that Version to the current schema. Missing sections in the returned/current-schema document keep current-schema deletion semantics and must not be re-expanded using legacy v1 absence rules.
 
 An older runtime must never use normalization fallback as an implicit downgrade path for a newer client payload.
 
@@ -524,9 +531,13 @@ Body:
 
 ```json
 {
-  "revision": 7
+  "revision": 7,
+  "expected_published_revision": 12,
+  "expected_active_version_id": "<uuid-or-null>"
 }
 ```
+
+The request must carry the publication-head state the merchant reviewed.
 
 If the target Version is currently Scheduled, **Publish Now is rejected with 409**. The merchant must explicitly cancel the schedule first, then Publish Now.
 
@@ -538,34 +549,27 @@ This prevents an older delayed Publish Now request from implicitly canceling a n
 PUT /api/commerce/workspace/storefronts/{storefront}/presentation/versions/{version}/schedule
 ```
 
-Schedule body when no storefront schedule currently exists:
+Every schedule mutation carries the caller's expected Storefront schedule lifecycle token:
 
 ```json
 {
   "revision": 7,
-  "scheduled_for": "2026-10-01T21:00:00+03:00"
+  "scheduled_for": "2026-10-01T21:00:00+03:00",
+  "expected_schedule_token": "<opaque token>"
 }
 ```
 
-If the Storefront already has **any** scheduled Version — whether the same target or a different target — the request must include the opaque token representing the currently scheduled lifecycle state:
-
-```json
-{
-  "revision": 7,
-  "scheduled_for": "2026-10-02T21:00:00+03:00",
-  "expected_current_schedule_token": "<opaque token>"
-}
-```
+The token represents the current persisted `schedule_epoch`, including the **no-schedule** state.
 
 Rules:
 
-- no current schedule → token must be absent/null;
-- current schedule exists → token is required;
-- stale/missing token while a schedule exists → **409**;
-- token is validated against the locked head/current scheduled Version before invalidating or replacing anything;
-- the rule applies equally to same-target reschedule and different-target replacement.
+- token is always required for schedule create/replace/reschedule/cancel;
+- token must match the locked Storefront `schedule_epoch`;
+- mismatch → **409** before any lifecycle mutation;
+- same rule applies whether a schedule currently exists or not;
+- every successful schedule create/replace/reschedule/cancel increments `schedule_epoch` and returns a new opaque token.
 
-A stale dialog for Version B therefore cannot erase a newer schedule for Version C.
+A stale dialog opened while no schedule existed therefore cannot recreate a schedule after another session has scheduled and canceled a Version in the meantime.
 
 `schedule_generation` remains an internal persistence/job concurrency value and is never part of the merchant API contract.
 
@@ -578,16 +582,17 @@ Schedule / replace transaction must:
 1. lock Storefront/head/target Version;
 2. reject active Published target;
 3. compare request `revision` to locked target Version revision; mismatch → **409** before any schedule/pointer mutation;
-4. read the locked head's current `scheduled_version_id`;
-5. if no current schedule exists, require `expected_current_schedule_token` to be absent/null;
-6. if a current schedule exists, lock that currently scheduled Version (if different from target) and require `expected_current_schedule_token` to match the current opaque schedule token; missing/stale token → **409**;
+4. validate `expected_schedule_token` against locked head `schedule_epoch`; mismatch → **409**;
+5. read the locked head's current `scheduled_version_id`;
+6. if a current schedule exists, lock that currently scheduled Version if different from target;
 7. validate future timestamp;
 8. if replacing another scheduled Version, invalidate it by incrementing its internal `schedule_generation` and clearing `scheduled_for`;
 9. increment the target Version internal `schedule_generation`;
 10. set target Version `scheduled_for`;
 11. atomically set head `scheduled_version_id = target.id`;
-12. return a new opaque `schedule_token`;
-13. commit.
+12. increment head `schedule_epoch`;
+13. return a new opaque `schedule_token` derived from the new epoch;
+14. commit.
 
 The previously scheduled Version must not retain obsolete schedule metadata after replacement. Its derived state becomes Draft and its `scheduled_for` must be null. Any delayed job for it becomes stale by generation/pointer checks.
 
@@ -615,19 +620,20 @@ Immediate Publish must:
 4. lock target Version;
 5. re-check tenant/storefront/version relationship;
 6. validate expected Version revision;
-7. **before normalization**, require `target.schema_version <= StorefrontPresentationNormalizer::VERSION`; if the Version uses a forward schema unsupported by the running code, abort with a lifecycle/compatibility conflict and leave both the Version and current Published snapshot unchanged;
-8. normalize target Version config server-side;
-9. enforce document-size limits;
-10. if normalization upgrades/transforms the Version document or schema, atomically persist the normalized `config` and resulting `schema_version` back to the target Version before/with publication; define this normalization-only rewrite as **not a merchant edit**, so it does not create a stale-edit surprise or increment the merchant-facing Version revision unless implementation evidence proves revision increment is necessary;
-11. copy that exact persisted normalized config to existing head `published_config`;
-12. atomically set head `published_schema_version = target.schema_version` using the persisted target schema version;
-13. do **not** retag the unrelated compatibility Draft; `draft_schema_version` remains the schema version of `draft_config`;
-14. update legacy shared `schema_version` only according to the compatibility strategy chosen in implementation, and never use it as authority for new reads;
-15. update `published_revision` with a compatibility monotonic value;
-16. update `published_at = now()`;
-17. set `active_version_id = target.id`;
-18. set target `last_published_at = now()`;
-19. commit.
+7. validate publication-head concurrency: locked head `published_revision` and `active_version_id` must match `expected_published_revision` / `expected_active_version_id`; mismatch → **409** before changing live state;
+8. **before normalization**, require `target.schema_version <= StorefrontPresentationNormalizer::VERSION`; if the Version uses a forward schema unsupported by the running code, abort with a lifecycle/compatibility conflict and leave both the Version and current Published snapshot unchanged;
+9. normalize target Version config server-side;
+10. enforce document-size limits;
+11. if normalization upgrades/transforms the Version document or schema, atomically persist the normalized `config` and resulting `schema_version` back to the target Version before/with publication; define this normalization-only rewrite as **not a merchant edit**, so it does not create a stale-edit surprise or increment the merchant-facing Version revision unless implementation evidence proves revision increment is necessary;
+12. copy that exact persisted normalized config to existing head `published_config`;
+13. atomically set head `published_schema_version = target.schema_version` using the persisted target schema version;
+14. do **not** retag the unrelated compatibility Draft; `draft_schema_version` remains the schema version of `draft_config`;
+15. update legacy shared `schema_version` only according to the compatibility strategy chosen in implementation, and never use it as authority for new reads;
+16. update `published_revision` with a compatibility monotonic value;
+17. update `published_at = now()`;
+18. set `active_version_id = target.id`;
+19. set target `last_published_at = now()`;
+20. commit.
 
 Precondition for **Publish Now**: the target must not be the current Scheduled Version. Publish Now never clears a schedule implicitly.
 
@@ -1250,14 +1256,16 @@ True concurrency tests should run on PostgreSQL where repository convention alre
 - same-version stale save;
 - different-version independent save;
 - publish vs save;
+- publish A vs publish B with stale publication-head token → stale request 409;
 - publish vs publish;
 - initial schedule stale revision → 409 with no schedule mutation;
 - replacing scheduled Version A with B clears A.scheduled_for and invalidates A.schedule_generation atomically;
 - schedule vs reschedule;
 - stale reschedule revision → 409 with no schedule mutation;
-- stale expected_current_schedule_token on same-target reschedule → 409;
-- stale expected_current_schedule_token on different-target schedule replacement → 409;
-- stale schedule_token on cancel → 409;
+- stale expected_schedule_token on initial scheduling after an ABA schedule/cancel cycle → 409;
+- stale expected_schedule_token on same-target reschedule → 409;
+- stale expected_schedule_token on different-target schedule replacement → 409;
+- stale expected_schedule_token on cancel → 409;
 - reordered reschedule/cancel requests cannot overwrite or clear newer scheduling state;
 - stale cancel for superseded Version cannot clear newer scheduled pointer;
 - schedule vs cancel;
@@ -1465,9 +1473,12 @@ Before CUST-H1 implementation starts, the following invariants are treated as on
 - [x] Published config/revision/schema tag move atomically.
 - [x] Active Version config/schema remains semantically identical to the public Published snapshot after normalization.
 - [x] Forward-schema documents fail closed before normalization across read/save/duplicate/legacy/immediate/scheduled paths.
-- [x] Raw `schedule_generation` is internal only; merchant API uses opaque schedule tokens.
+- [x] Raw `schedule_generation` is internal only; merchant API uses opaque schedule tokens backed by persistent Storefront `schedule_epoch`.
+- [x] Schedule epoch persists across no-schedule state to prevent ABA schedule/cancel races.
 - [x] Any existing storefront schedule must be matched by `expected_current_schedule_token` before same-target reschedule or different-target replacement.
 - [x] Publish Now cannot implicitly cancel a scheduled lifecycle state; Scheduled must be explicitly canceled first.
+- [x] Publish Now validates publication-head state (`published_revision` + `active_version_id`) so a stale publish cannot overwrite a newer live selection.
+- [x] Exact save atomically upgrades normalized config + Version schema tag using current-schema semantics.
 - [x] Scheduled jobs use a distinct verified scheduler entry into the shared publish transaction and clear schedule atomically on success.
 - [x] Legacy GET preserves `storefront_id` and legacy `schema_version`; new code uses separate Draft/Published schema tags internally.
 - [x] Initial schedule, replacement, reschedule, cancel, and delayed jobs all invalidate stale executions deterministically.
