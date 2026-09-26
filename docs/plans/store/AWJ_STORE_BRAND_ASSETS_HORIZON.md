@@ -278,7 +278,18 @@ Evidence → Architecture/Decision as needed → Scope/DoD → focused tests →
 
 No manual deploy.
 
-Note: Railway production may currently auto-deploy merges from `main`. This horizon must record actual deployment state truthfully, but must not modify deployment configuration or trigger a deploy without separate owner authorization.
+### Production auto-deploy merge gate
+
+Railway production is currently known to auto-deploy merges from `main`.
+
+Therefore, for any PR in this horizon that changes runtime behavior, **merge itself has Production impact**. Such a PR must stop before merge unless one of these is explicitly authorized by Safwan:
+
+1. the Production deployment impact of that merge; or
+2. a separately scoped change that places Production behind an approved deployment gate / disables automatic Production deployment.
+
+Documentation-only / evidence-only PRs may follow the ordinary merge gate because they do not change runtime behavior.
+
+Do not silently treat “no manual deploy” as equivalent to “no Production deployment”. Every report must state the actual deployment state truthfully. This horizon must not change Railway deployment configuration unless separately authorized.
 
 ## 11. Horizon end
 
@@ -287,7 +298,7 @@ Close only when:
 - every ready slice is merged and post-reviewed;
 - every external mark in use has provenance/usage evidence;
 - Contact icons, Social/WhatsApp marks, and App badges render on the actual published storefront;
-- payment marks either render from a proven truthful capability source or are explicitly left behind a documented decision gate;
+- payment marks either render from a proven truthful capability source or are explicitly left behind a documented decision gate; a decision-gated/deferred payment slice must not block composition, QA, or closure of the other completed scope;
 - Preview ↔ Published parity is recorded;
 - responsive/accessibility/security QA is recorded;
 - closure report and durable current state are updated.
