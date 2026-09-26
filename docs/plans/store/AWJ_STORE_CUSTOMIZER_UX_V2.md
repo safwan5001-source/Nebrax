@@ -4,7 +4,7 @@
 **Date:** 2026-09-19
 **Repository:** `safwan5001-source/Nebrax`
 **Base:** `main` `5dd415f7358137cac3e030b21ca7b629c15815c0` (Commerce API V1 PR-4 merge, #836)
-**Related authority:** `AWJ_STORE_CUSTOMIZER_PERSISTENCE_ARCHITECTURE.md` (STORE-CUSTOMIZER-ARCH-1, persistence lock), `STORE-UI-6-IMPLEMENTATION-REPORT.md` (current Customizer), `AWJ_STOREFRONT_DESIGN_FIRST_POLICY.md` (capability honesty policy).
+**Related authority:** `AWJ_STORE_CUSTOMIZER_PERSISTENCE_ARCHITECTURE.md` (STORE-CUSTOMIZER-ARCH-1, persistence lock), `STORE-UI-6-IMPLEMENTATION-REPORT.md` (historical Customizer baseline), `AWJ_STOREFRONT_DESIGN_FIRST_POLICY.md` (capability honesty policy), `AWJ_STORE_CUSTOMIZER_HORIZON_ROADMAP_V1.md` (current forward Horizon roadmap as of 2026-09-26).
 
 ---
 
@@ -386,3 +386,24 @@ The next Visual Builder UI slice is complete only when:
 - [ ] Desktop and Mobile visual/interaction QA is performed against Prototype V0.2 before recommending merge.
 
 ---
+
+
+## 20. 2026-09-26 amendment — Horizon execution roadmap
+
+The Customizer has materially advanced since the original gap inventory in §15. That section is retained as a **historical point-in-time record** and must not be read as the current implementation state.
+
+The current forward execution authority is:
+
+- `docs/plans/store/AWJ_STORE_CUSTOMIZER_HORIZON_ROADMAP_V1.md`
+
+The Horizon roadmap:
+
+- starts from the post-V2 / CONTRACT-2 / standalone Visual Builder foundation rather than rebuilding it;
+- incorporates current first-party Salla evidence as an external maturity benchmark;
+- preserves AWJ's direct Canvas editing, preview-first mobile UX, Theme Token isolation, tenant isolation and backward-compatibility requirements;
+- organizes future work as closed capability Horizons rather than an open-ended stream of small UI patches;
+- requires evidence → UX contract → architecture/data decision → implementation → responsive/accessibility/security verification → Pre-Merge Review → explicit owner merge approval → Post-Merge Review → Horizon Closure;
+- defines the next major capability sequence as Theme Copies & Safe Publication Lifecycle, Multi-Page Visual Builder, Store Identity Studio, Section Library, Undo/Redo & Recovery, then Advanced Extensibility;
+- keeps custom JavaScript outside the default parity target until a dedicated security architecture review approves it.
+
+No implementation, merge, deployment or production release is authorized by this amendment.
