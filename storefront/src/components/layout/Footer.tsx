@@ -215,6 +215,7 @@ export async function Footer({
                 <a
                   href={whatsappHref}
                   className={footerLinkClassName}
+                  target="_blank"
                   rel="noopener noreferrer"
                 >
                   {t("whatsapp")}

@@ -417,6 +417,7 @@ export function StorefrontPreviewCanvas({
                 <a
                   href={footerWhatsapp}
                   className="text-store-footer-link underline-offset-2 hover:underline"
+                  onClick={(event) => event.preventDefault()}
                 >
                   {t("whatsapp")}
                 </a>
@@ -551,6 +552,7 @@ export function StorefrontPreviewCanvas({
         <a
           href={whatsappHref}
           aria-label={t("whatsappAria")}
+          onClick={(event) => event.preventDefault()}
           className={cn(
             "absolute z-30 inline-flex size-12 items-center justify-center rounded-full bg-[#128c7e] text-white",
             compact ? "end-3 bottom-16" : "end-4 bottom-4",
