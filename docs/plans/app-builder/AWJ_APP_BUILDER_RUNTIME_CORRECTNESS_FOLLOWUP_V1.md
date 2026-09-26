@@ -91,8 +91,8 @@ Stop only for a genuine Decision Gate, a real blocker, or scope crossing as defi
 
 | Task | Purpose | State |
 |---|---|---|
-| RUNTIME-CORRECTNESS-1 | Evidence lock for the two LIVE-PREVIEW-7 findings | **READY** |
-| RUNTIME-CORRECTNESS-2 | Correct proof/test overclaims without weakening assertions | BLOCKED on RC-1 |
+| RUNTIME-CORRECTNESS-1 | Evidence lock for the two LIVE-PREVIEW-7 findings | **DONE** |
+| RUNTIME-CORRECTNESS-2 | Correct proof/test overclaims without weakening assertions | **READY** |
 | RUNTIME-CORRECTNESS-3 | Generic CartSummary live hydration | BLOCKED on RC-2 |
 | RUNTIME-CORRECTNESS-4 | Integrated runtime proof for arbitrary CartSummary ids | BLOCKED on RC-3 |
 | RUNTIME-CORRECTNESS-5 | Horizon closure / durable documentation | BLOCKED on RC-4 |
@@ -335,7 +335,26 @@ release-mode CI/build proof is green and the task does not require device-only b
   static cart summary values.
 - Live Preview real-data/auth question remains explicitly deferred to a **separate future
   workstream** and must not be pulled into this one.
-- Next task: **RUNTIME-CORRECTNESS-1 — Evidence lock**.
+
+### RUNTIME-CORRECTNESS-1 — DONE
+
+- PR: (this task's own docs-only PR, opened against `claude/awj-runtime-correctness-followup-x7anrt`)
+- Base SHA: `52d1ede313196c4042fe47c44b2c6fcd57af8c84`
+- Evidence report: `docs/plans/app-builder/RUNTIME-CORRECTNESS-1-EVIDENCE-PASS.md`
+- Scope: evidence only, no runtime/test code changed.
+- Result: both LIVE-PREVIEW-7 findings re-confirmed against current `main`. Finding A pinpointed to
+  exact doc-comment overclaims in `AppBuilderIntegratedProofTest.php`/`AppBuilderSameStoreProofTest.php`.
+  Finding B pinpointed to the single hardcoded id `'slot.cart.summary'` at `cart_screen.dart:195`.
+  Confirmed the shared LIVE-PREVIEW-7 fixture (`contracts/app-builder/integrated-proof-schema.v1.json`)
+  already authors its `CartSummary` node under a *different* id (`cart-summary`), so it is already a
+  ready-made arbitrary-id fixture for RC-4's integrated proof — no new fixture needed.
+  Confirmed the generic fix can key off `SchemaComponent.type == 'CartSummary'` (already a
+  capability-gated identifier) with no new schema/API field, and that no schema in this repository
+  authors more than one `CartSummary` node, so no multi-node ambiguity exists to gate on.
+- Decision Gate check: all 8 gates checked, none triggered.
+- No tests run (docs-only change); no runtime/behavior change.
+- Risks: none introduced. No new deferrals beyond what LIVE-PREVIEW-8 already recorded.
+- Next task: **RUNTIME-CORRECTNESS-2 — Proof truthfulness**.
 
 ## Autonomous execution instruction
 
