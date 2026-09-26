@@ -980,3 +980,222 @@ The Customizer advances **one closed Horizon at a time**.
 ---
 
 *Documentation only. This file does not authorize application code changes, database/API changes, merge, deploy or production release.*
+
+
+# 18. Precise Salla ↔ AWJ Comparison & Completion Matrix
+
+This section is the **single explicit parity/completeness matrix**. It exists to prevent requirements from being scattered across prose or lost between Horizons.
+
+The intent is not literal Salla parity. The matrix answers five questions for every important customization capability:
+
+1. What does Salla prove exists today?
+2. What does AWJ actually have today?
+3. What is still missing for AWJ to be complete and production-real?
+4. Which Horizon owns the gap?
+5. What proves the item is truly complete?
+
+> **Rule:** an item is not COMPLETE because a control exists in the editor. It is complete only when its UX, persistence, preview, published runtime, validation, tenant isolation, backward compatibility and responsive behavior are all verified where applicable.
+
+| Capability | Salla evidence / maturity benchmark | AWJ current verified direction/state | What AWJ still needs for a complete real capability | Owner Horizon | Completion proof |
+|---|---|---|---|---|---|
+| Visual editor workspace | Mature theme editor with preview + controls | Standalone full-screen Visual Builder; Canvas-dominant direction already implemented | Close current mobile/preview regressions and lock baseline | CUST-H0 | Responsive QA + build/CI + visual approval + closure report |
+| Direct Canvas selection | Salla exposes editable theme elements through the editor | AWJ exact instance-id Canvas selection is part of current V2 foundation | Preserve and extend to all supported page regions, Header/Footer and future sections | CUST-H0/H2/H4 | Exact target selection tests + keyboard equivalent + highlight + inspector sync |
+| Section list | Mature element management | Existing structured section list and selection bridge | Keep scalable as section count/library grows; search/grouping when needed | CUST-H4 | Large-page usability + keyboard + overflow QA |
+| Add section | Mature add-element flow | Section Picker exists | Expand real section contracts and merchant-useful library | CUST-H4 | Picker shows only honest capabilities; added section survives save/publish/runtime |
+| Reorder | Available theme-element ordering | AWJ reorder exists | Add polished DnD if useful without making DnD the only mechanism | CUST-H4/H5 | Mouse/touch + keyboard/button reorder; persisted order parity |
+| Duplicate | Available where element supports it | Capability-aware duplicate exists for supported multi-instance types | Ensure per-instance content is copied correctly once richer content contracts exist | CUST-H4 | Duplicate has unique id + copied content/settings + persistence/runtime parity |
+| Hide / Show | Mature | Exists | Preserve across all page types | CUST-H2/H4 | Draft + publish + public runtime parity |
+| Delete | Mature | Real v2 deletion semantics exist; not merely hidden | Extend safely to all deletable section/page regions | CUST-H2/H4 | Deleted instance does not resurrect after normalize/reload/publish |
+| Singleton/protected sections | Theme-dependent constraints | Capability model already supports singleton/protected behavior | Extend registry consistently | CUST-H4 | Registry tests + no invalid duplicate/delete paths |
+| Section instance identity | Platform-internal concept not exposed to merchant | Strong AWJ `{id,type,visible}` instance model | Maintain as canonical foundation for new pages/sections | All structural Horizons | Stable ids across save/reload/publish; legacy migration tests |
+| Homepage customization | Mature and broad | Most mature AWJ page today | Broaden library and finish content contracts | CUST-H4 | Full supported library parity between editor preview and public runtime |
+| Product page customization | Supported in Salla Theme Editor | AWJ concept exists but not yet equivalent to Home visual-builder maturity | Create true product-page region/section contract and editor UX | CUST-H2 | Product page selected in page switcher; real PDP data; presentation-only changes; public parity |
+| Category page customization | Supported | Not yet at Home maturity | Structured category layout/regions, filters/sort presentation boundaries | CUST-H2 | Category page draft preview + published parity + no commerce-rule mutation |
+| Informational/content pages | Supported | Not yet a mature visual-builder surface | Page model after Product/Category foundation is stable | CUST-H2 later slice | Real page data source + editor + published route parity |
+| Header customization | Mature theme region | AWJ has presentation/header settings but not yet full direct region editing maturity | Canvas-selectable Header with contextual inspector and safe global scope | CUST-H2/H3 | Header click-to-edit + global scope clarity + runtime parity |
+| Footer customization | Mature theme region | Footer presentation exists | Canvas-selectable Footer + structured groups/settings | CUST-H2/H3 | Same as Header |
+| Store identity | Dedicated Salla identity controls | AWJ presentation/identity foundations exist | Consolidated merchant-friendly Identity Studio | CUST-H3 | Logo/favicon/colors/fonts are real, validated, previewed and published |
+| Logo | Supported | Storefront presentation supports branding logo paths/data constraints | Replace temporary/design-only media limitations with production-safe tenant media when required | CUST-H3 | Upload/select/store/render securely, tenant isolated, fallback tested |
+| Favicon | Supported | Direction documented; maturity lower | Real media pipeline + browser runtime behavior | CUST-H3 | Correct browser icon publication + cache/update behavior |
+| Primary colors | Supported | Strong Theme Token architecture exists | Better merchant-facing controls and contrast/invalid-state UX | CUST-H3 | Token mapping + validation + preview/runtime parity |
+| Typography | Salla offers fonts and custom font support | AWJ token/preset direction exists | Curated font UX first; custom font only with real media/CSP/licensing handling | CUST-H3 | Font load correctness, Arabic/English coverage, fallback, performance |
+| Custom font upload | Supported by Salla | Not production-real in AWJ | Tenant media contract, validation, weights, format policy, CSP, licensing copy | CUST-H3 gated | Security/performance tests + actual public load |
+| Buttons/global component style | Theme-level customization | Theme Tokens can support it | Merchant-language Global Design controls | CUST-H3 | Shared component style affects supported storefront components consistently |
+| Product card style | Theme-dependent/global design | Existing presentation presets exist | Consolidate into Global Design with real preview examples | CUST-H3 | Listing/search/recommendation card parity |
+| Radius/density | Supported through theme settings | Existing tokens/presets | Present clearly; keep advanced details hidden | CUST-H3 | Responsive QA + token parity |
+| Desktop preview | Standard maturity | Exists | Keep exact responsive-document semantics | CUST-H0+ | Visual QA |
+| Tablet preview | Benchmark maturity varies by theme editor | Explicit AWJ mode exists | Ensure true viewport simulation and no fake tablet-specific document | CUST-H0+ | 768/1024 QA |
+| Mobile preview | Standard maturity | AWJ preview-first mobile is a deliberate strength | Close current MOBILE-PREVIEW work; retain Bottom Sheet editing | CUST-H0 | 390/430 QA + real editing from phone |
+| Mobile editing | Supported in mature platforms | AWJ direction intentionally preview-first | Ensure every primary merchant task is possible without desktop-only escape | All UX Horizons | Mobile acceptance criteria per Horizon |
+| Independent scroll regions | Mature editor expectation | Explicit AWJ requirement; scroll attributes already exist | Prevent regressions as inspector/library grows | CUST-H0+ | Canvas/sidebar/inspector/sheet overflow QA |
+| Draft editing | Mature | AWJ Draft→Save→Preview→Publish foundation exists | Preserve as core invariant | All | Public never reads draft |
+| Save state | Mature | Exists conceptually/implementation foundation | Consistent Saving/Saved/Error/Conflict states | CUST-H5 | Failure injection + stale write tests |
+| Preview | Mature | In-workspace draft Canvas exists | Version-aware preview once copies exist | CUST-H1 | Preview identifies exact version/draft |
+| Publish | Mature | Existing publish lifecycle foundation | Make version-aware and high-trust | CUST-H1 | Atomic publish + failed publish retains old live version |
+| Theme/design copies | Strong Salla capability | Missing as complete AWJ merchant capability | Multiple named design versions/copies | CUST-H1 | Create/rename/duplicate/open/delete eligible copy end-to-end |
+| Draft/Scheduled/Published states | Mature in Salla | AWJ currently has draft/published foundation, not full copy lifecycle | Explicit version state machine | CUST-H1 | Server-enforced transitions + UI state truth |
+| Scheduled publishing | Supported | Missing | Schedule, edit, cancel; timezone-visible | CUST-H1 | Scheduler correctness + timezone tests + no accidental early publish |
+| Seasonal/campaign designs | Enabled by theme copies/scheduling | Missing as product workflow | Reusable workflow based on versions | CUST-H1 | Merchant can prepare future campaign without touching live store |
+| Version history | Salla copies provide lifecycle maturity; exact semantics differ | Explicitly deferred in AWJ | Decide saved versions/history separate from Undo | CUST-H1/H5 | Restore target is explicit and safe |
+| Restore | Mature-platform expectation | Deferred | Restore a previous saved/published version without corrupting current work | CUST-H5 or extension of H1 | Restore creates safe state + public remains stable until publish |
+| Undo | Editor expectation | Not complete | Operation history for current editing session/draft | CUST-H5 | Structural + field edit undo |
+| Redo | Editor expectation | Not complete | Symmetric redo behavior | CUST-H5 | Redo test matrix |
+| Unsaved-change recovery | Mature editor expectation | Needs explicit policy | Reload/close/network-loss recovery | CUST-H5 | Browser reload/navigation failure scenarios |
+| Stale/concurrent edit protection | Required for safe SaaS editing | Needs explicit complete UX | Optimistic concurrency/conflict UX tied to versions/revisions | CUST-H1/H5 | Two-session conflict tests |
+| Section library breadth | Salla has a wide element ecosystem | AWJ registry exists but library is narrower | Broader production-real section catalogue | CUST-H4 | Each section has data contract, editor, preview, runtime and tests |
+| Picker search | Useful at scale | Prototype direction supports it; not the maturity target yet | Implement once library size justifies it | CUST-H4 | Search usability/keyboard QA |
+| Picker categories | Salla groups capabilities/theme components | AWJ proposed taxonomy documented | Real taxonomy based on section set | CUST-H4 | Clear categories + no dead entries |
+| Section thumbnails | Mature discovery UX | Not fully mature | Small trustworthy previews/examples | CUST-H4 | Accurate preview, no misleading content |
+| Per-section Content tab | Mature editor pattern | AWJ North Star | Standardize across all section editors | CUST-H4 | Shared inspector conventions |
+| Per-section Design tab | Mature editor pattern | AWJ North Star | Standardize supported visual controls | CUST-H4 | No raw token exposure |
+| Per-section Layout tab | Mature editor pattern | AWJ North Star | Structured layout choices only | CUST-H4 | Responsive-safe configurations |
+| Advanced settings | Mature platforms provide advanced controls | AWJ progressive-disclosure principle exists | Consistent collapsed advanced surface | CUST-H4/H6 | 80% routine workflow does not require Advanced |
+| Theme developer components | Salla Twilight supports custom components/schemas | AWJ registry/capabilities foundation points in same direction | Formal internal/developer section SDK/contract | CUST-H6 | New component can be registered without editing core editor logic everywhere |
+| Theme library / ready themes | Salla has theme marketplace/copies | AWJ has ready-theme direction and Boutique/Floral work | Formal theme package model and safe install/apply workflow | CUST-H6 or separate Theme Horizon | Theme install/apply preserves store content and compatibility |
+| Custom CSS | Salla offers advanced customization | Not approved as live AWJ capability | Scoped/safe custom CSS if business need justifies it | CUST-H6 | Scope isolation + reset + CSP/runtime review |
+| Custom JavaScript | Salla supports advanced code in certain contexts | Intentionally not an AWJ parity requirement today | Dedicated security architecture before any implementation | Separate security gate after CUST-H6 | Explicit security approval + sandbox/CSP/exfiltration review |
+| RTL-first | Strong regional expectation | Core AWJ requirement | Preserve across every new control/page/version flow | All | Arabic visual + keyboard QA |
+| English LTR | Required bilingual support | Existing product principle | Mirror structure without breaking merchant content direction | All | LTR QA |
+| Accessibility | Mature-product requirement | Explicit AWJ spec | Enforce focus, keyboard, non-color selection, touch targets | All | Accessibility acceptance checks |
+| Tenant isolation | SaaS requirement | Core AWJ architecture principle | Must remain verified for every persisted customization capability | All backend-affecting Horizons | Cross-tenant negative tests |
+| Backward compatibility | Mature SaaS requirement | Strong AWJ rule | Old stores/themes must continue to render safely | All structural Horizons | Legacy fixtures + normalization tests |
+| Preview ↔ published parity | Mature-platform expectation | Explicit AWJ parity rule | Required for every new section/page/global setting | All | Contract parity tests |
+| Merchant capability honesty | AWJ-specific product rule | Strong foundation | Preserve; never surface fake toggles | All | Capability matrix + gating tests |
+| Editor/store theme isolation | Strong AWJ architectural rule | Current direction implemented | Preserve under Identity/custom CSS/theme work | CUST-H3/H6 | Merchant styling cannot leak into AWJ editor chrome |
+
+---
+
+# 19. “Complete and Real” Minimum Product Contract
+
+The Store Customizer must **not** be described internally as “complete” until all of the following minimum platform capabilities are production-real:
+
+## 19.1 Editing foundation
+
+- [ ] Direct visual editing remains stable on Desktop/Tablet/Mobile.
+- [ ] Canvas selection supports every customizable visible region that AWJ claims is editable.
+- [ ] Structured section operations work end-to-end.
+- [ ] Mobile can perform real customization, not preview only.
+- [ ] RTL and LTR are both verified.
+
+## 19.2 Page coverage
+
+- [ ] Home is fully production-ready.
+- [ ] Product page is a true visual customization surface.
+- [ ] Category page is a true visual customization surface.
+- [ ] Header is directly editable.
+- [ ] Footer is directly editable.
+- [ ] Informational pages have an explicit status: LIVE or intentionally deferred; they are never implied as complete if not built.
+
+## 19.3 Identity and global design
+
+- [ ] Store logo is production-media-backed.
+- [ ] Favicon is production-real.
+- [ ] Store colors are validated and accessible enough for supported use.
+- [ ] Curated font selection is real.
+- [ ] Custom font upload is either production-real or clearly gated.
+- [ ] Buttons/cards/radius/density are consistent global controls.
+
+## 19.4 Safe lifecycle
+
+- [ ] Merchant can create more than one design copy/version.
+- [ ] Merchant can name and duplicate versions.
+- [ ] Merchant always knows which version is being edited.
+- [ ] Draft and live remain distinct.
+- [ ] Preview shows the intended version.
+- [ ] Publish is atomic.
+- [ ] Scheduled publish is production-real if presented.
+- [ ] Schedule timezone is explicit.
+- [ ] Live version cannot be accidentally deleted.
+- [ ] Failed publish never corrupts the current live storefront.
+- [ ] Concurrent/stale edits have a safe conflict path.
+
+## 19.5 Section ecosystem
+
+- [ ] Section library is broad enough for a real merchant storefront, not merely a demo.
+- [ ] Every LIVE section has typed content and visual settings.
+- [ ] Every LIVE section has preview + published renderer parity.
+- [ ] Every LIVE section has responsive constraints.
+- [ ] Every LIVE section has accessibility requirements.
+- [ ] GATED/DEFERRED sections cannot masquerade as working.
+
+## 19.6 Confidence and recovery
+
+- [ ] Saving state is explicit.
+- [ ] Network failure is explicit.
+- [ ] Unsaved work behavior is deliberate.
+- [ ] Undo/Redo is production-real or clearly documented as intentionally deferred.
+- [ ] A safe restore/version recovery path exists before we call the platform mature.
+
+## 19.7 Security / SaaS truth
+
+- [ ] Drafts are private.
+- [ ] Tenant isolation is tested.
+- [ ] Foreign IDs do not leak existence.
+- [ ] Server re-validates/normalizes all persisted presentation data.
+- [ ] Media is tenant-safe.
+- [ ] External URLs are sanitized.
+- [ ] Merchant presentation cannot inject unsafe script.
+- [ ] Backward compatibility is proven with legacy fixtures.
+
+## 19.8 Performance
+
+- [ ] Editor remains responsive with a realistic large page.
+- [ ] Preview updates do not trigger pathological rerenders/fetches.
+- [ ] Media-heavy sections remain usable on mobile.
+- [ ] Save/publish does not create unnecessary request storms.
+- [ ] Public storefront performance does not regress materially due to Customizer capabilities.
+
+---
+
+# 20. Explicit gap list that must not be lost
+
+For avoidance of doubt, the following items are **required work or explicit gated decisions** before the Customizer can be considered a fully mature platform:
+
+1. Finish and formally close current MOBILE-PREVIEW / Visual Builder baseline.
+2. Theme/design copies.
+3. Named version states.
+4. Scheduled publication.
+5. Safe stale/concurrent editing behavior.
+6. Product-page visual builder.
+7. Category-page visual builder.
+8. Header direct editing.
+9. Footer direct editing.
+10. Explicit informational-page plan/status.
+11. Identity Studio.
+12. Production-safe logo/favicon media handling.
+13. Curated typography UX.
+14. Custom-font decision and, if LIVE, full secure implementation.
+15. Global button/card/radius/density controls.
+16. Larger real Section Library.
+17. Per-section typed content contracts.
+18. Per-section Content/Design/Layout/Advanced inspector consistency.
+19. Picker search/categories/previews at scale.
+20. Preview ↔ Published parity tests for every structural capability.
+21. Undo/Redo.
+22. Unsaved-change recovery.
+23. Version restore/recovery.
+24. Responsive QA at representative widths.
+25. RTL/LTR verification.
+26. Accessibility/focus/keyboard/touch verification.
+27. Tenant isolation for every new persisted resource.
+28. Backward-compatibility fixtures.
+29. Performance checks for large/media-heavy designs.
+30. Extensible Section Registry/SDK direction.
+31. Ready-theme/theme-package lifecycle.
+32. Scoped Custom CSS only after an explicit architecture decision.
+33. Custom JavaScript remains blocked until a dedicated security architecture gate approves it.
+
+If an item above is intentionally postponed, its state must be recorded as **DEFERRED** or **GATED**. It must never silently disappear from the roadmap.
+
+---
+
+# 21. Product completion language
+
+Use these terms consistently in reports:
+
+- **Foundation complete:** core editor shell/selection/section-instance architecture works.
+- **Horizon complete:** one Horizon passed all of its closure gates.
+- **Production-real capability:** works end-to-end across UX, persistence, preview/public runtime, security, responsive behavior and tests.
+- **Customizer mature:** the minimum contract in §19 is satisfied, or every remaining omission is explicitly approved and recorded as a non-goal.
+
+Do not use “Customizer complete” merely because the main editor screen looks finished.
