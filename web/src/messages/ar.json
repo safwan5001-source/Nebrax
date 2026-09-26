@@ -6854,6 +6854,7 @@
     },
     "builder": {
       "back": "رجوع",
+      "backToCommerce": "العودة إلى التجارة الإلكترونية",
       "loadFailed": "تعذر تحميل مساحة العمل.",
       "savedBadge": "محفوظ",
       "unsavedBadge": "تغييرات غير محفوظة",

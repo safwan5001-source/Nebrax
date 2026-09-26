@@ -69,6 +69,15 @@ export function CommerceWorkspaceShell({ children }: { children: React.ReactNode
     ? catalog.stores.find((store) => store.id === selectedStoreId)
     : null;
   const isExperienceBuilder = pathname === '/commerce/appearance' || Boolean(pathname?.startsWith('/commerce/appearance/'));
+  const isAppBuilderWorkspace = Boolean(pathname?.match(/^\/app-builder\/[^/]+\/builder\/?$/));
+
+  if (isAppBuilderWorkspace) {
+    return (
+      <main id="commerce-workspace-content" className="h-screen w-full overflow-hidden bg-background [height:100dvh]">
+        <div className="flex h-full min-h-0 flex-col">{children}</div>
+      </main>
+    );
+  }
 
   if (isExperienceBuilder) {
     return (

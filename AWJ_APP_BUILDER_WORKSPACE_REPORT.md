@@ -1,0 +1,95 @@
+# AWJ App Builder Dedicated Workspace Report
+
+## Root cause
+
+App Builder was physically located under `web/src/app/(app)/app-builder`, so every App Builder route inherited `web/src/app/(app)/layout.tsx` (`AppLayout`). That layout renders the AWJ ERP `Sidebar`, `Topbar`, `DemoBanner`, padded scrolling `<main>`, and `BranchScope`.
+
+Build Store Experience follows a different composition: `web/src/app/(commerce)/layout.tsx` owns `CommerceWorkspaceShell`, while `web/src/components/commerce-workspace/commerce-workspace-shell.tsx` explicitly detects `/commerce/appearance` and returns a full-bleed, chrome-less surface. App Builder did not have that route-group composition and its editor also compensated for the ERP shell with `-m-4 sm:-m-6` and `h-[80vh]`.
+
+## Base SHA
+
+`c1bdac3b3f1f7f5be7cfde6b918671d0cb7814e1`
+
+## Branch
+
+`fix/app-builder-dedicated-workspace`
+
+## PR
+
+To be created from this branch after the verification below. No merge or deploy will be performed.
+
+## Route/layout before and after
+
+| Surface | Before | After |
+|---|---|---|
+| `/app-builder` | `(app)/layout.tsx` → AWJ `AppLayout` → App Manager | `(commerce)/layout.tsx` → `CommerceWorkspaceShell` → App Manager; Commerce placement and link are preserved |
+| `/app-builder/new` | `(app)/layout.tsx` → AWJ ERP shell | `(commerce)/layout.tsx` → Commerce shell |
+| `/app-builder/[id]` | `(app)/layout.tsx` → AWJ ERP shell | `(commerce)/layout.tsx` → Commerce shell |
+| `/app-builder/[id]/versions` | `(app)/layout.tsx` → AWJ ERP shell | `(commerce)/layout.tsx` → Commerce shell |
+| `/app-builder/[id]/builder` | AWJ ERP shell plus compensating negative margins and fixed `80vh` editor | `(commerce)/layout.tsx` → `CommerceWorkspaceShell` detects the builder route and returns a full-bleed `100dvh` surface with no Commerce or AWJ navigation chrome; editor uses `h-full min-h-0` |
+| `/commerce/appearance` | `(commerce)/layout.tsx` → existing chrome-less Store Experience pattern | Unchanged |
+
+## Files changed
+
+- `web/src/app/(commerce)/app-builder/**` — route-group move from `(app)`; route URLs and deep-link paths are unchanged.
+- `web/src/components/commerce-workspace/commerce-workspace-shell.tsx` — adds the App Builder editor route predicate and chrome-less full-bleed return path.
+- `web/src/components/commerce-workspace/commerce-workspace-shell.test.tsx` — adds a regression test proving App Builder has no Commerce navigation chrome.
+- `web/src/app/(commerce)/app-builder/[id]/builder/page.tsx` — uses the available viewport, derives `dir` from locale, and adds a visible `Back to Commerce` action.
+- `web/src/messages/en.json` — adds `appBuilder.builder.backToCommerce`.
+- `web/src/messages/ar.json` — adds `appBuilder.builder.backToCommerce`.
+- `AWJ_APP_BUILDER_WORKSPACE_REPORT.md` — this report.
+
+## How App Builder is separated from AWJ ERP shell
+
+The route tree is moved from the `(app)` route group into `(commerce)`, so it no longer mounts `AppLayout` and therefore no longer inherits the AWJ main Sidebar/Topbar. The editor route is then treated like the existing Store Experience Builder full-bleed surface: `CommerceWorkspaceShell` returns only the content main and the builder itself fills it with `h-full min-h-0`.
+
+The editor retains its own builder header (save, publish, preview/device controls, app-level back action) and now has an explicit Commerce return link. No builder component, API call, data contract, database schema, native runtime, release/update architecture, or permission check was changed.
+
+## Store Experience Builder pattern
+
+Yes, the same route/layout pattern was used where appropriate:
+
+- both editor surfaces are hosted under `(commerce)`;
+- both are detected at the shell boundary;
+- both render a chrome-less `100dvh` full-bleed surface;
+- both preserve their own feature-specific header and panels.
+
+They remain independent tools. App Builder was not merged with `ExperienceBuilder` or any Store Experience component.
+
+## RBAC / Tenant Isolation impact
+
+- **RBAC:** unchanged. Existing `hasAppBuilderPermission` checks remain in App Manager and editor pages, and backend `/api/app-builder/*` middleware was not modified.
+- **Tenant isolation:** unchanged. Existing API calls, active branch/session context, tenant-scoped backend authorization, and store-design sync behavior were not modified.
+- **Commerce capability gating:** unchanged. The existing Commerce nav entry remains at `/app-builder` with `commerce.app_builder` and `apps_builder.view` visibility rules.
+- **Deep links:** route URLs remain identical (`/app-builder`, `/app-builder/new`, `/app-builder/:id`, `/app-builder/:id/versions`, `/app-builder/:id/builder`). Only the Next route-group composition changed.
+- **RTL/LTR:** the editor now uses the active locale (`ar` → `rtl`, otherwise `ltr`) instead of hard-coding RTL. Root HTML direction remains supplied by the existing root layout.
+
+## Tests / results
+
+- Focused App Builder editor tests: **passed — 30 tests**.
+- Commerce workspace shell tests: **passed — 9 tests**, including the new no-chrome App Builder regression.
+- Commerce navigation tests: **passed — 10 tests** (`nav.test.ts` and `commerce-workspace-nav.test.ts`).
+- JSON validation for `en.json` and `ar.json`: **passed**.
+- `git diff --check`: to be run before commit/PR.
+
+## Build / CI
+
+- `pnpm run build`: **passed** (`next build`; compiled, lint/type validity for production build, generated 175 static pages).
+- The generated route table includes `/app-builder`, `/app-builder/[id]`, `/app-builder/[id]/builder`, `/app-builder/[id]/versions`, and `/app-builder/new`.
+- Standalone `pnpm exec tsc --noEmit` reports **12 pre-existing errors in 9 unrelated test files** (POS configuration, platform integrations, document/product tests, and import jobs). None reference the changed files; the production Next build passed its own validity step.
+- No CI workflow was dispatched by this task; PR checks are expected to run normally after opening the PR.
+
+## Risks / remaining work
+
+- The App Manager and creation/version routes remain inside the Commerce workspace shell rather than the full-bleed editor surface. This is intentional: only the actual builder editor needs maximum canvas/panel space, while list/detail/form pages retain normal Commerce navigation and clear escape routes.
+- The new route predicate intentionally targets `/app-builder/:id/builder` (with an optional trailing slash), avoiding accidental chrome removal from App Manager, detail, version, and creation routes.
+- Browser-level authenticated visual QA was not run in this sandbox; focused component tests and production build cover the route composition and rendered shell contract.
+- The existing unrelated TypeScript test errors should be addressed separately; they were not expanded in this PR.
+
+## Head SHA
+
+To be filled after the implementation commit and push.
+
+## Suggested next step
+
+Review the PR and run the authenticated Commerce → App Builder → open builder flow in a staging/preview environment in both Arabic and English, then merge only after the normal CI checks and browser QA pass. Deployment is intentionally not performed by this task.

@@ -4,7 +4,7 @@ import * as React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { ArrowRight, Home, LayoutPanelLeft, Plus, Redo2, SlidersHorizontal, Trash2, Undo2, UploadCloud } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -48,6 +48,7 @@ const HISTORY_LIMIT = 50;
 export default function AppBuilderWorkspacePage() {
   const t = useTranslations('appBuilder.builder');
   const tc = useTranslations('common');
+  const locale = useLocale();
   const params = useParams<{ id: string }>();
   const toast = useToast();
 
@@ -517,17 +518,15 @@ export default function AppBuilderWorkspacePage() {
   const isDraftView = previewState === 'draft';
 
   return (
-    // `-m-4 sm:-m-6` cancels `<main>`'s own padding (`(app)/layout.tsx`) so the workspace
-    // reaches the page edges like every other full-bleed panel in this shell — a fixed
-    // height (not 100vh) because this route stays inside the standard sidebar/topbar
-    // layout rather than a chrome-less route group (unlike the Store Customizer's
-    // `(commerce)` group); a precise 100vh calc would double-count that chrome.
-    <div dir="rtl" className="-m-4 flex h-[80vh] min-h-[560px] flex-col sm:-m-6">
+    <div dir={locale === 'ar' ? 'rtl' : 'ltr'} className="flex h-full min-h-0 flex-col">
       <header className="flex min-h-14 shrink-0 flex-wrap items-center gap-2 border-b border-border bg-surface px-3 md:px-4">
         <Button asChild variant="ghost" size="icon" aria-label={t('back')}>
           <Link href={`/app-builder/${app.id}`}>
             <ArrowRight className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />
           </Link>
+        </Button>
+        <Button asChild variant="ghost" size="sm" className="shrink-0">
+          <Link href="/commerce">{t('backToCommerce')}</Link>
         </Button>
         <p className="min-w-0 truncate text-sm font-semibold text-text">{appDisplayName(app, previewLocale)}</p>
         {statusBadge}
