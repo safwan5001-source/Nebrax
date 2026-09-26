@@ -1,6 +1,6 @@
 # Decision Packet — Store branding media durability
 
-**Status:** Open. No option is selected. No implementation is authorized.  
+**Status:** Resolved — owner selected Option 1 on 2026-09-26. No implementation is authorized.  
 **Horizon:** AWJ Store Branding & Media Foundation — evidence pass only  
 **Date:** 2026-09-26  
 **Evidence:** `docs/plans/store/AWJ_STORE_BRANDING_MEDIA_FOUNDATION_EVIDENCE.md`  
@@ -67,4 +67,33 @@ None inside this pass. Offers stays on its resolved deferral. Undo, version hist
 
 ## Owner decision
 
-Not selected.
+**Selected: Option 1 — keep embedded branding media until persistent storage is explicitly authorized.**
+
+Stable decision key:
+
+`KEEP_EMBEDDED_MEDIA_UNTIL_PERSISTENT_STORAGE_IS_AUTHORIZED`
+
+This resolves the Store Branding & Media infrastructure gate for the current horizon without authorizing implementation.
+
+### Effective behavior
+
+- Keep current raster Data URL branding in the storefront presentation JSON, subject to the existing 512 KiB cap and existing SVG rejection.
+- Keep existing merchant-entered `https` branding URLs supported.
+- Keep banner media as the existing `https` URL contract.
+- Do not add a branding upload endpoint yet.
+- Do not move branding onto the current local container disk.
+- Do not create a branding-only bucket or second storage service.
+- Do not enable `DOCUMENT_DURABLE_STORAGE_ENABLED` as a side effect of Store Customizer work.
+- Do not rewrite or migrate existing presentation documents.
+
+### Future prerequisite
+
+If persistent storage is later explicitly authorized, the next work is the platform durable-storage activation plan already described in `deploy/DEPLOY.md`, including bucket/secrets/tests and a file migration/retention policy as required.
+
+Only after that prerequisite is merged and post-merge reviewed may a separate branding-upload slice extend the existing file authority for tenant-scoped storefront branding.
+
+### Closure
+
+The current Store Branding & Media evidence pass is closed with an owner-resolved deferral. The classification is no longer an open `INFRA_DECISION_REQUIRED` gate for this horizon; it is a documented deferred prerequisite.
+
+No runtime code, database change, provider selection, upload path, production migration, or deploy is authorized by this decision.
