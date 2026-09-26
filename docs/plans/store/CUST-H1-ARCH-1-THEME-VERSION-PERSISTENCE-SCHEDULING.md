@@ -266,11 +266,21 @@ Migration must be deterministic and preserve current public bytes/meaning.
 
 ### Case A — no presentation row
 
-Create nothing.
+Migration itself creates nothing.
 
 The merchant still receives current virtual/default behavior.
 
-First use of Versions can lazily create the first version.
+On the **first Version creation** (or, as a defensive fallback, first Version publish), the service must create the missing `storefront_presentations` compatibility head **inside the same ownership-checked transaction**.
+
+Creation requirements:
+
+- lock the owned Storefront;
+- attempt a lazy insert with normalized default `draft_config`, `draft_revision = 0`, current `schema_version`, and null Published pointers;
+- rely on `unique(storefront_id)` as the final race authority;
+- catch unique violation outside the aborted PostgreSQL transaction and retry-read the winning head, following the existing STORE-BACKEND-1 first-insert pattern;
+- only then create/publish Version state.
+
+Therefore a storefront that starts with no presentation row can create its first Version and later publish it without a missing-head dead end.
 
 ### Case B — presentation row, Published exists, Draft equals Published
 
@@ -291,7 +301,7 @@ Keep existing head config fields unchanged.
 
 Create two versions:
 
-1. Published version from `published_config`.
+1. Published version from `published_config`, with `last_published_at = existing published_at`.
 2. Draft version from `draft_config`.
 
 Set active pointer to Published version.
@@ -484,6 +494,7 @@ Reject:
 
 - active version;
 - scheduled version unless schedule is canceled first;
+- `compatibility_working_version_id` while the legacy compatibility window is active;
 - foreign version.
 
 ### Publish now
@@ -516,6 +527,10 @@ Body:
 ```
 
 Server stores a canonical UTC timestamp.
+
+**Active Published Versions cannot be scheduled.** If `version.id === active_version_id`, return a lifecycle conflict (recommended **409**). A merchant who wants a future change must create/duplicate a Draft Version first.
+
+This keeps the derived state exclusive: a Version cannot be both Published and Scheduled.
 
 ### Cancel schedule
 
@@ -783,7 +798,9 @@ For Saudi-first default behavior, `Asia/Riyadh` must not be hard-coded as a univ
 
 Creation:
 
-- lock owned Storefront/head;
+- lock owned Storefront;
+- ensure the compatibility head exists using the concurrency-safe lazy-create contract from §7 Case A;
+- lock/read the resulting head;
 - resolve optional source Version within same Storefront/Tenant;
 - choose source config;
 - normalize;
