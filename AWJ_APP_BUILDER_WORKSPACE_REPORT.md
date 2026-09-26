@@ -88,7 +88,7 @@ The route-group move intentionally does **not** add `BranchScope` to `CommerceLa
 - `pnpm run build`: **passed** (`next build`; compiled, lint/type validity for production build, generated 175 static pages).
 - The generated route table includes `/app-builder`, `/app-builder/[id]`, `/app-builder/[id]/builder`, `/app-builder/[id]/versions`, and `/app-builder/new`.
 - Standalone `pnpm exec tsc --noEmit` reports **12 pre-existing errors in 9 unrelated test files** (POS configuration, platform integrations, document/product tests, and import jobs). None reference the changed files; the production Next build passed its own validity step.
-- GitHub PR CI: **in progress on the current PR head**. The previous run passed all 5 checks; CI was re-triggered for the current head and must complete before closure.
+- GitHub PR CI: **passed — all 5 checks succeeded on the final current PR head**. This includes the Web CI Next.js build and the PHP test matrix on SQLite and PostgreSQL (push and pull-request checks).
 
 ## Risks / remaining work
 
@@ -99,7 +99,7 @@ The route-group move intentionally does **not** add `BranchScope` to `CommerceLa
 
 ## Head SHA
 
-`f3a21ad4486b1a083de4fe2d87ab91494b463faa`
+`95b39c05618e54d1c2174ac9fe5dbc864a27992f`
 
 ## Suggested next step
 
