@@ -6854,6 +6854,7 @@
     },
     "builder": {
       "back": "Back",
+      "backToCommerce": "Back to Commerce",
       "loadFailed": "Could not load the workspace.",
       "savedBadge": "Saved",
       "unsavedBadge": "Unsaved changes",

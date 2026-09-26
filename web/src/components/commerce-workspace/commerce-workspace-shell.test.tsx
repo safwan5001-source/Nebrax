@@ -10,6 +10,7 @@ import { CommerceWorkspaceShell } from './commerce-workspace-shell';
 import { CommerceStoreProvider } from '@/modules/commerce-workspace/store-context';
 
 const locale = { current: 'en' };
+const pathname = { current: '/commerce' };
 
 vi.mock('next-intl', () => ({
   useLocale: () => locale.current,
@@ -17,7 +18,7 @@ vi.mock('next-intl', () => ({
 }));
 
 vi.mock('next/navigation', () => ({
-  usePathname: () => '/commerce',
+  usePathname: () => pathname.current,
 }));
 
 vi.mock('next/link', () => ({
@@ -45,8 +46,20 @@ describe('Commerce workspace shell header', () => {
   afterEach(() => {
     cleanup();
     locale.current = 'en';
+    pathname.current = '/commerce';
     apiMock.mockReset();
     window.localStorage.clear();
+  });
+
+  it('opens the App Builder route as a full-bleed workspace without Commerce chrome', () => {
+    pathname.current = '/app-builder/app-1/builder';
+    renderShell();
+
+    expect(screen.getByText('body')).toBeTruthy();
+    expect(screen.queryByRole('link', { name: 'workspaceHome' })).toBeNull();
+    expect(screen.queryByRole('navigation')).toBeNull();
+    expect(screen.getByRole('main').className).toContain('h-screen');
+    expect(screen.getByRole('main').className).toContain('overflow-hidden');
   });
 
   it('keeps View Store disabled and navigation working when the tenant has no stores', async () => {
