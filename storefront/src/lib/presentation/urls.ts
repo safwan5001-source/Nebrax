@@ -76,8 +76,9 @@ export function isSafeAppStoreUrl(value: string | null | undefined): boolean {
   }
 }
 
+/** Live first-party Apple badge. Arabic is ar-AR; ar-sa returns the English artwork. Other locales use en-us. */
 export function appStoreBadgeUrl(locale: string): string {
-  const code = locale === "ar" ? "ar-sa" : "en-us";
+  const code = locale === "ar" ? "ar-AR" : "en-us";
   return `https://toolbox.marketingtools.apple.com/api/badges/download-on-the-app-store/black/${code}?size=250x83`;
 }
 

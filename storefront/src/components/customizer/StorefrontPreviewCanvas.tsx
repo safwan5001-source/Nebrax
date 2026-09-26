@@ -378,7 +378,7 @@ export function StorefrontPreviewCanvas({
                   <h2 className="text-base font-extrabold md:text-lg">
                     {config.apps.appName.trim() || t("sectionAppPromo")}
                   </h2>
-                  <div className="mt-4 flex flex-wrap gap-3">
+                  <div className="mt-4 flex flex-wrap items-center gap-3">
                     {ios ? (
                       <OfficialStoreBadge
                         store="apple"
@@ -588,7 +588,7 @@ export function StorefrontPreviewCanvas({
                   <h3 className="text-sm font-bold text-store-footer-foreground">
                     {t("applications")}
                   </h3>
-                  <div className="mt-3 flex flex-wrap gap-3">
+                  <div className="mt-3 flex flex-wrap items-center gap-3">
                     {ios ? (
                       <OfficialStoreBadge
                         store="apple"

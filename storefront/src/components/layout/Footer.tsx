@@ -375,7 +375,7 @@ export async function Footer({
             ) : null}
             {visibleAppLinks.length > 0 ? (
               <TrustGroup id="footer-applications" title={t("applications")}>
-                <div className="flex flex-wrap gap-3">
+                <div className="flex flex-wrap items-center gap-3">
                   {visibleAppLinks.map((link) => (
                     <OfficialStoreBadge
                       key={link.id}

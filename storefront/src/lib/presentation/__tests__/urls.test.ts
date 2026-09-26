@@ -50,7 +50,7 @@ describe("presentation URL handling", () => {
 
   it("points at the live first-party badge and localizes only Arabic", () => {
     expect(appStoreBadgeUrl("ar")).toBe(
-      "https://toolbox.marketingtools.apple.com/api/badges/download-on-the-app-store/black/ar-sa?size=250x83",
+      "https://toolbox.marketingtools.apple.com/api/badges/download-on-the-app-store/black/ar-AR?size=250x83",
     );
     expect(appStoreBadgeUrl("en")).toContain("/en-us?");
     expect(appStoreBadgeUrl("de")).toContain("/en-us?");

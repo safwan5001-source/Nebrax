@@ -184,7 +184,7 @@ describe("Footer SBC presentation", () => {
     const apple = screen.getByRole("img", { name: "App Store" });
     const play = screen.getByRole("img", { name: "Google Play" });
 
-    expect(apple).toHaveAttribute("src", expect.stringContaining("/ar-sa?"));
+    expect(apple).toHaveAttribute("src", expect.stringContaining("/ar-AR?"));
     expect(apple).toHaveClass("h-10");
     expect(apple.closest("a")).toHaveAttribute("target", "_blank");
     expect(apple.closest("a")).toHaveAttribute("rel", "noopener noreferrer");
@@ -192,6 +192,7 @@ describe("Footer SBC presentation", () => {
       "src",
       expect.stringContaining("/ar_badge_web_generic.png"),
     );
+    expect(play).toHaveClass("h-[60px]");
     expect(screen.getAllByRole("img")).toHaveLength(2);
     expect(
       screen.getByRole("region", { name: "applications" }).contains(apple),
