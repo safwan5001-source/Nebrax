@@ -456,15 +456,20 @@ export function StorefrontPreviewCanvas({
               {config.contact.hours ? <p>{config.contact.hours}</p> : null}
               {enabledSocial.length > 0 && (
                 <p className="mt-2 flex flex-wrap gap-3">
-                  {enabledSocial.map((item) => (
-                    <a
-                      key={item.id}
-                      href={item.href}
-                      className="text-store-footer-link"
-                    >
-                      {item.network}
-                    </a>
-                  ))}
+                  {enabledSocial.map((item) => {
+                    const label = socialLabel(t, item.network);
+                    return (
+                      <a
+                        key={item.id}
+                        href={item.href}
+                        aria-label={label}
+                        className="text-store-footer-link"
+                        onClick={(event) => event.preventDefault()}
+                      >
+                        {label}
+                      </a>
+                    );
+                  })}
                 </p>
               )}
               {hasBusinessIdentity ? (
@@ -619,5 +624,29 @@ function pageTitleKey(
       return "pageReturns";
     default:
       return "pageTerms";
+  }
+}
+
+function socialLabel(
+  t: (key: CustomizerMessageKey) => string,
+  network: string,
+): string {
+  switch (network) {
+    case "instagram":
+      return t("socialInstagram");
+    case "x":
+      return t("socialX");
+    case "tiktok":
+      return t("socialTiktok");
+    case "snapchat":
+      return t("socialSnapchat");
+    case "youtube":
+      return t("socialYoutube");
+    case "linkedin":
+      return t("socialLinkedin");
+    case "facebook":
+      return t("socialFacebook");
+    default:
+      return network;
   }
 }

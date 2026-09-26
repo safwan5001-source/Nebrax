@@ -103,6 +103,22 @@ describe("Footer SBC presentation", () => {
     expect(link.getAttribute("rel")).toBe("noopener noreferrer");
   });
 
+  it("names a published social link and opens it in a new tab", async () => {
+    const view = await Footer({
+      ...baseProps,
+      socialLinks: [
+        { id: "ig", network: "instagram", href: "https://instagram.com/awj" },
+      ],
+    });
+    const screen = render(view);
+    const link = screen.getByRole("link", { name: "socialInstagram" });
+
+    expect(link.getAttribute("href")).toBe("https://instagram.com/awj");
+    expect(link.getAttribute("target")).toBe("_blank");
+    expect(link.getAttribute("rel")).toBe("noopener noreferrer");
+    expect(screen.queryByRole("link", { name: "instagram" })).toBeNull();
+  });
+
   it("omits the merchant-provided group when the license is blank", async () => {
     const view = await Footer({
       ...baseProps,
