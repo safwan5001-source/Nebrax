@@ -2,17 +2,28 @@
 
 > This file is a durable resume point, not a substitute for Git/GitHub evidence.
 
+LAST_UPDATED: 2026-09-26 (**Store branding media evidence pass is closed as `INFRA_DECISION_REQUIRED`.** Verified `origin/main` `0f36355573b3de746211bd1bed0a6f888f0bba0a`. Logos remain data URLs in the presentation JSON, which is the only durable branding store while `DOCUMENT_DURABLE_STORAGE_ENABLED=false`. No upload path, no new provider, no migration, and no deploy are authorized. Owner packet is open; silence stays on today’s data URLs. Store Customizer capability completion, visual verification, and the Offers deferral stay closed.)
+
+## Previous snapshot
+
 LAST_UPDATED: 2026-09-26 (**Store Customizer Offers decision is resolved.** Owner selected Option 1: Offers remains visible-but-gated in the merchant customizer and unpublished until AWJ has an authoritative shared Promotions Engine. No free-text discount claims, no shadow pricing, and no promotions implementation is authorized here. Store Customizer capability completion + visual verification remain closed. No deploy.)
 
 ## Previous snapshot
 
 LAST_UPDATED: 2026-09-24 (**AWJ App Builder Horizon V1 is CLOSED.** All 12 tasks resolved: APP-BUILDER-1/2/3/4/5/6/8/9/10/11/12 done, APP-BUILDER-7 explicitly deferred as a genuine Decision Escalation Gate. APP-BUILDER-7 (Data/Actions/Conditions/Visibility) evaluated for implementation and found NOT READY: three of its four named concepts (Data, Conditions, Visibility) have no backing in the accepted, tested App Schema contract, and building them requires inventing an expression/condition engine or a Data Source Registry contract, both explicitly "not yet locked" in the accepted architecture doc. Owner decision (2026-09-24): keep APP-BUILDER-7 explicitly deferred (decision_required, not completed, not permanently skipped) — table updated, APP-BUILDER-8/9/10 completed in sequence after narrow dependency checks each found no real runtime/schema dependency on APP-BUILDER-7 (PR #983, #985, #988). APP-BUILDER-11's original "bind real Commerce resource / proven Flutter runtime consumes" line was found genuinely unsatisfiable inside the accepted contract (the identical undecided Data Source Registry boundary as APP-BUILDER-7) and escalated; owner decision (2026-09-24, option 2): redefined as an Integrated Proof of the currently accepted and actually implemented App Builder contract, completed (PR #990) with the real-Commerce-binding/live-runtime portion carried forward as a deferred/decision_required follow-up track alongside APP-BUILDER-7. APP-BUILDER-12 (Horizon closure, PR #991) produced the horizon's final closure report distinguishing completed capabilities from this one connected deferred architecture track, plus known limitations, out-of-scope boundary, and next-horizon recommendation. Per the horizon bootstrap's own "Horizon End" rule, this session now STOPS — no automatic continuation to Preview & Testing or any new horizon without explicit owner/ChatGPT-reviewed authorization. Prior AWJ Mobile Runtime Proof Horizon V1 (below) is fully closed and was this horizon's accepted input.)
 LAYER_VERSION: V1
-STATUS: CLOSED — Store Customizer capability completion + visual verification. Offers Decision Packet is resolved: Option 1 selected, gated/unpublished until a future explicitly authorized Promotions & Discounts Engine horizon. Do not start another horizon automatically.
+STATUS: EVIDENCE CLOSED — Store branding/media foundation classified `INFRA_DECISION_REQUIRED`. Decision packet is open. Do not implement uploads, do not enable durable storage, and do not deploy unless the owner selects an option. Store Customizer capability completion, visual verification, and the Offers deferral remain closed.
 
 ## Current objective
 
-Store Customizer visual verification is recorded. Banner, benefits, custom content, featured ids, and app promo were checked in the browser at 390 / 430 / 768 / 1024 / 1280 / 1440 in Arabic RTL and English LTR, on the merchant preview canvas and the published bands, including empty, long, missing-media, and missing-product states. Long unbroken text no longer widens the page. Offers stay gated by owner decision until a future authoritative Promotions Engine exists; this is now a resolved deferral, not an open Store Customizer decision. No deploy. Stop.
+Branding/media evidence is recorded. Merchant logos stay as data URLs or `https` URLs inside the published presentation JSON, because that JSON is durable and the platform file disk is not (`DOCUMENT_DURABLE_STORAGE_ENABLED=false`). The owner packet asks whether to keep that path or to authorize the existing durable-storage activation before any branding upload. No code, migration, provider, or deploy is authorized by the evidence pass. Stop.
+
+## Store branding media — evidence log
+
+- Evidence: `docs/plans/store/AWJ_STORE_BRANDING_MEDIA_FOUNDATION_EVIDENCE.md`.
+- Decision packet: `docs/plans/store/AWJ_STORE_BRANDING_MEDIA_FOUNDATION_DECISION_PACKET.md`.
+- Classification: `INFRA_DECISION_REQUIRED`.
+- No runtime diff. No merge. No deploy.
 
 ## Store Customizer visual verification — execution log
 
