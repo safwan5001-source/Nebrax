@@ -202,14 +202,12 @@ The official site exposes logo/icon/color/promotional asset sections, but this e
 
 ### TikTok
 
-First-party TikTok materials confirm that TikTok brand assets are controlled. A current TikTok Shop brand-use legal resource states that use of the TikTok logo requires prior written authorization in that context.
+TikTok's current first-party developer Design Guidelines state that TikTok logos, icons, symbols, or designs may not be used without prior written permission. The same page exposes TikTok asset packs, but asset availability does not itself remove the permission requirement.
 
 First-party source:
-https://seller-us.tiktok.com/university/essay?knowledge_id=879518449731341
+https://developers.tiktok.com/doc/getting-started-design-guidelines
 
-This source is not sufficient to conclude that all ordinary social-link icon usage requires the same authorization, so AWJ must not generalize it.
-
-**Evidence conclusion:** exact general-purpose social-icon permission/source remains unresolved.
+**Evidence conclusion:** this is a permission gate, not merely an asset-discovery gap. AWJ must not render a TikTok mark in the storefront unless the applicable permission/authorization basis is established. Text-label fallback remains the safe current behavior.
 
 ## 4. Evidence matrix
 
@@ -222,7 +220,7 @@ This source is not sufficient to conclude that all ordinary social-link icon usa
 | WhatsApp destination | phone/message/placement | Present | Present | wa.me | Current URL construction is fail-closed | Existing commerce authoring boundary | Brand mark missing | ASSET_EVIDENCE_REQUIRED | SOCIAL-ASSET-EVIDENCE-1 |
 | Instagram | social[] HTTPS URL | Text label | Text label | Meta brand resources | URL safety exists | Existing commerce authoring boundary | Exact approved mark evidence incomplete | ASSET_EVIDENCE_REQUIRED | SOCIAL-ASSET-EVIDENCE-1 |
 | X | social[] HTTPS URL | Text label | Text label | X Brand Toolkit | Official source found | Existing commerce authoring boundary | Mark not implemented | IMPLEMENTATION_READY after shared asset pass | SOCIAL-ASSET-EVIDENCE-1 → WA-SOCIAL-1 |
-| TikTok | social[] HTTPS URL | Text label | Text label | TikTok first-party controlled assets | General social-icon permission unresolved | Existing commerce authoring boundary | Exact permission/source unresolved | ASSET_EVIDENCE_REQUIRED | SOCIAL-ASSET-EVIDENCE-1 |
+| TikTok | social[] HTTPS URL | Text label | Text label | TikTok first-party developer guidelines / asset packs | Prior written permission required by current developer guidance | Existing commerce authoring boundary | Permission basis not established | PRODUCT_DECISION_REQUIRED | SOCIAL-ASSET-EVIDENCE-1 decision packet |
 | Snapchat | social[] HTTPS URL | Text label | Text label | Snap Brand Guidelines | Official Ghost source found | Existing commerce authoring boundary | Mark not implemented | IMPLEMENTATION_READY after shared asset pass | SOCIAL-ASSET-EVIDENCE-1 → WA-SOCIAL-1 |
 | YouTube | social[] HTTPS URL | Text label | Text label | brand.youtube | Official center found; exact usage text incomplete | Existing commerce authoring boundary | Exact approved production asset evidence incomplete | ASSET_EVIDENCE_REQUIRED | SOCIAL-ASSET-EVIDENCE-1 |
 | LinkedIn | social[] HTTPS URL | Text label | Text label | LinkedIn [in] Logo | Social-icon lineup use explicitly supported | Existing commerce authoring boundary | Mark not implemented | IMPLEMENTATION_READY after shared asset pass | SOCIAL-ASSET-EVIDENCE-1 → WA-SOCIAL-1 |
@@ -262,7 +260,8 @@ Create:
 
 Purpose:
 
-- obtain/capture exact first-party downloadable asset and permitted-use evidence for WhatsApp, Instagram, TikTok, YouTube, Facebook;
+- obtain/capture exact first-party downloadable asset and permitted-use evidence for WhatsApp, Instagram, YouTube, Facebook;
+- for TikTok, document the prior-written-permission gate and determine whether AWJ has an applicable authorization basis;
 - re-confirm X, Snapchat, and LinkedIn asset variants;
 - decide local committed asset vs first-party remote asset only where the official terms allow it;
 - produce a closed asset registry for WA-SOCIAL-1.
