@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { DEFAULT_PRESENTATION_CONFIG } from "../config";
 import {
   publishedExtraNav,
+  publishedFaviconUrl,
   publishedStoreName,
   publishedThemeStyle,
   publishedWhatsAppHref,
@@ -41,6 +42,28 @@ describe("published presentation runtime helpers", () => {
         "المتجر",
       ),
     ).toBe("ظاهر");
+  });
+
+  it("publishes only the existing safe raster favicon value", () => {
+    expect(publishedFaviconUrl(null)).toBeNull();
+    expect(
+      publishedFaviconUrl({
+        ...DEFAULT_PRESENTATION_CONFIG,
+        branding: {
+          ...DEFAULT_PRESENTATION_CONFIG.branding,
+          faviconDataUrl: "data:image/png;base64,iVBORw0KGgo=",
+        },
+      }),
+    ).toBe("data:image/png;base64,iVBORw0KGgo=");
+    expect(
+      publishedFaviconUrl({
+        ...DEFAULT_PRESENTATION_CONFIG,
+        branding: {
+          ...DEFAULT_PRESENTATION_CONFIG.branding,
+          faviconDataUrl: "data:image/svg+xml;base64,PHN2Zy8+",
+        },
+      }),
+    ).toBeNull();
   });
 
   it("does not emit CSS vars when nothing is published", () => {

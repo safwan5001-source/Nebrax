@@ -65,6 +65,14 @@ export function publishedLogoUrl(
   return sanitizeLogoUrl(candidate);
 }
 
+export function publishedFaviconUrl(
+  presentation: StorefrontPresentationConfig | null,
+): string | null {
+  return presentation
+    ? sanitizeLogoUrl(presentation.branding.faviconDataUrl)
+    : null;
+}
+
 export function publishedWhatsAppHref(
   presentation: StorefrontPresentationConfig | null,
   placement: "floating" | "footer",
