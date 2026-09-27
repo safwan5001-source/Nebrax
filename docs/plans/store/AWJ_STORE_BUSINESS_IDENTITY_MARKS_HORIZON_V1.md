@@ -65,7 +65,7 @@ Rules:
 - do not redraw or imitate the SBC seal;
 - do not display or log the raw `seal_token`; passing it to the official SBC loader via its required `data-token` mechanism is permitted and required for the existing official integration;
 - Preview must remain inert and must not execute the government script;
-- SBC without an official seal token must use a neutral, non-verified fallback state. This horizon may replace the current misleading `sbcVerified` fallback for tokenless SBC, but must preserve the official loader path when a token exists.
+- Preserve the existing contracted tokenless SBC fallback (`sbcVerified`) unchanged in this horizon. Changing that wording/state requires a separate explicitly approved product-contract decision; this visual-completion horizon must not alter it. Preserve the official loader path when a token exists.
 
 Relevant prior work:
 
@@ -248,7 +248,7 @@ Identity states:
 - no CR/VAT;
 - long legal name;
 - SBC with seal token;
-- SBC without seal token using a neutral, non-verified fallback.
+- SBC without seal token using the existing contracted `sbcVerified` fallback.
 
 Verify:
 
@@ -272,7 +272,7 @@ At minimum:
 - absent VAT hides VAT row/icon;
 - legal-name behavior unchanged;
 - legacy `verification.crNumber` never becomes public authority;
-- SBC official-token loader behavior unchanged; tokenless fallback must be neutral/non-verified.
+- SBC official-token loader behavior unchanged; tokenless fallback remains the existing contracted `sbcVerified` behavior.
 
 ### Merchant / Storefront Preview
 
@@ -319,7 +319,7 @@ Done only when:
 - Salla/current external evidence is recorded;
 - CR/VAT mark classification is explicit;
 - CR and VAT have truthful, non-misleading visual treatment;
-- official SBC token/loader behavior remains intact; tokenless SBC uses the defined neutral/non-verified fallback;
+- official SBC token/loader behavior remains intact; tokenless SBC preserves the existing contracted `sbcVerified` fallback;
 - missing values render nothing;
 - Preview ↔ Published parity passes;
 - RTL/LTR and required widths pass;
