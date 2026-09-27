@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
-import { render, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, render, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { useCompanyMock } = vi.hoisted(() => ({
   useCompanyMock: vi.fn(),
@@ -11,7 +11,7 @@ vi.mock('@/lib/company', () => ({
   useCompany: useCompanyMock,
 }));
 
-import { CompanyBrowserIdentity, safeCompanyIconUrl } from './company-browser-identity';
+import { AuthenticatedCompanyBrowserIdentity, CompanyBrowserIdentity, safeCompanyIconUrl } from './company-browser-identity';
 
 const LOGO_A = 'data:image/png;base64,iVBORw0KGgo=';
 const LOGO_B = 'https://cdn.example.test/company-b.webp';
@@ -27,6 +27,11 @@ describe('company browser identity', () => {
   beforeEach(() => {
     document.head.innerHTML = '';
     useCompanyMock.mockReset();
+    localStorage.clear();
+  });
+
+  afterEach(() => {
+    cleanup();
   });
 
   it('uses a tenant company logo for both browser and Apple identity', async () => {
@@ -66,6 +71,37 @@ describe('company browser identity', () => {
     await waitFor(() => {
       expect(headLinks().icon?.getAttribute('href')).toBe('/icon.ico');
       expect(headLinks().apple?.getAttribute('href')).toBe('/icon.ico');
+    });
+  });
+
+  it('removes only links owned by the component on unmount', async () => {
+    const externalIcon = document.createElement('link');
+    externalIcon.rel = 'icon';
+    externalIcon.href = '/external-icon.ico';
+    document.head.appendChild(externalIcon);
+    useCompanyMock.mockReturnValue({ name: 'Tenant A', logo: LOGO_A });
+
+    const view = render(<CompanyBrowserIdentity />);
+    await waitFor(() => expect(document.head.querySelector('link[data-nebrax-company-icon][rel="icon"]')?.getAttribute('href')).toBe(LOGO_A));
+
+    view.unmount();
+
+    expect(document.head.querySelector('link[data-nebrax-company-icon]')).toBeNull();
+    expect(externalIcon.isConnected).toBe(true);
+  });
+
+  it('removes tenant identity when the authenticated session ends', async () => {
+    localStorage.setItem('token', 'token');
+    useCompanyMock.mockReturnValue({ name: 'Tenant A', logo: LOGO_A });
+
+    render(<AuthenticatedCompanyBrowserIdentity />);
+    await waitFor(() => expect(headLinks().apple?.getAttribute('href')).toBe(LOGO_A));
+
+    localStorage.removeItem('token');
+    window.dispatchEvent(new Event('nibras:auth-session-changed'));
+
+    await waitFor(() => {
+      expect(document.head.querySelector('link[data-nebrax-company-icon]')).toBeNull();
     });
   });
 });

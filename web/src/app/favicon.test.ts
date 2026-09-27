@@ -19,4 +19,18 @@ describe('AWJ ERP browser icon', () => {
 
     expect(layout).not.toMatch(/Nebrax|Nibras|نبراس|نبراكس/i);
   });
+
+  it('mounts tenant browser identity in the shared authenticated provider boundary', () => {
+    const providers = fs.readFileSync(
+      path.join(process.cwd(), 'src/components/providers.tsx'),
+      'utf8',
+    );
+    const appLayout = fs.readFileSync(
+      path.join(process.cwd(), 'src/app/(app)/layout.tsx'),
+      'utf8',
+    );
+
+    expect(providers).toContain('AuthenticatedCompanyBrowserIdentity');
+    expect(appLayout).not.toContain('CompanyBrowserIdentity');
+  });
 });
