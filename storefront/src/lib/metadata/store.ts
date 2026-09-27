@@ -48,6 +48,7 @@ export async function generateStoreMetadata({
     description: metaDescription,
     icons: {
       icon: faviconUrl ?? "/favicon.ico",
+      apple: faviconUrl ?? "/favicon.ico",
     },
     ...(metaKeywords ? { keywords: metaKeywords } : {}),
     openGraph: {

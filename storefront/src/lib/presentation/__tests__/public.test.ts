@@ -44,7 +44,7 @@ describe("published presentation runtime helpers", () => {
     ).toBe("ظاهر");
   });
 
-  it("publishes only the existing safe raster favicon value", () => {
+  it("prioritizes a safe favicon, then falls back to a safe logo", () => {
     expect(publishedFaviconUrl(null)).toBeNull();
     expect(
       publishedFaviconUrl({
@@ -61,6 +61,25 @@ describe("published presentation runtime helpers", () => {
         branding: {
           ...DEFAULT_PRESENTATION_CONFIG.branding,
           faviconDataUrl: "data:image/svg+xml;base64,PHN2Zy8+",
+        },
+      }),
+    ).toBeNull();
+    expect(
+      publishedFaviconUrl({
+        ...DEFAULT_PRESENTATION_CONFIG,
+        branding: {
+          ...DEFAULT_PRESENTATION_CONFIG.branding,
+          logoDataUrl: "https://cdn.example.test/store.webp",
+        },
+      }),
+    ).toBe("https://cdn.example.test/store.webp");
+    expect(
+      publishedFaviconUrl({
+        ...DEFAULT_PRESENTATION_CONFIG,
+        branding: {
+          ...DEFAULT_PRESENTATION_CONFIG.branding,
+          faviconDataUrl: "javascript:alert(1)",
+          logoDataUrl: "data:image/svg+xml;base64,PHN2Zy8+",
         },
       }),
     ).toBeNull();

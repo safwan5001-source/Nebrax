@@ -68,9 +68,11 @@ export function publishedLogoUrl(
 export function publishedFaviconUrl(
   presentation: StorefrontPresentationConfig | null,
 ): string | null {
-  return presentation
-    ? sanitizeLogoUrl(presentation.branding.faviconDataUrl)
-    : null;
+  if (!presentation) return null;
+  return (
+    sanitizeLogoUrl(presentation.branding.faviconDataUrl) ??
+    publishedLogoUrl(presentation)
+  );
 }
 
 export function publishedWhatsAppHref(
