@@ -282,7 +282,7 @@ for (const [scenario, expected] of stateCases) {
 
     if (scenario === "whatsapp-floating") {
       await expect(footerWhatsapp).toHaveCount(0);
-      await expect(page.locator('[data-store-whatsapp]')).toHaveCount(1);
+      await expect(page.locator("[data-store-whatsapp]")).toHaveCount(1);
     }
     await expect(page.getByRole("img", { name: "App Store" })).toHaveCount(
       expected.apple,
