@@ -13,8 +13,8 @@
 | 5 | STORE-BRAND-PAY-EVIDENCE-1 | done_decision_gate | high | STORE-BRAND-0 | Evidence proves COD/Pay on Pickup only; card/wallet acceptance model absent |
 | 6 | STORE-BRAND-PAY-1 | deferred | high | STORE-BRAND-PAY-EVIDENCE-1 | Deferred until authoritative card/wallet supported+enabled capability exists |
 | 7 | STORE-BRAND-COMPOSE-1 | done | normal | WA/SOCIAL + APPS + CONTACT; PAY deferred by evidence gate | Final Footer composition merged in #1070 |
-| 8 | STORE-BRAND-QA-1 | followup_in_review | high | implemented slices | Close-review follow-up: actual published route + required visual-state/accessibility matrix |
-| 9 | STORE-BRAND-CLOSE-1 | followup_in_review | normal | STORE-BRAND-QA-1 follow-up | Closure remains open until QA follow-up is green and reviewed |
+| 8 | STORE-BRAND-QA-1 | done | high | implemented slices | QA follow-up merged in #1077; actual published route + required visual-state/accessibility matrix closed |
+| 9 | STORE-BRAND-CLOSE-1 | done | normal | STORE-BRAND-QA-1 follow-up | Closure follow-up satisfied after #1077 merged green; no unresolved P1/P2 |
 
 ## STORE-BRAND-0 — Evidence Pass
 
@@ -176,6 +176,7 @@ Closed 2026-09-27.
 - Follow-up P2 trigger fix: PR #1073, merge SHA `b51f76f31967faf46281573b372ca362696c297e`.
 - PR-head checks were green for Store Brand QA, Storefront/Web where applicable, and Core CI.
 - The review P2 about missing implementation-path triggers is resolved.
+- Follow-up completion: PR #1077 merged as `26092b28649156a6111d7797a9513e96290797ae`; actual published-route coverage and required state/accessibility matrix are closed.
 
 Widths:
 
