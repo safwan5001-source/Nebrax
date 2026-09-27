@@ -12,8 +12,17 @@ on:
   pull_request:
     paths:
       - "web/e2e/store-brand-qa.spec.ts"
+      - "web/src/app/dev/trust-visual/**"
+      - "web/src/modules/store-experience-builder/**"
       - "storefront/e2e/store-brand-qa.spec.ts"
       - "storefront/playwright.brand-qa.config.ts"
+      - "storefront/src/app/dev/trust-visual/**"
+      - "storefront/src/app/[country]/[locale]/(storefront)/layout.tsx"
+      - "storefront/src/components/brand/**"
+      - "storefront/src/components/customizer/**"
+      - "storefront/src/components/layout/**"
+      - "storefront/src/lib/presentation/**"
+      - "storefront/public/brand/**"
       - ".github/workflows/store-brand-qa.yml"
 
 jobs:
