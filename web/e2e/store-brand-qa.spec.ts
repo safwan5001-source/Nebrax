@@ -142,7 +142,17 @@ for (const [scenario, expected] of stateCases) {
       const expectedCount = network === 'instagram' ? expected.instagram : 0;
       await expect(page.locator(`[data-official-social="${network}"]`)).toHaveCount(expectedCount);
     }
+    const footerWhatsapp = page.locator('footer [data-official-social="whatsapp"]');
     await expect(page.locator('[data-official-social="whatsapp"]')).toHaveCount(expected.whatsapp);
+
+    if (scenario === 'partial') {
+      await expect(footerWhatsapp).toHaveCount(1);
+    }
+
+    if (scenario === 'whatsapp-floating') {
+      await expect(footerWhatsapp).toHaveCount(0);
+      await expect(page.locator('[data-official-social="whatsapp"]')).toHaveCount(1);
+    }
     await expect(page.getByRole('img', { name: 'App Store' })).toHaveCount(expected.apple);
     await expect(page.getByRole('img', { name: 'Google Play' })).toHaveCount(expected.google);
 
