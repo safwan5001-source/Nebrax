@@ -60,7 +60,7 @@ const presentation = {
 const storefront = {
   data: {
     name: "Al Noor",
-    default_locale: "ar",
+    default_locale: null,
     business_identity: {
       legal_name: "Al Noor Trading Company",
       cr_number: "7050247977",
