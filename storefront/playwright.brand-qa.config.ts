@@ -37,6 +37,8 @@ export default defineConfig({
         ...process.env,
         AWJ_COMMERCE_API_URL: "http://127.0.0.1:4100",
         AWJ_STOREFRONT_DEV_HOST: "qa.store.awjdev.xyz",
+        NEXT_PUBLIC_DEFAULT_COUNTRY: "sa",
+        NEXT_PUBLIC_DEFAULT_LOCALE: "en",
       },
     },
   ],
