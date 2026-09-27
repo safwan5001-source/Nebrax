@@ -20,7 +20,7 @@ async function assertNoOverflow(page: Page) {
   expect(overflow.scrollWidth).toBeLessThanOrEqual(overflow.clientWidth + 1);
 }
 
-async function assertTouchTarget(locator: Locator, minimum = 40) {
+async function assertTouchTarget(locator: Locator, minimum = 44) {
   const box = await locator.boundingBox();
   expect(box).not.toBeNull();
   expect(box?.width ?? 0).toBeGreaterThanOrEqual(minimum);
@@ -140,7 +140,18 @@ for (const locale of locales) {
   for (const width of [390, 1440] as const) {
     test(`actual published route ${locale} ${width}`, async ({ page }) => {
       await page.setViewportSize({ width, height: 1000 });
-      await page.setExtraHTTPHeaders({ "accept-language": locale });
+      await page.context().addCookies([
+        {
+          name: "spree_country",
+          value: "sa",
+          url: "http://127.0.0.1:3001",
+        },
+        {
+          name: "spree_locale",
+          value: locale,
+          url: "http://127.0.0.1:3001",
+        },
+      ]);
       await page.goto(`/sa/${locale}`);
       await page.waitForLoadState("networkidle");
 
@@ -301,7 +312,18 @@ test("published icon targets are usable and keyboard focus is visible", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 1000 });
-  await page.setExtraHTTPHeaders({ "accept-language": "en" });
+  await page.context().addCookies([
+    {
+      name: "spree_country",
+      value: "sa",
+      url: "http://127.0.0.1:3001",
+    },
+    {
+      name: "spree_locale",
+      value: "en",
+      url: "http://127.0.0.1:3001",
+    },
+  ]);
   await page.goto("/sa/en");
   await page.waitForLoadState("networkidle");
 
