@@ -6,6 +6,7 @@ import { BranchScope, useBranchVersion } from '@/components/layout/branch-scope'
 import { Sidebar } from '@/components/layout/sidebar';
 import { Topbar } from '@/components/layout/topbar';
 import { DemoBanner } from '@/components/layout/demo-banner';
+import { CompanyBrowserIdentity } from '@/components/layout/company-browser-identity';
 import { currentUser, isAuthenticated } from '@/lib/auth';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -45,6 +46,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
+      <CompanyBrowserIdentity />
       <DemoBanner />
       <div className="flex min-h-0 flex-1">
         <Sidebar
