@@ -42,6 +42,30 @@ async function assertTouchTarget(locator: Locator, minimum = 44) {
   expect(box?.height ?? 0).toBeGreaterThanOrEqual(minimum);
 }
 
+async function assertKeyboardFocusVisible(page: Page, target: Locator) {
+  await page.evaluate(() => {
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
+  });
+  for (let index = 0; index < 80; index += 1) {
+    await page.keyboard.press('Tab');
+    if (await target.evaluate((el) => document.activeElement === el)) {
+      const focus = await target.evaluate((el) => {
+        const style = getComputedStyle(el);
+        return {
+          outlineWidth: Number.parseFloat(style.outlineWidth || '0'),
+          outlineStyle: style.outlineStyle,
+        };
+      });
+      expect(focus.outlineStyle).not.toBe('none');
+      expect(focus.outlineWidth).toBeGreaterThan(0);
+      return;
+    }
+  }
+  throw new Error('Target was not reached by keyboard navigation');
+}
+
 async function assertFooter(page: Page, width: number, locale: 'ar' | 'en') {
   await expect(page.locator('html')).toHaveAttribute('dir', locale === 'ar' ? 'rtl' : 'ltr');
   await assertNoOverflow(page);
@@ -164,4 +188,5 @@ test('merchant preview icon targets remain usable', async ({ page }) => {
 
   await assertTouchTarget(instagram);
   await assertTouchTarget(whatsapp);
+  await assertKeyboardFocusVisible(page, instagram);
 });
