@@ -46,8 +46,9 @@ class TenantSubdomainAuthTest extends TestCase
     public function browser_identity_is_publicly_resolved_only_from_the_tenant_hostname(): void
     {
         $a = $this->registerTenant('alnoor', 'owner@alnoor.test');
-        $tenant = Tenant::findOrFail($a['tenant_id']);
-        Settings::put('company', ['logo' => 'data:image/png;base64,AAA='], $tenant);
+        $b = $this->registerTenant('other', 'owner@other.test');
+        Settings::put('company', ['logo' => 'data:image/png;base64,AAA='], Tenant::findOrFail($a['tenant_id']));
+        Settings::put('company', ['logo' => 'data:image/png;base64,BBB='], Tenant::findOrFail($b['tenant_id']));
         $this->forgetTenancy();
 
         $this->getJson($this->tenantUrl('alnoor', 'company-browser-identity'))

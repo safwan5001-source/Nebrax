@@ -20,7 +20,9 @@ final class CompanyBrowserIdentityController extends ApiController
             abort(404);
         }
 
-        $tenant = Tenant::query()->find($tenantId, ['id']);
+        // Settings::group() reads the cast JSON from this model; selecting only
+        // the id would silently return the neutral default logo.
+        $tenant = Tenant::query()->find($tenantId, ['id', 'settings']);
         if ($tenant === null) {
             abort(404);
         }
