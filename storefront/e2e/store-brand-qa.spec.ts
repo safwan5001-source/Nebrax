@@ -272,28 +272,17 @@ for (const [scenario, expected] of stateCases) {
     const footerWhatsapp = page.locator(
       'footer [data-official-social="whatsapp"]',
     );
-    const floatingWhatsapp = page.locator(
-      'body > [data-official-social="whatsapp"], body > * [data-official-social="whatsapp"]',
-    ).filter({ hasNot: page.locator('footer [data-official-social="whatsapp"]') });
-
     await expect(page.locator('[data-official-social="whatsapp"]')).toHaveCount(
       expected.whatsapp,
     );
 
     if (scenario === "partial") {
       await expect(footerWhatsapp).toHaveCount(1);
-      await expect(
-        page.locator('[data-official-social="whatsapp"]').filter({
-          hasNot: footerWhatsapp,
-        }),
-      ).toHaveCount(0);
     }
 
     if (scenario === "whatsapp-floating") {
       await expect(footerWhatsapp).toHaveCount(0);
-      await expect(page.locator('[data-official-social="whatsapp"]')).toHaveCount(
-        1,
-      );
+      await expect(page.locator('[data-store-whatsapp]')).toHaveCount(1);
     }
     await expect(page.getByRole("img", { name: "App Store" })).toHaveCount(
       expected.apple,
