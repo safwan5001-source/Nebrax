@@ -138,7 +138,7 @@ for (const locale of locales) {
 }
 
 for (const locale of locales) {
-  for (const width of [390, 1440] as const) {
+  for (const width of widths) {
     test(`actual published route ${locale} ${width}`, async ({ page }) => {
       await page.setViewportSize({ width, height: 1000 });
       await page.context().addCookies([
