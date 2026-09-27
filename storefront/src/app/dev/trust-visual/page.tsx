@@ -188,11 +188,11 @@ export default async function TrustVisualPage({
             }
           : scenario === "unsafe"
             ? {
-              iosUrl: "https://www.apple.com/iphone",
-              androidUrl:
-                "https://play.google.com/store/apps/details?id=sa.awj",
-              show: true,
-            }
+                iosUrl: "https://www.apple.com/iphone",
+                androidUrl:
+                  "https://play.google.com/store/apps/details?id=sa.awj",
+                show: true,
+              }
             : {
                 iosUrl: "https://apps.apple.com/app/id000000000",
                 androidUrl:
