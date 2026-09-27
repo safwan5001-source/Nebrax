@@ -10,9 +10,11 @@ Canonical Commercial Registration and VAT number now render in the published foo
 
 ## Base SHA
 
-`ba64e1692180e0e29b46ad1db5b86e170dbba261`
+Implementation branch point: `ba64e1692180e0e29b46ad1db5b86e170dbba261`.
 
-Verified on `origin/main` before implementation. It is the merge of PR #1078. PR #1077 is merged (`26092b28649156a6111d7797a9513e96290797ae`).
+That was `origin/main` before this work. It is the merge of PR #1078. PR #1077 is merged (`26092b28649156a6111d7797a9513e96290797ae`).
+
+Before close, `origin/main` moved to `995e34a97d026e659973fe20512c8101aec7f871` (PR #1079, server-rendered tenant browser identity). That commit does not touch the identity-mark files. GitHub reports the pull request `MERGEABLE` against that tip. No rebase was required.
 
 ## Branch
 
@@ -24,7 +26,9 @@ Verified on `origin/main` before implementation. It is the merge of PR #1078. PR
 
 ## Head SHA
 
-Implementation commit `6ffecea47970dd9a3e03b2a48540578267357c35`. The pull request head also contains the documentation commit that records this PR link. CI is read from that head.
+Product implementation: `6ffecea47970dd9a3e03b2a48540578267357c35`.
+
+CI recorded below was green on `6ed906894f3550834fbbacd7b8fcaaff14f55f44` (that commit only added the first version of this report). This documentation commit does not change runtime code. The pull request head is this commit; its check rollup is the gate for owner review.
 
 ## External Evidence: Salla + authoritative Saudi sources
 
@@ -107,7 +111,18 @@ Storefront Store Brand QA (`pnpm exec playwright test e2e/store-brand-qa.spec.ts
 
 ## CI status
 
-Checks are requested on PR #1080. Local equivalents of Storefront CI unit/Biome/typecheck and both Store Brand QA jobs passed. Web CI's full `npm test` and `npm run build` were not re-run locally; the focused builder tests passed. `tsc --noEmit` on web reports pre-existing errors in unrelated POS/product/document tests and is not the CI gate (`npm run build` is). This section is updated if a check fails.
+All checks on head `6ed906894f3550834fbbacd7b8fcaaff14f55f44` passed. `mergeStateStatus` was `CLEAN` before this documentation commit. Duplicate Core CI jobs are the two pushes of that same head; both passed. No failing or cancelled check.
+
+| Check | Result | Run |
+|---|---|---|
+| storefront (lint + typecheck + test) | pass 59s | [36318829598](https://github.com/safwan5001-source/Nebrax/actions/runs/36318829598) |
+| web build (Next.js), includes `npm test` | pass 3m15s | [36318829597](https://github.com/safwan5001-source/Nebrax/actions/runs/36318829597) |
+| merchant preview visual QA | pass 2m22s | [36318829632](https://github.com/safwan5001-source/Nebrax/actions/runs/36318829632) |
+| published footer visual QA | pass 2m36s | [36318829632](https://github.com/safwan5001-source/Nebrax/actions/runs/36318829632) |
+| php artisan test (L11, sqlite) | pass 7m8s and 7m4s | [36318829683](https://github.com/safwan5001-source/Nebrax/actions/runs/36318829683), [36318826738](https://github.com/safwan5001-source/Nebrax/actions/runs/36318826738) |
+| php artisan test (L11, pgsql) | pass 20m8s and 19m42s | [36318829683](https://github.com/safwan5001-source/Nebrax/actions/runs/36318829683), [36318826738](https://github.com/safwan5001-source/Nebrax/actions/runs/36318826738) |
+
+Mobile CI and runtime-smoke do not apply to these paths. This documentation commit re-requests the same workflows because the pull request still touches `storefront/**` and `web/**`. It does not change product behavior.
 
 ## Tenant/Security confirmation
 
@@ -141,7 +156,7 @@ Browser QA covered Arabic RTL and English LTR at 390, 430, 768, 1024, 1280, and 
 - The utility icons are generic. They must not later be restyled into seals, shields, or checkmarks that imply government verification.
 - Salla's uploaded tax certificate is a real merchant pattern and is intentionally not copied. A future horizon would need its own evidence and a storage decision.
 - Store Brand QA screenshots are local test output and are not committed.
-- Web full `npm test` / `npm run build` remain for CI.
+- `origin/main` gained PR #1079 after the branch point. There is no file overlap and GitHub could merge cleanly. Rebase was not performed.
 
 ## Merge: NOT PERFORMED
 
