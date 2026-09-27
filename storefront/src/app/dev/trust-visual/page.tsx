@@ -186,19 +186,19 @@ export default async function TrustVisualPage({
                 "https://play.google.com/store/apps/details?id=sa.awj",
               show: true,
             }
-        : scenario === "unsafe"
-          ? {
+          : scenario === "unsafe"
+            ? {
               iosUrl: "https://www.apple.com/iphone",
               androidUrl:
                 "https://play.google.com/store/apps/details?id=sa.awj",
               show: true,
             }
-          : {
-              iosUrl: "https://apps.apple.com/app/id000000000",
-              androidUrl:
-                "https://play.google.com/store/apps/details?id=sa.awj",
-              show: true,
-            };
+            : {
+                iosUrl: "https://apps.apple.com/app/id000000000",
+                androidUrl:
+                  "https://play.google.com/store/apps/details?id=sa.awj",
+                show: true,
+              };
   const whatsappOn =
     scenario === "full" ||
     scenario === "long" ||
@@ -217,21 +217,30 @@ export default async function TrustVisualPage({
     contact:
       scenario === "empty" || scenario === "sbc-plain"
         ? {}
-        : {
-            phone: "+966500000001",
-            email: long ? `${"a".repeat(40)}@example.com` : "shop@example.com",
-            address: long
-              ? LONG
-              : locale === "ar"
-                ? "الدمام، المنطقة الشرقية"
-                : "Dammam, Eastern Province",
-            hours: locale === "ar" ? "٩ ص – ٩ م" : "9:00–21:00",
-          },
+        : scenario === "partial"
+          ? { phone: "+966500000001" }
+          : {
+              phone: "+966500000001",
+              email: long
+                ? `${"a".repeat(40)}@example.com`
+                : "shop@example.com",
+              address: long
+                ? LONG
+                : locale === "ar"
+                  ? "الدمام، المنطقة الشرقية"
+                  : "Dammam, Eastern Province",
+              hours: locale === "ar" ? "٩ ص – ٩ م" : "9:00–21:00",
+            },
     whatsapp: {
       enabled: whatsappOn,
       phone: scenario === "unsafe" ? "not-a-phone" : "+966500000000",
       message: "",
-      placement: scenario === "partial" ? "footer" : "both",
+      placement:
+        scenario === "partial"
+          ? "footer"
+          : scenario === "whatsapp-floating"
+            ? "floating"
+            : "both",
     },
     social,
     verification: {
