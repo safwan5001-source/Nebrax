@@ -1,0 +1,76 @@
+name: Store Brand QA
+
+on:
+  push:
+    branches:
+      - qa/store-brand-qa-1
+    paths:
+      - "web/e2e/store-brand-qa.spec.ts"
+      - "storefront/e2e/store-brand-qa.spec.ts"
+      - "storefront/playwright.brand-qa.config.ts"
+      - ".github/workflows/store-brand-qa.yml"
+  pull_request:
+    paths:
+      - "web/e2e/store-brand-qa.spec.ts"
+      - "storefront/e2e/store-brand-qa.spec.ts"
+      - "storefront/playwright.brand-qa.config.ts"
+      - ".github/workflows/store-brand-qa.yml"
+
+jobs:
+  merchant-preview:
+    name: merchant preview visual QA
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run merchant preview matrix
+        run: npx playwright test e2e/store-brand-qa.spec.ts --project=desktop
+      - name: Upload merchant preview evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: store-brand-qa-merchant-preview
+          path: web/test-results/store-brand-qa
+          if-no-files-found: error
+
+  published-footer:
+    name: published footer visual QA
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: storefront
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.4
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: storefront/pnpm-lock.yaml
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Run published footer matrix
+        run: pnpm exec playwright test e2e/store-brand-qa.spec.ts --config=playwright.brand-qa.config.ts --project=chromium
+      - name: Upload published footer evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: store-brand-qa-published-footer
+          path: storefront/test-results/store-brand-qa
+          if-no-files-found: error
