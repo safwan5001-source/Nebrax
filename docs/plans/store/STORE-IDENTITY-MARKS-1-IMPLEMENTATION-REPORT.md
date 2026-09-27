@@ -1,6 +1,6 @@
 # STORE-IDENTITY-MARKS-1 — Implementation Report
 
-STATUS: Ready for owner review. Merge not performed. Deploy not performed.
+STATUS: CLOSED — merged; post-merge auto-deploy statuses successful. No manual deploy performed.
 DATE: 2026-09-27
 Horizon: `docs/plans/store/AWJ_STORE_BUSINESS_IDENTITY_MARKS_HORIZON_V1.md`
 
@@ -165,3 +165,31 @@ Browser QA covered Arabic RTL and English LTR at 390, 430, 768, 1024, 1280, and 
 ## Next Step
 
 Owner review of the focused pull request. Do not merge or deploy without Safwan's explicit approval. Do not start another Store, Payment, or Trust horizon from this change.
+
+
+## Post-Merge Closure
+
+Owner approved merge after review.
+
+- PR: #1080
+- Reviewed head: `c46ecfd8b95d58271f8c804d401f8719ee961675`
+- Merge SHA: `071dfa3061fbb0c9393e02bdcba0ee9d150b17cd`
+- Merge result: SUCCESS
+- Unresolved P1/P2 at merge: none
+- Manual deploy: NOT PERFORMED
+- Production release action by ChatGPT/Grok: NOT PERFORMED
+
+Post-merge status contexts on the merge SHA all completed successfully:
+
+- Railway — Nebrax/Web: SUCCESS
+- Railway — Storefront: SUCCESS
+- Railway — nibras-api: SUCCESS
+- Railway — awj-scheduler: SUCCESS
+- Vercel — nebrax: SUCCESS
+- Vercel — storefront: SUCCESS
+
+These were repository/platform auto-deploy integrations triggered by the merge; they were not manually initiated in this task.
+
+### Final state
+
+`STORE-IDENTITY-MARKS-1` is CLOSED. The Business Identity Marks horizon ends here. Do not automatically start another Store, Payment, or Trust horizon.
