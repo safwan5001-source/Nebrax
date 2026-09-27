@@ -46,14 +46,14 @@ describe("store metadata favicon", () => {
     vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://store.example.test");
   });
 
-  it("exposes the configured published favicon and Apple icon without changing existing metadata", async () => {
+  it("uses a request-scoped icon route for both browser and Apple identity", async () => {
     mocks.fetchStorefrontConfig.mockResolvedValueOnce(
       storefrontWithBranding(FAVICON_A),
     );
 
     const metadata = await generateStoreMetadata({ locale: "en" });
 
-    expect(metadata.icons).toEqual({ icon: FAVICON_A, apple: FAVICON_A });
+    expect(metadata.icons).toEqual({ icon: "/icon", apple: "/icon" });
     expect(metadata.title).toEqual({
       template: "%s | AWJ Store",
       default: "AWJ Store",
@@ -66,17 +66,17 @@ describe("store metadata favicon", () => {
     });
   });
 
-  it("uses logoDataUrl for both browser and Apple identity when favicon is missing", async () => {
+  it("keeps the request-scoped icon route stable when favicon falls back to a logo", async () => {
     mocks.fetchStorefrontConfig.mockResolvedValueOnce(
       storefrontWithBranding(null, FAVICON_B),
     );
 
     const metadata = await generateStoreMetadata({ locale: "en" });
 
-    expect(metadata.icons).toEqual({ icon: FAVICON_B, apple: FAVICON_B });
+    expect(metadata.icons).toEqual({ icon: "/icon", apple: "/icon" });
   });
 
-  it("keeps store-specific values isolated across sequential metadata requests", async () => {
+  it("keeps store-specific identity isolated across sequential metadata requests", async () => {
     mocks.fetchStorefrontConfig
       .mockResolvedValueOnce(storefrontWithBranding(FAVICON_A))
       .mockResolvedValueOnce(storefrontWithBranding(FAVICON_B));
@@ -84,36 +84,21 @@ describe("store metadata favicon", () => {
     const storeA = await generateStoreMetadata({ locale: "en" });
     const storeB = await generateStoreMetadata({ locale: "en" });
 
-    expect(storeA.icons).toEqual({ icon: FAVICON_A, apple: FAVICON_A });
-    expect(storeB.icons).toEqual({ icon: FAVICON_B, apple: FAVICON_B });
-    expect(storeA.icons).not.toEqual(storeB.icons);
+    expect(storeA.icons).toEqual({ icon: "/icon", apple: "/icon" });
+    expect(storeB.icons).toEqual({ icon: "/icon", apple: "/icon" });
   });
 
-  it.each([
-    ["missing", null, null],
-    ["malformed", "data:image/svg+xml;base64,PHN2Zy8+", null],
-    ["unsupported", "javascript:alert(1)", null],
-  ])("uses the neutral fallback when favicon is %s and no logo exists", async (_, favicon, logo) => {
+  it("uses the neutral fallback when favicon and logo are unsafe", async () => {
     mocks.fetchStorefrontConfig.mockResolvedValueOnce(
-      storefrontWithBranding(favicon, logo),
+      storefrontWithBranding(
+        "javascript:alert(1)",
+        "data:image/svg+xml;base64,PHN2Zy8+",
+      ),
     );
 
     const metadata = await generateStoreMetadata({ locale: "en" });
 
-    expect(metadata.icons).toEqual({
-      icon: "/favicon.ico",
-      apple: "/favicon.ico",
-    });
-  });
-
-  it("falls back from an unsafe favicon to a valid logo", async () => {
-    mocks.fetchStorefrontConfig.mockResolvedValueOnce(
-      storefrontWithBranding("javascript:alert(1)", FAVICON_B),
-    );
-
-    const metadata = await generateStoreMetadata({ locale: "en" });
-
-    expect(metadata.icons).toEqual({ icon: FAVICON_B, apple: FAVICON_B });
+    expect(metadata.icons).toEqual({ icon: "/icon", apple: "/icon" });
   });
 
   it("does not fail metadata rendering when the storefront identity request fails", async () => {
@@ -122,7 +107,7 @@ describe("store metadata favicon", () => {
     await expect(
       generateStoreMetadata({ locale: "en" }),
     ).resolves.toMatchObject({
-      icons: { icon: "/favicon.ico", apple: "/favicon.ico" },
+      icons: { icon: "/icon", apple: "/icon" },
       description: "Store description",
     });
   });

@@ -28,6 +28,7 @@ use App\Http\Controllers\Api\CashBankAccountController;
 use App\Http\Controllers\Api\ClassificationAnalyticsReportController;
 use App\Http\Controllers\Api\ClassificationController;
 use App\Http\Controllers\Api\CompanyController;
+use App\Http\Controllers\Api\CompanyBrowserIdentityController;
 use App\Http\Controllers\Api\AppBuilderRegistryController;
 use App\Http\Controllers\Api\BuilderAppController;
 use App\Http\Controllers\Api\BuilderDraftExperienceController;
@@ -191,6 +192,8 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         ->middleware('throttle:register')
         ->name('auth.public-register');
     Route::post('login', [AuthController::class, 'login'])->middleware('throttle:5,1');
+    Route::get('company-browser-identity', [CompanyBrowserIdentityController::class, 'show'])
+        ->middleware('throttle:60,1');
     Route::post('forgot-password', [AuthController::class, 'forgotPassword'])->middleware('throttle:auth-recovery');
     Route::post('reset-password', [AuthController::class, 'resetPassword'])->middleware('throttle:auth-reset');
     Route::post('email/verify', [AuthController::class, 'verifyEmail'])->middleware('throttle:auth-reset');

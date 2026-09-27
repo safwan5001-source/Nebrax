@@ -1,6 +1,4 @@
 import type { Metadata } from "next";
-import { fetchStorefrontConfig } from "@/lib/commerce/storefront";
-import { publishedFaviconUrl } from "@/lib/presentation/public";
 import { SOCIAL_IMAGE_PATH } from "@/lib/seo";
 import {
   getStoreMetaDescription,
@@ -22,14 +20,11 @@ interface StoreMetadataParams {
 export async function generateStoreMetadata({
   locale,
 }: StoreMetadataParams): Promise<Metadata> {
-  const storefront = await fetchStorefrontConfig().catch(() => null);
   const storeName = getStoreSeoTitle();
   const storeUrl = getStoreUrl();
   const metaDescription = getStoreMetaDescription();
   const metaKeywords = process.env.STORE_META_KEYWORDS;
   const twitter = process.env.STORE_TWITTER;
-  const faviconUrl = publishedFaviconUrl(storefront?.presentation ?? null);
-
   let metadataBaseSpread: Partial<{ metadataBase: URL }> = {};
   if (storeUrl) {
     try {
@@ -47,8 +42,8 @@ export async function generateStoreMetadata({
     },
     description: metaDescription,
     icons: {
-      icon: faviconUrl ?? "/favicon.ico",
-      apple: faviconUrl ?? "/favicon.ico",
+      icon: "/icon",
+      apple: "/icon",
     },
     ...(metaKeywords ? { keywords: metaKeywords } : {}),
     openGraph: {
