@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { CommerceWorkspaceShell } from '@/components/commerce-workspace/commerce-workspace-shell';
+import { AuthenticatedCompanyBrowserIdentity } from '@/components/layout/company-browser-identity';
 import { currentUser, isAuthenticated } from '@/lib/auth';
 import { CommerceStoreProvider } from '@/modules/commerce-workspace/store-context';
 
@@ -30,8 +31,11 @@ export default function CommerceLayout({ children }: { children: React.ReactNode
   }
 
   return (
-    <CommerceStoreProvider>
-      <CommerceWorkspaceShell>{children}</CommerceWorkspaceShell>
-    </CommerceStoreProvider>
+    <>
+      <AuthenticatedCompanyBrowserIdentity />
+      <CommerceStoreProvider>
+        <CommerceWorkspaceShell>{children}</CommerceWorkspaceShell>
+      </CommerceStoreProvider>
+    </>
   );
 }

@@ -47,13 +47,21 @@ export function CompanyBrowserIdentity() {
 
 /** Boundary واحد لكل القشور المصادق عليها؛ لا يُركّب على المسارات العامة. */
 export function AuthenticatedCompanyBrowserIdentity() {
-  const [authenticated, setAuthenticated] = useState(() => isAuthenticated());
+  const [{ authenticated, generation }, setSession] = useState(() => ({
+    authenticated: isAuthenticated(),
+    generation: 0,
+  }));
 
   useEffect(() => {
-    const handleSessionChange = () => setAuthenticated(isAuthenticated());
+    const handleSessionChange = () => {
+      setSession((current) => ({
+        authenticated: isAuthenticated(),
+        generation: current.generation + 1,
+      }));
+    };
     window.addEventListener(AUTH_SESSION_CHANGED_EVENT, handleSessionChange);
     return () => window.removeEventListener(AUTH_SESSION_CHANGED_EVENT, handleSessionChange);
   }, []);
 
-  return authenticated ? <CompanyBrowserIdentity /> : null;
+  return authenticated ? <CompanyBrowserIdentity key={generation} /> : null;
 }

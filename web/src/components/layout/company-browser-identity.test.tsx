@@ -104,4 +104,21 @@ describe('company browser identity', () => {
       expect(document.head.querySelector('link[data-nebrax-company-icon]')).toBeNull();
     });
   });
+
+  it('reloads the identity when the account changes while still authenticated', async () => {
+    localStorage.setItem('token', 'token-a');
+    useCompanyMock.mockReturnValue({ name: 'Tenant A', logo: LOGO_A });
+
+    render(<AuthenticatedCompanyBrowserIdentity />);
+    await waitFor(() => expect(headLinks().icon?.getAttribute('href')).toBe(LOGO_A));
+
+    useCompanyMock.mockReturnValue({ name: 'Tenant B', logo: LOGO_B });
+    localStorage.setItem('token', 'token-b');
+    window.dispatchEvent(new Event('nibras:auth-session-changed'));
+
+    await waitFor(() => {
+      expect(headLinks().icon?.getAttribute('href')).toBe(LOGO_B);
+      expect(headLinks().apple?.getAttribute('href')).toBe(LOGO_B);
+    });
+  });
 });

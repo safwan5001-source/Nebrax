@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/layout/theme-toggle';
 import { LangToggle } from '@/components/layout/lang-toggle';
 import { CompanyLogoMark } from '@/components/layout/company-logo-mark';
+import { AuthenticatedCompanyBrowserIdentity } from '@/components/layout/company-browser-identity';
 import { useCompany } from '@/lib/company';
 import { currentUser, isAuthenticated, logout } from '@/lib/auth';
 
@@ -42,6 +43,7 @@ export default function SelfServiceLayout({ children }: { children: React.ReactN
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
+      <AuthenticatedCompanyBrowserIdentity />
       <header className="no-print flex h-14 shrink-0 items-center gap-3 border-b border-border bg-surface px-4">
         <CompanyLogoMark logo={company?.logo} name={company?.name} />
         <span className="truncate text-sm font-semibold text-text">{company?.name ?? t('portal_title')}</span>
