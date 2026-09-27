@@ -13,8 +13,8 @@
 | 5 | STORE-BRAND-PAY-EVIDENCE-1 | done_decision_gate | high | STORE-BRAND-0 | Evidence proves COD/Pay on Pickup only; card/wallet acceptance model absent |
 | 6 | STORE-BRAND-PAY-1 | deferred | high | STORE-BRAND-PAY-EVIDENCE-1 | Deferred until authoritative card/wallet supported+enabled capability exists |
 | 7 | STORE-BRAND-COMPOSE-1 | done | normal | WA/SOCIAL + APPS + CONTACT; PAY deferred by evidence gate | Final Footer composition merged in #1070 |
-| 8 | STORE-BRAND-QA-1 | done | high | implemented slices | Visual regression matrix merged in #1072; trigger P2 follow-up merged in #1073 |
-| 9 | STORE-BRAND-CLOSE-1 | in_review | normal | all ready work closed | Closure report + durable state |
+| 8 | STORE-BRAND-QA-1 | followup_in_review | high | implemented slices | Close-review follow-up: actual published route + required visual-state/accessibility matrix |
+| 9 | STORE-BRAND-CLOSE-1 | followup_in_review | normal | STORE-BRAND-QA-1 follow-up | Closure remains open until QA follow-up is green and reviewed |
 
 ## STORE-BRAND-0 — Evidence Pass
 
