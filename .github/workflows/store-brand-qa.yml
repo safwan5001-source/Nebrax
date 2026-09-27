@@ -7,6 +7,7 @@ on:
     paths:
       - "web/e2e/store-brand-qa.spec.ts"
       - "storefront/e2e/store-brand-qa.spec.ts"
+      - "storefront/e2e/support/**"
       - "storefront/playwright.brand-qa.config.ts"
       - ".github/workflows/store-brand-qa.yml"
   pull_request:
@@ -15,6 +16,7 @@ on:
       - "web/src/app/dev/trust-visual/**"
       - "web/src/modules/store-experience-builder/**"
       - "storefront/e2e/store-brand-qa.spec.ts"
+      - "storefront/e2e/support/**"
       - "storefront/playwright.brand-qa.config.ts"
       - "storefront/src/app/dev/trust-visual/**"
       - "storefront/src/app/**"
@@ -22,6 +24,8 @@ on:
       - "storefront/src/components/customizer/**"
       - "storefront/src/components/home/**"
       - "storefront/src/components/layout/**"
+      - "storefront/src/lib/commerce/**"
+      - "storefront/src/lib/data/**"
       - "storefront/src/lib/presentation/**"
       - "storefront/public/brand/**"
       - ".github/workflows/store-brand-qa.yml"
