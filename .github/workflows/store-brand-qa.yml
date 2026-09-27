@@ -16,6 +16,7 @@ on:
       - "web/src/app/dev/trust-visual/**"
       - "web/src/modules/store-experience-builder/**"
       - "storefront/e2e/store-brand-qa.spec.ts"
+      - "storefront/e2e/support/**"
       - "storefront/playwright.brand-qa.config.ts"
       - "storefront/src/app/dev/trust-visual/**"
       - "storefront/src/app/**"
