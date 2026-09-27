@@ -21,6 +21,47 @@ function expectedColumns(width: number) {
   return 1;
 }
 
+function previewViewport(width: number) {
+  if (width < 768) return "mobile";
+  if (width < 1024) return "tablet";
+  return "desktop";
+}
+
+const identityCopy = {
+  ar: {
+    cr: "السجل التجاري",
+    vat: "الرقم الضريبي",
+    verified: "موثّق في منصة الأعمال",
+  },
+  en: {
+    cr: "Commercial registration",
+    vat: "VAT number",
+    verified: "Verified in Saudi Business Center",
+  },
+} as const;
+
+async function assertIdentityIcons(
+  footer: Locator,
+  kinds: readonly ("cr" | "vat")[],
+) {
+  for (const kind of ["cr", "vat"] as const) {
+    const icon = footer.locator(`[data-identity-icon="${kind}"]`);
+    await expect(icon).toHaveCount(kinds.includes(kind) ? 1 : 0);
+    if (!kinds.includes(kind)) continue;
+    await expect(icon).toHaveAttribute("aria-hidden", "true");
+    const box = await icon.boundingBox();
+    expect(box).not.toBeNull();
+    expect(box?.width ?? 0).toBeGreaterThanOrEqual(14);
+    expect(box?.width ?? 0).toBeLessThanOrEqual(20);
+    expect(
+      Math.abs((box?.width ?? 0) - (box?.height ?? 0)),
+    ).toBeLessThanOrEqual(1);
+    await expect(
+      footer.locator(`[data-identity-detail="${kind}"] a`),
+    ).toHaveCount(0);
+  }
+}
+
 async function assertNoOverflow(page: Page) {
   const overflow = await page.evaluate(() => ({
     scrollWidth: document.documentElement.scrollWidth,
@@ -101,6 +142,17 @@ async function assertFullFooter(
     await expect(icon).toHaveAttribute("aria-hidden", "true");
   }
 
+  await assertIdentityIcons(footer, ["cr", "vat"]);
+  await expect(footer).toContainText("7050247977");
+  await expect(footer).toContainText("310123456700003");
+  await expect(footer).not.toContainText("DECOY-CR-NOT-CANONICAL");
+  const footerText = (await footer.innerText()).toLowerCase();
+  expect(footerText).not.toContain("mada");
+  expect(footerText).not.toContain("visa");
+  expect(footerText).not.toContain("mastercard");
+  expect(footerText).not.toContain("apple pay");
+  expect(footerText).not.toContain("google pay");
+
   expect(
     await page.locator('[data-official-social="whatsapp"]').count(),
   ).toBeGreaterThanOrEqual(2);
@@ -126,6 +178,11 @@ for (const locale of locales) {
         page.locator('[data-trust-surface="published"]'),
         locale,
       );
+      await expect(page.getByTestId("sbc-official-seal")).toHaveAttribute(
+        "data-token",
+        "official-token",
+      );
+      await expect(page.getByTestId("sbc-seal-preview")).toHaveCount(0);
       await page.screenshot({
         path: path.join(
           evidenceDir,
@@ -159,6 +216,8 @@ for (const locale of locales) {
       await assertFullFooter(page, width, page.locator("html"), locale);
       await expect(page.locator("footer")).toContainText("7050247977");
       await expect(page.locator("footer")).toContainText("310123456700003");
+      await expect(page.getByTestId("sbc-official-seal")).toHaveCount(0);
+      await expect(page.getByTestId("sbc-seal-preview")).toHaveCount(0);
 
       await page.screenshot({
         path: path.join(evidenceDir, `published-route-${locale}-${width}.png`),
@@ -293,6 +352,7 @@ for (const [scenario, expected] of stateCases) {
 
     if (scenario === "missing-identity") {
       await expect(page.locator("#footer-identity")).toHaveCount(0);
+      await expect(page.locator("[data-identity-icon]")).toHaveCount(0);
     }
   });
 }
@@ -304,6 +364,7 @@ test("published long values do not overflow", async ({ page }) => {
   );
   await page.waitForLoadState("networkidle");
   await assertNoOverflow(page);
+  await assertIdentityIcons(page.locator("footer"), ["cr", "vat"]);
 });
 
 test("published unsafe values fail closed", async ({ page }) => {
@@ -355,3 +416,106 @@ test("published icon targets are usable and keyboard focus is visible", async ({
   await assertTouchTarget(floatingWhatsapp);
   await assertKeyboardFocusVisible(page, instagram);
 });
+
+for (const locale of locales) {
+  for (const width of widths) {
+    test(`mirror full ${locale} ${width}`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 1000 });
+      await page.goto(
+        `/dev/trust-visual?surface=mirror&locale=${locale}&scenario=full&viewport=${previewViewport(width)}`,
+      );
+      await page.waitForLoadState("networkidle");
+      const root = page.locator('[data-trust-surface="mirror"]');
+      await expect(root).toHaveAttribute(
+        "dir",
+        locale === "ar" ? "rtl" : "ltr",
+      );
+      await assertNoOverflow(page);
+      const footer = page.locator("footer");
+      await expect(footer).toBeVisible();
+      const trustGrid = footer.locator(".grid").nth(1);
+      const columns = await trustGrid.evaluate(
+        (el) =>
+          getComputedStyle(el)
+            .gridTemplateColumns.trim()
+            .split(/\s+/)
+            .filter(Boolean).length,
+      );
+      expect(columns).toBe(expectedColumns(width));
+      await assertIdentityIcons(footer, ["cr", "vat"]);
+      await expect(footer).toContainText("7050247977");
+      await expect(footer).toContainText("310123456700003");
+      await expect(footer).not.toContainText("DECOY-CR-NOT-CANONICAL");
+      await expect(footer).not.toContainText("official-token");
+      await expect(page.getByTestId("sbc-seal-preview")).toBeVisible();
+      await expect(page.getByTestId("sbc-official-seal")).toHaveCount(0);
+      await expect(
+        page.locator('script[src*="EAuthSealApi/seal.js"]'),
+      ).toHaveCount(0);
+      const footerText = (await footer.innerText()).toLowerCase();
+      expect(footerText).not.toContain("mada");
+      expect(footerText).not.toContain("visa");
+      expect(footerText).not.toContain("mastercard");
+      expect(footerText).not.toContain("apple pay");
+      expect(footerText).not.toContain("google pay");
+    });
+  }
+}
+
+const identityScenarios = ["cr-only", "vat-only", "sbc-plain"] as const;
+
+for (const surface of ["published", "mirror"] as const) {
+  for (const locale of locales) {
+    for (const width of [390, 1440] as const) {
+      for (const scenario of identityScenarios) {
+        test(`identity ${surface} ${scenario} ${locale} ${width}`, async ({
+          page,
+        }) => {
+          await page.setViewportSize({ width, height: 1000 });
+          const viewport = previewViewport(width);
+          await page.goto(
+            `/dev/trust-visual?surface=${surface}&locale=${locale}&scenario=${scenario}&viewport=${viewport}`,
+          );
+          await page.waitForLoadState("networkidle");
+          const root =
+            surface === "published"
+              ? page.locator('[data-trust-surface="published"]')
+              : page.locator('[data-trust-surface="mirror"]');
+          await expect(root).toHaveAttribute(
+            "dir",
+            locale === "ar" ? "rtl" : "ltr",
+          );
+          await assertNoOverflow(page);
+          const footer = page.locator("footer");
+          await expect(footer).not.toContainText("DECOY-CR-NOT-CANONICAL");
+
+          if (scenario === "cr-only") {
+            await assertIdentityIcons(footer, ["cr"]);
+            await expect(footer).toContainText(identityCopy[locale].cr);
+            await expect(footer).toContainText("7050247977");
+            await expect(footer).not.toContainText(identityCopy[locale].vat);
+            await expect(footer).not.toContainText("310123456700003");
+          }
+
+          if (scenario === "vat-only") {
+            await assertIdentityIcons(footer, ["vat"]);
+            await expect(footer).toContainText(identityCopy[locale].vat);
+            await expect(footer).toContainText("310123456700003");
+            await expect(footer).not.toContainText(identityCopy[locale].cr);
+            await expect(footer).not.toContainText("7050247977");
+          }
+
+          if (scenario === "sbc-plain") {
+            await assertIdentityIcons(footer, []);
+            await expect(footer).toContainText(identityCopy[locale].verified);
+            await expect(page.getByTestId("sbc-official-seal")).toHaveCount(0);
+            await expect(page.getByTestId("sbc-seal-preview")).toHaveCount(0);
+            await expect(
+              page.locator('script[src*="EAuthSealApi/seal.js"]'),
+            ).toHaveCount(0);
+          }
+        });
+      }
+    }
+  }
+}

@@ -248,6 +248,8 @@ describe('ExperienceBuilder persistence wiring', () => {
     );
 
     expect(screen.getByText('Commercial registration: 7050247977')).toBeTruthy();
+    expect(document.querySelector("[data-identity-icon='cr']")).not.toBeNull();
+    expect(document.querySelector("[data-identity-icon='vat']")).toBeNull();
     expect(screen.queryByText(/legacy-cr-must-not-render/)).toBeNull();
     expect(screen.getByText('Verified in Saudi Business Center')).toBeTruthy();
   });

@@ -13,6 +13,7 @@ import {
   ContactDetail,
   contactDetailText,
 } from "@/components/store/ContactDetail";
+import { IdentityDetail } from "@/components/store/IdentityDetail";
 import { OfficialStoreBadge } from "@/components/store/OfficialStoreBadge";
 import { categoryAccent } from "@/lib/home/category-accent";
 import {
@@ -492,20 +493,20 @@ export function StorefrontPreviewCanvas({
                   </h3>
                   <div className="mt-3 break-words">
                     {legalName ? (
-                      <p>
+                      <p className="break-words">
                         {t("legalName")}: {legalName}
                       </p>
                     ) : null}
-                    {crNumber ? (
-                      <p>
-                        {t("crNumber")}: {crNumber}
-                      </p>
-                    ) : null}
-                    {vatNumber ? (
-                      <p>
-                        {t("vatNumber")}: {vatNumber}
-                      </p>
-                    ) : null}
+                    <IdentityDetail
+                      kind="cr"
+                      label={t("crNumber")}
+                      value={crNumber}
+                    />
+                    <IdentityDetail
+                      kind="vat"
+                      label={t("vatNumber")}
+                      value={vatNumber}
+                    />
                   </div>
                 </section>
               ) : null}

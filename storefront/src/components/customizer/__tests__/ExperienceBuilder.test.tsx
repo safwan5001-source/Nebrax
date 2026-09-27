@@ -105,6 +105,8 @@ describe("ExperienceBuilder", () => {
     expect(canvas?.textContent).toContain(
       "Commercial registration: 7050247977",
     );
+    expect(canvas?.querySelector("[data-identity-icon='cr']")).not.toBeNull();
+    expect(canvas?.querySelector("[data-identity-icon='vat']")).toBeNull();
     expect(canvas?.textContent).toContain("License number: LIC-9");
     expect(canvas?.textContent).not.toContain("legacy-cr-must-not-render");
     expect(canvas?.textContent).not.toMatch(/Verified/);
