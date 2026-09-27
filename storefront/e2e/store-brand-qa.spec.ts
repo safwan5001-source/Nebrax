@@ -4,6 +4,15 @@ import { expect, type Locator, type Page, test } from "@playwright/test";
 
 const widths = [390, 430, 768, 1024, 1280, 1440] as const;
 const locales = ["ar", "en"] as const;
+const socialNetworks = [
+  "instagram",
+  "x",
+  "tiktok",
+  "snapchat",
+  "youtube",
+  "linkedin",
+  "facebook",
+] as const;
 const evidenceDir = path.resolve(process.cwd(), "test-results/store-brand-qa");
 
 function expectedColumns(width: number) {
@@ -78,15 +87,7 @@ async function assertFullFooter(
   );
   expect(columns).toBe(expectedColumns(width));
 
-  for (const network of [
-    "instagram",
-    "x",
-    "tiktok",
-    "snapchat",
-    "youtube",
-    "linkedin",
-    "facebook",
-  ]) {
+  for (const network of socialNetworks) {
     const mark = footer.locator(`[data-official-social="${network}"]`);
     await expect(mark).toHaveCount(1);
     const anchor = mark.locator("xpath=ancestor::a[1]");
@@ -262,9 +263,12 @@ for (const [scenario, expected] of stateCases) {
         expected[kind],
       );
     }
-    await expect(
-      page.locator('[data-official-social="instagram"]'),
-    ).toHaveCount(expected.instagram);
+    for (const network of socialNetworks) {
+      const expectedCount = network === "instagram" ? expected.instagram : 0;
+      await expect(
+        page.locator(`[data-official-social="${network}"]`),
+      ).toHaveCount(expectedCount);
+    }
     await expect(page.locator('[data-official-social="whatsapp"]')).toHaveCount(
       expected.whatsapp,
     );
