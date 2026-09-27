@@ -58,7 +58,9 @@ type Scenario =
   | "long"
   | "missing-identity"
   | "sbc-plain"
-  | "apps-one";
+  | "apps-one"
+  | "apps-google"
+  | "whatsapp-floating";
 
 function scenarioOf(value: string | undefined): Scenario {
   if (
@@ -69,7 +71,9 @@ function scenarioOf(value: string | undefined): Scenario {
     value === "long" ||
     value === "missing-identity" ||
     value === "sbc-plain" ||
-    value === "apps-one"
+    value === "apps-one" ||
+    value === "apps-google" ||
+    value === "whatsapp-floating"
   ) {
     return value;
   }
@@ -175,6 +179,13 @@ export default async function TrustVisualPage({
             androidUrl: "",
             show: scenario === "apps-one",
           }
+        : scenario === "apps-google"
+          ? {
+              iosUrl: "",
+              androidUrl:
+                "https://play.google.com/store/apps/details?id=sa.awj",
+              show: true,
+            }
         : scenario === "unsafe"
           ? {
               iosUrl: "https://www.apple.com/iphone",
@@ -193,7 +204,8 @@ export default async function TrustVisualPage({
     scenario === "long" ||
     scenario === "partial" ||
     scenario === "missing-identity" ||
-    scenario === "unsafe";
+    scenario === "unsafe" ||
+    scenario === "whatsapp-floating";
   const config = normalizePresentationConfig({
     version: 2,
     branding: { displayName: storeName },
