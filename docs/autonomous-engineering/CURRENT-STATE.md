@@ -2,6 +2,10 @@
 
 > This file is a durable resume point, not a substitute for Git/GitHub evidence.
 
+LAST_UPDATED: 2026-09-27 (**AWJ Store Official Brand, Contact & Payment Marks V1 is at CLOSE REVIEW.** All implementation-ready non-payment slices are merged: WA/Social #1064, Apps #1066, Contact #1068, Compose #1070, QA #1072, and QA-trigger P2 follow-up #1073. The payment implementation remains explicitly deferred because only `cod` / `pay_on_pickup` are proven and no authoritative supported+enabled card/wallet capability exists. PR #1073 resolved the final QA-trigger P2. Closure report: `docs/plans/store/STORE-BRAND-CLOSE-1-CLOSURE-REPORT.md`. No manual deploy was performed for CLOSE-1; later COMPOSE/QA production deployment is not independently claimed. No automatic next horizon.)
+
+## Previous snapshot
+
 LAST_UPDATED: 2026-09-26 (**AWJ Store Trust, Business Identity & External Brands V1 is CLOSED** by STORE-TRUST-CLOSE-1. Ready tasks 0 through QA-1 are merged and POST_MERGE_REVIEW: PASS. QA-1 squash is `37b7f88b9bb08b19e4f1d0aca5b7ab4e4fe3496f` ([#1056](https://github.com/safwan5001-source/Nebrax/pull/1056)); post-merge runs [36251570726](https://github.com/safwan5001-source/Nebrax/actions/runs/36251570726), [36251570822](https://github.com/safwan5001-source/Nebrax/actions/runs/36251570822), [36251570723](https://github.com/safwan5001-source/Nebrax/actions/runs/36251570723). Closure: `docs/plans/store/STORE-TRUST-CLOSE-1-CLOSURE-REPORT.md`. PR #1044 stays open. Storage stays `KEEP_EMBEDDED_MEDIA_UNTIL_PERSISTENT_STORAGE_IS_AUTHORIZED`. Business Documents stay deferred. Promotions stay out of scope. No unresolved P1/P2. No deploy. No production release. Do not start another horizon from this close. This close PR's own merge SHA is recorded in its POST_MERGE_REVIEW comment.)
 
 ## Previous snapshot
