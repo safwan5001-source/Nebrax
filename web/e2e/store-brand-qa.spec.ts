@@ -4,6 +4,15 @@ import path from 'node:path';
 
 const widths = [390, 430, 768, 1024, 1280, 1440] as const;
 const locales = ['ar', 'en'] as const;
+const socialNetworks = [
+  'instagram',
+  'x',
+  'tiktok',
+  'snapchat',
+  'youtube',
+  'linkedin',
+  'facebook',
+] as const;
 const evidenceDir = path.resolve(process.cwd(), 'test-results/store-brand-qa');
 
 function previewViewport(width: number) {
@@ -48,7 +57,7 @@ async function assertFooter(page: Page, width: number, locale: 'ar' | 'en') {
   );
   expect(columns).toBe(expectedColumns(width));
 
-  for (const network of ['instagram', 'x', 'tiktok', 'snapchat', 'youtube', 'linkedin', 'facebook']) {
+  for (const network of socialNetworks) {
     const mark = footer.locator(`[data-official-social="${network}"]`);
     await expect(mark).toHaveCount(1);
     const anchor = mark.locator('xpath=ancestor::a[1]');
@@ -105,7 +114,10 @@ for (const [scenario, expected] of stateCases) {
     for (const kind of ['phone', 'email', 'address', 'hours'] as const) {
       await expect(page.locator(`[data-contact-icon="${kind}"]`)).toHaveCount(expected[kind]);
     }
-    await expect(page.locator('[data-official-social="instagram"]')).toHaveCount(expected.instagram);
+    for (const network of socialNetworks) {
+      const expectedCount = network === 'instagram' ? expected.instagram : 0;
+      await expect(page.locator(`[data-official-social="${network}"]`)).toHaveCount(expectedCount);
+    }
     await expect(page.locator('[data-official-social="whatsapp"]')).toHaveCount(expected.whatsapp);
     await expect(page.getByRole('img', { name: 'App Store' })).toHaveCount(expected.apple);
     await expect(page.getByRole('img', { name: 'Google Play' })).toHaveCount(expected.google);
