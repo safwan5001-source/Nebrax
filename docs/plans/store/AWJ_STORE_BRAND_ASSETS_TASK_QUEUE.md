@@ -12,9 +12,9 @@
 | 4 | STORE-BRAND-CONTACT-1 | done | normal | STORE-BRAND-0 | Contact utility icons merged in #1068 with Preview/Public parity |
 | 5 | STORE-BRAND-PAY-EVIDENCE-1 | done_decision_gate | high | STORE-BRAND-0 | Evidence proves COD/Pay on Pickup only; card/wallet acceptance model absent |
 | 6 | STORE-BRAND-PAY-1 | deferred | high | STORE-BRAND-PAY-EVIDENCE-1 | Deferred until authoritative card/wallet supported+enabled capability exists |
-| 7 | STORE-BRAND-COMPOSE-1 | ready | normal | WA/SOCIAL + APPS + CONTACT; PAY deferred by evidence gate | Final Footer composition and shared mark component behavior |
-| 8 | STORE-BRAND-QA-1 | blocked | high | implemented slices | Responsive RTL/LTR, accessibility, security, actual published-route parity |
-| 9 | STORE-BRAND-CLOSE-1 | blocked | normal | all ready work closed | Closure report + durable state |
+| 7 | STORE-BRAND-COMPOSE-1 | done | normal | WA/SOCIAL + APPS + CONTACT; PAY deferred by evidence gate | Final Footer composition merged in #1070 |
+| 8 | STORE-BRAND-QA-1 | done | high | implemented slices | Visual regression matrix merged in #1072; trigger P2 follow-up merged in #1073 |
+| 9 | STORE-BRAND-CLOSE-1 | in_review | normal | all ready work closed | Closure report + durable state |
 
 ## STORE-BRAND-0 — Evidence Pass
 
@@ -152,6 +152,12 @@ Definition of Done:
 
 ## STORE-BRAND-COMPOSE-1
 
+Closed 2026-09-27.
+
+- PR #1070 merged to `main`.
+- Merge SHA: `6ad8195a70a75610dd950c32e0a28b193e9a0a65`.
+- Scope: Footer composition only; no payment capability invented.
+
 Definition of Done:
 
 - one Footer implementation;
@@ -162,6 +168,14 @@ Definition of Done:
 - no horizontal overflow.
 
 ## STORE-BRAND-QA-1
+
+Closed 2026-09-27.
+
+- PR #1072 merged to `main`.
+- Merge SHA: `8845c351a41c55f5d66d360b0f2e9ba8d5433b86`.
+- Follow-up P2 trigger fix: PR #1073, merge SHA `b51f76f31967faf46281573b372ca362696c297e`.
+- PR-head checks were green for Store Brand QA, Storefront/Web where applicable, and Core CI.
+- The review P2 about missing implementation-path triggers is resolved.
 
 Widths:
 
