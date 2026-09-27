@@ -2,7 +2,7 @@
 
 **Horizon:** AWJ Store Official Brand, Contact & Payment Marks V1  
 **Date:** 2026-09-27  
-**Status:** READY_FOR_CLOSE_REVIEW  
+**Status:** FOLLOWUP_IN_REVIEW  
 **Closure branch:** `docs/store-brand-close-1`
 
 ## 1. Closure decision
@@ -23,9 +23,9 @@ No payment marks were added decoratively.
 | STORE-BRAND-PAY-EVIDENCE-1 | done_decision_gate | COD / pay_on_pickup only proven; card/wallet acceptance source absent |
 | STORE-BRAND-PAY-1 | deferred | Waits for authoritative supported+enabled capability |
 | STORE-BRAND-COMPOSE-1 | done | PR #1070, merge `6ad8195a70a75610dd950c32e0a28b193e9a0a65` |
-| STORE-BRAND-QA-1 | done | PR #1072, merge `8845c351a41c55f5d66d360b0f2e9ba8d5433b86` |
+| STORE-BRAND-QA-1 | followup_in_review | Baseline #1072/#1073 merged; close-review P2 follow-up in progress |
 | QA trigger P2 follow-up | done | PR #1073, merge `b51f76f31967faf46281573b372ca362696c297e` |
-| STORE-BRAND-CLOSE-1 | in_review | This report + durable state update |
+| STORE-BRAND-CLOSE-1 | followup_in_review | Final closure waits for QA follow-up |
 
 ## 3. QA evidence
 

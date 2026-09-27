@@ -17,12 +17,29 @@ export default defineConfig({
     launchOptions: { args: ["--no-sandbox"] },
   },
   projects: [{ name: "chromium", use: { browserName: "chromium" } }],
-  webServer: {
-    command: "pnpm dev",
-    url: "http://127.0.0.1:3001/dev/trust-visual?surface=published&locale=en&scenario=full",
-    reuseExistingServer: false,
-    timeout: 120_000,
-    stdout: "pipe",
-    stderr: "pipe",
-  },
+  webServer: [
+    {
+      command: "node e2e/support/store-brand-api-fixture.mjs",
+      port: 4100,
+      reuseExistingServer: false,
+      timeout: 30_000,
+      stdout: "pipe",
+      stderr: "pipe",
+    },
+    {
+      command: "pnpm dev",
+      url: "http://127.0.0.1:3001/sa/en",
+      reuseExistingServer: false,
+      timeout: 120_000,
+      stdout: "pipe",
+      stderr: "pipe",
+      env: {
+        ...process.env,
+        AWJ_COMMERCE_API_URL: "http://127.0.0.1:4100",
+        AWJ_STOREFRONT_DEV_HOST: "qa.store.awjdev.xyz",
+        NEXT_PUBLIC_DEFAULT_COUNTRY: "sa",
+        NEXT_PUBLIC_DEFAULT_LOCALE: "en",
+      },
+    },
+  ],
 });

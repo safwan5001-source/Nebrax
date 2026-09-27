@@ -58,7 +58,9 @@ type Scenario =
   | "long"
   | "missing-identity"
   | "sbc-plain"
-  | "apps-one";
+  | "apps-one"
+  | "apps-google"
+  | "whatsapp-floating";
 
 function scenarioOf(value: string | undefined): Scenario {
   if (
@@ -69,7 +71,9 @@ function scenarioOf(value: string | undefined): Scenario {
     value === "long" ||
     value === "missing-identity" ||
     value === "sbc-plain" ||
-    value === "apps-one"
+    value === "apps-one" ||
+    value === "apps-google" ||
+    value === "whatsapp-floating"
   ) {
     return value;
   }
@@ -175,25 +179,33 @@ export default async function TrustVisualPage({
             androidUrl: "",
             show: scenario === "apps-one",
           }
-        : scenario === "unsafe"
+        : scenario === "apps-google"
           ? {
-              iosUrl: "https://www.apple.com/iphone",
+              iosUrl: "",
               androidUrl:
                 "https://play.google.com/store/apps/details?id=sa.awj",
               show: true,
             }
-          : {
-              iosUrl: "https://apps.apple.com/app/id000000000",
-              androidUrl:
-                "https://play.google.com/store/apps/details?id=sa.awj",
-              show: true,
-            };
+          : scenario === "unsafe"
+            ? {
+                iosUrl: "https://www.apple.com/iphone",
+                androidUrl:
+                  "https://play.google.com/store/apps/details?id=sa.awj",
+                show: true,
+              }
+            : {
+                iosUrl: "https://apps.apple.com/app/id000000000",
+                androidUrl:
+                  "https://play.google.com/store/apps/details?id=sa.awj",
+                show: true,
+              };
   const whatsappOn =
     scenario === "full" ||
     scenario === "long" ||
     scenario === "partial" ||
     scenario === "missing-identity" ||
-    scenario === "unsafe";
+    scenario === "unsafe" ||
+    scenario === "whatsapp-floating";
   const config = normalizePresentationConfig({
     version: 2,
     branding: { displayName: storeName },
@@ -205,21 +217,30 @@ export default async function TrustVisualPage({
     contact:
       scenario === "empty" || scenario === "sbc-plain"
         ? {}
-        : {
-            phone: "+966500000001",
-            email: long ? `${"a".repeat(40)}@example.com` : "shop@example.com",
-            address: long
-              ? LONG
-              : locale === "ar"
-                ? "الدمام، المنطقة الشرقية"
-                : "Dammam, Eastern Province",
-            hours: locale === "ar" ? "٩ ص – ٩ م" : "9:00–21:00",
-          },
+        : scenario === "partial"
+          ? { phone: "+966500000001" }
+          : {
+              phone: "+966500000001",
+              email: long
+                ? `${"a".repeat(40)}@example.com`
+                : "shop@example.com",
+              address: long
+                ? LONG
+                : locale === "ar"
+                  ? "الدمام، المنطقة الشرقية"
+                  : "Dammam, Eastern Province",
+              hours: locale === "ar" ? "٩ ص – ٩ م" : "9:00–21:00",
+            },
     whatsapp: {
       enabled: whatsappOn,
       phone: scenario === "unsafe" ? "not-a-phone" : "+966500000000",
       message: "",
-      placement: scenario === "partial" ? "footer" : "both",
+      placement:
+        scenario === "partial"
+          ? "footer"
+          : scenario === "whatsapp-floating"
+            ? "floating"
+            : "both",
     },
     social,
     verification: {
