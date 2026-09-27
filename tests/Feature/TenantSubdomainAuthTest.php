@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Tenant;
+use App\Support\Settings;
 use App\Tenancy\HostnameTenantContext;
 use App\Tenancy\TenantContext;
 use App\Tenancy\TenantHostnameResolver;
@@ -39,6 +40,22 @@ class TenantSubdomainAuthTest extends TestCase
         $id = app(TenantHostnameResolver::class)->tenantIdForSlug('alnoor');
         $this->assertSame($a['tenant_id'], $id);
         $this->assertFalse(app(TenantContext::class)->has());
+    }
+
+    /** @test */
+    public function browser_identity_is_publicly_resolved_only_from_the_tenant_hostname(): void
+    {
+        $a = $this->registerTenant('alnoor', 'owner@alnoor.test');
+        $tenant = Tenant::findOrFail($a['tenant_id']);
+        Settings::put('company', ['logo' => 'data:image/png;base64,AAA='], $tenant);
+        $this->forgetTenancy();
+
+        $this->getJson($this->tenantUrl('alnoor', 'company-browser-identity'))
+            ->assertOk()
+            ->assertJsonPath('logo', 'data:image/png;base64,AAA=');
+
+        $this->getJson('http://platform.awj.app/api/company-browser-identity')
+            ->assertNotFound();
     }
 
     /** @test */

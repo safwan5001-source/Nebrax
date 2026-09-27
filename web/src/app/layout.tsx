@@ -23,8 +23,8 @@ export const metadata: Metadata = {
   title: BRAND.displayName,
   description: 'منصة سحابية متكاملة لإدارة المؤسسات',
   icons: {
-    icon: '/icon.ico',
-    apple: '/icon.ico',
+    icon: '/api/company-browser-icon',
+    apple: '/api/company-browser-icon',
   },
 };
 

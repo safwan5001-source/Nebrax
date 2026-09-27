@@ -36,4 +36,21 @@ describe('AWJ ERP browser icon', () => {
     expect(providers).not.toContain('CompanyBrowserIdentity');
     for (const shell of shells) expect(shell).toContain('AuthenticatedCompanyBrowserIdentity');
   });
+
+  it('uses a server-resolved icon endpoint so tenant identity is present in initial HTML', () => {
+    const layout = fs.readFileSync(
+      path.join(process.cwd(), 'src/app/layout.tsx'),
+      'utf8',
+    );
+    const route = fs.readFileSync(
+      path.join(process.cwd(), 'src/app/api/company-browser-icon/route.ts'),
+      'utf8',
+    );
+
+    expect(layout).toContain("icon: '/api/company-browser-icon'");
+    expect(layout).toContain("apple: '/api/company-browser-icon'");
+    expect(route).toContain('company-browser-identity');
+    expect(route).toContain("Origin: `${protocol}://${host}`");
+    expect(route).toContain("const FALLBACK_ICON = '/icon.ico'");
+  });
 });
