@@ -58,6 +58,8 @@ type Scenario =
   | "long"
   | "missing-identity"
   | "sbc-plain"
+  | "cr-only"
+  | "vat-only"
   | "apps-one"
   | "apps-google"
   | "whatsapp-floating";
@@ -71,6 +73,8 @@ function scenarioOf(value: string | undefined): Scenario {
     value === "long" ||
     value === "missing-identity" ||
     value === "sbc-plain" ||
+    value === "cr-only" ||
+    value === "vat-only" ||
     value === "apps-one" ||
     value === "apps-google" ||
     value === "whatsapp-floating"
@@ -112,6 +116,7 @@ export default async function TrustVisualPage({
 
   const messages = locale === "ar" ? ar : en;
   const long = scenario === "long";
+  const identityOnly = scenario === "cr-only" || scenario === "vat-only";
   const storeName = long
     ? LONG.slice(0, 80)
     : locale === "ar"
@@ -125,11 +130,16 @@ export default async function TrustVisualPage({
         : locale === "ar"
           ? "شركة النور للتجارة"
           : "Al Noor Trading Company";
-  const showCrVat = scenario === "full" || scenario === "long";
   const businessIdentity = {
     legal_name: legal,
-    cr_number: showCrVat ? "7050247977" : null,
-    vat_number: showCrVat ? "310123456700003" : null,
+    cr_number:
+      scenario === "full" || scenario === "long" || scenario === "cr-only"
+        ? "7050247977"
+        : null,
+    vat_number:
+      scenario === "full" || scenario === "long" || scenario === "vat-only"
+        ? "310123456700003"
+        : null,
   };
   const social =
     scenario === "full" || scenario === "long"
@@ -171,7 +181,7 @@ export default async function TrustVisualPage({
             ]
           : [];
   const apps =
-    scenario === "empty" || scenario === "sbc-plain"
+    scenario === "empty" || scenario === "sbc-plain" || identityOnly
       ? { iosUrl: "", androidUrl: "", show: false }
       : scenario === "apps-one" || scenario === "partial"
         ? {
@@ -215,7 +225,7 @@ export default async function TrustVisualPage({
       copyright: "",
     },
     contact:
-      scenario === "empty" || scenario === "sbc-plain"
+      scenario === "empty" || scenario === "sbc-plain" || identityOnly
         ? {}
         : scenario === "partial"
           ? { phone: "+966500000001" }
@@ -246,7 +256,9 @@ export default async function TrustVisualPage({
     verification: {
       crNumber: DECOY_CR,
       licenseNumber:
-        scenario === "empty" || scenario === "missing-identity" ? "" : "LIC-42",
+        scenario === "empty" || scenario === "missing-identity" || identityOnly
+          ? ""
+          : "LIC-42",
     },
     sbc: {
       show_in_storefront:

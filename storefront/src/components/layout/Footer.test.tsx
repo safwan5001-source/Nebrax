@@ -11,6 +11,10 @@ vi.mock("@/lib/spree", () => ({ isWholesaleEnabled: () => false }));
 
 import { Footer } from "./Footer";
 
+function identityIcon(container: HTMLElement, kind: string) {
+  return container.querySelector(`[data-identity-icon="${kind}"]`);
+}
+
 const baseProps = {
   basePath: "",
   locale: "ar" as Locale,
@@ -87,6 +91,14 @@ describe("Footer SBC presentation", () => {
     expect(screen.getByText("legalName: شركة النور")).toBeTruthy();
     expect(screen.getByText("crNumber: 7050247977")).toBeTruthy();
     expect(screen.queryByText(/vatNumber/)).toBeNull();
+    expect(
+      screen.getByText("crNumber: 7050247977").closest("p"),
+    ).toHaveAttribute("data-identity-detail", "cr");
+    expect(identityIcon(screen.container, "cr")).toHaveAttribute(
+      "aria-hidden",
+      "true",
+    );
+    expect(identityIcon(screen.container, "vat")).toBeNull();
     const identity = screen.getByRole("region", {
       name: "businessInformation",
     });
@@ -142,6 +154,28 @@ describe("Footer SBC presentation", () => {
 
     expect(screen.queryByText("merchantProvided")).toBeNull();
     expect(screen.queryByText("businessInformation")).toBeNull();
+  });
+
+  it("renders canonical VAT and hides an absent CR row and icon", async () => {
+    const view = await Footer({
+      ...baseProps,
+      businessIdentity: {
+        legal_name: null,
+        cr_number: "   ",
+        vat_number: "310123456700003",
+      },
+    });
+    const screen = render(view);
+
+    expect(screen.getByText("vatNumber: 310123456700003")).toBeTruthy();
+    expect(screen.queryByText(/crNumber/)).toBeNull();
+    expect(screen.queryByText(/legalName/)).toBeNull();
+    expect(identityIcon(screen.container, "vat")).toHaveAttribute(
+      "aria-hidden",
+      "true",
+    );
+    expect(identityIcon(screen.container, "cr")).toBeNull();
+    expect(screen.container.querySelector("img")).toBeNull();
   });
 
   it("renders no SBC presentation when the merchant turns it off", async () => {

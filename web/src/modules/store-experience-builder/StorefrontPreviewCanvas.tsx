@@ -4,6 +4,7 @@ import { Home, LayoutGrid, Search, ShoppingBag, User } from "lucide-react";
 import type { CSSProperties, ReactNode } from "react";
 import { OfficialStoreBadge } from "./OfficialStoreBadge";
 import { ContactDetail, contactDetailText } from "./ContactDetail";
+import { IdentityDetail } from "./IdentityDetail";
 import {
   isOfficialSocialNetwork,
   OfficialSocialMark,
@@ -705,20 +706,20 @@ export function StorefrontPreviewCanvas({
                   </h3>
                   <div className="mt-3 break-words">
                     {legalName ? (
-                      <p>
+                      <p className="break-words">
                         {t("legalName")}: {legalName}
                       </p>
                     ) : null}
-                    {crNumber ? (
-                      <p>
-                        {t("crNumber")}: {crNumber}
-                      </p>
-                    ) : null}
-                    {vatNumber ? (
-                      <p>
-                        {t("vatNumber")}: {vatNumber}
-                      </p>
-                    ) : null}
+                    <IdentityDetail
+                      kind="cr"
+                      label={t("crNumber")}
+                      value={crNumber}
+                    />
+                    <IdentityDetail
+                      kind="vat"
+                      label={t("vatNumber")}
+                      value={vatNumber}
+                    />
                   </div>
                 </section>
               ) : null}

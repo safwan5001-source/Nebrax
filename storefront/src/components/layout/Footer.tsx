@@ -15,6 +15,7 @@ import {
   ContactDetail,
   contactDetailText,
 } from "@/components/store/ContactDetail";
+import { IdentityDetail } from "@/components/store/IdentityDetail";
 import { OfficialStoreBadge } from "@/components/store/OfficialStoreBadge";
 import { POLICY_LINKS } from "@/lib/constants/policies";
 import { isSafeAppStoreUrl, isSafePlayStoreUrl } from "@/lib/presentation/urls";
@@ -131,10 +132,10 @@ function TrustGroup({
  * A dark band closing the page, as the approved baseline draws it.
  *
  * It carries only navigation the storefront actually has — categories from the
- * catalogue, the account routes, and the configured policy pages. The
- * reference's about paragraph, payment marks and registration badge are absent:
- * none of them are configured anywhere in AWJ, and a footer is exactly where an
- * invented claim reads as a commitment.
+ * catalogue, the account routes, and the configured policy pages. Payment marks
+ * stay absent. Commercial registration and the VAT number are canonical tenant
+ * facts with AWJ utility icons, not official seals. A footer is exactly where
+ * an invented official claim reads as a commitment.
  */
 export async function Footer({
   basePath,
@@ -302,20 +303,20 @@ export async function Footer({
             {hasBusinessIdentity ? (
               <TrustGroup id="footer-identity" title={t("businessInformation")}>
                 {legalName ? (
-                  <p>
+                  <p className="break-words">
                     {t("legalName")}: {legalName}
                   </p>
                 ) : null}
-                {crNumber ? (
-                  <p>
-                    {t("crNumber")}: {crNumber}
-                  </p>
-                ) : null}
-                {vatNumber ? (
-                  <p>
-                    {t("vatNumber")}: {vatNumber}
-                  </p>
-                ) : null}
+                <IdentityDetail
+                  kind="cr"
+                  label={t("crNumber")}
+                  value={crNumber}
+                />
+                <IdentityDetail
+                  kind="vat"
+                  label={t("vatNumber")}
+                  value={vatNumber}
+                />
               </TrustGroup>
             ) : null}
             {license ? (
