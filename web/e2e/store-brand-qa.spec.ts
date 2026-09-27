@@ -26,7 +26,7 @@ async function assertNoOverflow(page: Page) {
   expect(overflow.scrollWidth).toBeLessThanOrEqual(overflow.clientWidth + 1);
 }
 
-async function assertTouchTarget(locator: Locator, minimum = 40) {
+async function assertTouchTarget(locator: Locator, minimum = 44) {
   const box = await locator.boundingBox();
   expect(box).not.toBeNull();
   expect(box?.width ?? 0).toBeGreaterThanOrEqual(minimum);
