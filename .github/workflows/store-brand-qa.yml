@@ -24,6 +24,7 @@ on:
       - "storefront/src/components/customizer/**"
       - "storefront/src/components/home/**"
       - "storefront/src/components/layout/**"
+      - "storefront/src/lib/commerce/**"
       - "storefront/src/lib/presentation/**"
       - "storefront/public/brand/**"
       - ".github/workflows/store-brand-qa.yml"
