@@ -140,6 +140,7 @@ for (const locale of locales) {
   for (const width of [390, 1440] as const) {
     test(`actual published route ${locale} ${width}`, async ({ page }) => {
       await page.setViewportSize({ width, height: 1000 });
+      await page.setExtraHTTPHeaders({ "accept-language": locale });
       await page.goto(`/sa/${locale}`);
       await page.waitForLoadState("networkidle");
 
@@ -300,6 +301,7 @@ test("published icon targets are usable and keyboard focus is visible", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 1000 });
+  await page.setExtraHTTPHeaders({ "accept-language": "en" });
   await page.goto("/sa/en");
   await page.waitForLoadState("networkidle");
 
