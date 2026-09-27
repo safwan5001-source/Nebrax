@@ -25,6 +25,7 @@ on:
       - "storefront/src/components/home/**"
       - "storefront/src/components/layout/**"
       - "storefront/src/lib/commerce/**"
+      - "storefront/src/lib/data/**"
       - "storefront/src/lib/presentation/**"
       - "storefront/public/brand/**"
       - ".github/workflows/store-brand-qa.yml"
