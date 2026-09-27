@@ -20,11 +20,11 @@ Verified on `origin/main` before implementation. It is the merge of PR #1078. PR
 
 ## PR
 
-Filled after the pull request is opened.
+[#1080](https://github.com/safwan5001-source/Nebrax/pull/1080)
 
 ## Head SHA
 
-Filled from the implementation commit.
+Implementation commit `6ffecea47970dd9a3e03b2a48540578267357c35`. The pull request head also contains the documentation commit that records this PR link. CI is read from that head.
 
 ## External Evidence: Salla + authoritative Saudi sources
 
@@ -107,7 +107,7 @@ Storefront Store Brand QA (`pnpm exec playwright test e2e/store-brand-qa.spec.ts
 
 ## CI status
 
-Pending on the pull request. Local equivalents of Storefront CI unit/Biome/typecheck and the Store Brand QA jobs passed. Web CI's full `npm test` and `npm run build` were not re-run locally; the focused builder tests passed. `tsc --noEmit` on web reports pre-existing errors in unrelated POS/product/document tests and is not the CI gate (`npm run build` is).
+Checks are requested on PR #1080. Local equivalents of Storefront CI unit/Biome/typecheck and both Store Brand QA jobs passed. Web CI's full `npm test` and `npm run build` were not re-run locally; the focused builder tests passed. `tsc --noEmit` on web reports pre-existing errors in unrelated POS/product/document tests and is not the CI gate (`npm run build` is). This section is updated if a check fails.
 
 ## Tenant/Security confirmation
 
