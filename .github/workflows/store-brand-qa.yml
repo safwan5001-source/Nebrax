@@ -17,7 +17,7 @@ on:
       - "storefront/e2e/store-brand-qa.spec.ts"
       - "storefront/playwright.brand-qa.config.ts"
       - "storefront/src/app/dev/trust-visual/**"
-      - "storefront/src/app/[country]/[locale]/(storefront)/layout.tsx"
+      - "storefront/src/app/**"
       - "storefront/src/components/brand/**"
       - "storefront/src/components/customizer/**"
       - "storefront/src/components/layout/**"
