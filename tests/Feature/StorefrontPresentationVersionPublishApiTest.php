@@ -142,4 +142,104 @@ class StorefrontPresentationVersionPublishApiTest extends TestCase
             ->assertNotFound();
     }
 
+
+    /** @test */
+    public function scheduled_target_is_rejected_until_schedule_is_canceled(): void
+    {
+        $auth = $this->registerTenant('ver-publish-scheduled', 'owner@ver-publish-scheduled.test');
+        $storefront = $this->seedStorefront($auth['tenant_id']);
+        $token = $this->withToken($auth['token']);
+
+        $created = $token->postJson($this->listPath($storefront->id), ['name' => 'مجدولة'])
+            ->assertCreated();
+        $versionId = $created->json('data.id');
+
+        DB::table('storefront_presentation_versions')
+            ->where('id', $versionId)
+            ->update(['scheduled_for' => now()->addHour()]);
+        DB::table('storefront_presentations')
+            ->where('storefront_id', $storefront->id)
+            ->update(['scheduled_version_id' => $versionId]);
+
+        $token->postJson(
+            $this->publishPath($storefront->id, $versionId),
+            $this->body(1, null, null),
+        )->assertStatus(409);
+
+        $this->assertNull(
+            DB::table('storefront_presentations')
+                ->where('storefront_id', $storefront->id)
+                ->value('active_version_id')
+        );
+    }
+
+    /** @test */
+    public function forward_schema_target_fails_closed_without_replacing_live(): void
+    {
+        $auth = $this->registerTenant('ver-publish-forward', 'owner@ver-publish-forward.test');
+        $storefront = $this->seedStorefront($auth['tenant_id']);
+        $token = $this->withToken($auth['token']);
+
+        $live = $token->postJson($this->listPath($storefront->id), ['name' => 'حي'])->assertCreated();
+        $liveId = $live->json('data.id');
+        $token->postJson($this->publishPath($storefront->id, $liveId), $this->body(1, null, null))->assertOk();
+
+        $candidate = $token->postJson($this->listPath($storefront->id), ['name' => 'مستقبلية'])->assertCreated();
+        $candidateId = $candidate->json('data.id');
+
+        DB::table('storefront_presentation_versions')
+            ->where('id', $candidateId)
+            ->update(['schema_version' => StorefrontPresentationNormalizer::VERSION + 1]);
+
+        $token->postJson(
+            $this->publishPath($storefront->id, $candidateId),
+            $this->body(1, 1, $liveId),
+        )->assertStatus(409);
+
+        $head = DB::table('storefront_presentations')->where('storefront_id', $storefront->id)->first();
+        $this->assertSame($liveId, $head->active_version_id);
+        $this->assertSame(1, (int) $head->published_revision);
+    }
+
+    /** @test */
+    public function idempotent_republish_does_not_advance_publication_head(): void
+    {
+        $auth = $this->registerTenant('ver-publish-idempotent', 'owner@ver-publish-idempotent.test');
+        $storefront = $this->seedStorefront($auth['tenant_id']);
+        $token = $this->withToken($auth['token']);
+
+        $created = $token->postJson($this->listPath($storefront->id), ['name' => 'حي'])->assertCreated();
+        $versionId = $created->json('data.id');
+
+        $token->postJson($this->publishPath($storefront->id, $versionId), $this->body(1, null, null))->assertOk();
+        $before = DB::table('storefront_presentations')->where('storefront_id', $storefront->id)->first();
+
+        $token->postJson(
+            $this->publishPath($storefront->id, $versionId),
+            $this->body(1, 1, $versionId),
+        )->assertOk();
+
+        $after = DB::table('storefront_presentations')->where('storefront_id', $storefront->id)->first();
+        $this->assertSame((int) $before->published_revision, (int) $after->published_revision);
+        $this->assertSame((string) $before->published_at, (string) $after->published_at);
+    }
+
+    /** @test */
+    public function publish_rejects_unknown_fields(): void
+    {
+        $auth = $this->registerTenant('ver-publish-envelope', 'owner@ver-publish-envelope.test');
+        $storefront = $this->seedStorefront($auth['tenant_id']);
+        $token = $this->withToken($auth['token']);
+
+        $created = $token->postJson($this->listPath($storefront->id), ['name' => 'نسخة'])->assertCreated();
+
+        $body = $this->body(1, null, null);
+        $body['tenant_id'] = $auth['tenant_id'];
+
+        $token->postJson(
+            $this->publishPath($storefront->id, $created->json('data.id')),
+            $body,
+        )->assertStatus(422);
+    }
+
 }
