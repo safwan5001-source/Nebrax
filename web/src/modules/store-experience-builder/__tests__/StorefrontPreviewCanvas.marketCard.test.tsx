@@ -98,7 +98,7 @@ describe("web customizer preview — compact header style vs. mobile viewport", 
     );
     expect(view.getByRole("navigation", { name: "Categories" })).toBeTruthy();
     const grid = view.container.querySelector(".mt-4.grid.gap-3");
-    expect(grid?.className).toContain("lg:grid-cols-4");
+    expect(grid?.className).toContain("grid-cols-4");
     expect(view.queryByRole("navigation", { name: "Home" })).toBeNull();
   });
 
@@ -109,5 +109,42 @@ describe("web customizer preview — compact header style vs. mobile viewport", 
     );
     expect(view.getByRole("navigation", { name: "Home" })).toBeTruthy();
     expect(view.queryByRole("navigation", { name: "Categories" })).toBeNull();
+  });
+});
+
+/**
+ * Regression coverage for the Codex P2 finding (round 6) on PR #1084: the New
+ * Arrivals grid used `mobileViewport ? "grid-cols-2" : "grid-cols-2
+ * sm:grid-cols-3 lg:grid-cols-4"`, so a desktop host simulating the tablet
+ * (768px) or mobile device still got the `sm:`/`lg:` classes evaluated
+ * against the host's own window width instead of the simulated one — the
+ * same class of bug `cardImageHeight` was already fixed for. The published
+ * `ProductGrid.tsx` uses `grid-cols-2 lg:grid-cols-3 xl:grid-cols-4` (`lg` at
+ * 1024px, `xl` at 1280px), so of this preview's three discrete widths
+ * (390/768/1280) only desktop reaches 4 columns — 768px stays below `lg`, so
+ * tablet renders 2 columns, not 3.
+ */
+describe("web customizer preview — New Arrivals column count follows the simulated viewport", () => {
+  afterEach(() => {
+    cleanup();
+  });
+
+  it.each([
+    ["mobile", "grid-cols-2"],
+    ["tablet", "grid-cols-2"],
+    ["desktop", "grid-cols-4"],
+  ] as const)("renders %s columns at the %s simulated viewport", (viewport, expectedClass) => {
+    const { container } = render(
+      <StorefrontPreviewCanvas
+        config={DEFAULT_PRESENTATION_CONFIG}
+        locale="en"
+        viewport={viewport}
+      />,
+    );
+    const arrivalsGrid = container.querySelector(
+      'section[aria-labelledby="preview-arrivals"] ul.grid',
+    );
+    expect(arrivalsGrid).not.toBeNull();
+    expect(arrivalsGrid?.className).toContain(expectedClass);
   });
 });
