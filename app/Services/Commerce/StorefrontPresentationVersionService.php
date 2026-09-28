@@ -237,6 +237,26 @@ final class StorefrontPresentationVersionService
                 return null;
             }
 
+            if ($head->compatibility_working_version_id === null) {
+                $draftConfig = $head->draft_config ?? $this->normalizer->defaultConfig();
+                $draftSchema = StorefrontPresentationNormalizer::effectiveSchemaTag(
+                    $draftConfig,
+                    (int) $head->draft_schema_version,
+                );
+                $this->assertSupportedSchema($draftSchema);
+
+                $compat = StorefrontPresentationVersion::create([
+                    'tenant_id' => $storefront->tenant_id,
+                    'storefront_id' => $storefront->id,
+                    'name' => StorefrontPresentationVersionBackfillService::DEFAULT_MIGRATION_DRAFT_NAME,
+                    'schema_version' => $draftSchema,
+                    'config' => $draftConfig,
+                    'revision' => max(1, (int) $head->draft_revision),
+                ]);
+
+                $head->forceFill(['compatibility_working_version_id' => $compat->id])->save();
+            }
+
             $version = $this->lockOwnedVersion($storefront, $versionId);
             if ($version === null) {
                 return null;
