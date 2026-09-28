@@ -7,7 +7,7 @@
 ## Repository state
 
 - **Base SHA:** `2e9cdd058a50a2014dc0b4a3c5c0c3302c353616` (`origin/main` at task start — matched the SHA given in the task brief; verified with a fresh `git fetch origin main` before starting).
-- **Head SHA:** `0e3111c` (post-round-2-review-fix; round-1 fix head was `fddba52`; initial implementation head was `3077ecf`)
+- **Head SHA:** `892e1e1` (post-round-3-review-fix; round-2 fix head was `0e3111c`; round-1 fix head was `fddba52`; initial implementation head was `3077ecf`)
 - **Branch:** `claude/cust-h1-2-customizer-ux-23vvun`
 - **PR:** [#1085](https://github.com/safwan5001-source/Nebrax/pull/1085)
 
@@ -165,6 +165,18 @@ Two more P1 findings and one P2, the same class of stale-identity-across-an-asyn
 | `loadVersionList` committed `setVersions`/`setVersionsListState` unconditionally once the list request resolved — the round-1 token bump protected detail (`show`) requests but not list requests, so a slower store's list response could still overwrite a newer store's list after a fast `storefrontId` switch. | `loadVersionList` now captures the originating storefront/token before the `await` and checks both via the same `stillCurrent()` helper immediately before committing state; a stale response is dropped instead of applied. | `switching storefronts before a slower store's list response arrives never lets it overwrite the new store's list` |
 
 All three review threads were replied to individually (naming the fix commit `0e3111c`) and resolved. `npx vitest run` (2177 tests, full suite) and `npm run build` both re-verified green after this round.
+
+### Automated review (`chatgpt-codex-connector`, round 3, reviewed `81abebc`, fixed in `892e1e1`)
+
+Two more P1 findings and one P2 — not the stale-callback-identity class this time, but two related gaps: destructive actions that skip an existing safety prompt, and a success handler that doesn't account for further user input made while its own request was in flight.
+
+| Finding | Fix | Regression test |
+|---|---|---|
+| `handleCreateVersion`/`handleDuplicateVersion` adopted the new version into the editor unconditionally, silently discarding unsaved edits on whatever version was open — `selectVersion` already confirms this exact kind of discard before switching, but create/duplicate never did. Duplicate is worse: the server copies the last *persisted* config, not the local draft, so the discarded edits aren't even recoverable from the new version. | Both handlers now check the same `dirty` flag and show the same `versionSwitchDiscardConfirm` prompt *before* firing the request at all (not just before adopting the response) — declining leaves the open version's draft untouched and never calls the API. | `creating a new version while the open one has unsaved edits requires confirming the discard first (codex round 3)`, `duplicating a version while the open one has unsaved edits requires confirming the discard first (codex round 3)` |
+| `handleSave`'s success path replaced `draft` with the config it had just submitted, even if the merchant kept editing after clicking Save but before the `PUT` resolved (nothing in the UI blocks further edits during a save) — silently losing those newer edits. | `handleSave` now captures the draft at submission time and compares it (via a `draftRef` synced every render) to the current draft once the response arrives. Only replaces `draft` with the server's echo if they still match; otherwise updates `saved`/`selectedVersion` (so the next save carries the correct revision) and leaves the newer, still-dirty draft in place. | `does not discard an edit made while an earlier save is still in flight (codex round 3)` |
+| `EmptyVersionsPrompt`'s Enter-key handler fired `onCreate` unconditionally, unlike the adjacent submit button which already disables on `creating` — holding/repeating Enter during the first create could fire multiple POSTs. | The key handler now gates on `!creating` too. | `pressing Enter repeatedly while the first create is still pending does not send duplicate requests (codex round 3)` |
+
+All three review threads were replied to individually (naming the fix commit `892e1e1`) and resolved. `npx vitest run` (2181 tests, full suite) and `npm run build` both re-verified green after this round.
 
 ## Backward compatibility
 
