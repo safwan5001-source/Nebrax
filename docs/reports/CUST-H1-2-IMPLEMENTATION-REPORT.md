@@ -7,7 +7,7 @@
 ## Repository state
 
 - **Base SHA:** `2e9cdd058a50a2014dc0b4a3c5c0c3302c353616` (`origin/main` at task start — matched the SHA given in the task brief; verified with a fresh `git fetch origin main` before starting).
-- **Head SHA:** `c2033dd` (post-round-4-review-fix; round-3 fix head was `892e1e1`; round-2 fix head was `0e3111c`; round-1 fix head was `fddba52`; initial implementation head was `3077ecf`)
+- **Head SHA:** `01a4981` (post-round-5-review-fix; round-4 fix head was `c2033dd`; round-3 fix head was `892e1e1`; round-2 fix head was `0e3111c`; round-1 fix head was `fddba52`; initial implementation head was `3077ecf`)
 - **Branch:** `claude/cust-h1-2-customizer-ux-23vvun`
 - **PR:** [#1085](https://github.com/safwan5001-source/Nebrax/pull/1085)
 
@@ -189,6 +189,18 @@ One more P1 and two P2 findings, both extensions of round 3's fixes: the discard
 | `handleCreateVersion`/`handleDuplicateVersion`/`handleRenameVersion`/`handleDeleteVersion` all cleared their own busy flag (`versionCreating`/`versionBusy`) unconditionally right after their request resolved, before checking whether the response still belonged to the currently displayed storefront. A slower request for a previous store could therefore clear a newer store's own in-flight flag, re-enabling its controls mid-request. | All four now compute `sameStorefront` first and only clear the flag when it holds. | `a create for a previous storefront resolving late does not clear a newer storefront's own creating flag (codex round 4)` |
 
 All three review threads were replied to individually (naming the fix commit `c2033dd`) and resolved. `npx vitest run` (2184 tests, full suite) and `npm run build` both re-verified green after this round.
+
+### Automated review (`chatgpt-codex-connector`, round 5, reviewed `c8ca73f`, fixed in `01a4981`)
+
+Three more P2 findings — a second Enter-key gate the round-3 fix missed, a delete/open race the round-1/2 identity guards didn't cover, and a second-await staleness bug in the same family as round 4's list-loading fix.
+
+| Finding | Fix | Regression test |
+|---|---|---|
+| Round 3 only gated `EmptyVersionsPrompt`'s Enter handler. `VersionManagerPanel` has its own, separate create form with its own Enter handler and `submitCreate()` — neither checked `creating`, so reopening the form (the "+ نسخة جديدة" toggle has no guard either) and pressing Enter while an earlier create was still pending fired a second `POST`. | `submitCreate()` now checks `creating` itself before doing anything else, closing the same gap the round-3 fix closed for the other form. | `pressing Enter to submit a reopened manager create form while an earlier create is pending does not send a duplicate request (codex round 5)` |
+| A row's delete-confirmation UI clears the instant the merchant confirms, before the `DELETE` itself resolves, so its "Open" button reappeared enabled while the row was still being deleted. Opening it then raced the delete: the version's `GET` could complete after the confirm but the row still get deleted server-side, leaving the editor pointed at a version that no longer exists (a later Save would 404). | "Open" is now also disabled while `busy === "delete"` for that row, not just while `switching`. | `opening a version while its own delete is still pending is blocked (codex round 5)` |
+| `handleRenameVersion`'s conflict branch computed `current`/`sameStorefront` once, then awaited its own list refresh, then reused those pre-refresh values afterward — the same "value computed before a second `await`, reused after it" bug round 4 fixed in `loadVersionList`. A storefront switch mid-refresh could install the conflict banner (and its discard-on-reload action) over the new store's unrelated, freshly opened version. | The storefront/token identity is now re-checked from the live refs immediately after `loadVersionList()` resolves, not reused from before it started. | `switching storefronts while a rename-conflict's list refresh is pending does not apply the conflict to the new store (codex round 5)` |
+
+All three review threads were replied to individually (naming the fix commit `01a4981`) and resolved. `npx vitest run` (2187 tests, full suite) and `npm run build` both re-verified green after this round.
 
 ## Backward compatibility
 
