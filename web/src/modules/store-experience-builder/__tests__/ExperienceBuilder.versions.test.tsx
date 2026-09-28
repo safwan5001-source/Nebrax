@@ -1080,4 +1080,124 @@ describe('ExperienceBuilder — CUST-H1-2 Version Manager', () => {
       expect((within(rowB).getByRole('button', { name: 'حذف' }) as HTMLButtonElement).disabled).toBe(false),
     );
   });
+
+  it('retrying a failed background list refresh does not discard the dirty draft of the still-open version (codex round 8)', async () => {
+    listMock
+      .mockResolvedValueOnce({ ok: true, data: [summary({ id: 'a', name: 'نسخة أ', revision: 0 })] })
+      .mockResolvedValueOnce({ ok: false, reason: 'failed', message: 'boom' })
+      .mockResolvedValueOnce({ ok: true, data: [summary({ id: 'a', name: 'نسخة أ', revision: 1 })] });
+    showMock.mockResolvedValue({ ok: true, data: detail({ id: 'a', name: 'نسخة أ', revision: 0 }) });
+    renameMock.mockResolvedValue({ ok: false, reason: 'conflict', message: 'stale' });
+    const user = userEvent.setup();
+    render(<ExperienceBuilder storefrontId="store-1" initialLocale="ar" />);
+    await waitFor(() => expect(showMock).toHaveBeenCalled());
+
+    await user.click(screen.getByRole('button', { name: 'التوثيق والثقة' }));
+    await user.type(screen.getAllByRole('textbox')[0], 'تعديل غير محفوظ');
+
+    // A rename conflict's own list refresh fails, leaving the manager's list
+    // in an error state while A stays open with the unsaved edit above.
+    await openVersionManager(user);
+    await user.click(screen.getByRole('button', { name: 'إعادة تسمية' }));
+    await user.clear(screen.getByLabelText('اسم النسخة'));
+    await user.type(screen.getByLabelText('اسم النسخة'), 'اسم آخر');
+    await user.click(screen.getByRole('button', { name: 'حفظ الاسم' }));
+    await waitFor(() => expect(listMock).toHaveBeenCalledTimes(2));
+
+    // Retry (the manager panel's own — a version is still open, so the
+    // inspector-body retry never shows) must not silently re-select/reload
+    // and discard the dirty draft.
+    const manager = screen.getByRole('menu', { name: 'إدارة نسخ التصميم' });
+    await user.click(within(manager).getByRole('button', { name: 'تحديث النسخة' }));
+    await waitFor(() => expect(listMock).toHaveBeenCalledTimes(3));
+
+    expect((screen.getAllByRole('textbox')[0] as HTMLInputElement).value).toBe('تعديل غير محفوظ');
+    expect(screen.getByLabelText('نسخة التصميم قيد التعديل').textContent).toContain('نسخة أ');
+  });
+
+  it('an edit made while the conflict-reload GET is pending is not discarded when it resolves (codex round 8)', async () => {
+    listMock.mockResolvedValue({ ok: true, data: [summary({ id: 'a', name: 'نسخة أ', revision: 0 })] });
+    let resolveReload: (value: unknown) => void = () => {};
+    showMock
+      .mockResolvedValueOnce({ ok: true, data: detail({ id: 'a', name: 'نسخة أ', revision: 0 }) })
+      .mockReturnValueOnce(new Promise((resolve) => { resolveReload = resolve; }));
+    renameMock.mockResolvedValue({ ok: false, reason: 'conflict', message: 'stale' });
+    const user = userEvent.setup();
+    render(<ExperienceBuilder storefrontId="store-1" initialLocale="ar" />);
+    await waitFor(() => expect(showMock).toHaveBeenCalledTimes(1));
+
+    await openVersionManager(user);
+    await user.click(screen.getByRole('button', { name: 'إعادة تسمية' }));
+    await user.clear(screen.getByLabelText('اسم النسخة'));
+    await user.type(screen.getByLabelText('اسم النسخة'), 'اسم جديد');
+    await user.click(screen.getByRole('button', { name: 'حفظ الاسم' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'تحديث النسخة' })).toBeTruthy());
+
+    // Click reload — its GET never resolves during this test.
+    await user.click(screen.getByRole('button', { name: 'تحديث النسخة' }));
+    await waitFor(() => expect(showMock).toHaveBeenCalledTimes(2));
+
+    // Nothing blocks editing while the reload's own GET is still pending.
+    await user.click(screen.getByRole('button', { name: 'التوثيق والثقة' }));
+    await user.type(screen.getAllByRole('textbox')[0], 'تعديل أثناء التحديث');
+
+    resolveReload({ ok: true, data: detail({ id: 'a', name: 'نسخة من جلسة أخرى', revision: 3 }) });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    // The reload click only confirms discarding what was already dirty when
+    // it was clicked — not this newer edit made while it was in flight.
+    expect((screen.getAllByRole('textbox')[0] as HTMLInputElement).value).toBe('تعديل أثناء التحديث');
+  });
+
+  it('a pending rename on a row blocks starting a delete on the same row (codex round 8)', async () => {
+    listMock.mockResolvedValue({
+      ok: true,
+      data: [summary({ id: 'a', name: 'نسخة أ', revision: 0 }), summary({ id: 'b', name: 'نسخة ب', revision: 0 })],
+    });
+    let resolveRename: (value: unknown) => void = () => {};
+    renameMock.mockReturnValue(new Promise((resolve) => { resolveRename = resolve; }));
+    const user = userEvent.setup();
+    render(<ExperienceBuilder storefrontId="store-1" initialLocale="ar" />);
+    await screen.findByText('اختر نسخة للتعديل');
+
+    await openVersionManager(user);
+    const manager = screen.getByRole('menu', { name: 'إدارة نسخ التصميم' });
+    const row = within(manager).getByText('نسخة أ').closest('li') as HTMLElement;
+    await user.click(within(row).getByRole('button', { name: 'إعادة تسمية' }));
+    await user.clear(within(row).getByLabelText('اسم النسخة'));
+    await user.type(within(row).getByLabelText('اسم النسخة'), 'اسم جديد');
+    await user.click(within(row).getByRole('button', { name: 'حفظ الاسم' }));
+    await waitFor(() => expect(renameMock).toHaveBeenCalledTimes(1));
+
+    // Submitting returned this row's own action bar to view (`mode` resets
+    // synchronously) even though the rename is still pending in the
+    // background — Delete on this same row must stay blocked.
+    expect(
+      (within(row).getByRole('button', { name: 'حذف' }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+
+    resolveRename({ ok: true, data: detail({ id: 'a', name: 'اسم جديد', revision: 1 }) });
+    await waitFor(() =>
+      expect((within(row).getByRole('button', { name: 'حذف' }) as HTMLButtonElement).disabled).toBe(false),
+    );
+  });
+
+  it('switching the storefront to null resets the previously open version and draft (codex round 8)', async () => {
+    listMock.mockResolvedValue({ ok: true, data: [summary({ id: 'a', name: 'نسخة أ', revision: 0 })] });
+    showMock.mockResolvedValue({ ok: true, data: detail({ id: 'a', name: 'نسخة أ', revision: 0 }) });
+    const { rerender } = render(<ExperienceBuilder storefrontId="store-1" initialLocale="ar" />);
+    await waitFor(() =>
+      expect(screen.getByLabelText('نسخة التصميم قيد التعديل').textContent).toContain('نسخة أ'),
+    );
+
+    rerender(<ExperienceBuilder storefrontId={null} initialLocale="ar" />);
+
+    // No storefront selected is the pre-CUST-H1-2 local-only editing mode —
+    // it must not keep showing store-1's version identity.
+    expect(
+      document.querySelector('[data-experience-builder]')?.getAttribute('data-selected-version-id'),
+    ).toBe('');
+    expect(screen.queryByLabelText('نسخة التصميم قيد التعديل')).toBeNull();
+    expect(screen.queryByText('نسخة أ')).toBeNull();
+  });
 });

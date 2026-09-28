@@ -411,8 +411,12 @@ function VersionRow({
               // آخر مشغول يستبدلها بصمت فيُظهر ذلك الصفّ خاملاً رغم عمليته
               // الفعلية القائمة. `switching` يحرس هذا الصفّ نفسه: تبديله (GET)
               // قيد التنفيذ، وبدء كتابة عليه الآن قد تُنجَز قبل أن يستقرّ
-              // الاختيار على مستند قد يتغيّر مصيره في هذه الأثناء.
-              disabled={otherRowBusy || switching}
+              // الاختيار على مستند قد يتغيّر مصيره في هذه الأثناء. `busy` هنا
+              // يحرس هذا الصفّ من *نفسه*: تقديم إعادة تسمية يُعيد `mode` فوراً
+              // إلى "idle" (فيُظهر هذه الأزرار مجدداً) بينما طلبها لا يزال
+              // معلَّقاً فعلياً — بدء عملية ثانية عليه الآن يستبدل الفتحة
+              // المشتركة بنفسه.
+              disabled={otherRowBusy || switching || busy !== null}
               onClick={() => {
                 setDuplicateDraft(defaultDuplicateName(version.name, locale));
                 setMode("duplicate");
@@ -426,7 +430,7 @@ function VersionRow({
             <button
               type="button"
               data-version-rename={version.id}
-              disabled={otherRowBusy || switching}
+              disabled={otherRowBusy || switching || busy !== null}
               onClick={() => {
                 setNameDraft(version.name);
                 setMode("rename");
@@ -442,8 +446,10 @@ function VersionRow({
               data-version-delete={version.id}
               // نفس حراسة الأعلى: يمنع حذف صفّ لا يزال تبديله (فتحه) قيد
               // التنفيذ — حذفٌ ينجح بينما `GET`ـه لا يزال قادماً يترك المحرِّر
-              // يفتح مستنداً حُذف للتو (راجع تعليق زرّ «فتح للتعديل» أعلاه).
-              disabled={otherRowBusy || switching}
+              // يفتح مستنداً حُذف للتو (راجع تعليق زرّ «فتح للتعديل» أعلاه)،
+              // أو لا يزال لهذا الصفّ نفسه عمليةٌ أخرى معلَّقة فعلياً خلف
+              // ظاهر "idle" (راجع تعليق زرّ التكرار أعلاه).
+              disabled={otherRowBusy || switching || busy !== null}
               onClick={onOpenDeleteConfirm}
               className="h-7 rounded-md border border-border px-2 text-[11px] font-medium text-negative hover:bg-negative/10 disabled:opacity-50"
             >

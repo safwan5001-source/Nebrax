@@ -245,10 +245,7 @@ export function ExperienceBuilder({
   // النقطة الوحيدة التي تجلب مستند نسخة فعلياً وتطبّقه على المحرِّر. لا حرس
   // تكافؤ ولا تأكيد تجاهل هنا عمداً — `selectVersion` (الاختيار العادي)
   // يضيفهما، بينما `reloadConflictedVersion` (§15) يحتاج تجاوزهما معاً.
-  async function applyVersionSelection(
-    target: { id: string },
-    options: { allowOverwriteDuringFetch?: boolean } = {},
-  ) {
+  async function applyVersionSelection(target: { id: string }) {
     if (!storefrontId) return;
     const token = ++versionRequestTokenRef.current;
     const draftAtSwitchStart = draft;
@@ -275,9 +272,13 @@ export function ExperienceBuilder({
     // لا يبدّل الرمز (لا تبديل نسخة ولا متجر وقع)، فالفحص أعلاه وحده لا
     // يكتشفه. لا نستبدل هذا التعديل الأحدث بصمت بمحتوى الهدف؛ صفّه في القائمة
     // يُحدَّث فقط، وتبقى النسخة المفتوحة كما هي حتى يقرر التاجر مصير تعديله.
-    // `reloadConflictedVersion` يتجاوز هذا القيد عمداً — إعادة التحميل نفسها
-    // إعلانٌ صريح بتجاهل الحالة المحلية.
-    if (!options.allowOverwriteDuringFetch && !presentationConfigsEqual(draftRef.current, draftAtSwitchStart)) {
+    // هذا يحمي `reloadConflictedVersion` أيضاً بلا أي استثناء: `draftAtSwitchStart`
+    // تلتقط الحالة المحلية القديمة وقت الضغط على «تحديث النسخة» (وهي بالضبط
+    // ما يُفترض أن يُهمَلها الإعلان الصريح بالتحديث)، فإن لم يتغيّر شيء أثناء
+    // الانتظار يُستبدَل ذلك القديم بأمان؛ أمّا تعديل جديد وقع *بعد* الضغط
+    // وأثناء الانتظار فيُصان بنفس الفحص، بلا حاجة لتجاوزٍ منفصل قد يُصيبه هو
+    // الآخر بصمت.
+    if (!presentationConfigsEqual(draftRef.current, draftAtSwitchStart)) {
       updateVersionSummaryInList(result.data);
       return;
     }
@@ -300,10 +301,12 @@ export function ExperienceBuilder({
   function reloadConflictedVersion() {
     if (!selectedVersion) return;
     setVersionConflict(null);
-    // «تحديث النسخة» إعلانٌ صريح من التاجر بتجاهل حالته المحلية الحالية
-    // (هذا هو سبب وجود الزر أصلاً بعد بانر التعارض) — يتجاوز حرس التعديل
-    // أثناء التبديل الذي يحمي التبديل العادي.
-    void applyVersionSelection(selectedVersion, { allowOverwriteDuringFetch: true });
+    // «تحديث النسخة» إعلانٌ صريح من التاجر بتجاهل حالته المحلية القديمة
+    // (هذا هو سبب وجود الزر أصلاً بعد بانر التعارض) — `applyVersionSelection`
+    // تلتقط تلك الحالة القديمة بالضبط بوصفها `draftAtSwitchStart`، فتُستبدَل
+    // بأمان دون أي تجاوز خاص؛ حرسها الموحَّد يحمي فقط تعديلاً جديداً يقع
+    // *بعد* هذا الضغط وأثناء انتظاره.
+    void applyVersionSelection(selectedVersion);
   }
 
   function adoptCreatedVersion(detail: PresentationVersionDetail) {
@@ -326,12 +329,22 @@ export function ExperienceBuilder({
   }
 
   // مسار الاختيار التلقائي الحاسم عند أول تحميل: يُستدعى من تأثير `storefrontId`
-  // أدناه، **ومن زر «إعادة المحاولة»** بعد فشل القائمة أيضاً — كان هذا الأخير
-  // يعيد تحميل الصفوف فقط دون إعادة تشغيل منطق الاختيار (§13)، فمتجرٌ بمرشّح
-  // وحيد غير غامض كان يستقر على `ready` بلا نسخة مفتوحة، ويبقى تنبيه الخطأ
-  // الأصلي ظاهراً رغم نجاح المحاولة. مسارٌ واحد لكلا نقطتي الدخول يمنع الانحراف.
-  async function loadAndSelectInitialVersion() {
+  // أدناه (`context: "mount"`، الافتراضي — عندها لا نسخة مفتوحة قطعاً، التأثير
+  // صفّرها للتو)، **ومن زر «إعادة المحاولة»** بعد فشل القائمة أيضاً
+  // (`context: "retry"`) — كان هذا الأخير يعيد تحميل الصفوف فقط دون إعادة
+  // تشغيل منطق الاختيار (§13)، فمتجرٌ بمرشّح وحيد غير غامض كان يستقر على
+  // `ready` بلا نسخة مفتوحة، ويبقى تنبيه الخطأ الأصلي ظاهراً رغم نجاح
+  // المحاولة. لكن زرّ «إعادة المحاولة» داخل لوحة الإدارة نفسها يظهر أيضاً
+  // بينما نسخة أخرى **مفتوحة فعلاً** (تحديث خلفي فشل، مثلاً بعد تعارض تسمية) —
+  // تشغيل منطق الاختيار الأول عندها يستبدلها بصمت بلا تأكيد تجاهل. في سياق
+  // `"retry"` فقط، لا نتابع إلى الاختيار إن كانت نسخة مفتوحة بالفعل؛ تحديث
+  // صفوف القائمة وحده يكفي (يطابق سلوك الزر قبل الإصلاح، لحالة كهذه تحديداً).
+  async function loadAndSelectInitialVersion(context: "mount" | "retry" = "mount") {
     if (!storefrontId) return;
+    if (context === "retry" && selectedVersion) {
+      void loadVersionList();
+      return;
+    }
     const originStorefrontId = storefrontId;
     const tokenAtStart = versionRequestTokenRef.current;
     setBusy("loading");
@@ -363,30 +376,38 @@ export function ExperienceBuilder({
   }
 
   useEffect(() => {
-    if (!storefrontId) {
-      setBusy(null);
-      return;
-    }
-
     // يبطل أي طلب سابق (قائمة أو نسخة) قيد التنفيذ فوراً، ويُصفّر حالة النسخة
-    // المرتبطة بالمتجر السابق — وإلا، إن بدَّل المستدعي `storefrontId` دون
-    // إعادة تركيب هذا المكوّن (تبديل المتجر النشط)، تبقى نسخة المتجر القديم
-    // معروضة ومحدَّدة، وقد يُرسَل حفظ لاحق بمعرّفها تحت مسار المتجر الجديد؛
-    // كما قد تصل استجابة قائمة/نسخة متأخرة من المتجر القديم فتكتب فوق حالة
-    // المتجر الجديد.
+    // المرتبطة بالسياق السابق — وإلا، إن بدَّل المستدعي `storefrontId` دون
+    // إعادة تركيب هذا المكوّن (تبديل المتجر النشط، أو حتى تفريغه إلى `null`)،
+    // تبقى نسخة السياق القديم معروضة ومحدَّدة، وقد يُرسَل حفظ لاحق بمعرّفها
+    // تحت مسار مختلف؛ كما قد تصل استجابة قائمة/نسخة متأخرة من السياق القديم
+    // فتكتب فوق الحالة الجديدة. هذا يشمل التحوّل *إلى* `null` (لا مستأجر) لا
+    // فقط بين مستأجرَين حقيقيَّين — التبديل العائد لاحقاً إلى مستأجر سيُعيد
+    // تشغيل هذا التأثير من جديد فيصحّح نفسه، لكن حتى ذلك الحين يجب ألا يبقى
+    // محرِّر «محلي بحت» يعرض بصمت نسخة مستأجر سابق.
     ++versionRequestTokenRef.current;
     setVersionSwitchingId(null);
     setSelectedVersion(null);
     setVersions([]);
-    setVersionsListState("loading");
     setVersionCreating(false);
     setVersionBusy(null);
     setVersionConflict(null);
     setSelectedSection(null);
     setSelectedChrome(null);
+    setLifecycle("clean");
+
+    if (!storefrontId) {
+      setBusy(null);
+      setNotice(null);
+      setVersionsListState("ready");
+      setDraft(clonePresentationConfig(seed));
+      setSaved(clonePresentationConfig(seed));
+      return;
+    }
+
+    setVersionsListState("loading");
     setDraft(clonePresentationConfig(DEFAULT_PRESENTATION_CONFIG));
     setSaved(clonePresentationConfig(DEFAULT_PRESENTATION_CONFIG));
-    setLifecycle("clean");
 
     void loadAndSelectInitialVersion();
     // Intentionally reload only when the selected storefront changes.
@@ -748,7 +769,7 @@ export function ExperienceBuilder({
     busyVersionId: versionBusy?.id ?? null,
     busyAction: versionBusy?.action ?? null,
     onRetryList: () => {
-      void loadAndSelectInitialVersion();
+      void loadAndSelectInitialVersion("retry");
     },
     onSelect: (version) => selectVersion(version),
     onCreate: (name) => {
@@ -820,7 +841,7 @@ export function ExperienceBuilder({
     }
     if (versionsListState === "error" && !selectedVersion) {
       return (
-        <InspectorStatusMessage tone="error" onRetry={() => void loadAndSelectInitialVersion()} retryLabel={t("versionReloadLatest")}>
+        <InspectorStatusMessage tone="error" onRetry={() => void loadAndSelectInitialVersion("retry")} retryLabel={t("versionReloadLatest")}>
           {t("versionListLoadError")}
         </InspectorStatusMessage>
       );
