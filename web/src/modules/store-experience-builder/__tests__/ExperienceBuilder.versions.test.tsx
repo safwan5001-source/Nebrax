@@ -405,4 +405,137 @@ describe('ExperienceBuilder — CUST-H1-2 Version Manager', () => {
     expect(document.querySelector('[data-experience-builder]')?.getAttribute('data-selected-version-id')).toBe('b');
     expect(screen.queryByText('تم حفظ النسخة.')).toBeNull();
   });
+
+  it('a rename that completes after switching to another version does not overwrite it (codex round 2)', async () => {
+    listMock.mockResolvedValue({
+      ok: true,
+      data: [summary({ id: 'a', name: 'نسخة أ', revision: 0 }), summary({ id: 'b', name: 'نسخة ب', revision: 0 })],
+    });
+    showMock.mockImplementation((_storefrontId: string, versionId: string) =>
+      Promise.resolve({
+        ok: true,
+        data: versionId === 'a'
+          ? detail({ id: 'a', name: 'نسخة أ', revision: 0 })
+          : detail({ id: 'b', name: 'نسخة ب', revision: 0 }),
+      }),
+    );
+    let resolveRename: (value: unknown) => void = () => {};
+    renameMock.mockReturnValue(new Promise((resolve) => { resolveRename = resolve; }));
+    const user = userEvent.setup();
+    render(<ExperienceBuilder storefrontId="store-1" initialLocale="ar" />);
+    await screen.findByText('اختر نسخة للتعديل');
+
+    await openVersionManager(user);
+    let manager = screen.getByRole('menu', { name: 'إدارة نسخ التصميم' });
+    const rowA = within(manager).getByText('نسخة أ').closest('li') as HTMLElement;
+    await user.click(within(rowA).getByRole('button', { name: 'فتح للتعديل' }));
+    await waitFor(() =>
+      expect(screen.getByLabelText('نسخة التصميم قيد التعديل').textContent).toContain('نسخة أ'),
+    );
+
+    await openVersionManager(user);
+    manager = screen.getByRole('menu', { name: 'إدارة نسخ التصميم' });
+    const rowAAgain = within(manager).getByText('نسخة أ').closest('li') as HTMLElement;
+    await user.click(within(rowAAgain).getByRole('button', { name: 'إعادة تسمية' }));
+    await user.clear(screen.getByLabelText('اسم النسخة'));
+    await user.type(screen.getByLabelText('اسم النسخة'), 'اسم جديد لأ');
+    await user.click(screen.getByRole('button', { name: 'حفظ الاسم' }));
+    await waitFor(() => expect(renameMock).toHaveBeenCalledTimes(1));
+
+    // Switch to B while A's rename is still in flight. The manager is
+    // already open (renaming doesn't close it) — reopening it here would
+    // toggle it closed instead.
+    manager = screen.getByRole('menu', { name: 'إدارة نسخ التصميم' });
+    const rowB = within(manager).getByText('نسخة ب').closest('li') as HTMLElement;
+    await user.click(within(rowB).getByRole('button', { name: 'فتح للتعديل' }));
+    await waitFor(() =>
+      expect(screen.getByLabelText('نسخة التصميم قيد التعديل').textContent).toContain('نسخة ب'),
+    );
+
+    // A's rename now resolves successfully — must not pull the editor back to A.
+    resolveRename({ ok: true, data: detail({ id: 'a', name: 'اسم جديد لأ', revision: 1 }) });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(screen.getByLabelText('نسخة التصميم قيد التعديل').textContent).toContain('نسخة ب');
+    expect(document.querySelector('[data-experience-builder]')?.getAttribute('data-selected-version-id')).toBe('b');
+  });
+
+  it('a create superseded by a version switch updates only the manager list, not the open editor', async () => {
+    listMock.mockResolvedValue({
+      ok: true,
+      data: [summary({ id: 'a', name: 'نسخة أ' }), summary({ id: 'b', name: 'نسخة ب' })],
+    });
+    showMock.mockImplementation((_storefrontId: string, versionId: string) =>
+      Promise.resolve({
+        ok: true,
+        data: versionId === 'a' ? detail({ id: 'a', name: 'نسخة أ' }) : detail({ id: 'b', name: 'نسخة ب' }),
+      }),
+    );
+    let resolveCreate: (value: unknown) => void = () => {};
+    createMock.mockReturnValue(new Promise((resolve) => { resolveCreate = resolve; }));
+    const user = userEvent.setup();
+    render(<ExperienceBuilder storefrontId="store-1" initialLocale="ar" />);
+    await screen.findByText('اختر نسخة للتعديل');
+
+    await openVersionManager(user);
+    let manager = screen.getByRole('menu', { name: 'إدارة نسخ التصميم' });
+    const rowA = within(manager).getByText('نسخة أ').closest('li') as HTMLElement;
+    await user.click(within(rowA).getByRole('button', { name: 'فتح للتعديل' }));
+    await waitFor(() =>
+      expect(screen.getByLabelText('نسخة التصميم قيد التعديل').textContent).toContain('نسخة أ'),
+    );
+
+    await openVersionManager(user);
+    await user.click(screen.getByRole('button', { name: '+ نسخة جديدة' }));
+    await user.type(screen.getByPlaceholderText('مثال: رمضان ١٤٤٨'), 'نسخة موسمية');
+    await user.click(screen.getByRole('button', { name: 'إنشاء' }));
+    await waitFor(() => expect(createMock).toHaveBeenCalledTimes(1));
+
+    // Switch to B while the create for a brand-new version is still pending.
+    // The manager is already open (submitting the create form doesn't close
+    // it) — reopening it here would toggle it closed instead.
+    manager = screen.getByRole('menu', { name: 'إدارة نسخ التصميم' });
+    const rowB = within(manager).getByText('نسخة ب').closest('li') as HTMLElement;
+    await user.click(within(rowB).getByRole('button', { name: 'فتح للتعديل' }));
+    await waitFor(() =>
+      expect(screen.getByLabelText('نسخة التصميم قيد التعديل').textContent).toContain('نسخة ب'),
+    );
+
+    resolveCreate({ ok: true, data: detail({ id: 'new-1', name: 'نسخة موسمية', revision: 1 }) });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    // The editor must stay on B — the newly created version must not be forced open.
+    expect(screen.getByLabelText('نسخة التصميم قيد التعديل').textContent).toContain('نسخة ب');
+    // But it should still be visible in the manager's list for later opening.
+    await openVersionManager(user);
+    manager = screen.getByRole('menu', { name: 'إدارة نسخ التصميم' });
+    expect(within(manager).getByText('نسخة موسمية')).toBeTruthy();
+  });
+
+  it('switching storefronts before a slower store\'s list response arrives never lets it overwrite the new store\'s list', async () => {
+    let resolveStore1List: (value: unknown) => void = () => {};
+    const pendingStore1List = new Promise((resolve) => { resolveStore1List = resolve; });
+    listMock.mockImplementation((storefrontId: string) =>
+      storefrontId === 'store-1'
+        ? pendingStore1List
+        : Promise.resolve({ ok: true, data: [summary({ id: 'x', name: 'نسخة المتجر الثاني' })] }),
+    );
+    showMock.mockResolvedValue({ ok: true, data: detail({ id: 'x', name: 'نسخة المتجر الثاني' }) });
+    const { rerender } = render(<ExperienceBuilder storefrontId="store-1" initialLocale="ar" />);
+    await waitFor(() => expect(listMock).toHaveBeenCalledWith('store-1'));
+
+    // Move on to store-2 before store-1's list ever resolves.
+    rerender(<ExperienceBuilder storefrontId="store-2" initialLocale="ar" />);
+    await waitFor(() =>
+      expect(screen.getByLabelText('نسخة التصميم قيد التعديل').textContent).toContain('نسخة المتجر الثاني'),
+    );
+
+    // store-1's slow response now finally arrives — it must not clobber store-2's list.
+    resolveStore1List({ ok: true, data: [summary({ id: 'stale', name: 'نسخة قديمة من متجر آخر' })] });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(
+      screen.getByLabelText('نسخة التصميم قيد التعديل').textContent,
+    ).toContain('نسخة المتجر الثاني');
+  });
 });
