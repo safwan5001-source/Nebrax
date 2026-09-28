@@ -1402,4 +1402,147 @@ describe('ExperienceBuilder — CUST-H1-2 Version Manager', () => {
       (screen.getByRole('button', { name: 'إنشاء مسودة من هذه النسخة' }) as HTMLButtonElement).disabled,
     ).toBe(true);
   });
+
+  it("a create resolving after switching to a different already-open version (no new create) still clears the creating flag (codex round 11)", async () => {
+    // Regression guard for the round-9 fix itself: gating the flag-clear on
+    // the general `versionRequestTokenRef` (bumped by *any* version switch,
+    // not only a new create) would leave `versionCreating` stuck `true`
+    // forever once the merchant opens a different existing version while a
+    // create is still pending — even though nothing else claims the flag.
+    listMock.mockResolvedValue({
+      ok: true,
+      data: [summary({ id: 'a', name: 'نسخة أ', revision: 0 }), summary({ id: 'b', name: 'نسخة ب', revision: 0 })],
+    });
+    showMock.mockImplementation((_storefrontId: string, versionId: string) =>
+      Promise.resolve({
+        ok: true,
+        data: versionId === 'a'
+          ? detail({ id: 'a', name: 'نسخة أ', revision: 0 })
+          : detail({ id: 'b', name: 'نسخة ب', revision: 0 }),
+      }),
+    );
+    let resolveCreate: (value: unknown) => void = () => {};
+    createMock.mockReturnValue(new Promise((resolve) => { resolveCreate = resolve; }));
+    const user = userEvent.setup();
+    render(<ExperienceBuilder storefrontId="store-1" initialLocale="ar" />);
+    // Two eligible drafts is ambiguous — open one explicitly.
+    await screen.findByText('اختر نسخة للتعديل');
+    await openVersionManager(user);
+    let manager = screen.getByRole('menu', { name: 'إدارة نسخ التصميم' });
+    let rowA = within(manager).getByText('نسخة أ').closest('li') as HTMLElement;
+    await user.click(within(rowA).getByRole('button', { name: 'فتح للتعديل' }));
+    await waitFor(() =>
+      expect(screen.getByLabelText('نسخة التصميم قيد التعديل').textContent).toContain('نسخة أ'),
+    );
+
+    // Start a create — it never resolves during this test yet.
+    await openVersionManager(user);
+    await user.click(screen.getByRole('button', { name: '+ نسخة جديدة' }));
+    await user.type(screen.getByPlaceholderText('مثال: رمضان ١٤٤٨'), 'نسخة ثالثة');
+    await user.click(screen.getByRole('button', { name: 'إنشاء' }));
+    await waitFor(() => expect(createMock).toHaveBeenCalledTimes(1));
+
+    // Switch to the *other already-existing* version — no new create
+    // involved, only an ordinary version switch (which does bump the
+    // general request token). The manager is already open from the create
+    // above (submitting only closes its inline form, not the dropdown).
+    if (!screen.queryByRole('menu', { name: 'إدارة نسخ التصميم' })) {
+      await openVersionManager(user);
+    }
+    manager = screen.getByRole('menu', { name: 'إدارة نسخ التصميم' });
+    const rowB = within(manager).getByText('نسخة ب').closest('li') as HTMLElement;
+    await user.click(within(rowB).getByRole('button', { name: 'فتح للتعديل' }));
+    await waitFor(() =>
+      expect(screen.getByLabelText('نسخة التصميم قيد التعديل').textContent).toContain('نسخة ب'),
+    );
+
+    // The create now resolves. It must not force-adopt version B's editor
+    // (token mismatch already covers that, tested elsewhere), but it must
+    // still clear `versionCreating` — reopening the create form should show
+    // it enabled, not stuck disabled forever.
+    resolveCreate({ ok: true, data: detail({ id: 'new-1', name: 'نسخة ثالثة', revision: 0 }) });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    await openVersionManager(user);
+    await user.click(screen.getByRole('button', { name: '+ نسخة جديدة' }));
+    await user.type(screen.getByPlaceholderText('مثال: رمضان ١٤٤٨'), 'فحص');
+    expect(screen.getByRole('button', { name: 'إنشاء' })).toHaveProperty('disabled', false);
+  });
+
+  it("a stale row-write completing after an A→B→A switch does not clear a newer, still-pending row write's busy state (codex round 11)", async () => {
+    listMock.mockImplementation((storefrontId: string) =>
+      Promise.resolve({
+        ok: true,
+        data: [
+          storefrontId === 'store-a'
+            ? summary({ id: 'a', name: 'نسخة أ', revision: 0 })
+            : summary({ id: 'b', storefrontId: 'store-b', name: 'نسخة ب', revision: 0 }),
+        ],
+      }),
+    );
+    showMock.mockImplementation((storefrontId: string, versionId: string) =>
+      Promise.resolve({
+        ok: true,
+        data: versionId === 'a'
+          ? detail({ id: 'a', name: 'نسخة أ', revision: 0 })
+          : detail({ id: 'b', storefrontId: 'store-b', name: 'نسخة ب', revision: 0 }),
+      }),
+    );
+    let resolveFirstRename: (value: unknown) => void = () => {};
+    renameMock
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveFirstRename = resolve; })) // first rename on A
+      .mockImplementationOnce(() => new Promise(() => {})); // second rename on A, never resolves
+    const user = userEvent.setup();
+    const { rerender } = render(<ExperienceBuilder storefrontId="store-a" initialLocale="ar" />);
+    await waitFor(() =>
+      expect(screen.getByLabelText('نسخة التصميم قيد التعديل').textContent).toContain('نسخة أ'),
+    );
+
+    // Start a rename on A's only row — it never resolves during this test.
+    await openVersionManager(user);
+    await user.click(screen.getByRole('button', { name: 'إعادة تسمية' }));
+    await user.clear(screen.getByLabelText('اسم النسخة'));
+    await user.type(screen.getByLabelText('اسم النسخة'), 'محاولة أولى');
+    await user.click(screen.getByRole('button', { name: 'حفظ الاسم' }));
+    await waitFor(() => expect(renameMock).toHaveBeenCalledTimes(1));
+
+    // Switch away to B, then back to A — the mount effect resets
+    // `versionBusy` and bumps the request token, so A's row controls read
+    // idle again even though the first rename is still outstanding.
+    rerender(<ExperienceBuilder storefrontId="store-b" initialLocale="ar" />);
+    await waitFor(() =>
+      expect(screen.getByLabelText('نسخة التصميم قيد التعديل').textContent).toContain('نسخة ب'),
+    );
+    rerender(<ExperienceBuilder storefrontId="store-a" initialLocale="ar" />);
+    await waitFor(() =>
+      expect(screen.getByLabelText('نسخة التصميم قيد التعديل').textContent).toContain('نسخة أ'),
+    );
+
+    // Start a second, genuinely new rename on A's row.
+    if (!screen.queryByRole('menu', { name: 'إدارة نسخ التصميم' })) {
+      await openVersionManager(user);
+    }
+    await user.click(screen.getByRole('button', { name: 'إعادة تسمية' }));
+    await user.clear(screen.getByLabelText('اسم النسخة'));
+    await user.type(screen.getByLabelText('اسم النسخة'), 'محاولة ثانية');
+    await user.click(screen.getByRole('button', { name: 'حفظ الاسم' }));
+    await waitFor(() => expect(renameMock).toHaveBeenCalledTimes(2));
+
+    // The row returns to idle mode on submit (its own trigger buttons
+    // reappear), gated by `busy !== null` for this row.
+    expect(
+      (screen.getByRole('button', { name: 'تكرار النسخة' }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+
+    // The first (stale) rename now resolves successfully. Storefront
+    // equality alone would satisfy its cleanup check and clear the shared
+    // `versionBusy` slot — re-enabling this row's triggers while the second
+    // rename is still outstanding, letting a new write start and race it.
+    resolveFirstRename({ ok: true, data: detail({ id: 'a', name: 'محاولة أولى', revision: 1 }) });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(
+      (screen.getByRole('button', { name: 'تكرار النسخة' }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+  });
 });

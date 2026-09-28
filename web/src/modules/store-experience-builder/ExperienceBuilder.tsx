@@ -125,6 +125,15 @@ export function ExperienceBuilder({
   >(null);
   const [versionConflict, setVersionConflict] = useState<{ versionId: string } | null>(null);
   const versionRequestTokenRef = useRef(0);
+  // هويتا طلب مخصَّصتان لعلَمَي الانشغال (`versionCreating`/`versionBusy`) —
+  // منفصلتان عمداً عن `versionRequestTokenRef` أعلاه: ذاك يزيد أيضاً عند مجرَّد
+  // تبديل نسخة (لا إنشاء/كتابة جديدة)، فلو استُعمل لتصفير علَم إنشاءٍ قيد
+  // التنفيذ لبقي عالقاً `true` إلى الأبد إن بدَّل التاجر النسخة المفتوحة أثناء
+  // انتظاره بلا بدء إنشاء آخر. كل مرجع هنا يزيد فقط عند بدء العملية التي يخصّها
+  // فعلاً، فيميّز «هل ما زلتُ أحدث إنشاء/كتابة صفّ لهذا المتجر» بمعزل عن أي
+  // تبديل نسخة غير ذي صلة وقع في الأثناء.
+  const versionCreateRequestRef = useRef(0);
+  const versionWriteRequestRef = useRef(0);
   // مرجع متزامن لقيمة `storefrontId` الحالية — يُحدَّث كل تصيير بلا Effect، ليتيح
   // لإغلاقات غير متزامنة (نتائج شبكة متأخرة لحفظ/تسمية/إنشاء/حذف/قائمة) معرفة
   // هل ما زال المتجر نفسه معروضاً حين تصل، بمعزل عن القيمة التي أُغلِق عليها
@@ -542,19 +551,22 @@ export function ExperienceBuilder({
     const originStorefrontId = storefrontId;
     const tokenAtStart = versionRequestTokenRef.current;
     const draftAtStart = draft;
+    const createRequestId = ++versionCreateRequestRef.current;
     setVersionCreating(true);
     const result = await createPresentationVersion(storefrontId, name);
     const sameStorefront = storefrontIdRef.current === originStorefrontId;
-    // هوية الطلب نفسه، لا تطابق المتجر وحده: تبديل المتجر ذهاباً وإياباً
-    // (A→B→A) يُصفِّر `versionCreating` (تأثير التركيب) ويزيد هذا الرمز مرتين،
-    // فيسمح ببدء إنشاءٍ ثانٍ لنفس المتجر A بينما الطلب الأول لا يزال معلَّقاً.
-    // مطابقة المتجر وحدها كانت تُسكِت علَم الإنشاء عند اكتمال ذلك الأول
-    // المتأخر رغم أن الثاني لا يزال قيد التنفيذ، فيُعاد تفعيل الزرّ قبل أوانه
-    // ويُتيح إنشاءً ثالثاً غير مقصود.
-    const isLatestRequest = tokenAtStart === versionRequestTokenRef.current;
-    if (sameStorefront && isLatestRequest) setVersionCreating(false);
+    // هوية طلب الإنشاء نفسه (`versionCreateRequestRef`)، لا الرمز العام: ذاك
+    // يزيد أيضاً عند مجرَّد تبديل نسخة داخل المتجر نفسه — فلو استُعمل هنا
+    // لبقي العلَم عالقاً `true` إلى الأبد كلما بدَّل التاجر النسخة المفتوحة أثناء
+    // انتظار هذا الإنشاء بلا بدء إنشاء آخر. تبديل المتجر ذهاباً وإياباً
+    // (A→B→A) يُصفِّر `versionCreating` (تأثير التركيب) ويزيد `versionCreateRequestRef`
+    // عند أي إنشاء ثانٍ يبدأ لاحقاً لنفس المتجر A بينما الطلب الأول لا يزال
+    // معلَّقاً؛ مطابقة المتجر وحدها كانت تُسكِت علَم الإنشاء عند اكتمال ذلك
+    // الأول المتأخر رغم أن الثاني لا يزال قيد التنفيذ.
+    const isLatestCreateRequest = createRequestId === versionCreateRequestRef.current;
+    if (sameStorefront && isLatestCreateRequest) setVersionCreating(false);
     if (!result.ok) {
-      if (sameStorefront && isLatestRequest) {
+      if (sameStorefront && isLatestCreateRequest) {
         setNoticeKind("status");
         setNotice(t("versionCreateFailed"));
       }
@@ -564,9 +576,10 @@ export function ExperienceBuilder({
     // تبديل نسخة (الرمز) أو تعديل جديد على المسودة المفتوحة (لا يُغيِّر الرمز)
     // وقع أثناء انتظار الإنشاء — كلاهما يعني أن ما يُعرَض الآن لم يعد يطابق ما
     // كان عليه حين بدأ الطلب، فلا يُفرَض تبنّي النسخة الجديدة عليه؛ صفّها في
-    // القائمة يُحدَّث فقط، وتُفتَح لاحقاً صراحةً.
+    // القائمة يُحدَّث فقط، وتُفتَح لاحقاً صراحةً. هذا الفحص يستعمل الرمز العام
+    // عمداً (لا هوية الإنشاء) — أي تبديل، لا إنشاءٌ ثانٍ فقط، يكفي لمنع التبنّي.
     if (
-      !isLatestRequest ||
+      tokenAtStart !== versionRequestTokenRef.current ||
       !presentationConfigsEqual(draftRef.current, draftAtStart)
     ) {
       updateVersionSummaryInList(result.data);
@@ -584,12 +597,20 @@ export function ExperienceBuilder({
     const originStorefrontId = storefrontId;
     const tokenAtStart = versionRequestTokenRef.current;
     const draftAtStart = draft;
+    const writeRequestId = ++versionWriteRequestRef.current;
     setVersionBusy({ id: version.id, action: "duplicate" });
     const result = await createPresentationVersion(storefrontId, name, version.id);
     const sameStorefront = storefrontIdRef.current === originStorefrontId;
-    if (sameStorefront) setVersionBusy(null);
+    // هوية طلب الكتابة نفسه (`versionWriteRequestRef`)، لا تطابق المتجر وحده:
+    // `versionBusy` فتحة واحدة مشتركة بين التكرار/التسمية/الحذف، وتبديل
+    // المتجر ذهاباً وإياباً (A→B→A) يُصفِّرها (تأثير التركيب) فيسمح ببدء كتابة
+    // صفّ ثانية لنفس المتجر A بينما الأولى لا تزال معلَّقة؛ مطابقة المتجر وحدها
+    // كانت تُفرِغ الفتحة عند اكتمال تلك الأولى المتأخرة رغم أن الثانية لا تزال
+    // قيد التنفيذ فعلياً.
+    const isLatestWrite = writeRequestId === versionWriteRequestRef.current;
+    if (sameStorefront && isLatestWrite) setVersionBusy(null);
     if (!result.ok) {
-      if (sameStorefront) {
+      if (sameStorefront && isLatestWrite) {
         setNoticeKind("status");
         setNotice(t("versionDuplicateFailed"));
       }
@@ -612,13 +633,16 @@ export function ExperienceBuilder({
     const originStorefrontId = storefrontId;
     const tokenAtStart = versionRequestTokenRef.current;
     const wasOpenAtStart = selectedVersion?.id === version.id;
+    const writeRequestId = ++versionWriteRequestRef.current;
     setVersionBusy({ id: version.id, action: "rename" });
     const result = await renamePresentationVersion(storefrontId, version.id, name, version.revision);
     const current = stillCurrent(originStorefrontId, tokenAtStart);
     const sameStorefront = storefrontIdRef.current === originStorefrontId;
-    // نفس حرص إنشاء/تكرار النسخة: لا تصفّر علَم الانشغال إلا إن كان لا يزال
-    // يخصّ هذا المتجر، وإلا فقد يُسكِت بصمت علَم عملية أحدث بدأها متجر آخر.
-    if (sameStorefront) setVersionBusy(null);
+    // نفس حرص التكرار أعلاه: هوية طلب الكتابة، لا تطابق المتجر وحده — وإلا
+    // فقد يُسكِت اكتمالٌ متأخر لهذا الطلب (بعد A→B→A) علَم كتابة صفّ ثانية
+    // بدأت لاحقاً لنفس المتجر ولا تزال قيد التنفيذ.
+    const isLatestWrite = writeRequestId === versionWriteRequestRef.current;
+    if (sameStorefront && isLatestWrite) setVersionBusy(null);
     if (!result.ok) {
       if (result.reason === "conflict") {
         if (sameStorefront) {
@@ -664,11 +688,14 @@ export function ExperienceBuilder({
     const originStorefrontId = storefrontId;
     const tokenAtStart = versionRequestTokenRef.current;
     const wasOpenAtStart = selectedVersion?.id === version.id;
+    const writeRequestId = ++versionWriteRequestRef.current;
     setVersionBusy({ id: version.id, action: "delete" });
     const result = await deletePresentationVersion(storefrontId, version.id);
     const current = stillCurrent(originStorefrontId, tokenAtStart);
     const sameStorefront = storefrontIdRef.current === originStorefrontId;
-    if (sameStorefront) setVersionBusy(null);
+    // نفس حرص التكرار/التسمية أعلاه: هوية طلب الكتابة، لا تطابق المتجر وحده.
+    const isLatestWrite = writeRequestId === versionWriteRequestRef.current;
+    if (sameStorefront && isLatestWrite) setVersionBusy(null);
     if (!result.ok) {
       if (result.reason === "lifecycle_conflict") {
         if (sameStorefront) {
@@ -683,7 +710,7 @@ export function ExperienceBuilder({
         }
         return;
       }
-      if (sameStorefront) {
+      if (sameStorefront && isLatestWrite) {
         setNoticeKind("status");
         setNotice(t("versionDeleteFailed"));
       }
