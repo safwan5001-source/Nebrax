@@ -12,6 +12,7 @@ vi.mock('next-intl', () => ({
   useLocale: () => locale.current,
 }));
 
+
 vi.mock('@/modules/commerce-workspace/store-context', () => ({
   useCommerceStoreContext: () => ({
     catalog: {
@@ -67,6 +68,7 @@ describe('commerce appearance — STORE-BACKEND-1 / CUST-H1-2', () => {
     listMock.mockReset();
     showMock.mockReset();
     saveMock.mockReset();
+    window.history.replaceState({}, '', '/commerce/appearance');
   });
 
   it('replaces the destination placeholder with the Experience Builder', async () => {
@@ -77,6 +79,28 @@ describe('commerce appearance — STORE-BACKEND-1 / CUST-H1-2', () => {
     expect(screen.getByLabelText('معاينة المتجر')).toBeTruthy();
     expect(screen.queryByText('هذه الشاشة جزء من مساحة العمل وستنمو لاحقاً دون تكرار وحدات أَوْج.')).toBeNull();
     await waitFor(() => expect(listMock).toHaveBeenCalledWith('s1'));
+  });
+
+  it('opens the exact version named by the route query directly, bypassing the ambiguous-choice list logic', async () => {
+    // A store-experience-builder consumer outside this Horizon (the Theme
+    // Gallery) redirects to `?version=<id>` after creating a draft — the
+    // list here deliberately has two eligible drafts (which would normally
+    // show the "choose a version" state) to prove the explicit id wins.
+    window.history.replaceState({}, '', '/commerce/appearance?version=v1');
+    listMock.mockResolvedValue({
+      ok: true,
+      data: [versionSummary, { ...versionSummary, id: 'v2', name: 'نسخة أخرى' }],
+    });
+    showMock.mockResolvedValue({
+      ok: true,
+      data: { ...versionDetail, name: 'AWJ Modern — Theme Gallery' },
+    });
+
+    render(<CommerceAppearancePage />);
+
+    await waitFor(() => expect(showMock).toHaveBeenCalledWith('s1', 'v1'));
+    expect(screen.queryByText('اختر نسخة للتعديل')).toBeNull();
+    expect(screen.getByRole('button', { name: 'نشر' }).hasAttribute('disabled')).toBe(true);
   });
 
   it('uses the live store name as the typographic identity fallback', async () => {

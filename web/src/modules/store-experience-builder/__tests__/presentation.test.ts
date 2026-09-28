@@ -32,6 +32,20 @@ describe('web presentation contract', () => {
     expect(VERSION_HISTORY_CAPABILITY).toBe('deferred');
   });
 
+  it('accepts awj-market with its own default primary color, matching the storefront/PHP mirrors', () => {
+    expect(normalizePresentationConfig({ themePreset: 'awj-market' })).toMatchObject({
+      themePreset: 'awj-market',
+      primaryColor: '#0f766e',
+    });
+  });
+
+  it('a stale/unknown preset (including a bad awj-market variant) still fails closed to AWJ Modern', () => {
+    expect(normalizePresentationConfig({ themePreset: 'awj-market-v0' })).toMatchObject({
+      themePreset: 'awj-modern',
+      primaryColor: '#12372a',
+    });
+  });
+
   it('rejects javascript URLs and unverified badges as authority', () => {
     expect(sanitizeExternalUrl('javascript:alert(1)')).toBeNull();
     const config = normalizePresentationConfig({

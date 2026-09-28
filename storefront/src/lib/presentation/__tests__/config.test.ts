@@ -23,6 +23,30 @@ describe("normalizePresentationConfig", () => {
     });
   });
 
+  it("accepts awj-market and derives its own default primary color", () => {
+    expect(
+      normalizePresentationConfig({ themePreset: "awj-market" }),
+    ).toMatchObject({
+      themePreset: "awj-market",
+      primaryColor: "#0f766e",
+    });
+  });
+
+  it("a merchant-chosen color survives on awj-market like any other preset", () => {
+    expect(
+      normalizePresentationConfig({
+        themePreset: "awj-market",
+        primaryColor: "#123456",
+      }),
+    ).toMatchObject({ themePreset: "awj-market", primaryColor: "#123456" });
+  });
+
+  it("an unrecognized preset (including a stale awj-market variant) still fails closed to AWJ Modern", () => {
+    expect(
+      normalizePresentationConfig({ themePreset: "awj-market-v0" }),
+    ).toMatchObject({ themePreset: "awj-modern", primaryColor: "#12372a" });
+  });
+
   it("legacy key-shaped sections: drops unknown keys and migrates ids deterministically", () => {
     const normalized = normalizePresentationConfig({
       homepage: {

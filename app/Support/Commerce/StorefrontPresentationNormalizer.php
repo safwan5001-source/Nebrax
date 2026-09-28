@@ -35,6 +35,7 @@ final class StorefrontPresentationNormalizer
         'burgundy' => '#7f1d1d',
         'sand' => '#92400e',
         'slate' => '#334155',
+        'awj-market' => '#0f766e',
     ];
 
     public const FONT_PRESETS = ['cairo-geist'];

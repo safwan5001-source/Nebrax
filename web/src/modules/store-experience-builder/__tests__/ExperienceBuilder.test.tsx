@@ -73,6 +73,48 @@ describe('ExperienceBuilder persistence wiring — CUST-H1-2 version APIs', () =
     expect(screen.queryByText('Verified')).toBeNull();
   });
 
+  it('opens the exact version named by the versionId prop directly, bypassing the ambiguous-choice auto-select', async () => {
+    // A consumer outside this Horizon (the Theme Gallery) passes `versionId`
+    // after creating a draft, so it can be opened directly — even when the
+    // list has multiple eligible drafts, which would otherwise leave the
+    // choice ambiguous (§13).
+    listMock.mockResolvedValue({
+      ok: true,
+      data: [versionSummary({ id: 'version-1', name: 'Theme draft', revision: 3 }), versionSummary({ id: 'version-2', name: 'Other draft' })],
+    });
+    showMock.mockResolvedValue({
+      ok: true,
+      data: versionDetail({ id: 'version-1', name: 'Theme draft', schemaVersion: 2, revision: 3 }),
+    });
+    saveMock.mockResolvedValue({
+      ok: true,
+      data: versionDetail({ id: 'version-1', name: 'Theme draft', schemaVersion: 2, revision: 4 }),
+    });
+
+    const user = userEvent.setup();
+    render(
+      <ExperienceBuilder
+        storefrontId="store-1"
+        versionId="version-1"
+        initialLocale="en"
+      />,
+    );
+
+    await waitFor(() => expect(showMock).toHaveBeenCalledWith('store-1', 'version-1'));
+    expect(
+      document.querySelector('[data-experience-builder]')?.getAttribute('data-selected-version-id'),
+    ).toBe('version-1');
+    expect(screen.getByRole('button', { name: 'Publish' }).hasAttribute('disabled')).toBe(true);
+
+    await user.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() => expect(saveMock).toHaveBeenCalledWith(
+      'store-1',
+      'version-1',
+      expect.any(Object),
+      3,
+    ));
+  });
+
   it('follows the AWJ locale without a redundant language switcher', async () => {
     listMock.mockResolvedValue({ ok: true, data: [versionSummary()] });
     showMock.mockResolvedValue({ ok: true, data: versionDetail() });

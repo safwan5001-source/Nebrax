@@ -71,6 +71,7 @@ interface ExperienceBuilderProps {
   initialLocale?: CustomizerLocale;
   storefrontId?: string | null;
   storefrontUrl?: string | null;
+  versionId?: string | null;
 }
 
 export function ExperienceBuilder({
@@ -80,6 +81,7 @@ export function ExperienceBuilder({
   initialLocale = "ar",
   storefrontId = null,
   storefrontUrl = null,
+  versionId = null,
 }: ExperienceBuilderProps) {
   const seed = normalizePresentationConfig(
     initialConfig ?? DEFAULT_PRESENTATION_CONFIG,
@@ -359,6 +361,14 @@ export function ExperienceBuilder({
       return;
     }
     setNotice(null);
+    if (versionId) {
+      // فتحٌ مباشر لنسخة محدَّدة صراحةً (`?version=` من معرض القوالب، مثلاً) —
+      // يتجاوز منطق الاختيار التلقائي غير الغامض تماماً؛ تدفّقٌ آخر (لا
+      // التاجر بالضرورة) قرَّر فعلياً أيّ نسخة يُفتَح، فلا داعي لإعادة تخمينها
+      // من عدد المرشّحين في القائمة.
+      await applyVersionSelection({ id: versionId });
+      return;
+    }
     // اختيار تلقائي غير غامض فقط: مرشّح وحيد غير منشور، أو نسخة منشورة
     // وحيدة بلا أي مسودة (§13 — لا نتخمّن بين عدة مسودات محتملة).
     const candidates = list.filter((v) => v.state !== "published");
@@ -398,6 +408,7 @@ export function ExperienceBuilder({
 
     if (!storefrontId) {
       setBusy(null);
+      setNoticeKind("status");
       setNotice(null);
       setVersionsListState("ready");
       setDraft(clonePresentationConfig(seed));
@@ -410,9 +421,11 @@ export function ExperienceBuilder({
     setSaved(clonePresentationConfig(DEFAULT_PRESENTATION_CONFIG));
 
     void loadAndSelectInitialVersion();
-    // Intentionally reload only when the selected storefront changes.
+    // `versionId` مقصودةٌ في الاعتماديات: فتحٌ صريح لمعرّف نسخة (مثلاً
+    // `?version=` من معرض القوالب) يجب أن يُعاد تشغيل هذا التأثير عند تغيّره
+    // وحده، بمعزل عن تبديل `storefrontId`.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [storefrontId]);
+  }, [storefrontId, versionId]);
 
   function updateDraft(next: StorefrontPresentationConfig) {
     if (isPublishedReadOnly) return; // فشل آمن دفاعي — لوحة التحكم مخفية أصلاً لهذه الحالة.
@@ -870,6 +883,7 @@ export function ExperienceBuilder({
     <div
       dir={locale === "ar" ? "rtl" : "ltr"}
       data-experience-builder=""
+      data-version-id={versionId ?? ""}
       data-lifecycle={lifecycle}
       data-selected-version-id={selectedVersion?.id ?? ""}
       data-selected-version-state={selectedVersion?.state ?? ""}

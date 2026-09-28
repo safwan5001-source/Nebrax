@@ -3,6 +3,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PublishedCardStyleProvider } from "@/components/layout/PublishedCardStyle";
+import { PublishedThemeMarkerProvider } from "@/components/layout/PublishedThemeMarker";
 import { ProductCard } from "@/components/products/ProductCard";
 
 vi.mock("next-intl", () => ({
@@ -112,6 +113,20 @@ describe("ProductCard", () => {
       </PublishedCardStyleProvider>,
     );
     expect(container.querySelector("[data-card-body]")).toHaveClass("p-2.5");
+  });
+
+  it("uses a denser image tile under the AWJ Market theme marker, and the standard one otherwise", () => {
+    const { container, rerender } = render(
+      <ProductCard product={baseProduct} basePath="/us/en" />,
+    );
+    expect(container.querySelector(".group > div")).toHaveClass("h-36");
+
+    rerender(
+      <PublishedThemeMarkerProvider themePreset="awj-market">
+        <ProductCard product={baseProduct} basePath="/us/en" />
+      </PublishedThemeMarkerProvider>,
+    );
+    expect(container.querySelector(".group > div")).toHaveClass("h-28");
   });
 
   it("links to the product page", () => {

@@ -5,12 +5,14 @@ import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { memo, useState } from "react";
 import { usePublishedProductCard } from "@/components/layout/PublishedCardStyle";
+import { usePublishedThemeMarker } from "@/components/layout/PublishedThemeMarker";
 import { HiddenPricePrompt } from "@/components/products/HiddenPricePrompt";
 import { WishlistButton } from "@/components/products/WishlistButton";
 import { ProductImage } from "@/components/ui/product-image";
 import { useCart } from "@/contexts/CartContext";
 import { trackSelectItem } from "@/lib/analytics/gtm";
 import { publishedProductCardBodyClass } from "@/lib/presentation/public-rhythm";
+import { cn } from "@/lib/utils";
 
 interface ProductCardProps {
   product: Product;
@@ -36,6 +38,7 @@ export const ProductCard = memo(function ProductCard({
 }: ProductCardProps) {
   const t = useTranslations("products");
   const cardStyle = usePublishedProductCard();
+  const themePreset = usePublishedThemeMarker();
   const { addItem, surface } = useCart();
   const [adding, setAdding] = useState(false);
   const imageUrl = product.thumbnail_url || null;
@@ -86,7 +89,17 @@ export const ProductCard = memo(function ProductCard({
           into a wall of photography with the catalogue text pushed out of the
           fold. It sits flush inside the card rather than inset in a rounded
           tile of its own — one frame per product, not a frame inside a frame. */}
-      <div className="relative h-36 shrink-0 bg-store-surface-muted sm:h-44 md:h-52">
+      <div
+        className={cn(
+          "relative shrink-0 bg-store-surface-muted",
+          // AWJ Market trades image size for a denser, more scannable shelf
+          // (Master Spec §22 "compact, scan-friendly product cards") — every
+          // other preset keeps the existing proportions unchanged.
+          themePreset === "awj-market"
+            ? "h-28 sm:h-32 md:h-40"
+            : "h-36 sm:h-44 md:h-52",
+        )}
+      >
         <ProductImage
           src={imageUrl}
           alt={product.name}

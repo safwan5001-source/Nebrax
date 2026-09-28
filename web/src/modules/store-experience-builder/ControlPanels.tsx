@@ -16,6 +16,7 @@ import {
   MAX_HOME_SECTIONS,
   newHomeSectionId,
   type PresentationHomeSection,
+  presetSelectionPatch,
   PRODUCT_CARD_PRESETS,
   RADIUS_PRESETS,
   SOCIAL_NETWORKS,
@@ -306,6 +307,14 @@ function ThemePanel({
   patch: (partial: Partial<StorefrontPresentationConfig>) => void;
 }) {
   const contrast = contrastRatio(config.primaryColor, "#ffffff");
+  // Typing a hex that happens to equal a bundled preset's exact swatch (e.g.
+  // Market's #0f766e) is the same *transition* as clicking that preset's
+  // button — it must carry the same starting bundle, or the merchant ends up
+  // on "Market" with none of its compact density/card/header, and clicking
+  // the now-already-selected swatch can never repair it (presetSelectionPatch
+  // treats an active preset as a no-op re-click by design).
+  const applyColor = (hex: string) =>
+    patch(presetSelectionPatch(config, { id: matchPreset(hex, config.themePreset), primary: hex }));
   return (
     <div className="space-y-7">
       <Section title={t("preset")}>
@@ -316,12 +325,7 @@ function ThemePanel({
               <button
                 key={preset.id}
                 type="button"
-                onClick={() =>
-                  patch({
-                    themePreset: preset.id,
-                    primaryColor: preset.primary,
-                  })
-                }
+                onClick={() => patch(presetSelectionPatch(config, preset))}
                 className={`overflow-hidden border text-start ${
                   selected
                     ? "border-primary ring-1 ring-primary"
@@ -370,24 +374,14 @@ function ThemePanel({
             <input
               type="color"
               value={config.primaryColor}
-              onChange={(event) =>
-                patch({
-                  primaryColor: event.target.value,
-                  themePreset: matchPreset(event.target.value),
-                })
-              }
+              onChange={(event) => applyColor(event.target.value)}
               className="absolute inset-0 cursor-pointer opacity-0"
             />
           </label>
           <input
             className={`${inputClass} font-mono uppercase tracking-wide`}
             value={config.primaryColor}
-            onChange={(event) =>
-              patch({
-                primaryColor: event.target.value,
-                themePreset: matchPreset(event.target.value),
-              })
-            }
+            onChange={(event) => applyColor(event.target.value)}
           />
         </div>
       </Field>
@@ -443,10 +437,17 @@ function ThemePanel({
   );
 }
 
-function matchPreset(hex: string): ThemePresetId {
+/**
+ * A custom color that doesn't match any preset's swatch keeps the merchant's
+ * *current* preset rather than silently renaming it to `awj-modern` — a
+ * bundled preset (currently only AWJ Market) carries real behavior keyed off
+ * `themePreset` (see `usePublishedThemeMarker`), so resetting it on an
+ * ordinary color tweak would silently drop that styling too.
+ */
+export function matchPreset(hex: string, current: ThemePresetId): ThemePresetId {
   return (
     THEME_PRESETS.find((preset) => preset.primary === hex.toLowerCase())?.id ??
-    "awj-modern"
+    current
   );
 }
 
