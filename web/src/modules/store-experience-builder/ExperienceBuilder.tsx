@@ -861,10 +861,13 @@ export function ExperienceBuilder({
           versionName={selectedVersion.name}
           busy={versionBusy !== null}
           onCreateDraft={() => {
-            const name =
-              locale === "ar"
-                ? `مسودة من ${selectedVersion.name}`
-                : `Draft from ${selectedVersion.name}`;
+            // الخادم يرفض `name` أطول من 120 حرفاً (`CreateStorefrontPresentationVersionRequest`)
+            // — نسخة منشورة باسمٍ قريب من الحدّ تجعل الاسم المولَّد هنا (بادئة +
+            // اسمها) يتجاوزه، وهذا الزر لا يعرض حقل اسمٍ يُصحَّح منه، فكل إعادة
+            // محاولة كانت سترسل نفس القيمة غير الصالحة. نقصّ السلسلة كاملةً
+            // (بادئة + اسم) عند 120 حرفاً بدل رفض الطلب أو تعطيل الزرّ.
+            const prefix = locale === "ar" ? "مسودة من " : "Draft from ";
+            const name = `${prefix}${selectedVersion.name}`.slice(0, 120);
             void handleDuplicateVersion(toSummary(selectedVersion), name);
           }}
         />

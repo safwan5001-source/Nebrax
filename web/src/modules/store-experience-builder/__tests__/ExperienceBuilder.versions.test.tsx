@@ -175,6 +175,26 @@ describe('ExperienceBuilder — CUST-H1-2 Version Manager', () => {
     expect(screen.queryByText('هذه النسخة منشورة ومقروءة فقط')).toBeNull();
   });
 
+  it('truncates the generated draft name to the server\'s 120-character limit instead of sending an invalid request (codex round 12)', async () => {
+    const longName = 'أ'.repeat(118); // "مسودة من " (9 chars) + 118 = 127, over the limit
+    listMock.mockResolvedValue({ ok: true, data: [summary({ id: 'pub-1', name: longName, state: 'published' })] });
+    showMock.mockResolvedValue({ ok: true, data: detail({ id: 'pub-1', name: longName, state: 'published' }) });
+    createMock.mockResolvedValue({
+      ok: true,
+      data: detail({ id: 'draft-2', name: 'مسودة', state: 'draft', revision: 1 }),
+    });
+    const user = userEvent.setup();
+    render(<ExperienceBuilder storefrontId="store-1" initialLocale="ar" />);
+    await waitFor(() => expect(showMock).toHaveBeenCalled());
+
+    await user.click(screen.getByRole('button', { name: 'إنشاء مسودة من هذه النسخة' }));
+
+    await waitFor(() => expect(createMock).toHaveBeenCalled());
+    const sentName = createMock.mock.calls[0][1] as string;
+    expect(sentName.length).toBeLessThanOrEqual(120);
+    expect(sentName.startsWith('مسودة من ')).toBe(true);
+  });
+
   it('renames a version and reflects the new name immediately after authoritative success', async () => {
     listMock.mockResolvedValue({ ok: true, data: [summary()] });
     showMock.mockResolvedValue({ ok: true, data: detail() });
