@@ -906,6 +906,9 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::patch('commerce/workspace/storefronts/{id}/presentation/versions/{version}', [CommerceWorkspaceStorefrontPresentationVersionController::class, 'rename'])
             ->whereUuid('id')->whereUuid('version')
             ->middleware($perm('commerce.manage'));
+        Route::post('commerce/workspace/storefronts/{id}/presentation/versions/{version}/publish', [CommerceWorkspaceStorefrontPresentationVersionController::class, 'publish'])
+            ->whereUuid('id')->whereUuid('version')
+            ->middleware($perm('commerce.manage'));
         Route::delete('commerce/workspace/storefronts/{id}/presentation/versions/{version}', [CommerceWorkspaceStorefrontPresentationVersionController::class, 'destroy'])
             ->whereUuid('id')->whereUuid('version')
             ->middleware($perm('commerce.manage'));
