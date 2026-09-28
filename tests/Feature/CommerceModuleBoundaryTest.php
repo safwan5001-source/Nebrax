@@ -80,6 +80,9 @@ class CommerceModuleBoundaryTest extends TestCase
         'api/commerce/workspace/storefronts/{id}/domains/{domainId}/verify',
         'api/commerce/workspace/storefronts/{id}/presentation',
         'api/commerce/workspace/storefronts/{id}/presentation/publish',
+        // CUST-H1-1 — أساس نسخ مظهر المتجر (list/create/read/save/rename/delete).
+        'api/commerce/workspace/storefronts/{id}/presentation/versions',
+        'api/commerce/workspace/storefronts/{id}/presentation/versions/{version}',
         // COM-MOBILE-ADDRESSES-1 — دفتر عناوين العميل الموثَّق (X-Customer-Token).
         'commerce/v1/addresses',
         'commerce/v1/addresses/{id}',
