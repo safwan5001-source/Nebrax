@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Requests\CreateStorefrontPresentationVersionRequest;
+use App\Http\Requests\PublishStorefrontPresentationVersionRequest;
 use App\Http\Requests\RenameStorefrontPresentationVersionRequest;
 use App\Http\Requests\SaveStorefrontPresentationVersionRequest;
 use App\Services\Commerce\ActiveVersionImmutableException;
@@ -18,8 +19,8 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 
 /**
- * CUST-H1-1 — أساس النسخ (list/create/read/save/rename/delete) داخل
- * مساحة عمل التجارة. لا نشر ولا جدولة هنا. `{id}`/`{version}` محدِّدا صفّ
+ * CUST-H1 — أساس النسخ داخل مساحة عمل التجارة. CUST-H1-1 يوفّر CRUD،
+ * وCUST-H1-3 يضيف النشر الفوري. لا جدولة هنا. `{id}`/`{version}` محدِّدا صفّ
  * فقط. الملكية من `TenantContext`. أجنبي/مفقود → 404 لا 403.
  */
 class CommerceWorkspaceStorefrontPresentationVersionController extends ApiController
@@ -105,6 +106,35 @@ class CommerceWorkspaceStorefrontPresentationVersionController extends ApiContro
                 (int) $request->validated('revision'),
             );
         } catch (StaleVersionRevisionException|ActiveVersionImmutableException|ForwardSchemaVersionException $e) {
+            abort(409, $e->getMessage());
+        } catch (PresentationDocumentTooLargeException $e) {
+            abort(422, $e->getMessage());
+        }
+
+        if ($payload === null) {
+            abort(404, 'النسخة غير موجودة.');
+        }
+
+        return response()->json(['data' => $payload]);
+    }
+
+    public function publish(
+        PublishStorefrontPresentationVersionRequest $request,
+        StorefrontPresentationVersionService $versions,
+        string $id,
+        string $version,
+    ): JsonResponse {
+        $this->denySelfService($request);
+
+        try {
+            $payload = $versions->publishForCurrentTenant(
+                $id,
+                $version,
+                (int) $request->validated('revision'),
+                $request->validated('expected_published_revision'),
+                $request->validated('expected_active_version_id'),
+            );
+        } catch (StaleVersionRevisionException|VersionLifecycleConflictException|ForwardSchemaVersionException $e) {
             abort(409, $e->getMessage());
         } catch (PresentationDocumentTooLargeException $e) {
             abort(422, $e->getMessage());
