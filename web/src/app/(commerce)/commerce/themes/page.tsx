@@ -7,6 +7,8 @@ import { useRouter } from 'next/navigation';
 import { Check, ExternalLink, Palette } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { PageHeader } from '@/components/nebrax';
+import { currentUser } from '@/lib/auth';
+import { hasPermission } from '@/lib/permissions';
 import { commerceWorkspaceMessage, type CommerceWorkspaceMessageKey } from '@/modules/commerce-workspace/messages';
 import { useCommerceStoreContext } from '@/modules/commerce-workspace/store-context';
 import { THEME_REGISTRY, isRuntimeBackedTheme, type ThemeRegistryEntry } from '@/modules/commerce-workspace/theme-registry';
@@ -22,11 +24,13 @@ export default function CommerceThemesPage() {
   const router = useRouter();
   const t = (key: CommerceWorkspaceMessageKey) => commerceWorkspaceMessage(locale, key);
   const { selectedStoreId, viewStoreUrl } = useCommerceStoreContext();
+  const viewer = currentUser();
+  const canManage = hasPermission(viewer?.permissions, viewer?.role, 'commerce.manage');
   const [applyingThemeId, setApplyingThemeId] = useState<string | null>(null);
   const [applyError, setApplyError] = useState<string | null>(null);
 
   async function handleUseTheme(theme: ThemeRegistryEntry) {
-    if (!selectedStoreId || !isRuntimeBackedTheme(theme) || applyingThemeId) {
+    if (!selectedStoreId || !canManage || !isRuntimeBackedTheme(theme) || applyingThemeId) {
       if (!selectedStoreId) setApplyError(t('themeGalleryNoStore'));
       return;
     }
@@ -85,6 +89,7 @@ export default function CommerceThemesPage() {
             theme={theme}
             viewStoreUrl={viewStoreUrl}
             selectedStoreId={selectedStoreId}
+            canManage={canManage}
             applying={applyingThemeId === theme.id}
             onUseTheme={handleUseTheme}
             t={t}
@@ -99,6 +104,7 @@ function ThemeCard({
   theme,
   viewStoreUrl,
   selectedStoreId,
+  canManage,
   applying,
   onUseTheme,
   t,
@@ -106,6 +112,7 @@ function ThemeCard({
   theme: ThemeRegistryEntry;
   viewStoreUrl: string | null;
   selectedStoreId: string | null;
+  canManage: boolean;
   applying: boolean;
   onUseTheme: (theme: ThemeRegistryEntry) => void;
   t: (key: CommerceWorkspaceMessageKey) => string;
@@ -144,7 +151,7 @@ function ThemeCard({
               <button
                 type="button"
                 onClick={() => void onUseTheme(theme)}
-                disabled={applying || !selectedStoreId}
+                disabled={applying || !selectedStoreId || !canManage}
                 className="inline-flex min-h-11 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {applying ? t('themeGalleryApplying') : t('themeGalleryUse')}
