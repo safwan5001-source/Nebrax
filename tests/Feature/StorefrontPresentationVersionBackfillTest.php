@@ -350,4 +350,47 @@ class StorefrontPresentationVersionBackfillTest extends TestCase
         $this->assertSame(2, (int) $reconciled->schema_version, 'الوسم المضمَّن (v2) يجب أن يُستعمل عند التصالح، لا عمود draft_schema_version المتخلّف.');
         $this->assertSame('burgundy', $reconciled->config['themePreset']);
     }
+
+    /**
+     * Round-10 review: هجرة الحالتين B/C كانت تستعمل عمود `schema_version`
+     * المشترك حرفياً لكلا النسختين المُنشأتين (المنشورة والمسودة معاً).
+     * كاتبٌ قديم يحفظ مسودة v2 أثناء نافذة نشر متدرّج قصيرة بين هجرتَي
+     * إضافة الأعمدة وهذه الهجرة يُقدّم العمود المشترك وحده إلى 2، بينما
+     * `published_schema_version` المستقلّ يبقى 1 (يعكس منشوراً v1 لم
+     * يتغيّر فعلياً) — فكانت النسخة المنشورة المُهاجَرة تُوسَم خطأً v2.
+     */
+    /** @test */
+    public function case_c_backfill_tags_the_published_version_from_its_own_column_not_the_drifted_shared_one(): void
+    {
+        $auth = $this->registerTenant('backfill-independent-tags', 'owner@backfill-independent-tags.test');
+        $storefront = $this->seedWebStorefront($auth['tenant_id']);
+
+        // منشور v1 ناقص الأقسام الافتراضية عمداً (قسم "hero" فقط) — لإثبات
+        // أن النسخة المُهاجَرة تُقرأ لاحقاً بدلالة v1 الصحيحة (استعادة
+        // الأقسام الناقصة) لا v2 (الغياب حذفٌ حقيقي).
+        $v1Published = ['homepage' => ['sections' => [['id' => 'hero', 'type' => 'hero', 'visible' => true]]]];
+
+        $rowId = $this->insertLegacyRow($storefront, [
+            // العمود المشترك "منجرف": كاتبٌ قديم حفظ مسودة v2 فرفعه إلى 2،
+            // بينما published_schema_version المستقلّ ما يزال يعكس الحقيقة (1).
+            'schema_version' => 2,
+            'draft_config' => json_encode(['version' => 2, 'themePreset' => 'burgundy']),
+            'draft_revision' => 2,
+            'draft_schema_version' => 2,
+            'published_config' => json_encode($v1Published),
+            'published_revision' => 1,
+            'published_at' => now(),
+            'published_schema_version' => 1,
+        ]);
+
+        $created = $this->backfill()->backfillAll();
+        $this->assertSame(1, $created);
+
+        $head = StorefrontPresentation::withoutGlobalScopes()->find($rowId);
+        $published = StorefrontPresentationVersion::withoutGlobalScopes()->find($head->active_version_id);
+        $draft = StorefrontPresentationVersion::withoutGlobalScopes()->find($head->compatibility_working_version_id);
+
+        $this->assertSame(1, (int) $published->schema_version, 'النسخة المنشورة يجب أن تُوسَم من عمودها المستقلّ (1)، لا العمود المشترك المنجرف (2).');
+        $this->assertSame(2, (int) $draft->schema_version, 'النسخة المسودة يجب أن تُوسَم v2 كما تُقرّ وثيقتها ووسمها المستقلّ.');
+    }
 }

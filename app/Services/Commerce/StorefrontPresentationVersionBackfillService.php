@@ -102,17 +102,27 @@ final class StorefrontPresentationVersionBackfillService
 
         $tenantId = $locked->tenant_id;
         $storefrontId = $locked->storefront_id;
-        $schemaVersion = (int) $locked->schema_version;
+        $draftConfig = $locked->draft_config ?? [];
         $draftRevision = max(1, (int) $locked->draft_revision);
         $hasPublished = is_array($locked->published_config);
+
+        // وسم كلّ جانبٍ من وثيقته هو، لا العمود المشترك `schema_version`
+        // — كاتبٌ قديم يحفظ مسودة أثناء نافذة نشر متدرّج قصيرة بين هجرتَي
+        // إضافة الأعمدة وهذه الهجرة يُقدّم العمود المشترك بمفرده (مسودته
+        // v2 لكن منشوره غير المُعدَّل بقي v1)؛ استعمال القيمة المُقدَّمة
+        // لكلا الجانبين كان يُوسم النسخة المنشورة المُهاجَرة خطأً v2.
+        $effectiveDraftSchemaVersion = StorefrontPresentationNormalizer::effectiveSchemaTag(
+            $draftConfig,
+            (int) $locked->draft_schema_version,
+        );
 
         if (! $hasPublished) {
             $draftVersion = $this->createVersion(
                 $tenantId,
                 $storefrontId,
                 self::DEFAULT_MIGRATION_NAME,
-                $schemaVersion,
-                $locked->draft_config ?? [],
+                $effectiveDraftSchemaVersion,
+                $draftConfig,
                 $draftRevision,
                 null,
             );
@@ -122,12 +132,17 @@ final class StorefrontPresentationVersionBackfillService
             return true;
         }
 
-        if ($this->sameDocument($locked->draft_config, $locked->published_config)) {
+        $effectivePublishedSchemaVersion = StorefrontPresentationNormalizer::effectiveSchemaTag(
+            $locked->published_config,
+            $locked->published_schema_version !== null ? (int) $locked->published_schema_version : null,
+        );
+
+        if ($this->sameDocument($draftConfig, $locked->published_config)) {
             $version = $this->createVersion(
                 $tenantId,
                 $storefrontId,
                 self::DEFAULT_MIGRATION_NAME,
-                $schemaVersion,
+                $effectivePublishedSchemaVersion,
                 $locked->published_config,
                 $draftRevision,
                 $locked->published_at,
@@ -145,7 +160,7 @@ final class StorefrontPresentationVersionBackfillService
             $tenantId,
             $storefrontId,
             self::DEFAULT_MIGRATION_NAME,
-            $schemaVersion,
+            $effectivePublishedSchemaVersion,
             $locked->published_config,
             1,
             $locked->published_at,
@@ -155,8 +170,8 @@ final class StorefrontPresentationVersionBackfillService
             $tenantId,
             $storefrontId,
             self::DEFAULT_MIGRATION_DRAFT_NAME,
-            $schemaVersion,
-            $locked->draft_config ?? [],
+            $effectiveDraftSchemaVersion,
+            $draftConfig,
             $draftRevision,
             null,
         );
