@@ -39,6 +39,36 @@ tenant/{tenant_id}/{domain}/{resource_id}/{filename}
 
 `R2StorageService` reads `{tenant_id}` only from the scoped `TenantContext`; callers cannot provide a tenant prefix or arbitrary object key. Every segment is restricted to safe single-segment characters, so traversal such as `../` and embedded separators is rejected. No controller receives bucket-listing capability. This slice does not migrate data or switch Product Media, documents, invoices, attachments, or storefront assets to R2.
 
-### Manual smoke test status
+### Manual smoke test command
 
-No production smoke test was run. A real R2 smoke command is intentionally not included in this slice; the service is manually invocable by a future, separately reviewed diagnostic surface only. The automated tests use a mocked AWS client and prove that write/read/existence/delete send only `PutObject`, `GetObject`, `HeadObject`, and `DeleteObject` parameters without ACL fields. CI never requires real Cloudflare credentials.
+`php artisan awj:r2-smoke-test` is a **manual-only operator diagnostic**. It is not
+called by application boot, migrations, CI, deployment/Railway startup, scheduled
+jobs, HTTP routes, or queue workers.
+
+The command creates one internally generated temporary object with this exact
+contract:
+
+```text
+system/r2-smoke-test/{uuid}.txt
+```
+
+The UUID, complete key, and tiny non-sensitive payload are generated internally;
+there is no key, prefix, tenant identifier, or customer data input. The command
+uses only the ACL-free AWS operations `PutObject`, `HeadObject`, `GetObject`, and
+`DeleteObject`, in the order write → confirm exists → read/compare → delete →
+confirm missing. It never lists objects/buckets, generates URLs, calls visibility
+or ACL APIs, sends an ACL field/header, or touches `tenant/*` data.
+
+Cleanup is mandatory. After a successful write, any later failure triggers a
+delete of the exact generated key and a missing-object confirmation. A cleanup
+failure returns a non-zero exit code and reports only the safe temporary key,
+stating that the object may remain; credentials, request structures, and raw
+exceptions are never printed. Missing configuration also fails before a network
+operation.
+
+The focused automated tests use a mocked AWS client and require no real R2
+credentials or network calls. **No real Production smoke test has occurred.**
+Production execution requires explicit owner approval after the R2 environment
+variables (`R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`, `R2_ENDPOINT`,
+`R2_REGION`, and `R2_USE_PATH_STYLE_ENDPOINT`) are added directly to the approved
+runtime environment.
