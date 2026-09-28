@@ -1565,4 +1565,65 @@ describe('ExperienceBuilder — CUST-H1-2 Version Manager', () => {
       (screen.getByRole('button', { name: 'تكرار النسخة' }) as HTMLButtonElement).disabled,
     ).toBe(true);
   });
+
+  it("a rename started while switching to another version cannot re-select the old version once its own PATCH resolves (codex round 13)", async () => {
+    listMock.mockResolvedValue({
+      ok: true,
+      data: [summary({ id: 'a', name: 'نسخة أ', revision: 0 }), summary({ id: 'b', name: 'نسخة ب', revision: 0 })],
+    });
+    let resolveShowB: (value: unknown) => void = () => {};
+    showMock.mockImplementation((_storefrontId: string, versionId: string) => {
+      if (versionId === 'a') return Promise.resolve({ ok: true, data: detail({ id: 'a', name: 'نسخة أ', revision: 0 }) });
+      return new Promise((resolve) => { resolveShowB = resolve; });
+    });
+    let resolveRename: (value: unknown) => void = () => {};
+    renameMock.mockReturnValue(new Promise((resolve) => { resolveRename = resolve; }));
+    const user = userEvent.setup();
+    render(<ExperienceBuilder storefrontId="store-1" initialLocale="ar" />);
+    // Two eligible drafts is ambiguous — open A explicitly.
+    await screen.findByText('اختر نسخة للتعديل');
+    await openVersionManager(user);
+    let manager = screen.getByRole('menu', { name: 'إدارة نسخ التصميم' });
+    let rowA = within(manager).getByText('نسخة أ').closest('li') as HTMLElement;
+    await user.click(within(rowA).getByRole('button', { name: 'فتح للتعديل' }));
+    await waitFor(() =>
+      expect(screen.getByLabelText('نسخة التصميم قيد التعديل').textContent).toContain('نسخة أ'),
+    );
+
+    // Start switching to B — its GET never resolves during this part of the
+    // test, so A remains the displayed/selected version while the switch is
+    // in flight (only B's row is marked "switching").
+    await openVersionManager(user);
+    manager = screen.getByRole('menu', { name: 'إدارة نسخ التصميم' });
+    const rowB = within(manager).getByText('نسخة ب').closest('li') as HTMLElement;
+    await user.click(within(rowB).getByRole('button', { name: 'فتح للتعديل' }));
+
+    // A's own row is not switching, so its rename trigger is still enabled —
+    // start (and leave pending) a rename on A while B's switch is unresolved.
+    await openVersionManager(user);
+    manager = screen.getByRole('menu', { name: 'إدارة نسخ التصميم' });
+    rowA = within(manager).getByText('نسخة أ').closest('li') as HTMLElement;
+    await user.click(within(rowA).getByRole('button', { name: 'إعادة تسمية' }));
+    await user.clear(screen.getByLabelText('اسم النسخة'));
+    await user.type(screen.getByLabelText('اسم النسخة'), 'اسم جديد');
+    await user.click(screen.getByRole('button', { name: 'حفظ الاسم' }));
+    await waitFor(() => expect(renameMock).toHaveBeenCalledTimes(1));
+
+    // B's switch now resolves — the editor correctly moves to B.
+    resolveShowB({ ok: true, data: detail({ id: 'b', name: 'نسخة ب', revision: 0 }) });
+    await waitFor(() =>
+      expect(screen.getByLabelText('نسخة التصميم قيد التعديل').textContent).toContain('نسخة ب'),
+    );
+
+    // A's rename now resolves successfully too. Its own request token never
+    // changed *during its own lifetime* (B's switch had already bumped it
+    // *before* the rename started), so a token-only check would wrongly see
+    // this as "nothing changed" and restore A as selectedVersion while
+    // draft/saved still hold B's content.
+    resolveRename({ ok: true, data: detail({ id: 'a', name: 'اسم جديد', revision: 1 }) });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(screen.getByLabelText('نسخة التصميم قيد التعديل').textContent).toContain('نسخة ب');
+    expect(document.querySelector('[data-experience-builder]')?.getAttribute('data-selected-version-id')).toBe('b');
+  });
 });

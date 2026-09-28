@@ -147,6 +147,16 @@ export function ExperienceBuilder({
   // الأحدث بلقطة الخادم القديمة (راجع `handleSave`).
   const draftRef = useRef(draft);
   draftRef.current = draft;
+  // مرجع متزامن مماثل لهوية `selectedVersion` — يتيح لمعالج نجاح التسمية
+  // (وأي معالج مشابه لاحقاً) معرفة هل ما زالت النسخة التي بدأ يُعيد تسميتها
+  // هي المفتوحة فعلياً الآن، لا مجرَّد أن الرمز العام لم يتغيَّر أثناء *مدة
+  // طلبه هو*. تبديلٌ إلى نسخة أخرى قد يبدأ *قبل* هذا الطلب (فيزيد الرمز
+  // مبكراً) ويكتمل أثناء انتظاره — عندها `stillCurrent` وحدها لا تكتشف شيئاً
+  // (رمز الطلب لم يتغيَّر منذ بدء *هذا* الطلب تحديداً)، فيُخاطر بتبنّي نتيجة
+  // التسمية على `selectedVersion` رغم أن `draft`/`saved` أصبحا يخصّان نسخة
+  // أخرى تماماً.
+  const selectedVersionIdRef = useRef<string | null>(selectedVersion?.id ?? null);
+  selectedVersionIdRef.current = selectedVersion?.id ?? null;
 
   function stillCurrent(originStorefrontId: string | null, tokenAtStart: number): boolean {
     return storefrontIdRef.current === originStorefrontId && tokenAtStart === versionRequestTokenRef.current;
@@ -677,8 +687,12 @@ export function ExperienceBuilder({
     // صفّ القائمة يبقى صالحاً للتحديث طالما المتجر نفسه؛ `selectedVersion` ملك
     // النسخة التي كانت مفتوحة عند البدء ولا تزال (`current && wasOpenAtStart`) —
     // إغلاق هذا الاستدعاء قد يرى `selectedVersion` نسخة أخرى فُتحت أثناء الانتظار.
+    // `current` وحدها لا تكفي: تبديلٌ إلى نسخة أخرى قد يبدأ *قبل* هذا الطلب
+    // (فيزيد الرمز العام مبكراً) ويكتمل أثناء انتظاره — عندها `tokenAtStart`
+    // المُلتقَط هنا يطابق الرمز الحالي رغم أن نسخة مختلفة تماماً أصبحت مفتوحة
+    // فعلياً؛ الفحص الحيّ على `selectedVersionIdRef` يكشف هذه الحالة تحديداً.
     if (sameStorefront) updateVersionSummaryInList(result.data);
-    if (current && wasOpenAtStart) {
+    if (current && wasOpenAtStart && selectedVersionIdRef.current === version.id) {
       setSelectedVersion(result.data);
     }
   }
