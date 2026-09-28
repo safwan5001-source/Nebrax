@@ -7,7 +7,7 @@
 ## Repository state
 
 - **Base SHA:** `071dfa3061fbb0c9393e02bdcba0ee9d150b17cd` (`origin/main`, tip at task start — note: the baseline SHA given in the task brief, `d952542051956c324d846c8ac462c2f912ccd1f9`, was not the actual current `origin/main` tip; per instructions the fetched tip was used instead.)
-- **Head SHA:** `532905c` (fixes 21 review findings across 9 rounds on top of the initial `63a799e` — see Review findings)
+- **Head SHA:** `d65e564` (fixes 22 review findings across 10 rounds on top of the initial `63a799e` — see Review findings)
 - **Branch:** `claude/cust-h1-1-version-persistence-1p9jc9`
 - **PR:** [#1082](https://github.com/safwan5001-source/Nebrax/pull/1082)
 
@@ -82,17 +82,17 @@ php artisan test --filter=CommerceModuleBoundaryTest
 php artisan test   # full suite, both DB_CONNECTION=sqlite and DB_CONNECTION=pgsql
 ```
 
-**New test files** (59 new test methods, including all review-fix regression tests):
-- `tests/Feature/StorefrontPresentationVersionBackfillTest.php` — 9 tests (migration Cases A–D, idempotency, public-snapshot-unchanged, multi-storefront, soft-deleted-storefront skip, reconciliation embedded-tag correctness).
+**New test files** (60 new test methods, including all review-fix regression tests):
+- `tests/Feature/StorefrontPresentationVersionBackfillTest.php` — 10 tests (migration Cases A–D, idempotency, public-snapshot-unchanged, multi-storefront, soft-deleted-storefront skip, reconciliation embedded-tag correctness, independent per-side backfill schema tagging).
 - `tests/Feature/StorefrontPresentationVersionApiTest.php` — 27 tests (list, create/duplicate incl. from an active source, embedded-tag-derived default on create-without-source, tenant isolation incl. cross-storefront-same-tenant and cross-tenant `source_version_id`, read, save + stale-revision 409 + independent-version isolation, active-version-immutable-on-save 409, forward-schema fail-closed on read/save/duplicate/rename, rename + stale 409, delete + active/scheduled/compatibility-working 409 + foreign 404, guest/self_service guards).
 - `tests/Feature/StorefrontPresentationLegacyCompatibilityForkTest.php` — 23 tests (lazy compat-version creation on GET, atomic Draft/compat sync on PUT, active→Draft fork with revision continuity, forward-schema fail-closed on legacy PUT/GET/publish for both stored and incoming schema tags — draft **and** published sides, including a supported-draft/forward-published mixed case on legacy PUT — legacy publish promoting the forked compatibility Version to active, first-ever legacy save materializing a compatibility Version, bidirectional sync between the new Version API and legacy fields on save and on rename, published-snapshot schema-tag independence, cutover self-healing of a bypassing legacy writer, embedded-schema-tag correctness for an old-code publish (draft and published), publish-pointer promotion on an apparent no-op and on a head with no version pointers at all, fork-not-overwrite of a drifted active version, and fail-closed-before-reconciling a forward-tagged mapped Version — see Review findings below for the details).
 
-**Results (final, head `532905c`):**
+**Results (final, head `d65e564`):**
 
 | DB | Command | Result |
 |---|---|---|
-| SQLite | `php artisan test` (full suite) | 27 failed, 49 skipped, 4775 passed (29990 assertions) |
-| PostgreSQL 16 | `php artisan test` (full suite) | 27 failed, 4824 passed (30259 assertions) — the SQLite-skipped `StorefrontPresentationPostgresConcurrencyTest` ran and passed here; `php artisan test --filter=StorefrontPresentation` alone: 106 passed (682 assertions). |
+| SQLite | `php artisan test` (full suite) | 27 failed, 49 skipped, 4776 passed (29994 assertions) |
+| PostgreSQL 16 | `php artisan test` (full suite) | 27 failed, 4825 passed (30264 assertions) — the SQLite-skipped `StorefrontPresentationPostgresConcurrencyTest` ran and passed here; `php artisan test --filter=StorefrontPresentation` alone: 107 passed (687 assertions). |
 
 **Failures (27, identical set on both engines) — pre-existing, unrelated to this PR:** all in `FuelAviRfidServiceTest`, `FuelReconciliationTest`, `FuelSaleApiTest`, `FuelSaleServiceTest`, `FuelSupplyReceivingApiTest`, `FuelSupplyReceivingTest` — every one fails with `Call to undefined function App\Services\bcmul()`. The local dev container this session ran in does not have the `bcmath` PHP extension installed; `.github/workflows/ci.yml` explicitly installs `bcmath` for CI (`extensions: … bcmath …`), so these are a local-environment gap, not a code defect, and none of the failing files touch Storefront/Presentation/Commerce-workspace code. Verified no other failures exist on either engine.
 
@@ -106,7 +106,7 @@ All CUST-H1-1 tests plus every pre-existing `StorefrontPresentation*`/`Storefron
 
 ## Review findings
 
-Twenty-one findings (18 P1, 3 P2) from the repo's automated bot reviewer (`chatgpt-codex-connector[bot]`) across nine review rounds, all valid and fixed. Every finding pointed at a real bidirectional-sync or fail-closed gap between the new Version model and the legacy compatibility surface; two (round 6) were regressions in earlier rollout-guard fixes, and rounds 7–9's findings were the same embedded-schema-tag/materialize-before-use/fail-closed-before-write patterns as prior rounds but progressively generalized to code paths (the draft side, the publish-path pointer, reconcile-before-validate ordering, the reconciliation write path, the create-without-source copy path, the soft-delete/cascade mismatch in the bulk migration, and the two remaining mutation paths — legacy save and exact-Version rename — that had never gained the head/Version-level `assertSupportedLegacySchema()`/`assertSupportedSchema()` check every other mutation path already had) the earlier rounds' fixes hadn't yet covered — all caught by continued review of each new push. None required widening the PR's scope or touching scheduling/publish-UI code.
+Twenty-two findings (19 P1, 3 P2) from the repo's automated bot reviewer (`chatgpt-codex-connector[bot]`) across ten review rounds, all valid and fixed. Every finding pointed at a real bidirectional-sync or fail-closed gap between the new Version model and the legacy compatibility surface; two (round 6) were regressions in earlier rollout-guard fixes, and rounds 7–10's findings were the same embedded-schema-tag/materialize-before-use/fail-closed-before-write patterns as prior rounds but progressively generalized to code paths (the draft side, the publish-path pointer, reconcile-before-validate ordering, the reconciliation write path, the create-without-source copy path, the soft-delete/cascade mismatch in the bulk migration, the two remaining mutation paths — legacy save and exact-Version rename — that had never gained the head/Version-level `assertSupportedLegacySchema()`/`assertSupportedSchema()` check every other mutation path already had, and finally the one-shot bulk migration's own Version-creation call sites tagging both sides from the shared column instead of each side's own) the earlier rounds' fixes hadn't yet covered — all caught by continued review of each new push. None required widening the PR's scope or touching scheduling/publish-UI code.
 
 **Round 1** (reviewed `476fb03`, fixed in `9a6470e`):
 
@@ -174,7 +174,13 @@ Twenty-one findings (18 P1, 3 P2) from the repo's automated bot reviewer (`chatg
 | P2 — `applyDraftSave()`'s row-exists branch (legacy PUT) checked only the compatibility Version's own schema tag, never `assertSupportedLegacySchema()` on the head as GET and publish already do. A head whose draft/compatibility Version is supported but whose `published_config` carries a forward schema (rollback-after-upgrade scenario) would pass this partial check, persist the draft, and let `present()` silently normalize the forward published snapshot to AWJ-Modern defaults in the save response instead of returning 409. | Added `assertSupportedLegacySchema($row)` at the top of the row-exists branch, before any lock/read of the compatibility Version. | `legacy_put_fails_closed_when_the_published_snapshot_carries_a_forward_schema_even_with_a_supported_draft` |
 | P2 — `renameForCurrentTenant()` was the one exact-Version mutation path with no `assertSupportedSchema()` call at all (save/duplicate/read all have one) — renaming a forward-schema Version committed silently, then `detail()` normalized its config to defaults in the response. The rename controller action was also missing the `ForwardSchemaVersionException` → 409 catch every other action already had. | Added the same `assertSupportedSchema()` call used elsewhere, right after the stale-revision check and before any write; added the missing catch clause to the controller. | `renaming_a_forward_schema_version_fails_closed_without_mutating_it` |
 
-Every round's fixes were verified against the full `StorefrontPresentation*` suite and the full test suite on both SQLite and PostgreSQL before pushing (see Tests section for final counts). All 21 review comments across 9 rounds are addressed and their threads resolved.
+**Round 10** (reviewed `ce7b535`, fixed in `d65e564`) — the one-shot bulk migration's own Version-creation call sites (Cases B/C), the last untouched place still tagging from the shared column:
+
+| Finding | Fix | Regression test |
+|---|---|---|
+| P1 — `applyMigrationCasesWithinTransaction()` tagged both the migrated published Version and draft Version with the single shared `schema_version` column. During a rolling deployment, an old instance can save a v2 draft after the split-column migration runs but before this backfill migration runs, advancing the shared column to 2 while the unchanged `published_config` stays v1 (`published_schema_version` correctly still 1). The bulk backfill then tagged the migrated published Version as v2, so a later exact-Version read/duplicate of it applied v2 absence semantics and omitted sections the live v1 snapshot still restores. | Both created versions (Cases B and C) now derive their tag via the same `effectiveSchemaTag()` helper from their own document/column — `published_config`+`published_schema_version` for the published side, `draft_config`+`draft_schema_version` for the draft side — never the shared `schema_version` column. | `case_c_backfill_tags_the_published_version_from_its_own_column_not_the_drifted_shared_one` |
+
+Every round's fixes were verified against the full `StorefrontPresentation*` suite and the full test suite on both SQLite and PostgreSQL before pushing (see Tests section for final counts). All 22 review comments across 10 rounds are addressed and their threads resolved.
 
 ## Backward compatibility
 
