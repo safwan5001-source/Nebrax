@@ -9,7 +9,7 @@
 - **Base SHA:** `2e9cdd058a50a2014dc0b4a3c5c0c3302c353616` (`origin/main` at task start — matched the SHA given in the task brief; verified with a fresh `git fetch origin main` before starting).
 - **Head SHA:** `3077ecf88c70884c31affb623b445fd3e955f979`
 - **Branch:** `claude/cust-h1-2-customizer-ux-23vvun`
-- **PR:** to be opened against `main` from this branch (see final message for the URL).
+- **PR:** [#1085](https://github.com/safwan5001-source/Nebrax/pull/1085)
 
 This Horizon touches `web/` only. No backend/API/migration change — CUST-H1-1's persistence and endpoints (already on `main`) are consumed as-is.
 
