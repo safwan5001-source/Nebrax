@@ -51,8 +51,9 @@ own scope discipline):
 ## 3. Branch / PR / Head SHA
 
 - **Branch:** `claude/awj-market-horizon-6qxr5v`
-- **PR:** _(filled in after push — see §22)_
-- **Head SHA:** _(filled in after commit — see §22)_
+- **PR:** https://github.com/safwan5001-source/Nebrax/pull/1084
+- **Head SHA:** `d2e88cab` (fixed a Biome formatting nit in the new dev fixture found
+  by CI after the initial push at `0793217b50ae6b282bfb46def0aaabd24ebc3f91`)
 
 ## 4. Implementation summary by surface
 
