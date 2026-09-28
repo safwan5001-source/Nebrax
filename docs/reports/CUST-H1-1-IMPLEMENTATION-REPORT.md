@@ -7,7 +7,7 @@
 ## Repository state
 
 - **Base SHA:** `071dfa3061fbb0c9393e02bdcba0ee9d150b17cd` (`origin/main`, tip at task start — note: the baseline SHA given in the task brief, `d952542051956c324d846c8ac462c2f912ccd1f9`, was not the actual current `origin/main` tip; per instructions the fetched tip was used instead.)
-- **Head SHA:** `16c5d3c` (fixes 11 review findings across 5 rounds on top of the initial `63a799e` — see Review findings)
+- **Head SHA:** `f9b8875` (fixes 13 review findings across 6 rounds on top of the initial `63a799e` — see Review findings)
 - **Branch:** `claude/cust-h1-1-version-persistence-1p9jc9`
 - **PR:** [#1082](https://github.com/safwan5001-source/Nebrax/pull/1082)
 
@@ -82,17 +82,17 @@ php artisan test --filter=CommerceModuleBoundaryTest
 php artisan test   # full suite, both DB_CONNECTION=sqlite and DB_CONNECTION=pgsql
 ```
 
-**New test files** (48 new test methods, including all review-fix regression tests):
+**New test files** (50 new test methods, including all review-fix regression tests):
 - `tests/Feature/StorefrontPresentationVersionBackfillTest.php` — 7 tests (migration Cases A–D, idempotency, public-snapshot-unchanged, multi-storefront).
 - `tests/Feature/StorefrontPresentationVersionApiTest.php` — 25 tests (list, create/duplicate incl. from an active source, tenant isolation incl. cross-storefront-same-tenant and cross-tenant `source_version_id`, read, save + stale-revision 409 + independent-version isolation, active-version-immutable-on-save 409, forward-schema fail-closed on read/save/duplicate, rename + stale 409, delete + active/scheduled/compatibility-working 409 + foreign 404, guest/self_service guards).
-- `tests/Feature/StorefrontPresentationLegacyCompatibilityForkTest.php` — 16 tests (lazy compat-version creation on GET, atomic Draft/compat sync on PUT, active→Draft fork with revision continuity, forward-schema fail-closed on legacy PUT/GET/publish for both stored and incoming schema tags, legacy publish promoting the forked compatibility Version to active, first-ever legacy save materializing a compatibility Version, bidirectional sync between the new Version API and legacy fields on save and on rename, published-snapshot schema-tag independence, cutover self-healing of a bypassing legacy writer, and embedded-schema-tag correctness for an old-code publish — see Review findings below for the last 8).
+- `tests/Feature/StorefrontPresentationLegacyCompatibilityForkTest.php` — 18 tests (lazy compat-version creation on GET, atomic Draft/compat sync on PUT, active→Draft fork with revision continuity, forward-schema fail-closed on legacy PUT/GET/publish for both stored and incoming schema tags, legacy publish promoting the forked compatibility Version to active, first-ever legacy save materializing a compatibility Version, bidirectional sync between the new Version API and legacy fields on save and on rename, published-snapshot schema-tag independence, cutover self-healing of a bypassing legacy writer, embedded-schema-tag correctness for an old-code publish, publish-pointer promotion on an apparent no-op, and fork-not-overwrite of a drifted active version — see Review findings below for the last 10).
 
-**Results (final, head `16c5d3c`):**
+**Results (final, head `f9b8875`):**
 
 | DB | Command | Result |
 |---|---|---|
-| SQLite | `php artisan test` (full suite) | 27 failed, 49 skipped, 4764 passed (29929 assertions) |
-| PostgreSQL 16 | `php artisan test --filter=StorefrontPresentation` (all 6 presentation files) | 96 passed (624 assertions) — the SQLite-skipped `StorefrontPresentationPostgresConcurrencyTest` ran and passed here. |
+| SQLite | `php artisan test` (full suite) | 27 failed, 49 skipped, 4766 passed (29946 assertions) |
+| PostgreSQL 16 | `php artisan test --filter=StorefrontPresentation` (all 6 presentation files) | 98 passed (641 assertions) — the SQLite-skipped `StorefrontPresentationPostgresConcurrencyTest` ran and passed here. |
 
 **Failures (27, identical set on both engines) — pre-existing, unrelated to this PR:** all in `FuelAviRfidServiceTest`, `FuelReconciliationTest`, `FuelSaleApiTest`, `FuelSaleServiceTest`, `FuelSupplyReceivingApiTest`, `FuelSupplyReceivingTest` — every one fails with `Call to undefined function App\Services\bcmul()`. The local dev container this session ran in does not have the `bcmath` PHP extension installed; `.github/workflows/ci.yml` explicitly installs `bcmath` for CI (`extensions: … bcmath …`), so these are a local-environment gap, not a code defect, and none of the failing files touch Storefront/Presentation/Commerce-workspace code. Verified no other failures exist on either engine.
 
@@ -106,7 +106,7 @@ All CUST-H1-1 tests plus every pre-existing `StorefrontPresentation*`/`Storefron
 
 ## Review findings
 
-Eleven findings (10 P1, 1 P2) from the repo's automated bot reviewer (`chatgpt-codex-connector[bot]`) across five review rounds, all valid and fixed. Every finding pointed at a real bidirectional-sync or fail-closed gap between the new Version model and the legacy compatibility surface; none required widening the PR's scope or touching scheduling/publish-UI code.
+Thirteen findings (12 P1, 1 P2) from the repo's automated bot reviewer (`chatgpt-codex-connector[bot]`) across six review rounds, all valid and fixed. Every finding pointed at a real bidirectional-sync or fail-closed gap between the new Version model and the legacy compatibility surface; two (round 6) were regressions in the round-4/round-1 fixes themselves, caught by continued review of each new push. None required widening the PR's scope or touching scheduling/publish-UI code.
 
 **Round 1** (reviewed `476fb03`, fixed in `9a6470e`):
 
@@ -144,7 +144,14 @@ Eleven findings (10 P1, 1 P2) from the repo's automated bot reviewer (`chatgpt-c
 | P1 — An old (pre-CUST-H1-1) instance's legacy publish updates `published_config`/shared `schema_version` but cannot update the new `published_schema_version` column, so a subsequent read could misinterpret an actually-current-schema snapshot under legacy absence semantics. The lock-based fix used for the draft side doesn't apply here: the public runtime read path is architecturally required to stay lock/join-free. | `normalize()` always stamps `'version' => VERSION` inside every document it writes, regardless of which code wrote it, making `published_config` self-describing. `present()` and `publishedSnapshotForStorefront()` now derive the effective schema tag from the document's own embedded `version` field first (falling back to the column only when absent) — no lock needed, works identically on the public path. `assertSupportedLegacySchema()` also checks the embedded tag. | `an_old_code_publish_that_bypasses_published_schema_version_is_still_read_under_its_true_embedded_schema`, `a_forward_embedded_version_in_published_config_fails_closed_even_when_the_column_understates_it` |
 | P2 — `showForCurrentTenant()` validated the schema on an unlocked read, then re-read the row under lock without re-validating — a forward-schema write committed in between would slip through (check-then-lock race). | Added a second `assertSupportedLegacySchema()` call on the row read under lock, before further processing. | (covered by the existing forward-schema GET tests plus manual review of the added call site) |
 
-Every round's fixes were verified against the full `StorefrontPresentation*` suite and the full test suite on both SQLite and PostgreSQL before pushing (see Tests section for final counts). All 11 review threads are resolved.
+**Round 6** (reviewed `115aacd`, fixed in `f9b8875`) — both regressions in earlier rollout-guard fixes, caught by re-review after the round-4/round-5 pushes:
+
+| Finding | Fix | Regression test |
+|---|---|---|
+| P1 — `publishForCurrentTenant()`'s no-op short-circuit (content already matches, revision already synced) returned before ever reaching the `active_version_id` promotion logic. If a pre-CUST-H1-1 instance published directly (updating `published_config` but not the pointer), a subsequent publish call seeing matching content would hit the no-op path and never promote the pointer, permanently reporting a stale Version as published. | The no-op check now also requires the pointer to already be promoted; when only the pointer is behind, it's fixed without rewriting `published_at`/`published_revision` (content itself didn't change). | `legacy_publish_promotes_the_active_pointer_even_when_content_already_matches` |
+| P1 — The round-4 cutover reconciliation (`reconcileWithLegacyHead()`) could overwrite an active (published) Version's stored config in place when a pre-CUST-H1-1 writer drifted the head's `draft_config` while that Version was still both active and the compatibility working Version (Case B, pre-fork) — violating "an active Version is never mutated directly." | The reconciler now forks a new Draft Version from the head's current `draft_config` and repoints `compatibility_working_version_id` at the fork when the mapped Version is also active, instead of writing into it. | `a_legacy_writer_drifting_an_active_compatibility_version_forks_instead_of_overwriting_it` |
+
+Every round's fixes were verified against the full `StorefrontPresentation*` suite and the full test suite on both SQLite and PostgreSQL before pushing (see Tests section for final counts). All 13 review comments (12 resolvable threads + 1 review-summary-embedded finding, both classes fixed) are addressed.
 
 ## Backward compatibility
 
