@@ -252,7 +252,11 @@ export function ExperienceBuilder({
     const token = ++versionRequestTokenRef.current;
     const draftAtSwitchStart = draft;
     setVersionSwitchingId(target.id);
-    setVersionConflict(null);
+    // لا نصفّر بانر التعارض هنا: هذا الدالة تُستدعى أيضاً من
+    // `reloadConflictedVersion`، وتصفيره الآن — قبل نجاح الجلب — يُسقط الحماية
+    // بالضبط في الحالة التي وُجدت لأجلها: فشل هذا الجلب، أو نجاحه بعد تعديلٍ
+    // محلي جديد (الفرع أدناه الذي لا يتبنّى النتيجة). يُصفَّر فقط أسفله عند
+    // تبنّي المستند المجلوب فعلياً.
     setBusy("loading");
     setNoticeKind("status");
     setNotice(t("versionDetailLoading"));
@@ -285,6 +289,7 @@ export function ExperienceBuilder({
       return;
     }
     setNotice(null);
+    setVersionConflict(null);
     setSelectedVersion(result.data);
     setDraft(result.data.config);
     setSaved(result.data.config);
@@ -302,12 +307,14 @@ export function ExperienceBuilder({
 
   function reloadConflictedVersion() {
     if (!selectedVersion) return;
-    setVersionConflict(null);
     // «تحديث النسخة» إعلانٌ صريح من التاجر بتجاهل حالته المحلية القديمة
     // (هذا هو سبب وجود الزر أصلاً بعد بانر التعارض) — `applyVersionSelection`
     // تلتقط تلك الحالة القديمة بالضبط بوصفها `draftAtSwitchStart`، فتُستبدَل
     // بأمان دون أي تجاوز خاص؛ حرسها الموحَّد يحمي فقط تعديلاً جديداً يقع
-    // *بعد* هذا الضغط وأثناء انتظاره.
+    // *بعد* هذا الضغط وأثناء انتظاره. لا نصفّر بانر التعارض هنا: نتركه لِـ
+    // `applyVersionSelection` تصفيره فقط عند تبنّي المستند المجلوب فعلياً —
+    // وإلا فشل هذا الجلب، أو نجاحه بعد تعديلٍ محلي جديد، يُسقط الحماية هنا
+    // بالضبط في الحالة التي وُجدت لأجلها.
     void applyVersionSelection(selectedVersion);
   }
 
@@ -538,12 +545,16 @@ export function ExperienceBuilder({
     setVersionCreating(true);
     const result = await createPresentationVersion(storefrontId, name);
     const sameStorefront = storefrontIdRef.current === originStorefrontId;
-    // لا تصفّر علَم الإنشاء إلا إن كان لا يزال يخصّ هذا المتجر — وإلا فقد يكون
-    // المتجر الحالي بدأ إنشاءً خاصاً به (`versionCreating === true` له)، وهذا
-    // الإكمال المتأخر من متجر سابق سيُسكته بصمت فيُفعِّل زرّه قبل اكتمال طلبه.
-    if (sameStorefront) setVersionCreating(false);
+    // هوية الطلب نفسه، لا تطابق المتجر وحده: تبديل المتجر ذهاباً وإياباً
+    // (A→B→A) يُصفِّر `versionCreating` (تأثير التركيب) ويزيد هذا الرمز مرتين،
+    // فيسمح ببدء إنشاءٍ ثانٍ لنفس المتجر A بينما الطلب الأول لا يزال معلَّقاً.
+    // مطابقة المتجر وحدها كانت تُسكِت علَم الإنشاء عند اكتمال ذلك الأول
+    // المتأخر رغم أن الثاني لا يزال قيد التنفيذ، فيُعاد تفعيل الزرّ قبل أوانه
+    // ويُتيح إنشاءً ثالثاً غير مقصود.
+    const isLatestRequest = tokenAtStart === versionRequestTokenRef.current;
+    if (sameStorefront && isLatestRequest) setVersionCreating(false);
     if (!result.ok) {
-      if (sameStorefront) {
+      if (sameStorefront && isLatestRequest) {
         setNoticeKind("status");
         setNotice(t("versionCreateFailed"));
       }
@@ -555,7 +566,7 @@ export function ExperienceBuilder({
     // كان عليه حين بدأ الطلب، فلا يُفرَض تبنّي النسخة الجديدة عليه؛ صفّها في
     // القائمة يُحدَّث فقط، وتُفتَح لاحقاً صراحةً.
     if (
-      tokenAtStart !== versionRequestTokenRef.current ||
+      !isLatestRequest ||
       !presentationConfigsEqual(draftRef.current, draftAtStart)
     ) {
       updateVersionSummaryInList(result.data);

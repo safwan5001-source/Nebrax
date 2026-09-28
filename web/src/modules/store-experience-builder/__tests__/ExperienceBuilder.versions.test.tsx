@@ -1200,4 +1200,152 @@ describe('ExperienceBuilder — CUST-H1-2 Version Manager', () => {
     expect(screen.queryByLabelText('نسخة التصميم قيد التعديل')).toBeNull();
     expect(screen.queryByText('نسخة أ')).toBeNull();
   });
+
+  it("a reload whose GET fails leaves the conflict block in place instead of silently clearing it (codex round 9)", async () => {
+    listMock.mockResolvedValue({ ok: true, data: [summary({ id: 'a', name: 'نسخة أ', revision: 0 })] });
+    showMock
+      .mockResolvedValueOnce({ ok: true, data: detail({ id: 'a', name: 'نسخة أ', revision: 0 }) })
+      .mockResolvedValueOnce({ ok: false, reason: 'failed', message: 'network' });
+    renameMock.mockResolvedValue({ ok: false, reason: 'conflict', message: 'stale' });
+    const user = userEvent.setup();
+    render(<ExperienceBuilder storefrontId="store-1" initialLocale="ar" />);
+    await waitFor(() => expect(showMock).toHaveBeenCalledTimes(1));
+
+    await openVersionManager(user);
+    await user.click(screen.getByRole('button', { name: 'إعادة تسمية' }));
+    await user.clear(screen.getByLabelText('اسم النسخة'));
+    await user.type(screen.getByLabelText('اسم النسخة'), 'اسم جديد');
+    await user.click(screen.getByRole('button', { name: 'حفظ الاسم' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'تحديث النسخة' })).toBeTruthy());
+    expect(screen.getByRole('button', { name: 'حفظ المسودة' })).toHaveProperty('disabled', true);
+
+    await user.click(screen.getByRole('button', { name: 'تحديث النسخة' }));
+    await waitFor(() => expect(showMock).toHaveBeenCalledTimes(2));
+
+    // The reload's own GET failed — the stale local draft/revision is still
+    // what's open, so the conflict block must stay in place, not be cleared
+    // just because a reload was attempted.
+    expect(screen.getByRole('alert')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'حفظ المسودة' })).toHaveProperty('disabled', true);
+  });
+
+  it("an edit made during a conflict reload leaves the conflict block in place once the fetch resolves (codex round 9)", async () => {
+    listMock.mockResolvedValue({ ok: true, data: [summary({ id: 'a', name: 'نسخة أ', revision: 0 })] });
+    let resolveReload: (value: unknown) => void = () => {};
+    showMock
+      .mockResolvedValueOnce({ ok: true, data: detail({ id: 'a', name: 'نسخة أ', revision: 0 }) })
+      .mockReturnValueOnce(new Promise((resolve) => { resolveReload = resolve; }));
+    renameMock.mockResolvedValue({ ok: false, reason: 'conflict', message: 'stale' });
+    const user = userEvent.setup();
+    render(<ExperienceBuilder storefrontId="store-1" initialLocale="ar" />);
+    await waitFor(() => expect(showMock).toHaveBeenCalledTimes(1));
+
+    await openVersionManager(user);
+    await user.click(screen.getByRole('button', { name: 'إعادة تسمية' }));
+    await user.clear(screen.getByLabelText('اسم النسخة'));
+    await user.type(screen.getByLabelText('اسم النسخة'), 'اسم جديد');
+    await user.click(screen.getByRole('button', { name: 'حفظ الاسم' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'تحديث النسخة' })).toBeTruthy());
+
+    await user.click(screen.getByRole('button', { name: 'تحديث النسخة' }));
+    await waitFor(() => expect(showMock).toHaveBeenCalledTimes(2));
+
+    // The merchant edits again while the reload's own GET is still pending.
+    await user.click(screen.getByRole('button', { name: 'التوثيق والثقة' }));
+    await user.type(screen.getAllByRole('textbox')[0], 'تعديل أثناء التحديث');
+
+    resolveReload({ ok: true, data: detail({ id: 'a', name: 'نسخة من جلسة أخرى', revision: 3 }) });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    // The fetched (now-current) detail was not adopted — this newer edit was
+    // protected — so the conflict must not be reported resolved either;
+    // otherwise a rename from the refreshed list row, or another Save, could
+    // advance selectedVersion's revision without ever having pulled the
+    // fetched config into draft, overwriting the other session silently.
+    expect(screen.getByRole('alert')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'حفظ المسودة' })).toHaveProperty('disabled', true);
+  });
+
+  it("a first create resolving after an A→B→A switch does not re-enable creation while a second A create is still pending (codex round 9)", async () => {
+    // Each store already has one open version, so `selectedVersion` stays
+    // non-null throughout — the stale first create's late list update (below)
+    // cannot flip the screen between empty/choose states and hide the panel
+    // this test observes.
+    listMock.mockImplementation((storefrontId: string) =>
+      Promise.resolve({
+        ok: true,
+        data: [
+          storefrontId === 'store-a'
+            ? summary({ id: 'a', name: 'نسخة أ', revision: 0 })
+            : summary({ id: 'b', storefrontId: 'store-b', name: 'نسخة ب', revision: 0 }),
+        ],
+      }),
+    );
+    showMock.mockImplementation((storefrontId: string, versionId: string) =>
+      Promise.resolve({
+        ok: true,
+        data: versionId === 'a'
+          ? detail({ id: 'a', name: 'نسخة أ', revision: 0 })
+          : detail({ id: 'b', storefrontId: 'store-b', name: 'نسخة ب', revision: 0 }),
+      }),
+    );
+    let resolveFirstA: (value: unknown) => void = () => {};
+    const secondA = new Promise(() => {}); // never resolves during this test
+    createMock
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveFirstA = resolve; })) // first A create
+      .mockImplementationOnce(() => secondA); // second A create
+    const user = userEvent.setup();
+    const { rerender } = render(<ExperienceBuilder storefrontId="store-a" initialLocale="ar" />);
+    await waitFor(() =>
+      expect(screen.getByLabelText('نسخة التصميم قيد التعديل').textContent).toContain('نسخة أ'),
+    );
+
+    // Start a create for store A — it never resolves during this test.
+    await openVersionManager(user);
+    await user.click(screen.getByRole('button', { name: '+ نسخة جديدة' }));
+    await user.type(screen.getByPlaceholderText('مثال: رمضان ١٤٤٨'), 'نسخة ثانية أولى');
+    await user.click(screen.getByRole('button', { name: 'إنشاء' }));
+    await waitFor(() => expect(createMock).toHaveBeenCalledTimes(1));
+
+    // Switch away to B, then back to A — the mount effect resets
+    // `versionCreating` and bumps the request token on each switch alone,
+    // with no B-side create involved.
+    rerender(<ExperienceBuilder storefrontId="store-b" initialLocale="ar" />);
+    await waitFor(() =>
+      expect(screen.getByLabelText('نسخة التصميم قيد التعديل').textContent).toContain('نسخة ب'),
+    );
+    rerender(<ExperienceBuilder storefrontId="store-a" initialLocale="ar" />);
+    await waitFor(() =>
+      expect(screen.getByLabelText('نسخة التصميم قيد التعديل').textContent).toContain('نسخة أ'),
+    );
+
+    // Start a second, genuinely new create for A. The form auto-closes on
+    // submit (`submitCreate` resets `showCreateForm`), so the pending state
+    // isn't visible on this button anymore — reopen the form afterward to
+    // inspect the `creating` prop it's bound to.
+    if (!screen.queryByRole('menu', { name: 'إدارة نسخ التصميم' })) {
+      await openVersionManager(user);
+    }
+    await user.click(screen.getByRole('button', { name: '+ نسخة جديدة' }));
+    await user.type(screen.getByPlaceholderText('مثال: رمضان ١٤٤٨'), 'نسخة ثانية');
+    expect(screen.getByRole('button', { name: 'إنشاء' })).toHaveProperty('disabled', false);
+    await user.click(screen.getByRole('button', { name: 'إنشاء' }));
+    await waitFor(() => expect(createMock).toHaveBeenCalledTimes(2));
+
+    // Reopen the form (with a name typed, so only the `creating` prop gates
+    // the button) while the second request is still outstanding.
+    await user.click(screen.getByRole('button', { name: '+ نسخة جديدة' }));
+    await user.type(screen.getByPlaceholderText('مثال: رمضان ١٤٤٨'), 'فحص');
+    expect(screen.getByRole('button', { name: /إنشاء|جاري الإنشاء/ })).toHaveProperty('disabled', true);
+
+    // The first (stale) A create now resolves. Storefront equality alone
+    // would satisfy its "same store" check (we're back on A) and clear the
+    // creating flag — re-enabling the create controls (this same button,
+    // still showing the name typed above) while the second A request is
+    // still outstanding, permitting an unintended third create.
+    resolveFirstA({ ok: true, data: detail({ id: 'stale-first', name: 'نسخة ثانية أولى', revision: 0 }) });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(screen.getByRole('button', { name: /إنشاء|جاري الإنشاء/ })).toHaveProperty('disabled', true);
+  });
 });

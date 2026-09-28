@@ -113,6 +113,22 @@ describe('commerce workspace presentation-versions API client', () => {
     }
   });
 
+  it('rejects a detail response whose config is missing instead of silently defaulting it (codex round 9)', async () => {
+    apiMock.mockResolvedValue({ data: { ...summary() } }); // no `config` key at all
+
+    const result = await showPresentationVersion('store-1', 'v1');
+
+    expect(result).toEqual({ ok: false, reason: 'failed', message: 'invalid_payload' });
+  });
+
+  it('rejects a detail response whose config is not an object (codex round 9)', async () => {
+    apiMock.mockResolvedValue({ data: { ...summary(), config: 'not-an-object' } });
+
+    const result = await showPresentationVersion('store-1', 'v1');
+
+    expect(result).toEqual({ ok: false, reason: 'failed', message: 'invalid_payload' });
+  });
+
   it('classifies a 409 on read as unsupported_schema (forward-schema fail-closed)', async () => {
     apiMock.mockRejectedValue(new ApiError(409, 'النسخة بمخطط أمامي.', {}));
 

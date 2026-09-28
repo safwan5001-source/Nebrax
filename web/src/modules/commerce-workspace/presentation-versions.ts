@@ -185,6 +185,7 @@ function mapDetail(payload: unknown): PresentationVersionDetail | null {
   const summary = mapSummary(data);
   if (summary === null || !data || typeof data !== 'object') return null;
   const row = data as Record<string, unknown>;
+  if (!row.config || typeof row.config !== 'object' || Array.isArray(row.config)) return null;
   return { ...summary, config: normalizePresentationConfig(row.config) };
 }
 
