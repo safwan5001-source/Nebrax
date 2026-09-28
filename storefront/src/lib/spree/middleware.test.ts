@@ -347,3 +347,77 @@ describe("Spree locale middleware — Storefront default locale (STORE-LOCALE-WI
     );
   });
 });
+
+describe("dynamic store icon bypass", () => {
+  const localeMiddleware = createSpreeMiddleware({
+    defaultCountry: "sa",
+    defaultLocale: "ar",
+    supportedLocales: ["ar", "en"],
+    resolveStorefrontLocale: vi.fn().mockResolvedValue("ar"),
+  });
+
+  it.each([
+    "/icon",
+    "/icon/",
+  ])("does not locale-prefix %s", async (pathname) => {
+    const response = await localeMiddleware(
+      new NextRequest(`https://alrshd.store.example${pathname}`),
+    );
+
+    expect(response.headers.get("location")).toBeNull();
+  });
+
+  it("does not rewrite /icon to /sa/ar/icon when locale cookies are already set", async () => {
+    const request = new NextRequest("https://alrshd.store.example/icon");
+    request.cookies.set("spree_country", "sa");
+    request.cookies.set("spree_locale", "ar");
+
+    const response = await localeMiddleware(request);
+
+    expect(response.status).not.toBe(307);
+    expect(response.headers.get("location")).toBeNull();
+  });
+
+  it("still locale-routes / and storefront pages", async () => {
+    const root = await localeMiddleware(
+      new NextRequest("https://alrshd.store.example/"),
+    );
+    const products = await localeMiddleware(
+      new NextRequest("https://alrshd.store.example/products"),
+    );
+    const localized = await localeMiddleware(
+      new NextRequest("https://alrshd.store.example/sa/ar/products"),
+    );
+
+    expect(root.headers.get("location")).toBe(
+      "https://alrshd.store.example/sa/ar",
+    );
+    expect(products.headers.get("location")).toBe(
+      "https://alrshd.store.example/sa/ar/products",
+    );
+    expect(localized.headers.get("location")).toBeNull();
+  });
+
+  it("does not treat a longer path that starts with icon as the icon route", async () => {
+    const response = await localeMiddleware(
+      new NextRequest("https://alrshd.store.example/icons"),
+    );
+
+    expect(response.headers.get("location")).toBe(
+      "https://alrshd.store.example/sa/ar/icons",
+    );
+  });
+
+  it.each([
+    "/favicon.ico",
+    "/api/storefront",
+    "/_next/static/chunk.js",
+    "/_next/image",
+  ])("keeps the existing exclusion for %s", async (pathname) => {
+    const response = await middleware(
+      new NextRequest(`https://store.example${pathname}`),
+    );
+
+    expect(response.headers.get("location")).toBeNull();
+  });
+});
