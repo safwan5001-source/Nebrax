@@ -125,11 +125,27 @@ final class StorefrontPresentationVersionService
             $normalized = $this->normalizer->normalize($config, StorefrontPresentationNormalizer::VERSION);
             $this->assertStoredSize($normalized);
 
+            $newRevision = (int) $version->revision + 1;
+
             $version->forceFill([
                 'config' => $normalized,
                 'schema_version' => StorefrontPresentationNormalizer::VERSION,
-                'revision' => (int) $version->revision + 1,
+                'revision' => $newRevision,
             ])->save();
+
+            // CUST-H1-1: إن كانت النسخة المحفوظة هي نسخة العمل المتوافقة
+            // ذاتها، يجب مزامنة حقول المسودة على الرأس أيضاً في نفس
+            // المعاملة — وإلا رأى عميل قديم (GET/نشر) مستنداً قديماً رغم
+            // نجاح الحفظ عبر واجهة النسخ الجديدة. المستند ووسم المخطط زوجٌ
+            // ذرّي واحد على الجهتين معاً (§14).
+            if ($head !== null && $head->compatibility_working_version_id === $version->id) {
+                $head->forceFill([
+                    'draft_config' => $normalized,
+                    'draft_schema_version' => StorefrontPresentationNormalizer::VERSION,
+                    'draft_revision' => $newRevision,
+                    'schema_version' => StorefrontPresentationNormalizer::VERSION,
+                ])->save();
+            }
 
             return $this->detail($version->fresh(), $head);
         });

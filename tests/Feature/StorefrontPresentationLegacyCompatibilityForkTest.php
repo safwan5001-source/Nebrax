@@ -340,4 +340,99 @@ class StorefrontPresentationLegacyCompatibilityForkTest extends TestCase
         $oldActive = StorefrontPresentationVersion::withoutGlobalScopes()->find($originalActiveId);
         $this->assertSame('navy', $oldActive->config['themePreset'], 'النسخة النشطة السابقة يجب أن تبقى دون تعديل.');
     }
+
+    /** @test */
+    public function first_legacy_save_on_a_brand_new_storefront_materializes_a_compatibility_version(): void
+    {
+        $auth = $this->registerTenant('legacy-first-save-materializes', 'owner@legacy-first-save-materializes.test');
+        $seeded = $this->seedWebStorefront($auth['tenant_id']);
+        $token = $this->withToken($auth['token']);
+
+        // GET أولاً — يجب ألا يُنشئ شيئاً (سلوك الحالة A الأصلي محفوظ).
+        $token->getJson($this->legacyPath($seeded['storefront']->id))->assertOk();
+        $this->assertDatabaseCount('storefront_presentations', 0);
+
+        // أول PUT فعلي على متجر بلا رأس إطلاقاً — يُنشئ الرأس ونسخة العمل معاً.
+        $token->putJson($this->legacyPath($seeded['storefront']->id), [
+            'config' => ['version' => 2, 'themePreset' => 'navy'],
+            'draft_revision' => 0,
+        ])->assertOk();
+
+        $head = StorefrontPresentation::withoutGlobalScopes()->where('storefront_id', $seeded['storefront']->id)->first();
+        $this->assertNotNull($head->compatibility_working_version_id);
+
+        $compat = StorefrontPresentationVersion::withoutGlobalScopes()->find($head->compatibility_working_version_id);
+        $this->assertSame('navy', $compat->config['themePreset']);
+        $this->assertSame(1, (int) $compat->revision);
+
+        // نشر قديم لاحق يجب أن يرقّي هذه النسخة إلى نشطة، لا أن يترك
+        // active_version_id فارغاً للأبد.
+        $token->postJson($this->legacyPublishPath($seeded['storefront']->id), [])->assertOk();
+
+        $afterPublish = StorefrontPresentation::withoutGlobalScopes()->where('storefront_id', $seeded['storefront']->id)->first();
+        $this->assertSame($head->compatibility_working_version_id, $afterPublish->active_version_id);
+
+        // وواجهة النسخ الجديدة تُظهر نسخة واحدة منشورة فعلاً — لا صفر.
+        $list = $token->getJson($this->versionsPath($seeded['storefront']->id))->assertOk();
+        $this->assertCount(1, $list->json('data'));
+        $this->assertSame('published', $list->json('data.0.state'));
+    }
+
+    /** @test */
+    public function saving_the_compatibility_version_through_the_new_api_syncs_legacy_draft_fields(): void
+    {
+        $auth = $this->registerTenant('version-api-syncs-legacy', 'owner@version-api-syncs-legacy.test');
+        $seeded = $this->seedWebStorefront($auth['tenant_id']);
+        $token = $this->withToken($auth['token']);
+
+        $token->putJson($this->legacyPath($seeded['storefront']->id), [
+            'config' => ['version' => 2, 'themePreset' => 'navy'],
+            'draft_revision' => 0,
+        ])->assertOk();
+
+        $head = StorefrontPresentation::withoutGlobalScopes()->where('storefront_id', $seeded['storefront']->id)->first();
+        $compatId = $head->compatibility_working_version_id;
+
+        // تعديل عبر واجهة النسخ الجديدة على نفس نسخة العمل المتوافقة.
+        $token->putJson($this->versionsPath($seeded['storefront']->id).'/'.$compatId, [
+            'config' => ['version' => 2, 'themePreset' => 'sand'],
+            'revision' => 1,
+        ])->assertOk();
+
+        // GET القديم يجب أن يرى التعديل فوراً — لا يبقى خلف نسخة العمل.
+        $legacyGet = $token->getJson($this->legacyPath($seeded['storefront']->id))->assertOk();
+        $this->assertSame('sand', $legacyGet->json('data.draft.themePreset'));
+        $this->assertSame(2, $legacyGet->json('data.draft_revision'));
+
+        $refreshedHead = StorefrontPresentation::withoutGlobalScopes()->find($head->id);
+        $this->assertSame(2, (int) $refreshedHead->draft_revision);
+        $this->assertSame('sand', $refreshedHead->draft_config['themePreset']);
+    }
+
+    /** @test */
+    public function legacy_publish_fails_closed_when_the_compatibility_version_itself_carries_a_forward_schema(): void
+    {
+        $auth = $this->registerTenant('legacy-publish-forward-compat', 'owner@legacy-publish-forward-compat.test');
+        $seeded = $this->seedWebStorefront($auth['tenant_id']);
+        $token = $this->withToken($auth['token']);
+
+        $token->putJson($this->legacyPath($seeded['storefront']->id), [
+            'config' => ['version' => 2, 'themePreset' => 'navy'],
+            'draft_revision' => 0,
+        ])->assertOk();
+
+        $head = StorefrontPresentation::withoutGlobalScopes()->where('storefront_id', $seeded['storefront']->id)->first();
+
+        // حافة دفاعية: النسخة تحمل وسماً أحدث بينما وسم الرأس ما يزال
+        // مدعوماً (لا يُفترض بلوغها عبر الكود الحالي بعد إصلاح المزامنة
+        // الثنائية، لكن النشر يجب أن يفشل آمناً لو حدثت مستقبلاً).
+        DB::table('storefront_presentation_versions')
+            ->where('id', $head->compatibility_working_version_id)
+            ->update(['schema_version' => StorefrontPresentationNormalizer::VERSION + 1]);
+
+        $token->postJson($this->legacyPublishPath($seeded['storefront']->id), [])->assertStatus(409);
+
+        $unchanged = StorefrontPresentation::withoutGlobalScopes()->find($head->id);
+        $this->assertNull($unchanged->published_config);
+    }
 }

@@ -171,6 +171,26 @@ final class StorefrontPresentationService
             // الفشل الآمن.
             $this->assertSupportedLegacySchema($row);
 
+            // CUST-H1-1: نسخة العمل المتوافقة قد تكون انفصلت عن النسخة
+            // النشطة (تشويك سابق عبر legacy PUT). النشر القديم ينشر مستند
+            // نسخة العمل الحالية فعلياً (`draft_config` المتزامن معها) —
+            // فيجب أن تصبح هي النسخة النشطة الآن، وإلا بقيت نسخة قديمة
+            // مُعلَنة "منشورة" رغم أن محتواها لم يعد يطابق اللقطة العامة.
+            //
+            // يُقفَل ويُفحَص مخططها **قبل** أي تطبيع: وسم الرأس وحده لا
+            // يكفي — نسخة كُتبت بإصدارٍ أحدث عبر واجهة النسخ الجديدة قد
+            // تحمل وسماً أحدث من وسم الرأس نفسه (سيناريو تراجع نشر).
+            $compat = $row->compatibility_working_version_id !== null
+                ? StorefrontPresentationVersion::query()
+                    ->whereKey($row->compatibility_working_version_id)
+                    ->lockForUpdate()
+                    ->first()
+                : null;
+
+            if ($compat !== null && (int) $compat->schema_version > StorefrontPresentationNormalizer::VERSION) {
+                throw new ForwardSchemaVersionException;
+            }
+
             $normalized = $this->normalizer->normalize($row->draft_config ?? null, (int) $row->schema_version);
             $this->assertStoredSize($normalized);
 
@@ -182,18 +202,6 @@ final class StorefrontPresentationService
             ) {
                 return $this->present($storefront, $row);
             }
-
-            // CUST-H1-1: نسخة العمل المتوافقة قد تكون انفصلت عن النسخة
-            // النشطة (تشويك سابق عبر legacy PUT). النشر القديم ينشر مستند
-            // نسخة العمل الحالية فعلياً (`draft_config` المتزامن معها) —
-            // فيجب أن تصبح هي النسخة النشطة الآن، وإلا بقيت نسخة قديمة
-            // مُعلَنة "منشورة" رغم أن محتواها لم يعد يطابق اللقطة العامة.
-            $compat = $row->compatibility_working_version_id !== null
-                ? StorefrontPresentationVersion::query()
-                    ->whereKey($row->compatibility_working_version_id)
-                    ->lockForUpdate()
-                    ->first()
-                : null;
 
             $row->forceFill([
                 'draft_config' => $normalized,
@@ -261,10 +269,11 @@ final class StorefrontPresentationService
         }
 
         if ($row === null) {
-            // رأسٌ لأول مرة على الإطلاق — لا نسخة CUST-H1 بعد؛ ستُنشأ
-            // كسولاً لاحقاً عند أول GET/PUT/إنشاء نسخة يجدها موجودة
-            // (`ensureCompatibilityWorkingVersion`). سلوك ما قبل CUST-H1
-            // محفوظ حرفياً هنا.
+            // رأسٌ لأول مرة على الإطلاق: يُنشأ الرأس **ونسخة عمل متوافقة**
+            // معاً في نفس المعاملة — بلا هذه النسخة يبقى `active_version_id`
+            // فارغاً للأبد بعد أول نشر قديم لاحق (لا نسخة لتترقّى)، وواجهة
+            // النسخ الجديدة تُظهر تصميماً حياً بلا أي نسخة تمثّله. الاسم
+            // الافتراضي نفسه المستعمَل في هجرة الحالة D.
             $row = StorefrontPresentation::create([
                 'storefront_id' => $storefront->id,
                 'schema_version' => StorefrontPresentationNormalizer::VERSION,
@@ -272,6 +281,17 @@ final class StorefrontPresentationService
                 'draft_config' => $normalized,
                 'draft_revision' => 1,
             ]);
+
+            $version = StorefrontPresentationVersion::create([
+                'tenant_id' => $row->tenant_id,
+                'storefront_id' => $storefront->id,
+                'name' => StorefrontPresentationVersionBackfillService::DEFAULT_MIGRATION_NAME,
+                'schema_version' => StorefrontPresentationNormalizer::VERSION,
+                'config' => $normalized,
+                'revision' => 1,
+            ]);
+
+            $row->forceFill(['compatibility_working_version_id' => $version->id])->save();
 
             return $this->present($storefront, $row->fresh());
         }
