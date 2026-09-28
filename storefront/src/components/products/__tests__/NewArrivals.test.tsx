@@ -13,6 +13,7 @@ vi.mock("@/components/products/ProductCard", () => ({
 
 async function loadNewArrivals(
   listProducts: ReturnType<typeof vi.fn>,
+  themePreset?: "awj-market",
 ): Promise<{ element: React.JSX.Element; listProducts: typeof listProducts }> {
   vi.resetModules();
   vi.doMock("next-intl/server", () => ({
@@ -33,6 +34,7 @@ async function loadNewArrivals(
     locale: "ar",
     country: "sa",
     currency: "SAR",
+    themePreset,
   });
 
   return { element, listProducts };
@@ -85,5 +87,29 @@ describe("NewArrivals (AWJ catalog)", () => {
     // A grid, not a flex row: one product keeps a card's width instead of
     // expanding to the full measure.
     expect(container.querySelector("ul")?.className).toContain("grid-cols-2");
+  });
+
+  it("widens the desktop tier for AWJ Market without changing AWJ Modern", async () => {
+    const { element: marketEl } = await loadNewArrivals(
+      vi.fn().mockResolvedValue({ data: [{ id: "p1" }] }),
+      "awj-market",
+    );
+    const { element: modernEl } = await loadNewArrivals(
+      vi.fn().mockResolvedValue({ data: [{ id: "p1" }] }),
+    );
+
+    const market = render(marketEl);
+    expect(market.container.querySelector("ul")?.className).toContain(
+      "lg:grid-cols-5",
+    );
+    market.unmount();
+
+    const modern = render(modernEl);
+    expect(modern.container.querySelector("ul")?.className).toContain(
+      "lg:grid-cols-4",
+    );
+    expect(modern.container.querySelector("ul")?.className).not.toContain(
+      "lg:grid-cols-5",
+    );
   });
 });

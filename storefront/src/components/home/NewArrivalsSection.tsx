@@ -3,12 +3,21 @@ import { Suspense } from "react";
 import { SectionHeading } from "@/components/home/SectionHeading";
 import { NewArrivals } from "@/components/products/NewArrivals";
 import { ProductCardSkeleton } from "@/components/products/ProductCardSkeleton";
+import type { ThemePresetId } from "@/lib/presentation/tokens";
+import { cn } from "@/lib/utils";
 
 const SHELF_SIZE = 8;
 
-function ShelfSkeleton() {
+function ShelfSkeleton({ isMarket }: { isMarket: boolean }) {
   return (
-    <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 md:gap-5">
+    <ul
+      className={cn(
+        "grid gap-3 md:gap-5",
+        isMarket
+          ? "grid-cols-2 sm:grid-cols-3 lg:grid-cols-5"
+          : "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4",
+      )}
+    >
       {Array.from({ length: SHELF_SIZE }, (_, i) => i).map((i) => (
         <li key={i}>
           <ProductCardSkeleton />
@@ -23,6 +32,8 @@ interface NewArrivalsSectionProps {
   locale: string;
   country: string;
   currency?: string;
+  /** See `CategoriesSection`'s identical prop doc for why this is explicit. */
+  themePreset?: ThemePresetId;
 }
 
 /**
@@ -35,11 +46,13 @@ export async function NewArrivalsSection({
   locale,
   country,
   currency,
+  themePreset,
 }: NewArrivalsSectionProps) {
   const t = await getTranslations({
     locale: locale as Locale,
     namespace: "home",
   });
+  const isMarket = themePreset === "awj-market";
 
   return (
     <section aria-labelledby="home-new-arrivals">
@@ -49,13 +62,14 @@ export async function NewArrivalsSection({
         action={{ href: `${basePath}/products`, label: t("viewAll") }}
       />
       <div className="mt-3">
-        <Suspense fallback={<ShelfSkeleton />}>
+        <Suspense fallback={<ShelfSkeleton isMarket={isMarket} />}>
           <NewArrivals
             basePath={basePath}
             locale={locale}
             country={country}
             currency={currency}
             limit={SHELF_SIZE}
+            themePreset={themePreset}
           />
         </Suspense>
       </div>

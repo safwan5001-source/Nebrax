@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { useEffect, useMemo, useState } from "react";
 import { QuantityPickerField } from "@/components/cart/QuantityPickerField";
+import { usePublishedThemeMarker } from "@/components/layout/PublishedThemeMarker";
 import { StoreContainer } from "@/components/layout/StoreContainer";
 import { HiddenPricePrompt } from "@/components/products/HiddenPricePrompt";
 import { MediaGallery } from "@/components/products/MediaGallery";
@@ -17,6 +18,7 @@ import { useCart } from "@/contexts/CartContext";
 import { useHiddenPricing } from "@/contexts/HiddenPricingContext";
 import { useStore } from "@/contexts/StoreContext";
 import { trackAddToCart, trackViewItem } from "@/lib/analytics/gtm";
+import { cn } from "@/lib/utils";
 
 interface ProductDetailsProps {
   product: Product;
@@ -28,6 +30,7 @@ export function ProductDetails({ product, basePath }: ProductDetailsProps) {
   const { currency } = useStore();
   const t = useTranslations("products");
   const tw = useTranslations("wholesale");
+  const isMarket = usePublishedThemeMarker() === "awj-market";
   // Non-null inside a HiddenPricingProvider (wholesale `prices_hidden`, guest
   // view): prices are null on purpose, and ordering is gated behind sign-in.
   const hiddenPricing = useHiddenPricing();
@@ -182,7 +185,7 @@ export function ProductDetails({ product, basePath }: ProductDetailsProps) {
   const needsOptionChoice = isVariantManaged && selectedVariant === null;
 
   return (
-    <StoreContainer className="py-5 md:py-6">
+    <StoreContainer className={isMarket ? "py-3 md:py-5" : "py-5 md:py-6"}>
       {/* The product leads. No marketing band above it. */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,34rem)_minmax(0,1fr)] lg:gap-10">
         {/*
@@ -292,11 +295,28 @@ export function ProductDetails({ product, basePath }: ProductDetailsProps) {
             </div>
           )}
 
-          <div className="mt-5 border-t border-store-border pt-5">
+          {/*
+            AWJ Market's benchmark keeps quantity + add-to-cart reachable
+            without scrolling on a phone (see the coverage matrix's PDP
+            evidence). Below `md` — the same breakpoint `MobileBottomNav`
+            itself disappears at, so this bar never stacks on top of empty
+            space where the nav used to be — the row becomes a fixed bar
+            pinned above that nav; at `md` and up it reverts to the ordinary
+            static row every other theme already uses. The quantity/cart
+            state and `handleAddToCart` above are unchanged — this only moves
+            where the existing controls render, never duplicates them.
+          */}
+          <div
+            className={cn(
+              "mt-5 border-t border-store-border pt-5",
+              isMarket &&
+                "fixed inset-x-0 bottom-[calc(var(--store-bottom-nav-height)+env(safe-area-inset-bottom))] z-30 mt-0 border-t bg-store-surface px-4 py-3 shadow-[0_-2px_8px_rgba(0,0,0,0.08)] md:static md:inset-auto md:z-auto md:mt-5 md:bg-transparent md:px-0 md:py-0 md:pt-5 md:shadow-none",
+            )}
+          >
             {pricesHidden ? (
               // Guest on a prices-hidden channel: no pricing, no ordering —
               // route them through the wholesale sign-in first.
-              <Button asChild size="lg">
+              <Button asChild size="lg" className={cn(isMarket && "w-full")}>
                 <Link href={hiddenPricing.signInHref}>
                   {tw("hiddenPrice.signInToOrder")}
                 </Link>
@@ -334,6 +354,8 @@ export function ProductDetails({ product, basePath }: ProductDetailsProps) {
               </div>
             )}
           </div>
+          {/* Keeps the fixed bar above from covering the rest of the page. */}
+          {isMarket && <div aria-hidden="true" className="h-20 md:hidden" />}
 
           {descriptionText && (
             <section className="mt-5 border-t border-store-border pt-5">

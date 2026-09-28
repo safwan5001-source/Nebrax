@@ -1,5 +1,7 @@
 import { ProductCard } from "@/components/products/ProductCard";
 import { fetchProduct } from "@/lib/commerce/products";
+import type { ThemePresetId } from "@/lib/presentation/tokens";
+import { cn } from "@/lib/utils";
 
 export async function FeaturedShelf({
   productIds,
@@ -8,6 +10,7 @@ export async function FeaturedShelf({
   currency,
   title,
   headingId,
+  themePreset,
 }: {
   productIds: readonly string[];
   basePath: string;
@@ -15,7 +18,10 @@ export async function FeaturedShelf({
   currency?: string;
   title: string;
   headingId: string;
+  /** See `CategoriesSection`'s identical prop doc for why this is explicit. */
+  themePreset?: ThemePresetId;
 }) {
+  const isMarket = themePreset === "awj-market";
   const settled = await Promise.allSettled(
     productIds.map((id) => fetchProduct(id)),
   );
@@ -32,7 +38,14 @@ export async function FeaturedShelf({
       >
         {title}
       </h2>
-      <ul className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 md:gap-5">
+      <ul
+        className={cn(
+          "mt-4 grid gap-3 md:gap-5",
+          isMarket
+            ? "grid-cols-2 sm:grid-cols-3 lg:grid-cols-5"
+            : "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4",
+        )}
+      >
         {products.map((product, index) => (
           <li key={product.id} className="min-w-0">
             <ProductCard

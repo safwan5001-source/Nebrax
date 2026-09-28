@@ -4,7 +4,9 @@ import type { PaginatedResponse, Product, ProductListParams } from "@spree/sdk";
 import { Loader2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { usePublishedThemeMarker } from "@/components/layout/PublishedThemeMarker";
 import { ProductCard } from "@/components/products/ProductCard";
+import { cn } from "@/lib/utils";
 
 interface InfiniteProductListProps {
   initialProducts: Product[];
@@ -51,6 +53,7 @@ export function InfiniteProductList({
   currency,
 }: InfiniteProductListProps) {
   const t = useTranslations("products");
+  const isMarket = usePublishedThemeMarker() === "awj-market";
   const [products, setProducts] = useState<Product[]>(initialProducts);
   const [currentPage, setCurrentPage] = useState(initialPage);
   // knownPages = the total page count observed from the most recent fetch.
@@ -127,7 +130,14 @@ export function InfiniteProductList({
 
   return (
     <>
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-4 md:gap-5">
+      <div
+        className={cn(
+          "grid gap-4 md:gap-5",
+          isMarket
+            ? "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5"
+            : "grid-cols-2 lg:grid-cols-3 xl:grid-cols-4",
+        )}
+      >
         {products.map((product, index) => (
           <ProductCard
             key={product.id}

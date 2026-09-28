@@ -2,6 +2,8 @@ import { getTranslations } from "next-intl/server";
 import { ProductCard } from "@/components/products/ProductCard";
 import { PRODUCT_CARD_FIELDS } from "@/lib/data/cached";
 import { cachedListProducts } from "@/lib/data/products";
+import type { ThemePresetId } from "@/lib/presentation/tokens";
+import { cn } from "@/lib/utils";
 
 interface NewArrivalsProps {
   basePath: string;
@@ -9,6 +11,8 @@ interface NewArrivalsProps {
   country: string;
   currency?: string;
   limit?: number;
+  /** See `CategoriesSection`'s identical prop doc for why this is explicit. */
+  themePreset?: ThemePresetId;
 }
 
 /**
@@ -28,7 +32,9 @@ export async function NewArrivals({
   country,
   currency,
   limit = 8,
+  themePreset,
 }: NewArrivalsProps) {
+  const isMarket = themePreset === "awj-market";
   const products = await cachedListProducts(
     { limit, sort: "-available_on", fields: PRODUCT_CARD_FIELDS },
     { locale, country },
@@ -58,7 +64,14 @@ export async function NewArrivals({
   }
 
   return (
-    <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 md:gap-5">
+    <ul
+      className={cn(
+        "grid gap-3 md:gap-5",
+        isMarket
+          ? "grid-cols-2 sm:grid-cols-3 lg:grid-cols-5"
+          : "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4",
+      )}
+    >
       {products.map((product, index) => (
         <li key={product.id}>
           <ProductCard
