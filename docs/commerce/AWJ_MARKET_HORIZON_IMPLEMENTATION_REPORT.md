@@ -52,10 +52,9 @@ own scope discipline):
 
 - **Branch:** `claude/awj-market-horizon-6qxr5v`
 - **PR:** https://github.com/safwan5001-source/Nebrax/pull/1084
-- **Head SHA:** `1e8b8d8f151680807004a23898a8fb607acd2160` (after the initial push at
-  `0793217b`, a Biome formatting fix at `d2e88cab`, and five rounds of automated
-  review fixes at `747c45fa`, `4bcee30d`, `8e9a0624`, `65906c0d` and `1e8b8d8f` —
-  see §22a)
+- **Head SHA:** `c1acb0ec` (after the initial push at `0793217b`, a Biome formatting fix
+  at `d2e88cab`, and six rounds of automated review fixes at `747c45fa`, `4bcee30d`,
+  `8e9a0624`, `65906c0d`, `1e8b8d8f` and `c1acb0ec` — see §22a)
 
 ## 4. Implementation summary by surface
 
@@ -313,12 +312,14 @@ Market marker on both `ProductCard` and its loading skeleton).
 
 ## 12. Web tests/build
 
-- `npx vitest run` (full suite): **2160 tests passed, 0 failed** (312 files).
-- `npx tsc --noEmit`: 12 pre-existing errors, all in files this Horizon never touched
-  (POS settings, platform integrations, document/product-variant components) —
-  confirmed pre-existing by stashing this Horizon's changes and re-running against
-  unmodified `origin/main` (28 errors reproduce there too across the same broader
-  check; the relevant subset matches file-for-file). Kept outside scope.
+- `npx vitest run` (full suite): **2171 tests passed, 0 failed** (313 files) — after
+  round 6 (§22a), which added 3 tests and fixed 1 stale assertion in
+  `StorefrontPreviewCanvas.marketCard.test.tsx`.
+- `npx tsc --noEmit`: pre-existing errors only, all in files this Horizon never touched
+  (POS settings, platform integrations, document/product-variant components,
+  import-jobs) — confirmed pre-existing by `git status` showing zero changes to any of
+  those files across this Horizon's full diff, and reproduced identically against
+  unmodified `origin/main`. Kept outside scope.
 - `pnpm build` (Next.js production build): succeeded, exit code 0.
 
 ## 13. Backend tests
@@ -453,17 +454,51 @@ server-side normalizer already validates independently.
 
 ## 21. AWJ Modern regression status
 
-Green. Full storefront suite: 641/641 passing. Full web suite: 2160/2160 passing.
+Green. Full storefront suite: 641/641 passing. Full web suite: 2171/2171 passing.
 Full PHP suite: see §14/§22.
 
 ## 22. CI status / Merge status / Deploy status
 
-_(filled in after push, PR creation, and CI observation)_
+PR #1084 opened against `main`, base SHA `f8749a86945824faa235d3fb25f19721bb6c8b3b`
+(see §2/§3). Not merged, not deployed — outside this Horizon's authorization by design.
+
+CI jobs on the PR (workflow files `ci.yml`, `web-ci.yml`, `store-brand-qa.yml`):
+`storefront (lint + typecheck + test)`, `php artisan test (L11, sqlite)`,
+`php artisan test (L11, pgsql)`, `web build (Next.js)`, `merchant preview visual QA`,
+`published footer visual QA`.
+
+Two apparent CI-red signals were investigated on the current head and neither is a
+real regression from this diff:
+
+- **`php artisan test (L11, sqlite)`** showed one failure
+  (`ZatcaQrCertificateMaterialExtractorTest > it extracts the uncompressed ec key and
+  verifiable ca signature`, a binary EC-key byte-comparison unrelated to any file this
+  Horizon touches) on an *earlier* commit's run. Checking the check-run list for the
+  actual current head confirmed this job had already been re-run by CI itself and come
+  back green (4805/4805 passing) before this was investigated further — the failing run
+  was superseded, not outstanding.
+- **`published footer visual QA`** (Playwright, `storefront/playwright.brand-qa.config.ts`)
+  failed with `Error: Timed out waiting 120000ms from config.webServer.` — the dev
+  server never returned 200 for the readiness-check URL (`/sa/en`) within the 120s
+  window, returning fast 404s throughout. Reproduced the exact same fixture
+  (`e2e/support/store-brand-api-fixture.mjs`) and env vars locally against this PR's
+  current head: the *first* request compiled `/[country]/[locale]` and the route then
+  served `GET /sa/en 200` cleanly and repeatably — no 404, no hang. The CI log showed a
+  materially different pattern (the *first* request compiled `/_not-found/page`, not
+  `/[country]/[locale]`, and every subsequent poll returned a fast, never-recovering
+  404), which a code defect reachable from this diff would reproduce locally too, and it
+  did not. Treated as a CI-runner-specific timing flake and re-run once via
+  `rerun_failed_jobs` (run `36394695349`) per the one-retry-to-confirm-a-flake
+  allowance — see the live PR for that re-run's outcome as of the time this section was
+  last edited.
+
+_(This section reflects state as of head SHA in §3; see the PR itself for the current
+live status of any in-flight re-run.)_
 
 ## 22a. Automated review findings addressed
 
-Codex (`chatgpt-codex-connector[bot]`) reviewed this PR across five rounds and raised
-eight findings total, all verified real and fixed. All eight review threads are
+Codex (`chatgpt-codex-connector[bot]`) reviewed this PR across six rounds and raised
+nine findings total, all verified real and fixed. All nine review threads are
 resolved.
 
 **Round 1** (commit `747c45fa`):
@@ -569,15 +604,40 @@ resolved.
    category grids — dozens of pre-existing `sm:`/`md:`/`lg:` instances), but all of it
    predates this PR and none of it is keyed to `themePreset`/Market. The one
    `mobileViewport` conditional this PR touches (the `newArrivals` grid's column count)
-   changed only which pre-existing literal class string applies via a boolean, never the
-   strings' own embedded `sm:`/`lg:` content — so it carries the same residual,
-   unregressed approximation the file already had before this PR, not a new one.
-   Rewriting the preview canvas's whole responsive-simulation architecture is out of
-   this Horizon's bounded scope; it is recorded as a known pre-existing limitation in
-   §23 instead of being silently expanded into.
+   was judged, at the time, to carry the same residual, unregressed approximation the
+   file already had before this PR. **Round 6 (below) found that judgment wrong for this
+   specific line** — the column count is still fixed in the same push, for the same
+   reason the other conditional (`cardImageHeight`) already had been.
 
-All eight fixes re-verified: full web suite 2168/2168, `pnpm build` green,
-`tsc --noEmit` clean, Biome clean (rounds 4–5 touched only `web/`, so the storefront
+**Round 6** (commit `c1acb0ec`), raised against round 5's own self-audit note:
+
+9. **P2 — the New Arrivals grid's column count had the same host-browser-vs-simulated-
+   viewport bug as `cardImageHeight`, on the very line this PR already touches.** The
+   round-2 fix (finding 4) had rewritten this ternary from `compact` to `mobileViewport`,
+   but kept the same two-branch shape: `mobileViewport ? "grid-cols-2" :
+   "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4"`. Once round 5 established that this
+   preview frame is a plain, non-iframe `<div>` and that literal `sm:`/`lg:` classes
+   therefore evaluate against the host browser's real window rather than the simulated
+   device, the exact same defect applied here: a desktop host simulating the 768px
+   tablet device (or the reverse, a narrow host simulating the 1280px desktop device)
+   would get column counts computed against its own window, not the chosen preview
+   width. The round-5 self-audit reasoned this line was "pre-existing and unregressed"
+   because it only changed which *string* the ternary picked, not the strings'
+   `sm:`/`lg:` content — but that reasoning missed that this exact ternary is code this
+   PR's round 2 rewrote, not inherited untouched, so the same fix pattern applied here
+   was in scope, not a scope expansion. Fixed by resolving the column count explicitly
+   from the `viewport` prop, mirroring `cardImageHeight`: mapped against the published
+   `ProductGrid.tsx`'s real breakpoints (`grid-cols-2 lg:grid-cols-3 xl:grid-cols-4`,
+   `lg` at 1024px / `xl` at 1280px) onto this preview's three discrete simulated widths
+   (390/768/1280) — mobile and tablet both sit below the 1024px `lg` tier, so both
+   resolve to 2 columns; only the 1280px desktop width reaches the 1280px `xl` tier, for
+   4. Notably, 3 columns never applies at any of the three simulated widths, which the
+   naive `sm:grid-cols-3` in the removed code would have suggested for tablet. Covered by
+   3 new parameterized tests (one per simulated viewport) plus a fix to an existing
+   test's stale `lg:grid-cols-4` assertion (now the plain fixed class `grid-cols-4`).
+
+All nine fixes re-verified: full web suite 2171/2171, `pnpm build` green, `tsc --noEmit`
+clean on the touched files (rounds 4–6 touched only `web/`, so the storefront
 suite/build from round 3 — already 641/641 and green — stands unchanged).
 
 ## 23. Risks / remaining work
@@ -586,10 +646,12 @@ suite/build from round 3 — already 641/641 and green — stands unchanged).
   uses real Tailwind `sm:`/`md:`/`lg:` responsive classes throughout (hero, wholesale,
   footer, category grids) that technically evaluate against the host browser's window
   rather than the simulated device, since the preview frame is a plain div, not an
-  iframe. Round 5 fixed the one instance this PR's own Market feature depends on getting
-  exactly right (card image height); the rest is pre-existing, was not made worse by
-  this PR, and a full fix would be a preview-canvas-wide architectural change outside
-  this Horizon's bounded scope.
+  iframe. Rounds 5 and 6 fixed every instance this PR's own diff touches or depends on
+  getting exactly right — the Market card image height, and the New Arrivals grid's
+  column count. What remains (hero banner text sizing, the wholesale section, footer
+  grids, the category grid) is code this PR never edited and does not depend on for
+  correctness; it predates this PR, was not made worse by it, and a full fix would be a
+  preview-canvas-wide architectural change outside this Horizon's bounded scope.
 
 - Live Shona re-verification is recommended once the environment's network policy
   allows `store.shonaksa.com`, to confirm the parity matrix against fresh pixels
