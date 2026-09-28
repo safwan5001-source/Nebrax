@@ -128,7 +128,7 @@ Screenshots were captured to `web/test-results/cust-h1-2-version-manager/` durin
 
 ## CI
 
-Workflow: `.github/workflows/web-ci.yml` (`npm run test` then `npm run build`, Node 22). Both commands verified green locally under the same invocations CI uses. CI has since run across all 8 review rounds and both merge reconciliations (see "Merge-conflict reconciliation" below for the one real CI-caught regression, fixed in `9d3ffa4`); as of head `9d3ffa4` both jobs are green.
+Workflow: `.github/workflows/web-ci.yml` (`npm run test` then `npm run build`, Node 22). Both commands verified green locally under the same invocations CI uses. CI has since run across all 16 review rounds and both merge reconciliations (see "Merge-conflict reconciliation" below for the one real CI-caught regression, fixed in `9d3ffa4`); as of head `667cc15`, all 8 CI check runs (PHP tests × sqlite/pgsql, web build, and both visual QA jobs) are green and the PR reports `mergeable_state: clean`.
 
 ## Review findings
 
