@@ -142,16 +142,25 @@ export function StorefrontPreviewCanvas({
       : null;
   const density = config.density === "compact" ? "compact" : "comfortable";
   const cardPad = config.productCard === "compact" ? "p-2.5" : "p-3";
-  // The exact same fixed height classes ProductCard.tsx itself uses — not an
-  // approximated aspect ratio, which produces a materially taller image than
-  // the real card once the preview's column width differs from the
-  // published grid's (e.g. ~220px at a 4-column 1280px preview vs. the
-  // published card's fixed 160px `md:h-40`). Bounding by height, exactly
-  // like the real card, is the only way this preview can match it.
+  // The exact fixed heights ProductCard.tsx itself resolves to at each
+  // breakpoint — not the `sm:`/`md:` classes themselves. This preview frame
+  // is a plain, width-constrained div rendered inside the real Customizer
+  // page (`data-preview-frame` in ExperienceBuilder.tsx), not an iframe, so
+  // Tailwind's responsive prefixes would evaluate against the host browser's
+  // actual viewport rather than the simulated device width — a desktop host
+  // previewing "mobile" would still get `md:h-40`. Resolving the height
+  // explicitly from the `viewport` prop is the only way this preview can
+  // match the simulated device rather than the host's real window. None of
+  // this preview's three device widths (390/768/1280) ever land in the
+  // published `sm` tier (640–767px), so only base/`md` are reachable here.
   const cardImageHeight =
-    config.themePreset === "awj-market"
-      ? "h-28 sm:h-32 md:h-40"
-      : "h-36 sm:h-44 md:h-52";
+    viewport === "mobile"
+      ? config.themePreset === "awj-market"
+        ? "h-28"
+        : "h-36"
+      : config.themePreset === "awj-market"
+        ? "h-40"
+        : "h-52";
   const enabledSocial = config.social.flatMap((item) => {
     if (!item.enabled || !isOfficialSocialNetwork(item.network)) return [];
     const href = sanitizeExternalUrl(item.url);

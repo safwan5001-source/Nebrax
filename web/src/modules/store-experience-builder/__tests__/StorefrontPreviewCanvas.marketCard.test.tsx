@@ -10,13 +10,22 @@ import { StorefrontPreviewCanvas } from "../StorefrontPreviewCanvas";
  * Regression coverage for the Codex P2 finding on PR #1084: selecting AWJ
  * Market must change the merchant-facing preview's card proportions too, or
  * the preview materially disagrees with what Publish actually ships.
+ *
+ * The preview frame is a plain, width-constrained div rendered inside the
+ * real Customizer page (not an iframe — see `data-preview-frame` in
+ * `ExperienceBuilder.tsx`), so Tailwind's `sm:`/`md:` responsive prefixes
+ * would evaluate against the host browser's actual window width, not the
+ * simulated device. A desktop host previewing the mobile device must still
+ * get the mobile-sized image, which is exactly what a literal `sm:`/`md:`
+ * class name (present regardless of any real cascade) would get wrong and a
+ * single explicit class per simulated viewport gets right.
  */
 describe("web customizer preview — AWJ Market card proportions", () => {
   afterEach(() => {
     cleanup();
   });
 
-  it("uses ProductCard's own standard fixed image height for AWJ Modern (unchanged default)", () => {
+  it("uses ProductCard's own standard fixed image height for AWJ Modern at the desktop/tablet simulated width", () => {
     const { container } = render(
       <StorefrontPreviewCanvas
         config={DEFAULT_PRESENTATION_CONFIG}
@@ -24,11 +33,12 @@ describe("web customizer preview — AWJ Market card proportions", () => {
         viewport="desktop"
       />,
     );
-    expect(container.querySelector(".h-36")).not.toBeNull();
-    expect(container.querySelector(".h-28")).toBeNull();
+    expect(container.querySelector(".h-52")).not.toBeNull();
+    expect(container.querySelector(".h-36")).toBeNull();
+    expect(container.querySelector(".h-40")).toBeNull();
   });
 
-  it("uses ProductCard's own exact Market fixed image height once AWJ Market is selected", () => {
+  it("uses ProductCard's own exact Market fixed image height at the desktop/tablet simulated width", () => {
     const marketConfig = {
       ...DEFAULT_PRESENTATION_CONFIG,
       themePreset: "awj-market" as const,
@@ -36,8 +46,32 @@ describe("web customizer preview — AWJ Market card proportions", () => {
     const { container } = render(
       <StorefrontPreviewCanvas config={marketConfig} locale="en" viewport="desktop" />,
     );
+    expect(container.querySelector(".h-40")).not.toBeNull();
+    expect(container.querySelector(".h-52")).toBeNull();
+  });
+
+  it("uses the mobile-sized image at the simulated mobile viewport, not the host browser's own width (AWJ Modern)", () => {
+    const { container } = render(
+      <StorefrontPreviewCanvas
+        config={DEFAULT_PRESENTATION_CONFIG}
+        locale="en"
+        viewport="mobile"
+      />,
+    );
+    expect(container.querySelector(".h-36")).not.toBeNull();
+    expect(container.querySelector(".h-52")).toBeNull();
+  });
+
+  it("uses the mobile-sized Market image at the simulated mobile viewport, not the host browser's own width", () => {
+    const marketConfig = {
+      ...DEFAULT_PRESENTATION_CONFIG,
+      themePreset: "awj-market" as const,
+    };
+    const { container } = render(
+      <StorefrontPreviewCanvas config={marketConfig} locale="en" viewport="mobile" />,
+    );
     expect(container.querySelector(".h-28")).not.toBeNull();
-    expect(container.querySelector(".h-36")).toBeNull();
+    expect(container.querySelector(".h-40")).toBeNull();
   });
 });
 
