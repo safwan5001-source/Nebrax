@@ -52,9 +52,10 @@ own scope discipline):
 
 - **Branch:** `claude/awj-market-horizon-6qxr5v`
 - **PR:** https://github.com/safwan5001-source/Nebrax/pull/1084
-- **Head SHA:** `65906c0d12d95d345b7ee8271b29809814bee444` (after the initial push at
-  `0793217b`, a Biome formatting fix at `d2e88cab`, and four rounds of automated
-  review fixes at `747c45fa`, `4bcee30d`, `8e9a0624` and `65906c0d` — see §22a)
+- **Head SHA:** `1e8b8d8f151680807004a23898a8fb607acd2160` (after the initial push at
+  `0793217b`, a Biome formatting fix at `d2e88cab`, and five rounds of automated
+  review fixes at `747c45fa`, `4bcee30d`, `8e9a0624`, `65906c0d` and `1e8b8d8f` —
+  see §22a)
 
 ## 4. Implementation summary by surface
 
@@ -461,8 +462,8 @@ _(filled in after push, PR creation, and CI observation)_
 
 ## 22a. Automated review findings addressed
 
-Codex (`chatgpt-codex-connector[bot]`) reviewed this PR across four rounds and raised
-seven findings total, all verified real and fixed. All seven review threads are
+Codex (`chatgpt-codex-connector[bot]`) reviewed this PR across five rounds and raised
+eight findings total, all verified real and fixed. All eight review threads are
 resolved.
 
 **Round 1** (commit `747c45fa`):
@@ -546,11 +547,49 @@ resolved.
    longer any width-dependent gap to be wrong at any grid width. Tests updated to assert
    the exact height classes rather than the retired aspect-ratio ones.
 
-All seven fixes re-verified: full web suite 2166/2166, `pnpm build` green,
-`tsc --noEmit` clean, Biome clean (this final round touched only `web/`, so the
-storefront suite/build from round 3 — already 641/641 and green — stands unchanged).
+**Round 5** (commit `1e8b8d8f`), raised against round 4's own fix:
+
+8. **P2 — the fixed-height classes from round 4 still assumed a real CSS cascade.**
+   `ExperienceBuilder.tsx`'s preview frame (`data-preview-frame`) is a plain
+   width-constrained `<div>` rendered inside the actual Customizer page, not an iframe,
+   so `sm:`/`md:` responsive prefixes evaluate against the *host browser's* real window
+   width, not the simulated device. A desktop host previewing the 390px mobile device
+   would still trigger `md:h-40`/`md:h-52`, showing the tablet/desktop-sized image at
+   the mobile preview. Fixed by resolving the height explicitly from the `viewport` prop
+   instead of any responsive class prefix: mobile → the base height, tablet/desktop →
+   the md-tier height (both simulated widths are ≥768px, and none of the three land in
+   the published `sm` tier, so those two branches cover every case exactly). Tests
+   updated to assert the height at both the mobile and desktop/tablet simulated
+   viewports.
+
+   **Self-audit performed before pushing further**: since this was the third
+   consecutive finding on the same preview-height code, the rest of
+   `StorefrontPreviewCanvas.tsx` was checked for the same class of bug. It is pervasive
+   throughout the file (hero banner text sizing, wholesale section, footer grids,
+   category grids — dozens of pre-existing `sm:`/`md:`/`lg:` instances), but all of it
+   predates this PR and none of it is keyed to `themePreset`/Market. The one
+   `mobileViewport` conditional this PR touches (the `newArrivals` grid's column count)
+   changed only which pre-existing literal class string applies via a boolean, never the
+   strings' own embedded `sm:`/`lg:` content — so it carries the same residual,
+   unregressed approximation the file already had before this PR, not a new one.
+   Rewriting the preview canvas's whole responsive-simulation architecture is out of
+   this Horizon's bounded scope; it is recorded as a known pre-existing limitation in
+   §23 instead of being silently expanded into.
+
+All eight fixes re-verified: full web suite 2168/2168, `pnpm build` green,
+`tsc --noEmit` clean, Biome clean (rounds 4–5 touched only `web/`, so the storefront
+suite/build from round 3 — already 641/641 and green — stands unchanged).
 
 ## 23. Risks / remaining work
+
+- **Pre-existing, unregressed preview approximation**: `StorefrontPreviewCanvas.tsx`
+  uses real Tailwind `sm:`/`md:`/`lg:` responsive classes throughout (hero, wholesale,
+  footer, category grids) that technically evaluate against the host browser's window
+  rather than the simulated device, since the preview frame is a plain div, not an
+  iframe. Round 5 fixed the one instance this PR's own Market feature depends on getting
+  exactly right (card image height); the rest is pre-existing, was not made worse by
+  this PR, and a full fix would be a preview-canvas-wide architectural change outside
+  this Horizon's bounded scope.
 
 - Live Shona re-verification is recommended once the environment's network policy
   allows `store.shonaksa.com`, to confirm the parity matrix against fresh pixels
