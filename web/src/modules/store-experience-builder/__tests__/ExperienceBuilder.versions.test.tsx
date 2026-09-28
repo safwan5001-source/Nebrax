@@ -84,6 +84,29 @@ describe('ExperienceBuilder — CUST-H1-2 Version Manager', () => {
     expect(screen.getByRole('button', { name: 'حفظ المسودة' })).toHaveProperty('disabled', true);
   });
 
+  it('pressing Enter repeatedly while the first create is still pending does not send duplicate requests (codex round 3)', async () => {
+    listMock.mockResolvedValue({ ok: true, data: [] });
+    let resolveCreate: (value: unknown) => void = () => {};
+    createMock.mockReturnValue(new Promise((resolve) => { resolveCreate = resolve; }));
+    const user = userEvent.setup();
+    render(<ExperienceBuilder storefrontId="store-1" initialLocale="ar" />);
+    await waitFor(() => expect(document.querySelector('[data-version-empty-state]')).toBeTruthy());
+
+    const input = within(emptyStatePanel()).getByPlaceholderText('مثال: رمضان ١٤٤٨');
+    await user.type(input, 'رمضان 1448');
+    await user.type(input, '{Enter}');
+    await waitFor(() => expect(createMock).toHaveBeenCalledTimes(1));
+
+    // The request is still pending — a repeated Enter must not fire another one.
+    await user.type(input, '{Enter}');
+    expect(createMock).toHaveBeenCalledTimes(1);
+
+    resolveCreate({ ok: true, data: detail({ revision: 1 }) });
+    await waitFor(() =>
+      expect(screen.getByLabelText('نسخة التصميم قيد التعديل').textContent).toContain('رمضان 1448'),
+    );
+  });
+
   it('creates the first version, then selects/opens it', async () => {
     listMock.mockResolvedValue({ ok: true, data: [] });
     createMock.mockResolvedValue({ ok: true, data: detail({ revision: 1 }) });
@@ -537,5 +560,76 @@ describe('ExperienceBuilder — CUST-H1-2 Version Manager', () => {
     expect(
       screen.getByLabelText('نسخة التصميم قيد التعديل').textContent,
     ).toContain('نسخة المتجر الثاني');
+  });
+
+  it('creating a new version while the open one has unsaved edits requires confirming the discard first (codex round 3)', async () => {
+    listMock.mockResolvedValue({ ok: true, data: [summary({ id: 'a', name: 'نسخة أ', revision: 0 })] });
+    showMock.mockResolvedValue({ ok: true, data: detail({ id: 'a', name: 'نسخة أ', revision: 0 }) });
+    createMock.mockResolvedValue({ ok: true, data: detail({ id: 'new-1', name: 'نسخة جديدة', revision: 1 }) });
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true);
+    const user = userEvent.setup();
+    render(<ExperienceBuilder storefrontId="store-1" initialLocale="ar" />);
+    await waitFor(() => expect(showMock).toHaveBeenCalled());
+
+    await user.click(screen.getByRole('button', { name: 'التوثيق والثقة' }));
+    await user.type(screen.getAllByRole('textbox')[0], 'تعديل غير محفوظ');
+
+    // First attempt: declines the discard confirmation — no create request fires.
+    await openVersionManager(user);
+    await user.click(screen.getByRole('button', { name: '+ نسخة جديدة' }));
+    await user.type(screen.getByPlaceholderText('مثال: رمضان ١٤٤٨'), 'نسخة جديدة');
+    await user.click(screen.getByRole('button', { name: 'إنشاء' }));
+    expect(confirmSpy).toHaveBeenCalledTimes(1);
+    expect(createMock).not.toHaveBeenCalled();
+    expect((screen.getAllByRole('textbox')[0] as HTMLInputElement).value).toContain('تعديل غير محفوظ');
+
+    // Second attempt: confirms the discard — the create proceeds and adopts.
+    await user.click(screen.getByRole('button', { name: '+ نسخة جديدة' }));
+    await user.type(screen.getByPlaceholderText('مثال: رمضان ١٤٤٨'), 'نسخة جديدة');
+    await user.click(screen.getByRole('button', { name: 'إنشاء' }));
+    expect(confirmSpy).toHaveBeenCalledTimes(2);
+    await waitFor(() => expect(createMock).toHaveBeenCalledTimes(1));
+    await waitFor(() =>
+      expect(screen.getByLabelText('نسخة التصميم قيد التعديل').textContent).toContain('نسخة جديدة'),
+    );
+
+    confirmSpy.mockRestore();
+  });
+
+  it('duplicating a version while the open one has unsaved edits requires confirming the discard first (codex round 3)', async () => {
+    listMock.mockResolvedValue({ ok: true, data: [summary({ id: 'a', name: 'نسخة أ', revision: 0 })] });
+    showMock.mockResolvedValue({ ok: true, data: detail({ id: 'a', name: 'نسخة أ', revision: 0 }) });
+    createMock.mockResolvedValue({
+      ok: true,
+      data: detail({ id: 'copy-1', name: 'نسخة من نسخة أ', revision: 1 }),
+    });
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true);
+    const user = userEvent.setup();
+    render(<ExperienceBuilder storefrontId="store-1" initialLocale="ar" />);
+    await waitFor(() => expect(showMock).toHaveBeenCalled());
+
+    await user.click(screen.getByRole('button', { name: 'التوثيق والثقة' }));
+    await user.type(screen.getAllByRole('textbox')[0], 'تعديل غير محفوظ');
+
+    await openVersionManager(user);
+    const manager = screen.getByRole('menu', { name: 'إدارة نسخ التصميم' });
+    const rowA = within(manager).getByText('نسخة أ').closest('li') as HTMLElement;
+
+    // First attempt: declines the discard confirmation — no request fires.
+    await user.click(within(rowA).getByRole('button', { name: 'تكرار النسخة' }));
+    await user.click(within(rowA).getByRole('button', { name: 'إنشاء' }));
+    expect(confirmSpy).toHaveBeenCalledTimes(1);
+    expect(createMock).not.toHaveBeenCalled();
+
+    // Second attempt: confirms the discard — the duplicate proceeds and adopts.
+    await user.click(within(rowA).getByRole('button', { name: 'تكرار النسخة' }));
+    await user.click(within(rowA).getByRole('button', { name: 'إنشاء' }));
+    expect(confirmSpy).toHaveBeenCalledTimes(2);
+    await waitFor(() => expect(createMock).toHaveBeenCalledTimes(1));
+    await waitFor(() =>
+      expect(screen.getByLabelText('نسخة التصميم قيد التعديل').textContent).toContain('نسخة من نسخة أ'),
+    );
+
+    confirmSpy.mockRestore();
   });
 });

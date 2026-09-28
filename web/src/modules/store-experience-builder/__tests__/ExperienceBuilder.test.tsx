@@ -207,6 +207,45 @@ describe('ExperienceBuilder persistence wiring — CUST-H1-2 version APIs', () =
     expect(saveMock.mock.calls[0][2].sbc.seal_token).toBe('token=Opaque+/');
   });
 
+  it('does not discard an edit made while an earlier save is still in flight (codex round 3)', async () => {
+    listMock.mockResolvedValue({ ok: true, data: [versionSummary({ revision: 0 })] });
+    showMock.mockResolvedValue({ ok: true, data: versionDetail({ revision: 0 }) });
+    let resolveSave: (value: unknown) => void = () => {};
+    saveMock.mockReturnValue(new Promise((resolve) => { resolveSave = resolve; }));
+    const user = userEvent.setup();
+    render(<ExperienceBuilder storefrontId="store-1" initialLocale="en" />);
+    await waitFor(() => expect(showMock).toHaveBeenCalled());
+
+    await user.click(screen.getByRole('button', { name: 'Verification & trust' }));
+    const input = screen.getAllByRole('textbox')[0];
+    await user.type(input, 'first edit');
+
+    await user.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(1));
+    expect(saveMock.mock.calls[0][2].sbc.authentication_number).toBe('first edit');
+
+    // The merchant keeps editing while that PUT is still pending — nothing in
+    // the UI blocks it.
+    await user.type(input, ' second edit');
+    expect((input as HTMLInputElement).value).toBe('first edit second edit');
+
+    // The save resolves, echoing back exactly the older snapshot it was sent —
+    // it must not overwrite the newer edit made in the meantime.
+    resolveSave({
+      ok: true,
+      data: versionDetail({
+        revision: 1,
+        config: {
+          ...DEFAULT_PRESENTATION_CONFIG,
+          sbc: { ...DEFAULT_PRESENTATION_CONFIG.sbc, authentication_number: 'first edit' },
+        },
+      }),
+    });
+    await waitFor(() => expect(screen.getByText('Version saved.')).toBeTruthy());
+
+    expect((input as HTMLInputElement).value).toBe('first edit second edit');
+  });
+
   it('shows a stale-revision conflict banner and reloads only on explicit request — never merges or claims success', async () => {
     listMock.mockResolvedValue({ ok: true, data: [versionSummary({ revision: 1 })] });
     showMock

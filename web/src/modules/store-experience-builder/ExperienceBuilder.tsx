@@ -131,6 +131,11 @@ export function ExperienceBuilder({
   // صفّ في `versions` ما زال ينتمي للقائمة المعروضة أصلاً.
   const storefrontIdRef = useRef(storefrontId);
   storefrontIdRef.current = storefrontId;
+  // مرجع متزامن مماثل لـ`draft` — يتيح لمعالج نجاح الحفظ معرفة هل عدَّل التاجر
+  // المسودة مجدداً بعد إرسال الـ`PUT` وقبل وصول استجابته، فلا يُستبدَل تعديله
+  // الأحدث بلقطة الخادم القديمة (راجع `handleSave`).
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
 
   function stillCurrent(originStorefrontId: string | null, tokenAtStart: number): boolean {
     return storefrontIdRef.current === originStorefrontId && tokenAtStart === versionRequestTokenRef.current;
@@ -398,6 +403,7 @@ export function ExperienceBuilder({
     const originStorefrontId = storefrontId;
     const savingVersionId = selectedVersion.id;
     const tokenAtSaveStart = versionRequestTokenRef.current;
+    const draftAtSaveStart = draft;
     setBusy("saving");
     setNotice(null);
     setVersionConflict(null);
@@ -417,10 +423,20 @@ export function ExperienceBuilder({
       // لكن `draft`/`saved`/`selectedVersion` ملك النسخة المفتوحة حالياً فقط.
       if (sameStorefront) updateVersionSummaryInList(result.data);
       if (!current) return;
-      setDraft(result.data.config);
+      // التاجر قد يكون عدَّل المسودة مجدداً بعد إرسال الحفظ وقبل وصول هذه
+      // الاستجابة — تلك التعديلات الأحدث ما زالت في `draftRef.current` ولا
+      // تصل الخادم أصلاً بعد. استبدالها بلقطة الخادم (وهي مطابقة لِما أُرسل،
+      // لا لِما يُعرَض الآن) يُفقدها بصمت. نحدِّث `saved`/`selectedVersion`
+      // دوماً (مراجعة الخادم صحيحة الآن)، لكن `draft` فقط إن لم يتغيّر شيء.
+      const editedSincePersist = !presentationConfigsEqual(draftRef.current, draftAtSaveStart);
       setSaved(result.data.config);
       setSelectedVersion(result.data);
-      setLifecycle("clean");
+      if (editedSincePersist) {
+        setLifecycle("dirty");
+      } else {
+        setDraft(result.data.config);
+        setLifecycle("clean");
+      }
       setNoticeKind("status");
       setNotice(t("versionSaveSuccess"));
       return;
@@ -451,6 +467,10 @@ export function ExperienceBuilder({
 
   async function handleCreateVersion(name: string) {
     if (!storefrontId) return;
+    // الإنشاء يتبنّى النسخة الجديدة فوراً في المحرِّر (`adoptCreatedVersion`)،
+    // فيستبدل مسودة النسخة المفتوحة حالياً بصمت إن كانت غير محفوظة — نفس تأكيد
+    // `selectVersion` قبل أي تبديل يُطبَّق هنا قبل حتى إرسال الطلب.
+    if (dirty && !window.confirm(t("versionSwitchDiscardConfirm"))) return;
     const originStorefrontId = storefrontId;
     const tokenAtStart = versionRequestTokenRef.current;
     setVersionCreating(true);
@@ -475,6 +495,10 @@ export function ExperienceBuilder({
 
   async function handleDuplicateVersion(version: PresentationVersionSummary, name: string) {
     if (!storefrontId) return;
+    // نفس تأكيد الإنشاء أعلاه: التكرار يستنسخ آخر محتوى محفوظ من الخادم لا
+    // المسودة المحلية، فتعديلات غير محفوظة على النسخة المفتوحة تُفقَد بصمت
+    // (بلا حتى فرصة استرجاعها من النسخة الجديدة) إن لم نؤكّد قبل البدء.
+    if (dirty && !window.confirm(t("versionSwitchDiscardConfirm"))) return;
     const originStorefrontId = storefrontId;
     const tokenAtStart = versionRequestTokenRef.current;
     setVersionBusy({ id: version.id, action: "duplicate" });
@@ -1260,7 +1284,7 @@ function EmptyVersionsPrompt({
           value={name}
           onChange={(event) => setName(event.target.value)}
           onKeyDown={(event) => {
-            if (event.key === "Enter" && name.trim() !== "") onCreate(name.trim());
+            if (event.key === "Enter" && !creating && name.trim() !== "") onCreate(name.trim());
           }}
           placeholder={t("versionNamePlaceholder")}
           className="h-9 min-w-0 flex-1 rounded border border-border bg-surface px-2 text-sm text-text outline-none focus:border-primary"
