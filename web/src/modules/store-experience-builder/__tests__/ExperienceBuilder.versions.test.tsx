@@ -1626,4 +1626,94 @@ describe('ExperienceBuilder — CUST-H1-2 Version Manager', () => {
     expect(screen.getByLabelText('نسخة التصميم قيد التعديل').textContent).toContain('نسخة ب');
     expect(document.querySelector('[data-experience-builder]')?.getAttribute('data-selected-version-id')).toBe('b');
   });
+
+  it('the published-version "create draft" action is also blocked while a manager create is pending, not only a row write (codex round 14)', async () => {
+    listMock.mockResolvedValue({
+      ok: true,
+      data: [
+        summary({ id: 'pub-1', name: 'الحالية', state: 'published' }),
+        summary({ id: 'draft-1', name: 'مسودة أخرى', revision: 0 }),
+      ],
+    });
+    showMock.mockImplementation((_storefrontId: string, versionId: string) =>
+      Promise.resolve({
+        ok: true,
+        data: versionId === 'pub-1'
+          ? detail({ id: 'pub-1', name: 'الحالية', state: 'published' })
+          : detail({ id: 'draft-1', name: 'مسودة أخرى', revision: 0 }),
+      }),
+    );
+    createMock.mockReturnValue(new Promise(() => {})); // never resolves during this test
+    const user = userEvent.setup();
+    render(<ExperienceBuilder storefrontId="store-1" initialLocale="ar" />);
+    // The draft auto-selects (published is never a candidate) — switch
+    // explicitly to the published row to exercise its read-only view.
+    await waitFor(() =>
+      expect(screen.getByLabelText('نسخة التصميم قيد التعديل').textContent).toContain('مسودة أخرى'),
+    );
+    await openVersionManager(user);
+    const manager = screen.getByRole('menu', { name: 'إدارة نسخ التصميم' });
+    const pubRow = within(manager).getByText('الحالية').closest('li') as HTMLElement;
+    await user.click(within(pubRow).getByRole('button', { name: 'عرض' }));
+    await waitFor(() => expect(screen.getByText('هذه النسخة منشورة ومقروءة فقط')).toBeTruthy());
+    expect(
+      (screen.getByRole('button', { name: 'إنشاء مسودة من هذه النسخة' }) as HTMLButtonElement).disabled,
+    ).toBe(false);
+
+    // Start (and leave pending) a manager create — an entirely separate flag
+    // (`versionCreating`) from the row-write `versionBusy` slot.
+    await openVersionManager(user);
+    await user.click(screen.getByRole('button', { name: '+ نسخة جديدة' }));
+    await user.type(screen.getByPlaceholderText('مثال: رمضان ١٤٤٨'), 'نسخة ثالثة');
+    await user.click(screen.getByRole('button', { name: 'إنشاء' }));
+    await waitFor(() => expect(createMock).toHaveBeenCalledTimes(1));
+
+    // `busy` is now `versionBusy !== null || versionCreating`, so the
+    // button's own label reflects "busy" (it doesn't literally read
+    // "إنشاء مسودة من هذه النسخة" once disabled).
+    const createDraftButton = document.querySelector(
+      '[data-version-create-draft-from-published]',
+    ) as HTMLButtonElement;
+    expect(createDraftButton.disabled).toBe(true);
+  });
+
+  it('the manager\'s own create form is blocked while a row write is pending, not only while another create is (codex round 14)', async () => {
+    listMock.mockResolvedValue({ ok: true, data: [summary({ id: 'a', name: 'نسخة أ', revision: 0 })] });
+    showMock.mockResolvedValue({ ok: true, data: detail({ id: 'a', name: 'نسخة أ', revision: 0 }) });
+    renameMock.mockReturnValue(new Promise(() => {})); // never resolves during this test
+    const user = userEvent.setup();
+    render(<ExperienceBuilder storefrontId="store-1" initialLocale="ar" />);
+    await waitFor(() => expect(showMock).toHaveBeenCalled());
+
+    // Start (and leave pending) a rename — the shared `versionBusy` slot,
+    // an entirely separate flag from the manager create form's `creating`.
+    await openVersionManager(user);
+    await user.click(screen.getByRole('button', { name: 'إعادة تسمية' }));
+    await user.clear(screen.getByLabelText('اسم النسخة'));
+    await user.type(screen.getByLabelText('اسم النسخة'), 'اسم جديد');
+    await user.click(screen.getByRole('button', { name: 'حفظ الاسم' }));
+    await waitFor(() => expect(renameMock).toHaveBeenCalledTimes(1));
+
+    await user.click(screen.getByRole('button', { name: '+ نسخة جديدة' }));
+    await user.type(screen.getByPlaceholderText('مثال: رمضان ١٤٤٨'), 'نسخة ثانية');
+    // `creating` is bound to `versionCreating || versionBusy !== null`, so
+    // the submit button's own label reflects "busy" (not literally "إنشاء").
+    expect(screen.getByRole('button', { name: /إنشاء|جاري الإنشاء/ })).toHaveProperty('disabled', true);
+  });
+
+  it("truncates the manager's own generated duplicate-name default to the server's 120-character limit (codex round 14)", async () => {
+    const longName = 'ب'.repeat(118); // "نسخة من " (8 chars) + 118 = 126, over the limit
+    listMock.mockResolvedValue({ ok: true, data: [summary({ id: 'a', name: longName, revision: 0 })] });
+    showMock.mockResolvedValue({ ok: true, data: detail({ id: 'a', name: longName, revision: 0 }) });
+    const user = userEvent.setup();
+    render(<ExperienceBuilder storefrontId="store-1" initialLocale="ar" />);
+    await waitFor(() => expect(showMock).toHaveBeenCalled());
+
+    await openVersionManager(user);
+    await user.click(screen.getByRole('button', { name: 'تكرار النسخة' }));
+
+    const input = screen.getByLabelText('اسم النسخة') as HTMLInputElement;
+    expect(input.value.length).toBeLessThanOrEqual(120);
+    expect(input.value.startsWith('نسخة من ')).toBe(true);
+  });
 });

@@ -47,7 +47,13 @@ function stateLabel(state: PresentationVersionState, t: (key: Parameters<typeof 
 }
 
 function defaultDuplicateName(name: string, locale: CustomizerLocale): string {
-  return locale === "ar" ? `نسخة من ${name}` : `Copy of ${name}`;
+  // الخادم يرفض `name` أطول من 120 حرفاً (`CreateStorefrontPresentationVersionRequest`)
+  // — نسخة باسمٍ قريب من الحدّ تجعل هذا الاسم المولَّد (بادئة + اسمها) يتجاوزه،
+  // فيُملأ حقل التعديل بقيمة غير صالحة من البداية (تفشل الإرسال دون تعديلٍ
+  // يدوي). نقصّ السلسلة كاملةً (بادئة + اسم) عند 120 حرفاً بدل ترك الافتراضي
+  // غير صالح — نفس أسلوب اختصار «إنشاء مسودة من هذه النسخة» للنسخة المنشورة.
+  const prefix = locale === "ar" ? "نسخة من " : "Copy of ";
+  return `${prefix}${name}`.slice(0, 120);
 }
 
 export function VersionManagerPanel({

@@ -830,7 +830,12 @@ export function ExperienceBuilder({
     versions,
     selectedVersionId: selectedVersion?.id ?? null,
     switchingVersionId: versionSwitchingId,
-    creating: versionCreating,
+    // `versionCreating`/`versionBusy` علَما انشغال منفصلان (هويتا طلبٍ
+    // مستقلَّتان منذ إصلاح السباق A→B→A) — لكنهما يتشاركان نفس المخاطر إن بدأ
+    // أحدهما بينما الآخر معلَّق: إنشاءٌ من النموذج المضمَّن هنا أثناء تكرارٍ/
+    // تسميةٍ/حذفٍ قيد التنفيذ على صفّ آخر ليس خطأً تقنياً (لكل منهما هويته
+    // الآن) لكنه إرباكٌ تشغيلي غير مقصود لا داعي للسماح به.
+    creating: versionCreating || versionBusy !== null,
     busyVersionId: versionBusy?.id ?? null,
     busyAction: versionBusy?.action ?? null,
     onRetryList: () => {
@@ -873,7 +878,7 @@ export function ExperienceBuilder({
         <PublishedReadOnlyNotice
           locale={locale}
           versionName={selectedVersion.name}
-          busy={versionBusy !== null}
+          busy={versionBusy !== null || versionCreating}
           onCreateDraft={() => {
             // الخادم يرفض `name` أطول من 120 حرفاً (`CreateStorefrontPresentationVersionRequest`)
             // — نسخة منشورة باسمٍ قريب من الحدّ تجعل الاسم المولَّد هنا (بادئة +
