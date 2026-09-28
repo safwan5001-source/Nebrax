@@ -20,9 +20,11 @@ export type StorefrontPresentationVersionRecord = {
   config: StorefrontPresentationConfig;
 };
 
+export type PresentationVersionFailureReason = 'conflict' | 'not_found' | 'forbidden' | 'validation' | 'failed';
+
 export type PresentationVersionOutcome =
   | { ok: true; data: StorefrontPresentationVersionRecord }
-  | { ok: false; reason: 'conflict' | 'not_found' | 'forbidden' | 'validation' | 'failed'; message: string };
+  | { ok: false; reason: PresentationVersionFailureReason; message: string };
 
 export async function createStorefrontPresentationVersion(
   storefrontId: string,
@@ -97,7 +99,7 @@ export function mapVersionRecord(payload: unknown): StorefrontPresentationVersio
 }
 
 function failure(error: unknown, fallback: string): PresentationVersionOutcome {
-  let reason: PresentationVersionOutcome extends { ok: false; reason: infer R } ? R : never = 'failed';
+  let reason: PresentationVersionFailureReason = 'failed';
   if (hasApiStatus(error, 409)) reason = 'conflict';
   else if (hasApiStatus(error, 403)) reason = 'forbidden';
   else if (hasApiStatus(error, 404)) reason = 'not_found';
