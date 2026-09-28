@@ -160,7 +160,10 @@ final class StorefrontPresentationVersionService
                 return null;
             }
 
-            $head = StorefrontPresentation::query()->where('storefront_id', $storefront->id)->first();
+            $head = StorefrontPresentation::query()
+                ->where('storefront_id', $storefront->id)
+                ->lockForUpdate()
+                ->first();
 
             $version = $this->lockOwnedVersion($storefront, $versionId);
             if ($version === null) {
@@ -171,10 +174,21 @@ final class StorefrontPresentationVersionService
                 throw new StaleVersionRevisionException;
             }
 
+            $newRevision = (int) $version->revision + 1;
+
             $version->forceFill([
                 'name' => $name,
-                'revision' => (int) $version->revision + 1,
+                'revision' => $newRevision,
             ])->save();
+
+            // CUST-H1-1: رمز التزامن على الرأس (`draft_revision`) يجب أن
+            // يبقى مرآةً لمراجعة نسخة العمل المتوافقة حتى عند إعادة تسمية
+            // بلا تعديل مستند — وإلا حسب مسار PUT القديم مراجعة قديمة
+            // فتقبل حفظاً كان يجب رفضه (409)، أو يُصادف رقماً يطابق ما
+            // أرجعته إعادة التسمية دون أن يكون قد تقدّم فعلياً.
+            if ($head !== null && $head->compatibility_working_version_id === $version->id) {
+                $head->forceFill(['draft_revision' => $newRevision])->save();
+            }
 
             return $this->detail($version->fresh(), $head);
         });

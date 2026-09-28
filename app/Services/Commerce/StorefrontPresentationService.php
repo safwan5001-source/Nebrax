@@ -191,7 +191,7 @@ final class StorefrontPresentationService
                 throw new ForwardSchemaVersionException;
             }
 
-            $normalized = $this->normalizer->normalize($row->draft_config ?? null, (int) $row->schema_version);
+            $normalized = $this->normalizer->normalize($row->draft_config ?? null, (int) $row->draft_schema_version);
             $this->assertStoredSize($normalized);
 
             $published = is_array($row->published_config) ? $row->published_config : null;
@@ -236,13 +236,22 @@ final class StorefrontPresentationService
         $row = StorefrontPresentation::query()
             ->where('storefront_id', $storefrontId)
             ->whereNotNull('published_config')
-            ->first(['published_config', 'schema_version']);
+            ->first(['published_config', 'schema_version', 'published_schema_version']);
 
         if ($row === null || ! is_array($row->published_config)) {
             return null;
         }
 
-        return $this->normalizer->normalize($row->published_config, (int) $row->schema_version);
+        // CUST-H1-1: `published_schema_version` هو الوسم الصحيح — الشريك
+        // الذري لـ`published_config` (§12). العمود القديم المشترك
+        // `schema_version` قد يتقدّم الآن بفعل حفظ المسودة وحده (عبر
+        // الواجهة القديمة أو نسخة العمل المتوافقة عبر واجهة النسخ) دون أن
+        // تتغيّر اللقطة المنشورة إطلاقاً — استعماله هنا كان سيُعيد تفسير
+        // لقطة v1 منشورة بدلالات v2 لمجرّد أن المسودة أُعيد حفظها.
+        return $this->normalizer->normalize(
+            $row->published_config,
+            (int) ($row->published_schema_version ?? $row->schema_version),
+        );
     }
 
     /**
@@ -451,10 +460,17 @@ final class StorefrontPresentationService
 
         if ($row !== null) {
             $schemaVersion = StorefrontPresentationNormalizer::VERSION;
-            $draft = $this->normalizer->normalize($row->draft_config ?? null, (int) $row->schema_version);
+            // CUST-H1-1: وسمان منفصلان لا وسم مشترك — حفظ المسودة (عبر
+            // الواجهة القديمة أو نسخة العمل المتوافقة عبر واجهة النسخ)
+            // يقدّم `draft_schema_version` وحده؛ يجب ألا يغيّر تفسير
+            // `published_config` القائم إطلاقاً (§12).
+            $draft = $this->normalizer->normalize($row->draft_config ?? null, (int) $row->draft_schema_version);
             $draftRevision = (int) $row->draft_revision;
             if (is_array($row->published_config)) {
-                $published = $this->normalizer->normalize($row->published_config, (int) $row->schema_version);
+                $published = $this->normalizer->normalize(
+                    $row->published_config,
+                    (int) ($row->published_schema_version ?? $row->schema_version),
+                );
                 $publishedRevision = $row->published_revision !== null ? (int) $row->published_revision : null;
                 $publishedAt = $row->published_at?->toJSON();
             }

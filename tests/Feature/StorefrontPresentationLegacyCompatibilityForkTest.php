@@ -6,6 +6,7 @@ use App\Models\SalesChannel;
 use App\Models\Storefront;
 use App\Models\StorefrontPresentation;
 use App\Models\StorefrontPresentationVersion;
+use App\Services\Commerce\StorefrontPresentationService;
 use App\Support\Commerce\StorefrontPresentationNormalizer;
 use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -434,5 +435,97 @@ class StorefrontPresentationLegacyCompatibilityForkTest extends TestCase
 
         $unchanged = StorefrontPresentation::withoutGlobalScopes()->find($head->id);
         $this->assertNull($unchanged->published_config);
+    }
+
+    /** @test */
+    public function renaming_the_compatibility_version_keeps_the_legacy_draft_revision_in_sync(): void
+    {
+        $auth = $this->registerTenant('rename-syncs-legacy-revision', 'owner@rename-syncs-legacy-revision.test');
+        $seeded = $this->seedWebStorefront($auth['tenant_id']);
+        $token = $this->withToken($auth['token']);
+
+        $token->putJson($this->legacyPath($seeded['storefront']->id), [
+            'config' => ['version' => 2, 'themePreset' => 'navy'],
+            'draft_revision' => 0,
+        ])->assertOk();
+
+        $head = StorefrontPresentation::withoutGlobalScopes()->where('storefront_id', $seeded['storefront']->id)->first();
+        $compatId = $head->compatibility_working_version_id;
+
+        $token->patchJson($this->versionsPath($seeded['storefront']->id).'/'.$compatId, [
+            'name' => 'اسم جديد',
+            'revision' => 1,
+        ])->assertOk();
+
+        $refreshedHead = StorefrontPresentation::withoutGlobalScopes()->find($head->id);
+        $this->assertSame(2, (int) $refreshedHead->draft_revision, 'draft_revision يجب أن يتزامن مع مراجعة النسخة بعد إعادة التسمية.');
+
+        // مراجعة قديمة (1) أصبحت الآن فعلاً قديمة — يجب أن تُرفض.
+        $token->putJson($this->legacyPath($seeded['storefront']->id), [
+            'config' => ['version' => 2, 'themePreset' => 'burgundy'],
+            'draft_revision' => 1,
+        ])->assertStatus(409);
+
+        // المراجعة الصحيحة (2) تنجح.
+        $token->putJson($this->legacyPath($seeded['storefront']->id), [
+            'config' => ['version' => 2, 'themePreset' => 'burgundy'],
+            'draft_revision' => 2,
+        ])->assertOk();
+    }
+
+    /** @test */
+    public function draft_only_edits_do_not_change_how_a_migrated_v1_published_snapshot_is_normalized(): void
+    {
+        $auth = $this->registerTenant('v1-publish-isolation', 'owner@v1-publish-isolation.test');
+        $seeded = $this->seedWebStorefront($auth['tenant_id']);
+        $token = $this->withToken($auth['token']);
+
+        // منشور v1 ناقص الأقسام (قسم "hero" فقط) + مسودة v1 مختلفة قليلاً
+        // (Case C: منشور != مسودة، فتُهاجَران إلى نسختين منفصلتين).
+        $v1Published = ['homepage' => ['sections' => [['key' => 'hero', 'visible' => true]]]];
+        $v1Draft = ['homepage' => ['sections' => [['key' => 'hero', 'visible' => true]]], 'themePreset' => 'navy'];
+
+        $rowId = $this->insertLegacyRow($seeded['storefront'], [
+            'schema_version' => 1,
+            'draft_config' => json_encode($v1Draft),
+            'draft_revision' => 3,
+            'published_config' => json_encode($v1Published),
+            'published_revision' => 3,
+            'published_at' => now(),
+            'draft_schema_version' => 1,
+            'published_schema_version' => 1,
+        ]);
+
+        $service = app(StorefrontPresentationService::class);
+
+        // قبل أي تعديل: اللقطة المنشورة يجب أن تستعيد الأقسام الافتراضية
+        // الناقصة (دلالة v1 الصحيحة تحت published_schema_version=1).
+        $before = $service->publishedSnapshotForStorefront($seeded['storefront']->id);
+        $beforeTypes = collect($before['homepage']['sections'])->pluck('type')->sort()->values()->all();
+        $this->assertGreaterThan(1, count($beforeTypes), 'دلالة v1 يجب أن تستعيد الأقسام الافتراضية الناقصة.');
+
+        // GET يضمن نسخة العمل المتوافقة (نسخة المسودة وحدها — Case C).
+        $token->getJson($this->legacyPath($seeded['storefront']->id))->assertOk();
+        $head = StorefrontPresentation::withoutGlobalScopes()->find($rowId);
+        $compatId = $head->compatibility_working_version_id;
+        $this->assertNotSame($head->active_version_id, $compatId);
+
+        $compat = StorefrontPresentationVersion::withoutGlobalScopes()->find($compatId);
+
+        // نعدّل المسودة عبر واجهة النسخ الجديدة — هذا يرفع `schema_version`
+        // المشترك على الرأس إلى 2 (سلوك متعمَّد للمسودة)، لكن يجب ألا يمسّ
+        // تفسير اللقطة المنشورة القائمة إطلاقاً.
+        $token->putJson($this->versionsPath($seeded['storefront']->id).'/'.$compatId, [
+            'config' => ['version' => 2, 'themePreset' => 'sand'],
+            'revision' => (int) $compat->revision,
+        ])->assertOk();
+
+        $refreshedHead = StorefrontPresentation::withoutGlobalScopes()->find($rowId);
+        $this->assertSame(2, (int) $refreshedHead->schema_version, 'تأكيد أن العمود المشترك تقدّم فعلاً — هذا هو السيناريو المطلوب اختباره.');
+        $this->assertSame(1, (int) $refreshedHead->published_schema_version, 'وسم المنشور المستقل يجب ألا يتأثر بحفظ مسودة.');
+
+        $after = $service->publishedSnapshotForStorefront($seeded['storefront']->id);
+        $afterTypes = collect($after['homepage']['sections'])->pluck('type')->sort()->values()->all();
+        $this->assertSame($beforeTypes, $afterTypes, 'حفظ مسودة عبر واجهة النسخ يجب ألا يغيّر دلالة تطبيع اللقطة المنشورة القائمة.');
     }
 }
