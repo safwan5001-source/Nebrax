@@ -52,9 +52,9 @@ own scope discipline):
 
 - **Branch:** `claude/awj-market-horizon-6qxr5v`
 - **PR:** https://github.com/safwan5001-source/Nebrax/pull/1084
-- **Head SHA:** `c1acb0ec` (after the initial push at `0793217b`, a Biome formatting fix
-  at `d2e88cab`, and six rounds of automated review fixes at `747c45fa`, `4bcee30d`,
-  `8e9a0624`, `65906c0d`, `1e8b8d8f` and `c1acb0ec` — see §22a)
+- **Head SHA:** `cea4892d` (after the initial push at `0793217b`, a Biome formatting fix
+  at `d2e88cab`, and seven rounds of automated review fixes at `747c45fa`, `4bcee30d`,
+  `8e9a0624`, `65906c0d`, `1e8b8d8f`, `c1acb0ec` and `cea4892d` — see §22a)
 
 ## 4. Implementation summary by surface
 
@@ -493,26 +493,29 @@ real regression from this diff:
   the round-6 push (§22a), both passed this job cleanly (`success`) with no further
   investigation needed.
 
-**Final status on head SHA `024fc940` (§3): all 9 check runs green** —
+**Status as of head SHA `024fc940`: all 9 check runs green** —
 `storefront (lint + typecheck + test)`, `php artisan test (L11, sqlite)` ×2,
 `php artisan test (L11, pgsql)` ×2, `web build (Next.js)` ×2, `merchant preview visual
 QA`, `published footer visual QA` (duplicated runs are from `ci.yml`/`web-ci.yml` and
 `store-brand-qa.yml` both triggering on the same push). `mergeable_state: "clean"`, no
-merge conflict against `main`. All 9 Codex review threads resolved (§22a). No repo
-gate check (e.g. a "Claude Approvals" run) is configured on this PR beyond the 6 CI job
-names above.
+merge conflict against `main`. No repo gate check (e.g. a "Claude Approvals" run) is
+configured on this PR beyond the 6 CI job names above.
 
-The PR is genuinely review-ready: green, mergeable, no open review threads. Per this
-Horizon's authorization, merge and deployment remain explicitly out of scope — this PR
-is left open, subscribed, and watched for further activity rather than merged.
+Round 7 (§22a, commit `cea4892d` — current head, §3) landed after that green state, in
+response to a new review finding on the round-6 commit; its own CI run was in flight as
+of this edit. All 10 Codex review findings across seven rounds are replied-to and their
+threads resolved (§22a); watch the live PR for round 7's own CI outcome on the current
+head. Per this Horizon's authorization, merge and deployment remain explicitly out of
+scope regardless of that outcome — this PR is left open, subscribed, and watched for
+further activity rather than merged.
 
 _(This section reflects state as of head SHA in §3; see the PR itself for the current
 live status of any in-flight re-run.)_
 
 ## 22a. Automated review findings addressed
 
-Codex (`chatgpt-codex-connector[bot]`) reviewed this PR across six rounds and raised
-nine findings total, all verified real and fixed. All nine review threads are
+Codex (`chatgpt-codex-connector[bot]`) reviewed this PR across seven rounds and raised
+ten findings total, all verified real and fixed. All ten review threads are
 resolved.
 
 **Round 1** (commit `747c45fa`):
@@ -650,8 +653,33 @@ resolved.
    3 new parameterized tests (one per simulated viewport) plus a fix to an existing
    test's stale `lg:grid-cols-4` assertion (now the plain fixed class `grid-cols-4`).
 
-All nine fixes re-verified: full web suite 2171/2171, `pnpm build` green, `tsc --noEmit`
-clean on the touched files (rounds 4–6 touched only `web/`, so the storefront
+   **This fix was itself wrong — see round 7.** It mapped the column count against the
+   wrong published component's breakpoints.
+
+**Round 7** (commit `cea4892d`), raised against round 6's own fix:
+
+10. **P2 — round 6 modeled the wrong published component.** This preview section
+    represents the homepage shelf. The published storefront renders that shelf via
+    `storefront/src/components/products/NewArrivals.tsx`
+    (`grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 md:gap-5`, `sm` at 640px / `lg` at
+    1024px) — a *different* component from `ProductGrid.tsx` (used for catalog/category
+    listing pages), with different breakpoints. Round 6's dismissal of "3 columns" as
+    something the "naive" removed code would have wrongly suggested for tablet was
+    itself the error: at 768px, `NewArrivals.tsx` genuinely renders 3 columns (768px
+    sits at/above `sm` but below `lg`), not the 2 columns round 6 shipped. Verified by
+    reading `NewArrivals.tsx` directly before fixing (round 6's mistake was trusting an
+    assumed reference component without checking which one is actually rendered for
+    this preview section — the lesson applied here instead of just re-trusting the
+    reviewer). Fixed by remapping to `NewArrivals.tsx`'s real breakpoints: mobile below
+    `sm` → 2 columns, tablet at/above `sm` but below `lg` → 3 columns, desktop at/above
+    `lg` → 4 columns — all three of this preview's simulated widths now land in a
+    distinct tier (previously mobile and tablet both collapsed to the same branch).
+    Updated the 3 parameterized tests' tablet expectation from `grid-cols-2` to
+    `grid-cols-3`; mobile and desktop expectations were already correct by coincidence
+    (both components agree at those two widths, only tablet differs).
+
+All ten fixes re-verified: full web suite 2171/2171, `pnpm build` green, `tsc --noEmit`
+clean on the touched files (rounds 4–7 touched only `web/`, so the storefront
 suite/build from round 3 — already 641/641 and green — stands unchanged).
 
 ## 23. Risks / remaining work
