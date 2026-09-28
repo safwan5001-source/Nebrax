@@ -177,14 +177,17 @@ export function VersionManagerPanel({
                 switching={version.id === switchingVersionId}
                 busy={busyVersionId === version.id ? busyAction : null}
                 // `versionBusy` في المكوّن الأب فتحة مشتركة واحدة (تصميم مقصود:
-                // عملية صفّ واحدة في كل مرة)، وبدء عملية على صفّ آخر يستبدلها
-                // بصمت. تبديل نسخة أو إعادة تسمية أثناء انتظار عملية أخرى
-                // مدعومٌ ومُختبَر عمداً (تبديل النسخة لا يعتمد `versionBusy`
-                // أصلاً)؛ الخطر الحقيقي الوحيد هو تحديداً حذفٌ يفقد مؤشره —
-                // فتح أو تعديل صفّ يُحذَف فعلياً في الخلفية قد يُخلِّف محرِّراً
-                // يشير إلى مستندٍ لم يعد موجوداً. لذا نقيّد التعطيل بحالة الحذف
-                // فقط، لا أي انشغال آخر.
-                otherRowBusy={busyVersionId !== null && busyVersionId !== version.id && busyAction === "delete"}
+                // عملية صفّ واحدة في كل مرة). كان التعطيل مقيَّداً سابقاً بحالة
+                // الحذف فقط، فسمح ببدء حذف على صفّ آخر بينما إعادة تسمية على
+                // صفّ أول لا تزال معلَّقة — إعادة التسمية تكتمل أولاً فتصفِّر
+                // الفتحة بصمت رغم أن الحذف لا يزال قيد التنفيذ فعلياً، فيعاود
+                // "فتح" ذلك الصفّ الظهور مفعَّلاً. منع بدء أي عملية جديدة على
+                // صفّ آخر طالما صفّ واحد مشغول (أي إجراء)، لا الحذف حصراً، يمنع
+                // هذا التداخل من الأساس. لا يُطبَّق هذا على زر «فتح للتعديل» —
+                // تبديل النسخة لا يعتمد `versionBusy` أصلاً، والتبديل أثناء
+                // انتظار عملية أخرى مدعومٌ ومُختبَر عمداً؛ حراسته الخاصة (حذف
+                // هذا الصفّ نفسه أو تبديل نسخة آخر قيد التنفيذ) منفصلة تماماً.
+                otherRowBusy={busyVersionId !== null && busyVersionId !== version.id}
                 pendingDelete={pendingDeleteId === version.id}
                 onOpenDeleteConfirm={() => setPendingDeleteId(version.id)}
                 onCancelDeleteConfirm={() => setPendingDeleteId(null)}
@@ -390,8 +393,11 @@ function VersionRow({
             // بينما يبقى حذفه الفعلي في المتجَر معلَّقاً — فتحه في هذه الأثناء
             // يُحمِّل نسخةً قد لا تعود موجودة عند اكتمال الحذف، ويُبطل رمز
             // الطلب فلا يتعرّف حذفٌ لاحقٌ (`wasOpenAtStart` قِيست وقت بدئه لا
-            // وقت الفتح) على أنه يجب إفراغ المحرِّر.
-            disabled={switching || busy === "delete" || otherRowBusy}
+            // وقت الفتح) على أنه يجب إفراغ المحرِّر. عمداً بلا `otherRowBusy`:
+            // تبديل النسخة لا يعتمد فتحة `versionBusy` المشتركة أصلاً، وفتح
+            // نسخة أخرى بينما صفّ ثالث يُعاد تسميته أو يُكرَّر مدعومٌ ومُختبَر —
+            // الخطر الحقيقي مقصور على حالة هذا الصفّ نفسه أعلاه.
+            disabled={switching || busy === "delete"}
             onClick={onSelect}
             className="h-7 rounded-md border border-border px-2 text-[11px] font-medium text-text hover:bg-primary-soft disabled:opacity-50"
           >
@@ -402,9 +408,11 @@ function VersionRow({
               type="button"
               data-version-duplicate={version.id}
               // `versionBusy` الأب فتحة مشتركة واحدة — بدء عملية هنا بينما صفّ
-              // آخر مشغول (حذفاً غالباً) يستبدلها بصمت فيُظهر ذلك الصفّ خاملاً
-              // رغم عمليته الفعلية القائمة.
-              disabled={otherRowBusy}
+              // آخر مشغول يستبدلها بصمت فيُظهر ذلك الصفّ خاملاً رغم عمليته
+              // الفعلية القائمة. `switching` يحرس هذا الصفّ نفسه: تبديله (GET)
+              // قيد التنفيذ، وبدء كتابة عليه الآن قد تُنجَز قبل أن يستقرّ
+              // الاختيار على مستند قد يتغيّر مصيره في هذه الأثناء.
+              disabled={otherRowBusy || switching}
               onClick={() => {
                 setDuplicateDraft(defaultDuplicateName(version.name, locale));
                 setMode("duplicate");
@@ -418,7 +426,7 @@ function VersionRow({
             <button
               type="button"
               data-version-rename={version.id}
-              disabled={otherRowBusy}
+              disabled={otherRowBusy || switching}
               onClick={() => {
                 setNameDraft(version.name);
                 setMode("rename");
@@ -432,7 +440,10 @@ function VersionRow({
             <button
               type="button"
               data-version-delete={version.id}
-              disabled={otherRowBusy}
+              // نفس حراسة الأعلى: يمنع حذف صفّ لا يزال تبديله (فتحه) قيد
+              // التنفيذ — حذفٌ ينجح بينما `GET`ـه لا يزال قادماً يترك المحرِّر
+              // يفتح مستنداً حُذف للتو (راجع تعليق زرّ «فتح للتعديل» أعلاه).
+              disabled={otherRowBusy || switching}
               onClick={onOpenDeleteConfirm}
               className="h-7 rounded-md border border-border px-2 text-[11px] font-medium text-negative hover:bg-negative/10 disabled:opacity-50"
             >

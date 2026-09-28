@@ -968,4 +968,116 @@ describe('ExperienceBuilder — CUST-H1-2 Version Manager', () => {
       screen.getByLabelText('نسخة التصميم قيد التعديل').textContent,
     ).toContain('نسخة المتجر الثاني');
   });
+
+  it('an edit made to the still-open version while switching to another is not discarded when the switch resolves (codex round 7)', async () => {
+    listMock.mockResolvedValue({
+      ok: true,
+      data: [summary({ id: 'a', name: 'نسخة أ', revision: 0 }), summary({ id: 'b', name: 'نسخة ب', revision: 0 })],
+    });
+    let resolveShowB: (value: unknown) => void = () => {};
+    showMock.mockImplementation((_storefrontId: string, versionId: string) =>
+      versionId === 'a'
+        ? Promise.resolve({ ok: true, data: detail({ id: 'a', name: 'نسخة أ', revision: 0 }) })
+        : new Promise((resolve) => { resolveShowB = resolve; }),
+    );
+    const user = userEvent.setup();
+    render(<ExperienceBuilder storefrontId="store-1" initialLocale="ar" />);
+    await screen.findByText('اختر نسخة للتعديل');
+
+    await openVersionManager(user);
+    let manager = screen.getByRole('menu', { name: 'إدارة نسخ التصميم' });
+    const rowA = within(manager).getByText('نسخة أ').closest('li') as HTMLElement;
+    await user.click(within(rowA).getByRole('button', { name: 'فتح للتعديل' }));
+    await waitFor(() =>
+      expect(screen.getByLabelText('نسخة التصميم قيد التعديل').textContent).toContain('نسخة أ'),
+    );
+
+    // Start switching to B — its GET never resolves during this test.
+    await openVersionManager(user);
+    manager = screen.getByRole('menu', { name: 'إدارة نسخ التصميم' });
+    const rowB = within(manager).getByText('نسخة ب').closest('li') as HTMLElement;
+    await user.click(within(rowB).getByRole('button', { name: 'فتح للتعديل' }));
+
+    // Nothing blocks editing A's still-open panel while B's GET is pending.
+    await user.click(screen.getByRole('button', { name: 'التوثيق والثقة' }));
+    await user.type(screen.getAllByRole('textbox')[0], 'تعديل أثناء التبديل');
+
+    resolveShowB({ ok: true, data: detail({ id: 'b', name: 'نسخة ب', revision: 0 }) });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    // The editor must stay on A with the newer edit intact — not silently
+    // switched to B, discarding it.
+    expect(screen.getByLabelText('نسخة التصميم قيد التعديل').textContent).toContain('نسخة أ');
+    expect((screen.getAllByRole('textbox')[0] as HTMLInputElement).value).toBe('تعديل أثناء التبديل');
+  });
+
+  it("deleting a version whose own switch is still loading is blocked (codex round 7)", async () => {
+    listMock.mockResolvedValue({
+      ok: true,
+      data: [summary({ id: 'a', name: 'نسخة أ', revision: 0 }), summary({ id: 'b', name: 'نسخة ب', revision: 0 })],
+    });
+    let resolveShowB: (value: unknown) => void = () => {};
+    showMock.mockImplementation((_storefrontId: string, versionId: string) =>
+      versionId === 'a'
+        ? Promise.resolve({ ok: true, data: detail({ id: 'a', name: 'نسخة أ', revision: 0 }) })
+        : new Promise((resolve) => { resolveShowB = resolve; }),
+    );
+    const user = userEvent.setup();
+    render(<ExperienceBuilder storefrontId="store-1" initialLocale="ar" />);
+    await screen.findByText('اختر نسخة للتعديل');
+
+    await openVersionManager(user);
+    let manager = screen.getByRole('menu', { name: 'إدارة نسخ التصميم' });
+    const rowB = within(manager).getByText('نسخة ب').closest('li') as HTMLElement;
+    await user.click(within(rowB).getByRole('button', { name: 'فتح للتعديل' }));
+
+    // B's GET is still pending — its own Delete trigger must stay disabled,
+    // or a successful delete could race the GET and leave the editor
+    // pointed at a version that no longer exists.
+    await openVersionManager(user);
+    manager = screen.getByRole('menu', { name: 'إدارة نسخ التصميم' });
+    const rowBAgain = within(manager).getByText('نسخة ب').closest('li') as HTMLElement;
+    expect(
+      (within(rowBAgain).getByRole('button', { name: 'حذف' }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+
+    resolveShowB({ ok: true, data: detail({ id: 'b', name: 'نسخة ب', revision: 0 }) });
+    await waitFor(() =>
+      expect(screen.getByLabelText('نسخة التصميم قيد التعديل').textContent).toContain('نسخة ب'),
+    );
+  });
+
+  it('a pending rename on one row blocks starting a delete on another until it settles (codex round 7)', async () => {
+    listMock.mockResolvedValue({
+      ok: true,
+      data: [summary({ id: 'a', name: 'نسخة أ', revision: 0 }), summary({ id: 'b', name: 'نسخة ب', revision: 0 })],
+    });
+    let resolveRename: (value: unknown) => void = () => {};
+    renameMock.mockReturnValue(new Promise((resolve) => { resolveRename = resolve; }));
+    const user = userEvent.setup();
+    render(<ExperienceBuilder storefrontId="store-1" initialLocale="ar" />);
+    await screen.findByText('اختر نسخة للتعديل');
+
+    await openVersionManager(user);
+    const manager = screen.getByRole('menu', { name: 'إدارة نسخ التصميم' });
+    const rowA = within(manager).getByText('نسخة أ').closest('li') as HTMLElement;
+    await user.click(within(rowA).getByRole('button', { name: 'إعادة تسمية' }));
+    await user.clear(within(rowA).getByLabelText('اسم النسخة'));
+    await user.type(within(rowA).getByLabelText('اسم النسخة'), 'اسم جديد لأ');
+    await user.click(within(rowA).getByRole('button', { name: 'حفظ الاسم' }));
+    await waitFor(() => expect(renameMock).toHaveBeenCalledTimes(1));
+
+    // A's rename is still pending — starting a delete on B must be blocked
+    // outright, not merely allowed to race A's completion for the shared
+    // `versionBusy` slot.
+    const rowB = within(manager).getByText('نسخة ب').closest('li') as HTMLElement;
+    expect(
+      (within(rowB).getByRole('button', { name: 'حذف' }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+
+    resolveRename({ ok: true, data: detail({ id: 'a', name: 'اسم جديد لأ', revision: 1 }) });
+    await waitFor(() =>
+      expect((within(rowB).getByRole('button', { name: 'حذف' }) as HTMLButtonElement).disabled).toBe(false),
+    );
+  });
 });

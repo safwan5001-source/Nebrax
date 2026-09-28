@@ -245,9 +245,13 @@ export function ExperienceBuilder({
   // النقطة الوحيدة التي تجلب مستند نسخة فعلياً وتطبّقه على المحرِّر. لا حرس
   // تكافؤ ولا تأكيد تجاهل هنا عمداً — `selectVersion` (الاختيار العادي)
   // يضيفهما، بينما `reloadConflictedVersion` (§15) يحتاج تجاوزهما معاً.
-  async function applyVersionSelection(target: { id: string }) {
+  async function applyVersionSelection(
+    target: { id: string },
+    options: { allowOverwriteDuringFetch?: boolean } = {},
+  ) {
     if (!storefrontId) return;
     const token = ++versionRequestTokenRef.current;
+    const draftAtSwitchStart = draft;
     setVersionSwitchingId(target.id);
     setVersionConflict(null);
     setBusy("loading");
@@ -264,6 +268,17 @@ export function ExperienceBuilder({
           ? t("versionUnsupportedSchema")
           : t("versionListLoadError"),
       );
+      return;
+    }
+    // لوحة التحكم تبقى قابلة للتحرير أثناء انتظار هذا التحميل (لا حظر تحرير
+    // أثناء التبديل) — تعديلٌ جديد على النسخة المفتوحة حالياً في هذه الأثناء
+    // لا يبدّل الرمز (لا تبديل نسخة ولا متجر وقع)، فالفحص أعلاه وحده لا
+    // يكتشفه. لا نستبدل هذا التعديل الأحدث بصمت بمحتوى الهدف؛ صفّه في القائمة
+    // يُحدَّث فقط، وتبقى النسخة المفتوحة كما هي حتى يقرر التاجر مصير تعديله.
+    // `reloadConflictedVersion` يتجاوز هذا القيد عمداً — إعادة التحميل نفسها
+    // إعلانٌ صريح بتجاهل الحالة المحلية.
+    if (!options.allowOverwriteDuringFetch && !presentationConfigsEqual(draftRef.current, draftAtSwitchStart)) {
+      updateVersionSummaryInList(result.data);
       return;
     }
     setNotice(null);
@@ -285,7 +300,10 @@ export function ExperienceBuilder({
   function reloadConflictedVersion() {
     if (!selectedVersion) return;
     setVersionConflict(null);
-    void applyVersionSelection(selectedVersion);
+    // «تحديث النسخة» إعلانٌ صريح من التاجر بتجاهل حالته المحلية الحالية
+    // (هذا هو سبب وجود الزر أصلاً بعد بانر التعارض) — يتجاوز حرس التعديل
+    // أثناء التبديل الذي يحمي التبديل العادي.
+    void applyVersionSelection(selectedVersion, { allowOverwriteDuringFetch: true });
   }
 
   function adoptCreatedVersion(detail: PresentationVersionDetail) {
