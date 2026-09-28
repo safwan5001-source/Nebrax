@@ -7,7 +7,7 @@
 ## Repository state
 
 - **Base SHA:** `2e9cdd058a50a2014dc0b4a3c5c0c3302c353616` (`origin/main` at task start — matched the SHA given in the task brief; verified with a fresh `git fetch origin main` before starting).
-- **Head SHA:** `892e1e1` (post-round-3-review-fix; round-2 fix head was `0e3111c`; round-1 fix head was `fddba52`; initial implementation head was `3077ecf`)
+- **Head SHA:** `c2033dd` (post-round-4-review-fix; round-3 fix head was `892e1e1`; round-2 fix head was `0e3111c`; round-1 fix head was `fddba52`; initial implementation head was `3077ecf`)
 - **Branch:** `claude/cust-h1-2-customizer-ux-23vvun`
 - **PR:** [#1085](https://github.com/safwan5001-source/Nebrax/pull/1085)
 
@@ -177,6 +177,18 @@ Two more P1 findings and one P2 — not the stale-callback-identity class this t
 | `EmptyVersionsPrompt`'s Enter-key handler fired `onCreate` unconditionally, unlike the adjacent submit button which already disables on `creating` — holding/repeating Enter during the first create could fire multiple POSTs. | The key handler now gates on `!creating` too. | `pressing Enter repeatedly while the first create is still pending does not send duplicate requests (codex round 3)` |
 
 All three review threads were replied to individually (naming the fix commit `892e1e1`) and resolved. `npx vitest run` (2181 tests, full suite) and `npm run build` both re-verified green after this round.
+
+### Automated review (`chatgpt-codex-connector`, round 4, reviewed `c1d8396`, fixed in `c2033dd`)
+
+One more P1 and two P2 findings, both extensions of round 3's fixes: the discard-confirm guarded the *start* of create/duplicate but not edits made *during* the request, and the busy-flag bookkeeping around create/duplicate/rename/delete had the same "clear unconditionally, check ownership after" ordering bug in four places.
+
+| Finding | Fix | Regression test |
+|---|---|---|
+| Round 3's discard-confirm only ran once, before the create/duplicate request started. If the draft was clean at that point but the merchant kept editing the still-open version while the `POST` was in flight (no switch occurred, so the request token never moved), the successful response still force-adopted the new version and silently discarded that edit. | `handleCreateVersion`/`handleDuplicateVersion` now also compare the draft at completion time against the draft at submission time (same pattern as `handleSave`'s round-3 fix). A mismatch is treated like a superseding switch: only the manager's list entry is synced, `adoptCreatedVersion` is skipped, and the edit survives. | `an edit made while a create is still pending is not discarded when the create resolves (codex round 4)` |
+| `adoptCreatedVersion` invalidates the shared request token (correctly orphaning any in-flight save for the version being replaced) but never reset the generic `busy` flag. A save left pending under the replaced version would resolve, see a stale token, and correctly skip its own state updates — but also skip `setBusy(null)`, leaving the newly adopted version's Save button disabled until the merchant switched away and back. | `adoptCreatedVersion` now resets `busy` to `null` itself when it adopts. | `adopting a newly created version clears a still-pending save's stuck busy state (codex round 4)` |
+| `handleCreateVersion`/`handleDuplicateVersion`/`handleRenameVersion`/`handleDeleteVersion` all cleared their own busy flag (`versionCreating`/`versionBusy`) unconditionally right after their request resolved, before checking whether the response still belonged to the currently displayed storefront. A slower request for a previous store could therefore clear a newer store's own in-flight flag, re-enabling its controls mid-request. | All four now compute `sameStorefront` first and only clear the flag when it holds. | `a create for a previous storefront resolving late does not clear a newer storefront's own creating flag (codex round 4)` |
+
+All three review threads were replied to individually (naming the fix commit `c2033dd`) and resolved. `npx vitest run` (2184 tests, full suite) and `npm run build` both re-verified green after this round.
 
 ## Backward compatibility
 
