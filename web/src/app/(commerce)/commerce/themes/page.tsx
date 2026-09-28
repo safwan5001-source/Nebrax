@@ -17,7 +17,7 @@ import {
   deleteStorefrontPresentationVersion,
   saveStorefrontPresentationVersion,
 } from '@/modules/commerce-workspace/presentation-versions';
-import { presetPrimary } from '@/modules/store-experience-builder/presentation/tokens';
+import { presetSelectionPatch, THEME_PRESETS } from '@/modules/store-experience-builder/presentation';
 
 export default function CommerceThemesPage() {
   const locale = useLocale();
@@ -47,10 +47,17 @@ export default function CommerceThemesPage() {
       return;
     }
 
+    const preset = THEME_PRESETS.find((candidate) => candidate.id === theme.presetId);
+    if (!preset) {
+      await deleteStorefrontPresentationVersion(selectedStoreId, created.data.id);
+      setApplyingThemeId(null);
+      setApplyError(t('themeGalleryApplyFailed'));
+      return;
+    }
+
     const nextConfig = {
       ...created.data.config,
-      themePreset: theme.presetId,
-      primaryColor: presetPrimary(theme.presetId),
+      ...presetSelectionPatch(created.data.config, preset),
     };
     const saved = await saveStorefrontPresentationVersion(
       selectedStoreId,
