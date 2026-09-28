@@ -39,7 +39,8 @@ function fixtureProducts(locale: "ar" | "en"): Product[] {
     {
       ...base,
       id: "p-simple",
-      name: locale === "ar" ? "حليب طازج كامل الدسم ١ لتر" : "Fresh Whole Milk 1L",
+      name:
+        locale === "ar" ? "حليب طازج كامل الدسم ١ لتر" : "Fresh Whole Milk 1L",
       slug: "fresh-milk",
       purchasable: true,
       thumbnail_url: null,
@@ -70,11 +71,16 @@ function fixtureProducts(locale: "ar" | "en"): Product[] {
       slug: "orange-juice",
       purchasable: false,
       thumbnail_url: null,
-      categories: [{ id: "c3", name: locale === "ar" ? "مشروبات" : "Beverages" }],
+      categories: [
+        { id: "c3", name: locale === "ar" ? "مشروبات" : "Beverages" },
+      ],
     },
     {
       id: "p-variant",
-      name: locale === "ar" ? "جبن شرائح متعدد الأنواع" : "Sliced Cheese Assortment",
+      name:
+        locale === "ar"
+          ? "جبن شرائح متعدد الأنواع"
+          : "Sliced Cheese Assortment",
       slug: "sliced-cheese",
       purchasable: true,
       thumbnail_url: null,
@@ -95,7 +101,9 @@ function fixtureProducts(locale: "ar" | "en"): Product[] {
       slug: "red-apples",
       purchasable: true,
       thumbnail_url: null,
-      categories: [{ id: "c4", name: locale === "ar" ? "خضار وفواكه" : "Produce" }],
+      categories: [
+        { id: "c4", name: locale === "ar" ? "خضار وفواكه" : "Produce" },
+      ],
       price: {
         display_amount: locale === "ar" ? "٨٫٠٠ ر.س" : "SAR 8.00",
         amount_in_cents: 800,
@@ -148,7 +156,9 @@ export default async function MarketVisualPage({
               <ProductGrid
                 products={products}
                 basePath={locale === "ar" ? "/sa/ar" : "/sa/en"}
-                emptyMessage={locale === "ar" ? "لا توجد منتجات" : "No products"}
+                emptyMessage={
+                  locale === "ar" ? "لا توجد منتجات" : "No products"
+                }
               />
             </StoreContainer>
           </PublishedCardStyleProvider>
