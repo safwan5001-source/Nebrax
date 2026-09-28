@@ -52,9 +52,9 @@ own scope discipline):
 
 - **Branch:** `claude/awj-market-horizon-6qxr5v`
 - **PR:** https://github.com/safwan5001-source/Nebrax/pull/1084
-- **Head SHA:** `8e9a0624de55e8747c209bd1f4405ddf2ef24a02` (after the initial push at
-  `0793217b`, a Biome formatting fix at `d2e88cab`, and three rounds of automated
-  review fixes at `747c45fa`, `4bcee30d` and `8e9a0624` — see §22a)
+- **Head SHA:** `65906c0d12d95d345b7ee8271b29809814bee444` (after the initial push at
+  `0793217b`, a Biome formatting fix at `d2e88cab`, and four rounds of automated
+  review fixes at `747c45fa`, `4bcee30d`, `8e9a0624` and `65906c0d` — see §22a)
 
 ## 4. Implementation summary by surface
 
@@ -461,8 +461,9 @@ _(filled in after push, PR creation, and CI observation)_
 
 ## 22a. Automated review findings addressed
 
-Codex (`chatgpt-codex-connector[bot]`) reviewed this PR across three rounds and raised
-six findings total, all verified real and fixed. All six review threads are resolved.
+Codex (`chatgpt-codex-connector[bot]`) reviewed this PR across four rounds and raised
+seven findings total, all verified real and fixed. All seven review threads are
+resolved.
 
 **Round 1** (commit `747c45fa`):
 
@@ -482,9 +483,11 @@ six findings total, all verified real and fixed. All six review threads are reso
 3. **P2 — Customizer preview didn't reflect Market's card proportions.** The
    merchant-facing preview (`StorefrontPreviewCanvas.tsx`) rendered every product tile
    `aspect-square` and never read `config.themePreset`, so a merchant selecting Market
-   couldn't see its one real visual differentiator before publishing. Fixed: the
-   preview's `newArrivals` product tiles now use a shorter aspect ratio under Market,
-   matching what `ProductCard` actually ships. Covered by 2 new tests.
+   couldn't see its one real visual differentiator before publishing. Fixed (round 1):
+   the preview's `newArrivals` product tiles switched to a shorter `aspect-[4/3]` under
+   Market. **Superseded in round 4** — see finding 7 below: an aspect ratio is
+   width-dependent and doesn't actually reproduce the published card's fixed height at
+   every grid width, so this was only a partial fix.
 
 **Round 2** (commit `4bcee30d`), raised against round 1's own fixes:
 
@@ -530,8 +533,22 @@ six findings total, all verified real and fixed. All six review threads are reso
    English and Arabic label in this namespace, to catch this class of gap for any future
    preset addition.
 
-All six fixes re-verified: full storefront suite 641/641, full web suite 2166/2166,
-both `pnpm build`s green, `tsc --noEmit` clean on both, Biome clean.
+**Round 4** (commit `65906c0d`), raised against round 1's fix to finding 3:
+
+7. **P2 — the preview's `aspect-[4/3]` approximation still didn't match the published
+   card at every width.** The published `ProductCard` bounds its Market image by a
+   *fixed* height (`h-28 sm:h-32 md:h-40`) independent of column width, while the
+   preview's aspect-ratio approach is inherently width-dependent — at a 4-column 1280px
+   preview it produced an image around 220px tall against the published card's fixed
+   160px, still materially taller than what Publish ships. Fixed by removing the
+   approximation entirely: the preview now uses the exact same fixed height classes
+   `ProductCard.tsx` itself uses, for both Market and every other preset, so there is no
+   longer any width-dependent gap to be wrong at any grid width. Tests updated to assert
+   the exact height classes rather than the retired aspect-ratio ones.
+
+All seven fixes re-verified: full web suite 2166/2166, `pnpm build` green,
+`tsc --noEmit` clean, Biome clean (this final round touched only `web/`, so the
+storefront suite/build from round 3 — already 641/641 and green — stands unchanged).
 
 ## 23. Risks / remaining work
 
