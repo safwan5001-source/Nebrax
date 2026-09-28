@@ -1,18 +1,68 @@
 'use client';
 
 import Link from 'next/link';
+import { useState } from 'react';
 import { useLocale } from 'next-intl';
+import { useRouter } from 'next/navigation';
 import { Check, ExternalLink, Palette } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { PageHeader } from '@/components/nebrax';
 import { commerceWorkspaceMessage, type CommerceWorkspaceMessageKey } from '@/modules/commerce-workspace/messages';
 import { useCommerceStoreContext } from '@/modules/commerce-workspace/store-context';
 import { THEME_REGISTRY, isRuntimeBackedTheme, type ThemeRegistryEntry } from '@/modules/commerce-workspace/theme-registry';
+import {
+  createStorefrontPresentationVersion,
+  deleteStorefrontPresentationVersion,
+  saveStorefrontPresentationVersion,
+} from '@/modules/commerce-workspace/presentation-versions';
+import { presetPrimary } from '@/modules/store-experience-builder/presentation/tokens';
 
 export default function CommerceThemesPage() {
   const locale = useLocale();
+  const router = useRouter();
   const t = (key: CommerceWorkspaceMessageKey) => commerceWorkspaceMessage(locale, key);
-  const { viewStoreUrl } = useCommerceStoreContext();
+  const { selectedStoreId, viewStoreUrl } = useCommerceStoreContext();
+  const [applyingThemeId, setApplyingThemeId] = useState<string | null>(null);
+  const [applyError, setApplyError] = useState<string | null>(null);
+
+  async function handleUseTheme(theme: ThemeRegistryEntry) {
+    if (!selectedStoreId || !isRuntimeBackedTheme(theme) || applyingThemeId) {
+      if (!selectedStoreId) setApplyError(t('themeGalleryNoStore'));
+      return;
+    }
+
+    setApplyingThemeId(theme.id);
+    setApplyError(null);
+    const created = await createStorefrontPresentationVersion(
+      selectedStoreId,
+      `${t(theme.nameKey as CommerceWorkspaceMessageKey)} — Theme Gallery`,
+    );
+    if (!created.ok) {
+      setApplyingThemeId(null);
+      setApplyError(t('themeGalleryApplyFailed'));
+      return;
+    }
+
+    const nextConfig = {
+      ...created.data.config,
+      themePreset: theme.presetId,
+      primaryColor: presetPrimary(theme.presetId),
+    };
+    const saved = await saveStorefrontPresentationVersion(
+      selectedStoreId,
+      created.data.id,
+      nextConfig,
+      created.data.revision,
+    );
+    if (!saved.ok) {
+      await deleteStorefrontPresentationVersion(selectedStoreId, created.data.id);
+      setApplyingThemeId(null);
+      setApplyError(t('themeGalleryApplyFailed'));
+      return;
+    }
+
+    router.push(`/commerce/appearance?version=${encodeURIComponent(created.data.id)}`);
+  }
 
   return (
     <div className="space-y-6">
@@ -22,9 +72,23 @@ export default function CommerceThemesPage() {
         description={t('themeGalleryDescription')}
       />
 
+      {applyError ? (
+        <p role="alert" className="rounded-md border border-negative/30 bg-negative/5 px-3 py-2 text-sm text-negative">
+          {applyError}
+        </p>
+      ) : null}
+
       <section className="grid gap-5 xl:grid-cols-2">
         {THEME_REGISTRY.map((theme) => (
-          <ThemeCard key={theme.id} theme={theme} viewStoreUrl={viewStoreUrl} t={t} />
+          <ThemeCard
+            key={theme.id}
+            theme={theme}
+            viewStoreUrl={viewStoreUrl}
+            selectedStoreId={selectedStoreId}
+            applying={applyingThemeId === theme.id}
+            onUseTheme={handleUseTheme}
+            t={t}
+          />
         ))}
       </section>
     </div>
@@ -34,10 +98,16 @@ export default function CommerceThemesPage() {
 function ThemeCard({
   theme,
   viewStoreUrl,
+  selectedStoreId,
+  applying,
+  onUseTheme,
   t,
 }: {
   theme: ThemeRegistryEntry;
   viewStoreUrl: string | null;
+  selectedStoreId: string | null;
+  applying: boolean;
+  onUseTheme: (theme: ThemeRegistryEntry) => void;
   t: (key: CommerceWorkspaceMessageKey) => string;
 }) {
   const available = isRuntimeBackedTheme(theme);
@@ -71,9 +141,17 @@ function ThemeCard({
 
           {available ? (
             <div className="mt-auto flex flex-wrap gap-2 pt-6">
+              <button
+                type="button"
+                onClick={() => void onUseTheme(theme)}
+                disabled={applying || !selectedStoreId}
+                className="inline-flex min-h-11 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {applying ? t('themeGalleryApplying') : t('themeGalleryUse')}
+              </button>
               <Link
                 href="/commerce/appearance"
-                className="inline-flex min-h-11 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                className="inline-flex min-h-11 items-center justify-center rounded-md border border-border bg-surface px-4 text-sm font-medium text-text hover:bg-primary-soft hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
               >
                 {t('themeGalleryCustomize')}
               </Link>
