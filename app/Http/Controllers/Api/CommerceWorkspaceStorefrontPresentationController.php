@@ -28,7 +28,12 @@ class CommerceWorkspaceStorefrontPresentationController extends ApiController
     ): JsonResponse {
         $this->denySelfService($request);
 
-        $payload = $presentations->showForCurrentTenant($id);
+        try {
+            $payload = $presentations->showForCurrentTenant($id);
+        } catch (ForwardSchemaVersionException $e) {
+            abort(409, $e->getMessage());
+        }
+
         if ($payload === null) {
             abort(404, 'المتجر غير موجود.');
         }
@@ -76,7 +81,7 @@ class CommerceWorkspaceStorefrontPresentationController extends ApiController
                 $id,
                 $request->expectedRevision(),
             );
-        } catch (StaleDraftRevisionException $e) {
+        } catch (StaleDraftRevisionException|ForwardSchemaVersionException $e) {
             abort(409, $e->getMessage());
         } catch (NothingToPublishException|PresentationDocumentTooLargeException $e) {
             abort(422, $e->getMessage());

@@ -52,6 +52,14 @@ final class StorefrontPresentationService
             ->where('storefront_id', $storefront->id)
             ->first();
 
+        // فشل آمن قبل أي تطبيع: مخطط مخزَّن أحدث من الإصدار الحالي (مثلاً
+        // بعد تراجع نشر بعد ترقية) يجب أن يُرفض صراحة لا أن يُستبدل بافتراضي
+        // "AWJ Modern" صامتاً — القائمة الصريحة في المعمارية تشمل "legacy
+        // GET/PUT mapping".
+        if ($row !== null) {
+            $this->assertSupportedLegacySchema($row);
+        }
+
         // لا رأس بعد → افتراضات افتراضية بلا كتابة (سلوك STORE-BACKEND-1
         // الأصلي، محفوظ حرفياً). رأسٌ قائم بلا نسخة عمل متوافقة بعد (لم
         // تُهاجَر/لم تُلمَس منذ CUST-H1-1) → نضمنها الآن تحت قفل قبل إعادة
@@ -88,6 +96,12 @@ final class StorefrontPresentationService
      */
     public function saveDraftForCurrentTenant(string $storefrontId, array $config, int $expectedRevision): ?array
     {
+        // فشل آمن على الوثيقة الواردة **قبل** التطبيع: `normalize()` بلا
+        // `$storedSchemaVersion` (كما هنا) لا يرفض إصداراً معلَناً أحدث من
+        // الحالي — يطبّعه بصمت. يجب رفضه صراحةً هنا هو نفسه فحص
+        // `assertIncomingConfigNotForward` في مسار حفظ النسخة الدقيقة.
+        $this->assertIncomingConfigNotForward($config);
+
         $normalized = $this->normalizer->normalize($config);
         $this->assertStoredSize($normalized);
 
@@ -152,6 +166,11 @@ final class StorefrontPresentationService
                 throw new StaleDraftRevisionException;
             }
 
+            // فشل آمن قبل التطبيع: راجع تعليق GET أعلاه — النشر القديم
+            // مذكور صراحةً ضمن مسارات "immediate Publish" المشمولة بقاعدة
+            // الفشل الآمن.
+            $this->assertSupportedLegacySchema($row);
+
             $normalized = $this->normalizer->normalize($row->draft_config ?? null, (int) $row->schema_version);
             $this->assertStoredSize($normalized);
 
@@ -164,13 +183,36 @@ final class StorefrontPresentationService
                 return $this->present($storefront, $row);
             }
 
+            // CUST-H1-1: نسخة العمل المتوافقة قد تكون انفصلت عن النسخة
+            // النشطة (تشويك سابق عبر legacy PUT). النشر القديم ينشر مستند
+            // نسخة العمل الحالية فعلياً (`draft_config` المتزامن معها) —
+            // فيجب أن تصبح هي النسخة النشطة الآن، وإلا بقيت نسخة قديمة
+            // مُعلَنة "منشورة" رغم أن محتواها لم يعد يطابق اللقطة العامة.
+            $compat = $row->compatibility_working_version_id !== null
+                ? StorefrontPresentationVersion::query()
+                    ->whereKey($row->compatibility_working_version_id)
+                    ->lockForUpdate()
+                    ->first()
+                : null;
+
             $row->forceFill([
                 'draft_config' => $normalized,
+                'draft_schema_version' => StorefrontPresentationNormalizer::VERSION,
                 'published_config' => $normalized,
+                'published_schema_version' => StorefrontPresentationNormalizer::VERSION,
                 'published_revision' => (int) $row->draft_revision,
                 'published_at' => now(),
                 'schema_version' => StorefrontPresentationNormalizer::VERSION,
+                'active_version_id' => $compat->id ?? $row->active_version_id,
             ])->save();
+
+            if ($compat !== null) {
+                $compat->forceFill([
+                    'config' => $normalized,
+                    'schema_version' => StorefrontPresentationNormalizer::VERSION,
+                    'last_published_at' => now(),
+                ])->save();
+            }
 
             return $this->present($storefront, $row->fresh());
         });
@@ -414,6 +456,42 @@ final class StorefrontPresentationService
     {
         if ($this->normalizer->encodedSize($config) > StorefrontPresentationNormalizer::MAX_DOCUMENT_BYTES) {
             throw new PresentationDocumentTooLargeException;
+        }
+    }
+
+    /**
+     * فشل آمن على وثيقة **واردة** قبل أي تطبيع: `normalize()` بلا
+     * `$storedSchemaVersion` لا يرفض إصداراً معلَناً أحدث من الحالي وحده —
+     * يتجاهله ويطبّع بصمت. يُستعمل في مسار الحفظ القديم فقط؛ النشر القديم
+     * يقرأ مستنداً **مخزَّناً بالفعل** فيُفحص عبر `assertSupportedLegacySchema`.
+     *
+     * @param  array<string, mixed>  $config
+     */
+    private function assertIncomingConfigNotForward(array $config): void
+    {
+        if (
+            isset($config['version'])
+            && is_numeric($config['version'])
+            && (int) $config['version'] > StorefrontPresentationNormalizer::VERSION
+        ) {
+            throw new ForwardSchemaVersionException;
+        }
+    }
+
+    /**
+     * فشل آمن على رأسٍ **مخزَّن بالفعل** قبل أي تطبيع: يحمي GET والنشر
+     * القديمين من افتراض "AWJ Modern" الصامت حين يحمل الصفّ وسم مخطط أحدث
+     * من الإصدار الحالي (مثلاً بعد تراجع نشرٍ عقب ترقية) — القائمة الصريحة
+     * في المعمارية تشمل "legacy GET/PUT mapping" و"immediate Publish".
+     */
+    private function assertSupportedLegacySchema(StorefrontPresentation $row): void
+    {
+        if ((int) $row->draft_schema_version > StorefrontPresentationNormalizer::VERSION) {
+            throw new ForwardSchemaVersionException;
+        }
+
+        if ($row->published_schema_version !== null && (int) $row->published_schema_version > StorefrontPresentationNormalizer::VERSION) {
+            throw new ForwardSchemaVersionException;
         }
     }
 
