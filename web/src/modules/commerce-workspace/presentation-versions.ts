@@ -70,6 +70,20 @@ export async function saveStorefrontPresentationVersion(
   }
 }
 
+export async function deleteStorefrontPresentationVersion(
+  storefrontId: string,
+  versionId: string,
+): Promise<boolean> {
+  try {
+    await api<unknown>(commerceStorefrontPresentationVersionPath(storefrontId, versionId), {
+      method: 'DELETE',
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function mapOutcome(payload: unknown): PresentationVersionOutcome {
   const data = mapVersionRecord(payload);
   return data ? { ok: true, data } : { ok: false, reason: 'failed', message: 'invalid_payload' };
