@@ -4,6 +4,7 @@ namespace App\Services\Commerce;
 
 use App\Models\Storefront;
 use App\Models\StorefrontPresentation;
+use App\Models\StorefrontPresentationVersion;
 use App\Support\Commerce\StorefrontPresentationNormalizer;
 use App\Tenancy\TenantContext;
 use Illuminate\Database\QueryException;
@@ -16,10 +17,18 @@ use RuntimeException;
  * المستأجر من `TenantContext` فقط. `{id}` محدِّد صفّ. أجنبي/مفقود → null
  * (404 في المتحكّم). حفظ المسودة لا يمسّ المنشورة. النشر نسخة داخل الصف
  * تحت `lockForUpdate`.
+ *
+ * CUST-H1-1: الواجهة والاستجابة القديمتان محفوظتان حرفياً — الإضافة
+ * الوحيدة داخلياً هي التزامن الذرّي مع نسخة العمل المتوافقة
+ * (`compatibility_working_version_id`) والتشويك (fork) قبل تعديل نسخة
+ * منشورة نشطة؛ أنظر `applyDraftSave()`.
  */
 final class StorefrontPresentationService
 {
-    public function __construct(private readonly StorefrontPresentationNormalizer $normalizer) {}
+    public function __construct(
+        private readonly StorefrontPresentationNormalizer $normalizer,
+        private readonly StorefrontPresentationVersionBackfillService $backfill,
+    ) {}
 
     /**
      * @return array{
@@ -42,6 +51,25 @@ final class StorefrontPresentationService
         $row = StorefrontPresentation::query()
             ->where('storefront_id', $storefront->id)
             ->first();
+
+        // لا رأس بعد → افتراضات افتراضية بلا كتابة (سلوك STORE-BACKEND-1
+        // الأصلي، محفوظ حرفياً). رأسٌ قائم بلا نسخة عمل متوافقة بعد (لم
+        // تُهاجَر/لم تُلمَس منذ CUST-H1-1) → نضمنها الآن تحت قفل قبل إعادة
+        // حالة قابلة للتعديل (§21).
+        if ($row !== null && $row->compatibility_working_version_id === null) {
+            $row = DB::transaction(function () use ($storefront) {
+                $locked = StorefrontPresentation::query()
+                    ->where('storefront_id', $storefront->id)
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($locked !== null && $locked->compatibility_working_version_id === null) {
+                    $this->backfill->ensureCompatibilityWorkingVersion($locked);
+                }
+
+                return $locked;
+            });
+        }
 
         return $this->present($storefront, $row);
     }
@@ -191,24 +219,88 @@ final class StorefrontPresentationService
         }
 
         if ($row === null) {
+            // رأسٌ لأول مرة على الإطلاق — لا نسخة CUST-H1 بعد؛ ستُنشأ
+            // كسولاً لاحقاً عند أول GET/PUT/إنشاء نسخة يجدها موجودة
+            // (`ensureCompatibilityWorkingVersion`). سلوك ما قبل CUST-H1
+            // محفوظ حرفياً هنا.
             $row = StorefrontPresentation::create([
                 'storefront_id' => $storefront->id,
                 'schema_version' => StorefrontPresentationNormalizer::VERSION,
+                'draft_schema_version' => StorefrontPresentationNormalizer::VERSION,
                 'draft_config' => $normalized,
                 'draft_revision' => 1,
             ]);
-        } else {
-            if ($row->tenant_id !== $storefront->tenant_id) {
-                throw new RuntimeException('المتجر غير موجود لهذا المستأجر.');
-            }
-            $row->forceFill([
-                'draft_config' => $normalized,
-                'draft_revision' => $current + 1,
-                'schema_version' => StorefrontPresentationNormalizer::VERSION,
-            ])->save();
+
+            return $this->present($storefront, $row->fresh());
         }
 
+        if ($row->tenant_id !== $storefront->tenant_id) {
+            throw new RuntimeException('المتجر غير موجود لهذا المستأجر.');
+        }
+
+        // CUST-H1-1 §14/§15/§21: رأسٌ قائم — نقفل/نضمن نسخة العمل المتوافقة،
+        // نرفض فشلاً آمناً مخططاً أحدث، ونُشوّك (fork) قبل التعديل إن كانت
+        // نسخة العمل هي ذاتها المنشورة النشطة حالياً (لا تعديل مباشر على
+        // نسخة منشورة أبداً).
+        $compat = $this->lockCompatibilityWorkingVersion($row);
+
+        if ((int) $compat->schema_version > StorefrontPresentationNormalizer::VERSION) {
+            throw new ForwardSchemaVersionException;
+        }
+
+        if ($row->active_version_id !== null && $row->active_version_id === $compat->id) {
+            $compat = $this->forkCompatibilityVersion($row, $compat);
+        }
+
+        $newRevision = $current + 1;
+
+        $row->forceFill([
+            'draft_config' => $normalized,
+            'draft_revision' => $newRevision,
+            'schema_version' => StorefrontPresentationNormalizer::VERSION,
+            'draft_schema_version' => StorefrontPresentationNormalizer::VERSION,
+        ])->save();
+
+        $compat->forceFill([
+            'config' => $normalized,
+            'schema_version' => StorefrontPresentationNormalizer::VERSION,
+            'revision' => $newRevision,
+        ])->save();
+
         return $this->present($storefront, $row->fresh());
+    }
+
+    /**
+     * يضمن وجود نسخة العمل المتوافقة **مقفولةً** ضمن معاملة مفتوحة
+     * بالفعل من المستدعي (الرأس `$row` مقفول بالفعل بنفس المعاملة).
+     */
+    private function lockCompatibilityWorkingVersion(StorefrontPresentation $row): StorefrontPresentationVersion
+    {
+        $version = $this->backfill->ensureCompatibilityWorkingVersion($row);
+
+        return StorefrontPresentationVersion::query()->whereKey($version->id)->lockForUpdate()->firstOrFail();
+    }
+
+    /**
+     * يُشوّك نسخة عمل مسودة جديدة من النسخة المنشورة النشطة قبل تعديلها عبر
+     * الواجهة القديمة — يحافظ على استمرارية المراجعة (§15): يبدأ الفرع
+     * بمراجعة المسودة القديمة الحالية (حداً أدنى 1) بدل الصفر، فلا يرى عميل
+     * قديم غير معدَّل تعارضاً وهمياً أو انعكاس مراجعة.
+     */
+    private function forkCompatibilityVersion(StorefrontPresentation $row, StorefrontPresentationVersion $active): StorefrontPresentationVersion
+    {
+        $fork = StorefrontPresentationVersion::create([
+            'tenant_id' => $row->tenant_id,
+            'storefront_id' => $row->storefront_id,
+            'name' => $active->name,
+            'schema_version' => $active->schema_version,
+            'config' => $active->config,
+            'revision' => max(1, (int) $row->draft_revision),
+        ]);
+
+        $row->forceFill(['compatibility_working_version_id' => $fork->id])->save();
+
+        return $fork;
     }
 
     /**

@@ -37,6 +37,7 @@ use App\Http\Controllers\Api\CommercePaymentIntentController;
 use App\Http\Controllers\Api\CommerceShippingZoneController;
 use App\Http\Controllers\Api\CommerceWorkspaceStorefrontsController;
 use App\Http\Controllers\Api\CommerceWorkspaceStorefrontPresentationController;
+use App\Http\Controllers\Api\CommerceWorkspaceStorefrontPresentationVersionController;
 use App\Http\Controllers\Api\CorporateFuelContractController;
 use App\Http\Controllers\Api\ContactController;
 use App\Http\Controllers\Api\CustomerAuthController;
@@ -885,6 +886,28 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
             ->middleware($perm('commerce.manage'));
         Route::post('commerce/workspace/storefronts/{id}/presentation/publish', [CommerceWorkspaceStorefrontPresentationController::class, 'publish'])
             ->whereUuid('id')
+            ->middleware($perm('commerce.manage'));
+
+        // CUST-H1-1: أساس نسخ المظهر المستقلّة (list/create/read/save/rename/delete).
+        // لا نشر ولا جدولة هنا — الرأس أعلاه يبقى مصدر القراءة العامة كما هو.
+        // نفس صلاحية الرأس (commerce.manage) — لا صلاحية جديدة.
+        Route::get('commerce/workspace/storefronts/{id}/presentation/versions', [CommerceWorkspaceStorefrontPresentationVersionController::class, 'index'])
+            ->whereUuid('id')
+            ->middleware($perm('commerce.manage'));
+        Route::post('commerce/workspace/storefronts/{id}/presentation/versions', [CommerceWorkspaceStorefrontPresentationVersionController::class, 'store'])
+            ->whereUuid('id')
+            ->middleware($perm('commerce.manage'));
+        Route::get('commerce/workspace/storefronts/{id}/presentation/versions/{version}', [CommerceWorkspaceStorefrontPresentationVersionController::class, 'show'])
+            ->whereUuid('id')->whereUuid('version')
+            ->middleware($perm('commerce.manage'));
+        Route::put('commerce/workspace/storefronts/{id}/presentation/versions/{version}', [CommerceWorkspaceStorefrontPresentationVersionController::class, 'update'])
+            ->whereUuid('id')->whereUuid('version')
+            ->middleware($perm('commerce.manage'));
+        Route::patch('commerce/workspace/storefronts/{id}/presentation/versions/{version}', [CommerceWorkspaceStorefrontPresentationVersionController::class, 'rename'])
+            ->whereUuid('id')->whereUuid('version')
+            ->middleware($perm('commerce.manage'));
+        Route::delete('commerce/workspace/storefronts/{id}/presentation/versions/{version}', [CommerceWorkspaceStorefrontPresentationVersionController::class, 'destroy'])
+            ->whereUuid('id')->whereUuid('version')
             ->middleware($perm('commerce.manage'));
 
         // COM-MOBILE-SHIPPING-1 (ADR-10): مناطق شحن مُهيَّأة من التاجر —

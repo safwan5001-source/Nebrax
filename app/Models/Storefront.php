@@ -91,4 +91,9 @@ class Storefront extends BaseModel implements CompanyWide
     {
         return $this->hasOne(StorefrontPresentation::class);
     }
+
+    public function presentationVersions(): HasMany
+    {
+        return $this->hasMany(StorefrontPresentationVersion::class);
+    }
 }

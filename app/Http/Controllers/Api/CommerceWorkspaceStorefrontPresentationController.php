@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Requests\PublishStorefrontPresentationRequest;
 use App\Http\Requests\SaveStorefrontPresentationRequest;
+use App\Services\Commerce\ForwardSchemaVersionException;
 use App\Services\Commerce\NothingToPublishException;
 use App\Services\Commerce\PresentationDocumentTooLargeException;
 use App\Services\Commerce\StaleDraftRevisionException;
@@ -49,7 +50,7 @@ class CommerceWorkspaceStorefrontPresentationController extends ApiController
                 $request->validated('config'),
                 (int) $request->validated('draft_revision'),
             );
-        } catch (StaleDraftRevisionException $e) {
+        } catch (StaleDraftRevisionException|ForwardSchemaVersionException $e) {
             abort(409, $e->getMessage());
         } catch (PresentationDocumentTooLargeException $e) {
             abort(422, $e->getMessage());

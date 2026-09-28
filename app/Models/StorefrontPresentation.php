@@ -28,6 +28,12 @@ class StorefrontPresentation extends BaseModel implements CompanyWide
         'published_config',
         'published_revision',
         'published_at',
+        'draft_schema_version',
+        'published_schema_version',
+        'schedule_epoch',
+        'active_version_id',
+        'scheduled_version_id',
+        'compatibility_working_version_id',
     ];
 
     protected $casts = [
@@ -37,11 +43,15 @@ class StorefrontPresentation extends BaseModel implements CompanyWide
         'published_config' => 'array',
         'published_revision' => 'integer',
         'published_at' => 'datetime',
+        'draft_schema_version' => 'integer',
+        'published_schema_version' => 'integer',
+        'schedule_epoch' => 'integer',
     ];
 
     protected $attributes = [
         'schema_version' => 1,
         'draft_revision' => 0,
+        'schedule_epoch' => 0,
     ];
 
     protected static function booted(): void
@@ -69,5 +79,20 @@ class StorefrontPresentation extends BaseModel implements CompanyWide
     public function storefront(): BelongsTo
     {
         return $this->belongsTo(Storefront::class);
+    }
+
+    public function activeVersion(): BelongsTo
+    {
+        return $this->belongsTo(StorefrontPresentationVersion::class, 'active_version_id');
+    }
+
+    public function scheduledVersion(): BelongsTo
+    {
+        return $this->belongsTo(StorefrontPresentationVersion::class, 'scheduled_version_id');
+    }
+
+    public function compatibilityWorkingVersion(): BelongsTo
+    {
+        return $this->belongsTo(StorefrontPresentationVersion::class, 'compatibility_working_version_id');
     }
 }
