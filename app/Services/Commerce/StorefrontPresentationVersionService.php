@@ -174,6 +174,13 @@ final class StorefrontPresentationVersionService
                 throw new StaleVersionRevisionException;
             }
 
+            // فشل آمن قبل أي كتابة: راجع `saveForCurrentTenant()` — نظيرها
+            // هنا غائبٌ سابقاً، فكانت إعادة تسمية نسخة بمخطط أمامي (بعد
+            // تراجع نشرٍ عقب ترقية) تُثبَّت بصمت، ثم يُطبَّع `detail()`
+            // اللاحق مستندها المخزَّن صامتاً إلى افتراضي AWJ Modern بدل رفض
+            // الطلب بـ409 — نفس دلالة الفشل الآمن على القراءة/الحفظ/التكرار.
+            $this->assertSupportedSchema((int) $version->schema_version);
+
             $newRevision = (int) $version->revision + 1;
 
             $version->forceFill([

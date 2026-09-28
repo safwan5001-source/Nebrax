@@ -456,6 +456,34 @@ class StorefrontPresentationVersionApiTest extends TestCase
         $this->assertSame(2, $res->json('data.revision'));
     }
 
+    /**
+     * Round-9 review: إعادة التسمية كانت الاستثناء الوحيد بين مسارات
+     * القراءة/الحفظ/التكرار — لا تفحص وسم النسخة المخزَّن إطلاقاً، فتُثبَّت
+     * إعادة التسمية بصمت على نسخة بمخطط أمامي، ثم يُطبِّع `detail()` مستندها
+     * صامتاً إلى افتراضي AWJ Modern بدل رفض الطلب بـ409.
+     */
+    /** @test */
+    public function renaming_a_forward_schema_version_fails_closed_without_mutating_it(): void
+    {
+        $auth = $this->registerTenant('ver-rename-forward', 'owner@ver-rename-forward.test');
+        $seeded = $this->seedWebStorefront($auth['tenant_id']);
+        $token = $this->withToken($auth['token']);
+
+        $created = $token->postJson($this->listPath($seeded['storefront']->id), ['name' => 'مستقبلية'])
+            ->assertCreated();
+        $versionId = $created->json('data.id');
+        $this->forceVersionSchema($versionId, StorefrontPresentationNormalizer::VERSION + 1);
+
+        $token->patchJson($this->itemPath($seeded['storefront']->id, $versionId), [
+            'name' => 'اسم جديد',
+            'revision' => 1,
+        ])->assertStatus(409);
+
+        $unchanged = StorefrontPresentationVersion::withoutGlobalScopes()->find($versionId);
+        $this->assertSame('مستقبلية', $unchanged->name);
+        $this->assertSame(1, (int) $unchanged->revision);
+    }
+
     /** @test */
     public function a_stale_rename_revision_returns_409(): void
     {

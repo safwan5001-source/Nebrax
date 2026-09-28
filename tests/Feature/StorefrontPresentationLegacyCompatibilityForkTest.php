@@ -228,6 +228,44 @@ class StorefrontPresentationLegacyCompatibilityForkTest extends TestCase
         $this->assertSame(1, (int) $unchanged->draft_revision);
     }
 
+    /**
+     * Round-9 review: مسار الحفظ القديم كان يفحص وسم نسخة العمل وحدها —
+     * لا وسم الرأس الكامل (`assertSupportedLegacySchema`) كما يفعل GET
+     * والنشر. رأسٌ مسودته/نسخة عمله مدعومتان لكن لقطته المنشورة تحمل مخططاً
+     * أمامياً (تراجع نشرٍ عقب ترقية) كان يمرّ هذا الفحص الجزئي بصمت، ثم
+     * يُطبِّع present() اللاحق المنشور صامتاً إلى افتراضي AWJ Modern في
+     * استجابة الحفظ الناجح بدل رفضه بـ409.
+     */
+    /** @test */
+    public function legacy_put_fails_closed_when_the_published_snapshot_carries_a_forward_schema_even_with_a_supported_draft(): void
+    {
+        $auth = $this->registerTenant('legacy-forward-published-put', 'owner@legacy-forward-published-put.test');
+        $seeded = $this->seedWebStorefront($auth['tenant_id']);
+        $token = $this->withToken($auth['token']);
+
+        $forwardPublished = ['version' => StorefrontPresentationNormalizer::VERSION + 1, 'themePreset' => 'navy'];
+
+        $rowId = $this->insertLegacyRow($seeded['storefront'], [
+            'draft_config' => json_encode(['version' => 2, 'themePreset' => 'navy']),
+            'draft_revision' => 1,
+            'draft_schema_version' => StorefrontPresentationNormalizer::VERSION,
+            'published_config' => json_encode($forwardPublished),
+            'published_revision' => 1,
+            'published_at' => now(),
+            'published_schema_version' => StorefrontPresentationNormalizer::VERSION + 1,
+        ]);
+
+        $token->putJson($this->legacyPath($seeded['storefront']->id), [
+            'config' => ['version' => 2, 'themePreset' => 'burgundy'],
+            'draft_revision' => 1,
+        ])->assertStatus(409);
+
+        $unchanged = StorefrontPresentation::withoutGlobalScopes()->find($rowId);
+        $this->assertSame(1, (int) $unchanged->draft_revision, 'يجب ألا يُكتب شيء عند الرفض الآمن.');
+        $this->assertSame('navy', $unchanged->draft_config['themePreset']);
+        $this->assertNull($unchanged->compatibility_working_version_id, 'يجب ألا تُنشأ نسخة عمل أصلاً — الرفض قبل أي قفل/كتابة.');
+    }
+
     /** @test */
     public function legacy_put_rejects_a_forward_declared_config_version_before_normalizing(): void
     {

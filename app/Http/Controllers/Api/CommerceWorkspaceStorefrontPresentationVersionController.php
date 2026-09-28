@@ -132,7 +132,7 @@ class CommerceWorkspaceStorefrontPresentationVersionController extends ApiContro
                 $request->validated('name'),
                 (int) $request->validated('revision'),
             );
-        } catch (StaleVersionRevisionException $e) {
+        } catch (StaleVersionRevisionException|ForwardSchemaVersionException $e) {
             abort(409, $e->getMessage());
         }
 
