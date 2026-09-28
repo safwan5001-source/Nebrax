@@ -7,7 +7,7 @@
 ## Repository state
 
 - **Base SHA:** `2e9cdd058a50a2014dc0b4a3c5c0c3302c353616` (`origin/main` at task start — matched the SHA given in the task brief; verified with a fresh `git fetch origin main` before starting).
-- **Head SHA:** `458dc8e` (round-13 review fix; round-12 fix head was `4519fa2`; round-11 fix head was `7525d49`; round-10 fix head was `5c4cdb7`; round-9 fix head was `1b7f06c`; second reconciliation fix head was `9d3ffa4`; first reconciliation merge head was `d841b11`; post-round-8-review-fix head was `43fbb31`; round-7 fix head was `992d39b`; round-6 fix head was `9a4209d`; round-5 fix head was `01a4981`; round-4 fix head was `c2033dd`; round-3 fix head was `892e1e1`; round-2 fix head was `0e3111c`; round-1 fix head was `fddba52`; initial implementation head was `3077ecf`)
+- **Head SHA:** `efab4d6` (round-14 review fix; round-13 fix head was `458dc8e`; round-12 fix head was `4519fa2`; round-11 fix head was `7525d49`; round-10 fix head was `5c4cdb7`; round-9 fix head was `1b7f06c`; second reconciliation fix head was `9d3ffa4`; first reconciliation merge head was `d841b11`; post-round-8-review-fix head was `43fbb31`; round-7 fix head was `992d39b`; round-6 fix head was `9a4209d`; round-5 fix head was `01a4981`; round-4 fix head was `c2033dd`; round-3 fix head was `892e1e1`; round-2 fix head was `0e3111c`; round-1 fix head was `fddba52`; initial implementation head was `3077ecf`)
 - **Branch:** `claude/cust-h1-2-customizer-ux-23vvun`
 - **PR:** [#1085](https://github.com/safwan5001-source/Nebrax/pull/1085)
 
@@ -295,6 +295,18 @@ One P1 finding — a subtler variant of the version-identity races fixed in earl
 The review thread was replied to (naming the fix commit `458dc8e`) and resolved. `npx vitest run` (2240 tests, full suite) and `npm run build` both re-verified green after this round.
 
 **Note for a future round:** the same underlying gap (a switch to another version starting *before*, and completing *during*, a different write's flight) is structurally possible in `handleDuplicateVersion`'s and `handleCreateVersion`'s `adoptCreatedVersion` calls too, since neither create's nor duplicate's controls are gated by another version's in-flight switch either. This round's fix addresses only the specific instance the reviewer flagged (rename); the create/duplicate instances are noted here rather than fixed speculatively, since they'd need their own dedicated test coverage and there's a real behavioral question worth the reviewer's or owner's confirmation first: should a create/duplicate that resolves after the merchant has switched away *still* leave its new version selectable from the list only (today's behavior once a switch happens *during* the request), or does adopting behavior specifically need revisiting for the *already-switching-before-start* case too. Flagging rather than guessing.
+
+### Automated review (`chatgpt-codex-connector`, round 14, reviewed `4519fa2`, fixed in `efab4d6`)
+
+Two P2 findings — both cross-gating gaps between the two separate busy identities (`versionCreating`, `versionBusy`) introduced across rounds 9–11, plus one more instance of round 12's name-truncation fix in the manager's own (separate) duplicate-name field.
+
+| Finding | Fix | Regression test |
+|---|---|---|
+| The published-version "create draft" button's busy state (set in round 10) only checked `versionBusy`, not `versionCreating` — an entirely separate flag since round 11's dedicated-identity fix. A manager create left pending didn't disable this button at all, so clicking it fired a second POST (a duplicate) concurrently and created two drafts. | `busy` is now `versionBusy !== null \|\| versionCreating`. | `the published-version "create draft" action is also blocked while a manager create is pending, not only a row write (codex round 14)` |
+| Symmetrically (also self-checked while fixing the above, since the reviewer's note explicitly asked for it: "likewise prevent manager creation while a duplicate is pending"): the manager's own inline create form's `creating` prop only reflected `versionCreating`, not `versionBusy` — a pending row write (duplicate/rename/delete) didn't disable the "+ نسخة جديدة" form either. | `creating` passed to `VersionManagerPanel` is now `versionCreating \|\| versionBusy !== null`. | `the manager's own create form is blocked while a row write is pending, not only while another create is (codex round 14)` |
+| `VersionManagerPanel`'s own `defaultDuplicateName()` — used to pre-fill the *editable* duplicate-name field inline in the manager, a separate code path from the one-click published shortcut round 12 already fixed — had the same unbounded-length gap: a version with a name near the server's 120-character max produced an already-invalid default value, so submitting without editing it failed with 422. | Truncated the same way as round 12's fix (combined prefix + name, capped at 120 characters). | `truncates the manager's own generated duplicate-name default to the server's 120-character limit (codex round 14)` |
+
+All review threads were replied to individually (naming the fix commit `efab4d6`) and resolved. `npx vitest run` (2243 tests, full suite) and `npm run build` both re-verified green after this round.
 
 ## Merge-conflict reconciliation with main (`d841b11`, `9d3ffa4`)
 
