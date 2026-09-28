@@ -16,7 +16,7 @@ describe("web customizer preview — AWJ Market card proportions", () => {
     cleanup();
   });
 
-  it("uses a square image tile for AWJ Modern (unchanged default)", () => {
+  it("uses ProductCard's own standard fixed image height for AWJ Modern (unchanged default)", () => {
     const { container } = render(
       <StorefrontPreviewCanvas
         config={DEFAULT_PRESENTATION_CONFIG}
@@ -24,11 +24,11 @@ describe("web customizer preview — AWJ Market card proportions", () => {
         viewport="desktop"
       />,
     );
-    expect(container.querySelector(".aspect-square")).not.toBeNull();
-    expect(container.querySelector(".aspect-\\[4\\/3\\]")).toBeNull();
+    expect(container.querySelector(".h-36")).not.toBeNull();
+    expect(container.querySelector(".h-28")).toBeNull();
   });
 
-  it("uses a shorter, denser image tile once AWJ Market is selected", () => {
+  it("uses ProductCard's own exact Market fixed image height once AWJ Market is selected", () => {
     const marketConfig = {
       ...DEFAULT_PRESENTATION_CONFIG,
       themePreset: "awj-market" as const,
@@ -36,8 +36,8 @@ describe("web customizer preview — AWJ Market card proportions", () => {
     const { container } = render(
       <StorefrontPreviewCanvas config={marketConfig} locale="en" viewport="desktop" />,
     );
-    expect(container.querySelector(".aspect-\\[4\\/3\\]")).not.toBeNull();
-    expect(container.querySelector(".aspect-square")).toBeNull();
+    expect(container.querySelector(".h-28")).not.toBeNull();
+    expect(container.querySelector(".h-36")).toBeNull();
   });
 });
 
