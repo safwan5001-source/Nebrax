@@ -8,11 +8,18 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 const loadMock = vi.fn();
 const saveMock = vi.fn();
 const publishMock = vi.fn();
+const versionLoadMock = vi.fn();
+const versionSaveMock = vi.fn();
 
 vi.mock('@/modules/commerce-workspace/presentation', () => ({
   loadStorefrontPresentation: (...args: unknown[]) => loadMock(...args),
   saveStorefrontPresentation: (...args: unknown[]) => saveMock(...args),
   publishStorefrontPresentation: (...args: unknown[]) => publishMock(...args),
+}));
+
+vi.mock('@/modules/commerce-workspace/presentation-versions', () => ({
+  loadStorefrontPresentationVersion: (...args: unknown[]) => versionLoadMock(...args),
+  saveStorefrontPresentationVersion: (...args: unknown[]) => versionSaveMock(...args),
 }));
 
 import { DEFAULT_PRESENTATION_CONFIG } from '../presentation';
@@ -35,6 +42,8 @@ describe('ExperienceBuilder persistence wiring', () => {
     loadMock.mockReset();
     saveMock.mockReset();
     publishMock.mockReset();
+    versionLoadMock.mockReset();
+    versionSaveMock.mockReset();
   });
 
   it('loads the selected storefront draft on mount', async () => {
@@ -49,6 +58,56 @@ describe('ExperienceBuilder persistence wiring', () => {
     await waitFor(() => expect(loadMock).toHaveBeenCalledWith('store-1'));
     expect(screen.getByText('Store Experience Builder')).toBeTruthy();
     expect(screen.queryByText('Verified')).toBeNull();
+  });
+
+  it('loads and saves an isolated Version without using the legacy draft or publish path', async () => {
+    versionLoadMock.mockResolvedValue({
+      ok: true,
+      data: {
+        id: 'version-1',
+        storefrontId: 'store-1',
+        name: 'Theme draft',
+        state: 'draft',
+        schemaVersion: 2,
+        revision: 3,
+        config: DEFAULT_PRESENTATION_CONFIG,
+      },
+    });
+    versionSaveMock.mockResolvedValue({
+      ok: true,
+      data: {
+        id: 'version-1',
+        storefrontId: 'store-1',
+        name: 'Theme draft',
+        state: 'draft',
+        schemaVersion: 2,
+        revision: 4,
+        config: DEFAULT_PRESENTATION_CONFIG,
+      },
+    });
+
+    const user = userEvent.setup();
+    render(
+      <ExperienceBuilder
+        storefrontId="store-1"
+        versionId="version-1"
+        initialLocale="en"
+      />,
+    );
+
+    await waitFor(() => expect(versionLoadMock).toHaveBeenCalledWith('store-1', 'version-1'));
+    expect(loadMock).not.toHaveBeenCalled();
+    expect(document.querySelector('[data-experience-builder]')?.getAttribute('data-version-id')).toBe('version-1');
+    expect(screen.getByRole('button', { name: 'Publish' }).hasAttribute('disabled')).toBe(true);
+
+    await user.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() => expect(versionSaveMock).toHaveBeenCalledWith(
+      'store-1',
+      'version-1',
+      expect.any(Object),
+      3,
+    ));
+    expect(publishMock).not.toHaveBeenCalled();
   });
 
   it('follows the AWJ locale without a redundant language switcher', async () => {
