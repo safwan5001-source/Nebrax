@@ -29,9 +29,9 @@ vi.mock('@/modules/commerce-workspace/store-context', () => ({
 }));
 
 vi.mock('@/modules/commerce-workspace/presentation-versions', () => ({
-  createStorefrontPresentationVersion: (...args: unknown[]) => createMock(...args),
-  saveStorefrontPresentationVersion: (...args: unknown[]) => saveMock(...args),
-  deleteStorefrontPresentationVersion: (...args: unknown[]) => deleteMock(...args),
+  createPresentationVersion: (...args: unknown[]) => createMock(...args),
+  savePresentationVersion: (...args: unknown[]) => saveMock(...args),
+  deletePresentationVersion: (...args: unknown[]) => deleteMock(...args),
 }));
 
 import { DEFAULT_PRESENTATION_CONFIG } from '@/modules/store-experience-builder/presentation';

@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -20,6 +20,54 @@ vi.mock('@/modules/commerce-workspace/store-context', () => ({
     viewStoreUrl: null,
     refresh: vi.fn(),
   }),
+}));
+
+import { DEFAULT_PRESENTATION_CONFIG } from '@/modules/store-experience-builder/presentation';
+
+// CUST-H1-2 — الآن تُحمَّل الواجهة عبر نسخة تصميم واحدة (list → show)؛ نسخة
+// مسودة واحدة فقط فيُختار تلقائياً بلا غموض (`applyVersionSelection`). كلا
+// `vi.fn(impl)` يحمل تطبيقه وقت الإنشاء حتى ينجو من `vi.restoreAllMocks()`
+// في `afterEach` أدناه.
+const showMock = vi.fn(async () => ({
+  ok: true,
+  data: {
+    id: 'v1',
+    storefrontId: 's1',
+    name: 'التصميم الحالي',
+    state: 'draft',
+    schemaVersion: 1,
+    revision: 0,
+    scheduledFor: null,
+    lastPublishedAt: null,
+    createdAt: '2026-09-01T00:00:00.000Z',
+    updatedAt: '2026-09-01T00:00:00.000Z',
+    config: DEFAULT_PRESENTATION_CONFIG,
+  },
+}));
+
+vi.mock('@/modules/commerce-workspace/presentation-versions', () => ({
+  listPresentationVersions: vi.fn(async () => ({
+    ok: true,
+    data: [
+      {
+        id: 'v1',
+        storefrontId: 's1',
+        name: 'التصميم الحالي',
+        state: 'draft',
+        schemaVersion: 1,
+        revision: 0,
+        scheduledFor: null,
+        lastPublishedAt: null,
+        createdAt: '2026-09-01T00:00:00.000Z',
+        updatedAt: '2026-09-01T00:00:00.000Z',
+      },
+    ],
+  })),
+  showPresentationVersion: (...args: unknown[]) => showMock(...args),
+  createPresentationVersion: vi.fn(),
+  savePresentationVersion: vi.fn(),
+  renamePresentationVersion: vi.fn(),
+  deletePresentationVersion: vi.fn(),
 }));
 
 import CommerceAppearancePage from './page';
@@ -43,8 +91,9 @@ describe('commerce appearance — STORE-CUSTOMIZER-V2-1 shell and section select
     vi.restoreAllMocks();
   });
 
-  it('keeps toolbar / sidebar / preview as independent scroll regions', () => {
+  it('keeps toolbar / sidebar / preview as independent scroll regions', async () => {
     render(<CommerceAppearancePage />);
+    await waitFor(() => expect(showMock).toHaveBeenCalled());
     const regions = document.querySelectorAll('[data-customizer-scroll]');
     // sidebar nav + settings panel + preview canvas
     expect(regions.length).toBeGreaterThanOrEqual(3);
@@ -55,6 +104,7 @@ describe('commerce appearance — STORE-CUSTOMIZER-V2-1 shell and section select
   it('selects a section from the sidebar composer and syncs the preview', async () => {
     const user = userEvent.setup();
     render(<CommerceAppearancePage />);
+    await waitFor(() => expect(showMock).toHaveBeenCalled());
     await user.click(screen.getByRole('button', { name: 'الصفحة الرئيسية' }));
     await user.click(screen.getByRole('button', { name: 'التصنيفات' }));
 
@@ -74,6 +124,7 @@ describe('commerce appearance — STORE-CUSTOMIZER-V2-1 shell and section select
   it('scrolls the preview to the section chosen from the sidebar', async () => {
     const user = userEvent.setup();
     render(<CommerceAppearancePage />);
+    await waitFor(() => expect(showMock).toHaveBeenCalled());
     await user.click(screen.getByRole('button', { name: 'الصفحة الرئيسية' }));
     await user.click(screen.getByRole('button', { name: 'الجملة' }));
 
@@ -97,6 +148,7 @@ describe('commerce appearance — STORE-CUSTOMIZER-V2-1 shell and section select
 
     const user = userEvent.setup();
     render(<CommerceAppearancePage />);
+    await waitFor(() => expect(showMock).toHaveBeenCalled());
     await user.click(screen.getByRole('button', { name: 'الصفحة الرئيسية' }));
     await user.click(screen.getByRole('button', { name: 'وصل حديثاً' }));
 
@@ -109,6 +161,7 @@ describe('commerce appearance — STORE-CUSTOMIZER-V2-1 shell and section select
   it('clicking a section inside the preview selects it without scrolling again', async () => {
     const user = userEvent.setup();
     render(<CommerceAppearancePage />);
+    await waitFor(() => expect(showMock).toHaveBeenCalled());
 
     const previewSection = document.querySelector(
       '[data-preview-section="hero"]',
@@ -128,6 +181,7 @@ describe('commerce appearance — STORE-CUSTOMIZER-V2-1 shell and section select
   it('keeps Desktop/Tablet/Mobile preview modes working', async () => {
     const user = userEvent.setup();
     render(<CommerceAppearancePage />);
+    await waitFor(() => expect(showMock).toHaveBeenCalled());
     await user.click(screen.getByRole('button', { name: 'جوال' }));
     expect(builderRoot().dataset.device).toBe('mobile');
     expect(
@@ -142,6 +196,7 @@ describe('commerce appearance — STORE-CUSTOMIZER-V2-1 shell and section select
   it('preserves composer visibility and reorder behaviour', async () => {
     const user = userEvent.setup();
     render(<CommerceAppearancePage />);
+    await waitFor(() => expect(showMock).toHaveBeenCalled());
     await user.click(screen.getByRole('button', { name: 'الصفحة الرئيسية' }));
 
     // Hide the hero: its preview section disappears.
@@ -172,6 +227,7 @@ describe('commerce appearance — STORE-CUSTOMIZER-V2-1 shell and section select
   it('routes header, logo and footer clicks to their existing panels', async () => {
     const user = userEvent.setup();
     render(<CommerceAppearancePage />);
+    await waitFor(() => expect(showMock).toHaveBeenCalled());
 
     const header = document.querySelector(
       'header[data-preview-chrome="header"]',

@@ -13,9 +13,9 @@ import { commerceWorkspaceMessage, type CommerceWorkspaceMessageKey } from '@/mo
 import { useCommerceStoreContext } from '@/modules/commerce-workspace/store-context';
 import { THEME_REGISTRY, isRuntimeBackedTheme, type ThemeRegistryEntry } from '@/modules/commerce-workspace/theme-registry';
 import {
-  createStorefrontPresentationVersion,
-  deleteStorefrontPresentationVersion,
-  saveStorefrontPresentationVersion,
+  createPresentationVersion,
+  deletePresentationVersion,
+  savePresentationVersion,
 } from '@/modules/commerce-workspace/presentation-versions';
 import { presetSelectionPatch, THEME_PRESETS } from '@/modules/store-experience-builder/presentation';
 
@@ -37,7 +37,7 @@ export default function CommerceThemesPage() {
 
     setApplyingThemeId(theme.id);
     setApplyError(null);
-    const created = await createStorefrontPresentationVersion(
+    const created = await createPresentationVersion(
       selectedStoreId,
       `${t(theme.nameKey as CommerceWorkspaceMessageKey)} — Theme Gallery`,
     );
@@ -49,7 +49,7 @@ export default function CommerceThemesPage() {
 
     const preset = THEME_PRESETS.find((candidate) => candidate.id === theme.presetId);
     if (!preset) {
-      await deleteStorefrontPresentationVersion(selectedStoreId, created.data.id);
+      await deletePresentationVersion(selectedStoreId, created.data.id);
       setApplyingThemeId(null);
       setApplyError(t('themeGalleryApplyFailed'));
       return;
@@ -59,14 +59,14 @@ export default function CommerceThemesPage() {
       ...created.data.config,
       ...presetSelectionPatch(created.data.config, preset),
     };
-    const saved = await saveStorefrontPresentationVersion(
+    const saved = await savePresentationVersion(
       selectedStoreId,
       created.data.id,
       nextConfig,
       created.data.revision,
     );
     if (!saved.ok) {
-      await deleteStorefrontPresentationVersion(selectedStoreId, created.data.id);
+      await deletePresentationVersion(selectedStoreId, created.data.id);
       setApplyingThemeId(null);
       setApplyError(t('themeGalleryApplyFailed'));
       return;
