@@ -304,6 +304,11 @@ export function ExperienceBuilder({
     // وأثناء الانتظار فيُصان بنفس الفحص، بلا حاجة لتجاوزٍ منفصل قد يُصيبه هو
     // الآخر بصمت.
     if (!presentationConfigsEqual(draftRef.current, draftAtSwitchStart)) {
+      // الطلب نجح واكتمل فعلياً (busy/versionSwitchingId صُفِّرا أعلاه بالفعل)
+      // — لكن هذا الفرع لا يتبنّى نتيجته. تنبيه «جارٍ تحميل التفاصيل» المضبوط
+      // في بداية الدالة يبقى معروضاً بصمت إلى الأبد إن لم يُصفَّر هنا أيضاً،
+      // رغم أن لا شيء قيد التحميل فعلياً بعد الآن.
+      setNotice(null);
       updateVersionSummaryInList(result.data);
       return;
     }
@@ -561,6 +566,7 @@ export function ExperienceBuilder({
     const originStorefrontId = storefrontId;
     const tokenAtStart = versionRequestTokenRef.current;
     const draftAtStart = draft;
+    const openVersionIdAtStart = selectedVersion?.id ?? null;
     const createRequestId = ++versionCreateRequestRef.current;
     setVersionCreating(true);
     const result = await createPresentationVersion(storefrontId, name);
@@ -588,8 +594,14 @@ export function ExperienceBuilder({
     // كان عليه حين بدأ الطلب، فلا يُفرَض تبنّي النسخة الجديدة عليه؛ صفّها في
     // القائمة يُحدَّث فقط، وتُفتَح لاحقاً صراحةً. هذا الفحص يستعمل الرمز العام
     // عمداً (لا هوية الإنشاء) — أي تبديل، لا إنشاءٌ ثانٍ فقط، يكفي لمنع التبنّي.
+    // فحص الهوية الحيّة إضافةً: تبديلٌ قد يبدأ *قبل* هذا الإنشاء (فيزيد الرمز
+    // العام مبكراً)، ويكتمل أثناء انتظاره — عندها `tokenAtStart` يطابق الرمز
+    // الحالي من منظور هذا الطلب وحده رغم أن نسخة أخرى غير التي كانت مفتوحة
+    // عند البدء أصبحت مفتوحة فعلاً؛ وإن تصادف أن محتواها مطابق لـ`draftAtStart`
+    // (نسخ مستنسخة من بعضها، مثلاً) يفلت فحص المحتوى وحده أيضاً بصمت.
     if (
       tokenAtStart !== versionRequestTokenRef.current ||
+      selectedVersionIdRef.current !== openVersionIdAtStart ||
       !presentationConfigsEqual(draftRef.current, draftAtStart)
     ) {
       updateVersionSummaryInList(result.data);
@@ -607,6 +619,7 @@ export function ExperienceBuilder({
     const originStorefrontId = storefrontId;
     const tokenAtStart = versionRequestTokenRef.current;
     const draftAtStart = draft;
+    const openVersionIdAtStart = selectedVersion?.id ?? null;
     const writeRequestId = ++versionWriteRequestRef.current;
     setVersionBusy({ id: version.id, action: "duplicate" });
     const result = await createPresentationVersion(storefrontId, name, version.id);
@@ -627,8 +640,12 @@ export function ExperienceBuilder({
       return;
     }
     if (!sameStorefront) return;
+    // فحص الهوية الحيّة إضافةً — راجع تعليق `handleCreateVersion` أعلاه: تبديلٌ
+    // بدأ *قبل* التكرار قد يكتمل أثناء انتظاره فيُفلِت من فحصَي الرمز والمحتوى
+    // وحدهما إن تصادف أن محتوى النسخة المفتوحة الآن مطابقاً لـ`draftAtStart`.
     if (
       tokenAtStart !== versionRequestTokenRef.current ||
+      selectedVersionIdRef.current !== openVersionIdAtStart ||
       !presentationConfigsEqual(draftRef.current, draftAtStart)
     ) {
       updateVersionSummaryInList(result.data);

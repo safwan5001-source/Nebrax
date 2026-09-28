@@ -1716,4 +1716,114 @@ describe('ExperienceBuilder — CUST-H1-2 Version Manager', () => {
     expect(input.value.length).toBeLessThanOrEqual(120);
     expect(input.value.startsWith('نسخة من ')).toBe(true);
   });
+
+  it("a create started before a pending switch completes cannot overwrite the newly selected version, even when their content happens to match (codex round 15)", async () => {
+    listMock.mockResolvedValue({
+      ok: true,
+      data: [summary({ id: 'a', name: 'نسخة أ', revision: 0 }), summary({ id: 'b', name: 'نسخة ب', revision: 0 })],
+    });
+    let resolveShowB: (value: unknown) => void = () => {};
+    // Both A and B resolve to the *same* default config — a content-only
+    // equality check would not catch a wrong adoption here.
+    showMock.mockImplementation((_storefrontId: string, versionId: string) =>
+      versionId === 'a'
+        ? Promise.resolve({ ok: true, data: detail({ id: 'a', name: 'نسخة أ', revision: 0 }) })
+        : new Promise((resolve) => { resolveShowB = resolve; }),
+    );
+    let resolveCreate: (value: unknown) => void = () => {};
+    createMock.mockReturnValue(new Promise((resolve) => { resolveCreate = resolve; }));
+    const user = userEvent.setup();
+    render(<ExperienceBuilder storefrontId="store-1" initialLocale="ar" />);
+    await screen.findByText('اختر نسخة للتعديل');
+
+    await openVersionManager(user);
+    let manager = screen.getByRole('menu', { name: 'إدارة نسخ التصميم' });
+    const rowA = within(manager).getByText('نسخة أ').closest('li') as HTMLElement;
+    await user.click(within(rowA).getByRole('button', { name: 'فتح للتعديل' }));
+    await waitFor(() =>
+      expect(screen.getByLabelText('نسخة التصميم قيد التعديل').textContent).toContain('نسخة أ'),
+    );
+
+    // Start switching to B — its GET never resolves during this part of the test.
+    await openVersionManager(user);
+    manager = screen.getByRole('menu', { name: 'إدارة نسخ التصميم' });
+    const rowB = within(manager).getByText('نسخة ب').closest('li') as HTMLElement;
+    await user.click(within(rowB).getByRole('button', { name: 'فتح للتعديل' }));
+
+    // Start a create while B's switch is still pending (A is still shown,
+    // unedited, so this create's own dirty-confirm doesn't fire).
+    await openVersionManager(user);
+    await user.click(screen.getByRole('button', { name: '+ نسخة جديدة' }));
+    await user.type(screen.getByPlaceholderText('مثال: رمضان ١٤٤٨'), 'نسخة جديدة');
+    await user.click(screen.getByRole('button', { name: 'إنشاء' }));
+    await waitFor(() => expect(createMock).toHaveBeenCalledTimes(1));
+
+    // B's switch now resolves — the editor correctly moves to B.
+    resolveShowB({ ok: true, data: detail({ id: 'b', name: 'نسخة ب', revision: 0 }) });
+    await waitFor(() =>
+      expect(screen.getByLabelText('نسخة التصميم قيد التعديل').textContent).toContain('نسخة ب'),
+    );
+
+    // The create now resolves. Its own token-and-content check alone would
+    // wrongly pass (B's config matches draftAtStart by construction), so
+    // only the live selected-version-identity check protects B here.
+    resolveCreate({ ok: true, data: detail({ id: 'new-1', name: 'نسخة جديدة', revision: 0 }) });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(screen.getByLabelText('نسخة التصميم قيد التعديل').textContent).toContain('نسخة ب');
+    expect(document.querySelector('[data-experience-builder]')?.getAttribute('data-selected-version-id')).toBe('b');
+  });
+
+  it("a duplicate started before a pending switch completes cannot overwrite the newly selected version, even when their content happens to match (codex round 15)", async () => {
+    listMock.mockResolvedValue({
+      ok: true,
+      data: [summary({ id: 'a', name: 'نسخة أ', revision: 0 }), summary({ id: 'b', name: 'نسخة ب', revision: 0 })],
+    });
+    let resolveShowB: (value: unknown) => void = () => {};
+    showMock.mockImplementation((_storefrontId: string, versionId: string) =>
+      versionId === 'a'
+        ? Promise.resolve({ ok: true, data: detail({ id: 'a', name: 'نسخة أ', revision: 0 }) })
+        : new Promise((resolve) => { resolveShowB = resolve; }),
+    );
+    let resolveDuplicate: (value: unknown) => void = () => {};
+    createMock.mockReturnValue(new Promise((resolve) => { resolveDuplicate = resolve; }));
+    const user = userEvent.setup();
+    render(<ExperienceBuilder storefrontId="store-1" initialLocale="ar" />);
+    await screen.findByText('اختر نسخة للتعديل');
+
+    await openVersionManager(user);
+    let manager = screen.getByRole('menu', { name: 'إدارة نسخ التصميم' });
+    const rowA = within(manager).getByText('نسخة أ').closest('li') as HTMLElement;
+    await user.click(within(rowA).getByRole('button', { name: 'فتح للتعديل' }));
+    await waitFor(() =>
+      expect(screen.getByLabelText('نسخة التصميم قيد التعديل').textContent).toContain('نسخة أ'),
+    );
+
+    // Start switching to B — its GET never resolves during this part of the test.
+    await openVersionManager(user);
+    manager = screen.getByRole('menu', { name: 'إدارة نسخ التصميم' });
+    const rowB = within(manager).getByText('نسخة ب').closest('li') as HTMLElement;
+    await user.click(within(rowB).getByRole('button', { name: 'فتح للتعديل' }));
+
+    // Start duplicating A's row while B's switch is still pending.
+    await openVersionManager(user);
+    manager = screen.getByRole('menu', { name: 'إدارة نسخ التصميم' });
+    const rowAAgain = within(manager).getByText('نسخة أ').closest('li') as HTMLElement;
+    await user.click(within(rowAAgain).getByRole('button', { name: 'تكرار النسخة' }));
+    await user.click(within(rowAAgain).getByRole('button', { name: 'إنشاء' }));
+    await waitFor(() => expect(createMock).toHaveBeenCalledTimes(1));
+
+    // B's switch now resolves — the editor correctly moves to B.
+    resolveShowB({ ok: true, data: detail({ id: 'b', name: 'نسخة ب', revision: 0 }) });
+    await waitFor(() =>
+      expect(screen.getByLabelText('نسخة التصميم قيد التعديل').textContent).toContain('نسخة ب'),
+    );
+
+    // The duplicate now resolves — B must not be overwritten with it.
+    resolveDuplicate({ ok: true, data: detail({ id: 'new-1', name: 'نسخة من أ', revision: 0 }) });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(screen.getByLabelText('نسخة التصميم قيد التعديل').textContent).toContain('نسخة ب');
+    expect(document.querySelector('[data-experience-builder]')?.getAttribute('data-selected-version-id')).toBe('b');
+  });
 });
