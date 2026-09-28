@@ -9,15 +9,11 @@ const saveMock = vi.fn();
 const publishMock = vi.fn();
 const versionLoadMock = vi.fn();
 const versionSaveMock = vi.fn();
-const search = { value: '' };
 
 vi.mock('next-intl', () => ({
   useLocale: () => locale.current,
 }));
 
-vi.mock('next/navigation', () => ({
-  useSearchParams: () => new URLSearchParams(search.value),
-}));
 
 vi.mock('@/modules/commerce-workspace/store-context', () => ({
   useCommerceStoreContext: () => ({
@@ -73,7 +69,7 @@ describe('commerce appearance — STORE-BACKEND-1', () => {
     publishMock.mockReset();
     versionLoadMock.mockReset();
     versionSaveMock.mockReset();
-    search.value = '';
+    window.history.replaceState({}, '', '/commerce/appearance');
   });
 
   it('replaces the destination placeholder with the Experience Builder', async () => {
@@ -86,7 +82,7 @@ describe('commerce appearance — STORE-BACKEND-1', () => {
   });
 
   it('opens an exact draft Version when the route carries a version query', async () => {
-    search.value = 'version=v1';
+    window.history.replaceState({}, '', '/commerce/appearance?version=v1');
     versionLoadMock.mockResolvedValue({
       ok: true,
       data: {
