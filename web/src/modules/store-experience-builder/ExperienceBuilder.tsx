@@ -1479,6 +1479,7 @@ function EmptyVersionsPrompt({
             if (event.key === "Enter" && !creating && name.trim() !== "") onCreate(name.trim());
           }}
           placeholder={t("versionNamePlaceholder")}
+          maxLength={120}
           className="h-9 min-w-0 flex-1 rounded border border-border bg-surface px-2 text-sm text-text outline-none focus:border-primary"
         />
       </div>

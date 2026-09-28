@@ -1967,4 +1967,34 @@ describe('ExperienceBuilder — CUST-H1-2 Version Manager', () => {
     manager = screen.getByRole('menu', { name: 'إدارة نسخ التصميم' });
     expect(within(manager).queryByText('جاري تحميل النسخ…')).toBeNull();
   });
+
+  it('caps the create/rename/duplicate name inputs at the server\'s 120-character limit instead of accepting an unsubmittable value (codex round 16)', async () => {
+    listMock.mockResolvedValue({ ok: true, data: [summary({ id: 'a', name: 'نسخة أ', revision: 0 })] });
+    showMock.mockResolvedValue({ ok: true, data: detail({ id: 'a', name: 'نسخة أ', revision: 0 }) });
+    const user = userEvent.setup();
+    render(<ExperienceBuilder storefrontId="store-1" initialLocale="ar" />);
+    await waitFor(() => expect(showMock).toHaveBeenCalled());
+    const tooLong = 'س'.repeat(150);
+
+    await openVersionManager(user);
+    const manager = screen.getByRole('menu', { name: 'إدارة نسخ التصميم' });
+    const rowA = within(manager).getByText('نسخة أ').closest('li') as HTMLElement;
+
+    await user.click(screen.getByRole('button', { name: '+ نسخة جديدة' }));
+    await user.type(screen.getByPlaceholderText('مثال: رمضان ١٤٤٨'), tooLong);
+    expect((screen.getByPlaceholderText('مثال: رمضان ١٤٤٨') as HTMLInputElement).value.length).toBeLessThanOrEqual(120);
+
+    await user.click(within(rowA).getByRole('button', { name: 'إعادة تسمية' }));
+    const renameInput = within(rowA).getByLabelText('اسم النسخة') as HTMLInputElement;
+    await user.clear(renameInput);
+    await user.type(renameInput, tooLong);
+    expect(renameInput.value.length).toBeLessThanOrEqual(120);
+    await user.click(within(rowA).getByRole('button', { name: 'إلغاء' }));
+
+    await user.click(within(rowA).getByRole('button', { name: 'تكرار النسخة' }));
+    const duplicateInput = within(rowA).getByLabelText('اسم النسخة') as HTMLInputElement;
+    await user.clear(duplicateInput);
+    await user.type(duplicateInput, tooLong);
+    expect(duplicateInput.value.length).toBeLessThanOrEqual(120);
+  });
 });

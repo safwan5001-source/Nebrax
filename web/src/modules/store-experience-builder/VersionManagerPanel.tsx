@@ -120,6 +120,9 @@ export function VersionManagerPanel({
               if (event.key === "Escape") setShowCreateForm(false);
             }}
             placeholder={t("versionNamePlaceholder")}
+            // الخادم يرفض `name` أطول من 120 حرفاً — حدٌّ يمنع رسالة خطأ عامة
+            // بلا سبب ظاهر بعد الإرسال، لا مجرَّد اختصار افتراضٍ مولَّد.
+            maxLength={120}
             className="h-9 min-w-0 flex-1 rounded border border-border bg-surface px-2 text-sm text-text outline-none focus:border-primary"
           />
           <button
@@ -302,6 +305,7 @@ function VersionRow({
             onKeyDown={(event) => {
               if (event.key === "Escape") setMode("idle");
             }}
+            maxLength={120}
             className="h-8 min-w-0 flex-1 rounded border border-border bg-surface px-2 text-xs text-text outline-none focus:border-primary"
           />
           <button
@@ -339,6 +343,7 @@ function VersionRow({
             onKeyDown={(event) => {
               if (event.key === "Escape") setMode("idle");
             }}
+            maxLength={120}
             className="h-8 min-w-0 flex-1 rounded border border-border bg-surface px-2 text-xs text-text outline-none focus:border-primary"
           />
           <button
