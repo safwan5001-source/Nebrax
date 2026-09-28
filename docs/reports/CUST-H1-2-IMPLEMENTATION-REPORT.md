@@ -7,7 +7,7 @@
 ## Repository state
 
 - **Base SHA:** `2e9cdd058a50a2014dc0b4a3c5c0c3302c353616` (`origin/main` at task start — matched the SHA given in the task brief; verified with a fresh `git fetch origin main` before starting).
-- **Head SHA:** `992d39b` (post-round-7-review-fix; round-6 fix head was `9a4209d`; round-5 fix head was `01a4981`; round-4 fix head was `c2033dd`; round-3 fix head was `892e1e1`; round-2 fix head was `0e3111c`; round-1 fix head was `fddba52`; initial implementation head was `3077ecf`)
+- **Head SHA:** `43fbb31` (post-round-8-review-fix; round-7 fix head was `992d39b`; round-6 fix head was `9a4209d`; round-5 fix head was `01a4981`; round-4 fix head was `c2033dd`; round-3 fix head was `892e1e1`; round-2 fix head was `0e3111c`; round-1 fix head was `fddba52`; initial implementation head was `3077ecf`)
 - **Branch:** `claude/cust-h1-2-customizer-ux-23vvun`
 - **PR:** [#1085](https://github.com/safwan5001-source/Nebrax/pull/1085)
 
@@ -226,6 +226,19 @@ One more P1 and two P2 findings — the round-6 row-write serialization fix was 
 | A row's Duplicate/Rename/Delete triggers weren't disabled while that same row's own version was still being fetched (`switching`) — only "Open" was. Opening a version, then reopening the manager to delete that same row before its `GET` resolved, could delete a version the `GET` was about to select. | Duplicate/Rename/Delete triggers now also disable while `switching` is true for that row, matching "Open"'s existing guard. | `deleting a version whose own switch is still loading is blocked (codex round 7)` |
 
 All three review threads were replied to individually (naming the fix commit `992d39b`) and resolved. `npx vitest run` (2193 tests, full suite) and `npm run build` both re-verified green after this round.
+
+### Automated review (`chatgpt-codex-connector`, round 8, reviewed `5c9bfe7`, fixed in `43fbb31`)
+
+Two more P1 and two more P2 findings — two are extensions of the retry/reload guards from round 6, one closes the last gap in row-write serialization (this row itself, not just others), and one is a genuinely separate gap in the storefront-reset effect (transitioning *to* no storefront, not just between two storefronts).
+
+| Finding | Fix | Regression test |
+|---|---|---|
+| The manager panel's own "retry" button appears whenever the list is in an error state — including while a version is already open with unsaved edits (e.g. after a rename-conflict's own background refresh failed) — not just the inspector body's retry (gated on nothing being selected). Retrying in that state ran the same initial-selection logic meant for "nothing open yet," silently re-selecting and overwriting the open draft. | Split `loadAndSelectInitialVersion` into an explicit `"mount" \| "retry"` context. A `"retry"` call with a version already open now only refreshes the list and returns. | `retrying a failed background list refresh does not discard the dirty draft of the still-open version (codex round 8)` |
+| Round 7's `reloadConflictedVersion` bypassed the draft-snapshot check entirely via `allowOverwriteDuringFetch`, intending only to confirm discarding what was *already* dirty when reload was clicked — but the bypass also discarded edits made *after* the click, while the reload's own GET was still in flight. | Removed the flag: it turned out unnecessary. The snapshot check already compares against the draft *when the call started* — for a reload that's exactly the stale content it's meant to discard, so nothing further needed changing to preserve a later edit. | `an edit made while the conflict-reload GET is pending is not discarded when it resolves (codex round 8)` |
+| Round 7's row-write serialization (`otherRowBusy`) is false for the busy row itself by definition. Submitting a rename resets that row's `mode` back to `"idle"` synchronously — before the request resolves — so its Duplicate/Rename/Delete triggers reappeared enabled while its own rename was still in flight, letting a second write on the same row steal the shared slot. | Added a same-row `busy !== null` check to all three triggers, alongside the existing `otherRowBusy`/`switching` checks. | `a pending rename on a row blocks starting a delete on the same row (codex round 8)` |
+| The `storefrontId` effect's `!storefrontId` early-return branch only cleared `busy`, skipping the token bump and store-scoped reset the non-null branch does. A real-store-to-no-store transition left the old version/draft visible in local-only mode, and let a still-in-flight request from the old store commit anyway (its token check would still pass). | The reset (token bump, clearing `selectedVersion`/`versions`/`draft`/`saved`/etc.) now runs unconditionally before branching; the null-store branch seeds `draft`/`saved` from `initialConfig` (via the existing `seed`) instead of skipping the reset. | `switching the storefront to null resets the previously open version and draft (codex round 8)` |
+
+All four review threads were replied to individually (naming the fix commit `43fbb31`) and resolved. `npx vitest run` (2197 tests, full suite) and `npm run build` both re-verified green after this round.
 
 ## Backward compatibility
 
