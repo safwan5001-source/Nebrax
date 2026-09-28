@@ -104,7 +104,7 @@ describe('commerce appearance — STORE-BACKEND-1', () => {
 
     await waitFor(() => expect(versionLoadMock).toHaveBeenCalledWith('s1', 'v1'));
     expect(loadMock).not.toHaveBeenCalled();
-    expect(screen.getByRole('button', { name: 'نشر' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'نشر' }).hasAttribute('disabled')).toBe(true);
     expect(screen.getByRole('status').textContent).toMatch(/نسخة مسودة مستقلة/);
   });
 
