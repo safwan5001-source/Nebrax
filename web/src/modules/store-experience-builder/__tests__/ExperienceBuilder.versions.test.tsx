@@ -632,4 +632,108 @@ describe('ExperienceBuilder — CUST-H1-2 Version Manager', () => {
 
     confirmSpy.mockRestore();
   });
+
+  it("a create for a previous storefront resolving late does not clear a newer storefront's own creating flag (codex round 4)", async () => {
+    listMock.mockResolvedValue({ ok: true, data: [] });
+    let resolveA: (value: unknown) => void = () => {};
+    let resolveB: (value: unknown) => void = () => {};
+    createMock.mockImplementation((storefrontId: string) =>
+      storefrontId === 'store-a'
+        ? new Promise((resolve) => { resolveA = resolve; })
+        : new Promise((resolve) => { resolveB = resolve; }),
+    );
+    const createButton = () => within(emptyStatePanel()).getByRole('button', { name: /إنشاء أول نسخة|جاري الإنشاء/ });
+    const user = userEvent.setup();
+    const { rerender } = render(<ExperienceBuilder storefrontId="store-a" initialLocale="ar" />);
+    await waitFor(() => expect(document.querySelector('[data-version-empty-state]')).toBeTruthy());
+
+    await user.type(within(emptyStatePanel()).getByPlaceholderText('مثال: رمضان ١٤٤٨'), 'أ');
+    await user.click(createButton());
+    await waitFor(() => expect(createMock).toHaveBeenCalledTimes(1));
+
+    // Move on to store B before A's create ever resolves.
+    rerender(<ExperienceBuilder storefrontId="store-b" initialLocale="ar" />);
+    await waitFor(() => expect(document.querySelector('[data-version-empty-state]')).toBeTruthy());
+    await user.type(within(emptyStatePanel()).getByPlaceholderText('مثال: رمضان ١٤٤٨'), 'ب');
+    await user.click(createButton());
+    await waitFor(() => expect(createMock).toHaveBeenCalledTimes(2));
+    expect((createButton() as HTMLButtonElement).disabled).toBe(true);
+
+    // A's stale create now resolves — it must not clear B's own creating flag.
+    resolveA({ ok: true, data: detail({ id: 'a-1', name: 'أ', revision: 1 }) });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect((createButton() as HTMLButtonElement).disabled).toBe(true);
+
+    resolveB({ ok: true, data: detail({ id: 'b-1', name: 'ب', revision: 1 }) });
+    await waitFor(() =>
+      expect(screen.getByLabelText('نسخة التصميم قيد التعديل').textContent).toContain('ب'),
+    );
+  });
+
+  it('an edit made while a create is still pending is not discarded when the create resolves (codex round 4)', async () => {
+    listMock.mockResolvedValue({ ok: true, data: [summary({ id: 'a', name: 'نسخة أ', revision: 0 })] });
+    showMock.mockResolvedValue({ ok: true, data: detail({ id: 'a', name: 'نسخة أ', revision: 0 }) });
+    let resolveCreate: (value: unknown) => void = () => {};
+    createMock.mockReturnValue(new Promise((resolve) => { resolveCreate = resolve; }));
+    const user = userEvent.setup();
+    render(<ExperienceBuilder storefrontId="store-1" initialLocale="ar" />);
+    await waitFor(() => expect(showMock).toHaveBeenCalled());
+
+    // The draft is clean when creation starts — no discard confirmation needed.
+    await openVersionManager(user);
+    await user.click(screen.getByRole('button', { name: '+ نسخة جديدة' }));
+    await user.type(screen.getByPlaceholderText('مثال: رمضان ١٤٤٨'), 'نسخة جديدة');
+    await user.click(screen.getByRole('button', { name: 'إنشاء' }));
+    await waitFor(() => expect(createMock).toHaveBeenCalledTimes(1));
+
+    // The merchant keeps editing version A while that create POST is pending —
+    // nothing in the UI blocks it, and no switch (which would bump the token)
+    // has happened, so this edit alone must still protect A from being
+    // silently replaced by the new version's content.
+    await user.click(screen.getByRole('button', { name: 'التوثيق والثقة' }));
+    await user.type(screen.getAllByRole('textbox')[0], 'تعديل أثناء الإنشاء');
+
+    resolveCreate({ ok: true, data: detail({ id: 'new-1', name: 'نسخة جديدة', revision: 1 }) });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(screen.getByLabelText('نسخة التصميم قيد التعديل').textContent).toContain('نسخة أ');
+    expect((screen.getAllByRole('textbox')[0] as HTMLInputElement).value).toBe('تعديل أثناء الإنشاء');
+  });
+
+  it("adopting a newly created version clears a still-pending save's stuck busy state (codex round 4)", async () => {
+    listMock.mockResolvedValue({ ok: true, data: [summary({ id: 'a', name: 'نسخة أ', revision: 0 })] });
+    showMock.mockResolvedValue({ ok: true, data: detail({ id: 'a', name: 'نسخة أ', revision: 0 }) });
+    let resolveSave: (value: unknown) => void = () => {};
+    saveMock.mockReturnValue(new Promise((resolve) => { resolveSave = resolve; }));
+    createMock.mockResolvedValue({ ok: true, data: detail({ id: 'new-1', name: 'نسخة جديدة', revision: 1 }) });
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const user = userEvent.setup();
+    render(<ExperienceBuilder storefrontId="store-1" initialLocale="ar" />);
+    await waitFor(() => expect(showMock).toHaveBeenCalled());
+
+    // Dirty A, save it — never resolves yet.
+    await user.click(screen.getByRole('button', { name: 'التوثيق والثقة' }));
+    await user.type(screen.getAllByRole('textbox')[0], 'تعديل');
+    await user.click(screen.getByRole('button', { name: 'حفظ المسودة' }));
+    await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(1));
+
+    // While A's save is still in flight, the merchant creates (confirming the
+    // discard of A's unsaved edit) a brand-new version.
+    await openVersionManager(user);
+    await user.click(screen.getByRole('button', { name: '+ نسخة جديدة' }));
+    await user.type(screen.getByPlaceholderText('مثال: رمضان ١٤٤٨'), 'نسخة جديدة');
+    await user.click(screen.getByRole('button', { name: 'إنشاء' }));
+    await waitFor(() =>
+      expect(screen.getByLabelText('نسخة التصميم قيد التعديل').textContent).toContain('نسخة جديدة'),
+    );
+
+    // A's now-superseded save resolves — it must not leave the newly opened
+    // version's Save button stuck disabled forever.
+    resolveSave({ ok: true, data: detail({ id: 'a', name: 'نسخة أ', revision: 1 }) });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(screen.getByRole('button', { name: 'حفظ المسودة' })).toHaveProperty('disabled', false);
+
+    confirmSpy.mockRestore();
+  });
 });

@@ -292,6 +292,11 @@ export function ExperienceBuilder({
     // إبطال أي طلب تبديل قيد التنفيذ — نسخة جديدة تم إنشاؤها للتو أولى بالتطبيق.
     ++versionRequestTokenRef.current;
     setVersionSwitchingId(null);
+    // إبطال رمز الطلب يُسقط أي حفظ/تحميل قيد التنفيذ للنسخة السابقة من فحص
+    // `stillCurrent` الخاص به، فلن يصفّر `busy` عند اكتماله لاحقاً — لولا هذا
+    // السطر يبقى `busy === "saving"` عالقاً على النسخة الجديدة المفتوحة الآن
+    // فيُعطَّل زرّ الحفظ حتى يبدّل التاجر النسخة ذهاباً وإياباً.
+    setBusy(null);
     setSelectedVersion(detail);
     setDraft(detail.config);
     setSaved(detail.config);
@@ -473,10 +478,14 @@ export function ExperienceBuilder({
     if (dirty && !window.confirm(t("versionSwitchDiscardConfirm"))) return;
     const originStorefrontId = storefrontId;
     const tokenAtStart = versionRequestTokenRef.current;
+    const draftAtStart = draft;
     setVersionCreating(true);
     const result = await createPresentationVersion(storefrontId, name);
-    setVersionCreating(false);
     const sameStorefront = storefrontIdRef.current === originStorefrontId;
+    // لا تصفّر علَم الإنشاء إلا إن كان لا يزال يخصّ هذا المتجر — وإلا فقد يكون
+    // المتجر الحالي بدأ إنشاءً خاصاً به (`versionCreating === true` له)، وهذا
+    // الإكمال المتأخر من متجر سابق سيُسكته بصمت فيُفعِّل زرّه قبل اكتمال طلبه.
+    if (sameStorefront) setVersionCreating(false);
     if (!result.ok) {
       if (sameStorefront) {
         setNoticeKind("status");
@@ -485,8 +494,14 @@ export function ExperienceBuilder({
       return;
     }
     if (!sameStorefront) return; // أُنشئت لمتجر لم يعد معروضاً إطلاقاً — موجودة على الخادم، تظهر عند العودة إليه.
-    if (tokenAtStart !== versionRequestTokenRef.current) {
-      // نفس المتجر، لكن تبديل نسخة حدث أثناء الإنشاء — لا تُفرَض على محرِّر يعرض شيئاً آخر الآن.
+    // تبديل نسخة (الرمز) أو تعديل جديد على المسودة المفتوحة (لا يُغيِّر الرمز)
+    // وقع أثناء انتظار الإنشاء — كلاهما يعني أن ما يُعرَض الآن لم يعد يطابق ما
+    // كان عليه حين بدأ الطلب، فلا يُفرَض تبنّي النسخة الجديدة عليه؛ صفّها في
+    // القائمة يُحدَّث فقط، وتُفتَح لاحقاً صراحةً.
+    if (
+      tokenAtStart !== versionRequestTokenRef.current ||
+      !presentationConfigsEqual(draftRef.current, draftAtStart)
+    ) {
       updateVersionSummaryInList(result.data);
       return;
     }
@@ -501,10 +516,11 @@ export function ExperienceBuilder({
     if (dirty && !window.confirm(t("versionSwitchDiscardConfirm"))) return;
     const originStorefrontId = storefrontId;
     const tokenAtStart = versionRequestTokenRef.current;
+    const draftAtStart = draft;
     setVersionBusy({ id: version.id, action: "duplicate" });
     const result = await createPresentationVersion(storefrontId, name, version.id);
-    setVersionBusy(null);
     const sameStorefront = storefrontIdRef.current === originStorefrontId;
+    if (sameStorefront) setVersionBusy(null);
     if (!result.ok) {
       if (sameStorefront) {
         setNoticeKind("status");
@@ -513,7 +529,10 @@ export function ExperienceBuilder({
       return;
     }
     if (!sameStorefront) return;
-    if (tokenAtStart !== versionRequestTokenRef.current) {
+    if (
+      tokenAtStart !== versionRequestTokenRef.current ||
+      !presentationConfigsEqual(draftRef.current, draftAtStart)
+    ) {
       updateVersionSummaryInList(result.data);
       return;
     }
@@ -528,9 +547,11 @@ export function ExperienceBuilder({
     const wasOpenAtStart = selectedVersion?.id === version.id;
     setVersionBusy({ id: version.id, action: "rename" });
     const result = await renamePresentationVersion(storefrontId, version.id, name, version.revision);
-    setVersionBusy(null);
     const current = stillCurrent(originStorefrontId, tokenAtStart);
     const sameStorefront = storefrontIdRef.current === originStorefrontId;
+    // نفس حرص إنشاء/تكرار النسخة: لا تصفّر علَم الانشغال إلا إن كان لا يزال
+    // يخصّ هذا المتجر، وإلا فقد يُسكِت بصمت علَم عملية أحدث بدأها متجر آخر.
+    if (sameStorefront) setVersionBusy(null);
     if (!result.ok) {
       if (result.reason === "conflict") {
         if (sameStorefront) {
@@ -573,9 +594,9 @@ export function ExperienceBuilder({
     const wasOpenAtStart = selectedVersion?.id === version.id;
     setVersionBusy({ id: version.id, action: "delete" });
     const result = await deletePresentationVersion(storefrontId, version.id);
-    setVersionBusy(null);
     const current = stillCurrent(originStorefrontId, tokenAtStart);
     const sameStorefront = storefrontIdRef.current === originStorefrontId;
+    if (sameStorefront) setVersionBusy(null);
     if (!result.ok) {
       if (result.reason === "lifecycle_conflict") {
         if (sameStorefront) {
