@@ -73,6 +73,10 @@ final class StorefrontPresentationService
                     ->first();
 
                 if ($locked !== null) {
+                    // إعادة الفحص بعد القفل: الفحص أعلاه غير مقفول، فقد
+                    // يلتزم كاتبٌ أحدث مخططاً أماميّاً بين تلك القراءة وهذا
+                    // القفل. القفل هو مصدر الحقيقة، لا القراءة السابقة له.
+                    $this->assertSupportedLegacySchema($locked);
                     $this->backfill->ensureCompatibilityWorkingVersion($locked);
                 }
 
@@ -249,10 +253,36 @@ final class StorefrontPresentationService
         // الواجهة القديمة أو نسخة العمل المتوافقة عبر واجهة النسخ) دون أن
         // تتغيّر اللقطة المنشورة إطلاقاً — استعماله هنا كان سيُعيد تفسير
         // لقطة v1 منشورة بدلالات v2 لمجرّد أن المسودة أُعيد حفظها.
+        //
+        // ولأن هذا مسار القراءة العامة (بلا قفل ولا معاملة عمداً — لا انضمام
+        // إضافي ولا تغيير في دلالة الذاكرة المؤقتة، حسب المعمارية)، لا يمكنه
+        // تبنّي حارس التحوّل/العبور القفليّ نفسه المستعمل على الجانب الخاص
+        // بالمسودة. بدلاً منه: الوثيقة المخزَّنة تحمل وسمها الحقيقي داخلها —
+        // `normalize()` تكتب `'version' => VERSION` الجاري وقت أي حفظ، قديماً
+        // كان الكاتب أو جديداً، فيبقى صحيحاً حتى لو تخلَّف عمود
+        // `published_schema_version` المنفصل عن كاتبٍ قديم لا يعرفه (راجع
+        // `effectivePublishedSchemaTag()`).
         return $this->normalizer->normalize(
             $row->published_config,
-            (int) ($row->published_schema_version ?? $row->schema_version),
+            $this->effectivePublishedSchemaTag($row->published_config, $row->published_schema_version ?? $row->schema_version),
         );
+    }
+
+    /**
+     * الوسم الفعلي لمستند منشور مخزَّن: حقل `version` المضمَّن داخل الوثيقة
+     * نفسها أولاً (يكتبه `normalize()` عند كل حفظ فعلي، قديماً كان الكاتب أو
+     * جديداً، فلا يتخلَّف أبداً عن الشكل الحقيقي للمحتوى)، ثم عمود قاعدة
+     * البيانات المنفصل احتياطاً فقط لمستند بلا حقل مضمَّن.
+     *
+     * @param  array<string, mixed>  $publishedConfig
+     */
+    private function effectivePublishedSchemaTag(array $publishedConfig, ?int $columnFallback): int
+    {
+        if (isset($publishedConfig['version']) && is_numeric($publishedConfig['version'])) {
+            return (int) $publishedConfig['version'];
+        }
+
+        return $columnFallback ?? 1;
     }
 
     /**
@@ -470,7 +500,7 @@ final class StorefrontPresentationService
             if (is_array($row->published_config)) {
                 $published = $this->normalizer->normalize(
                     $row->published_config,
-                    (int) ($row->published_schema_version ?? $row->schema_version),
+                    $this->effectivePublishedSchemaTag($row->published_config, $row->published_schema_version ?? $row->schema_version),
                 );
                 $publishedRevision = $row->published_revision !== null ? (int) $row->published_revision : null;
                 $publishedAt = $row->published_at?->toJSON();
@@ -528,6 +558,15 @@ final class StorefrontPresentationService
         }
 
         if ($row->published_schema_version !== null && (int) $row->published_schema_version > StorefrontPresentationNormalizer::VERSION) {
+            throw new ForwardSchemaVersionException;
+        }
+
+        // عمود قاعدة البيانات وحده لا يكفي — قد يتخلَّف عن كاتبٍ قديم لا
+        // يعرفه، بينما الوثيقة المخزَّنة نفسها تحمل وسمها الحقيقي دوماً.
+        if (
+            is_array($row->published_config)
+            && $this->effectivePublishedSchemaTag($row->published_config, null) > StorefrontPresentationNormalizer::VERSION
+        ) {
             throw new ForwardSchemaVersionException;
         }
     }

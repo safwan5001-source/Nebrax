@@ -566,4 +566,64 @@ class StorefrontPresentationLegacyCompatibilityForkTest extends TestCase
         $this->assertSame('burgundy', $healedCompat->config['themePreset']);
         $this->assertSame(2, (int) $healedCompat->revision);
     }
+
+    /** @test */
+    public function an_old_code_publish_that_bypasses_published_schema_version_is_still_read_under_its_true_embedded_schema(): void
+    {
+        $auth = $this->registerTenant('published-embedded-tag', 'owner@published-embedded-tag.test');
+        $seeded = $this->seedWebStorefront($auth['tenant_id']);
+
+        // يحاكي نشراً قديماً: `published_config` أصبح v2 فعلياً (يحمل حقل
+        // 'version' مضمَّناً = 2، كما يكتبه normalize() دوماً أياً كان
+        // الكاتب)، لكن عمود `published_schema_version` المنفصل بقي 1 لأن
+        // الكاتب القديم لا يعرف هذا العمود إطلاقاً.
+        $v2PublishedWithExplicitDeletion = [
+            'version' => 2,
+            'homepage' => ['sections' => [['id' => 'hero', 'type' => 'hero', 'visible' => true]]],
+        ];
+
+        $this->insertLegacyRow($seeded['storefront'], [
+            'schema_version' => 2,
+            'draft_config' => json_encode($v2PublishedWithExplicitDeletion),
+            'draft_revision' => 1,
+            'published_config' => json_encode($v2PublishedWithExplicitDeletion),
+            'published_revision' => 1,
+            'published_at' => now(),
+            'draft_schema_version' => 2,
+            'published_schema_version' => 1,
+        ]);
+
+        $snapshot = app(StorefrontPresentationService::class)
+            ->publishedSnapshotForStorefront($seeded['storefront']->id);
+
+        $types = collect($snapshot['homepage']['sections'])->pluck('type')->values()->all();
+        $this->assertSame(
+            ['hero'],
+            $types,
+            'الوسم المضمَّن في الوثيقة (v2) يجب أن يمنع إحياء الأقسام المحذوفة رغم تخلّف عمود published_schema_version المنفصل.'
+        );
+    }
+
+    /** @test */
+    public function a_forward_embedded_version_in_published_config_fails_closed_even_when_the_column_understates_it(): void
+    {
+        $auth = $this->registerTenant('published-embedded-forward', 'owner@published-embedded-forward.test');
+        $seeded = $this->seedWebStorefront($auth['tenant_id']);
+        $token = $this->withToken($auth['token']);
+
+        $forwardEmbedded = ['version' => StorefrontPresentationNormalizer::VERSION + 1, 'themePreset' => 'navy'];
+
+        $this->insertLegacyRow($seeded['storefront'], [
+            'schema_version' => 1,
+            'draft_config' => json_encode(['version' => 2, 'themePreset' => 'navy']),
+            'draft_revision' => 1,
+            'published_config' => json_encode($forwardEmbedded),
+            'published_revision' => 1,
+            'published_at' => now(),
+            'draft_schema_version' => 2,
+            'published_schema_version' => 1,
+        ]);
+
+        $token->getJson($this->legacyPath($seeded['storefront']->id))->assertStatus(409);
+    }
 }
