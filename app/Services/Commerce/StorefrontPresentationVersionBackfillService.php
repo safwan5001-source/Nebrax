@@ -4,6 +4,7 @@ namespace App\Services\Commerce;
 
 use App\Models\StorefrontPresentation;
 use App\Models\StorefrontPresentationVersion;
+use App\Support\Commerce\StorefrontPresentationNormalizer;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -187,6 +188,15 @@ final class StorefrontPresentationVersionBackfillService
 
         if ($version === null) {
             throw new RuntimeException('تعذّر إنشاء نسخة العمل المتوافقة.');
+        }
+
+        // فشل آمن **قبل** أي تصالح: `reconcileWithLegacyHead()` قد يكتب فوق
+        // هذه النسخة أو يشوّك منها. نسخة عمل كُتبت بإصدارٍ أحدث عبر واجهة
+        // النسخ الجديدة (مثلاً تراجع نشرٍ يُعيد تنشيط رأسٍ قديم) يجب أن
+        // تُرفض هنا صراحةً، لا أن تُصالَح بصمت أو تُستعمل مصدراً لتشويكٍ
+        // يُخفي وسمها الحقيقي.
+        if ((int) $version->schema_version > StorefrontPresentationNormalizer::VERSION) {
+            throw new ForwardSchemaVersionException;
         }
 
         return $this->reconcileWithLegacyHead($lockedHead, $version);

@@ -729,4 +729,153 @@ class StorefrontPresentationLegacyCompatibilityForkTest extends TestCase
         $this->assertSame('burgundy', $fork->config['themePreset']);
         $this->assertSame(3, (int) $fork->revision);
     }
+
+    /**
+     * Round-7 Finding A: `draft_schema_version` تخلَّف (بقي عند افتراض العمود
+     * 1) عن صفٍّ أدخله كاتبٌ قديم بعد هذه الهجرة مباشرة رغم أن `draft_config`
+     * نفسه v2 فعلياً (يحمل حقل `version` مضمَّناً = 2). القراءة يجب أن تعتمد
+     * الوسم المضمَّن لا عمود قاعدة البيانات وحده — وإلا تُطبَّق ترقية v1→v2
+     * (استكمال الأقسام الافتراضية الناقصة) على مستندٍ v2 مكتمل أصلاً.
+     */
+    /** @test */
+    public function a_late_legacy_insert_with_a_stale_draft_schema_column_is_still_read_under_its_true_embedded_draft_tag(): void
+    {
+        $auth = $this->registerTenant('draft-embedded-tag', 'owner@draft-embedded-tag.test');
+        $seeded = $this->seedWebStorefront($auth['tenant_id']);
+        $token = $this->withToken($auth['token']);
+
+        $v2DraftMissingDefaults = [
+            'version' => 2,
+            'homepage' => ['sections' => [['id' => 'hero', 'type' => 'hero', 'visible' => true]]],
+        ];
+
+        $this->insertLegacyRow($seeded['storefront'], [
+            'draft_config' => json_encode($v2DraftMissingDefaults),
+            'draft_revision' => 1,
+            // عمود العمود عند افتراض الهجرة (1) رغم أن الوثيقة v2 مضمَّناً —
+            // يحاكي صفاً أدخله كاتبٌ قديم لا يعرف هذا العمود إطلاقاً.
+            'draft_schema_version' => 1,
+        ]);
+
+        $res = $token->getJson($this->legacyPath($seeded['storefront']->id))->assertOk();
+
+        $types = collect($res->json('data.draft.homepage.sections'))->pluck('type')->values()->all();
+        $this->assertSame(
+            ['hero'],
+            $types,
+            'الوسم المضمَّن في الوثيقة (v2) يجب أن يمنع إحياء الأقسام المحذوفة رغم تخلّف عمود draft_schema_version المنفصل.'
+        );
+    }
+
+    /**
+     * Round-7 Finding A (الوجه المقابل): وسم مضمَّن مستقبلي في `draft_config`
+     * يجب أن يفشل آمناً حتى لو كان عمود `draft_schema_version` يقلّل من
+     * شأنه — نظير الاختبار المكافئ على الجانب المنشور.
+     */
+    /** @test */
+    public function a_forward_embedded_version_in_draft_config_fails_closed_even_when_the_column_understates_it(): void
+    {
+        $auth = $this->registerTenant('draft-embedded-forward', 'owner@draft-embedded-forward.test');
+        $seeded = $this->seedWebStorefront($auth['tenant_id']);
+        $token = $this->withToken($auth['token']);
+
+        $forwardEmbedded = ['version' => StorefrontPresentationNormalizer::VERSION + 1, 'themePreset' => 'navy'];
+
+        $this->insertLegacyRow($seeded['storefront'], [
+            'draft_config' => json_encode($forwardEmbedded),
+            'draft_revision' => 1,
+            'draft_schema_version' => 1,
+        ]);
+
+        $token->getJson($this->legacyPath($seeded['storefront']->id))->assertStatus(409);
+    }
+
+    /**
+     * Round-7 Finding B: رأسٌ أدخله كاتبٌ قديم بعد هذه الهجرة مباشرة —
+     * أثناء نافذة نشر متدرّج قصيرة — بمسودة ومنشور متطابقين وبلا أي مؤشر
+     * نسخة إطلاقاً (لا `active_version_id` ولا `compatibility_working_version_id`).
+     * فحص "المحتوى بلا تغيير" وحده كان يعامل غياب المؤشر كـ"مُرقّى بالفعل"
+     * فيتجاهل النشر القديم اللاحق كلياً، تاركاً `active_version_id` فارغاً
+     * للأبد رغم نشرٍ فعلي ناجح.
+     */
+    /** @test */
+    public function legacy_publish_materializes_and_promotes_the_active_pointer_for_a_head_with_no_version_pointers_at_all(): void
+    {
+        $auth = $this->registerTenant('publish-materializes-null-compat', 'owner@publish-materializes-null-compat.test');
+        $seeded = $this->seedWebStorefront($auth['tenant_id']);
+        $token = $this->withToken($auth['token']);
+
+        $matchingConfig = ['version' => 2, 'themePreset' => 'navy'];
+
+        $rowId = $this->insertLegacyRow($seeded['storefront'], [
+            'draft_config' => json_encode($matchingConfig),
+            'draft_revision' => 1,
+            'published_config' => json_encode($matchingConfig),
+            'published_revision' => 1,
+            'published_at' => now(),
+            'draft_schema_version' => StorefrontPresentationNormalizer::VERSION,
+            'published_schema_version' => StorefrontPresentationNormalizer::VERSION,
+            // لا مؤشرات نسخ إطلاقاً — الحقول الافتراضية للعمودين تبقى null.
+        ]);
+
+        $before = StorefrontPresentation::withoutGlobalScopes()->find($rowId);
+        $this->assertNull($before->active_version_id);
+        $this->assertNull($before->compatibility_working_version_id);
+
+        $token->postJson($this->legacyPublishPath($seeded['storefront']->id), ['draft_revision' => 1])->assertOk();
+
+        $after = StorefrontPresentation::withoutGlobalScopes()->find($rowId);
+        $this->assertNotNull($after->active_version_id, 'النشر القديم يجب أن يُثبِّت نسخة نشطة حتى لو غاب المؤشر كلياً قبله.');
+        $this->assertNotNull($after->compatibility_working_version_id);
+        $this->assertSame($after->active_version_id, $after->compatibility_working_version_id);
+
+        $active = StorefrontPresentationVersion::withoutGlobalScopes()->find($after->active_version_id);
+        $this->assertSame('navy', $active->config['themePreset']);
+    }
+
+    /**
+     * Round-7 Finding C: نسخة العمل المتوافقة نفسها تحمل وسماً مستقبلياً،
+     * وقد انجرف الرأس عنها (كاتبٌ قديم عدَّل `draft_config` مباشرة) بما
+     * يستوجب تصالحاً. يجب أن يُرفض الوصول آمناً **قبل** أي كتابة تصالح/تشويك
+     * تستعمل تلك النسخة مصدراً أو هدفاً — لا أن تُصالَح بصمت أو يُبنى عليها
+     * فرع يُخفي وسمها المستقبلي الحقيقي.
+     */
+    /** @test */
+    public function reconciling_a_drifted_head_fails_closed_when_the_mapped_compatibility_version_itself_is_forward(): void
+    {
+        $auth = $this->registerTenant('reconcile-forward-compat', 'owner@reconcile-forward-compat.test');
+        $seeded = $this->seedWebStorefront($auth['tenant_id']);
+        $token = $this->withToken($auth['token']);
+
+        $token->putJson($this->legacyPath($seeded['storefront']->id), [
+            'config' => ['version' => 2, 'themePreset' => 'navy'],
+            'draft_revision' => 0,
+        ])->assertOk();
+
+        $head = StorefrontPresentation::withoutGlobalScopes()->where('storefront_id', $seeded['storefront']->id)->first();
+        $compatId = $head->compatibility_working_version_id;
+
+        // كاتبٌ قديم يعدّل draft_config مباشرة متجاوزاً كل منطق المزامنة —
+        // يُحدث انجرافاً (سامَحَ التصالح كان سيُشغَّل لولا الفشل الآمن أدناه).
+        DB::table('storefront_presentations')->where('id', $head->id)->update([
+            'draft_config' => json_encode(['version' => 2, 'themePreset' => 'burgundy']),
+            'draft_revision' => 2,
+        ]);
+
+        // نسخة العمل نفسها تحمل وسماً مستقبلياً.
+        DB::table('storefront_presentation_versions')->where('id', $compatId)->update([
+            'schema_version' => StorefrontPresentationNormalizer::VERSION + 1,
+        ]);
+
+        $token->getJson($this->legacyPath($seeded['storefront']->id))->assertStatus(409);
+
+        // لا كتابة تصالح ولا تشويك حدثا — كلا الصفّين كما تُركا قبل القراءة.
+        $unchangedHead = StorefrontPresentation::withoutGlobalScopes()->find($head->id);
+        $this->assertSame($compatId, $unchangedHead->compatibility_working_version_id);
+        $this->assertSame(2, (int) $unchangedHead->draft_revision);
+
+        $unchangedCompat = StorefrontPresentationVersion::withoutGlobalScopes()->find($compatId);
+        $this->assertSame('navy', $unchangedCompat->config['themePreset']);
+        $this->assertSame(1, (int) $unchangedCompat->revision);
+    }
 }

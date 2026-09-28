@@ -177,26 +177,30 @@ final class StorefrontPresentationService
             $this->assertSupportedLegacySchema($row);
 
             // CUST-H1-1: نسخة العمل المتوافقة قد تكون انفصلت عن النسخة
-            // النشطة (تشويك سابق عبر legacy PUT). النشر القديم ينشر مستند
-            // نسخة العمل الحالية فعلياً (`draft_config` المتزامن معها) —
-            // فيجب أن تصبح هي النسخة النشطة الآن، وإلا بقيت نسخة قديمة
-            // مُعلَنة "منشورة" رغم أن محتواها لم يعد يطابق اللقطة العامة.
+            // النشطة (تشويك سابق عبر legacy PUT)، أو لم تُنشأ بعد أصلاً (رأسٌ
+            // أنشأه كاتبٌ قديم بعد هذه الهجرة مباشرة، فبقي مؤشره فارغاً حتى
+            // أول قراءة/حفظ عبر هذا الالتزام). النشر القديم ينشر مستند نسخة
+            // العمل الحالية فعلياً (`draft_config` المتزامن معها) — فيجب أن
+            // تصبح هي النسخة النشطة الآن، وإلا بقيت نسخة قديمة مُعلَنة
+            // "منشورة" رغم أن محتواها لم يعد يطابق اللقطة العامة. `ensureCompatibilityWorkingVersion`
+            // تُنشئها إن غابت، وتُصالحها مع الرأس إن انجرفت (حارس التحوّل/
+            // العبور) — فتُعيد قيمة **مضمونة غير فارغة** أبداً؛ معاملة المؤشر
+            // الفارغ كـ"مُرقّى بالفعل" (كما كانت الشيفرة السابقة تفعل) كانت
+            // تُسقط نشراً حقيقياً ينبغي أن يُثبِّت النسخة النشطة الأولى.
             //
-            // يُقفَل ويُفحَص مخططها **قبل** أي تطبيع: وسم الرأس وحده لا
-            // يكفي — نسخة كُتبت بإصدارٍ أحدث عبر واجهة النسخ الجديدة قد
-            // تحمل وسماً أحدث من وسم الرأس نفسه (سيناريو تراجع نشر).
-            $compat = $row->compatibility_working_version_id !== null
-                ? StorefrontPresentationVersion::query()
-                    ->whereKey($row->compatibility_working_version_id)
-                    ->lockForUpdate()
-                    ->first()
-                : null;
+            // تُقفَل وتُفحَص وسمها **قبل** أي تطبيع: وسم الرأس وحده لا يكفي —
+            // نسخة كُتبت بإصدارٍ أحدث عبر واجهة النسخ الجديدة قد تحمل وسماً
+            // أحدث من وسم الرأس نفسه (سيناريو تراجع نشر).
+            $compat = $this->backfill->ensureCompatibilityWorkingVersion($row);
 
-            if ($compat !== null && (int) $compat->schema_version > StorefrontPresentationNormalizer::VERSION) {
+            if ((int) $compat->schema_version > StorefrontPresentationNormalizer::VERSION) {
                 throw new ForwardSchemaVersionException;
             }
 
-            $normalized = $this->normalizer->normalize($row->draft_config ?? null, (int) $row->draft_schema_version);
+            $normalized = $this->normalizer->normalize(
+                $row->draft_config ?? null,
+                $this->effectiveSchemaTag($row->draft_config ?? [], (int) $row->draft_schema_version),
+            );
             $this->assertStoredSize($normalized);
 
             $published = is_array($row->published_config) ? $row->published_config : null;
@@ -207,7 +211,7 @@ final class StorefrontPresentationService
             // أن يعرف active_version_id إطلاقاً — فحص "لا تغيير" وحده غير
             // كافٍ؛ يجب أن يكون المؤشر مُرقّىً بالفعل أيضاً، وإلا بقيت نسخة
             // قديمة مُعلَنة "منشورة" رغم تطابق المحتوى ظاهرياً.
-            $pointerAlreadyPromoted = $compat === null || $row->active_version_id === $compat->id;
+            $pointerAlreadyPromoted = $row->active_version_id === $compat->id;
 
             if ($contentUnchanged && $pointerAlreadyPromoted) {
                 return $this->present($storefront, $row);
@@ -218,13 +222,11 @@ final class StorefrontPresentationService
                 // published_at/published_revision لغياب تغيّر حقيقي في اللقطة.
                 $row->forceFill(['active_version_id' => $compat->id])->save();
 
-                if ($compat !== null) {
-                    $compat->forceFill([
-                        'config' => $normalized,
-                        'schema_version' => StorefrontPresentationNormalizer::VERSION,
-                        'last_published_at' => $row->published_at,
-                    ])->save();
-                }
+                $compat->forceFill([
+                    'config' => $normalized,
+                    'schema_version' => StorefrontPresentationNormalizer::VERSION,
+                    'last_published_at' => $row->published_at,
+                ])->save();
 
                 return $this->present($storefront, $row->fresh());
             }
@@ -237,16 +239,14 @@ final class StorefrontPresentationService
                 'published_revision' => (int) $row->draft_revision,
                 'published_at' => now(),
                 'schema_version' => StorefrontPresentationNormalizer::VERSION,
-                'active_version_id' => $compat->id ?? $row->active_version_id,
+                'active_version_id' => $compat->id,
             ])->save();
 
-            if ($compat !== null) {
-                $compat->forceFill([
-                    'config' => $normalized,
-                    'schema_version' => StorefrontPresentationNormalizer::VERSION,
-                    'last_published_at' => now(),
-                ])->save();
-            }
+            $compat->forceFill([
+                'config' => $normalized,
+                'schema_version' => StorefrontPresentationNormalizer::VERSION,
+                'last_published_at' => now(),
+            ])->save();
 
             return $this->present($storefront, $row->fresh());
         });
@@ -285,22 +285,26 @@ final class StorefrontPresentationService
         // `effectivePublishedSchemaTag()`).
         return $this->normalizer->normalize(
             $row->published_config,
-            $this->effectivePublishedSchemaTag($row->published_config, $row->published_schema_version ?? $row->schema_version),
+            $this->effectiveSchemaTag($row->published_config, $row->published_schema_version ?? $row->schema_version),
         );
     }
 
     /**
-     * الوسم الفعلي لمستند منشور مخزَّن: حقل `version` المضمَّن داخل الوثيقة
-     * نفسها أولاً (يكتبه `normalize()` عند كل حفظ فعلي، قديماً كان الكاتب أو
-     * جديداً، فلا يتخلَّف أبداً عن الشكل الحقيقي للمحتوى)، ثم عمود قاعدة
-     * البيانات المنفصل احتياطاً فقط لمستند بلا حقل مضمَّن.
+     * الوسم الفعلي لمستند مخزَّن (مسودة أو منشور على حدّ سواء): حقل `version`
+     * المضمَّن داخل الوثيقة نفسها أولاً (يكتبه `normalize()` عند كل حفظ فعلي،
+     * قديماً كان الكاتب أو جديداً، فلا يتخلَّف أبداً عن الشكل الحقيقي
+     * للمحتوى)، ثم عمود قاعدة البيانات المنفصل احتياطاً فقط لمستند بلا حقل
+     * مضمَّن. عمود `draft_schema_version`/`published_schema_version` قد
+     * يتخلَّف عن كاتبٍ قديم لا يعرف هذا العمود إطلاقاً (مثلاً صفّ أُدرج
+     * مباشرة بإصدار تطبيق سابق على CUST-H1-1، فحصل على قيمة العمود
+     * الافتراضية رغم أن محتواه v2 فعلياً) — الوسم المضمَّن هو مصدر الحقيقة.
      *
-     * @param  array<string, mixed>  $publishedConfig
+     * @param  array<string, mixed>  $config
      */
-    private function effectivePublishedSchemaTag(array $publishedConfig, ?int $columnFallback): int
+    private function effectiveSchemaTag(array $config, ?int $columnFallback): int
     {
-        if (isset($publishedConfig['version']) && is_numeric($publishedConfig['version'])) {
-            return (int) $publishedConfig['version'];
+        if (isset($config['version']) && is_numeric($config['version'])) {
+            return (int) $config['version'];
         }
 
         return $columnFallback ?? 1;
@@ -516,12 +520,15 @@ final class StorefrontPresentationService
             // الواجهة القديمة أو نسخة العمل المتوافقة عبر واجهة النسخ)
             // يقدّم `draft_schema_version` وحده؛ يجب ألا يغيّر تفسير
             // `published_config` القائم إطلاقاً (§12).
-            $draft = $this->normalizer->normalize($row->draft_config ?? null, (int) $row->draft_schema_version);
+            $draft = $this->normalizer->normalize(
+                $row->draft_config ?? null,
+                $this->effectiveSchemaTag($row->draft_config ?? [], (int) $row->draft_schema_version),
+            );
             $draftRevision = (int) $row->draft_revision;
             if (is_array($row->published_config)) {
                 $published = $this->normalizer->normalize(
                     $row->published_config,
-                    $this->effectivePublishedSchemaTag($row->published_config, $row->published_schema_version ?? $row->schema_version),
+                    $this->effectiveSchemaTag($row->published_config, $row->published_schema_version ?? $row->schema_version),
                 );
                 $publishedRevision = $row->published_revision !== null ? (int) $row->published_revision : null;
                 $publishedAt = $row->published_at?->toJSON();
@@ -582,11 +589,21 @@ final class StorefrontPresentationService
             throw new ForwardSchemaVersionException;
         }
 
-        // عمود قاعدة البيانات وحده لا يكفي — قد يتخلَّف عن كاتبٍ قديم لا
-        // يعرفه، بينما الوثيقة المخزَّنة نفسها تحمل وسمها الحقيقي دوماً.
+        // عمود قاعدة البيانات وحده لا يكفي على أيّ من الجانبين — قد يتخلَّف
+        // عن كاتبٍ قديم لا يعرفه (مثلاً صفّ أُدرج مباشرة بإصدار تطبيق سابق
+        // على CUST-H1-1 فحصل على قيمة `draft_schema_version` الافتراضية رغم
+        // أن `draft_config` نفسه v2 فعلياً)، بينما الوثيقة المخزَّنة نفسها
+        // تحمل وسمها الحقيقي دوماً.
+        if (
+            is_array($row->draft_config)
+            && $this->effectiveSchemaTag($row->draft_config, null) > StorefrontPresentationNormalizer::VERSION
+        ) {
+            throw new ForwardSchemaVersionException;
+        }
+
         if (
             is_array($row->published_config)
-            && $this->effectivePublishedSchemaTag($row->published_config, null) > StorefrontPresentationNormalizer::VERSION
+            && $this->effectiveSchemaTag($row->published_config, null) > StorefrontPresentationNormalizer::VERSION
         ) {
             throw new ForwardSchemaVersionException;
         }
