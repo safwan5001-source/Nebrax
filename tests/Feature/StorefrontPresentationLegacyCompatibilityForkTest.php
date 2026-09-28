@@ -528,4 +528,42 @@ class StorefrontPresentationLegacyCompatibilityForkTest extends TestCase
         $afterTypes = collect($after['homepage']['sections'])->pluck('type')->sort()->values()->all();
         $this->assertSame($beforeTypes, $afterTypes, 'حفظ مسودة عبر واجهة النسخ يجب ألا يغيّر دلالة تطبيع اللقطة المنشورة القائمة.');
     }
+
+    /** @test */
+    public function a_legacy_writer_bypassing_version_sync_is_self_healed_on_next_access(): void
+    {
+        $auth = $this->registerTenant('cutover-self-heal', 'owner@cutover-self-heal.test');
+        $seeded = $this->seedWebStorefront($auth['tenant_id']);
+        $token = $this->withToken($auth['token']);
+
+        $token->putJson($this->legacyPath($seeded['storefront']->id), [
+            'config' => ['version' => 2, 'themePreset' => 'navy'],
+            'draft_revision' => 0,
+        ])->assertOk();
+
+        $head = StorefrontPresentation::withoutGlobalScopes()->where('storefront_id', $seeded['storefront']->id)->first();
+        $compatId = $head->compatibility_working_version_id;
+
+        // يحاكي كاتباً قديماً (نسخة تطبيق سابقة على CUST-H1-1 لا تعرف أعمدة
+        // النسخ إطلاقاً) يكتب مباشرة إلى draft_config أثناء نافذة نشر
+        // متدرّج قصيرة — متجاوزاً كل منطق مزامنة النسخ الجديد كلياً.
+        DB::table('storefront_presentations')->where('id', $head->id)->update([
+            'draft_config' => json_encode(['version' => 2, 'themePreset' => 'burgundy']),
+            'draft_revision' => 2,
+        ]);
+
+        $driftedCompat = StorefrontPresentationVersion::withoutGlobalScopes()->find($compatId);
+        $this->assertSame('navy', $driftedCompat->config['themePreset'], 'تأكيد الانجراف قبل الإصلاح.');
+        $this->assertSame(1, (int) $driftedCompat->revision);
+
+        // أول وصول لاحق (GET) يجب أن يصالح نسخة العمل مع الرأس تلقائياً —
+        // لا يبقى الانجراف دائماً.
+        $res = $token->getJson($this->legacyPath($seeded['storefront']->id))->assertOk();
+        $this->assertSame('burgundy', $res->json('data.draft.themePreset'));
+        $this->assertSame(2, $res->json('data.draft_revision'));
+
+        $healedCompat = StorefrontPresentationVersion::withoutGlobalScopes()->find($compatId);
+        $this->assertSame('burgundy', $healedCompat->config['themePreset']);
+        $this->assertSame(2, (int) $healedCompat->revision);
+    }
 }

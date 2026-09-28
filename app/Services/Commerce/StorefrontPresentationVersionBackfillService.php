@@ -162,31 +162,52 @@ final class StorefrontPresentationVersionBackfillService
 
     /**
      * يضمن وجود نسخة العمل المتوافقة للرأس **المقفول بالفعل** ضمن معاملة
-     * مفتوحة من المستدعي، وتُعيدها. تُستعمل من مسارات GET/PUT القديمة
-     * ومن إنشاء نسخة جديدة بلا `source_version_id` (§21/§19).
+     * مفتوحة من المستدعي، ويُعيدها **مقفولةً هي الأخرى**. تُستعمل من مسارات
+     * GET/PUT القديمة ومن إنشاء نسخة جديدة بلا `source_version_id` (§21/§19).
+     *
+     * **حارس تحوّل/عبور:** أثناء نافذة نشر متدرّج قصيرة بعد هذه الهجرة، عميل
+     * قديم (إصدار تطبيق سابق على CUST-H1-1 لا يعرف أعمدة النسخ إطلاقاً) قد
+     * يكتب مباشرة إلى `draft_config` على الرأس. منذ هذا الالتزام فصاعداً كل
+     * مسار كتابة جديد يُزامن الرأس ونسخة العمل ذرّياً معاً، فانجراف كهذا
+     * مستحيل تحت تشغيل عادي — لذا أي انجراف مكتشَف هنا لا يمكن إلا أن يكون
+     * من كاتبٍ قديم، فيُصحَّح فوراً بدل أن يبقى دائماً (الرأس، وهو كل ما
+     * يعرفه الكاتب القديم، هو مصدر الحقيقة عند التصحيح).
      */
     public function ensureCompatibilityWorkingVersion(StorefrontPresentation $lockedHead): StorefrontPresentationVersion
     {
-        if ($lockedHead->compatibility_working_version_id !== null) {
-            $version = StorefrontPresentationVersion::withoutGlobalScopes()
-                ->find($lockedHead->compatibility_working_version_id);
-            if ($version !== null) {
-                return $version;
-            }
+        if ($lockedHead->compatibility_working_version_id === null) {
+            $this->applyMigrationCasesWithinTransaction($lockedHead);
+            $lockedHead->refresh();
         }
 
-        $this->applyMigrationCasesWithinTransaction($lockedHead);
-        $lockedHead->refresh();
-
-        $version = $lockedHead->compatibility_working_version_id !== null
-            ? StorefrontPresentationVersion::withoutGlobalScopes()->find($lockedHead->compatibility_working_version_id)
+        $versionId = $lockedHead->compatibility_working_version_id;
+        $version = $versionId !== null
+            ? StorefrontPresentationVersion::withoutGlobalScopes()->whereKey($versionId)->lockForUpdate()->first()
             : null;
 
         if ($version === null) {
             throw new RuntimeException('تعذّر إنشاء نسخة العمل المتوافقة.');
         }
 
-        return $version;
+        return $this->reconcileWithLegacyHead($lockedHead, $version);
+    }
+
+    private function reconcileWithLegacyHead(StorefrontPresentation $lockedHead, StorefrontPresentationVersion $version): StorefrontPresentationVersion
+    {
+        $sameConfig = $this->sameDocument($version->config, $lockedHead->draft_config ?? []);
+        $sameRevision = (int) $version->revision === (int) $lockedHead->draft_revision;
+
+        if ($sameConfig && $sameRevision) {
+            return $version;
+        }
+
+        $version->forceFill([
+            'config' => $lockedHead->draft_config ?? [],
+            'schema_version' => (int) $lockedHead->draft_schema_version,
+            'revision' => (int) $lockedHead->draft_revision,
+        ])->save();
+
+        return $version->fresh();
     }
 
     /** @param  array<string, mixed>  $config */

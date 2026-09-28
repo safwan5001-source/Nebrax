@@ -61,17 +61,18 @@ final class StorefrontPresentationService
         }
 
         // لا رأس بعد → افتراضات افتراضية بلا كتابة (سلوك STORE-BACKEND-1
-        // الأصلي، محفوظ حرفياً). رأسٌ قائم بلا نسخة عمل متوافقة بعد (لم
-        // تُهاجَر/لم تُلمَس منذ CUST-H1-1) → نضمنها الآن تحت قفل قبل إعادة
-        // حالة قابلة للتعديل (§21).
-        if ($row !== null && $row->compatibility_working_version_id === null) {
+        // الأصلي، محفوظ حرفياً). رأسٌ قائم → نضمن نسخة العمل المتوافقة تحت
+        // قفل في كل مرة (لا فقط أول مرة): `ensureCompatibilityWorkingVersion`
+        // نفسها حارس تحوّل/عبور يصالح النسخة مع الرأس لو انجرفت بفعل كاتبٍ
+        // قديم أثناء نافذة نشر متدرّج قصيرة بعد هذه الهجرة (§7).
+        if ($row !== null) {
             $row = DB::transaction(function () use ($storefront) {
                 $locked = StorefrontPresentation::query()
                     ->where('storefront_id', $storefront->id)
                     ->lockForUpdate()
                     ->first();
 
-                if ($locked !== null && $locked->compatibility_working_version_id === null) {
+                if ($locked !== null) {
                     $this->backfill->ensureCompatibilityWorkingVersion($locked);
                 }
 
@@ -344,12 +345,12 @@ final class StorefrontPresentationService
     /**
      * يضمن وجود نسخة العمل المتوافقة **مقفولةً** ضمن معاملة مفتوحة
      * بالفعل من المستدعي (الرأس `$row` مقفول بالفعل بنفس المعاملة).
+     * `ensureCompatibilityWorkingVersion()` تُعيدها مقفولةً ومُصالَحةً مع
+     * الرأس بالفعل (حارس التحوّل/العبور) — لا قفل إضافي هنا.
      */
     private function lockCompatibilityWorkingVersion(StorefrontPresentation $row): StorefrontPresentationVersion
     {
-        $version = $this->backfill->ensureCompatibilityWorkingVersion($row);
-
-        return StorefrontPresentationVersion::query()->whereKey($version->id)->lockForUpdate()->firstOrFail();
+        return $this->backfill->ensureCompatibilityWorkingVersion($row);
     }
 
     /**
