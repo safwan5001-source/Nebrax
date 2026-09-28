@@ -27,4 +27,18 @@ R2_REGION=auto
 R2_USE_PATH_STYLE_ENDPOINT=false
 ```
 
-The R2 bucket remains private. A later migration slice must use an ACL-free S3 adapter path before selecting this disk for writes; the standard Laravel/Flysystem S3 adapter can otherwise derive an ACL on direct writes or visibility operations. That adapter work is intentionally outside this foundation slice. This task does not migrate files, change database paths, expose raw bucket URLs, or switch any existing `Storage::disk(...)` call.
+The R2 bucket remains private. The standard Laravel/Flysystem S3 adapter is not used for runtime R2 writes because its visibility layer can derive ACLs and call `GetObjectAcl`/`PutObjectAcl`. The narrow `R2StorageService` proof path uses the AWS SDK S3 client directly and exposes only `put`, `get`, `exists`, and `delete`; it never sends `x-amz-acl`, calls ACL operations, sets visibility, generates public URLs, or lists the bucket.
+
+### Runtime key and tenant contract
+
+Future R2 objects use the server-derived key shape:
+
+```text
+tenant/{tenant_id}/{domain}/{resource_id}/{filename}
+```
+
+`R2StorageService` reads `{tenant_id}` only from the scoped `TenantContext`; callers cannot provide a tenant prefix or arbitrary object key. Every segment is restricted to safe single-segment characters, so traversal such as `../` and embedded separators is rejected. No controller receives bucket-listing capability. This slice does not migrate data or switch Product Media, documents, invoices, attachments, or storefront assets to R2.
+
+### Manual smoke test status
+
+No production smoke test was run. A real R2 smoke command is intentionally not included in this slice; the service is manually invocable by a future, separately reviewed diagnostic surface only. The automated tests use a mocked AWS client and prove that write/read/existence/delete send only `PutObject`, `GetObject`, `HeadObject`, and `DeleteObject` parameters without ACL fields. CI never requires real Cloudflare credentials.
