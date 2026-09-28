@@ -7,7 +7,7 @@
 ## Repository state
 
 - **Base SHA:** `2e9cdd058a50a2014dc0b4a3c5c0c3302c353616` (`origin/main` at task start — matched the SHA given in the task brief; verified with a fresh `git fetch origin main` before starting).
-- **Head SHA:** `3077ecf88c70884c31affb623b445fd3e955f979`
+- **Head SHA:** `fddba52` (post-review-fix; initial implementation head was `3077ecf`)
 - **Branch:** `claude/cust-h1-2-customizer-ux-23vvun`
 - **PR:** [#1085](https://github.com/safwan5001-source/Nebrax/pull/1085)
 
@@ -102,9 +102,9 @@ Exact commands and results (all green, this session, `web/`):
 ```
 npx vitest run src/modules/commerce-workspace/presentation-versions.test.ts   # 12 passed
 npx vitest run src/modules/store-experience-builder/__tests__/ExperienceBuilder.test.tsx          # 14 passed
-npx vitest run src/modules/store-experience-builder/__tests__/ExperienceBuilder.versions.test.tsx # 10 passed
+npx vitest run src/modules/store-experience-builder/__tests__/ExperienceBuilder.versions.test.tsx # 13 passed (10 + 3 review-fix regressions)
 npx vitest run "src/app/(commerce)/commerce/appearance"                       # 33 passed (5 files)
-npm test -- --run   # full web suite: 312 files / 2171 tests passed
+npm test -- --run   # full web suite: 312 files / 2174 tests passed (post review-fix round)
 npx tsc --noEmit -p tsconfig.json   # zero errors in any file this PR touches (71 pre-existing errors elsewhere, unchanged, unrelated — verified identical count on a clean checkout of this branch's base)
 npm run build        # next build — compiled + typechecked successfully, 177/177 pages generated
 ```
@@ -130,9 +130,11 @@ Screenshots were captured to `web/test-results/cust-h1-2-version-manager/` durin
 
 Workflow: `.github/workflows/web-ci.yml` (`npm run test` then `npm run build`, Node 22). Both commands verified green locally under the same invocations CI uses. CI itself will run once the PR is opened; this report will be updated if it surfaces anything not reproducible locally.
 
-## Review findings (self-review during implementation, pre-PR)
+## Review findings
 
-No external review has run yet (PR not yet open). Three real defects were found and fixed via the browser-based visual pass, which unit tests (jsdom, no real layout engine) could not have caught:
+### Self-review during implementation (pre-PR)
+
+Three real defects were found and fixed via the browser-based visual pass, which unit tests (jsdom, no real layout engine) could not have caught:
 
 | Finding | Root cause | Fix | Regression coverage |
 |---|---|---|---|
@@ -140,7 +142,17 @@ No external review has run yet (PR not yet open). Three real defects were found 
 | Same Dropdown panel used `absolute` positioning with a fixed `24rem` width and no viewport containment, which could push the (closed or open) menu past the screen edge at narrower "desktop" widths (768–1023px, since real mobile uses a different, Bottom-Sheet code path entirely) | The shared `Dropdown` primitive's plain `absolute` mode assumes ample viewport width | Enabled the primitive's existing `mobilePopover` mode (viewport-clamped `fixed` positioning below `lg`) for this specific usage | Same test as above |
 | A Playwright test asserting `html[dir]` failed — that attribute is owned by a different (platform) layout the dev fixture page doesn't render | Wrong assertion target, not a product bug | Asserted `[data-experience-builder]`'s own `dir` instead (the actual node this component controls) | n/a (test-only fix) |
 
-All three fixes and their regression coverage are already in this commit; there is no separate "found in CI" round yet since CI has not run.
+### Automated review (`chatgpt-codex-connector`, round 1, reviewed `743f5b6`, fixed in `fddba52`)
+
+Three P1 findings, all real, same underlying class of bug (a previous version/store's identity leaking into the currently-displayed one across an async boundary) but at three different points in the version lifecycle my own stale-callback guard (§28) hadn't yet reached:
+
+| Finding | Fix | Regression test |
+|---|---|---|
+| Switching `storefrontId` without remounting `ExperienceBuilder` (e.g. a multi-store merchant changing the active store) left the previous store's `selectedVersion`/`draft`/`versions` in place; if the new store had zero or several candidates (no auto-select), the old version stayed displayed *and editable*, so a Save would send its id under the new store's path. | The `[storefrontId]` effect now synchronously resets `selectedVersion`, `versions`, `draft`, `saved`, and bumps the shared request-invalidation token *before* starting the new store's load. | `switching storefrontId resets the previous store's version state instead of leaking it` |
+| A rename conflict (409) on the version currently open in the editor only refreshed the manager's row summaries, not the open editor's `draft`/`selectedVersion`. A retry could succeed against the now-correct row revision while `draft` stayed on stale content, so a subsequent Save would pass optimistic concurrency and silently overwrite another session's edit. | A conflict on the *currently selected* version now raises the same explicit-reload `versionConflict` banner used for save conflicts, and both `handleSave`/`handleRenameVersion` refuse to run against that version until the merchant explicitly reloads its full detail. A conflict on a row that isn't open still just refreshes the list, as before. | `a rename conflict on the currently open version blocks further save/rename until an explicit reload` |
+| Starting a Save on version A, then switching to version B while the `PUT` was still in flight, let A's later-arriving success response unconditionally restore A's config/selection — discarding whatever the merchant had already done on B. | `handleSave` now captures the shared request token before awaiting the `PUT` and re-checks it on completion; a save superseded by an intervening switch still syncs that version's entry in the manager's list (so its revision/updated-at stay correct) but never touches `draft`/`saved`/`selectedVersion` again. | `a save that resolves after the merchant switches to another version does not overwrite it` |
+
+All three review threads were replied to individually (naming the fix commit) and resolved. `npm test -- --run` (2174 tests, full suite) and `npm run build` both re-verified green after this round.
 
 ## Backward compatibility
 
