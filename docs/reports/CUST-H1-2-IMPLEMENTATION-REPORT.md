@@ -7,7 +7,7 @@
 ## Repository state
 
 - **Base SHA:** `2e9cdd058a50a2014dc0b4a3c5c0c3302c353616` (`origin/main` at task start — matched the SHA given in the task brief; verified with a fresh `git fetch origin main` before starting).
-- **Head SHA:** `992bf3b` (round-15 review fix; round-14 fix head was `efab4d6`; round-13 fix head was `458dc8e`; round-12 fix head was `4519fa2`; round-11 fix head was `7525d49`; round-10 fix head was `5c4cdb7`; round-9 fix head was `1b7f06c`; second reconciliation fix head was `9d3ffa4`; first reconciliation merge head was `d841b11`; post-round-8-review-fix head was `43fbb31`; round-7 fix head was `992d39b`; round-6 fix head was `9a4209d`; round-5 fix head was `01a4981`; round-4 fix head was `c2033dd`; round-3 fix head was `892e1e1`; round-2 fix head was `0e3111c`; round-1 fix head was `fddba52`; initial implementation head was `3077ecf`)
+- **Head SHA:** `b705b00` (round-16 review fix; round-15 fix head was `992bf3b`; round-14 fix head was `efab4d6`; round-13 fix head was `458dc8e`; round-12 fix head was `4519fa2`; round-11 fix head was `7525d49`; round-10 fix head was `5c4cdb7`; round-9 fix head was `1b7f06c`; second reconciliation fix head was `9d3ffa4`; first reconciliation merge head was `d841b11`; post-round-8-review-fix head was `43fbb31`; round-7 fix head was `992d39b`; round-6 fix head was `9a4209d`; round-5 fix head was `01a4981`; round-4 fix head was `c2033dd`; round-3 fix head was `892e1e1`; round-2 fix head was `0e3111c`; round-1 fix head was `fddba52`; initial implementation head was `3077ecf`)
 - **Branch:** `claude/cust-h1-2-customizer-ux-23vvun`
 - **PR:** [#1085](https://github.com/safwan5001-source/Nebrax/pull/1085)
 
@@ -319,6 +319,18 @@ Two P2 findings — one confirms and fixes the exact gap flagged (but deferred) 
 
 Both review threads were replied to individually (naming the fix commit `992bf3b`) and resolved. `npx vitest run` (2245 tests, full suite) and `npm run build` both re-verified green after this round.
 
+### Automated review (`chatgpt-codex-connector`, round 16, fixed in `b705b00`)
+
+One P1 and two P2 findings, all in adjacent code to what earlier rounds already hardened — a stale-conflict-inheritance gap in the same adoption path round 15 fixed, a "cancel my switch" UX gap in `selectVersion`'s own identity check, and a stuck-loading-state gap in `loadVersionList`'s superseded-response handling.
+
+| Finding | Fix | Regression test |
+|---|---|---|
+| `adoptCreatedVersion` left a previous version's `versionConflict` in place when adopting a newly created/duplicated version. The banner (its message names no specific version) kept showing over the new, never-saved version; its Reload action bypasses the discard confirmation by design (an explicit reload click *is* the confirmation), so a merchant confused by the stale banner who clicked it would have real edits on the new version silently discarded. | `adoptCreatedVersion` now clears `versionConflict`. | `adopting a newly created version clears a stale conflict banner left over from a previous version (codex round 16)` |
+| `selectVersion`'s early return for reselecting the already-open version didn't account for a *different* version's switch still pending. The click looked like it should cancel the pending switch (the reselected row isn't itself marked switching) but silently did nothing — that other switch still won once its GET resolved. | Reselecting the current row while a different switch is in flight now invalidates it directly (bumps the request token, clears `versionSwitchingId`/`busy`/notice) instead of no-opping. | `reselecting the currently open row cancels a pending switch to another version instead of silently no-opping (codex round 16)` |
+| `loadVersionList`'s superseded-response branch never reset `versionsListState` away from `"loading"` when abandoning a stale response. A list refresh whose context became obsolete mid-flight (e.g. a delete-conflict's own internal refresh, superseded by a create/duplicate adopting a new version and bumping the token) left the manager panel showing its loading skeleton forever — Retry is error-state only, so there was no way out short of a full switch. | Settles to `"ready"` when superseded, guarded two ways: only if nothing else already moved the state on (a functional `setState` update checks the live value) and only if the storefront is still the one the request was for. | `a list refresh superseded by an adopted version settles out of "loading" instead of leaving the manager stuck on its skeleton (codex round 16)` |
+
+All three review threads were replied to individually (naming the fix commit `b705b00`) and resolved. `npx vitest run` (2248 tests, full suite) and `npm run build` both re-verified green after this round. All three regression tests were verified to fail without their respective fixes (reverted the source changes together, confirmed each test's exact failure, then restored them) before finalizing.
+
 ## Merge-conflict reconciliation with main (`d841b11`, `9d3ffa4`)
 
 `origin/main` advanced (PR #1088, "STORE-THEME-GALLERY-3 — Safe draft handoff") while this PR's round 1–8 review cycle was in progress, and produced a real merge conflict — not a mechanical one. #1088 was developed in parallel, unaware of this Horizon's rewrite, and independently:
@@ -375,7 +387,7 @@ No frontend request body or path ever carries `tenant_id`/company id/authority f
 - **Owner decision needed:** the Scheduled row's "scheduled for" timestamp renders in the browser's local timezone (round-6 review finding, thread left unresolved on the PR — see that subsection above). Fixing it properly needs a decision on whether Nebrax should have an authoritative per-tenant timezone at all and, if so, where it's sourced from; not something this Horizon should decide unilaterally by hardcoding one into the shared formatter.
 - The Version Manager's per-row "Delete" client-side guard (`state === 'draft' && !selected`) is a defence-in-depth convenience, not a substitute for the server's own lifecycle checks (compatibility-working-version, which the API never exposes to the client) — a 409 there is expected, handled, and tested.
 - Tablet width (768px) is visually tight (title and version name both truncate aggressively) once no-overflow is guaranteed; this is functional and matches the existing header's own pre-CUST-H1-2 truncation behavior at that width, but has less breathing room than desktop. Acceptable for this Horizon; worth revisiting if the toolbar grows further in CUST-H1-3+.
-- CI has run repeatedly across 15 review rounds and two merge reconciliations with `main`; the only CI-caught regression (a stale function name reintroduced by the second reconciliation) is documented above and fixed in `9d3ffa4`. This PR continues to be watched for new CI events and review comments per the monitoring/babysitting workflow.
+- CI has run repeatedly across 16 review rounds and two merge reconciliations with `main`; the only CI-caught regression (a stale function name reintroduced by the second reconciliation) is documented above and fixed in `9d3ffa4`. This PR continues to be watched for new CI events and review comments per the monitoring/babysitting workflow.
 
 ## Next step
 
