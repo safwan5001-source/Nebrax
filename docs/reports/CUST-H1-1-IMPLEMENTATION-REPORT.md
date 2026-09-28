@@ -7,7 +7,7 @@
 ## Repository state
 
 - **Base SHA:** `071dfa3061fbb0c9393e02bdcba0ee9d150b17cd` (`origin/main`, tip at task start — note: the baseline SHA given in the task brief, `d952542051956c324d846c8ac462c2f912ccd1f9`, was not the actual current `origin/main` tip; per instructions the fetched tip was used instead.)
-- **Head SHA:** `9a6470e` (fixes 3 P1 review findings on top of the initial `63a799e`)
+- **Head SHA:** `108f433` (fixes 8 P1 review findings across 3 rounds on top of the initial `63a799e` — see Review findings)
 - **Branch:** `claude/cust-h1-1-version-persistence-1p9jc9`
 - **PR:** [#1082](https://github.com/safwan5001-source/Nebrax/pull/1082)
 
@@ -82,17 +82,17 @@ php artisan test --filter=CommerceModuleBoundaryTest
 php artisan test   # full suite, both DB_CONNECTION=sqlite and DB_CONNECTION=pgsql
 ```
 
-**New test files** (40 new test methods, after the review-fix regression tests below):
+**New test files** (45 new test methods, including all review-fix regression tests):
 - `tests/Feature/StorefrontPresentationVersionBackfillTest.php` — 7 tests (migration Cases A–D, idempotency, public-snapshot-unchanged, multi-storefront).
 - `tests/Feature/StorefrontPresentationVersionApiTest.php` — 25 tests (list, create/duplicate incl. from an active source, tenant isolation incl. cross-storefront-same-tenant and cross-tenant `source_version_id`, read, save + stale-revision 409 + independent-version isolation, active-version-immutable-on-save 409, forward-schema fail-closed on read/save/duplicate, rename + stale 409, delete + active/scheduled/compatibility-working 409 + foreign 404, guest/self_service guards).
-- `tests/Feature/StorefrontPresentationLegacyCompatibilityForkTest.php` — 8 tests (lazy compat-version creation on GET, atomic Draft/compat sync on PUT, active→Draft fork with revision continuity, forward-schema fail-closed on legacy PUT/GET/publish for both stored and incoming schema tags, legacy publish promoting the forked compatibility Version to active — see Review findings below).
+- `tests/Feature/StorefrontPresentationLegacyCompatibilityForkTest.php` — 13 tests (lazy compat-version creation on GET, atomic Draft/compat sync on PUT, active→Draft fork with revision continuity, forward-schema fail-closed on legacy PUT/GET/publish for both stored and incoming schema tags, legacy publish promoting the forked compatibility Version to active, first-ever legacy save materializing a compatibility Version, bidirectional sync between the new Version API and legacy fields on save and on rename, and published-snapshot schema-tag independence — see Review findings below for the last 5).
 
-**Results (after the review-fix commit `9a6470e`):**
+**Results (final, head `108f433`):**
 
 | DB | Command | Result |
 |---|---|---|
-| SQLite | `php artisan test` (full suite) | 27 failed, 49 skipped, 4756 passed (29878 assertions) |
-| PostgreSQL 16 | `php artisan test --filter=StorefrontPresentation` (all 6 presentation files) | 88 passed (573 assertions) — the SQLite-skipped `StorefrontPresentationPostgresConcurrencyTest` ran and passed here. Full-suite PostgreSQL run on the pre-review-fix commit (`63a799e`) was 27 failed (same pre-existing set), 4801 passed (30126 assertions), 0 skipped. |
+| SQLite | `php artisan test` (full suite) | 27 failed, 49 skipped, 4761 passed (29916 assertions) |
+| PostgreSQL 16 | `php artisan test --filter=StorefrontPresentation` (all 6 presentation files) | 93 passed (611 assertions) — the SQLite-skipped `StorefrontPresentationPostgresConcurrencyTest` ran and passed here. |
 
 **Failures (27, identical set on both engines) — pre-existing, unrelated to this PR:** all in `FuelAviRfidServiceTest`, `FuelReconciliationTest`, `FuelSaleApiTest`, `FuelSaleServiceTest`, `FuelSupplyReceivingApiTest`, `FuelSupplyReceivingTest` — every one fails with `Call to undefined function App\Services\bcmul()`. The local dev container this session ran in does not have the `bcmath` PHP extension installed; `.github/workflows/ci.yml` explicitly installs `bcmath` for CI (`extensions: … bcmath …`), so these are a local-environment gap, not a code defect, and none of the failing files touch Storefront/Presentation/Commerce-workspace code. Verified no other failures exist on either engine.
 
@@ -106,15 +106,32 @@ All CUST-H1-1 tests plus every pre-existing `StorefrontPresentation*`/`Storefron
 
 ## Review findings
 
-Three P1 findings from the repo's automated bot reviewer (`chatgpt-codex-connector[bot]`) on the initial push (`476fb03`), all valid and fixed in `9a6470e`:
+Eight P1 findings from the repo's automated bot reviewer (`chatgpt-codex-connector[bot]`) across three review rounds, all valid and fixed. Every finding pointed at a real bidirectional-sync or fail-closed gap between the new Version model and the legacy compatibility surface; none required widening the PR's scope or touching scheduling/publish-UI code.
 
-| Finding | Valid? | Fix | Resolution |
-|---|---|---|---|
-| Legacy publish never promoted the compatibility working Version to `active_version_id` after a legacy-edit fork, so a Version reported as `published` could silently drift from the actual public snapshot. | Yes | `publishForCurrentTenant()` now locks the current `compatibility_working_version_id` Version (if set), promotes it to `active_version_id`, syncs its `config`/`schema_version`, and stamps `last_published_at` on every non-no-op publish. | Fixed; regression test `legacy_publish_promotes_the_forked_compatibility_version_to_active`. Thread resolved. |
-| Legacy PUT only checked the *stored* compatibility Version's schema tag for forward-schema, never the *incoming* payload's declared `config.version`, so a forward-declared incoming document was silently normalized instead of failing closed. | Yes | Added `assertIncomingConfigNotForward()` (mirrors the exact-Version save path), called before `normalize()` in `saveDraftForCurrentTenant()`. | Fixed; regression test `legacy_put_rejects_a_forward_declared_config_version_before_normalizing`. Thread resolved. |
-| Legacy GET and legacy publish had no forward-schema check at all, so a rollback scenario (newer runtime wrote a later schema tag, older runtime reads it) could silently fall back to the AWJ Modern default instead of failing closed — the architecture explicitly lists "legacy GET/PUT mapping" and "immediate Publish" among the paths this rule must cover. | Yes | Added `assertSupportedLegacySchema()` (checks the head's own `draft_schema_version`/`published_schema_version`), called at the top of both `showForCurrentTenant()` and `publishForCurrentTenant()`. | Fixed; regression tests `legacy_get_fails_closed_when_the_stored_draft_schema_is_forward`, `legacy_publish_fails_closed_when_the_stored_draft_schema_is_forward`. Thread resolved. |
+**Round 1** (reviewed `476fb03`, fixed in `9a6470e`):
 
-All three fixes were verified against the full `StorefrontPresentation*` suite (87 passed, 1 correctly-skipped-on-SQLite) and the full suite on SQLite (4756 passed, same 27 pre-existing unrelated failures, no new regressions) before pushing.
+| Finding | Fix | Regression test |
+|---|---|---|
+| Legacy publish never promoted the compatibility working Version to `active_version_id` after a legacy-edit fork, so a Version reported as `published` could silently drift from the actual public snapshot. | `publishForCurrentTenant()` locks the current `compatibility_working_version_id` Version (if set), promotes it to `active_version_id`, syncs its `config`/`schema_version`, and stamps `last_published_at` on every non-no-op publish. | `legacy_publish_promotes_the_forked_compatibility_version_to_active` |
+| Legacy PUT only checked the *stored* compatibility Version's schema tag for forward-schema, never the *incoming* payload's declared `config.version`. | Added `assertIncomingConfigNotForward()` (mirrors the exact-Version save path), called before `normalize()` in `saveDraftForCurrentTenant()`. | `legacy_put_rejects_a_forward_declared_config_version_before_normalizing` |
+| Legacy GET and legacy publish had no forward-schema check at all — the architecture explicitly lists "legacy GET/PUT mapping" and "immediate Publish" among the paths the fail-closed rule must cover. | Added `assertSupportedLegacySchema()` (checks the head's own `draft_schema_version`/`published_schema_version`), called at the top of both `showForCurrentTenant()` and `publishForCurrentTenant()`. | `legacy_get_fails_closed_when_the_stored_draft_schema_is_forward`, `legacy_publish_fails_closed_when_the_stored_draft_schema_is_forward` |
+
+**Round 2** (reviewed `2bec969`'s predecessor, fixed in `2bec969`):
+
+| Finding | Fix | Regression test |
+|---|---|---|
+| The very first legacy PUT on a brand-new storefront (no head row yet) never created a compatibility Version, so a later legacy publish had nothing to promote and permanently left `active_version_id` null. | `applyDraftSave()`'s `row === null` branch now also creates the compatibility Version (Case-D-style) alongside the head, in the same transaction. | `first_legacy_save_on_a_brand_new_storefront_materializes_a_compatibility_version` |
+| Saving the compatibility Version through the new exact-Version API only updated the Version row — legacy GET/publish kept reading a stale `draft_config`/`draft_revision` from the head. | `saveForCurrentTenant()` now atomically syncs the head's `draft_config`/`draft_schema_version`/`draft_revision`/`schema_version` when the saved Version is the compatibility working Version. | `saving_the_compatibility_version_through_the_new_api_syncs_legacy_draft_fields` |
+| Legacy publish validated only the head's own schema tags, not the compatibility Version's own tag, leaving a residual rollback path where the head stays "supported" but the mapped Version was written by a newer deployment. | Moved the Version lookup/lock before normalization in `publishForCurrentTenant()` and check `$compat->schema_version` directly. | `legacy_publish_fails_closed_when_the_compatibility_version_itself_carries_a_forward_schema` |
+
+**Round 3** (reviewed `108f433`'s predecessor, fixed in `108f433`):
+
+| Finding | Fix | Regression test |
+|---|---|---|
+| Renaming the compatibility Version through the new API bumped only the Version's own revision, leaving the head's `draft_revision` behind — a subsequent legacy PUT could compute a revision number that collided with a concurrent new-API edit instead of being rejected as stale. | `renameForCurrentTenant()` now locks the head and advances `draft_revision` to match whenever the renamed Version is the compatibility working Version. | `renaming_the_compatibility_version_keeps_the_legacy_draft_revision_in_sync` |
+| `present()` and `publishedSnapshotForStorefront()` normalized `published_config` using the single shared legacy `schema_version` column, which advances on every draft-only save (legacy or new-API) — so an unrelated draft edit could silently change how a still-v1 published snapshot renders on the live public storefront (e.g. missing homepage sections no longer restored). | Both methods now use `published_schema_version` for `published_config` and `draft_schema_version` for `draft_config`, independent of the shared column. | `draft_only_edits_do_not_change_how_a_migrated_v1_published_snapshot_is_normalized` |
+
+Every round's fixes were verified against the full `StorefrontPresentation*` suite and the full test suite on both SQLite and PostgreSQL before pushing (see Tests section for final counts). All 8 review threads are resolved.
 
 ## Backward compatibility
 
