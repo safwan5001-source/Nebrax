@@ -283,4 +283,126 @@ describe('ExperienceBuilder — CUST-H1-2 Version Manager', () => {
 
     Object.defineProperty(window, 'innerWidth', { value: originalInnerWidth, configurable: true });
   });
+
+  // Review findings (chatgpt-codex-connector, PR #1085) — three related
+  // "stale local state after the merchant moved on" races.
+
+  it('switching storefrontId resets the previous store\'s version state instead of leaking it', async () => {
+    listMock.mockImplementation((storefrontId: string) =>
+      storefrontId === 'store-1'
+        ? Promise.resolve({ ok: true, data: [summary({ id: 'a', name: 'نسخة المتجر الأول' })] })
+        : Promise.resolve({
+            ok: true,
+            data: [summary({ id: 'x', name: 'نسخة أ' }), summary({ id: 'y', name: 'نسخة ب' })],
+          }),
+    );
+    showMock.mockResolvedValue({ ok: true, data: detail({ id: 'a', name: 'نسخة المتجر الأول' }) });
+    const { rerender } = render(<ExperienceBuilder storefrontId="store-1" initialLocale="ar" />);
+    await waitFor(() =>
+      expect(screen.getByLabelText('نسخة التصميم قيد التعديل').textContent).toContain('نسخة المتجر الأول'),
+    );
+
+    // Store 2 has two drafts (ambiguous) — nothing should auto-select, and the
+    // first store's version must not linger as the "open" one under the new
+    // storefrontId (which would let Save target the wrong store/version pair).
+    rerender(<ExperienceBuilder storefrontId="store-2" initialLocale="ar" />);
+    await waitFor(() => expect(listMock).toHaveBeenCalledWith('store-2'));
+
+    expect(
+      screen.getByLabelText('نسخة التصميم قيد التعديل').textContent,
+    ).not.toContain('نسخة المتجر الأول');
+    expect(document.querySelector('[data-experience-builder]')?.getAttribute('data-selected-version-id')).toBe('');
+    expect(screen.getByRole('button', { name: 'حفظ المسودة' })).toHaveProperty('disabled', true);
+    await screen.findByText('اختر نسخة للتعديل');
+  });
+
+  it('a rename conflict on the currently open version blocks further save/rename until an explicit reload', async () => {
+    listMock.mockResolvedValue({ ok: true, data: [summary({ id: 'a', name: 'قديم', revision: 0 })] });
+    showMock
+      .mockResolvedValueOnce({ ok: true, data: detail({ id: 'a', name: 'قديم', revision: 0 }) })
+      .mockResolvedValueOnce({ ok: true, data: detail({ id: 'a', name: 'اسم من جلسة أخرى', revision: 3 }) });
+    renameMock.mockResolvedValue({ ok: false, reason: 'conflict', message: 'stale' });
+    const user = userEvent.setup();
+    render(<ExperienceBuilder storefrontId="store-1" initialLocale="ar" />);
+    await waitFor(() => expect(showMock).toHaveBeenCalledTimes(1));
+
+    await openVersionManager(user);
+    await user.click(screen.getByRole('button', { name: 'إعادة تسمية' }));
+    await user.clear(screen.getByLabelText('اسم النسخة'));
+    await user.type(screen.getByLabelText('اسم النسخة'), 'اسم جديد');
+    await user.click(screen.getByRole('button', { name: 'حفظ الاسم' }));
+
+    await waitFor(() => expect(renameMock).toHaveBeenCalledTimes(1));
+    // The row-level list refresh must not silently resync the open editor's
+    // stale local revision/content — the save/rename path stays blocked.
+    expect(screen.getByRole('button', { name: 'حفظ المسودة' })).toHaveProperty('disabled', true);
+
+    // A retry (same stale local state) must not reach the server again.
+    // (The manager is already open from the previous attempt.)
+    await user.click(screen.getByRole('button', { name: 'إعادة تسمية' }));
+    await user.clear(screen.getByLabelText('اسم النسخة'));
+    await user.type(screen.getByLabelText('اسم النسخة'), 'محاولة ثانية');
+    await user.click(screen.getByRole('button', { name: 'حفظ الاسم' }));
+    expect(renameMock).toHaveBeenCalledTimes(1);
+
+    // Only an explicit reload re-reads the full (now-current) detail and
+    // clears the block.
+    await user.click(screen.getByRole('button', { name: 'تحديث النسخة' }));
+    await waitFor(() => expect(showMock).toHaveBeenCalledTimes(2));
+    await waitFor(() =>
+      expect(screen.getByLabelText('نسخة التصميم قيد التعديل').textContent).toContain('اسم من جلسة أخرى'),
+    );
+    expect(screen.getByRole('button', { name: 'حفظ المسودة' })).toHaveProperty('disabled', false);
+  });
+
+  it('a save that resolves after the merchant switches to another version does not overwrite it', async () => {
+    listMock.mockResolvedValue({
+      ok: true,
+      data: [summary({ id: 'a', name: 'نسخة أ', revision: 0 }), summary({ id: 'b', name: 'نسخة ب', revision: 0 })],
+    });
+    showMock.mockImplementation((_storefrontId: string, versionId: string) =>
+      Promise.resolve({
+        ok: true,
+        data: versionId === 'a'
+          ? detail({ id: 'a', name: 'نسخة أ', revision: 0 })
+          : detail({ id: 'b', name: 'نسخة ب', revision: 0 }),
+      }),
+    );
+    let resolveSave: (value: unknown) => void = () => {};
+    const pendingSave = new Promise((resolve) => {
+      resolveSave = resolve;
+    });
+    saveMock.mockReturnValue(pendingSave);
+    const user = userEvent.setup();
+    render(<ExperienceBuilder storefrontId="store-1" initialLocale="ar" />);
+    await screen.findByText('اختر نسخة للتعديل');
+
+    await openVersionManager(user);
+    let manager = screen.getByRole('menu', { name: 'إدارة نسخ التصميم' });
+    const rowA = within(manager).getByText('نسخة أ').closest('li') as HTMLElement;
+    await user.click(within(rowA).getByRole('button', { name: 'فتح للتعديل' }));
+    await waitFor(() =>
+      expect(screen.getByLabelText('نسخة التصميم قيد التعديل').textContent).toContain('نسخة أ'),
+    );
+
+    // Save on A is in flight (never resolved yet) when the merchant switches to B.
+    await user.click(screen.getByRole('button', { name: 'حفظ المسودة' }));
+    await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(1));
+
+    await openVersionManager(user);
+    manager = screen.getByRole('menu', { name: 'إدارة نسخ التصميم' });
+    const rowB = within(manager).getByText('نسخة ب').closest('li') as HTMLElement;
+    await user.click(within(rowB).getByRole('button', { name: 'فتح للتعديل' }));
+    await waitFor(() =>
+      expect(screen.getByLabelText('نسخة التصميم قيد التعديل').textContent).toContain('نسخة ب'),
+    );
+
+    // A's save now resolves successfully — it must not pull the editor back to A.
+    resolveSave({ ok: true, data: detail({ id: 'a', name: 'نسخة أ', revision: 1 }) });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(screen.getByLabelText('نسخة التصميم قيد التعديل').textContent).toContain('نسخة ب');
+    expect(document.querySelector('[data-experience-builder]')?.getAttribute('data-selected-version-id')).toBe('b');
+    expect(screen.queryByText('تم حفظ النسخة.')).toBeNull();
+  });
 });

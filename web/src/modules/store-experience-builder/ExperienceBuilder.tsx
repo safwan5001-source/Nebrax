@@ -283,6 +283,26 @@ export function ExperienceBuilder({
       return;
     }
 
+    // يبطل أي طلب سابق (قائمة أو نسخة) قيد التنفيذ فوراً، ويُصفّر حالة النسخة
+    // المرتبطة بالمتجر السابق — وإلا، إن بدَّل المستدعي `storefrontId` دون
+    // إعادة تركيب هذا المكوّن (تبديل المتجر النشط)، تبقى نسخة المتجر القديم
+    // معروضة ومحدَّدة، وقد يُرسَل حفظ لاحق بمعرّفها تحت مسار المتجر الجديد؛
+    // كما قد تصل استجابة قائمة/نسخة متأخرة من المتجر القديم فتكتب فوق حالة
+    // المتجر الجديد.
+    ++versionRequestTokenRef.current;
+    setVersionSwitchingId(null);
+    setSelectedVersion(null);
+    setVersions([]);
+    setVersionsListState("loading");
+    setVersionCreating(false);
+    setVersionBusy(null);
+    setVersionConflict(null);
+    setSelectedSection(null);
+    setSelectedChrome(null);
+    setDraft(clonePresentationConfig(DEFAULT_PRESENTATION_CONFIG));
+    setSaved(clonePresentationConfig(DEFAULT_PRESENTATION_CONFIG));
+    setLifecycle("clean");
+
     let cancelled = false;
 
     (async () => {
@@ -347,30 +367,43 @@ export function ExperienceBuilder({
       return;
     }
     if (selectedVersion.state === "published") return; // زر الحفظ معطَّل لهذه الحالة أصلاً.
+    if (versionConflict?.versionId === selectedVersion.id) return; // يجب تحديث النسخة أولاً — البانر يعرض زر ذلك.
 
+    // لقطة الهوية وقت بدء الحفظ: إن بدَّل المستخدم النسخة المفتوحة (أو المتجر)
+    // بينما طلب PUT هذا قيد التنفيذ، يجب ألا تُطبَّق نتيجته المتأخرة على
+    // النسخة الجديدة المعروضة الآن — `applyVersionSelection`/`adoptCreatedVersion`
+    // يزيدان هذا العدّاد ذاته عند كل تبديل/إنشاء، فتطابقه هنا كافٍ لاكتشاف ذلك.
+    const savingVersionId = selectedVersion.id;
+    const tokenAtSaveStart = versionRequestTokenRef.current;
     setBusy("saving");
     setNotice(null);
     setVersionConflict(null);
     const persistedDraft = normalizePresentationConfig(draft);
     const result = await savePresentationVersion(
       storefrontId,
-      selectedVersion.id,
+      savingVersionId,
       persistedDraft,
       selectedVersion.revision,
     );
-    setBusy(null);
+    const supersededBySwitch = tokenAtSaveStart !== versionRequestTokenRef.current;
+    if (!supersededBySwitch) setBusy(null);
     if (result.ok) {
+      // القائمة تبقى في الحالتين مصدر حقيقة صالحاً لهذه النسخة، سواء أعُرِضت
+      // الآن أم لا — لكن `draft`/`saved`/`selectedVersion` ملك النسخة المفتوحة
+      // حالياً فقط.
+      updateVersionSummaryInList(result.data);
+      if (supersededBySwitch) return;
       setDraft(result.data.config);
       setSaved(result.data.config);
       setSelectedVersion(result.data);
-      updateVersionSummaryInList(result.data);
       setLifecycle("clean");
       setNoticeKind("status");
       setNotice(t("versionSaveSuccess"));
       return;
     }
+    if (supersededBySwitch) return; // النسخة لم تعد مفتوحة — لا تنبيه ولا تعارض يخصّ عرضاً حالياً مختلفاً.
     if (result.reason === "conflict") {
-      setVersionConflict({ versionId: selectedVersion.id });
+      setVersionConflict({ versionId: savingVersionId });
       return;
     }
     setNoticeKind("status");
@@ -420,14 +453,25 @@ export function ExperienceBuilder({
 
   async function handleRenameVersion(version: PresentationVersionSummary, name: string) {
     if (!storefrontId) return;
+    if (versionConflict?.versionId === version.id) return; // يجب تحديث النسخة أولاً — راجع تعليق بانر التعارض.
     setVersionBusy({ id: version.id, action: "rename" });
     const result = await renamePresentationVersion(storefrontId, version.id, name, version.revision);
     setVersionBusy(null);
     if (!result.ok) {
       if (result.reason === "conflict") {
-        setNoticeKind("status");
-        setNotice(t("versionStaleConflict"));
         await loadVersionList();
+        if (selectedVersion?.id === version.id) {
+          // النسخة المُعاد تسميتها هي نفسها المفتوحة محلياً الآن: تحديث صفّها في
+          // القائمة وحده غير كافٍ — محتوى المحرِّر (draft) ومراجعته المحلية ما
+          // زالا قديمين، وقد تنجح إعادة محاولة لاحقة (تسمية أو حفظ) بمراجعة
+          // الصفّ المحدَّث فتكتب فوق تعديل جلسة أخرى بصمت. نفس بانر تعارض
+          // الحفظ إذن: لا إعادة تحميل تلقائية، ولا حفظ ولا تسمية أخرى قبل أن
+          // يطلب المستخدم «تحديث النسخة» صراحةً فتُعاد قراءة المستند كاملاً.
+          setVersionConflict({ versionId: version.id });
+        } else {
+          setNoticeKind("status");
+          setNotice(t("versionStaleConflict"));
+        }
         return;
       }
       setNoticeKind("status");
@@ -754,7 +798,12 @@ export function ExperienceBuilder({
             type="button"
             data-save=""
             onClick={handleSave}
-            disabled={busy !== null || !selectedVersion || isPublishedReadOnly}
+            disabled={
+              busy !== null ||
+              !selectedVersion ||
+              isPublishedReadOnly ||
+              versionConflict?.versionId === selectedVersion?.id
+            }
             title={
               isPublishedReadOnly
                 ? t("versionPublishedReadOnlyTitle")
@@ -762,7 +811,9 @@ export function ExperienceBuilder({
                   ? t("noStoreSelected")
                   : !selectedVersion
                     ? t("versionNoVersionSelected")
-                    : undefined
+                    : versionConflict?.versionId === selectedVersion?.id
+                      ? t("versionStaleConflict")
+                      : undefined
             }
             className="h-9 shrink-0 rounded-md border border-border bg-surface px-2.5 text-xs font-medium text-text hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-50 md:px-3 md:text-sm"
           >
