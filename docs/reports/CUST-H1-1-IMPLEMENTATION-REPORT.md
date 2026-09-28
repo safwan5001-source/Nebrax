@@ -102,7 +102,8 @@ All CUST-H1-1 tests plus every pre-existing `StorefrontPresentation*`/`Storefron
 
 ## Build / CI
 
-- Workflow: `.github/workflows/ci.yml` (`db: [sqlite, pgsql]` matrix). Not yet observed on GitHub Actions at report-writing time — PR CI will be monitored per the Horizon Execution Rule after this report is committed and the PR opens; any findings will be appended to this report before merge.
+- Workflow: `.github/workflows/ci.yml` (`db: [sqlite, pgsql]` matrix). **Green on the final head (`572a7ae`)** — both `php artisan test (L11, sqlite)` and `php artisan test (L11, pgsql)` completed successfully; `mergeable_state` is `clean` (no conflict with `main`).
+- The automated reviewer (`chatgpt-codex-connector[bot]`) posted twice after the round-10 fix that it has reached its Codex usage limit for code reviews and cannot review further pushes to this PR. This is external to the PR itself (an account-level quota, not a finding) and is not something this session can act on; it marks the natural end of the review-iteration loop documented below — every finding the reviewer did produce across its 10 active rounds was fixed and verified.
 
 ## Review findings
 
