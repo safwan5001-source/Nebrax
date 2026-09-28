@@ -162,13 +162,17 @@ export function StorefrontPreviewCanvas({
         ? "h-40"
         : "h-52";
   // Same host-browser-vs-simulated-device problem as `cardImageHeight` above,
-  // for the New Arrivals grid's column count. Mapped against the published
-  // `ProductGrid.tsx` breakpoints (`grid-cols-2 lg:grid-cols-3 xl:grid-cols-4`,
-  // i.e. `lg` at 1024px and `xl` at 1280px): mobile(390) and tablet(768) both
-  // sit below `lg`, so both resolve to 2 columns; only desktop(1280) reaches
-  // `xl` for 4. 3 columns never applies at any of this preview's three
-  // discrete simulated widths.
-  const newArrivalsColumns = viewport === "desktop" ? "grid-cols-4" : "grid-cols-2";
+  // for the New Arrivals grid's column count. This preview section represents
+  // the homepage shelf, which the published storefront renders via
+  // `NewArrivals.tsx` — not the (differently-breakpointed) `ProductGrid.tsx`
+  // used for catalog/category listing pages. `NewArrivals.tsx` uses
+  // `grid-cols-2 sm:grid-cols-3 lg:grid-cols-4` (`sm` at 640px, `lg` at
+  // 1024px): mobile(390) sits below `sm` for 2 columns, tablet(768) sits at
+  // or above `sm` but below `lg` for 3, and desktop(1280) sits at or above
+  // `lg` for 4 — all three of this preview's simulated widths land in a
+  // different tier here.
+  const newArrivalsColumns =
+    viewport === "mobile" ? "grid-cols-2" : viewport === "tablet" ? "grid-cols-3" : "grid-cols-4";
   const enabledSocial = config.social.flatMap((item) => {
     if (!item.enabled || !isOfficialSocialNetwork(item.network)) return [];
     const href = sanitizeExternalUrl(item.url);

@@ -113,16 +113,20 @@ describe("web customizer preview — compact header style vs. mobile viewport", 
 });
 
 /**
- * Regression coverage for the Codex P2 finding (round 6) on PR #1084: the New
- * Arrivals grid used `mobileViewport ? "grid-cols-2" : "grid-cols-2
+ * Regression coverage for the Codex P2 findings (rounds 6-7) on PR #1084: the
+ * New Arrivals grid used `mobileViewport ? "grid-cols-2" : "grid-cols-2
  * sm:grid-cols-3 lg:grid-cols-4"`, so a desktop host simulating the tablet
  * (768px) or mobile device still got the `sm:`/`lg:` classes evaluated
  * against the host's own window width instead of the simulated one — the
- * same class of bug `cardImageHeight` was already fixed for. The published
- * `ProductGrid.tsx` uses `grid-cols-2 lg:grid-cols-3 xl:grid-cols-4` (`lg` at
- * 1024px, `xl` at 1280px), so of this preview's three discrete widths
- * (390/768/1280) only desktop reaches 4 columns — 768px stays below `lg`, so
- * tablet renders 2 columns, not 3.
+ * same class of bug `cardImageHeight` was already fixed for (round 6). Round
+ * 7 then caught that the round-6 fix itself mapped the wrong published
+ * component's breakpoints: this preview section represents the homepage
+ * shelf, rendered by `NewArrivals.tsx` (`grid-cols-2 sm:grid-cols-3
+ * lg:grid-cols-4`, `sm` at 640px / `lg` at 1024px) — not the differently-
+ * breakpointed `ProductGrid.tsx` used for catalog/category pages. At this
+ * preview's three discrete widths (390/768/1280), all three land in a
+ * distinct tier: mobile below `sm` for 2 columns, tablet at/above `sm` but
+ * below `lg` for 3, desktop at/above `lg` for 4.
  */
 describe("web customizer preview — New Arrivals column count follows the simulated viewport", () => {
   afterEach(() => {
@@ -131,7 +135,7 @@ describe("web customizer preview — New Arrivals column count follows the simul
 
   it.each([
     ["mobile", "grid-cols-2"],
-    ["tablet", "grid-cols-2"],
+    ["tablet", "grid-cols-3"],
     ["desktop", "grid-cols-4"],
   ] as const)("renders %s columns at the %s simulated viewport", (viewport, expectedClass) => {
     const { container } = render(
