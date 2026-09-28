@@ -130,6 +130,12 @@ export function StorefrontPreviewCanvas({
       : null;
   const density = config.density === "compact" ? "compact" : "comfortable";
   const cardPad = config.productCard === "compact" ? "p-2.5" : "p-3";
+  // Mirrors the published ProductCard's own AWJ Market sizing (see
+  // `usePublishedThemeMarker`/`ProductCard.tsx`) so a merchant previewing
+  // Market sees the same denser tile they get after Publish, not a
+  // materially different card.
+  const cardImageAspect =
+    config.themePreset === "awj-market" ? "aspect-[4/3]" : "aspect-square";
   const enabledSocial = config.social.flatMap((item) => {
     if (!item.enabled || !isOfficialSocialNetwork(item.network)) return [];
     const href = sanitizeExternalUrl(item.url);
@@ -403,7 +409,7 @@ export function StorefrontPreviewCanvas({
                         key={product.id}
                         className="overflow-hidden rounded-store border border-store-border bg-store-surface"
                       >
-                        <div className="aspect-square bg-store-surface-muted" />
+                        <div className={cn(cardImageAspect, "bg-store-surface-muted")} />
                         <div className={cardPad}>
                           <p className="text-[11px] text-store-muted-foreground">
                             {product.category[locale]}

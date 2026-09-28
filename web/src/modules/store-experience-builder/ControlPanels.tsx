@@ -369,7 +369,7 @@ function ThemePanel({
               onChange={(event) =>
                 patch({
                   primaryColor: event.target.value,
-                  themePreset: matchPreset(event.target.value),
+                  themePreset: matchPreset(event.target.value, config.themePreset),
                 })
               }
               className="absolute inset-0 cursor-pointer opacity-0"
@@ -381,7 +381,7 @@ function ThemePanel({
             onChange={(event) =>
               patch({
                 primaryColor: event.target.value,
-                themePreset: matchPreset(event.target.value),
+                themePreset: matchPreset(event.target.value, config.themePreset),
               })
             }
           />
@@ -439,10 +439,17 @@ function ThemePanel({
   );
 }
 
-function matchPreset(hex: string): ThemePresetId {
+/**
+ * A custom color that doesn't match any preset's swatch keeps the merchant's
+ * *current* preset rather than silently renaming it to `awj-modern` — a
+ * bundled preset (currently only AWJ Market) carries real behavior keyed off
+ * `themePreset` (see `usePublishedThemeMarker`), so resetting it on an
+ * ordinary color tweak would silently drop that styling too.
+ */
+export function matchPreset(hex: string, current: ThemePresetId): ThemePresetId {
   return (
     THEME_PRESETS.find((preset) => preset.primary === hex.toLowerCase())?.id ??
-    "awj-modern"
+    current
   );
 }
 

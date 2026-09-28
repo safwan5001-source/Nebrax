@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { matchPreset } from '../ControlPanels';
 import { DEFAULT_PRESENTATION_CONFIG, presetSelectionPatch } from '../presentation/config';
 import { THEME_PRESETS } from '../presentation/tokens';
 
@@ -53,5 +54,21 @@ describe('presetSelectionPatch — AWJ Market starting bundle (Master Spec §29)
     expect(patch).not.toHaveProperty('branding');
     expect(patch).not.toHaveProperty('footer');
     expect(patch).not.toHaveProperty('homepage');
+  });
+});
+
+describe('matchPreset — a custom color keeps the active preset (Codex P1 finding on PR #1084)', () => {
+  it('an unmatched hex keeps the current preset instead of resetting to awj-modern', () => {
+    expect(matchPreset('#123456', 'awj-market')).toBe('awj-market');
+    expect(matchPreset('#123456', 'navy')).toBe('navy');
+  });
+
+  it('a hex that matches a known swatch still switches to that preset', () => {
+    expect(matchPreset(market.primary, 'navy')).toBe('awj-market');
+    expect(matchPreset(navy.primary, 'awj-market')).toBe('navy');
+  });
+
+  it('matching is case-insensitive, exactly as before', () => {
+    expect(matchPreset(market.primary.toUpperCase(), 'navy')).toBe('awj-market');
   });
 });

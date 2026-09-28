@@ -168,10 +168,12 @@ scope decision, not an oversight:
 - `web/src/modules/store-experience-builder/presentation/config.ts`
 - `web/src/modules/store-experience-builder/ControlPanels.tsx`
 
-**Theme marker seam + its one consumer:**
+**Theme marker seam + its consumers:**
 - `storefront/src/components/layout/PublishedThemeMarker.tsx` (new)
 - `storefront/src/app/[country]/[locale]/(storefront)/layout.tsx`
 - `storefront/src/components/products/ProductCard.tsx`
+- `storefront/src/components/products/ProductCardSkeleton.tsx` (review fix, §22a)
+- `web/src/modules/store-experience-builder/StorefrontPreviewCanvas.tsx` (review fix, §22a)
 
 **i18n labels:**
 - `web/src/modules/store-experience-builder/messages.ts`
@@ -188,6 +190,8 @@ scope decision, not an oversight:
 - `storefront/src/lib/presentation/__tests__/config.test.ts`
 - `storefront/src/app/[country]/[locale]/(storefront)/layout.test.tsx`
 - `storefront/src/components/products/__tests__/ProductCard.test.tsx`
+- `storefront/src/components/products/__tests__/ProductCardSkeleton.test.tsx` (new)
+- `web/src/modules/store-experience-builder/__tests__/StorefrontPreviewCanvas.marketCard.test.tsx` (new)
 - `web/src/modules/store-experience-builder/__tests__/presentation.test.ts`
 - `web/src/modules/store-experience-builder/__tests__/presetSelectionPatch.test.ts` (new)
 
@@ -270,34 +274,37 @@ actually read and exercised in this Horizon. No row below claims fresh live pixe
 **Broader PHP presentation suite** (`--filter=StorefrontPresentation`): 110 passed,
 1 skipped (PostgreSQL-only row-lock test, skipped identically before this change).
 
-**Storefront (vitest, focused):** 42 passed across
-`tokens.test.ts`, `config.test.ts`, `layout.test.tsx`, `ProductCard.test.tsx`
-(new/updated cases: preset registry parity, `awj-market` default/override color,
-stale-preset fallback, theme-marker wiring through the layout tree, image-density
-swap under the Market marker).
+**Storefront (vitest, focused):** 44 passed across
+`tokens.test.ts`, `config.test.ts`, `layout.test.tsx`, `ProductCard.test.tsx`,
+`ProductCardSkeleton.test.tsx` (new)
+(cases: preset registry parity, `awj-market` default/override color, stale-preset
+fallback, theme-marker wiring through the layout tree, image-density swap under the
+Market marker on both `ProductCard` and its loading skeleton).
 
-**Web (vitest, focused):** 30 passed across `presentation.test.ts`,
-`presetSelectionPatch.test.ts` (new, 4 cases), `ExperienceBuilder.test.tsx`.
+**Web (vitest, focused):** 35 passed across `presentation.test.ts`,
+`presetSelectionPatch.test.ts` (new, 7 cases: the starting-bundle patch plus
+`matchPreset`'s current-preset-preserving fallback),
+`StorefrontPreviewCanvas.marketCard.test.tsx` (new, 2 cases), `ExperienceBuilder.test.tsx`.
 
 ## 11. Storefront lint/typecheck/tests/build
 
-- `pnpm check` (Biome lint+format): clean, 0 errors (434 files).
+- `pnpm check` (Biome lint+format): clean, 0 errors (437 files).
 - `npx tsc --noEmit`: clean, 0 errors.
 - `pnpm check:locales`: all 5 locale files in sync with `en.json`.
-- `pnpm test` (full vitest suite): **639 tests, 1 failed** —
+- `pnpm test` (full vitest suite), first run: **639 tests, 1 failed** —
   `AwjCheckoutFlow.test.tsx > Idempotency-Key persistence ... > the persisted key is
   removed once completion is confirmed successful`. This test *by design* simulates a
-  transient network failure and a retry (see its own source comment); under this
-  Horizon's full-suite run it exceeded its 5s timeout. Proven pre-existing/unrelated:
-  (a) this Horizon touched zero checkout files (`git status` confirms), (b) re-run in
-  isolation it passes cleanly (20/20). Kept outside scope per the task's own protocol
-  for proven pre-existing/flaky failures.
+  transient network failure and a retry (see its own source comment); under that run it
+  exceeded its 5s timeout. Proven pre-existing/unrelated: (a) this Horizon touched zero
+  checkout files (`git status` confirms), (b) re-run in isolation it passed cleanly
+  (20/20). After the three review-finding fixes (§22a), a fresh full run came back
+  **641/641 passing, 0 failed** (the timing-sensitive test included).
 - `pnpm build`: succeeded, exit code 0, all routes (including the new
   `/dev/market-visual`) built cleanly.
 
 ## 12. Web tests/build
 
-- `npx vitest run` (full suite): **2155 tests passed, 0 failed** (311 files).
+- `npx vitest run` (full suite): **2160 tests passed, 0 failed** (312 files).
 - `npx tsc --noEmit`: 12 pre-existing errors, all in files this Horizon never touched
   (POS settings, platform integrations, document/product-variant components) —
   confirmed pre-existing by stashing this Horizon's changes and re-running against
@@ -311,28 +318,45 @@ See §10 (focused) and §14 (full suite, backend section).
 
 ## 14. Full `php artisan test` (mandatory pre-PR protocol)
 
-**Result: 4771 passed, 35 failed, 49 skipped (29987 assertions), 618s.**
+**Result: 4771 passed, 35 failed, 49 skipped (29987 assertions).** Reproduced twice,
+byte-identical counts both times (647.86s / 618.23s). Zero of the 35 failing tests are
+in `StorefrontPresentation*`, `Commerce`, or any file this Horizon's diff touches
+(confirmed by cross-referencing the full failure list against `git status`); the
+dedicated `StorefrontPresentation*` filter (§10, 110 tests) and the normalizer test
+(§10, 20 tests) — the actual surface this Horizon changed — are 100% green.
 
-All 35 failures are in `Tests\Feature\FuelSupplyReceivingTest` /
-`app/Services/FuelCostBasisService.php` (`Call to undefined function
-App\Services\bcmul()`) — the Fuel module's rational cost-basis arithmetic, which this
-Horizon never touched. Confirmed pre-existing and environment-caused, not a code
-regression:
+All 35 failures trace to exactly two pre-existing gaps in **this container's local
+`setup.sh` build**, not to any repository code and not to this diff:
 
-- `php -m | grep -i bcmath` returns nothing — this session's PHP build has the
-  **`bcmath` extension missing**, so every `bcmul()`/`bcadd()`/`bcdiv()` call in
-  `FuelCostBasisService` fails identically regardless of any code change.
-- This exact class of failure is already documented in the repository's own commit
-  history as a known, pre-existing, environment-only gap ("the 27 failures are the
-  same pre-existing bcmath-extension gap documented since round 1, unrelated to this
-  module" — CUST-H1-1). The count differs slightly from that historical note (35 vs.
-  27) simply because more Fuel tests have been added since; the root cause and the
-  zero-overlap with this Horizon's files are identical.
-- Zero of the 35 failing tests are in `StorefrontPresentation*`, `Commerce`, or any
-  file this Horizon's diff touches (confirmed by cross-referencing the failure list
-  against `git status`).
-- The dedicated `StorefrontPresentation*` filter (§10, 110 tests) and the normalizer
-  test (§10, 20 tests) — the actual surface this Horizon changed — are 100% green.
+- **26 failures — `bcmath` PHP extension missing.** `php -m | grep -i bcmath` returns
+  nothing in this session's PHP build, so every `bcmul()`/`bcadd()`/`bcdiv()` call in
+  `app/Services/FuelCostBasisService.php` fails with `Call to undefined function`.
+  Affects every Fuel-module test that exercises cost-basis arithmetic
+  (`FuelSupplyReceivingTest`, `FuelSupplyReceivingApiTest`, `FuelReconciliationTest`,
+  `FuelSaleServiceTest`, `FuelSaleApiTest`, `FuelAviRfidServiceTest`). This exact class
+  of failure is already documented in the repository's own commit history as a known,
+  pre-existing, environment-only gap (CUST-H1-1: "the 27 failures are the same
+  pre-existing bcmath-extension gap … unrelated to this module"); the count differs
+  slightly (26 vs. 27) simply because the Fuel suite has grown since.
+- **9 failures — `setup.sh` omits `app/Mail/` and `resources/views/emails/`.**
+  `AuthController::register()` sends `App\Mail\AuthActionMail`, but this session's
+  `setup.sh` copy-list (verified by reading it) never copies `app/Mail/` or
+  `resources/views/` from the core repo into the built Laravel app — both exist in the
+  repo (`app/Mail/AuthActionMail.php`, `resources/views/emails/auth-action.blade.php`)
+  but not in `/home/user/nibras-app`. **Verified by fixing it locally**: copying
+  `app/Mail/` in made all 8 previously-failing `AuthRecoveryTest` cases pass outright;
+  copying `resources/views/emails/` in as well got `DocumentCenterSecureIntakeTest`
+  past the mail step (a residual, unexplored view-chain gap in the same family keeps
+  its one PDF-intake case red, not investigated further since it is unambiguously the
+  same "incomplete local copy-list" root cause, not a code defect). This is local to
+  this session's container — CLAUDE.md itself documents that the checked-in repository
+  is core-only and a full Laravel project is assembled by `setup.sh`/CI for testing, so
+  a copy-list gap here says nothing about the repository's actual CI, which builds
+  fresh per run.
+
+Neither category is a regression from this Horizon: no file in either failure's stack
+trace was touched by this diff, both are reproducible on an unmodified checkout, and
+both are attributable to this local build, not to application code.
 
 49 skipped tests are the pre-existing PostgreSQL-only tests (require a real PostgreSQL
 connection for row-lock semantics), skipped identically on SQLite before this change.
@@ -420,12 +444,40 @@ server-side normalizer already validates independently.
 
 ## 21. AWJ Modern regression status
 
-Green. Full storefront suite: 638/639 passing (1 pre-existing/flaky, proven unrelated,
-§11). Full web suite: 2155/2155 passing. Full PHP suite: see §14/§22.
+Green. Full storefront suite: 641/641 passing. Full web suite: 2160/2160 passing.
+Full PHP suite: see §14/§22.
 
 ## 22. CI status / Merge status / Deploy status
 
 _(filled in after push, PR creation, and CI observation)_
+
+## 22a. Automated review findings addressed
+
+Codex (`chatgpt-codex-connector[bot]`) reviewed the initial push and raised three
+findings, all verified real and fixed in a follow-up commit:
+
+1. **P1 — a custom color on Market silently reset to AWJ Modern.** The Customizer's
+   color-picker/hex-input handlers called a `matchPreset()` helper that mapped any hex
+   not matching one of the six preset swatches to `"awj-modern"` unconditionally.
+   Harmless before this Horizon (nothing read `themePreset` for behavior), but now that
+   Market's `ProductCard` density is keyed off it, an otherwise-ordinary color tweak
+   would silently drop the Market styling and persist a different preset. Fixed:
+   `matchPreset(hex, currentPreset)` now keeps the merchant's current preset when the
+   hex doesn't match a known swatch. Covered by 3 new unit tests.
+2. **P2 — skeleton/loaded-card height mismatch under Market.** `ProductCardSkeleton`
+   still reserved the standard `h-36 sm:h-44 md:h-52` image height unconditionally, so
+   a Market catalog row collapsed the instant its real (shorter) cards loaded. Fixed:
+   the skeleton now reads the same `usePublishedThemeMarker()` seam `ProductCard` uses.
+   Covered by 2 new tests.
+3. **P2 — Customizer preview didn't reflect Market's card proportions.** The
+   merchant-facing preview (`StorefrontPreviewCanvas.tsx`) rendered every product tile
+   `aspect-square` and never read `config.themePreset`, so a merchant selecting Market
+   couldn't see its one real visual differentiator before publishing. Fixed: the
+   preview's `newArrivals` product tiles now use a shorter aspect ratio under Market,
+   matching what `ProductCard` actually ships. Covered by 2 new tests.
+
+All three fixes re-verified: full storefront suite 641/641, full web suite 2160/2160,
+both `pnpm build`s green, `tsc --noEmit` clean on both, Biome clean.
 
 ## 23. Risks / remaining work
 
