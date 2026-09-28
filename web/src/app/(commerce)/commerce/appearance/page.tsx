@@ -1,12 +1,14 @@
 'use client';
 
 import { useLocale } from 'next-intl';
+import { useSearchParams } from 'next/navigation';
 import { ExperienceBuilder } from '@/modules/store-experience-builder/ExperienceBuilder';
 import { useCommerceStoreContext } from '@/modules/commerce-workspace/store-context';
 import { useCompany } from '@/lib/company';
 
 export default function CommerceAppearancePage() {
   const locale = useLocale();
+  const searchParams = useSearchParams();
   const company = useCompany();
   const { catalog, selectedStoreId, viewStoreUrl } = useCommerceStoreContext();
   const selectedStore =
@@ -26,6 +28,7 @@ export default function CommerceAppearancePage() {
         }}
         initialLocale={locale === 'en' ? 'en' : 'ar'}
         storefrontUrl={viewStoreUrl}
+        versionId={searchParams.get('version')}
       />
     </div>
   );
