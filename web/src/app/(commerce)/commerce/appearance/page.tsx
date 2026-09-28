@@ -8,6 +8,7 @@ import { useCompany } from '@/lib/company';
 export default function CommerceAppearancePage() {
   const locale = useLocale();
   const company = useCompany();
+  const versionId = typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('version');
   const { catalog, selectedStoreId, viewStoreUrl } = useCommerceStoreContext();
   const selectedStore =
     catalog.status === 'ready'
@@ -26,6 +27,7 @@ export default function CommerceAppearancePage() {
         }}
         initialLocale={locale === 'en' ? 'en' : 'ar'}
         storefrontUrl={viewStoreUrl}
+        versionId={versionId}
       />
     </div>
   );

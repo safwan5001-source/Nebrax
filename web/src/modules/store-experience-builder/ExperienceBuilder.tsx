@@ -37,6 +37,10 @@ import {
   publishStorefrontPresentation,
   saveStorefrontPresentation,
 } from "@/modules/commerce-workspace/presentation";
+import {
+  loadStorefrontPresentationVersion,
+  saveStorefrontPresentationVersion,
+} from "@/modules/commerce-workspace/presentation-versions";
 
 export const PREVIEW_WIDTHS = {
   mobile: 390,
@@ -62,6 +66,7 @@ interface ExperienceBuilderProps {
   initialLocale?: CustomizerLocale;
   storefrontId?: string | null;
   storefrontUrl?: string | null;
+  versionId?: string | null;
 }
 
 export function ExperienceBuilder({
@@ -71,6 +76,7 @@ export function ExperienceBuilder({
   initialLocale = "ar",
   storefrontId = null,
   storefrontUrl = null,
+  versionId = null,
 }: ExperienceBuilderProps) {
   const seed = normalizePresentationConfig(
     initialConfig ?? DEFAULT_PRESENTATION_CONFIG,
@@ -148,7 +154,27 @@ export function ExperienceBuilder({
     setNoticeKind("status");
     setNotice(t("loadingDraft"));
 
-    loadStorefrontPresentation(storefrontId).then((result) => {
+    const loadVersion = async () => {
+      if (versionId) {
+        const result = await loadStorefrontPresentationVersion(storefrontId, versionId);
+        if (cancelled) return;
+        if (!result.ok) {
+          setBusy(null);
+          setNoticeKind("status");
+          setNotice(t("loadFailed"));
+          return;
+        }
+        setDraft(result.data.config);
+        setSaved(result.data.config);
+        setDraftRevision(result.data.revision);
+        setLifecycle("clean");
+        setBusy(null);
+        setNoticeKind("capability");
+        setNotice(t("versionDraftMode"));
+        return;
+      }
+
+      const result = await loadStorefrontPresentation(storefrontId);
       if (cancelled) return;
       if (!result.ok) {
         setBusy(null);
@@ -161,15 +187,18 @@ export function ExperienceBuilder({
       setDraftRevision(result.data.draftRevision);
       setLifecycle("clean");
       setBusy(null);
+      setNoticeKind("status");
       setNotice(null);
-    });
+    };
+
+    void loadVersion();
 
     return () => {
       cancelled = true;
     };
     // Intentionally reload only when the selected storefront changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [storefrontId]);
+  }, [storefrontId, versionId]);
 
   function updateDraft(next: StorefrontPresentationConfig) {
     const normalized = normalizePresentationConfig(next);
@@ -192,11 +221,43 @@ export function ExperienceBuilder({
     setBusy("saving");
     setNotice(null);
     const persistedDraft = normalizePresentationConfig(draft);
-    const result = await saveStorefrontPresentation(
-      storefrontId,
-      persistedDraft,
-      draftRevision,
-    );
+    if (versionId) {
+      const result = await saveStorefrontPresentationVersion(
+        storefrontId,
+        versionId,
+        persistedDraft,
+        draftRevision,
+      );
+      if (result.ok) {
+        setDraft(result.data.config);
+        setSaved(result.data.config);
+        setDraftRevision(result.data.revision);
+        setLifecycle("clean");
+        setNoticeKind("status");
+        setNotice(t("saveSuccess"));
+        setBusy(null);
+        return;
+      }
+      if (result.reason === "conflict") {
+        const reload = await loadStorefrontPresentationVersion(storefrontId, versionId);
+        if (reload.ok) {
+          setDraft(reload.data.config);
+          setSaved(reload.data.config);
+          setDraftRevision(reload.data.revision);
+          setLifecycle("clean");
+        }
+        setNoticeKind("status");
+        setNotice(t("staleRevision"));
+        setBusy(null);
+        return;
+      }
+      setNoticeKind("status");
+      setNotice(t("saveFailed"));
+      setBusy(null);
+      return;
+    }
+
+    const result = await saveStorefrontPresentation(storefrontId, persistedDraft, draftRevision);
     if (result.ok) {
       setDraft(result.data.draft);
       setSaved(result.data.draft);
@@ -226,6 +287,12 @@ export function ExperienceBuilder({
   }
 
   async function handlePublish() {
+    if (versionId) {
+      setLifecycle("publish_blocked");
+      setNoticeKind("capability");
+      setNotice(t("versionPublishDisabled"));
+      return;
+    }
     if (!storefrontId) {
       setLifecycle("publish_blocked");
       setNoticeKind("capability");
@@ -360,6 +427,7 @@ export function ExperienceBuilder({
     <div
       dir={locale === "ar" ? "rtl" : "ltr"}
       data-experience-builder=""
+      data-version-id={versionId ?? ""}
       data-lifecycle={lifecycle}
       data-draft-revision={draftRevision}
       data-panel={panel}
@@ -439,7 +507,7 @@ export function ExperienceBuilder({
             type="button"
             data-publish=""
             onClick={handlePublish}
-            disabled={busy !== null}
+            disabled={busy !== null || versionId !== null}
             className="h-9 shrink-0 rounded-md bg-primary px-2.5 text-xs font-semibold text-primary-foreground shadow-sm hover:bg-primary-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-50 md:px-3 md:text-sm"
           >
             {t("publish")}

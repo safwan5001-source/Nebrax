@@ -7,10 +7,13 @@ const locale = { current: 'ar' };
 const loadMock = vi.fn();
 const saveMock = vi.fn();
 const publishMock = vi.fn();
+const versionLoadMock = vi.fn();
+const versionSaveMock = vi.fn();
 
 vi.mock('next-intl', () => ({
   useLocale: () => locale.current,
 }));
+
 
 vi.mock('@/modules/commerce-workspace/store-context', () => ({
   useCommerceStoreContext: () => ({
@@ -39,6 +42,11 @@ vi.mock('@/modules/commerce-workspace/presentation', () => ({
   publishStorefrontPresentation: (...args: unknown[]) => publishMock(...args),
 }));
 
+vi.mock('@/modules/commerce-workspace/presentation-versions', () => ({
+  loadStorefrontPresentationVersion: (...args: unknown[]) => versionLoadMock(...args),
+  saveStorefrontPresentationVersion: (...args: unknown[]) => versionSaveMock(...args),
+}));
+
 import { DEFAULT_PRESENTATION_CONFIG } from '@/modules/store-experience-builder/presentation';
 import CommerceAppearancePage from './page';
 
@@ -59,6 +67,9 @@ describe('commerce appearance — STORE-BACKEND-1', () => {
     loadMock.mockReset();
     saveMock.mockReset();
     publishMock.mockReset();
+    versionLoadMock.mockReset();
+    versionSaveMock.mockReset();
+    window.history.replaceState({}, '', '/commerce/appearance');
   });
 
   it('replaces the destination placeholder with the Experience Builder', async () => {
@@ -68,6 +79,29 @@ describe('commerce appearance — STORE-BACKEND-1', () => {
     expect(screen.getByLabelText('معاينة المتجر')).toBeTruthy();
     expect(screen.queryByText('هذه الشاشة جزء من مساحة العمل وستنمو لاحقاً دون تكرار وحدات أَوْج.')).toBeNull();
     await waitFor(() => expect(loadMock).toHaveBeenCalledWith('s1'));
+  });
+
+  it('opens an exact draft Version when the route carries a version query', async () => {
+    window.history.replaceState({}, '', '/commerce/appearance?version=v1');
+    versionLoadMock.mockResolvedValue({
+      ok: true,
+      data: {
+        id: 'v1',
+        storefrontId: 's1',
+        name: 'AWJ Modern — Theme Gallery',
+        state: 'draft',
+        schemaVersion: 2,
+        revision: 1,
+        config: DEFAULT_PRESENTATION_CONFIG,
+      },
+    });
+
+    render(<CommerceAppearancePage />);
+
+    await waitFor(() => expect(versionLoadMock).toHaveBeenCalledWith('s1', 'v1'));
+    expect(loadMock).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'نشر' }).hasAttribute('disabled')).toBe(true);
+    expect(screen.getByRole('status').textContent).toMatch(/نسخة مسودة مستقلة/);
   });
 
   it('uses the live store name as the typographic identity fallback', async () => {
