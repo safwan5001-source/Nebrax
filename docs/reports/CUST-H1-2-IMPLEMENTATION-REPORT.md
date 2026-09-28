@@ -7,7 +7,7 @@
 ## Repository state
 
 - **Base SHA:** `2e9cdd058a50a2014dc0b4a3c5c0c3302c353616` (`origin/main` at task start — matched the SHA given in the task brief; verified with a fresh `git fetch origin main` before starting).
-- **Head SHA:** `9a4209d` (post-round-6-review-fix; round-5 fix head was `01a4981`; round-4 fix head was `c2033dd`; round-3 fix head was `892e1e1`; round-2 fix head was `0e3111c`; round-1 fix head was `fddba52`; initial implementation head was `3077ecf`)
+- **Head SHA:** `992d39b` (post-round-7-review-fix; round-6 fix head was `9a4209d`; round-5 fix head was `01a4981`; round-4 fix head was `c2033dd`; round-3 fix head was `892e1e1`; round-2 fix head was `0e3111c`; round-1 fix head was `fddba52`; initial implementation head was `3077ecf`)
 - **Branch:** `claude/cust-h1-2-customizer-ux-23vvun`
 - **PR:** [#1085](https://github.com/safwan5001-source/Nebrax/pull/1085)
 
@@ -214,6 +214,18 @@ Three more P2 findings extending the round-4/5 patterns to row-write serializati
 | `formatDateTime` renders `scheduledFor` in the browser's local timezone with no authoritative store timezone supplied. | **Deliberately deferred, not fixed** — replied on the thread rather than pushing a change. `src/lib/formatting.ts` explicitly documents *"without inventing a new timezone policy"*; hardcoding a timezone (Asia/Riyadh, the only real candidate given this product's Saudi-specific ZATCA/VAT/chart-of-accounts scope) for only this one field would create an inconsistency with every other timestamp in the same row and app, and no tenant/store timezone field exists in the data model to do it properly. This is a product decision (does Nebrax need an authoritative per-tenant timezone, and where would it live) that belongs with the repo owner, not something to guess at as a side effect of one row's label. | n/a — thread left open for the owner |
 
 Three of the four review threads were replied to individually (naming the fix commit `9a4209d`) and resolved; the timezone thread was replied to explaining the deferral and left **unresolved** for the owner's attention. `npx vitest run` (2190 tests, full suite) and `npm run build` both re-verified green after this round.
+
+### Automated review (`chatgpt-codex-connector`, round 7, reviewed `5bc6a14`, fixed in `992d39b`)
+
+One more P1 and two P2 findings — the round-6 row-write serialization fix was still too narrow (only guarded against a *delete* being masked, not any operation, and only in one ordering), and a genuinely new race in plain version-switching (not row actions) that no earlier round's guards covered.
+
+| Finding | Fix | Regression test |
+|---|---|---|
+| The editor for the currently-open version stays fully editable while switching to another version's `GET` is in flight (no editing lock during a switch). An edit made in that window doesn't bump the request token (only a further switch does), so `applyVersionSelection`'s unconditional assignment on success silently replaced it once the target resolved. | Captures the draft when the switch begins and compares it to the current draft (via `draftRef`) once the target resolves — same pattern as the round-3/4 save/create fixes. A mismatch updates only the target's list entry instead of forcing it open, leaving the newer edit in place. `reloadConflictedVersion()` opts back into the old unconditional behavior via a new `allowOverwriteDuringFetch` flag, since an explicit "reload version" click is itself a discard-and-refetch action. | `an edit made to the still-open version while switching to another is not discarded when the switch resolves (codex round 7)` |
+| Round 6 only blocked starting a new row write when the *existing* shared-slot operation was specifically a delete. The reverse ordering still worked: a rename starting first, then a delete starting on another row (not blocked, since the existing op wasn't a delete), followed by the rename completing and unconditionally clearing the shared slot — hiding the still-in-flight delete's own busy state and re-enabling that row's Open button. | Widened the guard to block a new row write whenever *any* other row has one in flight, regardless of which operation. "Open" stays exempt from this guard (it doesn't touch the shared slot, and switching during an unrelated row write is supported and already tested). | `a pending rename on one row blocks starting a delete on another until it settles (codex round 7)` |
+| A row's Duplicate/Rename/Delete triggers weren't disabled while that same row's own version was still being fetched (`switching`) — only "Open" was. Opening a version, then reopening the manager to delete that same row before its `GET` resolved, could delete a version the `GET` was about to select. | Duplicate/Rename/Delete triggers now also disable while `switching` is true for that row, matching "Open"'s existing guard. | `deleting a version whose own switch is still loading is blocked (codex round 7)` |
+
+All three review threads were replied to individually (naming the fix commit `992d39b`) and resolved. `npx vitest run` (2193 tests, full suite) and `npm run build` both re-verified green after this round.
 
 ## Backward compatibility
 
