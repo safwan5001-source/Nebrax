@@ -307,6 +307,43 @@ export function ExperienceBuilder({
     updateVersionSummaryInList(detail);
   }
 
+  // مسار الاختيار التلقائي الحاسم عند أول تحميل: يُستدعى من تأثير `storefrontId`
+  // أدناه، **ومن زر «إعادة المحاولة»** بعد فشل القائمة أيضاً — كان هذا الأخير
+  // يعيد تحميل الصفوف فقط دون إعادة تشغيل منطق الاختيار (§13)، فمتجرٌ بمرشّح
+  // وحيد غير غامض كان يستقر على `ready` بلا نسخة مفتوحة، ويبقى تنبيه الخطأ
+  // الأصلي ظاهراً رغم نجاح المحاولة. مسارٌ واحد لكلا نقطتي الدخول يمنع الانحراف.
+  async function loadAndSelectInitialVersion() {
+    if (!storefrontId) return;
+    const originStorefrontId = storefrontId;
+    const tokenAtStart = versionRequestTokenRef.current;
+    setBusy("loading");
+    setNoticeKind("status");
+    setNotice(t("versionListLoading"));
+    const list = await loadVersionList();
+    if (!stillCurrent(originStorefrontId, tokenAtStart)) return;
+    if (list === null) {
+      setBusy(null);
+      setNoticeKind("status");
+      setNotice(t("versionListLoadError"));
+      return;
+    }
+    setNotice(null);
+    // اختيار تلقائي غير غامض فقط: مرشّح وحيد غير منشور، أو نسخة منشورة
+    // وحيدة بلا أي مسودة (§13 — لا نتخمّن بين عدة مسودات محتملة).
+    const candidates = list.filter((v) => v.state !== "published");
+    const target =
+      candidates.length === 1
+        ? candidates[0]
+        : candidates.length === 0 && list.length === 1
+          ? list[0]
+          : null;
+    if (!target) {
+      setBusy(null);
+      return;
+    }
+    await applyVersionSelection(target);
+  }
+
   useEffect(() => {
     if (!storefrontId) {
       setBusy(null);
@@ -333,40 +370,7 @@ export function ExperienceBuilder({
     setSaved(clonePresentationConfig(DEFAULT_PRESENTATION_CONFIG));
     setLifecycle("clean");
 
-    let cancelled = false;
-
-    (async () => {
-      setBusy("loading");
-      setNoticeKind("status");
-      setNotice(t("versionListLoading"));
-      const list = await loadVersionList();
-      if (cancelled) return;
-      if (list === null) {
-        setBusy(null);
-        setNoticeKind("status");
-        setNotice(t("versionListLoadError"));
-        return;
-      }
-      // اختيار تلقائي غير غامض فقط: مرشّح وحيد غير منشور، أو نسخة منشورة
-      // وحيدة بلا أي مسودة (§13 — لا نتخمّن بين عدة مسودات محتملة).
-      const candidates = list.filter((v) => v.state !== "published");
-      const target =
-        candidates.length === 1
-          ? candidates[0]
-          : candidates.length === 0 && list.length === 1
-            ? list[0]
-            : null;
-      if (!target) {
-        setBusy(null);
-        setNotice(null);
-        return;
-      }
-      await applyVersionSelection(target);
-    })();
-
-    return () => {
-      cancelled = true;
-    };
+    void loadAndSelectInitialVersion();
     // Intentionally reload only when the selected storefront changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storefrontId]);
@@ -606,6 +610,11 @@ export function ExperienceBuilder({
       if (result.reason === "lifecycle_conflict") {
         if (sameStorefront) {
           await loadVersionList();
+          // نفس تصحيح تعارض التسمية: المتجر قد يتبدّل أثناء انتظار هذا
+          // التحديث الثاني — `sameStorefront` أعلاه قِيست *قبله*، فإعادة
+          // استعمالها هنا قد تُثبِت تنبيه حذفٍ يخصّ متجراً سابقاً على متجرٍ
+          // آخر تماماً فتحه المستخدم أثناء الانتظار.
+          if (storefrontIdRef.current !== originStorefrontId) return;
           setNoticeKind("status");
           setNotice(t("versionLifecycleConflict"));
         }
@@ -721,7 +730,7 @@ export function ExperienceBuilder({
     busyVersionId: versionBusy?.id ?? null,
     busyAction: versionBusy?.action ?? null,
     onRetryList: () => {
-      void loadVersionList();
+      void loadAndSelectInitialVersion();
     },
     onSelect: (version) => selectVersion(version),
     onCreate: (name) => {
@@ -793,7 +802,7 @@ export function ExperienceBuilder({
     }
     if (versionsListState === "error" && !selectedVersion) {
       return (
-        <InspectorStatusMessage tone="error" onRetry={() => void loadVersionList()} retryLabel={t("versionReloadLatest")}>
+        <InspectorStatusMessage tone="error" onRetry={() => void loadAndSelectInitialVersion()} retryLabel={t("versionReloadLatest")}>
           {t("versionListLoadError")}
         </InspectorStatusMessage>
       );

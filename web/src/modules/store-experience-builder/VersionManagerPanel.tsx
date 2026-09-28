@@ -176,6 +176,15 @@ export function VersionManagerPanel({
                 selected={version.id === selectedVersionId}
                 switching={version.id === switchingVersionId}
                 busy={busyVersionId === version.id ? busyAction : null}
+                // `versionBusy` في المكوّن الأب فتحة مشتركة واحدة (تصميم مقصود:
+                // عملية صفّ واحدة في كل مرة)، وبدء عملية على صفّ آخر يستبدلها
+                // بصمت. تبديل نسخة أو إعادة تسمية أثناء انتظار عملية أخرى
+                // مدعومٌ ومُختبَر عمداً (تبديل النسخة لا يعتمد `versionBusy`
+                // أصلاً)؛ الخطر الحقيقي الوحيد هو تحديداً حذفٌ يفقد مؤشره —
+                // فتح أو تعديل صفّ يُحذَف فعلياً في الخلفية قد يُخلِّف محرِّراً
+                // يشير إلى مستندٍ لم يعد موجوداً. لذا نقيّد التعطيل بحالة الحذف
+                // فقط، لا أي انشغال آخر.
+                otherRowBusy={busyVersionId !== null && busyVersionId !== version.id && busyAction === "delete"}
                 pendingDelete={pendingDeleteId === version.id}
                 onOpenDeleteConfirm={() => setPendingDeleteId(version.id)}
                 onCancelDeleteConfirm={() => setPendingDeleteId(null)}
@@ -201,6 +210,7 @@ function VersionRow({
   selected,
   switching,
   busy,
+  otherRowBusy,
   pendingDelete,
   onOpenDeleteConfirm,
   onCancelDeleteConfirm,
@@ -214,6 +224,7 @@ function VersionRow({
   selected: boolean;
   switching: boolean;
   busy: VersionRowAction;
+  otherRowBusy: boolean;
   pendingDelete: boolean;
   onOpenDeleteConfirm: () => void;
   onCancelDeleteConfirm: () => void;
@@ -287,7 +298,7 @@ function VersionRow({
           <button
             type="button"
             data-version-rename-submit={version.id}
-            disabled={busy === "rename" || nameDraft.trim() === ""}
+            disabled={busy === "rename" || nameDraft.trim() === "" || otherRowBusy}
             onClick={() => {
               onRename(nameDraft.trim());
               setMode("idle");
@@ -324,7 +335,7 @@ function VersionRow({
           <button
             type="button"
             data-version-duplicate-submit={version.id}
-            disabled={busy === "duplicate" || duplicateDraft.trim() === ""}
+            disabled={busy === "duplicate" || duplicateDraft.trim() === "" || otherRowBusy}
             onClick={() => {
               onDuplicate(duplicateDraft.trim());
               setMode("idle");
@@ -353,8 +364,9 @@ function VersionRow({
             <button
               type="button"
               data-version-delete-confirm={version.id}
+              disabled={otherRowBusy}
               onClick={onDelete}
-              className="h-8 rounded-md bg-negative px-2.5 text-[11px] font-semibold text-white"
+              className="h-8 rounded-md bg-negative px-2.5 text-[11px] font-semibold text-white disabled:opacity-50"
             >
               {t("versionConfirmDelete")}
             </button>
@@ -379,7 +391,7 @@ function VersionRow({
             // يُحمِّل نسخةً قد لا تعود موجودة عند اكتمال الحذف، ويُبطل رمز
             // الطلب فلا يتعرّف حذفٌ لاحقٌ (`wasOpenAtStart` قِيست وقت بدئه لا
             // وقت الفتح) على أنه يجب إفراغ المحرِّر.
-            disabled={switching || busy === "delete"}
+            disabled={switching || busy === "delete" || otherRowBusy}
             onClick={onSelect}
             className="h-7 rounded-md border border-border px-2 text-[11px] font-medium text-text hover:bg-primary-soft disabled:opacity-50"
           >
@@ -389,11 +401,15 @@ function VersionRow({
             <button
               type="button"
               data-version-duplicate={version.id}
+              // `versionBusy` الأب فتحة مشتركة واحدة — بدء عملية هنا بينما صفّ
+              // آخر مشغول (حذفاً غالباً) يستبدلها بصمت فيُظهر ذلك الصفّ خاملاً
+              // رغم عمليته الفعلية القائمة.
+              disabled={otherRowBusy}
               onClick={() => {
                 setDuplicateDraft(defaultDuplicateName(version.name, locale));
                 setMode("duplicate");
               }}
-              className="h-7 rounded-md border border-border px-2 text-[11px] font-medium text-text hover:bg-primary-soft"
+              className="h-7 rounded-md border border-border px-2 text-[11px] font-medium text-text hover:bg-primary-soft disabled:opacity-50"
             >
               {duplicateLabel}
             </button>
@@ -402,11 +418,12 @@ function VersionRow({
             <button
               type="button"
               data-version-rename={version.id}
+              disabled={otherRowBusy}
               onClick={() => {
                 setNameDraft(version.name);
                 setMode("rename");
               }}
-              className="h-7 rounded-md border border-border px-2 text-[11px] font-medium text-text hover:bg-primary-soft"
+              className="h-7 rounded-md border border-border px-2 text-[11px] font-medium text-text hover:bg-primary-soft disabled:opacity-50"
             >
               {t("versionRename")}
             </button>
@@ -415,8 +432,9 @@ function VersionRow({
             <button
               type="button"
               data-version-delete={version.id}
+              disabled={otherRowBusy}
               onClick={onOpenDeleteConfirm}
-              className="h-7 rounded-md border border-border px-2 text-[11px] font-medium text-negative hover:bg-negative/10"
+              className="h-7 rounded-md border border-border px-2 text-[11px] font-medium text-negative hover:bg-negative/10 disabled:opacity-50"
             >
               {t("versionDelete")}
             </button>

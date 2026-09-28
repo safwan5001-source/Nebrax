@@ -846,4 +846,126 @@ describe('ExperienceBuilder — CUST-H1-2 Version Manager', () => {
       screen.getByLabelText('نسخة التصميم قيد التعديل').textContent,
     ).toContain('نسخة المتجر الثاني');
   });
+
+  it("a pending delete on one row blocks starting a new write on another row until it settles (codex round 6)", async () => {
+    listMock.mockResolvedValue({
+      ok: true,
+      data: [summary({ id: 'a', name: 'الحالية' }), summary({ id: 'b', name: 'نسخة قديمة' })],
+    });
+    let resolveDelete: (value: unknown) => void = () => {};
+    deleteMock.mockReturnValue(new Promise((resolve) => { resolveDelete = resolve; }));
+    const user = userEvent.setup();
+    render(<ExperienceBuilder storefrontId="store-1" initialLocale="ar" />);
+    await screen.findByText('اختر نسخة للتعديل');
+
+    await openVersionManager(user);
+    const manager = screen.getByRole('menu', { name: 'إدارة نسخ التصميم' });
+    const rowB = within(manager).getByText('نسخة قديمة').closest('li') as HTMLElement;
+    await user.click(within(rowB).getByRole('button', { name: 'حذف' }));
+    await user.click(within(rowB).getByRole('button', { name: 'حذف النسخة' }));
+    await waitFor(() => expect(deleteMock).toHaveBeenCalledTimes(1));
+
+    // `versionBusy` is a single shared slot — starting a write on a
+    // different row while B's delete is in flight would silently steal it,
+    // hiding B's own pending delete from its Open button.
+    const rowA = within(manager).getByText('الحالية').closest('li') as HTMLElement;
+    expect(
+      (within(rowA).getByRole('button', { name: 'إعادة تسمية' }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+    expect(
+      (within(rowB).getByRole('button', { name: 'فتح للتعديل' }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+
+    resolveDelete({ ok: true });
+    await waitFor(() => expect(screen.queryByText('نسخة قديمة')).toBeNull());
+    expect(
+      (within(rowA).getByRole('button', { name: 'إعادة تسمية' }) as HTMLButtonElement).disabled,
+    ).toBe(false);
+  });
+
+  it('a successful retry after a failed initial list load auto-selects a single eligible version and clears the stale error (codex round 6)', async () => {
+    listMock
+      .mockResolvedValueOnce({ ok: false, reason: 'failed', message: 'boom' })
+      .mockResolvedValueOnce({ ok: true, data: [summary({ id: 'a', name: 'نسخة أ' })] });
+    showMock.mockResolvedValue({ ok: true, data: detail({ id: 'a', name: 'نسخة أ' }) });
+    const user = userEvent.setup();
+    render(<ExperienceBuilder storefrontId="store-1" initialLocale="ar" />);
+    // The same error string also shows in the always-present (but closed)
+    // toolbar manager panel and in the top notice bar (plain text, no retry
+    // button of its own) — only the visible `InspectorStatusMessage`'s own
+    // `<p>` sits next to the retry button this test needs.
+    const visibleErrorParagraph = () =>
+      screen
+        .queryAllByText('تعذّر تحميل نسخ التصميم. أعد المحاولة.')
+        .find((el) => el.tagName === 'P' && !el.closest('[aria-hidden="true"]')) ?? null;
+    await waitFor(() => expect(visibleErrorParagraph()).toBeTruthy());
+    const retryButton = visibleErrorParagraph()!.closest('div')!.querySelector('button') as HTMLButtonElement;
+
+    await user.click(retryButton);
+
+    // A successful retry must run the same deterministic auto-selection the
+    // initial mount uses — not just refresh the (otherwise unreachable) list.
+    await waitFor(() =>
+      expect(screen.getByLabelText('نسخة التصميم قيد التعديل').textContent).toContain('نسخة أ'),
+    );
+    expect(visibleErrorParagraph()).toBeNull();
+  });
+
+  it('switching storefronts while a delete-conflict list refresh is pending does not apply the notice to the new store (codex round 6)', async () => {
+    let resolveStaleRefresh: (value: unknown) => void = () => {};
+    listMock
+      .mockResolvedValueOnce({
+        ok: true,
+        data: [summary({ id: 'a', name: 'نسخة أ', revision: 0 }), summary({ id: 'b', name: 'نسخة ب', revision: 0 })],
+      })
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveStaleRefresh = resolve; }))
+      .mockResolvedValueOnce({ ok: true, data: [summary({ id: 'x', name: 'نسخة المتجر الثاني' })] });
+    showMock.mockImplementation((_storefrontId: string, versionId: string) =>
+      Promise.resolve({
+        ok: true,
+        data: versionId === 'a'
+          ? detail({ id: 'a', name: 'نسخة أ', revision: 0 })
+          : versionId === 'x'
+            ? detail({ id: 'x', name: 'نسخة المتجر الثاني' })
+            : detail({ id: 'b', name: 'نسخة ب', revision: 0 }),
+      }),
+    );
+    deleteMock.mockResolvedValue({ ok: false, reason: 'lifecycle_conflict', message: 'blocked' });
+    const user = userEvent.setup();
+    const { rerender } = render(<ExperienceBuilder storefrontId="store-1" initialLocale="ar" />);
+    await screen.findByText('اختر نسخة للتعديل');
+
+    // Two drafts is ambiguous (no auto-select) — open A explicitly so B (not
+    // the open version) is the one eligible to delete.
+    await openVersionManager(user);
+    let manager = screen.getByRole('menu', { name: 'إدارة نسخ التصميم' });
+    const rowA = within(manager).getByText('نسخة أ').closest('li') as HTMLElement;
+    await user.click(within(rowA).getByRole('button', { name: 'فتح للتعديل' }));
+    await waitFor(() =>
+      expect(screen.getByLabelText('نسخة التصميم قيد التعديل').textContent).toContain('نسخة أ'),
+    );
+
+    await openVersionManager(user);
+    manager = screen.getByRole('menu', { name: 'إدارة نسخ التصميم' });
+    const rowB = within(manager).getByText('نسخة ب').closest('li') as HTMLElement;
+    await user.click(within(rowB).getByRole('button', { name: 'حذف' }));
+    await user.click(within(rowB).getByRole('button', { name: 'حذف النسخة' }));
+    await waitFor(() => expect(deleteMock).toHaveBeenCalledTimes(1));
+
+    // The delete conflict's own list refresh (2nd listMock call, store-1) is
+    // still pending when the merchant moves on to a different store.
+    rerender(<ExperienceBuilder storefrontId="store-2" initialLocale="ar" />);
+    await waitFor(() =>
+      expect(screen.getByLabelText('نسخة التصميم قيد التعديل').textContent).toContain('نسخة المتجر الثاني'),
+    );
+
+    resolveStaleRefresh({ ok: true, data: [summary({ id: 'a', name: 'نسخة أ', revision: 0 })] });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    // Store-1's delete-conflict notice must not land on store-2's editor.
+    expect(screen.queryByText(/لم يعد بالإمكان حذف/)).toBeNull();
+    expect(
+      screen.getByLabelText('نسخة التصميم قيد التعديل').textContent,
+    ).toContain('نسخة المتجر الثاني');
+  });
 });
