@@ -7,7 +7,7 @@
 ## Repository state
 
 - **Base SHA:** `2e9cdd058a50a2014dc0b4a3c5c0c3302c353616` (`origin/main` at task start — matched the SHA given in the task brief; verified with a fresh `git fetch origin main` before starting).
-- **Head SHA:** `1b7f06c` (round-9 review fix, on top of the second reconciliation; second reconciliation fix head was `9d3ffa4`; first reconciliation merge head was `d841b11`; post-round-8-review-fix head was `43fbb31`; round-7 fix head was `992d39b`; round-6 fix head was `9a4209d`; round-5 fix head was `01a4981`; round-4 fix head was `c2033dd`; round-3 fix head was `892e1e1`; round-2 fix head was `0e3111c`; round-1 fix head was `fddba52`; initial implementation head was `3077ecf`)
+- **Head SHA:** `5c4cdb7` (round-10 review fix; round-9 fix head was `1b7f06c`; second reconciliation fix head was `9d3ffa4`; first reconciliation merge head was `d841b11`; post-round-8-review-fix head was `43fbb31`; round-7 fix head was `992d39b`; round-6 fix head was `9a4209d`; round-5 fix head was `01a4981`; round-4 fix head was `c2033dd`; round-3 fix head was `892e1e1`; round-2 fix head was `0e3111c`; round-1 fix head was `fddba52`; initial implementation head was `3077ecf`)
 - **Branch:** `claude/cust-h1-2-customizer-ux-23vvun`
 - **PR:** [#1085](https://github.com/safwan5001-source/Nebrax/pull/1085)
 
@@ -251,6 +251,17 @@ One P1 and two P2 findings, all against code introduced or merged in during the 
 | `handleCreateVersion` cleared `versionCreating` whenever the completing request's storefront still matched the current one (`sameStorefront`), not whether it was the *latest* request for that storefront. Switching A→B→A resets `versionCreating` and bumps the shared request token twice (the mount effect), so a second create for A could start while the first was still pending. That first (stale) request's later completion then also satisfied `sameStorefront` and cleared the flag — re-enabling the create controls, and permitting an unintended third create, while the second request was still outstanding. | Gated the flag-clear (and the failure notice) on `tokenAtStart === versionRequestTokenRef.current` in addition to `sameStorefront`, reusing the token identity already captured for the adoption check below it — no new ref needed, since the mount effect already bumps this token on every storefront (or `versionId`) switch. | `a first create resolving after an A→B→A switch does not re-enable creation while a second A create is still pending (codex round 9)` |
 
 All three review threads were replied to individually (naming the fix commit `1b7f06c`) and resolved. `npx vitest run` (2233 tests, full suite) and `npm run build` both re-verified green after this round.
+
+### Automated review (`chatgpt-codex-connector`, round 10, reviewed `01aae08`, fixed in `5c4cdb7`)
+
+Two more P2 findings, both fail-open gaps in code the second main reconciliation touched — one in the same `presentation-versions.ts` mapper round 9 already hardened once (a sibling field, not the same one), one in the published-version read-only view's own busy gating.
+
+| Finding | Fix | Regression test |
+|---|---|---|
+| `mapSummary()` mapped any `state` value other than `'published'`/`'scheduled'` to `'draft'` — the single most-permissive state (editable, eligible for Save/Rename/Delete, and a candidate for auto-select) — instead of rejecting the row. A missing or unexpected `state` from the server (e.g. a future state value the client doesn't know about yet, or a malformed response) would silently present as fully editable rather than failing closed. | Now accepts only `'draft'`, `'scheduled'`, or `'published'`; any other value returns `null` from `mapSummary` (→ `invalid_payload`), matching the existing fail-closed handling for a malformed `id`/`name`/`revision`. | `rejects a row with a missing state instead of silently defaulting it to draft (codex round 10)`, `rejects a row with an unrecognized state instead of silently defaulting it to draft (codex round 10)` |
+| The published-version read-only view's "create draft" button computed its busy/disabled state as `versionBusy?.action === "duplicate"` — true only while *its own* duplicate call was pending, not while the shared `versionBusy` slot was occupied by an unrelated row's rename or delete. Since `handleDuplicateVersion` writes into that same single shared slot, starting a duplicate while another row's write was in flight could race it exactly the way the row-level triggers' own `otherRowBusy`/`busy !== null` guards already prevent for each other. | Changed to `versionBusy !== null` — blocked whenever *any* row write is pending, not only a duplicate, matching the row-level triggers' existing guard. | `the published-version "create draft" action is blocked while any other row write is pending, not only a duplicate (codex round 10)` |
+
+Both review threads were replied to individually (naming the fix commit `5c4cdb7`) and resolved. `npx vitest run` (2236 tests, full suite) and `npm run build` both re-verified green after this round.
 
 ## Merge-conflict reconciliation with main (`d841b11`, `9d3ffa4`)
 
