@@ -52,9 +52,9 @@ own scope discipline):
 
 - **Branch:** `claude/awj-market-horizon-6qxr5v`
 - **PR:** https://github.com/safwan5001-source/Nebrax/pull/1084
-- **Head SHA:** `4bcee30d98c077ca6de3faae3c2f2f67f00496da` (after the initial push at
-  `0793217b`, a Biome formatting fix at `d2e88cab`, and two rounds of automated
-  review fixes at `747c45fa` and `4bcee30d` — see §22a)
+- **Head SHA:** `8e9a0624de55e8747c209bd1f4405ddf2ef24a02` (after the initial push at
+  `0793217b`, a Biome formatting fix at `d2e88cab`, and three rounds of automated
+  review fixes at `747c45fa`, `4bcee30d` and `8e9a0624` — see §22a)
 
 ## 4. Implementation summary by surface
 
@@ -164,6 +164,13 @@ scope decision, not an oversight:
 - `app/Support/Commerce/StorefrontPresentationNormalizer.php`
 - `storefront/src/lib/presentation/tokens.ts`
 - `web/src/modules/store-experience-builder/presentation/tokens.ts`
+
+**App Builder translations (review fix, §22a — a third, independent consumer of the
+same shared `THEME_PRESETS` registry, discovered by review rather than by the
+initial architecture mapping):**
+- `web/src/messages/en.json`
+- `web/src/messages/ar.json`
+- `web/src/modules/app-builder/__tests__/theme-panel.presets.test.ts` (new)
 
 **Starting-bundle logic (production Customizer only):**
 - `web/src/modules/store-experience-builder/presentation/config.ts`
@@ -454,8 +461,8 @@ _(filled in after push, PR creation, and CI observation)_
 
 ## 22a. Automated review findings addressed
 
-Codex (`chatgpt-codex-connector[bot]`) reviewed this PR across two rounds and raised
-five findings total, all verified real and fixed. All five review threads are resolved.
+Codex (`chatgpt-codex-connector[bot]`) reviewed this PR across three rounds and raised
+six findings total, all verified real and fixed. All six review threads are resolved.
 
 **Round 1** (commit `747c45fa`):
 
@@ -505,7 +512,25 @@ five findings total, all verified real and fixed. All five review threads are re
    `presetSelectionPatch(config, { id: matchPreset(hex, config.themePreset), primary: hex })`,
    the same call the swatch button makes. Covered by 2 new tests.
 
-All five fixes re-verified: full storefront suite 641/641, full web suite 2164/2164,
+**Round 3** (commit `8e9a0624`), raised against a file round 1 only edited additively:
+
+6. **P2 — App Builder's own Theme panel had no translation for the new preset.**
+   `web/src/modules/app-builder/theme-panel.tsx` — an entirely different feature (a
+   mobile-app-schema editor, distinct from the storefront Customizer) — imports the same
+   shared `THEME_PRESETS` registry to let a merchant either pick a swatch directly or
+   import theme tokens from their live storefront design, and renders each preset's
+   label via `appBuilder.builder.theme.preset.<id>`. Neither `en.json` nor `ar.json` had
+   that key for `awj-market`, so opening App Builder's Theme panel after this PR would
+   show a missing-message fallback. Considered excluding Market from that picker
+   instead, but App Builder's own "import my store's design" flow can already set
+   `themePreset: "awj-market"` from a live storefront independent of the picker, so
+   excluding it would leave an imported value with no matching label at all — adding the
+   translation (matching the other five presets exactly) was the more consistent fix.
+   Added alongside a regression test asserting every `THEME_PRESETS` entry has both an
+   English and Arabic label in this namespace, to catch this class of gap for any future
+   preset addition.
+
+All six fixes re-verified: full storefront suite 641/641, full web suite 2166/2166,
 both `pnpm build`s green, `tsc --noEmit` clean on both, Biome clean.
 
 ## 23. Risks / remaining work
