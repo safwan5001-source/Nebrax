@@ -36,6 +36,40 @@ class StorefrontPresentationNormalizerTest extends TestCase
     }
 
     /** @test */
+    public function awj_market_preset_is_accepted_with_its_own_default_primary_color(): void
+    {
+        $normalized = $this->normalizer->normalize(['themePreset' => 'awj-market']);
+
+        $this->assertSame('awj-market', $normalized['themePreset']);
+        $this->assertSame('#0f766e', $normalized['primaryColor']);
+        $this->assertSame(
+            StorefrontPresentationNormalizer::THEME_PRESETS['awj-market'],
+            $normalized['primaryColor'],
+        );
+    }
+
+    /** @test */
+    public function a_stale_awj_market_typo_still_fails_closed_to_awj_modern(): void
+    {
+        $normalized = $this->normalizer->normalize(['themePreset' => 'awj-market-v0']);
+
+        $this->assertSame('awj-modern', $normalized['themePreset']);
+        $this->assertSame('#12372a', $normalized['primaryColor']);
+    }
+
+    /** @test */
+    public function awj_market_does_not_change_the_no_presentation_defaults(): void
+    {
+        // Registering a new preset must not mutate defaultConfig()/no-presentation
+        // behaviour — every existing AWJ Modern store stays AWJ Modern.
+        $this->assertSame('awj-modern', $this->normalizer->defaultConfig()['themePreset']);
+        $this->assertSame('awj-modern', $this->normalizer->normalize(null)['themePreset']);
+        $this->assertSame('comfortable', $this->normalizer->normalize(null)['density']);
+        $this->assertSame('standard', $this->normalizer->normalize(null)['productCard']);
+        $this->assertSame('standard', $this->normalizer->normalize(null)['header']['style']);
+    }
+
+    /** @test */
     public function unknown_keys_are_dropped_and_invalid_tokens_fail_closed(): void
     {
         $input = $this->fixture('v1-unsafe-input.json');

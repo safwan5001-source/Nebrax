@@ -16,6 +16,7 @@ import {
   MAX_HOME_SECTIONS,
   newHomeSectionId,
   type PresentationHomeSection,
+  presetSelectionPatch,
   PRODUCT_CARD_PRESETS,
   RADIUS_PRESETS,
   SOCIAL_NETWORKS,
@@ -316,12 +317,7 @@ function ThemePanel({
               <button
                 key={preset.id}
                 type="button"
-                onClick={() =>
-                  patch({
-                    themePreset: preset.id,
-                    primaryColor: preset.primary,
-                  })
-                }
+                onClick={() => patch(presetSelectionPatch(config, preset))}
                 className={`overflow-hidden border text-start ${
                   selected
                     ? "border-primary ring-1 ring-primary"
