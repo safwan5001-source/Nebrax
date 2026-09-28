@@ -7,9 +7,9 @@
 ## Repository state
 
 - **Base SHA:** `071dfa3061fbb0c9393e02bdcba0ee9d150b17cd` (`origin/main`, tip at task start — note: the baseline SHA given in the task brief, `d952542051956c324d846c8ac462c2f912ccd1f9`, was not the actual current `origin/main` tip; per instructions the fetched tip was used instead.)
-- **Head SHA:** `63a799e3ea67807e8f2cb2f6321a2efac542f661`
+- **Head SHA:** `9a6470e` (fixes 3 P1 review findings on top of the initial `63a799e`)
 - **Branch:** `claude/cust-h1-1-version-persistence-1p9jc9`
-- **PR:** opened against `main` (see PR number/URL in the session's final message — created via GitHub after this report was written)
+- **PR:** [#1082](https://github.com/safwan5001-source/Nebrax/pull/1082)
 
 ## What was implemented
 
@@ -82,17 +82,17 @@ php artisan test --filter=CommerceModuleBoundaryTest
 php artisan test   # full suite, both DB_CONNECTION=sqlite and DB_CONNECTION=pgsql
 ```
 
-**New test files** (36 new test methods):
+**New test files** (40 new test methods, after the review-fix regression tests below):
 - `tests/Feature/StorefrontPresentationVersionBackfillTest.php` — 7 tests (migration Cases A–D, idempotency, public-snapshot-unchanged, multi-storefront).
 - `tests/Feature/StorefrontPresentationVersionApiTest.php` — 25 tests (list, create/duplicate incl. from an active source, tenant isolation incl. cross-storefront-same-tenant and cross-tenant `source_version_id`, read, save + stale-revision 409 + independent-version isolation, active-version-immutable-on-save 409, forward-schema fail-closed on read/save/duplicate, rename + stale 409, delete + active/scheduled/compatibility-working 409 + foreign 404, guest/self_service guards).
-- `tests/Feature/StorefrontPresentationLegacyCompatibilityForkTest.php` — 4 tests (lazy compat-version creation on GET, atomic Draft/compat sync on PUT, active→Draft fork with revision continuity, forward-schema fail-closed on legacy PUT).
+- `tests/Feature/StorefrontPresentationLegacyCompatibilityForkTest.php` — 8 tests (lazy compat-version creation on GET, atomic Draft/compat sync on PUT, active→Draft fork with revision continuity, forward-schema fail-closed on legacy PUT/GET/publish for both stored and incoming schema tags, legacy publish promoting the forked compatibility Version to active — see Review findings below).
 
-**Results:**
+**Results (after the review-fix commit `9a6470e`):**
 
 | DB | Command | Result |
 |---|---|---|
-| SQLite | `php artisan test` (full suite) | 27 failed, 49 skipped, 4752 passed (29857 assertions) |
-| PostgreSQL 16 | `php artisan test` (full suite) | 27 failed, 4801 passed (30126 assertions) — the SQLite-skipped `StorefrontPresentationPostgresConcurrencyTest` ran and passed here |
+| SQLite | `php artisan test` (full suite) | 27 failed, 49 skipped, 4756 passed (29878 assertions) |
+| PostgreSQL 16 | `php artisan test --filter=StorefrontPresentation` (all 6 presentation files) | 88 passed (573 assertions) — the SQLite-skipped `StorefrontPresentationPostgresConcurrencyTest` ran and passed here. Full-suite PostgreSQL run on the pre-review-fix commit (`63a799e`) was 27 failed (same pre-existing set), 4801 passed (30126 assertions), 0 skipped. |
 
 **Failures (27, identical set on both engines) — pre-existing, unrelated to this PR:** all in `FuelAviRfidServiceTest`, `FuelReconciliationTest`, `FuelSaleApiTest`, `FuelSaleServiceTest`, `FuelSupplyReceivingApiTest`, `FuelSupplyReceivingTest` — every one fails with `Call to undefined function App\Services\bcmul()`. The local dev container this session ran in does not have the `bcmath` PHP extension installed; `.github/workflows/ci.yml` explicitly installs `bcmath` for CI (`extensions: … bcmath …`), so these are a local-environment gap, not a code defect, and none of the failing files touch Storefront/Presentation/Commerce-workspace code. Verified no other failures exist on either engine.
 
@@ -106,7 +106,15 @@ All CUST-H1-1 tests plus every pre-existing `StorefrontPresentation*`/`Storefron
 
 ## Review findings
 
-None yet — PR not yet reviewed at report-writing time. Will be appended here as they are triaged.
+Three P1 findings from the repo's automated bot reviewer (`chatgpt-codex-connector[bot]`) on the initial push (`476fb03`), all valid and fixed in `9a6470e`:
+
+| Finding | Valid? | Fix | Resolution |
+|---|---|---|---|
+| Legacy publish never promoted the compatibility working Version to `active_version_id` after a legacy-edit fork, so a Version reported as `published` could silently drift from the actual public snapshot. | Yes | `publishForCurrentTenant()` now locks the current `compatibility_working_version_id` Version (if set), promotes it to `active_version_id`, syncs its `config`/`schema_version`, and stamps `last_published_at` on every non-no-op publish. | Fixed; regression test `legacy_publish_promotes_the_forked_compatibility_version_to_active`. Thread resolved. |
+| Legacy PUT only checked the *stored* compatibility Version's schema tag for forward-schema, never the *incoming* payload's declared `config.version`, so a forward-declared incoming document was silently normalized instead of failing closed. | Yes | Added `assertIncomingConfigNotForward()` (mirrors the exact-Version save path), called before `normalize()` in `saveDraftForCurrentTenant()`. | Fixed; regression test `legacy_put_rejects_a_forward_declared_config_version_before_normalizing`. Thread resolved. |
+| Legacy GET and legacy publish had no forward-schema check at all, so a rollback scenario (newer runtime wrote a later schema tag, older runtime reads it) could silently fall back to the AWJ Modern default instead of failing closed — the architecture explicitly lists "legacy GET/PUT mapping" and "immediate Publish" among the paths this rule must cover. | Yes | Added `assertSupportedLegacySchema()` (checks the head's own `draft_schema_version`/`published_schema_version`), called at the top of both `showForCurrentTenant()` and `publishForCurrentTenant()`. | Fixed; regression tests `legacy_get_fails_closed_when_the_stored_draft_schema_is_forward`, `legacy_publish_fails_closed_when_the_stored_draft_schema_is_forward`. Thread resolved. |
+
+All three fixes were verified against the full `StorefrontPresentation*` suite (87 passed, 1 correctly-skipped-on-SQLite) and the full suite on SQLite (4756 passed, same 27 pre-existing unrelated failures, no new regressions) before pushing.
 
 ## Backward compatibility
 
