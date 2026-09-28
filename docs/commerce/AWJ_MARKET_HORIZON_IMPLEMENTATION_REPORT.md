@@ -52,8 +52,9 @@ own scope discipline):
 
 - **Branch:** `claude/awj-market-horizon-6qxr5v`
 - **PR:** https://github.com/safwan5001-source/Nebrax/pull/1084
-- **Head SHA:** `d2e88cab` (fixed a Biome formatting nit in the new dev fixture found
-  by CI after the initial push at `0793217b50ae6b282bfb46def0aaabd24ebc3f91`)
+- **Head SHA:** `4bcee30d98c077ca6de3faae3c2f2f67f00496da` (after the initial push at
+  `0793217b`, a Biome formatting fix at `d2e88cab`, and two rounds of automated
+  review fixes at `747c45fa` and `4bcee30d` — see §22a)
 
 ## 4. Implementation summary by surface
 
@@ -453,8 +454,10 @@ _(filled in after push, PR creation, and CI observation)_
 
 ## 22a. Automated review findings addressed
 
-Codex (`chatgpt-codex-connector[bot]`) reviewed the initial push and raised three
-findings, all verified real and fixed in a follow-up commit:
+Codex (`chatgpt-codex-connector[bot]`) reviewed this PR across two rounds and raised
+five findings total, all verified real and fixed. All five review threads are resolved.
+
+**Round 1** (commit `747c45fa`):
 
 1. **P1 — a custom color on Market silently reset to AWJ Modern.** The Customizer's
    color-picker/hex-input handlers called a `matchPreset()` helper that mapped any hex
@@ -476,7 +479,33 @@ findings, all verified real and fixed in a follow-up commit:
    preview's `newArrivals` product tiles now use a shorter aspect ratio under Market,
    matching what `ProductCard` actually ships. Covered by 2 new tests.
 
-All three fixes re-verified: full storefront suite 641/641, full web suite 2160/2160,
+**Round 2** (commit `4bcee30d`), raised against round 1's own fixes:
+
+4. **P2 — the preview's compact-header state was conflated with its mobile-viewport
+   simulation.** `StorefrontPreviewCanvas.tsx` used one `compact` boolean
+   (`viewport === "mobile" || header.style === "compact"`) to drive everything from the
+   utility strip down to the product-grid column count. Verified against the published
+   `Header.tsx`/`layout.tsx`: `header.style === "compact"` only ever controls the logo
+   variant and the utility strip there — the mobile identity grid, search placement,
+   category nav, bottom nav and grid columns are the shell's own responsive (`md`/`lg`)
+   behavior, unrelated to header style. Because Market's starting bundle sets
+   `header.style` to `compact` by default, every desktop/tablet Market preview was
+   rendering as if it were mobile. Fixed by splitting the single boolean into
+   `mobileViewport` (drives the responsive simulation, used everywhere the old `compact`
+   was standing in for small-viewport behavior) and `headerStyleCompact` (drives only the
+   logo choice; combined with `mobileViewport` for the one spot — the utility strip —
+   that the real component also gates on it). Covered by 2 new tests.
+5. **P2 — a color match into Market's exact swatch bypassed the starting bundle.**
+   Typing `#0f766e` into either color control while on a different preset correctly
+   flipped `themePreset` to `awj-market` via the round-1 `matchPreset()` fix, but that
+   handler never called `presetSelectionPatch()`, so density/card/header stayed
+   whatever they were — and the merchant couldn't self-repair by clicking the
+   now-already-selected Market swatch, since `presetSelectionPatch()` treats an active
+   preset as a no-op reselect by design. Fixed by routing both color inputs through
+   `presetSelectionPatch(config, { id: matchPreset(hex, config.themePreset), primary: hex })`,
+   the same call the swatch button makes. Covered by 2 new tests.
+
+All five fixes re-verified: full storefront suite 641/641, full web suite 2164/2164,
 both `pnpm build`s green, `tsc --noEmit` clean on both, Biome clean.
 
 ## 23. Risks / remaining work
