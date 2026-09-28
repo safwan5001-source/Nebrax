@@ -7,7 +7,7 @@
 ## Repository state
 
 - **Base SHA:** `071dfa3061fbb0c9393e02bdcba0ee9d150b17cd` (`origin/main`, tip at task start — note: the baseline SHA given in the task brief, `d952542051956c324d846c8ac462c2f912ccd1f9`, was not the actual current `origin/main` tip; per instructions the fetched tip was used instead.)
-- **Head SHA:** `2b380a0` (fixes 16 review findings across 7 rounds on top of the initial `63a799e` — see Review findings)
+- **Head SHA:** `767069f` (fixes 19 review findings across 8 rounds on top of the initial `63a799e` — see Review findings)
 - **Branch:** `claude/cust-h1-1-version-persistence-1p9jc9`
 - **PR:** [#1082](https://github.com/safwan5001-source/Nebrax/pull/1082)
 
@@ -82,17 +82,17 @@ php artisan test --filter=CommerceModuleBoundaryTest
 php artisan test   # full suite, both DB_CONNECTION=sqlite and DB_CONNECTION=pgsql
 ```
 
-**New test files** (54 new test methods, including all review-fix regression tests):
-- `tests/Feature/StorefrontPresentationVersionBackfillTest.php` — 7 tests (migration Cases A–D, idempotency, public-snapshot-unchanged, multi-storefront).
-- `tests/Feature/StorefrontPresentationVersionApiTest.php` — 25 tests (list, create/duplicate incl. from an active source, tenant isolation incl. cross-storefront-same-tenant and cross-tenant `source_version_id`, read, save + stale-revision 409 + independent-version isolation, active-version-immutable-on-save 409, forward-schema fail-closed on read/save/duplicate, rename + stale 409, delete + active/scheduled/compatibility-working 409 + foreign 404, guest/self_service guards).
+**New test files** (57 new test methods, including all review-fix regression tests):
+- `tests/Feature/StorefrontPresentationVersionBackfillTest.php` — 9 tests (migration Cases A–D, idempotency, public-snapshot-unchanged, multi-storefront, soft-deleted-storefront skip, reconciliation embedded-tag correctness).
+- `tests/Feature/StorefrontPresentationVersionApiTest.php` — 26 tests (list, create/duplicate incl. from an active source, embedded-tag-derived default on create-without-source, tenant isolation incl. cross-storefront-same-tenant and cross-tenant `source_version_id`, read, save + stale-revision 409 + independent-version isolation, active-version-immutable-on-save 409, forward-schema fail-closed on read/save/duplicate, rename + stale 409, delete + active/scheduled/compatibility-working 409 + foreign 404, guest/self_service guards).
 - `tests/Feature/StorefrontPresentationLegacyCompatibilityForkTest.php` — 22 tests (lazy compat-version creation on GET, atomic Draft/compat sync on PUT, active→Draft fork with revision continuity, forward-schema fail-closed on legacy PUT/GET/publish for both stored and incoming schema tags — draft **and** published sides, legacy publish promoting the forked compatibility Version to active, first-ever legacy save materializing a compatibility Version, bidirectional sync between the new Version API and legacy fields on save and on rename, published-snapshot schema-tag independence, cutover self-healing of a bypassing legacy writer, embedded-schema-tag correctness for an old-code publish (draft and published), publish-pointer promotion on an apparent no-op and on a head with no version pointers at all, fork-not-overwrite of a drifted active version, and fail-closed-before-reconciling a forward-tagged mapped Version — see Review findings below for the details).
 
-**Results (final, head `2b380a0`):**
+**Results (final, head `767069f`):**
 
 | DB | Command | Result |
 |---|---|---|
-| SQLite | `php artisan test` (full suite) | 27 failed, 49 skipped, 4770 passed (29966 assertions) |
-| PostgreSQL 16 | `php artisan test` (full suite) | 27 failed, 4819 passed (30235 assertions) — the SQLite-skipped `StorefrontPresentationPostgresConcurrencyTest` ran and passed here; `php artisan test --filter=StorefrontPresentation` alone: 102 passed (661 assertions). |
+| SQLite | `php artisan test` (full suite) | 27 failed, 49 skipped, 4773 passed (29980 assertions) |
+| PostgreSQL 16 | `php artisan test` (full suite) | 27 failed, 4822 passed (30249 assertions) — the SQLite-skipped `StorefrontPresentationPostgresConcurrencyTest` ran and passed here; `php artisan test --filter=StorefrontPresentation` alone: 104 passed (672 assertions). |
 
 **Failures (27, identical set on both engines) — pre-existing, unrelated to this PR:** all in `FuelAviRfidServiceTest`, `FuelReconciliationTest`, `FuelSaleApiTest`, `FuelSaleServiceTest`, `FuelSupplyReceivingApiTest`, `FuelSupplyReceivingTest` — every one fails with `Call to undefined function App\Services\bcmul()`. The local dev container this session ran in does not have the `bcmath` PHP extension installed; `.github/workflows/ci.yml` explicitly installs `bcmath` for CI (`extensions: … bcmath …`), so these are a local-environment gap, not a code defect, and none of the failing files touch Storefront/Presentation/Commerce-workspace code. Verified no other failures exist on either engine.
 
@@ -106,7 +106,7 @@ All CUST-H1-1 tests plus every pre-existing `StorefrontPresentation*`/`Storefron
 
 ## Review findings
 
-Sixteen findings (15 P1, 1 P2) from the repo's automated bot reviewer (`chatgpt-codex-connector[bot]`) across seven review rounds, all valid and fixed. Every finding pointed at a real bidirectional-sync or fail-closed gap between the new Version model and the legacy compatibility surface; two (round 6) were regressions in earlier rollout-guard fixes, and round 7's findings were the same embedded-schema-tag/materialize-before-use gaps as prior rounds but generalized to code paths (the draft side, the publish-path pointer, and reconcile-before-validate ordering) the earlier rounds' fixes hadn't yet covered — all caught by continued review of each new push. None required widening the PR's scope or touching scheduling/publish-UI code.
+Nineteen findings (18 P1, 1 P2) from the repo's automated bot reviewer (`chatgpt-codex-connector[bot]`) across eight review rounds, all valid and fixed. Every finding pointed at a real bidirectional-sync or fail-closed gap between the new Version model and the legacy compatibility surface; two (round 6) were regressions in earlier rollout-guard fixes, and rounds 7–8's findings were the same embedded-schema-tag/materialize-before-use gaps as prior rounds but progressively generalized to code paths (the draft side, the publish-path pointer, reconcile-before-validate ordering, the reconciliation write path, the create-without-source copy path, and the soft-delete/cascade mismatch in the bulk migration) the earlier rounds' fixes hadn't yet covered — all caught by continued review of each new push. None required widening the PR's scope or touching scheduling/publish-UI code.
 
 **Round 1** (reviewed `476fb03`, fixed in `9a6470e`):
 
@@ -159,7 +159,15 @@ Sixteen findings (15 P1, 1 P2) from the repo's automated bot reviewer (`chatgpt-
 | P1 — `publishForCurrentTenant()` looked up `compatibility_working_version_id` directly and treated a null pointer as "already promoted." A head inserted by old code after this migration (pointer never set) could publish without ever materializing or promoting an active Version, so the Versions API would report no published Version for a live, publicly-served storefront. | Replaced the bare nullable lookup with `$this->backfill->ensureCompatibilityWorkingVersion($row)`, which is guaranteed to return a non-null, reconciled Version (same primitive already used by the legacy GET/PUT paths); removed the now-unreachable `$compat === null` branches. | `legacy_publish_materializes_and_promotes_the_active_pointer_for_a_head_with_no_version_pointers_at_all` |
 | P1 — `ensureCompatibilityWorkingVersion()` could reach `reconcileWithLegacyHead()` — which forks or overwrites the mapped Version — without ever checking that Version's own schema tag first, so a Version written by a newer deployment (rollback scenario) could be silently reconciled against or forked from, losing its forward tag. | Added the forward-schema check on the resolved, locked Version immediately after resolving it, **before** calling `reconcileWithLegacyHead()`, in `ensureCompatibilityWorkingVersion()` itself — covers both the legacy GET and PUT paths, which both route through this one method. | `reconciling_a_drifted_head_fails_closed_when_the_mapped_compatibility_version_itself_is_forward` |
 
-Every round's fixes were verified against the full `StorefrontPresentation*` suite and the full test suite on both SQLite and PostgreSQL before pushing (see Tests section for final counts). All 16 review comments across 7 rounds are addressed and their threads resolved.
+**Round 8** (reviewed `0826e98`, fixed in `767069f`) — the same embedded-schema-tag-priority pattern generalized further (from reads to writes/copies), plus one new class of finding (a soft-delete/hard-cascade mismatch in the bulk migration):
+
+| Finding | Fix | Regression test |
+|---|---|---|
+| P1 — `reconcileWithLegacyHead()` (both its fork-creation and in-place-overwrite branches) wrote a Version's `schema_version` from the `draft_schema_version` **column** literally, not from `draft_config`'s own embedded tag — the same class of bug round 7 fixed for reads, but on this write path. A drift-writer whose `draft_config` is v2 but whose column understates it could still tag the reconciled/forked Version as v1. | Extracted the round-7 tag-priority logic into a new public static `StorefrontPresentationNormalizer::effectiveSchemaTag()` (single shared implementation) and applied it to both branches of `reconcileWithLegacyHead()`. | `reconciling_a_drifted_head_preserves_the_embedded_draft_tag_even_when_the_column_is_stale` |
+| P1 — `StorefrontPresentationVersionService::resolveSourceConfig()`'s no-source/no-active/no-compat fallback (a brand-new head with no Version pointers set yet) also copied `draft_schema_version` straight through when creating a Version without a source. | Same shared `effectiveSchemaTag()` helper applied to this fallback. | `create_without_source_derives_the_default_from_the_embedded_draft_tag_not_a_stale_column` |
+| P1 — `backfillAll()`'s bulk migration query was unscoped and could pick up a presentation row whose storefront was soft-deleted before this migration ran. `SoftDeletes` is an `UPDATE`, not a real `DELETE`, so `cascadeOnDelete()` never fires and the orphaned row survives; creating a Version for it then fails structurally in `StorefrontPresentationVersion::booted()` (its ownership check still applies `SoftDeletingScope`), aborting the entire one-shot migration instead of skipping that one row. | Added `->whereHas('storefront')` to the bulk query — excludes soft-deleted-storefront rows without changing any live per-request path; the row is picked up lazily via the existing self-healing path if the storefront is ever restored. | `backfill_all_skips_a_presentation_whose_storefront_was_soft_deleted_instead_of_aborting` |
+
+Every round's fixes were verified against the full `StorefrontPresentation*` suite and the full test suite on both SQLite and PostgreSQL before pushing (see Tests section for final counts). All 19 review comments across 8 rounds are addressed and their threads resolved.
 
 ## Backward compatibility
 
