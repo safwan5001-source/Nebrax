@@ -56,6 +56,8 @@ return [
         ],
 
         // Foundation-only disk: no existing flow selects this disk yet.
+        // Do not set `visibility`: R2 has no S3 ACL API. Bucket privacy is
+        // enforced by Cloudflare bucket settings and scoped credentials.
         'r2' => [
             'driver' => 's3',
             'key' => env('R2_ACCESS_KEY_ID'),
@@ -64,7 +66,6 @@ return [
             'bucket' => env('R2_BUCKET'),
             'endpoint' => env('R2_ENDPOINT'),
             'use_path_style_endpoint' => env('R2_USE_PATH_STYLE_ENDPOINT', false),
-            'visibility' => 'private',
             'throw' => false,
             'report' => false,
         ],

@@ -13,7 +13,7 @@ The repository is a Laravel core that is assembled into a Laravel 11 application
 
 ## Cloudflare R2 foundation disk
 
-`config/filesystems.php` now defines a separate `r2` disk using Laravel's S3-compatible driver. It is private by default and is server-side only. The current default disk and existing flows are intentionally unchanged.
+`config/filesystems.php` now defines a separate `r2` disk using Laravel's S3-compatible driver. The disk deliberately does not declare a `visibility` option: Cloudflare R2 does not implement S3 object ACL APIs, while the Laravel/Flysystem S3 adapter maps visibility to ACL behavior. Privacy is enforced by the private R2 bucket and scoped credentials, and the disk is server-side only. The current default disk and existing flows are intentionally unchanged.
 
 Configure these values in the runtime environment only; do not commit credentials:
 
@@ -27,4 +27,4 @@ R2_REGION=auto
 R2_USE_PATH_STYLE_ENDPOINT=false
 ```
 
-The R2 bucket remains private. A later migration slice must explicitly decide which flow, tenant-prefixed key contract, and server-side access policy will use this disk. This task does not migrate files, change database paths, expose raw bucket URLs, or switch any existing `Storage::disk(...)` call.
+The R2 bucket remains private. A later migration slice must use an ACL-free S3 adapter path before selecting this disk for writes; the standard Laravel/Flysystem S3 adapter can otherwise derive an ACL on direct writes or visibility operations. That adapter work is intentionally outside this foundation slice. This task does not migrate files, change database paths, expose raw bucket URLs, or switch any existing `Storage::disk(...)` call.

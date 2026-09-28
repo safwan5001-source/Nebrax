@@ -33,7 +33,7 @@ class R2FilesystemConfigurationTest extends TestCase
             $this->assertSame($environment['R2_BUCKET'], $r2['bucket']);
             $this->assertSame($environment['R2_ENDPOINT'], $r2['endpoint']);
             $this->assertSame($environment['R2_REGION'], $r2['region']);
-            $this->assertSame('private', $r2['visibility']);
+            $this->assertArrayNotHasKey('visibility', $r2);
             $this->assertFalse($r2['use_path_style_endpoint']);
         } finally {
             foreach ($previous as $key => $value) {
