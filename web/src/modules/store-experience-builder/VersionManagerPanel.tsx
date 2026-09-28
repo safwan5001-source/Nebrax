@@ -72,6 +72,10 @@ export function VersionManagerPanel({
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
   function submitCreate() {
+    // الزر المجاور يُعطَّل أثناء `creating`، لكن الإدخال يبقى مركَّزاً — إن
+    // أُغلِق النموذج بعد إرسالٍ أول ثم أُعيد فتحه (`+ نسخة جديدة` لا يتحقق من
+    // `creating`) واسمٌ جديد كُتب، يستقبل Enter طلباً ثانياً بلا هذا الحارس.
+    if (creating) return;
     const name = createName.trim();
     if (!name) return;
     onCreate(name);
@@ -370,7 +374,12 @@ function VersionRow({
           <button
             type="button"
             data-version-open={version.id}
-            disabled={switching}
+            // حذف هذا الصفّ نفسه يُنهي حالة تأكيده فوراً (`onDelete` أعلاه)
+            // بينما يبقى حذفه الفعلي في المتجَر معلَّقاً — فتحه في هذه الأثناء
+            // يُحمِّل نسخةً قد لا تعود موجودة عند اكتمال الحذف، ويُبطل رمز
+            // الطلب فلا يتعرّف حذفٌ لاحقٌ (`wasOpenAtStart` قِيست وقت بدئه لا
+            // وقت الفتح) على أنه يجب إفراغ المحرِّر.
+            disabled={switching || busy === "delete"}
             onClick={onSelect}
             className="h-7 rounded-md border border-border px-2 text-[11px] font-medium text-text hover:bg-primary-soft disabled:opacity-50"
           >

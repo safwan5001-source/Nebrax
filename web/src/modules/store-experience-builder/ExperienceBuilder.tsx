@@ -556,7 +556,12 @@ export function ExperienceBuilder({
       if (result.reason === "conflict") {
         if (sameStorefront) {
           await loadVersionList();
-          if (current && wasOpenAtStart) {
+          // المتجر أو النسخة قد يتبدّلان أثناء انتظار تحديث القائمة أعلاه —
+          // `current`/`sameStorefront` أعلاه قِيمتان قِيسَتا *قبل* هذا الانتظار
+          // الثاني، فإعادة استعمالهما هنا قد تُثبِت بانر التعارض على متجرٍ لم
+          // يعد معروضاً أصلاً. أعِد الفحص من المراجع الحيّة بعد الاكتمال.
+          if (storefrontIdRef.current !== originStorefrontId) return;
+          if (stillCurrent(originStorefrontId, tokenAtStart) && wasOpenAtStart) {
             // النسخة المُعاد تسميتها هي نفسها المفتوحة محلياً الآن (ولم يتبدّل
             // شيء منذ بدء الطلب): تحديث صفّها في القائمة وحده غير كافٍ — محتوى
             // المحرِّر (draft) ومراجعته المحلية ما زالا قديمين، وقد تنجح إعادة

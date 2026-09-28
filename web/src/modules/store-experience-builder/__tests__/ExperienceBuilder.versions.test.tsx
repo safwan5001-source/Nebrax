@@ -736,4 +736,114 @@ describe('ExperienceBuilder — CUST-H1-2 Version Manager', () => {
 
     confirmSpy.mockRestore();
   });
+
+  it('pressing Enter to submit a reopened manager create form while an earlier create is pending does not send a duplicate request (codex round 5)', async () => {
+    listMock.mockResolvedValue({ ok: true, data: [] });
+    let resolveCreate: (value: unknown) => void = () => {};
+    createMock.mockReturnValue(new Promise((resolve) => { resolveCreate = resolve; }));
+    const user = userEvent.setup();
+    render(<ExperienceBuilder storefrontId="store-1" initialLocale="ar" />);
+    await waitFor(() => expect(document.querySelector('[data-version-empty-state]')).toBeTruthy());
+
+    await openVersionManager(user);
+    const manager = screen.getByRole('menu', { name: 'إدارة نسخ التصميم' });
+    await user.click(within(manager).getByRole('button', { name: '+ نسخة جديدة' }));
+    await user.type(within(manager).getByPlaceholderText('مثال: رمضان ١٤٤٨'), 'الأولى');
+    await user.click(within(manager).getByRole('button', { name: 'إنشاء' }));
+    await waitFor(() => expect(createMock).toHaveBeenCalledTimes(1));
+
+    // Submitting closed the form — reopen it (the toggle button itself has no
+    // `creating` guard) while the first create is still pending, and try
+    // submitting a second one via Enter instead of the (disabled) button.
+    await user.click(within(manager).getByRole('button', { name: '+ نسخة جديدة' }));
+    const input = within(manager).getByPlaceholderText('مثال: رمضان ١٤٤٨');
+    await user.type(input, 'الثانية');
+    await user.type(input, '{Enter}');
+    expect(createMock).toHaveBeenCalledTimes(1);
+
+    resolveCreate({ ok: true, data: detail({ id: 'new-1', name: 'الأولى', revision: 1 }) });
+    await waitFor(() =>
+      expect(screen.getByLabelText('نسخة التصميم قيد التعديل').textContent).toContain('الأولى'),
+    );
+  });
+
+  it("opening a version while its own delete is still pending is blocked (codex round 5)", async () => {
+    listMock.mockResolvedValue({
+      ok: true,
+      data: [summary({ id: 'a', name: 'الحالية' }), summary({ id: 'b', name: 'نسخة قديمة' })],
+    });
+    let resolveDelete: (value: unknown) => void = () => {};
+    deleteMock.mockReturnValue(new Promise((resolve) => { resolveDelete = resolve; }));
+    const user = userEvent.setup();
+    render(<ExperienceBuilder storefrontId="store-1" initialLocale="ar" />);
+    await screen.findByText('اختر نسخة للتعديل');
+
+    await openVersionManager(user);
+    const manager = screen.getByRole('menu', { name: 'إدارة نسخ التصميم' });
+    const row = within(manager).getByText('نسخة قديمة').closest('li') as HTMLElement;
+    await user.click(within(row).getByRole('button', { name: 'حذف' }));
+    await user.click(within(row).getByRole('button', { name: 'حذف النسخة' }));
+
+    // The confirmation step dismisses immediately, but the DELETE request
+    // itself is still pending — Open must stay disabled until it settles,
+    // or the merchant could open a version that no longer exists by the
+    // time its own GET resolves.
+    expect(
+      (within(row).getByRole('button', { name: 'فتح للتعديل' }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+
+    resolveDelete({ ok: true });
+    await waitFor(() => expect(screen.queryByText('نسخة قديمة')).toBeNull());
+  });
+
+  it("switching storefronts while a rename-conflict's list refresh is pending does not apply the conflict to the new store (codex round 5)", async () => {
+    let resolveStaleRefresh: (value: unknown) => void = () => {};
+    listMock
+      // 1st call: initial mount for store-1.
+      .mockResolvedValueOnce({ ok: true, data: [summary({ id: 'a', name: 'نسخة أ', revision: 0 })] })
+      // 2nd call: the rename conflict's own refresh for store-1 — kept
+      // pending so the merchant can move on to store-2 before it resolves.
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveStaleRefresh = resolve; }))
+      // 3rd call: initial mount for store-2, after the storefront switch.
+      .mockResolvedValueOnce({ ok: true, data: [summary({ id: 'x', name: 'نسخة المتجر الثاني' })] });
+    showMock.mockImplementation((_storefrontId: string, versionId: string) =>
+      Promise.resolve({
+        ok: true,
+        data: versionId === 'a'
+          ? detail({ id: 'a', name: 'نسخة أ', revision: 0 })
+          : detail({ id: 'x', name: 'نسخة المتجر الثاني' }),
+      }),
+    );
+    renameMock.mockResolvedValue({ ok: false, reason: 'conflict', message: 'stale' });
+    const user = userEvent.setup();
+    const { rerender } = render(<ExperienceBuilder storefrontId="store-1" initialLocale="ar" />);
+    await waitFor(() =>
+      expect(screen.getByLabelText('نسخة التصميم قيد التعديل').textContent).toContain('نسخة أ'),
+    );
+
+    await openVersionManager(user);
+    await user.click(screen.getByRole('button', { name: 'إعادة تسمية' }));
+    await user.clear(screen.getByLabelText('اسم النسخة'));
+    await user.type(screen.getByLabelText('اسم النسخة'), 'اسم جديد');
+    await user.click(screen.getByRole('button', { name: 'حفظ الاسم' }));
+    await waitFor(() => expect(renameMock).toHaveBeenCalledTimes(1));
+
+    // The conflict's own list refresh (2nd listMock call, for store-1) is
+    // still pending when the merchant moves on to an entirely different store.
+    rerender(<ExperienceBuilder storefrontId="store-2" initialLocale="ar" />);
+    await waitFor(() =>
+      expect(screen.getByLabelText('نسخة التصميم قيد التعديل').textContent).toContain('نسخة المتجر الثاني'),
+    );
+
+    // The stale refresh now finally resolves — it must not install a
+    // conflict banner (scoped to store-1's version 'a') over store-2's
+    // unrelated, freshly opened version.
+    resolveStaleRefresh({ ok: true, data: [summary({ id: 'a', name: 'اسم جديد', revision: 1 })] });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(
+      screen.getByLabelText('نسخة التصميم قيد التعديل').textContent,
+    ).toContain('نسخة المتجر الثاني');
+  });
 });
