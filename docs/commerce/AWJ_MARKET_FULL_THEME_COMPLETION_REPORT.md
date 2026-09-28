@@ -16,6 +16,8 @@ No database model, storefront route, commerce authority, or persisted `Storefron
 
 - **Base SHA:** `f6ce95a215d82767139332cf14722c5a9b80261a` (`origin/main`, confirmed via `git fetch` + `git rev-parse` at Horizon start)
 - **Branch:** `claude/awj-market-full-theme-completion`
+- **PR:** https://github.com/safwan5001-source/Nebrax/pull/1096
+- **Head SHA:** `4218ad403b275d9449a44abff01d66cfb7225f26`
 - Working tree was clean at start; no intervening conflicting work found (this was the exact tip of `main` at the time of `git fetch`, not a moved target).
 
 ## 3. Live evidence pass
@@ -171,8 +173,8 @@ No accessibility-relevant markup changed. The PDP purchase row's semantic struct
 
 ## 16. CI status / merge state / deploy state
 
-Not yet opened as of this report's writing in this session — see the PR link added once opened. Per this Horizon's authorization, **merge and deployment remain explicitly out of scope.**
+PR #1096 opened against `main` at base SHA `f6ce95a215d82767139332cf14722c5a9b80261a`, head SHA `4218ad403b275d9449a44abff01d66cfb7225f26`. This session is subscribed to the PR's activity (CI, reviews, comments) and will drive it to green and address in-scope findings as they arrive. Not merged, not deployed — outside this Horizon's authorization by design.
 
 ## 17. Recommended next action
 
-Review the PR. The visual/coverage matrix should be reconciled against the actual live storefront once a backend-connected preview environment is available, to extend the screenshot evidence in §11 to PDP/Cart. Otherwise this slice is ready to merge once CI is green and review feedback (if any) is addressed — merge/deploy remain outside this Horizon's authorization.
+Follow CI on PR #1096 to green and address any in-scope review findings. The visual/coverage matrix should be reconciled against the actual live storefront once a backend-connected preview environment is available, to extend the screenshot evidence in §11 to PDP/Cart. Otherwise this slice is ready to merge once CI is green and review feedback is addressed — **merge/deploy remain outside this Horizon's authorization.**
