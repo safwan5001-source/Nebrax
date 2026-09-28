@@ -307,6 +307,14 @@ function ThemePanel({
   patch: (partial: Partial<StorefrontPresentationConfig>) => void;
 }) {
   const contrast = contrastRatio(config.primaryColor, "#ffffff");
+  // Typing a hex that happens to equal a bundled preset's exact swatch (e.g.
+  // Market's #0f766e) is the same *transition* as clicking that preset's
+  // button — it must carry the same starting bundle, or the merchant ends up
+  // on "Market" with none of its compact density/card/header, and clicking
+  // the now-already-selected swatch can never repair it (presetSelectionPatch
+  // treats an active preset as a no-op re-click by design).
+  const applyColor = (hex: string) =>
+    patch(presetSelectionPatch(config, { id: matchPreset(hex, config.themePreset), primary: hex }));
   return (
     <div className="space-y-7">
       <Section title={t("preset")}>
@@ -366,24 +374,14 @@ function ThemePanel({
             <input
               type="color"
               value={config.primaryColor}
-              onChange={(event) =>
-                patch({
-                  primaryColor: event.target.value,
-                  themePreset: matchPreset(event.target.value, config.themePreset),
-                })
-              }
+              onChange={(event) => applyColor(event.target.value)}
               className="absolute inset-0 cursor-pointer opacity-0"
             />
           </label>
           <input
             className={`${inputClass} font-mono uppercase tracking-wide`}
             value={config.primaryColor}
-            onChange={(event) =>
-              patch({
-                primaryColor: event.target.value,
-                themePreset: matchPreset(event.target.value, config.themePreset),
-              })
-            }
+            onChange={(event) => applyColor(event.target.value)}
           />
         </div>
       </Field>

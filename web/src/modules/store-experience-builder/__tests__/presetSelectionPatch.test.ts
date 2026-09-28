@@ -72,3 +72,31 @@ describe('matchPreset — a custom color keeps the active preset (Codex P1 findi
     expect(matchPreset(market.primary.toUpperCase(), 'navy')).toBe('awj-market');
   });
 });
+
+describe('color input -> matchPreset -> presetSelectionPatch (Codex P2 finding on PR #1084)', () => {
+  it('typing a hex that exactly matches Market applies the same starting bundle as clicking its swatch', () => {
+    const config = { ...DEFAULT_PRESENTATION_CONFIG, themePreset: 'navy' as const };
+    const matched = matchPreset(market.primary, config.themePreset);
+    const patch = presetSelectionPatch(config, { id: matched, primary: market.primary });
+
+    expect(patch).toMatchObject({
+      themePreset: 'awj-market',
+      density: 'compact',
+      productCard: 'compact',
+      header: { ...config.header, style: 'compact' },
+    });
+  });
+
+  it('typing an unmatched hex while on Market keeps the bundle untouched (only the color changes)', () => {
+    const config = {
+      ...DEFAULT_PRESENTATION_CONFIG,
+      themePreset: 'awj-market' as const,
+      density: 'compact' as const,
+      productCard: 'compact' as const,
+    };
+    const matched = matchPreset('#123456', config.themePreset);
+    const patch = presetSelectionPatch(config, { id: matched, primary: '#123456' });
+
+    expect(patch).toEqual({ themePreset: 'awj-market', primaryColor: '#123456' });
+  });
+});
