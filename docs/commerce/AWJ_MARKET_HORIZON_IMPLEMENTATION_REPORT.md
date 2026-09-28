@@ -501,12 +501,13 @@ QA`, `published footer visual QA` (duplicated runs are from `ci.yml`/`web-ci.yml
 merge conflict against `main`. No repo gate check (e.g. a "Claude Approvals" run) is
 configured on this PR beyond the 6 CI job names above.
 
-Round 7 (§22a, commit `cea4892d` — current head, §3) landed after that green state, in
-response to a new review finding on the round-6 commit; its own CI run was in flight as
-of this edit. All 10 Codex review findings across seven rounds are replied-to and their
-threads resolved (§22a); watch the live PR for round 7's own CI outcome on the current
-head. Per this Horizon's authorization, merge and deployment remain explicitly out of
-scope regardless of that outcome — this PR is left open, subscribed, and watched for
+Round 7 (§22a, commit `cea4892d`) landed after that green state, in response to a new
+review finding on the round-6 commit. Its own CI run (triggered by the docs-only
+follow-up push `d032b658` — current head, §3) has since completed: **all 9 check runs
+green again**, `mergeable_state: "clean"`, no merge conflict. All 10 Codex review
+findings across seven rounds are replied-to and their threads resolved (§22a). Per this
+Horizon's authorization, merge and deployment remain explicitly out of scope — this PR
+is left open, subscribed, and watched for
 further activity rather than merged.
 
 _(This section reflects state as of head SHA in §3; see the PR itself for the current
