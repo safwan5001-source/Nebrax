@@ -1,9 +1,28 @@
 import * as React from 'react';
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const locale = { current: 'ar' };
+// يُبنى الاستدعاء الافتراضي هنا حتى `vi.fn(impl)` نفسه — `vi.restoreAllMocks()`
+// في `afterEach` أدناه يعيد أي `vi.fn()` عاري الإنشاء إلى دالة فارغة، لكنه
+// يستعيد التطبيق الأصلي الممرَّر وقت الإنشاء، فلا حاجة لإعادة ضبطه في كل اختبار.
+const showMock = vi.fn(async () => ({
+  ok: true,
+  data: {
+    id: 'v1',
+    storefrontId: 's1',
+    name: 'التصميم الحالي',
+    state: 'draft',
+    schemaVersion: 1,
+    revision: 0,
+    scheduledFor: null,
+    lastPublishedAt: null,
+    createdAt: '2026-09-01T00:00:00.000Z',
+    updatedAt: '2026-09-01T00:00:00.000Z',
+    config: DEFAULT_PRESENTATION_CONFIG,
+  },
+}));
 
 vi.mock('next-intl', () => ({
   useLocale: () => locale.current,
@@ -22,6 +41,34 @@ vi.mock('@/modules/commerce-workspace/store-context', () => ({
   }),
 }));
 
+// CUST-H1-2 — الآن تُحمَّل الواجهة عبر نسخة تصميم واحدة (list → show)؛ نسخة
+// مسودة واحدة فقط فيُختار تلقائياً بلا غموض (`applyVersionSelection`).
+vi.mock('@/modules/commerce-workspace/presentation-versions', () => ({
+  listPresentationVersions: vi.fn(async () => ({
+    ok: true,
+    data: [
+      {
+        id: 'v1',
+        storefrontId: 's1',
+        name: 'التصميم الحالي',
+        state: 'draft',
+        schemaVersion: 1,
+        revision: 0,
+        scheduledFor: null,
+        lastPublishedAt: null,
+        createdAt: '2026-09-01T00:00:00.000Z',
+        updatedAt: '2026-09-01T00:00:00.000Z',
+      },
+    ],
+  })),
+  showPresentationVersion: (...args: unknown[]) => showMock(...args),
+  createPresentationVersion: vi.fn(),
+  savePresentationVersion: vi.fn(),
+  renamePresentationVersion: vi.fn(),
+  deletePresentationVersion: vi.fn(),
+}));
+
+import { DEFAULT_PRESENTATION_CONFIG } from '@/modules/store-experience-builder/presentation';
 import CommerceAppearancePage from './page';
 
 function builderRoot(): HTMLElement {
@@ -52,6 +99,7 @@ describe('commerce appearance — STORE-CUSTOMIZER-V2-2 section editing', () => 
   it('shows the default hero content section when nothing is selected', async () => {
     const user = userEvent.setup();
     render(<CommerceAppearancePage />);
+    await waitFor(() => expect(showMock).toHaveBeenCalled());
     await openHomepage(user);
 
     expect(selectedSettings()).toBeNull();
@@ -61,6 +109,7 @@ describe('commerce appearance — STORE-CUSTOMIZER-V2-2 section editing', () => 
   it('shows only the selected section settings for hero, with its content fields', async () => {
     const user = userEvent.setup();
     render(<CommerceAppearancePage />);
+    await waitFor(() => expect(showMock).toHaveBeenCalled());
     await openHomepage(user);
     await user.click(
       document.querySelector('[data-section-option="hero"]') as HTMLElement,
@@ -77,6 +126,7 @@ describe('commerce appearance — STORE-CUSTOMIZER-V2-2 section editing', () => 
   it('editing the hero headline in the selected block updates the preview', async () => {
     const user = userEvent.setup();
     render(<CommerceAppearancePage />);
+    await waitFor(() => expect(showMock).toHaveBeenCalled());
     await openHomepage(user);
     await user.click(
       document.querySelector('[data-section-option="hero"]') as HTMLElement,
@@ -95,6 +145,7 @@ describe('commerce appearance — STORE-CUSTOMIZER-V2-2 section editing', () => 
   it('shows an honest catalog-managed note for implemented non-hero sections', async () => {
     const user = userEvent.setup();
     render(<CommerceAppearancePage />);
+    await waitFor(() => expect(showMock).toHaveBeenCalled());
     await openHomepage(user);
     await user.click(screen.getByRole('button', { name: 'التصنيفات' }));
 
@@ -110,6 +161,7 @@ describe('commerce appearance — STORE-CUSTOMIZER-V2-2 section editing', () => 
   it('shows the gated note for gated sections without content fields', async () => {
     const user = userEvent.setup();
     render(<CommerceAppearancePage />);
+    await waitFor(() => expect(showMock).toHaveBeenCalled());
     await openHomepage(user);
     await user.click(
       document.querySelector('[data-section-option="offers"]') as HTMLElement,
@@ -124,6 +176,7 @@ describe('commerce appearance — STORE-CUSTOMIZER-V2-2 section editing', () => 
   it('toggles visibility from the selected block and keeps preview in sync', async () => {
     const user = userEvent.setup();
     render(<CommerceAppearancePage />);
+    await waitFor(() => expect(showMock).toHaveBeenCalled());
     await openHomepage(user);
     await user.click(screen.getByRole('button', { name: 'التصنيفات' }));
 
@@ -147,6 +200,7 @@ describe('commerce appearance — STORE-CUSTOMIZER-V2-2 section editing', () => 
   it('keeps reorder working while a section is selected', async () => {
     const user = userEvent.setup();
     render(<CommerceAppearancePage />);
+    await waitFor(() => expect(showMock).toHaveBeenCalled());
     await openHomepage(user);
     await user.click(screen.getByRole('button', { name: 'وصل حديثاً' }));
 
@@ -170,6 +224,7 @@ describe('commerce appearance — STORE-CUSTOMIZER-V2-2 section editing', () => 
   it('offers duplicate only for multi-instance types, never for singletons', async () => {
     const user = userEvent.setup();
     render(<CommerceAppearancePage />);
+    await waitFor(() => expect(showMock).toHaveBeenCalled());
     await openHomepage(user);
     await user.click(
       document.querySelector('[data-section-option="wholesale"]') as HTMLElement,

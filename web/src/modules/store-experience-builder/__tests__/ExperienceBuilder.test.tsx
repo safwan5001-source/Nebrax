@@ -5,40 +5,61 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const loadMock = vi.fn();
+const listMock = vi.fn();
+const showMock = vi.fn();
+const createMock = vi.fn();
 const saveMock = vi.fn();
-const publishMock = vi.fn();
+const renameMock = vi.fn();
+const deleteMock = vi.fn();
 
-vi.mock('@/modules/commerce-workspace/presentation', () => ({
-  loadStorefrontPresentation: (...args: unknown[]) => loadMock(...args),
-  saveStorefrontPresentation: (...args: unknown[]) => saveMock(...args),
-  publishStorefrontPresentation: (...args: unknown[]) => publishMock(...args),
+vi.mock('@/modules/commerce-workspace/presentation-versions', () => ({
+  listPresentationVersions: (...args: unknown[]) => listMock(...args),
+  showPresentationVersion: (...args: unknown[]) => showMock(...args),
+  createPresentationVersion: (...args: unknown[]) => createMock(...args),
+  savePresentationVersion: (...args: unknown[]) => saveMock(...args),
+  renamePresentationVersion: (...args: unknown[]) => renameMock(...args),
+  deletePresentationVersion: (...args: unknown[]) => deleteMock(...args),
 }));
 
 import { DEFAULT_PRESENTATION_CONFIG } from '../presentation';
 import { ExperienceBuilder } from '../ExperienceBuilder';
 
-const record = {
-  storefrontId: 'store-1',
-  schemaVersion: 1,
-  draft: DEFAULT_PRESENTATION_CONFIG,
-  draftRevision: 0,
-  published: null,
-  publishedRevision: null,
-  publishedAt: null,
-};
+function versionSummary(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'v1',
+    storefrontId: 'store-1',
+    name: 'Current design',
+    state: 'draft',
+    schemaVersion: 1,
+    revision: 0,
+    scheduledFor: null,
+    lastPublishedAt: null,
+    createdAt: '2026-09-01T00:00:00.000Z',
+    updatedAt: '2026-09-01T00:00:00.000Z',
+    ...overrides,
+  };
+}
 
-describe('ExperienceBuilder persistence wiring', () => {
+function versionDetail(overrides: Record<string, unknown> = {}) {
+  const { config, ...rest } = overrides;
+  return { ...versionSummary(rest), config: config ?? DEFAULT_PRESENTATION_CONFIG };
+}
+
+describe('ExperienceBuilder persistence wiring — CUST-H1-2 version APIs', () => {
   afterEach(() => {
     cleanup();
     window.localStorage.clear();
-    loadMock.mockReset();
+    listMock.mockReset();
+    showMock.mockReset();
+    createMock.mockReset();
     saveMock.mockReset();
-    publishMock.mockReset();
+    renameMock.mockReset();
+    deleteMock.mockReset();
   });
 
-  it('loads the selected storefront draft on mount', async () => {
-    loadMock.mockResolvedValue({ ok: true, data: record });
+  it('loads the selected storefront design version on mount', async () => {
+    listMock.mockResolvedValue({ ok: true, data: [versionSummary()] });
+    showMock.mockResolvedValue({ ok: true, data: versionDetail() });
     render(
       <ExperienceBuilder
         storefrontId="store-1"
@@ -46,16 +67,18 @@ describe('ExperienceBuilder persistence wiring', () => {
         liveStoreName="Al-Noor Store"
       />,
     );
-    await waitFor(() => expect(loadMock).toHaveBeenCalledWith('store-1'));
+    await waitFor(() => expect(listMock).toHaveBeenCalledWith('store-1'));
+    await waitFor(() => expect(showMock).toHaveBeenCalledWith('store-1', 'v1'));
     expect(screen.getByText('Store Experience Builder')).toBeTruthy();
     expect(screen.queryByText('Verified')).toBeNull();
   });
 
   it('follows the AWJ locale without a redundant language switcher', async () => {
-    loadMock.mockResolvedValue({ ok: true, data: record });
+    listMock.mockResolvedValue({ ok: true, data: [versionSummary()] });
+    showMock.mockResolvedValue({ ok: true, data: versionDetail() });
     render(<ExperienceBuilder storefrontId="store-1" initialLocale="en" />);
 
-    await waitFor(() => expect(loadMock).toHaveBeenCalledWith('store-1'));
+    await waitFor(() => expect(showMock).toHaveBeenCalled());
 
     const builder = document.querySelector('[data-experience-builder]');
     expect(builder?.getAttribute('dir')).toBe('ltr');
@@ -146,31 +169,29 @@ describe('ExperienceBuilder persistence wiring', () => {
     expect(document.querySelector('[data-builder-preview]')).toBeTruthy();
   });
 
-  it('does not claim save success until PUT returns 200', async () => {
-    loadMock.mockResolvedValue({ ok: true, data: record });
-    saveMock.mockResolvedValue({
-      ok: true,
-      data: { ...record, draftRevision: 1 },
-    });
+  it('does not claim save success until the exact-version PUT returns 200', async () => {
+    listMock.mockResolvedValue({ ok: true, data: [versionSummary({ revision: 0 })] });
+    showMock.mockResolvedValue({ ok: true, data: versionDetail({ revision: 0 }) });
+    saveMock.mockResolvedValue({ ok: true, data: versionDetail({ revision: 1 }) });
     const user = userEvent.setup();
     render(<ExperienceBuilder storefrontId="store-1" initialLocale="en" />);
-    await waitFor(() => expect(loadMock).toHaveBeenCalled());
+    await waitFor(() => expect(showMock).toHaveBeenCalled());
     await user.click(screen.getByRole('button', { name: 'Save draft' }));
     await waitFor(() => expect(saveMock).toHaveBeenCalled());
-    expect(saveMock.mock.calls[0][2]).toBe(0);
-    expect(screen.getByRole('status').textContent).toMatch(/Draft saved/);
+    expect(saveMock.mock.calls[0][0]).toBe('store-1');
+    expect(saveMock.mock.calls[0][1]).toBe('v1');
+    expect(saveMock.mock.calls[0][3]).toBe(0);
+    expect(screen.getByRole('status').textContent).toMatch(/Version saved/);
     expect(screen.queryByText(/nothing was stored/i)).toBeNull();
   });
 
   it('preserves SBC internal whitespace while editing and outer-trims at save', async () => {
-    loadMock.mockResolvedValue({ ok: true, data: record });
-    saveMock.mockResolvedValue({
-      ok: true,
-      data: { ...record, draftRevision: 1 },
-    });
+    listMock.mockResolvedValue({ ok: true, data: [versionSummary({ revision: 0 })] });
+    showMock.mockResolvedValue({ ok: true, data: versionDetail({ revision: 0 }) });
+    saveMock.mockResolvedValue({ ok: true, data: versionDetail({ revision: 1 }) });
     const user = userEvent.setup();
     render(<ExperienceBuilder storefrontId="store-1" initialLocale="en" />);
-    await waitFor(() => expect(loadMock).toHaveBeenCalled());
+    await waitFor(() => expect(showMock).toHaveBeenCalled());
 
     await user.click(screen.getByRole('button', { name: 'Verification & trust' }));
     const input = screen.getAllByRole('textbox')[0];
@@ -182,38 +203,48 @@ describe('ExperienceBuilder persistence wiring', () => {
     expect((sealTokenInput as HTMLInputElement).value).toBe(' token=Opaque+/ ');
     await user.click(screen.getByRole('button', { name: 'Save draft' }));
     await waitFor(() => expect(saveMock).toHaveBeenCalled());
-    expect(saveMock.mock.calls[0][1].sbc.authentication_number).toBe('00123 456');
-    expect(saveMock.mock.calls[0][1].sbc.seal_token).toBe('token=Opaque+/');
+    expect(saveMock.mock.calls[0][2].sbc.authentication_number).toBe('00123 456');
+    expect(saveMock.mock.calls[0][2].sbc.seal_token).toBe('token=Opaque+/');
   });
 
-  it('reloads on 409 instead of merging or claiming success', async () => {
-    loadMock
-      .mockResolvedValueOnce({ ok: true, data: record })
+  it('shows a stale-revision conflict banner and reloads only on explicit request — never merges or claims success', async () => {
+    listMock.mockResolvedValue({ ok: true, data: [versionSummary({ revision: 1 })] });
+    showMock
+      .mockResolvedValueOnce({ ok: true, data: versionDetail({ revision: 1 }) })
       .mockResolvedValueOnce({
         ok: true,
-        data: {
-          ...record,
-          draftRevision: 2,
-          draft: { ...DEFAULT_PRESENTATION_CONFIG, homepage: { ...DEFAULT_PRESENTATION_CONFIG.homepage, heroHeadline: 'server' } },
-        },
+        data: versionDetail({
+          revision: 2,
+          config: {
+            ...DEFAULT_PRESENTATION_CONFIG,
+            homepage: { ...DEFAULT_PRESENTATION_CONFIG.homepage, heroHeadline: 'server' },
+          },
+        }),
       });
     saveMock.mockResolvedValue({ ok: false, reason: 'conflict', message: 'stale' });
     const user = userEvent.setup();
     render(<ExperienceBuilder storefrontId="store-1" initialLocale="en" />);
-    await waitFor(() => expect(loadMock).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(showMock).toHaveBeenCalledTimes(1));
+
     await user.click(screen.getByRole('button', { name: 'Save draft' }));
-    await waitFor(() => expect(loadMock).toHaveBeenCalledTimes(2));
-    expect(screen.getByRole('status').textContent).toMatch(/changed elsewhere/i);
-    expect(screen.queryByText(/Draft saved/)).toBeNull();
+    await waitFor(() => expect(saveMock).toHaveBeenCalled());
+    expect(screen.getByRole('alert').textContent).toMatch(/edited from another session/i);
+    expect(screen.queryByText(/Version saved/)).toBeNull();
+    expect(showMock).toHaveBeenCalledTimes(1);
+
+    await user.click(screen.getByRole('button', { name: 'Reload version' }));
+    await waitFor(() => expect(showMock).toHaveBeenCalledTimes(2));
+    expect(screen.queryByRole('alert')).toBeNull();
   });
 
   it('does not write the draft to browser storage', async () => {
-    loadMock.mockResolvedValue({ ok: true, data: record });
-    saveMock.mockResolvedValue({ ok: true, data: { ...record, draftRevision: 1 } });
+    listMock.mockResolvedValue({ ok: true, data: [versionSummary({ revision: 0 })] });
+    showMock.mockResolvedValue({ ok: true, data: versionDetail({ revision: 0 }) });
+    saveMock.mockResolvedValue({ ok: true, data: versionDetail({ revision: 1 }) });
     const setItem = vi.spyOn(Storage.prototype, 'setItem');
     const user = userEvent.setup();
     render(<ExperienceBuilder storefrontId="store-1" initialLocale="en" />);
-    await waitFor(() => expect(loadMock).toHaveBeenCalled());
+    await waitFor(() => expect(showMock).toHaveBeenCalled());
     await user.click(screen.getByRole('button', { name: 'Save draft' }));
     await waitFor(() => expect(saveMock).toHaveBeenCalled());
     expect(

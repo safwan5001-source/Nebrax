@@ -11,11 +11,7 @@ import {
   presentationConfigsEqual,
   type StorefrontPresentationConfig,
 } from "./presentation";
-import {
-  DRAFT_PERSISTENCE_CAPABILITY,
-  PUBLISH_CAPABILITY,
-  VERSION_HISTORY_CAPABILITY,
-} from "./presentation/capabilities";
+import { DRAFT_PERSISTENCE_CAPABILITY, PUBLISH_CAPABILITY } from "./presentation/capabilities";
 import {
   ControlPanels,
   CUSTOMIZER_NAV_GROUPS,
@@ -32,11 +28,22 @@ import {
   StorefrontPreviewCanvas,
   type StorefrontBusinessIdentity,
 } from "./StorefrontPreviewCanvas";
+import { VersionSelector } from "./VersionSelector";
 import {
-  loadStorefrontPresentation,
-  publishStorefrontPresentation,
-  saveStorefrontPresentation,
-} from "@/modules/commerce-workspace/presentation";
+  VersionManagerPanel,
+  type VersionManagerListState,
+  type VersionManagerPanelProps,
+} from "./VersionManagerPanel";
+import {
+  createPresentationVersion,
+  deletePresentationVersion,
+  listPresentationVersions,
+  type PresentationVersionDetail,
+  type PresentationVersionSummary,
+  renamePresentationVersion,
+  savePresentationVersion,
+  showPresentationVersion,
+} from "@/modules/commerce-workspace/presentation-versions";
 
 export const PREVIEW_WIDTHS = {
   mobile: 390,
@@ -54,6 +61,8 @@ export type BuilderLifecycle =
   | "dirty"
   | "save_blocked"
   | "publish_blocked";
+
+type MobileSheet = "sections" | "settings" | "design" | "versions" | null;
 
 interface ExperienceBuilderProps {
   initialConfig?: StorefrontPresentationConfig;
@@ -77,12 +86,11 @@ export function ExperienceBuilder({
   );
   const [saved, setSaved] = useState<StorefrontPresentationConfig>(seed);
   const [draft, setDraft] = useState<StorefrontPresentationConfig>(seed);
-  const [draftRevision, setDraftRevision] = useState(0);
   const locale: CustomizerLocale = initialLocale;
   const [panel, setPanel] = useState<CustomizerPanel>("theme");
   const [device, setDevice] = useState<PreviewDevice>("desktop");
   const [mobilePane, setMobilePane] = useState<"edit" | "preview">("preview");
-  const [mobileSheet, setMobileSheet] = useState<"sections" | "settings" | "design" | null>(null);
+  const [mobileSheet, setMobileSheet] = useState<MobileSheet>(null);
   const [isMobileViewport, setIsMobileViewport] = useState(false);
   const [builderSidebarCollapsed, setBuilderSidebarCollapsed] = useState(false);
   const [sidebarPreferenceLoaded, setSidebarPreferenceLoaded] = useState(false);
@@ -95,13 +103,47 @@ export function ExperienceBuilder({
   const [lifecycle, setLifecycle] = useState<BuilderLifecycle>("clean");
   const [notice, setNotice] = useState<string | null>(null);
   const [noticeKind, setNoticeKind] = useState<"capability" | "status">("status");
-  const [busy, setBusy] = useState<"loading" | "saving" | "publishing" | null>(
+  const [busy, setBusy] = useState<"loading" | "saving" | null>(
     storefrontId ? "loading" : null,
   );
+
+  // CUST-H1-2 — نسخ التصميم. القائمة والحالة المشتقة من الخادم حصراً
+  // (`StorefrontPresentationVersionService::deriveState`)؛ لا نموذج حالة
+  // محلي. `versionRequestTokenRef` يمنع نتيجة متأخرة من نسخة سابقة (A) من
+  // الكتابة فوق حالة نسخة لاحقة (B) بعد تبديل سريع بينهما (§28).
+  const [versionsListState, setVersionsListState] =
+    useState<VersionManagerListState>(storefrontId ? "loading" : "ready");
+  const [versions, setVersions] = useState<PresentationVersionSummary[]>([]);
+  const [selectedVersion, setSelectedVersion] =
+    useState<PresentationVersionDetail | null>(null);
+  const [versionSwitchingId, setVersionSwitchingId] = useState<string | null>(null);
+  const [versionCreating, setVersionCreating] = useState(false);
+  const [versionBusy, setVersionBusy] = useState<
+    { id: string; action: "duplicate" | "rename" | "delete" } | null
+  >(null);
+  const [versionConflict, setVersionConflict] = useState<{ versionId: string } | null>(null);
+  const versionRequestTokenRef = useRef(0);
+
   const t = (key: CustomizerMessageKey) => customizerMessage(locale, key);
 
   const dirty = !presentationConfigsEqual(draft, saved);
   const activePanel = CUSTOMIZER_PANELS.find((item) => item.id === panel);
+  const isPublishedReadOnly = selectedVersion?.state === "published";
+  const candidateVersions = versions.filter((v) => v.state !== "published");
+  // بلا `storefrontId` لا يوجد شيء يُحمَّل أو يُحفَظ (سلوك سابق للتحرير المحلي
+  // البحت عبر `initialConfig` — يبقى كما هو حرفياً)، فبوابات النسخ لا تنطبق.
+  const ambiguousChoice =
+    Boolean(storefrontId) &&
+    versionsListState === "ready" &&
+    selectedVersion === null &&
+    versionSwitchingId === null &&
+    candidateVersions.length > 1;
+  const noVersionsYet =
+    Boolean(storefrontId) &&
+    versionsListState === "ready" &&
+    versions.length === 0 &&
+    selectedVersion === null &&
+    versionSwitchingId === null;
 
   useEffect(() => {
     const updateViewport = () => setIsMobileViewport(window.innerWidth < 768);
@@ -137,6 +179,104 @@ export function ExperienceBuilder({
     }
   }, [builderSidebarCollapsed, sidebarPreferenceLoaded]);
 
+  async function loadVersionList(): Promise<PresentationVersionSummary[] | null> {
+    if (!storefrontId) return null;
+    setVersionsListState("loading");
+    const result = await listPresentationVersions(storefrontId);
+    if (!result.ok) {
+      setVersionsListState("error");
+      return null;
+    }
+    setVersions(result.data);
+    setVersionsListState("ready");
+    return result.data;
+  }
+
+  function toSummary(detail: PresentationVersionDetail): PresentationVersionSummary {
+    return {
+      id: detail.id,
+      storefrontId: detail.storefrontId,
+      name: detail.name,
+      state: detail.state,
+      schemaVersion: detail.schemaVersion,
+      revision: detail.revision,
+      scheduledFor: detail.scheduledFor,
+      lastPublishedAt: detail.lastPublishedAt,
+      createdAt: detail.createdAt,
+      updatedAt: detail.updatedAt,
+    };
+  }
+
+  function updateVersionSummaryInList(detail: PresentationVersionDetail) {
+    const summary = toSummary(detail);
+    setVersions((prev) => {
+      const exists = prev.some((v) => v.id === summary.id);
+      return exists
+        ? prev.map((v) => (v.id === summary.id ? summary : v))
+        : [...prev, summary];
+    });
+  }
+
+  // النقطة الوحيدة التي تجلب مستند نسخة فعلياً وتطبّقه على المحرِّر. لا حرس
+  // تكافؤ ولا تأكيد تجاهل هنا عمداً — `selectVersion` (الاختيار العادي)
+  // يضيفهما، بينما `reloadConflictedVersion` (§15) يحتاج تجاوزهما معاً.
+  async function applyVersionSelection(target: { id: string }) {
+    if (!storefrontId) return;
+    const token = ++versionRequestTokenRef.current;
+    setVersionSwitchingId(target.id);
+    setVersionConflict(null);
+    setBusy("loading");
+    setNoticeKind("status");
+    setNotice(t("versionDetailLoading"));
+    const result = await showPresentationVersion(storefrontId, target.id);
+    if (token !== versionRequestTokenRef.current) return; // نسخة أحدث تجاوزت هذا الطلب
+    setVersionSwitchingId(null);
+    setBusy(null);
+    if (!result.ok) {
+      setNoticeKind("status");
+      setNotice(
+        result.reason === "unsupported_schema"
+          ? t("versionUnsupportedSchema")
+          : t("versionListLoadError"),
+      );
+      return;
+    }
+    setNotice(null);
+    setSelectedVersion(result.data);
+    setDraft(result.data.config);
+    setSaved(result.data.config);
+    setLifecycle("clean");
+    setSelectedSection(null);
+    setSelectedChrome(null);
+    updateVersionSummaryInList(result.data);
+  }
+
+  function selectVersion(target: PresentationVersionSummary) {
+    if (selectedVersion?.id === target.id) return;
+    if (dirty && !window.confirm(t("versionSwitchDiscardConfirm"))) return;
+    void applyVersionSelection(target);
+  }
+
+  function reloadConflictedVersion() {
+    if (!selectedVersion) return;
+    setVersionConflict(null);
+    void applyVersionSelection(selectedVersion);
+  }
+
+  function adoptCreatedVersion(detail: PresentationVersionDetail) {
+    // إبطال أي طلب تبديل قيد التنفيذ — نسخة جديدة تم إنشاؤها للتو أولى بالتطبيق.
+    ++versionRequestTokenRef.current;
+    setVersionSwitchingId(null);
+    setSelectedVersion(detail);
+    setDraft(detail.config);
+    setSaved(detail.config);
+    setLifecycle("clean");
+    setNotice(null);
+    setSelectedSection(null);
+    setSelectedChrome(null);
+    updateVersionSummaryInList(detail);
+  }
+
   useEffect(() => {
     if (!storefrontId) {
       setBusy(null);
@@ -144,25 +284,35 @@ export function ExperienceBuilder({
     }
 
     let cancelled = false;
-    setBusy("loading");
-    setNoticeKind("status");
-    setNotice(t("loadingDraft"));
 
-    loadStorefrontPresentation(storefrontId).then((result) => {
+    (async () => {
+      setBusy("loading");
+      setNoticeKind("status");
+      setNotice(t("versionListLoading"));
+      const list = await loadVersionList();
       if (cancelled) return;
-      if (!result.ok) {
+      if (list === null) {
         setBusy(null);
         setNoticeKind("status");
-        setNotice(t("loadFailed"));
+        setNotice(t("versionListLoadError"));
         return;
       }
-      setDraft(result.data.draft);
-      setSaved(result.data.draft);
-      setDraftRevision(result.data.draftRevision);
-      setLifecycle("clean");
-      setBusy(null);
-      setNotice(null);
-    });
+      // اختيار تلقائي غير غامض فقط: مرشّح وحيد غير منشور، أو نسخة منشورة
+      // وحيدة بلا أي مسودة (§13 — لا نتخمّن بين عدة مسودات محتملة).
+      const candidates = list.filter((v) => v.state !== "published");
+      const target =
+        candidates.length === 1
+          ? candidates[0]
+          : candidates.length === 0 && list.length === 1
+            ? list[0]
+            : null;
+      if (!target) {
+        setBusy(null);
+        setNotice(null);
+        return;
+      }
+      await applyVersionSelection(target);
+    })();
 
     return () => {
       cancelled = true;
@@ -172,6 +322,7 @@ export function ExperienceBuilder({
   }, [storefrontId]);
 
   function updateDraft(next: StorefrontPresentationConfig) {
+    if (isPublishedReadOnly) return; // فشل آمن دفاعي — لوحة التحكم مخفية أصلاً لهذه الحالة.
     const normalized = normalizePresentationConfig(next);
     // Keep the opaque SBC value lossless while the merchant is editing. The
     // persistence boundary below performs the contract-required outer trim.
@@ -189,90 +340,131 @@ export function ExperienceBuilder({
       setNotice(t("noStoreSelected"));
       return;
     }
+    if (!selectedVersion) {
+      setLifecycle("save_blocked");
+      setNoticeKind("capability");
+      setNotice(t("versionNoVersionSelected"));
+      return;
+    }
+    if (selectedVersion.state === "published") return; // زر الحفظ معطَّل لهذه الحالة أصلاً.
+
     setBusy("saving");
     setNotice(null);
+    setVersionConflict(null);
     const persistedDraft = normalizePresentationConfig(draft);
-    const result = await saveStorefrontPresentation(
+    const result = await savePresentationVersion(
       storefrontId,
+      selectedVersion.id,
       persistedDraft,
-      draftRevision,
+      selectedVersion.revision,
     );
+    setBusy(null);
     if (result.ok) {
-      setDraft(result.data.draft);
-      setSaved(result.data.draft);
-      setDraftRevision(result.data.draftRevision);
+      setDraft(result.data.config);
+      setSaved(result.data.config);
+      setSelectedVersion(result.data);
+      updateVersionSummaryInList(result.data);
       setLifecycle("clean");
       setNoticeKind("status");
-      setNotice(t("saveSuccess"));
-      setBusy(null);
+      setNotice(t("versionSaveSuccess"));
       return;
     }
     if (result.reason === "conflict") {
-      const reload = await loadStorefrontPresentation(storefrontId);
-      if (reload.ok) {
-        setDraft(reload.data.draft);
-        setSaved(reload.data.draft);
-        setDraftRevision(reload.data.draftRevision);
-        setLifecycle("clean");
-      }
-      setNoticeKind("status");
-      setNotice(t("staleRevision"));
-      setBusy(null);
+      setVersionConflict({ versionId: selectedVersion.id });
       return;
     }
     setNoticeKind("status");
-    setNotice(t("saveFailed"));
-    setBusy(null);
+    setNotice(t("versionSaveFailed"));
   }
 
-  async function handlePublish() {
-    if (!storefrontId) {
-      setLifecycle("publish_blocked");
-      setNoticeKind("capability");
-      setNotice(t("noStoreSelected"));
-      return;
-    }
-    setBusy("publishing");
-    setNotice(null);
-    const result = await publishStorefrontPresentation(
-      storefrontId,
-      draftRevision,
-    );
-    if (result.ok) {
-      setDraft(result.data.draft);
-      setSaved(result.data.draft);
-      setDraftRevision(result.data.draftRevision);
-      setLifecycle("clean");
-      setNoticeKind("status");
-      setNotice(t("publishSuccess"));
-      setBusy(null);
-      return;
-    }
-    if (result.reason === "conflict") {
-      const reload = await loadStorefrontPresentation(storefrontId);
-      if (reload.ok) {
-        setDraft(reload.data.draft);
-        setSaved(reload.data.draft);
-        setDraftRevision(reload.data.draftRevision);
-        setLifecycle("clean");
-      }
-      setNoticeKind("status");
-      setNotice(t("staleRevision"));
-      setBusy(null);
-      return;
-    }
-    setNoticeKind("status");
-    setNotice(t("publishFailed"));
-    setBusy(null);
+  function handlePublishGatedClick() {
+    setNoticeKind("capability");
+    setNotice(t("versionPublishGated"));
   }
 
   function handleRestore() {
+    if (isPublishedReadOnly) return;
     const confirmed = window.confirm(t("restoreConfirm"));
     if (!confirmed) return;
     setDraft(clonePresentationConfig(DEFAULT_PRESENTATION_CONFIG));
     setLifecycle("dirty");
-    setNoticeKind("capability");
-    setNotice(VERSION_HISTORY_CAPABILITY === "deferred" ? t("versionDeferred") : null);
+    setNoticeKind("status");
+    setNotice(null);
+  }
+
+  async function handleCreateVersion(name: string) {
+    if (!storefrontId) return;
+    setVersionCreating(true);
+    const result = await createPresentationVersion(storefrontId, name);
+    setVersionCreating(false);
+    if (!result.ok) {
+      setNoticeKind("status");
+      setNotice(t("versionCreateFailed"));
+      return;
+    }
+    adoptCreatedVersion(result.data);
+  }
+
+  async function handleDuplicateVersion(version: PresentationVersionSummary, name: string) {
+    if (!storefrontId) return;
+    setVersionBusy({ id: version.id, action: "duplicate" });
+    const result = await createPresentationVersion(storefrontId, name, version.id);
+    setVersionBusy(null);
+    if (!result.ok) {
+      setNoticeKind("status");
+      setNotice(t("versionDuplicateFailed"));
+      return;
+    }
+    adoptCreatedVersion(result.data);
+  }
+
+  async function handleRenameVersion(version: PresentationVersionSummary, name: string) {
+    if (!storefrontId) return;
+    setVersionBusy({ id: version.id, action: "rename" });
+    const result = await renamePresentationVersion(storefrontId, version.id, name, version.revision);
+    setVersionBusy(null);
+    if (!result.ok) {
+      if (result.reason === "conflict") {
+        setNoticeKind("status");
+        setNotice(t("versionStaleConflict"));
+        await loadVersionList();
+        return;
+      }
+      setNoticeKind("status");
+      setNotice(t("versionRenameFailed"));
+      return;
+    }
+    updateVersionSummaryInList(result.data);
+    if (selectedVersion?.id === result.data.id) {
+      setSelectedVersion(result.data);
+    }
+  }
+
+  async function handleDeleteVersion(version: PresentationVersionSummary) {
+    if (!storefrontId) return;
+    setVersionBusy({ id: version.id, action: "delete" });
+    const result = await deletePresentationVersion(storefrontId, version.id);
+    setVersionBusy(null);
+    if (!result.ok) {
+      if (result.reason === "lifecycle_conflict") {
+        setNoticeKind("status");
+        setNotice(t("versionLifecycleConflict"));
+        await loadVersionList();
+        return;
+      }
+      setNoticeKind("status");
+      setNotice(t("versionDeleteFailed"));
+      return;
+    }
+    setVersions((prev) => prev.filter((v) => v.id !== version.id));
+    if (selectedVersion?.id === version.id) {
+      // لا يفترض أن يحدث (الواجهة تخفي حذف النسخة المفتوحة حالياً)، لكن
+      // التعافي الآمن أولى من الاستمرار في تحرير نسخة لم تعد موجودة.
+      setSelectedVersion(null);
+      setDraft(clonePresentationConfig(DEFAULT_PRESENTATION_CONFIG));
+      setSaved(clonePresentationConfig(DEFAULT_PRESENTATION_CONFIG));
+      setLifecycle("clean");
+    }
   }
 
   // Section selection bridge (STORE-CUSTOMIZER-V2-1), upgraded to instance
@@ -356,12 +548,121 @@ export function ExperienceBuilder({
     }
   })();
 
+  const versionManagerPanelProps: VersionManagerPanelProps = {
+    locale,
+    listState: versionsListState,
+    versions,
+    selectedVersionId: selectedVersion?.id ?? null,
+    switchingVersionId: versionSwitchingId,
+    creating: versionCreating,
+    busyVersionId: versionBusy?.id ?? null,
+    busyAction: versionBusy?.action ?? null,
+    onRetryList: () => {
+      void loadVersionList();
+    },
+    onSelect: (version) => selectVersion(version),
+    onCreate: (name) => {
+      void handleCreateVersion(name);
+    },
+    onDuplicate: (version, name) => {
+      void handleDuplicateVersion(version, name);
+    },
+    onRename: (version, name) => {
+      void handleRenameVersion(version, name);
+    },
+    onDelete: (version) => {
+      void handleDeleteVersion(version);
+    },
+  };
+
+  function renderInspectorBody(panelForSlot: CustomizerPanel) {
+    if (!storefrontId) {
+      // لا مستأجر محدَّد بعد — تحرير محلي بحت عبر `initialConfig`، بلا نسخ
+      // ولا حفظ. سلوك ما قبل CUST-H1-2 حرفياً.
+      return (
+        <ControlPanels
+          panel={panelForSlot}
+          config={draft}
+          locale={locale}
+          liveStoreName={liveStoreName}
+          businessIdentity={businessIdentity}
+          onChange={updateDraft}
+          selectedSection={selectedSection}
+          onSelectSection={(id) => handleSelectSection(id, "sidebar")}
+        />
+      );
+    }
+    if (isPublishedReadOnly && selectedVersion) {
+      return (
+        <PublishedReadOnlyNotice
+          locale={locale}
+          versionName={selectedVersion.name}
+          busy={versionBusy?.action === "duplicate"}
+          onCreateDraft={() => {
+            const name =
+              locale === "ar"
+                ? `مسودة من ${selectedVersion.name}`
+                : `Draft from ${selectedVersion.name}`;
+            void handleDuplicateVersion(toSummary(selectedVersion), name);
+          }}
+        />
+      );
+    }
+    if (ambiguousChoice) {
+      return (
+        <ChooseVersionPrompt
+          locale={locale}
+          onOpenMobileManager={isMobileViewport ? () => setMobileSheet("versions") : undefined}
+        />
+      );
+    }
+    if (noVersionsYet) {
+      return (
+        <EmptyVersionsPrompt
+          locale={locale}
+          creating={versionCreating}
+          onCreate={handleCreateVersion}
+        />
+      );
+    }
+    if (versionsListState === "loading" && !selectedVersion) {
+      return <InspectorStatusMessage>{t("versionListLoading")}</InspectorStatusMessage>;
+    }
+    if (versionsListState === "error" && !selectedVersion) {
+      return (
+        <InspectorStatusMessage tone="error" onRetry={() => void loadVersionList()} retryLabel={t("versionReloadLatest")}>
+          {t("versionListLoadError")}
+        </InspectorStatusMessage>
+      );
+    }
+    if (versionSwitchingId && !selectedVersion) {
+      return <InspectorStatusMessage>{t("versionDetailLoading")}</InspectorStatusMessage>;
+    }
+    if (!selectedVersion) {
+      return <InspectorStatusMessage live={false}>{t("versionNoVersionBody")}</InspectorStatusMessage>;
+    }
+    return (
+      <ControlPanels
+        panel={panelForSlot}
+        config={draft}
+        locale={locale}
+        liveStoreName={liveStoreName}
+        businessIdentity={businessIdentity}
+        onChange={updateDraft}
+        selectedSection={selectedSection}
+        onSelectSection={(id) => handleSelectSection(id, "sidebar")}
+      />
+    );
+  }
+
   return (
     <div
       dir={locale === "ar" ? "rtl" : "ltr"}
       data-experience-builder=""
       data-lifecycle={lifecycle}
-      data-draft-revision={draftRevision}
+      data-selected-version-id={selectedVersion?.id ?? ""}
+      data-selected-version-state={selectedVersion?.state ?? ""}
+      data-selected-version-revision={selectedVersion?.revision ?? ""}
       data-panel={panel}
       data-device={effectiveDevice}
       data-selected-section={selectedSection ?? ""}
@@ -387,6 +688,28 @@ export function ExperienceBuilder({
             <bdi>{liveStoreName ?? t("currentPage")}</bdi> · {t("currentPage")}
           </p>
         </div>
+        {storefrontId ? (
+          isMobileViewport ? (
+            <button
+              type="button"
+              data-version-selector-mobile=""
+              onClick={() => setMobileSheet("versions")}
+              className="flex min-w-0 items-center gap-1 border-s border-border px-2 py-1 ps-3 text-[11px] font-medium text-text"
+            >
+              <bdi className="max-w-[92px] truncate">
+                {selectedVersion?.name ?? t("versionsLabel")}
+              </bdi>
+            </button>
+          ) : (
+            <VersionSelector
+              locale={locale}
+              currentName={selectedVersion?.name ?? null}
+              currentState={selectedVersion?.state ?? null}
+              loading={versionSwitchingId !== null}
+              panelProps={versionManagerPanelProps}
+            />
+          )
+        ) : null}
         <span
           data-draft-status=""
           className={`hidden shrink-0 rounded-full px-2 py-1 text-[11px] sm:inline ${dirty ? "bg-warning-soft text-warning" : "bg-positive-soft text-positive"}`}
@@ -422,7 +745,8 @@ export function ExperienceBuilder({
           <button
             type="button"
             onClick={handleRestore}
-            className="hidden h-9 shrink-0 px-2 text-xs text-muted hover:text-text lg:inline"
+            disabled={isPublishedReadOnly}
+            className="hidden h-9 shrink-0 px-2 text-xs text-muted hover:text-text disabled:opacity-40 lg:inline"
           >
             {t("restore")}
           </button>
@@ -430,7 +754,16 @@ export function ExperienceBuilder({
             type="button"
             data-save=""
             onClick={handleSave}
-            disabled={busy !== null}
+            disabled={busy !== null || !selectedVersion || isPublishedReadOnly}
+            title={
+              isPublishedReadOnly
+                ? t("versionPublishedReadOnlyTitle")
+                : !storefrontId
+                  ? t("noStoreSelected")
+                  : !selectedVersion
+                    ? t("versionNoVersionSelected")
+                    : undefined
+            }
             className="h-9 shrink-0 rounded-md border border-border bg-surface px-2.5 text-xs font-medium text-text hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-50 md:px-3 md:text-sm"
           >
             {t("save")}
@@ -438,9 +771,10 @@ export function ExperienceBuilder({
           <button
             type="button"
             data-publish=""
-            onClick={handlePublish}
-            disabled={busy !== null}
-            className="h-9 shrink-0 rounded-md bg-primary px-2.5 text-xs font-semibold text-primary-foreground shadow-sm hover:bg-primary-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-50 md:px-3 md:text-sm"
+            disabled
+            title={t("versionPublishGated")}
+            onClick={handlePublishGatedClick}
+            className="h-9 shrink-0 rounded-md bg-primary px-2.5 text-xs font-semibold text-primary-foreground shadow-sm disabled:opacity-40 md:px-3 md:text-sm"
           >
             {t("publish")}
           </button>
@@ -458,6 +792,24 @@ export function ExperienceBuilder({
             <span className="font-medium">{t("capabilityTitle")}. </span>
           ) : null}
           {notice}
+        </div>
+      ) : null}
+
+      {versionConflict ? (
+        <div
+          role="alert"
+          data-version-conflict=""
+          className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-warning/30 bg-warning-soft px-3 py-2 text-xs leading-5 text-warning"
+        >
+          <span>{t("versionStaleConflict")}</span>
+          <button
+            type="button"
+            data-version-reload=""
+            onClick={reloadConflictedVersion}
+            className="shrink-0 rounded-md border border-warning/40 bg-surface px-2.5 py-1 text-[11px] font-medium text-warning hover:bg-warning-soft"
+          >
+            {t("versionReloadLatest")}
+          </button>
         </div>
       ) : null}
 
@@ -567,16 +919,7 @@ export function ExperienceBuilder({
               data-customizer-scroll=""
               className="h-full min-h-0 overflow-y-auto px-4 py-4 md:px-5 md:py-5 lg:px-4 lg:py-5"
             >
-              <ControlPanels
-                panel={panel}
-                config={draft}
-                locale={locale}
-                liveStoreName={liveStoreName}
-                businessIdentity={businessIdentity}
-                onChange={updateDraft}
-                selectedSection={selectedSection}
-                onSelectSection={(id) => handleSelectSection(id, "sidebar")}
-              />
+              {renderInspectorBody(panel)}
             </div>
             <ScrollIndicator targetRef={inspectorScrollRef} />
           </div>
@@ -590,10 +933,28 @@ export function ExperienceBuilder({
           } min-w-0 flex-1 flex-col lg:flex`}
         >
           <div className="flex h-9 shrink-0 items-center justify-between gap-3 border-b border-neutral-200 bg-white px-3 text-[11px] text-neutral-500">
-            <span className="font-medium text-neutral-700">
-              {t("livePreview")}
-            </span>
-            <div className="flex items-center gap-2">
+            <div className="flex min-w-0 items-center gap-2">
+              <span className="shrink-0 font-medium text-neutral-700">
+                {t("livePreview")}
+              </span>
+              {selectedVersion ? (
+                <span data-version-preview-banner="" className="min-w-0 truncate">
+                  <bdi className="font-medium text-neutral-700">{selectedVersion.name}</bdi>
+                  {" · "}
+                  {selectedVersion.state === "published"
+                    ? t("versionStatePublished")
+                    : selectedVersion.state === "scheduled"
+                      ? t("versionStateScheduled")
+                      : t("versionStateDraft")}
+                  {selectedVersion.state === "published" ? (
+                    <span className="text-positive"> — {t("versionPreviewBannerLive")}</span>
+                  ) : (
+                    <span className="text-warning"> — {t("versionPreviewBannerNonLive")}</span>
+                  )}
+                </span>
+              ) : null}
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
               <span className="tabular-nums">
                 {t("deviceWidth")} · {width}
               </span>
@@ -661,12 +1022,30 @@ export function ExperienceBuilder({
           <section
             role="dialog"
             aria-modal="true"
-            aria-label={mobileSheet === "sections" ? t("sections") : mobileSheet === "design" ? t("design") : activePanel ? t(activePanel.label) : t("edit")}
+            aria-label={
+              mobileSheet === "sections"
+                ? t("sections")
+                : mobileSheet === "design"
+                  ? t("design")
+                  : mobileSheet === "versions"
+                    ? t("versionManagerTitle")
+                    : activePanel
+                      ? t(activePanel.label)
+                      : t("edit")
+            }
             className="flex max-h-[86dvh] w-full flex-col rounded-t-2xl border-t border-border bg-surface shadow-2xl"
           >
             <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-3">
               <h2 className="text-sm font-semibold text-text">
-                {mobileSheet === "sections" ? t("sections") : mobileSheet === "design" ? t("design") : activePanel ? t(activePanel.label) : t("edit")}
+                {mobileSheet === "sections"
+                  ? t("sections")
+                  : mobileSheet === "design"
+                    ? t("design")
+                    : mobileSheet === "versions"
+                      ? t("versionManagerTitle")
+                      : activePanel
+                        ? t(activePanel.label)
+                        : t("edit")}
               </h2>
               <button
                 type="button"
@@ -678,28 +1057,18 @@ export function ExperienceBuilder({
               </button>
             </div>
             <div data-customizer-scroll="" className="min-h-0 flex-1 overflow-y-auto p-4">
-              {mobileSheet === "sections" ? (
-                <ControlPanels
-                  panel="homepage"
-                  config={draft}
-                  locale={locale}
-                  liveStoreName={liveStoreName}
-                  businessIdentity={businessIdentity}
-                  onChange={updateDraft}
-                  selectedSection={selectedSection}
-                  onSelectSection={(id) => handleSelectSection(id, "sidebar")}
+              {mobileSheet === "versions" ? (
+                <VersionManagerPanel
+                  {...versionManagerPanelProps}
+                  onSelect={(version) => {
+                    selectVersion(version);
+                    setMobileSheet(null);
+                  }}
                 />
+              ) : mobileSheet === "sections" ? (
+                renderInspectorBody("homepage")
               ) : (
-                <ControlPanels
-                  panel={mobileSheet === "design" ? "theme" : panel}
-                  config={draft}
-                  locale={locale}
-                  liveStoreName={liveStoreName}
-                  businessIdentity={businessIdentity}
-                  onChange={updateDraft}
-                  selectedSection={selectedSection}
-                  onSelectSection={(id) => handleSelectSection(id, "sidebar")}
-                />
+                renderInspectorBody(mobileSheet === "design" ? "theme" : panel)
               )}
             </div>
           </section>
@@ -709,6 +1078,142 @@ export function ExperienceBuilder({
       <span className="sr-only">
         {DRAFT_PERSISTENCE_CAPABILITY}:{PUBLISH_CAPABILITY}
       </span>
+    </div>
+  );
+}
+
+function InspectorStatusMessage({
+  children,
+  tone = "muted",
+  onRetry,
+  retryLabel,
+  live = true,
+}: {
+  children: ReactNode;
+  tone?: "muted" | "error";
+  onRetry?: () => void;
+  retryLabel?: string;
+  /** false for a static "nothing to show" fallback — avoids a second
+   * simultaneous `role="status"` region colliding with the top notice bar's. */
+  live?: boolean;
+}) {
+  return (
+    <div
+      role={live ? "status" : undefined}
+      className={`flex flex-col items-start gap-2 px-1 py-6 text-sm ${tone === "error" ? "text-negative" : "text-muted"}`}
+    >
+      <p>{children}</p>
+      {onRetry ? (
+        <button
+          type="button"
+          onClick={onRetry}
+          className="rounded-md border border-border px-2.5 py-1 text-xs font-medium text-text hover:bg-primary-soft"
+        >
+          {retryLabel}
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+function EmptyVersionsPrompt({
+  locale,
+  creating,
+  onCreate,
+}: {
+  locale: CustomizerLocale;
+  creating: boolean;
+  onCreate: (name: string) => void;
+}) {
+  const t = (key: CustomizerMessageKey) => customizerMessage(locale, key);
+  const [name, setName] = useState("");
+  return (
+    <div data-version-empty-state="" className="flex flex-col items-start gap-3 px-1 py-6">
+      <p className="text-sm font-medium text-text">{t("versionEmptyTitle")}</p>
+      <p className="text-xs text-muted">{t("versionEmptyBody")}</p>
+      <div className="flex w-full items-center gap-1.5">
+        <label className="sr-only" htmlFor="version-empty-create-name">
+          {t("versionNamePrompt")}
+        </label>
+        <input
+          id="version-empty-create-name"
+          value={name}
+          onChange={(event) => setName(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" && name.trim() !== "") onCreate(name.trim());
+          }}
+          placeholder={t("versionNamePlaceholder")}
+          className="h-9 min-w-0 flex-1 rounded border border-border bg-surface px-2 text-sm text-text outline-none focus:border-primary"
+        />
+      </div>
+      <button
+        type="button"
+        data-version-create-first=""
+        disabled={creating || name.trim() === ""}
+        onClick={() => onCreate(name.trim())}
+        className="inline-flex h-9 items-center rounded-md bg-primary px-3 text-xs font-semibold text-primary-foreground disabled:opacity-50"
+      >
+        {creating ? t("versionCreating") : t("versionCreateFirst")}
+      </button>
+    </div>
+  );
+}
+
+function ChooseVersionPrompt({
+  locale,
+  onOpenMobileManager,
+}: {
+  locale: CustomizerLocale;
+  onOpenMobileManager?: () => void;
+}) {
+  const t = (key: CustomizerMessageKey) => customizerMessage(locale, key);
+  return (
+    <div data-version-choose-state="" className="flex flex-col items-start gap-2 px-1 py-6">
+      <p className="text-sm font-medium text-text">{t("versionChooseTitle")}</p>
+      <p className="text-xs text-muted">{t("versionChooseBody")}</p>
+      {onOpenMobileManager ? (
+        <button
+          type="button"
+          onClick={onOpenMobileManager}
+          className="inline-flex h-9 items-center rounded-md bg-primary px-3 text-xs font-semibold text-primary-foreground"
+        >
+          {t("versionOpenManager")}
+        </button>
+      ) : (
+        <p className="text-xs text-muted">{t("versionOpenManagerHint")}</p>
+      )}
+    </div>
+  );
+}
+
+function PublishedReadOnlyNotice({
+  locale,
+  versionName,
+  busy,
+  onCreateDraft,
+}: {
+  locale: CustomizerLocale;
+  versionName: string;
+  busy: boolean;
+  onCreateDraft: () => void;
+}) {
+  const t = (key: CustomizerMessageKey) => customizerMessage(locale, key);
+  return (
+    <div data-version-published-readonly="" className="flex flex-col items-start gap-2 px-1 py-6">
+      <p className="text-sm font-medium text-text">{t("versionPublishedReadOnlyTitle")}</p>
+      <p className="text-xs text-muted">{t("versionPublishedReadOnlyBody")}</p>
+      <button
+        type="button"
+        data-version-create-draft-from-published=""
+        disabled={busy}
+        onClick={onCreateDraft}
+        className="inline-flex h-9 items-center rounded-md bg-primary px-3 text-xs font-semibold text-primary-foreground disabled:opacity-50"
+      >
+        {busy ? t("versionDuplicating") : t("versionCreateDraftFromThis")}
+      </button>
+      <p className="text-[11px] text-muted">
+        <bdi>{versionName}</bdi>
+      </p>
     </div>
   );
 }
