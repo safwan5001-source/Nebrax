@@ -181,7 +181,7 @@ describe('ExperienceBuilder — CUST-H1-2 Version Manager', () => {
     showMock.mockResolvedValue({ ok: true, data: detail({ id: 'pub-1', name: longName, state: 'published' }) });
     createMock.mockResolvedValue({
       ok: true,
-      data: detail({ id: 'draft-2', name: 'مسودة', state: 'draft', revision: 1 }),
+      data: detail({ id: 'draft-2', name: 'مسودة أ', state: 'draft', revision: 1 }),
     });
     const user = userEvent.setup();
     render(<ExperienceBuilder storefrontId="store-1" initialLocale="ar" />);
@@ -1825,5 +1825,146 @@ describe('ExperienceBuilder — CUST-H1-2 Version Manager', () => {
 
     expect(screen.getByLabelText('نسخة التصميم قيد التعديل').textContent).toContain('نسخة ب');
     expect(document.querySelector('[data-experience-builder]')?.getAttribute('data-selected-version-id')).toBe('b');
+  });
+
+  it('adopting a newly created version clears a stale conflict banner left over from a previous version (codex round 16)', async () => {
+    listMock.mockResolvedValue({ ok: true, data: [summary({ id: 'a', name: 'نسخة أ', revision: 0 })] });
+    showMock.mockResolvedValue({ ok: true, data: detail({ id: 'a', name: 'نسخة أ', revision: 0 }) });
+    renameMock.mockResolvedValue({ ok: false, reason: 'conflict', message: 'stale' });
+    createMock.mockResolvedValue({ ok: true, data: detail({ id: 'new-1', name: 'نسخة جديدة', revision: 0 }) });
+    const user = userEvent.setup();
+    render(<ExperienceBuilder storefrontId="store-1" initialLocale="ar" />);
+    await waitFor(() => expect(showMock).toHaveBeenCalledTimes(1));
+
+    // Produce a rename conflict on the currently open version A.
+    await openVersionManager(user);
+    await user.click(screen.getByRole('button', { name: 'إعادة تسمية' }));
+    await user.clear(screen.getByLabelText('اسم النسخة'));
+    await user.type(screen.getByLabelText('اسم النسخة'), 'اسم جديد');
+    await user.click(screen.getByRole('button', { name: 'حفظ الاسم' }));
+    await waitFor(() => expect(screen.getByRole('alert')).toBeTruthy());
+
+    // Create a new version — its adoption should not inherit A's stale
+    // conflict. The manager is already open from the rename above (only
+    // *selecting* a row closes it — submitting a rename does not).
+    await user.click(screen.getByRole('button', { name: '+ نسخة جديدة' }));
+    await user.type(screen.getByPlaceholderText('مثال: رمضان ١٤٤٨'), 'نسخة جديدة');
+    await user.click(screen.getByRole('button', { name: 'إنشاء' }));
+    await waitFor(() =>
+      expect(screen.getByLabelText('نسخة التصميم قيد التعديل').textContent).toContain('نسخة جديدة'),
+    );
+
+    // The banner (and its own unconfirmed-discard Reload action) must not
+    // still be showing over this brand-new, never-saved version.
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.getByRole('button', { name: 'حفظ المسودة' })).toHaveProperty('disabled', false);
+  });
+
+  it('reselecting the currently open row cancels a pending switch to another version instead of silently no-opping (codex round 16)', async () => {
+    listMock.mockResolvedValue({
+      ok: true,
+      data: [summary({ id: 'a', name: 'نسخة أ', revision: 0 }), summary({ id: 'b', name: 'نسخة ب', revision: 0 })],
+    });
+    let resolveShowB: (value: unknown) => void = () => {};
+    showMock.mockImplementation((_storefrontId: string, versionId: string) =>
+      versionId === 'a'
+        ? Promise.resolve({ ok: true, data: detail({ id: 'a', name: 'نسخة أ', revision: 0 }) })
+        : new Promise((resolve) => { resolveShowB = resolve; }),
+    );
+    const user = userEvent.setup();
+    render(<ExperienceBuilder storefrontId="store-1" initialLocale="ar" />);
+    await screen.findByText('اختر نسخة للتعديل');
+
+    await openVersionManager(user);
+    let manager = screen.getByRole('menu', { name: 'إدارة نسخ التصميم' });
+    const rowA = within(manager).getByText('نسخة أ').closest('li') as HTMLElement;
+    await user.click(within(rowA).getByRole('button', { name: 'فتح للتعديل' }));
+    await waitFor(() =>
+      expect(screen.getByLabelText('نسخة التصميم قيد التعديل').textContent).toContain('نسخة أ'),
+    );
+
+    // Start switching to B — its GET never resolves during this part of the test.
+    await openVersionManager(user);
+    manager = screen.getByRole('menu', { name: 'إدارة نسخ التصميم' });
+    const rowB = within(manager).getByText('نسخة ب').closest('li') as HTMLElement;
+    await user.click(within(rowB).getByRole('button', { name: 'فتح للتعديل' }));
+
+    // Change of mind — reopen the manager and click Open on the still-open A row.
+    await openVersionManager(user);
+    manager = screen.getByRole('menu', { name: 'إدارة نسخ التصميم' });
+    const rowAAgain = within(manager).getByText('نسخة أ').closest('li') as HTMLElement;
+    await user.click(within(rowAAgain).getByRole('button', { name: 'فتح للتعديل' }));
+
+    // B's switch now resolves — it must not take over after being cancelled.
+    resolveShowB({ ok: true, data: detail({ id: 'b', name: 'نسخة ب', revision: 0 }) });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(screen.getByLabelText('نسخة التصميم قيد التعديل').textContent).toContain('نسخة أ');
+    expect(document.querySelector('[data-experience-builder]')?.getAttribute('data-selected-version-id')).toBe('a');
+  });
+
+  it('a list refresh superseded by an adopted version settles out of "loading" instead of leaving the manager stuck on its skeleton (codex round 16)', async () => {
+    let resolveSecondList: (value: unknown) => void = () => {};
+    listMock
+      .mockResolvedValueOnce({
+        ok: true,
+        data: [summary({ id: 'draft-1', name: 'مسودة أ', revision: 0 }), summary({ id: 'pub-1', name: 'الحالية', state: 'published' })],
+      })
+      .mockReturnValueOnce(new Promise((resolve) => { resolveSecondList = resolve; })); // the delete-conflict's own internal refresh
+    showMock.mockImplementation((_storefrontId: string, versionId: string) =>
+      Promise.resolve({
+        ok: true,
+        data: versionId === 'pub-1'
+          ? detail({ id: 'pub-1', name: 'الحالية', state: 'published' })
+          : detail({ id: 'draft-1', name: 'مسودة أ', revision: 0 }),
+      }),
+    );
+    deleteMock.mockResolvedValue({ ok: false, reason: 'lifecycle_conflict', message: 'in use' });
+    createMock.mockResolvedValue({
+      ok: true,
+      data: detail({ id: 'new-1', name: 'مسودة من الحالية', revision: 0 }),
+    });
+    const user = userEvent.setup();
+    render(<ExperienceBuilder storefrontId="store-1" initialLocale="ar" />);
+    // The draft auto-selects (published is never a candidate) — switch
+    // explicitly to the published row to exercise its read-only shortcut.
+    await waitFor(() =>
+      expect(screen.getByLabelText('نسخة التصميم قيد التعديل').textContent).toContain('مسودة أ'),
+    );
+    await openVersionManager(user);
+    let manager = screen.getByRole('menu', { name: 'إدارة نسخ التصميم' });
+    const pubRow = within(manager).getByText('الحالية').closest('li') as HTMLElement;
+    await user.click(within(pubRow).getByRole('button', { name: 'عرض' }));
+    await waitFor(() => expect(screen.getByText('هذه النسخة منشورة ومقروءة فقط')).toBeTruthy());
+
+    // Start deleting the draft row — its 409 triggers an internal list
+    // refresh (listMock's second call) that we keep pending for now.
+    await openVersionManager(user);
+    manager = screen.getByRole('menu', { name: 'إدارة نسخ التصميم' });
+    const draftRow = within(manager).getByText('مسودة أ').closest('li') as HTMLElement;
+    await user.click(within(draftRow).getByRole('button', { name: 'حذف' }));
+    await user.click(within(draftRow).getByRole('button', { name: 'حذف النسخة' }));
+    await waitFor(() => expect(deleteMock).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(listMock).toHaveBeenCalledTimes(2));
+
+    // While that refresh is still pending, use the published shortcut to
+    // create a draft — its adoption bumps the shared request token, making
+    // the pending refresh above obsolete once it resolves.
+    await user.click(screen.getByRole('button', { name: 'إنشاء مسودة من هذه النسخة' }));
+    await waitFor(() =>
+      expect(screen.getByLabelText('نسخة التصميم قيد التعديل').textContent).toContain('مسودة من الحالية'),
+    );
+
+    // The superseded list refresh now finally resolves (a real network
+    // response arriving late) — it must settle the list state instead of
+    // leaving it stuck on "loading" forever with no retry affordance.
+    resolveSecondList({ ok: true, data: [summary({ id: 'draft-1', name: 'مسودة أ', revision: 0 })] });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    if (!screen.queryByRole('menu', { name: 'إدارة نسخ التصميم' })) {
+      await openVersionManager(user);
+    }
+    manager = screen.getByRole('menu', { name: 'إدارة نسخ التصميم' });
+    expect(within(manager).queryByText('جاري تحميل النسخ…')).toBeNull();
   });
 });

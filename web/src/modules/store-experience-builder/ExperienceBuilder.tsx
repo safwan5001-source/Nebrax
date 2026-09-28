@@ -227,6 +227,15 @@ export function ExperienceBuilder({
       // فات أوانها: متجر أو نسخة أحدث تولّت العرض أثناء هذا الطلب — لا تُكتب
       // فوق حالتها (كانت هذه الكتابة تسبق فحص `cancelled` في المستدعي، فتُصيب
       // `versions` بصفّ متجر آخر رغم أن المستدعي يتجاهل النتيجة لاحقاً).
+      // العملية المتفوّقة (تبنّي نسخة جديدة، مثلاً) لا تُصفِّر حالة تحميل هذه
+      // القائمة بالضرورة — تبقى عالقة على "loading" إلى الأبد بلا حتى وسيلة
+      // إعادة محاولة (تلك تظهر فقط لحالة "error")، رغم أن لا طلب فعلي قيد
+      // التنفيذ بعد الآن. الاستقرار إلى "ready" هنا آمن: لم نكتب فوق `versions`
+      // أعلاه، وإن كان لا يزال المتجر نفسه ولا تزال الحالة "loading" فعلاً (لم
+      // يُسوِّها استدعاءٌ آخر أحدث بالفعل) فلا ضرر من إنهائها.
+      if (storefrontIdRef.current === originStorefrontId) {
+        setVersionsListState((current) => (current === "loading" ? "ready" : current));
+      }
       return null;
     }
     if (!result.ok) {
@@ -324,7 +333,19 @@ export function ExperienceBuilder({
   }
 
   function selectVersion(target: PresentationVersionSummary) {
-    if (selectedVersion?.id === target.id) return;
+    if (selectedVersion?.id === target.id) {
+      // النسخة نفسها مفتوحة أصلاً فظاهرياً لا شيء يلزم فعله — لكن تبديلاً
+      // إلى نسخة *أخرى* قد يكون لا يزال معلَّقاً (بدأه التاجر ثم عاد وفتح هذا
+      // الصفّ نفسه عدولاً عنه). إبطاله صراحةً هنا يمنع اكتماله لاحقاً بصمت
+      // فيُبعد المحرِّر عن هذه النسخة رغم اختيارها للتوّ مجدداً.
+      if (versionSwitchingId && versionSwitchingId !== target.id) {
+        ++versionRequestTokenRef.current;
+        setVersionSwitchingId(null);
+        setBusy(null);
+        setNotice(null);
+      }
+      return;
+    }
     if (dirty && !window.confirm(t("versionSwitchDiscardConfirm"))) return;
     void applyVersionSelection(target);
   }
@@ -351,6 +372,12 @@ export function ExperienceBuilder({
     // السطر يبقى `busy === "saving"` عالقاً على النسخة الجديدة المفتوحة الآن
     // فيُعطَّل زرّ الحفظ حتى يبدّل التاجر النسخة ذهاباً وإياباً.
     setBusy(null);
+    // أي تعارض معلَّق يخصّ النسخة *السابقة* حتماً — النسخة الجديدة المتبنّاة
+    // هنا لم تُحفَظ قط فلا تعارض حقيقي لها. تركه قائماً يُبقي بانره ظاهراً
+    // فوق هذه النسخة الجديدة (رسالته عامة، لا تسمّي نسخة بعينها)، وضغط زرّه
+    // «تحديث النسخة» يُعيد تحميل هذه النسخة الجديدة نفسها *بلا* تأكيد تجاهل —
+    // فيمحو بصمت أي تعديل محلي عليها ظنّاً من التاجر أنه يحلّ تعارضاً حقيقياً.
+    setVersionConflict(null);
     setSelectedVersion(detail);
     setDraft(detail.config);
     setSaved(detail.config);
