@@ -12,8 +12,9 @@ use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
 /**
- * CUST-H1-1 — أساس ثابت النسخ (list/create/read/save/rename/delete). لا
- * نشر ولا جدولة هنا — تلك لاحقة (CUST-H1-3/CUST-H1-4). مرجعها المعماري:
+ * CUST-H1 — أساس النسخ المستقلة. CUST-H1-1 يوفّر
+ * list/create/read/save/rename/delete، وCUST-H1-3 يضيف النشر الفوري لنسخة
+ * محددة. الجدولة فقط تبقى لاحقة (CUST-H1-4). المرجع المعماري:
  * `docs/plans/store/CUST-H1-ARCH-1-THEME-VERSION-PERSISTENCE-SCHEDULING.md`
  * §7 (الحالة A)، §9، §10، §19، §20، §25.
  *
@@ -148,6 +149,202 @@ final class StorefrontPresentationVersionService
             }
 
             return $this->detail($version->fresh(), $head);
+        });
+    }
+
+    /**
+     * CUST-H1-3 — نشر فوري لنسخة محددة مع حماية مراجعة النسخة ورأس النشر.
+     *
+     * لا يلمس compatibility Draft. اللقطة العامة ومؤشر النسخة النشطة
+     * يتحركان ذرّياً تحت ترتيب الأقفال Storefront ← head ← Version.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function publishForCurrentTenant(
+        string $storefrontId,
+        string $versionId,
+        int $expectedRevision,
+        ?int $expectedPublishedRevision,
+        ?string $expectedActiveVersionId,
+    ): ?array {
+        try {
+            return $this->attemptPublish(
+                $storefrontId,
+                $versionId,
+                $expectedRevision,
+                $expectedPublishedRevision,
+                $expectedActiveVersionId,
+            );
+        } catch (QueryException $e) {
+            if (! $this->isUniqueViolation($e)) {
+                throw $e;
+            }
+
+            // حارس دفاعي لحالة رأس مفقود مع Version موجودة: إذا أنشأت
+            // معاملة أخرى الرأس بالتزامن نعيد المحاولة على معاملة جديدة.
+            return $this->attemptPublish(
+                $storefrontId,
+                $versionId,
+                $expectedRevision,
+                $expectedPublishedRevision,
+                $expectedActiveVersionId,
+            );
+        }
+    }
+
+    /** @return array<string, mixed>|null */
+    private function attemptPublish(
+        string $storefrontId,
+        string $versionId,
+        int $expectedRevision,
+        ?int $expectedPublishedRevision,
+        ?string $expectedActiveVersionId,
+    ): ?array {
+        return DB::transaction(function () use (
+            $storefrontId,
+            $versionId,
+            $expectedRevision,
+            $expectedPublishedRevision,
+            $expectedActiveVersionId,
+        ) {
+            $storefront = $this->lockOwnedStorefront($storefrontId);
+            if ($storefront === null) {
+                return null;
+            }
+
+            $head = StorefrontPresentation::query()
+                ->where('storefront_id', $storefront->id)
+                ->lockForUpdate()
+                ->first();
+
+            if ($head === null) {
+                StorefrontPresentation::create([
+                    'storefront_id' => $storefront->id,
+                    'tenant_id' => $storefront->tenant_id,
+                    'schema_version' => StorefrontPresentationNormalizer::VERSION,
+                    'draft_schema_version' => StorefrontPresentationNormalizer::VERSION,
+                    'draft_config' => $this->normalizer->defaultConfig(),
+                    'draft_revision' => 0,
+                ]);
+
+                $head = StorefrontPresentation::query()
+                    ->where('storefront_id', $storefront->id)
+                    ->lockForUpdate()
+                    ->first();
+            }
+
+            if ($head === null || $head->tenant_id !== $storefront->tenant_id) {
+                return null;
+            }
+
+            if ($head->compatibility_working_version_id === null) {
+                $draftConfig = $head->draft_config ?? $this->normalizer->defaultConfig();
+                $draftSchema = StorefrontPresentationNormalizer::effectiveSchemaTag(
+                    $draftConfig,
+                    (int) $head->draft_schema_version,
+                );
+                $this->assertSupportedSchema($draftSchema);
+
+                $compat = StorefrontPresentationVersion::create([
+                    'tenant_id' => $storefront->tenant_id,
+                    'storefront_id' => $storefront->id,
+                    'name' => StorefrontPresentationVersionBackfillService::DEFAULT_MIGRATION_DRAFT_NAME,
+                    'schema_version' => $draftSchema,
+                    'config' => $draftConfig,
+                    'revision' => max(1, (int) $head->draft_revision),
+                ]);
+
+                $head->forceFill(['compatibility_working_version_id' => $compat->id])->save();
+            }
+
+            $version = $this->lockOwnedVersion($storefront, $versionId);
+            if ($version === null) {
+                return null;
+            }
+
+            if ((int) $version->revision !== $expectedRevision) {
+                throw new StaleVersionRevisionException;
+            }
+
+            $currentPublishedRevision = $head->published_revision === null
+                ? null
+                : (int) $head->published_revision;
+
+            if (
+                $currentPublishedRevision !== $expectedPublishedRevision
+                || $head->active_version_id !== $expectedActiveVersionId
+            ) {
+                throw new VersionLifecycleConflictException(
+                    'حالة النشر تغيّرت. أعد تحميل النسخة وحالة المتجر قبل النشر.'
+                );
+            }
+
+            if (
+                $head->scheduled_version_id === $version->id
+                && $version->scheduled_for !== null
+            ) {
+                throw new VersionLifecycleConflictException(
+                    'هذه النسخة مجدولة. ألغِ الجدولة أولاً قبل النشر الفوري.'
+                );
+            }
+
+            $this->assertSupportedSchema((int) $version->schema_version);
+
+            if (is_array($head->published_config)) {
+                $publishedSchema = StorefrontPresentationNormalizer::effectiveSchemaTag(
+                    $head->published_config,
+                    $head->published_schema_version ?? $head->schema_version,
+                );
+                $this->assertSupportedSchema($publishedSchema);
+            }
+
+            $normalized = $this->normalizer->normalize(
+                $version->config ?? [],
+                (int) $version->schema_version,
+            );
+            $this->assertStoredSize($normalized);
+
+            // التطبيع وقت النشر ترقية تقنية لا تعديل تاجر؛ نحفظه على نفس
+            // revision حتى لا نخلق تعارض تحرير وهمياً بعد النشر.
+            if (
+                $version->config != $normalized
+                || (int) $version->schema_version !== StorefrontPresentationNormalizer::VERSION
+            ) {
+                $version->forceFill([
+                    'config' => $normalized,
+                    'schema_version' => StorefrontPresentationNormalizer::VERSION,
+                ])->save();
+            }
+
+            $published = is_array($head->published_config) ? $head->published_config : null;
+            $alreadyLive = $head->active_version_id === $version->id
+                && $published !== null
+                && $published == $normalized
+                && (int) ($head->published_schema_version ?? 0) === StorefrontPresentationNormalizer::VERSION;
+
+            if ($alreadyLive) {
+                return $this->detail($version->fresh(), $head);
+            }
+
+            $publishedAt = now();
+            $nextPublishedRevision = ($currentPublishedRevision ?? 0) + 1;
+
+            $head->forceFill([
+                'published_config' => $normalized,
+                'published_schema_version' => StorefrontPresentationNormalizer::VERSION,
+                'published_revision' => $nextPublishedRevision,
+                'published_at' => $publishedAt,
+                'schema_version' => StorefrontPresentationNormalizer::VERSION,
+                'active_version_id' => $version->id,
+            ])->save();
+
+            $version->forceFill([
+                'config' => $normalized,
+                'schema_version' => StorefrontPresentationNormalizer::VERSION,
+                'last_published_at' => $publishedAt,
+            ])->save();
+
+            return $this->detail($version->fresh(), $head->fresh());
         });
     }
 
