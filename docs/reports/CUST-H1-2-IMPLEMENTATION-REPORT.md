@@ -7,7 +7,7 @@
 ## Repository state
 
 - **Base SHA:** `2e9cdd058a50a2014dc0b4a3c5c0c3302c353616` (`origin/main` at task start — matched the SHA given in the task brief; verified with a fresh `git fetch origin main` before starting).
-- **Head SHA:** `01a4981` (post-round-5-review-fix; round-4 fix head was `c2033dd`; round-3 fix head was `892e1e1`; round-2 fix head was `0e3111c`; round-1 fix head was `fddba52`; initial implementation head was `3077ecf`)
+- **Head SHA:** `9a4209d` (post-round-6-review-fix; round-5 fix head was `01a4981`; round-4 fix head was `c2033dd`; round-3 fix head was `892e1e1`; round-2 fix head was `0e3111c`; round-1 fix head was `fddba52`; initial implementation head was `3077ecf`)
 - **Branch:** `claude/cust-h1-2-customizer-ux-23vvun`
 - **PR:** [#1085](https://github.com/safwan5001-source/Nebrax/pull/1085)
 
@@ -202,6 +202,19 @@ Three more P2 findings — a second Enter-key gate the round-3 fix missed, a del
 
 All three review threads were replied to individually (naming the fix commit `01a4981`) and resolved. `npx vitest run` (2187 tests, full suite) and `npm run build` both re-verified green after this round.
 
+### Automated review (`chatgpt-codex-connector`, round 6, reviewed `5bc6d32`, fixed in `9a4209d`)
+
+Three more P2 findings extending the round-4/5 patterns to row-write serialization and the retry/reload paths, plus one finding deliberately deferred rather than fixed.
+
+| Finding | Fix | Regression test |
+|---|---|---|
+| `versionBusy` is a single shared slot across all rows (one row operation at a time, by design). Starting a rename/duplicate on row A while row B's delete was in flight silently stole the slot, so B's Open button re-enabled mid-delete — the same risk the round-5 fix addressed, just reachable through a second row instead of a storefront switch. | Row action buttons (Open, Duplicate/Rename/Delete triggers, and their inline submit/confirm buttons) are now also disabled on every *other* row while any row has a delete in flight, scoped specifically to `busyAction === "delete"` — the one case where losing the busy signal risks the editor pointing at a removed document. Switching versions or renaming elsewhere while a non-delete op is pending remains supported (already tested). | `a pending delete on one row blocks starting a new write on another row until it settles (codex round 6)` |
+| The list-load "retry" action only refreshed the row data — the deterministic single-candidate auto-selection logic lived exclusively in the mount effect, so a successful retry on a store with exactly one eligible draft left nothing open and the original error notice still showing. | Extracted the mount effect's load-then-select flow into `loadAndSelectInitialVersion()`, reused by both the manager panel's and the inspector body's retry actions. | `a successful retry after a failed initial list load auto-selects a single eligible version and clears the stale error (codex round 6)` |
+| `handleDeleteVersion`'s lifecycle-conflict branch had the same "value computed before a second `await`, reused after it" bug the previous round fixed in the rename-conflict branch — a storefront switch during its own list refresh could apply store A's delete-conflict notice to store B's editor. | Re-checks the live storefront ref after `loadVersionList()` completes, same as the rename-conflict fix. | `switching storefronts while a delete-conflict list refresh is pending does not apply the notice to the new store (codex round 6)` |
+| `formatDateTime` renders `scheduledFor` in the browser's local timezone with no authoritative store timezone supplied. | **Deliberately deferred, not fixed** — replied on the thread rather than pushing a change. `src/lib/formatting.ts` explicitly documents *"without inventing a new timezone policy"*; hardcoding a timezone (Asia/Riyadh, the only real candidate given this product's Saudi-specific ZATCA/VAT/chart-of-accounts scope) for only this one field would create an inconsistency with every other timestamp in the same row and app, and no tenant/store timezone field exists in the data model to do it properly. This is a product decision (does Nebrax need an authoritative per-tenant timezone, and where would it live) that belongs with the repo owner, not something to guess at as a side effect of one row's label. | n/a — thread left open for the owner |
+
+Three of the four review threads were replied to individually (naming the fix commit `9a4209d`) and resolved; the timezone thread was replied to explaining the deferral and left **unresolved** for the owner's attention. `npx vitest run` (2190 tests, full suite) and `npm run build` both re-verified green after this round.
+
 ## Backward compatibility
 
 - `GET/PUT/POST …/presentation` and `…/presentation/publish` (legacy compatibility endpoints) are untouched on the backend and are no longer called by the Customizer UI at all — any other consumer of those routes is unaffected.
@@ -222,6 +235,7 @@ No frontend request body or path ever carries `tenant_id`/company id/authority f
 
 ## Risks / remaining work
 
+- **Owner decision needed:** the Scheduled row's "scheduled for" timestamp renders in the browser's local timezone (round-6 review finding, thread left unresolved on the PR — see that subsection above). Fixing it properly needs a decision on whether Nebrax should have an authoritative per-tenant timezone at all and, if so, where it's sourced from; not something this Horizon should decide unilaterally by hardcoding one into the shared formatter.
 - The Version Manager's per-row "Delete" client-side guard (`state === 'draft' && !selected`) is a defence-in-depth convenience, not a substitute for the server's own lifecycle checks (compatibility-working-version, which the API never exposes to the client) — a 409 there is expected, handled, and tested.
 - Tablet width (768px) is visually tight (title and version name both truncate aggressively) once no-overflow is guaranteed; this is functional and matches the existing header's own pre-CUST-H1-2 truncation behavior at that width, but has less breathing room than desktop. Acceptable for this Horizon; worth revisiting if the toolbar grows further in CUST-H1-3+.
 - No CI run has happened yet for this PR (about to be opened) — this report will need a follow-up note once CI reports back, per the monitoring/babysitting workflow.
