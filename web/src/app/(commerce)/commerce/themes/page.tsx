@@ -49,7 +49,7 @@ export default function CommerceThemesPage() {
 
     const preset = THEME_PRESETS.find((candidate) => candidate.id === theme.presetId);
     if (!preset) {
-      await deleteStorefrontPresentationVersion(selectedStoreId, created.data.id);
+      await deletePresentationVersion(selectedStoreId, created.data.id);
       setApplyingThemeId(null);
       setApplyError(t('themeGalleryApplyFailed'));
       return;
