@@ -7,7 +7,7 @@
 ## Repository state
 
 - **Base SHA:** `071dfa3061fbb0c9393e02bdcba0ee9d150b17cd` (`origin/main`, tip at task start — note: the baseline SHA given in the task brief, `d952542051956c324d846c8ac462c2f912ccd1f9`, was not the actual current `origin/main` tip; per instructions the fetched tip was used instead.)
-- **Head SHA:** `108f433` (fixes 8 P1 review findings across 3 rounds on top of the initial `63a799e` — see Review findings)
+- **Head SHA:** `058b319` (fixes 9 P1 review findings across 4 rounds on top of the initial `63a799e` — see Review findings)
 - **Branch:** `claude/cust-h1-1-version-persistence-1p9jc9`
 - **PR:** [#1082](https://github.com/safwan5001-source/Nebrax/pull/1082)
 
@@ -82,17 +82,17 @@ php artisan test --filter=CommerceModuleBoundaryTest
 php artisan test   # full suite, both DB_CONNECTION=sqlite and DB_CONNECTION=pgsql
 ```
 
-**New test files** (45 new test methods, including all review-fix regression tests):
+**New test files** (46 new test methods, including all review-fix regression tests):
 - `tests/Feature/StorefrontPresentationVersionBackfillTest.php` — 7 tests (migration Cases A–D, idempotency, public-snapshot-unchanged, multi-storefront).
 - `tests/Feature/StorefrontPresentationVersionApiTest.php` — 25 tests (list, create/duplicate incl. from an active source, tenant isolation incl. cross-storefront-same-tenant and cross-tenant `source_version_id`, read, save + stale-revision 409 + independent-version isolation, active-version-immutable-on-save 409, forward-schema fail-closed on read/save/duplicate, rename + stale 409, delete + active/scheduled/compatibility-working 409 + foreign 404, guest/self_service guards).
-- `tests/Feature/StorefrontPresentationLegacyCompatibilityForkTest.php` — 13 tests (lazy compat-version creation on GET, atomic Draft/compat sync on PUT, active→Draft fork with revision continuity, forward-schema fail-closed on legacy PUT/GET/publish for both stored and incoming schema tags, legacy publish promoting the forked compatibility Version to active, first-ever legacy save materializing a compatibility Version, bidirectional sync between the new Version API and legacy fields on save and on rename, and published-snapshot schema-tag independence — see Review findings below for the last 5).
+- `tests/Feature/StorefrontPresentationLegacyCompatibilityForkTest.php` — 14 tests (lazy compat-version creation on GET, atomic Draft/compat sync on PUT, active→Draft fork with revision continuity, forward-schema fail-closed on legacy PUT/GET/publish for both stored and incoming schema tags, legacy publish promoting the forked compatibility Version to active, first-ever legacy save materializing a compatibility Version, bidirectional sync between the new Version API and legacy fields on save and on rename, published-snapshot schema-tag independence, and cutover self-healing of a bypassing legacy writer — see Review findings below for the last 6).
 
-**Results (final, head `108f433`):**
+**Results (final, head `058b319`):**
 
 | DB | Command | Result |
 |---|---|---|
-| SQLite | `php artisan test` (full suite) | 27 failed, 49 skipped, 4761 passed (29916 assertions) |
-| PostgreSQL 16 | `php artisan test --filter=StorefrontPresentation` (all 6 presentation files) | 93 passed (611 assertions) — the SQLite-skipped `StorefrontPresentationPostgresConcurrencyTest` ran and passed here. |
+| SQLite | `php artisan test` (full suite) | 27 failed, 49 skipped, 4762 passed (29925 assertions) |
+| PostgreSQL 16 | `php artisan test --filter=StorefrontPresentation` (all 6 presentation files) | 94 passed (620 assertions) — the SQLite-skipped `StorefrontPresentationPostgresConcurrencyTest` ran and passed here. |
 
 **Failures (27, identical set on both engines) — pre-existing, unrelated to this PR:** all in `FuelAviRfidServiceTest`, `FuelReconciliationTest`, `FuelSaleApiTest`, `FuelSaleServiceTest`, `FuelSupplyReceivingApiTest`, `FuelSupplyReceivingTest` — every one fails with `Call to undefined function App\Services\bcmul()`. The local dev container this session ran in does not have the `bcmath` PHP extension installed; `.github/workflows/ci.yml` explicitly installs `bcmath` for CI (`extensions: … bcmath …`), so these are a local-environment gap, not a code defect, and none of the failing files touch Storefront/Presentation/Commerce-workspace code. Verified no other failures exist on either engine.
 
@@ -106,7 +106,7 @@ All CUST-H1-1 tests plus every pre-existing `StorefrontPresentation*`/`Storefron
 
 ## Review findings
 
-Eight P1 findings from the repo's automated bot reviewer (`chatgpt-codex-connector[bot]`) across three review rounds, all valid and fixed. Every finding pointed at a real bidirectional-sync or fail-closed gap between the new Version model and the legacy compatibility surface; none required widening the PR's scope or touching scheduling/publish-UI code.
+Nine P1 findings from the repo's automated bot reviewer (`chatgpt-codex-connector[bot]`) across four review rounds, all valid and fixed. Every finding pointed at a real bidirectional-sync or fail-closed gap between the new Version model and the legacy compatibility surface; none required widening the PR's scope or touching scheduling/publish-UI code.
 
 **Round 1** (reviewed `476fb03`, fixed in `9a6470e`):
 
@@ -131,7 +131,13 @@ Eight P1 findings from the repo's automated bot reviewer (`chatgpt-codex-connect
 | Renaming the compatibility Version through the new API bumped only the Version's own revision, leaving the head's `draft_revision` behind — a subsequent legacy PUT could compute a revision number that collided with a concurrent new-API edit instead of being rejected as stale. | `renameForCurrentTenant()` now locks the head and advances `draft_revision` to match whenever the renamed Version is the compatibility working Version. | `renaming_the_compatibility_version_keeps_the_legacy_draft_revision_in_sync` |
 | `present()` and `publishedSnapshotForStorefront()` normalized `published_config` using the single shared legacy `schema_version` column, which advances on every draft-only save (legacy or new-API) — so an unrelated draft edit could silently change how a still-v1 published snapshot renders on the live public storefront (e.g. missing homepage sections no longer restored). | Both methods now use `published_schema_version` for `published_config` and `draft_schema_version` for `draft_config`, independent of the shared column. | `draft_only_edits_do_not_change_how_a_migrated_v1_published_snapshot_is_normalized` |
 
-Every round's fixes were verified against the full `StorefrontPresentation*` suite and the full test suite on both SQLite and PostgreSQL before pushing (see Tests section for final counts). All 8 review threads are resolved.
+**Round 4** (reviewed `108f433`, fixed in `058b319`) — a rollout/cutover concern the architecture's own implementation slicing explicitly scopes into CUST-H1-1 ("rollout/cutover guard proving no head-only legacy writer remains before backfill"):
+
+| Finding | Fix | Regression test |
+|---|---|---|
+| During a rolling deployment window, an old (pre-CUST-H1-1) instance can still write `draft_config` directly to the head after the one-shot backfill already ran for that row. That code has no knowledge of Version rows, bypasses every sync path in this PR, and since the backfill skips rows whose pointers are already set, the resulting drift would otherwise be permanent — the Version API could expose stale content indefinitely. | `ensureCompatibilityWorkingVersion()` now always locks the resolved Version and reconciles it against the head's current `draft_config`/`draft_schema_version`/`draft_revision` on *every* call (not just first-migration), treating the head as authoritative on mismatch. Runs on every legacy GET and PUT, so drift self-heals on the next access instead of persisting; a no-op under normal (this-PR-only) operation since the two are always already in sync. | `a_legacy_writer_bypassing_version_sync_is_self_healed_on_next_access` |
+
+Every round's fixes were verified against the full `StorefrontPresentation*` suite and the full test suite on both SQLite and PostgreSQL before pushing (see Tests section for final counts). All 9 review threads are resolved.
 
 ## Backward compatibility
 
