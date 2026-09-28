@@ -242,4 +242,57 @@ class StorefrontPresentationVersionPublishApiTest extends TestCase
         )->assertStatus(422);
     }
 
+
+    /** @test */
+    public function publishing_a_new_version_retains_the_previous_live_version_row(): void
+    {
+        $auth = $this->registerTenant('ver-publish-retain', 'owner@ver-publish-retain.test');
+        $storefront = $this->seedStorefront($auth['tenant_id']);
+        $token = $this->withToken($auth['token']);
+
+        $first = $token->postJson($this->listPath($storefront->id), ['name' => 'الأول'])->assertCreated();
+        $firstId = $first->json('data.id');
+        $token->postJson($this->publishPath($storefront->id, $firstId), $this->body(1, null, null))->assertOk();
+
+        $second = $token->postJson($this->listPath($storefront->id), ['name' => 'الثاني'])->assertCreated();
+        $secondId = $second->json('data.id');
+
+        $token->postJson(
+            $this->publishPath($storefront->id, $secondId),
+            $this->body(1, 1, $firstId),
+        )->assertOk();
+
+        $this->assertDatabaseHas('storefront_presentation_versions', ['id' => $firstId]);
+        $this->assertDatabaseHas('storefront_presentation_versions', ['id' => $secondId]);
+        $this->assertSame(
+            $secondId,
+            DB::table('storefront_presentations')
+                ->where('storefront_id', $storefront->id)
+                ->value('active_version_id')
+        );
+    }
+
+    /** @test */
+    public function self_service_cannot_publish_a_version(): void
+    {
+        $auth = $this->registerTenant('ver-publish-self', 'owner@ver-publish-self.test');
+        $storefront = $this->seedStorefront($auth['tenant_id']);
+        $created = $this->withToken($auth['token'])
+            ->postJson($this->listPath($storefront->id), ['name' => 'نسخة'])
+            ->assertCreated();
+
+        $selfToken = $this->tokenForRole(
+            $auth['tenant_id'],
+            'self_service',
+            'self@ver-publish-self.test',
+        );
+
+        $this->withToken($selfToken)
+            ->postJson(
+                $this->publishPath($storefront->id, $created->json('data.id')),
+                $this->body(1, null, null),
+            )
+            ->assertForbidden();
+    }
+
 }
