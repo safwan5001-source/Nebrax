@@ -832,7 +832,7 @@ export function ExperienceBuilder({
         <PublishedReadOnlyNotice
           locale={locale}
           versionName={selectedVersion.name}
-          busy={versionBusy?.action === "duplicate"}
+          busy={versionBusy !== null}
           onCreateDraft={() => {
             const name =
               locale === "ar"

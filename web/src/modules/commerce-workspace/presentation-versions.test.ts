@@ -137,6 +137,22 @@ describe('commerce workspace presentation-versions API client', () => {
     expect(result).toEqual({ ok: false, reason: 'unsupported_schema', message: 'النسخة بمخطط أمامي.' });
   });
 
+  it('rejects a row with a missing state instead of silently defaulting it to draft (codex round 10)', async () => {
+    apiMock.mockResolvedValue({ data: [summary({ state: undefined })] });
+
+    const result = await listPresentationVersions('store-1');
+
+    expect(result).toEqual({ ok: false, reason: 'failed', message: 'invalid_payload' });
+  });
+
+  it('rejects a row with an unrecognized state instead of silently defaulting it to draft (codex round 10)', async () => {
+    apiMock.mockResolvedValue(detailEnvelope({ state: 'archived' }));
+
+    const result = await showPresentationVersion('store-1', 'v1');
+
+    expect(result).toEqual({ ok: false, reason: 'failed', message: 'invalid_payload' });
+  });
+
   it('saves with config + revision only', async () => {
     apiMock.mockResolvedValue(detailEnvelope({ revision: 2 }));
 

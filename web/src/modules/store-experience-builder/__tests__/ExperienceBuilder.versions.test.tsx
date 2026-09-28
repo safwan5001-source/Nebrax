@@ -1348,4 +1348,58 @@ describe('ExperienceBuilder — CUST-H1-2 Version Manager', () => {
 
     expect(screen.getByRole('button', { name: /إنشاء|جاري الإنشاء/ })).toHaveProperty('disabled', true);
   });
+
+  it("the published-version \"create draft\" action is blocked while any other row write is pending, not only a duplicate (codex round 10)", async () => {
+    listMock.mockResolvedValue({
+      ok: true,
+      data: [
+        summary({ id: 'pub-1', name: 'الحالية', state: 'published' }),
+        summary({ id: 'draft-1', name: 'مسودة أخرى', revision: 0 }),
+      ],
+    });
+    showMock.mockImplementation((_storefrontId: string, versionId: string) =>
+      Promise.resolve({
+        ok: true,
+        data: versionId === 'pub-1'
+          ? detail({ id: 'pub-1', name: 'الحالية', state: 'published' })
+          : detail({ id: 'draft-1', name: 'مسودة أخرى', revision: 0 }),
+      }),
+    );
+    renameMock.mockReturnValue(new Promise(() => {})); // never resolves during this test
+    const user = userEvent.setup();
+    render(<ExperienceBuilder storefrontId="store-1" initialLocale="ar" />);
+    // Two eligible candidates (one published, one draft) is not ambiguous —
+    // the draft auto-selects (the published one is never a candidate) —
+    // switch explicitly to the published row to exercise its read-only view.
+    await waitFor(() =>
+      expect(screen.getByLabelText('نسخة التصميم قيد التعديل').textContent).toContain('مسودة أخرى'),
+    );
+
+    await openVersionManager(user);
+    let manager = screen.getByRole('menu', { name: 'إدارة نسخ التصميم' });
+    const pubRow = within(manager).getByText('الحالية').closest('li') as HTMLElement;
+    await user.click(within(pubRow).getByRole('button', { name: 'عرض' }));
+    await waitFor(() => expect(screen.getByText('هذه النسخة منشورة ومقروءة فقط')).toBeTruthy());
+    expect(
+      (screen.getByRole('button', { name: 'إنشاء مسودة من هذه النسخة' }) as HTMLButtonElement).disabled,
+    ).toBe(false);
+
+    // Start (and leave pending) a rename on the *other* row — unrelated to
+    // this published version, and not a duplicate at all.
+    await openVersionManager(user);
+    manager = screen.getByRole('menu', { name: 'إدارة نسخ التصميم' });
+    const draftRow = within(manager).getByText('مسودة أخرى').closest('li') as HTMLElement;
+    await user.click(within(draftRow).getByRole('button', { name: 'إعادة تسمية' }));
+    await user.clear(screen.getByLabelText('اسم النسخة'));
+    await user.type(screen.getByLabelText('اسم النسخة'), 'اسم جديد');
+    await user.click(screen.getByRole('button', { name: 'حفظ الاسم' }));
+    await waitFor(() => expect(renameMock).toHaveBeenCalledTimes(1));
+
+    // `versionBusy` is the same single shared slot `handleDuplicateVersion`
+    // would write into — starting a duplicate now would race with (and could
+    // be silently cleared by) this unrelated rename settling first.
+    expect(
+      (screen.getByRole('button', { name: 'إنشاء مسودة من هذه النسخة' }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+  });
 });

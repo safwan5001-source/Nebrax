@@ -195,7 +195,8 @@ function mapSummary(row: unknown): PresentationVersionSummary | null {
   if (typeof record.id !== 'string' || record.id === '') return null;
   if (typeof record.storefront_id !== 'string' || record.storefront_id === '') return null;
   if (typeof record.name !== 'string') return null;
-  const state = record.state === 'published' || record.state === 'scheduled' ? record.state : 'draft';
+  if (record.state !== 'draft' && record.state !== 'scheduled' && record.state !== 'published') return null;
+  const state = record.state;
   if (typeof record.revision !== 'number' || !Number.isFinite(record.revision)) return null;
 
   return {
