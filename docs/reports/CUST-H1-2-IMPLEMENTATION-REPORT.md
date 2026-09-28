@@ -7,7 +7,7 @@
 ## Repository state
 
 - **Base SHA:** `2e9cdd058a50a2014dc0b4a3c5c0c3302c353616` (`origin/main` at task start — matched the SHA given in the task brief; verified with a fresh `git fetch origin main` before starting).
-- **Head SHA:** `fddba52` (post-review-fix; initial implementation head was `3077ecf`)
+- **Head SHA:** `0e3111c` (post-round-2-review-fix; round-1 fix head was `fddba52`; initial implementation head was `3077ecf`)
 - **Branch:** `claude/cust-h1-2-customizer-ux-23vvun`
 - **PR:** [#1085](https://github.com/safwan5001-source/Nebrax/pull/1085)
 
@@ -153,6 +153,18 @@ Three P1 findings, all real, same underlying class of bug (a previous version/st
 | Starting a Save on version A, then switching to version B while the `PUT` was still in flight, let A's later-arriving success response unconditionally restore A's config/selection — discarding whatever the merchant had already done on B. | `handleSave` now captures the shared request token before awaiting the `PUT` and re-checks it on completion; a save superseded by an intervening switch still syncs that version's entry in the manager's list (so its revision/updated-at stay correct) but never touches `draft`/`saved`/`selectedVersion` again. | `a save that resolves after the merchant switches to another version does not overwrite it` |
 
 All three review threads were replied to individually (naming the fix commit) and resolved. `npm test -- --run` (2174 tests, full suite) and `npm run build` both re-verified green after this round.
+
+### Automated review (`chatgpt-codex-connector`, round 2, reviewed `8075d9d`, fixed in `0e3111c`)
+
+Two more P1 findings and one P2, the same class of stale-identity-across-an-async-boundary bug as round 1, at three lifecycle points the round-1 fix hadn't reached yet: rename completion, create/duplicate completion, and list loading.
+
+| Finding | Fix | Regression test |
+|---|---|---|
+| A rename for the currently-open version A completing after the merchant had already opened B still restored A's metadata into `selectedVersion` (the async closure's `selectedVersion` reference is stale by the time the response arrives) — a subsequent Save could then write B's edited config into A under the revision the rename returned. | `handleRenameVersion` now captures `wasOpenAtStart = selectedVersion?.id === version.id` *before* the `await`, and combines it with the existing token/storefront `stillCurrent()` check: `setSelectedVersion` (success path) and the conflict-reload banner (conflict path) only fire when both hold. `handleDeleteVersion` got the same treatment for consistency. | `a rename that completes after switching to another version does not overwrite it (codex round 2)` |
+| `handleCreateVersion`/`handleDuplicateVersion` didn't capture the originating store/token before their `POST`, so `adoptCreatedVersion` unconditionally force-opened the new version even if the merchant had switched to a different store or a different version while the request was in flight — discarding whatever they'd started editing there. | Both handlers now capture `originStorefrontId`/`tokenAtStart` up front and branch three ways on completion: a different store now → drop the result; same store but a different version now open → update the manager's list entry only, never force-adopt; still current → adopt normally. | `a create superseded by a version switch updates only the manager list, not the open editor` |
+| `loadVersionList` committed `setVersions`/`setVersionsListState` unconditionally once the list request resolved — the round-1 token bump protected detail (`show`) requests but not list requests, so a slower store's list response could still overwrite a newer store's list after a fast `storefrontId` switch. | `loadVersionList` now captures the originating storefront/token before the `await` and checks both via the same `stillCurrent()` helper immediately before committing state; a stale response is dropped instead of applied. | `switching storefronts before a slower store's list response arrives never lets it overwrite the new store's list` |
+
+All three review threads were replied to individually (naming the fix commit `0e3111c`) and resolved. `npx vitest run` (2177 tests, full suite) and `npm run build` both re-verified green after this round.
 
 ## Backward compatibility
 
