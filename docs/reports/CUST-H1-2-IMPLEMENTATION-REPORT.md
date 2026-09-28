@@ -7,7 +7,7 @@
 ## Repository state
 
 - **Base SHA:** `2e9cdd058a50a2014dc0b4a3c5c0c3302c353616` (`origin/main` at task start — matched the SHA given in the task brief; verified with a fresh `git fetch origin main` before starting).
-- **Head SHA:** `43fbb31` (post-round-8-review-fix; round-7 fix head was `992d39b`; round-6 fix head was `9a4209d`; round-5 fix head was `01a4981`; round-4 fix head was `c2033dd`; round-3 fix head was `892e1e1`; round-2 fix head was `0e3111c`; round-1 fix head was `fddba52`; initial implementation head was `3077ecf`)
+- **Head SHA:** `9d3ffa4` (second merge-conflict reconciliation with main, see below; first reconciliation merge head was `d841b11`; post-round-8-review-fix head was `43fbb31`; round-7 fix head was `992d39b`; round-6 fix head was `9a4209d`; round-5 fix head was `01a4981`; round-4 fix head was `c2033dd`; round-3 fix head was `892e1e1`; round-2 fix head was `0e3111c`; round-1 fix head was `fddba52`; initial implementation head was `3077ecf`)
 - **Branch:** `claude/cust-h1-2-customizer-ux-23vvun`
 - **PR:** [#1085](https://github.com/safwan5001-source/Nebrax/pull/1085)
 
@@ -128,7 +128,7 @@ Screenshots were captured to `web/test-results/cust-h1-2-version-manager/` durin
 
 ## CI
 
-Workflow: `.github/workflows/web-ci.yml` (`npm run test` then `npm run build`, Node 22). Both commands verified green locally under the same invocations CI uses. CI itself will run once the PR is opened; this report will be updated if it surfaces anything not reproducible locally.
+Workflow: `.github/workflows/web-ci.yml` (`npm run test` then `npm run build`, Node 22). Both commands verified green locally under the same invocations CI uses. CI has since run across all 8 review rounds and both merge reconciliations (see "Merge-conflict reconciliation" below for the one real CI-caught regression, fixed in `9d3ffa4`); as of head `9d3ffa4` both jobs are green.
 
 ## Review findings
 
@@ -240,6 +240,39 @@ Two more P1 and two more P2 findings — two are extensions of the retry/reload 
 
 All four review threads were replied to individually (naming the fix commit `43fbb31`) and resolved. `npx vitest run` (2197 tests, full suite) and `npm run build` both re-verified green after this round.
 
+## Merge-conflict reconciliation with main (`d841b11`, `9d3ffa4`)
+
+`origin/main` advanced (PR #1088, "STORE-THEME-GALLERY-3 — Safe draft handoff") while this PR's round 1–8 review cycle was in progress, and produced a real merge conflict — not a mechanical one. #1088 was developed in parallel, unaware of this Horizon's rewrite, and independently:
+
+- Added its own `web/src/modules/commerce-workspace/presentation-versions.ts` (an **add/add** conflict) — a narrower client (`createStorefrontPresentationVersion`/`saveStorefrontPresentationVersion`/`deleteStorefrontPresentationVersion`, no list, no rename) against the same CUST-H1-1 backend endpoints this PR's fuller client (list/create/show/save/rename/delete) already covers.
+- Added a `versionId` prop to `ExperienceBuilder` bolted onto the **old**, pre-CUST-H1-2 single-version `loadStorefrontPresentation`/`saveStorefrontPresentation`/`publishStorefrontPresentation` model — the exact model this PR replaces entirely with the Version Manager.
+- Shipped a new Theme Gallery page (`commerce/themes`) that creates a draft version, applies a theme preset to it, and redirects to `/commerce/appearance?version=<id>` expecting `versionId` to open that exact draft.
+
+Picking either side outright would have broken something real and already merged: keeping this PR's code as-is would silently drop the Theme Gallery's redirect-and-open flow; keeping main's would discard this PR's entire Version Manager UI (create/rename/delete/switch/list) — the actual deliverable. This was flagged to the repository owner before resolving (see the PR's conversation); the owner asked for reconciliation, keeping this PR's architecture as canonical while restoring real support for `versionId`.
+
+**Resolution:**
+
+| Conflict | Resolution |
+|---|---|
+| `presentation-versions.ts` (add/add) | Kept this PR's version entirely (`git checkout --ours`) — it's a strict superset of what #1088's client needed. |
+| `ExperienceBuilder.tsx` imports/`handleSave`/`handlePublishGatedClick`/the Publish button | Kept this PR's Version Manager architecture entirely; dropped the legacy `presentation.ts` load/save/publish calls and the old `versionId`-based single-draft save path (main's) since `handleSave` already saves whatever `selectedVersion` is open, generically, with no special-casing needed. |
+| The mount effect (`storefrontId`/`!storefrontId` branches) | Kept this PR's round-8 reset logic (token bump, full state reset, `initialConfig`-seeded local mode) exactly; added `versionId` to the effect's dependency array (from main) so changing it alone re-triggers a load, matching #1088's original intent. |
+| `loadAndSelectInitialVersion()` | **New code**, not a conflict resolution: when `versionId` is provided, it now calls `applyVersionSelection({ id: versionId })` directly — bypassing the ambiguous-choice auto-select logic entirely — instead of guessing among list candidates. This is what actually restores the Theme Gallery's "open the exact draft I just created" behavior on top of the new architecture. |
+| `commerce/themes/page.tsx` (+ its test) | Updated the three call sites to this PR's function names (`createPresentationVersion`/`savePresentationVersion`/`deletePresentationVersion`) — signatures are compatible, so no other logic changed. |
+| `ExperienceBuilder.test.tsx`, `commerce/appearance/page.test.tsx` | Rewrote the one test in each file that exercised the old `versionId`-based legacy flow to instead verify the new direct-open behavior: opening `versionId` bypasses an *ambiguous* list (two eligible drafts) that would otherwise show the "choose a version" state, proving the explicit id wins over auto-select guessing. |
+
+`npx tsc --noEmit` (no new errors in any file this merge touches — same pre-existing, unrelated errors as before), `npx vitest run` (2227 tests, full suite), and `npm run build` all re-verified green after this merge. The PHP files main brought in (`StorefrontPresentationNormalizer.php` and its test) were not touched by this PR or this merge resolution — they arrived already-CI-green from main and are validated by this PR's own CI run on the merge commit, not re-run locally.
+
+### Second reconciliation — main's AWJ Market promotion (`9d3ffa4`)
+
+After `d841b11` was pushed, `origin/main` advanced again with PR #1091 ("feat: promote AWJ Market in Theme Gallery"), which touched the same `commerce/themes/page.tsx` this PR had just reconciled — promoting the AWJ Market theme from `planned` to `available` and adding a preset-lookup guard (`THEME_PRESETS.find` + `presetSelectionPatch`) before applying it. This was a narrower, self-contained change with no overlap with this PR's Version Manager work, so it merged with **no textual conflict** — `git merge origin/main` reported a clean auto-merge.
+
+That clean auto-merge was nonetheless semantically broken: PR #1091 was written against main's pre-reconciliation function name (`deleteStorefrontPresentationVersion`), and git's 3-way merge reapplied that literal call site on top of this branch without knowing it needed renaming to this PR's `deletePresentationVersion` — the same class of rename main keeps reintroducing every time it touches this file, because main's own `presentation-versions.ts` still uses the old names. The `web build (Next.js)` CI job caught it immediately as a type error (`Cannot find name 'deleteStorefrontPresentationVersion'`) on the merge commit `d841b11`'s corresponding pull-request test-merge ref.
+
+**Resolution:** one-line fix in `commerce/themes/page.tsx` — `deleteStorefrontPresentationVersion` → `deletePresentationVersion` — the only call site the merge got wrong; `presetSelectionPatch`/`THEME_PRESETS` imports and the new preset-guard logic needed no changes, since they don't reference the renamed API. Re-verified: `npm run build` (Next.js production build + type-check) and `npx vitest run` (2228 tests, full suite — one net-new test from PR #1091's own coverage) both green.
+
+**Pattern worth flagging to the owner:** this is the second time main has independently touched `commerce/themes/page.tsx` using the pre-reconciliation function names, because main's own copy of `presentation-versions.ts` was never updated to this PR's naming (by design — the reconciliation kept the rename scoped to this branch only, per the original owner decision). Every future main change to that file will keep needing this same one-line fix until either this PR merges (making the rename canonical) or main's `presentation-versions.ts` is renamed to match ahead of that.
+
 ## Backward compatibility
 
 - `GET/PUT/POST …/presentation` and `…/presentation/publish` (legacy compatibility endpoints) are untouched on the backend and are no longer called by the Customizer UI at all — any other consumer of those routes is unaffected.
@@ -263,7 +296,7 @@ No frontend request body or path ever carries `tenant_id`/company id/authority f
 - **Owner decision needed:** the Scheduled row's "scheduled for" timestamp renders in the browser's local timezone (round-6 review finding, thread left unresolved on the PR — see that subsection above). Fixing it properly needs a decision on whether Nebrax should have an authoritative per-tenant timezone at all and, if so, where it's sourced from; not something this Horizon should decide unilaterally by hardcoding one into the shared formatter.
 - The Version Manager's per-row "Delete" client-side guard (`state === 'draft' && !selected`) is a defence-in-depth convenience, not a substitute for the server's own lifecycle checks (compatibility-working-version, which the API never exposes to the client) — a 409 there is expected, handled, and tested.
 - Tablet width (768px) is visually tight (title and version name both truncate aggressively) once no-overflow is guaranteed; this is functional and matches the existing header's own pre-CUST-H1-2 truncation behavior at that width, but has less breathing room than desktop. Acceptable for this Horizon; worth revisiting if the toolbar grows further in CUST-H1-3+.
-- No CI run has happened yet for this PR (about to be opened) — this report will need a follow-up note once CI reports back, per the monitoring/babysitting workflow.
+- CI has run repeatedly across 8 review rounds and two merge reconciliations with `main`; the only CI-caught regression (a stale function name reintroduced by the second reconciliation) is documented above and fixed in `9d3ffa4`. This PR continues to be watched for new CI events and review comments per the monitoring/babysitting workflow.
 
 ## Next step
 
