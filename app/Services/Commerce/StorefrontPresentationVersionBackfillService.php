@@ -201,6 +201,26 @@ final class StorefrontPresentationVersionBackfillService
             return $version;
         }
 
+        // النسخة النشطة (المنشورة) غير قابلة للتعديل المباشر أبداً — ولو
+        // كان التعديل إصلاح انجراف. إن كانت نسخة العمل هي ذاتها النشطة
+        // (حالة الهجرة B قبل أي تشويك، وكاتبٌ قديم عدَّل draft_config
+        // مباشرة أثناء نافذة نشر متدرّج بلا معرفة بهذا التصنيف إطلاقاً)،
+        // شوّك أولاً بدل الكتابة فوق النسخة النشطة نفسها.
+        if ($lockedHead->active_version_id !== null && $lockedHead->active_version_id === $version->id) {
+            $fork = StorefrontPresentationVersion::create([
+                'tenant_id' => $lockedHead->tenant_id,
+                'storefront_id' => $lockedHead->storefront_id,
+                'name' => $version->name,
+                'schema_version' => (int) $lockedHead->draft_schema_version,
+                'config' => $lockedHead->draft_config ?? [],
+                'revision' => max(1, (int) $lockedHead->draft_revision),
+            ]);
+
+            $lockedHead->forceFill(['compatibility_working_version_id' => $fork->id])->save();
+
+            return $fork;
+        }
+
         $version->forceFill([
             'config' => $lockedHead->draft_config ?? [],
             'schema_version' => (int) $lockedHead->draft_schema_version,

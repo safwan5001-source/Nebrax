@@ -200,12 +200,33 @@ final class StorefrontPresentationService
             $this->assertStoredSize($normalized);
 
             $published = is_array($row->published_config) ? $row->published_config : null;
-            if (
-                $row->published_revision !== null
+            $contentUnchanged = $row->published_revision !== null
                 && (int) $row->draft_revision === (int) $row->published_revision
-                && $this->sameDocument($published, $normalized)
-            ) {
+                && $this->sameDocument($published, $normalized);
+            // نشر قديم أثناء نافذة نشر متدرّج قد يحدّث published_config دون
+            // أن يعرف active_version_id إطلاقاً — فحص "لا تغيير" وحده غير
+            // كافٍ؛ يجب أن يكون المؤشر مُرقّىً بالفعل أيضاً، وإلا بقيت نسخة
+            // قديمة مُعلَنة "منشورة" رغم تطابق المحتوى ظاهرياً.
+            $pointerAlreadyPromoted = $compat === null || $row->active_version_id === $compat->id;
+
+            if ($contentUnchanged && $pointerAlreadyPromoted) {
                 return $this->present($storefront, $row);
+            }
+
+            if ($contentUnchanged) {
+                // المحتوى بلا تغيير فعلاً — رقِّ المؤشر فقط، بلا إعادة كتابة
+                // published_at/published_revision لغياب تغيّر حقيقي في اللقطة.
+                $row->forceFill(['active_version_id' => $compat->id])->save();
+
+                if ($compat !== null) {
+                    $compat->forceFill([
+                        'config' => $normalized,
+                        'schema_version' => StorefrontPresentationNormalizer::VERSION,
+                        'last_published_at' => $row->published_at,
+                    ])->save();
+                }
+
+                return $this->present($storefront, $row->fresh());
             }
 
             $row->forceFill([

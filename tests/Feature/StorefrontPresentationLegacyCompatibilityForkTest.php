@@ -626,4 +626,107 @@ class StorefrontPresentationLegacyCompatibilityForkTest extends TestCase
 
         $token->getJson($this->legacyPath($seeded['storefront']->id))->assertStatus(409);
     }
+
+    /** @test */
+    public function legacy_publish_promotes_the_active_pointer_even_when_content_already_matches(): void
+    {
+        $auth = $this->registerTenant('publish-noop-still-promotes', 'owner@publish-noop-still-promotes.test');
+        $seeded = $this->seedWebStorefront($auth['tenant_id']);
+        $token = $this->withToken($auth['token']);
+
+        $created = $token->postJson($this->versionsPath($seeded['storefront']->id), ['name' => 'الأصل'])
+            ->assertCreated();
+        $originalActiveId = $created->json('data.id');
+        $token->putJson($this->versionsPath($seeded['storefront']->id).'/'.$originalActiveId, [
+            'config' => ['version' => 2, 'themePreset' => 'navy'],
+            'revision' => 1,
+        ])->assertOk();
+
+        DB::table('storefront_presentations')->where('storefront_id', $seeded['storefront']->id)->update([
+            'active_version_id' => $originalActiveId,
+            'compatibility_working_version_id' => $originalActiveId,
+            'draft_config' => json_encode(['version' => 2, 'themePreset' => 'navy']),
+            'draft_revision' => 2,
+            'draft_schema_version' => StorefrontPresentationNormalizer::VERSION,
+            'published_config' => json_encode(['version' => 2, 'themePreset' => 'navy']),
+            'published_revision' => 2,
+            'published_schema_version' => StorefrontPresentationNormalizer::VERSION,
+            'published_at' => now(),
+        ]);
+
+        // عميل قديم يعدّل — يُشوَّك (fork) كالمعتاد.
+        $token->putJson($this->legacyPath($seeded['storefront']->id), [
+            'config' => ['version' => 2, 'themePreset' => 'burgundy'],
+            'draft_revision' => 2,
+        ])->assertOk();
+
+        $headAfterFork = StorefrontPresentation::withoutGlobalScopes()->where('storefront_id', $seeded['storefront']->id)->first();
+        $forkId = $headAfterFork->compatibility_working_version_id;
+        $this->assertNotSame($originalActiveId, $forkId);
+
+        // يحاكي نشراً قديماً: يحدّث published_config/revision/at مباشرة
+        // (يطابق المسودة الآن) لكن لا يعرف active_version_id إطلاقاً فلا
+        // يلمسه — يبقى مشيراً إلى النسخة النشطة الأصلية القديمة.
+        DB::table('storefront_presentations')->where('id', $headAfterFork->id)->update([
+            'published_config' => json_encode(['version' => 2, 'themePreset' => 'burgundy']),
+            'published_revision' => 3,
+            'published_schema_version' => StorefrontPresentationNormalizer::VERSION,
+            'published_at' => now(),
+        ]);
+
+        // نشر لاحق: المحتوى يطابق ظاهرياً (لا تغيير) لكن المؤشر لم يُرقَّ —
+        // يجب أن يُرقَّى الآن رغم غياب تغيّر ظاهري في المحتوى.
+        $token->postJson($this->legacyPublishPath($seeded['storefront']->id), ['draft_revision' => 3])->assertOk();
+
+        $final = StorefrontPresentation::withoutGlobalScopes()->find($headAfterFork->id);
+        $this->assertSame($forkId, $final->active_version_id, 'يجب ترقية المؤشر حتى لو بدا النشر بلا تغيير ظاهري في المحتوى.');
+    }
+
+    /** @test */
+    public function a_legacy_writer_drifting_an_active_compatibility_version_forks_instead_of_overwriting_it(): void
+    {
+        $auth = $this->registerTenant('drift-active-forks', 'owner@drift-active-forks.test');
+        $seeded = $this->seedWebStorefront($auth['tenant_id']);
+        $token = $this->withToken($auth['token']);
+
+        $created = $token->postJson($this->versionsPath($seeded['storefront']->id), ['name' => 'المنشور'])
+            ->assertCreated();
+        $activeId = $created->json('data.id');
+        $token->putJson($this->versionsPath($seeded['storefront']->id).'/'.$activeId, [
+            'config' => ['version' => 2, 'themePreset' => 'navy'],
+            'revision' => 1,
+        ])->assertOk();
+
+        // يحاكي حالة هجرة B: نفس النسخة نشطة وهي نسخة العمل المتوافقة معاً.
+        DB::table('storefront_presentations')->where('storefront_id', $seeded['storefront']->id)->update([
+            'active_version_id' => $activeId,
+            'compatibility_working_version_id' => $activeId,
+            'draft_config' => json_encode(['version' => 2, 'themePreset' => 'navy']),
+            'draft_revision' => 2,
+            'draft_schema_version' => StorefrontPresentationNormalizer::VERSION,
+        ]);
+
+        // كاتب قديم يعدّل draft_config مباشرة متجاوزاً كل منطق المزامنة/التشويك.
+        DB::table('storefront_presentations')->where('storefront_id', $seeded['storefront']->id)->update([
+            'draft_config' => json_encode(['version' => 2, 'themePreset' => 'burgundy']),
+            'draft_revision' => 3,
+        ]);
+
+        // أول وصول لاحق (GET) يجب أن يشوّك بدل الكتابة فوق النسخة النشطة.
+        $token->getJson($this->legacyPath($seeded['storefront']->id))->assertOk();
+
+        $head = StorefrontPresentation::withoutGlobalScopes()->where('storefront_id', $seeded['storefront']->id)->first();
+        $this->assertSame($activeId, $head->active_version_id, 'مؤشر النسخة النشطة يجب ألا يتغيّر.');
+        $this->assertNotSame($activeId, $head->compatibility_working_version_id, 'يجب أن يتحوّل مؤشر نسخة العمل إلى فرع جديد.');
+
+        // مراجعتها 2 (أُنشئت بـ1، ثم حُفظت مرة عبر PUT النسخ قبل تعيينها
+        // نشطة) — المهم أنها لم تتغيّر بفعل انجراف الكاتب القديم.
+        $active = StorefrontPresentationVersion::withoutGlobalScopes()->find($activeId);
+        $this->assertSame('navy', $active->config['themePreset'], 'النسخة النشطة يجب ألا تتأثر بانجراف كاتبٍ قديم إطلاقاً.');
+        $this->assertSame(2, (int) $active->revision);
+
+        $fork = StorefrontPresentationVersion::withoutGlobalScopes()->find($head->compatibility_working_version_id);
+        $this->assertSame('burgundy', $fork->config['themePreset']);
+        $this->assertSame(3, (int) $fork->revision);
+    }
 }
