@@ -489,8 +489,22 @@ real regression from this diff:
   404), which a code defect reachable from this diff would reproduce locally too, and it
   did not. Treated as a CI-runner-specific timing flake and re-run once via
   `rerun_failed_jobs` (run `36394695349`) per the one-retry-to-confirm-a-flake
-  allowance — see the live PR for that re-run's outcome as of the time this section was
-  last edited.
+  allowance. **Confirmed a flake**: the re-run, and the fresh full CI run triggered by
+  the round-6 push (§22a), both passed this job cleanly (`success`) with no further
+  investigation needed.
+
+**Final status on head SHA `024fc940` (§3): all 9 check runs green** —
+`storefront (lint + typecheck + test)`, `php artisan test (L11, sqlite)` ×2,
+`php artisan test (L11, pgsql)` ×2, `web build (Next.js)` ×2, `merchant preview visual
+QA`, `published footer visual QA` (duplicated runs are from `ci.yml`/`web-ci.yml` and
+`store-brand-qa.yml` both triggering on the same push). `mergeable_state: "clean"`, no
+merge conflict against `main`. All 9 Codex review threads resolved (§22a). No repo
+gate check (e.g. a "Claude Approvals" run) is configured on this PR beyond the 6 CI job
+names above.
+
+The PR is genuinely review-ready: green, mergeable, no open review threads. Per this
+Horizon's authorization, merge and deployment remain explicitly out of scope — this PR
+is left open, subscribed, and watched for further activity rather than merged.
 
 _(This section reflects state as of head SHA in §3; see the PR itself for the current
 live status of any in-flight re-run.)_
