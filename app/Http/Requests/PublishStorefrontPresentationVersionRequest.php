@@ -29,8 +29,8 @@ class PublishStorefrontPresentationVersionRequest extends FormRequest
     {
         return [
             'revision' => ['required', 'integer', 'min:0'],
-            'expected_published_revision' => ['required', 'nullable', 'integer', 'min:0'],
-            'expected_active_version_id' => ['required', 'nullable', 'uuid'],
+            'expected_published_revision' => ['present', 'nullable', 'integer', 'min:0'],
+            'expected_active_version_id' => ['present', 'nullable', 'uuid'],
         ];
     }
 
