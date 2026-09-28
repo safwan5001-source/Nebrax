@@ -111,9 +111,21 @@ export function StorefrontPreviewCanvas({
     PREVIEW_STORE_NAME[locale],
   );
   const vars = presentationCssVars(config.primaryColor, config.radius) as CSSProperties;
-  const compact = viewport === "mobile" || config.header.style === "compact";
+  // The published Header only ties `header.style === "compact"` to two things:
+  // which logo variant renders, and whether the utility strip shows at all
+  // (`(storefront)/layout.tsx`, `Header.tsx`). Every other difference below —
+  // the mobile identity grid, search placement, category nav, bottom nav,
+  // product-grid columns — is the published shell's own `md`/`lg` responsive
+  // behavior, which this fixed-width preview box can only approximate by
+  // simulating the selected viewport, never by a merchant's header-style
+  // choice. Conflating the two made every Market desktop preview render as
+  // if it were mobile, since Market's starting bundle sets header.style to
+  // compact by default.
+  const mobileViewport = viewport === "mobile";
+  const headerStyleCompact = config.header.style === "compact";
+  const compact = mobileViewport || headerStyleCompact;
   const logo =
-    compact && config.branding.compactLogoDataUrl
+    headerStyleCompact && config.branding.compactLogoDataUrl
       ? config.branding.compactLogoDataUrl
       : config.branding.logoDataUrl;
   const whatsappHref =
@@ -130,6 +142,37 @@ export function StorefrontPreviewCanvas({
       : null;
   const density = config.density === "compact" ? "compact" : "comfortable";
   const cardPad = config.productCard === "compact" ? "p-2.5" : "p-3";
+  // The exact fixed heights ProductCard.tsx itself resolves to at each
+  // breakpoint — not the `sm:`/`md:` classes themselves. This preview frame
+  // is a plain, width-constrained div rendered inside the real Customizer
+  // page (`data-preview-frame` in ExperienceBuilder.tsx), not an iframe, so
+  // Tailwind's responsive prefixes would evaluate against the host browser's
+  // actual viewport rather than the simulated device width — a desktop host
+  // previewing "mobile" would still get `md:h-40`. Resolving the height
+  // explicitly from the `viewport` prop is the only way this preview can
+  // match the simulated device rather than the host's real window. None of
+  // this preview's three device widths (390/768/1280) ever land in the
+  // published `sm` tier (640–767px), so only base/`md` are reachable here.
+  const cardImageHeight =
+    viewport === "mobile"
+      ? config.themePreset === "awj-market"
+        ? "h-28"
+        : "h-36"
+      : config.themePreset === "awj-market"
+        ? "h-40"
+        : "h-52";
+  // Same host-browser-vs-simulated-device problem as `cardImageHeight` above,
+  // for the New Arrivals grid's column count. This preview section represents
+  // the homepage shelf, which the published storefront renders via
+  // `NewArrivals.tsx` — not the (differently-breakpointed) `ProductGrid.tsx`
+  // used for catalog/category listing pages. `NewArrivals.tsx` uses
+  // `grid-cols-2 sm:grid-cols-3 lg:grid-cols-4` (`sm` at 640px, `lg` at
+  // 1024px): mobile(390) sits below `sm` for 2 columns, tablet(768) sits at
+  // or above `sm` but below `lg` for 3, and desktop(1280) sits at or above
+  // `lg` for 4 — all three of this preview's simulated widths land in a
+  // different tier here.
+  const newArrivalsColumns =
+    viewport === "mobile" ? "grid-cols-2" : viewport === "tablet" ? "grid-cols-3" : "grid-cols-4";
   const enabledSocial = config.social.flatMap((item) => {
     if (!item.enabled || !isOfficialSocialNetwork(item.network)) return [];
     const href = sanitizeExternalUrl(item.url);
@@ -221,12 +264,12 @@ export function StorefrontPreviewCanvas({
           <div
             className={cn(
               storeContainerClassName,
-              compact
+              mobileViewport
                 ? "grid grid-cols-[1fr_minmax(0,1fr)_1fr] items-center gap-2 py-2"
                 : "flex items-center gap-6 py-3",
             )}
           >
-            {compact && (
+            {mobileViewport && (
               <span className="text-xs font-medium text-store-muted-foreground">
                 {t("home")}
               </span>
@@ -250,7 +293,7 @@ export function StorefrontPreviewCanvas({
                 "inline-flex min-w-0 max-w-full",
                 onSelectChrome && "awj-preview-section",
                 selectedChrome === "branding" && "awj-preview-section-selected",
-                compact && "justify-self-center",
+                mobileViewport && "justify-self-center",
               )}
             >
               <StoreBrand
@@ -261,14 +304,14 @@ export function StorefrontPreviewCanvas({
                 linked={!onSelectChrome}
               />
             </button>
-            {config.header.showSearch && !compact && (
+            {config.header.showSearch && !mobileViewport && (
               <div className="flex min-h-10 flex-1 items-center gap-2 rounded-store border border-store-border bg-store-surface px-3 text-sm text-store-muted-foreground">
                 <Search className="size-4" aria-hidden />
                 {t("search")}
               </div>
             )}
-            <div className={cn("flex items-center gap-1", compact && "justify-self-end")}>
-              {config.header.showAccount && !compact && (
+            <div className={cn("flex items-center gap-1", mobileViewport && "justify-self-end")}>
+              {config.header.showAccount && !mobileViewport && (
                 <span className="inline-flex size-9 items-center justify-center text-store-foreground">
                   <User className="size-5" aria-hidden />
                   <span className="sr-only">{t("account")}</span>
@@ -277,11 +320,11 @@ export function StorefrontPreviewCanvas({
               {config.header.showCart && (
                 <span className="inline-flex h-9 items-center gap-1.5 rounded-store px-2 text-sm font-medium text-store-foreground">
                   <ShoppingBag className="size-5" aria-hidden />
-                  {!compact && t("cart")}
+                  {!mobileViewport && t("cart")}
                 </span>
               )}
             </div>
-            {config.header.showSearch && compact && (
+            {config.header.showSearch && mobileViewport && (
               <div className="col-span-3 flex min-h-9 items-center gap-2 rounded-store border border-store-border px-3 text-xs text-store-muted-foreground">
                 <Search className="size-3.5" aria-hidden />
                 {t("search")}
@@ -290,7 +333,7 @@ export function StorefrontPreviewCanvas({
           </div>
         </div>
 
-        {(config.header.showCategoryNav || extraNav.length > 0) && !compact && (
+        {(config.header.showCategoryNav || extraNav.length > 0) && !mobileViewport && (
           <nav
             aria-label={t("sectionCategories")}
             className="border-b border-store-border bg-store-surface-muted"
@@ -392,18 +435,13 @@ export function StorefrontPreviewCanvas({
               return (
                 <section key="newArrivals" aria-labelledby="preview-arrivals">
                   <SectionRule title={t("newArrivals")} action={t("viewAll")} />
-                  <ul
-                    className={cn(
-                      "mt-4 grid gap-3",
-                      compact ? "grid-cols-2" : "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4",
-                    )}
-                  >
+                  <ul className={cn("mt-4 grid gap-3", newArrivalsColumns)}>
                     {PREVIEW_PRODUCTS.map((product) => (
                       <li
                         key={product.id}
                         className="overflow-hidden rounded-store border border-store-border bg-store-surface"
                       >
-                        <div className="aspect-square bg-store-surface-muted" />
+                        <div className={cn(cardImageHeight, "bg-store-surface-muted")} />
                         <div className={cardPad}>
                           <p className="text-[11px] text-store-muted-foreground">
                             {product.category[locale]}
@@ -848,7 +886,7 @@ export function StorefrontPreviewCanvas({
         </div>
       </footer>
 
-      {compact && (
+      {mobileViewport && (
         <nav
           aria-label={t("home")}
           className="sticky bottom-0 border-t border-store-border bg-store-surface"
@@ -889,7 +927,7 @@ export function StorefrontPreviewCanvas({
             "absolute z-30 inline-flex size-12 items-center justify-center rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#111827]",
             onSelectChrome && "awj-preview-section",
             selectedChrome === "whatsapp" && "awj-preview-section-selected",
-            compact ? "end-3 bottom-16" : "end-4 bottom-4",
+            mobileViewport ? "end-3 bottom-16" : "end-4 bottom-4",
           )}
         >
           <OfficialSocialMark network="whatsapp" size="floating" />
