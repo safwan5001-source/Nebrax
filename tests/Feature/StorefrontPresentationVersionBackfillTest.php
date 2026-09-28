@@ -263,4 +263,91 @@ class StorefrontPresentationVersionBackfillTest extends TestCase
         $version = StorefrontPresentationVersion::withoutGlobalScopes()->first();
         $this->assertSame($withDraft->id, $version->storefront_id);
     }
+
+    /**
+     * Round-8 review: حذف متجرٍ ناعماً (`SoftDeletes`) قبل هذا الترحيل يترك
+     * صفّ عرضه كما هو — الحذف الناعم UPDATE لا DELETE حقيقياً، فلا يُفعِّل
+     * `cascadeOnDelete()` إطلاقاً. بلا استبعاد صريح، كان `backfillAll()` غير
+     * المقيَّد بنطاق (`withoutGlobalScopes()`) يلتقط هذا الصفّ اليتيم، فيحاول
+     * إنشاء نسخة له تفشل بنيوياً في `StorefrontPresentationVersion::booted()`
+     * (لأن بحثها عن المتجر عبر `Storefront::withoutGlobalScope(TenantScope::class)`
+     * لا يزال يطبّق `SoftDeletingScope` فيُعيد null) — فيُفشِل الهجرة الجماعية
+     * كلّها بدل تجاهل هذا الصفّ وحده.
+     */
+    /** @test */
+    public function backfill_all_skips_a_presentation_whose_storefront_was_soft_deleted_instead_of_aborting(): void
+    {
+        $auth = $this->registerTenant('backfill-skips-trashed', 'owner@backfill-skips-trashed.test');
+        $live = $this->seedWebStorefront($auth['tenant_id'], ['slug' => 'live']);
+        $trashed = $this->seedWebStorefront($auth['tenant_id'], ['slug' => 'trashed']);
+
+        $liveRowId = $this->insertLegacyRow($live, [
+            'draft_config' => json_encode(['version' => 2, 'themePreset' => 'navy']),
+            'draft_revision' => 1,
+        ]);
+        $trashedRowId = $this->insertLegacyRow($trashed, [
+            'draft_config' => json_encode(['version' => 2, 'themePreset' => 'sand']),
+            'draft_revision' => 1,
+        ]);
+
+        $trashed->delete();
+        $this->assertSoftDeleted('storefronts', ['id' => $trashed->id]);
+        // تأكيد أن صفّ العرض اليتيم بقي قائماً فعلاً (لا cascade حقيقي).
+        $this->assertDatabaseHas('storefront_presentations', ['id' => $trashedRowId]);
+
+        $created = $this->backfill()->backfillAll();
+
+        $this->assertSame(1, $created, 'يجب أن يُهاجَر صفّ المتجر الحيّ وحده — لا استثناء يُفشِل الدفعة كلّها.');
+
+        $liveHead = StorefrontPresentation::withoutGlobalScopes()->find($liveRowId);
+        $this->assertNotNull($liveHead->compatibility_working_version_id);
+
+        $trashedHead = StorefrontPresentation::withoutGlobalScopes()->find($trashedRowId);
+        $this->assertNull($trashedHead->compatibility_working_version_id, 'صفّ المتجر المحذوف ناعماً يجب ألا يُهاجَر ضمن الدفعة الجماعية.');
+        $this->assertNull($trashedHead->active_version_id);
+    }
+
+    /**
+     * Round-8 review: التصالح (`reconcileWithLegacyHead`) كان يكتب
+     * `draft_schema_version` **عمود الرأس** حرفياً إلى النسخة، لا الوسم
+     * المضمَّن في `draft_config` نفسه. كاتبٌ قديم يكتب `draft_config` مباشرة
+     * لا يعرف هذا العمود إطلاقاً فيتركه متخلّفاً (1) رغم أن المحتوى v2 —
+     * فتُوسَم النسخة المُصالَحة/المُشوَّكة خطأً بمخطط قديم، وقراءتها لاحقاً
+     * عبر واجهة النسخ الدقيقة تُحيي أقساماً افتراضية محذوفة عمداً.
+     */
+    /** @test */
+    public function reconciling_a_drifted_head_preserves_the_embedded_draft_tag_even_when_the_column_is_stale(): void
+    {
+        $auth = $this->registerTenant('reconcile-embedded-draft-tag', 'owner@reconcile-embedded-draft-tag.test');
+        $storefront = $this->seedWebStorefront($auth['tenant_id']);
+
+        $rowId = $this->insertLegacyRow($storefront, [
+            'draft_config' => json_encode(['version' => 2, 'themePreset' => 'navy']),
+            'draft_revision' => 1,
+            'draft_schema_version' => 2,
+        ]);
+
+        $this->backfill()->backfillAll();
+        $head = StorefrontPresentation::withoutGlobalScopes()->find($rowId);
+        $compatId = $head->compatibility_working_version_id;
+        $this->assertNotNull($compatId);
+
+        // كاتبٌ قديم يعدّل draft_config مباشرة إلى مستند v2 (يحمل 'version' => 2
+        // مضمَّناً) لكنه لا يعرف عمود draft_schema_version إطلاقاً فيتركه
+        // متخلّفاً عند 1 رغم أن المحتوى v2 فعلياً.
+        DB::table('storefront_presentations')->where('id', $head->id)->update([
+            'draft_config' => json_encode(['version' => 2, 'themePreset' => 'burgundy']),
+            'draft_revision' => 2,
+            'draft_schema_version' => 1,
+        ]);
+
+        DB::transaction(function () use ($rowId) {
+            $locked = StorefrontPresentation::withoutGlobalScopes()->whereKey($rowId)->lockForUpdate()->first();
+            $this->backfill()->ensureCompatibilityWorkingVersion($locked);
+        });
+
+        $reconciled = StorefrontPresentationVersion::withoutGlobalScopes()->find($compatId);
+        $this->assertSame(2, (int) $reconciled->schema_version, 'الوسم المضمَّن (v2) يجب أن يُستعمل عند التصالح، لا عمود draft_schema_version المتخلّف.');
+        $this->assertSame('burgundy', $reconciled->config['themePreset']);
+    }
 }

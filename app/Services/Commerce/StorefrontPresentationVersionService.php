@@ -333,9 +333,15 @@ final class StorefrontPresentationVersionService
             }
         }
 
+        // وسم الرأس المضمَّن هو مصدر الحقيقة لا عمود `draft_schema_version`
+        // وحده — كاتبٌ قديم أنشأ هذا الرأس بعد هذه الهجرة مباشرة قد لا
+        // يعرف هذا العمود إطلاقاً فيتركه عند الافتراض (1) رغم أن محتواه v2
+        // فعلياً (راجع `StorefrontPresentationNormalizer::effectiveSchemaTag()`).
+        $draftConfig = $lockedHead->draft_config ?? $this->normalizer->defaultConfig();
+
         return [
-            $lockedHead->draft_config ?? $this->normalizer->defaultConfig(),
-            (int) $lockedHead->draft_schema_version,
+            $draftConfig,
+            StorefrontPresentationNormalizer::effectiveSchemaTag($draftConfig, (int) $lockedHead->draft_schema_version),
         ];
     }
 

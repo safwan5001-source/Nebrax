@@ -323,6 +323,27 @@ final class StorefrontPresentationNormalizer
         return strlen((string) json_encode($config, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
     }
 
+    /**
+     * الوسم الفعلي لمستند مخزَّن (مسودة أو منشور، رأس أو نسخة على حدّ سواء):
+     * حقل `version` المضمَّن داخل الوثيقة نفسها أولاً (تكتبه `normalize()`
+     * عند كل حفظ فعلي، قديماً كان الكاتب أو جديداً، فلا يتخلَّف أبداً عن
+     * الشكل الحقيقي للمحتوى)، ثم عمود قاعدة البيانات المنفصل احتياطاً فقط
+     * لمستند بلا حقل مضمَّن. عمود كـ`draft_schema_version` قد يتخلَّف عن
+     * كاتبٍ قديم لا يعرفه (مثلاً صفّ أُدرج مباشرة بإصدار تطبيق سابق على
+     * CUST-H1-1 فحصل على قيمة العمود الافتراضية رغم أن محتواه v2 فعلياً) —
+     * الوسم المضمَّن هو مصدر الحقيقة، أياً كان مصدر القراءة أو النسخ.
+     *
+     * @param  array<string, mixed>  $config
+     */
+    public static function effectiveSchemaTag(array $config, ?int $columnFallback): int
+    {
+        if (isset($config['version']) && is_numeric($config['version'])) {
+            return (int) $config['version'];
+        }
+
+        return $columnFallback ?? 1;
+    }
+
     public function sanitizeExternalUrl(?string $value): ?string
     {
         $trimmed = trim((string) $value);

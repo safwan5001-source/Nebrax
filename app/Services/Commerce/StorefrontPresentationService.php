@@ -290,24 +290,16 @@ final class StorefrontPresentationService
     }
 
     /**
-     * الوسم الفعلي لمستند مخزَّن (مسودة أو منشور على حدّ سواء): حقل `version`
-     * المضمَّن داخل الوثيقة نفسها أولاً (يكتبه `normalize()` عند كل حفظ فعلي،
-     * قديماً كان الكاتب أو جديداً، فلا يتخلَّف أبداً عن الشكل الحقيقي
-     * للمحتوى)، ثم عمود قاعدة البيانات المنفصل احتياطاً فقط لمستند بلا حقل
-     * مضمَّن. عمود `draft_schema_version`/`published_schema_version` قد
-     * يتخلَّف عن كاتبٍ قديم لا يعرف هذا العمود إطلاقاً (مثلاً صفّ أُدرج
-     * مباشرة بإصدار تطبيق سابق على CUST-H1-1، فحصل على قيمة العمود
-     * الافتراضية رغم أن محتواه v2 فعلياً) — الوسم المضمَّن هو مصدر الحقيقة.
+     * الوسم الفعلي لمستند مخزَّن (مسودة أو منشور على حدّ سواء) — يفوّض إلى
+     * `StorefrontPresentationNormalizer::effectiveSchemaTag()` المشتركة، التي
+     * تستعملها أيضاً خدمة الهجرة/التصالح والنسخ الجديدة، فلا يبقى منطق
+     * أولوية الوسم المضمَّن مكرَّراً في أكثر من مكان.
      *
      * @param  array<string, mixed>  $config
      */
     private function effectiveSchemaTag(array $config, ?int $columnFallback): int
     {
-        if (isset($config['version']) && is_numeric($config['version'])) {
-            return (int) $config['version'];
-        }
-
-        return $columnFallback ?? 1;
+        return StorefrontPresentationNormalizer::effectiveSchemaTag($config, $columnFallback);
     }
 
     /**

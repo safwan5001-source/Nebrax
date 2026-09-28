@@ -44,6 +44,14 @@ final class StorefrontPresentationVersionBackfillService
         StorefrontPresentation::withoutGlobalScopes()
             ->whereNull('active_version_id')
             ->whereNull('compatibility_working_version_id')
+            // متجرٌ حُذف حذفاً ناعماً (`SoftDeletes`) قبل هذا الترحيل يترك
+            // صفّ عرضه كما هو — الحذف الناعم UPDATE لا DELETE حقيقياً،
+            // فلا يُفعِّل `cascadeOnDelete()` إطلاقاً. `whereHas('storefront')`
+            // يستبعد هذه الصفوف اليتيمة: علاقة `storefront()` تستعمل نطاقات
+            // `Storefront` الافتراضية الخاصة بها (`SoftDeletingScope` يستبعد
+            // المحذوف؛ `TenantScope` بلا أثر هنا لغياب سياق مستأجر HTTP)،
+            // فتبقى غير مهاجَرة الآن وتُهاجَر كسولاً إن أُعيد المتجر لاحقاً.
+            ->whereHas('storefront')
             ->orderBy('id')
             ->chunkById(100, function ($rows) use (&$count) {
                 foreach ($rows as $row) {
@@ -216,13 +224,23 @@ final class StorefrontPresentationVersionBackfillService
         // (حالة الهجرة B قبل أي تشويك، وكاتبٌ قديم عدَّل draft_config
         // مباشرة أثناء نافذة نشر متدرّج بلا معرفة بهذا التصنيف إطلاقاً)،
         // شوّك أولاً بدل الكتابة فوق النسخة النشطة نفسها.
+        // وسم الرأس المضمَّن هو مصدر الحقيقة لا عمود `draft_schema_version`
+        // وحده — كاتبٌ قديم يكتب مباشرة إلى `draft_config` لا يعرف هذا
+        // العمود إطلاقاً فيتركه متخلّفاً رغم أن محتواه v2 فعلياً (راجع
+        // `StorefrontPresentationNormalizer::effectiveSchemaTag()`).
+        $draftConfig = $lockedHead->draft_config ?? [];
+        $effectiveDraftSchemaVersion = StorefrontPresentationNormalizer::effectiveSchemaTag(
+            $draftConfig,
+            (int) $lockedHead->draft_schema_version,
+        );
+
         if ($lockedHead->active_version_id !== null && $lockedHead->active_version_id === $version->id) {
             $fork = StorefrontPresentationVersion::create([
                 'tenant_id' => $lockedHead->tenant_id,
                 'storefront_id' => $lockedHead->storefront_id,
                 'name' => $version->name,
-                'schema_version' => (int) $lockedHead->draft_schema_version,
-                'config' => $lockedHead->draft_config ?? [],
+                'schema_version' => $effectiveDraftSchemaVersion,
+                'config' => $draftConfig,
                 'revision' => max(1, (int) $lockedHead->draft_revision),
             ]);
 
@@ -232,8 +250,8 @@ final class StorefrontPresentationVersionBackfillService
         }
 
         $version->forceFill([
-            'config' => $lockedHead->draft_config ?? [],
-            'schema_version' => (int) $lockedHead->draft_schema_version,
+            'config' => $draftConfig,
+            'schema_version' => $effectiveDraftSchemaVersion,
             'revision' => (int) $lockedHead->draft_revision,
         ])->save();
 

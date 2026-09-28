@@ -9,6 +9,7 @@ use App\Support\Commerce\StorefrontPresentationNormalizer;
 use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 /**
@@ -187,6 +188,54 @@ class StorefrontPresentationVersionApiTest extends TestCase
                 'tenant_id' => 'x',
             ])
             ->assertStatus(422);
+    }
+
+    /**
+     * Round-8 review: عند غياب مصدر ونشطة ونسخة عمل معاً (رأسٌ أدخله كاتبٌ
+     * قديم بعد هذه الهجرة مباشرة)، كان الاحتياط الأخير يستعمل عمود
+     * `draft_schema_version` حرفياً — قد يبقى عند الافتراض (1) رغم أن
+     * `draft_config` نفسه v2 فعلياً، فتُطبَّق دلالة v1 (إحياء الأقسام
+     * الافتراضية الناقصة) على مستند v2 مكتمل أصلاً.
+     */
+    /** @test */
+    public function create_without_source_derives_the_default_from_the_embedded_draft_tag_not_a_stale_column(): void
+    {
+        $auth = $this->registerTenant('ver-create-embedded-tag', 'owner@ver-create-embedded-tag.test');
+        $seeded = $this->seedWebStorefront($auth['tenant_id']);
+
+        $v2DraftMissingDefaults = [
+            'version' => 2,
+            'homepage' => ['sections' => [['id' => 'hero', 'type' => 'hero', 'visible' => true]]],
+        ];
+
+        // يحاكي كاتباً قديماً أدرج رأساً بعد هذه الهجرة مباشرة: draft_config
+        // مضمَّن v2 لكن عمود draft_schema_version بقي عند افتراض العمود (1)،
+        // وبلا أي مؤشر نسخ إطلاقاً (active/compat كلاهما null).
+        DB::table('storefront_presentations')->insert([
+            'id' => (string) Str::uuid(),
+            'tenant_id' => $auth['tenant_id'],
+            'storefront_id' => $seeded['storefront']->id,
+            'schema_version' => 2,
+            'draft_config' => json_encode($v2DraftMissingDefaults),
+            'draft_revision' => 1,
+            'draft_schema_version' => 1,
+            'published_config' => null,
+            'published_revision' => null,
+            'published_at' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $res = $this->withToken($auth['token'])
+            ->postJson($this->listPath($seeded['storefront']->id), ['name' => 'نسخة جديدة'])
+            ->assertCreated();
+
+        $types = collect($res->json('data.config.homepage.sections'))->pluck('type')->values()->all();
+        $this->assertSame(
+            ['hero'],
+            $types,
+            'الوسم المضمَّن في draft_config (v2) يجب أن يُشتقّ منه لا من عمود draft_schema_version المتخلّف، فلا تُستعاد أقسام افتراضية.'
+        );
     }
 
     // ───────────────────────── Read ─────────────────────────
