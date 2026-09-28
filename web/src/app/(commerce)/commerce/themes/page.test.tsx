@@ -75,7 +75,7 @@ describe('Theme Gallery draft handoff', () => {
     const user = userEvent.setup();
     render(<CommerceThemesPage />);
 
-    await user.click(screen.getByRole('button', { name: 'استخدام الثيم' }));
+    await user.click(screen.getAllByRole('button', { name: 'استخدام الثيم' })[0]);
 
     await waitFor(() => expect(createMock).toHaveBeenCalledWith(
       'store-1',
@@ -91,6 +91,62 @@ describe('Theme Gallery draft handoff', () => {
       1,
     );
     expect(pushMock).toHaveBeenCalledWith('/commerce/appearance?version=version-1');
+    expect(deleteMock).not.toHaveBeenCalled();
+  });
+
+  it('applies AWJ Market starting bundle while preserving unrelated draft fields', async () => {
+    createMock.mockResolvedValue({
+      ok: true,
+      data: {
+        id: 'version-market',
+        storefrontId: 'store-1',
+        name: 'أَوْج ماركت — Theme Gallery',
+        state: 'draft',
+        schemaVersion: 2,
+        revision: 7,
+        config: {
+          ...DEFAULT_PRESENTATION_CONFIG,
+          themePreset: 'awj-modern',
+          primaryColor: '#12372a',
+          density: 'comfortable',
+          productCard: 'standard',
+          header: { ...DEFAULT_PRESENTATION_CONFIG.header, style: 'standard' },
+          radius: 'sharp',
+        },
+      },
+    });
+    saveMock.mockResolvedValue({
+      ok: true,
+      data: {
+        id: 'version-market',
+        storefrontId: 'store-1',
+        name: 'أَوْج ماركت — Theme Gallery',
+        state: 'draft',
+        schemaVersion: 2,
+        revision: 8,
+        config: DEFAULT_PRESENTATION_CONFIG,
+      },
+    });
+
+    const user = userEvent.setup();
+    render(<CommerceThemesPage />);
+    await user.click(screen.getAllByRole('button', { name: 'استخدام الثيم' })[1]);
+
+    await waitFor(() => expect(saveMock).toHaveBeenCalled());
+    expect(saveMock).toHaveBeenCalledWith(
+      'store-1',
+      'version-market',
+      expect.objectContaining({
+        themePreset: 'awj-market',
+        primaryColor: '#0f766e',
+        density: 'compact',
+        productCard: 'compact',
+        header: expect.objectContaining({ style: 'compact' }),
+        radius: 'sharp',
+      }),
+      7,
+    );
+    expect(pushMock).toHaveBeenCalledWith('/commerce/appearance?version=version-market');
     expect(deleteMock).not.toHaveBeenCalled();
   });
 
@@ -112,7 +168,7 @@ describe('Theme Gallery draft handoff', () => {
 
     const user = userEvent.setup();
     render(<CommerceThemesPage />);
-    await user.click(screen.getByRole('button', { name: 'استخدام الثيم' }));
+    await user.click(screen.getAllByRole('button', { name: 'استخدام الثيم' })[0]);
 
     await waitFor(() => expect(deleteMock).toHaveBeenCalledWith('store-1', 'version-2'));
     expect(pushMock).not.toHaveBeenCalled();
@@ -124,6 +180,6 @@ describe('Theme Gallery draft handoff', () => {
 
     expect(screen.getByText('أَوْج ماركت')).toBeTruthy();
     expect(screen.getByText('بوتيك فلورال')).toBeTruthy();
-    expect(screen.getAllByRole('button', { name: 'استخدام الثيم' })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: 'استخدام الثيم' })).toHaveLength(2);
   });
 });

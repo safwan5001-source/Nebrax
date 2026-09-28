@@ -32,10 +32,10 @@ export const THEME_REGISTRY: readonly ThemeRegistryEntry[] = [
   },
   {
     id: 'awj-market',
-    presetId: null,
+    presetId: 'awj-market',
     nameKey: 'themeNameAwjMarket',
     descriptionKey: 'themeDescriptionAwjMarket',
-    status: 'planned',
+    status: 'available',
     official: true,
     category: 'retail',
   },
