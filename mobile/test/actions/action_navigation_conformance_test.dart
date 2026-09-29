@@ -97,7 +97,7 @@ void main() {
 
   group('decodeAction conformance (vs. contracts/app-builder/action-navigation-conformance.v1.json)', () {
     for (final testCase in cases) {
-      test(testCase['id'], () {
+      test(testCase['id'] as String, () {
         final actionJson = testCase['action'] as Map<String, Object?>;
         final ref = ActionRef(
           type: actionJson['type'] as String,
