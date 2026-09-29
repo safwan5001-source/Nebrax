@@ -60,9 +60,14 @@ class R2FilesystemConfigurationTest extends TestCase
             $this->assertFalse($documentCenter['storage']['persistent_enabled']);
             $this->assertSame('local', $documentCenter['storage']['disk']);
 
+            // AWJ-R2-4: توجيه وسائط المنتج الجديدة إلى R2 صار ممكناً، لكن محروساً
+            // خلف `product_media.r2.enabled` ويبقى false افتراضياً — المسار
+            // القديم (`disk = 'document'`) لا يزال الافتراض الفعلي بلا هذا العلم.
+            $this->assertFalse((bool) config('product_media.r2.enabled'));
+
             $mediaService = file_get_contents(base_path('app/Services/ProductMediaService.php'));
             $this->assertIsString($mediaService);
-            $this->assertStringContainsString("'disk' => 'document'", $mediaService);
+            $this->assertStringContainsString("\$disk = 'document';", $mediaService);
             $this->assertStringNotContainsString("Storage::disk('r2')", $mediaService);
         } finally {
             putenv($previous === false ? 'FILESYSTEM_DISK' : "FILESYSTEM_DISK={$previous}");

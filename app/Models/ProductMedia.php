@@ -33,6 +33,14 @@ class ProductMedia extends BaseModel implements CompanyWide
 {
     use ResolvesBranchReferences;
 
+    /**
+     * نطاق R2 الثابت لكل وسائط المنتج (AWJ-R2-4) — نفس السلسلة تماماً بين
+     * كتابة `disk = 'r2'` الجديدة وكل مسارات القراءة/الحذف الثلاثة
+     * (`ProductController`, `CommerceMediaController`, `StorefrontMediaController`)
+     * وأداة الترحيل اليدوية؛ مصدرٌ واحدٌ يمنع انحراف الحرفية بينها.
+     */
+    public const R2_DOMAIN = 'product-media';
+
     protected $fillable = [
         'tenant_id', 'product_id', 'product_option_value_id', 'product_variant_id',
         'disk', 'path', 'original_name', 'mime_type', 'size', 'sort_order', 'uploaded_by',
