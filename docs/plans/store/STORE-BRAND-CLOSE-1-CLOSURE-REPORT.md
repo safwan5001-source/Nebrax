@@ -2,7 +2,7 @@
 
 **Horizon:** AWJ Store Official Brand, Contact & Payment Marks V1  
 **Date:** 2026-09-27  
-**Status:** FOLLOWUP_IN_REVIEW  
+**Status:** CLOSED  
 **Closure branch:** `docs/store-brand-close-1`
 
 ## 1. Closure decision
@@ -23,9 +23,9 @@ No payment marks were added decoratively.
 | STORE-BRAND-PAY-EVIDENCE-1 | done_decision_gate | COD / pay_on_pickup only proven; card/wallet acceptance source absent |
 | STORE-BRAND-PAY-1 | deferred | Waits for authoritative supported+enabled capability |
 | STORE-BRAND-COMPOSE-1 | done | PR #1070, merge `6ad8195a70a75610dd950c32e0a28b193e9a0a65` |
-| STORE-BRAND-QA-1 | followup_in_review | Baseline #1072/#1073 merged; close-review P2 follow-up in progress |
+| STORE-BRAND-QA-1 | done | Baseline #1072/#1073 merged; close-review follow-up #1077 merged as `26092b28649156a6111d7797a9513e96290797ae` |
 | QA trigger P2 follow-up | done | PR #1073, merge `b51f76f31967faf46281573b372ca362696c297e` |
-| STORE-BRAND-CLOSE-1 | followup_in_review | Final closure waits for QA follow-up |
+| STORE-BRAND-CLOSE-1 | done | QA follow-up #1077 completed green with no unresolved P1/P2 |
 
 ## 3. QA evidence
 
@@ -48,11 +48,15 @@ PR #1072 passed its PR-head Web CI, Storefront CI, Core CI, and Store Brand QA c
 
 A review P2 then identified that the new visual QA workflow could be skipped by later implementation changes. PR #1073 expanded the workflow triggers to the implementation paths protected by the suite, including the AppPromo home component. Its Store Brand QA and Core CI checks passed before merge, and the review thread is resolved.
 
-## 4. Published-route limitation
+Close review later surfaced two additional valid gaps: the suite did not exercise the actual published `/{country}/{locale}` route with populated deterministic Store API data, and the required state/accessibility matrix was incomplete. PR #1077 addressed those gaps and merged as `26092b28649156a6111d7797a9513e96290797ae` after Web CI, Storefront CI, Store Brand QA, and Core CI all passed with no unresolved P1/P2.
 
-The QA fixture mounts the real published components and public presentation helpers, but it is not itself the tenant production URL. The earlier evidence explicitly distinguishes this from a fully populated production-route proof.
+## 4. Published-route evidence boundary
 
-No claim is made here that a live production tenant with populated brand configuration was browser-verified during CLOSE-1.
+PR #1077 added browser coverage for the actual published `/{country}/{locale}` route using a deterministic local Store API fixture, so route-shell, locale, responsive, and integration behavior are exercised through the real published route rather than only a component mirror.
+
+The maintained dev mirror remains supplemental and non-authoritative.
+
+This is still not a claim that a live deployed production tenant with populated brand configuration was browser-verified during CLOSE-1. The closure evidence proves the actual published route integration under deterministic E2E data, not live-tenant production content.
 
 ## 5. External asset provenance
 
@@ -76,9 +80,9 @@ This deferral is a resolved state for this horizon, not an unresolved blocker.
 
 ## 7. P1 / P2 status
 
-No unresolved P1/P2 remains in the STORE-BRAND scope at close-review time.
+No unresolved P1/P2 remains in the STORE-BRAND scope.
 
-The QA-trigger P2 discovered after PR #1072 was fixed in PR #1073 and its review thread is resolved.
+The QA-trigger P2 discovered after PR #1072 was fixed in PR #1073. The later published-route/state/accessibility close-review gaps were fixed in PR #1077. All related review threads were resolved before final closure.
 
 ## 8. Deployment state
 
@@ -104,6 +108,8 @@ No CLOSE-1 change modifies:
 
 ## 10. Horizon end
 
-If this close PR is reviewed and merged, mark STORE-BRAND-CLOSE-1 as `done` and the horizon as **CLOSED**.
+STORE-BRAND-CLOSE-1 is `done` and the horizon is **CLOSED**.
+
+The payment implementation remains intentionally deferred by the resolved evidence decision and is not an open blocker for this horizon.
 
 Per the task queue: **no automatic next horizon**.
