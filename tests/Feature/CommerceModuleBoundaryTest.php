@@ -85,6 +85,8 @@ class CommerceModuleBoundaryTest extends TestCase
         'api/commerce/workspace/storefronts/{id}/presentation/versions/{version}',
         // CUST-H1-3 — نشر فوري لنسخة محدَّدة تماماً.
         'api/commerce/workspace/storefronts/{id}/presentation/versions/{version}/publish',
+        // CUST-H1-4 — جدولة/استبدال/إعادة جدولة (PUT) وإلغاء (DELETE) نشرٍ مستقبلي.
+        'api/commerce/workspace/storefronts/{id}/presentation/versions/{version}/schedule',
         // COM-MOBILE-ADDRESSES-1 — دفتر عناوين العميل الموثَّق (X-Customer-Token).
         'commerce/v1/addresses',
         'commerce/v1/addresses/{id}',

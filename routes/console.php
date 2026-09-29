@@ -56,3 +56,16 @@ Schedule::command('imports:prune')
     ->dailyAt('02:15')
     ->withoutOverlapping()
     ->onOneServer();
+
+// CUST-H1-4: نشر نسخ عروض المتاجر المجدولة المستحقّة. كل عنصر معزول ذرّياً
+// (قفل صفّ + فحص جيل الجدولة) — فشل عنصرٍ واحد لا يوقف الدفعة، والقاعدة
+// تبقى مصدر الحقيقة فيسترد المُرسِل ما فات تلقائياً بعد أي تعطّل.
+// ⚠ التفعيل التشغيليّ محجوب بنفس قيد `webhooks:deliver` أعلاه: النشر
+// الحاليّ (Render، حاوية ويب واحدة عبر Apache/mod_php، `QUEUE_CONNECTION=sync`)
+// لا يشغّل `schedule:run` ولا cron — هذا التعريف خامل حتى يوصَل جدولٌ في
+// النشر، أو يُستدعى الأمر يدوياً. واجهة الجدولة (Schedule UX) تبقى محجوبة
+// من جهتها حتى CUST-H1-5 بصرف النظر عن حالة هذا التفعيل.
+Schedule::command('storefront-presentations:dispatch-due')
+    ->everyMinute()
+    ->withoutOverlapping()
+    ->onOneServer();

@@ -5,11 +5,15 @@ namespace App\Services\Commerce;
 use App\Models\Storefront;
 use App\Models\StorefrontPresentation;
 use App\Models\StorefrontPresentationVersion;
+use App\Support\Commerce\SchedulePublicationTokenCodec;
 use App\Support\Commerce\StorefrontPresentationNormalizer;
 use App\Tenancy\TenantContext;
+use App\Tenancy\TenantScope;
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
+use Throwable;
 
 /**
  * CUST-H1-1 — أساس ثابت النسخ (list/create/read/save/rename/delete). لا
@@ -22,8 +26,30 @@ use RuntimeException;
  */
 final class StorefrontPresentationVersionService
 {
+    /** CUST-H1-4 — نجاح تنفيذ النشر المجدول: تحرّك المؤشر النشِط فعلياً. */
+    public const OUTCOME_PUBLISHED = 'published';
+
+    /** CUST-H1-4 — المتجر أو النسخة أجنبي/مفقود وقت التنفيذ (نادرٌ بنيوياً). */
+    public const OUTCOME_MISSING = 'missing';
+
+    /**
+     * CUST-H1-4 — مؤشر الجدولة على الرأس لم يعد يشير لهذه النسخة (أُلغيت/
+     * استُبدلت/نُشرت بالفعل) — no-op آمنة لمهمّة متأخّرة/مكرَّرة.
+     */
+    public const OUTCOME_NOT_SCHEDULED = 'not_scheduled';
+
+    /** CUST-H1-4 — جيل الجدولة تغيّر منذ اختيار المهمّة لهذا العنصر — no-op آمنة. */
+    public const OUTCOME_STALE_GENERATION = 'stale_generation';
+
+    /** CUST-H1-4 — الوقت المجدول لم يحن بعد وقت التنفيذ الفعلي — no-op آمنة. */
+    public const OUTCOME_NOT_DUE = 'not_due';
+
+    /** CUST-H1-4 — مخطط الهدف أحدث مما يدعمه الخادم الحالي — فشلٌ آمن قابل للتشخيص/إعادة المحاولة. */
+    public const OUTCOME_FORWARD_SCHEMA_REJECTED = 'forward_schema_rejected';
+
     public function __construct(
         private readonly StorefrontPresentationNormalizer $normalizer,
+        private readonly SchedulePublicationTokenCodec $tokenCodec,
     ) {}
 
     /** @return list<array<string, mixed>>|null */
@@ -324,6 +350,270 @@ final class StorefrontPresentationVersionService
     }
 
     /**
+     * CUST-H1-4 — جدولة/استبدال/إعادة جدولة نشرٍ مستقبلي لنسخة محدَّدة. مسارٌ
+     * واحد لكل الحالات الثلاث: العميل يرسل نفس الغلاف دائماً على
+     * `PUT .../versions/{version}/schedule`، والفرق بينها مُشتقٌّ خادمياً من
+     * مقارنة الهدف بمؤشر الرأس الحالي `scheduled_version_id` تحت القفل — لا
+     * معاملة API منفصلة لإعادة الجدولة. حين يكون الهدف هو ذاته المجدول
+     * سلفاً، خطوة "إبطال المجدول السابق" لا تنطبق ببساطة (الهدف ≡ السابق)
+     * بينما خطوات الترقيم/الوقت/المؤشر/العدّاد تُطبَّق كما هي — فتصبح إعادة
+     * الجدولة حالة خاصة من الاستبدال لا مساراً مستقلاً.
+     *
+     * مرجعها المعماري: `docs/plans/store/CUST-H1-ARCH-1-...md` §10 "Schedule"،
+     * §17 "Reschedule"، §34. ترتيب الأقفال Storefront ← head ← Version الهدف ←
+     * Version المجدولة سابقاً (إن اختلفت واحتاجت الاستبدال).
+     *
+     * @return array<string, mixed>|null null = المتجر أو النسخة أجنبي/مفقود (404).
+     *
+     * @throws VersionLifecycleConflictException الهدف هو النسخة المنشورة حالياً.
+     * @throws StaleVersionRevisionException مراجعة النسخة الهدف لا تطابق المقفولة.
+     * @throws StaleScheduleTokenException رمز الجدولة الوارد لا يطابق `schedule_epoch` المقفول.
+     * @throws InvalidScheduleTimeException `scheduled_for` ليس تاريخاً مستقبلياً صالحاً.
+     */
+    public function scheduleForCurrentTenant(
+        string $storefrontId,
+        string $versionId,
+        int $expectedRevision,
+        string $scheduledForIso,
+        string $expectedScheduleToken,
+    ): ?array {
+        return DB::transaction(function () use (
+            $storefrontId,
+            $versionId,
+            $expectedRevision,
+            $scheduledForIso,
+            $expectedScheduleToken,
+        ) {
+            $storefront = $this->lockOwnedStorefront($storefrontId);
+            if ($storefront === null) {
+                return null;
+            }
+
+            $head = StorefrontPresentation::query()
+                ->where('storefront_id', $storefront->id)
+                ->lockForUpdate()
+                ->first();
+
+            $version = $this->lockOwnedVersion($storefront, $versionId);
+            if ($version === null) {
+                return null;
+            }
+
+            if ($head === null) {
+                // بنيوياً غير قابل للحدوث: راجع نظيرها في publishForCurrentTenant() —
+                // أي Version موجودة تعني أن رأسها أُنشئ معها بالفعل.
+                throw new RuntimeException('رأس عرض المتجر غير موجود لنسخة قائمة — حالة غير متّسقة.');
+            }
+
+            if ($head->active_version_id === $version->id) {
+                throw new VersionLifecycleConflictException(
+                    'لا يمكن جدولة النسخة المنشورة حالياً. أنشئ نسخة مسودة للتعديل.'
+                );
+            }
+
+            if ((int) $version->revision !== $expectedRevision) {
+                throw new StaleVersionRevisionException;
+            }
+
+            if ($this->tokenCodec->decode($storefront->id, $expectedScheduleToken) !== (int) $head->schedule_epoch) {
+                throw new StaleScheduleTokenException;
+            }
+
+            $previousScheduledId = $head->scheduled_version_id;
+            $previous = null;
+            if ($previousScheduledId !== null && $previousScheduledId !== $version->id) {
+                // مؤشرٌ يتيم بنيوياً غير متوقَّع لو عاد null هنا (FK لا يُحذف
+                // إلا عبر مسار خدمة محروس) — لا نُسقط جدولة الهدف الصالح لسببٍ
+                // خارج تحكّم التاجر؛ نكتفي بعدم إبطال ما لم نجده.
+                $previous = $this->lockOwnedVersion($storefront, $previousScheduledId);
+            }
+
+            $scheduledFor = $this->parseFutureScheduleTime($scheduledForIso);
+
+            if ($previous !== null) {
+                $previous->forceFill([
+                    'scheduled_for' => null,
+                    'schedule_generation' => (int) $previous->schedule_generation + 1,
+                ])->save();
+            }
+
+            $version->forceFill([
+                'scheduled_for' => $scheduledFor,
+                'schedule_generation' => (int) $version->schedule_generation + 1,
+            ])->save();
+
+            $head->forceFill([
+                'scheduled_version_id' => $version->id,
+                'schedule_epoch' => (int) $head->schedule_epoch + 1,
+            ])->save();
+
+            return $this->detail($version->fresh(), $head->fresh());
+        });
+    }
+
+    /**
+     * CUST-H1-4 — إلغاء جدولة نسخة. مرجعها المعماري: `docs/plans/store/
+     * CUST-H1-ARCH-1-...md` §17 "Cancel". لا يُلغى مؤشر نسخة أخرى أبداً — إن
+     * لم يعد الهدف هو المجدول الحالي (استُبدل/أُلغي بالفعل من جلسة أخرى)
+     * يُرفض الطلب بتعارض دورة حياة، لا نجاحاً صامتاً على حالة لم تعد قائمة.
+     *
+     * @return array<string, mixed>|null null = المتجر أو النسخة أجنبي/مفقود (404).
+     *
+     * @throws VersionLifecycleConflictException الهدف ليس النسخة المجدولة حالياً.
+     * @throws StaleScheduleTokenException رمز الجدولة الوارد لا يطابق `schedule_epoch` المقفول.
+     */
+    public function cancelScheduleForCurrentTenant(string $storefrontId, string $versionId, string $expectedScheduleToken): ?array
+    {
+        return DB::transaction(function () use ($storefrontId, $versionId, $expectedScheduleToken) {
+            $storefront = $this->lockOwnedStorefront($storefrontId);
+            if ($storefront === null) {
+                return null;
+            }
+
+            $head = StorefrontPresentation::query()
+                ->where('storefront_id', $storefront->id)
+                ->lockForUpdate()
+                ->first();
+
+            $version = $this->lockOwnedVersion($storefront, $versionId);
+            if ($version === null) {
+                return null;
+            }
+
+            if ($head === null || $head->scheduled_version_id !== $version->id) {
+                throw new VersionLifecycleConflictException('هذه النسخة ليست مجدولة حالياً.');
+            }
+
+            if ($this->tokenCodec->decode($storefront->id, $expectedScheduleToken) !== (int) $head->schedule_epoch) {
+                throw new StaleScheduleTokenException;
+            }
+
+            $version->forceFill([
+                'scheduled_for' => null,
+                'schedule_generation' => (int) $version->schedule_generation + 1,
+            ])->save();
+
+            $head->forceFill([
+                'scheduled_version_id' => null,
+                'schedule_epoch' => (int) $head->schedule_epoch + 1,
+            ])->save();
+
+            return $this->detail($version->fresh(), $head->fresh());
+        });
+    }
+
+    /**
+     * CUST-H1-4 — وحدة تنفيذ النشر المجدول: نقطة الدخول الوحيدة التي
+     * يستدعيها `ScheduledPresentationDispatcher`. **لا تثق بسياق مستأجر
+     * الطلب الحالي مطلقاً** — تُحلّ سياق المستأجر من علاقة Storefront
+     * المخزَّنة فعلياً فقط، أبداً من مُدخل العميل (docs/plans/store/
+     * CUST-H1-ARCH-1-...md §15).
+     *
+     * هويّة التنفيذ الثلاثية (storefront_id + version_id + schedule_generation
+     * المتوقَّع) هي كامل عقد الـIdempotency: إعادة التنفيذ بنفس الهويّة بعد
+     * نجاحٍ سابق تعود `OUTCOME_STALE_GENERATION` بأمان — النجاح نفسه يزيد
+     * `schedule_generation` (الخطوة الأخيرة أدناه)، فلا حاجة لعلَمِ "أُنجز"
+     * منفصل. نفس المنطق يُبطل مهمّة نسخة استُبدلت أو أُلغيت أو أُعيدت جدولتها.
+     *
+     * تُعيد رمز حالة (`OUTCOME_*`) لكل "لا تنفيذ آمن" (مؤشر تغيّر/جيل قديم/
+     * غير مستحقّ بعد/متجر أو نسخة محذوفان) — هذه no-op متوقَّعة لا استثناءات.
+     * استثناءٌ فعلي (مثلاً تجاوز حجم المستند) يتسرّب فيُلغي `DB::transaction`
+     * المعاملة تلقائياً — لا حالة جزئية أبداً، والمُستدعي (`ScheduledPresentationDispatcher`)
+     * يلتقطه معزولاً عن بقية الدفعة.
+     */
+    public function executeScheduledPublish(string $storefrontId, string $versionId, int $expectedGeneration): string
+    {
+        $storefront = Storefront::withoutGlobalScope(TenantScope::class)->find($storefrontId);
+        if ($storefront === null) {
+            return self::OUTCOME_MISSING;
+        }
+
+        $tenantContext = app(TenantContext::class);
+        $previousTenantId = $tenantContext->id();
+        $tenantContext->set($storefront->tenant_id);
+
+        try {
+            return DB::transaction(function () use ($storefront, $versionId, $expectedGeneration) {
+                $lockedStorefront = Storefront::query()
+                    ->whereKey($storefront->id)
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($lockedStorefront === null || $lockedStorefront->tenant_id !== $storefront->tenant_id) {
+                    return self::OUTCOME_MISSING;
+                }
+
+                $head = StorefrontPresentation::query()
+                    ->where('storefront_id', $lockedStorefront->id)
+                    ->lockForUpdate()
+                    ->first();
+
+                $version = $this->lockOwnedVersion($lockedStorefront, $versionId);
+                if ($version === null) {
+                    return self::OUTCOME_MISSING;
+                }
+
+                if ($head === null || $head->scheduled_version_id !== $version->id) {
+                    return self::OUTCOME_NOT_SCHEDULED;
+                }
+
+                if ((int) $version->schedule_generation !== $expectedGeneration) {
+                    return self::OUTCOME_STALE_GENERATION;
+                }
+
+                if ($version->scheduled_for === null || $version->scheduled_for->isFuture()) {
+                    return self::OUTCOME_NOT_DUE;
+                }
+
+                // فشلٌ آمن قبل أي تطبيع — لا تُلمَس الجدولة: تبقى قابلة
+                // للتشخيص/إعادة المحاولة حتى يُنشَر مخطّطٌ يدعمها (§ Forward Schema).
+                if ((int) $version->schema_version > StorefrontPresentationNormalizer::VERSION) {
+                    return self::OUTCOME_FORWARD_SCHEMA_REJECTED;
+                }
+
+                $normalized = $this->normalizer->normalize($version->config, (int) $version->schema_version);
+                $this->assertStoredSize($normalized);
+
+                if (
+                    (int) $version->schema_version !== StorefrontPresentationNormalizer::VERSION
+                    || ! $this->sameDocument($version->config, $normalized)
+                ) {
+                    $version->forceFill([
+                        'config' => $normalized,
+                        'schema_version' => StorefrontPresentationNormalizer::VERSION,
+                    ])->save();
+                }
+
+                $newPublishedRevision = ($head->published_revision !== null ? (int) $head->published_revision : 0) + 1;
+
+                $head->forceFill([
+                    'published_config' => $normalized,
+                    'published_schema_version' => StorefrontPresentationNormalizer::VERSION,
+                    'published_revision' => $newPublishedRevision,
+                    'published_at' => now(),
+                    'active_version_id' => $version->id,
+                    'scheduled_version_id' => null,
+                    'schedule_epoch' => (int) $head->schedule_epoch + 1,
+                ])->save();
+
+                $version->forceFill([
+                    'last_published_at' => now(),
+                    'scheduled_for' => null,
+                    'schedule_generation' => (int) $version->schedule_generation + 1,
+                ])->save();
+
+                return self::OUTCOME_PUBLISHED;
+            });
+        } finally {
+            if ($previousTenantId === null) {
+                $tenantContext->forget();
+            } else {
+                $tenantContext->set($previousTenantId);
+            }
+        }
+    }
+
+    /**
      * @return bool|null null = المتجر أو النسخة أجنبي/مفقود (404).
      *
      * @throws VersionLifecycleConflictException
@@ -517,6 +807,16 @@ final class StorefrontPresentationVersionService
             'published_revision' => ($head !== null && $head->published_revision !== null)
                 ? (int) $head->published_revision
                 : null,
+            // CUST-H1-4: رمز معتم لحالة دورة حياة الجدولة الحالية على مستوى
+            // المتجر (`schedule_epoch`) — موجودٌ حتى في حالة "لا جدولة قائمة"
+            // (docs/plans/store/CUST-H1-ARCH-1-...md §10). نفس القيمة على كل
+            // صفوف هذا المتجر، تماماً كـ`published_revision` أعلاه؛ لا `0`
+            // افتراضياً حين لا يوجد رأس بعد — رأسٌ غير موجود يعني لم تُنشأ أي
+            // نسخة لهذا المتجر أصلاً، وهذه الدالة لا تُستدعى بلا نسخة قائمة.
+            'schedule_token' => $this->tokenCodec->encode(
+                $version->storefront_id,
+                $head !== null ? (int) $head->schedule_epoch : 0,
+            ),
         ];
     }
 
@@ -571,6 +871,33 @@ final class StorefrontPresentationVersionService
         if ($this->normalizer->encodedSize($config) > StorefrontPresentationNormalizer::MAX_DOCUMENT_BYTES) {
             throw new PresentationDocumentTooLargeException;
         }
+    }
+
+    /**
+     * CUST-H1-4 — يتحقق أن `scheduled_for` نصٌّ ISO-8601 بإزاحة صريحة
+     * (`Z` أو `+HH:MM`/`-HH:MM` — كلاهما إزاحة صريحة، `Z` توقيت UTC صريح لا
+     * غياب توقيت)، ثم يحوّله لتوقيت UTC كانوني مستقبلي حصراً. لا نثق بتوقيت
+     * المتصفّح مطلقاً (docs/plans/store/CUST-H1-ARCH-1-...md §18) — هذا فحصٌ
+     * خادمي مستقل عن أي تحقق شكلي جرى بالفعل في FormRequest (دفاعٌ مزدوج:
+     * الشكل هناك 422 فوري، و"المستقبل" هنا تحت قفلٍ فعلي لحظة الالتزام).
+     */
+    private function parseFutureScheduleTime(string $scheduledForIso): Carbon
+    {
+        if (! preg_match('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/', $scheduledForIso)) {
+            throw new InvalidScheduleTimeException;
+        }
+
+        try {
+            $parsed = Carbon::parse($scheduledForIso)->utc();
+        } catch (Throwable) {
+            throw new InvalidScheduleTimeException;
+        }
+
+        if (! $parsed->isFuture()) {
+            throw new InvalidScheduleTimeException;
+        }
+
+        return $parsed;
     }
 
     private function ownedStorefront(string $storefrontId): ?Storefront
