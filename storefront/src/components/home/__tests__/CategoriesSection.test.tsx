@@ -6,6 +6,7 @@ function category(overrides: Record<string, unknown>) {
     id: "c1",
     name: "إلكترونيات",
     color: null,
+    image: null,
     children: undefined,
     ...overrides,
   };
@@ -120,6 +121,31 @@ describe("CategoriesSection", () => {
     // jsdom normalises the literal to rgb() on the way into the attribute.
     expect(accented.getAttribute("style")).toContain("rgb(18, 55, 42)");
     expect(neutral.getAttribute("style")).toContain("--store-border-strong");
+    expect(accented.querySelector('[aria-hidden="true"]')).toBeTruthy();
+    expect(neutral.querySelector('[aria-hidden="true"]')).toBeNull();
+  });
+
+  it("uses the authoritative category image before color and keeps accessible text", async () => {
+    const element = await loadSection(
+      vi.fn().mockResolvedValue({
+        data: [
+          category({
+            color: "#12372a",
+            image: { url: "/store/v1/media/categories/c1", alt: "هواتف" },
+          }),
+        ],
+      }),
+    );
+
+    const { getByRole } = render(element as React.JSX.Element);
+    const link = getByRole("link");
+    expect(link.querySelector("img")).toHaveAttribute(
+      "src",
+      "/store/v1/media/categories/c1",
+    );
+    expect(link.querySelector("img")).toHaveAttribute("alt", "هواتف");
+    expect(link.querySelector('[aria-hidden="true"]')).toBeNull();
+    expect(link.textContent).toContain("إلكترونيات");
   });
 
   describe("AWJ Market density", () => {

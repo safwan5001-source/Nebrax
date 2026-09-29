@@ -5,6 +5,7 @@ namespace App\Http\Resources;
 use App\Models\ProductCategory;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Facades\Route;
 
 /**
  * Public storefront catalog — تمثيل تصنيف للقراءة العامة المجهولة. الحراسة
@@ -29,7 +30,8 @@ class StorefrontCategoryResource extends JsonResource
 
     public function toArray(Request $request): array
     {
-        return [
+        $image = $this->publicImage($request);
+        $payload = [
             'id' => $this->resource->id,
             'name' => $this->resource->name,
             'description' => $this->resource->description,
@@ -50,6 +52,50 @@ class StorefrontCategoryResource extends JsonResource
                     'name' => $ancestor->name,
                 ])->all(),
             ),
+        ];
+
+        // Commerce/mobile reuses this resource but has a closed OpenAPI
+        // schema. Keep the media projection additive to the public storefront
+        // contract instead of emitting an undocumented null field there.
+        if ($this->isStorefrontRequest($request)) {
+            $payload['image'] = $image;
+        }
+
+        return $payload;
+    }
+
+    private function isStorefrontRequest(Request $request): bool
+    {
+        return str_starts_with((string) $request->route()?->getName(), 'storefront.v1.');
+    }
+
+    /**
+     * The category path is a public storefront route, never the private
+     * `image_path`. Commerce/mobile consumers keep the existing projection;
+     * only the store/v1 contract gains this additive field.
+     *
+     * @return array{url:string,alt:string}|null
+     */
+    private function publicImage(Request $request): ?array
+    {
+        if (! $this->resource->image_path || ! $this->isStorefrontRequest($request)) {
+            return null;
+        }
+
+        $route = str_contains((string) $request->route()?->getName(), '.legacy.')
+            ? 'storefront.v1.legacy.media.category.show'
+            : 'storefront.v1.media.category.show';
+
+        $parameters = ['id' => $this->resource->id];
+        if (str_contains($route, '.legacy.')) {
+            $parameters['tenantSlug'] = (string) $request->route('tenantSlug');
+        }
+
+        return [
+            'url' => Route::has($route)
+                ? route($route, $parameters, false)
+                : '/store/v1/media/categories/'.$this->resource->id,
+            'alt' => $this->resource->name,
         ];
     }
 }

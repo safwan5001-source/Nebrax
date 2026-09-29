@@ -443,6 +443,13 @@ export function StorefrontPreviewCanvas({
                             )}
                             style={{ borderInlineStartColor: accent.rule }}
                           >
+                            {accent.isMerchantColor && (
+                              <span
+                                aria-hidden="true"
+                                className="mb-1 h-2 w-full rounded-store"
+                                style={{ backgroundColor: accent.rule }}
+                              />
+                            )}
                             <span
                               className={cn(
                                 "line-clamp-2 font-bold leading-snug text-store-foreground",

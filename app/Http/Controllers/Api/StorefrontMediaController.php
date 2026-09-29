@@ -3,10 +3,13 @@
 namespace App\Http\Controllers\Api;
 
 use App\Models\CommerceListing;
+use App\Models\CommerceCategoryListing;
+use App\Models\ProductCategory;
 use App\Models\ProductMedia;
 use App\Services\DocumentCenter\DocumentStorageService;
 use App\Services\R2StorageService;
 use App\Tenancy\StorefrontContext;
+use App\Tenancy\BranchScope;
 use Aws\Exception\AwsException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -97,5 +100,41 @@ class StorefrontMediaController extends PublicApiController
         }
 
         return $disk->response($media->path, $media->original_name, $headers);
+    }
+
+    /**
+     * Serve a merchant category image only when that category is published on
+     * the resolved storefront channel. The stored path is deliberately never
+     * returned to the client and the same host/channel context gates the bytes.
+     */
+    public function showCategory(Request $request)
+    {
+        $id = (string) $request->route('id');
+        $category = ProductCategory::query()
+            ->withoutGlobalScope(BranchScope::class)
+            ->where('is_active', true)
+            ->whereIn('id', CommerceCategoryListing::publishedOn(app(StorefrontContext::class)->salesChannelId())->select('category_id'))
+            ->find($id);
+
+        if ($category === null || ! $category->image_path) {
+            abort(404, 'الوسائط غير موجودة.');
+        }
+
+        try {
+            $stream = $this->documentStorage->readStream(
+                $this->documentStorage->profile(),
+                $category->image_path,
+            );
+        } catch (RuntimeException) {
+            abort(404, 'الوسائط غير موجودة.');
+        }
+
+        return response()->streamDownload(function () use ($stream): void {
+            fpassthru($stream);
+            fclose($stream);
+        }, $category->image_original_name ?: "category-{$category->id}", [
+            'Content-Type' => $category->image_mime_type ?: 'application/octet-stream',
+            'Cache-Control' => 'public, max-age=3600',
+        ], 'inline');
     }
 }
