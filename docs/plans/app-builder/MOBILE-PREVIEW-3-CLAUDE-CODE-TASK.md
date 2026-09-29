@@ -15,6 +15,7 @@ Only what is needed:
 - `docs/plans/app-builder/AWJ_APP_BUILDER_REAL_MOBILE_PREVIEW_HORIZON.md`
 - `docs/plans/app-builder/REAL-MOBILE-PREVIEW-1-EVIDENCE-PASS.md`
 - `docs/plans/app-builder/REAL-MOBILE-PREVIEW-2-RUNTIME-ARCHITECTURE-EVIDENCE.md`
+- `docs/plans/app-builder/REAL-MOBILE-PREVIEW-SALLA-MOBILE-BENCHMARK.md`
 
 Do not repeat a broad App Builder/mobile-runtime investigation.
 
@@ -44,7 +45,9 @@ This task implements **Browser App Preview only**.
 4. Device preview:
    - professional iPhone preset
    - professional Android preset
+   - app-level preview shell, not a decorative card
    - content-first frame, not decorative fake OS chrome
+   - desktop: central device viewport + Full Preview
    - on small/mobile admin screens, do **not** show a tiny phone inside the phone; use available width
 
 5. Keep:
@@ -66,6 +69,10 @@ This task implements **Browser App Preview only**.
 
 8. Prefer reusing `AppBuilderCanvas` with an explicit `design/preview` mode.
    Do not fork renderer/schema semantics unless technically unavoidable.
+
+9. Keep the shell structurally ready for app-level navigation and truthful states such as empty cart, empty category/content, auth-required orders, and logged-out account. In MP-3, reuse only already-supported safe semantics/placeholders; do not invent runtime/auth behavior. Deeper parity is MP-4+.
+
+10. A `Refresh Preview` action is allowed only if it refreshes existing browser-preview state safely. It must not publish, persist, create a preview session, or introduce auth/token architecture.
 
 ## Likely files
 Inspect first:
@@ -111,7 +118,7 @@ Use:
 Open one PR:
 `feat(app-builder): MOBILE-PREVIEW-3 browser app preview shell`
 
-Do **not** merge or deploy.
+Use the Horizon workflow: complete implementation, focused tests, relevant web tests/build, open the PR, follow CI, and address in-scope findings until the task is ready for closure. Stop only before merge unless explicit merge approval exists. Do not deploy/Production.
 
 ## Final report
 Return a concise Markdown report with:
