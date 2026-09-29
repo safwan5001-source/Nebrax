@@ -149,6 +149,8 @@ function toOptionValues(
  * this proxy needs the real one for). One literal, not two.
  */
 export const AWJ_MEDIA_PROXY_PATH_PREFIX = "/api/storefront/media/";
+export const AWJ_CATEGORY_MEDIA_PROXY_PATH_PREFIX =
+  "/api/storefront/media/categories/";
 
 /**
  * AWJ media URLs are guarded by Laravel's hostname-resolved storefront
@@ -165,6 +167,26 @@ function toRenderableMediaUrl(url: string | null): string | null {
     const match = parsed.pathname.match(/^\/store\/v1\/media\/([^/]+)$/);
     if (match) {
       return `${AWJ_MEDIA_PROXY_PATH_PREFIX}${encodeURIComponent(match[1])}`;
+    }
+  } catch {
+    // Keep the original URL if an upstream producer sends a non-URL value.
+  }
+
+  return url;
+}
+
+function toRenderableCategoryMediaUrl(url: string | null): string | null {
+  if (!url) return null;
+
+  try {
+    const parsed = new URL(url, "http://awj.invalid");
+    const match = parsed.pathname.match(
+      /^\/store\/v1\/media\/categories\/([^/]+)$/,
+    );
+    if (match) {
+      return `${AWJ_CATEGORY_MEDIA_PROXY_PATH_PREFIX}${encodeURIComponent(
+        match[1],
+      )}`;
     }
   } catch {
     // Keep the original URL if an upstream producer sends a non-URL value.
@@ -398,11 +420,15 @@ export function mapAwjCategoryToViewModel(
     mapAwjCategoryToViewModel(child, depth + 1),
   );
 
+  const imageUrl = toRenderableCategoryMediaUrl(category.image?.url ?? null);
+  const image =
+    category.image && imageUrl ? { ...category.image, url: imageUrl } : null;
+
   return {
     id: category.id,
     name: category.name,
     color: category.color,
-    image: category.image ?? null,
+    image,
     permalink: category.id,
     position: 0,
     depth,
@@ -413,8 +439,8 @@ export function mapAwjCategoryToViewModel(
     parent_id: category.parent_id,
     description: category.description ?? "",
     description_html: category.description ?? "",
-    image_url: category.image?.url ?? null,
-    square_image_url: category.image?.url ?? null,
+    image_url: imageUrl,
+    square_image_url: imageUrl,
     is_root: category.parent_id === null,
     is_child: category.parent_id !== null,
     is_leaf: children.length === 0,

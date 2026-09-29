@@ -177,11 +177,13 @@ describe("mapAwjCategoryToViewModel", () => {
     );
 
     expect(viewModel.image).toEqual({
-      url: "/store/v1/media/categories/cat-1",
+      url: "/api/storefront/media/categories/cat-1",
       alt: "إلكترونيات",
     });
-    expect(viewModel.image_url).toBe("/store/v1/media/categories/cat-1");
-    expect(viewModel.square_image_url).toBe("/store/v1/media/categories/cat-1");
+    expect(viewModel.image_url).toBe("/api/storefront/media/categories/cat-1");
+    expect(viewModel.square_image_url).toBe(
+      "/api/storefront/media/categories/cat-1",
+    );
   });
 
   it("recursively maps nested children", () => {
