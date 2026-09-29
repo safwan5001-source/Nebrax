@@ -916,6 +916,19 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
             ->whereUuid('id')->whereUuid('version')
             ->middleware($perm('commerce.manage'));
 
+        // CUST-H1-4: جدولة/استبدال/إعادة جدولة نشرٍ مستقبلي (PUT، مسارٌ واحد
+        // للحالات الثلاث)، وإلغاء الجدولة (DELETE بجسم JSON يحمل رمز الحالة
+        // الحالي — نفس نمط DELETE ذات المعطى المستعمل فعلاً في هذه الوحدة).
+        // نفس صلاحية بقية مسارات النسخ (commerce.manage) — لا صلاحية جديدة.
+        // واجهة الجدولة (Schedule UX) تبقى محجوبة حتى CUST-H1-5 — هذا الأفق
+        // خلفي/تنفيذي فقط.
+        Route::put('commerce/workspace/storefronts/{id}/presentation/versions/{version}/schedule', [CommerceWorkspaceStorefrontPresentationVersionController::class, 'schedule'])
+            ->whereUuid('id')->whereUuid('version')
+            ->middleware($perm('commerce.manage'));
+        Route::delete('commerce/workspace/storefronts/{id}/presentation/versions/{version}/schedule', [CommerceWorkspaceStorefrontPresentationVersionController::class, 'cancelSchedule'])
+            ->whereUuid('id')->whereUuid('version')
+            ->middleware($perm('commerce.manage'));
+
         // COM-MOBILE-SHIPPING-1 (ADR-10): مناطق شحن مُهيَّأة من التاجر —
         // مطابقة مدينة/منطقة ⇐ رسم ثابت. نفس صلاحية بنية Commerce التحتية
         // الأخرى (commerce.manage) لقراءةً وكتابةً معاً، بلا نطاق `shipping.*`
