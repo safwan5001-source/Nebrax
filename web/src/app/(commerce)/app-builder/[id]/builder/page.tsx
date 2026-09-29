@@ -5,7 +5,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
-import { ArrowRight, Home, LayoutPanelLeft, Plus, Redo2, SlidersHorizontal, Trash2, Undo2, UploadCloud } from 'lucide-react';
+import {
+  ArrowRight, Home, LayoutPanelLeft, Maximize2, Minimize2, Plus, Redo2, SlidersHorizontal, Trash2, Undo2, UploadCloud,
+} from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
@@ -24,12 +26,22 @@ import {
 } from '@/lib/app-builder';
 import { AppBuilderCanvas, PREVIEW_WIDTHS, type PreviewDevice } from '@/modules/app-builder/canvas';
 import { DEFAULT_APP_EXPERIENCE } from '@/modules/app-builder/default-experience';
+import { DeviceFrame, DEVICE_FRAME_PRESETS, type DeviceFramePreset } from '@/modules/app-builder/device-frame';
 import { LayersTree } from '@/modules/app-builder/layers-tree';
 import { Inspector } from '@/modules/app-builder/inspector';
 import { ThemePanel } from '@/modules/app-builder/theme-panel';
 
 type MobilePanel = 'structure' | 'inspector';
 type StructureMode = 'pages' | 'theme';
+/**
+ * MOBILE-PREVIEW-3 — المحور العلوي الجديد المستقل عن `PreviewState` أدناه: `design` هو
+ * سطح التحرير الحالي بلا أي تغيير (`AWJ_APP_BUILDER_REAL_MOBILE_PREVIEW_HORIZON.md` §2/6).
+ * `preview` هو «معاينة التطبيق» — سطح غير قابل للتحرير إطلاقاً بصرف النظر عن `PreviewState`
+ * المختار (مسودة/منشورة/افتراضية تبقى تُختار داخل المعاينة، لكن العرض دوماً قراءة فقط).
+ * هذا Level B — Browser Mobile Preview فقط (`REAL-MOBILE-PREVIEW-2-...md` §8/MP2-D1)، لا
+ * زمن تشغيل Flutter حقيقي ولا بيانات متجر حيّة — كلاهما مؤجَّل صراحةً لمهام لاحقة.
+ */
+type BuilderMode = 'design' | 'preview';
 /**
  * LIVE-PREVIEW-6 — أيّ نسخة يعرضها الكانفاس حالياً. `draft` هو الوضع الوحيد القابل
  * للتحرير (المسار الموجود أصلاً، بلا تغيير). `published`/`default` قراءة فقط بالكامل —
@@ -81,6 +93,14 @@ export default function AppBuilderWorkspacePage() {
   const [publishedLoading, setPublishedLoading] = useState(false);
   const [publishedError, setPublishedError] = useState<string | null>(null);
   const [viewedPageId, setViewedPageId] = useState<string | null>(null);
+
+  // MOBILE-PREVIEW-3 — App Preview shell state. `builderMode` never mutates `previewState`
+  // and vice versa: switching to Preview keeps whichever source (draft/published/default)
+  // was already selected, and returning to Design restores the exact same editor state
+  // (selection, dirty flag, history) — nothing here is cleared or reset on mode switch.
+  const [builderMode, setBuilderMode] = useState<BuilderMode>('design');
+  const [previewDevicePreset, setPreviewDevicePreset] = useState<DeviceFramePreset>('iphone');
+  const [fullPreview, setFullPreview] = useState(false);
 
   const load = useCallback(() => {
     if (!params.id) return;
@@ -363,6 +383,22 @@ export default function AppBuilderWorkspacePage() {
   if (loading) return <LoadingState rows={8} label={tc('loading')} />;
   if (!app || !schema || !registries) return <ErrorState message={loadError ?? t('loadFailed')} onRetry={load} retryLabel={tc('retry')} />;
 
+  // MOBILE-PREVIEW-3 — App Preview always renders read-only, for whichever `previewState`
+  // is selected, including `draft`: unlike Design mode (where `draft` is the one editable
+  // branch), Preview never calls `onSelect`/mutates the schema, so the draft's own live
+  // `currentPageRoot`/`schema` can be shown safely without a second fetch or a second
+  // "viewed" tracking variable — `published`/`default` keep using the existing
+  // `viewedPageRoot`/`viewedSchema` exactly as Design's own read-only branch already does.
+  const previewRoot = previewState === 'draft' ? currentPageRoot : viewedPageRoot;
+  const previewThemeTokensResolved =
+    previewState === 'draft' ? schemaThemeTokens(schema) : viewedSchema ? schemaThemeTokens(viewedSchema) : undefined;
+  const previewBannerText =
+    previewState === 'draft'
+      ? t('previewState.draftBanner')
+      : previewState === 'published'
+      ? t('previewState.publishedBanner', { version: publishedVersion?.version ?? 0 })
+      : t('previewState.defaultBanner');
+
   const statusBadge = saving ? (
     <Badge tone="muted" className="shrink-0">{t('savingBadge')}</Badge>
   ) : dirty ? (
@@ -517,6 +553,54 @@ export default function AppBuilderWorkspacePage() {
 
   const isDraftView = previewState === 'draft';
 
+  /**
+   * MOBILE-PREVIEW-3 — the read-only device-frame content shared by normal App Preview and
+   * Full Preview: same loading/error/canvas branching Design mode's own read-only branch
+   * already has for `published` (lines above), just wrapped in `DeviceFrame` and rendered
+   * with `interactive={false}` instead of the desktop-width bordered box.
+   */
+  const previewCanvasArea =
+    previewState === 'published' && publishedLoading ? (
+      <div className="text-sm text-muted">{tc('loading')}</div>
+    ) : previewState === 'published' && publishedError ? (
+      <div className="max-w-xs text-center text-sm text-negative">{publishedError}</div>
+    ) : (
+      <DeviceFrame preset={previewDevicePreset}>
+        <AppBuilderCanvas
+          root={previewRoot}
+          device="mobile"
+          locale={previewLocale}
+          selectedId={null}
+          onSelect={() => {}}
+          themeTokens={previewThemeTokensResolved}
+          registries={registries}
+          stateBanner={previewBannerText}
+          interactive={false}
+        />
+      </DeviceFrame>
+    );
+
+  const previewTruthBadge = (
+    <span className="inline-flex items-center gap-1.5 rounded-md border border-border bg-surface px-2.5 py-1 text-[11px] font-medium text-muted">
+      {t('preview.browserTruthBadge')}
+    </span>
+  );
+
+  if (builderMode === 'preview' && fullPreview) {
+    return (
+      <div dir={locale === 'ar' ? 'rtl' : 'ltr'} className="fixed inset-0 z-50 flex flex-col bg-background">
+        <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border bg-surface px-3 py-2">
+          {previewTruthBadge}
+          <Button type="button" variant="outline" size="sm" onClick={() => setFullPreview(false)}>
+            <Minimize2 className="h-3.5 w-3.5" strokeWidth={1.7} aria-hidden="true" />
+            {t('preview.exitFullPreviewAction')}
+          </Button>
+        </div>
+        <div className="flex min-h-0 flex-1 items-stretch justify-center overflow-auto p-0 lg:items-center lg:p-6">{previewCanvasArea}</div>
+      </div>
+    );
+  }
+
   return (
     <div dir={locale === 'ar' ? 'rtl' : 'ltr'} className="flex h-full min-h-0 flex-col">
       <header className="flex min-h-14 shrink-0 flex-wrap items-center gap-2 border-b border-border bg-surface px-3 md:px-4">
@@ -531,27 +615,51 @@ export default function AppBuilderWorkspacePage() {
         <p className="min-w-0 truncate text-sm font-semibold text-text">{appDisplayName(app, previewLocale)}</p>
         {statusBadge}
 
-        <div className="flex shrink-0 items-center gap-0.5">
-          <Button variant="ghost" size="icon" aria-label={t('undoLabel')} disabled={!isDraftView || !canUndo} onClick={undo}>
-            <Undo2 className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />
-          </Button>
-          <Button variant="ghost" size="icon" aria-label={t('redoLabel')} disabled={!isDraftView || !canRedo} onClick={redo}>
-            <Redo2 className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />
-          </Button>
+        {/* MOBILE-PREVIEW-3 — top-level Design / App Preview switch. Deliberately not
+            `hidden ... sm:flex` like the other toggle groups below: this is the primary
+            mode switch the Horizon calls for, not a secondary control. */}
+        <div className="flex shrink-0 items-center gap-1 rounded-md border border-border p-1">
+          {(['design', 'preview'] as const).map((mode) => (
+            <button
+              key={mode}
+              type="button"
+              aria-pressed={builderMode === mode}
+              onClick={() => setBuilderMode(mode)}
+              className={cn(
+                'h-7 rounded px-2.5 text-xs font-medium',
+                builderMode === mode ? 'bg-primary text-primary-foreground' : 'text-muted hover:bg-primary-soft hover:text-primary'
+              )}
+            >
+              {t(`builderMode.${mode}`)}
+            </button>
+          ))}
         </div>
-        <Button size="sm" disabled={!isDraftView || !dirty || saving} onClick={handleSave}>
-          {saving ? t('savingBadge') : tc('save')}
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          disabled={!isDraftView || dirty || saving || !canPublish}
-          title={!isDraftView ? t('previewState.switchToDraftToPublish') : !canPublish ? t('publish.forbidden') : dirty ? t('publish.saveFirst') : undefined}
-          onClick={openPublishDialog}
-        >
-          <UploadCloud className="h-3.5 w-3.5" strokeWidth={1.7} aria-hidden="true" />
-          {t('publish.action')}
-        </Button>
+
+        {builderMode === 'design' ? (
+          <>
+            <div className="flex shrink-0 items-center gap-0.5">
+              <Button variant="ghost" size="icon" aria-label={t('undoLabel')} disabled={!isDraftView || !canUndo} onClick={undo}>
+                <Undo2 className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />
+              </Button>
+              <Button variant="ghost" size="icon" aria-label={t('redoLabel')} disabled={!isDraftView || !canRedo} onClick={redo}>
+                <Redo2 className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />
+              </Button>
+            </div>
+            <Button size="sm" disabled={!isDraftView || !dirty || saving} onClick={handleSave}>
+              {saving ? t('savingBadge') : tc('save')}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={!isDraftView || dirty || saving || !canPublish}
+              title={!isDraftView ? t('previewState.switchToDraftToPublish') : !canPublish ? t('publish.forbidden') : dirty ? t('publish.saveFirst') : undefined}
+              onClick={openPublishDialog}
+            >
+              <UploadCloud className="h-3.5 w-3.5" strokeWidth={1.7} aria-hidden="true" />
+              {t('publish.action')}
+            </Button>
+          </>
+        ) : null}
 
         <div className="ms-auto flex flex-wrap items-center gap-2">
           <div className="hidden items-center gap-1 rounded-md border border-border p-1 sm:flex">
@@ -591,26 +699,59 @@ export default function AppBuilderWorkspacePage() {
               </button>
             ))}
           </div>
-          <div className="hidden items-center gap-1 rounded-md border border-border p-1 md:flex">
-            {(Object.keys(PREVIEW_WIDTHS) as PreviewDevice[]).map((item) => (
-              <button
-                key={item}
-                type="button"
-                aria-pressed={device === item}
-                onClick={() => setDevice(item)}
-                className={cn(
-                  'h-7 rounded px-2.5 text-xs font-medium',
-                  device === item ? 'bg-primary text-primary-foreground' : 'text-muted hover:bg-primary-soft hover:text-primary'
-                )}
-              >
-                {t(`device.${item}`)}
-              </button>
-            ))}
-          </div>
+          {builderMode === 'design' ? (
+            <div className="hidden items-center gap-1 rounded-md border border-border p-1 md:flex">
+              {(Object.keys(PREVIEW_WIDTHS) as PreviewDevice[]).map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  aria-pressed={device === item}
+                  onClick={() => setDevice(item)}
+                  className={cn(
+                    'h-7 rounded px-2.5 text-xs font-medium',
+                    device === item ? 'bg-primary text-primary-foreground' : 'text-muted hover:bg-primary-soft hover:text-primary'
+                  )}
+                >
+                  {t(`device.${item}`)}
+                </button>
+              ))}
+            </div>
+          ) : null}
         </div>
       </header>
 
-      {/* Desktop/tablet: three fixed panes. Below `lg`: canvas + a switchable structure/inspector pane, per the responsive admin baseline in APP-BUILDER-5-UX-EVIDENCE-PASS.md. */}
+      {builderMode === 'preview' ? (
+        // MOBILE-PREVIEW-3 — App Preview shell: no structure/inspector asides, no
+        // edit/undo/redo/save/publish controls (already hidden above), no selection —
+        // just the device-frame-wrapped, non-interactive canvas plus its own small toolbar.
+        <div className="flex min-h-0 flex-1 flex-col overflow-auto bg-background">
+          <div className="flex flex-wrap items-center justify-center gap-2 border-b border-border bg-surface p-3">
+            <div className="flex items-center gap-1 rounded-md border border-border p-1">
+              {(Object.keys(DEVICE_FRAME_PRESETS) as DeviceFramePreset[]).map((preset) => (
+                <button
+                  key={preset}
+                  type="button"
+                  aria-pressed={previewDevicePreset === preset}
+                  onClick={() => setPreviewDevicePreset(preset)}
+                  className={cn(
+                    'h-7 rounded px-2.5 text-xs font-medium',
+                    previewDevicePreset === preset ? 'bg-primary text-primary-foreground' : 'text-muted hover:bg-primary-soft hover:text-primary'
+                  )}
+                >
+                  {DEVICE_FRAME_PRESETS[preset].label}
+                </button>
+              ))}
+            </div>
+            {previewTruthBadge}
+            <Button type="button" variant="outline" size="sm" onClick={() => setFullPreview(true)}>
+              <Maximize2 className="h-3.5 w-3.5" strokeWidth={1.7} aria-hidden="true" />
+              {t('preview.fullPreviewAction')}
+            </Button>
+          </div>
+          <div className="flex min-h-0 flex-1 items-stretch justify-center overflow-auto p-0 lg:items-center lg:p-6">{previewCanvasArea}</div>
+        </div>
+      ) : (
+      /* Desktop/tablet: three fixed panes. Below `lg`: canvas + a switchable structure/inspector pane, per the responsive admin baseline in APP-BUILDER-5-UX-EVIDENCE-PASS.md. */
       <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
         <aside className="hidden w-60 shrink-0 overflow-hidden border-e border-border bg-surface lg:block">
           {isDraftView ? structurePanel : readOnlyPagePanel}
@@ -692,6 +833,7 @@ export default function AppBuilderWorkspacePage() {
           )}
         </div>
       </div>
+      )}
 
       <Dialog open={publishOpen} onClose={() => (publishing ? null : setPublishOpen(false))} title={t('publish.dialogTitle')}>
         <div className="space-y-3">

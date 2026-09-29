@@ -138,6 +138,11 @@ const { api, currentUser, translate } = vi.hoisted(() => {
     'previewState.loadFailed': 'Could not load the published version',
     'previewState.readOnlyNotice': 'Read-only — switch to the Draft tab to edit',
     'previewState.switchToDraftToPublish': 'Switch to Draft to publish',
+    'builderMode.design': 'Design',
+    'builderMode.preview': 'App Preview',
+    'preview.browserTruthBadge': 'Browser Preview — not a real runtime render',
+    'preview.fullPreviewAction': 'Full Preview',
+    'preview.exitFullPreviewAction': 'Exit Full Preview',
   };
   const cache = new Map<string, ReturnType<typeof buildTranslator>>();
   function buildTranslator(namespace: string) {
@@ -873,6 +878,141 @@ describe('AppBuilderWorkspacePage', () => {
 
       const publishedTab = screen.getByRole('button', { name: 'Published' });
       expect((publishedTab as HTMLButtonElement).disabled).toBe(true);
+    });
+  });
+
+  // MOBILE-PREVIEW-3 — Browser App Preview shell. `builderMode` ('design' | 'preview') is
+  // fully independent of `PreviewState` ('draft' | 'published' | 'default') tested above —
+  // these tests only exercise the new top-level switch and its own shell.
+  describe('App Preview shell', () => {
+    it('switching to App Preview hides every editing control and structure/inspector pane, shows the browser-preview truth badge, and still renders the live draft content read-only', async () => {
+      mockApi();
+      render(<AppBuilderWorkspacePage />);
+      await screen.findByText('Featured');
+
+      await userEvent.setup().click(screen.getByRole('button', { name: 'App Preview' }));
+
+      // No editing affordances survive the mode switch — not merely disabled, entirely absent.
+      expect(screen.queryAllByText('Save').length).toBe(0);
+      expect(screen.queryAllByText('Publish').length).toBe(0);
+      expect(screen.queryAllByLabelText('Undo').length).toBe(0);
+      expect(screen.queryAllByLabelText('Redo').length).toBe(0);
+      expect(screen.queryAllByText('Add page').length).toBe(0);
+      expect(screen.queryAllByText('Layers').length).toBe(0);
+      // The type-tag chrome ('Section'/'Text'/'Product Card') is authoring-only — gone too.
+      expect(screen.queryAllByText('Section').length).toBe(0);
+
+      // Honesty label + the live draft's own content, still visible inside the device frame.
+      expect(screen.getByText('Browser Preview — not a real runtime render')).toBeTruthy();
+      expect(screen.getAllByText('Featured').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('Welcome').length).toBeGreaterThan(0);
+    });
+
+    it('a click on canvas content in App Preview never selects anything (no Inspector, no stray mutation)', async () => {
+      mockApi();
+      render(<AppBuilderWorkspacePage />);
+      await screen.findByText('Featured');
+
+      await userEvent.setup().click(screen.getByRole('button', { name: 'App Preview' }));
+      await userEvent.setup().click(screen.getByText('Welcome'));
+
+      // Nothing resembling the Inspector (props/action panel) is even mounted in Preview mode.
+      expect(screen.queryAllByText('Properties').length).toBe(0);
+      expect(screen.queryAllByText('This component has no properties.').length).toBe(0);
+    });
+
+    it('App Preview offers iPhone/Android device-frame presets, defaulting to iPhone, and switches the rendered frame', async () => {
+      mockApi();
+      const { container } = render(<AppBuilderWorkspacePage />);
+      await screen.findByText('Featured');
+
+      await userEvent.setup().click(screen.getByRole('button', { name: 'App Preview' }));
+
+      expect(container.querySelector('[data-device-frame="iphone"]')).toBeTruthy();
+
+      await userEvent.setup().click(screen.getByRole('button', { name: 'Android' }));
+      expect(container.querySelector('[data-device-frame="android"]')).toBeTruthy();
+      expect(container.querySelector('[data-device-frame="iphone"]')).toBeNull();
+    });
+
+    it('Full Preview opens a distraction-free overlay that still shows the truth badge and device content, and Exit returns to the normal Preview toolbar', async () => {
+      mockApi();
+      render(<AppBuilderWorkspacePage />);
+      await screen.findByText('Featured');
+
+      await userEvent.setup().click(screen.getByRole('button', { name: 'App Preview' }));
+      await userEvent.setup().click(screen.getByRole('button', { name: 'Full Preview' }));
+
+      expect(screen.getByText('Browser Preview — not a real runtime render')).toBeTruthy();
+      expect(screen.getAllByText('Featured').length).toBeGreaterThan(0);
+      const exitButton = screen.getByRole('button', { name: 'Exit Full Preview' });
+      expect(exitButton).toBeTruthy();
+      // The device-preset toolbar is not part of the Full Preview chrome.
+      expect(screen.queryAllByText('Android').length).toBe(0);
+
+      await userEvent.setup().click(exitButton);
+
+      expect(screen.queryAllByText('Exit Full Preview').length).toBe(0);
+      expect(screen.getByRole('button', { name: 'Android' })).toBeTruthy();
+    });
+
+    it('App Preview follows the Draft/Published/Default source switcher exactly like Design mode, staying read-only for every source', async () => {
+      api.mockImplementation((path?: string) => {
+        if (!path) return Promise.resolve({ data: null });
+        if (path.endsWith('/draft')) return Promise.resolve({ data: draftData });
+        if (path.endsWith('/registries')) return Promise.resolve({ data: registriesData });
+        if (path.endsWith('/apps/app-1')) return Promise.resolve({ data: appData });
+        return Promise.reject(new Error(`unexpected path: ${path}`));
+      });
+      render(<AppBuilderWorkspacePage />);
+      await screen.findByText('Featured');
+
+      await userEvent.setup().click(screen.getByRole('button', { name: 'App Preview' }));
+      expect(screen.getAllByText('Featured').length).toBeGreaterThan(0);
+
+      await userEvent.setup().click(screen.getByRole('button', { name: 'Default' }));
+
+      expect(await screen.findByText('أَوْج')).toBeTruthy();
+      expect(screen.getByText('Default experience — what a customer sees before this tenant has published anything')).toBeTruthy();
+      expect(screen.queryAllByText('Featured').length).toBe(0);
+      // Still no editing chrome for the Default source either.
+      expect(screen.queryAllByText('Save').length).toBe(0);
+    });
+
+    it('returning to Design from App Preview restores the exact same editor state — selection and unsaved changes are never reset by the mode switch', async () => {
+      mockApi();
+      render(<AppBuilderWorkspacePage />);
+      await screen.findByText('Featured');
+
+      const desktopTree = screen.getAllByRole('tree')[0];
+      await userEvent.setup().click(within(desktopTree).getByText('Text'));
+      const textareas = await screen.findAllByDisplayValue('Welcome');
+      fireEvent.change(textareas[0], { target: { value: 'Bye' } });
+      expect(screen.getByText('Unsaved changes')).toBeTruthy();
+
+      await userEvent.setup().click(screen.getByRole('button', { name: 'App Preview' }));
+      expect(screen.getAllByText('Bye').length).toBeGreaterThan(0);
+
+      await userEvent.setup().click(screen.getByRole('button', { name: 'Design' }));
+
+      // The Text node is still selected, still shows its edited value, and the draft is
+      // still marked dirty — none of this was cleared by switching modes in either direction.
+      expect(screen.getByText('Unsaved changes')).toBeTruthy();
+      expect(screen.getAllByDisplayValue('Bye').length).toBeGreaterThan(0);
+    });
+
+    it('the locale toggle still applies RTL/LTR direction to the App Preview canvas content', async () => {
+      mockApi();
+      render(<AppBuilderWorkspacePage />);
+      await screen.findByText('Featured');
+
+      await userEvent.setup().click(screen.getByRole('button', { name: 'App Preview' }));
+      const screenBoxAr = screen.getAllByText('Featured')[0].closest('[dir]');
+      expect(screenBoxAr?.getAttribute('dir')).toBe('rtl');
+
+      await userEvent.setup().click(screen.getByRole('button', { name: 'EN' }));
+      const screenBoxEn = screen.getAllByText('Featured')[0].closest('[dir]');
+      expect(screenBoxEn?.getAttribute('dir')).toBe('ltr');
     });
   });
 });
