@@ -4,7 +4,7 @@ import { notFound, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { ExperienceBuilder } from "@/modules/store-experience-builder/ExperienceBuilder";
 import { enableDemo } from "@/lib/demo";
-import { seedMockPresentationVersions } from "@/lib/mock-data";
+import { seedMockPresentationVersions, setMockSchedulingRuntimeActive } from "@/lib/mock-data";
 
 /**
  * CUST-H1-2 — ثابتة تحقّق بصري فقط، غير مرتبطة بالمنتج. تركّب `ExperienceBuilder`
@@ -22,7 +22,10 @@ type Scenario =
   | "choose"
   | "published-readonly"
   | "many-long-names"
-  | "draft-and-published";
+  | "draft-and-published"
+  | "schedule-eligible"
+  | "scheduled"
+  | "scheduling-gated";
 
 function scenarioOf(value: string | null): Scenario {
   if (
@@ -31,7 +34,10 @@ function scenarioOf(value: string | null): Scenario {
     value === "choose" ||
     value === "published-readonly" ||
     value === "many-long-names" ||
-    value === "draft-and-published"
+    value === "draft-and-published" ||
+    value === "schedule-eligible" ||
+    value === "scheduled" ||
+    value === "scheduling-gated"
   ) {
     return value;
   }
@@ -80,6 +86,47 @@ function seedFor(scenario: Scenario) {
       { id: "v-published-1", name: "التصميم الحالي", state: "published", revision: 5 },
       { id: "v-draft-1", name: "رمضان 1448", state: "draft", revision: 2 },
     ]);
+    return;
+  }
+  if (scenario === "schedule-eligible") {
+    // CUST-H1-5 — مسودة وحيدة أهلة للجدولة: أنظف سيناريو لفتح حوار الجدولة
+    // بلا تحذير استبدال (لا نسخة مجدولة أخرى قائمة).
+    seedMockPresentationVersions(STORE_ID, [
+      { id: "v-published-1", name: "التصميم الحالي", state: "published", revision: 5 },
+      { id: "v-draft-1", name: "رمضان 1448", state: "draft", revision: 2 },
+    ]);
+    return;
+  }
+  if (scenario === "scheduled") {
+    // CUST-H1-5 — نسخة مجدولة بالفعل + مسودة أخرى: تفتح "إعادة الجدولة"/
+    // "إلغاء الجدولة" على الأولى، وتُظهر تحذير الاستبدال عند جدولة الثانية.
+    seedMockPresentationVersions(STORE_ID, [
+      { id: "v-published-1", name: "التصميم الحالي", state: "published", revision: 5 },
+      {
+        id: "v-scheduled-1",
+        name: "عروض نهاية السنة",
+        state: "scheduled",
+        revision: 2,
+        scheduledFor: "2026-12-25T21:00:00.000Z",
+      },
+      { id: "v-draft-1", name: "رمضان 1448", state: "draft", revision: 1 },
+    ]);
+    return;
+  }
+  if (scenario === "scheduling-gated") {
+    // CUST-H1-5 — بوابة تشغيل الإنتاج غير مفعَّلة: زرّ الجدولة معطَّل بشرح
+    // صريح، وإلغاء جدولة نسخة قائمة يبقى متاحاً (إجراء تعافٍ آمن دائماً).
+    seedMockPresentationVersions(STORE_ID, [
+      { id: "v-draft-1", name: "رمضان 1448", state: "draft", revision: 2 },
+      {
+        id: "v-scheduled-1",
+        name: "عروض نهاية السنة",
+        state: "scheduled",
+        revision: 1,
+        scheduledFor: "2026-12-25T21:00:00.000Z",
+      },
+    ]);
+    setMockSchedulingRuntimeActive(STORE_ID, false);
     return;
   }
   seedMockPresentationVersions(STORE_ID, [

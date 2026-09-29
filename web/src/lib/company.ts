@@ -24,6 +24,12 @@ export interface Company {
   city?: string | null;
   postal_code?: string | null;
   short_address?: string | null;
+  /**
+   * CUST-H1-5 — منطقة `tenants.timezone` الزمنية (معرّف IANA، مثال:
+   * `Asia/Riyadh`). قراءة فقط هنا — لا شاشة تعديل بعد. المصدر الوحيد المعتمد
+   * لعرض/تحويل موعد جدولة نسخ عرض المتجر؛ توقيت المتصفح ليس معتمداً أبداً.
+   */
+  timezone?: string | null;
 }
 
 const COMPANY_UPDATED_EVENT = 'nebrax:company-updated';

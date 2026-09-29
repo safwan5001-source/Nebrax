@@ -418,6 +418,9 @@ export const mockCompany = {
   country: 'SA',
   address: 'حي الفيصلية، الدمام',
   city: 'الدمام',
+  // CUST-H1-5 — نفس افتراض عمود `tenants.timezone` الحقيقي (`Asia/Riyadh`)،
+  // لتطابق سلوك وضع العرض التجريبي مع الخادم الفعلي لجدولة نسخ عرض المتجر.
+  timezone: 'Asia/Riyadh',
 };
 
 export const mockZatca = {
@@ -2537,6 +2540,25 @@ const mockPresentationVersionsByStore = new Map<string, MockPresentationVersionR
 // الصفّ الذي حالته `published` حالياً — لا خريطة مؤشر منفصلة، تماماً كواجهة
 // القائمة الحقيقية (لا `active_version_id` خام، فقط `state`).
 const mockPublishedRevisionByStore = new Map<string, number | null>();
+// CUST-H1-5 — نظير `schedule_epoch` الحقيقي لكل متجر. رمزٌ نصّي مشتقٌّ منه
+// مباشرة (لا حاجة لتوقيع HMAC وهمي — هذه طبقة معاينة محلية بلا خادم حقيقي
+// يتحقّق من التوقيع، والتحقق هنا مساواة نصّية بسيطة كما يفعل الخادم الحقيقي
+// مع الرمز المُفكَّك فعلياً).
+const mockScheduleEpochByStore = new Map<string, number>();
+// CUST-H1-5 — بوابة تشغيل الإنتاج الوهمية لكل متجر (نظير
+// `config('storefront.scheduled_publishing.runtime_active')`). `true`
+// افتراضياً — يطابق افتراض بيئة `local`/`testing` الحقيقية؛ تُضبَط `false`
+// صراحةً لسيناريو التحقّق البصري من الحالة المحجوبة فقط.
+const mockSchedulingRuntimeActiveByStore = new Map<string, boolean>();
+
+function mockScheduleToken(storefrontId: string): string {
+  return `mock-schedule-epoch-${mockScheduleEpochByStore.get(storefrontId) ?? 0}`;
+}
+
+/** CUST-H1-5 — يضبط بوابة تشغيل الجدولة الوهمية لسيناريوهات التحقّق البصري من الحالة المحجوبة. */
+export function setMockSchedulingRuntimeActive(storefrontId: string, active: boolean): void {
+  mockSchedulingRuntimeActiveByStore.set(storefrontId, active);
+}
 
 export function seedMockPresentationVersions(
   storefrontId: string,
@@ -2569,6 +2591,8 @@ export function seedMockPresentationVersions(
   );
   const hasPublished = versions.some((v) => v.state === 'published');
   mockPublishedRevisionByStore.set(storefrontId, hasPublished ? 1 : null);
+  mockScheduleEpochByStore.set(storefrontId, 0);
+  mockSchedulingRuntimeActiveByStore.set(storefrontId, true);
 }
 
 function mockVersionSummary(storefrontId: string, row: MockPresentationVersionRow) {
@@ -2584,6 +2608,8 @@ function mockVersionSummary(storefrontId: string, row: MockPresentationVersionRo
     created_at: row.created_at,
     updated_at: row.updated_at,
     published_revision: mockPublishedRevisionByStore.get(storefrontId) ?? null,
+    schedule_token: mockScheduleToken(storefrontId),
+    scheduling_runtime_active: mockSchedulingRuntimeActiveByStore.get(storefrontId) ?? true,
   };
 }
 
@@ -3225,6 +3251,72 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
       row.state = 'published';
       row.last_published_at = new Date().toISOString();
       mockPublishedRevisionByStore.set(storefrontId, (currentPublishedRevision ?? 0) + 1);
+      return resolve({ data: mockVersionDetail(storefrontId, row) });
+    }
+
+    // CUST-H1-5 — جدولة/استبدال/إعادة جدولة، وإلغاء الجدولة. نفس تحذير
+    // التعليق أعلى النشر الفوري: يجب أن يُطابَقا هنا (داخل فرع `m !== 'GET'`)
+    // قبل الافتراضي العام أسفله، وإلا كانا صامتَي الفشل بنجاحٍ وهمي مضلِّل
+    // (نفس عطل CUST-H1-3 المُوثَّق لمسارات الإنشاء/التسمية/الحذف).
+    const scheduleMatch = clean.match(/^\/commerce\/workspace\/storefronts\/([^/]+)\/presentation\/versions\/([^/]+)\/schedule$/);
+    if (scheduleMatch && (m === 'PUT' || m === 'DELETE')) {
+      const [, storefrontId, versionId] = scheduleMatch;
+      const rows = mockPresentationVersionsByStore.get(storefrontId) ?? [];
+      const row = rows.find((r) => r.id === versionId);
+      if (!row) {
+        return Promise.reject(Object.assign(new Error('النسخة غير موجودة.'), { status: 404 }));
+      }
+      const currentToken = mockScheduleToken(storefrontId);
+
+      if (m === 'DELETE') {
+        const bodyRecord = (body && typeof body === 'object' ? body : {}) as { expected_schedule_token?: unknown };
+        if (row.state !== 'scheduled') {
+          return Promise.reject(Object.assign(new Error('هذه النسخة ليست مجدولة حالياً.'), { status: 409 }));
+        }
+        if (bodyRecord.expected_schedule_token !== currentToken) {
+          return Promise.reject(
+            Object.assign(new Error('حالة الجدولة تغيّرت منذ آخر مراجعة. أعد تحميل حالة المتجر الحالية ثم أعد المحاولة.'), { status: 409 }),
+          );
+        }
+        row.state = 'draft';
+        row.scheduled_for = null;
+        row.updated_at = new Date().toISOString();
+        mockScheduleEpochByStore.set(storefrontId, (mockScheduleEpochByStore.get(storefrontId) ?? 0) + 1);
+        return resolve({ data: mockVersionDetail(storefrontId, row) });
+      }
+
+      const bodyRecord = (body && typeof body === 'object' ? body : {}) as {
+        revision?: unknown;
+        scheduled_for?: unknown;
+        expected_schedule_token?: unknown;
+      };
+      const activeRow = rows.find((r) => r.state === 'published') ?? null;
+      if (activeRow?.id === row.id) {
+        return Promise.reject(
+          Object.assign(new Error('لا يمكن جدولة النسخة المنشورة حالياً. أنشئ نسخة مسودة للتعديل.'), { status: 409 }),
+        );
+      }
+      if (bodyRecord.revision !== row.revision) {
+        return Promise.reject(Object.assign(new Error('النسخة تغيّرت. أعد التحميل ثم احفظ من جديد.'), { status: 409 }));
+      }
+      if (bodyRecord.expected_schedule_token !== currentToken) {
+        return Promise.reject(
+          Object.assign(new Error('حالة الجدولة تغيّرت منذ آخر مراجعة. أعد تحميل حالة المتجر الحالية ثم أعد المحاولة.'), { status: 409 }),
+        );
+      }
+      const scheduledFor = typeof bodyRecord.scheduled_for === 'string' ? bodyRecord.scheduled_for : '';
+      if (!scheduledFor || Number.isNaN(new Date(scheduledFor).getTime()) || new Date(scheduledFor).getTime() <= Date.now()) {
+        return Promise.reject(Object.assign(new Error('وقت الجدولة يجب أن يكون في المستقبل.'), { status: 422 }));
+      }
+      const previouslyScheduled = rows.find((r) => r.state === 'scheduled' && r.id !== row.id);
+      if (previouslyScheduled) {
+        previouslyScheduled.state = 'draft';
+        previouslyScheduled.scheduled_for = null;
+      }
+      row.state = 'scheduled';
+      row.scheduled_for = scheduledFor;
+      row.updated_at = new Date().toISOString();
+      mockScheduleEpochByStore.set(storefrontId, (mockScheduleEpochByStore.get(storefrontId) ?? 0) + 1);
       return resolve({ data: mockVersionDetail(storefrontId, row) });
     }
 

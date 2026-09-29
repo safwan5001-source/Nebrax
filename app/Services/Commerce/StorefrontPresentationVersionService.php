@@ -817,6 +817,15 @@ final class StorefrontPresentationVersionService
                 $version->storefront_id,
                 $head !== null ? (int) $head->schedule_epoch : 0,
             ),
+            // CUST-H1-5 — بوابة إنفاذ الإنتاج (docs/plans/store/CUST-H1-ARCH-1-...md
+            // §14). لا علاقة لها بهذه النسخة أو هذا المتجر تحديداً — قيمة بيئة
+            // واحدة (`config('storefront.scheduled_publishing.runtime_active')`)
+            // تُكرَّر على كل صفّ، تماماً كـ`schedule_token`/`published_revision`
+            // أعلاه، فلا عقد استجابة جديد ولا مسار API إضافي لمجرَّد بثّها.
+            // الواجهة تعطّل عناصر الجدولة بشرحٍ صريح حين تكون `false` — الـAPI
+            // نفسها (هذا المسار) تبقى تعمل بلا قيد مهما كانت القيمة، فبيئات
+            // التطوير/الاختبار تفحص المسار الحيّ الكامل بمعزل عن حالة الإنتاج.
+            'scheduling_runtime_active' => (bool) config('storefront.scheduled_publishing.runtime_active'),
         ];
     }
 

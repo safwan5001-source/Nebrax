@@ -19,7 +19,14 @@ import { type CustomizerLocale, customizerMessage } from "./messages";
 
 export type VersionManagerListState = "loading" | "error" | "ready";
 
-export type VersionRowAction = "duplicate" | "rename" | "delete" | "publish" | null;
+export type VersionRowAction =
+  | "duplicate"
+  | "rename"
+  | "delete"
+  | "publish"
+  | "schedule"
+  | "cancel_schedule"
+  | null;
 
 export interface VersionManagerPanelProps {
   locale: CustomizerLocale;
@@ -45,6 +52,12 @@ export interface VersionManagerPanelProps {
    * (جدول الحالات في مرجع الأفق المعماري §6.2).
    */
   onPublish: (version: PresentationVersionSummary) => void;
+  /** CUST-H1-5 — يفتح حوار الجدولة لصفّ `draft` مؤهَّل (وضع "جدولة" جديدة). */
+  onSchedule: (version: PresentationVersionSummary) => void;
+  /** CUST-H1-5 — يفتح نفس حوار الجدولة لصفّ `scheduled` (وضع "إعادة جدولة"). */
+  onReschedule: (version: PresentationVersionSummary) => void;
+  /** CUST-H1-5 — يفتح حوار تأكيد إلغاء الجدولة لصفّ `scheduled`. */
+  onCancelSchedule: (version: PresentationVersionSummary) => void;
 }
 
 function stateLabel(state: PresentationVersionState, t: (key: Parameters<typeof customizerMessage>[1]) => string) {
@@ -79,11 +92,18 @@ export function VersionManagerPanel({
   onRename,
   onDelete,
   onPublish,
+  onSchedule,
+  onReschedule,
+  onCancelSchedule,
 }: VersionManagerPanelProps) {
   const t = (key: Parameters<typeof customizerMessage>[1]) => customizerMessage(locale, key);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [createName, setCreateName] = useState("");
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  // بيئة واحدة تُقرِّر هذه القيمة لكل صفوف هذا المتجر (راجع تعليق
+  // `schedulingRuntimeActive` في `presentation-versions.ts`) — تكفي قراءتها
+  // من أول صفّ حين توجد نسخ أصلاً؛ لا حاجة لحسابها لكل صفّ على حدة.
+  const schedulingGated = versions.length > 0 && !versions[0].schedulingRuntimeActive;
 
   function submitCreate() {
     // الزر المجاور يُعطَّل أثناء `creating`، لكن الإدخال يبقى مركَّزاً — إن
@@ -168,6 +188,16 @@ export function VersionManagerPanel({
           </div>
         ) : null}
 
+        {listState === "ready" && schedulingGated ? (
+          <div
+            role="status"
+            data-scheduling-gated-notice=""
+            className="mb-2 rounded-md border border-warning/30 bg-warning-soft px-2.5 py-2 text-[11px] leading-5 text-warning"
+          >
+            {t("versionSchedulingGatedBody")}
+          </div>
+        ) : null}
+
         {listState === "ready" && versions.length === 0 ? (
           <div className="flex flex-col items-center gap-3 px-3 py-8 text-center">
             <p className="text-sm font-medium text-text">{t("versionEmptyTitle")}</p>
@@ -216,6 +246,9 @@ export function VersionManagerPanel({
                   onDelete(version);
                 }}
                 onPublish={() => onPublish(version)}
+                onSchedule={() => onSchedule(version)}
+                onReschedule={() => onReschedule(version)}
+                onCancelSchedule={() => onCancelSchedule(version)}
               />
             ))}
           </ul>
@@ -240,6 +273,9 @@ function VersionRow({
   onRename,
   onDelete,
   onPublish,
+  onSchedule,
+  onReschedule,
+  onCancelSchedule,
 }: {
   version: PresentationVersionSummary;
   locale: CustomizerLocale;
@@ -255,6 +291,9 @@ function VersionRow({
   onRename: (name: string) => void;
   onDelete: () => void;
   onPublish: () => void;
+  onSchedule: () => void;
+  onReschedule: () => void;
+  onCancelSchedule: () => void;
 }) {
   const t = (key: Parameters<typeof customizerMessage>[1]) => customizerMessage(locale, key);
   const [mode, setMode] = useState<"idle" | "rename" | "duplicate">("idle");
@@ -461,6 +500,49 @@ function VersionRow({
               className="h-7 rounded-md bg-primary px-2 text-[11px] font-semibold text-primary-foreground disabled:opacity-50"
             >
               {busy === "publish" ? t("versionPublishing") : t("versionPublishNow")}
+            </button>
+          ) : null}
+          {version.state === "draft" ? (
+            <button
+              type="button"
+              data-version-schedule={version.id}
+              // نفس حراسة النشر أعلاه، وإضافةً عليها: بوابة تشغيل الإنتاج
+              // (`schedulingRuntimeActive`) — جدولة "حقيقية" في بيئة لا يعمل
+              // فيها أي مُرسِل فعلياً (§CUST-H1-ARCH-1 §14) تبدو ناجحة للتاجر
+              // بينما لن تُنفَّذ أبداً؛ نمنع الإجراء نفسه بدل السماح بنجاحٍ كاذب.
+              disabled={otherRowBusy || switching || busy !== null || !version.schedulingRuntimeActive}
+              title={!version.schedulingRuntimeActive ? t("versionSchedulingGatedBody") : undefined}
+              onClick={onSchedule}
+              className="h-7 rounded-md border border-border px-2 text-[11px] font-medium text-text hover:bg-primary-soft disabled:opacity-50"
+            >
+              {busy === "schedule" ? t("versionScheduling") : t("versionSchedule")}
+            </button>
+          ) : null}
+          {version.state === "scheduled" ? (
+            <button
+              type="button"
+              data-version-reschedule={version.id}
+              disabled={otherRowBusy || switching || busy !== null || !version.schedulingRuntimeActive}
+              title={!version.schedulingRuntimeActive ? t("versionSchedulingGatedBody") : undefined}
+              onClick={onReschedule}
+              className="h-7 rounded-md border border-border px-2 text-[11px] font-medium text-text hover:bg-primary-soft disabled:opacity-50"
+            >
+              {busy === "schedule" ? t("versionScheduling") : t("versionReschedule")}
+            </button>
+          ) : null}
+          {version.state === "scheduled" ? (
+            <button
+              type="button"
+              data-version-cancel-schedule={version.id}
+              // إلغاء الجدولة إجراء تعافٍ آمن دائماً — لا يُعطَّل ببوابة تشغيل
+              // الإنتاج (خلافاً للجدولة/إعادة الجدولة أعلاه): جدولة أُنشئت في
+              // بيئة تطوير/اختبار (أو قبل تعطيل البوابة) يجب أن تبقى قابلة
+              // للإلغاء دوماً، فلا تنتهي إلى طريق مسدود.
+              disabled={otherRowBusy || switching || busy !== null}
+              onClick={onCancelSchedule}
+              className="h-7 rounded-md border border-negative/30 px-2 text-[11px] font-medium text-negative hover:bg-negative/10 disabled:opacity-50"
+            >
+              {busy === "cancel_schedule" ? t("versionCancelScheduling") : t("versionCancelSchedule")}
             </button>
           ) : null}
           {version.state !== "published" ? (

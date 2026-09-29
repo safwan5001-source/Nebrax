@@ -189,6 +189,13 @@ export type FormatDateTimeOptions = {
   fallback?: string;
   dateStyle?: 'short' | 'medium' | 'long';
   timeStyle?: 'short' | 'medium';
+  /**
+   * CUST-H1-5 — explicit IANA timezone to format in (e.g. the tenant's
+   * authoritative `company.timezone`). Omitted: unchanged pre-existing
+   * behavior (the browser's local timezone) — this is additive only, no
+   * existing call site's output changes without opting in.
+   */
+  timeZone?: string;
 };
 
 /**
@@ -207,6 +214,7 @@ export function formatDateTime(
     dateStyle: options.dateStyle ?? 'medium',
     timeStyle: options.timeStyle ?? 'short',
     hour12: true,
+    ...(options.timeZone ? { timeZone: options.timeZone } : {}),
   });
 }
 

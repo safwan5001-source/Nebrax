@@ -35,6 +35,7 @@ import {
   type VersionManagerPanelProps,
 } from "./VersionManagerPanel";
 import {
+  cancelPresentationVersionSchedule,
   createPresentationVersion,
   deletePresentationVersion,
   listPresentationVersions,
@@ -43,8 +44,12 @@ import {
   publishPresentationVersion,
   renamePresentationVersion,
   savePresentationVersion,
+  schedulePresentationVersion,
   showPresentationVersion,
 } from "@/modules/commerce-workspace/presentation-versions";
+import { useCompany } from "@/lib/company";
+import { safeTimeZone } from "@/lib/timezone";
+import { CancelScheduleConfirmDialog, ScheduleConfirmDialog } from "./ScheduleDialogs";
 
 export const PREVIEW_WIDTHS = {
   mobile: 390,
@@ -122,7 +127,7 @@ export function ExperienceBuilder({
   const [versionSwitchingId, setVersionSwitchingId] = useState<string | null>(null);
   const [versionCreating, setVersionCreating] = useState(false);
   const [versionBusy, setVersionBusy] = useState<
-    { id: string; action: "duplicate" | "rename" | "delete" | "publish" } | null
+    { id: string; action: "duplicate" | "rename" | "delete" | "publish" | "schedule" | "cancel_schedule" } | null
   >(null);
   const [versionConflict, setVersionConflict] = useState<{ versionId: string } | null>(null);
   // CUST-H1-3 — النشر الفوري لنسخة محدَّدة. حوارٌ صريح دوماً قبل أي طلب
@@ -131,6 +136,21 @@ export function ExperienceBuilder({
   // بالضرورة: النشر من صفٍّ في المدير لا يستلزم أن تكون تلك النسخة مفتوحة
   // في المحرِّر أصلاً.
   const [publishTarget, setPublishTarget] = useState<PresentationVersionSummary | null>(null);
+  // CUST-H1-5 — جدولة/إعادة جدولة نسخة محدَّدة. نفس نمط `publishTarget` تماماً:
+  // حوارٌ صريح، ولا يفترض أن تكون النسخة مفتوحة في المحرِّر. `mode` يميّز
+  // النصّ/الزر فقط — الخادم يعامل الحالتين كمعاملة واحدة (`scheduleForCurrentTenant`).
+  const [scheduleTarget, setScheduleTarget] = useState<
+    { version: PresentationVersionSummary; mode: "schedule" | "reschedule" } | null
+  >(null);
+  // CUST-H1-5 — تأكيد إلغاء الجدولة. إجراء دورة حياة منفصل عن الحذف العام
+  // (راجع تعليق `CancelScheduleConfirmDialog`) — يحتاج حوار تأكيد خاصاً به.
+  const [cancelScheduleTarget, setCancelScheduleTarget] = useState<PresentationVersionSummary | null>(null);
+  // CUST-H1-5 — التوقيت الزمني المعتمَد الوحيد لعرض/تحويل مواعيد الجدولة
+  // (`tenants.timezone` عبر `/me` → `company.timezone`؛ راجع `lib/timezone.ts`
+  // لتفصيل لماذا لا يُعتمَد توقيت المتصفح إطلاقاً). `useCompany()` نفس الخطّاف
+  // الذي تستهلكه بقية القشرة لهذه البيانات — لا مسار جلب جديد.
+  const company = useCompany();
+  const tenantTimezone = safeTimeZone(company?.timezone);
   const versionRequestTokenRef = useRef(0);
   // هويتا طلب مخصَّصتان لعلَمَي الانشغال (`versionCreating`/`versionBusy`) —
   // منفصلتان عمداً عن `versionRequestTokenRef` أعلاه: ذاك يزيد أيضاً عند مجرَّد
@@ -267,6 +287,8 @@ export function ExperienceBuilder({
       createdAt: detail.createdAt,
       updatedAt: detail.updatedAt,
       publishedRevision: detail.publishedRevision,
+      scheduleToken: detail.scheduleToken,
+      schedulingRuntimeActive: detail.schedulingRuntimeActive,
     };
   }
 
@@ -898,6 +920,157 @@ export function ExperienceBuilder({
     }
   }
 
+  // CUST-H1-5 — يفتح حوار الجدولة (لا يطلب الشبكة هنا مطلقاً، تماماً كنظيره
+  // في النشر). `mode` مشتقٌّ من حالة الهدف نفسها وقت الفتح: نسخة مجدولة
+  // بالفعل تفتح في وضع "إعادة جدولة"، وأي نسخة أخرى مؤهَّلة (مسودة) في وضع
+  // "جدولة" جديدة — الخادم يعامل الحالتين كمعاملة واحدة على أي حال
+  // (`scheduleForCurrentTenant`، راجع تقرير CUST-H1-4).
+  function handleOpenScheduleDialog(version: PresentationVersionSummary) {
+    setScheduleTarget({ version, mode: version.state === "scheduled" ? "reschedule" : "schedule" });
+  }
+
+  function handleCancelScheduleDialog() {
+    if (versionBusy?.action === "schedule") return; // طلب الجدولة قيد التنفيذ فعلياً — لا يُغلَق الحوار في منتصف الطريق.
+    setScheduleTarget(null);
+  }
+
+  async function handleConfirmSchedule(scheduledForIso: string) {
+    if (!storefrontId || !scheduleTarget) return;
+    const { version: target, mode } = scheduleTarget;
+    const originStorefrontId = storefrontId;
+    const tokenAtStart = versionRequestTokenRef.current;
+    const wasOpenAtStart = selectedVersion?.id === target.id;
+    const writeRequestId = ++versionWriteRequestRef.current;
+    setVersionBusy({ id: target.id, action: "schedule" });
+    const result = await schedulePresentationVersion(
+      storefrontId,
+      target.id,
+      target.revision,
+      scheduledForIso,
+      target.scheduleToken,
+    );
+    const current = stillCurrent(originStorefrontId, tokenAtStart);
+    const sameStorefront = storefrontIdRef.current === originStorefrontId;
+    const isLatestWrite = writeRequestId === versionWriteRequestRef.current;
+    if (sameStorefront && isLatestWrite) setVersionBusy(null);
+    if (!result.ok) {
+      if (!sameStorefront) return;
+      // يُغلَق الحوار هنا عمداً — تماماً كنظيرها في `handleConfirmPublish`،
+      // لا تفريقاً عنها: إبقاؤه مفتوحاً كان يترك `scheduleTarget.revision`/
+      // `scheduleToken` القديمين معلَّقين في الحوار، فيُعيد أي ضغط ثانٍ على
+      // «جدولة» إرسال نفس القيم القديمة ويكرّر 409 نفسه في حلقة صامتة. إغلاقه
+      // يفرض إعادة فتحٍ صريحة (من صفّ محدَّث بعد `loadVersionList` أدناه)
+      // بدل تكرار محاولة محكوم عليها بالفشل.
+      setScheduleTarget(null);
+      // نُحدِّث القائمة بعد أي فشل — لا لإعادة محاولة تلقائية (ممنوعة صراحةً)،
+      // بل لتصحيح أي رمز/مراجعة جدولة محلية قديمة قبل أن يعيد التاجر المحاولة
+      // يدوياً، تماماً كنظيرها في `handleConfirmPublish`.
+      await loadVersionList();
+      if (storefrontIdRef.current !== originStorefrontId || !isLatestWrite) return;
+      setNoticeKind("status");
+      setNotice(
+        result.reason === "stale_token"
+          ? t("versionScheduleStaleToken")
+          : result.reason === "active_conflict"
+            ? t("versionScheduleActiveConflict")
+            : result.reason === "forbidden"
+              ? t("versionScheduleForbidden")
+              : result.reason === "not_found"
+                ? t("versionScheduleNotFound")
+                : result.reason === "stale_revision"
+                  ? t("versionScheduleStaleRevision")
+                  : t("versionScheduleFailed"),
+      );
+      return;
+    }
+    if (!sameStorefront) return;
+    setScheduleTarget(null);
+    // نُحدِّث القائمة كاملةً لا صفّ الهدف وحده: جدولة ناجحة قد تُنزِل نسخة
+    // أخرى (المجدولة سابقاً لهذا المتجر) من "مجدولة" إلى "مسودة" بالاشتقاق —
+    // تماماً كنظيرها في `handleConfirmPublish` عند استبدال نسخة منشورة.
+    const refreshedList = await loadVersionList();
+    if (storefrontIdRef.current !== originStorefrontId) return;
+    if (current && wasOpenAtStart && selectedVersionIdRef.current === target.id) {
+      setSelectedVersion(result.data);
+    } else if (refreshedList) {
+      const openId = selectedVersionIdRef.current;
+      const fresh = openId ? refreshedList.find((v) => v.id === openId) : undefined;
+      if (fresh) {
+        setSelectedVersion((prev) =>
+          prev && prev.id === fresh.id
+            ? {
+                ...prev,
+                state: fresh.state,
+                scheduledFor: fresh.scheduledFor,
+                scheduleToken: fresh.scheduleToken,
+                updatedAt: fresh.updatedAt,
+              }
+            : prev,
+        );
+      }
+    }
+    if (isLatestWrite) {
+      setNoticeKind("status");
+      setNotice(mode === "reschedule" ? t("versionRescheduleSuccess") : t("versionScheduleSuccess"));
+    }
+  }
+
+  // CUST-H1-5 — يفتح حوار تأكيد إلغاء الجدولة (إجراء دورة حياة منفصل عن
+  // الحذف العام — راجع تعليق `CancelScheduleConfirmDialog`).
+  function handleOpenCancelScheduleConfirm(version: PresentationVersionSummary) {
+    setCancelScheduleTarget(version);
+  }
+
+  function handleCancelCancelScheduleConfirm() {
+    if (versionBusy?.action === "cancel_schedule") return;
+    setCancelScheduleTarget(null);
+  }
+
+  async function handleConfirmCancelSchedule() {
+    if (!storefrontId || !cancelScheduleTarget) return;
+    const target = cancelScheduleTarget;
+    const originStorefrontId = storefrontId;
+    const tokenAtStart = versionRequestTokenRef.current;
+    const wasOpenAtStart = selectedVersion?.id === target.id;
+    const writeRequestId = ++versionWriteRequestRef.current;
+    setVersionBusy({ id: target.id, action: "cancel_schedule" });
+    const result = await cancelPresentationVersionSchedule(storefrontId, target.id, target.scheduleToken);
+    const current = stillCurrent(originStorefrontId, tokenAtStart);
+    const sameStorefront = storefrontIdRef.current === originStorefrontId;
+    const isLatestWrite = writeRequestId === versionWriteRequestRef.current;
+    if (sameStorefront && isLatestWrite) setVersionBusy(null);
+    if (!result.ok) {
+      if (!sameStorefront) return;
+      // نفس تعليل إغلاق حوار الجدولة عند الفشل: `cancelScheduleTarget.scheduleToken`
+      // القديم يبقى معلَّقاً في الحوار إن تُرك مفتوحاً، فتُعيد محاولة ثانية نفس
+      // الرمز البائت وتكرّر 409 نفسه. الإغلاق يفرض فتحاً صريحاً لاحقاً من صفّ
+      // محدَّث بعد `loadVersionList` أدناه.
+      setCancelScheduleTarget(null);
+      await loadVersionList();
+      if (storefrontIdRef.current !== originStorefrontId || !isLatestWrite) return;
+      setNoticeKind("status");
+      setNotice(
+        result.reason === "stale_token"
+          ? t("versionCancelScheduleStaleToken")
+          : result.reason === "not_scheduled"
+            ? t("versionCancelScheduleNotScheduled")
+            : t("versionCancelScheduleFailed"),
+      );
+      return;
+    }
+    if (!sameStorefront) return;
+    setCancelScheduleTarget(null);
+    await loadVersionList();
+    if (storefrontIdRef.current !== originStorefrontId) return;
+    if (current && wasOpenAtStart && selectedVersionIdRef.current === target.id) {
+      setSelectedVersion(result.data);
+    }
+    if (isLatestWrite) {
+      setNoticeKind("status");
+      setNotice(t("versionCancelScheduleSuccess"));
+    }
+  }
+
   // Section selection bridge (STORE-CUSTOMIZER-V2-1), upgraded to instance
   // identity in V2-2: selection is a homepage section *instance id* (CONTRACT-2),
   // never a section type — two instances of the same type stay independently
@@ -1010,6 +1183,9 @@ export function ExperienceBuilder({
       void handleDeleteVersion(version);
     },
     onPublish: (version) => handleOpenPublishConfirm(version),
+    onSchedule: (version) => handleOpenScheduleDialog(version),
+    onReschedule: (version) => handleOpenScheduleDialog(version),
+    onCancelSchedule: (version) => handleOpenCancelScheduleConfirm(version),
   };
 
   function renderInspectorBody(panelForSlot: CustomizerPanel) {
@@ -1251,6 +1427,56 @@ export function ExperienceBuilder({
             className="h-9 shrink-0 rounded-md bg-primary px-2.5 text-xs font-semibold text-primary-foreground shadow-sm disabled:opacity-40 md:px-3 md:text-sm"
           >
             {t("publish")}
+          </button>
+          <button
+            type="button"
+            data-schedule=""
+            // نفس أهلية النشر الفوري تماماً، بشرطٍ إضافي واحد: بوابة تشغيل
+            // الإنتاج (`schedulingRuntimeActive`) — Schedule وPublish إجراءان
+            // منفصلان ظاهرياً دوماً (لا إخفاء الجدولة لمجرَّد وجود نشر فوري)،
+            // لكن كلاهما يحتاج مسودة محفوظة غير متعارضة أصلاً.
+            onClick={() => {
+              if (!selectedVersion) return;
+              handleOpenScheduleDialog(toSummary(selectedVersion));
+            }}
+            disabled={
+              !storefrontId ||
+              !selectedVersion ||
+              selectedVersion.state !== "draft" ||
+              dirty ||
+              versionConflict?.versionId === selectedVersion?.id ||
+              busy !== null ||
+              versionBusy !== null ||
+              versionCreating ||
+              !selectedVersion.schedulingRuntimeActive
+            }
+            title={
+              !storefrontId
+                ? t("noStoreSelected")
+                : !selectedVersion
+                  ? t("versionNoVersionSelected")
+                  : selectedVersion.state === "published"
+                    ? t("versionPublishGatedPublished")
+                    : selectedVersion.state === "scheduled"
+                      ? t("versionScheduleGatedScheduled")
+                      : versionConflict?.versionId === selectedVersion?.id
+                        ? t("versionStaleConflict")
+                        : dirty
+                          ? t("versionPublishSaveFirst")
+                          : !selectedVersion.schedulingRuntimeActive
+                            ? t("versionSchedulingGatedBody")
+                            : undefined
+            }
+            // الشريط العلوي عند 768px مكتظّ بالفعل (منتقي النسخة + مبدِّل
+            // الجهاز + حفظ + نشر) — عنصرٌ رابع دائم الظهور هنا يُفيض أفقياً
+            // (مُتحقَّقٌ فعلياً: Playwright كشف الفيضان عند 768 و390px). نفس
+            // معالجة زرّ «استعادة الافتراضي» (`hidden ... lg:inline`) بالضبط:
+            // مخفيٌّ حتى سطح المكتب (lg+)، ومتاحٌ دوماً من إدارة النسخ على أي
+            // مقاس — لا فقدان قدرة، فقط نقل «إجراء أقل تواتراً» عن الشريط
+            // الضيّق تماشياً مع مرجع الأفق (§Toolbar: "Do not overload").
+            className="hidden h-9 shrink-0 rounded-md border border-border bg-surface px-2.5 text-xs font-medium text-text hover:bg-primary-soft disabled:opacity-40 lg:inline lg:px-3 lg:text-sm"
+          >
+            {t("versionSchedule")}
           </button>
         </div>
       </header>
@@ -1542,6 +1768,18 @@ export function ExperienceBuilder({
                     setMobileSheet(null);
                     handleOpenPublishConfirm(version);
                   }}
+                  onSchedule={(version) => {
+                    setMobileSheet(null);
+                    handleOpenScheduleDialog(version);
+                  }}
+                  onReschedule={(version) => {
+                    setMobileSheet(null);
+                    handleOpenScheduleDialog(version);
+                  }}
+                  onCancelSchedule={(version) => {
+                    setMobileSheet(null);
+                    handleOpenCancelScheduleConfirm(version);
+                  }}
                 />
               ) : mobileSheet === "sections" ? (
                 renderInspectorBody("homepage")
@@ -1562,6 +1800,34 @@ export function ExperienceBuilder({
           busy={versionBusy?.id === publishTarget.id && versionBusy.action === "publish"}
           onCancel={handleCancelPublishConfirm}
           onConfirm={() => void handleConfirmPublish()}
+        />
+      ) : null}
+
+      {scheduleTarget ? (
+        <ScheduleConfirmDialog
+          locale={locale}
+          mode={scheduleTarget.mode}
+          target={scheduleTarget.version}
+          storeName={liveStoreName}
+          timezone={tenantTimezone}
+          replacingVersion={
+            scheduleTarget.mode === "schedule"
+              ? (versions.find((v) => v.state === "scheduled" && v.id !== scheduleTarget.version.id) ?? null)
+              : null
+          }
+          busy={versionBusy?.id === scheduleTarget.version.id && versionBusy.action === "schedule"}
+          onCancel={handleCancelScheduleDialog}
+          onConfirm={(iso) => void handleConfirmSchedule(iso)}
+        />
+      ) : null}
+
+      {cancelScheduleTarget ? (
+        <CancelScheduleConfirmDialog
+          locale={locale}
+          target={cancelScheduleTarget}
+          busy={versionBusy?.id === cancelScheduleTarget.id && versionBusy.action === "cancel_schedule"}
+          onCancel={handleCancelCancelScheduleConfirm}
+          onConfirm={() => void handleConfirmCancelSchedule()}
         />
       ) : null}
 

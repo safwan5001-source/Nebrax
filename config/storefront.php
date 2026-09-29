@@ -57,4 +57,33 @@ return [
         'target_port' => env('RAILWAY_STOREFRONT_TARGET_PORT'),
         'endpoint' => env('RAILWAY_GRAPHQL_ENDPOINT', 'https://backboard.railway.com/graphql/v2'),
     ],
+
+    /*
+     * CUST-H1-5 — بوابة إنفاذ النشر المجدول (`docs/plans/store/
+     * CUST-H1-ARCH-1-...md` §14 "Deployment gate"). الـAPI (CUST-H1-4) يعمل
+     * ويُختبَر بمعزل عن هذه القيمة تماماً — البوابة تخصّ الواجهة فقط: هل تُعرَض
+     * الجدولة على أنها تعمل فعلياً في هذه البيئة، أم مُعطَّلة بشرح صريح؟
+     *
+     * الإنتاج الحالي (Render) **لا** يشغّل `schedule:run` عبر أي cron
+     * (موثَّق في تقرير CUST-H1-4) — فالقيمة الفعلية هناك تبقى `false` حتى
+     * يُربَط ذلك التشغيل فعلياً ويتحقّق صاحب المنتج من التفعيل صراحةً عبر
+     * `STORE_SCHEDULING_RUNTIME_ACTIVE=true`. الافتراض هنا `true` في بيئتي
+     * `local`/`testing` فقط — يتيح فحص التدفّق الكامل تطويرياً واختبارياً بلا
+     * حاجة لتعديل بيئة، ويبقى مغلقاً افتراضياً في أي بيئة أخرى (staging/إنتاج)
+     * ما لم يُفعَّل صراحةً. هذا تخمينٌ صفري لبيئة العميل — القيمة تُحسَب مرّة
+     * واحدة خادمياً وتُبَثّ للواجهة، لا اسم مضيف ولا تخمين طرفي.
+     *
+     * `env('APP_ENV')` الخام لا `app()->environment()` عمداً: ملفات `config/*`
+     * تُحمَّل قبل أن يربط `LoadConfiguration` القيمة `'env'` في الحاوية
+     * (`detectEnvironment()` يُستدعى بعد تحميل كل الملفات، انظر مصدر
+     * `Illuminate\Foundation\Bootstrap\LoadConfiguration::bootstrap()`) —
+     * استدعاء `app()->environment()` هنا يفشل كل أمر/طلب بـ
+     * "Target class [env] does not exist" قبل أن يُشغَّل أي كود منها إطلاقاً.
+     */
+    'scheduled_publishing' => [
+        'runtime_active' => env(
+            'STORE_SCHEDULING_RUNTIME_ACTIVE',
+            in_array(env('APP_ENV', 'production'), ['local', 'testing'], true),
+        ),
+    ],
 ];

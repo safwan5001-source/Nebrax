@@ -14,6 +14,15 @@ const ROOT = join(__dirname, '../..');
 const ALLOWED_DIRECT_INTL_FILES = new Set([
   // Central formatter — the only place that constructs DateTimeFormat for display.
   'lib/formatting.ts',
+  // CUST-H1-5 — authoritative-timezone arithmetic (zoned wall-clock ⇄ UTC
+  // conversion for scheduled Version publishing), not display formatting.
+  // Its `Intl.DateTimeFormat` calls either parse into numbers only (never
+  // shown to a merchant) or hard-code `'en-US'` for a GMT-offset fallback
+  // label (`GMT+03:00`) — locale-invariant, never Hijri months or Eastern
+  // Arabic digits, the exact failure this guardrail exists to catch. User
+  // *display* dates/times still go through `formatDateTime`/`formatting.ts`
+  // exclusively — `lib/timezone.ts` never formats a date for display itself.
+  'lib/timezone.ts',
   // Tests that assert locale contracts and formatter output.
   'lib/__tests__/formatting.test.ts',
   'lib/__tests__/date-formatting-guardrail.test.ts',

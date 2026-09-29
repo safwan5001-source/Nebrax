@@ -11,8 +11,10 @@ vi.mock('@/lib/api', async () => {
 });
 
 import {
+  cancelPresentationVersionSchedule,
   commerceStorefrontPresentationVersionPath,
   commerceStorefrontPresentationVersionPublishPath,
+  commerceStorefrontPresentationVersionSchedulePath,
   commerceStorefrontPresentationVersionsPath,
   createPresentationVersion,
   deletePresentationVersion,
@@ -20,6 +22,7 @@ import {
   publishPresentationVersion,
   renamePresentationVersion,
   savePresentationVersion,
+  schedulePresentationVersion,
   showPresentationVersion,
 } from './presentation-versions';
 
@@ -44,6 +47,10 @@ function summary(overrides: Record<string, unknown> = {}) {
     last_published_at: null,
     created_at: '2026-09-01T00:00:00.000Z',
     updated_at: '2026-09-01T00:00:00.000Z',
+    // CUST-H1-5 — present on every real row (see `summarize()`); tests that
+    // care about a specific value override it explicitly.
+    schedule_token: 'opaque-token-0',
+    scheduling_runtime_active: true,
     ...overrides,
   };
 }
@@ -62,6 +69,9 @@ describe('commerce workspace presentation-versions API client', () => {
     );
     expect(commerceStorefrontPresentationVersionPath('store-1', 'v1')).not.toContain('store/v1');
     expect(commerceStorefrontPresentationVersionPath('store-1', 'v1')).not.toContain('tenant');
+    expect(commerceStorefrontPresentationVersionSchedulePath('store-1', 'v1')).toBe(
+      '/commerce/workspace/storefronts/store-1/presentation/versions/v1/schedule',
+    );
   });
 
   it('lists versions and maps snake_case fields to camelCase', async () => {
@@ -323,12 +333,129 @@ describe('commerce workspace presentation-versions API client', () => {
     if (!validation.ok) expect(validation.reason).toBe('validation');
   });
 
+  it('lists versions and maps the schedule token + scheduling runtime gate', async () => {
+    apiMock.mockResolvedValue({
+      data: [summary({ schedule_token: 'tok-a', scheduling_runtime_active: false })],
+    });
+    const result = await listPresentationVersions('store-1');
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data[0].scheduleToken).toBe('tok-a');
+      expect(result.data[0].schedulingRuntimeActive).toBe(false);
+    }
+  });
+
+  it('rejects a row whose schedule_token is missing or empty instead of sending a fabricated authority later', async () => {
+    apiMock.mockResolvedValueOnce({ data: [summary({ schedule_token: undefined })] });
+    expect((await listPresentationVersions('store-1')).ok).toBe(false);
+    apiMock.mockResolvedValueOnce({ data: [summary({ schedule_token: '' })] });
+    expect((await listPresentationVersions('store-1')).ok).toBe(false);
+  });
+
+  it('defaults scheduling_runtime_active to false (the restrictive value) rather than rejecting the row, for a missing/wrong-typed value', async () => {
+    apiMock.mockResolvedValueOnce({ data: [summary({ scheduling_runtime_active: undefined })] });
+    const missing = await listPresentationVersions('store-1');
+    expect(missing.ok).toBe(true);
+    if (missing.ok) expect(missing.data[0].schedulingRuntimeActive).toBe(false);
+
+    apiMock.mockResolvedValueOnce({ data: [summary({ scheduling_runtime_active: 'yes' })] });
+    const wrongType = await listPresentationVersions('store-1');
+    expect(wrongType.ok).toBe(true);
+    if (wrongType.ok) expect(wrongType.data[0].schedulingRuntimeActive).toBe(false);
+  });
+
+  it('schedules a version with revision + explicit-offset time + the current schedule token, never a client config', async () => {
+    apiMock.mockResolvedValueOnce(
+      detailEnvelope({ state: 'scheduled', scheduled_for: '2026-12-01T18:00:00.000Z' }),
+    );
+    const result = await schedulePresentationVersion(
+      'store-1',
+      'v1',
+      3,
+      '2026-12-01T21:00:00+03:00',
+      'tok-current',
+    );
+    expect(result.ok).toBe(true);
+    expect(apiMock).toHaveBeenCalledWith('/commerce/workspace/storefronts/store-1/presentation/versions/v1/schedule', {
+      method: 'PUT',
+      body: { revision: 3, scheduled_for: '2026-12-01T21:00:00+03:00', expected_schedule_token: 'tok-current' },
+    });
+  });
+
+  it('classifies schedule 409s by the server message: stale token, active conflict, and stale revision (default)', async () => {
+    apiMock.mockRejectedValueOnce(
+      new ApiError(409, 'حالة الجدولة تغيّرت منذ آخر مراجعة. أعد تحميل حالة المتجر الحالية ثم أعد المحاولة.', {}),
+    );
+    const staleToken = await schedulePresentationVersion('store-1', 'v1', 1, '2026-12-01T00:00:00Z', 'tok');
+    expect(staleToken).toEqual({
+      ok: false,
+      reason: 'stale_token',
+      message: 'حالة الجدولة تغيّرت منذ آخر مراجعة. أعد تحميل حالة المتجر الحالية ثم أعد المحاولة.',
+    });
+
+    apiMock.mockRejectedValueOnce(
+      new ApiError(409, 'لا يمكن جدولة النسخة المنشورة حالياً. أنشئ نسخة مسودة للتعديل.', {}),
+    );
+    const activeConflict = await schedulePresentationVersion('store-1', 'v1', 1, '2026-12-01T00:00:00Z', 'tok');
+    expect(activeConflict).toEqual({
+      ok: false,
+      reason: 'active_conflict',
+      message: 'لا يمكن جدولة النسخة المنشورة حالياً. أنشئ نسخة مسودة للتعديل.',
+    });
+
+    apiMock.mockRejectedValueOnce(new ApiError(409, 'النسخة تغيّرت. أعد التحميل ثم احفظ من جديد.', {}));
+    const staleRevision = await schedulePresentationVersion('store-1', 'v1', 1, '2026-12-01T00:00:00Z', 'tok');
+    expect(staleRevision).toEqual({
+      ok: false,
+      reason: 'stale_revision',
+      message: 'النسخة تغيّرت. أعد التحميل ثم احفظ من جديد.',
+    });
+  });
+
+  it('classifies a 422 (past/malformed scheduled_for) as validation', async () => {
+    apiMock.mockRejectedValueOnce(new ApiError(422, 'وقت الجدولة يجب أن يكون في المستقبل.', {}));
+    const result = await schedulePresentationVersion('store-1', 'v1', 1, '2020-01-01T00:00:00Z', 'tok');
+    expect(result).toEqual({ ok: false, reason: 'validation', message: 'وقت الجدولة يجب أن يكون في المستقبل.' });
+  });
+
+  it('cancels a schedule with only the current schedule token, via DELETE-with-JSON-body', async () => {
+    apiMock.mockResolvedValueOnce(detailEnvelope({ state: 'draft', scheduled_for: null }));
+    const result = await cancelPresentationVersionSchedule('store-1', 'v1', 'tok-current');
+    expect(result.ok).toBe(true);
+    expect(apiMock).toHaveBeenCalledWith('/commerce/workspace/storefronts/store-1/presentation/versions/v1/schedule', {
+      method: 'DELETE',
+      body: { expected_schedule_token: 'tok-current' },
+    });
+  });
+
+  it('classifies cancel-schedule 409s: stale token vs. not-scheduled (default)', async () => {
+    apiMock.mockRejectedValueOnce(
+      new ApiError(409, 'حالة الجدولة تغيّرت منذ آخر مراجعة. أعد تحميل حالة المتجر الحالية ثم أعد المحاولة.', {}),
+    );
+    const staleToken = await cancelPresentationVersionSchedule('store-1', 'v1', 'tok');
+    expect(staleToken).toEqual({
+      ok: false,
+      reason: 'stale_token',
+      message: 'حالة الجدولة تغيّرت منذ آخر مراجعة. أعد تحميل حالة المتجر الحالية ثم أعد المحاولة.',
+    });
+
+    apiMock.mockRejectedValueOnce(new ApiError(409, 'هذه النسخة ليست مجدولة حالياً.', {}));
+    const notScheduled = await cancelPresentationVersionSchedule('store-1', 'v1', 'tok');
+    expect(notScheduled).toEqual({
+      ok: false,
+      reason: 'not_scheduled',
+      message: 'هذه النسخة ليست مجدولة حالياً.',
+    });
+  });
+
   it('never sends a tenant_id in any request body', async () => {
     apiMock.mockResolvedValue(detailEnvelope());
     await createPresentationVersion('store-1', 'name');
     await savePresentationVersion('store-1', 'v1', CONFIG as never, 1);
     await renamePresentationVersion('store-1', 'v1', 'name', 1);
     await publishPresentationVersion('store-1', 'v1', 1, 1, 'v0');
+    await schedulePresentationVersion('store-1', 'v1', 1, '2026-12-01T00:00:00Z', 'tok');
+    await cancelPresentationVersionSchedule('store-1', 'v1', 'tok');
     for (const call of apiMock.mock.calls) {
       expect(JSON.stringify(call)).not.toContain('tenant_id');
     }

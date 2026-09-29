@@ -37,6 +37,13 @@ export function commerceStorefrontPresentationVersionPublishPath(
   return `${commerceStorefrontPresentationVersionPath(storefrontId, versionId)}/publish`;
 }
 
+export function commerceStorefrontPresentationVersionSchedulePath(
+  storefrontId: string,
+  versionId: string,
+): string {
+  return `${commerceStorefrontPresentationVersionPath(storefrontId, versionId)}/schedule`;
+}
+
 export type PresentationVersionState = 'draft' | 'scheduled' | 'published';
 
 export type PresentationVersionSummary = {
@@ -57,6 +64,24 @@ export type PresentationVersionSummary = {
    * حقل آخر يكشف هذه الحالة. `null` = لم يُنشَر هذا المتجر شيئاً بعد.
    */
   publishedRevision: number | null;
+  /**
+   * CUST-H1-4/5 — opaque Storefront-level schedule lifecycle token
+   * (`schedule_epoch`-derived). Same value on every row of this Storefront's
+   * list, present even in the no-schedule state. Required for every
+   * schedule/reschedule/cancel request — never derived or guessed
+   * client-side.
+   */
+  scheduleToken: string;
+  /**
+   * CUST-H1-5 — whether the Production runtime deployment gate
+   * (`docs/plans/store/CUST-H1-ARCH-1-...md` §14) is verified active in the
+   * *current* backend environment. A single environment-wide value mirrored
+   * onto every row, exactly like `publishedRevision`/`scheduleToken` above.
+   * `false` in Production today (no scheduler cron wired yet — CUST-H1-4
+   * report) — the UI must gate Schedule/Reschedule with a clear explanation
+   * rather than imply a live capability that isn't actually running.
+   */
+  schedulingRuntimeActive: boolean;
 };
 
 export type PresentationVersionDetail = PresentationVersionSummary & {
@@ -99,6 +124,33 @@ export type VersionDeleteOutcome =
 export type VersionPublishOutcome =
   | { ok: true; data: PresentationVersionDetail }
   | Failure<'not_found' | 'stale' | 'scheduled_conflict' | 'unsupported_schema' | 'validation'>;
+
+/**
+ * CUST-H1-5 — schedule/replace/reschedule failure classification, same
+ * message-text convention as `classifyPublishFailure` (no dedicated `code`
+ * field on this path either — see that function's own comment for why that
+ * consistency was chosen over inventing one just for this endpoint):
+ * - `stale_revision`: the target Version's `revision` no longer matches —
+ *   someone edited/saved it since the dialog opened.
+ * - `stale_token`: the Storefront's schedule lifecycle state changed since
+ *   last reviewed (another session scheduled/replaced/canceled/rescheduled).
+ * - `active_conflict`: the target became the Published version meanwhile —
+ *   a Published Version can never be scheduled.
+ */
+export type VersionScheduleOutcome =
+  | { ok: true; data: PresentationVersionDetail }
+  | Failure<'not_found' | 'stale_revision' | 'stale_token' | 'active_conflict' | 'validation'>;
+
+/**
+ * CUST-H1-5 — cancel-schedule failure classification:
+ * - `stale_token`: schedule lifecycle state changed since last reviewed.
+ * - `not_scheduled`: the target is no longer the currently-scheduled
+ *   Version (already published, replaced, or canceled elsewhere) — cancel
+ *   never clears another Version's schedule.
+ */
+export type VersionCancelScheduleOutcome =
+  | { ok: true; data: PresentationVersionDetail }
+  | Failure<'not_found' | 'stale_token' | 'not_scheduled'>;
 
 export async function listPresentationVersions(storefrontId: string): Promise<VersionListOutcome> {
   try {
@@ -214,6 +266,66 @@ export async function publishPresentationVersion(
   }
 }
 
+/**
+ * CUST-H1-5 — schedule a Draft Version, replace another Storefront's
+ * currently-scheduled Version, or reschedule the same Version already
+ * scheduled — the backend collapses all three into one transaction
+ * (`StorefrontPresentationVersionService::scheduleForCurrentTenant`, see
+ * CUST-H1-4's report for why: the request shape and lock/compare steps are
+ * identical in every case). `scheduledForIso` must carry an explicit offset
+ * (`Z` or `±HH:MM`) — never a bare local time. `expectedScheduleToken` must
+ * come from the authoritative Storefront/Version state the merchant actually
+ * reviewed (the current `scheduleToken` on any row of the last successful
+ * list/detail load) — never inferred or fabricated.
+ */
+export async function schedulePresentationVersion(
+  storefrontId: string,
+  versionId: string,
+  revision: number,
+  scheduledForIso: string,
+  expectedScheduleToken: string,
+): Promise<VersionScheduleOutcome> {
+  try {
+    const payload = await api<unknown>(commerceStorefrontPresentationVersionSchedulePath(storefrontId, versionId), {
+      method: 'PUT',
+      body: {
+        revision,
+        scheduled_for: scheduledForIso,
+        expected_schedule_token: expectedScheduleToken,
+      },
+    });
+    const data = mapDetail(payload);
+    if (data === null) return { ok: false, reason: 'failed', message: 'invalid_payload' };
+    return { ok: true, data };
+  } catch (error) {
+    return { ok: false, reason: classifyScheduleFailure(error), message: errorMessage(error, 'schedule_failed') };
+  }
+}
+
+/**
+ * CUST-H1-5 — cancel a Version's schedule, returning it to Draft. Never a
+ * generic delete: the Version row itself is untouched, only its schedule
+ * state. `expectedScheduleToken` — same authority rule as
+ * `schedulePresentationVersion` above.
+ */
+export async function cancelPresentationVersionSchedule(
+  storefrontId: string,
+  versionId: string,
+  expectedScheduleToken: string,
+): Promise<VersionCancelScheduleOutcome> {
+  try {
+    const payload = await api<unknown>(commerceStorefrontPresentationVersionSchedulePath(storefrontId, versionId), {
+      method: 'DELETE',
+      body: { expected_schedule_token: expectedScheduleToken },
+    });
+    const data = mapDetail(payload);
+    if (data === null) return { ok: false, reason: 'failed', message: 'invalid_payload' };
+    return { ok: true, data };
+  } catch (error) {
+    return { ok: false, reason: classifyCancelScheduleFailure(error), message: errorMessage(error, 'cancel_schedule_failed') };
+  }
+}
+
 export async function deletePresentationVersion(
   storefrontId: string,
   versionId: string,
@@ -271,6 +383,10 @@ function mapSummary(row: unknown): PresentationVersionSummary | null {
   ) {
     return null;
   }
+  // نفس منطق `published_revision` أعلاه: `schedule_token` سلطة تُرسَل حرفياً
+  // في طلبات الجدولة/الإلغاء اللاحقة (`expected_schedule_token`) — قيمة
+  // مفقودة أو من نوع خاطئ تُرفض الصفّ كله بدل إرسال سلطة ملفَّقة لاحقاً.
+  if (typeof record.schedule_token !== 'string' || record.schedule_token === '') return null;
 
   return {
     id: record.id,
@@ -284,6 +400,11 @@ function mapSummary(row: unknown): PresentationVersionSummary | null {
     createdAt: typeof record.created_at === 'string' ? record.created_at : null,
     updatedAt: typeof record.updated_at === 'string' ? record.updated_at : null,
     publishedRevision: typeof record.published_revision === 'number' ? record.published_revision : null,
+    scheduleToken: record.schedule_token,
+    // فشلٌ نحو الحالة الأكثر تقييداً لا رفض الصفّ: قيمةٌ مفقودة أو من نوع
+    // خاطئ هنا تُسقِط قدرة الجدولة (`false`) بدل منحها ضمناً — خلافاً لـ`state`
+    // حيث الافتراض الأكثر تساهلاً ("draft") هو ما يستوجب رفض الصفّ كله.
+    schedulingRuntimeActive: record.scheduling_runtime_active === true,
   };
 }
 
@@ -340,6 +461,50 @@ function classifyPublishFailure(
   if (hasApiStatus(error, 403)) return 'forbidden';
   if (hasApiStatus(error, 404)) return 'not_found';
   if (hasApiStatus(error, 422)) return 'validation';
+  return 'failed';
+}
+
+/**
+ * CUST-H1-5 — same message-text classification convention as
+ * `classifyPublishFailure` above, for the three 409 causes
+ * `scheduleForCurrentTenant()` can raise (`StaleVersionRevisionException` /
+ * `StaleScheduleTokenException` / `VersionLifecycleConflictException` when
+ * the target is the active Published version) — each with its own fixed
+ * Arabic text. `stale_revision` is the default 409 classification (matches
+ * `StaleVersionRevisionException`'s text, the one case with no more specific
+ * substring to match).
+ */
+function classifyScheduleFailure(
+  error: unknown,
+): 'not_found' | 'forbidden' | 'validation' | 'stale_revision' | 'stale_token' | 'active_conflict' | 'failed' {
+  if (hasApiStatus(error, 409)) {
+    const message = error instanceof Error ? error.message : '';
+    if (message.includes('حالة الجدولة تغيّرت')) return 'stale_token';
+    if (message.includes('لا يمكن جدولة')) return 'active_conflict';
+    return 'stale_revision';
+  }
+  if (hasApiStatus(error, 403)) return 'forbidden';
+  if (hasApiStatus(error, 404)) return 'not_found';
+  if (hasApiStatus(error, 422)) return 'validation';
+  return 'failed';
+}
+
+/**
+ * CUST-H1-5 — `cancelScheduleForCurrentTenant()` raises only two 409 causes
+ * (no `revision` in this request at all): `StaleScheduleTokenException` or
+ * `VersionLifecycleConflictException` (target is no longer the scheduled
+ * Version). `not_scheduled` is the default 409 classification.
+ */
+function classifyCancelScheduleFailure(
+  error: unknown,
+): 'not_found' | 'forbidden' | 'stale_token' | 'not_scheduled' | 'failed' {
+  if (hasApiStatus(error, 409)) {
+    const message = error instanceof Error ? error.message : '';
+    if (message.includes('حالة الجدولة تغيّرت')) return 'stale_token';
+    return 'not_scheduled';
+  }
+  if (hasApiStatus(error, 403)) return 'forbidden';
+  if (hasApiStatus(error, 404)) return 'not_found';
   return 'failed';
 }
 

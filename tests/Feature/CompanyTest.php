@@ -53,6 +53,31 @@ class CompanyTest extends TestCase
             ->assertJsonPath('company.mobile', '0551234567');
     }
 
+    /**
+     * CUST-H1-5 — `tenants.timezone` (قائمٌ منذ الترحيل الأول، مصدر المنطقة
+     * الزمنية المعتمَد فعلياً في منع خسائر نقاط البيع) يُعرَض الآن للقراءة عبر
+     * `/me` لأول مرة، لاستهلاك جدولة نسخ عرض المتجر. `PUT /api/company` لا
+     * يقبله رغم ذلك — `CompanyProfile::TENANT_FIELDS` (القائمة البيضاء للكتابة)
+     * لم يتضمّنه عمداً؛ هذا الأفق يعرض فقط، ولا يفتح مسار تعديل جديداً.
+     */
+    /** @test */
+    public function me_exposes_the_tenant_timezone_read_only(): void
+    {
+        ['token' => $token, 'tenant_id' => $tenantId] = $this->registerTenant('tz-nibras', 'owner@tz-nibras.test');
+
+        $this->withToken($token)->getJson('/api/me')
+            ->assertOk()
+            ->assertJsonPath('company.timezone', 'Asia/Riyadh');
+
+        $this->withToken($token)->putJson('/api/company', [
+            'name'     => 'نبراس للتوقيت',
+            'timezone' => 'Africa/Cairo',
+        ])->assertOk();
+
+        $tenant = Tenant::find($tenantId);
+        $this->assertSame('Asia/Riyadh', $tenant->timezone);
+    }
+
     /** @test */
     public function owner_can_upload_and_remove_company_logo(): void
     {
