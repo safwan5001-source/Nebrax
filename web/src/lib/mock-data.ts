@@ -2532,6 +2532,11 @@ type MockPresentationVersionRow = {
 };
 
 const mockPresentationVersionsByStore = new Map<string, MockPresentationVersionRow[]>();
+// CUST-H1-3 — حالة رأس النشر الوهمية لكل متجر (مراجعة رأس النشر التي يجب أن
+// تطابقها `expected_published_revision` الواردة). تُشتقّ النسخة النشِطة من
+// الصفّ الذي حالته `published` حالياً — لا خريطة مؤشر منفصلة، تماماً كواجهة
+// القائمة الحقيقية (لا `active_version_id` خام، فقط `state`).
+const mockPublishedRevisionByStore = new Map<string, number | null>();
 
 export function seedMockPresentationVersions(
   storefrontId: string,
@@ -2562,6 +2567,8 @@ export function seedMockPresentationVersions(
       config: v.config ?? { version: 2 },
     })),
   );
+  const hasPublished = versions.some((v) => v.state === 'published');
+  mockPublishedRevisionByStore.set(storefrontId, hasPublished ? 1 : null);
 }
 
 function mockVersionSummary(storefrontId: string, row: MockPresentationVersionRow) {
@@ -2576,6 +2583,7 @@ function mockVersionSummary(storefrontId: string, row: MockPresentationVersionRo
     last_published_at: row.last_published_at,
     created_at: row.created_at,
     updated_at: row.updated_at,
+    published_revision: mockPublishedRevisionByStore.get(storefrontId) ?? null,
   };
 }
 
@@ -3176,6 +3184,50 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
       mockPosSessions.unshift(opened as typeof mockPosSessions[number]);
       return resolve({ data: opened });
     }
+
+    // CUST-H1-3 — نشر فوري لنسخة محدَّدة. مُدرَجٌ هنا داخل فرع `m !== 'GET'`
+    // (لا بعد نهايته كبقية مسارات النسخ الأخرى) لأن هذا الفرع ينتهي بقيمة
+    // نجاح افتراضية عامة (`{ id: 'demo-new' }`) تسبق أي مطابقة لاحقة خارجه —
+    // أي مسار POST/PUT/PATCH/DELETE جديد يجب أن يُطابَق **قبل** هذا الافتراضي.
+    const publishMatch = clean.match(/^\/commerce\/workspace\/storefronts\/([^/]+)\/presentation\/versions\/([^/]+)\/publish$/);
+    if (publishMatch && m === 'POST') {
+      const [, storefrontId, versionId] = publishMatch;
+      const rows = mockPresentationVersionsByStore.get(storefrontId) ?? [];
+      const row = rows.find((r) => r.id === versionId);
+      if (!row) {
+        return Promise.reject(Object.assign(new Error('النسخة غير موجودة.'), { status: 404 }));
+      }
+      const bodyRecord = (body && typeof body === 'object' ? body : {}) as {
+        revision?: unknown;
+        expected_published_revision?: unknown;
+        expected_active_version_id?: unknown;
+      };
+      if (bodyRecord.revision !== row.revision) {
+        return Promise.reject(Object.assign(new Error('النسخة تغيّرت. أعد التحميل ثم احفظ من جديد.'), { status: 409 }));
+      }
+      const activeRow = rows.find((r) => r.state === 'published') ?? null;
+      const currentPublishedRevision = mockPublishedRevisionByStore.get(storefrontId) ?? null;
+      const currentActiveVersionId = activeRow?.id ?? null;
+      if (
+        (bodyRecord.expected_published_revision ?? null) !== currentPublishedRevision
+        || (bodyRecord.expected_active_version_id ?? null) !== currentActiveVersionId
+      ) {
+        return Promise.reject(
+          Object.assign(new Error('حالة النشر تغيّرت منذ آخر مراجعة. أعد تحميل حالة المتجر الحالية قبل النشر من جديد.'), { status: 409 }),
+        );
+      }
+      if (row.state === 'scheduled') {
+        return Promise.reject(
+          Object.assign(new Error('هذه النسخة مجدولة للنشر لاحقاً. ألغِ الجدولة أولاً قبل النشر الفوري.'), { status: 409 }),
+        );
+      }
+      if (activeRow && activeRow.id !== row.id) activeRow.state = 'draft';
+      row.state = 'published';
+      row.last_published_at = new Date().toISOString();
+      mockPublishedRevisionByStore.set(storefrontId, (currentPublishedRevision ?? 0) + 1);
+      return resolve({ data: mockVersionDetail(storefrontId, row) });
+    }
+
     return resolve({ data: { id: 'demo-new' } });
   }
 

@@ -40,6 +40,7 @@ import {
   listPresentationVersions,
   type PresentationVersionDetail,
   type PresentationVersionSummary,
+  publishPresentationVersion,
   renamePresentationVersion,
   savePresentationVersion,
   showPresentationVersion,
@@ -121,9 +122,15 @@ export function ExperienceBuilder({
   const [versionSwitchingId, setVersionSwitchingId] = useState<string | null>(null);
   const [versionCreating, setVersionCreating] = useState(false);
   const [versionBusy, setVersionBusy] = useState<
-    { id: string; action: "duplicate" | "rename" | "delete" } | null
+    { id: string; action: "duplicate" | "rename" | "delete" | "publish" } | null
   >(null);
   const [versionConflict, setVersionConflict] = useState<{ versionId: string } | null>(null);
+  // CUST-H1-3 — النشر الفوري لنسخة محدَّدة. حوارٌ صريح دوماً قبل أي طلب
+  // شبكة فعلي (لا نشر بضغطة واحدة) — `publishTarget` يحمل الصفّ المطلوب
+  // نشره (من الشريط العلوي أو من صفّ في إدارة النسخ)، لا `selectedVersion`
+  // بالضرورة: النشر من صفٍّ في المدير لا يستلزم أن تكون تلك النسخة مفتوحة
+  // في المحرِّر أصلاً.
+  const [publishTarget, setPublishTarget] = useState<PresentationVersionSummary | null>(null);
   const versionRequestTokenRef = useRef(0);
   // هويتا طلب مخصَّصتان لعلَمَي الانشغال (`versionCreating`/`versionBusy`) —
   // منفصلتان عمداً عن `versionRequestTokenRef` أعلاه: ذاك يزيد أيضاً عند مجرَّد
@@ -259,6 +266,7 @@ export function ExperienceBuilder({
       lastPublishedAt: detail.lastPublishedAt,
       createdAt: detail.createdAt,
       updatedAt: detail.updatedAt,
+      publishedRevision: detail.publishedRevision,
     };
   }
 
@@ -569,11 +577,6 @@ export function ExperienceBuilder({
     setNotice(t("versionSaveFailed"));
   }
 
-  function handlePublishGatedClick() {
-    setNoticeKind("capability");
-    setNotice(t("versionPublishGated"));
-  }
-
   function handleRestore() {
     if (isPublishedReadOnly) return;
     const confirmed = window.confirm(t("restoreConfirm"));
@@ -787,6 +790,114 @@ export function ExperienceBuilder({
     }
   }
 
+  // CUST-H1-3 — يفتح حوار تأكيد النشر (لا يطلب الشبكة هنا مطلقاً). يُستدعى
+  // من زرّ النشر في الشريط العلوي (النسخة المفتوحة حالياً) أو من إجراء «نشر
+  // الآن» على صفّ في إدارة النسخ (قد لا تكون تلك النسخة مفتوحة في المحرِّر).
+  function handleOpenPublishConfirm(version: PresentationVersionSummary) {
+    setPublishTarget(version);
+  }
+
+  function handleCancelPublishConfirm() {
+    if (versionBusy?.action === "publish") return; // طلب النشر قيد التنفيذ فعلياً — لا يُغلَق الحوار في منتصف الطريق.
+    setPublishTarget(null);
+  }
+
+  async function handleConfirmPublish() {
+    if (!storefrontId || !publishTarget) return;
+    const target = publishTarget;
+    const originStorefrontId = storefrontId;
+    const tokenAtStart = versionRequestTokenRef.current;
+    const wasOpenAtStart = selectedVersion?.id === target.id;
+    // حالة رأس النشر التي "راجعها" التاجر فعلياً: آخر قائمة نُسخٍ حُمِّلت
+    // بنجاح لهذا المتجر — لا قيمة مُخمَّنة أو مُعاد اشتقاقها هنا. `publishedRevision`
+    // نفس القيمة على كل صفوف `versions` (حالة رأس واحدة للمتجر كله)، والنسخة
+    // النشِطة هي الصفّ الوحيد بحالة `published` إن وُجد.
+    const activeVersion = versions.find((v) => v.state === "published") ?? null;
+    const expectedActiveVersionId = activeVersion?.id ?? null;
+    const expectedPublishedRevision = target.publishedRevision;
+    const writeRequestId = ++versionWriteRequestRef.current;
+    setVersionBusy({ id: target.id, action: "publish" });
+    const result = await publishPresentationVersion(
+      storefrontId,
+      target.id,
+      target.revision,
+      expectedPublishedRevision,
+      expectedActiveVersionId,
+    );
+    const current = stillCurrent(originStorefrontId, tokenAtStart);
+    const sameStorefront = storefrontIdRef.current === originStorefrontId;
+    // نفس حرص التكرار/التسمية/الحذف أعلاه: هوية طلب الكتابة، لا تطابق المتجر وحده.
+    const isLatestWrite = writeRequestId === versionWriteRequestRef.current;
+    if (sameStorefront && isLatestWrite) setVersionBusy(null);
+    if (!result.ok) {
+      if (!sameStorefront) return;
+      setPublishTarget(null);
+      // نحدِّث القائمة بعد أي فشل نشر — لا لإعادة محاولة النشر تلقائياً (ممنوع
+      // صراحةً)، بل لتصحيح أي حالة رأس نشر محلية قديمة (`published_revision`/
+      // النسخة المنشورة الحالية) قبل أن يعيد التاجر المحاولة يدوياً، كما
+      // تشترط معمارية النشر (§CONCURRENCY).
+      await loadVersionList();
+      if (storefrontIdRef.current !== originStorefrontId || !isLatestWrite) return;
+      setNoticeKind("status");
+      setNotice(
+        result.reason === "scheduled_conflict"
+          ? t("versionPublishScheduledConflict")
+          : result.reason === "unsupported_schema"
+            ? t("versionPublishUnsupportedSchema")
+            : result.reason === "forbidden"
+              ? t("versionPublishForbidden")
+              : result.reason === "not_found"
+                ? t("versionPublishNotFound")
+                : result.reason === "stale"
+                  ? t("versionPublishStaleConflict")
+                  : t("versionPublishFailed"),
+      );
+      return;
+    }
+    if (!sameStorefront) return;
+    setPublishTarget(null);
+    // نُحدِّث القائمة كاملةً، لا صفّ الهدف وحده: نشرٌ ناجح قد يُنزِل نسخة
+    // أخرى (المنشورة سابقاً) من حالة "منشورة" إلى "مسودة" بالاشتقاق — تحديثٌ
+    // جزئي هنا كان سيُبقي ذلك الصفّ يعرض حالته القديمة حتى تحديثٍ لاحق منفصل.
+    const refreshedList = await loadVersionList();
+    if (storefrontIdRef.current !== originStorefrontId) return; // تبدَّل المتجر أثناء تحديث القائمة.
+    if (current && wasOpenAtStart && selectedVersionIdRef.current === target.id) {
+      // النسخة المنشورة للتوّ هي نفسها المفتوحة في المحرِّر الآن (ولم يتبدَّل
+      // شيء منذ بدء الطلب) — تتحوَّل إلى منشورة/مقروءة فقط فوراً؛ `updateDraft`
+      // نفسها تمنع أي تعديل إضافي بمجرَّد أن تصبح `selectedVersion.state`
+      // "published" (فشل آمن دفاعي مستقل عن هذا الفرع).
+      setSelectedVersion(result.data);
+      setSaved(result.data.config);
+      setDraft(result.data.config);
+      setLifecycle("clean");
+    } else if (refreshedList) {
+      // النسخة المفتوحة حالياً (إن وُجدت) قد تكون هي *سابقاً* المنشورة التي
+      // فقدت هذه الحالة للتوّ بفعل نشر نسخة أخرى — تحديث حالتها المشتقة فقط
+      // (بلا لمس `draft`/`saved`، فلا تعديل محلي يُفقَد) يمنعها من الاستمرار
+      // بالظهور "منشورة ومقروءة فقط" بصمت حتى يبدِّل التاجر النسخة ذهاباً وإياباً.
+      const openId = selectedVersionIdRef.current;
+      const fresh = openId ? refreshedList.find((v) => v.id === openId) : undefined;
+      if (fresh) {
+        setSelectedVersion((prev) =>
+          prev && prev.id === fresh.id
+            ? {
+                ...prev,
+                state: fresh.state,
+                publishedRevision: fresh.publishedRevision,
+                lastPublishedAt: fresh.lastPublishedAt,
+                scheduledFor: fresh.scheduledFor,
+                updatedAt: fresh.updatedAt,
+              }
+            : prev,
+        );
+      }
+    }
+    if (isLatestWrite) {
+      setNoticeKind("status");
+      setNotice(t("versionPublishSuccess"));
+    }
+  }
+
   // Section selection bridge (STORE-CUSTOMIZER-V2-1), upgraded to instance
   // identity in V2-2: selection is a homepage section *instance id* (CONTRACT-2),
   // never a section type — two instances of the same type stay independently
@@ -898,6 +1009,7 @@ export function ExperienceBuilder({
     onDelete: (version) => {
       void handleDeleteVersion(version);
     },
+    onPublish: (version) => handleOpenPublishConfirm(version),
   };
 
   function renderInspectorBody(panelForSlot: CustomizerPanel) {
@@ -1107,9 +1219,35 @@ export function ExperienceBuilder({
           <button
             type="button"
             data-publish=""
-            disabled
-            title={t("versionPublishGated")}
-            onClick={handlePublishGatedClick}
+            onClick={() => {
+              if (!selectedVersion) return;
+              handleOpenPublishConfirm(toSummary(selectedVersion));
+            }}
+            disabled={
+              !storefrontId ||
+              !selectedVersion ||
+              selectedVersion.state !== "draft" ||
+              dirty ||
+              versionConflict?.versionId === selectedVersion?.id ||
+              busy !== null ||
+              versionBusy !== null ||
+              versionCreating
+            }
+            title={
+              !storefrontId
+                ? t("noStoreSelected")
+                : !selectedVersion
+                  ? t("versionNoVersionSelected")
+                  : selectedVersion.state === "published"
+                    ? t("versionPublishGatedPublished")
+                    : selectedVersion.state === "scheduled"
+                      ? t("versionPublishGatedScheduled")
+                      : versionConflict?.versionId === selectedVersion?.id
+                        ? t("versionStaleConflict")
+                        : dirty
+                          ? t("versionPublishSaveFirst")
+                          : undefined
+            }
             className="h-9 shrink-0 rounded-md bg-primary px-2.5 text-xs font-semibold text-primary-foreground shadow-sm disabled:opacity-40 md:px-3 md:text-sm"
           >
             {t("publish")}
@@ -1400,6 +1538,10 @@ export function ExperienceBuilder({
                     selectVersion(version);
                     setMobileSheet(null);
                   }}
+                  onPublish={(version) => {
+                    setMobileSheet(null);
+                    handleOpenPublishConfirm(version);
+                  }}
                 />
               ) : mobileSheet === "sections" ? (
                 renderInspectorBody("homepage")
@@ -1409,6 +1551,18 @@ export function ExperienceBuilder({
             </div>
           </section>
         </div>
+      ) : null}
+
+      {publishTarget ? (
+        <PublishConfirmDialog
+          locale={locale}
+          target={publishTarget}
+          storeName={liveStoreName}
+          hasExistingLive={versions.some((v) => v.state === "published" && v.id !== publishTarget.id)}
+          busy={versionBusy?.id === publishTarget.id && versionBusy.action === "publish"}
+          onCancel={handleCancelPublishConfirm}
+          onConfirm={() => void handleConfirmPublish()}
+        />
       ) : null}
 
       <span className="sr-only">
@@ -1551,6 +1705,86 @@ function PublishedReadOnlyNotice({
       <p className="text-[11px] text-muted">
         <bdi>{versionName}</bdi>
       </p>
+    </div>
+  );
+}
+
+/**
+ * CUST-H1-3 — حوار تأكيد النشر الفوري. عملٌ عالي الثقة: يذكر صراحةً اسم
+ * النسخة، المتجر المتأثر، أن التصميم الحي الحالي سيُستبدَل، وأن النسخة
+ * المنشورة الحالية ستبقى محتفَظاً بها كنسخة سابقة قابلة للاسترجاع — لا
+ * "هل أنت متأكد؟" عامة (مرجع UX: docs/plans/store/CUST-H1-THEME-VERSIONS-EVIDENCE-UX.md §6.5).
+ * مركزيٌّ لا Bottom Sheet — نفس الترميز على الجوال وسطح المكتب، بعرض أقصى
+ * يبقيه مضغوطاً وواضحاً على 390px، وتمرير مستقل إن طال المحتوى.
+ */
+function PublishConfirmDialog({
+  locale,
+  target,
+  storeName,
+  hasExistingLive,
+  busy,
+  onCancel,
+  onConfirm,
+}: {
+  locale: CustomizerLocale;
+  target: PresentationVersionSummary;
+  storeName: string | null;
+  hasExistingLive: boolean;
+  busy: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const t = (key: CustomizerMessageKey) => customizerMessage(locale, key);
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      role="presentation"
+      onClick={(event) => {
+        if (event.target === event.currentTarget && !busy) onCancel();
+      }}
+    >
+      <section
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="publish-confirm-title"
+        data-publish-confirm-dialog=""
+        className="flex max-h-[85dvh] w-full max-w-sm flex-col overflow-y-auto rounded-xl border border-border bg-surface p-4 shadow-2xl"
+      >
+        <h2 id="publish-confirm-title" className="text-sm font-semibold text-text">
+          {t("versionPublishConfirmTitlePrefix")}
+          <bdi>{target.name}</bdi>
+          {t("versionPublishConfirmTitleSuffix")}
+        </h2>
+        <p className="mt-2 text-xs text-muted">
+          {t("versionPublishConfirmStorefrontLabel")}: <bdi>{storeName ?? t("currentPage")}</bdi>
+        </p>
+        <p className="mt-3 text-xs leading-5 text-text">
+          {hasExistingLive ? t("versionPublishConfirmReplaceBody") : t("versionPublishConfirmFirstBody")}
+        </p>
+        {hasExistingLive ? (
+          <p className="mt-2 text-xs leading-5 text-muted">{t("versionPublishConfirmRetainBody")}</p>
+        ) : null}
+        <div className="mt-4 flex items-center justify-end gap-2">
+          <button
+            type="button"
+            data-publish-confirm-cancel=""
+            disabled={busy}
+            onClick={onCancel}
+            className="h-9 rounded-md border border-border px-3 text-xs font-medium text-text hover:bg-primary-soft disabled:opacity-50"
+          >
+            {t("versionPublishConfirmCancel")}
+          </button>
+          <button
+            type="button"
+            data-publish-confirm-submit=""
+            disabled={busy}
+            onClick={onConfirm}
+            className="h-9 rounded-md bg-primary px-3 text-xs font-semibold text-primary-foreground disabled:opacity-50"
+          >
+            {busy ? t("versionPublishing") : t("versionPublishConfirmSubmit")}
+          </button>
+        </div>
+      </section>
     </div>
   );
 }

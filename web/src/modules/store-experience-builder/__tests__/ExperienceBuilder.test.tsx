@@ -104,7 +104,9 @@ describe('ExperienceBuilder persistence wiring — CUST-H1-2 version APIs', () =
     expect(
       document.querySelector('[data-experience-builder]')?.getAttribute('data-selected-version-id'),
     ).toBe('version-1');
-    expect(screen.getByRole('button', { name: 'Publish' }).hasAttribute('disabled')).toBe(true);
+    // CUST-H1-3 replaced the CUST-H1-2 hard publish gate with real per-Version
+    // eligibility: an opened, unmodified Draft is now publishable.
+    expect(screen.getByRole('button', { name: 'Publish' }).hasAttribute('disabled')).toBe(false);
 
     await user.click(screen.getByRole('button', { name: 'Save draft' }));
     await waitFor(() => expect(saveMock).toHaveBeenCalledWith(

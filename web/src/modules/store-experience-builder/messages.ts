@@ -311,8 +311,7 @@ export const CUSTOMIZER_MESSAGES = {
     versionPublishedReadOnlyTitle: "هذه النسخة منشورة ومقروءة فقط",
     versionPublishedReadOnlyBody:
       "هذه هي النسخة المباشرة على المتجر الحي. لتعديلها، أنشئ مسودة منها أولاً.",
-    versionPublishGated:
-      "النشر الفوري لكل نسخة يصل في تحديث لاحق. استخدم «حفظ» لتجهيز هذه النسخة الآن.",
+    versionPublishSaveFirst: "احفظ التعديلات أولاً، ثم انشر.",
     versionPreviewBannerNonLive: "هذه النسخة غير منشورة ولن تظهر للعملاء.",
     versionPreviewBannerLive: "هذه هي النسخة المنشورة حالياً على المتجر.",
     versionRenameLabel: "اسم النسخة",
@@ -331,6 +330,29 @@ export const CUSTOMIZER_MESSAGES = {
     versionSwitchDiscardConfirm:
       "لديك تعديلات غير محفوظة على هذه النسخة. التبديل الآن يتجاهلها ولا يحفظها في أي نسخة. متابعة؟",
     versionOpenManagerHint: "افتح «نسخة التصميم» من الشريط العلوي واختر نسخة للمتابعة.",
+    // CUST-H1-3 — نشر فوري لنسخة محدَّدة.
+    versionPublishNow: "نشر الآن",
+    versionPublishConfirmTitlePrefix: "نشر «",
+    versionPublishConfirmTitleSuffix: "»؟",
+    versionPublishConfirmStorefrontLabel: "المتجر",
+    versionPublishConfirmReplaceBody: "سيصبح هذا التصميم هو التصميم المباشر لهذا المتجر.",
+    versionPublishConfirmFirstBody: "لا يوجد تصميم منشور لهذا المتجر بعد — سيكون هذا أول نشر له.",
+    versionPublishConfirmRetainBody: "سيُحتفَظ بالنسخة المنشورة الحالية كنسخة سابقة يمكن الرجوع إليها.",
+    versionPublishConfirmSubmit: "نشر الآن",
+    versionPublishConfirmCancel: "إلغاء",
+    versionPublishing: "جاري النشر…",
+    versionPublishSuccess: "تم النشر. هذه النسخة هي التصميم المباشر الآن.",
+    versionPublishFailed: "تعذّر النشر. لم يتغيَّر التصميم المباشر الحالي.",
+    versionPublishStaleConflict:
+      "تغيّرت حالة النشر منذ آخر مراجعة لك. رُوجعت قائمة النسخ؛ راجع الحالة الحالية للمتجر ثم أعد المحاولة.",
+    versionPublishScheduledConflict:
+      "هذه النسخة مجدولة للنشر لاحقاً. ألغِ الجدولة أولاً من إدارة النسخ قبل النشر الفوري.",
+    versionPublishUnsupportedSchema:
+      "إصدار هذه النسخة أحدث مما يدعمه النظام حالياً. حدِّث الصفحة أو تواصل مع الدعم.",
+    versionPublishForbidden: "لا تملك صلاحية نشر هذا المتجر.",
+    versionPublishNotFound: "تعذّر العثور على هذه النسخة. رُوجعت قائمة النسخ.",
+    versionPublishGatedPublished: "هذه النسخة منشورة بالفعل.",
+    versionPublishGatedScheduled: "هذه النسخة مجدولة — ألغِ الجدولة أولاً من إدارة النسخ قبل النشر الفوري.",
   },
   en: {
     title: "Store Experience Builder",
@@ -650,8 +672,7 @@ export const CUSTOMIZER_MESSAGES = {
     versionPublishedReadOnlyTitle: "This version is published and read-only",
     versionPublishedReadOnlyBody:
       "This is the live version on the storefront. To edit it, create a draft from it first.",
-    versionPublishGated:
-      "Immediate per-version publishing arrives in a later update. Use Save to prepare this version now.",
+    versionPublishSaveFirst: "Save your changes first, then publish.",
     versionPreviewBannerNonLive: "This version is not published and will not appear to customers.",
     versionPreviewBannerLive: "This is the version currently published on the storefront.",
     versionRenameLabel: "Version name",
@@ -670,6 +691,29 @@ export const CUSTOMIZER_MESSAGES = {
     versionSwitchDiscardConfirm:
       "You have unsaved changes on this version. Switching now discards them without saving to any version. Continue?",
     versionOpenManagerHint: "Open the version selector in the top toolbar and pick a version to continue.",
+    // CUST-H1-3 — immediate publish of an exact Version.
+    versionPublishNow: "Publish now",
+    versionPublishConfirmTitlePrefix: 'Publish "',
+    versionPublishConfirmTitleSuffix: '"?',
+    versionPublishConfirmStorefrontLabel: "Storefront",
+    versionPublishConfirmReplaceBody: "This design will become this storefront's live design.",
+    versionPublishConfirmFirstBody: "This storefront has no published design yet — this will be its first publish.",
+    versionPublishConfirmRetainBody: "The current live version will be kept as a retrievable previous version.",
+    versionPublishConfirmSubmit: "Publish now",
+    versionPublishConfirmCancel: "Cancel",
+    versionPublishing: "Publishing…",
+    versionPublishSuccess: "Published. This version is now live.",
+    versionPublishFailed: "Could not publish. The current live design is unchanged.",
+    versionPublishStaleConflict:
+      "The publication state changed since you last reviewed it. The version list was refreshed; review the store's current state and try again.",
+    versionPublishScheduledConflict:
+      "This version is scheduled for later. Cancel the schedule from the version manager first, then publish now.",
+    versionPublishUnsupportedSchema:
+      "This version's format is newer than what the system currently supports. Refresh the page or contact support.",
+    versionPublishForbidden: "You do not have permission to publish this storefront.",
+    versionPublishNotFound: "This version could not be found. The version list was refreshed.",
+    versionPublishGatedPublished: "This version is already published.",
+    versionPublishGatedScheduled: "This version is scheduled — cancel the schedule from the version manager before publishing now.",
   },
 } as const;
 

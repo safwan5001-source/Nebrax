@@ -16,7 +16,13 @@ import { seedMockPresentationVersions } from "@/lib/mock-data";
 
 const STORE_ID = "dev-store-1";
 
-type Scenario = "empty" | "single-draft" | "choose" | "published-readonly" | "many-long-names";
+type Scenario =
+  | "empty"
+  | "single-draft"
+  | "choose"
+  | "published-readonly"
+  | "many-long-names"
+  | "draft-and-published";
 
 function scenarioOf(value: string | null): Scenario {
   if (
@@ -24,7 +30,8 @@ function scenarioOf(value: string | null): Scenario {
     value === "single-draft" ||
     value === "choose" ||
     value === "published-readonly" ||
-    value === "many-long-names"
+    value === "many-long-names" ||
+    value === "draft-and-published"
   ) {
     return value;
   }
@@ -63,6 +70,15 @@ function seedFor(scenario: Scenario) {
         revision: 5,
         lastPublishedAt: "2026-09-01T09:00:00.000Z",
       },
+    ]);
+    return;
+  }
+  if (scenario === "draft-and-published") {
+    // CUST-H1-3 — مسودة أهلة للنشر بجانب نسخة منشورة قائمة: التأكيد يعرض
+    // نص "استبدال" لا نص "أول نشر"، ونجاح النشر يُنزل هذه المنشورة إلى مسودة.
+    seedMockPresentationVersions(STORE_ID, [
+      { id: "v-published-1", name: "التصميم الحالي", state: "published", revision: 5 },
+      { id: "v-draft-1", name: "رمضان 1448", state: "draft", revision: 2 },
     ]);
     return;
   }

@@ -100,7 +100,9 @@ describe('commerce appearance — STORE-BACKEND-1 / CUST-H1-2', () => {
 
     await waitFor(() => expect(showMock).toHaveBeenCalledWith('s1', 'v1'));
     expect(screen.queryByText('اختر نسخة للتعديل')).toBeNull();
-    expect(screen.getByRole('button', { name: 'نشر' }).hasAttribute('disabled')).toBe(true);
+    // CUST-H1-3 replaced the CUST-H1-2 hard publish gate — an opened,
+    // unmodified Draft is now publishable.
+    expect(screen.getByRole('button', { name: 'نشر' }).hasAttribute('disabled')).toBe(false);
   });
 
   it('uses the live store name as the typographic identity fallback', async () => {
@@ -135,12 +137,12 @@ describe('commerce appearance — STORE-BACKEND-1 / CUST-H1-2', () => {
     expect(screen.queryByText(/لم يُحفظ شيء/)).toBeNull();
   });
 
-  it('gates Publish in the version-aware Customizer instead of faking success', async () => {
+  it('enables real Publish for an eligible Draft in the version-aware Customizer (CUST-H1-3)', async () => {
     listMock.mockResolvedValue({ ok: true, data: [versionSummary] });
     showMock.mockResolvedValue({ ok: true, data: versionDetail });
     render(<CommerceAppearancePage />);
     await waitFor(() => expect(showMock).toHaveBeenCalled());
     const publishButton = screen.getByRole('button', { name: 'نشر' }) as HTMLButtonElement;
-    expect(publishButton.disabled).toBe(true);
+    expect(publishButton.disabled).toBe(false);
   });
 });

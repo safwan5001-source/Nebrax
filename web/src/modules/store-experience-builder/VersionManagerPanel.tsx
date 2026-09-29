@@ -19,7 +19,7 @@ import { type CustomizerLocale, customizerMessage } from "./messages";
 
 export type VersionManagerListState = "loading" | "error" | "ready";
 
-export type VersionRowAction = "duplicate" | "rename" | "delete" | null;
+export type VersionRowAction = "duplicate" | "rename" | "delete" | "publish" | null;
 
 export interface VersionManagerPanelProps {
   locale: CustomizerLocale;
@@ -38,6 +38,13 @@ export interface VersionManagerPanelProps {
   onDuplicate: (version: PresentationVersionSummary, name: string) => void;
   onRename: (version: PresentationVersionSummary, name: string) => void;
   onDelete: (version: PresentationVersionSummary) => void;
+  /**
+   * CUST-H1-3 — يفتح حوار تأكيد النشر لهذا الصفّ (لا ينشر مباشرة من هنا؛
+   * التأكيد إلزامي — راجع `ExperienceBuilder.handleConfirmPublish`). يُعرَض
+   * فقط لصفوف `draft` — المنشورة والمجدولة لا تعرضان هذا الإجراء إطلاقاً
+   * (جدول الحالات في مرجع الأفق المعماري §6.2).
+   */
+  onPublish: (version: PresentationVersionSummary) => void;
 }
 
 function stateLabel(state: PresentationVersionState, t: (key: Parameters<typeof customizerMessage>[1]) => string) {
@@ -71,6 +78,7 @@ export function VersionManagerPanel({
   onDuplicate,
   onRename,
   onDelete,
+  onPublish,
 }: VersionManagerPanelProps) {
   const t = (key: Parameters<typeof customizerMessage>[1]) => customizerMessage(locale, key);
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -207,6 +215,7 @@ export function VersionManagerPanel({
                   setPendingDeleteId(null);
                   onDelete(version);
                 }}
+                onPublish={() => onPublish(version)}
               />
             ))}
           </ul>
@@ -230,6 +239,7 @@ function VersionRow({
   onDuplicate,
   onRename,
   onDelete,
+  onPublish,
 }: {
   version: PresentationVersionSummary;
   locale: CustomizerLocale;
@@ -244,6 +254,7 @@ function VersionRow({
   onDuplicate: (name: string) => void;
   onRename: (name: string) => void;
   onDelete: () => void;
+  onPublish: () => void;
 }) {
   const t = (key: Parameters<typeof customizerMessage>[1]) => customizerMessage(locale, key);
   const [mode, setMode] = useState<"idle" | "rename" | "duplicate">("idle");
@@ -435,6 +446,21 @@ function VersionRow({
               className="h-7 rounded-md border border-border px-2 text-[11px] font-medium text-text hover:bg-primary-soft disabled:opacity-50"
             >
               {duplicateLabel}
+            </button>
+          ) : null}
+          {version.state === "draft" ? (
+            <button
+              type="button"
+              data-version-publish={version.id}
+              // نفس حراسة التكرار: `otherRowBusy` يمنع بدء عملية على هذا الصفّ
+              // بينما صفّ آخر مشغول (بأي إجراء)، و`busy` يحرسه من نفسه (تعديل
+              // آخر معلَّق فعلياً على هذا الصفّ رغم ظاهر "idle" — راجع تعليق
+              // زرّ التكرار أعلاه لنفس المنطق حرفياً).
+              disabled={otherRowBusy || switching || busy !== null}
+              onClick={onPublish}
+              className="h-7 rounded-md bg-primary px-2 text-[11px] font-semibold text-primary-foreground disabled:opacity-50"
+            >
+              {busy === "publish" ? t("versionPublishing") : t("versionPublishNow")}
             </button>
           ) : null}
           {version.state !== "published" ? (
