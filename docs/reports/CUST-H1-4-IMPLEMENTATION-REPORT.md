@@ -7,9 +7,9 @@
 ## Repository state
 
 - **Base SHA:** `7bd9e904e7ed357e19927ef6fdf20c51f4b3587c` (`origin/main` tip at task start, confirmed with a fresh `git fetch origin main` before starting — matches the SHA given in the task brief exactly).
-- **Head SHA:** _filled in at PR open_
+- **Head SHA:** `4e560aad61f33943d34f47e59aa12e62c41a3773`
 - **Branch:** `feat/cust-h1-4-scheduling-runtime`
-- **PR:** _filled in after `create_pull_request`_
+- **PR:** [#1112](https://github.com/safwan5001-source/Nebrax/pull/1112)
 
 This Horizon builds on CUST-H1-1 (persistence foundation, PR #1082), CUST-H1-2 (Version-aware Customizer UX, PR #1085), and CUST-H1-3 (immediate version publishing, PR #1103), all already on `main`. Their investigation was not repeated; `CUST-H1-ARCH-1-THEME-VERSION-PERSISTENCE-SCHEDULING.md` and the three prior implementation reports were read as authoritative context, as instructed.
 
