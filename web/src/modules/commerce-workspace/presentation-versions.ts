@@ -30,6 +30,13 @@ export function commerceStorefrontPresentationVersionPath(
   return `${commerceStorefrontPresentationVersionsPath(storefrontId)}/${versionId}`;
 }
 
+export function commerceStorefrontPresentationVersionPublishPath(
+  storefrontId: string,
+  versionId: string,
+): string {
+  return `${commerceStorefrontPresentationVersionPath(storefrontId, versionId)}/publish`;
+}
+
 export type PresentationVersionState = 'draft' | 'scheduled' | 'published';
 
 export type PresentationVersionSummary = {
@@ -43,6 +50,13 @@ export type PresentationVersionSummary = {
   lastPublishedAt: string | null;
   createdAt: string | null;
   updatedAt: string | null;
+  /**
+   * CUST-H1-3 — حالة رأس النشر الحالية لهذا المتجر (`storefront_presentations.published_revision`)،
+   * نفس القيمة على كل صفوف القائمة. المصدر الوحيد الذي يمكّن الواجهة من
+   * إرسال `expected_published_revision` صحيحة مع طلب النشر الفوري — لا
+   * حقل آخر يكشف هذه الحالة. `null` = لم يُنشَر هذا المتجر شيئاً بعد.
+   */
+  publishedRevision: number | null;
 };
 
 export type PresentationVersionDetail = PresentationVersionSummary & {
@@ -68,6 +82,23 @@ export type VersionWriteOutcome =
 export type VersionDeleteOutcome =
   | { ok: true }
   | Failure<'not_found' | 'lifecycle_conflict'>;
+
+/**
+ * CUST-H1-3 — تصنيف فشل النشر أدقّ من فئة "conflict" العامة المستعملة
+ * للحفظ/إعادة التسمية: كل هذه الحالات ترجع 409 من الخادم بنص عربي مختلف
+ * (`StaleVersionRevisionException`/`StalePublicationHeadException`/
+ * `VersionLifecycleConflictException`/`ForwardSchemaVersionException`) —
+ * لا رمز خطأ منفصل في هذا المسار (خلافاً لمسار الأرصدة الافتتاحية)، فالتمييز
+ * هنا نصّي عمداً على نص الرسالة العربية نفسه الذي يعرضه الخادم أصلاً، لا حقلاً
+ * جديداً يُضاف الآن لعقدٍ ثابتٍ فعلاً.
+ * - `stale`: مراجعة النسخة أو حالة رأس النشر لم تعودا كما راجعهما التاجر —
+ *   العلاج نفسه للاثنين: تحديث الحالة الحالية قبل إعادة المحاولة يدوياً.
+ * - `scheduled_conflict`: الهدف مجدولٌ حالياً — يجب إلغاء الجدولة أولاً.
+ * - `unsupported_schema`: مخطط الهدف أحدث مما يدعمه الخادم الحالي.
+ */
+export type VersionPublishOutcome =
+  | { ok: true; data: PresentationVersionDetail }
+  | Failure<'not_found' | 'stale' | 'scheduled_conflict' | 'unsupported_schema' | 'validation'>;
 
 export async function listPresentationVersions(storefrontId: string): Promise<VersionListOutcome> {
   try {
@@ -152,6 +183,37 @@ export async function renamePresentationVersion(
   }
 }
 
+/**
+ * CUST-H1-3 — نشر فوري لنسخة محدَّدة تماماً. `expectedPublishedRevision`/
+ * `expectedActiveVersionId` يجب أن يأتيا من آخر حالة رأس نشر وثّقتها الواجهة
+ * فعلياً (آخر تحميل ناجح لقائمة النسخ) — لا قيمة مُخمَّنة أو مُفترَضة. لا
+ * إعادة محاولة تلقائية هنا على أي فشل: التعارض دوماً قرارٌ يدوي صريح من
+ * التاجر (راجع `VersionPublishOutcome`).
+ */
+export async function publishPresentationVersion(
+  storefrontId: string,
+  versionId: string,
+  revision: number,
+  expectedPublishedRevision: number | null,
+  expectedActiveVersionId: string | null,
+): Promise<VersionPublishOutcome> {
+  try {
+    const payload = await api<unknown>(commerceStorefrontPresentationVersionPublishPath(storefrontId, versionId), {
+      method: 'POST',
+      body: {
+        revision,
+        expected_published_revision: expectedPublishedRevision,
+        expected_active_version_id: expectedActiveVersionId,
+      },
+    });
+    const data = mapDetail(payload);
+    if (data === null) return { ok: false, reason: 'failed', message: 'invalid_payload' };
+    return { ok: true, data };
+  } catch (error) {
+    return { ok: false, reason: classifyPublishFailure(error), message: errorMessage(error, 'publish_failed') };
+  }
+}
+
 export async function deletePresentationVersion(
   storefrontId: string,
   versionId: string,
@@ -198,6 +260,17 @@ function mapSummary(row: unknown): PresentationVersionSummary | null {
   if (record.state !== 'draft' && record.state !== 'scheduled' && record.state !== 'published') return null;
   const state = record.state;
   if (typeof record.revision !== 'number' || !Number.isFinite(record.revision)) return null;
+  // فشل آمن كنظائره أعلاه (الحالة/المعرّف/المراجعة): `null` معناها الوحيد
+  // المقبول "لم يُنشَر هذا المتجر شيئاً بعد" — أي نوع آخر غير رقم يُرفض الصفّ
+  // كله بدل افتراض هذا المعنى بصمت (يُستعمل مباشرةً كـ`expected_published_revision`
+  // في طلب النشر، فقيمة خاطئة صامتة هنا تُرسَل كسلطة نشرٍ فعلية).
+  if (
+    record.published_revision !== undefined
+    && record.published_revision !== null
+    && typeof record.published_revision !== 'number'
+  ) {
+    return null;
+  }
 
   return {
     id: record.id,
@@ -210,6 +283,7 @@ function mapSummary(row: unknown): PresentationVersionSummary | null {
     lastPublishedAt: typeof record.last_published_at === 'string' ? record.last_published_at : null,
     createdAt: typeof record.created_at === 'string' ? record.created_at : null,
     updatedAt: typeof record.updated_at === 'string' ? record.updated_at : null,
+    publishedRevision: typeof record.published_revision === 'number' ? record.published_revision : null,
   };
 }
 
@@ -243,6 +317,29 @@ function classifyDeleteFailure(error: unknown): 'not_found' | 'forbidden' | 'lif
   if (hasApiStatus(error, 409)) return 'lifecycle_conflict';
   if (hasApiStatus(error, 403)) return 'forbidden';
   if (hasApiStatus(error, 404)) return 'not_found';
+  return 'failed';
+}
+
+/**
+ * كل حالات 409 على مسار النشر ترجع من الخادم بنفس رمز الحالة (409) بنصوص
+ * عربية مختلفة — لا رمز خطأ منفصل (`code`) في هذا المسار بعد. التمييز هنا
+ * نصّي عمداً على نص رسالة الخادم نفسها (`StalePublicationHeadException`/
+ * `VersionLifecycleConflictException`/`ForwardSchemaVersionException` —
+ * كلٌّ بنصّ ثابت مغاير)؛ أي 409 آخر (مراجعة النسخة الهدف نفسها، مثلاً) يُصنَّف
+ * `stale` — نفس معالجة "حدّث الحالة ثم أعد المحاولة يدوياً".
+ */
+function classifyPublishFailure(
+  error: unknown,
+): 'not_found' | 'forbidden' | 'validation' | 'stale' | 'scheduled_conflict' | 'unsupported_schema' | 'failed' {
+  if (hasApiStatus(error, 409)) {
+    const message = error instanceof Error ? error.message : '';
+    if (message.includes('مخطط') || message.includes('أحدث مما يدعمه')) return 'unsupported_schema';
+    if (message.includes('مجدولة')) return 'scheduled_conflict';
+    return 'stale';
+  }
+  if (hasApiStatus(error, 403)) return 'forbidden';
+  if (hasApiStatus(error, 404)) return 'not_found';
+  if (hasApiStatus(error, 422)) return 'validation';
   return 'failed';
 }
 

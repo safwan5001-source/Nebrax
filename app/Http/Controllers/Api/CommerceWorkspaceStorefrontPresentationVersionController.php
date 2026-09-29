@@ -3,12 +3,14 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Requests\CreateStorefrontPresentationVersionRequest;
+use App\Http\Requests\PublishStorefrontPresentationVersionRequest;
 use App\Http\Requests\RenameStorefrontPresentationVersionRequest;
 use App\Http\Requests\SaveStorefrontPresentationVersionRequest;
 use App\Services\Commerce\ActiveVersionImmutableException;
 use App\Services\Commerce\ForwardSchemaVersionException;
 use App\Services\Commerce\PresentationDocumentTooLargeException;
 use App\Services\Commerce\SourceVersionNotFoundException;
+use App\Services\Commerce\StalePublicationHeadException;
 use App\Services\Commerce\StaleVersionRevisionException;
 use App\Services\Commerce\StorefrontPresentationVersionService;
 use App\Services\Commerce\VersionLifecycleConflictException;
@@ -134,6 +136,37 @@ class CommerceWorkspaceStorefrontPresentationVersionController extends ApiContro
             );
         } catch (StaleVersionRevisionException|ForwardSchemaVersionException $e) {
             abort(409, $e->getMessage());
+        }
+
+        if ($payload === null) {
+            abort(404, 'النسخة غير موجودة.');
+        }
+
+        return response()->json(['data' => $payload]);
+    }
+
+    public function publish(
+        PublishStorefrontPresentationVersionRequest $request,
+        StorefrontPresentationVersionService $versions,
+        string $id,
+        string $version,
+    ): JsonResponse {
+        $this->denySelfService($request);
+
+        $expectedPublishedRevision = $request->validated('expected_published_revision');
+
+        try {
+            $payload = $versions->publishForCurrentTenant(
+                $id,
+                $version,
+                (int) $request->validated('revision'),
+                $expectedPublishedRevision !== null ? (int) $expectedPublishedRevision : null,
+                $request->validated('expected_active_version_id'),
+            );
+        } catch (StaleVersionRevisionException|StalePublicationHeadException|ForwardSchemaVersionException|VersionLifecycleConflictException $e) {
+            abort(409, $e->getMessage());
+        } catch (PresentationDocumentTooLargeException $e) {
+            abort(422, $e->getMessage());
         }
 
         if ($payload === null) {

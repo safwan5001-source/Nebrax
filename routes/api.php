@@ -910,6 +910,12 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
             ->whereUuid('id')->whereUuid('version')
             ->middleware($perm('commerce.manage'));
 
+        // CUST-H1-3: نشر فوري لنسخة محدَّدة تماماً. نفس صلاحية بقية مسارات
+        // النسخ (commerce.manage) — لا صلاحية جديدة.
+        Route::post('commerce/workspace/storefronts/{id}/presentation/versions/{version}/publish', [CommerceWorkspaceStorefrontPresentationVersionController::class, 'publish'])
+            ->whereUuid('id')->whereUuid('version')
+            ->middleware($perm('commerce.manage'));
+
         // COM-MOBILE-SHIPPING-1 (ADR-10): مناطق شحن مُهيَّأة من التاجر —
         // مطابقة مدينة/منطقة ⇐ رسم ثابت. نفس صلاحية بنية Commerce التحتية
         // الأخرى (commerce.manage) لقراءةً وكتابةً معاً، بلا نطاق `shipping.*`

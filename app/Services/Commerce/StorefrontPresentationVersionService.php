@@ -202,6 +202,128 @@ final class StorefrontPresentationVersionService
     }
 
     /**
+     * CUST-H1-3 — نشر فوري لنسخة محدَّدة تماماً. مرجعها المعماري:
+     * `docs/plans/store/CUST-H1-ARCH-1-...md` §11. ترتيب الأقفال Storefront
+     * ← head ← Version كبقية الخدمة. لا حذف للنسخة السابقة النشِطة — تبقى
+     * كما هي وتُشتقّ حالتها "مسودة" تلقائياً بمجرّد تحرّك المؤشر عنها.
+     *
+     * @return array<string, mixed>|null null = المتجر أو النسخة أجنبي/مفقود (404).
+     *
+     * @throws StaleVersionRevisionException رقم مراجعة النسخة الهدف لا يطابق المقفول.
+     * @throws StalePublicationHeadException حالة رأس النشر التي راجعها التاجر لم تعد الحالية.
+     * @throws VersionLifecycleConflictException الهدف مجدولٌ حالياً — يجب إلغاء الجدولة أولاً.
+     * @throws ForwardSchemaVersionException مخطط الهدف أحدث مما يدعمه الخادم الحالي.
+     * @throws PresentationDocumentTooLargeException المستند المطبَّع أكبر من الحد المسموح.
+     */
+    public function publishForCurrentTenant(
+        string $storefrontId,
+        string $versionId,
+        int $expectedRevision,
+        ?int $expectedPublishedRevision,
+        ?string $expectedActiveVersionId,
+    ): ?array {
+        return DB::transaction(function () use (
+            $storefrontId,
+            $versionId,
+            $expectedRevision,
+            $expectedPublishedRevision,
+            $expectedActiveVersionId,
+        ) {
+            $storefront = $this->lockOwnedStorefront($storefrontId);
+            if ($storefront === null) {
+                return null;
+            }
+
+            $head = StorefrontPresentation::query()
+                ->where('storefront_id', $storefront->id)
+                ->lockForUpdate()
+                ->first();
+
+            $version = $this->lockOwnedVersion($storefront, $versionId);
+            if ($version === null) {
+                return null;
+            }
+
+            if ((int) $version->revision !== $expectedRevision) {
+                throw new StaleVersionRevisionException;
+            }
+
+            $currentPublishedRevision = ($head !== null && $head->published_revision !== null)
+                ? (int) $head->published_revision
+                : null;
+            $currentActiveVersionId = $head?->active_version_id;
+
+            if (
+                $currentPublishedRevision !== $expectedPublishedRevision
+                || $currentActiveVersionId !== $expectedActiveVersionId
+            ) {
+                throw new StalePublicationHeadException;
+            }
+
+            // النشر الفوري (Publish Now) لا يُلغي جدولةً ضمنياً أبداً — التاجر
+            // يجب أن يُلغيها صراحةً أولاً من مدير النسخ (خارج نطاق CUST-H1-3).
+            if ($head !== null && $head->scheduled_version_id === $version->id) {
+                throw new VersionLifecycleConflictException(
+                    'هذه النسخة مجدولة للنشر لاحقاً. ألغِ الجدولة أولاً قبل النشر الفوري.'
+                );
+            }
+
+            // فشل آمن قبل أي تطبيع — راجع نظائرها في save/rename/create أعلاه.
+            $this->assertSupportedSchema((int) $version->schema_version);
+
+            $normalized = $this->normalizer->normalize($version->config, (int) $version->schema_version);
+            $this->assertStoredSize($normalized);
+
+            // بنية Version لا تعرف كاتباً قديماً يتجاوز هذا المسار (خلافاً
+            // للرأس المتوافق) — عمود `schema_version` يعكس المستند المخزَّن
+            // دوماً. ترقية/تطبيع الهدف يُثبَّت ذرّياً هنا سواء تغيّر المستند
+            // أو لا، دون زيادة مراجعة النسخة (هذا ليس تعديل تاجر، §11 خطوة 11).
+            if (
+                (int) $version->schema_version !== StorefrontPresentationNormalizer::VERSION
+                || ! $this->sameDocument($version->config, $normalized)
+            ) {
+                $version->forceFill([
+                    'config' => $normalized,
+                    'schema_version' => StorefrontPresentationNormalizer::VERSION,
+                ])->save();
+            }
+
+            $alreadyActive = $currentActiveVersionId === $version->id;
+            $publishedUnchanged = $head !== null
+                && is_array($head->published_config)
+                && $this->sameDocument($head->published_config, $normalized);
+
+            if ($alreadyActive && $publishedUnchanged) {
+                // نشر مثالي غير مؤثّر (idempotent no-op): لا إعادة كتابة
+                // published_at/published_revision بلا تغيّر حقيقي في اللقطة
+                // العامة (§11 "Publishing the already-active unchanged version").
+                return $this->detail($version->fresh(), $head);
+            }
+
+            if ($head === null) {
+                // بنيوياً غير قابل للحدوث: أي Version موجودة تعني أن رأسها
+                // أُنشئ معها بالفعل (راجع `attemptCreate()`/الهجرة §7 الحالة A) —
+                // لا مسار حذفٍ للرأس وحده مستقلاً عن المتجر في هذه الخدمة.
+                throw new RuntimeException('رأس عرض المتجر غير موجود لنسخة قائمة — حالة غير متّسقة.');
+            }
+
+            $newPublishedRevision = ($head->published_revision !== null ? (int) $head->published_revision : 0) + 1;
+
+            $head->forceFill([
+                'published_config' => $normalized,
+                'published_schema_version' => StorefrontPresentationNormalizer::VERSION,
+                'published_revision' => $newPublishedRevision,
+                'published_at' => now(),
+                'active_version_id' => $version->id,
+            ])->save();
+
+            $version->forceFill(['last_published_at' => now()])->save();
+
+            return $this->detail($version->fresh(), $head->fresh());
+        });
+    }
+
+    /**
      * @return bool|null null = المتجر أو النسخة أجنبي/مفقود (404).
      *
      * @throws VersionLifecycleConflictException
@@ -387,6 +509,14 @@ final class StorefrontPresentationVersionService
             'last_published_at' => $version->last_published_at?->toJSON(),
             'created_at' => $version->created_at?->toJSON(),
             'updated_at' => $version->updated_at?->toJSON(),
+            // CUST-H1-3: حالة رأس النشر (`published_revision`) التي يجب على
+            // التاجر مراجعتها قبل النشر الفوري — نفس قيمة الرأس على كل صفوف
+            // هذا المتجر، وليست مراجعة النسخة نفسها (`revision`). النسخة
+            // النشِطة تُعرف من `state === 'published'` في نفس القائمة، فلا
+            // حاجة لتسريب `active_version_id` الخام كحقل منفصل.
+            'published_revision' => ($head !== null && $head->published_revision !== null)
+                ? (int) $head->published_revision
+                : null,
         ];
     }
 
@@ -483,5 +613,16 @@ final class StorefrontPresentationVersionService
         $driverCode = $e->errorInfo[1] ?? null;
 
         return $sqlState === '23505' || $driverCode === 19 || str_contains(strtolower($e->getMessage()), 'unique');
+    }
+
+    /** @param  array<string, mixed>  $right */
+    private function sameDocument(?array $left, array $right): bool
+    {
+        if ($left === null) {
+            return false;
+        }
+
+        return json_encode($left, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
+            === json_encode($right, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     }
 }
