@@ -23,14 +23,14 @@ the first pass; confirmed still the merge base.
 
 ## 2. Final Head SHA
 
-`298584380f809de5737a0f5cec47d60c8fb50ede` plus this audit's commit, pushed
-to the same branch (no new PR opened). The branch history for this Horizon:
+`6ec7b90c61664761cd9f038bd4cf1914e7d4bbd6`, pushed to the same branch (no
+new PR opened). The branch history for this Horizon:
 
 ```
 f6ce95a  main (base)
 4218ad4  feat(store): complete AWJ Market full theme density and composition   (first pass)
 2985843  docs: fill in PR number and head SHA in the Full Theme Completion report
-<new>    feat(store): AWJ Market closure audit — carousel, FAQ accordion, quick view, share, hero density   (this audit)
+6ec7b90  feat(store): AWJ Market closure audit — carousel, FAQ accordion, quick view, share, hero density   (this audit)
 ```
 
 ## 3. PR number
