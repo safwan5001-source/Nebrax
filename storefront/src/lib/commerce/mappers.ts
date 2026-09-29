@@ -422,9 +422,7 @@ export function mapAwjCategoryToViewModel(
 
   const imageUrl = toRenderableCategoryMediaUrl(category.image?.url ?? null);
   const image =
-    category.image && imageUrl
-      ? { ...category.image, url: imageUrl }
-      : null;
+    category.image && imageUrl ? { ...category.image, url: imageUrl } : null;
 
   return {
     id: category.id,
