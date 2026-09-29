@@ -1,0 +1,147 @@
+{
+  "_meta": {
+    "purpose": "MOBILE-PREVIEW-4 (AWJ_APP_BUILDER_REAL_MOBILE_PREVIEW_HORIZON.md) — canonical, single-source conformance fixture for the App Builder action-decode and navigation-support contract. Both the Flutter runtime's implementation (source of truth) and the Builder web Preview's derived TypeScript port MUST agree on every case's 'decode' result, and — for 'navigate' actions only — on whether the real shipped runtime's RuntimeActionHandler actually changes screen for that pageId. This file is the one place that contract is written down; do not duplicate case data inline in either test suite.",
+    "sourceOfTruth": [
+      "mobile/lib/actions/app_action.dart (decodeAction — param validation per action type)",
+      "mobile/lib/app/runtime_action_handler.dart (RuntimeActionHandler.onNavigate — the exact home/cart-only pageId switch)"
+    ],
+    "portedTo": "web/src/modules/app-builder/action-semantics.ts",
+    "consumers": [
+      "mobile/test/actions/action_navigation_conformance_test.dart",
+      "web/src/modules/app-builder/action-semantics.test.ts"
+    ],
+    "note": "Every case's 'decode' field is a real cross-runtime invariant: decodeAction's param validation is identical Dart/TypeScript logic and must produce the same typed result (or null) on both sides for the same ActionRef. The 'previewOutcome' field is NOT a Flutter concept — the shipped runtime has no 'outcome classification', it just dispatches for real (a live network call, a real screen switch, or a real silent no-op). It is Browser-Preview-only policy layered on top of the identical decode step, describing what Browser Preview honestly shows since it has no live commerce/auth. Its 'navigate'/'navigate-unsupported' split IS still a real cross-runtime fact (mirrors onNavigate's exact pageId switch — only 'home'/'cart' change RuntimeState.page, anything else is a documented no-op — 'a schema-authoring mistake, not a runtime crash'), so the Dart consumer asserts it too, by actually dispatching through RuntimeActionHandler and checking RuntimeState.page. 'requires-live-data' (openProduct/addToCart/updateCartQuantity/removeCartItem) and 'safe-noop' (refresh) are preview-only judgments about whether the action needs a live network/auth boundary Browser Preview intentionally does not have (openProduct's OWN action-handler call is instant/local — the live dependency is the destination Product screen's own CommerceClient fetch, not the navigate step itself) — the Dart consumer does not assert these two categories, since Flutter has nothing analogous to 'this action is unavailable in preview' to check."
+  },
+  "cases": [
+    {
+      "id": "navigate-home-supported",
+      "description": "navigate({pageId:'home'}) decodes and is one of the runtime's exact two wired navigation targets — RuntimeActionHandler.onNavigate switches RuntimeState.page to home.",
+      "action": { "type": "navigate", "params": { "pageId": "home" } },
+      "decode": { "kind": "NavigateAction", "pageId": "home" },
+      "previewOutcome": { "kind": "navigate", "pageId": "home" }
+    },
+    {
+      "id": "navigate-cart-supported",
+      "description": "navigate({pageId:'cart'}) — the runtime's other wired navigation target.",
+      "action": { "type": "navigate", "params": { "pageId": "cart" } },
+      "decode": { "kind": "NavigateAction", "pageId": "cart" },
+      "previewOutcome": { "kind": "navigate", "pageId": "cart" }
+    },
+    {
+      "id": "navigate-unknown-pageid-is-a-real-silent-noop",
+      "description": "navigate({pageId:'categories'}) decodes fine (well-formed ActionRef) but RuntimeActionHandler.onNavigate's switch has no case for it — the real shipped app does nothing at all. Not a Preview gap to paper over by inventing a generic page router.",
+      "action": { "type": "navigate", "params": { "pageId": "categories" } },
+      "decode": { "kind": "NavigateAction", "pageId": "categories" },
+      "previewOutcome": { "kind": "navigate-unsupported", "pageId": "categories" }
+    },
+    {
+      "id": "navigate-missing-pageid-malformed",
+      "description": "navigate({}) — decodeAction returns null (fail-safe, never throws); dispatcher does nothing.",
+      "action": { "type": "navigate", "params": {} },
+      "decode": null,
+      "previewOutcome": { "kind": "inert" }
+    },
+    {
+      "id": "navigate-wrong-typed-pageid-malformed",
+      "description": "navigate({pageId:42}) — pageId must be a String.",
+      "action": { "type": "navigate", "params": { "pageId": 42 } },
+      "decode": null,
+      "previewOutcome": { "kind": "inert" }
+    },
+    {
+      "id": "openProduct-valid",
+      "description": "openProduct always decodes for any non-empty productId and (on real mobile) always switches RuntimeState.page to product — but the destination ProductScreen fetches the product from CommerceClient, which Browser Preview has no live/authorized path to.",
+      "action": { "type": "openProduct", "params": { "productId": "p-1" } },
+      "decode": { "kind": "OpenProductAction", "productId": "p-1" },
+      "previewOutcome": { "kind": "requires-live-data", "actionType": "openProduct" }
+    },
+    {
+      "id": "openProduct-missing-productId-malformed",
+      "action": { "type": "openProduct", "params": {} },
+      "decode": null,
+      "previewOutcome": { "kind": "inert" }
+    },
+    {
+      "id": "addToCart-defaults",
+      "description": "addToCart with only productId — quantity defaults to 1, variantId to null.",
+      "action": { "type": "addToCart", "params": { "productId": "p-1" } },
+      "decode": { "kind": "AddToCartAction", "productId": "p-1", "variantId": null, "quantity": 1 },
+      "previewOutcome": { "kind": "requires-live-data", "actionType": "addToCart" }
+    },
+    {
+      "id": "addToCart-explicit-variant-and-quantity",
+      "action": { "type": "addToCart", "params": { "productId": "p-1", "variantId": "v-1", "quantity": 3 } },
+      "decode": { "kind": "AddToCartAction", "productId": "p-1", "variantId": "v-1", "quantity": 3 },
+      "previewOutcome": { "kind": "requires-live-data", "actionType": "addToCart" }
+    },
+    {
+      "id": "addToCart-missing-productId-malformed",
+      "action": { "type": "addToCart", "params": {} },
+      "decode": null,
+      "previewOutcome": { "kind": "inert" }
+    },
+    {
+      "id": "addToCart-zero-quantity-malformed",
+      "description": "quantity must be a positive int when present.",
+      "action": { "type": "addToCart", "params": { "productId": "p-1", "quantity": 0 } },
+      "decode": null,
+      "previewOutcome": { "kind": "inert" }
+    },
+    {
+      "id": "addToCart-wrong-typed-variantId-malformed",
+      "action": { "type": "addToCart", "params": { "productId": "p-1", "variantId": 42 } },
+      "decode": null,
+      "previewOutcome": { "kind": "inert" }
+    },
+    {
+      "id": "updateCartQuantity-valid",
+      "action": { "type": "updateCartQuantity", "params": { "cartItemId": "ci-1", "quantity": 5 } },
+      "decode": { "kind": "UpdateCartQuantityAction", "cartItemId": "ci-1", "quantity": 5 },
+      "previewOutcome": { "kind": "requires-live-data", "actionType": "updateCartQuantity" }
+    },
+    {
+      "id": "updateCartQuantity-zero-is-valid",
+      "description": "quantity 0 decodes fine — removal-by-zero is the caller's policy, not decodeAction's.",
+      "action": { "type": "updateCartQuantity", "params": { "cartItemId": "ci-1", "quantity": 0 } },
+      "decode": { "kind": "UpdateCartQuantityAction", "cartItemId": "ci-1", "quantity": 0 },
+      "previewOutcome": { "kind": "requires-live-data", "actionType": "updateCartQuantity" }
+    },
+    {
+      "id": "updateCartQuantity-negative-malformed",
+      "action": { "type": "updateCartQuantity", "params": { "cartItemId": "ci-1", "quantity": -1 } },
+      "decode": null,
+      "previewOutcome": { "kind": "inert" }
+    },
+    {
+      "id": "updateCartQuantity-missing-cartItemId-malformed",
+      "action": { "type": "updateCartQuantity", "params": { "quantity": 1 } },
+      "decode": null,
+      "previewOutcome": { "kind": "inert" }
+    },
+    {
+      "id": "removeCartItem-valid",
+      "action": { "type": "removeCartItem", "params": { "cartItemId": "ci-1" } },
+      "decode": { "kind": "RemoveCartItemAction", "cartItemId": "ci-1" },
+      "previewOutcome": { "kind": "requires-live-data", "actionType": "removeCartItem" }
+    },
+    {
+      "id": "removeCartItem-missing-cartItemId-malformed",
+      "action": { "type": "removeCartItem", "params": {} },
+      "decode": null,
+      "previewOutcome": { "kind": "inert" }
+    },
+    {
+      "id": "refresh-ignores-any-params",
+      "description": "refresh decodes regardless of params and, on real mobile, only bumps a local refresh counter — no network call at all (proven by mobile/test/app/runtime_action_handler_test.dart's 'onRefresh ... without touching the Commerce API'). Safe to treat as a real no-op in Preview too: there is nothing live to refresh.",
+      "action": { "type": "refresh", "params": { "unused": true } },
+      "decode": { "kind": "RefreshAction" },
+      "previewOutcome": { "kind": "safe-noop" }
+    },
+    {
+      "id": "unknown-action-type",
+      "action": { "type": "deleteAccount", "params": {} },
+      "decode": null,
+      "previewOutcome": { "kind": "inert" }
+    }
+  ]
+}

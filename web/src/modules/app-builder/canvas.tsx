@@ -5,7 +5,7 @@ import { useLocale, useTranslations } from 'next-intl';
 import { EyeOff, FlaskConical, ImageOff, ShoppingCart } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatRiyal } from '@/lib/money';
-import { registryLabel, type AppBuilderRegistries, type AppSchemaComponent } from '@/lib/app-builder';
+import { registryLabel, type AppBuilderRegistries, type AppSchemaActionRef, type AppSchemaComponent } from '@/lib/app-builder';
 import { presentationCssVars, radiusToken, RADIUS_PRESETS, type RadiusId } from '@/modules/store-experience-builder/presentation/tokens';
 import { resolveNodeBindings } from './runtime-contract';
 import { SAMPLE_RESOURCE_DATA } from './sample-resource-data';
@@ -115,6 +115,7 @@ function NodeFrame({
   children,
   registries,
   interactive,
+  onAction,
 }: {
   node: AppSchemaComponent;
   /** المعرّف الذي يُرسَل فعلياً إلى `onSelect` — معرّف العقدة نفسها إن كانت حقيقية (موجودة
@@ -133,6 +134,14 @@ function NodeFrame({
    * إخفاؤها خلف مظهرٍ يبدو مكتملاً في أيّ وضع.
    */
   interactive: boolean;
+  /**
+   * MOBILE-PREVIEW-4 — يُستدعى عند النقر على عقدة تحمل `action` بينما `interactive=false`
+   * فقط (وضع المعاينة): هذا هو مسار الإرسال الوحيد الذي يوازي `_ActionTappable`/`InkWell`
+   * الحقيقيين في `component_widgets.dart` — عقدة بلا `action` تبقى خاملة كما كانت (لا
+   * `onClick` إطلاقاً)، تماماً كـ`IgnorePointer` الحقيقي. لا صلة بتحديد التحرير (`onSelect`)
+   * ولا يُستدعى في وضع «تصميم» (`interactive=true`) أبداً.
+   */
+  onAction?: (action: AppSchemaActionRef) => void;
 }) {
   const uiLocale = useLocale();
   const t = useTranslations('appBuilder.builder');
@@ -140,6 +149,29 @@ function NodeFrame({
   const typeLabel = definition ? registryLabel(definition.label, uiLocale) : node.type;
 
   if (!interactive) {
+    const action = node.action;
+    if (action && onAction) {
+      return (
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={(event) => {
+            event.stopPropagation();
+            onAction(action);
+          }}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault();
+              onAction(action);
+            }
+          }}
+          className={cn('relative rounded outline-none', className)}
+        >
+          {node.visibility ? <UnsupportedVisibilityBadge label={t('visibilityUnsupportedBadge')} /> : null}
+          {children}
+        </div>
+      );
+    }
     return (
       <div className={cn('relative rounded', className)}>
         {node.visibility ? <UnsupportedVisibilityBadge label={t('visibilityUnsupportedBadge')} /> : null}
@@ -183,6 +215,7 @@ function CanvasComponentNode({
   knownIds,
   selectFallbackId,
   interactive,
+  onAction,
 }: {
   node: AppSchemaComponent;
   selectedId: string | null;
@@ -194,6 +227,8 @@ function CanvasComponentNode({
   selectFallbackId: string;
   /** MOBILE-PREVIEW-3 — انظر تعليق `NodeFrame` الرأسي. */
   interactive: boolean;
+  /** MOBILE-PREVIEW-4 — انظر تعليق `NodeFrame` الرأسي. */
+  onAction?: (action: AppSchemaActionRef) => void;
 }) {
   const isKnown = knownIds.has(node.id);
   const effectiveSelectId = isKnown ? node.id : selectFallbackId;
@@ -209,6 +244,7 @@ function CanvasComponentNode({
       className={className}
       registries={registries}
       interactive={interactive}
+      onAction={onAction}
     >
       {body}
     </NodeFrame>
@@ -219,7 +255,7 @@ function CanvasComponentNode({
       return (
         <div className="space-y-3 p-3">
           {children.map((child) => (
-            <CanvasComponentNode key={child.id} node={child} selectedId={selectedId} onSelect={onSelect} registries={registries} knownIds={knownIds} selectFallbackId={childFallbackId} interactive={interactive} />
+            <CanvasComponentNode key={child.id} node={child} selectedId={selectedId} onSelect={onSelect} registries={registries} knownIds={knownIds} selectFallbackId={childFallbackId} interactive={interactive} onAction={onAction} />
           ))}
         </div>
       );
@@ -231,7 +267,7 @@ function CanvasComponentNode({
           {title ? <p className="text-sm font-semibold text-text">{title}</p> : null}
           <div className="space-y-2">
             {children.map((child) => (
-              <CanvasComponentNode key={child.id} node={child} selectedId={selectedId} onSelect={onSelect} registries={registries} knownIds={knownIds} selectFallbackId={childFallbackId} interactive={interactive} />
+              <CanvasComponentNode key={child.id} node={child} selectedId={selectedId} onSelect={onSelect} registries={registries} knownIds={knownIds} selectFallbackId={childFallbackId} interactive={interactive} onAction={onAction} />
             ))}
           </div>
         </div>
@@ -274,7 +310,7 @@ function CanvasComponentNode({
           ) : (
             children.map((child) => (
               <div key={child.id} className="w-32 shrink-0">
-                <CanvasComponentNode node={child} selectedId={selectedId} onSelect={onSelect} registries={registries} knownIds={knownIds} selectFallbackId={childFallbackId} interactive={interactive} />
+                <CanvasComponentNode node={child} selectedId={selectedId} onSelect={onSelect} registries={registries} knownIds={knownIds} selectFallbackId={childFallbackId} interactive={interactive} onAction={onAction} />
               </div>
             ))
           )}
@@ -310,7 +346,7 @@ function CanvasComponentNode({
           {description ? <p className="text-sm text-muted">{description}</p> : null}
           <div className="space-y-2 border-t border-border pt-2">
             {children.map((child) => (
-              <CanvasComponentNode key={child.id} node={child} selectedId={selectedId} onSelect={onSelect} registries={registries} knownIds={knownIds} selectFallbackId={childFallbackId} interactive={interactive} />
+              <CanvasComponentNode key={child.id} node={child} selectedId={selectedId} onSelect={onSelect} registries={registries} knownIds={knownIds} selectFallbackId={childFallbackId} interactive={interactive} onAction={onAction} />
             ))}
           </div>
         </div>
@@ -367,7 +403,7 @@ function CanvasComponentNode({
           {children.length === 0 ? (
             <span className="text-xs text-muted">—</span>
           ) : (
-            children.map((child) => <CanvasComponentNode key={child.id} node={child} selectedId={selectedId} onSelect={onSelect} registries={registries} knownIds={knownIds} selectFallbackId={childFallbackId} interactive={interactive} />)
+            children.map((child) => <CanvasComponentNode key={child.id} node={child} selectedId={selectedId} onSelect={onSelect} registries={registries} knownIds={knownIds} selectFallbackId={childFallbackId} interactive={interactive} onAction={onAction} />)
           )}
         </div>
       );
@@ -446,6 +482,7 @@ export function AppBuilderCanvas({
   registries = null,
   stateBanner,
   interactive = true,
+  onAction,
 }: {
   root: AppSchemaComponent | null;
   device: PreviewDevice;
@@ -468,6 +505,12 @@ export function AppBuilderCanvas({
    * الافتراض `true` يُبقي كل استدعاء موجود (وضع «تصميم») بلا أي تغيير سلوكي.
    */
   interactive?: boolean;
+  /**
+   * MOBILE-PREVIEW-4 — انظر تعليق `NodeFrame` الرأسي. لا أثر له عملياً إلا حين
+   * `interactive={false}` وعقدة تحمل `action` معاً؛ حذفه هنا لا يغيّر أي استدعاء موجود
+   * (وضع «تصميم» لا يستدعيه، ولا وضع معاينة قديم كان يمرّره).
+   */
+  onAction?: (action: AppSchemaActionRef) => void;
 }) {
   const t = useTranslations('appBuilder.builder');
 
@@ -506,6 +549,7 @@ export function AppBuilderCanvas({
             knownIds={knownIds}
             selectFallbackId={resolvedRoot.id}
             interactive={interactive}
+            onAction={onAction}
           />
         ) : (
           <p className="p-6 text-center text-sm text-muted">{t('emptyPage')}</p>
