@@ -158,14 +158,15 @@ Browser QA covered Arabic RTL and English LTR at 390, 430, 768, 1024, 1280, and 
 - Store Brand QA screenshots are local test output and are not committed.
 - `origin/main` gained PR #1079 after the branch point. There is no file overlap and GitHub could merge cleanly. Rebase was not performed.
 
-## Merge: NOT PERFORMED
+## Pre-Merge Historical State
 
-## Deploy: NOT PERFORMED
+Before owner approval, the implementation stopped with:
 
-## Next Step
+- Merge: NOT PERFORMED
+- Deploy: NOT PERFORMED
+- Next step at that time: owner review of PR #1080.
 
-Owner review of the focused pull request. Do not merge or deploy without Safwan's explicit approval. Do not start another Store, Payment, or Trust horizon from this change.
-
+This section is retained only as pre-merge history. The authoritative final state is the Post-Merge Closure below.
 
 ## Post-Merge Closure
 
