@@ -218,6 +218,62 @@ class ProductMediaR2BackfillTest extends TestCase
     }
 
     /** @test */
+    public function a_non_404_exists_check_failure_after_put_deletes_the_orphaned_r2_object(): void
+    {
+        // R2StorageService::exists() يُعيد false لـ404/NoSuchKey فقط، ويُعيد
+        // رمي أي خطأٍ آخر (هنا 500 داخلي) — يجب التقاطه هنا أيضاً وإلا أفلت
+        // من migrateOne() بلا cleanupOrphan().
+        Storage::fake('local');
+        $client = $this->mockR2();
+        $seed = $this->seedLegacyMedia('backfill-verify-exists-error');
+
+        $expectedKey = "tenant/{$seed['tenant']->id}/product-media/{$seed['product']->id}/legacy.webp";
+        $client->shouldReceive('putObject')->once()->andReturn([]);
+        $client->shouldReceive('headObject')->once()->andThrow(new AwsException(
+            'network failure', Mockery::mock('Aws\\CommandInterface'),
+            ['code' => 'InternalError', 'response' => new Response(500)],
+        ));
+        $client->shouldNotReceive('getObject');
+        $client->shouldReceive('deleteObject')->once()
+            ->with(['Bucket' => 'awj-product-media-test', 'Key' => $expectedKey])->andReturn([]);
+
+        $result = $this->artisan('awj:product-media-r2-backfill', ['--tenant' => $seed['tenant']->id])
+            ->assertExitCode(1);
+        $result->expectsOutputToContain('failed_verify_exists');
+
+        $seed['media']->refresh();
+        $this->assertSame('document', $seed['media']->disk);
+        Storage::disk('local')->assertExists("product-media/{$seed['tenant']->id}/{$seed['product']->id}/legacy.webp");
+    }
+
+    /** @test */
+    public function a_non_404_exists_check_failure_whose_orphan_cleanup_also_fails_is_reported_not_silently_swallowed(): void
+    {
+        Storage::fake('local');
+        $client = $this->mockR2();
+        $seed = $this->seedLegacyMedia('backfill-verify-exists-cleanup-fail');
+
+        $client->shouldReceive('putObject')->once()->andReturn([]);
+        $client->shouldReceive('headObject')->once()->andThrow(new AwsException(
+            'network failure', Mockery::mock('Aws\\CommandInterface'),
+            ['code' => 'InternalError', 'response' => new Response(500)],
+        ));
+        $client->shouldNotReceive('getObject');
+        // محاولة التنظيف نفسها تُخفق أيضاً — يجب أن يظهر ذلك في الحالة، لا أن يُبتلع.
+        $client->shouldReceive('deleteObject')->once()->andThrow(new AwsException(
+            'network failure', Mockery::mock('Aws\\CommandInterface'),
+            ['code' => 'InternalError', 'response' => new Response(500)],
+        ));
+
+        $result = $this->artisan('awj:product-media-r2-backfill', ['--tenant' => $seed['tenant']->id])
+            ->assertExitCode(1);
+        $result->expectsOutputToContain('failed_verify_exists_orphan_cleanup_failed');
+
+        $seed['media']->refresh();
+        $this->assertSame('document', $seed['media']->disk);
+    }
+
+    /** @test */
     public function a_read_back_failure_after_put_deletes_the_orphaned_r2_object(): void
     {
         Storage::fake('local');

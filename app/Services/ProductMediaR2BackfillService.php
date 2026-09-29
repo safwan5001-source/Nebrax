@@ -135,7 +135,18 @@ class ProductMediaR2BackfillService
         // بادئة)، والمصدر القديم يبقى كما هو دائماً بلا مساس.
         $productId = (string) $media->product_id;
 
-        if (! $this->r2->exists(ProductMedia::R2_DOMAIN, $productId, $filename)) {
+        // exists() تُعيد false لـ404/NoSuchKey فقط، وتُعيد رمي أي خطأ آخر
+        // (5xx/شبكة) — يجب التقاطه هنا أيضاً وإلا أفلت من migrateOne() بلا
+        // cleanupOrphan()، تاركاً كائناً يتيماً كتبه put() هذا التشغيل تحديداً.
+        try {
+            $exists = $this->r2->exists(ProductMedia::R2_DOMAIN, $productId, $filename);
+        } catch (RuntimeException|AwsException $exception) {
+            $row['status'] = $this->cleanupOrphan($productId, $filename, 'failed_verify_exists');
+
+            return $row;
+        }
+
+        if (! $exists) {
             $row['status'] = $this->cleanupOrphan($productId, $filename, 'failed_verify_missing');
 
             return $row;
