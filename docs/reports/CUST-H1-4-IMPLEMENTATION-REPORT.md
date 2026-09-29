@@ -151,8 +151,12 @@ Both full-suite runs used the exact commands/credentials CI's `ci.yml` matrix us
 
 | DB | Result |
 |---|---|
-| SQLite | 46 failed, 49 skipped, 4875 passed (30544 assertions) |
-| PostgreSQL 16 | `StorefrontPresentation`-scoped: 179 passed, 0 skipped · `CommerceModuleBoundaryTest`: 3 passed · broader full-suite (excluding 10 pre-existing R2 test files, see below): _filled in once the run completes_ |
+| SQLite | 46 failed, 49 skipped, 4875 passed (30544 assertions) — full, unfiltered `php artisan test` |
+| PostgreSQL 16 | `StorefrontPresentation`-scoped: 179 passed, 0 skipped · `CommerceModuleBoundaryTest`: 3 passed · broader full-suite (excluding 10 pre-existing R2 test files, see below): 27 failed, 4896 passed (30702 assertions) |
+
+The PostgreSQL broader run's 27 failures: 26 are `Fuel*Test` (`Call to undefined function App\Services\bcmul()` — same missing-`bcmath`-extension cause as SQLite, reproduced identically on the second engine, as expected since it's a PHP-extension gap, not a database-engine difference). The 27th, `DocumentCenterSecureIntakeTest > a_valid_pdf_is_counted...`, is unrelated to Storefront/Presentation/Commerce (a PDF document-intake test); its debug output shows the same `View [emails.auth-action] not found` trace as the local dev-harness `app/Mail`-copy gap already documented above (that exception is caught-and-swallowed by `AuthController`'s own `try/catch(Throwable)`, same as before) — the test's actual 201-vs-422 assertion failure is a separate, pre-existing condition in an unrelated module, not chased further since it is out of this Horizon's scope and does not touch any file this PR changes.
+
+**Zero failures in `StorefrontPresentation*`, `CommerceModuleBoundaryTest`, or any of the three new CUST-H1-4 test files, on either database, across every run in this session** (isolated filtered runs and both full-suite runs alike).
 
 All 46 SQLite failures are in three pre-existing, unrelated categories — verified by listing every failing class and reading each failure's actual exception:
 
