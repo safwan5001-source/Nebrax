@@ -1,10 +1,12 @@
 # MOBILE-PREVIEW-4 — Runtime Semantic Parity — Implementation Report
 
 **Horizon:** AWJ App Builder — Real Mobile Preview
-**Status:** IMPLEMENTED — PR open, **not merged, no deploy**
+**Status:** IMPLEMENTED — CI green — PR open, **not merged, no deploy**
 **Repository:** `safwan5001-source/Nebrax`
 **Branch:** `feat/mobile-preview-4-runtime-semantic-parity`
+**PR:** #1100
 **Base SHA:** `bf023359a58f8c9bfefc526be0c77f18df4518e3` (latest `origin/main` at task start)
+**Head SHA:** `49d9105c747e5f0f0b50654d6a7a58b9e61a2d7c`
 **Scope:** Web (`web/`) + mobile test-only (`mobile/test/`) + shared conformance fixtures
 (`contracts/app-builder/`). No `app/`/`routes/`/`database/` file touched. No `mobile/lib/`
 (runtime source) file touched — the shipped Flutter runtime is unchanged.
@@ -155,11 +157,15 @@ No file under `mobile/lib/` (runtime source), `app/`, `routes/`, or `database/` 
 
 - **Focused, new:** 41 (`action-semantics.test.ts`) + 3 (`registry-identifiers.test.tsx`) + 4
   (`page.test.tsx`) = **48 new web tests, all passing.**
-- **Mobile, new (not run in this sandbox — no Flutter toolchain available here; relies on
-  `mobile-ci.yml`):** `action_navigation_conformance_test.dart` (20 decode cases + 3 navigate-
-  support dispatch cases) and `registry_identifiers_conformance_test.dart` (2 set-equality
-  cases), written directly against the same method signatures already exercised by
-  `app_action_test.dart`/`runtime_action_handler_test.dart`/`component_registry_test.dart`.
+- **Mobile, new:** `action_navigation_conformance_test.dart` (20 decode cases + 3 navigate-support
+  dispatch cases) and `registry_identifiers_conformance_test.dart` (2 set-equality cases), written
+  directly against the same method signatures already exercised by
+  `app_action_test.dart`/`runtime_action_handler_test.dart`/`component_registry_test.dart`. Could
+  not be run locally (no Flutter toolchain in this sandbox); `mobile-ci.yml`'s `flutter analyze`
+  caught one real type error on first push (`test()`'s description parameter is `Object`, not
+  `Object?` — a fixture-driven test id needed an explicit `as String` cast), fixed in commit
+  `49d9105`. `flutter analyze` and `flutter test` (both duplicate CI trigger sets) and the
+  Android/iOS release build proofs are now **green** on the current head.
 - **Broader, same files:** `canvas.test.tsx` 14/14, `runtime-contract.test.ts` 24/24 — both
   unchanged and still green, confirming binding/visibility/collection semantics are untouched.
 - **Full web suite:** `npm run test` (Vitest) — **320 test files, 2313 tests, all green**
@@ -171,6 +177,15 @@ No file under `mobile/lib/` (runtime source), `app/`, `routes/`, or `database/` 
   including the `/app-builder/[id]/builder` route.
 - **Lint:** not part of this repo's web CI (`web-ci.yml` runs `npm run test` + `npm run build`
   only — confirmed by MP-3's own report; unchanged here).
+- **CI (PR #1100, head `49d9105`):** all 11 check runs green —
+  `web build (Next.js)`, `php artisan test (L11, sqlite)`, `php artisan test (L11, pgsql)`,
+  `mobile (analyze + test)`, `mobile (Android release build proof)`,
+  `mobile (iOS release build proof)`. (The PHP checks are unaffected by this PR — no backend file
+  is touched — and pass as expected.) `mergeable_state: clean`, no merge conflict with `main`.
+  One transient GitHub Actions runner-provisioning outage affected the very first CI attempt
+  (every check failed in ~3-4s with no runner assigned, before any checkout ran); confirmed
+  infra-side (not this PR's diff — `main`'s own CI was unaffected minutes earlier) and resolved
+  on GitHub's side, then re-run clean.
 
 ## 7. Known limitation (not solved by this task)
 
@@ -224,9 +239,6 @@ logic into Draft/Published/Default page resolution for marginal added fidelity.
 
 - The empty-sample-data limitation (§7) means "truthful empty cart/orders" preview states remain
   aspirational, not delivered, despite the dispatch/navigation work landing.
-- Mobile-side new tests were written against verified real method signatures but could not be
-  executed in this sandbox (no Flutter toolchain) — CI (`mobile-ci.yml`) is the first real run;
-  flagged explicitly rather than claimed as verified.
 - The Draft-mode navigate-to-nonexistent-page fallback (empty-page state) and Published/Default's
   fallback-to-initial-page are both safe but slightly different from each other and from the real
   runtime's own Default-substitution behavior — documented in §7, not hidden.
@@ -241,8 +253,9 @@ any of them.
 
 ## 12. Next step
 
-- PR open against `main`, CI to be monitored to green.
-- **Not merged. No deploy.** Awaiting the owner's explicit merge approval.
+- PR #1100 open against `main`, **all 11 CI checks green**, `mergeable_state: clean`.
+- **Not merged. No deploy.** Stopping here per the task's instructions — awaiting the owner's
+  explicit merge approval.
 - Recommended next task per the Horizon: **MOBILE-PREVIEW-5 — Preview Session security
   architecture** (the mandatory Decision Gate before any real-runtime/physical-device preview
   work), or, if preferred first, a small standalone follow-up to add an empty/populated
