@@ -37,7 +37,7 @@ Future R2 objects use the server-derived key shape:
 tenant/{tenant_id}/{domain}/{resource_id}/{filename}
 ```
 
-`R2StorageService` reads `{tenant_id}` only from the scoped `TenantContext`; callers cannot provide a tenant prefix or arbitrary object key. Every segment is restricted to safe single-segment characters, so traversal such as `../` and embedded separators is rejected. No controller receives bucket-listing capability. This foundation slice does not migrate data by itself; **Product Media is the first, and so far only, consumer** — see below. Documents, invoices, generic attachments, and storefront assets are still explicitly out of scope.
+`R2StorageService` reads `{tenant_id}` only from the scoped `TenantContext`; callers cannot provide a tenant prefix or arbitrary object key. Every segment is restricted to safe single-segment characters, so traversal such as `../` and embedded separators is rejected. No controller receives bucket-listing capability. This foundation slice does not migrate data by itself. **Product Media is the first consumer**, and category images now reuse the same private tenant-scoped R2 boundary for new writes when their own flag is enabled. Documents, invoices, generic attachments, and unrelated storefront assets remain out of scope.
 
 ### Manual smoke test command
 
@@ -72,6 +72,36 @@ credentials or network calls. A real Production smoke test has already passed
 Cloudflare R2 bucket, with `nibras-api`'s Railway R2 variables configured
 (AWJ-R2-3). Production execution of the smoke test remains a manual, explicit
 operator action; it is never invoked automatically.
+
+
+## Category image durability
+
+Product-category images can opt into the same private R2 credentials without a
+schema migration. New writes are controlled by
+`CATEGORY_MEDIA_R2_ENABLED` (`config/category_media.php`) and use:
+
+```text
+tenant/{tenant_id}/product-category-media/{category_id}/{filename}
+```
+
+The filename is server-generated. The original merchant filename never becomes
+part of the object key. The existing `image_path` column remains the pointer:
+R2-backed paths have the server-derived `tenant/.../product-category-media/...`
+shape, while legacy local/document paths keep their old
+`product-category-media/{tenant_id}/{category_id}/...` shape. Reads and
+deletes branch from that stored shape, so existing rows remain backward
+compatible and no database migration is required.
+
+Both authenticated AWJ downloads and public storefront category-media reads keep
+their existing authorization/publication checks before touching storage.
+`R2StorageService` reconstructs the tenant prefix from `TenantContext`; it
+never trusts a caller-supplied tenant prefix or exposes a public bucket URL.
+
+Production cutover is explicit: keep the flag off until the R2 credentials are
+confirmed, then set `CATEGORY_MEDIA_R2_ENABLED=true`. Images whose old local
+bytes were already lost during a previous ephemeral-container replacement cannot
+be reconstructed by this change and must be uploaded once more after cutover.
+
 
 ## Product Media R2 migration (AWJ-R2-4)
 
