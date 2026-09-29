@@ -38,7 +38,7 @@ When a task is assigned **بنظام الأفق**:
 
 Stop and ask the owner only when one of these is reached:
 
-- Merge is required but no merge authorization exists.
+- A merge would fall outside the currently approved Horizon scope, or the owner explicitly revoked/limited Horizon merge authority.
 - Deploy, Production release, migration execution, destructive operation, or irreversible external action is required.
 - Scope must materially expand.
 - A financial/accounting rule must change.
@@ -174,13 +174,17 @@ When the final Slice is complete, produce one Horizon-level closure report conta
 
 ## 11. Merge and deployment authority
 
-Horizon mode does not override owner authorization.
+The owner's instruction **"نفذ بنظام الأفق"** (or an equivalent explicit Horizon instruction) is itself authorization for **continuous in-scope Slice merging for that Horizon**.
 
-- Never deploy to Production without explicit owner approval.
+That authorization is narrow and bounded:
+
+- A Slice may be merged only after its scoped implementation is complete, required tests pass, relevant CI/review findings are resolved, and no unresolved P1/P2 or equivalent blocking finding remains.
+- After a ready Slice is merged, continue automatically from the newest `origin/main` to the next planned Slice.
+- The authorization applies only to branches/PRs that belong to the approved Horizon. It does not authorize unrelated cleanup, refactors, or scope expansion.
+- If the owner explicitly says not to merge, or limits merge authority for a particular Slice/Horizon, that newer instruction wins.
+- Never deploy to Production without separate explicit owner approval.
 - Never perform a Production release merely because all Slices are merged.
-- Merge only under the owner's current explicit authorization.
-- If the owner has explicitly authorized continuous merging for the current Horizon, each ready Slice may be merged and execution may continue automatically.
-- When that authorization is absent, stop only at the merge gate; do not discard the completed Slice work.
+- Database migrations with operational/destructive Production impact, irreversible external actions, or scope-changing architectural decisions remain separate decision gates.
 
 ## 12. Default interpretation
 
@@ -190,4 +194,4 @@ When the owner says only:
 
 interpret it as:
 
-> Research first where relevant — including official documentation and visual inspection — define ordered Slices, implement each Slice on its own branch, test it, open and harden its PR, merge only when authorized, then continue automatically to the next Slice until the Horizon is complete or a true decision gate is reached.
+> Research first where relevant — including official documentation and visual inspection — define ordered Slices, implement each Slice on its own branch, test it, open and harden its PR, merge each ready in-scope Slice under the Horizon authorization, then continue automatically to the next Slice until the Horizon is complete or a true decision gate is reached. Deploy/Production still requires separate explicit approval.
