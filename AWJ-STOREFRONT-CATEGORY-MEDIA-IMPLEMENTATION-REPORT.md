@@ -10,7 +10,8 @@
 |---|---|
 | Base SHA | `7bd9e904` (`origin/main` عند بدء التنفيذ) |
 | Branch | `fix/storefront-category-image-color` |
-| Head SHA | `a768c5c17d5960393d9c7931e94f9a574988ca45` |
+| Head SHA (implementation) | `a768c5c17d5960393d9c7931e94f9a574988ca45` |
+| PR tip (includes this report) | `99b355d0670540cee399d9096e57cd28b77d41a1` |
 | PR | [#1110 — Fix AWJ storefront category image and color presentation](https://github.com/safwan5001-source/Nebrax/pull/1110) |
 | Merge | لم يتم |
 | Deploy | لم يتم |
