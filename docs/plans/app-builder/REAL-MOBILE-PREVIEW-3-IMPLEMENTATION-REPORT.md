@@ -5,6 +5,8 @@
 **Repository:** `safwan5001-source/Nebrax`
 **Branch:** `mobile-preview-3-claude-code`
 **Base SHA:** `7bef75797ab608aeccb66056e049861ac787a102` (latest `origin/main` at task start)
+**PR:** #1097
+**Head SHA (this evidence-pass update):** `28b12671b62c95a5a6f43b0a4f5badbfcef9bec7`
 **Scope:** Web-only (`web/`). No backend, no mobile Flutter runtime, no schema/API change.
 
 ## 0. Note on the task file named in the request
