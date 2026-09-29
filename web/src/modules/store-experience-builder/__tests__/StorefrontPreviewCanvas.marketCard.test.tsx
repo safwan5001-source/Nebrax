@@ -97,7 +97,15 @@ describe("web customizer preview — compact header style vs. mobile viewport", 
       <StorefrontPreviewCanvas config={config} locale="en" viewport="desktop" />,
     );
     expect(view.getByRole("navigation", { name: "Categories" })).toBeTruthy();
-    const grid = view.container.querySelector(".mt-4.grid.gap-3");
+    // Scoped to the New Arrivals shelf specifically: the homepage categories
+    // grid below now also resolves to `gap-3` at this (non-Market) config —
+    // see `categoriesGap` — so the previous unscoped `.mt-4.grid.gap-3`
+    // selector would otherwise match whichever of the two sections happens
+    // to render first in the DOM instead of the shelf this test means to
+    // check.
+    const grid = view.container.querySelector(
+      'section[aria-labelledby="preview-arrivals"] ul.grid',
+    );
     expect(grid?.className).toContain("grid-cols-4");
     expect(view.queryByRole("navigation", { name: "Home" })).toBeNull();
   });
@@ -150,5 +158,70 @@ describe("web customizer preview — New Arrivals column count follows the simul
     );
     expect(arrivalsGrid).not.toBeNull();
     expect(arrivalsGrid?.className).toContain(expectedClass);
+  });
+
+  it("widens the desktop tier to 5 columns for AWJ Market", () => {
+    const marketConfig = {
+      ...DEFAULT_PRESENTATION_CONFIG,
+      themePreset: "awj-market" as const,
+    };
+    const { container } = render(
+      <StorefrontPreviewCanvas config={marketConfig} locale="en" viewport="desktop" />,
+    );
+    const arrivalsGrid = container.querySelector(
+      'section[aria-labelledby="preview-arrivals"] ul.grid',
+    );
+    expect(arrivalsGrid?.className).toContain("grid-cols-5");
+  });
+});
+
+/**
+ * Regression coverage for AWJ Market Full Theme Completion: the homepage
+ * categories grid (`CategoriesSection.tsx`) got its own dense preset for
+ * Market (more/tighter tiles). This preview section mirrors it with the same
+ * resolve-from-`viewport` technique as `cardImageHeight`/`newArrivalsColumns`
+ * above, for the same reason: real `sm:`/`lg:`/`xl:` prefixes would evaluate
+ * against this host browser, not the simulated device.
+ */
+describe("web customizer preview — categories grid follows the simulated viewport and theme", () => {
+  afterEach(() => {
+    cleanup();
+  });
+
+  it.each([
+    ["mobile", "grid-cols-2"],
+    ["tablet", "grid-cols-3"],
+    ["desktop", "grid-cols-6"],
+  ] as const)("AWJ Modern renders %s columns at the %s simulated viewport", (viewport, expectedClass) => {
+    const { container } = render(
+      <StorefrontPreviewCanvas
+        config={DEFAULT_PRESENTATION_CONFIG}
+        locale="en"
+        viewport={viewport}
+      />,
+    );
+    const categoriesGrid = container.querySelector(
+      'section[aria-labelledby="preview-categories"] ul.grid',
+    );
+    expect(categoriesGrid?.className).toContain(expectedClass);
+  });
+
+  it.each([
+    ["mobile", "grid-cols-3"],
+    ["tablet", "grid-cols-4"],
+    ["desktop", "grid-cols-8"],
+  ] as const)("AWJ Market renders %s columns at the %s simulated viewport", (viewport, expectedClass) => {
+    const marketConfig = {
+      ...DEFAULT_PRESENTATION_CONFIG,
+      themePreset: "awj-market" as const,
+    };
+    const { container } = render(
+      <StorefrontPreviewCanvas config={marketConfig} locale="en" viewport={viewport} />,
+    );
+    const categoriesGrid = container.querySelector(
+      'section[aria-labelledby="preview-categories"] ul.grid',
+    );
+    expect(categoriesGrid?.className).toContain(expectedClass);
+    expect(categoriesGrid?.className).toContain("gap-2");
   });
 });

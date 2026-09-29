@@ -1,7 +1,9 @@
 import { getTranslations } from "next-intl/server";
 import { ProductCard } from "@/components/products/ProductCard";
+import { ProductCarousel } from "@/components/products/ProductCarousel";
 import { PRODUCT_CARD_FIELDS } from "@/lib/data/cached";
 import { cachedListProducts } from "@/lib/data/products";
+import type { ThemePresetId } from "@/lib/presentation/tokens";
 
 interface NewArrivalsProps {
   basePath: string;
@@ -9,6 +11,8 @@ interface NewArrivalsProps {
   country: string;
   currency?: string;
   limit?: number;
+  /** See `CategoriesSection`'s identical prop doc for why this is explicit. */
+  themePreset?: ThemePresetId;
 }
 
 /**
@@ -28,7 +32,9 @@ export async function NewArrivals({
   country,
   currency,
   limit = 8,
+  themePreset,
 }: NewArrivalsProps) {
+  const isMarket = themePreset === "awj-market";
   const products = await cachedListProducts(
     { limit, sort: "-available_on", fields: PRODUCT_CARD_FIELDS },
     { locale, country },
@@ -54,6 +60,28 @@ export async function NewArrivals({
           {t("browseCollection")}
         </p>
       </div>
+    );
+  }
+
+  // AWJ Market's benchmark browses this shelf as a horizontally scrollable
+  // rail, not a fixed grid — see the coverage matrix's product-rail evidence.
+  // `ProductCarousel` already existed (used nowhere before this) and takes
+  // the exact same `Product[]`/`ProductCard` contract this shelf already
+  // fetches, so no new data path or component fork is introduced.
+  if (isMarket) {
+    return (
+      <ProductCarousel
+        products={products}
+        basePath={basePath}
+        currency={currency}
+        listId="home_new_arrivals"
+        listName="Home — New arrivals"
+        slidesPerView={2}
+        breakpoints={{
+          640: { slidesPerView: 3, spaceBetween: 16 },
+          1024: { slidesPerView: 5, spaceBetween: 20 },
+        }}
+      />
     );
   }
 

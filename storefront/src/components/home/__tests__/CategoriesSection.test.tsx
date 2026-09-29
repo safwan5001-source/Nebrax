@@ -1,5 +1,5 @@
-import { render } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { cleanup, render } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 function category(overrides: Record<string, unknown>) {
   const base = {
@@ -14,7 +14,10 @@ function category(overrides: Record<string, unknown>) {
   return { ...base, permalink: base.id };
 }
 
-async function loadSection(getCategories: ReturnType<typeof vi.fn>) {
+async function loadSection(
+  getCategories: ReturnType<typeof vi.fn>,
+  themePreset?: "awj-market",
+) {
   vi.resetModules();
   vi.doMock("next-intl/server", () => ({
     getTranslations: vi.fn(async () => (key: string) => key),
@@ -24,10 +27,19 @@ async function loadSection(getCategories: ReturnType<typeof vi.fn>) {
   const { CategoriesSection } = await import(
     "@/components/home/CategoriesSection"
   );
-  return CategoriesSection({ basePath: "/sa/ar", locale: "ar", country: "sa" });
+  return CategoriesSection({
+    basePath: "/sa/ar",
+    locale: "ar",
+    country: "sa",
+    themePreset,
+  });
 }
 
 describe("CategoriesSection", () => {
+  afterEach(() => {
+    cleanup();
+  });
+
   it("links every tile to the authoritative category route", async () => {
     const element = await loadSection(
       vi.fn().mockResolvedValue({
@@ -134,5 +146,66 @@ describe("CategoriesSection", () => {
     expect(link.querySelector("img")).toHaveAttribute("alt", "هواتف");
     expect(link.querySelector('[aria-hidden="true"]')).toBeNull();
     expect(link.textContent).toContain("إلكترونيات");
+  });
+
+  describe("AWJ Market density", () => {
+    it("raises the tile ceiling above the default AWJ Modern limit", async () => {
+      const element = await loadSection(
+        vi.fn().mockResolvedValue({
+          data: Array.from({ length: 20 }, (_, i) =>
+            category({ id: `c${i}`, name: `قسم ${i}` }),
+          ),
+        }),
+        "awj-market",
+      );
+
+      const { getAllByRole } = render(element as React.JSX.Element);
+      const links = getAllByRole("link").map((a) => a.getAttribute("href"));
+      // 18 tiles plus the catch-all into the catalogue.
+      expect(links).toHaveLength(19);
+      expect(links).toContain("/sa/ar/products");
+    });
+
+    it("does not raise the ceiling for AWJ Modern (no theme regression)", async () => {
+      const element = await loadSection(
+        vi.fn().mockResolvedValue({
+          data: Array.from({ length: 20 }, (_, i) =>
+            category({ id: `c${i}`, name: `قسم ${i}` }),
+          ),
+        }),
+      );
+
+      const { getAllByRole } = render(element as React.JSX.Element);
+      // Unchanged from the pre-Market behaviour asserted above: 12 + catch-all.
+      expect(getAllByRole("link")).toHaveLength(13);
+    });
+
+    it("denser grid columns and tighter tile padding than AWJ Modern", async () => {
+      // More than two categories: the short-list branch (`shown.length <= 2`)
+      // keeps a fixed, theme-independent grid regardless of preset, so this
+      // needs enough tiles to reach the theme-aware branch either theme uses.
+      const data = [
+        category({}),
+        category({ id: "c2", name: "المنزل" }),
+        category({ id: "c3", name: "أخرى" }),
+      ];
+      const marketEl = await loadSection(
+        vi.fn().mockResolvedValue({ data }),
+        "awj-market",
+      );
+      const modernEl = await loadSection(vi.fn().mockResolvedValue({ data }));
+
+      const market = render(marketEl as React.JSX.Element);
+      const grid = market.container.querySelector("ul");
+      expect(grid?.className).toContain("grid-cols-3");
+      expect(grid?.className).toContain("gap-2");
+      const tile = market.getAllByRole("link")[0];
+      expect(tile.className).toContain("px-3");
+      market.unmount();
+
+      const modern = render(modernEl as React.JSX.Element);
+      const modernTile = modern.getAllByRole("link")[0];
+      expect(modernTile.className).toContain("px-4");
+    });
   });
 });

@@ -2,6 +2,7 @@ import type { Product } from "@spree/sdk";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { PublishedThemeMarkerProvider } from "@/components/layout/PublishedThemeMarker";
 import { PRODUCT_PAGE_EXPAND } from "@/lib/data/cached";
 import { ProductDetails } from "./ProductDetails";
 
@@ -262,5 +263,58 @@ describe("ProductDetails — AWJ variant-managed products (STORE-UI-3)", () => {
 
     expect(screen.getByText("pricedByOption")).toBeInTheDocument();
     expect(screen.queryByText("$50.00")).not.toBeInTheDocument();
+  });
+});
+
+describe("ProductDetails — AWJ Market mobile purchase bar", () => {
+  beforeEach(() => {
+    mockAddItem.mockClear();
+    mockSurface.current = "dtc";
+  });
+
+  it("pins the existing quantity/add-to-cart row to the bottom below the desktop breakpoint", () => {
+    render(
+      <PublishedThemeMarkerProvider themePreset="awj-market">
+        <ProductDetails
+          product={productWithoutCustomVariants}
+          basePath="/us/en"
+        />
+      </PublishedThemeMarkerProvider>,
+    );
+
+    // Same control, not a duplicate: exactly one add-to-cart button exists,
+    // just repositioned by CSS for the simulated/mobile breakpoint.
+    expect(screen.getAllByText("addToCart")).toHaveLength(1);
+    const row = screen.getByText("addToCart").closest("div.mt-5, div.fixed");
+    expect(row?.className).toContain("fixed");
+    expect(row?.className).toContain("md:static");
+  });
+
+  it("keeps AWJ Modern's row static (no theme regression)", () => {
+    render(
+      <ProductDetails
+        product={productWithoutCustomVariants}
+        basePath="/us/en"
+      />,
+    );
+
+    const row = screen.getByText("addToCart").closest("div");
+    expect(row?.className).not.toContain("fixed");
+  });
+
+  it("add-to-cart still sends the same authoritative arguments under Market", async () => {
+    const user = userEvent.setup();
+    render(
+      <PublishedThemeMarkerProvider themePreset="awj-market">
+        <ProductDetails
+          product={productWithoutCustomVariants}
+          basePath="/us/en"
+        />
+      </PublishedThemeMarkerProvider>,
+    );
+
+    await user.click(screen.getByText("addToCart"));
+
+    expect(mockAddItem).toHaveBeenCalledWith("product-1", 1, "base", null);
   });
 });

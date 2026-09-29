@@ -1,6 +1,6 @@
 "use client";
 
-import { Home, LayoutGrid, Search, ShoppingBag, User } from "lucide-react";
+import { Eye, Home, LayoutGrid, Search, ShoppingBag, User } from "lucide-react";
 import type { CSSProperties, ReactNode } from "react";
 import { OfficialStoreBadge } from "./OfficialStoreBadge";
 import { ContactDetail, contactDetailText } from "./ContactDetail";
@@ -142,6 +142,7 @@ export function StorefrontPreviewCanvas({
       : null;
   const density = config.density === "compact" ? "compact" : "comfortable";
   const cardPad = config.productCard === "compact" ? "p-2.5" : "p-3";
+  const isMarket = config.themePreset === "awj-market";
   // The exact fixed heights ProductCard.tsx itself resolves to at each
   // breakpoint — not the `sm:`/`md:` classes themselves. This preview frame
   // is a plain, width-constrained div rendered inside the real Customizer
@@ -155,10 +156,10 @@ export function StorefrontPreviewCanvas({
   // published `sm` tier (640–767px), so only base/`md` are reachable here.
   const cardImageHeight =
     viewport === "mobile"
-      ? config.themePreset === "awj-market"
+      ? isMarket
         ? "h-28"
         : "h-36"
-      : config.themePreset === "awj-market"
+      : isMarket
         ? "h-40"
         : "h-52";
   // Same host-browser-vs-simulated-device problem as `cardImageHeight` above,
@@ -166,13 +167,38 @@ export function StorefrontPreviewCanvas({
   // the homepage shelf, which the published storefront renders via
   // `NewArrivals.tsx` — not the (differently-breakpointed) `ProductGrid.tsx`
   // used for catalog/category listing pages. `NewArrivals.tsx` uses
-  // `grid-cols-2 sm:grid-cols-3 lg:grid-cols-4` (`sm` at 640px, `lg` at
-  // 1024px): mobile(390) sits below `sm` for 2 columns, tablet(768) sits at
-  // or above `sm` but below `lg` for 3, and desktop(1280) sits at or above
-  // `lg` for 4 — all three of this preview's simulated widths land in a
-  // different tier here.
+  // `grid-cols-2 sm:grid-cols-3 lg:grid-cols-4` for every theme but Market,
+  // which widens the desktop tier to 5 (`sm` at 640px, `lg` at 1024px):
+  // mobile(390) sits below `sm` for 2 columns, tablet(768) sits at or above
+  // `sm` but below `lg` for 3, and desktop(1280) sits at or above `lg` for 4
+  // (Modern) or 5 (Market) — all three of this preview's simulated widths
+  // land in a different tier here.
   const newArrivalsColumns =
-    viewport === "mobile" ? "grid-cols-2" : viewport === "tablet" ? "grid-cols-3" : "grid-cols-4";
+    viewport === "mobile"
+      ? "grid-cols-2"
+      : viewport === "tablet"
+        ? "grid-cols-3"
+        : isMarket
+          ? "grid-cols-5"
+          : "grid-cols-4";
+  // Same resolve-from-`viewport` requirement as `newArrivalsColumns` above —
+  // real `sm:`/`lg:`/`xl:` prefixes would evaluate against this host browser,
+  // not the simulated device. Mirrors `CategoriesSection.tsx`'s real
+  // breakpoints (`sm` 640px, `lg` 1024px, `xl` 1280px) for both the Market
+  // and default column counts, so the preview and the published homepage
+  // agree at every simulated width instead of only by coincidence.
+  const categoriesColumns = isMarket
+    ? viewport === "mobile"
+      ? "grid-cols-3"
+      : viewport === "tablet"
+        ? "grid-cols-4"
+        : "grid-cols-8"
+    : viewport === "mobile"
+      ? "grid-cols-2"
+      : viewport === "tablet"
+        ? "grid-cols-3"
+        : "grid-cols-6";
+  const categoriesGap = isMarket ? "gap-2" : "gap-3";
   const enabledSocial = config.social.flatMap((item) => {
     if (!item.enabled || !isOfficialSocialNetwork(item.network)) return [];
     const href = sanitizeExternalUrl(item.url);
@@ -405,13 +431,16 @@ export function StorefrontPreviewCanvas({
               return (
                 <section key="categories" aria-labelledby="preview-categories">
                   <SectionRule title={t("browseCategories")} action={t("viewAll")} />
-                  <ul className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+                  <ul className={cn("mt-4 grid", categoriesGap, categoriesColumns)}>
                     {PREVIEW_CATEGORIES.map((category) => {
                       const accent = categoryAccent(category.color);
                       return (
                         <li key={category.id}>
                           <div
-                            className="flex h-full flex-col justify-center gap-0.5 rounded-store border border-store-border border-s-[3px] bg-store-surface px-4 py-3.5"
+                            className={cn(
+                              "flex h-full flex-col justify-center gap-0.5 rounded-store border border-store-border border-s-[3px] bg-store-surface",
+                              isMarket ? "px-3 py-2.5" : "px-4 py-3.5",
+                            )}
                             style={{ borderInlineStartColor: accent.rule }}
                           >
                             {accent.isMerchantColor && (
@@ -421,10 +450,15 @@ export function StorefrontPreviewCanvas({
                                 style={{ backgroundColor: accent.rule }}
                               />
                             )}
-                            <span className="line-clamp-2 text-sm font-bold leading-snug text-store-foreground">
+                            <span
+                              className={cn(
+                                "line-clamp-2 font-bold leading-snug text-store-foreground",
+                                isMarket ? "text-xs" : "text-sm",
+                              )}
+                            >
                               {category.name[locale]}
                             </span>
-                            {category.childCount > 0 && (
+                            {category.childCount > 0 && !isMarket && (
                               <span className="text-xs text-store-muted-foreground tabular-nums">
                                 {category.childCount}
                               </span>
@@ -448,7 +482,24 @@ export function StorefrontPreviewCanvas({
                         key={product.id}
                         className="overflow-hidden rounded-store border border-store-border bg-store-surface"
                       >
-                        <div className={cn(cardImageHeight, "bg-store-surface-muted")} />
+                        <div
+                          className={cn(
+                            cardImageHeight,
+                            "relative bg-store-surface-muted",
+                          )}
+                        >
+                          {/* Decorative only — the real quick-view dialog
+                              (`QuickView.tsx`) needs a live cart/store
+                              context this static preview frame doesn't
+                              have. This mirrors its trigger's exact
+                              position/icon so a merchant sees the
+                              affordance before publishing. */}
+                          {isMarket && (
+                            <span className="absolute bottom-2 start-2 inline-flex size-8 items-center justify-center rounded-full bg-store-surface/90 text-store-foreground shadow-sm">
+                              <Eye className="size-4" aria-hidden="true" />
+                            </span>
+                          )}
+                        </div>
                         <div className={cardPad}>
                           <p className="text-[11px] text-store-muted-foreground">
                             {product.category[locale]}

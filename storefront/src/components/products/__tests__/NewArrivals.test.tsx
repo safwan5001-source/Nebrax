@@ -11,8 +11,26 @@ vi.mock("@/components/products/ProductCard", () => ({
   ),
 }));
 
+vi.mock("@/components/products/ProductCarousel", () => ({
+  ProductCarousel: (props: {
+    products: { id: string }[];
+    slidesPerView?: number;
+    listId?: string;
+    listName?: string;
+  }) => (
+    <div
+      data-testid="product-carousel"
+      data-count={props.products.length}
+      data-slides-per-view={props.slidesPerView}
+      data-list-id={props.listId}
+      data-list-name={props.listName}
+    />
+  ),
+}));
+
 async function loadNewArrivals(
   listProducts: ReturnType<typeof vi.fn>,
+  themePreset?: "awj-market",
 ): Promise<{ element: React.JSX.Element; listProducts: typeof listProducts }> {
   vi.resetModules();
   vi.doMock("next-intl/server", () => ({
@@ -21,6 +39,22 @@ async function loadNewArrivals(
   vi.doMock("@/components/products/ProductCard", () => ({
     ProductCard: ({ product }: { product: { id: string } }) => (
       <div data-testid="product-card" data-id={product.id} />
+    ),
+  }));
+  vi.doMock("@/components/products/ProductCarousel", () => ({
+    ProductCarousel: (props: {
+      products: { id: string }[];
+      slidesPerView?: number;
+      listId?: string;
+      listName?: string;
+    }) => (
+      <div
+        data-testid="product-carousel"
+        data-count={props.products.length}
+        data-slides-per-view={props.slidesPerView}
+        data-list-id={props.listId}
+        data-list-name={props.listName}
+      />
     ),
   }));
   vi.doMock("@/lib/data/products", () => ({
@@ -33,6 +67,7 @@ async function loadNewArrivals(
     locale: "ar",
     country: "sa",
     currency: "SAR",
+    themePreset,
   });
 
   return { element, listProducts };
@@ -85,5 +120,34 @@ describe("NewArrivals (AWJ catalog)", () => {
     // A grid, not a flex row: one product keeps a card's width instead of
     // expanding to the full measure.
     expect(container.querySelector("ul")?.className).toContain("grid-cols-2");
+  });
+
+  it("renders as a carousel for AWJ Market, starting from two slides on mobile (never one)", async () => {
+    const { element: marketEl } = await loadNewArrivals(
+      vi.fn().mockResolvedValue({ data: [{ id: "p1" }] }),
+      "awj-market",
+    );
+
+    const market = render(marketEl);
+    const carousel = market.getByTestId("product-carousel");
+    // The storefront's locked responsive baseline requires two-column
+    // product browsing on mobile; `ProductCarousel`'s own default
+    // (slidesPerView=1) would silently regress that, so this shelf must
+    // override it explicitly.
+    expect(carousel.dataset.slidesPerView).toBe("2");
+    expect(carousel.dataset.listId).toBe("home_new_arrivals");
+    expect(carousel.dataset.count).toBe("1");
+  });
+
+  it("keeps AWJ Modern as a static grid — no theme regression", async () => {
+    const { element: modernEl } = await loadNewArrivals(
+      vi.fn().mockResolvedValue({ data: [{ id: "p1" }] }),
+    );
+
+    const modern = render(modernEl);
+    expect(modern.queryByTestId("product-carousel")).toBeNull();
+    expect(modern.container.querySelector("ul")?.className).toContain(
+      "lg:grid-cols-4",
+    );
   });
 });

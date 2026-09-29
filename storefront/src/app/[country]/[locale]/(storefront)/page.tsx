@@ -23,6 +23,7 @@ import {
   customContentOf,
   featuredContentOf,
 } from "@/lib/presentation/section-content";
+import type { ThemePresetId } from "@/lib/presentation/tokens";
 
 interface HomePageProps {
   params: Promise<{
@@ -63,6 +64,7 @@ export default async function HomePage({ params }: HomePageProps) {
         storeName={storeName || null}
         headline={heroHeadline}
         subheadline={heroSubheadline}
+        themePreset={presentation?.themePreset}
       />
     ),
     categories: (
@@ -70,6 +72,7 @@ export default async function HomePage({ params }: HomePageProps) {
         basePath={basePath}
         locale={locale}
         country={country}
+        themePreset={presentation?.themePreset}
       />
     ),
     newArrivals: (
@@ -78,6 +81,7 @@ export default async function HomePage({ params }: HomePageProps) {
         locale={locale}
         country={country}
         currency={currency}
+        themePreset={presentation?.themePreset}
       />
     ),
     wholesale: <WholesaleSection basePath={basePath} locale={locale} />,
@@ -92,6 +96,7 @@ export default async function HomePage({ params }: HomePageProps) {
         basePath,
         locale,
         currency,
+        themePreset: presentation.themePreset,
         apps: presentation.apps,
         benefitsTitle: homeCopy("benefits"),
         featuredTitle: homeCopy("featured"),
@@ -119,6 +124,7 @@ async function publishedNodes(
     basePath: string;
     locale: string;
     currency?: string;
+    themePreset?: ThemePresetId;
     apps: {
       iosUrl: string;
       androidUrl: string;
@@ -184,6 +190,7 @@ async function publishedNodes(
           key={section.id}
           sectionId={section.id}
           content={content}
+          themePreset={ctx.themePreset}
         />,
       );
       continue;
@@ -203,6 +210,7 @@ async function publishedNodes(
           currency={ctx.currency}
           title={ctx.featuredTitle}
           headingId={`featured-${section.id}`}
+          themePreset={ctx.themePreset}
         />,
       );
       continue;

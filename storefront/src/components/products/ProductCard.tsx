@@ -7,6 +7,7 @@ import { memo, useState } from "react";
 import { usePublishedProductCard } from "@/components/layout/PublishedCardStyle";
 import { usePublishedThemeMarker } from "@/components/layout/PublishedThemeMarker";
 import { HiddenPricePrompt } from "@/components/products/HiddenPricePrompt";
+import { QuickView } from "@/components/products/QuickView";
 import { WishlistButton } from "@/components/products/WishlistButton";
 import { ProductImage } from "@/components/ui/product-image";
 import { useCart } from "@/contexts/CartContext";
@@ -118,6 +119,21 @@ export const ProductCard = memo(function ProductCard({
           productId={product.id}
           className="absolute top-2 end-2"
         />
+        {/*
+          AWJ Market only (see the coverage matrix's product-card evidence).
+          Bottom-start, not top-start, so it never shares a corner with the
+          sale badge above — both can be true for the same card at once.
+        */}
+        {themePreset === "awj-market" && surface !== "wholesale" && (
+          <div className="absolute bottom-2 start-2">
+            <QuickView
+              product={product}
+              basePath={basePath}
+              categoryId={categoryId}
+              isVariantManaged={isVariantManaged}
+            />
+          </div>
+        )}
       </div>
 
       {/* Content */}
