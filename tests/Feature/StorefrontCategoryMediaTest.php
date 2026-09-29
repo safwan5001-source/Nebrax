@@ -8,10 +8,13 @@ use App\Models\SalesChannel;
 use App\Models\Storefront;
 use App\Models\StorefrontDomain;
 use App\Models\Tenant;
+use App\Services\R2StorageService;
 use App\Tenancy\TenantContext;
+use Aws\S3\S3ClientInterface;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Mockery;
 use Tests\TestCase;
 
 class StorefrontCategoryMediaTest extends TestCase
@@ -23,6 +26,12 @@ class StorefrontCategoryMediaTest extends TestCase
         parent::setUp();
         Storage::fake('local');
         config(['document_center.storage.driver' => 'local', 'document_center.storage.disk' => 'local']);
+    }
+
+    protected function tearDown(): void
+    {
+        Mockery::close();
+        parent::tearDown();
     }
 
     /** @return array{tenant: Tenant, category: ProductCategory, domain: StorefrontDomain} */
@@ -96,6 +105,44 @@ class StorefrontCategoryMediaTest extends TestCase
             ->assertOk()->assertHeader('Content-Type', 'image/webp');
         $this->getJson("http://{$otherDomain->hostname}/store/v1/media/categories/{$category->id}")
             ->assertNotFound();
+    }
+
+
+    public function test_r2_category_image_bytes_are_served_through_the_same_storefront_tenant_boundary(): void
+    {
+        ['tenant' => $tenant, 'category' => $category, 'domain' => $domain] =
+            $this->seedStore('category-r2.example.com');
+
+        $category->update([
+            'image_path' => "tenant/{$tenant->id}/product-category-media/{$category->id}/category.webp",
+            'image_original_name' => 'category.webp',
+            'image_mime_type' => 'image/webp',
+            'image_size' => 7,
+        ]);
+
+        config()->set('filesystems.disks.r2', [
+            'key' => 'placeholder-key',
+            'secret' => 'placeholder-secret',
+            'bucket' => 'awj-category-media-test',
+            'endpoint' => 'https://placeholder.r2.cloudflarestorage.com',
+            'region' => 'auto',
+            'use_path_style_endpoint' => false,
+        ]);
+
+        $client = Mockery::mock(S3ClientInterface::class);
+        $client->shouldReceive('getObject')->once()->with(Mockery::on(
+            fn (array $args): bool => $args['Bucket'] === 'awj-category-media-test'
+                && $args['Key'] === "tenant/{$tenant->id}/product-category-media/{$category->id}/category.webp",
+        ))->andReturn(['Body' => 'r2-data']);
+
+        $this->app->instance(
+            R2StorageService::class,
+            new R2StorageService(app(TenantContext::class), $client),
+        );
+
+        $this->get("http://{$domain->hostname}/store/v1/media/categories/{$category->id}")
+            ->assertOk()
+            ->assertHeader('Content-Type', 'image/webp');
     }
 
     public function test_missing_category_image_is_a_non_revealing_not_found(): void
