@@ -1,12 +1,13 @@
 /**
  * The merchant's own category colour, prepared for presentation.
  *
- * `store/v1/categories` exposes no image, so colour is the only visual
- * identity a category actually has. It is used as an accent on an otherwise
- * neutral tile rather than as the tile's surface: a grid of saturated or
- * pastel blocks reads as decoration and makes every category shout at the same
- * volume, where a calm grid with a coloured edge keeps the category names the
- * thing being read.
+ * `store/v1/categories` exposes the merchant's authoritative image when one is
+ * present. The merchant colour is the visual fallback, used as an accent on an
+ * otherwise neutral tile rather than as the tile's surface: a grid of saturated
+ * or pastel blocks reads as decoration and makes every category shout at the
+ * same volume, where a calm grid with a coloured edge keeps the category names
+ * the thing being read. When neither image nor valid colour exists, the tile
+ * stays neutral.
  *
  * The colour reaches us as a free-text column and ends up in a `style`
  * attribute, so it is validated rather than trusted: only a plain hex literal
