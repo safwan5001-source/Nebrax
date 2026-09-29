@@ -4,6 +4,7 @@ import { Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { QuantityPickerField } from "@/components/cart/QuantityPickerField";
+import { usePublishedThemeMarker } from "@/components/layout/PublishedThemeMarker";
 import { Button } from "@/components/ui/button";
 import { ProductImage } from "@/components/ui/product-image";
 import {
@@ -97,6 +98,7 @@ export function CartLine({
 }: CartLineProps) {
   const t = useTranslations("cart");
   const tc = useTranslations("common");
+  const isMarket = usePublishedThemeMarker() === "awj-market";
 
   const readOnly = density === "summary";
   const unavailable = !view.available;
@@ -119,8 +121,8 @@ export function CartLine({
     <div
       className={cn(
         "flex gap-3 sm:gap-4",
-        density === "page" && "py-4",
-        density === "drawer" && "py-4",
+        density === "page" && (isMarket ? "py-3" : "py-4"),
+        density === "drawer" && (isMarket ? "py-3" : "py-4"),
         density === "summary" && "py-3",
       )}
       data-testid="cart-line"

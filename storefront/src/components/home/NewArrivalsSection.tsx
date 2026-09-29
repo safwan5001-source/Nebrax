@@ -3,10 +3,29 @@ import { Suspense } from "react";
 import { SectionHeading } from "@/components/home/SectionHeading";
 import { NewArrivals } from "@/components/products/NewArrivals";
 import { ProductCardSkeleton } from "@/components/products/ProductCardSkeleton";
+import type { ThemePresetId } from "@/lib/presentation/tokens";
 
 const SHELF_SIZE = 8;
 
-function ShelfSkeleton() {
+function ShelfSkeleton({ isMarket }: { isMarket: boolean }) {
+  if (isMarket) {
+    // Approximates the carousel's own 2/3/5-per-view rhythm (see
+    // `NewArrivals.tsx`) so the loading state doesn't jump from a grid to a
+    // horizontal rail the instant the real shelf resolves.
+    return (
+      <div className="flex gap-3 overflow-hidden md:gap-5" aria-hidden="true">
+        {Array.from({ length: 5 }, (_, i) => i).map((i) => (
+          <div
+            key={i}
+            className="w-[calc(50%-0.375rem)] shrink-0 sm:w-[calc(33.333%-0.5rem)] lg:w-[calc(20%-1rem)]"
+          >
+            <ProductCardSkeleton />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   return (
     <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 md:gap-5">
       {Array.from({ length: SHELF_SIZE }, (_, i) => i).map((i) => (
@@ -23,6 +42,8 @@ interface NewArrivalsSectionProps {
   locale: string;
   country: string;
   currency?: string;
+  /** See `CategoriesSection`'s identical prop doc for why this is explicit. */
+  themePreset?: ThemePresetId;
 }
 
 /**
@@ -35,11 +56,13 @@ export async function NewArrivalsSection({
   locale,
   country,
   currency,
+  themePreset,
 }: NewArrivalsSectionProps) {
   const t = await getTranslations({
     locale: locale as Locale,
     namespace: "home",
   });
+  const isMarket = themePreset === "awj-market";
 
   return (
     <section aria-labelledby="home-new-arrivals">
@@ -49,13 +72,14 @@ export async function NewArrivalsSection({
         action={{ href: `${basePath}/products`, label: t("viewAll") }}
       />
       <div className="mt-3">
-        <Suspense fallback={<ShelfSkeleton />}>
+        <Suspense fallback={<ShelfSkeleton isMarket={isMarket} />}>
           <NewArrivals
             basePath={basePath}
             locale={locale}
             country={country}
             currency={currency}
             limit={SHELF_SIZE}
+            themePreset={themePreset}
           />
         </Suspense>
       </div>

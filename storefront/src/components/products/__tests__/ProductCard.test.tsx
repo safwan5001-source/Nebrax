@@ -185,6 +185,31 @@ describe("ProductCard", () => {
     const link = screen.getByRole("link");
     expect(link).toHaveAttribute("href", "/products/classic-t-shirt");
   });
+
+  it("offers quick view only under the AWJ Market theme marker", () => {
+    const { queryByLabelText, rerender } = render(
+      <ProductCard product={baseProduct} basePath="/us/en" />,
+    );
+    expect(queryByLabelText("quickView")).not.toBeInTheDocument();
+
+    rerender(
+      <PublishedThemeMarkerProvider themePreset="awj-market">
+        <ProductCard product={baseProduct} basePath="/us/en" />
+      </PublishedThemeMarkerProvider>,
+    );
+    expect(queryByLabelText("quickView")).toBeInTheDocument();
+  });
+
+  it("hides quick view on the wholesale surface, matching the card's own inline action", () => {
+    mockSurface.current = "wholesale";
+    const { queryByLabelText } = render(
+      <PublishedThemeMarkerProvider themePreset="awj-market">
+        <ProductCard product={baseProduct} basePath="/us/en" />
+      </PublishedThemeMarkerProvider>,
+    );
+    expect(queryByLabelText("quickView")).not.toBeInTheDocument();
+    mockSurface.current = "dtc";
+  });
 });
 
 describe("ProductCard — purchase action (STORE-UI-3)", () => {

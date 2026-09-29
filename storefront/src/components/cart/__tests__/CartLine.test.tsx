@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import { PublishedThemeMarkerProvider } from "@/components/layout/PublishedThemeMarker";
 import type { StorefrontCartLine } from "@/lib/commerce/cart-types";
 import { awjCartLineView, CartLine } from "../CartLine";
 
@@ -111,5 +112,27 @@ describe("CartLine", () => {
 
     expect(screen.queryByLabelText("quantity")).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/removeItemLabel/)).not.toBeInTheDocument();
+  });
+
+  it("tightens row spacing under AWJ Market without touching money/quantity logic", () => {
+    const { getByTestId } = render(
+      <PublishedThemeMarkerProvider themePreset="awj-market">
+        <CartLine
+          view={awjCartLineView(line(), "/sa/ar", null)}
+          density="page"
+        />
+      </PublishedThemeMarkerProvider>,
+    );
+    expect(getByTestId("cart-line").className).toContain("py-3");
+  });
+
+  it("keeps AWJ Modern's row spacing unchanged (no theme regression)", () => {
+    const { getByTestId } = render(
+      <CartLine
+        view={awjCartLineView(line(), "/sa/ar", null)}
+        density="page"
+      />,
+    );
+    expect(getByTestId("cart-line").className).toContain("py-4");
   });
 });

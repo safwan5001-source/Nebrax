@@ -243,7 +243,11 @@
     "selectOptions": "Wybierz opcje",
     "priceFromLabel": "Od",
     "addToFavorites": "Dodaj do ulubionych",
-    "removeFromFavorites": "Usuń z ulubionych"
+    "removeFromFavorites": "Usuń z ulubionych",
+    "quickView": "Szybki podgląd",
+    "viewFullDetails": "Zobacz pełne szczegóły",
+    "share": "Udostępnij",
+    "linkCopied": "Link skopiowany"
   },
   "navigation": {
     "home": "Strona główna",

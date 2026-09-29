@@ -1,5 +1,7 @@
 import { ProductCard } from "@/components/products/ProductCard";
+import { ProductCarousel } from "@/components/products/ProductCarousel";
 import { fetchProduct } from "@/lib/commerce/products";
+import type { ThemePresetId } from "@/lib/presentation/tokens";
 
 export async function FeaturedShelf({
   productIds,
@@ -8,6 +10,7 @@ export async function FeaturedShelf({
   currency,
   title,
   headingId,
+  themePreset,
 }: {
   productIds: readonly string[];
   basePath: string;
@@ -15,7 +18,10 @@ export async function FeaturedShelf({
   currency?: string;
   title: string;
   headingId: string;
+  /** See `CategoriesSection`'s identical prop doc for why this is explicit. */
+  themePreset?: ThemePresetId;
 }) {
+  const isMarket = themePreset === "awj-market";
   const settled = await Promise.allSettled(
     productIds.map((id) => fetchProduct(id)),
   );
@@ -32,20 +38,37 @@ export async function FeaturedShelf({
       >
         {title}
       </h2>
-      <ul className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 md:gap-5">
-        {products.map((product, index) => (
-          <li key={product.id} className="min-w-0">
-            <ProductCard
-              product={product}
-              basePath={basePath}
-              index={index}
-              listId="home_featured"
-              listName="Home — Featured"
-              currency={currency}
-            />
-          </li>
-        ))}
-      </ul>
+      {isMarket ? (
+        <div className="mt-4">
+          <ProductCarousel
+            products={products}
+            basePath={basePath}
+            currency={currency}
+            listId="home_featured"
+            listName="Home — Featured"
+            slidesPerView={2}
+            breakpoints={{
+              640: { slidesPerView: 3, spaceBetween: 16 },
+              1024: { slidesPerView: 5, spaceBetween: 20 },
+            }}
+          />
+        </div>
+      ) : (
+        <ul className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 md:gap-5">
+          {products.map((product, index) => (
+            <li key={product.id} className="min-w-0">
+              <ProductCard
+                product={product}
+                basePath={basePath}
+                index={index}
+                listId="home_featured"
+                listName="Home — Featured"
+                currency={currency}
+              />
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
   );
 }
