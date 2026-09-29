@@ -78,10 +78,7 @@ export function CategoryTile({
         ) : category.color && accent.isMerchantColor ? (
           <span
             aria-hidden="true"
-            className={cn(
-              "w-full rounded-store",
-              compact ? "h-7" : "h-10",
-            )}
+            className={cn("w-full rounded-store", compact ? "h-7" : "h-10")}
             style={{ backgroundColor: accent.rule }}
           />
         ) : null}
