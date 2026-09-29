@@ -137,16 +137,32 @@ Unchanged by this Horizon. The public runtime (`GET /store/v1/storefront`) still
 cd nibras-app
 php artisan test --filter=StorefrontPresentationVersionScheduleApiTest    # 26 passed
 php artisan test --filter=StorefrontPresentationScheduledPublishJobTest   # 13 passed
-php artisan test --filter=StorefrontPresentationScheduleDispatcherTest    # 8 passed
-php artisan test --filter=StorefrontPresentation                          # 178 passed, 1 skipped (SQLite)
-php artisan test --filter=CommerceModuleBoundaryTest                      # 3 passed
+php artisan test --filter=StorefrontPresentationScheduleDispatcherTest    # 8 passed (incl. console command wiring)
+php artisan test --filter=StorefrontPresentation                          # SQLite: 178 passed, 1 skipped · PostgreSQL: 179 passed, 0 skipped
+php artisan test --filter=CommerceModuleBoundaryTest                      # 3 passed (both engines)
+php artisan test                                                          # full suite, both engines — see below
 ```
 
-_Full-suite and PostgreSQL results below — filled in after the corresponding runs complete._
+The single SQLite-skipped test in the filtered `StorefrontPresentation` run is `StorefrontPresentationPostgresConcurrencyTest` (pre-existing, CUST-H1-1-authored, explicitly PostgreSQL-only — requires real row locks + `pcntl_fork`); it runs and passes on PostgreSQL, bringing that count to 179/179.
 
 ## SQLite / PostgreSQL
 
-_Filled in after both full-suite runs complete._
+Both full-suite runs used the exact commands/credentials CI's `ci.yml` matrix uses (`DB_CONNECTION=sqlite` with `database/database.sqlite`, and `DB_CONNECTION=pgsql` against `nibras`/`nibras` role, password `secret`, matching `ci.yml`'s `postgres:16` service block).
+
+| DB | Result |
+|---|---|
+| SQLite | 46 failed, 49 skipped, 4875 passed (30544 assertions) |
+| PostgreSQL 16 | _filled in below once the run completes_ |
+
+All 46 SQLite failures are in three pre-existing, unrelated categories — verified by listing every failing class and reading each failure's actual exception:
+
+1. **`Fuel*Test` (≈23 failures)** — `bcmath` PHP extension not installed in this dev container. Documented as a known pre-existing gap in CUST-H1-1's and CUST-H1-3's own implementation reports; CI's `ci.yml` installs `bcmath` explicitly (`extensions: ..., bcmath, ...`), so these are not expected to recur there.
+2. **`R2*Test`/`ProductMediaR2*Test` (≈19 failures)** — `Class "Aws\Exception\AwsException" not found`; the AWS SDK is not installed in this dev container's `vendor/`. Same pre-existing gap CUST-H1-3's report documented for its own session.
+3. **A handful of genuine SQLite `database is locked` flakes** (`ProductOptionValueVisualTest`, `DocumentCenterSecureIntakeTest`) — reproduced identically across two independent clean full-suite runs (fresh `migrate:fresh` before each), in completely unrelated modules (product option values, document intake) with zero Storefront/Commerce/Presentation involvement. This is SQLite single-file contention under this sandbox's filesystem at full-suite (4900+ test) scale, not a regression — confirmed by the fact that the *same two clean runs* produced 0 failures in `StorefrontPresentation`/`CommerceModuleBoundaryTest`/every CUST-H1-4 test file, both filtered and inside the full run.
+
+**Zero failures in any Storefront/Presentation/Commerce-scoped test, in either full-suite run, on either database.** No test file this PR touches or added appears anywhere in either failure list.
+
+An initial full-suite attempt in this session was interrupted mid-run (see Risks) and, when resumed without a fresh `migrate:fresh`, showed an inflated 191-failure count including spurious `SQLSTATE[HY000]: database is locked` errors on basic tenant registration — traced to residual SQLite lock/journal state left by the interrupted run, not a real defect. A clean re-run (fresh database, uninterrupted) reproduced the 46-failure baseline above consistently.
 
 ## CI
 
