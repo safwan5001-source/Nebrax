@@ -129,31 +129,61 @@ class ProductMediaR2BackfillService
             return $row;
         }
 
-        if (! $this->r2->exists(ProductMedia::R2_DOMAIN, (string) $media->product_id, $filename)) {
-            $row['status'] = 'failed_verify_missing';
+        // من هنا فصاعداً كائنٌ فعليٌّ موجودٌ على R2 بهذا المفتاح تحديداً. أي
+        // فشلٍ لاحق (تحقّق/قراءة رجعية/تكامل/حفظ) يجب ألّا يترك كائناً يتيماً
+        // لا يشير إليه أي صفّ — فتُحاول إزالته (الكائن الدقيق فقط، لا سرد ولا
+        // بادئة)، والمصدر القديم يبقى كما هو دائماً بلا مساس.
+        $productId = (string) $media->product_id;
+
+        if (! $this->r2->exists(ProductMedia::R2_DOMAIN, $productId, $filename)) {
+            $row['status'] = $this->cleanupOrphan($productId, $filename, 'failed_verify_missing');
 
             return $row;
         }
 
         try {
-            $readBack = $this->r2->get(ProductMedia::R2_DOMAIN, (string) $media->product_id, $filename);
+            $readBack = $this->r2->get(ProductMedia::R2_DOMAIN, $productId, $filename);
         } catch (RuntimeException|AwsException $exception) {
-            $row['status'] = 'failed_verify_read';
+            $row['status'] = $this->cleanupOrphan($productId, $filename, 'failed_verify_read');
 
             return $row;
         }
 
         if (! hash_equals($sourceHash, hash('sha256', (string) $readBack))) {
-            $row['status'] = 'failed_integrity_mismatch';
+            $row['status'] = $this->cleanupOrphan($productId, $filename, 'failed_integrity_mismatch');
 
             return $row;
         }
 
         // المصدر القديم لا يُحذف هنا عمداً (خارج النطاق) — فقط تحويل الإشارة.
-        $media->forceFill(['disk' => 'r2', 'path' => $key])->save();
+        try {
+            $media->forceFill(['disk' => 'r2', 'path' => $key])->save();
+        } catch (Throwable $exception) {
+            $row['status'] = $this->cleanupOrphan($productId, $filename, 'failed_db_update');
+
+            return $row;
+        }
+
         $row['status'] = 'migrated';
 
         return $row;
+    }
+
+    /**
+     * يحذف كائن R2 الذي أنشأه `put()` في هذا الاستدعاء تحديداً عند فشل خطوةٍ
+     * لاحقة — لا سرد، لا بادئة، الكائن الدقيق فقط. فشل الحذف نفسه لا يُموَّه:
+     * يُلحَق بحالة الصفّ لاحقةً `_orphan_cleanup_failed` فيظهر في التقرير
+     * المُنظَّم للتشغيل اليدوي بدل أن يُبتلَع صامتاً.
+     */
+    private function cleanupOrphan(string $productId, string $filename, string $reasonStatus): string
+    {
+        try {
+            $this->r2->delete(ProductMedia::R2_DOMAIN, $productId, $filename);
+        } catch (RuntimeException|AwsException $exception) {
+            return $reasonStatus.'_orphan_cleanup_failed';
+        }
+
+        return $reasonStatus;
     }
 
     /** @throws RuntimeException بحالةٍ رمزية (source_missing/source_unavailable) ككودٍ في الرسالة */

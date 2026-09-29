@@ -150,16 +150,41 @@ is a real stream or a plain string in tests.
 
 ### Delete behavior (R2-4D)
 
-`ProductController::destroyMedia()`, `ProductMediaService::delete()`, and
-`ProductMediaService::deleteFiles()` (the post-commit bulk cleanup used when
-a variant/option value/product is deleted) each gained an `r2` branch that
-calls `R2StorageService::delete(ProductMedia::R2_DOMAIN, $productId, basename($path))`
+Every delete site — `ProductController::destroyMedia()`, `ProductMediaService::delete()`,
+and `ProductMediaService::deleteFiles()` — gained an `r2` branch that calls
+`R2StorageService::delete(ProductMedia::R2_DOMAIN, $productId, basename($path))`
 — the exact object for that row, never a prefix or a listing. Cross-tenant
 delete is impossible for the same reason cross-tenant read is: the row is
 resolved through the normal tenant-scoped Eloquent relation before any
-storage call happens. A failed R2 delete throws before the `ProductMedia`
-row is deleted, so a storage failure never silently desyncs the database
-from the bucket (identical to the existing `document` failure semantics).
+storage call happens. There are two different, deliberately different,
+consistency guarantees depending on which site is involved — this PR
+preserves both exactly as they already existed for the `document` and
+legacy-disk branches, and only adds the matching `r2` branch to each:
+
+- **Direct single delete** (`ProductController::destroyMedia()`,
+  `ProductMediaService::delete()`, both driving the same single-media
+  DELETE endpoint/call): storage delete happens **before** the
+  `ProductMedia` row is deleted, and a failed storage delete **throws**,
+  so the row survives. A storage failure here can never silently desync
+  the database from the bucket.
+- **Bulk lifecycle cleanup** (`ProductMediaService::collectAndQueueDeletion()`
+  + `deleteFiles()`, used by `ProductVariantService` when an option, an
+  option value, or a variant is deleted — the same pattern
+  `ProductLifecycleService::delete()` already used before this epic): the
+  `ProductMedia` rows are deleted **inside the caller's DB transaction**
+  first, and the actual storage objects are cleaned up **after that
+  transaction commits**, on a best-effort basis. A storage failure here is
+  caught and reported (`report($exception)`), **not** re-thrown — it never
+  rolls back the already-committed parent deletion (the option/value/
+  variant is gone regardless). This is an intentional, pre-existing
+  architectural choice (external storage I/O is kept out of the DB
+  transaction so a slow or unavailable backend can never hold a lock or
+  block a cascade delete), not something this PR introduced or weakened —
+  the `r2` branch added here simply matches the `document` and legacy-disk
+  branches that already behaved this way. A storage failure in this path
+  can leave an orphaned object in the bucket (with no `ProductMedia` row
+  pointing to it); this is the existing, accepted tradeoff for every disk
+  type this path handles, not an R2-specific gap.
 
 ### Key contract
 
