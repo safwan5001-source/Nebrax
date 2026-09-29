@@ -19,6 +19,38 @@ Only what is needed:
 
 Do not repeat a broad App Builder/mobile-runtime investigation.
 
+## Required external benchmark pass before coding
+Do a **small evidence-first benchmark pass** before fixing the MP-3 UX. Use original/official documentation first and keep it proportional to this task.
+
+Required sources to inspect:
+- Salla App Maker / mobile-app design and preview documentation:
+  - https://help.salla.sa/subcategory/%D8%AA%D8%B5%D9%85%D9%8A%D9%85-%D8%A7%D9%84%D8%AA%D8%B7%D8%A8%D9%8A%D9%82/zwocpbw83fyabe83uead25zy
+  - https://help.salla.sa/subcategory/%D8%AA%D8%B5%D9%85%D9%8A%D9%85-%D8%A7%D9%84%D8%AA%D8%B7%D8%A8%D9%8A%D9%82-1/xqnf6uqfpwemieicn4nfcul6
+  - https://help.salla.sa/article/%D8%A7%D8%A8%D8%AF%D8%A3-%D8%A8%D8%AA%D8%B5%D9%85%D9%8A%D9%85-%D8%A7%D9%84%D8%AA%D8%B7%D8%A8%D9%8A%D9%82/r4f54u89q3ivwaj9is0jc6qs
+- Zid official mobile-app/help documentation:
+  - https://help.zid.sa/category/zid-mobile-app/
+  - https://help.zid.sa/subscription-to-mobile-app/
+  - https://help.zid.sa/create-app/
+- Shopify official theme editor / preview patterns for mature merchant editing UX:
+  - https://help.shopify.com/en/manual/online-store/themes/customizing-themes/theme-editor/features-overview
+  - https://help.shopify.com/en/manual/online-store/themes/customizing-themes/theme-editor/preview-inspector
+- Flutter official web/runtime documentation only where it affects truthful preview boundaries:
+  - https://docs.flutter.dev/platform-integration/web
+  - https://docs.flutter.dev/platform-integration/web/embedding-flutter-web
+
+Also read:
+- `docs/plans/app-builder/REAL-MOBILE-PREVIEW-SALLA-MOBILE-BENCHMARK.md`
+- the user-provided Salla screenshots referenced there.
+
+Benchmark rules:
+- distinguish **external evidence** from **AWJ decision**
+- do not assume Zid has the same self-serve builder model as Salla; document differences
+- do not copy any product blindly
+- extract only patterns relevant to MP-3: Design vs Preview separation, device viewport, full preview, navigation expectations, empty/auth-dependent states, refresh-preview behavior, responsive desktop/mobile-admin treatment, and truth labeling
+- keep deeper runtime/auth/session conclusions deferred to their locked Horizons unless current evidence proves a blocker
+- if a new finding would materially change the locked MP-3 architecture or cross a Decision Gate, STOP and report it before coding
+- add only a concise evidence note to the implementation report; do not create a broad new research project
+
 ## Locked architecture
 `React Design Canvas → React Browser App Preview → Flutter Real Runtime Preview → Flutter Physical Device Preview`
 
