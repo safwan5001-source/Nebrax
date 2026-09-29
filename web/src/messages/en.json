@@ -6836,7 +6836,27 @@
       "versionsEmpty": "No version published yet.",
       "versionRow": "Version {version} — {date}",
       "viewAllVersions": "View all versions",
-      "openBuilder": "Open the builder"
+      "openBuilder": "Open the builder",
+      "previewSessions": {
+        "title": "On-device preview sessions",
+        "empty": "No preview sessions yet.",
+        "issueAction": "Issue preview session",
+        "issuing": "Issuing…",
+        "revokeAction": "Revoke",
+        "revoking": "Revoking…",
+        "revokeConfirmTitle": "Revoke preview session",
+        "revokeConfirmBody": "This session will stop working once revoked. This cannot be undone.",
+        "expiresLabel": "Expires: {date}",
+        "statusActive": "Active",
+        "statusExpired": "Expired",
+        "statusRevoked": "Revoked",
+        "tokenDialogTitle": "Preview session credential",
+        "tokenDialogDescription": "Paste this into the real AWJ app (preview build) to view the current draft on a real device.",
+        "issueSuccessTitle": "Preview session issued",
+        "issueErrorTitle": "Could not issue the preview session",
+        "revokeErrorTitle": "Could not revoke the session",
+        "loadErrorTitle": "Could not load preview sessions"
+      }
     },
     "versions": {
       "title": "Published versions",

@@ -24,7 +24,7 @@ fi
 cd "$APP_DIR"
 
 echo "▶ 3/6  تثبيت Sanctum + تفعيل مسارات API..."
-composer require laravel/sanctum --quiet
+composer require laravel/sanctum league/flysystem-aws-s3-v3:^3.0 predis/predis:^2.2 --quiet
 php artisan install:api --no-interaction --quiet || true
 # لدينا جدول personal_access_tokens ضمن migration النواة — نحذف نسخة Sanctum المنشورة لتجنّب التكرار
 rm -f database/migrations/*_create_personal_access_tokens_table.php 2>/dev/null || true
@@ -35,10 +35,11 @@ cp -r "$CORE_DIR/app/Models/"*.php        app/Models/
 # السمات في مجلد فرعي لا يلتقطها glob النماذج أعلاه؛ يجب أن تطابق CI والإنتاج.
 # قائمة المجلدات هنا يدوية ويجب أن تبقى مطابقة لقائمة .github/workflows/ci.yml
 # (كلاهما ينسخ من نفس النواة بمنطق مستقل) — نسيان مجلد هنا لا يظهر في CI فيمر بصمت.
-mkdir -p app/Contracts app/Models/Concerns app/Jobs/Accounting app/Jobs/DocumentCenter app/Services app/Services/Accounting app/Services/Commerce app/Services/Commerce/Edge app/Services/Commerce/Otp app/Services/DocumentCenter app/Services/AppBuilder app/Services/Pos app/Services/Pos/Hardware app/Services/Reporting app/Services/PrintTemplates app/Support app/Support/Inventory app/Support/Dns app/Support/Commerce \
+mkdir -p app/Contracts app/Mail app/Models/Concerns app/Jobs/Accounting app/Jobs/DocumentCenter app/Services app/Services/Accounting app/Services/Commerce app/Services/Commerce/Edge app/Services/Commerce/Otp app/Services/DocumentCenter app/Services/AppBuilder app/Services/Pos app/Services/Pos/Hardware app/Services/Reporting app/Services/PrintTemplates app/Support app/Support/Inventory app/Support/Dns app/Support/Commerce \
          app/Tenancy app/Http/Middleware app/Http/Controllers/Api config \
          app/Http/Requests app/Http/Resources app/Console/Commands tests/Feature tests/Fixtures/presentation routes docs/openapi contracts/app-builder
 cp -r "$CORE_DIR/app/Contracts/"*.php app/Contracts/
+cp -r "$CORE_DIR/app/Mail/"*.php app/Mail/ 2>/dev/null || true
 cp -r "$CORE_DIR/app/Jobs/DocumentCenter/"*.php app/Jobs/DocumentCenter/
 cp -r "$CORE_DIR/app/Jobs/Accounting/"*.php app/Jobs/Accounting/
 cp -r "$CORE_DIR/app/Models/Concerns/"*.php app/Models/Concerns/
@@ -71,6 +72,7 @@ cp -r "$CORE_DIR/routes/api.php"                 routes/api.php
 cp -r "$CORE_DIR/routes/api_public.php"          routes/api_public.php
 cp -r "$CORE_DIR/routes/api_storefront.php"      routes/api_storefront.php
 cp -r "$CORE_DIR/routes/api_commerce.php"        routes/api_commerce.php
+cp -r "$CORE_DIR/routes/api_preview.php"         routes/api_preview.php
 cp -r "$CORE_DIR/routes/console.php"             routes/console.php
 cp -r "$CORE_DIR/tests/Feature/"*.php            tests/Feature/
 cp -r "$CORE_DIR/tests/Fixtures/presentation/"*.json tests/Fixtures/presentation/ 2>/dev/null || true
@@ -95,6 +97,9 @@ if ! grep -q "StorefrontApiServiceProvider" bootstrap/providers.php; then
 fi
 if ! grep -q "CommerceApiServiceProvider" bootstrap/providers.php; then
   sed -i "s|return \[|return [\n    App\\\\Providers\\\\CommerceApiServiceProvider::class,|" bootstrap/providers.php
+fi
+if ! grep -q "PreviewApiServiceProvider" bootstrap/providers.php; then
+  sed -i "s|return \[|return [\n    App\\\\Providers\\\\PreviewApiServiceProvider::class,|" bootstrap/providers.php
 fi
 if ! grep -q "WebhookServiceProvider" bootstrap/providers.php; then
   sed -i "s|return \[|return [\n    App\\\\Providers\\\\WebhookServiceProvider::class,|" bootstrap/providers.php

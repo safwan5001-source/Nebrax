@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Http\Middleware\SlowRequestAttribution;
 use App\Models\CustomerIdentity;
+use App\Models\PreviewSession;
 use App\Services\Commerce\Edge\RailwayStorefrontEdgeClient;
 use App\Services\Commerce\Edge\StorefrontEdgeClient;
 use App\Support\Dns\DnsTxtResolver;
@@ -185,6 +186,25 @@ class TenancyServiceProvider extends ServiceProvider
             $key = $identity instanceof CustomerIdentity ? $identity->getKey() : $request->ip();
 
             return Limit::perMinute(30)->by('commerce-customer-session|' . $key);
+        });
+
+        // MOBILE-PREVIEW-6 — إصدار جلسة معاينة (لوحة التاجر، مصادَق سلفاً):
+        // كيليد لكل مستخدم داخل مستأجره، لا IP وحده — دفاعٌ إضافي متواضع
+        // (§5.13 من وثيقة معمارية MP-5 يصفها "أرقام توضيحية" قابلة للضبط لاحقاً).
+        RateLimiter::for('preview-session-issue', function (Request $request): Limit {
+            $key = $request->user()?->getAuthIdentifier() ?? $request->ip();
+
+            return Limit::perMinute(20)->by('preview-session-issue|' . $key);
+        });
+
+        // جلب `preview/v1/experience`: كيليد بجلسة المعاينة نفسها (متاحة بعد
+        // AuthenticatePreviewSession)، لا بالـIP — يكفي بسهولة أي استقصاء/تحديث
+        // عادي، ويمنع سكربتاً يستنزف حصّة جلسة مسروقة واحدة إلى الأبد.
+        RateLimiter::for('preview-fetch', function (Request $request): Limit {
+            $session = $request->user();
+            $key = $session instanceof PreviewSession ? $session->getKey() : $request->ip();
+
+            return Limit::perMinute(60)->by('preview-fetch|' . $key);
         });
     }
 }
