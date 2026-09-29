@@ -53,6 +53,15 @@ class CompanyProfile
             'cr_number'     => $tenant->cr_number,
             'currency'      => $tenant->currency,
             'country'       => $tenant->country,
+            // CUST-H1-5 — عمود `tenants.timezone` قائمٌ منذ الترحيل الأول
+            // (افتراضه 'Asia/Riyadh')، ومصدر المنطقة الزمنية المعتمَد فعلياً في
+            // منع خسائر نقاط البيع (`PosLpDigestService`/`PosExceptionDetectionService`
+            // — "لا مصدر ثانٍ موازٍ"). لم يكن مكشوفاً لأي عميل واجهة قبل هذا؛
+            // هذا الحقل يعرضه للقراءة فقط عبر عقد `/me` القائم أصلاً — لا كتابة
+            // جديدة هنا (`TENANT_FIELDS` لا يتضمّنه عمداً، فتعديله خارج نطاق
+            // هذا الأفق). يُستهلَك من جدولة نسخ عرض المتجر (CUST-H1-5) كمصدر
+            // التوقيت الوحيد الموثوق — لا توقيت المتصفح ولا "آسيا/الرياض" ثابتاً.
+            'timezone'      => $tenant->timezone,
             'logo'          => $company['logo'],
             'phone'         => $company['phone'],
             'mobile'        => $company['mobile'],

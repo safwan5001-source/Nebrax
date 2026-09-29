@@ -557,6 +557,50 @@ class StorefrontPresentationVersionScheduleApiTest extends TestCase
         $this->assertSame($draft['id'], $head->scheduled_version_id);
     }
 
+    /**
+     * CUST-H1-5 — بند إلزامي في مصفوفة QA المتكاملة لهذا الأفق: "Scheduled →
+     * edit → save → remains Scheduled" (`docs/plans/store/CUST-H1-ARCH-1-...md`
+     * §16 "Schedule / edit semantics" — تعديل نسخة مجدولة مسموح، وآخر مستند
+     * محفوظ هو ما يُنشَر عند التنفيذ، لا لقطة مجمَّدة وقت الجدولة).
+     * `saveForCurrentTenant()` (CUST-H1-1) لا يفحص إطلاقاً سوى كون الهدف هو
+     * النسخة النشِطة (`active_version_id`) — هذا الاختبار يثبت الأثر الفعلي
+     * صراحة على مسار جدولة حقيقي، لا مجرَّد قراءة الكود.
+     */
+    /** @test */
+    public function saving_a_scheduled_version_is_allowed_and_the_schedule_survives(): void
+    {
+        $auth = $this->registerTenant('sched-save', 'owner@sched-save.test');
+        $seeded = $this->seedWebStorefront($auth['tenant_id']);
+        $token = $this->withToken($auth['token']);
+
+        $draft = $this->createDraft($token, $seeded['storefront']->id);
+        $scheduledFor = $this->futureIso();
+
+        $scheduled = $token->putJson($this->schedulePath($seeded['storefront']->id, $draft['id']), [
+            'revision' => $draft['revision'],
+            'scheduled_for' => $scheduledFor,
+            'expected_schedule_token' => $draft['schedule_token'],
+        ])->assertOk();
+
+        $saved = $token->putJson($this->itemPath($seeded['storefront']->id, $draft['id']), [
+            'config' => ['version' => 2, 'themePreset' => 'navy'],
+            'revision' => $scheduled->json('data.revision'),
+        ])->assertOk();
+
+        $this->assertSame('scheduled', $saved->json('data.state'));
+        $this->assertSame('navy', $saved->json('data.config.themePreset'));
+        $this->assertNotNull($saved->json('data.scheduled_for'));
+
+        $head = $this->presentationHead($seeded['storefront']->id);
+        $this->assertSame($draft['id'], $head->scheduled_version_id);
+
+        // القراءة المباشرة تعكس التعديل الأحدث — هذا حرفياً ما سيُنشَر عند
+        // التنفيذ المجدول، لا المستند وقت الجدولة الأصلية.
+        $reread = $token->getJson($this->itemPath($seeded['storefront']->id, $draft['id']))->assertOk();
+        $this->assertSame('navy', $reread->json('data.config.themePreset'));
+        $this->assertTrue(Carbon::parse($reread->json('data.scheduled_for'))->equalTo(Carbon::parse($scheduledFor)));
+    }
+
     // ───────────────────────── Validation ─────────────────────────
 
     /** @test */
@@ -718,5 +762,29 @@ class StorefrontPresentationVersionScheduleApiTest extends TestCase
             'scheduled_for' => $this->futureIso(),
             'expected_schedule_token' => $draft['schedule_token'],
         ])->assertStatus(403);
+    }
+
+    /**
+     * CUST-H1-5 — بوابة إنفاذ الإنتاج (`config('storefront.scheduled_publishing.runtime_active')`).
+     * قيمة بيئة واحدة تُكرَّر على كل صفّ نسخة، لا حالة لهذا المتجر أو هذه
+     * النسخة تحديداً — الافتراض `true` في بيئة الاختبار (`config/storefront.php`)
+     * يتحقّق هنا صراحةً بدل افتراضه ضمنياً من نجاح اختبارات الجدولة الأخرى.
+     */
+    /** @test */
+    public function scheduling_runtime_active_reflects_the_environment_gate(): void
+    {
+        $auth = $this->registerTenant('sched-gate', 'owner@sched-gate.test');
+        $seeded = $this->seedWebStorefront($auth['tenant_id']);
+        $token = $this->withToken($auth['token']);
+
+        $created = $token->postJson($this->listPath($seeded['storefront']->id), ['name' => 'رمضان'])
+            ->assertCreated();
+        $this->assertTrue($created->json('data.scheduling_runtime_active'));
+
+        config(['storefront.scheduled_publishing.runtime_active' => false]);
+
+        $token->getJson($this->listPath($seeded['storefront']->id))
+            ->assertOk()
+            ->assertJsonPath('data.0.scheduling_runtime_active', false);
     }
 }

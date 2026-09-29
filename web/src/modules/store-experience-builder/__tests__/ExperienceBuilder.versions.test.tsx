@@ -42,6 +42,11 @@ function summary(overrides: Record<string, unknown> = {}) {
     lastPublishedAt: null,
     createdAt: '2026-09-01T00:00:00.000Z',
     updatedAt: '2026-09-01T00:00:00.000Z',
+    // CUST-H1-5 — present on every real row (see `summarize()`); tests that
+    // care about a specific value override it explicitly.
+    publishedRevision: null,
+    scheduleToken: 'opaque-token-0',
+    schedulingRuntimeActive: true,
     ...overrides,
   };
 }

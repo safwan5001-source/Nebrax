@@ -1,0 +1,137 @@
+/**
+ * CUST-H1-5 — Authoritative-timezone helpers for scheduled Version publishing.
+ *
+ * Browser timezone is never authoritative (architecture: `docs/plans/store/
+ * CUST-H1-ARCH-1-...md` §18). The merchant enters a date/time understood as
+ * wall-clock time *in the tenant's authoritative timezone* (`tenants.timezone`,
+ * exposed read-only via `/me` → `company.timezone` — see `CompanyProfile`),
+ * exactly like Shopify's own "Store defaults" timezone model: the scheduler
+ * does not ask the merchant to pick a timezone inline, it interprets the
+ * entered date/time using the account's already-authoritative zone and only
+ * *displays* that zone so the merchant is never guessing. These helpers
+ * convert that wall-clock value to/from a canonical UTC instant regardless of
+ * what timezone the visiting browser happens to run in.
+ */
+
+export const DEFAULT_TENANT_TIMEZONE = "Asia/Riyadh";
+
+/**
+ * Falls back to the tenant model's own DB-level default when the configured
+ * value is missing or not a real IANA identifier — never throws, never
+ * silently uses the browser's zone.
+ */
+export function safeTimeZone(timeZone: string | null | undefined): string {
+  const candidate = (timeZone ?? "").trim();
+  if (!candidate) return DEFAULT_TENANT_TIMEZONE;
+  try {
+    // Throws RangeError for an invalid IANA identifier.
+    new Intl.DateTimeFormat("en-US", { timeZone: candidate });
+    return candidate;
+  } catch {
+    return DEFAULT_TENANT_TIMEZONE;
+  }
+}
+
+function offsetMinutesAt(utcMillis: number, timeZone: string): number {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    hourCycle: "h23",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).formatToParts(new Date(utcMillis));
+  const get = (type: string) => Number(parts.find((p) => p.type === type)?.value ?? "0");
+  const asIfUtc = Date.UTC(get("year"), get("month") - 1, get("day"), get("hour"), get("minute"), get("second"));
+  return (asIfUtc - utcMillis) / 60000;
+}
+
+/**
+ * Converts a `YYYY-MM-DD` date + `HH:mm` time, understood as wall-clock time
+ * in `timeZone`, to a canonical UTC ISO-8601 string (explicit `Z` offset —
+ * satisfies the backend's `scheduled_for` contract). Returns `null` for a
+ * malformed date/time instead of guessing.
+ */
+export function zonedWallTimeToUtcIso(
+  dateValue: string,
+  timeValue: string,
+  timeZone: string,
+): string | null {
+  const dateMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateValue.trim());
+  const timeMatch = /^(\d{2}):(\d{2})$/.exec(timeValue.trim());
+  if (!dateMatch || !timeMatch) return null;
+  const [year, month, day] = dateMatch.slice(1).map(Number);
+  const [hour, minute] = timeMatch.slice(1).map(Number);
+  if (month < 1 || month > 12 || day < 1 || day > 31 || hour > 23 || minute > 59) return null;
+
+  const zone = safeTimeZone(timeZone);
+  // First pass: treat the wall-clock values as if they were already UTC,
+  // then correct by the target zone's actual offset at that instant. Exact
+  // for zones without DST (Asia/Riyadh among them); correct everywhere
+  // except the rare one-hour DST-transition window in a zone that observes it.
+  const naiveUtc = Date.UTC(year, month - 1, day, hour, minute, 0);
+  if (Number.isNaN(naiveUtc)) return null;
+  const offset = offsetMinutesAt(naiveUtc, zone);
+  const date = new Date(naiveUtc - offset * 60000);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
+/**
+ * The inverse of `zonedWallTimeToUtcIso` — formats a UTC instant back into
+ * `{ date, time }` wall-clock values in `timeZone`, for prefilling a
+ * reschedule dialog's native date/time inputs. Returns `null` for an
+ * unparsable instant.
+ */
+export function utcIsoToZonedWallTime(
+  iso: string,
+  timeZone: string,
+): { date: string; time: string } | null {
+  const instant = new Date(iso);
+  if (Number.isNaN(instant.getTime())) return null;
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: safeTimeZone(timeZone),
+    hourCycle: "h23",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).formatToParts(instant);
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
+  return { date: `${get("year")}-${get("month")}-${get("day")}`, time: `${get("hour")}:${get("minute")}` };
+}
+
+/** `{ date, time }` for "now, rounded up to the next 30-minute mark" in `timeZone` — the schedule dialog's default suggestion (same rounding Shopify's own future-publishing picker defaults to). */
+export function suggestedInitialWallTime(timeZone: string): { date: string; time: string } {
+  const stepMs = 30 * 60000;
+  const roundedMillis = Math.ceil((Date.now() + 60000) / stepMs) * stepMs;
+  return (
+    utcIsoToZonedWallTime(new Date(roundedMillis).toISOString(), timeZone) ?? { date: "", time: "" }
+  );
+}
+
+/** Human-readable timezone label. Only names a city when the zone is proven to be it — never guessed from locale/country. */
+export function timeZoneDisplayLabel(timeZone: string, locale: "ar" | "en"): string {
+  const zone = safeTimeZone(timeZone);
+  if (zone === "Asia/Riyadh") {
+    return locale === "ar" ? "بتوقيت الرياض" : "Riyadh time";
+  }
+  const offset = timeZoneOffsetLabel(zone);
+  return locale === "ar" ? `بتوقيت ${zone} (${offset})` : `${zone} time (${offset})`;
+}
+
+function timeZoneOffsetLabel(timeZone: string): string {
+  try {
+    const part = new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      timeZoneName: "longOffset",
+    })
+      .formatToParts(new Date())
+      .find((p) => p.type === "timeZoneName");
+    return part?.value ?? "UTC";
+  } catch {
+    return "UTC";
+  }
+}
