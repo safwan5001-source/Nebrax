@@ -6871,6 +6871,15 @@
       "emptyPage": "صفحة فارغة",
       "sampleDataBanner": "بيانات تجريبية — لإظهار شكل الربط بالبيانات فقط، وليست بيانات متجرك الفعلية",
       "visibilityUnsupportedBadge": "شرط ظهور غير مُفعَّل بعد",
+      "builderMode": {
+        "design": "تصميم",
+        "preview": "معاينة التطبيق"
+      },
+      "preview": {
+        "browserTruthBadge": "معاينة المتصفح — ليست عرض زمن تشغيل حقيقي",
+        "fullPreviewAction": "معاينة كاملة",
+        "exitFullPreviewAction": "إنهاء المعاينة الكاملة"
+      },
       "previewState": {
         "draft": "مسودة",
         "published": "منشورة",

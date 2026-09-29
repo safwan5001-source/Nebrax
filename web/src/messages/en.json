@@ -6871,6 +6871,15 @@
       "emptyPage": "Empty page",
       "sampleDataBanner": "Sample data — shows how data binding renders, not your real store data",
       "visibilityUnsupportedBadge": "Visibility condition not yet active",
+      "builderMode": {
+        "design": "Design",
+        "preview": "App Preview"
+      },
+      "preview": {
+        "browserTruthBadge": "Browser Preview — not a real runtime render",
+        "fullPreviewAction": "Full Preview",
+        "exitFullPreviewAction": "Exit Full Preview"
+      },
       "previewState": {
         "draft": "Draft",
         "published": "Published",

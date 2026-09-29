@@ -208,3 +208,107 @@ describe('AppBuilderCanvas — LIVE-PREVIEW-4 visibility stays explicit, never s
     expect(screen.queryByText('Visibility condition not yet active')).toBeNull();
   });
 });
+
+describe('AppBuilderCanvas — MOBILE-PREVIEW-3 interactive=false (App Preview shell)', () => {
+  it('defaults to interactive (`interactive` omitted): unchanged selection chrome, exactly as every Design-mode caller already relies on', () => {
+    const onSelect = vi.fn();
+    const root: AppSchemaComponent = {
+      type: 'Page',
+      id: 'home-root',
+      children: [{ type: 'Text', id: 'txt-1', props: { text: 'نص' } }],
+    };
+
+    render(<AppBuilderCanvas root={root} device="mobile" locale="en" selectedId={null} onSelect={onSelect} />);
+
+    const wrapper = screen.getByText('نص').closest('[role="button"]');
+    expect(wrapper).toBeTruthy();
+    fireEvent.click(screen.getByText('نص'));
+    expect(onSelect).toHaveBeenCalledWith('txt-1');
+  });
+
+  it('interactive=false removes selection/hover chrome and click-to-select entirely, on every node', () => {
+    const onSelect = vi.fn();
+    const root: AppSchemaComponent = {
+      type: 'Page',
+      id: 'home-root',
+      children: [
+        {
+          type: 'Section',
+          id: 'sec-1',
+          props: { title: 'قسم' },
+          children: [{ type: 'Text', id: 'txt-1', props: { text: 'نص' } }],
+        },
+      ],
+    };
+
+    render(<AppBuilderCanvas root={root} device="mobile" locale="en" selectedId={null} onSelect={onSelect} interactive={false} />);
+
+    // No `role="button"` anywhere — no NodeFrame is interactive, container included.
+    expect(screen.queryAllByRole('button').length).toBe(0);
+    // The hover-revealed type tag ('Section'/'Text') is authoring chrome — hidden entirely.
+    expect(screen.queryByText('Section')).toBeNull();
+    expect(screen.queryByText('Text')).toBeNull();
+
+    fireEvent.click(screen.getByText('نص'));
+    fireEvent.click(screen.getByText('قسم'));
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it('interactive=false still resolves bindings, repeats templates, and shows the sample-data banner exactly like interactive=true — only chrome differs', () => {
+    const root: AppSchemaComponent = {
+      type: 'Page',
+      id: 'home-root',
+      children: [
+        {
+          type: 'ProductList',
+          id: 'featured-list',
+          binding: { resource: 'commerce.products' },
+          children: [{ type: 'ProductCard', id: 'card-template', props: { title: '$item.name' } }],
+        },
+      ],
+    };
+
+    render(<AppBuilderCanvas root={root} device="mobile" locale="en" selectedId={null} onSelect={vi.fn()} interactive={false} />);
+
+    expect(screen.getByText('قهوة عربية مختصة')).toBeTruthy();
+    expect(screen.getByText('شاي أخضر فاخر')).toBeTruthy();
+    expect(screen.getByText('كوب سيراميك')).toBeTruthy();
+    expect(screen.getByText('Sample data — not your real store data')).toBeTruthy();
+  });
+
+  it('interactive=false still shows the unsupported-visibility honesty badge — it is not editing chrome and must never hide', () => {
+    const root: AppSchemaComponent = {
+      type: 'Page',
+      id: 'home-root',
+      children: [
+        {
+          type: 'Text',
+          id: 'txt-conditional',
+          props: { text: 'نص مشروط' },
+          visibility: { signal: 'cart.itemCount', operator: 'gt', value: 0 },
+        },
+      ],
+    };
+
+    render(<AppBuilderCanvas root={root} device="mobile" locale="en" selectedId={null} onSelect={vi.fn()} interactive={false} />);
+
+    expect(screen.getByText('نص مشروط')).toBeTruthy();
+    expect(screen.getByText('Visibility condition not yet active')).toBeTruthy();
+  });
+
+  it('interactive=false suppresses the canvas background click-to-select-root handler too', () => {
+    const onSelect = vi.fn();
+    const root: AppSchemaComponent = {
+      type: 'Page',
+      id: 'home-root',
+      children: [{ type: 'Text', id: 'txt-1', props: { text: 'نص' } }],
+    };
+
+    render(<AppBuilderCanvas root={root} device="mobile" locale="en" selectedId={null} onSelect={onSelect} interactive={false} />);
+
+    // Click the device-screen box itself (the dir-wrapped container), not a child node.
+    const screenBox = screen.getByText('نص').closest('[dir]') as HTMLElement;
+    fireEvent.click(screenBox);
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+});

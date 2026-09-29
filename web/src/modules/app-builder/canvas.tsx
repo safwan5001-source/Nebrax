@@ -114,6 +114,7 @@ function NodeFrame({
   className,
   children,
   registries,
+  interactive,
 }: {
   node: AppSchemaComponent;
   /** المعرّف الذي يُرسَل فعلياً إلى `onSelect` — معرّف العقدة نفسها إن كانت حقيقية (موجودة
@@ -124,11 +125,28 @@ function NodeFrame({
   className?: string;
   children: React.ReactNode;
   registries: AppBuilderRegistries | null;
+  /**
+   * MOBILE-PREVIEW-3 — `false` في وضع «معاينة التطبيق» (Browser App Preview): تُخفى شارة
+   * النوع وكل تفاعل تحديد/تحويم (لا `role="button"`، لا مُعالِجات نقر/لوحة مفاتيح، لا حلقة
+   * تحديد) — «معاينة، لا تحرير» حرفياً، دون أي تفرّع في منطق العرض نفسه. شارة تعذّر الظهور
+   * تبقى ظاهرة رغم ذلك: ليست أداة تحرير، بل إفصاحٌ صادق عن حدود التشغيل الحقيقي، ولا يجوز
+   * إخفاؤها خلف مظهرٍ يبدو مكتملاً في أيّ وضع.
+   */
+  interactive: boolean;
 }) {
   const uiLocale = useLocale();
   const t = useTranslations('appBuilder.builder');
   const definition = registries?.components[node.type];
   const typeLabel = definition ? registryLabel(definition.label, uiLocale) : node.type;
+
+  if (!interactive) {
+    return (
+      <div className={cn('relative rounded', className)}>
+        {node.visibility ? <UnsupportedVisibilityBadge label={t('visibilityUnsupportedBadge')} /> : null}
+        {children}
+      </div>
+    );
+  }
 
   return (
     <div
@@ -164,6 +182,7 @@ function CanvasComponentNode({
   registries,
   knownIds,
   selectFallbackId,
+  interactive,
 }: {
   node: AppSchemaComponent;
   selectedId: string | null;
@@ -173,6 +192,8 @@ function CanvasComponentNode({
   knownIds: Set<string>;
   /** أقرب سلفٍ معروف لهذه العقدة، تُسنَد إليه التحديدات الصادرة من نسخ مولَّدة. */
   selectFallbackId: string;
+  /** MOBILE-PREVIEW-3 — انظر تعليق `NodeFrame` الرأسي. */
+  interactive: boolean;
 }) {
   const isKnown = knownIds.has(node.id);
   const effectiveSelectId = isKnown ? node.id : selectFallbackId;
@@ -180,7 +201,15 @@ function CanvasComponentNode({
   const selected = isKnown && node.id === selectedId;
   const children = node.children ?? [];
   const frame = (body: React.ReactNode, className?: string) => (
-    <NodeFrame node={node} selectId={effectiveSelectId} selected={selected} onSelect={onSelect} className={className} registries={registries}>
+    <NodeFrame
+      node={node}
+      selectId={effectiveSelectId}
+      selected={selected}
+      onSelect={onSelect}
+      className={className}
+      registries={registries}
+      interactive={interactive}
+    >
       {body}
     </NodeFrame>
   );
@@ -190,7 +219,7 @@ function CanvasComponentNode({
       return (
         <div className="space-y-3 p-3">
           {children.map((child) => (
-            <CanvasComponentNode key={child.id} node={child} selectedId={selectedId} onSelect={onSelect} registries={registries} knownIds={knownIds} selectFallbackId={childFallbackId} />
+            <CanvasComponentNode key={child.id} node={child} selectedId={selectedId} onSelect={onSelect} registries={registries} knownIds={knownIds} selectFallbackId={childFallbackId} interactive={interactive} />
           ))}
         </div>
       );
@@ -202,7 +231,7 @@ function CanvasComponentNode({
           {title ? <p className="text-sm font-semibold text-text">{title}</p> : null}
           <div className="space-y-2">
             {children.map((child) => (
-              <CanvasComponentNode key={child.id} node={child} selectedId={selectedId} onSelect={onSelect} registries={registries} knownIds={knownIds} selectFallbackId={childFallbackId} />
+              <CanvasComponentNode key={child.id} node={child} selectedId={selectedId} onSelect={onSelect} registries={registries} knownIds={knownIds} selectFallbackId={childFallbackId} interactive={interactive} />
             ))}
           </div>
         </div>
@@ -245,7 +274,7 @@ function CanvasComponentNode({
           ) : (
             children.map((child) => (
               <div key={child.id} className="w-32 shrink-0">
-                <CanvasComponentNode node={child} selectedId={selectedId} onSelect={onSelect} registries={registries} knownIds={knownIds} selectFallbackId={childFallbackId} />
+                <CanvasComponentNode node={child} selectedId={selectedId} onSelect={onSelect} registries={registries} knownIds={knownIds} selectFallbackId={childFallbackId} interactive={interactive} />
               </div>
             ))
           )}
@@ -281,7 +310,7 @@ function CanvasComponentNode({
           {description ? <p className="text-sm text-muted">{description}</p> : null}
           <div className="space-y-2 border-t border-border pt-2">
             {children.map((child) => (
-              <CanvasComponentNode key={child.id} node={child} selectedId={selectedId} onSelect={onSelect} registries={registries} knownIds={knownIds} selectFallbackId={childFallbackId} />
+              <CanvasComponentNode key={child.id} node={child} selectedId={selectedId} onSelect={onSelect} registries={registries} knownIds={knownIds} selectFallbackId={childFallbackId} interactive={interactive} />
             ))}
           </div>
         </div>
@@ -338,7 +367,7 @@ function CanvasComponentNode({
           {children.length === 0 ? (
             <span className="text-xs text-muted">—</span>
           ) : (
-            children.map((child) => <CanvasComponentNode key={child.id} node={child} selectedId={selectedId} onSelect={onSelect} registries={registries} knownIds={knownIds} selectFallbackId={childFallbackId} />)
+            children.map((child) => <CanvasComponentNode key={child.id} node={child} selectedId={selectedId} onSelect={onSelect} registries={registries} knownIds={knownIds} selectFallbackId={childFallbackId} interactive={interactive} />)
           )}
         </div>
       );
@@ -416,6 +445,7 @@ export function AppBuilderCanvas({
   themeTokens,
   registries = null,
   stateBanner,
+  interactive = true,
 }: {
   root: AppSchemaComponent | null;
   device: PreviewDevice;
@@ -431,6 +461,13 @@ export function AppBuilderCanvas({
    * (`builder/page.tsx`) لا يُحسَب هنا، لأن هذا الملف لا يعرف شيئاً عن حالات المسودة/النشر.
    */
   stateBanner?: string;
+  /**
+   * MOBILE-PREVIEW-3 — `false` لوضع «معاينة التطبيق» (Browser App Preview): يوقف تحديد/
+   * تحويم النقر على كل عقدة (`NodeFrame`) وعلى خلفية الكانفاس نفسها أدناه، بلا أي تفرّع في
+   * حلّ الربط أو تحويل بيانات العرض — نفس الشجرة المُحلولة تماماً، عرضٌ فقط يتغيّر.
+   * الافتراض `true` يُبقي كل استدعاء موجود (وضع «تصميم») بلا أي تغيير سلوكي.
+   */
+  interactive?: boolean;
 }) {
   const t = useTranslations('appBuilder.builder');
 
@@ -447,7 +484,7 @@ export function AppBuilderCanvas({
         dir={locale.toLowerCase().startsWith('ar') ? 'rtl' : 'ltr'}
         style={{ width: PREVIEW_WIDTHS[device], maxWidth: '100%', ...themeCssVars(themeTokens) }}
         className="h-fit min-h-[480px] shrink-0 overflow-hidden rounded-lg border border-border bg-surface shadow-sm"
-        onClick={() => root && onSelect(root.id)}
+        onClick={interactive ? () => root && onSelect(root.id) : undefined}
       >
         {stateBanner ? (
           <div className="border-b border-border bg-background px-3 py-1.5 text-center text-[11px] font-semibold text-text">
@@ -468,6 +505,7 @@ export function AppBuilderCanvas({
             registries={registries}
             knownIds={knownIds}
             selectFallbackId={resolvedRoot.id}
+            interactive={interactive}
           />
         ) : (
           <p className="p-6 text-center text-sm text-muted">{t('emptyPage')}</p>
