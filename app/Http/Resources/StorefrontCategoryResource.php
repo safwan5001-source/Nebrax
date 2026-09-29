@@ -31,14 +31,12 @@ class StorefrontCategoryResource extends JsonResource
     public function toArray(Request $request): array
     {
         $image = $this->publicImage($request);
-
-        return [
+        $payload = [
             'id' => $this->resource->id,
             'name' => $this->resource->name,
             'description' => $this->resource->description,
             'color' => $this->resource->color,
             'parent_id' => $this->resource->parent_id,
-            'image' => $image,
             'children' => $this->when(
                 $this->childDepth > 0 && $this->resource->relationLoaded('children'),
                 fn () => $this->resource->children
@@ -55,6 +53,20 @@ class StorefrontCategoryResource extends JsonResource
                 ])->all(),
             ),
         ];
+
+        // Commerce/mobile reuses this resource but has a closed OpenAPI
+        // schema. Keep the media projection additive to the public storefront
+        // contract instead of emitting an undocumented null field there.
+        if ($this->isStorefrontRequest($request)) {
+            $payload['image'] = $image;
+        }
+
+        return $payload;
+    }
+
+    private function isStorefrontRequest(Request $request): bool
+    {
+        return str_starts_with((string) $request->route()?->getName(), 'storefront.v1.');
     }
 
     /**
@@ -66,7 +78,7 @@ class StorefrontCategoryResource extends JsonResource
      */
     private function publicImage(Request $request): ?array
     {
-        if (! $this->resource->image_path || ! str_starts_with((string) $request->route()?->getName(), 'storefront.v1.')) {
+        if (! $this->resource->image_path || ! $this->isStorefrontRequest($request)) {
             return null;
         }
 
