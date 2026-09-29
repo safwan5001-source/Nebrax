@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Api;
 use App\Models\CommerceListing;
 use App\Models\ProductMedia;
 use App\Services\DocumentCenter\DocumentStorageService;
+use App\Services\R2StorageService;
 use App\Tenancy\StorefrontContext;
+use Aws\Exception\AwsException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use RuntimeException;
@@ -48,7 +50,10 @@ use RuntimeException;
  */
 class CommerceMediaController extends PublicApiController
 {
-    public function __construct(private readonly DocumentStorageService $documentStorage) {}
+    public function __construct(
+        private readonly DocumentStorageService $documentStorage,
+        private readonly R2StorageService $r2,
+    ) {}
 
     public function show(Request $request)
     {
@@ -86,6 +91,18 @@ class CommerceMediaController extends PublicApiController
             return response()->streamDownload(function () use ($stream): void {
                 fpassthru($stream);
                 fclose($stream);
+            }, $media->original_name, $headers, 'inline');
+        }
+
+        if ($media->disk === 'r2') {
+            try {
+                $body = $this->r2->get(ProductMedia::R2_DOMAIN, (string) $media->product_id, basename($media->path));
+            } catch (RuntimeException|AwsException $exception) {
+                abort(404, 'الوسائط غير موجودة.');
+            }
+
+            return response()->streamDownload(function () use ($body): void {
+                echo (string) $body;
             }, $media->original_name, $headers, 'inline');
         }
 

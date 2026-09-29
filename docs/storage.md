@@ -8,8 +8,8 @@ The repository is a Laravel core that is assembled into a Laravel 11 application
 - `public` is the existing public local disk.
 - `s3` remains the existing AWS-compatible disk and keeps its `AWS_*` environment contract.
 - `document` is a logical value stored in existing media/attachment rows. It is resolved by `DocumentStorageService`; it is not a direct `Storage::disk('document')` disk.
-- Product media paths are tenant-prefixed (`product-media/{tenant_id}/{product_id}/...`) and are served through authenticated API download endpoints. Existing media uploads, reads, and deletes continue to resolve through the current local document-storage profile.
-- No existing flow selects the `r2` disk in this foundation slice.
+- Product media paths are tenant-prefixed (`product-media/{tenant_id}/{product_id}/...`) and are served through authenticated API download endpoints. Existing media uploads, reads, and deletes continue to resolve through the current local document-storage profile **unless the row's `disk` column reads `r2`** — see "Product Media R2 migration" below.
+- All other flows (invoices, documents, generic attachments, storefront assets) still select no `r2` disk at all.
 
 ## Cloudflare R2 foundation disk
 
@@ -37,7 +37,7 @@ Future R2 objects use the server-derived key shape:
 tenant/{tenant_id}/{domain}/{resource_id}/{filename}
 ```
 
-`R2StorageService` reads `{tenant_id}` only from the scoped `TenantContext`; callers cannot provide a tenant prefix or arbitrary object key. Every segment is restricted to safe single-segment characters, so traversal such as `../` and embedded separators is rejected. No controller receives bucket-listing capability. This slice does not migrate data or switch Product Media, documents, invoices, attachments, or storefront assets to R2.
+`R2StorageService` reads `{tenant_id}` only from the scoped `TenantContext`; callers cannot provide a tenant prefix or arbitrary object key. Every segment is restricted to safe single-segment characters, so traversal such as `../` and embedded separators is rejected. No controller receives bucket-listing capability. This foundation slice does not migrate data by itself; **Product Media is the first, and so far only, consumer** — see below. Documents, invoices, generic attachments, and storefront assets are still explicitly out of scope.
 
 ### Manual smoke test command
 
@@ -67,8 +67,186 @@ exceptions are never printed. Missing configuration also fails before a network
 operation.
 
 The focused automated tests use a mocked AWS client and require no real R2
-credentials or network calls. **No real Production smoke test has occurred.**
-Production execution requires explicit owner approval after the R2 environment
-variables (`R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`, `R2_ENDPOINT`,
-`R2_REGION`, and `R2_USE_PATH_STYLE_ENDPOINT`) are added directly to the approved
-runtime environment.
+credentials or network calls. A real Production smoke test has already passed
+(write/exists/read/delete/cleanup all PASS) against the `awj-production`
+Cloudflare R2 bucket, with `nibras-api`'s Railway R2 variables configured
+(AWJ-R2-3). Production execution of the smoke test remains a manual, explicit
+operator action; it is never invoked automatically.
+
+## Product Media R2 migration (AWJ-R2-4)
+
+Product Media (`app/Models/ProductMedia.php`) is the first real consumer of
+`R2StorageService`. The migration is scoped to Product Media only — invoices,
+generic documents/attachments, and storefront assets are untouched and keep
+using `DocumentStorageService` exclusively.
+
+### Architecture
+
+`ProductMedia.disk` (an existing column, no schema change) is the single
+source of truth for which backend a row lives on:
+
+- `disk = 'document'` — legacy path, resolved through `DocumentStorageService`
+  (local disk in dev/test, S3-compatible profile when
+  `document_center.storage.persistent_enabled` is on).
+- `disk = 'r2'` — new path, resolved through `R2StorageService`.
+- Any other value (e.g. a raw local disk name from very old rows) — resolved
+  through `Storage::disk($media->disk)`, unchanged from before this epic.
+
+Every read, write, and delete site branches on this column. There is no
+migration flag stored anywhere else, and no inference from file content or
+extension.
+
+### New write behavior (R2-4A)
+
+New Product Media uploads go to R2 only when the `product_media.r2.enabled`
+config flag is **on**. It defaults to **off**
+(`PRODUCT_MEDIA_R2_ENABLED` env var, `config/product_media.php`), so merging
+and even deploying this code changes nothing in Production until the flag is
+explicitly flipped — a deliberate rollback lever that needs no redeploy.
+
+Two write sites route through this flag identically:
+
+- `ProductController::storeMedia()` — the product-level upload endpoint
+  (`POST /api/products/{id}/media`).
+- `ProductMediaService::store()` — the option-value/variant-scoped media
+  writer (`attachToOptionValue()`/`attachToVariant()`).
+
+When enabled, each file is read fully into memory (uploads are already capped
+at 5 MB by `StoreProductMediaRequest`) and written via
+`R2StorageService::put('product-media', $product->id, $filename, $bytes, $mimeType)`,
+where `$filename` is a server-generated `Str::uuid().'.'.$extension` — the
+caller's original filename never reaches the object key. The resulting row
+gets `disk = 'r2'` and `path` = the full server-derived key. When disabled,
+behavior is byte-for-byte what it was before this epic (`disk = 'document'`).
+
+### Backward-compatible reads (R2-4B)
+
+`ProductController::downloadMedia()`, `CommerceMediaController::show()`
+(`/commerce/v1/media/{id}`), and `StorefrontMediaController::show()`
+(`/store/v1/{tenantSlug}/media/{id}`) each gained one additional branch:
+
+```php
+if ($media->disk === 'r2') {
+    $body = $this->r2->get(ProductMedia::R2_DOMAIN, (string) $media->product_id, basename($media->path));
+    return response()->streamDownload(fn () => print((string) $body), ...);
+}
+```
+
+placed alongside the existing `document` branch and ahead of the legacy
+`Storage::disk($media->disk)` fallback, so a product's gallery can freely mix
+`document` and `r2` rows — each row is served from whichever backend it
+actually lives on. Existing authorization and tenant-isolation checks
+(`Product::findOrFail`, publish/channel gating) run unchanged before the disk
+branch is ever reached. A missing/failed R2 read returns the same
+non-revealing 404 the `document` branch already returns for a missing file.
+
+### R2 read behavior
+
+`R2StorageService::get()` returns the AWS SDK response body (a PSR-7 stream
+in production, whatever the test double returns in tests). All three read
+sites cast it once with `(string) $body` before streaming it back — simple
+and safe given the 5 MB upload cap, and it works uniformly whether the value
+is a real stream or a plain string in tests.
+
+### Delete behavior (R2-4D)
+
+`ProductController::destroyMedia()`, `ProductMediaService::delete()`, and
+`ProductMediaService::deleteFiles()` (the post-commit bulk cleanup used when
+a variant/option value/product is deleted) each gained an `r2` branch that
+calls `R2StorageService::delete(ProductMedia::R2_DOMAIN, $productId, basename($path))`
+— the exact object for that row, never a prefix or a listing. Cross-tenant
+delete is impossible for the same reason cross-tenant read is: the row is
+resolved through the normal tenant-scoped Eloquent relation before any
+storage call happens. A failed R2 delete throws before the `ProductMedia`
+row is deleted, so a storage failure never silently desyncs the database
+from the bucket (identical to the existing `document` failure semantics).
+
+### Key contract
+
+```text
+tenant/{tenant_id}/product-media/{product_id}/{filename}
+```
+
+`{tenant_id}` comes from `TenantContext` only, `{product_id}` comes from the
+already tenant-scoped `Product`/`ProductMedia` row, and `{filename}` is
+always server-generated. No caller-supplied value ever reaches the key.
+
+### Backfill command (R2-4C)
+
+`php artisan awj:product-media-r2-backfill --tenant=<uuid> [--limit=200] [--dry-run]`
+(`App\Services\ProductMediaR2BackfillService`) copies one tenant's legacy
+Product Media rows to R2:
+
+- **Manual only** — not wired into boot, migrations, deploy, scheduler, or
+  queue workers.
+- **Tenant-scoped and batch-bounded** — `--tenant` is required and validated
+  as a UUID; `--limit` defaults to 200 and is capped at 2000.
+- **Idempotent** — it only ever queries rows where `disk != 'r2'`, so a row
+  already migrated is never revisited by a later run; safe to re-run after a
+  partial failure.
+- **Integrity-verified** — after `put()`, it confirms the object exists
+  (`HeadObject`) and then reads it back (`GetObject`) and compares a SHA-256
+  hash of the source bytes against the read-back bytes with `hash_equals()`;
+  the `ProductMedia` row is only flipped to `disk = 'r2'` when both checks
+  pass. A mismatch leaves the row on its legacy disk and reports
+  `failed_integrity_mismatch`.
+- **Never deletes the legacy source** — out of scope for this epic by
+  design; the row keeps whatever legacy bytes it had, now duplicated on R2.
+- **Never lists the bucket and never accepts a raw object key** — every key
+  is derived the same way the live write path derives it, from the row's own
+  `product_id` and a safe filename.
+- **Never touches another tenant, another file domain, or another model** —
+  the service only ever queries and updates `ProductMedia` rows within the
+  one tenant passed on the command line.
+- **Dry-run exists** — `--dry-run` reports what would happen (`would_migrate`
+  per row) without calling R2 or writing to the database.
+- Produces a structured table (`media_id`, `product_id`, `source_disk`,
+  `status`) plus a summary count per status; exits non-zero if any row
+  reports a `failed_*` status.
+
+### Rollback / fallback strategy
+
+- **New writes**: flip `PRODUCT_MEDIA_R2_ENABLED` back to `false` (or leave
+  it unset). No code change or redeploy needed; the next upload goes back to
+  `disk = 'document'` immediately.
+- **Already-migrated rows**: reads keep working regardless of the flag,
+  because the read branch is keyed off each row's own `disk` column, not the
+  write flag. Turning the write flag off does not "un-migrate" rows already
+  on R2, and does not break reading them.
+- **Backfill**: since it never deletes the legacy source, a backfilled row
+  can always be manually reverted (`UPDATE product_media SET disk = 'document', path = '<original path>'`)
+  if ever needed, because the original bytes were never touched.
+
+### Coexistence
+
+A single product's gallery can contain a mix of `document`- and `r2`-backed
+rows indefinitely — there is no requirement or expectation that a tenant (or
+even a single product) is ever "fully migrated." Every read/write/delete
+site treats each row independently by its own `disk` value.
+
+### Production cutover checklist (not executed by this PR)
+
+1. Confirm `R2_*` Railway variables are present for `nibras-api` (already
+   true per AWJ-R2-3).
+2. Set `PRODUCT_MEDIA_R2_ENABLED=true` in Production — new uploads start
+   going to R2 immediately, legacy rows keep reading from their existing
+   backend.
+3. Verify a handful of new uploads end-to-end (create → list → download →
+   delete) in Production.
+4. When ready to backfill: run
+   `php artisan awj:product-media-r2-backfill --tenant=<uuid> --dry-run`
+   first per tenant, review the report, then re-run without `--dry-run`.
+   Repeat per tenant/batch as needed; it is safe to re-run and safe to
+   interleave with live traffic (idempotent, additive only).
+5. Legacy source deletion is a **separate, future, explicitly out-of-scope**
+   decision — not part of this checklist.
+
+### What remains before R2 is authoritative
+
+- Legacy source deletion after backfill (explicitly out of scope for this
+  epic).
+- A background/queued backfill worker — today's command is synchronous and
+  manual, consistent with `QUEUE_CONNECTION=sync` in Production today.
+- Extending this same pattern to any other file domain (documents, invoices,
+  storefront assets) — each would need its own explicit epic; nothing here
+  changes their behavior.

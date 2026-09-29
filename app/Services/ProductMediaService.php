@@ -7,6 +7,7 @@ use App\Models\ProductMedia;
 use App\Models\ProductOptionValue;
 use App\Models\ProductVariant;
 use App\Services\DocumentCenter\DocumentStorageService;
+use Aws\Exception\AwsException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Http\UploadedFile;
@@ -33,7 +34,16 @@ class ProductMediaService
 {
     private const MAX_PER_SCOPE = 8;
 
-    public function __construct(private readonly DocumentStorageService $documentStorage) {}
+    public function __construct(
+        private readonly DocumentStorageService $documentStorage,
+        private readonly R2StorageService $r2,
+    ) {}
+
+    /** AWJ-R2-4A: يبقى false افتراضياً — تراجعٌ فوريٌّ بمتغيّر بيئة بلا نشر كود. */
+    private function r2Enabled(): bool
+    {
+        return (bool) config('product_media.r2.enabled', false);
+    }
 
     /**
      * مستوى المنتج المشترك — يوازي `ProductController::storeMedia()` منطقاً
@@ -91,34 +101,51 @@ class ProductMediaService
 
         foreach (array_values($files) as $offset => $file) {
             $extension = strtolower($file->getClientOriginalExtension() ?: $file->extension() ?: 'bin');
-            $path = "product-media/{$product->tenant_id}/{$product->id}/".Str::uuid().".{$extension}";
-            $profile = $this->documentStorage->profile();
-            $stream = fopen($file->getRealPath(), 'rb');
-            try {
+            $filename = Str::uuid().".{$extension}";
+
+            if ($this->r2Enabled()) {
+                // بايتاتٌ في الذاكرة لا مجرى: حجم الملف محدودٌ أصلاً (5 ميغابايت،
+                // StoreProductMediaRequest)، وتفادياً لعلّة قائمة في
+                // R2StorageService::put() تستدعي is_readable() على مجرًى لا اسم
+                // ملف — لا يُصلَح هنا (خارج نطاق وسائط المنتج، AWJ-R2-2 مدموجة).
+                $bytes = file_get_contents($file->getRealPath());
                 try {
-                    $this->documentStorage->put($profile, $path, $stream);
-                } catch (RuntimeException $exception) {
+                    $path = $this->r2->put(ProductMedia::R2_DOMAIN, (string) $product->id, $filename, $bytes, $file->getMimeType());
+                } catch (RuntimeException|AwsException $exception) {
                     throw new RuntimeException('تعذّر حفظ الصورة. تحقق من إعداد تخزين الملفات الدائم ثم أعد المحاولة.');
                 }
-
-                // خارج try/catch التخزين عمداً: فشل هوية `ProductMedia::booted()`
-                // (قيمة خيارٍ/متغيّرٍ لا تخصّ هذا المنتج، أو تعارض مستأجر) يجب أن
-                // يظهر برسالته الحقيقية، لا يُموَّه برسالة عطل تخزينٍ مضلِّلة.
-                $created[] = ProductMedia::create(array_merge([
-                    'product_id' => $product->id,
-                    'disk' => 'document',
-                    'path' => $path,
-                    'original_name' => $file->getClientOriginalName(),
-                    'mime_type' => $file->getMimeType(),
-                    'size' => $file->getSize(),
-                    'sort_order' => $start + $offset,
-                    'uploaded_by' => $uploadedBy,
-                ], $scope));
-            } finally {
-                if (is_resource($stream)) {
-                    fclose($stream);
+                $disk = 'r2';
+            } else {
+                $path = "product-media/{$product->tenant_id}/{$product->id}/{$filename}";
+                $profile = $this->documentStorage->profile();
+                $stream = fopen($file->getRealPath(), 'rb');
+                try {
+                    try {
+                        $this->documentStorage->put($profile, $path, $stream);
+                    } catch (RuntimeException $exception) {
+                        throw new RuntimeException('تعذّر حفظ الصورة. تحقق من إعداد تخزين الملفات الدائم ثم أعد المحاولة.');
+                    }
+                    $disk = 'document';
+                } finally {
+                    if (is_resource($stream)) {
+                        fclose($stream);
+                    }
                 }
             }
+
+            // خارج try/catch التخزين عمداً: فشل هوية `ProductMedia::booted()`
+            // (قيمة خيارٍ/متغيّرٍ لا تخصّ هذا المنتج، أو تعارض مستأجر) يجب أن
+            // يظهر برسالته الحقيقية، لا يُموَّه برسالة عطل تخزينٍ مضلِّلة.
+            $created[] = ProductMedia::create(array_merge([
+                'product_id' => $product->id,
+                'disk' => $disk,
+                'path' => $path,
+                'original_name' => $file->getClientOriginalName(),
+                'mime_type' => $file->getMimeType(),
+                'size' => $file->getSize(),
+                'sort_order' => $start + $offset,
+                'uploaded_by' => $uploadedBy,
+            ], $scope));
         }
 
         return $created;
@@ -129,7 +156,13 @@ class ProductMediaService
         $disk = $media->disk;
         $path = $media->path;
 
-        if ($disk === 'document') {
+        if ($disk === 'r2') {
+            try {
+                $this->r2->delete(ProductMedia::R2_DOMAIN, (string) $media->product_id, basename($path));
+            } catch (RuntimeException|AwsException $exception) {
+                throw new RuntimeException('تعذّر حذف ملف الوسيط من التخزين الدائم. أعد المحاولة.');
+            }
+        } elseif ($disk === 'document') {
             try {
                 $this->documentStorage->delete($this->documentStorage->profile(), $path);
             } catch (RuntimeException $exception) {
@@ -148,20 +181,31 @@ class ProductMediaService
      * `ProductLifecycleService::delete()` حرفياً. يُستعمل عند حذفٍ حقيقي
      * لمتغيّرٍ/قيمةٍ حتى لا يبقى وسيطٌ يتيم.
      *
-     * @return list<array{disk: string, path: string}> ليُحذَف بعد الالتزام
+     * @return list<array{disk: string, path: string, product_id: string}> ليُحذَف بعد الالتزام
      */
     public function collectAndQueueDeletion(HasMany|Builder $mediaRelation): array
     {
-        $files = $mediaRelation->get(['disk', 'path'])->map(fn ($m) => ['disk' => $m->disk, 'path' => $m->path])->all();
+        $files = $mediaRelation->get(['disk', 'path', 'product_id'])
+            ->map(fn ($m) => ['disk' => $m->disk, 'path' => $m->path, 'product_id' => $m->product_id])->all();
         $mediaRelation->delete();
 
         return $files;
     }
 
-    /** @param  list<array{disk: string, path: string}>  $files */
+    /** @param  list<array{disk: string, path: string, product_id: string}>  $files */
     public function deleteFiles(array $files): void
     {
         foreach ($files as $item) {
+            if ($item['disk'] === 'r2') {
+                try {
+                    $this->r2->delete(ProductMedia::R2_DOMAIN, (string) $item['product_id'], basename($item['path']));
+                } catch (RuntimeException|AwsException $exception) {
+                    report($exception);
+                }
+
+                continue;
+            }
+
             if ($item['disk'] === 'document') {
                 try {
                     $this->documentStorage->delete($this->documentStorage->profile(), $item['path']);
