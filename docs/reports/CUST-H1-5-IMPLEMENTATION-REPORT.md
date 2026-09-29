@@ -7,9 +7,9 @@
 ## Repository State
 
 - **Base SHA:** `9d11a9dbed1da5097a3abccb00d1c8cad443608d` (`origin/main` tip at task start, confirmed with a fresh `git fetch origin main` before starting — matches the SHA given in the task brief exactly; main had not advanced).
-- **Head SHA:** _(filled in at commit time — see PR)_
+- **Head SHA:** `e98275c1886cee756c965877d49e12d0d0bfd51f`
 - **Branch:** `feat/cust-h1-5-scheduling-ux`
-- **PR:** _(opened after this report; link added once created)_
+- **PR:** [#1114](https://github.com/safwan5001-source/Nebrax/pull/1114)
 
 This Horizon builds on CUST-H1-1 (persistence foundation, PR #1082), CUST-H1-2 (Version-aware Customizer UX, PR #1085), CUST-H1-3 (immediate version publishing, PR #1103), and CUST-H1-4 (scheduling backend/runtime, PR #1112), all already on `main`. Their investigation was not repeated; `CUST-H1-ARCH-1-THEME-VERSION-PERSISTENCE-SCHEDULING.md`, `CUST-H1-THEME-VERSIONS-EVIDENCE-UX.md`, `AWJ_STORE_CUSTOMIZER_HORIZON_ROADMAP_V1.md`, and the four prior implementation reports were read as authoritative context, as instructed.
 
@@ -216,7 +216,14 @@ New backend tests (`StorefrontPresentationVersionScheduleApiTest.php`): `schedul
 
 Both engines matched CI's own `ci.yml` matrix exactly (SQLite: `database/database.sqlite`; PostgreSQL 16: role/db `nibras`/`nibras`, password `secret`, matching `ci.yml`'s `postgres:16` service block). All CUST-H1-5-touched test files pass identically on both engines with zero differences in outcome.
 
-_[Full-suite SQLite run in progress at report-drafting time; exact final failing-test inventory to be confirmed against the pre-existing `Fuel*`/`bcmath` and `R2*`/AWS-SDK gaps CUST-H1-1 through H1-4 already documented in this dev container, per this session's own targeted-scope verification above. Updated before PR is opened.]_
+Full-suite SQLite run (clean, isolated — no concurrent access to the same database file): **54 failed, 49 skipped, 4874 passed (30562 assertions)**, matching every prior CUST-H1 Horizon's documented pre-existing gaps in this exact dev container, with zero exceptions:
+
+- **`Fuel*Test`/`FuelSale*`/`FuelReconciliation*`/`FuelSupplyReceiving*`/`FuelAviRfidServiceTest`** — `bcmath` PHP extension not installed in this dev container (confirmed directly: `php -m | grep bcmath` → not present). CI's `ci.yml` installs `bcmath` explicitly, so these are not expected to recur there — documented as a known pre-existing gap since CUST-H1-1's own report.
+- **`R2*Test`/`ProductMediaR2*Test`** — `Class "Aws\Exception\AwsException" not found`; the AWS SDK is not installed in this dev container's `vendor/`. Same pre-existing gap every prior CUST-H1 report has documented.
+- **`AuthRecoveryTest`/`DocumentCenterSecureIntakeTest`** — `Class "App\Mail\AuthActionMail" not found`; the exact local-dev-only `setup.sh` gap (missing an `app/Mail` copy step that `deploy/assemble.sh` and CI both already have) CUST-H1-4's own report documented — pre-existing, unrelated to this Horizon.
+- **`ProductOptionValueVisualTest`** — `SQLSTATE[HY000]: General error: 5 database is locked`; the exact SQLite single-file-contention flake at full-suite scale CUST-H1-4's report documented for this same test, reproduced identically here with zero Storefront/Commerce/Presentation involvement.
+
+**Zero failures in any Storefront/Presentation/Commerce/Company-scoped test** — verified both by this full-suite run (none of the 17 failing test classes touch this Horizon's code) and by the isolated scoped runs above, on both database engines.
 
 ## Build / Typecheck
 
@@ -244,7 +251,7 @@ _Filled in as the PR receives review activity._
 - **Toolbar Schedule button is desktop-only (`lg:inline`, ≥1024px)** — a deliberate, evidenced trade-off (see Toolbar Budget), not an oversight. Schedule remains fully available at every width via the Version Manager. Worth revisiting only if the toolbar is redesigned with more horizontal budget in a future Horizon.
 - **`scheduling_runtime_active` is a single environment-wide value**, not per-tenant or per-storefront — this matches the architecture's own framing of the Production gate as a whole-deployment concern (the scheduler either runs for everyone or no one), not a per-merchant setting. If AWJ ever needs a staged/per-tenant rollout of live scheduling, that is a new decision, not something this Horizon's flag shape accommodates.
 - **The Production activation dependency is unchanged and still owner-gated** — no code in this Horizon can or does flip it; it requires the owner to wire up Render cron + (queue worker or verified Path B trigger) and then explicitly set `STORE_SCHEDULING_RUNTIME_ACTIVE=true`, per CUST-H1-4's own documented gate.
-- Full-suite SQLite backend run's exact pre-existing-failure inventory to be pasted here once the long-running background verification completes (see Tests section note) — expected to match the `Fuel*`(bcmath)/`R2*`(AWS SDK) categories every prior CUST-H1 Horizon has already documented in this dev container, none touching Storefront/Presentation/Commerce/Company code.
+- Full-suite SQLite backend run confirmed clean (see Tests section) — 54 pre-existing failures, all in the `Fuel*`(bcmath)/`R2*`(AWS SDK)/`AuthRecoveryTest`+`DocumentCenterSecureIntakeTest`(missing local `app/Mail` copy)/`ProductOptionValueVisualTest`(SQLite lock flake) categories every prior CUST-H1 Horizon has already documented in this dev container. None touch Storefront/Presentation/Commerce/Company code.
 
 ## CUST-H1 Closure Readiness
 
