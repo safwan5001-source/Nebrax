@@ -94,16 +94,31 @@ class StorefrontProductResource extends JsonResource
         return self::buildPayload($items, fn (string $id) => self::buildMediaUrl($id, $tenantSlug));
     }
 
+    /**
+     * **متعمَّدٌ نسبياً (بلا مخطّط/مضيف)** — AWJ-R2-5. الخادم الوحيد الذي يستدعي
+     * `store/v1` إنتاجياً هو خادم Next.js نفسه (`storefrontFetch()`، لا متصفح
+     * الزائر مباشرة — راجع تعليق `ResolveStorefrontDomain`)، فـ`$request->getHost()`
+     * الذي يبنيه `route()` هنا يعكس دومًا مضيف Laravel/الـ API الداخلي (مثل
+     * Railway) لا نطاق متجر الزائر العام (`{tenant}.store.awjdev.xyz`) الذي لا
+     * يُخدَّم منه `store/v1` إطلاقاً. رابطٌ مطلَقٌ بهذا المضيف كان يعمل خطأً
+     * بالصدفة فقط عبر `toRenderableMediaUrl()` في الواجهة (يعيد كتابته بمساره
+     * فقط) — سلطة تعويضٍ هشّة في طبقة الاستهلاك لعيبٍ في طبقة الإنتاج، تنكسر
+     * صامتةً لأي مستهلكٍ مستقبلي (بريد، معاينة رابط، تصدير) لا يمرّ عبرها.
+     * رابطٌ نسبي يُزيل الاعتماد على مضيف الطلب كليةً؛ لا تغيير في السلوك على
+     * `toRenderableMediaUrl()` نفسها (`new URL(url, base)` يحسم المسار سواءً
+     * كان الرابط مطلقاً أو نسبياً) ولا على `/commerce/v1` (تطبيقٌ جوّالٌ يحتاج
+     * رابطاً مطلقاً فعلاً — `buildCommerceMediaUrl()` أدناه لا يتأثر).
+     */
     public static function buildMediaUrl(string $mediaId, ?string $tenantSlug): string
     {
         if ($tenantSlug !== null) {
             return RouteFacade::has('storefront.v1.legacy.media.show')
-                ? route('storefront.v1.legacy.media.show', ['tenantSlug' => $tenantSlug, 'id' => $mediaId])
+                ? route('storefront.v1.legacy.media.show', ['tenantSlug' => $tenantSlug, 'id' => $mediaId], false)
                 : "/store/v1/{$tenantSlug}/media/{$mediaId}";
         }
 
         return RouteFacade::has('storefront.v1.media.show')
-            ? route('storefront.v1.media.show', ['id' => $mediaId])
+            ? route('storefront.v1.media.show', ['id' => $mediaId], false)
             : "/store/v1/media/{$mediaId}";
     }
 
