@@ -142,6 +142,15 @@ function toOptionValues(
 }
 
 /**
+ * Exported so `ProductImage` can recognize our own guarded media proxy and
+ * mark it `unoptimized` for `next/image` — see that component's comment for
+ * why (`next/image`'s internal optimizer resolves a local/relative `src`
+ * in-process, via a mocked request that carries no headers at all, which
+ * this proxy needs the real one for). One literal, not two.
+ */
+export const AWJ_MEDIA_PROXY_PATH_PREFIX = "/api/storefront/media/";
+
+/**
  * AWJ media URLs are guarded by Laravel's hostname-resolved storefront
  * middleware. A browser request cannot carry the server-only forwarded-host
  * gateway headers, so route AWJ media through the same-origin Next proxy.
@@ -155,7 +164,7 @@ function toRenderableMediaUrl(url: string | null): string | null {
     const parsed = new URL(url, "http://awj.invalid");
     const match = parsed.pathname.match(/^\/store\/v1\/media\/([^/]+)$/);
     if (match) {
-      return `/api/storefront/media/${encodeURIComponent(match[1])}`;
+      return `${AWJ_MEDIA_PROXY_PATH_PREFIX}${encodeURIComponent(match[1])}`;
     }
   } catch {
     // Keep the original URL if an upstream producer sends a non-URL value.
