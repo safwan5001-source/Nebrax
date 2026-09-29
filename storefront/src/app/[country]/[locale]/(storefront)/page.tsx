@@ -64,6 +64,7 @@ export default async function HomePage({ params }: HomePageProps) {
         storeName={storeName || null}
         headline={heroHeadline}
         subheadline={heroSubheadline}
+        themePreset={presentation?.themePreset}
       />
     ),
     categories: (
@@ -189,6 +190,7 @@ async function publishedNodes(
           key={section.id}
           sectionId={section.id}
           content={content}
+          themePreset={ctx.themePreset}
         />,
       );
       continue;

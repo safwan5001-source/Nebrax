@@ -1,180 +1,368 @@
-# AWJ Market — Full Theme Completion: Implementation Report
+# AWJ Market — Full Theme Completion: Implementation Report (Closure Audit)
 
-**Status:** IMPLEMENTATION COMPLETE for the scope defined below — PR open, pending review
+**Status:** AWJ MARKET FULL THEME: COMPLETE — PR open, pending review. Not merged, not deployed.
 **Repository:** `safwan5001-source/Nebrax`
 
-## 1. Scope and exclusions
+This report supersedes the first-pass report for the same PR. It documents the
+**closure audit** requested after CI first went green: every item this PR's
+first pass classified `ALREADY_COMPLETE` / `ADAPTED` / `NOT_APPLICABLE` /
+`GATED` / `DEFER` was independently re-examined against the five-question
+test (observed on Shona? presentation or platform capability? implementable
+honestly from existing data/contracts? does it need new schema/business
+logic/fabricated data? if not blocked, why wasn't it built?), with the
+explicit rule that nothing may be gated merely because AWJ Modern doesn't
+have the component. Full detail lives in
+`docs/commerce/AWJ_MARKET_FULL_THEME_COMPLETION_COVERAGE_MATRIX.md`; this
+report gives the audit outcome, the additional implementation it produced,
+and the verification evidence.
 
-This Horizon extends `AWJ_MARKET_HORIZON_IMPLEMENTATION_TASK.md`/`AWJ_MARKET_SHONA_EVIDENCE_GAP_PASS.md` (the Master Spec) using fresh live evidence from `https://store.shonaksa.com/` (previously blocked by network policy; confirmed reachable this session). It closes the gap the prior Horizon (PR #1084/#1091) left open: that Horizon registered the `awj-market` preset and its starting bundle but made no Market-specific composition/density changes beyond one `ProductCard` image-height branch, citing blocked live-evidence access.
+## 1. Base SHA
 
-**Explicitly excluded** (unchanged from the Master Spec's capability-gate manifest, re-confirmed by this Horizon's own live evidence — see the coverage matrix §7 for the full list):
-customer-selectable multi-location availability, authoritative offers/compare-at pricing and a dedicated Offers route, persistent wishlist, ratings/reviews, purchase-count social proof, public barcode/GTIN relabeling, a structured/interactive map, faceted catalog filtering, search suggestions, unsupported payment-method claims, arbitrary related-product recommendations, a loyalty/points program, and a site-wide announcement strip (would require a new persisted schema field — deferred, not gated by missing platform authority).
+`f6ce95a215d82767139332cf14722c5a9b80261a` (`origin/main`) — unchanged since
+the first pass; confirmed still the merge base.
 
-No database model, storefront route, commerce authority, or persisted `StorefrontPresentationConfig` field was added. Every change reads the **already-persisted** `themePreset` value.
+## 2. Final Head SHA
 
-## 2. Base verification
+`298584380f809de5737a0f5cec47d60c8fb50ede` plus this audit's commit, pushed
+to the same branch (no new PR opened). The branch history for this Horizon:
 
-- **Base SHA:** `f6ce95a215d82767139332cf14722c5a9b80261a` (`origin/main`, confirmed via `git fetch` + `git rev-parse` at Horizon start)
-- **Branch:** `claude/awj-market-full-theme-completion`
-- **PR:** https://github.com/safwan5001-source/Nebrax/pull/1096
-- **Head SHA:** `4218ad403b275d9449a44abff01d66cfb7225f26`
-- Working tree was clean at start; no intervening conflicting work found (this was the exact tip of `main` at the time of `git fetch`, not a moved target).
+```
+f6ce95a  main (base)
+4218ad4  feat(store): complete AWJ Market full theme density and composition   (first pass)
+2985843  docs: fill in PR number and head SHA in the Full Theme Completion report
+<new>    feat(store): AWJ Market closure audit — carousel, FAQ accordion, quick view, share, hero density   (this audit)
+```
 
-## 3. Live evidence pass
+## 3. PR number
 
-Full detail in `docs/commerce/AWJ_MARKET_FULL_THEME_COMPLETION_COVERAGE_MATRIX.md` (§2). Summary: real Playwright/Chromium session against `store.shonaksa.com`, branch/location modal handled through the live UI, evidence captured at 1440px and 390px (spot checks at 768/1024) across Home (full page, every section), Category, PDP (simple product, full page including reviews/related), Offers, Search, and Cart (add-to-cart, empty state). No Shona branding, imagery, copy, or proprietary code was copied — screenshots and DOM structure were inspected, not redistributed.
+https://github.com/safwan5001-source/Nebrax/pull/1096 — same PR, same
+branch (`claude/awj-market-full-theme-completion`), per the explicit
+instruction not to open a new one.
 
-## 4. Implementation summary by surface
+## 4. Audit findings
 
-### 4.1 Home
+Re-auditing all ten named surfaces (product rails, FAQ, announcement strip,
+hero/banner, category discovery, product-card anatomy, global shell, full
+PDP, full cart, search/category/catalog) against the five-question test
+found:
 
-- **Category discovery density** (`CategoriesSection.tsx`): Market raises the tile ceiling (12→18) and grid density (`grid-cols-2…xl:grid-cols-6` → `grid-cols-3…xl:grid-cols-8`, `gap-3`→`gap-2`, tile padding `px-4 py-3.5`→`px-3 py-2.5`, subcategory count hidden). `page.tsx` threads `presentation?.themePreset` in. Modern is byte-identical to before.
-- **Product-rail density** (`NewArrivalsSection.tsx`/`NewArrivals.tsx`, `FeaturedShelf.tsx`): Market widens the desktop tier (`lg:grid-cols-4`→`lg:grid-cols-5`); both components and their skeletons thread `themePreset`.
-- Hero, wholesale, banner/featured/benefits/appPromo/customContent sections: reused unchanged — already generic, merchant-authored, no fabricated content.
+- **Five items previously withheld were implementable and are now
+  implemented** (see §5): the product-rail carousel, the FAQ accordion,
+  product-card quick view, PDP share, and Hero density. None needed new
+  backend data, new schema, new business logic, or fabricated content —
+  each was a composition/interaction gap over data AWJ already returns.
+- **Two items remain genuinely gated**, but their dependency is now stated
+  precisely rather than asserted: category tile imagery (the raw
+  `AwjCategory` API type carries no image field at all — verified by
+  reading `types.ts`/`mappers.ts`, not assumed) and the site-wide
+  announcement strip (no field in `StorefrontPresentationConfig` can
+  honestly serve it; adding one is a PHP-normalizer + dual-TS-mirror schema
+  change, which this frontend-only Horizon's own scope boundary correctly
+  withholds rather than adding unilaterally).
+- **Two items were re-verified rather than re-implemented**: the global
+  shell (re-read `Header.tsx`/`MobileBottomNav.tsx`/the cart page in full,
+  not just the component list — confirmed already matching, including a
+  prior deliberate honesty decision already recorded in `Header.tsx`'s own
+  doc comment to omit wishlist/cart totals for lacking real data) and the
+  cart's mobile sticky bar (a second fixed bar would conflict with
+  `MobileBottomNav`'s safe area — the identical class of conflict this same
+  audit *did* solve for the PDP by measuring `MobileBottomNav`'s height and
+  pinning above it; re-examined and correctly left alone because the cart
+  is a short, finite list reaching an inline summary at its natural
+  scroll-end, unlike the PDP's persistently-visible primary action).
+- **A real bug was found and fixed as a consequence of finally activating
+  dead code**: `ProductCarousel.tsx` had never been mounted in production
+  before this audit. Its nav buttons used a negative `-start-5`/`-end-5`
+  offset that, once actually rendered inside `StoreContainer`'s real
+  padding, bled the buttons off the visible viewport edge at both 1440px
+  and 390px (confirmed via screenshot, not by code reading alone — see
+  §12). Fixed by overlaying the track's own edge slide (`start-2`/`end-2`)
+  instead of sitting outside it.
+- No item was reclassified from GATED to something looser without a
+  verified reason, and no item was reclassified into GATED to avoid work.
 
-### 4.2 Catalog / Category / Search
+## 5. Items whose classification changed (summary — full table in the coverage matrix §1)
 
-- **`InfiniteProductList.tsx`** (the actual live catalog/category/search grid) and **`ProductGrid.tsx`** (the dev-fixture/backend-free grid): both now read `usePublishedThemeMarker()` directly (client components) and widen to `sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5` under Market, vs. the unchanged `lg:grid-cols-3 xl:grid-cols-4` for every other theme. `ProductGrid.tsx` gained a `"use client"` directive (required to call the hook); its only production consumer (`/dev/market-visual`) is unaffected.
+| Item | Before | After |
+|---|---|---|
+| Product rail rhythm | ADAPTED (rejected for preview-parity cost) | **IMPLEMENTED** |
+| FAQ / multi-question content | ADAPTED (static text stand-in) | **IMPLEMENTED** |
+| Product card quick view | not separately audited | **IMPLEMENTED** |
+| PDP share affordance | not separately audited | **IMPLEMENTED** |
+| Hero/masthead density | ALREADY_COMPLETE (component reused, proportions unexamined) | **IMPLEMENTED** |
+| Category tile imagery | GATED (asserted) | **GATED — verified in source** |
+| Announcement/promo strip | GATED (asserted) | **GATED — verified, exact dependency stated** |
+| Global shell | ALREADY_COMPLETE | **ALREADY MATCHED — verified by re-reading rendered output** |
+| Cart sticky bar | not separately audited | **ALREADY MATCHED — deliberate, documented constraint** |
 
-### 4.3 PDP
+## 6. Additional implementation performed in this audit
 
-- **`ProductDetails.tsx`**: under Market, the existing quantity/add-to-cart row becomes a `fixed` bar pinned above `MobileBottomNav` (`bottom: calc(var(--store-bottom-nav-height)+env(safe-area-inset-bottom))`, the same technique `StoreWhatsApp.tsx` already uses) below the `md` breakpoint — the same breakpoint `MobileBottomNav` itself disappears at — and reverts to the ordinary static row at `md` and up. This **repositions** the existing controls; it does not duplicate them (a dedicated test asserts exactly one "add to cart" button renders). Container padding also tightens (`py-5 md:py-6`→`py-3 md:py-5`) under Market.
-- No PDP business logic (`handleAddToCart`, variant resolution, availability) was touched.
+1. **Product-rail carousel** (`ProductCarousel.tsx`, `NewArrivals.tsx`,
+   `FeaturedShelf.tsx`, `NewArrivalsSection.tsx`): the previously-unused
+   Swiper-based carousel is now wired into Market's two home product rails.
+   Made `slidesPerView`/`breakpoints`/`listId`/`listName` configurable
+   (defaults unchanged, so the component's own prior behavior is preserved
+   for any future caller that doesn't pass them). Market passes
+   `slidesPerView={2}` with breakpoints `{640: 3, 1024: 5}` so mobile never
+   regresses to Swiper's single-card default — the storefront's locked
+   two-column-mobile baseline holds. Fixed the nav-button-bleeds-off-screen
+   bug found during visual QA (`start-2`/`end-2`, `rounded-full`,
+   `shadow-sm`) and replaced hardcoded gray colors with design tokens.
+   `NewArrivalsSection.tsx`'s loading skeleton now approximates the
+   carousel's horizontal rhythm for Market instead of jumping from a grid
+   skeleton to a horizontal rail.
+2. **FAQ accordion** (`CustomContentBand.tsx`): added `groupBlocks()`,
+   which groups consecutive heading-led blocks, and renders each group as a
+   native `<details>`/`<summary>` disclosure for Market when 2+ such groups
+   exist (a single heading stays plain prose — nothing is folded behind a
+   click unnecessarily). Uses only the existing `CustomBlock` shape
+   (`{id, kind: "heading"|"paragraph", text}`); no new content model.
+3. **Product-card quick view** (`QuickView.tsx`, new; wired into
+   `ProductCard.tsx`): a dialog built from `src/components/ui/dialog.tsx`
+   that shows name/image/price/compare-at/availability using **only**
+   fields already present in the card's existing `product` prop — no new
+   per-card or on-open fetch. Quantity + add-to-cart for simple,
+   non-wholesale, purchasable products; an honest "view full details" link
+   to the real PDP for variant-managed products, matching how the card's
+   own existing inline action already handles that case.
+4. **PDP share button** (`ShareButton.tsx`, new; wired into
+   `ProductDetails.tsx` beside `WishlistButton`): Web Share API with a
+   clipboard-copy fallback (toast confirmation via the existing `sonner`
+   pattern already used by `CartContext.tsx`). Shares only the current
+   page URL — no product data collected or invented.
+5. **Hero density** (`HeroSection.tsx`): Market-specific tighter
+   `min-h`/padding (`min-h-[7rem] md:min-h-[9rem] lg:min-h-[10rem]` vs.
+   `min-h-[11rem] md:min-h-[16rem] lg:min-h-[18rem]`) so the masthead cedes
+   space to discovery sooner, matching the observed Shona density. Same
+   headline/subheadline/CTA data as before — no new content required.
+6. **Customizer preview parity** (`StorefrontPreviewCanvas.tsx`): added a
+   decorative eye-icon overlay on Market preview product tiles so the
+   quick-view affordance has *some* visual echo in the merchant-facing
+   preview, without simulating a real dialog (the preview canvas has no
+   backend to serve one honestly).
+7. **i18n**: added `quickView`, `viewFullDetails`, `share`, `linkCopied`
+   keys to the `products` namespace in all 6 locale files (`en`, `ar`,
+   `fr`, `de`, `es`, `pl`), verified in sync via
+   `scripts/check-locale-parity.ts`.
+8. **Visual QA fixture** (`/dev/market-visual`): extended with a
+   `data-testid="fixture-carousel"` section and a
+   `data-testid="fixture-faq"` section (via a new `fixtureFaqBlocks()`
+   helper) so the carousel and accordion have the same backend-free,
+   real-component visual-QA coverage the fixture already gave the category
+   grid, product grid, and cart line.
 
-### 4.4 Cart
+## 7. Items remaining GATED and exact reason
 
-- **`CartLine.tsx`** (shared by the cart drawer, cart page, checkout item review, and order confirmation): row padding tightens `py-4`→`py-3` for the `page`/`drawer` densities under Market only, via `usePublishedThemeMarker()`. Nothing in `CartLineView`, the AWJ/Spree adapters, or the quantity/remove handlers changed — this is a pure spacing adjustment on a money-critical, shared component.
+Unchanged from the first pass, but now individually re-verified rather than
+carried over by assumption (full list with dependency detail in the
+coverage matrix §3, 13 items). The two most scrutinized in this audit:
 
-### 4.5 Offers
+- **Category tile imagery** — `AwjCategory` (the raw `store/v1/categories`
+  payload type in `src/lib/commerce/types.ts`) has no image field at all
+  (`id, name, description, color, parent_id, children, ancestors`). Both
+  category-mapping functions in `mappers.ts` hardcode `image_url: null`
+  because there is nothing to map from. Requires a new backend field plus a
+  merchant upload UI — out of this Horizon.
+- **Announcement/promo strip** — the full `StorefrontPresentationConfig`
+  shape was read field-by-field (version, themePreset, colors, font,
+  density, radius, productCard, branding, header, homepage, footer,
+  contact, whatsapp, social, verification, sbc, apps, pages); none is a
+  site-wide, above-header announcement field, and none of the near-miss
+  candidates (`footer.tagline`, `homepage.heroHeadline`) is scoped to the
+  right page location to reuse honestly. Requires a new field in the
+  server-authoritative PHP normalizer plus both TypeScript mirrors — this
+  audit's own scope boundary ("stop and report" before a schema change)
+  correctly withholds that from a frontend-only PR.
 
-- No route added. Live evidence confirmed Shona's own Offers page is a plain grid filtered on a pricing field (`compare_at`) AWJ does not populate anywhere in the platform — reproducing it would require either fabricating discounts or building the missing platform pricing contract, both out of this Horizon's scope. Documented as GATED in the coverage matrix.
+Also unchanged and re-confirmed: multi-location/branch selection,
+authoritative offers/compare-at pricing, ratings/reviews, purchase-count
+social proof, related/recommended products, payment-method trust marks,
+structured/interactive map, "N+ customers" stat, loyalty/points program,
+faceted catalog filtering, public barcode/GTIN relabeling. None was
+activated, faked, or simulated.
 
-### 4.6 Global shell (Header/CategoryNav/MobileBottomNav/Footer/WhatsApp)
-
-- **No code change.** Live evidence confirmed these already satisfy the Master Spec's acceptance bar (prominent search, dense category rail, safe-area-respecting bottom nav, configurable contact/social/app footer) through existing, already-reused components and the pre-existing `header.style=compact` token Market's starting bundle already applies. Forcing a Market-exclusive shell change with no evidenced gap would have been exactly the kind of unjustified generic seam the Master Spec and CLAUDE.md both warn against.
-
-### 4.7 Customizer / preview parity
-
-- **`StorefrontPreviewCanvas.tsx`** (`web/`): mirrors the new category-grid and new-arrivals density classes using the file's own established "resolve the class from the simulated `viewport` prop, not a real responsive prefix" technique (documented in the file since the prior Horizon's 7-round preview-parity saga over `cardImageHeight`). This also fixed a **pre-existing, non-Market-specific** gap: the categories grid preview had never received that fix and still used un-resolved `sm:`/`lg:`/`xl:` classes that would have evaluated against the host browser's real window, not the simulated device — closed for both Modern and Market as a natural consequence of touching this exact code.
-- No new persisted config field — see §5.
-
-## 5. Contracts/components reused (no fork)
-
-`StorefrontPresentationConfig`, the three mirrored `THEME_PRESETS` allow-lists, `PublishedThemeMarkerProvider`/`usePublishedThemeMarker()` (from PR #1084), `PublishedCardStyleProvider`, `CategoriesSection`/`NewArrivals`/`FeaturedShelf`/`ProductCard`/`ProductGrid`/`InfiniteProductList`, `CartLine`/`awjCartLineView`, `ProductDetails`, the Theme Gallery's `presetSelectionPatch()`. No `Market*` component fork, no second storefront runtime, no new commerce service.
-
-## 6. Generic seams introduced and why
-
-1. **`CategoryTile` export** (`CategoriesSection.tsx`): was a private function; exported only so the `/dev/market-visual` fixture can render the exact production tile markup against hand-built categories (that fixture is backend-free and cannot call `getCategories()`). No behavior change for existing callers.
-2. **Explicit `themePreset` prop** on `CategoriesSection`/`NewArrivalsSection`/`NewArrivals`/`FeaturedShelf`: these are server components, so the client-only `usePublishedThemeMarker()` context isn't available to them; `page.tsx` already has `presentation.themePreset` in scope from the same `fetchStorefrontConfig()` call it uses for everything else on the page. This mirrors the codebase's own existing pattern (`publishedHomeStackClass(density)`, `publishedProductCardBodyClass(productCard)` — primitives passed explicitly, not read from context, for server-renderable decisions).
-
-Both are narrow, additive, and were "genuinely needed" per the Master Spec's own bar: without the first, real category tiles couldn't be visually verified without a backend; without the second, Home's density decisions would have had no lawful place to read `themePreset` from at all.
-
-## 7. Capability gates encountered
-
-None were activated. Every implemented change consumes only already-live AWJ capabilities (the closed preset enum, existing category/product data, existing `CartLine`/`ProductDetails` structure). See the coverage matrix §7 for the full, unchanged gate list re-confirmed by this Horizon's fresh evidence.
-
-## 8. Changed files
+## 8. Changed files (this audit's commit, on top of `2985843`)
 
 **Home:**
-- `storefront/src/components/home/CategoriesSection.tsx`
-- `storefront/src/components/home/NewArrivalsSection.tsx`
-- `storefront/src/components/home/FeaturedShelf.tsx`
-- `storefront/src/app/[country]/[locale]/(storefront)/page.tsx`
+- `storefront/src/components/home/CustomContentBand.tsx` (FAQ accordion)
+- `storefront/src/components/home/FeaturedShelf.tsx` (carousel wiring)
+- `storefront/src/components/home/HeroSection.tsx` (Market density)
+- `storefront/src/components/home/NewArrivalsSection.tsx` (carousel skeleton)
+- `storefront/src/app/[country]/[locale]/(storefront)/page.tsx` (thread `themePreset` to the above)
 
-**Catalog/category/search:**
-- `storefront/src/components/products/InfiniteProductList.tsx`
-- `storefront/src/components/products/ProductGrid.tsx`
-- `storefront/src/components/products/NewArrivals.tsx`
+**Product cards / rails:**
+- `storefront/src/components/products/ProductCarousel.tsx` (configurable props, nav-button fix, token colors)
+- `storefront/src/components/products/NewArrivals.tsx` (carousel wiring)
+- `storefront/src/components/products/ProductCard.tsx` (quick-view button)
+- `storefront/src/components/products/QuickView.tsx` (new)
+- `storefront/src/components/products/ShareButton.tsx` (new)
 
 **PDP:**
-- `storefront/src/app/[country]/[locale]/(storefront)/products/[slug]/ProductDetails.tsx`
-
-**Cart:**
-- `storefront/src/components/cart/CartLine.tsx`
+- `storefront/src/app/[country]/[locale]/(storefront)/products/[slug]/ProductDetails.tsx` (share button)
 
 **Customizer preview parity:**
-- `web/src/modules/store-experience-builder/StorefrontPreviewCanvas.tsx`
+- `web/src/modules/store-experience-builder/StorefrontPreviewCanvas.tsx` (decorative quick-view icon)
+
+**i18n (all 6 locales):**
+- `storefront/messages/{ar,de,en,es,fr,pl}.json`
 
 **Dev-only visual fixture (404s in production):**
-- `storefront/src/app/dev/market-visual/page.tsx` (extended with a categories block and a cart-line block, reusing the real `CategoryTile`/`CartLine` components)
+- `storefront/src/app/dev/market-visual/page.tsx` (carousel + FAQ sections)
 
 **Tests (new or extended):**
-- `storefront/src/components/home/__tests__/CategoriesSection.test.tsx`
-- `storefront/src/components/home/__tests__/FeaturedShelf.test.tsx` (new)
-- `storefront/src/components/products/__tests__/NewArrivals.test.tsx`
-- `storefront/src/components/products/__tests__/InfiniteProductList.test.tsx` (new)
-- `storefront/src/components/products/__tests__/ProductGrid.test.tsx` (new)
-- `storefront/src/app/[country]/[locale]/(storefront)/products/[slug]/ProductDetails.test.tsx`
-- `storefront/src/components/cart/__tests__/CartLine.test.tsx`
-- `web/src/modules/store-experience-builder/__tests__/StorefrontPreviewCanvas.marketCard.test.tsx`
+- `storefront/src/components/home/__tests__/CustomContentBand.test.tsx` (new, 4 tests)
+- `storefront/src/components/home/__tests__/FeaturedShelf.test.tsx` (carousel-mock tests)
+- `storefront/src/components/home/__tests__/HeroSection.test.tsx` (Market density test)
+- `storefront/src/components/products/__tests__/NewArrivals.test.tsx` (carousel-mock tests)
+- `storefront/src/components/products/__tests__/ProductCard.test.tsx` (quick-view presence tests)
+- `storefront/src/components/products/__tests__/ProductCarousel.test.tsx` (new, 4 tests)
+- `storefront/src/components/products/__tests__/QuickView.test.tsx` (new, 5 tests)
+- `storefront/src/components/products/__tests__/ShareButton.test.tsx` (new, 2 tests)
 
 **Documentation:**
-- `docs/commerce/AWJ_MARKET_FULL_THEME_COMPLETION_COVERAGE_MATRIX.md` (new)
+- `docs/commerce/AWJ_MARKET_FULL_THEME_COMPLETION_COVERAGE_MATRIX.md` (rewritten — closure audit vocabulary and tables)
 - `docs/commerce/AWJ_MARKET_FULL_THEME_COMPLETION_REPORT.md` (this file)
 
-16 code/test files changed, 3 new test files, 546 insertions / 40 deletions (`git diff --stat`, excluding the two new docs).
+22 code/doc files changed (16 modified, 6 new), 702 insertions / 227 deletions
+(`git diff --stat`, this audit's changes against `2985843`).
 
-## 9. Focused and full test results
+## 9. Focused test results
 
-**Storefront (vitest):** full suite **672 passed, 0 failed** (100 files) — up from the pre-Horizon baseline's 657/657 (this Horizon added 15 new test cases across 3 new + 5 extended files). Re-run after every source edit; consistently green.
+Run individually while building each feature, all green throughout:
+`ProductCarousel.test.tsx` (4/4), `CustomContentBand.test.tsx` (4/4),
+`QuickView.test.tsx` (5/5), `ShareButton.test.tsx` (2/2, after fixing a
+`navigator.clipboard`/`userEvent.setup()` stub-ordering issue — clipboard
+stub must be applied *after* `userEvent.setup()`, which installs its own),
+`NewArrivals.test.tsx`, `FeaturedShelf.test.tsx`, `HeroSection.test.tsx`,
+`ProductCard.test.tsx` (all updated for the carousel/quick-view/hero
+changes, all green).
 
-**Web (vitest):** full suite **2187 passed, 0 failed** (315 files) — up from 2180/2180 (7 new cases in `StorefrontPreviewCanvas.marketCard.test.tsx`, plus one existing assertion's selector fixed — see §10).
+## 10. Full relevant test results
 
-**Storefront `tsc --noEmit`:** clean, 0 errors.
-**Web `tsc --noEmit`:** pre-existing errors only, in files this Horizon never touched (POS settings, platform integrations, product-variant/document components, import-jobs) — identical list to the pre-existing baseline the prior Horizon documented, confirmed unrelated by `git diff` showing zero changes to any of those files.
+**Storefront (vitest):** full suite **692 passed, 0 failed** (104 files) —
+up from the pre-audit 672/672 (this audit added 15 new test cases across 4
+new files, plus extended 4 existing files).
 
-**Storefront `pnpm check` (Biome):** clean, 0 errors (442 files) after one auto-fix pass (import ordering + formatter nits on 3 files this Horizon touched).
-**Web:** has no Biome config and its `lint` script (`next lint`) requires interactive first-time ESLint setup not present in this container; web's CI (`web-ci.yml`) runs `npm run test` + `npm run build` only, both green — see §11.
+**Web (vitest):** full suite **2187 passed, 0 failed** (315 files) —
+unchanged from the pre-audit count; this audit's only `web/` change
+(`StorefrontPreviewCanvas.tsx`'s decorative icon) did not require new
+assertions beyond the first pass's own `StorefrontPreviewCanvas.marketCard.test.tsx`
+coverage, which remains green.
 
-**Storefront `pnpm build` (Next.js production build):** succeeded, exit code 0, all routes including `/dev/market-visual` built cleanly.
-**Web `npm run build`:** succeeded, exit code 0 (this also performs web's TypeScript check per its own build step).
+Both counts re-run after every source edit in this audit; consistently
+green throughout, not a single end-of-session run.
 
-**Backend (PHP):** not run. Confirmed via `git diff --stat` that this Horizon touched zero files outside `storefront/` and `web/` — no `app/`, `routes/`, or `database/` file changed, and no new `StorefrontPresentationConfig` field was persisted. Per the Master Spec's own conditional ("run backend/presentation contract tests if shared normalization/persistence code changes"), that condition was never met this Horizon.
+## 11. Typecheck / lint / build results
 
-## 10. One pre-existing test selector fixed (not a regression)
+- **Storefront `tsc` (via `pnpm build`):** clean, 0 errors.
+- **Web `tsc` (via `npm run build`):** clean for every file this audit
+  touched; pre-existing unrelated errors in untouched files carry over
+  unchanged from the first pass (confirmed via `git diff` showing zero
+  changes to those files).
+- **Storefront `npx biome check .`:** clean, 0 errors, no fixes needed.
+- **Web:** no separate lint step in `web-ci.yml` (`npm run test` +
+  `npm run build` only, both green — see below).
+- **Storefront `pnpm build`:** exit code 0, all routes built, including
+  `/dev/market-visual`.
+- **Web `npm run build`:** exit code 0.
+- **Locale parity (`npx tsx scripts/check-locale-parity.ts`):** all 6
+  locales in sync after adding the 4 new `products` namespace keys.
 
-`StorefrontPreviewCanvas.marketCard.test.tsx`'s "keeps desktop chrome… when header.style is compact" test used an unscoped `.mt-4.grid.gap-3` selector that was only *coincidentally* unique before this Horizon (the categories preview grid used a hardcoded `gap-2`, the New Arrivals grid `gap-3`). Fixing the categories preview's gap to correctly track the real component (`gap-3` for Modern, matching `CategoriesSection.tsx`) made the selector ambiguous — `querySelector` would return whichever section happens to render first in the DOM. Scoped the selector to `section[aria-labelledby="preview-arrivals"] ul.grid` (the same disambiguation pattern the file's own newer column-count test already uses) — same expected value, no assertion weakened.
+## 12. Visual QA matrix
 
-## 11. Visual acceptance evidence
+Real component visual QA via the extended `/dev/market-visual` dev fixture
+(404s in production; mounts the exact production
+`ProductGrid`/`ProductCard`/`CategoryTile`/`CartLine`/`ProductCarousel`/
+`CustomContentBand` components against fixture data — no backend). Captured
+with Playwright/Chromium at **390, 768, 1024, 1440**, both `ar` (RTL) and
+`en` (LTR), for both `awj-market` and `awj-modern` presets:
 
-Real component visual QA via the extended `/dev/market-visual` dev fixture (404s in production; mounts `ProductGrid`/`ProductCard`/`CategoryTile`/`CartLine` — the exact production components — against fixture data, no backend). Captured with Playwright/Chromium at **390, 768, 1024, 1440** for `{ar,en} × {awj-market,awj-modern}` (18 screenshots). Confirmed:
+| Surface | 390 | 768 | 1024 | 1280/1440 | AR RTL | EN LTR | Result |
+|---|---|---|---|---|---|---|---|
+| Category grid | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | 3/4/6/8 cols (Market) vs. 2/3/4/6 (Modern); no overflow |
+| Product grid | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | 2/3/4/5 cols (Market) vs. 2/2/3/4 (Modern); sale badge, out-of-stock, long-name truncation all intact |
+| Product carousel | ✓ (bug found + fixed) | ✓ | ✓ | ✓ (bug found + fixed) | ✓ | ✓ | Nav buttons initially bled off-screen at 1440 and 390 (see §4); fixed and re-screenshotted, confirmed fully contained |
+| FAQ accordion | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | 3 groups render as `<details>`, expand/collapse works with mouse and keyboard, RTL chevron/disclosure marker mirrors correctly |
+| Cart line | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | Quantity controls, price alignment, +/- stepper mirror correctly in both directions |
 
-- Category grid: 3/4/6/8 columns at mobile/tablet/(1024)/(1280+) for Market vs. 2/3/4/6 for Modern — matches the resolved breakpoints exactly, no overflow at any width.
-- Product grid: 2/3/4/5 columns for Market vs. 2/2/3/4 for Modern at the same widths (5 columns confirmed rendering at 1440 with real product-card content, sale badge, out-of-stock state, and long-name truncation all intact).
-- Cart line: renders correctly in both densities; RTL (Arabic) and LTR (English) both verified — quantity controls, price alignment, and the +/- stepper mirror correctly.
-- No horizontal overflow, no broken wrapping of long Arabic/English product names, at any captured width.
+**Not captured as pixel screenshots this audit:** the PDP mobile sticky bar,
+PDP share button, and quick-view dialog. All three are verified by
+dedicated unit/component tests instead
+(`ProductDetails.test.tsx`'s purchase-bar and share-button suites,
+`QuickView.test.tsx`'s 5 tests covering open/close, add-to-cart, and the
+variant-managed fallback) rather than pixel screenshots, because mounting
+the full `ProductDetails`/`ProductCard`-with-dialog tree backend-free in the
+dev fixture would require additionally faking `CartContext`/`StoreContext`/
+`HiddenPricingContext`/`MediaGallery`/`Dialog` portal behavior — risking the
+fixture drifting from what those contexts actually enforce, for changes
+that are positional/interactive additions over already-tested controls
+rather than new grid/carousel/accordion layout structure. Reported
+explicitly rather than claimed as visually verified.
 
-**Not captured as screenshots this session:** the PDP mobile sticky bar and the exact Cart-drawer/page padding delta. Both are single, narrow CSS changes (a `fixed`/`md:static` positioning swap and a `py-4`→`py-3` padding swap respectively) verified precisely by dedicated unit tests (`ProductDetails.test.tsx`'s "AWJ Market mobile purchase bar" suite; `CartLine.test.tsx`'s density tests) rather than pixel screenshots, because mounting the full `ProductDetails`/`CartDrawer` tree backend-free would require additionally faking `CartContext`/`StoreContext`/`HiddenPricingContext`/`MediaGallery`/`Sheet` portal behavior — risking the fixture drifting from what those contexts actually enforce, for a change that is positional/spacing-only rather than new layout structure. This is reported explicitly rather than claimed as visually verified.
+**AWJ Modern:** every screenshot pair above includes the Modern preset
+rendered from the identical fixture data — in every case Modern is
+pixel-for-pixel the same structure/density it was before this audit (static
+grid, no carousel, no accordion, no quick-view icon), confirming the
+`themePreset === "awj-market"` gate holds.
 
-RTL/LTR: verified via the 390/1440 `ar`/`en` fixture screenshots (§ above) for the surfaces that fixture covers; not separately re-verified for PDP/Cart beyond the unit tests noted above.
+## 13. AWJ Modern regression result
 
-## 12. Accessibility
+**Pass.** Every new branch in every changed file is
+`themePreset === "awj-market"`-gated with an unchanged `else`/default path.
+Confirmed three ways: (1) the full green test suites in §10 include an
+explicit "no theme regression" assertion alongside each new Market test
+(e.g. `ProductCard.test.tsx`'s quick-view-absent-for-Modern case,
+`CustomContentBand.test.tsx`'s flat-render-for-Modern case); (2) the visual
+QA matrix in §12 screenshots Modern from the same fixture in the same pass;
+(3) `git diff` shows zero changes to any Modern-only code path or to the
+other four presets (`navy`/`burgundy`/`sand`/`slate`).
 
-No accessibility-relevant markup changed. The PDP purchase row's semantic structure (labelled quantity control, button) is identical — only its CSS position changes; the spacer div added alongside it is `aria-hidden="true"`. `CategoryTile`'s link/heading semantics are unchanged (only Tailwind classes and a boolean-gated subcategory count changed). `CartLine`'s DOM structure/ARIA is unchanged (only a padding class is conditional). No new icon-only control, no color-only state communication.
+## 14. Risks / remaining gaps
 
-## 13. Performance
+- **Category tile imagery** and **announcement strip** remain genuinely
+  gated on a backend/schema dependency each — see §7. Both are documented
+  precisely enough that a future, explicitly-scoped Horizon can act on
+  either without re-deriving the investigation.
+- **PDP sticky bar, share button, and quick-view dialog** are verified by
+  targeted unit tests rather than pixel screenshots (see §12) — a future
+  pass with a fuller backend-free PDP fixture (faking the additional
+  contexts listed above) could extend screenshot coverage to these.
+- The 11 other items in the coverage matrix's capability-gate list (§3)
+  are unchanged, previously-documented platform absences (ratings/reviews,
+  purchase counts, branch selection, offers pricing, payment logos, map,
+  loyalty points, related products, faceted filters, barcode relabeling,
+  multi-location) — none was newly discovered as implementable in this
+  audit.
 
-**Measured:** zero new client bundle added to the hot path — every change is either a conditional Tailwind class or an existing hook already wired into these components' provider tree; no new network request, no duplicated storefront-config/catalog fetch. `ProductGrid.tsx` gained a `"use client"` directive, but its only consumer is the dev-only fixture, so this adds no client-bundle weight to any public route.
-**Not measured:** real paint/LCP deltas from the denser grids (would require a live backend + Lighthouse pass, out of reach in this environment). Reported explicitly as unmeasured.
+## 15. Whether any implementable visual/theme element remains incomplete
 
-## 14. Tenant isolation / security / backward compatibility
+**No.** Every item the closure-audit's ten named surfaces raised was either
+implemented in this audit (carousel, FAQ accordion, quick view, share
+button, Hero density) or is backed by a verified, precisely-stated platform
+capability gap (§7, §3 of the coverage matrix) rather than convenience or
+avoided frontend work. No item was rejected solely because implementing it
+required additional frontend effort or preview-parity work — the opposite
+was true for the carousel, which was reversed for exactly that reason. No
+implementable presentation/interaction element was found and left
+deliberately deferred.
 
-- No tenant-resolution, publication-guard, or Draft/Published-isolation code was touched.
-- No new persisted field — the preset enum, its normalization, and its fail-closed-to-`awj-modern` behavior are all unchanged (verified: zero diff in `StorefrontPresentationNormalizer.php` or either TS `tokens.ts`/`config.ts` mirror).
-- Every new branch is `themePreset === "awj-market"`-gated with an unchanged `else` path; AWJ Modern and the other four presets (`navy`/`burgundy`/`sand`/`slate`) are provably unaffected — confirmed by the full green test suites both before and after every change, and by the explicit "no theme regression" test added alongside each Market-specific test (e.g. `NewArrivals.test.tsx`'s "widens the desktop tier for AWJ Market without changing AWJ Modern").
-- No raw stock, cost, margin, or accounting data is touched or newly exposed.
+## 16. Final verdict
 
-## 15. Risks / remaining work
+**AWJ MARKET FULL THEME: COMPLETE**
 
-- **Product-rail carousel** (`ProductCarousel.tsx`) remains unused. Wiring it into the homepage rails for a closer visual match to Shona's carousel-style shelves is a legitimate future enhancement, deliberately deferred this Horizon to avoid re-deriving the preview/published parity work the prior Horizon's 7 review rounds already paid for on a different dimension (see the coverage matrix §3.2 and §6).
-- **Site-wide announcement strip** is a real Shona pattern with no AWJ equivalent; would need a new persisted presentation field, out of this Horizon's "no new schema" discipline.
-- **PDP sticky bar and Cart padding** are verified by precise unit tests rather than pixel screenshots (see §11) — a future pass with a fuller backend-free PDP/cart fixture could add that screenshot evidence.
-- **FAQ accordion interaction** — the content slot exists (`customContent`); the expand/collapse behavior does not. Static text blocks are the honest current state.
+- Every observed implementable presentation/component/interaction is
+  implemented or already genuinely matched (§4–§6, §15).
+- Every remaining omission requires a proven-missing platform/business
+  capability, individually verified in source rather than assumed (§7, and
+  the coverage matrix §3's 13-item list with exact dependencies).
+- Visual evidence passes at 390/768/1024/1440, AR RTL and EN LTR, across
+  the fixture-covered surfaces, with one real bug (carousel nav buttons)
+  found and fixed as a direct result of this audit's visual verification
+  requirement (§4, §12).
+- AWJ Modern is unchanged — confirmed by full green regression tests and
+  matching screenshots (§13).
+- Tests, typecheck, lint, and both production builds are green (§10, §11).
 
-## 16. CI status / merge state / deploy state
-
-PR #1096 opened against `main` at base SHA `f6ce95a215d82767139332cf14722c5a9b80261a`, head SHA `4218ad403b275d9449a44abff01d66cfb7225f26`. This session is subscribed to the PR's activity (CI, reviews, comments) and will drive it to green and address in-scope findings as they arrive. Not merged, not deployed — outside this Horizon's authorization by design.
-
-## 17. Recommended next action
-
-Follow CI on PR #1096 to green and address any in-scope review findings. The visual/coverage matrix should be reconciled against the actual live storefront once a backend-connected preview environment is available, to extend the screenshot evidence in §11 to PDP/Cart. Otherwise this slice is ready to merge once CI is green and review feedback is addressed — **merge/deploy remain outside this Horizon's authorization.**
+Not merged. Not deployed. PR #1096 remains open on
+`claude/awj-market-full-theme-completion`, subscribed for CI/review
+follow-up per standing instructions.

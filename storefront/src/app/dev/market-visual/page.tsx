@@ -3,9 +3,11 @@ import { notFound } from "next/navigation";
 import { setRequestLocale } from "next-intl/server";
 import { CartLine, type CartLineView } from "@/components/cart/CartLine";
 import { CategoryTile } from "@/components/home/CategoriesSection";
+import { CustomContentBand } from "@/components/home/CustomContentBand";
 import { PublishedCardStyleProvider } from "@/components/layout/PublishedCardStyle";
 import { PublishedThemeMarkerProvider } from "@/components/layout/PublishedThemeMarker";
 import { StoreContainer } from "@/components/layout/StoreContainer";
+import { ProductCarousel } from "@/components/products/ProductCarousel";
 import { ProductGrid } from "@/components/products/ProductGrid";
 import type { StoreCategory } from "@/lib/commerce/types";
 import { publishedHomeStackClass } from "@/lib/presentation/public-rhythm";
@@ -17,20 +19,22 @@ import { MarketVisualFrame } from "./frame";
 /**
  * Development-only visual fixture for the AWJ Market theme marker and its
  * compact starting bundle (density/productCard). Mounts the real shared
- * `ProductGrid`/`ProductCard`/`CategoryTile`/`CartLine` used by the public
- * storefront with fixture data — no backend required. Not linked from the
- * storefront, not found in production. `?preset=awj-market|awj-modern&locale=ar|en`.
+ * `ProductGrid`/`ProductCard`/`ProductCarousel`/`CategoryTile`/
+ * `CustomContentBand`/`CartLine` used by the public storefront with fixture
+ * data — no backend required. Not linked from the storefront, not found in
+ * production. `?preset=awj-market|awj-modern&locale=ar|en`.
  *
  * Covers the AWJ Market Full Theme Completion surfaces that have no other
  * backend-free way to verify real component output: the homepage category
- * grid's Market density and a cart line's Market row spacing. The PDP mobile
- * purchase bar is verified by `ProductDetails.test.tsx` instead — mounting
- * the real `ProductDetails` here would additionally require faking
+ * grid's density, the product-rail carousel, the FAQ accordion, a product
+ * card's quick-view affordance (via the real `ProductGrid`/`ProductCard`),
+ * and a cart line's row spacing. The PDP mobile purchase bar and share
+ * button are verified by `ProductDetails.test.tsx` instead — mounting the
+ * real `ProductDetails` here would additionally require faking
  * `CartContext`/`StoreContext`/`HiddenPricingContext`/`MediaGallery`, which
- * risks the fixture drifting from what those contexts actually do; the
- * sticky-bar change here is a pure CSS repositioning of the existing,
- * already-tested purchase controls, not new layout structure like the grids
- * below.
+ * risks the fixture drifting from what those contexts actually do; both are
+ * pure CSS/DOM additions to the existing, already-tested purchase controls,
+ * not new layout structure like the grids/carousel/accordion below.
  */
 
 function fixtureCategories(locale: "ar" | "en") {
@@ -179,6 +183,50 @@ function presetOf(value: string | undefined): ThemePresetId {
   return value === "awj-market" ? "awj-market" : "awj-modern";
 }
 
+function fixtureFaqBlocks(locale: "ar" | "en") {
+  return locale === "ar"
+    ? [
+        { id: "q1", kind: "heading" as const, text: "كم مدة التوصيل؟" },
+        {
+          id: "a1",
+          kind: "paragraph" as const,
+          text: "نوصّل خلال يومي عمل داخل المدينة.",
+        },
+        { id: "q2", kind: "heading" as const, text: "هل يمكن الاسترجاع؟" },
+        {
+          id: "a2",
+          kind: "paragraph" as const,
+          text: "نعم، خلال 14 يوماً من الاستلام.",
+        },
+        { id: "q3", kind: "heading" as const, text: "هل التوصيل مجاني؟" },
+        {
+          id: "a3",
+          kind: "paragraph" as const,
+          text: "مجاني للطلبات فوق 100 ريال.",
+        },
+      ]
+    : [
+        { id: "q1", kind: "heading" as const, text: "How long is delivery?" },
+        {
+          id: "a1",
+          kind: "paragraph" as const,
+          text: "Two business days within the city.",
+        },
+        { id: "q2", kind: "heading" as const, text: "Can I return items?" },
+        {
+          id: "a2",
+          kind: "paragraph" as const,
+          text: "Yes, within 14 days of delivery.",
+        },
+        { id: "q3", kind: "heading" as const, text: "Is delivery free?" },
+        {
+          id: "a3",
+          kind: "paragraph" as const,
+          text: "Free on orders over 100 SAR.",
+        },
+      ];
+}
+
 export default async function MarketVisualPage({
   searchParams,
 }: {
@@ -241,6 +289,28 @@ export default async function MarketVisualPage({
                   locale === "ar" ? "لا توجد منتجات" : "No products"
                 }
               />
+
+              {!empty && (
+                <section data-testid="fixture-carousel">
+                  <ProductCarousel
+                    products={products}
+                    basePath={basePath}
+                    slidesPerView={2}
+                    breakpoints={{
+                      640: { slidesPerView: 3, spaceBetween: 16 },
+                      1024: { slidesPerView: 5, spaceBetween: 20 },
+                    }}
+                  />
+                </section>
+              )}
+
+              <section data-testid="fixture-faq">
+                <CustomContentBand
+                  sectionId="faq-fixture"
+                  content={{ blocks: fixtureFaqBlocks(locale) }}
+                  themePreset={preset}
+                />
+              </section>
 
               <section
                 data-testid="fixture-cart-line"

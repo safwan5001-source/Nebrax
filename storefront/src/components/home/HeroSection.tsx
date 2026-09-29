@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
+import type { ThemePresetId } from "@/lib/presentation/tokens";
+import { cn } from "@/lib/utils";
 
 interface HeroSectionProps {
   basePath: string;
@@ -12,6 +14,8 @@ interface HeroSectionProps {
    */
   headline?: string | null;
   subheadline?: string | null;
+  /** See `CategoriesSection`'s identical prop doc for why this is explicit. */
+  themePreset?: ThemePresetId;
 }
 
 /**
@@ -29,6 +33,12 @@ interface HeroSectionProps {
  * anything put there — a monogram, an illustration, a stock photograph — would
  * be storefront invention standing in for merchant content. The band is not
  * made taller to compensate for the space it no longer fills.
+ *
+ * AWJ Market shrinks it further still: the benchmark's high-SKU retail
+ * composition puts category/product discovery first and treats the masthead
+ * as a brief identity strip, not a destination — see the coverage matrix.
+ * Nothing about *what* the band says changes, only how much vertical space it
+ * claims before the categories/products below it appear.
  */
 export async function HeroSection({
   basePath,
@@ -36,6 +46,7 @@ export async function HeroSection({
   storeName,
   headline,
   subheadline,
+  themePreset,
 }: HeroSectionProps) {
   const t = await getTranslations({
     locale: locale as Locale,
@@ -47,13 +58,24 @@ export async function HeroSection({
   });
   const displayName = storeName?.trim() || footer("shop");
   const title = headline?.trim() || displayName;
+  const isMarket = themePreset === "awj-market";
 
   return (
     <section
       aria-labelledby="home-hero"
-      className="flex min-h-[11rem] items-center rounded-store bg-linear-to-r rtl:bg-linear-to-l from-primary-700 via-primary-600 to-primary-500 text-store-primary-foreground md:min-h-[16rem] lg:min-h-[18rem]"
+      className={cn(
+        "flex items-center rounded-store bg-linear-to-r rtl:bg-linear-to-l from-primary-700 via-primary-600 to-primary-500 text-store-primary-foreground",
+        isMarket
+          ? "min-h-[7rem] md:min-h-[9rem] lg:min-h-[10rem]"
+          : "min-h-[11rem] md:min-h-[16rem] lg:min-h-[18rem]",
+      )}
     >
-      <div className="max-w-2xl p-5 md:p-10 lg:p-14">
+      <div
+        className={cn(
+          "max-w-2xl",
+          isMarket ? "p-4 md:p-6 lg:p-8" : "p-5 md:p-10 lg:p-14",
+        )}
+      >
         <h1
           id="home-hero"
           className="text-xl font-black leading-tight sm:text-2xl lg:text-4xl"

@@ -11,6 +11,7 @@ import { StoreContainer } from "@/components/layout/StoreContainer";
 import { HiddenPricePrompt } from "@/components/products/HiddenPricePrompt";
 import { MediaGallery } from "@/components/products/MediaGallery";
 import { ProductCustomFields } from "@/components/products/ProductCustomFields";
+import { ShareButton } from "@/components/products/ShareButton";
 import { VariantPicker } from "@/components/products/VariantPicker";
 import { WishlistButton } from "@/components/products/WishlistButton";
 import { Button } from "@/components/ui/button";
@@ -213,11 +214,16 @@ export function ProductDetails({ product, basePath }: ProductDetailsProps) {
             <h1 className="min-w-0 text-lg font-extrabold leading-snug text-store-foreground md:text-xl">
               {product.name}
             </h1>
-            <WishlistButton
-              productId={product.id}
-              variant="detail"
-              className="shrink-0"
-            />
+            <div className="flex shrink-0 items-center gap-2">
+              <WishlistButton productId={product.id} variant="detail" />
+              {/* AWJ Market only — see the coverage matrix's PDP evidence. */}
+              {isMarket && (
+                <ShareButton
+                  title={product.name}
+                  className="grid size-10 place-items-center rounded-full border border-store-border bg-store-surface text-store-muted-foreground transition-colors hover:border-store-border-strong hover:text-store-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-store-foreground"
+                />
+              )}
+            </div>
           </div>
 
           <div className="mt-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">

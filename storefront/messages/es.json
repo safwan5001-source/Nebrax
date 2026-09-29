@@ -243,7 +243,11 @@
     "selectOptions": "Elegir opciones",
     "priceFromLabel": "Desde",
     "addToFavorites": "Añadir a favoritos",
-    "removeFromFavorites": "Quitar de favoritos"
+    "removeFromFavorites": "Quitar de favoritos",
+    "quickView": "Vista rápida",
+    "viewFullDetails": "Ver todos los detalles",
+    "share": "Compartir",
+    "linkCopied": "Enlace copiado"
   },
   "navigation": {
     "home": "Inicio",

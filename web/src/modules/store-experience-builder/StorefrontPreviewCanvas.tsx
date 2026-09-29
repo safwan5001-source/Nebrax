@@ -1,6 +1,6 @@
 "use client";
 
-import { Home, LayoutGrid, Search, ShoppingBag, User } from "lucide-react";
+import { Eye, Home, LayoutGrid, Search, ShoppingBag, User } from "lucide-react";
 import type { CSSProperties, ReactNode } from "react";
 import { OfficialStoreBadge } from "./OfficialStoreBadge";
 import { ContactDetail, contactDetailText } from "./ContactDetail";
@@ -475,7 +475,24 @@ export function StorefrontPreviewCanvas({
                         key={product.id}
                         className="overflow-hidden rounded-store border border-store-border bg-store-surface"
                       >
-                        <div className={cn(cardImageHeight, "bg-store-surface-muted")} />
+                        <div
+                          className={cn(
+                            cardImageHeight,
+                            "relative bg-store-surface-muted",
+                          )}
+                        >
+                          {/* Decorative only — the real quick-view dialog
+                              (`QuickView.tsx`) needs a live cart/store
+                              context this static preview frame doesn't
+                              have. This mirrors its trigger's exact
+                              position/icon so a merchant sees the
+                              affordance before publishing. */}
+                          {isMarket && (
+                            <span className="absolute bottom-2 start-2 inline-flex size-8 items-center justify-center rounded-full bg-store-surface/90 text-store-foreground shadow-sm">
+                              <Eye className="size-4" aria-hidden="true" />
+                            </span>
+                          )}
+                        </div>
                         <div className={cardPad}>
                           <p className="text-[11px] text-store-muted-foreground">
                             {product.category[locale]}

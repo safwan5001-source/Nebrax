@@ -47,4 +47,31 @@ describe("HeroSection (COM-7-P3A)", () => {
     expect(queryByText("Spree Store")).toBeNull();
     expect(queryByText("Store")).toBeNull();
   });
+
+  it("shrinks the band under AWJ Market so discovery, not the masthead, dominates the fold", async () => {
+    const { HeroSection } = await import("../HeroSection");
+
+    const marketEl = await HeroSection({
+      basePath: "/sa/ar",
+      locale: "ar",
+      storeName: "متجر",
+      themePreset: "awj-market",
+    });
+    const market = render(marketEl);
+    expect(market.container.querySelector("section")?.className).toContain(
+      "min-h-[7rem]",
+    );
+    market.unmount();
+
+    const modernEl = await HeroSection({
+      basePath: "/sa/ar",
+      locale: "ar",
+      storeName: "متجر",
+    });
+    const modern = render(modernEl);
+    // Unchanged from before this Horizon — no theme regression.
+    expect(modern.container.querySelector("section")?.className).toContain(
+      "min-h-[11rem]",
+    );
+  });
 });

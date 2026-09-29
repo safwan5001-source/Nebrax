@@ -6,6 +6,7 @@ import { useCallback, useRef, useState } from "react";
 import type Swiper from "swiper";
 import { Navigation } from "swiper/modules";
 import { Swiper as SwiperComponent, SwiperSlide } from "swiper/react";
+import type { SwiperOptions } from "swiper/types";
 import "swiper/css";
 import "swiper/css/navigation";
 import { ChevronLeft, ChevronRight } from "lucide-react";
@@ -17,15 +18,41 @@ interface ProductCarouselProps {
   basePath: string;
   /** Optional currency used for analytics in each ProductCard. */
   currency?: string;
+  /** Analytics list identity for each ProductCard. Defaults preserve this
+   * component's original (only) caller's values, so existing behavior is
+   * unchanged when callers don't pass these. */
+  listId?: string;
+  listName?: string;
+  /**
+   * Slides visible below the first breakpoint. Defaults to this component's
+   * original single-card mobile behavior. A caller mounting this as a
+   * *replacement* for a multi-column grid (e.g. a home product shelf) should
+   * pass 2 — the storefront's locked responsive baseline requires two-column
+   * product browsing on mobile, and a bare carousel default would silently
+   * regress that to one.
+   */
+  slidesPerView?: number;
+  /** Defaults preserve this component's original breakpoints. */
+  breakpoints?: Record<number, SwiperOptions>;
 }
 
 const NAV_BUTTON_BASE =
-  "absolute top-1/2 -translate-y-1/2 z-10 w-10 h-10 flex items-center justify-center cursor-pointer rounded-lg bg-white border border-gray-300 text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors";
+  "absolute top-1/2 -translate-y-1/2 z-10 flex size-10 items-center justify-center cursor-pointer rounded-full border border-store-border bg-store-surface text-store-muted-foreground shadow-sm transition-colors hover:bg-store-surface-muted hover:text-store-foreground";
+
+const DEFAULT_BREAKPOINTS: Record<number, SwiperOptions> = {
+  640: { slidesPerView: 2, spaceBetween: 24 },
+  768: { slidesPerView: 3, spaceBetween: 24 },
+  1024: { slidesPerView: 4, spaceBetween: 24 },
+};
 
 export function ProductCarousel({
   products,
   basePath,
   currency,
+  listId = "featured-products",
+  listName = "Featured Products",
+  slidesPerView = 1,
+  breakpoints = DEFAULT_BREAKPOINTS,
 }: ProductCarouselProps): ReactElement {
   const t = useTranslations("products");
   const [isBeginning, setIsBeginning] = useState(true);
@@ -56,12 +83,20 @@ export function ProductCarousel({
 
   return (
     <div className="relative">
+      {/*
+        `start-2`/`end-2` (inside the track, overlaying its edge slide)
+        rather than a negative offset outside it: this component has no
+        control over how much side padding its caller's container provides,
+        and a negative offset bled past `StoreContainer`'s own padding into
+        the page edge — clipped on mobile, floating in open space on desktop.
+        Overlaying the track itself is safe at any container width.
+      */}
       <button
         ref={prevRef}
         type="button"
         aria-label={t("carouselPrev")}
         disabled={isBeginning}
-        className={`${NAV_BUTTON_BASE} -start-5 ${isBeginning ? "opacity-0" : ""}`}
+        className={`${NAV_BUTTON_BASE} start-2 ${isBeginning ? "opacity-0" : ""}`}
       >
         <ChevronLeft className="w-5 h-5 rtl:rotate-180" />
       </button>
@@ -70,14 +105,14 @@ export function ProductCarousel({
         type="button"
         aria-label={t("carouselNext")}
         disabled={isEnd}
-        className={`${NAV_BUTTON_BASE} -end-5 ${isEnd ? "opacity-0" : ""}`}
+        className={`${NAV_BUTTON_BASE} end-2 ${isEnd ? "opacity-0" : ""}`}
       >
         <ChevronRight className="w-5 h-5 rtl:rotate-180" />
       </button>
       <SwiperComponent
         modules={[Navigation]}
         spaceBetween={24}
-        slidesPerView={1}
+        slidesPerView={slidesPerView}
         navigation={{
           prevEl: prevRef.current,
           nextEl: nextRef.current,
@@ -87,11 +122,7 @@ export function ProductCarousel({
         onReachBeginning={updateNavState}
         onReachEnd={updateNavState}
         onAfterInit={updateNavState}
-        breakpoints={{
-          640: { slidesPerView: 2, spaceBetween: 24 },
-          768: { slidesPerView: 3, spaceBetween: 24 },
-          1024: { slidesPerView: 4, spaceBetween: 24 },
-        }}
+        breakpoints={breakpoints}
         className="product-carousel"
       >
         {products.map((product, index) => (
@@ -100,8 +131,8 @@ export function ProductCarousel({
               product={product}
               basePath={basePath}
               index={index}
-              listId="featured-products"
-              listName="Featured Products"
+              listId={listId}
+              listName={listName}
               currency={currency}
               fetchPriority={index === 0 ? "high" : undefined}
             />

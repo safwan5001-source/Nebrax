@@ -1,9 +1,9 @@
 import { getTranslations } from "next-intl/server";
 import { ProductCard } from "@/components/products/ProductCard";
+import { ProductCarousel } from "@/components/products/ProductCarousel";
 import { PRODUCT_CARD_FIELDS } from "@/lib/data/cached";
 import { cachedListProducts } from "@/lib/data/products";
 import type { ThemePresetId } from "@/lib/presentation/tokens";
-import { cn } from "@/lib/utils";
 
 interface NewArrivalsProps {
   basePath: string;
@@ -63,15 +63,30 @@ export async function NewArrivals({
     );
   }
 
+  // AWJ Market's benchmark browses this shelf as a horizontally scrollable
+  // rail, not a fixed grid — see the coverage matrix's product-rail evidence.
+  // `ProductCarousel` already existed (used nowhere before this) and takes
+  // the exact same `Product[]`/`ProductCard` contract this shelf already
+  // fetches, so no new data path or component fork is introduced.
+  if (isMarket) {
+    return (
+      <ProductCarousel
+        products={products}
+        basePath={basePath}
+        currency={currency}
+        listId="home_new_arrivals"
+        listName="Home — New arrivals"
+        slidesPerView={2}
+        breakpoints={{
+          640: { slidesPerView: 3, spaceBetween: 16 },
+          1024: { slidesPerView: 5, spaceBetween: 20 },
+        }}
+      />
+    );
+  }
+
   return (
-    <ul
-      className={cn(
-        "grid gap-3 md:gap-5",
-        isMarket
-          ? "grid-cols-2 sm:grid-cols-3 lg:grid-cols-5"
-          : "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4",
-      )}
-    >
+    <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 md:gap-5">
       {products.map((product, index) => (
         <li key={product.id}>
           <ProductCard
