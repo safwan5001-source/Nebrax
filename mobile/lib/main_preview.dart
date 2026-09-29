@@ -6,9 +6,11 @@ import 'preview/preview.dart';
 /// production entry point (`main.dart`/`AwjMobileRuntimeApp`, untouched by
 /// this task). Launch explicitly with a real `PreviewSession` bearer:
 ///
-///   flutter run -t lib/main_preview.dart \
-///     --dart-define=PREVIEW_SESSION_TOKEN=<raw bearer from the Builder> \
-///     --dart-define=PREVIEW_BASE_URL=https://<host>/preview/v1
+/// ```
+/// flutter run -t lib/main_preview.dart \
+///   --dart-define=PREVIEW_SESSION_TOKEN=`<raw bearer from the Builder>` \
+///   --dart-define=PREVIEW_BASE_URL=https://`<host>`/preview/v1
+/// ```
 ///
 /// An ordinary build (this file not selected as the entry point, or run
 /// without those defines) never renders this screen and never even

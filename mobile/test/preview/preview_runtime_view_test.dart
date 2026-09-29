@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:awj_mobile_runtime/commerce/commerce.dart' show CommerceHttpRequest, CommerceHttpResponse;
 import 'package:awj_mobile_runtime/preview/preview.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
