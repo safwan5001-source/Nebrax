@@ -165,6 +165,23 @@ describe("mapAwjCategoryToViewModel", () => {
     expect(viewModel.is_root).toBe(true);
     expect(viewModel.is_leaf).toBe(true);
     expect(viewModel.children).toBeUndefined();
+    expect(viewModel.image).toBeNull();
+    expect(viewModel.color).toBe("#3366ff");
+  });
+
+  it("preserves the authoritative image and never invents one", () => {
+    const viewModel = mapAwjCategoryToViewModel(
+      baseCategory({
+        image: { url: "/store/v1/media/categories/cat-1", alt: "إلكترونيات" },
+      }),
+    );
+
+    expect(viewModel.image).toEqual({
+      url: "/store/v1/media/categories/cat-1",
+      alt: "إلكترونيات",
+    });
+    expect(viewModel.image_url).toBe("/store/v1/media/categories/cat-1");
+    expect(viewModel.square_image_url).toBe("/store/v1/media/categories/cat-1");
   });
 
   it("recursively maps nested children", () => {

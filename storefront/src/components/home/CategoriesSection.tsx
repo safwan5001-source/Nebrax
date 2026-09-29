@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { SectionHeading } from "@/components/home/SectionHeading";
@@ -30,20 +31,31 @@ function CategoryTile({
 }) {
   const accent = categoryAccent(category.color);
   const childCount = category.children?.length ?? 0;
+  const image = category.image?.url ? category.image : null;
 
   return (
     <li>
-      {/*
-        Typography first. The tile is the category's name on the store's own
-        surface; the merchant's colour is a 3px edge on it, not the surface
-        itself. There is no mark, because AWJ has no category media and a
-        generated initial is pseudo-branding rather than a stand-in for one.
-      */}
       <Link
         href={`${basePath}/c/${category.permalink}`}
-        className="group flex h-full flex-col justify-center gap-0.5 rounded-store border border-store-border border-s-[3px] bg-store-surface px-4 py-3.5 transition-colors hover:border-store-border-strong hover:bg-store-surface-muted"
+        className="group flex h-full flex-col gap-2 rounded-store border border-store-border bg-store-surface p-2.5 transition-colors hover:border-store-border-strong hover:bg-store-surface-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-store-primary"
         style={{ borderInlineStartColor: accent.rule }}
       >
+        {image ? (
+          <Image
+            src={image.url}
+            alt={image.alt || category.name}
+            className="h-20 w-full rounded-store object-cover"
+            width={320}
+            height={160}
+            unoptimized
+          />
+        ) : category.color && accent.isMerchantColor ? (
+          <span
+            aria-hidden="true"
+            className="h-10 w-full rounded-store"
+            style={{ backgroundColor: accent.rule }}
+          />
+        ) : null}
         <span className="line-clamp-2 text-sm font-bold leading-snug text-store-foreground group-hover:text-store-primary">
           {category.name}
         </span>

@@ -414,6 +414,13 @@ export function StorefrontPreviewCanvas({
                             className="flex h-full flex-col justify-center gap-0.5 rounded-store border border-store-border border-s-[3px] bg-store-surface px-4 py-3.5"
                             style={{ borderInlineStartColor: accent.rule }}
                           >
+                            {accent.isMerchantColor && (
+                              <span
+                                aria-hidden="true"
+                                className="mb-1 h-2 w-full rounded-store"
+                                style={{ backgroundColor: accent.rule }}
+                              />
+                            )}
                             <span className="line-clamp-2 text-sm font-bold leading-snug text-store-foreground">
                               {category.name[locale]}
                             </span>
