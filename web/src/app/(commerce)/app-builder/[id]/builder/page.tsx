@@ -596,7 +596,7 @@ export default function AppBuilderWorkspacePage() {
             {t('preview.exitFullPreviewAction')}
           </Button>
         </div>
-        <div className="flex min-h-0 flex-1 items-center justify-center overflow-auto p-6">{previewCanvasArea}</div>
+        <div className="flex min-h-0 flex-1 items-stretch justify-center overflow-auto p-0 lg:items-center lg:p-6">{previewCanvasArea}</div>
       </div>
     );
   }
@@ -748,7 +748,7 @@ export default function AppBuilderWorkspacePage() {
               {t('preview.fullPreviewAction')}
             </Button>
           </div>
-          <div className="flex min-h-0 flex-1 items-center justify-center overflow-auto p-6">{previewCanvasArea}</div>
+          <div className="flex min-h-0 flex-1 items-stretch justify-center overflow-auto p-0 lg:items-center lg:p-6">{previewCanvasArea}</div>
         </div>
       ) : (
       /* Desktop/tablet: three fixed panes. Below `lg`: canvas + a switchable structure/inspector pane, per the responsive admin baseline in APP-BUILDER-5-UX-EVIDENCE-PASS.md. */
