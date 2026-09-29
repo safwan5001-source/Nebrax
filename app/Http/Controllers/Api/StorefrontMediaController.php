@@ -120,6 +120,27 @@ class StorefrontMediaController extends PublicApiController
             abort(404, 'الوسائط غير موجودة.');
         }
 
+        $headers = [
+            'Content-Type' => $category->image_mime_type ?: 'application/octet-stream',
+            'Cache-Control' => 'public, max-age=3600',
+        ];
+
+        if (ProductCategory::isR2ImagePath($category->image_path)) {
+            try {
+                $body = $this->r2->get(
+                    ProductCategory::R2_DOMAIN,
+                    (string) $category->id,
+                    basename($category->image_path),
+                );
+            } catch (RuntimeException|AwsException) {
+                abort(404, 'الوسائط غير موجودة.');
+            }
+
+            return response()->streamDownload(function () use ($body): void {
+                echo (string) $body;
+            }, $category->image_original_name ?: "category-{$category->id}", $headers, 'inline');
+        }
+
         try {
             $stream = $this->documentStorage->readStream(
                 $this->documentStorage->profile(),
@@ -132,9 +153,6 @@ class StorefrontMediaController extends PublicApiController
         return response()->streamDownload(function () use ($stream): void {
             fpassthru($stream);
             fclose($stream);
-        }, $category->image_original_name ?: "category-{$category->id}", [
-            'Content-Type' => $category->image_mime_type ?: 'application/octet-stream',
-            'Cache-Control' => 'public, max-age=3600',
-        ], 'inline');
+        }, $category->image_original_name ?: "category-{$category->id}", $headers, 'inline');
     }
 }

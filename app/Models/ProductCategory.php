@@ -30,6 +30,14 @@ class ProductCategory extends BaseModel implements BranchShareable
      */
     public const COLOR_REGEX = '/^#[0-9A-Fa-f]{6}$/';
 
+    public const R2_DOMAIN = 'product-category-media';
+
+    public static function isR2ImagePath(?string $path): bool
+    {
+        return is_string($path)
+            && preg_match('#\\Atenant/[^/]+/'.self::R2_DOMAIN.'/[^/]+/[^/]+\\z#', $path) === 1;
+    }
+
     protected $fillable = [
         'tenant_id',
         'branch_id',
