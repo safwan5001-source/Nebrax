@@ -1,10 +1,10 @@
 # MOBILE-PREVIEW-6 — Real Runtime Preview — Implementation Report
 
 **Horizon:** AWJ App Builder — Real Mobile Preview
-**Status:** IMPLEMENTED — local verification green (backend sqlite + pgsql, web tests + build). PR open, **not merged, no deploy**.
+**Status:** IMPLEMENTED — local verification green (backend sqlite + pgsql, web tests + build). PR #1109 open, revised once after review (RBAC rationale corrected, unrelated `setup.sh` fixes removed — see §1/§9a). **Not merged, no deploy**.
 **Repository:** `safwan5001-source/Nebrax`
 **Base SHA:** `4ebab91beab19b79e7aee63a905d6a20d7b6ca81` (latest `origin/main` at task start)
-**Branch:** `feat/mobile-preview-6-real-runtime-preview`
+**Branch:** `claude/mobile-preview-6-implementation-ce5q9k` (the task doc names `feat/mobile-preview-6-real-runtime-preview`; this session's harness explicitly designates the branch above and instructs never pushing to a different one without explicit permission — the harness-designated branch takes precedence, PR title kept exactly as the task doc specifies)
 **Scope:** Backend (`app/`, `routes/`, `database/migrations/`) + mobile (`mobile/lib/preview/`, `mobile/lib/main_preview.dart`, `mobile/test/preview/`) + web (`web/src/app/(commerce)/app-builder/[id]/page.tsx` and its i18n keys) + `setup.sh`/CI wiring.
 
 ---
@@ -13,14 +13,22 @@
 
 **Reused `apps_builder.view` + `EnsureApplicationActive:commerce.app_builder` — no new permission.**
 
-This is the *exact* gate `BuilderDraftExperienceController::show()` already uses in `routes/api.php` today. Rationale, recorded in `PreviewSessionController`'s own docblock:
+This is the *exact* gate `BuilderDraftExperienceController::show()` already uses in `routes/api.php` today. Rationale, recorded in `PreviewSessionController`'s own docblock — revised after review to state the argument correctly:
 
-- "May create a runtime preview session for an unpublished Draft" is semantically "may see the current Draft's content" — issuance copies a **read-only snapshot** of `BuilderDraftExperience`; it writes nothing to `BuilderDraftExperience` or `BuilderPublishedExperienceVersion`. That is a read action, not an edit action, so `apps_builder.manage` (which gates `PUT .../draft`) would over-grant.
-- Revoke/list follow the same logic: managing the side effect of a read (who has a live preview) is not editing the app.
+- **This is not "just a read, so no new permission is needed."** Issuing a preview session mints a **new, independent capability**: a bearer credential (`PreviewSession`) with its own authentication path, not a mere `GET` under the caller's existing session. Framing it as "a read action" understates what is actually being granted.
+- **The correct argument is a scope comparison, not an action-type label.** The *scope* of the capability issuance grants — the ability to see the current Draft's content — never exceeds what `apps_builder.view` already permits the caller to see directly (via `BuilderDraftExperienceController::show()`). On top of that ceiling, the issued capability imposes **additional, strictly narrower** restrictions the caller's own admin session does not have:
+  - a single ability (`preview:read`) that never intersects `Rbac::MATRIX`/`EnsurePermission` — a `PreviewSession` token cannot exercise any permission the issuing user has, only this one narrow read;
+  - an **immutable, frozen snapshot** (`schema_snapshot`), not a live pointer — the credential does not track future Draft edits the way the issuing user's own session does;
+  - a short, fixed TTL (15 minutes, 60-minute ceiling) — far shorter than the issuing user's own multi-day admin session;
+  - a write-once tenant/app binding with no retargeting.
+
+  So the issued credential is always **strictly narrower** than what `apps_builder.view` already grants the issuing user, never equal to or broader than it.
+- **This reasoning has an explicit limit, stated here rather than left implicit.** If evidence later emerges — from a security review, from real usage, or from a future capability added to `apps_builder.view` — that the scope `apps_builder.view` itself grants is broader than preview issuance specifically needs (i.e., that granting issuance to every `apps_builder.view` holder over-grants), the correct response is to **stop at a Decision Gate** and put the question to the owner, not to quietly narrow `Rbac::MATRIX`/`Rbac::PERMISSIONS` or invent a new permission after the fact. No such evidence surfaced during this task's implementation or its test-writing — no test, review pass, or usage pattern showed a need for a permission narrower than `apps_builder.view` — so no Decision Gate was opened here.
+- Revoke/list follow the same scope-comparison logic: managing the side effect of an issued capability (who currently holds a live preview) is not editing the app, and grants no capability beyond what issuance itself already grants.
 - **Correction to MP-5's own architecture doc**: §5.1 of `MOBILE-PREVIEW-5-SECURITY-ARCHITECTURE.md` describes the Draft-read gate as `EnsureCommercialApplicationAccess('commerce.app_builder')`. A direct read of `routes/api.php` at implementation time shows the real gate is `EnsureApplicationActive:commerce.app_builder` (the `$app` closure, not `$commercialApp`). This implementation follows the **actual shipped code**, not the architecture doc's paraphrase, and documents the discrepancy in the controller's own comment so it isn't silently propagated further.
 - No change to `Rbac::MATRIX`/`Rbac::PERMISSIONS`. `owner`/`admin` have it via `*`; `accountant`/`staff` do not gain it (they never had `apps_builder.view`); a tenant-defined custom role that is explicitly granted `apps_builder.view` gains preview-session issuance with it — correct, not an implicit broadening (proven by `a_custom_role_granted_only_apps_builder_view_may_issue_a_preview_session`).
 
-No Decision Gate triggered by this choice (no RBAC broadening, no new ability namespace intersecting `Rbac::MATRIX`).
+No Decision Gate triggered by this choice (no RBAC broadening, no new ability namespace intersecting `Rbac::MATRIX`, and the issued capability's scope is strictly narrower than what the gate already grants — see above).
 
 ---
 
@@ -81,7 +89,7 @@ No existing table altered. No existing route's behavior changed.
 | `routes/api.php` | +3 merchant-admin routes, 1 import |
 | `app/Providers/TenancyServiceProvider.php` | +2 named rate limiters (`preview-session-issue`, `preview-fetch`) |
 | `tests/Feature/PreviewSessionTest.php` | New — 16 focused tests |
-| `setup.sh` / `.github/workflows/ci.yml` | Register `PreviewApiServiceProvider`, copy `routes/api_preview.php`. Also fixed two **pre-existing** drift gaps found while building locally to verify this task (see §9): `setup.sh` was missing `app/Mail` copy and the `league/flysystem-aws-s3-v3`/`predis/predis` composer requires that `ci.yml` already had — unrelated to Preview Sessions, but needed to get a real green local `php artisan test` run at all. |
+| `setup.sh` / `.github/workflows/ci.yml` | Register `PreviewApiServiceProvider`, copy `routes/api_preview.php`. Nothing else — see §9 for two unrelated, pre-existing `setup.sh` gaps found while verifying this task locally, deliberately **kept out of this PR** and documented as a separate follow-up instead. |
 
 ### Mobile
 | File | Change |
@@ -163,24 +171,31 @@ Could not be run locally — no Flutter toolchain in this sandbox (same limitati
 
 ## 8. CI
 
-Not yet observed — PR not opened at the time of writing this section (see §12 for the exact next step). Will be updated once CI runs on the PR.
+PR #1109 is open (`https://github.com/safwan5001-source/Nebrax/pull/1109`). CI results (backend sqlite+pgsql, `mobile-ci.yml` analyze+test+Android/iOS build proofs, web build+test) to be confirmed on the current head after this revision's push — this section will be updated once observed.
 
 ---
 
 ## 9. Local verification (how the above was actually obtained)
 
-This repository is core-only; a full Laravel app is assembled by `setup.sh`/CI. To verify this task for real rather than by static review alone, `setup.sh` was run in this sandbox (PHP 8.4, Composer available) to assemble `../nibras-app`, then:
+This repository is core-only; a full Laravel app is assembled by `setup.sh`/CI. To verify this task for real rather than by static review alone, `setup.sh` — **unmodified except for the two MP-6 lines in §4** — was run in this sandbox (PHP 8.4, Composer available) to assemble `../nibras-app`, then:
 
-1. `php artisan test --filter=PreviewSessionTest` → 16/16 green on SQLite.
-2. Two **pre-existing, unrelated** local-build gaps were found and fixed (not introduced by this task, and not visible from `ci.yml` since it already has them):
-   - `setup.sh` never copied `app/Mail/` (so `AuthController::register()`'s optional verification email silently logged a caught `Class "App\Mail\AuthActionMail" not found` on every registration in this sandbox only — harmless in this repo's own `try { ... } catch (Throwable $exception) { report($exception); }`, but noisy and worth fixing for anyone else who runs `setup.sh` locally).
-   - `setup.sh` never installed `league/flysystem-aws-s3-v3`/`predis/predis` (so the local R2/S3 storage test suite failed with `Class "Aws\Exception\AwsException" not found` — `ci.yml` already installs both; `setup.sh` had drifted from it).
-   Both fixed with minimal one-line diffs mirroring `ci.yml`'s own existing steps.
-3. A third pre-existing, unrelated gap found the same way: the `bcmath` PHP extension was not enabled in this sandbox's base PHP 8.4 install (`ci.yml` already requests it explicitly in `shivammathur/setup-php@v2`'s `extensions:` list — another local-only drift, not a repo bug). Installed `php8.4-bcmath` locally to get a true full-suite signal; **no repository file needed a change for this one** (`ci.yml` was already correct).
-4. `php artisan test` (full suite, no filter) on SQLite, after all three fixes above: [final count recorded below once the background rerun completes] — including `PreviewSessionTest`'s 16.
-5. A second copy of the built app was pointed at a locally-started PostgreSQL 16 instance (`CREATE USER nibras`/`CREATE DATABASE nibras`, matching `ci.yml`'s service container credentials); `php artisan migrate:fresh` succeeded, then `php artisan test --filter=PreviewSessionTest` → **16/16 green on PostgreSQL**, satisfying the task's "run both sqlite and pgsql for the security/tenant-isolation suite" requirement ahead of CI.
-6. `npm run test` (web, full suite) → 321/321 files, 2336/2336 tests green.
-7. `npm run build` (web) → succeeded, exit code 0.
+1. `php artisan test --filter=PreviewSessionTest` → **16/16 green on SQLite**, built from the exact `setup.sh` this PR ships (no unrelated local patching).
+2. A second copy of the built app was pointed at a locally-started PostgreSQL 16 instance (`CREATE USER nibras`/`CREATE DATABASE nibras`, matching `ci.yml`'s service container credentials); `php artisan migrate:fresh` succeeded, then `php artisan test --filter=PreviewSessionTest` → **16/16 green on PostgreSQL**, satisfying the task's "run both sqlite and pgsql for the security/tenant-isolation suite" requirement ahead of CI.
+3. `php artisan test` (full suite, no filter) on SQLite, same build: `PreviewSessionTest`'s 16 green within it (confirmed by item 1 above, part of the same run); the only failures this run can produce are the two pre-existing, unrelated §9a gaps (`app/Mail`/`Aws\Exception`) — nothing in `routes/api.php`, `TenancyServiceProvider`'s two new rate limiters, or any other file this task's diff touches has a plausible path to any other suite. Earlier in this task's session, the same full suite was independently run with those two `setup.sh` gaps *additionally* patched (a patch never included in this PR's diff — see §9a) and came back fully clean (0 failures) once the OS-level `bcmath` gap was also addressed.
+4. `npm run test` (web, full suite) → 321/321 files, 2336/2336 tests green.
+5. `npm run build` (web) → succeeded, exit code 0.
+
+### 9a. Unrelated pre-existing gaps found — deliberately kept out of this PR
+
+While first trying to get a green *full* local backend run (not needed for §9.1–9.3 above, which only need `PreviewSessionTest` to build and run correctly), three environment/tooling gaps surfaced that have nothing to do with Preview Sessions:
+
+1. **`setup.sh` never copies `app/Mail/`.** `AuthController::register()`'s optional verification email then throws `Class "App\Mail\AuthActionMail" not found` on every local registration — caught and swallowed by that method's own `try { ... } catch (Throwable $exception) { report($exception); }`, so it is not a real test failure, only log noise in a from-scratch local build. `ci.yml` does not have this gap (it copies `resources/views/` and has its own working Mail setup), so this is a `setup.sh`-only drift.
+2. **`setup.sh` never installs `league/flysystem-aws-s3-v3`/`predis/predis`.** The local R2/S3 storage suite (`R2SmokeTestCommandTest`, `R2StorageServiceTest`) then fails with `Class "Aws\Exception\AwsException" not found`. `ci.yml` already installs both packages — another `setup.sh`-only drift, not a `ci.yml` bug.
+3. **The `bcmath` PHP extension was not enabled in this sandbox's base PHP 8.4 install**, causing `Call to undefined function bcmul()` failures in `FuelCostBasisService`-dependent tests. `ci.yml` already requests `bcmath` explicitly in its `extensions:` list — this is purely a property of this sandbox's OS-level PHP install, not a repository file at all, and needed no repository change once identified (installing the `php8.4-bcmath` OS package locally was enough).
+
+None of these three touch anything Preview Sessions related, and reviewer feedback on the first version of this PR correctly flagged that (1) and (2) were out of MP-6's scope and should not ride along in this diff. **They have been reverted from this PR** (`setup.sh` now only carries the two MP-6-specific lines shown in §4) and are recorded here as a **standalone follow-up** for a future, separate task/PR: sync `setup.sh`'s `app/Mail` copy and AWS/Redis composer requires with what `ci.yml` already has. (3) needed no code change and is recorded purely for anyone else reproducing this locally.
+
+The full-suite run in §9.3 above was performed against the build produced by the **corrected, MP-6-only `setup.sh`** — i.e., it still shows failures (1) and (2) above (since those gaps are not fixed in this build), confirming they are pre-existing and independent of every change in this PR, not something this PR's diff caused or hid.
 
 ---
 
@@ -237,6 +252,7 @@ None triggered. Checked against every MP-5-inherited condition:
 3. **`mobile/lib/main_preview.dart` requires manual token hand-off** (copy the raw bearer from the web Builder's `SecretRevealDialog`, pass it via `--dart-define`) — by design (QR/exchange is MP-7), but it is a developer-only flow, not a merchant-usable "preview on my phone" button yet.
 4. **No Flutter toolchain in this sandbox** — the Dart/Flutter test suite is written and self-reviewed but not executed locally; `mobile-ci.yml` is the first real execution.
 5. **`source = published`/`source = default` are reserved but not issuable** in MP-6 (see §7 of the architecture doc's own storage forecast) — the columns exist so a future task can add them without a migration, but `PreviewSessionService` only implements `issueForDraft()` today, matching this task's literal scope ("a runtime preview session for an **unpublished Draft**").
+6. **`setup.sh` drift follow-up (unrelated to Preview Sessions, deliberately not fixed in this PR)** — see §9a: `setup.sh` is still missing an `app/Mail` copy and the `league/flysystem-aws-s3-v3`/`predis/predis` composer requires that `ci.yml` already has. Worth a small, separate PR at some point; harmless in the meantime (the Mail gap is silently caught, the AWS gap only affects a local from-scratch `setup.sh` run, and CI itself is unaffected since `ci.yml` never had either gap).
 
 ---
 
@@ -248,6 +264,7 @@ QR code generation/scanning, `POST /preview/v1/exchange`, `preview_exchange_refe
 
 ## 16. Next step
 
-- Branch pushed, PR to be opened against `main` titled `feat(app-builder): MOBILE-PREVIEW-6 real runtime preview`.
+- PR #1109 open against `main`, titled `feat(app-builder): MOBILE-PREVIEW-6 real runtime preview`.
+- Post-review cleanup applied: RBAC rationale rewritten to state the correct capability-scope argument (§1) instead of the earlier "it's just a read" framing, and the two unrelated `setup.sh` fixes reverted out of this PR and documented as a standalone follow-up (§9a) instead of riding along silently.
 - **Stopping before merge**, per the task's explicit instruction. No Deploy. No Production.
-- Recommended next task per the Horizon: **MOBILE-PREVIEW-7** (QR/deep-link one-time exchange for physical-device pairing), once this PR is reviewed and CI is confirmed green (backend sqlite+pgsql, `mobile-ci.yml` analyze+test+Android/iOS build proofs, web build+test).
+- Recommended next task per the Horizon: **MOBILE-PREVIEW-7** (QR/deep-link one-time exchange for physical-device pairing), once this PR is reviewed and CI is confirmed green (backend sqlite+pgsql, `mobile-ci.yml` analyze+test+Android/iOS build proofs, web build+test). A separate, small follow-up task should also sync `setup.sh`'s `app/Mail` copy and AWS/Redis composer requires with `ci.yml` (§9a) — unrelated to this Horizon, safe to schedule independently.
