@@ -6879,7 +6879,12 @@
       "preview": {
         "browserTruthBadge": "معاينة المتصفح — ليست عرض زمن تشغيل حقيقي",
         "fullPreviewAction": "معاينة كاملة",
-        "exitFullPreviewAction": "إنهاء المعاينة الكاملة"
+        "exitFullPreviewAction": "إنهاء المعاينة الكاملة",
+        "limitation": {
+          "navigateUnsupportedTitle": "غير مدعوم في التطبيق الفعلي",
+          "navigateUnsupportedDescription": "التطبيق الحقيقي لا يفعّل التنقل إلى \"{pageId}\" اليوم — فقط الرئيسية والسلة مفعّلتان فعلياً",
+          "requiresLiveDataTitle": "غير متاح في معاينة المتصفح — يتطلب بيانات حيّة"
+        }
       },
       "previewState": {
         "draft": "مسودة",

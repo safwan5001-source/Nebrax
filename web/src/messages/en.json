@@ -6879,7 +6879,12 @@
       "preview": {
         "browserTruthBadge": "Browser Preview — not a real runtime render",
         "fullPreviewAction": "Full Preview",
-        "exitFullPreviewAction": "Exit Full Preview"
+        "exitFullPreviewAction": "Exit Full Preview",
+        "limitation": {
+          "navigateUnsupportedTitle": "Not supported by the real app",
+          "navigateUnsupportedDescription": "The shipped app doesn't wire up navigation to \"{pageId}\" today — only Home and Cart are",
+          "requiresLiveDataTitle": "Unavailable in Browser Preview — requires live data"
+        }
       },
       "previewState": {
         "draft": "Draft",

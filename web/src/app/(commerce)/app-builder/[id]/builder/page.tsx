@@ -21,9 +21,10 @@ import {
   addChildComponent, addPage, appDisplayName, findComponentById, findParentId, generatePageId, hasAppBuilderPermission,
   mergeThemeTokens, moveSibling, removeComponentById, removePage, reorderChildren, setInitialPage,
   themeTokens as schemaThemeTokens, updateComponentById,
-  type AppBuilderRegistries, type AppSchema, type AppSchemaComponent, type BuilderApp, type BuilderDraftExperience,
-  type BuilderPublishedVersion,
+  type AppBuilderRegistries, type AppSchema, type AppSchemaActionRef, type AppSchemaComponent, type BuilderApp,
+  type BuilderDraftExperience, type BuilderPublishedVersion,
 } from '@/lib/app-builder';
+import { resolvePreviewActionOutcome } from '@/modules/app-builder/action-semantics';
 import { AppBuilderCanvas, PREVIEW_WIDTHS, type PreviewDevice } from '@/modules/app-builder/canvas';
 import { DEFAULT_APP_EXPERIENCE } from '@/modules/app-builder/default-experience';
 import { DeviceFrame, DEVICE_FRAME_PRESETS, type DeviceFramePreset } from '@/modules/app-builder/device-frame';
@@ -554,6 +555,48 @@ export default function AppBuilderWorkspacePage() {
   const isDraftView = previewState === 'draft';
 
   /**
+   * MOBILE-PREVIEW-4 — dispatches a tapped node's `action` inside App Preview. This mirrors
+   * what the shipped runtime's `RuntimeActionHandler` would actually do for the same action —
+   * never a silent success, never a generic page router the real app doesn't have — see
+   * `resolvePreviewActionOutcome`'s own doc comments (`action-semantics.ts`) for the exact
+   * reasoning behind each branch below. Only ever wired to the Preview canvas (`onAction` on
+   * `previewCanvasArea`'s `AppBuilderCanvas` below) — Design mode's own canvas calls never pass
+   * `onAction`, so tapping a node there still only selects it, exactly as before.
+   */
+  function handlePreviewAction(action: AppSchemaActionRef) {
+    const outcome = resolvePreviewActionOutcome(action);
+    switch (outcome.kind) {
+      case 'navigate':
+        // `isDraftView` reuses the same page-selection state Design mode already relies on
+        // (`selectedPageId`/`currentPageRoot`) — MOBILE-PREVIEW-3's own architecture already
+        // avoids a second "viewed" tracking variable for Draft; `published`/`default` use the
+        // existing `viewedPageId` the read-only page sidebar already sets. If the target page id
+        // doesn't exist in the currently viewed schema, the existing `effectiveViewedPageId`/
+        // `currentPageRoot` fallbacks already degrade safely (to the schema's own initial page,
+        // or to the canvas's own "empty page" state) — never a crash, never a fabricated page.
+        if (isDraftView) setSelectedPageId(outcome.pageId);
+        else setViewedPageId(outcome.pageId);
+        break;
+      case 'navigate-unsupported':
+        toast.toast({
+          title: t('preview.limitation.navigateUnsupportedTitle'),
+          description: t('preview.limitation.navigateUnsupportedDescription', { pageId: outcome.pageId }),
+          variant: 'warning',
+        });
+        break;
+      case 'requires-live-data':
+        toast.toast({ title: t('preview.limitation.requiresLiveDataTitle'), variant: 'warning' });
+        break;
+      case 'safe-noop':
+      case 'inert':
+        // Matches the real runtime exactly: `refresh` has no live effect to simulate here (the
+        // real handler never touches the network either), and a malformed/unknown action
+        // already dispatches nothing on real mobile — silence here is honest, not a gap.
+        break;
+    }
+  }
+
+  /**
    * MOBILE-PREVIEW-3 — the read-only device-frame content shared by normal App Preview and
    * Full Preview: same loading/error/canvas branching Design mode's own read-only branch
    * already has for `published` (lines above), just wrapped in `DeviceFrame` and rendered
@@ -576,6 +619,7 @@ export default function AppBuilderWorkspacePage() {
           registries={registries}
           stateBanner={previewBannerText}
           interactive={false}
+          onAction={handlePreviewAction}
         />
       </DeviceFrame>
     );

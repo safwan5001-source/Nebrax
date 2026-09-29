@@ -143,6 +143,9 @@ const { api, currentUser, translate } = vi.hoisted(() => {
     'preview.browserTruthBadge': 'Browser Preview — not a real runtime render',
     'preview.fullPreviewAction': 'Full Preview',
     'preview.exitFullPreviewAction': 'Exit Full Preview',
+    'preview.limitation.navigateUnsupportedTitle': 'Not supported by the real app',
+    'preview.limitation.navigateUnsupportedDescription': 'The shipped app doesn\'t wire up navigation to "{pageId}" today — only Home and Cart are',
+    'preview.limitation.requiresLiveDataTitle': 'Unavailable in Browser Preview — requires live data',
   };
   const cache = new Map<string, ReturnType<typeof buildTranslator>>();
   function buildTranslator(namespace: string) {
@@ -174,7 +177,7 @@ vi.mock('@/lib/api', async () => {
   return { ...actual, api };
 });
 vi.mock('@/lib/auth', () => ({ currentUser }));
-const { toastFns } = vi.hoisted(() => ({ toastFns: { success: vi.fn(), error: vi.fn() } }));
+const { toastFns } = vi.hoisted(() => ({ toastFns: { success: vi.fn(), error: vi.fn(), toast: vi.fn() } }));
 vi.mock('@/components/ui/toast', () => ({ useToast: () => toastFns }));
 vi.mock('lucide-react', () => {
   const iconStub = () => <span />;
@@ -331,6 +334,7 @@ describe('AppBuilderWorkspacePage', () => {
     api.mockReset();
     toastFns.success.mockReset();
     toastFns.error.mockReset();
+    toastFns.toast.mockReset();
     currentUser.mockReturnValue({ role: 'owner' });
   });
 
@@ -1013,6 +1017,114 @@ describe('AppBuilderWorkspacePage', () => {
       await userEvent.setup().click(screen.getByRole('button', { name: 'EN' }));
       const screenBoxEn = screen.getAllByText('Featured')[0].closest('[dir]');
       expect(screenBoxEn?.getAttribute('dir')).toBe('ltr');
+    });
+  });
+
+  // MOBILE-PREVIEW-4 — runtime semantic parity. Preview now actually dispatches a tapped
+  // node's `action` (previously a complete no-op — see action-semantics.ts's own doc comments),
+  // honestly matching what the shipped runtime's RuntimeActionHandler would do: only 'home'/
+  // 'cart' are real, wired navigation targets; anything else, and every action that needs live
+  // commerce data, must show a truthful notice — never fake success, never invent a generic
+  // page router the real app doesn't have.
+  describe('MOBILE-PREVIEW-4 runtime semantic parity', () => {
+    const navDraftData = {
+      id: 'draft-1', builder_app_id: 'app-1', revision: 0, updated_at: null,
+      schema: {
+        schemaVersion: '1.0.0', minRuntimeVersion: '1.0.0',
+        navigation: { initialPageId: 'home' },
+        theme: { tokens: {} },
+        pages: {
+          home: {
+            type: 'Page', id: 'home-root',
+            children: [
+              { type: 'Text', id: 'home-text', props: { text: 'Home content' } },
+              {
+                type: 'Button', id: 'btn-cart', props: { label: 'Go to cart' },
+                action: { type: 'navigate', params: { pageId: 'cart' } },
+              },
+              {
+                type: 'Button', id: 'btn-about', props: { label: 'Go to about' },
+                action: { type: 'navigate', params: { pageId: 'about' } },
+              },
+            ],
+          },
+          cart: {
+            type: 'Page', id: 'cart-root',
+            children: [{ type: 'Text', id: 'cart-text', props: { text: 'Cart content' } }],
+          },
+          about: {
+            type: 'Page', id: 'about-root',
+            children: [{ type: 'Text', id: 'about-text', props: { text: 'About content' } }],
+          },
+        },
+      },
+    };
+
+    function mockNavApi() {
+      api.mockImplementation((path?: string) => {
+        if (!path) return Promise.resolve({ data: null });
+        if (path.endsWith('/draft')) return Promise.resolve({ data: navDraftData });
+        if (path.endsWith('/registries')) return Promise.resolve({ data: registriesData });
+        if (path.includes('/app-builder/apps/')) return Promise.resolve({ data: appData });
+        return Promise.reject(new Error(`unexpected path: ${path}`));
+      });
+    }
+
+    it('tapping a navigate action to a runtime-wired pageId (home/cart) actually switches the visible page', async () => {
+      mockNavApi();
+      render(<AppBuilderWorkspacePage />);
+      await screen.findByText('Home content');
+
+      await userEvent.setup().click(screen.getByRole('button', { name: 'App Preview' }));
+      await userEvent.setup().click(screen.getByText('Go to cart'));
+
+      expect(await screen.findByText('Cart content')).toBeTruthy();
+      expect(screen.queryByText('Home content')).toBeNull();
+      expect(toastFns.toast).not.toHaveBeenCalled();
+    });
+
+    it('tapping a navigate action to a pageId the shipped runtime never wires up shows a truthful limitation notice and does not switch pages, even though that page exists in the schema', async () => {
+      mockNavApi();
+      render(<AppBuilderWorkspacePage />);
+      await screen.findByText('Home content');
+
+      await userEvent.setup().click(screen.getByRole('button', { name: 'App Preview' }));
+      await userEvent.setup().click(screen.getByText('Go to about'));
+
+      expect(toastFns.toast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: 'Not supported by the real app',
+          description: 'The shipped app doesn\'t wire up navigation to "about" today — only Home and Cart are',
+          variant: 'warning',
+        })
+      );
+      expect(screen.getAllByText('Home content').length).toBeGreaterThan(0);
+      expect(screen.queryByText('About content')).toBeNull();
+    });
+
+    it('tapping an action that needs live commerce data (openProduct) shows a truthful "unavailable" notice, never a fake success', async () => {
+      mockApi();
+      render(<AppBuilderWorkspacePage />);
+      await screen.findByText('Featured');
+
+      await userEvent.setup().click(screen.getByRole('button', { name: 'App Preview' }));
+      await userEvent.setup().click(screen.getByText('Shoe'));
+
+      expect(toastFns.toast).toHaveBeenCalledWith(
+        expect.objectContaining({ title: 'Unavailable in Browser Preview — requires live data', variant: 'warning' })
+      );
+    });
+
+    it('Design mode is unaffected: tapping the same navigate-actionable node only selects it, never dispatches or shows a notice', async () => {
+      mockNavApi();
+      render(<AppBuilderWorkspacePage />);
+      await screen.findByText('Home content');
+
+      await userEvent.setup().click(screen.getByText('Go to cart'));
+
+      expect(screen.getByText('Home content')).toBeTruthy();
+      expect(screen.queryByText('Cart content')).toBeNull();
+      expect(toastFns.toast).not.toHaveBeenCalled();
     });
   });
 });

@@ -1,0 +1,37 @@
+{
+  "_meta": {
+    "purpose": "MOBILE-PREVIEW-4 (AWJ_APP_BUILDER_REAL_MOBILE_PREVIEW_HORIZON.md) — canonical, single-source list of every component/action identifier the shipped runtime actually implements. Component Registry parity (Horizon requirement #5: 'Verify Browser Preview coverage against runtime-supported component identifiers. No second independent component contract.') is a set-equality fact, not a rendering-detail fact — this fixture makes that set explicit and shared so drift in either allowlist fails a test immediately instead of being noticed later by a merchant.",
+    "sourceOfTruth": "mobile/lib/schema/registry_identifiers.dart (RuntimeCapabilities.components / .actions)",
+    "portedTo": "web/src/modules/app-builder/registry-identifiers.ts",
+    "consumers": [
+      "mobile/test/registry/registry_identifiers_conformance_test.dart",
+      "web/src/modules/app-builder/registry-identifiers.test.ts"
+    ],
+    "note": "mobile/test/registry/component_registry_test.dart already asserts ComponentRegistry.builders.keys == RuntimeCapabilities.components.keys (an internal Dart-only invariant); mobile/test/actions/app_action_test.dart already asserts decodeAction's recognized type set == RuntimeCapabilities.actions.keys. This fixture's own Dart consumer instead asserts RuntimeCapabilities' two maps against THIS file, closing the loop so a future capability bump only needs one shared edit reviewed on both sides, never a silent one-sided drift."
+  },
+  "components": [
+    "Page",
+    "Section",
+    "Text",
+    "Image",
+    "ProductList",
+    "ProductCard",
+    "ProductDetail",
+    "Price",
+    "VariantSelector",
+    "Quantity",
+    "AddToCart",
+    "CartList",
+    "CartSummary",
+    "Button",
+    "NavigationTarget"
+  ],
+  "actions": [
+    "navigate",
+    "openProduct",
+    "addToCart",
+    "updateCartQuantity",
+    "removeCartItem",
+    "refresh"
+  ]
+}
