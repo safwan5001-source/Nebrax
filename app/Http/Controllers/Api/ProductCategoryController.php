@@ -6,8 +6,10 @@ use App\Http\Requests\StoreProductCategoryRequest;
 use App\Http\Resources\ProductCategoryResource;
 use App\Models\ProductCategory;
 use App\Services\DocumentCenter\DocumentStorageService;
+use App\Services\R2StorageService;
 use App\Tenancy\BranchScope;
 use Illuminate\Http\JsonResponse;
+use Aws\Exception\AwsException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -20,7 +22,15 @@ use RuntimeException;
  */
 class ProductCategoryController extends ApiController
 {
-    public function __construct(protected DocumentStorageService $documentStorage) {}
+    public function __construct(
+        protected DocumentStorageService $documentStorage,
+        protected R2StorageService $r2,
+    ) {}
+
+    private function r2Enabled(): bool
+    {
+        return (bool) config('category_media.r2.enabled', false);
+    }
 
     /**
      * القائمة مسطّحة بـ `parent_id` — الشجرة تُبنى في العرض، لا في الاستعلام.
@@ -121,16 +131,33 @@ class ProductCategoryController extends ApiController
         }
 
         $extension = strtolower($file->getClientOriginalExtension() ?: $file->extension() ?: 'bin');
-        $path = "product-category-media/{$category->tenant_id}/{$category->id}/" . Str::uuid() . ".{$extension}";
-        $stream = fopen($file->getRealPath(), 'rb');
+        $filename = Str::uuid() . ".{$extension}";
 
-        try {
-            $this->documentStorage->put($this->documentStorage->profile(), $path, $stream);
-        } catch (RuntimeException $exception) {
-            abort(503, 'تعذّر حفظ صورة التصنيف. أعد المحاولة.');
-        } finally {
-            if (is_resource($stream)) {
-                fclose($stream);
+        if ($this->r2Enabled()) {
+            $bytes = file_get_contents($file->getRealPath());
+            try {
+                $path = $this->r2->put(
+                    ProductCategory::R2_DOMAIN,
+                    (string) $category->id,
+                    $filename,
+                    $bytes,
+                    $file->getMimeType(),
+                );
+            } catch (RuntimeException|AwsException $exception) {
+                abort(503, 'تعذّر حفظ صورة التصنيف في التخزين الدائم. أعد المحاولة.');
+            }
+        } else {
+            $path = "product-category-media/{$category->tenant_id}/{$category->id}/{$filename}";
+            $stream = fopen($file->getRealPath(), 'rb');
+
+            try {
+                $this->documentStorage->put($this->documentStorage->profile(), $path, $stream);
+            } catch (RuntimeException $exception) {
+                abort(503, 'تعذّر حفظ صورة التصنيف. أعد المحاولة.');
+            } finally {
+                if (is_resource($stream)) {
+                    fclose($stream);
+                }
             }
         }
 
@@ -146,8 +173,12 @@ class ProductCategoryController extends ApiController
         // قديم لا يحوّل استبدالاً ناجحاً للمستخدم إلى فشل ولا يعيد المؤشر إليه.
         if ($oldPath && $oldPath !== $path) {
             try {
-                $this->documentStorage->delete($this->documentStorage->profile(), $oldPath);
-            } catch (RuntimeException $exception) {
+                if (ProductCategory::isR2ImagePath($oldPath)) {
+                    $this->r2->delete(ProductCategory::R2_DOMAIN, (string) $category->id, basename($oldPath));
+                } else {
+                    $this->documentStorage->delete($this->documentStorage->profile(), $oldPath);
+                }
+            } catch (RuntimeException|AwsException $exception) {
                 report($exception);
             }
         }
@@ -159,6 +190,26 @@ class ProductCategoryController extends ApiController
         $category = ProductCategory::findOrFail($id);
         if (! $category->image_path) {
             abort(404, 'لا توجد صورة لهذا التصنيف.');
+        }
+
+        $headers = [
+            'Content-Type' => $category->image_mime_type ?: 'application/octet-stream',
+        ];
+
+        if (ProductCategory::isR2ImagePath($category->image_path)) {
+            try {
+                $body = $this->r2->get(
+                    ProductCategory::R2_DOMAIN,
+                    (string) $category->id,
+                    basename($category->image_path),
+                );
+            } catch (RuntimeException|AwsException $exception) {
+                abort(404, 'ملف صورة التصنيف غير موجود.');
+            }
+
+            return response()->streamDownload(function () use ($body): void {
+                echo (string) $body;
+            }, $category->image_original_name ?: "category-{$category->id}", $headers);
         }
 
         try {
@@ -173,17 +224,23 @@ class ProductCategoryController extends ApiController
         return response()->streamDownload(function () use ($stream): void {
             fpassthru($stream);
             fclose($stream);
-        }, $category->image_original_name ?: "category-{$category->id}", [
-            'Content-Type' => $category->image_mime_type ?: 'application/octet-stream',
-        ]);
+        }, $category->image_original_name ?: "category-{$category->id}", $headers);
     }
 
     private function deleteStoredImage(ProductCategory $category): void
     {
         if ($category->image_path) {
             try {
-                $this->documentStorage->delete($this->documentStorage->profile(), $category->image_path);
-            } catch (RuntimeException $exception) {
+                if (ProductCategory::isR2ImagePath($category->image_path)) {
+                    $this->r2->delete(
+                        ProductCategory::R2_DOMAIN,
+                        (string) $category->id,
+                        basename($category->image_path),
+                    );
+                } else {
+                    $this->documentStorage->delete($this->documentStorage->profile(), $category->image_path);
+                }
+            } catch (RuntimeException|AwsException $exception) {
                 abort(503, 'تعذّر حذف صورة التصنيف من التخزين. أعد المحاولة.');
             }
         }
