@@ -1,0 +1,380 @@
+import { render, waitFor } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
+import { OFFICIAL_SOCIAL_MARKS } from "@/components/brand/OfficialSocialMark";
+import { SBC_SEAL_SCRIPT_URL } from "./SbcSeal";
+
+vi.mock("next/server", () => ({ connection: vi.fn() }));
+vi.mock("next-intl/server", () => ({
+  getTranslations: vi.fn(async () => (key: string) => key),
+}));
+vi.mock("@/lib/spree", () => ({ isWholesaleEnabled: () => false }));
+
+import { Footer } from "./Footer";
+
+function identityIcon(container: HTMLElement, kind: string) {
+  return container.querySelector(`[data-identity-icon="${kind}"]`);
+}
+
+const baseProps = {
+  basePath: "",
+  locale: "ar" as Locale,
+  categoryLinks: null,
+  storeName: "متجر الاختبار",
+};
+
+describe("Footer SBC presentation", () => {
+  it("keeps the text-only fallback when no seal token is configured", async () => {
+    const view = await Footer({
+      ...baseProps,
+      showSbc: true,
+      sbcSealToken: "",
+    });
+    const screen = render(view);
+
+    expect(screen.getByText("sbcVerified")).toBeTruthy();
+    expect(screen.queryByTestId("sbc-official-seal")).toBeNull();
+  });
+
+  it("renders the official container path only when a seal token is configured", async () => {
+    const view = await Footer({
+      ...baseProps,
+      showSbc: true,
+      sbcSealToken: "official-token",
+    });
+    const screen = render(view);
+
+    expect(screen.getByTestId("sbc-official-seal")).toHaveAttribute(
+      "data-token",
+      "official-token",
+    );
+    expect(screen.getByTestId("sbc-text-fallback")).toHaveTextContent(
+      "sbcVerified",
+    );
+  });
+
+  it("loads the official seal script on the public storefront when enabled and a token exists", async () => {
+    const view = await Footer({
+      ...baseProps,
+      showSbc: true,
+      sbcSealToken: "official-token",
+    });
+    const screen = render(view);
+
+    expect(screen.getByTestId("sbc-official-seal")).toHaveAttribute(
+      "data-token",
+      "official-token",
+    );
+    await waitFor(() =>
+      expect(
+        document.querySelector(`script[src="${SBC_SEAL_SCRIPT_URL}"]`),
+      ).not.toBeNull(),
+    );
+    expect(document.getElementById("awj-sbc-seal-loader")).toHaveAttribute(
+      "src",
+      SBC_SEAL_SCRIPT_URL,
+    );
+    expect(screen.queryByTestId("sbc-seal-preview")).toBeNull();
+  });
+
+  it("renders canonical identity and a separate merchant license", async () => {
+    const view = await Footer({
+      ...baseProps,
+      businessIdentity: {
+        legal_name: "شركة النور",
+        cr_number: "7050247977",
+        vat_number: null,
+      },
+      licenseNumber: "LIC-42",
+    });
+    const screen = render(view);
+
+    expect(screen.getByText("legalName: شركة النور")).toBeTruthy();
+    expect(screen.getByText("crNumber: 7050247977")).toBeTruthy();
+    expect(screen.queryByText(/vatNumber/)).toBeNull();
+    expect(
+      screen.getByText("crNumber: 7050247977").closest("p"),
+    ).toHaveAttribute("data-identity-detail", "cr");
+    expect(identityIcon(screen.container, "cr")).toHaveAttribute(
+      "aria-hidden",
+      "true",
+    );
+    expect(identityIcon(screen.container, "vat")).toBeNull();
+    const identity = screen.getByRole("region", {
+      name: "businessInformation",
+    });
+    const licenseRegion = screen.getByRole("region", {
+      name: "merchantProvided",
+    });
+    expect(identity.textContent).toContain("7050247977");
+    expect(identity.textContent).not.toContain("LIC-42");
+    expect(licenseRegion.textContent).toContain("LIC-42");
+  });
+
+  it("opens the published WhatsApp link in a new tab without sending a message", async () => {
+    const view = await Footer({
+      ...baseProps,
+      whatsappHref: "https://wa.me/966500000000",
+    });
+    const screen = render(view);
+    const link = screen.getByRole("link", { name: "whatsapp" });
+
+    expect(link.getAttribute("href")).toBe("https://wa.me/966500000000");
+    expect(link.getAttribute("target")).toBe("_blank");
+    expect(link.getAttribute("rel")).toBe("noopener noreferrer");
+    expect(
+      screen.getByRole("region", { name: "communication" }).contains(link),
+    ).toBe(true);
+    expect(
+      screen.getByRole("navigation", { name: "account" }).contains(link),
+    ).toBe(false);
+  });
+
+  it("names a published social link and opens it in a new tab", async () => {
+    const view = await Footer({
+      ...baseProps,
+      socialLinks: [
+        { id: "ig", network: "instagram", href: "https://instagram.com/awj" },
+      ],
+    });
+    const screen = render(view);
+    const link = screen.getByRole("link", { name: "socialInstagram" });
+
+    expect(link.getAttribute("href")).toBe("https://instagram.com/awj");
+    expect(link.getAttribute("target")).toBe("_blank");
+    expect(link.getAttribute("rel")).toBe("noopener noreferrer");
+    expect(screen.queryByRole("link", { name: "instagram" })).toBeNull();
+  });
+
+  it("omits the merchant-provided group when the license is blank", async () => {
+    const view = await Footer({
+      ...baseProps,
+      licenseNumber: "   ",
+    });
+    const screen = render(view);
+
+    expect(screen.queryByText("merchantProvided")).toBeNull();
+    expect(screen.queryByText("businessInformation")).toBeNull();
+  });
+
+  it("renders canonical VAT and hides an absent CR row and icon", async () => {
+    const view = await Footer({
+      ...baseProps,
+      businessIdentity: {
+        legal_name: null,
+        cr_number: "   ",
+        vat_number: "310123456700003",
+      },
+    });
+    const screen = render(view);
+
+    expect(screen.getByText("vatNumber: 310123456700003")).toBeTruthy();
+    expect(screen.queryByText(/crNumber/)).toBeNull();
+    expect(screen.queryByText(/legalName/)).toBeNull();
+    expect(identityIcon(screen.container, "vat")).toHaveAttribute(
+      "aria-hidden",
+      "true",
+    );
+    expect(identityIcon(screen.container, "cr")).toBeNull();
+    expect(screen.container.querySelector("img")).toBeNull();
+  });
+
+  it("renders no SBC presentation when the merchant turns it off", async () => {
+    const view = await Footer({
+      ...baseProps,
+      showSbc: false,
+      sbcSealToken: "official-token",
+    });
+    const screen = render(view);
+
+    expect(screen.queryByTestId("sbc-official-seal")).toBeNull();
+    expect(screen.queryByText("sbcVerified")).toBeNull();
+  });
+
+  it("renders official store badges and drops a host that is not allow-listed", async () => {
+    const view = await Footer({
+      ...baseProps,
+      appLinks: [
+        {
+          id: "ios",
+          store: "apple",
+          label: "App Store",
+          href: "https://apps.apple.com/app/id1",
+        },
+        {
+          id: "wide",
+          store: "apple",
+          label: "App Store",
+          href: "https://www.apple.com/iphone",
+        },
+        {
+          id: "play",
+          store: "google",
+          label: "Google Play",
+          href: "https://play.google.com/store/apps/details?id=sa.awj",
+        },
+      ],
+    });
+    const screen = render(view);
+    const apple = screen.getByRole("img", { name: "App Store" });
+    const play = screen.getByRole("img", { name: "Google Play" });
+
+    expect(apple).toHaveAttribute("src", expect.stringContaining("/ar-AR?"));
+    expect(apple).toHaveClass("h-10");
+    expect(apple.closest("a")).toHaveAttribute("target", "_blank");
+    expect(apple.closest("a")).toHaveAttribute("rel", "noopener noreferrer");
+    expect(play).toHaveAttribute(
+      "src",
+      expect.stringContaining("/ar_badge_web_generic.png"),
+    );
+    expect(play).toHaveClass("h-[60px]");
+    expect(screen.getAllByRole("img")).toHaveLength(2);
+    expect(
+      screen.getByRole("region", { name: "applications" }).contains(apple),
+    ).toBe(true);
+    expect(
+      screen.getByRole("navigation", { name: "policies" }).querySelector("img"),
+    ).toBeNull();
+  });
+
+  it("wraps an unbroken tagline and copyright instead of widening the footer", async () => {
+    const view = await Footer({
+      ...baseProps,
+      tagline: "AwjUnbrokenToken".repeat(12),
+      copyright: "AwjUnbrokenToken".repeat(8),
+    });
+    const screen = render(view);
+    const nodes = screen.getAllByText(/AwjUnbrokenToken/);
+
+    expect(
+      nodes.some(
+        (node) =>
+          node.className.includes("break-words") &&
+          node.className.includes("max-w-lg"),
+      ),
+    ).toBe(true);
+    expect(
+      nodes.some(
+        (node) =>
+          node.className.includes("break-words") &&
+          node.className.includes("text-xs"),
+      ),
+    ).toBe(true);
+  });
+
+  it("renders an official mark for every supported network and keeps the link safe", async () => {
+    const view = await Footer({
+      ...baseProps,
+      whatsappHref: "https://wa.me/966500000000",
+      socialLinks: [
+        { id: "ig", network: "instagram", href: "https://instagram.com/awj" },
+        { id: "x", network: "x", href: "https://x.com/awj" },
+        { id: "tt", network: "tiktok", href: "https://www.tiktok.com/@awj" },
+        {
+          id: "sc",
+          network: "snapchat",
+          href: "https://www.snapchat.com/add/awj",
+        },
+        { id: "yt", network: "youtube", href: "https://www.youtube.com/@awj" },
+        {
+          id: "li",
+          network: "linkedin",
+          href: "https://www.linkedin.com/company/awj",
+        },
+        { id: "fb", network: "facebook", href: "https://www.facebook.com/awj" },
+        { id: "empty", network: "instagram", href: "" },
+        { id: "unknown", network: "myspace", href: "https://example.com/awj" },
+      ],
+    });
+    const screen = render(view);
+    const expected = [
+      ["socialInstagram", "https://instagram.com/awj", "instagram"],
+      ["socialX", "https://x.com/awj", "x"],
+      ["socialTiktok", "https://www.tiktok.com/@awj", "tiktok"],
+      ["socialSnapchat", "https://www.snapchat.com/add/awj", "snapchat"],
+      ["socialYoutube", "https://www.youtube.com/@awj", "youtube"],
+      ["socialLinkedin", "https://www.linkedin.com/company/awj", "linkedin"],
+      ["socialFacebook", "https://www.facebook.com/awj", "facebook"],
+    ] as const;
+
+    for (const [name, href, network] of expected) {
+      const link = screen.getByRole("link", { name });
+      const mark = link.querySelector("img");
+      expect(link.getAttribute("href")).toBe(href);
+      expect(link.getAttribute("target")).toBe("_blank");
+      expect(link.getAttribute("rel")).toBe("noopener noreferrer");
+      expect(link.className).toContain("size-11");
+      expect(mark?.getAttribute("data-official-social")).toBe(network);
+      expect(mark?.getAttribute("src")).toBe(
+        OFFICIAL_SOCIAL_MARKS[network].src,
+      );
+      expect(mark?.getAttribute("alt")).toBe("");
+    }
+
+    const whatsapp = screen.getByRole("link", { name: "whatsapp" });
+    expect(whatsapp.getAttribute("href")).toBe("https://wa.me/966500000000");
+    expect(
+      whatsapp.querySelector("img")?.getAttribute("data-official-social"),
+    ).toBe("whatsapp");
+    expect(screen.queryByRole("link", { name: "myspace" })).toBeNull();
+    expect(
+      document.querySelector('[data-official-social="myspace"]'),
+    ).toBeNull();
+    expect(
+      screen.getAllByRole("link", { name: "socialInstagram" }),
+    ).toHaveLength(1);
+  });
+
+  it("does not render a WhatsApp mark when whatsappHref is absent", async () => {
+    const view = await Footer({ ...baseProps, whatsappHref: null });
+    const screen = render(view);
+    expect(screen.queryByRole("link", { name: "whatsapp" })).toBeNull();
+    expect(
+      document.querySelector('[data-official-social="whatsapp"]'),
+    ).toBeNull();
+  });
+
+  it("shows a utility icon beside each present contact value and no link", async () => {
+    const view = await Footer({
+      ...baseProps,
+      contact: {
+        phone: "+966500000000",
+        email: "  ",
+        address: "الدمام، شارع طويل جداً بلا انقطاع في السطر الواحد",
+        hours: "",
+      },
+    });
+    const screen = render(view);
+    const region = screen.getByRole("region", { name: "communication" });
+
+    expect(screen.getByText("+966500000000").closest("p")).toContainElement(
+      region.querySelector("[data-contact-icon='phone']"),
+    );
+    expect(screen.getByText(/الدمام/).className).toContain("break-words");
+    expect(
+      region.querySelector("[data-contact-icon='address']"),
+    ).not.toBeNull();
+    expect(region.querySelector("[data-contact-icon='email']")).toBeNull();
+    expect(region.querySelector("[data-contact-icon='hours']")).toBeNull();
+    expect(region.querySelector("a")).toBeNull();
+  });
+
+  it("renders every contact field when the set is complete", async () => {
+    const view = await Footer({
+      ...baseProps,
+      contact: {
+        phone: "050",
+        email: "a@awj.dev",
+        address: "Dammam",
+        hours: "9–5",
+      },
+    });
+    const screen = render(view);
+    for (const kind of ["phone", "email", "address", "hours"]) {
+      expect(
+        document.querySelector(`[data-contact-icon='${kind}']`),
+      ).not.toBeNull();
+    }
+    expect(screen.getByText("a@awj.dev")).toBeTruthy();
+    expect(screen.queryByRole("link", { name: "a@awj.dev" })).toBeNull();
+  });
+});

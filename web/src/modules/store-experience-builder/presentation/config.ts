@@ -136,6 +136,7 @@ export interface StorefrontPresentationConfig {
   };
   sbc: {
     authentication_number: string;
+    seal_token: string;
     show_in_storefront: boolean;
   };
   apps: {
@@ -240,6 +241,7 @@ export const DEFAULT_PRESENTATION_CONFIG: StorefrontPresentationConfig = {
   },
   sbc: {
     authentication_number: "",
+    seal_token: "",
     show_in_storefront: false,
   },
   apps: {
@@ -510,6 +512,7 @@ export function normalizePresentationConfig(
     },
     sbc: {
       authentication_number: asString(sbcRaw.authentication_number).trim(),
+      seal_token: asString(sbcRaw.seal_token).trim(),
       show_in_storefront: asBoolean(sbcRaw.show_in_storefront, false),
     },
     apps: {
@@ -526,6 +529,56 @@ export function normalizePresentationConfig(
           .map((page, index) => normalizePage(page, index))
           .filter((page): page is PresentationContentPage => Boolean(page))
       : DEFAULT_PRESENTATION_CONFIG.pages.map((page) => ({ ...page })),
+  };
+}
+
+interface PresetStartingBundle {
+  density?: DensityId;
+  productCard?: ProductCardStyleId;
+  headerStyle?: HeaderStyleId;
+}
+
+/**
+ * Presets that ship a coordinated starting bundle beyond their color. Keyed
+ * so a future bundled preset only needs an entry here, not a new branch.
+ * AWJ Market's bundle is the explicit starting composition locked in the
+ * AWJ Market Master Spec (§29): compact density/card/header, every other
+ * field left untouched.
+ */
+const PRESET_STARTING_BUNDLES: Partial<Record<ThemePresetId, PresetStartingBundle>> = {
+  "awj-market": { density: "compact", productCard: "compact", headerStyle: "compact" },
+};
+
+/**
+ * The patch to apply when a merchant clicks a theme preset swatch in the
+ * production Customizer.
+ *
+ * A bundled preset's extra fields apply only on the *transition* into it —
+ * once `config.themePreset` already equals the clicked preset, re-clicking
+ * (or any later normalization/reload) must not keep forcing compact
+ * density/card/header back over choices the merchant has since changed.
+ * That is what keeps this a one-time starting composition instead of a
+ * permanent override layer (Master Spec §29).
+ */
+export function presetSelectionPatch(
+  config: StorefrontPresentationConfig,
+  preset: { id: ThemePresetId; primary: string },
+): Partial<StorefrontPresentationConfig> {
+  const base: Partial<StorefrontPresentationConfig> = {
+    themePreset: preset.id,
+    primaryColor: preset.primary,
+  };
+  const bundle = PRESET_STARTING_BUNDLES[preset.id];
+  if (!bundle || config.themePreset === preset.id) {
+    return base;
+  }
+  return {
+    ...base,
+    ...(bundle.density ? { density: bundle.density } : {}),
+    ...(bundle.productCard ? { productCard: bundle.productCard } : {}),
+    ...(bundle.headerStyle
+      ? { header: { ...config.header, style: bundle.headerStyle } }
+      : {}),
   };
 }
 

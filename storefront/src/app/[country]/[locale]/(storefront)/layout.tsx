@@ -8,6 +8,7 @@ import { Footer, FooterCategoryLinks } from "@/components/layout/Footer";
 import { Header, HeaderMobileMenu } from "@/components/layout/Header";
 import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
 import { PublishedCardStyleProvider } from "@/components/layout/PublishedCardStyle";
+import { PublishedThemeMarkerProvider } from "@/components/layout/PublishedThemeMarker";
 import { StoreWhatsApp } from "@/components/layout/StoreWhatsApp";
 import { fetchStorefrontConfig } from "@/lib/commerce/storefront";
 import { getCategories } from "@/lib/data/categories";
@@ -187,13 +188,30 @@ export default async function StorefrontLayout({
     : null;
   const appLinks = [
     ios && isSafeAppStoreUrl(ios)
-      ? { id: "app-ios", label: "App Store", href: ios }
+      ? {
+          id: "app-ios",
+          store: "apple" as const,
+          label: "App Store",
+          href: ios,
+        }
       : null,
     android && isSafePlayStoreUrl(android)
-      ? { id: "app-android", label: "Google Play", href: android }
+      ? {
+          id: "app-android",
+          store: "google" as const,
+          label: "Google Play",
+          href: android,
+        }
       : null,
-  ].filter((item): item is { id: string; label: string; href: string } =>
-    Boolean(item),
+  ].filter(
+    (
+      item,
+    ): item is {
+      id: string;
+      store: "apple" | "google";
+      label: string;
+      href: string;
+    } => Boolean(item),
   );
 
   const chrome = (
@@ -238,13 +256,17 @@ export default async function StorefrontLayout({
         id="main-content"
         className="flex-1 scroll-mt-(--store-header-offset)"
       >
-        <PublishedCardStyleProvider
-          productCard={
-            presentation?.productCard === "compact" ? "compact" : "standard"
-          }
+        <PublishedThemeMarkerProvider
+          themePreset={presentation?.themePreset ?? "awj-modern"}
         >
-          {children}
-        </PublishedCardStyleProvider>
+          <PublishedCardStyleProvider
+            productCard={
+              presentation?.productCard === "compact" ? "compact" : "standard"
+            }
+          >
+            {children}
+          </PublishedCardStyleProvider>
+        </PublishedThemeMarkerProvider>
       </main>
       <Footer
         basePath={basePath}
@@ -252,6 +274,7 @@ export default async function StorefrontLayout({
         storeName={displayName}
         businessIdentity={identity?.business_identity}
         showSbc={presentation?.sbc.show_in_storefront ?? false}
+        sbcSealToken={presentation?.sbc.seal_token ?? ""}
         logoUrl={logoUrl}
         showLogo={presentation ? presentation.footer.showLogo : true}
         tagline={presentation?.footer.tagline ?? ""}
@@ -260,6 +283,7 @@ export default async function StorefrontLayout({
         socialLinks={publishedSocialLinks(presentation)}
         whatsappHref={footerWhatsApp}
         appLinks={appLinks}
+        licenseNumber={presentation?.verification.licenseNumber ?? ""}
         categoryLinks={
           <Suspense fallback={<FooterCategoryLinksFallback />}>
             <StorefrontFooterCategoryLinks

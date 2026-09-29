@@ -62,12 +62,18 @@ interface ExperienceBuilderProps {
   initialConfig?: StorefrontPresentationConfig;
   liveStoreName?: string | null;
   initialLocale?: CustomizerLocale;
+  businessIdentity?: {
+    legal_name: string | null;
+    cr_number: string | null;
+    vat_number: string | null;
+  };
 }
 
 export function ExperienceBuilder({
   initialConfig,
   liveStoreName = null,
   initialLocale = "ar",
+  businessIdentity,
 }: ExperienceBuilderProps) {
   const baseline = useMemo(
     () =>
@@ -90,6 +96,8 @@ export function ExperienceBuilder({
 
   function updateDraft(next: StorefrontPresentationConfig) {
     const normalized = normalizePresentationConfig(next);
+    normalized.sbc.authentication_number = next.sbc.authentication_number;
+    normalized.sbc.seal_token = next.sbc.seal_token;
     setDraft(normalized);
     setLifecycle("dirty");
     setNotice(null);
@@ -247,6 +255,7 @@ export function ExperienceBuilder({
               config={draft}
               locale={locale}
               liveStoreName={liveStoreName}
+              businessIdentity={businessIdentity}
               onChange={updateDraft}
             />
           </div>
@@ -304,6 +313,7 @@ export function ExperienceBuilder({
                 locale={locale}
                 viewport={device}
                 liveStoreName={liveStoreName}
+                businessIdentity={businessIdentity}
               />
             </div>
           </div>
@@ -384,6 +394,7 @@ export function ExperienceBuilder({
               config={draft}
               locale={locale}
               liveStoreName={liveStoreName}
+              businessIdentity={businessIdentity}
               onChange={updateDraft}
             />
           </div>

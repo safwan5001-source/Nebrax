@@ -130,6 +130,13 @@ export function createSpreeMiddleware(
   return async function middleware(request: NextRequest) {
     const { pathname } = request.nextUrl;
 
+    // `/icon` is the dynamic store icon. Locale-prefixing it 404s before
+    // `app/icon/route.ts` runs. Match the proxy matcher (`icon/?$`) exactly —
+    // `/icons` and other routes still receive locale routing.
+    if (pathname === "/icon" || pathname === "/icon/") {
+      return NextResponse.next();
+    }
+
     // Skip static routes
     if (staticRoutes.some((route) => pathname.startsWith(route))) {
       return NextResponse.next();

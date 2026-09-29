@@ -124,6 +124,33 @@ Until those conditions are satisfied:
 
 The lack of an approved asset must not block the persistence and Show/Hide contract itself. It blocks only shipping an official SBC logo or trust mark.
 
+### 7.1 Official merchant seal integration boundary
+
+The official merchant-facing seal is rendered only through the Saudi Business
+Center's government-hosted integration:
+
+`https://eauthenticate.saudibusiness.gov.sa/EAuthSealApi/seal.js`
+
+An authenticated merchant obtains the opaque `data-token` through the official
+Saudi Business Center **Add QR Seal** flow and copies only that token into the
+typed `sbc.seal_token` setting. AWJ does not accept or persist merchant-provided
+HTML or JavaScript.
+
+The published Storefront may load the official loader so that the SBC service
+continues to own the seal artwork, QR, certificate link, and verification
+presentation. AWJ does not copy, locally host, mirror, modify, or recreate
+`seal.js`, SBC emblem/logo artwork, the government QR, or a government status.
+The authenticated AWJ Admin/Customizer must not execute the loader; the public
+Storefront is the only AWJ runtime permitted to do so.
+
+When the official service is unavailable, the existing text-only
+`موثّق في منصة الأعمال` presentation is retained as an AWJ presentation choice.
+It is not an independent AWJ verification result and must not be changed into
+an invalid, expired, suspended, unverified, or other status claim. Any future
+official asset or integration change must repeat the official-source,
+usage-guidance, and permission evidence gate; assets must not be copied from
+Salla, Zid, or another platform.
+
 ## 8. Persistence and API boundary
 
 Use the smallest persistence path compatible with the existing StorefrontPresentation contract. Do not create a new table or migration if the existing presentation document can represent these two settings safely and backward-compatibly.

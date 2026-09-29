@@ -23,6 +23,30 @@ describe("normalizePresentationConfig", () => {
     });
   });
 
+  it("accepts awj-market and derives its own default primary color", () => {
+    expect(
+      normalizePresentationConfig({ themePreset: "awj-market" }),
+    ).toMatchObject({
+      themePreset: "awj-market",
+      primaryColor: "#0f766e",
+    });
+  });
+
+  it("a merchant-chosen color survives on awj-market like any other preset", () => {
+    expect(
+      normalizePresentationConfig({
+        themePreset: "awj-market",
+        primaryColor: "#123456",
+      }),
+    ).toMatchObject({ themePreset: "awj-market", primaryColor: "#123456" });
+  });
+
+  it("an unrecognized preset (including a stale awj-market variant) still fails closed to AWJ Modern", () => {
+    expect(
+      normalizePresentationConfig({ themePreset: "awj-market-v0" }),
+    ).toMatchObject({ themePreset: "awj-modern", primaryColor: "#12372a" });
+  });
+
   it("legacy key-shaped sections: drops unknown keys and migrates ids deterministically", () => {
     const normalized = normalizePresentationConfig({
       homepage: {
@@ -287,6 +311,16 @@ describe("normalizePresentationConfig", () => {
     expect(normalized.social[0].url).toBe("");
     expect(normalized.apps.iosUrl).toBe("");
     expect(normalized.apps.androidUrl).toContain("play.google.com");
+    expect(
+      normalizePresentationConfig({
+        apps: { iosUrl: "https://www.apple.com/iphone" },
+      }).apps.iosUrl,
+    ).toBe("");
+    expect(
+      normalizePresentationConfig({
+        apps: { iosUrl: "https://apps.apple.com/app/id1" },
+      }).apps.iosUrl,
+    ).toContain("apps.apple.com");
   });
 
   it("does not invent a store name when branding is empty", () => {

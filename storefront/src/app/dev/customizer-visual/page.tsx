@@ -305,6 +305,7 @@ export default async function PublishedVisualPage({
           title={text.appTitle}
           appStoreLabel={text.appStoreLabel}
           playStoreLabel={text.playStoreLabel}
+          locale={locale}
         />
       </StoreContainer>
     </div>

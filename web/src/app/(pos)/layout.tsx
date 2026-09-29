@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { isAuthenticated } from '@/lib/auth';
+import { AuthenticatedCompanyBrowserIdentity } from '@/components/layout/company-browser-identity';
 
 /**
  * تخطيط مستقل لنقطة البيع — يملأ الشاشة بالكامل بلا شريط جانبي ولا هيدر.
@@ -24,5 +25,10 @@ export default function PosLayout({ children }: { children: React.ReactNode }) {
     return <div className="grid h-screen place-items-center bg-background text-muted">…</div>;
   }
 
-  return <div className="h-screen w-full overflow-hidden bg-background [height:100dvh]">{children}</div>;
+  return (
+    <div className="h-screen w-full overflow-hidden bg-background [height:100dvh]">
+      <AuthenticatedCompanyBrowserIdentity />
+      {children}
+    </div>
+  );
 }

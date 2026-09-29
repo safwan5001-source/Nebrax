@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { FuelWorkspaceShell } from '@/components/fuel-stations/fuel-workspace-shell';
+import { AuthenticatedCompanyBrowserIdentity } from '@/components/layout/company-browser-identity';
 import { currentUser, isAuthenticated } from '@/lib/auth';
 
 /**
@@ -27,5 +28,10 @@ export default function FuelLayout({ children }: { children: React.ReactNode }) 
     return <div className="grid h-screen place-items-center bg-background text-muted [height:100dvh]">…</div>;
   }
 
-  return <FuelWorkspaceShell>{children}</FuelWorkspaceShell>;
+  return (
+    <>
+      <AuthenticatedCompanyBrowserIdentity />
+      <FuelWorkspaceShell>{children}</FuelWorkspaceShell>
+    </>
+  );
 }

@@ -22,6 +22,10 @@ const mono = IBM_Plex_Mono({
 export const metadata: Metadata = {
   title: BRAND.displayName,
   description: 'منصة سحابية متكاملة لإدارة المؤسسات',
+  icons: {
+    icon: '/api/company-browser-icon',
+    apple: '/api/company-browser-icon',
+  },
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {

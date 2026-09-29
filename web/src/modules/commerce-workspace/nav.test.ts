@@ -13,6 +13,7 @@ describe('commerce workspace navigation', () => {
       '/commerce',
       '/commerce/stores',
       '/commerce/published-products',
+      '/commerce/themes',
       '/commerce/appearance',
       '/app-builder',
       '/commerce/domains',
@@ -21,22 +22,23 @@ describe('commerce workspace navigation', () => {
     ]);
   });
 
-  it('places App Builder after Store Experience and preserves its guards', () => {
+  it('places Theme Gallery before Store Experience and preserves App Builder guards', () => {
     const storeItems = COMMERCE_WORKSPACE_NAV_GROUPS.find((group) => group.labelKey === 'groupStore')?.items;
     expect(storeItems?.map((item) => item.href)).toEqual([
       '/commerce/stores',
       '/commerce/published-products',
+      '/commerce/themes',
       '/commerce/appearance',
       '/app-builder',
     ]);
-    expect(storeItems?.[3]).toMatchObject({
+    expect(storeItems?.[4]).toMatchObject({
       appKey: 'commerce.app_builder',
       permission: 'apps_builder.view',
     });
   });
 
   it('hides App Builder from viewers without the existing permission or entitlement', () => {
-    const appBuilder = COMMERCE_WORKSPACE_NAV_GROUPS.find((group) => group.labelKey === 'groupStore')?.items[3];
+    const appBuilder = COMMERCE_WORKSPACE_NAV_GROUPS.find((group) => group.labelKey === 'groupStore')?.items[4];
     expect(appBuilder).toBeDefined();
     expect(isNavEntryVisible(appBuilder!, new Set(), { role: 'staff', permissions: [] })).toBe(false);
     expect(isNavEntryVisible(appBuilder!, new Set(['commerce.app_builder']), { role: 'admin' })).toBe(false);

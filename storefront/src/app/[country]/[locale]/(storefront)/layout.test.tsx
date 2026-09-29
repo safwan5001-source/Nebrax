@@ -44,6 +44,7 @@ import { Footer } from "@/components/layout/Footer";
 import { Header } from "@/components/layout/Header";
 import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
 import { PublishedCardStyleProvider } from "@/components/layout/PublishedCardStyle";
+import { PublishedThemeMarkerProvider } from "@/components/layout/PublishedThemeMarker";
 import StorefrontLayout from "./layout";
 
 interface LayoutElementProps {
@@ -76,7 +77,13 @@ describe("StorefrontLayout", () => {
 
     expect(header.type).toBe(Header);
     expect(main.type).toBe("main");
-    const cardStyle = main.props.children as ReactElement<{
+    const themeMarker = main.props.children as ReactElement<{
+      themePreset: string;
+      children: ReactNode;
+    }>;
+    expect(themeMarker.type).toBe(PublishedThemeMarkerProvider);
+    expect(themeMarker.props.themePreset).toBe("awj-modern");
+    const cardStyle = themeMarker.props.children as ReactElement<{
       productCard: string;
       children: ReactNode;
     }>;

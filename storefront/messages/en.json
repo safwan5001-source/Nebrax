@@ -88,7 +88,17 @@
     "vatNumber": "VAT number",
     "sbcVerified": "Verified in Saudi Business Center",
     "merchantProvided": "Merchant-provided information",
-    "licenseNumber": "License number"
+    "licenseNumber": "License number",
+    "communication": "Contact",
+    "applications": "Applications",
+    "sbcGroup": "Saudi Business Center",
+    "socialInstagram": "Instagram",
+    "socialX": "X",
+    "socialTiktok": "TikTok",
+    "socialSnapchat": "Snapchat",
+    "socialYoutube": "YouTube",
+    "socialLinkedin": "LinkedIn",
+    "socialFacebook": "Facebook"
   },
   "home": {
     "welcome": "{storeName}",

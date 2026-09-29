@@ -1,16 +1,20 @@
 "use client";
 
-import {
-  Home,
-  LayoutGrid,
-  MessageCircle,
-  Search,
-  ShoppingBag,
-  User,
-} from "lucide-react";
+import { Home, LayoutGrid, Search, ShoppingBag, User } from "lucide-react";
 import type { CSSProperties, ReactNode } from "react";
+import {
+  isOfficialSocialNetwork,
+  OfficialSocialMark,
+  officialSocialLinkClassName,
+} from "@/components/brand/OfficialSocialMark";
 import { StoreBrand } from "@/components/layout/StoreBrand";
 import { storeContainerClassName } from "@/components/layout/StoreContainer";
+import {
+  ContactDetail,
+  contactDetailText,
+} from "@/components/store/ContactDetail";
+import { IdentityDetail } from "@/components/store/IdentityDetail";
+import { OfficialStoreBadge } from "@/components/store/OfficialStoreBadge";
 import { categoryAccent } from "@/lib/home/category-accent";
 import {
   isGatedHomeSection,
@@ -18,7 +22,12 @@ import {
   type StorefrontPresentationConfig,
 } from "@/lib/presentation/config";
 import { presentationCssVars } from "@/lib/presentation/tokens";
-import { buildWhatsAppUrl, sanitizeExternalUrl } from "@/lib/presentation/urls";
+import {
+  buildWhatsAppUrl,
+  isSafeAppStoreUrl,
+  isSafePlayStoreUrl,
+  sanitizeExternalUrl,
+} from "@/lib/presentation/urls";
 import { cn } from "@/lib/utils";
 import {
   type CustomizerLocale,
@@ -30,6 +39,7 @@ import {
   PREVIEW_PRODUCTS,
   PREVIEW_STORE_NAME,
 } from "./preview-fixtures";
+import { SbcSeal } from "./SbcSeal";
 
 const SECTION_TITLE: Record<string, CustomizerMessageKey> = {
   hero: "sectionHero",
@@ -49,6 +59,11 @@ interface StorefrontPreviewCanvasProps {
   locale: CustomizerLocale;
   viewport: "desktop" | "tablet" | "mobile";
   liveStoreName?: string | null;
+  businessIdentity?: {
+    legal_name: string | null;
+    cr_number: string | null;
+    vat_number: string | null;
+  };
 }
 
 export function StorefrontPreviewCanvas({
@@ -56,6 +71,7 @@ export function StorefrontPreviewCanvas({
   locale,
   viewport,
   liveStoreName = null,
+  businessIdentity = { legal_name: null, cr_number: null, vat_number: null },
 }: StorefrontPreviewCanvasProps) {
   const t = (key: CustomizerMessageKey) => customizerMessage(locale, key);
   const storeName = previewStoreName(
@@ -72,6 +88,15 @@ export function StorefrontPreviewCanvas({
     compact && config.branding.compactLogoDataUrl
       ? config.branding.compactLogoDataUrl
       : config.branding.logoDataUrl;
+  const legalName = businessIdentity.legal_name?.trim() || null;
+  const crNumber = businessIdentity.cr_number?.trim() || null;
+  const vatNumber = businessIdentity.vat_number?.trim() || null;
+  const license = config.verification.licenseNumber.trim();
+  const phone = contactDetailText(config.contact.phone);
+  const email = contactDetailText(config.contact.email);
+  const address = contactDetailText(config.contact.address);
+  const hours = contactDetailText(config.contact.hours);
+  const hasBusinessIdentity = Boolean(legalName || crNumber || vatNumber);
   const whatsappHref =
     config.whatsapp.enabled &&
     (config.whatsapp.placement === "floating" ||
@@ -87,7 +112,7 @@ export function StorefrontPreviewCanvas({
   const density = config.density === "compact" ? "compact" : "comfortable";
   const cardPad = config.productCard === "compact" ? "p-2.5" : "p-3";
   const enabledSocial = config.social.flatMap((item) => {
-    if (!item.enabled) return [];
+    if (!item.enabled || !isOfficialSocialNetwork(item.network)) return [];
     const href = sanitizeExternalUrl(item.url);
     return href ? [{ ...item, href }] : [];
   });
@@ -98,8 +123,12 @@ export function StorefrontPreviewCanvas({
     }
     return true;
   });
-  const ios = sanitizeExternalUrl(config.apps.iosUrl);
-  const android = sanitizeExternalUrl(config.apps.androidUrl);
+  const ios = isSafeAppStoreUrl(config.apps.iosUrl)
+    ? sanitizeExternalUrl(config.apps.iosUrl)
+    : null;
+  const android = isSafePlayStoreUrl(config.apps.androidUrl)
+    ? sanitizeExternalUrl(config.apps.androidUrl)
+    : null;
   const hasApps = Boolean(ios || android);
   const visiblePages = config.pages.filter((page) => page.enabled);
 
@@ -137,7 +166,7 @@ export function StorefrontPreviewCanvas({
             className={cn(
               storeContainerClassName,
               compact
-                ? "grid grid-cols-[1fr_auto_1fr] items-center gap-2 py-2"
+                ? "grid grid-cols-[1fr_minmax(0,1fr)_1fr] items-center gap-2 py-2"
                 : "flex items-center gap-6 py-3",
             )}
           >
@@ -348,8 +377,40 @@ export function StorefrontPreviewCanvas({
               );
             }
 
-            if (section.type === "appPromo" && !hasApps) {
-              return null;
+            if (section.type === "appPromo") {
+              if (!hasApps) return null;
+              return (
+                <section
+                  key={section.id}
+                  className="rounded-store bg-store-footer px-5 py-6 text-store-footer-foreground md:px-8"
+                >
+                  <h2 className="text-base font-extrabold md:text-lg">
+                    {config.apps.appName.trim() || t("sectionAppPromo")}
+                  </h2>
+                  <div className="mt-4 flex flex-wrap items-center gap-3">
+                    {ios ? (
+                      <OfficialStoreBadge
+                        store="apple"
+                        href={ios}
+                        locale={locale}
+                        label="App Store"
+                        newTab={false}
+                        onClick={(event) => event.preventDefault()}
+                      />
+                    ) : null}
+                    {android ? (
+                      <OfficialStoreBadge
+                        store="google"
+                        href={android}
+                        locale={locale}
+                        label="Google Play"
+                        newTab={false}
+                        onClick={(event) => event.preventDefault()}
+                      />
+                    ) : null}
+                  </div>
+                </section>
+              );
             }
 
             return (
@@ -387,7 +448,7 @@ export function StorefrontPreviewCanvas({
             />
           )}
           {config.footer.tagline.trim() ? (
-            <p className="mt-3 max-w-lg text-sm text-store-footer-muted">
+            <p className="mt-3 max-w-lg break-words text-sm text-store-footer-muted">
               {config.footer.tagline}
             </p>
           ) : null}
@@ -401,14 +462,6 @@ export function StorefrontPreviewCanvas({
             <FooterCol title={t("account")}>
               <span>{t("account")}</span>
               <span>{t("cart")}</span>
-              {footerWhatsapp ? (
-                <a
-                  href={footerWhatsapp}
-                  className="text-store-footer-link underline-offset-2 hover:underline"
-                >
-                  {t("whatsapp")}
-                </a>
-              ) : null}
             </FooterCol>
             <FooterCol title={t("policies")}>
               {visiblePages.length ? (
@@ -420,63 +473,160 @@ export function StorefrontPreviewCanvas({
               ) : (
                 <span>{t("pagesHint")}</span>
               )}
-              {hasApps && config.apps.showFooterLinks ? (
-                <>
-                  {ios ? <span>App Store</span> : null}
-                  {android ? <span>Google Play</span> : null}
-                </>
-              ) : null}
             </FooterCol>
           </div>
-          {(config.contact.phone ||
-            config.contact.email ||
-            config.contact.address ||
-            config.contact.hours ||
+          {(phone ||
+            email ||
+            address ||
+            hours ||
+            footerWhatsapp ||
             enabledSocial.length > 0 ||
-            config.verification.crNumber.trim() ||
-            config.verification.licenseNumber.trim()) && (
-            <div className="mt-8 border-t border-store-footer-border pt-6 text-sm text-store-footer-muted">
-              {config.contact.phone ? <p>{config.contact.phone}</p> : null}
-              {config.contact.email ? <p>{config.contact.email}</p> : null}
-              {config.contact.address ? <p>{config.contact.address}</p> : null}
-              {config.contact.hours ? <p>{config.contact.hours}</p> : null}
-              {enabledSocial.length > 0 && (
-                <p className="mt-2 flex flex-wrap gap-3">
-                  {enabledSocial.map((item) => (
-                    <a
-                      key={item.id}
-                      href={item.href}
-                      className="text-store-footer-link"
-                    >
-                      {item.network}
-                    </a>
-                  ))}
-                </p>
-              )}
-              {(config.verification.crNumber.trim() ||
-                config.verification.licenseNumber.trim()) && (
-                <div className="mt-4 space-y-1">
-                  <p className="font-medium text-store-footer-link">
+            hasBusinessIdentity ||
+            license ||
+            config.sbc.show_in_storefront ||
+            (hasApps && config.apps.showFooterLinks)) && (
+            <div className="mt-8 grid grid-cols-1 gap-x-8 gap-y-8 border-t border-store-footer-border pt-6 text-sm text-store-footer-muted sm:grid-cols-2 lg:grid-cols-3">
+              {hasBusinessIdentity ? (
+                <section className="min-w-0">
+                  <h3 className="text-sm font-bold text-store-footer-foreground">
+                    {t("businessInformation")}
+                  </h3>
+                  <div className="mt-3 break-words">
+                    {legalName ? (
+                      <p className="break-words">
+                        {t("legalName")}: {legalName}
+                      </p>
+                    ) : null}
+                    <IdentityDetail
+                      kind="cr"
+                      label={t("crNumber")}
+                      value={crNumber}
+                    />
+                    <IdentityDetail
+                      kind="vat"
+                      label={t("vatNumber")}
+                      value={vatNumber}
+                    />
+                  </div>
+                </section>
+              ) : null}
+              {license ? (
+                <section className="min-w-0">
+                  <h3 className="text-sm font-bold text-store-footer-foreground">
                     {t("merchantProvided")}
+                  </h3>
+                  <p className="mt-3 break-words">
+                    {t("licenseNumber")}: {license}
                   </p>
-                  {config.verification.crNumber.trim() ? (
-                    <p>
-                      {t("crNumber")}: {config.verification.crNumber}
-                    </p>
-                  ) : null}
-                  {config.verification.licenseNumber.trim() ? (
-                    <p>
-                      {t("licenseNumber")}: {config.verification.licenseNumber}
-                    </p>
-                  ) : null}
-                </div>
-              )}
+                </section>
+              ) : null}
+              {config.sbc.show_in_storefront ? (
+                <section className="min-w-0">
+                  <h3 className="text-sm font-bold text-store-footer-foreground">
+                    {t("sbcGroup")}
+                  </h3>
+                  <div className="mt-3">
+                    {config.sbc.seal_token.trim() ? (
+                      <SbcSeal message={t("sbcSealPreview")} />
+                    ) : (
+                      <p className="font-medium text-store-footer-link">
+                        {t("sbcVerified")}
+                      </p>
+                    )}
+                  </div>
+                </section>
+              ) : null}
+              {phone ||
+              email ||
+              address ||
+              hours ||
+              footerWhatsapp ||
+              enabledSocial.length > 0 ? (
+                <section className="min-w-0">
+                  <h3 className="text-sm font-bold text-store-footer-foreground">
+                    {t("communication")}
+                  </h3>
+                  <div className="mt-3 space-y-2 break-words">
+                    {phone ? (
+                      <ContactDetail kind="phone" value={phone} />
+                    ) : null}
+                    {email ? (
+                      <ContactDetail kind="email" value={email} />
+                    ) : null}
+                    {address ? (
+                      <ContactDetail kind="address" value={address} />
+                    ) : null}
+                    {hours ? (
+                      <ContactDetail kind="hours" value={hours} />
+                    ) : null}
+                    {footerWhatsapp ? (
+                      <p>
+                        <a
+                          href={footerWhatsapp}
+                          className="inline-flex min-h-11 items-center gap-2 text-store-footer-link underline-offset-2 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+                          onClick={(event) => event.preventDefault()}
+                        >
+                          <OfficialSocialMark network="whatsapp" />
+                          {t("whatsapp")}
+                        </a>
+                      </p>
+                    ) : null}
+                    {enabledSocial.length > 0 ? (
+                      <div className="flex flex-wrap items-center gap-1">
+                        {enabledSocial.map((item) => {
+                          const label = socialLabel(t, item.network);
+                          return (
+                            <a
+                              key={item.id}
+                              href={item.href}
+                              aria-label={label}
+                              className={officialSocialLinkClassName}
+                              onClick={(event) => event.preventDefault()}
+                            >
+                              <OfficialSocialMark network={item.network} />
+                            </a>
+                          );
+                        })}
+                      </div>
+                    ) : null}
+                  </div>
+                </section>
+              ) : null}
+              {hasApps && config.apps.showFooterLinks ? (
+                <section className="min-w-0">
+                  <h3 className="text-sm font-bold text-store-footer-foreground">
+                    {t("applications")}
+                  </h3>
+                  <div className="mt-3 flex flex-wrap items-center gap-3">
+                    {ios ? (
+                      <OfficialStoreBadge
+                        store="apple"
+                        href={ios}
+                        locale={locale}
+                        label="App Store"
+                        newTab={false}
+                        onClick={(event) => event.preventDefault()}
+                      />
+                    ) : null}
+                    {android ? (
+                      <OfficialStoreBadge
+                        store="google"
+                        href={android}
+                        locale={locale}
+                        label="Google Play"
+                        newTab={false}
+                        onClick={(event) => event.preventDefault()}
+                      />
+                    ) : null}
+                  </div>
+                </section>
+              ) : null}
             </div>
           )}
         </div>
         <div className="border-t border-store-footer-border">
           <div className={cn(storeContainerClassName, "py-5")}>
-            <p className="text-xs text-store-footer-muted">
+            <p className="break-words text-xs text-store-footer-muted">
               {config.footer.copyright.trim() || `© ${storeName}`}
             </p>
           </div>
@@ -513,12 +663,13 @@ export function StorefrontPreviewCanvas({
         <a
           href={whatsappHref}
           aria-label={t("whatsappAria")}
+          onClick={(event) => event.preventDefault()}
           className={cn(
-            "absolute z-30 inline-flex size-12 items-center justify-center rounded-full bg-[#128c7e] text-white",
+            "absolute z-30 inline-flex size-12 items-center justify-center rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#111827]",
             compact ? "end-3 bottom-16" : "end-4 bottom-4",
           )}
         >
-          <MessageCircle className="size-5" aria-hidden />
+          <OfficialSocialMark network="whatsapp" size="floating" />
         </a>
       )}
     </div>
@@ -579,5 +730,29 @@ function pageTitleKey(
       return "pageReturns";
     default:
       return "pageTerms";
+  }
+}
+
+function socialLabel(
+  t: (key: CustomizerMessageKey) => string,
+  network: string,
+): string {
+  switch (network) {
+    case "instagram":
+      return t("socialInstagram");
+    case "x":
+      return t("socialX");
+    case "tiktok":
+      return t("socialTiktok");
+    case "snapchat":
+      return t("socialSnapchat");
+    case "youtube":
+      return t("socialYoutube");
+    case "linkedin":
+      return t("socialLinkedin");
+    case "facebook":
+      return t("socialFacebook");
+    default:
+      return network;
   }
 }

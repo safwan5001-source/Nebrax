@@ -2513,6 +2513,76 @@ function matchesSearchTerm(term: string, ...fields: Array<string | null | undefi
   return fields.some((field) => typeof field === 'string' && field.toLowerCase().includes(needle));
 }
 
+/**
+ * CUST-H1-2 — مخزون وهمي في الذاكرة لنسخ التصميم، لصفحة `/dev/customizer-versions`
+ * فقط (تحقّق بصري بدون Laravel). يُعاد تهيئته بإعادة تحميل الصفحة (متغيّر
+ * على مستوى الوحدة يعاد تقييمه مع كل حزمة عميل جديدة)، ولا صلة له بأي اختبار.
+ */
+type MockPresentationVersionRow = {
+  id: string;
+  name: string;
+  state: 'draft' | 'scheduled' | 'published';
+  schema_version: number;
+  revision: number;
+  scheduled_for: string | null;
+  last_published_at: string | null;
+  created_at: string;
+  updated_at: string;
+  config: Record<string, unknown>;
+};
+
+const mockPresentationVersionsByStore = new Map<string, MockPresentationVersionRow[]>();
+
+export function seedMockPresentationVersions(
+  storefrontId: string,
+  versions: Array<{
+    id: string;
+    name: string;
+    state?: 'draft' | 'scheduled' | 'published';
+    revision?: number;
+    scheduledFor?: string | null;
+    lastPublishedAt?: string | null;
+    updatedAt?: string;
+    config?: Record<string, unknown>;
+  }>,
+): void {
+  const now = new Date().toISOString();
+  mockPresentationVersionsByStore.set(
+    storefrontId,
+    versions.map((v) => ({
+      id: v.id,
+      name: v.name,
+      state: v.state ?? 'draft',
+      schema_version: 2,
+      revision: v.revision ?? 0,
+      scheduled_for: v.scheduledFor ?? null,
+      last_published_at: v.lastPublishedAt ?? null,
+      created_at: now,
+      updated_at: v.updatedAt ?? now,
+      config: v.config ?? { version: 2 },
+    })),
+  );
+}
+
+function mockVersionSummary(storefrontId: string, row: MockPresentationVersionRow) {
+  return {
+    id: row.id,
+    storefront_id: storefrontId,
+    name: row.name,
+    state: row.state,
+    schema_version: row.schema_version,
+    revision: row.revision,
+    scheduled_for: row.scheduled_for,
+    last_published_at: row.last_published_at,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  };
+}
+
+function mockVersionDetail(storefrontId: string, row: MockPresentationVersionRow) {
+  return { ...mockVersionSummary(storefrontId, row), config: row.config };
+}
+
 export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknown): Promise<T> {
   const operationsResponse = handleDocumentOperationsDemo(path, method.toUpperCase(), body);
   if (operationsResponse.handled) {
@@ -3200,6 +3270,82 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
         published_at: null,
       },
     });
+  }
+  const versionsListMatch = clean.match(/^\/commerce\/workspace\/storefronts\/([^/]+)\/presentation\/versions$/);
+  if (versionsListMatch) {
+    const storefrontId = versionsListMatch[1];
+    const rows = mockPresentationVersionsByStore.get(storefrontId) ?? [];
+    const versionsVerb = method.toUpperCase();
+    if (versionsVerb === 'POST') {
+      const bodyRecord = (body && typeof body === 'object' ? body : {}) as {
+        name?: unknown;
+        source_version_id?: unknown;
+      };
+      const name = typeof bodyRecord.name === 'string' && bodyRecord.name.trim() !== '' ? bodyRecord.name : 'نسخة جديدة';
+      const source =
+        typeof bodyRecord.source_version_id === 'string'
+          ? rows.find((r) => r.id === bodyRecord.source_version_id)
+          : (rows.find((r) => r.state === 'published') ?? rows[0]);
+      const now = new Date().toISOString();
+      const created: MockPresentationVersionRow = {
+        id: `mock-v-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        name,
+        state: 'draft',
+        schema_version: 2,
+        revision: 1,
+        scheduled_for: null,
+        last_published_at: null,
+        created_at: now,
+        updated_at: now,
+        config: source?.config ?? { version: 2 },
+      };
+      rows.push(created);
+      mockPresentationVersionsByStore.set(storefrontId, rows);
+      return resolve({ data: mockVersionDetail(storefrontId, created) });
+    }
+    return resolve({ data: rows.map((row) => mockVersionSummary(storefrontId, row)) });
+  }
+
+  const versionMatch = clean.match(/^\/commerce\/workspace\/storefronts\/([^/]+)\/presentation\/versions\/([^/]+)$/);
+  if (versionMatch) {
+    const [, storefrontId, versionId] = versionMatch;
+    const rows = mockPresentationVersionsByStore.get(storefrontId) ?? [];
+    const row = rows.find((r) => r.id === versionId);
+    if (!row) {
+      return Promise.reject(Object.assign(new Error('النسخة غير موجودة.'), { status: 404 }));
+    }
+    const versionVerb = method.toUpperCase();
+    if (versionVerb === 'PUT') {
+      if (row.state === 'published') {
+        return Promise.reject(Object.assign(new Error('النسخة منشورة ومقروءة فقط.'), { status: 409 }));
+      }
+      const bodyRecord = (body && typeof body === 'object' ? body : {}) as { config?: unknown; revision?: unknown };
+      if (bodyRecord.revision !== row.revision) {
+        return Promise.reject(Object.assign(new Error('تم تعديل هذه النسخة من جلسة أخرى.'), { status: 409 }));
+      }
+      row.config = (bodyRecord.config as Record<string, unknown> | undefined) ?? row.config;
+      row.revision += 1;
+      row.updated_at = new Date().toISOString();
+      return resolve({ data: mockVersionDetail(storefrontId, row) });
+    }
+    if (versionVerb === 'PATCH') {
+      const bodyRecord = (body && typeof body === 'object' ? body : {}) as { name?: unknown; revision?: unknown };
+      if (bodyRecord.revision !== row.revision) {
+        return Promise.reject(Object.assign(new Error('تم تعديل هذه النسخة من جلسة أخرى.'), { status: 409 }));
+      }
+      if (typeof bodyRecord.name === 'string' && bodyRecord.name.trim() !== '') row.name = bodyRecord.name;
+      row.revision += 1;
+      row.updated_at = new Date().toISOString();
+      return resolve({ data: mockVersionDetail(storefrontId, row) });
+    }
+    if (versionVerb === 'DELETE') {
+      if (row.state !== 'draft') {
+        return Promise.reject(Object.assign(new Error('لا يمكن حذف هذه النسخة الآن.'), { status: 409 }));
+      }
+      mockPresentationVersionsByStore.set(storefrontId, rows.filter((r) => r.id !== versionId));
+      return resolve(null);
+    }
+    return resolve({ data: mockVersionDetail(storefrontId, row) });
   }
   if (/^\/commerce\/workspace\/products\/[^/]+\/publication$/.test(clean)) {
     return resolve({ data: { stores: [] } });

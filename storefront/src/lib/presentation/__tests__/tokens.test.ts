@@ -3,7 +3,9 @@ import {
   contrastRatio,
   isSafeHexColor,
   presentationCssVars,
+  presetPrimary,
   primaryForeground,
+  THEME_PRESETS,
 } from "../tokens";
 
 describe("presentation tokens", () => {
@@ -24,5 +26,19 @@ describe("presentation tokens", () => {
     expect(vars["--store-primary"]).toBe("#1e3a5f");
     expect(vars["--store-radius"]).toBe("0.5rem");
     expect(vars["--store-primary-foreground"]).toBe("#ffffff");
+  });
+
+  it("registers awj-market alongside the existing closed preset set", () => {
+    const ids = THEME_PRESETS.map((preset) => preset.id);
+    expect(ids).toEqual([
+      "awj-modern",
+      "navy",
+      "burgundy",
+      "sand",
+      "slate",
+      "awj-market",
+    ]);
+    expect(presetPrimary("awj-market")).toBe("#0f766e");
+    expect(primaryForeground("#0f766e")).toBe("#ffffff");
   });
 });

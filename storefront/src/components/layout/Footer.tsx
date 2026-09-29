@@ -3,9 +3,22 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { getTranslations } from "next-intl/server";
 import type { ReactNode } from "react";
+import {
+  isOfficialSocialNetwork,
+  OfficialSocialMark,
+  officialSocialLinkClassName,
+} from "@/components/brand/OfficialSocialMark";
+import { SbcSeal } from "@/components/layout/SbcSeal";
 import { StoreBrand } from "@/components/layout/StoreBrand";
 import { StoreContainer } from "@/components/layout/StoreContainer";
+import {
+  ContactDetail,
+  contactDetailText,
+} from "@/components/store/ContactDetail";
+import { IdentityDetail } from "@/components/store/IdentityDetail";
+import { OfficialStoreBadge } from "@/components/store/OfficialStoreBadge";
 import { POLICY_LINKS } from "@/lib/constants/policies";
+import { isSafeAppStoreUrl, isSafePlayStoreUrl } from "@/lib/presentation/urls";
 import { isWholesaleEnabled } from "@/lib/spree";
 
 interface FooterProps {
@@ -19,6 +32,7 @@ interface FooterProps {
     vat_number: string | null;
   };
   showSbc?: boolean;
+  sbcSealToken?: string;
   logoUrl?: string | null;
   showLogo?: boolean;
   tagline?: string;
@@ -31,7 +45,13 @@ interface FooterProps {
   } | null;
   socialLinks?: { id: string; network: string; href: string }[];
   whatsappHref?: string | null;
-  appLinks?: { id: string; label: string; href: string }[];
+  appLinks?: {
+    id: string;
+    store: "apple" | "google";
+    label: string;
+    href: string;
+  }[];
+  licenseNumber?: string;
 }
 
 interface FooterCategoryLinksProps {
@@ -87,16 +107,35 @@ function FooterColumn({ id, title, children }: FooterColumnProps) {
   );
 }
 
+function TrustGroup({
+  id,
+  title,
+  children,
+}: {
+  id: string;
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <section aria-labelledby={id} className="min-w-0">
+      <h2 id={id} className="text-sm font-bold text-store-footer-foreground">
+        {title}
+      </h2>
+      <div className="mt-3 break-words">{children}</div>
+    </section>
+  );
+}
+
 /**
  * The storefront footer.
  *
  * A dark band closing the page, as the approved baseline draws it.
  *
  * It carries only navigation the storefront actually has — categories from the
- * catalogue, the account routes, and the configured policy pages. The
- * reference's about paragraph, payment marks and registration badge are absent:
- * none of them are configured anywhere in AWJ, and a footer is exactly where an
- * invented claim reads as a commitment.
+ * catalogue, the account routes, and the configured policy pages. Payment marks
+ * stay absent. Commercial registration and the VAT number are canonical tenant
+ * facts with AWJ utility icons, not official seals. A footer is exactly where
+ * an invented official claim reads as a commitment.
  */
 export async function Footer({
   basePath,
@@ -105,6 +144,7 @@ export async function Footer({
   storeName,
   businessIdentity = { legal_name: null, cr_number: null, vat_number: null },
   showSbc = false,
+  sbcSealToken = "",
   logoUrl = null,
   showLogo = true,
   tagline = "",
@@ -113,6 +153,7 @@ export async function Footer({
   socialLinks = [],
   whatsappHref = null,
   appLinks = [],
+  licenseNumber = "",
 }: FooterProps) {
   const t = await getTranslations({ locale, namespace: "footer" });
   const tp = await getTranslations({ locale, namespace: "policies" });
@@ -123,9 +164,40 @@ export async function Footer({
   const legalName = businessIdentity.legal_name?.trim() || null;
   const crNumber = businessIdentity.cr_number?.trim() || null;
   const vatNumber = businessIdentity.vat_number?.trim() || null;
-  const hasContact = Boolean(
-    contact?.phone || contact?.email || contact?.address || contact?.hours,
+  const license = licenseNumber.trim();
+  const visibleAppLinks = appLinks.filter((link) =>
+    link.store === "apple"
+      ? isSafeAppStoreUrl(link.href)
+      : isSafePlayStoreUrl(link.href),
   );
+  const visibleSocial = socialLinks.filter(
+    (item) => Boolean(item.href) && isOfficialSocialNetwork(item.network),
+  );
+  const socialLabel = (network: string) => {
+    switch (network) {
+      case "instagram":
+        return t("socialInstagram");
+      case "x":
+        return t("socialX");
+      case "tiktok":
+        return t("socialTiktok");
+      case "snapchat":
+        return t("socialSnapchat");
+      case "youtube":
+        return t("socialYoutube");
+      case "linkedin":
+        return t("socialLinkedin");
+      case "facebook":
+        return t("socialFacebook");
+      default:
+        return network;
+    }
+  };
+  const phone = contactDetailText(contact?.phone);
+  const email = contactDetailText(contact?.email);
+  const address = contactDetailText(contact?.address);
+  const hours = contactDetailText(contact?.hours);
+  const hasContact = Boolean(phone || email || address || hours);
   const hasBusinessIdentity = Boolean(legalName || crNumber || vatNumber);
 
   return (
@@ -154,7 +226,7 @@ export async function Footer({
           </p>
         )}
         {tagline.trim() ? (
-          <p className="mt-3 max-w-lg text-sm text-store-footer-muted">
+          <p className="mt-3 max-w-lg break-words text-sm text-store-footer-muted">
             {tagline.trim()}
           </p>
         ) : null}
@@ -204,17 +276,6 @@ export async function Footer({
                 </Link>
               </li>
             )}
-            {whatsappHref ? (
-              <li>
-                <a
-                  href={whatsappHref}
-                  className={footerLinkClassName}
-                  rel="noopener noreferrer"
-                >
-                  {t("whatsapp")}
-                </a>
-              </li>
-            ) : null}
           </FooterColumn>
 
           <FooterColumn id="footer-policies" title={t("policies")}>
@@ -228,71 +289,115 @@ export async function Footer({
                 </Link>
               </li>
             ))}
-            {appLinks.map((link) => (
-              <li key={link.id}>
-                <a
-                  href={link.href}
-                  className={footerLinkClassName}
-                  rel="noopener noreferrer"
-                >
-                  {link.label}
-                </a>
-              </li>
-            ))}
           </FooterColumn>
         </div>
 
         {(hasContact ||
-          socialLinks.length > 0 ||
+          Boolean(whatsappHref) ||
+          visibleSocial.length > 0 ||
           hasBusinessIdentity ||
-          showSbc) && (
-          <div className="mt-8 border-t border-store-footer-border pt-6 text-sm text-store-footer-muted">
-            {contact?.phone ? <p>{contact.phone}</p> : null}
-            {contact?.email ? <p>{contact.email}</p> : null}
-            {contact?.address ? <p>{contact.address}</p> : null}
-            {contact?.hours ? <p>{contact.hours}</p> : null}
-            {socialLinks.length > 0 ? (
-              <p className="mt-2 flex flex-wrap gap-3">
-                {socialLinks.map((item) => (
-                  <a
-                    key={item.id}
-                    href={item.href}
-                    className="text-store-footer-link"
-                    rel="noopener noreferrer"
-                  >
-                    {item.network}
-                  </a>
-                ))}
-              </p>
-            ) : null}
+          license ||
+          showSbc ||
+          visibleAppLinks.length > 0) && (
+          <div className="mt-8 grid grid-cols-1 gap-x-8 gap-y-8 border-t border-store-footer-border pt-6 text-sm text-store-footer-muted sm:grid-cols-2 lg:grid-cols-3">
             {hasBusinessIdentity ? (
-              <div className="mt-4 space-y-1">
-                <p className="font-medium text-store-footer-link">
-                  {t("businessInformation")}
-                </p>
+              <TrustGroup id="footer-identity" title={t("businessInformation")}>
                 {legalName ? (
-                  <p>
+                  <p className="break-words">
                     {t("legalName")}: {legalName}
                   </p>
                 ) : null}
-                {crNumber ? (
-                  <p>
-                    {t("crNumber")}: {crNumber}
-                  </p>
-                ) : null}
-                {vatNumber ? (
-                  <p>
-                    {t("vatNumber")}: {vatNumber}
-                  </p>
-                ) : null}
-              </div>
+                <IdentityDetail
+                  kind="cr"
+                  label={t("crNumber")}
+                  value={crNumber}
+                />
+                <IdentityDetail
+                  kind="vat"
+                  label={t("vatNumber")}
+                  value={vatNumber}
+                />
+              </TrustGroup>
+            ) : null}
+            {license ? (
+              <TrustGroup id="footer-license" title={t("merchantProvided")}>
+                <p>
+                  {t("licenseNumber")}: {license}
+                </p>
+              </TrustGroup>
             ) : null}
             {showSbc ? (
-              <div className="mt-4 border-t border-store-footer-border pt-4">
-                <p className="font-medium text-store-footer-link">
-                  {t("sbcVerified")}
-                </p>
-              </div>
+              <TrustGroup id="footer-sbc" title={t("sbcGroup")}>
+                {sbcSealToken.trim() ? (
+                  <SbcSeal
+                    token={sbcSealToken}
+                    fallbackLabel={t("sbcVerified")}
+                  />
+                ) : (
+                  <p className="font-medium text-store-footer-link">
+                    {t("sbcVerified")}
+                  </p>
+                )}
+              </TrustGroup>
+            ) : null}
+            {hasContact || whatsappHref || visibleSocial.length > 0 ? (
+              <TrustGroup id="footer-communication" title={t("communication")}>
+                <div className="space-y-2">
+                  {phone ? <ContactDetail kind="phone" value={phone} /> : null}
+                  {email ? <ContactDetail kind="email" value={email} /> : null}
+                  {address ? (
+                    <ContactDetail kind="address" value={address} />
+                  ) : null}
+                  {hours ? <ContactDetail kind="hours" value={hours} /> : null}
+                  {whatsappHref ? (
+                    <p>
+                      <a
+                        href={whatsappHref}
+                        className={`${footerLinkClassName} inline-flex min-h-11 items-center gap-2`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        <OfficialSocialMark network="whatsapp" />
+                        {t("whatsapp")}
+                      </a>
+                    </p>
+                  ) : null}
+                  {visibleSocial.length > 0 ? (
+                    <div className="flex flex-wrap items-center gap-1">
+                      {visibleSocial.map((item) => {
+                        const label = socialLabel(item.network);
+                        return (
+                          <a
+                            key={item.id}
+                            href={item.href}
+                            className={officialSocialLinkClassName}
+                            aria-label={label}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            <OfficialSocialMark network={item.network} />
+                          </a>
+                        );
+                      })}
+                    </div>
+                  ) : null}
+                </div>
+              </TrustGroup>
+            ) : null}
+            {visibleAppLinks.length > 0 ? (
+              <TrustGroup id="footer-applications" title={t("applications")}>
+                <div className="flex flex-wrap items-center gap-3">
+                  {visibleAppLinks.map((link) => (
+                    <OfficialStoreBadge
+                      key={link.id}
+                      store={link.store}
+                      href={link.href}
+                      locale={locale}
+                      label={link.label}
+                    />
+                  ))}
+                </div>
+              </TrustGroup>
             ) : null}
           </div>
         )}
@@ -300,7 +405,7 @@ export async function Footer({
 
       <div className="border-t border-store-footer-border">
         <StoreContainer className="py-5">
-          <p className="text-xs text-store-footer-muted">
+          <p className="break-words text-xs text-store-footer-muted">
             {copyright.trim() ? (
               copyright.trim()
             ) : (

@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -20,6 +20,55 @@ vi.mock('@/modules/commerce-workspace/store-context', () => ({
     viewStoreUrl: null,
     refresh: vi.fn(),
   }),
+}));
+
+import { DEFAULT_PRESENTATION_CONFIG } from '@/modules/store-experience-builder/presentation';
+
+// CUST-H1-2 — الآن تُحمَّل الواجهة عبر نسخة تصميم واحدة (list → show)؛ نسخة
+// مسودة واحدة فقط فيُختار تلقائياً بلا غموض (`applyVersionSelection`). كلا
+// `vi.fn(impl)` يحمل تطبيقه وقت الإنشاء حتى ينجو من `vi.restoreAllMocks()`
+// في `afterEach` (تُعيد Vitest أي `vi.fn()` عاري الإنشاء إلى دالة فارغة، لا
+// التطبيق المضاف لاحقاً عبر `mockImplementation`).
+const showMock = vi.fn(async () => ({
+  ok: true,
+  data: {
+    id: 'v1',
+    storefrontId: 's1',
+    name: 'التصميم الحالي',
+    state: 'draft',
+    schemaVersion: 1,
+    revision: 0,
+    scheduledFor: null,
+    lastPublishedAt: null,
+    createdAt: '2026-09-01T00:00:00.000Z',
+    updatedAt: '2026-09-01T00:00:00.000Z',
+    config: DEFAULT_PRESENTATION_CONFIG,
+  },
+}));
+
+vi.mock('@/modules/commerce-workspace/presentation-versions', () => ({
+  listPresentationVersions: vi.fn(async () => ({
+    ok: true,
+    data: [
+      {
+        id: 'v1',
+        storefrontId: 's1',
+        name: 'التصميم الحالي',
+        state: 'draft',
+        schemaVersion: 1,
+        revision: 0,
+        scheduledFor: null,
+        lastPublishedAt: null,
+        createdAt: '2026-09-01T00:00:00.000Z',
+        updatedAt: '2026-09-01T00:00:00.000Z',
+      },
+    ],
+  })),
+  showPresentationVersion: (...args: unknown[]) => showMock(...args),
+  createPresentationVersion: vi.fn(),
+  savePresentationVersion: vi.fn(),
+  renamePresentationVersion: vi.fn(),
+  deletePresentationVersion: vi.fn(),
 }));
 
 import CommerceAppearancePage from './page';
@@ -77,6 +126,7 @@ describe('commerce appearance — STORE-CUSTOMIZER-V2-2 section instances', () =
   it('picker lists every registered type with its translated name and gated badge', async () => {
     const user = userEvent.setup();
     render(<CommerceAppearancePage />);
+    await waitFor(() => expect(showMock).toHaveBeenCalled());
     await openHomepage(user);
     await user.click(screen.getByRole('button', { name: /إضافة قسم/ }));
 
@@ -121,6 +171,7 @@ describe('commerce appearance — STORE-CUSTOMIZER-V2-2 section instances', () =
   it('add creates a new instance with a safe unique id and selects it', async () => {
     const user = userEvent.setup();
     render(<CommerceAppearancePage />);
+    await waitFor(() => expect(showMock).toHaveBeenCalled());
     await openHomepage(user);
 
     expect(composerRows()).toHaveLength(DEFAULT_ROW_COUNT);
@@ -141,6 +192,7 @@ describe('commerce appearance — STORE-CUSTOMIZER-V2-2 section instances', () =
   it('multi-instance types can be added more than once with distinct ids', async () => {
     const user = userEvent.setup();
     render(<CommerceAppearancePage />);
+    await waitFor(() => expect(showMock).toHaveBeenCalled());
     await openHomepage(user);
 
     const first = await addSection(user, 'offers');
@@ -156,6 +208,7 @@ describe('commerce appearance — STORE-CUSTOMIZER-V2-2 section instances', () =
   it('duplicate copies type/visible, creates a new id, sits next to the source and is selected', async () => {
     const user = userEvent.setup();
     render(<CommerceAppearancePage />);
+    await waitFor(() => expect(showMock).toHaveBeenCalled());
     await openHomepage(user);
 
     const sourceId = await addSection(user, 'benefits');
@@ -194,6 +247,7 @@ describe('commerce appearance — STORE-CUSTOMIZER-V2-2 section instances', () =
   it('selects duplicate instances of the same type independently', async () => {
     const user = userEvent.setup();
     render(<CommerceAppearancePage />);
+    await waitFor(() => expect(showMock).toHaveBeenCalled());
     await openHomepage(user);
 
     const first = await addSection(user, 'customContent');
@@ -231,6 +285,7 @@ describe('commerce appearance — STORE-CUSTOMIZER-V2-2 section instances', () =
   it('does not offer delete for hero while hero content remains global', async () => {
     const user = userEvent.setup();
     render(<CommerceAppearancePage />);
+    await waitFor(() => expect(showMock).toHaveBeenCalled());
     await openHomepage(user);
 
     const heroRow = document.querySelector(
@@ -248,6 +303,7 @@ describe('commerce appearance — STORE-CUSTOMIZER-V2-2 section instances', () =
   it('delete removes the instance from the list (not a hide) and moves selection to the next sibling', async () => {
     const user = userEvent.setup();
     render(<CommerceAppearancePage />);
+    await waitFor(() => expect(showMock).toHaveBeenCalled());
     await openHomepage(user);
 
     // Default order: hero, categories, newArrivals, wholesale (id = type).
@@ -279,6 +335,7 @@ describe('commerce appearance — STORE-CUSTOMIZER-V2-2 section instances', () =
   it('delete falls back to the previous sibling when the last instance is removed', async () => {
     const user = userEvent.setup();
     render(<CommerceAppearancePage />);
+    await waitFor(() => expect(showMock).toHaveBeenCalled());
     await openHomepage(user);
 
     // The default list ends with customContent; removing it must fall back
@@ -304,6 +361,7 @@ describe('commerce appearance — STORE-CUSTOMIZER-V2-2 section instances', () =
   it('hide keeps the instance in the list and only flips visible', async () => {
     const user = userEvent.setup();
     render(<CommerceAppearancePage />);
+    await waitFor(() => expect(showMock).toHaveBeenCalled());
     await openHomepage(user);
 
     const before = rowIds();
@@ -322,6 +380,7 @@ describe('commerce appearance — STORE-CUSTOMIZER-V2-2 section instances', () =
   it('reorder moves the instance itself and preserves every id', async () => {
     const user = userEvent.setup();
     render(<CommerceAppearancePage />);
+    await waitFor(() => expect(showMock).toHaveBeenCalled());
     await openHomepage(user);
 
     const bannerId = await addSection(user, 'banner');
@@ -343,6 +402,7 @@ describe('commerce appearance — STORE-CUSTOMIZER-V2-2 section instances', () =
   it('selected-section settings target the selected instance id among duplicates', async () => {
     const user = userEvent.setup();
     render(<CommerceAppearancePage />);
+    await waitFor(() => expect(showMock).toHaveBeenCalled());
     await openHomepage(user);
 
     const first = await addSection(user, 'featured');

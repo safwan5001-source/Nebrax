@@ -111,6 +111,7 @@
   },
   "sbc": {
     "authentication_number": "",
+    "seal_token": "",
     "show_in_storefront": false
   },
   "apps": {

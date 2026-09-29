@@ -49,6 +49,9 @@ class StorefrontConfigController extends PublicApiController
             $presentation = $presentations->publishedSnapshotForStorefront($context->storefrontId());
             if (is_array($presentation) && isset($presentation['sbc']) && is_array($presentation['sbc'])) {
                 $presentation['sbc']['authentication_number'] = '';
+                if (($presentation['sbc']['show_in_storefront'] ?? false) !== true) {
+                    $presentation['sbc']['seal_token'] = '';
+                }
             }
 
             $tenant = $row

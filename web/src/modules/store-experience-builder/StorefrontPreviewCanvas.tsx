@@ -1,7 +1,15 @@
 "use client";
 
-import { Home, LayoutGrid, MessageCircle, Search, ShoppingBag, User } from "lucide-react";
+import { Home, LayoutGrid, Search, ShoppingBag, User } from "lucide-react";
 import type { CSSProperties, ReactNode } from "react";
+import { OfficialStoreBadge } from "./OfficialStoreBadge";
+import { ContactDetail, contactDetailText } from "./ContactDetail";
+import { IdentityDetail } from "./IdentityDetail";
+import {
+  isOfficialSocialNetwork,
+  OfficialSocialMark,
+  officialSocialLinkClassName,
+} from "./OfficialSocialMark";
 import { StoreBrand, storeContainerClassName } from "./StoreBrand";
 import { categoryAccent } from "./category-accent";
 import {
@@ -16,8 +24,14 @@ import {
   customContentOf,
   featuredContentOf,
 } from "./presentation/section-content";
-import { buildWhatsAppUrl, sanitizeExternalUrl } from "./presentation/urls";
+import {
+  buildWhatsAppUrl,
+  isSafeAppStoreUrl,
+  isSafePlayStoreUrl,
+  sanitizeExternalUrl,
+} from "./presentation/urls";
 import { cn } from "@/lib/utils";
+import { SbcSeal } from "./SbcSeal";
 import {
   customizerMessage,
   type CustomizerLocale,
@@ -97,9 +111,21 @@ export function StorefrontPreviewCanvas({
     PREVIEW_STORE_NAME[locale],
   );
   const vars = presentationCssVars(config.primaryColor, config.radius) as CSSProperties;
-  const compact = viewport === "mobile" || config.header.style === "compact";
+  // The published Header only ties `header.style === "compact"` to two things:
+  // which logo variant renders, and whether the utility strip shows at all
+  // (`(storefront)/layout.tsx`, `Header.tsx`). Every other difference below —
+  // the mobile identity grid, search placement, category nav, bottom nav,
+  // product-grid columns — is the published shell's own `md`/`lg` responsive
+  // behavior, which this fixed-width preview box can only approximate by
+  // simulating the selected viewport, never by a merchant's header-style
+  // choice. Conflating the two made every Market desktop preview render as
+  // if it were mobile, since Market's starting bundle sets header.style to
+  // compact by default.
+  const mobileViewport = viewport === "mobile";
+  const headerStyleCompact = config.header.style === "compact";
+  const compact = mobileViewport || headerStyleCompact;
   const logo =
-    compact && config.branding.compactLogoDataUrl
+    headerStyleCompact && config.branding.compactLogoDataUrl
       ? config.branding.compactLogoDataUrl
       : config.branding.logoDataUrl;
   const whatsappHref =
@@ -116,8 +142,39 @@ export function StorefrontPreviewCanvas({
       : null;
   const density = config.density === "compact" ? "compact" : "comfortable";
   const cardPad = config.productCard === "compact" ? "p-2.5" : "p-3";
+  // The exact fixed heights ProductCard.tsx itself resolves to at each
+  // breakpoint — not the `sm:`/`md:` classes themselves. This preview frame
+  // is a plain, width-constrained div rendered inside the real Customizer
+  // page (`data-preview-frame` in ExperienceBuilder.tsx), not an iframe, so
+  // Tailwind's responsive prefixes would evaluate against the host browser's
+  // actual viewport rather than the simulated device width — a desktop host
+  // previewing "mobile" would still get `md:h-40`. Resolving the height
+  // explicitly from the `viewport` prop is the only way this preview can
+  // match the simulated device rather than the host's real window. None of
+  // this preview's three device widths (390/768/1280) ever land in the
+  // published `sm` tier (640–767px), so only base/`md` are reachable here.
+  const cardImageHeight =
+    viewport === "mobile"
+      ? config.themePreset === "awj-market"
+        ? "h-28"
+        : "h-36"
+      : config.themePreset === "awj-market"
+        ? "h-40"
+        : "h-52";
+  // Same host-browser-vs-simulated-device problem as `cardImageHeight` above,
+  // for the New Arrivals grid's column count. This preview section represents
+  // the homepage shelf, which the published storefront renders via
+  // `NewArrivals.tsx` — not the (differently-breakpointed) `ProductGrid.tsx`
+  // used for catalog/category listing pages. `NewArrivals.tsx` uses
+  // `grid-cols-2 sm:grid-cols-3 lg:grid-cols-4` (`sm` at 640px, `lg` at
+  // 1024px): mobile(390) sits below `sm` for 2 columns, tablet(768) sits at
+  // or above `sm` but below `lg` for 3, and desktop(1280) sits at or above
+  // `lg` for 4 — all three of this preview's simulated widths land in a
+  // different tier here.
+  const newArrivalsColumns =
+    viewport === "mobile" ? "grid-cols-2" : viewport === "tablet" ? "grid-cols-3" : "grid-cols-4";
   const enabledSocial = config.social.flatMap((item) => {
-    if (!item.enabled) return [];
+    if (!item.enabled || !isOfficialSocialNetwork(item.network)) return [];
     const href = sanitizeExternalUrl(item.url);
     return href ? [{ ...item, href }] : [];
   });
@@ -128,13 +185,21 @@ export function StorefrontPreviewCanvas({
     }
     return true;
   });
-  const ios = sanitizeExternalUrl(config.apps.iosUrl);
-  const android = sanitizeExternalUrl(config.apps.androidUrl);
+  const ios = isSafeAppStoreUrl(config.apps.iosUrl)
+    ? sanitizeExternalUrl(config.apps.iosUrl)
+    : null;
+  const android = isSafePlayStoreUrl(config.apps.androidUrl)
+    ? sanitizeExternalUrl(config.apps.androidUrl)
+    : null;
   const hasApps = Boolean(ios || android);
   const visiblePages = config.pages.filter((page) => page.enabled);
   const legalName = businessIdentity.legal_name?.trim() || null;
   const crNumber = businessIdentity.cr_number?.trim() || null;
   const vatNumber = businessIdentity.vat_number?.trim() || null;
+  const phone = contactDetailText(config.contact.phone);
+  const email = contactDetailText(config.contact.email);
+  const address = contactDetailText(config.contact.address);
+  const hours = contactDetailText(config.contact.hours);
   const hasBusinessIdentity = Boolean(legalName || crNumber || vatNumber);
 
   return (
@@ -199,12 +264,12 @@ export function StorefrontPreviewCanvas({
           <div
             className={cn(
               storeContainerClassName,
-              compact
-                ? "grid grid-cols-[1fr_auto_1fr] items-center gap-2 py-2"
+              mobileViewport
+                ? "grid grid-cols-[1fr_minmax(0,1fr)_1fr] items-center gap-2 py-2"
                 : "flex items-center gap-6 py-3",
             )}
           >
-            {compact && (
+            {mobileViewport && (
               <span className="text-xs font-medium text-store-muted-foreground">
                 {t("home")}
               </span>
@@ -225,10 +290,10 @@ export function StorefrontPreviewCanvas({
                   : undefined
               }
               className={cn(
-                "inline-flex",
+                "inline-flex min-w-0 max-w-full",
                 onSelectChrome && "awj-preview-section",
                 selectedChrome === "branding" && "awj-preview-section-selected",
-                compact && "justify-self-center",
+                mobileViewport && "justify-self-center",
               )}
             >
               <StoreBrand
@@ -239,14 +304,14 @@ export function StorefrontPreviewCanvas({
                 linked={!onSelectChrome}
               />
             </button>
-            {config.header.showSearch && !compact && (
+            {config.header.showSearch && !mobileViewport && (
               <div className="flex min-h-10 flex-1 items-center gap-2 rounded-store border border-store-border bg-store-surface px-3 text-sm text-store-muted-foreground">
                 <Search className="size-4" aria-hidden />
                 {t("search")}
               </div>
             )}
-            <div className={cn("flex items-center gap-1", compact && "justify-self-end")}>
-              {config.header.showAccount && !compact && (
+            <div className={cn("flex items-center gap-1", mobileViewport && "justify-self-end")}>
+              {config.header.showAccount && !mobileViewport && (
                 <span className="inline-flex size-9 items-center justify-center text-store-foreground">
                   <User className="size-5" aria-hidden />
                   <span className="sr-only">{t("account")}</span>
@@ -255,11 +320,11 @@ export function StorefrontPreviewCanvas({
               {config.header.showCart && (
                 <span className="inline-flex h-9 items-center gap-1.5 rounded-store px-2 text-sm font-medium text-store-foreground">
                   <ShoppingBag className="size-5" aria-hidden />
-                  {!compact && t("cart")}
+                  {!mobileViewport && t("cart")}
                 </span>
               )}
             </div>
-            {config.header.showSearch && compact && (
+            {config.header.showSearch && mobileViewport && (
               <div className="col-span-3 flex min-h-9 items-center gap-2 rounded-store border border-store-border px-3 text-xs text-store-muted-foreground">
                 <Search className="size-3.5" aria-hidden />
                 {t("search")}
@@ -268,7 +333,7 @@ export function StorefrontPreviewCanvas({
           </div>
         </div>
 
-        {(config.header.showCategoryNav || extraNav.length > 0) && !compact && (
+        {(config.header.showCategoryNav || extraNav.length > 0) && !mobileViewport && (
           <nav
             aria-label={t("sectionCategories")}
             className="border-b border-store-border bg-store-surface-muted"
@@ -370,18 +435,13 @@ export function StorefrontPreviewCanvas({
               return (
                 <section key="newArrivals" aria-labelledby="preview-arrivals">
                   <SectionRule title={t("newArrivals")} action={t("viewAll")} />
-                  <ul
-                    className={cn(
-                      "mt-4 grid gap-3",
-                      compact ? "grid-cols-2" : "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4",
-                    )}
-                  >
+                  <ul className={cn("mt-4 grid gap-3", newArrivalsColumns)}>
                     {PREVIEW_PRODUCTS.map((product) => (
                       <li
                         key={product.id}
                         className="overflow-hidden rounded-store border border-store-border bg-store-surface"
                       >
-                        <div className="aspect-square bg-store-surface-muted" />
+                        <div className={cn(cardImageHeight, "bg-store-surface-muted")} />
                         <div className={cardPad}>
                           <p className="text-[11px] text-store-muted-foreground">
                             {product.category[locale]}
@@ -521,9 +581,25 @@ export function StorefrontPreviewCanvas({
               return (
                 <section key={section.id} className="rounded-store bg-store-footer px-5 py-6 text-store-footer-foreground">
                   <h2 className="text-base font-extrabold">{config.apps.appName.trim() || t("sectionAppPromo")}</h2>
-                  <div className="mt-3 flex flex-wrap gap-2 text-xs font-bold">
-                    {ios ? <span className="rounded-store bg-white px-3 py-2 text-store-foreground">App Store</span> : null}
-                    {android ? <span className="rounded-store bg-white px-3 py-2 text-store-foreground">Google Play</span> : null}
+                  <div className="mt-4 flex flex-wrap items-center gap-3">
+                    {ios ? (
+                      <OfficialStoreBadge
+                        store="apple"
+                        href={ios}
+                        locale={locale}
+                        label="App Store"
+                        onClick={(event) => event.preventDefault()}
+                      />
+                    ) : null}
+                    {android ? (
+                      <OfficialStoreBadge
+                        store="google"
+                        href={android}
+                        locale={locale}
+                        label="Google Play"
+                        onClick={(event) => event.preventDefault()}
+                      />
+                    ) : null}
                   </div>
                 </section>
               );
@@ -612,7 +688,7 @@ export function StorefrontPreviewCanvas({
                     }
                   : undefined
               }
-              className="inline-flex"
+              className="inline-flex min-w-0 max-w-full"
             >
               <StoreBrand
                 href="#preview"
@@ -625,7 +701,7 @@ export function StorefrontPreviewCanvas({
             </button>
           )}
           {config.footer.tagline.trim() ? (
-            <p className="mt-3 max-w-lg text-sm text-store-footer-muted">
+            <p className="mt-3 max-w-lg break-words text-sm text-store-footer-muted">
               {config.footer.tagline}
             </p>
           ) : null}
@@ -639,20 +715,6 @@ export function StorefrontPreviewCanvas({
             <FooterCol title={t("account")}>
               <span>{t("account")}</span>
               <span>{t("cart")}</span>
-              {footerWhatsapp ? (
-                <a
-                  href={footerWhatsapp}
-                  data-preview-chrome="whatsapp"
-                  className="text-store-footer-link underline-offset-2 hover:underline"
-                  onClick={(event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    onSelectChrome?.("whatsapp");
-                  }}
-                >
-                  {t("whatsapp")}
-                </a>
-              ) : null}
             </FooterCol>
             <FooterCol title={t("policies")}>
               {visiblePages.length
@@ -662,100 +724,169 @@ export function StorefrontPreviewCanvas({
                     </span>
                   ))
                 : <span>{t("pagesHint")}</span>}
-              {hasApps && config.apps.showFooterLinks ? (
-                <>
-                  {ios ? <span>App Store</span> : null}
-                  {android ? <span>Google Play</span> : null}
-                </>
-              ) : null}
             </FooterCol>
           </div>
-          {(config.contact.phone ||
-            config.contact.email ||
-            config.contact.address ||
-            config.contact.hours ||
+          {(phone ||
+            email ||
+            address ||
+            hours ||
+            footerWhatsapp ||
             enabledSocial.length > 0 ||
             hasBusinessIdentity ||
             config.verification.licenseNumber.trim() ||
-            config.sbc.show_in_storefront) && (
-            <div className="mt-8 border-t border-store-footer-border pt-6 text-sm text-store-footer-muted">
-              {config.contact.phone ? <p>{config.contact.phone}</p> : null}
-              {config.contact.email ? <p>{config.contact.email}</p> : null}
-              {config.contact.address ? <p>{config.contact.address}</p> : null}
-              {config.contact.hours ? <p>{config.contact.hours}</p> : null}
-              {enabledSocial.length > 0 && (
-                <p className="mt-2 flex flex-wrap gap-3">
-                  {enabledSocial.map((item) => (
-                    <a
-                      key={item.id}
-                      href={item.href}
-                      data-preview-chrome="social"
-                      className="text-store-footer-link"
-                      onClick={(event) => {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        onSelectChrome?.("social");
-                      }}
-                    >
-                      {item.network}
-                    </a>
-                  ))}
-                </p>
-              )}
+            config.sbc.show_in_storefront ||
+            (hasApps && config.apps.showFooterLinks)) && (
+            <div className="mt-8 grid grid-cols-1 gap-x-8 gap-y-8 border-t border-store-footer-border pt-6 text-sm text-store-footer-muted sm:grid-cols-2 lg:grid-cols-3">
               {hasBusinessIdentity ? (
-                <div className="mt-4 space-y-1">
-                  <p className="font-medium text-store-footer-link">
+                <section className="min-w-0">
+                  <h3 className="text-sm font-bold text-store-footer-foreground">
                     {t("businessInformation")}
-                  </p>
-                  {legalName ? (
-                    <p>
-                      {t("legalName")}: {legalName}
-                    </p>
-                  ) : null}
-                  {crNumber ? (
-                    <p>
-                      {t("crNumber")}: {crNumber}
-                    </p>
-                  ) : null}
-                  {vatNumber ? (
-                    <p>
-                      {t("vatNumber")}: {vatNumber}
-                    </p>
-                  ) : null}
-                </div>
+                  </h3>
+                  <div className="mt-3 break-words">
+                    {legalName ? (
+                      <p className="break-words">
+                        {t("legalName")}: {legalName}
+                      </p>
+                    ) : null}
+                    <IdentityDetail
+                      kind="cr"
+                      label={t("crNumber")}
+                      value={crNumber}
+                    />
+                    <IdentityDetail
+                      kind="vat"
+                      label={t("vatNumber")}
+                      value={vatNumber}
+                    />
+                  </div>
+                </section>
               ) : null}
               {config.verification.licenseNumber.trim() ? (
-                <div className="mt-4 space-y-1">
-                  <p className="font-medium text-store-footer-link">
+                <section className="min-w-0">
+                  <h3 className="text-sm font-bold text-store-footer-foreground">
                     {t("merchantProvided")}
+                  </h3>
+                  <p className="mt-3 break-words">
+                    {t("licenseNumber")}: {config.verification.licenseNumber}
                   </p>
-                  {config.verification.licenseNumber.trim() ? (
-                    <p>
-                      {t("licenseNumber")}: {config.verification.licenseNumber}
-                    </p>
-                  ) : null}
-                </div>
+                </section>
               ) : null}
               {config.sbc.show_in_storefront ? (
-                <div className="mt-4 border-t border-store-footer-border pt-4">
-                  <p className="font-medium text-store-footer-link">
-                    {t("sbcVerified")}
-                  </p>
-                </div>
+                <section className="min-w-0">
+                  <h3 className="text-sm font-bold text-store-footer-foreground">
+                    {t("sbcGroup")}
+                  </h3>
+                  <div className="mt-3">
+                    {config.sbc.seal_token.trim() ? (
+                      <SbcSeal message={t("sbcSealPreview")} />
+                    ) : (
+                      <p className="font-medium text-store-footer-link">
+                        {t("sbcVerified")}
+                      </p>
+                    )}
+                  </div>
+                </section>
+              ) : null}
+              {phone ||
+              email ||
+              address ||
+              hours ||
+              footerWhatsapp ||
+              enabledSocial.length > 0 ? (
+                <section className="min-w-0">
+                  <h3 className="text-sm font-bold text-store-footer-foreground">
+                    {t("communication")}
+                  </h3>
+                  <div className="mt-3 space-y-2 break-words">
+                    {phone ? <ContactDetail kind="phone" value={phone} /> : null}
+                    {email ? <ContactDetail kind="email" value={email} /> : null}
+                    {address ? (
+                      <ContactDetail kind="address" value={address} />
+                    ) : null}
+                    {hours ? <ContactDetail kind="hours" value={hours} /> : null}
+                    {footerWhatsapp ? (
+                      <p>
+                        <a
+                          href={footerWhatsapp}
+                          data-preview-chrome="whatsapp"
+                          className="inline-flex min-h-11 items-center gap-2 text-store-footer-link underline-offset-2 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+                          onClick={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            onSelectChrome?.("whatsapp");
+                          }}
+                        >
+                          <OfficialSocialMark network="whatsapp" />
+                          {t("whatsapp")}
+                        </a>
+                      </p>
+                    ) : null}
+                    {enabledSocial.length > 0 ? (
+                      <div className="flex flex-wrap items-center gap-1">
+                        {enabledSocial.map((item) => {
+                          const label = socialLabel(t, item.network);
+                          return (
+                            <a
+                              key={item.id}
+                              href={item.href}
+                              aria-label={label}
+                              data-preview-chrome="social"
+                              className={officialSocialLinkClassName}
+                              onClick={(event) => {
+                                event.preventDefault();
+                                event.stopPropagation();
+                                onSelectChrome?.("social");
+                              }}
+                            >
+                              <OfficialSocialMark network={item.network} />
+                            </a>
+                          );
+                        })}
+                      </div>
+                    ) : null}
+                  </div>
+                </section>
+              ) : null}
+              {hasApps && config.apps.showFooterLinks ? (
+                <section className="min-w-0">
+                  <h3 className="text-sm font-bold text-store-footer-foreground">
+                    {t("applications")}
+                  </h3>
+                  <div className="mt-3 flex flex-wrap items-center gap-3">
+                    {ios ? (
+                      <OfficialStoreBadge
+                        store="apple"
+                        href={ios}
+                        locale={locale}
+                        label="App Store"
+                        onClick={(event) => event.preventDefault()}
+                      />
+                    ) : null}
+                    {android ? (
+                      <OfficialStoreBadge
+                        store="google"
+                        href={android}
+                        locale={locale}
+                        label="Google Play"
+                        onClick={(event) => event.preventDefault()}
+                      />
+                    ) : null}
+                  </div>
+                </section>
               ) : null}
             </div>
           )}
         </div>
         <div className="border-t border-store-footer-border">
           <div className={cn(storeContainerClassName, "py-5")}>
-            <p className="text-xs text-store-footer-muted">
+            <p className="break-words text-xs text-store-footer-muted">
               {config.footer.copyright.trim() || `© ${storeName}`}
             </p>
           </div>
         </div>
       </footer>
 
-      {compact && (
+      {mobileViewport && (
         <nav
           aria-label={t("home")}
           className="sticky bottom-0 border-t border-store-border bg-store-surface"
@@ -793,13 +924,13 @@ export function StorefrontPreviewCanvas({
             onSelectChrome?.("whatsapp");
           }}
           className={cn(
-            "absolute z-30 inline-flex size-12 items-center justify-center rounded-full bg-[#128c7e] text-white",
+            "absolute z-30 inline-flex size-12 items-center justify-center rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#111827]",
             onSelectChrome && "awj-preview-section",
             selectedChrome === "whatsapp" && "awj-preview-section-selected",
-            compact ? "end-3 bottom-16" : "end-4 bottom-4",
+            mobileViewport ? "end-3 bottom-16" : "end-4 bottom-4",
           )}
         >
-          <MessageCircle className="size-5" aria-hidden />
+          <OfficialSocialMark network="whatsapp" size="floating" />
         </a>
       )}
     </div>
@@ -889,5 +1020,29 @@ function pageTitleKey(
       return "pageReturns";
     default:
       return "pageTerms";
+  }
+}
+
+function socialLabel(
+  t: (key: CustomizerMessageKey) => string,
+  network: string,
+): string {
+  switch (network) {
+    case "instagram":
+      return t("socialInstagram");
+    case "x":
+      return t("socialX");
+    case "tiktok":
+      return t("socialTiktok");
+    case "snapchat":
+      return t("socialSnapchat");
+    case "youtube":
+      return t("socialYoutube");
+    case "linkedin":
+      return t("socialLinkedin");
+    case "facebook":
+      return t("socialFacebook");
+    default:
+      return network;
   }
 }

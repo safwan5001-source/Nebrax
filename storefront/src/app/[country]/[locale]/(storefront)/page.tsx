@@ -217,6 +217,7 @@ async function publishedNodes(
           title={ctx.appTitle}
           appStoreLabel={ctx.appStoreLabel}
           playStoreLabel={ctx.playStoreLabel}
+          locale={ctx.locale}
         />,
       );
     }

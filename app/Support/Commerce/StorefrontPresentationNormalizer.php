@@ -35,6 +35,7 @@ final class StorefrontPresentationNormalizer
         'burgundy' => '#7f1d1d',
         'sand' => '#92400e',
         'slate' => '#334155',
+        'awj-market' => '#0f766e',
     ];
 
     public const FONT_PRESETS = ['cairo-geist'];
@@ -175,6 +176,7 @@ final class StorefrontPresentationNormalizer
             ],
             'sbc' => [
                 'authentication_number' => '',
+                'seal_token' => '',
                 'show_in_storefront' => false,
             ],
             'apps' => [
@@ -303,6 +305,7 @@ final class StorefrontPresentationNormalizer
             ],
             'sbc' => [
                 'authentication_number' => trim($this->asString($sbcRaw['authentication_number'] ?? null)),
+                'seal_token' => trim($this->asString($sbcRaw['seal_token'] ?? null)),
                 'show_in_storefront' => $this->asBoolean($sbcRaw['show_in_storefront'] ?? null, false),
             ],
             'apps' => [
@@ -319,6 +322,27 @@ final class StorefrontPresentationNormalizer
     public function encodedSize(array $config): int
     {
         return strlen((string) json_encode($config, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+    }
+
+    /**
+     * الوسم الفعلي لمستند مخزَّن (مسودة أو منشور، رأس أو نسخة على حدّ سواء):
+     * حقل `version` المضمَّن داخل الوثيقة نفسها أولاً (تكتبه `normalize()`
+     * عند كل حفظ فعلي، قديماً كان الكاتب أو جديداً، فلا يتخلَّف أبداً عن
+     * الشكل الحقيقي للمحتوى)، ثم عمود قاعدة البيانات المنفصل احتياطاً فقط
+     * لمستند بلا حقل مضمَّن. عمود كـ`draft_schema_version` قد يتخلَّف عن
+     * كاتبٍ قديم لا يعرفه (مثلاً صفّ أُدرج مباشرة بإصدار تطبيق سابق على
+     * CUST-H1-1 فحصل على قيمة العمود الافتراضية رغم أن محتواه v2 فعلياً) —
+     * الوسم المضمَّن هو مصدر الحقيقة، أياً كان مصدر القراءة أو النسخ.
+     *
+     * @param  array<string, mixed>  $config
+     */
+    public static function effectiveSchemaTag(array $config, ?int $columnFallback): int
+    {
+        if (isset($config['version']) && is_numeric($config['version'])) {
+            return (int) $config['version'];
+        }
+
+        return $columnFallback ?? 1;
     }
 
     public function sanitizeExternalUrl(?string $value): ?string
@@ -398,7 +422,7 @@ final class StorefrontPresentationNormalizer
         }
         $host = strtolower((string) parse_url($url, PHP_URL_HOST));
 
-        return $host === 'apps.apple.com' || str_ends_with($host, '.apple.com');
+        return $host === 'apps.apple.com';
     }
 
     private function isSafePlayStoreUrl(string $value): bool

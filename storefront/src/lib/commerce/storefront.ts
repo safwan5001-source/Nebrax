@@ -1,3 +1,4 @@
+import { cache } from "react";
 import type { StorefrontPresentationConfig } from "@/lib/presentation/config";
 import { readPublishedPresentation } from "@/lib/presentation/public";
 import { storefrontFetch } from "./config";
@@ -103,16 +104,20 @@ export async function fetchPublishedPresentation(): Promise<StorefrontPresentati
  * name — callers must not invent a tenant identity or fall back to
  * `NEXT_PUBLIC_STORE_NAME` / "Spree Store".
  */
-export async function fetchStorefrontConfig(): Promise<AwjStorefrontConfig> {
-  const response = await storefrontFetch<AwjStorefrontConfigResponse>(
-    "storefront",
-    undefined,
-    { cache: "no-store" },
-  );
-  return {
-    name: response.data.name ?? null,
-    default_locale: response.data.default_locale ?? null,
-    business_identity: readBusinessIdentity(response.data.business_identity),
-    presentation: readPublishedPresentation(response.data.presentation ?? null),
-  };
-}
+export const fetchStorefrontConfig = cache(
+  async function fetchStorefrontConfig(): Promise<AwjStorefrontConfig> {
+    const response = await storefrontFetch<AwjStorefrontConfigResponse>(
+      "storefront",
+      undefined,
+      { cache: "no-store" },
+    );
+    return {
+      name: response.data.name ?? null,
+      default_locale: response.data.default_locale ?? null,
+      business_identity: readBusinessIdentity(response.data.business_identity),
+      presentation: readPublishedPresentation(
+        response.data.presentation ?? null,
+      ),
+    };
+  },
+);

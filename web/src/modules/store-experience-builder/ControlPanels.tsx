@@ -16,6 +16,7 @@ import {
   MAX_HOME_SECTIONS,
   newHomeSectionId,
   type PresentationHomeSection,
+  presetSelectionPatch,
   PRODUCT_CARD_PRESETS,
   RADIUS_PRESETS,
   SOCIAL_NETWORKS,
@@ -124,7 +125,11 @@ interface PanelsProps {
   config: StorefrontPresentationConfig;
   locale: CustomizerLocale;
   liveStoreName: string | null;
-  businessIdentity?: { cr_number: string | null };
+  businessIdentity?: {
+    legal_name: string | null;
+    cr_number: string | null;
+    vat_number: string | null;
+  };
   onChange: (next: StorefrontPresentationConfig) => void;
   selectedSection?: string | null;
   onSelectSection?: (id: string | null) => void;
@@ -302,6 +307,14 @@ function ThemePanel({
   patch: (partial: Partial<StorefrontPresentationConfig>) => void;
 }) {
   const contrast = contrastRatio(config.primaryColor, "#ffffff");
+  // Typing a hex that happens to equal a bundled preset's exact swatch (e.g.
+  // Market's #0f766e) is the same *transition* as clicking that preset's
+  // button — it must carry the same starting bundle, or the merchant ends up
+  // on "Market" with none of its compact density/card/header, and clicking
+  // the now-already-selected swatch can never repair it (presetSelectionPatch
+  // treats an active preset as a no-op re-click by design).
+  const applyColor = (hex: string) =>
+    patch(presetSelectionPatch(config, { id: matchPreset(hex, config.themePreset), primary: hex }));
   return (
     <div className="space-y-7">
       <Section title={t("preset")}>
@@ -312,12 +325,7 @@ function ThemePanel({
               <button
                 key={preset.id}
                 type="button"
-                onClick={() =>
-                  patch({
-                    themePreset: preset.id,
-                    primaryColor: preset.primary,
-                  })
-                }
+                onClick={() => patch(presetSelectionPatch(config, preset))}
                 className={`overflow-hidden border text-start ${
                   selected
                     ? "border-primary ring-1 ring-primary"
@@ -366,24 +374,14 @@ function ThemePanel({
             <input
               type="color"
               value={config.primaryColor}
-              onChange={(event) =>
-                patch({
-                  primaryColor: event.target.value,
-                  themePreset: matchPreset(event.target.value),
-                })
-              }
+              onChange={(event) => applyColor(event.target.value)}
               className="absolute inset-0 cursor-pointer opacity-0"
             />
           </label>
           <input
             className={`${inputClass} font-mono uppercase tracking-wide`}
             value={config.primaryColor}
-            onChange={(event) =>
-              patch({
-                primaryColor: event.target.value,
-                themePreset: matchPreset(event.target.value),
-              })
-            }
+            onChange={(event) => applyColor(event.target.value)}
           />
         </div>
       </Field>
@@ -439,10 +437,17 @@ function ThemePanel({
   );
 }
 
-function matchPreset(hex: string): ThemePresetId {
+/**
+ * A custom color that doesn't match any preset's swatch keeps the merchant's
+ * *current* preset rather than silently renaming it to `awj-modern` — a
+ * bundled preset (currently only AWJ Market) carries real behavior keyed off
+ * `themePreset` (see `usePublishedThemeMarker`), so resetting it on an
+ * ordinary color tweak would silently drop that styling too.
+ */
+export function matchPreset(hex: string, current: ThemePresetId): ThemePresetId {
   return (
     THEME_PRESETS.find((preset) => preset.primary === hex.toLowerCase())?.id ??
-    "awj-modern"
+    current
   );
 }
 
@@ -1428,9 +1433,15 @@ function VerificationPanel({
   config: StorefrontPresentationConfig;
   t: (key: CustomizerMessageKey) => string;
   patch: (partial: Partial<StorefrontPresentationConfig>) => void;
-  businessIdentity?: { cr_number: string | null };
+  businessIdentity?: {
+    legal_name: string | null;
+    cr_number: string | null;
+    vat_number: string | null;
+  };
 }) {
+  const canonicalLegalName = businessIdentity?.legal_name?.trim() || null;
   const canonicalCrNumber = businessIdentity?.cr_number?.trim() || null;
+  const canonicalVatNumber = businessIdentity?.vat_number?.trim() || null;
 
   return (
     <div className="space-y-6">
@@ -1449,6 +1460,20 @@ function VerificationPanel({
             }
           />
         </Field>
+        <Field label={t("sbcSealToken")} hint={t("sbcSealTokenHint")}>
+          <input
+            className={inputClass}
+            value={config.sbc.seal_token}
+            onChange={(event) =>
+              patch({
+                sbc: {
+                  ...config.sbc,
+                  seal_token: event.target.value,
+                },
+              })
+            }
+          />
+        </Field>
         <div className="border-y border-neutral-200">
           <Toggle
             label={t("sbcShowInStorefront")}
@@ -1460,6 +1485,14 @@ function VerificationPanel({
         </div>
       </Section>
       <Section title={t("businessInformation")} hint={t("canonicalIdentityHint")}>
+        <Field label={t("legalName")}>
+          <output
+            className={`${inputClass} block bg-neutral-50 text-neutral-700`}
+            aria-readonly="true"
+          >
+            {canonicalLegalName || "—"}
+          </output>
+        </Field>
         <Field label={t("crNumber")}>
           <output
             className={`${inputClass} block bg-neutral-50 text-neutral-700`}
@@ -1467,6 +1500,15 @@ function VerificationPanel({
             dir="ltr"
           >
             {canonicalCrNumber || "—"}
+          </output>
+        </Field>
+        <Field label={t("vatNumber")}>
+          <output
+            className={`${inputClass} block bg-neutral-50 text-neutral-700`}
+            aria-readonly="true"
+            dir="ltr"
+          >
+            {canonicalVatNumber || "—"}
           </output>
         </Field>
         <a

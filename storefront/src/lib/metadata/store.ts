@@ -25,7 +25,6 @@ export async function generateStoreMetadata({
   const metaDescription = getStoreMetaDescription();
   const metaKeywords = process.env.STORE_META_KEYWORDS;
   const twitter = process.env.STORE_TWITTER;
-
   let metadataBaseSpread: Partial<{ metadataBase: URL }> = {};
   if (storeUrl) {
     try {
@@ -42,6 +41,10 @@ export async function generateStoreMetadata({
       default: storeName,
     },
     description: metaDescription,
+    icons: {
+      icon: "/icon",
+      apple: "/icon",
+    },
     ...(metaKeywords ? { keywords: metaKeywords } : {}),
     openGraph: {
       siteName: getStoreName(),

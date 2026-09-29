@@ -6,6 +6,7 @@ import {
   PUBLISH_CAPABILITY,
   VERSION_HISTORY_CAPABILITY,
 } from "@/lib/presentation/capabilities";
+import { DEFAULT_PRESENTATION_CONFIG } from "@/lib/presentation/config";
 import { ExperienceBuilder } from "../ExperienceBuilder";
 
 describe("ExperienceBuilder", () => {
@@ -72,15 +73,132 @@ describe("ExperienceBuilder", () => {
     );
   });
 
-  it("does not mint a Verified badge from a merchant request", async () => {
+  it("shows canonical identity and does not edit a second CR", async () => {
     const user = userEvent.setup();
-    render(<ExperienceBuilder initialLocale="en" />);
+    render(
+      <ExperienceBuilder
+        initialLocale="en"
+        businessIdentity={{
+          legal_name: "Al-Noor Company",
+          cr_number: "7050247977",
+          vat_number: null,
+        }}
+        initialConfig={{
+          ...DEFAULT_PRESENTATION_CONFIG,
+          verification: {
+            ...DEFAULT_PRESENTATION_CONFIG.verification,
+            crNumber: "legacy-cr-must-not-render",
+            licenseNumber: "LIC-9",
+          },
+        }}
+      />,
+    );
     await user.click(
       screen.getByRole("button", { name: "Verification & trust" }),
     );
-    await user.click(screen.getByLabelText("Request a verified badge"));
+
+    expect(screen.queryByLabelText("Request a verified badge")).toBeNull();
+    expect(screen.queryByDisplayValue("legacy-cr-must-not-render")).toBeNull();
+    expect(screen.getByText("7050247977")).toBeTruthy();
+    expect(screen.getByText("Al-Noor Company")).toBeTruthy();
     const canvas = document.querySelector("[data-preview-canvas]");
+    expect(canvas?.textContent).toContain(
+      "Commercial registration: 7050247977",
+    );
+    expect(canvas?.querySelector("[data-identity-icon='cr']")).not.toBeNull();
+    expect(canvas?.querySelector("[data-identity-icon='vat']")).toBeNull();
+    expect(canvas?.textContent).toContain("License number: LIC-9");
+    expect(canvas?.textContent).not.toContain("legacy-cr-must-not-render");
     expect(canvas?.textContent).not.toMatch(/Verified/);
-    expect(canvas?.textContent).not.toMatch(/موثّق/);
+  });
+
+  it("does not navigate away when the preview WhatsApp control is used", async () => {
+    const user = userEvent.setup();
+    render(
+      <ExperienceBuilder
+        initialLocale="en"
+        initialConfig={{
+          ...DEFAULT_PRESENTATION_CONFIG,
+          whatsapp: {
+            enabled: true,
+            phone: "+966500000000",
+            message: "",
+            placement: "both",
+          },
+        }}
+      />,
+    );
+
+    const footerLink = screen.getByRole("link", { name: "WhatsApp" });
+    const floating = screen.getByRole("link", { name: "Contact on WhatsApp" });
+    expect(footerLink.getAttribute("href")).toMatch(
+      /^https:\/\/wa\.me\/966500000000/,
+    );
+    expect(floating.getAttribute("target")).toBeNull();
+    await user.click(footerLink);
+    await user.click(floating);
+    expect(screen.getByLabelText("Live store preview")).toBeTruthy();
+  });
+
+  it("keeps the official seal out of the storefront customizer preview", () => {
+    const token = "opaque-token-must-not-reach-the-preview-loader";
+    render(
+      <ExperienceBuilder
+        initialLocale="en"
+        initialConfig={{
+          ...DEFAULT_PRESENTATION_CONFIG,
+          sbc: {
+            ...DEFAULT_PRESENTATION_CONFIG.sbc,
+            seal_token: token,
+            show_in_storefront: true,
+          },
+        }}
+      />,
+    );
+
+    const canvas = document.querySelector("[data-preview-canvas]");
+    expect(screen.getByTestId("sbc-seal-preview").textContent).toBe(
+      "Editor preview: the official Saudi Business Center seal will appear on the published storefront.",
+    );
+    expect(canvas?.textContent).toContain(
+      "Editor preview: the official Saudi Business Center seal will appear on the published storefront.",
+    );
+    expect(screen.queryByTestId("sbc-official-seal")).toBeNull();
+    expect(canvas?.querySelector("[data-token]")).toBeNull();
+    expect(canvas?.innerHTML ?? "").not.toContain(token);
+    expect(document.querySelector("script")).toBeNull();
+    expect(
+      document.querySelector(
+        'script[src="https://eauthenticate.saudibusiness.gov.sa/EAuthSealApi/seal.js"]',
+      ),
+    ).toBeNull();
+    expect(document.getElementById("awj-sbc-seal-loader")).toBeNull();
+  });
+
+  it("keeps the approved SBC text when the preview has no seal token", () => {
+    render(
+      <ExperienceBuilder
+        initialLocale="en"
+        initialConfig={{
+          ...DEFAULT_PRESENTATION_CONFIG,
+          sbc: {
+            ...DEFAULT_PRESENTATION_CONFIG.sbc,
+            seal_token: "   ",
+            show_in_storefront: true,
+          },
+        }}
+      />,
+    );
+
+    const canvas = document.querySelector("[data-preview-canvas]");
+    expect(canvas?.textContent).toContain("Verified in Saudi Business Center");
+    expect(screen.queryByTestId("sbc-seal-preview")).toBeNull();
+    expect(screen.queryByTestId("sbc-official-seal")).toBeNull();
+    expect(canvas?.querySelector("[data-token]")).toBeNull();
+    expect(
+      document.querySelector(
+        'script[src="https://eauthenticate.saudibusiness.gov.sa/EAuthSealApi/seal.js"]',
+      ),
+    ).toBeNull();
   });
 });

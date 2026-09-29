@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { DEFAULT_PRESENTATION_CONFIG } from "../config";
 import {
   publishedExtraNav,
+  publishedFaviconUrl,
   publishedStoreName,
   publishedThemeStyle,
   publishedWhatsAppHref,
@@ -41,6 +42,47 @@ describe("published presentation runtime helpers", () => {
         "المتجر",
       ),
     ).toBe("ظاهر");
+  });
+
+  it("prioritizes a safe favicon, then falls back to a safe logo", () => {
+    expect(publishedFaviconUrl(null)).toBeNull();
+    expect(
+      publishedFaviconUrl({
+        ...DEFAULT_PRESENTATION_CONFIG,
+        branding: {
+          ...DEFAULT_PRESENTATION_CONFIG.branding,
+          faviconDataUrl: "data:image/png;base64,iVBORw0KGgo=",
+        },
+      }),
+    ).toBe("data:image/png;base64,iVBORw0KGgo=");
+    expect(
+      publishedFaviconUrl({
+        ...DEFAULT_PRESENTATION_CONFIG,
+        branding: {
+          ...DEFAULT_PRESENTATION_CONFIG.branding,
+          faviconDataUrl: "data:image/svg+xml;base64,PHN2Zy8+",
+        },
+      }),
+    ).toBeNull();
+    expect(
+      publishedFaviconUrl({
+        ...DEFAULT_PRESENTATION_CONFIG,
+        branding: {
+          ...DEFAULT_PRESENTATION_CONFIG.branding,
+          logoDataUrl: "https://cdn.example.test/store.webp",
+        },
+      }),
+    ).toBe("https://cdn.example.test/store.webp");
+    expect(
+      publishedFaviconUrl({
+        ...DEFAULT_PRESENTATION_CONFIG,
+        branding: {
+          ...DEFAULT_PRESENTATION_CONFIG.branding,
+          faviconDataUrl: "javascript:alert(1)",
+          logoDataUrl: "data:image/svg+xml;base64,PHN2Zy8+",
+        },
+      }),
+    ).toBeNull();
   });
 
   it("does not emit CSS vars when nothing is published", () => {

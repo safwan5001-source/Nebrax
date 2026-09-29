@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Requests\PublishStorefrontPresentationRequest;
 use App\Http\Requests\SaveStorefrontPresentationRequest;
+use App\Services\Commerce\ForwardSchemaVersionException;
 use App\Services\Commerce\NothingToPublishException;
 use App\Services\Commerce\PresentationDocumentTooLargeException;
 use App\Services\Commerce\StaleDraftRevisionException;
@@ -27,7 +28,12 @@ class CommerceWorkspaceStorefrontPresentationController extends ApiController
     ): JsonResponse {
         $this->denySelfService($request);
 
-        $payload = $presentations->showForCurrentTenant($id);
+        try {
+            $payload = $presentations->showForCurrentTenant($id);
+        } catch (ForwardSchemaVersionException $e) {
+            abort(409, $e->getMessage());
+        }
+
         if ($payload === null) {
             abort(404, 'المتجر غير موجود.');
         }
@@ -49,7 +55,7 @@ class CommerceWorkspaceStorefrontPresentationController extends ApiController
                 $request->validated('config'),
                 (int) $request->validated('draft_revision'),
             );
-        } catch (StaleDraftRevisionException $e) {
+        } catch (StaleDraftRevisionException|ForwardSchemaVersionException $e) {
             abort(409, $e->getMessage());
         } catch (PresentationDocumentTooLargeException $e) {
             abort(422, $e->getMessage());
@@ -75,7 +81,7 @@ class CommerceWorkspaceStorefrontPresentationController extends ApiController
                 $id,
                 $request->expectedRevision(),
             );
-        } catch (StaleDraftRevisionException $e) {
+        } catch (StaleDraftRevisionException|ForwardSchemaVersionException $e) {
             abort(409, $e->getMessage());
         } catch (NothingToPublishException|PresentationDocumentTooLargeException $e) {
             abort(422, $e->getMessage());

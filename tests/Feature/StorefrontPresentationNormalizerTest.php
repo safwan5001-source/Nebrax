@@ -36,6 +36,40 @@ class StorefrontPresentationNormalizerTest extends TestCase
     }
 
     /** @test */
+    public function awj_market_preset_is_accepted_with_its_own_default_primary_color(): void
+    {
+        $normalized = $this->normalizer->normalize(['themePreset' => 'awj-market']);
+
+        $this->assertSame('awj-market', $normalized['themePreset']);
+        $this->assertSame('#0f766e', $normalized['primaryColor']);
+        $this->assertSame(
+            StorefrontPresentationNormalizer::THEME_PRESETS['awj-market'],
+            $normalized['primaryColor'],
+        );
+    }
+
+    /** @test */
+    public function a_stale_awj_market_typo_still_fails_closed_to_awj_modern(): void
+    {
+        $normalized = $this->normalizer->normalize(['themePreset' => 'awj-market-v0']);
+
+        $this->assertSame('awj-modern', $normalized['themePreset']);
+        $this->assertSame('#12372a', $normalized['primaryColor']);
+    }
+
+    /** @test */
+    public function awj_market_does_not_change_the_no_presentation_defaults(): void
+    {
+        // Registering a new preset must not mutate defaultConfig()/no-presentation
+        // behaviour — every existing AWJ Modern store stays AWJ Modern.
+        $this->assertSame('awj-modern', $this->normalizer->defaultConfig()['themePreset']);
+        $this->assertSame('awj-modern', $this->normalizer->normalize(null)['themePreset']);
+        $this->assertSame('comfortable', $this->normalizer->normalize(null)['density']);
+        $this->assertSame('standard', $this->normalizer->normalize(null)['productCard']);
+        $this->assertSame('standard', $this->normalizer->normalize(null)['header']['style']);
+    }
+
+    /** @test */
     public function unknown_keys_are_dropped_and_invalid_tokens_fail_closed(): void
     {
         $input = $this->fixture('v1-unsafe-input.json');
@@ -57,6 +91,12 @@ class StorefrontPresentationNormalizerTest extends TestCase
         $this->assertSame('', $normalized['social'][0]['url']);
         $this->assertSame('', $normalized['apps']['iosUrl']);
         $this->assertStringContainsString('play.google.com', $normalized['apps']['androidUrl']);
+        $this->assertSame('', $this->normalizer->normalize([
+            'apps' => ['iosUrl' => 'https://www.apple.com/iphone'],
+        ])['apps']['iosUrl']);
+        $this->assertStringContainsString('apps.apple.com', $this->normalizer->normalize([
+            'apps' => ['iosUrl' => 'https://apps.apple.com/app/id1'],
+        ])['apps']['iosUrl']);
     }
 
     /** @test */
@@ -230,18 +270,21 @@ class StorefrontPresentationNormalizerTest extends TestCase
     }
 
     /** @test */
-    public function sbc_authentication_number_is_trimmed_as_opaque_text_and_visibility_defaults_off(): void
+    public function sbc_values_are_opaque_and_trimmed_only_at_normalization_boundary(): void
     {
         $normalized = $this->normalizer->normalize([
             'sbc' => [
                 'authentication_number' => '  000123  ',
+                'seal_token' => "  token=AbC +/  ",
                 'show_in_storefront' => true,
             ],
         ]);
 
         $this->assertSame('000123', $normalized['sbc']['authentication_number']);
+        $this->assertSame('token=AbC +/', $normalized['sbc']['seal_token']);
         $this->assertTrue($normalized['sbc']['show_in_storefront']);
         $this->assertSame('', $this->normalizer->normalize([])['sbc']['authentication_number']);
+        $this->assertSame('', $this->normalizer->normalize([])['sbc']['seal_token']);
         $this->assertFalse($this->normalizer->normalize([])['sbc']['show_in_storefront']);
     }
 
