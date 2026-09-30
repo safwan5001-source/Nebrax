@@ -646,17 +646,24 @@ ambiguities were found and corrected (see "Review Findings").
 ### SQLite (full suite, this session)
 
 Two full runs were done. Between them, two **pre-existing, unrelated**
-`setup.sh` gaps were found and fixed (see "Review Findings"): `app/Mail` and
-`resources/views` were never copied into the locally-built Laravel app at
-all (confirmed: `ci.yml`'s own copy list already includes both — this is a
-local-build-tool drift from CI, not a CI gap, and not something this feature
-touches). Fixing them turned two full classes of failures
-(`AccountManagementTest`, `AuthRecoveryTest`) green.
+`setup.sh` gaps were found (not shipped in this PR — see "Explicitly
+Deferred" for why and "Review Findings" for the finding itself): `app/Mail`
+and `resources/views` were never copied into the locally-built Laravel app
+at all (confirmed: `ci.yml`'s own copy list already includes both — this is
+a local-build-tool drift from CI, not a CI gap, and not something this
+feature touches). **This is independent of CI**: `ci.yml` never runs
+`setup.sh` at all — it has its own, already-correct copy steps — so neither
+the gap nor the local fix this session tried ever affected, or could have
+affected, the CI result for this or any other PR. To read this session's own
+local full-suite result without that unrelated pre-existing gap drowning out
+real signal, the two missing directories were copied into the already-built
+local app **once, by hand**, outside of `setup.sh`; `setup.sh` itself is
+unmodified by this PR (see "Explicitly Deferred").
 
 ```
 php artisan test
-# (before the setup.sh fix)  57 failed, 49 skipped, 4941 passed, 830s
-# (after the setup.sh fix)   46 failed, 49 skipped, 4952 passed (30885 assertions), ~800s
+# (before the one-off local app/Mail + resources/views copy)  57 failed, 49 skipped, 4941 passed, 830s
+# (after it)                                                   46 failed, 49 skipped, 4952 passed (30885 assertions), ~800s
 ```
 
 The remaining 46 failures were individually attributed, not waved away:
@@ -683,9 +690,10 @@ The remaining 46 failures were individually attributed, not waved away:
   transient `SQLSTATE[HY000]: database is locked` contention under the
   full suite's own ~13-minute sustained SQLite write load in this
   container, not a real failure — the identical transient class this
-  session also saw (and confirmed resolved) for `AccountManagementTest`/
-  `AuthRecoveryTest` before the `setup.sh` fix explained those away for
-  good.
+  session also saw (and confirmed resolved on isolated re-run) for
+  `AccountManagementTest`/`AuthRecoveryTest` once the local
+  `app/Mail`/`resources/views` gap (see above) no longer masked their real
+  result.
 
 None of the 46 remaining failures are in any file this diff touches. To
 directly confirm zero regression in anything this diff actually touches
@@ -712,7 +720,7 @@ Not yet observed — reported once the PR is opened and CI runs.
 | (self-caught during e2e authoring) a picker-option locator scoped only by a loose name regex matched two different rows whose text happened to overlap (a category's own name vs. another category's parent-hint text containing the same words) | Scoped the assertion to the specific `data-category-option` id, and to the open sheet element, instead of a name regex | Re-run, passing deterministically |
 | (self-caught during e2e authoring) `getByLabel('Preview category')` (non-exact) also matched the dropdown menu's own `aria-label="Choose a preview category"` (a substring match), a collision that did not occur in Arabic ("تصنيف المعاينة" vs. "اختيار تصنيف للمعاينة" do not share a substring the same way) | Switched to `getByRole('button', { name: ..., exact: true })` in both locales for this trigger | Re-run, passing deterministically |
 | (found by this slice's own Playwright pass) at exactly 390px width, the Next.js dev-mode indicator overlay portal physically intercepts a real pointer click on the mobile bottom bar's leftmost button — a local dev-tooling artifact (confirmed: the same button, at other widths and in every other test, is clicked normally without issue) | Used `dispatchEvent('click')` for that one interaction, bypassing hit-testing directly against the (visible, enabled, correctly positioned) button | Re-run, passing deterministically |
-| (found while running this slice's mandatory full `php artisan test` pass, not by this slice's own code) `setup.sh` never copied `app/Mail` or `resources/views` into the locally-built Laravel app at all — `ci.yml`'s own copy list already includes both (the file's own header comment says the two lists "must stay matching"; they had drifted). This caused `AccountManagementTest`/`AuthRecoveryTest` (unrelated modules) to fail locally with `Class "App\Mail\AuthActionMail" not found` / a missing Blade view — never a CI-visible gap, but one that blocked confidently reading this session's own full-suite result | Added the missing `mkdir -p app/Mail` + `cp -r app/Mail/*.php` and `cp -r resources/views/*` steps to `setup.sh`, mirroring `ci.yml` exactly | Re-ran `AccountManagementTest`/`AuthRecoveryTest`/`DocumentCenterSecureIntakeTest` after the fix — both former classes fully green |
+| (found while running this slice's mandatory full `php artisan test` pass, not by this slice's own code, and **not a CUST-H2-4 finding** — Store/Customizer code has no connection to `App\Mail` or Document Center views) `setup.sh` never copies `app/Mail` or `resources/views` into the locally-built Laravel app at all — `ci.yml`'s own copy list already includes both (the file's own header comment says the two lists "must stay matching"; they had drifted). This caused `AccountManagementTest`/`AuthRecoveryTest` (unrelated modules) to fail **locally, in this session's own container** with `Class "App\Mail\AuthActionMail" not found` / a missing Blade view — never a CI-visible gap (`ci.yml` has its own correct copy steps and never runs `setup.sh`), but one that initially made this session's own local full-suite read noisier than it needed to be | **Not fixed in this PR** — an initial commit did patch `setup.sh` to add the missing copy steps, but per owner review this was out of CUST-H2-4's scope and has been reverted (`setup.sh` is now byte-identical to `origin/main` in this PR's diff). The two directories were instead copied into the already-built local app **once, by hand, outside of `setup.sh`**, purely so this session could read its own full-suite result without the unrelated noise — this leaves no trace in the shipped diff. The gap itself is real and is recorded as a deferred, independent follow-up (see "Explicitly Deferred") | N/A — no code in this PR depends on this; `CommerceWorkspaceStorefrontCategoryApiTest`/extended `CommerceWorkspaceStorefrontProductApiTest`/full `vitest` suite were all re-confirmed green with `setup.sh` in its reverted (`origin/main`-identical) state |
 
 No external review round has occurred yet (this report is written before PR review).
 
@@ -812,6 +820,30 @@ entry to show per the project's pre-PR protocol, because none was generated.
 - A saved/named "column mapping" style reuse concept does not apply here;
   no analogous deferred item exists for Category beyond what Product already
   deferred.
+- **`setup.sh` local-build-tool gap (unrelated to CUST-H2-4, independent
+  follow-up, out of scope for this PR):** `setup.sh` never copies `app/Mail`
+  or `resources/views` into the locally-built Laravel app at all, while
+  `ci.yml`'s own copy list already includes both — the two lists have
+  drifted from the "must stay matching" invariant `setup.sh`'s own header
+  comment states. Concretely: `App\Mail\AuthActionMail` (used by
+  `AuthRecoveryTest`) and `resources/views/emails/auth-action.blade.php`
+  (used by `DocumentCenterSecureIntakeTest`'s mail-sending path) are absent
+  from a locally-built app, causing unrelated test classes
+  (`AccountManagementTest`, `AuthRecoveryTest`) to fail locally with
+  `Class "App\Mail\AuthActionMail" not found` / a missing-view error. This
+  was discovered while running CUST-H2-4's own mandatory full-suite pass,
+  but has **no connection to Store/Customizer/Category code** — it is a pure
+  local-dev-tooling gap. **Never a CI-visible issue**: `ci.yml` has its own,
+  already-correct copy steps and never invokes `setup.sh` at all, so no
+  production, CI, or merge-gate behavior is affected either way. An initial
+  commit on this PR's branch did patch `setup.sh` to close the gap; per
+  owner review that was reverted as out of scope for CUST-H2-4 — `setup.sh`
+  in this PR's final diff is byte-identical to `origin/main`. A future,
+  independent task should add the missing `mkdir -p app/Mail` +
+  `cp -r app/Mail/*.php app/Mail/` and
+  `cp -r resources/views/* resources/views/` steps to `setup.sh`, mirroring
+  `ci.yml`'s existing copy list exactly (see `ci.yml` lines under its own
+  "نسخ ملفات النواة" step for the exact source of truth).
 
 ---
 

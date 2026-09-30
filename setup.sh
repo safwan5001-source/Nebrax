@@ -35,11 +35,9 @@ cp -r "$CORE_DIR/app/Models/"*.php        app/Models/
 # السمات في مجلد فرعي لا يلتقطها glob النماذج أعلاه؛ يجب أن تطابق CI والإنتاج.
 # قائمة المجلدات هنا يدوية ويجب أن تبقى مطابقة لقائمة .github/workflows/ci.yml
 # (كلاهما ينسخ من نفس النواة بمنطق مستقل) — نسيان مجلد هنا لا يظهر في CI فيمر بصمت.
-mkdir -p app/Contracts app/Mail app/Models/Concerns app/Jobs/Accounting app/Jobs/DocumentCenter app/Services app/Services/Accounting app/Services/Commerce app/Services/Commerce/Edge app/Services/Commerce/Otp app/Services/DocumentCenter app/Services/AppBuilder app/Services/Pos app/Services/Pos/Hardware app/Services/Reporting app/Services/PrintTemplates app/Support app/Support/Inventory app/Support/Dns app/Support/Commerce \
+mkdir -p app/Contracts app/Models/Concerns app/Jobs/Accounting app/Jobs/DocumentCenter app/Services app/Services/Accounting app/Services/Commerce app/Services/Commerce/Edge app/Services/Commerce/Otp app/Services/DocumentCenter app/Services/AppBuilder app/Services/Pos app/Services/Pos/Hardware app/Services/Reporting app/Services/PrintTemplates app/Support app/Support/Inventory app/Support/Dns app/Support/Commerce \
          app/Tenancy app/Http/Middleware app/Http/Controllers/Api config \
          app/Http/Requests app/Http/Resources app/Console/Commands tests/Feature tests/Fixtures/presentation routes docs/openapi contracts/app-builder
-cp -r "$CORE_DIR/app/Mail/"*.php app/Mail/ 2>/dev/null || true
-cp -r "$CORE_DIR/resources/views/"* resources/views/ 2>/dev/null || true
 cp -r "$CORE_DIR/app/Contracts/"*.php app/Contracts/
 cp -r "$CORE_DIR/app/Jobs/DocumentCenter/"*.php app/Jobs/DocumentCenter/
 cp -r "$CORE_DIR/app/Jobs/Accounting/"*.php app/Jobs/Accounting/
