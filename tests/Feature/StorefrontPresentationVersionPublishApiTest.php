@@ -217,6 +217,49 @@ class StorefrontPresentationVersionPublishApiTest extends TestCase
     }
 
     /** @test */
+    public function publishing_a_version_with_page_presentation_preserves_it_unchanged(): void
+    {
+        // CUST-H2-1 — the additive `pagePresentation` namespace is part of the
+        // same whole-document config this test file already proves publishes
+        // byte-identically; this asserts that holds for the new key too.
+        $auth = $this->registerTenant('pub-page-presentation', 'owner@pub-page-presentation.test');
+        $seeded = $this->seedWebStorefront($auth['tenant_id']);
+        $token = $this->withToken($auth['token']);
+
+        $created = $token->postJson($this->listPath($seeded['storefront']->id), ['name' => 'نسخة'])
+            ->assertCreated();
+        $versionId = $created->json('data.id');
+
+        $token->putJson($this->itemPath($seeded['storefront']->id, $versionId), [
+            'config' => [
+                'version' => 3,
+                'pagePresentation' => [
+                    'category' => [
+                        'regions' => [
+                            ['key' => 'breadcrumbs', 'visible' => false],
+                            ['key' => 'subcategories_rail', 'visible' => true],
+                        ],
+                    ],
+                ],
+            ],
+            'revision' => 1,
+        ])->assertOk();
+
+        $token->postJson($this->publishPath($seeded['storefront']->id, $versionId), [
+            'revision' => 2,
+            'expected_published_revision' => null,
+            'expected_active_version_id' => null,
+        ])->assertOk();
+
+        $head = $this->presentationHead($seeded['storefront']->id);
+        $categoryRegions = collect($head->published_config['pagePresentation']['category']['regions'])->keyBy('key');
+        // FIXED_REQUIRED forced back to visible=true regardless of the false sent above.
+        $this->assertTrue($categoryRegions['breadcrumbs']['visible']);
+        $this->assertTrue($categoryRegions['subcategories_rail']['visible']);
+        $this->assertArrayNotHasKey('product', $head->published_config['pagePresentation']);
+    }
+
+    /** @test */
     public function publishing_a_new_version_retains_the_former_published_version_as_draft(): void
     {
         $auth = $this->registerTenant('pub-retain', 'owner@pub-retain.test');

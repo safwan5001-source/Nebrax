@@ -328,6 +328,55 @@ class StorefrontPresentationVersionApiTest extends TestCase
     }
 
     /** @test */
+    public function save_persists_page_presentation_and_duplicate_copies_it_unchanged(): void
+    {
+        // CUST-H2-1 — proves the additive `pagePresentation` namespace survives
+        // the two H1 lifecycle paths this slice's schema bump touches most
+        // directly: a whole-document Save, and a Duplicate that copies the
+        // source Version's already-normalized config verbatim.
+        $auth = $this->registerTenant('ver-save-page-presentation', 'owner@ver-save-page-presentation.test');
+        $seeded = $this->seedWebStorefront($auth['tenant_id']);
+        $token = $this->withToken($auth['token']);
+
+        $created = $token->postJson($this->listPath($seeded['storefront']->id), ['name' => 'نسخة'])
+            ->assertCreated();
+        $versionId = $created->json('data.id');
+
+        $res = $token->putJson($this->itemPath($seeded['storefront']->id, $versionId), [
+            'config' => [
+                'version' => 3,
+                'themePreset' => 'slate',
+                'pagePresentation' => [
+                    'product' => [
+                        'regions' => [
+                            ['key' => 'media_gallery', 'visible' => false],
+                            ['key' => 'description', 'visible' => true],
+                        ],
+                    ],
+                ],
+            ],
+            'revision' => 1,
+        ])->assertOk();
+
+        $this->assertSame(3, $res->json('data.config.version'));
+        $productRegions = collect($res->json('data.config.pagePresentation.product.regions'))->keyBy('key');
+        // FIXED_REQUIRED forced back to visible=true regardless of the false sent above.
+        $this->assertTrue($productRegions['media_gallery']['visible']);
+        $this->assertTrue($productRegions['description']['visible']);
+        $this->assertArrayNotHasKey('category', $res->json('data.config.pagePresentation'));
+
+        $duplicate = $token->postJson($this->listPath($seeded['storefront']->id), [
+            'name' => 'نسخة عن الأصل',
+            'source_version_id' => $versionId,
+        ])->assertCreated();
+
+        $this->assertSame(
+            $res->json('data.config.pagePresentation'),
+            $duplicate->json('data.config.pagePresentation'),
+        );
+    }
+
+    /** @test */
     public function a_stale_save_revision_returns_409_and_preserves_the_winner(): void
     {
         $auth = $this->registerTenant('ver-stale-save', 'owner@ver-stale-save.test');
