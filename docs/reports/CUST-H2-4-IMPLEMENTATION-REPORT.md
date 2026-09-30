@@ -16,9 +16,9 @@ green and CI passing.
   the task named as the known post-CUST-H2-3-merge main tip (`feat(store):
   add Product page structured editing (CUST-H2-3) (#1119)`). Main had not
   advanced.
-- **Head SHA:** this report's own commit, on top of the Base SHA above.
+- **Head SHA:** `026f1293e1fd8cd34d911263d607a8b8acb831b3`
 - **Branch:** `feat/cust-h2-4-category-page-editing`
-- **PR:** opened against `main` from this branch (see end of this report). **Not merged.**
+- **PR:** [#1129](https://github.com/safwan5001-source/Nebrax/pull/1129) — opened against `main`. **Not merged.**
 
 ---
 
