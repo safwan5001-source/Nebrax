@@ -17,6 +17,8 @@ import {
   previewStoreName,
   type StorefrontPresentationConfig,
 } from "./presentation/config";
+import type { PageType } from "./presentation/page-regions";
+import { PageIcon, pageLabelKey } from "./PageNavigatorPanel";
 import { presentationCssVars } from "./presentation/tokens";
 import {
   bannerContentOf,
@@ -61,6 +63,15 @@ interface StorefrontPreviewCanvasProps {
   config: StorefrontPresentationConfig;
   locale: CustomizerLocale;
   viewport: "desktop" | "tablet" | "mobile";
+  /**
+   * CUST-H2-2 — which storefront page is previewed. Defaults to "home" so
+   * every existing caller (dev harness, tests) that never passes it keeps
+   * rendering exactly the Home preview it always has. "product"/"category"
+   * replace only the page-content area below with an honest placeholder;
+   * header/footer chrome stays identical across every page (global, per
+   * `docs/plans/store/CUST-H2-ARCH-1-PAGE-CONTRACT.md`).
+   */
+  page?: PageType;
   liveStoreName?: string | null;
   businessIdentity?: StorefrontBusinessIdentity;
   /**
@@ -97,6 +108,7 @@ export function StorefrontPreviewCanvas({
   config,
   locale,
   viewport,
+  page = "home",
   liveStoreName = null,
   businessIdentity = { legal_name: null, cr_number: null, vat_number: null },
   selectedSection = null,
@@ -218,7 +230,7 @@ export function StorefrontPreviewCanvas({
     ? sanitizeExternalUrl(config.apps.androidUrl)
     : null;
   const hasApps = Boolean(ios || android);
-  const visiblePages = config.pages.filter((page) => page.enabled);
+  const visiblePages = config.pages.filter((p) => p.enabled);
   const legalName = businessIdentity.legal_name?.trim() || null;
   const crNumber = businessIdentity.cr_number?.trim() || null;
   const vatNumber = businessIdentity.vat_number?.trim() || null;
@@ -232,6 +244,7 @@ export function StorefrontPreviewCanvas({
     <div
       data-preview-canvas=""
       data-preview-viewport={viewport}
+      data-preview-page={page}
       dir={locale === "ar" ? "rtl" : "ltr"}
       className="awj-store-preview relative min-h-full bg-store-background text-store-foreground"
       style={{
@@ -391,6 +404,9 @@ export function StorefrontPreviewCanvas({
         )}
       </header>
 
+      {page !== "home" ? (
+        <PagePlaceholder page={page} locale={locale} density={density} />
+      ) : (
       <div
         className={cn(
           storeContainerClassName,
@@ -696,6 +712,7 @@ export function StorefrontPreviewCanvas({
             );
           })}
       </div>
+      )}
 
       <footer
         className={cn(
@@ -991,6 +1008,49 @@ export function StorefrontPreviewCanvas({
           <OfficialSocialMark network="whatsapp" size="floating" />
         </a>
       )}
+    </div>
+  );
+}
+
+/**
+ * CUST-H2-2 — honest "not yet editable" shell for Product/Category. No fake
+ * product/category data (`PREVIEW_PRODUCTS`/`PREVIEW_CATEGORIES` stay
+ * Homepage-only fixtures — never promoted here as if they were a real
+ * merchant Product/Category, per ARCH-1's Preview Context Model). Structured
+ * region editing is CUST-H2-3/H2-4's scope, not this slice's.
+ */
+function PagePlaceholder({
+  page,
+  locale,
+  density,
+}: {
+  page: Exclude<PageType, "home">;
+  locale: CustomizerLocale;
+  density: "compact" | "comfortable";
+}) {
+  const t = (key: CustomizerMessageKey) => customizerMessage(locale, key);
+  const bodyKey: CustomizerMessageKey =
+    page === "product" ? "pageProductPlaceholderBody" : "pageCategoryPlaceholderBody";
+  return (
+    <div
+      data-page-placeholder={page}
+      className={cn(
+        storeContainerClassName,
+        density === "compact" ? "py-10" : "py-14 md:py-20",
+      )}
+    >
+      <div className="mx-auto flex max-w-sm flex-col items-center gap-3 text-center">
+        <span className="inline-flex size-12 items-center justify-center rounded-full bg-store-surface-muted text-store-muted-foreground">
+          <PageIcon page={page} />
+        </span>
+        <span className="inline-flex items-center rounded-full bg-store-surface-muted px-2.5 py-1 text-[11px] font-medium text-store-muted-foreground">
+          {t("pagePlaceholderBadge")}
+        </span>
+        <h2 className="text-base font-semibold text-store-foreground">
+          {t(pageLabelKey(page))}
+        </h2>
+        <p className="text-sm leading-6 text-store-muted-foreground">{t(bodyKey)}</p>
+      </div>
     </div>
   );
 }
