@@ -17,6 +17,8 @@
 - Facebook
 - TikTok
 - Snapchat
+- Google Ads
+- YouTube Ads
 - WhatsApp Business Platform
 
 المنتج المقترح داخل أَوْج:
@@ -38,7 +40,7 @@
 
 ## 2. المبدأ الأساسي
 
-أَوْج لا يجب أن يكون مجرد واجهة لإعادة فتح أدوات Meta أو TikTok أو Snapchat.
+أَوْج لا يجب أن يكون مجرد واجهة لإعادة فتح أدوات Meta أو TikTok أو Snapchat أو Google Ads.
 
 القيمة الحقيقية هي **Closed-loop Growth System**:
 
@@ -123,6 +125,36 @@ Snapchat Provider
 Official developer docs:
 - https://developers.snap.com/
 - https://developers.snap.com/api/marketing-api/
+
+### 3.4 Google Ads + YouTube
+
+Google Ads يُعامل كـ Provider مستقل، وYouTube أحد أهم Surfaces داخله مع قدرات خاصة للفيديو وShorts وCreator/Video discovery.
+
+```text
+GoogleAdsProvider
+├── Search
+├── Performance Max
+├── Demand Gen
+│   ├── YouTube
+│   ├── YouTube Shorts
+│   ├── Discover
+│   ├── Gmail
+│   ├── Maps
+│   └── Google Display Network
+├── Shopping / Merchant-linked campaigns
+├── YouTube video campaigns
+├── Conversion tracking
+├── Enhanced Conversions
+└── Reporting / Measurement
+```
+
+**Evidence — 2026:** Google يوضح أن Performance Max يصل إلى Inventory عبر YouTube وDisplay وSearch وDiscover وGmail وMaps من حملة واحدة، بينما Demand Gen يغطي YouTube بما فيه Shorts إضافة إلى Discover وGmail وMaps وGDN.
+
+Official docs:
+- https://support.google.com/google-ads/answer/10724817
+- https://support.google.com/google-ads/answer/13695777
+- https://support.google.com/google-ads/answer/16040528
+- https://support.google.com/google-ads/answer/16042442
 
 ---
 
@@ -379,7 +411,7 @@ THEN suggest budget increase
 - اقتراح أفكار الصور والفيديو والـHooks والسيناريوهات القصيرة.
 - تحليل أداء Campaign / Ad Set / Ad / Creative.
 - اكتشاف الإنفاق غير الفعال والانحرافات والـCreative fatigue.
-- اقتراح توزيع الميزانيات بين Meta / TikTok / Snapchat.
+- اقتراح توزيع الميزانيات بين Meta / TikTok / Snapchat / Google Ads / YouTube.
 - مراعاة المخزون والسعر والهامش والمرتجعات قبل التوصية.
 - اقتراح شرائح العملاء وحملات WhatsApp المناسبة ضمن قواعد الموافقة والـconsent.
 - تلخيص أسباب التوصيات بلغة قابلة للفهم والتدقيق.
@@ -515,6 +547,8 @@ Growth
 - Facebook
 - TikTok
 - Snapchat
+- Google Ads
+- YouTube
 - WhatsApp
 
 ### 9.3 Product action
@@ -544,6 +578,8 @@ Growth Provider Interface
         +--> TikTokProvider
         |
         +--> SnapchatProvider
+        |
+        +--> GoogleAdsProvider
         |
         +--> WhatsAppProvider
 ```
@@ -665,7 +701,187 @@ InvoicePosted
 
 ---
 
-## 16. Phased Roadmap
+## 16. Modern Growth & Rapid Distribution Playbook — 2026 Evidence
+
+هذه ليست قائمة Tricks أو وعود Viral. هي اتجاهات حديثة مثبتة في منتجات الإعلان الرسمية خلال 2026، وتُستخدم كـ **AWJ product requirements** لا كضمان نتائج.
+
+### 16.1 AI-native campaign buying
+
+المنصات تتحرك من إعدادات يدوية كثيرة إلى حملات مدعومة بالذكاء الاصطناعي مع بقاء Guardrails للمعلن:
+
+- **Google Performance Max**: هدف واحد عبر Search / YouTube / Display / Discover / Gmail / Maps.
+- **TikTok Smart+**: يدعم Full / Partial / Manual automation مع تحكم بالاستهداف والميزانية والـCreative.
+- **Meta Advantage / Reels automation**: توزيع وتحسين Creative/placements بالذكاء الاصطناعي.
+
+**AWJ Decision:** لا نبني Automation تنافس خوارزمية كل منصة في المزاد نفسه؛ نبني طبقة أعلى تقوم باختيار الهدف والميزانية والـassets والقيود، ثم تترك Delivery Optimization للمنصة وتراقب الربح الحقيقي.
+
+### 16.2 Short-form vertical video as default creative surface
+
+النمط الأهم للاكتشاف السريع حاليًا هو **9:16 short-form video** عبر:
+
+- Instagram/Facebook Reels
+- TikTok
+- YouTube Shorts
+- Snapchat vertical placements
+
+Google يدعم Shorts ضمن Demand Gen وأنواع حملات فيديو متعددة، وMeta يوصي بـReels-native 9:16 creative، بينما TikTok يبني Smart+ وSpark Ads حول Creative أصلي للمنصة.
+
+**AWJ Requirement:** كل Creative رئيسي يجب أن يستطيع إنتاج Variants:
+- 9:16
+- 1:1
+- 4:5
+- landscape عند الحاجة
+
+مع Safe Zones ونصوص وCTA مختلفة حسب Placement.
+
+### 16.3 Creator / UGC amplification
+
+الطريقة الحديثة ليست أن تصنع العلامة التجارية كل شيء بنفسها؛ بل اكتشاف محتوى Creators/UGC ثم تحويل الأفضل إلى إعلان:
+
+- TikTok Spark Ads يحول Organic TikTok إلى إعلان مع الحفاظ على الطابع الأصلي.
+- TikTok One Content Suite يستخدم AI لاكتشاف UGC مناسب للعلامة وتسريع تفعيله.
+- Meta Partnership/Reels ads تسمح بترويج محتوى Creator.
+- Google/YouTube Creator Partnerships تسمح باستخدام Creator assets داخل Demand Gen.
+
+**AWJ Requirement:** مستقبلًا يكون لدينا **Creator/UGC Asset Library** مع:
+- source creator
+- usage rights / authorization
+- platform
+- product linkage
+- organic performance
+- paid performance
+- expiry / permission status
+
+### 16.4 Creative velocity + AI variation
+
+الاتجاه الحديث هو كثرة التجارب الإبداعية السريعة بدل Creative واحد لفترة طويلة:
+
+- TikTok Symphony يولد/يعدل الفيديو والصور والترجمة والدبلجة والـavatars.
+- Google Demand Gen يستخدم Gemini/Veo لاقتراح وتحويل/توسيع Creative.
+- Meta Advantage+ Creative يعيد تهيئة assets للمقاسات والplacements.
+
+**AWJ Decision:** Growth AI يجب أن يقيس **Creative Velocity** و**Creative Fatigue** ويقترح Variants جديدة قبل هبوط الأداء.
+
+### 16.5 First-party data + server-side conversion signals
+
+دقة الإعلان الحديثة تعتمد أكثر على بيانات الطرف الأول بدل الاعتماد على cookies فقط.
+
+Google Enhanced Conversions في 2026 يقبل first-party user-provided data من tags وData Manager وAPI، مع hashing قبل الاستخدام.
+
+**AWJ Requirement:** نبني Conversion/Event Gateway موحدًا يدعم:
+- browser events
+- server-side events
+- order-paid events
+- refund/cancellation events
+- hashed first-party identifiers عندما تسمح السياسات
+- consent state
+- provider-specific event IDs
+- deduplication
+
+### 16.6 Profit-aware optimization, not platform ROAS only
+
+منصة الإعلان ترى conversion/revenue بحسب Attribution الخاص بها. أَوْج يرى أيضًا:
+
+- COGS
+- discounts
+- refunds
+- shipping
+- tax treatment
+- payment costs where applicable
+- inventory
+- actual invoice/payment state
+
+**AWJ Decision:** أهم ميزة تنافسية هي **Profit-aware media optimization**.
+
+### 16.7 Incrementality + MMM + experiments
+
+Attribution وحده لا يثبت أن الإعلان تسبب في المبيعات.
+
+Google في 2026 يدفع باتجاه:
+- first-party data foundation
+- causal/incrementality experiments
+- Meridian MMM
+- GeoX experiments
+- Scenario Planner / budget planning
+
+**AWJ Requirement:** Analytics roadmap يجب أن يضيف لاحقًا:
+- incrementality tests
+- geo experiments
+- holdout groups
+- MMM-compatible exports
+- marginal ROI / budget scenario planning
+
+### 16.8 Conversational commerce
+
+الرحلة الإعلانية الحديثة يمكن أن تنتهي في محادثة بدل Landing Page فقط:
+
+```text
+Ad
+→ WhatsApp / Instagram conversation
+→ qualification
+→ product recommendation
+→ checkout/order
+→ invoice/payment
+```
+
+**AWJ Requirement:** Click-to-message / conversation-origin metadata يجب أن يحتفظ به أَوْج حتى يمكن ربط المحادثة بالطلب والربح.
+
+### 16.9 AI agents connected directly to ad platforms
+
+في 2026 بدأت المنصات نفسها تفتح طبقات رسمية لوكلاء AI:
+
+- Snapchat أطلق **Snap Ads MCP Server** الرسمي لربط AI agents ببيانات Snap Ads.
+- TikTok يوسع Smart+ وSymphony Agent كطبقة AI للحملات والCreative.
+- Google يضيف قدرات Agentic داخل measurement/commerce workflows.
+
+**AWJ Decision:** بنية AWJ Growth Agent يجب أن تكون Provider-aware، لكن كل Action يمر عبر:
+RBAC → Tenant guardrails → policy validation → audit → execution.
+
+### 16.10 Rapid-distribution loop
+
+الانتشار السريع لا يُبنى على "زر Viral". النموذج الصحيح:
+
+```text
+Organic test
+→ detect winner
+→ creator/UGC permission
+→ paid amplification
+→ short-form variants
+→ cross-channel distribution
+→ first-party conversion signals
+→ profit measurement
+→ AI recommendation
+→ refresh winning creative
+```
+
+هذه الحلقة تجمع Organic + Paid + Creator + Commerce + AI بدل فصلها.
+
+### 16.11 AWJ Viral / Momentum Signals — Proposal
+
+لا ندّعي توقع Viral بشكل يقيني، لكن يمكن بناء Signals تساعد على التقاط الزخم مبكرًا:
+
+- View velocity
+- watch-time / completion
+- share rate
+- save rate
+- comment velocity
+- profile/product click rate
+- organic-to-paid conversion
+- creator reuse potential
+- CPA trend after paid boost
+- stock readiness
+- margin readiness
+
+إذا تحققت Thresholds موثقة، يقترح Growth AI:
+- Boost / Spark / Partnership promotion
+- Cross-post variant
+- New hook
+- Budget increase داخل Guardrail
+- Inventory warning قبل التوسع
+
+---
+
+## 17. Phased Roadmap
 
 ### Phase 0 — Evidence & Contracts
 
@@ -774,7 +990,7 @@ InvoicePosted
 
 ---
 
-## 17. Definition of Done لكل Provider
+## 18. Definition of Done لكل Provider
 
 لا يعتبر Provider جاهزًا بمجرد نجاح OAuth.
 
@@ -796,10 +1012,10 @@ InvoicePosted
 
 ---
 
-## 18. قرارات V1 المثبتة
+## 19. قرارات V1 المثبتة
 
 - الاسم المبدئي: **AWJ Growth**
-- القنوات الأساسية: Instagram, Facebook, TikTok, Snapchat, WhatsApp.
+- القنوات الأساسية: Instagram, Facebook, TikTok, Snapchat, Google Ads, YouTube, WhatsApp.
 - Facebook + Instagram Ads تحت Meta Provider.
 - WhatsApp Provider مستقل وظيفيًا.
 - Ads وPublishing وMessaging Modules منفصلة.
@@ -817,7 +1033,7 @@ InvoicePosted
 
 ---
 
-## 19. Evidence Register — البداية
+## 20. Evidence Register — البداية
 
 | Platform | Capability | Official source | Status |
 |---|---|---|---|
@@ -827,11 +1043,15 @@ InvoicePosted
 | Snapchat | Developer platform | https://developers.snap.com/ | To detail in Phase 0 |
 | Snapchat | Marketing API | https://developers.snap.com/api/marketing-api/ | To detail in Phase 0 |
 | Meta | Ads / Instagram / WhatsApp | Official Meta developer documentation | To detail in Phase 0 |
+| Google | Performance Max | https://support.google.com/google-ads/answer/10724817 | Verified baseline |
+| Google | Demand Gen / YouTube / Shorts | https://support.google.com/google-ads/answer/13695777 | Verified baseline |
+| Google | Enhanced Conversions | https://support.google.com/google-ads/answer/15712870 | Verified baseline |
+| Google | Measurement / Meridian | https://blog.google/products/ads-commerce/data-strength-updates/ | Verified 2026 direction |
 | Salla | Benchmark only | https://help.salla.sa/ + https://docs.salla.dev/ | Benchmark |
 
 ---
 
-## 20. ما ليس ضمن هذه الوثيقة
+## 21. ما ليس ضمن هذه الوثيقة
 
 هذه الوثيقة لا:
 
@@ -846,4 +1066,4 @@ InvoicePosted
 
 > **AWJ-GROWTH-EVIDENCE-1 — Official Platform Capability & Integration Matrix**
 
-ويجب أن يغطي Meta / Instagram / Facebook / TikTok / Snapchat / WhatsApp بالتوثيق الرسمي، ثم يقفل النطاق الواقعي للـV1 قبل كتابة الكود.
+ويجب أن يغطي Meta / Instagram / Facebook / TikTok / Snapchat / Google Ads / YouTube / WhatsApp بالتوثيق الرسمي، ثم يقفل النطاق الواقعي للـV1 قبل كتابة الكود.
