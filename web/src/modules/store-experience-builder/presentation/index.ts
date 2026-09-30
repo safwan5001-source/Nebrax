@@ -1,5 +1,7 @@
 export * from "./capabilities";
 export * from "./config";
+export * from "./page-region-registry";
+export * from "./page-regions";
 export * from "./section-capabilities";
 export * from "./tokens";
 export * from "./urls";

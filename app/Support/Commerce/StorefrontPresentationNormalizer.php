@@ -20,8 +20,14 @@ final class StorefrontPresentationNormalizer
      * تُعاد إلحاق الأقسام الافتراضية الناقصة لها (سلوكها الأصلي)، ووثائق
      * v2 تعتبر الغياب حذفاً حقيقياً دون إحياء. الأنواع المجهولة تُسقط
      * fail-closed في كل الأحوال.
+     *
+     * CUST-H2-1 — الإصدار 3: مفتاح جديد اختياري `pagePresentation` لعرض
+     * صفحتي المنتج والفئة، إضافي بحت — كل حقل موجود يبقى كما هو حرفياً.
+     * الغياب يعني «لم تُخصَّص بعد» ولا يُكتب كِياناً فارغاً؛ كل نسخة سابقة
+     * على CUST-H2 تُطبَّع طبق الأصل. راجع
+     * `docs/plans/store/CUST-H2-ARCH-1-PAGE-CONTRACT.md`.
      */
-    public const VERSION = 2;
+    public const VERSION = 3;
 
     public const MAX_HOME_SECTIONS = 30;
 
@@ -90,6 +96,66 @@ final class StorefrontPresentationNormalizer
         'privacy-policy',
         'returns-policy',
         'terms-of-service',
+    ];
+
+    /**
+     * CUST-H2-1 — Page Type Registry. توأم `PageType` في
+     * `web/.../presentation/page-regions.ts`.
+     */
+    public const PAGE_TYPES = ['home', 'product', 'category'];
+
+    /**
+     * CUST-H2-1 — Product Page Region Contract (المفاتيح المُنفَّذة فقط؛
+     * specifications/related_products/trust_shipping_payment مؤجَّلة —
+     * لا نموذج بيانات لها، فليست مفتاحاً هنا أصلاً).
+     */
+    public const PRODUCT_PAGE_REGION_KEYS = [
+        'media_gallery',
+        'identity',
+        'price',
+        'availability',
+        'variant_selector',
+        'quantity_cta',
+        'description',
+        'custom_fields',
+        'sku_options_details',
+    ];
+
+    /**
+     * CUST-H2-1 — Category Page Region Contract. لا `pagination` هنا: مذكورة
+     * في نوع TS التوضيحي بالمعمارية لكن بلا صفّ قدرة خاص بها في جدول العقد
+     * التفصيلي أو ملخص التقرير — كلاهما يصفانها خاصية لـ`product_grid`
+     * («نموذج الصفحات infinite-scroll تجاري السلطة لا خياراً تصميمياً في
+     * H2 V1»)، لا منطقة مستقلة. مفتاح بلا بيانات قدرة كاملة يخالف عقد هذا
+     * السجلّ نفسه.
+     */
+    public const CATEGORY_PAGE_REGION_KEYS = [
+        'breadcrumbs',
+        'identity_title',
+        'description',
+        'subcategories_rail',
+        'filter_sort_bar',
+        'product_grid',
+    ];
+
+    /**
+     * مناطق FIXED_REQUIRED تُعاد إلى visible=true عند التطبيع مهما أرسل
+     * العميل. `variant_selector` مُستثناة عمداً: شرطها الحقيقي
+     * `product.hasVariants` بيانات منتج محدد لا تملكها وثيقة العرض العامة —
+     * إنفاذها مسؤولية زمن العرض العام (CUST-H2-5)، لا مطبّع الوثيقة.
+     */
+    public const FIXED_REQUIRED_PRODUCT_REGION_KEYS = [
+        'media_gallery',
+        'identity',
+        'price',
+        'quantity_cta',
+    ];
+
+    public const FIXED_REQUIRED_CATEGORY_REGION_KEYS = [
+        'breadcrumbs',
+        'identity_title',
+        'filter_sort_bar',
+        'product_grid',
     ];
 
     /** @return array<string, mixed> */
@@ -245,8 +311,9 @@ final class StorefrontPresentationNormalizer
 
         $iosUrl = $this->asString($appsRaw['iosUrl'] ?? null);
         $androidUrl = $this->asString($appsRaw['androidUrl'] ?? null);
+        $pagePresentation = $this->normalizePagePresentation($input['pagePresentation'] ?? null);
 
-        return [
+        $config = [
             'version' => self::VERSION,
             'themePreset' => $themePreset,
             'primaryColor' => $primaryColor,
@@ -317,6 +384,12 @@ final class StorefrontPresentationNormalizer
             ],
             'pages' => $this->normalizePages($input['pages'] ?? null, $defaults['pages']),
         ];
+
+        if ($pagePresentation !== null) {
+            $config['pagePresentation'] = $pagePresentation;
+        }
+
+        return $config;
     }
 
     public function encodedSize(array $config): int
@@ -728,6 +801,117 @@ final class StorefrontPresentationNormalizer
         }
 
         return $pages;
+    }
+
+    /**
+     * CUST-H2-1 — يطبّع مفتاح `pagePresentation` كاملاً. `null` تعني «لم
+     * تُخصَّص بعد» ويجب ألا تُكتب إلى الوثيقة إطلاقاً — الغياب يبقى غياباً،
+     * لا كِياناً فارغاً `{}`، حتى تستمر كل نسخة سابقة على CUST-H2 بالتطبيع
+     * طبق الأصل بلا هذا المفتاح.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function normalizePagePresentation(mixed $raw): ?array
+    {
+        if (! is_array($raw) || $this->isList($raw)) {
+            return null;
+        }
+
+        $product = $this->normalizePageTypePresentation(
+            $raw['product'] ?? null,
+            self::PRODUCT_PAGE_REGION_KEYS,
+            self::FIXED_REQUIRED_PRODUCT_REGION_KEYS,
+        );
+        $category = $this->normalizePageTypePresentation(
+            $raw['category'] ?? null,
+            self::CATEGORY_PAGE_REGION_KEYS,
+            self::FIXED_REQUIRED_CATEGORY_REGION_KEYS,
+        );
+
+        if ($product === null && $category === null) {
+            return null;
+        }
+
+        $result = [];
+        if ($product !== null) {
+            $result['product'] = $product;
+        }
+        if ($category !== null) {
+            $result['category'] = $category;
+        }
+
+        return $result;
+    }
+
+    /**
+     * يطبّع مستند نوع صفحة واحد `{version, regions}`. إصدار محتوى الصفحة
+     * يتطور مستقلاً عن `version` الأعلى للوثيقة (عقد المعمارية، فقرة
+     * «Normalization») — إصدار أعلى مما يدعمه هذا الإصدار يفشل إلى الغياب
+     * بدل التخمين.
+     *
+     * @param  list<string>  $allowedKeys
+     * @param  list<string>  $fixedRequiredKeys
+     * @return array{version: int, regions: list<array{id: string, key: string, visible: bool}>}|null
+     */
+    private function normalizePageTypePresentation(mixed $raw, array $allowedKeys, array $fixedRequiredKeys): ?array
+    {
+        if (! is_array($raw) || $this->isList($raw)) {
+            return null;
+        }
+
+        if (isset($raw['version']) && is_numeric($raw['version']) && (int) $raw['version'] > 1) {
+            return null;
+        }
+
+        return [
+            'version' => 1,
+            'regions' => $this->normalizePageRegions($raw['regions'] ?? null, $allowedKeys, $fixedRequiredKeys),
+        ];
+    }
+
+    /**
+     * مفاتيح مجهولة أو من نوع صفحة آخر تُسقط fail-closed. الـid يسقط إلى
+     * المفتاح نفسه حين غيابه/عدم أمانه — نفس اتفاقية `id = key` الحتمية
+     * المستعملة لترحيل أقسام الصفحة الرئيسية. كل منطقة FIXED_REQUIRED تُجبَر
+     * visible=true. التكرار بالمفتاح ينهار إلى أول ورود (maxInstances=1
+     * وcanDuplicate=false لكل منطقة في H2 V1). لا `content` في هذا الإصدار
+     * — لا عقد محتوى مُصنَّف لكل منطقة بعد (CUST-H2-3/H2-4).
+     *
+     * @param  list<string>  $allowedKeys
+     * @param  list<string>  $fixedRequiredKeys
+     * @return list<array{id: string, key: string, visible: bool}>
+     */
+    private function normalizePageRegions(mixed $raw, array $allowedKeys, array $fixedRequiredKeys): array
+    {
+        if (! is_array($raw) || ! $this->isList($raw)) {
+            return [];
+        }
+
+        $out = [];
+        $seenKeys = [];
+        foreach ($raw as $entry) {
+            if (! is_array($entry)) {
+                continue;
+            }
+
+            $key = $this->asString($entry['key'] ?? null);
+            if (! in_array($key, $allowedKeys, true)) {
+                continue;
+            }
+            if (isset($seenKeys[$key])) {
+                continue;
+            }
+            $seenKeys[$key] = true;
+
+            $isFixedRequired = in_array($key, $fixedRequiredKeys, true);
+            $out[] = [
+                'id' => $this->safeId($entry['id'] ?? null, $key),
+                'key' => $key,
+                'visible' => $isFixedRequired ? true : (bool) ($entry['visible'] ?? false),
+            ];
+        }
+
+        return $out;
     }
 
     private function safeId(mixed $value, string $fallback): string

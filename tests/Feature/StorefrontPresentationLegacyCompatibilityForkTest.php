@@ -559,7 +559,7 @@ class StorefrontPresentationLegacyCompatibilityForkTest extends TestCase
         ])->assertOk();
 
         $refreshedHead = StorefrontPresentation::withoutGlobalScopes()->find($rowId);
-        $this->assertSame(2, (int) $refreshedHead->schema_version, 'تأكيد أن العمود المشترك تقدّم فعلاً — هذا هو السيناريو المطلوب اختباره.');
+        $this->assertSame(StorefrontPresentationNormalizer::VERSION, (int) $refreshedHead->schema_version, 'تأكيد أن العمود المشترك تقدّم فعلاً — هذا هو السيناريو المطلوب اختباره.');
         $this->assertSame(1, (int) $refreshedHead->published_schema_version, 'وسم المنشور المستقل يجب ألا يتأثر بحفظ مسودة.');
 
         $after = $service->publishedSnapshotForStorefront($seeded['storefront']->id);

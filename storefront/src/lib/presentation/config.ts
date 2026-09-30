@@ -2,6 +2,7 @@ import {
   normalizeOptionalSectionContent,
   type SectionContent,
 } from "./section-content";
+import { normalizePagePresentation, type PagePresentation } from "./page-regions";
 import {
   CONTENT_PAGE_SLUGS,
   type ContentPageSlug,
@@ -152,6 +153,12 @@ export interface StorefrontPresentationConfig {
     showFooterLinks: boolean;
   };
   pages: PresentationContentPage[];
+  /**
+   * CUST-H2-1 — additive, optional namespace for Product/Category page
+   * presentation. Absent means "not customized yet"; every pre-CUST-H2
+   * Version normalizes without this key, byte-identically to before.
+   */
+  pagePresentation?: PagePresentation;
 }
 
 const NAV_KINDS: NavLinkKind[] = [
@@ -457,6 +464,7 @@ export function normalizePresentationConfig(
 
   const iosUrl = asString(appsRaw.iosUrl);
   const androidUrl = asString(appsRaw.androidUrl);
+  const pagePresentation = normalizePagePresentation(raw.pagePresentation);
 
   return {
     version: PRESENTATION_CONFIG_VERSION,
@@ -555,6 +563,7 @@ export function normalizePresentationConfig(
           .map((page, index) => normalizePage(page, index))
           .filter((page): page is PresentationContentPage => Boolean(page))
       : DEFAULT_PRESENTATION_CONFIG.pages.map((page) => ({ ...page })),
+    ...(pagePresentation ? { pagePresentation } : {}),
   };
 }
 

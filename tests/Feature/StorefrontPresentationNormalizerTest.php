@@ -384,6 +384,212 @@ class StorefrontPresentationNormalizerTest extends TestCase
         $this->assertSame('#1e3a5f', $normalized['primaryColor']);
     }
 
+    /** @test */
+    public function page_presentation_is_absent_by_default_and_version_bumps_to_three(): void
+    {
+        $this->assertSame(3, StorefrontPresentationNormalizer::VERSION);
+        $this->assertArrayNotHasKey('pagePresentation', $this->normalizer->defaultConfig());
+        $this->assertArrayNotHasKey('pagePresentation', $this->normalizer->normalize(null));
+        $this->assertArrayNotHasKey('pagePresentation', $this->normalizer->normalize([]));
+        $this->assertSame(3, $this->normalizer->normalize([])['version']);
+    }
+
+    /** @test */
+    public function a_pre_cust_h2_document_normalizes_byte_identically_aside_from_the_version_bump(): void
+    {
+        $legacyV2 = [
+            'version' => 2,
+            'themePreset' => 'navy',
+            'homepage' => ['sections' => [['id' => 'hero', 'type' => 'hero', 'visible' => true]]],
+        ];
+
+        $normalized = $this->normalizer->normalize($legacyV2);
+
+        $this->assertArrayNotHasKey('pagePresentation', $normalized);
+        $this->assertSame(3, $normalized['version']);
+        $this->assertSame('navy', $normalized['themePreset']);
+    }
+
+    /** @test */
+    public function an_empty_or_malformed_page_presentation_object_collapses_to_absent(): void
+    {
+        $this->assertArrayNotHasKey('pagePresentation', $this->normalizer->normalize(['pagePresentation' => []]));
+        $this->assertArrayNotHasKey('pagePresentation', $this->normalizer->normalize(['pagePresentation' => 'nope']));
+        $this->assertArrayNotHasKey('pagePresentation', $this->normalizer->normalize(['pagePresentation' => ['a', 'b']]));
+        $this->assertArrayNotHasKey('pagePresentation', $this->normalizer->normalize([
+            'pagePresentation' => ['product' => null, 'category' => 'x'],
+        ]));
+    }
+
+    /** @test */
+    public function product_regions_accept_valid_keys_and_default_id_to_key(): void
+    {
+        $normalized = $this->normalizer->normalize([
+            'pagePresentation' => [
+                'product' => [
+                    'version' => 1,
+                    'regions' => [
+                        ['key' => 'description', 'visible' => true],
+                        ['id' => 'sku-1', 'key' => 'sku_options_details', 'visible' => false],
+                    ],
+                ],
+            ],
+        ]);
+
+        $this->assertArrayNotHasKey('category', $normalized['pagePresentation']);
+        $regions = collect($normalized['pagePresentation']['product']['regions'])->keyBy('key');
+        $this->assertSame(1, $normalized['pagePresentation']['product']['version']);
+        $this->assertSame('description', $regions['description']['id']);
+        $this->assertTrue($regions['description']['visible']);
+        $this->assertSame('sku-1', $regions['sku_options_details']['id']);
+        $this->assertFalse($regions['sku_options_details']['visible']);
+    }
+
+    /** @test */
+    public function unknown_and_cross_page_type_region_keys_are_dropped(): void
+    {
+        $normalized = $this->normalizer->normalize([
+            'pagePresentation' => [
+                'product' => [
+                    'regions' => [
+                        ['key' => 'evil-key', 'visible' => true],
+                        // A real Category key sent under Product must be dropped too,
+                        // even though it is valid for a different page type.
+                        ['key' => 'breadcrumbs', 'visible' => true],
+                        ['key' => 'description', 'visible' => true],
+                    ],
+                ],
+            ],
+        ]);
+
+        $keys = collect($normalized['pagePresentation']['product']['regions'])->pluck('key')->all();
+        $this->assertSame(['description'], $keys);
+    }
+
+    /** @test */
+    public function duplicate_region_keys_collapse_to_the_first_occurrence(): void
+    {
+        $normalized = $this->normalizer->normalize([
+            'pagePresentation' => [
+                'category' => [
+                    'regions' => [
+                        ['id' => 'first', 'key' => 'description', 'visible' => true],
+                        ['id' => 'second', 'key' => 'description', 'visible' => false],
+                    ],
+                ],
+            ],
+        ]);
+
+        $regions = $normalized['pagePresentation']['category']['regions'];
+        $this->assertCount(1, $regions);
+        $this->assertSame('first', $regions[0]['id']);
+        $this->assertTrue($regions[0]['visible']);
+    }
+
+    /** @test */
+    public function fixed_required_regions_are_forced_visible_regardless_of_input(): void
+    {
+        $normalized = $this->normalizer->normalize([
+            'pagePresentation' => [
+                'product' => [
+                    'regions' => [
+                        ['key' => 'media_gallery', 'visible' => false],
+                        ['key' => 'identity', 'visible' => false],
+                        ['key' => 'price', 'visible' => false],
+                        ['key' => 'quantity_cta', 'visible' => false],
+                    ],
+                ],
+                'category' => [
+                    'regions' => [
+                        ['key' => 'breadcrumbs', 'visible' => false],
+                        ['key' => 'identity_title', 'visible' => false],
+                        ['key' => 'filter_sort_bar', 'visible' => false],
+                        ['key' => 'product_grid', 'visible' => false],
+                    ],
+                ],
+            ],
+        ]);
+
+        foreach ($normalized['pagePresentation']['product']['regions'] as $region) {
+            $this->assertTrue($region['visible'], $region['key']);
+        }
+        foreach ($normalized['pagePresentation']['category']['regions'] as $region) {
+            $this->assertTrue($region['visible'], $region['key']);
+        }
+    }
+
+    /** @test */
+    public function variant_selector_is_not_forced_visible_because_it_is_data_dependent(): void
+    {
+        $normalized = $this->normalizer->normalize([
+            'pagePresentation' => [
+                'product' => [
+                    'regions' => [
+                        ['key' => 'variant_selector', 'visible' => false],
+                    ],
+                ],
+            ],
+        ]);
+
+        $this->assertFalse($normalized['pagePresentation']['product']['regions'][0]['visible']);
+    }
+
+    /** @test */
+    public function region_content_is_always_dropped_in_this_slice(): void
+    {
+        $normalized = $this->normalizer->normalize([
+            'pagePresentation' => [
+                'product' => [
+                    'regions' => [
+                        ['key' => 'description', 'visible' => true, 'content' => ['text' => 'hello']],
+                    ],
+                ],
+            ],
+        ]);
+
+        $this->assertArrayNotHasKey('content', $normalized['pagePresentation']['product']['regions'][0]);
+    }
+
+    /** @test */
+    public function a_forward_page_content_schema_version_drops_that_page_type_only(): void
+    {
+        $normalized = $this->normalizer->normalize([
+            'pagePresentation' => [
+                'product' => [
+                    'version' => 99,
+                    'regions' => [['key' => 'description', 'visible' => true]],
+                ],
+                'category' => [
+                    'version' => 1,
+                    'regions' => [['key' => 'description', 'visible' => true]],
+                ],
+            ],
+        ]);
+
+        $this->assertArrayNotHasKey('product', $normalized['pagePresentation']);
+        $this->assertArrayHasKey('category', $normalized['pagePresentation']);
+    }
+
+    /** @test */
+    public function page_presentation_round_trips_stably_across_repeated_normalization(): void
+    {
+        $input = [
+            'pagePresentation' => [
+                'product' => [
+                    'regions' => [
+                        ['key' => 'media_gallery', 'visible' => false],
+                        ['key' => 'description', 'visible' => true],
+                    ],
+                ],
+            ],
+        ];
+
+        $once = $this->normalizer->normalize($input);
+        $twice = $this->normalizer->normalize($once);
+
+        $this->assertSame($once['pagePresentation'], $twice['pagePresentation']);
+    }
+
     /** @return array<string, mixed> */
     private function fixture(string $name): array
     {
