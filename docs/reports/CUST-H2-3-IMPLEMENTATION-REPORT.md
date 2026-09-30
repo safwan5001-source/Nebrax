@@ -15,7 +15,7 @@ green and CI passing.
   — confirmed identical to the SHA the task named as the known post-CUST-H2-2-merge
   main tip (`feat(store): add multi-page Customizer navigation (CUST-H2-2) (#1118)`).
   Main had not advanced.
-- **Head SHA:** this report's own commit, on top of the Base SHA above.
+- **Head SHA:** `797dd3a0046d912187b6147f74b1f6a5e230cb7e`
 - **Branch:** `feat/cust-h2-3-product-page-editing`
 - **PR:** opened against `main` from this branch (see end of this report). **Not merged.**
 
