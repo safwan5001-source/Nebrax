@@ -23,6 +23,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\ValidationException;
 use Throwable;
@@ -200,26 +201,63 @@ class AuthController extends ApiController
         ]);
     }
 
+    /**
+     * AUTH-MAIL-PROD-1: تشخيص مؤقت أحادي الحدث — لا بريد ولا توكن ولا هاش ولا
+     * بيانات شخصية، فقط حالة كل مرحلة + اسم الـ mailer الفعّال (`mail.default`
+     * قد يسقط صامتاً على `log` إن غاب `MAIL_MAILER` بيئياً، فينجح الإرسال
+     * محلياً دون أي استثناء ودون أن يصل أي مزوّد فعلي). يُزال بعد تأكيد نقطة
+     * التوقف في الإنتاج — لا يغيّر أي قرار أو استجابة.
+     */
     public function forgotPassword(Request $request, AuthRecoveryService $recovery): JsonResponse
     {
         $data = $request->validate(['email' => ['required', 'email', 'max:255']]);
         $tenantId = app(HostnameTenantContext::class)->id();
-        if ($tenantId === null) {
-            return response()->json(['message' => 'إذا كان الحساب موجوداً لهذا البريد، فقد أُرسلت تعليمات الاسترداد.']);
-        }
-        $query = User::where('email', $data['email'])
-            ->where('tenant_id', $tenantId)
-            ->where('is_active', true);
-        if ($user = $query->first()) {
-            try {
-                $token = $recovery->issue($user, AuthRecoveryService::PASSWORD_RESET);
-                Mail::to($user->email)->send(new AuthActionMail('reset', $recovery->frontendLink($user, '/reset-password', $token)));
-            } catch (Throwable $exception) {
-                report($exception);
+
+        $diagnostic = [
+            'request_host' => $request->getHost(),
+            'origin_present' => $request->headers->has('Origin'),
+            'origin_host' => $this->safeOriginHost($request),
+            'tenant_slug_resolved' => app(HostnameTenantContext::class)->slug(),
+            'hostname_tenant_present' => $tenantId !== null,
+            'user_matched' => false,
+            'token_issue_reached' => false,
+            'mail_send_reached' => false,
+            'mail_transport' => config('mail.default'),
+        ];
+
+        if ($tenantId !== null) {
+            $query = User::where('email', $data['email'])
+                ->where('tenant_id', $tenantId)
+                ->where('is_active', true);
+            if ($user = $query->first()) {
+                $diagnostic['user_matched'] = true;
+                try {
+                    $token = $recovery->issue($user, AuthRecoveryService::PASSWORD_RESET);
+                    $diagnostic['token_issue_reached'] = true;
+                    Mail::to($user->email)->send(new AuthActionMail('reset', $recovery->frontendLink($user, '/reset-password', $token)));
+                    $diagnostic['mail_send_reached'] = true;
+                } catch (Throwable $exception) {
+                    $diagnostic['exception_class'] = get_class($exception);
+                    report($exception);
+                }
             }
         }
 
+        Log::info('auth_recovery_diagnostic', $diagnostic);
+
         return response()->json(['message' => 'إذا كان الحساب موجوداً لهذا البريد، فقد أُرسلت تعليمات الاسترداد.']);
+    }
+
+    /** يستخرج مضيف Origin فقط (بلا مسار ولا استعلام) — آمن للتسجيل، لا يغيّر حسم المستأجر. */
+    private function safeOriginHost(Request $request): ?string
+    {
+        $origin = $request->headers->get('Origin');
+        if (! is_string($origin) || $origin === '') {
+            return null;
+        }
+        $host = parse_url($origin, PHP_URL_HOST);
+
+        return is_string($host) ? mb_strtolower($host) : null;
     }
 
     public function resetPassword(Request $request, AuthRecoveryService $recovery): JsonResponse
