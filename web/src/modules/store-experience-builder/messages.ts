@@ -19,6 +19,21 @@ export const CUSTOMIZER_MESSAGES = {
     openStore: "فتح المتجر ↗",
     exit: "الخروج إلى التجارة",
     currentPage: "الرئيسية",
+    // CUST-H2-2 — منتقي الصفحة: منفصل دلالياً وبصرياً عن منتقي النسخة
+    // (راجع تعليق `VersionSelector.tsx`). "الصفحة" تعني أي صفحة متجر
+    // (الرئيسية/المنتج/التصنيف) أُعايِن الآن — لا "أي نسخة تصميم أُعدِّل؟".
+    pageNavigatorSelectorLabel: "الصفحة المعروضة حالياً",
+    pageNavigatorMenuTitle: "اختيار صفحة",
+    pageHome: "الرئيسية",
+    pageProduct: "صفحة المنتج",
+    pageCategory: "صفحة التصنيف",
+    pagePlaceholderBadge: "قريباً",
+    pageProductPlaceholderBody:
+      "تخصيص صفحة المنتج سيصبح متاحًا في الخطوة التالية. المعاينة هنا سياق الصفحة فقط، وليست بيانات منتج حقيقية.",
+    pageCategoryPlaceholderBody:
+      "تخصيص صفحة التصنيف سيصبح متاحًا في الخطوة التالية. المعاينة هنا سياق الصفحة فقط، وليست بيانات تصنيف حقيقية.",
+    pagePlaceholderSidebarBody:
+      "عناصر تحكم الصفحة الرئيسية غير متاحة هنا. اختر «الرئيسية» من محدد الصفحات للتعديل عليها.",
     previewDraft: "معاينة المسودة",
     sections: "الأقسام",
     design: "التصميم",
@@ -414,6 +429,22 @@ export const CUSTOMIZER_MESSAGES = {
     openStore: "Open store ↗",
     exit: "Exit to Commerce",
     currentPage: "Home",
+    // CUST-H2-2 — Page Navigator: distinct in meaning and visual weight from
+    // the Version selector (see `VersionSelector.tsx`'s own comment). "Page"
+    // is which storefront page (Home/Product/Category) is being previewed —
+    // never "which design Version am I editing?".
+    pageNavigatorSelectorLabel: "Page currently being viewed",
+    pageNavigatorMenuTitle: "Choose a page",
+    pageHome: "Home",
+    pageProduct: "Product page",
+    pageCategory: "Category page",
+    pagePlaceholderBadge: "Coming soon",
+    pageProductPlaceholderBody:
+      "Customizing the product page will become available in the next step. This is page context only, not real product data.",
+    pageCategoryPlaceholderBody:
+      "Customizing the category page will become available in the next step. This is page context only, not real category data.",
+    pagePlaceholderSidebarBody:
+      "Homepage controls aren't available here. Choose “Home” from the page selector to edit them.",
     previewDraft: "Preview draft",
     sections: "Sections",
     design: "Design",

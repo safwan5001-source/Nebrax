@@ -8,6 +8,7 @@ import {
   DEFAULT_PRESENTATION_CONFIG,
   type HomeBuilderSectionKey,
   normalizePresentationConfig,
+  type PageType,
   presentationConfigsEqual,
   type StorefrontPresentationConfig,
 } from "./presentation";
@@ -29,6 +30,8 @@ import {
   type StorefrontBusinessIdentity,
 } from "./StorefrontPreviewCanvas";
 import { VersionSelector } from "./VersionSelector";
+import { PageNavigator } from "./PageNavigator";
+import { PageIcon, PageNavigatorPanel, pageLabelKey } from "./PageNavigatorPanel";
 import {
   VersionManagerPanel,
   type VersionManagerListState,
@@ -68,7 +71,7 @@ export type BuilderLifecycle =
   | "save_blocked"
   | "publish_blocked";
 
-type MobileSheet = "sections" | "settings" | "design" | "versions" | null;
+type MobileSheet = "sections" | "settings" | "design" | "versions" | "pages" | null;
 
 interface ExperienceBuilderProps {
   initialConfig?: StorefrontPresentationConfig;
@@ -105,6 +108,11 @@ export function ExperienceBuilder({
   const [selectedSection, setSelectedSection] = useState<string | null>(null);
   const [selectedChrome, setSelectedChrome] =
     useState<PreviewChromeTarget | null>(null);
+  // CUST-H2-2 — أي صفحة متجر (رئيسية/منتج/تصنيف) يُعايِنها المحرِّر الآن.
+  // حالة محرِّر محلية بحتة: لا تُخزَّن في `pagePresentation`، لا تُرسَل مع
+  // الحفظ/النشر، ولا تُغيِّر سلطة الاستحقاق التجاري لمنتج/تصنيف — تجيب فقط
+  // «أي صفحة أعرض؟»، منفصلة تماماً عن `selectedVersion` («أي نسخة أُعدِّل؟»).
+  const [currentPage, setCurrentPage] = useState<PageType>("home");
   const [pendingSectionScroll, setPendingSectionScroll] = useState<
     string | null
   >(null);
@@ -192,6 +200,19 @@ export function ExperienceBuilder({
   const t = (key: CustomizerMessageKey) => customizerMessage(locale, key);
 
   const dirty = !presentationConfigsEqual(draft, saved);
+  // CUST-H2-2 — لوحة "homepage" (أقسام الصفحة الرئيسية) صالحة على الرئيسية
+  // فقط؛ اللوحات الأخرى كلها هوية/تصميم/تواصل عالمية تصلح لكل صفحة (راجع
+  // "Global vs Page-Specific Matrix" في العقد المعماري). إخفاؤها من التنقّل
+  // بدل تعطيلها يمنع عرض عناصر تحكم الرئيسية على صفحة خاطئة دون اختراع حالة
+  // "معطَّلة" جديدة.
+  const visibleNavGroups = CUSTOMIZER_NAV_GROUPS.map((group) => ({
+    items: group.items.filter(
+      (item) => item.id !== "homepage" || currentPage === "home",
+    ),
+  })).filter((group) => group.items.length > 0);
+  const visiblePanels = CUSTOMIZER_PANELS.filter(
+    (item) => item.id !== "homepage" || currentPage === "home",
+  );
   const activePanel = CUSTOMIZER_PANELS.find((item) => item.id === panel);
   const isPublishedReadOnly = selectedVersion?.state === "published";
   const candidateVersions = versions.filter((v) => v.state !== "published");
@@ -493,6 +514,11 @@ export function ExperienceBuilder({
     setSelectedSection(null);
     setSelectedChrome(null);
     setLifecycle("clean");
+    // فتحٌ جديد (متجر مختلف، أو `versionId` صريح كمعرض القوالب) يبدأ من
+    // الرئيسية دوماً — راجع "Theme Gallery Handoff". لا يمسّ هذا تبديل الصفحة
+    // العادي أثناء الجلسة (`handleSelectPage`)، ولا تبديل النسخة العادي
+    // (`applyVersionSelection`) اللذين يحافظان على الصفحة الحالية عمداً.
+    setCurrentPage("home");
 
     if (!storefrontId) {
       setBusy(null);
@@ -1087,6 +1113,21 @@ export function ExperienceBuilder({
     }
   }
 
+  // CUST-H2-2 — تبديل الصفحة الحالية. لا شبكة، لا حفظ، لا تغيير في `dirty`/
+  // `lifecycle`، ولا استبدال للمسودة داخل النسخة نفسها (كلها تبقى كما هي —
+  // راجع "Page Switching" في العقد المعماري). يُصفَّر فقط ما يصبح غير صالح
+  // لسياق الصفحة الجديدة: تحديد قسم/كروم الصفحة الرئيسية (لا معنى له خارجها)،
+  // ولوحة التحكم إن كانت مفتوحة على "homepage" تحديداً.
+  function handleSelectPage(page: PageType) {
+    if (page === currentPage) return;
+    setCurrentPage(page);
+    setSelectedSection(null);
+    setSelectedChrome(null);
+    if (page !== "home" && panel === "homepage") {
+      setPanel("theme");
+    }
+  }
+
   function handleSelectSection(
     id: string | null,
     origin: "sidebar" | "preview",
@@ -1189,6 +1230,17 @@ export function ExperienceBuilder({
   };
 
   function renderInspectorBody(panelForSlot: CustomizerPanel) {
+    // دفاعي: `visibleNavGroups`/`visiblePanels` تخفي "homepage" عن التنقّل
+    // فعلياً خارج الرئيسية، و`handleSelectPage` تُعيد `panel` بعيداً عنه عند
+    // التبديل — هذا يحمي فقط استدعاءً مباشراً متبقياً (ورقة الجوال "sections"
+    // مقفلة على "homepage" حرفياً) لو انفتحت خارج الرئيسية بأي مسار لاحق.
+    if (panelForSlot === "homepage" && currentPage !== "home") {
+      return (
+        <InspectorStatusMessage>
+          {t("pagePlaceholderSidebarBody")}
+        </InspectorStatusMessage>
+      );
+    }
     if (!storefrontId) {
       // لا مستأجر محدَّد بعد — تحرير محلي بحت عبر `initialConfig`، بلا نسخ
       // ولا حفظ. سلوك ما قبل CUST-H1-2 حرفياً.
@@ -1284,6 +1336,7 @@ export function ExperienceBuilder({
       data-device={effectiveDevice}
       data-selected-section={selectedSection ?? ""}
       data-selected-chrome={selectedChrome ?? ""}
+      data-current-page={currentPage}
       data-builder-navigation-collapsed={builderSidebarCollapsed ? "true" : "false"}
       className="relative flex h-full min-h-0 flex-col bg-background text-text"
     >
@@ -1301,9 +1354,13 @@ export function ExperienceBuilder({
           <p className="truncate text-[13px] font-semibold leading-none md:text-sm">
             {t("title")}
           </p>
-          <p className="mt-1 hidden truncate text-[11px] leading-none text-muted md:block">
-            <bdi>{liveStoreName ?? t("currentPage")}</bdi> · {t("currentPage")}
-          </p>
+          <div className="mt-1 hidden md:block">
+            <PageNavigator
+              locale={locale}
+              currentPage={currentPage}
+              onSelect={handleSelectPage}
+            />
+          </div>
         </div>
         {storefrontId ? (
           isMobileViewport ? (
@@ -1542,7 +1599,7 @@ export function ExperienceBuilder({
             </button>
           </div>
           <div className="flex flex-col py-2">
-            {CUSTOMIZER_NAV_GROUPS.map((group, groupIndex) => (
+            {visibleNavGroups.map((group, groupIndex) => (
               <div
                 key={group.items.map((item) => item.id).join("-")}
                 className={
@@ -1601,7 +1658,7 @@ export function ExperienceBuilder({
               }
               className="h-11 w-full border border-neutral-300 bg-white px-3 text-sm font-medium text-neutral-900 outline-none focus:border-neutral-800"
             >
-              {CUSTOMIZER_PANELS.map((item) => (
+              {visiblePanels.map((item) => (
                 <option key={item.id} value={item.id}>
                   {t(item.label)}
                 </option>
@@ -1634,9 +1691,25 @@ export function ExperienceBuilder({
         >
           <div className="flex h-9 shrink-0 items-center justify-between gap-3 border-b border-neutral-200 bg-white px-3 text-[11px] text-neutral-500">
             <div className="flex min-w-0 items-center gap-2">
-              <span className="shrink-0 font-medium text-neutral-700">
-                {t("livePreview")}
-              </span>
+              {isMobileViewport ? (
+                // الجوال لا يعرض `PageNavigator` الشريط العلوي (مخفيّ تحت
+                // `md`) — حبّة مدمجة هنا تفتح ورقة "pages" السفلية بدل نص
+                // "معاينة المتجر" الساكن، فلا يُستهلَك عرضٌ جديد بلا فائدة
+                // مقابلة على هذا الشريط الضيّق أصلاً.
+                <button
+                  type="button"
+                  data-page-navigator-mobile=""
+                  onClick={() => setMobileSheet("pages")}
+                  className="flex shrink-0 items-center gap-1 rounded-full border border-neutral-300 bg-white px-2 py-0.5 font-medium text-neutral-700"
+                >
+                  <PageIcon page={currentPage} />
+                  <bdi className="max-w-[86px] truncate">{t(pageLabelKey(currentPage))}</bdi>
+                </button>
+              ) : (
+                <span className="shrink-0 font-medium text-neutral-700">
+                  {t("livePreview")}
+                </span>
+              )}
               {selectedVersion ? (
                 <span data-version-preview-banner="" className="min-w-0 truncate">
                   <bdi className="font-medium text-neutral-700">{selectedVersion.name}</bdi>
@@ -1664,7 +1737,23 @@ export function ExperienceBuilder({
             <div
               ref={canvasScrollRef}
               data-customizer-scroll=""
-              className="h-full min-h-0 overflow-y-auto overscroll-contain p-3 md:overflow-y-scroll md:p-5 xl:p-8"
+              // CUST-H2-2 QA finding (pre-existing, not new here): `relative
+              // z-0` gives this scroll region — which holds the Canvas's own
+              // `position: sticky` header — an *explicit* stacking context.
+              // Without one, real Chromium at exactly 768px paints that
+              // sticky header above a `z-50` toolbar popover (Version
+              // Manager or the new Page Navigator) regardless of z-index,
+              // transform, or will-change on either side — confirmed with
+              // the exact pinned Playwright Chromium build, reproducible on
+              // unmodified `main` for `VersionSelector` alone (undiscovered
+              // until this slice, since no prior test opened a toolbar
+              // dropdown and clicked inside it at 768px). This one-line fix
+              // (an explicit z-index on the containing scroll region, so the
+              // browser compares the whole region against the popover by
+              // normal stacking rules instead of an implicit/ambiguous one)
+              // resolves it for both controls without touching the shared
+              // `Dropdown` component or `StorefrontPreviewCanvas`.
+              className="relative z-0 h-full min-h-0 overflow-y-auto overscroll-contain p-3 md:overflow-y-scroll md:p-5 xl:p-8"
             >
               <div
                 data-preview-frame=""
@@ -1675,6 +1764,7 @@ export function ExperienceBuilder({
                   config={draft}
                   locale={locale}
                   viewport={effectiveDevice}
+                  page={currentPage}
                   liveStoreName={liveStoreName}
                   businessIdentity={businessIdentity}
                   selectedSection={selectedSection}
@@ -1690,27 +1780,43 @@ export function ExperienceBuilder({
       </div>
 
       {isMobileViewport ? <div className="flex h-16 shrink-0 items-center gap-2 border-t border-border bg-surface px-3 lg:hidden">
-        <button
-          type="button"
-          className="flex min-h-11 flex-1 items-center justify-center rounded-md border border-border text-sm font-medium text-text hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-          onClick={() => setMobileSheet("sections")}
-        >
-          {t("sections")}
-        </button>
-        <button
-          type="button"
-          className="flex min-h-11 flex-1 items-center justify-center rounded-md bg-primary text-sm font-semibold text-primary-foreground shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-          onClick={() => setMobileSheet("sections")}
-        >
-          + {t("addSection")}
-        </button>
-        <button
-          type="button"
-          className="flex min-h-11 flex-1 items-center justify-center rounded-md border border-border text-sm font-medium text-text hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-          onClick={() => { setPanel("theme"); setMobileSheet("design"); }}
-        >
-          {t("design")}
-        </button>
+        {currentPage === "home" ? (
+          <>
+            <button
+              type="button"
+              className="flex min-h-11 flex-1 items-center justify-center rounded-md border border-border text-sm font-medium text-text hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+              onClick={() => setMobileSheet("sections")}
+            >
+              {t("sections")}
+            </button>
+            <button
+              type="button"
+              className="flex min-h-11 flex-1 items-center justify-center rounded-md bg-primary text-sm font-semibold text-primary-foreground shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+              onClick={() => setMobileSheet("sections")}
+            >
+              + {t("addSection")}
+            </button>
+            <button
+              type="button"
+              className="flex min-h-11 flex-1 items-center justify-center rounded-md border border-border text-sm font-medium text-text hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+              onClick={() => { setPanel("theme"); setMobileSheet("design"); }}
+            >
+              {t("design")}
+            </button>
+          </>
+        ) : (
+          // منتج/تصنيف: لا أقسام رئيسية تُحرَّر هنا بعد (CUST-H2-3/H2-4) —
+          // "الأقسام"/"+ إضافة قسم" تختصّان بمركّب الرئيسية حصراً؛ عرضهما هنا
+          // كان يوحي بتحرير مناطق غير موجودة فعلياً. "التصميم" العالمي يبقى
+          // صالحاً على كل صفحة فيبقى متاحاً وحده.
+          <button
+            type="button"
+            className="flex min-h-11 flex-1 items-center justify-center rounded-md bg-primary text-sm font-semibold text-primary-foreground shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+            onClick={() => { setPanel("theme"); setMobileSheet("design"); }}
+          >
+            {t("design")}
+          </button>
+        )}
       </div> : null}
 
       {isMobileViewport && mobileSheet ? (
@@ -1729,9 +1835,11 @@ export function ExperienceBuilder({
                   ? t("design")
                   : mobileSheet === "versions"
                     ? t("versionManagerTitle")
-                    : activePanel
-                      ? t(activePanel.label)
-                      : t("edit")
+                    : mobileSheet === "pages"
+                      ? t("pageNavigatorMenuTitle")
+                      : activePanel
+                        ? t(activePanel.label)
+                        : t("edit")
             }
             className="flex max-h-[86dvh] w-full flex-col rounded-t-2xl border-t border-border bg-surface shadow-2xl"
           >
@@ -1743,9 +1851,11 @@ export function ExperienceBuilder({
                     ? t("design")
                     : mobileSheet === "versions"
                       ? t("versionManagerTitle")
-                      : activePanel
-                        ? t(activePanel.label)
-                        : t("edit")}
+                      : mobileSheet === "pages"
+                        ? t("pageNavigatorMenuTitle")
+                        : activePanel
+                          ? t(activePanel.label)
+                          : t("edit")}
               </h2>
               <button
                 type="button"
@@ -1779,6 +1889,15 @@ export function ExperienceBuilder({
                   onCancelSchedule={(version) => {
                     setMobileSheet(null);
                     handleOpenCancelScheduleConfirm(version);
+                  }}
+                />
+              ) : mobileSheet === "pages" ? (
+                <PageNavigatorPanel
+                  locale={locale}
+                  currentPage={currentPage}
+                  onSelect={(page) => {
+                    handleSelectPage(page);
+                    setMobileSheet(null);
                   }}
                 />
               ) : mobileSheet === "sections" ? (
