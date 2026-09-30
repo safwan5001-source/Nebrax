@@ -139,6 +139,55 @@ class StorefrontPresentationScheduledPublishJobTest extends TestCase
     }
 
     /** @test */
+    public function a_due_scheduled_version_with_page_presentation_publishes_it_without_information_loss(): void
+    {
+        // CUST-H2-1 — the last H1 lifecycle path this slice's schema bump
+        // touches: a scheduled publish executes the exact same normalize/copy
+        // path as an immediate one, so `pagePresentation` must survive it too.
+        $auth = $this->registerTenant('job-due-page-presentation', 'owner@job-due-page-presentation.test');
+        $seeded = $this->seedWebStorefront($auth['tenant_id']);
+        $token = $this->withToken($auth['token']);
+
+        $created = $token->postJson($this->listPath($seeded['storefront']->id), ['name' => 'رمضان'])
+            ->assertCreated();
+        $versionId = $created->json('data.id');
+
+        $saved = $token->putJson($this->itemPath($seeded['storefront']->id, $versionId), [
+            'config' => [
+                'version' => 3,
+                'pagePresentation' => [
+                    'product' => ['regions' => [['key' => 'availability', 'visible' => true]]],
+                ],
+            ],
+            'revision' => 1,
+        ])->assertOk();
+
+        $scheduled = $token->putJson($this->schedulePath($seeded['storefront']->id, $versionId), [
+            'revision' => $saved->json('data.revision'),
+            'scheduled_for' => Carbon::now('UTC')->addMinutes(10)->toIso8601String(),
+            'expected_schedule_token' => $saved->json('data.schedule_token'),
+        ])->assertOk();
+
+        DB::table('storefront_presentation_versions')
+            ->where('id', $versionId)
+            ->update(['scheduled_for' => Carbon::now('UTC')->subMinute()]);
+
+        $outcome = app(StorefrontPresentationVersionService::class)->executeScheduledPublish(
+            $seeded['storefront']->id,
+            $versionId,
+            (int) $this->version($versionId)->schedule_generation,
+        );
+
+        $this->assertSame(StorefrontPresentationVersionService::OUTCOME_PUBLISHED, $outcome);
+
+        $head = $this->presentationHead($seeded['storefront']->id);
+        $this->assertSame(
+            ['product' => ['version' => 1, 'regions' => [['id' => 'availability', 'key' => 'availability', 'visible' => true]]]],
+            $head->published_config['pagePresentation'],
+        );
+    }
+
+    /** @test */
     public function schedule_epoch_advances_on_successful_scheduled_publish(): void
     {
         $auth = $this->registerTenant('job-epoch', 'owner@job-epoch.test');

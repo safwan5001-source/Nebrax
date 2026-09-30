@@ -30,6 +30,15 @@ export const PUBLISH_CAPABILITY = "live" as CapabilityState;
 export const VERSION_HISTORY_CAPABILITY = "deferred" as CapabilityState;
 
 /**
+ * CUST-H2-1 — the `pagePresentation` schema/registry exists and round-trips
+ * through Draft/Published storage, but no Customizer UI reads or writes it
+ * yet (CUST-H2-2+) and the public Product/Category renderers do not read it
+ * at all yet (CUST-H2-5). Design-only until both close.
+ */
+export const PRODUCT_PAGE_PRESENTATION_CAPABILITY = "design_only" as CapabilityState;
+export const CATEGORY_PAGE_PRESENTATION_CAPABILITY = "design_only" as CapabilityState;
+
+/**
  * Remaining contracts (do not invent in this slice):
  *
  * Logo / favicon media:
