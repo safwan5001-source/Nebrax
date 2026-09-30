@@ -112,7 +112,7 @@ GrowthConnection
 ├── display_name nullable string
 ├── status string
 ├── granted_scopes json
-├── credentials encrypted json
+├── credentials encrypted json   (added in GF-2, not GF-1)
 ├── connected_at nullable datetime
 ├── expires_at nullable datetime
 ├── last_refreshed_at nullable datetime
@@ -122,6 +122,10 @@ GrowthConnection
 ├── updated_by nullable UUID
 └── timestamps
 ```
+
+GF-1 schema note:
+- GF-1 creates the connection identity/lifecycle columns **without a credentials column**.
+- GF-2 adds the credentials column/cast together with the dedicated custody service so there is never an interim plaintext-secret path.
 
 Constraints:
 - tenant-scoped uniqueness where appropriate;
@@ -262,7 +266,7 @@ Follow AWJ design system and RTL/LTR + light/dark + explicit loading/empty/error
 
 ### GF-1 — Domain + RBAC + Capability Registry
 - enums/value objects;
-- GrowthConnection migration/model;
+- GrowthConnection migration/model **excluding credential storage**;
 - provider registry;
 - capability registry;
 - RBAC additions;
@@ -293,6 +297,16 @@ Follow AWJ design system and RTL/LTR + light/dark + explicit loading/empty/error
 - lifecycle guards;
 - idempotent revoke;
 - no provider network.
+
+Client-writable fields in this horizon are intentionally narrow. A client may choose the provider and local display metadata only. The client must **not** set or spoof:
+- `tenant_id`;
+- `status`;
+- `provider_account_id`;
+- `granted_scopes`;
+- `connected_at` / `expires_at` / `last_refreshed_at`;
+- `last_error_code`.
+
+Create starts as `pending`. Only the explicit local revoke action may transition it to `revoked` in this horizon. Provider-authoritative connection/scopes/account metadata are populated only in later provider integration horizons after verified OAuth/API evidence.
 
 ### GF-5 — Minimal Connections UI
 - provider/status/capability presentation;
@@ -326,6 +340,7 @@ Across the horizon prove:
 - tenant spoofing ignored/rejected;
 - accountant/staff without explicit custom permission denied;
 - self_service denied;
+- client cannot create/update a connection as `connected` or inject provider-authoritative account/scope metadata;
 - revoked connection cannot silently become connected;
 - credentials never serialize;
 - credentials never enter audit;
