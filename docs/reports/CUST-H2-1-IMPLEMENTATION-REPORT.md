@@ -369,9 +369,24 @@ cd storefront && npm run build
 
 ### CI
 
-Not yet observed at PR-open time — this section will be updated once GitHub Actions
-reports the `php artisan test (L11, sqlite)`, `php artisan test (L11, pgsql)`, and
-`web build (Next.js)` checks for this PR's head commit.
+PR #1117, head commit `7d35878` — all 9 check runs **completed, conclusion `success`**
+(confirmed live via the GitHub API; two runs each of the `php artisan test` jobs
+appear because `ci.yml` triggers on both `push` and `pull_request` for the same
+commit — both pairs green):
+
+| Check | Conclusion |
+|---|---|
+| `php artisan test (L11, sqlite)` (×2 — push + PR trigger) | success |
+| `php artisan test (L11, pgsql)` (×2 — push + PR trigger) | success |
+| `storefront (lint + typecheck + test)` (×2 — push + PR trigger) | success |
+| `web build (Next.js)` | success |
+| `merchant preview visual QA` | success |
+| `published footer visual QA` | success |
+
+`mergeable_state: "clean"`. One earlier push (`5eff7df`) failed
+`storefront (lint + typecheck + test)` — Biome lint/format, not caught by this
+session's local checks (vitest/tsc/build only) — fixed and re-verified green in
+commit `7d35878` (see "Review Findings" below).
 
 ### Review Findings
 
@@ -379,9 +394,12 @@ reports the `php artisan test (L11, sqlite)`, `php artisan test (L11, pgsql)`, a
 |---|---|---|
 | `StorefrontPresentationLegacyCompatibilityForkTest` hardcoded the schema-version literal `2` for "current normalizer version after a Version save," where every other assertion in the same file already references `StorefrontPresentationNormalizer::VERSION` | Changed the one call site to reference the constant, matching its neighbors | The test itself, re-run green after the fix; the bump to 3 is real, intended behavior, not masked |
 | (self-caught, pre-review) A session mistake briefly wrote PostgreSQL credentials into the live `.env` while a SQLite full-suite run was executing in the background, corrupting that run (Laravel's `TestCase::createApplication()` re-reads `.env` per test class) | Restored `.env` immediately; created a separate `.env.pgsql` used only via `--env=pgsql`, never touching the shared `.env`; discarded the corrupted run and re-ran the full suite cleanly | The clean re-run's own result, reported above |
+| CI's `storefront (lint + typecheck + test)` check failed on push `5eff7df`: Biome (`pnpm check`) flagged line-wrapping and import-sort violations in the new `page-regions.ts`/`config.ts`/`capabilities.ts`/test files — this session had verified vitest/`tsc --noEmit`/`npm run build` locally but never ran Biome, the actual first step of that CI job | Ran `biome check --write .`; re-verified typecheck, locale-parity check, and the presentation test suite all still pass (formatting-only change) | Pushed as commit `7d35878`; CI re-ran and passed on the exact same check |
 
-No reviewer has looked at this PR yet at report-writing time; this table will be
-updated as real findings arrive.
+No unresolved review comment or thread exists at report-writing time (the sole PR
+comment is `chatgpt-codex-connector[bot]` reporting it hit its own usage limit and
+could not perform a review — not a finding). This table will be updated as real
+findings arrive.
 
 ## Risks / Remaining
 
