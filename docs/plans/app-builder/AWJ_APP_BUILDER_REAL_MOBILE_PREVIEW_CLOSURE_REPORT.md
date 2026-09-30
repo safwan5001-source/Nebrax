@@ -9,7 +9,7 @@
 > ## **BLOCKED — OWNER DECISION REQUIRED**
 >
 > All in-scope engineering is implemented, tested, and CI-green (CODE/TEST/CI evidence complete
-> for 9 of 12 exit criteria; criterion 11/12 also pass). The Horizon's own exit criterion 10
+> for 11 of 12 exit criteria — criteria 1–9 and 11–12 all PASS). The Horizon's own exit criterion 10
 > ("real Android and iOS device verification is recorded") **cannot be honestly attempted** until
 > the owner resolves **two open Decision Gates** first (build-flavor/packaging, §3 below; preview
 > domain/hosting, §4 below) — the physical-device proof depends on both. Even after those
@@ -250,7 +250,7 @@ current `main` tip — see §8), not merely copied from a prior report.
 | 11 | Existing Builder and runtime behavior remain backward compatible | **CODE** — `main.dart` confirmed byte-identical to its pre-Horizon shape (`runApp(const AwjMobileRuntimeApp())`, no preview import); no file under `mobile/lib/app/` touched by MP-3–MP-8; no existing route's behavior changed by any MP-3–MP-8 diff (re-confirmed by direct source read this session, §9 below); **TEST/CI** — full backend + web suites carry zero new failures attributable to Preview across every MP report and this session's own reconfirmation (§8) | **PASS** |
 | 12 | Closure report documents remaining limitations and distribution boundaries | This report (§10, §11, §12) | **PASS** (by virtue of this report existing and being honest about #10) |
 
-**9 of 12 criteria PASS. Criterion 10 is OPEN. The Horizon cannot be marked CLOSED while any
+**11 of 12 criteria PASS (1–9 and 11–12). Criterion 10 is OPEN. The Horizon cannot be marked CLOSED while any
 mandatory criterion is OPEN**, per this task's own closure model — this alone would already force
 status B or C; §3/§4's unresolved Decision Gates specifically force **C**.
 
