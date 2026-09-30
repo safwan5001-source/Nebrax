@@ -17,7 +17,9 @@ import {
   previewStoreName,
   type StorefrontPresentationConfig,
 } from "./presentation/config";
-import type { PageType } from "./presentation/page-regions";
+import type { PageRegionInstance, PageType, ProductPageRegionKey } from "./presentation/page-regions";
+import type { WorkspaceProductDetail } from "@/modules/commerce-workspace/workspace-products";
+import { displayLocale } from "@/lib/formatting";
 import { PageIcon, pageLabelKey } from "./PageNavigatorPanel";
 import { presentationCssVars } from "./presentation/tokens";
 import {
@@ -89,6 +91,19 @@ interface StorefrontPreviewCanvasProps {
    */
   selectedChrome?: PreviewChromeTarget | null;
   onSelectChrome?: (target: PreviewChromeTarget) => void;
+  /**
+   * CUST-H2-3 — the currently previewed Product (editor context only, never
+   * presentation authority — see `ExperienceBuilder`'s `previewProductId`)
+   * and its structured region document. All optional so every existing
+   * caller (dev harness, Home-only tests) that never passes them keeps
+   * rendering exactly as before — `page="product"` with these all absent
+   * falls back to `productPreviewState="idle"`'s honest empty state.
+   */
+  productPreviewState?: "idle" | "loading" | "error" | "empty" | "ready";
+  previewProduct?: WorkspaceProductDetail | null;
+  productRegions?: PageRegionInstance<ProductPageRegionKey>[];
+  selectedProductRegionId?: string | null;
+  onSelectProductRegion?: (id: string) => void;
 }
 
 export interface StorefrontBusinessIdentity {
@@ -115,6 +130,11 @@ export function StorefrontPreviewCanvas({
   onSelectSection,
   selectedChrome = null,
   onSelectChrome,
+  productPreviewState = "idle",
+  previewProduct = null,
+  productRegions,
+  selectedProductRegionId = null,
+  onSelectProductRegion,
 }: StorefrontPreviewCanvasProps) {
   const t = (key: CustomizerMessageKey) => customizerMessage(locale, key);
   const storeName = previewStoreName(
@@ -404,7 +424,17 @@ export function StorefrontPreviewCanvas({
         )}
       </header>
 
-      {page !== "home" ? (
+      {page === "product" ? (
+        <ProductPagePreview
+          locale={locale}
+          density={density}
+          state={productPreviewState}
+          product={previewProduct}
+          regions={productRegions ?? []}
+          selectedRegionId={selectedProductRegionId}
+          onSelectRegion={onSelectProductRegion}
+        />
+      ) : page !== "home" ? (
         <PagePlaceholder page={page} locale={locale} density={density} />
       ) : (
       <div
@@ -1012,12 +1042,334 @@ export function StorefrontPreviewCanvas({
   );
 }
 
+function formatMinorAmount(amountMinor: number, currency: string, locale: CustomizerLocale): string {
+  try {
+    // `displayLocale()` forces Gregorian calendar + Latin digits (`-nu-latn`)
+    // regardless of Arabic/English — the same guardrail every date/number
+    // display in this codebase already goes through (`lib/formatting.ts`),
+    // avoiding Eastern Arabic digits some ICU builds would otherwise emit.
+    return new Intl.NumberFormat(displayLocale(locale), {
+      style: "currency",
+      currency,
+      currencyDisplay: "narrowSymbol",
+    }).format(amountMinor / 100);
+  } catch {
+    return `${(amountMinor / 100).toFixed(2)} ${currency}`;
+  }
+}
+
 /**
- * CUST-H2-2 — honest "not yet editable" shell for Product/Category. No fake
- * product/category data (`PREVIEW_PRODUCTS`/`PREVIEW_CATEGORIES` stay
- * Homepage-only fixtures — never promoted here as if they were a real
- * merchant Product/Category, per ARCH-1's Preview Context Model). Structured
- * region editing is CUST-H2-3/H2-4's scope, not this slice's.
+ * CUST-H2-3 — real structured Product-page preview. Reuses the exact
+ * presentation meaning of `storefront/.../products/[slug]/ProductDetails.tsx`
+ * (region order, which fields exist, which are honestly omitted when a
+ * Product lacks the data) via inline JSX and the same `store-*` CSS-variable
+ * classes Home's own preview already uses — **not** a cross-package import
+ * of that component, which is a separate Next.js app with no established
+ * cross-app component boundary anywhere in this codebase (Home's own
+ * preview is the same kind of parallel reimplementation, not an import
+ * either). Region order/visibility comes from `regions` (the caller's
+ * already-resolved effective list — default contract or the draft's own
+ * `pagePresentation.product.regions`); `custom_fields`/`sku_options_details`
+ * regions honestly omit themselves when the previewed Product has no such
+ * data, exactly like the real `ProductCustomFields` component does, never
+ * fabricating content.
+ *
+ * AWJ Decision (found by this slice's own Playwright pass, not a
+ * hypothetical): `ProductDetails.tsx`'s real two-column gallery/content grid
+ * (`lg:grid-cols-[minmax(0,34rem)_minmax(0,1fr)]`) assumes an unconstrained
+ * ~1024px+ browser viewport. The Customizer's own preview frame is a
+ * *scaled-down container* that stays well under that even for the "desktop"
+ * simulated device, once the editor's sidebar/inspector panels take their
+ * share of a real window. A `lg:` media query activates purely on the real
+ * browser viewport, not this container's width, so at a real ≥1024px window
+ * it forced the two-column grid inside a much narrower box: `minmax(0,34rem)`
+ * sized its first track from the gallery's own preferred near-square size
+ * rather than the container's actual budget, squeezing the content column
+ * to a sliver and wrapping Arabic titles almost one character per line —
+ * while still geometrically escaping the frame's own `overflow-hidden` clip
+ * (confirmed: `document.documentElement.scrollWidth` grew regardless of that
+ * clip). This Tailwind setup has no `@container` support to size off the
+ * frame's own width instead, so the Product preview always stacks
+ * single-column (gallery, then content) — the exact same region order and
+ * content the real desktop layout shows, matching the task's own "reuse the
+ * same presentation meaning, not the exact transport mechanism" instruction;
+ * only the desktop-only side-by-side arrangement is not replicated
+ * in-editor.
+ */
+function ProductPagePreview({
+  locale,
+  density,
+  state,
+  product,
+  regions,
+  selectedRegionId,
+  onSelectRegion,
+}: {
+  locale: CustomizerLocale;
+  density: "compact" | "comfortable";
+  state: "idle" | "loading" | "error" | "empty" | "ready";
+  product: WorkspaceProductDetail | null;
+  regions: PageRegionInstance<ProductPageRegionKey>[];
+  selectedRegionId?: string | null;
+  onSelectRegion?: (id: string) => void;
+}) {
+  const t = (key: CustomizerMessageKey) => customizerMessage(locale, key);
+
+  if (state !== "ready" || product === null) {
+    const bodyKey: CustomizerMessageKey =
+      state === "loading"
+        ? "productPreviewLoading"
+        : state === "error"
+          ? "productPreviewLoadFailed"
+          : state === "empty"
+            ? "productPreviewNoEligibleProducts"
+            : "productPreviewSelectAProduct";
+    return (
+      <div
+        data-product-preview-state={state}
+        className={cn(
+          storeContainerClassName,
+          density === "compact" ? "py-10" : "py-14 md:py-20",
+        )}
+      >
+        <div className="mx-auto flex max-w-sm flex-col items-center gap-3 text-center">
+          <span className="inline-flex size-12 items-center justify-center rounded-full bg-store-surface-muted text-store-muted-foreground">
+            <PageIcon page="product" />
+          </span>
+          <p className="text-sm leading-6 text-store-muted-foreground">{t(bodyKey)}</p>
+        </div>
+      </div>
+    );
+  }
+
+  const hasVariants = (product.variants?.length ?? 0) > 0;
+  const wrap = (region: PageRegionInstance<ProductPageRegionKey>, children: ReactNode) => (
+    <ProductRegionShell
+      key={region.id}
+      region={region}
+      selected={region.id === selectedRegionId}
+      onSelect={onSelectRegion}
+    >
+      {children}
+    </ProductRegionShell>
+  );
+
+  const visibleRegions = regions.filter(
+    (region) => region.visible && (region.key !== "variant_selector" || hasVariants),
+  );
+
+  return (
+    <div
+      data-product-preview="ready"
+      className={cn(
+        storeContainerClassName,
+        density === "compact" ? "py-3" : "py-5 md:py-6",
+      )}
+    >
+      <div className="grid grid-cols-1 gap-6">
+        {visibleRegions
+          .filter((r) => r.key === "media_gallery")
+          .map((region) =>
+            wrap(
+              region,
+              <div className="w-full">
+                {product.media.length > 0 ? (
+                  <div className="grid gap-2">
+                    <div className="aspect-square overflow-hidden rounded-store bg-store-surface-muted">
+                      {/* eslint-disable-next-line @next/next/no-img-element -- tenant media URL, not a static asset */}
+                      <img src={product.media[0].url} alt={product.media[0].alt ?? ""} className="size-full object-cover" />
+                    </div>
+                    {product.media.length > 1 && (
+                      <div className="flex gap-2 overflow-x-auto">
+                        {product.media.slice(1, 5).map((m) => (
+                          // eslint-disable-next-line @next/next/no-img-element -- tenant media URL, not a static asset
+                          <img key={m.id} src={m.url} alt={m.alt ?? ""} className="size-14 shrink-0 rounded-store object-cover" />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div
+                    data-product-preview-no-image=""
+                    className="grid aspect-square place-items-center rounded-store bg-store-surface-muted text-store-muted-foreground"
+                  >
+                    <ProductPlaceholderGlyph />
+                  </div>
+                )}
+              </div>,
+            ),
+          )}
+
+        <div className="min-w-0">
+          {visibleRegions.map((region) => {
+            switch (region.key) {
+              case "media_gallery":
+                return null;
+              case "identity":
+                return wrap(
+                  region,
+                  <div>
+                    {product.categoryName && (
+                      <p className="mb-1 text-xs font-medium text-store-muted-foreground">{product.categoryName}</p>
+                    )}
+                    <h1 className="text-lg font-extrabold leading-snug text-store-foreground md:text-xl">
+                      <bdi>{product.name}</bdi>
+                    </h1>
+                  </div>,
+                );
+              case "price":
+                return wrap(
+                  region,
+                  <div className="mt-3">
+                    <span className="text-xl font-black text-store-primary md:text-2xl">
+                      <bdi>{formatMinorAmount(product.priceAmountMinor, product.currency, locale)}</bdi>
+                    </span>
+                  </div>,
+                );
+              case "availability":
+                return product.inStock === null
+                  ? null
+                  : wrap(
+                      region,
+                      <p className="mt-2 text-xs font-medium">
+                        {product.inStock ? (
+                          <span className="text-store-success">{t("productPreviewInStock")}</span>
+                        ) : (
+                          <span className="text-store-destructive">{t("productPreviewOutOfStock")}</span>
+                        )}
+                      </p>,
+                    );
+              case "variant_selector":
+                return !hasVariants
+                  ? null
+                  : wrap(
+                      region,
+                      <div className="mt-5 border-t border-store-border pt-5">
+                        {(product.options ?? []).map((option) => (
+                          <div key={option.id} className="mb-3">
+                            <p className="mb-1.5 text-xs font-medium text-store-muted-foreground">{option.name}</p>
+                            <div className="flex flex-wrap gap-1.5">
+                              {option.values.map((value) => (
+                                <span
+                                  key={value.id}
+                                  className="rounded-store border border-store-border px-2.5 py-1 text-xs text-store-foreground"
+                                >
+                                  {value.value}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>,
+                    );
+              case "quantity_cta":
+                return wrap(
+                  region,
+                  <div className="mt-5 border-t border-store-border pt-5">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <span className="flex h-11 w-24 items-center justify-center rounded-store border border-store-border text-sm text-store-foreground">
+                        1
+                      </span>
+                      <span className="flex h-11 min-w-40 flex-1 items-center justify-center rounded-store bg-store-primary text-sm font-bold text-store-primary-foreground">
+                        {product.inStock === false ? t("productPreviewOutOfStock") : t("productPreviewAddToCart")}
+                      </span>
+                    </div>
+                  </div>,
+                );
+              case "description":
+                return !product.description
+                  ? null
+                  : wrap(
+                      region,
+                      <section className="mt-5 border-t border-store-border pt-5">
+                        <h2 className="mb-2 text-sm font-bold text-store-foreground">{t("productPreviewDescriptionTitle")}</h2>
+                        <p className="whitespace-pre-line text-sm leading-relaxed text-store-muted-foreground">
+                          {product.description}
+                        </p>
+                      </section>,
+                    );
+              case "custom_fields":
+                // AWJ's own catalog never populates structured custom fields
+                // today (Spree-wholesale-only concept) — this region is
+                // therefore always an honest omission for a real AWJ
+                // Product, exactly like the published `ProductCustomFields`
+                // component's own `null` return for an empty list.
+                return null;
+              case "sku_options_details":
+                return !product.sku
+                  ? null
+                  : wrap(
+                      region,
+                      <section className="mt-5 border-t border-store-border pt-5">
+                        <h2 className="mb-2 text-sm font-bold text-store-foreground">{t("productPreviewDetailsTitle")}</h2>
+                        <dl className="space-y-1.5 text-sm">
+                          <div className="flex gap-3">
+                            <dt className="w-28 shrink-0 text-store-muted-foreground">{t("productPreviewSkuLabel")}</dt>
+                            <dd className="min-w-0 text-store-foreground">{product.sku}</dd>
+                          </div>
+                        </dl>
+                      </section>,
+                    );
+              default:
+                return null;
+            }
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ProductRegionShell({
+  region,
+  selected,
+  onSelect,
+  children,
+}: {
+  region: PageRegionInstance<ProductPageRegionKey>;
+  selected: boolean;
+  onSelect?: (id: string) => void;
+  children: ReactNode;
+}) {
+  if (!onSelect) return <>{children}</>;
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      aria-pressed={selected}
+      data-preview-product-region={region.key}
+      data-preview-product-region-id={region.id}
+      data-region-selected={selected ? "" : undefined}
+      onClick={() => onSelect(region.id)}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onSelect(region.id);
+        }
+      }}
+      className={cn("awj-preview-section", selected && "awj-preview-section-selected")}
+    >
+      {children}
+    </div>
+  );
+}
+
+function ProductPlaceholderGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" className="size-8" fill="none" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
+      <path d="M4 7 12 3l8 4v10l-8 4-8-4z" />
+      <path d="M4 7 12 11l8-4M12 11v10" />
+    </svg>
+  );
+}
+
+/**
+ * CUST-H2-2 — honest "not yet editable" shell for Category (Product now has
+ * its own real preview above, CUST-H2-3). No fake product/category data
+ * (`PREVIEW_PRODUCTS`/`PREVIEW_CATEGORIES` stay Homepage-only fixtures —
+ * never promoted here as if they were a real merchant Product/Category, per
+ * ARCH-1's Preview Context Model). Structured Category region editing is
+ * CUST-H2-4's scope, not this slice's.
  */
 function PagePlaceholder({
   page,

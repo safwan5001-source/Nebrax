@@ -39,6 +39,7 @@ use App\Http\Controllers\Api\CommerceShippingZoneController;
 use App\Http\Controllers\Api\CommerceWorkspaceStorefrontsController;
 use App\Http\Controllers\Api\CommerceWorkspaceStorefrontPresentationController;
 use App\Http\Controllers\Api\CommerceWorkspaceStorefrontPresentationVersionController;
+use App\Http\Controllers\Api\CommerceWorkspaceStorefrontProductController;
 use App\Http\Controllers\Api\CorporateFuelContractController;
 use App\Http\Controllers\Api\ContactController;
 use App\Http\Controllers\Api\CustomerAuthController;
@@ -928,6 +929,18 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
             ->middleware($perm('commerce.manage'));
         Route::delete('commerce/workspace/storefronts/{id}/presentation/versions/{version}/schedule', [CommerceWorkspaceStorefrontPresentationVersionController::class, 'cancelSchedule'])
             ->whereUuid('id')->whereUuid('version')
+            ->middleware($perm('commerce.manage'));
+
+        // CUST-H2-3: قراءة منتجات مساحة عمل Commerce — منتقي "معاينة منتج"
+        // في مُخصِّص صفحة المنتج. قراءة فقط، بلا سلطة سعر/مخزون/نشر — معرّف
+        // المنتج مُحدِّدٌ لا سلطة. نفس صلاحية بقية مسارات المتجر/النسخ
+        // (commerce.manage) — لا صلاحية جديدة. الأهلية مقيَّدة بقناة *هذا*
+        // المتجر تحديداً (`Storefront.sales_channel_id`)، لا أي قناة للمستأجر.
+        Route::get('commerce/workspace/storefronts/{id}/products', [CommerceWorkspaceStorefrontProductController::class, 'index'])
+            ->whereUuid('id')
+            ->middleware($perm('commerce.manage'));
+        Route::get('commerce/workspace/storefronts/{id}/products/{product}', [CommerceWorkspaceStorefrontProductController::class, 'show'])
+            ->whereUuid('id')->whereUuid('product')
             ->middleware($perm('commerce.manage'));
 
         // COM-MOBILE-SHIPPING-1 (ADR-10): مناطق شحن مُهيَّأة من التاجر —

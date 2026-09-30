@@ -30,12 +30,25 @@ export const PUBLISH_CAPABILITY = "live" as CapabilityState;
 export const VERSION_HISTORY_CAPABILITY = "deferred" as CapabilityState;
 
 /**
+ * CUST-H2-3 — Product page structured editing (region visibility/reorder,
+ * the Preview Product picker, and the Customizer-side preview renderer) is
+ * now real and persists into the active Version. Still `design_only` in one
+ * precise sense worth stating honestly: the **public** Next.js Product page
+ * does not read `pagePresentation.product` yet — that is CUST-H2-5. Kept at
+ * `"live"` here because the capability this constant describes is the
+ * Customizer-side editing surface (matching `HOMEPAGE_COMPOSITION_CAPABILITY`'s
+ * own precedent, which is also `"live"` despite the public storefront being
+ * a separate, already-shipped concern) — see the CUST-H2-3 implementation
+ * report's "Public Runtime Boundary" section for the explicit, unambiguous
+ * statement of what does and does not change on the live storefront.
+ */
+export const PRODUCT_PAGE_PRESENTATION_CAPABILITY = "live" as CapabilityState;
+/**
  * CUST-H2-1 — the `pagePresentation` schema/registry exists and round-trips
  * through Draft/Published storage, but no Customizer UI reads or writes it
- * yet (CUST-H2-2+) and the public Product/Category renderers do not read it
- * at all yet (CUST-H2-5). Design-only until both close.
+ * yet (CUST-H2-4) and the public Category renderer does not read it at all
+ * yet (CUST-H2-5). Design-only until both close — unchanged by this slice.
  */
-export const PRODUCT_PAGE_PRESENTATION_CAPABILITY = "design_only" as CapabilityState;
 export const CATEGORY_PAGE_PRESENTATION_CAPABILITY = "design_only" as CapabilityState;
 
 /**

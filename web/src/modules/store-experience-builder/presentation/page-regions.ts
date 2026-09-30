@@ -103,6 +103,25 @@ export interface PagePresentation {
   category?: CategoryPagePresentation;
 }
 
+/**
+ * CUST-H2-3 — canonical default Product-page region order, deterministically
+ * derived from `PRODUCT_PAGE_REGION_KEYS`'s own declaration order (already
+ * exactly the real `ProductDetails.tsx` render order: gallery → identity →
+ * price → availability → variant_selector → quantity_cta → description →
+ * custom_fields → sku_options_details — verified against that file directly,
+ * not guessed). Every region starts `visible: true`: the least-surprising
+ * initial state, since it reproduces today's real Product page output
+ * exactly before the merchant changes anything.
+ *
+ * Used only as an **in-memory fallback** when `pagePresentation.product` is
+ * absent from the draft — never written to the draft merely by reading it
+ * (see `ExperienceBuilder`'s `effectiveProductRegions`). Only an actual edit
+ * (a toggle or a reorder) materializes this shape into the draft.
+ */
+export function defaultProductPageRegions(): PageRegionInstance<ProductPageRegionKey>[] {
+  return PRODUCT_PAGE_REGION_KEYS.map((key) => ({ id: key, key, visible: true }));
+}
+
 function asString(value: unknown, fallback = ""): string {
   return typeof value === "string" ? value : fallback;
 }
