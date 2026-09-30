@@ -17,7 +17,7 @@ fi
 cd "$APP_DIR"
 
 echo "▶ 2/4  Sanctum + تخزين S3/R2 + تفعيل طبقة الـ API..."
-composer require laravel/sanctum league/flysystem-aws-s3-v3:^3.0 predis/predis:^2.2 --no-interaction
+composer require laravel/sanctum league/flysystem-aws-s3-v3:^3.0 predis/predis:^2.2 resend/resend-php --no-interaction
 php artisan install:api --no-interaction --without-migration-prompt || true
 rm -f database/migrations/*_create_personal_access_tokens_table.php 2>/dev/null || true
 
@@ -92,6 +92,9 @@ if ! grep -q "CommerceApiServiceProvider" bootstrap/providers.php; then
 fi
 if ! grep -q "WebhookServiceProvider" bootstrap/providers.php; then
   sed -i "s|return \[|return [\n    App\\\\Providers\\\\WebhookServiceProvider::class,|" bootstrap/providers.php
+fi
+if ! grep -q "MailServiceProvider" bootstrap/providers.php; then
+  sed -i "s|return \[|return [\n    App\\\\Providers\\\\MailServiceProvider::class,|" bootstrap/providers.php
 fi
 
 rm -f database/migrations/*_create_users_table.php \
