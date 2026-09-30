@@ -36,6 +36,7 @@ export default defineConfig({
       ['src/app/**/commerce/**/*.test.tsx', 'jsdom'],
       ['src/components/commerce-workspace/**/*.test.tsx', 'jsdom'],
       ['src/app/(app)/accounts/**/*.test.tsx', 'jsdom'],
+      ['src/app/(app)/products/**/*.test.tsx', 'jsdom'],
       ['src/app/platform/tenants/**/*.test.tsx', 'jsdom'],
     ],
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],

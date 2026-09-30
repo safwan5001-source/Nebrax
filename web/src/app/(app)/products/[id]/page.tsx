@@ -188,18 +188,7 @@ export default function ProductProfilePage() {
 
       {activeTab === 'info' && (
         <TabPanel id="info">
-          <div className="space-y-5">
-            {/* المعلومات الأساسية والتسعير والمحاسبة والمخزون والوحدات/الباركود
-                المتعدّد/السعر لكل وحدة والخيارات/المتغيّرات والوسائط والنشر
-                التجاري — كلّها قابلة للتحرير مباشرةً عبر مساحة العمل
-                المشتركة، بلا نافذة منبثقة ولا تبويبٌ منفصل (PR-PROD-UX-1/2/3/4؛
-                `ProductDialog` يبقى قائماً للإضافة السريعة فقط). */}
-            <ProductWorkspace
-              mode="edit"
-              product={product}
-              onUpdated={() => void load()}
-            />
-          </div>
+          <p className="text-sm text-muted">{t('product_info')}</p>
         </TabPanel>
       )}
 
