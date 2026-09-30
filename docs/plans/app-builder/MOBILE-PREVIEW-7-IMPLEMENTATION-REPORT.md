@@ -1,7 +1,7 @@
 # MOBILE-PREVIEW-7 — QR Device Preview Exchange — Implementation Report
 
 **Horizon:** AWJ App Builder — Real Mobile Preview
-**Status:** IMPLEMENTED — local verification green (backend sqlite + pgsql incl. real two-connection concurrency proof, web tests + build). **Not merged, no deploy.**
+**Status:** IMPLEMENTED — PR [#1121](https://github.com/safwan5001-source/Nebrax/pull/1121) fully green on CI (backend sqlite + pgsql full suite incl. the real two-connection concurrency proof, `flutter analyze`+460/460 tests+Android/iOS build proofs, web tests + production build), mergeable, no open review threads. **Not merged, no deploy.**
 **Repository:** `safwan5001-source/Nebrax`
 **Base SHA:** `b3a71ad19e5dcde74e0682524391dcf0691ac8fe` (latest `origin/main` at task start — matches the task doc's own baseline lineage: `2c7c717` + `MOBILE-PREVIEW-7-CLAUDE-CODE-TASK.md`'s own merge commit `b3a71ad`)
 **Branch:** `claude/trusting-brown-6y61jc` (this session's harness-designated branch takes precedence over the task doc's suggested `feat/mobile-preview-7-qr-exchange`, exactly as MOBILE-PREVIEW-6's own report recorded for the same reason; PR title kept exactly as the task doc specifies)
@@ -183,6 +183,12 @@ No file under `mobile/lib/app/` (the production `AwjRuntimeShell`), `mobile/lib/
 
 `tests/Feature/PreviewSessionTest.php` (MOBILE-PREVIEW-6's own suite) — still **16/16 green** on both databases, confirming no regression to the direct-issuance path this task deliberately left untouched.
 
+**Full unfiltered backend suite, confirmed on CI (`ci.yml`, current head `936f283`)** — both jobs run `php artisan test` with no filter:
+- SQLite: `Tests: 51 skipped, 4990 passed (31155 assertions)` — **0 failed**. The 51 skipped are the repository's existing PostgreSQL-only concurrency proofs (this task's own `PreviewExchangePostgresConcurrencyTest` among them), which self-skip on SQLite via `markTestSkipped` (no row-level locking / no second real connection there).
+- PostgreSQL 16: `Tests: 5041 passed (31431 assertions)` — **0 failed**, including every skipped-on-SQLite concurrency test now actually exercised.
+
+No pre-existing gap of any kind surfaced — unlike a from-scratch local `setup.sh` rebuild, which can hit local-environment-only gaps unrelated to any PR (see MOBILE-PREVIEW-6's own §9a for that distinction); CI's own environment carries none of those, and this task's local verification (§8 above) was run against the exact same `setup.sh`-assembled app before pushing, so this result was expected, not a surprise.
+
 Coverage against the task's minimum bar:
 
 | Requirement | Test |
@@ -227,7 +233,14 @@ This proves the task's exact requirement — "concurrent double-exchange cannot 
 
 ## 11. Flutter tests / builds
 
-**Could not be run locally** — no Flutter toolchain in this sandbox (same limitation MOBILE-PREVIEW-4's/MOBILE-PREVIEW-6's own reports recorded). Written directly against the real, already-exercised APIs (`resolveDeepLinkUri`'s own sibling shape, `CommerceTransport`/`FakeCommerceTransport`, `PreviewRuntimeView`, `TestDefaultBinaryMessengerBinding`'s platform-channel simulation exactly as `app/deep_link_navigation_test.dart` already establishes), and self-reviewed line-by-line against the codebase's existing Dart style (e.g. `is`/`as` narrowing on sealed-class outcomes rather than Dart 3 pattern-matching `switch`, matching `preview_startup.dart`'s own established convention, specifically to avoid the exact class of `flutter analyze` surprise MOBILE-PREVIEW-6's own report recorded — an import miss `flutter analyze` caught that static self-review had missed).
+**Could not be run locally** — no Flutter toolchain in this sandbox (same limitation MOBILE-PREVIEW-4's/MOBILE-PREVIEW-6's own reports recorded). Written directly against the real, already-exercised APIs (`resolveDeepLinkUri`'s own sibling shape, `CommerceTransport`/`FakeCommerceTransport`, `PreviewRuntimeView`, `TestDefaultBinaryMessengerBinding`'s platform-channel simulation exactly as `app/deep_link_navigation_test.dart` already establishes), and self-reviewed line-by-line against the codebase's existing Dart style (e.g. `is`/`as` narrowing on sealed-class outcomes rather than Dart 3 pattern-matching `switch`, matching `preview_startup.dart`'s own established convention).
+
+**CI (`mobile-ci.yml`) was the first real execution, and it caught one real bug this static self-review missed**: `flutter analyze` passed clean on the first push, but `flutter test` failed 4 of the 22 new Dart tests, all in `device_preview_app_test.dart`. Root cause: the test fixtures used hyphenated, human-readable reference strings (e.g. `"scanned-once-reference"`) inside simulated deep links, but `resolvePreviewExchangeReferenceFromUri` correctly restricts a reference to `[A-Za-z0-9]+` — matching the real backend's `Str::random(40)` alphanumeric shape, and already covered as an explicit negative case in `preview_deep_link_test.dart` (`abc-123` is rejected by design). The hyphenated fixtures were silently rejected by the resolver, so those 4 widget tests never left their waiting-for-link state — **the app code was correct; only the test data was wrong**. Fixed in a follow-up commit (`936f283`) by switching the affected fixtures to alphanumeric-only strings; no production code changed. After that fix, CI is fully green:
+
+- `flutter analyze` — **No issues found**.
+- `flutter test` — **all 460 tests pass** (438 pre-existing + this task's own 22 across `preview_deep_link_test.dart`/`preview_exchange_client_test.dart`/`device_preview_app_test.dart`).
+- `flutter build apk --release` / `flutter build appbundle --release` (Android release build proof) — **succeeded**.
+- `flutter build ios --release --no-codesign` (iOS release build proof) — **succeeded**.
 
 - `preview_deep_link_test.dart` (10): the one allowlisted shape resolves; wrong scheme rejected; **the production runtime's own host is rejected too** (the two allowlists never overlap — a dedicated regression guard); unrecognized path shapes (`/home`, `/preview`, `/preview/a/b`) rejected; empty reference segment rejected; out-of-charset reference rejected (`abc-123`, percent-encoded); pathologically long reference rejected; query parameters ignored entirely (still resolves the reference, proving they are never consulted); a trailing slash does not change resolution; unparseable string input never throws.
 - `preview_exchange_client_test.dart` (6): reference sent in the request body only — never a query string, never an `Authorization` header; a successful exchange yields `PreviewExchangeSucceeded` carrying the real bearer; 401 → `PreviewExchangeInvalid` regardless of body; non-2xx/401 → `PreviewExchangeUnavailable`; malformed body → `PreviewExchangeUnavailable`; a 2xx body missing a usable token → `PreviewExchangeUnavailable`, never a fabricated session.
@@ -254,7 +267,18 @@ This proves the task's exact requirement — "concurrent double-exchange cannot 
 
 ## 14. CI
 
-Not yet observed on this PR's actual GitHub Actions run — this section will be confirmed once the PR is opened and CI reports. Locally reproduced ahead of CI (§8–§12 above): backend sqlite + pgsql (including the real two-connection concurrency proof), web full test suite + production build. Flutter `analyze`/`test`/Android+iOS build proofs are **not** run locally (no toolchain in this sandbox) and rely on `mobile-ci.yml` as the first real execution — flagged explicitly, not glossed over, exactly as MOBILE-PREVIEW-6's own report did for the same limitation.
+**PR [#1121](https://github.com/safwan5001-source/Nebrax/pull/1121), head `936f283`, fully green** — `mergeable_state: clean`, no open review threads, no merge conflict:
+
+| Check | Result |
+|---|---|
+| `ci.yml` — `php artisan test (L11, sqlite)` | ✅ 4990 passed, 51 skipped, **0 failed** (31155 assertions) |
+| `ci.yml` — `php artisan test (L11, pgsql)` | ✅ 5041 passed, **0 failed** (31431 assertions) |
+| `mobile-ci.yml` — `mobile (analyze + test)` | ✅ `flutter analyze`: no issues; `flutter test`: 460/460 passed |
+| `mobile-ci.yml` — `mobile (Android release build proof)` | ✅ succeeded |
+| `mobile-ci.yml` — `mobile (iOS release build proof)` | ✅ succeeded |
+| `web-ci.yml` — `web build (Next.js)` | ✅ succeeded |
+
+One round-trip was needed: the first push (`23cfe11`) failed `mobile (analyze + test)` — 4 of 22 new Dart tests failed for the test-data reason detailed in §11 (hyphenated reference fixtures rejected by the resolver's own, correct charset check), never a production-code defect. Root-caused, fixed, validated against the actual resolver logic, and pushed as `936f283`; CI re-ran fully green. No other finding, review comment, or CI failure was posted on any run (the one PR comment present is an automated "Codex usage limit reached" notice from `chatgpt-codex-connector[bot]`, not a review — no action needed).
 
 ---
 
@@ -274,7 +298,7 @@ None triggered — see §6 for the full walk-through against every condition the
 
 ## 17. Risks / remaining limitations
 
-1. **No Flutter toolchain in this sandbox** — the Dart/Flutter test suite (22 tests across 3 new files) is written and self-reviewed but not executed locally; `mobile-ci.yml` is the first real execution, exactly as MOBILE-PREVIEW-6's own report recorded for its own Dart tests.
+1. **No Flutter toolchain in this sandbox** — the Dart/Flutter test suite (22 tests across 3 new files) was written and self-reviewed but not executable locally; `mobile-ci.yml` was the first real execution, exactly as MOBILE-PREVIEW-6's own report recorded for its own Dart tests. It caught one real gap in the test data (not the app code) — see §11 — fixed and now green (460/460).
 2. **The "consumed" indicator in the web QR dialog is best-effort, not authoritative.** It polls the merchant's own existing preview-sessions list (no new API surface was added purely for this) and infers "connected" from the list's length increasing — there is no direct reference→session correlation in `PreviewSessionResource` today. If two devices scan two different QR codes for the same app in quick succession, either could be the one that flips the indicator. This is a UX nicety, not a security boundary — the actual exchange/session security proofs in §9/§10 do not depend on it.
 3. **No dedicated "revoke this exchange reference" action.** A generated-but-unscanned reference simply expires after 5 minutes; the task's UX minimum bar lists revoke/cancel "where applicable" — closing the dialog is the only cancel affordance today (the reference still expires on its own regardless). Adding an explicit revoke would need a new endpoint not currently justified by any negative test requiring it.
 4. **Two Universal Link / App Link hosts, one shared native project.** See §15.2 — a real product/build decision (build flavors) is deferred, not resolved.
@@ -291,6 +315,6 @@ Real physical-device end-to-end proof against an actual provisioned domain (AASA
 
 ## 19. Next step
 
-- Branch `claude/trusting-brown-6y61jc` pushed; PR to be opened against `main`, titled `feat(app-builder): MOBILE-PREVIEW-7 QR device preview exchange`, per the task's own branch/PR instruction (harness-designated branch, task-doc-specified title).
+- PR [#1121](https://github.com/safwan5001-source/Nebrax/pull/1121) opened from `claude/trusting-brown-6y61jc` against `main`, titled `feat(app-builder): MOBILE-PREVIEW-7 QR device preview exchange`, per the task's own branch/PR instruction (harness-designated branch, task-doc-specified title). CI is fully green (§14), `mergeable_state: clean`, no open review threads.
 - **Stopping before merge**, per the task's explicit instruction. No Deploy. No Production.
-- Recommended next step per the Horizon: confirm CI green (backend sqlite+pgsql, `mobile-ci.yml` analyze+test+Android/iOS build proofs, web build+test), address any findings, then this PR is ready for owner review and merge.
+- **Ready for owner review and merge.**
