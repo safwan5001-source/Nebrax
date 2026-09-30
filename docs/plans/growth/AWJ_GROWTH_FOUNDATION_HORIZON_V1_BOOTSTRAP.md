@@ -72,7 +72,7 @@ Implement only:
 1. provider key enum/registry;
 2. capability status enum/registry;
 3. connection lifecycle status enum;
-4. `GrowthConnection` tenant-scoped CompanyWide model + additive migration;
+4. `GrowthConnection` tenant-scoped CompanyWide model + additive migration **without credential storage in GF-1**;
 5. RBAC permissions:
    - `growth.view`
    - `growth.connections.manage`
@@ -92,7 +92,7 @@ Implement only:
 
 GF-1 must **not** create:
 - HTTP mutation endpoints;
-- credential storage implementation;
+- any credentials column/cast/service or secret write path (GF-2 owns credential storage end-to-end);
 - OAuth;
 - webhooks;
 - UI;
@@ -145,7 +145,24 @@ If repository enum conventions require internal casing differences, preserve the
 - PostgreSQL + SQLite;
 - rollback verified;
 - indexes only when justified;
-- no speculative columns outside the locked contract without evidence.
+- no speculative columns outside the locked contract without evidence;
+- GF-1 must not add a credentials column; GF-2 adds encrypted credential storage atomically with its custody service and leakage tests.
+
+## GF-4 lifecycle authority constraint
+
+When GF-4 is reached, the local API must not let clients claim provider-authenticated state.
+
+Client-writable local fields are limited to provider selection and safe display metadata. Reject/ignore spoofing of:
+- `tenant_id`;
+- `status`;
+- `provider_account_id`;
+- `granted_scopes`;
+- connection/expiry/refresh timestamps;
+- provider error state.
+
+A locally created record starts `pending`. In this horizon the only externally-triggerable status transition is explicit local revoke → `revoked`. `connected`, provider account identity and granted scopes are provider-authoritative and belong to later verified provider OAuth/API horizons.
+
+Add negative tests for create/update attempts that inject those fields.
 
 ## Testing policy
 
