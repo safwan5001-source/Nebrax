@@ -71,6 +71,7 @@ cp -r "$CORE_DIR/routes/api.php"                 routes/api.php
 cp -r "$CORE_DIR/routes/api_public.php"          routes/api_public.php
 cp -r "$CORE_DIR/routes/api_storefront.php"      routes/api_storefront.php
 cp -r "$CORE_DIR/routes/api_commerce.php"        routes/api_commerce.php
+cp -r "$CORE_DIR/routes/api_preview.php"         routes/api_preview.php
 cp -r "$CORE_DIR/routes/console.php"             routes/console.php
 cp -r "$CORE_DIR/tests/Feature/"*.php            tests/Feature/
 cp -r "$CORE_DIR/tests/Fixtures/presentation/"*.json tests/Fixtures/presentation/ 2>/dev/null || true
@@ -95,6 +96,9 @@ if ! grep -q "StorefrontApiServiceProvider" bootstrap/providers.php; then
 fi
 if ! grep -q "CommerceApiServiceProvider" bootstrap/providers.php; then
   sed -i "s|return \[|return [\n    App\\\\Providers\\\\CommerceApiServiceProvider::class,|" bootstrap/providers.php
+fi
+if ! grep -q "PreviewApiServiceProvider" bootstrap/providers.php; then
+  sed -i "s|return \[|return [\n    App\\\\Providers\\\\PreviewApiServiceProvider::class,|" bootstrap/providers.php
 fi
 if ! grep -q "WebhookServiceProvider" bootstrap/providers.php; then
   sed -i "s|return \[|return [\n    App\\\\Providers\\\\WebhookServiceProvider::class,|" bootstrap/providers.php

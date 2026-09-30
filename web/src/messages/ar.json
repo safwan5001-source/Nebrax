@@ -6836,7 +6836,27 @@
       "versionsEmpty": "لم يُنشر أي إصدار بعد.",
       "versionRow": "الإصدار {version} — {date}",
       "viewAllVersions": "عرض كل النسخ",
-      "openBuilder": "فتح مساحة التحرير"
+      "openBuilder": "فتح مساحة التحرير",
+      "previewSessions": {
+        "title": "جلسات المعاينة على الجهاز",
+        "empty": "لا توجد جلسات معاينة بعد.",
+        "issueAction": "إصدار جلسة معاينة",
+        "issuing": "جارٍ الإصدار…",
+        "revokeAction": "إبطال",
+        "revoking": "جارٍ الإبطال…",
+        "revokeConfirmTitle": "إبطال جلسة المعاينة",
+        "revokeConfirmBody": "لن تعمل هذه الجلسة بعد الإبطال. لا يمكن التراجع.",
+        "expiresLabel": "تنتهي: {date}",
+        "statusActive": "نشطة",
+        "statusExpired": "منتهية",
+        "statusRevoked": "مبطَلة",
+        "tokenDialogTitle": "بيانات اعتماد جلسة المعاينة",
+        "tokenDialogDescription": "الصقه في تطبيق أَوْج الحقيقي (بيئة معاينة) لعرض المسودة الحالية على جهاز فعلي.",
+        "issueSuccessTitle": "أُصدرت جلسة المعاينة",
+        "issueErrorTitle": "تعذّر إصدار جلسة المعاينة",
+        "revokeErrorTitle": "تعذّر إبطال الجلسة",
+        "loadErrorTitle": "تعذّر تحميل جلسات المعاينة"
+      }
     },
     "versions": {
       "title": "النسخ المنشورة",

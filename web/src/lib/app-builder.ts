@@ -31,6 +31,21 @@ export interface BuilderPublishedVersion {
   published_at: string | null;
 }
 
+/** MOBILE-PREVIEW-6 — تطابق `PreviewSessionResource`. لا يحمل هذا النوع التوكن الخام أبداً. */
+export interface PreviewSession {
+  id: string;
+  builder_app_id: string;
+  source: 'draft' | 'published' | 'default';
+  channel: 'browser' | 'device';
+  device_label: string | null;
+  draft_revision: number | null;
+  created_by: string | null;
+  expires_at: string | null;
+  revoked_at: string | null;
+  last_used_at: string | null;
+  created_at: string;
+}
+
 export function appDisplayName(app: Pick<BuilderApp, 'name' | 'name_en'>, locale: string): string {
   return locale.toLowerCase().startsWith('en') && app.name_en ? app.name_en : app.name;
 }

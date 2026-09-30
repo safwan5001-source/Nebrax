@@ -33,6 +33,7 @@ use App\Http\Controllers\Api\AppBuilderRegistryController;
 use App\Http\Controllers\Api\BuilderAppController;
 use App\Http\Controllers\Api\BuilderDraftExperienceController;
 use App\Http\Controllers\Api\BuilderPublishedExperienceVersionController;
+use App\Http\Controllers\Api\PreviewSessionController;
 use App\Http\Controllers\Api\CommercePaymentIntentController;
 use App\Http\Controllers\Api\CommerceShippingZoneController;
 use App\Http\Controllers\Api\CommerceWorkspaceStorefrontsController;
@@ -978,6 +979,18 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         // APP-BUILDER-5: تسلسل ComponentRegistry/ActionRegistry (APP-BUILDER-3) — مصدر
         // Inspector الوصفي. بيانات منصّة ثابتة لا مسار {id}، ونفس بوابتَي الصلاحية/القدرة.
         Route::get('app-builder/registries', [AppBuilderRegistryController::class, 'index'])
+            ->middleware([$perm('apps_builder.view'), $app('commerce.app_builder')]);
+
+        // MOBILE-PREVIEW-6: إصدار/سرد/إبطال جلسات معاينة — `apps_builder.view`
+        // لا `apps_builder.manage`: إصدار الجلسة ينسخ لقطة قراءة فقط ولا يكتب
+        // في المسودة (انظر قرار RBAC الموثَّق في PreviewSessionController).
+        Route::post('app-builder/apps/{id}/preview-sessions', [PreviewSessionController::class, 'store'])
+            ->whereUuid('id')
+            ->middleware([$perm('apps_builder.view'), $app('commerce.app_builder'), 'throttle:preview-session-issue']);
+        Route::get('app-builder/apps/{id}/preview-sessions', [PreviewSessionController::class, 'index'])
+            ->whereUuid('id')->middleware([$perm('apps_builder.view'), $app('commerce.app_builder')]);
+        Route::delete('app-builder/apps/{id}/preview-sessions/{sessionId}', [PreviewSessionController::class, 'destroy'])
+            ->whereUuid('id')->whereUuid('sessionId')
             ->middleware([$perm('apps_builder.view'), $app('commerce.app_builder')]);
 
         // Cycle 0: Workspace foundation only. لا CRUD ولا مبيعات ولا اتصال أجهزة
