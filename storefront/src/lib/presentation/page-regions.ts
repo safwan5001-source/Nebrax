@@ -95,6 +95,38 @@ export interface PagePresentation {
   category?: CategoryPagePresentation;
 }
 
+/**
+ * CUST-H2-3 — canonical default Product-page region order, deterministically
+ * derived from `PRODUCT_PAGE_REGION_KEYS`'s own declaration order (already
+ * exactly the real `ProductDetails.tsx` render order). Twin of
+ * `web/src/modules/store-experience-builder/presentation/page-regions.ts`'s
+ * own `defaultProductPageRegions()` — kept here too because the public
+ * runtime (CUST-H2-5) needs the identical fallback when
+ * `pagePresentation.product` is absent, the same way the Customizer does.
+ */
+export function defaultProductPageRegions(): PageRegionInstance<ProductPageRegionKey>[] {
+  return PRODUCT_PAGE_REGION_KEYS.map((key) => ({
+    id: key,
+    key,
+    visible: true,
+  }));
+}
+
+/**
+ * CUST-H2-4 — canonical default Category-page region order, deterministically
+ * derived from `CATEGORY_PAGE_REGION_KEYS`'s own declaration order. Twin of
+ * the web module's `defaultCategoryPageRegions()` — see
+ * `defaultProductPageRegions()`'s own comment for why this is duplicated
+ * here rather than imported cross-package.
+ */
+export function defaultCategoryPageRegions(): PageRegionInstance<CategoryPageRegionKey>[] {
+  return CATEGORY_PAGE_REGION_KEYS.map((key) => ({
+    id: key,
+    key,
+    visible: true,
+  }));
+}
+
 function asString(value: unknown, fallback = ""): string {
   return typeof value === "string" ? value : fallback;
 }

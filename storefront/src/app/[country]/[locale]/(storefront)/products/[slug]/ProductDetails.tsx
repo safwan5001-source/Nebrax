@@ -4,6 +4,7 @@ import type { Media, Product, Variant } from "@spree/sdk";
 import { CircleCheckBig, CircleX, Loader2, ShoppingBag } from "lucide-react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
+import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { QuantityPickerField } from "@/components/cart/QuantityPickerField";
 import { usePublishedThemeMarker } from "@/components/layout/PublishedThemeMarker";
@@ -19,14 +20,31 @@ import { useCart } from "@/contexts/CartContext";
 import { useHiddenPricing } from "@/contexts/HiddenPricingContext";
 import { useStore } from "@/contexts/StoreContext";
 import { trackAddToCart, trackViewItem } from "@/lib/analytics/gtm";
+import type {
+  PagePresentation,
+  ProductPageRegionKey,
+} from "@/lib/presentation/page-regions";
+import { resolvePublicProductRegions } from "@/lib/presentation/page-runtime";
 import { cn } from "@/lib/utils";
 
 interface ProductDetailsProps {
   product: Product;
   basePath: string;
+  /**
+   * CUST-H2-5 — the Published Version's `pagePresentation.product`, or
+   * `undefined` when nothing has been published/customized yet. Absence
+   * renders today's exact default region order (`resolvePublicProductRegions`
+   * falls back to the canonical order in that case) — no visible change for
+   * any existing merchant.
+   */
+  pagePresentation?: PagePresentation;
 }
 
-export function ProductDetails({ product, basePath }: ProductDetailsProps) {
+export function ProductDetails({
+  product,
+  basePath,
+  pagePresentation,
+}: ProductDetailsProps) {
   const { addItem, surface } = useCart();
   const { currency } = useStore();
   const t = useTranslations("products");
@@ -44,6 +62,15 @@ export function ProductDetails({ product, basePath }: ProductDetailsProps) {
 
   const hasVariants = variants.length > 0;
   const optionTypes = product.option_types || [];
+  // The real gate the VariantPicker JSX below already uses — variants alone
+  // do not justify the region without option data to render (data absence
+  // stays authoritative regardless of presentation visibility, per the
+  // locked contract's "Product Optional Visibility"/"Conditional Semantics").
+  const showVariantSelector = hasVariants && optionTypes.length > 0;
+  const regionOrder = useMemo(
+    () => resolvePublicProductRegions(pagePresentation, showVariantSelector),
+    [pagePresentation, showVariantSelector],
+  );
   /*
    * AWJ's own flag, not a count. A variant-managed product with every variant
    * deactivated still must not be purchasable through its parent, and
@@ -185,6 +212,241 @@ export function ProductDetails({ product, basePath }: ProductDetailsProps) {
 
   const needsOptionChoice = isVariantManaged && selectedVariant === null;
 
+  /*
+   * CUST-H2-5 — each region's content, as a named node keyed by its
+   * `ProductPageRegionKey`. `regionOrder` (above) decides which of these are
+   * rendered and in what order; every node below is byte-identical to what
+   * this file always rendered — only the assembly into the content column
+   * moved from a fixed JSX sequence to `regionOrder.map(...)`. `media_gallery`
+   * has no entry here: it is FIXED_REQUIRED, never reorderable, and always
+   * renders in its own gallery column regardless of its position in the
+   * stored array (architecture doc — "Product Region Order": "Do not
+   * physically move media into invalid content-column positions").
+   */
+  const regionNodes: Record<ProductPageRegionKey, ReactNode> = {
+    // Rendered in its own gallery column above, never from this map.
+    media_gallery: null,
+    identity: (
+      <div>
+        {product.categories?.[0]?.name && (
+          <p className="mb-1 text-xs font-medium text-store-muted-foreground">
+            {product.categories[0].name}
+          </p>
+        )}
+
+        <div className="flex items-start justify-between gap-3">
+          <h1 className="min-w-0 text-lg font-extrabold leading-snug text-store-foreground md:text-xl">
+            {product.name}
+          </h1>
+          <div className="flex shrink-0 items-center gap-2">
+            <WishlistButton productId={product.id} variant="detail" />
+            {/* AWJ Market only — see the coverage matrix's PDP evidence. */}
+            {isMarket && (
+              <ShareButton
+                title={product.name}
+                className="grid size-10 place-items-center rounded-full border border-store-border bg-store-surface text-store-muted-foreground transition-colors hover:border-store-border-strong hover:text-store-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-store-foreground"
+              />
+            )}
+          </div>
+        </div>
+      </div>
+    ),
+    price: (
+      <div className="mt-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        {displayPrice ? (
+          <span className="text-xl font-black text-store-primary md:text-2xl">
+            {/*
+                For a variant-managed product with nothing selected yet, the
+                figure the API sends is its cheapest active variant — stating
+                it bare would claim it is the price. Once a variant is chosen
+                the figure is that variant's own, and the qualifier goes.
+              */}
+            {needsOptionChoice ? (
+              <>
+                <span className="me-1 text-sm font-semibold text-store-muted-foreground">
+                  {t("priceFromLabel")}
+                </span>
+                {/*
+                    Prices are always formatted in Arabic numerals by the
+                    adapter, so on the English storefront the qualifier and
+                    the figure are opposite directions. Isolating the figure
+                    keeps the two from reordering into each other.
+                  */}
+                <bdi>{displayPrice}</bdi>
+              </>
+            ) : (
+              <bdi>{displayPrice}</bdi>
+            )}
+          </span>
+        ) : needsOptionChoice ? (
+          <span className="text-sm font-medium text-store-muted-foreground">
+            {t("pricedByOption")}
+          </span>
+        ) : (
+          <HiddenPricePrompt className="inline-flex items-center gap-1.5 text-sm font-medium text-store-foreground underline underline-offset-4 hover:text-store-primary" />
+        )}
+        {/* Only ever rendered from a real compare-at price the server sent. */}
+        {onSale && strikethroughPrice && (
+          <span className="text-sm text-store-muted-foreground line-through">
+            {strikethroughPrice}
+          </span>
+        )}
+      </div>
+    ),
+    availability: !needsOptionChoice ? (
+      /*
+       * Availability is stated only once it means something. For a
+       * variant-managed product that is after a variant is chosen — before
+       * then the parent's rolled-up flag would answer a question the
+       * shopper has not asked yet. Data absence stays authoritative
+       * regardless of the region's own visibility flag.
+       */
+      <p className="mt-2 text-xs font-medium">
+        {inStock ? (
+          <span className="inline-flex items-center gap-1.5 text-store-success">
+            <CircleCheckBig className="size-4" aria-hidden="true" />
+            {t("inStock")}
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1.5 text-store-destructive">
+            <CircleX className="size-4" aria-hidden="true" />
+            {t("outOfStock")}
+          </span>
+        )}
+      </p>
+    ) : null,
+    variant_selector: showVariantSelector ? (
+      <div className="mt-5 border-t border-store-border pt-5">
+        <VariantPicker
+          variants={variants}
+          optionTypes={optionTypes}
+          selectedVariant={selectedVariant}
+          onVariantChange={setSelectedVariant}
+        />
+      </div>
+    ) : null,
+    quantity_cta: (
+      <>
+        {/*
+            AWJ Market's benchmark keeps quantity + add-to-cart reachable
+            without scrolling on a phone (see the coverage matrix's PDP
+            evidence). Below `md` — the same breakpoint `MobileBottomNav`
+            itself disappears at, so this bar never stacks on top of empty
+            space where the nav used to be — the row becomes a fixed bar
+            pinned above that nav; at `md` and up it reverts to the ordinary
+            static row every other theme already uses. The quantity/cart
+            state and `handleAddToCart` above are unchanged — this only moves
+            where the existing controls render, never duplicates them. The
+            fixed positioning means this region's *visual* placement on AWJ
+            Market is unaffected by where it sits in `regionOrder` — only its
+            DOM/focus order changes, which is the correct trade for keyboard
+            navigation per the locked contract's accessibility requirement.
+          */}
+        <div
+          className={cn(
+            "mt-5 border-t border-store-border pt-5",
+            isMarket &&
+              "fixed inset-x-0 bottom-[calc(var(--store-bottom-nav-height)+env(safe-area-inset-bottom))] z-30 mt-0 border-t bg-store-surface px-4 py-3 shadow-[0_-2px_8px_rgba(0,0,0,0.08)] md:static md:inset-auto md:z-auto md:mt-5 md:bg-transparent md:px-0 md:py-0 md:pt-5 md:shadow-none",
+          )}
+        >
+          {pricesHidden ? (
+            // Guest on a prices-hidden channel: no pricing, no ordering —
+            // route them through the wholesale sign-in first.
+            <Button asChild size="lg" className={cn(isMarket && "w-full")}>
+              <Link href={hiddenPricing.signInHref}>
+                {tw("hiddenPrice.signInToOrder")}
+              </Link>
+            </Button>
+          ) : (
+            <div className="flex flex-wrap items-center gap-3">
+              <QuantityPickerField
+                quantity={quantity}
+                onQuantityChange={setQuantity}
+                size="lg"
+              />
+
+              <Button
+                size="lg"
+                className="min-w-40 flex-1"
+                onClick={handleAddToCart}
+                disabled={loading || !isPurchasable}
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="size-5 animate-spin motion-reduce:animate-none" />
+                    {t("adding")}
+                  </>
+                ) : needsOptionChoice ? (
+                  t("selectOptions")
+                ) : isPurchasable ? (
+                  <>
+                    <ShoppingBag className="size-5" />
+                    {t("addToCart")}
+                  </>
+                ) : (
+                  t("outOfStock")
+                )}
+              </Button>
+            </div>
+          )}
+        </div>
+        {/* Keeps the fixed bar above from covering the rest of the page. */}
+        {isMarket && <div aria-hidden="true" className="h-20 md:hidden" />}
+      </>
+    ),
+    description: descriptionText ? (
+      <section className="mt-5 border-t border-store-border pt-5">
+        <h2 className="mb-2 text-sm font-bold text-store-foreground">
+          {t("description")}
+        </h2>
+        {/*
+            AWJ's description is a plain text column, not authored HTML —
+            rendering it through `dangerouslySetInnerHTML` both lost its
+            line breaks and treated merchant input as markup.
+          */}
+        <p className="whitespace-pre-line text-sm leading-relaxed text-store-muted-foreground">
+          {descriptionText}
+        </p>
+      </section>
+    ) : null,
+    // `ProductCustomFields` already returns `null` internally for an empty
+    // list; mirrored here too so `[data-region]` never renders an empty
+    // wrapper for a region with nothing to show — consistent with how
+    // `description`/`sku_options_details` are handled just above.
+    custom_fields:
+      product.custom_fields && product.custom_fields.length > 0 ? (
+        <ProductCustomFields customFields={product.custom_fields} />
+      ) : null,
+    sku_options_details:
+      sku || selectedVariant?.options_text ? (
+        <section className="mt-5 border-t border-store-border pt-5">
+          <h2 className="mb-2 text-sm font-bold text-store-foreground">
+            {t("details")}
+          </h2>
+          <dl className="space-y-1.5 text-sm">
+            {sku && (
+              <div className="flex gap-3">
+                <dt className="w-28 shrink-0 text-store-muted-foreground">
+                  {t("sku")}
+                </dt>
+                <dd className="min-w-0 text-store-foreground">{sku}</dd>
+              </div>
+            )}
+            {selectedVariant?.options_text && (
+              <div className="flex gap-3">
+                <dt className="w-28 shrink-0 text-store-muted-foreground">
+                  {t("options")}
+                </dt>
+                <dd className="min-w-0 text-store-foreground">
+                  {selectedVariant.options_text}
+                </dd>
+              </div>
+            )}
+          </dl>
+        </section>
+      ) : null,
+  };
+
   return (
     <StoreContainer className={isMarket ? "py-3 md:py-5" : "py-5 md:py-6"}>
       {/* The product leads. No marketing band above it. */}
@@ -193,7 +455,8 @@ export function ProductDetails({ product, basePath }: ProductDetailsProps) {
           The gallery is capped rather than left to fill its track. It is a
           square, so an uncapped column made it ~880px tall at 1440 and pushed
           the price and the purchase action below the fold — the opposite of
-          product-first.
+          product-first. `media_gallery` is FIXED_REQUIRED and never
+          reorderable, so it always renders here regardless of `regionOrder`.
         */}
         <div className="w-full lg:sticky lg:top-(--store-header-offset) lg:self-start">
           <MediaGallery
@@ -204,210 +467,15 @@ export function ProductDetails({ product, basePath }: ProductDetailsProps) {
         </div>
 
         <div className="min-w-0 lg:max-w-2xl">
-          {product.categories?.[0]?.name && (
-            <p className="mb-1 text-xs font-medium text-store-muted-foreground">
-              {product.categories[0].name}
-            </p>
-          )}
-
-          <div className="flex items-start justify-between gap-3">
-            <h1 className="min-w-0 text-lg font-extrabold leading-snug text-store-foreground md:text-xl">
-              {product.name}
-            </h1>
-            <div className="flex shrink-0 items-center gap-2">
-              <WishlistButton productId={product.id} variant="detail" />
-              {/* AWJ Market only — see the coverage matrix's PDP evidence. */}
-              {isMarket && (
-                <ShareButton
-                  title={product.name}
-                  className="grid size-10 place-items-center rounded-full border border-store-border bg-store-surface text-store-muted-foreground transition-colors hover:border-store-border-strong hover:text-store-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-store-foreground"
-                />
-              )}
-            </div>
-          </div>
-
-          <div className="mt-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-            {displayPrice ? (
-              <span className="text-xl font-black text-store-primary md:text-2xl">
-                {/*
-                  For a variant-managed product with nothing selected yet, the
-                  figure the API sends is its cheapest active variant — stating
-                  it bare would claim it is the price. Once a variant is chosen
-                  the figure is that variant's own, and the qualifier goes.
-                */}
-                {needsOptionChoice ? (
-                  <>
-                    <span className="me-1 text-sm font-semibold text-store-muted-foreground">
-                      {t("priceFromLabel")}
-                    </span>
-                    {/*
-                      Prices are always formatted in Arabic numerals by the
-                      adapter, so on the English storefront the qualifier and
-                      the figure are opposite directions. Isolating the figure
-                      keeps the two from reordering into each other.
-                    */}
-                    <bdi>{displayPrice}</bdi>
-                  </>
-                ) : (
-                  <bdi>{displayPrice}</bdi>
-                )}
-              </span>
-            ) : needsOptionChoice ? (
-              <span className="text-sm font-medium text-store-muted-foreground">
-                {t("pricedByOption")}
-              </span>
-            ) : (
-              <HiddenPricePrompt className="inline-flex items-center gap-1.5 text-sm font-medium text-store-foreground underline underline-offset-4 hover:text-store-primary" />
-            )}
-            {/* Only ever rendered from a real compare-at price the server sent. */}
-            {onSale && strikethroughPrice && (
-              <span className="text-sm text-store-muted-foreground line-through">
-                {strikethroughPrice}
-              </span>
-            )}
-          </div>
-
-          {/*
-            Availability is stated only once it means something. For a
-            variant-managed product that is after a variant is chosen — before
-            then the parent's rolled-up flag would answer a question the shopper
-            has not asked yet.
-          */}
-          {!needsOptionChoice && (
-            <p className="mt-2 text-xs font-medium">
-              {inStock ? (
-                <span className="inline-flex items-center gap-1.5 text-store-success">
-                  <CircleCheckBig className="size-4" aria-hidden="true" />
-                  {t("inStock")}
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-1.5 text-store-destructive">
-                  <CircleX className="size-4" aria-hidden="true" />
-                  {t("outOfStock")}
-                </span>
-              )}
-            </p>
-          )}
-
-          {/* Options: rendered only when the merchant actually defined some. */}
-          {hasVariants && optionTypes.length > 0 && (
-            <div className="mt-5 border-t border-store-border pt-5">
-              <VariantPicker
-                variants={variants}
-                optionTypes={optionTypes}
-                selectedVariant={selectedVariant}
-                onVariantChange={setSelectedVariant}
-              />
-            </div>
-          )}
-
-          {/*
-            AWJ Market's benchmark keeps quantity + add-to-cart reachable
-            without scrolling on a phone (see the coverage matrix's PDP
-            evidence). Below `md` — the same breakpoint `MobileBottomNav`
-            itself disappears at, so this bar never stacks on top of empty
-            space where the nav used to be — the row becomes a fixed bar
-            pinned above that nav; at `md` and up it reverts to the ordinary
-            static row every other theme already uses. The quantity/cart
-            state and `handleAddToCart` above are unchanged — this only moves
-            where the existing controls render, never duplicates them.
-          */}
-          <div
-            className={cn(
-              "mt-5 border-t border-store-border pt-5",
-              isMarket &&
-                "fixed inset-x-0 bottom-[calc(var(--store-bottom-nav-height)+env(safe-area-inset-bottom))] z-30 mt-0 border-t bg-store-surface px-4 py-3 shadow-[0_-2px_8px_rgba(0,0,0,0.08)] md:static md:inset-auto md:z-auto md:mt-5 md:bg-transparent md:px-0 md:py-0 md:pt-5 md:shadow-none",
-            )}
-          >
-            {pricesHidden ? (
-              // Guest on a prices-hidden channel: no pricing, no ordering —
-              // route them through the wholesale sign-in first.
-              <Button asChild size="lg" className={cn(isMarket && "w-full")}>
-                <Link href={hiddenPricing.signInHref}>
-                  {tw("hiddenPrice.signInToOrder")}
-                </Link>
-              </Button>
-            ) : (
-              <div className="flex flex-wrap items-center gap-3">
-                <QuantityPickerField
-                  quantity={quantity}
-                  onQuantityChange={setQuantity}
-                  size="lg"
-                />
-
-                <Button
-                  size="lg"
-                  className="min-w-40 flex-1"
-                  onClick={handleAddToCart}
-                  disabled={loading || !isPurchasable}
-                >
-                  {loading ? (
-                    <>
-                      <Loader2 className="size-5 animate-spin motion-reduce:animate-none" />
-                      {t("adding")}
-                    </>
-                  ) : needsOptionChoice ? (
-                    t("selectOptions")
-                  ) : isPurchasable ? (
-                    <>
-                      <ShoppingBag className="size-5" />
-                      {t("addToCart")}
-                    </>
-                  ) : (
-                    t("outOfStock")
-                  )}
-                </Button>
+          {regionOrder
+            .filter(
+              (key) => key !== "media_gallery" && regionNodes[key] !== null,
+            )
+            .map((key) => (
+              <div data-region={key} key={key}>
+                {regionNodes[key]}
               </div>
-            )}
-          </div>
-          {/* Keeps the fixed bar above from covering the rest of the page. */}
-          {isMarket && <div aria-hidden="true" className="h-20 md:hidden" />}
-
-          {descriptionText && (
-            <section className="mt-5 border-t border-store-border pt-5">
-              <h2 className="mb-2 text-sm font-bold text-store-foreground">
-                {t("description")}
-              </h2>
-              {/*
-                AWJ's description is a plain text column, not authored HTML —
-                rendering it through `dangerouslySetInnerHTML` both lost its
-                line breaks and treated merchant input as markup.
-              */}
-              <p className="whitespace-pre-line text-sm leading-relaxed text-store-muted-foreground">
-                {descriptionText}
-              </p>
-            </section>
-          )}
-
-          <ProductCustomFields customFields={product.custom_fields} />
-
-          {(sku || selectedVariant?.options_text) && (
-            <section className="mt-5 border-t border-store-border pt-5">
-              <h2 className="mb-2 text-sm font-bold text-store-foreground">
-                {t("details")}
-              </h2>
-              <dl className="space-y-1.5 text-sm">
-                {sku && (
-                  <div className="flex gap-3">
-                    <dt className="w-28 shrink-0 text-store-muted-foreground">
-                      {t("sku")}
-                    </dt>
-                    <dd className="min-w-0 text-store-foreground">{sku}</dd>
-                  </div>
-                )}
-                {selectedVariant?.options_text && (
-                  <div className="flex gap-3">
-                    <dt className="w-28 shrink-0 text-store-muted-foreground">
-                      {t("options")}
-                    </dt>
-                    <dd className="min-w-0 text-store-foreground">
-                      {selectedVariant.options_text}
-                    </dd>
-                  </div>
-                )}
-              </dl>
-            </section>
-          )}
+            ))}
         </div>
       </div>
     </StoreContainer>

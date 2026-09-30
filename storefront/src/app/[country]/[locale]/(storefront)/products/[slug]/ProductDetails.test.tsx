@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PublishedThemeMarkerProvider } from "@/components/layout/PublishedThemeMarker";
 import { PRODUCT_PAGE_EXPAND } from "@/lib/data/cached";
+import type { PagePresentation } from "@/lib/presentation/page-regions";
 import { ProductDetails } from "./ProductDetails";
 
 vi.mock("next-intl", () => ({
@@ -316,5 +317,268 @@ describe("ProductDetails — AWJ Market mobile purchase bar", () => {
     await user.click(screen.getByText("addToCart"));
 
     expect(mockAddItem).toHaveBeenCalledWith("product-1", 1, "base", null);
+  });
+});
+
+describe("ProductDetails — CUST-H2-5 public page presentation parity", () => {
+  beforeEach(() => {
+    mockAddItem.mockClear();
+    mockSurface.current = "dtc";
+  });
+
+  const productWithDescriptionAndSku = {
+    ...productWithoutCustomVariants,
+    id: "product-5",
+    name: "Described Product",
+    description: "A great description of the product.",
+    categories: [],
+  } as unknown as Product;
+
+  function contentColumnText(container: HTMLElement): string {
+    const column = container.querySelector(".lg\\:max-w-2xl");
+    if (!column) throw new Error("content column not found");
+    return column.textContent ?? "";
+  }
+
+  it("renders today's exact default region order when pagePresentation is absent", () => {
+    const { container } = render(
+      <ProductDetails
+        product={productWithDescriptionAndSku}
+        basePath="/us/en"
+      />,
+    );
+
+    const text = contentColumnText(container);
+    const order = [
+      "Described Product",
+      "$25.00",
+      "inStock",
+      "addToCart",
+      "A great description of the product.",
+      "MASTER-SKU-001",
+    ];
+    const positions = order.map((needle) => text.indexOf(needle));
+    expect(positions.every((position) => position >= 0)).toBe(true);
+    expect(positions).toEqual([...positions].sort((a, b) => a - b));
+  });
+
+  it("hides an optional region marked not visible, without changing anything else", () => {
+    const pagePresentation: PagePresentation = {
+      product: {
+        version: 1,
+        regions: [
+          { id: "media_gallery", key: "media_gallery", visible: true },
+          { id: "identity", key: "identity", visible: true },
+          { id: "price", key: "price", visible: true },
+          { id: "availability", key: "availability", visible: true },
+          { id: "quantity_cta", key: "quantity_cta", visible: true },
+          { id: "description", key: "description", visible: false },
+          { id: "custom_fields", key: "custom_fields", visible: true },
+          {
+            id: "sku_options_details",
+            key: "sku_options_details",
+            visible: true,
+          },
+        ],
+      },
+    };
+
+    render(
+      <ProductDetails
+        product={productWithDescriptionAndSku}
+        basePath="/us/en"
+        pagePresentation={pagePresentation}
+      />,
+    );
+
+    expect(
+      screen.queryByText("A great description of the product."),
+    ).not.toBeInTheDocument();
+    // Data-absence stays authoritative for what remains: SKU is real data,
+    // still shown.
+    expect(screen.getByText("MASTER-SKU-001")).toBeInTheDocument();
+  });
+
+  it("respects an authored non-default region order", () => {
+    const pagePresentation: PagePresentation = {
+      product: {
+        version: 1,
+        regions: [
+          { id: "media_gallery", key: "media_gallery", visible: true },
+          { id: "identity", key: "identity", visible: true },
+          { id: "price", key: "price", visible: true },
+          { id: "availability", key: "availability", visible: true },
+          { id: "quantity_cta", key: "quantity_cta", visible: true },
+          // Authored order: SKU/details before the description.
+          {
+            id: "sku_options_details",
+            key: "sku_options_details",
+            visible: true,
+          },
+          { id: "description", key: "description", visible: true },
+          { id: "custom_fields", key: "custom_fields", visible: true },
+        ],
+      },
+    };
+
+    const { container } = render(
+      <ProductDetails
+        product={productWithDescriptionAndSku}
+        basePath="/us/en"
+        pagePresentation={pagePresentation}
+      />,
+    );
+
+    const text = contentColumnText(container);
+    expect(text.indexOf("MASTER-SKU-001")).toBeLessThan(
+      text.indexOf("A great description of the product."),
+    );
+  });
+
+  const variantOptionType = {
+    id: "opt-color",
+    name: "Color",
+    label: "Color",
+    position: 0,
+    kind: "awj_generic",
+  };
+  const redValue = {
+    id: "val-red",
+    option_type_id: "opt-color",
+    name: "Red",
+    label: "Red",
+    position: 0,
+    color_code: null,
+    option_type_name: "Color",
+    option_type_label: "Color",
+    image_url: null,
+  };
+  const productWithRealVariants = {
+    id: "product-6",
+    name: "Variant Product",
+    slug: "variant-product",
+    default_variant_id: "variant-red",
+    default_variant: {
+      id: "variant-red",
+      product_id: "product-6",
+      sku: "SKU-RED",
+      options_text: "Red",
+      purchasable: true,
+      in_stock: true,
+      option_values: [redValue],
+      price: {
+        display_amount: "$30.00",
+        amount_in_cents: 3000,
+        compare_at_amount_in_cents: null,
+        display_compare_at_amount: null,
+      },
+      original_price: null,
+    },
+    variants: [
+      {
+        id: "variant-red",
+        product_id: "product-6",
+        sku: "SKU-RED",
+        options_text: "Red",
+        purchasable: true,
+        in_stock: true,
+        media: [],
+        option_values: [redValue],
+        price: {
+          display_amount: "$30.00",
+          amount_in_cents: 3000,
+          compare_at_amount_in_cents: null,
+          display_compare_at_amount: null,
+        },
+        original_price: null,
+      },
+    ],
+    option_types: [variantOptionType],
+    media: [],
+    purchasable: true,
+    in_stock: true,
+    price: {
+      display_amount: "$30.00",
+      amount_in_cents: 3000,
+      compare_at_amount_in_cents: null,
+      display_compare_at_amount: null,
+    },
+    original_price: null,
+    description: null,
+    description_html: null,
+    custom_fields: [],
+    categories: [],
+  } as unknown as Product;
+
+  it("never hides variant_selector for a product with variants, even if the stored entry marks it not visible", () => {
+    const pagePresentation: PagePresentation = {
+      product: {
+        version: 1,
+        regions: [
+          { id: "variant_selector", key: "variant_selector", visible: false },
+        ],
+      },
+    };
+
+    render(
+      <ProductDetails
+        product={productWithRealVariants}
+        basePath="/us/en"
+        pagePresentation={pagePresentation}
+      />,
+    );
+
+    // VariantPicker (real, unmocked) renders the option type's own label.
+    expect(screen.getByText("Color")).toBeInTheDocument();
+  });
+
+  it("omits variant_selector for a product without variants, even if a stored entry marks it visible", () => {
+    const pagePresentation: PagePresentation = {
+      product: {
+        version: 1,
+        regions: [
+          { id: "variant_selector", key: "variant_selector", visible: true },
+        ],
+      },
+    };
+
+    render(
+      <ProductDetails
+        product={productWithoutCustomVariants}
+        basePath="/us/en"
+        pagePresentation={pagePresentation}
+      />,
+    );
+
+    // The simple fixture's own option types are empty, so there is nothing
+    // to select from regardless — this proves it stays that way rather than
+    // fabricating a picker from a stale stored flag.
+    expect(screen.queryByText("Color")).not.toBeInTheDocument();
+    expect(screen.queryByText("selectOptions")).not.toBeInTheDocument();
+  });
+
+  it("fails safe to the default layout when the stored regions array is missing a commerce-critical region", () => {
+    const malformedPagePresentation = {
+      product: {
+        version: 1,
+        // `quantity_cta` (Add-to-Cart) missing outright.
+        regions: [
+          { id: "media_gallery", key: "media_gallery", visible: true },
+          { id: "identity", key: "identity", visible: true },
+          { id: "price", key: "price", visible: true },
+        ],
+      },
+    } as any as PagePresentation;
+
+    render(
+      <ProductDetails
+        product={productWithoutCustomVariants}
+        basePath="/us/en"
+        pagePresentation={malformedPagePresentation}
+      />,
+    );
+
+    // Add-to-Cart must never disappear because of a malformed stored document.
+    expect(screen.getByText("addToCart")).toBeInTheDocument();
   });
 });

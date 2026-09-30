@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Breadcrumbs } from "@/components/navigation/Breadcrumbs";
 import { JsonLd } from "@/components/seo/JsonLd";
+import { fetchPublishedPresentation } from "@/lib/commerce/storefront";
 import { getCachedProduct, PRODUCT_PAGE_EXPAND } from "@/lib/data/cached";
 import { generateProductMetadata } from "@/lib/metadata/product";
 import {
@@ -58,6 +59,13 @@ export default async function ProductPage({
     notFound();
   }
 
+  // CUST-H2-5 — same request-deduped `fetchStorefrontConfig()` the
+  // storefront shell layout already calls for header/footer chrome; this is
+  // a cache hit, not a new network round-trip. Published-only, host/tenant
+  // resolved server-side (`StorefrontContext`) — never Draft, never a
+  // client-supplied Storefront/Version id.
+  const presentation = await fetchPublishedPresentation();
+
   const storeUrl = getStoreUrl();
   const canonicalUrl = storeUrl
     ? buildCanonicalUrl(
@@ -94,7 +102,11 @@ export default async function ProductPage({
           />
         )}
       </div>
-      <ProductDetails product={product} basePath={basePath} />
+      <ProductDetails
+        product={product}
+        basePath={basePath}
+        pagePresentation={presentation?.pagePresentation}
+      />
     </>
   );
 }
