@@ -13,7 +13,7 @@ production release — even with all tests green and CI passing.
 - **Base SHA (fetched `origin/main` tip at task start):** `ce97b2d3367c954af5e353a4df058635fdfa1918` — confirmed identical to the SHA the task named as the known post-CUST-H2-ARCH-1-merge main tip (`docs(store): define CUST-H2 multi-page builder architecture (#1116)`). Main had not advanced.
 - **Head SHA:** this report's own commit, on top of the Base SHA above.
 - **Branch:** `feature/cust-h2-1-page-presentation-schema`
-- **PR:** opened against `main` from this branch (link below, once opened).
+- **PR:** [#1117](https://github.com/safwan5001-source/Nebrax/pull/1117), opened against `main` from this branch. **Not merged.**
 
 ## Implemented Scope
 
