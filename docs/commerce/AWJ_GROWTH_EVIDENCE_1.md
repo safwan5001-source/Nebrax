@@ -520,11 +520,13 @@ Example:
 A capability can have metadata:
 
 ```text
-state: VERIFIED | GATED | PARTIAL | UNAVAILABLE
+state: VERIFIED | VERIFIED_WITH_GATES | PARTIAL | OPEN | NOT_APPLICABLE
 requires_review: boolean
 requires_business_account: boolean
 requires_scope: string[]
 regional_status: VERIFIED | UNKNOWN | RESTRICTED
+
+The runtime/UI enum names must match this document's status legend; do not introduce a second vocabulary such as `GATED` or `UNAVAILABLE` without an explicit mapping.
 ```
 
 ---
