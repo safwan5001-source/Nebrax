@@ -6,6 +6,7 @@ use App\Mail\AuthActionMail;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Carbon;
 use Tests\TestCase;
@@ -137,5 +138,105 @@ class AuthRecoveryTest extends TestCase
         Mail::assertSent(AuthActionMail::class, function (AuthActionMail $mail): bool {
             return $mail->action === 'verify' && str_starts_with($mail->url, 'http://alpha.awj.app/verify-email?token=');
         });
+    }
+
+    /**
+     * AUTH-MAIL-PROD-1 diagnostic — الإرسال الناجح لا يسرّب البريد ولا التوكن
+     * إلى السجل، والحقول المتوقعة تُسجَّل صحيحة.
+     *
+     * @test
+     */
+    public function diagnostic_log_on_a_successful_send_never_exposes_the_email_or_token(): void
+    {
+        $captured = null;
+        Log::shouldReceive('info')
+            ->once()
+            ->with('auth_recovery_diagnostic', \Mockery::on(function (array $payload) use (&$captured): bool {
+                $captured = $payload;
+                return true;
+            }));
+
+        $this->registerTenant('alpha', 'owner@alpha.test');
+        $this->postJson($this->tenantUrl('alpha', 'forgot-password'), ['email' => 'owner@alpha.test'])->assertOk();
+
+        $url = null;
+        Mail::assertSent(AuthActionMail::class, function (AuthActionMail $mail) use (&$url): bool {
+            $url = $mail->url;
+            return $mail->action === 'reset';
+        });
+        parse_str((string) parse_url($url, PHP_URL_QUERY), $query);
+        $token = $query['token'];
+        $tokenHash = hash('sha256', $token);
+
+        $this->assertNotNull($captured);
+        $haystack = json_encode($captured);
+        $this->assertStringNotContainsString('owner@alpha.test', $haystack);
+        $this->assertStringNotContainsString($token, $haystack);
+        $this->assertStringNotContainsString($tokenHash, $haystack);
+        $this->assertArrayNotHasKey('email', $captured);
+        $this->assertArrayNotHasKey('token', $captured);
+        $this->assertArrayNotHasKey('password', $captured);
+
+        $this->assertTrue($captured['hostname_tenant_present']);
+        $this->assertSame('alpha', $captured['tenant_slug_resolved']);
+        $this->assertTrue($captured['user_matched']);
+        $this->assertTrue($captured['token_issue_reached']);
+        $this->assertTrue($captured['mail_send_reached']);
+        $this->assertArrayNotHasKey('exception_class', $captured);
+    }
+
+    /**
+     * AUTH-MAIL-PROD-1 diagnostic — بلا سياق مستأجر يبقى السلوك مغلقاً
+     * (محايد، بلا بريد، بلا توكن) والحقول المسجَّلة تعكس ذلك دون تسريب البريد.
+     *
+     * @test
+     */
+    public function diagnostic_log_without_tenant_context_stays_fail_closed(): void
+    {
+        $this->registerTenant('alpha', 'owner@alpha.test');
+
+        $captured = null;
+        Log::shouldReceive('info')
+            ->once()
+            ->with('auth_recovery_diagnostic', \Mockery::on(function (array $payload) use (&$captured): bool {
+                $captured = $payload;
+                return true;
+            }));
+
+        $res = $this->postJson('/api/forgot-password', ['email' => 'owner@alpha.test']);
+
+        $res->assertOk()->assertJsonPath('message', 'إذا كان الحساب موجوداً لهذا البريد، فقد أُرسلت تعليمات الاسترداد.');
+        Mail::assertNotSent(AuthActionMail::class, fn (AuthActionMail $mail) => $mail->action === 'reset');
+        $this->assertDatabaseMissing('auth_action_tokens', ['type' => 'password_reset']);
+
+        $this->assertNotNull($captured);
+        $this->assertStringNotContainsString('owner@alpha.test', json_encode($captured));
+        $this->assertFalse($captured['hostname_tenant_present']);
+        $this->assertNull($captured['tenant_slug_resolved']);
+        $this->assertFalse($captured['user_matched']);
+        $this->assertFalse($captured['token_issue_reached']);
+        $this->assertFalse($captured['mail_send_reached']);
+    }
+
+    /**
+     * AUTH-MAIL-PROD-1 diagnostic — تعارض Host/Origin بين مستأجرين يُرفض
+     * مغلقاً (404) داخل الـ middleware قبل بلوغ المتحكم، فلا يصدر أي حدث
+     * تشخيصي إطلاقاً — حدود العزل بين المستأجرين لم تتغيّر.
+     *
+     * @test
+     */
+    public function diagnostic_logging_does_not_run_and_cross_tenant_isolation_holds_on_conflicting_origin(): void
+    {
+        $this->registerTenant('company-a', 'a@alpha.test');
+        $this->registerTenant('company-b', 'b@beta.test');
+
+        Log::shouldReceive('info')->never();
+
+        $res = $this->postJson($this->tenantUrl('company-a', 'forgot-password'), [
+            'email' => 'a@alpha.test',
+        ], ['Origin' => 'https://company-b.awj.app']);
+
+        $res->assertStatus(404);
+        Mail::assertNotSent(AuthActionMail::class, fn (AuthActionMail $mail) => $mail->action === 'reset');
     }
 }
