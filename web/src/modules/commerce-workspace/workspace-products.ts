@@ -205,12 +205,17 @@ function mapDetail(payload: unknown): WorkspaceProductDetail | null {
 
 export async function listWorkspaceProducts(
   storefrontId: string,
-  params: { search?: string; page?: number; perPage?: number } = {},
+  params: { search?: string; categoryId?: string; page?: number; perPage?: number } = {},
   signal?: AbortSignal,
 ): Promise<WorkspaceProductListOutcome> {
   try {
     const query = new URLSearchParams();
     if (params.search) query.set('search', params.search);
+    // CUST-H2-4 — feeds the Category page's real `product_grid` preview
+    // region: the same authoritative category-membership + eligibility gate
+    // the public Commerce API already applies (`category_id` on this exact
+    // route), never a client-side filter over a fetched list.
+    if (params.categoryId) query.set('category_id', params.categoryId);
     if (params.page) query.set('page', String(params.page));
     if (params.perPage) query.set('per_page', String(params.perPage));
     const qs = query.toString();

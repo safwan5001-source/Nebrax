@@ -51,6 +51,7 @@ export type CustomizerPanel =
   | "header"
   | "homepage"
   | "product"
+  | "category"
   | "footer"
   | "contact"
   | "whatsapp"
@@ -73,6 +74,7 @@ export const CUSTOMIZER_NAV_GROUPS: Array<{
       { id: "header", label: "header" },
       { id: "homepage", label: "homepage" },
       { id: "product", label: "productRegionsPanelLabel" },
+      { id: "category", label: "categoryRegionsPanelLabel" },
       { id: "footer", label: "footer" },
     ],
   },

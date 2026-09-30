@@ -4,10 +4,13 @@ import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import { ScrollIndicator } from "./ScrollIndicator";
 import {
+  type CategoryPageRegionKey,
   clonePresentationConfig,
   DEFAULT_PRESENTATION_CONFIG,
+  defaultCategoryPageRegions,
   defaultProductPageRegions,
   type HomeBuilderSectionKey,
+  moveCategoryRegion,
   moveProductRegion,
   normalizePresentationConfig,
   type PageRegionInstance,
@@ -19,12 +22,21 @@ import {
 import { ProductPreviewPicker } from "./ProductPreviewPicker";
 import { ProductPreviewPickerPanel } from "./ProductPreviewPickerPanel";
 import { ProductRegionInspector } from "./ProductRegionInspector";
+import { CategoryPreviewPicker } from "./CategoryPreviewPicker";
+import { CategoryPreviewPickerPanel } from "./CategoryPreviewPickerPanel";
+import { CategoryRegionInspector } from "./CategoryRegionInspector";
 import {
   listWorkspaceProducts,
   showWorkspaceProduct,
   type WorkspaceProductDetail,
   type WorkspaceProductSummary,
 } from "@/modules/commerce-workspace/workspace-products";
+import {
+  listWorkspaceCategories,
+  showWorkspaceCategory,
+  type WorkspaceCategoryDetail,
+  type WorkspaceCategorySummary,
+} from "@/modules/commerce-workspace/workspace-categories";
 import { DRAFT_PERSISTENCE_CAPABILITY, PUBLISH_CAPABILITY } from "./presentation/capabilities";
 import {
   ControlPanels,
@@ -91,6 +103,7 @@ type MobileSheet =
   | "versions"
   | "pages"
   | "product-picker"
+  | "category-picker"
   | null;
 
 interface ExperienceBuilderProps {
@@ -154,6 +167,32 @@ export function ExperienceBuilder({
   // تبديل سريع للمتجر أو لمنتج المعاينة نفسه.
   const productListRequestRef = useRef(0);
   const previewProductRequestRef = useRef(0);
+  // CUST-H2-4 — نفس نموذج حالة المنتج أعلاه بالضبط، لصفحة التصنيف: أي تصنيف
+  // يُعايِن المحرِّر حالياً. **سياق محرِّر بحت**: لا يُكتَب أبداً إلى
+  // `pagePresentation`، لا يُرسَل مع الحفظ/النشر، ولا يُغيِّر `dirty`/`lifecycle`.
+  const [previewCategoryId, setPreviewCategoryId] = useState<string | null>(null);
+  const [previewCategory, setPreviewCategory] =
+    useState<WorkspaceCategoryDetail | null>(null);
+  const [previewCategoryState, setPreviewCategoryState] = useState<
+    "idle" | "loading" | "error" | "empty" | "ready"
+  >("idle");
+  const [categoryList, setCategoryList] = useState<WorkspaceCategorySummary[]>([]);
+  const [categoryListState, setCategoryListState] = useState<
+    "idle" | "loading" | "error" | "ready"
+  >("idle");
+  const [categorySearch, setCategorySearch] = useState("");
+  const [selectedCategoryRegion, setSelectedCategoryRegion] = useState<string | null>(null);
+  const categoryListRequestRef = useRef(0);
+  const previewCategoryRequestRef = useRef(0);
+  // CUST-H2-4 — منتجات `product_grid` الحقيقية للتصنيف المُعايَن حالياً
+  // (راجع `StorefrontPreviewCanvas`'s `CategoryPagePreview` — لا بيانات
+  // مُختلَقة، مصدرها الوحيد واجهة منتجات مساحة العمل نفسها بمرشِّح `category_id`).
+  const [categoryGridProducts, setCategoryGridProducts] = useState<WorkspaceProductSummary[]>([]);
+  const [categoryGridProductsTotal, setCategoryGridProductsTotal] = useState(0);
+  const [categoryGridProductsState, setCategoryGridProductsState] = useState<
+    "idle" | "loading" | "error" | "ready"
+  >("idle");
+  const categoryGridRequestRef = useRef(0);
   const [pendingSectionScroll, setPendingSectionScroll] = useState<
     string | null
   >(null);
@@ -248,17 +287,20 @@ export function ExperienceBuilder({
   // "معطَّلة" جديدة.
   // CUST-H2-3 — نفس منطق إخفاء "homepage" أعلاه بالضبط، معكوساً: لوحة "product"
   // صالحة على صفحة المنتج فقط.
+  // CUST-H2-4 — نفس المنطق بالضبط للوحة "category": صالحة على صفحة التصنيف فقط.
   const visibleNavGroups = CUSTOMIZER_NAV_GROUPS.map((group) => ({
     items: group.items.filter(
       (item) =>
         (item.id !== "homepage" || currentPage === "home")
-        && (item.id !== "product" || currentPage === "product"),
+        && (item.id !== "product" || currentPage === "product")
+        && (item.id !== "category" || currentPage === "category"),
     ),
   })).filter((group) => group.items.length > 0);
   const visiblePanels = CUSTOMIZER_PANELS.filter(
     (item) =>
       (item.id !== "homepage" || currentPage === "home")
-      && (item.id !== "product" || currentPage === "product"),
+      && (item.id !== "product" || currentPage === "product")
+      && (item.id !== "category" || currentPage === "category"),
   );
   const activePanel = CUSTOMIZER_PANELS.find((item) => item.id === panel);
   const isPublishedReadOnly = selectedVersion?.state === "published";
@@ -580,6 +622,20 @@ export function ExperienceBuilder({
     setProductListState("idle");
     setProductSearch("");
     setSelectedProductRegion(null);
+    // CUST-H2-4 — نفس منطق المنتج أعلاه بالضبط لسياق التصنيف.
+    ++previewCategoryRequestRef.current;
+    ++categoryListRequestRef.current;
+    ++categoryGridRequestRef.current;
+    setPreviewCategoryId(null);
+    setPreviewCategory(null);
+    setPreviewCategoryState("idle");
+    setCategoryList([]);
+    setCategoryListState("idle");
+    setCategorySearch("");
+    setSelectedCategoryRegion(null);
+    setCategoryGridProducts([]);
+    setCategoryGridProductsTotal(0);
+    setCategoryGridProductsState("idle");
 
     if (!storefrontId) {
       setBusy(null);
@@ -674,6 +730,160 @@ export function ExperienceBuilder({
       setPreviewProductState("ready");
     })();
   }, [storefrontId, previewProductId, productList]);
+
+  // CUST-H2-4 — نفس منطق `effectiveProductRegions` أعلاه بالضبط، للتصنيف.
+  const effectiveCategoryRegions: PageRegionInstance<CategoryPageRegionKey>[] =
+    draft.pagePresentation?.category?.regions ?? defaultCategoryPageRegions();
+
+  async function loadCategoryList(search?: string) {
+    if (!storefrontId) return;
+    const token = ++categoryListRequestRef.current;
+    const originStorefrontId = storefrontId;
+    setCategoryListState("loading");
+    const result = await listWorkspaceCategories(storefrontId, { search: search || undefined, perPage: 50 });
+    if (token !== categoryListRequestRef.current || storefrontIdRef.current !== originStorefrontId) return;
+    if (!result.ok) {
+      setCategoryListState("error");
+      setCategoryList([]);
+      return;
+    }
+    setCategoryListState("ready");
+    setCategoryList(result.data);
+    if (result.data.length === 0) {
+      setPreviewCategoryId(null);
+      setPreviewCategoryState("empty");
+      return;
+    }
+    // "Otherwise select the first eligible Category deterministically" —
+    // only when there is no current selection yet, never overriding a
+    // merchant's own (still-eligible) choice merely because the list
+    // reloaded (e.g. after a search).
+    setPreviewCategoryId((current) => current ?? result.data[0].id);
+  }
+
+  useEffect(() => {
+    if (currentPage !== "category" || !storefrontId || categoryListState !== "idle") return;
+    void loadCategoryList();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPage, storefrontId, categoryListState]);
+
+  useEffect(() => {
+    if (!storefrontId || !previewCategoryId) return;
+    const token = ++previewCategoryRequestRef.current;
+    const originStorefrontId = storefrontId;
+    const originCategoryId = previewCategoryId;
+    setPreviewCategoryState("loading");
+    void (async () => {
+      const result = await showWorkspaceCategory(storefrontId, originCategoryId);
+      if (token !== previewCategoryRequestRef.current || storefrontIdRef.current !== originStorefrontId) return;
+      if (!result.ok) {
+        if (result.reason === "not_found") {
+          // Category deleted/unpublished between requests — never resurrect
+          // a stale entity; fall back to a different eligible Category from
+          // the already-loaded list, or an honest empty state if none remain.
+          const fallback = categoryList.find((c) => c.id !== originCategoryId) ?? null;
+          setPreviewCategory(null);
+          if (fallback) {
+            setPreviewCategoryId(fallback.id);
+          } else {
+            setPreviewCategoryId(null);
+            setPreviewCategoryState("empty");
+          }
+          return;
+        }
+        setPreviewCategory(null);
+        setPreviewCategoryState("error");
+        return;
+      }
+      setPreviewCategory(result.data);
+      setPreviewCategoryState("ready");
+    })();
+  }, [storefrontId, previewCategoryId, categoryList]);
+
+  // CUST-H2-4 — منطقة `product_grid` الحقيقية: تُجلَب فقط حين تكون مرئية
+  // فعلاً (تحسين أداء بسيط، لا شرط صحة) ولها تصنيفٌ جاهزٌ فعلاً. مرشَّحة على
+  // `category_id` عبر نفس واجهة منتجات مساحة العمل (H2-3) — لا قائمة تُصفَّى
+  // محلياً ولا عضوية منتَجة مُختَلَقة.
+  //
+  // `categoryGridVisible` عمداً بدائيٌّ (boolean) لا المصفوفة الكاملة: مصفوفة
+  // `effectiveCategoryRegions` مرجعٌ جديد كل تصيير (سقوطٌ آمن على
+  // `defaultCategoryPageRegions()` الذي يُنشئ مصفوفة جديدة دوماً) — لو اعتمد
+  // هذا التأثير عليها مباشرةً لأعاد التشغيل عند كل تصيير، فيُبطِل طلبه
+  // السابق عبر `categoryGridRequestRef` قبل أن يستقر أيّ طلبٍ فعلياً (سباقٌ
+  // ذاتيّ لا ينتهي أبداً إلى "ready" — وُجد بالفحص البصري الفعلي، لا نظرياً).
+  const categoryGridVisible =
+    effectiveCategoryRegions.find((r) => r.key === "product_grid")?.visible ?? true;
+
+  useEffect(() => {
+    if (!storefrontId || previewCategoryState !== "ready" || !previewCategoryId) return;
+    if (!categoryGridVisible) return;
+    const token = ++categoryGridRequestRef.current;
+    const originStorefrontId = storefrontId;
+    const originCategoryId = previewCategoryId;
+    setCategoryGridProductsState("loading");
+    void (async () => {
+      const result = await listWorkspaceProducts(storefrontId, { categoryId: originCategoryId, perPage: 6 });
+      if (token !== categoryGridRequestRef.current || storefrontIdRef.current !== originStorefrontId) return;
+      if (!result.ok) {
+        setCategoryGridProductsState("error");
+        setCategoryGridProducts([]);
+        setCategoryGridProductsTotal(0);
+        return;
+      }
+      setCategoryGridProductsState("ready");
+      setCategoryGridProducts(result.data);
+      // The list endpoint's own pagination meta does not surface a bare
+      // "total" the picker needs here beyond `hasMore` — the bounded page
+      // itself is the honest count when there is no next page, and "more
+      // than this page" otherwise; a precise total is not needed for a
+      // structural editor preview and pagination model is commerce-
+      // authoritative in H2 V1 per the locked contract, not a presentation
+      // concern.
+      setCategoryGridProductsTotal(result.data.length + (result.hasMore ? 1 : 0));
+    })();
+  }, [storefrontId, previewCategoryId, previewCategoryState, categoryGridVisible]);
+
+  function handleSelectPreviewCategory(category: WorkspaceCategorySummary) {
+    if (category.id === previewCategoryId) return;
+    setPreviewCategoryId(category.id);
+  }
+
+  function handleCategorySearchChange(value: string) {
+    setCategorySearch(value);
+    void loadCategoryList(value);
+  }
+
+  function handleRetryCategoryList() {
+    void loadCategoryList(categorySearch);
+  }
+
+  function handleSelectCategoryRegion(id: string) {
+    setSelectedCategoryRegion(id);
+    setPanel("category");
+    if (typeof window !== "undefined" && window.innerWidth < 768) {
+      setMobileSheet("settings");
+    }
+  }
+
+  function writeCategoryRegions(regions: PageRegionInstance<CategoryPageRegionKey>[]) {
+    updateDraft({
+      ...draft,
+      pagePresentation: { ...draft.pagePresentation, category: { version: 1, regions } },
+    });
+  }
+
+  function handleToggleCategoryRegionVisibility(id: string) {
+    const regions = effectiveCategoryRegions.map((region) =>
+      region.id === id ? { ...region, visible: !region.visible } : region,
+    );
+    writeCategoryRegions(regions);
+  }
+
+  function handleMoveCategoryRegion(id: string, delta: 1 | -1) {
+    const index = effectiveCategoryRegions.findIndex((region) => region.id === id);
+    if (index < 0) return;
+    writeCategoryRegions(moveCategoryRegion(effectiveCategoryRegions, index, delta));
+  }
 
   function handleSelectPreviewProduct(product: WorkspaceProductSummary) {
     if (product.id === previewProductId) return;
@@ -1305,10 +1515,17 @@ export function ExperienceBuilder({
       // are untouched, only this transient selection UI state.
       setSelectedProductRegion(null);
     }
+    if (page !== "category") {
+      // Same rule as Product above, for Category region selection.
+      setSelectedCategoryRegion(null);
+    }
     if (page !== "home" && panel === "homepage") {
       setPanel("theme");
     }
     if (page !== "product" && panel === "product") {
+      setPanel("theme");
+    }
+    if (page !== "category" && panel === "category") {
       setPanel("theme");
     }
   }
@@ -1442,6 +1659,21 @@ export function ExperienceBuilder({
           onSelectRegion={handleSelectProductRegion}
           onToggleVisibility={handleToggleProductRegionVisibility}
           onMove={handleMoveProductRegion}
+          readOnly={isPublishedReadOnly}
+        />
+      );
+    }
+    // CUST-H2-4 — نفس منطق المنتج أعلاه بالضبط: بنية صفحة التصنيف تُعرَض
+    // دوماً على صفحة التصنيف، حتى على نسخة منشورة (تصفّح/اختيار معاينة فقط).
+    if (panelForSlot === "category" && currentPage === "category") {
+      return (
+        <CategoryRegionInspector
+          locale={locale}
+          regions={effectiveCategoryRegions}
+          selectedRegionId={selectedCategoryRegion}
+          onSelectRegion={handleSelectCategoryRegion}
+          onToggleVisibility={handleToggleCategoryRegionVisibility}
+          onMove={handleMoveCategoryRegion}
           readOnly={isPublishedReadOnly}
         />
       );
@@ -1587,6 +1819,25 @@ export function ExperienceBuilder({
                 onRetry={handleRetryProductList}
                 onOpenChange={(open) => {
                   if (open && productListState === "idle") void loadProductList();
+                }}
+              />
+            ) : null}
+            {currentPage === "category" && storefrontId ? (
+              <CategoryPreviewPicker
+                locale={locale}
+                selectedCategory={
+                  previewCategory
+                    ? { id: previewCategory.id, name: previewCategory.name, parentId: previewCategory.parentId, parentName: null }
+                    : (categoryList.find((c) => c.id === previewCategoryId) ?? null)
+                }
+                listState={categoryListState === "idle" ? "loading" : categoryListState}
+                categories={categoryList}
+                search={categorySearch}
+                onSearchChange={handleCategorySearchChange}
+                onSelect={handleSelectPreviewCategory}
+                onRetry={handleRetryCategoryList}
+                onOpenChange={(open) => {
+                  if (open && categoryListState === "idle") void loadCategoryList();
                 }}
               />
             ) : null}
@@ -2006,6 +2257,14 @@ export function ExperienceBuilder({
                   productRegions={effectiveProductRegions}
                   selectedProductRegionId={selectedProductRegion}
                   onSelectProductRegion={handleSelectProductRegion}
+                  categoryPreviewState={previewCategoryState}
+                  previewCategory={previewCategory}
+                  categoryRegions={effectiveCategoryRegions}
+                  selectedCategoryRegionId={selectedCategoryRegion}
+                  onSelectCategoryRegion={handleSelectCategoryRegion}
+                  categoryGridProductsState={categoryGridProductsState}
+                  categoryGridProducts={categoryGridProducts.map((p) => ({ id: p.id, name: p.name, thumbnailUrl: p.thumbnailUrl }))}
+                  categoryGridProductsTotal={categoryGridProductsTotal}
                 />
               </div>
             </div>
@@ -2067,11 +2326,32 @@ export function ExperienceBuilder({
               {t("design")}
             </button>
           </>
+        ) : currentPage === "category" ? (
+          // CUST-H2-4 — نفس مبدأ المنتج أعلاه بالضبط، لصفحة التصنيف.
+          <>
+            <button
+              type="button"
+              className="flex min-h-11 flex-1 items-center justify-center rounded-md border border-border text-sm font-medium text-text hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+              onClick={() => setMobileSheet("category-picker")}
+            >
+              {t("categoryPickerTriggerLabel")}
+            </button>
+            <button
+              type="button"
+              className="flex min-h-11 flex-1 items-center justify-center rounded-md bg-primary text-sm font-semibold text-primary-foreground shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+              onClick={() => { setPanel("category"); setMobileSheet("sections"); }}
+            >
+              {t("categoryRegionsPanelLabel")}
+            </button>
+            <button
+              type="button"
+              className="flex min-h-11 flex-1 items-center justify-center rounded-md border border-border text-sm font-medium text-text hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+              onClick={() => { setPanel("theme"); setMobileSheet("design"); }}
+            >
+              {t("design")}
+            </button>
+          </>
         ) : (
-          // تصنيف: لا أقسام رئيسية تُحرَّر هنا بعد (CUST-H2-4) — "الأقسام"/
-          // "+ إضافة قسم" تختصّان بمركّب الرئيسية حصراً؛ عرضهما هنا كان
-          // يوحي بتحرير مناطق غير موجودة فعلياً. "التصميم" العالمي يبقى
-          // صالحاً على كل صفحة فيبقى متاحاً وحده.
           <button
             type="button"
             className="flex min-h-11 flex-1 items-center justify-center rounded-md bg-primary text-sm font-semibold text-primary-foreground shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
@@ -2095,7 +2375,9 @@ export function ExperienceBuilder({
               mobileSheet === "sections"
                 ? currentPage === "product"
                   ? t("productRegionsPanelLabel")
-                  : t("sections")
+                  : currentPage === "category"
+                    ? t("categoryRegionsPanelLabel")
+                    : t("sections")
                 : mobileSheet === "design"
                   ? t("design")
                   : mobileSheet === "versions"
@@ -2104,9 +2386,11 @@ export function ExperienceBuilder({
                       ? t("pageNavigatorMenuTitle")
                       : mobileSheet === "product-picker"
                         ? t("productPickerMenuTitle")
-                        : activePanel
-                          ? t(activePanel.label)
-                          : t("edit")
+                        : mobileSheet === "category-picker"
+                          ? t("categoryPickerMenuTitle")
+                          : activePanel
+                            ? t(activePanel.label)
+                            : t("edit")
             }
             className="flex max-h-[86dvh] w-full flex-col rounded-t-2xl border-t border-border bg-surface shadow-2xl"
           >
@@ -2115,7 +2399,9 @@ export function ExperienceBuilder({
                 {mobileSheet === "sections"
                   ? currentPage === "product"
                     ? t("productRegionsPanelLabel")
-                    : t("sections")
+                    : currentPage === "category"
+                      ? t("categoryRegionsPanelLabel")
+                      : t("sections")
                   : mobileSheet === "design"
                     ? t("design")
                     : mobileSheet === "versions"
@@ -2124,9 +2410,11 @@ export function ExperienceBuilder({
                         ? t("pageNavigatorMenuTitle")
                         : mobileSheet === "product-picker"
                           ? t("productPickerMenuTitle")
-                          : activePanel
-                            ? t(activePanel.label)
-                            : t("edit")}
+                          : mobileSheet === "category-picker"
+                            ? t("categoryPickerMenuTitle")
+                            : activePanel
+                              ? t(activePanel.label)
+                              : t("edit")}
               </h2>
               <button
                 type="button"
@@ -2187,8 +2475,26 @@ export function ExperienceBuilder({
                   }}
                   onRetry={handleRetryProductList}
                 />
+              ) : mobileSheet === "category-picker" ? (
+                <CategoryPreviewPickerPanel
+                  locale={locale}
+                  listState={
+                    categoryListState === "idle" ? "loading" : categoryListState
+                  }
+                  categories={categoryList}
+                  selectedCategoryId={previewCategoryId}
+                  search={categorySearch}
+                  onSearchChange={handleCategorySearchChange}
+                  onSelect={(category) => {
+                    handleSelectPreviewCategory(category);
+                    setMobileSheet(null);
+                  }}
+                  onRetry={handleRetryCategoryList}
+                />
               ) : mobileSheet === "sections" ? (
-                renderInspectorBody(currentPage === "product" ? "product" : "homepage")
+                renderInspectorBody(
+                  currentPage === "product" ? "product" : currentPage === "category" ? "category" : "homepage",
+                )
               ) : (
                 renderInspectorBody(mobileSheet === "design" ? "theme" : panel)
               )}
@@ -2501,6 +2807,11 @@ function NavIcon({ panel }: { panel: CustomizerPanel }) {
       <svg {...common}>
         <path d="M2.5 5 8 2.5 13.5 5v6L8 13.5 2.5 11z" />
         <path d="M2.5 5 8 7.5 13.5 5M8 7.5v6" />
+      </svg>
+    ),
+    category: (
+      <svg {...common}>
+        <path d="M2.5 3.5h11M2.5 8h11M2.5 12.5h5" strokeLinecap="round" />
       </svg>
     ),
     footer: (

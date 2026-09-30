@@ -71,6 +71,10 @@ class CommerceModuleBoundaryTest extends TestCase
         'api/commerce/workspace/storefronts',
         'api/commerce/workspace/storefronts/{id}',
         'api/commerce/workspace/storefronts/{id}/activate',
+        // CUST-H2-4 — قراءة تصنيفات مساحة عمل Commerce لمنتقي "معاينة تصنيف"
+        // في مُخصِّص صفحة التصنيف. قراءة فقط، أهليتها مقيَّدة بقناة هذا المتجر تحديداً.
+        'api/commerce/workspace/storefronts/{id}/categories',
+        'api/commerce/workspace/storefronts/{id}/categories/{category}',
         'api/commerce/workspace/storefronts/{id}/deactivate',
         'api/commerce/workspace/storefronts/{id}/domains',
         'api/commerce/workspace/storefronts/{id}/domains/{domainId}',

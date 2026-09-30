@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Resources\StorefrontProductResource;
+use App\Models\CommerceCategoryListing;
 use App\Models\CommerceListing;
 use App\Models\Product;
 use App\Models\Storefront;
@@ -68,6 +69,7 @@ class CommerceWorkspaceStorefrontProductController extends ApiController
 
         $filters = $request->validate([
             'search' => ['sometimes', 'nullable', 'string', 'max:120'],
+            'category_id' => ['sometimes', 'nullable', 'uuid'],
             'page' => ['sometimes', 'nullable', 'integer', 'min:1'],
             'per_page' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:'.self::PER_PAGE_MAX],
         ]);
@@ -87,6 +89,22 @@ class CommerceWorkspaceStorefrontProductController extends ApiController
                 ->where('name', 'like', $like)
                 ->orWhere('name_en', 'like', $like)
                 ->orWhere('sku', 'like', $like));
+        }
+
+        if (filled($filters['category_id'] ?? null)) {
+            // CUST-H2-4 — يغذّي معاينة منطقة `product_grid` الحقيقية في
+            // مُخصِّص صفحة التصنيف بمنتجات فعلية منتمية لتصنيفٍ بعينه، بنفس
+            // بوابة نشر التصنيف الموثوقة التي يطبّقها `CommerceProductController`
+            // العام حرفياً (تصنيفٌ غير منشور على هذه القناة تحديداً → نتيجة
+            // فارغة حتمية، لا خطأ) — استقلالية كاملة عن بوابة نشر المنتج نفسه.
+            $categoryId = (string) $filters['category_id'];
+            $query->where('category_id', $categoryId);
+            $categoryPublished = CommerceCategoryListing::publishedOn($storefront->sales_channel_id)
+                ->where('category_id', $categoryId)
+                ->exists();
+            if (! $categoryPublished) {
+                $query->whereRaw('0 = 1');
+            }
         }
 
         $perPage = min((int) ($filters['per_page'] ?? self::PER_PAGE_DEFAULT), self::PER_PAGE_MAX);

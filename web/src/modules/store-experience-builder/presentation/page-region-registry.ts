@@ -290,3 +290,47 @@ export function moveProductRegion<T extends { key: string }>(
   next.splice(target, 0, item);
   return next;
 }
+
+/**
+ * CUST-H2-4 — reorderable Category regions. Unlike Product (where every
+ * non-FIXED_REQUIRED region is reorderable), the Category Page Region
+ * Contract (architecture doc — "Category Page Region Contract" table) marks
+ * `description`'s Reorderable column "No": it may be hidden/shown, but ARCH-1
+ * records no arbitrary-reorder requirement for it. Only `subcategories_rail`
+ * is "Yes (position)". **AWJ Decision**: the generic "skip past a fixed
+ * anchor" rule alone (as used for Product) is not enough here, because it
+ * would also let `description` initiate a move — so a region may only
+ * *initiate* a move when it is in this explicit reorderable set; the region
+ * on the other side of the swap does not need to be in the set itself (a
+ * swap changes both regions' positions, but only the moving region needs
+ * `move` permission — the same relationship a swap already has for Product's
+ * `availability`/`variant_selector` pair).
+ */
+const REORDERABLE_CATEGORY_REGION_KEYS: readonly CategoryPageRegionKey[] = ["subcategories_rail"];
+
+export function canMoveCategoryRegion<T extends { key: string }>(
+  regions: readonly T[],
+  index: number,
+  delta: 1 | -1,
+): boolean {
+  const target = index + delta;
+  if (index < 0 || index >= regions.length || target < 0 || target >= regions.length) return false;
+  if (!(REORDERABLE_CATEGORY_REGION_KEYS as readonly string[]).includes(regions[index].key)) return false;
+  if (isFixedRequiredRegion("category", regions[index].key) || isFixedRequiredRegion("category", regions[target].key)) {
+    return false;
+  }
+  return true;
+}
+
+export function moveCategoryRegion<T extends { key: string }>(
+  regions: readonly T[],
+  index: number,
+  delta: 1 | -1,
+): T[] {
+  if (!canMoveCategoryRegion(regions, index, delta)) return regions.slice();
+  const target = index + delta;
+  const next = regions.slice();
+  const [item] = next.splice(index, 1);
+  next.splice(target, 0, item);
+  return next;
+}

@@ -122,6 +122,26 @@ export function defaultProductPageRegions(): PageRegionInstance<ProductPageRegio
   return PRODUCT_PAGE_REGION_KEYS.map((key) => ({ id: key, key, visible: true }));
 }
 
+/**
+ * CUST-H2-4 — canonical default Category-page region order, deterministically
+ * derived from `CATEGORY_PAGE_REGION_KEYS`'s own declaration order (already
+ * exactly the real component tree order: `CategoryBanner.tsx` renders
+ * breadcrumbs → identity/title → description → subcategories rail, then
+ * `ProductListing.tsx` renders the filter/sort bar → the product grid —
+ * verified against both files directly, not guessed). Every region starts
+ * `visible: true`: the least-surprising initial state, since it reproduces
+ * today's real Category page output exactly before the merchant changes
+ * anything.
+ *
+ * Used only as an **in-memory fallback** when `pagePresentation.category` is
+ * absent from the draft — never written to the draft merely by reading it
+ * (see `ExperienceBuilder`'s `effectiveCategoryRegions`). Only an actual edit
+ * (a toggle or a reorder) materializes this shape into the draft.
+ */
+export function defaultCategoryPageRegions(): PageRegionInstance<CategoryPageRegionKey>[] {
+  return CATEGORY_PAGE_REGION_KEYS.map((key) => ({ id: key, key, visible: true }));
+}
+
 function asString(value: unknown, fallback = ""): string {
   return typeof value === "string" ? value : fallback;
 }
