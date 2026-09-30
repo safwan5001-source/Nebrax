@@ -40,6 +40,7 @@ use App\Http\Controllers\Api\CommerceShippingZoneController;
 use App\Http\Controllers\Api\CommerceWorkspaceStorefrontsController;
 use App\Http\Controllers\Api\CommerceWorkspaceStorefrontPresentationController;
 use App\Http\Controllers\Api\CommerceWorkspaceStorefrontPresentationVersionController;
+use App\Http\Controllers\Api\CommerceWorkspaceStorefrontCategoryController;
 use App\Http\Controllers\Api\CommerceWorkspaceStorefrontProductController;
 use App\Http\Controllers\Api\CorporateFuelContractController;
 use App\Http\Controllers\Api\ContactController;
@@ -942,6 +943,19 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
             ->middleware($perm('commerce.manage'));
         Route::get('commerce/workspace/storefronts/{id}/products/{product}', [CommerceWorkspaceStorefrontProductController::class, 'show'])
             ->whereUuid('id')->whereUuid('product')
+            ->middleware($perm('commerce.manage'));
+
+        // CUST-H2-4: قراءة تصنيفات مساحة عمل Commerce — منتقي "معاينة تصنيف"
+        // في مُخصِّص صفحة التصنيف. قراءة فقط، بلا سلطة نشر/شجرة/عضوية منتج —
+        // معرّف التصنيف مُحدِّدٌ لا سلطة. نفس صلاحية بقية مسارات المتجر/النسخ/
+        // المنتج (commerce.manage) — لا صلاحية جديدة. الأهلية مقيَّدة بقناة
+        // *هذا* المتجر تحديداً (`Storefront.sales_channel_id`)، بنفس نمط
+        // CUST-H2-3.
+        Route::get('commerce/workspace/storefronts/{id}/categories', [CommerceWorkspaceStorefrontCategoryController::class, 'index'])
+            ->whereUuid('id')
+            ->middleware($perm('commerce.manage'));
+        Route::get('commerce/workspace/storefronts/{id}/categories/{category}', [CommerceWorkspaceStorefrontCategoryController::class, 'show'])
+            ->whereUuid('id')->whereUuid('category')
             ->middleware($perm('commerce.manage'));
 
         // COM-MOBILE-SHIPPING-1 (ADR-10): مناطق شحن مُهيَّأة من التاجر —

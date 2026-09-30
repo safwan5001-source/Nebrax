@@ -2,8 +2,10 @@
 
 namespace Tests\Feature;
 
+use App\Models\CommerceCategoryListing;
 use App\Models\CommerceListing;
 use App\Models\Product;
+use App\Models\ProductCategory;
 use App\Models\SalesChannel;
 use App\Models\Storefront;
 use App\Models\Tenant;
@@ -381,5 +383,56 @@ class CommerceWorkspaceStorefrontProductApiTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.is_variant_managed', true)
             ->assertJsonPath('data.variants', []);
+    }
+
+    // ───────────────────────── CUST-H2-4 — category_id filter (feeds the Category-page product grid preview) ─────────────────────────
+
+    /** @test */
+    public function category_id_filters_the_list_to_that_categorys_own_eligible_products(): void
+    {
+        $auth = $this->registerTenant('prod-cat-filter', 'owner@prod-cat-filter.test');
+        $seeded = $this->seedWebStorefront($auth['tenant_id']);
+
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $category = ProductCategory::create(['name' => 'تصنيف', 'is_active' => true]);
+        CommerceCategoryListing::create([
+            'tenant_id' => $auth['tenant_id'],
+            'category_id' => $category->id,
+            'sales_channel_id' => $seeded['channel']->id,
+            'is_published' => true,
+        ]);
+        app(TenantContext::class)->forget();
+
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $inCategory = $this->seedProduct($seeded['channel'], ['name' => 'داخل التصنيف', 'category_id' => $category->id]);
+        $this->seedProduct($seeded['channel'], ['name' => 'خارج التصنيف']);
+        app(TenantContext::class)->forget();
+
+        $res = $this->withToken($auth['token'])
+            ->getJson($this->listPath($seeded['storefront']->id).'?category_id='.$category->id)
+            ->assertOk();
+
+        $this->assertSame([$inCategory->id], array_column($res->json('data'), 'id'));
+    }
+
+    /** @test */
+    public function category_id_for_an_unpublished_category_returns_an_empty_list_not_an_error(): void
+    {
+        $auth = $this->registerTenant('prod-cat-filter-unpub', 'owner@prod-cat-filter-unpub.test');
+        $seeded = $this->seedWebStorefront($auth['tenant_id']);
+
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $category = ProductCategory::create(['name' => 'تصنيف غير منشور', 'is_active' => true]);
+        app(TenantContext::class)->forget();
+
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $this->seedProduct($seeded['channel'], ['name' => 'منتج', 'category_id' => $category->id]);
+        app(TenantContext::class)->forget();
+
+        $res = $this->withToken($auth['token'])
+            ->getJson($this->listPath($seeded['storefront']->id).'?category_id='.$category->id)
+            ->assertOk();
+
+        $this->assertSame([], $res->json('data'));
     }
 }

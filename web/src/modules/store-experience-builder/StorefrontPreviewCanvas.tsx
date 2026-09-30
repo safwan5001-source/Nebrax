@@ -17,8 +17,9 @@ import {
   previewStoreName,
   type StorefrontPresentationConfig,
 } from "./presentation/config";
-import type { PageRegionInstance, PageType, ProductPageRegionKey } from "./presentation/page-regions";
+import type { CategoryPageRegionKey, PageRegionInstance, PageType, ProductPageRegionKey } from "./presentation/page-regions";
 import type { WorkspaceProductDetail } from "@/modules/commerce-workspace/workspace-products";
+import type { WorkspaceCategoryDetail } from "@/modules/commerce-workspace/workspace-categories";
 import { displayLocale } from "@/lib/formatting";
 import { PageIcon, pageLabelKey } from "./PageNavigatorPanel";
 import { presentationCssVars } from "./presentation/tokens";
@@ -104,6 +105,26 @@ interface StorefrontPreviewCanvasProps {
   productRegions?: PageRegionInstance<ProductPageRegionKey>[];
   selectedProductRegionId?: string | null;
   onSelectProductRegion?: (id: string) => void;
+  /**
+   * CUST-H2-4 — the currently previewed Category (editor context only, never
+   * presentation authority — see `ExperienceBuilder`'s `previewCategoryId`)
+   * and its structured region document. Same optionality contract as the
+   * Product props above.
+   */
+  categoryPreviewState?: "idle" | "loading" | "error" | "empty" | "ready";
+  previewCategory?: WorkspaceCategoryDetail | null;
+  categoryRegions?: PageRegionInstance<CategoryPageRegionKey>[];
+  selectedCategoryRegionId?: string | null;
+  onSelectCategoryRegion?: (id: string) => void;
+  /**
+   * CUST-H2-4 — the `product_grid` region's real, bounded product preview
+   * for the currently previewed Category (see `CategoryPagePreview`'s own
+   * doc comment). Sourced from the same Workspace Product API H2-3 built,
+   * filtered by `category_id` — never invented client-side.
+   */
+  categoryGridProductsState?: "idle" | "loading" | "error" | "ready";
+  categoryGridProducts?: { id: string; name: string; thumbnailUrl: string | null }[];
+  categoryGridProductsTotal?: number;
 }
 
 export interface StorefrontBusinessIdentity {
@@ -135,6 +156,14 @@ export function StorefrontPreviewCanvas({
   productRegions,
   selectedProductRegionId = null,
   onSelectProductRegion,
+  categoryPreviewState = "idle",
+  previewCategory = null,
+  categoryRegions,
+  selectedCategoryRegionId = null,
+  onSelectCategoryRegion,
+  categoryGridProductsState = "idle",
+  categoryGridProducts = [],
+  categoryGridProductsTotal = 0,
 }: StorefrontPreviewCanvasProps) {
   const t = (key: CustomizerMessageKey) => customizerMessage(locale, key);
   const storeName = previewStoreName(
@@ -434,8 +463,19 @@ export function StorefrontPreviewCanvas({
           selectedRegionId={selectedProductRegionId}
           onSelectRegion={onSelectProductRegion}
         />
-      ) : page !== "home" ? (
-        <PagePlaceholder page={page} locale={locale} density={density} />
+      ) : page === "category" ? (
+        <CategoryPagePreview
+          locale={locale}
+          density={density}
+          state={categoryPreviewState}
+          category={previewCategory}
+          regions={categoryRegions ?? []}
+          selectedRegionId={selectedCategoryRegionId}
+          onSelectRegion={onSelectCategoryRegion}
+          gridProductsState={categoryGridProductsState}
+          gridProducts={categoryGridProducts}
+          gridProductsTotal={categoryGridProductsTotal}
+        />
       ) : (
       <div
         className={cn(
@@ -1364,45 +1404,232 @@ function ProductPlaceholderGlyph() {
 }
 
 /**
- * CUST-H2-2 — honest "not yet editable" shell for Category (Product now has
- * its own real preview above, CUST-H2-3). No fake product/category data
- * (`PREVIEW_PRODUCTS`/`PREVIEW_CATEGORIES` stay Homepage-only fixtures —
- * never promoted here as if they were a real merchant Product/Category, per
- * ARCH-1's Preview Context Model). Structured Category region editing is
- * CUST-H2-4's scope, not this slice's.
+ * CUST-H2-4 — real structured Category-page preview. Same reasoning as
+ * `ProductPagePreview` above: reuses the exact presentation meaning of
+ * `CategoryBanner.tsx` (breadcrumbs → title → description → subcategories
+ * rail) + `ProductListing.tsx` (filter/sort bar → product grid) via inline
+ * JSX and the same `store-*` CSS-variable classes, not a cross-package
+ * import. Region order/visibility comes from `regions` (the caller's
+ * already-resolved effective list). `description`/`subcategories_rail`
+ * honestly omit themselves when the previewed Category has no such data,
+ * exactly like the real `CategoryBanner.tsx` does — never fabricating
+ * content.
+ *
+ * **Filter/sort bar is a non-interactive shell** (AWJ Decision — see the
+ * implementation report's "Product Grid/Filter-Sort Preview Policy"):
+ * rendering the real, authoritative facet/sort UI over editor-context data
+ * would let the Customizer fork commerce query/filter semantics it has no
+ * authority over (the locked contract explicitly forbids this) — so it
+ * shows the real shell labels, disabled, never a fake filter that pretends
+ * to work. **Product grid uses real data**: `gridProducts`/`gridProductsTotal`
+ * come from the same authoritative Workspace Product API H2-3 built,
+ * filtered by this Category's own id (`category_id`) — the identical
+ * membership + publication gate the public Commerce API already applies —
+ * never a client-filtered slice of an unrelated list and never a fabricated
+ * count.
  */
-function PagePlaceholder({
-  page,
+function CategoryPagePreview({
   locale,
   density,
+  state,
+  category,
+  regions,
+  selectedRegionId,
+  onSelectRegion,
+  gridProductsState,
+  gridProducts,
+  gridProductsTotal,
 }: {
-  page: Exclude<PageType, "home">;
   locale: CustomizerLocale;
   density: "compact" | "comfortable";
+  state: "idle" | "loading" | "error" | "empty" | "ready";
+  category: WorkspaceCategoryDetail | null;
+  regions: PageRegionInstance<CategoryPageRegionKey>[];
+  selectedRegionId?: string | null;
+  onSelectRegion?: (id: string) => void;
+  gridProductsState?: "idle" | "loading" | "error" | "ready";
+  gridProducts?: { id: string; name: string; thumbnailUrl: string | null }[];
+  gridProductsTotal?: number;
 }) {
   const t = (key: CustomizerMessageKey) => customizerMessage(locale, key);
-  const bodyKey: CustomizerMessageKey =
-    page === "product" ? "pageProductPlaceholderBody" : "pageCategoryPlaceholderBody";
+
+  if (state !== "ready" || category === null) {
+    const bodyKey: CustomizerMessageKey =
+      state === "loading"
+        ? "categoryPreviewLoading"
+        : state === "error"
+          ? "categoryPreviewLoadFailed"
+          : state === "empty"
+            ? "categoryPreviewNoEligibleCategories"
+            : "categoryPreviewSelectACategory";
+    return (
+      <div
+        data-category-preview-state={state}
+        className={cn(
+          storeContainerClassName,
+          density === "compact" ? "py-10" : "py-14 md:py-20",
+        )}
+      >
+        <div className="mx-auto flex max-w-sm flex-col items-center gap-3 text-center">
+          <span className="inline-flex size-12 items-center justify-center rounded-full bg-store-surface-muted text-store-muted-foreground">
+            <PageIcon page="category" />
+          </span>
+          <p className="text-sm leading-6 text-store-muted-foreground">{t(bodyKey)}</p>
+        </div>
+      </div>
+    );
+  }
+
+  const wrap = (region: PageRegionInstance<CategoryPageRegionKey>, children: ReactNode) => (
+    <CategoryRegionShell
+      key={region.id}
+      region={region}
+      selected={region.id === selectedRegionId}
+      onSelect={onSelectRegion}
+    >
+      {children}
+    </CategoryRegionShell>
+  );
+
+  const visibleRegions = regions.filter((region) => region.visible);
+
   return (
     <div
-      data-page-placeholder={page}
+      data-category-preview="ready"
       className={cn(
         storeContainerClassName,
-        density === "compact" ? "py-10" : "py-14 md:py-20",
+        density === "compact" ? "space-y-3 py-3" : "space-y-4 py-5 md:py-6",
       )}
     >
-      <div className="mx-auto flex max-w-sm flex-col items-center gap-3 text-center">
-        <span className="inline-flex size-12 items-center justify-center rounded-full bg-store-surface-muted text-store-muted-foreground">
-          <PageIcon page={page} />
-        </span>
-        <span className="inline-flex items-center rounded-full bg-store-surface-muted px-2.5 py-1 text-[11px] font-medium text-store-muted-foreground">
-          {t("pagePlaceholderBadge")}
-        </span>
-        <h2 className="text-base font-semibold text-store-foreground">
-          {t(pageLabelKey(page))}
-        </h2>
-        <p className="text-sm leading-6 text-store-muted-foreground">{t(bodyKey)}</p>
-      </div>
+      {visibleRegions.map((region) => {
+        switch (region.key) {
+          case "breadcrumbs":
+            return wrap(
+              region,
+              <nav aria-label={category.name} className="flex flex-wrap items-center gap-1 text-xs text-store-muted-foreground">
+                {category.ancestors.map((ancestor) => (
+                  <span key={ancestor.id} className="flex items-center gap-1">
+                    <bdi className="truncate">{ancestor.name}</bdi>
+                    <span aria-hidden="true">/</span>
+                  </span>
+                ))}
+                <bdi className="truncate font-medium text-store-foreground">{category.name}</bdi>
+              </nav>,
+            );
+          case "identity_title":
+            return wrap(
+              region,
+              <div className="flex items-start gap-2">
+                <span aria-hidden="true" className="mt-1 h-4 w-1.5 shrink-0 rounded-full bg-store-primary" />
+                <h1 className="text-base font-extrabold leading-tight text-store-foreground md:text-lg">
+                  <bdi>{category.name}</bdi>
+                </h1>
+              </div>,
+            );
+          case "description":
+            return !category.description
+              ? null
+              : wrap(
+                  region,
+                  <p className="text-xs text-store-muted-foreground md:text-sm">{category.description}</p>,
+                );
+          case "subcategories_rail":
+            return category.children.length === 0
+              ? null
+              : wrap(
+                  region,
+                  <nav aria-label={category.name} className="store-rail flex gap-1.5 overflow-x-auto pb-1">
+                    {category.children.map((child) => (
+                      <span
+                        key={child.id}
+                        className="shrink-0 rounded-store border border-store-border bg-store-surface px-3 py-1.5 text-xs font-medium text-store-foreground"
+                      >
+                        <bdi>{child.name}</bdi>
+                      </span>
+                    ))}
+                  </nav>,
+                );
+          case "filter_sort_bar":
+            return wrap(
+              region,
+              <div className="flex items-center justify-between gap-2 border-t border-store-border pt-3 text-xs text-store-muted-foreground">
+                <span aria-hidden="true" className="rounded-store border border-store-border px-2.5 py-1">
+                  {t("categoryPreviewFilterLabel")}
+                </span>
+                <span aria-hidden="true" className="rounded-store border border-store-border px-2.5 py-1">
+                  {t("categoryPreviewSortLabel")}
+                </span>
+              </div>,
+            );
+          case "product_grid":
+            return wrap(
+              region,
+              gridProductsState === "loading" ? (
+                <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
+                  {Array.from({ length: 6 }).map((_, index) => (
+                    <div key={index} className="aspect-[3/4] animate-pulse rounded-store bg-store-surface-muted" />
+                  ))}
+                </div>
+              ) : !gridProductsTotal ? (
+                <p data-category-preview-no-products="" className="py-6 text-center text-xs text-store-muted-foreground">
+                  {t("categoryPreviewNoProducts")}
+                </p>
+              ) : (
+                <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
+                  {(gridProducts ?? []).map((product) => (
+                    <div key={product.id} className="overflow-hidden rounded-store bg-store-surface-muted">
+                      <div className="aspect-square">
+                        {product.thumbnailUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element -- tenant media URL, not a static asset
+                          <img src={product.thumbnailUrl} alt="" className="size-full object-cover" />
+                        ) : null}
+                      </div>
+                      <p className="truncate px-1.5 py-1 text-[11px] text-store-foreground">
+                        <bdi>{product.name}</bdi>
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              ),
+            );
+          default:
+            return null;
+        }
+      })}
+    </div>
+  );
+}
+
+function CategoryRegionShell({
+  region,
+  selected,
+  onSelect,
+  children,
+}: {
+  region: PageRegionInstance<CategoryPageRegionKey>;
+  selected: boolean;
+  onSelect?: (id: string) => void;
+  children: ReactNode;
+}) {
+  if (!onSelect) return <>{children}</>;
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      aria-pressed={selected}
+      data-preview-category-region={region.key}
+      data-preview-category-region-id={region.id}
+      data-region-selected={selected ? "" : undefined}
+      onClick={() => onSelect(region.id)}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onSelect(region.id);
+        }
+      }}
+      className={cn("awj-preview-section", selected && "awj-preview-section-selected")}
+    >
+      {children}
     </div>
   );
 }

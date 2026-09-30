@@ -80,7 +80,10 @@ test.describe('CUST-H2-2 — Page Navigator + page-aware Canvas shell', () => {
 
     await page.locator('[data-page-navigator-mobile]').click();
     await page.getByRole('dialog', { name: 'اختيار صفحة' }).getByRole('button', { name: 'صفحة التصنيف' }).click();
-    await expect(page.locator('[data-page-placeholder="category"]')).toBeVisible();
+    // CUST-H2-4 — Category is no longer a placeholder: the first eligible
+    // dev-fixture Category (never a fabricated one) renders for real.
+    await expect(page.locator('[data-category-preview="ready"]')).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('[data-page-placeholder]')).toHaveCount(0);
     await expect(page.locator('[data-page-navigator-mobile]')).toContainText('صفحة التصنيف');
     await assertNoOverflow(page);
     await page.screenshot({ path: path.join(evidenceDir, 'ar-430-category.png') });
@@ -142,7 +145,7 @@ test.describe('CUST-H2-2 — Page Navigator + page-aware Canvas shell', () => {
 
     await page.getByLabel('الصفحة المعروضة حالياً').click();
     await page.getByRole('menu', { name: 'اختيار صفحة' }).getByRole('button', { name: 'صفحة التصنيف' }).click();
-    await expect(page.locator('[data-page-placeholder="category"]')).toBeVisible();
+    await expect(page.locator('[data-category-preview="ready"]')).toBeVisible({ timeout: 10000 });
     // Version and draft status are untouched by a page switch.
     await expect(page.getByLabel('نسخة التصميم قيد التعديل')).toContainText('التصميم الحالي');
     await expect(page.locator('[data-experience-builder]')).toHaveAttribute('data-lifecycle', 'clean');
@@ -175,7 +178,7 @@ test.describe('CUST-H2-2 — Page Navigator + page-aware Canvas shell', () => {
 
     await page.getByLabel('Page currently being viewed').click();
     await page.getByRole('menu', { name: 'Choose a page' }).getByRole('button', { name: 'Category page' }).click();
-    await expect(page.locator('[data-page-placeholder="category"]')).toBeVisible();
+    await expect(page.locator('[data-category-preview="ready"]')).toBeVisible({ timeout: 10000 });
     await assertNoOverflow(page);
     await page.screenshot({ path: path.join(evidenceDir, 'en-768-category.png') });
   });

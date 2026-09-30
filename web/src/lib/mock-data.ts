@@ -2575,6 +2575,7 @@ const MOCK_WORKSPACE_PRODUCTS = [
     name_en: 'Impact-Resistant Bike Helmet with Full Ventilation and Night Reflectors',
     description: 'خوذة خفيفة الوزن مصنوعة من البوليسترين عالي الكثافة، مناسبة للاستخدام اليومي والرياضي.',
     sku: 'HEL-1001',
+    category_id: 'mock-category-bikes',
     category: { id: 'cat-gear', name: 'مستلزمات رياضية' },
     price: { amount_minor: 18900, currency: 'SAR' },
     in_stock: true,
@@ -2592,6 +2593,7 @@ const MOCK_WORKSPACE_PRODUCTS = [
     name_en: 'Cotton T-Shirt',
     description: 'قطن 100%، متوفر بعدة ألوان ومقاسات.',
     sku: null,
+    category_id: 'mock-category-bikes',
     category: { id: 'cat-apparel', name: 'ملابس' },
     price: { amount_minor: 7500, currency: 'SAR' },
     in_stock: true,
@@ -2655,6 +2657,64 @@ const MOCK_WORKSPACE_PRODUCTS = [
     variants: null,
     created_at: '2026-09-01T00:00:00.000Z',
     updated_at: '2026-09-01T00:00:00.000Z',
+  },
+];
+
+/**
+ * CUST-H2-4 — ثوابت تصنيفات مساحة عمل Commerce الوهمية، بنفس الشكل الحرفي
+ * الذي يعيده `CommerceWorkspaceStorefrontCategoryController` الحقيقي —
+ * يقرؤها `workspace-categories.ts` عبر نفس دوال التخطيط التي تستهلك
+ * الاستجابة الحقيقية، فلا مسار عرض ثانٍ. أربعة تثبت مصفوفة التحقّق البصري
+ * الخاصة بهذه الشريحة: تصنيفٌ بوصفٍ وأبناء ومنتجات حقيقية، تصنيفٌ باسمٍ طويل
+ * ومسار تنقّل عميق (breadcrumb) وبلا منتجات، تصنيفٌ بأبناء كثيرين، وتصنيفٌ
+ * بلا وصفٍ ولا أبناء ولا منتجات (حالات الحذف الصادق).
+ */
+const MOCK_WORKSPACE_CATEGORIES = [
+  {
+    id: 'mock-category-bikes',
+    name: 'الدراجات الهوائية ومستلزماتها',
+    description: 'كل ما يخص الدراجات الهوائية من قطع غيار وإكسسوارات وخوذات أمان.',
+    parent_id: null,
+    children: [{ id: 'mock-category-road-bikes', name: 'دراجات الطريق' }],
+    ancestors: [],
+  },
+  {
+    id: 'mock-category-road-bikes',
+    name: 'دراجات الطريق',
+    description: null,
+    parent_id: 'mock-category-bikes',
+    children: [],
+    ancestors: [{ id: 'mock-category-bikes', name: 'الدراجات الهوائية ومستلزماتها' }],
+  },
+  {
+    id: 'mock-category-deep',
+    name: 'ملحقات الدراجات الجبلية الاحترافية طويلة المدى للرحلات الصحراوية والجبلية معاً',
+    description: 'تصنيفٌ بمسار تنقّل عميق ومنتجات غير متوفرة حالياً.',
+    parent_id: 'mock-category-road-bikes',
+    children: [],
+    ancestors: [
+      { id: 'mock-category-bikes', name: 'الدراجات الهوائية ومستلزماتها' },
+      { id: 'mock-category-road-bikes', name: 'دراجات الطريق' },
+    ],
+  },
+  {
+    id: 'mock-category-many-children',
+    name: 'إكسسوارات متنوعة',
+    description: null,
+    parent_id: null,
+    children: Array.from({ length: 9 }, (_, i) => ({
+      id: `mock-category-child-${i + 1}`,
+      name: `تصنيف فرعي ${i + 1}`,
+    })),
+    ancestors: [],
+  },
+  {
+    id: 'mock-category-empty',
+    name: 'تصنيف فارغ',
+    description: null,
+    parent_id: null,
+    children: [],
+    ancestors: [],
   },
 ];
 
@@ -3601,9 +3661,16 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
   // (the honest-omission cases).
   const workspaceProductsListMatch = clean.match(/^\/commerce\/workspace\/storefronts\/([^/]+)\/products$/);
   if (workspaceProductsListMatch) {
-    const search = (new URLSearchParams(path.split('?')[1] ?? '').get('search') ?? '').trim().toLowerCase();
+    const listQuery = new URLSearchParams(path.split('?')[1] ?? '');
+    const search = (listQuery.get('search') ?? '').trim().toLowerCase();
+    // CUST-H2-4 — feeds the Category page's real `product_grid` preview
+    // region with the same category_id-filtered shape the real endpoint
+    // returns; never a client-side filter over an unrelated list.
+    const categoryId = listQuery.get('category_id');
     const rows = MOCK_WORKSPACE_PRODUCTS.filter(
-      (p) => !search || p.name.toLowerCase().includes(search) || (p.name_en ?? '').toLowerCase().includes(search),
+      (p) =>
+        (!search || p.name.toLowerCase().includes(search) || (p.name_en ?? '').toLowerCase().includes(search))
+        && (!categoryId || p.category_id === categoryId),
     );
     return resolve({
       data: rows.map((p) => ({
@@ -3624,6 +3691,33 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
       return Promise.reject(Object.assign(new Error('المنتج غير موجود.'), { status: 404 }));
     }
     return resolve({ data: product });
+  }
+  // CUST-H2-4 — Workspace Category read API (list/detail) for the Category
+  // page Customizer's Preview Category picker + structured editing. Same
+  // dev-harness-only posture as the Product fixtures above.
+  const workspaceCategoriesListMatch = clean.match(/^\/commerce\/workspace\/storefronts\/([^/]+)\/categories$/);
+  if (workspaceCategoriesListMatch) {
+    const search = (new URLSearchParams(path.split('?')[1] ?? '').get('search') ?? '').trim().toLowerCase();
+    const parentNameById = new Map(MOCK_WORKSPACE_CATEGORIES.map((c) => [c.id, c.name]));
+    const rows = MOCK_WORKSPACE_CATEGORIES.filter((c) => !search || c.name.toLowerCase().includes(search));
+    return resolve({
+      data: rows.map((c) => ({
+        id: c.id,
+        name: c.name,
+        parent_id: c.parent_id,
+        parent_name: c.parent_id ? (parentNameById.get(c.parent_id) ?? null) : null,
+      })),
+      meta: { pagination: { page: 1, per_page: 20, total: rows.length, last_page: 1, has_more: false } },
+    });
+  }
+  const workspaceCategoryMatch = clean.match(/^\/commerce\/workspace\/storefronts\/([^/]+)\/categories\/([^/]+)$/);
+  if (workspaceCategoryMatch) {
+    const [, , categoryId] = workspaceCategoryMatch;
+    const category = MOCK_WORKSPACE_CATEGORIES.find((c) => c.id === categoryId);
+    if (!category) {
+      return Promise.reject(Object.assign(new Error('التصنيف غير موجود.'), { status: 404 }));
+    }
+    return resolve({ data: category });
   }
   if (clean === '/fuel-stations/workspace') return resolve({ data: { stations: mockFuelStations } });
   if (clean === '/fuel-stations/dashboard') return resolve({ data: mockFuelDashboard });
