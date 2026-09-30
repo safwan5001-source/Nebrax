@@ -34,6 +34,7 @@ use App\Http\Controllers\Api\BuilderAppController;
 use App\Http\Controllers\Api\BuilderDraftExperienceController;
 use App\Http\Controllers\Api\BuilderPublishedExperienceVersionController;
 use App\Http\Controllers\Api\PreviewSessionController;
+use App\Http\Controllers\Api\PreviewExchangeReferenceController;
 use App\Http\Controllers\Api\CommercePaymentIntentController;
 use App\Http\Controllers\Api\CommerceShippingZoneController;
 use App\Http\Controllers\Api\CommerceWorkspaceStorefrontsController;
@@ -1005,6 +1006,15 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::delete('app-builder/apps/{id}/preview-sessions/{sessionId}', [PreviewSessionController::class, 'destroy'])
             ->whereUuid('id')->whereUuid('sessionId')
             ->middleware([$perm('apps_builder.view'), $app('commerce.app_builder')]);
+
+        // MOBILE-PREVIEW-7: إصدار مرجع تبادل QR/رابط عميق لمرّة واحدة — نفس
+        // بوابة RBAC/القدرة أعلاه حرفياً (انظر قرار RBAC في
+        // PreviewExchangeReferenceController). لا يُعاد توكن جلسة عامل هنا
+        // أبداً — المرجع الخام فقط، يُستهلَك لاحقاً عبر POST /preview/v1/exchange
+        // العام (routes/api_preview.php).
+        Route::post('app-builder/apps/{id}/preview-exchange-references', [PreviewExchangeReferenceController::class, 'store'])
+            ->whereUuid('id')
+            ->middleware([$perm('apps_builder.view'), $app('commerce.app_builder'), 'throttle:preview-exchange-issue']);
 
         // Cycle 0: Workspace foundation only. لا CRUD ولا مبيعات ولا اتصال أجهزة
         // قبل دوراتها، لكن هذا المسار يثبت سلسلة RBAC + entitlement + حالة التطبيق.

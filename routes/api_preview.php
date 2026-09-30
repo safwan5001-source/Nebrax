@@ -1,12 +1,13 @@
 <?php
 
+use App\Http\Controllers\Api\PreviewExchangeController;
 use App\Http\Controllers\Api\PreviewExperienceController;
 use App\Http\Middleware\AuthenticatePreviewSession;
 use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
-| Preview API — v1  (MOBILE-PREVIEW-6)
+| Preview API — v1  (MOBILE-PREVIEW-6 / MOBILE-PREVIEW-7)
 |--------------------------------------------------------------------------
 | Loaded via App\Providers\PreviewApiServiceProvider under prefix
 | `preview/v1`, entirely outside `commerce/v1` and `api/v1` — a
@@ -26,3 +27,14 @@ Route::middleware([
 ])->group(function () {
     Route::get('experience', [PreviewExperienceController::class, 'show'])->name('experience.show');
 });
+
+// MOBILE-PREVIEW-7 — device-facing exchange: **no prior authentication at
+// all**, since the scanning device holds nothing yet but the one-time
+// reference from the QR/deep link. Rate-limited by IP only (no session to
+// key on before a successful exchange); PreviewExchangeService::consume()
+// itself is the sole source of truth on tenant/app scope — this route
+// reads no tenant/app parameter from the request (E6/BOLA, matching
+// `experience.show` above).
+Route::post('exchange', [PreviewExchangeController::class, 'store'])
+    ->middleware('throttle:preview-exchange')
+    ->name('exchange.store');
