@@ -338,7 +338,16 @@ Duration    188.25s
 
 ### 9.7 CI
 
-*(the PR's CI run results are recorded here once observed, per §14)*
+**PR [#1130](https://github.com/safwan5001-source/Nebrax/pull/1130), head `2e9ad406833dd774d294bdd692b2de748aae085c`, fully green** — `mergeable_state: clean`, no merge conflict, no open review threads (the one PR comment present is an automated "Codex usage limit reached" notice from `chatgpt-codex-connector[bot]`, not a review — no action needed, matching MOBILE-PREVIEW-7's own identical precedent):
+
+| Check | Result |
+|---|---|
+| `ci.yml` — `php artisan test (L11, sqlite)` | ✅ success |
+| `ci.yml` — `php artisan test (L11, pgsql)` | ✅ success |
+
+`web-ci.yml` and `mobile-ci.yml` did not run on this PR — both are path-filtered to `web/**`/`mobile/**`/`contracts/app-builder/**` (confirmed by direct inspection of their `on.pull_request.paths` triggers), and this PR touches only `tests/Feature/PreviewIntegratedChainTest.php` and this report — correctly matching the PR's own stated scope ("no mobile/web code change").
+
+Two consecutive pushes to this branch (the test file + first report draft, then a documentation-only wording tightening for §2's association-file claims) each triggered their own `ci.yml` run; both are green on their respective heads, and the reported result above is for the current, final head.
 
 ---
 
@@ -422,10 +431,10 @@ Duration    188.25s
 ## 14. Branch / PR / CI
 
 - Branch: `test/mobile-preview-8-integrated-proof`
-- Head SHA: `d7610fa85bbc15541ca4bd043b28c2c3a851ea3f`
+- Head SHA: `2e9ad406833dd774d294bdd692b2de748aae085c` (the last content commit; this report's own recording commit necessarily lands one commit after, as in every prior MP report)
 - PR: [#1130](https://github.com/safwan5001-source/Nebrax/pull/1130) — `test(app-builder): MOBILE-PREVIEW-8 integrated real-device proof`
-- CI: to be confirmed once the PR's workflows run on this head; this report will be updated with the observed result before requesting merge approval.
-- **Stopping before merge**, per the task's explicit instruction. No Deploy. No Production. No DNS.
+- CI: **fully green** — `ci.yml` sqlite + pgsql both succeeded on this head; `mergeable_state: clean`; no open review threads (§9.7).
+- **Stopping before merge**, per the task's explicit instruction. No Deploy. No Production. No DNS. **Ready for owner review and merge.**
 
 ---
 
