@@ -35,8 +35,10 @@ export const VERSION_HISTORY_CAPABILITY = "deferred" as CapabilityState;
  * yet (CUST-H2-2+) and the public Product/Category renderers do not read it
  * at all yet (CUST-H2-5). Design-only until both close.
  */
-export const PRODUCT_PAGE_PRESENTATION_CAPABILITY = "design_only" as CapabilityState;
-export const CATEGORY_PAGE_PRESENTATION_CAPABILITY = "design_only" as CapabilityState;
+export const PRODUCT_PAGE_PRESENTATION_CAPABILITY =
+  "design_only" as CapabilityState;
+export const CATEGORY_PAGE_PRESENTATION_CAPABILITY =
+  "design_only" as CapabilityState;
 
 /**
  * Remaining contracts (do not invent in this slice):

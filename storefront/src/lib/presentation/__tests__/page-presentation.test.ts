@@ -1,12 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_PRESENTATION_CONFIG, normalizePresentationConfig } from "../config";
-import { PRESENTATION_CONFIG_VERSION } from "../tokens";
+import {
+  DEFAULT_PRESENTATION_CONFIG,
+  normalizePresentationConfig,
+} from "../config";
 import {
   FIXED_REQUIRED_CATEGORY_REGION_KEYS,
   FIXED_REQUIRED_PRODUCT_REGION_KEYS,
-  PAGE_TYPES,
   normalizePagePresentation,
+  PAGE_TYPES,
 } from "../page-regions";
+import { PRESENTATION_CONFIG_VERSION } from "../tokens";
 
 /**
  * CUST-H2-1 — schema/registry foundation. No UI, no public runtime wiring;
@@ -26,7 +29,9 @@ describe("CUST-H2-1 page presentation schema", () => {
   it("is absent by default and every pre-CUST-H2 document stays byte-identical", () => {
     expect(DEFAULT_PRESENTATION_CONFIG.pagePresentation).toBeUndefined();
     expect(normalizePresentationConfig().pagePresentation).toBeUndefined();
-    expect(normalizePresentationConfig(undefined)).toEqual(DEFAULT_PRESENTATION_CONFIG);
+    expect(normalizePresentationConfig(undefined)).toEqual(
+      DEFAULT_PRESENTATION_CONFIG,
+    );
 
     const legacyV2 = normalizePresentationConfig({
       version: 2,
@@ -47,7 +52,9 @@ describe("CUST-H2-1 page presentation schema", () => {
     expect(normalizePagePresentation("nope")).toBeUndefined();
     expect(normalizePagePresentation(["a", "b"])).toBeUndefined();
     expect(normalizePagePresentation({})).toBeUndefined();
-    expect(normalizePagePresentation({ product: null, category: "x" })).toBeUndefined();
+    expect(
+      normalizePagePresentation({ product: null, category: "x" }),
+    ).toBeUndefined();
   });
 
   it("accepts valid product regions and defaults id to key", () => {
@@ -98,16 +105,25 @@ describe("CUST-H2-1 page presentation schema", () => {
     });
 
     expect(result?.category?.regions).toHaveLength(1);
-    expect(result?.category?.regions[0]).toMatchObject({ id: "first", visible: true });
+    expect(result?.category?.regions[0]).toMatchObject({
+      id: "first",
+      visible: true,
+    });
   });
 
   it("forces every FIXED_REQUIRED region back to visible regardless of input", () => {
     const result = normalizePagePresentation({
       product: {
-        regions: FIXED_REQUIRED_PRODUCT_REGION_KEYS.map((key) => ({ key, visible: false })),
+        regions: FIXED_REQUIRED_PRODUCT_REGION_KEYS.map((key) => ({
+          key,
+          visible: false,
+        })),
       },
       category: {
-        regions: FIXED_REQUIRED_CATEGORY_REGION_KEYS.map((key) => ({ key, visible: false })),
+        regions: FIXED_REQUIRED_CATEGORY_REGION_KEYS.map((key) => ({
+          key,
+          visible: false,
+        })),
       },
     });
 
@@ -130,7 +146,9 @@ describe("CUST-H2-1 page presentation schema", () => {
   it("always drops region content in this slice", () => {
     const result = normalizePagePresentation({
       product: {
-        regions: [{ key: "description", visible: true, content: { text: "hello" } }],
+        regions: [
+          { key: "description", visible: true, content: { text: "hello" } },
+        ],
       },
     });
 
@@ -139,8 +157,14 @@ describe("CUST-H2-1 page presentation schema", () => {
 
   it("a forward page-content schema version drops only that page type", () => {
     const result = normalizePagePresentation({
-      product: { version: 99, regions: [{ key: "description", visible: true }] },
-      category: { version: 1, regions: [{ key: "description", visible: true }] },
+      product: {
+        version: 99,
+        regions: [{ key: "description", visible: true }],
+      },
+      category: {
+        version: 1,
+        regions: [{ key: "description", visible: true }],
+      },
     });
 
     expect(result?.product).toBeUndefined();

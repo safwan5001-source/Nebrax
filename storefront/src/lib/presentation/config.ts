@@ -1,8 +1,11 @@
 import {
+  normalizePagePresentation,
+  type PagePresentation,
+} from "./page-regions";
+import {
   normalizeOptionalSectionContent,
   type SectionContent,
 } from "./section-content";
-import { normalizePagePresentation, type PagePresentation } from "./page-regions";
 import {
   CONTENT_PAGE_SLUGS,
   type ContentPageSlug,

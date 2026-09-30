@@ -126,7 +126,9 @@ function normalizeRegions<K extends string>(
     if (seenKeys.has(key)) continue;
     seenKeys.add(key);
 
-    const isFixedRequired = (fixedRequiredKeys as readonly string[]).includes(key);
+    const isFixedRequired = (fixedRequiredKeys as readonly string[]).includes(
+      key,
+    );
     out.push({
       id: safeId(value.id, key),
       key: key as K,
@@ -166,7 +168,9 @@ function normalizePageTypePresentation<K extends string>(
  * when there is nothing to store — absence must stay absence, not an empty
  * `{}` shell, so every pre-CUST-H2 Version keeps normalizing byte-identically.
  */
-export function normalizePagePresentation(raw: unknown): PagePresentation | undefined {
+export function normalizePagePresentation(
+  raw: unknown,
+): PagePresentation | undefined {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined;
   const value = raw as Record<string, unknown>;
 
