@@ -83,7 +83,7 @@ Build output confirmed both routes:
 
 ## 7. CI status
 
-The previous PR #1123 is confirmed **MERGED** in GitHub. This follow-up PR is newly opened from the updated `origin/main`; its remote CI checks are pending or will be reported from GitHub after PR creation. No merge action will be taken.
+The previous PR #1123 is confirmed **MERGED** in GitHub. The follow-up PR #1126 is open from the updated `origin/main`; at final verification, GitHub reported 6 CI checks pending and 0 failing/successful checks. No merge action will be taken.
 
 ## 8. Mobile / Desktop verification
 
@@ -109,7 +109,7 @@ No direction, spacing, typography, API, or permission logic was changed. Existin
 - **Base branch:** `main`
 - **Base SHA:** `929e978cf5bbc42bcd4ebe09b71d7191aa8e559b`
 - **Branch:** `fix/product-view-readonly-followup`
-- **Head SHA:** to be recorded after commit and push
-- **PR number/link:** to be recorded after PR creation
+- **Head SHA:** `bb47d7750ba3740dc4e45358195710c2e1e49a99`
+- **PR number/link:** [#1126 — fix(products): keep product view read-only](https://github.com/safwan5001-source/Nebrax/pull/1126)
 - **Merge:** not performed
 - **Deploy:** not performed
