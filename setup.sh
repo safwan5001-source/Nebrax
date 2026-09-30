@@ -24,7 +24,7 @@ fi
 cd "$APP_DIR"
 
 echo "▶ 3/6  تثبيت Sanctum + تفعيل مسارات API..."
-composer require laravel/sanctum --quiet
+composer require laravel/sanctum resend/resend-php --quiet
 php artisan install:api --no-interaction --quiet || true
 # لدينا جدول personal_access_tokens ضمن migration النواة — نحذف نسخة Sanctum المنشورة لتجنّب التكرار
 rm -f database/migrations/*_create_personal_access_tokens_table.php 2>/dev/null || true
@@ -102,6 +102,9 @@ if ! grep -q "PreviewApiServiceProvider" bootstrap/providers.php; then
 fi
 if ! grep -q "WebhookServiceProvider" bootstrap/providers.php; then
   sed -i "s|return \[|return [\n    App\\\\Providers\\\\WebhookServiceProvider::class,|" bootstrap/providers.php
+fi
+if ! grep -q "MailServiceProvider" bootstrap/providers.php; then
+  sed -i "s|return \[|return [\n    App\\\\Providers\\\\MailServiceProvider::class,|" bootstrap/providers.php
 fi
 
 # حذف users migration الافتراضية (لدينا واحدة خاصة بالمستأجرين)

@@ -93,6 +93,8 @@ SELECT migration FROM migrations ORDER BY id DESC LIMIT 5;
 | `DOCUMENT_DURABLE_STORAGE_ENABLED` | `render.yaml` | `false` حالياً؛ قفل مركزي يمنع تفعيل S3/R2 |
 | `DOCUMENT_STORAGE_DRIVER` | `render.yaml` | `local` حالياً |
 | `DOCUMENT_STORAGE_DISK` | `render.yaml` | `local` حالياً |
+| `MAIL_MAILER` | يدوي | `resend` لتفعيل ناقل Resend HTTPS الرسمي (AUTH-MAIL-PROD-3) — بديل SMTP إن كان منفذ 587 محجوباً على منصّة التشغيل |
+| `RESEND_KEY` | يدوي | مفتاح Resend (نفس القيمة المستعملة سابقاً ككلمة مرور SMTP — نموذج اعتماد Resend يستخدم المفتاح ذاته للقناتين). **اسم المتغيّر من `config/services.php` الافتراضي في Laravel هو `RESEND_KEY` لا `RESEND_API_KEY`** |
 
 ## نطاقات المستأجر الفرعية `{slug}.awj.app` — لم يُنفَّذ في الإنتاج بعد
 
