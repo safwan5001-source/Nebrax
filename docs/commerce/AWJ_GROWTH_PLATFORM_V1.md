@@ -1,4 +1,4 @@
-# AWJ Growth Platform V1 — Ads, Publishing & Messaging
+# AWJ Growth Platform V1 — Ads, Publishing, Messaging & AI
 
 **Status:** Product / Architecture Baseline  
 **Scope:** Documentation only — no implementation, merge, deploy, or production changes  
@@ -23,13 +23,16 @@
 
 > **AWJ Growth**
 
-وتحته خمس مساحات رئيسية:
+وتحته ست مساحات رئيسية:
 
 1. **Ads**
 2. **Publishing**
 3. **Messaging**
 4. **Analytics**
 5. **Automation**
+6. **AWJ Growth AI**
+
+الذكاء الاصطناعي **جزء أساسي من Product Scope منذ البداية**، وليس إضافة تجميلية لاحقة. لكنه يُفعّل بصلاحيات تدريجية ومضبوطة حتى لا ينفذ إنفاقًا أو تغييرات حساسة بلا Guardrails وموافقة مناسبة.
 
 ---
 
@@ -363,7 +366,120 @@ THEN suggest budget increase
 
 ---
 
-## 9. Product UX
+## 9. AWJ Growth AI
+
+### 9.1 الدور
+
+**AWJ Growth AI** هو طبقة ذكاء فوق Ads / Publishing / Messaging / Analytics / Automation، ولا يستبدل Provider APIs أو قواعد الأمان أو القيود الرسمية للمنصات.
+
+وظائفه المستهدفة:
+
+- إنشاء نصوص الإعلانات والعناوين والـCTA والـHashtags.
+- إنشاء Variants متعددة لكل منصة بدل نسخ إعلان واحد حرفيًا.
+- اقتراح أفكار الصور والفيديو والـHooks والسيناريوهات القصيرة.
+- تحليل أداء Campaign / Ad Set / Ad / Creative.
+- اكتشاف الإنفاق غير الفعال والانحرافات والـCreative fatigue.
+- اقتراح توزيع الميزانيات بين Meta / TikTok / Snapchat.
+- مراعاة المخزون والسعر والهامش والمرتجعات قبل التوصية.
+- اقتراح شرائح العملاء وحملات WhatsApp المناسبة ضمن قواعد الموافقة والـconsent.
+- تلخيص أسباب التوصيات بلغة قابلة للفهم والتدقيق.
+
+### 9.2 مستويات التشغيل
+
+يجب أن يدعم أَوْج ثلاث درجات واضحة للصلاحية:
+
+```text
+LEVEL 1 — SUGGEST
+AI analyzes → recommends → no external change
+
+LEVEL 2 — APPROVE
+AI prepares action → human approves → AWJ applies
+
+LEVEL 3 — GUARDED AUTO
+AI may act automatically only inside explicit tenant guardrails
+```
+
+الافتراضي في المراحل الأولى هو **Suggest** ثم **Approve**. لا يتم الانتقال إلى التنفيذ التلقائي إلا بعد وجود Tracking وAttribution موثوقين وسجل تدقيق كامل.
+
+### 9.3 Guardrails إلزامية
+
+أي قرار قد يسبب إنفاقًا أو إيقاف حملة يجب أن يخضع إلى حدود يحددها Tenant، مثل:
+
+- Maximum daily budget.
+- Maximum campaign spend.
+- Maximum budget increase/decrease percentage per period.
+- Stop-loss threshold.
+- Minimum observation window.
+- Minimum conversion/sample threshold.
+- Minimum stock threshold.
+- Human approval requirement.
+- Allowed channels/actions.
+- Audit log لكل اقتراح وقرار وتنفيذ.
+
+### 9.4 Profit-aware AI
+
+لا يجوز تقييم الحملات على ROAS وحده.
+
+مثال:
+
+```text
+Ad Spend                1,000 SAR
+Attributed Revenue      5,000 SAR
+COGS                    2,600 SAR
+Shipping                  400 SAR
+Discounts                 300 SAR
+Returns                   500 SAR
+--------------------------------
+Contribution after ads    200 SAR
+```
+
+في هذه الحالة، لا يصف AWJ Growth AI الحملة بأنها ناجحة فقط لأن Platform ROAS مرتفع؛ بل يوضح أثر التكلفة والمرتجعات والهامش.
+
+### 9.5 أمثلة توصيات
+
+```text
+TikTok CPA أقل، لكن Meta يحقق هامش مساهمة أعلى.
+اقتراح: تحويل 20% من ميزانية Snapchat إلى Meta.
+سبب الاقتراح: profit-adjusted performance وليس clicks فقط.
+```
+
+```text
+Inventory for Product X = 4
+اقتراح: إيقاف زيادة الميزانية وعدم إطلاق Creative جديد حتى إعادة التوريد.
+```
+
+```text
+Creative Y frequency مرتفعة وCTR يتراجع.
+اقتراح: إنشاء 3 Variants جديدة مع Hooks مختلفة، مع بقاء الحملة الحالية دون تعديل حتى الموافقة.
+```
+
+### 9.6 Explainability & Audit
+
+كل Recommendation يجب أن تحتوي على:
+
+- ما الذي لاحظه النظام؟
+- ما البيانات المستخدمة؟
+- ما التغيير المقترح؟
+- ما الأثر المتوقع بصيغة احتمالية/تقديرية لا كضمان؟
+- ما حدود المخاطرة؟
+- هل يحتاج موافقة بشرية؟
+- من وافق ومتى؟
+- ما نتيجة التنفيذ الفعلية؟
+
+### 9.7 AI Safety Boundary
+
+الـAI لا:
+
+- يتجاوز سياسات Meta/TikTok/Snapchat/WhatsApp.
+- يرسل حملات رسائل دون consent والسياسات المطلوبة.
+- ينشئ ميزانية غير محدودة.
+- يغير حدود Tenant الأمنية أو RBAC.
+- يخلط بيانات Tenants في prompt/context/retrieval.
+- يعتبر توصياته حقائق محاسبية أو مالية نهائية دون بيانات ERP الموثقة.
+
+---
+
+## 10. Product UX
 
 ### 9.1 Navigation
 
@@ -377,6 +493,7 @@ Growth
 ├── Audiences
 ├── Creatives
 ├── Analytics
+├── Growth AI
 ├── Automations
 └── Connections
 ```
@@ -414,7 +531,7 @@ Growth
 
 ---
 
-## 10. Provider Architecture
+## 11. Provider Architecture
 
 ```text
 AWJ Growth Domain
@@ -454,7 +571,7 @@ capabilities:
 
 ---
 
-## 11. Multi-tenant
+## 12. Multi-tenant
 
 كل Tenant يربط حساباته بنفسه.
 
@@ -474,7 +591,7 @@ capabilities:
 
 ---
 
-## 12. Event Model
+## 13. Event Model
 
 AWJ Growth يعتمد على Domain Events بدل الربط المباشر بالشاشات:
 
@@ -501,7 +618,7 @@ InvoicePosted
 
 ---
 
-## 13. Attribution
+## 14. Attribution
 
 لا يجب تثبيت نموذج Attribution واحد على كل القنوات.
 
@@ -526,7 +643,7 @@ InvoicePosted
 
 ---
 
-## 14. مقارنة مرجعية مع Salla
+## 15. مقارنة مرجعية مع Salla
 
 سلة تُستخدم كـ **Benchmark UX/Product** وليس كمرجع معماري يُنسخ.
 
@@ -548,7 +665,7 @@ InvoicePosted
 
 ---
 
-## 15. Phased Roadmap
+## 16. Phased Roadmap
 
 ### Phase 0 — Evidence & Contracts
 
@@ -626,29 +743,38 @@ InvoicePosted
 - campaigns
 - consent/opt-out
 
-### Phase 7 — Automation
+### Phase 7 — AI Assist + Automation
 
-- rules
-- alerts
-- recommendations
-- approval workflow
-- controlled auto-actions
-
-### Phase 8 — AI Growth Agent
-
-- campaign draft generation
+- AI campaign draft generation
 - creative variants
 - copy generation
 - anomaly detection
-- budget recommendations
-- stock-aware actions
+- explainable recommendations
+- rules
+- alerts
+- approval workflow
+- stock-aware recommendations
 - profit-aware recommendations
+- controlled auto-actions
 
-الـAgent لا يملك إنفاقًا غير محدود، وكل إجراء مالي يخضع للـGuardrails.
+في هذه المرحلة يكون المسار الافتراضي **Suggest → Approve → Apply**.
+
+### Phase 8 — Advanced AI Growth Agent
+
+- cross-channel budget recommendations
+- campaign/creative fatigue detection
+- guarded budget reallocation
+- stock-aware pause/resume suggestions
+- profit-aware optimization
+- customer-segment recommendations
+- WhatsApp campaign assistance within consent/policy constraints
+- autonomous actions only inside tenant-defined guardrails
+
+الـAgent لا يملك إنفاقًا غير محدود، وكل إجراء مالي أو خارجي حساس يخضع للـGuardrails وRBAC وAudit، مع إمكانية فرض Human Approval على مستوى Tenant.
 
 ---
 
-## 16. Definition of Done لكل Provider
+## 17. Definition of Done لكل Provider
 
 لا يعتبر Provider جاهزًا بمجرد نجاح OAuth.
 
@@ -670,7 +796,7 @@ InvoicePosted
 
 ---
 
-## 17. قرارات V1 المثبتة
+## 18. قرارات V1 المثبتة
 
 - الاسم المبدئي: **AWJ Growth**
 - القنوات الأساسية: Instagram, Facebook, TikTok, Snapchat, WhatsApp.
@@ -681,14 +807,17 @@ InvoicePosted
 - Provider Capability Matrix إلزامية.
 - Multi-tenant credentials لكل منشأة.
 - Read-before-write في الإعلانات.
-- Automation المالية تبدأ بموافقة بشرية.
-- الربح الحقيقي والمخزون جزء من منطق التحسين.
+- **AWJ Growth AI جزء أساسي من Product Scope منذ V1، وليس Feature جانبية.**
+- AI يعمل تدريجيًا عبر: **Suggest → Approve → Guarded Auto**.
+- Automation المالية تبدأ بموافقة بشرية، ولا تصبح تلقائية إلا ضمن Tenant Guardrails صريحة.
+- كل AI Recommendation يجب أن تكون Explainable وقابلة للتدقيق.
+- الربح الحقيقي والمخزون والتكلفة والمرتجعات جزء من منطق AI والتحسين.
 - Salla benchmark، لا copy.
 - لا تنفيذ API بناءً على افتراض؛ Evidence-first من الوثائق الرسمية.
 
 ---
 
-## 18. Evidence Register — البداية
+## 19. Evidence Register — البداية
 
 | Platform | Capability | Official source | Status |
 |---|---|---|---|
@@ -702,7 +831,7 @@ InvoicePosted
 
 ---
 
-## 19. ما ليس ضمن هذه الوثيقة
+## 20. ما ليس ضمن هذه الوثيقة
 
 هذه الوثيقة لا:
 
@@ -711,6 +840,7 @@ InvoicePosted
 - تسمح بالدمج أو النشر.
 - تسمح بتنفيذ إنفاق أو إرسال رسائل بدون موافقات وسياسات المزود.
 - تستبدل توثيق Provider-specific implementation contracts.
+- تمنح AI صلاحية إنفاق أو إرسال أو تعديل غير محدودة؛ التنفيذ الذكي يبقى محكومًا بالـRBAC والـGuardrails والـAudit.
 
 الخطوة التالية الصحيحة بعد اعتماد هذه الوثيقة:
 
