@@ -3,9 +3,9 @@ import { formatDateTime } from '@/lib/formatting';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, usePathname } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { ArrowRight, ArrowLeftRight, Copy, MoreVertical, Plus, ReceiptText, Trash2 } from 'lucide-react';
+import { ArrowRight, ArrowLeftRight, Copy, MoreVertical, Pencil, Plus, ReceiptText, Trash2 } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
 import { formatRiyal } from '@/lib/money';
 import { Badge } from '@/components/ui/badge';
@@ -30,10 +30,12 @@ const movementTone: Record<string, 'positive' | 'warning' | 'muted'> = { in: 'po
 
 export default function ProductProfilePage() {
   const params = useParams<{ id: string }>();
+  const pathname = usePathname();
   const id = params.id;
   const t = useTranslations('products');
   const ti = useTranslations('inventory');
   const { success, error: showError } = useToast();
+  const isEditMode = pathname.endsWith('/edit');
   const [product, setProduct] = useState<Product | null>(null);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [movements, setMovements] = useState<Movement[] | null>(null);
@@ -131,15 +133,16 @@ export default function ProductProfilePage() {
   return (
     <div className="space-y-5">
       <header className="flex flex-wrap items-center gap-3">
-        <Button asChild variant="ghost" size="icon" aria-label={t('back')}><Link href="/products"><ArrowRight className="h-4 w-4" /></Link></Button>
+        <Button asChild variant="ghost" size="icon" aria-label={t('back')}><Link href={isEditMode ? `/products/${id}` : '/products'}><ArrowRight className="h-4 w-4" /></Link></Button>
         <div className="min-w-0">
           <p className="text-xs font-medium text-muted">{t('profile_title')}</p>
           <h1 className="truncate text-xl font-semibold text-text">{product.name}</h1>
           <p className="num text-sm text-muted">{product.sku ?? '—'}</p>
         </div>
         <div className="ms-auto flex items-center gap-2">
+          {!isEditMode && <Button asChild variant="outline" size="sm"><Link href={`/products/${id}/edit`}><Pencil className="h-4 w-4" />{t('edit')}</Link></Button>}
           <Badge tone={product.is_active ? 'positive' : 'muted'}>{product.is_active ? t('active') : t('inactive')}</Badge>
-          <Dropdown
+          {!isEditMode && <Dropdown
             trigger={<MoreVertical className="h-5 w-5" strokeWidth={1.8} />}
             triggerLabel={t('more_actions')}
             menuLabel={t('more_actions')}
@@ -151,11 +154,15 @@ export default function ProductProfilePage() {
             <DropdownItem href={`/stock-permits/new?type=issue&product=${id}`} icon={ReceiptText}>{t('issue_stock')}</DropdownItem>
             <DropdownItem icon={Copy} onClick={() => void copyProduct()}>{t('copy')}</DropdownItem>
             <DropdownItem icon={Trash2} tone="danger" disabled={deleting} onClick={() => void deleteProduct()}>{t('delete')}</DropdownItem>
-          </Dropdown>
+          </Dropdown>}
         </div>
       </header>
 
       {error && <p role="alert" className="rounded bg-negative/10 px-3 py-2 text-sm text-negative">{error}</p>}
+
+      {isEditMode ? (
+        <ProductWorkspace mode="edit" product={product} onUpdated={() => void load()} />
+      ) : <>
 
       <section className="grid gap-3 sm:grid-cols-4" aria-label={t('product_info')}>
         <Card><CardContent className="p-4"><p className="text-xs text-muted">{t('stock')}</p><p className="mt-1 text-lg font-semibold num text-text">{product.track_inventory ? product.quantity_on_hand : '—'}</p></CardContent></Card>
@@ -223,6 +230,7 @@ export default function ProductProfilePage() {
           </Card>
         </TabPanel>
       )}
+      </>}
     </div>
   );
 }
