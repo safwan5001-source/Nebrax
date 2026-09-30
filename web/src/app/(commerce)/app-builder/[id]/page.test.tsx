@@ -38,6 +38,20 @@ const { api, translate } = vi.hoisted(() => {
     'detail.previewSessions.issueErrorTitle': 'Could not issue the preview session',
     'detail.previewSessions.revokeErrorTitle': 'Could not revoke the session',
     'detail.previewSessions.loadErrorTitle': 'Could not load preview sessions',
+    'detail.previewSessions.qrAction': 'Preview on phone',
+    'detail.previewSessions.qrDialogTitle': 'Preview on your phone',
+    'detail.previewSessions.qrCreating': 'Preparing a one-time code…',
+    'detail.previewSessions.qrInstructions': 'Scan this code on the device.',
+    'detail.previewSessions.qrExpiresIn': 'Expires in {seconds}s',
+    'detail.previewSessions.qrExpired': 'This code has expired. Generate a new one.',
+    'detail.previewSessions.qrConsumed': 'Connected — a preview session is now active on the device.',
+    'detail.previewSessions.qrCopyLink': 'Copy link',
+    'detail.previewSessions.qrCopied': 'Copied',
+    'detail.previewSessions.qrRegenerate': 'Generate a new code',
+    'detail.previewSessions.qrRetry': 'Try again',
+    'detail.previewSessions.qrErrorTitle': 'Could not prepare the preview code',
+    'detail.previewSessions.qrErrorBody': 'Something went wrong while preparing the preview code.',
+    'detail.previewSessions.qrTemporaryNote': 'This code is temporary and works once.',
     'creationSource.store_design': 'From store design',
     'creationSource.template': 'From template',
     'creationSource.scratch': 'From scratch',
@@ -235,5 +249,173 @@ describe('AppBuilderDetailPage', () => {
       (call) => call[0] === '/app-builder/apps/app-1/preview-sessions/ps-1' && call[1]?.method === 'DELETE',
     );
     expect(deleteCall).toBeTruthy();
+  });
+
+  describe('MOBILE-PREVIEW-7 — phone preview QR exchange', () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('requests a one-time exchange reference and shows only the deep link — never a session bearer', async () => {
+      api.mockImplementation((path: string, init?: { method?: string }) => {
+        if (path.endsWith('/versions')) return Promise.resolve({ data: [] });
+        if (path.endsWith('/preview-sessions')) return Promise.resolve({ data: [] });
+        if (path.endsWith('/preview-exchange-references') && init?.method === 'POST') {
+          return Promise.resolve({
+            reference: 'raw-exchange-reference',
+            deep_link: 'https://preview.awj-runtime-proof.example/preview/raw-exchange-reference',
+            expires_at: new Date(Date.now() + 5 * 60_000).toISOString(),
+            exchange_reference_id: 'xref-1',
+          });
+        }
+        return Promise.resolve({ data: appData });
+      });
+
+      render(<AppBuilderDetailPage />);
+      const openButton = await screen.findByText('Preview on phone');
+      await userEvent.setup().click(openButton);
+
+      expect(await screen.findByText('Scan this code on the device.')).toBeTruthy();
+      expect(await screen.findByText(/Expires in \d+s/)).toBeTruthy();
+
+      const postCall = api.mock.calls.find(
+        (call) => call[0] === '/app-builder/apps/app-1/preview-exchange-references' && call[1]?.method === 'POST',
+      );
+      expect(postCall).toBeTruthy();
+
+      // لا بصمة عمل تُعرض هنا إطلاقاً — لا `token` ولا نصّ المرجع الخام كنصّ عادي بديل رابط.
+      expect(screen.queryByText('raw-exchange-reference')).toBeNull();
+    });
+
+    it('copying the link writes the deep link (never a bearer) to the clipboard', async () => {
+      // jsdom/`@testing-library/user-event` يثبّتان stub حافظة حقيقياً بمجرّد
+      // أول `userEvent.setup()` — يستبدل أيّ `Object.defineProperty` سابقاً
+      // على `navigator.clipboard` بصمت. نتحقّق إذن من محتوى الحافظة الفعلي
+      // عبر `readText()` بدل تجسّس دالّة قد لا تُستدعى أصلاً.
+      const deepLink = 'https://preview.awj-runtime-proof.example/preview/copy-me-reference';
+      api.mockImplementation((path: string, init?: { method?: string }) => {
+        if (path.endsWith('/versions')) return Promise.resolve({ data: [] });
+        if (path.endsWith('/preview-sessions')) return Promise.resolve({ data: [] });
+        if (path.endsWith('/preview-exchange-references') && init?.method === 'POST') {
+          return Promise.resolve({
+            reference: 'copy-me-reference', deep_link: deepLink,
+            expires_at: new Date(Date.now() + 5 * 60_000).toISOString(), exchange_reference_id: 'xref-2',
+          });
+        }
+        return Promise.resolve({ data: appData });
+      });
+
+      const user = userEvent.setup();
+      render(<AppBuilderDetailPage />);
+      await user.click(await screen.findByText('Preview on phone'));
+      await user.click(await screen.findByText('Copy link'));
+
+      expect(await navigator.clipboard.readText()).toBe(deepLink);
+      expect(await screen.findByText('Copied')).toBeTruthy();
+    });
+
+    it('regenerating requests a fresh exchange reference', async () => {
+      let issueCount = 0;
+      api.mockImplementation((path: string, init?: { method?: string }) => {
+        if (path.endsWith('/versions')) return Promise.resolve({ data: [] });
+        if (path.endsWith('/preview-sessions')) return Promise.resolve({ data: [] });
+        if (path.endsWith('/preview-exchange-references') && init?.method === 'POST') {
+          issueCount += 1;
+          return Promise.resolve({
+            reference: `reference-${issueCount}`, deep_link: `https://preview.example/preview/reference-${issueCount}`,
+            expires_at: new Date(Date.now() + 5 * 60_000).toISOString(), exchange_reference_id: `xref-${issueCount}`,
+          });
+        }
+        return Promise.resolve({ data: appData });
+      });
+
+      render(<AppBuilderDetailPage />);
+      await userEvent.setup().click(await screen.findByText('Preview on phone'));
+      await screen.findByText(/Expires in \d+s/);
+
+      await userEvent.setup().click(await screen.findByText('Generate a new code'));
+
+      expect(issueCount).toBe(2);
+    });
+
+    it('shows a controlled error state and lets the merchant retry', async () => {
+      const { ApiError } = await import('@/lib/api');
+      api.mockImplementation((path: string, init?: { method?: string }) => {
+        if (path.endsWith('/versions')) return Promise.resolve({ data: [] });
+        if (path.endsWith('/preview-sessions')) return Promise.resolve({ data: [] });
+        if (path.endsWith('/preview-exchange-references') && init?.method === 'POST') {
+          return Promise.reject(new ApiError(500, 'internal error', null));
+        }
+        return Promise.resolve({ data: appData });
+      });
+
+      render(<AppBuilderDetailPage />);
+      await userEvent.setup().click(await screen.findByText('Preview on phone'));
+
+      expect(await screen.findByText('Something went wrong while preparing the preview code.')).toBeTruthy();
+      expect(toastFns.error).toHaveBeenCalled();
+      expect(await screen.findByText('Try again')).toBeTruthy();
+    });
+
+    it('shows the expired state once the five-minute window elapses, without extending it', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      api.mockImplementation((path: string, init?: { method?: string }) => {
+        if (path.endsWith('/versions')) return Promise.resolve({ data: [] });
+        if (path.endsWith('/preview-sessions')) return Promise.resolve({ data: [] });
+        if (path.endsWith('/preview-exchange-references') && init?.method === 'POST') {
+          return Promise.resolve({
+            reference: 'soon-to-expire', deep_link: 'https://preview.example/preview/soon-to-expire',
+            expires_at: new Date(Date.now() + 3000).toISOString(), exchange_reference_id: 'xref-exp',
+          });
+        }
+        return Promise.resolve({ data: appData });
+      });
+
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      render(<AppBuilderDetailPage />);
+      await user.click(await screen.findByText('Preview on phone'));
+      await screen.findByText(/Expires in \d+s/);
+
+      await vi.advanceTimersByTimeAsync(6000);
+
+      expect(await screen.findByText('This code has expired. Generate a new one.')).toBeTruthy();
+    });
+
+    it('shows a connected state once a new preview session appears on the device', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      let sessionExists = false;
+      api.mockImplementation((path: string, init?: { method?: string }) => {
+        if (path.endsWith('/versions')) return Promise.resolve({ data: [] });
+        if (path.endsWith('/preview-exchange-references') && init?.method === 'POST') {
+          return Promise.resolve({
+            reference: 'device-scanned', deep_link: 'https://preview.example/preview/device-scanned',
+            expires_at: new Date(Date.now() + 5 * 60_000).toISOString(), exchange_reference_id: 'xref-consumed',
+          });
+        }
+        if (path.endsWith('/preview-sessions')) {
+          return Promise.resolve({
+            data: sessionExists
+              ? [{
+                  id: 'ps-device', builder_app_id: 'app-1', source: 'draft', channel: 'device',
+                  device_label: null, draft_revision: 0, created_by: 'u1',
+                  expires_at: '2099-01-01T00:00:00Z', revoked_at: null, last_used_at: null,
+                  created_at: '2026-09-29T12:00:00Z',
+                }]
+              : [],
+          });
+        }
+        return Promise.resolve({ data: appData });
+      });
+
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      render(<AppBuilderDetailPage />);
+      await user.click(await screen.findByText('Preview on phone'));
+      await screen.findByText(/Expires in \d+s/);
+
+      sessionExists = true;
+      await vi.advanceTimersByTimeAsync(4500);
+
+      expect(await screen.findByText('Connected — a preview session is now active on the device.')).toBeTruthy();
+    });
   });
 });

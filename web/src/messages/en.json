@@ -6855,7 +6855,21 @@
         "issueSuccessTitle": "Preview session issued",
         "issueErrorTitle": "Could not issue the preview session",
         "revokeErrorTitle": "Could not revoke the session",
-        "loadErrorTitle": "Could not load preview sessions"
+        "loadErrorTitle": "Could not load preview sessions",
+        "qrAction": "Preview on phone",
+        "qrDialogTitle": "Preview on your phone",
+        "qrCreating": "Preparing a one-time code…",
+        "qrInstructions": "Open the AWJ preview app and scan this code, or open the link on the device. It works once and stops working on its own.",
+        "qrExpiresIn": "Expires in {seconds}s",
+        "qrExpired": "This code has expired. Generate a new one.",
+        "qrConsumed": "Connected — a preview session is now active on the device.",
+        "qrCopyLink": "Copy link",
+        "qrCopied": "Copied",
+        "qrRegenerate": "Generate a new code",
+        "qrRetry": "Try again",
+        "qrErrorTitle": "Could not prepare the preview code",
+        "qrErrorBody": "Something went wrong while preparing the preview code.",
+        "qrTemporaryNote": "This code is temporary and works once. It never carries a reusable credential."
       }
     },
     "versions": {

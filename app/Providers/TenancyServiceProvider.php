@@ -206,5 +206,21 @@ class TenancyServiceProvider extends ServiceProvider
 
             return Limit::perMinute(60)->by('preview-fetch|' . $key);
         });
+
+        // MOBILE-PREVIEW-7 — إصدار مرجع تبادل (لوحة التاجر، مصادَق سلفاً):
+        // نفس كيليد إصدار جلسة المعاينة المباشرة تماماً (مستخدم داخل مستأجره).
+        RateLimiter::for('preview-exchange-issue', function (Request $request): Limit {
+            $key = $request->user()?->getAuthIdentifier() ?? $request->ip();
+
+            return Limit::perMinute(20)->by('preview-exchange-issue|' . $key);
+        });
+
+        // MOBILE-PREVIEW-7 — `POST /preview/v1/exchange`: بلا مصادقة سابقة
+        // إطلاقاً، فلا كيليد سوى الـIP. المرجع نفسه قصير الأجل (٥ دقائق) وحيد
+        // الاستعمال (§5.13 من معمارية MP-5: نفس نمط `customer_otp_codes` —
+        // نافذة قصيرة + كيليد IP مستقلّ عن أي حصّة إصدار).
+        RateLimiter::for('preview-exchange', function (Request $request): Limit {
+            return Limit::perMinute(20)->by('preview-exchange|' . $request->ip());
+        });
     }
 }

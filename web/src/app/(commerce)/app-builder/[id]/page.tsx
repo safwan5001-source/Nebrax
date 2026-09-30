@@ -5,7 +5,8 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
-import { Layers, PenSquare, Smartphone, Ban } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
+import { Layers, PenSquare, Smartphone, Ban, QrCode, Copy, RefreshCw, Clock } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
@@ -15,6 +16,10 @@ import { DetailPage, ErrorState, LoadingState, type PageAction } from '@/compone
 import { api, ApiError } from '@/lib/api';
 import { appDisplayName, type BuilderApp, type BuilderPublishedVersion, type PreviewSession } from '@/lib/app-builder';
 import { formatDate } from '@/lib/formatting';
+import { cn } from '@/lib/utils';
+
+type ExchangeReference = { reference: string; deep_link: string; expires_at: string; exchange_reference_id: string };
+type QrPhase = 'idle' | 'creating' | 'ready' | 'expired' | 'consumed' | 'error';
 
 /**
  * APP-BUILDER-4/5 — نظرة عامة على التطبيق. «فتح مساحة التحرير» يقود إلى
@@ -26,6 +31,14 @@ import { formatDate } from '@/lib/formatting';
  * `mobile/lib/main_preview.dart`). النصّ الخام يُعرض مرّة واحدة فقط عبر
  * `SecretRevealDialog` (نفس مكوّن عرض أسرار مفاتيح Developer API) ولا يُخزَّن
  * في حالة هذه الصفحة بعد إغلاق الحوار.
+ *
+ * MOBILE-PREVIEW-7 — «معاينة على الهاتف» (QR): يطلب مرجع تبادل لمرّة واحدة
+ * (`POST .../preview-exchange-references`) ويعرضه كرمز QR ورابطٍ قابل
+ * للنسخ. **لا بصمة عمل تُعرض هنا إطلاقاً** — المرجع الخام مختلفٌ عمداً عن
+ * توكن جلسة المعاينة نفسه، ولا يصلح لشيء غير استهلاكٍ واحد عبر
+ * `POST /preview/v1/exchange` من الجهاز. عدّاد الانتهاء (٥ دقائق) والتجديد
+ * والحالة المنتهية محلّية بالكامل؛ رصد «تم الاتصال» أفضل-جهدٍ فقط (استطلاع
+ * قائمة الجلسات القائمة أصلاً — بلا مسار API جديد لغرضه وحده).
  */
 export default function AppBuilderDetailPage() {
   const t = useTranslations('appBuilder.detail');
@@ -46,6 +59,13 @@ export default function AppBuilderDetailPage() {
   const [revokeTarget, setRevokeTarget] = useState<PreviewSession | null>(null);
   const [revoking, setRevoking] = useState(false);
   const [issuedToken, setIssuedToken] = useState<string | null>(null);
+
+  const [qrOpen, setQrOpen] = useState(false);
+  const [qrPhase, setQrPhase] = useState<QrPhase>('idle');
+  const [qrData, setQrData] = useState<ExchangeReference | null>(null);
+  const [qrRemainingSeconds, setQrRemainingSeconds] = useState(0);
+  const [qrBaselineCount, setQrBaselineCount] = useState(0);
+  const [qrCopied, setQrCopied] = useState(false);
 
   const load = useCallback(() => {
     if (!params.id) return;
@@ -73,6 +93,74 @@ export default function AppBuilderDetailPage() {
   }, [params.id, toast, tp]);
 
   useEffect(() => load(), [load]);
+
+  // عدّاد الانتهاء (٥ دقائق) — محلّي بالكامل، لا يمدَّد أبداً.
+  useEffect(() => {
+    if (qrPhase !== 'ready' || !qrData) return;
+    const tick = () => {
+      const remaining = Math.max(0, Math.floor((new Date(qrData.expires_at).getTime() - Date.now()) / 1000));
+      setQrRemainingSeconds(remaining);
+      if (remaining <= 0) setQrPhase('expired');
+    };
+    tick();
+    const id = window.setInterval(tick, 1000);
+    return () => window.clearInterval(id);
+  }, [qrPhase, qrData]);
+
+  // رصد «تم الاتصال» أفضل-جهدٍ: استطلاع قائمة الجلسات القائمة أصلاً — لا
+  // مسار API جديد لغرضه وحده (لا ربط مباشر بين مرجعٍ بعينه وجلسته الناتجة
+  // في عقد `PreviewSessionResource` اليوم).
+  useEffect(() => {
+    if (qrPhase !== 'ready' || !params.id) return;
+    const id = window.setInterval(reloadPreviewSessions, 4000);
+    return () => window.clearInterval(id);
+  }, [qrPhase, params.id, reloadPreviewSessions]);
+
+  useEffect(() => {
+    if (qrPhase === 'ready' && previewSessions.length > qrBaselineCount) {
+      setQrPhase('consumed');
+    }
+  }, [previewSessions, qrPhase, qrBaselineCount]);
+
+  async function createExchangeReference() {
+    if (!params.id) return;
+    setQrPhase('creating');
+    try {
+      const res = await api<ExchangeReference>(`/app-builder/apps/${params.id}/preview-exchange-references`, {
+        method: 'POST',
+        body: {},
+      });
+      setQrData(res);
+      setQrBaselineCount(previewSessions.length);
+      setQrPhase('ready');
+    } catch (err) {
+      setQrPhase('error');
+      toast.error(tp('qrErrorTitle'), err instanceof ApiError ? err.message : undefined);
+    }
+  }
+
+  function openQrDialog() {
+    setQrOpen(true);
+    setQrData(null);
+    void createExchangeReference();
+  }
+
+  function closeQrDialog() {
+    setQrOpen(false);
+    setQrPhase('idle');
+    setQrData(null);
+  }
+
+  async function copyDeepLink() {
+    if (!qrData) return;
+    try {
+      await navigator.clipboard.writeText(qrData.deep_link);
+      setQrCopied(true);
+      window.setTimeout(() => setQrCopied(false), 1800);
+    } catch {
+      // الحافظة قد تُرفض في سياق غير آمن — يبقى الرابط قابلاً للنسخ يدوياً من QR.
+    }
+  }
 
   async function issuePreviewSession() {
     if (!params.id) return;
@@ -174,10 +262,16 @@ export default function AppBuilderDetailPage() {
           })}
         </div>
       )}
-      <Button type="button" variant="outline" size="sm" disabled={issuing} onClick={() => void issuePreviewSession()}>
-        <Smartphone className="h-3.5 w-3.5" strokeWidth={1.7} aria-hidden="true" />
-        {issuing ? tp('issuing') : tp('issueAction')}
-      </Button>
+      <div className="flex flex-wrap gap-2">
+        <Button type="button" variant="outline" size="sm" onClick={openQrDialog}>
+          <QrCode className="h-3.5 w-3.5" strokeWidth={1.7} aria-hidden="true" />
+          {tp('qrAction')}
+        </Button>
+        <Button type="button" variant="outline" size="sm" disabled={issuing} onClick={() => void issuePreviewSession()}>
+          <Smartphone className="h-3.5 w-3.5" strokeWidth={1.7} aria-hidden="true" />
+          {issuing ? tp('issuing') : tp('issueAction')}
+        </Button>
+      </div>
     </div>
   );
 
@@ -210,6 +304,79 @@ export default function AppBuilderDetailPage() {
         description={tp('tokenDialogDescription')}
         secret={issuedToken ?? ''}
       />
+
+      <Dialog
+        open={qrOpen}
+        onClose={() => (qrPhase === 'creating' ? undefined : closeQrDialog())}
+        title={tp('qrDialogTitle')}
+      >
+        <div className="space-y-4">
+          {qrPhase === 'creating' && <p className="py-6 text-center text-sm text-muted">{tp('qrCreating')}</p>}
+
+          {qrPhase === 'error' && (
+            <div className="space-y-3">
+              <p className="text-sm text-negative">{tp('qrErrorBody')}</p>
+              <Button type="button" variant="outline" size="sm" onClick={() => void createExchangeReference()}>
+                <RefreshCw className="h-3.5 w-3.5" strokeWidth={1.7} aria-hidden="true" />
+                {tp('qrRetry')}
+              </Button>
+            </div>
+          )}
+
+          {(qrPhase === 'ready' || qrPhase === 'expired' || qrPhase === 'consumed') && qrData && (
+            <div className="space-y-4">
+              <p className="text-sm leading-6 text-text">{tp('qrInstructions')}</p>
+
+              <div className="flex justify-center">
+                <div
+                  className={cn(
+                    'rounded-lg border p-3',
+                    qrPhase === 'ready' ? 'border-border' : 'border-border opacity-30 grayscale',
+                  )}
+                >
+                  <QRCodeSVG value={qrData.deep_link} size={196} />
+                </div>
+              </div>
+
+              {qrPhase === 'ready' && (
+                <p className="flex items-center justify-center gap-1.5 text-xs text-muted">
+                  <Clock className="h-3.5 w-3.5" strokeWidth={1.7} aria-hidden="true" />
+                  {tp('qrExpiresIn', { seconds: qrRemainingSeconds })}
+                </p>
+              )}
+              {qrPhase === 'expired' && (
+                <p className="text-center text-sm font-medium text-warning">{tp('qrExpired')}</p>
+              )}
+              {qrPhase === 'consumed' && (
+                <p className="text-center text-sm font-medium text-positive">{tp('qrConsumed')}</p>
+              )}
+
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={qrPhase !== 'ready'}
+                  onClick={() => void copyDeepLink()}
+                >
+                  <Copy className="h-3.5 w-3.5" strokeWidth={1.7} aria-hidden="true" />
+                  {qrCopied ? tp('qrCopied') : tp('qrCopyLink')}
+                </Button>
+                <Button type="button" variant="outline" size="sm" onClick={() => void createExchangeReference()}>
+                  <RefreshCw className="h-3.5 w-3.5" strokeWidth={1.7} aria-hidden="true" />
+                  {tp('qrRegenerate')}
+                </Button>
+              </div>
+
+              <p className="text-center text-xs text-muted">{tp('qrTemporaryNote')}</p>
+            </div>
+          )}
+
+          <div className="flex justify-end">
+            <Button variant="outline" onClick={closeQrDialog}>{tc('cancel')}</Button>
+          </div>
+        </div>
+      </Dialog>
 
       <Dialog
         open={revokeTarget !== null}

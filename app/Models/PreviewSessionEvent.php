@@ -25,6 +25,12 @@ class PreviewSessionEvent extends BaseModel implements CompanyWide
 
     public const ACTION_REJECTED = 'rejected';
 
+    /** MOBILE-PREVIEW-7 — مرجع تبادل صدر (لوحة التاجر، قبل أي تبادل فعلي). */
+    public const ACTION_EXCHANGE_CREATED = 'exchange_created';
+
+    /** MOBILE-PREVIEW-7 — تبادل ناجح استهلك المرجع وأنشأ جلسة معاينة حقيقية. */
+    public const ACTION_EXCHANGED = 'exchanged';
+
     protected $fillable = [
         'tenant_id',
         'preview_session_id',
