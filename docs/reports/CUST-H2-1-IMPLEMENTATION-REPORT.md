@@ -306,14 +306,20 @@ php artisan test --filter="BranchIsolationGuardTest|CommerceModuleBoundaryTest|C
 # SQLite writer from a since-corrected background-job mistake; re-run alone: clean)
 
 php artisan test <every *Test.php file except Fuel*/R2*/ProductMediaR2*>
-# in progress at PR-open time in this session (~4800 tests, single-process phpunit,
-# several minutes); this session's own earlier attempt was invalidated by the
-# `.env` mistake noted in "Review Findings" below and re-launched clean. Every
-# Storefront/Presentation/Commerce/Branch/Company-scoped file this slice could
-# plausibly affect was independently verified above and is green; this run is the
-# broader defense-in-depth pass and its final tally will be added to this report
-# as a follow-up commit on this same PR once it completes.
+# 9 failed, 49 skipped, 4824 passed (30187 assertions), 536.63s
 ```
+
+All 9 failures are in exactly 2 files — `AuthRecoveryTest` (8) and
+`DocumentCenterSecureIntakeTest` (1) — both the exact pre-existing, unrelated,
+local-dev-only gap `App\Mail\AuthActionMail` not found (`setup.sh` does not copy
+`app/Mail/` into this container's assembled app; `deploy/assemble.sh` and
+`.github/workflows/ci.yml`'s assembly step both do). This is the identical failure
+signature `docs/reports/CUST-H1-HORIZON-CLOSURE-REPORT.md`'s own closure pass
+independently documented (its "Tests" section: *"All 9 failures are in exactly 2
+files — `AuthRecoveryTest` and `DocumentCenterSecureIntakeTest` — both the exact
+pre-existing, unrelated local-dev-only gap"*) — re-confirmed here on top of this
+slice's changes. **Zero failures in any Storefront/Presentation/Commerce/Branch/
+Company-scoped test.**
 
 `Fuel*`/`R2*`/`ProductMediaR2*` excluded per this repo's own documented precedent
 (`docs/reports/CUST-H1-HORIZON-CLOSURE-REPORT.md`'s "Tests" section) — missing
