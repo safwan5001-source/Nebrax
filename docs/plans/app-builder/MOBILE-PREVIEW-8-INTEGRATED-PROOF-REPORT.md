@@ -285,17 +285,52 @@ PreviewExchangePostgresConcurrencyTest       2 passed (7 assertions)   — real 
 PreviewIntegratedChainTest                   4 passed (44 assertions)   ← new this session
 ```
 
+Re-confirmed once more at the very end of this session (§9.4), on a freshly migrated, fully clean PostgreSQL 16 database, after diagnosing and locally working around an unrelated pre-existing gap: **all 35 tests across these four files passed again (218 assertions, 0 failed)** — the Preview subsystem's own correctness was never in question at any point during that investigation.
+
 ### 9.3 Full backend suite — SQLite, no filter
 
-*(filled in immediately below once the background run completes — this report is republished with the final counts before the PR is opened; see the commit for the final, confirmed numbers)*
+```
+Tests:    54 failed, 51 skipped, 4940 passed (30921 assertions)
+Duration: 1200.62s
+```
+
+All 54 failures independently root-caused this session, by direct inspection of their error output — not assumed from MP-6's report alone:
+- **R2/AWS-SDK-related** (`R2SmokeTestCommandTest`, `R2StorageServiceTest`, `ProductMediaR2*Test` — the large majority): `Class "Aws\Exception\AwsException" not found` — `setup.sh` does not install `league/flysystem-aws-s3-v3`/`predis/predis`, exactly MOBILE-PREVIEW-6's own already-documented §9a gap (present in `setup.sh`, absent from `ci.yml`, which installs both).
+- **`AuthRecoveryTest`** (8 tests): `setup.sh` does not copy `app/Mail/` — the same, already-documented MOBILE-PREVIEW-6 §9a gap.
+- **`FuelAviRfidServiceTest`/`FuelReconciliationTest`/`FuelSaleServiceTest`/`FuelSupplyReceivingTest`/`FuelSaleApiTest`/`FuelSupplyReceivingApiTest`**: this sandbox's base PHP 8.4 install was missing the `bcmath` extension (confirmed directly: `function_exists('bcmul')` returned `false` before a fix) — the same category of OS-level gap MOBILE-PREVIEW-6's report recorded for its own sandbox.
+- **`ProductOptionValueVisualTest`** (3 tests) and **`DocumentCenterSecureIntakeTest`** (1 test): this sandbox's base PHP was also missing the `gd` extension (pulled in as a dependency while fixing `bcmath` via `apt-get install php8.4-bcmath`) — a newly identified instance of the same OS-level-gap category, not previously named in MP-6's report but structurally identical to it.
+
+**Zero of the 54 failures reference `Preview`, `PreviewSession`, `PreviewExchange`, or any file under `app/Services/AppBuilder/Preview*`/`tests/Feature/Preview*` in any way.** None of MP-8's own new tests failed. `bcmath`/`gd` were installed system-wide (`apt-get install php8.4-bcmath`, which pulls `php8.4-gd`) purely to aid this session's own local diagnosis — **no repository file was changed to do this**, matching MP-6's own precedent of fixing local sandbox gaps without touching the shipped `setup.sh`.
 
 ### 9.4 Full backend suite — PostgreSQL 16, no filter
 
-*(same as above)*
+**First attempt hung indefinitely and required real diagnosis — recorded here in full rather than silently retried away, since it surfaced a genuine (if environment-specific) interaction worth documenting.**
+
+The first two full-suite attempts against a local PostgreSQL 16 instance stalled indefinitely partway through (confirmed via `pg_stat_activity`: one backend `idle in transaction` on `DEALLOCATE pdo_stmt_...`, a second backend blocked waiting for a row lock on `tenant_reference_number_sequences`). Root-caused by direct investigation rather than guessed:
+
+1. `php artisan test` launches `vendor/phpunit/phpunit/phpunit` as a **child process**. Two earlier attempts in this session were interrupted with `kill -9` on the **parent** PID only — the PHPUnit **child** kept running, orphaned, still holding live database connections, and raced a later fresh attempt over the same rows (`ps auxww` later showed multiple concurrent orphaned `phpunit` processes from different start times). Fixed by `pkill -9 -f phpunit` (not just the parent) before each retry.
+2. Once process-level cleanliness was confirmed (a single PHPUnit process, verified via `ps`), the suite still stalled at the **same** point every time: immediately after a `ProductMediaR2*Test` whose code path throws `Class "Aws\Exception\AwsException" not found` — a PHP `\Error`, not an `\Exception` — from inside a DB-transaction-wrapped code path. Under SQLite this class-not-found `\Error` merely fails that one test (no cross-connection row locking exists to jam). Under PostgreSQL, it appears to leave that test's connection `idle in transaction` while still holding row locks, which then blocks every subsequent test's `registerTenant()` call (used by nearly every feature test) on the shared `tenant_reference_number_sequences` lock — turning one pre-existing, already-documented gap (missing AWS SDK, §9.3) into a **suite-wide hang specific to PostgreSQL**, not a PR-caused regression.
+3. **Confirmed, not merely theorized**: after installing `league/flysystem-aws-s3-v3`/`predis/predis` directly into the built app via `composer require` (a local-only fix, exactly MOBILE-PREVIEW-6's own §9a precedent — **no `setup.sh`/repository file changed**), the full suite ran to completion cleanly, with no hang, confirming the AWS-SDK gap was the actual trigger.
+
+**Final, clean, completed run:**
+
+```
+Tests:    9 failed, 5036 passed (31454 assertions)
+```
+
+All 9 remaining failures are `AuthRecoveryTest` (8) + `DocumentCenterSecureIntakeTest` (1) — the same already-documented `app/Mail` copy gap from §9.3, unaffected by the AWS-SDK fix. **Zero failures reference Preview in any way.** Immediately afterward, the full focused Preview suite (`PreviewSessionTest`, `PreviewExchangeTest`, `PreviewExchangePostgresConcurrencyTest`, `PreviewIntegratedChainTest` — 35 tests total) was re-run once more against this same clean PostgreSQL instance as a final confirmation: **35 passed (218 assertions)**, 0 failed.
+
+**This PostgreSQL-specific hang is recorded as a new, distinct risk finding in §12** — it is a genuine interaction between a pre-existing gap and PostgreSQL's locking model, surfaced only because this session ran the full suite against a real, sustained PostgreSQL instance rather than a single focused pass; it is not caused by, and does not affect, any Preview Sessions code.
 
 ### 9.5 Web — `npm run test` / `npm run build`
 
-*(filled in below once the background run completes)*
+```
+Test Files  328 passed (328)
+     Tests  2440 passed (2440)
+Duration    188.25s
+```
+
+`npm run build` (Next.js production build) — **succeeded, exit code 0**, including the `/app-builder/[id]` route (the QR/preview-sessions UI, unmodified by this task).
 
 ### 9.6 Mobile — `flutter analyze` / `flutter test` / Android / iOS build proofs
 
@@ -369,6 +404,7 @@ PreviewIntegratedChainTest                   4 passed (44 assertions)   ← new 
 6. **No build-flavor separation** — §5.3/§11, the one open Decision Gate.
 7. **No minimal browser-fallback page or logging-redaction policy is implementable yet**, because no hosting decision for the preview host has been made — §3.4/§10. Not a code defect; a sequencing dependency (hosting decision must come first).
 8. **Real-device/emulator execution has never actually happened for this feature, at any MP stage** — every report from MP-4 onward has honestly recorded "no Flutter toolchain in this sandbox." This is the single largest gap between "code/CI proof" and the Horizon's own exit criterion #10 ("real Android and iOS device verification is recorded"). It requires either a local development machine or an extended CI job (§6) — a concrete, actionable follow-up, not a vague caveat.
+9. **A pre-existing, already-documented gap (missing AWS SDK in `setup.sh`, MOBILE-PREVIEW-6 §9a) has a PostgreSQL-specific side effect not previously recorded: a `Class not found` `\Error` thrown inside a DB-transaction-wrapped code path can leave that connection `idle in transaction` while holding row locks, which then blocks every subsequent test needing `tenant_reference_number_sequences` under PostgreSQL's stricter locking model** (§9.4). This is unrelated to Preview Sessions and does not occur once the already-known `setup.sh` gap is fixed (confirmed: a full, clean 9-failed/5036-passed PostgreSQL run after installing the missing packages locally). Recorded here as a sharper characterization of an already-known gap's blast radius, worth folding into whatever future task finally closes MOBILE-PREVIEW-6 §9a's `setup.sh` follow-up.
 
 ---
 
