@@ -3,6 +3,7 @@
 **Status:** READY FOR OWNER REVIEW  
 **Base SHA:** `82e5199fe75d06bb3546802d141f42da92e3a63f`  
 **Execution:** نظام الأفق / Claude Code  
+**Merge authority:** Not granted by this document; requires Safwan's explicit launch/merge authorization.  
 **Depends on:** `docs/commerce/AWJ_GROWTH_PLATFORM_V1.md`, `docs/commerce/AWJ_GROWTH_EVIDENCE_1.md`
 
 ## Goal
@@ -329,6 +330,8 @@ GF-1 → GF-2 → GF-3 → GF-4 → GF-5 → GF-6
 ```
 
 No dependent stacked PRs by default. Each task unlocks only after previous merge + POST_MERGE_REVIEW PASS + durable report.
+
+This horizon document does **not** itself grant standing merge authority. If Safwan launches Claude Code without explicitly granting merge authority for this horizon, Claude must stop at the merge gate after `PRE_MERGE_REVIEW: PASS` and request approval. Deploy/Production authority is never implied.
 
 ## Mandatory negative tests
 
