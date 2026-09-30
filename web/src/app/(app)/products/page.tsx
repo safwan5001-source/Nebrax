@@ -250,7 +250,7 @@ export default function ProductsPage() {
           <Link href={`/products/${product.id}`}><Eye className="h-4 w-4" strokeWidth={1.7} /></Link>
         </Button>
         <Button asChild type="button" variant="ghost" size="icon" aria-label={t('edit')}>
-          <Link href={`/products/${product.id}`}><Pencil className="h-4 w-4" strokeWidth={1.7} /></Link>
+          <Link href={`/products/${product.id}/edit`}><Pencil className="h-4 w-4" strokeWidth={1.7} /></Link>
         </Button>
         <Button type="button" variant="ghost" size="icon" aria-label={t('copy')} disabled={working} onClick={() => void copyProduct(product)}>
           <Copy className="h-4 w-4" strokeWidth={1.7} />
