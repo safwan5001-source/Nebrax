@@ -42,7 +42,7 @@ GF-6 Webhook Intake Boundary + Closure
 Start with **GF-1 only**.
 
 After each task:
-inspect → implement smallest correct slice → focused/risk tests → Implementer review → Reviewer review → AWJ Guardian → final diff → exact-final-Head CI → PRE_MERGE_REVIEW PASS → merge only when Horizon gates permit → actual Merge SHA → POST_MERGE_REVIEW PASS → durable implementation report → next dependency-ready task.
+inspect → implement smallest correct slice → focused/risk tests → Implementer review → Reviewer review → AWJ Guardian → final diff → exact-final-Head CI → PRE_MERGE_REVIEW PASS → **merge only if Safwan's launch instruction explicitly grants merge authority for this horizon; otherwise stop and request approval** → actual Merge SHA → POST_MERGE_REVIEW PASS → durable implementation report → next dependency-ready task.
 
 Do not wait for “continue” between normal stages.
 
@@ -62,6 +62,7 @@ Do not wait for “continue” between normal stages.
 - No campaign/ad/budget/publish/message external writes.
 - No accounting/payment/inventory/pricing/tax/ZATCA changes.
 - No unrelated refactor.
+- This bootstrap does **not** itself grant standing merge authority. Safwan must explicitly grant it when launching the horizon, or Claude must stop before each merge.
 - Merge ≠ Deploy.
 - Never Production Deploy/Release without Safwan's explicit approval.
 
