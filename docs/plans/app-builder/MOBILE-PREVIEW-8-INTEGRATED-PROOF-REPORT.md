@@ -4,9 +4,9 @@
 **Status:** IMPLEMENTED (verification + minimal integrated-proof tests) — **code/CI proof complete, operational proof gated (no real domain provisioned), real-device proof environment-gated (no Flutter/Android/iOS toolchain in this sandbox)**. Stopping before merge per the task's explicit instruction.
 **Repository:** `safwan5001-source/Nebrax`
 **Base SHA:** `82e5199fe75d06bb3546802d141f42da92e3a63f` (latest `origin/main` at task start — the task doc's own baseline lineage `929e978` plus the MOBILE-PREVIEW-8 task-doc commit itself and one unrelated merged follow-up, `#1126`)
-**Head SHA:** recorded in §14 once pushed
+**Head SHA:** `d7610fa85bbc15541ca4bd043b28c2c3a851ea3f`
 **Branch:** `test/mobile-preview-8-integrated-proof` (matches the task doc's own instruction — no harness branch override needed this time, unlike MP-6/7)
-**PR:** recorded in §14 once opened
+**PR:** [#1130](https://github.com/safwan5001-source/Nebrax/pull/1130)
 **Scope:** Verification/integration only, per the task's own framing ("MP-8 is primarily a verification/integration task"). One new backend integration test file (`tests/Feature/PreviewIntegratedChainTest.php`, 4 tests) closing gaps MP-6/MP-7's own test suites left on the **exchange path specifically**. No redesign, no migration, no new route, no mobile/web code change.
 
 ---
@@ -422,7 +422,9 @@ Duration    188.25s
 ## 14. Branch / PR / CI
 
 - Branch: `test/mobile-preview-8-integrated-proof`
-- Head SHA / PR link: recorded once pushed and opened (this report is republished with the final line before requesting review)
+- Head SHA: `d7610fa85bbc15541ca4bd043b28c2c3a851ea3f`
+- PR: [#1130](https://github.com/safwan5001-source/Nebrax/pull/1130) — `test(app-builder): MOBILE-PREVIEW-8 integrated real-device proof`
+- CI: to be confirmed once the PR's workflows run on this head; this report will be updated with the observed result before requesting merge approval.
 - **Stopping before merge**, per the task's explicit instruction. No Deploy. No Production. No DNS.
 
 ---
