@@ -6,12 +6,25 @@ import { ScrollIndicator } from "./ScrollIndicator";
 import {
   clonePresentationConfig,
   DEFAULT_PRESENTATION_CONFIG,
+  defaultProductPageRegions,
   type HomeBuilderSectionKey,
+  moveProductRegion,
   normalizePresentationConfig,
+  type PageRegionInstance,
   type PageType,
+  type ProductPageRegionKey,
   presentationConfigsEqual,
   type StorefrontPresentationConfig,
 } from "./presentation";
+import { ProductPreviewPicker } from "./ProductPreviewPicker";
+import { ProductPreviewPickerPanel } from "./ProductPreviewPickerPanel";
+import { ProductRegionInspector } from "./ProductRegionInspector";
+import {
+  listWorkspaceProducts,
+  showWorkspaceProduct,
+  type WorkspaceProductDetail,
+  type WorkspaceProductSummary,
+} from "@/modules/commerce-workspace/workspace-products";
 import { DRAFT_PERSISTENCE_CAPABILITY, PUBLISH_CAPABILITY } from "./presentation/capabilities";
 import {
   ControlPanels,
@@ -71,7 +84,14 @@ export type BuilderLifecycle =
   | "save_blocked"
   | "publish_blocked";
 
-type MobileSheet = "sections" | "settings" | "design" | "versions" | "pages" | null;
+type MobileSheet =
+  | "sections"
+  | "settings"
+  | "design"
+  | "versions"
+  | "pages"
+  | "product-picker"
+  | null;
 
 interface ExperienceBuilderProps {
   initialConfig?: StorefrontPresentationConfig;
@@ -113,6 +133,27 @@ export function ExperienceBuilder({
   // الحفظ/النشر، ولا تُغيِّر سلطة الاستحقاق التجاري لمنتج/تصنيف — تجيب فقط
   // «أي صفحة أعرض؟»، منفصلة تماماً عن `selectedVersion` («أي نسخة أُعدِّل؟»).
   const [currentPage, setCurrentPage] = useState<PageType>("home");
+  // CUST-H2-3 — أي منتج يُعايِن المحرِّر حالياً في صفحة المنتج. **سياق محرِّر
+  // بحت**: لا يُكتَب أبداً إلى `pagePresentation`، لا يُرسَل مع الحفظ/النشر،
+  // ولا يُغيِّر `dirty`/`lifecycle` (راجع العقد المعماري، "Preview Context
+  // Model" — يجيب «أي منتج أُعايِن؟» لا «لأي منتج هذا التخطيط؟»).
+  const [previewProductId, setPreviewProductId] = useState<string | null>(null);
+  const [previewProduct, setPreviewProduct] =
+    useState<WorkspaceProductDetail | null>(null);
+  const [previewProductState, setPreviewProductState] = useState<
+    "idle" | "loading" | "error" | "empty" | "ready"
+  >("idle");
+  const [productList, setProductList] = useState<WorkspaceProductSummary[]>([]);
+  const [productListState, setProductListState] = useState<
+    "idle" | "loading" | "error" | "ready"
+  >("idle");
+  const [productSearch, setProductSearch] = useState("");
+  const [selectedProductRegion, setSelectedProductRegion] = useState<string | null>(null);
+  // هويتا طلبٍ مستقلَّتان (نفس نمط `versionRequestTokenRef`) — تمنعان نتيجة
+  // شبكة متأخرة (قائمة منتجات أو تفصيل منتج) من الكتابة فوق حالة أحدث بعد
+  // تبديل سريع للمتجر أو لمنتج المعاينة نفسه.
+  const productListRequestRef = useRef(0);
+  const previewProductRequestRef = useRef(0);
   const [pendingSectionScroll, setPendingSectionScroll] = useState<
     string | null
   >(null);
@@ -205,13 +246,19 @@ export function ExperienceBuilder({
   // "Global vs Page-Specific Matrix" في العقد المعماري). إخفاؤها من التنقّل
   // بدل تعطيلها يمنع عرض عناصر تحكم الرئيسية على صفحة خاطئة دون اختراع حالة
   // "معطَّلة" جديدة.
+  // CUST-H2-3 — نفس منطق إخفاء "homepage" أعلاه بالضبط، معكوساً: لوحة "product"
+  // صالحة على صفحة المنتج فقط.
   const visibleNavGroups = CUSTOMIZER_NAV_GROUPS.map((group) => ({
     items: group.items.filter(
-      (item) => item.id !== "homepage" || currentPage === "home",
+      (item) =>
+        (item.id !== "homepage" || currentPage === "home")
+        && (item.id !== "product" || currentPage === "product"),
     ),
   })).filter((group) => group.items.length > 0);
   const visiblePanels = CUSTOMIZER_PANELS.filter(
-    (item) => item.id !== "homepage" || currentPage === "home",
+    (item) =>
+      (item.id !== "homepage" || currentPage === "home")
+      && (item.id !== "product" || currentPage === "product"),
   );
   const activePanel = CUSTOMIZER_PANELS.find((item) => item.id === panel);
   const isPublishedReadOnly = selectedVersion?.state === "published";
@@ -519,6 +566,20 @@ export function ExperienceBuilder({
     // العادي أثناء الجلسة (`handleSelectPage`)، ولا تبديل النسخة العادي
     // (`applyVersionSelection`) اللذين يحافظان على الصفحة الحالية عمداً.
     setCurrentPage("home");
+    // نفس منطق `currentPage` أعلاه بالضبط: فتحٌ جديد يبدأ بلا منتج معاينة
+    // مُختار — الاختيار الفعلي (أول منتج مؤهَّل) يحدث في تأثير تحميل القائمة
+    // أدناه، لا هنا. تبديل نسخة عادي أثناء الجلسة لا يمسّ هذا (راجع
+    // "Version Switching" في العقد المعماري — الأهلية مرتبطة بقناة *المتجر*
+    // لا بالنسخة، فتبقى صالحة عبر تبديل النسخ العادي تلقائياً).
+    ++previewProductRequestRef.current;
+    ++productListRequestRef.current;
+    setPreviewProductId(null);
+    setPreviewProduct(null);
+    setPreviewProductState("idle");
+    setProductList([]);
+    setProductListState("idle");
+    setProductSearch("");
+    setSelectedProductRegion(null);
 
     if (!storefrontId) {
       setBusy(null);
@@ -540,6 +601,121 @@ export function ExperienceBuilder({
     // وحده، بمعزل عن تبديل `storefrontId`.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storefrontId, versionId]);
+
+  // CUST-H2-3 — القائمة/التفصيل الفعليان المعروضان الآن: مستمَدّان من
+  // `draft.pagePresentation.product.regions` إن وُجدت، وإلا من العقد
+  // الافتراضي المحسوب محلياً (`defaultProductPageRegions()`) بلا كتابة إلى
+  // `draft` — فتح صفحة المنتج وحده لا يُوسِّخ النسخة أبداً؛ التحرير الفعلي
+  // (تبديل رؤية أو نقل) وحده يُماديها فعلياً عبر `updateDraft` أول مرة.
+  const effectiveProductRegions: PageRegionInstance<ProductPageRegionKey>[] =
+    draft.pagePresentation?.product?.regions ?? defaultProductPageRegions();
+
+  async function loadProductList(search?: string) {
+    if (!storefrontId) return;
+    const token = ++productListRequestRef.current;
+    const originStorefrontId = storefrontId;
+    setProductListState("loading");
+    const result = await listWorkspaceProducts(storefrontId, { search: search || undefined, perPage: 50 });
+    if (token !== productListRequestRef.current || storefrontIdRef.current !== originStorefrontId) return;
+    if (!result.ok) {
+      setProductListState("error");
+      setProductList([]);
+      return;
+    }
+    setProductListState("ready");
+    setProductList(result.data);
+    if (result.data.length === 0) {
+      setPreviewProductId(null);
+      setPreviewProductState("empty");
+      return;
+    }
+    // "Otherwise select the first eligible Product deterministically" —
+    // only when there is no current selection yet, never overriding a
+    // merchant's own (still-eligible) choice merely because the list
+    // reloaded (e.g. after a search).
+    setPreviewProductId((current) => current ?? result.data[0].id);
+  }
+
+  useEffect(() => {
+    if (currentPage !== "product" || !storefrontId || productListState !== "idle") return;
+    void loadProductList();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPage, storefrontId, productListState]);
+
+  useEffect(() => {
+    if (!storefrontId || !previewProductId) return;
+    const token = ++previewProductRequestRef.current;
+    const originStorefrontId = storefrontId;
+    const originProductId = previewProductId;
+    setPreviewProductState("loading");
+    void (async () => {
+      const result = await showWorkspaceProduct(storefrontId, originProductId);
+      if (token !== previewProductRequestRef.current || storefrontIdRef.current !== originStorefrontId) return;
+      if (!result.ok) {
+        if (result.reason === "not_found") {
+          // Product deleted/unpublished between requests — never resurrect
+          // a stale entity; fall back to a different eligible Product from
+          // the already-loaded list, or an honest empty state if none remain.
+          const fallback = productList.find((p) => p.id !== originProductId) ?? null;
+          setPreviewProduct(null);
+          if (fallback) {
+            setPreviewProductId(fallback.id);
+          } else {
+            setPreviewProductId(null);
+            setPreviewProductState("empty");
+          }
+          return;
+        }
+        setPreviewProduct(null);
+        setPreviewProductState("error");
+        return;
+      }
+      setPreviewProduct(result.data);
+      setPreviewProductState("ready");
+    })();
+  }, [storefrontId, previewProductId, productList]);
+
+  function handleSelectPreviewProduct(product: WorkspaceProductSummary) {
+    if (product.id === previewProductId) return;
+    setPreviewProductId(product.id);
+  }
+
+  function handleProductSearchChange(value: string) {
+    setProductSearch(value);
+    void loadProductList(value);
+  }
+
+  function handleRetryProductList() {
+    void loadProductList(productSearch);
+  }
+
+  function handleSelectProductRegion(id: string) {
+    setSelectedProductRegion(id);
+    setPanel("product");
+    if (typeof window !== "undefined" && window.innerWidth < 768) {
+      setMobileSheet("settings");
+    }
+  }
+
+  function writeProductRegions(regions: PageRegionInstance<ProductPageRegionKey>[]) {
+    updateDraft({
+      ...draft,
+      pagePresentation: { ...draft.pagePresentation, product: { version: 1, regions } },
+    });
+  }
+
+  function handleToggleProductRegionVisibility(id: string) {
+    const regions = effectiveProductRegions.map((region) =>
+      region.id === id ? { ...region, visible: !region.visible } : region,
+    );
+    writeProductRegions(regions);
+  }
+
+  function handleMoveProductRegion(id: string, delta: 1 | -1) {
+    const index = effectiveProductRegions.findIndex((region) => region.id === id);
+    if (index < 0) return;
+    writeProductRegions(moveProductRegion(effectiveProductRegions, index, delta));
+  }
 
   function updateDraft(next: StorefrontPresentationConfig) {
     if (isPublishedReadOnly) return; // فشل آمن دفاعي — لوحة التحكم مخفية أصلاً لهذه الحالة.
@@ -1123,7 +1299,16 @@ export function ExperienceBuilder({
     setCurrentPage(page);
     setSelectedSection(null);
     setSelectedChrome(null);
+    if (page !== "product") {
+      // Product region selection resets safely on leaving the page (task's
+      // own "Page Switching" rule) — the underlying draft edits themselves
+      // are untouched, only this transient selection UI state.
+      setSelectedProductRegion(null);
+    }
     if (page !== "home" && panel === "homepage") {
+      setPanel("theme");
+    }
+    if (page !== "product" && panel === "product") {
       setPanel("theme");
     }
   }
@@ -1241,6 +1426,26 @@ export function ExperienceBuilder({
         </InspectorStatusMessage>
       );
     }
+    // CUST-H2-3 — بنية صفحة المنتج تُعرَض دوماً على صفحة المنتج، **حتى على
+    // نسخة منشورة**: التاجر قد يتصفّح البنية ويختار منتج معاينة على المنشورة
+    // (العقد المعماري، "Published Version" — "Merchant may: navigate Product
+    // page; choose preview Product; inspect layout")، فهذا الفرع يسبق تحقّق
+    // `isPublishedReadOnly` أدناه عمداً، بخلاف كل لوحة أخرى. `readOnly` يعطّل
+    // فعلياً التبديل/النقل فقط — القائمة نفسها تبقى مرئية دوماً.
+    if (panelForSlot === "product" && currentPage === "product") {
+      return (
+        <ProductRegionInspector
+          locale={locale}
+          regions={effectiveProductRegions}
+          hasVariants={(previewProduct?.variants?.length ?? 0) > 0}
+          selectedRegionId={selectedProductRegion}
+          onSelectRegion={handleSelectProductRegion}
+          onToggleVisibility={handleToggleProductRegionVisibility}
+          onMove={handleMoveProductRegion}
+          readOnly={isPublishedReadOnly}
+        />
+      );
+    }
     if (!storefrontId) {
       // لا مستأجر محدَّد بعد — تحرير محلي بحت عبر `initialConfig`، بلا نسخ
       // ولا حفظ. سلوك ما قبل CUST-H1-2 حرفياً.
@@ -1354,12 +1559,37 @@ export function ExperienceBuilder({
           <p className="truncate text-[13px] font-semibold leading-none md:text-sm">
             {t("title")}
           </p>
-          <div className="mt-1 hidden md:block">
+          <div className="mt-1 hidden items-center gap-1 md:flex">
             <PageNavigator
               locale={locale}
               currentPage={currentPage}
               onSelect={handleSelectPage}
             />
+            {currentPage === "product" && storefrontId ? (
+              <ProductPreviewPicker
+                locale={locale}
+                selectedProduct={
+                  previewProduct
+                    ? {
+                        id: previewProduct.id,
+                        name: previewProduct.name,
+                        nameEn: previewProduct.nameEn,
+                        thumbnailUrl: previewProduct.media[0]?.url ?? null,
+                        isVariantManaged: previewProduct.isVariantManaged,
+                      }
+                    : (productList.find((p) => p.id === previewProductId) ?? null)
+                }
+                listState={productListState === "idle" ? "loading" : productListState}
+                products={productList}
+                search={productSearch}
+                onSearchChange={handleProductSearchChange}
+                onSelect={handleSelectPreviewProduct}
+                onRetry={handleRetryProductList}
+                onOpenChange={(open) => {
+                  if (open && productListState === "idle") void loadProductList();
+                }}
+              />
+            ) : null}
           </div>
         </div>
         {storefrontId ? (
@@ -1771,6 +2001,11 @@ export function ExperienceBuilder({
                   onSelectSection={(key) => handleSelectSection(key, "preview")}
                   selectedChrome={selectedChrome}
                   onSelectChrome={handleSelectChrome}
+                  productPreviewState={previewProductState}
+                  previewProduct={previewProduct}
+                  productRegions={effectiveProductRegions}
+                  selectedProductRegionId={selectedProductRegion}
+                  onSelectProductRegion={handleSelectProductRegion}
                 />
               </div>
             </div>
@@ -1804,10 +2039,38 @@ export function ExperienceBuilder({
               {t("design")}
             </button>
           </>
+        ) : currentPage === "product" ? (
+          // CUST-H2-3 — يعيد استعمال فتحات الأزرار الثلاثة نفسها (نفس مبدأ
+          // إعادة استعمال منتقي الصفحة لفتحة الشريط الميتة): "معاينة منتج"
+          // بدل "الأقسام"، "بنية الصفحة" بدل "+ إضافة قسم" (تُعيد استعمال
+          // ورقة "sections" نفسها — راجع فرعها أدناه)، و"التصميم" كما هو.
+          <>
+            <button
+              type="button"
+              className="flex min-h-11 flex-1 items-center justify-center rounded-md border border-border text-sm font-medium text-text hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+              onClick={() => setMobileSheet("product-picker")}
+            >
+              {t("productPickerTriggerLabel")}
+            </button>
+            <button
+              type="button"
+              className="flex min-h-11 flex-1 items-center justify-center rounded-md bg-primary text-sm font-semibold text-primary-foreground shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+              onClick={() => { setPanel("product"); setMobileSheet("sections"); }}
+            >
+              {t("productRegionsPanelLabel")}
+            </button>
+            <button
+              type="button"
+              className="flex min-h-11 flex-1 items-center justify-center rounded-md border border-border text-sm font-medium text-text hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+              onClick={() => { setPanel("theme"); setMobileSheet("design"); }}
+            >
+              {t("design")}
+            </button>
+          </>
         ) : (
-          // منتج/تصنيف: لا أقسام رئيسية تُحرَّر هنا بعد (CUST-H2-3/H2-4) —
-          // "الأقسام"/"+ إضافة قسم" تختصّان بمركّب الرئيسية حصراً؛ عرضهما هنا
-          // كان يوحي بتحرير مناطق غير موجودة فعلياً. "التصميم" العالمي يبقى
+          // تصنيف: لا أقسام رئيسية تُحرَّر هنا بعد (CUST-H2-4) — "الأقسام"/
+          // "+ إضافة قسم" تختصّان بمركّب الرئيسية حصراً؛ عرضهما هنا كان
+          // يوحي بتحرير مناطق غير موجودة فعلياً. "التصميم" العالمي يبقى
           // صالحاً على كل صفحة فيبقى متاحاً وحده.
           <button
             type="button"
@@ -1830,32 +2093,40 @@ export function ExperienceBuilder({
             aria-modal="true"
             aria-label={
               mobileSheet === "sections"
-                ? t("sections")
+                ? currentPage === "product"
+                  ? t("productRegionsPanelLabel")
+                  : t("sections")
                 : mobileSheet === "design"
                   ? t("design")
                   : mobileSheet === "versions"
                     ? t("versionManagerTitle")
                     : mobileSheet === "pages"
                       ? t("pageNavigatorMenuTitle")
-                      : activePanel
-                        ? t(activePanel.label)
-                        : t("edit")
+                      : mobileSheet === "product-picker"
+                        ? t("productPickerMenuTitle")
+                        : activePanel
+                          ? t(activePanel.label)
+                          : t("edit")
             }
             className="flex max-h-[86dvh] w-full flex-col rounded-t-2xl border-t border-border bg-surface shadow-2xl"
           >
             <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-3">
               <h2 className="text-sm font-semibold text-text">
                 {mobileSheet === "sections"
-                  ? t("sections")
+                  ? currentPage === "product"
+                    ? t("productRegionsPanelLabel")
+                    : t("sections")
                   : mobileSheet === "design"
                     ? t("design")
                     : mobileSheet === "versions"
                       ? t("versionManagerTitle")
                       : mobileSheet === "pages"
                         ? t("pageNavigatorMenuTitle")
-                        : activePanel
-                          ? t(activePanel.label)
-                          : t("edit")}
+                        : mobileSheet === "product-picker"
+                          ? t("productPickerMenuTitle")
+                          : activePanel
+                            ? t(activePanel.label)
+                            : t("edit")}
               </h2>
               <button
                 type="button"
@@ -1900,8 +2171,24 @@ export function ExperienceBuilder({
                     setMobileSheet(null);
                   }}
                 />
+              ) : mobileSheet === "product-picker" ? (
+                <ProductPreviewPickerPanel
+                  locale={locale}
+                  listState={
+                    productListState === "idle" ? "loading" : productListState
+                  }
+                  products={productList}
+                  selectedProductId={previewProductId}
+                  search={productSearch}
+                  onSearchChange={handleProductSearchChange}
+                  onSelect={(product) => {
+                    handleSelectPreviewProduct(product);
+                    setMobileSheet(null);
+                  }}
+                  onRetry={handleRetryProductList}
+                />
               ) : mobileSheet === "sections" ? (
-                renderInspectorBody("homepage")
+                renderInspectorBody(currentPage === "product" ? "product" : "homepage")
               ) : (
                 renderInspectorBody(mobileSheet === "design" ? "theme" : panel)
               )}
@@ -2208,6 +2495,12 @@ function NavIcon({ panel }: { panel: CustomizerPanel }) {
         <rect x="2.5" y="2.5" width="11" height="3" />
         <rect x="2.5" y="7" width="5" height="6.5" />
         <rect x="8.5" y="7" width="5" height="6.5" />
+      </svg>
+    ),
+    product: (
+      <svg {...common}>
+        <path d="M2.5 5 8 2.5 13.5 5v6L8 13.5 2.5 11z" />
+        <path d="M2.5 5 8 7.5 13.5 5M8 7.5v6" />
       </svg>
     ),
     footer: (

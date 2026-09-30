@@ -2560,6 +2560,104 @@ export function setMockSchedulingRuntimeActive(storefrontId: string, active: boo
   mockSchedulingRuntimeActiveByStore.set(storefrontId, active);
 }
 
+/**
+ * CUST-H2-3 — ثوابت منتجات مساحة عمل Commerce الوهمية، بنفس الشكل الحرفي
+ * (snake_case) الذي يعيده `CommerceWorkspaceStorefrontProductController`
+ * الحقيقي — يقرؤها `workspace-products.ts` عبر نفس دالة `mapDetail()`
+ * التي تستهلك الاستجابة الحقيقية، فلا مسار عرض ثانٍ. ثلاثة تثبت مصفوفة
+ * التحقّق البصري الخاصة بهذه الشريحة: منتج بسيط متوفر، منتج بمتغيّرات، ومنتج
+ * بلا صورة/وصف/رمز صنف (حالات الحذف الصادق).
+ */
+const MOCK_WORKSPACE_PRODUCTS = [
+  {
+    id: 'mock-product-helmet',
+    name: 'خوذة دراجة هوائية مقاومة للصدمات مع تهوية كاملة وعاكسات ليلية',
+    name_en: 'Impact-Resistant Bike Helmet with Full Ventilation and Night Reflectors',
+    description: 'خوذة خفيفة الوزن مصنوعة من البوليسترين عالي الكثافة، مناسبة للاستخدام اليومي والرياضي.',
+    sku: 'HEL-1001',
+    category: { id: 'cat-gear', name: 'مستلزمات رياضية' },
+    price: { amount_minor: 18900, currency: 'SAR' },
+    in_stock: true,
+    thumbnail_url: null,
+    media: [{ id: 'm1', url: '/dev/fixtures/helmet.svg', alt: null, position: 0 }],
+    is_variant_managed: false,
+    options: null,
+    variants: null,
+    created_at: '2026-09-01T00:00:00.000Z',
+    updated_at: '2026-09-01T00:00:00.000Z',
+  },
+  {
+    id: 'mock-product-tshirt',
+    name: 'قميص قطني',
+    name_en: 'Cotton T-Shirt',
+    description: 'قطن 100%، متوفر بعدة ألوان ومقاسات.',
+    sku: null,
+    category: { id: 'cat-apparel', name: 'ملابس' },
+    price: { amount_minor: 7500, currency: 'SAR' },
+    in_stock: true,
+    thumbnail_url: null,
+    media: [],
+    is_variant_managed: true,
+    options: [
+      {
+        id: 'opt-color',
+        name: 'اللون',
+        name_en: 'Color',
+        values: [
+          { id: 'val-red', value: 'أحمر', value_en: 'Red' },
+          { id: 'val-blue', value: 'أزرق', value_en: 'Blue' },
+        ],
+      },
+      {
+        id: 'opt-size',
+        name: 'المقاس',
+        name_en: 'Size',
+        values: [
+          { id: 'val-m', value: 'M', value_en: 'M' },
+          { id: 'val-l', value: 'L', value_en: 'L' },
+        ],
+      },
+    ],
+    variants: [
+      {
+        id: 'var-red-m',
+        sku: 'TSH-RED-M',
+        option_value_ids: ['val-red', 'val-m'],
+        price: { amount_minor: 7500, currency: 'SAR' },
+        in_stock: true,
+        media: [],
+      },
+      {
+        id: 'var-blue-l',
+        sku: 'TSH-BLUE-L',
+        option_value_ids: ['val-blue', 'val-l'],
+        price: { amount_minor: 7900, currency: 'SAR' },
+        in_stock: false,
+        media: [],
+      },
+    ],
+    created_at: '2026-09-01T00:00:00.000Z',
+    updated_at: '2026-09-01T00:00:00.000Z',
+  },
+  {
+    id: 'mock-product-bare',
+    name: 'منتج بسيط بلا وصف',
+    name_en: 'Bare Product',
+    description: null,
+    sku: null,
+    category: null,
+    price: { amount_minor: 5000, currency: 'SAR' },
+    in_stock: false,
+    thumbnail_url: null,
+    media: [],
+    is_variant_managed: false,
+    options: null,
+    variants: null,
+    created_at: '2026-09-01T00:00:00.000Z',
+    updated_at: '2026-09-01T00:00:00.000Z',
+  },
+];
+
 export function seedMockPresentationVersions(
   storefrontId: string,
   versions: Array<{
@@ -3493,6 +3591,39 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
   }
   if (/^\/commerce\/workspace\/products\/[^/]+\/publication$/.test(clean)) {
     return resolve({ data: { stores: [] } });
+  }
+  // CUST-H2-3 — Workspace Product read API (list/detail) for the Product
+  // page Customizer's Preview Product picker. Dev-harness fixtures only —
+  // never used as merchant runtime data (the real endpoint is
+  // `CommerceWorkspaceStorefrontProductController`). Three fixtures cover
+  // the visual-QA matrix's own required cases: a simple in-stock product, a
+  // variant-managed product, and a product with no media/description/SKU
+  // (the honest-omission cases).
+  const workspaceProductsListMatch = clean.match(/^\/commerce\/workspace\/storefronts\/([^/]+)\/products$/);
+  if (workspaceProductsListMatch) {
+    const search = (new URLSearchParams(path.split('?')[1] ?? '').get('search') ?? '').trim().toLowerCase();
+    const rows = MOCK_WORKSPACE_PRODUCTS.filter(
+      (p) => !search || p.name.toLowerCase().includes(search) || (p.name_en ?? '').toLowerCase().includes(search),
+    );
+    return resolve({
+      data: rows.map((p) => ({
+        id: p.id,
+        name: p.name,
+        name_en: p.name_en,
+        thumbnail_url: p.media[0]?.url ?? null,
+        is_variant_managed: p.is_variant_managed,
+      })),
+      meta: { pagination: { page: 1, per_page: 20, total: rows.length, last_page: 1, has_more: false } },
+    });
+  }
+  const workspaceProductMatch = clean.match(/^\/commerce\/workspace\/storefronts\/([^/]+)\/products\/([^/]+)$/);
+  if (workspaceProductMatch) {
+    const [, , productId] = workspaceProductMatch;
+    const product = MOCK_WORKSPACE_PRODUCTS.find((p) => p.id === productId);
+    if (!product) {
+      return Promise.reject(Object.assign(new Error('المنتج غير موجود.'), { status: 404 }));
+    }
+    return resolve({ data: product });
   }
   if (clean === '/fuel-stations/workspace') return resolve({ data: { stations: mockFuelStations } });
   if (clean === '/fuel-stations/dashboard') return resolve({ data: mockFuelDashboard });

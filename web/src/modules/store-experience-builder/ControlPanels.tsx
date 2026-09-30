@@ -50,6 +50,7 @@ export type CustomizerPanel =
   | "branding"
   | "header"
   | "homepage"
+  | "product"
   | "footer"
   | "contact"
   | "whatsapp"
@@ -71,6 +72,7 @@ export const CUSTOMIZER_NAV_GROUPS: Array<{
     items: [
       { id: "header", label: "header" },
       { id: "homepage", label: "homepage" },
+      { id: "product", label: "productRegionsPanelLabel" },
       { id: "footer", label: "footer" },
     ],
   },
@@ -285,7 +287,7 @@ const inputClass =
 const selectClass = inputClass;
 const btnClass =
   "inline-flex h-8 items-center border border-neutral-300 bg-white px-2.5 text-xs font-medium text-neutral-800 hover:bg-neutral-50";
-const iconBtnClass =
+export const iconBtnClass =
   "inline-flex size-7 items-center justify-center text-xs text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 disabled:text-neutral-300 disabled:hover:bg-transparent";
 
 function moveIndex<T>(list: T[], index: number, delta: number): T[] {
@@ -1876,22 +1878,24 @@ function PagesPanel({
   );
 }
 
-function Toggle({
+export function Toggle({
   label,
   checked,
   onChange,
   compact = false,
+  disabled = false,
 }: {
   label: string;
   checked: boolean;
   onChange: (value: boolean) => void;
   compact?: boolean;
+  disabled?: boolean;
 }) {
   return (
     <label
       className={`flex items-center gap-2 ${
         compact ? "min-h-8 shrink-0" : "min-h-11 justify-between gap-3"
-      }`}
+      } ${disabled ? "opacity-50" : ""}`}
     >
       <span
         className={
@@ -1906,6 +1910,7 @@ function Toggle({
         <input
           type="checkbox"
           checked={checked}
+          disabled={disabled}
           onChange={(event) => onChange(event.target.checked)}
           aria-label={label}
           className="peer sr-only"

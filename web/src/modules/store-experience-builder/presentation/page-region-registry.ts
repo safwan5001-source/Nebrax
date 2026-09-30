@@ -244,3 +244,49 @@ export function isFixedRequiredRegion(
   }
   return (FIXED_REQUIRED_CATEGORY_REGION_KEYS as readonly string[]).includes(key);
 }
+
+/**
+ * CUST-H2-3 — swaps a region with its immediate neighbor, refusing to move a
+ * FIXED_REQUIRED region at all, and refusing to cross one: `media_gallery`/
+ * `identity`/`price`/`quantity_cta` anchor the layout (architecture doc,
+ * "Region Reordering" — "required commerce-critical regions may be
+ * anchored"), so a swap that would place any region on the far side of one
+ * of them is a no-op instead. This naturally creates two independent
+ * reorder zones (before `quantity_cta`: `availability`/`variant_selector`;
+ * after it: `description`/`custom_fields`/`sku_options_details`) without
+ * hardcoding zone boundaries — `variant_selector` is "Limited (position
+ * within content column only)" per the architecture doc's own Product Page
+ * Region Contract table, which this generic skip-adjacent-fixed rule
+ * satisfies exactly: it may swap with `availability` but never cross
+ * `price` above it or `quantity_cta` below it.
+ */
+export function canMoveProductRegion<T extends { key: string }>(
+  regions: readonly T[],
+  index: number,
+  delta: 1 | -1,
+): boolean {
+  const target = index + delta;
+  if (index < 0 || index >= regions.length || target < 0 || target >= regions.length) return false;
+  if (isFixedRequiredRegion("product", regions[index].key) || isFixedRequiredRegion("product", regions[target].key)) {
+    return false;
+  }
+  return true;
+}
+
+export function moveProductRegion<T extends { key: string }>(
+  regions: readonly T[],
+  index: number,
+  delta: 1 | -1,
+): T[] {
+  const target = index + delta;
+  if (index < 0 || index >= regions.length || target < 0 || target >= regions.length) {
+    return regions.slice();
+  }
+  if (isFixedRequiredRegion("product", regions[index].key) || isFixedRequiredRegion("product", regions[target].key)) {
+    return regions.slice();
+  }
+  const next = regions.slice();
+  const [item] = next.splice(index, 1);
+  next.splice(target, 0, item);
+  return next;
+}

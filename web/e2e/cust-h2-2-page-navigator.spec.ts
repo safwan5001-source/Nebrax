@@ -49,7 +49,7 @@ test.describe('CUST-H2-2 — Page Navigator + page-aware Canvas shell', () => {
     await page.screenshot({ path: path.join(evidenceDir, 'ar-390-home.png') });
   });
 
-  test('AR 390 — Product: Page Navigator sheet open, then Product placeholder, no overflow', async ({ page }) => {
+  test('AR 390 — Product: Page Navigator sheet open, then a real structured Product preview (CUST-H2-3), no overflow', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/dev/customizer-versions?locale=ar&scenario=single-draft');
     await page.waitForLoadState('networkidle');
@@ -64,11 +64,12 @@ test.describe('CUST-H2-2 — Page Navigator + page-aware Canvas shell', () => {
     await sheet.getByRole('button', { name: 'صفحة المنتج' }).click();
     await expect(page.getByRole('dialog')).toHaveCount(0);
     await expect(page.locator('[data-experience-builder]')).toHaveAttribute('data-current-page', 'product');
-    await expect(page.locator('[data-page-placeholder="product"]')).toBeVisible();
-    await expect(page.getByText('بيانات منتج حقيقية', { exact: false })).toBeVisible();
-    await expect(page.getByText('قريباً', { exact: true })).toBeVisible();
+    // CUST-H2-3 — Product is no longer a placeholder: the first eligible
+    // dev-fixture Product (never a fabricated one) renders for real.
+    await expect(page.locator('[data-product-preview="ready"]')).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('[data-page-placeholder="product"]')).toHaveCount(0);
     await assertNoOverflow(page);
-    await page.screenshot({ path: path.join(evidenceDir, 'ar-390-product-placeholder.png') });
+    await page.screenshot({ path: path.join(evidenceDir, 'ar-390-product-ready.png') });
   });
 
   test('AR 430 — Category via the mobile sheet, no overflow', async ({ page }) => {
@@ -100,7 +101,12 @@ test.describe('CUST-H2-2 — Page Navigator + page-aware Canvas shell', () => {
 
     await pageTrigger.click();
     await page.getByRole('menu', { name: 'اختيار صفحة' }).getByRole('button', { name: 'صفحة المنتج' }).click();
-    await expect(page.locator('[data-page-placeholder="product"]')).toBeVisible();
+    await expect(page.locator('[data-product-preview="ready"]')).toBeVisible({ timeout: 10000 });
+    // CUST-H2-3 — the Preview Product picker reuses PageNavigator's own
+    // 768–1023px icon-only compaction (H2-2's own measured fix for this
+    // exact budget) — visible, but without its full product-name label yet.
+    const productPicker = page.getByLabel('منتج المعاينة');
+    await expect(productPicker).toBeVisible();
     await assertNoOverflow(page);
     await page.screenshot({ path: path.join(evidenceDir, 'ar-768-product.png') });
   });
@@ -144,7 +150,7 @@ test.describe('CUST-H2-2 — Page Navigator + page-aware Canvas shell', () => {
     await page.screenshot({ path: path.join(evidenceDir, 'ar-1440-category.png') });
   });
 
-  test('EN 390 — Product via the mobile sheet, honest placeholder copy, no overflow', async ({ page }) => {
+  test('EN 390 — Product via the mobile sheet, a real structured preview (CUST-H2-3), no overflow', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/dev/customizer-versions?locale=en&scenario=single-draft');
     await page.waitForLoadState('networkidle');
@@ -155,9 +161,8 @@ test.describe('CUST-H2-2 — Page Navigator + page-aware Canvas shell', () => {
     const sheet = page.getByRole('dialog', { name: 'Choose a page' });
     await expect(sheet).toBeVisible();
     await sheet.getByRole('button', { name: 'Product page' }).click();
-    await expect(page.locator('[data-page-placeholder="product"]')).toBeVisible();
-    await expect(page.getByText('not real product data', { exact: false })).toBeVisible();
-    await expect(page.getByText('Coming soon')).toBeVisible();
+    await expect(page.locator('[data-product-preview="ready"]')).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('[data-page-placeholder="product"]')).toHaveCount(0);
     await assertNoOverflow(page);
     await page.screenshot({ path: path.join(evidenceDir, 'en-390-product.png') });
   });

@@ -12,7 +12,7 @@
  */
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const listMock = vi.fn();
 const showMock = vi.fn();
@@ -25,6 +25,19 @@ vi.mock('@/modules/commerce-workspace/presentation-versions', () => ({
   savePresentationVersion: (...args: unknown[]) => saveMock(...args),
   renamePresentationVersion: vi.fn(),
   deletePresentationVersion: vi.fn(),
+}));
+
+// CUST-H2-3 — this file predates the Product page becoming real (CUST-H2-3
+// replaced its honest placeholder with structured editing). It never
+// exercised the Workspace Product API, so these calls default to an empty,
+// deterministic "no eligible products" result here — an honest outcome this
+// file's own assertions below already expect, not a fabricated product.
+const listProductsMock = vi.fn();
+const showProductMock = vi.fn();
+
+vi.mock('@/modules/commerce-workspace/workspace-products', () => ({
+  listWorkspaceProducts: (...args: unknown[]) => listProductsMock(...args),
+  showWorkspaceProduct: (...args: unknown[]) => showProductMock(...args),
 }));
 
 import { DEFAULT_PRESENTATION_CONFIG } from '../presentation';
@@ -67,11 +80,18 @@ async function openPageNavigator(user: ReturnType<typeof userEvent.setup>) {
 }
 
 describe('ExperienceBuilder — CUST-H2-2 Page Navigator', () => {
+  beforeEach(() => {
+    listProductsMock.mockResolvedValue({ ok: true, data: [], hasMore: false });
+    showProductMock.mockResolvedValue({ ok: false, reason: 'not_found', message: 'not found' });
+  });
+
   afterEach(() => {
     cleanup();
     listMock.mockReset();
     showMock.mockReset();
     saveMock.mockReset();
+    listProductsMock.mockReset();
+    showProductMock.mockReset();
   });
 
   it('defaults to Home: toolbar, canvas and mobile pill all agree, with no Product/Category placeholder', async () => {
@@ -86,7 +106,7 @@ describe('ExperienceBuilder — CUST-H2-2 Page Navigator', () => {
     expect(screen.getByLabelText('Page currently being viewed').textContent).toContain('Home');
   });
 
-  it('switches Home → Product → Category → Home, updating the Canvas with an honest placeholder and no fake product/category data', async () => {
+  it('switches Home → Product → Category → Home, updating the Canvas with real Product structure (CUST-H2-3) and an honest Category placeholder, never fake data', async () => {
     listMock.mockResolvedValue({ ok: true, data: [summary()] });
     showMock.mockResolvedValue({ ok: true, data: detail() });
     const user = userEvent.setup();
@@ -97,12 +117,14 @@ describe('ExperienceBuilder — CUST-H2-2 Page Navigator', () => {
     await user.click(screen.getByRole('button', { name: 'Product page' }));
     expect(builderRoot().getAttribute('data-current-page')).toBe('product');
     expect(canvas().getAttribute('data-preview-page')).toBe('product');
-    expect(document.querySelector('[data-page-placeholder="product"]')).not.toBeNull();
-    expect(
-      screen.getByText(
-        'Customizing the product page will become available in the next step. This is page context only, not real product data.',
-      ),
-    ).toBeTruthy();
+    // CUST-H2-3 — Product is no longer a placeholder; zero eligible products
+    // on this store (the mock above) is an honest empty state, never a
+    // fabricated product.
+    await waitFor(() => expect(listProductsMock).toHaveBeenCalled());
+    expect(document.querySelector('[data-page-placeholder="product"]')).toBeNull();
+    await waitFor(() =>
+      expect(document.querySelector('[data-product-preview-state="empty"]')).not.toBeNull(),
+    );
 
     await openPageNavigator(user);
     await user.click(screen.getByRole('button', { name: 'Category page' }));
