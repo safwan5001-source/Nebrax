@@ -6,20 +6,32 @@
 
 ## Final closure status
 
-> ## **BLOCKED — OWNER DECISION REQUIRED**
+> ## **IMPLEMENTATION COMPLETE / OPERATIONAL GATES OPEN**
 >
-> All in-scope engineering is implemented, tested, and CI-green (CODE/TEST/CI evidence complete
-> for 11 of 12 exit criteria — criteria 1–9 and 11–12 all PASS). The Horizon's own exit criterion 10
-> ("real Android and iOS device verification is recorded") **cannot be honestly attempted** until
-> the owner resolves **two open Decision Gates** first (build-flavor/packaging, §3 below; preview
-> domain/hosting, §4 below) — the physical-device proof depends on both. Even after those
-> decisions, executing the proof further requires a local Flutter/Android/Xcode toolchain or an
-> extended CI job, absent from every sandbox this Horizon has run in through MP-4/6/7/8/9.
+> **Update (2026-09-30, this revision):** the owner has resolved both Decision Gates that
+> previously forced status C:
 >
-> This is **not** softened to "complete" and **not** claimed as CLOSED/PASS. Per the task's own
-> model, this is squarely status **C**, not B: a required closure step (criterion 10) cannot
-> proceed at all — not even attempted — without the owner first choosing among the packaging
-> options in §3 and the hosting options in §4.
+> 1. **Build-flavor/packaging → Option A approved.** Run `main_device_preview.dart` standalone
+>    for real-device verification. No Flutter flavor, `applicationId`, bundle ID, scheme, or
+>    native target change is authorized or made. See §3.
+> 2. **Preview domain → `preview.awjdev.xyz` approved** for development/preview verification. See
+>    §4. **No DNS, hosting, AASA, `assetlinks.json`, signing, or deployment has been provisioned —
+>    the owner explicitly withheld that authorization for this update.** Only the hostname
+>    identity itself is decided.
+>
+> With both choices made, **no remaining closure step is blocked on an owner decision.** What
+> remains is (a) the operational work of actually provisioning the approved domain — not yet
+> authorized to execute — and (b) executing the already-written real-device matrix on Android and
+> iOS — which requires a local Flutter/Android/Xcode toolchain or an extended CI job, absent from
+> every sandbox this Horizon has run in through MP-4/6/7/8/9. All in-scope engineering remains
+> implemented, tested, and CI-green (CODE/TEST/CI evidence complete for 11 of 12 exit criteria —
+> criteria 1–9 and 11–12 all PASS).
+>
+> **Criterion 10 ("real Android and iOS device verification is recorded") remains OPEN** — per the
+> owner's own explicit instruction, it stays open until genuine device execution is recorded, and
+> this update performs none. Per the task's own model this is now squarely status **B**, not C:
+> the feature implementation is complete; only real domain/device work remains, and it is now
+> owner-timing-gated (provisioning) and environment-gated (toolchain), not decision-gated.
 
 ---
 
@@ -55,7 +67,7 @@ PR number below), not from memory or report text alone.
 | **MP-6** — Real Runtime Preview | [#1109](https://github.com/safwan5001-source/Nebrax/pull/1109) | merged 2026-09-30T13:19:30Z | `7bd9e90` | `MOBILE-PREVIEW-6-IMPLEMENTATION-REPORT.md` | `PreviewSession`/`AuthenticatePreviewSession`/`preview/v1/experience`; real `CompatibilityResolver`/`ExperienceView` rendering via `main_preview.dart` | None (RBAC scope-comparison reasoning recorded explicitly) | `setup.sh` drift (App Mail/AWS SDK) — unrelated, separately tracked |
 | **MP-7** — QR device preview exchange | [#1121](https://github.com/safwan5001-source/Nebrax/pull/1121) | merged 2026-09-30T15:37:18Z | `b3a71ad` | `MOBILE-PREVIEW-7-IMPLEMENTATION-REPORT.md` | `preview_exchange_references`, one-time exchange, `main_device_preview.dart`, dedicated preview Universal/App Link host | One non-forbidden item recorded transparently (second deep-link host — not a listed gate) | Build-flavor/packaging gap first surfaced (§15.2 of its report) |
 | **MP-8** — Integrated proof & real-device verification | [#1130](https://github.com/safwan5001-source/Nebrax/pull/1130) | merged 2026-09-30T20:29:26Z | `82e5199` | `MOBILE-PREVIEW-8-INTEGRATED-PROOF-REPORT.md` | Exchange-path integration tests (4 new), full URL/logging leakage audit, exact packaging/domain gates named | **Build-flavor Decision Gate opened, not resolved** — classified (B) | Real-device execution (criterion 10), packaging gate, domain/hosting gate — all carried to MP-9 |
-| **MP-9** — Closure (this task) | *pending* | *pending* | `28db328` | This report | Ledger, exit-criteria audit, two Decision Packets, closure status | **Two Decision Gates presented, neither resolved by this task** | Same three items, now formally packeted for the owner (§3, §4) |
+| **MP-9** — Closure (this task) | [#1132](https://github.com/safwan5001-source/Nebrax/pull/1132) | *pending* | `28db328` | This report | Ledger, exit-criteria audit, two Decision Packets, closure status | **Both Decision Gates presented and subsequently resolved by the owner** (Option A packaging; `preview.awjdev.xyz` domain — see §3/§4) | Real-device execution (criterion 10) and domain/AASA/assetlinks provisioning — neither yet performed; both now unblocked to proceed whenever toolchain/authorization exist |
 
 All eight prior PRs are confirmed **merged** (not merely opened) by direct query of the GitHub PR
 API at the time of this report — `merged: true` for every one of #1043/#1045/#1097/#1100/#1106/
@@ -63,10 +75,14 @@ API at the time of this report — `merged: true` for every one of #1043/#1045/#
 
 ---
 
-## 3. Build-flavor / packaging Decision Gate — **Owner Decision Packet**
+## 3. Build-flavor / packaging Decision Gate — **RESOLVED by owner**
 
-**STOP — no packaging change is made by this task.** This section is the packet the task's §3
-requires; it does not choose on the owner's behalf.
+> **Owner decision (2026-09-30): Option A approved.** Run `main_device_preview.dart` standalone
+> for real-device verification. Do not introduce a new Flutter flavor, `applicationId`, bundle ID,
+> scheme, or native target. No code change is required to act on this decision — Option A is, by
+> construction (§3.1), exactly how `main_device_preview.dart` already runs today. This section is
+> kept in full below as the evidence record the decision was made against; it is no longer an open
+> packet awaiting a choice.
 
 ### 3.1 Exact current state (re-verified directly this session, not restated from MP-8 alone)
 
@@ -127,53 +143,56 @@ own matrix asks for today.
   too).
 - No further packaging action taken at all until the owner decides otherwise.
 
-### 3.4 What this task did **not** do, and why
+### 3.4 Disposition
 
 This task did **not** implement Option B (or any equivalent packaging change) — doing so without
-owner approval is exactly the condition both the Horizon's §12 item 12 and this task's own §11
-list the change under. It also did not silently adopt Option A as if it were a foregone technical
-detail: **Option A still requires the owner's go-ahead** before anyone spends real-device time
-executing against it, if only so the owner is aware that criterion-10 evidence gathered under
-Option A will *not* demonstrate production/preview coexistence.
+owner approval was exactly the condition both the Horizon's §12 item 12 and this task's own §11
+listed the change under, and the owner's decision (above) confirms Option A, not B, so Option B
+remains permanently out of scope unless separately revisited.
 
-**Additional, orthogonal constraint, stated plainly**: no sandbox this Horizon has run in (MP-4,
-MP-6, MP-7, MP-8, and this MP-9 session, re-confirmed directly: `which flutter dart adb emulator
-xcrun simctl avdmanager sdkmanager` all return nothing; `$ANDROID_HOME`/`$ANDROID_SDK_ROOT` unset)
-has a Flutter/Android/Xcode toolchain. **Resolving this Decision Gate alone does not unblock
-real-device execution** — it only removes the packaging question as a blocker so that whoever
-*does* have local tooling, or an extended CI job, can proceed without a further approval round.
+**Additional, orthogonal constraint, stated plainly, unaffected by this decision**: no sandbox this
+Horizon has run in (MP-4, MP-6, MP-7, MP-8, and this MP-9 session, re-confirmed directly: `which
+flutter dart adb emulator xcrun simctl avdmanager sdkmanager` all return nothing;
+`$ANDROID_HOME`/`$ANDROID_SDK_ROOT` unset) has a Flutter/Android/Xcode toolchain. **Resolving this
+Decision Gate does not by itself unblock real-device execution** — it only removes the packaging
+question as a blocker so that whoever *does* have local tooling, or an extended CI job, can proceed
+without a further approval round.
 
-**Requested decision**: the owner selects A, B, or C above (or a documented alternative) before
-any real-device execution is attempted under this Horizon, and before any `build.gradle`/Xcode
-project change is made.
+**Decision recorded**: the owner selected Option A. No `build.gradle`/Xcode project change is
+authorized by this decision, and none was made.
 
 ---
 
-## 4. Preview domain / association Decision Gate — **Owner Decision Packet**
+## 4. Preview domain / association Decision Gate — **Hostname RESOLVED by owner; provisioning still withheld**
 
-**STOP — no DNS, hosting, or association-file deployment is made by this task.**
+> **Owner decision (2026-09-30): hostname approved — `preview.awjdev.xyz`**, for
+> development/preview verification. This resolves the *naming* question this packet asked. It does
+> **not** authorize provisioning: **no DNS record, hosting project, `apple-app-site-association`,
+> `assetlinks.json`, signing identity, or deployment has been created by this update**, per the
+> owner's explicit instruction. Hosting-target selection (§4.2), AASA/assetlinks content, the
+> signing-fingerprint dependency, and the fallback page all remain to be executed as a distinct,
+> separately-authorized follow-up action — not a further Decision Gate on identity, since the host
+> name itself is now fixed.
 
 ### 4.1 Exact current state (re-verified directly this session)
 
 | Item | State |
 |---|---|
-| `PREVIEW_DEEP_LINK_HOST` | `preview.awj-runtime-proof.example` (`config/preview.php:17`) — a reserved, non-routable `.example` TLD (RFC 2606), unchanged since MP-7 |
-| Android App Link host | Same placeholder, alongside the separate production-host entry, `mobile/android/app/src/main/AndroidManifest.xml` |
-| iOS Associated Domains host | Same placeholder, alongside the production entry, `mobile/ios/Runner/Runner.entitlements` |
+| `PREVIEW_DEEP_LINK_HOST` (code default, **unchanged by this update**) | `preview.awj-runtime-proof.example` (`config/preview.php:17`) — a reserved, non-routable `.example` TLD (RFC 2606), unchanged since MP-7. This is intentionally **not** changed to the approved hostname yet — wiring the real value in without the domain being provisioned would make the deep link resolve nowhere, and the owner explicitly withheld provisioning authorization this round. |
+| **Owner-approved future hostname (not yet wired anywhere)** | **`preview.awjdev.xyz`** — decided this session for development/preview verification; to be set as the `PREVIEW_DEEP_LINK_HOST` env value (not the code default) once DNS/hosting is actually provisioned |
+| Android App Link host | Still the placeholder, alongside the separate production-host entry, `mobile/android/app/src/main/AndroidManifest.xml` — unchanged |
+| iOS Associated Domains host | Still the placeholder, alongside the production entry, `mobile/ios/Runner/Runner.entitlements` — unchanged |
 | `.well-known/assetlinks.json` | **Does not exist anywhere in this repository** — `find . -iname assetlinks.json` returns nothing, re-confirmed this session |
 | `apple-app-site-association` | **Does not exist anywhere in this repository** — same confirmation |
-| Any web route (Next.js, Laravel, nginx/Caddy/`vercel.json`) serving either preview host | **None** — `web/vercel.json`/`storefront/vercel.json` reference entirely different, real, already-deployed apps; no entry for either `.example` host anywhere |
-| Is the preview host real or placeholder | **Placeholder, by the repository's own configuration** — unchanged since it was first introduced |
+| Any web route (Next.js, Laravel, nginx/Caddy/`vercel.json`) serving either preview host or `preview.awjdev.xyz` | **None** — `web/vercel.json`/`storefront/vercel.json` reference entirely different, real, already-deployed apps; no entry for any preview host anywhere |
+| Is the preview host real or placeholder, today | **Still a placeholder in code and DNS** — a real hostname has been *approved*, but nothing has been *provisioned* |
 
-### 4.2 Packet contents (per the task's own required list)
+### 4.2 Packet contents (per the task's own required list) — hostname line now resolved
 
-- **Proposed real preview hostname pattern** — not chosen by this task. A plausible, non-binding
-  shape for the owner's consideration: a dedicated subdomain distinct from both the production
-  runtime's own future host and the merchant-admin/storefront hosts already live on Vercel (e.g.
-  `preview.<awj-production-domain>` or a fully separate low-traffic domain), so that a compromised
-  or misconfigured preview host can never be confused with — or inherit trust from — the
-  production API/admin/storefront hosts. The *exact* value is an owner/infrastructure decision, not
-  a technical one this report can respons­ibly make.
+- **Proposed real preview hostname pattern — RESOLVED: `preview.awjdev.xyz`.** Approved by the
+  owner this session for development/preview verification. It is a dedicated subdomain distinct
+  from both the production runtime's own future host and the merchant-admin/storefront hosts
+  already live on Vercel, matching the separation rationale this packet originally recommended.
 - **Hosting target options already compatible with AWJ infrastructure** — `web/` and `storefront/`
   already deploy via `vercel.json`-driven Vercel projects (confirmed present in both directories);
   a dedicated minimal fallback page (per §4.3) could be a third, equally minimal Vercel project on
@@ -213,19 +232,23 @@ project change is made.
   — no code change needed to roll back, only an environment-variable change plus removing the
   hosted association files/fallback page from whatever infrastructure was chosen.
 
-### 4.3 What this task did **not** do, and why
+### 4.3 What this update did **not** do, and why
 
 No DNS record, hosting project, association file, or fallback page was created, deployed, or
-even drafted as a runnable artifact by this task — doing so without the owner's explicit approval
-is precisely what this task's §4 and the Horizon's own §12 forbid. The minimum fallback-page
-*policy* is specified above (unchanged from MP-8) so it can be implemented in one pass once the
-owner picks a hosting target — building the page itself now, before that choice, would risk
-shipping something that quietly diverges from whatever the real deployment needs.
+even drafted as a runnable artifact by this update — doing so without the owner's explicit approval
+is precisely what this task's §4 and the Horizon's own §12 forbid, and the owner's own instruction
+this round was explicit: approve the hostname, do not provision anything yet. The minimum
+fallback-page *policy* remains specified above (unchanged from MP-8) so it can be implemented in
+one pass once provisioning is authorized — building the page itself now, before that authorization,
+would risk shipping something unused or that quietly diverges from whatever the real deployment
+ends up needing.
 
-**Requested decision**: the owner (a) picks a real hostname and hosting target, (b) confirms the
-signing identity that will back the SHA-256 fingerprint in `assetlinks.json` (tied to §3's
-packaging decision), and (c) approves building the minimal fallback page to the policy in §4.2
-once (a)/(b) are settled.
+**Decision recorded**: hostname = `preview.awjdev.xyz`. **Still outstanding, as separate
+follow-up authorizations (not further identity decisions)**: (a) the specific hosting target
+(Vercel project vs. dedicated proxy/CDN), (b) the signing identity that will back the SHA-256
+fingerprint in `assetlinks.json` (tied to §3's now-resolved packaging decision, since Option A
+keeps the existing single `applicationId`/bundle ID), and (c) explicit go-ahead to actually
+provision DNS, host the association files, and build the fallback page to the policy above.
 
 ---
 
@@ -246,13 +269,15 @@ current `main` tip — see §8), not merely copied from a prior report.
 | 7 | Draft Preview does not mutate Published Experience | **CODE** — no code path in the preview subsystem writes `BuilderPublishedExperienceVersion` (re-confirmed by direct source read this session); **TEST** — `preview_never_publishes_the_draft`, `the_full_exchange_chain_serves_the_snapshot_frozen_at_reference_issuance_never_a_later_publish` (re-run green this session, §8.1) | **PASS** |
 | 8 | Preview auth/session is tenant-isolated, scoped, short-lived, and tested | **CODE** — disjoint `PreviewSession` Sanctum principal, write-once tenant/app binding, ≤60-min TTL ceiling, 5-min one-time exchange reference (MP-5/6/7); **TEST** — full tenant/app isolation + cross-tenant/cross-app suites re-run green on SQLite **and real PostgreSQL 16** this session, including the genuine two-connection concurrency proof (§8.1–§8.2) | **PASS** |
 | 9 | QR/open-on-phone flow works safely | **CODE** — one-time, hash-only, 5-minute exchange reference, never the bearer, in the URL path only (MP-7); **TEST** — `PreviewExchangeTest`/`PreviewExchangePostgresConcurrencyTest` re-run green this session (§8.1–§8.2); **CI** — Android/iOS release build proofs green on PR #1121 | **PASS (CODE + TEST + CI)** — QR flow's *code* path is proven; a real phone has never scanned it (see #10) |
-| 10 | **Real Android and iOS device verification is recorded** | **ENVIRONMENT-GATED, not attempted, not faked.** No Flutter/Android/Xcode toolchain exists in this sandbox (re-confirmed this session: `which flutter dart adb emulator xcrun simctl avdmanager sdkmanager` all empty) or in any prior MP-4/6/7/8 sandbox. Even where execution were possible, it is additionally blocked by the two unresolved Decision Gates in §3/§4 (no real domain to verify app-link association against; no resolved packaging decision for which build to install). **Source inspection, Dart widget tests, and release-build proofs — however thorough — are explicitly not accepted as satisfying this criterion**, per the task's own rule. | **OPEN** |
+| 10 | **Real Android and iOS device verification is recorded** | **ENVIRONMENT-GATED, not attempted, not faked.** No Flutter/Android/Xcode toolchain exists in this sandbox (re-confirmed this session: `which flutter dart adb emulator xcrun simctl avdmanager sdkmanager` all empty) or in any prior MP-4/6/7/8 sandbox. **Update:** the two Decision Gates that previously also blocked this criterion are now resolved by the owner — packaging Option A approved (§3), preview hostname `preview.awjdev.xyz` approved (§4) — but neither has been *provisioned/executed* yet (DNS/hosting/AASA/assetlinks remain unprovisioned by explicit owner instruction; no device/emulator run has occurred). **Source inspection, Dart widget tests, and release-build proofs — however thorough — are explicitly not accepted as satisfying this criterion**, per the task's own rule, and per the owner's explicit instruction this criterion stays OPEN until genuine device execution is recorded. | **OPEN** |
 | 11 | Existing Builder and runtime behavior remain backward compatible | **CODE** — `main.dart` confirmed byte-identical to its pre-Horizon shape (`runApp(const AwjMobileRuntimeApp())`, no preview import); no file under `mobile/lib/app/` touched by MP-3–MP-8; no existing route's behavior changed by any MP-3–MP-8 diff (re-confirmed by direct source read this session, §9 below); **TEST/CI** — full backend + web suites carry zero new failures attributable to Preview across every MP report and this session's own reconfirmation (§8) | **PASS** |
 | 12 | Closure report documents remaining limitations and distribution boundaries | This report (§10, §11, §12) | **PASS** (by virtue of this report existing and being honest about #10) |
 
-**11 of 12 criteria PASS (1–9 and 11–12). Criterion 10 is OPEN. The Horizon cannot be marked CLOSED while any
-mandatory criterion is OPEN**, per this task's own closure model — this alone would already force
-status B or C; §3/§4's unresolved Decision Gates specifically force **C**.
+**11 of 12 criteria PASS (1–9 and 11–12). Criterion 10 is OPEN. The Horizon cannot be marked CLOSED
+while any mandatory criterion is OPEN**, per this task's own closure model — this alone already
+forces status B or C. With both §3/§4 Decision Gates now resolved by the owner (no choice remains
+unmade), the correct status is **B**, not C: nothing further is blocked on a decision, only on
+provisioning authorization and toolchain availability.
 
 ---
 
@@ -393,16 +418,16 @@ untouched follow-up item, not addressed here, per the task's explicit instructio
 
 | Item | Status |
 |---|---|
-| Real preview domain provisioned | **Deferred — owner Decision Gate, §4** |
-| HTTPS routing for that domain | **Deferred — depends on §4's hosting choice** |
-| `apple-app-site-association` hosted at `/.well-known/` | **Deferred — cannot exist before the domain does** |
-| `.well-known/assetlinks.json` with correct SHA-256 fingerprint | **Deferred — also requires the signing identity behind §3's packaging decision** |
-| Android `applicationId`/iOS bundle-ID separation for device-preview coexistence | **Owner Decision Gate, §3** |
-| Signing/provisioning for whichever build runs on physical devices | **Deferred — explicitly out of this Horizon's scope until approved; blocked behind §3** |
-| `PREVIEW_DEEP_LINK_HOST` env wiring | **Code complete** — only the *value* is a deployment-time decision |
+| Real preview domain provisioned | **Hostname decided (`preview.awjdev.xyz`, §4) — provisioning itself not yet authorized** |
+| HTTPS routing for that domain | **Deferred — depends on the still-open hosting-target choice (§4.2)** |
+| `apple-app-site-association` hosted at `/.well-known/` | **Deferred — cannot exist before provisioning is authorized and performed** |
+| `.well-known/assetlinks.json` with correct SHA-256 fingerprint | **Deferred — packaging identity is now fixed (Option A, §3), so the app identity to fingerprint is known; the signing identity itself is still undecided** |
+| Android `applicationId`/iOS bundle-ID separation for device-preview coexistence | **Resolved — Option A approved (§3): no separation, run `main_device_preview.dart` standalone** |
+| Signing/provisioning for whichever build runs on physical devices | **Deferred — explicitly out of this Horizon's scope until separately approved** |
+| `PREVIEW_DEEP_LINK_HOST` env wiring | **Code complete; target value decided (`preview.awjdev.xyz`) but not yet set — wiring the real value before the domain resolves would break the deep link** |
 | Logging/redaction policy at the reverse-proxy/CDN layer | **Specified (§4.2), not yet implementable — no infrastructure exists to configure** |
-| Minimal safe browser-fallback page | **Specified (§4.2), not built — needs the hosting decision first** |
-| Real-device/emulator execution of the full matrix | **Deferred — Decision-Gate-blocked (§3/§4) and environment-gated (no toolchain in any sandbox this Horizon has used)** |
+| Minimal safe browser-fallback page | **Specified (§4.2), not built — needs hosting-target selection and provisioning authorization first** |
+| Real-device/emulator execution of the full matrix | **No longer Decision-Gate-blocked — both gates resolved. Still environment-gated (no toolchain in any sandbox this Horizon has used) and, for the domain-dependent parts (real App Link/Universal Link verification), still blocked on provisioning** |
 | Backend code (issuance, exchange, fetch, revoke, audit, rate limits) | **Code complete**, re-verified this session |
 | Mobile code (deep-link resolution, exchange client, device-preview app, runtime rendering reuse) | **Code complete**, re-verified this session; zero changes in MP-9 |
 | Web code (QR issuance UX, countdown, expired/consumed/regenerate states, i18n parity) | **Code complete**, zero changes in MP-9 |
@@ -423,10 +448,12 @@ untouched follow-up item, not addressed here, per the task's explicit instructio
    increase), not an authoritative reference↔session correlation.
 5. No dedicated "revoke this exchange reference" action — an unscanned reference simply expires
    in 5 minutes.
-6. No Android/iOS build-flavor separation (§3) — the single largest reason real-device coexistence
-   testing cannot even begin without an owner decision.
-7. No real preview domain/hosting/association files (§4) — real-device link verification cannot
-   succeed until this is resolved.
+6. ~~No Android/iOS build-flavor separation (§3)~~ — **resolved**: owner approved Option A
+   (no separation; run `main_device_preview.dart` standalone). Merchant-realistic
+   production+preview side-by-side coexistence remains unsupported by design, not by omission.
+7. No real preview domain/hosting/association files provisioned yet (§4) — hostname is now decided
+   (`preview.awjdev.xyz`), but DNS/hosting/AASA/`assetlinks.json` remain unprovisioned by explicit
+   owner instruction, so real-device link verification still cannot succeed today.
 8. **Real-device/emulator execution has never happened for this feature, at any MP stage** — every
    report from MP-4 through this MP-9 session has honestly recorded "no Flutter toolchain in this
    sandbox." This is the single largest gap between "code/CI proof" and the Horizon's own exit
@@ -450,23 +477,23 @@ open that door.
 | Gate | Raised by | Disposition at MP-9 closure |
 |---|---|---|
 | Preview Session security architecture (session issuer, credential shape, scope, TTL, etc.) | MP-5 | **Resolved — PASS.** Implemented exactly as designed in MP-6/7, re-verified this session. No re-litigation needed. |
-| Build-flavor / `applicationId`/bundle-ID packaging separation | First surfaced MP-7 §15.2, formally opened MP-8 §5.3/§11 | **Open — Decision Packet presented in §3 of this report. Not resolved by this task. Owner must choose Option A, B, or C.** |
-| Preview domain / hosting / AASA / assetlinks | First surfaced MP-5/MP-7, formally opened MP-8 §2/§10 | **Open — Decision Packet presented in §4 of this report. Not resolved by this task. Owner must pick a hostname, hosting target, and confirm the signing dependency.** |
+| Build-flavor / `applicationId`/bundle-ID packaging separation | First surfaced MP-7 §15.2, formally opened MP-8 §5.3/§11 | **RESOLVED — owner approved Option A** (2026-09-30): run `main_device_preview.dart` standalone; no flavor/applicationId/bundle-ID/scheme/native-target change authorized or made. §3. |
+| Preview domain / hosting / AASA / assetlinks | First surfaced MP-5/MP-7, formally opened MP-8 §2/§10 | **PARTIALLY RESOLVED — owner approved hostname** (2026-09-30): `preview.awjdev.xyz`. Hosting-target selection, signing identity, and provisioning authorization remain open as separate, non-identity follow-up items. §4. |
 | URL/reference security design (one-time-reference-in-path) | MP-7, reviewed again MP-8 §3 | **Re-confirmed APPROVED AS-IS this session** — no new evidence surfaced that the design itself is unsafe; not re-opened as a gate. |
 
-**No Decision Gate was resolved by this task's own authority.** Both open items above require the
-owner's explicit choice before any further implementation, packaging, or deployment work proceeds.
+**Both Decision Gates that previously blocked closure (packaging, domain identity) are now resolved
+by the owner's explicit choices, recorded above.** What remains — provisioning the approved domain,
+and executing real-device verification — is operational/environment work, not a further decision,
+except for the still-separate hosting-target/signing/provisioning-authorization items named in §4.3.
 
 ---
 
 ## 14. CI
 
-This PR's own CI result is recorded in the final implementation-report message once observed on
-the opened PR. Based on this session's own local reproduction (§8.3, §8.1–§8.2 — full suite +
-focused Preview suites green on both SQLite and real PostgreSQL 16, against the exact current
-`main` tip this PR is based on) and the repository's own CI trigger configuration: `ci.yml`
-(backend, sqlite + pgsql, no path filter — confirmed by direct inspection of `on:` in
-`.github/workflows/ci.yml`) is expected to run and be green; `web-ci.yml`/`mobile-ci.yml` (both
+Every commit pushed on this branch has run `ci.yml` (backend, sqlite + pgsql, no path filter) and
+returned green (`conclusion: success`), including the prior heads that carried the full-suite
+reconfirmation (§8.3) and the exit-criteria-count fix. This revision (owner-decision update, docs
+only) is expected to be green on the same basis; `web-ci.yml`/`mobile-ci.yml` (both
 path-filtered to `web/**`/`mobile/**`/`contracts/app-builder/**`) are expected **not** to trigger,
 since this PR touches only `docs/plans/app-builder/`.
 
@@ -474,21 +501,27 @@ since this PR touches only `docs/plans/app-builder/`.
 
 ## 15. Next recommended Horizon
 
-1. **Immediate**: owner resolves the two Decision Gates in §3 and §4. Neither requires new product
-   scope — both are packaging/infrastructure choices this report has narrowed to concrete options.
-2. **Once §3 is resolved**: whichever engineer/session has access to a real Flutter/Android/Xcode
+Both Decision Gates are now resolved (§3, §4). Remaining work is operational/environment execution,
+not further decisions:
+
+1. **Immediate, whenever the owner separately authorizes it**: provision `preview.awjdev.xyz` —
+   DNS, HTTPS routing, hosting-target selection (§4.2), `apple-app-site-association`,
+   `assetlinks.json` (needs a signing identity decided first), and the minimal fallback page to the
+   policy already specified (§4.2). This is a distinct authorization from today's hostname approval.
+2. **In parallel or after**: whichever engineer/session has access to a real Flutter/Android/Xcode
    toolchain (a local development machine, or an extended CI job that boots an emulator/simulator)
-   executes the existing, already-written matrix — no new application code should be required, only
-   execution and honest recording of the result, closing criterion 10.
-3. **Once §4 is resolved**: provision the real domain, host the association files, build the
-   minimal fallback page to the policy already specified (§4.2), and re-run the Android/iOS
-   App-Link/Universal-Link verification for real.
-4. **After criterion 10 closes**: re-issue this closure report (or a short MP-10 addendum) to
-   move the Horizon from BLOCKED to CLOSED/PASS — no other criterion is expected to require new
-   work at that point.
-5. **Separately, unrelated to this Horizon**: the `setup.sh` drift documented since MOBILE-PREVIEW-6
+   runs `main_device_preview.dart` standalone (Option A, §3) through the existing, already-written
+   real-device matrix — no new application code should be required, only execution and honest
+   recording of the result. Cold-start/warm-start/wrong-host/expired/consumed/exchange/snapshot/
+   revoke checks (§3.2) do not require the domain to be provisioned first (they can run with a
+   directly-invoked dev build); only genuine App-Link/Universal-Link **verification** specifically
+   needs step 1 done first.
+3. **After criterion 10 closes** (genuine Android + iOS device execution recorded): re-issue this
+   closure report (or a short MP-10 addendum) to move the Horizon from B to CLOSED/PASS — no other
+   criterion is expected to require new work at that point.
+4. **Separately, unrelated to this Horizon**: the `setup.sh` drift documented since MOBILE-PREVIEW-6
    §9a (`app/Mail` copy, AWS SDK/Redis composer packages) remains open and safe to schedule
    independently at any time.
-6. **Not recommended before the above**: starting a new Horizon-scale App Builder initiative while
+5. **Not recommended before the above**: starting a new Horizon-scale App Builder initiative while
    criterion 10 remains open — the Horizon's own exit criteria treat real-device proof as mandatory,
    not optional polish.
