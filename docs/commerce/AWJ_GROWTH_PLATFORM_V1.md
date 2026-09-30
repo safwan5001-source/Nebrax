@@ -30,9 +30,10 @@
 1. **Ads**
 2. **Publishing**
 3. **Messaging**
-4. **Analytics**
-5. **Automation**
-6. **AWJ Growth AI**
+4. **Communications Platform**
+5. **Analytics**
+6. **Automation**
+7. **AWJ Growth AI**
 
 الذكاء الاصطناعي **جزء أساسي من Product Scope منذ البداية**، وليس إضافة تجميلية لاحقة. لكنه يُفعّل بصلاحيات تدريجية ومضبوطة حتى لا ينفذ إنفاقًا أو تغييرات حساسة بلا Guardrails وموافقة مناسبة.
 
@@ -314,7 +315,98 @@ AWJ Inbox
 
 ---
 
-## 7. Analytics
+## 7. AWJ Communications Platform
+
+**AWJ Communications Platform** هي طبقة مشتركة على مستوى النظام، وليست مملوكة لـAWJ Growth وحده.
+
+تخدم:
+
+- ERP events
+- AWJ Store
+- POS
+- Auth / OTP
+- AWJ Growth
+- Customer service
+
+القنوات الأساسية:
+
+- WhatsApp
+- SMS
+- Email
+- Instagram Messaging عندما تسمح القدرات الرسمية
+- قنوات مستقبلية عبر Provider abstraction
+
+### 7.1 Provider / Handler model
+
+كل Tenant يحدد الـProvider أو الـActive Handler لكل قناة بشكل مستقل:
+
+```text
+WhatsApp → Meta Cloud API / approved provider
+SMS      → Provider selected by tenant
+Email    → Provider selected by tenant
+```
+
+ولا يُربط منطق أَوْج بمزود واحد.
+
+### 7.2 Event-driven communication
+
+أمثلة:
+
+```text
+InvoicePosted
+→ WhatsApp invoice
+
+OrderPaid
+→ WhatsApp confirmation
+
+ShipmentUpdated
+→ WhatsApp / SMS
+
+PasswordOTP
+→ SMS / Email
+
+MonthlyStatementReady
+→ Email
+```
+
+### 7.3 Transactional vs Marketing separation
+
+يجب الفصل بوضوح بين:
+
+- Transactional notifications
+- OTP / authentication
+- Service conversations
+- Marketing campaigns
+
+لكل نوع قواعد Consent / Opt-out / Template / Provider policy مستقلة.
+
+### 7.4 Tenant & Security requirements
+
+- Tenant-scoped credentials
+- Encrypted secrets
+- RBAC
+- Consent records
+- Opt-out registry
+- Audit trail
+- Retry policy
+- Idempotency
+- Delivery/read status where supported
+- Provider failover only if contract/policy allows it
+- Cross-tenant negative tests
+
+### 7.5 Growth dependency
+
+AWJ Growth **يستهلك** AWJ Communications Platform للحملات والمحادثات، لكنه لا يملكها معماريًا. هذا يمنع ربط وظائف OTP أو الفواتير أو التنبيهات التشغيلية بوحدة التسويق.
+
+### 7.6 Salla benchmark
+
+يُستخدم مفهوم Salla Communication Apps كمرجع Product/Architecture: وجود طبقة توجيه موحدة تسمح لتطبيق اتصال أن يصبح handler لقناة مثل WhatsApp أو SMS أو Email.
+
+قرار AWJ هو توسيع الفكرة إلى Foundation مشتركة لكل النظام مع Tenant-scoped providers وRBAC وAudit وConsent.
+
+---
+
+## 8. Analytics
 
 AWJ Growth يجب أن يربط بيانات المنصة ببيانات ERP/Commerce.
 
@@ -364,7 +456,7 @@ Stock-aware campaign performance
 
 ---
 
-## 8. Automation
+## 9. Automation
 
 الأتمتة تأتي بعد استقرار Tracking وAttribution.
 
@@ -398,9 +490,9 @@ THEN suggest budget increase
 
 ---
 
-## 9. AWJ Growth AI
+## 10. AWJ Growth AI
 
-### 9.1 الدور
+### 10.1 الدور
 
 **AWJ Growth AI** هو طبقة ذكاء فوق Ads / Publishing / Messaging / Analytics / Automation، ولا يستبدل Provider APIs أو قواعد الأمان أو القيود الرسمية للمنصات.
 
@@ -416,7 +508,7 @@ THEN suggest budget increase
 - اقتراح شرائح العملاء وحملات WhatsApp المناسبة ضمن قواعد الموافقة والـconsent.
 - تلخيص أسباب التوصيات بلغة قابلة للفهم والتدقيق.
 
-### 9.2 مستويات التشغيل
+### 10.2 مستويات التشغيل
 
 يجب أن يدعم أَوْج ثلاث درجات واضحة للصلاحية:
 
@@ -433,7 +525,7 @@ AI may act automatically only inside explicit tenant guardrails
 
 الافتراضي في المراحل الأولى هو **Suggest** ثم **Approve**. لا يتم الانتقال إلى التنفيذ التلقائي إلا بعد وجود Tracking وAttribution موثوقين وسجل تدقيق كامل.
 
-### 9.3 Guardrails إلزامية
+### 10.3 Guardrails إلزامية
 
 أي قرار قد يسبب إنفاقًا أو إيقاف حملة يجب أن يخضع إلى حدود يحددها Tenant، مثل:
 
@@ -448,7 +540,7 @@ AI may act automatically only inside explicit tenant guardrails
 - Allowed channels/actions.
 - Audit log لكل اقتراح وقرار وتنفيذ.
 
-### 9.4 Profit-aware AI
+### 10.4 Profit-aware AI
 
 لا يجوز تقييم الحملات على ROAS وحده.
 
@@ -467,7 +559,7 @@ Contribution after ads    200 SAR
 
 في هذه الحالة، لا يصف AWJ Growth AI الحملة بأنها ناجحة فقط لأن Platform ROAS مرتفع؛ بل يوضح أثر التكلفة والمرتجعات والهامش.
 
-### 9.5 أمثلة توصيات
+### 10.5 أمثلة توصيات
 
 ```text
 TikTok CPA أقل، لكن Meta يحقق هامش مساهمة أعلى.
@@ -485,7 +577,7 @@ Creative Y frequency مرتفعة وCTR يتراجع.
 اقتراح: إنشاء 3 Variants جديدة مع Hooks مختلفة، مع بقاء الحملة الحالية دون تعديل حتى الموافقة.
 ```
 
-### 9.6 Explainability & Audit
+### 10.6 Explainability & Audit
 
 كل Recommendation يجب أن تحتوي على:
 
@@ -498,7 +590,7 @@ Creative Y frequency مرتفعة وCTR يتراجع.
 - من وافق ومتى؟
 - ما نتيجة التنفيذ الفعلية؟
 
-### 9.7 AI Safety Boundary
+### 10.7 AI Safety Boundary
 
 الـAI لا:
 
@@ -511,9 +603,9 @@ Creative Y frequency مرتفعة وCTR يتراجع.
 
 ---
 
-## 10. Product UX
+## 11. Product UX
 
-### 9.1 Navigation
+### 11.1 Navigation
 
 ```text
 Growth
@@ -530,7 +622,7 @@ Growth
 └── Connections
 ```
 
-### 9.2 Overview
+### 11.2 Overview
 
 بطاقات قليلة وواضحة:
 
@@ -551,7 +643,7 @@ Growth
 - YouTube
 - WhatsApp
 
-### 9.3 Product action
+### 11.3 Product action
 
 داخل صفحة المنتج:
 
@@ -565,7 +657,7 @@ Growth
 
 ---
 
-## 11. Provider Architecture
+## 12. Provider Architecture
 
 ```text
 AWJ Growth Domain
@@ -607,7 +699,7 @@ capabilities:
 
 ---
 
-## 12. Multi-tenant
+## 13. Multi-tenant
 
 كل Tenant يربط حساباته بنفسه.
 
@@ -627,7 +719,7 @@ capabilities:
 
 ---
 
-## 13. Event Model
+## 14. Event Model
 
 AWJ Growth يعتمد على Domain Events بدل الربط المباشر بالشاشات:
 
@@ -654,7 +746,7 @@ InvoicePosted
 
 ---
 
-## 14. Attribution
+## 15. Attribution
 
 لا يجب تثبيت نموذج Attribution واحد على كل القنوات.
 
@@ -679,7 +771,7 @@ InvoicePosted
 
 ---
 
-## 15. مقارنة مرجعية مع Salla
+## 16. مقارنة مرجعية مع Salla
 
 سلة تُستخدم كـ **Benchmark UX/Product** وليس كمرجع معماري يُنسخ.
 
@@ -701,11 +793,11 @@ InvoicePosted
 
 ---
 
-## 16. Modern Growth & Rapid Distribution Playbook — 2026 Evidence
+## 17. Modern Growth & Rapid Distribution Playbook — 2026 Evidence
 
 هذه ليست قائمة Tricks أو وعود Viral. هي اتجاهات حديثة مثبتة في منتجات الإعلان الرسمية خلال 2026، وتُستخدم كـ **AWJ product requirements** لا كضمان نتائج.
 
-### 16.1 AI-native campaign buying
+### 17.1 AI-native campaign buying
 
 المنصات تتحرك من إعدادات يدوية كثيرة إلى حملات مدعومة بالذكاء الاصطناعي مع بقاء Guardrails للمعلن:
 
@@ -715,7 +807,7 @@ InvoicePosted
 
 **AWJ Decision:** لا نبني Automation تنافس خوارزمية كل منصة في المزاد نفسه؛ نبني طبقة أعلى تقوم باختيار الهدف والميزانية والـassets والقيود، ثم تترك Delivery Optimization للمنصة وتراقب الربح الحقيقي.
 
-### 16.2 Short-form vertical video as default creative surface
+### 17.2 Short-form vertical video as default creative surface
 
 النمط الأهم للاكتشاف السريع حاليًا هو **9:16 short-form video** عبر:
 
@@ -734,7 +826,7 @@ Google يدعم Shorts ضمن Demand Gen وأنواع حملات فيديو مت
 
 مع Safe Zones ونصوص وCTA مختلفة حسب Placement.
 
-### 16.3 Creator / UGC amplification
+### 17.3 Creator / UGC amplification
 
 الطريقة الحديثة ليست أن تصنع العلامة التجارية كل شيء بنفسها؛ بل اكتشاف محتوى Creators/UGC ثم تحويل الأفضل إلى إعلان:
 
@@ -752,7 +844,7 @@ Google يدعم Shorts ضمن Demand Gen وأنواع حملات فيديو مت
 - paid performance
 - expiry / permission status
 
-### 16.4 Creative velocity + AI variation
+### 17.4 Creative velocity + AI variation
 
 الاتجاه الحديث هو كثرة التجارب الإبداعية السريعة بدل Creative واحد لفترة طويلة:
 
@@ -762,7 +854,7 @@ Google يدعم Shorts ضمن Demand Gen وأنواع حملات فيديو مت
 
 **AWJ Decision:** Growth AI يجب أن يقيس **Creative Velocity** و**Creative Fatigue** ويقترح Variants جديدة قبل هبوط الأداء.
 
-### 16.5 First-party data + server-side conversion signals
+### 17.5 First-party data + server-side conversion signals
 
 دقة الإعلان الحديثة تعتمد أكثر على بيانات الطرف الأول بدل الاعتماد على cookies فقط.
 
@@ -778,7 +870,7 @@ Google Enhanced Conversions في 2026 يقبل first-party user-provided data م
 - provider-specific event IDs
 - deduplication
 
-### 16.6 Profit-aware optimization, not platform ROAS only
+### 17.6 Profit-aware optimization, not platform ROAS only
 
 منصة الإعلان ترى conversion/revenue بحسب Attribution الخاص بها. أَوْج يرى أيضًا:
 
@@ -793,7 +885,7 @@ Google Enhanced Conversions في 2026 يقبل first-party user-provided data م
 
 **AWJ Decision:** أهم ميزة تنافسية هي **Profit-aware media optimization**.
 
-### 16.7 Incrementality + MMM + experiments
+### 17.7 Incrementality + MMM + experiments
 
 Attribution وحده لا يثبت أن الإعلان تسبب في المبيعات.
 
@@ -811,7 +903,7 @@ Google في 2026 يدفع باتجاه:
 - MMM-compatible exports
 - marginal ROI / budget scenario planning
 
-### 16.8 Conversational commerce
+### 17.8 Conversational commerce
 
 الرحلة الإعلانية الحديثة يمكن أن تنتهي في محادثة بدل Landing Page فقط:
 
@@ -826,7 +918,7 @@ Ad
 
 **AWJ Requirement:** Click-to-message / conversation-origin metadata يجب أن يحتفظ به أَوْج حتى يمكن ربط المحادثة بالطلب والربح.
 
-### 16.9 AI agents connected directly to ad platforms
+### 17.9 AI agents connected directly to ad platforms
 
 في 2026 بدأت المنصات نفسها تفتح طبقات رسمية لوكلاء AI:
 
@@ -837,7 +929,7 @@ Ad
 **AWJ Decision:** بنية AWJ Growth Agent يجب أن تكون Provider-aware، لكن كل Action يمر عبر:
 RBAC → Tenant guardrails → policy validation → audit → execution.
 
-### 16.10 Rapid-distribution loop
+### 17.10 Rapid-distribution loop
 
 الانتشار السريع لا يُبنى على "زر Viral". النموذج الصحيح:
 
@@ -856,7 +948,7 @@ Organic test
 
 هذه الحلقة تجمع Organic + Paid + Creator + Commerce + AI بدل فصلها.
 
-### 16.11 AWJ Viral / Momentum Signals — Proposal
+### 17.11 AWJ Viral / Momentum Signals — Proposal
 
 لا ندّعي توقع Viral بشكل يقيني، لكن يمكن بناء Signals تساعد على التقاط الزخم مبكرًا:
 
@@ -881,7 +973,7 @@ Organic test
 
 ---
 
-## 17. Phased Roadmap
+## 18. Phased Roadmap
 
 ### Phase 0 — Evidence & Contracts
 
@@ -990,7 +1082,7 @@ Organic test
 
 ---
 
-## 18. Definition of Done لكل Provider
+## 19. Definition of Done لكل Provider
 
 لا يعتبر Provider جاهزًا بمجرد نجاح OAuth.
 
@@ -1012,13 +1104,14 @@ Organic test
 
 ---
 
-## 19. قرارات V1 المثبتة
+## 20. قرارات V1 المثبتة
 
 - الاسم المبدئي: **AWJ Growth**
 - القنوات الأساسية: Instagram, Facebook, TikTok, Snapchat, Google Ads, YouTube, WhatsApp.
 - Facebook + Instagram Ads تحت Meta Provider.
 - WhatsApp Provider مستقل وظيفيًا.
 - Ads وPublishing وMessaging Modules منفصلة.
+- **AWJ Communications Platform Foundation مشتركة** تخدم Growth وStore وERP وPOS وAuth، وليست مملوكة لوحدة التسويق.
 - Unified Analytics فوق الجميع.
 - Provider Capability Matrix إلزامية.
 - Multi-tenant credentials لكل منشأة.
@@ -1033,7 +1126,7 @@ Organic test
 
 ---
 
-## 20. Evidence Register — البداية
+## 21. Evidence Register — البداية
 
 | Platform | Capability | Official source | Status |
 |---|---|---|---|
@@ -1051,7 +1144,7 @@ Organic test
 
 ---
 
-## 21. ما ليس ضمن هذه الوثيقة
+## 22. ما ليس ضمن هذه الوثيقة
 
 هذه الوثيقة لا:
 
