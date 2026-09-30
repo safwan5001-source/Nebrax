@@ -44,7 +44,7 @@ void main() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, (call) async {
           if (call.method == 'getInitialLink') {
-            return 'https://$kPreviewDeepLinkHost/preview/scanned-once-reference';
+            return 'https://$kPreviewDeepLinkHost/preview/scannedOnceReference';
           }
           return null;
         });
@@ -91,7 +91,7 @@ void main() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, (call) async {
           if (call.method == 'getInitialLink') {
-            return 'https://$kPreviewDeepLinkHost/preview/already-used';
+            return 'https://$kPreviewDeepLinkHost/preview/alreadyUsed';
           }
           return null;
         });
@@ -113,7 +113,7 @@ void main() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, (call) async {
           if (call.method == 'getInitialLink') {
-            return 'https://$kPreviewDeepLinkHost/preview/server-down';
+            return 'https://$kPreviewDeepLinkHost/preview/serverDown';
           }
           return null;
         });
@@ -135,7 +135,7 @@ void main() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, (call) async {
           if (call.method == 'getInitialLink') {
-            return 'https://$kPreviewDeepLinkHost/preview/first-scan';
+            return 'https://$kPreviewDeepLinkHost/preview/firstScan';
           }
           return null;
         });
@@ -148,7 +148,7 @@ void main() {
     expect(find.byType(PreviewRuntimeView), findsOneWidget);
 
     final data = const StandardMethodCodec().encodeMethodCall(
-      MethodCall('onLink', 'https://$kPreviewDeepLinkHost/preview/second-scan-should-be-ignored'),
+      MethodCall('onLink', 'https://$kPreviewDeepLinkHost/preview/secondScanIgnored'),
     );
     await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .handlePlatformMessage(channel.name, data, (_) {});
