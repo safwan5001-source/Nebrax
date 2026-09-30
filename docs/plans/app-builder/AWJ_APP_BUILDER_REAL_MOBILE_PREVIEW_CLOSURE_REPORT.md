@@ -314,7 +314,37 @@ PreviewIntegratedChainTest                   4 passed (44 assertions)
 **35/35 green on both databases, 218 assertions, 0 failed** — identical result shape to MP-8's own
 re-run, now reconfirmed a second time at MP-9's own base commit.
 
-### 8.3 Web / mobile
+### 8.3 Full unfiltered backend suite — SQLite (mandatory pre-PR gate per `CLAUDE.md`)
+
+Run twice this session on a freshly rebuilt SQLite database (the first attempt collided with a
+stray duplicate `php artisan test` process from this same session, corrupting the on-disk SQLite
+file mid-write — `database disk image is malformed`; the database was rebuilt via
+`migrate:fresh` and the suite re-run once, cleanly, with the collision confirmed not to recur):
+
+```
+Tests:    55 failed, 51 skipped, 4942 passed (30940 assertions)
+Duration: 928.84s
+```
+
+**Zero of the 55 failures reference `Preview`, `PreviewSession`, `PreviewExchange`, or any file
+under `app/Services/AppBuilder/Preview*`/`tests/Feature/Preview*`** — confirmed by grepping the
+full failure list, not merely the tail. Every failure falls into the same four already-documented,
+pre-existing sandbox/environment gaps MOBILE-PREVIEW-6 §9a and MOBILE-PREVIEW-8 §9.3 already
+recorded, re-confirmed by category this session:
+
+| Category | Count | Root cause (already documented) |
+|---|---|---|
+| `ProductMediaR2*Test`, `R2SmokeTestCommandTest`, `R2StorageServiceTest` | 14 | `setup.sh` does not install `league/flysystem-aws-s3-v3`/`predis/predis` (`Class "Aws\Exception\AwsException" not found`) — MOBILE-PREVIEW-6 §9a |
+| `AuthRecoveryTest` | 9 | `setup.sh` does not copy `app/Mail/` — MOBILE-PREVIEW-6 §9a. (One additional case beyond MP-8's own count of 8 traces to a new diagnostic-logging line added by an unrelated, already-merged PR, `63cf51e`, not to anything in this task's diff.) |
+| `Fuel*ServiceTest`/`FuelReconciliationTest`/`FuelSupplyReceiving*Test`/`FuelAviRfidServiceTest`/`FuelSaleApiTest` | 26 | This sandbox's base PHP 8.4 install is missing the `bcmath` extension — MOBILE-PREVIEW-8 §9.3 |
+| `ProductOptionValueVisualTest`, `DocumentCenterSecureIntakeTest` | 6 | Same sandbox missing the `gd` extension — MOBILE-PREVIEW-8 §9.3 |
+
+No repository file (including `setup.sh`) was changed to investigate or characterize this, matching
+MOBILE-PREVIEW-6/8's own precedent of diagnosing local-sandbox-only gaps without touching the
+shipped install script. This full-suite run satisfies this repository's own mandatory pre-PR gate
+(`php artisan test`, no `--filter`, full run) for this task's diff, which is itself documentation-only and could not plausibly introduce any of the 55 pre-existing failures above.
+
+### 8.4 Web / mobile
 
 Not re-run in full by this task: this closure task changes no web/mobile source file, and MP-8
 already re-ran the full web suite (2440 tests) and confirmed the Dart suite via CI (460/460) at a
@@ -324,7 +354,7 @@ either. Full CI (§14) re-confirms `ci.yml`'s backend suite on the PR itself; `w
 direct inspection of their `on.pull_request.paths` triggers) and correctly will not run against a
 docs-only diff — consistent with, not a gap introduced by, this task.
 
-### 8.4 Real-device / emulator / simulator execution
+### 8.5 Real-device / emulator / simulator execution
 
 **Not performed.** No Flutter SDK, Android SDK/emulator, or Xcode/iOS Simulator exists in this
 sandbox (re-confirmed: `which flutter dart adb emulator xcrun simctl avdmanager sdkmanager` all
@@ -431,12 +461,14 @@ owner's explicit choice before any further implementation, packaging, or deploym
 
 ## 14. CI
 
-This PR's own CI result is recorded here once observed on the opened PR (see the final
-implementation-report message for the live status). Expected shape, based on this session's local
-reproduction and the repository's own CI trigger configuration (§8.3): `ci.yml` (backend, sqlite +
-pgsql, no path filter) will run and is expected green given §8's local reconfirmation; `web-ci.yml`/
-`mobile-ci.yml` (both path-filtered to `web/**`/`mobile/**`/`contracts/app-builder/**`) are expected
-**not** to trigger, since this PR touches only `docs/plans/app-builder/`.
+This PR's own CI result is recorded in the final implementation-report message once observed on
+the opened PR. Based on this session's own local reproduction (§8.3, §8.1–§8.2 — full suite +
+focused Preview suites green on both SQLite and real PostgreSQL 16, against the exact current
+`main` tip this PR is based on) and the repository's own CI trigger configuration: `ci.yml`
+(backend, sqlite + pgsql, no path filter — confirmed by direct inspection of `on:` in
+`.github/workflows/ci.yml`) is expected to run and be green; `web-ci.yml`/`mobile-ci.yml` (both
+path-filtered to `web/**`/`mobile/**`/`contracts/app-builder/**`) are expected **not** to trigger,
+since this PR touches only `docs/plans/app-builder/`.
 
 ---
 
