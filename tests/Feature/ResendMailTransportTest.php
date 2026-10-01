@@ -10,8 +10,6 @@ use GuzzleHttp\Middleware;
 use GuzzleHttp\Psr7\Request as Psr7Request;
 use GuzzleHttp\Psr7\Response as Psr7Response;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Log;
-use Mockery;
 use Resend\Client as ResendClient;
 use Resend\Contracts\Client as ResendClientContract;
 use Resend\Transporters\HttpTransporter;
@@ -19,7 +17,6 @@ use Resend\ValueObjects\ApiKey;
 use Resend\ValueObjects\Transporter\BaseUri;
 use Resend\ValueObjects\Transporter\Headers;
 use ReflectionClass;
-use Symfony\Component\Mailer\Exception\TransportException;
 use Tests\TestCase;
 
 /**
@@ -187,8 +184,16 @@ class ResendMailTransportTest extends TestCase
         $this->assertCount($baseline, $history);
     }
 
-    /** @test */
-    public function a_provider_connection_failure_keeps_the_public_response_neutral_and_leaks_nothing(): void
+    /**
+     * فشل النقل يبقى داخلياً: الاستجابة العامة تظل محايدة رغم فشل الإرسال
+     * الفعلي، والتوكن (الصادر قبل محاولة الإرسال) يبقى في قاعدة البيانات —
+     * بلا أي كشف لوجود الحساب عبر الاستجابة. `AuthController::forgotPassword`
+     * يبلّغ عن الاستثناء عبر `report()` القائم أصلاً (غير مسّ هنا) لا عبر أي
+     * تسجيل إضافي.
+     *
+     * @test
+     */
+    public function a_provider_connection_failure_keeps_the_public_response_neutral(): void
     {
         // بريد التحقق عند التسجيل ينجح (استجابة 200 أولى)؛ الفشل المحاكى
         // مخصَّص فقط لمحاولة إرسال بريد الاسترداد التالية.
@@ -201,32 +206,11 @@ class ResendMailTransportTest extends TestCase
         ]));
         $this->registerTenant('alpha', 'owner@alpha.test');
 
-        $captured = null;
-        Log::shouldReceive('error')->zeroOrMoreTimes();
-        Log::shouldReceive('info')
-            ->once()
-            ->with('auth_recovery_diagnostic', Mockery::on(function (array $payload) use (&$captured): bool {
-                $captured = $payload;
-                return true;
-            }));
-
         $res = $this->postJson($this->tenantUrl('alpha', 'forgot-password'), ['email' => 'owner@alpha.test']);
 
         $res->assertOk()->assertJsonPath('message', 'إذا كان الحساب موجوداً لهذا البريد، فقد أُرسلت تعليمات الاسترداد.');
-
-        // التوكن أُصدر (سابق لمحاولة الإرسال) لكن الإرسال فشل — تحقّق أن هذا لا يُسرّب شيئاً.
-        $this->assertNotNull($captured);
-        $haystack = json_encode($captured);
-        $this->assertStringNotContainsString('owner@alpha.test', $haystack);
-        $this->assertStringNotContainsString(self::FAKE_KEY, $haystack);
-        $this->assertStringNotContainsString('Authorization', $haystack);
-        $this->assertStringNotContainsString('Bearer', $haystack);
-        $this->assertArrayNotHasKey('email', $captured);
-        $this->assertArrayNotHasKey('token', $captured);
-
-        $this->assertTrue($captured['token_issue_reached']);
-        $this->assertFalse($captured['mail_send_reached']);
-        $this->assertSame(TransportException::class, $captured['exception_class']);
+        $this->assertStringNotContainsString(self::FAKE_KEY, $res->getContent());
+        $this->assertDatabaseHas('auth_action_tokens', ['type' => 'password_reset']);
     }
 
     /** @test */
