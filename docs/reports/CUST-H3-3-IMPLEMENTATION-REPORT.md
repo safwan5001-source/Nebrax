@@ -14,7 +14,7 @@
 
 ## 4. PR number + URL
 
-Opened against `safwan5001-source/Nebrax` — see the PR this report accompanies (created immediately after this commit). No merge performed.
+PR #1145 — https://github.com/safwan5001-source/Nebrax/pull/1145. No merge performed.
 
 ## 5. Evidence table (before implementation)
 
