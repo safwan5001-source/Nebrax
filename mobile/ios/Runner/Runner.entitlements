@@ -5,17 +5,22 @@
 	<key>com.apple.developer.associated-domains</key>
 	<array>
 		<string>applinks:awj-runtime-proof.example</string>
-		<!-- MOBILE-PREVIEW-7 — dedicated Universal Link host for the physical-
-		     device preview handoff, deliberately separate from the production
-		     host above (see mobile/lib/preview/preview_deep_link.dart). Same
-		     placeholder `.example` TLD and same open Decision Gate: no real
-		     domain hosts `.well-known/apple-app-site-association` for it yet.
+		<!-- MOBILE-PREVIEW-7 (host updated under MOBILE-PREVIEW-10B) —
+		     dedicated Universal Link host for the physical-device preview
+		     handoff, deliberately separate from the production host above
+		     (see mobile/lib/preview/preview_deep_link.dart). `preview.awjdev.xyz`
+		     is the owner-approved preview host (MOBILE-PREVIEW-10A/10B) —
+		     unlike the production host above, it is not a placeholder
+		     `.example` domain. It is not yet provisioned: no DNS/HTTPS or
+		     `.well-known/apple-app-site-association` exists for it today, so
+		     Universal Link verification still cannot succeed until that
+		     hosting is actually stood up — this edit is source wiring only.
 		     Both entries live in this one entitlements file today because
 		     `main.dart` and `main_device_preview.dart` share one Xcode target/
 		     bundle until a future task introduces build-flavor separation —
 		     each entry point only ever resolves its own link shape
 		     (resolveDeepLinkUri vs resolvePreviewExchangeReferenceFromUri). -->
-		<string>applinks:preview.awj-runtime-proof.example</string>
+		<string>applinks:preview.awjdev.xyz</string>
 	</array>
 </dict>
 </plist>

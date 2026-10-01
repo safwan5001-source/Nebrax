@@ -48,17 +48,22 @@
                 <category android:name="android.intent.category.BROWSABLE"/>
                 <data android:scheme="https" android:host="awj-runtime-proof.example"/>
             </intent-filter>
-            <!-- MOBILE-PREVIEW-7 — a **dedicated, separate** App Link host for
-                 the physical-device preview handoff, deliberately distinct
-                 from the production host immediately above (see
+            <!-- MOBILE-PREVIEW-7 (host updated under MOBILE-PREVIEW-10B) — a
+                 **dedicated, separate** App Link host for the physical-device
+                 preview handoff, deliberately distinct from the production
+                 host immediately above (see
                  `mobile/lib/preview/preview_deep_link.dart`'s own doc comment
                  for why: two independent entry points — `main.dart` and
                  `main_device_preview.dart` — should not need to share one
                  association file's `apps` array to disambiguate ownership).
-                 Same placeholder `.example` TLD, same open Decision Gate as
-                 the production host: `autoVerify` cannot actually succeed
-                 until a real domain hosts `.well-known/assetlinks.json` for
-                 it. Both intent-filters currently live in the same
+                 `preview.awjdev.xyz` is the owner-approved preview host
+                 (MOBILE-PREVIEW-10A/10B) — unlike the production host above,
+                 it is not a placeholder under the IANA-reserved `.example`
+                 TLD. It is not yet provisioned, though: no DNS/HTTPS or
+                 `.well-known/assetlinks.json` exists for it today, so
+                 `autoVerify` still cannot succeed until that hosting is
+                 actually stood up — this edit is source wiring only. Both
+                 intent-filters currently live in the same
                  `AndroidManifest.xml`/application because this repository has
                  no build-flavor separation between the production and device
                  preview binaries yet — only whichever Dart entry point was
@@ -73,7 +78,7 @@
                 <action android:name="android.intent.action.VIEW"/>
                 <category android:name="android.intent.category.DEFAULT"/>
                 <category android:name="android.intent.category.BROWSABLE"/>
-                <data android:scheme="https" android:host="preview.awj-runtime-proof.example"/>
+                <data android:scheme="https" android:host="preview.awjdev.xyz"/>
             </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.
