@@ -8,6 +8,7 @@ import { Topbar } from '@/components/layout/topbar';
 import { DemoBanner } from '@/components/layout/demo-banner';
 import { AuthenticatedCompanyBrowserIdentity } from '@/components/layout/company-browser-identity';
 import { currentUser, isAuthenticated } from '@/lib/auth';
+import { applyAwjUiGate } from '@/lib/awj-ui-gate';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -33,6 +34,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (branchVersion > 0) setCollapsed(false);
   }, [branchVersion]);
+
+  // AWJ v3 feature gate (Horizon 1) — scoped to exactly this route group's mount
+  // lifecycle. (app)/(commerce)/(pos)/(fuel) are mutually-exclusive sibling route
+  // groups, so this never leaks the gate into Commerce, POS, Fuel, Platform, or auth
+  // screens. Default is OFF everywhere (no silent production rollout) — see
+  // src/lib/awj-ui-gate.ts for the explicit internal/dev/QA opt-in mechanism.
+  useEffect(() => applyAwjUiGate(), []);
 
   const dismissSidebar = () => {
     // إعادة التركيز قبل إخفاء الدرج تمنع بقاء المؤشر داخل سطح غير مرئي.

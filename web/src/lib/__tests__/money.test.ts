@@ -3,6 +3,7 @@ import {
   SAUDI_RIYAL_SYMBOL,
   formatRiyal,
   formatRiyalShort,
+  formatRiyalParts,
   riyalToMinor,
   isNegative,
   extractInclusiveTax,
@@ -84,5 +85,42 @@ describe('isNegative', () => {
     expect(isNegative('5')).toBe(false);
     expect(isNegative(0)).toBe(false);
     expect(isNegative(null)).toBe(false);
+  });
+});
+
+describe('formatRiyalParts — تفكيك بصري بلا تغيير في القيمة (أساس Money presentation، H1)', () => {
+  function reconstruct(value: string | number | null | undefined): string {
+    const p = formatRiyalParts(value);
+    if (p.invalid) return '—';
+    return `${p.negative ? '-' : ''}${p.integer}.${p.fraction} ${p.symbol}`;
+  }
+
+  it('يعيد بناء مخرجات formatRiyal حرفياً لكل قيمة صالحة — لا انحراف حسابي', () => {
+    for (const value of [0, 1150, '1150.00', 1234567.5, -115, '-115.00', 0.05, -0.05]) {
+      expect(reconstruct(value)).toBe(formatRiyal(value));
+    }
+  });
+
+  it('يعيد بناء مخرجات formatRiyal لـ null/undefined كصفر', () => {
+    expect(reconstruct(null)).toBe(formatRiyal(null));
+    expect(reconstruct(undefined)).toBe(formatRiyal(undefined));
+  });
+
+  it('يفصل الإشارة عن الجزء الصحيح (negative منفصلة، integer بلا "-")', () => {
+    const parts = formatRiyalParts(-1150.5);
+    expect(parts.negative).toBe(true);
+    expect(parts.integer).toBe('1,150');
+    expect(parts.fraction).toBe('50');
+    expect(parts.integer).not.toContain('-');
+  });
+
+  it('مدخل غير صالح: invalid=true وبلا رمز عملة (يطابق "—" في formatRiyal)', () => {
+    const parts = formatRiyalParts('ليس رقماً');
+    expect(parts.invalid).toBe(true);
+    expect(formatRiyal('ليس رقماً')).toBe('—');
+  });
+
+  it('الرمز دائماً U+20C1', () => {
+    expect(formatRiyalParts(10).symbol).toBe(SAUDI_RIYAL_SYMBOL);
   });
 });

@@ -14,6 +14,40 @@ export function formatRiyal(value: string | number | null | undefined): string {
   return `${formatter.format(n)} ${SAUDI_RIYAL_SYMBOL}`;
 }
 
+/**
+ * تفكيك هيكلي للقيمة نفسها التي يُنسِّقها `formatRiyal` — بلا أي حساب جديد ولا
+ * اقتطاع فاصل، لعرضها بتمييز بصري (جزء صحيح / جزء عشري) من دون تغيير القيمة
+ * المنطوقة. `negative` مفصولة عمداً عن النص (`sign` دائماً "-" ASCII، لا U+2212 —
+ * انظر design-system/v3/FOUNDATIONS.md §5 رقم 5) ليتحكّم المكوّن بموضعها.
+ *
+ * ثابتٌ لكل قيمة صالحة: `${negative ? '-' : ''}${integer}.${fraction} ${symbol}`
+ * يساوي حرفياً `formatRiyal(value)` — هذا مضمون باختبار في money.test.ts.
+ */
+export interface RiyalParts {
+  negative: boolean;
+  integer: string;
+  fraction: string;
+  symbol: string;
+  /** مدخل غير صالح (كما في formatRiyal) — المكوّن يعرض '—' ولا يلوّن أي جزء. */
+  invalid: boolean;
+}
+
+export function formatRiyalParts(value: string | number | null | undefined): RiyalParts {
+  const n = Number(value ?? 0);
+  if (!Number.isFinite(n)) {
+    return { negative: false, integer: '—', fraction: '', symbol: '', invalid: true };
+  }
+
+  let integer = '';
+  let fraction = '';
+  for (const part of formatter.formatToParts(Math.abs(n))) {
+    if (part.type === 'integer' || part.type === 'group') integer += part.value;
+    else if (part.type === 'fraction') fraction += part.value;
+  }
+
+  return { negative: n < 0, integer, fraction, symbol: SAUDI_RIYAL_SYMBOL, invalid: false };
+}
+
 // تنسيق مختصر بلا أصفار عشرية زائدة (للأرقام العنوانية كمؤشرات اللوحة):
 // 482500 → "482,500 𞸁"، 1150.50 → "1,150.50 𞸁". الجداول والفواتير تبقى بفاصلتين.
 const shortFormatter = new Intl.NumberFormat('en-US', {

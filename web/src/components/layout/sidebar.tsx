@@ -504,6 +504,7 @@ export function Sidebar({
       <aside
         aria-hidden={drawerHiddenOnMobile || undefined}
         inert={drawerHiddenOnMobile}
+        data-awj-shell="sidebar"
         className={cn(
           'no-print fixed inset-y-0 start-0 z-50 flex w-64 flex-col border-e border-border bg-surface',
           'transition-[transform,width] duration-200 ease-out',
@@ -557,6 +558,9 @@ export function Sidebar({
             aria-current={isActive('/dashboard') ? 'page' : undefined}
             onClick={onClose}
             title={mini ? t('dashboard') : undefined}
+            data-awj-apex={!mini ? '' : undefined}
+            data-awj-apex-on={isActive('/dashboard') && !mini ? '' : undefined}
+            data-awj-shell-active={isActive('/dashboard') ? '' : undefined}
             className={cn(
               'relative mb-3 flex h-11 items-center rounded text-sm text-muted hover:bg-primary-soft hover:text-primary',
               mini ? 'justify-center px-0' : 'gap-2 px-2',
@@ -564,7 +568,7 @@ export function Sidebar({
             )}
           >
             {isActive('/dashboard') && !mini && (
-              <span className="absolute inset-y-1.5 start-0 w-0.5 rounded bg-primary" />
+              <span data-awj-legacy-marker className="absolute inset-y-1.5 start-0 w-0.5 rounded bg-primary" />
             )}
             <LayoutDashboard className="h-[18px] w-[18px] shrink-0" strokeWidth={1.7} />
             {!mini && t('dashboard')}
@@ -575,7 +579,10 @@ export function Sidebar({
               {/* عنوان المجموعة: خافت وصغير، بلا زخرفة ولا حدّ — يفصل بالفراغ
                   والوزن لا بخطّ. ويختفي في الحالة المطوية: لا عرض لنصّ فيها. */}
               {!mini && (
-                <div className="px-4 pb-1.5 pt-3.5 text-[11px] font-bold tracking-wide text-muted/70">
+                <div
+                  data-awj-super-group-label
+                  className="px-4 pb-1.5 pt-3.5 text-[11px] font-bold tracking-wide text-muted/70"
+                >
                   {t(`superGroups.${sg.label}`)}
                 </div>
               )}
@@ -601,6 +608,7 @@ export function Sidebar({
                   aria-expanded={mini ? flyout?.title === group.title : expanded}
                   aria-haspopup={mini ? 'menu' : undefined}
                   title={mini ? t(`groups.${group.title}`) : undefined}
+                  data-awj-shell-active={groupActive ? '' : undefined}
                   className={cn(
                     'relative flex h-11 w-full items-center rounded text-[14.5px] font-medium transition-colors',
                     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
@@ -613,7 +621,7 @@ export function Sidebar({
                   {/* الخطّ الجانبي ٣px يرافق الخلفية على **الرئيسي النشط وحده** —
                       فيبقى للفرع النشط تمييزُ اللون والوزن بلا خلفية تنافسه. */}
                   {groupActive && !mini && (
-                    <span aria-hidden className="absolute inset-y-1.5 start-0 w-[3px] rounded bg-primary" />
+                    <span data-awj-legacy-marker aria-hidden className="absolute inset-y-1.5 start-0 w-[3px] rounded bg-primary" />
                   )}
                   <GroupIcon className="h-[18px] w-[18px] shrink-0" strokeWidth={1.7} />
                   {!mini && (
@@ -648,6 +656,8 @@ export function Sidebar({
                           {...posNavNewTabAnchorProps(item.openInNewTab)}
                           aria-current={active ? 'page' : undefined}
                           onClick={onClose}
+                          data-awj-apex=""
+                          data-awj-apex-on={active ? '' : undefined}
                           className={cn(
                             // الفرع أصغر وأخفت من أبيه — والنشِط يتميّز باللون
                             // والوزن **بلا خلفية**: `primary-soft` للرئيسي وحده،

@@ -1,0 +1,10 @@
+# نظام الملكية الافتراضي — راجع design-system/v3/GOVERNANCE.md قبل تعديل هذا الملف.
+# افتراضي: كل الملفات.
+*                                   @safwan5001-source
+
+# نظام التصميم v3 ورموزه (Horizon execution model) — أي تغيير على مصدر الحقيقة
+# للرموز أو المولِّد يحتاج مراجعة صاحب نظام التصميم.
+/design-system/                    @safwan5001-source
+/web/scripts/generate-awj-tokens.mjs @safwan5001-source
+/web/src/app/globals.css           @safwan5001-source
+/web/tailwind.config.ts            @safwan5001-source

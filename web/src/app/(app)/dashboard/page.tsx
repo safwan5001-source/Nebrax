@@ -18,6 +18,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table';
+import { Money } from '@/components/ui/money';
 import { Donut } from '@/components/charts/donut';
 import { KpiCard } from '@/components/dashboard/kpi-card';
 import { SalesChart } from '@/components/dashboard/sales-chart';
@@ -401,7 +402,7 @@ function RecentInvoices({
                   </Link>
                 </TD>
                 <TD className="num text-muted">{inv.invoice_date}</TD>
-                <TD className="num text-end">{formatRiyal(inv.total)}</TD>
+                <TD className="text-end"><Money value={inv.total} /></TD>
                 <TD>
                   <Badge tone={inv.status === 'posted' ? 'positive' : 'muted'}>{ts(inv.status)}</Badge>
                 </TD>

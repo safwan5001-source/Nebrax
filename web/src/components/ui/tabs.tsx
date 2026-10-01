@@ -80,6 +80,8 @@ export function Tabs({
             aria-controls={`panel-${t.id}`}
             tabIndex={on || (!value && tabs[0]?.id === t.id) ? 0 : -1}
             onClick={() => onChange(t.id)}
+            data-awj-apex="tab"
+            data-awj-apex-on={on ? '' : undefined}
             className={cn(
               'whitespace-nowrap border-b-2 px-3.5 py-3 text-sm font-medium transition-colors',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
