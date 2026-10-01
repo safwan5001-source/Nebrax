@@ -50,7 +50,11 @@ export function publishedThemeStyle(
   presentation: StorefrontPresentationConfig | null,
 ): Record<string, string> | undefined {
   if (!presentation) return undefined;
-  return presentationCssVars(presentation.primaryColor, presentation.radius);
+  return presentationCssVars(
+    presentation.primaryColor,
+    presentation.radius,
+    presentation.fontPreset,
+  );
 }
 
 export function publishedLogoUrl(

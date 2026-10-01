@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   contrastRatio,
+  FONT_PRESETS,
+  fontPresetArabicVar,
   isSafeHexColor,
   presentationCssVars,
   presetPrimary,
@@ -40,5 +42,34 @@ describe("presentation tokens", () => {
     ]);
     expect(presetPrimary("awj-market")).toBe("#0f766e");
     expect(primaryForeground("#0f766e")).toBe("#ffffff");
+  });
+
+  it("CUST-H3-2: registers the curated tajawal-geist preset alongside cairo-geist", () => {
+    expect(FONT_PRESETS.map((preset) => preset.id)).toEqual([
+      "cairo-geist",
+      "tajawal-geist",
+    ]);
+  });
+
+  it("CUST-H3-2: resolves the Arabic face deterministically and fails closed to Cairo", () => {
+    expect(fontPresetArabicVar("cairo-geist")).toBe("var(--font-cairo)");
+    expect(fontPresetArabicVar("tajawal-geist")).toBe("var(--font-tajawal)");
+    expect(fontPresetArabicVar("bogus-value" as never)).toBe(
+      "var(--font-cairo)",
+    );
+  });
+
+  it("CUST-H3-2: emits --store-font-arabic without changing color/radius output", () => {
+    const cairoVars = presentationCssVars("#1e3a5f", "subtle");
+    expect(cairoVars["--store-font-arabic"]).toBe("var(--font-cairo)");
+    expect(cairoVars["--store-primary"]).toBe("#1e3a5f");
+
+    const tajawalVars = presentationCssVars(
+      "#1e3a5f",
+      "subtle",
+      "tajawal-geist",
+    );
+    expect(tajawalVars["--store-font-arabic"]).toBe("var(--font-tajawal)");
+    expect(tajawalVars["--store-primary"]).toBe("#1e3a5f");
   });
 });

@@ -92,6 +92,18 @@ describe("published presentation runtime helpers", () => {
     ).toBe("#12372a");
   });
 
+  it("CUST-H3-2: resolves --store-font-arabic from the published fontPreset, never from Draft", () => {
+    expect(
+      publishedThemeStyle(DEFAULT_PRESENTATION_CONFIG)?.["--store-font-arabic"],
+    ).toBe("var(--font-cairo)");
+    expect(
+      publishedThemeStyle({
+        ...DEFAULT_PRESENTATION_CONFIG,
+        fontPreset: "tajawal-geist",
+      })?.["--store-font-arabic"],
+    ).toBe("var(--font-tajawal)");
+  });
+
   it("unmounts WhatsApp unless enabled with a sanitary number", () => {
     expect(
       publishedWhatsAppHref(DEFAULT_PRESENTATION_CONFIG, "floating"),

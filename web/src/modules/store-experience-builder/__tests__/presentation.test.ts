@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_PRESENTATION_CONFIG, normalizePresentationConfig } from '../presentation/config';
+import { fontPresetArabicVar, FONT_PRESETS, presentationCssVars } from '../presentation/tokens';
 import {
   BRANDING_PERSISTENCE_CAPABILITY,
   BUSINESS_VERIFICATION_CAPABILITY,
@@ -136,6 +137,36 @@ describe('web presentation contract', () => {
     expect(config.homepage.sections).toEqual([
       { id: 'hero', type: 'hero', visible: false },
     ]);
+  });
+
+  it('CUST-H3-2: accepts the verified tajawal-geist preset and fails closed to cairo-geist for unknown values', () => {
+    expect(normalizePresentationConfig({ fontPreset: 'tajawal-geist' }).fontPreset).toBe(
+      'tajawal-geist',
+    );
+    expect(normalizePresentationConfig({ fontPreset: 'cairo-geist' }).fontPreset).toBe(
+      'cairo-geist',
+    );
+    expect(normalizePresentationConfig({ fontPreset: 'helvetica-geist' }).fontPreset).toBe(
+      'cairo-geist',
+    );
+    expect(normalizePresentationConfig({}).fontPreset).toBe('cairo-geist');
+    expect(FONT_PRESETS.map((preset) => preset.id)).toEqual(['cairo-geist', 'tajawal-geist']);
+  });
+
+  it('CUST-H3-2: resolves the Arabic face deterministically and fails closed to Cairo', () => {
+    expect(fontPresetArabicVar('cairo-geist')).toBe('var(--font-cairo)');
+    expect(fontPresetArabicVar('tajawal-geist')).toBe('var(--font-tajawal)');
+    expect(fontPresetArabicVar('bogus-value' as never)).toBe('var(--font-cairo)');
+  });
+
+  it('CUST-H3-2: presentationCssVars emits --store-font-arabic without changing color/radius output', () => {
+    const cairoVars = presentationCssVars('#1e3a5f', 'subtle');
+    expect(cairoVars['--store-font-arabic']).toBe('var(--font-cairo)');
+    expect(cairoVars['--store-primary']).toBe('#1e3a5f');
+
+    const tajawalVars = presentationCssVars('#1e3a5f', 'subtle', 'tajawal-geist');
+    expect(tajawalVars['--store-font-arabic']).toBe('var(--font-tajawal)');
+    expect(tajawalVars['--store-primary']).toBe('#1e3a5f');
   });
 
   it('keeps per-instance content without accepting offer or price fields', () => {

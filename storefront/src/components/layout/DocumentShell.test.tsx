@@ -4,6 +4,7 @@ import { DocumentShell } from "./DocumentShell";
 const fontOptions = vi.hoisted(() => ({
   geist: undefined as Record<string, unknown> | undefined,
   cairo: undefined as Record<string, unknown> | undefined,
+  tajawal: undefined as Record<string, unknown> | undefined,
 }));
 
 vi.mock("next/font/google", () => ({
@@ -14,6 +15,10 @@ vi.mock("next/font/google", () => ({
   Cairo: (options: Record<string, unknown>) => {
     fontOptions.cairo = options;
     return { variable: "--font-cairo" };
+  },
+  Tajawal: (options: Record<string, unknown>) => {
+    fontOptions.tajawal = options;
+    return { variable: "--font-tajawal" };
   },
 }));
 
@@ -91,5 +96,20 @@ describe("DocumentShell", () => {
     // for Arabic, so Cairo never receives the glyph.
     expect(fontOptions.geist?.fallback).toContain("Cairo");
     expect(fontOptions.cairo?.subsets).toContain("arabic");
+  });
+
+  it("declares the curated Tajawal alternative on every document too (CUST-H3-2)", () => {
+    const document = DocumentShell({
+      children: <main>Storefront</main>,
+      locale: "en",
+    });
+    const body = document.props.children.find(
+      (child: { type?: string } | false | null) =>
+        child && typeof child === "object" && child.type === "body",
+    );
+
+    expect(body.props.className).toContain("--font-tajawal");
+    expect(fontOptions.tajawal?.subsets).toContain("arabic");
+    expect(fontOptions.tajawal?.weight).not.toContain("600");
   });
 });

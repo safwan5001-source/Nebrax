@@ -40,5 +40,6 @@ export default defineConfig({
       ['src/app/platform/tenants/**/*.test.tsx', 'jsdom'],
     ],
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
+    setupFiles: ['./vitest.setup.ts'],
   },
 });

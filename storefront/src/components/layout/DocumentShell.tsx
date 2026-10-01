@@ -1,7 +1,7 @@
 import { GoogleTagManager } from "@next/third-parties/google";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
-import { Cairo, Geist } from "next/font/google";
+import { Cairo, Geist, Tajawal } from "next/font/google";
 import { Suspense } from "react";
 import { localeDirection } from "@/i18n/locales";
 
@@ -55,6 +55,23 @@ const cairo = Cairo({
   display: "swap",
 });
 
+/**
+ * CUST-H3-2 — curated Arabic alternative, selectable per merchant via
+ * `presentation.fontPreset` ("tajawal-geist"). Declared unconditionally here,
+ * same as Cairo above, so it never requires an extra request: the browser
+ * only fetches this face's file when the resolved `font-family` (set by
+ * `--store-font-arabic`, `lib/presentation/tokens.ts`) actually references
+ * it for a published store. Tajawal ships no 600 weight (verified against
+ * Next.js's bundled Google Fonts metadata) — 400/500/700/800 approximates
+ * Cairo's weight set above without requesting an unavailable cut.
+ */
+const tajawal = Tajawal({
+  variable: "--font-tajawal",
+  subsets: ["arabic"],
+  weight: ["400", "500", "700", "800"],
+  display: "swap",
+});
+
 interface DocumentShellProps {
   children: React.ReactNode;
   locale: string;
@@ -75,7 +92,7 @@ export function DocumentShell({ children, locale }: DocumentShellProps) {
       </head>
       {gtmId && <GoogleTagManager gtmId={gtmId} />}
       <body
-        className={`${geist.variable} ${cairo.variable} antialiased min-h-screen flex flex-col`}
+        className={`${geist.variable} ${cairo.variable} ${tajawal.variable} antialiased min-h-screen flex flex-col`}
       >
         <Suspense fallback={null}>{children}</Suspense>
         <Analytics />

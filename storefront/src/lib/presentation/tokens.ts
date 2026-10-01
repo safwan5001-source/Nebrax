@@ -15,9 +15,24 @@ export type ThemePresetId = (typeof THEME_PRESETS)[number]["id"];
 
 export const FONT_PRESETS = [
   { id: "cairo-geist", labelKey: "fontCairoGeist" },
+  { id: "tajawal-geist", labelKey: "fontTajawalGeist" },
 ] as const;
 
 export type FontPresetId = (typeof FONT_PRESETS)[number]["id"];
+
+/**
+ * Resolves a merchant font preset to the Arabic face's next/font CSS
+ * variable. Latin stays Geist in every preset (CUST-H3-2 decision — one
+ * merchant-facing Typography control, no heading/body split); only the
+ * Arabic face swaps. Both faces are declared on every document by
+ * `DocumentShell` (`components/layout/DocumentShell.tsx`), so referencing
+ * either variable here never triggers a new network request — the browser
+ * only fetches whichever face the resolved `font-family` actually uses.
+ * Unknown/unrecognized presets fail closed to Cairo.
+ */
+export function fontPresetArabicVar(id: FontPresetId): string {
+  return id === "tajawal-geist" ? "var(--font-tajawal)" : "var(--font-cairo)";
+}
 
 export const DENSITY_PRESETS = ["comfortable", "compact"] as const;
 export type DensityId = (typeof DENSITY_PRESETS)[number];
@@ -152,6 +167,7 @@ export function radiusToken(id: RadiusId): string {
 export function presentationCssVars(
   primary: string,
   radius: RadiusId,
+  fontPreset: FontPresetId = "cairo-geist",
 ): Record<string, string> {
   const color = isSafeHexColor(primary) ? primary.trim() : "#12372a";
   const foreground = primaryForeground(color);
@@ -166,6 +182,7 @@ export function presentationCssVars(
     "--store-primary-foreground": foreground,
     "--store-primary-soft": mixHex(color, "#ffffff", 0.92),
     "--store-radius": radiusToken(radius),
+    "--store-font-arabic": fontPresetArabicVar(fontPreset),
     "--primary": color,
     "--primary-foreground": foreground,
     "--ring": color,

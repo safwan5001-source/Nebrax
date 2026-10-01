@@ -6,6 +6,7 @@ import {
   previewStoreName,
 } from "../config";
 import {
+  FONT_PRESETS,
   HOME_BUILDER_SECTION_KEYS,
   PRESENTATION_CONFIG_VERSION,
 } from "../tokens";
@@ -193,6 +194,23 @@ describe("normalizePresentationConfig", () => {
     const once = normalizePresentationConfig(input);
     const twice = normalizePresentationConfig(JSON.parse(JSON.stringify(once)));
     expect(twice.homepage.sections).toEqual(once.homepage.sections);
+  });
+
+  it("CUST-H3-2: accepts the verified tajawal-geist preset and fails closed to cairo-geist for unknown values", () => {
+    expect(
+      normalizePresentationConfig({ fontPreset: "tajawal-geist" }).fontPreset,
+    ).toBe("tajawal-geist");
+    expect(
+      normalizePresentationConfig({ fontPreset: "cairo-geist" }).fontPreset,
+    ).toBe("cairo-geist");
+    expect(
+      normalizePresentationConfig({ fontPreset: "helvetica-geist" }).fontPreset,
+    ).toBe("cairo-geist");
+    expect(normalizePresentationConfig({}).fontPreset).toBe("cairo-geist");
+    expect(FONT_PRESETS.map((preset) => preset.id)).toEqual([
+      "cairo-geist",
+      "tajawal-geist",
+    ]);
   });
 
   it("rejects unsupported colours instead of applying them", () => {

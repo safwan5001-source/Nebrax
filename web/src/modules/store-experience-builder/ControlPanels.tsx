@@ -9,6 +9,8 @@ import {
   type CONTENT_PAGE_SLUGS,
   contrastRatio,
   DENSITY_PRESETS,
+  FONT_PRESETS,
+  type FontPresetId,
   hasAddableSectionType,
   HOME_BUILDER_SECTION_KEYS,
   type HomeBuilderSectionKey,
@@ -391,8 +393,18 @@ function ThemePanel({
       </Field>
       <div className="space-y-5">
         <Field label={t("font")}>
-          <select className={selectClass} value={config.fontPreset} disabled>
-            <option value="cairo-geist">{t("fontCairoGeist")}</option>
+          <select
+            className={selectClass}
+            value={config.fontPreset}
+            onChange={(event) =>
+              patch({ fontPreset: event.target.value as FontPresetId })
+            }
+          >
+            {FONT_PRESETS.map((preset) => (
+              <option key={preset.id} value={preset.id}>
+                {t(preset.labelKey as CustomizerMessageKey)}
+              </option>
+            ))}
           </select>
         </Field>
         <Field label={t("density")}>

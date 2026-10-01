@@ -18,7 +18,7 @@
   --store-content-max: 85rem;
   background: var(--store-background);
   color: var(--store-foreground);
-  font-family: Cairo, Geist, sans-serif;
+  font-family: var(--font-geist), var(--font-cairo), system-ui, sans-serif;
 }
 
 .awj-store-preview .bg-store-background { background-color: var(--store-background); }
