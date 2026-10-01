@@ -36,6 +36,7 @@
 | D-26 | بوابة `data-awj-ui="3"` على `<html>`؛ لا تراجع بالحذف الجماعي | DECIDED | فخ البوابل | MIGRATION |
 | D-27 | إيقاع التنفيذ: خمسة Horizons؛ البداية H1 Core Visual System (S0–S5)، وS1 يسبق التغيير البصري الواسع | **APPROVED** | قرار المالك لتقليل التشتّت مع إبقاء الشرائح كوحدات أمان تقنية؛ ويمنع إنشاء مصدر حقيقة ثالث أثناء الانتقال | HORIZONS + MIGRATION §4 |
 | D-31 | Claude Code داخل الأفق = Product Design Lead + Frontend Engineer بصلاحية UI/UX واسعة؛ الـPrototype اتجاه لا Pixel Spec | **APPROVED** | قرار المالك: الحفاظ على الإبداع، وتقييد الأداة فقط عند حدود المحاسبة/البيانات/API/الأمن/Tenant/التوافق/Scope | HORIZONS §2–3 |
+| D-32 | توحيد واجهات أَوْج على **Design System v3 الجديد** عبر Shared Core مركزي؛ لا Patterns/Components محلية منافسة دون استثناء موثّق | **APPROVED** | قرار المالك: الهدف ليس تجميل الشاشات منفردة بل إزالة Design Drift وتوحيد النظام كله مع اختلاف Postures وظيفياً فقط | HORIZONS §2A |
 | D-28 | WCAG 2.2 AA هدفاً (من 2.1 AA) | DECIDED | | FOUNDATIONS §13 |
 | D-29 | لا اختصار أحادي للترحيل | DECIDED | فعل لا رجعة فيه | DOCUMENT_WORKSPACE §4 |
 | D-30 | شريط الأوامر لاصق، رأس الصفحة غير لاصق | DECIDED | يوفّر ارتفاعاً | DOCUMENT_WORKSPACE §3 |
