@@ -6,8 +6,12 @@
 
 ## 2. Head SHA
 
-`dd29cd9ae8098e290d7d5e46308818ce3028cba8` (the preceding code-only commit — the two regression tests;
-`a6cde2856b441b136e93aa5bd13ea7b7ac01ce79` is the commit adding this report on top of it).
+`b3f4dc6c408d0a5724280bf79487c48b33b3c077` (current PR head).
+
+Historical trace (superseded, kept for traceability only — neither is the current head):
+`dd29cd9ae8098e290d7d5e46308818ce3028cba8` (superseded — the code-only commit adding the two
+regression tests); `a6cde2856b441b136e93aa5bd13ea7b7ac01ce79` (superseded — the commit adding the
+first version of this report, before the Head SHA/CI sections were updated to match the final head).
 
 ## 3. Branch
 
@@ -372,15 +376,15 @@ No PHP file changed (confirmed via `git status` before committing).
 
 ## 32. CI
 
-Both workflows that cover this PR's changed paths will run for real on GitHub:
+Actual final GitHub results on the current head (`b3f4dc6c408d0a5724280bf79487c48b33b3c077`):
 
-- `storefront-ci.yml` (paths: `storefront/**`) — covers the modified `layout.test.tsx`.
-- `store-brand-qa.yml` (paths include `web/src/modules/store-experience-builder/**`) — covers the new
-  Canvas test file.
-- `ci.yml` (PHP, sqlite + pgsql) — runs on every branch/PR regardless of path; will pass, since no PHP
-  file changed and the full local run (§29) already confirms zero PHP impact.
-- `web-ci.yml` (paths: `web/**`) — covers the new Canvas test file; will pass, local `npm run build`
-  already succeeded (§31).
+- Storefront CI: SUCCESS
+- Store Brand QA: SUCCESS
+- Web CI: SUCCESS
+- CI (PHP, sqlite + pgsql): SUCCESS
+- PR mergeable: `true`
+- `mergeable_state`: `clean`
+- Unresolved review threads: 0
 
 ## 33. Risks / remaining gaps
 
