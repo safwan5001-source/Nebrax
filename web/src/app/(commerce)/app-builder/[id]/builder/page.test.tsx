@@ -1182,6 +1182,10 @@ describe('AppBuilderWorkspacePage', () => {
   // above runs at the default `false` and already proved (41/41 green before this block
   // existed) that nothing here changes narrow-viewport behavior.
   describe('APP-BUILDER-PREVIEW-UX-1 — inline mobile preview + Refresh Preview', () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
     const navDraftData = {
       id: 'draft-1', builder_app_id: 'app-1', revision: 0, updated_at: null,
       schema: {
@@ -1285,6 +1289,44 @@ describe('AppBuilderWorkspacePage', () => {
       // Opening the QR dialog never re-fetches the registries the way Refresh Preview does.
       const registriesCallsAfter = api.mock.calls.filter((call) => (call[0] as string).endsWith('/registries')).length;
       expect(registriesCallsAfter).toBe(registriesCallsBefore);
+    });
+
+    it('"Preview on Phone" in the builder reaches the "Connected" state on its own, with no `onConsumed` callback wired (it has no session list to refresh)', async () => {
+      // PR #1137 review fix: `onConsumed` is optional on `PreviewOnPhoneButton` and the
+      // builder page passes none — this proves the QR dialog's own poll/consumption flow
+      // stays fully self-contained here and never depends on that prop existing.
+      wideBuilderViewport = true;
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      let sessionExists = false;
+      api.mockImplementation((path?: string, init?: { method?: string }) => {
+        if (!path) return Promise.resolve({ data: null });
+        if (path.endsWith('/draft')) return Promise.resolve({ data: draftData });
+        if (path.endsWith('/registries')) return Promise.resolve({ data: registriesData });
+        if (path.endsWith('/preview-exchange-references') && init?.method === 'POST') {
+          return Promise.resolve({
+            reference: 'builder-consumed-reference',
+            deep_link: 'https://preview.example/preview/builder-consumed-reference',
+            expires_at: new Date(Date.now() + 5 * 60_000).toISOString(),
+            exchange_reference_id: 'xref-builder-consumed',
+          });
+        }
+        if (path.endsWith('/preview-sessions')) return Promise.resolve({ data: sessionExists ? [{ id: 'ps-1' }] : [] });
+        if (path.includes('/app-builder/apps/')) return Promise.resolve({ data: appData });
+        return Promise.reject(new Error(`unexpected path: ${path}`));
+      });
+
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      render(<AppBuilderWorkspacePage />);
+      await waitFor(() => expect(screen.getAllByText('Featured').length).toBe(2));
+
+      const inlinePane = screen.getByTestId('inline-mobile-preview');
+      await user.click(within(inlinePane).getByRole('button', { name: 'Preview on Phone' }));
+      await screen.findByText(/Expires in \d+s/);
+
+      sessionExists = true;
+      await vi.advanceTimersByTimeAsync(4500);
+
+      expect(await screen.findByText('Connected — a preview session is now active on the device.')).toBeTruthy();
     });
 
     it('Refresh Preview shows a loading state, gives success feedback, and never calls a mutating (draft PUT / publish POST) endpoint', async () => {

@@ -35,11 +35,23 @@ export function PreviewOnPhoneButton({
   variant = 'outline',
   size = 'sm',
   className,
+  onConsumed,
 }: {
   appId: string;
   variant?: ButtonProps['variant'];
   size?: ButtonProps['size'];
   className?: string;
+  /**
+   * APP-BUILDER-PREVIEW-UX-1 review fix — fires exactly once per exchange reference, the
+   * first time this component's own best-effort poll detects a newly-created preview
+   * session (i.e. the moment `qrPhase` first becomes `'consumed'`). Optional: the app
+   * detail page passes its own `reloadPreviewSessions` so its on-device preview-session
+   * list stops going stale the instant the QR shows "Connected" (a regression the
+   * extraction into this standalone component introduced — the list used to live in the
+   * same component as the poll). The builder page's inline toolbar instance has no such
+   * list to refresh and omits this prop entirely.
+   */
+  onConsumed?: () => void;
 }) {
   const tp = useTranslations('appBuilder.detail.previewSessions');
   const tc = useTranslations('common');
@@ -51,6 +63,10 @@ export function PreviewOnPhoneButton({
   const [qrRemainingSeconds, setQrRemainingSeconds] = useState(0);
   const [qrBaselineCount, setQrBaselineCount] = useState(0);
   const [qrCopied, setQrCopied] = useState(false);
+  // Guards `onConsumed` against firing more than once per exchange reference — two
+  // overlapping polls could otherwise both observe the inflated count before either
+  // `setQrPhase('consumed')` commits. Reset whenever a fresh reference is requested.
+  const notifiedConsumedRef = React.useRef(false);
 
   // عدّاد الانتهاء (٥ دقائق) — محلّي بالكامل، لا يمدَّد أبداً.
   useEffect(() => {
@@ -73,17 +89,24 @@ export function PreviewOnPhoneButton({
     const id = window.setInterval(() => {
       api<{ data: unknown[] }>(`/app-builder/apps/${appId}/preview-sessions`)
         .then((res) => {
-          if (res.data.length > qrBaselineCount) setQrPhase('consumed');
+          if (res.data.length > qrBaselineCount) {
+            setQrPhase('consumed');
+            if (!notifiedConsumedRef.current) {
+              notifiedConsumedRef.current = true;
+              onConsumed?.();
+            }
+          }
         })
         .catch(() => {
           // استطلاع أفضل-جهدٍ فقط — فشله لا يعطّل حوار الـQR نفسه.
         });
     }, 4000);
     return () => window.clearInterval(id);
-  }, [qrPhase, appId, qrBaselineCount]);
+  }, [qrPhase, appId, qrBaselineCount, onConsumed]);
 
   async function createExchangeReference() {
     setQrPhase('creating');
+    notifiedConsumedRef.current = false;
     try {
       const [res, baseline] = await Promise.all([
         api<ExchangeReference>(`/app-builder/apps/${appId}/preview-exchange-references`, { method: 'POST', body: {} }),

@@ -184,7 +184,7 @@ export default function AppBuilderDetailPage() {
         </div>
       )}
       <div className="flex flex-wrap gap-2">
-        <PreviewOnPhoneButton appId={app.id} />
+        <PreviewOnPhoneButton appId={app.id} onConsumed={reloadPreviewSessions} />
         <Button type="button" variant="outline" size="sm" disabled={issuing} onClick={() => void issuePreviewSession()}>
           <Smartphone className="h-3.5 w-3.5" strokeWidth={1.7} aria-hidden="true" />
           {issuing ? tp('issuing') : tp('issueAction')}

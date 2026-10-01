@@ -417,5 +417,52 @@ describe('AppBuilderDetailPage', () => {
 
       expect(await screen.findByText('Connected — a preview session is now active on the device.')).toBeTruthy();
     });
+
+    it('also refreshes the on-device preview-session list behind the dialog once the QR is consumed (onConsumed callback)', async () => {
+      // Review fix for PR #1137: before extracting the QR flow into `PreviewOnPhoneButton`,
+      // the poll lived in this same page and updated `previewSessions` directly, so the list
+      // section below never went stale. The extracted component now notifies the page via
+      // `onConsumed` (wired to `reloadPreviewSessions`) the first time it detects a new
+      // session — this proves the list section (not just the dialog's own "Connected" text)
+      // reflects the new session without any extra manual action.
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      let sessionExists = false;
+      const session = {
+        id: 'ps-device', builder_app_id: 'app-1', source: 'draft', channel: 'device',
+        device_label: null, draft_revision: 0, created_by: 'u1',
+        expires_at: '2099-01-01T00:00:00Z', revoked_at: null, last_used_at: null,
+        created_at: '2026-09-29T12:00:00Z',
+      };
+      api.mockImplementation((path: string, init?: { method?: string }) => {
+        if (path.endsWith('/versions')) return Promise.resolve({ data: [] });
+        if (path.endsWith('/preview-exchange-references') && init?.method === 'POST') {
+          return Promise.resolve({
+            reference: 'list-refresh-reference', deep_link: 'https://preview.example/preview/list-refresh-reference',
+            expires_at: new Date(Date.now() + 5 * 60_000).toISOString(), exchange_reference_id: 'xref-list-refresh',
+          });
+        }
+        if (path.endsWith('/preview-sessions')) {
+          return Promise.resolve({ data: sessionExists ? [session] : [] });
+        }
+        return Promise.resolve({ data: appData });
+      });
+
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      render(<AppBuilderDetailPage />);
+      // The list section starts empty — confirms the later appearance isn't just leftover state.
+      expect(await screen.findByText('No preview sessions yet.')).toBeTruthy();
+
+      await user.click(screen.getByText('Preview on phone'));
+      await screen.findByText(/Expires in \d+s/);
+
+      sessionExists = true;
+      await vi.advanceTimersByTimeAsync(4500);
+
+      expect(await screen.findByText('Connected — a preview session is now active on the device.')).toBeTruthy();
+      // The list section (a sibling of the dialog, not inside it) now shows the new session —
+      // proof `onConsumed` reached the page's own `previewSessions` state, not just the dialog.
+      expect(await screen.findByText('Active')).toBeTruthy();
+      expect(screen.queryByText('No preview sessions yet.')).toBeNull();
+    });
   });
 });
