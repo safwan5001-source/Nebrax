@@ -6,7 +6,7 @@
 
 ## 2. Head SHA
 
-`f647258` (see `git log feat/cust-h3-3-global-component-parity`).
+`bbf0169b8d5ad88c3d4d6607640d07c141fb404e` (the commit adding this report; `f6472589aa4b0ce27a1eb7c0733d7038eadeb93f` is the preceding code-only commit).
 
 ## 3. Branch
 
