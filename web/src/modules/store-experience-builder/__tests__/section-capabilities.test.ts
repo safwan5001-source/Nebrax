@@ -5,11 +5,16 @@ import {
   DEFAULT_PRESENTATION_CONFIG,
   HOME_BUILDER_SECTION_KEYS,
   hasAddableSectionType,
+  isGatedHomeSection,
   MAX_HOME_SECTIONS,
   newHomeSectionId,
   type PresentationHomeSection,
   SECTION_CAPABILITIES,
+  SECTION_LIBRARY_CATEGORIES,
+  SECTION_LIBRARY_CATEGORY_LABEL,
+  sectionTypesInCategory,
 } from "../presentation";
+import { customizerMessage } from "../messages";
 
 const SAFE_ID = /^[a-zA-Z0-9_-]{1,64}$/;
 
@@ -117,5 +122,112 @@ describe("section capabilities (STORE-CUSTOMIZER-V2-2)", () => {
       expect(id.startsWith("section-")).toBe(true);
       expect(id.length).toBeLessThanOrEqual(64);
     }
+  });
+});
+
+describe("CUST-H4-2 capability registry — state/category/library metadata", () => {
+  it("has exactly one well-formed capability entry per registered type, no unknowns", () => {
+    const keys = Object.keys(SECTION_CAPABILITIES);
+    expect(new Set(keys).size).toBe(keys.length);
+    expect(keys.sort()).toEqual([...HOME_BUILDER_SECTION_KEYS].sort());
+    for (const type of HOME_BUILDER_SECTION_KEYS) {
+      expect(SECTION_CAPABILITIES[type].type).toBe(type);
+    }
+  });
+
+  it("only uses valid state values from the H4 vocabulary", () => {
+    const valid = new Set(["live", "partial", "gated", "deferred"]);
+    for (const type of HOME_BUILDER_SECTION_KEYS) {
+      expect(valid.has(SECTION_CAPABILITIES[type].state)).toBe(true);
+    }
+  });
+
+  it("never flattens a non-live state to live (H4-1 §5 truth matrix)", () => {
+    // Exact truth matrix from CUST-H4-ARCH-1 §5 — PARTIAL/GATED sections must
+    // keep their honest state, not read as LIVE.
+    const expected: Record<string, string> = {
+      hero: "live",
+      categories: "live",
+      newArrivals: "live",
+      wholesale: "live",
+      banner: "live",
+      featured: "partial",
+      offers: "gated",
+      benefits: "live",
+      appPromo: "live",
+      customContent: "live",
+    };
+    for (const type of HOME_BUILDER_SECTION_KEYS) {
+      expect(SECTION_CAPABILITIES[type].state).toBe(expected[type]);
+    }
+  });
+
+  it("keeps offers' formalized gated state consistent with the existing isGatedHomeSection gate", () => {
+    for (const type of HOME_BUILDER_SECTION_KEYS) {
+      expect(SECTION_CAPABILITIES[type].state === "gated").toBe(
+        isGatedHomeSection(type),
+      );
+    }
+  });
+
+  it("documents Featured as truthfully PARTIAL with a merchant-facing reason, not silently LIVE", () => {
+    expect(SECTION_CAPABILITIES.featured.state).toBe("partial");
+    expect(SECTION_CAPABILITIES.featured.reasonKey).toBeTruthy();
+  });
+
+  it("documents Offers as truthfully GATED with a merchant-facing reason, not hidden or silently LIVE", () => {
+    expect(SECTION_CAPABILITIES.offers.state).toBe("gated");
+    expect(SECTION_CAPABILITIES.offers.reasonKey).toBeTruthy();
+    // H4-2 does not reinterpret H4-1's decision: Offers stays addable (a real,
+    // non-deceptive gate), it is not withheld from merchant-addable results.
+    expect(SECTION_CAPABILITIES.offers.merchantAddable).toBe(true);
+  });
+
+  it("maps every section to exactly one of the 7 taxonomy categories, none empty", () => {
+    expect(SECTION_LIBRARY_CATEGORIES.length).toBe(7);
+    const covered = new Set<string>();
+    for (const type of HOME_BUILDER_SECTION_KEYS) {
+      const category = SECTION_CAPABILITIES[type].category;
+      expect(SECTION_LIBRARY_CATEGORIES.includes(category)).toBe(true);
+      covered.add(category);
+    }
+    // No empty category: every declared category has at least one section.
+    for (const category of SECTION_LIBRARY_CATEGORIES) {
+      expect(sectionTypesInCategory(category).length).toBeGreaterThan(0);
+      expect(covered.has(category)).toBe(true);
+    }
+  });
+
+  it("resolves every title/description/category-label/reason key in both Arabic and English, never a raw key", () => {
+    const keys = new Set<string>();
+    for (const category of SECTION_LIBRARY_CATEGORIES) {
+      keys.add(SECTION_LIBRARY_CATEGORY_LABEL[category]);
+    }
+    for (const type of HOME_BUILDER_SECTION_KEYS) {
+      const cap = SECTION_CAPABILITIES[type];
+      keys.add(cap.titleKey);
+      keys.add(cap.descriptionKey);
+      if (cap.reasonKey) keys.add(cap.reasonKey);
+    }
+    for (const key of keys) {
+      const ar = customizerMessage("ar", key as never);
+      const en = customizerMessage("en", key as never);
+      expect(ar).toBeTruthy();
+      expect(en).toBeTruthy();
+      expect(ar).not.toBe(key);
+      expect(en).not.toBe(key);
+    }
+  });
+
+  it("merchantAddable gates canAddSectionType independently of instance count", () => {
+    // No registered type is withheld today — every one should be reachable
+    // via canAddSectionType once instance-count rules allow it.
+    for (const type of HOME_BUILDER_SECTION_KEYS) {
+      expect(SECTION_CAPABILITIES[type].merchantAddable).toBe(true);
+    }
+    const sections = DEFAULT_PRESENTATION_CONFIG.homepage.sections.filter(
+      (s) => s.type !== "appPromo",
+    );
+    expect(canAddSectionType(sections, "appPromo")).toBe(true);
   });
 });

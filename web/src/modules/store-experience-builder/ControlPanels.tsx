@@ -21,12 +21,14 @@ import {
   presetSelectionPatch,
   PRODUCT_CARD_PRESETS,
   RADIUS_PRESETS,
+  SECTION_CAPABILITIES,
   SOCIAL_NETWORKS,
   type SocialNetwork,
   type StorefrontPresentationConfig,
   THEME_PRESETS,
   type ThemePresetId,
 } from "./presentation";
+import { SectionLibraryDialog } from "./SectionLibrary";
 import { buildWhatsAppUrl } from "./presentation/urls";
 import {
   bannerContentOf,
@@ -113,18 +115,16 @@ const PAGE_LABEL: Record<
   "terms-of-service": "pageTerms",
 };
 
-const SECTION_LABEL: Record<HomeBuilderSectionKey, CustomizerMessageKey> = {
-  hero: "sectionHero",
-  categories: "sectionCategories",
-  newArrivals: "sectionNewArrivals",
-  wholesale: "sectionWholesale",
-  banner: "sectionBanner",
-  featured: "sectionFeatured",
-  offers: "sectionOffers",
-  benefits: "sectionBenefits",
-  appPromo: "sectionAppPromo",
-  customContent: "sectionCustomContent",
-};
+// CUST-H4-2 — titles now live once in SECTION_CAPABILITIES (the Section
+// Library's own source of truth); this stays a thin derived alias so every
+// other `SECTION_LABEL[type]` call site in this file is untouched.
+const SECTION_LABEL: Record<HomeBuilderSectionKey, CustomizerMessageKey> =
+  Object.fromEntries(
+    HOME_BUILDER_SECTION_KEYS.map((type) => [
+      type,
+      SECTION_CAPABILITIES[type].titleKey,
+    ]),
+  ) as Record<HomeBuilderSectionKey, CustomizerMessageKey>;
 
 interface PanelsProps {
   panel: CustomizerPanel;
@@ -1044,32 +1044,12 @@ function HomepagePanel({
             + {t("addSection")}
           </button>
           {pickerOpen ? (
-            <ul
-              data-section-picker=""
-              className="mt-1 border border-neutral-200 bg-white"
-            >
-              {HOME_BUILDER_SECTION_KEYS.map((type) => {
-                const addable = canAddSectionType(sections, type);
-                return (
-                  <li key={type}>
-                    <button
-                      type="button"
-                      data-picker-option={type}
-                      disabled={!addable}
-                      onClick={() => addSection(type)}
-                      className="flex h-9 w-full items-center justify-between gap-2 px-3 text-start text-[13px] text-neutral-800 outline-none hover:bg-primary-soft focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40 disabled:text-neutral-400 disabled:hover:bg-transparent"
-                    >
-                      <span className="truncate">{t(SECTION_LABEL[type])}</span>
-                      {isGatedHomeSection(type) ? (
-                        <span className="text-[10px] leading-none text-neutral-400">
-                          {t("gatedBadge")}
-                        </span>
-                      ) : null}
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
+            <SectionLibraryDialog
+              sections={sections}
+              t={t}
+              onAdd={addSection}
+              onClose={() => setPickerOpen(false)}
+            />
           ) : null}
         </div>
         <ul className="border border-neutral-200">

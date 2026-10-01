@@ -123,7 +123,7 @@ describe('commerce appearance — STORE-CUSTOMIZER-V2-2 section instances', () =
     vi.restoreAllMocks();
   });
 
-  it('picker lists every registered type with its translated name and gated badge', async () => {
+  it('Section Library lists every registered type, grouped by category, with its translated name and gated badge', async () => {
     const user = userEvent.setup();
     render(<CommerceAppearancePage />);
     await waitFor(() => expect(showMock).toHaveBeenCalled());
@@ -132,17 +132,20 @@ describe('commerce appearance — STORE-CUSTOMIZER-V2-2 section instances', () =
 
     const picker = document.querySelector('[data-section-picker]') as HTMLElement;
     const options = Array.from(picker.querySelectorAll('[data-picker-option]'));
+    // CUST-H4-2 — grouped by the 7-category taxonomy (products →
+    // categories&nav → offers&marketing → media&video → content →
+    // trust&services → app&communication), not declaration order.
     expect(options.map((el) => el.getAttribute('data-picker-option'))).toEqual([
-      'hero',
+      'featured',
       'categories',
       'newArrivals',
       'wholesale',
-      'banner',
-      'featured',
       'offers',
+      'hero',
+      'banner',
+      'customContent',
       'benefits',
       'appPromo',
-      'customContent',
     ]);
     expect(picker.textContent).toContain('شريط ترويجي');
     const offersOption = picker.querySelector(
