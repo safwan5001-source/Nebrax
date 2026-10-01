@@ -36,15 +36,11 @@ describe("published rhythm", () => {
    */
   it("gives the Product/Category page shells a real compact padding, unknown values failing closed", () => {
     expect(publishedPageContainerPaddingClass(null)).toBe("py-5 md:py-6");
-    expect(publishedPageContainerPaddingClass(undefined)).toBe(
-      "py-5 md:py-6",
-    );
+    expect(publishedPageContainerPaddingClass(undefined)).toBe("py-5 md:py-6");
     expect(publishedPageContainerPaddingClass("comfortable")).toBe(
       "py-5 md:py-6",
     );
-    expect(publishedPageContainerPaddingClass("unknown")).toBe(
-      "py-5 md:py-6",
-    );
+    expect(publishedPageContainerPaddingClass("unknown")).toBe("py-5 md:py-6");
     expect(publishedPageContainerPaddingClass("compact")).toBe("py-3");
   });
 });
