@@ -122,8 +122,7 @@ owner merge gate.
 **All five implementation Slices have been merged. None has been deployed
 or Production-released as part of this Horizon closure.** Merge approval and
 deployment approval remain separate owner gates. No Production release has
-occurred as part of CUST-H2.ION RELEASE**, even with
-green CI, until the owner explicitly approves.
+occurred as part of CUST-H2.
 
 ---
 
