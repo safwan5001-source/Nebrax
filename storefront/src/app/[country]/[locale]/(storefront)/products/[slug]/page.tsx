@@ -106,6 +106,7 @@ export default async function ProductPage({
         product={product}
         basePath={basePath}
         pagePresentation={presentation?.pagePresentation}
+        density={presentation?.density}
       />
     </>
   );

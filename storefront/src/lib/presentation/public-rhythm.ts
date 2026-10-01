@@ -16,3 +16,19 @@ export function publishedProductCardBodyClass(
     ? "flex grow flex-col p-2.5"
     : "flex grow flex-col p-3";
 }
+
+/**
+ * CUST-H3-3 — the Product and Category page shells' own outer vertical
+ * padding. Matches the Customizer Canvas's `ProductPagePreview`/
+ * `CategoryPagePreview` ready-state padding exactly (`StorefrontPreviewCanvas.tsx`),
+ * so selecting a density actually changes these pages, not only the
+ * homepage section rhythm `publishedHomeStackClass` already covered. The
+ * AWJ Market theme's own compact chrome (`isMarket` branches elsewhere) is
+ * untouched — this resolver only applies where no Market-specific override
+ * already exists.
+ */
+export function publishedPageContainerPaddingClass(
+  density: string | null | undefined,
+): string {
+  return density === "compact" ? "py-3" : "py-5 md:py-6";
+}

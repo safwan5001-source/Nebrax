@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_PRESENTATION_CONFIG, normalizePresentationConfig } from '../presentation/config';
-import { fontPresetFamilyStack, FONT_PRESETS, presentationCssVars } from '../presentation/tokens';
+import {
+  fontPresetFamilyStack,
+  FONT_PRESETS,
+  pageContainerPaddingClass,
+  presentationCssVars,
+} from '../presentation/tokens';
 import {
   BRANDING_PERSISTENCE_CAPABILITY,
   BUSINESS_VERIFICATION_CAPABILITY,
@@ -180,6 +185,12 @@ describe('web presentation contract', () => {
     expect(vars['--store-primary']).toBe('#1e3a5f');
     expect(vars['--store-radius']).toBe('0.5rem');
     expect(vars).not.toHaveProperty('--store-font-arabic');
+  });
+
+  it('CUST-H3-3: pageContainerPaddingClass maps density deterministically, matching the Published resolver (public-rhythm.ts)', () => {
+    expect(pageContainerPaddingClass('comfortable')).toBe('py-5 md:py-6');
+    expect(pageContainerPaddingClass('compact')).toBe('py-3');
+    expect(pageContainerPaddingClass('bogus-value' as never)).toBe('py-5 md:py-6');
   });
 
   it('keeps per-instance content without accepting offer or price fields', () => {

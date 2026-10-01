@@ -8,6 +8,7 @@ import { getCategory, getCategoryProducts } from "@/lib/data/categories";
 import { resolveCurrency } from "@/lib/data/markets";
 import { getProductFilters } from "@/lib/data/products";
 import { generateCategoryMetadata } from "@/lib/metadata/category";
+import { publishedPageContainerPaddingClass } from "@/lib/presentation/public-rhythm";
 import { buildBreadcrumbJsonLd } from "@/lib/seo";
 import { getStoreUrl } from "@/lib/store";
 import { parseListingSearchParams } from "@/lib/utils/listing-search-params";
@@ -81,7 +82,9 @@ export default async function CategoryPage({
         pagePresentation={presentation?.pagePresentation}
       />
 
-      <StoreContainer className="py-5 md:py-6">
+      <StoreContainer
+        className={publishedPageContainerPaddingClass(presentation?.density)}
+      >
         <ProductListing
           state={listingState}
           basePath={basePath}

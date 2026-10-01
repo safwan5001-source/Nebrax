@@ -52,6 +52,20 @@ export function fontPresetFamilyStack(id: FontPresetId): string {
 export const DENSITY_PRESETS = ["comfortable", "compact"] as const;
 export type DensityId = (typeof DENSITY_PRESETS)[number];
 
+/**
+ * CUST-H3-3 — the Product and Category page previews' own outer vertical
+ * padding (`StorefrontPreviewCanvas.tsx`'s `ProductPagePreview`/
+ * `CategoryPagePreview` ready states). Mirrors
+ * `publishedPageContainerPaddingClass()` in
+ * `storefront/src/lib/presentation/public-rhythm.ts` exactly, so the Canvas
+ * and the Published storefront agree on what "compact" density means for
+ * these two pages, not only for the homepage section rhythm
+ * `presentationCssVars`'s sibling helper already covered.
+ */
+export function pageContainerPaddingClass(density: DensityId): string {
+  return density === "compact" ? "py-3" : "py-5 md:py-6";
+}
+
 export const RADIUS_PRESETS = [
   { id: "default", value: "0.75rem" },
   { id: "subtle", value: "0.5rem" },
