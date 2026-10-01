@@ -5,7 +5,7 @@
 | | |
 |---|---|
 | **Base SHA** | `8f425ceb7cd944c7cef9a887aa01a0cf77a81a54` (verified against `origin/main` at task start — the CUST-H3-ARCH-1 merge commit, `docs(store): define CUST-H3 Store Identity architecture (#1138)`) |
-| **Head SHA** | `6bbe3e90566552e2ab941263986e203005a178f1` |
+| **Head SHA** | `9408bd06a0a6d2f64dcfac50c4d3f60d000b37ee` |
 | **Branch** | `feat/cust-h3-1-identity-studio-shell` |
 | **PR** | [#1140 — feat(store): consolidate Store Identity Studio](https://github.com/safwan5001-source/Nebrax/pull/1140) |
 
