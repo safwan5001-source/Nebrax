@@ -4,6 +4,8 @@
 **Horizon:** Store Customizer Capability Completion  
 **Date:** 2026-09-26
 
+> **Superseded 2026-10-01.** The owner reviewed this decision during the CUST-H4 Horizon and corrected it: Offers must not remain permanently gated. A bounded, non-pricing Commerce contract for Offers (curation/scheduling only, live price resolution via the existing `CommercePriceResolver`, no new pricing logic) is defined in `docs/plans/store/CUST-H4-ARCH-1-SECTION-LIBRARY-ACTIVATION-CONTRACT.md` §23. That document is now authoritative for Offers going forward. This packet's original text is kept below unmodified as the historical record of why the gate existed and what evidence it rested on — evidence that remains correct (no promotions engine existed, and still doesn't); what changed is the owner's judgment that a bounded display contract over already-real pricing is enough, without building the engine ADR-11 deferred.
+
 ## Problem
 
 The merchant customizer lists an Offers section. The Build, Don’t Hide decision says to complete it when it can point at authoritative AWJ offer data, and to stop rather than invent prices.
