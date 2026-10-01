@@ -104,6 +104,72 @@ web/                   واجهة Next.js 15 (انظر DESIGN_SYSTEM.md)
 > **ملاحظة:** شاشتا **المدفوعات** و**المرتجعات** مبنيّتان بالكامل وتظلّان متاحتين بمساراتهما
 > (`/payments`، `/returns`)؛ تُدمجان لاحقاً ضمن تدفّقات المبيعات/الحسابات في الشريط.
 
+## التجارة الإلكترونية — Commerce / Storefront / App Builder
+
+التجارة الإلكترونية في أَوْج **جزء من منصة الـERP وليست نظاماً محاسبياً موازياً**. تعامل معها كقناة مبيعات ضمن بنية Commerce متعددة القنوات، مع بقاء خدمات أَوْج الحالية هي مصدر الحقيقة للمحاسبة والمخزون والفوترة وZATCA.
+
+### الحدود التي يجب عدم خلطها
+
+- **Commerce Core / Workspace:** إدارة القنوات، النشر التجاري للكتالوج، الطلبات، الحجز/ATS، الدفع، التنفيذ والمرتجعات وفق عقود Commerce المعتمدة.
+- **Storefront:** واجهة المتجر العامة للمتسوق. لا تُنشئ حقائق مالية أو مخزنية من جهة العميل، ولا تفترض قدرات backend غير موجودة.
+- **Store Customizer:** محرر تجربة المتجر المرئية والصفحات/الأقسام/الهوية. ليس App Builder، وليس App Factory.
+- **App Builder:** منصة إنشاء وإدارة تجربة تطبيقات iOS/Android التجارية المبنية على بيانات AWJ Commerce.
+- **App Factory / Release System:** البناء والتوقيع والتحقق والإرسال للمتاجر وإدارة دورة الإصدار؛ منفصل عن الـBuilder نفسه.
+
+### عقود Commerce غير القابلة للكسر
+
+1. **CommerceOrder ليس Invoice.** إنشاء الطلب التجاري لا يعني إنشاء فاتورة أو قيد محاسبي تلقائياً.
+2. **Inventory Reservation ليست StockMovement.** الحجز لا يغيّر On Hand ولا تقييم المخزون.
+3. **PaymentIntent ليس AWJ Payment.** محاولة/نية الدفع ونتيجة المزود تظل منفصلة عن سجل الدفع المحاسبي في أَوْج.
+4. **Return وRefund وCredit Note وExchange كيانات/أحداث مختلفة** ولا تُختزل في حالة واحدة.
+5. **SalesChannel ليس Branch ولا Warehouse ولا PickupLocation.** لا تخلط حدود القناة بحدود الفرع أو مصدر التنفيذ.
+6. Commerce لا يكتب مباشرةً في journal lines أو تقييم المخزون أو COGS أو مخرجات ZATCA؛ يمر عبر الخدمات المحاسبية/المخزنية المعتمدة (`LedgerService`, `InventoryService`, `InvoiceService`, `PaymentService` وما يتبعها).
+7. **Tenant Isolation + RBAC + idempotency + backward compatibility بوابات إصدار** وليست تحسينات لاحقة.
+8. لا تُجبر تدفقات ERP/POS القديمة على المرور عبر `CommerceOrder` لمجرد إضافة Commerce.
+9. لا تعتمد سلوكاً سعودياً مالياً/ضريبياً أو توقيت إنشاء فاتورة كتخمين. أي قرار من هذا النوع يحتاج عقداً/ADR معتمداً وأدلة مناسبة.
+10. لا تختلق API أو persistence أو سعر/خصم/مخزون/توصيل أو حالة تجارية في Storefront/Customizer لإكمال التصميم. القدرة غير المدعومة تُسجَّل صراحةً كـ `DESIGN_ONLY` / `GATED` / `DEFERRED` وفق السياسة المعتمدة.
+
+### مصادر الحقيقة وترتيبها
+
+عند تنفيذ مهمة Commerce لا تبدأ من الصفر ولا تعتمد وثيقة واحدة بمعزل عن الباقي. استخدم هذا الترتيب:
+
+1. **الكود الحالي + الاختبارات المدموجة** = الحقيقة التنفيذية الحالية.
+2. **ADR معتمد ومندمج** = القرار المعماري الملزم حتى يُستبدل صراحةً.
+3. **Implementation / Closure Report المرتبط بآخر Slice** = حالة التنفيذ والتسليم.
+4. **Master Plan / Evidence / UX docs** = اتجاه وخطة ومرجع؛ لا تمنح وحدها إذن تنفيذ أو Merge/Deploy.
+
+المرجع المركزي لخطة التنفيذ:
+`docs/plans/store/AWJ_COMMERCE_IMPLEMENTATION_MASTER_PLAN.md`
+
+المرجع الأعلى لرؤية المتجر وقنوات البيع:
+`docs/plans/store/AWJ_STORE_MASTER_PLAN.md`
+
+قرارات Commerce المعمارية:
+`docs/plans/store/ADR-*.md`
+
+سياسة Storefront عند غياب قدرات backend:
+`docs/plans/store/AWJ_STOREFRONT_DESIGN_FIRST_POLICY.md`
+
+تصميم Storefront:
+`docs/plans/store/AWJ_STOREFRONT_DESIGN_SYSTEM.md`
+
+تجربة Store Customizer:
+`docs/plans/store/AWJ_STORE_CUSTOMIZER_UX_V2.md`
+
+عقد الاستمرارية/التخزين للـCustomizer:
+`docs/plans/store/AWJ_STORE_CUSTOMIZER_PERSISTENCE_ARCHITECTURE.md`
+
+App Builder — المنتج والمعمار:
+`docs/plans/store/AWJ_APP_BUILDER_PRODUCT_ARCHITECTURE_V1.md`
+
+App Builder — البحث المرجعي:
+`docs/plans/store/AWJ_MOBILE_APP_BUILDER_BENCHMARK.md`
+
+Custom Domains / Edge / TLS:
+`docs/plans/store/AWJ_CUSTOM_DOMAIN_EDGE_TLS_ARCHITECTURE.md`
+
+> **قاعدة للوكلاء:** قبل تعديل Commerce/Storefront/Customizer/App Builder، حدّد أولاً أي طبقة تملك السلوك، اقرأ ADR/العقد والـImplementation Report الأقرب للمهمة فقط، ثم حافظ على Scope صغير. لا تعِد استكشاف المنظومة كاملة ولا تنقل مسؤولية بين الطبقات دون قرار معماري صريح.
+
 ## كتالوج التطبيقات — المرحلة الأولى
 
 `App\Support\ApplicationCatalog` هو مصدر حقيقة **نطاق المنتج** للتطبيقات: مفتاح ثابت، مجموعة نبراكس، نضج القدرة (`built` / `coming_soon` / `retired`)، إلزامية، واعتماديات صريحة. لا يخزن هذا الكتالوج قرار مستأجر بتفعيل تطبيق، ولا يستبدل RBAC أو الخطط أو فاحص الجاهزية؛ تلك مراحل لاحقة منفصلة عمداً.
