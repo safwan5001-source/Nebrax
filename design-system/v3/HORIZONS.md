@@ -37,6 +37,45 @@
 
 لا يحتاج موافقة مسبقة على التفاصيل الدقيقة مثل فروق spacing الصغيرة، hierarchy فرعي، تنظيم card/grid داخلي، microcopy غير محاسبي، أو تحسينات accessibility/responsive لا تغير منطق المنتج. تُوثق القرارات المهمة في التقرير النهائي.
 
+
+## 2A. Design Unification Contract
+
+الهدف النهائي ليس فقط "تحسين الشاشات"، بل **توحيد لغة أَوْج التصميمية على مستوى النظام كله**.
+
+### النواة الموحّدة
+يجب أن تشترك كل مساحات الإدارة في:
+- typography hierarchy واحدة.
+- spacing logic واحدة.
+- radius / border / elevation grammar واحدة.
+- focus / hover / selected / editing semantics موحّدة.
+- Money presentation موحّدة.
+- Button / Input / Select / Badge / Dialog / Drawer grammar موحّدة.
+- Empty / Loading / Error / Read-only states موحّدة.
+- DataTable / List / Filter / Toolbar / Pagination grammar موحّدة.
+- Document Workspace grammar موحّدة.
+- RTL/LTR behavior موحّد.
+- responsive rules موحّدة.
+- Theme contract موحّد: Default وInk فوق نفس المكونات، لا تصميمان منفصلان.
+
+### قاعدة المكوّن الواحد
+إذا كان هناك Pattern أو Component مركزي موجود، **MUST NOT** يبني Module نسخة محلية تنافسه.
+إذا احتاج Module إلى Variant جديد:
+1. يُراجع أولاً هل يمكن تمثيله بVariant مركزي.
+2. إذا نعم، يُضاف للنظام المركزي ثم يُستهلك.
+3. إذا لا، يُوثق الاستثناء وسبب عدم صلاحيته للتعميم.
+
+### الاستثناءات المسموحة
+Floor/POS وStudio/Builder يجوز أن يختلفا وظيفياً وبصرياً بما يلائم العمل، لكنهما لا ينفصلان عن Shared Core.
+الاختلاف يكون في Posture-specific composition/density/touch/media/chrome، وليس في معاني الحالات أو قواعد الوصولية أو المكونات الأساسية بلا مبرر.
+
+### شرط الإغلاق
+بحلول H5:
+- لا توجد أنماط متنافسة لنفس الوظيفة إلا باستثناء موثّق.
+- لا توجد نسخ محلية غير لازمة من مكونات النظام.
+- نفس الحالة تعني وتبدو متسقة عبر المبيعات والمشتريات والمخزون وHR والتقارير وCommerce.
+- الاختلاف بين Postures يكون مقصوداً وموثقاً، لا نتيجة تاريخية أو drift.
+
+
 ## 3. الحدود غير القابلة للكسر
 
 الحرية التصميمية تتوقف عند أي تغيير قد يمس:
