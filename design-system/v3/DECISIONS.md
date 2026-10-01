@@ -34,7 +34,7 @@
 | D-24 | Floor: لمس 44/56، سطح نتيجة دائم، ماسح HID، لا ربط بسمة واحدة | DECIDED | | POSTURES §6 |
 | D-25 | الحوكمة: ratchet، توكنز مولَّدة، CODEOWNERS، فحوص تسرّب | DECIDED | | GOVERNANCE |
 | D-26 | بوابة `data-awj-ui="3"` على `<html>`؛ لا تراجع بالحذف الجماعي | DECIDED | فخ البوابل | MIGRATION |
-| D-27 | الشريحة الأولى: Depth Foundation (S2 + S4-lite) | DECIDED | أكبر أثر بأقل خطر | MIGRATION §4 |
+| D-27 | إيقاع التنفيذ: خمسة Horizons؛ البداية H1 Core Visual System (S0–S5)، وS1 يسبق التغيير البصري الواسع | DECIDED | يقلل التشتّت مع إبقاء الشرائح كوحدات أمان تقنية؛ ويمنع إنشاء مصدر حقيقة ثالث أثناء الانتقال | HORIZONS + MIGRATION §4 |
 | D-28 | WCAG 2.2 AA هدفاً (من 2.1 AA) | DECIDED | | FOUNDATIONS §13 |
 | D-29 | لا اختصار أحادي للترحيل | DECIDED | فعل لا رجعة فيه | DOCUMENT_WORKSPACE §4 |
 | D-30 | شريط الأوامر لاصق، رأس الصفحة غير لاصق | DECIDED | يوفّر ارتفاعاً | DOCUMENT_WORKSPACE §3 |
