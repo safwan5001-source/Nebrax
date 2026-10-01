@@ -1,0 +1,70 @@
+# نظام تصميم أَوْج — المواصفة v3 (Target Specification)
+
+> **الحالة: `v3.0-draft` — مواصفة هدف، غير نافذة بعد.**
+> لا تغيّر هذه الوثائق أي مكوّن أو CSS أو API أو سلوك محاسبي. القواعد النافذة اليوم تبقى في
+> [`DESIGN_SYSTEM.md`](../../DESIGN_SYSTEM.md) و[`design-system/`](../README.md) (v2.0) إلى أن تُعتمد
+> الشرائح في [`MIGRATION.md`](./MIGRATION.md) واحدةً واحدة.
+
+## لماذا v3
+
+v2.0 أرست الانضباط (جداول، RTL، أرقام مالية، لون واحد). v3 تحوّلها من «قواعد محافظة» إلى **نظام ناضج له شخصية**:
+سُلَّم أسطح حقيقي، لغة حالات مسموعة، توقيع بصري (Apex، Totals Dock، خط الإجمالي المزدوج)، سمات (Default/Ink)،
+وأوضاع عمل (Postures) تحت نواة واحدة — دون تجزّؤ ودون أي ادّعاء أمام المحاسبة.
+
+صدرت v3 عن جولة تصميم من ثلاث مراحل: استراتيجية ← Prototype مقارن (Baseline / Default / Ink) ← مواصفة.
+مراجع هذه الجولة غير المعيارية في [`reference/`](./reference/README.md).
+
+## ترتيب السلطة (عند التعارض)
+
+1. **الكود المنفَّذ + اختباراته** هو الواقع الحالي (ما يعمل اليوم). لا تُعدَّل الوثائق لتخالفه بصمت.
+2. **v3 (هذا المجلد)** — الهدف المعتمد مبدئياً، ويصبح نافذاً شريحةً بشريحة.
+3. `DESIGN_SYSTEM.md` و`design-system/` (v2.0) — نافذة حتى تُستبدل بند بند (انظر [`RULES_DELTA.md`](./RULES_DELTA.md)).
+4. `docs/plans/design/*` — مواصفات V2 للأنماط (Document Workspace، Master Record، Shell…). **تبقى سارية في
+   السلوك والبنية والاستجابة**؛ وv3 تضيف فوقها اللغة البصرية والتوكنز. عند التعارض في **الحقائق المحاسبية/دورة الحياة**
+   تسود الوثائق الأحدث والكود (انظر [`LIFECYCLE_MODEL.md`](./LIFECYCLE_MODEL.md)).
+5. `CLAUDE.md` — قواعد معمارية غير قابلة للكسر (القيد المزدوج، الهللات، عزل tenant، السياسات القابلة للضبط) تعلو أي قرار تصميم.
+
+## وسوم الحالة المستعملة في كل وثيقة
+
+| الوسم | المعنى |
+|---|---|
+| `[APPROVED]` | قرار مالك مبدئي (Default، Ink، Apex، Totals Dock، Posting كتبويب، بُعدا دورة الحياة، شبكة جديدة، فصل Storefront) |
+| `[DECIDED]` | قرار تصميمي من مهمة التوثيق نفسها، مُسبَّب في [`DECISIONS.md`](./DECISIONS.md)، قابل للمراجعة |
+| `[EXPERIMENTAL]` | ظهر في الـPrototype أو الاستراتيجية ولا يدعمه الـbackend/المنتج اليوم — **يحتاج تحقق منتج** |
+| `[OPEN]` | قرار مالك مطلوب — قائمة في [`DECISIONS.md`](./DECISIONS.md) §3 |
+| `[REJECTED]` | فكرة دُرست ورُفضت — مع السبب |
+| `MUST / SHOULD / MAY` | ثقل الإلزام (RFC 2119) |
+
+## الفهرس
+
+| الوثيقة | المحتوى |
+|---|---|
+| [`FOUNDATIONS.md`](./FOUNDATIONS.md) | المبادئ: طبقات التوكنز، اللون، الأسطح، الطباعة، الأرقام المالية، التباعد، الزوايا، الحدود، الارتفاع، الحركة، التركيز، RTL، الوصولية، الكثافة، الاستجابة |
+| [`TOKEN_REFERENCE.md`](./TOKEN_REFERENCE.md) | الجداول المرجعية للقيم (قيم Default، Ink، الحالات، التباين المحسوب) |
+| [`THEMES.md`](./THEMES.md) | عقد السمات (Default/Ink)، مصفوفة Theme × Mode، معمارية الداكن، ما يجوز وما لا يجوز |
+| [`SIGNATURE_LANGUAGE.md`](./SIGNATURE_LANGUAGE.md) | Apex Marker، Outcome Surface («الحبر = النتيجة»)، خط الإجمالي المزدوج، لغة الأرقام، لغة النشط/المحدد/التركيز |
+| [`DATA_GRID.md`](./DATA_GRID.md) | عقد الشبكة: DataTable (قوائم) + LineGrid (بنود مستند)، الحالات، لوحة المفاتيح، الكثافة |
+| [`DOCUMENT_WORKSPACE.md`](./DOCUMENT_WORKSPACE.md) | نمط المستندات العام + Domain Variants |
+| [`LIFECYCLE_MODEL.md`](./LIFECYCLE_MODEL.md) | دورة المستند ≠ دورة الدفع، من حالات الكود الموثَّقة فقط |
+| [`POSTING_PREVIEW.md`](./POSTING_PREVIEW.md) | القيود المرحَّلة (مدعومة اليوم) مقابل معاينة المسودة (تحتاج قدرة backend) |
+| [`TOTALS_DOCK.md`](./TOTALS_DOCK.md) | نمط الإجماليات الثابت |
+| [`WORKSPACE_POSTURES.md`](./WORKSPACE_POSTURES.md) | Ledger · Floor · Studio، المشترك/المسموح/الممنوع، عقدا POS وStudio |
+| [`COMMERCE_ADMIN.md`](./COMMERCE_ADMIN.md) | إدارة التجارة داخل نظام الإدارة |
+| [`STOREFRONT_BOUNDARY.md`](./STOREFRONT_BOUNDARY.md) | الحدّ بين `awj.*` و`store.*` وأدوات الاستوديو |
+| [`TENANT_BRANDING.md`](./TENANT_BRANDING.md) | عقد هوية المستأجر |
+| [`GOVERNANCE.md`](./GOVERNANCE.md) | مصدر الحقيقة، تدقيق الانجراف الحالي، الفحوص والعمليات |
+| [`MIGRATION.md`](./MIGRATION.md) | شرائح الانتقال التدريجي + الشريحة الأولى الموصى بها |
+| [`DECISIONS.md`](./DECISIONS.md) | سجل القرارات، المرفوض، التجريبي، قرارات المالك المفتوحة، انحرافات عن الـPrototype |
+| [`RULES_DELTA.md`](./RULES_DELTA.md) | ما يتغيّر عن قواعد v2.0 (Keep/Evolve/Replace) |
+
+## كيف يقرأ المطوّر هذه الوثائق
+
+1. اقرأ [`FOUNDATIONS.md`](./FOUNDATIONS.md) ثم [`TOKEN_REFERENCE.md`](./TOKEN_REFERENCE.md): المكوّن **لا يقرأ قيمة خام أبداً**.
+2. اقرأ وثيقة النمط الذي تبنيه (شبكة/مستند/إجماليات…) ثم [`WORKSPACE_POSTURES.md`](./WORKSPACE_POSTURES.md) لتعرف ما يُسمح لك بتغييره.
+3. قبل أي PR واجهة: [`GOVERNANCE.md`](./GOVERNANCE.md) §5 (قائمة المراجعة).
+4. لا تحوّل شاشة Sales Invoice إلى قانون: هي **حالة إثبات**. القواعد المستخرجة منها هنا؛ تفاصيلها التجارية (حقول، أعمدة) ليست ملزِمة لمستند آخر.
+
+## حدود هذه الحزمة
+
+لا تُنفِّذ شيئاً. لا تعدّل `globals.css` ولا `tailwind.config.ts` ولا أي مكوّن. لا تمسّ backend أو قاعدة بيانات أو API.
+أي سلوك أمام المحاسبة تذكره الوثائق إما **مُتحقَّق منه في الكود** (مع المسار) أو موسوم `[EXPERIMENTAL]`.
