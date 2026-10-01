@@ -1,5 +1,4 @@
 {
-  "$schema": "./awj.tokens.schema-note.md",
   "$description": "AWJ v3 — DTCG-subset token source of truth. Values verified against design-system/v3/TOKEN_REFERENCE.md. Consumed by web/scripts/generate-awj-tokens.mjs, which writes the resolved CSS into web/src/app/globals.css between the AWJ-TOKENS:GENERATED markers. Do not hand-edit the generated block — edit this file and re-run the generator. Primitives are not consumed by components directly; only semantic/interaction/theme/elevation/radius/rule/apex tokens are emitted as --awj-* CSS variables.",
   "primitive": {
     "brand": {
