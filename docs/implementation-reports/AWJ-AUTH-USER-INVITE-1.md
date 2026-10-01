@@ -232,7 +232,7 @@ The repository was inspected for an existing user-management activity/audit mech
 - Repository: `safwan5001-source/Nebrax`
 - Branch: `task/awj-auth-user-invite-1`
 - Base SHA: `946ef115b986caaf7893a0b24cc0afbcddbc4830`
-- Head SHA: `07a0655a9abecc4706f685f050eb72cd53726f09`
+- Head SHA: `cf38c6d9af374c6c22f85994bf03b6401d682475`
 - PR: [#1147](https://github.com/safwan5001-source/Nebrax/pull/1147)
 - PR state: `OPEN`
 - Merge state: `CLEAN`
