@@ -146,6 +146,32 @@ const { api, currentUser, translate } = vi.hoisted(() => {
     'preview.limitation.navigateUnsupportedTitle': 'Not supported by the real app',
     'preview.limitation.navigateUnsupportedDescription': 'The shipped app doesn\'t wire up navigation to "{pageId}" today — only Home and Cart are',
     'preview.limitation.requiresLiveDataTitle': 'Unavailable in Browser Preview — requires live data',
+    'preview.inlineTitle': 'Mobile preview',
+    'preview.refreshAction': 'Refresh Preview',
+    'preview.refreshing': 'Refreshing…',
+    'preview.refreshSuccessTitle': 'Preview refreshed',
+    'preview.refreshErrorTitle': 'Could not refresh the preview',
+    'preview.showInlineAction': 'Show mobile preview',
+    'preview.hideInlineAction': 'Hide mobile preview',
+    // APP-BUILDER-PREVIEW-UX-1 — `PreviewOnPhoneButton` reads `appBuilder.detail.previewSessions.*`
+    // (a different namespace than this file's own `appBuilder.builder.*`), so this translator's
+    // `appBuilder.builder.` prefix strip never matches it; the full dotted key is the only one
+    // that resolves. See `preview-on-phone.tsx` and MOBILE-PREVIEW-7's own detail-page test file
+    // for the identical real copy these English strings mirror.
+    'appBuilder.detail.previewSessions.qrAction': 'Preview on Phone',
+    'appBuilder.detail.previewSessions.qrDialogTitle': 'Preview on your phone',
+    'appBuilder.detail.previewSessions.qrCreating': 'Preparing a one-time code…',
+    'appBuilder.detail.previewSessions.qrInstructions': 'Scan this code on the device.',
+    'appBuilder.detail.previewSessions.qrExpiresIn': 'Expires in {seconds}s',
+    'appBuilder.detail.previewSessions.qrExpired': 'This code has expired. Generate a new one.',
+    'appBuilder.detail.previewSessions.qrConsumed': 'Connected — a preview session is now active on the device.',
+    'appBuilder.detail.previewSessions.qrCopyLink': 'Copy link',
+    'appBuilder.detail.previewSessions.qrCopied': 'Copied',
+    'appBuilder.detail.previewSessions.qrRegenerate': 'Generate a new code',
+    'appBuilder.detail.previewSessions.qrRetry': 'Try again',
+    'appBuilder.detail.previewSessions.qrErrorTitle': 'Could not prepare the preview code',
+    'appBuilder.detail.previewSessions.qrErrorBody': 'Something went wrong while preparing the preview code.',
+    'appBuilder.detail.previewSessions.qrTemporaryNote': 'This code is temporary and works once.',
   };
   const cache = new Map<string, ReturnType<typeof buildTranslator>>();
   function buildTranslator(namespace: string) {
@@ -188,6 +214,28 @@ vi.mock('lucide-react', () => {
         : iconStub,
     has: () => true,
   });
+});
+
+// APP-BUILDER-PREVIEW-UX-1 — jsdom doesn't implement `matchMedia` by default; the page uses
+// it (same pattern already shipped in `components/layout/sidebar.tsx`) to decide whether the
+// inline mobile-preview pane mounts at all, specifically so a narrow/non-CSS environment like
+// this one never duplicates canvas content into the DOM. `wideBuilderViewport` defaults to
+// `false` so every pre-existing test below (none of which know about the inline pane) keeps
+// seeing exactly one canvas, exactly as before; the dedicated inline-preview tests flip it to
+// `true` before rendering.
+let wideBuilderViewport = false;
+beforeEach(() => {
+  wideBuilderViewport = false;
+  window.matchMedia = ((query: string) => ({
+    matches: wideBuilderViewport,
+    media: query,
+    onchange: null,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    addListener: () => {},
+    removeListener: () => {},
+    dispatchEvent: () => false,
+  })) as unknown as typeof window.matchMedia;
 });
 
 const appData = {
@@ -1125,6 +1173,248 @@ describe('AppBuilderWorkspacePage', () => {
       expect(screen.getByText('Home content')).toBeTruthy();
       expect(screen.queryByText('Cart content')).toBeNull();
       expect(toastFns.toast).not.toHaveBeenCalled();
+    });
+  });
+
+  // APP-BUILDER-PREVIEW-UX-1 — the approved UX decision's required side-by-side builder
+  // layout (§2), interactive navigation inside it (§3), and the two separate preview toolbar
+  // actions (§4). `wideBuilderViewport` is flipped to `true` only in this block; every test
+  // above runs at the default `false` and already proved (41/41 green before this block
+  // existed) that nothing here changes narrow-viewport behavior.
+  describe('APP-BUILDER-PREVIEW-UX-1 — inline mobile preview + Refresh Preview', () => {
+    const navDraftData = {
+      id: 'draft-1', builder_app_id: 'app-1', revision: 0, updated_at: null,
+      schema: {
+        schemaVersion: '1.0.0', minRuntimeVersion: '1.0.0',
+        navigation: { initialPageId: 'home' },
+        theme: { tokens: {} },
+        pages: {
+          home: {
+            type: 'Page', id: 'home-root',
+            children: [
+              { type: 'Text', id: 'home-text', props: { text: 'Home content' } },
+              {
+                type: 'Button', id: 'btn-cart', props: { label: 'Go to cart' },
+                action: { type: 'navigate', params: { pageId: 'cart' } },
+              },
+              {
+                type: 'Button', id: 'btn-about', props: { label: 'Go to about' },
+                action: { type: 'navigate', params: { pageId: 'about' } },
+              },
+            ],
+          },
+          cart: {
+            type: 'Page', id: 'cart-root',
+            children: [{ type: 'Text', id: 'cart-text', props: { text: 'Cart content' } }],
+          },
+          about: {
+            type: 'Page', id: 'about-root',
+            children: [{ type: 'Text', id: 'about-text', props: { text: 'About content' } }],
+          },
+        },
+      },
+    };
+
+    function mockNavApi() {
+      api.mockImplementation((path?: string) => {
+        if (!path) return Promise.resolve({ data: null });
+        if (path.endsWith('/draft')) return Promise.resolve({ data: navDraftData });
+        if (path.endsWith('/registries')) return Promise.resolve({ data: registriesData });
+        if (path.includes('/app-builder/apps/')) return Promise.resolve({ data: appData });
+        return Promise.reject(new Error(`unexpected path: ${path}`));
+      });
+    }
+
+    it('on a narrow/default viewport, Design mode never mounts the inline mobile preview (no duplicate canvas content, no layout regression)', async () => {
+      mockApi();
+      render(<AppBuilderWorkspacePage />);
+      await screen.findByText('Featured');
+
+      expect(screen.queryByTestId('inline-mobile-preview')).toBeNull();
+      // Exactly one canvas worth of content — the editable one — confirming nothing here
+      // silently duplicates page text the way an always-mounted pane would.
+      expect(screen.getAllByText('Featured').length).toBe(1);
+    });
+
+    it('on a wide viewport, Design mode shows the inline mobile preview side-by-side with the editable canvas, each with Refresh Preview and Preview on Phone as two separate actions', async () => {
+      wideBuilderViewport = true;
+      mockApi();
+      render(<AppBuilderWorkspacePage />);
+      // The live draft content renders a second time, inside the inline frame.
+      await waitFor(() => expect(screen.getAllByText('Featured').length).toBe(2));
+
+      const inlinePane = screen.getByTestId('inline-mobile-preview');
+
+      const refreshButton = within(inlinePane).getByRole('button', { name: 'Refresh Preview' });
+      const phoneButton = within(inlinePane).getByRole('button', { name: 'Preview on Phone' });
+      expect(refreshButton).toBeTruthy();
+      expect(phoneButton).toBeTruthy();
+      expect(refreshButton).not.toBe(phoneButton);
+    });
+
+    it('"Preview on Phone" opens the existing MOBILE-PREVIEW-7 QR dialog and never triggers a Refresh Preview network call', async () => {
+      wideBuilderViewport = true;
+      api.mockImplementation((path?: string, init?: { method?: string }) => {
+        if (!path) return Promise.resolve({ data: null });
+        if (path.endsWith('/draft')) return Promise.resolve({ data: draftData });
+        if (path.endsWith('/registries')) return Promise.resolve({ data: registriesData });
+        if (path.endsWith('/preview-sessions')) return Promise.resolve({ data: [] });
+        if (path.endsWith('/preview-exchange-references') && init?.method === 'POST') {
+          return Promise.resolve({
+            reference: 'builder-toolbar-reference',
+            deep_link: 'https://preview.example/preview/builder-toolbar-reference',
+            expires_at: new Date(Date.now() + 5 * 60_000).toISOString(),
+            exchange_reference_id: 'xref-builder-1',
+          });
+        }
+        if (path.includes('/app-builder/apps/')) return Promise.resolve({ data: appData });
+        return Promise.reject(new Error(`unexpected path: ${path}`));
+      });
+      render(<AppBuilderWorkspacePage />);
+      await waitFor(() => expect(screen.getAllByText('Featured').length).toBe(2));
+
+      const registriesCallsBefore = api.mock.calls.filter((call) => (call[0] as string).endsWith('/registries')).length;
+      const inlinePane = screen.getByTestId('inline-mobile-preview');
+      await userEvent.setup().click(within(inlinePane).getByRole('button', { name: 'Preview on Phone' }));
+
+      expect(await screen.findByText('Scan this code on the device.')).toBeTruthy();
+      const exchangeCall = api.mock.calls.find(
+        (call) => call[0] === '/app-builder/apps/app-1/preview-exchange-references' && call[1]?.method === 'POST'
+      );
+      expect(exchangeCall).toBeTruthy();
+      // Opening the QR dialog never re-fetches the registries the way Refresh Preview does.
+      const registriesCallsAfter = api.mock.calls.filter((call) => (call[0] as string).endsWith('/registries')).length;
+      expect(registriesCallsAfter).toBe(registriesCallsBefore);
+    });
+
+    it('Refresh Preview shows a loading state, gives success feedback, and never calls a mutating (draft PUT / publish POST) endpoint', async () => {
+      wideBuilderViewport = true;
+      let resolveSecondRegistriesCall: (() => void) | null = null;
+      let registriesCallCount = 0;
+      api.mockImplementation((path?: string) => {
+        if (!path) return Promise.resolve({ data: null });
+        if (path.endsWith('/registries')) {
+          registriesCallCount += 1;
+          if (registriesCallCount === 1) return Promise.resolve({ data: registriesData });
+          return new Promise((resolve) => {
+            resolveSecondRegistriesCall = () => resolve({ data: registriesData });
+          });
+        }
+        if (path.endsWith('/draft')) return Promise.resolve({ data: draftData });
+        if (path.includes('/app-builder/apps/')) return Promise.resolve({ data: appData });
+        return Promise.reject(new Error(`unexpected path: ${path}`));
+      });
+
+      render(<AppBuilderWorkspacePage />);
+      await waitFor(() => expect(screen.getAllByText('Featured').length).toBe(2));
+
+      const inlinePane = screen.getByTestId('inline-mobile-preview');
+      await userEvent.setup().click(within(inlinePane).getByRole('button', { name: 'Refresh Preview' }));
+
+      expect(await within(inlinePane).findByRole('button', { name: 'Refreshing…' })).toBeTruthy();
+      expect((within(inlinePane).getByRole('button', { name: 'Refreshing…' }) as HTMLButtonElement).disabled).toBe(true);
+
+      resolveSecondRegistriesCall!();
+
+      expect(await within(inlinePane).findByRole('button', { name: 'Refresh Preview' })).toBeTruthy();
+      expect(toastFns.success).toHaveBeenCalledWith('Preview refreshed');
+
+      const mutatingCall = api.mock.calls.find(
+        (call) => (call[1] as { method?: string } | undefined)?.method === 'PUT' || (call[1] as { method?: string } | undefined)?.method === 'POST'
+      );
+      expect(mutatingCall).toBeUndefined();
+    });
+
+    it('a runtime-wired navigate action tapped inside the inline preview navigates only that frame — the editable canvas and its selection stay on the page being edited', async () => {
+      wideBuilderViewport = true;
+      mockNavApi();
+      render(<AppBuilderWorkspacePage />);
+      await screen.findAllByText('Home content');
+
+      const inlinePane = screen.getByTestId('inline-mobile-preview');
+      await userEvent.setup().click(within(inlinePane).getByText('Go to cart'));
+
+      expect(await within(inlinePane).findByText('Cart content')).toBeTruthy();
+      expect(within(inlinePane).queryByText('Home content')).toBeNull();
+      // The editable canvas (outside the inline pane) is untouched — still editing Home.
+      expect(screen.getByText('Home content')).toBeTruthy();
+      expect(toastFns.toast).not.toHaveBeenCalled();
+    });
+
+    it('a navigate target the shipped runtime never wires up shows the same truthful limitation notice inside the inline preview, without switching any page', async () => {
+      wideBuilderViewport = true;
+      mockNavApi();
+      render(<AppBuilderWorkspacePage />);
+      await screen.findAllByText('Home content');
+
+      const inlinePane = screen.getByTestId('inline-mobile-preview');
+      await userEvent.setup().click(within(inlinePane).getByText('Go to about'));
+
+      expect(toastFns.toast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: 'Not supported by the real app',
+          description: 'The shipped app doesn\'t wire up navigation to "about" today — only Home and Cart are',
+          variant: 'warning',
+        })
+      );
+      expect(within(inlinePane).queryByText('About content')).toBeNull();
+      // Neither the inline frame nor the editable canvas navigated away from Home.
+      expect(screen.getAllByText('Home content').length).toBe(2);
+    });
+
+    it('an action requiring live commerce data tapped inside the inline preview shows a truthful "unavailable" notice, never a fake success', async () => {
+      wideBuilderViewport = true;
+      mockApi();
+      render(<AppBuilderWorkspacePage />);
+      await waitFor(() => expect(screen.getAllByText('Featured').length).toBe(2));
+
+      const inlinePane = screen.getByTestId('inline-mobile-preview');
+      await userEvent.setup().click(within(inlinePane).getByText('Shoe'));
+
+      expect(toastFns.toast).toHaveBeenCalledWith(
+        expect.objectContaining({ title: 'Unavailable in Browser Preview — requires live data', variant: 'warning' })
+      );
+    });
+
+    it('selecting a different page to edit re-syncs the inline preview to follow it, and the inline frame still respects the RTL/LTR locale toggle', async () => {
+      wideBuilderViewport = true;
+      mockNavApi();
+      render(<AppBuilderWorkspacePage />);
+      await screen.findAllByText('Home content');
+
+      const inlinePane = screen.getByTestId('inline-mobile-preview');
+      // Page-list rows render twice (desktop aside + mobile bottom-sheet copy, same pattern
+      // other tests in this file already rely on) — the desktop copy is first in DOM order.
+      const [desktopCartPageRow] = screen.getAllByText('cart');
+      await userEvent.setup().click(desktopCartPageRow);
+
+      expect(await within(inlinePane).findByText('Cart content')).toBeTruthy();
+
+      const screenBoxAr = within(inlinePane).getByText('Cart content').closest('[dir]');
+      expect(screenBoxAr?.getAttribute('dir')).toBe('rtl');
+
+      await userEvent.setup().click(screen.getByRole('button', { name: 'EN' }));
+      const screenBoxEn = within(inlinePane).getByText('Cart content').closest('[dir]');
+      expect(screenBoxEn?.getAttribute('dir')).toBe('ltr');
+    });
+
+    it('collapsing the inline preview hides its canvas and both toolbar actions behind a single "show" toggle, and re-opening restores them', async () => {
+      wideBuilderViewport = true;
+      mockApi();
+      render(<AppBuilderWorkspacePage />);
+      await waitFor(() => expect(screen.getAllByText('Featured').length).toBe(2));
+
+      await userEvent.setup().click(screen.getByRole('button', { name: 'Hide mobile preview' }));
+
+      expect(screen.queryByTestId('inline-mobile-preview')).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Preview on Phone' })).toBeNull();
+      // Exactly one copy of the page content remains — the editable canvas.
+      expect(screen.getAllByText('Featured').length).toBe(1);
+
+      await userEvent.setup().click(screen.getByRole('button', { name: 'Show mobile preview' }));
+
+      expect(screen.getByTestId('inline-mobile-preview')).toBeTruthy();
+      expect(screen.getAllByText('Featured').length).toBe(2);
     });
   });
 });

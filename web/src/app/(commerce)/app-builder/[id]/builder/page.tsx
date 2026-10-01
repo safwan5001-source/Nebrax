@@ -6,7 +6,8 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import {
-  ArrowRight, Home, LayoutPanelLeft, Maximize2, Minimize2, Plus, Redo2, SlidersHorizontal, Trash2, Undo2, UploadCloud,
+  ArrowRight, Eye, EyeOff, Home, LayoutPanelLeft, Maximize2, Minimize2, Plus, Redo2, RefreshCcw, SlidersHorizontal, Trash2,
+  Undo2, UploadCloud,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -30,6 +31,7 @@ import { DEFAULT_APP_EXPERIENCE } from '@/modules/app-builder/default-experience
 import { DeviceFrame, DEVICE_FRAME_PRESETS, type DeviceFramePreset } from '@/modules/app-builder/device-frame';
 import { LayersTree } from '@/modules/app-builder/layers-tree';
 import { Inspector } from '@/modules/app-builder/inspector';
+import { PreviewOnPhoneButton } from '@/modules/app-builder/preview-on-phone';
 import { ThemePanel } from '@/modules/app-builder/theme-panel';
 
 type MobilePanel = 'structure' | 'inspector';
@@ -102,6 +104,33 @@ export default function AppBuilderWorkspacePage() {
   const [builderMode, setBuilderMode] = useState<BuilderMode>('design');
   const [previewDevicePreset, setPreviewDevicePreset] = useState<DeviceFramePreset>('iphone');
   const [fullPreview, setFullPreview] = useState(false);
+
+  /**
+   * APP-BUILDER-PREVIEW-UX-1 — Design mode's own side-by-side mobile frame (the UX
+   * decision's §2 "editing controls and a mobile device frame in the same working
+   * context"), kept entirely separate from the existing full "App Preview" shell above.
+   * `isWideBuilderViewport` is a real JS `matchMedia` check — never a CSS-only `hidden
+   * xl:flex` class — because this pane renders a second, read-only copy of the exact
+   * same canvas content Design mode's editable canvas already shows; a CSS-only hide
+   * would still mount it (and duplicate every visible string) in any environment that
+   * doesn't apply stylesheets, breaking existing single-match lookups elsewhere on this
+   * page. The same pattern already ships in `components/layout/sidebar.tsx`. Defaults to
+   * `false` so a narrow viewport (and a test environment with no `matchMedia` override)
+   * never mounts the second canvas at all.
+   */
+  const [isWideBuilderViewport, setIsWideBuilderViewport] = useState(false);
+  const [showInlinePreview, setShowInlinePreview] = useState(true);
+  const [inlinePreviewPageId, setInlinePreviewPageId] = useState<string | null>(null);
+  const [refreshingPreview, setRefreshingPreview] = useState(false);
+  const [previewRefreshKey, setPreviewRefreshKey] = useState(0);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(min-width: 1280px)');
+    const syncViewport = () => setIsWideBuilderViewport(mediaQuery.matches);
+    syncViewport();
+    mediaQuery.addEventListener('change', syncViewport);
+    return () => mediaQuery.removeEventListener('change', syncViewport);
+  }, []);
 
   const load = useCallback(() => {
     if (!params.id) return;
@@ -299,6 +328,56 @@ export default function AppBuilderWorkspacePage() {
     }
   }
 
+  /**
+   * APP-BUILDER-PREVIEW-UX-1 — «تحديث المعاينة»: يعيد مزامنة إطار المعاينة من حالة
+   * المسودة المدعومة حالياً — **بلا نشر وبلا أي كتابة على المسودة أو النسخة المنشورة
+   * إطلاقاً** (كل استدعاء هنا `GET`). ثلاث خطوات حقيقية، لا مجرّد مؤشّر تحميل تجميلي:
+   * (1) يعيد جلب سجلّات المكوّنات/الإجراءات طازجةً — لو تغيّر سجلّ المنصّة نفسه بين
+   * جلستي عمل، هذا هو مسار التقاطه دون إعادة تحميل الصفحة كاملةً؛ (2) عند عرض نسخة
+   * «منشورة»، يُبطِل ذاكرة `publishedVersion` المخبّأة محلياً ويعيد جلب أحدث نسخة فعلياً
+   * — تحديداً الحالة التي يعالجها «تحديث المعاينة» في القرار المعتمَد: نشرٌ من جلسة أخرى
+   * لن يظهر هنا أبداً من دون هذا التحديث اليدوي؛ (3) يعيد تنقّل إطار المعاينة المضمَّن
+   * (`inlinePreviewPageId`) إلى الصفحة قيد التحرير ويزيد `previewRefreshKey` لإعادة
+   * تركيب شجرة الكانفاس بالكامل، فتُمحى أي حالة داخلية عالقة لمكوّن مخصَّص.
+   */
+  async function refreshPreview() {
+    if (!params.id) return;
+    setRefreshingPreview(true);
+    try {
+      const registriesRes = await api<{ data: AppBuilderRegistries }>('/app-builder/registries');
+      setRegistries(registriesRes.data);
+
+      if (previewState === 'published') {
+        setPublishedLoading(true);
+        setPublishedError(null);
+        try {
+          const list = await api<{ data: BuilderPublishedVersion[] }>(`/app-builder/apps/${params.id}/versions`);
+          const latest = list.data.reduce<BuilderPublishedVersion | null>(
+            (best, version) => (!best || version.version > best.version ? version : best),
+            null
+          );
+          if (!latest) {
+            setPublishedError(t('previewState.noPublishedVersion'));
+          } else {
+            const full = await api<{ data: BuilderPublishedVersion }>(`/app-builder/apps/${params.id}/versions/${latest.version}`);
+            setPublishedVersion(full.data);
+            setViewedPageId(full.data.schema?.navigation.initialPageId ?? null);
+          }
+        } finally {
+          setPublishedLoading(false);
+        }
+      }
+
+      setInlinePreviewPageId(null);
+      setPreviewRefreshKey((key) => key + 1);
+      toast.success(t('preview.refreshSuccessTitle'));
+    } catch (err) {
+      toast.error(t('preview.refreshErrorTitle'), err instanceof ApiError ? err.message : undefined);
+    } finally {
+      setRefreshingPreview(false);
+    }
+  }
+
   const pageIds = useMemo(() => (schema ? Object.keys(schema.pages) : []), [schema]);
   const viewedSchema: AppSchema | null =
     previewState === 'published' ? publishedVersion?.schema ?? null : previewState === 'default' ? DEFAULT_APP_EXPERIENCE : null;
@@ -311,6 +390,19 @@ export default function AppBuilderWorkspacePage() {
   const canUndo = pastRef.current.length > 0;
   const canRedo = futureRef.current.length > 0;
 
+  /**
+   * APP-BUILDER-PREVIEW-UX-1 — Design mode's inline mobile frame always mirrors the live
+   * Draft (`schema`), never `previewState`/`viewedPageId` — it is a second, read-only
+   * window onto the exact page being edited, not another "App Preview" source selector.
+   * `inlinePreviewPageId` is `null` by default ("follow whatever page is selected for
+   * editing"); tapping an in-frame nav action (`handleInlinePreviewAction` below) can
+   * decouple it, exactly mirroring `handlePreviewAction`'s own draft branch — including
+   * its safe degrade to `null`/"Empty page" for a well-formed-but-missing target id,
+   * never a crash or a fabricated page.
+   */
+  const inlineEffectivePageId = inlinePreviewPageId ?? selectedPageId;
+  const inlinePreviewRoot = schema && inlineEffectivePageId ? schema.pages[inlineEffectivePageId] ?? null : null;
+
   /** يبدّل وضع لوحة البنية — يلغي أي معاينة مزامنة مظهر معلّقة عند مغادرة تبويب المظهر، فلا تبقى معلَّقة على كانفاس لم يعد يُظهر أدواتها. */
   function switchStructureMode(mode: StructureMode) {
     setStructureMode(mode);
@@ -322,6 +414,10 @@ export default function AppBuilderWorkspacePage() {
     switchStructureMode('pages');
     setSelectedPageId(pageId);
     setSelectedComponentId(schema.pages[pageId]?.id ?? null);
+    // Picking a different page to edit immediately re-syncs the inline mobile preview to
+    // follow it — the one case `inlinePreviewPageId` resets to "follow the editor" on its
+    // own, no manual Refresh needed (per the UX decision's "simple/safe edits auto-refresh").
+    setInlinePreviewPageId(null);
   }
 
   /** التحديد من الشجرة/الكانفاس يعيد لوحة الفحص دوماً لوضع «الصفحات» — لا يبقى التحديد يتغيّر خلف تبويب المظهر بصمت. */
@@ -597,6 +693,36 @@ export default function AppBuilderWorkspacePage() {
   }
 
   /**
+   * APP-BUILDER-PREVIEW-UX-1 — identical dispatch to `handlePreviewAction` above (same
+   * `resolvePreviewActionOutcome`, same truthful "unsupported"/"requires live data" notices
+   * — no second preview semantic model), except a `navigate` outcome moves only the inline
+   * Design-mode frame's own `inlinePreviewPageId`, never `selectedPageId`/`viewedPageId`.
+   * Tapping "Cart" inside the live phone frame while editing the Home page explores the app
+   * without pulling the editor away from what it's actually editing.
+   */
+  function handleInlinePreviewAction(action: AppSchemaActionRef) {
+    const outcome = resolvePreviewActionOutcome(action);
+    switch (outcome.kind) {
+      case 'navigate':
+        setInlinePreviewPageId(outcome.pageId);
+        break;
+      case 'navigate-unsupported':
+        toast.toast({
+          title: t('preview.limitation.navigateUnsupportedTitle'),
+          description: t('preview.limitation.navigateUnsupportedDescription', { pageId: outcome.pageId }),
+          variant: 'warning',
+        });
+        break;
+      case 'requires-live-data':
+        toast.toast({ title: t('preview.limitation.requiresLiveDataTitle'), variant: 'warning' });
+        break;
+      case 'safe-noop':
+      case 'inert':
+        break;
+    }
+  }
+
+  /**
    * MOBILE-PREVIEW-3 — the read-only device-frame content shared by normal App Preview and
    * Full Preview: same loading/error/canvas branching Design mode's own read-only branch
    * already has for `published` (lines above), just wrapped in `DeviceFrame` and rendered
@@ -608,7 +734,7 @@ export default function AppBuilderWorkspacePage() {
     ) : previewState === 'published' && publishedError ? (
       <div className="max-w-xs text-center text-sm text-negative">{publishedError}</div>
     ) : (
-      <DeviceFrame preset={previewDevicePreset}>
+      <DeviceFrame key={previewRefreshKey} preset={previewDevicePreset}>
         <AppBuilderCanvas
           root={previewRoot}
           device="mobile"
@@ -629,6 +755,21 @@ export default function AppBuilderWorkspacePage() {
       {t('preview.browserTruthBadge')}
     </span>
   );
+
+  /**
+   * APP-BUILDER-PREVIEW-UX-1 — the two required, clearly-separated preview toolbar actions
+   * (decision §4): "Refresh Preview" re-syncs this browser device frame; "Preview on Phone"
+   * (`PreviewOnPhoneButton`, MOBILE-PREVIEW-7's own QR flow, untouched) opens the real
+   * Flutter runtime on a device. Shared between the inline Design-mode frame and the full
+   * App Preview toolbar below — never shown in the same toolbar as each other's meaning.
+   */
+  const refreshPreviewButton = (
+    <Button type="button" variant="outline" size="sm" disabled={refreshingPreview} onClick={() => void refreshPreview()}>
+      <RefreshCcw className={cn('h-3.5 w-3.5', refreshingPreview && 'animate-spin')} strokeWidth={1.7} aria-hidden="true" />
+      {refreshingPreview ? t('preview.refreshing') : t('preview.refreshAction')}
+    </Button>
+  );
+  const previewOnPhoneButton = <PreviewOnPhoneButton appId={app.id} />;
 
   if (builderMode === 'preview' && fullPreview) {
     return (
@@ -786,6 +927,8 @@ export default function AppBuilderWorkspacePage() {
                 </button>
               ))}
             </div>
+            {refreshPreviewButton}
+            {previewOnPhoneButton}
             {previewTruthBadge}
             <Button type="button" variant="outline" size="sm" onClick={() => setFullPreview(true)}>
               <Maximize2 className="h-3.5 w-3.5" strokeWidth={1.7} aria-hidden="true" />
@@ -801,43 +944,107 @@ export default function AppBuilderWorkspacePage() {
           {isDraftView ? structurePanel : readOnlyPagePanel}
         </aside>
 
-        {isDraftView ? (
-          <AppBuilderCanvas
-            root={currentPageRoot}
-            device={device}
-            locale={previewLocale}
-            selectedId={selectedComponentId}
-            onSelect={selectComponent}
-            themeTokens={previewThemeTokens ?? schemaThemeTokens(schema)}
-            registries={registries}
-            stateBanner={t('previewState.draftBanner')}
-          />
-        ) : previewState === 'published' && publishedLoading ? (
-          <div className="flex h-full min-h-0 flex-1 items-center justify-center bg-background text-sm text-muted">{tc('loading')}</div>
-        ) : previewState === 'published' && publishedError ? (
-          <div className="flex h-full min-h-0 flex-1 items-center justify-center bg-background p-6 text-center text-sm text-negative">
-            {publishedError}
-          </div>
-        ) : (
-          <AppBuilderCanvas
-            root={viewedPageRoot}
-            device={device}
-            locale={previewLocale}
-            selectedId={null}
-            onSelect={() => {}}
-            themeTokens={viewedSchema ? schemaThemeTokens(viewedSchema) : undefined}
-            registries={registries}
-            stateBanner={
-              previewState === 'published'
-                ? t('previewState.publishedBanner', { version: publishedVersion?.version ?? 0 })
-                : t('previewState.defaultBanner')
-            }
-          />
-        )}
+        <div className="flex min-h-0 min-w-0 flex-1">
+          {isDraftView ? (
+            <AppBuilderCanvas
+              root={currentPageRoot}
+              device={device}
+              locale={previewLocale}
+              selectedId={selectedComponentId}
+              onSelect={selectComponent}
+              themeTokens={previewThemeTokens ?? schemaThemeTokens(schema)}
+              registries={registries}
+              stateBanner={t('previewState.draftBanner')}
+            />
+          ) : previewState === 'published' && publishedLoading ? (
+            <div className="flex h-full min-h-0 flex-1 items-center justify-center bg-background text-sm text-muted">{tc('loading')}</div>
+          ) : previewState === 'published' && publishedError ? (
+            <div className="flex h-full min-h-0 flex-1 items-center justify-center bg-background p-6 text-center text-sm text-negative">
+              {publishedError}
+            </div>
+          ) : (
+            <AppBuilderCanvas
+              root={viewedPageRoot}
+              device={device}
+              locale={previewLocale}
+              selectedId={null}
+              onSelect={() => {}}
+              themeTokens={viewedSchema ? schemaThemeTokens(viewedSchema) : undefined}
+              registries={registries}
+              stateBanner={
+                previewState === 'published'
+                  ? t('previewState.publishedBanner', { version: publishedVersion?.version ?? 0 })
+                  : t('previewState.defaultBanner')
+              }
+            />
+          )}
+        </div>
 
         <aside className="hidden w-72 shrink-0 overflow-hidden border-s border-border bg-surface lg:block">
           {isDraftView ? inspectorPanel : readOnlyNotice}
         </aside>
+
+        {/* APP-BUILDER-PREVIEW-UX-1 — Design mode's own side-by-side mobile frame (UX decision
+            §2). Mounted only on a real wide viewport (`isWideBuilderViewport`, a JS
+            `matchMedia` check — see its declaration above for why this can't be CSS-only) and
+            only while editing the Draft; `published`/`default` keep their existing dedicated
+            read-only page browser instead of a second preview surface. */}
+        {isDraftView && isWideBuilderViewport && !showInlinePreview ? (
+          <div className="flex shrink-0 items-start border-s border-border bg-surface p-1.5">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              aria-label={t('preview.showInlineAction')}
+              title={t('preview.showInlineAction')}
+              onClick={() => setShowInlinePreview(true)}
+            >
+              <Eye className="h-3.5 w-3.5" strokeWidth={1.7} aria-hidden="true" />
+            </Button>
+          </div>
+        ) : null}
+
+        {isDraftView && isWideBuilderViewport && showInlinePreview ? (
+          <aside
+            data-testid="inline-mobile-preview"
+            className="flex w-[420px] shrink-0 flex-col overflow-hidden border-s border-border bg-background"
+          >
+            <div className="flex shrink-0 flex-wrap items-center gap-1.5 border-b border-border bg-surface px-2 py-1.5">
+              <span className="truncate text-[11px] font-semibold text-muted">{t('preview.inlineTitle')}</span>
+              <div className="ms-auto flex items-center gap-1">
+                {refreshPreviewButton}
+                {previewOnPhoneButton}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  aria-label={t('preview.hideInlineAction')}
+                  title={t('preview.hideInlineAction')}
+                  onClick={() => setShowInlinePreview(false)}
+                >
+                  <EyeOff className="h-3.5 w-3.5" strokeWidth={1.7} aria-hidden="true" />
+                </Button>
+              </div>
+            </div>
+            <div className="flex min-h-0 flex-1 items-center justify-center overflow-auto bg-background p-3">
+              <DeviceFrame key={previewRefreshKey} preset={previewDevicePreset}>
+                <AppBuilderCanvas
+                  root={inlinePreviewRoot}
+                  device="mobile"
+                  locale={previewLocale}
+                  selectedId={null}
+                  onSelect={() => {}}
+                  themeTokens={schemaThemeTokens(schema)}
+                  registries={registries}
+                  stateBanner={t('previewState.draftBanner')}
+                  interactive={false}
+                  onAction={handleInlinePreviewAction}
+                />
+              </DeviceFrame>
+            </div>
+            <div className="flex shrink-0 justify-center border-t border-border bg-surface p-1.5">{previewTruthBadge}</div>
+          </aside>
+        ) : null}
 
         <div className="flex min-h-0 shrink-0 flex-col border-t border-border bg-surface lg:hidden" style={{ height: '38vh' }}>
           {isDraftView ? (
