@@ -47,7 +47,9 @@ Check off each box only after the action has genuinely been performed and its ev
 
 ## Phase 3 — Android physical device
 
-- [ ] `flutter pub get` run in `mobile/` (materializes Gradle wrapper)
+- [ ] Android Gradle wrapper/platform scaffold confirmed valid (restored/regenerated from the
+      repo's pinned Flutter version if missing or stale, without overwriting AWJ native
+      customizations), then `flutter pub get` run in `mobile/` for Dart/Flutter dependencies
 - [ ] Real device connected, listed by `flutter devices`
 - [ ] `flutter run --target lib/main_device_preview.dart --dart-define=PREVIEW_BASE_URL=<real-backend-url>/preview/v1 -d <device-id>`
 - [ ] QR issued from the dashboard for a real draft
