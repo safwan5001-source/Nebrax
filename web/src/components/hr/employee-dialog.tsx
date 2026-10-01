@@ -172,7 +172,7 @@ export function EmployeeDialog({
   const photoInputRef = useRef<HTMLInputElement>(null);
 
   const [allowAccess, setAllowAccess] = useState(initialAllowAccess);
-  const [loginForm, setLoginForm] = useState({ email: '', password: '', role: 'staff' });
+  const [loginForm, setLoginForm] = useState({ email: '', password: '', role: 'staff', sendInvitation: false });
   const [scope, setScope] = useState<AccessScope>({ branch_ids: [], warehouse_ids: [] });
   const [roles, setRoles] = useState<RoleOption[]>([]);
 
@@ -208,7 +208,7 @@ export function EmployeeDialog({
     if (!open) return;
     setForm(employee ?? EMPTY_EMPLOYEE);
     setAllowAccess(!!linkedUser || initialAllowAccess);
-    setLoginForm({ email: linkedUser?.email ?? '', password: '', role: linkedUser?.role ?? 'staff' });
+    setLoginForm({ email: linkedUser?.email ?? '', password: '', role: linkedUser?.role ?? 'staff', sendInvitation: false });
     setScope({ branch_ids: linkedUser?.branch_ids ?? [], warehouse_ids: linkedUser?.warehouse_ids ?? [] });
     setError(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -327,7 +327,8 @@ export function EmployeeDialog({
                 body: {
                   name: form.name,
                   email: loginForm.email,
-                  password: loginForm.password,
+                  ...(loginForm.sendInvitation ? {} : { password: loginForm.password }),
+                  send_invitation: loginForm.sendInvitation,
                   role: loginForm.role,
                   employee_id: savedEmployeeId,
                   ...scope,
@@ -432,10 +433,19 @@ export function EmployeeDialog({
                     dir="ltr"
                     value={loginForm.password}
                     onChange={(e) => setLogin('password', e.target.value)}
-                    required={!linkedUser}
+                    required={!linkedUser && !loginForm.sendInvitation}
                   />
                   {linkedUser && <p className="text-xs text-muted">{tu('password_hint')}</p>}
                 </div>
+                {!linkedUser && (
+                  <div className="flex items-center justify-between gap-3 rounded border border-border p-3">
+                    <div>
+                      <Label htmlFor="send_invitation_employee">{tu('send_invitation')}</Label>
+                      <p className="text-xs text-muted">{tu('send_invitation_hint')}</p>
+                    </div>
+                    <Switch id="send_invitation_employee" checked={loginForm.sendInvitation} onCheckedChange={(checked) => setLoginForm((f) => ({ ...f, sendInvitation: checked }))} aria-label={tu('send_invitation')} />
+                  </div>
+                )}
                 <div className="space-y-1.5">
                   <Label htmlFor="login_role">{tu('role')}</Label>
                   <Select id="login_role" value={loginForm.role} onChange={(e) => setLogin('role', e.target.value)}>

@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
 import { AccessScopeFields, type AccessScope } from './access-scope-fields';
@@ -62,6 +63,7 @@ export function UserDialog({
   const tc = useTranslations('common');
   const { success } = useToast();
   const [form, setForm] = useState({ name: '', email: '', password: '', role: 'staff', employee_id: '', is_active: true });
+  const [sendInvitation, setSendInvitation] = useState(false);
   const [scope, setScope] = useState<AccessScope>({ branch_ids: [], warehouse_ids: [] });
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
   const [roles, setRoles] = useState<RoleOption[]>([]);
@@ -90,6 +92,7 @@ export function UserDialog({
       setScope({ branch_ids: user.branch_ids ?? [], warehouse_ids: user.warehouse_ids ?? [] });
     } else {
       setForm({ name: '', email: '', password: '', role: 'staff', employee_id: '', is_active: true });
+      setSendInvitation(false);
       setScope({ branch_ids: [], warehouse_ids: [] });
     }
     setError(null);
@@ -111,7 +114,13 @@ export function UserDialog({
         success(tc('updated'));
       } else {
         const { employee_id, ...rest } = form;
-        await api('/users', { method: 'POST', body: { ...rest, employee_id: employee_id || undefined, ...scope } });
+        await api('/users', { method: 'POST', body: {
+          ...rest,
+          password: sendInvitation ? undefined : rest.password,
+          send_invitation: sendInvitation,
+          employee_id: employee_id || undefined,
+          ...scope,
+        } });
         success(tc('created'));
       }
       onSaved();
@@ -137,9 +146,18 @@ export function UserDialog({
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="upass">{t('password')}</Label>
-          <Input id="upass" type="password" dir="ltr" value={form.password} onChange={(e) => set('password', e.target.value)} required={!user} />
+          <Input id="upass" type="password" dir="ltr" value={form.password} onChange={(e) => set('password', e.target.value)} required={!user && !sendInvitation} />
           {user && <p className="text-xs text-muted">{t('password_hint')}</p>}
         </div>
+        {!user && (
+          <div className="flex items-center justify-between gap-3 rounded border border-border p-3">
+            <div>
+              <Label htmlFor="send_invitation">{t('send_invitation')}</Label>
+              <p className="text-xs text-muted">{t('send_invitation_hint')}</p>
+            </div>
+            <Switch id="send_invitation" checked={sendInvitation} onCheckedChange={setSendInvitation} aria-label={t('send_invitation')} />
+          </div>
+        )}
         <div className="space-y-1.5">
           <Label htmlFor="urole">{t('role')}</Label>
           <Select id="urole" value={form.role} onChange={(e) => set('role', e.target.value)}>

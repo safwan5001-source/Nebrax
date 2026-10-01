@@ -5,15 +5,19 @@ namespace App\Http\Controllers\Api;
 use App\Http\Requests\StoreUserRequest;
 use App\Http\Requests\UpdateUserRequest;
 use App\Http\Resources\UserResource;
+use App\Mail\AuthActionMail;
 use App\Models\Branch;
 use App\Models\Employee;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Models\Warehouse;
+use App\Services\AuthRecoveryService;
 use App\Support\PlanGate;
 use App\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
 
 /**
  * إدارة مستخدمي المؤسسة (owner/admin فقط).
@@ -134,15 +138,46 @@ class UserController extends ApiController
             'employee_id' => $data['employee_id'] ?? null,
             'name'        => $data['name'],
             'email'       => $data['email'],
-            'password'    => $data['password'],
+            // لا تُخزَّن كلمة مرور مؤقتة معروفة عند اختيار الدعوة؛ القيمة
+            // العشوائية لا تصل إلى البريد أو أي استجابة.
+            'password'    => $data['password'] ?? Str::random(64),
             'role'        => $data['role'],
             'is_active'   => $data['is_active'] ?? true,
         ]);
 
         $this->syncAccessScope($user, $data);
 
+        $invitationSent = true;
+        if ((bool) ($data['send_invitation'] ?? false)) {
+            $invitationSent = $this->sendLoginInvitation($user);
+        }
+
         return (new UserResource($user->load('employee', 'branches', 'warehouses')))
+            ->additional(['invitation' => [
+                'sent' => $invitationSent,
+                'message' => $invitationSent
+                    ? null
+                    : 'تم حفظ المستخدم، لكن تعذر إرسال دعوة الدخول. يمكنك إعادة الإرسال من قائمة المستخدمين.',
+            ]])
             ->response()->setStatusCode(201);
+    }
+
+    public function sendInvitation(Request $request, string $id, AuthRecoveryService $recovery): JsonResponse
+    {
+        $user = User::where('tenant_id', $this->tenantId())->findOrFail($id);
+
+        if (! is_string($user->email) || trim($user->email) === '') {
+            abort(422, 'لا يمكن إرسال دعوة لمستخدم بلا بريد إلكتروني.');
+        }
+
+        if (! $this->sendLoginInvitation($user, $recovery)) {
+            return response()->json([
+                'message' => 'تعذر إرسال دعوة الدخول. بقيت الدعوة السابقة صالحة إن وُجدت، ويمكنك إعادة المحاولة.',
+                'invitation_sent' => false,
+            ], 503);
+        }
+
+        return response()->json(['message' => 'تم إرسال بيانات الدخول إلى بريد المستخدم.']);
     }
 
     public function update(UpdateUserRequest $request, string $id): JsonResponse
@@ -175,5 +210,31 @@ class UserController extends ApiController
         $user->delete();
 
         return response()->json(['message' => 'تم الحذف.']);
+    }
+
+    private function sendLoginInvitation(User $user, ?AuthRecoveryService $recovery = null): bool
+    {
+        $recovery ??= app(AuthRecoveryService::class);
+        $delivery = $recovery->issueForDelivery($user, AuthRecoveryService::LOGIN_INVITATION);
+        $tenantName = (string) $user->tenant()->value('name');
+
+        try {
+            Mail::to($user->email)->send(new AuthActionMail(
+                'invite',
+                $recovery->frontendLink($user, '/reset-password', $delivery['token']),
+                $tenantName,
+                $user->name,
+                $user->email,
+            ));
+        } catch (\Throwable $exception) {
+            $recovery->abandonDelivery($delivery['id']);
+            report($exception);
+
+            return false;
+        }
+
+        $recovery->commitDelivery($delivery['id'], $delivery['previous_ids']);
+
+        return true;
     }
 }

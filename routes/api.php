@@ -1488,6 +1488,8 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::get('users', [UserController::class, 'index'])->middleware($perm('users.view'));
         Route::post('users', [UserController::class, 'store'])->middleware($perm('users.manage'));
         Route::put('users/{id}', [UserController::class, 'update'])->middleware($perm('users.manage'));
+        Route::post('users/{id}/send-invitation', [UserController::class, 'sendInvitation'])
+            ->middleware([$perm('users.manage'), 'throttle:auth-invitation']);
         Route::delete('users/{id}', [UserController::class, 'destroy'])->middleware($perm('users.manage'));
 
         // أدوار الصلاحيات القابلة للضبط (owner/admin) — مشروع أمني حسّاس
