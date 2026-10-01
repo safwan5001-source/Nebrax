@@ -6,9 +6,9 @@
 
 ## 2. Head SHA
 
-`51dfa3e06ca849d5a106f78369df54da30190992`
+`0b03713e359e1233eb93aba8f9c448c9d9516a4a`
 
-(First-pass head, now superseded by the P1 fix in §5a below: `6eaeae5c330d37a41a5129605452a60ad2514c0c`.)
+Fix-history trail, kept for traceability only — none of these is the current head: first pass `6eaeae5c330d37a41a5129605452a60ad2514c0c`, P1 code fix `51dfa3e06ca849d5a106f78369df54da30190992`.
 
 ## 3. Branch
 
@@ -240,13 +240,24 @@ No file outside this list and the first pass's original 26 was touched. No new f
 
 ## 21. CI status
 
-Not yet observed on this revision. `.github/workflows/storefront-ci.yml` (Biome check + locale parity + typecheck + Vitest) and `.github/workflows/web-ci.yml` (Vitest + build) were replicated locally, in full, against the fixed code, with matching green results (§18, §19, §20, plus `pnpm check` and `pnpm check:locales`, both green). `.github/workflows/ci.yml` (PHP) was not re-run, since no PHP file changed in this fix.
+Observed on GitHub at the current head (`0b03713e359e1233eb93aba8f9c448c9d9516a4a`), via the PR's own check runs:
+
+| Check | Conclusion |
+|---|---|
+| Storefront CI (`storefront (lint + typecheck + test)`) | SUCCESS |
+| Web CI (`web build (Next.js)`) | SUCCESS |
+| CI (`php artisan test (L11, sqlite)`, `php artisan test (L11, pgsql)`) | SUCCESS |
+| Store Brand QA (`merchant preview visual QA`, `published footer visual QA`) | SUCCESS |
+
+PR mergeable: `true` · `mergeable_state`: `clean`.
+
+This also closes out the local-replication caveat from earlier revisions: `.github/workflows/storefront-ci.yml`, `.github/workflows/web-ci.yml`, and `.github/workflows/ci.yml` (PHP, both sqlite and pgsql) all ran for real on GitHub against this exact head and came back green — not merely reproduced locally (§18–§20).
 
 ## 22. Backward compatibility
 
 - **Enum addition only** — unaffected by the fix. `FONT_PRESETS` gained one value in all three layers; `cairo-geist` remains first, default, and the fail-closed fallback.
 - **No DB migration, no backfill, no schema version bump.** `StorefrontPresentationNormalizer::VERSION` is unchanged (still `3`).
-- **A merchant who already selected `cairo-geist`** (the only value ever possible before this PR) sees **zero visual change**, on both Canvas and the Published storefront — and this claim is now actually load-bearing-correct rather than merely asserted: `cairo-geist`'s resolved stack (`var(--font-geist), var(--font-cairo), system-ui, sans-serif`) is **identical before and after the P1 fix**, because the fix only added a *second*, separate Geist instance for `tajawal-geist`; it never touched the original `--font-geist` instance or the `cairo-geist` branch of `fontPresetFamilyStack()`/`fontPresetArabicVar()` (both old and new resolver functions return the exact same string for `cairo-geist`). This is directly asserted by the unchanged `"cairo-geist resolves to the Geist/Cairo stack (unchanged default behavior)"` tests in both `StorefrontPreviewCanvas.typography.test.tsx` files, which needed **no edits** in the fix pass.
+- **A merchant who already selected `cairo-geist`** (the only value ever possible before this PR) sees **zero visual change**, on both Canvas and the Published storefront: `cairo-geist`'s resolved stack (`var(--font-geist), var(--font-cairo), system-ui, sans-serif`) is produced by `fontPresetFamilyStack()`, the single resolver in the final architecture, and never touches the dedicated `--font-geist-tajawal` instance added for `tajawal-geist` — the original `--font-geist` instance is untouched. This is directly asserted by the `"cairo-geist resolves to the Geist/Cairo stack (unchanged default behavior)"` tests in both `StorefrontPreviewCanvas.typography.test.tsx` files.
 - **Forward safety:** an unknown future `fontPreset` value still falls back to `cairo-geist` at both the normalizer (PHP/web/storefront enum acceptance) and resolver (`fontPresetFamilyStack()`) layers — the fix added an explicit fail-closed test for the resolver layer specifically (§9, §12).
 
 ## 23. Risks / remaining gaps
