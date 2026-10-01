@@ -1,19 +1,32 @@
 import { describe, expect, it, vi } from "vitest";
 import { DocumentShell } from "./DocumentShell";
 
+/**
+ * `DocumentShell` now calls `Geist(...)` twice — once for `--font-geist`
+ * (Cairo fallback), once for `--font-geist-tajawal` (Tajawal fallback) — so
+ * the mock must capture every call, keyed by the `variable` each call
+ * actually requests, and return that same `variable` back (not a hardcoded
+ * string), or a second call would silently overwrite the first's captured
+ * options and both instances would collapse onto one class name.
+ */
 const fontOptions = vi.hoisted(() => ({
-  geist: undefined as Record<string, unknown> | undefined,
+  geistCalls: [] as Record<string, unknown>[],
   cairo: undefined as Record<string, unknown> | undefined,
+  tajawal: undefined as Record<string, unknown> | undefined,
 }));
 
 vi.mock("next/font/google", () => ({
   Geist: (options: Record<string, unknown>) => {
-    fontOptions.geist = options;
-    return { variable: "--font-geist" };
+    fontOptions.geistCalls.push(options);
+    return { variable: options.variable };
   },
   Cairo: (options: Record<string, unknown>) => {
     fontOptions.cairo = options;
-    return { variable: "--font-cairo" };
+    return { variable: options.variable };
+  },
+  Tajawal: (options: Record<string, unknown>) => {
+    fontOptions.tajawal = options;
+    return { variable: options.variable };
   },
 }));
 
@@ -89,7 +102,55 @@ describe("DocumentShell", () => {
     // Without this, --font-geist expands to `"Geist", "Geist Fallback"`, and
     // that generated face is local(Arial) with no unicode-range — it answers
     // for Arabic, so Cairo never receives the glyph.
-    expect(fontOptions.geist?.fallback).toContain("Cairo");
+    const geistDefault = fontOptions.geistCalls.find(
+      (call) => call.variable === "--font-geist",
+    );
+    expect(geistDefault?.fallback).toContain("Cairo");
     expect(fontOptions.cairo?.subsets).toContain("arabic");
+  });
+
+  it("declares the curated Tajawal alternative on every document too (CUST-H3-2)", () => {
+    const document = DocumentShell({
+      children: <main>Storefront</main>,
+      locale: "en",
+    });
+    const body = document.props.children.find(
+      (child: { type?: string } | false | null) =>
+        child && typeof child === "object" && child.type === "body",
+    );
+
+    expect(body.props.className).toContain("--font-tajawal");
+    expect(fontOptions.tajawal?.subsets).toContain("arabic");
+    expect(fontOptions.tajawal?.weight).not.toContain("600");
+  });
+
+  it("CUST-H3-2-FIX-1: declares a second Geist instance whose own fallback names Tajawal, not Cairo", () => {
+    const document = DocumentShell({
+      children: <main>Storefront</main>,
+      locale: "en",
+    });
+    const body = document.props.children.find(
+      (child: { type?: string } | false | null) =>
+        child && typeof child === "object" && child.type === "body",
+    );
+
+    // Two distinct Geist calls, not one call overwritten by the other.
+    expect(fontOptions.geistCalls).toHaveLength(2);
+
+    const cairoFallbackGeist = fontOptions.geistCalls.find(
+      (call) => call.variable === "--font-geist",
+    );
+    const tajawalFallbackGeist = fontOptions.geistCalls.find(
+      (call) => call.variable === "--font-geist-tajawal",
+    );
+
+    expect(cairoFallbackGeist?.fallback).toEqual(["Cairo"]);
+    expect(tajawalFallbackGeist?.fallback).toEqual(["Tajawal"]);
+    // The Tajawal-fallback instance must never also name Cairo — that is
+    // exactly the bug this fix closes (Cairo answering for Arabic before
+    // Tajawal is ever reached).
+    expect(tajawalFallbackGeist?.fallback).not.toContain("Cairo");
+
+    expect(body.props.className).toContain("--font-geist-tajawal");
   });
 });

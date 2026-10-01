@@ -21,7 +21,10 @@ import {
   previewStoreName,
   type StorefrontPresentationConfig,
 } from "@/lib/presentation/config";
-import { presentationCssVars } from "@/lib/presentation/tokens";
+import {
+  fontPresetFamilyStack,
+  presentationCssVars,
+} from "@/lib/presentation/tokens";
 import {
   buildWhatsAppUrl,
   isSafeAppStoreUrl,
@@ -140,7 +143,7 @@ export function StorefrontPreviewCanvas({
       className="relative min-h-full bg-store-background text-store-foreground"
       style={{
         ...vars,
-        fontFamily: '"Cairo", "Geist", sans-serif',
+        fontFamily: fontPresetFamilyStack(config.fontPreset),
       }}
     >
       <p className="sr-only">{t("fixtureCatalogHint")}</p>

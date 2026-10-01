@@ -92,6 +92,38 @@ describe("published presentation runtime helpers", () => {
     ).toBe("#12372a");
   });
 
+  it("CUST-H3-2-FIX-1: sets fontFamily directly on the same style object as the color vars, so the wrapper that consumes it actually owns it", () => {
+    // `(storefront)/layout.tsx` applies this entire object as one inline
+    // `style` on its theme wrapper div. A CSS custom property (like
+    // `--store-primary`) and a real CSS property (`fontFamily`) living on
+    // that same object/element both resolve for that element and cascade
+    // down normally — unlike a custom property declared on a descendant
+    // that a `globals.css` rule on `body` (an ancestor) tries to consume,
+    // which can never work (custom properties only cascade downward).
+    const cairoStyle = publishedThemeStyle(DEFAULT_PRESENTATION_CONFIG);
+    expect(cairoStyle?.["--store-primary"]).toBe("#12372a");
+    expect(cairoStyle?.fontFamily).toBe(
+      "var(--font-geist), var(--font-cairo), system-ui, sans-serif",
+    );
+
+    const tajawalStyle = publishedThemeStyle({
+      ...DEFAULT_PRESENTATION_CONFIG,
+      fontPreset: "tajawal-geist",
+    });
+    expect(tajawalStyle?.fontFamily).toBe(
+      "var(--font-geist-tajawal), var(--font-tajawal), system-ui, sans-serif",
+    );
+    // The published Tajawal stack must never reference Cairo or the shared
+    // --font-geist (whose own fallback bakes in Cairo) — otherwise Cairo
+    // would answer for Arabic glyphs before Tajawal is ever reached.
+    expect(tajawalStyle?.fontFamily).not.toContain("--font-cairo");
+    expect(tajawalStyle?.fontFamily).not.toMatch(/var\(--font-geist\),/);
+  });
+
+  it("no-presentation routes keep the Cairo + Geist default — never crash, never leak a stale stack", () => {
+    expect(publishedThemeStyle(null)).toBeUndefined();
+  });
+
   it("unmounts WhatsApp unless enabled with a sanitary number", () => {
     expect(
       publishedWhatsAppHref(DEFAULT_PRESENTATION_CONFIG, "floating"),

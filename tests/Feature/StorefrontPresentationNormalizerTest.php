@@ -300,6 +300,46 @@ class StorefrontPresentationNormalizerTest extends TestCase
     }
 
     /** @test */
+    public function font_preset_accepts_known_values_and_fails_closed_to_cairo_geist(): void
+    {
+        $this->assertSame('cairo-geist', $this->normalizer->normalize([])['fontPreset']);
+        $this->assertSame(
+            'cairo-geist',
+            $this->normalizer->normalize(['fontPreset' => 'cairo-geist'])['fontPreset'],
+        );
+        $this->assertSame(
+            'tajawal-geist',
+            $this->normalizer->normalize(['fontPreset' => 'tajawal-geist'])['fontPreset'],
+        );
+        $this->assertSame(
+            'cairo-geist',
+            $this->normalizer->normalize(['fontPreset' => 'helvetica-geist'])['fontPreset'],
+        );
+        $this->assertSame(
+            ['cairo-geist', 'tajawal-geist'],
+            StorefrontPresentationNormalizer::FONT_PRESETS,
+        );
+    }
+
+    /** @test */
+    public function accent_color_round_trips_without_becoming_a_public_consumer_bound_field(): void
+    {
+        // CUST-H3-2 — accentColor stays accepted/persisted for backward
+        // compatibility; it is not a public semantic consumer, so it carries
+        // no public-facing derivation the way primaryColor drives
+        // presentationCssVars(). This test only guards the normalizer's
+        // round-trip, not any UI exposure (none exists today).
+        $normalized = $this->normalizer->normalize(['accentColor' => '#ff00aa']);
+        $this->assertSame('#ff00aa', $normalized['accentColor']);
+
+        $twice = $this->normalizer->normalize($normalized);
+        $this->assertSame('#ff00aa', $twice['accentColor']);
+
+        $this->assertNull($this->normalizer->normalize(['accentColor' => 'not-a-hex'])['accentColor']);
+        $this->assertNull($this->normalizer->normalize([])['accentColor']);
+    }
+
+    /** @test */
     public function a_forward_schema_version_fails_closed_to_awj_modern_without_guessing(): void
     {
         $normalized = $this->normalizer->normalize(

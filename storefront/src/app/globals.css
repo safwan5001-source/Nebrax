@@ -221,6 +221,18 @@
  *
  * This only works because Geist names Cairo as its own fallback; read the
  * rationale in DocumentShell.tsx before reordering this stack.
+ *
+ * This is the no-presentation / pre-CUST-H3-2-document default only. A
+ * Published store with a real `fontPreset` is not driven by this rule at
+ * all — `(storefront)/layout.tsx` applies the merchant's resolved
+ * `fontFamily` (`publishedThemeStyle()`, `lib/presentation/public.ts`)
+ * directly as an inline style on its own theme wrapper, which is an
+ * *ancestor* of every page element. A CSS custom property set on a
+ * *descendant* of `body` cannot affect a property this rule already computed
+ * on `body` itself (custom properties only cascade downward) — this rule
+ * intentionally stays a fixed Cairo/Geist default rather than reaching for
+ * one, so there is exactly one place (the wrapper's own inline `fontFamily`)
+ * that decides the Published font.
  */
 body {
   font-family: var(--font-geist), var(--font-cairo), system-ui, sans-serif;

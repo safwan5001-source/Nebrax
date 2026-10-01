@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_PRESENTATION_CONFIG, normalizePresentationConfig } from '../presentation/config';
+import { fontPresetFamilyStack, FONT_PRESETS, presentationCssVars } from '../presentation/tokens';
 import {
   BRANDING_PERSISTENCE_CAPABILITY,
   BUSINESS_VERIFICATION_CAPABILITY,
@@ -136,6 +137,49 @@ describe('web presentation contract', () => {
     expect(config.homepage.sections).toEqual([
       { id: 'hero', type: 'hero', visible: false },
     ]);
+  });
+
+  it('CUST-H3-2: accepts the verified tajawal-geist preset and fails closed to cairo-geist for unknown values', () => {
+    expect(normalizePresentationConfig({ fontPreset: 'tajawal-geist' }).fontPreset).toBe(
+      'tajawal-geist',
+    );
+    expect(normalizePresentationConfig({ fontPreset: 'cairo-geist' }).fontPreset).toBe(
+      'cairo-geist',
+    );
+    expect(normalizePresentationConfig({ fontPreset: 'helvetica-geist' }).fontPreset).toBe(
+      'cairo-geist',
+    );
+    expect(normalizePresentationConfig({}).fontPreset).toBe('cairo-geist');
+    expect(FONT_PRESETS.map((preset) => preset.id)).toEqual(['cairo-geist', 'tajawal-geist']);
+  });
+
+  it('CUST-H3-2: resolves the full font-family stack deterministically and fails closed to Cairo', () => {
+    expect(fontPresetFamilyStack('cairo-geist')).toBe(
+      'var(--font-geist), var(--font-cairo), system-ui, sans-serif',
+    );
+    expect(fontPresetFamilyStack('tajawal-geist')).toBe(
+      'var(--font-geist-tajawal), var(--font-tajawal), system-ui, sans-serif',
+    );
+    expect(fontPresetFamilyStack('bogus-value' as never)).toBe(
+      'var(--font-geist), var(--font-cairo), system-ui, sans-serif',
+    );
+  });
+
+  it('CUST-H3-2-FIX-1: the tajawal-geist stack never references Cairo or the shared --font-geist, so Cairo cannot shadow Tajawal', () => {
+    const stack = fontPresetFamilyStack('tajawal-geist');
+    expect(stack).not.toContain('--font-cairo');
+    // Must use the dedicated Tajawal-fallback Geist instance, not the
+    // Cairo-fallback one — reusing --font-geist here would resolve Arabic
+    // to Cairo via Geist's own baked-in fallback before Tajawal is reached.
+    expect(stack).toContain('--font-geist-tajawal');
+    expect(stack).not.toMatch(/var\(--font-geist\),/);
+  });
+
+  it('CUST-H3-2: presentationCssVars is unaffected by font preset — color/radius only', () => {
+    const vars = presentationCssVars('#1e3a5f', 'subtle');
+    expect(vars['--store-primary']).toBe('#1e3a5f');
+    expect(vars['--store-radius']).toBe('0.5rem');
+    expect(vars).not.toHaveProperty('--store-font-arabic');
   });
 
   it('keeps per-instance content without accepting offer or price fields', () => {

@@ -44,7 +44,15 @@ final class StorefrontPresentationNormalizer
         'awj-market' => '#0f766e',
     ];
 
-    public const FONT_PRESETS = ['cairo-geist'];
+    /**
+     * CUST-H3-2 — `tajawal-geist` added after implementation-time verification
+     * (Tajawal is in Next.js's bundled Google Fonts metadata with arabic+latin
+     * subsets; see `docs/reports/CUST-H3-2-IMPLEMENTATION-REPORT.md`). Adding
+     * an allowed value here does not move the default — `normalize()` still
+     * falls back to `cairo-geist` for anything else, so every existing stored
+     * document keeps rendering exactly as before.
+     */
+    public const FONT_PRESETS = ['cairo-geist', 'tajawal-geist'];
 
     public const DENSITY_PRESETS = ['comfortable', 'compact'];
 

@@ -22,7 +22,8 @@ import type { WorkspaceProductDetail } from "@/modules/commerce-workspace/worksp
 import type { WorkspaceCategoryDetail } from "@/modules/commerce-workspace/workspace-categories";
 import { displayLocale } from "@/lib/formatting";
 import { PageIcon, pageLabelKey } from "./PageNavigatorPanel";
-import { presentationCssVars } from "./presentation/tokens";
+import { fontPresetFamilyStack, presentationCssVars } from "./presentation/tokens";
+import { PREVIEW_FONT_VARIABLES } from "./presentation/fonts";
 import {
   bannerContentOf,
   benefitsContentOf,
@@ -295,10 +296,13 @@ export function StorefrontPreviewCanvas({
       data-preview-viewport={viewport}
       data-preview-page={page}
       dir={locale === "ar" ? "rtl" : "ltr"}
-      className="awj-store-preview relative min-h-full bg-store-background text-store-foreground"
+      className={cn(
+        "awj-store-preview relative min-h-full bg-store-background text-store-foreground",
+        PREVIEW_FONT_VARIABLES,
+      )}
       style={{
         ...vars,
-        fontFamily: '"Cairo", "Geist", sans-serif',
+        fontFamily: fontPresetFamilyStack(config.fontPreset),
       }}
     >
       <p className="sr-only">{t("fixtureCatalogHint")}</p>

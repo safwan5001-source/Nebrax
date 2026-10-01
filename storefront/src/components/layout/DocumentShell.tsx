@@ -1,7 +1,7 @@
 import { GoogleTagManager } from "@next/third-parties/google";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
-import { Cairo, Geist } from "next/font/google";
+import { Cairo, Geist, Tajawal } from "next/font/google";
 import { Suspense } from "react";
 import { localeDirection } from "@/i18n/locales";
 
@@ -36,6 +36,26 @@ const geist = Geist({
 });
 
 /**
+ * CUST-H3-2-FIX-1 — a second Geist instance dedicated to `tajawal-geist`.
+ * `fallback` bakes the named face directly into *this instance's own* CSS
+ * value, exactly like `geist` above does for Cairo — so a single shared
+ * `--font-geist` naming Cairo would always resolve Arabic to Cairo first,
+ * regardless of what a consuming font-family stack listed afterward
+ * (`var(--font-geist), var(--font-tajawal)` would still expand to
+ * `"Geist", Cairo, Tajawal`). `--font-geist` above stays untouched for
+ * `cairo-geist` and for every other existing consumer (the `--font-sans`
+ * Tailwind alias in `globals.css` included). See
+ * `lib/presentation/tokens.ts#fontPresetFamilyStack` for how the two
+ * instances are selected per merchant.
+ */
+const geistTajawalFallback = Geist({
+  variable: "--font-geist-tajawal",
+  subsets: ["latin"],
+  display: "swap",
+  fallback: ["Tajawal"],
+});
+
+/**
  * Arabic is the storefront's default locale, and Geist ships no Arabic glyphs —
  * without this the primary language rendered in whatever the device happened to
  * have. Cairo is the face the approved Responsive Visual Baseline V1 reference
@@ -52,6 +72,24 @@ const cairo = Cairo({
   variable: "--font-cairo",
   subsets: ["arabic"],
   weight: ["400", "500", "600", "700", "800"],
+  display: "swap",
+});
+
+/**
+ * CUST-H3-2 — curated Arabic alternative, selectable per merchant via
+ * `presentation.fontPreset` ("tajawal-geist"). Declared unconditionally here,
+ * same as Cairo above, so it never requires an extra request: the browser
+ * only fetches this face's file when the resolved `font-family`
+ * (`fontPresetFamilyStack()`, `lib/presentation/tokens.ts`) actually
+ * references it for a published store. Tajawal ships no 600 weight
+ * (verified against Next.js's bundled Google Fonts metadata) —
+ * 400/500/700/800 approximates Cairo's weight set above without requesting
+ * an unavailable cut.
+ */
+const tajawal = Tajawal({
+  variable: "--font-tajawal",
+  subsets: ["arabic"],
+  weight: ["400", "500", "700", "800"],
   display: "swap",
 });
 
@@ -75,7 +113,7 @@ export function DocumentShell({ children, locale }: DocumentShellProps) {
       </head>
       {gtmId && <GoogleTagManager gtmId={gtmId} />}
       <body
-        className={`${geist.variable} ${cairo.variable} antialiased min-h-screen flex flex-col`}
+        className={`${geist.variable} ${geistTajawalFallback.variable} ${cairo.variable} ${tajawal.variable} antialiased min-h-screen flex flex-col`}
       >
         <Suspense fallback={null}>{children}</Suspense>
         <Analytics />
