@@ -25,6 +25,7 @@ import type {
   ProductPageRegionKey,
 } from "@/lib/presentation/page-regions";
 import { resolvePublicProductRegions } from "@/lib/presentation/page-runtime";
+import { publishedPageContainerPaddingClass } from "@/lib/presentation/public-rhythm";
 import { cn } from "@/lib/utils";
 
 interface ProductDetailsProps {
@@ -38,12 +39,21 @@ interface ProductDetailsProps {
    * any existing merchant.
    */
   pagePresentation?: PagePresentation;
+  /**
+   * CUST-H3-3 — the Published Version's global `density`, or `undefined`
+   * when no presentation exists yet. Drives this page's own outer vertical
+   * padding (see `publishedPageContainerPaddingClass`) for every theme but
+   * AWJ Market, whose own compact chrome (`isMarket` below) stays exactly
+   * as it was — untouched by this merchant-wide control.
+   */
+  density?: string | null;
 }
 
 export function ProductDetails({
   product,
   basePath,
   pagePresentation,
+  density,
 }: ProductDetailsProps) {
   const { addItem, surface } = useCart();
   const { currency } = useStore();
@@ -448,7 +458,11 @@ export function ProductDetails({
   };
 
   return (
-    <StoreContainer className={isMarket ? "py-3 md:py-5" : "py-5 md:py-6"}>
+    <StoreContainer
+      className={
+        isMarket ? "py-3 md:py-5" : publishedPageContainerPaddingClass(density)
+      }
+    >
       {/* The product leads. No marketing band above it. */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,34rem)_minmax(0,1fr)] lg:gap-10">
         {/*

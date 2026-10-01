@@ -582,3 +582,86 @@ describe("ProductDetails — CUST-H2-5 public page presentation parity", () => {
     expect(screen.getByText("addToCart")).toBeInTheDocument();
   });
 });
+
+describe("ProductDetails — CUST-H3-3 density container-padding parity", () => {
+  beforeEach(() => {
+    mockAddItem.mockClear();
+    mockSurface.current = "dtc";
+  });
+
+  function pageShell(container: HTMLElement): Element {
+    const shell = container.querySelector(".max-w-store");
+    if (!shell) throw new Error("page shell not found");
+    return shell;
+  }
+
+  it("defaults to the pre-H3-3 comfortable padding when density is absent", () => {
+    const { container } = render(
+      <ProductDetails
+        product={productWithoutCustomVariants}
+        basePath="/us/en"
+      />,
+    );
+
+    expect(pageShell(container).className).toContain("py-5");
+    expect(pageShell(container).className).toContain("md:py-6");
+  });
+
+  it("keeps the comfortable padding for an explicit comfortable density", () => {
+    const { container } = render(
+      <ProductDetails
+        product={productWithoutCustomVariants}
+        basePath="/us/en"
+        density="comfortable"
+      />,
+    );
+
+    expect(pageShell(container).className).toContain("py-5");
+    expect(pageShell(container).className).toContain("md:py-6");
+  });
+
+  it("shrinks the page shell's own padding for a compact density", () => {
+    const { container } = render(
+      <ProductDetails
+        product={productWithoutCustomVariants}
+        basePath="/us/en"
+        density="compact"
+      />,
+    );
+
+    expect(pageShell(container).className).toContain("py-3");
+    expect(pageShell(container).className).not.toContain("py-5");
+  });
+
+  it("fails closed to the comfortable padding for an unknown density value", () => {
+    const { container } = render(
+      <ProductDetails
+        product={productWithoutCustomVariants}
+        basePath="/us/en"
+        density="unknown-value"
+      />,
+    );
+
+    expect(pageShell(container).className).toContain("py-5");
+    expect(pageShell(container).className).toContain("md:py-6");
+  });
+
+  it("keeps AWJ Market's own locked compact chrome regardless of density", () => {
+    const { container } = render(
+      <PublishedThemeMarkerProvider themePreset="awj-market">
+        <ProductDetails
+          product={productWithoutCustomVariants}
+          basePath="/us/en"
+          density="comfortable"
+        />
+      </PublishedThemeMarkerProvider>,
+    );
+
+    // AWJ Market's compact chrome (Master Spec §29) is a separate, already
+    // locked identity decision — it must not be overridden by this generic
+    // density resolver even when density itself says "comfortable".
+    expect(pageShell(container).className).toContain("py-3");
+    expect(pageShell(container).className).toContain("md:py-5");
+    expect(pageShell(container).className).not.toContain("py-5 md:py-6");
+  });
+});

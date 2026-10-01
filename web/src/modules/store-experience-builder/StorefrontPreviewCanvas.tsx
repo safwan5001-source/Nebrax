@@ -22,7 +22,12 @@ import type { WorkspaceProductDetail } from "@/modules/commerce-workspace/worksp
 import type { WorkspaceCategoryDetail } from "@/modules/commerce-workspace/workspace-categories";
 import { displayLocale } from "@/lib/formatting";
 import { PageIcon, pageLabelKey } from "./PageNavigatorPanel";
-import { fontPresetFamilyStack, presentationCssVars } from "./presentation/tokens";
+import {
+  fontPresetFamilyStack,
+  pageContainerPaddingClass,
+  presentationCssVars,
+  type ProductCardStyleId,
+} from "./presentation/tokens";
 import { PREVIEW_FONT_VARIABLES } from "./presentation/fonts";
 import {
   bannerContentOf,
@@ -471,6 +476,7 @@ export function StorefrontPreviewCanvas({
         <CategoryPagePreview
           locale={locale}
           density={density}
+          productCard={config.productCard}
           state={categoryPreviewState}
           category={previewCategory}
           regions={categoryRegions ?? []}
@@ -1207,7 +1213,7 @@ function ProductPagePreview({
       data-product-preview="ready"
       className={cn(
         storeContainerClassName,
-        density === "compact" ? "py-3" : "py-5 md:py-6",
+        pageContainerPaddingClass(density),
       )}
     >
       <div className="grid grid-cols-1 gap-6">
@@ -1435,6 +1441,7 @@ function ProductPlaceholderGlyph() {
 function CategoryPagePreview({
   locale,
   density,
+  productCard,
   state,
   category,
   regions,
@@ -1446,6 +1453,7 @@ function CategoryPagePreview({
 }: {
   locale: CustomizerLocale;
   density: "compact" | "comfortable";
+  productCard: ProductCardStyleId;
   state: "idle" | "loading" | "error" | "empty" | "ready";
   category: WorkspaceCategoryDetail | null;
   regions: PageRegionInstance<CategoryPageRegionKey>[];
@@ -1502,7 +1510,8 @@ function CategoryPagePreview({
       data-category-preview="ready"
       className={cn(
         storeContainerClassName,
-        density === "compact" ? "space-y-3 py-3" : "space-y-4 py-5 md:py-6",
+        density === "compact" ? "space-y-3" : "space-y-4",
+        pageContainerPaddingClass(density),
       )}
     >
       {visibleRegions.map((region) => {
@@ -1588,7 +1597,12 @@ function CategoryPagePreview({
                           <img src={product.thumbnailUrl} alt="" className="size-full object-cover" />
                         ) : null}
                       </div>
-                      <p className="truncate px-1.5 py-1 text-[11px] text-store-foreground">
+                      <p
+                        className={cn(
+                          "truncate text-[11px] text-store-foreground",
+                          productCard === "compact" ? "px-1.5 py-1" : "px-2 py-1.5",
+                        )}
+                      >
                         <bdi>{product.name}</bdi>
                       </p>
                     </div>
