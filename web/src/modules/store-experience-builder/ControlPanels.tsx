@@ -466,50 +466,59 @@ function BrandingPanel({
   liveStoreName: string | null;
   patch: (partial: Partial<StorefrontPresentationConfig>) => void;
 }) {
+  // CUST-H3-1 — one Store Identity surface: display name, logo, compact logo
+  // and favicon were already a single `branding.*` persistence group (no
+  // storage change here), but the UI previously rendered them as a bare
+  // field list with no shared framing. The inspector header above already
+  // shows the panel's own title ("Identity"/"الهوية" — see `ControlPanels`'
+  // switch); this only adds the explanatory intro, not a second heading
+  // that would repeat it.
   return (
     <div className="space-y-6">
-      <Field label={t("displayName")} hint={t("displayNameHint")}>
-        <input
-          className={inputClass}
-          value={config.branding.displayName}
-          placeholder={liveStoreName ?? ""}
-          onChange={(event) =>
-            patch({
-              branding: { ...config.branding, displayName: event.target.value },
-            })
+      <Section hint={t("identityIntro")}>
+        <Field label={t("displayName")} hint={t("displayNameHint")}>
+          <input
+            className={inputClass}
+            value={config.branding.displayName}
+            placeholder={liveStoreName ?? ""}
+            onChange={(event) =>
+              patch({
+                branding: { ...config.branding, displayName: event.target.value },
+              })
+            }
+          />
+        </Field>
+        {liveStoreName ? (
+          <p className="text-[12px] text-neutral-500">
+            {t("liveName")}: {liveStoreName}
+          </p>
+        ) : null}
+        <LogoField
+          label={t("logo")}
+          hint={t("logoHint")}
+          value={config.branding.logoDataUrl}
+          t={t}
+          onChange={(logoDataUrl) =>
+            patch({ branding: { ...config.branding, logoDataUrl } })
           }
         />
-      </Field>
-      {liveStoreName ? (
-        <p className="text-[12px] text-neutral-500">
-          {t("liveName")}: {liveStoreName}
-        </p>
-      ) : null}
-      <LogoField
-        label={t("logo")}
-        hint={t("logoHint")}
-        value={config.branding.logoDataUrl}
-        t={t}
-        onChange={(logoDataUrl) =>
-          patch({ branding: { ...config.branding, logoDataUrl } })
-        }
-      />
-      <LogoField
-        label={t("compactLogo")}
-        value={config.branding.compactLogoDataUrl}
-        t={t}
-        onChange={(compactLogoDataUrl) =>
-          patch({ branding: { ...config.branding, compactLogoDataUrl } })
-        }
-      />
-      <LogoField
-        label={t("favicon")}
-        value={config.branding.faviconDataUrl}
-        t={t}
-        onChange={(faviconDataUrl) =>
-          patch({ branding: { ...config.branding, faviconDataUrl } })
-        }
-      />
+        <LogoField
+          label={t("compactLogo")}
+          value={config.branding.compactLogoDataUrl}
+          t={t}
+          onChange={(compactLogoDataUrl) =>
+            patch({ branding: { ...config.branding, compactLogoDataUrl } })
+          }
+        />
+        <LogoField
+          label={t("favicon")}
+          value={config.branding.faviconDataUrl}
+          t={t}
+          onChange={(faviconDataUrl) =>
+            patch({ branding: { ...config.branding, faviconDataUrl } })
+          }
+        />
+      </Section>
     </div>
   );
 }
@@ -527,18 +536,35 @@ function LogoField({
   t: (key: CustomizerMessageKey) => string;
   onChange: (value: string | null) => void;
 }) {
+  // CUST-H3-1 — all three logo slots previously shared the same literal
+  // "Choose image"/"Remove" accessible name (the upload `<label>`'s own text
+  // is what Testing Library/screen readers compute as the `<input>`'s name
+  // when nothing more specific is set), so assistive tech could not tell the
+  // logo, compact logo and favicon controls apart. An explicit `aria-label`
+  // on the input/button wins over that implicit label text and names each
+  // field distinctly, without changing the visible copy or upload semantics.
+  const uploadAccessibleLabel = `${label} — ${t("uploadLogo")}`;
+  const removeAccessibleLabel = `${label} — ${t("clearLogo")}`;
   return (
     <div className="space-y-1.5">
       <span className="block text-[12px] font-medium text-neutral-600">
         {label}
       </span>
       <div className="flex items-center gap-2">
+        {value ? (
+          <img
+            src={value}
+            alt=""
+            className="size-10 shrink-0 rounded-sm border border-neutral-200 bg-white object-contain"
+          />
+        ) : null}
         <label className={btnClass}>
           {t("uploadLogo")}
           <input
             type="file"
             accept="image/png,image/jpeg,image/webp"
             className="sr-only"
+            aria-label={uploadAccessibleLabel}
             onChange={(event) => {
               const file = event.target.files?.[0];
               event.target.value = "";
@@ -557,6 +583,7 @@ function LogoField({
           <button
             type="button"
             className={btnClass}
+            aria-label={removeAccessibleLabel}
             onClick={() => onChange(null)}
           >
             {t("clearLogo")}

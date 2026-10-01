@@ -146,6 +146,10 @@ export const CUSTOMIZER_MESSAGES = {
     appsPlacement: "موضع الظهور في المتجر",
     theme: "المظهر",
     branding: "الهوية",
+    // CUST-H3-1 — مقدّمة لوحة الهوية: تُثبّت أن اسم المتجر، الشعار، الشعار
+    // المصغّر وأيقونة التبويب أربعة حقول لهوية واحدة لا أربع إعدادات متفرقة.
+    identityIntro:
+      "اسم متجرك وشعاره يُحفظان هنا معاً. الشعار المصغّر يظهر في الرأس المضغوط على الجوال، وأيقونة التبويب تظهر في شريط المتصفح.",
     header: "الرأس والتنقل",
     homepage: "الصفحة الرئيسية",
     footer: "التذييل",
@@ -619,6 +623,11 @@ export const CUSTOMIZER_MESSAGES = {
     appsPlacement: "Where they appear",
     theme: "Appearance",
     branding: "Identity",
+    // CUST-H3-1 — Identity panel intro: makes explicit that display name,
+    // logo, compact logo and favicon are four fields of one Identity, not
+    // four unrelated settings.
+    identityIntro:
+      "Your store's name and logo live here together. The compact logo appears in the mobile header, and the favicon shows in the browser tab.",
     header: "Header & navigation",
     homepage: "Homepage",
     footer: "Footer",
