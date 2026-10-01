@@ -15,12 +15,18 @@
 /// Link / App Link host between them would require either platform's
 /// association file to declare which of two *different* apps owns which
 /// path (Apple's `apps` array, or Android's multi-package `assetlinks.json`)
-/// — an unnecessary complication this repository does not need yet, since
-/// neither host has a real, publicly hosted domain today (this task's
-/// implementation report records the exact operational gate). A distinct
-/// preview-only subdomain keeps the two allowlists — and the two apps that
-/// will eventually claim them — structurally independent from day one,
-/// rather than retrofitting that separation once a real domain exists.
+/// — an unnecessary complication this repository does not need yet. The
+/// production host (`awj-runtime-proof.example`) remains a placeholder
+/// under the IANA-reserved `.example` TLD; this preview host,
+/// `preview.awjdev.xyz`, is the owner-approved domain name
+/// (MOBILE-PREVIEW-10A/10B), but it is not yet provisioned — no DNS/HTTPS
+/// or `.well-known/assetlinks.json`/`apple-app-site-association` exists for
+/// it today, so App Link/Universal Link verification still cannot succeed
+/// until that hosting is actually stood up (this constant change is source
+/// wiring only). A distinct preview-only subdomain keeps the two
+/// allowlists — and the two apps that will eventually claim them —
+/// structurally independent from day one, rather than retrofitting that
+/// separation once hosting exists.
 const String kPreviewDeepLinkHost = 'preview.awjdev.xyz';
 
 /// A defensive cap on an accepted reference's length — the backend's own
