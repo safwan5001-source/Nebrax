@@ -39,11 +39,19 @@ function normalizeSearchText(value: string): string {
   return value.trim().toLocaleLowerCase();
 }
 
+/**
+ * Disabled-reason hierarchy (CUST-H4-2 review fix): a capability-level
+ * non-addable reason always wins — a section withheld from merchant-addable
+ * results (today: `offers`, gated until H4-6/H4-7) must explain *why*, never
+ * fall through to a generic/empty reason. Only once the capability itself
+ * allows adding do the document-wide cap and the per-type instance cap get
+ * a turn.
+ */
 function addDisabledReasonKey(
   sections: readonly PresentationHomeSection[],
   cap: SectionCapability,
 ): CustomizerMessageKey | null {
-  if (!cap.merchantAddable) return null;
+  if (!cap.merchantAddable) return cap.reasonKey ?? null;
   if (sections.length >= MAX_HOME_SECTIONS) return "sectionLimitReached";
   if (cap.maxInstances !== null) {
     const count = sections.filter((section) => section.type === cap.type).length;

@@ -167,16 +167,22 @@ export const SECTION_CAPABILITIES: Record<
     canDuplicate: true,
     canDelete: true,
     // GATED today (CUST-H4-ARCH-1 §23) — target LIVE in H4-6/H4-7, not this
-    // slice. Stays merchantAddable: true, matching today's actual behavior
-    // (`isGatedHomeSection`/`gatedSection`) — a real, non-deceptive gate, not
-    // a hidden one. H4-2 formalizes that existing honesty, it does not
-    // reinterpret it.
+    // slice. CUST-H4-2 review fix: no merchant-addable fake section — Offers
+    // has neither the H4-6 real Commerce backend nor the H4-7 real Canvas/
+    // Published renderers yet, so it must stay visible-but-not-addable, not
+    // "addable with a caveat badge." merchantAddable: false (changed from
+    // the first H4-2 revision's `true`, which the owner correctly rejected).
+    //
+    // Capability transition (documented, NOT performed by this slice):
+    //   today      → state: "gated",  merchantAddable: false
+    //   after H4-6 + H4-7 ship → state: "live", merchantAddable: true
+    // Do not flip this pair until both of those slices are actually done.
     state: "gated",
     category: "offersMarketing",
-    merchantAddable: true,
+    merchantAddable: false,
     titleKey: "sectionOffers",
     descriptionKey: "sectionOffersDescription",
-    reasonKey: "gatedSection",
+    reasonKey: "sectionOffersComingSoon",
   },
   benefits: {
     type: "benefits",

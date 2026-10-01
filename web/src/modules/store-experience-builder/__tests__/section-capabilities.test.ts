@@ -175,12 +175,34 @@ describe("CUST-H4-2 capability registry — state/category/library metadata", ()
     expect(SECTION_CAPABILITIES.featured.reasonKey).toBeTruthy();
   });
 
-  it("documents Offers as truthfully GATED with a merchant-facing reason, not hidden or silently LIVE", () => {
+  it("documents Offers as truthfully GATED and NOT merchant-addable yet (CUST-H4-2 review fix)", () => {
     expect(SECTION_CAPABILITIES.offers.state).toBe("gated");
     expect(SECTION_CAPABILITIES.offers.reasonKey).toBeTruthy();
-    // H4-2 does not reinterpret H4-1's decision: Offers stays addable (a real,
-    // non-deceptive gate), it is not withheld from merchant-addable results.
-    expect(SECTION_CAPABILITIES.offers.merchantAddable).toBe(true);
+    // No merchant-addable fake section: Offers has neither the H4-6 real
+    // Commerce backend nor the H4-7 real Canvas/Published renderers yet, so
+    // it must be withheld from merchant-addable results — visible, but not
+    // addable — until those slices land. Do not flip this to `true` outside
+    // of that transition (see the capability-transition comment in
+    // `section-capabilities.ts`).
+    expect(SECTION_CAPABILITIES.offers.merchantAddable).toBe(false);
+  });
+
+  it("still shows Offers in the Library, still disallows adding it, via the public canAddSectionType/hasAddableSectionType API", () => {
+    const sections = DEFAULT_PRESENTATION_CONFIG.homepage.sections;
+    expect(canAddSectionType(sections, "offers")).toBe(false);
+    // Removing every offers instance must not make it addable either — the
+    // capability-level gate is independent of instance count.
+    const withoutOffers = sections.filter((s) => s.type !== "offers");
+    expect(canAddSectionType(withoutOffers, "offers")).toBe(false);
+  });
+
+  it("documents the Offers capability transition this slice does NOT perform", () => {
+    // Current H4-2: gated + withheld from merchant-addable results.
+    expect(SECTION_CAPABILITIES.offers.state).toBe("gated");
+    expect(SECTION_CAPABILITIES.offers.merchantAddable).toBe(false);
+    // The future pair (state: "live", merchantAddable: true) only applies
+    // once H4-6 (real Commerce backend) and H4-7 (real Canvas/Published
+    // renderers) both ship — not in this PR.
   });
 
   it("maps every section to exactly one of the 7 taxonomy categories, none empty", () => {
@@ -220,10 +242,10 @@ describe("CUST-H4-2 capability registry — state/category/library metadata", ()
   });
 
   it("merchantAddable gates canAddSectionType independently of instance count", () => {
-    // No registered type is withheld today — every one should be reachable
-    // via canAddSectionType once instance-count rules allow it.
+    // Every type except `offers` (withheld until H4-6/H4-7, see above) is
+    // reachable via canAddSectionType once instance-count rules allow it.
     for (const type of HOME_BUILDER_SECTION_KEYS) {
-      expect(SECTION_CAPABILITIES[type].merchantAddable).toBe(true);
+      expect(SECTION_CAPABILITIES[type].merchantAddable).toBe(type !== "offers");
     }
     const sections = DEFAULT_PRESENTATION_CONFIG.homepage.sections.filter(
       (s) => s.type !== "appPromo",

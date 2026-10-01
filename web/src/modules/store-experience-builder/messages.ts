@@ -255,6 +255,12 @@ export const CUSTOMIZER_MESSAGES = {
     sectionCustomContentDescription: "فقرات وعناوين نصية حرة.",
     sectionFeaturedPartialReason:
       "منتقي منتجات حقيقي قادم قريباً. حالياً يُضاف المنتج بكتابة معرّفه يدوياً.",
+    // CUST-H4-2 (مراجعة) — العروض مرئية في المكتبة لكنها غير قابلة للإضافة
+    // بعد: لا بنية تجارية حقيقية ولا عارض Canvas/منشور حقيقي لها اليوم. نصٌّ
+    // مخصّص لحالة «غير قابل للإضافة» في المكتبة، مستقلٌّ عن `gatedSection`
+    // (نص لوحة إعدادات instance موجود مسبقاً، سيناريو مختلف).
+    sectionOffersComingSoon:
+      "العروض قادمة. ستصبح قابلة للإضافة عند اكتمال بنيتها التجارية الحقيقية وعارضَيها في أَوْج.",
     selectedSectionHint: "تظهر هنا إعدادات القسم المحدد فقط.",
     sectionManagedNote:
       "محتوى هذا القسم يأتي من كتالوج أَوْج ولا يُحرَّر من هنا. يمكنك إظهاره أو إخفاؤه وإعادة ترتيبه.",
@@ -766,6 +772,12 @@ export const CUSTOMIZER_MESSAGES = {
     sectionCustomContentDescription: "Free-form headings and paragraphs.",
     sectionFeaturedPartialReason:
       "A real product picker is coming soon. For now, add a product by typing its id.",
+    // CUST-H4-2 (review fix) — Offers stays visible in the Library but is
+    // not addable yet: no real Commerce backend or Canvas/Published
+    // renderer exists today. Distinct from `gatedSection` (the existing
+    // selected-instance settings copy, a different scenario).
+    sectionOffersComingSoon:
+      "Offers is coming. It will become addable once its real Commerce backend and both renderers are built in AWJ.",
     selectedSectionHint: "Only the selected section's settings appear here.",
     sectionManagedNote:
       "This section's content comes from the AWJ catalog and cannot be edited here. You can show, hide and reorder it.",

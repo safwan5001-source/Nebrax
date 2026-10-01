@@ -139,17 +139,31 @@ describe("CUST-H4-2 — Section Library UX", () => {
     expect(onAdd).not.toHaveBeenCalled();
   });
 
-  it("gated (offers) stays addable but shows its honest reason and badge; partial (featured) shows its own badge and reason", () => {
+  it("Offers (gated) is visible in the Library but NOT addable, with its own merchant-facing reason — CUST-H4-2 review fix", () => {
     renderLibrary();
     const offers = card("offers");
-    expect(offers.disabled).toBe(false);
+    // Visible, not hidden.
+    expect(offers).toBeTruthy();
+    // Not addable: no real Commerce backend or Canvas/Published renderer
+    // exists yet (H4-6/H4-7), so the card must be disabled.
+    expect(offers.disabled).toBe(true);
     expect(within(dialog()).getByText("غير مفعّل")).toBeTruthy();
     expect(
-      within(dialog()).getByText(
-        "العروض تنتظر محرك العروض المعتمد في أَوْج. لا يُسعَّر هذا القسم من هنا ولا يُنشر.",
+      within(offers).getByText(
+        "العروض قادمة. ستصبح قابلة للإضافة عند اكتمال بنيتها التجارية الحقيقية وعارضَيها في أَوْج.",
       ),
     ).toBeTruthy();
+  });
 
+  it("clicking the disabled Offers card never calls onAdd", async () => {
+    const user = userEvent.setup();
+    const { onAdd } = renderLibrary();
+    await user.click(card("offers"));
+    expect(onAdd).not.toHaveBeenCalled();
+  });
+
+  it("Featured (partial) remains addable, as currently designed — unaffected by the Offers fix", () => {
+    renderLibrary();
     const featured = card("featured");
     expect(featured.disabled).toBe(false);
     expect(within(dialog()).getByText("قيد الإكمال")).toBeTruthy();

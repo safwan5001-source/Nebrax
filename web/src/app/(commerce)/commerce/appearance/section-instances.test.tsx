@@ -169,6 +169,11 @@ describe('commerce appearance — STORE-CUSTOMIZER-V2-2 section instances', () =
       (picker.querySelector('[data-picker-option="banner"]') as HTMLButtonElement)
         .disabled,
     ).toBe(false);
+    // CUST-H4-2 review fix — Offers is visible but withheld from
+    // merchant-addable results (no real H4-6 backend / H4-7 renderers yet):
+    // the gated badge alone is not enough, the Add control itself must be
+    // disabled too.
+    expect((offersOption as HTMLButtonElement).disabled).toBe(true);
   });
 
   it('add creates a new instance with a safe unique id and selects it', async () => {
@@ -198,14 +203,39 @@ describe('commerce appearance — STORE-CUSTOMIZER-V2-2 section instances', () =
     await waitFor(() => expect(showMock).toHaveBeenCalled());
     await openHomepage(user);
 
-    const first = await addSection(user, 'offers');
-    const second = await addSection(user, 'offers');
+    // CUST-H4-2 review fix — `offers` is no longer a valid example of "an
+    // addable multi-instance type" (it is gated/not-addable until
+    // H4-6/H4-7); `benefits` is multi-instance and still fully addable.
+    const first = await addSection(user, 'benefits');
+    const second = await addSection(user, 'benefits');
 
     expect(first).not.toBe(second);
     // One default instance plus the two added ones.
     expect(
-      document.querySelectorAll('[data-composer-section="offers"]'),
+      document.querySelectorAll('[data-composer-section="benefits"]'),
     ).toHaveLength(3);
+  });
+
+  it('offers is withheld from merchant-addable results — clicking it never creates a new instance', async () => {
+    const user = userEvent.setup();
+    render(<CommerceAppearancePage />);
+    await waitFor(() => expect(showMock).toHaveBeenCalled());
+    await openHomepage(user);
+
+    const before = composerRows().length;
+    await user.click(screen.getByRole('button', { name: /إضافة قسم/ }));
+    const picker = document.querySelector('[data-section-picker]') as HTMLElement;
+    const offersOption = picker.querySelector(
+      '[data-picker-option="offers"]',
+    ) as HTMLButtonElement;
+    expect(offersOption.disabled).toBe(true);
+    await user.click(offersOption);
+
+    // Still just the one default `offers` instance — no new one appeared.
+    expect(composerRows()).toHaveLength(before);
+    expect(
+      document.querySelectorAll('[data-composer-section="offers"]'),
+    ).toHaveLength(1);
   });
 
   it('duplicate copies type/visible, creates a new id, sits next to the source and is selected', async () => {
