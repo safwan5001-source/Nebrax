@@ -6,7 +6,8 @@
 
 ## 2. Head SHA
 
-`dd29cd9ae8098e290d7d5e46308818ce3028cba8`
+`dd29cd9ae8098e290d7d5e46308818ce3028cba8` (the preceding code-only commit — the two regression tests;
+`a6cde2856b441b136e93aa5bd13ea7b7ac01ce79` is the commit adding this report on top of it).
 
 ## 3. Branch
 
