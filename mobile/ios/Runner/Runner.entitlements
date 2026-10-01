@@ -15,7 +15,7 @@
 		     bundle until a future task introduces build-flavor separation —
 		     each entry point only ever resolves its own link shape
 		     (resolveDeepLinkUri vs resolvePreviewExchangeReferenceFromUri). -->
-		<string>applinks:preview.awj-runtime-proof.example</string>
+		<string>applinks:preview.awjdev.xyz</string>
 	</array>
 </dict>
 </plist>

@@ -21,7 +21,7 @@
 /// preview-only subdomain keeps the two allowlists — and the two apps that
 /// will eventually claim them — structurally independent from day one,
 /// rather than retrofitting that separation once a real domain exists.
-const String kPreviewDeepLinkHost = 'preview.awj-runtime-proof.example';
+const String kPreviewDeepLinkHost = 'preview.awjdev.xyz';
 
 /// A defensive cap on an accepted reference's length — the backend's own
 /// opaque exchange references are short random ASCII strings
