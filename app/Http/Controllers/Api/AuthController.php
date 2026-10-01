@@ -228,7 +228,10 @@ class AuthController extends ApiController
             'token' => ['required', 'string', 'size:64'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
         ]);
-        $user = $recovery->consume($data['token'], AuthRecoveryService::PASSWORD_RESET);
+        // دعوة الدخول تعيد استخدام عقد reset-password نفسه: الرابط يعيّن
+        // كلمة مرور لأول مرة أو يعيد تعيينها، من دون كشف كلمة مرور مؤقتة.
+        $user = $recovery->consume($data['token'], AuthRecoveryService::PASSWORD_RESET)
+            ?? $recovery->consume($data['token'], AuthRecoveryService::LOGIN_INVITATION);
         if (! $user) {
             throw ValidationException::withMessages(['token' => 'رابط الاسترداد غير صالح أو منتهي الصلاحية.']);
         }

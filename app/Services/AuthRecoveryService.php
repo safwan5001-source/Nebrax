@@ -14,6 +14,8 @@ class AuthRecoveryService
     public const PASSWORD_RESET = 'password_reset';
     public const EMAIL_VERIFICATION = 'email_verification';
 
+    public const LOGIN_INVITATION = 'login_invitation';
+
     /**
      * TENANT-PROVISIONING-E2E-1 — انتقال ما بعد التسجيل عبر نطاق فرعي مختلف
      * (`test.{base}` → `{slug}.{base}`). نفس بنية `auth_action_tokens`
@@ -37,7 +39,7 @@ class AuthRecoveryService
 
     public function issue(User $user, string $type): string
     {
-        if (! in_array($type, [self::PASSWORD_RESET, self::EMAIL_VERIFICATION, self::TENANT_HANDOFF], true)) {
+        if (! in_array($type, [self::PASSWORD_RESET, self::EMAIL_VERIFICATION, self::LOGIN_INVITATION, self::TENANT_HANDOFF], true)) {
             throw new RuntimeException('Unsupported auth token type.');
         }
 

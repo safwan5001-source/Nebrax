@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { type ColumnDef } from '@tanstack/react-table';
-import { Plus, Pencil, Trash2, MapPin, User, UserCog } from 'lucide-react';
+import { Plus, Pencil, Trash2, MapPin, User, UserCog, Mail } from 'lucide-react';
 import { DataTable } from '@/components/data-table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -112,6 +112,16 @@ export default function HrPage() {
     await api(`/users/${id}`, { method: 'DELETE' }).catch(() => {});
     success(tc('deleted'));
     loadTeam();
+  }
+
+  async function sendInvitation(user: TeamUser) {
+    if (!window.confirm(tu('send_invitation_confirm', { email: user.email }))) return;
+    try {
+      await api(`/users/${user.id}/send-invitation`, { method: 'POST' });
+      success(tu('invitation_sent'));
+    } catch (err) {
+      error(err instanceof ApiError ? err.message : tc('saveFailed'));
+    }
   }
 
   const toLinkedUser = (u: TeamUser): LinkedUser => ({
@@ -383,6 +393,9 @@ export default function HrPage() {
             </Button>
             <Button variant="ghost" size="icon" aria-label={tu('scope_title')} onClick={() => setScopeUser(row.original)}>
               <MapPin className="h-4 w-4 text-muted" strokeWidth={1.7} />
+            </Button>
+            <Button variant="ghost" size="icon" aria-label={tu('send_invitation')} onClick={() => sendInvitation(row.original)}>
+              <Mail className="h-4 w-4 text-muted" strokeWidth={1.7} />
             </Button>
             {row.original.id !== meId && (
               <Button variant="ghost" size="icon" aria-label={tu('remove')} onClick={() => removeUser(row.original.id)}>

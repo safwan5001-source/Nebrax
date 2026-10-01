@@ -5,15 +5,19 @@ namespace App\Http\Controllers\Api;
 use App\Http\Requests\StoreUserRequest;
 use App\Http\Requests\UpdateUserRequest;
 use App\Http\Resources\UserResource;
+use App\Mail\AuthActionMail;
 use App\Models\Branch;
 use App\Models\Employee;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Models\Warehouse;
+use App\Services\AuthRecoveryService;
 use App\Support\PlanGate;
 use App\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
 
 /**
  * إدارة مستخدمي المؤسسة (owner/admin فقط).
@@ -134,15 +138,34 @@ class UserController extends ApiController
             'employee_id' => $data['employee_id'] ?? null,
             'name'        => $data['name'],
             'email'       => $data['email'],
-            'password'    => $data['password'],
+            // لا تُخزَّن كلمة مرور مؤقتة معروفة عند اختيار الدعوة؛ القيمة
+            // العشوائية لا تصل إلى البريد أو أي استجابة.
+            'password'    => $data['password'] ?? Str::random(64),
             'role'        => $data['role'],
             'is_active'   => $data['is_active'] ?? true,
         ]);
 
         $this->syncAccessScope($user, $data);
 
+        if ((bool) ($data['send_invitation'] ?? false)) {
+            $this->sendLoginInvitation($user);
+        }
+
         return (new UserResource($user->load('employee', 'branches', 'warehouses')))
             ->response()->setStatusCode(201);
+    }
+
+    public function sendInvitation(Request $request, string $id, AuthRecoveryService $recovery): JsonResponse
+    {
+        $user = User::where('tenant_id', $this->tenantId())->findOrFail($id);
+
+        if (! is_string($user->email) || trim($user->email) === '') {
+            abort(422, 'لا يمكن إرسال دعوة لمستخدم بلا بريد إلكتروني.');
+        }
+
+        $this->sendLoginInvitation($user, $recovery);
+
+        return response()->json(['message' => 'تم إرسال بيانات الدخول إلى بريد المستخدم.']);
     }
 
     public function update(UpdateUserRequest $request, string $id): JsonResponse
@@ -175,5 +198,20 @@ class UserController extends ApiController
         $user->delete();
 
         return response()->json(['message' => 'تم الحذف.']);
+    }
+
+    private function sendLoginInvitation(User $user, ?AuthRecoveryService $recovery = null): void
+    {
+        $recovery ??= app(AuthRecoveryService::class);
+        $token = $recovery->issue($user, AuthRecoveryService::LOGIN_INVITATION);
+        $tenantName = (string) $user->tenant()->value('name');
+
+        Mail::to($user->email)->send(new AuthActionMail(
+            'invite',
+            $recovery->frontendLink($user, '/reset-password', $token),
+            $tenantName,
+            $user->name,
+            $user->email,
+        ));
     }
 }

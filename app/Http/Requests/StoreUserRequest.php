@@ -20,7 +20,8 @@ class StoreUserRequest extends FormRequest
         return [
             'name'      => ['required', 'string', 'max:255'],
             'email'     => ['required', 'email', 'max:255'],
-            'password'  => ['required', 'string', 'min:8'],
+            'password'  => ['nullable', 'string', 'min:8', 'required_unless:send_invitation,true'],
+            'send_invitation' => ['sometimes', 'boolean'],
             // يشمل النظامية (owner/admin/accountant/staff — مزروعة لكل مستأجر
             // عند التسجيل) والمخصَّصة معاً؛ لا قائمة ثابتة بعد اليوم.
             'role' => [

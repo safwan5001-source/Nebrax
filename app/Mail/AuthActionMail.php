@@ -15,13 +15,18 @@ class AuthActionMail extends Mailable
     public function __construct(
         public readonly string $action,
         public readonly string $url,
+        public readonly ?string $tenantName = null,
+        public readonly ?string $userName = null,
+        public readonly ?string $loginEmail = null,
     ) {}
 
     public function envelope(): Envelope
     {
-        return new Envelope(subject: $this->action === 'verify'
-            ? 'تأكيد البريد الإلكتروني — أَوْج ERP'
-            : 'استرداد كلمة المرور — أَوْج ERP');
+        return new Envelope(subject: match ($this->action) {
+            'verify' => 'تأكيد البريد الإلكتروني — أَوْج ERP',
+            'invite' => 'دعوة الدخول إلى أَوْج ERP',
+            default => 'استرداد كلمة المرور — أَوْج ERP',
+        });
     }
 
     public function content(): Content
