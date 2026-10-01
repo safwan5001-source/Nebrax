@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   contrastRatio,
   FONT_PRESETS,
-  fontPresetArabicVar,
+  fontPresetFamilyStack,
   isSafeHexColor,
   presentationCssVars,
   presetPrimary,
@@ -51,25 +51,32 @@ describe("presentation tokens", () => {
     ]);
   });
 
-  it("CUST-H3-2: resolves the Arabic face deterministically and fails closed to Cairo", () => {
-    expect(fontPresetArabicVar("cairo-geist")).toBe("var(--font-cairo)");
-    expect(fontPresetArabicVar("tajawal-geist")).toBe("var(--font-tajawal)");
-    expect(fontPresetArabicVar("bogus-value" as never)).toBe(
-      "var(--font-cairo)",
+  it("CUST-H3-2: resolves the full font-family stack deterministically and fails closed to Cairo", () => {
+    expect(fontPresetFamilyStack("cairo-geist")).toBe(
+      "var(--font-geist), var(--font-cairo), system-ui, sans-serif",
+    );
+    expect(fontPresetFamilyStack("tajawal-geist")).toBe(
+      "var(--font-geist-tajawal), var(--font-tajawal), system-ui, sans-serif",
+    );
+    expect(fontPresetFamilyStack("bogus-value" as never)).toBe(
+      "var(--font-geist), var(--font-cairo), system-ui, sans-serif",
     );
   });
 
-  it("CUST-H3-2: emits --store-font-arabic without changing color/radius output", () => {
-    const cairoVars = presentationCssVars("#1e3a5f", "subtle");
-    expect(cairoVars["--store-font-arabic"]).toBe("var(--font-cairo)");
-    expect(cairoVars["--store-primary"]).toBe("#1e3a5f");
+  it("CUST-H3-2-FIX-1: the tajawal-geist stack never references Cairo or the shared --font-geist, so Cairo cannot shadow Tajawal", () => {
+    const stack = fontPresetFamilyStack("tajawal-geist");
+    expect(stack).not.toContain("--font-cairo");
+    // Must use the dedicated Tajawal-fallback Geist instance, not the
+    // Cairo-fallback one — reusing --font-geist here would resolve Arabic
+    // to Cairo via Geist's own baked-in fallback before Tajawal is reached.
+    expect(stack).toContain("--font-geist-tajawal");
+    expect(stack).not.toMatch(/var\(--font-geist\),/);
+  });
 
-    const tajawalVars = presentationCssVars(
-      "#1e3a5f",
-      "subtle",
-      "tajawal-geist",
-    );
-    expect(tajawalVars["--store-font-arabic"]).toBe("var(--font-tajawal)");
-    expect(tajawalVars["--store-primary"]).toBe("#1e3a5f");
+  it("CUST-H3-2: presentationCssVars is unaffected by font preset — color/radius only", () => {
+    const vars = presentationCssVars("#1e3a5f", "subtle");
+    expect(vars["--store-primary"]).toBe("#1e3a5f");
+    expect(vars["--store-radius"]).toBe("0.5rem");
+    expect(vars).not.toHaveProperty("--store-font-arabic");
   });
 });

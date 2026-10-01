@@ -8,7 +8,7 @@ import type {
   StorefrontPresentationConfig,
 } from "./config";
 import { normalizePresentationConfig, previewStoreName } from "./config";
-import { presentationCssVars } from "./tokens";
+import { fontPresetFamilyStack, presentationCssVars } from "./tokens";
 import { buildWhatsAppUrl, sanitizeExternalUrl, sanitizeLogoUrl } from "./urls";
 
 export function readPublishedPresentation(
@@ -46,15 +46,26 @@ export function publishedStoreName(
   return previewStoreName(presentation, liveName, fallback);
 }
 
+/**
+ * CUST-H3-2-FIX-1 — `fontFamily` is set directly on this same returned
+ * object (applied inline on `(storefront)/layout.tsx`'s theme wrapper div)
+ * rather than through a CSS custom property a `globals.css` rule on `body`
+ * would need to consume. `body` is an *ancestor* of that wrapper, and a
+ * custom property set on a descendant never affects a property already
+ * computed on an ancestor — so a `body { font-family: ...var(--store-font-
+ * arabic)... }` rule could never see a value this wrapper set. Putting the
+ * resolved stack directly on the wrapper's own `style` sidesteps that
+ * entirely: the wrapper declares its own `font-family`, which every element
+ * inside it (the whole published page) then inherits normally.
+ */
 export function publishedThemeStyle(
   presentation: StorefrontPresentationConfig | null,
 ): Record<string, string> | undefined {
   if (!presentation) return undefined;
-  return presentationCssVars(
-    presentation.primaryColor,
-    presentation.radius,
-    presentation.fontPreset,
-  );
+  return {
+    ...presentationCssVars(presentation.primaryColor, presentation.radius),
+    fontFamily: fontPresetFamilyStack(presentation.fontPreset),
+  };
 }
 
 export function publishedLogoUrl(

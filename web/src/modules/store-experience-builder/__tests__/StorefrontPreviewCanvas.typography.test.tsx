@@ -35,9 +35,13 @@ describe("Customizer Canvas — Typography runtime (CUST-H3-2)", () => {
       <StorefrontPreviewCanvas config={config} locale="en" viewport="desktop" />,
     );
     const canvas = container.querySelector("[data-preview-canvas]") as HTMLElement;
+    // CUST-H3-2-FIX-1: must use the dedicated Tajawal-fallback Geist
+    // instance (`--font-geist-tajawal`), never the shared `--font-geist` —
+    // that instance's own fallback names Cairo and would shadow Tajawal.
     expect(canvas.style.fontFamily).toBe(
-      "var(--font-geist), var(--font-tajawal), system-ui, sans-serif",
+      "var(--font-geist-tajawal), var(--font-tajawal), system-ui, sans-serif",
     );
+    expect(canvas.style.fontFamily).not.toContain("--font-cairo");
   });
 
   it("an unknown/stale fontPreset fails closed to the Cairo stack", () => {
@@ -59,7 +63,7 @@ describe("Customizer Canvas — Typography runtime (CUST-H3-2)", () => {
       );
       const canvas = container.querySelector("[data-preview-canvas]") as HTMLElement;
       expect(canvas.style.fontFamily).toBe(
-        "var(--font-geist), var(--font-tajawal), system-ui, sans-serif",
+        "var(--font-geist-tajawal), var(--font-tajawal), system-ui, sans-serif",
       );
       unmount();
     }

@@ -22,7 +22,7 @@ import {
   type StorefrontPresentationConfig,
 } from "@/lib/presentation/config";
 import {
-  fontPresetArabicVar,
+  fontPresetFamilyStack,
   presentationCssVars,
 } from "@/lib/presentation/tokens";
 import {
@@ -85,7 +85,6 @@ export function StorefrontPreviewCanvas({
   const vars = presentationCssVars(
     config.primaryColor,
     config.radius,
-    config.fontPreset,
   ) as CSSProperties;
   const compact = viewport === "mobile" || config.header.style === "compact";
   const logo =
@@ -144,7 +143,7 @@ export function StorefrontPreviewCanvas({
       className="relative min-h-full bg-store-background text-store-foreground"
       style={{
         ...vars,
-        fontFamily: `var(--font-geist), ${fontPresetArabicVar(config.fontPreset)}, system-ui, sans-serif`,
+        fontFamily: fontPresetFamilyStack(config.fontPreset),
       }}
     >
       <p className="sr-only">{t("fixtureCatalogHint")}</p>

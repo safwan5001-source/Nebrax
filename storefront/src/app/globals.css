@@ -215,23 +215,27 @@
 
 /*
  * One stack, two scripts. Latin glyphs resolve in Geist; Arabic glyphs are not
- * in Geist so the browser falls through per-character to the Arabic face —
- * Cairo by default, the face the approved Responsive Visual Baseline V1
- * reference is drawn in. Arabic is the storefront's default locale, so it
- * must not land on a system fallback.
+ * in Geist so the browser falls through per-character to Cairo — the face the
+ * approved Responsive Visual Baseline V1 reference is drawn in. Arabic is the
+ * storefront's default locale, so it must not land on a system fallback.
  *
  * This only works because Geist names Cairo as its own fallback; read the
  * rationale in DocumentShell.tsx before reordering this stack.
  *
- * CUST-H3-2 — `--store-font-arabic` is the merchant's chosen Arabic face
- * (Cairo or Tajawal), set inline by the Published theme wrapper
- * (`presentationCssVars()`, `(storefront)/layout.tsx`). The `var(--font-cairo)`
- * fallback keeps every route with no Published presentation — and every
- * pre-CUST-H3-2 document, which normalizes to `cairo-geist` — rendering
- * exactly as before.
+ * This is the no-presentation / pre-CUST-H3-2-document default only. A
+ * Published store with a real `fontPreset` is not driven by this rule at
+ * all — `(storefront)/layout.tsx` applies the merchant's resolved
+ * `fontFamily` (`publishedThemeStyle()`, `lib/presentation/public.ts`)
+ * directly as an inline style on its own theme wrapper, which is an
+ * *ancestor* of every page element. A CSS custom property set on a
+ * *descendant* of `body` cannot affect a property this rule already computed
+ * on `body` itself (custom properties only cascade downward) — this rule
+ * intentionally stays a fixed Cairo/Geist default rather than reaching for
+ * one, so there is exactly one place (the wrapper's own inline `fontFamily`)
+ * that decides the Published font.
  */
 body {
-  font-family: var(--font-geist), var(--store-font-arabic, var(--font-cairo)), system-ui, sans-serif;
+  font-family: var(--font-geist), var(--font-cairo), system-ui, sans-serif;
   font-weight: 400;
 }
 

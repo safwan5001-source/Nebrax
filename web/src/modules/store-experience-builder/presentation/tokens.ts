@@ -21,15 +21,32 @@ export const FONT_PRESETS = [
 export type FontPresetId = (typeof FONT_PRESETS)[number]["id"];
 
 /**
- * Resolves a merchant font preset to the Arabic face's next/font CSS
- * variable. Latin stays Geist in every preset (CUST-H3-2 decision — one
+ * Resolves a merchant font preset to its complete CSS font-family stack.
+ * Latin always resolves through Geist (CUST-H3-2 decision — one
  * merchant-facing Typography control, no heading/body split); only the
- * Arabic face swaps. Both faces are declared on the Canvas root by
- * `./fonts.ts`, so referencing either variable here never triggers a new
- * network request. Unknown/unrecognized presets fail closed to Cairo.
+ * Arabic face swaps between presets.
+ *
+ * CUST-H3-2-FIX-1 — a single shared `--font-geist` cannot serve every
+ * preset: `next/font`'s `fallback` option bakes the configured Arabic face
+ * directly into that Geist instance's own CSS value (see `./fonts.ts`'s
+ * comment on why `fallback: ["Cairo"]` exists at all), so a stack built as
+ * `var(--font-geist), var(--font-tajawal)` with a Cairo-fallback Geist
+ * instance actually expands to `"Geist", Cairo, Tajawal` — Cairo answers for
+ * Arabic before Tajawal is ever reached, making `tajawal-geist` a visual
+ * no-op. `cairo-geist` keeps the original, unrenamed `--font-geist` (so
+ * every pre-existing consumer, including the `--font-sans` Tailwind alias,
+ * is unaffected); `tajawal-geist` uses a second, dedicated
+ * `--font-geist-tajawal` instance whose own fallback names Tajawal instead.
+ * Both Geist variants and both Arabic faces are declared unconditionally by
+ * `./fonts.ts`, so resolving either stack never triggers a new network
+ * request — the browser only fetches the files the resolved stack actually
+ * uses for rendered text. Unknown/unrecognized presets fail closed to
+ * Cairo.
  */
-export function fontPresetArabicVar(id: FontPresetId): string {
-  return id === "tajawal-geist" ? "var(--font-tajawal)" : "var(--font-cairo)";
+export function fontPresetFamilyStack(id: FontPresetId): string {
+  return id === "tajawal-geist"
+    ? "var(--font-geist-tajawal), var(--font-tajawal), system-ui, sans-serif"
+    : "var(--font-geist), var(--font-cairo), system-ui, sans-serif";
 }
 
 export const DENSITY_PRESETS = ["comfortable", "compact"] as const;
@@ -158,11 +175,7 @@ export function radiusToken(id: RadiusId): string {
  * CSS custom properties applied to the preview (and, later, the published
  * storefront). Unknown or unreadable colours fall back to AWJ Modern.
  */
-export function presentationCssVars(
-  primary: string,
-  radius: RadiusId,
-  fontPreset: FontPresetId = "cairo-geist",
-): Record<string, string> {
+export function presentationCssVars(primary: string, radius: RadiusId): Record<string, string> {
   const color = isSafeHexColor(primary) ? primary.trim() : "#12372a";
   const foreground = primaryForeground(color);
   return {
@@ -176,7 +189,6 @@ export function presentationCssVars(
     "--store-primary-foreground": foreground,
     "--store-primary-soft": mixHex(color, "#ffffff", 0.92),
     "--store-radius": radiusToken(radius),
-    "--store-font-arabic": fontPresetArabicVar(fontPreset),
     "--primary": color,
     "--primary-foreground": foreground,
     "--ring": color,

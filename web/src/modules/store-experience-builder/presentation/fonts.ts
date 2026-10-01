@@ -22,6 +22,22 @@ const geist = Geist({
   fallback: ["Cairo"],
 });
 
+/**
+ * CUST-H3-2-FIX-1 — a second Geist instance dedicated to `tajawal-geist`.
+ * `fallback` bakes the named face directly into this instance's own CSS
+ * value (see `presentation/tokens.ts#fontPresetFamilyStack`'s comment), so a
+ * single shared `--font-geist` naming Cairo would always resolve Arabic to
+ * Cairo first regardless of what came later in the stack. `--font-geist`
+ * above stays untouched for `cairo-geist` and for every other existing
+ * consumer (e.g. the `--font-sans` alias).
+ */
+const geistTajawalFallback = Geist({
+  variable: "--font-geist-tajawal",
+  subsets: ["latin"],
+  display: "swap",
+  fallback: ["Tajawal"],
+});
+
 const cairo = Cairo({
   variable: "--font-cairo",
   subsets: ["arabic"],
@@ -41,5 +57,9 @@ const tajawal = Tajawal({
   display: "swap",
 });
 
-/** Applied on the Canvas root so `var(--font-cairo)` / `var(--font-tajawal)` resolve. */
-export const PREVIEW_FONT_VARIABLES = `${geist.variable} ${cairo.variable} ${tajawal.variable}`;
+/**
+ * Applied on the Canvas root so every variable `fontPresetFamilyStack()` can
+ * reference — `--font-geist`, `--font-geist-tajawal`, `--font-cairo`,
+ * `--font-tajawal` — actually resolves.
+ */
+export const PREVIEW_FONT_VARIABLES = `${geist.variable} ${geistTajawalFallback.variable} ${cairo.variable} ${tajawal.variable}`;
