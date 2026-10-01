@@ -2,13 +2,12 @@
 
 ## Status
 
-**CUST-H2 READY FOR HORIZON CLOSURE AFTER OWNER MERGE APPROVAL.**
+**CUST-H2 CLOSED.**
 
-Not CLOSED. Every Slice below is implemented, tested, and opened as its own
-PR against `main`; none has been merged yet. This report may be marked
-CLOSED only after the owner reviews and merges CUST-H2-1 through CUST-H2-5
-(in order, per the architecture doc's own dependency chain) and confirms no
-scope regression across the whole Horizon.
+Owner review and merge gates are complete for CUST-H2-ARCH-1 and
+CUST-H2-1 through CUST-H2-5. The final implementation Slice, CUST-H2-5,
+was squash-merged as `cdcd1eb7ad7a52a3003d0c82f2cec61e17607541`.
+No deployment or Production release is implied by Horizon closure.
 
 ---
 
@@ -39,16 +38,15 @@ Mapping": *"This chain is only fully closed in CUST-H2-5."*
 
 | Slice | Scope | PR | Status |
 |---|---|---|---|
-| **CUST-H2-ARCH-1** | Architecture: `pagePresentation` additive schema, Page Type Registry, Page Capability Registry, region contracts for Product/Category, schema bump 2→3 | #1116 (merged, per task's own "known current main") | Merged |
-| **CUST-H2-1** | Schema/registry foundation: PHP + TS twin normalizers, closed region-key unions, fail-closed tests. No UI, no public runtime. | #1117 | Ready for merge, not merged |
-| **CUST-H2-2** | Page Navigator + page-aware Canvas shell (Customizer UI only) | #1118 | Ready for merge, not merged |
-| **CUST-H2-3** | Product page structured editing: region instances, Preview Product picker, workspace product-read API | #1119 | Ready for merge, not merged |
-| **CUST-H2-4** | Category page structured editing: same shape for Category, workspace category-read API | #1129 | Ready for merge, not merged |
-| **CUST-H2-5** | Cross-page public runtime parity: the public Product/Category pages now read `pagePresentation`; integrated Home/Product/Category QA | *(this PR)* | Ready for merge, not merged |
+| **CUST-H2-ARCH-1** | Architecture: `pagePresentation` additive schema, Page Type Registry, Page Capability Registry, region contracts for Product/Category, schema bump 2→3 | #1116 · `ce97b2d3367c954af5e353a4df058635fdfa1918` | Merged |
+| **CUST-H2-1** | Schema/registry foundation: PHP + TS twin normalizers, closed region-key unions, fail-closed tests. No UI, no public runtime. | #1117 · `19cbe6da128eaf8f7a36369a69131b3560e0aeb5` | Merged |
+| **CUST-H2-2** | Page Navigator + page-aware Canvas shell (Customizer UI only) | #1118 · `60db405ed9fcdeb118de66c525943647ad6548bb` | Merged |
+| **CUST-H2-3** | Product page structured editing: region instances, Preview Product picker, workspace product-read API | #1119 · `3b8c1d18182459bfe0047d4b6dbaa06fceded481` | Merged |
+| **CUST-H2-4** | Category page structured editing: same shape for Category, workspace category-read API | #1129 · `2f4a35e71ed4769757ccdb6003f8be68dc228cbc` | Merged |
+| **CUST-H2-5** | Cross-page public runtime parity: the public Product/Category pages now read `pagePresentation`; integrated Home/Product/Category QA | #1134 · `cdcd1eb7ad7a52a3003d0c82f2cec61e17607541` | Merged |
 
-Main has not advanced past CUST-H2-4's merge (`2f4a35e71ed4769757ccdb6003f8be68dc228cbc`)
-at the time CUST-H2-5 branched — confirmed by fetching `origin/main` at task
-start.
+CUST-H2's final merge baseline is
+`cdcd1eb7ad7a52a3003d0c82f2cec61e17607541`.
 
 ---
 
@@ -111,19 +109,20 @@ start.
 | **H2-5** | **930/930 (Commerce\|Presentation), 95/95 lifecycle** | not re-run (zero backend diff) | untouched | untouched | **108 files / 734 tests** | ✓ | **23/23 + 12/12 Home regression** |
 
 CI status for H2-1 through H2-4: reported green in each PR's own
-implementation report (H2-1's PR #1117 confirmed all 9 check runs
-`success`). CUST-H2-5's own CI status: not yet observed — will be reported
-once this PR is opened, per this report's own "CI" section requirement.
+implementation report. CUST-H2-5 PR #1134 also completed green after a
+transient Packagist HTTP/2 502 caused the SQLite job to fail before tests;
+the failed SQLite job was re-run without code changes and then passed.
+Storefront CI, Store Brand QA, and the main CI workflow were green at the
+owner merge gate.
 
 ---
 
 ## Production / Deployment Status
 
-**None of the five implementation Slices have been merged or deployed.**
-No Production release has occurred at any point in this Horizon. Every
-Slice's own report — and this closure report — states the same merge/deploy
-gate: **DO NOT MERGE. DO NOT DEPLOY. DO NOT PRODUCTION RELEASE**, even with
-green CI, until the owner explicitly approves.
+**All five implementation Slices have been merged. None has been deployed
+or Production-released as part of this Horizon closure.** Merge approval and
+deployment approval remain separate owner gates. No Production release has
+occurred as part of CUST-H2.
 
 ---
 
@@ -173,13 +172,13 @@ sections, still open after H2-5:
 ## Horizon Closure Checklist
 
 - **H2-1 — schema/registry foundation:** ✓ implemented, tested (PHP/TS
-  parity across three normalizer twins), PR open, not merged.
+  parity across three normalizer twins), merged via PR #1117.
 - **H2-2 — Page Navigator/page-aware Canvas:** ✓ implemented, tested
-  (Playwright + vitest), PR open, not merged.
+  (Playwright + vitest), merged via PR #1118.
 - **H2-3 — Product structured editor + preview API:** ✓ implemented, tested,
-  PR open, not merged.
+  merged via PR #1119.
 - **H2-4 — Category structured editor + preview API:** ✓ implemented,
-  tested, PR open, not merged.
+  tested, merged via PR #1129.
 - **H2-5 — public Product runtime:** ✓ implemented this PR — region
   order/visibility/data-absence/malformed-safety all verified by real
   component tests and real-browser Playwright evidence.
@@ -233,22 +232,21 @@ sections, still open after H2-5:
 
 ## Confirmation
 
-**CUST-H2 is functionally complete** against the architecture doc's own
-Implementation Slicing table and the Public Runtime Mapping chain it
-defined. It is **not yet CLOSED**: closure requires the owner's explicit
-review and merge of all five implementation PRs (H2-1 → H2-5, in that
-dependency order — later Slices assume earlier ones are on `main`), plus a
-final confirmation that no PR review round surfaced a scope-changing
-finding. Deploy/Production release remains a wholly separate, explicit
-decision this Horizon does not authorize on its own.
+**CUST-H2 is CLOSED** against the architecture doc's Implementation Slicing
+table and Public Runtime Mapping chain. Owner review and merge gates were
+completed in dependency order through PR #1134, with final CUST-H2 baseline
+`cdcd1eb7ad7a52a3003d0c82f2cec61e17607541`.
 
-**CUST-H2 READY FOR HORIZON CLOSURE AFTER OWNER MERGE APPROVAL.**
+This closure does **not** authorize Deploy or Production release. Those
+remain separate explicit owner decisions.
+
+**CUST-H2 CLOSED.**
 
 ---
 
 ## Next Step
 
-After CUST-H2-1 through CUST-H2-5 are reviewed and merged in order, and this
-closure report is confirmed:
-
 **CUST-H3 — Store Identity Studio.**
+
+Begin with an evidence-first architecture/UX pass against the current merged
+Customizer implementation before authorizing implementation slices.
