@@ -4,8 +4,8 @@
 
 | | |
 |---|---|
-| **Base SHA** | `8f425cebcd944c7cef9a887aa01a0cf77a81a54` (verified against `origin/main` at task start — `docs(store): define CUST-H3 Store Identity architecture (#1138)`) |
-| **Head SHA** | `9a75ae64b82f97b01991dfefd2df83056a2430c6` |
+| **Base SHA** | `8f425ceb7cd944c7cef9a887aa01a0cf77a81a54` (verified against `origin/main` at task start — the CUST-H3-ARCH-1 merge commit, `docs(store): define CUST-H3 Store Identity architecture (#1138)`) |
+| **Head SHA** | `6bbe3e90566552e2ab941263986e203005a178f1` |
 | **Branch** | `feat/cust-h3-1-identity-studio-shell` |
 | **PR** | [#1140 — feat(store): consolidate Store Identity Studio](https://github.com/safwan5001-source/Nebrax/pull/1140) |
 
@@ -138,7 +138,13 @@ Exit code `0`. Full static/dynamic route manifest generated with no compile erro
 
 ## 17. CI status
 
-Not yet observed post-push (PR #1140 just opened); CI will run on GitHub Actions (`web-ci.yml`) once the PR is live. No CI run was skipped or bypassed locally — the full local Vitest, typecheck and build runs above are what CI itself would run on `web/`.
+Verified on PR #1140's GitHub Actions checks:
+
+- **CI:** SUCCESS (`php artisan test` — L11 sqlite and pgsql)
+- **Web CI:** SUCCESS (web build / Next.js)
+- **Store Brand QA:** SUCCESS (merchant preview visual QA, published footer visual QA)
+
+All 7 check runs on the PR completed with conclusion `success`. No CI run was skipped or bypassed — these are the same checks the full local Vitest, typecheck and build runs above (§13–16) already validated.
 
 ## 18. Backward compatibility
 
@@ -152,7 +158,6 @@ Not yet observed post-push (PR #1140 just opened); CI will run on GitHub Actions
 ## 19. Risks / remaining gaps
 
 - **Dev-only storefront twin left unsynced.** `storefront/src/components/customizer/{ControlPanels,messages}.tsx` still has the old four-bare-fields `BrandingPanel` with shared accessible names. This is intentional (see §5) since it's dev-harness-only and not parity-tested, but a future slice that *does* start relying on that twin for visual QA should pick up the same framing.
-- **CI status unconfirmed** at report time (§17) — PR was just opened.
 - **No image-content validation beyond existing `sanitizeLogoUrl`.** The new thumbnail simply renders whatever `logoDataUrl`/`compactLogoDataUrl`/`faviconDataUrl` already passed that existing regex-based check; this PR added no new validation and relies entirely on the pre-existing contract.
 - **One design decision worth flagging for owner review:** a `<Section title={t("branding")} ...>` (i.e., repeating "Identity" as a second heading inside the panel) was tried first and reverted after it created an ambiguous `getByRole('heading', { name: 'Identity' })` match against the inspector's own `<h2>`. The current shape (intro paragraph, no second heading) was chosen as the less redundant, equally clear option — but it is a visual judgment call, not a locked requirement from the architecture docs, and the owner may prefer an explicit "Store Identity" sub-heading instead.
 
