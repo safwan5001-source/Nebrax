@@ -2,11 +2,11 @@
 
 **Horizon:** CUST-H4 — Section Library & Section Quality (named and scoped in `AWJ_STORE_CUSTOMIZER_HORIZON_ROADMAP_V1.md:585-646`)
 **Status:** Architecture/Evidence draft — awaiting owner review. No runtime code, schema, or API changed by this task.
-**Author:** Claude (session `session_011sFWxaxv1beYdzjrNt9RXn`), 2026-10-01. Revised 2026-10-01 per owner correction on PR #1150 (see Revision Note below).
+**Author:** Claude (session `session_011sFWxaxv1beYdzjrNt9RXn`), 2026-10-01. Revised 2026-10-01 per owner correction on PR #1150 (see Revision Notes below).
 
 ---
 
-## Revision Note (owner correction, 2026-10-01)
+## Revision Note 1 (owner correction, 2026-10-01)
 
 The owner reviewed the first version of this document on PR #1150 and issued a correction: **Offers must not close H4 as permanently GATED.** The instruction is explicit — where a merchant-visible section has no authoritative source today, H4 must define and build the *smallest bounded* real Commerce contract needed to make it genuinely functional, not hide it. The owner set firm boundaries on that contract: no price/stock/tax/discount/campaign truth may live in `StorefrontPresentationConfig`; Commerce stays authoritative; presentation may hold only references; do not build a broad promotions engine unless evidence proves it's needed; if a genuine architecture/security blocker makes even a bounded contract unsafe, stop and escalate rather than silently gating.
 
@@ -16,6 +16,17 @@ This revision:
 - Revises the implementation slice sequence (§35), Definition of Done (§39), and every section this change touches (§24, §30, §31, §33, §34, §36–§40).
 - Everything **not** touched by this revision note — banner, benefits, customContent, appPromo's LIVE status, the Salla/Zid evidence, the generic contract, the UX sections — is carried forward unchanged from the first version; it was not reopened.
 - This document still only documents architecture. No runtime code, schema, or API was created in this repository by this task. The new Offers table/endpoints described below are a design for a future implementation slice (§23.6, H4-6/H4-7), not work performed here.
+
+## Revision Note 2 (owner correction, 2026-10-01)
+
+A second review on PR #1150 corrected §23.5's public Offers route: the first revision proposed `GET /api/store/v1/storefronts/{id}/offers`, which does not match AWJ's existing production public-storefront authority model (every `store/v1` read today is Host-resolved via `ResolveStorefrontDomain` → `StorefrontContext`, with no storefront/tenant identifier in the URL, query, body, or any client-controlled header). Re-verified directly against `routes/api_storefront.php`, `app/Http/Middleware/ResolveStorefrontDomain.php`, and `app/Tenancy/StorefrontContext.php` for this correction.
+
+This revision:
+- Corrects the public route to `GET /store/v1/offers` — no storefront id, same middleware group and authority chain as `products`/`categories`/`storefront`/`cart` (§23.5).
+- Separates the "Canvas preview" read from the public read: Canvas is merchant-authenticated and legitimately storefront-id-scoped via the existing workspace route (§23.4); only the *public* Published read needed correcting. Parity between the two is now described correctly as structural at the shared `StorefrontOfferResolver` **service** level, not the HTTP route level.
+- Adds 8 explicit tenant-isolation/host-authority tests to §30, required before H4-6 can be considered done.
+- Updates §23.6, §30, §32, §35 (H4-6/H4-7), §36–§40 to reflect the corrected route and the added test requirements.
+- Does not change the already-approved bounded Offers design otherwise: `storefront_offers` remains curation/scheduling-only (no price/discount/percentage column), `CommercePriceResolver`/`Product.sale_price` remain the price authority, non-genuine discounts remain silently omitted, and no promotions engine is introduced.
 
 ---
 
@@ -53,8 +64,11 @@ This document is therefore an *activation and library* contract for nine of the 
 **Backend (Laravel):**
 `app/Support/ApplicationCatalog.php`; `app/Models/ProductMedia.php`; `app/Http/Controllers/Api/StorefrontMediaController.php`; `database/migrations/*storefront_presentations*`, `*storefront_presentation_versions*`; full-repo grep across `app/Models`, `app/Http/Controllers`, `routes/api*.php`, `database/migrations` for promotion/discount/campaign/offer/price-rule.
 
-**Added for this revision (Offers bounded contract evidence):**
+**Added for revision 1 (Offers bounded contract evidence):**
 `app/Services/Commerce/CommercePriceResolver.php`, `app/Models/PriceList.php`, `app/Models/PriceListItem.php`, `app/Models/Product.php` (`sale_price` accessor, `discount`/`discount_type` fields), `app/Http/Controllers/Api/StorefrontProductController.php`, `app/Http/Controllers/Api/CommerceWorkspaceStorefrontProductController.php`, `app/Services/AppBuilder/DataResourceRegistry.php`; `storefront/src/lib/spree/{index,surface,config}.ts`, `storefront/src/lib/commerce/{products,config,mappers,types}.ts`; `web/src/modules/commerce-workspace/{workspace-products,workspace-categories}.ts`; `web/src/modules/store-experience-builder/{ProductPreviewPicker,ProductPreviewPickerPanel,ProductRegionInspector,CategoryPreviewPicker,CategoryPreviewPickerPanel,CategoryRegionInspector}.tsx`; `routes/api.php` (commerce workspace storefront routes); `docs/plans/store/ADR-11-COMMERCE-PROMOTIONS-DEFERRAL.md` (full text), `docs/plans/store/CUST-H2-ARCH-1-PAGE-CONTRACT.md` (Preview Context Model), `docs/reports/CUST-H2-3-IMPLEMENTATION-REPORT.md`, `docs/reports/CUST-H2-4-IMPLEMENTATION-REPORT.md`, `docs/reports/CUST-H2-HORIZON-CLOSURE-REPORT.md`.
+
+**Added for revision 2 (public storefront authority correction):**
+`routes/api_storefront.php` (full `store/v1` route group and its header comment, §25-49), `app/Http/Middleware/ResolveStorefrontDomain.php` (full file), `app/Tenancy/StorefrontContext.php` (full file), re-read `app/Http/Controllers/Api/StorefrontProductController.php:38-58` specifically for its `StorefrontContext` usage pattern.
 
 **Prior horizon docs (`docs/plans/store/`, `docs/reports/`):**
 `AWJ_STORE_CUSTOMIZER_HORIZON_ROADMAP_V1.md`, `AWJ_STORE_CUSTOMIZER_OFFERS_DECISION_PACKET.md`, `AWJ_STORE_CUSTOMIZER_PERSISTENCE_ARCHITECTURE.md`, `STORE-CUSTOMIZER-CONTRACT-2-IMPLEMENTATION-REPORT.md`, `AWJ_STORE_CUSTOMIZER_BUILD_DONT_HIDE_DECISION.md`, `AWJ_STORE_CUSTOMIZER_UX_V2.md`, `AWJ_STOREFRONT_DESIGN_SYSTEM.md`, `ADR-11-COMMERCE-PROMOTIONS-DEFERRAL.md`, `CUST-H3-ARCH-1-IDENTITY-CONTRACT.md`, `docs/reports/CUST-H3-HORIZON-CLOSURE-REPORT.md`, `CUST-H2-ARCH-1-PAGE-CONTRACT.md`.
@@ -333,14 +347,41 @@ DELETE /api/commerce/workspace/storefronts/{id}/offers/{offer}
 ```
 Same auth chain as every sibling route in that group: `auth:sanctum`, `SetTenant`, `SetBranch`, `EnsureActiveSubscription`, `EnsurePermission:commerce.manage`, `ownedStorefront()`. Request body for create/update: `{product_id, starts_at?, ends_at?, is_active?, position?}` — the controller **explicitly rejects** any `price`/`discount`/`percent`-shaped field in the request body (defense in depth, named here precisely because that is the exact attack/footgun surface being closed). The merchant picks candidate products via the *existing* `GET .../products` read (§21) — no new product-search capability is needed for curation; a product that isn't currently genuinely discounted simply won't render once curated (fail-closed), which is a UX nuance (§23.7) not an architecture gap.
 
-### 23.5 Public (Published + Canvas) read
+### 23.5 Public (Published) read — corrected to Host-resolved authority
+
+**Corrected in this revision.** The first version of this document proposed `GET /api/store/v1/storefronts/{id}/offers`. That does not match AWJ's existing, already-shipped public storefront authority model and was wrong — re-verified directly against `routes/api_storefront.php` for this correction. The real pattern, used by every other `store/v1` read today (`categories`, `products`, `media`, `storefront`, `cart`), never takes a storefront id as a route or query parameter at all:
 
 ```
-GET /api/store/v1/storefronts/{id}/offers
+routes/api_storefront.php:25-34 (doc comment, quoted):
+  السلسلة الأمنية لكل مسار: Host الوارد → ResolveStorefrontDomain (يحلّ
+  StorefrontDomain النشط والموثَّق ثم Storefront النشط ثم SalesChannel
+  النشطة من نوع web التابعة لنفس المستأجر، ويضبط TenantContext/
+  StorefrontContext لعمر الطلب فقط — 404 غير كاشف عند أي فشل) →
+  EnforcePublicApiRateLimit:unauth → استعلام قراءة معزول.
+  لا `{tenantSlug}` في مسارات هذه المجموعة — الحسم كلّه من الـ Host، لا من الرابط.
 ```
-Public, read-only, same gateway family as the existing `store/v1/products`. Returns only currently-real, currently-active, currently-discounted offers — the filtering in §23.3 step 3 happens server-side, so the client never re-derives "is this discounted," avoiding any drift between what the public API says and what's true: `{productId, name, thumbnailUrl, referencePrice, offerPrice, discountPercent, currency, startsAt, endsAt}`. Both the Published renderer (`page.tsx`'s new `offers` branch) and the editor's Canvas preview call this same read (the Canvas call goes through an authenticated equivalent reusing the identical resolver, for Draft-stage curation preview) — Canvas/Published parity is structural, not a thing to separately verify after the fact.
 
-A `commerce.offers` entry should be added to `app/Services/AppBuilder/DataResourceRegistry.php` following the exact shape its existing entries use (`id/version/apiSurface/listEndpoint/detailEndpoint/fields/queryParams/paginated/auth/notes`) — not required for H4's own closure, but keeps the mobile app builder's resource catalog honest once this exists.
+i.e.: *Host → `ResolveStorefrontDomain` (resolves the active, verified `StorefrontDomain`, then the active `Storefront`, then the active `web`-type `SalesChannel` of the same tenant, sets `TenantContext`/`StorefrontContext` for the request's lifetime only — uniform non-revealing 404 on any failure) → rate limit → isolated read.* No tenant/storefront identifier ever appears in the URL for this route group — confirmed directly in `routes/api_storefront.php:36-49`, where `products`, `categories`, `storefront`, `cart`, and `media` all take zero storefront-identifying parameter.
+
+**Corrected route:**
+```
+GET /store/v1/offers
+```
+Registered in the same `Route::middleware([ResolveStorefrontDomain::class, EnforcePublicApiRateLimit::class.':'.PublicApiRateLimits::CLASS_UNAUTH])` group as every sibling `store/v1` route (`routes/api_storefront.php:36-39`) — no new middleware stack invented. The controller resolves authority exactly the way `StorefrontProductController::index` already does today (`StorefrontProductController.php:48-49`):
+```php
+$storefront = app(StorefrontContext::class);
+$channelId = $storefront->salesChannelId();
+// + $storefront->tenantId(), $storefront->storefrontId() — never a request input
+```
+The Offers query is scoped to `storefront_offers.storefront_id === $storefront->storefrontId()` (and implicitly `tenant_id`, via `BaseModel`'s tenant scope on the `Product`/`storefront_offers` query) — **never** from a route parameter, query string, request body, or client-controlled header. `StorefrontContext` (`app/Tenancy/StorefrontContext.php`) only ever holds values `ResolveStorefrontDomain` set from the resolved Host; nothing downstream can override `tenantId()`/`storefrontId()`/`salesChannelId()` — there is no setter reachable from a controller action.
+
+One real nuance worth recording precisely, because it is part of how "the Host remains authority" actually holds in production: `storefront/` (Next.js) is the sole production caller of this Laravel endpoint, not the visitor's browser directly, so `$request->getHost()` as Laravel sees it would reflect the Next.js server's own host, not the storefront domain the visitor typed. `ResolveStorefrontDomain::incomingHostname()` (`ResolveStorefrontDomain.php:134-145`) handles this with a narrow, server-only escape hatch: it accepts an `X-Storefront-Forwarded-Host` header **only** when paired with a correct `X-Storefront-Gateway-Secret` header (constant-time `hash_equals` comparison against a server-only secret the browser never receives) — a wrong or missing secret is treated identically to no header at all, falling back to the real Laravel-visible host (which then safely 404s). This is not a competing resolution mechanism and does not change the authority model in this document: it only changes *where the hostname string comes from*, never who may supply a tenant/storefront id directly.
+
+Response shape — only currently-real, currently-active, currently-discounted offers, filtered server-side per §23.3 step 3 so the client never re-derives "is this discounted": `{productId, name, thumbnailUrl, referencePrice, offerPrice, discountPercent, currency, startsAt, endsAt}`.
+
+**Canvas (editor) read — corrected framing.** The first version of this document said Canvas calls "the same read" as Published through "an authenticated equivalent." That blurred two different authority models together and is corrected here: Canvas is a merchant-authenticated, Draft-stage preview for a *specific* storefront being edited, so it legitimately uses the **workspace** route (§23.4, `GET .../workspace/storefronts/{id}/offers`, already `storefront_id`-scoped with `ownedStorefront()` ownership checks) extended to return the same resolved shape (name, thumbnail, referencePrice, offerPrice, discountPercent) as the public read — it must **not** call the Host-resolved public route (Canvas isn't reached via the merchant's own storefront hostname). Parity between Canvas and Published is therefore structural at the **service** level, not the route level: both the workspace controller and `store/v1/offers` call the same underlying `StorefrontOfferResolver` (§23.3), each from its own correctly-scoped authority boundary, exactly the precedent `CommerceWorkspaceStorefrontProductController` and `StorefrontProductController` already set by both reusing `CommercePriceResolver`/`AvailableToSellService` without duplicating them.
+
+A `commerce.offers` entry may later be added to `app/Services/AppBuilder/DataResourceRegistry.php` (mobile app builder catalog) following the exact shape its existing entries use (`id/version/apiSurface/listEndpoint/detailEndpoint/fields/queryParams/paginated/auth/notes`) — not required for H4's own closure. If added, its `listEndpoint`/`detailEndpoint` must read `store/v1/offers` (Host-resolved, no id), matching every other `commerce.*` entry's existing pattern of never requiring a client-supplied `storefront_id` to read public storefront data; it must **not** document the old, corrected `storefronts/{id}/offers` shape.
 
 ### 23.6 What this explicitly does not do
 
@@ -348,7 +389,8 @@ A `commerce.offers` entry should be added to `app/Services/AppBuilder/DataResour
 - Does not touch `LedgerService`, `InvoiceService`, cart totals, or checkout's amount-due computation in any way — purely a read-only curation+display layer over pricing decisions that already affect checkout through the existing, unmodified `CommercePriceResolver` path.
 - Does not modify `PriceList`/`PriceListItem`'s schema, semantics, or any existing caller of them.
 - Does not add tax computation (mirrors `CommercePriceResolver`'s own explicit "tax absent by design" boundary).
-- Does not build a broad enterprise promotions engine — exactly one new table, zero new pricing logic, two small additive API route groups.
+- Does not build a broad enterprise promotions engine — exactly one new table, zero new pricing logic, three small additive API route groups (workspace CRUD, workspace Canvas-preview read, public `store/v1/offers`).
+- Does not change AWJ's existing public storefront authority model in any way: the public read is Host-resolved exactly like every other `store/v1` route (§23.5, corrected) — it does not introduce a storefront-id-bearing public route, and it does not give any public request a way to select or override tenant/storefront/channel.
 
 This reframes Offers as a **display capability over already-authoritative pricing data**, not a promotions/discount **engine** — which is the distinction that lets it proceed without reopening ADR-11's deferral (that ADR deferred an engine that changes amount-due semantics; this does not) and without the financial/order-total review ADR-11 names as a prerequisite for *that* engine. This reframing is itself a decision the owner is making by issuing this correction; it is recorded here as the explicit reasoning, not asserted silently.
 
@@ -407,8 +449,19 @@ Every section has at minimum an `aria-labelledby` landmark tied to its heading. 
 - `storefront_presentations` and `storefront_presentation_versions` both carry `tenant_id` (FK, cascade-delete) and `storefront_id`, with compound unique constraints — presentation config cannot cross tenant boundaries by schema construction.
 - Draft is unreachable from the public runtime (`public.ts:1-4`, `page.tsx:47` reads Published only) — confirmed at the code level, not just by convention.
 - Unknown section types are dropped (fail-closed) at normalization — confirmed by `config.test.ts:139-156`.
-- **New boundary created by this revision**: `storefront_offers` (§23.3). Same tenant-scoping pattern as every other table in this document — `tenant_id` FK, `BaseModel` scope, `storefront_id` ownership-checked via the existing `ownedStorefront()` pattern (404 for foreign/missing, never 403), `product_id` resolved via the same safe cross-tenant-failing reference pattern `PriceListItem.product()` already uses. The workspace CRUD (§23.4) is `commerce.manage`-gated, identical to every sibling `commerce/workspace/storefronts/{id}/...` route; the public read (§23.5) exposes only already-public-equivalent fields (price, name, thumbnail — the same class of data `store/v1/products` already exposes publicly), never Draft-stage or cross-tenant data.
+- **New boundary created by this revision**: `storefront_offers` (§23.3). Same tenant-scoping pattern as every other table in this document — `tenant_id` FK, `BaseModel` scope, `product_id` resolved via the same safe cross-tenant-failing reference pattern `PriceListItem.product()` already uses. **Two different, correctly-separated authority models for the two read paths (corrected in this revision, §23.5):**
+  - **Workspace CRUD + Canvas-preview read** (§23.4): `storefront_id` route param, ownership-checked via the existing `ownedStorefront()` pattern (404 for foreign/missing, never 403) — same model every sibling `commerce/workspace/storefronts/{id}/...` route already uses, `commerce.manage`-gated, `auth:sanctum` + `SetTenant`.
+  - **Public Published read** (§23.5, `GET /store/v1/offers`): **no storefront id in the route at all** — authority comes exclusively from `ResolveStorefrontDomain` resolving the request Host to a verified `StorefrontDomain` → `Storefront` → `SalesChannel`, setting `StorefrontContext` for the request's lifetime only (`ResolveStorefrontDomain.php:69-128`, `StorefrontContext.php`). The query is scoped to `StorefrontContext::storefrontId()`/`tenantId()`, values a controller can read but never set — there is no public-facing mutator. This is the exact same model `StorefrontProductController`, `StorefrontCategoryController`, `StorefrontConfigController`, and `StorefrontCartController` already use (`routes/api_storefront.php:36-51`). Exposes only already-public-equivalent fields (price, name, thumbnail — the same class of data `store/v1/products` already exposes publicly), never Draft-stage or cross-tenant data.
 - The Featured product picker's search seam (§21) reuses the existing tenant-scoped `commerce/workspace/storefronts/{id}/products` boundary — no new one needed.
+- **Required tenant-isolation tests for the Offers public read** (per owner correction), to be written in H4-6/H4-7, not this task:
+  1. A request to Host A cannot read Offers belonging to Storefront B.
+  2. No public request parameter (route, query, body, or header) can select a foreign-tenant storefront — only `X-Storefront-Forwarded-Host` + the correct server-only `X-Storefront-Gateway-Secret` can supply an alternate hostname (`ResolveStorefrontDomain.php:134-145`), and a wrong/missing secret falls back to the real Laravel-visible host exactly as if no header were sent.
+  3. An unknown hostname fails closed (404, same uniform message as every other `ResolveStorefrontDomain` failure).
+  4. An inactive or unverified `StorefrontDomain` fails closed (404), matching existing `ResolveStorefrontDomain` behavior for `products`/`categories`/`storefront`.
+  5. Public Offers resolution uses `StorefrontContext::salesChannelId()` from the resolved context, passed into `CommercePriceResolver`, never a channel id from the request.
+  6. `GET /store/v1/offers` accepts no storefront UUID of any kind — confirmed by route definition (no `{id}` segment) and by a test asserting a supplied `storefront_id` query param has no effect on which storefront is resolved.
+  7. A `storefront_offers` row referencing a foreign-tenant `product_id` cannot leak or resolve — `Product`'s own `BaseModel` tenant scope means a cross-tenant reference simply fails to resolve, same as Featured's existing `productIds` handling.
+  8. Workspace CRUD (§23.4) still returns the established non-revealing 404 for a foreign/missing `storefront_id`, unchanged by this correction.
 - Application-layer query scoping (Laravel global scope/middleware enforcement in controllers) was not independently re-verified in this evidence pass beyond the schema-level guarantees above, for either the pre-existing tables or the newly designed `storefront_offers` — flagged as a verification item for the implementation slices (H4-6/H4-7), not assumed.
 
 ## 31. Commerce truth boundaries
@@ -421,6 +474,7 @@ Confirmed respected everywhere today: `featured` stores only `productIds` (never
 - `featured`: **N unbatched requests** — the one real performance gap in the current architecture (§21). Target: one batched request via an `ids` filter.
 - `wholesale`, `appPromo`, `banner`, `benefits`, `customContent`: no data fetch (config/content only) — zero marginal request cost.
 - `hero`: no fetch.
+- `offers`: one request (`GET /store/v1/offers`) resolving all curated-and-currently-genuine offers for the resolved storefront in a single call — same batched-by-construction shape as `categories`/`newArrivals`, not per-item. The Host-resolution chain (`ResolveStorefrontDomain`) it rides on is the same chain every other `store/v1` read already pays on every request; this is not new SSR cost, it's the existing cost every sibling public read already has.
 - No SSR/Canvas-rerender cost concerns were identified beyond the Featured N+1 issue.
 
 ## 33. Backward compatibility
@@ -448,8 +502,8 @@ Revised twice now: first from the task brief's content-first assumption (most co
 - **H4-3. Real Canvas catalog parity for Categories/New Arrivals.** Wire `StorefrontPreviewCanvas.tsx`'s `categories`/`newArrivals` branches to the already-shipped `commerce/workspace/storefronts/{id}/{products,categories}` reads (§5, §21) instead of `PREVIEW_CATEGORIES`/`PREVIEW_PRODUCTS`. No new backend endpoint needed — confirmed in this revision's evidence pass. Independent of H4-4/H4-5/H4-6.
 - **H4-4. Banner / Benefits / Custom Content / App Promo completion.** Small polish items on sections already confirmed LIVE: `imageAlt` on `BannerContent` (§18), `config.apps` fields surfaced inline in appPromo's own Content tab (§22). Treated as completion/polish, not rebuilding — these sections' core contracts, normalizers, and renderers are not touched.
 - **H4-5. Featured Products real picker + batched data read.** Build a new multi-select product picker on the existing `workspace-products.ts` data layer (§21); add an `ids[]` filter to `StorefrontProductController::index` and a `fetchProductsByIds()` helper, replacing `FeaturedShelf.tsx`'s N unbatched calls with one batched read.
-- **H4-6. Real Offers Commerce contract.** Build `storefront_offers` (migration), `StorefrontOfferResolver`, the workspace CRUD routes, and the public read route (§23.3–§23.5). Backend-only slice — no Canvas/Published UI yet. Depends on nothing else in this list (it's additive, new-table work) but should land before H4-7 since H4-7 needs it to render against.
-- **H4-7. Offers Canvas + Published implementation.** `OffersContent{offerIds}` in both `section-content.ts` twins, the new picker UI (reusing H4-5's multi-select picker pattern), `GATED_HOME_SECTION_KEYS` loses `offers`, new `<OffersBand>`/`<OffersShelf>` Published component, Canvas branch replacing the gated placeholder. Depends on H4-6.
+- **H4-6. Real Offers Commerce contract.** Build `storefront_offers` (migration), `StorefrontOfferResolver`, the workspace CRUD routes, the workspace Canvas-preview read, and the **Host-resolved public route `GET /store/v1/offers`** (§23.3–§23.5, corrected in this revision — not a `storefronts/{id}/offers` shape). Backend-only slice — no Canvas/Published UI yet. Must include the 8 tenant-isolation/host-authority tests listed in §30. Depends on nothing else in this list (it's additive, new-table work) but should land before H4-7 since H4-7 needs it to render against.
+- **H4-7. Offers Canvas + Published implementation.** `OffersContent{offerIds}` in both `section-content.ts` twins, the new picker UI (reusing H4-5's multi-select picker pattern) reading the workspace Canvas-preview read, `GATED_HOME_SECTION_KEYS` loses `offers`, new `<OffersBand>`/`<OffersShelf>` Published component calling `GET /store/v1/offers` (no storefront id, Host-resolved — §23.5), Canvas branch replacing the gated placeholder. Depends on H4-6.
 - **H4-8. Integrated responsive / RTL / LTR / accessibility / parity QA.** Cross-cutting verification pass across all ten sections on the now-complete Picker + activation set, including Offers' Canvas/Published parity (structural by construction, §23.5, but still verified) and the categories/newArrivals fix from H4-3. Mobile/desktop, RTL/LTR visual check (§28's flagged gap), accessibility audit.
 - **H4 Closure.**
 
@@ -474,7 +528,9 @@ Two deviations from the owner's proposed sequence, both evidence-driven and note
 | Tenant boundaries | Confirmed at schema level for existing tables and designed for the new `storefront_offers` table; app-layer not independently re-verified for either | §30 |
 | Backward compatibility | Confirmed via existing test suite; Offers' addition confirmed purely additive | §33 |
 | Commerce truth never in presentation | Yes, by construction, including the new Offers contract | §31 |
-| No promotions engine built | Yes — exactly one new non-pricing table + two small additive read/write API groups; no coupon/campaign/stacking logic | §23.6 |
+| No promotions engine built | Yes — exactly one new non-pricing table + three small additive read/write API groups; no coupon/campaign/stacking logic | §23.6 |
+| Public Offers route matches existing storefront authority model | Yes, corrected in this revision — `GET /store/v1/offers`, Host-resolved via `ResolveStorefrontDomain`/`StorefrontContext`, no storefront id in any public parameter | §23.5, §30 |
+| 8 tenant-isolation/host-authority tests specified | Yes — listed explicitly, not yet written (H4-6) | §30 |
 | Focused/broader tests | Not run in this task (docs-only, no runtime code changed) | See §40 |
 | CI | N/A to this PR (docs-only) | — |
 
@@ -484,7 +540,8 @@ Two deviations from the owner's proposed sequence, both evidence-driven and note
 - **`section-content.ts` duplication** (§9, §34) is a standing maintenance risk (drift between `web/` and `storefront/` copies) — not blocking, but should be tracked. Offers' new `OffersContent` type must be added to both twins identically.
 - **RTL/LTR and responsive claims beyond hero** were not pixel-verified visually in this evidence pass (text-based code reading only) — H4-8 must include actual visual QA, not just code inspection.
 - **Media architecture** (§24) remains a real gap for banner/hero images, now explicitly deferred past H4 (decided, not left ambiguous) — no owner decision needed before H4 closes.
-- **Offers is new, untested surface area** (§23): a genuine new DB table and two new API route groups, even though bounded and non-pricing. It deserves the same scrutiny as any new Commerce-adjacent table — tenant-isolation tests, request-validation tests rejecting any price-shaped field, and a focused review before H4-6 merges.
+- **Offers is new, untested surface area** (§23): a genuine new DB table and three new API route groups, even though bounded and non-pricing. It deserves the same scrutiny as any new Commerce-adjacent table — tenant-isolation tests, request-validation tests rejecting any price-shaped field, the 8 host-authority tests in §30, and a focused review before H4-6 merges.
+- **The first version of this document's public route proposal was architecturally wrong** (`storefronts/{id}/offers` instead of Host-resolved `/store/v1/offers`) and was corrected only on a second owner review. This is recorded as a risk-process lesson, not just a content fix: any future new `store/v1` route in this document or a successor must be checked against `routes/api_storefront.php`'s existing pattern before being proposed, not derived from the workspace-route pattern by analogy.
 - **`starts_at`/`ends_at` is a new time-bounding pattern** (§23.7) with no precedent elsewhere in Commerce — worth a second look during H4-6's implementation to confirm the validity-window check (open-ended vs. both-bounds vs. start-only) matches merchant expectations.
 
 ## 38. Stop/escalation gates
@@ -498,6 +555,7 @@ No stop condition from the task brief, or from the owner's correction's own stop
 - No DB migration, schema, or API change was **made** by this task — `storefront_offers` and its API routes are a *design*, for a future implementation slice (H4-6), consistent with "no runtime code, schema, or API changed by this task."
 - No section requires copying price/stock/discount into presentation data — confirmed none do; Offers' contract is designed specifically to preserve this boundary while still being real (§23.3, §31).
 - No promotions/discount *engine* is being built — re-confirmed against ADR-11's specific concern (amount-due semantics, checkout totals) and found not to apply here (§23.6).
+- **AWJ's existing public storefront authority model is preserved, not changed**: re-verified directly against `routes/api_storefront.php`, `ResolveStorefrontDomain.php`, and `StorefrontContext.php` for this correction (§23.5, §30) — the corrected public Offers route carries no storefront identifier of any kind, matching every sibling `store/v1` route exactly.
 - All external visual evidence cited (§11, §12, §13) was actually opened and inspected via screenshot; the one page that could not be reached (Salla help center merchant article, §11) is reported as a 404, not fabricated.
 
 ## 39. H4 Definition of Done
@@ -510,7 +568,8 @@ Adopting CUST-H3's closure template (`docs/reports/CUST-H3-HORIZON-CLOSURE-REPOR
 - [ ] Banner gains merchant-authorable `imageAlt`; appPromo content editable from its own Content tab.
 - [ ] Categories/NewArrivals Canvas preview wired to the real `commerce/workspace/storefronts/{id}/{products,categories}` read, closing the parity gap (§5, §21, H4-3).
 - [ ] Featured gets a real product picker and a batched published-side product-ids read.
-- [ ] **Offers is LIVE end-to-end**: `storefront_offers` table exists and is tenant-isolated; workspace CRUD and public read routes exist and reject any price-shaped input; `OffersContent{offerIds}` is live in both `section-content.ts` twins; Canvas and Published both render real, live-resolved offers through the same resolution path; a curated-but-not-genuinely-discounted product is honestly omitted, never faked.
+- [ ] **Offers is LIVE end-to-end**: `storefront_offers` table exists and is tenant-isolated; workspace CRUD and the Host-resolved public read route (`GET /store/v1/offers`, no storefront id) exist and reject any price-shaped input; `OffersContent{offerIds}` is live in both `section-content.ts` twins; Canvas and Published both render real, live-resolved offers through the same `StorefrontOfferResolver` service; a curated-but-not-genuinely-discounted product is honestly omitted, never faked.
+- [ ] All 8 tenant-isolation/host-authority tests from §30 pass, specifically confirming no public request parameter can select or override tenant/storefront/sales-channel for Offers.
 - [ ] Canvas/Published parity re-confirmed for all 10 types — no known, undocumented gap remains unaddressed.
 - [ ] Mobile, desktop, RTL, LTR, accessibility visually re-verified (not just code-read) in H4-8.
 - [ ] Tenant boundaries re-confirmed at the application layer (not just schema), specifically for the new `storefront_offers` table and any new Featured product-search seam.
@@ -528,6 +587,7 @@ Owner review of this revised architecture/evidence document, specifically:
 2. Confirm the revised slice order (§35) — H4-2 through H4-8 — including Offers landing as its own backend slice (H4-6) before its UI slice (H4-7).
 3. Approve the additive-field proposals in this document before any implementation slice touches code: `imageAlt` (banner), `state` (capability registry), `OffersContent{offerIds}`, and the new `storefront_offers` table/migration.
 4. Confirm the media decision (§24) — https-URL-only stays sufficient for H4 closure, managed upload is explicitly out of scope for this Horizon.
-5. On approval, proceed to **H4-2 (Capability Registry + Section Library UX)** as the first implementation slice, with H4-3 through H4-5 free to run in parallel once H4-2 lands, and H4-6 (Offers backend) startable independently of all of them.
+5. Confirm the corrected public Offers route (§23.5) — `GET /store/v1/offers`, Host-resolved, no storefront id in any public parameter, matching the existing `store/v1` authority model exactly — is now correct; this was wrong in the first revision and is fixed here against direct evidence from `routes/api_storefront.php`/`ResolveStorefrontDomain.php`/`StorefrontContext.php`.
+6. On approval, proceed to **H4-2 (Capability Registry + Section Library UX)** as the first implementation slice, with H4-3 through H4-5 free to run in parallel once H4-2 lands, and H4-6 (Offers backend) startable independently of all of them.
 
 No merge, deploy, or production release is requested or performed by this task.
