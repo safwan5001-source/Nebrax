@@ -9,6 +9,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\DB;
+use RuntimeException;
 use Tests\TestCase;
 
 class UserInvitationTest extends TestCase
@@ -79,6 +80,80 @@ class UserInvitationTest extends TestCase
             $this->withToken($auth['token'])->postJson("/api/users/{$user->id}/send-invitation");
         }
         $this->withToken($auth['token'])->postJson("/api/users/{$user->id}/send-invitation")->assertStatus(429);
+    }
+
+    /** @test */
+    public function failed_resend_keeps_the_previous_invitation_usable(): void
+    {
+        $auth = $this->registerTenant('alpha', 'owner@alpha.test');
+        $user = User::create([
+            'tenant_id' => $auth['tenant_id'], 'name' => 'مستخدم', 'email' => 'user@alpha.test',
+            'password' => 'known-password-123', 'role' => 'staff',
+        ]);
+        $oldToken = app(AuthRecoveryService::class)->issue($user, AuthRecoveryService::LOGIN_INVITATION);
+        Mail::shouldReceive('to')->once()->andThrow(new RuntimeException('mail unavailable'));
+
+        $this->withToken($auth['token'])->postJson("/api/users/{$user->id}/send-invitation")
+            ->assertStatus(503)->assertJsonPath('invitation_sent', false);
+
+        $this->postJson($this->tenantUrl('alpha', 'reset-password'), [
+            'token' => $oldToken, 'password' => 'new-password-123', 'password_confirmation' => 'new-password-123',
+        ])->assertOk();
+        $this->assertTrue(Hash::check('new-password-123', $user->fresh()->password));
+        $this->assertDatabaseMissing('auth_action_tokens', ['type' => AuthRecoveryService::LOGIN_INVITATION, 'used_at' => null]);
+    }
+
+    /** @test */
+    public function failed_creation_reports_saved_user_without_leaving_a_live_unmailed_invitation(): void
+    {
+        $auth = $this->registerTenant('alpha', 'owner@alpha.test');
+        Mail::shouldReceive('to')->once()->andThrow(new RuntimeException('mail unavailable'));
+
+        $response = $this->withToken($auth['token'])->postJson('/api/users', [
+            'name' => 'مستخدم محفوظ', 'email' => 'saved@alpha.test', 'role' => 'staff', 'send_invitation' => true,
+        ])->assertCreated()->assertJsonPath('invitation.sent', false);
+
+        $user = User::where('email', 'saved@alpha.test')->firstOrFail();
+        $this->assertSame($user->id, $response->json('data.id'));
+        $this->assertDatabaseHas('auth_action_tokens', [
+            'user_id' => $user->id, 'type' => AuthRecoveryService::LOGIN_INVITATION,
+        ]);
+        $this->assertDatabaseMissing('auth_action_tokens', [
+            'user_id' => $user->id, 'type' => AuthRecoveryService::LOGIN_INVITATION, 'used_at' => null,
+        ]);
+
+        // الإعادة الطبيعية لا تُنشئ مستخدماً ثانياً؛ الحالة المحفوظة أُعلنت
+        // صراحة ويمكن إعادة الإرسال من إجراء المستخدم الحالي.
+        $this->withToken($auth['token'])->postJson('/api/users', [
+            'name' => 'مستخدم محفوظ', 'email' => 'saved@alpha.test', 'role' => 'staff', 'send_invitation' => true,
+        ])->assertStatus(422);
+    }
+
+    /** @test */
+    public function successful_resend_commits_new_invitation_and_retires_the_previous_one(): void
+    {
+        $auth = $this->registerTenant('alpha', 'owner@alpha.test');
+        $user = User::create([
+            'tenant_id' => $auth['tenant_id'], 'name' => 'مستخدم', 'email' => 'user@alpha.test',
+            'password' => 'known-password-123', 'role' => 'staff',
+        ]);
+        $oldToken = app(AuthRecoveryService::class)->issue($user, AuthRecoveryService::LOGIN_INVITATION);
+        $before = $user->fresh()->password;
+
+        $this->withToken($auth['token'])->postJson("/api/users/{$user->id}/send-invitation")->assertOk();
+        Mail::assertSent(AuthActionMail::class, function (AuthActionMail $mail) use (&$newToken): bool {
+            parse_str((string) parse_url($mail->url, PHP_URL_QUERY), $query);
+            $newToken = $query['token'];
+            return $mail->action === 'invite';
+        });
+        $this->postJson($this->tenantUrl('alpha', 'reset-password'), [
+            'token' => $oldToken, 'password' => 'unused-password-123', 'password_confirmation' => 'unused-password-123',
+        ])->assertStatus(422);
+        $this->postJson($this->tenantUrl('alpha', 'reset-password'), [
+            'token' => $newToken, 'password' => 'new-password-123', 'password_confirmation' => 'new-password-123',
+        ])->assertOk();
+        $this->assertSame($before !== $user->fresh()->password, true);
+        $this->assertTrue(Hash::check('new-password-123', $user->fresh()->password));
     }
 
     /** @test */

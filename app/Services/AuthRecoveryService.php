@@ -67,6 +67,60 @@ class AuthRecoveryService
         return $plain;
     }
 
+    /**
+     * إصدار مرشح للتسليم من دون إبطال الدعوة السابقة. لا يُعتمد المرشح
+     * ويُبطل السابق إلا بعد نجاح Mail::send() خارج هذه الخدمة.
+     *
+     * @return array{token: string, id: string, previous_ids: list<string>}
+     */
+    public function issueForDelivery(User $user, string $type): array
+    {
+        if (! in_array($type, [self::LOGIN_INVITATION], true)) {
+            throw new RuntimeException('Unsupported delivery token type.');
+        }
+
+        $previousIds = DB::table('auth_action_tokens')
+            ->where('user_id', $user->id)
+            ->where('type', $type)
+            ->whereNull('used_at')
+            ->pluck('id')
+            ->all();
+        $plain = Str::random(64);
+        $id = (string) Str::uuid();
+
+        DB::table('auth_action_tokens')->insert([
+            'id' => $id,
+            'tenant_id' => $user->tenant_id,
+            'user_id' => $user->id,
+            'type' => $type,
+            'token_hash' => hash('sha256', $plain),
+            'expires_at' => now()->addMinutes(self::TTL_MINUTES),
+            'used_at' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return ['token' => $plain, 'id' => $id, 'previous_ids' => $previousIds];
+    }
+
+    public function commitDelivery(string $id, array $previousIds): void
+    {
+        if ($previousIds !== []) {
+            DB::table('auth_action_tokens')->whereIn('id', $previousIds)->update([
+                'used_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+    }
+
+    public function abandonDelivery(string $id): void
+    {
+        DB::table('auth_action_tokens')->where('id', $id)->whereNull('used_at')->update([
+            'used_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
     public function consume(string $plain, string $type): ?User
     {
         return DB::transaction(function () use ($plain, $type) {

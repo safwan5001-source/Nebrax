@@ -18,6 +18,17 @@ Administrators can now send an invitation when creating a user and resend a secu
 
 No merge, deploy, or production release was performed.
 
+### Post-review P2 consistency fix
+
+The delivery sequence was hardened so a synchronous mail failure cannot invalidate a previously valid invitation:
+
+1. `issueForDelivery()` creates a candidate token without revoking previous unused invitation tokens.
+2. `Mail::send()` runs outside any long-running database transaction.
+3. On success, `commitDelivery()` retires previous invitation tokens and keeps the delivered candidate active.
+4. On failure, `abandonDelivery()` retires only the undelivered candidate, preserving the previous invitation.
+
+For new-user creation, the saved user is not rolled back after the mail call fails. The API returns `201` with `invitation.sent=false` and an explicit retry message, so the client knows the user exists and can use the existing resend action. The failed candidate is revoked, leaving no live unmailed invitation.
+
 ## Security Design
 
 ### Token mechanism
@@ -53,6 +64,14 @@ When creation uses the invitation option and no password is supplied, the user r
 
 The email contains the tenant/company name, user name where available, login email, tenant-specific setup URL, expiry information, CTA, and a security notice. It does not contain the token text, internal IDs, or passwords.
 
+### Mail-failure consistency
+
+The mail call is deliberately not placed inside a database transaction. The candidate token is provisional state:
+
+- **Successful send:** the new token remains usable and previous unused invitations are retired.
+- **Failed send with an old invitation:** only the new candidate is retired; the old invitation remains usable.
+- **Failed send for a newly created user:** the user remains saved and is explicitly reported as saved; the unmailed candidate is retired, and a later resend creates a fresh candidate.
+
 ## UX
 
 ### New user creation
@@ -85,11 +104,11 @@ The action does not change the current password. Repeated sends are protected by
 
 ## Files Changed
 
-- `app/Services/AuthRecoveryService.php` — Added the `login_invitation` token type while reusing existing hashing, expiry, single-use, and tenant-hostname checks.
+- `app/Services/AuthRecoveryService.php` — Added the `login_invitation` token type and provisional delivery/commit/abandon operations while reusing existing hashing, expiry, single-use, and tenant-hostname checks.
 - `app/Mail/AuthActionMail.php` — Added invitation metadata and subject handling while retaining the existing mail class.
 - `resources/views/emails/auth-action.blade.php` — Added bilingual-compatible invitation content with tenant, user, login email, CTA, expiry, and security notice.
 - `app/Http/Controllers/Api/AuthController.php` — Allowed invitation tokens to use the existing reset-password completion flow.
-- `app/Http/Controllers/Api/UserController.php` — Added invitation sending on creation and the tenant-scoped resend action; preserves existing passwords on resend.
+- `app/Http/Controllers/Api/UserController.php` — Added invitation sending on creation and the tenant-scoped resend action; preserves existing passwords on resend and reports mail failure without hiding a saved user.
 - `app/Http/Requests/StoreUserRequest.php` — Made the password optional only when `send_invitation=true`.
 - `app/Providers/TenancyServiceProvider.php` — Added a focused tenant/user/IP invitation throttle.
 - `routes/api.php` — Added the protected resend route behind `users.manage` and `auth-invitation` throttling.
@@ -98,7 +117,7 @@ The action does not change the current password. Repeated sends are protected by
 - `web/src/app/(app)/hr/page.tsx` — Added the existing-user resend action and confirmation.
 - `web/src/messages/ar.json` — Added Arabic invitation/action strings.
 - `web/src/messages/en.json` — Added English invitation/action strings.
-- `tests/Feature/UserInvitationTest.php` — Added focused backend tests for authorization, delivery, URL, tenant isolation, password preservation, expiry, single use, session revocation, and throttling.
+- `tests/Feature/UserInvitationTest.php` — Added focused backend tests for authorization, delivery, URL, tenant isolation, password preservation, expiry, single use, session revocation, throttling, failed resend preservation, failed creation consistency, and successful replacement delivery.
 - `docs/implementation-reports/AWJ-AUTH-USER-INVITE-1.md` — This report.
 
 ## Tests
@@ -134,6 +153,9 @@ Added `tests/Feature/UserInvitationTest.php` covering:
 11. Password changes only after completing the reset/setup flow.
 12. Existing Sanctum sessions are revoked by the existing reset-password contract.
 13. Invitation resends are rate limited.
+14. A failed resend preserves a previously valid invitation.
+15. A failed creation reports the saved user and leaves no live unmailed invitation.
+16. A successful resend retires the previous invitation and keeps the new invitation usable.
 
 PHPUnit could not be run in the local Sandbox because PHP, Composer, and Laravel vendor dependencies are not installed there. The repository CI environment executed the backend tests successfully on both SQLite and PostgreSQL.
 
@@ -203,7 +225,7 @@ The repository was inspected for an existing user-management activity/audit mech
 
 - Local backend PHPUnit execution was unavailable in the Sandbox due to missing PHP/Composer/vendor dependencies; the official CI backend matrix passed on SQLite and PostgreSQL.
 - No dedicated audit event was added because no existing suitable audit mechanism was found.
-- Mail delivery failures remain subject to the existing synchronous mail/Resend behavior and error conventions; no unrelated mail infrastructure was changed.
+- Synchronous mail failures are caught by the invitation flow: the candidate token is abandoned, prior valid invitations are preserved, and creation/resend responses state the delivery failure explicitly. No unrelated mail infrastructure was changed.
 
 ## Git
 

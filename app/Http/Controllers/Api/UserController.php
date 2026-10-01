@@ -147,11 +147,18 @@ class UserController extends ApiController
 
         $this->syncAccessScope($user, $data);
 
+        $invitationSent = true;
         if ((bool) ($data['send_invitation'] ?? false)) {
-            $this->sendLoginInvitation($user);
+            $invitationSent = $this->sendLoginInvitation($user);
         }
 
         return (new UserResource($user->load('employee', 'branches', 'warehouses')))
+            ->additional(['invitation' => [
+                'sent' => $invitationSent,
+                'message' => $invitationSent
+                    ? null
+                    : 'تم حفظ المستخدم، لكن تعذر إرسال دعوة الدخول. يمكنك إعادة الإرسال من قائمة المستخدمين.',
+            ]])
             ->response()->setStatusCode(201);
     }
 
@@ -163,7 +170,12 @@ class UserController extends ApiController
             abort(422, 'لا يمكن إرسال دعوة لمستخدم بلا بريد إلكتروني.');
         }
 
-        $this->sendLoginInvitation($user, $recovery);
+        if (! $this->sendLoginInvitation($user, $recovery)) {
+            return response()->json([
+                'message' => 'تعذر إرسال دعوة الدخول. بقيت الدعوة السابقة صالحة إن وُجدت، ويمكنك إعادة المحاولة.',
+                'invitation_sent' => false,
+            ], 503);
+        }
 
         return response()->json(['message' => 'تم إرسال بيانات الدخول إلى بريد المستخدم.']);
     }
@@ -200,18 +212,29 @@ class UserController extends ApiController
         return response()->json(['message' => 'تم الحذف.']);
     }
 
-    private function sendLoginInvitation(User $user, ?AuthRecoveryService $recovery = null): void
+    private function sendLoginInvitation(User $user, ?AuthRecoveryService $recovery = null): bool
     {
         $recovery ??= app(AuthRecoveryService::class);
-        $token = $recovery->issue($user, AuthRecoveryService::LOGIN_INVITATION);
+        $delivery = $recovery->issueForDelivery($user, AuthRecoveryService::LOGIN_INVITATION);
         $tenantName = (string) $user->tenant()->value('name');
 
-        Mail::to($user->email)->send(new AuthActionMail(
-            'invite',
-            $recovery->frontendLink($user, '/reset-password', $token),
-            $tenantName,
-            $user->name,
-            $user->email,
-        ));
+        try {
+            Mail::to($user->email)->send(new AuthActionMail(
+                'invite',
+                $recovery->frontendLink($user, '/reset-password', $delivery['token']),
+                $tenantName,
+                $user->name,
+                $user->email,
+            ));
+        } catch (\Throwable $exception) {
+            $recovery->abandonDelivery($delivery['id']);
+            report($exception);
+
+            return false;
+        }
+
+        $recovery->commitDelivery($delivery['id'], $delivery['previous_ids']);
+
+        return true;
     }
 }
