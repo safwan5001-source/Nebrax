@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { StoreContainer } from "@/components/layout/StoreContainer";
 import { ProductListing } from "@/components/products/ProductListing";
 import { JsonLd } from "@/components/seo/JsonLd";
+import { fetchPublishedPresentation } from "@/lib/commerce/storefront";
 import { getCategory, getCategoryProducts } from "@/lib/data/categories";
 import { resolveCurrency } from "@/lib/data/markets";
 import { getProductFilters } from "@/lib/data/products";
@@ -51,6 +52,12 @@ export default async function CategoryPage({
     notFound();
   }
 
+  // CUST-H2-5 — same request-deduped `fetchStorefrontConfig()` call the
+  // storefront shell layout already makes for header/footer chrome; this is
+  // a cache hit, not a new network round-trip. Published-only, host/tenant
+  // resolved server-side — never Draft, never a client-supplied id.
+  const presentation = await fetchPublishedPresentation();
+
   const storeUrl = getStoreUrl();
   const currency = await resolveCurrency(country);
   const listingState = parseListingSearchParams(rawSearchParams);
@@ -67,7 +74,12 @@ export default async function CategoryPage({
         <JsonLd data={buildBreadcrumbJsonLd(category, basePath, storeUrl)} />
       )}
 
-      <CategoryBanner category={category} basePath={basePath} locale={locale} />
+      <CategoryBanner
+        category={category}
+        basePath={basePath}
+        locale={locale}
+        pagePresentation={presentation?.pagePresentation}
+      />
 
       <StoreContainer className="py-5 md:py-6">
         <ProductListing

@@ -1,14 +1,36 @@
 import type { Category } from "@spree/sdk";
 import { cacheLife, cacheTag } from "next/cache";
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { StoreContainer } from "@/components/layout/StoreContainer";
 import { Breadcrumbs } from "@/components/navigation/Breadcrumbs";
+import type { PagePresentation } from "@/lib/presentation/page-regions";
+import { resolvePublicCategoryRegions } from "@/lib/presentation/page-runtime";
 
 interface CategoryBannerProps {
   category: Category;
   basePath: string;
   locale: string;
+  /**
+   * CUST-H2-5 — the Published Version's `pagePresentation.category`, or
+   * `undefined` when nothing has been published/customized yet. Only the
+   * four regions this component owns
+   * (`breadcrumbs`/`identity_title`/`description`/`subcategories_rail`) are
+   * read here — `filter_sort_bar`/`product_grid` live in `ProductListing`, a
+   * separate component the category page route renders as this banner's
+   * sibling, and are both FIXED_REQUIRED with no reorder possible relative
+   * to each other (see the category page route for why nothing about them
+   * needs wiring at all).
+   */
+  pagePresentation?: PagePresentation;
 }
+
+const BANNER_REGION_KEYS = [
+  "breadcrumbs",
+  "identity_title",
+  "description",
+  "subcategories_rail",
+] as const;
 
 /**
  * The category header.
@@ -25,6 +47,7 @@ export async function CategoryBanner({
   category,
   basePath,
   locale,
+  pagePresentation,
 }: CategoryBannerProps) {
   "use cache: remote";
   cacheLife("minutes");
@@ -32,28 +55,48 @@ export async function CategoryBanner({
 
   const children = category.children ?? [];
 
-  return (
-    <StoreContainer className="pt-4">
-      <Breadcrumbs category={category} basePath={basePath} locale={locale} />
+  const regionOrder = resolvePublicCategoryRegions(pagePresentation).filter(
+    (key): key is (typeof BANNER_REGION_KEYS)[number] =>
+      (BANNER_REGION_KEYS as readonly string[]).includes(key),
+  );
 
+  /*
+   * CUST-H2-5 — one named node per region this component owns. Every node
+   * below is byte-identical to what this file always rendered; only the
+   * assembly moved from a fixed JSX sequence to `regionOrder.map(...)`.
+   * `identity_title`/`description` are split into two independent nodes
+   * (they were one combined block before) because the locked contract treats
+   * them as two separate regions — FIXED_REQUIRED title vs. OPTIONAL_TOGGLE
+   * description — exactly like the Customizer's own `CategoryPagePreview`
+   * already does.
+   */
+  const regionNodes: Record<(typeof BANNER_REGION_KEYS)[number], ReactNode> = {
+    breadcrumbs: (
+      <Breadcrumbs category={category} basePath={basePath} locale={locale} />
+    ),
+    identity_title: (
       <div className="mt-2 flex items-start gap-2">
         <span
           aria-hidden="true"
           className="mt-1 h-4 w-1.5 shrink-0 rounded-full bg-store-primary md:mt-1.5 md:h-5"
         />
-        <div className="min-w-0">
-          <h1 className="text-base font-extrabold leading-tight text-store-foreground md:text-lg">
-            {category.name}
-          </h1>
-          {category.description && (
-            <p className="mt-0.5 text-xs text-store-muted-foreground md:text-sm">
-              {category.description}
-            </p>
-          )}
-        </div>
+        <h1 className="min-w-0 text-base font-extrabold leading-tight text-store-foreground md:text-lg">
+          {category.name}
+        </h1>
       </div>
-
-      {children.length > 0 && (
+    ),
+    description: category.description ? (
+      // `ps-3.5` (0.375rem accent-bar width + 0.5rem gap, the exact offset
+      // `identity_title`'s own flex row uses) keeps the description aligned
+      // under the title now that the two are independent regions, matching
+      // this file's original combined-block layout exactly when both render
+      // in their default adjacent order.
+      <p className="mt-0.5 ps-3.5 text-xs text-store-muted-foreground md:text-sm">
+        {category.description}
+      </p>
+    ) : null,
+    subcategories_rail:
+      children.length > 0 ? (
         <nav aria-label={category.name} className="mt-3">
           <ul className="store-rail flex gap-1.5 overflow-x-auto pb-1">
             {children.map((child) => (
@@ -68,7 +111,18 @@ export async function CategoryBanner({
             ))}
           </ul>
         </nav>
-      )}
+      ) : null,
+  };
+
+  return (
+    <StoreContainer className="pt-4">
+      {regionOrder
+        .filter((key) => regionNodes[key] !== null)
+        .map((key) => (
+          <div data-region={key} key={key}>
+            {regionNodes[key]}
+          </div>
+        ))}
     </StoreContainer>
   );
 }
