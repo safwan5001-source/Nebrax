@@ -53,7 +53,8 @@ v2.0 أرست الانضباط (جداول، RTL، أرقام مالية، لو�
 | [`STOREFRONT_BOUNDARY.md`](./STOREFRONT_BOUNDARY.md) | الحدّ بين `awj.*` و`store.*` وأدوات الاستوديو |
 | [`TENANT_BRANDING.md`](./TENANT_BRANDING.md) | عقد هوية المستأجر |
 | [`GOVERNANCE.md`](./GOVERNANCE.md) | مصدر الحقيقة، تدقيق الانجراف الحالي، الفحوص والعمليات |
-| [`MIGRATION.md`](./MIGRATION.md) | شرائح الانتقال التدريجي + الشريحة الأولى الموصى بها |
+| [`MIGRATION.md`](./MIGRATION.md) | الشرائح التقنية للانتقال التدريجي ومخاطرها واعتمادياتها |
+| [`HORIZONS.md`](./HORIZONS.md) | **نظام التنفيذ الرسمي:** خمسة آفاق، Definition of Done، منع التشتّت، وصلاحية Claude Code الإبداعية داخل كل أفق |
 | [`DECISIONS.md`](./DECISIONS.md) | سجل القرارات، المرفوض، التجريبي، قرارات المالك المفتوحة، انحرافات عن الـPrototype |
 | [`RULES_DELTA.md`](./RULES_DELTA.md) | ما يتغيّر عن قواعد v2.0 (Keep/Evolve/Replace) |
 
@@ -61,8 +62,9 @@ v2.0 أرست الانضباط (جداول، RTL، أرقام مالية، لو�
 
 1. اقرأ [`FOUNDATIONS.md`](./FOUNDATIONS.md) ثم [`TOKEN_REFERENCE.md`](./TOKEN_REFERENCE.md): المكوّن **لا يقرأ قيمة خام أبداً**.
 2. اقرأ وثيقة النمط الذي تبنيه (شبكة/مستند/إجماليات…) ثم [`WORKSPACE_POSTURES.md`](./WORKSPACE_POSTURES.md) لتعرف ما يُسمح لك بتغييره.
-3. قبل أي PR واجهة: [`GOVERNANCE.md`](./GOVERNANCE.md) §5 (قائمة المراجعة).
-4. لا تحوّل شاشة Sales Invoice إلى قانون: هي **حالة إثبات**. القواعد المستخرجة منها هنا؛ تفاصيلها التجارية (حقول، أعمدة) ليست ملزِمة لمستند آخر.
+3. عند تنفيذ v3 اقرأ [`HORIZONS.md`](./HORIZONS.md) أولاً لتحديد الأفق الحالي؛ شرائح [`MIGRATION.md`](./MIGRATION.md) تفاصيل تقنية داخله وليست جلسات مستقلة.
+4. قبل أي PR واجهة: [`GOVERNANCE.md`](./GOVERNANCE.md) §5 (قائمة المراجعة).
+5. لا تحوّل شاشة Sales Invoice إلى قانون: هي **حالة إثبات**. القواعد المستخرجة منها هنا؛ تفاصيلها التجارية (حقول، أعمدة) ليست ملزِمة لمستند آخر.
 
 ## حدود هذه الحزمة
 
