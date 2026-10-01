@@ -18,7 +18,13 @@ export function TBody(props: React.HTMLAttributes<HTMLTableSectionElement>) {
 }
 
 export function TR({ className, ...props }: React.HTMLAttributes<HTMLTableRowElement>) {
-  return <tr className={cn('border-b border-border last:border-0 hover:bg-primary-soft/40', className)} {...props} />;
+  return (
+    <tr
+      data-awj-row=""
+      className={cn('border-b border-border last:border-0 hover:bg-primary-soft/40', className)}
+      {...props}
+    />
+  );
 }
 
 export function TH({ className, ...props }: React.ThHTMLAttributes<HTMLTableCellElement>) {

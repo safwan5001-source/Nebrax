@@ -316,8 +316,9 @@ export function DataTable<T>({
               <TBody>
                 {rows.map((row) => {
                   const rowId = selection?.getRowId(row.original);
+                  const isSelected = rowId != null && selectedSet.has(rowId);
                   return (
-                    <TR key={row.id}>
+                    <TR key={row.id} data-awj-selected={isSelected ? '' : undefined}>
                       {selection && rowId != null ? (
                         <TD className="w-10">
                           <input

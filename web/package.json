@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "openapi:generate": "node scripts/build-openapi-model.mjs",
+    "tokens:generate": "node scripts/generate-awj-tokens.mjs",
     "test": "NODE_OPTIONS=--max-old-space-size=4096 vitest run",
     "test:e2e": "playwright test"
   },

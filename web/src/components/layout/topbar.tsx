@@ -38,7 +38,7 @@ export function Topbar({
   }
 
   return (
-    <header className="no-print flex h-14 shrink-0 items-center gap-3 border-b border-border bg-surface px-4">
+    <header data-awj-shell="topbar" className="no-print flex h-14 shrink-0 items-center gap-3 border-b border-border bg-surface px-4">
       <Button
         variant="ghost"
         size="icon"
@@ -54,7 +54,10 @@ export function Topbar({
           الشريط الجانبي، وتكرارها في الشريطين ضجيجٌ بلا فائدة. */}
       <CompanyLogoMark logo={company?.logo} name={company?.name} size="sm" className="lg:hidden" />
 
-      <div className="hidden h-12 items-center gap-2 rounded border border-border px-3 focus-within:ring-2 focus-within:ring-primary/40 sm:flex">
+      <div
+        data-awj-shell-field=""
+        className="hidden h-12 items-center gap-2 rounded border border-border px-3 focus-within:ring-2 focus-within:ring-primary/40 sm:flex"
+      >
         <Search className="h-4 w-4 shrink-0 text-muted" strokeWidth={1.6} />
         <input
           placeholder={t('search')}

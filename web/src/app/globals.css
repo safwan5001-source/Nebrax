@@ -39,6 +39,342 @@
   --flag-mark: #ffffff;
 }
 
+/*
+ * AWJ v3 — design tokens (Horizon 1: Core Visual System).
+ *
+ * Source of truth: design-system/tokens/awj.tokens.json
+ * Generator: web/scripts/generate-awj-tokens.mjs (npm run tokens:generate)
+ *
+ * Everything below, between the markers, is GENERATED — do not hand-edit it; edit the
+ * JSON source and re-run the generator. Everything scoped under html[data-awj-ui="3"]
+ * is inert unless that attribute is present on <html> (see web/src/app/(app)/layout.tsx),
+ * so gate-off rendering is byte-identical to today. v2.0 variables above are untouched
+ * and remain the active source for every screen outside the (app) route group.
+ */
+/* AWJ-TOKENS:GENERATED:BEGIN — do not hand-edit, see design-system/tokens/awj.tokens.json */
+html[data-awj-ui="3"]:not(.dark) {
+  --awj-surface-desk: #E9E8E4;
+  --awj-surface-paper: #FFFFFF;
+  --awj-surface-band: #F8F9FC;
+  --awj-surface-sunken: #F1F3F7;
+  --awj-surface-outcome: #0E1A31;
+  --awj-border-hairline: #DCE0E8;
+  --awj-border-strong: #C6CCD7;
+  --awj-border-control: #7F8898;
+  --awj-text-primary: #15181D;
+  --awj-text-secondary: #586172;
+  --awj-text-tertiary: #656D7B;
+  --awj-text-inverse: #FFFFFF;
+  --awj-action-primary: #1E40AF;
+  --awj-action-primary-hover: #1E3A8A;
+  --awj-action-primary-pressed: #172F73;
+  --awj-action-primary-fg: #FFFFFF;
+  --awj-status-positive-fg: #166534;
+  --awj-status-positive-bg: #E8F5EC;
+  --awj-status-positive-border: #BFE2CB;
+  --awj-status-negative-fg: #B91C1C;
+  --awj-status-negative-bg: #FDECEC;
+  --awj-status-negative-border: #F5C2C2;
+  --awj-status-warning-fg: #92400E;
+  --awj-status-warning-bg: #FDF3E3;
+  --awj-status-warning-border: #F1D9A8;
+  --awj-status-info-fg: #1E40AF;
+  --awj-status-info-bg: #EAF0FE;
+  --awj-status-neutral-fg: #586172;
+  --awj-status-neutral-bg: #F1F3F7;
+  --awj-brand-soft: #EAF0FE;
+  --awj-state-hover: #F2F5FC;
+  --awj-state-selected: #DDE7FB;
+  --awj-state-selected-edge: #C2D2F2;
+  --awj-state-editing-edge: #8FA9EA;
+  --awj-state-focus-ring: #1E40AF;
+  --awj-state-focus-ring-on-ink: #7FA8FF;
+  --awj-state-focus-halo: rgba(30,64,175,.18);
+  --awj-state-disabled-fg: #9AA3B2;
+  --awj-elevation-0: none;
+  --awj-elevation-1: 0 1px 0 rgba(15,27,51,.04), 0 1px 2px rgba(15,27,51,.07);
+  --awj-elevation-2: 0 -8px 18px -10px rgba(15,27,51,.22);
+  --awj-elevation-3: 0 10px 28px rgba(15,27,51,.16), 0 2px 6px rgba(15,27,51,.08);
+  --awj-elevation-4: 0 10px 28px rgba(15,27,51,.16), 0 2px 6px rgba(15,27,51,.08);
+  --awj-elevation-scrim: rgba(14,26,49,.5);
+  --awj-shell-cast: inset 0 7px 7px -7px rgba(15,27,51,.20);
+  --awj-shell-cast-edge: inset 7px 0 7px -7px rgba(15,27,51,.14);
+  --awj-radius-micro: 4px;
+  --awj-radius-control: 6px;
+  --awj-radius-surface: 8px;
+  --awj-radius-float: 12px;
+  --awj-radius-canvas: 16px;
+  --awj-radius-pill: 9999px;
+  --awj-rule-ledger: 4px double #15181D;
+  --awj-rule-ledger-on-outcome: 4px double #7FA8FF;
+  --awj-rule-total: 2px solid #15181D;
+  --awj-apex-rail: 3px;
+  --awj-apex-cap-w: 9px;
+  --awj-apex-cap-h: 3px;
+  --awj-shell-bg: #D5DFF0;
+  --awj-shell-fg: #12203B;
+  --awj-shell-fg-muted: #3F4F6C;
+  --awj-shell-line: #BFCCE3;
+  --awj-shell-hover: #C6D3EA;
+  --awj-shell-active-bg: #FFFFFF;
+  --awj-shell-active-fg: #12203B;
+  --awj-shell-active-shadow: 0 1px 2px rgba(15,27,51,.14), 0 0 0 1px rgba(15,27,51,.04);
+  --awj-shell-apex: #1E40AF;
+  --awj-shell-field-bg: #E9EFF9;
+  --awj-shell-field-line: #6F82A6;
+  --awj-shell-focus-ring: #1E40AF;
+  --awj-shell-brandmark-bg: #1E40AF;
+}
+
+html[data-awj-ui="3"][data-awj-theme="ink"]:not(.dark) {
+  --awj-shell-bg: #0E1A31;
+  --awj-shell-fg: #E8EEF9;
+  --awj-shell-fg-muted: #9FB0CC;
+  --awj-shell-line: #22345A;
+  --awj-shell-hover: #15244A;
+  --awj-shell-active-bg: #1A2A4A;
+  --awj-shell-active-fg: #FFFFFF;
+  --awj-shell-active-shadow: inset 0 0 0 1px #2C4170;
+  --awj-shell-apex: #7FA8FF;
+  --awj-shell-field-bg: #15244A;
+  --awj-shell-field-line: #5A74A8;
+  --awj-shell-focus-ring: #7FA8FF;
+  --awj-shell-brandmark-bg: #2D5BDB;
+}
+
+html[data-awj-ui="3"].dark {
+  --awj-surface-desk: var(--background);
+  --awj-surface-paper: var(--surface);
+  --awj-surface-band: var(--surface);
+  --awj-surface-sunken: var(--background);
+  --awj-surface-outcome: var(--background);
+  --awj-border-hairline: var(--border);
+  --awj-border-strong: var(--border);
+  --awj-border-control: var(--muted);
+  --awj-text-primary: var(--text);
+  --awj-text-secondary: var(--muted);
+  --awj-text-tertiary: var(--muted);
+  --awj-action-primary: var(--primary);
+  --awj-action-primary-hover: var(--primary-hover);
+  --awj-state-hover: var(--primary-soft);
+  --awj-state-selected: var(--primary-soft);
+  --awj-state-selected-edge: var(--primary);
+  --awj-state-editing-edge: var(--primary);
+  --awj-state-focus-ring: var(--primary);
+  --awj-state-focus-ring-on-ink: var(--primary);
+  --awj-state-disabled-fg: var(--muted);
+  --awj-shell-bg: var(--surface);
+  --awj-shell-fg: var(--text);
+  --awj-shell-fg-muted: var(--muted);
+  --awj-shell-line: var(--border);
+  --awj-shell-hover: var(--primary-soft);
+  --awj-shell-active-bg: var(--primary-soft);
+  --awj-shell-active-fg: var(--primary);
+  --awj-shell-active-shadow: none;
+  --awj-shell-apex: var(--primary);
+  --awj-shell-field-bg: var(--background);
+  --awj-shell-field-line: var(--border);
+  --awj-shell-focus-ring: var(--primary);
+  --awj-shell-brandmark-bg: var(--primary);
+}
+/* AWJ-TOKENS:GENERATED:END */
+
+/*
+ * AWJ v3 — hand-authored rules (Horizon 1).
+ *
+ * Everything below is scoped under html[data-awj-ui="3"] and consumes only the
+ * generated --awj-* variables above, so it is inert when the gate is off. Elements
+ * opt in via inert `data-awj-*` marker attributes (safe to add unconditionally to
+ * JSX — they have zero effect without the gate) or via existing stable ARIA
+ * attributes already in the markup ([role="menu"], [role="dialog"][aria-modal]).
+ *
+ * Three techniques, used deliberately throughout:
+ *   1. Pure variable redefinition — a utility class already reads var(--x); we only
+ *      redefine --x inside the gate.
+ *   2. Variable-with-fallback — a new Tailwind utility (tailwind.config.ts) reads
+ *      var(--awj-y, var(--legacy)), safe to use unconditionally in JSX.
+ *   3. Marker attribute + fully-gated selector — anything beyond a color swap
+ *      (box-shadow, pseudo-elements, focus rings): an inert data-awj-* attribute,
+ *      paired with a rule that only exists under the gate.
+ */
+
+/* Unified focus language (FOUNDATIONS.md §11). Neutralizes the three different
+   focus patterns found in the existing code (global 3px outline, Button's
+   ring-2/ring-offset-2, Sidebar's ring-primary/40) with one rule. box-shadow is
+   cancelled only here — Button/Switch/Sidebar's own classes are left completely
+   untouched so gate-off rendering of those components does not change at all. */
+html[data-awj-ui="3"] :is(a[href], button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--awj-state-focus-ring);
+  outline-offset: 2px;
+  box-shadow: none !important;
+}
+
+html[data-awj-ui="3"] [data-awj-surface="outcome"] :is(a[href], button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline-color: var(--awj-state-focus-ring-on-ink);
+}
+
+/* Apex signature marker (SIGNATURE_LANGUAGE.md §1). One pattern, reused for the
+   sidebar active leaf item, the active tab, and selected grid rows — the only
+   positions the spec allows. `data-awj-apex` opts an element in; `data-awj-apex-on`
+   is the live state. The pseudo-element always exists once gated (so no layout
+   shift on activation) and is invisible until `-on` is present. */
+html[data-awj-ui="3"] [data-awj-apex] {
+  position: relative;
+}
+html[data-awj-ui="3"] [data-awj-apex]::before {
+  content: '';
+  position: absolute;
+  inset-inline-start: 0;
+  inset-block: 7px;
+  width: var(--awj-apex-rail);
+  border-radius: 0 2px 2px 0;
+  background: var(--awj-shell-apex, var(--awj-action-primary));
+  opacity: 0;
+  pointer-events: none;
+}
+html[data-awj-ui="3"] [data-awj-apex="row"]::before {
+  inset-block: 0;
+  border-radius: 0;
+}
+html[data-awj-ui="3"] [data-awj-apex="tab"]::before {
+  /* Horizontal list (tabs) gets the signature as a bottom-edge bar — the same
+     geometric idea as the rail, rotated to match a horizontal arrangement, rather
+     than a literal reuse of the vertical left-rail CSS. */
+  inset-inline: 0;
+  inset-block-start: auto;
+  inset-block-end: 0;
+  width: auto;
+  height: var(--awj-apex-rail);
+  border-radius: 2px 2px 0 0;
+}
+html[data-awj-ui="3"] [role="tab"] {
+  /* Apex replaces the legacy border-bottom-color:var(--primary) active indicator. */
+  border-bottom-color: transparent;
+}
+html[data-awj-ui="3"] [data-awj-legacy-marker] {
+  /* The v2.0 inline active-bar span this element replaces (kept in the JSX,
+     unconditionally rendered, so gate-off output is unchanged byte-for-byte). */
+  display: none;
+}
+html[data-awj-ui="3"] [data-awj-apex][data-awj-apex-on]::before {
+  opacity: 1;
+}
+html[data-awj-ui="3"] [data-awj-surface="outcome"] [data-awj-apex][data-awj-apex-on]::before {
+  background: var(--awj-state-focus-ring-on-ink);
+}
+@media (forced-colors: active) {
+  /* a11y: never rely on background color alone under forced-colors */
+  html[data-awj-ui="3"] [data-awj-apex]::before {
+    background: none;
+  }
+  html[data-awj-ui="3"] [data-awj-apex][data-awj-apex-on] {
+    border-inline-start: 3px solid Highlight;
+  }
+}
+
+/* Row interaction states (FOUNDATIONS.md §11, TOKEN_REFERENCE.md §3). `data-awj-row`
+   is a hard-coded attribute on the shared <TR> primitive (table.tsx), so every table
+   in the app — including DataTable — gets this for free. Higher selector specificity
+   than the existing `.hover:bg-primary-soft/40` utility means this always wins once
+   gated, without removing that utility (gate-off keeps today's hover exactly). */
+html[data-awj-ui="3"] [data-awj-row]:hover {
+  background-color: var(--awj-state-hover);
+}
+html[data-awj-ui="3"] [data-awj-row][data-awj-selected] {
+  background-color: var(--awj-state-selected);
+  box-shadow: inset 0 0 0 1px var(--awj-state-selected-edge);
+}
+html[data-awj-ui="3"] [data-awj-row][data-awj-selected]:hover {
+  background-color: var(--awj-state-selected);
+}
+html[data-awj-ui="3"] [data-awj-row][data-awj-editing] {
+  background-color: var(--awj-surface-paper);
+  box-shadow: inset 0 0 0 1px var(--awj-state-editing-edge);
+}
+html[data-awj-ui="3"] [data-awj-row][aria-disabled="true"] {
+  color: var(--awj-state-disabled-fg);
+}
+
+/* Shell language (FOUNDATIONS.md §3, TOKEN_REFERENCE.md §4). `data-awj-shell` marks
+   the sidebar/topbar chrome itself; `data-awj-shell-field` marks search-style fields
+   living inside that chrome (distinct tokens from ordinary form fields on Paper). */
+html[data-awj-ui="3"] [data-awj-shell] {
+  background-color: var(--awj-shell-bg);
+  color: var(--awj-shell-fg-muted);
+  border-color: var(--awj-shell-line);
+}
+html[data-awj-ui="3"] [data-awj-shell="sidebar"] {
+  box-shadow: var(--awj-shell-cast), inset 7px 0 7px -7px rgba(15, 27, 51, 0.14);
+}
+html[data-awj-ui="3"][dir='rtl'] [data-awj-shell="sidebar"] {
+  box-shadow: var(--awj-shell-cast), inset -7px 0 7px -7px rgba(15, 27, 51, 0.14);
+}
+html[data-awj-ui="3"] [data-awj-shell-active] {
+  background-color: var(--awj-shell-active-bg);
+  color: var(--awj-shell-active-fg);
+  box-shadow: var(--awj-shell-active-shadow);
+  font-weight: 600;
+}
+html[data-awj-ui="3"] [data-awj-shell-field] {
+  background-color: var(--awj-shell-field-bg);
+  border-color: var(--awj-shell-field-line);
+}
+html[data-awj-ui="3"] [data-awj-shell-field]:focus-within {
+  border-color: var(--awj-shell-focus-ring);
+  box-shadow: 0 0 0 2px var(--awj-state-focus-halo);
+}
+html[data-awj-ui="3"] [data-awj-super-group-label] {
+  color: var(--awj-shell-fg-muted);
+  opacity: 1;
+}
+
+/* Elevation on existing portal-free surfaces (FOUNDATIONS.md §9). These selectors
+   are stable ARIA hooks already in the markup — no component edit required, and the
+   non-modal calendar popover in input.tsx ([role="dialog"] without aria-modal) is
+   naturally excluded. */
+html[data-awj-ui="3"] [role="menu"] {
+  box-shadow: var(--awj-elevation-3);
+  border-radius: var(--awj-radius-surface);
+  border-color: var(--awj-border-hairline);
+}
+html[data-awj-ui="3"] [role="dialog"][aria-modal="true"] {
+  box-shadow: var(--awj-elevation-4);
+  border-radius: var(--awj-radius-float);
+  border-color: var(--awj-border-hairline);
+}
+
+/* Money typography foundation (FOUNDATIONS.md §5). Context-sensitive decimal color:
+   tertiary is the default (meets 4.5:1 on Paper/Band/Sunken/Hover), but measures
+   below threshold on Selected/Desk (TOKEN_REFERENCE.md §12), so those contexts step
+   up to secondary. No animation, no color-only negative cue (handled in the <Money>
+   component itself via an explicit sign glyph, not color alone). */
+html[data-awj-ui="3"] [data-awj-money-integer] {
+  font-weight: 500;
+}
+html[data-awj-ui="3"] [data-awj-money-decimal] {
+  font-weight: 400;
+  color: var(--awj-text-tertiary);
+}
+html[data-awj-ui="3"] [data-awj-row][data-awj-selected] [data-awj-money-decimal],
+html[data-awj-ui="3"] [data-awj-surface="desk"] [data-awj-money-decimal] {
+  color: var(--awj-text-secondary);
+}
+html[data-awj-ui="3"] [data-awj-surface="outcome"] [data-awj-money-decimal] {
+  color: #a9b8d3; /* primitive ink.300 — Outcome Surface is an H2 pattern; this rule is
+                      latent foundation until a surface opts into data-awj-surface="outcome" */
+}
+html[data-awj-ui="3"] [data-awj-money-negative] {
+  color: var(--awj-status-negative-fg);
+}
+
+/* CardTitle (FOUNDATIONS.md §4) — slightly stronger than muted body text, still
+   clearly a label rather than a value. */
+html[data-awj-ui="3"] [data-awj-card-title] {
+  color: var(--awj-text-secondary);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
 @layer base {
   body {
     background-color: var(--background);
