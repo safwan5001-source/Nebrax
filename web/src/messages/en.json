@@ -6305,6 +6305,7 @@
     "password": "Password",
     "password_hint": "Leave blank to keep the current password.",
     "send_invitation": "Send login invitation by email",
+    "send_login_details": "Send login details",
     "send_invitation_hint": "The user will receive a secure password setup link; no password is emailed.",
     "send_invitation_confirm": "A secure link will be sent to {email} to set or reset the password.",
     "invitation_sent": "Login details were sent to the user's email.",

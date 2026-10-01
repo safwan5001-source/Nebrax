@@ -394,7 +394,7 @@ export default function HrPage() {
             <Button variant="ghost" size="icon" aria-label={tu('scope_title')} onClick={() => setScopeUser(row.original)}>
               <MapPin className="h-4 w-4 text-muted" strokeWidth={1.7} />
             </Button>
-            <Button variant="ghost" size="icon" aria-label={tu('send_invitation')} onClick={() => sendInvitation(row.original)}>
+            <Button variant="ghost" size="icon" aria-label={tu('send_login_details')} onClick={() => sendInvitation(row.original)}>
               <Mail className="h-4 w-4 text-muted" strokeWidth={1.7} />
             </Button>
             {row.original.id !== meId && (

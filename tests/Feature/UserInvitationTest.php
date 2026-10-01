@@ -8,6 +8,7 @@ use App\Services\AuthRecoveryService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class UserInvitationTest extends TestCase
@@ -103,6 +104,7 @@ class UserInvitationTest extends TestCase
         ]);
         $token = app(AuthRecoveryService::class)->issue($user, AuthRecoveryService::LOGIN_INVITATION);
         $before = $user->fresh()->password;
+        $user->createToken('active-session');
 
         $this->postJson($this->tenantUrl('beta', 'reset-password'), [
             'token' => $token, 'password' => 'new-password-123', 'password_confirmation' => 'new-password-123',
@@ -113,8 +115,25 @@ class UserInvitationTest extends TestCase
             'token' => $token, 'password' => 'new-password-123', 'password_confirmation' => 'new-password-123',
         ])->assertOk();
         $this->assertTrue(Hash::check('new-password-123', $user->fresh()->password));
+        $this->assertDatabaseMissing('personal_access_tokens', ['tokenable_id' => $user->id, 'name' => 'active-session']);
         $this->postJson($this->tenantUrl('alpha', 'reset-password'), [
             'token' => $token, 'password' => 'another-password-123', 'password_confirmation' => 'another-password-123',
+        ])->assertStatus(422);
+    }
+
+    /** @test */
+    public function an_expired_invitation_token_is_rejected(): void
+    {
+        $a = $this->registerTenant('alpha', 'owner@alpha.test');
+        $user = User::create([
+            'tenant_id' => $a['tenant_id'], 'name' => 'مدعو', 'email' => 'invite@alpha.test',
+            'password' => 'old-password-123', 'role' => 'staff',
+        ]);
+        $token = app(AuthRecoveryService::class)->issue($user, AuthRecoveryService::LOGIN_INVITATION);
+        DB::table('auth_action_tokens')->where('user_id', $user->id)->update(['expires_at' => now()->subMinute()]);
+
+        $this->postJson($this->tenantUrl('alpha', 'reset-password'), [
+            'token' => $token, 'password' => 'new-password-123', 'password_confirmation' => 'new-password-123',
         ])->assertStatus(422);
     }
 }
