@@ -2199,6 +2199,15 @@
     "zatca_note": "رمز الاستجابة السريعة (هيئة الزكاة والضريبة)"
   },
   "invoiceForm": {
+    "ws_type": "فاتورة مبيعات",
+    "ws_toolbar": "إجراءات المستند",
+    "ws_lifecycle_document": "حالة المستند",
+    "ws_lifecycle_payment": "حالة الدفع",
+    "ws_tab_payment": "السداد",
+    "ws_tab_meta": "بيانات إضافية",
+    "ws_tab_design": "القالب واللغة",
+    "ws_expand": "عرض",
+    "ws_collapse": "إخفاء",
     "totals_region": "منطقة الإجماليات",
     "totals_detail": "تفصيل",
     "zatca_document_type": "نوع مستند ZATCA",

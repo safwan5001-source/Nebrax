@@ -168,3 +168,75 @@ test.describe('gate ON — Data Grid and LineGrid', () => {
     await expect(page.locator('[data-awj-dock]')).toHaveCount(1);
   });
 });
+
+test.describe('regression — purchase detail never crashes in Demo Mode', () => {
+  for (const gate of [true, false]) {
+    test(`/purchases/pu-42 renders without a page error (gate ${gate ? 'ON' : 'OFF'})`, async ({ page }) => {
+      const errors: string[] = [];
+      page.on('pageerror', (e) => errors.push(e.message));
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await enterDemo(page);
+      await go(page, '/purchases/pu-42', gate);
+      await expect(page.getByText('Application error')).toHaveCount(0);
+      await expect(page.locator('main')).toContainText('6,900.00');
+      expect(errors).toEqual([]);
+    });
+  }
+});
+
+test.describe('gate ON — Sales Invoice create is an editable Document Workspace', () => {
+  test('header, command bar, compact context, hero grid, adjustments, tabs and dock; totals follow the form', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await enterDemo(page);
+    await go(page, '/invoices/new', true);
+
+    await expect(page.locator('[data-awj-docws-header]')).toBeVisible();
+    const bar = page.getByRole('toolbar', { name: 'إجراءات المستند' });
+    await expect(bar.getByRole('button', { name: 'حفظ كمسودة' })).toBeVisible();
+    await expect(bar.getByRole('button', { name: 'حفظ وترحيل' })).toBeVisible();
+    // lifecycle shows the real stored draft state only — no invented "issued" step
+    await expect(page.locator('[data-awj-lifecycle]').getByText(/صادرة|issued/i)).toHaveCount(0);
+
+    // core context is one dense row of the existing fields (same ids)
+    for (const id of ['partner', 'date', 'terms', 'due', 'zatca-document-type', 'taxmode', 'dmode', 'dval', 'ship', 'adj']) {
+      await expect(page.locator(`#${id}`)).toBeAttached();
+    }
+    const ctx = await page.locator('[data-awj-docws-context]').boundingBox();
+    expect(ctx!.height).toBeLessThan(110);
+
+    // the grid is the hero and the dock stays reachable
+    await expect(page.locator('[data-awj-linegrid-hero]')).toBeVisible();
+    for (let i = 0; i < 2; i++) await page.locator('[data-awj-linegrid-hero-bar] button').click();
+    const rows = page.locator('[data-awj-linegrid-row]');
+    await expect(rows).toHaveCount(3);
+    for (let i = 0; i < 3; i++) {
+      await rows.nth(i).locator('input[id$="-price"]').fill(String(100 * (i + 1)));
+      await rows.nth(i).locator('input[id$="-qty"]').fill('2');
+    }
+    // 2×(100+200+300)=1200 + 15% VAT — the dock presents the form's own figure
+    await expect(page.locator('[data-awj-dock-outcome-value]')).toContainText('1,380.00');
+    const dock = await page.locator('[data-awj-dock]').boundingBox();
+    expect(dock!.y + dock!.height).toBeLessThanOrEqual(721);
+
+    // secondary information lives in tabs, all reachable; payment fields keep their ids
+    for (const name of [/السداد/, /ملاحظات/, /القالب واللغة/]) {
+      await expect(page.getByRole('tab', { name })).toBeVisible();
+    }
+    await page.getByRole('tab', { name: /ملاحظات/ }).click();
+    await expect(page.getByPlaceholder('ملاحظات')).toBeVisible();
+  });
+
+  test('mobile: actions reachable, tabs reachable, no horizontal page overflow', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await enterDemo(page);
+    await go(page, '/invoices/new', true);
+    await expect(page.getByRole('button', { name: 'حفظ وترحيل' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'حفظ كمسودة' })).toBeVisible();
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(overflow).toBeLessThanOrEqual(1);
+    for (const name of [/السداد/, /ملاحظات/, /القالب واللغة/]) {
+      await page.getByRole('tab', { name }).scrollIntoViewIfNeeded();
+      await expect(page.getByRole('tab', { name })).toBeVisible();
+    }
+  });
+});

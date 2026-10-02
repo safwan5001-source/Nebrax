@@ -2199,6 +2199,15 @@
     "zatca_note": "QR code (ZATCA)"
   },
   "invoiceForm": {
+    "ws_type": "Sales invoice",
+    "ws_toolbar": "Document actions",
+    "ws_lifecycle_document": "Document status",
+    "ws_lifecycle_payment": "Payment status",
+    "ws_tab_payment": "Payment",
+    "ws_tab_meta": "More details",
+    "ws_tab_design": "Template & language",
+    "ws_expand": "Show",
+    "ws_collapse": "Hide",
     "totals_region": "Totals region",
     "totals_detail": "Details",
     "zatca_document_type": "ZATCA document type",

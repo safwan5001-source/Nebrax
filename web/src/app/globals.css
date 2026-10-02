@@ -3,6 +3,17 @@
 @tailwind components;
 @tailwind utilities;
 
+/* رمز الريال السعودي (U+20C1، Unicode 17) غير موجود في معظم الخطوط المثبّتة؛ المتصفح كان يسقط
+   إلى أي خط يحويه (مثل خط بكسلي) فيظهر مربّعاً. هذا خط فرعي بحرفٍ واحد (OFL، انظر
+   public/fonts/awj-saudi-riyal.OFL.txt) ولا يُستعمل إلا لهذا الرمز عبر unicode-range؛
+   عرضٌ فقط — النص والقيمة لا يتغيّران. */
+@font-face {
+  font-family: 'AWJ Saudi Riyal';
+  src: url('/fonts/awj-saudi-riyal.woff2') format('woff2');
+  unicode-range: U+20C1;
+  font-display: swap;
+}
+
 :root {
   --background: #f6f7f9;
   --surface: #ffffff;
@@ -18,8 +29,8 @@
   --warning: #92400e;
   --flag-saudi: #006c35;
   --flag-mark: #ffffff;
-  --font-sans: var(--font-ibm-sans), 'IBM Plex Sans Arabic', system-ui, sans-serif;
-  --font-mono: var(--font-ibm-mono), 'IBM Plex Mono', ui-monospace, monospace;
+  --font-sans: var(--font-ibm-sans), 'IBM Plex Sans Arabic', 'AWJ Saudi Riyal', system-ui, sans-serif;
+  --font-mono: var(--font-ibm-mono), 'IBM Plex Mono', 'AWJ Saudi Riyal', ui-monospace, monospace;
 }
 
 .dark {
@@ -560,11 +571,56 @@ html[data-awj-ui="3"] [data-awj-cmdbar] {
   background-color: var(--awj-surface-desk);
   border-bottom: 1px solid var(--awj-border-hairline);
 }
+/* Editable document on a phone: the stacked actions would pin ~170px over the line fields, so the
+   command bar flows with the page below md and pins from md up. */
+@media (max-width: 767px) {
+  html[data-awj-ui="3"] [data-awj-docws]:has([data-awj-ctxgrid]) [data-awj-cmdbar] {
+    position: static;
+  }
+}
 html[data-awj-ui="3"] [data-awj-docws-context] {
   background-color: var(--awj-surface-paper);
   border: 1px solid var(--awj-border-hairline);
   border-radius: var(--awj-radius-surface);
   padding: 12px 16px;
+}
+/* Editable document (Sales Invoice create/edit): compact paper regions, no card soup. The line
+   grid is the hero; context and commercial adjustments are single dense rows. Field hints stay
+   in the DOM for assistive tech but leave the visual flow. */
+html[data-awj-ui="3"] [data-awj-ctxgrid] > div > p,
+html[data-awj-ui="3"] [data-awj-ctxgrid] p {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+html[data-awj-ui="3"] [data-awj-ctxgrid] label {
+  font-size: 12px;
+  color: var(--awj-text-secondary);
+}
+html[data-awj-ui="3"] [data-awj-ctxgrid] .space-y-1\.5 > * + * {
+  margin-top: 4px;
+}
+html[data-awj-ui="3"] [data-awj-ctxgrid] :is(input, select, button[role="combobox"]) {
+  min-height: 34px;
+}
+html[data-awj-ui="3"] [data-awj-linegrid-hero],
+html[data-awj-ui="3"] [data-awj-adjust] {
+  background-color: var(--awj-surface-paper);
+  border: 1px solid var(--awj-border-hairline);
+  border-radius: var(--awj-radius-surface);
+}
+html[data-awj-ui="3"] [data-awj-linegrid-hero-bar] {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--awj-border-hairline);
+}
+html[data-awj-ui="3"] [data-awj-linegrid-hero] > [data-awj-linegrid] {
+  padding: 0 8px 8px;
+}
+html[data-awj-ui="3"] [data-awj-adjust] {
+  padding: 10px 16px;
 }
 html[data-awj-ui="3"] [data-awj-docws-tabs] {
   background-color: var(--awj-surface-paper);
