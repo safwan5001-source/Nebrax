@@ -344,6 +344,48 @@ class DeliveryPlatformProfileDomainTest extends TestCase
     }
 
     /** @test */
+    public function ensure_is_idempotent_creates_once_and_rejects_only_real_conflicts(): void
+    {
+        $this->tenant('dlv-ensure');
+        $branch = Branch::create(['name' => 'فرع', 'code' => 'EB']);
+
+        [$first, $createdFirst] = $this->service()->ensure(['platform_key' => 'keeta', 'collection_mode' => 'platform_collected']);
+        [$again, $createdAgain] = $this->service()->ensure(['platform_key' => 'keeta']);
+        [$same, $createdSame] = $this->service()->ensure(['platform_key' => 'keeta', 'collection_mode' => 'platform_collected', 'sales_channel_id' => $first->sales_channel_id]);
+
+        $this->assertTrue($createdFirst);
+        $this->assertFalse($createdAgain);
+        $this->assertFalse($createdSame);
+        $this->assertSame($first->id, $again->id);
+        $this->assertSame($first->id, $same->id);
+        $this->assertSame(1, SalesChannel::count());
+        $this->assertSame(1, $this->service()->latestVersion($first)->version_number);
+
+        // لا رأي في الحالة/المرجع لا يعيد تفعيل ملف معطّل ولا يغيّره.
+        $this->service()->update($first, ['is_active' => false]);
+        [$stillOff] = $this->service()->ensure(['platform_key' => 'keeta']);
+        $this->assertFalse($stillOff->is_active);
+
+        foreach ([
+            ['collection_mode' => 'merchant_collected'],
+            ['external_reference_policy' => 'required'],
+            ['is_active' => true],
+            ['display_name' => 'اسم آخر'],
+            ['sales_channel_id' => '00000000-0000-4000-8000-000000000000'],
+            ['branch_overrides' => [['branch_id' => $branch->id, 'collection_mode' => 'platform_collected']]],
+        ] as $conflict) {
+            $rejected = false;
+            try {
+                $this->service()->ensure(['platform_key' => 'keeta', ...$conflict]);
+            } catch (RuntimeException) {
+                $rejected = true;
+            }
+            $this->assertTrue($rejected, json_encode($conflict));
+        }
+        $this->assertSame(2, $this->service()->latestVersion($first)->version_number);
+    }
+
+    /** @test */
     public function the_database_refuses_a_duplicate_version_number_for_the_same_profile(): void
     {
         $this->tenant('dlv-dupver');

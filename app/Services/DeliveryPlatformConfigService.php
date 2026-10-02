@@ -78,6 +78,75 @@ final class DeliveryPlatformConfigService
     }
 
     /**
+     * إنشاء/تفعيل **متكرر الأمان**: يعيد الملف القائم دون نسخة جديدة إن لم يتعارض الطلب
+     * مع إعداده الحالي (الحقول الغائبة أو null = بلا رأي)، ويُنشئه إن لم يوجد. تعارض صريح
+     * (قيمة مختلفة أو قناة أخرى) يُرفض ويُوجَّه إلى التعديل (PUT) — لا تغيير صامت.
+     * إعادة المحاولة بعد استجابة ملتبسة (أو سباق على الإنشاء) آمنة.
+     *
+     * @param  array<string, mixed>  $input
+     * @return array{0: DeliveryPlatformProfile, 1: bool} [الملف، هل أُنشئ الآن]
+     */
+    public function ensure(array $input, ?User $actor = null): array
+    {
+        $this->requireTenant();
+        $key = (string) ($input['platform_key'] ?? '');
+        if (! DeliveryPlatformCatalog::exists($key)) {
+            throw new RuntimeException('منصة التوصيل غير معروفة.');
+        }
+
+        $existing = DeliveryPlatformProfile::query()->where('platform_key', $key)->first();
+        if ($existing === null) {
+            try {
+                return [$this->create($input, $actor), true];
+            } catch (RuntimeException $e) {
+                // سباق: ملف المنصة أُنشئ بين الفحص والإدراج — يُعامَل كمتكرر إن لم يتعارض.
+                $existing = DeliveryPlatformProfile::query()->where('platform_key', $key)->first();
+                if ($existing === null) {
+                    throw $e;
+                }
+            }
+        }
+
+        $this->assertCompatibleWithExisting($existing, $input, $actor);
+
+        return [$existing, false];
+    }
+
+    /** @param array<string, mixed> $input */
+    private function assertCompatibleWithExisting(DeliveryPlatformProfile $profile, array $input, ?User $actor): void
+    {
+        $conflict = fn () => new RuntimeException('ملف هذه المنصة موجود بإعداد مختلف — عدّله عبر التعديل (PUT) لا الإنشاء.');
+
+        if (! empty($input['sales_channel_id']) && $input['sales_channel_id'] !== $profile->sales_channel_id) {
+            throw $conflict();
+        }
+
+        $current = $this->latestVersion($profile);
+        foreach (['collection_mode', 'external_reference_policy'] as $field) {
+            if (isset($input[$field]) && $input[$field] !== $current->{$field}) {
+                throw $conflict();
+            }
+        }
+        foreach (['display_name', 'display_name_en', 'logo_asset_key'] as $field) {
+            if (isset($input[$field]) && $this->nonEmpty($input[$field]) !== $current->{$field}) {
+                throw $conflict();
+            }
+        }
+        if (isset($input['is_active']) && (bool) $input['is_active'] !== (bool) $current->is_active) {
+            throw $conflict();
+        }
+        if (isset($input['branch_overrides'])) {
+            $provided = $this->normalizeOverrides($input['branch_overrides'], $actor);
+            $existing = $this->overrideMap($current);
+            ksort($provided);
+            ksort($existing);
+            if ($provided !== $existing) {
+                throw $conflict();
+            }
+        }
+    }
+
+    /**
      * @param  array<string, mixed>  $changes  أي مفتاح غائب يبقى كما في النسخة الحالية؛
      *                                         `branch_overrides` الغائب أو null = بلا تغيير، و[] = مسح المتاح للفاعل.
      */

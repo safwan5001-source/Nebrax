@@ -10,7 +10,11 @@ class DeliveryPlatformVersionResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
-        $allowed = $request->user()?->allowedBranchIds();
+        // مرة واحدة لكل طلب: `toArray()` يُستدعى لكل نسخة، و`allowedBranchIds()` استعلام.
+        if (! $request->attributes->has('dlv.allowed_branch_ids')) {
+            $request->attributes->set('dlv.allowed_branch_ids', $request->user()?->allowedBranchIds());
+        }
+        $allowed = $request->attributes->get('dlv.allowed_branch_ids');
 
         return [
             'id' => $this->id,

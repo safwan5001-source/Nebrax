@@ -247,15 +247,52 @@ class DeliveryPlatformApiTest extends TestCase
     }
 
     /** @test */
-    public function a_duplicate_platform_is_rejected_and_a_noop_update_does_not_add_a_version(): void
+    public function re_posting_a_platform_is_idempotent_unless_it_conflicts_and_a_noop_update_adds_no_version(): void
     {
         $auth = $this->owner('dlv-api-dup');
-        $profile = $this->create($auth['token']);
+        $profile = $this->create($auth['token'], ['collection_mode' => 'platform_collected']);
 
-        $this->withToken($auth['token'])->postJson('/api/delivery-platforms', ['platform_key' => 'keeta'])->assertStatus(422);
+        // إعادة محاولة بلا رأي أو بنفس القيم: 200 بنفس الملف، بلا نسخة جديدة.
+        foreach ([['platform_key' => 'keeta'], ['platform_key' => 'keeta', 'collection_mode' => 'platform_collected', 'is_active' => true]] as $retry) {
+            $this->withToken($auth['token'])->postJson('/api/delivery-platforms', $retry)
+                ->assertOk()->assertJsonPath('data.id', $profile['id'])->assertJsonPath('data.current_version.version_number', 1);
+        }
+        // تعارض صريح: يُرفض ويُوجَّه إلى PUT، والإعداد القائم لا يتغيّر.
+        $this->withToken($auth['token'])->postJson('/api/delivery-platforms', ['platform_key' => 'keeta', 'collection_mode' => 'merchant_collected'])
+            ->assertStatus(422);
+        $this->withToken($auth['token'])->postJson('/api/delivery-platforms', ['platform_key' => 'keeta', 'is_active' => false])
+            ->assertStatus(422);
+        $this->withToken($auth['token'])->getJson("/api/delivery-platforms/{$profile['id']}/versions")->assertJsonCount(1, 'data');
+        $this->withToken($auth['token'])->getJson('/api/delivery-platforms')->assertJsonCount(1, 'data');
 
-        $this->withToken($auth['token'])->putJson("/api/delivery-platforms/{$profile['id']}", ['collection_mode' => 'merchant_collected'])
+        $this->withToken($auth['token'])->putJson("/api/delivery-platforms/{$profile['id']}", ['collection_mode' => 'platform_collected'])
             ->assertOk()->assertJsonPath('data.current_version.version_number', 1);
+    }
+
+    /** @test */
+    public function the_versions_listing_resolves_the_branch_scope_once_not_per_version(): void
+    {
+        $auth = $this->owner('dlv-api-queries');
+        $profile = $this->create($auth['token']);
+        foreach (['platform_collected', 'merchant_collected', 'platform_collected'] as $mode) {
+            $this->withToken($auth['token'])->putJson("/api/delivery-platforms/{$profile['id']}", ['collection_mode' => $mode])->assertOk();
+        }
+
+        $count = 0;
+        \Illuminate\Support\Facades\DB::listen(function ($q) use (&$count) {
+            if (str_contains($q->sql, 'branch_user')) {
+                $count++;
+            }
+        });
+        $listing = function (string $query) use ($auth, $profile, &$count): int {
+            $count = 0;
+            $this->withToken($auth['token'])->getJson("/api/delivery-platforms/{$profile['id']}/versions?{$query}")->assertOk();
+
+            return $count;
+        };
+
+        // عدد استعلامات نطاق الفروع لا يتناسب مع عدد النسخ في الصفحة.
+        $this->assertSame($listing('per_page=1'), $listing('per_page=50'));
     }
 
     /** @test */

@@ -50,9 +50,11 @@ class DeliveryPlatformController extends ApiController
 
     public function store(StoreDeliveryPlatformRequest $request): JsonResponse
     {
-        $profile = $this->domain(fn () => $this->config->create($request->validated(), $request->user()));
+        // متكرر الأمان: 201 عند الإنشاء، و200 إن كان الملف قائماً بلا تعارض (إعادة محاولة آمنة).
+        [$profile, $created] = $this->domain(fn () => $this->config->ensure($request->validated(), $request->user()));
 
-        return (new DeliveryPlatformResource($this->withCurrent($profile->load(self::WITH))))->response()->setStatusCode(201);
+        return (new DeliveryPlatformResource($this->withCurrent($profile->load(self::WITH))))
+            ->response()->setStatusCode($created ? 201 : 200);
     }
 
     public function update(UpdateDeliveryPlatformRequest $request, string $id): JsonResponse
