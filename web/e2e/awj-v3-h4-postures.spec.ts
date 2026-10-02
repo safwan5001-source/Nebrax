@@ -39,6 +39,7 @@ async function fillCart(page: Page) {
 
 test.describe('postures are declared per workspace root', () => {
   test('Ledger, Floor and Studio roots carry data-posture', async ({ page }) => {
+    test.setTimeout(120_000); // visits three routes; the first dev-server compile of each is slow
     await enterDemo(page);
     await go(page, '/dashboard', true);
     await expect(page.locator('[data-posture="ledger"]')).toHaveCount(1);
