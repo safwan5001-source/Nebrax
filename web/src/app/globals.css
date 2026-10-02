@@ -82,6 +82,46 @@ html[data-awj-ui="3"] {
   --awj-cmdbar-h: 46px;
 }
 
+html[data-awj-ui="3"] {
+  --background: var(--awj-surface-desk);
+  --surface: var(--awj-surface-paper);
+  --border: var(--awj-border-hairline);
+  --text: var(--awj-text-primary);
+  --muted: var(--awj-text-secondary);
+  --primary: var(--awj-action-primary);
+  --primary-hover: var(--awj-action-primary-hover);
+  --primary-foreground: var(--awj-action-primary-fg);
+  --primary-soft: var(--awj-brand-soft);
+  --positive: var(--awj-status-positive-fg);
+  --negative: var(--awj-status-negative-fg);
+  --warning: var(--awj-status-warning-fg);
+}
+
+html[data-awj-ui="3"] [data-awj-shell] {
+  --text: var(--awj-shell-fg);
+  --muted: var(--awj-shell-fg-muted);
+  --border: var(--awj-shell-line);
+  --surface: var(--awj-shell-bg);
+  --primary: var(--awj-shell-apex);
+  --primary-soft: var(--awj-shell-hover);
+}
+
+html[data-awj-ui="3"] [data-awj-shell] :is([role="menu"], [role="dialog"], [role="listbox"], [role="tooltip"]) {
+  --background: var(--awj-surface-desk);
+  --surface: var(--awj-surface-paper);
+  --border: var(--awj-border-hairline);
+  --text: var(--awj-text-primary);
+  --muted: var(--awj-text-secondary);
+  --primary: var(--awj-action-primary);
+  --primary-hover: var(--awj-action-primary-hover);
+  --primary-foreground: var(--awj-action-primary-fg);
+  --primary-soft: var(--awj-brand-soft);
+  --positive: var(--awj-status-positive-fg);
+  --negative: var(--awj-status-negative-fg);
+  --warning: var(--awj-status-warning-fg);
+  color: var(--awj-text-primary);
+}
+
 html[data-awj-ui="3"]:not(.dark) {
   --awj-surface-desk: #E9E8E4;
   --awj-surface-paper: #FFFFFF;
@@ -1554,4 +1594,36 @@ html[data-awj-ui="3"] [data-posture="studio"] [data-builder-preview] > div:first
   background-color: var(--awj-editor-chrome-hover);
   border-color: var(--awj-editor-chrome-control-line);
   color: var(--awj-editor-chrome-fg);
+}
+
+/* ===== SHARED CORE — form control boundary (Horizon 5) =====
+   WCAG 1.4.11: a control's boundary must reach 3:1 against its surround; the hairline
+   (--awj-border-hairline, ~1.3:1) is a layout divider, not a control edge (FOUNDATIONS §11,
+   TOKEN_REFERENCE §2 border-control). Input / Select / Textarea / Combobox and the raw native
+   controls that follow the same `border border-border` convention all get the control edge
+   from one rule — no per-component fork. `border-transparent`, error (`border-negative`) and
+   borderless inline-cell inputs do not carry `.border-border`, so they are untouched. Region
+   rules that already choose a border (shell fields, Studio inspector, Floor) sit deeper in the
+   tree and keep winning. */
+html[data-awj-ui="3"] :is(input, select, textarea).border-border:not([type="checkbox"], [type="radio"], [type="range"]),
+html[data-awj-ui="3"] button[aria-haspopup="listbox"].border-border {
+  border-color: var(--awj-border-control);
+}
+html[data-awj-ui="3"] :is(input, select, textarea).border-border:disabled,
+html[data-awj-ui="3"] button[aria-haspopup="listbox"].border-border:disabled {
+  border-color: var(--awj-border-strong);
+}
+
+/* Fixed-white foregrounds on semantic fills (Horizon 5). A handful of call sites pair
+   `text-white` with `bg-primary` / `bg-negative`. In v3 Dark those fills are the light
+   brand-500 / red-400 values, where white text drops below 4.5:1. The pairing is corrected
+   here, once, with the semantic foreground tokens — gate-off and Light are untouched. */
+html[data-awj-ui="3"].dark .bg-primary.text-white {
+  color: var(--awj-action-primary-fg);
+}
+html[data-awj-ui="3"].dark .bg-negative.text-white {
+  color: var(--awj-text-inverse);
+}
+html[data-awj-ui="3"].dark .hover\:bg-negative.hover\:text-white:hover {
+  color: var(--awj-text-inverse);
 }

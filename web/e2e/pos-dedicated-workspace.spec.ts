@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { seedDemoSession } from './helpers/demo-session';
 import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { fillAndSubmitOpenSellingSession, POS_OPEN_SESSION_TITLE } from './helpers/open-pos';
@@ -11,8 +12,8 @@ type DemoWindow = Window & {
 };
 
 async function enterDemo(page: Page) {
-  await page.goto('/login', { waitUntil: 'load' });
-  await page.getByRole('button', { name: /دخول تجريبي|Demo login/ }).click();
+  await seedDemoSession(page);
+  await page.goto('/dashboard', { waitUntil: 'load' });
   await expect(page).toHaveURL(/\/dashboard$/);
 }
 

@@ -4,6 +4,7 @@ import { getLocale, getMessages } from 'next-intl/server';
 import { Providers } from '@/components/providers';
 import { BRAND } from '@/lib/brand';
 import { AWJ_THEME_PRE_PAINT_SCRIPT } from '@/lib/awj-theme';
+import { buildAwjUiPrePaintScript } from '@/lib/awj-ui-gate';
 import './globals.css';
 
 // خطوط ذاتية الاستضافة (next/font) — تُبنى محلياً فلا طلب CDN حاجب للعرض
@@ -43,6 +44,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             never touches data-awj-ui — see src/lib/awj-theme.ts. suppressHydrationWarning
             above covers the attribute this adds outside React's own render. */}
         <script dangerouslySetInnerHTML={{ __html: AWJ_THEME_PRE_PAINT_SCRIPT }} />
+        {/* AWJ v3 rollout pre-paint (Horizon 5): applies data-awj-ui="3" before first paint
+            when the stored choice or the build default says so. Inert while
+            NEXT_PUBLIC_AWJ_UI_DEFAULT is unset (today) — see src/lib/awj-ui-gate.ts. */}
+        <script dangerouslySetInnerHTML={{ __html: buildAwjUiPrePaintScript() }} />
       </head>
       <body suppressHydrationWarning>
         <Providers locale={locale} messages={messages}>

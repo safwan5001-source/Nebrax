@@ -1,11 +1,12 @@
 import { expect, test, type Page } from '@playwright/test';
+import { seedDemoSession } from './helpers/demo-session';
 
 const baseUrl = process.env.PLAYWRIGHT_BASE_URL ?? 'http://127.0.0.1:3001';
 
 async function enterDemo(page: Page) {
   await page.context().addCookies([{ name: 'locale', value: 'ar', url: baseUrl }]);
-  await page.goto(`${baseUrl}/login`);
-  await page.getByRole('button', { name: 'دخول تجريبي' }).click();
+  await seedDemoSession(page);
+  await page.goto(`${baseUrl}/dashboard`);
   await expect(page).toHaveURL(/\/dashboard$/);
 }
 
