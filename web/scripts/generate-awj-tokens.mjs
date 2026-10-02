@@ -174,11 +174,55 @@ function cssBlock(selector, vars, indent = '  ') {
   return `${selector} {\n${lines.join('\n')}\n}`;
 }
 
+/** v2.0 variable → semantic v3 token (TOKEN_REFERENCE.md §10). Exported for the drift test. */
+export const LEGACY_ALIAS_MAP = {
+  '--background': 'var(--awj-surface-desk)',
+  '--surface': 'var(--awj-surface-paper)',
+  '--border': 'var(--awj-border-hairline)',
+  '--text': 'var(--awj-text-primary)',
+  '--muted': 'var(--awj-text-secondary)',
+  '--primary': 'var(--awj-action-primary)',
+  '--primary-hover': 'var(--awj-action-primary-hover)',
+  '--primary-foreground': 'var(--awj-action-primary-fg)',
+  '--primary-soft': 'var(--awj-brand-soft)',
+  '--positive': 'var(--awj-status-positive-fg)',
+  '--negative': 'var(--awj-status-negative-fg)',
+  '--warning': 'var(--awj-status-warning-fg)',
+};
+
+/** Legacy variables redefined inside the shell chrome from the shell tokens (Horizon 5). */
+export const SHELL_SCOPE_MAP = {
+  '--text': 'var(--awj-shell-fg)',
+  '--muted': 'var(--awj-shell-fg-muted)',
+  '--border': 'var(--awj-shell-line)',
+  '--surface': 'var(--awj-shell-bg)',
+  '--primary': 'var(--awj-shell-apex)',
+  '--primary-soft': 'var(--awj-shell-hover)',
+};
+
 export function buildCss(tokens) {
   const { base, themeDefault, themeInk, darkBase, modeless } = buildTokens(tokens);
 
   const blocks = [];
   blocks.push(cssBlock('html[data-awj-ui="3"]', modeless));
+  // Legacy-variable bridge (TOKEN_REFERENCE.md §10, Horizon 5). The v2.0 variables that
+  // every shared utility still reads (bg-background, bg-surface, border-border, text-muted…)
+  // are re-pointed at the semantic v3 tokens, so one pair of definitions (Light, Dark)
+  // drives the whole product instead of v2 `.dark` values drifting beside v3 ones. var()
+  // resolves on <html>, where --awj-* already carries the active mode; region-local
+  // redefinitions (shell, Floor, Studio chrome) sit deeper in the tree and still win.
+  blocks.push(cssBlock('html[data-awj-ui="3"]', LEGACY_ALIAS_MAP));
+  // Shell chrome (sidebar + topbar) sits on --awj-shell-bg (Default tint · Ink navy · Dark navy),
+  // not on Paper, so the legacy text/border/surface variables are redefined from the SHELL tokens
+  // inside it — otherwise Ink renders dark-on-navy. Popovers that live inside the chrome (menus,
+  // dialogs, listboxes) sit on Paper again, so they are re-bridged to the workspace tokens.
+  blocks.push(cssBlock('html[data-awj-ui="3"] [data-awj-shell]', SHELL_SCOPE_MAP));
+  blocks.push(
+    cssBlock(
+      'html[data-awj-ui="3"] [data-awj-shell] :is([role="menu"], [role="dialog"], [role="listbox"], [role="tooltip"])',
+      { ...LEGACY_ALIAS_MAP, color: 'var(--awj-text-primary)' }
+    )
+  );
   blocks.push(
     cssBlock('html[data-awj-ui="3"]:not(.dark)', { ...base, ...themeDefault })
   );

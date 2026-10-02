@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { seedDemoSession } from './helpers/demo-session';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
@@ -13,8 +14,8 @@ type BaselineMetrics = {
 };
 
 async function enterDemo(page: Page) {
-  await page.goto(`${baseUrl}/login`);
-  await page.getByRole('button', { name: 'دخول تجريبي' }).click();
+  await seedDemoSession(page);
+  await page.goto(`${baseUrl}/dashboard`);
   await expect(page).toHaveURL(/\/dashboard$/);
 }
 

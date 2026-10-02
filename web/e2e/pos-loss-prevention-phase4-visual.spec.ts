@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { seedDemoSession } from './helpers/demo-session';
 import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
 
@@ -60,8 +61,8 @@ test.describe('Phase 4 visual QA', () => {
 });
 
 async function enterDemo(page: Page) {
-  await page.goto('/login', { waitUntil: 'load' });
-  await page.getByRole('button', { name: /دخول تجريبي|Demo login/ }).click();
+  await seedDemoSession(page);
+  await page.goto('/dashboard', { waitUntil: 'load' });
   await expect(page).toHaveURL(/\/dashboard$/);
   const closeBanner = page.getByRole('button', { name: /إغلاق|Close/ });
   if (await closeBanner.isVisible().catch(() => false)) {

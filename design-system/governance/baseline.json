@@ -1,0 +1,237 @@
+{
+  "$comment": "Per-file counts of fixed-palette classes and raw hex in TSX. Ratchet: may only go down. Regenerate with `node scripts/awj-drift-scan.mjs --write` after a reduction.",
+  "totals": {
+    "palette": 369,
+    "hex": 8
+  },
+  "files": {
+    "web/src/app/(app)/cash-and-bank/page.tsx": {
+      "palette": 1,
+      "hex": 0
+    },
+    "web/src/app/(app)/credit-notes/[id]/page.tsx": {
+      "palette": 2,
+      "hex": 0
+    },
+    "web/src/app/(app)/dashboard/page.tsx": {
+      "palette": 1,
+      "hex": 0
+    },
+    "web/src/app/(app)/hr/page.tsx": {
+      "palette": 1,
+      "hex": 0
+    },
+    "web/src/app/(app)/inventory-settings/categories/page.tsx": {
+      "palette": 0,
+      "hex": 1
+    },
+    "web/src/app/(app)/partners/[id]/page.tsx": {
+      "palette": 1,
+      "hex": 0
+    },
+    "web/src/app/(app)/payments/[id]/page.tsx": {
+      "palette": 2,
+      "hex": 0
+    },
+    "web/src/app/(app)/pos/report/page.tsx": {
+      "palette": 1,
+      "hex": 0
+    },
+    "web/src/app/(app)/quotes/[id]/page.tsx": {
+      "palette": 2,
+      "hex": 0
+    },
+    "web/src/app/(app)/returns/[id]/page.tsx": {
+      "palette": 2,
+      "hex": 0
+    },
+    "web/src/app/(pos)/pos/page.tsx": {
+      "palette": 3,
+      "hex": 0
+    },
+    "web/src/app/page.tsx": {
+      "palette": 8,
+      "hex": 0
+    },
+    "web/src/components/commerce-workspace/commerce-workspace-shell.tsx": {
+      "palette": 1,
+      "hex": 0
+    },
+    "web/src/components/documents/tax-document.tsx": {
+      "palette": 20,
+      "hex": 0
+    },
+    "web/src/components/fuel-stations/fuel-workspace-shell.tsx": {
+      "palette": 1,
+      "hex": 0
+    },
+    "web/src/components/layout/company-logo-mark.tsx": {
+      "palette": 1,
+      "hex": 0
+    },
+    "web/src/components/layout/notification-bell.tsx": {
+      "palette": 1,
+      "hex": 0
+    },
+    "web/src/components/layout/sidebar.tsx": {
+      "palette": 1,
+      "hex": 0
+    },
+    "web/src/components/partners/partner-actions.tsx": {
+      "palette": 1,
+      "hex": 0
+    },
+    "web/src/components/partners/partner-statement-document.tsx": {
+      "palette": 33,
+      "hex": 0
+    },
+    "web/src/components/pos/pos-dialog.tsx": {
+      "palette": 1,
+      "hex": 0
+    },
+    "web/src/components/pos/pos-payment.tsx": {
+      "palette": 1,
+      "hex": 0
+    },
+    "web/src/components/pos/pos-topbar.tsx": {
+      "palette": 1,
+      "hex": 0
+    },
+    "web/src/components/products/product-variants-panel.tsx": {
+      "palette": 0,
+      "hex": 1
+    },
+    "web/src/components/reports/report-document.tsx": {
+      "palette": 11,
+      "hex": 0
+    },
+    "web/src/components/reports/report-filters.tsx": {
+      "palette": 1,
+      "hex": 0
+    },
+    "web/src/components/sales-config/config-list-editor.tsx": {
+      "palette": 0,
+      "hex": 1
+    },
+    "web/src/components/settings/designs-settings-card.tsx": {
+      "palette": 2,
+      "hex": 1
+    },
+    "web/src/components/ui/button.tsx": {
+      "palette": 1,
+      "hex": 0
+    },
+    "web/src/components/ui/dialog.tsx": {
+      "palette": 1,
+      "hex": 0
+    },
+    "web/src/components/ui/input.tsx": {
+      "palette": 1,
+      "hex": 0
+    },
+    "web/src/modules/app-builder/device-frame.tsx": {
+      "palette": 3,
+      "hex": 0
+    },
+    "web/src/modules/documents/components/sections/doc-amount-words.tsx": {
+      "palette": 4,
+      "hex": 0
+    },
+    "web/src/modules/documents/components/sections/doc-bank.tsx": {
+      "palette": 4,
+      "hex": 0
+    },
+    "web/src/modules/documents/components/sections/doc-barcode.tsx": {
+      "palette": 0,
+      "hex": 1
+    },
+    "web/src/modules/documents/components/sections/doc-footer.tsx": {
+      "palette": 4,
+      "hex": 0
+    },
+    "web/src/modules/documents/components/sections/doc-header.tsx": {
+      "palette": 34,
+      "hex": 0
+    },
+    "web/src/modules/documents/components/sections/doc-items-table.tsx": {
+      "palette": 7,
+      "hex": 0
+    },
+    "web/src/modules/documents/components/sections/doc-layout.tsx": {
+      "palette": 2,
+      "hex": 0
+    },
+    "web/src/modules/documents/components/sections/doc-notes.tsx": {
+      "palette": 4,
+      "hex": 0
+    },
+    "web/src/modules/documents/components/sections/doc-parties.tsx": {
+      "palette": 29,
+      "hex": 0
+    },
+    "web/src/modules/documents/components/sections/doc-qr.tsx": {
+      "palette": 4,
+      "hex": 0
+    },
+    "web/src/modules/documents/components/sections/doc-signature.tsx": {
+      "palette": 4,
+      "hex": 0
+    },
+    "web/src/modules/documents/components/sections/doc-stamp.tsx": {
+      "palette": 4,
+      "hex": 0
+    },
+    "web/src/modules/documents/components/sections/doc-terms.tsx": {
+      "palette": 5,
+      "hex": 0
+    },
+    "web/src/modules/documents/components/sections/doc-totals.tsx": {
+      "palette": 27,
+      "hex": 0
+    },
+    "web/src/modules/documents/components/sections/doc-voucher.tsx": {
+      "palette": 15,
+      "hex": 0
+    },
+    "web/src/modules/documents/components/thermal-layout.tsx": {
+      "palette": 2,
+      "hex": 0
+    },
+    "web/src/modules/print-templates/components/print-template-creation-wizard.tsx": {
+      "palette": 1,
+      "hex": 0
+    },
+    "web/src/modules/products/import/stepper.tsx": {
+      "palette": 1,
+      "hex": 0
+    },
+    "web/src/modules/store-experience-builder/ControlPanels.tsx": {
+      "palette": 72,
+      "hex": 2
+    },
+    "web/src/modules/store-experience-builder/ExperienceBuilder.tsx": {
+      "palette": 33,
+      "hex": 0
+    },
+    "web/src/modules/store-experience-builder/OfficialSocialMark.tsx": {
+      "palette": 1,
+      "hex": 0
+    },
+    "web/src/modules/store-experience-builder/ScheduleDialogs.tsx": {
+      "palette": 3,
+      "hex": 0
+    },
+    "web/src/modules/store-experience-builder/SectionLibrary.tsx": {
+      "palette": 1,
+      "hex": 0
+    },
+    "web/src/modules/store-experience-builder/StorefrontPreviewCanvas.tsx": {
+      "palette": 1,
+      "hex": 1
+    },
+    "web/src/modules/store-experience-builder/VersionManagerPanel.tsx": {
+      "palette": 1,
+      "hex": 0
+    }
+  }
+}
