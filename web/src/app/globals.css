@@ -64,6 +64,7 @@
  */
 /* AWJ-TOKENS:GENERATED:BEGIN — do not hand-edit, see design-system/tokens/awj.tokens.json */
 html[data-awj-ui="3"] {
+  --awj-surface-outcome: #0E1A31;
   --awj-outcome-fg: #F2F6FD;
   --awj-outcome-label: #C5D1E8;
   --awj-outcome-decimal: #A9B8D3;
@@ -181,39 +182,68 @@ html[data-awj-ui="3"][data-awj-theme="ink"]:not(.dark) {
 }
 
 html[data-awj-ui="3"].dark {
-  --awj-surface-desk: var(--background);
-  --awj-surface-paper: var(--surface);
-  --awj-surface-band: var(--surface);
-  --awj-surface-sunken: var(--background);
-  --awj-surface-outcome: var(--background);
-  --awj-border-hairline: var(--border);
-  --awj-border-strong: var(--border);
-  --awj-border-control: var(--muted);
-  --awj-text-primary: var(--text);
-  --awj-text-secondary: var(--muted);
-  --awj-text-tertiary: var(--muted);
-  --awj-action-primary: var(--primary);
-  --awj-action-primary-hover: var(--primary-hover);
-  --awj-state-hover: var(--primary-soft);
-  --awj-state-selected: var(--primary-soft);
-  --awj-state-selected-edge: var(--primary);
-  --awj-state-editing-edge: var(--primary);
-  --awj-state-focus-ring: var(--primary);
-  --awj-state-focus-ring-on-ink: var(--primary);
-  --awj-state-disabled-fg: var(--muted);
-  --awj-shell-bg: var(--surface);
-  --awj-shell-fg: var(--text);
-  --awj-shell-fg-muted: var(--muted);
-  --awj-shell-line: var(--border);
-  --awj-shell-hover: var(--primary-soft);
-  --awj-shell-active-bg: var(--primary-soft);
-  --awj-shell-active-fg: var(--primary);
-  --awj-shell-active-shadow: none;
-  --awj-shell-apex: var(--primary);
-  --awj-shell-field-bg: var(--background);
-  --awj-shell-field-line: var(--border);
-  --awj-shell-focus-ring: var(--primary);
-  --awj-shell-brandmark-bg: var(--primary);
+  --awj-surface-desk: #07090C;
+  --awj-surface-paper: #1C1F28;
+  --awj-surface-band: #22262F;
+  --awj-surface-sunken: #15171D;
+  --awj-surface-raised: #1F232C;
+  --awj-surface-docked: #232833;
+  --awj-surface-float: #282E39;
+  --awj-border-hairline: #2E3340;
+  --awj-border-strong: #3A4150;
+  --awj-border-control: #8691A3;
+  --awj-text-primary: #F3F4F6;
+  --awj-text-secondary: #AAB2C0;
+  --awj-text-tertiary: #8D96A6;
+  --awj-text-inverse: #0E1A31;
+  --awj-action-primary: #4F8CFF;
+  --awj-action-primary-hover: #6BA0FF;
+  --awj-action-primary-pressed: #3E73D6;
+  --awj-action-primary-fg: #0E1A31;
+  --awj-status-positive-fg: #16A34A;
+  --awj-status-positive-bg: #122A1D;
+  --awj-status-positive-border: #1F4A30;
+  --awj-status-negative-fg: #F87171;
+  --awj-status-negative-bg: #2C1616;
+  --awj-status-negative-border: #4A2020;
+  --awj-status-warning-fg: #D97706;
+  --awj-status-warning-bg: #2B210E;
+  --awj-status-warning-border: #4A3515;
+  --awj-status-info-fg: #4F8CFF;
+  --awj-status-info-bg: #16233E;
+  --awj-status-neutral-fg: #AAB2C0;
+  --awj-status-neutral-bg: #15171D;
+  --awj-brand-soft: #16233E;
+  --awj-state-hover: #20242D;
+  --awj-state-selected: #1B2A4A;
+  --awj-state-selected-edge: #2B4C86;
+  --awj-state-editing-edge: #3E73D6;
+  --awj-state-focus-ring: #7FA8FF;
+  --awj-state-focus-ring-on-ink: #7FA8FF;
+  --awj-state-focus-halo: rgba(127,168,255,.22);
+  --awj-state-disabled-fg: #3A4150;
+  --awj-elevation-0: none;
+  --awj-elevation-1: 0 1px 0 rgba(0,0,0,.4), 0 1px 2px rgba(0,0,0,.5);
+  --awj-elevation-2: 0 -8px 18px -10px rgba(0,0,0,.55);
+  --awj-elevation-3: 0 10px 28px rgba(0,0,0,.5), 0 2px 6px rgba(0,0,0,.4);
+  --awj-elevation-4: 0 10px 28px rgba(0,0,0,.5), 0 2px 6px rgba(0,0,0,.4);
+  --awj-elevation-scrim: rgba(3,5,9,.7);
+  --awj-shell-cast: inset 0 7px 7px -7px rgba(0,0,0,.45);
+  --awj-shell-cast-edge: inset 7px 0 7px -7px rgba(0,0,0,.35);
+  --awj-outcome-edge: #22345A;
+  --awj-shell-bg: #0E1A31;
+  --awj-shell-fg: #E8EEF9;
+  --awj-shell-fg-muted: #9FB0CC;
+  --awj-shell-line: #22345A;
+  --awj-shell-hover: #15244A;
+  --awj-shell-active-bg: #1A2A4A;
+  --awj-shell-active-fg: #FFFFFF;
+  --awj-shell-active-shadow: inset 0 0 0 1px #2C4170;
+  --awj-shell-apex: #7FA8FF;
+  --awj-shell-field-bg: #15244A;
+  --awj-shell-field-line: #5A74A8;
+  --awj-shell-focus-ring: #7FA8FF;
+  --awj-shell-brandmark-bg: #2D5BDB;
 }
 /* AWJ-TOKENS:GENERATED:END */
 
@@ -400,6 +430,14 @@ html[data-awj-ui="3"] [data-awj-surface="desk"] [data-awj-money-decimal] {
 html[data-awj-ui="3"] [data-awj-surface="outcome"] [data-awj-money-decimal] {
   color: #a9b8d3; /* primitive ink.300 — Outcome Surface is an H2 pattern; this rule is
                       latent foundation until a surface opts into data-awj-surface="outcome" */
+}
+/* Dark v3 (H3, TOKEN_REFERENCE.md §11 point 3): surface-outcome is mode-fixed ink-900,
+   which sits only ~1.1:1 from the new dark desk — visually indistinguishable without a
+   seam. A 1px ink-600 edge (never used in Light, where the Outcome surface already
+   contrasts sharply against Paper/Desk) restores the separation without touching the
+   surface color itself. */
+html[data-awj-ui="3"].dark [data-awj-surface="outcome"] {
+  box-shadow: inset 0 0 0 1px var(--awj-outcome-edge);
 }
 html[data-awj-ui="3"] [data-awj-money-negative] {
   color: var(--awj-status-negative-fg);

@@ -193,19 +193,72 @@
 | **`--primary-soft`** | **يتفرّع**: `brand-soft` (شارة محايدة) · `state-hover` · `state-selected` | 319 استعمالاً — يُرحَّل **بالسياق لا بالاستبدال الأعمى** (الشريحة 3) |
 | `--positive` / `--negative` / `--warning` | `--awj-status-*-fg` | تُوحَّد الوثائق على قيم الكود |
 
-## 11. Dark — خط الأساس القائم (للتوثيق فقط، غير مُعاد تصميمه هنا)
+## 11. Dark v3 — `html[data-awj-ui="3"].dark` (S10، مُنفَّذ)
 
-القيم المنفَّذة اليوم في `.dark` (`globals.css`) — تبقى كما هي حتى الشريحة 10:
+> يستبدل خط الأساس v2.0 أدناه بالكامل تحت البوابة. `--awj-*` تحت `.dark` قيمٌ دلالية حقيقية
+> من `design-system/tokens/awj.tokens.json` (`dark.*`)، وليست أسماء مستعارة لـ`.dark` v2.0.
+> `--awj-surface-outcome` و`--awj-outcome-*` **ثابتة عبر الوضعين** (D-13) فلا تتكرّر هنا.
+> القشرة في الداكن **لا تملك مصفوفة ثانية**: `Ink-Dark = Default-Dark` (D-12) يُنفَّذ حرفياً
+> بإعادة استعمال `theme.ink.shell-*` المحسوبة في كتلة `.dark` نفسها، أياً كانت قيمة
+> `data-awj-theme` المختارة.
 
-| Alias | `.dark` | | Alias | `.dark` |
-|---|---|---|---|---|
-| `--background` | `#0E1014` | | `--primary` | `#4F8CFF` |
-| `--surface` | `#181B20` | | `--primary-hover` | `#6BA0FF` |
-| `--text` | `#F3F4F6` | | `--primary-soft` | `#1B2740` |
-| `--muted` | `#9099A5` | | `--positive` | `#16A34A` |
-| `--border` | `#262A31` | | `--negative` / `--warning` | `#F87171` / `#D97706` |
+| التوكن | القيمة | من |
+|---|---|---|
+| `surface-desk` | `#07090C` | primitive.night.desk |
+| `surface-paper` | `#1C1F28` | primitive.night.paper |
+| `surface-band` | `#22262F` | primitive.night.band |
+| `surface-sunken` | `#15171D` | primitive.night.sunken |
+| `surface-raised` | `#1F232C` | primitive.night.raised |
+| `surface-docked` | `#232833` | primitive.night.docked |
+| `surface-float` | `#282E39` | primitive.night.float |
+| `border-hairline` | `#2E3340` | primitive.night.line-100 |
+| `border-strong` | `#3A4150` | primitive.night.line-200 |
+| `border-control` | `#8691A3` | primitive.night.line-300 |
+| `text-primary` | `#F3F4F6` | primitive.night.text-900 |
+| `text-secondary` | `#AAB2C0` | primitive.night.text-600 |
+| `text-tertiary` | `#8D96A6` | primitive.night.text-500 |
+| `text-inverse` | `#0E1A31` | primitive.ink.900 (نص داكن على أزرار الهوية) |
+| `action-primary` | `#4F8CFF` | primitive.brand.500 (لا 600 — انظر §2) |
+| `action-primary-fg` | `#0E1A31` | نص داكن لا أبيض (§2) |
+| `status-positive-fg` | `#16A34A` | مطابقة لقيمة v2.0 المُتحقَّقة سلفاً |
+| `status-negative-fg` | `#F87171` | مطابقة |
+| `status-warning-fg` | `#D97706` | مطابقة |
+| `state-focus-ring` | `#7FA8FF` | primitive.brand.300 — نفس قيمة `focus-ring-on-ink` |
+| `outcome-edge` *(جديد)* | `#22345A` (ink-600) | يفصل `surface-outcome` عن `surface-desk` القريبين لوناً في الداكن (THEMES.md §6.3) |
+| `shell-*` (13 توكناً) | = `theme.ink.shell-*` | معاد استعمالها حرفياً، لا قيم جديدة |
 
-بنية الداكن المستقبلية: [`THEMES.md`](./THEMES.md) §6.
+### مصفوفة التباين (محسوبة، 28 زوجاً، كلها ناجحة)
+
+| الزوج | النسبة | الحدّ |
+|---|---|---|
+| `text-primary` / paper · desk | 14.95 · 18.11 | 4.5 |
+| `text-secondary` / paper · desk · band · sunken · selected | 7.71 · 9.34 · 7.10 · 8.39 · 6.66 | 4.5 |
+| `text-tertiary` / paper | 5.52 | 4.5 |
+| `action-primary` / paper | 5.12 | 3.0 |
+| `action-primary-fg` / action-primary | 5.39 | 4.5 |
+| `status-positive-fg` / paper · positive-bg | 4.99 · 4.64 | 4.5 |
+| `status-negative-fg` / paper · negative-bg | 5.95 · 6.15 | 4.5 |
+| `status-warning-fg` / paper · warning-bg | 5.17 · 4.97 | 4.5 |
+| `border-control` / paper | 5.17 | 3.0 |
+| `border-hairline` / paper (بنيوي) | 1.30 | 1.3 |
+| `border-strong` / paper (بنيوي) | 1.61 | 1.6 |
+| `paper` / `desk` (بنيوي) | 1.21 | 1.2 |
+| `docked` / `desk` (بنيوي) | 1.35 | 1.2 |
+| `float` / `paper` (بنيوي) | 1.21 | 1.1 |
+| `focus-ring` / paper · selected | 7.01 · 6.06 | 3.0 |
+| `outcome-edge` / outcome (بنيوي) | 1.41 | 1.2 |
+| shell(Ink) `fg` / `muted` / `apex` على `bg` | 14.89 · 7.89 · 7.39 | 4.5 / 4.5 / 3.0 |
+
+**قرارات تصميمية داخل الحدود (§2 المرجعية في `THEMES.md`):**
+1. **الأسطح بالتدرّج النغمي لا الظل:** `desk < sunken < paper < band ≈ raised < docked < float` (الارتفاع = فاتحية أعلى، لا ظلّ أغمق). الظلال (`elevation-1..4`) أُبقيت لكنها خافتة (`rgba(0,0,0,…)`) — دعمٌ إضافي لا المصدر الوحيد للفصل.
+2. **`action-primary` = `brand-500`** (`#4F8CFF`) لا `brand-600`: `brand-600` (`#1E40AF`) على `paper` الداكن ≈ 2:1، دون 3:1. ولأن الأبيض على `brand-500` لا يجتاز 4.5:1، **`action-primary-fg` نصّ داكن (`ink-900`)** على أزرار الهوية في الداكن — الزر نفسه لا منطقه ولا نصّه يتغيّران، فقط لون نصّه.
+3. **`surface-outcome` بلا تغيير** (`#0E1A31`) لكنه قريب جداً من `surface-desk` الجديد (`#07090C`، نسبة ≈ 1.1) فيختفي الحدّ البصري بينهما. أُضيف `--awj-outcome-edge` (`ink-600`) يُستهلك بقاعدة CSS مخصّصة (`.dark [data-awj-surface="outcome"]`) كحدٍّ 1px، تماماً كما نصّ عليه `THEMES.md` §6.3 — لا تغيير لقيمة السطح نفسها.
+4. **حالات الدلالة (`status-*-fg`) أُبقيت على قيمها v2.0 الثلاث** (`#16A34A`/`#F87171`/`#D97706`) بدل اختراع لوحة جديدة: كانت بالفعل مُتحقَّقة التباين على سطح داكن مشابه (`GOVERNANCE.md` §2.1)، وإبقاؤها يحفظ الاستمرارية البصرية لمستخدمي `.dark` الحاليين خارج بوابة v3.
+5. **لا مصفوفة Ink داكنة ثانية:** قيم `shell-*` في `.dark` = القيم المحسوبة لـ`theme.ink` حرفياً (نفس المرجع في JS، لا نسخ قيم)، فأي تعديل مستقبلي على Ink يتبعه الداكن تلقائياً بلا صيانة مزدوجة.
+
+مصدر القيم: `design-system/tokens/awj.tokens.json` (`dark.*`، `primitive.night`، `primitive.status.*.night-*`). التحقق الآلي: `web/scripts/generate-awj-tokens.mjs` (`checkContrasts`) + `web/src/design/__tests__/*`.
+
+بنية الداكن (القواعد): [`THEMES.md`](./THEMES.md) §6.
 
 ## 12. مصفوفة التباين المحسوبة (Default · Light)
 

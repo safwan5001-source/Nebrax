@@ -83,14 +83,45 @@ export function buildTokens(tokens) {
 
   const themeDefault = resolveThemeBlock(tokens, tokens.theme.default);
   const themeInk = resolveThemeBlock(tokens, tokens.theme.ink);
+  const darkBase = buildDarkBase(tokens);
 
-  // Mode-independent tokens: valid in light AND dark under the gate.
+  // Mode-independent tokens: valid in light AND dark under the gate. Outcome is
+  // mode-fixed (THEMES.md D-13 — the ink surface never changes with theme or mode),
+  // so it is resolved once here rather than duplicated in `base` and `darkBase`.
   const modeless = {
+    '--awj-surface-outcome': resolveRef(tokens.semantic.surface.outcome.value, tokens),
     ...resolveGroup(tokens, tokens.outcome, 'outcome'),
     ...densityVars(tokens, 'standard'),
   };
 
-  return { base, themeDefault, themeInk, modeless };
+  return { base, themeDefault, themeInk, darkBase, modeless };
+}
+
+// Dark v3 (Horizon 3, S10): real semantic dark tokens, not an alias back to the old
+// v2.0 `.dark` variables. Resolved the same way as the light `base` group above, from
+// design-system/tokens/awj.tokens.json `dark.*`. Shell tokens are deliberately absent
+// here — Ink-Dark = Default-Dark (THEMES.md D-12) reuses the resolved Ink theme block
+// verbatim in buildCss() rather than maintaining a second dark shell matrix.
+function buildDarkBase(tokens) {
+  const d = tokens.dark;
+  return {
+    ...resolveGroup(tokens, d.surface, 'surface'),
+    ...resolveGroup(tokens, d.border, 'border'),
+    ...resolveGroup(tokens, d.text, 'text'),
+    ...resolveGroup(tokens, d.action, 'action'),
+    ...resolveGroup(tokens, d.status, 'status'),
+    '--awj-brand-soft': resolveRef(d['brand-soft'].value, tokens),
+    ...resolveGroup(tokens, d.interaction, 'state'),
+    '--awj-elevation-0': resolveRef(d.elevation['0'].value, tokens),
+    '--awj-elevation-1': resolveRef(d.elevation['1'].value, tokens),
+    '--awj-elevation-2': resolveRef(d.elevation['2'].value, tokens),
+    '--awj-elevation-3': resolveRef(d.elevation['3'].value, tokens),
+    '--awj-elevation-4': resolveRef(d.elevation['4'].value, tokens),
+    '--awj-elevation-scrim': resolveRef(d.elevation.scrim.value, tokens),
+    '--awj-shell-cast': resolveRef(d.elevation['shell-cast'].value, tokens),
+    '--awj-shell-cast-edge': resolveRef(d.elevation['shell-cast-edge'].value, tokens),
+    '--awj-outcome-edge': resolveRef(d['outcome-edge'].value, tokens),
+  };
 }
 
 // Density tokens carry a `standard` value and a `compact` value. Compact applies
@@ -117,7 +148,7 @@ function cssBlock(selector, vars, indent = '  ') {
 }
 
 export function buildCss(tokens) {
-  const { base, themeDefault, themeInk, modeless } = buildTokens(tokens);
+  const { base, themeDefault, themeInk, darkBase, modeless } = buildTokens(tokens);
 
   const blocks = [];
   blocks.push(cssBlock('html[data-awj-ui="3"]', modeless));
@@ -133,48 +164,14 @@ export function buildCss(tokens) {
       .map((line) => `  ${line}`)
       .join('\n')}\n}`
   );
-  // Gate + Dark compatibility: H1 explicitly excludes a Dark redesign (that is H3/S10).
-  // These aliases point the new --awj-* surface/text/border/shell tokens back at today's
-  // existing .dark variables so a gate-on + dark-mode combination degrades to the current
-  // dark appearance instead of rendering undefined/broken values. Hand-authored (not
-  // generated from awj.tokens.json) because Dark is explicitly out of scope for the v3
-  // token source in H1 — see design-system/v3/TOKEN_REFERENCE.md §11.
+  // Dark v3 (Horizon 3, S10): real semantic dark tokens from design-system/tokens/awj.tokens.json
+  // `dark.*` (buildDarkBase above) — no longer aliases to the old v2.0 `.dark` variables.
+  // Per THEMES.md D-12, Ink-Dark = Default-Dark: dark mode always renders the Ink shell
+  // values regardless of `data-awj-theme`, so this single block is unconditional and the
+  // `[data-awj-theme="ink"]:not(.dark)` block above simply stops matching once `.dark` is
+  // present — no shell values are duplicated or redefined, just reused.
   blocks.push(
-    cssBlock('html[data-awj-ui="3"].dark', {
-      '--awj-surface-desk': 'var(--background)',
-      '--awj-surface-paper': 'var(--surface)',
-      '--awj-surface-band': 'var(--surface)',
-      '--awj-surface-sunken': 'var(--background)',
-      '--awj-surface-outcome': 'var(--background)',
-      '--awj-border-hairline': 'var(--border)',
-      '--awj-border-strong': 'var(--border)',
-      '--awj-border-control': 'var(--muted)',
-      '--awj-text-primary': 'var(--text)',
-      '--awj-text-secondary': 'var(--muted)',
-      '--awj-text-tertiary': 'var(--muted)',
-      '--awj-action-primary': 'var(--primary)',
-      '--awj-action-primary-hover': 'var(--primary-hover)',
-      '--awj-state-hover': 'var(--primary-soft)',
-      '--awj-state-selected': 'var(--primary-soft)',
-      '--awj-state-selected-edge': 'var(--primary)',
-      '--awj-state-editing-edge': 'var(--primary)',
-      '--awj-state-focus-ring': 'var(--primary)',
-      '--awj-state-focus-ring-on-ink': 'var(--primary)',
-      '--awj-state-disabled-fg': 'var(--muted)',
-      '--awj-shell-bg': 'var(--surface)',
-      '--awj-shell-fg': 'var(--text)',
-      '--awj-shell-fg-muted': 'var(--muted)',
-      '--awj-shell-line': 'var(--border)',
-      '--awj-shell-hover': 'var(--primary-soft)',
-      '--awj-shell-active-bg': 'var(--primary-soft)',
-      '--awj-shell-active-fg': 'var(--primary)',
-      '--awj-shell-active-shadow': 'none',
-      '--awj-shell-apex': 'var(--primary)',
-      '--awj-shell-field-bg': 'var(--background)',
-      '--awj-shell-field-line': 'var(--border)',
-      '--awj-shell-focus-ring': 'var(--primary)',
-      '--awj-shell-brandmark-bg': 'var(--primary)',
-    })
+    cssBlock('html[data-awj-ui="3"].dark', { ...darkBase, ...themeInk })
   );
 
   return `${BEGIN_MARKER}\n${blocks.join('\n\n')}\n${END_MARKER}`;

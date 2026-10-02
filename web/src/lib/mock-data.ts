@@ -1437,6 +1437,15 @@ function mockNotificationsResponse(path: string): { data: MockNotification[]; me
   };
 }
 
+// تفضيلات المستخدم في وضع المعاينة — جلسة فقط (مثل أنماط ZATCA أدناه)، فتتحقق
+// جولة الحفظ/القراءة محلياً دون خادم حقيقي. AWJ v3 Horizon 3: appTheme مستقل عن
+// theme (فاتح/داكن)، ولا تُمسح قيمته عند حفظٍ لا يرسلها (يطابق سلوك الخادم الفعلي).
+let mockAccountPreferences: NonNullable<typeof DEMO_USER.preferences> = {
+  locale: 'ar',
+  theme: 'system',
+  appTheme: 'default',
+};
+
 let mockZatcaSubmissionMode: MockZatcaSubmissionMode = 'manual';
 let mockZatcaEnvironment: MockZatcaEnvironment = 'developer';
 const mockZatcaCredentials: MockZatcaCredential[] = [{
@@ -3015,6 +3024,18 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
   // الطفرات (إنشاء/تعديل/حذف/ترحيل) — نجاح صوري دون أي أثر فعلي.
   if (m !== 'GET') {
     if (clean === '/logout') return resolve(null);
+    if (clean === '/account/preferences' && m === 'PUT') {
+      const requested = body as { locale?: unknown; theme?: unknown; appTheme?: unknown } | undefined;
+      const locale = requested?.locale === 'en' || requested?.locale === 'ar' ? requested.locale : mockAccountPreferences.locale;
+      const theme = requested?.theme === 'light' || requested?.theme === 'dark' || requested?.theme === 'system'
+        ? requested.theme : mockAccountPreferences.theme;
+      // الخادم الحقيقي يستبدل العمود كاملاً إن لم يُرسَل appTheme إلا أنه يحافظ على
+      // القيمة القائمة (AccountSettingsController::updatePreferences) — نطابق ذلك هنا.
+      const appTheme = requested?.appTheme === 'ink' || requested?.appTheme === 'default'
+        ? requested.appTheme : (mockAccountPreferences.appTheme ?? 'default');
+      mockAccountPreferences = { locale, theme, appTheme };
+      return resolve({ user: { ...DEMO_USER, preferences: mockAccountPreferences } });
+    }
     if (clean === '/products' && m === 'POST') {
       const created = productFromDemoInput(body);
       saveDemoProduct(created);
@@ -3503,7 +3524,7 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
     const template = mockPrintTemplates.find((item) => item.id === printTemplateMatch[1]);
     return resolve({ data: template ?? null });
   }
-  if (clean === '/me') return resolve({ user: DEMO_USER, company: mockCompany });
+  if (clean === '/me') return resolve({ user: { ...DEMO_USER, preferences: mockAccountPreferences }, company: mockCompany });
   if (clean === '/applications/nav-state') {
     return resolve({
       data: Object.fromEntries(
