@@ -374,6 +374,37 @@ class DeliveryPlatformApiTest extends TestCase
     }
 
     /** @test */
+    public function a_race_between_branch_delete_and_a_new_override_returns_422_not_a_database_error(): void
+    {
+        $auth = $this->owner('dlv-api-race');
+        $branch = $this->branchOf($auth['token'], 'فرع السباق');
+        $profile = $this->create($auth['token']);
+        $versionId = $profile['current_version']['id'];
+
+        // يُحاكى السباق: بعد انتهاء فحص «لا تجاوز» (وقبل تنفيذ DELETE) يُدرَج تجاوز للفرع نفسه
+        // خارج معاملة الحذف — كما تفعل جلسة أخرى — فيبقى بعد التراجع عن فشل FK ويراه الفحص الثاني.
+        $fired = false;
+        \Illuminate\Support\Facades\DB::listen(function ($query) use (&$fired, $auth, $versionId, $branch) {
+            if ($fired || ! str_starts_with(strtolower($query->sql), 'select') || ! str_contains($query->sql, 'delivery_platform_version_overrides')) {
+                return;
+            }
+            $fired = true;
+            \Illuminate\Support\Facades\DB::table('delivery_platform_version_overrides')->insert([
+                'id' => (string) \Illuminate\Support\Str::uuid(),
+                'tenant_id' => $auth['tenant_id'],
+                'delivery_platform_profile_version_id' => $versionId,
+                'branch_id' => $branch,
+                'collection_mode' => 'platform_collected',
+                'created_at' => now()->format('Y-m-d H:i:s'),
+            ]);
+        });
+
+        $this->withToken($auth['token'])->deleteJson("/api/branches/{$branch}")->assertStatus(422);
+        $this->assertTrue($fired, 'the race hook must have fired');
+        $this->withToken($auth['token'])->getJson('/api/branches')->assertJsonFragment(['id' => $branch]);
+    }
+
+    /** @test */
     public function summary_responses_carry_only_the_current_version_and_the_history_endpoint_is_paginated(): void
     {
         $auth = $this->owner('dlv-api-summary');

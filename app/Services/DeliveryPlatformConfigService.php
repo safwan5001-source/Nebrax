@@ -566,6 +566,10 @@ final class DeliveryPlatformConfigService
             if (str_contains(strtolower($e->getMessage()), 'unique')) {
                 throw new RuntimeException('ملف هذه المنصة أو قناتها أو رقم النسخة موجود مسبقاً.', 0, $e);
             }
+            // سباق: فرعٌ حُذف بين التحقق والإدراج — قيد FK يرفض الإدراج؛ رسالة عمل (422) لا 500.
+            if (($e->errorInfo[0] ?? null) === '23503' || str_contains(strtolower($e->getMessage()), 'foreign key')) {
+                throw new RuntimeException('أحد الفروع لم يعد متاحاً — أعد المحاولة.', 0, $e);
+            }
             throw $e;
         }
     }

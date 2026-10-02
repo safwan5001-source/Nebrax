@@ -416,6 +416,35 @@ class DeliveryPlatformVersioningTest extends TestCase
     }
 
     /** @test */
+    public function a_branch_deleted_between_validation_and_insert_is_a_business_error_not_a_database_error(): void
+    {
+        $branch = $this->branch('RACE');
+        $profile = $this->svc()->create(['platform_key' => 'keeta']);
+
+        // يُحاكى السباق: يُحذف الفرع بعد اجتياز التحقق وقبل إدراج التجاوز.
+        $fired = false;
+        \Illuminate\Support\Facades\DB::beforeExecuting(function ($query) use (&$fired, $branch) {
+            if ($fired || ! str_starts_with(strtolower($query), 'insert into "delivery_platform_version_overrides"')) {
+                return;
+            }
+            $fired = true;
+            \Illuminate\Support\Facades\DB::table('branches')->where('id', $branch->id)->delete();
+        });
+
+        try {
+            $this->svc()->update($profile, ['branch_overrides' => [['branch_id' => $branch->id, 'collection_mode' => 'platform_collected']]]);
+            $this->fail('expected a business error');
+        } catch (RuntimeException $e) {
+            $this->assertNotInstanceOf(\Illuminate\Database\QueryException::class, $e);
+            $this->assertStringContainsString('لم يعد متاحاً', $e->getMessage());
+        }
+
+        $this->assertTrue($fired, 'the race hook must have fired');
+        $this->assertSame(1, $this->versionCount($profile), 'no partial version after the failed insert');
+        $this->assertSame(0, DeliveryPlatformVersionOverride::count());
+    }
+
+    /** @test */
     public function a_non_uuid_branch_id_is_rejected_as_unavailable_without_a_database_error(): void
     {
         $profile = $this->svc()->create(['platform_key' => 'keeta']);
