@@ -210,8 +210,10 @@ Applying the exact same local-only workaround CUST-H4-3's report used (copying b
 
 ```
 php artisan test (full, no --filter)
-Tests: <final count, see §12.4> — all failures confined to the pre-existing, unrelated R2StorageServiceTest/aws-sdk-php local-scaffold gap, zero failures in any file this diff touches.
+Tests: 4999 passed, 47 failed, 51 skipped (31157 assertions), 1094s.
 ```
+
+The failure count dropped from 59 to 47 purely from that local workaround (the 12 `AuthActionMail`-dependent failures are gone), isolating the remaining 47 to a second, equally unrelated, local-scaffold-only gap: every one of the 47 is `Class "Aws\Exception\AwsException" not found` in `R2SmokeTestCommandTest`/`R2StorageServiceTest` — `aws/aws-sdk-php` is simply not present in this session's `nibras-app/vendor/`. This diff never touches storage/R2 code, and this is the exact same second gap CUST-H4-3's own report (§10) documented and root-caused against this same local scaffold (4995 passed/47 failed there; 4999/47 here — the +4 is this slice's own new `banner_image_alt_*` tests). **Zero failures occur in any file this diff touches** — `StorefrontPresentationNormalizerTest` itself is fully green (§12.2).
 
 **Frontend, full suites:**
 ```
@@ -232,10 +234,6 @@ web:         npx tsc --noEmit -p .   same pre-existing, unrelated error set CUST
              errors in (commerce)/commerce/appearance) — none of this slice's changed or new files appear.
 storefront:  npx tsc --noEmit        0 errors.
 ```
-
-### 12.4 Clean backend re-run (after the documented local-scaffold workaround)
-
-<!-- Filled in once the re-run (started before this report) completes; see §16 for final confirmation. -->
 
 ---
 
@@ -279,7 +277,7 @@ New spec: `web/e2e/cust-h4-4-section-completion-visual.spec.ts`, **4/4 passed**.
 
 ## 16. Risks / remaining items
 
-- **Local-scaffold-only backend test gap** (§12.3): confirmed, by direct root-cause tracing matching CUST-H4-3's own precedent, to be `setup.sh`'s incomplete directory copy list (not committed to, and out of scope to fix in, this slice) and a missing `aws/aws-sdk-php` dependency in this session's local `vendor/`. Neither is caused by, or related to, this diff's own changed files. CI (`.github/workflows/ci.yml`) copies both directories correctly and should not reproduce either gap.
+- **Local-scaffold-only backend test gap** (§12.3): confirmed, by direct root-cause tracing matching CUST-H4-3's own precedent, to be `setup.sh`'s incomplete directory copy list (12 of the original 59 failures; not committed to, and out of scope to fix in, this slice) and a missing `aws/aws-sdk-php` dependency in this session's local `vendor/` (the remaining 47, all `R2SmokeTestCommandTest`/`R2StorageServiceTest`). Neither is caused by, or related to, this diff's own changed files — confirmed final count after the documented workaround: **4999 passed, 47 failed (all pre-existing/unrelated), 51 skipped**. CI (`.github/workflows/ci.yml`) copies both directories correctly and installs the full Composer dependency set, and should not reproduce either gap (CUST-H4-3's own PR observed both `php artisan test` CI jobs fully green on an equivalent diff).
 - **One confirmed flaky frontend test** (`AwjCheckoutFlow.test.tsx`, unrelated checkout/idempotency-key test) — re-ran in isolation and passed 20/20; not related to this diff.
 - **Custom Content's accordion-vs-flat Canvas/Published difference** (§5): reviewed and accepted as an editor-affordance difference, not a gap — documented rather than silently left unexamined.
 - **No media-upload architecture added for Banner images** — confirmed unnecessary for H4 closure per H4-1 §24's own explicit decision; this slice did not reopen that question.
