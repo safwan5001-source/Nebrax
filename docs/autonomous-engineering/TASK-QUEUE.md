@@ -17,7 +17,7 @@ This is the human-reviewable V1 queue. It is deliberately Markdown first. Do not
 
 ## Authorized horizon
 
-STATUS: ACTIVE
+STATUS: HISTORICAL — superseded 2026-10-02 as the active horizon by "Horizon: AWJ Delivery Platforms & Settlement V1" (end of this file). Task rows below keep their recorded statuses; do not select work from this section.
 
 **Horizon: Commerce Mobile API readiness closure V1**
 
@@ -482,7 +482,7 @@ If a task reaches a true `owner_gate`, Claude may continue only with independent
 
 ## Authorized horizon — AWJ App Builder Horizon V1
 
-STATUS: ACTIVE (2026-09-23) — authorized by `docs/plans/app-builder/AWJ_APP_BUILDER_HORIZON_V1.md`
+STATUS: HISTORICAL (was ACTIVE 2026-09-23; superseded 2026-10-02 by the Delivery Platforms horizon at the end of this file — do not select work from this section) — authorized by `docs/plans/app-builder/AWJ_APP_BUILDER_HORIZON_V1.md`
 and its bootstrap `docs/plans/app-builder/AWJ_APP_BUILDER_HORIZON_V1_BOOTSTRAP.md`, launched
 after AWJ Mobile Runtime Proof Horizon V1 closed (`main@95198157f1b64e0e437675d9c0e01f45479d776d`).
 
@@ -1236,3 +1236,30 @@ Home/Cart accept the resolved live Experience or keep the bundled default). Full
 shell-integration test proves all four branches (4 passed); full `flutter test` 356 passed, 0
 failed; `flutter analyze` clean. Real-device verification before any actual mobile distribution
 remains owed and unresolved, as previously recorded.
+
+## Horizon: AWJ Delivery Platforms & Settlement V1 (AUTHORIZED / ACTIVE)
+
+Source of truth: `docs/plans/pos/AWJ_DELIVERY_PLATFORMS_HORIZON_V1.md` (+ `-BOOTSTRAP.md`, merged via #1162/#1163). Decision: `docs/plans/pos/AWJ_POS_DELIVERY_PLATFORMS_ACCOUNTING_UX_DECISION.md`. Merge != Deploy; no deploy authorized.
+
+Only evidence-backed statuses are recorded here; unlisted tasks of the horizon plan are `blocked` on their stated dependencies and are not ready.
+
+| Order | Task ID | Status | Risk | Depends on | Evidence |
+|---|---|---|---|---|---|
+| 0 | DLV-EVIDENCE-1 | in_review (PR open, not merged) | high | accepted decision | `docs/plans/pos/DLV-EVIDENCE-1-REPORT.md`, recommendation READY |
+| 1 | DLV-FOUNDATION-1 | evidence_ready, LOCKED until DLV-EVIDENCE-1 is merged + POST_MERGE_REVIEW: PASS | high | DLV-EVIDENCE-1 | Report §12–§14 (additive config-only scope) |
+
+Owed gates — authoritative text and blocker mapping is report §11; complete mapping copied here (none blocks FOUNDATION-1):
+
+| Gate | Blocks |
+|---|---|
+| DG-1 | ACCOUNTING-1 |
+| DG-2 | POS-1, ACCOUNTING-1 |
+| DG-3 | ACCOUNTING-1, SETTLEMENT-1 |
+| DG-4 | CLOSE-1 |
+| DG-6 | HUB-1, REFUND-1, CONNECTOR-CORE-1 |
+| DG-7 | CONNECTOR-CORE-1 |
+| DG-8 | POS-1 and later channel pricing |
+| DG-9 | HUB-1, POS-1 |
+| DG-5 | RESOLVED in the report (reuse `SalesChannel` type `external`, slug `delivery-<platform>`); no longer open |
+
+A task must not be promoted to `ready` while any gate mapped to it is unresolved.

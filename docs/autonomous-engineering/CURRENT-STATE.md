@@ -2,6 +2,16 @@
 
 > This file is a durable resume point, not a substitute for Git/GitHub evidence.
 
+LAST_UPDATED: 2026-10-02 (**AWJ Delivery Platforms & Settlement Horizon V1 is the single ACTIVE horizon.** DLV-EVIDENCE-1 delivered, PR in review (`docs/plans/pos/DLV-EVIDENCE-1-REPORT.md`, recommendation READY, base `3429ec39018479671326928ecb732294404f2878`). DLV-FOUNDATION-1 is evidence-ready but locked until EVIDENCE-1 is merged and post-merge reviewed. No runtime/schema/accounting change yet. No deploy.)
+LAYER_VERSION: V1
+STATUS: ACTIVE — AWJ Delivery Platforms & Settlement Horizon V1 (authoritative queue: `TASK-QUEUE.md`, section "Horizon: AWJ Delivery Platforms & Settlement V1"). Every snapshot, STATUS and objective below this section is historical and superseded.
+
+## Current objective
+
+Deliver DLV-EVIDENCE-1 (PR review/merge + post-merge review), then promote DLV-FOUNDATION-1 only when its dependency is satisfied. Stop at any Decision Gate, owner production gate, or blocker. Merge != Deploy.
+
+## Previous snapshot (historical, superseded)
+
 LAST_UPDATED: 2026-09-27 (**AWJ Store Business Identity Marks V1 is CLOSED.** PR #1080 `feat(store): present canonical CR and VAT with utility icons` merged as `071dfa3061fbb0c9393e02bdcba0ee9d150b17cd`. Canonical CR and VAT now render as labeled facts with decorative AWJ utility icons across Published Footer, storefront preview mirror, and merchant preview; no official-looking CR/VAT seal was introduced. SBC official-token loader and contracted tokenless `sbcVerified` behavior remain unchanged. Preview ↔ Published QA, RTL/LTR, required widths, missing-value states, and accessibility passed; no unresolved P1/P2. Post-merge auto-deploy statuses for Railway Nebrax/Web, Storefront, API, Scheduler and Vercel Nebrax/Storefront are all SUCCESS on the merge SHA. No manual deploy was performed. Horizon ends here; do not automatically start another Store/Payment/Trust horizon.)
 
 ## Previous snapshot
@@ -19,10 +29,10 @@ LAST_UPDATED: 2026-09-26 (**Store Customizer Offers decision is resolved.** Owne
 ## Previous snapshot
 
 LAST_UPDATED: 2026-09-24 (**AWJ App Builder Horizon V1 is CLOSED.** All 12 tasks resolved: APP-BUILDER-1/2/3/4/5/6/8/9/10/11/12 done, APP-BUILDER-7 explicitly deferred as a genuine Decision Escalation Gate. APP-BUILDER-7 (Data/Actions/Conditions/Visibility) evaluated for implementation and found NOT READY: three of its four named concepts (Data, Conditions, Visibility) have no backing in the accepted, tested App Schema contract, and building them requires inventing an expression/condition engine or a Data Source Registry contract, both explicitly "not yet locked" in the accepted architecture doc. Owner decision (2026-09-24): keep APP-BUILDER-7 explicitly deferred (decision_required, not completed, not permanently skipped) — table updated, APP-BUILDER-8/9/10 completed in sequence after narrow dependency checks each found no real runtime/schema dependency on APP-BUILDER-7 (PR #983, #985, #988). APP-BUILDER-11's original "bind real Commerce resource / proven Flutter runtime consumes" line was found genuinely unsatisfiable inside the accepted contract (the identical undecided Data Source Registry boundary as APP-BUILDER-7) and escalated; owner decision (2026-09-24, option 2): redefined as an Integrated Proof of the currently accepted and actually implemented App Builder contract, completed (PR #990) with the real-Commerce-binding/live-runtime portion carried forward as a deferred/decision_required follow-up track alongside APP-BUILDER-7. APP-BUILDER-12 (Horizon closure, PR #991) produced the horizon's final closure report distinguishing completed capabilities from this one connected deferred architecture track, plus known limitations, out-of-scope boundary, and next-horizon recommendation. Per the horizon bootstrap's own "Horizon End" rule, this session now STOPS — no automatic continuation to Preview & Testing or any new horizon without explicit owner/ChatGPT-reviewed authorization. Prior AWJ Mobile Runtime Proof Horizon V1 (below) is fully closed and was this horizon's accepted input.)
-LAYER_VERSION: V1
-STATUS: CLOSED — Store Customizer capability completion + visual verification. Offers Decision Packet is resolved: Option 1 selected, gated/unpublished until a future explicitly authorized Promotions & Discounts Engine horizon. Do not start another horizon automatically.
+LAYER_VERSION: V1 (historical)
+STATUS (historical, superseded): CLOSED — Store Customizer capability completion + visual verification. Offers Decision Packet is resolved: Option 1 selected, gated/unpublished until a future explicitly authorized Promotions & Discounts Engine horizon. Do not start another horizon automatically.
 
-## Current objective
+## Previous objective (historical, superseded — Store Customizer)
 
 Store Customizer visual verification is recorded. Banner, benefits, custom content, featured ids, and app promo were checked in the browser at 390 / 430 / 768 / 1024 / 1280 / 1440 in Arabic RTL and English LTR, on the merchant preview canvas and the published bands, including empty, long, missing-media, and missing-product states. Long unbroken text no longer widens the page. Offers stay gated by owner decision until a future authoritative Promotions Engine exists; this is now a resolved deferral, not an open Store Customizer decision. No deploy. Stop.
 
