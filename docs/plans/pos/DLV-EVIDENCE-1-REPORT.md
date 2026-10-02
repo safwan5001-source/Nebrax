@@ -170,13 +170,13 @@ None blocks DLV-FOUNDATION-1 (DG-5, the only gate touching it, is resolved below
 ## 12. Proposed scope — DLV-FOUNDATION-1
 
 **In scope (additive, config only):**
-1. Delivery platform profile bound to a tenant `SalesChannel` of `type=external` (R1; decided, DG-5). Channel slug convention `delivery-<platform>`: platform key (catalog of the six; extensible), display name (ar/en), collection mode (`platform_collected` | `merchant_collected`), settlement counterparty reference (nullable; no ledger account selection), external-order-reference policy (`required|optional|none`, default `optional`), logo asset reference (nullable string, no assets shipped), `is_active`.
+1. Delivery platform profile bound to a tenant `SalesChannel` of `type=external` (R1; decided, DG-5). Channel slug convention `delivery-<platform>`: platform key (catalog of the six; extensible), display name (ar/en), collection mode (`platform_collected` | `merchant_collected`) as data only, external-order-reference policy (`required|optional|none`, default `optional`), logo asset reference (nullable string, no assets shipped), `is_active`.
 2. Append-only configuration **versions** (effective-dated, immutable) so later documents can reference a version id that survives edits.
 3. Optional per-branch override rows (`BelongsToBranch`) only where configured, never crossing tenant.
 4. Service layer (tenant guard, same-tenant validation, soft-disable not delete when referenced) and tenant-scoped REST CRUD under existing permissions (`company.manage` write, `invoices.view` read).
 5. Idempotent catalog seeding/enable action (explicit, no auto-creation for existing tenants).
 
-**Out of scope:** any invoice/payment/ledger change, POS UI/selector, checkout field, close/Z-report, Hub, commission, settlement, refund, connector/webhook/secret handling, logos, new catalog/permission keys, VAT assumptions.
+**Out of scope:** any settlement-counterparty field or model (Partner FK vs other authority is DG-1; it is added only after DG-1 is resolved, and never as a bare external identifier), any invoice/payment/ledger change, POS UI/selector, checkout field, close/Z-report, Hub, commission, settlement, refund, connector/webhook/secret handling, logos, new catalog/permission keys, VAT assumptions.
 
 ## 13. Acceptance criteria — DLV-FOUNDATION-1
 
