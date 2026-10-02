@@ -1246,25 +1246,11 @@ html[data-awj-ui="3"] [data-posture="ledger"] > [data-awj-shell="topbar"] {
 html[data-awj-ui="3"] [data-posture="floor"] {
   background-color: var(--awj-surface-desk);
 }
-/* Cart is the transaction anchor: 5:7 instead of 1:2 (the owner prefers a wide cart), on
-   tablet-landscape and up. Category rail keeps its fixed width. */
-@media (min-width: 1024px) {
-  html[data-awj-ui="3"] [data-awj-floor-grid] {
-    grid-template-columns: minmax(360px, 5fr) minmax(0, 7fr) 112px;
-  }
-}
-@media (min-width: 1280px) {
-  html[data-awj-ui="3"] [data-awj-floor-grid] {
-    grid-template-columns: minmax(400px, 5fr) minmax(0, 7fr) 128px;
-  }
-}
+/* Column tracks live on POS_SALE_GRID_CLASS (catalog 13fr / cart 7fr from md).
+   Do not set grid-template-columns here — a third rail track would override the utility. */
 html[data-awj-ui="3"] [data-awj-floor-cart] {
   background-color: var(--awj-surface-paper);
   border-color: var(--awj-border-strong);
-}
-html[data-awj-ui="3"] [data-awj-floor-cats] {
-  background-color: var(--awj-surface-band);
-  border-color: var(--awj-border-hairline);
 }
 
 /* Cart lines: selected = tonal fill + edge ring + weight (never color alone). */

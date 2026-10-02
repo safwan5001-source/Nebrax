@@ -28,10 +28,6 @@ export const POS_CART_PAY_FOOTER_CLASS =
 export const POS_PRODUCTS_PANEL_CLASS =
   'flex min-h-0 flex-col gap-3 overflow-y-auto p-3 sm:p-4';
 
-/** شريط الأقسام داخل عمود الكتالوج حتى V3-2. عرض ثابت حتى لا يأكل حصة المنتجات. */
-export const POS_DESKTOP_CATEGORIES_CLASS =
-  'hidden w-[104px] shrink-0 flex-col gap-1.5 overflow-y-auto border-s border-border bg-surface p-2 lg:flex xl:w-[148px] xl:gap-2 xl:p-3';
-
 const POS_PRODUCT_GRID_WITH_IMAGES_CLASS =
   'grid-cols-2 sm:grid-cols-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5';
 
@@ -58,8 +54,18 @@ export function posProductGridPadClass(hasCartItems: boolean): string {
  * شبكة المنتجات لا تعتمد على عدد أعمدة ثابت في تنقل الكيبورد؛ التنقل يقرأ هندسة العناصر الفعلية.
  * لذلك نضبط الكثافة حسب المساحة المتاحة، مع حماية iPad landscape من بطاقات شديدة الضيق.
  */
-export function posProductGridClass(showImages: boolean, hasCartItems: boolean): string {
-  const columns = showImages ? POS_PRODUCT_GRID_WITH_IMAGES_CLASS : POS_PRODUCT_GRID_COMPACT_CLASS;
+export function posProductGridClass(
+  showImages: boolean,
+  hasCartItems: boolean,
+  density: 'compact' | 'standard' | 'visual' = 'standard',
+): string {
+  const columns = density === 'compact'
+    ? POS_PRODUCT_GRID_COMPACT_CLASS
+    : density === 'visual' && showImages
+      ? 'grid-cols-2 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
+      : showImages
+        ? POS_PRODUCT_GRID_WITH_IMAGES_CLASS
+        : POS_PRODUCT_GRID_COMPACT_CLASS;
   return `grid gap-3 outline-none ${columns}${posProductGridPadClass(hasCartItems)}`;
 }
 

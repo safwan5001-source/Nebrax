@@ -1,6 +1,6 @@
 # POS-UI-V3-1 — Implementation Report
 
-STATUS: READY FOR REVIEW
+STATUS: MERGED
 DATE: 2026-10-02
 
 ## Outcome
@@ -49,25 +49,37 @@ Pre-existing stderr, not a failure: `IntlError: INVALID_KEY` for dotted message 
 
 ## CI
 
-Pending on the PR Head. Web CI is required (`web/**`). Root PHP CI also runs.
+Exact reviewed Head `c8cab2cbf986425024a871786992915c61ffc642`:
+
+- Web pull request run [37056512371](https://github.com/safwan5001-source/Nebrax/actions/runs/37056512371) SUCCESS.
+- Web push run [37056495965](https://github.com/safwan5001-source/Nebrax/actions/runs/37056495965) SUCCESS.
+- PHP pull request run [37056512320](https://github.com/safwan5001-source/Nebrax/actions/runs/37056512320) SUCCESS (sqlite + pgsql).
+- PHP push run [37056495947](https://github.com/safwan5001-source/Nebrax/actions/runs/37056495947) SUCCESS (sqlite + pgsql).
+
+Post-merge runs on Merge SHA `96977ab382e8defe402490ed77d3727783aa7a19`:
+
+- Web CI [37058284673](https://github.com/safwan5001-source/Nebrax/actions/runs/37058284673) SUCCESS.
+- PHP CI [37058284828](https://github.com/safwan5001-source/Nebrax/actions/runs/37058284828) SUCCESS (sqlite + pgsql).
 
 ## Pre-merge review
 
-- PRE_MERGE_REVIEW: PENDING until the exact final Head
-- Reviewed Head SHA: PR tip after this branch is opened from merged evidence main
-- Findings / resolution: —
+- PRE_MERGE_REVIEW: PASS
+- Reviewed Head SHA: `c8cab2cbf986425024a871786992915c61ffc642`
+- Findings / resolution: none. Comment: https://github.com/safwan5001-source/Nebrax/pull/1168#issuecomment-5960537749
 
 ## Merge
 
-- Merge status: not merged
-- Merge SHA: —
+- Merge status: merged
+- Merge SHA: `96977ab382e8defe402490ed77d3727783aa7a19`
+- PR: https://github.com/safwan5001-source/Nebrax/pull/1168
+- Method: squash
 
 ## Post-merge review
 
-- POST_MERGE_REVIEW: PENDING
-- Reviewed Merge SHA: —
-- Target-branch checks/smoke: —
-- Findings / resolution: —
+- POST_MERGE_REVIEW: PASS
+- Reviewed Merge SHA: `96977ab382e8defe402490ed77d3727783aa7a19`
+- Target-branch checks/smoke: `origin/main` is this merge commit. Post-merge Web CI and PHP CI above are SUCCESS. No production deploy.
+- Findings / resolution: none. Comment: https://github.com/safwan5001-source/Nebrax/pull/1168#issuecomment-5960852973
 
 ## Self-review
 
@@ -123,11 +135,12 @@ None that is a Decision Gate.
 
 ## Git state
 
-- Branch: `pos-ui-v3-1`
-- PR: opened after POS-UI-V3-EVIDENCE post-merge review
+- Branch: `pos-ui-v3-1` (merged)
+- PR: https://github.com/safwan5001-source/Nebrax/pull/1168
 - Base SHA: `d9942a6e264bf05aadc4f005485699cd04f41844` (evidence merge, PR #1166)
-- Head SHA: tip of `pos-ui-v3-1` when the PR is opened; that tip is the review authority
+- Reviewed Head SHA: `c8cab2cbf986425024a871786992915c61ffc642`
+- Merge SHA: `96977ab382e8defe402490ed77d3727783aa7a19`
 
 ## Recommended next dependency-ready task
 
-POS-UI-V3-2 — horizontal categories and density modes, after this slice is merged and POST_MERGE_REVIEW passes.
+POS-UI-V3-2 — horizontal categories and density modes. POST_MERGE_REVIEW on this slice has passed, so V3-2 may start from this merge SHA.

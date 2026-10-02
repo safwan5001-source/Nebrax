@@ -77,30 +77,26 @@ describe('PosProductTile', () => {
     expect(card.className).toContain('focus-visible:ring-2');
   });
 
-  it('يعرض الباركود ويخفي SKU داخل البطاقة', () => {
+  it('يخفي الباركود وSKU ومخزون الحالة الطبيعية عن وجه البطاقة', () => {
     renderTile();
-    expect(screen.getByTestId('pos-product-barcode').textContent).toContain('6281000000330');
-    expect(screen.queryByText('W330')).toBeNull();
-    expect(screen.getByText('1.50')).toBeTruthy();
-    expect(screen.getByText('Available: 12')).toBeTruthy();
-  });
-
-  it('يثبّت اتجاه الباركود LTR ويترك المخزون في سطر مستقل', () => {
-    renderTile();
-    const barcode = screen.getByText('6281000000330');
-    const stock = screen.getByText('Available: 12');
-    const barcodeRow = screen.getByTestId('pos-product-barcode');
-    const stockRow = screen.getByTestId('pos-product-stock');
-    expect(barcode.getAttribute('dir')).toBe('ltr');
-    expect(barcodeRow.contains(barcode)).toBe(true);
-    expect(stockRow.contains(stock)).toBe(true);
-    expect(barcodeRow).not.toBe(stockRow);
-  });
-
-  it('لا يعرض باركودًا وهميًا عند عدم وجود باركود حقيقي', () => {
-    renderTile({ product: { ...product, barcode: null } });
     expect(screen.queryByTestId('pos-product-barcode')).toBeNull();
+    expect(screen.queryByText('6281000000330')).toBeNull();
     expect(screen.queryByText('W330')).toBeNull();
+    expect(screen.queryByTestId('pos-product-stock')).toBeNull();
+    expect(screen.getByText('1.50')).toBeTruthy();
+  });
+
+  it('يظهر شارة الكمية الموجودة في السلة دون أن تمنع الإضافة', () => {
+    const { onAdd } = renderTile({ cartQty: 2 });
+    const badge = screen.getByTestId('pos-product-cart-qty');
+    expect(badge.textContent).toBe('×2');
+    fireEvent.click(screen.getByRole('button', { name: /Water 330ml/ }));
+    expect(onAdd).toHaveBeenCalledOnce();
+  });
+
+  it('الوضع المضغوط لا يعرض صورة حتى لو كانت متاحة', () => {
+    renderTile({ density: 'compact', showImage: false });
+    expect(document.body.querySelector('[data-awj-media]')).toBeNull();
   });
 
   it('لا يعرض زر Quick View إن لم يُمرَّر onOpenQuickView (توافق رجعي)', () => {
@@ -155,12 +151,13 @@ describe('PosProductTile', () => {
     expect(lowStockLine.className).not.toContain('text-negative');
   });
 
-  it('لا يعرض تنبيه مخزون منخفض فوق حد إعادة الطلب', () => {
+  it('لا يعرض مخزوناً عادياً فوق حد إعادة الطلب', () => {
     renderTile({
       product: { ...product, quantity_on_hand: 12, reorder_level: 5 },
       lowStockLabel: 'Low stock',
     });
-    expect(screen.getByTestId('pos-product-stock').textContent).toBe('Available: 12');
+    expect(screen.queryByTestId('pos-product-stock')).toBeNull();
+    expect(screen.queryByTestId('pos-product-low-stock')).toBeNull();
   });
 
   // Floor posture (H4): the tile exposes inert markers the gated stylesheet keys on. They

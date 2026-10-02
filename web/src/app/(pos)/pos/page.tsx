@@ -19,7 +19,6 @@ import { POS_RETURN_HREF, POS_START_HREF, decidePosUnsavedExit } from '@/lib/pos
 import {
   POS_CART_FAB_CLASS,
   POS_CART_PAY_FOOTER_CLASS,
-  POS_DESKTOP_CATEGORIES_CLASS,
   POS_MOBILE_NAV_CLASS,
   POS_PRODUCTS_PANEL_CLASS,
   POS_SALE_GRID_CLASS,
@@ -28,6 +27,7 @@ import {
   posProductGridPadClass,
   posProductsPaneClass,
 } from '@/lib/pos-responsive';
+import { POS_DENSITY_STORAGE_KEY, parsePosDensity, posTileShowsImage, type PosDensityMode } from '@/lib/pos-density';
 import { formatRiyal, riyalToMinor, isValidRiyal, extractInclusiveTax } from '@/lib/money';
 import { discountMinorFromPercent, discountPercentFromMinor, type PosDiscountMode } from '@/lib/pos-discount';
 import { cn } from '@/lib/utils';
@@ -311,6 +311,7 @@ export default function PosPage() {
   const [search, setSearch] = useState('');
   const [cat, setCat] = useState('all');
   const [tab, setTab] = useState('all');
+  const [density, setDensity] = useState<PosDensityMode>('standard');
   const [favs, setFavs] = useState<Set<string>>(new Set());
   /** Quick View: معرّف المنتج المعروض فقط — قراءة بحتة، لا تمسّ السلة أو العميل أو الجلسة. */
   const [quickViewProductId, setQuickViewProductId] = useState<string | null>(null);
@@ -401,6 +402,14 @@ export default function PosPage() {
     defaultTaxInclusive: systemTaxInclusive,
   });
   const cart = activeCart.items;
+  const cartQtyByProduct = useMemo(() => {
+    const totals = new Map<string, number>();
+    for (const line of cart) {
+      if (!line.productId) continue;
+      totals.set(line.productId, (totals.get(line.productId) ?? 0) + line.qty);
+    }
+    return totals;
+  }, [cart]);
   const selectedCustomer = activeCart.customer;
   const taxInclusive = activeCart.taxInclusive;
   const setCart = useCallback((updater: PosCartLine[] | ((current: PosCartLine[]) => PosCartLine[])) => {
@@ -667,6 +676,10 @@ export default function PosPage() {
     if (!sessionReady || session) return;
     router.replace(sessionInvalid ? `${POS_START_HREF}?reason=closed` : POS_START_HREF);
   }, [router, session, sessionInvalid, sessionReady]);
+
+  useEffect(() => {
+    setDensity(parsePosDensity(localStorage.getItem(POS_DENSITY_STORAGE_KEY)));
+  }, []);
 
   const toggleFav = useCallback((id: string) => {
     setFavs((prev) => {
@@ -1511,10 +1524,23 @@ export default function PosPage() {
         return <PosCategoryImage path={decision.path} alt={item.label} />;
     }
   }
-  const TABS = [
-    { key: 'all', label: t('tab_all'), icon: null },
-    { key: 'favorites', label: t('tab_favorites'), icon: Star },
-  ];
+
+  function selectCategory(key: string) {
+    if (key === 'favorites') {
+      setTab('favorites');
+      setCat('all');
+      return;
+    }
+    setTab('all');
+    setCat(key);
+  }
+
+  function chooseDensity(next: PosDensityMode) {
+    setDensity(next);
+    try {
+      localStorage.setItem(POS_DENSITY_STORAGE_KEY, next);
+    } catch { /* ignore */ }
+  }
 
   // PR-6: شرط واحد لإتاحة الاستبدال — يحتاج سلة بديلة نشطة، يُستخدم لتعطيل
   // زرّ الشريط العلوي وزرّ «بدء استبدال» في تفاصيل الفاتورة معاً بلا ازدواج.
@@ -1557,50 +1583,62 @@ export default function PosPage() {
   // ── لوحات فرعية ──────────────────────────────────────────────
   const productsPanel = (
     <section className={POS_PRODUCTS_PANEL_CLASS}>
-      {/* تصنيفات POS على الجوال/التابلت: صور سريعة مع تمرير أفقي، ونفس الفلتر التشغيلي. */}
-      <div className="-mx-3 flex flex-nowrap gap-2 overflow-x-auto px-3 pb-1 touch-pan-x sm:-mx-4 sm:px-4 lg:hidden" aria-label={t('categories')}>
-        {CATS.map((item, index) => {
-          const { key, label } = item;
-          const on = cat === key;
-          return (
-            <button
-              key={key}
-              type="button"
-              aria-pressed={on}
-              onClick={() => setCat(key)}
-              className={'flex w-[76px] shrink-0 touch-manipulation flex-col items-center gap-1.5 rounded-lg border p-2 text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ' + (index === 0 ? 'ms-0 ' : '') + (index === CATS.length - 1 ? 'me-1 ' : '') + (on ? 'border-primary bg-primary-soft text-primary' : 'border-border bg-surface text-text')}
-            >
-              <span className="h-11 w-11 overflow-hidden rounded-md bg-background">
-                {renderCategoryVisual(item)}
-              </span>
-              <span className="line-clamp-2 min-h-7 text-[10.5px] font-semibold leading-tight">{label}</span>
-            </button>
-          );
-        })}
-      </div>
-
       <div className="flex items-center gap-2">
-        {TABS.map((qt) => {
-          const Icon = qt.icon;
-          const on = tab === qt.key;
-          return (
+        <div className="flex min-w-0 flex-1 gap-2 overflow-x-auto touch-pan-x" data-testid="pos-category-strip" aria-label={t('categories')}>
+          <button
+            type="button"
+            aria-pressed={cat === 'all' && tab !== 'favorites'}
+            onClick={() => selectCategory('all')}
+            className={'inline-flex min-h-11 shrink-0 items-center rounded-md px-3 text-sm font-semibold touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ' + (cat === 'all' && tab !== 'favorites' ? 'bg-primary-soft text-primary' : 'text-muted hover:bg-surface hover:text-text')}
+          >
+            {t('tab_all')}
+          </button>
+          <button
+            type="button"
+            aria-pressed={tab === 'favorites'}
+            onClick={() => selectCategory('favorites')}
+            className={'inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-md px-3 text-sm font-semibold touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ' + (tab === 'favorites' ? 'bg-primary-soft text-primary' : 'text-muted hover:bg-surface hover:text-text')}
+          >
+            <Star className="h-3.5 w-3.5" strokeWidth={1.7} />
+            {t('tab_favorites')}
+          </button>
+          {CATS.filter((item) => item.key !== 'all').map((item) => {
+            const on = cat === item.key && tab !== 'favorites';
+            return (
+              <button
+                key={item.key}
+                type="button"
+                aria-pressed={on}
+                onClick={() => selectCategory(item.key)}
+                className={'inline-flex min-h-11 shrink-0 items-center gap-2 rounded-md border px-2.5 text-sm font-semibold touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ' + (on ? 'border-primary bg-primary-soft text-primary' : 'border-border bg-surface text-text')}
+              >
+                <span className="h-7 w-7 overflow-hidden rounded-md bg-background">
+                  {renderCategoryVisual(item)}
+                </span>
+                <span className="max-w-32 truncate">{item.label}</span>
+              </button>
+            );
+          })}
+        </div>
+        <div className="flex shrink-0 items-center gap-1" role="group" aria-label={t('density_label')}>
+          {(['compact', 'standard', 'visual'] as const).map((mode) => (
             <button
-              key={qt.key}
+              key={mode}
               type="button"
-              onClick={() => setTab(qt.key)}
-              className={'inline-flex min-h-11 items-center gap-1.5 rounded-md px-3 text-sm font-semibold touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ' + (on ? 'bg-primary-soft text-primary' : 'text-muted hover:bg-surface hover:text-text')}
+              aria-pressed={density === mode}
+              onClick={() => chooseDensity(mode)}
+              className={'inline-flex min-h-11 items-center rounded-md px-2.5 text-xs font-semibold touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ' + (density === mode ? 'bg-primary text-primary-foreground' : 'text-muted hover:bg-surface hover:text-text')}
             >
-              {Icon && <Icon className="h-3.5 w-3.5" strokeWidth={1.7} />}
-              {qt.label}
+              {t(`density_${mode}`)}
             </button>
-          );
-        })}
+          ))}
+        </div>
       </div>
 
       <div
         ref={registerProductsContainer}
         tabIndex={-1}
-        className={posProductGridClass(posCfg.show_product_images, count > 0)}
+        className={posProductGridClass(posTileShowsImage(density, posCfg.show_product_images), count > 0, density)}
       >
         {filtered.map((p, index) => {
           const tracked = p.track_inventory;
@@ -1620,7 +1658,9 @@ export default function PosPage() {
                 quantity_on_hand: p.quantity_on_hand,
                 reorder_level: p.reorder_level ?? null,
               }}
-              showImage={posCfg.show_product_images}
+              showImage={posTileShowsImage(density, posCfg.show_product_images)}
+              density={density}
+              cartQty={cartQtyByProduct.get(p.id) ?? 0}
               selected={productSelected}
               isFavorite={fav}
               availableLabel={t('available')}
@@ -2078,30 +2118,6 @@ export default function PosPage() {
     </aside>
   );
 
-  const catsPanel = (
-    <aside data-awj-floor-cats="" className={POS_DESKTOP_CATEGORIES_CLASS}>
-      <h4 className="mb-1 px-1 text-xs font-bold text-muted">{t('categories')}</h4>
-      {CATS.map((item) => {
-        const { key, label } = item;
-        const on = cat === key;
-        return (
-          <button
-            key={key}
-            type="button"
-            aria-pressed={on}
-            onClick={() => setCat(key)}
-            className={'flex min-h-12 w-full touch-manipulation flex-col items-center gap-2 rounded-lg border p-2 text-center text-[11px] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ' + (on ? 'border-primary bg-primary-soft text-primary' : 'border-transparent text-text hover:bg-background')}
-          >
-            <span className="h-12 w-12 overflow-hidden rounded-md bg-background">
-              {renderCategoryVisual(item)}
-            </span>
-            <span className="line-clamp-2 leading-tight">{label}</span>
-          </button>
-        );
-      })}
-    </aside>
-  );
-
   if (!sessionReady || !session) {
     return (
       <div className="grid h-full place-items-center bg-background text-sm text-muted">
@@ -2210,12 +2226,7 @@ export default function PosPage() {
           {/* من md: كتالوج ~65% ثم سلة ~35%. الجوال: تبويب واحد */}
           <div data-awj-floor-grid="" className={POS_SALE_GRID_CLASS}>
             <div className={posProductsPaneClass(mobileTab)}>
-              <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
-                <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-                  {productsPanel}
-                </div>
-                {catsPanel}
-              </div>
+              {productsPanel}
               {/* شريط سلة عائم (جوال فقط — التابلت يعرض السلة بجانب المنتجات) */}
               {count > 0 && (
                 <button
