@@ -1,6 +1,6 @@
 # POS-UI-V3-2 — Implementation Report
 
-STATUS: READY FOR REVIEW
+STATUS: MERGED
 DATE: 2026-10-02
 
 ## Outcome
@@ -49,25 +49,39 @@ Local Vitest after cherry-pick onto the V3-1 merge, exit 0: `pos-density.test.ts
 
 ## CI
 
-Pending on the PR Head. Web CI is required (`web/**`). Root PHP CI also runs. Do not treat this file's commit as the reviewed Head until the PR tip is recorded in PRE_MERGE_REVIEW.
+Exact reviewed Head `9c0125f9d2786e7323173ae05750dc4ab41f8575`:
+
+- Web pull request run [37062336343](https://github.com/safwan5001-source/Nebrax/actions/runs/37062336343) SUCCESS.
+- Web push run [37062331580](https://github.com/safwan5001-source/Nebrax/actions/runs/37062331580) SUCCESS.
+- PHP pull request run [37062335896](https://github.com/safwan5001-source/Nebrax/actions/runs/37062335896) SUCCESS (sqlite + pgsql).
+- PHP push run [37062331717](https://github.com/safwan5001-source/Nebrax/actions/runs/37062331717) SUCCESS (sqlite + pgsql).
+
+An earlier Head `0be9cd7` failed the drift ratchet (`text-white`). That was fixed forward on the reviewed Head. It was not merged.
+
+Post-merge runs on Merge SHA `2781cd1bc360cbc68d6a5c9d0569f6bff6db22ef`:
+
+- Web CI [37064066042](https://github.com/safwan5001-source/Nebrax/actions/runs/37064066042) SUCCESS.
+- PHP CI [37064066029](https://github.com/safwan5001-source/Nebrax/actions/runs/37064066029) SUCCESS (sqlite + pgsql).
 
 ## Pre-merge review
 
-- PRE_MERGE_REVIEW: PENDING
-- Reviewed Head SHA: branch tip when the PR is opened (review authority is that tip, not a SHA written inside this file)
-- Findings / resolution: —
+- PRE_MERGE_REVIEW: PASS
+- Reviewed Head SHA: `9c0125f9d2786e7323173ae05750dc4ab41f8575`
+- Findings / resolution: none. Comment: https://github.com/safwan5001-source/Nebrax/pull/1169#issuecomment-5961385091
 
 ## Merge
 
-- Merge status: not merged
-- Merge SHA: —
+- Merge status: merged
+- Merge SHA: `2781cd1bc360cbc68d6a5c9d0569f6bff6db22ef`
+- PR: https://github.com/safwan5001-source/Nebrax/pull/1169
+- Method: squash
 
 ## Post-merge review
 
-- POST_MERGE_REVIEW: PENDING
-- Reviewed Merge SHA: —
-- Target-branch checks/smoke: —
-- Findings / resolution: —
+- POST_MERGE_REVIEW: PASS
+- Reviewed Merge SHA: `2781cd1bc360cbc68d6a5c9d0569f6bff6db22ef`
+- Target-branch checks/smoke: post-merge Web and PHP CI above are SUCCESS. `origin/main` later also contains `30ead92` (store canvas catalog, PR #1167), which does not change the POS sale shell.
+- Findings / resolution: none. Comment: https://github.com/safwan5001-source/Nebrax/pull/1169#issuecomment-5961676001
 
 ## Self-review
 
@@ -121,12 +135,12 @@ None that is a Decision Gate.
 
 ## Git state
 
-- Branch: `pos-ui-v3-2`
-- PR: opened after POS-UI-V3-1 POST_MERGE_REVIEW PASS
+- Branch: `pos-ui-v3-2` (merged)
+- PR: https://github.com/safwan5001-source/Nebrax/pull/1169
 - Base SHA: `96977ab382e8defe402490ed77d3727783aa7a19` (POS-UI-V3-1 merge, PR #1168)
-- Catalog commit: `bb78871` (cherry-pick of `8e0a67a` onto that base)
-- Head SHA: branch tip after the report correction; the PRE_MERGE comment records the exact reviewed SHA
+- Reviewed Head SHA: `9c0125f9d2786e7323173ae05750dc4ab41f8575`
+- Merge SHA: `2781cd1bc360cbc68d6a5c9d0569f6bff6db22ef`
 
 ## Recommended next dependency-ready task
 
-POS-UI-V3-3 — cart hierarchy, touch quantity, totals and Pay — after this slice merges and POST_MERGE_REVIEW passes.
+POS-UI-V3-3 — cart hierarchy, touch quantity, totals and Pay. POST_MERGE_REVIEW on this slice has passed. Start from the latest `origin/main` (includes this merge and the later store commit `30ead92`).
