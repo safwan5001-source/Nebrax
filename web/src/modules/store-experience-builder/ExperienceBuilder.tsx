@@ -2275,7 +2275,7 @@ export function ExperienceBuilder({
         </section>
       </div>
 
-      {isMobileViewport ? <div className="flex h-16 shrink-0 items-center gap-2 border-t border-border bg-surface px-3 lg:hidden">
+      {isMobileViewport ? <div data-builder-mobile-bar="" className="flex h-16 shrink-0 items-center gap-2 border-t border-border bg-surface px-3 lg:hidden">
         {currentPage === "home" ? (
           <>
             <button

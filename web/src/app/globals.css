@@ -1395,6 +1395,7 @@ html[data-awj-ui="3"] [data-posture="studio"] [data-experience-builder] {
 }
 html[data-awj-ui="3"] [data-posture="studio"] [data-experience-builder] > header,
 html[data-awj-ui="3"] [data-posture="studio"] [data-experience-builder] > div > nav,
+html[data-awj-ui="3"] [data-posture="studio"] [data-experience-builder] > [data-builder-mobile-bar],
 html[data-awj-ui="3"] [data-posture="studio"] [data-builder-preview] > div:first-child {
   --text: var(--awj-editor-chrome-fg);
   --muted: var(--awj-editor-chrome-fg-muted);
@@ -1419,6 +1420,20 @@ html[data-awj-ui="3"] [data-posture="studio"] [data-experience-builder] > header
 html[data-awj-ui="3"] [data-posture="studio"] [data-experience-builder] > div > nav :is(button, a):focus-visible,
 html[data-awj-ui="3"] [data-posture="studio"] [data-builder-preview] :is(button, a):focus-visible {
   outline-color: var(--awj-editor-focus-ring);
+}
+/* Mobile bottom action bar: same chrome as the header (Light and Dark alike — editor chrome is
+   mode-fixed). Actions keep their semantics; only the surface/tokens follow the editor palette. */
+html[data-awj-ui="3"] [data-posture="studio"] [data-experience-builder] > [data-builder-mobile-bar] {
+  background-color: var(--awj-editor-chrome);
+  border-color: var(--awj-editor-chrome-line);
+  color: var(--awj-editor-chrome-fg);
+}
+html[data-awj-ui="3"] [data-posture="studio"] [data-experience-builder] > [data-builder-mobile-bar] button:focus-visible {
+  outline: 2px solid var(--awj-editor-focus-ring);
+  outline-offset: 2px;
+}
+html[data-awj-ui="3"] [data-posture="studio"] [data-experience-builder] > [data-builder-mobile-bar] button:not(.bg-primary) {
+  border-color: var(--awj-editor-chrome-control-line);
 }
 /* Control boundaries on graphite must stay ≥ 3:1 (WCAG 1.4.11). */
 html[data-awj-ui="3"] [data-posture="studio"] [data-experience-builder] > header :is(button, a, select, input):not([data-publish]),

@@ -284,6 +284,28 @@ test.describe('Studio (Builder)', () => {
     expect(await bg(page, '[data-experience-builder] > header')).toBe(GRAPHITE);
   });
 
+  for (const mode of ['light', 'dark'] as const) {
+    test(`mobile bottom action bar follows the editor chrome (${mode})`, async ({ page }) => {
+      await page.setViewportSize({ width: 390, height: 844 });
+      await enterDemo(page, { theme: mode });
+      await go(page, '/commerce/appearance', true);
+      const bar = page.locator('[data-experience-builder] > [data-builder-mobile-bar]');
+      await expect(bar).toBeVisible();
+      expect(await bg(page, '[data-experience-builder] > [data-builder-mobile-bar]')).toBe(GRAPHITE);
+      // Same chrome as the header; the primary action keeps its semantics (editor action fill).
+      expect(await bg(page, '[data-experience-builder] > header')).toBe(GRAPHITE);
+      expect(await bar.locator('button.bg-primary').first().evaluate((el) => getComputedStyle(el).backgroundColor)).toBe('rgb(79, 140, 255)');
+    });
+  }
+
+  test('gate OFF: the mobile bottom action bar keeps the legacy surface', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await enterDemo(page);
+    await go(page, '/commerce/appearance', false);
+    await expect(page.locator('[data-builder-mobile-bar]')).toBeVisible();
+    expect(await bg(page, '[data-builder-mobile-bar]')).not.toBe(GRAPHITE);
+  });
+
   test('Inspector follows Light/Dark through the shared tokens (Paper), chrome does not', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 720 });
     await enterDemo(page, { theme: 'dark' });
