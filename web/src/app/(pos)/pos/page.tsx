@@ -17,7 +17,7 @@ import { api, ApiError } from '@/lib/api';
 import { logout } from '@/lib/auth';
 import { POS_RETURN_HREF, POS_START_HREF, decidePosUnsavedExit } from '@/lib/pos-workspace';
 import {
-  POS_CART_FAB_CLASS,
+  POS_TRANSACTION_BAR_CLASS,
   POS_CART_PAY_FOOTER_CLASS,
   POS_MOBILE_NAV_CLASS,
   POS_PRODUCTS_PANEL_CLASS,
@@ -1816,7 +1816,7 @@ export default function PosPage() {
   const cartPanel = (
     // PR-3: `w-full` ضروري — الأب Flex ولا يمدّد عرض الابن تلقائياً؛ بدونه
     // يبقى العمود متقلّصاً على عرض محتواه فلا يظهر التوسيع الفعلي لعمود الشبكة.
-    <aside data-awj-floor-cart="" className="flex w-full min-h-0 min-w-0 flex-col overflow-hidden border-border bg-surface md:border-s">
+    <aside data-awj-floor-cart="" className="flex h-full w-full min-h-0 min-w-0 flex-col overflow-hidden border-border bg-surface min-[900px]:border-s">
       <div className="border-b border-border p-3">
         <div className="hidden items-center gap-1 overflow-x-auto pb-2 md:flex" role="tablist" aria-label={t('open_carts')}>
           {carts.map((cartState) => {
@@ -2230,25 +2230,40 @@ export default function PosPage() {
         )
       ) : (
         <>
-          {/* من md: كتالوج ~65% ثم سلة ~35%. الجوال: تبويب واحد */}
+          {/* من 900px: كتالوج ~65% ثم سلة ~35%. تحت ذلك: مساحة واحدة بارتفاع كامل */}
           <div data-awj-floor-grid="" className={POS_SALE_GRID_CLASS}>
             <div className={posProductsPaneClass(mobileTab)}>
               {productsPanel}
-              {/* شريط سلة عائم (جوال فقط — التابلت يعرض السلة بجانب المنتجات) */}
-              {count > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setMobileTab('cart')}
-                  className={POS_CART_FAB_CLASS}
-                >
-                  <span className="num grid h-6 w-6 place-items-center rounded-lg bg-white/25 text-[13px] font-bold">{count}</span>
-                  <span className="flex-1 text-start text-[13px] font-semibold">{t('view_cart')}</span>
-                  <span className="num text-base font-extrabold">{formatRiyal(totalMinor / 100)}</span>
-                </button>
-              )}
             </div>
             <div className={posCartPaneClass(mobileTab)}>{cartPanel}</div>
           </div>
+
+          {count > 0 && mobileTab === 'products' && (
+            <div data-testid="pos-transaction-bar" className={POS_TRANSACTION_BAR_CLASS}>
+              <span className="num grid h-11 min-w-11 place-items-center rounded-md bg-primary-soft px-2 text-sm font-bold text-primary">{count}</span>
+              <span className="num min-w-0 flex-1 truncate text-base font-extrabold text-text">{formatRiyal(totalMinor / 100)}</span>
+              <button
+                type="button"
+                onClick={() => setMobileTab('cart')}
+                className="inline-flex min-h-11 items-center rounded-md border border-border px-3 text-sm font-semibold text-text touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+              >
+                {t('view_cart')}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (pendingAttempt?.cartId === activeCart.id) {
+                    checkoutAttemptRef.current.adopt(pendingAttempt.attemptId);
+                  }
+                  setStep('payment');
+                }}
+                disabled={cart.length === 0 || catalogLoading || sessionInvalid || !online}
+                className="inline-flex min-h-14 items-center rounded-md bg-primary px-4 text-sm font-bold text-white touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:pointer-events-none disabled:opacity-50"
+              >
+                {t('pay')}
+              </button>
+            </div>
+          )}
 
           <PosShortcuts visible={policy.showShortcutHints} />
 
