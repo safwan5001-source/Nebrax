@@ -47,7 +47,13 @@ class AccountSettingsController extends ApiController
     public function updatePreferences(UpdateAccountPreferencesRequest $request): JsonResponse
     {
         $user = $request->user();
-        $user->update(['preferences' => $request->validated()]);
+        $data = $request->validated();
+        // AWJ v3 theme (Default/Ink): `preferences` column is replaced wholesale (not
+        // merged) by this endpoint, so a client that doesn't yet send `appTheme` would
+        // otherwise silently drop whatever was stored. Keep the previous value, or the
+        // documented default, instead of losing it on every locale/mode-only save.
+        $data['appTheme'] = $data['appTheme'] ?? ($user->preferences['appTheme'] ?? 'default');
+        $user->update(['preferences' => $data]);
 
         return response()->json(['user' => $this->userPayload($user->fresh())]);
     }
@@ -187,7 +193,7 @@ class AccountSettingsController extends ApiController
             'role'        => $user->role,
             'employee_id' => $user->employee_id,
             'tenant_id'   => $user->tenant_id,
-            'preferences' => $user->preferences ?? ['locale' => 'ar', 'theme' => 'system'],
+            'preferences' => $user->preferences ?? ['locale' => 'ar', 'theme' => 'system', 'appTheme' => 'default'],
         ];
     }
 }

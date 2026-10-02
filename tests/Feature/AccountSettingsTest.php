@@ -36,6 +36,38 @@ class AccountSettingsTest extends TestCase
     }
 
     /** @test */
+    public function app_theme_defaults_to_default_and_is_not_dropped_by_a_locale_only_save(): void
+    {
+        $auth = $this->registerTenant();
+
+        // لم يُرسَل appTheme من قبل — الافتراض المخزَّن default.
+        $this->withToken($auth['token'])->getJson('/api/me')
+            ->assertOk()
+            ->assertJsonPath('user.preferences.appTheme', 'default');
+
+        $this->withToken($auth['token'])->putJson('/api/account/preferences', [
+            'locale'   => 'ar',
+            'theme'    => 'system',
+            'appTheme' => 'ink',
+        ])->assertOk()
+            ->assertJsonPath('user.preferences.appTheme', 'ink');
+
+        // حفظ لاحق بلا appTheme (عميل قديم) لا يمسح الاختيار القائم.
+        $this->withToken($auth['token'])->putJson('/api/account/preferences', [
+            'locale' => 'en',
+            'theme'  => 'light',
+        ])->assertOk()
+            ->assertJsonPath('user.preferences.locale', 'en')
+            ->assertJsonPath('user.preferences.appTheme', 'ink');
+
+        $this->withToken($auth['token'])->putJson('/api/account/preferences', [
+            'locale'   => 'en',
+            'theme'    => 'light',
+            'appTheme' => 'neon',
+        ])->assertStatus(422);
+    }
+
+    /** @test */
     public function user_must_confirm_current_password_to_change_email_and_global_email_stays_unique(): void
     {
         $auth = $this->registerTenant('account-email', 'account-email@example.test');
