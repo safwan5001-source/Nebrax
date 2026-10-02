@@ -36,21 +36,21 @@ The Horizon forbids a broad re-investigation and forbids business-contract chang
 
 ## Tests and exact results
 
-Not run. This slice does not change executable code. Root PHP CI is expected to run because `ci.yml` has no path filter.
+Not run locally. This slice does not change executable code. Root PHP CI is expected because `ci.yml` has no path filter. Web CI is not expected (no `web/**` change).
 
 ## Build / lint / typecheck
 
-Not run. No `web/**` or PHP changes, so Web CI is not expected to trigger.
+Not run. No `web/**` or PHP source changes.
 
 ## CI
 
-Pending on the PR. Recorded after checks complete.
+Recorded on the PR against the exact final Head before merge. This section is not a substitute for the PR check list.
 
 ## Pre-merge review
 
-- PRE_MERGE_REVIEW: PENDING
-- Reviewed Head SHA: pending
-- Findings / resolution: pending exact Head
+- PRE_MERGE_REVIEW: PENDING until the exact final Head is reviewed
+- Reviewed Head SHA: the tip of `pos-ui-v3-evidence` after this report correction (authoritative SHA is the one cited by `PRE_MERGE_REVIEW` on the PR)
+- Findings / resolution: none in the evidence diff; formal pass is recorded on the PR at that tip
 
 ## Merge
 
@@ -68,7 +68,7 @@ Pending on the PR. Recorded after checks complete.
 
 ### Implementer
 
-Evidence cites the files and class strings read on the Base. No code edits.
+Evidence cites the files and class strings read on the Base. No production code edits. Git state below names the evidence-content commit instead of "pending commit".
 
 ### Reviewer
 
@@ -117,9 +117,10 @@ None that blocks this Horizon. Portrait sticky transaction bar is intentionally 
 ## Git state
 
 - Branch: `pos-ui-v3-evidence`
-- PR: pending
+- PR: opened against `main` after this correction
 - Base SHA: `72a9c4e239cdca0dd90483878307eb328bdd70f4`
-- Head SHA: pending commit
+- Evidence content SHA: `05b288ec8cea2e80ae352659d6001f15e0de9f63`
+- Head SHA: tip of `pos-ui-v3-evidence` after this correction commit. That tip, not `05b288ec`, is the review authority (`PRE_MERGE_REVIEW` records it verbatim).
 
 ## Recommended next dependency-ready task
 
