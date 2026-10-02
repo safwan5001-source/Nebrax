@@ -1248,4 +1248,18 @@ Only evidence-backed statuses are recorded here; unlisted tasks of the horizon p
 | 0 | DLV-EVIDENCE-1 | in_review (PR open, not merged) | high | accepted decision | `docs/plans/pos/DLV-EVIDENCE-1-REPORT.md`, recommendation READY |
 | 1 | DLV-FOUNDATION-1 | evidence_ready, LOCKED until DLV-EVIDENCE-1 is merged + POST_MERGE_REVIEW: PASS | high | DLV-EVIDENCE-1 | Report §12–§14 (additive config-only scope) |
 
-Owed gates (from the report §11), each blocking the named downstream task, none blocking FOUNDATION-1: DG-1/DG-3 (ACCOUNTING-1, SETTLEMENT-1), DG-2 (POS-1), DG-4 (CLOSE-1), DG-6 (HUB-1, REFUND-1, CONNECTOR-CORE-1), DG-7 (CONNECTOR-CORE-1), DG-8, DG-9. DG-5 (reuse `SalesChannel` type `external`) is confirmed at FOUNDATION-1 acceptance review.
+Owed gates — authoritative text and blocker mapping is report §11; complete mapping copied here (none blocks FOUNDATION-1):
+
+| Gate | Blocks |
+|---|---|
+| DG-1 | ACCOUNTING-1 |
+| DG-2 | POS-1, ACCOUNTING-1 |
+| DG-3 | ACCOUNTING-1, SETTLEMENT-1 |
+| DG-4 | CLOSE-1 |
+| DG-6 | HUB-1, REFUND-1, CONNECTOR-CORE-1 |
+| DG-7 | CONNECTOR-CORE-1 |
+| DG-8 | POS-1 and later channel pricing |
+| DG-9 | HUB-1, POS-1 |
+| DG-5 | RESOLVED in the report (reuse `SalesChannel` type `external`, slug `delivery-<platform>`); no longer open |
+
+A task must not be promoted to `ready` while any gate mapped to it is unresolved.

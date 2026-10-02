@@ -153,7 +153,7 @@ Future (conceptual, **not authorized**; owned by DLV-ACCOUNTING/SETTLEMENT/COMMI
 
 ## 11. Decision Gates
 
-None blocks DLV-FOUNDATION-1. The following are recorded against the downstream task that they block:
+None blocks DLV-FOUNDATION-1 (DG-5, the only gate touching it, is resolved below). The remaining gates are recorded against the downstream task that they block:
 
 | Gate | Question | Blocks |
 |---|---|---|
@@ -161,7 +161,7 @@ None blocks DLV-FOUNDATION-1. The following are recorded against the downstream 
 | DG-2 | Which `partner_id` the POS invoice uses for platform orders (walk-in default vs end customer) and where channel/collector/config-version are stamped (side table vs `invoices` columns). | POS-1 / ACCOUNTING-1 |
 | DG-3 | Legal/tax role per platform contract; effect on ZATCA document type (derived from partner VAT) and tax point. Owner/tax decision with evidence. | ACCOUNTING-1, SETTLEMENT-1 |
 | DG-4 | Close/Z-report presentation: whether platform-collected sales appear as separate rows without creating an expected physical tender row (requires deciding the payment representation first, see G4). | CLOSE-1 |
-| DG-5 | Confirm reuse of `SalesChannel(type=external)` (Commerce-owned, ADR-03) as delivery channel identity vs a separate model; verify no Commerce listing/endpoint enumerates all channels assuming commerce semantics. Evidence favors reuse; decision recorded for FOUNDATION-1 acceptance review, not a blocker. | FOUNDATION-1 (design choice) |
+| DG-5 | **RESOLVED in this evidence pass.** Reuse of `SalesChannel(type=external)` as delivery channel identity. Evidence: every query that enumerates channels filters by type (`ResolveStorefrontTenant`/`ResolveStorefrontDomain`/`StorefrontProvisioningService`/`EnsureWebSalesChannelCommand`/`RegisterStorefrontDomainCommand` = `web`; `ResolveCommerceChannel`/`MobileSalesChannelResolver` = `mobile`); none lists all channels; `type=external` is defined (ADR-03 §11 anticipates external channels) with zero consumers. Caveats made binding on FOUNDATION-1: (a) slug convention must not collide with reserved `web` (provisioning throws on a non-web occupant), use `delivery-<platform>`; (b) the staff `CommerceOrderService::create` path accepts any channel id, so FOUNDATION-1 adds no Commerce order path for delivery channels and a test asserts delivery channels are never returned by web/mobile resolvers. Reuse is therefore decided, not deferred. | — |
 | DG-6 | Inventory consumption event for API-ingested orders with no cashier (invoice at accept / handoff / completion) and cancel/restock rule, consistent with canonical lifecycle. Reuse `CommerceOrder` vs separate delivery-order projection (Commerce contract #8 forbids forcing POS flows through `CommerceOrder`). | HUB-1, REFUND-1, CONNECTOR-CORE-1 |
 | DG-7 | Accept app-key encrypted casts as the "canonical tenant-scoped secret mechanism", or require vault/versioned rotation. | CONNECTOR-CORE-1 |
 | DG-8 | Channel-price precedence vs partner price list for POS delivery channels (configurable policy per CLAUDE.md rule 6, default preserving current behavior). | POS-1 / later pricing |
@@ -170,7 +170,7 @@ None blocks DLV-FOUNDATION-1. The following are recorded against the downstream 
 ## 12. Proposed scope — DLV-FOUNDATION-1
 
 **In scope (additive, config only):**
-1. Delivery platform profile bound to a tenant `SalesChannel` of `type=external` (R1): platform key (catalog of the six; extensible), display name (ar/en), collection mode (`platform_collected` | `merchant_collected`), settlement counterparty reference (nullable; no ledger account selection), external-order-reference policy (`required|optional|none`, default `optional`), logo asset reference (nullable string, no assets shipped), `is_active`.
+1. Delivery platform profile bound to a tenant `SalesChannel` of `type=external` (R1; decided, DG-5). Channel slug convention `delivery-<platform>`: platform key (catalog of the six; extensible), display name (ar/en), collection mode (`platform_collected` | `merchant_collected`), settlement counterparty reference (nullable; no ledger account selection), external-order-reference policy (`required|optional|none`, default `optional`), logo asset reference (nullable string, no assets shipped), `is_active`.
 2. Append-only configuration **versions** (effective-dated, immutable) so later documents can reference a version id that survives edits.
 3. Optional per-branch override rows (`BelongsToBranch`) only where configured, never crossing tenant.
 4. Service layer (tenant guard, same-tenant validation, soft-disable not delete when referenced) and tenant-scoped REST CRUD under existing permissions (`company.manage` write, `invoices.view` read).
@@ -190,6 +190,7 @@ None blocks DLV-FOUNDATION-1. The following are recorded against the downstream 
 8. Unauthorized role ⇒ 403; foreign tenant/branch/channel ids ⇒ non-revealing 404/422; inactive/foreign `default_price_list_id` rules unchanged.
 9. Responses expose no secrets (none stored) and no ledger accounts.
 10. No change to `POST pos/checkout` contract/checksum, close math, or any journal.
+11. Delivery channel slugs follow `delivery-<platform>` and never collide with `web`; no Commerce order path is added for delivery channels.
 
 ## 14. Required tests — DLV-FOUNDATION-1
 
@@ -201,8 +202,22 @@ None blocks DLV-FOUNDATION-1. The following are recorded against the downstream 
 
 ## 15. Final recommendation
 
-**READY** — DLV-FOUNDATION-1 is dependency-ready by evidence **once DLV-EVIDENCE-1 is merged and POST_MERGE_REVIEW: PASS is recorded** (Horizon §5: an unmerged dependency does not unlock its child). It is not started in this PR. The posting/tax/payment-representation gates (DG-1…DG-4, DG-6…DG-9) are real and are explicitly scoped *out* of FOUNDATION-1; they must be resolved with owner decisions/evidence before ACCOUNTING-1, POS-1, HUB-1 and CONNECTOR-CORE-1 are promoted.
+**READY** — DLV-FOUNDATION-1 has no open gate (DG-5 resolved above) and is dependency-ready by evidence **once DLV-EVIDENCE-1 is merged and POST_MERGE_REVIEW: PASS is recorded** (Horizon §5: an unmerged dependency does not unlock its child). It is not started in this PR. The posting/tax/payment-representation gates (DG-1…DG-4, DG-6…DG-9) are real and are explicitly scoped *out* of FOUNDATION-1; they must be resolved with owner decisions/evidence before ACCOUNTING-1, POS-1, HUB-1 and CONNECTOR-CORE-1 are promoted.
 
 ## 16. Durable state
 
-`TASK-QUEUE.md` and `CURRENT-STATE.md` receive a Delivery Platforms Horizon V1 section recording only: horizon ACTIVE; DLV-EVIDENCE-1 delivered/in review; DLV-FOUNDATION-1 evidence-ready but locked until EVIDENCE-1 merge + post-merge review; all other tasks unchanged and not ready; gates DG-1…DG-9 listed as owed.
+`TASK-QUEUE.md` and `CURRENT-STATE.md` receive a Delivery Platforms Horizon V1 section recording only: horizon ACTIVE; DLV-EVIDENCE-1 delivered/in review; DLV-FOUNDATION-1 evidence-ready but locked until EVIDENCE-1 merge + post-merge review; all other tasks unchanged and not ready; gates DG-1…DG-4 and DG-6…DG-9 listed as owed (DG-5 resolved in the report).
+
+## 17. Final evidence metadata
+
+| Field | Value |
+|---|---|
+| Task | DLV-EVIDENCE-1 |
+| Branch | `claude/fervent-tesla-vwm7os` |
+| PR | [safwan5001-source/Nebrax#1171](https://github.com/safwan5001-source/Nebrax/pull/1171) |
+| Evidence base SHA | `3429ec39018479671326928ecb732294404f2878` (all code evidence frozen at this SHA) |
+| Head SHA | The PR head at review time. A report cannot contain its own commit hash; the reviewed head is stated in the PR's final report and `PRE_MERGE_REVIEW` comment, and evidence applies only if the PR diff touches nothing outside the three docs below. |
+| Changed files | `docs/plans/pos/DLV-EVIDENCE-1-REPORT.md`, `docs/autonomous-engineering/TASK-QUEUE.md`, `docs/autonomous-engineering/CURRENT-STATE.md` |
+| Checks | Docs-only: referenced paths/test classes verified to exist; `git diff --check` clean; no runtime tests run (no code changed). CI status is reported in the PR. |
+| Risks / remaining | Evidence is from code/test reading, not runtime execution; DG-1…DG-4, DG-6…DG-9 owner decisions owed before their downstream tasks; provider evidence (§10) unavailable. |
+| Next dependency-ready task | DLV-FOUNDATION-1, only after this PR is merged and `POST_MERGE_REVIEW: PASS` is recorded. |
