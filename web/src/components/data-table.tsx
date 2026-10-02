@@ -21,6 +21,7 @@ import { MobileRecordItem, type MobileRecord } from './nebrax/mobile-record';
 import { toCsv, downloadCsv } from '@/lib/export';
 import { cn } from '@/lib/utils';
 import { normalizeProtectedColumns, type DataTableColumnVisibilityControl } from '@/lib/data-explorer/table-layout';
+import { useAwjUi3 } from '@/lib/use-awj-ui3';
 
 /**
  * فرز خادميّ — حين تُمرَّر هذه الخاصية يصبح الخادم **مصدر الحقيقة الوحيد**
@@ -76,6 +77,17 @@ interface DataTableProps<T> {
   columnVisibility?: DataTableColumnVisibilityControl;
   /** يثبت رأس الجدول داخل حاوية التمرير عند الحاجة إلى مسح قوائم كثيفة. */
   stickyHeader?: boolean;
+  /**
+   * v3: يلصق عمود الهوية (أول عمود بيانات) عند بداية السطر المنطقية أثناء التمرير الأفقي.
+   * أثر بصري تحت بوابة v3 فقط؛ بدونها لا يتغيّر شيء.
+   */
+  stickyStartColumn?: boolean;
+  /**
+   * v3: إجراءات جماعية تظهر في شريط يحلّ محل أداة الجدول عند وجود تحديد. تُمرَّر
+   * فقط من الشاشات التي تملك فعلاً جماعياً؛ بدونها لا يظهر الشريط (لا تكرار لواجهة
+   * تحديد قائمة خارج الجدول).
+   */
+  bulkActions?: React.ReactNode;
 }
 
 export function DataTable<T>({
@@ -98,8 +110,11 @@ export function DataTable<T>({
   selection,
   columnVisibility,
   stickyHeader = false,
+  stickyStartColumn = false,
+  bulkActions,
 }: DataTableProps<T>) {
   const t = useTranslations('nebrax');
+  const v3 = useAwjUi3();
   const [sorting, setSorting] = useState<SortingState>([]);
   const [internalGlobalFilter, setInternalGlobalFilter] = useState('');
   const globalFilter = searchValue ?? internalGlobalFilter;
@@ -199,15 +214,33 @@ export function DataTable<T>({
   const checkboxClass =
     'h-4 w-4 cursor-pointer accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40';
 
+  const showBulkBar = v3 && bulkActions != null && selection != null && selection.selectedIds.length > 0;
+
   return (
-    <div className="rounded border border-border bg-surface">
-      {showToolbar ? (
-        <div className="flex items-center gap-2 border-b border-border p-3">
+    <div data-awj-grid="" className="rounded border border-border bg-surface">
+      {showBulkBar ? (
+        <div
+          data-awj-bulkbar=""
+          role="region"
+          aria-label={t('selectedCount', { count: selection.selectedIds.length })}
+          className="flex items-center gap-3 border-b border-border p-3"
+        >
+          <span aria-live="polite" className="num text-sm font-semibold text-text">
+            {t('selectedCount', { count: selection.selectedIds.length })}
+          </span>
+          <div className="flex items-center gap-2">{bulkActions}</div>
+          <Button variant="ghost" size="sm" className="ms-auto" onClick={() => selection.onChange([])}>
+            {t('clearSelection')}
+          </Button>
+        </div>
+      ) : showToolbar ? (
+        <div data-awj-grid-toolbar="" className="flex items-center gap-2 border-b border-border p-3">
           <Search className="h-4 w-4 text-muted" strokeWidth={1.6} />
           <input
             value={globalFilter}
             onChange={(e) => setGlobalFilter(e.target.value)}
             placeholder={searchPlaceholder}
+            data-awj-grid-search=""
             className="h-8 w-full max-w-xs bg-transparent text-sm text-text placeholder:text-muted focus:outline-none"
           />
           {columnVisibility ? (
@@ -258,12 +291,15 @@ export function DataTable<T>({
           {/* الجدول يمرّر أفقياً داخل حاويته (لا على مستوى الصفحة) بدل أن تنضغط
               أعمدته: رأسٌ مكسور على سطرين وتاريخٌ ينقسم ليسا كثافةً بل ضوضاء. */}
           <div className="hidden md:block">
-            <Table className="[&_th]:whitespace-nowrap">
+            <Table
+              className="[&_th]:whitespace-nowrap"
+              wrapperProps={stickyHeader ? ({ 'data-awj-sticky-head': '' } as React.HTMLAttributes<HTMLDivElement>) : undefined}
+            >
               <THead className={stickyHeader ? 'sticky top-0 z-10 bg-surface' : undefined}>
                 {table.getHeaderGroups().map((hg) => (
                   <TR key={hg.id}>
                     {selection ? (
-                      <TH className="w-10">
+                      <TH className="w-10" data-awj-sticky-start={stickyStartColumn ? '0' : undefined}>
                         <input
                           type="checkbox"
                           className={checkboxClass}
@@ -273,13 +309,14 @@ export function DataTable<T>({
                         />
                       </TH>
                     ) : null}
-                    {hg.headers.map((header) => {
+                    {hg.headers.map((header, headerIndex) => {
                       const sorted = header.column.getIsSorted();
                       const SortIcon = sorted === 'asc' ? ArrowUp : sorted === 'desc' ? ArrowDown : ChevronsUpDown;
                       const sortable = header.column.getCanSort() && canSort(header.column.id);
                       return (
                         <TH
                           key={header.id}
+                          data-awj-sticky-start={stickyStartColumn && headerIndex === 0 ? (selection ? '1' : '0') : undefined}
                           aria-sort={sorted === 'asc' ? 'ascending' : sorted === 'desc' ? 'descending' : 'none'}
                         >
                           {header.isPlaceholder ? null : sortable ? (
@@ -295,6 +332,7 @@ export function DataTable<T>({
                                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
                                 sorted && 'text-primary'
                               )}
+                              data-awj-sort={sorted || undefined}
                             >
                               {flexRender(header.column.columnDef.header, header.getContext())}
                               <SortIcon
@@ -320,7 +358,7 @@ export function DataTable<T>({
                   return (
                     <TR key={row.id} data-awj-selected={isSelected ? '' : undefined}>
                       {selection && rowId != null ? (
-                        <TD className="w-10">
+                        <TD className="w-10" data-awj-sticky-start={stickyStartColumn ? '0' : undefined}>
                           <input
                             type="checkbox"
                             className={checkboxClass}
@@ -330,8 +368,13 @@ export function DataTable<T>({
                           />
                         </TD>
                       ) : null}
-                      {row.getVisibleCells().map((cell) => (
-                        <TD key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</TD>
+                      {row.getVisibleCells().map((cell, cellIndex) => (
+                        <TD
+                          key={cell.id}
+                          data-awj-sticky-start={stickyStartColumn && cellIndex === 0 ? (selection ? '1' : '0') : undefined}
+                        >
+                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        </TD>
                       ))}
                     </TR>
                   );

@@ -78,6 +78,7 @@ export function ListToolbar({
   return (
     <section
       aria-label={t('searchAndFilter')}
+      data-awj-listbar=""
       className={cn('space-y-3 rounded border border-border bg-surface p-3 sm:p-4', className)}
     >
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -120,7 +121,7 @@ export function ListToolbar({
       ) : null}
 
       {filters.length > 0 || typeof resultCount === 'number' ? (
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3">
+        <div data-awj-listbar-meta="" className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3">
           <ActiveFilterChips filters={filters} onRemove={onRemoveFilter} onClear={onClearFilters} />
 
           {typeof resultCount === 'number' ? (

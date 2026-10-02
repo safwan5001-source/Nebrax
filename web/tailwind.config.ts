@@ -32,6 +32,7 @@ export default {
         band: 'var(--awj-surface-band, var(--surface))',
         sunken: 'var(--awj-surface-sunken, var(--background))',
         outcome: 'var(--awj-surface-outcome, var(--text))',
+        'brand-soft': 'var(--awj-brand-soft, var(--primary-soft))',
         hairline: 'var(--awj-border-hairline, var(--border))',
         strong: 'var(--awj-border-strong, var(--border))',
         control: 'var(--awj-border-control, var(--muted))',

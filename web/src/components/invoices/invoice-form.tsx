@@ -9,6 +9,9 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { FieldGrid, FieldSpan, FormActions, FormAlert, FormPage, FormSection } from '@/components/nebrax';
 import { InvoiceLineRow, LINE_GRID } from '@/components/invoices/invoice-line-row';
+import { LineGrid, LineGridHeader } from '@/components/workspace/line-grid';
+import { TotalsDock } from '@/components/workspace/totals-dock';
+import { useAwjUi3 } from '@/lib/use-awj-ui3';
 import { InvoiceTemplateSelector } from '@/components/invoices/invoice-template-selector';
 import { DocumentLanguageSelector } from '@/components/documents/document-language-selector';
 import { Input } from '@/components/ui/input';
@@ -649,6 +652,25 @@ export function InvoiceForm({ editId }: { editId?: string }) {
     </>
   );
 
+  const v3 = useAwjUi3();
+
+  // v3: نفس الأرقام التي يحسبها النموذج اليوم (subMinor…totalMinor) تُعرض في الـDock؛ لا حساب جديد.
+  const totalsDock = (
+    <TotalsDock
+      variant="editor"
+      ariaLabel={t('totals_region')}
+      detailLabel={t('totals_detail')}
+      cells={[
+        { key: 'subtotal', label: t('subtotal'), value: subMinor / 100 },
+        ...(discountMinor > 0 ? [{ key: 'discount', label: t('discount'), value: -(discountMinor / 100) }] : []),
+        ...(shippingMinor > 0 ? [{ key: 'shipping', label: t('shipping'), value: shippingMinor / 100 }] : []),
+        { key: 'tax', label: t('tax_total'), value: taxMinor / 100 },
+        ...(adjustmentMinor !== 0 ? [{ key: 'adjustment', label: t('adjustment'), value: adjustmentMinor / 100 }] : []),
+      ]}
+      outcome={{ label: t('total'), value: totalMinor / 100 }}
+    />
+  );
+
   const summaryRow = (label: string, value: string, tone?: 'positive' | 'muted') => (
     <div className="flex items-baseline justify-between gap-3 text-sm">
       <span className="text-muted">{label}</span>
@@ -757,8 +779,9 @@ export function InvoiceForm({ editId }: { editId?: string }) {
         }
         contentClassName="space-y-2"
       >
+        <LineGrid onAddLine={addLine} className="space-y-2">
         {/* رأس الأعمدة للصفّ الكثيف وحده — دونه لكل حقلٍ تسميتُه. */}
-        <div className={cn('hidden gap-2 px-1 text-[11px] font-medium text-muted lg:grid', LINE_GRID)}>
+        <LineGridHeader className={cn('hidden gap-2 px-1 text-[11px] font-medium text-muted lg:grid', LINE_GRID)}>
           <div>{t('item')}</div>
           <div>{t('description')}</div>
           <div className="text-end">{t('price')}</div>
@@ -767,7 +790,7 @@ export function InvoiceForm({ editId }: { editId?: string }) {
           <div className="text-end">{t('tax')}</div>
           <div className="text-end">{t('total_with_vat')}</div>
           <div />
-        </div>
+        </LineGridHeader>
 
         {lines.map((l) => {
           const [net, lineTax] = lineNetTax(l);
@@ -799,6 +822,7 @@ export function InvoiceForm({ editId }: { editId?: string }) {
             />
           );
         })}
+        </LineGrid>
 
         <p className="pt-1 text-xs leading-relaxed text-muted">{t('items_hint')}</p>
         {missingQty && (
@@ -854,6 +878,7 @@ export function InvoiceForm({ editId }: { editId?: string }) {
           في تدفّق القراءة تحت التسويات التي تصنعها مباشرة، لا في عمودٍ جانبي:
           العمود الجانبي كان يقتطع من عرض البنود — وهي منطقة العمل الأولى — نحو
           ٣٠٠px عند كل مقاس، فيضيق صفّها الكثيف حتى تُقصّ أرقامه. */}
+      {!v3 ? (
       <Card>
         <CardContent className="grid gap-x-8 gap-y-2 p-4 sm:grid-cols-2">
           <div className="space-y-2">
@@ -872,6 +897,7 @@ export function InvoiceForm({ editId }: { editId?: string }) {
           </div>
         </CardContent>
       </Card>
+      ) : null}
 
       {/* ═══ ٥. السداد — الخانة هي البوّابة ═══ */}
       <FormSection title={t('payment_section')} icon={Wallet}>
@@ -983,6 +1009,8 @@ export function InvoiceForm({ editId }: { editId?: string }) {
           placeholder={t('notes')}
         />
       </FormSection>
+
+      {v3 ? totalsDock : null}
 
       {error && <FormAlert>{error}</FormAlert>}
     </FormPage>

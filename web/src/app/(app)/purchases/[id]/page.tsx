@@ -22,8 +22,19 @@ import type { Party, DocLine } from '@/components/documents/tax-document';
 import { PurchaseDocument } from '@/components/purchases/purchase-document';
 import { CreateReturnDialog } from '@/components/returns/create-return-dialog';
 import { RevisionLog } from '@/components/documents/revision-log';
-import { api, ApiError, downloadFile, fetchImageUrl } from '@/lib/api';
+import { api, ApiError, downloadFile, fetchImageUrl, hasApiStatus } from '@/lib/api';
 import { formatRiyal } from '@/lib/money';
+import { useAwjUi3 } from '@/lib/use-awj-ui3';
+import { Money } from '@/components/ui/money';
+import type { PageAction } from '@/components/nebrax/action-group';
+import {
+  DocumentCommandBar, DocumentContext, DocumentHeader, DocumentWorkspace, WorkspaceTabs, type WorkspaceTab,
+} from '@/components/workspace/document-workspace';
+import { LifecycleRail } from '@/components/workspace/lifecycle-rail';
+import { PURCHASE_LIFECYCLE } from '@/components/workspace/lifecycle';
+import { LineGridView, type LineGridColumn } from '@/components/workspace/line-grid';
+import { PostedEntries } from '@/components/workspace/posted-entries';
+import { TotalsDock, type DockCell } from '@/components/workspace/totals-dock';
 import { useCompany } from '@/lib/company';
 import { exportXlsx } from '@/lib/xlsx';
 import { DocumentScaler } from '@/modules/documents/components/document-scaler';
@@ -183,6 +194,10 @@ export default function PurchaseDetailPage() {
   const [signatureUrl, setSignatureUrl] = useState<string | null>(null);
   const [attachmentUrls, setAttachmentUrls] = useState<Record<string, string>>({});
   const [duplicating, setDuplicating] = useState(false);
+  const v3 = useAwjUi3();
+  const [wsTab, setWsTab] = useState('items');
+  const [accountingForbidden, setAccountingForbidden] = useState(false);
+  const [relationsFailed, setRelationsFailed] = useState(false);
 
   const isDraft = purchase?.status === 'draft';
   const isPosted = purchase?.status === 'posted';
@@ -216,6 +231,12 @@ export default function PurchaseDetailPage() {
         if (inventoryRelations.status === 'fulfilled') setInventoryMovements(inventoryRelations.value.data);
         if (accountingRelations.status === 'fulfilled') setAccounting(accountingRelations.value.data);
         setRelationsUnavailable(paymentRelations.status === 'rejected' || inventoryRelations.status === 'rejected' || accountingRelations.status === 'rejected');
+        // v3: صلاحية القيود قرار الخادم — 403 يُخفي التبويب كلياً، وأي فشل آخر يُعلَن.
+        setAccountingForbidden(accountingRelations.status === 'rejected' && hasApiStatus(accountingRelations.reason, 403));
+        setRelationsFailed(
+          paymentRelations.status === 'rejected' || inventoryRelations.status === 'rejected'
+          || (accountingRelations.status === 'rejected' && !hasApiStatus(accountingRelations.reason, 403)),
+        );
         setRelationsLoading(false);
 
         const frozen = response.data.print_template_revision?.definition;
@@ -338,10 +359,19 @@ export default function PurchaseDetailPage() {
   const relationContent = relationSection === 'payments' ? paymentsContent : relationSection === 'inventory' ? inventoryContent : relationSection === 'accounting' ? accountingContent : null;
   const toggleRelationSection = (section: RelationSection) => setRelationSection((current) => current === section ? null : section);
 
+  // v3: لوحة «المستند» تبقى مركَّبة لكنها مخفية على الشاشة حين لا تكون نشطة؛ التصدير
+  // يقرأ العنصر من DOM فيجب إظهارها أولاً. بلا بوابة v3 لا يتغيّر شيء.
+  async function revealDocument() {
+    if (!v3 || wsTab === 'document') return;
+    setWsTab('document');
+    await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+  }
+
   async function handleDownloadPdf() {
     if (!purchase) return;
     setBusy('pdf');
     try {
+      await revealDocument();
       const element = document.getElementById('print-root');
       if (!element) throw new Error('Purchase template is unavailable');
       await documentExporter.download({ element, fileName: purchase.number, paper });
@@ -357,6 +387,7 @@ export default function PurchaseDetailPage() {
     if (!purchase) return;
     setBusy('share');
     try {
+      await revealDocument();
       const element = document.getElementById('print-root');
       if (!element) throw new Error('Purchase template is unavailable');
       const result = await documentExporter.share({ element, fileName: purchase.number, title: purchase.number, paper });
@@ -436,10 +467,224 @@ export default function PurchaseDetailPage() {
     {isDraft && <DropdownItem icon={Trash2} tone="danger" disabled={!canDeleteDraft} onClick={() => setPendingAction('delete')}>{tp('delete')}</DropdownItem>}
   </>;
 
+  const purchaseDocumentEl = <PurchaseDocument purchase={purchase} company={company} supplier={supplier} templateId={templateId} themeId={themeId} footerText={footerText} terms={termsText} bank={bankText} stampUrl={stampUrl} signatureUrl={signatureUrl} showLogo={showLogo} logoHeight={logoHeight} layout={layout} />;
+
   const documentPreview = <Card>
     <CardHeader className="no-print p-0"><button type="button" onClick={() => setDocumentOpen((value) => !value)} aria-expanded={documentOpen} aria-controls="purchase-document-content" className="flex w-full items-center justify-between gap-3 px-5 py-4 text-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40"><CardTitle>{t('document')}</CardTitle><ChevronDown className={`h-4 w-4 shrink-0 text-muted transition-transform ${documentOpen ? 'rotate-180 text-primary' : ''}`} strokeWidth={2} /></button></CardHeader>
-    <CardContent id="purchase-document-content" className={documentOpen ? 'print:p-0' : 'hidden print:block print:p-0'}><div className="rounded border border-border bg-background p-3 print:border-0 print:bg-transparent print:p-0"><DocumentScaler><PurchaseDocument purchase={purchase} company={company} supplier={supplier} templateId={templateId} themeId={themeId} footerText={footerText} terms={termsText} bank={bankText} stampUrl={stampUrl} signatureUrl={signatureUrl} showLogo={showLogo} logoHeight={logoHeight} layout={layout} /></DocumentScaler></div></CardContent>
+    <CardContent id="purchase-document-content" className={documentOpen ? 'print:p-0' : 'hidden print:block print:p-0'}><div className="rounded border border-border bg-background p-3 print:border-0 print:bg-transparent print:p-0"><DocumentScaler>{purchaseDocumentEl}</DocumentScaler></div></CardContent>
   </Card>;
+
+  const printOutputs = <>
+    {frozenThermalDefinition && thermalPaper && thermalTemplateId && <PurchaseDocument purchase={purchase} company={company} supplier={supplier} templateId={thermalTemplateId} themeId={frozenThermalDefinition.theme_id ?? null} footerText={frozenThermalDefinition.footer_text ?? null} terms={frozenThermalDefinition.terms_text ?? null} bank={frozenThermalDefinition.bank_text ?? null} stampUrl={frozenThermalDefinition.stamp ?? null} signatureUrl={frozenThermalDefinition.signature ?? null} showLogo={frozenThermalDefinition.show_logo !== false} logoUrl={frozenThermalDefinition.logo ?? null} logoHeight={frozenThermalDefinition.logo_height ?? null} layout={Array.isArray(frozenThermalDefinition.layout) && frozenThermalDefinition.layout.length ? frozenThermalDefinition.layout : null} rootId="thermal-print-root" />}
+  </>;
+
+  const dialogs = <>
+    <CreateReturnDialog open={returnOpen} onClose={() => setReturnOpen(false)} onCreated={() => { setReturnOpen(false); load(); }} fixedType="purchase" initialPurchase={{ id: purchase.id, partnerId: purchase.partner_id }} />
+    <Dialog open={pendingAction !== null} onClose={() => (actioning ? null : setPendingAction(null))} title={pendingAction === 'post' ? t('post') : tp('delete_title')}><p className="text-sm text-text">{pendingAction === 'post' ? t('post_confirm') : <>{tp('delete_confirm')} <span className="num font-medium">{purchase.number}</span>؟</>}</p><div className="mt-4 flex justify-end gap-2"><Button variant="outline" onClick={() => setPendingAction(null)} disabled={actioning}>{tp('cancel')}</Button><Button variant={pendingAction === 'delete' ? 'danger' : 'primary'} onClick={confirmAction} disabled={actioning}>{pendingAction === 'post' ? t('post') : tp('delete')}</Button></div></Dialog>
+  </>;
+
+  const attachmentsBody = <div className="p-4">{purchase.attachments.length === 0 ? <p className="text-sm text-muted">{t('no_attachments')}</p> : <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">{purchase.attachments.map((attachment) => { const previewUrl = attachmentUrls[attachment.id]; return <article key={attachment.id} className="overflow-hidden rounded border border-border bg-background"><button type="button" className="block w-full bg-muted/30 text-start" onClick={() => previewUrl && window.open(previewUrl, '_blank', 'noopener,noreferrer')} disabled={!previewUrl} aria-label={attachment.original_name}>{previewUrl ? <img src={previewUrl} alt={attachment.original_name} className="h-40 w-full object-contain" /> : <div className="flex h-40 items-center justify-center"><FileText className="h-10 w-10 text-muted" strokeWidth={1.5} /></div>}</button><div className="flex items-center justify-between gap-2 border-t border-border p-3"><span className="min-w-0 truncate text-sm text-text" title={attachment.original_name}>{attachment.original_name}</span><Button variant="outline" size="sm" onClick={() => downloadFile(`/purchases/${id}/attachments/${attachment.id}/download`, attachment.original_name).catch((error) => errorToast(error instanceof ApiError ? error.message : t('action_failed')))}><Download className="h-4 w-4" strokeWidth={1.7} />{t('download_attachment')}</Button></div></article>; })}</div>}</div>;
+
+  if (v3) {
+    const lineColumns: LineGridColumn<DocLine>[] = [
+      { id: 'n', header: '#', className: 'w-10', cell: (_line, index) => <span className="num text-secondary">{index + 1}</span> },
+      { id: 'item', header: t('ws_item'), cell: (line) => <div className="max-w-[28rem] truncate font-medium text-primary-ink" title={line.description ?? undefined}>{line.description ?? '—'}</div> },
+      { id: 'qty', header: t('qty'), align: 'end', cell: (line) => <span className="num">{line.quantity}</span> },
+      { id: 'price', header: t('unit_price'), align: 'end', priority: 'p2', cell: (line) => <Money value={line.unit_price} /> },
+      ...(purchase.lines.some((line) => line.line_discount != null && Number(line.line_discount) !== 0)
+        ? [{ id: 'discount', header: t('discount'), align: 'end' as const, priority: 'p3' as const, cell: (line: DocLine) => <Money value={line.line_discount} /> }]
+        : []),
+      { id: 'tax', header: t('tax'), align: 'end', priority: 'p3', cell: (line) => <Money value={line.line_tax} /> },
+      { id: 'total', header: t('ws_line_total'), align: 'end', derived: true, cell: (line) => <Money value={line.line_total} className="font-semibold" /> },
+    ];
+    const paymentColumns: LineGridColumn<PurchasePayment>[] = [
+      { id: 'number', header: t('payment_number'), cell: (payment) => <Link href={`/payments/${payment.id}`} className="num font-medium text-primary hover:underline">{payment.number}</Link> },
+      { id: 'date', header: t('payment_date'), priority: 'p2', cell: (payment) => <span className="num">{payment.payment_date ?? '—'}</span> },
+      { id: 'method', header: t('payment_method'), priority: 'p2', cell: (payment) => paymentMethod(payment.method) },
+      { id: 'amount', header: t('voucher_amount'), align: 'end', cell: (payment) => <Money value={payment.amount} /> },
+      { id: 'allocated', header: t('allocated_amount'), align: 'end', cell: (payment) => <Money value={payment.allocated_amount} className="font-semibold" /> },
+      { id: 'status', header: t('status'), cell: (payment) => <Badge tone={statusTone[payment.status] ?? 'muted'}>{ts(payment.status)}</Badge> },
+    ];
+    const inventoryColumns: LineGridColumn<PurchaseInventoryMovement>[] = [
+      {
+        id: 'product', header: t('inventory_product'),
+        cell: (movement) => (
+          <div className="min-w-0">
+            <div className="truncate font-medium text-primary-ink">{movement.product?.name ?? '—'}</div>
+            {movement.product?.sku ? <div className="num truncate text-xs text-secondary">{movement.product.sku}</div> : null}
+          </div>
+        ),
+      },
+      { id: 'warehouse', header: t('inventory_warehouse'), priority: 'p2', cell: (movement) => (movement.warehouse ? `${movement.warehouse.code} · ${movement.warehouse.name}` : '—') },
+      { id: 'date', header: t('inventory_date'), priority: 'p2', cell: (movement) => <span className="num">{movement.movement_date ?? '—'}</span> },
+      {
+        id: 'direction', header: t('inventory_direction'),
+        cell: (movement) => (
+          <Badge tone={movement.type === 'out' ? 'warning' : movement.type === 'in' ? 'positive' : 'muted'}>
+            {movement.type === 'out' ? t('inventory_out') : movement.type === 'in' ? t('inventory_in') : t('inventory_adjustment')}
+          </Badge>
+        ),
+      },
+      { id: 'qty', header: t('qty'), align: 'end', cell: (movement) => <span className="num">{movement.quantity}</span> },
+      { id: 'unit', header: t('inventory_unit_cost'), align: 'end', priority: 'p3', cell: (movement) => <Money value={movement.unit_cost} /> },
+      { id: 'total', header: t('inventory_total_cost'), align: 'end', priority: 'p3', cell: (movement) => <Money value={movement.total_cost} /> },
+      { id: 'balance', header: t('inventory_balance'), align: 'end', cell: (movement) => <span className="num font-medium">{movement.balance_quantity}</span> },
+    ];
+    const loadingBlock = <div className="space-y-3 p-4"><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /></div>;
+    const nonZero = (value: string | null | undefined) => value != null && Number.isFinite(Number(value)) && Number(value) !== 0;
+
+    const dockCells: DockCell[] = [
+      { key: 'subtotal', label: t('subtotal'), value: purchase.subtotal },
+      ...(nonZero(purchase.discount) ? [{ key: 'discount', label: t('discount'), value: purchase.discount }] : []),
+      ...(nonZero(purchase.shipping) ? [{ key: 'shipping', label: t('shipping'), value: purchase.shipping }] : []),
+      { key: 'tax', label: t('tax_amount'), value: purchase.tax_amount },
+      ...(nonZero(purchase.adjustment) ? [{ key: 'adjustment', label: t('adjustment'), value: purchase.adjustment }] : []),
+      ...(isPosted ? [{ key: 'paid', label: t('ws_paid_cell'), value: purchase.paid_amount }] : []),
+    ];
+
+    const wsTabs: WorkspaceTab[] = [
+      {
+        id: 'items',
+        label: t('ws_tab_items'),
+        count: purchase.lines.length,
+        content: (
+          <LineGridView
+            columns={lineColumns}
+            rows={purchase.lines}
+            getKey={(line) => line.id}
+            ariaLabel={t('ws_lines_label')}
+            emptyLabel={t('ws_no_lines')}
+            footerNote={t('ws_derived_note')}
+            mobileRow={(line) => (
+              <div className="flex items-baseline justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-medium text-primary-ink">{line.description ?? '—'}</div>
+                  <div className="num text-xs text-secondary">{line.quantity} × <Money value={line.unit_price} /></div>
+                </div>
+                <Money value={line.line_total} className="shrink-0 font-semibold" />
+              </div>
+            )}
+          />
+        ),
+      },
+      {
+        id: 'document',
+        label: t('document'),
+        keepMounted: true,
+        content: (
+          <div className="rounded-surface bg-sunken p-3 print:bg-transparent print:p-0">
+            <DocumentScaler>{purchaseDocumentEl}</DocumentScaler>
+          </div>
+        ),
+      },
+      {
+        id: 'payments',
+        label: t('payments'),
+        count: relationsLoading ? undefined : payments.length,
+        content: relationsLoading ? loadingBlock : (
+          <LineGridView columns={paymentColumns} rows={payments} getKey={(payment) => payment.id} ariaLabel={t('payments')} emptyLabel={t('no_payments')} />
+        ),
+      },
+      {
+        id: 'entries',
+        label: t('accounting'),
+        hidden: isDraft || accountingForbidden,
+        content: relationsLoading ? loadingBlock : (
+          <PostedEntries
+            groups={[{ key: 'purchase', title: t('purchase_entry'), entry: accounting?.purchase_entry ?? null, empty: t('no_purchase_entry') }]}
+            labels={{
+              entryNumber: t('entry_number'), entryDate: t('entry_date'), description: t('description'), account: t('account'),
+              debit: t('debit'), credit: t('credit_amount'), openEntry: t('ws_open_entry'), readOnly: t('ws_read_only'),
+            }}
+            statusLabel={(status) => ts(status)}
+            statusTone={(status) => statusTone[status] ?? 'muted'}
+          />
+        ),
+      },
+      {
+        id: 'inventory',
+        label: t('inventory_movements'),
+        count: relationsLoading ? undefined : inventoryMovements.length,
+        content: relationsLoading ? loadingBlock : (
+          <LineGridView columns={inventoryColumns} rows={inventoryMovements} getKey={(movement) => movement.id} ariaLabel={t('inventory_movements')} emptyLabel={t('no_inventory_movements')} />
+        ),
+      },
+      { id: 'attachments', label: t('attachments'), count: purchase.attachments.length, content: attachmentsBody },
+    ];
+
+    const wsActions: PageAction[] = [
+      ...(isDraft ? [{ key: 'edit', label: tp('edit'), icon: Pencil, href: `/purchases/${purchase.id}/edit`, variant: 'outline' as const, emphasis: 'secondary' as const }] : []),
+      { key: 'print', label: t('print'), icon: Printer, onClick: () => { void revealDocument().then(() => printDocument(paper, 'print-root')); }, variant: 'outline', emphasis: 'secondary' },
+      { key: 'pdf', label: busy === 'pdf' ? t('generating') : t('download_pdf'), icon: Download, onClick: handleDownloadPdf, variant: 'outline', emphasis: 'secondary' },
+      { key: 'share', label: t('share'), icon: Share2, onClick: handleSharePdf, variant: 'outline', emphasis: 'secondary' },
+      { key: 'excel', label: t('excel'), icon: FileSpreadsheet, onClick: handleExcel, variant: 'outline', emphasis: 'secondary' },
+      ...(isPosted ? [{ key: 'return', label: t('create_return'), icon: RotateCcw, onClick: () => setReturnOpen(true), variant: 'outline' as const, emphasis: 'secondary' as const }] : []),
+      { key: 'duplicate', label: duplicating ? t('duplicating') : t('duplicate'), icon: Copy, onClick: handleDuplicate, disabled: duplicating, variant: 'outline', emphasis: 'secondary' },
+      ...(frozenThermalDefinition && thermalPaper && thermalTemplateId ? [{ key: 'thermal', label: tPrint('thermal_print'), icon: Printer, onClick: () => printDocument(thermalPaper, 'thermal-print-root'), variant: 'outline' as const, emphasis: 'secondary' as const }] : []),
+      ...(isDraft ? [{ key: 'delete', label: tp('delete'), icon: Trash2, onClick: () => setPendingAction('delete'), disabled: !canDeleteDraft, variant: 'danger' as const, emphasis: 'secondary' as const }] : []),
+      ...(isDraft ? [{ key: 'post', label: t('post'), icon: CheckCircle2, onClick: () => setPendingAction('post'), disabled: actioning, variant: 'primary' as const, emphasis: 'primary' as const }] : []),
+      ...(canPay ? [{ key: 'pay', label: t('add_payment'), icon: RotateCcw, href: `/purchases/${purchase.id}/payments/new`, variant: 'primary' as const, emphasis: 'primary' as const }] : []),
+    ];
+
+    return (
+      <DocumentWorkspace>
+        <DocumentHeader
+          backHref="/purchases"
+          backLabel={t('back')}
+          number={purchase.number}
+          typeLabel={t('ws_type_purchase')}
+          badges={<Badge tone={receivedStatusKey === 'full' ? 'positive' : receivedStatusKey === 'partial' ? 'warning' : 'muted'}>{receivedStatusLabel}</Badge>}
+          note={isDraft && purchase.document_linked ? t('document_linked_locked') : isPosted ? t('ws_posted_note') : undefined}
+        />
+        <DocumentCommandBar
+          toolbarLabel={t('ws_toolbar')}
+          state={
+            <LifecycleRail
+              definition={PURCHASE_LIFECYCLE}
+              status={purchase.status}
+              paymentStatus={purchase.payment_status}
+              stateLabel={(state) => ts(state)}
+              documentAriaLabel={t('ws_lifecycle_document')}
+              paymentAriaLabel={t('ws_lifecycle_payment')}
+            />
+          }
+          actions={wsActions}
+        />
+        {relationsFailed && <p className="rounded-surface border border-hairline bg-band px-3 py-2 text-sm text-primary-ink">{t('relations_unavailable')}</p>}
+        <DocumentContext
+          party={
+            <div>
+              <p className="text-xs text-secondary">{tp('supplier')}</p>
+              <p className="mt-0.5 text-base font-semibold text-primary-ink">
+                {supplier ? <Link href={`/partners/${purchase.partner_id}`} className="hover:underline">{supplierName}</Link> : supplierName}
+              </p>
+            </div>
+          }
+          facts={[
+            { label: t('date'), value: <span className="num">{purchase.purchase_date}</span> },
+            { label: t('due_date'), value: <span className="num">{purchase.due_date ?? '—'}</span> },
+            { label: t('payment_type'), value: purchase.payment_type === 'cash' ? t('cash') : t('credit') },
+            { label: tp('supplier_invoice_no'), value: <span className="num">{purchase.supplier_invoice_no ?? '—'}</span> },
+            { label: tpf('received_date'), value: <span className="num">{purchase.received_date ?? '—'}</span> },
+          ]}
+        />
+        <WorkspaceTabs tabs={wsTabs} value={wsTab} onChange={setWsTab} />
+        <section aria-label={t('activity')} className="mt-3"><RevisionLog type="purchase" id={id} collapsible defaultOpen={false} /></section>
+        {printOutputs}
+        <TotalsDock
+          ariaLabel={t('ws_totals')}
+          cells={dockCells}
+          detailLabel={t('ws_totals_detail')}
+          outcome={{
+            label: t('ws_totals_outcome_purchase'),
+            value: purchase.total,
+            note: isPosted ? <>{t('ws_remaining_line')} <Money value={purchase.remaining} /></> : undefined,
+          }}
+        />
+        {dialogs}
+      </DocumentWorkspace>
+    );
+  }
 
   return <div className="space-y-5">
     <header className="space-y-4">
@@ -458,11 +703,10 @@ export default function PurchaseDetailPage() {
 
     <section aria-label={t('relations')}>{relationsUnavailable && <p className="mb-3 rounded border border-border bg-muted/40 px-3 py-2 text-sm text-text">{t('relations_unavailable')}</p>}<Card className="hidden lg:block"><CardHeader><CardTitle>{t('relations')}</CardTitle></CardHeader><Tabs tabs={relationTabs} value={relationSection} onChange={(value) => setRelationSection(value as RelationSection)} />{relationSection && <CardContent className="p-0"><TabPanel id={relationSection}>{relationContent}</TabPanel></CardContent>}</Card><div className="lg:hidden"><Accordion><AccordionItem id="payments" title={t('payments')} count={relationsLoading ? undefined : payments.length} open={relationSection === 'payments'} onToggle={() => toggleRelationSection('payments')}>{paymentsContent}</AccordionItem><AccordionItem id="inventory" title={t('inventory_movements')} count={relationsLoading ? undefined : inventoryMovements.length} open={relationSection === 'inventory'} onToggle={() => toggleRelationSection('inventory')}>{inventoryContent}</AccordionItem><AccordionItem id="accounting" title={t('accounting')} open={relationSection === 'accounting'} onToggle={() => toggleRelationSection('accounting')}>{accountingContent}</AccordionItem></Accordion></div></section>
 
-    {frozenThermalDefinition && thermalPaper && thermalTemplateId && <PurchaseDocument purchase={purchase} company={company} supplier={supplier} templateId={thermalTemplateId} themeId={frozenThermalDefinition.theme_id ?? null} footerText={frozenThermalDefinition.footer_text ?? null} terms={frozenThermalDefinition.terms_text ?? null} bank={frozenThermalDefinition.bank_text ?? null} stampUrl={frozenThermalDefinition.stamp ?? null} signatureUrl={frozenThermalDefinition.signature ?? null} showLogo={frozenThermalDefinition.show_logo !== false} logoUrl={frozenThermalDefinition.logo ?? null} logoHeight={frozenThermalDefinition.logo_height ?? null} layout={Array.isArray(frozenThermalDefinition.layout) && frozenThermalDefinition.layout.length ? frozenThermalDefinition.layout : null} rootId="thermal-print-root" />}
+    {printOutputs}
 
     <section aria-label={t('activity')}><RevisionLog type="purchase" id={id} collapsible defaultOpen={false} /></section>
 
-    <CreateReturnDialog open={returnOpen} onClose={() => setReturnOpen(false)} onCreated={() => { setReturnOpen(false); load(); }} fixedType="purchase" initialPurchase={{ id: purchase.id, partnerId: purchase.partner_id }} />
-    <Dialog open={pendingAction !== null} onClose={() => (actioning ? null : setPendingAction(null))} title={pendingAction === 'post' ? t('post') : tp('delete_title')}><p className="text-sm text-text">{pendingAction === 'post' ? t('post_confirm') : <>{tp('delete_confirm')} <span className="num font-medium">{purchase.number}</span>؟</>}</p><div className="mt-4 flex justify-end gap-2"><Button variant="outline" onClick={() => setPendingAction(null)} disabled={actioning}>{tp('cancel')}</Button><Button variant={pendingAction === 'delete' ? 'danger' : 'primary'} onClick={confirmAction} disabled={actioning}>{pendingAction === 'post' ? t('post') : tp('delete')}</Button></div></Dialog>
+    {dialogs}
   </div>;
 }

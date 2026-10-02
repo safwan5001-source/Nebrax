@@ -362,6 +362,7 @@ export default function ProductsPage() {
         }}
         columnVisibility={columnVisibility}
         stickyHeader
+        stickyStartColumn
         mobileRecord={(product) => ({
           title: (
             <Link href={`/products/${product.id}`} className="text-primary hover:underline">

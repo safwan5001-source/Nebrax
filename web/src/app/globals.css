@@ -52,6 +52,21 @@
  * and remain the active source for every screen outside the (app) route group.
  */
 /* AWJ-TOKENS:GENERATED:BEGIN — do not hand-edit, see design-system/tokens/awj.tokens.json */
+html[data-awj-ui="3"] {
+  --awj-outcome-fg: #F2F6FD;
+  --awj-outcome-label: #C5D1E8;
+  --awj-outcome-decimal: #A9B8D3;
+  --awj-outcome-rule: #7FA8FF;
+  --awj-outcome-positive: #7FD1A0;
+  --awj-grid-row-1l: 36px;
+  --awj-grid-row-2l: 44px;
+  --awj-grid-head-h: 34px;
+  --awj-grid-cell-px: 10px;
+  --awj-dock-h: 68px;
+  --awj-dock-outcome-fs: 28px;
+  --awj-cmdbar-h: 46px;
+}
+
 html[data-awj-ui="3"]:not(.dark) {
   --awj-surface-desk: #E9E8E4;
   --awj-surface-paper: #FFFFFF;
@@ -140,6 +155,18 @@ html[data-awj-ui="3"][data-awj-theme="ink"]:not(.dark) {
   --awj-shell-field-line: #5A74A8;
   --awj-shell-focus-ring: #7FA8FF;
   --awj-shell-brandmark-bg: #2D5BDB;
+}
+
+@media (max-height: 740px) {
+  html[data-awj-ui="3"] {
+      --awj-grid-row-1l: 32px;
+      --awj-grid-row-2l: 38px;
+      --awj-grid-head-h: 30px;
+      --awj-grid-cell-px: 8px;
+      --awj-dock-h: 56px;
+      --awj-dock-outcome-fs: 22px;
+      --awj-cmdbar-h: 42px;
+  }
 }
 
 html[data-awj-ui="3"].dark {
@@ -365,6 +392,371 @@ html[data-awj-ui="3"] [data-awj-surface="outcome"] [data-awj-money-decimal] {
 }
 html[data-awj-ui="3"] [data-awj-money-negative] {
   color: var(--awj-status-negative-fg);
+}
+
+/* ------------------------------------------------------------------------------
+ * H2 — Data grid (DataTable + shared table primitives). One grammar for every list:
+ * the Band header, dense rows from the density tokens, hover/selected/focus states
+ * with Apex on the selected row, sticky header, sticky start column, bulk-action bar.
+ * Everything keys off inert data-awj-* attributes added by ui/table.tsx and
+ * data-table.tsx — gate-off the attributes do nothing.
+ * ---------------------------------------------------------------------------- */
+html[data-awj-ui="3"] [data-awj-grid] {
+  border-color: var(--awj-border-hairline);
+  border-radius: var(--awj-radius-surface);
+}
+html[data-awj-ui="3"] [data-awj-grid-head] {
+  background-color: var(--awj-surface-sunken);
+  border-bottom: 1px solid var(--awj-border-strong);
+  color: var(--awj-text-secondary);
+}
+html[data-awj-ui="3"] [data-awj-th] {
+  height: var(--awj-grid-head-h);
+  padding-block: 0;
+  padding-inline: var(--awj-grid-cell-px);
+  font-size: 12px;
+  font-weight: 600;
+}
+html[data-awj-ui="3"] [data-awj-td] {
+  height: var(--awj-grid-row-1l);
+  padding-block: 3px;
+  padding-inline: var(--awj-grid-cell-px);
+  vertical-align: middle;
+}
+html[data-awj-ui="3"] [data-awj-row] {
+  border-bottom-color: var(--awj-border-hairline);
+}
+/* the header row shares the TR primitive but is not an interactive row */
+html[data-awj-ui="3"] [data-awj-grid-head] [data-awj-row]:hover {
+  background-color: transparent;
+}
+html[data-awj-ui="3"] [data-awj-row]:focus-within:not([data-awj-selected]) {
+  background-color: var(--awj-state-hover);
+}
+/* Apex on a selected grid row: <tr> pseudo-elements are unreliable across engines,
+   so the rail lives on the row's first cell (full cell height, logical start edge). */
+html[data-awj-ui="3"] [data-awj-row][data-awj-selected] > :first-child {
+  position: relative;
+}
+html[data-awj-ui="3"] [data-awj-row][data-awj-selected] > :first-child::before {
+  content: '';
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  width: var(--awj-apex-rail);
+  background: var(--awj-action-primary);
+  pointer-events: none;
+}
+@media (forced-colors: active) {
+  html[data-awj-ui="3"] [data-awj-row][data-awj-selected] > :first-child {
+    border-inline-start: 3px solid Highlight;
+  }
+  html[data-awj-ui="3"] [data-awj-row][data-awj-selected] > :first-child::before {
+    background: none;
+  }
+}
+html[data-awj-ui="3"] [data-awj-grid-toolbar] {
+  background-color: var(--awj-surface-paper);
+  border-bottom-color: var(--awj-border-hairline);
+  padding: 8px 10px;
+}
+html[data-awj-ui="3"] [data-awj-grid-search] {
+  height: 32px;
+  padding-inline: 10px;
+  background-color: var(--awj-surface-paper);
+  border: 1px solid var(--awj-border-control);
+  border-radius: var(--awj-radius-control);
+}
+html[data-awj-ui="3"] [data-awj-bulkbar] {
+  position: relative;
+  background-color: var(--awj-state-selected);
+  border-bottom-color: var(--awj-state-selected-edge);
+  padding-inline-start: 16px;
+}
+html[data-awj-ui="3"] [data-awj-bulkbar]::before {
+  content: '';
+  position: absolute;
+  inset-block: 7px;
+  inset-inline-start: 0;
+  width: var(--awj-apex-rail);
+  border-radius: 0 2px 2px 0;
+  background: var(--awj-action-primary);
+}
+/* Sticky header: the scroll container becomes bounded so the header can stick inside it. */
+html[data-awj-ui="3"] [data-awj-grid-scroll][data-awj-sticky-head] {
+  max-height: calc(100dvh - 17rem);
+  overflow-y: auto;
+  scroll-padding-top: var(--awj-grid-head-h);
+}
+html[data-awj-ui="3"] [data-awj-sticky-head] [data-awj-grid-head] {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+/* Sticky identity column at the logical start edge (opaque so scrolled cells never show through). */
+html[data-awj-ui="3"] [data-awj-sticky-start] {
+  position: sticky;
+  z-index: 5;
+  background-color: var(--awj-surface-paper);
+  border-inline-end: 1px solid var(--awj-border-hairline);
+}
+html[data-awj-ui="3"] [data-awj-grid-head] [data-awj-sticky-start] {
+  background-color: var(--awj-surface-sunken);
+  z-index: 15;
+}
+html[data-awj-ui="3"] [data-awj-sticky-start="0"] { inset-inline-start: 0; }
+html[data-awj-ui="3"] [data-awj-sticky-start="1"] { inset-inline-start: 2.5rem; }
+html[data-awj-ui="3"] [data-awj-row]:hover > [data-awj-sticky-start],
+html[data-awj-ui="3"] [data-awj-row]:focus-within:not([data-awj-selected]) > [data-awj-sticky-start] {
+  background-color: var(--awj-state-hover);
+}
+html[data-awj-ui="3"] [data-awj-row][data-awj-selected] > [data-awj-sticky-start] {
+  background-color: var(--awj-state-selected);
+}
+html[data-awj-ui="3"] [data-awj-grid-head] [data-awj-row]:hover > [data-awj-sticky-start] {
+  background-color: var(--awj-surface-sunken);
+}
+/* List toolbar (search/sort/filters above a grid): tighter rhythm, hairline frame. */
+html[data-awj-ui="3"] [data-awj-listbar] {
+  padding: 10px 12px;
+  row-gap: 8px;
+  border-color: var(--awj-border-hairline);
+  border-radius: var(--awj-radius-surface);
+}
+html[data-awj-ui="3"] [data-awj-listbar-meta] {
+  padding-top: 8px;
+  border-top-color: var(--awj-border-hairline);
+}
+@media (max-height: 740px) {
+  html[data-awj-ui="3"] [data-awj-listbar] {
+    padding: 8px 10px;
+  }
+  html[data-awj-ui="3"] [data-awj-listbar-meta] {
+    padding-top: 4px;
+  }
+}
+/* Row actions: compact hit area so a dense 36px row stays 36px (touch posture keeps 44 via erp-touch). */
+html[data-awj-ui="3"] [data-awj-row-actions] > * {
+  height: 28px;
+  min-width: 28px;
+}
+
+/* ------------------------------------------------------------------------------
+ * H2 — Document Workspace, Totals Dock, LineGrid, Lifecycle rail, posted entries.
+ * Components live in components/workspace/*; they render only their markers.
+ * ---------------------------------------------------------------------------- */
+html[data-awj-ui="3"] [data-awj-docws] {
+  gap: 10px;
+}
+html[data-awj-ui="3"] [data-awj-docws-header] {
+  min-height: 36px;
+}
+html[data-awj-ui="3"] [data-awj-cmdbar] {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  min-height: var(--awj-cmdbar-h);
+  padding-block: 6px;
+  background-color: var(--awj-surface-desk);
+  border-bottom: 1px solid var(--awj-border-hairline);
+}
+html[data-awj-ui="3"] [data-awj-docws-context] {
+  background-color: var(--awj-surface-paper);
+  border: 1px solid var(--awj-border-hairline);
+  border-radius: var(--awj-radius-surface);
+  padding: 12px 16px;
+}
+html[data-awj-ui="3"] [data-awj-docws-tabs] {
+  background-color: var(--awj-surface-paper);
+  border: 1px solid var(--awj-border-hairline);
+  border-radius: var(--awj-radius-surface);
+}
+html[data-awj-ui="3"] [data-awj-docws-tabs] > [role="tablist"] {
+  background-color: var(--awj-surface-band);
+  border-bottom: 1px solid var(--awj-border-hairline);
+  border-start-start-radius: var(--awj-radius-surface);
+  border-start-end-radius: var(--awj-radius-surface);
+}
+html[data-awj-ui="3"] [data-awj-docws-tabs] [role="tabpanel"] {
+  scroll-margin-top: var(--awj-cmdbar-h);
+}
+/* A document page lets the WINDOW scroll (main stops being a scroll container) so the sticky
+   command bar and the dock pin to the viewport; main becomes a flex column so the workspace
+   fills the remaining height and the dock rests at the bottom of short documents. */
+html[data-awj-ui="3"] main:has(> [data-awj-docws]) {
+  display: flex;
+  flex-direction: column;
+}
+html[data-awj-ui="3"] main:has([data-awj-dock]) {
+  overflow-x: clip;
+  overflow-y: visible;
+}
+html[data-awj-ui="3"] [data-awj-docws] {
+  flex: 1 1 auto;
+}
+/* scroll-padding keeps a focused control clear of the sticky command bar and the dock */
+html[data-awj-ui="3"]:has([data-awj-dock]) {
+  scroll-padding-top: calc(var(--awj-cmdbar-h) + 8px);
+  scroll-padding-bottom: calc(var(--awj-dock-h) + 8px);
+}
+
+/* Lifecycle rail */
+html[data-awj-ui="3"] [data-awj-apex="step"]::before {
+  inset-block: 5px;
+}
+
+/* Totals Dock */
+html[data-awj-ui="3"] [data-awj-dock] {
+  position: sticky;
+  bottom: 0;
+  z-index: 25;
+  margin-top: auto;
+  min-height: var(--awj-dock-h);
+  background-color: var(--awj-surface-paper);
+  border: 1px solid var(--awj-border-strong);
+  border-radius: var(--awj-radius-surface) var(--awj-radius-surface) 0 0;
+  box-shadow: var(--awj-elevation-2);
+}
+@media (max-width: 1023px) {
+  html[data-awj-ui="3"] [data-awj-dock-editor] {
+    position: static;
+    border-radius: var(--awj-radius-surface);
+    margin-top: 0;
+  }
+}
+html[data-awj-ui="3"] [data-awj-dock-cell] {
+  padding-inline: 16px;
+  border-inline-end: 1px solid var(--awj-border-hairline);
+}
+html[data-awj-ui="3"] [data-awj-dock-cell] dt {
+  font-size: 12px;
+  color: var(--awj-text-secondary);
+}
+html[data-awj-ui="3"] [data-awj-dock-cell] dd {
+  font-size: 15px;
+  color: var(--awj-text-primary);
+}
+html[data-awj-ui="3"] [data-awj-dock-detail] {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--awj-action-primary);
+  min-height: 28px;
+}
+html[data-awj-ui="3"] [data-awj-dock-outcome] {
+  flex: none;
+  white-space: nowrap;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 13rem;
+  padding: 6px 20px;
+  background-color: var(--awj-surface-outcome);
+  color: var(--awj-outcome-fg);
+  border-radius: var(--awj-radius-control);
+  margin: 4px;
+}
+html[data-awj-ui="3"] [data-awj-dock-outcome-label] {
+  font-size: 12px;
+  color: var(--awj-outcome-label);
+}
+html[data-awj-ui="3"] [data-awj-dock-outcome-value] {
+  font-size: var(--awj-dock-outcome-fs);
+  font-weight: 600;
+  line-height: 1.15;
+  width: fit-content;
+  border-bottom: var(--awj-rule-ledger-on-outcome);
+}
+html[data-awj-ui="3"] [data-awj-dock-outcome-note] {
+  white-space: normal;
+  max-inline-size: 18rem;
+  font-size: 12px;
+  color: var(--awj-outcome-label);
+}
+html[data-awj-ui="3"] [data-awj-dock-outcome-note] a {
+  color: var(--awj-outcome-fg);
+  text-decoration: underline;
+}
+html[data-awj-ui="3"] [data-awj-dock-popover] {
+  position: absolute;
+  inset-inline-start: 8px;
+  bottom: calc(100% + 6px);
+  min-width: 18rem;
+  max-width: calc(100vw - 2rem);
+  background-color: var(--awj-surface-paper);
+  border: 1px solid var(--awj-border-strong);
+  border-radius: var(--awj-radius-surface);
+  box-shadow: var(--awj-elevation-3);
+  padding: 8px 12px;
+}
+html[data-awj-ui="3"] [data-awj-dock-popover] dl > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding-block: 5px;
+  border-bottom: 1px solid var(--awj-border-hairline);
+  font-size: 14px;
+}
+html[data-awj-ui="3"] [data-awj-dock-popover] dl > div:last-child {
+  border-bottom: 0;
+}
+html[data-awj-ui="3"] [data-awj-dock-popover] dt {
+  color: var(--awj-text-secondary);
+}
+
+/* LineGrid — read-only view (also used for posted-entry tables) */
+html[data-awj-ui="3"] [data-awj-linegrid-view] thead {
+  background-color: var(--awj-surface-sunken);
+  border-bottom: 1px solid var(--awj-border-strong);
+}
+html[data-awj-ui="3"] [data-awj-linegrid-view] th {
+  height: var(--awj-grid-head-h);
+  padding-inline: var(--awj-grid-cell-px);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--awj-text-secondary);
+  white-space: nowrap;
+}
+html[data-awj-ui="3"] [data-awj-linegrid-view] td {
+  height: var(--awj-grid-row-1l);
+  padding-block: 3px;
+  padding-inline: var(--awj-grid-cell-px);
+  border-bottom: 1px solid var(--awj-border-hairline);
+  vertical-align: middle;
+}
+html[data-awj-ui="3"] [data-awj-linegrid-view] tbody tr:last-child td {
+  border-bottom: 0;
+}
+html[data-awj-ui="3"] [data-awj-linegrid-view] tbody tr:hover td {
+  background-color: var(--awj-state-hover);
+}
+html[data-awj-ui="3"] [data-awj-linegrid-footer] {
+  background-color: var(--awj-surface-sunken);
+  border-top: 1px solid var(--awj-border-hairline);
+}
+
+/* LineGrid — editable layer: Band header, current-row state (Apex + edit edge), invalid row */
+html[data-awj-ui="3"] [data-awj-linegrid-head] {
+  background-color: var(--awj-surface-sunken);
+  border-block: 1px solid var(--awj-border-strong);
+  color: var(--awj-text-secondary);
+  font-weight: 600;
+  padding-block: 6px;
+}
+html[data-awj-ui="3"] [data-awj-linegrid-row] {
+  border-bottom: 1px solid var(--awj-border-hairline);
+}
+html[data-awj-ui="3"] [data-awj-linegrid-row]:focus-within {
+  background-color: var(--awj-surface-paper);
+  box-shadow: inset 0 1px 0 var(--awj-state-editing-edge), inset 0 -1px 0 var(--awj-state-editing-edge);
+}
+html[data-awj-ui="3"] [data-awj-linegrid-row]:focus-within::before {
+  opacity: 1;
+}
+html[data-awj-ui="3"] [data-awj-linegrid-row][data-awj-invalid]::before {
+  background: var(--awj-status-negative-fg);
+  opacity: 1;
 }
 
 /* CardTitle (FOUNDATIONS.md §4) — slightly stronger than muted body text, still
